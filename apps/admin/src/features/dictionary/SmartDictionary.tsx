@@ -1,4 +1,3 @@
-import { BatchPublicationModal } from "./BatchPublicationModal";
 import {
   DeleteOutlined,
   PlusOutlined,
@@ -96,7 +95,6 @@ import {
 import {
   ENTRY_WRITE_BLOCKED_HINT,
   canWriteEntry,
-  canPublishEntry,
   canTransitionEntry,
   entryWriteForbiddenMessage,
   isEntryOwnershipError,
@@ -222,8 +220,6 @@ export function SmartDictionary({
   const { filters, page, pageSize } = listSearch;
 
   // 服务端分页 + 筛选:三者共同构成列表查询,任何变化都触发重取。
-  const [publicationRows, setPublicationRows] =
-    useState<AdminWordListItemAny[]>();
   const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([]);
   const [selectedRecords, setSelectedRecords] = useState<
     Record<string, AdminWordListItemAny>
@@ -1192,25 +1188,6 @@ export function SmartDictionary({
           <Space wrap>
             {!trashMode && (
               <Button
-                disabled={
-                  selectedRows.length === 0 ||
-                  selectedRows.length !== selectedKeys.length ||
-                  selectedRows.length > 50 ||
-                  selectedRows.some(
-                    (row) =>
-                      row.status === "archived" ||
-                      !row.revision ||
-                      !row.lifecycle_revision ||
-                      !canPublishEntry(profile, row)
-                  )
-                }
-                onClick={() => setPublicationRows([...selectedRows])}
-              >
-                发布所选
-              </Button>
-            )}
-            {!trashMode && (
-              <Button
                 type="primary"
                 icon={<PlusOutlined />}
                 onClick={() => navigate("/words/new")}
@@ -1362,18 +1339,6 @@ export function SmartDictionary({
           }}
         />
       </Card>
-      {publicationRows && (
-        <BatchPublicationModal
-          rows={publicationRows}
-          onClose={() => setPublicationRows(undefined)}
-          onPublished={() => {
-            setPublicationRows(undefined);
-            setSelectedKeys([]);
-            setSelectedRecords({});
-            message.success("所选词条已全部发布");
-          }}
-        />
-      )}
     </Flex>
   );
 }
