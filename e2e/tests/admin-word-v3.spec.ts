@@ -368,9 +368,9 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     );
   });
 
-  test("E06 Mock 引用影响：草稿词性可删除，保留必要原形保护及引用跳转", async ({
+  test("E06 Mock 引用影响：被引用词形禁止删除，草稿词性可删除及引用跳转", async ({
     page
-  }) => {
+  }, testInfo) => {
     const api = await mockAdminV3Api(page, {
       formsFailureOnce: false,
       referencedByShared: true
@@ -378,15 +378,25 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
 
     const firstGroup = page.locator("[data-pos-id] .v3-form-group-card").nth(0);
-    // 引用只提示影响，不锁草稿编辑；本组唯一原形仍受结构性保护。
+    // 引用不锁英美规则编辑，但阻止删除词形。
     await expect(firstGroup.getByLabel("英美拼写有区别")).toBeEnabled();
     await expect(firstGroup.getByLabel("英美音标有区别")).toBeEnabled();
     await expect(
       firstGroup.getByLabel(/修改词形类型会让 \d+ 处引用漂移/)
     ).toBeVisible();
-    await expect(
-      firstGroup.getByRole("button", { name: "删除变化组 1 的词形 1" })
-    ).toBeDisabled();
+    const deleteForm = firstGroup.getByRole("button", {
+      name: "删除变化组 1 的词形 1"
+    });
+    await expect(deleteForm).toBeDisabled();
+    await deleteForm.locator("..").hover();
+    await expect(page.getByRole("tooltip")).toHaveText(
+      "存在 1 处关联，解除所有关联才能删除词形"
+    );
+    await page.screenshot({
+      path: testInfo.outputPath("task-67-delete-guard.png"),
+      fullPage: true
+    });
+    await page.getByRole("heading").first().hover();
     const deletePos = page.getByRole("button", { name: "删除名词" });
     await expect(deletePos).toBeEnabled();
     await deletePos.click();
