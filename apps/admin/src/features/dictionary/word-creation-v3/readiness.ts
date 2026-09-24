@@ -103,7 +103,9 @@ function uniqueIssues(issues: readonly V3DraftValidationIssue[]) {
   });
 }
 
-// 比较拼写和整组字典音标；英美共用等价于两侧填写相同内容。
+// 同类型内比较拼写和每条发音的全部音标；不同类型（如动名词/现在分词）分别计数。
+// 英美共用等价于两侧填写相同内容，原形可跨词性合并。
+// 原形的空音标也参与比较，但不把未填写拼写的占位条目合并。
 function formIdentity(form: WordConcreteFormV3): string {
   const variants =
     form.regional_variants.mode === "common"
@@ -113,26 +115,35 @@ function formIdentity(form: WordConcreteFormV3): string {
     variants.some(
       (variant) =>
         !variant.spelling.trim() ||
-        !variant.pronunciations.length ||
-        variant.pronunciations.some(
-          (pronunciation) => !pronunciation.dict_phonetic.trim()
-        )
+        (form.form_type !== "base" &&
+          (!variant.pronunciations.length ||
+            variant.pronunciations.some(
+              (pronunciation) => !pronunciation.dict_phonetic.trim()
+            )))
     )
   ) {
     return `unfilled:${form.id}`;
   }
-  return JSON.stringify(
+  return JSON.stringify([
+    form.form_type,
     variants.map((variant) => [
       variant.spelling.trim(),
       [
         ...new Set(
-          variant.pronunciations.map((pronunciation) =>
-            pronunciation.dict_phonetic.trim()
-          )
+          variant.pronunciations
+            .map((pronunciation) => [
+              pronunciation.dict_phonetic.trim(),
+              pronunciation.actual_pron.trim(),
+              pronunciation.synthesis?.ipa.trim() ?? "",
+              pronunciation.synthesis?.ups.trim() ?? ""
+            ])
+            // 尚无发音行与全部音标为空的发音行等价。
+            .filter((phonetics) => phonetics.some(Boolean))
+            .map((phonetics) => JSON.stringify(phonetics))
         )
       ].sort()
     ])
-  );
+  ]);
 }
 
 /** 窄屏「完成情况」入口上的计数，如 "2/7"。 */
@@ -306,7 +317,7 @@ export function buildV3ProductProgress({
       label: "词形变化",
       completed: allFormsComplete,
       count: allIdentities.size,
-      statusDescription: "包含原形；拼写和音标均相同的词形合并计数"
+      statusDescription: "包含原形；同类型、拼写和全部音标均相同的词形合并计数"
     },
     {
       key: "sense_groups",
