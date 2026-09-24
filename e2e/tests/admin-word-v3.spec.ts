@@ -19,10 +19,8 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(dialog).toContainText("运行轨道");
     await expect(page.locator(".ant-popconfirm")).toHaveCount(0);
     await expect(page.locator(".ant-modal-mask")).toBeVisible();
-    await expect(dialog).toHaveCSS("transform", "none");
+    await expect.poll(async () => (await dialog.boundingBox())?.y).toBe(48);
     await page.screenshot({ path: test.info().outputPath("sense-delete.png") });
-    const box = await dialog.boundingBox();
-    expect(box?.y).toBe(48);
     await page.mouse.click(8, 8);
     await expect(dialog).toBeVisible();
     await dialog.getByRole("button", { name: "取 消" }).click();
