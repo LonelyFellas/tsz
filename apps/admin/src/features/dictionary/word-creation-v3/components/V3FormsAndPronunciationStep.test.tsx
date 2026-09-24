@@ -330,6 +330,43 @@ describe("V3FormsAndPronunciationStep 被引用节点保护", () => {
     catalogState.pending = undefined;
   });
 
+  it.each([
+    ["loading", "正在加载关联信息，暂不能删除词形"],
+    ["unavailable", "关联信息暂不可用，请刷新后再删除词形"]
+  ] as const)(
+    "关联索引 %s 时禁止删除，加载完成后恢复",
+    async (status, reason) => {
+      const initial = multiPosFixture();
+      function Guarded({ index }: { index: V3ReferenceGuard["index"] }) {
+        return (
+          <V3ReferenceGuardProvider value={guardFor(index)}>
+            <Harness initial={initial} />
+          </V3ReferenceGuardProvider>
+        );
+      }
+      const loaded = buildReferenceIndex(inboundReferences([]));
+      const blocked = buildReferenceIndex(undefined, status);
+      const rendered = render(<Guarded index={blocked} />);
+      const deleteForm = await screen.findByLabelText("删除变化组 1 的词形 2");
+      expect(deleteForm).toBeDisabled();
+      await expectDisabledReason(deleteForm, reason);
+      fireEvent.click(deleteForm);
+      expect(openDeleteConfirm()).toBeNull();
+
+      rendered.rerender(<Guarded index={loaded} />);
+      const enabledDelete = screen.getByLabelText("删除变化组 1 的词形 2");
+      expect(enabledDelete).toBeEnabled();
+      fireEvent.click(enabledDelete);
+      expect(openDeleteConfirm()).not.toBeNull();
+
+      rendered.rerender(<Guarded index={blocked} />);
+      await waitFor(() => expect(openDeleteConfirm()).toBeNull());
+      expect(screen.getByLabelText("删除变化组 1 的词形 2")).toBeDisabled();
+      expect(screen.getByDisplayValue("second-base")).toBeInTheDocument();
+    },
+    20_000
+  );
+
   it("被引用词形禁止删除但仍可编辑，徽标仍可打开来源", async () => {
     const initial = multiPosFixture();
     const pos = initial.pos[0]!;

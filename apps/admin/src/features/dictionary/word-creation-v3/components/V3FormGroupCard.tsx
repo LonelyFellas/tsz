@@ -114,6 +114,12 @@ export function V3FormGroupCard({
   // 改类型和删词形动的是 form 本身，所有引用它的组都会受影响；但只有第 1 组要求
   // 必须保留原形，所以只按第 1 组算：只要它是第 1 组的唯一原形就锁。
   const referenceGuard = useV3ReferenceGuard();
+  const referenceStatusHint =
+    referenceGuard.index.status === "loading"
+      ? "正在加载关联信息，暂不能删除词形"
+      : referenceGuard.index.status === "unavailable"
+        ? "关联信息暂不可用，请刷新后再删除词形"
+        : undefined;
   const lockedBaseFormIds = new Set(
     pos.form_groups.slice(0, 1).flatMap((candidate) => {
       const baseMembers = baseMembersOf(candidate);
@@ -135,7 +141,8 @@ export function V3FormGroupCard({
       : pos.forms.find((item) => item.id === blockedFormId);
   if (
     blockedForm &&
-    (lockedBaseFormIds.has(blockedForm.id) ||
+    (referenceStatusHint !== undefined ||
+      lockedBaseFormIds.has(blockedForm.id) ||
       formReferenceCount(referenceGuard.index, blockedForm) > 0)
   )
     setBlockedFormId(undefined);
@@ -179,10 +186,12 @@ export function V3FormGroupCard({
       sameTypeMembers.length > 1 ? `${baseLabel} ${sameTypeIndex}` : baseLabel;
     const formPositionLabel = `${baseLabel} ${sameTypeIndex}`;
     const deleteLocked =
+      referenceStatusHint !== undefined ||
       formReferences > 0 ||
       lastRequiredForm ||
       member.id === soleBaseMembershipId;
     const deleteReason =
+      referenceStatusHint ??
       referenceHint ??
       (lastRequiredForm
         ? "每个词性至少保留一个词形"
