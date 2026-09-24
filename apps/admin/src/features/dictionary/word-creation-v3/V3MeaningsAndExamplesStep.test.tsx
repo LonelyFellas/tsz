@@ -1628,9 +1628,9 @@ describe("V3MeaningsAndExamplesStep", () => {
     ) as HTMLElement;
     expect([...header.children].map((item) => item.textContent)).toEqual([
       "",
-      "等级",
-      "语言",
-      "释义方式",
+      "",
+      "",
+      "",
       "释义语句",
       "语法结构",
       ""
@@ -1674,6 +1674,54 @@ describe("V3MeaningsAndExamplesStep", () => {
       /\.v3-meanings-v2 \.word-definition-row \.word-number-cell,\s*\.v3-meanings-v2 \.word-sentence-row \.word-number-cell\s*\{[^}]*line-height:\s*32px;/u
     );
     expect(meaningsCss).toContain(".word-table-row.word-definition-row {");
+  });
+
+  it("释义文字选择器保留选择、Escape 和外部点击关闭，语法结构不受影响", async () => {
+    render(<Harness />);
+    const level = screen.getByLabelText("定义 1 等级");
+    const language = screen.getByLabelText("定义 1 语言");
+    const style = screen.getByLabelText("定义 1 释义方式");
+    for (const input of [level, language, style]) {
+      expect(input.closest(".ant-select")).toHaveClass(
+        "word-definition-text-select",
+        "ant-select-borderless"
+      );
+      expect(
+        input.closest(".ant-select")!.querySelector(".ant-select-arrow")
+      ).toBeNull();
+    }
+    expect(
+      screen.getByLabelText("定义 1 语法结构").closest(".ant-select")
+    ).not.toHaveClass("word-definition-text-select");
+
+    fireEvent.mouseDown(level);
+    expect(level).toHaveAttribute("aria-expanded", "true");
+    const option = [
+      ...document.querySelectorAll<HTMLElement>(
+        ".word-definition-text-options .ant-select-item-option-content"
+      )
+    ].find((item) => item.textContent === "B2")!;
+    fireEvent.click(option);
+    expect(value().pos[0]!.senses[0]!.definitions[0]!.level).toBe("B2");
+    await waitFor(() =>
+      expect(level).toHaveAttribute("aria-expanded", "false")
+    );
+
+    const beforeDismiss = value();
+    fireEvent.mouseDown(language);
+    expect(language).toHaveAttribute("aria-expanded", "true");
+    fireEvent.keyDown(language, { key: "Escape", keyCode: 27 });
+    await waitFor(() =>
+      expect(language).toHaveAttribute("aria-expanded", "false")
+    );
+
+    fireEvent.mouseDown(style);
+    expect(style).toHaveAttribute("aria-expanded", "true");
+    fireEvent.mouseDown(document.body);
+    await waitFor(() =>
+      expect(style).toHaveAttribute("aria-expanded", "false")
+    );
+    expect(value()).toEqual(beforeDismiss);
   });
 
   it("仅在传入发布问题后把词频和必选项映射到字段，输入时不主动清除", () => {
@@ -4204,7 +4252,8 @@ describe("V3MeaningsAndExamplesStep", () => {
       screen.getByLabelText("拖动名词").closest('[role="tab"]')
     ).toBeInTheDocument();
     expect(screen.getByText("可数名词")).toBeVisible();
-    expect(screen.getByText("n. 可数名词")).toBeVisible();
+    expect(screen.getByText("Countable noun 可数名词")).toBeVisible();
+    expect(screen.queryByText("n. 可数名词")).not.toBeInTheDocument();
     expect(screen.getByText("核心")).toBeInTheDocument();
     expect(
       screen.getByLabelText("定义 1 语法结构").closest(".ant-select")

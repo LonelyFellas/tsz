@@ -449,6 +449,109 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
   });
 });
 
+test("任务72：专用词形文案与适配条件在真实弹层中展示", async ({
+  page
+}, testInfo) => {
+  const api = await mockAdminV3Api(page);
+  const word = api.getWord();
+  word.capabilities.multi_group_sense_bindings = true;
+  await page.route(
+    `**/api/v1/admin${ADMIN_V3_ENTRIES_PATH}/${word.id}`,
+    (route) => route.fulfill({ json: { word, retired_stable_nodes: [] } })
+  );
+  await page.goto(`/words/${word.id}/v3/wizard/forms`);
+  const entry = page.getByLabel("第 1 组专用词义", { exact: true });
+  await expect(entry).toHaveText("设置专用词形");
+  await entry.click();
+  const editor = page.getByLabel("第 1 组适用词义编辑", { exact: true });
+  await expect(editor.getByText("适配专用词义")).toBeVisible();
+  await expect(editor).toContainText("该词形专属于适配词义，不用于其他词义。");
+  await expect(editor).toContainText("至少选一项词义才能适配，可多选。");
+  await expect(editor).toContainText("只可适配同一词性下的词义。");
+  await expect(editor.getByText(/沿轨道运行/)).toHaveCount(0);
+  await expect(editor.getByRole("button", { name: "确认选择" })).toBeDisabled();
+  await editor.getByLabel(/运行轨道/).check();
+  await expect(editor.getByRole("button", { name: "确认选择" })).toBeEnabled();
+  await editor.screenshot({ path: testInfo.outputPath("dedicated-form.png") });
+  await editor.getByRole("button", { name: /^取\s*消$/ }).click();
+  await expect(entry).toHaveText("设置专用词形");
+});
+
+test("任务74：释义文字居中、打开变蓝、关闭恢复且弹层不越界", async ({
+  page
+}, testInfo) => {
+  await mockAdminV3Api(page);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/meanings`);
+  await expect(page.locator(".word-sense-sub-pos-badge").first()).toHaveText(
+    "Countable noun 可数名词"
+  );
+  const row = page.locator(".word-definition-row").first();
+  const select = row.locator(".word-definition-text-select").first();
+  const input = select.getByRole("combobox");
+  const content = select.locator(".ant-select-content");
+  const popup = page.locator(".word-definition-text-options:visible");
+  await expect(row.locator(".word-definition-text-select")).toHaveCount(3);
+  await expect(select.locator(".ant-select-suffix")).toHaveCount(0);
+  await expect(page.locator(".word-definition-list-header").first()).toHaveText(
+    "释义语句语法结构"
+  );
+  const closedColor = await content.evaluate(
+    (el) => getComputedStyle(el).color
+  );
+  await input.click();
+  await expect(popup).toBeVisible();
+  await expect(popup).toHaveCSS("opacity", "1");
+  await expect(content).toHaveCSS("color", "rgb(32, 83, 255)");
+  await expect(content).toHaveCSS("opacity", "1");
+  const triggerBox = (await select.boundingBox())!;
+  const popupBox = (await popup.boundingBox())!;
+  expect(
+    Math.abs(
+      triggerBox.x + triggerBox.width / 2 - popupBox.x - popupBox.width / 2
+    )
+  ).toBeLessThan(2);
+  await page.screenshot({
+    path: testInfo.outputPath("definitions-open.png"),
+    fullPage: true
+  });
+  await popup.getByText("B2", { exact: true }).click();
+  await expect(popup).toHaveCount(0);
+  await expect(content).toHaveCSS("color", closedColor);
+  await expect(content).toHaveText("B2");
+  await input.click();
+  await input.press("Escape");
+  await expect(popup).toHaveCount(0);
+  await expect(content).toHaveCSS("color", closedColor);
+
+  // 把真实触发器放到视口两侧，验证菜单比文字宽时的防溢出行为。
+  for (const edge of ["left", "right"] as const) {
+    await select.evaluate((el, edge) => {
+      (el as HTMLElement).style.cssText =
+        `position:fixed;top:200px;${edge}:0;width:36px;z-index:1000`;
+    }, edge);
+    await input.click();
+    await expect(popup).toBeVisible();
+    await expect(popup).toHaveCSS("opacity", "1");
+    await expect
+      .poll(async () => (await popup.boundingBox())!.x)
+      .toBeGreaterThanOrEqual(0);
+    await expect
+      .poll(async () => {
+        const box = (await popup.boundingBox())!;
+        return box.x + box.width;
+      })
+      .toBeLessThanOrEqual(1440);
+    await input.press("Escape");
+    await expect(popup).toHaveCount(0);
+  }
+  await select.evaluate((el) => el.removeAttribute("style"));
+  await page.screenshot({
+    path: testInfo.outputPath("definitions-closed.png"),
+    fullPage: true
+  });
+});
+
 test("语法引用：选中与下拉保留富文本、基线和稳定弧线空间", async ({ page }) => {
   const api = await mockAdminV3Api(page);
   const word = api.getWord();
