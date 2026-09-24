@@ -133,7 +133,11 @@ export function V3FormGroupCard({
     blockedFormId === undefined
       ? undefined
       : pos.forms.find((item) => item.id === blockedFormId);
-  if (blockedForm && lockedBaseFormIds.has(blockedForm.id))
+  if (
+    blockedForm &&
+    (lockedBaseFormIds.has(blockedForm.id) ||
+      formReferenceCount(referenceGuard.index, blockedForm) > 0)
+  )
     setBlockedFormId(undefined);
   const formRow = (
     member: WordFormGroupV3["members"][number],
@@ -161,7 +165,7 @@ export function V3FormGroupCard({
     const formReferences = formReferenceCount(referenceGuard.index, form);
     const referenceHint =
       formReferences > 0
-        ? `存在 ${formReferences} 处关联，可保存删除草稿，发布前需修复`
+        ? `存在 ${formReferences} 处关联，解除所有关联才能删除词形`
         : undefined;
     // 改类型的提示：告知会影响多少处引用，但不阻断编辑。
     const formTypeChangeHint =
@@ -174,12 +178,17 @@ export function V3FormGroupCard({
     const formLabel =
       sameTypeMembers.length > 1 ? `${baseLabel} ${sameTypeIndex}` : baseLabel;
     const formPositionLabel = `${baseLabel} ${sameTypeIndex}`;
-    const deleteLocked = lastRequiredForm || member.id === soleBaseMembershipId;
-    const deleteReason = lastRequiredForm
-      ? "每个词性至少保留一个词形"
-      : member.id === soleBaseMembershipId
-        ? BASE_REQUIRED_HINT
-        : undefined;
+    const deleteLocked =
+      formReferences > 0 ||
+      lastRequiredForm ||
+      member.id === soleBaseMembershipId;
+    const deleteReason =
+      referenceHint ??
+      (lastRequiredForm
+        ? "每个词性至少保留一个词形"
+        : member.id === soleBaseMembershipId
+          ? BASE_REQUIRED_HINT
+          : undefined);
 
     return {
       membershipId: member.id,
