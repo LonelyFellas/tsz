@@ -339,7 +339,7 @@ export function V3FormGroupCard({
               >
                 {hasBoundSenses
                   ? `专用词义 · ${boundSenseCount}`
-                  : "设置专用词义"}
+                  : "设置专用词形"}
               </Button>
             </Popover>
           ) : null}

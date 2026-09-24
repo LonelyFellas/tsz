@@ -1561,7 +1561,7 @@
 
 .word-definition-list-header {
   grid-template-columns:
-    28px minmax(58px, 64px) minmax(72px, 88px) minmax(104px, 128px)
+    28px 36px 40px 72px
     minmax(0, 1fr) minmax(180px, 260px) var(--word-ops-col, 32px);
 }
 
@@ -1573,9 +1573,28 @@
 
 .word-table-row.word-definition-row {
   grid-template-columns:
-    28px minmax(58px, 64px) minmax(72px, 88px) minmax(104px, 128px)
+    28px 36px 40px 72px
     minmax(0, 1fr) minmax(180px, 260px) var(--word-ops-col, 32px);
   padding-block: 9px;
+}
+
+.word-definition-text-select.ant-select {
+  padding-inline: 0;
+}
+
+.word-definition-text-select .ant-select-content {
+  margin-inline-end: 0;
+  text-align: center;
+}
+
+.word-definition-text-select.ant-select.ant-select-open
+  .ant-select-content.ant-select-content-has-value {
+  color: var(--ant-color-primary, #2053ff);
+  opacity: 1;
+}
+
+.word-definition-text-options .ant-select-item-option-content {
+  text-align: center;
 }
 
 .word-definition-content-cell {

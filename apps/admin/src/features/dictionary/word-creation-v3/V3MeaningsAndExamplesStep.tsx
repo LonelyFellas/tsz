@@ -34,6 +34,7 @@ import {
   Popover,
   Popconfirm,
   Select,
+  type SelectProps,
   Space,
   Switch,
   Tag,
@@ -982,6 +983,18 @@ const DEFINITION_STYLE_OPTIONS: Array<{
   { label: "定义释义", value: "definition" },
   { label: "整句释义", value: "sentence" }
 ];
+
+const DEFINITION_TEXT_SELECT_PROPS = {
+  className: "word-definition-text-select",
+  classNames: { popup: { root: "word-definition-text-options" } },
+  variant: "borderless",
+  suffixIcon: null,
+  popupMatchSelectWidth: false,
+  popupAlign: {
+    points: ["tc", "bc"],
+    overflow: { adjustX: true, adjustY: true, shiftX: true }
+  }
+} satisfies SelectProps;
 
 /** 语言与释义方式分两列选，落 wire 前合回后端唯一认的 definition_mode。 */
 const DEFINITION_MODE_BY_PARTS: Record<
@@ -2869,10 +2882,7 @@ function V3MeaningsAndExamplesStepContent({
                                 }
                                 subPosLabel={
                                   visibleSubPos
-                                    ? [
-                                        selectedSubPos?.abbreviation,
-                                        visibleSubPos
-                                      ]
+                                    ? [selectedSubPos?.name_en, visibleSubPos]
                                         .filter(Boolean)
                                         .join(" ")
                                     : undefined
@@ -3239,9 +3249,9 @@ function V3MeaningsAndExamplesStepContent({
                                         {sense.definitions.length > 0 ? (
                                           <div className="word-list-header word-definition-list-header">
                                             <span aria-hidden="true" />
-                                            <span>等级</span>
-                                            <span>语言</span>
-                                            <span>释义方式</span>
+                                            <span aria-hidden="true" />
+                                            <span aria-hidden="true" />
+                                            <span aria-hidden="true" />
                                             <span>释义语句</span>
                                             <span>语法结构</span>
                                             <span aria-hidden="true" />
@@ -3295,6 +3305,7 @@ function V3MeaningsAndExamplesStepContent({
                                                   </span>
                                                   <>
                                                     <Select
+                                                      {...DEFINITION_TEXT_SELECT_PROPS}
                                                       aria-label={`定义 ${definitionIndex + 1} 等级`}
                                                       data-v3-field="level"
                                                       data-v3-node-id={
@@ -3317,6 +3328,7 @@ function V3MeaningsAndExamplesStepContent({
                                                       value={definition.level}
                                                     />
                                                     <Select
+                                                      {...DEFINITION_TEXT_SELECT_PROPS}
                                                       aria-label={`定义 ${definitionIndex + 1} 语言`}
                                                       data-v3-field="definition_mode"
                                                       data-v3-node-id={
@@ -3356,6 +3368,7 @@ function V3MeaningsAndExamplesStepContent({
                                                       )}
                                                     />
                                                     <Select
+                                                      {...DEFINITION_TEXT_SELECT_PROPS}
                                                       aria-label={`定义 ${definitionIndex + 1} 释义方式`}
                                                       data-v3-node-id={
                                                         definition.id

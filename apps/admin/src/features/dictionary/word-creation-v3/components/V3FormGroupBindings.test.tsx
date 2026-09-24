@@ -93,12 +93,19 @@ describe("词形组的专用词义交互", () => {
     expect(screen.queryByText("通用", { exact: true })).not.toBeInTheDocument();
     const headerEntry = await screen.findByLabelText("第 1 组专用词义");
     expect(headerEntry.closest(".ant-card-head")).not.toBeNull();
-    expect(headerEntry).toHaveTextContent("设置专用词义");
+    expect(headerEntry).toHaveTextContent("设置专用词形");
     expect(screen.queryByText("专用", { exact: true })).not.toBeInTheDocument();
     expect(screen.queryByText("限定适用词义")).not.toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("收起第 1 组词形变化"));
     fireEvent.click(headerEntry);
     let dialog = await screen.findByLabelText("第 1 组适用词义编辑");
+    expect(dialog).toHaveTextContent("适配专用词义");
+    expect(dialog).toHaveTextContent(
+      "注意：该词形仅适配少量词义，请准确识别正确的词义。适配之后，该词形专属于适配词义，不用于其他词义。"
+    );
+    expect(dialog).toHaveTextContent(
+      "适配条件：1）至少选一项词义才能适配，可多选。2）只可适配同一词性下的词义。"
+    );
     expect(within(dialog).queryByText(/其他词性/)).not.toBeInTheDocument();
     expect(
       within(dialog).getByText("确认选择").closest("button")!
