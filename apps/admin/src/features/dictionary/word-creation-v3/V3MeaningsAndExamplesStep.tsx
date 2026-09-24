@@ -31,8 +31,8 @@ import {
   Flex,
   Input,
   InputNumber,
+  Modal,
   Popover,
-  Popconfirm,
   Select,
   type SelectProps,
   Space,
@@ -307,6 +307,7 @@ function SenseEditorShell({
   /** 指向本词义的引用数；大于 0 时不能删除。 */
   referenceCount?: number;
 }) {
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const safeLevel = /^(?:A1|A2|B1|B2|C1|C2)$/u.test(level) ? level : "A1";
   return (
     <div
@@ -366,24 +367,17 @@ function SenseEditorShell({
                       : undefined
                   }
                 >
-                  <Popconfirm
-                    title="确定删除该词义吗？"
-                    description={summary}
-                    okText="确认删除"
-                    cancelText="取消"
-                    okButtonProps={{ danger: true }}
-                    disabled={!confirmDelete}
-                    onConfirm={onDelete}
-                  >
-                    <Button
-                      aria-label={`删除词义 ${index + 1}`}
-                      icon={<DeleteOutlined />}
-                      danger
-                      size="small"
-                      type="text"
-                      onClick={confirmDelete ? undefined : onDelete}
-                    />
-                  </Popconfirm>
+                  <Button
+                    aria-label={`删除词义 ${index + 1}`}
+                    icon={<DeleteOutlined />}
+                    danger
+                    size="small"
+                    type="text"
+                    onClick={() => {
+                      if (confirmDelete) setDeleteOpen(true);
+                      else onDelete();
+                    }}
+                  />
                 </Tooltip>
               </Space>
             ),
@@ -391,6 +385,23 @@ function SenseEditorShell({
           }
         ]}
       />
+      <Modal
+        title="确定删除该词义吗？"
+        open={deleteOpen}
+        style={{ top: 48 }}
+        maskClosable={false}
+        okText="确认删除"
+        cancelText="取消"
+        okButtonProps={{ danger: true }}
+        cancelButtonProps={{ autoFocus: true }}
+        onCancel={() => setDeleteOpen(false)}
+        onOk={() => {
+          setDeleteOpen(false);
+          onDelete();
+        }}
+      >
+        <Typography.Text>{summary}</Typography.Text>
+      </Modal>
     </div>
   );
 }
