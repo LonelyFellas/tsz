@@ -305,25 +305,31 @@ function formsValue(): DraftFormsStepContentV3 {
 }
 
 describe("V3MeaningsAndExamplesStep", () => {
-  it("有内容的词义取消删除时保持内容和展开状态，确认后才删除", () => {
-    render(<Harness />);
+  it("有内容的词义在页面顶部弹窗确认，取消保留内容和展开状态，确认后才删除", () => {
+    const { container } = render(<Harness />);
     const before = value();
     const expanded = document.querySelector(
       ".word-sense-editor .ant-collapse-item"
     )?.className;
     fireEvent.click(screen.getByLabelText("删除词义 1"));
     expect(screen.getByText("确定删除该词义吗？")).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveStyle({ top: "48px" });
+    expect(container).not.toContainElement(dialog);
+    expect(document.querySelector(".ant-modal-mask")).toBeInTheDocument();
+    expect(document.querySelector(".ant-popconfirm")).toBeNull();
+    expect(dialog).toHaveTextContent("中心");
     expect(value()).toEqual(before);
     expect(
       document.querySelector(".word-sense-editor .ant-collapse-item")?.className
     ).toBe(expanded);
     fireEvent.click(
-      screen.getByText(/取\s*消/u, { selector: ".ant-popconfirm button span" })
+      screen.getByText(/取\s*消/u, { selector: ".ant-modal button span" })
     );
     expect(value()).toEqual(before);
     fireEvent.click(screen.getByLabelText("删除词义 1"));
     fireEvent.click(
-      screen.getByText("确认删除", { selector: ".ant-popconfirm button span" })
+      screen.getByText("确认删除", { selector: ".ant-modal button span" })
     );
     expect(value().pos[0]!.senses).toHaveLength(0);
   });
@@ -357,7 +363,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     fireEvent.click(screen.getByLabelText("删除词义 2"));
     expect(screen.getByText("确定删除该词义吗？")).toBeInTheDocument();
     fireEvent.click(
-      screen.getByText(/取\s*消/u, { selector: ".ant-popconfirm button span" })
+      screen.getByText(/取\s*消/u, { selector: ".ant-modal button span" })
     );
     expect(value()).toEqual(before);
   });
@@ -388,7 +394,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     fireEvent.click(screen.getByLabelText("删除词义 1"));
     expect(screen.getByText("确定删除该词义吗？")).toBeInTheDocument();
     fireEvent.click(
-      screen.getByText(/取\s*消/u, { selector: ".ant-popconfirm button span" })
+      screen.getByText(/取\s*消/u, { selector: ".ant-modal button span" })
     );
     expect(value()).toEqual(initial);
   });
@@ -3491,7 +3497,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     );
     fireEvent.click(screen.getByLabelText("删除词义 2"));
     fireEvent.click(
-      screen.getByText("确认删除", { selector: ".ant-popconfirm button span" })
+      screen.getByText("确认删除", { selector: ".ant-modal button span" })
     );
     expect(value().sense_groups.map((item) => item.id)).toEqual([
       "sense-group-2"

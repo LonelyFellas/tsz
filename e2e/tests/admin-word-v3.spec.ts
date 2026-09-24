@@ -9,6 +9,30 @@ import {
 } from "./support/mockAdminV3Api";
 
 test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () => {
+  test("词义删除使用页面顶部弹窗，取消保留、确认才删除", async ({ page }) => {
+    await mockAdminV3Api(page);
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/meanings`);
+    const deleteButton = page.getByLabel("删除词义 1", { exact: true });
+    await deleteButton.click();
+    const dialog = page.getByRole("dialog", { name: "确定删除该词义吗？" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText("运行轨道");
+    await expect(page.locator(".ant-popconfirm")).toHaveCount(0);
+    await expect(page.locator(".ant-modal-mask")).toBeVisible();
+    await expect.poll(async () => (await dialog.boundingBox())?.y).toBe(48);
+    await page.screenshot({ path: test.info().outputPath("sense-delete.png") });
+    await page.mouse.click(8, 8);
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "取 消" }).click();
+    await expect(dialog).toBeHidden();
+    await expect(deleteButton).toBeVisible();
+    await deleteButton.click();
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "确认删除" }).click();
+    await expect(dialog).toBeHidden();
+    await expect(deleteButton).toHaveCount(0);
+  });
+
   test("E01a Mock：统一入口新建复杂单词、保存刷新、422 定位及发布阻断", async ({
     page
   }) => {
