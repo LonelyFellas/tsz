@@ -1031,7 +1031,7 @@ describe("SmartDictionary", () => {
     });
   });
 
-  it("翻页时保留完整批量选择", async () => {
+  it("翻页时保留完整批量选择，但不提供批量发布入口", async () => {
     const { container } = render(
       <MemoryRouter>
         <AntApp>
@@ -1041,6 +1041,7 @@ describe("SmartDictionary", () => {
     );
 
     expect(screen.getByText("first")).toBeInTheDocument();
+    expect(screen.queryByText("发布所选")).not.toBeInTheDocument();
     const firstRowCheckbox = container.querySelector(
       "tbody input[type='checkbox']"
     );
@@ -1057,6 +1058,7 @@ describe("SmartDictionary", () => {
       expect(screen.getByText("移入垃圾桶(1)")).toBeInTheDocument();
     });
     expect(batchButton).not.toBeDisabled();
+    expect(screen.queryByText("发布所选")).not.toBeInTheDocument();
   });
 
   it("HTTP 环境单条归档可降级生成幂等键，连续确认只发一次", async () => {
