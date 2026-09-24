@@ -272,6 +272,188 @@ describe("buildV3Readiness", () => {
 });
 
 describe("buildV3ProductProgress", () => {
+  it.each(["actual_pron", "ipa", "ups"] as const)(
+    "TASK#8：%s 不同的原形不能合并，恢复一致后实时合并",
+    (field) => {
+      const noun = commonFormFixture({ spelling: "job" });
+      const verb = commonFormFixture({
+        id: uuidFromInt(1100),
+        spelling: "job"
+      });
+      const first = noun.regional_variants.common.pronunciations[0]!;
+      const second = verb.regional_variants.common.pronunciations[0]!;
+      first.synthesis = { alphabet: "ipa", ipa: "dʒɒb", ups: "jh aa b" };
+      second.synthesis = structuredClone(first.synthesis);
+      const input = {
+        language: "en",
+        wordId: "test",
+        completedSteps: [] as const,
+        forms: {
+          pos: [
+            ...formsFixture({ forms: [noun] }).pos,
+            ...formsFixture({
+              pos_id: uuidFromInt(1101),
+              pos: "verb",
+              forms: [verb]
+            }).pos
+          ]
+        },
+        meanings: { sense_groups: [], pos: [] }
+      };
+      expect(buildV3ProductProgress(input)[2]!.count).toBe(1);
+      if (field === "actual_pron") second.actual_pron = "different";
+      else second.synthesis[field] = "different";
+      expect(buildV3ProductProgress(input)[2]).toMatchObject({
+        count: 2,
+        details: [{ count: 1 }, { count: 1 }]
+      });
+      second.actual_pron = first.actual_pron;
+      second.synthesis = structuredClone(first.synthesis);
+      expect(buildV3ProductProgress(input)[2]!.count).toBe(1);
+    }
+  );
+
+  it("TASK#8：空音标原形合并，填写任一音标后拆分，不合并空白派生词形", () => {
+    const noun = commonFormFixture({ spelling: "job", pronunciations: [] });
+    const verb = commonFormFixture({
+      id: uuidFromInt(1110),
+      spelling: "job",
+      pronunciations: [
+        {
+          id: uuidFromInt(1111),
+          dict_phonetic: "",
+          actual_pron: "",
+          synthesis: { alphabet: "ipa", ipa: "", ups: "" }
+        }
+      ]
+    });
+    const input = {
+      language: "en",
+      wordId: "test",
+      completedSteps: [] as const,
+      forms: {
+        pos: [
+          ...formsFixture({ forms: [noun] }).pos,
+          ...formsFixture({
+            pos_id: uuidFromInt(1112),
+            pos: "verb",
+            forms: [verb]
+          }).pos
+        ]
+      },
+      meanings: { sense_groups: [], pos: [] }
+    };
+    expect(buildV3ProductProgress(input)[2]).toMatchObject({
+      count: 1,
+      completed: false
+    });
+    verb.regional_variants.common.pronunciations[0]!.actual_pron = "dʒɒb";
+    expect(buildV3ProductProgress(input)[2]!.count).toBe(2);
+    verb.regional_variants.common.pronunciations[0]!.actual_pron = "";
+    input.forms.pos[1]!.forms.push(
+      commonFormFixture({
+        id: uuidFromInt(1113),
+        form_type: "past_tense",
+        spelling: "",
+        pronunciations: []
+      }),
+      commonFormFixture({
+        id: uuidFromInt(1114),
+        form_type: "past_participle",
+        spelling: "",
+        pronunciations: []
+      })
+    );
+    expect(buildV3ProductProgress(input)[2]!.count).toBe(3);
+  });
+
+  it("TASK#8：多条发音必须成组匹配，不能分别比较各字段集合", () => {
+    const first = commonFormFixture({
+      spelling: "job",
+      pronunciations: [
+        { id: uuidFromInt(1120), dict_phonetic: "a", actual_pron: "x" },
+        { id: uuidFromInt(1121), dict_phonetic: "b", actual_pron: "y" }
+      ]
+    });
+    const second = structuredClone(first);
+    second.id = uuidFromInt(1122);
+    second.regional_variants.common.pronunciations.reverse();
+    const input = {
+      language: "en",
+      wordId: "test",
+      completedSteps: [] as const,
+      forms: formsFixture({ forms: [first, second] }),
+      meanings: { sense_groups: [], pos: [] }
+    };
+    expect(buildV3ProductProgress(input)[2]!.count).toBe(1);
+    second.regional_variants.common.pronunciations[0]!.actual_pron = "x";
+    second.regional_variants.common.pronunciations[1]!.actual_pron = "y";
+    expect(buildV3ProductProgress(input)[2]!.count).toBe(2);
+  });
+
+  it("TASK#8：job 名词3种、动词6种，只合并重复原形，总数8", () => {
+    const makeForm = (
+      id: number,
+      form_type: string,
+      spelling: string,
+      phonetic: string
+    ) =>
+      commonFormFixture({
+        id: uuidFromInt(id),
+        form_type,
+        spelling,
+        pronunciations: [
+          {
+            id: uuidFromInt(id + 100),
+            dict_phonetic: phonetic,
+            actual_pron: phonetic
+          }
+        ]
+      });
+    const noun = makeForm(1200, "base", "job", "dʒɒb");
+    const nounSecond = makeForm(1201, "base", "job", "dʒɒb");
+    nounSecond.regional_variants.common.pronunciations[0]!.synthesis = {
+      alphabet: "ipa",
+      ipa: "dʒɑːb",
+      ups: ""
+    };
+    const input = {
+      language: "en",
+      wordId: "test",
+      completedSteps: [] as const,
+      forms: {
+        pos: [
+          ...formsFixture({
+            forms: [noun, makeForm(1202, "plural", "jobs", "dʒɒbz"), nounSecond]
+          }).pos,
+          ...formsFixture({
+            pos_id: uuidFromInt(1220),
+            pos: "verb",
+            forms: [
+              makeForm(1203, "base", "job", "dʒɒb"),
+              makeForm(1204, "third_person_singular", "jobs", "dʒɒbz"),
+              makeForm(1205, "present_participle", "jobbing", "dʒɒbɪŋ"),
+              makeForm(1206, "gerund", "jobbing", "dʒɒbɪŋ"),
+              makeForm(1207, "past_tense", "jobbed", "dʒɒbd"),
+              makeForm(1208, "past_participle", "jobbed", "dʒɒbd")
+            ]
+          }).pos
+        ]
+      },
+      meanings: { sense_groups: [], pos: [] }
+    };
+    expect(buildV3ProductProgress(input)[2]).toMatchObject({
+      count: 8,
+      details: [{ count: 3 }, { count: 6 }]
+    });
+    // 第二个名词原形恢复全部音标一致时，才应合并为7。
+    delete nounSecond.regional_variants.common.pronunciations[0]!.synthesis;
+    expect(buildV3ProductProgress(input)[2]).toMatchObject({
+      count: 7,
+      details: [{ count: 2 }, { count: 6 }]
+    });
+  });
+
   it("截图规则：原形计入，跨词性同拼写同音标合并，不同音标分别计数", () => {
     const noun = commonFormFixture({ spelling: "job" });
     const plural = commonFormFixture({
@@ -329,13 +511,13 @@ describe("buildV3ProductProgress", () => {
       count: 2
     },
     {
-      name: "TASK#8：原形与过去式同形同音，忽略词形类型合并",
+      name: "TASK#8：原形与过去式同形同音，保留不同词形类型",
       spelling: "cut",
       otherSpelling: "cut",
       phonetic: "kʌt",
       otherPhonetic: "kʌt",
       otherType: "past_tense" as const,
-      count: 1
+      count: 2
     }
   ])(
     "$name",
