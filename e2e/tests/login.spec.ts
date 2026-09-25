@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
+import { mockApi } from "./support/mockApi";
 
 test.describe("登录页", () => {
   test.beforeEach(async ({ page }) => {
+    await mockApi(page, { authenticated: false });
     await page.goto("/login");
   });
 
