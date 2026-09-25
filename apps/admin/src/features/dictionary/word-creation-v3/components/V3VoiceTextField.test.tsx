@@ -341,7 +341,7 @@ it("降级文本框在插入文本后平移原标注和关联", () => {
   ]);
 });
 
-it("正文在外部输入框编辑，内部只做标注；多行正文、关联和设置往返不丢失", async () => {
+it("页面只读、弹窗编辑；多行正文、关联和设置往返不丢失", async () => {
   state.flags.VOICE_PREVIEW = true;
   const observe = vi.fn();
   function Host() {
@@ -386,22 +386,18 @@ it("正文在外部输入框编辑，内部只做标注；多行正文、关联�
   expect(screen.queryByRole("toolbar")).not.toBeInTheDocument();
   expect(screen.getByLabelText("英文例句")).toHaveValue("hello\nthere");
   expect(observe).not.toHaveBeenCalled();
-  fireEvent.change(screen.getByLabelText("英文例句"), {
-    target: { value: "oh hello\nthere" }
-  });
+  expect(screen.getByLabelText("英文例句")).toHaveAttribute("readonly");
   fireEvent.click(screen.getByLabelText("打开英文例句编辑器"));
   await screen.findByRole("toolbar", { name: "标注工具栏" });
-  expect(
-    screen.queryByRole("button", { name: "编辑文本" })
-  ).not.toBeInTheDocument();
-  expect(screen.getByLabelText("英文例句")).toHaveAttribute("readonly");
+  expect(screen.getByRole("button", { name: "编辑文本" })).toBeInTheDocument();
+  expect(screen.getByLabelText("英文例句")).not.toHaveAttribute("readonly");
   fireEvent.change(screen.getByLabelText("英文例句"), {
-    target: { value: "不会覆盖原文" }
+    target: { value: "oh hello\nthere" }
   });
   fireEvent.click(screen.getByLabelText("完成英文例句编辑"));
   expect(screen.queryByRole("toolbar")).not.toBeInTheDocument();
   expect(screen.getByLabelText("英文例句")).toHaveValue("oh hello\nthere");
-  expect(screen.getByLabelText("英文例句")).not.toHaveAttribute("readonly");
+  expect(screen.getByLabelText("英文例句")).toHaveAttribute("readonly");
   expect(screen.getByLabelText("英文例句")).toHaveAttribute(
     "data-v3-node-id",
     "example"
@@ -422,11 +418,11 @@ it("正文在外部输入框编辑，内部只做标注；多行正文、关联�
   expect(document.querySelectorAll(".tsz-ve-letter.is-linked")).toHaveLength(5);
 });
 
-it("普通输入也同步迁移标注，关闭能力或只读时不能打开编辑器", () => {
+it("普通首次输入可保存，关闭能力或只读时不能打开编辑器", () => {
   const onChange = vi.fn();
   const { rerender } = render(
     <V3VoiceTextField
-      value={VALUE}
+      value={{ version: 2, text: "", annotations: [] }}
       ariaLabel="语法"
       nodeId="v"
       field="content"
@@ -462,7 +458,7 @@ it("普通输入也同步迁移标注，关闭能力或只读时不能打开编�
   expect(screen.queryByLabelText("打开语法编辑器")).not.toBeInTheDocument();
 });
 
-it("正文为空时编辑器按钮置灰，敲进内容后才可点", () => {
+it("正文为空或仅空白也能打开编辑器进行首次录入", () => {
   const onChange = vi.fn();
   const blank: RichTextV3 = { version: 2, text: "", annotations: [] };
   const { rerender } = render(
@@ -474,10 +470,9 @@ it("正文为空时编辑器按钮置灰，敲进内容后才可点", () => {
       onChange={onChange}
     />
   );
-  // 空画布没有东西可标注
-  expect(screen.getByLabelText("打开语法编辑器")).toBeDisabled();
+  expect(screen.getByLabelText("打开语法编辑器")).toBeEnabled();
 
-  // 只有空白同样算空
+  // 只有空白同样可以录入。
   rerender(
     <V3VoiceTextField
       value={{ version: 2, text: "   ", annotations: [] }}
@@ -487,7 +482,7 @@ it("正文为空时编辑器按钮置灰，敲进内容后才可点", () => {
       onChange={onChange}
     />
   );
-  expect(screen.getByLabelText("打开语法编辑器")).toBeDisabled();
+  expect(screen.getByLabelText("打开语法编辑器")).toBeEnabled();
 
   rerender(
     <V3VoiceTextField
@@ -541,40 +536,35 @@ it("外部改字移除关联后，撤销和重做同时恢复正文、标注与�
     );
   }
   render(<Host />);
-  fireEvent.change(screen.getByLabelText("正文撤销"), {
-    target: { value: "hello friend" }
-  });
-  expect(observe.mock.lastCall![1]).toEqual([]);
-  expect(
-    await screen.findByText("已移除受改字影响的关联或标注，可撤销恢复")
-  ).toBeInTheDocument();
-  fireEvent.keyDown(screen.getByLabelText("正文撤销"), {
-    key: "z",
-    metaKey: true
-  });
-  expect(observe.mock.lastCall).toEqual([initial, originalLinks]);
-  fireEvent.keyDown(screen.getByLabelText("正文撤销"), {
-    key: "z",
-    metaKey: true,
-    shiftKey: true
-  });
-  expect(observe.mock.lastCall![0].text).toBe("hello friend");
-  expect(observe.mock.lastCall![1]).toEqual([]);
-  fireEvent.click(screen.getByRole("button", { name: "打开正文撤销编辑器" }));
+  expect(screen.getByLabelText("正文撤销")).toHaveAttribute("readonly");
+  fireEvent.click(screen.getByLabelText("打开正文撤销编辑器"));
   await screen.findByRole(
     "toolbar",
     { name: "标注工具栏" },
     { timeout: 10000 }
   );
-  fireEvent.click(screen.getByRole("button", { name: "完成正文撤销编辑" }));
-  fireEvent.keyDown(screen.getByLabelText("正文撤销"), {
-    key: "z",
-    ctrlKey: true
+  fireEvent.change(screen.getByLabelText("正文撤销"), {
+    target: { value: "hello friend" }
   });
+  expect(observe).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "保留原文" }));
+  expect(screen.getByLabelText("正文撤销")).toHaveValue("hello there");
+  fireEvent.change(screen.getByLabelText("正文撤销"), {
+    target: { value: "hello friend" }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "确认修改" }));
+  expect(observe.mock.lastCall![1]).toEqual([]);
+  fireEvent.click(screen.getByLabelText("上一步"));
+  expect(observe.mock.lastCall).toEqual([initial, originalLinks]);
+  fireEvent.click(screen.getByLabelText("下一步"));
+  expect(observe.mock.lastCall![0].text).toBe("hello friend");
+  expect(observe.mock.lastCall![1]).toEqual([]);
+  fireEvent.click(screen.getByLabelText("取消正文撤销编辑"));
   expect(observe.mock.lastCall).toEqual([initial, originalLinks]);
 });
 
-it("旧版正文改字后的撤销保留旧标注，并可继续重做", () => {
+it("关闭编辑器能力时，旧版正文撤销保留标注并可重做", () => {
+  state.flags.VOICE_EDITOR = false;
   const observe = vi.fn();
   function Host() {
     const [value, setValue] = useState<RichTextV3>({
@@ -620,7 +610,7 @@ it("旧版正文改字后的撤销保留旧标注，并可继续重做", () => {
 
 it.each([false, true])(
   "真实英文宿主无初始关联时可撤销重做，能力开关=%s",
-  (linksEnabled) => {
+  async (linksEnabled) => {
     const observe = vi.fn();
     function Host() {
       const [value, setValue] = useState<EnglishTextV3>({
@@ -645,17 +635,20 @@ it.each([false, true])(
       );
     }
     render(<Host />);
-    fireEvent.change(screen.getByRole("textbox"), {
-      target: { value: "hello there" }
-    });
-    fireEvent.keyDown(screen.getByRole("textbox"), { key: "z", ctrlKey: true });
-    expect(screen.getByRole("textbox")).toHaveValue("hello");
+    fireEvent.click(screen.getByRole("button", { name: /^打开.*编辑器$/ }));
+    await screen.findByRole("toolbar", { name: "标注工具栏" });
+    const input = document.querySelector<HTMLTextAreaElement>(
+      ".tsz-ve-canvas-input"
+    )!;
+    fireEvent.change(input, { target: { value: "hello there" } });
+    fireEvent.click(screen.getByLabelText("上一步"));
+    expect(input).toHaveValue("hello");
     const variant = observe.mock.lastCall![0].common;
     // 关闭能力时仍省略 wire 字段；支持关联时，恢复空关联须明确发送 []，不能让后端保留旧关联。
     if (linksEnabled) expect(variant.text_links).toEqual([]);
     else expect(variant).not.toHaveProperty("text_links");
-    fireEvent.keyDown(screen.getByRole("textbox"), { key: "y", ctrlKey: true });
-    expect(screen.getByRole("textbox")).toHaveValue("hello there");
+    fireEvent.click(screen.getByLabelText("下一步"));
+    expect(input).toHaveValue("hello there");
   }
 );
 
@@ -674,7 +667,7 @@ it.each([
   ["association", "定义 1 英美通用内容"]
 ] as const)(
   "%s 收起态输入框上标出连读两端；改字去掉连读后弧线层撤掉，输入框仍是同一个节点",
-  (mode, label) => {
+  async (mode, label) => {
     function Harness() {
       const [value, setValue] = useState<RichTextV3>(LIAISON_TEXT);
       return (
@@ -708,8 +701,13 @@ it.each([
       ["end", "i"]
     ]);
 
-    // 删掉起点字母 k，连读随之移除；弧线层撤掉时不能把输入框重挂，否则正在打字的光标会丢。
-    fireEvent.change(input, { target: { value: "pic it up" } });
+    fireEvent.click(screen.getByLabelText(`打开${label}编辑器`));
+    await screen.findByRole("toolbar", { name: "标注工具栏" });
+    fireEvent.change(screen.getByLabelText(label), {
+      target: { value: "pic it up" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "确认修改" }));
+    fireEvent.click(screen.getByLabelText(`完成${label}编辑`));
     expect(anchors()).toEqual([]);
     expect(
       container.querySelector(".v3-voice-text-liaison-overlay")

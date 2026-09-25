@@ -1,3 +1,4 @@
+import { changeVoiceText } from "./V3VoiceTextField.test-helper";
 import { env } from "@/lib/env";
 import { ConfigProvider } from "antd";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -45,10 +46,20 @@ vi.mock("../../word-creation/PronunciationPreview", () => ({
 vi.mock("@tsz/voice-editor/editor", () => ({
   VoiceEditor: ({
     value,
+    contextLabel,
+    onChange,
     onVoiceProfileChange,
     onAudioAssetsChange
   }: VoiceEditorProps) => (
     <div>
+      <div role="toolbar" aria-label="标注工具栏" />
+      <textarea
+        aria-label={contextLabel}
+        value={value.text}
+        onChange={(event) =>
+          onChange({ version: 2, text: event.target.value, annotations: [] })
+        }
+      />
       <span data-testid="editor-content">{JSON.stringify(value)}</span>
       <button
         onClick={() =>
@@ -115,7 +126,7 @@ const field = (name: string) => screen.getByLabelText(`第 1 条发音的${name}
 const convert = (name: string) =>
   fireEvent.click(screen.getByLabelText(`第 1 条发音转换为 Azure ${name}`));
 const change = (name: string, value: string) =>
-  fireEvent.change(field(name), { target: { value } });
+  changeVoiceText(field(name), { target: { value } });
 const rows = () =>
   JSON.parse(screen.getByTestId("wire").textContent!).pos[0].forms[0]
     .regional_variants.common.pronunciations;
@@ -168,8 +179,8 @@ describe("独立发音输入", () => {
   });
   it("固定从实际发音转换，不读字典或另一候选；覆盖确认、取消、撤销且不改变来源", async () => {
     render(<Harness />);
-    change("字典音标", "dɔg");
-    change("实际发音", "kæt");
+    await change("字典音标", "dɔg");
+    await change("实际发音", "kæt");
     change("Azure UPS", "H U M");
     change("Azure IPA", "human IPA");
     convert("UPS");
@@ -183,11 +194,11 @@ describe("独立发音输入", () => {
     expect(screen.getByRole("radio", { name: "词形拼写" })).toBeChecked();
     fireEvent.keyDown(field("Azure UPS"), { key: "z", ctrlKey: true });
     expect(field("Azure UPS")).toHaveValue("H U M");
-    change("实际发音", "");
+    await change("实际发音", "");
     convert("UPS");
     expect(screen.getByText("请先填写实际发音")).toBeInTheDocument();
     expect(field("Azure UPS")).toHaveValue("H U M");
-    change("实际发音", "kæt?");
+    await change("实际发音", "kæt?");
     convert("IPA");
     expect(screen.getByText(/此符号或组合/)).toBeInTheDocument();
     expect(field("Azure IPA")).toHaveValue("human IPA");
@@ -297,7 +308,7 @@ describe("独立发音输入", () => {
     render(<Harness />);
     change("Azure UPS", "OLD");
     convert("UPS");
-    change("实际发音", "dɔg");
+    await change("实际发音", "dɔg");
     fireEvent.click(screen.getByText("应用转换结果"));
     expect(field("Azure UPS")).toHaveValue("OLD");
     expect(screen.getByText(/来源、口音或目标内容已变化/)).toBeInTheDocument();
@@ -322,9 +333,9 @@ it("关闭入口时旧 UPS 记录原样保存且保留设置", async () => {
     env.AZURE_PRONUNCIATION_INPUTS = true;
   }
 });
-it("实际发音填入需确认并保留可撤销快照", () => {
+it("实际发音填入需确认并保留可撤销快照", async () => {
   render(<Harness />);
-  change("实际发音", "dɔg");
+  await change("实际发音", "dɔg");
   fireEvent.click(screen.getByLabelText("从字典音标填入实际发音"));
   fireEvent.click(screen.getByText(/^应\s*用$/));
   expect(field("实际发音")).toHaveValue("kæt");

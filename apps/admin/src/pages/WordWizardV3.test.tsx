@@ -1,3 +1,4 @@
+import { changeVoiceText } from "@/features/dictionary/word-creation-v3/components/V3VoiceTextField.test-helper";
 import { wordKeys } from "@/features/dictionary/api";
 import {
   QueryClient,
@@ -287,11 +288,11 @@ describe("WordWizardV3Page", () => {
       const save = screen.getByText("保存草稿").closest("button")!;
       const original = (input as HTMLInputElement).value;
       expect(save).toBeDisabled();
-      fireEvent.change(input, { target: { value: "edited" } });
+      await changeVoiceText(input, { target: { value: "edited" } });
       expect(save).toBeEnabled();
-      fireEvent.change(input, { target: { value: original } });
+      await changeVoiceText(input, { target: { value: original } });
       expect(save).toBeDisabled();
-      fireEvent.change(input, { target: { value: "edited" } });
+      await changeVoiceText(input, { target: { value: "edited" } });
       fireEvent.click(save);
       const request =
         step === "forms"
@@ -694,7 +695,7 @@ describe("WordWizardV3Page", () => {
     if (firstVariant.mode !== "common")
       throw new Error("expected common fixture");
     firstVariant.common.spelling = "centre-edited";
-    fireEvent.change(await screen.findByLabelText("原形英美通用拼写"), {
+    await changeVoiceText(await screen.findByLabelText("原形英美通用拼写"), {
       target: { value: "centre-edited" }
     });
     fireEvent.click(await screen.findByText("保存草稿"));
@@ -768,7 +769,7 @@ describe("WordWizardV3Page", () => {
     if (firstVariant.mode !== "common")
       throw new Error("expected common fixture");
     firstVariant.common.spelling = "centre-edited";
-    fireEvent.change(await screen.findByLabelText("原形英美通用拼写"), {
+    await changeVoiceText(await screen.findByLabelText("原形英美通用拼写"), {
       target: { value: "centre-edited" }
     });
     fireEvent.click(await screen.findByText("保存草稿"));
@@ -859,7 +860,7 @@ describe("WordWizardV3Page", () => {
     expect(await screen.findAllByLabelText("被引用 1")).not.toHaveLength(0);
     // TASK#58：被引用不再锁英美结构开关（引用按语义坐标重解析）。
     expect(screen.getByLabelText("英美拼写有区别")).not.toBeDisabled();
-    fireEvent.change(await screen.findByLabelText("原形英美通用拼写"), {
+    await changeVoiceText(await screen.findByLabelText("原形英美通用拼写"), {
       target: { value: "center" }
     });
     expect(screen.getByText("保存草稿").closest("button")).toBeEnabled();
@@ -977,7 +978,7 @@ describe("WordWizardV3Page", () => {
       screen.getByText("保存草稿").closest(".v3-disabled-reason")
     ).toBeNull();
     // 有改动、拼写仍与失效片段对不上：旧冲突不挡，保存照样可点。
-    fireEvent.change(screen.getByLabelText("原形英美通用拼写"), {
+    await changeVoiceText(screen.getByLabelText("原形英美通用拼写"), {
       target: { value: "centres" }
     });
     expect(screen.getByText("保存草稿").closest("button")).not.toBeDisabled();
@@ -997,7 +998,7 @@ describe("WordWizardV3Page", () => {
       createV3WordRequests(endpoints)
     );
     expect(await screen.findByText("引用信息暂不可用")).toBeInTheDocument();
-    fireEvent.change(await screen.findByLabelText("原形英美通用拼写"), {
+    await changeVoiceText(await screen.findByLabelText("原形英美通用拼写"), {
       target: { value: "centre-edited" }
     });
     fireEvent.click(screen.getByText("保存草稿"));
@@ -1098,7 +1099,7 @@ describe("WordWizardV3Page", () => {
       createV3WordRequests(endpoints)
     );
 
-    fireEvent.change(await screen.findByLabelText("原形英美通用拼写"), {
+    await changeVoiceText(await screen.findByLabelText("原形英美通用拼写"), {
       target: { value: "center-unsaved" }
     });
     fireEvent.click(screen.getByText("进入词义与例句"));
@@ -1154,13 +1155,13 @@ describe("WordWizardV3Page", () => {
     if (firstVariant.mode !== "common")
       throw new Error("expected common fixture");
     firstVariant.common.spelling = "centre-edited";
-    fireEvent.change(await screen.findByLabelText("原形英美通用拼写"), {
+    await changeVoiceText(await screen.findByLabelText("原形英美通用拼写"), {
       target: { value: "centre-edited" }
     });
     fireEvent.click(await screen.findByText("保存草稿"));
     expect(await screen.findByText("确认影响并保存草稿")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText(`原形英美通用拼写`), {
+    await changeVoiceText(screen.getByLabelText(`原形英美通用拼写`), {
       target: { value: "center-updated" }
     });
     await waitFor(() =>
@@ -1272,7 +1273,7 @@ describe("WordWizardV3Page", () => {
       createV3WordRequests(endpoints)
     );
 
-    fireEvent.change(await screen.findByLabelText(`原形英美通用拼写`), {
+    await changeVoiceText(await screen.findByLabelText(`原形英美通用拼写`), {
       target: { value: "centre-local-draft" }
     });
     fireEvent.click(screen.getByText("词义与例句"));
@@ -1384,7 +1385,7 @@ describe("WordWizardV3Page", () => {
       target: { value: "词形保存后仍保留" }
     });
     fireEvent.click(screen.getByText("词形与发音"));
-    fireEvent.change(await screen.findByLabelText(`原形英美通用拼写`), {
+    await changeVoiceText(await screen.findByLabelText(`原形英美通用拼写`), {
       target: { value: "centre-forms-saved" }
     });
     fireEvent.click(screen.getByText("保存草稿").closest("button")!);
@@ -1426,7 +1427,7 @@ describe("WordWizardV3Page", () => {
       createV3WordRequests(endpoints)
     );
 
-    fireEvent.change(await screen.findByLabelText(`原形英美通用拼写`), {
+    await changeVoiceText(await screen.findByLabelText(`原形英美通用拼写`), {
       target: { value: "centre-unsaved-forms" }
     });
     fireEvent.click(screen.getByText("词义与例句"));

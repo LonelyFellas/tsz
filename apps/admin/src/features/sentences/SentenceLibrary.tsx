@@ -171,20 +171,19 @@ export function SentenceLibrary({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linkedSentenceId]);
   const rows = query.data?.items ?? [];
-  if (editor)
-    return (
-      <SentenceEditor
-        key={`${editor.id}:${editor.revision}`}
-        sentence={editor}
-        onClose={() => setEditor(undefined)}
-        onSaved={() => {
-          setEditor(undefined);
-          refresh();
-        }}
-      />
-    );
   return (
     <Flex vertical gap="middle">
+      {editor && (
+        <SentenceEditor
+          key={`${editor.id}:${editor.revision}`}
+          sentence={editor}
+          onClose={() => setEditor(undefined)}
+          onSaved={() => {
+            setEditor(undefined);
+            refresh();
+          }}
+        />
+      )}
       <Flex justify="space-between" align="center">
         <Typography.Title level={entryId ? 4 : 2} style={{ margin: 0 }}>
           多维例句

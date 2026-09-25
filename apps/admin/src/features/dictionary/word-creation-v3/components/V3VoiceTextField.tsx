@@ -17,7 +17,7 @@ import {
   toRichTextV2
 } from "@tsz/voice-editor/core";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
-import { AudioOutlined, EditOutlined } from "@ant-design/icons";
+import { EditOutlined } from "@ant-design/icons";
 import { flushSync } from "react-dom";
 import { Button, Input, Space, message } from "antd";
 import {
@@ -39,6 +39,7 @@ import { env } from "@/lib/env";
 // 样式随组件一起引入：V3 这条路径此前从没挂过语音编辑器，不引的话两层各画各的、完全错位。
 import "@tsz/voice-editor/styles.css";
 import "./V3VoiceTextField.css";
+import { VoiceEditorModal } from "./VoiceEditorModal";
 
 const VoiceEditor = lazy(() =>
   import("@tsz/voice-editor/editor").then((module) => ({
@@ -55,7 +56,7 @@ function voiceLocale(dialect?: Dialect): AudioAssetLocaleV3 | undefined {
 
 /** 录词条英文的字段（释义、例句、语法结构）用 Ubuntu；两种音标字段不能用，Ubuntu 缺音标字形。 */
 const ENTRY_ENGLISH_MODES: ReadonlySet<NonNullable<VoiceEditorProps["mode"]>> =
-  new Set(["grammar", "association"]);
+  new Set(["grammar", "association", "spelling"]);
 
 export interface V3VoiceTextFieldProps<
   TLink extends VoiceAssociation = TextLinkV3
@@ -82,6 +83,7 @@ export interface V3VoiceTextFieldProps<
   value: RichTextV3;
   ariaLabel: string;
   nodeId: string;
+  nodeAliases?: string;
   field: string;
   placeholder?: string;
   readOnly?: boolean;
@@ -97,16 +99,7 @@ export interface V3VoiceTextFieldProps<
   onChange: VoiceEditorProps<TLink>["onChange"];
 }
 
-/**
- * V3 里带语音标注的文本字段。
- *
- * 默认显示普通输入框，点击右侧入口才展开编辑器；完成后回到输入框。
- * 两种视图都实时回写同一份正文、标注和关联，不把富文本降成纯字符串。
- *
- * `data-v3-node-id` / `data-v3-field` 必须落在**真正可聚焦的输入框**上：向导的
- * 错误定位是 `querySelector` 之后 `focus()` 再校验 `activeElement`，挂在外层
- * 容器上会让「跳到出错字段」失效。
- */
+// 错误定位属性仅挂在当前编辑入口，避免弹窗与页面出现重复锚点。
 export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   onDone,
   onCancel,
@@ -125,6 +118,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   value,
   ariaLabel,
   nodeId,
+  nodeAliases,
   field,
   placeholder,
   readOnly,
@@ -139,6 +133,10 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
 }: V3VoiceTextFieldProps<TLink>) {
   const [editing, setEditing] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [recorded, setRecorded] = useState(value.text.length > 0);
+  useEffect(() => {
+    if (!editing && !focused && !value.text) setRecorded(false);
+  }, [editing, focused, value.text]);
   const [editorSession, setEditorSession] = useState(0);
   const captureSession = () =>
     structuredClone({ nodeId, value, textLinks, voiceProfile, audioAssets });
@@ -252,8 +250,11 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   const fallback = (
     <Input.TextArea
       onFocus={() => setFocused(true)}
-      onBlur={() => setFocused(false)}
-      aria-label={ariaLabel}
+      onBlur={() => {
+        setFocused(false);
+        if (value.text.trim()) setRecorded(true);
+      }}
+      aria-label={expanded ? `${ariaLabel}预览` : ariaLabel}
       aria-invalid={invalid}
       status={invalid ? "error" : undefined}
       // 有连读时为弧线留出高度；增删标注也会触发自动重新测量。
@@ -264,8 +265,9 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           : undefined
       }
       className={`word-pronunciation-phonetic-input${englishContent ? " tsz-entry-en" : ""}${largePreview ? " v3-voice-text-large-preview" : ""}${mode === "grammar" ? " v3-grammar-input" : ""}`}
-      data-v3-field={field}
-      data-v3-node-id={nodeId}
+      data-v3-field={expanded ? undefined : field}
+      data-v3-node-id={expanded ? undefined : nodeId}
+      data-v3-node-aliases={expanded ? undefined : nodeAliases}
       onKeyDown={(event) => {
         if (
           (event.metaKey || event.ctrlKey) &&
@@ -277,6 +279,11 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         }
       }}
       onChange={(event) => {
+        if (
+          readOnly ||
+          (env.VOICE_EDITOR && editingEnabled && (recorded || expanded))
+        )
+          return;
         const inputType = (event.nativeEvent as InputEvent).inputType;
         if (inputType === "historyUndo" || inputType === "historyRedo") {
           restore(inputType === "historyRedo");
@@ -295,7 +302,10 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           void feedback.info("已移除受改字影响的关联或标注，可撤销恢复");
       }}
       placeholder={placeholder}
-      readOnly={readOnly || (expanded && presentation !== "editor")}
+      readOnly={
+        readOnly ||
+        (env.VOICE_EDITOR && editingEnabled && (recorded || expanded))
+      }
       value={value.text}
     />
   );
@@ -344,41 +354,32 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       </>
     );
 
-  if (!expanded) {
-    return (
-      <>
-        {feedbackHolder}
-        <Space.Compact block className="v3-voice-text-field-compact">
-          {leadingAction}
-          {/* 外层常驻：连读有无切换时只增删弧线层，输入框不重挂，打字的光标不丢。 */}
-          {collapsedField}
-          <Button
-            aria-label={`打开${ariaLabel}编辑器`}
-            // 正文还是空的时候没有东西可标注，编辑器打开也只是一块空画布，先置灰。
-            disabled={readOnly || value.text.trim() === ""}
-            title={
-              mode === "actual-pron" ? "编辑实际发音与连读标注" : undefined
-            }
-            icon={mode === "actual-pron" ? <EditOutlined /> : <AudioOutlined />}
-            onClick={() => {
-              session.current = captureSession();
-              setEditing(true);
-            }}
-            style={{ height: "auto" }}
-          />
-        </Space.Compact>
-      </>
-    );
-  }
+  const fieldView = (
+    <Space.Compact block className="v3-voice-text-field-compact">
+      {leadingAction}
+      {collapsedField}
+      <Button
+        aria-label={`打开${ariaLabel}编辑器`}
+        disabled={readOnly}
+        icon={<EditOutlined />}
+        onClick={() => {
+          session.current = captureSession();
+          setRecorded(true);
+          setEditing(true);
+        }}
+        style={{ height: "auto" }}
+      />
+    </Space.Compact>
+  );
 
-  return (
+  const editor = (
     <div className="v3-voice-text-editor" style={{ minWidth: 0 }}>
       {feedbackHolder}
       <Suspense fallback={<div style={{ paddingBottom: 32 }}>{fallback}</div>}>
         <VoiceEditor<TLink>
           key={`${nodeId}:${editorSession}`}
           onAssociationPendingChange={onAssociationPendingChange}
-          textReadOnly={presentation !== "editor"}
+          textReadOnly={false}
           mode={mode}
           locale={voiceLocale(dialect)}
           textLinks={textLinks}
@@ -387,7 +388,8 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           contextLabel={ariaLabel}
           inputDataAttributes={{
             "data-v3-node-id": nodeId,
-            "data-v3-field": field
+            "data-v3-field": field,
+            ...(nodeAliases ? { "data-v3-node-aliases": nodeAliases } : {})
           }}
           language="en"
           placeholder={placeholder}
@@ -437,6 +439,25 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         </Space>
       )}
     </div>
+  );
+
+  if (presentation === "editor") return editor;
+  return (
+    <>
+      {fieldView}
+      {editing && (
+        <VoiceEditorModal
+          title={`编辑${ariaLabel}`}
+          open={editing}
+          footer={null}
+          onCancel={cancelEditing}
+          closable={!doneLoading}
+          keyboard={!doneLoading}
+        >
+          {editor}
+        </VoiceEditorModal>
+      )}
+    </>
   );
 }
 

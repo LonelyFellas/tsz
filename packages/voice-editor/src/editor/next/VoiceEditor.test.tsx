@@ -231,9 +231,21 @@ function useLiaisonBrush() {
   fireEvent.click(document.querySelector(".tsz-ve-liaison-button")!);
 }
 
-/** 连读面板上的「起点 / 终点」开关：接下来点的字母归这一端。 */
-function chooseEnd(label: "起点" | "终点") {
-  fireEvent.click(button(`选择${label}`));
+function selectText(start: number, end: number) {
+  const input = document.querySelector<HTMLTextAreaElement>(
+    ".tsz-ve-canvas-input"
+  )!;
+  input.focus();
+  input.setSelectionRange(start, end);
+  fireEvent.mouseUp(input);
+  fireEvent.select(input);
+}
+
+function connect(start: number, end: number, startLength = 1, endLength = 1) {
+  selectText(start, start + startLength);
+  fireEvent.click(button("连读起点"));
+  selectText(end, end + endLength);
+  fireEvent.click(button("连读终点"));
 }
 
 /**
@@ -391,7 +403,8 @@ it("连续标注明确进入和退出，收起分类不残留画笔", () => {
     "data-brush",
     "none"
   );
-  expect(screen.queryByLabelText("语法结构标注")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("语法结构标注")).toBeInTheDocument();
+  expect(button("连读起点")).toBeInTheDocument();
 });
 
 it("语法结构先选文本再选择分类，保持旧 wire 格式并支持撤销", () => {
@@ -454,7 +467,7 @@ it("先选两个词再打开连读，选区生成端点并在确认后保存", (
   fireEvent.select(input);
   useLiaisonBrush();
   expect(view.onChange).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByLabelText("添加连读"));
+  fireEvent.click(button("确认添加"));
   expect(view.onChange).toHaveBeenLastCalledWith(
     expect.objectContaining({
       annotations: [
@@ -553,10 +566,10 @@ describe("VoiceEditor 标注带", () => {
     expect(letter(0, 0)).toHaveAttribute("aria-disabled", "false");
     expect(gap(0)).toHaveAttribute("aria-disabled", "true");
 
-    // 连读：同样认字母
+    // 连读保持文本可选，不接管鼠标为字母画笔。
     useLiaisonBrush();
     expect(word("a").tagName).toBe("SPAN");
-    expect(letter(0, 0)).toHaveAttribute("aria-disabled", "false");
+    expect(letter(0, 0)).toHaveAttribute("aria-disabled", "true");
     expect(gap(0)).toHaveAttribute("aria-disabled", "true");
 
     // 停顿：认词缝，字母不可点
@@ -565,114 +578,62 @@ describe("VoiceEditor 标注带", () => {
     expect(letter(0, 0)).toHaveAttribute("aria-disabled", "true");
   });
 
-  it("连读两段选：起点一个词、终点另一个词，确认后成线", () => {
+  it("连读默认可用：选中整段文本直接添加首尾连读", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
-    useLiaisonBrush();
-
-    fireEvent.mouseDown(letter(1, 5)); // centre 的 e
-    expect(letter(1, 5)).toHaveClass("is-anchor-start");
-    // 两端未齐前不能确认
-    expect(button("添加连读")).toBeDisabled();
-
-    chooseEnd("终点");
-    fireEvent.mouseDown(letter(2, 0)); // of 的 o
-    expect(letter(2, 0)).toHaveClass("is-anchor-end");
-    expect(button("添加连读")).toBeEnabled();
-
-    fireEvent.click(button("添加连读"));
-
+    expect(button("确认添加")).toBeDisabled();
+    selectText(7, 10);
+    fireEvent.click(button("确认添加"));
     expect(applied(view).annotations).toEqual([
-      {
-        type: "liaison",
-        start: 7,
-        end: 10,
-        start_len: 1,
-        end_len: 1
-      }
+      { type: "liaison", start: 7, end: 10, start_len: 1, end_len: 1 }
     ]);
   });
 
-  it("两端都能扩成多字母锚点，并在工具栏回显选中的字母", () => {
+  it("先选起点再选终点，点终点立即成线并保留多字母宽度", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
-    useLiaisonBrush();
-
-    // 起点：centre 的 "re"
-    fireEvent.mouseDown(letter(1, 4));
-    fireEvent.mouseDown(letter(1, 5));
-    expect(letter(1, 4)).toHaveClass("is-anchor-start");
-    expect(letter(1, 5)).toHaveClass("is-anchor-start");
-
-    // 终点：of 的 "of"
-    chooseEnd("终点");
-    fireEvent.mouseDown(letter(2, 0));
-    fireEvent.mouseDown(letter(2, 1));
-    expect(letter(2, 1)).toHaveClass("is-anchor-end");
-
-    // 锚点回显已并入工具栏，不再是标注带下方的独立一行。
-    // 一端可以横跨几个词，「在哪个词」说明不了位置，回显的是选中的那几个字母。
-    const slots = [...document.querySelectorAll(".tsz-ve-anchor-slot")].map(
-      (slot) => slot.textContent
-    );
-    expect(slots[0]).toBe("re");
-    expect(slots[1]).toBe("of");
-
-    fireEvent.click(button("添加连读"));
-    // 两端各自的宽度也存得下：起点 "re"、终点 "of" 各占 2 个码点。
+    selectText(6, 8);
+    fireEvent.click(button("连读起点"));
+    expect(view.onChange).not.toHaveBeenCalled();
+    expect(screen.getByText("起点「re」，请选中终点文字")).toBeInTheDocument();
+    selectText(9, 11);
+    fireEvent.click(button("连读终点"));
     expect(applied(view).annotations).toEqual([
       { type: "liaison", start: 6, end: 11, start_len: 2, end_len: 2 }
     ]);
   });
 
-  it("点隔开的字母会把中间整段填满，而不是丢掉先点的那个", () => {
-    render(<VoiceEditor {...props()} />);
-    useLiaisonBrush();
-
-    fireEvent.mouseDown(letter(1, 0));
-    fireEvent.mouseDown(letter(1, 3)); // 跳开的字母
-    for (const offset of [0, 1, 2, 3]) {
-      expect(letter(1, offset)).toHaveClass("is-anchor-start");
-    }
-
-    // 再点已选中的字母则收回到该字母，给一个就地重来的出口
-    fireEvent.mouseDown(letter(1, 2));
-    expect(letter(1, 2)).toHaveClass("is-anchor-start");
-    expect(letter(1, 0)).not.toHaveClass("is-anchor-start");
+  it("选择另一个起点会替换未完成的起点", () => {
+    const view = props();
+    render(<VoiceEditor {...view} />);
+    selectText(2, 6);
+    fireEvent.click(button("连读起点"));
+    selectText(4, 5);
+    fireEvent.click(button("连读起点"));
+    selectText(9, 10);
+    fireEvent.click(button("连读终点"));
+    expect(applied(view).annotations).toEqual([
+      { type: "liaison", start: 4, end: 10, start_len: 1, end_len: 1 }
+    ]);
   });
 
   it("一端可以横跨空格盖住相邻两个词", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
-    useLiaisonBrush();
-
-    // 起点从 centre 的 "re" 一路拉到 of 的 "o"
-    fireEvent.mouseDown(letter(1, 4));
-    fireEvent.mouseDown(letter(2, 0));
-    expect(letter(1, 4)).toHaveClass("is-anchor-start");
-    expect(letter(1, 5)).toHaveClass("is-anchor-start");
-    expect(letter(2, 0)).toHaveClass("is-anchor-start");
-    expect(document.querySelector(".tsz-ve-anchor-slot")?.textContent).toBe(
-      "re o"
-    );
-
-    chooseEnd("终点");
-    fireEvent.mouseDown(letter(3, 0));
-    fireEvent.click(button("添加连读"));
-    // 起点占 "re o" 共 4 个码点（含空格），终点是 the 的 t
+    connect(6, 12, 4);
     expect(applied(view).annotations).toEqual([
       { type: "liaison", start: 6, end: 13, start_len: 4, end_len: 1 }
     ]);
   });
 
-  it("同一个词里点第二下只是改起点，不会被当成终点", () => {
-    render(<VoiceEditor {...props()} />);
-    useLiaisonBrush();
-
-    fireEvent.mouseDown(letter(1, 0));
-    fireEvent.mouseDown(letter(1, 1));
-    expect(document.querySelectorAll(".is-anchor-end")).toHaveLength(0);
-    expect(button("添加连读")).toBeDisabled();
+  it("选起点不会保存半条连读", () => {
+    const view = props();
+    render(<VoiceEditor {...view} />);
+    selectText(2, 4);
+    fireEvent.click(button("连读起点"));
+    expect(view.onChange).not.toHaveBeenCalled();
+    selectText(0, 0);
+    expect(button("连读终点")).toBeDisabled();
   });
 
   it.each([false, true])(
@@ -682,56 +643,37 @@ describe("VoiceEditor 标注带", () => {
         value: { version: 2, text: "part-time", annotations: [] }
       });
       const mounted = render(<VoiceEditor {...view} />);
-      useLiaisonBrush();
-      fireEvent.mouseDown(letter(0, reverse ? 5 : 3));
-      chooseEnd("终点");
-      fireEvent.mouseDown(letter(0, reverse ? 3 : 5));
-      expect(button("添加连读")).toBeEnabled();
-      fireEvent.click(button("添加连读"));
-      const saved = view.onChange.mock.calls.at(-1)![0];
+      connect(reverse ? 5 : 3, reverse ? 3 : 5);
+      const saved = applied(view);
       expect(saved.annotations).toEqual([
         { type: "liaison", start: 3, end: 6, start_len: 1, end_len: 1 }
       ]);
       mounted.unmount();
       render(<VoiceEditor {...props({ value: saved })} />);
-      useLiaisonBrush();
-      fireEvent.mouseDown(letter(0, 3));
-      chooseEnd("终点");
-      fireEvent.mouseDown(letter(0, 5));
-      fireEvent.click(button("添加连读"));
+      connect(3, 5);
       expect(screen.getByText("这两处已经连过了")).toBeInTheDocument();
     }
   );
 
-  it("端别由面板开关手选，不按点击先后推断：先定终点再回头选起点也行", () => {
+  it("语法结构与连读共用选区，不需要切换画笔", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
-    useLiaisonBrush();
-    expect(button("选择起点")).toHaveAttribute("aria-pressed", "true");
-
-    // 点到另一个词也不会被当成终点：开关还在「起点」上，只是换了起点
-    fireEvent.mouseDown(letter(1, 5));
-    fireEvent.mouseDown(letter(2, 0));
-    expect(letter(2, 0)).toHaveClass("is-anchor-start");
-    expect(document.querySelectorAll(".is-anchor-end")).toHaveLength(0);
-
-    chooseEnd("终点");
-    expect(button("选择终点")).toHaveAttribute("aria-pressed", "true");
-    fireEvent.mouseDown(letter(3, 0)); // the 的 t
-    expect(letter(3, 0)).toHaveClass("is-anchor-end");
-
-    // 回头改起点，终点原样保留
-    chooseEnd("起点");
-    fireEvent.mouseDown(letter(1, 5));
-    expect(letter(1, 5)).toHaveClass("is-anchor-start");
-    expect(letter(3, 0)).toHaveClass("is-anchor-end");
-
-    fireEvent.click(button("添加连读"));
-    expect(applied(view).annotations).toEqual([
-      { type: "liaison", start: 7, end: 13, start_len: 1, end_len: 1 }
-    ]);
-    // 成线后开关回到「起点」
-    expect(button("选择起点")).toHaveAttribute("aria-pressed", "true");
+    selectText(2, 8);
+    fireEvent.click(button("标记为固定核心词"));
+    fireEvent.click(button("确认添加"));
+    expect(applied(view).annotations).toEqual(
+      expect.arrayContaining([
+        { type: "emphasis", start: 2, end: 8, level: "core" },
+        { type: "liaison", start: 2, end: 8, start_len: 1, end_len: 1 }
+      ])
+    );
+    fireEvent.click(button("标记为词性提示符"));
+    expect(applied(view).annotations).toEqual(
+      expect.arrayContaining([
+        { type: "emphasis", start: 2, end: 8, level: "grammar" },
+        { type: "liaison", start: 2, end: 8, start_len: 1, end_len: 1 }
+      ])
+    );
   });
 
   it("连读弧颜色是本机偏好：面板里有取色器，改一次弧线层立即换色", () => {
@@ -755,10 +697,7 @@ describe("VoiceEditor 标注带", () => {
     render(<VoiceEditor {...view} />);
     useLiaisonBrush();
 
-    fireEvent.mouseDown(letter(0, 0)); // a
-    chooseEnd("终点");
-    fireEvent.mouseDown(letter(4, 3)); // city 的 y
-    fireEvent.click(button("添加连读"));
+    connect(0, 19);
 
     expect(applied(view).annotations).toEqual([
       {
@@ -771,27 +710,19 @@ describe("VoiceEditor 标注带", () => {
     ]);
   });
 
-  it("重选清空草稿，换画笔或改文本也清空", () => {
+  it("取消起点或改文本会清空连读草稿", () => {
     render(<VoiceEditor {...props()} />);
-    useLiaisonBrush();
-
-    fireEvent.mouseDown(letter(0, 0));
-    fireEvent.click(button("重选"));
-    expect(document.querySelectorAll(".is-anchor-start")).toHaveLength(0);
-
-    // 换画笔
-    fireEvent.mouseDown(letter(0, 0));
-    usePauseBrush();
-    useLiaisonBrush();
-    expect(document.querySelectorAll(".is-anchor-start")).toHaveLength(0);
-
-    // 改文本也丢弃未拼完的草稿：锚点按词序号存，词一变就不再可信
-    fireEvent.mouseDown(letter(0, 0));
+    selectText(0, 1);
+    fireEvent.click(button("连读起点"));
+    fireEvent.click(button("取消起点"));
+    expect(button("连读终点")).toBeDisabled();
+    selectText(0, 1);
+    fireEvent.click(button("连读起点"));
     fireEvent.change(screen.getByLabelText("语音编辑器"), {
       target: { value: "a centre of the town" }
     });
-    useLiaisonBrush();
-    expect(document.querySelectorAll(".is-anchor-start")).toHaveLength(0);
+    selectText(2, 3);
+    expect(button("连读终点")).toBeDisabled();
   });
 
   it("停顿画笔按所选时长落到词缝上", () => {
@@ -1321,16 +1252,16 @@ describe("VoiceEditor 文本与落盘", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
     useLiaisonBrush();
-    fireEvent.mouseDown(letter(1, 5));
-    chooseEnd("终点");
-    fireEvent.mouseDown(letter(2, 0));
-    fireEvent.click(button("添加连读"));
+    connect(7, 9);
     expect(applied(view).annotations).toHaveLength(1);
 
     fireEvent.change(screen.getByLabelText("语音编辑器"), {
       target: { value: "a centre\nof the city" }
     });
 
+    expect(applied(view).text).toBe(TEXT);
+    expect(applied(view).annotations).toHaveLength(1);
+    fireEvent.click(button("确认修改"));
     expect(applied(view).text).toBe("a centre\nof the city");
     expect(applied(view).annotations).toEqual([]);
 
@@ -1347,10 +1278,7 @@ describe("VoiceEditor 文本与落盘", () => {
     });
     render(<VoiceEditor {...view} />);
     useLiaisonBrush();
-    fireEvent.mouseDown(letter(1, 5));
-    chooseEnd("终点");
-    fireEvent.mouseDown(letter(2, 0));
-    fireEvent.click(button("添加连读"));
+    connect(7, 9);
 
     expect(screen.getByText(/连读不能跨越换行/)).toBeInTheDocument();
     expect(view.onChange).not.toHaveBeenCalled();
@@ -1365,15 +1293,8 @@ describe("VoiceEditor 文本与落盘", () => {
     render(<VoiceEditor {...view} />);
     useLiaisonBrush();
 
-    fireEvent.mouseDown(letter(0, 3));
-    chooseEnd("终点");
-    fireEvent.mouseDown(letter(1, 0));
-    fireEvent.click(button("添加连读"));
-
-    fireEvent.mouseDown(letter(1, 1));
-    chooseEnd("终点");
-    fireEvent.mouseDown(letter(2, 0));
-    fireEvent.click(button("添加连读"));
+    connect(3, 5);
+    connect(6, 8);
 
     expect(applied(view).annotations).toEqual([
       {
@@ -1401,15 +1322,8 @@ describe("VoiceEditor 文本与落盘", () => {
     render(<VoiceEditor {...view} />);
     useLiaisonBrush();
 
-    fireEvent.mouseDown(letter(0, 0));
-    chooseEnd("终点");
-    fireEvent.mouseDown(letter(0, 2));
-    fireEvent.click(button("添加连读"));
-
-    fireEvent.mouseDown(letter(0, 1));
-    chooseEnd("终点");
-    fireEvent.mouseDown(letter(0, 4));
-    fireEvent.click(button("添加连读"));
+    connect(0, 2);
+    connect(1, 4);
 
     expect(applied(view).annotations).toEqual([
       { type: "liaison", start: 0, end: 3, start_len: 1, end_len: 1 },
@@ -1445,16 +1359,10 @@ describe("VoiceEditor 文本与落盘", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
     useLiaisonBrush();
-    fireEvent.mouseDown(letter(1, 5));
-    chooseEnd("终点");
-    fireEvent.mouseDown(letter(2, 0));
-    fireEvent.click(button("添加连读"));
+    connect(7, 9);
 
     // 添加成功后开关回到「起点」，第二条从头选
-    fireEvent.mouseDown(letter(1, 5));
-    chooseEnd("终点");
-    fireEvent.mouseDown(letter(2, 0));
-    fireEvent.click(button("添加连读"));
+    connect(7, 9);
 
     expect(screen.getByText(/已经连过了/)).toBeInTheDocument();
     expect(applied(view).annotations).toHaveLength(1);
@@ -1510,15 +1418,15 @@ describe("VoiceEditor 文本与落盘", () => {
     expect(input()).toHaveValue("a centre of the town");
   });
 
-  it("关掉连读面板即收笔，不会留下够不着「添加」的草稿", () => {
+  it("连读操作始终可见且不阻挡文本输入", () => {
     render(<VoiceEditor {...props()} />);
     const canvas = document.querySelector(".tsz-ve-canvas")!;
     useLiaisonBrush();
-    expect(canvas).toHaveAttribute("data-target", "letter");
-
-    // 再点一次 = 关面板；面板是它的工作台，关掉就该收笔
+    expect(canvas).toHaveAttribute("data-target", "none");
+    expect(button("连读起点")).toBeInTheDocument();
     useLiaisonBrush();
     expect(canvas).toHaveAttribute("data-target", "none");
+    expect(button("确认添加")).toBeInTheDocument();
   });
 
   it("焦点在工具栏上时 Esc 也能收笔", () => {
@@ -2360,7 +2268,7 @@ it("按字段分工给工具：只有字典音标那一侧收走连读", () => {
   expect(screen.queryByRole("button", { name: /语法结构/ })).toBeNull();
   for (const name of ["连读", "停顿", "发音", "音频"])
     expect(
-      screen.getByRole("button", { name: new RegExp(name) })
+      screen.getByRole("button", { name: new RegExp(`^${name}$`) })
     ).toBeInTheDocument();
 
   // 字典音标只负责喂语音合成：语法结构和连读都不给。
@@ -2369,16 +2277,16 @@ it("按字段分工给工具：只有字典音标那一侧收走连读", () => {
     expect(screen.queryByRole("button", { name: new RegExp(name) })).toBeNull();
   for (const name of ["停顿", "发音", "音频"])
     expect(
-      screen.getByRole("button", { name: new RegExp(name) })
+      screen.getByRole("button", { name: new RegExp(`^${name}$`) })
     ).toBeInTheDocument();
 
   rerender(<VoiceEditor {...view} mode="grammar" />);
   expect(screen.getByRole("button", { name: /语法结构/ })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: /连读/ })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "连读" })).toBeInTheDocument();
 
   // 实际发音只用于展示：留连读，其余冲着合成去的工具都收起来。
   rerender(<VoiceEditor {...view} mode="actual-pron" />);
-  expect(screen.getByRole("button", { name: /连读/ })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "连读" })).toBeInTheDocument();
   for (const name of ["语法结构", "停顿", "发音", "音频"])
     expect(screen.queryByRole("button", { name: new RegExp(name) })).toBeNull();
 });

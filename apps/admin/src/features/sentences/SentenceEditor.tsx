@@ -36,6 +36,7 @@ import { editableEnglishText } from "../dictionary/word-creation-v3/meaningsMode
 import { SharedSentenceAssociationPicker } from "./SharedSentenceAssociationPicker";
 import { newSentence } from "./model";
 import "./SentenceEditor.css";
+import { VoiceEditorModal } from "../dictionary/word-creation-v3/components/VoiceEditorModal";
 const LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"].map((value) => ({
   value,
   label: value
@@ -359,224 +360,238 @@ export function SentenceEditor({
   };
   return (
     <PronunciationPreviewProvider>
-      <Flex className="sentence-editor" vertical gap="middle">
-        {recovery.notice}
-        {router && !registerLeaveGuard && (
-          <SentenceNavigationGuard
-            dirty={dirty}
-            saving={saving}
-            canSave={canSave}
-            save={finish}
-          />
-        )}
-        <Flex justify="space-between" align="center">
-          <Typography.Text type="secondary">
-            {sentence
-              ? `保存仅更新草稿；发布后影响 ${sentence.entries.length} 个词条的 ${sentence.entries.reduce((count, entry) => count + entry.senses.length, 0)} 个词义`
-              : "例句独立保存为草稿，发布后按句内关联展示到对应词义。"}
-          </Typography.Text>
-          <Space>
-            <Typography.Text>等级</Typography.Text>
-            <Select
-              aria-label="例句等级"
-              value={content.sentence.level}
-              options={LEVELS}
-              disabled={saving}
-              onChange={(level) =>
-                setContent((current) => ({
-                  ...current,
-                  sentence: { ...current.sentence, level }
-                }))
-              }
+      <VoiceEditorModal
+        open
+        title="编辑例句"
+        footer={null}
+        onCancel={close}
+        closable={!saving}
+        keyboard={!saving}
+      >
+        <Flex className="sentence-editor" vertical gap="middle">
+          {recovery.notice}
+          {router && !registerLeaveGuard && (
+            <SentenceNavigationGuard
+              dirty={dirty}
+              saving={saving}
+              canSave={canSave}
+              save={finish}
             />
-          </Space>
-        </Flex>
-        {error && (
-          <Alert type="error" title={error} description="输入已保留。" />
-        )}
-        {conflict && (
-          <Alert
-            type="warning"
-            title="例句版本冲突"
-            description="本地输入仍已保留。比较最新草稿并选择保留或放弃后，才能再次保存。"
-            action={
-              <Space wrap>
-                <Button loading={saving} onClick={() => void refreshConflict()}>
-                  刷新并比较
-                </Button>
-                {latest && (
-                  <>
-                    <Button
-                      disabled={saving}
-                      onClick={() => resolveConflict(false)}
-                    >
-                      保留本地修改
-                    </Button>
-                    <Button
-                      disabled={saving}
-                      danger
-                      onClick={() =>
-                        modal.confirm({
-                          title: "放弃本地修改？",
-                          content: `未保存的输入会被丢弃，改用第 ${latest.revision} 版内容。`,
-                          onOk: () => resolveConflict(true)
-                        })
-                      }
-                    >
-                      放弃本地修改
-                    </Button>
-                  </>
-                )}
-              </Space>
-            }
-          />
-        )}
-        {latest && <DraftComparison local={content} remote={latest.content} />}
-        {content.annotations.some(
-          (annotation) => annotation.target.state === "entry_only"
-        ) && (
-          <Alert
-            type="warning"
-            title="旧关联待选择词义"
-            description="请点击原来的关联片段，补选具体词义或清除关联后再完成。"
-          />
-        )}
-        {sourceEntryId && (
-          <Alert
-            type={currentLinked ? "success" : "info"}
-            title={
-              currentLinked
-                ? `已关联当前词义：${contextLabel}`
-                : `请关联当前词义：${contextLabel}`
-            }
-            description={
-              !currentLinked
-                ? "至少一处单词或短语关联到此词义后才能完成。"
-                : undefined
-            }
-          />
-        )}
-        {candidates.length > 0 && (
-          <Flex wrap gap="small" aria-label="当前词义匹配位置">
-            {candidates.map(({ segments, target, gloss, surface }) => (
-              <Button
-                key={segments[0]!.start}
-                size="small"
-                disabled={saving || pendingAnnotation}
-                onClick={() => {
-                  setTargetLabels((labels) => ({
-                    ...labels,
-                    [`${sourceEntryId}:${sourceSenseId}`]: `${surface.headword} · ${gloss}`
-                  }));
+          )}
+          <Flex justify="space-between" align="center">
+            <Typography.Text type="secondary">
+              {sentence
+                ? `保存仅更新草稿；发布后影响 ${sentence.entries.length} 个词条的 ${sentence.entries.reduce((count, entry) => count + entry.senses.length, 0)} 个词义`
+                : "例句独立保存为草稿，发布后按句内关联展示到对应词义。"}
+            </Typography.Text>
+            <Space>
+              <Typography.Text>等级</Typography.Text>
+              <Select
+                aria-label="例句等级"
+                value={content.sentence.level}
+                options={LEVELS}
+                disabled={saving}
+                onChange={(level) =>
                   setContent((current) => ({
                     ...current,
-                    annotations: [
-                      ...current.annotations,
-                      {
-                        id: crypto.randomUUID(),
-                        source_dialect: row.dialect,
-                        source_segments: segments,
-                        target
-                      }
-                    ]
-                  }));
-                }}
-              >
-                确认关联 {segments.map((s) => s.surface).join(" … ")}（位置{" "}
-                {segments[0]!.start + 1}）
-              </Button>
-            ))}
-          </Flex>
-        )}
-        {rows.length > 1 && (
-          <Radio.Group
-            aria-label="例句方言"
-            value={row.dialect}
-            disabled={saving}
-            onChange={(event) => setDialect(event.target.value)}
-            options={rows.map((item) => ({
-              value: item.dialect,
-              label: item.dialect === "uk" ? "英式" : "美式"
-            }))}
-          />
-        )}
-        {variant && (
-          <V3VoiceTextField<SharedSentenceAnnotation>
-            key={row.variant_id}
-            mode="association"
-            presentation="editor"
-            restoreTextLinksOnCorrection
-            audioUploadEnabled
-            value={variant.value}
-            textLinks={content.annotations.filter(
-              (item) => item.source_dialect === row.dialect
-            )}
-            ariaLabel="例句正文"
-            nodeId={row.variant_id}
-            field="value"
-            placeholder="请输入英文例句"
-            dialect={row.dialect}
-            readOnly={saving}
-            onAssociationPendingChange={setPendingAnnotation}
-            showDone={false}
-            onChange={(value, annotations) =>
-              changeVariant({ value }, annotations)
-            }
-            voiceProfile={variant.voice_profile}
-            onVoiceProfileChange={(voice_profile) =>
-              changeVariant({ voice_profile })
-            }
-            audioAssets={variant.audio_assets}
-            onAudioAssetsChange={(audio_assets) =>
-              changeVariant({ audio_assets })
-            }
-            renderAssociationPicker={(props) => (
-              <SharedSentenceAssociationPicker
-                {...props}
-                key={`${props.kind}:${props.selected?.id ?? props.segments.map((segment) => `${segment.start}:${segment.end}`).join(",")}`}
-                dialect={row.dialect}
-                labels={targetLabels}
-                sourceEntryId={sourceEntryId}
-                sourceSenseId={sourceSenseId}
-                sourcePosId={
-                  sourceWord?.meanings.pos.find((pos) =>
-                    pos.senses.some((sense) => sense.id === sourceSenseId)
-                  )?.pos_id
-                }
-                sourceForms={sourceWord?.forms}
-                onTargetLabel={(id, label) =>
-                  setTargetLabels((current) => ({ ...current, [id]: label }))
+                    sentence: { ...current.sentence, level }
+                  }))
                 }
               />
-            )}
+            </Space>
+          </Flex>
+          {error && (
+            <Alert type="error" title={error} description="输入已保留。" />
+          )}
+          {conflict && (
+            <Alert
+              type="warning"
+              title="例句版本冲突"
+              description="本地输入仍已保留。比较最新草稿并选择保留或放弃后，才能再次保存。"
+              action={
+                <Space wrap>
+                  <Button
+                    loading={saving}
+                    onClick={() => void refreshConflict()}
+                  >
+                    刷新并比较
+                  </Button>
+                  {latest && (
+                    <>
+                      <Button
+                        disabled={saving}
+                        onClick={() => resolveConflict(false)}
+                      >
+                        保留本地修改
+                      </Button>
+                      <Button
+                        disabled={saving}
+                        danger
+                        onClick={() =>
+                          modal.confirm({
+                            title: "放弃本地修改？",
+                            content: `未保存的输入会被丢弃，改用第 ${latest.revision} 版内容。`,
+                            onOk: () => resolveConflict(true)
+                          })
+                        }
+                      >
+                        放弃本地修改
+                      </Button>
+                    </>
+                  )}
+                </Space>
+              }
+            />
+          )}
+          {latest && (
+            <DraftComparison local={content} remote={latest.content} />
+          )}
+          {content.annotations.some(
+            (annotation) => annotation.target.state === "entry_only"
+          ) && (
+            <Alert
+              type="warning"
+              title="旧关联待选择词义"
+              description="请点击原来的关联片段，补选具体词义或清除关联后再完成。"
+            />
+          )}
+          {sourceEntryId && (
+            <Alert
+              type={currentLinked ? "success" : "info"}
+              title={
+                currentLinked
+                  ? `已关联当前词义：${contextLabel}`
+                  : `请关联当前词义：${contextLabel}`
+              }
+              description={
+                !currentLinked
+                  ? "至少一处单词或短语关联到此词义后才能完成。"
+                  : undefined
+              }
+            />
+          )}
+          {candidates.length > 0 && (
+            <Flex wrap gap="small" aria-label="当前词义匹配位置">
+              {candidates.map(({ segments, target, gloss, surface }) => (
+                <Button
+                  key={segments[0]!.start}
+                  size="small"
+                  disabled={saving || pendingAnnotation}
+                  onClick={() => {
+                    setTargetLabels((labels) => ({
+                      ...labels,
+                      [`${sourceEntryId}:${sourceSenseId}`]: `${surface.headword} · ${gloss}`
+                    }));
+                    setContent((current) => ({
+                      ...current,
+                      annotations: [
+                        ...current.annotations,
+                        {
+                          id: crypto.randomUUID(),
+                          source_dialect: row.dialect,
+                          source_segments: segments,
+                          target
+                        }
+                      ]
+                    }));
+                  }}
+                >
+                  确认关联 {segments.map((s) => s.surface).join(" … ")}（位置{" "}
+                  {segments[0]!.start + 1}）
+                </Button>
+              ))}
+            </Flex>
+          )}
+          {rows.length > 1 && (
+            <Radio.Group
+              aria-label="例句方言"
+              value={row.dialect}
+              disabled={saving}
+              onChange={(event) => setDialect(event.target.value)}
+              options={rows.map((item) => ({
+                value: item.dialect,
+                label: item.dialect === "uk" ? "英式" : "美式"
+              }))}
+            />
+          )}
+          {variant && (
+            <V3VoiceTextField<SharedSentenceAnnotation>
+              key={row.variant_id}
+              mode="association"
+              presentation="editor"
+              restoreTextLinksOnCorrection
+              audioUploadEnabled
+              value={variant.value}
+              textLinks={content.annotations.filter(
+                (item) => item.source_dialect === row.dialect
+              )}
+              ariaLabel="例句正文"
+              nodeId={row.variant_id}
+              field="value"
+              placeholder="请输入英文例句"
+              dialect={row.dialect}
+              readOnly={saving}
+              onAssociationPendingChange={setPendingAnnotation}
+              showDone={false}
+              onChange={(value, annotations) =>
+                changeVariant({ value }, annotations)
+              }
+              voiceProfile={variant.voice_profile}
+              onVoiceProfileChange={(voice_profile) =>
+                changeVariant({ voice_profile })
+              }
+              audioAssets={variant.audio_assets}
+              onAudioAssetsChange={(audio_assets) =>
+                changeVariant({ audio_assets })
+              }
+              renderAssociationPicker={(props) => (
+                <SharedSentenceAssociationPicker
+                  {...props}
+                  key={`${props.kind}:${props.selected?.id ?? props.segments.map((segment) => `${segment.start}:${segment.end}`).join(",")}`}
+                  dialect={row.dialect}
+                  labels={targetLabels}
+                  sourceEntryId={sourceEntryId}
+                  sourceSenseId={sourceSenseId}
+                  sourcePosId={
+                    sourceWord?.meanings.pos.find((pos) =>
+                      pos.senses.some((sense) => sense.id === sourceSenseId)
+                    )?.pos_id
+                  }
+                  sourceForms={sourceWord?.forms}
+                  onTargetLabel={(id, label) =>
+                    setTargetLabels((current) => ({ ...current, [id]: label }))
+                  }
+                />
+              )}
+            />
+          )}
+          <V3SentenceTranslationsField
+            sentence={content.sentence}
+            index={0}
+            disabled={saving}
+            onChange={(zh_translations) =>
+              setContent((current) => ({
+                ...current,
+                sentence: { ...current.sentence, zh_translations }
+              }))
+            }
           />
-        )}
-        <V3SentenceTranslationsField
-          sentence={content.sentence}
-          index={0}
-          disabled={saving}
-          onChange={(zh_translations) =>
-            setContent((current) => ({
-              ...current,
-              sentence: { ...current.sentence, zh_translations }
-            }))
-          }
-        />
-        <Flex justify="end" gap="small">
-          <Button disabled={saving} onClick={close}>
-            取消
-          </Button>
-          <Button
-            aria-label="完成例句编辑"
-            type="primary"
-            loading={saving}
-            disabled={!canSave}
-            onClick={() => void finish()}
-          >
-            完成
-          </Button>
+          <Flex justify="end" gap="small">
+            <Button disabled={saving} onClick={close}>
+              取消
+            </Button>
+            <Button
+              aria-label="完成例句编辑"
+              type="primary"
+              loading={saving}
+              disabled={!canSave}
+              onClick={() => void finish()}
+            >
+              完成
+            </Button>
+          </Flex>
         </Flex>
-      </Flex>
+      </VoiceEditorModal>
     </PronunciationPreviewProvider>
   );
 }

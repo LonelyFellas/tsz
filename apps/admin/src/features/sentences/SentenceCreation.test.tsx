@@ -376,6 +376,8 @@ describe("按词条关联反查共享多维例句", () => {
       await screen.findByText("已关联当前词义：make up · 编造（故事、借口等）");
       const input = screen.getByRole("textbox", { name: "例句正文" });
       fireEvent.change(input, { target: { value: typo } });
+      expect(input).toHaveValue(text);
+      fireEvent.click(screen.getByRole("button", { name: "确认修改" }));
       expect(
         screen.getByRole("button", { name: "完成例句编辑" })
       ).toBeDisabled();

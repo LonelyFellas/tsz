@@ -9,6 +9,138 @@ import {
 } from "./support/mockAdminV3Api";
 
 test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () => {
+  test("统一富文本弹窗：保持布局、拖动、选区连读、改字确认和取消恢复", async ({
+    page
+  }) => {
+    test.skip(
+      process.env.VITE_VOICE_EDITOR !== "true",
+      "需要显式启用语音编辑器的构建"
+    );
+    await mockAdminV3Api(page);
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/meanings`);
+    const opener = page
+      .getByRole("button", { name: /^打开.*语法结构.*编辑器$/ })
+      .first();
+    await opener.click();
+    const dialog = page
+      .getByRole("dialog")
+      .filter({ has: page.locator(".tsz-ve-editor") });
+    await expect(dialog).toBeVisible();
+    const input = dialog.locator(".tsz-ve-canvas-input");
+    await expect(input).toHaveCount(1);
+    await expect(input).toBeEditable();
+    await expect
+      .poll(() =>
+        dialog
+          .locator(".ant-modal-body")
+          .evaluate((body) => body.scrollWidth - body.clientWidth)
+      )
+      .toBe(0);
+    await expect(dialog.locator(".tsz-ve-inline-tools")).toHaveAttribute(
+      "data-combined",
+      "true"
+    );
+    const original = await input.inputValue();
+    await input.fill("a job");
+    await input.press("ControlOrMeta+A");
+    const actions = dialog.locator(".tsz-ve-inline-tools");
+    await expect(actions).toHaveCount(1);
+    await expect(actions).toHaveAttribute("data-combined", "true");
+    const grammarActions = actions.getByRole("group", { name: "语法标注类别" });
+    const liaisonActions = actions.locator(".tsz-ve-selection-liaison");
+    await expect
+      .poll(async () => {
+        const grammarBox = (await grammarActions.boundingBox())!;
+        const liaisonBox = (await liaisonActions.boundingBox())!;
+        return Math.abs(
+          grammarBox.y +
+            grammarBox.height / 2 -
+            liaisonBox.y -
+            liaisonBox.height / 2
+        );
+      })
+      .toBeLessThan(2);
+    const grammarBox = (await grammarActions.boundingBox())!;
+    const liaisonBox = (await liaisonActions.boundingBox())!;
+    expect(liaisonBox.x - grammarBox.x - grammarBox.width).toBeLessThan(35);
+    const canvasBox = (await dialog.locator(".tsz-ve-canvas").boundingBox())!;
+    const footerBox = (await dialog
+      .locator(".v3-voice-text-editor-done")
+      .boundingBox())!;
+    expect(footerBox.y).toBeGreaterThanOrEqual(
+      canvasBox.y + canvasBox.height - 1
+    );
+    await dialog.getByRole("button", { name: "确认添加", exact: true }).click();
+    await expect(
+      dialog.locator(".tsz-ve-arc-layer path").first()
+    ).toBeVisible();
+    await expect(actions).toHaveAttribute("data-combined", "true");
+    await input.press("Escape");
+    await expect(actions).toHaveAttribute("data-combined", "true");
+    await input.fill("new text");
+    const confirmation = page.getByRole("dialog", {
+      name: "修改文字会移除已有标注"
+    });
+    await expect(confirmation).toBeVisible();
+    await confirmation.getByRole("button", { name: "保留原文" }).click();
+    await expect(confirmation).toBeHidden();
+    await expect(input).toHaveValue("a job");
+    const handle = dialog.locator(".ant-modal-title");
+    const box = (await handle.boundingBox())!;
+    await page.mouse.move(box.x + 100, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 160, box.y + box.height / 2 + 50, {
+      steps: 5
+    });
+    await page.mouse.up();
+    await expect
+      .poll(async () => Math.round((await handle.boundingBox())!.x - box.x))
+      .toBe(60);
+    await dialog.locator(".tsz-ve-role-button").click();
+    await page.screenshot({
+      path: test.info().outputPath("unified-rich-editor.png")
+    });
+    await dialog.getByRole("button", { name: /^取消.*编辑$/ }).click();
+    await expect(dialog).toBeHidden();
+    await expect(opener).toBeVisible();
+    await opener.click();
+    await expect(dialog.locator(".tsz-ve-canvas-input")).toHaveValue(original);
+  });
+
+  test("统一富文本入口：拼写和实际发音可打开编辑并取消", async ({ page }) => {
+    test.skip(
+      process.env.VITE_VOICE_EDITOR !== "true",
+      "需要显式启用语音编辑器的构建"
+    );
+    await mockAdminV3Api(page);
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+    for (const name of [/^打开.*拼写编辑器$/, /^打开.*实际发音编辑器$/]) {
+      const opener = page.getByRole("button", { name }).first();
+      await opener.click();
+      const dialog = page
+        .getByRole("dialog")
+        .filter({ has: page.locator(".tsz-ve-editor") });
+      const input = dialog.locator(".tsz-ve-canvas-input");
+      await expect(input).toBeEditable();
+      await expect(input).toHaveCount(1);
+      const original = await input.inputValue();
+      await input.fill(`${original}x`);
+      const confirmation = page.getByRole("dialog", {
+        name: "修改文字会移除已有标注"
+      });
+      if (await confirmation.isVisible())
+        await confirmation.getByRole("button", { name: "确认修改" }).click();
+      await dialog.getByRole("button", { name: /^取消.*编辑$/ }).click();
+      await expect(dialog).toBeHidden();
+      await opener.click();
+      await expect(dialog.locator(".tsz-ve-canvas-input")).toHaveValue(
+        original
+      );
+      await dialog.getByRole("button", { name: /^取消.*编辑$/ }).click();
+      await expect(dialog).toBeHidden();
+    }
+  });
+
   test("词义删除使用页面顶部弹窗，取消保留、确认才删除", async ({ page }) => {
     await mockAdminV3Api(page);
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/meanings`);

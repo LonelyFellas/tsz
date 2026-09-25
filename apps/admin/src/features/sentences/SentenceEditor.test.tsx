@@ -187,7 +187,11 @@ describe("当前词条关联与离开保护", () => {
     expect(screen.getByRole("textbox", { name: "例句正文" })).toHaveValue(
       "We make stories."
     );
-    const dialog = await screen.findByRole("dialog");
+    const dialog = (
+      await screen.findByText("放弃本地修改？", {
+        selector: ".ant-modal-confirm-title"
+      })
+    ).closest('[role="dialog"]')! as HTMLElement;
     fireEvent.click(within(dialog).getByRole("button", { name: /OK|确.*定/ }));
     await waitFor(() =>
       expect(screen.getByRole("textbox", { name: "例句正文" })).toHaveValue(
@@ -516,19 +520,31 @@ describe("当前词条关联与离开保护", () => {
       { target: { value: "保留我的修改" } }
     );
     fireEvent.click(screen.getByText("离开词条"));
-    let dialog = await screen.findByRole("dialog");
+    let dialog = (await screen.findByText("例句还有未保存的修改")).closest(
+      '[role="dialog"]'
+    )! as HTMLElement;
     fireEvent.click(within(dialog).getByRole("button", { name: "继续编辑" }));
     expect(router.state.location.pathname).toBe("/");
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "例句还有未保存的修改" })
+      ).toBeNull()
+    );
     fireEvent.click(screen.getByText("离开词条"));
-    dialog = await screen.findByRole("dialog");
+    dialog = (await screen.findByText("例句还有未保存的修改")).closest(
+      '[role="dialog"]'
+    )! as HTMLElement;
     fireEvent.click(
       within(dialog).getByRole("button", { name: "保存例句后离开" })
     );
     await screen.findByText("版本已变化");
     expect(router.state.location.pathname).toBe("/");
     expect(screen.getByDisplayValue("保留我的修改")).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "例句还有未保存的修改" })
+      ).toBeNull()
+    );
     fireEvent.click(screen.getByText("离开词条"));
     const retry = await screen.findByRole("button", { name: "保存例句后离开" });
     await waitFor(() => expect(retry).toBeEnabled());
