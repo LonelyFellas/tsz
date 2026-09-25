@@ -130,7 +130,7 @@ test.describe("鉴权与引导端到端流程", () => {
     expect(registrations).toBe(0);
     await page.getByRole("button", { name: "没有账号，立即注册" }).click();
     await expect(page).toHaveURL(/\/register\?method=email&redirect=/);
-    await page.getByPlaceholder("请输入邮箱").fill("Student@EXAMPLE.com");
+    await page.getByPlaceholder("请输入邮箱").fill("　Student@EXAMPLE.com ");
     const sent = page.waitForRequest("**/api/v1/otp/send");
     await page.getByRole("button", { name: "获取验证码" }).click();
     expect((await sent).postDataJSON()).toEqual({
