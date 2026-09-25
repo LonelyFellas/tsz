@@ -7,41 +7,52 @@
   display: none;
 }
 
-/* 两层同时留出完成按钮的空间，保持光标对齐，并避开末行停顿标记。 */
+.v3-voice-text-editor .tsz-ve-markup {
+  box-sizing: border-box;
+  border: 1px solid #e1e6ef;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.v3-voice-text-editor:has(.v3-voice-text-editor-done) .tsz-ve-markup {
+  border-bottom: 0;
+  border-radius: 12px 12px 0 0;
+}
+
+.v3-voice-text-editor .tsz-ve-toolbar,
+.v3-voice-text-editor .tsz-ve-canvas {
+  border: 0;
+  border-radius: 0;
+}
+
+.v3-voice-text-editor .tsz-ve-canvas {
+  background: #fff;
+}
+
+/* 输入层与标注层必须使用相同的内边距，保证选区和光标对齐。 */
 .v3-voice-text-editor .tsz-ve-strip,
 .v3-voice-text-editor .tsz-ve-canvas-input {
-  padding-bottom: 44px;
+  padding: 32px 20px;
 }
 
 .v3-voice-text-editor-done {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  z-index: 1;
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  border: 1px solid #e1e6ef;
+  border-top: 1px solid #edf0f5;
+  border-radius: 0 0 12px 12px;
+  background: #fafbfe;
 }
 
-/* 完成按钮与底栏次要操作共用最后一行，不再额外占一行。 */
-.v3-voice-text-editor:has(.v3-voice-text-editor-done) .tsz-ve-grammar-actions {
-  padding-right: 126px;
-}
-.v3-voice-text-editor:has(.tsz-ve-role-inline)
-  .v3-voice-text-editor-done
-  .ant-btn {
-  height: 26px;
-  border-radius: 6px;
-  padding-inline: 12px;
-  font-size: 12px;
-}
-
-/* 窄栏无法同时容纳四个操作时，取消/完成独占最后一行，避免遮挡。 */
-@container tsz-voice-editor (max-width: 330px) {
-  .v3-voice-text-editor:has(.v3-voice-text-editor-done) .tsz-ve-role-inline {
-    padding-bottom: 44px;
-  }
-  .v3-voice-text-editor:has(.v3-voice-text-editor-done)
-    .tsz-ve-grammar-actions {
-    padding-right: 0;
-  }
+.v3-voice-text-editor-done .ant-btn {
+  min-width: 68px;
+  height: 30px;
+  border-radius: 7px;
+  padding-inline: 14px;
+  font-size: 13px;
 }
 
 .v3-voice-text-field-compact > .word-pronunciation-play-action {

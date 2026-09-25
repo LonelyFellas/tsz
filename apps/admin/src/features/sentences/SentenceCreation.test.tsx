@@ -372,21 +372,20 @@ describe("按词条关联反查共享多维例句", () => {
           onClose={vi.fn()}
         />
       );
-      await screen.findByRole("toolbar", { name: "标注工具栏" });
+      await screen.findByLabelText("标注工具栏");
       await screen.findByText("已关联当前词义：make up · 编造（故事、借口等）");
-      const input = screen.getByRole("textbox", { name: "例句正文" });
+      const input = screen.getByLabelText("例句正文");
+      const save = screen.getByLabelText("完成例句编辑");
       fireEvent.change(input, { target: { value: typo } });
-      expect(
-        screen.getByRole("button", { name: "完成例句编辑" })
-      ).toBeDisabled();
-      fireEvent.change(input, { target: { value: text } });
-      await waitFor(() =>
-        expect(
-          screen.getByRole("button", { name: "完成例句编辑" })
-        ).toBeEnabled()
+      expect(input).toHaveValue(text);
+      fireEvent.click(
+        screen.getByText("确认修改", { selector: "button span" })
       );
+      expect(save).toBeDisabled();
+      fireEvent.change(input, { target: { value: text } });
+      await waitFor(() => expect(save).toBeEnabled());
       expect(screen.queryByText(/正文变化使部分原标注位置失效/)).toBeNull();
-      fireEvent.click(screen.getByRole("button", { name: "完成例句编辑" }));
+      fireEvent.click(save);
       await waitFor(() => expect(api.sentences.update).toHaveBeenCalledOnce());
       expect(
         vi.mocked(api.sentences.update).mock.calls[0]![1].content.annotations

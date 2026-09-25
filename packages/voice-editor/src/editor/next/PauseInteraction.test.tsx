@@ -61,6 +61,7 @@ function select(start: number, end = start) {
   const input = screen.getByLabelText("语音编辑器") as HTMLTextAreaElement;
   input.focus();
   input.setSelectionRange(start, end);
+  fireEvent.mouseUp(input);
   fireEvent.select(input);
   fireEvent.click(input);
 }
@@ -196,16 +197,8 @@ describe("停顿定位与显式编辑", () => {
 
   it("添加连读跨过停顿也必须确认，取消保留原标注", async () => {
     render(<Host />);
-    fireEvent.click(button("连读"));
-    fireEvent.mouseDown(document.querySelector('[data-codepoint="12"]')!, {
-      button: 0
-    });
-    fireEvent.click(screen.getByLabelText("选择终点"));
-    fireEvent.mouseDown(document.querySelector('[data-codepoint="18"]')!, {
-      button: 0
-    });
-    expect(screen.getByLabelText("添加连读")).not.toBeDisabled();
-    fireEvent.click(screen.getByLabelText("添加连读"));
+    select(12, 19);
+    fireEvent.click(button("确认添加"));
     expect(data()).toEqual(initial);
     fireEvent.click(
       await screen.findByRole("button", { name: "移除冲突停顿，添加连读" })

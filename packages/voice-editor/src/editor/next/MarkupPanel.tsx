@@ -47,6 +47,7 @@ export interface DropdownTool {
   stayOpen?: boolean;
   /** 语法分类使用行内面板，不遮挡需要选择的正文。 */
   inline?: boolean;
+  alwaysVisible?: boolean;
   suppressPopup?: boolean;
 }
 
@@ -152,6 +153,16 @@ export function MarkupPanel({
   // 正文关联多一个工具，提早切换纯图标，但所有入口始终保留。
   const compact = width <= 640 + Math.max(0, tools.length - 6) * 80;
 
+  const inlineTools = tools.filter(
+    (tool) =>
+      tool.inline &&
+      (tool.alwaysVisible ||
+        openTool === tool.key ||
+        (tool.key === "roles" && showRoleSelection))
+  );
+  const combinedTools =
+    inlineTools.some((tool) => tool.key === "roles") &&
+    inlineTools.some((tool) => tool.key === "liaison");
   const marked =
     marks.roles.length +
     marks.liaisons.length +
@@ -186,7 +197,9 @@ export function MarkupPanel({
                   aria-pressed={tool.active ?? false}
                   aria-expanded={
                     tool.inline
-                      ? openTool === tool.key || !!showRoleSelection
+                      ? tool.alwaysVisible ||
+                        openTool === tool.key ||
+                        !!showRoleSelection
                       : undefined
                   }
                   disabled={readOnly}
@@ -195,7 +208,11 @@ export function MarkupPanel({
                   }
                   onClick={() =>
                     onOpenToolChange(
-                      tool.inline && openTool === tool.key ? "text" : tool.key
+                      tool.inline &&
+                        !tool.alwaysVisible &&
+                        openTool === tool.key
+                        ? "text"
+                        : tool.key
                     )
                   }
                 >
@@ -298,6 +315,22 @@ export function MarkupPanel({
         </span>
       </div>
 
+      {inlineTools.length > 0 && (
+        <div
+          className="tsz-ve-inline-tools"
+          data-combined={combinedTools || undefined}
+        >
+          {inlineTools.map((tool) => (
+            <div
+              key={tool.key}
+              className="tsz-ve-inline-tool-group"
+              data-tool={tool.key}
+            >
+              {tool.content}
+            </div>
+          ))}
+        </div>
+      )}
       <AnnotationStrip
         associationContent={associationContent}
         associationAnchor={associationAnchor}
@@ -326,13 +359,6 @@ export function MarkupPanel({
         onLetterClick={onLetterClick}
         onLiaisonClick={onLiaisonClick}
       />
-      {tools.map((tool) =>
-        tool.inline && (openTool === tool.key || showRoleSelection) ? (
-          <div key={tool.key} className="tsz-ve-role-inline">
-            {tool.content}
-          </div>
-        ) : null
-      )}
     </div>
   );
 }

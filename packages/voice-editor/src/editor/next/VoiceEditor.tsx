@@ -6,7 +6,8 @@ import {
   PauseOutlined,
   SoundOutlined
 } from "@ant-design/icons";
-import { Alert, Button, Modal, Tag, Tooltip } from "antd";
+import { Alert, Button, ColorPicker, Modal, Tag, Tooltip } from "antd";
+import { setLiaisonColor, useLiaisonColor } from "../../marks";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RichText, RichTextV2, TextLinkV3 } from "@tsz/types";
 import { AUDIO_ASSETS_PER_VARIANT_MAX } from "@tsz/types";
@@ -42,7 +43,6 @@ import {
 import { MarkupPanel, type DropdownTool } from "./MarkupPanel";
 import {
   LiaisonIcon,
-  LiaisonPanel,
   PausePanel,
   RolePanel,
   UploadPanel,
@@ -155,6 +155,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
    * 初值直接从 value 灌，而不是先置空再由 effect 补。先置空的话，首帧折算出的是
    * 空内容，实时回调会把这份空值抛给宿主——一挂载就把表单里原有的文本清掉。
    */
+  const liaisonColor = useLiaisonColor();
   const [initial] = useState(() => parseValue(value));
   const [text, setText] = useState(initial.value.text);
   const [links, setLinks] = useState<TLink[]>(textLinks ?? []);
@@ -171,6 +172,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   const [marks, setMarks] = useState<MarkState>(() =>
     annotationsToMarks(initial.value)
   );
+  const [pendingText, setPendingText] = useState<string>();
   const [loadError, setLoadError] = useState(initial.error ?? "");
   const [brush, setBrush] = useState<Brush>(DEFAULT_BRUSH);
   const [textSelection, setTextSelection] = useState<{
@@ -202,6 +204,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     setPauseGap(undefined);
     setPauseFromMarker(false);
     setPendingConflict(undefined);
+    setPendingText(undefined);
     setLinkWords([]);
     setLinkAnchor(undefined);
     setInspectedLinkId(undefined);
@@ -492,8 +495,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       }
       paintRoles(roles);
       lastRoleRef.current = next.level;
-      changeBrush({ kind: "none" });
-      setTextSelection(textSelection);
+      setBrush({ kind: "none" });
       setOpenTool(undefined);
       return;
     }
@@ -560,39 +562,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       setOpenTool("roles");
       return;
     }
-    if (
-      mode === "grammar" &&
-      textSelection &&
-      (key === "roles" || key === "liaison")
-    ) {
-      changeBrush({ kind: "none" });
-      setTextSelection(textSelection);
-      if (key === "liaison") {
-        const selected = tokens.filter(
-          (token) =>
-            token.start < textSelection.end && token.end > textSelection.start
-        );
-        const first = selected[0];
-        const last = selected.at(-1);
-        if (!first || !last) {
-          setValidationMessage("请先选中文字来添加连读");
-          return;
-        }
-        // 选区与该词的交集就是这一端；同一个词时退成选区的首尾两个字母。
-        const within = (token: typeof first) => ({
-          start: Math.max(token.start, textSelection.start),
-          end: Math.min(token.end, textSelection.end)
-        });
-        setDraft(
-          first.index === last.index
-            ? {
-                start: makeAnchor(Math.max(first.start, textSelection.start)),
-                end: makeAnchor(Math.min(last.end, textSelection.end) - 1)
-              }
-            : { start: within(first), end: within(last) }
-        );
-      }
-      setOpenTool(key);
+    if (key === "liaison") {
+      setBrush({ kind: "none" });
+      setOpenTool("liaison");
       return;
     }
     setOpenTool(key);
@@ -702,11 +674,22 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     setValidationMessage("");
   };
 
-  const changeText = (nextText: string) => {
+  const changeText = (nextText: string, confirmed = false) => {
     if (readOnly || textReadOnly) return;
+    const nextMarks = remapMarks(text, nextText, marks);
     const mapped = restoreTextLinksOnCorrection
       ? remapTextLinksWithRecovery(text, nextText, links, recoverableLinks)
       : { links: remapTextLinks(text, nextText, links), recoverable: [] };
+    if (
+      !confirmed &&
+      (nextMarks.liaisons.length < marks.liaisons.length ||
+        Object.keys(nextMarks.pauses).length <
+          Object.keys(marks.pauses).length ||
+        mapped.links.length < links.length)
+    ) {
+      setPendingText(nextText);
+      return;
+    }
     setLinkNotice(
       restoreTextLinksOnCorrection
         ? mapped.recoverable.length
@@ -717,11 +700,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           : ""
     );
     commit(
-      (current) => ({
+      () => ({
         text: nextText,
         textLinks: mapped.links,
         recoverableTextLinks: mapped.recoverable,
-        marks: remapMarks(current.text, nextText, current.marks)
+        marks: nextMarks
       }),
       { typing: true }
     );
@@ -1010,12 +993,12 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     });
   };
 
-  const commitLiaison = () => {
-    if (!draft.start || !draft.end) return;
+  const commitLiaison = (selected: LiaisonDraft = draft) => {
+    if (readOnly || !selected.start || !selected.end) return;
     const link =
-      draft.start.start <= draft.end.start
-        ? { start: draft.start, end: draft.end }
-        : { start: draft.end, end: draft.start };
+      selected.start.start <= selected.end.start
+        ? { start: selected.start, end: selected.end }
+        : { start: selected.end, end: selected.start };
     if (!isValidLiaison(link)) {
       setValidationMessage("请选择有效的连读端点");
       return;
@@ -1053,6 +1036,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       marks: { ...current.marks, liaisons: [...current.marks.liaisons, link] }
     }));
     resetTransient();
+    setTextSelection(textSelection);
   };
 
   const resetDraft = resetTransient;
@@ -1310,8 +1294,13 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       label: "语法结构",
       ariaLabel: `语法结构 ${roleLabel}`,
       className: `tsz-ve-role-button is-${roleLevel}`,
-      active: brush.kind === "role" || openTool === "roles" || !!textSelection,
+      active:
+        mode === "grammar" ||
+        brush.kind === "role" ||
+        openTool === "roles" ||
+        !!textSelection,
       inline: mode === "grammar",
+      alwaysVisible: mode === "grammar",
       icon: (
         <span
           className={`tsz-ve-pop-swatch is-${roleLevel} tsz-ve-role-dot`}
@@ -1377,21 +1366,75 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       label: "连读",
       icon: <LiaisonIcon />,
       className: "tsz-ve-liaison-button",
-      active: brush.kind === "liaison",
+      active: true,
       dividerBefore: true,
-      // 面板开在上方且不随外部点击关闭：选锚点要在下面的文字上点字母。
-      placement: "topLeft" as const,
-      stayOpen: true,
+      inline: true,
+      alwaysVisible: true,
       content: (
-        <LiaisonPanel
-          readOnly={readOnly}
-          text={text}
-          draft={draft}
-          activeEnd={liaisonEnd}
-          onActiveEndChange={setLiaisonEnd}
-          onCommit={commitLiaison}
-          onResetDraft={resetDraft}
-        />
+        <div
+          className="tsz-ve-selection-liaison"
+          onMouseDown={(event) => event.preventDefault()}
+        >
+          <Button
+            size="small"
+            disabled={readOnly || !textSelection}
+            onClick={() => {
+              if (!textSelection) return;
+              setDraft({ start: { ...textSelection } });
+            }}
+          >
+            连读起点
+          </Button>
+          <Button
+            size="small"
+            disabled={readOnly || !draft.start || !textSelection}
+            onClick={() => {
+              if (textSelection)
+                commitLiaison({
+                  start: draft.start,
+                  end: { ...textSelection }
+                });
+            }}
+          >
+            连读终点
+          </Button>
+          <Button
+            size="small"
+            disabled={
+              readOnly ||
+              !textSelection ||
+              textSelection.end - textSelection.start < 2
+            }
+            onClick={() => {
+              if (!textSelection) return;
+              commitLiaison({
+                start: makeAnchor(textSelection.start),
+                end: makeAnchor(textSelection.end - 1)
+              });
+            }}
+          >
+            确认添加
+          </Button>
+          <ColorPicker
+            size="small"
+            value={liaisonColor}
+            disabledAlpha
+            disabled={readOnly}
+            onChange={(color) => setLiaisonColor(color.toHexString())}
+          />
+          {draft.start && (
+            <Button size="small" onClick={resetDraft}>
+              取消起点
+            </Button>
+          )}
+          <span>
+            {draft.start
+              ? `起点「${Array.from(text).slice(draft.start.start, draft.start.end).join("")}」，请选中终点文字`
+              : textSelection
+                ? `已选「${Array.from(text).slice(textSelection.start, textSelection.end).join("")}」`
+                : "先选中文字，再添加连读"}
+          </span>
+        </div>
       )
     },
     {
@@ -1534,6 +1577,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     // 字典音标只负责喂语音合成，连读是展示用的标注，归实际发音那一侧。
     // 判据必须是这个显式取值：默认的 pronunciation 还挂着别的调用方，
     // 摘在默认值上会连带把它们的连读也拿掉。
+    if (mode === "spelling") return tool.key === "text";
     if (mode === "dict-phonetic")
       return tool.key !== "roles" && tool.key !== "liaison";
     // 实际发音只用于展示，其余工具都是冲着合成去的。
@@ -1593,6 +1637,20 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         openToolAndArm("text");
       }}
     >
+      <Modal
+        open={pendingText !== undefined}
+        title="修改文字会移除已有标注"
+        okText="确认修改"
+        cancelText="保留原文"
+        onOk={() => {
+          if (pendingText !== undefined) changeText(pendingText, true);
+          setPendingText(undefined);
+        }}
+        onCancel={() => setPendingText(undefined)}
+        okButtonProps={{ disabled: readOnly }}
+      >
+        此次修改会移除受影响的连读、关联或停顿。未受影响的标注会保留；确认后仍可撤销恢复。
+      </Modal>
       <Modal
         destroyOnHidden
         open={!!pendingConflict}
@@ -1655,7 +1713,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         readOnly={readOnly}
         textReadOnly={textReadOnly}
         onRoleRange={handleRoleRange}
-        onTextSelection={mode === "grammar" ? setTextSelection : undefined}
+        onTextSelection={setTextSelection}
         roleAnchorStart={roleAnchor?.start}
         onGapClick={handleGapClick}
         onInspectPause={inspectPause}

@@ -165,7 +165,7 @@ export function WordSentences({
         onToggle={() => setCollapsed(!collapsed)}
       />
       <SenseSectionBody collapsed={collapsed}>
-        {editor ? (
+        {editor && (
           <SentenceEditor
             key={editor === "new" ? "new" : `${editor.id}:${editor.revision}`}
             sourceWord={sourceWord}
@@ -180,130 +180,125 @@ export function WordSentences({
               refresh();
             }}
           />
-        ) : (
-          <Flex vertical gap="small">
-            <Typography.Text type="secondary">
-              {savedSense
-                ? "保存只更新例句草稿；例句发布后才更新展示。局部移除随词条发布生效。"
-                : "先保存词义，再添加例句。"}
-            </Typography.Text>
-            {query.isError && (
-              <Alert
-                type="error"
-                title="例句加载失败"
-                action={
-                  <Button onClick={() => void query.refetch()}>重试</Button>
-                }
-              />
-            )}
-            {!rows.length && !query.isFetching && (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="暂无关联例句"
-              />
-            )}
-            {rows.map((item) => (
+        )}
+        <Flex vertical gap="small">
+          <Typography.Text type="secondary">
+            {savedSense
+              ? "保存只更新例句草稿；例句发布后才更新展示。局部移除随词条发布生效。"
+              : "先保存词义，再添加例句。"}
+          </Typography.Text>
+          {query.isError && (
+            <Alert
+              type="error"
+              title="例句加载失败"
+              action={
+                <Button onClick={() => void query.refetch()}>重试</Button>
+              }
+            />
+          )}
+          {!rows.length && !query.isFetching && (
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description="暂无关联例句"
+            />
+          )}
+          {rows.map((item) => (
+            <Flex
+              key={item.id}
+              vertical
+              gap={12}
+              className="shared-sentence-row"
+            >
               <Flex
-                key={item.id}
-                vertical
-                gap={12}
-                className="shared-sentence-row"
+                align="center"
+                justify="space-between"
+                gap="small"
+                className="shared-sentence-header"
               >
-                <Flex
-                  align="center"
-                  justify="space-between"
-                  gap="small"
-                  className="shared-sentence-header"
-                >
-                  <Tag>{item.content.sentence.level}</Tag>
-                  {!readOnly && (
-                    <Space>
-                      <Button size="small" onClick={() => void edit(item)}>
-                        编辑
+                <Tag>{item.content.sentence.level}</Tag>
+                {!readOnly && (
+                  <Space>
+                    <Button size="small" onClick={() => void edit(item)}>
+                      编辑
+                    </Button>
+                    <Popover
+                      content="从当前词义移除，随词条发布生效"
+                      trigger="hover"
+                    >
+                      <Button size="small" onClick={() => remove(item)}>
+                        移除
                       </Button>
-                      <Popover
-                        content="从当前词义移除，随词条发布生效"
-                        trigger="hover"
-                      >
-                        <Button size="small" onClick={() => remove(item)}>
-                          移除
-                        </Button>
-                      </Popover>
-                    </Space>
+                    </Popover>
+                  </Space>
+                )}
+              </Flex>
+              <Flex vertical gap={12} style={{ minWidth: 0 }}>
+                <div className="shared-sentence-english">
+                  <V3EnglishTextPreview
+                    value={item.content.sentence.en_text}
+                    hideCommonDialect
+                    showPlayback
+                  />
+                </div>
+                <Flex vertical gap={8} className="shared-sentence-translations">
+                  {TRANSLATION_BANDS.flatMap(({ band, label }) =>
+                    item.content.sentence.zh_translations
+                      .filter(
+                        (translation) =>
+                          translation.band === band &&
+                          translation.content.text.trim()
+                      )
+                      .map((translation) => (
+                        <Flex
+                          key={translation.id}
+                          role="group"
+                          aria-label={`${label}阶译文`}
+                          align="start"
+                          gap={10}
+                          className="shared-sentence-translation"
+                        >
+                          <Tag
+                            color="blue"
+                            style={{ marginInlineEnd: 0, flexShrink: 0 }}
+                          >
+                            {label}
+                          </Tag>
+                          <Typography.Text
+                            type="secondary"
+                            style={{ whiteSpace: "pre-wrap" }}
+                          >
+                            {translation.content.text}
+                          </Typography.Text>
+                        </Flex>
+                      ))
                   )}
                 </Flex>
-                <Flex vertical gap={12} style={{ minWidth: 0 }}>
-                  <div className="shared-sentence-english">
-                    <V3EnglishTextPreview
-                      value={item.content.sentence.en_text}
-                      hideCommonDialect
-                      showPlayback
-                    />
-                  </div>
-                  <Flex
-                    vertical
-                    gap={8}
-                    className="shared-sentence-translations"
-                  >
-                    {TRANSLATION_BANDS.flatMap(({ band, label }) =>
-                      item.content.sentence.zh_translations
-                        .filter(
-                          (translation) =>
-                            translation.band === band &&
-                            translation.content.text.trim()
-                        )
-                        .map((translation) => (
-                          <Flex
-                            key={translation.id}
-                            role="group"
-                            aria-label={`${label}阶译文`}
-                            align="start"
-                            gap={10}
-                            className="shared-sentence-translation"
-                          >
-                            <Tag
-                              color="blue"
-                              style={{ marginInlineEnd: 0, flexShrink: 0 }}
-                            >
-                              {label}
-                            </Tag>
-                            <Typography.Text
-                              type="secondary"
-                              style={{ whiteSpace: "pre-wrap" }}
-                            >
-                              {translation.content.text}
-                            </Typography.Text>
-                          </Flex>
-                        ))
-                    )}
-                  </Flex>
-                </Flex>
               </Flex>
-            ))}
-            {(query.data?.total ?? 0) > 5 && (
-              <Pagination
-                size="small"
-                current={page}
-                pageSize={5}
-                total={query.data?.total}
-                onChange={setPage}
-                showSizeChanger={false}
-              />
-            )}
-            {!readOnly && (
-              <Button
-                block
-                type="dashed"
-                className="word-section-add-button"
-                icon={<PlusOutlined aria-hidden />}
-                disabled={!savedSense}
-                onClick={() => onOpen("new")}
-              >
-                添加例句
-              </Button>
-            )}
-          </Flex>
-        )}
+            </Flex>
+          ))}
+          {(query.data?.total ?? 0) > 5 && (
+            <Pagination
+              size="small"
+              current={page}
+              pageSize={5}
+              total={query.data?.total}
+              onChange={setPage}
+              showSizeChanger={false}
+            />
+          )}
+          {!readOnly && (
+            <Button
+              block
+              type="dashed"
+              className="word-section-add-button"
+              icon={<PlusOutlined aria-hidden />}
+              disabled={!savedSense}
+              onClick={() => onOpen("new")}
+            >
+              添加例句
+            </Button>
+          )}
+        </Flex>
       </SenseSectionBody>
     </section>
   );

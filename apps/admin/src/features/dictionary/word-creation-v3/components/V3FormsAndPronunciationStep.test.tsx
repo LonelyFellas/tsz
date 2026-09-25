@@ -1,3 +1,4 @@
+import { changeVoiceText } from "./V3VoiceTextField.test-helper";
 import { env } from "../../../../lib/env";
 import { FormTypeLabelsProvider } from "../../part-of-speech/FormTypeLabels";
 import {
@@ -527,17 +528,17 @@ describe("V3FormsAndPronunciationStep 被引用节点保护", () => {
     );
     const spelling = await screen.findByLabelText("原形英美通用拼写");
     expect(spelling).not.toHaveAttribute("aria-invalid", "true");
-    fireEvent.change(spelling, { target: { value: "orbits" } });
+    await changeVoiceText(spelling, { target: { value: "orbits" } });
     expect(spelling).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByText(/与被引用片段“orbit”不一致/)).toBeInTheDocument();
-    fireEvent.change(spelling, { target: { value: " ORBIT " } });
+    await changeVoiceText(spelling, { target: { value: " ORBIT " } });
     expect(spelling).not.toHaveAttribute("aria-invalid", "true");
     expect(screen.queryByText(/与被引用片段/)).toBeNull();
   });
 });
 
 describe("V3FormsAndPronunciationStep", () => {
-  it("基本词性徽标按本地词形草稿实时递减且不依赖发布问题", () => {
+  it("基本词性徽标按本地词形草稿实时递减且不依赖发布问题", async () => {
     const initial = formsFixture({
       forms: [
         commonFormFixture({
@@ -548,7 +549,7 @@ describe("V3FormsAndPronunciationStep", () => {
     render(<Harness initial={initial} issues={[]} />);
 
     expect(screen.getByTitle("该词性未填项")).toHaveTextContent("1");
-    fireEvent.change(screen.getByLabelText("第 1 条发音的实际发音"), {
+    await changeVoiceText(screen.getByLabelText("第 1 条发音的实际发音"), {
       target: { value: "centre" }
     });
     expect(screen.getByTitle("该词性未填项")).toHaveAttribute(
@@ -585,7 +586,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(screen.queryByLabelText("复数英美通用拼写")).toBeNull();
     expect(canonicalValue()).toEqual(initial);
     expect(screen.getByTestId("progress-count")).toHaveTextContent("1");
-    fireEvent.change(screen.getByLabelText("原形英美通用拼写"), {
+    await changeVoiceText(screen.getByLabelText("原形英美通用拼写"), {
       target: { value: "dog" }
     });
     expect(canonicalValue().pos[0]!.forms).toHaveLength(1);
@@ -596,7 +597,7 @@ describe("V3FormsAndPronunciationStep", () => {
       "data-completed",
       "true"
     );
-    fireEvent.change(screen.getByLabelText("原形英美通用拼写"), {
+    await changeVoiceText(screen.getByLabelText("原形英美通用拼写"), {
       target: { value: "bird" }
     });
     expect(screen.queryByLabelText("复数英美通用拼写")).toBeNull();
@@ -789,7 +790,7 @@ describe("V3FormsAndPronunciationStep", () => {
       );
       const input = await screen.findByLabelText("原形英美通用拼写");
       expect(container.querySelector(".v3-spelling-regularity")).toBeNull();
-      fireEvent.change(input, { target: { value: "edited" } });
+      await changeVoiceText(input, { target: { value: "edited" } });
       expect(formById(canonicalValue(), form.id)).toMatchObject({
         regional_variants: { common: { spelling: "edited", is_regular: false } }
       });
@@ -861,7 +862,7 @@ describe("V3FormsAndPronunciationStep", () => {
       container.querySelectorAll(".word-pronunciation-editor")
     ).toHaveLength(2);
 
-    fireEvent.change(screen.getByLabelText("原形英美通用拼写"), {
+    await changeVoiceText(screen.getByLabelText("原形英美通用拼写"), {
       target: { value: "harbour" }
     });
 
@@ -1278,7 +1279,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(screen.getByLabelText("原形英美通用拼写")).toHaveValue("center");
     expect(container.querySelector(".v3-dialect-separated-matrix")).toBeNull();
     expect(container.querySelector(".word-form-matrix-distinguish")).toBeNull();
-    fireEvent.change(screen.getByLabelText("原形英美通用拼写"), {
+    await changeVoiceText(screen.getByLabelText("原形英美通用拼写"), {
       target: { value: "centred" }
     });
     expect(screen.getByLabelText("原形英美通用拼写")).toHaveValue("centred");
@@ -1410,7 +1411,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(await screen.findByText("名词")).toBeInTheDocument();
     expect(screen.getByText("动词")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("原形 1英美通用拼写"), {
+    await changeVoiceText(screen.getByLabelText("原形 1英美通用拼写"), {
       target: { value: "first-edited" }
     });
     expect(screen.getByLabelText("原形 1英美通用拼写")).toHaveValue(
@@ -1646,7 +1647,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(canonicalValue()).toEqual(before);
   });
 
-  it("I04 多发音使用 field.key，编辑、新增与删除保持 pronunciation UUID 和顺序", () => {
+  it("I04 多发音使用 field.key，编辑、新增与删除保持 pronunciation UUID 和顺序", async () => {
     const pronunciations = [
       pronunciationFixture({
         id: uuidFromInt(501),
@@ -1682,7 +1683,7 @@ describe("V3FormsAndPronunciationStep", () => {
     ]);
     expect(screen.getAllByLabelText(/拖动第 \d+ 条发音/)).toHaveLength(3);
 
-    fireEvent.change(screen.getByLabelText("第 2 条发音的实际发音"), {
+    await changeVoiceText(screen.getByLabelText("第 2 条发音的实际发音"), {
       target: { value: "two-edited" }
     });
     fireEvent.click(screen.getByLabelText("在第 3 条后新增发音"));
@@ -2155,7 +2156,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it("覆盖 UK/US 双区域与字段 issue", () => {
+  it("覆盖 UK/US 双区域与字段 issue", async () => {
     const form = ukUsFormFixture({ id: uuidFromInt(801) });
     const content = formsFixture({ forms: [form] });
     const ukIssue: V3DraftValidationIssue = {
@@ -2202,13 +2203,13 @@ describe("V3FormsAndPronunciationStep", () => {
       "aria-invalid",
       "false"
     );
-    fireEvent.change(screen.getByLabelText("词形美式拼写"), {
+    await changeVoiceText(screen.getByLabelText("词形美式拼写"), {
       target: { value: "centered" }
     });
     expect(onChange).toHaveBeenCalledTimes(1);
   });
 
-  it("覆盖 UK 发音缺省 style、字段编辑、增删与 issue", () => {
+  it("覆盖 UK 发音缺省 style、字段编辑、增删与 issue", async () => {
     const first = pronunciationFixture({
       id: uuidFromInt(901),
       dict_phonetic: "first-dict",
@@ -2275,10 +2276,10 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(screen.queryByLabelText("新增发音")).toBeNull();
     expect(screen.getAllByLabelText(/在第 \d+ 条后新增发音/)).toHaveLength(2);
 
-    fireEvent.change(screen.getByLabelText("第 2 条发音的字典音标"), {
+    await changeVoiceText(screen.getByLabelText("第 2 条发音的字典音标"), {
       target: { value: "edited-dict" }
     });
-    fireEvent.change(screen.getByLabelText("第 2 条发音的实际发音"), {
+    await changeVoiceText(screen.getByLabelText("第 2 条发音的实际发音"), {
       target: { value: "edited-actual" }
     });
     fireEvent.mouseDown(screen.getByLabelText("第 2 条发音的发音方式"));
@@ -2561,7 +2562,7 @@ describe("V3FormsAndPronunciationStep", () => {
     ]);
   });
 
-  it("#128 受控向导中连续编辑英美音标不会被 Form.List 回写旧值", () => {
+  it("#128 受控向导中连续编辑英美音标不会被 Form.List 回写旧值", async () => {
     const form = ukUsFormFixture({
       uk: {
         pronunciations: [
@@ -2583,9 +2584,9 @@ describe("V3FormsAndPronunciationStep", () => {
     render(<Harness initial={formsFixture({ forms: [form] })} />);
     const inputs = screen.getAllByLabelText("第 1 条发音的字典音标");
 
-    fireEvent.change(inputs[0]!, { target: { value: "sent-uk" } });
+    await changeVoiceText(inputs[0]!, { target: { value: "sent-uk" } });
     expect(inputs[0]).toHaveValue("sent-uk");
-    fireEvent.change(inputs[1]!, { target: { value: "sent-us" } });
+    await changeVoiceText(inputs[1]!, { target: { value: "sent-us" } });
     expect(inputs[0]).toHaveValue("sent-uk");
     expect(inputs[1]).toHaveValue("sent-us");
 
@@ -2668,7 +2669,7 @@ describe("V3FormsAndPronunciationStep", () => {
     )!;
     const firstInput =
       within(firstGroupCard).getByLabelText("原形 1英美通用拼写");
-    fireEvent.change(firstInput, { target: { value: "orbit" } });
+    await changeVoiceText(firstInput, { target: { value: "orbit" } });
     expect(
       within(firstGroupCard).getByLabelText("原形 1英美通用拼写")
     ).toHaveValue("orbit");

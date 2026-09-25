@@ -118,14 +118,18 @@ describe("当前词条关联与离开保护", () => {
       <SentenceEditor sentence={current} onClose={vi.fn()} onSaved={onSaved} />
     );
     fireEvent.click(screen.getByLabelText("完成例句编辑"));
-    fireEvent.click(await screen.findByRole("button", { name: "刷新并比较" }));
-    const comparison = await screen.findByRole("region", { name: "草稿差异" });
+    fireEvent.click(
+      await screen.findByText("刷新并比较", { selector: "button span" })
+    );
+    const comparison = await screen.findByLabelText("草稿差异");
     expect(comparison).toHaveTextContent("Remote sentence.");
     expect(comparison).toHaveTextContent("We make stories.");
     expect(api.sentences.get).toHaveBeenCalledWith(current.id, "draft");
     fireEvent.click(screen.getByLabelText("完成例句编辑"));
     expect(api.sentences.update).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole("button", { name: "保留本地修改" }));
+    fireEvent.click(
+      screen.getByText("保留本地修改", { selector: "button span" })
+    );
     fireEvent.click(screen.getByLabelText("完成例句编辑"));
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
     expect(vi.mocked(api.sentences.update).mock.calls[1]![1]).toMatchObject({
@@ -146,24 +150,28 @@ describe("当前词条关联与离开保护", () => {
       <SentenceEditor sentence={current} onClose={vi.fn()} onSaved={vi.fn()} />
     );
     fireEvent.click(screen.getByLabelText("完成例句编辑"));
-    fireEvent.click(await screen.findByRole("button", { name: "刷新并比较" }));
+    fireEvent.click(
+      await screen.findByText("刷新并比较", { selector: "button span" })
+    );
     expect(await screen.findByText("暂时无法读取")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "保留本地修改" })).toBeNull();
+    expect(
+      screen.queryByText("保留本地修改", { selector: "button span" })
+    ).toBeNull();
     fireEvent.click(screen.getByLabelText("完成例句编辑"));
     expect(api.sentences.update).toHaveBeenCalledTimes(1);
-    fireEvent.click(await screen.findByRole("button", { name: /刷新并比较/ }));
     fireEvent.click(
-      await screen.findByRole("button", { name: "保留本地修改" })
+      await screen.findByText("刷新并比较", { selector: "button span" })
+    );
+    fireEvent.click(
+      await screen.findByText("保留本地修改", { selector: "button span" })
     );
     fireEvent.click(screen.getByLabelText("完成例句编辑"));
     await waitFor(() => expect(api.sentences.update).toHaveBeenCalledTimes(2));
     expect(await screen.findByText("例句版本冲突")).toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "草稿差异" })).toBeNull();
+    expect(screen.queryByLabelText("草稿差异")).toBeNull();
     fireEvent.click(screen.getByLabelText("完成例句编辑"));
     expect(api.sentences.update).toHaveBeenCalledTimes(2);
-    expect(screen.getByRole("textbox", { name: "例句正文" })).toHaveValue(
-      "We make stories."
-    );
+    expect(screen.getByLabelText("例句正文")).toHaveValue("We make stories.");
   });
 
   it("放弃输入须二次确认，确认后改用最新内容但不自动保存", async () => {
@@ -180,19 +188,21 @@ describe("当前词条关联与离开保护", () => {
       <SentenceEditor sentence={current} onClose={vi.fn()} onSaved={vi.fn()} />
     );
     fireEvent.click(screen.getByLabelText("完成例句编辑"));
-    fireEvent.click(await screen.findByRole("button", { name: "刷新并比较" }));
     fireEvent.click(
-      await screen.findByRole("button", { name: "放弃本地修改" })
+      await screen.findByText("刷新并比较", { selector: "button span" })
     );
-    expect(screen.getByRole("textbox", { name: "例句正文" })).toHaveValue(
-      "We make stories."
+    fireEvent.click(
+      await screen.findByText("放弃本地修改", { selector: "button span" })
     );
-    const dialog = await screen.findByRole("dialog");
+    expect(screen.getByLabelText("例句正文")).toHaveValue("We make stories.");
+    const dialog = (
+      await screen.findByText("放弃本地修改？", {
+        selector: ".ant-modal-confirm-title"
+      })
+    ).closest('[role="dialog"]')! as HTMLElement;
     fireEvent.click(within(dialog).getByRole("button", { name: /OK|确.*定/ }));
     await waitFor(() =>
-      expect(screen.getByRole("textbox", { name: "例句正文" })).toHaveValue(
-        "Remote sentence."
-      )
+      expect(screen.getByLabelText("例句正文")).toHaveValue("Remote sentence.")
     );
     expect(api.sentences.update).toHaveBeenCalledTimes(1);
   });
@@ -211,7 +221,7 @@ describe("当前词条关联与离开保护", () => {
     expect(screen.queryByText("从例句中发现已有词条")).toBeNull();
     expect(screen.queryByRole("button", { name: "一键发现" })).toBeNull();
     expect(screen.queryByLabelText("手动选择")).toBeNull();
-    expect(screen.getByRole("textbox", { name: "例句正文" })).toBeEnabled();
+    expect(screen.getByLabelText("例句正文")).toBeEnabled();
   });
 
   it("保存仍保留 voice-editor 的已有标注与当前词义关联", async () => {
@@ -278,12 +288,14 @@ describe("当前词条关联与离开保护", () => {
         />
       );
       await screen.findByText(new RegExp(`请关联当前词义：${spelling}`));
-      const shortcut = screen.queryByRole("button", { name: /确认关联 make/ });
-      if (spelling === "make") expect(shortcut).not.toBeInTheDocument();
+      const shortcut = screen
+        .queryByText(/确认关联 make/, {
+          selector: "button span"
+        })
+        ?.closest("button");
+      if (spelling === "make") expect(shortcut).toBeUndefined();
       else expect(shortcut).toBeEnabled();
-      expect(
-        screen.getByRole("button", { name: "完成例句编辑" })
-      ).toBeDisabled();
+      expect(screen.getByLabelText("完成例句编辑")).toBeDisabled();
       expect(api.sentences.update).not.toHaveBeenCalled();
       expect(api.sentences.create).not.toHaveBeenCalled();
     }
@@ -318,7 +330,7 @@ describe("当前词条关联与离开保护", () => {
         />
       );
       await screen.findByText(/请关联当前词义：make/);
-      expect(screen.getByRole("textbox", { name: "例句正文" })).toBeEnabled();
+      expect(screen.getByLabelText("例句正文")).toBeEnabled();
       expect(
         screen.getByRole("button", { name: "完成例句编辑" })
       ).toBeDisabled();
@@ -516,19 +528,31 @@ describe("当前词条关联与离开保护", () => {
       { target: { value: "保留我的修改" } }
     );
     fireEvent.click(screen.getByText("离开词条"));
-    let dialog = await screen.findByRole("dialog");
+    let dialog = (await screen.findByText("例句还有未保存的修改")).closest(
+      '[role="dialog"]'
+    )! as HTMLElement;
     fireEvent.click(within(dialog).getByRole("button", { name: "继续编辑" }));
     expect(router.state.location.pathname).toBe("/");
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "例句还有未保存的修改" })
+      ).toBeNull()
+    );
     fireEvent.click(screen.getByText("离开词条"));
-    dialog = await screen.findByRole("dialog");
+    dialog = (await screen.findByText("例句还有未保存的修改")).closest(
+      '[role="dialog"]'
+    )! as HTMLElement;
     fireEvent.click(
       within(dialog).getByRole("button", { name: "保存例句后离开" })
     );
     await screen.findByText("版本已变化");
     expect(router.state.location.pathname).toBe("/");
     expect(screen.getByDisplayValue("保留我的修改")).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "例句还有未保存的修改" })
+      ).toBeNull()
+    );
     fireEvent.click(screen.getByText("离开词条"));
     const retry = await screen.findByRole("button", { name: "保存例句后离开" });
     await waitFor(() => expect(retry).toBeEnabled());

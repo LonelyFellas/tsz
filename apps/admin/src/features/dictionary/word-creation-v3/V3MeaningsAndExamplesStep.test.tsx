@@ -1,3 +1,4 @@
+import { changeVoiceText } from "./components/V3VoiceTextField.test-helper";
 import { env } from "@/lib/env";
 import { adminVoicePreviewAdapter } from "@/features/dictionary/voice-editor/dataSource";
 import {
@@ -1160,7 +1161,7 @@ describe("V3MeaningsAndExamplesStep", () => {
           )
         );
       }
-      fireEvent.change(screen.getByLabelText("语法结构 1 英美通用内容"), {
+      await changeVoiceText(screen.getByLabelText("语法结构 1 英美通用内容"), {
         target: { value: "" }
       });
       expect(
@@ -1177,14 +1178,16 @@ describe("V3MeaningsAndExamplesStep", () => {
     // 关联编辑器共存时，语法结构仍使用原来的标注工具。
     render(<Harness initial={meaningsFixture} />);
 
-    fireEvent.change(screen.getByLabelText("语法结构 1 英美通用内容"), {
+    await changeVoiceText(screen.getByLabelText("语法结构 1 英美通用内容"), {
       target: { value: "a centre of the city" }
     });
     fireEvent.click(screen.getByLabelText("打开语法结构 1 英美通用内容编辑器"));
     // 等的是按需加载的编辑器分块，给足超时：默认 1 秒在负载高的 CI runner 上不够
-    const editor = await within(
-      document.querySelector(".word-grammar-panel") as HTMLElement
-    ).findByLabelText("标注工具栏", {}, { timeout: 10_000 });
+    const editor = await screen.findByLabelText(
+      "标注工具栏",
+      {},
+      { timeout: 10_000 }
+    );
     expect(editor).toBeInTheDocument();
 
     const input = screen.getByLabelText("语法结构 1 英美通用内容");
@@ -1192,7 +1195,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(input).toHaveAttribute("data-v3-field", "content");
     expect(input.tagName).toBe("TEXTAREA");
 
-    expect(input).toHaveAttribute("readonly");
+    expect(input).not.toHaveAttribute("readonly");
     expect(
       value().pos[0]!.grammar_structures[0]!.variants[0]!.content.text
     ).toBe("a centre of the city");
@@ -1245,15 +1248,8 @@ describe("V3MeaningsAndExamplesStep", () => {
     ];
     render(<Harness initial={initial} />);
     fireEvent.click(screen.getByLabelText("打开语法结构 1 英美通用内容编辑器"));
-    const grammarPanel = document.querySelector(
-      ".word-grammar-panel"
-    ) as HTMLElement;
-    await within(grammarPanel).findByLabelText(
-      "标注工具栏",
-      {},
-      { timeout: 10_000 }
-    );
-    fireEvent.click(within(grammarPanel).getByLabelText("音频"));
+    await screen.findByLabelText("标注工具栏", {}, { timeout: 10_000 });
+    fireEvent.click(screen.getByLabelText("音频"));
     expect(screen.getByLabelText("试听 old.mp3")).toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText("移除 old.mp3"));
@@ -1293,19 +1289,17 @@ describe("V3MeaningsAndExamplesStep", () => {
       fireEvent.click(
         screen.getByLabelText("打开语法结构 1 英美通用内容编辑器")
       );
-      await within(
-        document.querySelector(".word-grammar-panel") as HTMLElement
-      ).findByRole("toolbar", { name: "标注工具栏" }, { timeout: 10_000 });
+      await screen.findByRole(
+        "toolbar",
+        { name: "标注工具栏" },
+        { timeout: 10_000 }
+      );
 
       const variant = () => value().pos[0]!.grammar_structures[0]!.variants[0]!;
       // 没动过之前不该凭空写出一份配置
       expect(variant().voice_profile).toBeUndefined();
 
-      fireEvent.click(
-        within(
-          document.querySelector(".word-grammar-panel") as HTMLElement
-        ).getByLabelText("发音")
-      );
+      fireEvent.click(screen.getByLabelText("发音"));
       const rateButtons = await screen.findAllByLabelText(/^设置 .* 的语速$/);
       fireEvent.click(rateButtons[0]!);
       fireEvent.click(await screen.findByLabelText("语速 1.25 倍"));
@@ -1353,7 +1347,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(container.querySelector(".word-grammar-add")).toBeNull();
   });
 
-  it("区分英美式词性的语法结构提供英式美式双栏，新增也按方言建双条", () => {
+  it("区分英美式词性的语法结构提供英式美式双栏，新增也按方言建双条", async () => {
     const initial = structuredClone(meaningsFixture);
     initial.pos[0]!.grammar_structures[0]!.variants = [
       {
@@ -1411,7 +1405,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(screen.queryByText("英式")).toBeNull();
     expect(screen.queryByText("美式")).toBeNull();
 
-    fireEvent.change(us, { target: { value: "the center" } });
+    await changeVoiceText(us, { target: { value: "the center" } });
     expect(value().pos[0]!.grammar_structures[0]!.variants[1]).toMatchObject({
       dialect: "us",
       content: { text: "the center" }
@@ -3868,13 +3862,13 @@ describe("V3MeaningsAndExamplesStep", () => {
     }
   });
 
-  it("controlled 编辑 frequency/grammar/definition/relation 且外层例句保持只读", () => {
+  it("controlled 编辑 frequency/grammar/definition/relation 且外层例句保持只读", async () => {
     render(<Harness />);
 
     fireEvent.change(screen.getByLabelText("释义 1 频率"), {
       target: { value: "42.5" }
     });
-    fireEvent.change(screen.getByLabelText("语法结构 1 英美通用内容"), {
+    await changeVoiceText(screen.getByLabelText("语法结构 1 英美通用内容"), {
       target: { value: "updated grammar" }
     });
     fireEvent.change(screen.getByLabelText("定义 1 内容"), {
@@ -4325,7 +4319,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(editor).not.toHaveTextContent("countable");
   });
 
-  it("zh_sentence 与 distinguish EnglishText 暴露各自 locator 并保持方言 UUID", () => {
+  it("zh_sentence 与 distinguish EnglishText 暴露各自 locator 并保持方言 UUID", async () => {
     const initial = structuredClone(meaningsFixture);
     initial.pos[0]!.senses[0]!.definitions[0] = {
       id: "definition-zh-sentence",
@@ -4376,7 +4370,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(zh).not.toBeNull();
     expect(uk).not.toBeNull();
     fireEvent.change(zh!, { target: { value: "更新中文句意" } });
-    fireEvent.change(uk!, { target: { value: "Updated UK meaning" } });
+    await changeVoiceText(uk!, { target: { value: "Updated UK meaning" } });
 
     const sense = value().pos[0]!.senses[0]!;
     expect(sense.definitions).toEqual([

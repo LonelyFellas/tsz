@@ -1,7 +1,8 @@
 import { env } from "../../../../lib/env";
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
 import { WarningOutlined } from "@ant-design/icons";
-import { Flex, Input, Radio, Select, Tooltip, Typography } from "antd";
+import { Flex, Radio, Select, Tooltip, Typography } from "antd";
+import { V3VoiceTextField } from "./V3VoiceTextField";
 import type {
   DialectRulesV3,
   DraftFormsStepContentV3,
@@ -302,25 +303,22 @@ function V3DialectFormCell({
             onChange={onChange}
           />
         </Flex>
-        <Input
-          aria-invalid={spellingInvalid}
-          aria-label={`${formLabel}${dialectLabel(dialect)}拼写`}
-          className="tsz-entry-en"
-          data-v3-field="spelling"
-          data-v3-node-id={variant.id}
+        <V3VoiceTextField
+          mode="spelling"
+          invalid={spellingInvalid}
+          ariaLabel={`${formLabel}${dialectLabel(dialect)}拼写`}
+          field="spelling"
+          nodeId={variant.id}
           placeholder={`${dialectLabel(dialect)}拼写`}
-          onChange={(event) => {
+          onChange={(next) => {
             if (dialectRules.spelling_mode === "unified") {
-              const result = unifyUkUsSpelling(form, event.target.value);
+              const result = unifyUkUsSpelling(form, next.text);
               if (result.ok) onChange(replaceForm(content, result.value));
               return;
             }
-            onChange(
-              updateVariantSpelling(content, variant.id, event.target.value)
-            );
+            onChange(updateVariantSpelling(content, variant.id, next.text));
           }}
-          status={conflictLiteralList.length > 0 ? "error" : undefined}
-          value={variant.spelling}
+          value={{ version: 2, text: variant.spelling, annotations: [] }}
         />
         <SpellingConflictNote literals={conflictLiteralList} />
         <V3PronunciationList
@@ -475,8 +473,9 @@ export function V3ConcreteFormRow({
                   onChange={onChange}
                 />
               </Flex>
-              <Input
-                aria-invalid={
+              <V3VoiceTextField
+                mode="spelling"
+                invalid={
                   commonConflictLiterals.length > 0 ||
                   issues.some(
                     (issue) =>
@@ -484,23 +483,20 @@ export function V3ConcreteFormRow({
                       issue.field === "spelling"
                   )
                 }
-                aria-label={`${formLabel}英美通用拼写`}
-                className="tsz-entry-en"
-                data-v3-field="spelling"
-                data-v3-node-id={commonVariant.id}
-                onChange={(event) =>
+                ariaLabel={`${formLabel}英美通用拼写`}
+                field="spelling"
+                nodeId={commonVariant.id}
+                onChange={(next) =>
                   onChange(
-                    updateVariantSpelling(
-                      content,
-                      commonVariant.id,
-                      event.target.value
-                    )
+                    updateVariantSpelling(content, commonVariant.id, next.text)
                   )
                 }
                 placeholder="词形拼写"
-                status={commonConflictLiterals.length > 0 ? "error" : undefined}
-                style={{ marginTop: 10 }}
-                value={commonVariant.spelling}
+                value={{
+                  version: 2,
+                  text: commonVariant.spelling,
+                  annotations: []
+                }}
               />
               <SpellingConflictNote literals={commonConflictLiterals} />
             </div>
@@ -533,21 +529,23 @@ export function V3ConcreteFormRow({
                   onChange={onChange}
                 />
               </Flex>
-              <Input
-                aria-invalid={unifiedSpellingInvalid}
-                aria-label={`${formLabel}英美通用拼写`}
-                className="tsz-entry-en"
-                data-v3-field="spelling"
-                data-v3-node-aliases={unifiedSpellingVariantIds.join(" ")}
-                data-v3-node-id={form.id}
-                onChange={(event) => {
-                  const result = unifyUkUsSpelling(form, event.target.value);
+              <V3VoiceTextField
+                mode="spelling"
+                invalid={unifiedSpellingInvalid}
+                ariaLabel={`${formLabel}英美通用拼写`}
+                field="spelling"
+                nodeAliases={unifiedSpellingVariantIds.join(" ")}
+                nodeId={form.id}
+                onChange={(next) => {
+                  const result = unifyUkUsSpelling(form, next.text);
                   if (result.ok) onChange(replaceForm(content, result.value));
                 }}
                 placeholder="词形拼写"
-                status={unifiedSpellingInvalid ? "error" : undefined}
-                style={{ marginTop: 10 }}
-                value={unifiedSpellingVariants.uk.spelling}
+                value={{
+                  version: 2,
+                  text: unifiedSpellingVariants.uk.spelling,
+                  annotations: []
+                }}
               />
               <SpellingConflictNote literals={unifiedConflictLiterals} />
             </div>

@@ -1,3 +1,4 @@
+import { changeVoiceText } from "./components/V3VoiceTextField.test-helper";
 import { useAuthStore } from "@/lib/auth";
 import { HttpError } from "@tsz/api-client";
 import type {
@@ -2731,7 +2732,7 @@ describe("V3WordCreationWizard", () => {
       .closest<HTMLElement>('[role="button"]');
     expect(secondSenseHeader).not.toBeNull();
     fireEvent.click(secondSenseHeader!);
-    fireEvent.change(screen.getByLabelText("定义 1 英美通用内容"), {
+    await changeVoiceText(screen.getByLabelText("定义 1 英美通用内容"), {
       target: { value: "local unsaved" }
     });
     const secondSense = secondSenseHeader!.closest<HTMLElement>(

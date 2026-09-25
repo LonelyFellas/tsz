@@ -87,6 +87,8 @@ describe("正文关联编辑器", () => {
     fireEvent.change(screen.getByLabelText("释义正文"), {
       target: { value: "father helps mother" }
     });
+    expect(observe.mock.lastCall?.[1]).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "确认修改" }));
     await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([]));
     expect(screen.getByText(/被修改词段的关联已移除/)).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "上一步" }));
@@ -354,6 +356,8 @@ it("例句的关联恢复跟随撤销重做，主动清除后不再自动恢复"
   render(<Host />);
   const input = screen.getByLabelText("例句正文");
   fireEvent.change(input, { target: { value: "makke up" } });
+  expect(observe).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "确认修改" }));
   await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([]));
   fireEvent.click(screen.getByRole("button", { name: "上一步" }));
   await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([original]));
@@ -426,6 +430,8 @@ it.each([
     render(<Host />);
     const input = screen.getByLabelText("例句正文");
     fireEvent.change(input, { target: { value: changed } });
+    expect(observe).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "确认修改" }));
     await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([]));
     expect(screen.getByText(/部分关联暂时失效/)).toBeVisible();
     fireEvent.change(input, { target: { value: `${changed}!` } });

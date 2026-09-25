@@ -1,3 +1,25 @@
+.tsz-ve-selection-liaison {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tsz-ve-selection-liaison > span {
+  color: #7b8799;
+  font-size: 12px;
+}
+.tsz-ve-selection-liaison .ant-btn {
+  height: 28px;
+  padding-inline: 10px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.tsz-ve-selection-liaison .ant-btn:disabled {
+  background: #f7f9fc;
+  border-color: #e2e7f0;
+  color: #99a3b2;
+}
+
 /* 工具栏仅改变排布与视觉，功能面板复用原组件。 */
 .tsz-ve-editor .tsz-ve-toolbar {
   box-sizing: border-box;
@@ -110,11 +132,58 @@
   background: #2053ff;
   box-shadow: 0 0 0 2px #2053ff20;
 }
-/* 分类底栏：类别与提示一行，次要操作单独靠左，完成按钮由宿主放在同一行右侧。 */
-.tsz-ve-editor .tsz-ve-role-inline {
-  padding: 10px 12px 8px;
+.tsz-ve-editor .tsz-ve-inline-tools {
+  padding: 12px 14px 10px;
   border-top: 1px solid #e8ecf2;
-  background: #fbfcfe;
+  border-bottom: 1px solid #e8ecf2;
+  background: #fbfcff;
+}
+.tsz-ve-inline-tools[data-combined] {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 8px 12px;
+  align-items: center;
+}
+.tsz-ve-inline-tools[data-combined] > [data-tool="roles"],
+.tsz-ve-inline-tools[data-combined] .tsz-ve-grammar-panel {
+  display: contents;
+}
+.tsz-ve-inline-tools[data-combined] .tsz-ve-grammar-panel > [role="group"] {
+  grid-column: 1;
+  grid-row: 1;
+}
+.tsz-ve-inline-tools[data-combined] > [data-tool="liaison"] {
+  grid-column: 2;
+  grid-row: 1;
+  border-left: 1px solid #dfe4ec;
+  padding-left: 12px;
+  min-width: 0;
+}
+.tsz-ve-inline-tools[data-combined] .tsz-ve-grammar-actions {
+  grid-column: 1;
+  grid-row: 2;
+}
+.tsz-ve-inline-tools[data-combined] .tsz-ve-grammar-hint {
+  grid-column: 2;
+  grid-row: 2;
+}
+@container tsz-voice-editor (max-width: 640px) {
+  .tsz-ve-inline-tools[data-combined] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tsz-ve-inline-tools[data-combined] > [data-tool="liaison"] {
+    grid-column: 1;
+    grid-row: 2;
+    border-left: 0;
+    padding-left: 0;
+  }
+  .tsz-ve-inline-tools[data-combined] .tsz-ve-grammar-actions {
+    grid-row: 3;
+  }
+  .tsz-ve-inline-tools[data-combined] .tsz-ve-grammar-hint {
+    grid-column: 1;
+    grid-row: 4;
+  }
 }
 .tsz-ve-editor .tsz-ve-grammar-panel {
   display: grid;
@@ -128,8 +197,8 @@
 }
 .tsz-ve-editor .tsz-ve-grammar-option.ant-btn {
   font-size: 12px;
-  height: 26px;
-  padding-inline: 9px;
+  height: 28px;
+  padding-inline: 10px;
 }
 .tsz-ve-editor .tsz-ve-grammar-option.ant-btn:disabled {
   background: #fff;
