@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderWithProviders } from "@/test/render";
 import { LoginForm } from "./LoginForm";
+import { useUserStore } from "@/stores/user";
 
 const mockPush = vi.fn();
 // 可变的查询参数，便于覆盖「找回密码 / 注销账号跳回」的成功提示分支
@@ -58,6 +59,7 @@ const ME_USER = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  useUserStore.setState({ user: null, onboarded: null, hydrated: false });
   mockPush.mockReset();
   mockResetParam = null;
   mockDeletedParam = null;
@@ -126,7 +128,7 @@ describe("LoginForm — 登录流程", () => {
     await user.click(screen.getByRole("button", { name: "立即登录" }));
   }
 
-  it("登录成功 → 跳转到 /", async () => {
+  it("登录成功 → 发布完整用户态，交给守卫导航", async () => {
     mockLogin.mockResolvedValueOnce({
       user: {
         id: "1",
@@ -145,11 +147,16 @@ describe("LoginForm — 登录流程", () => {
 
     await waitFor(() => {
       expect(mockLogin).toHaveBeenCalledWith("13800138000", "ABC123");
-      expect(mockPush).toHaveBeenCalledWith("/");
+      expect(useUserStore.getState()).toMatchObject({
+        user: ME_USER,
+        onboarded: true,
+        hydrated: true
+      });
+      expect(mockPush).not.toHaveBeenCalled();
     });
   });
 
-  it("新用户登录（未 onboarded）→ 跳转到 /onboarding", async () => {
+  it("新用户登录 → 发布未完成引导的用户态", async () => {
     mockLogin.mockResolvedValueOnce({
       user: ME_USER,
       access_token: "at",
@@ -168,7 +175,12 @@ describe("LoginForm — 登录流程", () => {
     await fillAndSubmit();
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith("/onboarding");
+      expect(useUserStore.getState()).toMatchObject({
+        user: ME_USER,
+        onboarded: false,
+        hydrated: true
+      });
+      expect(mockPush).not.toHaveBeenCalled();
     });
   });
 
@@ -208,7 +220,7 @@ describe("LoginForm — 登录流程", () => {
     });
   });
 
-  it("URL 带 redirect → 登录后回跳到该目标页", async () => {
+  it("URL 带 redirect → 表单只发布状态，不自行导航", async () => {
     mockRedirectParam = "/student/practice";
     mockLogin.mockResolvedValueOnce({
       user: ME_USER,
@@ -222,7 +234,8 @@ describe("LoginForm — 登录流程", () => {
     await fillAndSubmit();
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith("/student/practice");
+      expect(useUserStore.getState().user).toEqual(ME_USER);
+      expect(mockPush).not.toHaveBeenCalled();
     });
   });
 });
@@ -349,7 +362,7 @@ describe("LoginForm — 验证码登录", () => {
     expect(screen.getByRole("button", { name: "获取验证码" })).toBeDisabled();
   });
 
-  it("手机号 + 验证码登录成功 → 调用 loginWithCode 并跳转", async () => {
+  it("手机号 + 验证码登录成功 → 调用 loginWithCode 并发布用户态", async () => {
     const user = userEvent.setup();
     mockLoginWithCode.mockResolvedValueOnce(AUTH_OK as never);
     renderWithProviders(<LoginForm />);
@@ -361,7 +374,12 @@ describe("LoginForm — 验证码登录", () => {
 
     await waitFor(() => {
       expect(mockLoginWithCode).toHaveBeenCalledWith("13800138000", "123456");
-      expect(mockPush).toHaveBeenCalledWith("/");
+      expect(useUserStore.getState()).toMatchObject({
+        user: ME_USER,
+        onboarded: true,
+        hydrated: true
+      });
+      expect(mockPush).not.toHaveBeenCalled();
     });
   });
 

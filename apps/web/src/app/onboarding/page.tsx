@@ -7,7 +7,7 @@ import { RouteGuard } from "@/features/auth/components/RouteGuard";
 import { isBand } from "@/features/placement";
 
 // 新用户引导页：选择难度等级 + 英式/美式。
-// RouteGuard 保证已登录；登录/注册后的自动路由由 navigateAfterAuth 决策，
+// RouteGuard 保证已登录；登录/注册后的自动路由由 GuestGuard 决策，
 // 本页不做「已 onboarded 即弹回」——学习设置是 onboarding 与后续修改共用的
 // (PUT /me/learning-settings)，显式到达（定级测试 CTA / 直接访问）一律放行，
 // 否则定级结果页的 /onboarding?level=XX 回填会被弹回首页、等级被丢弃。
