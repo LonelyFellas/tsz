@@ -7,6 +7,7 @@ export default defineConfig({
   testDir: "./tests",
   // admin 使用独立构建与 baseURL，由 playwright.admin.config.ts 单独执行。
   testIgnore: [
+    "admin-accounts.spec.ts",
     "admin-word-creation.spec.ts",
     "admin-word-v3.spec.ts",
     "admin-part-of-speech.spec.ts",
