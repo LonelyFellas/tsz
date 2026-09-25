@@ -181,10 +181,14 @@ describe("createAdminEndpoints", () => {
   it("changePassword → POST /auth/change-password 带 current/new 密码", () => {
     const api = createAdminEndpoints(http);
     api.auth.changePassword("old-temp-pw!!", "brand-new-pw-2026");
-    expect(http.post).toHaveBeenCalledWith("/auth/change-password", {
-      current_password: "old-temp-pw!!",
-      new_password: "brand-new-pw-2026"
-    });
+    expect(http.post).toHaveBeenCalledWith(
+      "/auth/change-password",
+      {
+        current_password: "old-temp-pw!!",
+        new_password: "brand-new-pw-2026"
+      },
+      { retryOnUnauthorized: expect.any(Function) }
+    );
   });
 
   it("profile → GET /profile", () => {

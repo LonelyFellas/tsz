@@ -1,4 +1,9 @@
 import { expect, test } from "@playwright/test";
+import { mockApi } from "./support/mockApi";
+
+test.beforeEach(async ({ page }) => {
+  await mockApi(page, { authenticated: false });
+});
 
 test("首页可达并能进入词表", async ({ page }) => {
   await page.goto("/");

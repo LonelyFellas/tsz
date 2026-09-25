@@ -1883,7 +1883,9 @@ describe("createHttpClient", () => {
         { ok: false, status: 401, contentType: "application/problem+json" }
       )
     );
-    const onRefresh = vi.fn().mockRejectedValue(new Error("refresh failed"));
+    const onRefresh = vi
+      .fn()
+      .mockRejectedValue(new HttpError(401, "refresh failed"));
     const onSessionExpired = vi.fn();
     const http = createHttpClient({
       baseUrl: "",

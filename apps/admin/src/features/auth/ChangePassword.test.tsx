@@ -1,5 +1,12 @@
 import { HttpError } from "@tsz/api-client";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor
+} from "@testing-library/react";
 import { App as AntApp } from "antd";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -83,7 +90,12 @@ beforeEach(() => {
     value: { href: "" }
   });
 });
-afterEach(() => {
+afterEach(async () => {
+  cleanup();
+  // antd Form 的 useDebounce 卸载后仍有 10ms 更新，须在 jsdom 销毁前结算。
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  });
   Object.defineProperty(window, "location", {
     configurable: true,
     writable: true,
@@ -184,7 +196,12 @@ describe("ChangePassword · 强制改密（forced）", () => {
 
   it("临时密码错(401)：就地标红临时密码字段", async () => {
     mockChange.mockRejectedValue(
-      new HttpError(401, "current password is incorrect")
+      new HttpError(
+        401,
+        "current password is incorrect",
+        [],
+        "invalid_credentials"
+      )
     );
     renderForced();
     fillCurrent("wrong-temp-pw");
@@ -225,7 +242,12 @@ describe("ChangePassword · 自助改密", () => {
 
   it("当前密码错(401)：就地标红当前密码字段", async () => {
     mockChange.mockRejectedValue(
-      new HttpError(401, "current password is incorrect")
+      new HttpError(
+        401,
+        "current password is incorrect",
+        [],
+        "invalid_credentials"
+      )
     );
     renderSelf();
     fillCurrent("wrong-pass-123");

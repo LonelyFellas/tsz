@@ -9,7 +9,8 @@ export default defineConfig({
     "admin-accounts.spec.ts",
     "admin-word-creation.spec.ts",
     "admin-word-v3.spec.ts",
-    "admin-part-of-speech.spec.ts"
+    "admin-part-of-speech.spec.ts",
+    "admin-auth-refresh.spec.ts"
   ],
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,

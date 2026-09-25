@@ -232,7 +232,7 @@ describe("createAdminAuthRuntime · 401 拦截器与 realm 隔离", () => {
     // 本包测试跑在 node 环境（无 window/document）。注入 window.location 观测跳转；
     // tokenManager 见 window 存在会注册 visibilitychange，故一并补 document 桩。
     const location = { href: "", pathname: "/words" };
-    vi.stubGlobal("window", { location });
+    vi.stubGlobal("window", { location, addEventListener: vi.fn() });
     vi.stubGlobal("document", { addEventListener: () => undefined });
 
     const rt = createAdminAuthRuntime({ baseUrl: "/api/v1/admin" });
@@ -254,21 +254,21 @@ describe("redirectToChangePassword", () => {
 
   it("code=must_change_password 且不在改密页：整页跳改密页", () => {
     const location = { href: "", pathname: "/words" };
-    vi.stubGlobal("window", { location });
+    vi.stubGlobal("window", { location, addEventListener: vi.fn() });
     redirectToChangePassword("must_change_password", "/change-password");
     expect(location.href).toBe("/change-password");
   });
 
   it("已在改密页：不跳（防会话恢复探 profile 的 403 触发自循环）", () => {
     const location = { href: "", pathname: "/change-password" };
-    vi.stubGlobal("window", { location });
+    vi.stubGlobal("window", { location, addEventListener: vi.fn() });
     redirectToChangePassword("must_change_password", "/change-password");
     expect(location.href).toBe("");
   });
 
   it("其它 403 code（如 account disabled 无 code）：不跳", () => {
     const location = { href: "", pathname: "/words" };
-    vi.stubGlobal("window", { location });
+    vi.stubGlobal("window", { location, addEventListener: vi.fn() });
     redirectToChangePassword(undefined, "/change-password");
     expect(location.href).toBe("");
   });

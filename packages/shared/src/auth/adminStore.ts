@@ -6,8 +6,9 @@ export interface AdminAuthState {
   profile: AdminProfile | null;
   /** 身份等级（wire 字段名 role，Q11），单列出来驱动菜单（super_admin 才显示管理员管理入口）。 */
   role: AdminLevel | null;
-  /** 会话恢复是否已尝试完成（成功或失败）。用于区分「恢复中」与「确未登录」，避免登录态闪烁。 */
+  /** 身份已确认或明确无会话；临时恢复故障保持 false。 */
   hydrated: boolean;
+  connectionError: boolean;
   setProfile: (profile: AdminProfile | null) => void;
   setHydrated: (hydrated: boolean) => void;
 }
@@ -24,7 +25,13 @@ export function createAdminAuthStore(): AdminAuthStore {
     profile: null,
     role: null,
     hydrated: false,
-    setProfile: (profile) => set({ profile, role: profile?.role ?? null }),
+    connectionError: false,
+    setProfile: (profile) =>
+      set({
+        profile,
+        role: profile?.role ?? null,
+        ...(profile ? { hydrated: true, connectionError: false } : {})
+      }),
     setHydrated: (hydrated) => set({ hydrated })
   }));
 }

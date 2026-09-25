@@ -241,10 +241,11 @@ export function createAdminEndpoints(http: HttpClient) {
        * 401 = 当前密码错误。
        */
       changePassword: (currentPassword: string, newPassword: string) =>
-        http.post<void>("/auth/change-password", {
-          current_password: currentPassword,
-          new_password: newPassword
-        })
+        http.post<void>(
+          "/auth/change-password",
+          { current_password: currentPassword, new_password: newPassword },
+          { retryOnUnauthorized: (code) => code === "invalid_token" }
+        )
     },
     /** GET /admin/profile — 门禁探针：200=有效 admin / 401=未登录。 */
     profile: () => http.get<AdminProfile>("/profile"),
