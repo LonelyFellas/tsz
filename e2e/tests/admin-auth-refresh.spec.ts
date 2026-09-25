@@ -10,6 +10,37 @@ const profile = {
   preferences: { dialect: "uk" }
 };
 
+test("初始恢复 503 后手动登录可进入后台，不永久停在加载态", async ({
+  page
+}) => {
+  await page.route("**/api/v1/admin/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/auth/refresh")) return route.fulfill({ status: 503 });
+    if (path.endsWith("/auth/login"))
+      return route.fulfill({
+        json: {
+          access_token: "login",
+          expires_in: 900,
+          must_change_password: false
+        }
+      });
+    if (path.endsWith("/profile")) return route.fulfill({ json: profile });
+    return route.fulfill({ json: {} });
+  });
+  await page.goto("/login?redirect=/settings/profile");
+  await expect(page.getByText("暂时无法恢复会话，请重试")).toBeVisible();
+  await page.getByLabel("手机号", { exact: true }).fill("13800138000");
+  await page
+    .getByLabel("登录密码", { exact: true })
+    .fill("Correct!Password731");
+  await page.getByLabel("验证码", { exact: true }).fill("000000");
+  await page.getByRole("button", { name: "登 录", exact: true }).click();
+  await expect(page).toHaveURL(/\/settings\/profile$/);
+  await expect(page.getByText("加载中...", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("暂时无法恢复会话，请重试")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "个人设置" })).toBeVisible();
+});
+
 for (const forced of [false, true]) {
   for (const code of ["invalid_credentials", "invalid_token"]) {
     test(`${forced ? "强制" : "自助"}改密 ${code} 的请求次数与恢复`, async ({

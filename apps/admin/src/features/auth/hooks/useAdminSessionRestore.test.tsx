@@ -59,6 +59,40 @@ describe("useAdminSessionRestore + runtime + HTTP", () => {
     }
   );
 
+  it("恢复临时失败后正常登录，确认 profile 才结束恢复状态", async () => {
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(json({}, 503));
+    renderHook(() => useAdminSessionRestore());
+    await waitFor(() =>
+      expect(authRuntime.store.getState().connectionError).toBe(true)
+    );
+    fetch
+      .mockResolvedValueOnce(
+        json({
+          access_token: "login",
+          expires_in: 900,
+          must_change_password: false
+        })
+      )
+      .mockResolvedValueOnce(json(profile));
+    await act(async () => {
+      const auth = await authRuntime.api.auth.login(
+        "13800138000",
+        "test-password",
+        "000000"
+      );
+      authRuntime.persistSession(auth);
+      expect(authRuntime.store.getState().hydrated).toBe(false);
+      authRuntime.store.getState().setProfile(await authRuntime.api.profile());
+    });
+    expect(authRuntime.store.getState()).toMatchObject({
+      hydrated: true,
+      profile,
+      connectionError: false
+    });
+  });
+
   it("明确 refresh 401 才标记未登录", async () => {
     const fetch = vi
       .spyOn(globalThis, "fetch")

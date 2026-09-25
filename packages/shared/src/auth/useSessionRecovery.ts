@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 
-export function useSessionRecovery(restore: () => Promise<void>) {
+export function useSessionRecovery(
+  restore: () => Promise<void>,
+  getState: () => { connectionError: boolean }
+) {
   const [retrying, setRetrying] = useState(false);
   const retry = useCallback(async () => {
     setRetrying(true);
@@ -16,11 +19,11 @@ export function useSessionRecovery(restore: () => Promise<void>) {
   useEffect(() => {
     void retry();
     const online = () => {
-      void retry();
+      if (getState().connectionError) void retry();
     };
     window.addEventListener("online", online);
     return () => window.removeEventListener("online", online);
-  }, [retry]);
+  }, [retry, getState]);
 
   return { retry, retrying };
 }

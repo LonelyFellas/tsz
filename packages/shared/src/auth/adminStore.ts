@@ -26,7 +26,12 @@ export function createAdminAuthStore(): AdminAuthStore {
     role: null,
     hydrated: false,
     connectionError: false,
-    setProfile: (profile) => set({ profile, role: profile?.role ?? null }),
+    setProfile: (profile) =>
+      set({
+        profile,
+        role: profile?.role ?? null,
+        ...(profile ? { hydrated: true, connectionError: false } : {})
+      }),
     setHydrated: (hydrated) => set({ hydrated })
   }));
 }

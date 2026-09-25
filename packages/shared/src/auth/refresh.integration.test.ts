@@ -27,6 +27,18 @@ describe.each(["web", "admin"] as const)("%s HTTP + auth runtime", (realm) => {
     return { rt, request, location };
   }
 
+  it("取 token 后立即换会话时，不发送旧身份的写请求", async () => {
+    const { rt } = setup();
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(response(204));
+    const pending = rt.api.auth.logout();
+    rt.persistSession({ access_token: "new-login", expires_in: 900 });
+    await expect(pending).rejects.toThrow("session changed");
+    expect(fetch).not.toHaveBeenCalled();
+    rt.tokens.setAccessToken(null);
+  });
+
   it("同页并发业务 401 只产生一次 refresh", async () => {
     const { rt, request } = setup();
     let release!: (res: Response) => void;

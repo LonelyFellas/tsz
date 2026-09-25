@@ -69,6 +69,27 @@ describe("useSessionRestore + runtime + HTTP", () => {
     });
   });
 
+  it.each([false, true])(
+    "online 不恢复健康会话或已主动清除的会话（登出=%s）",
+    async (logout) => {
+      const fetch = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(json({ access_token: "first", expires_in: 900 }))
+        .mockResolvedValueOnce(json(user));
+      renderHook(() => useSessionRestore());
+      await waitFor(() =>
+        expect(authRuntime.store.getState().hydrated).toBe(true)
+      );
+      if (logout) act(() => authRuntime.clearSession());
+      fetch.mockClear();
+      await act(async () => {
+        window.dispatchEvent(new Event("online"));
+      });
+      expect(fetch).not.toHaveBeenCalled();
+      expect(authRuntime.store.getState().user).toEqual(logout ? null : user);
+    }
+  );
+
   it("明确 refresh 401 才标记未登录", async () => {
     const fetch = vi
       .spyOn(globalThis, "fetch")

@@ -174,6 +174,7 @@ export function createHttpClient({
     const isCurrent = () => generation === getSessionGeneration?.();
     // 公开端点(登录/注册等)不带 access token，避免遗留的旧 token 污染请求。
     const token = skipAuth ? undefined : await getToken?.();
+    if (!skipAuth && !isCurrent()) throw new Error("session changed");
     const headers = new Headers(init.headers);
     if (!headers.has("Content-Type")) {
       headers.set("Content-Type", "application/json");
