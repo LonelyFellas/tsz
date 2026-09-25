@@ -5,9 +5,11 @@ import { GuestGuard } from "./GuestGuard";
 import { useUserStore } from "@/stores/user";
 
 const mockReplace = vi.fn();
+let searchParams = new URLSearchParams();
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace: mockReplace })
+  useRouter: () => ({ replace: mockReplace }),
+  useSearchParams: () => searchParams
 }));
 
 const USER: User = {
@@ -21,6 +23,7 @@ const USER: User = {
 
 beforeEach(() => {
   mockReplace.mockReset();
+  searchParams = new URLSearchParams();
   useUserStore.setState({ user: null, onboarded: null, hydrated: false });
 });
 
@@ -57,6 +60,31 @@ describe("GuestGuard", () => {
       expect(mockReplace).toHaveBeenCalledWith("/");
     });
     expect(screen.queryByText("登录表单")).not.toBeInTheDocument();
+  });
+
+  it("已有会话访问登录页也使用安全回跳目标", async () => {
+    searchParams.set("redirect", "/student/practice?unit=2#words");
+    useUserStore.setState({ hydrated: true, user: USER, onboarded: true });
+    render(
+      <GuestGuard>
+        <p>登录表单</p>
+      </GuestGuard>
+    );
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith("/student/practice?unit=2#words")
+    );
+    expect(mockReplace).toHaveBeenCalledTimes(1);
+  });
+
+  it("引导状态尚未确定时不抢跳首页", () => {
+    useUserStore.setState({ hydrated: true, user: USER, onboarded: null });
+    render(
+      <GuestGuard>
+        <p>登录表单</p>
+      </GuestGuard>
+    );
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(screen.getByText("登录表单")).toBeVisible();
   });
 
   it("已登录但未完成引导 → 跳 /onboarding", async () => {
