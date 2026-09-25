@@ -981,13 +981,13 @@ export function SmartDictionary({
                   // 置灰时把原因摆出来，否则管理员只看到一个不能点的按钮。
                   // 缺 lifecycle 字段那种置灰不给 Tooltip：那是数据问题，刷新即可，
                   // 与「这条不归你管」不是一回事。
-                  const hint = !rowWritable
-                    ? ENTRY_WRITE_BLOCKED_HINT
-                    : !canTransitionEntry(writeActor, record)
+                  const hint = !canTransitionEntry(writeActor, record)
+                    ? record.published_revision !== undefined
                       ? "操作已发布词条需要词库发布权限"
-                      : record.status === "archived"
-                        ? ""
-                        : "移入垃圾桶";
+                      : ENTRY_WRITE_BLOCKED_HINT
+                    : record.status === "archived"
+                      ? ""
+                      : "移入垃圾桶";
                   return hint ? (
                     <Tooltip title={hint}>
                       <span>{button}</span>

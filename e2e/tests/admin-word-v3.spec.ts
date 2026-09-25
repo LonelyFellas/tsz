@@ -602,6 +602,28 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       .toBe(1);
   });
 
+  test("Mock 发布者：已发布词条归档可用且提示与权限一致", async ({ page }) => {
+    await mockAdminV3Api(page, { viewerRole: "admin" });
+    await page.goto("/words");
+    const status = await page.evaluate(async (id) => {
+      const response = await fetch(
+        `/api/v1/admin/lexicon/entries/${id}/publications`,
+        { method: "POST" }
+      );
+      return response.status;
+    }, ADMIN_V3_MIXED_WORD_ID);
+    expect(status).toBe(200);
+    await page.reload();
+    const row = page.locator("tbody tr", { hasText: "orbit-v3" });
+    const archive = row.getByRole("button", { name: "移入垃圾桶「orbit-v3」" });
+    await expect(archive).toBeEnabled();
+    await expect(
+      row.getByRole("button", { name: "编辑「orbit-v3」" })
+    ).toHaveCount(0);
+    await archive.hover();
+    await expect(page.getByRole("tooltip")).toHaveText("移入垃圾桶");
+  });
+
   test("E04 Mock 身份：普通管理员看他人未发布草稿只读", async ({ page }) => {
     await mockAdminV3Api(page, { entryCreator: "other", viewerRole: "admin" });
     await page.goto("/words");

@@ -33,12 +33,11 @@ const dataSourceMocks = vi.hoisted(() => ({
   get: vi.fn()
 }));
 
-// 默认登录者 = fixture 里词条的 created_by，使「仅本人可删」默认放行；
-// 需要验证越权时在单测里改 authMocks.profile。
 const authMocks = vi.hoisted(() => ({
   profile: { id: "admin-1", role: "super_admin" } as {
     id: string;
     role: string;
+    can_publish_lexicon?: boolean;
   } | null
 }));
 
@@ -410,6 +409,41 @@ describe("SmartDictionary", () => {
       </AntApp>
     );
     expect(screen.getByLabelText("移入垃圾桶「center」")).toBeDisabled();
+  });
+
+  it("普通发布者的归档提示按生命周期权限而非编辑权限显示", async () => {
+    authMocks.profile = {
+      id: "admin-1",
+      role: "admin",
+      can_publish_lexicon: true
+    };
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [
+          {
+            ...v3Word("entry", "center"),
+            status: "published",
+            published_revision: 3
+          }
+        ],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      isPending: false,
+      isError: false
+    });
+    render(
+      <AntApp>
+        <MemoryRouter>
+          <SmartDictionary />
+        </MemoryRouter>
+      </AntApp>
+    );
+    const button = screen.getByLabelText("移入垃圾桶「center」");
+    expect(button).toBeEnabled();
+    expect(screen.queryByLabelText("编辑「center」")).toBeNull();
+    fireEvent.mouseEnter(button.parentElement!);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("移入垃圾桶");
+    expect(screen.getByRole("tooltip")).not.toHaveTextContent("仅有读取权限");
   });
 
   it("超管对他人创建的词条也有标注编辑入口", () => {
