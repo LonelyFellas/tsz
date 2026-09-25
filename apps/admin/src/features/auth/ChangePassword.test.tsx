@@ -184,7 +184,12 @@ describe("ChangePassword · 强制改密（forced）", () => {
 
   it("临时密码错(401)：就地标红临时密码字段", async () => {
     mockChange.mockRejectedValue(
-      new HttpError(401, "current password is incorrect")
+      new HttpError(
+        401,
+        "current password is incorrect",
+        [],
+        "invalid_credentials"
+      )
     );
     renderForced();
     fillCurrent("wrong-temp-pw");
@@ -225,7 +230,12 @@ describe("ChangePassword · 自助改密", () => {
 
   it("当前密码错(401)：就地标红当前密码字段", async () => {
     mockChange.mockRejectedValue(
-      new HttpError(401, "current password is incorrect")
+      new HttpError(
+        401,
+        "current password is incorrect",
+        [],
+        "invalid_credentials"
+      )
     );
     renderSelf();
     fillCurrent("wrong-pass-123");

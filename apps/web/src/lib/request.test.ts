@@ -159,7 +159,7 @@ describe("refreshTokens — 竞态保护", () => {
     setAccessToken("tok");
     refreshFail();
 
-    await expect(refreshTokens()).rejects.toThrow("refresh failed");
+    await expect(refreshTokens()).rejects.toThrow("会话刷新失败，请重试");
 
     // 下次可以重新发请求
     refreshOk("at-retry");

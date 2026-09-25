@@ -1,89 +1,97 @@
-import type { AdminProfile } from "@tsz/api-client";
-import { renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-
-// 用真实 admin store 驱动状态断言，api/tokens 受控 mock。
-vi.mock("@/lib/auth", async () => {
-  const { createAdminAuthStore } = await import("@tsz/shared/auth");
-  return {
-    useAuthStore: createAdminAuthStore(),
-    api: { profile: vi.fn() },
-    tokens: { refreshTokens: vi.fn() }
-  };
-});
-
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAdminSessionRestore } from "./useAdminSessionRestore";
-import { api, tokens, useAuthStore } from "@/lib/auth";
+import { authRuntime } from "@/lib/auth";
 
-const mockRefresh = vi.mocked(tokens.refreshTokens);
-const mockProfile = vi.mocked(api.profile);
-
-const PROFILE: AdminProfile = {
+const profile = {
   id: "a1",
   phone: "13800138000",
   display_name: "Administrator",
   role: "super_admin",
   can_publish_lexicon: true,
   permissions: [],
-  preferences: { dialect: "uk" as const }
+  preferences: { dialect: "uk" }
 };
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status });
 
 beforeEach(() => {
-  vi.clearAllMocks();
-  useAuthStore.setState({ profile: null, role: null, hydrated: false });
+  authRuntime.tokens.setAccessToken(null);
+  authRuntime.store.setState({
+    profile: null,
+    role: null,
+    hydrated: false,
+    connectionError: false
+  });
+});
+afterEach(() => {
+  authRuntime.tokens.setAccessToken(null);
+  vi.restoreAllMocks();
 });
 
-describe("useAdminSessionRestore", () => {
-  it("refresh 成功 → 探 /admin/profile → 写入 profile + hydrated", async () => {
-    mockRefresh.mockResolvedValueOnce("new-at");
-    mockProfile.mockResolvedValueOnce(PROFILE);
+describe("useAdminSessionRestore + runtime + HTTP", () => {
+  it.each([503, "offline"])(
+    "refresh %s 不判未登录，重试后恢复",
+    async (failure) => {
+      const fetch = vi.spyOn(globalThis, "fetch");
+      if (failure === 503) fetch.mockResolvedValueOnce(json({}, 503));
+      else fetch.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+      const { result, rerender } = renderHook(() => useAdminSessionRestore());
+      await waitFor(() =>
+        expect(authRuntime.store.getState().connectionError).toBe(true)
+      );
+      expect(authRuntime.store.getState()).toMatchObject({
+        hydrated: false,
+        profile: null
+      });
+      rerender();
+      expect(fetch).toHaveBeenCalledTimes(1);
+      fetch
+        .mockResolvedValueOnce(json({ access_token: "new", expires_in: 900 }))
+        .mockResolvedValueOnce(json(profile));
+      await act(() => result.current.retry());
+      expect(authRuntime.store.getState()).toMatchObject({
+        profile,
+        hydrated: true,
+        connectionError: false
+      });
+      expect(fetch).toHaveBeenCalledTimes(3);
+    }
+  );
 
+  it("明确 refresh 401 才标记未登录", async () => {
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(json({}, 401));
     renderHook(() => useAdminSessionRestore());
-
-    await waitFor(() => {
-      expect(useAuthStore.getState().profile).toEqual(PROFILE);
-    });
-    expect(useAuthStore.getState().role).toBe("super_admin");
-    expect(useAuthStore.getState().hydrated).toBe(true);
-    expect(mockRefresh).toHaveBeenCalledTimes(1);
-    expect(mockProfile).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(authRuntime.store.getState().hydrated).toBe(true)
+    );
+    expect(authRuntime.store.getState().profile).toBeNull();
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  it("refresh 失败 → profile 保持 null，仍标记 hydrated", async () => {
-    mockRefresh.mockRejectedValueOnce(new Error("invalid refresh token"));
-
+  it("profile 503 不放行身份，online 后只重试 profile", async () => {
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(json({ access_token: "new", expires_in: 900 }))
+      .mockResolvedValueOnce(json({}, 503));
     renderHook(() => useAdminSessionRestore());
-
-    await waitFor(() => {
-      expect(useAuthStore.getState().hydrated).toBe(true);
+    await waitFor(() =>
+      expect(authRuntime.store.getState().connectionError).toBe(true)
+    );
+    expect(authRuntime.store.getState()).toMatchObject({
+      hydrated: false,
+      profile: null
     });
-    expect(mockProfile).not.toHaveBeenCalled();
-    expect(useAuthStore.getState().profile).toBeNull();
-  });
-
-  it("refresh 成功但 profile 失败 → profile 保持 null", async () => {
-    mockRefresh.mockResolvedValueOnce("new-at");
-    mockProfile.mockRejectedValueOnce(new Error("session expired"));
-
-    renderHook(() => useAdminSessionRestore());
-
-    await waitFor(() => {
-      expect(mockProfile).toHaveBeenCalledTimes(1);
-    });
-    expect(useAuthStore.getState().profile).toBeNull();
-  });
-
-  it("只在挂载时执行一次", async () => {
-    mockRefresh.mockResolvedValue("new-at");
-    mockProfile.mockResolvedValue(PROFILE);
-
-    const { rerender } = renderHook(() => useAdminSessionRestore());
-    rerender();
-    rerender();
-
-    await waitFor(() => {
-      expect(useAuthStore.getState().profile).toEqual(PROFILE);
-    });
-    expect(mockRefresh).toHaveBeenCalledTimes(1);
+    fetch.mockResolvedValueOnce(json(profile));
+    act(() => window.dispatchEvent(new Event("online")));
+    await waitFor(() =>
+      expect(authRuntime.store.getState().hydrated).toBe(true)
+    );
+    expect(
+      fetch.mock.calls.filter(([url]) => String(url).endsWith("/auth/refresh"))
+    ).toHaveLength(1);
+    expect(authRuntime.store.getState().profile).toEqual(profile);
   });
 });

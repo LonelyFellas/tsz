@@ -1,102 +1,107 @@
-import { renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useSessionRestore } from "./useSessionRestore";
-import { useUserStore } from "@/stores/user";
-import type { User } from "@tsz/types";
+import { authRuntime } from "@/lib/auth";
 
-// ── 依赖 mock ─────────────────────────────────────────────────────────────────
-
-vi.mock("@/lib/request", () => ({
-  refreshTokens: vi.fn(),
-  api: { auth: { me: vi.fn() } }
-}));
-
-import { refreshTokens, api } from "@/lib/request";
-const mockRefreshTokens = vi.mocked(refreshTokens);
-const mockMe = vi.mocked(api.auth.me);
-
-const MOCK_USER: User = {
+const user = {
   id: "u1",
-  phone: "13800138000",
   display_name: "Alice",
   roles: ["student"],
   avatar_url: "",
   active_role: "student"
 };
-
-// ── 工具 ──────────────────────────────────────────────────────────────────────
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status });
 
 beforeEach(() => {
-  vi.clearAllMocks();
-  useUserStore.setState({ user: null, onboarded: null, hydrated: false });
+  authRuntime.clearSession();
+  authRuntime.store.setState({ hydrated: false, connectionError: false });
+});
+afterEach(() => {
+  authRuntime.clearSession();
+  vi.restoreAllMocks();
 });
 
-// ── 用例 ──────────────────────────────────────────────────────────────────────
+describe("useSessionRestore + runtime + HTTP", () => {
+  it.each([503, "offline"])(
+    "refresh %s 不判未登录，手动重试可恢复",
+    async (failure) => {
+      const fetch = vi.spyOn(globalThis, "fetch");
+      if (failure === 503) fetch.mockResolvedValueOnce(json({}, 503));
+      else fetch.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+      const { result, rerender } = renderHook(() => useSessionRestore());
+      await waitFor(() =>
+        expect(authRuntime.store.getState().connectionError).toBe(true)
+      );
+      expect(authRuntime.store.getState()).toMatchObject({
+        hydrated: false,
+        user: null
+      });
+      rerender();
+      expect(fetch).toHaveBeenCalledTimes(1);
+      fetch
+        .mockResolvedValueOnce(json({ access_token: "new", expires_in: 900 }))
+        .mockResolvedValueOnce(json(user));
+      await act(() => result.current.retry());
+      expect(authRuntime.store.getState()).toMatchObject({
+        user,
+        hydrated: true,
+        connectionError: false
+      });
+      expect(fetch).toHaveBeenCalledTimes(3);
+    }
+  );
 
-describe("useSessionRestore", () => {
-  it("refresh 成功 → 调 /me → 写入 user store", async () => {
-    mockRefreshTokens.mockResolvedValueOnce("new-at");
-    mockMe.mockResolvedValueOnce({
-      user: MOCK_USER,
-      active_role: "student",
-      learning_settings: null,
-      onboarded: true
-    });
-
+  it("资料恢复失败后，单独刷新 token 不能清掉恢复错误", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(json({ access_token: "first", expires_in: 900 }))
+      .mockResolvedValueOnce(json({}, 503))
+      .mockResolvedValueOnce(json({ access_token: "second", expires_in: 900 }));
     renderHook(() => useSessionRestore());
-
-    await waitFor(() => {
-      expect(useUserStore.getState().user).toEqual(MOCK_USER);
+    await waitFor(() =>
+      expect(authRuntime.store.getState().connectionError).toBe(true)
+    );
+    await act(() => authRuntime.tokens.refreshTokens());
+    expect(authRuntime.store.getState()).toMatchObject({
+      hydrated: false,
+      connectionError: true,
+      user: null
     });
-    expect(mockRefreshTokens).toHaveBeenCalledTimes(1);
-    expect(mockMe).toHaveBeenCalledTimes(1);
   });
 
-  it("refresh 失败（401）→ user store 保持 null，不跳转", async () => {
-    mockRefreshTokens.mockRejectedValueOnce(new Error("invalid refresh token"));
-
+  it("明确 refresh 401 才标记未登录", async () => {
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(json({}, 401));
     renderHook(() => useSessionRestore());
-
-    // 等一个 tick 让 effect 跑完
-    await waitFor(() => {
-      expect(mockRefreshTokens).toHaveBeenCalledTimes(1);
-    });
-    expect(mockMe).not.toHaveBeenCalled();
-    expect(useUserStore.getState().user).toBeNull();
-    // 即便失败，也应标记会话恢复完成，供 UI 区分「恢复中」与「未登录」。
-    await waitFor(() => {
-      expect(useUserStore.getState().hydrated).toBe(true);
-    });
+    await waitFor(() =>
+      expect(authRuntime.store.getState().hydrated).toBe(true)
+    );
+    expect(authRuntime.store.getState().user).toBeNull();
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  it("refresh 成功但 /me 失败 → user store 保持 null", async () => {
-    mockRefreshTokens.mockResolvedValueOnce("new-at");
-    mockMe.mockRejectedValueOnce(new Error("user not found"));
-
+  it("资料 503 不放行身份，online 后只重试资料", async () => {
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(json({ access_token: "new", expires_in: 900 }))
+      .mockResolvedValueOnce(json({}, 503));
     renderHook(() => useSessionRestore());
-
-    await waitFor(() => {
-      expect(mockMe).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(authRuntime.store.getState().connectionError).toBe(true)
+    );
+    expect(authRuntime.store.getState()).toMatchObject({
+      hydrated: false,
+      user: null
     });
-    expect(useUserStore.getState().user).toBeNull();
-  });
-
-  it("只在挂载时执行一次，不重复调用", async () => {
-    mockRefreshTokens.mockResolvedValue("new-at");
-    mockMe.mockResolvedValue({
-      user: MOCK_USER,
-      active_role: "student",
-      learning_settings: null,
-      onboarded: true
-    });
-
-    const { rerender } = renderHook(() => useSessionRestore());
-    rerender();
-    rerender();
-
-    await waitFor(() => {
-      expect(useUserStore.getState().user).toEqual(MOCK_USER);
-    });
-    expect(mockRefreshTokens).toHaveBeenCalledTimes(1);
+    fetch.mockResolvedValueOnce(json(user));
+    act(() => window.dispatchEvent(new Event("online")));
+    await waitFor(() =>
+      expect(authRuntime.store.getState().hydrated).toBe(true)
+    );
+    expect(
+      fetch.mock.calls.filter(([url]) => String(url).endsWith("/auth/refresh"))
+    ).toHaveLength(1);
+    expect(authRuntime.store.getState().user).toEqual(user);
   });
 });

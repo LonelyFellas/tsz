@@ -1,7 +1,14 @@
 import { RecoverySession } from "@/features/recovery/RecoverySession";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { browserQueryDefaults } from "@tsz/shared";
-import { App as AntApp, ConfigProvider, theme as antTheme } from "antd";
+import {
+  Alert,
+  Button,
+  App as AntApp,
+  ConfigProvider,
+  theme as antTheme
+} from "antd";
+import { useAuthStore } from "@/lib/auth";
 import zhCN from "antd/locale/zh_CN";
 import { Outlet } from "react-router-dom";
 import { useAdminSessionRestore } from "@/features/auth/hooks/useAdminSessionRestore";
@@ -54,12 +61,30 @@ const antdTheme = {
 // 挂载时用 admin refresh cookie 静默恢复会话，写入 profile / level / hydrated。
 // AntApp 提供 message/modal/notification 的 context 版（v6 起不建议再用静态方法）。
 export function RootProviders() {
-  useAdminSessionRestore();
+  const { retry, retrying } = useAdminSessionRestore();
+  const connectionError = useAuthStore((s) => s.connectionError);
+  const hydrated = useAuthStore((s) => s.hydrated);
   return (
     <QueryClientProvider client={queryClient}>
       <ConfigProvider locale={zhCN} theme={antdTheme}>
         <AntApp>
           <RecoverySession />
+          {connectionError && (
+            <Alert
+              type="warning"
+              showIcon
+              title={
+                hydrated
+                  ? "连接暂时中断，当前内容已保留"
+                  : "暂时无法恢复会话，请重试"
+              }
+              action={
+                <Button loading={retrying} onClick={() => void retry()}>
+                  重试连接
+                </Button>
+              }
+            />
+          )}
           <Outlet />
         </AntApp>
       </ConfigProvider>

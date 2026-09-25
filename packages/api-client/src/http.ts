@@ -11,6 +11,7 @@ export interface HttpClientOptions {
   baseUrl: string;
   /** 每次请求动态获取 access token。 */
   getToken?: () => string | undefined | Promise<string | undefined>;
+  getSessionGeneration?: () => number;
   /**
    * access token 过期(401)时调用。实现应：
    *   1. 用 refresh token 换取新的 access token
@@ -18,7 +19,7 @@ export interface HttpClientOptions {
    *   3. 若 refresh 本身也 401 则抛出(http 层会调 onSessionExpired)
    */
   onRefresh?: () => Promise<string>;
-  /** refresh 失败后调用(通常跳转登录页)。 */
+  /** refresh 明确返回 HttpError(401) 时调用。 */
   onSessionExpired?: () => void;
   /**
    * 收到 403 时以副作用形式通知(携带业务 code)。用于全局分支——如
@@ -156,6 +157,7 @@ async function parseError(res: Response): Promise<ParsedError> {
 export function createHttpClient({
   baseUrl,
   getToken,
+  getSessionGeneration,
   onRefresh,
   onSessionExpired,
   onForbidden
@@ -165,8 +167,11 @@ export function createHttpClient({
     init: RequestInit = {},
     retrying = false,
     skipAuth = false,
-    retryOnUnauthorized = true
+    retryOnUnauthorized:
+      boolean | ((code: string | undefined) => boolean) = true
   ): Promise<T> {
+    const generation = getSessionGeneration?.();
+    const isCurrent = () => generation === getSessionGeneration?.();
     // 公开端点(登录/注册等)不带 access token，避免遗留的旧 token 污染请求。
     const token = skipAuth ? undefined : await getToken?.();
     const headers = new Headers(init.headers);
@@ -182,27 +187,35 @@ export function createHttpClient({
       headers
     });
 
-    // 只有携带了 access token 的请求才触发 refresh 逻辑。
-    // 无 token 时(如登录接口)，401 代表凭证错误，直接抛出即可。
+    if (!skipAuth && !isCurrent()) throw new Error("session changed");
+    const parsedError = res.ok ? undefined : await parseError(res);
+    if (!skipAuth && !isCurrent()) throw new Error("session changed");
     if (
       res.status === 401 &&
       !retrying &&
       token &&
       onRefresh &&
-      retryOnUnauthorized
+      (typeof retryOnUnauthorized === "function"
+        ? retryOnUnauthorized(parsedError?.code)
+        : retryOnUnauthorized)
     ) {
       try {
-        await onRefresh();
-        return request<T>(path, init, true, skipAuth, retryOnUnauthorized);
-      } catch {
-        onSessionExpired?.();
-        throw new HttpError(401, "session expired");
+        const currentToken = await getToken?.();
+        if (!isCurrent()) throw new Error("session changed");
+        if (currentToken === token) await onRefresh();
+      } catch (error) {
+        if (isCurrent() && error instanceof HttpError && error.status === 401) {
+          onSessionExpired?.();
+        }
+        throw error;
       }
+      if (!isCurrent()) throw new Error("session changed");
+      return request<T>(path, init, true, skipAuth, retryOnUnauthorized);
     }
 
-    if (!res.ok) {
+    if (parsedError) {
       const { message, details, code, problem, field_issues, meta } =
-        await parseError(res);
+        parsedError;
       // 403 全局通知(如 must_change_password → 跳改密页)。只作副作用,不吞错:仍照常抛出。
       if (res.status === 403) onForbidden?.(code);
       throw new HttpError(
@@ -219,6 +232,7 @@ export function createHttpClient({
     // 204 No Content / 202 Accepted(otp/send)等空 body:直接 res.json() 会抛
     // SyntaxError,统一按文本解析、空则返回 undefined。
     const text = await res.text();
+    if (!skipAuth && !isCurrent()) throw new Error("session changed");
     return (text ? JSON.parse(text) : undefined) as T;
   }
 
@@ -230,6 +244,7 @@ export function createHttpClient({
       data?: unknown,
       opts?: {
         skipAuth?: boolean;
+        retryOnUnauthorized?: (code: string | undefined) => boolean;
         signal?: AbortSignal;
         headers?: HeadersInit;
       }
@@ -243,7 +258,8 @@ export function createHttpClient({
           ...(opts?.signal ? { signal: opts.signal } : {})
         },
         false,
-        opts?.skipAuth
+        opts?.skipAuth,
+        opts?.retryOnUnauthorized
       ),
     put: <T>(
       path: string,
