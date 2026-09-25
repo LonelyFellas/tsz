@@ -18,11 +18,11 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/lib/request", () => ({
-  setAccessToken: vi.fn(),
+  clearSession: vi.fn(),
   api: { auth: { logout: vi.fn().mockResolvedValue(undefined) } }
 }));
 
-import { api, setAccessToken } from "@/lib/request";
+import { api, clearSession } from "@/lib/request";
 
 const USER: User = {
   id: "u1",
@@ -121,7 +121,7 @@ describe("AccountMenu", () => {
 
     await waitFor(() => {
       expect(api.auth.logout).toHaveBeenCalled();
-      expect(setAccessToken).toHaveBeenCalledWith(null);
+      expect(clearSession).toHaveBeenCalledTimes(1);
       expect(mockPush).toHaveBeenCalledWith("/login");
     });
   });

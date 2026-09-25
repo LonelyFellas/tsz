@@ -1087,6 +1087,7 @@ describe("WordWizardV3Page", () => {
     );
   });
 
+  // 三次页面挂载加富文本编辑器交互，CI 覆盖率插桩下会超过默认 5 秒。
   it("#137 未保存词形草稿跨步骤导航后仍保留", async () => {
     const current = word({
       meanings: { sense_groups: [], pos: [] },
@@ -1116,7 +1117,7 @@ describe("WordWizardV3Page", () => {
     );
     expect(endpoints.previewFormsImpactV3).not.toHaveBeenCalled();
     expect(endpoints.saveFormsStepV3).not.toHaveBeenCalled();
-  });
+  }, 10_000);
 
   it("invalidates a prepared confirmation when the exact forms draft changes", async () => {
     const current = word();

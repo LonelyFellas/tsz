@@ -56,7 +56,11 @@ export function ChangePassword() {
         navigate("/", { replace: true });
       }
     } catch (err) {
-      if (err instanceof HttpError && err.status === 401) {
+      if (
+        err instanceof HttpError &&
+        err.status === 401 &&
+        err.code === "invalid_credentials"
+      ) {
         // 401 = 当前密码（强制态即临时密码）不正确。
         form.setFields([
           {

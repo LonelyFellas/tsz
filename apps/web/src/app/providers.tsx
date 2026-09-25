@@ -6,6 +6,7 @@ import { useEffect, useLayoutEffect } from "react";
 import { getQueryClient } from "@/lib/query-client";
 import { syncThemeToDom } from "@/lib/theme";
 import { useSessionRestore } from "@/features/auth/hooks/useSessionRestore";
+import { useUserStore } from "@/stores/user";
 
 // 服务端无 layout effect;客户端用 layoutEffect 在 paint 前补主题 class。
 const useIsoLayoutEffect =
@@ -29,11 +30,31 @@ const ReactQueryDevtools = dynamic(
 );
 
 function SessionRestorer() {
-  useSessionRestore();
+  const { retry, retrying } = useSessionRestore();
+  const connectionError = useUserStore((s) => s.connectionError);
+  const hydrated = useUserStore((s) => s.hydrated);
   useEffect(() => {
     window.dispatchEvent(new Event("tsz:app-ready"));
   }, []);
-  return null;
+  if (!connectionError) return null;
+  return (
+    <div
+      role="alert"
+      className="fixed inset-x-4 top-4 z-50 mx-auto max-w-lg rounded-3xl border border-gray-200 bg-white p-4 text-center text-gray-900 shadow-lg dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+    >
+      <p>
+        {hydrated ? "连接暂时中断，当前内容已保留" : "暂时无法恢复会话，请重试"}
+      </p>
+      <button
+        type="button"
+        disabled={retrying}
+        onClick={() => void retry()}
+        className="mt-3 rounded-full bg-[#0071e3] px-5 py-2 text-white disabled:opacity-50"
+      >
+        {retrying ? "重试中…" : "重试连接"}
+      </button>
+    </div>
+  );
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {

@@ -3,19 +3,13 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { AdminProfile } from "@tsz/api-client";
 import { snapshotKey, writeSnapshot } from "@tsz/shared/recovery";
 vi.mock("@/lib/auth", async () => {
-  const { createAdminAuthStore } = await import("@tsz/shared/auth");
+  const { createAdminAuthRuntime } = await import("@tsz/shared/auth");
+  const authRuntime = createAdminAuthRuntime({ baseUrl: "/api/v1/admin" });
   return {
-    useAuthStore: createAdminAuthStore(),
-    tokens: {
-      refreshTokens: vi
-        .fn()
-        .mockRejectedValue(new TypeError("network unavailable")),
-      setAccessToken: vi.fn()
-    },
-    api: {
-      profile: vi.fn(),
-      auth: { logout: vi.fn().mockRejectedValue(new Error("offline")) }
-    }
+    authRuntime,
+    useAuthStore: authRuntime.store,
+    tokens: authRuntime.tokens,
+    api: authRuntime.api
   };
 });
 import { useAuthStore } from "@/lib/auth";
@@ -34,6 +28,9 @@ const profile: AdminProfile = {
 const key = snapshotKey(profile.id, "word:1");
 const originalLocation = window.location;
 beforeEach(() => {
+  vi.spyOn(globalThis, "fetch").mockRejectedValue(
+    new TypeError("network unavailable")
+  );
   sessionStorage.clear();
   writeSnapshot(key, 1, "未保存输入", sessionStorage);
   useAuthStore.setState({ profile: null, role: null, hydrated: false });
@@ -51,9 +48,15 @@ function RestoreSession() {
 }
 it("retains drafts after a failed session restore and a subsequent login by the same account", async () => {
   render(<RestoreSession />);
-  await waitFor(() => expect(useAuthStore.getState().hydrated).toBe(true));
+  await waitFor(() =>
+    expect(useAuthStore.getState().connectionError).toBe(true)
+  );
+  expect(useAuthStore.getState().hydrated).toBe(false);
   expect(sessionStorage.getItem(key)).toContain("未保存输入");
-  act(() => useAuthStore.getState().setProfile(profile));
+  act(() => {
+    useAuthStore.getState().setProfile(profile);
+    useAuthStore.getState().setHydrated(true);
+  });
   expect(sessionStorage.getItem(key)).toContain("未保存输入");
   act(() =>
     useAuthStore.getState().setProfile({ ...profile, id: "different-editor" })

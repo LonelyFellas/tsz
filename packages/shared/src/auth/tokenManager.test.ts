@@ -78,9 +78,45 @@ describe("createTokenManager", () => {
     tm.setAccessToken(null);
     resolveFetch(jsonResponse({ access_token: "at-late", expires_in: 900 }));
 
-    await expect(refreshing).resolves.toBe("at-late");
+    await expect(refreshing).rejects.toThrow("session changed");
     expect(tm.getToken()).toBeUndefined();
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("新登录中止旧刷新，旧请求结算不释放新会话的去重锁", async () => {
+    vi.useFakeTimers();
+    let finishOld!: (res: Response) => void;
+    let finishNew!: (res: Response) => void;
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            finishOld = resolve;
+          })
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            finishNew = resolve;
+          })
+      );
+    const tm = createTokenManager({ baseUrl: "/api/v1" });
+    tm.setAccessToken("old");
+    const old = tm.refreshTokens();
+    const stale = expect(old).rejects.toThrow("session changed");
+    const signal = fetch.mock.calls[0]?.[1]?.signal;
+    tm.setAccessToken("new-login");
+    expect(signal?.aborted).toBe(true);
+    const current = tm.refreshTokens();
+    finishOld(jsonResponse({ access_token: "late", expires_in: 900 }));
+    await stale;
+    expect(tm.refreshTokens()).toBe(current);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    finishNew(jsonResponse({ access_token: "new-refreshed", expires_in: 900 }));
+    await expect(current).resolves.toBe("new-refreshed");
+    expect(tm.getToken()).toBe("new-refreshed");
+    tm.setAccessToken(null);
   });
 
   it("refresh 失败（非 2xx）抛错且不写 token", async () => {
@@ -106,6 +142,30 @@ describe("createTokenManager", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it.each(["/api/v1", "/api/v1/admin"])(
+    "%s 主动刷新遇到 503 保留会话且不跳登录",
+    async (baseUrl) => {
+      vi.useFakeTimers();
+      const tm = createTokenManager({ baseUrl });
+      const location = { href: "" };
+      vi.stubGlobal("window", { location });
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response(null, { status: 503 })
+      );
+      tm.setAccessToken("at-existing");
+      tm.scheduleRefresh(60);
+
+      try {
+        await vi.advanceTimersByTimeAsync(30_000);
+        expect(tm.getToken()).toBe("at-existing");
+        expect(location.href).toBe("");
+      } finally {
+        tm.setAccessToken(null);
+        vi.unstubAllGlobals();
+      }
+    }
+  );
 
   it("expiresIn 过小不排期（交给 401 重试）", () => {
     vi.useFakeTimers();

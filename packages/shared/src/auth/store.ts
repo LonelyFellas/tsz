@@ -7,8 +7,9 @@ export interface AuthState {
   activeRole: string | null;
   /** 是否已完成新用户引导。仅学员端有意义，后台忽略（恒 null）。 */
   onboarded: boolean | null;
-  /** 会话恢复是否已尝试完成（成功或失败）。用于区分「恢复中」与「确未登录」，避免登录态闪烁。 */
+  /** 身份已确认或明确无会话；临时恢复故障保持 false。 */
   hydrated: boolean;
+  connectionError: boolean;
   /** 一次性发布已准备好的登录态，避免守卫读到 user/onboarded 的中间状态。 */
   setSession: (user: User, onboarded: boolean) => void;
   setUser: (user: User | null) => void;
@@ -30,12 +31,14 @@ export function createAuthStore(): AuthStore {
     activeRole: null,
     onboarded: null,
     hydrated: false,
+    connectionError: false,
     setSession: (user, onboarded) =>
       set({
         user,
         onboarded,
         activeRole: user.active_role ?? null,
-        hydrated: true
+        hydrated: true,
+        connectionError: false
       }),
     setUser: (user) => set({ user }),
     setActiveRole: (activeRole) => set({ activeRole }),

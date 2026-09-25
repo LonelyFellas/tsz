@@ -6,6 +6,7 @@ import {
   type AuthResponse,
   type Endpoints
 } from "@tsz/api-client";
+import { createSessionRestore } from "./sessionRestore";
 import { createAuthStore, type AuthStore } from "./store";
 import { createTokenManager, type TokenManager } from "./tokenManager";
 
@@ -13,6 +14,7 @@ export interface AuthRuntime {
   api: Endpoints;
   store: AuthStore;
   tokens: TokenManager;
+  restoreSession: () => Promise<void>;
   /** 登录 / 注册成功后：access token 存内存并启动主动刷新定时器。 */
   persistSession: (
     auth: Pick<AuthResponse, "access_token" | "expires_in">
@@ -31,12 +33,21 @@ export function createAuthRuntime({
   baseUrl,
   loginPath
 }: AuthRuntimeOptions): AuthRuntime {
-  const tokens = createTokenManager({ baseUrl, loginPath });
   const store = createAuthStore();
+  const tokens = createTokenManager({
+    baseUrl,
+    loginPath,
+    onRefreshError: (error) => {
+      if (error !== null || store.getState().hydrated) {
+        store.setState({ connectionError: error !== null });
+      }
+    }
+  });
 
   const http = createHttpClient({
     baseUrl,
     getToken: tokens.getToken,
+    getSessionGeneration: tokens.getSessionGeneration,
     onRefresh: tokens.refreshTokens,
     onSessionExpired: tokens.redirectToLogin
   });
@@ -46,8 +57,23 @@ export function createAuthRuntime({
     api,
     store,
     tokens,
+    restoreSession: createSessionRestore(
+      tokens,
+      () => api.auth.me(),
+      ({ user, onboarded }) => store.getState().setSession(user, onboarded),
+      () =>
+        store.setState({
+          user: null,
+          activeRole: null,
+          onboarded: null,
+          hydrated: true,
+          connectionError: false
+        }),
+      () => store.setState({ connectionError: true })
+    ),
     persistSession: (auth) => {
       tokens.setAccessToken(auth.access_token);
+      store.setState({ connectionError: false });
       tokens.scheduleRefresh(auth.expires_in);
     },
     clearSession: () => {
@@ -56,7 +82,8 @@ export function createAuthRuntime({
         user: null,
         activeRole: null,
         onboarded: null,
-        hydrated: true
+        hydrated: true,
+        connectionError: false
       });
     }
   };

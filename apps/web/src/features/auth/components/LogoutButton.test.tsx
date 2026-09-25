@@ -10,11 +10,11 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/lib/request", () => ({
-  setAccessToken: vi.fn(),
+  clearSession: vi.fn(),
   api: { auth: { logout: vi.fn().mockResolvedValue(undefined) } }
 }));
 
-import { api, setAccessToken } from "@/lib/request";
+import { api, clearSession } from "@/lib/request";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -30,7 +30,7 @@ describe("LogoutButton", () => {
 
     await waitFor(() => {
       expect(api.auth.logout).toHaveBeenCalled();
-      expect(setAccessToken).toHaveBeenCalledWith(null);
+      expect(clearSession).toHaveBeenCalledTimes(1);
       expect(mockPush).toHaveBeenCalledWith("/login");
     });
   });
@@ -43,7 +43,7 @@ describe("LogoutButton", () => {
     await user.click(screen.getByRole("button", { name: "退出登录" }));
 
     await waitFor(() => {
-      expect(setAccessToken).toHaveBeenCalledWith(null);
+      expect(clearSession).toHaveBeenCalledTimes(1);
       expect(mockPush).toHaveBeenCalledWith("/login");
     });
   });

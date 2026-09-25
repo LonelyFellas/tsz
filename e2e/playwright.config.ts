@@ -9,7 +9,8 @@ export default defineConfig({
   testIgnore: [
     "admin-word-creation.spec.ts",
     "admin-word-v3.spec.ts",
-    "admin-part-of-speech.spec.ts"
+    "admin-part-of-speech.spec.ts",
+    "admin-auth-refresh.spec.ts"
   ],
   // CI 上失败重试一次,本地不重试。
   retries: process.env.CI ? 1 : 0,

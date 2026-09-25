@@ -5,9 +5,11 @@
 import {
   createAdminEndpoints,
   createHttpClient,
+  HttpError,
   type AdminEndpoints
 } from "@tsz/api-client";
 import type { AdminAuthResponse } from "@tsz/types";
+import { createSessionRestore } from "./sessionRestore";
 import { createAdminAuthStore, type AdminAuthStore } from "./adminStore";
 import { createTokenManager, type TokenManager } from "./tokenManager";
 
@@ -15,6 +17,7 @@ export interface AdminAuthRuntime {
   api: AdminEndpoints;
   store: AdminAuthStore;
   tokens: TokenManager;
+  restoreSession: () => Promise<void>;
   /** 登录成功后：access token 存内存并启动主动刷新定时器。 */
   persistSession: (
     auth: Pick<AdminAuthResponse, "access_token" | "expires_in">
@@ -51,12 +54,21 @@ export function createAdminAuthRuntime({
   loginPath,
   changePasswordPath = "/change-password"
 }: AdminAuthRuntimeOptions): AdminAuthRuntime {
-  const tokens = createTokenManager({ baseUrl, loginPath });
   const store = createAdminAuthStore();
+  const tokens = createTokenManager({
+    baseUrl,
+    loginPath,
+    onRefreshError: (error) => {
+      if (error !== null || store.getState().hydrated) {
+        store.setState({ connectionError: error !== null });
+      }
+    }
+  });
 
   const http = createHttpClient({
     baseUrl,
     getToken: tokens.getToken,
+    getSessionGeneration: tokens.getSessionGeneration,
     onRefresh: tokens.refreshTokens,
     onSessionExpired: tokens.redirectToLogin,
     onForbidden: (code) => redirectToChangePassword(code, changePasswordPath)
@@ -67,8 +79,34 @@ export function createAdminAuthRuntime({
     api,
     store,
     tokens,
+    restoreSession: createSessionRestore(
+      tokens,
+      () =>
+        api.profile().catch((error: unknown) => {
+          if (
+            error instanceof HttpError &&
+            error.status === 403 &&
+            error.code === "must_change_password"
+          )
+            return null;
+          throw error;
+        }),
+      (profile) => {
+        store.getState().setProfile(profile);
+        store.setState({ hydrated: true, connectionError: false });
+      },
+      () =>
+        store.setState({
+          profile: null,
+          role: null,
+          hydrated: true,
+          connectionError: false
+        }),
+      () => store.setState({ connectionError: true })
+    ),
     persistSession: (auth) => {
       tokens.setAccessToken(auth.access_token);
+      store.setState({ connectionError: false });
       tokens.scheduleRefresh(auth.expires_in);
     }
   };

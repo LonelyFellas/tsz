@@ -1,87 +1,59 @@
 import { renderHook, act } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useLogout } from "./useLogout";
-import { useUserStore } from "@/stores/user";
-
-// ── 依赖 mock ─────────────────────────────────────────────────────────────────
+import { authRuntime } from "@/lib/auth";
 
 const mockPush = vi.fn();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush })
 }));
 
-vi.mock("@/lib/request", () => ({
-  setAccessToken: vi.fn(),
-  api: { auth: { logout: vi.fn() } }
-}));
-
-import { api, setAccessToken } from "@/lib/request";
-const mockLogout = vi.mocked(api.auth.logout);
-const mockSetAccessToken = vi.mocked(setAccessToken);
-
-// ── 工具 ──────────────────────────────────────────────────────────────────────
-
-function renderLogout() {
-  const { result } = renderHook(() => useLogout());
-  return result.current; // logout 函数
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
-  // 重置 user store
-  useUserStore.setState({ user: { id: "1" } as never });
+  authRuntime.tokens.setAccessToken("token");
+  authRuntime.store.setState({
+    user: {
+      id: "1",
+      display_name: "User",
+      avatar_url: "",
+      roles: ["student"],
+      active_role: "student"
+    },
+    activeRole: "student",
+    onboarded: true,
+    hydrated: false,
+    connectionError: true
+  });
+});
+afterEach(() => {
+  authRuntime.clearSession();
+  vi.restoreAllMocks();
 });
 
-// ── 用例 ──────────────────────────────────────────────────────────────────────
-
-describe("useLogout", () => {
-  it("logout 成功：清除 token、清除 user store、跳转 /login", async () => {
-    mockLogout.mockResolvedValueOnce(undefined);
-
-    const logout = renderLogout();
-    await act(async () => {
-      await logout();
-    });
-
-    expect(mockLogout).toHaveBeenCalledTimes(1);
-    expect(mockSetAccessToken).toHaveBeenCalledWith(null);
-    expect(useUserStore.getState().user).toBeNull();
-    expect(mockPush).toHaveBeenCalledWith("/login");
-  });
-
-  it("logout API 失败：吞掉错误（始终 resolve），本地状态仍清除并跳转 /login", async () => {
-    mockLogout.mockRejectedValueOnce(new Error("network error"));
-
-    const logout = renderLogout();
-    // 新契约：logout() 始终 resolve，调用方无需 catch。
-    await act(async () => {
-      await expect(logout()).resolves.toBeUndefined();
-    });
-
-    // 即使后端报错，本地必须清干净
-    expect(mockSetAccessToken).toHaveBeenCalledWith(null);
-    expect(useUserStore.getState().user).toBeNull();
-    expect(mockPush).toHaveBeenCalledWith("/login");
-  });
-
-  it("清除顺序：先清 token 和 user，再跳转", async () => {
-    const callOrder: string[] = [];
-    mockLogout.mockResolvedValueOnce(undefined);
-    mockSetAccessToken.mockImplementation(() => {
-      callOrder.push("setAccessToken");
-    });
-    mockPush.mockImplementation(() => {
-      callOrder.push("push");
-    });
-    useUserStore.subscribe(() => {
-      if (useUserStore.getState().user === null) callOrder.push("clearUser");
-    });
-
-    const logout = renderLogout();
-    await act(async () => {
-      await logout();
-    });
-
-    expect(callOrder).toEqual(["setAccessToken", "clearUser", "push"]);
-  });
+describe("useLogout + runtime + HTTP", () => {
+  it.each(["success", "offline"])(
+    "logout %s 都清完整会话，再跳登录页",
+    async (outcome) => {
+      const fetch = vi.spyOn(globalThis, "fetch");
+      if (outcome === "success")
+        fetch.mockResolvedValue(new Response(null, { status: 204 }));
+      else fetch.mockRejectedValue(new TypeError("network error"));
+      mockPush.mockImplementation(() => {
+        expect(authRuntime.tokens.getToken()).toBeUndefined();
+        expect(authRuntime.store.getState()).toMatchObject({
+          user: null,
+          activeRole: null,
+          onboarded: null,
+          hydrated: true,
+          connectionError: false
+        });
+      });
+      const { result } = renderHook(() => useLogout());
+      await act(async () => {
+        await expect(result.current()).resolves.toBeUndefined();
+      });
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(mockPush).toHaveBeenCalledWith("/login");
+    }
+  );
 });
