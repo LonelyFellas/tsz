@@ -1,105 +1,63 @@
-# C 端手机号注册接口对接设计
+# C 端注册登录设计
 
-## 方案
+## 数据与接口
 
-在现有注册页上做最小收敛：手机 Tab 保持可用，邮箱 Tab 保留但禁用并展示“未开放”；复用登录页已有的验证码倒计时与错误交互。API client 将注册返回值直接声明为 `AuthResponse`，组件拿响应完成会话落地，不再链式登录。
+复用 `users` 的 phone/email 至少一个非空约束、手机号唯一索引和 `lower(email)` 部分唯一索引，无新增迁移。跨仓需求只在前端此目录维护，后端对应 `codex/account-permissions-batch-2`。
 
-邮箱入口仅用于向用户传达后续能力，不绑定状态、不渲染邮箱输入框，也不会产生邮箱请求。注册不继续采用“注册后再登录”，因为新接口已经创建 refresh 会话，重复登录会额外创建会话并增加失败分支。
+`POST /api/v1/auth/register` 接受 `{ phone, password, code }` 或 `{ email, password, code }`，恰好一种联系方式；错误返回 400，重复账号返回 409 并使用对应的 phone/email 字段。成功仍为 201 与原 `LoginResponse`，HttpOnly cookie 下发 refresh token。
 
-## 文件影响
+处理顺序：
 
-### `packages/api-client`
+1. 用 `Phone::parse`／`Email::parse` 归一化并校验联系方式。
+2. 校验注册密码为 11–20 位 ASCII 字母数字且二者都有，转大写。
+3. OTP 验证使用归一化标识及固定 Register 用途。
+4. hash 后开启事务，通过 `register_verified_in` 创建账号和 student 角色。
+5. 同事务写 refresh session，提交后返回响应及 cookie。失败回滚全部 DB 写入；验证码已消费时须重新获取。
 
-- `src/endpoints.ts`
-  - `RegisterPayload` 改为必填 `phone/password/code`，移除 email。
-  - 删除旧 `RegisterResponse`。
-  - `OtpPurpose` 增加 `register`。
-  - `auth.register` 改调 `/auth/register` 并返回 `AuthResponse`。
-- `src/endpoints.test.ts`
-  - 更新注册 method/path/body/返回契约测试。
-  - 增加注册用途发码测试。
-- `src/openapi.snapshot.json`
-  - 从后端最新 OpenAPI 同步 `/auth/register`。
-- `src/endpoints.contract.test.ts`
-  - 新路径自动纳入正式契约校验，不进入 PENDING。
+`/otp/send` 和 `/auth/login-otp` 复用现有协议及限流存储。Mock sender 暂时保留，真实 provider 不在本次范围。前端请求类型 `RegisterPayload` 位于 `@tsz/types`，以互斥联合限制 phone/email，API client 不增加字段转换层。
 
-### `apps/web`
+## 密码兼容
 
-- `src/features/auth/components/RegisterForm.tsx`
-  - 邮箱 Tab 改为禁用的“未开放”状态，不进入邮箱表单。
-  - 新增 code、countdown、sending 状态和发码函数。
-  - 提交 `phone/password/code`，直接消费 `AuthResponse`。
-  - 保留 `persistSession`、`setUser`、`navigateAfterAuth`。
-- `src/features/auth/components/RegisterForm.test.tsx`
-  - 更新按钮状态、发码、倒计时、提交 payload、成功跳转和错误映射测试。
-  - 删除邮箱注册和链式登录失败用例。
+新注册沿用现有 web 产品规则；不全局改 `Password::parse`，避免把 admin、改密和存量服务路径纳入本次改造。
 
-无需修改 `@tsz/types`：注册响应复用现有 `User` 和 `AuthResponse`。无需修改 `@tsz/shared`：`isPhone`、`isCode`、`isRegisterPassword` 已存在。
+登录前端不再提前丢失输入大小写，传原串；后端 user 域先比较原串，失败且存在小写 ASCII 字符时比较大写版本。未知账号用同样流程对 dummy hash 验证，仍返回相同凭据错误；账号状态只在密码正确后暴露。
 
-## Wire 契约
+这兼容已有两类凭据：历史 API 原串哈希和 web 大写哈希。历史混合大小写原串仍按原串匹配，不迁移哈希或假定能从 hash 恢复密码；新注册大写哈希支持大小写变体。额外 bcrypt 只出现在原串未匹配且有大小写变化时。
 
-### 发注册验证码
+## 前端状态与入口
 
-```http
-POST /api/v1/otp/send
-Content-Type: application/json
+- `RegisterForm` 共用 phone/email 状态机；归一化后的同一 identifier 用于发码和提交。
+- `/register?method=email` 由服务端注册页传初始方式，保留无 JS 的 SSR 表单；不新增海外路由。
+- 登录失败的注册按钮按当前登录方式／账号格式选择邮箱入口，不携带联系方式；保持 redirect，最终由原有 safe redirect／GuestGuard 处理。
+- 注册／登录成功先 persistSession，再 completeAuthentication；资料失败时锁定认证参数，仅重试 me。
+- 验证码表单限定六位；切换联系方式清旧码和 UI 冷却，真实限流仍由服务端负责。
+- 重复账号提示当前渠道并提供登录入口；登录凭据错误不强行区分未注册和密码错误。
 
-{
-  "phone": "13800138000",
-  "purpose": "register"
-}
+## 验证命令
+
+前端根目录：
+
+```sh
+pnpm typecheck
+pnpm lint
+pnpm test:cov
+WEB_E2E_PORT=3017 CI=1 pnpm --filter @tsz/e2e exec playwright test --workers=2
 ```
 
-成功为 202 空 body；429 表示频控；503 表示验证码基础设施不可用。
+后端任务工作树（测试指向本地 PostgreSQL，SQLx 创建隔离测试库；Redis 使用测试前缀）：
 
-### 注册并建立会话
-
-```http
-POST /api/v1/auth/register
-Content-Type: application/json
-
-{
-  "phone": "13800138000",
-  "password": "ABC12345678",
-  "code": "123456"
-}
+```sh
+cargo fmt --check
+SQLX_OFFLINE=true cargo clippy --locked --all-targets --all-features -- -D warnings
+SQLX_OFFLINE=true cargo test --locked --all-targets --all-features --no-fail-fast
 ```
 
-成功响应复用 `AuthResponse` 的 snake_case wire shape：`user`、`access_token`、`expires_in`、`refresh_token_expires_at`；refresh token 经 `Set-Cookie` 下发。
+预期：所有非既有忽略测试通过；浏览器证明 email-only 注册、资料失败重试、重复邮箱、手机和邮箱登录及安全回跳。真实 API 测试不等于真实短信／邮件送达；后者明确暂缓。测试资源参数与实际结果写入六批记录。
 
-## 状态流
+## 契约与发布回退
 
-```text
-手机号合法
-  → sendCode(phone, "register")
-  → 202 → countdown 60s
-  → 输入 code + password
-  → register({phone,password,code})
-  → AuthResponse
-  → persistSession + setUser
-  → GET /auth/me
-  → onboarding 或首页
-```
+后端源码生成 OpenAPI 后，以该任务工作树的绝对 `OPENAPI_SOURCE` 同步前端；生成文件不手工改。前端精简快照未收录注册 DTO 时，不把元数据变化误当作请求校验已覆盖，注册集成测试直接断言真实 handler。
 
-发码与注册分别使用 `sending`、`loading`，互不混用。倒计时期间禁止重复发码；注册中禁止重复提交。
+发布须后端先行：旧 web 注册提交本来就符合 11–20 位字母数字并转大写，旧 web 的手机号注册／登录仍适配新后端；新 web 邮箱注册和原串登录需要新后端。直接 API 客户端使用旧的 8–10 位或符号注册密码会被新规则拒绝，这是已批准的注册规则收口，不声称所有旧注册请求都兼容。
 
-## 错误映射
-
-- `invalid code` → 验证码无效或已过期。
-- `user already exists` → 该手机号已注册，请直接登录。
-- rate limit/429 → 操作频繁，请稍后重试。
-- 其他错误沿用 `translateAuthError` 与中文兜底。
-
-## 测试策略
-
-- API client 单测：新路径、body、`skipAuth`、register purpose。
-- API contract：实际调用路径必须存在于 OpenAPI 快照。
-- RegisterForm 集成测试：字段和按钮状态、发码成功/失败、倒计时、成功会话、onboarding 分支、401/409/429、未知错误、显示密码、回车提交。
-- 手工联调：真实后端 + Redis Mock sender，使用后端日志中的验证码走完整注册流程并检查 refresh cookie。
-- 不新增 E2E：当前关键风险集中在接口契约和表单状态，组件集成测试覆盖更直接；真实短信供应商不在本次范围。
-
-## 风险与回滚
-
-- 后端已公开 `register` OTP purpose；若部署环境未同步最新后端，发码会返回 422。
-- 前端不分支判断 200/201，但以 OpenAPI 声明的 201 作为接口契约。
-- 回滚只需恢复旧 API client 与 RegisterForm；独立分支不会影响当前字典功能工作区。
+回退先退前端，再退后端；先退后端会令新邮箱注册失败，并可能令新前端的小写输入无法匹配大写哈希。已有邮箱账号不删除，无 schema 回滚；邮箱账号本身已受旧后端登录模型支持。没有自动部署或真实数据变更授权。

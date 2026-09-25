@@ -1,3 +1,8 @@
+export type RegisterPayload = {
+  password: string;
+  code: string;
+} & ({ phone: string; email?: never } | { email: string; phone?: never });
+
 /** 当前账号可用于注销验证的在档联系方式渠道。 */
 export type AccountDeletionChannel = "phone" | "email";
 

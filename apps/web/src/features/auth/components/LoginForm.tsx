@@ -1,6 +1,6 @@
 "use client";
 
-import { isCode, isEmail, isPhone, isValidAccount } from "@tsz/shared";
+import { isEmail, isPhone, isValidAccount } from "@tsz/shared";
 import type { AuthResponse } from "@tsz/api-client";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -19,13 +19,19 @@ type Tab = "password" | "phone" | "email";
 // invalid credentials(防枚举),前端不区分;403 forbidden = 密码对但账号被禁。
 const LOGIN_ERRORS: Record<string, string> = {
   "invalid credentials": "账号或密码错误，请重新输入",
+  "identifier is invalid": "手机号或邮箱格式错误，请检查后重试",
   forbidden: "该账号已被禁用，请联系客服"
 };
 
 // 验证码登录的错误文案,对齐后端 /otp/send + /auth/login-otp 的真实 message。
 const CODE_ERRORS: Record<string, string> = {
   "invalid code": "验证码错误或已失效，请重新获取",
-  "user not found": "该账号未注册，请先注册",
+  "invalid credentials": "登录凭据无效；尚未注册请先注册",
+  "invalid identifier": "手机号或邮箱格式错误，请检查后重试",
+  "invalid email": "邮箱格式错误，请检查后重试",
+  "invalid phone": "手机号码错误，请检查后重试",
+  "otp unavailable": "验证码服务暂时不可用，请稍后再试",
+  forbidden: "该账号已被禁用，请联系客服",
   "too many requests": "验证码发送过于频繁，请稍后再试",
   "service unavailable": "验证码服务暂时不可用，请稍后再试"
 };
@@ -60,13 +66,18 @@ export function LoginForm() {
     return () => clearTimeout(timer);
   }, [countdown]);
 
-  const accountValid = isValidAccount(account);
-  const passwordValid = password.length >= 6;
+  const identifier = account.includes("@")
+    ? account.trim().toLowerCase()
+    : account.trim();
+  const accountValid = isValidAccount(identifier);
+  const passwordValid = password.length > 0;
   const canSubmit =
     (authenticated || (accountValid && passwordValid)) && !loading;
 
   // 验证码 tab：手机号 tab 校验手机号，邮箱 tab 校验邮箱。
-  const identifierValid = tab === "phone" ? isPhone(account) : isEmail(account);
+  const identifierValid =
+    tab === "phone" ? isPhone(identifier) : isEmail(identifier);
+  const codeValid = /^\d{6}$/.test(code);
   const canSendCode =
     identifierValid &&
     countdown === 0 &&
@@ -74,7 +85,7 @@ export function LoginForm() {
     !loading &&
     !authenticated;
   const canCodeSubmit =
-    (authenticated || (identifierValid && isCode(code))) && !loading;
+    (authenticated || (identifierValid && codeValid)) && !loading && !sending;
 
   // 从找回密码流程跳回时展示成功提示，引导用户用新密码登录。
   const resetSuccess = searchParams.get("reset") === "success";
@@ -84,9 +95,27 @@ export function LoginForm() {
   const registeredSuccess = searchParams.get("registered") === "success";
 
   function switchTab(id: Tab) {
+    if (tab === id) return;
     setTab(id);
     setError("");
     setCode("");
+    setCountdown(0);
+  }
+
+  function changeAccount(value: string) {
+    setAccount(value);
+    setCode("");
+    setCountdown(0);
+    setError("");
+  }
+
+  function openRegistration() {
+    const params = new URLSearchParams();
+    if (tab === "email" || (tab === "password" && identifier.includes("@")))
+      params.set("method", "email");
+    const redirect = searchParams.get("redirect");
+    if (redirect) params.set("redirect", redirect);
+    router.push(params.size ? `/register?${params}` : "/register");
   }
 
   // 认证已成功时只重试资料，不能再次消费登录验证码。
@@ -113,11 +142,7 @@ export function LoginForm() {
       if (authenticated) {
         await loadProfile();
       } else {
-        const auth = await api.auth.login(
-          account,
-          // 业务规则:密码不区分大小写,与注册一致统一转大写。
-          password.toUpperCase()
-        );
+        const auth = await api.auth.login(identifier, password);
         await onAuthSuccess(auth);
       }
     } catch (e: unknown) {
@@ -133,7 +158,7 @@ export function LoginForm() {
     setError("");
     setSending(true);
     try {
-      await api.auth.sendCode(account);
+      await api.auth.sendCode(identifier);
       setCountdown(CODE_COUNTDOWN);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "";
@@ -153,7 +178,7 @@ export function LoginForm() {
       if (authenticated) {
         await loadProfile();
       } else {
-        const auth = await api.auth.loginWithCode(account, code);
+        const auth = await api.auth.loginWithCode(identifier, code);
         await onAuthSuccess(auth);
       }
     } catch (e: unknown) {
@@ -197,7 +222,7 @@ export function LoginForm() {
               <button
                 key={id}
                 onClick={() => switchTab(id)}
-                disabled={loading || authenticated}
+                disabled={sending || loading || authenticated}
                 className={`pb-3 text-sm font-medium transition-colors ${
                   tab === id
                     ? "text-primary border-b-2 border-primary"
@@ -219,8 +244,8 @@ export function LoginForm() {
                   type="text"
                   placeholder="请输入手机号/邮箱号码"
                   value={account}
-                  disabled={loading || authenticated}
-                  onChange={(e) => setAccount(e.target.value)}
+                  disabled={sending || loading || authenticated}
+                  onChange={(e) => changeAccount(e.target.value)}
                   className={AUTH_INPUT_CLASS}
                 />
               </div>
@@ -233,7 +258,7 @@ export function LoginForm() {
                     type={showPassword ? "text" : "password"}
                     placeholder="请输入登录密码"
                     value={password}
-                    disabled={loading || authenticated}
+                    disabled={sending || loading || authenticated}
                     onChange={(e) => setPassword(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleLogin()}
                     className={`${AUTH_INPUT_CLASS} pr-12`}
@@ -276,8 +301,8 @@ export function LoginForm() {
                       tab === "phone" ? "请输入手机号" : "请输入邮箱"
                     }
                     value={account}
-                    disabled={loading || authenticated}
-                    onChange={(e) => setAccount(e.target.value)}
+                    disabled={sending || loading || authenticated}
+                    onChange={(e) => changeAccount(e.target.value)}
                     className={AUTH_INPUT_CLASS}
                   />
                   {account && !identifierValid && (
@@ -299,12 +324,12 @@ export function LoginForm() {
                       inputMode="numeric"
                       placeholder="请输入验证码"
                       value={code}
-                      disabled={loading || authenticated}
+                      disabled={sending || loading || authenticated}
                       onChange={(e) => setCode(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && handleCodeLogin()}
                       className={`${AUTH_INPUT_CLASS} pr-20`}
                     />
-                    {code && !isCode(code) && (
+                    {code && !codeValid && (
                       <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-danger">
                         验证码错误
                       </span>
@@ -344,7 +369,8 @@ export function LoginForm() {
           {/* 两种登录方式共用的页脚：注册入口 + 忘记密码（对齐设计稿）。 */}
           <div className="mt-4 space-y-4">
             <button
-              onClick={() => router.push("/register")}
+              onClick={openRegistration}
+              disabled={sending || loading || authenticated}
               className="w-full rounded-full border border-border py-3 text-sm text-foreground-muted hover:bg-muted transition-colors"
             >
               没有账号，立即注册

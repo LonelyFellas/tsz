@@ -7,6 +7,18 @@ export const metadata: Metadata = {
   alternates: { canonical: "/register" }
 };
 
-export default function RegisterPage() {
-  return <RegisterForm />;
+export default async function RegisterPage({
+  searchParams
+}: {
+  searchParams: Promise<{ method?: string; redirect?: string }>;
+}) {
+  const params = await searchParams;
+  const method = params.method === "email" ? "email" : "phone";
+  return (
+    <RegisterForm
+      key={method}
+      initialMethod={method}
+      redirect={params.redirect}
+    />
+  );
 }

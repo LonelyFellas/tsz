@@ -6,6 +6,7 @@ import type {
   Comment,
   ConfirmAccountDeletionRequest,
   Paginated,
+  RegisterPayload,
   Task,
   User,
   Word,
@@ -92,15 +93,6 @@ export interface AvatarUpload {
   max_bytes: number;
 }
 
-export interface RegisterPayload {
-  /** 当前仅支持中国大陆手机号注册。 */
-  phone: string;
-  /** 8–72 字节(bcrypt 上限)。 */
-  password: string;
-  /** `/otp/send` 以 purpose=register 发出的短信验证码。 */
-  code: string;
-}
-
 /** OTP 用途(otp/send 的 purpose 字段,snake_case 对齐后端枚举)。 */
 export type OtpPurpose =
   "login" | "register" | "password_reset" | "account_deletion" | "contact_bind";
@@ -135,7 +127,7 @@ export function createEndpoints(http: HttpClient) {
        */
       bindContact: (contact: string, code: string) =>
         http.post<{ user: User }>("/me/contact/bind", { contact, code }),
-      /** POST /auth/register — 手机号验证码注册；成功直接建立登录会话。 */
+      /** POST /auth/register — 手机或邮箱验证码注册，成功直接建立会话。 */
       register: (payload: RegisterPayload) =>
         http.post<AuthResponse>("/auth/register", payload, {
           skipAuth: true
