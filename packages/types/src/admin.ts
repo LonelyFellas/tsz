@@ -169,6 +169,10 @@ export interface AdminListResponse {
   pagination: AdminPaginationMeta;
 }
 
+export interface UpdateAdminInput {
+  display_name: string;
+}
+
 /** PATCH /admin/admins/{id}/status 请求体。 */
 export interface AdminStatusInput {
   status: AdminStatus;

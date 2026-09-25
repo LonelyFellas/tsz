@@ -434,7 +434,7 @@ export interface MockAdminV3ApiOptions {
   surfaceWarnings?: boolean;
   /** 默认第一次保存词形步返回 422（E01a 的问题定位）；只建一个词性的用例要关掉。 */
   formsFailureOnce?: boolean;
-  /** 当前登录管理员的角色，默认普通管理员。真实 profile 的 permissions 不分角色，这里只切 role。 */
+  /** 编辑流程默认使用超级管理员；只读验收显式使用 admin。 */
   viewerRole?: "admin" | "super_admin";
   /**
    * 初始那条 mock 词条（列表行与详情）由谁创建，默认当前登录管理员本人；
@@ -868,7 +868,7 @@ export async function mockAdminV3Api(
     if (method === "GET" && path === "/profile") {
       return json(route, 200, {
         ...ADMIN_PROFILE,
-        role: options.viewerRole ?? "admin"
+        role: options.viewerRole ?? "super_admin"
       });
     }
     if (method === "GET" && path === "/settings/parts-of-speech/catalog") {

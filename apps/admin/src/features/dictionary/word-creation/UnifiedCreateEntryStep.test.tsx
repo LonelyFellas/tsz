@@ -23,7 +23,7 @@ const dialectPreference = vi.hoisted(() => ({
 // 默认登录者 = 冲突 fixture 里已有词条的 created_by，使「只能改自己的标注」默认放行；
 // 需要验证越权时在单测里改 authMocks.profile。
 const authMocks = vi.hoisted(() => ({
-  profile: { id: "admin-1", role: "admin" } as {
+  profile: { id: "admin-1", role: "super_admin" } as {
     id: string;
     role: string;
   } | null
@@ -430,7 +430,7 @@ function input() {
 beforeEach(() => {
   vi.clearAllMocks();
   dialectPreference.value = "us";
-  authMocks.profile = { id: "admin-1", role: "admin" };
+  authMocks.profile = { id: "admin-1", role: "super_admin" };
 });
 
 describe("UnifiedCreateEntryStep", () => {
@@ -1796,7 +1796,8 @@ describe("真实词条标注创建", () => {
     return dialog;
   }
 
-  it("他人词条在冲突弹窗里只读、不参与必填，提交只带自己有权改的", async () => {
+  it("普通管理员不能编辑冲突弹窗中的任何既有词条标注", async () => {
+    authMocks.profile = { id: "admin-1", role: "admin" };
     const supplied = requests();
     vi.mocked(supplied.detectV3).mockResolvedValue(v3Detection());
     vi.mocked(supplied.createV3)
@@ -1815,16 +1816,13 @@ describe("真实词条标注创建", () => {
     expect(theirs).toBeDisabled();
     // 理由挂在自己那一行上，不是弹窗里飘着的一句话。
     expect(
-      within(theirs.closest("tr")!).getByText("他人词条")
+      within(theirs.closest("tr")!).getByText("当前账号仅有读取权限")
     ).toBeInTheDocument();
     const mine = within(dialog).getByLabelText("centre / center标注");
-    expect(mine).toBeEnabled();
+    expect(mine).toBeDisabled();
     expect(
-      within(mine.closest("tr")!).queryByText("他人词条")
-    ).not.toBeInTheDocument();
-
-    // 只填自己那条和新建条：别人那条空着也不该挡住提交。
-    fireEvent.change(mine, { target: { value: "001" } });
+      within(mine.closest("tr")!).getByText("当前账号仅有读取权限")
+    ).toBeInTheDocument();
     fireEvent.change(within(dialog).getByLabelText("新建词条标注"), {
       target: { value: "002" }
     });
@@ -1833,13 +1831,12 @@ describe("真实词条标注创建", () => {
 
     expect(vi.mocked(supplied.createV3).mock.calls[1]![1]).toMatchObject({
       annotation: "002",
-      annotation_updates: [
-        { entry_id: "mine", annotation: "001", base_annotation_revision: 1 }
-      ]
+      annotation_updates: []
     });
   });
 
-  it("整组都是他人词条时只提交新建条的标注，不夹带任何越权更新", async () => {
+  it("普通管理员的冲突请求不夹带既有词条的越权标注更新", async () => {
+    authMocks.profile = { id: "admin-1", role: "admin" };
     const supplied = requests();
     vi.mocked(supplied.detectV3).mockResolvedValue(v3Detection());
     vi.mocked(supplied.createV3)
@@ -1880,7 +1877,9 @@ describe("真实词条标注创建", () => {
 
     const theirs = within(dialog).getByLabelText("center (theirs)标注");
     expect(theirs).toBeEnabled();
-    expect(within(dialog).queryByText("他人词条")).not.toBeInTheDocument();
+    expect(
+      within(dialog).queryByText("当前账号仅有读取权限")
+    ).not.toBeInTheDocument();
     fireEvent.change(theirs, { target: { value: "001" } });
     fireEvent.change(within(dialog).getByLabelText("新建词条标注"), {
       target: { value: "002" }
@@ -1909,6 +1908,9 @@ describe("真实词条标注创建", () => {
       );
     renderStep(supplied);
     const dialog = await openConflict();
+    fireEvent.change(within(dialog).getByLabelText("center (theirs)标注"), {
+      target: { value: "001" }
+    });
     fireEvent.change(within(dialog).getByLabelText("新建词条标注"), {
       target: { value: "002" }
     });

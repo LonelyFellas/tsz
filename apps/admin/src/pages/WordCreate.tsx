@@ -1,7 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Typography } from "antd";
 import { wordKeys } from "@/features/dictionary/api";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
+import { useAuthStore } from "@/lib/auth";
+import { canWriteEntry } from "@/features/dictionary/entryWritePermission";
 import {
   UnifiedCreateEntryStep,
   type UnifiedCreateRequests
@@ -30,6 +32,8 @@ export function WordCreatePage({
 } = {}) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const profile = useAuthStore((state) => state.profile);
+  if (!canWriteEntry(profile)) return <Navigate to="/words" replace />;
   return (
     <WordCreationLayout
       currentStep="basics"

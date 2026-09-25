@@ -8,9 +8,13 @@ import type { SharedSentence } from "@tsz/types";
 import { SentenceLibrary } from "./SentenceLibrary";
 import { newSentence } from "./model";
 import { api } from "@/lib/auth";
+const auth = vi.hoisted(() => ({ role: "admin" }));
 vi.mock("@/lib/auth", () => ({
-  useAuthStore: (select: (state: { profile: null }) => unknown) =>
-    select({ profile: null }),
+  useAuthStore: (
+    select: (state: {
+      profile: { role: string; can_publish_lexicon: boolean };
+    }) => unknown
+  ) => select({ profile: { role: auth.role, can_publish_lexicon: false } }),
   api: {
     sentences: {
       list: vi.fn(),
@@ -70,8 +74,12 @@ function show(entryId?: string) {
   );
 }
 
+beforeEach(() => {
+  vi.clearAllMocks();
+  auth.role = "admin";
+});
+
 describe("独立多维例句库", () => {
-  beforeEach(() => vi.clearAllMocks());
   it("列表与查看详情保留连读标注及英文展示字体类", async () => {
     const item = fixture();
     if (item.content.sentence.en_text.mode === "unified") {
@@ -106,7 +114,7 @@ describe("独立多维例句库", () => {
     await waitFor(() => expect(api.sentences.list).toHaveBeenCalled());
     expect(screen.queryByRole("button", { name: "创编例句" })).toBeNull();
   });
-  it("列表只提供查询查看编辑删除，没有创建、审核或发布入口", async () => {
+  it("普通管理员可查询查看，但不能编辑删除或发布", async () => {
     const item = fixture();
     vi.mocked(api.sentences.list).mockResolvedValue({
       items: [item],
@@ -120,7 +128,10 @@ describe("独立多维例句库", () => {
       )
     ).toBe(false);
     expect(screen.getByText(/查\s*看/).closest("button")).toBeVisible();
-    expect(screen.getByText(/编\s*辑/).closest("button")).toBeVisible();
+    expect(screen.queryByText(/^编\s*辑$/)).toBeNull();
+    expect(screen.queryByText(/^删\s*除$/)).toBeNull();
+    expect(screen.getByText("删除所选").closest("button")).toBeDisabled();
+    expect(api.sentences.delete).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText("例句关键词"), {
       target: { value: "flower" }
     });
@@ -144,7 +155,8 @@ describe("独立多维例句库", () => {
   });
 });
 
-it("已发布例句不提供永久删除，编辑读取草稿而不是发布快照", async () => {
+it("已发布例句不提供永久删除，超管编辑读取草稿而不是发布快照", async () => {
+  auth.role = "super_admin";
   const item = { ...fixture(), current_publication_id: "publication" };
   vi.mocked(api.sentences.list).mockResolvedValue({ items: [item], total: 1 });
   vi.mocked(api.sentences.get).mockResolvedValue(item);

@@ -1165,6 +1165,14 @@ describe("createAdminEndpoints — 用户管理 users", () => {
 });
 
 describe("createAdminEndpoints — 管理员管理 admins", () => {
+  it("update → PATCH /admins/{id} 仅提交昵称", () => {
+    const api = createAdminEndpoints(http);
+    api.admins.update("a-1", { display_name: "新昵称" });
+    expect(http.patch).toHaveBeenCalledWith("/admins/a-1", {
+      display_name: "新昵称"
+    });
+  });
+
   it("list 无参 → GET /admins(不带 ?)", () => {
     const api = createAdminEndpoints(http);
     api.admins.list();

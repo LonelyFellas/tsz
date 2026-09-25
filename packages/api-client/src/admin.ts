@@ -3,6 +3,7 @@ import { createSharedSentenceEndpoints } from "./shared-sentences";
 // 独立登录 / 独立 token / 独立 refresh cookie（path=/api/v1/admin）。
 // 这些端点要绑定到 baseUrl=/api/v1/admin 的 HttpClient 上，路径才会落到 /api/v1/admin/*。
 import type {
+  UpdateAdminInput,
   UpdateEntryAnnotationInput,
   RollbackPublicationV3Input,
   AdminListQuery,
@@ -612,6 +613,8 @@ export function createAdminEndpoints(http: HttpClient) {
      * 契约见 tsz-rust openapi `admin-accounts` 标签。
      */
     admins: {
+      update: (adminId: string, input: UpdateAdminInput) =>
+        http.patch<Admin>(`/admins/${adminId}`, input),
       setPublicationPermission: (
         adminId: string,
         can_publish_lexicon: boolean
@@ -634,7 +637,7 @@ export function createAdminEndpoints(http: HttpClient) {
       /**
        * PATCH /admin/admins/{id}/status — 启用/禁用；返回更新后的 Admin（含 created_by，
        * 与列表条目同形状）。403 = 目标是 super_admin（含超管改自己）；404 = 目标不存在；
-       * 422 = status 不在枚举内或缺字段。禁用不即时踢线，接受一个 access-token TTL 的延迟。
+       * 422 = status 不在枚举内或缺字段。禁用后受保护接口会拒绝已有访问令牌。
        */
       setStatus: (adminId: string, status: AdminStatus) =>
         http.patch<Admin>(`/admins/${adminId}/status`, { status }),

@@ -58,6 +58,7 @@ export function SentenceLibrary({
 }) {
   const { modal, message } = App.useApp();
   const profile = useAuthStore((state) => state.profile);
+  const canEdit = !readOnly && profile?.role === "super_admin";
   const canPublish =
     !readOnly &&
     Boolean(
@@ -265,7 +266,7 @@ export function SentenceLibrary({
           <Button
             danger
             disabled={
-              readOnly ||
+              !canEdit ||
               !selected.length ||
               rows.some(
                 (row) =>
@@ -296,7 +297,7 @@ export function SentenceLibrary({
             loading={query.isFetching}
             scroll={{ x: entryId ? 700 : 1350 }}
             rowSelection={
-              !entryId && !readOnly
+              !entryId && (canEdit || canPublish)
                 ? { selectedRowKeys: selected, onChange: setSelected }
                 : undefined
             }
@@ -398,7 +399,7 @@ export function SentenceLibrary({
               {
                 title: "操作",
                 fixed: "right",
-                width: readOnly ? 140 : 380,
+                width: canEdit || canPublish ? 380 : 140,
                 render: (_, row) => (
                   <Space>
                     <Button
@@ -415,12 +416,14 @@ export function SentenceLibrary({
                     </Button>
                     {!readOnly && (
                       <>
-                        <Button
-                          size="small"
-                          onClick={() => void open(row.id, true)}
-                        >
-                          编辑
-                        </Button>
+                        {canEdit && (
+                          <Button
+                            size="small"
+                            onClick={() => void open(row.id, true)}
+                          >
+                            编辑
+                          </Button>
+                        )}
                         {canPublish && (
                           <>
                             <Button
@@ -447,7 +450,7 @@ export function SentenceLibrary({
                             )}
                           </>
                         )}
-                        {!entryId && !row.current_publication_id && (
+                        {canEdit && !entryId && !row.current_publication_id && (
                           <Button
                             size="small"
                             danger

@@ -16,6 +16,25 @@ async function confirmDetectedCreation(page: Page): Promise<void> {
 }
 
 test.describe("统一 V3 创建流程", () => {
+  test("普通管理员默认只读，直接访问创建页也不能发起写请求", async ({
+    page
+  }) => {
+    const api = await mockAdminV3Api(page, { viewerRole: "admin" });
+    await page.goto("/words");
+    await expect(page.getByText("累计智能词汇:")).toBeVisible();
+    await expect(page.getByRole("button", { name: "创建词条" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^编辑/ })).toHaveCount(0);
+    await page.goto("/words/new");
+    await expect(page).toHaveURL(/\/words$/);
+    await expect(page.getByRole("button", { name: "词典检测" })).toHaveCount(0);
+    expect(api.count("POST", ADMIN_V3_DETECTIONS_PATH)).toBe(0);
+    expect(api.count("POST", ADMIN_V3_ENTRIES_PATH)).toBe(0);
+    await page.goto("/admins");
+    await expect(
+      page.getByText("管理员管理仅超级管理员可访问。")
+    ).toBeVisible();
+  });
+
   test("创建入口统一输入并自动分流单词与短语", async ({ page }) => {
     await mockAdminV3Api(page);
 

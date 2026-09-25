@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/lexicon-domain-batch-5/docs/openapi.json",
-  "_source_sha256": "32f2eb74c8fbc6c47576c66f7bba98e05431dfa121540da67f1f5ae35f51db65",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/.claude/worktrees/account-permissions-batch-1/docs/openapi.json",
+  "_source_sha256": "8a8a9d2b52eac69f3bd1016e09d5c8e9755b7e1e1f51d2f049d19683e37a4f3d",
   "roots": [
     "SharedSentence",
     "SentencePublication",

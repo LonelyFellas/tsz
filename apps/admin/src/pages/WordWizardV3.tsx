@@ -49,7 +49,10 @@ import {
   shouldRetryV3Detail
 } from "@/features/dictionary/word-creation-v3/presentationErrors";
 import { resolveV3StepAccess } from "@/features/dictionary/word-creation-v3/stepAccess";
-import { canWriteEntry } from "@/features/dictionary/entryWritePermission";
+import {
+  canWriteEntry,
+  canPublishEntry
+} from "@/features/dictionary/entryWritePermission";
 import { api, useAuthStore } from "@/lib/auth";
 import { usePartOfSpeechCatalog } from "@/features/dictionary/part-of-speech/api";
 import { summarizeFormsImpact } from "@/features/dictionary/word-creation-v3/presentation";
@@ -763,6 +766,7 @@ function V3WizardSlots({
   const navigate = useNavigate();
   const location = useLocation();
   const referenceGuard = useV3ReferenceGuard();
+  const profile = useAuthStore((state) => state.profile);
   const [focusSentence, setFocusSentence] = useState<V3FocusSentence>();
   // 引用列表的「查看例句」：切到词义步、定位到该词义卡片，再由例句区块直接打开这条例句。
   // 只读会话没有例句区块，改在例句库里看。
@@ -826,22 +830,30 @@ function V3WizardSlots({
   if (context.readOnly) {
     return (
       <Flex vertical gap="middle">
-        <V3ReadOnlyPreview
-          word={context.word}
-          onEdit={
-            context.word.status === "published"
-              ? () =>
-                  navigate(
-                    `/words/${context.word.id}/v3/wizard/forms?${new URLSearchParams(
-                      {
-                        mode: "edit",
-                        ...(focusNode ? { focus_node: focusNode } : {})
-                      }
-                    )}`
-                  )
-              : undefined
-          }
-        />
+        {canPublishEntry(profile, context.word) && !canWriteEntry(profile) ? (
+          <V3PreviewAndPublishStep
+            word={context.word}
+            requests={requests}
+            onPublished={onActivated}
+          />
+        ) : (
+          <V3ReadOnlyPreview
+            word={context.word}
+            onEdit={
+              canWriteEntry(profile) && context.word.status === "published"
+                ? () =>
+                    navigate(
+                      `/words/${context.word.id}/v3/wizard/forms?${new URLSearchParams(
+                        {
+                          mode: "edit",
+                          ...(focusNode ? { focus_node: focusNode } : {})
+                        }
+                      )}`
+                    )
+                : undefined
+            }
+          />
+        )}
         <V3PublicationHistory
           currentWord={context.word}
           onActivated={onActivated}
@@ -1008,12 +1020,11 @@ export function WordWizardV3Page({
   const editingPublished =
     word.status === "published" && searchParams.get("mode") === "edit";
   const requestedStep = isStep(step) ? step : word.max_reachable_step;
-  // 别人的未发布草稿是只读的：看得见、改不动（后端 403 entry_edit_forbidden 兜底）。
   const stepAccess = resolveV3StepAccess(
     word,
     requestedStep,
     editingPublished,
-    canWriteEntry(writeActor, word)
+    canWriteEntry(writeActor)
   );
   const forcePreview = stepAccess.readOnly;
   const legalStep = stepAccess.effective;

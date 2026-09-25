@@ -1263,7 +1263,7 @@ export function UnifiedCreateEntryStep({
           rows={[
             ...annotationSession.conflict.entries.map((entry) => {
               // 改不了的行照样列出来：标注要在整组内互不相同，看不见别人的值就没法避重。
-              const editable = canEditConflictEntry(annotationActor, entry);
+              const editable = canEditConflictEntry(annotationActor);
               return {
                 key: entry.entry_id,
                 label: entry.presentation.label,
@@ -1309,7 +1309,7 @@ export function UnifiedCreateEntryStep({
               annotation: values.incoming ?? null,
               // 只提交自己有权改的：非超管带上别人的词条会被后端整单 403 驳回。
               annotation_updates: annotationSession.conflict.entries
-                .filter((entry) => canEditConflictEntry(annotationActor, entry))
+                .filter(() => canEditConflictEntry(annotationActor))
                 .map((entry) => ({
                   entry_id: entry.entry_id,
                   annotation: values[entry.entry_id] ?? null,

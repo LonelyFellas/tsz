@@ -11,6 +11,16 @@ import { WordListsPage } from "./WordLists";
 import { WordCreatePage } from "./WordCreate";
 import { WordsPage } from "./Words";
 
+const smokeProfile = vi.hoisted(() => ({
+  id: "smoke-admin",
+  phone: "13800138000",
+  display_name: "测试超管",
+  role: "super_admin" as const,
+  can_publish_lexicon: true,
+  permissions: ["words.access"],
+  preferences: { dialect: "uk" as const }
+}));
+
 vi.mock("@/lib/env", () => ({
   env: {
     API_BASE_URL: "/api/v1",
@@ -42,10 +52,10 @@ vi.mock("@/lib/auth", () => ({
   },
   // 既要能当 hook 调（个人设置页取 profile.id），也要保留 getState/subscribe 静态用法。
   useAuthStore: Object.assign(
-    (selector: (state: { profile: null }) => unknown) =>
-      selector({ profile: null }),
+    (selector: (state: { profile: typeof smokeProfile }) => unknown) =>
+      selector({ profile: smokeProfile }),
     {
-      getState: () => ({ profile: null }),
+      getState: () => ({ profile: smokeProfile }),
       subscribe: vi.fn(() => vi.fn())
     }
   ),

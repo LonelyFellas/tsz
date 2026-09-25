@@ -224,7 +224,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       .nth(0)
       .fill("ˈɔːbɪt");
     await firstForm
-      .getByLabel(/第 \d+ 条发音的实际发音/)
+      .getByRole("textbox", { name: /^第 \d+ 条发音的实际发音$/ })
       .nth(0)
       .fill("orbit");
     await firstForm
@@ -232,7 +232,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       .nth(1)
       .fill("ˈɔrbɪt");
     await firstForm
-      .getByLabel(/第 \d+ 条发音的实际发音/)
+      .getByRole("textbox", { name: /^第 \d+ 条发音的实际发音$/ })
       .nth(1)
       .fill("orbit-us");
 
@@ -258,12 +258,16 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       .getByRole("textbox", { name: "原形英式拼写", exact: true })
       .fill("orbit-centre");
     await ukSecondForm.getByLabel("第 1 条发音的字典音标").fill("ˈɔːbɪt");
-    await ukSecondForm.getByLabel("第 1 条发音的实际发音").fill("orbit-uk");
+    await ukSecondForm
+      .getByRole("textbox", { name: "第 1 条发音的实际发音", exact: true })
+      .fill("orbit-uk");
     await usSecondForm
       .getByRole("textbox", { name: "原形美式拼写", exact: true })
       .fill("orbit-center");
     await usSecondForm.getByLabel("第 1 条发音的字典音标").fill("ˈɔrbɪt");
-    await usSecondForm.getByLabel("第 1 条发音的实际发音").fill("orbit-us");
+    await usSecondForm
+      .getByRole("textbox", { name: "第 1 条发音的实际发音", exact: true })
+      .fill("orbit-us");
 
     await page.getByLabel("添加基本词性").click();
     await page
@@ -281,16 +285,35 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     const usVerb = verbPanel
       .locator(".v3-dialect-panel-us .v3-dialect-form-cell")
       .filter({ has: page.getByLabel("原形美式拼写", { exact: true }) });
-    await ukVerb
-      .getByRole("textbox", { name: "原形英式拼写", exact: true })
-      .fill("orbit-verb-uk");
-    await ukVerb.getByLabel("第 1 条发音的字典音标").fill("ˈɔːbɪt");
-    await ukVerb.getByLabel("第 1 条发音的实际发音").fill("orbit-verb-uk");
-    await usVerb
-      .getByRole("textbox", { name: "原形美式拼写", exact: true })
-      .fill("orbit-verb-us");
-    await usVerb.getByLabel("第 1 条发音的字典音标").fill("ˈɔrbɪt");
-    await usVerb.getByLabel("第 1 条发音的实际发音").fill("orbit-verb-us");
+    for (const [form, dialect, spelling, phonetic] of [
+      [ukVerb, "英式", "orbit-verb-uk", "ˈɔːbɪt"],
+      [usVerb, "美式", "orbit-verb-us", "ˈɔrbɪt"]
+    ] as const) {
+      const input = form.getByRole("textbox", {
+        name: `原形${dialect}拼写`,
+        exact: true
+      });
+      if (await input.isEditable()) {
+        await input.fill(spelling);
+      } else {
+        await form
+          .getByRole("button", {
+            name: `打开原形${dialect}拼写编辑器`,
+            exact: true
+          })
+          .click();
+        const dialog = page
+          .getByRole("dialog")
+          .filter({ has: page.locator(".tsz-ve-editor") });
+        await dialog.locator(".tsz-ve-canvas-input").fill(spelling);
+        await dialog.getByRole("button", { name: /^完成.*编辑$/ }).click();
+        await expect(dialog).toBeHidden();
+      }
+      await form.getByLabel("第 1 条发音的字典音标").fill(phonetic);
+      await form
+        .getByRole("textbox", { name: "第 1 条发音的实际发音", exact: true })
+        .fill(spelling);
+    }
 
     await page.getByRole("button", { name: "保存草稿" }).click();
     await expect(page.getByRole("tab", { name: "动词" })).toHaveAttribute(
@@ -302,7 +325,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       .getByRole("tabpanel", { name: /动词/ })
       .locator(".v3-dialect-panel-uk .v3-dialect-form-cell")
       .filter({ has: page.getByLabel("原形英式拼写", { exact: true }) })
-      .getByLabel("第 1 条发音的实际发音");
+      .getByRole("textbox", { name: "第 1 条发音的实际发音", exact: true });
     await expect(issueTarget).toBeFocused();
     await expect(
       page
@@ -579,8 +602,30 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       .toBe(1);
   });
 
+  test("Mock 发布者：已发布词条归档可用且提示与权限一致", async ({ page }) => {
+    await mockAdminV3Api(page, { viewerRole: "admin" });
+    await page.goto("/words");
+    const status = await page.evaluate(async (id) => {
+      const response = await fetch(
+        `/api/v1/admin/lexicon/entries/${id}/publications`,
+        { method: "POST" }
+      );
+      return response.status;
+    }, ADMIN_V3_MIXED_WORD_ID);
+    expect(status).toBe(200);
+    await page.reload();
+    const row = page.locator("tbody tr", { hasText: "orbit-v3" });
+    const archive = row.getByRole("button", { name: "移入垃圾桶「orbit-v3」" });
+    await expect(archive).toBeEnabled();
+    await expect(
+      row.getByRole("button", { name: "编辑「orbit-v3」" })
+    ).toHaveCount(0);
+    await archive.hover();
+    await expect(page.getByRole("tooltip")).toHaveText("移入垃圾桶");
+  });
+
   test("E04 Mock 身份：普通管理员看他人未发布草稿只读", async ({ page }) => {
-    await mockAdminV3Api(page, { entryCreator: "other" });
+    await mockAdminV3Api(page, { entryCreator: "other", viewerRole: "admin" });
     await page.goto("/words");
 
     const row = page.locator("tbody tr", { hasText: "orbit-v3" });

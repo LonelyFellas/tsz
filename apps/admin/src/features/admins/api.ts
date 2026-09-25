@@ -1,6 +1,11 @@
 // 管理员管理数据层：按 tsz-rust 当前已落地契约封装列表、建号发码、建号、启禁用与重置密码。
 // 全部端点要求 super_admin；改动列表内容的写操作成功后失效列表重取。
-import type { AdminListQuery, AdminStatus, CreateAdminInput } from "@tsz/types";
+import type {
+  AdminListQuery,
+  AdminStatus,
+  CreateAdminInput,
+  UpdateAdminInput
+} from "@tsz/types";
 import {
   keepPreviousData,
   useMutation,
@@ -25,6 +30,15 @@ export function useAdminList(query: AdminListQuery) {
 function useInvalidateAdmins() {
   const qc = useQueryClient();
   return () => qc.invalidateQueries({ queryKey: adminKeys.all });
+}
+
+export function useUpdateAdmin() {
+  const invalidate = useInvalidateAdmins();
+  return useMutation({
+    mutationFn: (vars: { id: string; input: UpdateAdminInput }) =>
+      api.admins.update(vars.id, vars.input),
+    onSuccess: invalidate
+  });
 }
 
 export function useCreateAdmin() {

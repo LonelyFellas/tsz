@@ -38,13 +38,12 @@ import {
 } from "@/features/dictionary/word-creation-v3/fixtures";
 import { WordWizardV3Page, type V3MeaningsStepRenderer } from "./WordWizardV3";
 
-// 默认登录者 = fixture 词条的 created_by，使「未发布草稿仅本人可写」默认放行；
-// 需要验证他人草稿只读时在单测里改 authMocks.profile。
+// 编辑用例使用超管，默认只读用例显式切换为普通管理员。
 const authMocks = vi.hoisted(() => ({
   profile: {
     id: "019d2c55-1f9e-7f88-a189-a2b8a07153fc",
     can_publish_lexicon: true,
-    role: "admin"
+    role: "super_admin"
   } as { id: string; role: string; can_publish_lexicon?: boolean } | null
 }));
 
@@ -307,27 +306,48 @@ describe("WordWizardV3Page", () => {
     }
   );
 
-  it("别人的未发布草稿被强制成只读预览", async () => {
-    // 草稿对所有管理员可见，但只有创建者与超管能写（后端 403 entry_edit_forbidden 兜底）。
-    // 页面表现是：不论请求哪一步，都落到只读的 preview。
-    authMocks.profile = { id: "someone-else", role: "admin" };
+  it.each(["019d2c55-1f9e-7f88-a189-a2b8a07153fc", "someone-else"])(
+    "普通管理员 %s 的草稿编辑被强制成只读预览",
+    async (id) => {
+      authMocks.profile = { id, role: "admin" };
+      try {
+        const current = word();
+        const api = source({ word: current, retired_stable_nodes: [] });
+        const router = renderPage(
+          `/words/${WORD_ID}/v3/wizard/meanings`,
+          createV3WordRequests(api)
+        );
+        await waitFor(() =>
+          expect(router.state.location.pathname).toContain("/preview")
+        );
+        expect(screen.queryByLabelText("语义区间 1 中文")).toBeNull();
+      } finally {
+        authMocks.profile = {
+          id: "019d2c55-1f9e-7f88-a189-a2b8a07153fc",
+          can_publish_lexicon: true,
+          role: "super_admin"
+        };
+      }
+    }
+  );
+
+  it("已有发布授权的普通管理员保留发布检查，但不开放内容编辑", async () => {
+    const previous = authMocks.profile;
+    authMocks.profile = {
+      id: "019d2c55-1f9e-7f88-a189-a2b8a07153fc",
+      role: "admin",
+      can_publish_lexicon: true
+    };
     try {
-      const current = word();
-      const api = source({ word: current, retired_stable_nodes: [] });
-      const router = renderPage(
-        `/words/${WORD_ID}/v3/wizard/meanings`,
+      const api = source({ word: word(), retired_stable_nodes: [] });
+      renderPage(
+        `/words/${WORD_ID}/v3/wizard/forms`,
         createV3WordRequests(api)
       );
-      await waitFor(() =>
-        expect(router.state.location.pathname).toContain("/preview")
-      );
+      expect(await screen.findByText("检查发布条件")).toBeVisible();
       expect(screen.queryByLabelText("语义区间 1 中文")).toBeNull();
     } finally {
-      authMocks.profile = {
-        id: "019d2c55-1f9e-7f88-a189-a2b8a07153fc",
-        can_publish_lexicon: true,
-        role: "admin"
-      };
+      authMocks.profile = previous;
     }
   });
 
@@ -346,7 +366,7 @@ describe("WordWizardV3Page", () => {
       authMocks.profile = {
         id: "019d2c55-1f9e-7f88-a189-a2b8a07153fc",
         can_publish_lexicon: true,
-        role: "admin"
+        role: "super_admin"
       };
     }
   });

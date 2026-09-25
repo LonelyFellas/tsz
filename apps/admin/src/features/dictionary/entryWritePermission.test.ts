@@ -5,8 +5,7 @@ import {
   canPublishEntry,
   canTransitionEntry,
   entryWriteForbiddenMessage,
-  isEntryOwnershipError,
-  partitionWritableRows
+  isEntryOwnershipError
 } from "./entryWritePermission";
 
 function row(overrides: Partial<AdminWordListItemAny> = {}) {
@@ -41,77 +40,13 @@ const stranger = { id: "admin-2", role: "admin" };
 const superAdmin = { id: "admin-9", role: "super_admin" };
 
 describe("canWriteEntry", () => {
-  it("本人的未发布草稿可写", () => {
-    expect(canWriteEntry(owner, row())).toBe(true);
-  });
-
-  it("他人的未发布草稿不可写", () => {
-    expect(canWriteEntry(stranger, row())).toBe(false);
-  });
-
-  it("超管不受创建人限制", () => {
-    expect(canWriteEntry(superAdmin, row())).toBe(true);
-  });
-
-  it("已发布词条全员可写——收口只针对未发布草稿", () => {
-    const published = row({
-      status: "published",
-      published_revision: 3
-    });
-    expect(canWriteEntry(stranger, published)).toBe(true);
-  });
-
-  it("已发布且带未发布修改的词条同样全员可写", () => {
-    const editing = row({
-      status: "published",
-      published_revision: 2,
-      has_unpublished_changes: true
-    });
-    expect(canWriteEntry(stranger, editing)).toBe(true);
-  });
-
-  it("归档了的草稿仍按未发布处理：垃圾桶里别人的草稿恢复不了", () => {
-    // 归档优先于发布态，所以这一行的 status 是 archived 而不是 draft——
-    // 判定必须走 published_revision，否则这条会被漏放行。
-    const archivedDraft = row({ status: "archived" });
-    expect(canWriteEntry(stranger, archivedDraft)).toBe(false);
-    expect(canWriteEntry(owner, archivedDraft)).toBe(true);
-  });
-
-  it("归档了的已发布词条不受限", () => {
-    const archivedPublished = row({
-      status: "archived",
-      published_revision: 2
-    });
-    expect(canWriteEntry(stranger, archivedPublished)).toBe(true);
-  });
-
-  it("拿不到管理员身份时一律不放行", () => {
-    expect(canWriteEntry(undefined, row())).toBe(false);
-  });
-
-  it("行上缺少 created_by 时不放行——判不了归属就不猜", () => {
-    expect(canWriteEntry(owner, row({ created_by: undefined }))).toBe(false);
-  });
-});
-
-describe("partitionWritableRows", () => {
-  it("把他人的未发布草稿挑出来，其余照常可提交", () => {
-    const mine = row({ id: "mine" });
-    const theirs = row({ id: "theirs", created_by: "admin-2" });
-    const published = row({
-      id: "published",
-      created_by: "admin-2",
-      status: "published",
-      published_revision: 1
-    });
-    const { writable, blocked } = partitionWritableRows(owner, [
-      mine,
-      theirs,
-      published
-    ]);
-    expect(writable.map((r) => r.id)).toEqual(["mine", "published"]);
-    expect(blocked.map((r) => r.id)).toEqual(["theirs"]);
+  it("普通管理员和无身份用户默认不可写，超管可写", () => {
+    expect(canWriteEntry(owner)).toBe(false);
+    expect(canWriteEntry(stranger)).toBe(false);
+    expect(canWriteEntry(undefined)).toBe(false);
+    expect(canWriteEntry(null)).toBe(false);
+    expect(canWriteEntry(superAdmin)).toBe(true);
+    expect(canWriteEntry({ ...owner, can_publish_lexicon: true })).toBe(false);
   });
 });
 
@@ -132,7 +67,7 @@ describe("错误分流", () => {
 
 describe("独立发布权限", () => {
   it("编辑能力不授予发布权，普通发布者不能发布他人的草稿", () => {
-    expect(canWriteEntry(owner, row())).toBe(true);
+    expect(canWriteEntry(owner)).toBe(false);
     expect(canPublishEntry(owner, row())).toBe(false);
     expect(
       canPublishEntry({ ...owner, can_publish_lexicon: true }, row())
@@ -149,7 +84,7 @@ describe("独立发布权限", () => {
     expect(canPublishEntry(superAdmin, row())).toBe(true);
   });
   it("已发布词条归档恢复需要发布权，草稿归属限制仍生效", () => {
-    expect(canTransitionEntry(owner, row())).toBe(true);
+    expect(canTransitionEntry(owner, row())).toBe(false);
     expect(canTransitionEntry(owner, row({ published_revision: 2 }))).toBe(
       false
     );

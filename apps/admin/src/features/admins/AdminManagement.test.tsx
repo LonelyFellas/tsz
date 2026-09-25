@@ -16,6 +16,7 @@ vi.mock("@/lib/auth", () => ({
     admins: {
       list: vi.fn(),
       create: vi.fn(),
+      update: vi.fn(),
       requestCreateCode: vi.fn(),
       setStatus: vi.fn(),
       resetPassword: vi.fn()
@@ -107,6 +108,48 @@ beforeEach(() => {
 });
 
 describe("AdminManagement", () => {
+  it("编辑昵称只提交显示名称并刷新列表，超管编辑入口置灰", async () => {
+    vi.mocked(api.admins.update).mockResolvedValue({
+      ...plainAdmin,
+      display_name: "新昵称"
+    });
+    renderPage();
+    await screen.findByText("审核员小王");
+    expect(buttonOf(/^编\s*辑$/, 1)).toBeDisabled();
+    clickButton(/^编\s*辑$/);
+    await screen.findByText("编辑管理员资料");
+    const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
+    const name = within(dialog).getByLabelText("昵称");
+    expect(name).toHaveValue("审核员小王");
+    expect(within(dialog).getByDisplayValue(plainAdmin.phone)).toBeDisabled();
+    fireEvent.change(name, { target: { value: " 新昵称 " } });
+    fireEvent.click(within(dialog).getByText(/^保\s*存$/));
+    await waitFor(() =>
+      expect(api.admins.update).toHaveBeenCalledWith("a1", {
+        display_name: "新昵称"
+      })
+    );
+    await waitFor(() => expect(mockList).toHaveBeenCalledTimes(2));
+  });
+
+  it("编辑失败保留输入，空昵称不提交", async () => {
+    vi.mocked(api.admins.update).mockRejectedValue(new Error("failed"));
+    renderPage();
+    await screen.findByText("审核员小王");
+    clickButton(/^编\s*辑$/);
+    await screen.findByText("编辑管理员资料");
+    const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
+    const name = within(dialog).getByLabelText("昵称");
+    fireEvent.change(name, { target: { value: " " } });
+    fireEvent.click(within(dialog).getByText(/^保\s*存$/));
+    await screen.findByText("请输入昵称");
+    expect(api.admins.update).not.toHaveBeenCalled();
+    fireEvent.change(name, { target: { value: "有效昵称" } });
+    fireEvent.click(within(dialog).getByText(/^保\s*存$/));
+    await screen.findByText("更新管理员资料失败，请重试");
+    expect(name).toHaveValue("有效昵称");
+  });
+
   it("渲染管理员列表", async () => {
     renderPage();
     expect(await screen.findByText("审核员小王")).toBeInTheDocument();
@@ -254,9 +297,8 @@ describe("AdminManagement — 行操作", () => {
     renderPage();
     await screen.findByText("审核员小王");
     clickButton(/^禁\s?用$/, 0);
-    // 文案不承诺「立即下线」：禁用有一个 access-token TTL 的延迟。
     expect(
-      await screen.findByText(/最长在一个访问令牌有效期内失效/)
+      await screen.findByText(/已有登录态也不能继续访问后台数据/)
     ).toBeInTheDocument();
     clickConfirmOk(/^禁\s?用$/);
     await waitFor(() =>
@@ -291,7 +333,7 @@ describe("AdminManagement — 行操作", () => {
     renderPage();
     await screen.findByText("审核员小王");
     clickButton(/^禁\s?用$/, 0);
-    await screen.findByText(/最长在一个访问令牌有效期内失效/);
+    await screen.findByText(/已有登录态也不能继续访问后台数据/);
     clickConfirmOk(/^禁\s?用$/);
     expect(await screen.findByText("不能启禁用超级管理员")).toBeInTheDocument();
   });
