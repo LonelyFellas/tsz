@@ -97,8 +97,7 @@ import {
   canWriteEntry,
   canTransitionEntry,
   entryWriteForbiddenMessage,
-  isEntryOwnershipError,
-  partitionWritableRows
+  isEntryOwnershipError
 } from "./entryWritePermission";
 import { newWordNodeId } from "./word-model/primitives";
 
@@ -201,10 +200,7 @@ export function SmartDictionary({
   const deleteActor = profile
     ? { id: profile.id, role: profile.role }
     : undefined;
-  // 删除与标注共用同一个「当前管理员」，两处归属规则都是「超管或创建人本人」。
   const annotationActor = deleteActor;
-  // 写操作（继续创建/归档/恢复）的归属规则不同：只卡**未发布**草稿，
-  // 已发布词条全员可改，见 canWriteEntry。
   const writeActor = profile;
   const [searchParams, setSearchParams] = useSearchParams();
   const [annotationEntry, setAnnotationEntry] =
@@ -624,23 +620,10 @@ export function SmartDictionary({
       message.warning("垃圾桶与正常词条不能在同一批次处理");
       return;
     }
-    // 后端整批原子：混进一条别人的未发布草稿会拒掉整批（403 entry_edit_forbidden）。
+    // 整批原子：任意一条没有生命周期操作权限，后端会拒绝整批。
     // 与其让整批失败，不如提交前就把不归自己管的挑明。
     if (selectedRows.some((row) => !canTransitionEntry(writeActor, row))) {
       message.warning("当前账号没有操作所选词条的权限；已发布词条需要发布权限");
-      return;
-    }
-    const { blocked } = partitionWritableRows(writeActor, selectedRows);
-    if (blocked.length > 0) {
-      const detail = blocked
-        .slice(0, 3)
-        .map((row) => `「${wordListLabel(row)}」`)
-        .join("、");
-      message.warning(
-        blocked.length > 3
-          ? `${detail} 等 ${blocked.length} 条是他人的未发布草稿，无法操作`
-          : `${detail} 是他人的未发布草稿，无法操作`
-      );
       return;
     }
     const restoring = restoringSelection;
@@ -918,7 +901,7 @@ export function SmartDictionary({
       fixed: "right",
       render: (_: unknown, record: AdminWordListItemAny) => {
         const rowName = `「${wordListLabel(record)}」`;
-        const rowWritable = canWriteEntry(writeActor, record);
+        const rowWritable = canWriteEntry(writeActor);
         return (
           // 左组是进入词条的入口、右组是生命周期动作，各自贴住一边：
           // 「标注」按行有无都不会让删除入口跟着左右跳。
@@ -1186,7 +1169,7 @@ export function SmartDictionary({
           style={{ marginBottom: 12 }}
         >
           <Space wrap>
-            {!trashMode && (
+            {!trashMode && canWriteEntry(writeActor) && (
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
@@ -1201,7 +1184,12 @@ export function SmartDictionary({
                 icon={
                   showRestoreAction ? <RollbackOutlined /> : <DeleteOutlined />
                 }
-                disabled={selectedKeys.length === 0}
+                disabled={
+                  selectedKeys.length === 0 ||
+                  selectedRows.some(
+                    (row) => !canTransitionEntry(writeActor, row)
+                  )
+                }
                 loading={archiveBatch.isPending || restoreBatch.isPending}
                 onClick={transitionSelected}
               >
@@ -1214,7 +1202,9 @@ export function SmartDictionary({
                 <Button
                   danger
                   icon={<DeleteOutlined />}
-                  disabled={selectedKeys.length === 0}
+                  disabled={
+                    selectedKeys.length === 0 || !canWriteEntry(writeActor)
+                  }
                   loading={deleteBatch.isPending}
                   onClick={deleteSelected}
                 >

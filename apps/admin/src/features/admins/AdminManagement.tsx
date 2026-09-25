@@ -15,6 +15,7 @@ import {
   Flex,
   Form,
   Input,
+  Modal,
   Select,
   Space,
   Table,
@@ -28,6 +29,7 @@ import type { Admin, AdminLevel, AdminListQuery } from "@tsz/types";
 import { GatedButton } from "@/components/GatedButton";
 import {
   useAdminList,
+  useUpdateAdmin,
   useResetAdminPassword,
   useSetAdminStatus,
   useSetPublicationPermission
@@ -49,6 +51,9 @@ interface FilterValues {
 export function AdminManagement() {
   const { message, modal } = App.useApp();
   const [form] = Form.useForm<FilterValues>();
+  const [editForm] = Form.useForm<{ display_name: string }>();
+  const [editingAdmin, setEditingAdmin] = useState<Admin | null>(null);
+  const updateAdmin = useUpdateAdmin();
 
   const [filters, setFilters] = useState<FilterValues>({});
   const [page, setPage] = useState(1);
@@ -85,7 +90,6 @@ export function AdminManagement() {
     setPage(1);
   };
 
-  // 启禁用不即时踢线：后端接受一个 access-token TTL 的延迟，文案别承诺「立即下线」。
   const confirmToggleStatus = (record: Admin) => {
     const next = record.status === "active" ? "disabled" : "active";
     const verb = next === "disabled" ? "禁用" : "启用";
@@ -93,7 +97,7 @@ export function AdminManagement() {
       title: `${verb}管理员「${record.display_name}」`,
       content:
         next === "disabled"
-          ? "禁用后该管理员无法再登录后台；已登录的会话不会立即断开，最长在一个访问令牌有效期内失效。确认禁用？"
+          ? "禁用后该管理员无法再登录后台，已有登录态也不能继续访问后台数据。确认禁用？"
           : "启用后该管理员可以重新登录后台。确认启用？",
       okText: verb,
       okButtonProps: { danger: next === "disabled" },
@@ -204,6 +208,18 @@ export function AdminManagement() {
         const isSuper = record.role === "super_admin";
         return (
           <Space size={4} wrap>
+            <GatedButton
+              type="link"
+              size="small"
+              reason="超级管理员不可操作"
+              disabled={isSuper}
+              onClick={() => {
+                editForm.setFieldsValue({ display_name: record.display_name });
+                setEditingAdmin(record);
+              }}
+            >
+              编辑
+            </GatedButton>
             <GatedButton
               type="link"
               size="small"
@@ -343,6 +359,58 @@ export function AdminManagement() {
           }}
         />
       </Card>
+
+      <Modal
+        title="编辑管理员资料"
+        open={editingAdmin !== null}
+        onCancel={() => !updateAdmin.isPending && setEditingAdmin(null)}
+        onOk={() => editForm.submit()}
+        okText="保存"
+        cancelText="取消"
+        confirmLoading={updateAdmin.isPending}
+        cancelButtonProps={{ disabled: updateAdmin.isPending }}
+        closable={!updateAdmin.isPending}
+      >
+        <Form
+          name="admin-edit"
+          form={editForm}
+          layout="vertical"
+          disabled={updateAdmin.isPending}
+          onFinish={(values) => {
+            if (!editingAdmin || updateAdmin.isPending) return;
+            void updateAdmin
+              .mutateAsync({
+                id: editingAdmin.id,
+                input: { display_name: values.display_name.trim() }
+              })
+              .then(() => {
+                setEditingAdmin(null);
+                void message.success("管理员资料已更新");
+              })
+              .catch(() => message.error("更新管理员资料失败，请重试"));
+          }}
+        >
+          <Form.Item label="手机号">
+            <Input value={editingAdmin?.phone ?? ""} disabled />
+          </Form.Item>
+          <Form.Item
+            name="display_name"
+            label="昵称"
+            rules={[
+              { required: true, whitespace: true, message: "请输入昵称" },
+              { max: 50, message: "昵称最多 50 个字符" },
+              {
+                validator: (_, value: string) =>
+                  value && /[<>\p{Cc}\p{Cf}]/u.test(value)
+                    ? Promise.reject(new Error("昵称不能包含特殊或控制字符"))
+                    : Promise.resolve()
+              }
+            ]}
+          >
+            <Input maxLength={50} />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       <CreateAdminModal
         open={createOpen}

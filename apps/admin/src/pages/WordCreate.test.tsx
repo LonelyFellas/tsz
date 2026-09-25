@@ -51,6 +51,7 @@ vi.mock("@/features/dictionary/word-creation/UnifiedCreateEntryStep", () => ({
 
 import type { UnifiedCreateRequests } from "@/features/dictionary/word-creation/UnifiedCreateEntryStep";
 import { WordCreatePage } from "./WordCreate";
+import { useAuthStore } from "@/lib/auth";
 
 function LocationProbe() {
   const location = useLocation();
@@ -63,9 +64,42 @@ function LocationProbe() {
 
 beforeEach(() => {
   wired.props = undefined;
+  useAuthStore.setState({
+    profile: {
+      id: "super-admin",
+      phone: "13800138000",
+      display_name: "测试超管",
+      role: "super_admin",
+      can_publish_lexicon: true,
+      permissions: ["words.access"],
+      preferences: { dialect: "uk" }
+    }
+  });
 });
 
 describe("WordCreatePage", () => {
+  it("普通管理员直接进入创建页会返回列表，不挂载创建表单", () => {
+    useAuthStore.setState({
+      profile: {
+        ...useAuthStore.getState().profile!,
+        role: "admin",
+        can_publish_lexicon: false
+      }
+    });
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={["/words/new"]}>
+          <Routes>
+            <Route path="/words/new" element={<WordCreatePage />} />
+            <Route path="*" element={<LocationProbe />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+    expect(screen.getByTestId("location")).toHaveTextContent("/words|");
+    expect(wired.props).toBeUndefined();
+  });
+
   it.each([
     [
       "完成单词创建",

@@ -11,8 +11,7 @@ export type DeleteBlockReason =
   | "published"
   /** 被其他词条引用（关联词/例句/短语成分等），后端会拒绝删除。 */
   | "referenced"
-  /** 非本人创建，且当前不是超管。 */
-  | "not_owner"
+  | "read_only"
   /** 拿不到当前管理员身份，无法判定归属——保守不放行。 */
   | "unknown_identity"
   /** 行上缺少乐观锁字段，无法安全提交。 */
@@ -32,7 +31,7 @@ export const DELETE_BLOCK_REASON_TEXT: Record<DeleteBlockReason, string> = {
   not_archived: "只有垃圾桶中的词条可以永久删除",
   published: "该词条已发布过，发布历史必须保留，不能永久删除",
   referenced: "该词条被其他内容引用，需先解除引用才能删除",
-  not_owner: "只能永久删除自己创建的词条",
+  read_only: "当前账号仅有读取权限",
   unknown_identity: "无法确认当前管理员身份，请刷新后重试",
   missing_revision: "该行缺少并发版本信息，请刷新列表后重试"
 };
@@ -46,6 +45,9 @@ export function evaluateDeleteEligibility(
   row: AdminWordListItemAny
 ): DeleteEligibility {
   if (!actor) return { deletable: false, reason: "unknown_identity" };
+  if (actor.role !== "super_admin") {
+    return { deletable: false, reason: "read_only" };
+  }
   if (row.status !== "archived") {
     return { deletable: false, reason: "not_archived" };
   }
@@ -54,9 +56,6 @@ export function evaluateDeleteEligibility(
     typeof row.lifecycle_revision !== "number"
   ) {
     return { deletable: false, reason: "missing_revision" };
-  }
-  if (actor.role !== "super_admin" && row.created_by !== actor.id) {
-    return { deletable: false, reason: "not_owner" };
   }
   // 发布过的词条即使在垃圾桶里也删不掉；published_revision 缺省即从未发布。
   // 该字段对 legacy 行也会缺省，可能漏判——后端的 409 是最终兜底。

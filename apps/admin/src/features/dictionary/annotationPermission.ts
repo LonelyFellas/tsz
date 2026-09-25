@@ -1,9 +1,3 @@
-// 标注的修改权限判定。与 deletePermission 同一套路：**这不是权限**——真正的归属
-// 校验在后端（越权返回 403）。前端判定的意义是让管理员在点击前就知道结果，
-// 以及在冲突弹窗里把改不了的行摆成只读，而不是填完再被整单驳回。
-//
-// 规则（2026-09-07 定盘）：超管可以改任何词条的标注；其他管理员只能改自己创建的
-// 词条（含自己的草稿）。
 import type { AdminWordListItemAny } from "@tsz/types";
 
 export interface AnnotationActor {
@@ -23,12 +17,9 @@ export function isAnnotationOwnershipError(code: string | undefined): boolean {
 }
 
 export function canEditAnnotationOf(
-  actor: AnnotationActor | undefined,
-  createdBy: string | undefined
+  actor: AnnotationActor | undefined
 ): boolean {
-  if (!actor) return false;
-  if (actor.role === "super_admin") return true;
-  return createdBy !== undefined && createdBy === actor.id;
+  return actor?.role === "super_admin";
 }
 
 /** 重复原型才提供标注入口；空标注也允许由有权限的管理员补填。 */
@@ -37,25 +28,16 @@ export function canEditRowAnnotation(
   row: AdminWordListItemAny
 ): boolean {
   if (!row.annotation_visible) return false;
-  return canEditAnnotationOf(actor, row.created_by);
+  return canEditAnnotationOf(actor);
 }
 
-/**
- * 冲突弹窗里的一行能不能改。
- *
- * `created_by` 缺省 = 后端还没下发归属（旧契约要求把整组填满），此时按可改处理：
- * 在后端就绪前把建条流程锁死，比放宽一格更糟。
- */
 export function canEditConflictEntry(
-  actor: AnnotationActor | undefined,
-  entry: { created_by?: string }
+  actor: AnnotationActor | undefined
 ): boolean {
-  if (entry.created_by === undefined) return true;
-  return canEditAnnotationOf(actor, entry.created_by);
+  return canEditAnnotationOf(actor);
 }
 
-/** 只读行给出理由，避免留下没有解释的灰输入框。 */
-export const OTHERS_ENTRY_HINT = "他人词条";
+export const OTHERS_ENTRY_HINT = "当前账号仅有读取权限";
 
 /**
  * 标注保存失败里 403 的文案。归属越权与「压根没有标注权限」对管理员意味不同，

@@ -34,135 +34,80 @@ function row(overrides: Partial<AdminWordListItemAny> = {}) {
 }
 
 const owner = { id: "admin-1", role: "admin" };
-const stranger = { id: "admin-2", role: "admin" };
 const superAdmin = { id: "admin-9", role: "super_admin" };
 
 describe("evaluateDeleteEligibility", () => {
-  it("垃圾桶里本人创建、从未发布的词条可删", () => {
-    expect(evaluateDeleteEligibility(owner, row())).toEqual({
-      deletable: true
-    });
-  });
-
-  it("超管不受创建人限制", () => {
-    expect(evaluateDeleteEligibility(superAdmin, row())).toEqual({
-      deletable: true
-    });
-  });
-
-  it("普通管理员删他人创建的词条被拦下", () => {
-    expect(evaluateDeleteEligibility(stranger, row())).toEqual({
-      deletable: false,
-      reason: "not_owner"
-    });
-  });
-
-  it("垃圾桶之外不提供永久删除", () => {
-    for (const status of ["draft", "published"] as const) {
-      expect(evaluateDeleteEligibility(owner, row({ status }))).toEqual({
+  it("普通管理员不能删除自己的或他人的词条", () => {
+    for (const created_by of [owner.id, "admin-2", undefined]) {
+      expect(evaluateDeleteEligibility(owner, row({ created_by }))).toEqual({
         deletable: false,
-        reason: "not_archived"
+        reason: "read_only"
       });
     }
-  });
-
-  it("发布过的归档词条不可删", () => {
-    expect(
-      evaluateDeleteEligibility(owner, row({ published_revision: 2 }))
-    ).toEqual({ deletable: false, reason: "published" });
-  });
-
-  it("拿不到当前管理员身份时保守不放行", () => {
     expect(evaluateDeleteEligibility(undefined, row())).toEqual({
       deletable: false,
       reason: "unknown_identity"
     });
   });
 
-  it("缺少乐观锁字段时不放行", () => {
+  it("超管仍受归档、版本、发布历史和引用保护约束", () => {
+    expect(evaluateDeleteEligibility(superAdmin, row())).toEqual({
+      deletable: true
+    });
+    for (const status of ["draft", "published"] as const) {
+      expect(evaluateDeleteEligibility(superAdmin, row({ status }))).toEqual({
+        deletable: false,
+        reason: "not_archived"
+      });
+    }
     for (const missing of [
       { revision: undefined },
       { lifecycle_revision: undefined }
     ]) {
-      expect(
-        evaluateDeleteEligibility(
-          owner,
-          row(missing as Partial<AdminWordListItemAny>)
-        )
-      ).toEqual({ deletable: false, reason: "missing_revision" });
+      expect(evaluateDeleteEligibility(superAdmin, row(missing))).toEqual({
+        deletable: false,
+        reason: "missing_revision"
+      });
     }
-  });
-
-  it("归属判定先于可删性——与后端错误优先级一致", () => {
-    // 他人创建 + 已发布：后端先答 403，前端不能先说「已发布」而暴露该词条状态。
     expect(
-      evaluateDeleteEligibility(stranger, row({ published_revision: 2 }))
-    ).toEqual({ deletable: false, reason: "not_owner" });
-  });
-
-  it("被其他内容引用时不可删——与后端入站引用拦截同口径", () => {
+      evaluateDeleteEligibility(superAdmin, row({ published_revision: 2 }))
+    ).toEqual({
+      deletable: false,
+      reason: "published"
+    });
     expect(
       evaluateDeleteEligibility(
-        owner,
+        superAdmin,
         row({
-          reference_summary: {
-            total: 2,
-            previews: [],
-            truncated: false
-          }
+          reference_summary: { total: 2, previews: [], truncated: false }
         })
       )
     ).toEqual({ deletable: false, reason: "referenced" });
   });
 
-  it("引用数为 0 时可删——这条不变量由后端测试同时守着", () => {
-    expect(
-      evaluateDeleteEligibility(
-        owner,
-        row({
-          reference_summary: { total: 0, previews: [], truncated: false }
-        })
-      )
-    ).toEqual({ deletable: true });
-  });
-
   it("每个拦截原因都有对应文案", () => {
-    const reasons = [
-      "not_archived",
-      "published",
-      "referenced",
-      "not_owner",
-      "unknown_identity",
-      "missing_revision"
-    ] as const;
-    for (const reason of reasons) {
-      expect(DELETE_BLOCK_REASON_TEXT[reason]).toBeTruthy();
-    }
+    for (const text of Object.values(DELETE_BLOCK_REASON_TEXT))
+      expect(text).toBeTruthy();
   });
 });
 
 describe("partitionDeletableRows", () => {
-  it("按可删与否分组，并带上每条被挡下的原因", () => {
-    const mine = row({ id: "mine" });
-    const others = row({ id: "others", created_by: "admin-2" });
-    const published = row({ id: "published", published_revision: 1 });
-    const active = row({ id: "active", status: "draft" });
-
-    const result = partitionDeletableRows(owner, [
-      mine,
-      others,
-      published,
-      active
-    ]);
-
-    expect(result.deletable.map((item) => item.id)).toEqual(["mine"]);
+  it("普通管理员全部拦截，超管按业务约束分组", () => {
+    const rows = [
+      row({ id: "mine" }),
+      row({ id: "others", created_by: "admin-2" }),
+      row({ id: "published", published_revision: 1 }),
+      row({ id: "active", status: "draft" })
+    ];
+    expect(partitionDeletableRows(owner, rows)).toEqual({
+      deletable: [],
+      blocked: rows.map((item) => ({ row: item, reason: "read_only" }))
+    });
+    const result = partitionDeletableRows(superAdmin, rows);
+    expect(result.deletable.map((item) => item.id)).toEqual(["mine", "others"]);
     expect(
-      result.blocked.map(({ row: blockedRow, reason }) => [
-        blockedRow.id,
-        reason
-      ])
+      result.blocked.map(({ row: item, reason }) => [item.id, reason])
     ).toEqual([
-      ["others", "not_owner"],
       ["published", "published"],
       ["active", "not_archived"]
     ]);

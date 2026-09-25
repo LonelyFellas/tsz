@@ -36,7 +36,7 @@ const dataSourceMocks = vi.hoisted(() => ({
 // 默认登录者 = fixture 里词条的 created_by，使「仅本人可删」默认放行；
 // 需要验证越权时在单测里改 authMocks.profile。
 const authMocks = vi.hoisted(() => ({
-  profile: { id: "admin-1", role: "admin" } as {
+  profile: { id: "admin-1", role: "super_admin" } as {
     id: string;
     role: string;
   } | null
@@ -194,7 +194,7 @@ function HistoryProbe() {
 beforeEach(() => {
   vi.clearAllMocks();
   dataSourceMocks.get.mockReset().mockResolvedValue(undefined);
-  authMocks.profile = { id: "admin-1", role: "admin" };
+  authMocks.profile = { id: "admin-1", role: "super_admin" };
   catalogMocks.items = [];
   for (const hook of [
     apiMocks.useArchiveWord,
@@ -310,7 +310,8 @@ describe("SmartDictionary", () => {
     expect(screen.getByLabelText("编辑标注「center」")).toBeVisible();
   });
 
-  it("他人创建的词条照常显示角标，但不给标注编辑入口", async () => {
+  it("普通管理员可见他人词条角标，但不给标注编辑入口", async () => {
+    authMocks.profile = { id: "admin-1", role: "admin" };
     apiMocks.useWordList.mockReturnValue({
       data: {
         words: [
@@ -342,9 +343,8 @@ describe("SmartDictionary", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("他人的未发布草稿：行入口降为「查看」，移入垃圾桶置灰", () => {
-    // 草稿全员可见但只有创建者与超管能写；置灰是给管理员的预告，
-    // 真正的拦截在后端（403 entry_edit_forbidden）。
+  it("普通管理员的草稿行入口为查看，移入垃圾桶置灰", () => {
+    authMocks.profile = { id: "admin-1", role: "admin" };
     apiMocks.useWordList.mockReturnValue({
       data: {
         words: [{ ...v3Word("entry", "center"), created_by: "admin-2" }],
@@ -365,7 +365,7 @@ describe("SmartDictionary", () => {
     expect(screen.getByLabelText("移入垃圾桶「center」")).toBeDisabled();
   });
 
-  it("自己的未发布草稿照常可以继续创建与移入垃圾桶", () => {
+  it("超管的未发布草稿照常可以继续创建与移入垃圾桶", () => {
     apiMocks.useWordList.mockReturnValue({
       data: {
         words: [v3Word("entry", "center")],
@@ -385,7 +385,8 @@ describe("SmartDictionary", () => {
     expect(screen.getByLabelText("移入垃圾桶「center」")).toBeEnabled();
   });
 
-  it("普通管理员仍可编辑已发布词条，但无发布权不能归档", () => {
+  it("普通管理员不能编辑已发布词条，无发布权不能归档", () => {
+    authMocks.profile = { id: "admin-1", role: "admin" };
     apiMocks.useWordList.mockReturnValue({
       data: {
         words: [
@@ -1466,7 +1467,8 @@ describe("SmartDictionary", () => {
     expect(screen.queryByText("永久删除", { exact: true })).toBeNull();
   });
 
-  it("他人创建的垃圾桶词条置灰永久删除且点击不发请求", async () => {
+  it("普通管理员对垃圾桶词条置灰永久删除且点击不发请求", async () => {
+    authMocks.profile = { id: "admin-1", role: "admin" };
     const mutateAsync = vi.fn();
     apiMocks.useDeleteWordDraft.mockReturnValue({
       ...idleMutation(),
@@ -1579,7 +1581,8 @@ describe("SmartDictionary", () => {
     await waitFor(() => expect(screen.queryByText("永久删除(2)")).toBeNull());
   });
 
-  it("批量选择混入他人创建的词条时提交前拦截，不发请求", async () => {
+  it("普通管理员选择自己的和他人的词条都不能批量删除", async () => {
+    authMocks.profile = { id: "admin-1", role: "admin" };
     const mutateAsync = vi.fn();
     apiMocks.useDeleteWordBatch.mockReturnValue({
       ...idleMutation(),
@@ -1610,7 +1613,7 @@ describe("SmartDictionary", () => {
     fireEvent.click(container.querySelector("thead input[type='checkbox']")!);
     fireEvent.click(screen.getByText("永久删除(2)").closest("button")!);
 
-    await screen.findByText(/只能永久删除自己创建的词条/);
+    expect(screen.getByText("永久删除(2)").closest("button")).toBeDisabled();
     expect(mutateAsync).not.toHaveBeenCalled();
   });
 

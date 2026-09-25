@@ -40,72 +40,34 @@ const owner = { id: "admin-1", role: "admin" };
 const stranger = { id: "admin-2", role: "admin" };
 const superAdmin = { id: "admin-9", role: "super_admin" };
 
-describe("canEditAnnotationOf", () => {
-  it("超管可以改任何词条的标注", () => {
-    expect(canEditAnnotationOf(superAdmin, "admin-1")).toBe(true);
+describe("标注写权限", () => {
+  it("普通管理员和身份缺失时不允许修改标注", () => {
+    for (const actor of [owner, stranger, undefined]) {
+      expect(canEditAnnotationOf(actor)).toBe(false);
+      expect(canEditConflictEntry(actor)).toBe(false);
+      expect(canEditRowAnnotation(actor, row())).toBe(false);
+      expect(canEditRowAnnotation(actor, row({ created_by: undefined }))).toBe(
+        false
+      );
+      expect(canEditRowAnnotation(actor, row({ annotation: null }))).toBe(
+        false
+      );
+    }
   });
 
-  it("其他管理员只能改自己创建的词条", () => {
-    expect(canEditAnnotationOf(owner, "admin-1")).toBe(true);
-    expect(canEditAnnotationOf(stranger, "admin-1")).toBe(false);
-  });
-
-  it("拿不到当前管理员身份时一律不放行", () => {
-    expect(canEditAnnotationOf(undefined, "admin-1")).toBe(false);
-    expect(canEditAnnotationOf(undefined, undefined)).toBe(false);
-  });
-
-  it("创建人缺省时非超管不放行——不拿 undefined === undefined 当自己人", () => {
-    expect(canEditAnnotationOf(owner, undefined)).toBe(false);
-    expect(canEditAnnotationOf(superAdmin, undefined)).toBe(true);
-  });
-});
-
-describe("canEditRowAnnotation", () => {
-  it("有角标且是自己创建的才给入口", () => {
-    expect(canEditRowAnnotation(owner, row())).toBe(true);
-  });
-
-  it("别人的词条有角标也不给入口", () => {
-    expect(canEditRowAnnotation(stranger, row())).toBe(false);
-  });
-
-  it("超管对别人的词条有入口", () => {
+  it("超管可修改标注，入口仍受重复原型标记约束", () => {
+    expect(canEditAnnotationOf(superAdmin)).toBe(true);
+    expect(canEditConflictEntry(superAdmin)).toBe(true);
     expect(canEditRowAnnotation(superAdmin, row())).toBe(true);
-  });
-
-  it("唯一原型没有入口，重复原型允许补充空标注", () => {
-    expect(
-      canEditRowAnnotation(owner, row({ annotation_visible: false }))
-    ).toBe(false);
-    expect(canEditRowAnnotation(owner, row({ annotation: null }))).toBe(true);
     expect(canEditRowAnnotation(superAdmin, row({ annotation: null }))).toBe(
       true
     );
-    expect(canEditRowAnnotation(stranger, row({ annotation: null }))).toBe(
-      false
-    );
-    expect(canEditRowAnnotation(owner, row({ annotation: "  " }))).toBe(true);
+    expect(
+      canEditRowAnnotation(superAdmin, row({ created_by: undefined }))
+    ).toBe(true);
     expect(
       canEditRowAnnotation(superAdmin, row({ annotation_visible: false }))
     ).toBe(false);
-  });
-});
-
-describe("canEditConflictEntry", () => {
-  it("按 created_by 判定归属", () => {
-    expect(canEditConflictEntry(owner, { created_by: "admin-1" })).toBe(true);
-    expect(canEditConflictEntry(stranger, { created_by: "admin-1" })).toBe(
-      false
-    );
-    expect(canEditConflictEntry(superAdmin, { created_by: "admin-1" })).toBe(
-      true
-    );
-  });
-
-  it("created_by 缺省＝后端未下发归属，按可改处理不锁死建条", () => {
-    expect(canEditConflictEntry(stranger, {})).toBe(true);
-    expect(canEditConflictEntry(undefined, {})).toBe(true);
   });
 });
 
