@@ -5,11 +5,10 @@ import type { AuthResponse } from "@tsz/api-client";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/request";
-import { useUserStore } from "@/stores/user";
 import { AuthBranding } from "./AuthBranding";
 import {
   AUTH_INPUT_CLASS,
-  navigateAfterAuth,
+  completeAuthentication,
   persistSession,
   translateAuthError
 } from "../shared";
@@ -48,9 +47,9 @@ export function LoginForm() {
   const [countdown, setCountdown] = useState(0);
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
   const [error, setError] = useState("");
 
-  const setUser = useUserStore((s) => s.setUser);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -63,12 +62,19 @@ export function LoginForm() {
 
   const accountValid = isValidAccount(account);
   const passwordValid = password.length >= 6;
-  const canSubmit = accountValid && passwordValid && !loading;
+  const canSubmit =
+    (authenticated || (accountValid && passwordValid)) && !loading;
 
   // 验证码 tab：手机号 tab 校验手机号，邮箱 tab 校验邮箱。
   const identifierValid = tab === "phone" ? isPhone(account) : isEmail(account);
-  const canSendCode = identifierValid && countdown === 0 && !sending;
-  const canCodeSubmit = identifierValid && isCode(code) && !loading;
+  const canSendCode =
+    identifierValid &&
+    countdown === 0 &&
+    !sending &&
+    !loading &&
+    !authenticated;
+  const canCodeSubmit =
+    (authenticated || (identifierValid && isCode(code))) && !loading;
 
   // 从找回密码流程跳回时展示成功提示，引导用户用新密码登录。
   const resetSuccess = searchParams.get("reset") === "success";
@@ -83,13 +89,20 @@ export function LoginForm() {
     setCode("");
   }
 
-  // 登录 / 验证码登录成功后的统一收尾：存会话 → 写用户态 → 按 onboarding 跳转。
+  // 认证已成功时只重试资料，不能再次消费登录验证码。
+  async function loadProfile() {
+    try {
+      await completeAuthentication();
+    } catch {
+      setError("登录成功，但加载账号信息失败，请重试");
+    }
+  }
+
+  // 资料准备完整后再发布登录态，由 GuestGuard 统一导航。
   async function onAuthSuccess(auth: AuthResponse) {
     persistSession(auth);
-    setUser(auth.user);
-    // 拉取 /me 判断是否新用户：新用户先进引导页，老用户进目标页。
-    const redirect = searchParams.get("redirect") ?? "/";
-    await navigateAfterAuth((href) => router.push(href), redirect);
+    setAuthenticated(true);
+    await loadProfile();
   }
 
   async function handleLogin() {
@@ -97,12 +110,16 @@ export function LoginForm() {
     setError("");
     setLoading(true);
     try {
-      const auth = await api.auth.login(
-        account,
-        // 业务规则:密码不区分大小写,与注册一致统一转大写。
-        password.toUpperCase()
-      );
-      await onAuthSuccess(auth);
+      if (authenticated) {
+        await loadProfile();
+      } else {
+        const auth = await api.auth.login(
+          account,
+          // 业务规则:密码不区分大小写,与注册一致统一转大写。
+          password.toUpperCase()
+        );
+        await onAuthSuccess(auth);
+      }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "";
       setError(translateAuthError(msg, LOGIN_ERRORS, "登录失败，请稍后重试"));
@@ -133,8 +150,12 @@ export function LoginForm() {
     setError("");
     setLoading(true);
     try {
-      const auth = await api.auth.loginWithCode(account, code);
-      await onAuthSuccess(auth);
+      if (authenticated) {
+        await loadProfile();
+      } else {
+        const auth = await api.auth.loginWithCode(account, code);
+        await onAuthSuccess(auth);
+      }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "";
       setError(translateAuthError(msg, CODE_ERRORS, "登录失败，请稍后重试"));
@@ -176,6 +197,7 @@ export function LoginForm() {
               <button
                 key={id}
                 onClick={() => switchTab(id)}
+                disabled={loading || authenticated}
                 className={`pb-3 text-sm font-medium transition-colors ${
                   tab === id
                     ? "text-primary border-b-2 border-primary"
@@ -197,6 +219,7 @@ export function LoginForm() {
                   type="text"
                   placeholder="请输入手机号/邮箱号码"
                   value={account}
+                  disabled={loading || authenticated}
                   onChange={(e) => setAccount(e.target.value)}
                   className={AUTH_INPUT_CLASS}
                 />
@@ -210,6 +233,7 @@ export function LoginForm() {
                     type={showPassword ? "text" : "password"}
                     placeholder="请输入登录密码"
                     value={password}
+                    disabled={loading || authenticated}
                     onChange={(e) => setPassword(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleLogin()}
                     className={`${AUTH_INPUT_CLASS} pr-12`}
@@ -232,7 +256,11 @@ export function LoginForm() {
                 disabled={!canSubmit}
                 className="w-full rounded-full bg-primary py-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {loading ? "登录中..." : "立即登录"}
+                {loading
+                  ? "登录中..."
+                  : authenticated
+                    ? "重试加载"
+                    : "立即登录"}
               </button>
             </div>
           ) : (
@@ -248,6 +276,7 @@ export function LoginForm() {
                       tab === "phone" ? "请输入手机号" : "请输入邮箱"
                     }
                     value={account}
+                    disabled={loading || authenticated}
                     onChange={(e) => setAccount(e.target.value)}
                     className={AUTH_INPUT_CLASS}
                   />
@@ -270,6 +299,7 @@ export function LoginForm() {
                       inputMode="numeric"
                       placeholder="请输入验证码"
                       value={code}
+                      disabled={loading || authenticated}
                       onChange={(e) => setCode(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && handleCodeLogin()}
                       className={`${AUTH_INPUT_CLASS} pr-20`}
@@ -302,7 +332,11 @@ export function LoginForm() {
                 disabled={!canCodeSubmit}
                 className="w-full rounded-full bg-primary py-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {loading ? "登录中..." : "立即登录"}
+                {loading
+                  ? "登录中..."
+                  : authenticated
+                    ? "重试加载"
+                    : "立即登录"}
               </button>
             </div>
           )}

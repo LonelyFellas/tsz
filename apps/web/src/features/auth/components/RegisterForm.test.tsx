@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthResponse } from "@tsz/api-client";
 import { renderWithProviders } from "@/test/render";
 import { RegisterForm } from "./RegisterForm";
+import { useUserStore } from "@/stores/user";
 
 const mockPush = vi.fn();
 const mockBack = vi.fn();
@@ -60,6 +61,7 @@ function authResult(): AuthResponse {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  useUserStore.setState({ user: null, onboarded: null, hydrated: false });
   mockRegister.mockResolvedValue(authResult());
   mockSendCode.mockResolvedValue(undefined);
   mockMe.mockResolvedValue({
@@ -163,7 +165,9 @@ describe("RegisterForm — 手机号验证码注册", () => {
     await user.click(screen.getByRole("button", { name: "立即注册" }));
     expect(phoneInput).toBeDisabled();
     registration.resolve(authResult());
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/"));
+    await waitFor(() =>
+      expect(useUserStore.getState().user).toEqual(authResult().user)
+    );
   });
 
   it("非法手机号不能发送验证码", async () => {
@@ -174,7 +178,7 @@ describe("RegisterForm — 手机号验证码注册", () => {
     expect(screen.getByRole("button", { name: "获取验证码" })).toBeDisabled();
   });
 
-  it("注册成功直接使用返回会话并跳首页", async () => {
+  it("注册成功直接使用返回会话并发布用户态", async () => {
     renderWithProviders(<RegisterForm />);
     const user = userEvent.setup();
     await fillForm(user);
@@ -186,11 +190,11 @@ describe("RegisterForm — 手机号验证码注册", () => {
         password: PASSWORD.toUpperCase(),
         code: CODE
       });
-      expect(mockPush).toHaveBeenCalledWith("/");
+      expect(useUserStore.getState().user).toEqual(authResult().user);
     });
   });
 
-  it("未完成 onboarding 时跳转引导页", async () => {
+  it("保留未完成 onboarding 的状态，由守卫决定目标", async () => {
     mockMe.mockResolvedValueOnce({
       user: authResult().user,
       active_role: "student",
@@ -201,7 +205,8 @@ describe("RegisterForm — 手机号验证码注册", () => {
     const user = userEvent.setup();
     await fillForm(user);
     await user.click(screen.getByRole("button", { name: "立即注册" }));
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/onboarding"));
+    await waitFor(() => expect(useUserStore.getState().onboarded).toBe(false));
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it.each([
