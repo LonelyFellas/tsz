@@ -343,7 +343,19 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(page.getByRole("tab", { name: "名词" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "动词" })).toBeVisible();
     await page.getByRole("tab", { name: "名词" }).click();
-    await expect(page.locator('input[value="orbit-common"]')).toHaveCount(2);
+    await expect
+      .poll(() =>
+        page
+          .getByRole("textbox", { name: /拼写$/ })
+          .evaluateAll(
+            (fields) =>
+              fields.filter(
+                (field) =>
+                  (field as HTMLTextAreaElement).value === "orbit-common"
+              ).length
+          )
+      )
+      .toBe(2);
     await expect(page.getByLabel("原形英式拼写", { exact: true })).toHaveCount(
       2
     );

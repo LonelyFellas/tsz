@@ -282,12 +282,14 @@ describe("当前词条关联与离开保护", () => {
         />
       );
       await screen.findByText(new RegExp(`请关联当前词义：${spelling}`));
-      const shortcut = screen.queryByRole("button", { name: /确认关联 make/ });
-      if (spelling === "make") expect(shortcut).not.toBeInTheDocument();
+      const shortcut = screen
+        .queryByText(/确认关联 make/, {
+          selector: "button span"
+        })
+        ?.closest("button");
+      if (spelling === "make") expect(shortcut).toBeUndefined();
       else expect(shortcut).toBeEnabled();
-      expect(
-        screen.getByRole("button", { name: "完成例句编辑" })
-      ).toBeDisabled();
+      expect(screen.getByLabelText("完成例句编辑")).toBeDisabled();
       expect(api.sentences.update).not.toHaveBeenCalled();
       expect(api.sentences.create).not.toHaveBeenCalled();
     }
