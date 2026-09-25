@@ -1,4 +1,5 @@
 import type { AuthResponse } from "@tsz/api-client";
+import { safeRedirectPath } from "@tsz/shared/auth";
 import { api, setAccessToken, scheduleRefresh } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
 
@@ -20,18 +21,21 @@ export function persistSession(
   scheduleRefresh(auth.expires_in);
 }
 
-/**
- * 登录 / 注册成功后的统一跳转决策：
- * 拉取 /me 判断是否新用户（未完成 onboarding），新用户先进引导页，
- * 老用户进目标页（redirect 或首页）。同时把用户态写入全局 store。
- */
-export async function navigateAfterAuth(
-  push: (href: string) => void,
-  redirect = "/"
-): Promise<void> {
+/** 认证成功后一次性发布完整用户态；导航只由 GuestGuard 执行。 */
+export async function completeAuthentication(): Promise<void> {
   const me = await api.auth.me();
-  const { setUser, setOnboarded } = useUserStore.getState();
-  setUser(me.user);
-  setOnboarded(me.onboarded);
-  push(me.onboarded ? redirect : ONBOARDING_PATH);
+  useUserStore.getState().setSession(me.user, me.onboarded);
+}
+
+export function postAuthPath(
+  onboarded: boolean,
+  redirect: string | null
+): string {
+  if (!onboarded) return ONBOARDING_PATH;
+  const target = safeRedirectPath(redirect);
+  const pathname = decodeURIComponent(target.split(/[?#]/)[0]!);
+  // 登录/注册/找回密码共享访客守卫，回跳到这些页面会形成导航循环。
+  return /^\/(login|register|forgot-password)(\/|$)/i.test(pathname)
+    ? "/"
+    : target;
 }

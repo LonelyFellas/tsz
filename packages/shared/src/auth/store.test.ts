@@ -30,6 +30,24 @@ describe("createAuthStore", () => {
     expect(s.hydrated).toBe(true);
   });
 
+  it("完整会话只通知一次，订阅者不会看到半成品用户态", () => {
+    const store = createAuthStore();
+    const snapshots: unknown[] = [];
+    const unsubscribe = store.subscribe((state) => {
+      snapshots.push({
+        user: state.user,
+        onboarded: state.onboarded,
+        activeRole: state.activeRole,
+        hydrated: state.hydrated
+      });
+    });
+    store.getState().setSession(USER, false);
+    expect(snapshots).toEqual([
+      { user: USER, onboarded: false, activeRole: "admin", hydrated: true }
+    ]);
+    unsubscribe();
+  });
+
   it("hasRole 基于 user.roles", () => {
     const store = createAuthStore();
     expect(store.getState().hasRole("admin")).toBe(false);

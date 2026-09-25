@@ -4,11 +4,10 @@ import { isPhone, isRegisterPassword } from "@tsz/shared";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/request";
-import { useUserStore } from "@/stores/user";
 import { AuthBranding } from "./AuthBranding";
 import {
   AUTH_INPUT_CLASS,
-  navigateAfterAuth,
+  completeAuthentication,
   persistSession,
   translateAuthError
 } from "../shared";
@@ -31,9 +30,9 @@ export function RegisterForm() {
   const [countdown, setCountdown] = useState(0);
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [registered, setRegistered] = useState(false);
   const [error, setError] = useState("");
 
-  const setUser = useUserStore((state) => state.setUser);
   const router = useRouter();
 
   useEffect(() => {
@@ -45,8 +44,10 @@ export function RegisterForm() {
   const phoneValid = isPhone(phone);
   const codeValid = REGISTER_CODE_RE.test(code);
   const passwordValid = isRegisterPassword(password);
-  const canSendCode = phoneValid && countdown === 0 && !sending;
-  const canSubmit = phoneValid && codeValid && passwordValid && !loading;
+  const canSendCode =
+    phoneValid && countdown === 0 && !sending && !loading && !registered;
+  const canSubmit =
+    (registered || (phoneValid && codeValid && passwordValid)) && !loading;
 
   function translateError(value: unknown, fallback: string): string {
     const message = value instanceof Error ? value.message : "";
@@ -81,18 +82,26 @@ export function RegisterForm() {
     if (!canSubmit) return;
     setError("");
     setLoading(true);
+    let accountCreated = registered;
     try {
-      // 与现有密码登录保持一致：提交前统一转大写。
-      const auth = await api.auth.register({
-        phone,
-        password: password.toUpperCase(),
-        code
-      });
-      persistSession(auth);
-      setUser(auth.user);
-      await navigateAfterAuth((href) => router.push(href));
+      if (!accountCreated) {
+        // 与现有密码登录保持一致：提交前统一转大写。
+        const auth = await api.auth.register({
+          phone,
+          password: password.toUpperCase(),
+          code
+        });
+        accountCreated = true;
+        setRegistered(true);
+        persistSession(auth);
+      }
+      await completeAuthentication();
     } catch (cause: unknown) {
-      setError(translateError(cause, "注册失败，请稍后重试"));
+      setError(
+        accountCreated
+          ? "注册成功，但加载账号信息失败，请重试"
+          : translateError(cause, "注册失败，请稍后重试")
+      );
     } finally {
       setLoading(false);
     }
@@ -146,7 +155,7 @@ export function RegisterForm() {
                 autoComplete="tel"
                 placeholder="请输入手机号"
                 value={phone}
-                disabled={sending || loading}
+                disabled={sending || loading || registered}
                 onChange={(event) => handlePhoneChange(event.target.value)}
                 className={AUTH_INPUT_CLASS}
               />
@@ -166,6 +175,7 @@ export function RegisterForm() {
                   autoComplete="one-time-code"
                   placeholder="请输入验证码"
                   value={code}
+                  disabled={loading || registered}
                   onChange={(event) => setCode(event.target.value)}
                   className={`${AUTH_INPUT_CLASS} min-w-0 flex-1`}
                 />
@@ -199,6 +209,7 @@ export function RegisterForm() {
                   autoComplete="new-password"
                   placeholder="请输入登录密码"
                   value={password}
+                  disabled={loading || registered}
                   onChange={(event) => setPassword(event.target.value)}
                   className={`${AUTH_INPUT_CLASS} pr-12`}
                 />
@@ -229,7 +240,13 @@ export function RegisterForm() {
               disabled={!canSubmit}
               className="w-full rounded-full bg-primary py-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {loading ? "注册中..." : "立即注册"}
+              {loading
+                ? registered
+                  ? "加载中..."
+                  : "注册中..."
+                : registered
+                  ? "重试加载"
+                  : "立即注册"}
             </button>
 
             <p className="text-center text-sm">

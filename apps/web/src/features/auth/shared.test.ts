@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { User } from "@tsz/types";
 import {
-  navigateAfterAuth,
+  completeAuthentication,
+  postAuthPath,
   persistSession,
   translateAuthError
 } from "./shared";
@@ -71,53 +72,72 @@ describe("persistSession", () => {
   });
 });
 
-describe("navigateAfterAuth", () => {
+describe("completeAuthentication", () => {
   beforeEach(() => {
-    useUserStore.setState({ user: null, onboarded: null });
+    useUserStore.setState({ user: null, onboarded: null, hydrated: false });
   });
 
-  it("老用户（已 onboarded）→ 跳目标页并写入用户态", async () => {
-    vi.spyOn(request.api.auth, "me").mockResolvedValueOnce({
-      user: ME_USER,
-      active_role: "student",
-      learning_settings: { cefr_level: "B1", english_variant: "BrE" },
-      onboarded: true
+  it.each([true, false])(
+    "一次性发布完整用户和引导状态 %s",
+    async (onboarded) => {
+      vi.spyOn(request.api.auth, "me").mockResolvedValueOnce({
+        user: ME_USER,
+        active_role: "student",
+        learning_settings: null,
+        onboarded
+      });
+      const listener = vi.fn();
+      const unsubscribe = useUserStore.subscribe(listener);
+      try {
+        await completeAuthentication();
+        expect(listener).toHaveBeenCalledTimes(1);
+        expect(useUserStore.getState()).toMatchObject({
+          user: ME_USER,
+          onboarded,
+          hydrated: true
+        });
+      } finally {
+        unsubscribe();
+      }
+    }
+  );
+
+  it("资料读取失败不发布用户态", async () => {
+    vi.spyOn(request.api.auth, "me").mockRejectedValueOnce(
+      new Error("unavailable")
+    );
+    await expect(completeAuthentication()).rejects.toThrow("unavailable");
+    expect(useUserStore.getState()).toMatchObject({
+      user: null,
+      onboarded: null
     });
-    const push = vi.fn();
+  });
+});
 
-    await navigateAfterAuth(push, "/wordlists");
-
-    expect(push).toHaveBeenCalledWith("/wordlists");
-    expect(useUserStore.getState().user).toEqual(ME_USER);
-    expect(useUserStore.getState().onboarded).toBe(true);
+describe("postAuthPath", () => {
+  it("默认首页，合法回跳保留 query 和 hash", () => {
+    expect(postAuthPath(true, null)).toBe("/");
+    expect(postAuthPath(true, "/student/practice?unit=2#words")).toBe(
+      "/student/practice?unit=2#words"
+    );
   });
 
-  it("新用户（未 onboarded）→ 跳 /onboarding", async () => {
-    vi.spyOn(request.api.auth, "me").mockResolvedValueOnce({
-      user: ME_USER,
-      active_role: "student",
-      learning_settings: null,
-      onboarded: false
-    });
-    const push = vi.fn();
-
-    await navigateAfterAuth(push);
-
-    expect(push).toHaveBeenCalledWith("/onboarding");
-    expect(useUserStore.getState().onboarded).toBe(false);
+  it("新用户仍优先进入引导页", () => {
+    expect(postAuthPath(false, "/wordlists")).toBe("/onboarding");
   });
 
-  it("redirect 默认首页", async () => {
-    vi.spyOn(request.api.auth, "me").mockResolvedValueOnce({
-      user: ME_USER,
-      active_role: "student",
-      learning_settings: { cefr_level: "A1", english_variant: "AmE" },
-      onboarded: true
-    });
-    const push = vi.fn();
-
-    await navigateAfterAuth(push);
-
-    expect(push).toHaveBeenCalledWith("/");
+  it.each([
+    "/login",
+    "/login/?redirect=/wordlists",
+    "/register",
+    "/forgot-password#reset",
+    "/wordlists/../login",
+    "/%6cogin",
+    "/register%2f",
+    "https://outside.example/",
+    "//outside.example/",
+    "javascript:void(0)"
+  ])("拒绝认证页循环或危险地址 %s", (redirect) => {
+    expect(postAuthPath(true, redirect)).toBe("/");
   });
 });
