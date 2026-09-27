@@ -5,7 +5,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { App as AntApp, ConfigProvider } from "antd";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type {
@@ -88,7 +88,11 @@ describe("词形组的专用词义交互", () => {
         </AntApp>
       );
     }
-    render(<ScopeHarness />);
+    render(
+      <ConfigProvider theme={{ token: { motion: false } }}>
+        <ScopeHarness />
+      </ConfigProvider>
+    );
     // 按标签与可见文案定位；复选框类型、按钮禁用及可见性仍独立断言。
     expect(screen.queryByText("通用", { exact: true })).not.toBeInTheDocument();
     const headerEntry = await screen.findByLabelText("第 1 组专用词义");
@@ -100,12 +104,20 @@ describe("词形组的专用词义交互", () => {
     fireEvent.click(headerEntry);
     let dialog = await screen.findByLabelText("第 1 组适用词义编辑");
     expect(dialog).toHaveTextContent("适配专用词义");
-    expect(dialog).toHaveTextContent(
+    expect(screen.queryByText(/注意：该词形仅适配少量词义/)).toBeNull();
+    const help = within(dialog).getByRole("button", {
+      name: "查看适配专用词义说明"
+    });
+    fireEvent.click(help);
+    const description = await screen.findByText(/注意：该词形仅适配少量词义/);
+    expect(description).toHaveTextContent(
       "注意：该词形仅适配少量词义，请准确识别正确的词义。适配之后，该词形专属于适配词义，不用于其他词义。"
     );
-    expect(dialog).toHaveTextContent(
+    expect(description).toHaveTextContent(
       "适配条件：1）至少选一项词义才能适配，可多选。2）只可适配同一词性下的词义。"
     );
+    fireEvent.click(help);
+    await waitFor(() => expect(description).not.toBeInTheDocument());
     expect(within(dialog).queryByText(/其他词性/)).not.toBeInTheDocument();
     expect(
       within(dialog).getByText("确认选择").closest("button")!

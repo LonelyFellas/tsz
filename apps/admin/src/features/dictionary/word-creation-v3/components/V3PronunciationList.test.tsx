@@ -131,6 +131,25 @@ const rows = () =>
   JSON.parse(screen.getByTestId("wire").textContent!).pos[0].forms[0]
     .regional_variants.common.pronunciations;
 describe("独立发音输入", () => {
+  it("实际发音与音素输入的转换按钮和右侧操作都位于输入组合内", () => {
+    render(<Harness />);
+    const actualGroup = field("实际发音").closest(".ant-space-compact");
+    expect(actualGroup).toContainElement(
+      screen.getByLabelText("从字典音标填入实际发音")
+    );
+    expect(actualGroup).toContainElement(
+      screen.getByLabelText("打开第 1 条发音的实际发音编辑器")
+    );
+    for (const alphabet of ["IPA", "UPS"]) {
+      const group = field(`Azure ${alphabet}`).closest(".ant-space-compact");
+      expect(group).toContainElement(
+        screen.getByLabelText(`第 1 条发音转换为 Azure ${alphabet}`)
+      );
+      expect(group).toContainElement(
+        screen.getByLabelText(`第 1 条发音 Azure ${alphabet} 最终读音`)
+      );
+    }
+  });
   it("默认拼写；两种音素预览、音色、录音及另一行保持独立", async () => {
     render(<Harness />);
     fireEvent.click(screen.getByLabelText("在第 1 条后新增发音"));
@@ -293,7 +312,14 @@ describe("独立发音输入", () => {
     view.rerender(<Harness configured />);
     expect(preview()).toBeDisabled();
     expect(field("Azure UPS")).toHaveValue("K AE T");
-    expect(screen.getByText(/当前发音：英式/)).toBeInTheDocument();
+    expect(
+      view.container.querySelector(".word-pronunciation-synthesis")
+    ).toHaveAttribute("data-phoneme-locale", "en-GB");
+    expect(screen.queryByText(/当前发音：/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^英式$/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/英式 UPS 自动转换暂未支持/)
+    ).not.toBeInTheDocument();
     change("Azure IPA", "kɛt");
     expect(rows()[0].synthesis.ipa_locale).toBe("en-GB");
     expect(rows()[0].synthesis.ups_locale).toBe("en-US");

@@ -109,7 +109,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   onEditingChange,
   onAssociationPendingChange,
   mode,
-  editingEnabled = true,
+  editingEnabled = mode !== "spelling",
   presentation = "field",
   dialect,
   textLinks,
@@ -244,11 +244,13 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     publish(snapshot.value, snapshot.links);
   };
   const englishContent = mode !== undefined && ENTRY_ENGLISH_MODES.has(mode);
-  const largePreview = englishContent || mode === "actual-pron";
+  const largePreview =
+    (englishContent && mode !== "spelling") || mode === "actual-pron";
   const grammarPreview =
     mode === "grammar" && !expanded && !focused && value.text !== "";
   const fallback = (
     <Input.TextArea
+      key={largePreview ? "large" : "standard"}
       onFocus={() => setFocused(true)}
       onBlur={() => {
         setFocused(false);

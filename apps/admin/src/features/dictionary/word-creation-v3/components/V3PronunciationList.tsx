@@ -379,21 +379,23 @@ export function V3PronunciationList({
                           实际发音
                         </Typography.Text>
                         <div className="word-actual-pronunciation-control">
-                          <V3ActualPronunciationCopy
-                            pronunciation={pronunciation}
-                            onChange={(patch) =>
-                              onChange(
-                                updatePronunciation(
-                                  content,
-                                  pronunciation.id,
-                                  patch
-                                )
-                              )
-                            }
-                          />
                           <Form.Item noStyle>
                             <V3VoiceTextField
                               mode="actual-pron"
+                              leadingAction={
+                                <V3ActualPronunciationCopy
+                                  pronunciation={pronunciation}
+                                  onChange={(patch) =>
+                                    onChange(
+                                      updatePronunciation(
+                                        content,
+                                        pronunciation.id,
+                                        patch
+                                      )
+                                    )
+                                  }
+                                />
+                              }
                               dialect={variant.dialect}
                               ariaLabel={`第 ${index + 1} 条发音的实际发音`}
                               field="actual_pron"

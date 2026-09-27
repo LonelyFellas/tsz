@@ -85,8 +85,13 @@
 }
 
 .v3-form-group-card .word-form-rules {
-  padding-block-start: 16px;
+  padding-block-start: 8px;
   padding-inline: 16px;
+}
+
+.v3-concrete-form-row .word-shared-form-spelling {
+  display: grid;
+  gap: 8px;
 }
 
 .v3-concrete-form-row .word-form-matrix {
