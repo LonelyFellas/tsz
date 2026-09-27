@@ -3454,7 +3454,7 @@ it.each([false, true])(
       expect(element).not.toBeNull();
       return element!;
     });
-    expect(popup).toHaveStyle({ width: "240px" });
+    expect(popup).toHaveStyle({ width: "max-content" });
     expect((popup as HTMLElement).style.maxWidth).toBe("calc(100vw - 32px)");
     expect(popup).not.toHaveClass("ant-select-dropdown-hidden");
     for (const label of labels)

@@ -162,14 +162,22 @@ function V3ConcreteFormTypeCell({
               aria-label={formTypeAriaLabel}
               classNames={{ popup: { root: "v3-form-type-popup" } }}
               disabled={formTypeDisabled}
-              popupMatchSelectWidth={240}
+              popupMatchSelectWidth={false}
+              popupAlign={{
+                overflow: { adjustX: true, adjustY: true, shiftX: true }
+              }}
               styles={{
                 content: {
                   whiteSpace: "normal",
                   overflowWrap: "anywhere",
                   textOverflow: "clip"
                 },
-                popup: { root: { maxWidth: "calc(100vw - 32px)" } }
+                popup: {
+                  root: {
+                    width: "max-content",
+                    maxWidth: "calc(100vw - 32px)"
+                  }
+                }
               }}
               virtual={false}
               onChange={(formType) =>

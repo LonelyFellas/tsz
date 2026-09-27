@@ -1,5 +1,9 @@
+.word-pronunciation-fields:has(> .word-pronunciation-synthesis)
+  .word-pronunciation-row {
+  column-gap: 24px;
+}
+
 .word-pronunciation-synthesis {
-  container-type: inline-size;
   display: grid;
   gap: 12px;
   min-width: 0;
@@ -12,20 +16,19 @@
 }
 
 .word-pronunciation-synthesis .word-pronunciation-row {
-  grid-template-columns: 96px minmax(0, 1fr);
+  grid-template-columns: 64px minmax(0, 1fr);
   gap: 6px 12px;
 }
 
-.word-actual-pronunciation-control {
-  display: flex;
-  align-items: flex-start;
-  min-width: 0;
-}
-.word-actual-pronunciation-control > .ant-btn {
+.word-actual-pronunciation-control .v3-voice-text-field-compact > .ant-btn,
+.word-synthesis-control > .ant-btn:first-child {
+  width: 32px;
+  height: 32px;
+  padding: 0;
   flex-shrink: 0;
 }
-.word-actual-pronunciation-control > :last-child {
-  flex: 1;
+
+.word-actual-pronunciation-control {
   min-width: 0;
 }
 .word-actual-pronunciation-control textarea {
@@ -33,22 +36,10 @@
 }
 .word-actual-pronunciation-control
   textarea.v3-voice-text-large-preview.ant-input {
+  font-size: 14px;
   font-weight: 400;
-  padding-block: 6px;
-  line-height: 1.5;
-}
-.word-actual-pronunciation-control
-  .v3-voice-text-field-compact
-  > .ant-btn:last-child {
-  width: 38px;
-  border-inline-start-color: transparent;
-  color: var(--ant-color-text-secondary, #666);
-}
-.word-actual-pronunciation-control
-  .v3-voice-text-field-compact
-  > .ant-btn:last-child:hover {
-  color: var(--ant-color-primary, #2053ff);
-  border-color: var(--ant-color-primary-hover, #597ef7);
+  padding: 4px 11px;
+  line-height: 22px;
 }
 
 .word-synthesis-input {
@@ -68,25 +59,33 @@
   min-width: 0;
 }
 
+.word-actual-pronunciation-control
+  .v3-voice-text-field-compact
+  textarea.ant-input,
+.word-synthesis-control > textarea.ant-input {
+  border-radius: 0;
+}
+
 .word-synthesis-control > .ant-btn,
 .word-synthesis-input > .ant-btn {
   flex-shrink: 0;
 }
 
-.word-synthesis-locale-notice {
-  font-size: 12px;
-  line-height: 1.6;
-}
-.word-synthesis-locale-label {
-  display: block;
-  font-size: 12px;
-  font-weight: 400;
-  color: var(--ant-color-text-secondary, #666);
-}
 .word-synthesis-locale-warning {
   grid-column: 2;
   font-size: 12px;
   line-height: 1.6;
+}
+
+@container (max-width: 440px) {
+  .word-pronunciation-synthesis .word-pronunciation-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+
+  .word-synthesis-locale-warning {
+    grid-column: 1;
+  }
 }
 
 .word-synthesis-source-actions {

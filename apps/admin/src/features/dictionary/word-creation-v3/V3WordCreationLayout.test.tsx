@@ -272,7 +272,7 @@ describe("V3WordCreationLayout", () => {
       "多维例句"
     ]);
     expect(rows.map((row) => row.textContent)).toEqual([
-      "语言识别完成",
+      "语言识别",
       "基本词性1",
       "词形变化2",
       "4语义区间1",
@@ -321,7 +321,7 @@ describe("V3WordCreationLayout", () => {
     const detailsOf = (label: string) =>
       row(label)
         .closest(".v3-product-progress-group")!
-        .querySelector(".v3-product-progress-details");
+        .querySelector<HTMLUListElement>(".v3-product-progress-details");
 
     // 默认全部收起：一条明细都不渲染
     expect(
@@ -342,6 +342,12 @@ describe("V3WordCreationLayout", () => {
     fireEvent.click(row("多维词义"));
     expect(row("多维词义")).toHaveAttribute("aria-expanded", "true");
     expect(detailsOf("多维词义")).not.toBeNull();
+    const panel = document.getElementById(
+      row("多维词义").getAttribute("aria-controls")!
+    );
+    expect(panel).toContainElement(detailsOf("多维词义"));
+    expect(panel).toHaveAttribute("aria-hidden", "false");
+    expect(panel).not.toHaveAttribute("inert");
     // 展开互不影响：其余行仍旧收起
     expect(
       document.querySelectorAll(".v3-product-progress-details")
@@ -355,10 +361,16 @@ describe("V3WordCreationLayout", () => {
 
     fireEvent.click(row("多维词义"));
     expect(row("多维词义")).toHaveAttribute("aria-expanded", "false");
-    expect(detailsOf("多维词义")).toBeNull();
+    expect(panel).toHaveAttribute("aria-hidden", "true");
+    expect(panel).toHaveAttribute("inert");
     expect(
-      document.querySelectorAll(".v3-product-progress-details")
+      document.querySelectorAll(
+        '.v3-product-progress-panel[aria-hidden="false"] .v3-product-progress-details'
+      )
     ).toHaveLength(1);
+    fireEvent.click(row("多维词义"));
+    expect(panel).toHaveAttribute("aria-hidden", "false");
+    expect(panel).not.toHaveAttribute("inert");
   });
 
   it("窄屏入口按完成的行数报计数，清单本身不再占首屏", () => {
@@ -376,7 +388,7 @@ describe("V3WordCreationLayout", () => {
     }
   });
 
-  it("左栏只保留返回和完成情况，面包屑保留第一个原形", () => {
+  it("左栏在完成情况上方展示当前原形与所属语言", () => {
     const current = word();
     current.presentation.label = "center / centers";
     current.presentation.matched_surfaces = ["center", "centers"];
@@ -398,9 +410,10 @@ describe("V3WordCreationLayout", () => {
     renderLayout({ word: current });
 
     const summary = within(screen.getByRole("region", { name: "词条摘要" }));
-    expect(summary.queryByText("center", { exact: true })).toBeNull();
-    expect(summary.queryByText("当前词条")).toBeNull();
-    expect(summary.queryByText("所属语言")).toBeNull();
+    expect(summary.getByText("center", { exact: true })).toBeVisible();
+    expect(summary.getByText("当前词条")).toBeVisible();
+    expect(summary.getByText("所属语言")).toBeVisible();
+    expect(summary.getByText("English", { exact: true })).toBeVisible();
     expect(
       summary.getByRole("button", { name: /返回智能词库/u })
     ).toBeVisible();
@@ -473,9 +486,10 @@ describe("V3WordCreationLayout", () => {
     fireEvent.click(screen.getByRole("button", { name: "展开语言识别" }));
 
     const summary = within(screen.getByRole("region", { name: "词条摘要" }));
-    expect(summary.queryByText("center", { exact: true })).toBeNull();
-    expect(summary.queryByText("当前词条")).toBeNull();
-    expect(summary.queryByText("所属语言")).toBeNull();
+    expect(summary.getByText("center", { exact: true })).toBeVisible();
+    expect(summary.getByText("当前词条")).toBeVisible();
+    expect(summary.getByText("所属语言")).toBeVisible();
+    expect(summary.getByText("English", { exact: true })).toBeVisible();
     expect(
       summary.getByRole("button", { name: /返回智能词库/u })
     ).toBeVisible();
@@ -495,7 +509,7 @@ describe("V3WordCreationLayout", () => {
     renderLayout({ word: current });
 
     const summary = within(screen.getByRole("region", { name: "词条摘要" }));
-    expect(summary.queryByText("fallback-label", { exact: true })).toBeNull();
+    expect(summary.getByText("fallback-label", { exact: true })).toBeVisible();
     expect(screen.getByText("fallback-label · 词形与发音")).toBeVisible();
   });
 
@@ -510,8 +524,8 @@ describe("V3WordCreationLayout", () => {
 
     const summary = within(screen.getByRole("region", { name: "词条摘要" }));
     expect(
-      summary.queryByText("fallback-for-blank-base", { exact: true })
-    ).toBeNull();
+      summary.getByText("fallback-for-blank-base", { exact: true })
+    ).toBeVisible();
     expect(
       screen.getByText("fallback-for-blank-base · 词形与发音")
     ).toBeVisible();

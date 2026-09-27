@@ -417,7 +417,10 @@ describe("WordWizardV3Page", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("所属语言｜英美区分")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /返回智能词库/ })).toBeVisible();
-    expect(screen.queryByText("当前词条")).toBeNull();
+    expect(screen.getByText("当前词条")).toBeVisible();
+    expect(document.querySelector(".v3-summary-headword")).toHaveTextContent(
+      "centre"
+    );
     expect(screen.getByText("完成情况")).toBeVisible();
     expect(screen.getByText("语言识别")).toBeVisible();
     expect(screen.getByText("录入与检测")).toBeInTheDocument();
@@ -667,7 +670,10 @@ describe("WordWizardV3Page", () => {
 
     expect(await screen.findByText("centre · 词形与发音")).toBeInTheDocument();
     expect(screen.getByText("STEP 02")).toBeVisible();
-    expect(screen.queryByText("当前词条")).toBeNull();
+    expect(screen.getByText("当前词条")).toBeVisible();
+    expect(document.querySelector(".v3-summary-headword")).toHaveTextContent(
+      "centre"
+    );
     expect(screen.getByText("完成情况")).toBeVisible();
     expect(document.querySelector(".word-creation-page")).not.toBeNull();
     expect(document.querySelector(".word-creation-stepper")).not.toBeNull();

@@ -241,7 +241,11 @@ function V3WordCreationLayoutContent({
         wordExists: true,
         breadcrumbTitle: `${visibleLabel} · ${STEP_TITLE[activeStep]}`,
         completedSteps: word.completed_steps,
-        showEntrySummary: false,
+        summaryHeadword: (
+          <strong className="v3-summary-headword tsz-entry-en">
+            {visibleLabel}
+          </strong>
+        ),
         progressBadge: v3ProductProgressBadge(progressRows),
         progress: (
           <V3ProductProgressList

@@ -359,35 +359,56 @@
   animation-duration: 0.01s !important;
 }
 
+.v3-summary-headword {
+  min-width: 0;
+  color: #273043;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.v3-product-progress-list :is(.word-progress-done, .word-progress-index) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 12px;
+  line-height: 1;
+}
+
 .v3-product-progress-list .word-progress-done {
-  color: #252c3c;
-  font-size: 18px;
+  color: var(--ant-color-primary, #2053ff);
+  background: var(--ant-color-primary-bg, #edf4ff);
 }
 
 .v3-product-progress-list .word-progress-index {
-  display: inline-grid;
-  width: 18px;
-  height: 18px;
-  color: #8b9099;
-  font-weight: 600;
-  font-size: 11px;
-  line-height: 1;
-  place-items: center;
-  border: 1.5px solid #c6c9cf;
-  border-radius: 50%;
+  color: #667085;
+  background: var(--ant-color-fill-secondary, #f0f1f3);
+  font-variant-numeric: tabular-nums;
+}
+
+.v3-product-progress-list
+  .word-creation-progress-row[aria-current="step"]
+  :is(.word-progress-done, .word-progress-index) {
+  color: #fff;
+  background: var(--ant-color-primary, #2053ff);
 }
 
 .v3-product-progress-list .word-progress-label {
-  color: #273043;
-  font-weight: 600;
+  color: #344054;
+  font-weight: 400;
 }
 
 .v3-product-progress-trailing {
   display: inline-flex;
-  gap: 6px;
+  gap: 10px;
   align-items: center;
   justify-self: end;
   color: #8b9099;
+  font-variant-numeric: tabular-nums;
 }
 
 .v3-product-progress-list
@@ -397,6 +418,7 @@
   min-width: 0;
   padding: 0;
   color: #8b9099;
+  font-size: 12px;
   background: transparent;
   border-radius: 0;
 }
@@ -405,7 +427,7 @@
   .v3-product-progress-list {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 24px 32px !important;
+  gap: 4px;
 }
 
 .v3-product-progress-group {
@@ -415,30 +437,85 @@
 :is(.word-creation-shell, .word-creation-progress-drawer)
   .v3-product-progress-list
   .word-creation-progress-row {
-  grid-template-columns: 18px minmax(0, 1fr) auto;
-  gap: 8px;
-  /* 负外边距让底色比文字宽出一圈,同时保持左栏里各行文字的起始位置不变。 */
-  margin-inline: -8px;
-  padding: 5px 8px;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 10px;
+  min-height: 42px;
+  padding: 8px;
   font-size: 13px;
   background: transparent;
   border: 0;
-  border-radius: 8px;
-  transition: background-color 0.15s ease;
+  border-radius: 6px;
+  transition: background-color 160ms ease;
 }
 
 :is(.word-creation-shell, .word-creation-progress-drawer)
   .v3-product-progress-list
   .word-creation-progress-row:hover {
-  background: var(--ant-color-fill-tertiary, #f2f4f8);
+  background: var(--ant-color-fill-quaternary, #fafafa);
 }
 
-/* 展开的行给一块更明显的底,免得收起来之后认不出刚才看的是哪一行。 */
+.v3-product-progress-list .word-creation-progress-row:focus-visible {
+  outline: 2px solid var(--ant-color-primary, #2053ff);
+  outline-offset: 2px;
+}
+
 :is(.word-creation-shell, .word-creation-progress-drawer)
   .v3-product-progress-list
-  .word-creation-progress-row[aria-expanded="true"] {
-  /* 跟着 ConfigProvider 的主色走，免得换主色时这里留一块旧蓝。 */
+  .word-creation-progress-row[aria-current="step"] {
   background: var(--ant-color-primary-bg, #edf4ff);
+}
+
+.v3-product-progress-list
+  .word-creation-progress-row[aria-current="step"]
+  .word-progress-label {
+  color: var(--ant-color-primary, #2053ff);
+  font-weight: 600;
+}
+
+.v3-product-progress-chevron {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  color: var(--ant-color-text-description, #8b9099);
+  transition: transform var(--ant-motion-duration-slow, 0.3s);
+}
+
+.v3-product-progress-chevron::before,
+.v3-product-progress-chevron::after {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 6px;
+  height: 1.5px;
+  background: currentColor;
+  border-radius: var(--ant-border-radius, 6px);
+  content: "";
+  transition: transform var(--ant-motion-duration-slow, 0.3s)
+    var(--ant-motion-ease-in-out, cubic-bezier(0.645, 0.045, 0.355, 1));
+}
+
+.v3-product-progress-chevron::before {
+  transform: rotate(-45deg) translateX(2.5px);
+}
+
+.v3-product-progress-chevron::after {
+  transform: rotate(45deg) translateX(-2.5px);
+}
+
+.word-creation-progress-row[aria-expanded="true"] .v3-product-progress-chevron {
+  transform: translateY(-2px);
+}
+
+.word-creation-progress-row[aria-expanded="true"]
+  .v3-product-progress-chevron::before {
+  transform: rotate(45deg) translateX(2.5px);
+}
+
+.word-creation-progress-row[aria-expanded="true"]
+  .v3-product-progress-chevron::after {
+  transform: rotate(-45deg) translateX(-2.5px);
 }
 
 .word-creation-summary:has(.v3-product-progress-list)
@@ -446,21 +523,40 @@
   display: block;
 }
 
+.v3-product-progress-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 200ms ease,
+    opacity 160ms ease;
+}
+
+.v3-product-progress-panel[data-expanded="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.v3-product-progress-panel-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
 .v3-product-progress-details,
 .v3-product-progress-items {
   display: grid;
   gap: 4px;
-  margin: 8px 0 0;
-  padding: 0 0 0 26px;
-  color: #8b9099;
-  font-size: 13px;
+  margin: 4px 0 8px;
+  padding: 0 8px 0 40px;
+  color: #667085;
+  font-size: 12px;
   line-height: 1.6;
   list-style: none;
 }
 
 .v3-product-progress-items {
-  margin-top: 4px;
-  padding-left: 8px;
+  margin-block: 0 4px;
+  padding-inline: 12px 0;
 }
 
 .v3-product-progress-details > li {
@@ -472,6 +568,7 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
+  min-height: 28px;
 }
 
 .v3-product-progress-detail > .v3-product-progress-text {
@@ -488,6 +585,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v3-product-progress-list .word-creation-progress-row,
+  .v3-product-progress-chevron,
+  .v3-product-progress-chevron::before,
+  .v3-product-progress-chevron::after,
+  .v3-product-progress-panel {
+    transition: none;
+  }
 }
 
 @media (max-width: 991px) {
