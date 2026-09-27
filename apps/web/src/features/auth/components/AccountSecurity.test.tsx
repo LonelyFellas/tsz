@@ -209,21 +209,25 @@ describe("AccountSecurity", () => {
     expect(screen.getByRole("button", { name: "确认换绑邮箱" })).toBeDisabled();
   });
 
-  it("绑定成功带双码，清会话并整页跳登录", async () => {
-    await open("绑定邮箱");
-    fillBind("New@EXAMPLE.com");
-    fireEvent.click(screen.getByRole("button", { name: "确认绑定邮箱" }));
-    await waitFor(() =>
-      expect(replace).toHaveBeenCalledWith("/login?security=success")
-    );
-    expect(auth.bindContact).toHaveBeenCalledWith({
-      contact: "new@example.com",
-      code: "654321",
-      verification_channel: "phone",
-      verification_code: "123456"
-    });
-    expect(clearSession).toHaveBeenCalledTimes(1);
-  });
+  it.each(["绑定邮箱", "换绑邮箱"])(
+    "%s成功带双码，清会话并整页跳登录",
+    async (name) => {
+      if (name === "换绑邮箱") seed({ email: EMAIL });
+      await open(name);
+      fillBind("New@EXAMPLE.com");
+      fireEvent.click(screen.getByRole("button", { name: `确认${name}` }));
+      await waitFor(() =>
+        expect(replace).toHaveBeenCalledWith("/login?security=success")
+      );
+      expect(auth.bindContact).toHaveBeenCalledWith({
+        contact: "new@example.com",
+        code: "654321",
+        verification_channel: "phone",
+        verification_code: "123456"
+      });
+      expect(clearSession).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it("解绑允许使用另一在档渠道，发码绑定被解绑的实际联系方式", async () => {
     seed({ email: EMAIL });
@@ -373,5 +377,107 @@ describe("AccountSecurity", () => {
       await screen.findByRole("button", { name: "修改密码" })
     ).toBeEnabled();
     expect(auth.me).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ["验证原渠道", "requestContactVerificationCode"],
+    ["验证新渠道", "requestContactBindCode"]
+  ] as const)("%s 快速重复点击只发送一次请求", async (name, method) => {
+    let resolve!: () => void;
+    auth[method].mockReturnValueOnce(
+      new Promise<void>((r) => {
+        resolve = r;
+      })
+    );
+    await open("绑定邮箱");
+    fill("新邮箱", "new@example.com");
+    const button = screen.getByRole("button", { name });
+    act(() => {
+      fireEvent.click(button);
+      fireEvent.click(button);
+      fireEvent.click(button);
+    });
+    expect(auth[method]).toHaveBeenCalledTimes(1);
+    expect(button).toBeDisabled();
+    await act(async () => {
+      resolve();
+    });
+    expect(auth[method]).toHaveBeenCalledTimes(1);
+    expect(button).toHaveTextContent("60s 后重发");
+    expect(button).toBeDisabled();
+  });
+
+  it("原渠道发码进行中时，新渠道按钮不可点击", async () => {
+    let resolve!: () => void;
+    auth.requestContactVerificationCode.mockReturnValueOnce(
+      new Promise<void>((r) => {
+        resolve = r;
+      })
+    );
+    await open("绑定邮箱");
+    fill("新邮箱", "new@example.com");
+    fireEvent.click(screen.getByRole("button", { name: "验证原渠道" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "验证新渠道" })).toBeDisabled()
+    );
+    fireEvent.click(screen.getByRole("button", { name: "验证新渠道" }));
+    expect(auth.requestContactBindCode).not.toHaveBeenCalled();
+    await act(async () => {
+      resolve();
+    });
+    expect(auth.requestContactBindCode).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "60s 后重发" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "验证新渠道" })).toBeEnabled();
+  });
+
+  it("新渠道发码进行中时，原渠道按钮不可点击", async () => {
+    let resolve!: () => void;
+    auth.requestContactBindCode.mockReturnValueOnce(
+      new Promise<void>((r) => {
+        resolve = r;
+      })
+    );
+    await open("绑定邮箱");
+    fill("新邮箱", "new@example.com");
+    fireEvent.click(screen.getByRole("button", { name: "验证新渠道" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "验证原渠道" })).toBeDisabled()
+    );
+    fireEvent.click(screen.getByRole("button", { name: "验证原渠道" }));
+    expect(auth.requestContactVerificationCode).not.toHaveBeenCalled();
+    await act(async () => {
+      resolve();
+    });
+    expect(auth.requestContactVerificationCode).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "60s 后重发" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "验证原渠道" })).toBeEnabled();
+  });
+
+  it.each([
+    ["验证原渠道", "requestContactVerificationCode"],
+    ["验证新渠道", "requestContactBindCode"]
+  ] as const)("%s 请求失败后两个按钮恢复且可重试", async (name, method) => {
+    let reject!: (error: Error) => void;
+    auth[method].mockReturnValueOnce(
+      new Promise<void>((_, r) => {
+        reject = r;
+      })
+    );
+    await open("绑定邮箱");
+    fill("新邮箱", "new@example.com");
+    fireEvent.click(screen.getByRole("button", { name }));
+    expect(screen.getByRole("button", { name: "验证原渠道" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "验证新渠道" })).toBeDisabled();
+    await act(async () => {
+      reject(new HttpError(401, "changed", [], "invalid_otp_code"));
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent("验证码错误或已失效");
+    expect(screen.getByRole("button", { name: "验证原渠道" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "验证新渠道" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "60s 后重发" })).toBeDisabled()
+    );
+    expect(auth[method]).toHaveBeenCalledTimes(2);
   });
 });
