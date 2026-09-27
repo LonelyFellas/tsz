@@ -410,7 +410,11 @@ export function V3BasicsStep({
         wordExists: true,
         breadcrumbTitle: entryLabel ? `${entryLabel} · 创建新词条` : "创建词条",
         completedSteps: word.completed_steps,
-        showEntrySummary: false,
+        summaryHeadword: (
+          <strong className="v3-summary-headword tsz-entry-en">
+            {entryLabel || "新词条"}
+          </strong>
+        ),
         progressBadge: v3ProductProgressBadge(rows),
         progress: (
           <V3ProductProgressList

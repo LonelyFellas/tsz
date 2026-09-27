@@ -72,9 +72,10 @@
   color: #5d6574;
 }
 
-.word-creation-back:hover {
-  color: #2053ff !important;
-  background: #eef6ff !important;
+.word-creation-back:hover,
+.word-creation-back:active {
+  color: #273043 !important;
+  background: transparent !important;
 }
 
 .word-summary-entry-card {

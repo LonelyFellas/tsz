@@ -85,6 +85,33 @@ beforeEach(() => {
   state.resolveUrl.mockReset();
 });
 
+it("词形拼写使用可直接编辑的普通输入框，不显示语音编辑器入口", () => {
+  const onChange = vi.fn();
+  render(
+    <V3VoiceTextField
+      mode="spelling"
+      value={{ version: 2, text: "translate", annotations: [] }}
+      onChange={onChange}
+      ariaLabel="英式拼写"
+      nodeId="spelling-uk"
+      field="spelling"
+    />
+  );
+  const input = screen.getByLabelText("英式拼写");
+  expect(input).not.toHaveAttribute("readonly");
+  expect(input).not.toHaveClass("v3-voice-text-large-preview");
+  expect(
+    screen.queryByRole("button", { name: "打开英式拼写编辑器" })
+  ).not.toBeInTheDocument();
+  fireEvent.change(input, { target: { value: "translated" } });
+  expect(onChange).toHaveBeenCalledWith(
+    { version: 2, text: "translated", annotations: [] },
+    undefined
+  );
+  fireEvent.blur(input);
+  expect(input).not.toHaveAttribute("readonly");
+});
+
 describe("V3VoiceTextField 取消和收起态", () => {
   function Host() {
     const [value, setValue] = useState<RichTextV3>({

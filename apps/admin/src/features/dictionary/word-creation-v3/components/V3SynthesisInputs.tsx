@@ -281,15 +281,6 @@ export function V3SynthesisInputs({
   );
   return (
     <div className="word-pronunciation-synthesis" data-phoneme-locale={locale}>
-      <Typography.Text
-        type="secondary"
-        className="word-synthesis-locale-notice"
-      >
-        当前发音：{localeLabel}（{locale}）
-        {dialect === "common"
-          ? " · 通用栏按个人偏好，切换后需重新确认候选"
-          : ""}
-      </Typography.Text>
       {synthesisEditable ? (
         <>
           {(["ipa", "ups"] as const).map((alphabet) => {
@@ -319,14 +310,10 @@ export function V3SynthesisInputs({
               <div className="word-pronunciation-row" key={alphabet}>
                 <Typography.Text className="word-pronunciation-label">
                   {name}
-                  <span className="word-synthesis-locale-label">
-                    {localeLabel}
-                  </span>
                 </Typography.Text>
                 <div className="word-synthesis-input">
                   <Space.Compact className="word-synthesis-control">
                     <Button
-                      type="text"
                       icon={<SwapOutlined />}
                       aria-label={`${label}转换为 ${name}`}
                       title={
@@ -402,14 +389,6 @@ export function V3SynthesisInputs({
                       </Button>
                     )}
                   </div>
-                )}
-                {alphabet === "ups" && locale !== "en-US" && (
-                  <Typography.Text
-                    type="secondary"
-                    className="word-synthesis-locale-warning"
-                  >
-                    英式 UPS 自动转换暂未支持；可手工输入并确认对应口音后试听。
-                  </Typography.Text>
                 )}
                 {invalid && (
                   <Typography.Text className="word-field-help" type="danger">

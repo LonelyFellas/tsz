@@ -688,9 +688,18 @@ test("任务72：专用词形文案与适配条件在真实弹层中展示", asy
   await entry.click();
   const editor = page.getByLabel("第 1 组适用词义编辑", { exact: true });
   await expect(editor.getByText("适配专用词义")).toBeVisible();
-  await expect(editor).toContainText("该词形专属于适配词义，不用于其他词义。");
-  await expect(editor).toContainText("至少选一项词义才能适配，可多选。");
-  await expect(editor).toContainText("只可适配同一词性下的词义。");
+  const helpText = page.getByText(/该词形专属于适配词义，不用于其他词义。/);
+  const helpButton = editor.getByRole("button", {
+    name: "查看适配专用词义说明"
+  });
+  await expect(helpText).toBeHidden();
+  await helpButton.click();
+  await expect(helpText).toBeVisible();
+  await expect(helpText).toContainText("至少选一项词义才能适配，可多选。");
+  await expect(helpText).toContainText("只可适配同一词性下的词义。");
+  await helpButton.click();
+  await expect(helpText).toBeHidden();
+  await expect(editor).toBeVisible();
   await expect(editor.getByText(/沿轨道运行/)).toHaveCount(0);
   await expect(editor.getByRole("button", { name: "确认选择" })).toBeDisabled();
   await editor.getByLabel(/运行轨道/).check();

@@ -41,7 +41,7 @@ export function V3ActualPronunciationCopy({
   return (
     <>
       <Button
-        type="text"
+        type="default"
         icon={<SwapOutlined />}
         aria-label="从字典音标填入实际发音"
         title="从字典音标填入实际发音（不自动生成连读）"
@@ -62,7 +62,7 @@ export function V3ActualPronunciationCopy({
         history.applied === pronunciation.actual_pron &&
         !hasAnnotations && (
           <Button
-            type="text"
+            type="default"
             icon={<UndoOutlined />}
             aria-label="撤销实际发音填入"
             onClick={() => {
