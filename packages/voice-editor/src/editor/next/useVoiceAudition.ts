@@ -101,7 +101,7 @@ export function useVoiceAudition({
     setStatus("");
   }, [open, stop]);
 
-  useEffect(() => stop, [stop]);
+  useEffect(() => stop, [stop, previewAdapter]);
 
   // 正文或语速一变，已播/在飞的音频就不再代表当前内容，直接作废。
   // stop 是恒定引用（依赖链到底都是空依赖的 useCallback），进依赖数组不会多跑。

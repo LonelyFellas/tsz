@@ -146,6 +146,16 @@ describe("dictionary React Query hooks", () => {
       "outside",
       expect.objectContaining({ cursor: "contains-next" })
     );
+    for (const [, query] of dataSource.relatedSearch.mock.calls) {
+      expect(query).not.toHaveProperty("include_drafts");
+    }
+    expect(wordKeys.relatedSearch("outside", "word", "exact")).toEqual([
+      "admin-words",
+      "related-search",
+      "outside",
+      "word",
+      "exact"
+    ]);
   });
 
   it("mixed 列表与 Any 详情只调用 schema-aware facade", async () => {

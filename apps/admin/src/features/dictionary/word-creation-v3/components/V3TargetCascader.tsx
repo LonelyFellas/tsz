@@ -4,7 +4,6 @@ import {
   Alert,
   Button,
   Cascader,
-  Checkbox,
   Empty,
   Flex,
   Spin,
@@ -511,7 +510,6 @@ export function V3TargetCascader({
       ])
   );
   const [initialTarget] = useState(() => selectedTarget ?? targets[0]);
-  const [includeDrafts, setIncludeDrafts] = useState(false);
   const [searchState, setSearchState] = useState(initialSearchState);
   const searchActions = useRef<{ more: () => void; reload: () => void } | null>(
     null
@@ -537,7 +535,6 @@ export function V3TargetCascader({
             schema_version: 3,
             q: literal,
             match: "exact",
-            include_drafts: includeDrafts,
             ...(targetKind ? { kind: targetKind } : {}),
             page_size: 50,
             ...(cursor ? { cursor } : {})
@@ -590,7 +587,7 @@ export function V3TargetCascader({
       searchActions.current = null;
       controller.abort();
     };
-  }, [literal, targetKind, requests, includeDrafts]);
+  }, [literal, targetKind, requests]);
 
   const state = {
     ...searchState,
@@ -608,7 +605,7 @@ export function V3TargetCascader({
     return () => {
       context.current.active = false;
     };
-  }, [literal, targetKind, includeDrafts]);
+  }, [literal, targetKind]);
 
   const directCandidates = useMemo(() => {
     if (phraseSelection !== "entry") return state.candidates;
@@ -746,7 +743,6 @@ export function V3TargetCascader({
             q: component.literal,
             entry_id: component.target.target_word_id,
             match: "exact",
-            include_drafts: includeDrafts,
             page_size: 50,
             ...(cursor ? { cursor } : {})
           });
@@ -775,7 +771,7 @@ export function V3TargetCascader({
         if (generation.active) componentPending.current.delete(component.key);
       }
     },
-    [requests, includeDrafts]
+    [requests]
   );
   // 单选：至多一条关联。回填单条路径（存量多于一条时以第一条为准，选新词义时整组替换）。
   const selected = targets[0];
@@ -940,17 +936,6 @@ export function V3TargetCascader({
   };
   const pagination = (
     <>
-      <Checkbox
-        checked={includeDrafts}
-        onChange={(event) => setIncludeDrafts(event.target.checked)}
-      >
-        显示草稿候选
-      </Checkbox>
-      {includeDrafts && (
-        <Typography.Text type="secondary">
-          草稿目标尚未发布，保存关联不代表可以发布。
-        </Typography.Text>
-      )}
       {state.error ? (
         <Alert showIcon title={state.error} type="warning" />
       ) : null}

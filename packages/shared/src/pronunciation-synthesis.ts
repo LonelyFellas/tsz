@@ -2,6 +2,8 @@ import type {
   PronunciationSynthesisV3,
   RichTextV2,
   PhonemeLocaleV3,
+  SentenceSourceRangeV3,
+  WordPronunciationV3,
   Dialect
 } from "@tsz/types";
 
@@ -125,6 +127,65 @@ export function pronunciationSynthesisContent(
       }
     ]
   };
+}
+
+export function grammarSynthesisContent(
+  content: RichTextV2,
+  bindings: readonly {
+    source_segments: SentenceSourceRangeV3[];
+    dialect: Dialect;
+    pronunciations: WordPronunciationV3[];
+  }[],
+  locale: PhonemeLocaleV3
+): RichTextV2 {
+  const annotations: RichTextV2["annotations"] = content.annotations.filter(
+    (item) => item.type !== "phoneme"
+  );
+  const text = Array.from(content.text);
+  for (const binding of bindings) {
+    const segment = binding.source_segments[0];
+    if (
+      binding.source_segments.length !== 1 ||
+      !segment ||
+      text.slice(segment.start, segment.end).join("") !== segment.surface
+    ) {
+      throw new Error("词形关联已失效，请重新关联");
+    }
+    const first = binding.pronunciations[0];
+    const synthesis = first?.synthesis;
+    const anchoredSynthesis =
+      synthesis?.ups_words?.length === 1
+        ? {
+            ...synthesis,
+            ups_words: [{ ...synthesis.ups_words[0]!, text: segment.surface }]
+          }
+        : synthesis;
+    const resolved = pronunciationSynthesisContent(
+      segment.surface,
+      anchoredSynthesis,
+      locale,
+      binding.dialect === "common"
+    );
+    if (
+      !resolved ||
+      (!first?.synthesis?.use_spelling &&
+        binding.dialect !== "common" &&
+        pronunciationLocale(binding.dialect, "uk") !== locale)
+    ) {
+      throw new Error(
+        `“${segment.surface}”关联词形的第一个发音未配置或与当前口音不匹配，请先完善该发音`
+      );
+    }
+    for (const annotation of resolved.annotations) {
+      if (annotation.type === "phoneme")
+        annotations.push({
+          ...annotation,
+          start: segment.start + annotation.start,
+          end: segment.start + annotation.end
+        });
+    }
+  }
+  return { ...content, annotations };
 }
 
 /** Atomic conversion from actual IPA, retaining phrase word boundaries separately. */

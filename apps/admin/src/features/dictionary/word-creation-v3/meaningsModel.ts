@@ -301,8 +301,11 @@ function cloneDefinition(definition: WordDefinitionV3): WordDefinitionV3 {
 function variantSidecars(
   variant: GrammarVariantV3,
   audioAssets: GrammarVariantV3["audio_assets"] = variant.audio_assets
-): Pick<GrammarVariantV3, "voice_profile" | "audio_assets"> {
+): Pick<GrammarVariantV3, "voice_profile" | "audio_assets" | "form_links"> {
   return {
+    ...(variant.form_links === undefined
+      ? {}
+      : { form_links: structuredClone(variant.form_links) }),
     ...(variant.voice_profile === undefined
       ? {}
       : { voice_profile: structuredClone(variant.voice_profile) }),

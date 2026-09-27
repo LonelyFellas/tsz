@@ -1979,28 +1979,10 @@ describe("V3MeaningsAndExamplesStep", () => {
       score: "0",
       pending_target_headword: "outside"
     });
-    expect(relatedSearch).toHaveBeenLastCalledWith(
-      "outside",
-      "word",
-      true,
-      false
-    );
-    const beforeToggle = value();
-    fireEvent.click(screen.getByRole("switch", { name: "显示关联词草稿候选" }));
-    expect(relatedSearch).toHaveBeenLastCalledWith(
-      "outside",
-      "word",
-      true,
-      true
-    );
-    expect(value()).toEqual(beforeToggle);
-    fireEvent.click(screen.getByRole("switch", { name: "显示关联词草稿候选" }));
-    expect(relatedSearch).toHaveBeenLastCalledWith(
-      "outside",
-      "word",
-      true,
-      false
-    );
+    expect(relatedSearch).toHaveBeenLastCalledWith("outside", "word", true);
+    expect(
+      screen.queryByRole("switch", { name: "显示关联词草稿候选" })
+    ).toBeNull();
     fireEvent.click(screen.getAllByText("outside").at(-1)!);
     expect(value().pos[0]!.senses[0]!.relations[0]).toMatchObject({
       target_word_id: "external-word-1"
@@ -2050,18 +2032,13 @@ describe("V3MeaningsAndExamplesStep", () => {
       .at(-1)!;
     fireEvent.change(pendingTarget, { target: { value: "苹果" } });
     expect(within(synonymCard).getByText(/仅支持英文词条/u)).toBeVisible();
-    expect(relatedSearch).not.toHaveBeenCalledWith("苹果", "word", true, false);
+    expect(relatedSearch).not.toHaveBeenCalledWith("苹果", "word", true);
     expect(value().pos[0]!.senses[0]!.relations[2]).not.toHaveProperty(
       "pending_target_headword"
     );
 
     fireEvent.change(pendingTarget, { target: { value: "  give   up  " } });
-    expect(relatedSearch).toHaveBeenCalledWith(
-      "give up",
-      "phrase",
-      true,
-      false
-    );
+    expect(relatedSearch).toHaveBeenCalledWith("give up", "phrase", true);
     expect(value().pos[0]!.senses[0]!.relations[2]).toMatchObject({
       pending_target_headword: "give up"
     });
@@ -2190,7 +2167,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       });
       fireEvent.click(screen.getByText("保存草稿"));
       expect(onSave).toHaveBeenCalledWith(value(), "save");
-      expect(relatedSearch).toHaveBeenCalledWith("reli", "word", true, false);
+      expect(relatedSearch).toHaveBeenCalledWith("reli", "word", true);
       let targetInput = screen.getByLabelText(`${label}目标词条`);
       let metricInput = screen.getByLabelText(
         label === "近义词" ? "相似度" : label === "反义词" ? "差异度" : "关联度"
@@ -3089,7 +3066,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     }
   );
 
-  it("同词条跨页发布和草稿结果合并，新增词义单独标识且仍可选择", () => {
+  it("关联词只查询已发布候选，不提供草稿候选开关", () => {
     relatedSearch.mockImplementation((query, kind, open, includeDrafts) => {
       const result = defaultRelatedSearchImplementation(query, kind, open);
       const published = result.contains.data.pages[0]!.results[0]!;
@@ -3116,15 +3093,18 @@ describe("V3MeaningsAndExamplesStep", () => {
     fireEvent.change(screen.getByLabelText("近义词目标词条"), {
       target: { value: "beyond" }
     });
-    fireEvent.click(screen.getByRole("switch", { name: "显示关联词草稿候选" }));
+    expect(
+      screen.queryByRole("switch", { name: "显示关联词草稿候选" })
+    ).toBeNull();
+    expect(relatedSearch).toHaveBeenLastCalledWith("beyond", "word", true);
     fireEvent.click(screen.getAllByText("beyond").at(-1)!);
     fireEvent.mouseDown(screen.getByLabelText("近义词目标词义"));
-    expect(screen.getAllByText("外部词义二").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("未发布词义").length).toBeGreaterThan(0);
-    fireEvent.click(screen.getAllByText("新增草稿义").at(-1)!);
+    expect(screen.queryByText("新增草稿义")).toBeNull();
+    expect(screen.queryByText("未发布词义")).toBeNull();
+    fireEvent.click(screen.getAllByText("外部词义二").at(-1)!);
     expect(value().pos[0]!.senses[0]!.relations[0]).toMatchObject({
       target_word_id: "external-word-2",
-      target_sense_id: "new-draft-sense"
+      target_sense_id: "external-sense-2"
     });
   });
 
@@ -3153,8 +3133,8 @@ describe("V3MeaningsAndExamplesStep", () => {
     );
     expect(screen.getByText("未发布词义")).toBeVisible();
     expect(
-      screen.getByRole("switch", { name: "显示关联词草稿候选" })
-    ).not.toBeChecked();
+      screen.queryByRole("switch", { name: "显示关联词草稿候选" })
+    ).toBeNull();
     expect(value()).toEqual(initial);
   });
 

@@ -38,6 +38,26 @@ import {
   toWritableMeanings
 } from "./meaningsModel";
 
+it("语法结构词形关联在保存回显时深拷贝保留，不绑定释义", () => {
+  const canonical = structuredClone(meaningsCanonicalFixture);
+  const variant = canonical.pos[0]!.grammar_structures[0]!.variants[0]!;
+  variant.form_links = [
+    {
+      id: "link",
+      source_segments: [{ start: 0, end: 4, surface: "used" }],
+      target_word_id: "word",
+      target_pos_id: "pos",
+      target_form_id: "form",
+      target_variant_id: "variant",
+      target_dialect: "common"
+    }
+  ];
+  const writable = toWritableMeanings(canonical);
+  const saved = writable.pos[0]!.grammar_structures[0]!.variants[0]!;
+  expect(saved.form_links).toEqual(variant.form_links);
+  expect(saved.form_links).not.toBe(variant.form_links);
+});
+
 const audioAsset = (
   id: string,
   locale: AudioAssetV3["locale"]

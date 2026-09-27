@@ -8,9 +8,12 @@ import {
 } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { V3TextAssociationPicker } from "./V3TextAssociationPicker";
+import { V3GrammarFormPicker } from "./V3GrammarFormPicker";
 const search = vi.fn();
+const get = vi.fn();
 vi.mock("../api", () => ({
   createV3WordRequests: () => ({
+    get: (id: string) => get(id),
     searchComponentTargets: (input: unknown) => search(input)
   })
 }));
@@ -79,6 +82,121 @@ async function selectGive() {
     )!
   );
 }
+it("语法结构选到词形即绑定，无释义的词形也可选择，且不发送释义字段", async () => {
+  const response = giveEntryResponse();
+  response.matches[0]!.senses = [];
+  search.mockResolvedValue(response);
+  const onSelect = vi.fn();
+  render(
+    <V3GrammarFormPicker
+      kind="word"
+      segments={[segments[0]!]}
+      onSelect={onSelect}
+    />
+  );
+  await waitFor(() => {
+    fireEvent.click(document.querySelector(".ant-cascader-menu-item-content")!);
+    expect(screen.getByText(/原形 give/)).toBeVisible();
+  });
+  fireEvent.click(
+    screen.getByText(/原形 give/).closest(".ant-cascader-menu-item-content")!
+  );
+  expect(onSelect).toHaveBeenCalledWith({
+    id: expect.any(String),
+    source_segments: [segments[0]],
+    target_word_id: "entry-give",
+    target_publication_id: "pub-give",
+    target_pos_id: "pos-give",
+    target_form_id: "form-give",
+    target_variant_id: "variant-give",
+    target_dialect: "common"
+  });
+  expect(screen.queryByText("暂无可关联词义")).toBeNull();
+});
+
+it.each(["pub-give", undefined])(
+  "已关联词形仍查询列表并只读回显（%s）",
+  async (publicationId) => {
+    const response = giveEntryResponse();
+    search.mockClear();
+    search.mockResolvedValue({
+      ...response,
+      matches: publicationId
+        ? response.matches.map((candidate) => ({
+            ...candidate,
+            senses: []
+          }))
+        : []
+    });
+    get.mockResolvedValue({
+      word: {
+        id: "entry-give",
+        presentation: { label: "give" },
+        forms: {
+          pos: [
+            {
+              pos_id: "pos-give",
+              pos: "verb",
+              forms: [
+                {
+                  id: "form-give",
+                  form_type: "base",
+                  regional_variants: {
+                    mode: "common",
+                    common: {
+                      id: "variant-give",
+                      dialect: "common",
+                      spelling: "give"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    });
+    const onSelect = vi.fn();
+    render(
+      <V3GrammarFormPicker
+        kind="word"
+        segments={[segments[0]!]}
+        selected={{
+          id: "link-give",
+          source_segments: [segments[0]!],
+          target_word_id: "entry-give",
+          target_publication_id: publicationId,
+          target_pos_id: "pos-give",
+          target_form_id: "form-give",
+          target_variant_id: "variant-give",
+          target_dialect: "common"
+        }}
+        onSelect={onSelect}
+      />
+    );
+    await waitFor(() =>
+      expect(search).toHaveBeenCalledWith(
+        expect.objectContaining({
+          q: "give",
+          kind: "word"
+        })
+      )
+    );
+    expect(search.mock.lastCall?.[0]).not.toHaveProperty("include_drafts");
+    expect(screen.queryByText("显示草稿候选")).toBeNull();
+    const form = await screen.findByText(/原形 give/);
+    expect(form.closest(".ant-cascader-menu-item")).toHaveAttribute(
+      "aria-checked",
+      "true"
+    );
+    fireEvent.click(form);
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(screen.queryByText("给；交给")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "清除关联" }));
+    expect(onSelect).toHaveBeenCalledWith(undefined);
+  }
+);
+
 it("关联单词只查询并展示单词，保留稳定目标身份", async () => {
   search.mockResolvedValue({
     ...giveEntryResponse(),
@@ -97,8 +215,7 @@ it("关联单词只查询并展示单词，保留稳定目标身份", async () =
     expect.objectContaining({
       q: "give",
       kind: "word",
-      match: "exact",
-      include_drafts: false
+      match: "exact"
     })
   );
   expect(
@@ -250,16 +367,17 @@ it("关联短语只展示短语及其成分，不再提供短语本身入口", a
     expect.objectContaining({
       q: "give up",
       kind: "phrase",
-      match: "exact",
-      include_drafts: false
+      match: "exact"
     })
   );
-  // 成分展开的子查询同样按词形等值，默认仅发布目标。
+  // 成分展开的子查询同样按词形等值，仅查询发布目标。
+  for (const [input] of search.mock.calls) {
+    expect(input).not.toHaveProperty("include_drafts");
+  }
   expect(search).toHaveBeenCalledWith(
     expect.objectContaining({
       q: "give",
-      match: "exact",
-      include_drafts: false
+      match: "exact"
     })
   );
   expect(

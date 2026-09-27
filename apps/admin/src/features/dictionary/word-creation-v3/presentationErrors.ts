@@ -33,6 +33,7 @@ const ISSUE_MESSAGES = {
   duplicate_pos_meanings: "同一词性不能重复录入词义",
   grammar_required: "请至少添加一个语法结构",
   grammar_variants_invalid: "请完整填写当前方言的语法结构",
+  grammar_form_link_invalid: "词形关联无效，或第一个发音未配置，请检查后重试",
   sense_required: "请至少添加一条词义",
   level_invalid: "请选择有效的词义等级",
   sub_pos_required: "请选择细分词性",

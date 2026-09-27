@@ -589,7 +589,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "6fa1b8fd39d1eb16499ade0b5910c328ab9be48a27986b3755a18c1db4130208"
+      "fa998c4ba3c41ed0bd86b0c9fa2e03f6e31a119d3a447d2382bcc42e453b651d"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -798,7 +798,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       snapshot.operationQueryParameters[
         "get /admin/lexicon/entries/related-search"
       ].map((parameter) => parameter.name)
-    ).toContain("include_drafts");
+    ).not.toContain("include_drafts");
     expect(
       runtimeSchemaBundle.$defs.RelatedWordResultV3.properties.status
     ).toEqual({
@@ -989,12 +989,6 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       },
       {
         name: "exclude_exact",
-        in: "query",
-        required: false,
-        schema: { type: "boolean" }
-      },
-      {
-        name: "include_drafts",
         in: "query",
         required: false,
         schema: { type: "boolean" }

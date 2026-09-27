@@ -88,7 +88,7 @@ describe("voice-editor 目标查询契约", () => {
     expect(words.searchComponentTargetsV3).toBeTypeOf("function");
   });
 
-  it("发布与草稿共用完整节点身份，草稿可选择具体词义而非只能转 Pending", () => {
+  it("节点身份结构保留既有草稿引用的读取兼容", () => {
     const baseCandidate = schemaByRequiredProperties(
       "entry_id",
       "pos_id",
@@ -97,7 +97,6 @@ describe("voice-editor 目标查询契约", () => {
       "matches",
       "senses"
     );
-    // component-targets/search 带 include_drafts 时会回从未发布的草稿：没有 publication_id。
     expect(property(baseCandidate, "publication_id")).toBeDefined();
     expect(baseCandidate.required).not.toContain("publication_id");
     const sense = dereference(property(baseCandidate, "senses").items);

@@ -412,7 +412,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     emittedRef.current = serialized;
     // 自己抛出去的这份，等父组件回灌时不能再被当成外部改动。
     incomingRef.current = serialized;
-    if (mode === "association") onChange(workingValue, links);
+    if (
+      mode === "association" ||
+      (mode === "grammar" && textLinks !== undefined)
+    )
+      onChange(workingValue, links);
     else onChange(workingValue);
   }, [
     onChange,
@@ -421,7 +425,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     working.error,
     workingValue,
     links,
-    mode
+    mode,
+    textLinks
   ]);
 
   /* 自己刚抛出去、又被父组件回灌的那份要跳过，否则每次改动都会重置一遍。 */
@@ -1745,46 +1750,58 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         onUndo={undo}
         onRedo={redo}
         tools={
-          mode === "association"
+          mode === "association" ||
+          (mode === "grammar" && renderAssociationPicker)
             ? tools.flatMap<DropdownTool>((tool) =>
                 tool.key === "roles"
-                  ? (["word", "phrase"] as const).map((targetKind) => ({
-                      key: `association-${targetKind}`,
-                      label: targetKind === "word" ? "关联单词" : "关联短语",
-                      icon: <LinkOutlined />,
-                      active:
-                        brush.kind === "association" &&
-                        brush.targetKind === targetKind,
-                      dividerBefore: targetKind === "word",
-                      placement: "topLeft",
-                      stayOpen: true,
-                      content: (
-                        <div className="tsz-ve-pop">
-                          <div className="tsz-ve-pop-hint">
-                            {!renderAssociationPicker
-                              ? "当前后端尚不支持正文关联，已有关联保留。"
-                              : targetKind === "word"
-                                ? "点击一个未关联的单词，再选择关联目标。"
-                                : linkWords.length > 0
-                                  ? `已选 ${linkWords.length} 个单词：${linkSegments.map((segment) => segment.surface).join(" … ")}`
-                                  : "依次点击至少两个未关联的单词，可不连续；再次点击取消选择。"}
+                  ? [
+                      ...(mode === "grammar" ? [tool] : []),
+                      ...(mode === "grammar"
+                        ? (["word"] as const)
+                        : (["word", "phrase"] as const)
+                      ).map((targetKind): DropdownTool => ({
+                        key: `association-${targetKind}`,
+                        label:
+                          mode === "grammar"
+                            ? "关联词形"
+                            : targetKind === "word"
+                              ? "关联单词"
+                              : "关联短语",
+                        icon: <LinkOutlined />,
+                        active:
+                          brush.kind === "association" &&
+                          brush.targetKind === targetKind,
+                        dividerBefore: targetKind === "word",
+                        placement: "topLeft",
+                        stayOpen: true,
+                        content: (
+                          <div className="tsz-ve-pop">
+                            <div className="tsz-ve-pop-hint">
+                              {!renderAssociationPicker
+                                ? "当前后端尚不支持正文关联，已有关联保留。"
+                                : targetKind === "word"
+                                  ? "点击一个未关联的单词，再选择关联目标。"
+                                  : linkWords.length > 0
+                                    ? `已选 ${linkWords.length} 个单词：${linkSegments.map((segment) => segment.surface).join(" … ")}`
+                                    : "依次点击至少两个未关联的单词，可不连续；再次点击取消选择。"}
+                            </div>
+                            {renderAssociationPicker &&
+                              targetKind === "phrase" && (
+                                <Button
+                                  size="small"
+                                  disabled={readOnly || linkWords.length < 2}
+                                  onClick={() => {
+                                    setOpenTool(undefined);
+                                    setAssociationPickerOpen(true);
+                                  }}
+                                >
+                                  选择关联短语
+                                </Button>
+                              )}
                           </div>
-                          {renderAssociationPicker &&
-                            targetKind === "phrase" && (
-                              <Button
-                                size="small"
-                                disabled={readOnly || linkWords.length < 2}
-                                onClick={() => {
-                                  setOpenTool(undefined);
-                                  setAssociationPickerOpen(true);
-                                }}
-                              >
-                                选择关联短语
-                              </Button>
-                            )}
-                        </div>
-                      )
-                    }))
+                        )
+                      }))
+                    ]
                   : [tool]
               )
             : tools

@@ -303,10 +303,22 @@ export interface AudioAssetV3 {
   created_at: string;
 }
 
+export interface GrammarFormLinkV3 {
+  id: string;
+  source_segments: SentenceSourceRangeV3[];
+  target_word_id: string;
+  target_publication_id?: string;
+  target_pos_id: string;
+  target_form_id: string;
+  target_variant_id: string;
+  target_dialect: Dialect;
+}
+
 export interface GrammarVariantV3 {
   id: string;
   dialect: Dialect;
   content: RichTextV3;
+  form_links?: GrammarFormLinkV3[];
   /** 缺省 / null 表示未配置：按系统默认音色与原速处理。 */
   voice_profile?: VoiceProfileV3 | null;
   /** 挂在这段文本上的真人录音；缺省 / 空数组 = 没有音频。 */
@@ -431,7 +443,7 @@ export interface SentenceTargetCandidateFormV3 {
 
 export interface PublishedSentenceTargetCandidateV3 {
   entry_id: string;
-  /** 命中的发布版本。缺省即草稿候选（只在 `include_drafts` 时出现）。 */
+  /** 命中的发布版本；可缺省以兼容已有草稿引用。 */
   publication_id?: string;
   pos_id: string;
   base_form_id: string;
@@ -458,15 +470,13 @@ export interface SearchComponentTargetsV3Input {
   page_size?: number;
   /** 已知目标词条时直接限定目标，仍校验词面及可用状态。 */
   entry_id?: string;
-  /** 上一页返回的 `next_cursor`；换了关键字/kind/match/include_drafts 或词面数据变动后即失效（400 invalid_query）。 */
+  /** 上一页返回的 `next_cursor`；换了关键字/kind/match 或词面数据变动后即失效（400 invalid_query）。 */
   cursor?: string;
   /**
    * 匹配方式。缺省 `contains` = 词面包含关键字；`exact` = 关键字归一化后与词形等值，
    * 屈折词形（jobs / gave）照样命中原形词条。例句里点词做关联要用 `exact`。
    */
   match?: "contains" | "exact";
-  /** 把当前 V3 草稿（不限创建者，包含已发布词条的新增节点）也列为候选；草稿候选没有 `publication_id`。 */
-  include_drafts?: boolean;
 }
 
 export interface SearchComponentTargetsV3Response {
@@ -789,6 +799,7 @@ export const V3_VALIDATION_ISSUE_CODES = [
   "duplicate_pos_meanings",
   "grammar_required",
   "grammar_variants_invalid",
+  "grammar_form_link_invalid",
   "sense_required",
   "level_invalid",
   "sub_pos_required",
@@ -916,6 +927,7 @@ export type InboundReferenceKindV3 =
   | "shared_sentence"
   | "publication_sense_ref"
   | "draft_text_link"
+  | "grammar_form_link"
   | "draft_relation"
   | "phrase_component"
   | "form_group_sense_binding";

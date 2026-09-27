@@ -101,7 +101,6 @@ it("首批50条后加载第51条并选中完整目标，加载期间阻止重复
     schema_version: 3,
     q: "give",
     match: "exact",
-    include_drafts: false,
     kind: "word",
     page_size: 50,
     cursor: "page-2"
@@ -127,33 +126,37 @@ it("首批50条后加载第51条并选中完整目标，加载期间阻止重复
   expect(screen.queryByRole("button", { name: "加载更多" })).toBeNull();
 });
 
-it("默认仅发布候选，主动展开草稿重新查首页且忽略旧分页响应", async () => {
-  const latePage = pending<SearchComponentTargetsV3Response>();
-  search
-    .mockResolvedValueOnce(response([candidate(0)], "published-page-2"))
-    .mockReturnValueOnce(latePage.promise)
-    .mockResolvedValueOnce(response([candidate(1)]))
-    .mockResolvedValueOnce(response([candidate(0)]));
+it("仅查询发布候选，不显示草稿开关，查询不改动已有引用", async () => {
+  search.mockResolvedValue(response([candidate(0)]));
   const onReplace = vi.fn();
+  const selectedTarget = {
+    state: "resolved" as const,
+    target_word_id: "draft-entry",
+    target_pos_id: "draft-pos",
+    target_base_form_id: "draft-form",
+    target_form_id: "draft-form",
+    target_variant_id: "draft-variant",
+    target_sense_id: "draft-sense",
+    target_dialect: "common" as const,
+    target_form_type: "base" as const,
+    target_headword: "give",
+    target_gloss: "已有草稿引用"
+  };
   render(
-    <V3TargetCascader literal="give" targets={[]} onReplace={onReplace} />
+    <V3TargetCascader
+      literal="give"
+      targets={[selectedTarget]}
+      selectedTarget={selectedTarget}
+      readOnly
+      onReplace={onReplace}
+    />
   );
-  fireEvent.click(await screen.findByRole("button", { name: "加载更多" }));
-  expect(search.mock.calls[0]![0].include_drafts).toBe(false);
-  fireEvent.click(screen.getByRole("checkbox", { name: "显示草稿候选" }));
-  await screen.findByText("give 1");
-  expect(search.mock.calls[2]![0]).toEqual(
-    expect.objectContaining({ include_drafts: true })
-  );
-  expect(search.mock.calls[2]![0]).not.toHaveProperty("cursor");
-  latePage.resolve(response([candidate(2)]));
-  await waitFor(() =>
-    expect(screen.queryByText("give 2")).not.toBeInTheDocument()
-  );
-  fireEvent.click(screen.getByRole("checkbox", { name: "显示草稿候选" }));
   await screen.findByText("give 0");
-  expect(search.mock.calls[3]![0].include_drafts).toBe(false);
-  expect(search.mock.calls[3]![0]).not.toHaveProperty("cursor");
+  expect(search.mock.calls[0]![0]).not.toHaveProperty("include_drafts");
+  expect(
+    screen.queryByRole("checkbox", { name: "显示草稿候选" })
+  ).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "清除关联" })).toBeNull();
   expect(onReplace).not.toHaveBeenCalled();
 });
 

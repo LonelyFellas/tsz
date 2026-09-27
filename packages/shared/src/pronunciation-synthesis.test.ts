@@ -1,9 +1,151 @@
 import { describe, expect, it } from "vitest";
 import {
   convertDictionaryPhonetic,
+  grammarSynthesisContent,
   pronunciationSynthesisContent,
   synthesisInputIssue
 } from "./pronunciation-synthesis";
+
+describe("语法结构整段合成", () => {
+  const first = {
+    id: "first",
+    dict_phonetic: "",
+    actual_pron: "",
+    synthesis: {
+      alphabet: "ipa" as const,
+      ipa: "dʒɒb",
+      ups: "",
+      ipa_locale: "en-GB" as const
+    }
+  };
+  const binding = {
+    source_segments: [{ start: 4, end: 7, surface: "job" }],
+    dialect: "uk" as const,
+    pronunciations: [
+      first,
+      {
+        ...first,
+        id: "second",
+        synthesis: { ...first.synthesis, ipa: "never-read-this" }
+      }
+    ]
+  };
+  const content = { version: 2 as const, text: "😀 a job", annotations: [] };
+  it("大写正文关联小写词形时，UPS 仍覆盖当前完整单词", () => {
+    expect(
+      grammarSynthesisContent(
+        { version: 2, text: "a Job", annotations: [] },
+        [
+          {
+            source_segments: [{ start: 2, end: 5, surface: "Job" }],
+            dialect: "uk",
+            pronunciations: [
+              {
+                ...first,
+                synthesis: {
+                  alphabet: "ups",
+                  ipa: "",
+                  ups: "JH Q B",
+                  ups_locale: "en-GB",
+                  ups_words: [{ text: "job", phoneme: "JH Q B" }]
+                }
+              }
+            ]
+          }
+        ],
+        "en-GB"
+      )
+    ).toEqual({
+      version: 2,
+      text: "a Job",
+      annotations: [
+        {
+          type: "phoneme",
+          start: 2,
+          end: 5,
+          alphabet: "ups",
+          phoneme: "JH Q B"
+        }
+      ]
+    });
+  });
+  it("保持整段正文，只将关联词形的第一条发音标注到对应码点", () => {
+    expect(grammarSynthesisContent(content, [binding], "en-GB")).toEqual({
+      ...content,
+      annotations: [
+        { type: "phoneme", start: 4, end: 7, alphabet: "ipa", phoneme: "dʒɒb" }
+      ]
+    });
+  });
+  it("首条未配置或口音不匹配时明确报错，不跳到第二条或默认发音", () => {
+    expect(() =>
+      grammarSynthesisContent(
+        content,
+        [
+          {
+            ...binding,
+            pronunciations: [{ ...first, synthesis: undefined }, first]
+          }
+        ],
+        "en-GB"
+      )
+    ).toThrow(/第一个发音/);
+    expect(() => grammarSynthesisContent(content, [binding], "en-US")).toThrow(
+      /第一个发音/
+    );
+    expect(() =>
+      grammarSynthesisContent(
+        content,
+        [{ ...binding, pronunciations: [] }],
+        "en-GB"
+      )
+    ).toThrow(/第一个发音/);
+  });
+  it("旧英式词形未记录音素口音时也不借用美式发音人", () => {
+    expect(() =>
+      grammarSynthesisContent(
+        content,
+        [
+          {
+            ...binding,
+            pronunciations: [
+              {
+                ...first,
+                synthesis: { ...first.synthesis, ipa_locale: undefined }
+              }
+            ]
+          }
+        ],
+        "en-US"
+      )
+    ).toThrow(/第一个发音/);
+  });
+  it("首条明确选择按拼写合成时尊重该设置，未关联文本和停顿原样保留", () => {
+    const paused = {
+      ...content,
+      annotations: [{ type: "pause" as const, at: 3, duration_ms: 500 }]
+    };
+    expect(
+      grammarSynthesisContent(
+        paused,
+        [
+          {
+            ...binding,
+            pronunciations: [
+              {
+                ...first,
+                synthesis: { ...first.synthesis, use_spelling: true }
+              },
+              first
+            ]
+          }
+        ],
+        "en-GB"
+      )
+    ).toEqual(paused);
+    expect(grammarSynthesisContent(paused, [], "en-GB")).toEqual(paused);
+  });
+});
 
 describe("独立合成输入", () => {
   it("拼写是正文，选中音素是覆盖全码点区间的参数；未选中候选不参与", () => {
