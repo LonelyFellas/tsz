@@ -86,10 +86,10 @@ export async function mockApi(page: Page, opts: MockOptions = {}) {
       });
     }
     if (path === "/auth/password/forgot" && method === "POST") {
-      return json(route, 200, { status: "sent" });
+      return json(route, 200, { status: "ok" });
     }
     if (path === "/auth/password/reset" && method === "POST") {
-      return json(route, 200, { status: "reset" });
+      return json(route, 200, { status: "ok" });
     }
     if (path === "/auth/logout" && method === "POST") {
       return route.fulfill({ status: 204, body: "" });

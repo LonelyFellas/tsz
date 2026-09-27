@@ -54,13 +54,69 @@ describe("createEndpoints · auth", () => {
     });
   });
 
-  it("bindContact → POST /me/contact/bind 带 contact + code", () => {
+  it("requestContactVerificationCode → 发送旧渠道验证码并绑定操作和目标", () => {
     const api = createEndpoints(http);
-    api.auth.bindContact("new@qq.com", "123456");
-    expect(http.post).toHaveBeenCalledWith("/me/contact/bind", {
+    const input = {
+      operation: "bind" as const,
       contact: "new@qq.com",
-      code: "123456"
+      verification_channel: "phone" as const
+    };
+    api.auth.requestContactVerificationCode(input);
+    expect(http.post).toHaveBeenCalledWith(
+      "/me/contact/verification-code",
+      input
+    );
+  });
+
+  it("bindContact → 发送新旧两组验证码，只对invalid_token重试", () => {
+    const api = createEndpoints(http);
+    const input = {
+      contact: "new@qq.com",
+      code: "123456",
+      verification_channel: "phone" as const,
+      verification_code: "654321"
+    };
+    api.auth.bindContact(input);
+    expect(http.post).toHaveBeenCalledWith("/me/contact/bind", input, {
+      retryOnUnauthorized: expect.any(Function)
     });
+    const retry = http.post.mock.calls[0]![2].retryOnUnauthorized;
+    expect(retry("invalid_token")).toBe(true);
+    expect(retry("invalid_credentials")).toBe(false);
+    expect(retry("invalid_otp_code")).toBe(false);
+  });
+
+  it("unbindContact → 发送渠道与旧验证码，不盲目重放", () => {
+    const api = createEndpoints(http);
+    const input = {
+      channel: "email" as const,
+      verification_channel: "phone" as const,
+      verification_code: "654321"
+    };
+    api.auth.unbindContact(input);
+    expect(http.post).toHaveBeenCalledWith("/me/contact/unbind", input, {
+      retryOnUnauthorized: expect.any(Function)
+    });
+    const retry = http.post.mock.calls[0]![2].retryOnUnauthorized;
+    expect(retry("invalid_token")).toBe(true);
+    expect(retry("invalid_credentials")).toBe(false);
+    expect(retry("invalid_otp_code")).toBe(false);
+  });
+
+  it("changePassword → 保留当前密码原串，凭据错误不重试", () => {
+    const api = createEndpoints(http);
+    const input = {
+      current_password: "MixedCase!234",
+      new_password: "NewPassword123"
+    };
+    api.auth.changePassword(input);
+    expect(http.post).toHaveBeenCalledWith("/auth/password/change", input, {
+      retryOnUnauthorized: expect.any(Function)
+    });
+    const retry = http.post.mock.calls[0]![2].retryOnUnauthorized;
+    expect(retry("invalid_token")).toBe(true);
+    expect(retry("invalid_credentials")).toBe(false);
+    expect(retry("invalid_otp_code")).toBe(false);
   });
 
   it("register → POST /auth/register 带手机号、密码和注册验证码", () => {

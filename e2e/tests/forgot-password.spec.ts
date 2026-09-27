@@ -2,6 +2,45 @@ import { expect, test } from "@playwright/test";
 import { mockApi } from "./support/mockApi";
 
 test.describe("找回密码端到端流程", () => {
+  test("邮箱找回使用规范化账号调用发码与重置端点", async ({ page }) => {
+    await mockApi(page, { authenticated: false });
+    const requests: { path: string; body: unknown }[] = [];
+    await page.route("**/api/v1/auth/password/*", async (route) => {
+      requests.push({
+        path: new URL(route.request().url()).pathname,
+        body: route.request().postDataJSON()
+      });
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ status: "ok" })
+      });
+    });
+    await page.goto("/forgot-password");
+    await page.getByRole("button", { name: "邮箱", exact: true }).click();
+    await page.getByPlaceholder("请输入邮箱").fill("Recovery@EXAMPLE.com");
+    await page.getByRole("button", { name: "获取验证码" }).click();
+    await expect(page.getByText(/后重发/)).toBeVisible();
+    await page.getByPlaceholder("请输入验证码").fill("000000");
+    await page.getByPlaceholder("请输入新密码").fill("NewPassword123");
+    await page.getByRole("button", { name: "重置密码" }).click();
+    await expect(page).toHaveURL(/\/login\?reset=success$/);
+    expect(requests).toEqual([
+      {
+        path: "/api/v1/auth/password/forgot",
+        body: { identifier: "recovery@example.com" }
+      },
+      {
+        path: "/api/v1/auth/password/reset",
+        body: {
+          identifier: "recovery@example.com",
+          code: "000000",
+          new_password: "NEWPASSWORD123"
+        }
+      }
+    ]);
+  });
+
   test("登录页 → 忘记密码 → 重置成功 → 跳回登录并提示", async ({ page }) => {
     await mockApi(page, { authenticated: false });
 

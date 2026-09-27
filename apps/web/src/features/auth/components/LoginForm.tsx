@@ -89,6 +89,7 @@ export function LoginForm() {
 
   // 从找回密码流程跳回时展示成功提示，引导用户用新密码登录。
   const resetSuccess = searchParams.get("reset") === "success";
+  const securitySuccess = searchParams.get("security") === "success";
   // 从注销账号流程跳回时展示成功提示。
   const deletedSuccess = searchParams.get("deleted") === "success";
   // 注册成功但自动登录失败(网络抖动等)跳回时展示成功提示，避免误以为注册失败。
@@ -197,6 +198,15 @@ export function LoginForm() {
       <div className="flex flex-1 items-center justify-center px-8 py-16 bg-surface">
         <div className="w-full max-w-sm">
           <h1 className="text-3xl font-bold text-foreground mb-8">欢迎回来</h1>
+
+          {securitySuccess && (
+            <p
+              role="status"
+              className="mb-6 rounded-lg bg-success/10 px-4 py-3 text-sm text-success"
+            >
+              账号安全信息已更新，请使用当前绑定的手机号或邮箱重新登录。
+            </p>
+          )}
 
           {resetSuccess && (
             <p className="mb-6 rounded-lg bg-success/10 px-4 py-3 text-sm text-success">

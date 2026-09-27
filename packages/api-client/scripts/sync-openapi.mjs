@@ -98,6 +98,7 @@ if (!spec?.paths) {
   throw new Error(`spec 无 paths 字段: ${source}`);
 }
 const contractSchemaNames = [
+  "PasswordStatus",
   "FormTypeConfig",
   "FormTypeCatalogItem",
   "CatalogResponse",
@@ -475,6 +476,8 @@ for (const [rawPath, item] of Object.entries(spec.paths)) {
     const operationKey = `${method} ${path}`;
     if (
       rawPath.startsWith(ADMIN_LEXICON_PREFIX) ||
+      rawPath.startsWith(`${API_PREFIX}/auth/password/`) ||
+      rawPath.startsWith(`${API_PREFIX}/me/contact/`) ||
       rawPath.startsWith(`${API_PREFIX}/admin/settings/form-types`) ||
       rawPath === `${API_PREFIX}/admin/settings/parts-of-speech/catalog`
     ) {

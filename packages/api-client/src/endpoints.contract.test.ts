@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { V3_VALIDATION_ISSUE_CODES } from "@tsz/types";
+import {
+  V3_VALIDATION_ISSUE_CODES,
+  type BindContactRequest,
+  type UnbindContactRequest,
+  type ContactVerificationCodeRequest,
+  type ChangePasswordRequest
+} from "@tsz/types";
 import { createAdminEndpoints } from "./admin";
 import runtimeSchemaBundle from "./admin-word-v3.runtime-schema.json";
 import { createEndpoints } from "./endpoints";
@@ -41,16 +47,11 @@ const PENDING = new Set<string>([
   // ---- 后端已切换为 tsz-rust(重写进行中),spec 只含 auth 核心 7 条路由。 ----
   // 以下按 tsz-rust 落地节奏逐步从白名单移除(T 系列见 tsz-rust/docs/frontend-integration.md §6)。
 
-  // 个人资料 / 学习设置 / 联系方式 / 头像(tsz-rust 未实现)。
+  // 个人资料 / 学习设置 / 头像(tsz-rust 未实现)。
   "patch /me",
-  "post /me/contact/bind-code",
-  "post /me/contact/bind",
   "put /me/learning-settings",
   "post /me/avatar/upload-url",
   "post /me/avatar",
-  // 找回密码(tsz-rust 未实现)。
-  "post /auth/password/forgot",
-  "post /auth/password/reset",
   // 教师申请:ApplyTeacherForm 在用,但后端 spec 暂无此路由。
   "post /auth/apply-teacher",
   // 词库 / 词表 / 评论 / 任务:目前全是前端 mock(useWordLists 等),后端未实现。
@@ -167,6 +168,96 @@ function collectComponentSchemaRefs(value: unknown): Set<string> {
 
   return refs;
 }
+
+describe("账号安全请求与状态码契约", () => {
+  const cases = [
+    [
+      "/me/contact/verification-code",
+      {
+        operation: "bind",
+        contact: "new@example.com",
+        verification_channel: "phone"
+      } satisfies ContactVerificationCodeRequest,
+      "204"
+    ],
+    ["/me/contact/bind-code", { contact: "new@example.com" }, "204"],
+    [
+      "/me/contact/bind",
+      {
+        contact: "new@example.com",
+        code: "123456",
+        verification_channel: "phone",
+        verification_code: "654321"
+      } satisfies BindContactRequest,
+      "204"
+    ],
+    [
+      "/me/contact/unbind",
+      {
+        channel: "email",
+        verification_channel: "phone",
+        verification_code: "654321"
+      } satisfies UnbindContactRequest,
+      "204"
+    ],
+    [
+      "/auth/password/change",
+      {
+        current_password: "old",
+        new_password: "NewPassword123"
+      } satisfies ChangePasswordRequest,
+      "204"
+    ],
+    ["/auth/password/forgot", { identifier: "user@example.com" }, "200"],
+    [
+      "/auth/password/reset",
+      {
+        identifier: "user@example.com",
+        code: "123456",
+        new_password: "NewPassword123"
+      },
+      "200"
+    ]
+  ] as const;
+
+  it.each(cases)(
+    "%s 请求字段、必填项与成功状态来自真实spec",
+    (path, body, status) => {
+      const contract = snapshot.operationSchemas[`post ${path}`];
+      const responses: Record<string, unknown> = contract.responses;
+      expect(contract).toBeDefined();
+      const name = contract.request.$ref.split("/").at(-1)!;
+      const schemas = snapshot.schemas as Record<
+        string,
+        {
+          required?: string[];
+          properties?: Record<string, unknown>;
+          additionalProperties?: boolean;
+        }
+      >;
+      const schema = schemas[name]!;
+      expect(schema.required?.slice().sort()).toEqual(Object.keys(body).sort());
+      expect(Object.keys(schema.properties ?? {}).sort()).toEqual(
+        Object.keys(body).sort()
+      );
+      expect(schema.additionalProperties).toBe(false);
+      expect(responses).toHaveProperty(status);
+      if (status === "204") expect(responses[status]).toBeNull();
+      else
+        expect(responses[status]).toEqual({
+          $ref: "#/components/schemas/PasswordStatus"
+        });
+    }
+  );
+
+  it("渠道和操作枚举不漂移，密码状态响应不带会话或内部安全版本", () => {
+    expect(snapshot.schemas.ContactChannel.enum).toEqual(["phone", "email"]);
+    expect(snapshot.schemas.ContactOperation.enum).toEqual(["bind", "unbind"]);
+    expect(Object.keys(snapshot.schemas.PasswordStatus.properties)).toEqual([
+      "status"
+    ]);
+  });
+});
 
 describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
   it("Admin Lexicon 每个非空 request root 的完整 schema closure 都已入快照", () => {
@@ -498,7 +589,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "26390d49efe4a3924089f99789e3bce71208c18eda5384fd7c58eef0568e46f5"
+      "519a05239d0843428298f79febdaa0f146ba168d2c1bee6b2ec7ac8e6b003bd3"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");

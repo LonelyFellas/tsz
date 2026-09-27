@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "@/test/render";
+import { HttpError } from "@tsz/api-client";
 import { ForgotPasswordForm } from "./ForgotPasswordForm";
 
 const mockPush = vi.fn();
@@ -119,7 +120,7 @@ describe("ForgotPasswordForm — 获取验证码", () => {
 
   it("发送过于频繁(429) → 显示中文文案", async () => {
     mockForgot.mockRejectedValueOnce(
-      new Error("too many code requests, try again later")
+      new HttpError(429, "changed detail", [], "otp_rate_limited")
     );
     renderWithProviders(<ForgotPasswordForm />);
     const user = userEvent.setup();
@@ -156,7 +157,9 @@ describe("ForgotPasswordForm — 重置流程", () => {
   });
 
   it("验证码错误/失效 → 显示中文提示且不跳转", async () => {
-    mockReset.mockRejectedValueOnce(new Error("invalid or expired reset code"));
+    mockReset.mockRejectedValueOnce(
+      new HttpError(401, "changed detail", [], "invalid_otp_code")
+    );
     renderWithProviders(<ForgotPasswordForm />);
     const user = userEvent.setup();
 
@@ -165,14 +168,16 @@ describe("ForgotPasswordForm — 重置流程", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("验证码错误或已失效，请重新获取")
+        screen.getByText("验证码错误或已失效，请重新获取所需的全部验证码")
       ).toBeInTheDocument();
     });
     expect(mockPush).not.toHaveBeenCalled();
   });
 
   it("账号被禁用 → 显示中文提示", async () => {
-    mockReset.mockRejectedValueOnce(new Error("account disabled"));
+    mockReset.mockRejectedValueOnce(
+      new HttpError(403, "changed detail", [], "account_disabled")
+    );
     renderWithProviders(<ForgotPasswordForm />);
     const user = userEvent.setup();
 
@@ -181,7 +186,7 @@ describe("ForgotPasswordForm — 重置流程", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("该账号已被禁用，无法重置密码")
+        screen.getByText("账号已停用，请联系平台客服")
       ).toBeInTheDocument();
     });
   });
@@ -195,7 +200,7 @@ describe("ForgotPasswordForm — 重置流程", () => {
     await user.click(screen.getByRole("button", { name: "重置密码" }));
 
     await waitFor(() => {
-      expect(screen.getByText("操作失败，请稍后重试")).toBeInTheDocument();
+      expect(screen.getByText("网络异常，请稍后重试")).toBeInTheDocument();
     });
   });
 
@@ -263,8 +268,90 @@ describe("ForgotPasswordForm — 交互细节", () => {
     await user.click(screen.getByRole("button", { name: "获取验证码" }));
 
     await waitFor(() => {
-      expect(screen.getByText("操作失败，请稍后重试")).toBeInTheDocument();
+      expect(screen.getByText("网络异常，请稍后重试")).toBeInTheDocument();
     });
+  });
+});
+
+describe("ForgotPasswordForm — 安全边界", () => {
+  it("验证码必须为六位，修改目标清空旧码", async () => {
+    renderWithProviders(<ForgotPasswordForm />);
+    const user = userEvent.setup();
+    await fillForm(user, { code: "12345" });
+    expect(screen.getByRole("button", { name: "重置密码" })).toBeDisabled();
+    await user.type(screen.getByPlaceholderText("请输入验证码"), "6");
+    expect(screen.getByRole("button", { name: "重置密码" })).toBeEnabled();
+    await user.clear(screen.getByPlaceholderText("请输入手机号"));
+    expect(screen.getByPlaceholderText("请输入验证码")).toHaveValue("");
+  });
+
+  it("邮箱发码与重置使用同一规范化值", async () => {
+    mockForgot.mockResolvedValueOnce({ status: "ok" });
+    mockReset.mockResolvedValueOnce({ status: "ok" });
+    renderWithProviders(<ForgotPasswordForm />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "邮箱" }));
+    fireEvent.change(screen.getByPlaceholderText("请输入邮箱"), {
+      target: { value: "Alice@EXAMPLE.com" }
+    });
+    await user.click(screen.getByRole("button", { name: "获取验证码" }));
+    expect(mockForgot).toHaveBeenCalledWith("alice@example.com");
+    await user.type(screen.getByPlaceholderText("请输入验证码"), VALID_CODE);
+    await user.type(
+      screen.getByPlaceholderText("请输入新密码"),
+      VALID_PASSWORD
+    );
+    await user.click(screen.getByRole("button", { name: "重置密码" }));
+    expect(mockReset).toHaveBeenCalledWith(
+      "alice@example.com",
+      VALID_CODE,
+      VALID_PASSWORD.toUpperCase()
+    );
+  });
+
+  it("发码进行中锁定输入、切换和重置，避免使用过期目标", async () => {
+    let release!: (value: { status: string }) => void;
+    mockForgot.mockReturnValueOnce(
+      new Promise((resolve) => {
+        release = resolve;
+      })
+    );
+    const { container } = renderWithProviders(<ForgotPasswordForm />);
+    const user = userEvent.setup();
+    await fillForm(user);
+    await user.click(screen.getByRole("button", { name: "获取验证码" }));
+    expect(screen.getByPlaceholderText("请输入手机号")).toBeDisabled();
+    expect(screen.getByPlaceholderText("请输入验证码")).toBeDisabled();
+    expect(screen.getByPlaceholderText("请输入新密码")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "邮箱" })).toBeDisabled();
+    fireEvent.submit(container.querySelector("form")!);
+    expect(mockReset).not.toHaveBeenCalled();
+    release({ status: "ok" });
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText("请输入手机号")).toBeEnabled()
+    );
+    expect(screen.getByPlaceholderText("请输入验证码")).toHaveValue("");
+  });
+
+  it("重置进行中重复submit不重发，发码与渠道切换也锁定", async () => {
+    let release!: (value: { status: string }) => void;
+    mockReset.mockReturnValueOnce(
+      new Promise((resolve) => {
+        release = resolve;
+      })
+    );
+    const { container } = renderWithProviders(<ForgotPasswordForm />);
+    const user = userEvent.setup();
+    await fillForm(user);
+    await user.click(screen.getByRole("button", { name: "重置密码" }));
+    fireEvent.submit(container.querySelector("form")!);
+    expect(mockReset).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "获取验证码" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "邮箱" })).toBeDisabled();
+    release({ status: "ok" });
+    await waitFor(() =>
+      expect(mockPush).toHaveBeenCalledWith("/login?reset=success")
+    );
   });
 });
 

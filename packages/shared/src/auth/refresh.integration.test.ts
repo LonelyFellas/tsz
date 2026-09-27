@@ -234,6 +234,86 @@ describe.each(["web", "admin"] as const)("%s HTTP + auth runtime", (realm) => {
   });
 });
 
+describe("web 账号安全真实请求层", () => {
+  const operations = [
+    [
+      "/me/contact/bind",
+      (rt: ReturnType<typeof createAuthRuntime>) =>
+        rt.api.auth.bindContact({
+          contact: "new@example.com",
+          code: "123456",
+          verification_channel: "phone",
+          verification_code: "654321"
+        })
+    ],
+    [
+      "/me/contact/unbind",
+      (rt: ReturnType<typeof createAuthRuntime>) =>
+        rt.api.auth.unbindContact({
+          channel: "email",
+          verification_channel: "phone",
+          verification_code: "654321"
+        })
+    ],
+    [
+      "/auth/password/change",
+      (rt: ReturnType<typeof createAuthRuntime>) =>
+        rt.api.auth.changePassword({
+          current_password: "old-password",
+          new_password: "newPassword123"
+        })
+    ]
+  ] as const;
+
+  it.each(operations)(
+    "%s 业务401不刷新、不重复消费凭据",
+    async (path, request) => {
+      vi.useFakeTimers();
+      const rt = createAuthRuntime({ baseUrl: "/api/v1" });
+      rt.persistSession({ access_token: "old", expires_in: 900 });
+      const fetch = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(response(401, { code: "invalid_otp_code" }));
+      await expect(request(rt)).rejects.toMatchObject({
+        code: "invalid_otp_code"
+      });
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(fetch.mock.calls[0]?.[0]).toBe(`/api/v1${path}`);
+      expect(rt.tokens.getToken()).toBe("old");
+      rt.tokens.setAccessToken(null);
+    }
+  );
+
+  it.each(operations)(
+    "%s 仅token过期时刷新并重试一次",
+    async (path, request) => {
+      vi.useFakeTimers();
+      const rt = createAuthRuntime({ baseUrl: "/api/v1" });
+      rt.persistSession({ access_token: "old", expires_in: 900 });
+      const fetch = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(response(401, { code: "invalid_token" }))
+        .mockResolvedValueOnce(
+          response(200, { access_token: "new", expires_in: 900 })
+        )
+        .mockResolvedValueOnce(response(204));
+      await request(rt);
+      expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+        `/api/v1${path}`,
+        "/api/v1/auth/refresh",
+        `/api/v1${path}`
+      ]);
+      expect(
+        new Headers(fetch.mock.calls[2]?.[1]?.headers).get("Authorization")
+      ).toBe("Bearer new");
+      expect(fetch.mock.calls[2]?.[1]?.body).toBe(
+        fetch.mock.calls[0]?.[1]?.body
+      );
+      rt.tokens.setAccessToken(null);
+    }
+  );
+});
+
 describe("admin 改密真实请求层", () => {
   it("invalid_credentials 仅改密一次、refresh 零次", async () => {
     vi.useFakeTimers();
