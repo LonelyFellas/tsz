@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { mockApi } from "./support/mockApi";
+import { mockApi, TEST_USER } from "./support/mockApi";
 
 test.describe("鉴权与引导端到端流程", () => {
   for (const [path, title] of [
@@ -71,6 +71,145 @@ test.describe("鉴权与引导端到端流程", () => {
     await expect(page).toHaveURL(/\/$/);
     expect(registerCount).toBe(1);
     expect(meCount).toBe(2);
+  });
+
+  test("邮箱登录失败 → 对应注册入口 → email-only 会话，资料失败不重复注册", async ({
+    page
+  }, testInfo) => {
+    await mockApi(page, { authenticated: false });
+    const user = {
+      ...TEST_USER,
+      phone: undefined,
+      email: "student@example.com"
+    };
+    let registrations = 0;
+    let profiles = 0;
+    await page.route("**/api/v1/auth/login", (route) =>
+      route.fulfill({
+        status: 401,
+        contentType: "application/problem+json",
+        body: JSON.stringify({
+          type: "urn:tsz:problem:invalid_credentials",
+          title: "Unauthorized",
+          status: 401,
+          code: "invalid_credentials",
+          detail: "invalid credentials"
+        })
+      })
+    );
+    await page.route("**/api/v1/auth/register", async (route) => {
+      registrations++;
+      expect(route.request().postDataJSON()).toEqual({
+        email: "student@example.com",
+        password: "ABC12345678",
+        code: "123456"
+      });
+      await route.fulfill({
+        status: 201,
+        json: {
+          user,
+          access_token: "test-access-token",
+          expires_in: 900,
+          refresh_token_expires_at: 9999999999
+        }
+      });
+    });
+    await page.route("**/api/v1/auth/me", async (route) => {
+      profiles++;
+      await route.fulfill(
+        profiles === 1 ? { status: 503, body: "unavailable" } : { json: user }
+      );
+    });
+    await page.goto("/login?redirect=%2Fstudent%2Fpractice");
+    await page
+      .getByPlaceholder("请输入手机号/邮箱号码")
+      .fill("Student@EXAMPLE.com");
+    await page.getByPlaceholder("请输入登录密码").fill("abc12345678");
+    await page.getByRole("button", { name: "立即登录" }).click();
+    await expect(page.getByText("账号或密码错误，请重新输入")).toBeVisible();
+    expect(registrations).toBe(0);
+    await page.getByRole("button", { name: "没有账号，立即注册" }).click();
+    await expect(page).toHaveURL(/\/register\?method=email&redirect=/);
+    await page.getByPlaceholder("请输入邮箱").fill("　Student@EXAMPLE.com ");
+    const sent = page.waitForRequest("**/api/v1/otp/send");
+    await page.getByRole("button", { name: "获取验证码" }).click();
+    expect((await sent).postDataJSON()).toEqual({
+      email: "student@example.com",
+      purpose: "register"
+    });
+    await page.getByPlaceholder("请输入登录密码").fill("abc12345678");
+    await page.getByPlaceholder("请输入验证码").fill("1234");
+    await expect(page.getByRole("button", { name: "立即注册" })).toBeDisabled();
+    await page.getByPlaceholder("请输入验证码").fill("123456");
+    await page.screenshot({
+      path: testInfo.outputPath("email-registration.png")
+    });
+    await page.getByRole("button", { name: "立即注册" }).click();
+    await expect(
+      page.getByText("注册成功，但加载账号信息失败，请重试")
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "手机", exact: true })
+    ).toBeDisabled();
+    await page.getByRole("button", { name: "重试加载" }).click();
+    await expect(page).toHaveURL(/\/student\/practice$/);
+    expect(registrations).toBe(1);
+    expect(profiles).toBe(2);
+  });
+
+  test("窄屏邮箱注册切换与重复账号提示", async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await mockApi(page, { authenticated: false });
+    await page.route("**/api/v1/auth/register", (route) =>
+      route.fulfill({
+        status: 409,
+        contentType: "application/problem+json",
+        body: JSON.stringify({
+          type: "urn:tsz:problem:user_already_exists",
+          title: "Conflict",
+          status: 409,
+          code: "user_already_exists",
+          field: "email",
+          detail: "user already exists"
+        })
+      })
+    );
+    await page.goto("/register");
+    await page.getByPlaceholder("请输入手机号").fill("13800138000");
+    await page.getByPlaceholder("请输入验证码").fill("123456");
+    await page.getByRole("button", { name: "邮箱", exact: true }).click();
+    await expect(page.getByPlaceholder("请输入验证码")).toHaveValue("");
+    await page.getByPlaceholder("请输入邮箱").fill("user@example.com");
+    await page.getByPlaceholder("请输入验证码").fill("123456");
+    await page.getByPlaceholder("请输入登录密码").fill("abc12345678");
+    await page.getByRole("button", { name: "立即注册" }).click();
+    await expect(page.getByText("该邮箱已注册，请直接登录")).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth
+      )
+    ).toBe(true);
+    await page.screenshot({
+      path: testInfo.outputPath("email-registration-mobile.png")
+    });
+    await page.getByRole("button", { name: "已有账号,去登录" }).click();
+    await expect(page).toHaveURL(/\/login$/);
+  });
+
+  test("邮箱密码原串登录成功", async ({ page }) => {
+    await mockApi(page, { authenticated: false });
+    await page.goto("/login");
+    await page
+      .getByPlaceholder("请输入手机号/邮箱号码")
+      .fill("Student@EXAMPLE.com");
+    await page.getByPlaceholder("请输入登录密码").fill("OldPass!");
+    const login = page.waitForRequest("**/api/v1/auth/login");
+    await page.getByRole("button", { name: "立即登录" }).click();
+    expect((await login).postDataJSON()).toEqual({
+      identifier: "student@example.com",
+      password: "OldPass!"
+    });
+    await expect(page.getByRole("button", { name: "账户菜单" })).toBeVisible();
   });
 
   test("显式访问引导页 → 选择难度与口音 → 保存后进入主页", async ({ page }) => {

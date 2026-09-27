@@ -74,6 +74,90 @@ beforeEach(() => {
   } as never);
 });
 
+describe("LoginForm — 注册登录边界", () => {
+  it.each(["1234", "12345", "1234567", "12345678"])(
+    "拒绝非六位验证码 %s",
+    async (code) => {
+      renderWithProviders(<LoginForm />);
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "手机验证" }));
+      await user.type(
+        screen.getByPlaceholderText("请输入手机号"),
+        "13800138000"
+      );
+      await user.type(
+        screen.getByPlaceholderText("请输入验证码"),
+        code + "{Enter}"
+      );
+      expect(screen.getByRole("button", { name: "立即登录" })).toBeDisabled();
+      expect(mockLoginWithCode).not.toHaveBeenCalled();
+    }
+  );
+
+  it("邮箱失败引导邮箱注册并保留回跳，不传联系方式或密码到URL", async () => {
+    mockRedirectParam = "/student/practice";
+    mockLogin.mockRejectedValueOnce(new Error("invalid credentials"));
+    renderWithProviders(<LoginForm />);
+    const user = userEvent.setup();
+    await user.type(
+      screen.getByPlaceholderText("请输入手机号/邮箱号码"),
+      "Student@EXAMPLE.com"
+    );
+    await user.type(screen.getByPlaceholderText("请输入登录密码"), "OldPass!");
+    await user.click(screen.getByRole("button", { name: "立即登录" }));
+    await screen.findByText("账号或密码错误，请重新输入");
+    expect(mockLogin).toHaveBeenCalledWith("student@example.com", "OldPass!");
+    await user.click(
+      screen.getByRole("button", { name: "没有账号，立即注册" })
+    );
+    expect(mockPush).toHaveBeenCalledWith(
+      "/register?method=email&redirect=%2Fstudent%2Fpractice"
+    );
+  });
+
+  it("验证码登录失败保留防枚举提示并提供注册入口", async () => {
+    mockLoginWithCode.mockRejectedValueOnce(new Error("invalid credentials"));
+    renderWithProviders(<LoginForm />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "邮箱验证" }));
+    await user.type(
+      screen.getByPlaceholderText("请输入邮箱"),
+      "user@example.com"
+    );
+    await user.type(screen.getByPlaceholderText("请输入验证码"), "123456");
+    await user.click(screen.getByRole("button", { name: "立即登录" }));
+    await screen.findByText("登录凭据无效；尚未注册请先注册");
+    await user.click(
+      screen.getByRole("button", { name: "没有账号，立即注册" })
+    );
+    expect(mockPush).toHaveBeenCalledWith("/register?method=email");
+  });
+
+  it("发码时不能改账号或切换，换号后清空旧验证码及冷却", async () => {
+    let finish!: () => void;
+    mockSendCode.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      })
+    );
+    renderWithProviders(<LoginForm />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "手机验证" }));
+    const input = screen.getByPlaceholderText("请输入手机号");
+    await user.type(input, "13800138000");
+    await user.click(screen.getByRole("button", { name: "获取验证码" }));
+    expect(input).toBeDisabled();
+    expect(screen.getByRole("button", { name: "邮箱验证" })).toBeDisabled();
+    finish();
+    await screen.findByRole("button", { name: "60s 后重发" });
+    await user.type(screen.getByPlaceholderText("请输入验证码"), "123456");
+    await user.clear(input);
+    await user.type(input, "13900139000");
+    expect(screen.getByPlaceholderText("请输入验证码")).toHaveValue("");
+    expect(screen.getByRole("button", { name: "获取验证码" })).toBeEnabled();
+  });
+});
+
 // ── 按钮状态 ──────────────────────────────────────────
 describe("LoginForm — 按钮状态", () => {
   // 默认 tab 即为「账号密码」，无需再切换。
@@ -146,7 +230,7 @@ describe("LoginForm — 登录流程", () => {
     await fillAndSubmit();
 
     await waitFor(() => {
-      expect(mockLogin).toHaveBeenCalledWith("13800138000", "ABC123");
+      expect(mockLogin).toHaveBeenCalledWith("13800138000", "abc123");
       expect(useUserStore.getState()).toMatchObject({
         user: ME_USER,
         onboarded: true,
@@ -460,7 +544,7 @@ describe("LoginForm — 回车提交", () => {
     await user.type(screen.getByPlaceholderText("请输入登录密码"), "{Enter}");
 
     await waitFor(() =>
-      expect(mockLogin).toHaveBeenCalledWith("13800138000", "ABC123")
+      expect(mockLogin).toHaveBeenCalledWith("13800138000", "abc123")
     );
   });
 

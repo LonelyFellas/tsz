@@ -81,6 +81,25 @@ describe("createEndpoints · auth", () => {
     );
   });
 
+  it("邮箱注册只传邮箱并使用独立注册用途发码", () => {
+    const api = createEndpoints(http);
+    const payload = {
+      email: "student@example.com",
+      password: "PASSWORD123",
+      code: "123456"
+    };
+    api.auth.register(payload);
+    expect(http.post).toHaveBeenCalledWith("/auth/register", payload, {
+      skipAuth: true
+    });
+    api.auth.sendCode(payload.email, "register");
+    expect(http.post).toHaveBeenLastCalledWith(
+      "/otp/send",
+      { email: payload.email, purpose: "register" },
+      { skipAuth: true }
+    );
+  });
+
   it("sendCode → 注册用途原样传 register", () => {
     const api = createEndpoints(http);
     api.auth.sendCode("13800138000", "register");
