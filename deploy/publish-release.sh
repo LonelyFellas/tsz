@@ -87,7 +87,7 @@ if [[ "$component" = web ]]; then
   systemctl enable --now "tsz-web@$new_port.service"
   ready=false
   for attempt in {1..15}; do
-    if curl -fsS -m 2 "http://127.0.0.1:$new_port/" -o /dev/null; then ready=true; break; fi
+    if curl --noproxy '*' -fsS -m 2 "http://127.0.0.1:$new_port/" -o /dev/null; then ready=true; break; fi
     sleep 1
   done
   [[ "$ready" = true ]]
@@ -110,7 +110,7 @@ else host=test.tianshengzhi.com; api_path=auth/me; fi
 # reload 返回时旧 worker 可能仍在处理连接；以新版本探测成功为准。
 ready=false
 for attempt in {1..10}; do
-  if curl -fsS -m 3 --resolve "$host:443:127.0.0.1" "https://$host/version.json" > served-version.json &&
+  if curl --noproxy '*' -fsS -m 3 --resolve "$host:443:127.0.0.1" "https://$host/version.json" > served-version.json &&
     "$node_bin" --input-type=module -e 'import fs from "node:fs"; if (JSON.parse(fs.readFileSync("served-version.json")).release_id !== process.argv[1]) process.exit(1)' "$id"; then
     ready=true
     break
@@ -118,16 +118,21 @@ for attempt in {1..10}; do
   sleep 1
 done
 [[ "$ready" = true ]]
-curl -fsS -m 8 --resolve "$host:443:127.0.0.1" "https://$host/" -o /dev/null
-code="$(curl -sS -m 8 -o /dev/null -w '%{http_code}' --resolve "$host:443:127.0.0.1" "https://$host/api/v1/$api_path")"
+curl --noproxy '*' -fsS -m 8 --resolve "$host:443:127.0.0.1" "https://$host/" -o /dev/null
+code="$(curl --noproxy '*' -sS -m 8 -o /dev/null -w '%{http_code}' --resolve "$host:443:127.0.0.1" "https://$host/api/v1/$api_path")"
 [[ "$code" = 401 ]]
-if [[ "$component" = admin ]]; then
-  curl -fsS -m 8 http://127.0.0.1:8081/login -o /dev/null
-  code="$(curl -sS -m 8 -o /dev/null -w '%{http_code}' http://127.0.0.1:8081/api/v1/admin/profile)"
-  [[ "$code" = 401 ]]
-else
-  curl -fsS -m 8 http://127.0.0.1/ -o /dev/null
-fi
+for port in 80 8081; do
+  for http_host in unknown.invalid 47.121.142.19; do
+    for path in / /login /api/v1/auth/me /api/v1/admin/profile; do
+      code="$(curl --noproxy '*' -sS -m 8 -o /dev/null -w '%{http_code}' -H "Host: $http_host" "http://127.0.0.1:$port$path")"
+      [[ "$code" = 404 ]] || { echo "明文入口未关闭：$http_host:$port$path ($code)，请核对独立 IP 配置" >&2; exit 1; }
+    done
+  done
+done
+for http_host in test.tianshengzhi.com admin-test.tianshengzhi.com; do
+  result="$(curl --noproxy '*' -sS -m 8 -o /dev/null -w '%{http_code} %{redirect_url}' --resolve "$http_host:80:127.0.0.1" "http://$http_host/login")"
+  [[ "$result" = "301 https://$http_host/login" ]]
+done
 "$node_bin" provenance.mjs accept --manifest candidate.json --artifact-root "$release" --output "$manifest"
 "$node_bin" provenance.mjs verify --manifest "$manifest" --artifact-root "$release"
 printf '%s\n' "$(basename "$old")" > "$root/previous"

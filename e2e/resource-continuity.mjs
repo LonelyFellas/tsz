@@ -94,6 +94,10 @@ try {
   for (const name of ["tshb-test.conf", "tshb-test-domains.conf"]) {
     let config = await readFile(path.join(repo, "deploy/nginx", name), "utf8");
     config = config
+      .replace(
+        "server_name admin-test.tianshengzhi.com;",
+        "server_name admin-test.tianshengzhi.com 127.0.0.1;"
+      )
       .replace(/ssl_certificate .*?;/g, "ssl_certificate /test-cert/cert.pem;")
       .replace(
         /ssl_certificate_key .*?;/g,
@@ -131,11 +135,33 @@ try {
   );
   const port = docker("port", container, "8081/tcp").split(":").at(-1);
   const tlsPort = docker("port", container, "443/tcp").split(":").at(-1);
-  browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage();
+  assert.equal(
+    execFileSync(
+      "curl",
+      [
+        "--noproxy",
+        "*",
+        "-sS",
+        "-o",
+        "/dev/null",
+        "-w",
+        "%{http_code}",
+        `http://127.0.0.1:${port}/`
+      ],
+      { encoding: "utf8" }
+    ),
+    "404"
+  );
+  browser = await chromium.launch({
+    headless: true,
+    args: ["--no-proxy-server"]
+  });
+  // 容器使用本测试生成的自签名证书，不影响生产探针的证书校验。
+  const context = await browser.newContext({ ignoreHTTPSErrors: true });
+  const page = await context.newPage();
   const failures = [];
   page.on("pageerror", (error) => failures.push(error.message));
-  await page.goto(`http://127.0.0.1:${port}/`);
+  await page.goto(`https://127.0.0.1:${tlsPort}/`);
   await archive(admin, path.join(admin, "releases/B"), "admin", "B");
   docker(
     "cp",
@@ -184,9 +210,9 @@ try {
   assert.match(missing.headers, /404 Not Found/);
   assert.ok(!missing.headers.includes("immutable"));
   // First-entry JS failure must still show a usable native UI.
-  const failedPage = await browser.newPage();
+  const failedPage = await context.newPage();
   await failedPage.route("**/assets/*.js", (route) => route.abort());
-  await failedPage.goto(`http://127.0.0.1:${port}/`);
+  await failedPage.goto(`https://127.0.0.1:${tlsPort}/`);
   await failedPage.waitForSelector("[data-resource-recovery]");
   assert.match(
     await failedPage.textContent("[data-resource-recovery]"),

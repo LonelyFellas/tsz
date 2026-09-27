@@ -64,13 +64,59 @@ function publish(dir, component, success) {
   const result = spawnSync(
     "bash",
     [`${dir}/publish-release.sh`, dir, component],
-    { encoding: "utf8" }
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        http_proxy: "http://127.0.0.1:9",
+        https_proxy: "http://127.0.0.1:9",
+        ALL_PROXY: "http://127.0.0.1:9",
+        NO_PROXY: "",
+        no_proxy: ""
+      }
+    }
   );
   assert.equal(result.status === 0, success, result.stdout + result.stderr);
 }
+const ipConfig = await file("/etc/nginx/conf.d/zentao-ip.conf");
 await stage("admin", "A");
 publish("/opt/stage-A", "admin", true);
 assert.match(await readlink("/opt/tsz-releases/admin/current"), /\/A$/);
+for (const port of [80, 8081]) {
+  for (const host of ["unknown.invalid", "47.121.142.19"]) {
+    for (const path of [
+      "/",
+      "/login",
+      "/api/v1/auth/me",
+      "/api/v1/admin/profile"
+    ]) {
+      const response = spawnSync(
+        "curl",
+        [
+          "--noproxy",
+          "*",
+          "-sS",
+          "-m",
+          "3",
+          "-o",
+          "/dev/null",
+          "-w",
+          "%{http_code}",
+          "-H",
+          `Host: ${host}`,
+          `http://127.0.0.1:${port}${path}`
+        ],
+        { encoding: "utf8" }
+      );
+      assert.equal(response.status, 0, response.stderr);
+      assert.equal(
+        response.stdout,
+        "404",
+        `${host}:${port}${path} must reject HTTP`
+      );
+    }
+  }
+}
 assert.equal(
   await file("/opt/tsz-releases/admin/assets/legacy.css"),
   "old-css"
@@ -104,10 +150,23 @@ await stage("web", "W1");
 publish("/opt/stage-W1", "web", true);
 assert.equal((await file("/opt/tsz-releases/web/port")).trim(), "3100");
 assert.equal(await file("/opt/tsz-releases/web/assets/legacy.js"), "old-js");
-assert.match(
-  await file("/etc/nginx/conf.d/zentao-ip.conf"),
-  /include \/etc\/nginx\/tsz-web-upstream/
+assert.equal(await file("/etc/nginx/conf.d/zentao-ip.conf"), ipConfig);
+const zentao = spawnSync(
+  "curl",
+  [
+    "--noproxy",
+    "*",
+    "-fsS",
+    "-m",
+    "3",
+    "-H",
+    "Host: 47.121.142.19",
+    "http://127.0.0.1/zentao/"
+  ],
+  { encoding: "utf8" }
 );
+assert.equal(zentao.status, 0, zentao.stderr);
+assert.equal(zentao.stdout, "zentao");
 const webAccepted = await file("/opt/tsz-deploy-manifests/web.json");
 await stage("web", "W2");
 await writeFile("/tmp/fail-api", "fail");
@@ -143,6 +202,61 @@ assert.equal(
   await (await fetch("http://127.0.0.1:3100/", webProbeOptions)).text(),
   "W4"
 );
+for (const component of ["admin", "web"]) {
+  const current = await readlink(`/opt/tsz-releases/${component}/current`);
+  const manifest = await file(`/opt/tsz-deploy-manifests/${component}.json`);
+  await writeFile(
+    "/etc/nginx/conf.d/zentao-ip.conf",
+    ipConfig.replace(
+      "location / { return 404; }",
+      "location / { proxy_pass http://127.0.0.1:8383; }"
+    )
+  );
+  assert.equal(spawnSync("nginx", ["-s", "reload"]).status, 0);
+  let insecureStatus;
+  for (let attempt = 0; attempt < 30; attempt++) {
+    insecureStatus = spawnSync(
+      "curl",
+      [
+        "--noproxy",
+        "*",
+        "-sS",
+        "-m",
+        "3",
+        "-o",
+        "/dev/null",
+        "-w",
+        "%{http_code}",
+        "-H",
+        "Host: 47.121.142.19",
+        "http://127.0.0.1/api/v1/auth/me"
+      ],
+      { encoding: "utf8" }
+    );
+    if (insecureStatus.stdout === "401") break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.equal(insecureStatus.status, 0, insecureStatus.stderr);
+  assert.equal(
+    insecureStatus.stdout,
+    "401",
+    "HTTP bypass must be live before deployment"
+  );
+  const id = `${component}-insecure-ip`;
+  await stage(component, id);
+  publish(`/opt/stage-${id}`, component, false);
+  assert.equal(
+    await readlink(`/opt/tsz-releases/${component}/current`),
+    current
+  );
+  assert.equal(
+    await file(`/opt/tsz-deploy-manifests/${component}.json`),
+    manifest
+  );
+  await assert.rejects(access("/opt/tsz-frontend-transaction"));
+  await writeFile("/etc/nginx/conf.d/zentao-ip.conf", ipConfig);
+  assert.equal(spawnSync("nginx", ["-s", "reload"]).status, 0);
+}
 console.log(
-  "PASS: first migration, accepted manifest, tamper rejection, admin/web HTTP failure rollback, web slot switch, legacy IP forwarding"
+  "PASS: first migration, accepted manifest, tamper rejection, admin/web HTTP failure rollback, web slot switch, HTTPS-only rejection, independent IP bypass blocks publication, preserved Zentao"
 );
