@@ -64,7 +64,17 @@ function publish(dir, component, success) {
   const result = spawnSync(
     "bash",
     [`${dir}/publish-release.sh`, dir, component],
-    { encoding: "utf8" }
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        http_proxy: "http://127.0.0.1:9",
+        https_proxy: "http://127.0.0.1:9",
+        ALL_PROXY: "http://127.0.0.1:9",
+        NO_PROXY: "",
+        no_proxy: ""
+      }
+    }
   );
   assert.equal(result.status === 0, success, result.stdout + result.stderr);
 }
