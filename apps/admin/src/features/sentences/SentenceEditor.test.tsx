@@ -532,11 +532,7 @@ describe("当前词条关联与离开保护", () => {
     )! as HTMLElement;
     fireEvent.click(within(dialog).getByRole("button", { name: "继续编辑" }));
     expect(router.state.location.pathname).toBe("/");
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("dialog", { name: "例句还有未保存的修改" })
-      ).toBeNull()
-    );
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
     fireEvent.click(screen.getByText("离开词条"));
     dialog = (await screen.findByText("例句还有未保存的修改")).closest(
       '[role="dialog"]'
@@ -547,11 +543,7 @@ describe("当前词条关联与离开保护", () => {
     await screen.findByText("版本已变化");
     expect(router.state.location.pathname).toBe("/");
     expect(screen.getByDisplayValue("保留我的修改")).toBeInTheDocument();
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("dialog", { name: "例句还有未保存的修改" })
-      ).toBeNull()
-    );
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
     fireEvent.click(screen.getByText("离开词条"));
     const retry = await screen.findByRole("button", { name: "保存例句后离开" });
     await waitFor(() => expect(retry).toBeEnabled());
