@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/.claude/worktrees/account-permissions-batch-2/docs/openapi.json",
-  "_generatedAt": "2026-09-25T15:21:44.049Z",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/.claude/worktrees/account-permissions-batch-3/docs/openapi.json",
+  "_generatedAt": "2026-09-27T01:35:02.289Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -79,8 +79,15 @@
     "/auth/login-otp": ["post"],
     "/auth/logout": ["post"],
     "/auth/me": ["get"],
+    "/auth/password/change": ["post"],
+    "/auth/password/forgot": ["post"],
+    "/auth/password/reset": ["post"],
     "/auth/refresh": ["post"],
     "/auth/register": ["post"],
+    "/me/contact/bind": ["post"],
+    "/me/contact/bind-code": ["post"],
+    "/me/contact/unbind": ["post"],
+    "/me/contact/verification-code": ["post"],
     "/otp/send": ["post"]
   },
   "operationHeaders": {
@@ -831,9 +838,84 @@
         "403": { "$ref": "#/components/schemas/ProblemDetails" },
         "500": { "$ref": "#/components/schemas/ProblemDetails" }
       }
+    },
+    "post /auth/password/change": {
+      "request": { "$ref": "#/components/schemas/PasswordChangeRequest" },
+      "responses": {
+        "204": null,
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /auth/password/forgot": {
+      "request": { "$ref": "#/components/schemas/PasswordForgotRequest" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/PasswordStatus" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "429": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /auth/password/reset": {
+      "request": { "$ref": "#/components/schemas/PasswordResetRequest" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/PasswordStatus" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /me/contact/bind": {
+      "request": { "$ref": "#/components/schemas/ContactBindRequest" },
+      "responses": {
+        "204": null,
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /me/contact/bind-code": {
+      "request": { "$ref": "#/components/schemas/ContactBindCodeRequest" },
+      "responses": {
+        "204": null,
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "429": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /me/contact/unbind": {
+      "request": { "$ref": "#/components/schemas/ContactUnbindRequest" },
+      "responses": {
+        "204": null,
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /me/contact/verification-code": {
+      "request": {
+        "$ref": "#/components/schemas/ContactVerificationCodeRequest"
+      },
+      "responses": {
+        "204": null,
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "429": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
     }
   },
   "schemas": {
+    "PasswordStatus": {
+      "type": "object",
+      "required": ["status"],
+      "properties": { "status": { "type": "string" } }
+    },
     "FormTypeConfig": {
       "type": "object",
       "required": [
@@ -2908,6 +2990,56 @@
       },
       "additionalProperties": false
     },
+    "ContactBindCodeRequest": {
+      "type": "object",
+      "required": ["contact"],
+      "properties": { "contact": { "type": "string" } },
+      "additionalProperties": false
+    },
+    "ContactBindRequest": {
+      "type": "object",
+      "required": [
+        "contact",
+        "code",
+        "verification_channel",
+        "verification_code"
+      ],
+      "properties": {
+        "code": { "type": "string" },
+        "contact": { "type": "string" },
+        "verification_channel": {
+          "$ref": "#/components/schemas/ContactChannel"
+        },
+        "verification_code": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "ContactChannel": { "type": "string", "enum": ["phone", "email"] },
+    "ContactOperation": { "type": "string", "enum": ["bind", "unbind"] },
+    "ContactUnbindRequest": {
+      "type": "object",
+      "required": ["channel", "verification_channel", "verification_code"],
+      "properties": {
+        "channel": { "$ref": "#/components/schemas/ContactChannel" },
+        "verification_channel": {
+          "$ref": "#/components/schemas/ContactChannel"
+        },
+        "verification_code": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "ContactVerificationCodeRequest": {
+      "type": "object",
+      "required": ["operation", "contact", "verification_channel"],
+      "properties": {
+        "contact": { "type": "string" },
+        "operation": { "$ref": "#/components/schemas/ContactOperation" },
+        "verification_channel": {
+          "$ref": "#/components/schemas/ContactChannel"
+        }
+      },
+      "additionalProperties": false
+    },
     "CreateAudioUploadRequest": {
       "type": "object",
       "required": ["content_type", "size"],
@@ -3113,6 +3245,31 @@
           "$ref": "#/components/schemas/VoiceProfileV3",
           "description": "缺省即「没配过」。未配置时不上 wire，存量内容重新序列化后逐字节不变。"
         }
+      },
+      "additionalProperties": false
+    },
+    "PasswordChangeRequest": {
+      "type": "object",
+      "required": ["current_password", "new_password"],
+      "properties": {
+        "current_password": { "type": "string" },
+        "new_password": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "PasswordForgotRequest": {
+      "type": "object",
+      "required": ["identifier"],
+      "properties": { "identifier": { "type": "string" } },
+      "additionalProperties": false
+    },
+    "PasswordResetRequest": {
+      "type": "object",
+      "required": ["identifier", "code", "new_password"],
+      "properties": {
+        "code": { "type": "string" },
+        "identifier": { "type": "string" },
+        "new_password": { "type": "string" }
       },
       "additionalProperties": false
     },

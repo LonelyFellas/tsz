@@ -76,6 +76,10 @@ describe("ProfileHub — 渲染", () => {
       "href",
       "/student/coins"
     );
+    expect(screen.getByRole("link", { name: /账号安全/ })).toHaveAttribute(
+      "href",
+      "/account/security"
+    );
     expect(screen.getByRole("link", { name: /我的词表/ })).toHaveAttribute(
       "href",
       "/wordlists"

@@ -1,12 +1,8 @@
 "use client";
 
 import type { MeResponse } from "@tsz/api-client";
-import {
-  DISPLAY_NAME_MAX,
-  hasDisplayNameForbiddenChars,
-  isEmail,
-  isPhone
-} from "@tsz/shared";
+import { DISPLAY_NAME_MAX, hasDisplayNameForbiddenChars } from "@tsz/shared";
+import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { User } from "@tsz/types";
@@ -23,10 +19,6 @@ import { translateAuthError } from "../shared";
 // 精细化输入框:Apple 风圆角 + 品牌蓝聚焦环,贴合落地页设计体系。
 const INPUT_CLASS =
   "w-full rounded-2xl border border-border bg-muted/60 px-4 py-3 text-sm text-foreground outline-hidden transition placeholder:text-foreground-subtle focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/15";
-
-// 编辑资料:进入拉 /me 展示资料,支持改昵称 + 绑定/换绑邮箱或手机(两步:发码→确认)、
-// 更换头像(OSS 预签名直传,流程在 ../avatar);等级/口音只读(改等级请联系客服)。
-// 错误文案对齐后端 /me 系列接口返回(权威来源见 Swagger /docs)。
 
 // 昵称禁字符提示:前端预检与后端 400 兜底共用同一句(规则见 @tsz/shared 的
 // hasDisplayNameForbiddenChars,与后端 validateDisplayName 对齐)。
@@ -57,17 +49,6 @@ const AVATAR_ERRORS: Record<string, string> = {
   "user not found": "账号不存在,请重新登录"
 };
 
-// 绑定/换绑(bind-code / bind)错误。
-const BIND_ERRORS: Record<string, string> = {
-  "invalid contact": "邮箱 / 手机号格式错误",
-  "email already registered": "该邮箱已被占用",
-  "phone already registered": "该手机号已被占用",
-  "too many code requests, try again later": "操作过于频繁,请稍后再试",
-  "invalid or expired verification code": "验证码错误或已过期",
-  "user not found": "账号不存在,请重新登录"
-};
-
-const CODE_COUNTDOWN = 60;
 // 昵称上限与后端一致,单一来源在 @tsz/shared。
 const NICKNAME_MAX = DISPLAY_NAME_MAX;
 
@@ -81,16 +62,8 @@ export function EditProfileForm() {
 
   // 表单字段。
   const [displayName, setDisplayName] = useState("");
-  const [contact, setContact] = useState("");
-  const [code, setCode] = useState("");
-
-  // 交互状态。
-  const [countdown, setCountdown] = useState(0);
-  const [sending, setSending] = useState(false);
   const [saving, setSaving] = useState(false);
   const [nameError, setNameError] = useState("");
-  const [contactError, setContactError] = useState("");
-  const [codeError, setCodeError] = useState("");
   const [success, setSuccess] = useState(false);
 
   // 头像上传。整个三步流程是一个不可重入的提交动作(uploading 期间按钮禁用)。
@@ -118,13 +91,6 @@ export function EditProfileForm() {
     };
   }, []);
 
-  // 验证码倒计时(与注销/找回一致)。
-  useEffect(() => {
-    if (countdown <= 0) return;
-    const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [countdown]);
-
   if (loadError) {
     return (
       <div className="mx-auto max-w-md px-6 py-24 text-center text-sm text-foreground-subtle">
@@ -143,54 +109,28 @@ export function EditProfileForm() {
 
   const { user, learning_settings } = me;
 
-  // 缺哪个绑哪个;两个都已绑定时按手机换绑(罕见,原型只覆盖单边)。
-  const bindKind: "email" | "phone" = user.email == null ? "email" : "phone";
-  const isEmailBind = bindKind === "email";
-  const contactPlaceholder = isEmailBind ? "请输入邮箱号" : "请输入手机号";
-  const bindLabel = isEmailBind
-    ? user.email == null
-      ? "绑定邮箱"
-      : "换绑邮箱"
-    : user.phone == null
-      ? "绑定手机"
-      : "换绑手机";
-  const formatHint = isEmailBind ? "邮箱格式错误" : "手机号格式错误";
-
-  const contactValid =
-    contact === "" || (isEmailBind ? isEmail(contact) : isPhone(contact));
-  const contactFilled =
-    contact !== "" && (isEmailBind ? isEmail(contact) : isPhone(contact));
   // 与 trimmedName 同口径 trim:遗留数据/其他客户端可能存入带首尾空格的
   // 昵称,原样比较会把未编辑的表单误判为「已修改」。
   const nameInitial = (user.display_name ?? "").trim();
   const trimmedName = displayName.trim();
   const nameChanged = trimmedName !== "" && trimmedName !== nameInitial;
   // 禁字符预检,与后端 display_name 规则对齐;命中即禁用保存,不发请求。
-  // 只在昵称有改动时预检:未改动则提交不带昵称,历史遗留的禁字符昵称
-  // 不应锁死绑定联系方式等无关操作。
   const nameForbidden =
     nameChanged && hasDisplayNameForbiddenChars(trimmedName);
   // 昵称槽位单条提示:预检命中优先于后端返回的 nameError。
   const nameMessage = nameForbidden ? NICKNAME_FORBIDDEN_MSG : nameError;
-  const wantsBind = contactFilled && code.trim() !== "";
-
   const topContact = user.phone ?? user.email ?? "";
   const avatarInitial = displayNameOf(user).charAt(0).toUpperCase();
 
-  const canSendCode = contactFilled && countdown === 0 && !sending;
-  // !avatarUploading:保存与头像上传互斥,见 handleAvatar 的说明。
   const canSubmit =
-    (nameChanged || wantsBind) && !nameForbidden && !saving && !avatarUploading;
+    nameChanged && !nameForbidden && !saving && !avatarUploading;
 
   function clearMessages() {
     setNameError("");
-    setContactError("");
-    setCodeError("");
     setAvatarError("");
     setSuccess(false);
   }
 
-  // 服务端回传的 user 立即写入 store 与本页 me,头像/昵称/绑定共用。
   function commit(u: User) {
     setUser(u);
     setMe((prev) => (prev ? { ...prev, user: u } : prev));
@@ -227,23 +167,6 @@ export function EditProfileForm() {
     }
   }
 
-  async function handleSendCode() {
-    if (!canSendCode) return;
-    clearMessages();
-    setSending(true);
-    try {
-      await api.auth.requestContactBindCode(contact);
-      setCountdown(CODE_COUNTDOWN);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "";
-      setContactError(
-        translateAuthError(msg, BIND_ERRORS, "验证码发送失败,请稍后再试")
-      );
-    } finally {
-      setSending(false);
-    }
-  }
-
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     // avatarUploading 同样拦截:互斥不能只靠按钮 disabled,
@@ -251,17 +174,13 @@ export function EditProfileForm() {
     if (saving || avatarUploading) return;
     clearMessages();
 
-    if (!nameChanged && !wantsBind) {
+    if (!nameChanged) {
       setNameError("没有需要保存的修改");
       return;
     }
 
     setSaving(true);
     try {
-      // 每步成功后立即 commit 服务端回传的 user:即便后一步失败,
-      // 已落库的改动(如昵称)也会同步到本地 store/me,不会丢。
-
-      // ① 昵称有改动才提交。
       if (nameChanged) {
         try {
           const r = await api.auth.updateProfile(trimmedName);
@@ -274,23 +193,6 @@ export function EditProfileForm() {
           return;
         }
       }
-      // ② 填了待绑定联系方式 + 验证码才提交。
-      if (wantsBind) {
-        try {
-          const r = await api.auth.bindContact(contact, code.trim());
-          commit(r.user);
-        } catch (e: unknown) {
-          const msg = e instanceof Error ? e.message : "";
-          setCodeError(
-            translateAuthError(msg, BIND_ERRORS, "绑定失败,请稍后再试")
-          );
-          return;
-        }
-      }
-
-      setContact("");
-      setCode("");
-      setCountdown(0);
       setSuccess(true);
     } finally {
       setSaving(false);
@@ -414,64 +316,12 @@ export function EditProfileForm() {
             )}
           </div>
 
-          {/* 绑定 / 换绑 */}
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-foreground-muted">
-              {bindLabel}
-            </label>
-            <input
-              type="text"
-              inputMode={isEmailBind ? "email" : "numeric"}
-              placeholder={contactPlaceholder}
-              value={contact}
-              onChange={(e) => {
-                setContact(e.target.value);
-                setContactError("");
-              }}
-              className={INPUT_CLASS}
-            />
-            {!contactValid ? (
-              <p className="mt-1.5 text-sm text-danger">{formatHint}</p>
-            ) : contactError ? (
-              <p className="mt-1.5 text-sm text-danger">{contactError}</p>
-            ) : null}
-          </div>
-
-          {/* 验证码 */}
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-foreground-muted">
-              验证码
-            </label>
-            <div className="flex gap-3">
-              <input
-                type="text"
-                inputMode="numeric"
-                placeholder="请输入验证码"
-                maxLength={8}
-                value={code}
-                onChange={(e) => {
-                  setCode(e.target.value);
-                  setCodeError("");
-                }}
-                className={`${INPUT_CLASS} min-w-0`}
-              />
-              <button
-                type="button"
-                onClick={handleSendCode}
-                disabled={!canSendCode}
-                className="shrink-0 rounded-2xl bg-primary/10 px-4 text-sm font-medium text-primary transition hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {countdown > 0
-                  ? `${countdown}s 后重发`
-                  : sending
-                    ? "发送中..."
-                    : "获取验证码"}
-              </button>
-            </div>
-            {codeError && (
-              <p className="mt-1.5 text-sm text-danger">{codeError}</p>
-            )}
-          </div>
+          <Link
+            href="/account/security"
+            className="block text-sm font-medium text-primary hover:underline"
+          >
+            账号安全：绑定、换绑、解绑与修改密码 →
+          </Link>
 
           {success && (
             <p className="flex items-center justify-center gap-1.5 rounded-2xl bg-success/10 px-4 py-3 text-center text-sm font-medium text-success">

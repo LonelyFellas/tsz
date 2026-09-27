@@ -15,7 +15,25 @@ import { VARIANT_LABEL, displayNameOf } from "@/lib/user";
 // 不在本页重复。占位类(邀请好友 / 我的任务 / 设置)待后端就绪再加。
 const TILES: { label: string; href: string; icon: ReactNode }[] = [
   { label: "我的天生币", href: "/student/coins", icon: <CoinIcon /> },
-  { label: "我的词表", href: "/wordlists", icon: <ListIcon /> }
+  { label: "我的词表", href: "/wordlists", icon: <ListIcon /> },
+  {
+    label: "账号安全",
+    href: "/account/security",
+    icon: (
+      <svg
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        aria-hidden
+      >
+        <path d="M12 3 4 6v6c0 4 8 9 8 9s8-5 8-9V6l-8-3Z" />
+        <path d="m8 12 3 3 5-6" />
+      </svg>
+    )
+  }
 ];
 
 export function ProfileHub() {

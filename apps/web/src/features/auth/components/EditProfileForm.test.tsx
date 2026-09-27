@@ -16,9 +16,7 @@ vi.mock("@/lib/request", () => ({
   api: {
     auth: {
       me: vi.fn(),
-      updateProfile: vi.fn(),
-      requestContactBindCode: vi.fn(),
-      bindContact: vi.fn()
+      updateProfile: vi.fn()
     }
   }
 }));
@@ -39,14 +37,10 @@ import {
 } from "../avatar";
 const mockMe = vi.mocked(api.auth.me);
 const mockUpdate = vi.mocked(api.auth.updateProfile);
-const mockBindCode = vi.mocked(api.auth.requestContactBindCode);
-const mockBind = vi.mocked(api.auth.bindContact);
 const mockUnavailable = vi.mocked(isAvatarStorageUnavailable);
 const mockUploadAvatar = vi.mocked(uploadAvatar);
 
 const PHONE = "13899997777";
-const NEW_EMAIL = "new@qq.com";
-const VALID_CODE = "123456";
 
 function userWith(overrides: Partial<User> = {}): User {
   return {
@@ -100,25 +94,19 @@ describe("EditProfileForm — 加载与渲染", () => {
     expect(screen.queryByText("英式")).not.toBeInTheDocument();
   });
 
-  it("纯手机账号 → 展示「绑定邮箱」", async () => {
+  it.each([
+    { phone: PHONE },
+    { phone: undefined, email: "a@b.com" },
+    { phone: PHONE, email: "a@b.com" }
+  ])("联系方式维护统一进入账号安全页：%j", async (contact) => {
+    mockMe.mockResolvedValue(meResponse({ user: userWith(contact) }));
     render(<EditProfileForm />);
-    expect(await screen.findByText("绑定邮箱")).toBeInTheDocument();
-  });
-
-  it("纯邮箱账号 → 展示「绑定手机」", async () => {
-    mockMe.mockResolvedValue(
-      meResponse({ user: userWith({ phone: undefined, email: "a@b.com" }) })
-    );
-    render(<EditProfileForm />);
-    expect(await screen.findByText("绑定手机")).toBeInTheDocument();
-  });
-
-  it("已绑定手机+邮箱 → 展示「换绑手机」", async () => {
-    mockMe.mockResolvedValue(
-      meResponse({ user: userWith({ email: "a@b.com" }) })
-    );
-    render(<EditProfileForm />);
-    expect(await screen.findByText("换绑手机")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("link", { name: /账号安全/ })
+    ).toHaveAttribute("href", "/account/security");
+    expect(
+      screen.queryByPlaceholderText("请输入验证码")
+    ).not.toBeInTheDocument();
   });
 
   it("拉取失败 → 显示兜底文案", async () => {
@@ -153,7 +141,6 @@ describe("EditProfileForm — 昵称", () => {
     fireEvent.submit(container.querySelector("form")!);
     expect(screen.getByText("没有需要保存的修改")).toBeInTheDocument();
     expect(mockUpdate).not.toHaveBeenCalled();
-    expect(mockBind).not.toHaveBeenCalled();
   });
 
   it("仅改昵称 → 调 updateProfile、刷新 store、显示「操作成功」", async () => {
@@ -172,7 +159,6 @@ describe("EditProfileForm — 昵称", () => {
       expect(screen.getByText("操作成功")).toBeInTheDocument();
     });
     expect(useUserStore.getState().user?.display_name).toBe("Bob");
-    expect(mockBind).not.toHaveBeenCalled();
   });
 
   it("昵称含禁字符 → 实时红字提示且确定禁用,不发请求", async () => {
@@ -234,27 +220,19 @@ describe("EditProfileForm — 昵称", () => {
     });
   });
 
-  it("遗留昵称含禁字符但未改动 → 不提示、不锁绑定操作", async () => {
+  it("遗留昵称含禁字符但未改动 → 不提示且保留账号安全入口", async () => {
     mockMe.mockResolvedValue(
       meResponse({ user: userWith({ display_name: "A<lice" }) })
     );
-    mockBind.mockResolvedValue({ user: userWith({ email: NEW_EMAIL }) });
     render(<EditProfileForm />);
     await screen.findByDisplayValue("A<lice");
-    const user = userEvent.setup();
-
     expect(
       screen.queryByText("昵称不能包含 < > 或不可见字符")
     ).not.toBeInTheDocument();
-
-    await user.type(screen.getByPlaceholderText("请输入邮箱号"), NEW_EMAIL);
-    await user.type(screen.getByPlaceholderText("请输入验证码"), VALID_CODE);
-    await user.click(screen.getByRole("button", { name: "确定" }));
-
-    await waitFor(() => {
-      expect(mockBind).toHaveBeenCalledWith(NEW_EMAIL, VALID_CODE);
-    });
-    // 未改动的昵称不随绑定一并提交。
+    expect(screen.getByRole("link", { name: /账号安全/ })).toHaveAttribute(
+      "href",
+      "/account/security"
+    );
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
@@ -303,111 +281,6 @@ describe("EditProfileForm — 昵称", () => {
 
     expect(screen.getByRole("button", { name: "确定" })).toBeDisabled();
     expect(mockUpdate).not.toHaveBeenCalled();
-  });
-});
-
-// ── 绑定流程 ──────────────────────────────────────────
-describe("EditProfileForm — 绑定", () => {
-  it("邮箱格式非法 → 红字「邮箱格式错误」且获取验证码禁用", async () => {
-    render(<EditProfileForm />);
-    await screen.findByText("绑定邮箱");
-    const user = userEvent.setup();
-
-    await user.type(screen.getByPlaceholderText("请输入邮箱号"), "bad");
-    expect(screen.getByText("邮箱格式错误")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "获取验证码" })).toBeDisabled();
-  });
-
-  it("合法邮箱 → 获取验证码请求并进入倒计时", async () => {
-    mockBindCode.mockResolvedValue({ status: "sent" });
-    render(<EditProfileForm />);
-    await screen.findByText("绑定邮箱");
-    const user = userEvent.setup();
-
-    await user.type(screen.getByPlaceholderText("请输入邮箱号"), NEW_EMAIL);
-    await user.click(screen.getByRole("button", { name: "获取验证码" }));
-
-    await waitFor(() => {
-      expect(mockBindCode).toHaveBeenCalledWith(NEW_EMAIL);
-      expect(screen.getByRole("button", { name: /后重发/ })).toBeDisabled();
-    });
-  });
-
-  it("邮箱已被占用(409) → 红字提示且不进入倒计时", async () => {
-    mockBindCode.mockRejectedValue(new Error("email already registered"));
-    render(<EditProfileForm />);
-    await screen.findByText("绑定邮箱");
-    const user = userEvent.setup();
-
-    await user.type(screen.getByPlaceholderText("请输入邮箱号"), NEW_EMAIL);
-    await user.click(screen.getByRole("button", { name: "获取验证码" }));
-
-    await waitFor(() => {
-      expect(screen.getByText("该邮箱已被占用")).toBeInTheDocument();
-    });
-    expect(
-      screen.queryByRole("button", { name: /后重发/ })
-    ).not.toBeInTheDocument();
-  });
-
-  it("填邮箱+验证码点确定 → 调 bindContact、刷新 store、操作成功", async () => {
-    mockBind.mockResolvedValue({
-      user: userWith({ email: NEW_EMAIL })
-    });
-    render(<EditProfileForm />);
-    await screen.findByText("绑定邮箱");
-    const user = userEvent.setup();
-
-    await user.type(screen.getByPlaceholderText("请输入邮箱号"), NEW_EMAIL);
-    await user.type(screen.getByPlaceholderText("请输入验证码"), VALID_CODE);
-    await user.click(screen.getByRole("button", { name: "确定" }));
-
-    await waitFor(() => {
-      expect(mockBind).toHaveBeenCalledWith(NEW_EMAIL, VALID_CODE);
-      expect(screen.getByText("操作成功")).toBeInTheDocument();
-    });
-    expect(useUserStore.getState().user?.email).toBe(NEW_EMAIL);
-  });
-
-  it("改昵称成功但绑定失败 → 已存的昵称仍写回 store,并提示绑定错误", async () => {
-    mockUpdate.mockResolvedValue({ user: userWith({ display_name: "Bob" }) });
-    mockBind.mockRejectedValue(
-      new Error("invalid or expired verification code")
-    );
-    render(<EditProfileForm />);
-    await screen.findByDisplayValue("Alice");
-    const user = userEvent.setup();
-
-    const name = screen.getByDisplayValue("Alice");
-    await user.clear(name);
-    await user.type(name, "Bob");
-    await user.type(screen.getByPlaceholderText("请输入邮箱号"), NEW_EMAIL);
-    await user.type(screen.getByPlaceholderText("请输入验证码"), VALID_CODE);
-    await user.click(screen.getByRole("button", { name: "确定" }));
-
-    await waitFor(() => {
-      expect(screen.getByText("验证码错误或已过期")).toBeInTheDocument();
-    });
-    // 昵称已落库,即便绑定步骤失败也应同步到本地 store,不显示「操作成功」。
-    expect(useUserStore.getState().user?.display_name).toBe("Bob");
-    expect(screen.queryByText("操作成功")).not.toBeInTheDocument();
-  });
-
-  it("验证码错误(400) → 验证码下红字提示", async () => {
-    mockBind.mockRejectedValue(
-      new Error("invalid or expired verification code")
-    );
-    render(<EditProfileForm />);
-    await screen.findByText("绑定邮箱");
-    const user = userEvent.setup();
-
-    await user.type(screen.getByPlaceholderText("请输入邮箱号"), NEW_EMAIL);
-    await user.type(screen.getByPlaceholderText("请输入验证码"), VALID_CODE);
-    await user.click(screen.getByRole("button", { name: "确定" }));
-
-    await waitFor(() => {
-      expect(screen.getByText("验证码错误或已过期")).toBeInTheDocument();
-    });
   });
 });
 

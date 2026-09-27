@@ -1,3 +1,29 @@
+export type ContactChannel = "phone" | "email";
+
+export interface ContactVerificationCodeRequest {
+  operation: "bind" | "unbind";
+  contact: string;
+  verification_channel: ContactChannel;
+}
+
+export interface BindContactRequest {
+  contact: string;
+  code: string;
+  verification_channel: ContactChannel;
+  verification_code: string;
+}
+
+export interface UnbindContactRequest {
+  channel: ContactChannel;
+  verification_channel: ContactChannel;
+  verification_code: string;
+}
+
+export interface ChangePasswordRequest {
+  current_password: string;
+  new_password: string;
+}
+
 export type RegisterPayload = {
   password: string;
   code: string;

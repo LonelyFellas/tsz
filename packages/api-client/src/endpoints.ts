@@ -3,6 +3,10 @@
 import type {
   AccountDeletionChannel,
   AccountDeletionCodeRequest,
+  BindContactRequest,
+  ChangePasswordRequest,
+  ContactVerificationCodeRequest,
+  UnbindContactRequest,
   Comment,
   ConfirmAccountDeletionRequest,
   Paginated,
@@ -114,19 +118,22 @@ export function createEndpoints(http: HttpClient) {
       /** PATCH /me — 改昵称(去空格后 1–50 字符);返回刷新后的 user */
       updateProfile: (display_name: string) =>
         http.patch<{ user: User }>("/me", { display_name }),
-      /**
-       * POST /me/contact/bind-code — 发码到「新」联系方式(绑定/换绑用)。
-       * contact 含 @ 走邮件,否则走短信;前端把绑定框输入原样传入。
-       * 与登录/找回的 send-code 语义相反(那些发往在档联系方式),不要复用。
-       */
+      requestContactVerificationCode: (input: ContactVerificationCodeRequest) =>
+        http.post<void>("/me/contact/verification-code", input),
       requestContactBindCode: (contact: string) =>
-        http.post<{ status: string }>("/me/contact/bind-code", { contact }),
-      /**
-       * POST /me/contact/bind — 带验证码确认绑定/换绑。
-       * contact 必须与发码时完全一致;返回带新 phone/email 的 user。
-       */
-      bindContact: (contact: string, code: string) =>
-        http.post<{ user: User }>("/me/contact/bind", { contact, code }),
+        http.post<void>("/me/contact/bind-code", { contact }),
+      bindContact: (input: BindContactRequest) =>
+        http.post<void>("/me/contact/bind", input, {
+          retryOnUnauthorized: (code) => code === "invalid_token"
+        }),
+      unbindContact: (input: UnbindContactRequest) =>
+        http.post<void>("/me/contact/unbind", input, {
+          retryOnUnauthorized: (code) => code === "invalid_token"
+        }),
+      changePassword: (input: ChangePasswordRequest) =>
+        http.post<void>("/auth/password/change", input, {
+          retryOnUnauthorized: (code) => code === "invalid_token"
+        }),
       /** POST /auth/register — 手机或邮箱验证码注册，成功直接建立会话。 */
       register: (payload: RegisterPayload) =>
         http.post<AuthResponse>("/auth/register", payload, {
