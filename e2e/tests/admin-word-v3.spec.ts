@@ -9,6 +9,99 @@ import {
 } from "./support/mockAdminV3Api";
 
 test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () => {
+  test("语法结构关联词形：不选释义、完成回显和取消恢复", async ({ page }) => {
+    test.skip(process.env.VITE_VOICE_EDITOR !== "true", "需要启用语音编辑器");
+    const api = await mockAdminV3Api(page);
+    const word = api.getWord();
+    const pos = word.forms.pos[0]!;
+    const form = pos.forms[0]!;
+    const regional = form.regional_variants;
+    const variant = regional.mode === "common" ? regional.common : regional.uk;
+    await page.route(
+      "**/lexicon/entries/component-targets/search",
+      async (route) => {
+        await route.fulfill({
+          json: {
+            schema_version: 3,
+            total: 1,
+            truncated: false,
+            matches: [
+              {
+                entry_id: word.id,
+                pos_id: pos.pos_id,
+                base_form_id: form.id,
+                publication_id: variant.id,
+                headword: "job",
+                kind: "word",
+                pos: pos.pos,
+                matched_form_id: form.id,
+                matched_variant_id: variant.id,
+                matched_dialect: variant.dialect,
+                matched_form_type: form.form_type,
+                component_usages: [],
+                matches: [],
+                senses: [],
+                forms: [
+                  {
+                    form_id: form.id,
+                    variant_id: variant.id,
+                    form_type: form.form_type,
+                    spelling: "job",
+                    dialect: variant.dialect,
+                    base_form_ids: [form.id],
+                    allowed_sense_ids: []
+                  }
+                ]
+              }
+            ]
+          }
+        });
+      }
+    );
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/meanings`);
+    const opener = page
+      .getByRole("button", { name: /^打开.*语法结构.*编辑器$/ })
+      .first();
+    await opener.click();
+    const dialog = page
+      .getByRole("dialog")
+      .filter({ has: page.locator(".tsz-ve-editor") });
+    await dialog.locator(".tsz-ve-canvas-input").fill("a job");
+    await dialog.getByRole("button", { name: "关联词形", exact: true }).click();
+    await dialog.getByLabel("关联 job（2）").click();
+    await page
+      .locator(".ant-cascader-menu-item-content")
+      .filter({ hasText: /^job ·/ })
+      .click();
+    await expect(page.getByText(/原形 job/)).toBeVisible();
+    await page.screenshot({
+      path: "/tmp/grammar-form-picker.png",
+      fullPage: false,
+      animations: "disabled"
+    });
+    await page.getByText(/原形 job/).click();
+    await expect(page.getByText("选择词义", { exact: true })).toHaveCount(0);
+    await dialog.getByRole("button", { name: /^完成.*编辑$/ }).click();
+    await opener.click();
+    await dialog.getByRole("button", { name: "关联词形", exact: true }).click();
+    await dialog.getByLabel("关联 job（2）").click();
+    await expect(page.getByText(/已关联词形/)).toBeVisible();
+    await expect(
+      page.getByText(/整段合成仅使用该词形的第一个发音/)
+    ).toBeVisible();
+    await page.screenshot({
+      path: "/tmp/grammar-form-linked.png",
+      fullPage: false,
+      animations: "disabled"
+    });
+    await page.getByRole("button", { name: "清除关联", exact: true }).click();
+    await dialog.getByRole("button", { name: /^取消.*编辑$/ }).click();
+    await opener.click();
+    await dialog.getByRole("button", { name: "关联词形", exact: true }).click();
+    await dialog.getByLabel("关联 job（2）").click();
+    await expect(page.getByText(/已关联词形/)).toBeVisible();
+  });
+
   test("统一富文本弹窗：保持布局、拖动、选区连读、改字确认和取消恢复", async ({
     page
   }) => {

@@ -598,18 +598,17 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       kind: "word",
       match_mode: "contains",
       exclude_exact: true,
-      include_drafts: false,
       page_size: 20,
       cursor: "opaque-cursor"
     });
     const [path] = http.get.mock.calls[0] as [string];
     const sp = new URLSearchParams(path.split("?")[1]);
+    expect(sp.has("include_drafts")).toBe(false);
     expect(Object.fromEntries(sp)).toMatchObject({
       q: "workspace",
       kind: "word",
       match_mode: "contains",
       exclude_exact: "true",
-      include_drafts: "false",
       page_size: "20",
       cursor: "opaque-cursor"
     });
@@ -739,7 +738,6 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       kind: "word",
       match_mode: "contains",
       exclude_exact: true,
-      include_drafts: true,
       page_size: 20,
       cursor: "related-cursor"
     });
@@ -833,7 +831,6 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       kind: "word",
       match_mode: "contains",
       exclude_exact: "true",
-      include_drafts: "true",
       page_size: "20",
       cursor: "related-cursor"
     });
@@ -1342,7 +1339,6 @@ it("成分查询原样透传目标 entry_id、cursor 与取消信号", async () 
     q: "give",
     entry_id: "entry-give",
     match: "exact" as const,
-    include_drafts: true,
     page_size: 50,
     cursor: "next"
   };

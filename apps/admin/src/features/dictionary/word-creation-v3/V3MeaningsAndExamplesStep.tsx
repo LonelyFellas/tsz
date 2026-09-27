@@ -97,6 +97,7 @@ import "./posTabs.css";
 import { v3IssueMessage } from "./presentationErrors";
 import { countV3PosMeaningIncomplete } from "./posCompletion";
 import { V3VoiceTextField } from "./components/V3VoiceTextField";
+import { V3GrammarVoiceTextField } from "./components/V3GrammarVoiceTextField";
 import { V3LinkedEnglishTextField } from "./components/V3LinkedEnglishTextField";
 import { V3AddBasicPosSelect } from "./components/V3AddBasicPosSelect";
 import {
@@ -413,12 +414,16 @@ const GRAMMAR_PLACEHOLDER: Record<Dialect, string> = {
 };
 
 function GrammarStructuresCard({
+  wordId,
+  forms,
   pos,
   posIndex,
   spellingMode,
   change,
   idFactory
 }: {
+  wordId?: string;
+  forms?: DraftFormsStepContentV3;
   pos: DraftMeaningsStepContentWritableV3["pos"][number];
   posIndex: number;
   spellingMode: DialectModeV3;
@@ -489,29 +494,22 @@ function GrammarStructuresCard({
                     data-v3-node-id={variant.id}
                     key={variant.id}
                   >
-                    <V3VoiceTextField
-                      mode="grammar"
+                    <V3GrammarVoiceTextField
+                      wordId={wordId}
+                      forms={forms}
+                      textLinks={variant.form_links}
                       dialect={variant.dialect}
-                      leadingAction={
-                        <PronunciationPreviewControls
-                          playbackOnly
-                          pronunciationId={variant.id}
-                          dialect={variant.dialect}
-                          ariaLabelPrefix={`语法结构 ${structureIndex + 1} ${dialectLabel(variant.dialect)}内容`}
-                          content={toRichTextV2(variant.content)}
-                          voiceProfile={variant.voice_profile ?? undefined}
-                        />
-                      }
                       ariaLabel={`语法结构 ${structureIndex + 1} ${dialectLabel(variant.dialect)}内容`}
                       field="content"
                       nodeId={variant.id}
-                      onChange={(next) =>
+                      onChange={(next, links) =>
                         change((draft) => {
                           const target =
                             draft.pos[posIndex]!.grammar_structures[
                               structureIndex
                             ]!.variants[variantIndex]!;
                           target.content = next;
+                          target.form_links = links ?? [];
                         })
                       }
                       onVoiceProfileChange={(next) =>
@@ -1267,14 +1265,12 @@ function RelationsGrid({
     wordId: string;
     query: string;
   }>();
-  const [includeDrafts, setIncludeDrafts] = useState(false);
   const activeSearch = searching ?? senseSearch;
   const preparedSearch = validateEntryInput(activeSearch?.query ?? "");
   const relatedSearch = useRelatedSearch(
     preparedSearch.normalized,
     preparedSearch.kind,
-    Boolean(activeSearch?.query.trim()) && !preparedSearch.issue,
-    includeDrafts
+    Boolean(activeSearch?.query.trim()) && !preparedSearch.issue
   );
   // 完全相同的排在前面，其余按整词命中的跟在后面。
   const searchWords = relatedWordChoices(
@@ -1358,20 +1354,6 @@ function RelationsGrid({
 
   return (
     <div className="word-relations-grid word-relations-grid-stacked">
-      <Flex align="center" gap="small">
-        <Switch
-          aria-label="显示关联词草稿候选"
-          checked={includeDrafts}
-          onChange={setIncludeDrafts}
-          size="small"
-        />
-        <Typography.Text>显示关联词草稿候选</Typography.Text>
-        {includeDrafts && (
-          <Typography.Text type="secondary">
-            草稿目标尚未发布，保存关联不代表可以发布。
-          </Typography.Text>
-        )}
-      </Flex>
       {RELATION_TYPES.map((relationType) => {
         const meta = RELATION_META[relationType];
         const relations = groupRelations(
@@ -2725,6 +2707,8 @@ function V3MeaningsAndExamplesStepContent({
                 >
                   <Flex vertical gap="middle">
                     <GrammarStructuresCard
+                      wordId={wordId}
+                      forms={forms}
                       change={change}
                       idFactory={idFactory}
                       pos={pos}

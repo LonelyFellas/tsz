@@ -11,6 +11,8 @@ export function referenceKindLabel(reference: InboundReferenceV3): string {
       return "多维例句";
     case "publication_sense_ref":
       return "已发布内容";
+    case "grammar_form_link":
+      return "语法结构关联词形";
     case "draft_text_link":
       return "草稿正文关联";
     case "draft_relation":

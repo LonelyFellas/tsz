@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/.claude/worktrees/account-permissions-batch-3/docs/openapi.json",
-  "_generatedAt": "2026-09-27T01:35:02.289Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/grammar-form-pronunciation/docs/openapi.json",
+  "_generatedAt": "2026-09-27T12:42:00.298Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -206,12 +206,6 @@
       },
       {
         "name": "exclude_exact",
-        "in": "query",
-        "required": false,
-        "schema": { "type": "boolean" }
-      },
-      {
-        "name": "include_drafts",
         "in": "query",
         "required": false,
         "schema": { "type": "boolean" }
@@ -2010,6 +2004,7 @@
         "duplicate_pos_meanings",
         "grammar_required",
         "grammar_variants_invalid",
+        "grammar_form_link_invalid",
         "sense_required",
         "level_invalid",
         "sub_pos_required",
@@ -2246,7 +2241,8 @@
         "draft_relation",
         "phrase_component",
         "form_group_sense_binding",
-        "draft_text_link"
+        "draft_text_link",
+        "grammar_form_link"
       ]
     },
     "InboundReferenceNodeTypeV3": {
@@ -2669,17 +2665,12 @@
       "properties": {
         "cursor": {
           "type": "string",
-          "description": "上一页返回的 `next_cursor`。绑定 `q` / `kind` / `match` / `include_drafts` / `entry_id`\n及最后返回的稳定节点排序键；查询条件改变或游标无效返回 400 `invalid_query`。\n无关保存、发布及归档不会使游标失效；并发修改下搜索弱一致，保存/发布仍严格验证。"
+          "description": "上一页返回的 `next_cursor`。绑定 `q` / `kind` / `match` / `entry_id`\n及最后返回的稳定节点排序键；查询条件改变或游标无效返回 400 `invalid_query`。\n无关保存、发布及归档不会使游标失效；并发修改下搜索弱一致，保存/发布仍严格验证。"
         },
         "entry_id": {
           "type": "string",
           "format": "uuid",
           "description": "已知目标词条时直接限定该词条；仍校验词面、类型、发布/草稿与归档状态。"
-        },
-        "include_drafts": {
-          "type": "boolean",
-          "description": "是否把当前 V3 草稿（不限创建者，包括已发布词条的新增节点）也列为候选；草稿候选没有 `publication_id`。\n已发布词条只按其当前发布版本出现，草稿里未发布的改动不作候选。",
-          "default": false
         },
         "kind": {
           "$ref": "#/components/schemas/EntryKind",
@@ -2837,7 +2828,7 @@
         "publication_id": {
           "type": "string",
           "format": "uuid",
-          "description": "命中的发布版本。**缺省即草稿候选**（只在 `include_drafts = true` 时出现），包括已发布词条的当前草稿；\n关联它时 `target_publication_id` 同样留空，保存时按目标当前草稿内容校验。"
+          "description": "命中的发布版本；缺省仅兼容已有草稿引用。"
         },
         "senses": {
           "type": "array",
@@ -3215,6 +3206,34 @@
     },
     "EntryKind": { "type": "string", "enum": ["word", "phrase"] },
     "FormGroupScopeV3": { "type": "string", "enum": ["general", "dedicated"] },
+    "GrammarFormLinkV3": {
+      "type": "object",
+      "required": [
+        "id",
+        "source_segments",
+        "target_word_id",
+        "target_pos_id",
+        "target_form_id",
+        "target_variant_id",
+        "target_dialect"
+      ],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "source_segments": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/SentenceSourceRangeV1" },
+          "maxItems": 1,
+          "minItems": 1
+        },
+        "target_dialect": { "$ref": "#/components/schemas/Dialect" },
+        "target_form_id": { "type": "string", "format": "uuid" },
+        "target_pos_id": { "type": "string", "format": "uuid" },
+        "target_publication_id": { "type": "string", "format": "uuid" },
+        "target_variant_id": { "type": "string", "format": "uuid" },
+        "target_word_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
     "GrammarStructureV3": {
       "type": "object",
       "required": ["id", "variants"],
@@ -3240,6 +3259,11 @@
         },
         "content": { "$ref": "#/components/schemas/RichTextV3" },
         "dialect": { "$ref": "#/components/schemas/Dialect" },
+        "form_links": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/GrammarFormLinkV3" },
+          "maxItems": 100
+        },
         "id": { "type": "string", "format": "uuid" },
         "voice_profile": {
           "$ref": "#/components/schemas/VoiceProfileV3",

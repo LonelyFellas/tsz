@@ -414,8 +414,7 @@ describe("当前词条关联与离开保护", () => {
       expect.objectContaining({
         q: "make",
         match: "exact",
-        kind: "word",
-        include_drafts: false
+        kind: "word"
       }),
       expect.any(AbortSignal)
     );

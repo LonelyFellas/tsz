@@ -80,6 +80,7 @@ export interface V3VoiceTextFieldProps<
   textLinks?: VoiceEditorProps<TLink>["textLinks"];
   restoreTextLinksOnCorrection?: boolean;
   renderAssociationPicker?: VoiceEditorProps<TLink>["renderAssociationPicker"];
+  previewAdapter?: VoiceEditorProps<TLink>["previewAdapter"];
   value: RichTextV3;
   ariaLabel: string;
   nodeId: string;
@@ -115,6 +116,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   textLinks,
   restoreTextLinksOnCorrection,
   renderAssociationPicker,
+  previewAdapter,
   value,
   ariaLabel,
   nodeId,
@@ -293,7 +295,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         }
         const next = editRichText(value, event.target.value);
         const links =
-          mode === "association"
+          mode === "association" || textLinks !== undefined
             ? remapTextLinks(value.text, event.target.value, textLinks ?? [])
             : undefined;
         const removed =
@@ -397,7 +399,9 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           placeholder={placeholder}
           onChange={(next: RichTextV2, nextLinks) => change(next, nextLinks)}
           previewAdapter={
-            env.VOICE_PREVIEW ? adminVoicePreviewAdapter : undefined
+            env.VOICE_PREVIEW
+              ? (previewAdapter ?? adminVoicePreviewAdapter)
+              : undefined
           }
           previewIsMock={voicePreviewIsMock}
           onVoiceProfileChange={onVoiceProfileChange}

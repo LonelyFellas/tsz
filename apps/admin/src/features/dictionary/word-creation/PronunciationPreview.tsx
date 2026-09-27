@@ -178,6 +178,7 @@ export function usePronunciationVoiceNotice(
 
 export function PronunciationPreviewControls({
   pronunciationId,
+  previewAdapter,
   spelling,
   content,
   voiceProfile,
@@ -191,6 +192,7 @@ export function PronunciationPreviewControls({
   children
 }: {
   pronunciationId: string;
+  previewAdapter?: VoicePreviewAdapter;
   spelling?: string;
   content?: RichTextV2;
   voiceProfile?: VoiceProfileV3;
@@ -278,7 +280,14 @@ export function PronunciationPreviewControls({
     cleanup();
     setBusy(false);
     setStatus("");
-  }, [cleanup, contentKey, pronunciationId, voice?.id, disabled]);
+  }, [
+    cleanup,
+    contentKey,
+    pronunciationId,
+    voice?.id,
+    disabled,
+    previewAdapter
+  ]);
 
   useEffect(
     () => () => {
@@ -338,7 +347,7 @@ export function PronunciationPreviewControls({
     setBusy(true);
     setStatus("正在生成试听…");
     try {
-      const preview = await context.adapter.synthesize(
+      const preview = await (previewAdapter ?? context.adapter).synthesize(
         {
           language: "en",
           content: previewContent,

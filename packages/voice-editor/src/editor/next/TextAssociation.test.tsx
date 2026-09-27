@@ -96,6 +96,44 @@ describe("正文关联编辑器", () => {
   });
 });
 
+it("语法结构保留标注工具，以完整单词关联词形并支持撤销", async () => {
+  const observe = vi.fn();
+  const formTarget: Pick<TextLinkV3, "id" | "source_segments"> = {
+    id: "form-link",
+    source_segments: []
+  };
+  render(
+    <VoiceEditor<typeof formTarget>
+      mode="grammar"
+      value={{ version: 2, text: "a job", annotations: [] }}
+      textLinks={[]}
+      renderAssociationPicker={({ segments, onSelect }) => (
+        <button
+          onClick={() => onSelect({ ...formTarget, source_segments: segments })}
+        >
+          选择词形
+        </button>
+      )}
+      onChange={observe}
+    />
+  );
+  expect(screen.getByRole("button", { name: /^语法结构/ })).toBeVisible();
+  expect(screen.queryByRole("button", { name: "关联短语" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "关联词形" }));
+  fireEvent.mouseDown(screen.getByLabelText("关联 job（2）"), { button: 0 });
+  fireEvent.click(await screen.findByText("选择词形"));
+  await waitFor(() =>
+    expect(observe.mock.lastCall?.[1]).toEqual([
+      {
+        id: "form-link",
+        source_segments: [{ start: 2, end: 5, surface: "job" }]
+      }
+    ])
+  );
+  fireEvent.click(screen.getByRole("button", { name: "上一步" }));
+  await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([]));
+});
+
 it.each(["grammar", "association"] as const)(
   "%s 模式可锁定正文而继续标注，Esc 不会重新允许改字",
   async (mode) => {

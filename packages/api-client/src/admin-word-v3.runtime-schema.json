@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/.claude/worktrees/account-permissions-batch-3/docs/openapi.json",
-  "_source_sha256": "519a05239d0843428298f79febdaa0f146ba168d2c1bee6b2ec7ac8e6b003bd3",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/grammar-form-pronunciation/docs/openapi.json",
+  "_source_sha256": "099f3b085261cf34a62f758d6cc91c97df181dce4041eac89d432c443293056e",
   "roots": [
     "SharedSentence",
     "SentencePublication",
@@ -830,6 +830,34 @@
       },
       "additionalProperties": false
     },
+    "GrammarFormLinkV3": {
+      "type": "object",
+      "required": [
+        "id",
+        "source_segments",
+        "target_word_id",
+        "target_pos_id",
+        "target_form_id",
+        "target_variant_id",
+        "target_dialect"
+      ],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "source_segments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SentenceSourceRangeV1" },
+          "maxItems": 1,
+          "minItems": 1
+        },
+        "target_dialect": { "$ref": "#/$defs/Dialect" },
+        "target_form_id": { "type": "string", "format": "uuid" },
+        "target_pos_id": { "type": "string", "format": "uuid" },
+        "target_publication_id": { "type": "string", "format": "uuid" },
+        "target_variant_id": { "type": "string", "format": "uuid" },
+        "target_word_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
     "GrammarStructureV3": {
       "type": "object",
       "required": ["id", "variants"],
@@ -854,6 +882,11 @@
         },
         "content": { "$ref": "#/$defs/RichTextV3" },
         "dialect": { "$ref": "#/$defs/Dialect" },
+        "form_links": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/GrammarFormLinkV3" },
+          "maxItems": 100
+        },
         "id": { "type": "string", "format": "uuid" },
         "voice_profile": { "$ref": "#/$defs/VoiceProfileV3" }
       },
@@ -867,7 +900,8 @@
         "draft_relation",
         "phrase_component",
         "form_group_sense_binding",
-        "draft_text_link"
+        "draft_text_link",
+        "grammar_form_link"
       ]
     },
     "InboundReferenceNodeTypeV3": {
@@ -2259,6 +2293,7 @@
         "duplicate_pos_meanings",
         "grammar_required",
         "grammar_variants_invalid",
+        "grammar_form_link_invalid",
         "sense_required",
         "level_invalid",
         "sub_pos_required",
