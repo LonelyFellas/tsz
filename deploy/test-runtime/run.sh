@@ -24,7 +24,12 @@ ssl_certificate /etc/letsencrypt/live/test.tianshengzhi.com/fullchain.pem;
 ssl_certificate_key /etc/letsencrypt/live/test.tianshengzhi.com/privkey.pem; }
 CONF
 cat >/etc/nginx/conf.d/zentao-ip.conf <<'CONF'
-server { listen 8090; location / { proxy_pass http://127.0.0.1:3000; } }
+server {
+    listen 80;
+    server_name 47.121.142.19;
+    location /zentao/ { return 200 'zentao'; }
+    location / { return 404; }
+}
 CONF
 cat >/usr/local/bin/systemctl <<'CONTROL'
 #!/usr/bin/env bash

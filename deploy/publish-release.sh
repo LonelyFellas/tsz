@@ -121,13 +121,18 @@ done
 curl -fsS -m 8 --resolve "$host:443:127.0.0.1" "https://$host/" -o /dev/null
 code="$(curl -sS -m 8 -o /dev/null -w '%{http_code}' --resolve "$host:443:127.0.0.1" "https://$host/api/v1/$api_path")"
 [[ "$code" = 401 ]]
-if [[ "$component" = admin ]]; then
-  curl -fsS -m 8 http://127.0.0.1:8081/login -o /dev/null
-  code="$(curl -sS -m 8 -o /dev/null -w '%{http_code}' http://127.0.0.1:8081/api/v1/admin/profile)"
-  [[ "$code" = 401 ]]
-else
-  curl -fsS -m 8 http://127.0.0.1/ -o /dev/null
-fi
+for port in 80 8081; do
+  for http_host in unknown.invalid 47.121.142.19; do
+    for path in / /login /api/v1/auth/me /api/v1/admin/profile; do
+      code="$(curl --noproxy '*' -sS -m 8 -o /dev/null -w '%{http_code}' -H "Host: $http_host" "http://127.0.0.1:$port$path")"
+      [[ "$code" = 404 ]] || { echo "明文入口未关闭：$http_host:$port$path ($code)，请核对独立 IP 配置" >&2; exit 1; }
+    done
+  done
+done
+for http_host in test.tianshengzhi.com admin-test.tianshengzhi.com; do
+  result="$(curl --noproxy '*' -sS -m 8 -o /dev/null -w '%{http_code} %{redirect_url}' --resolve "$http_host:80:127.0.0.1" "http://$http_host/login")"
+  [[ "$result" = "301 https://$http_host/login" ]]
+done
 "$node_bin" provenance.mjs accept --manifest candidate.json --artifact-root "$release" --output "$manifest"
 "$node_bin" provenance.mjs verify --manifest "$manifest" --artifact-root "$release"
 printf '%s\n' "$(basename "$old")" > "$root/previous"
