@@ -317,7 +317,7 @@ function ContactForm({
             <button
               className={`${BUTTON} shrink-0`}
               type="button"
-              disabled={!targetValid || oldCountdown > 0}
+              disabled={busy || !targetValid || oldCountdown > 0}
               onClick={() => sendCode("old")}
             >
               {oldCountdown ? `${oldCountdown}s 后重发` : "验证原渠道"}
@@ -339,7 +339,7 @@ function ContactForm({
               <button
                 className={`${BUTTON} shrink-0`}
                 type="button"
-                disabled={!targetValid || newCountdown > 0}
+                disabled={busy || !targetValid || newCountdown > 0}
                 onClick={() => sendCode("new")}
               >
                 {newCountdown ? `${newCountdown}s 后重发` : "验证新渠道"}
