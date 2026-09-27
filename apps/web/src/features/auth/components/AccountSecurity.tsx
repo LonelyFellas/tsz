@@ -245,7 +245,7 @@ function ContactForm({
   }
 
   return (
-    <form onSubmit={submit} className="space-y-5">
+    <form noValidate onSubmit={submit} className="space-y-5">
       <h2 className="text-xl font-semibold text-foreground">{title}</h2>
       <p className="text-sm leading-6 text-foreground-muted">
         先验证任一已绑定的联系方式。
@@ -266,7 +266,13 @@ function ContactForm({
               type={action.channel === "phone" ? "tel" : "email"}
               value={contact}
               onChange={(e) => {
-                setContact(e.target.value);
+                const next = e.target.value;
+                const normalized =
+                  action.channel === "email"
+                    ? next.trim().toLowerCase()
+                    : next.trim();
+                if (normalized !== target) setNewCountdown(0);
+                setContact(next);
                 setCode("");
                 setVerificationCode("");
                 setError("");
@@ -282,6 +288,7 @@ function ContactForm({
             value={verificationChannel}
             onChange={(e) => {
               setVerificationChannel(e.target.value as ContactChannel);
+              setOldCountdown(0);
               setVerificationCode("");
               setError("");
             }}

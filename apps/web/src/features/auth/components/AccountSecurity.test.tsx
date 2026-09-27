@@ -86,6 +86,42 @@ afterEach(() => {
 });
 
 describe("AccountSecurity", () => {
+  it("新目标和验证渠道各自重置倒计时，不重置未变化的收件人", async () => {
+    seed({ email: EMAIL });
+    await open("换绑邮箱");
+    fill("新邮箱", "first@example.com");
+    fireEvent.click(screen.getByRole("button", { name: "验证原渠道" }));
+    await waitFor(() => expect(screen.getByLabelText("新邮箱")).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "验证新渠道" }));
+    await waitFor(() =>
+      expect(screen.getAllByRole("button", { name: /后重发/ })).toHaveLength(2)
+    );
+    fill("新邮箱", "FIRST@example.com");
+    expect(screen.getAllByRole("button", { name: /后重发/ })).toHaveLength(2);
+    fill("新邮箱", "second@example.com");
+    expect(screen.getByRole("button", { name: "验证新渠道" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /后重发/ })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "验证新渠道" }));
+    await waitFor(() =>
+      expect(auth.requestContactBindCode).toHaveBeenLastCalledWith(
+        "second@example.com"
+      )
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText("身份验证渠道")).toBeEnabled()
+    );
+    fill("身份验证渠道", "email");
+    expect(screen.getByRole("button", { name: "验证原渠道" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "验证原渠道" }));
+    await waitFor(() =>
+      expect(auth.requestContactVerificationCode).toHaveBeenLastCalledWith({
+        operation: "bind",
+        contact: "second@example.com",
+        verification_channel: "email"
+      })
+    );
+  });
+
   it.each([
     { contact: { phone: PHONE }, binding: "绑定邮箱", unlink: "解绑手机号" },
     {

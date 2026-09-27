@@ -18,7 +18,7 @@ test.describe("找回密码端到端流程", () => {
     });
     await page.goto("/forgot-password");
     await page.getByRole("button", { name: "邮箱", exact: true }).click();
-    await page.getByPlaceholder("请输入邮箱").fill("Recovery@EXAMPLE.com");
+    await page.getByPlaceholder("请输入邮箱").fill(" Recovery@EXAMPLE.com ");
     await page.getByRole("button", { name: "获取验证码" }).click();
     await expect(page.getByText(/后重发/)).toBeVisible();
     await page.getByPlaceholder("请输入验证码").fill("000000");

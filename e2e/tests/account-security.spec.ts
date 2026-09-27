@@ -74,6 +74,49 @@ async function fillBind(page: Page, oldCode = "123456", newCode = "654321") {
 }
 
 test.describe("账号安全", () => {
+  test("游客直达安全页跳转登录并保留回跳目标", async ({ page }) => {
+    await mockApi(page, { authenticated: false });
+    await page.goto("/account/security");
+    await expect(page).toHaveURL(/\/login\?redirect=%2Faccount%2Fsecurity$/);
+    await expect(page.getByRole("heading", { name: "账号安全" })).toHaveCount(
+      0
+    );
+  });
+
+  test("硬刷新等待会话恢复后才加载账号安全资料", async ({ page }) => {
+    await mockApi(page, { authenticated: true });
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let meRequests = 0;
+    await page.route("**/api/v1/auth/refresh", async (route) => {
+      await pending;
+      await route.fallback();
+    });
+    await page.route("**/api/v1/auth/me", async (route) => {
+      meRequests += 1;
+      expect(route.request().headers().authorization).toBe(
+        "Bearer test-access-token"
+      );
+      await route.fallback();
+    });
+    await page.goto("/account/security");
+    try {
+      await expect(page.getByText("加载中...", { exact: true })).toBeVisible();
+      expect(meRequests).toBe(0);
+    } finally {
+      release();
+    }
+    await expect(
+      page.getByRole("button", { name: "换绑邮箱", exact: true })
+    ).toBeVisible();
+    await page.reload();
+    await expect(
+      page.getByRole("button", { name: "换绑邮箱", exact: true })
+    ).toBeVisible();
+  });
+
   test("个人中心进入安全页，手机账号绑定邮箱后整页退出", async ({ page }) => {
     const requests = await securityApi(page, { email: undefined });
     await page.goto("/account");
@@ -83,7 +126,7 @@ test.describe("账号安全", () => {
       page.getByRole("button", { name: "解绑手机号" })
     ).toBeDisabled();
     await page.getByRole("button", { name: "绑定邮箱", exact: true }).click();
-    await page.getByLabel("新邮箱", { exact: true }).fill("New@EXAMPLE.com");
+    await page.getByLabel("新邮箱", { exact: true }).fill(" New@EXAMPLE.com ");
     await page.getByRole("button", { name: "验证原渠道" }).click();
     await expect(page.getByLabel("新邮箱", { exact: true })).toBeEnabled();
     await page.getByRole("button", { name: "验证新渠道" }).click();

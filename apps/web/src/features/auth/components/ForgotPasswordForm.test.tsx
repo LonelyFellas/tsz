@@ -48,6 +48,25 @@ describe("ForgotPasswordForm — 按钮状态", () => {
     renderWithProviders(<ForgotPasswordForm />);
   });
 
+  it("切换真实邮箱目标可立即发码，同一归一化目标保持冷却", async () => {
+    mockForgot.mockResolvedValue({ status: "ok" });
+    fireEvent.click(screen.getByRole("button", { name: "邮箱" }));
+    const account = screen.getByPlaceholderText("请输入邮箱");
+    fireEvent.change(account, { target: { value: "first@example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: "获取验证码" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /后重发/ })).toBeDisabled()
+    );
+    fireEvent.change(account, { target: { value: "FIRST@example.com" } });
+    expect(screen.getByRole("button", { name: /后重发/ })).toBeDisabled();
+    fireEvent.change(account, { target: { value: "second@example.com" } });
+    expect(screen.getByRole("button", { name: "获取验证码" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "获取验证码" }));
+    await waitFor(() =>
+      expect(mockForgot).toHaveBeenLastCalledWith("second@example.com")
+    );
+  });
+
   it("初始状态下重置按钮禁用", () => {
     expect(screen.getByRole("button", { name: "重置密码" })).toBeDisabled();
   });

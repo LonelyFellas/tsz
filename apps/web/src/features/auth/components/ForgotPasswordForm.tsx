@@ -129,7 +129,7 @@ export function ForgotPasswordForm() {
             ))}
           </div>
 
-          <form className="space-y-4" onSubmit={handleReset}>
+          <form noValidate className="space-y-4" onSubmit={handleReset}>
             {/* 账号 */}
             <div>
               <label className="block text-sm text-foreground-muted mb-1">
@@ -141,7 +141,11 @@ export function ForgotPasswordForm() {
                 value={account}
                 disabled={busy}
                 onChange={(e) => {
-                  setAccount(e.target.value);
+                  const next = e.target.value;
+                  const normalized =
+                    tab === "email" ? next.trim().toLowerCase() : next.trim();
+                  if (normalized !== identifier) setCountdown(0);
+                  setAccount(next);
                   setCode("");
                   setError("");
                 }}
