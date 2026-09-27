@@ -8,6 +8,7 @@ const base: AdminUserView = {
   display_name: "Full",
   avatar_url: "",
   roles: ["student"],
+  teacher_verified: false,
   status: "active",
   created_at: "2026-06-01T08:00:00Z",
   updated_at: "2026-06-02T09:30:00Z"
@@ -34,6 +35,15 @@ describe("UserDetailDrawer", () => {
     // 师生合一：两个角色 tag 都在。
     expect(screen.getByText("学生")).toBeInTheDocument();
     expect(screen.getByText("老师")).toBeInTheDocument();
+  });
+
+  it.each([true, false])("展示教师认证状态：%s", (verified) => {
+    const user = { ...base, teacher_verified: verified };
+    render(<UserDetailDrawer user={user} onClose={vi.fn()} />);
+    expect(screen.getByText("教师认证")).toBeInTheDocument();
+    expect(
+      screen.getByText(verified ? "已认证" : "未认证")
+    ).toBeInTheDocument();
   });
 
   it("最小用户：缺失字段显示占位「-」，状态正常", () => {
