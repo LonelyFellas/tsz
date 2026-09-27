@@ -79,6 +79,7 @@ function seed(): AdminUserView[] {
     display_name: s.name,
     avatar_url: "",
     roles: [s.role],
+    teacher_verified: false,
     status: s.status ?? "active",
     created_at: "2026-06-01T08:00:00Z",
     updated_at: "2026-06-02T08:00:00Z"
@@ -178,6 +179,16 @@ describe("UserManagement", () => {
     expect(screen.getAllByText("-").length).toBeGreaterThan(0);
     // 首行带 level：「等级」列的有值分支渲染成 Tag「B2等级」。
     expect(screen.getByText("B2等级")).toBeInTheDocument();
+  });
+
+  it("列表展示真实教师认证状态，不从教师角色推断", async () => {
+    Object.assign(users[0]!, { teacher_verified: true });
+    Object.assign(users[1]!, { teacher_verified: false });
+    renderPage();
+    const verifiedRow = (await screen.findByText("record")).closest("tr")!;
+    const unverifiedRow = screen.getByText("workout").closest("tr")!;
+    expect(within(verifiedRow).getByText("已认证")).toBeInTheDocument();
+    expect(within(unverifiedRow).getByText("未认证")).toBeInTheDocument();
   });
 
   it("切换到「老师」tab 只留老师行", async () => {
@@ -293,9 +304,8 @@ describe("UserManagement", () => {
     renderPage();
     await screen.findByText("record");
     clickRowButton(/^禁\s?用$/);
-    // 文案不承诺「立即下线」：禁用有一个 access-token TTL 的延迟。
     expect(
-      await screen.findByText(/最长在一个访问令牌有效期内失效/)
+      await screen.findByText(/禁用后该用户无法登录或继续访问受保护功能/)
     ).toBeInTheDocument();
     clickConfirmOk(/^禁\s?用$/);
     await waitFor(() =>
@@ -313,7 +323,9 @@ describe("UserManagement", () => {
     await screen.findByText("aged");
     clickRowButton(/^启\s?用$/);
     expect(
-      await screen.findByText("启用后该用户可以重新登录。确认启用？")
+      await screen.findByText(
+        /启用后该用户可以重新登录，原有角色和绑定信息保持不变/
+      )
     ).toBeInTheDocument();
     clickConfirmOk(/^启\s?用$/);
     await waitFor(() =>
@@ -327,7 +339,7 @@ describe("UserManagement", () => {
     renderPage();
     await screen.findByText("record");
     clickRowButton(/^禁\s?用$/);
-    await screen.findByText(/最长在一个访问令牌有效期内失效/);
+    await screen.findByText(/禁用后该用户无法登录或继续访问受保护功能/);
     clickConfirmOk(/^禁\s?用$/);
     expect(await screen.findByText("需超级管理员权限")).toBeInTheDocument();
   });

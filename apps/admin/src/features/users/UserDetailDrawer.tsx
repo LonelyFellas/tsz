@@ -44,6 +44,11 @@ export function UserDetailDrawer({ user, onClose }: Props) {
               ))}
             </Space>
           </Descriptions.Item>
+          <Descriptions.Item label="教师认证">
+            <Tag color={user.teacher_verified ? "success" : "default"}>
+              {user.teacher_verified ? "已认证" : "未认证"}
+            </Tag>
+          </Descriptions.Item>
           <Descriptions.Item label="等级">
             {user.level ? (
               <Tag color={levelColor(user.level)}>{user.level}等级</Tag>

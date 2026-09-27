@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/.claude/worktrees/account-permissions-batch-3/docs/openapi.json",
-  "_generatedAt": "2026-09-27T01:35:02.289Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/account-permissions-batch-4/docs/openapi.json",
+  "_generatedAt": "2026-09-27T09:52:58.376Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],

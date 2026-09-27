@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/.claude/worktrees/account-permissions-batch-3/docs/openapi.json",
-  "_source_sha256": "519a05239d0843428298f79febdaa0f146ba168d2c1bee6b2ec7ac8e6b003bd3",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/account-permissions-batch-4/docs/openapi.json",
+  "_source_sha256": "6fa1b8fd39d1eb16499ade0b5910c328ab9be48a27986b3755a18c1db4130208",
   "roots": [
     "SharedSentence",
     "SentencePublication",

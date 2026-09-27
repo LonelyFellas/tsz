@@ -76,8 +76,6 @@ export function UserManagement() {
   const notReady = (label: string) =>
     message.info(`${label}功能待接入，接口开发中`);
 
-  // 启禁用是有后果的动作，二次确认。禁用不即时踢线（后端接受一个 access-token TTL
-  // 的延迟），文案据实说明，别承诺「立即下线」。
   const confirmToggleStatus = (record: AdminUserView) => {
     const next = record.status === "active" ? "disabled" : "active";
     const verb = next === "disabled" ? "禁用" : "启用";
@@ -85,8 +83,8 @@ export function UserManagement() {
       title: `${verb}用户「${record.display_name}」`,
       content:
         next === "disabled"
-          ? "禁用后该用户无法再登录；已登录的会话不会立即断开，最长在一个访问令牌有效期内失效。确认禁用？"
-          : "启用后该用户可以重新登录。确认启用？",
+          ? "禁用后该用户无法登录或继续访问受保护功能，原有角色和绑定信息会保留。确认禁用？"
+          : "启用后该用户可以重新登录，原有角色和绑定信息保持不变。确认启用？",
       okText: verb,
       okButtonProps: { danger: next === "disabled" },
       cancelText: "取消",
@@ -145,6 +143,16 @@ export function UserManagement() {
             </Tag>
           ))}
         </Space>
+      )
+    },
+    {
+      title: "教师认证",
+      dataIndex: "teacher_verified",
+      width: 110,
+      render: (verified: boolean) => (
+        <Tag color={verified ? "success" : "default"}>
+          {verified ? "已认证" : "未认证"}
+        </Tag>
       )
     },
     {
