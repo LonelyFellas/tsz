@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import type { PublishedSentenceTargetCandidateV3 } from "@tsz/types";
 import { V3TargetCascader } from "./V3TargetCascader";
@@ -47,16 +47,24 @@ function candidate(glosses: string[]): PublishedSentenceTargetCandidateV3 {
 
 beforeEach(() => search.mockReset());
 
+async function renderUnselected(onReplace: () => void) {
+  // 候选请求完成后才挂载 Panel；先等待挂载 effect（初始展开路径）提交，
+  // 避免只等文字出现就点击，随后被初始化 effect 重置展开状态。
+  await act(async () => {
+    render(
+      <V3TargetCascader literal="some" targets={[]} onReplace={onReplace} />
+    );
+  });
+}
+
 it("新选时隐藏空字符串和纯空白词义，正常词义仍可选择", async () => {
   search.mockResolvedValue({
     matches: [candidate(["一些", "", "  \n "])],
     truncated: false
   });
   const onReplace = vi.fn();
-  render(
-    <V3TargetCascader literal="some" targets={[]} onReplace={onReplace} />
-  );
-  fireEvent.click(await screen.findByText("some"));
+  await renderUnselected(onReplace);
+  fireEvent.click(screen.getByText("some"));
   fireEvent.click(await screen.findByText("原形 some"));
   expect(document.querySelectorAll(".v3-component-usage-sense")).toHaveLength(
     1
@@ -110,10 +118,8 @@ it("全部词义为空时禁用词形，不产生可选空白叶子", async () =
     truncated: false
   });
   const onReplace = vi.fn();
-  render(
-    <V3TargetCascader literal="some" targets={[]} onReplace={onReplace} />
-  );
-  fireEvent.click(await screen.findByText("some"));
+  await renderUnselected(onReplace);
+  fireEvent.click(screen.getByText("some"));
   const form = await screen.findByText("原形 some（暂无可关联词义）");
   expect(form.closest("li")).toHaveClass("ant-cascader-menu-item-disabled");
   fireEvent.click(form);

@@ -4,7 +4,7 @@ import type { Role } from "./user";
 import type { AdminPaginationMeta } from "./admin";
 
 /**
- * GET /admin/users 列表项。required: id, display_name, avatar_url, roles, status,
+ * GET /admin/users 列表项。required: id, display_name, avatar_url, roles, teacher_verified, status,
  * created_at, updated_at；phone / email 可选（邮箱账号无手机，反之亦然）。
  */
 export interface AdminUser {
@@ -18,6 +18,7 @@ export interface AdminUser {
   avatar_url: string;
   /** 师生合一：一个账号可同时持有 student / teacher。 */
   roles: Role[];
+  teacher_verified: boolean;
   status: "active" | "disabled";
   /** ISO8601 注册时间。 */
   created_at: string;

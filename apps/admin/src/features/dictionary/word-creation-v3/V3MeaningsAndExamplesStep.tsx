@@ -5,10 +5,7 @@ import {
 } from "./components/V3RelationSorting";
 import { toRichTextV2 } from "@tsz/voice-editor/core";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
-import {
-  PronunciationPreviewProvider,
-  PronunciationPreviewControls
-} from "../word-creation/PronunciationPreview";
+import { PronunciationPreviewProvider } from "../word-creation/PronunciationPreview";
 import {
   CaretDownFilled,
   CaretUpFilled,
@@ -96,7 +93,6 @@ import { reorderPos } from "./operations";
 import "./posTabs.css";
 import { v3IssueMessage } from "./presentationErrors";
 import { countV3PosMeaningIncomplete } from "./posCompletion";
-import { V3VoiceTextField } from "./components/V3VoiceTextField";
 import { V3GrammarVoiceTextField } from "./components/V3GrammarVoiceTextField";
 import { V3LinkedEnglishTextField } from "./components/V3LinkedEnglishTextField";
 import { V3AddBasicPosSelect } from "./components/V3AddBasicPosSelect";

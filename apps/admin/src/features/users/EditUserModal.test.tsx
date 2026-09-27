@@ -21,6 +21,7 @@ const user: AdminUserView = {
   display_name: "Frank",
   avatar_url: "",
   roles: ["student"],
+  teacher_verified: false,
   status: "active",
   created_at: "2026-06-01T08:00:00Z",
   updated_at: "2026-06-01T08:00:00Z"
