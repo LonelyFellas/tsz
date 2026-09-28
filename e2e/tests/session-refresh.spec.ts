@@ -13,6 +13,7 @@ test("离线登出后 online 不会用残留 cookie 重新登录", async ({ page
   );
   await page.goto("/student/practice");
   await expect(page.getByRole("heading", { name: "今日练习" })).toBeVisible();
+  await page.getByRole("button", { name: "账户菜单" }).click();
   await page.getByRole("button", { name: "退出登录" }).click();
   await expect(page).toHaveURL(/\/login(?:\?|$)/);
   await expect(page.getByRole("button", { name: "立即登录" })).toBeVisible();
