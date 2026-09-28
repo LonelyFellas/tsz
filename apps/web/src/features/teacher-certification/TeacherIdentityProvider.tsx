@@ -129,7 +129,8 @@ export function TeacherIdentityProvider({ children }: { children: ReactNode }) {
       if (!result.data?.teacher_verified)
         throw new Error("当前账号尚未通过教师认证");
     }
-    writeWorkspaceIdentity(userId, next);
+    if (!writeWorkspaceIdentity(userId, next))
+      throw new Error("无法保存工作台偏好，请检查浏览器存储设置后重试");
     router.push(next === "teacher" ? "/teacher/classes" : "/student/practice");
   }
 

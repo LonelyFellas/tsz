@@ -13,12 +13,13 @@ export function readWorkspaceIdentity(userId: string): WorkspaceIdentity {
 export function writeWorkspaceIdentity(
   userId: string,
   identity: WorkspaceIdentity
-): void {
+): boolean {
   try {
     localStorage.setItem(`tsz:workspace:${userId}`, identity);
     window.dispatchEvent(new Event("workspace-identity-change"));
+    return true;
   } catch {
-    // 存储不可用时保留学生工作台，不影响后端教师资格。
+    return false;
   }
 }
 

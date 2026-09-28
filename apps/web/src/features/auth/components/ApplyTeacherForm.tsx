@@ -101,6 +101,7 @@ function ApplicationEditor({
     initial.application?.statement ?? ""
   );
   const [files, setFiles] = useState(initial.files);
+  const [pendingCleanup, setPendingCleanup] = useState<CertificationFile[]>([]);
   const [uploading, setUploading] = useState(false);
   const [fileError, setFileError] = useState("");
   const temporary = useRef(new Set<string>());
@@ -172,8 +173,12 @@ function ApplicationEditor({
         if (group.limit === 1) {
           for (const old of previous)
             if (temporary.current.has(old.id)) {
-              await api.teacherCertification.removeFile(old.id);
-              temporary.current.delete(old.id);
+              try {
+                await api.teacherCertification.removeFile(old.id);
+                temporary.current.delete(old.id);
+              } catch {
+                setPendingCleanup((current) => [...current, old]);
+              }
             }
         }
       }
@@ -193,6 +198,9 @@ function ApplicationEditor({
         temporary.current.delete(file.id);
       }
       setFiles((current) => current.filter((item) => item.id !== file.id));
+      setPendingCleanup((current) =>
+        current.filter((item) => item.id !== file.id)
+      );
     } catch (error) {
       setFileError(error instanceof Error ? error.message : "移除失败，请重试");
     } finally {
@@ -332,6 +340,25 @@ function ApplicationEditor({
           {statement.length}/2000
         </span>
       </div>
+      {pendingCleanup.length > 0 && (
+        <div
+          role="status"
+          className="space-y-2 rounded-xl border border-border p-4 text-sm"
+        >
+          <p>旧材料清理失败，请重试；新材料已保留，不影响提交。</p>
+          {pendingCleanup.map((file) => (
+            <button
+              key={file.id}
+              type="button"
+              disabled={uploading || mutation.isPending}
+              onClick={() => void remove(file)}
+              className="block text-primary disabled:opacity-50"
+            >
+              重试清理{groups.find((group) => group.kind === file.kind)?.label}
+            </button>
+          ))}
+        </div>
+      )}
       {fileError && (
         <p role="alert" className="text-sm text-danger">
           {fileError}

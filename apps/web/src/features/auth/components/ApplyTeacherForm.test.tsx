@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 import { ApplyTeacherForm } from "./ApplyTeacherForm";
@@ -99,4 +99,62 @@ it("shows a pending application without editable fields or a second submit", asy
     screen.queryByRole("button", { name: "提交审核" })
   ).not.toBeInTheDocument();
   expect(screen.queryByLabelText("真实姓名")).not.toBeInTheDocument();
+});
+
+it("keeps a retry action for failed old-material cleanup without losing the replacement", async () => {
+  const user = userEvent.setup();
+  let sequence = 0;
+  vi.mocked(api.teacherCertification.upload).mockImplementation(
+    async (kind) => ({
+      id: `${kind}-${++sequence}`,
+      kind,
+      content_type: "image/png",
+      size_bytes: 4
+    })
+  );
+  vi.mocked(api.teacherCertification.removeFile)
+    .mockRejectedValueOnce(new Error("删除连接失败"))
+    .mockResolvedValue(undefined);
+  vi.mocked(api.teacherCertification.submit).mockRejectedValue(
+    new Error("提交连接失败")
+  );
+  renderForm();
+  await user.type(await screen.findByLabelText("真实姓名"), "测试老师");
+  await user.type(screen.getByLabelText("联系方式"), "teacher@example.test");
+  await user.type(screen.getByLabelText("认证说明"), "申请任教");
+  for (const label of [
+    "身份证人像面",
+    "身份证国徽面",
+    "学历证书",
+    "语言成绩",
+    "身份证人像面"
+  ]) {
+    await user.upload(
+      screen.getByLabelText(label),
+      new File(["test"], `material-${sequence}.png`, { type: "image/png" })
+    );
+    await waitFor(() => expect(screen.getByLabelText(label)).toBeEnabled());
+  }
+  const retry = await screen.findByRole("button", {
+    name: "重试清理身份证人像面"
+  });
+  expect(api.teacherCertification.removeFile).toHaveBeenCalledWith(
+    "id_front-1"
+  );
+  expect(screen.getByRole("button", { name: "提交审核" })).toBeEnabled();
+  await user.click(screen.getByRole("button", { name: "提交审核" }));
+  await screen.findByText("提交连接失败");
+  expect(api.teacherCertification.submit).toHaveBeenCalledWith(
+    expect.objectContaining({ id_front: "id_front-5" })
+  );
+  await user.click(retry);
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("button", { name: "重试清理身份证人像面" })
+    ).not.toBeInTheDocument()
+  );
+  expect(api.teacherCertification.removeFile).toHaveBeenLastCalledWith(
+    "id_front-1"
+  );
+  expect(api.teacherCertification.removeFile).toHaveBeenCalledTimes(2);
 });
