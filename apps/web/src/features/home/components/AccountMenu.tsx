@@ -5,12 +5,16 @@ import { useEffect, useRef, useState } from "react";
 import { useUserStore } from "@/stores/user";
 import { displayNameOf } from "@/lib/user";
 import { useLogout } from "@/features/auth/hooks/useLogout";
+import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIdentityProvider";
 
 // 账户菜单——头像触发的下拉。把编辑资料/退出/注销等账户操作收纳起来,顶栏只露一个头像。
 // 头像优先用后端 avatar_url 字段;缺失或加载失败时回退到昵称首字母色块作默认头像。
 export function AccountMenu() {
   const user = useUserStore((s) => s.user);
   const logout = useLogout();
+  const teacher = useTeacherIdentity();
+  const [switching, setSwitching] = useState(false);
+  const [switchError, setSwitchError] = useState("");
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   // 记录「哪个 URL」加载失败而非布尔闩锁:换头像后 avatar_url 变化,新图自动重试。
@@ -77,9 +81,64 @@ export function AccountMenu() {
             <p className="truncate text-sm font-medium text-foreground">
               {displayName}
             </p>
-            <p className="truncate text-xs text-foreground-subtle">已登录</p>
+            <p className="truncate text-xs text-foreground-subtle">
+              {teacher.identity === "teacher" ? "教师工作台" : "学生工作台"}
+            </p>
+            {teacher.verified && (
+              <span className="mt-1 inline-block text-xs text-primary">
+                已认证教师
+              </span>
+            )}
           </div>
           <div className="my-1 h-px bg-border" />
+          {teacher.verified && (
+            <button
+              type="button"
+              disabled={switching}
+              className="block w-full rounded-lg px-3 py-2 text-left text-sm text-primary hover:bg-muted disabled:opacity-50"
+              onClick={async () => {
+                setSwitching(true);
+                setSwitchError("");
+                try {
+                  await teacher.select(
+                    teacher.identity === "teacher" ? "student" : "teacher"
+                  );
+                  setOpen(false);
+                } catch (error) {
+                  setSwitchError(
+                    error instanceof Error ? error.message : "切换失败，请重试"
+                  );
+                } finally {
+                  setSwitching(false);
+                }
+              }}
+            >
+              {switching
+                ? "正在切换…"
+                : teacher.identity === "teacher"
+                  ? "切换为学生身份"
+                  : "切换为教师身份"}
+            </button>
+          )}
+          {switchError && (
+            <p role="alert" className="px-3 py-2 text-xs text-danger">
+              {switchError}
+            </p>
+          )}
+          <Link
+            href="/apply-teacher"
+            onClick={() => setOpen(false)}
+            className="block rounded-lg px-3 py-2 text-sm text-foreground-muted hover:bg-muted"
+          >
+            教师认证
+          </Link>
+          <Link
+            href="/account/notifications"
+            onClick={() => setOpen(false)}
+            className="block rounded-lg px-3 py-2 text-sm text-foreground-muted hover:bg-muted"
+          >
+            站内通知
+          </Link>
           <Link
             href="/account"
             onClick={() => setOpen(false)}

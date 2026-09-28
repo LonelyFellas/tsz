@@ -1,10 +1,12 @@
-// 用户详情（只读抽屉）。列表项已是完整 AdminUser（详情接口 GET /admin/users/{id} 同形），
+// 用户详情。列表项已是完整 AdminUser（详情接口 GET /admin/users/{id} 同形），
 // 故直接复用行数据、无需二次请求。等级/天生币余额后端暂不返回，显示占位「-」。
 import { Avatar, Badge, Descriptions, Drawer, Space, Tag } from "antd";
 import { UserOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import type { AdminUserView } from "@tsz/types";
 import { CopyableText } from "@/components/CopyableText";
+import { useIsSuperAdmin } from "@/lib/auth";
+import { RevokeTeacherButton } from "@/features/teacher-certification/RevokeTeacherButton";
 import { ROLE_LABEL, ROLE_TAG_COLOR, levelColor } from "./labels";
 
 interface Props {
@@ -17,10 +19,16 @@ function fmt(t?: string): string {
 }
 
 export function UserDetailDrawer({ user, onClose }: Props) {
+  const isSuperAdmin = useIsSuperAdmin();
   return (
     <Drawer
       open={!!user}
       onClose={onClose}
+      extra={
+        isSuperAdmin && user?.teacher_verified ? (
+          <RevokeTeacherButton userId={user.id} onSuccess={onClose} />
+        ) : undefined
+      }
       // antd v6 弃用 Drawer 的 width，改用 size（现接受 number）。
       size={480}
       title={

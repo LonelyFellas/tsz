@@ -3,21 +3,21 @@
 import Link from "next/link";
 import { useUserStore } from "@/stores/user";
 import { ThemeToggle } from "@/features/theme/ThemeToggle";
-import { LogoutButton } from "./LogoutButton";
+import { AccountMenu } from "@/features/home/components/AccountMenu";
+import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIdentityProvider";
 
-// 登录后主区导航：角色感知（师/生看到各自入口）。
-// 订阅 user 本身再计算角色——store 的 hasRole 是稳定函数引用，user 变化时不会触发重渲染。
 export function MainNav() {
   const user = useUserStore((s) => s.user);
-  const isTeacher = !!user?.roles.includes("teacher");
-  const isStudent = !!user?.roles.includes("student");
+  const teacher = useTeacherIdentity();
+  const isTeacher = teacher.verified && teacher.identity === "teacher";
+  const isStudent = !!user && !isTeacher;
 
   return (
-    <header className="flex items-center gap-6 border-b border-border py-4">
+    <header className="flex flex-wrap items-center gap-4 border-b border-border py-4">
       <Link href="/" className="font-bold">
         天生会背
       </Link>
-      <nav className="flex flex-1 gap-4 text-sm">
+      <nav className="flex flex-1 flex-wrap gap-4 text-sm">
         <Link href="/wordlists">词表</Link>
         {isTeacher && (
           <>
@@ -32,14 +32,14 @@ export function MainNav() {
             <Link href="/student/coins">天生币</Link>
           </>
         )}
-        {!isTeacher && (
+        {!teacher.verified && (
           <Link href="/apply-teacher" className="text-primary">
             申请成为老师
           </Link>
         )}
       </nav>
       <ThemeToggle />
-      <LogoutButton />
+      <AccountMenu />
     </header>
   );
 }

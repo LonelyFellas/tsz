@@ -285,14 +285,6 @@ describe("createEndpoints · auth", () => {
     );
   });
 
-  it("applyTeacher → POST /auth/apply-teacher 带 { profile }", () => {
-    const api = createEndpoints(http);
-    api.auth.applyTeacher({ realName: "张三" });
-    expect(http.post).toHaveBeenCalledWith("/auth/apply-teacher", {
-      profile: { realName: "张三" }
-    });
-  });
-
   it("updateLearningSettings → PUT /me/learning-settings 带 cefr_level + english_variant", () => {
     const api = createEndpoints(http);
     api.auth.updateLearningSettings({

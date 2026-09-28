@@ -17,6 +17,7 @@ import type {
   WordList
 } from "@tsz/types";
 import type { HttpClient } from "./http";
+import { createTeacherCertificationEndpoints } from "./teacher-certification";
 
 // ---- Auth 相关类型(对齐 tsz-rust 后端,权威 spec 见 openapi.snapshot.json) ----
 
@@ -103,6 +104,7 @@ export type OtpPurpose =
 
 export function createEndpoints(http: HttpClient) {
   return {
+    teacherCertification: createTeacherCertificationEndpoints(http),
     auth: {
       /**
        * GET /auth/me — 当前登录用户信息。后端返回扁平 UserProfile,
@@ -207,8 +209,6 @@ export function createEndpoints(http: HttpClient) {
         http.del<void>("/auth/account", input, {
           retryOnUnauthorized: false
         }),
-      applyTeacher: (profile: Record<string, string>) =>
-        http.post<User>("/auth/apply-teacher", { profile }),
       /** PUT /me/learning-settings — 设置 CEFR 等级 + 英式/美式（新用户 onboarding 与后续修改共用） */
       updateLearningSettings: (settings: LearningSettings) =>
         http.put<LearningSettingsResponse>("/me/learning-settings", settings),

@@ -168,7 +168,8 @@ export function createHttpClient({
     retrying = false,
     skipAuth = false,
     retryOnUnauthorized:
-      boolean | ((code: string | undefined) => boolean) = true
+      boolean | ((code: string | undefined) => boolean) = true,
+    responseType: "json" | "blob" = "json"
   ): Promise<T> {
     const generation = getSessionGeneration?.();
     const isCurrent = () => generation === getSessionGeneration?.();
@@ -211,7 +212,14 @@ export function createHttpClient({
         throw error;
       }
       if (!isCurrent()) throw new Error("session changed");
-      return request<T>(path, init, true, skipAuth, retryOnUnauthorized);
+      return request<T>(
+        path,
+        init,
+        true,
+        skipAuth,
+        retryOnUnauthorized,
+        responseType
+      );
     }
 
     if (parsedError) {
@@ -230,6 +238,12 @@ export function createHttpClient({
       );
     }
 
+    if (responseType === "blob") {
+      const blob = await res.blob();
+      if (!skipAuth && !isCurrent()) throw new Error("session changed");
+      return blob as T;
+    }
+
     // 204 No Content / 202 Accepted(otp/send)等空 body:直接 res.json() 会抛
     // SyntaxError,统一按文本解析、空则返回 undefined。
     const text = await res.text();
@@ -238,6 +252,22 @@ export function createHttpClient({
   }
 
   return {
+    getBlob: (path: string, opts?: { signal?: AbortSignal }) =>
+      request<Blob>(
+        path,
+        { signal: opts?.signal, cache: "no-store" },
+        false,
+        false,
+        true,
+        "blob"
+      ),
+    upload: <T>(path: string, body: Blob, opts?: { signal?: AbortSignal }) =>
+      request<T>(path, {
+        method: "POST",
+        body,
+        headers: { "Content-Type": body.type || "application/octet-stream" },
+        signal: opts?.signal
+      }),
     get: <T>(path: string, opts?: { signal?: AbortSignal }) =>
       request<T>(path, opts?.signal ? { signal: opts.signal } : {}),
     post: <T>(

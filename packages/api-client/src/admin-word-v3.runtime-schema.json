@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/grammar-form-pronunciation/docs/openapi.json",
-  "_source_sha256": "fa998c4ba3c41ed0bd86b0c9fa2e03f6e31a119d3a447d2382bcc42e453b651d",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/teacher-certification-batch-5/docs/openapi.json",
+  "_source_sha256": "af9b0cdce58bb7ea7092eaff30daad73093441df02f4467479dec7f66ce6b02c",
   "roots": [
     "SharedSentence",
     "SentencePublication",
