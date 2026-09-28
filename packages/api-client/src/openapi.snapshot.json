@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/grammar-form-pronunciation/docs/openapi.json",
-  "_generatedAt": "2026-09-27T13:06:40.474Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/teacher-certification-batch-5/docs/openapi.json",
+  "_generatedAt": "2026-09-28T05:56:47.080Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -70,9 +70,14 @@
     ],
     "/admin/speech/previews": ["post"],
     "/admin/speech/voices": ["get"],
+    "/admin/teacher-applications": ["get"],
+    "/admin/teacher-applications/{id}": ["get"],
+    "/admin/teacher-applications/{id}/review": ["post"],
+    "/admin/teacher-certification/files/{id}": ["get"],
     "/admin/users": ["get"],
     "/admin/users/{id}": ["get", "patch"],
     "/admin/users/{id}/status": ["patch"],
+    "/admin/users/{id}/teacher-certification": ["delete"],
     "/auth/account": ["delete"],
     "/auth/account/deletion-code": ["post"],
     "/auth/login": ["post"],
@@ -88,6 +93,13 @@
     "/me/contact/bind-code": ["post"],
     "/me/contact/unbind": ["post"],
     "/me/contact/verification-code": ["post"],
+    "/me/notifications": ["get"],
+    "/me/notifications/{id}/read": ["patch"],
+    "/me/teacher-certification": ["get"],
+    "/me/teacher-certification/applications": ["post"],
+    "/me/teacher-certification/applications/{id}": ["get"],
+    "/me/teacher-certification/files": ["post"],
+    "/me/teacher-certification/files/{id}": ["delete", "get"],
     "/otp/send": ["post"]
   },
   "operationHeaders": {

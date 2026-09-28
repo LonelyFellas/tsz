@@ -143,10 +143,9 @@ const GROUPS: Group[] = [
         disabled: true
       },
       {
-        key: "todo:teacher-apply",
+        key: "/teacher-applications",
         label: "教师申请审核",
-        perm: "teacherapply.access",
-        disabled: true
+        superOnly: true
       },
       {
         key: "todo:comments",

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { RouteGuard } from "@/features/auth/components/RouteGuard";
+import { TeacherAccessGuard } from "@/features/teacher-certification/TeacherIdentityProvider";
 
 // 需登录的私密区域，禁止搜索引擎收录。
 export const metadata: Metadata = {
@@ -12,5 +13,9 @@ export default function TeacherLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <RouteGuard>{children}</RouteGuard>;
+  return (
+    <RouteGuard>
+      <TeacherAccessGuard>{children}</TeacherAccessGuard>
+    </RouteGuard>
+  );
 }

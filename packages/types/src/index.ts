@@ -7,6 +7,7 @@ export * from "./word";
 export * from "./task";
 export * from "./api";
 export * from "./auth";
+export * from "./teacher-certification";
 export * from "./admin";
 export * from "./admin-user";
 export * from "./admin-role";

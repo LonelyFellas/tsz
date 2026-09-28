@@ -7,6 +7,7 @@ import { getQueryClient } from "@/lib/query-client";
 import { syncThemeToDom } from "@/lib/theme";
 import { useSessionRestore } from "@/features/auth/hooks/useSessionRestore";
 import { useUserStore } from "@/stores/user";
+import { TeacherIdentityProvider } from "@/features/teacher-certification/TeacherIdentityProvider";
 
 // 服务端无 layout effect;客户端用 layoutEffect 在 paint 前补主题 class。
 const useIsoLayoutEffect =
@@ -65,7 +66,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <ThemeSync />
       <SessionRestorer />
-      {children}
+      <TeacherIdentityProvider>{children}</TeacherIdentityProvider>
       {process.env.NODE_ENV === "development" && (
         <ReactQueryDevtools initialIsOpen={false} />
       )}
