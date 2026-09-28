@@ -215,7 +215,7 @@ jobs:
       # 不合并下载，每份产物各占一个目录，再由脚本给每个模块挑最近一次 attempt。
       # 不能只收当前 attempt：只重跑失败任务时，没重跑的模块用的仍是之前 attempt 的产物。
       - name: Download coverage modules
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           pattern: vitest-blob-*
           path: .ci-downloads
