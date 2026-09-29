@@ -59,8 +59,7 @@ test("CI, Docker, and native deployment use the same pinned Node runtime", async
     deployWeb,
     webService,
     claudeInstructions,
-    agentInstructions,
-    foundationReadme
+    agentInstructions
   ] = await Promise.all([
     readRepositoryFile(".github/workflows/ci.yml"),
     readRepositoryFile(".github/actions/setup-node-pnpm/action.yml"),
@@ -69,8 +68,7 @@ test("CI, Docker, and native deployment use the same pinned Node runtime", async
     readRepositoryFile("deploy/deploy-web.sh"),
     readRepositoryFile("deploy/systemd/tsz-web.service"),
     readRepositoryFile("CLAUDE.md"),
-    readRepositoryFile("AGENTS.md"),
-    readRepositoryFile("docs/foundation/README.md")
+    readRepositoryFile("AGENTS.md")
   ]);
   const setupActionSteps = (
     ci.match(/uses: \.\/\.github\/actions\/setup-node-pnpm/g) ?? []
@@ -98,7 +96,6 @@ test("CI, Docker, and native deployment use the same pinned Node runtime", async
     webService,
     /^ExecStart=\/usr\/bin\/node apps\/web\/server\.js/m
   );
-  assert.match(claudeInstructions, /Node = 24\.19\.0/);
+  assert.match(claudeInstructions, /^@AGENTS\.md$/m);
   assert.match(agentInstructions, /Node = 24\.19\.0/);
-  assert.match(foundationReadme, /统一使用 \*\*24\.19\.0\*\*/);
 });
