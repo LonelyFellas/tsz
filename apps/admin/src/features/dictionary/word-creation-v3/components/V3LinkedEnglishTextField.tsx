@@ -1,6 +1,12 @@
 import { toRichTextV2 } from "@tsz/voice-editor/core";
 import { PronunciationPreviewControls } from "../../word-creation/PronunciationPreview";
-import type { Dialect, EnglishTextV3, RichTextVariantV3 } from "@tsz/types";
+import type {
+  Dialect,
+  EnglishTextV3,
+  RichTextVariantV3,
+  DraftFormsStepContentV3,
+  DraftMeaningsStepContentWritableV3
+} from "@tsz/types";
 import { Flex } from "antd";
 import { editableEnglishText } from "../meaningsModel";
 import { dialectLabel } from "../presentation";
@@ -24,6 +30,8 @@ export function V3LinkedEnglishTextField({
   suffix,
   placeholder,
   wordId,
+  forms,
+  meanings,
   readOnly,
   linksEnabled,
   onChange
@@ -33,6 +41,8 @@ export function V3LinkedEnglishTextField({
   suffix: string;
   placeholder?: string;
   wordId?: string;
+  forms?: DraftFormsStepContentV3;
+  meanings?: DraftMeaningsStepContentWritableV3;
   readOnly?: boolean;
   linksEnabled: boolean;
   onChange: (next: EnglishTextV3) => void;
@@ -80,7 +90,13 @@ export function V3LinkedEnglishTextField({
             renderAssociationPicker={
               linksEnabled
                 ? (props) => (
-                    <V3TextAssociationPicker {...props} wordId={wordId} />
+                    <V3TextAssociationPicker
+                      {...props}
+                      wordId={wordId}
+                      forms={forms}
+                      meanings={meanings}
+                      dialect={row.dialect}
+                    />
                   )
                 : undefined
             }

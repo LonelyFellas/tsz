@@ -3470,6 +3470,8 @@ function V3MeaningsAndExamplesStepContent({
                                                             : "请输入英文释义"
                                                         }
                                                         wordId={wordId}
+                                                        forms={forms}
+                                                        meanings={value}
                                                         linksEnabled={
                                                           textLinksEnabled
                                                         }

@@ -1,4 +1,8 @@
-import type { PublishedSentenceTargetCandidateV3 } from "@tsz/types";
+import type {
+  PublishedSentenceTargetCandidateV3,
+  DraftMeaningsStepContentWritableV3
+} from "@tsz/types";
+import { commonFormFixture, formsFixture } from "../fixtures";
 import {
   fireEvent,
   render,
@@ -197,6 +201,204 @@ it.each(["pub-give", undefined])(
   }
 );
 
+it.each(["word", "phrase"] as const)(
+  "释义允许直接关联当前草稿 %s，不提供待关联入口",
+  async (kind) => {
+    const response = kind === "word" ? giveEntryResponse() : phraseResponse();
+    const candidate = response.matches[0]!;
+    search.mockResolvedValue({
+      ...response,
+      matches: [
+        {
+          ...draftify(candidate),
+          senses: candidate.senses.map((sense) => ({
+            ...draftify(sense),
+            component_usages: []
+          }))
+        }
+      ]
+    });
+    const onSelect = vi.fn();
+    render(
+      <V3TextAssociationPicker
+        kind={kind}
+        wordId={candidate.entry_id}
+        segments={kind === "word" ? [segments[0]!] : segments}
+        onSelect={onSelect}
+      />
+    );
+    await waitFor(() => {
+      fireEvent.click(column(0).getByText(candidate.headword, { exact: true }));
+      expect(column(1).getByText(`原形 ${candidate.headword}`)).toBeVisible();
+    });
+    fireEvent.click(column(1).getByText(`原形 ${candidate.headword}`));
+    fireEvent.click(column(2).getByText(candidate.senses[0]!.gloss));
+    expect(onSelect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target_word_id: candidate.entry_id,
+        target_sense_id: candidate.senses[0]!.sense_id,
+        source_segments: kind === "word" ? [segments[0]!] : segments
+      })
+    );
+    expect(onSelect.mock.lastCall![0]).not.toHaveProperty(
+      "target_publication_id"
+    );
+    expect(onSelect.mock.lastCall![0]).not.toHaveProperty("via_phrase");
+    expect(screen.queryByText(/待关联/)).not.toBeInTheDocument();
+  }
+);
+
+it("自关联不展示旧发布词义，但其他词条仍可选择发布内容", async () => {
+  const response = giveEntryResponse();
+  const published = response.matches[0]!;
+  const current = {
+    ...draftify(published),
+    senses: published.senses.map(draftify)
+  };
+  search.mockResolvedValue({
+    ...response,
+    matches: [
+      {
+        ...published,
+        senses: [
+          {
+            ...published.senses[0]!,
+            sense_id: "removed-sense",
+            gloss: "草稿已删除的词义"
+          }
+        ]
+      },
+      current,
+      { ...published, entry_id: "other-give", headword: "另一个 give" }
+    ]
+  });
+  const onSelect = vi.fn();
+  render(
+    <V3TextAssociationPicker
+      kind="word"
+      wordId="entry-give"
+      segments={[segments[0]!]}
+      onSelect={onSelect}
+    />
+  );
+  await selectGive();
+  expect(screen.queryByText("草稿已删除的词义")).not.toBeInTheDocument();
+  expect(onSelect.mock.lastCall![0]).not.toHaveProperty(
+    "target_publication_id"
+  );
+  fireEvent.click(column(0).getByText("另一个 give", { exact: true }));
+  fireEvent.click(column(1).getByText("原形 give", { exact: true }));
+  fireEvent.click(column(2).getByText("给；交给"));
+  expect(onSelect.mock.lastCall![0].target_publication_id).toBe("pub-give");
+});
+
+it.each(["sense", "variant", "binding"] as const)(
+  "自关联按当前未保存的 %s 变化过滤候选，恢复后可选择",
+  async (change) => {
+    const response = giveEntryResponse();
+    const candidate = response.matches[0]!;
+    search.mockResolvedValue({
+      ...response,
+      matches: [
+        { ...draftify(candidate), senses: candidate.senses.map(draftify) }
+      ]
+    });
+    const forms = formsFixture({
+      pos_id: "pos-give",
+      pos: "verb",
+      forms: [
+        commonFormFixture({
+          id: "form-give",
+          variant_id: "variant-give",
+          spelling: "give"
+        })
+      ]
+    });
+    const meanings: DraftMeaningsStepContentWritableV3 = {
+      sense_groups: [],
+      pos: [
+        {
+          pos_id: "pos-give",
+          grammar_structures: [],
+          senses: [
+            {
+              id: "sense-give-1",
+              sub_pos: "",
+              level: "A1",
+              depends_on_context: false,
+              sentences: [],
+              relations: [],
+              definitions: [
+                {
+                  id: "definition-give",
+                  level: "A1",
+                  definition_mode: "zh_definition",
+                  content_id: "content-give",
+                  content: { version: 2, text: "本地更新词义", annotations: [] }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+    const editedForms = structuredClone(forms);
+    const editedMeanings = structuredClone(meanings);
+    if (change === "sense") editedMeanings.pos[0]!.senses = [];
+    if (change === "variant") {
+      const variant = editedForms.pos[0]!.forms[0]!.regional_variants;
+      if (variant.mode === "common") variant.common.id = "replacement-variant";
+    }
+    if (change === "binding")
+      editedForms.pos[0]!.form_groups[0]!.scope = "dedicated";
+    const onSelect = vi.fn();
+    const { rerender } = render(
+      <V3TextAssociationPicker
+        kind="word"
+        wordId="entry-give"
+        forms={editedForms}
+        meanings={editedMeanings}
+        segments={[segments[0]!]}
+        onSelect={onSelect}
+      />
+    );
+    if (change === "variant") {
+      expect(await screen.findByText("没有匹配的词条")).toBeVisible();
+    } else {
+      await waitFor(() =>
+        expect(
+          document.querySelector(".ant-cascader-menu-item-content")
+        ).not.toBeNull()
+      );
+      fireEvent.click(
+        document.querySelector(".ant-cascader-menu-item-content")!
+      );
+      const row = screen.queryByText("原形 give", { exact: true });
+      if (row) fireEvent.click(row);
+    }
+    expect(screen.queryByText("本地更新词义")).not.toBeInTheDocument();
+    expect(screen.queryByText("给；交给")).not.toBeInTheDocument();
+    expect(onSelect).not.toHaveBeenCalled();
+    rerender(
+      <V3TextAssociationPicker
+        kind="word"
+        wordId="entry-give"
+        forms={forms}
+        meanings={meanings}
+        segments={[segments[0]!]}
+        onSelect={onSelect}
+      />
+    );
+    fireEvent.click(column(0).getByText("give", { exact: true }));
+    fireEvent.click(column(1).getByText("原形 give", { exact: true }));
+    fireEvent.click(column(2).getByText("本地更新词义"));
+    expect(onSelect.mock.lastCall![0].target_gloss).toBe("本地更新词义");
+    expect(onSelect.mock.lastCall![0]).not.toHaveProperty(
+      "target_publication_id"
+    );
+  }
+);
+
 it("关联单词只查询并展示单词，保留稳定目标身份", async () => {
   search.mockResolvedValue({
     ...giveEntryResponse(),
@@ -282,24 +484,17 @@ function column(index: number) {
   );
 }
 
-async function openPhraseComponent() {
+async function selectPhrase(gloss = "放弃") {
   await waitFor(() => {
     fireEvent.click(column(0).getByText("give up", { exact: true }));
-    expect(column(1).getByText("give", { exact: true })).toBeVisible();
+    expect(column(1).getByText("原形 give up")).toBeVisible();
   });
-  expect(column(0).getAllByText("give up", { exact: true })).toHaveLength(1);
-  expect(column(1).getAllByText("give", { exact: true })).toHaveLength(1);
-  fireEvent.click(column(1).getByText("give", { exact: true }));
+  fireEvent.click(column(1).getByText("原形 give up"));
+  fireEvent.click(column(2).getByText(gloss));
 }
 
-function mockPhraseSearch() {
-  search.mockImplementation(async ({ q }) =>
-    q === "give" ? giveEntryResponse() : phraseResponse()
-  );
-}
-
-it("短语四级选择后只能查看和清除，不能重复关联", async () => {
-  mockPhraseSearch();
+it("短语直接选择词形词义，已关联后只能查看和清除", async () => {
+  search.mockResolvedValue(phraseResponse());
   const onSelect = vi.fn();
   const { rerender } = render(
     <V3TextAssociationPicker
@@ -308,24 +503,17 @@ it("短语四级选择后只能查看和清除，不能重复关联", async () =
       onSelect={onSelect}
     />
   );
-  await screen.findByText("give up", { exact: true });
-  expect(screen.queryByText(/· 成分用词/)).not.toBeInTheDocument();
-  await openPhraseComponent();
-  expect(onSelect).not.toHaveBeenCalled();
-  fireEvent.click(await screen.findByText("原形 give", { exact: true }));
-  expect(document.querySelectorAll(".ant-cascader-menu")).toHaveLength(4);
-  expect(onSelect).not.toHaveBeenCalled();
-  fireEvent.click(column(3).getByText("给；交给"));
-  expect(onSelect.mock.lastCall![0]).toMatchObject({
-    source_segments: segments,
-    target_word_id: "entry-give",
-    via_phrase: {
-      word_id: "phrase",
-      publication_id: "phrase-pub",
-      sense_id: "phrase-sense",
-      component_id: "component"
-    }
-  });
+  await selectPhrase();
+  expect(document.querySelectorAll(".ant-cascader-menu")).toHaveLength(3);
+  expect(onSelect).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      source_segments: segments,
+      target_word_id: "phrase",
+      target_publication_id: "phrase-pub",
+      target_sense_id: "phrase-sense"
+    })
+  );
+  expect(onSelect.mock.lastCall![0]).not.toHaveProperty("via_phrase");
   search.mockClear();
   rerender(
     <V3TextAssociationPicker
@@ -336,63 +524,76 @@ it("短语四级选择后只能查看和清除，不能重复关联", async () =
       onSelect={onSelect}
     />
   );
-  expect(screen.getByText(/已关联：give/)).toBeVisible();
-  expect(
-    screen.getByText("这些单词已有关联，请先清除原关联再重新选择。")
-  ).toBeVisible();
-  expect(document.querySelectorAll(".ant-cascader-menu")).toHaveLength(0);
+  expect(screen.getByText(/已关联：give up/)).toBeVisible();
   expect(search).not.toHaveBeenCalled();
   fireEvent.click(screen.getByText("清除关联"));
   expect(onSelect).toHaveBeenLastCalledWith(undefined);
 });
 
-it("关联短语只展示短语及其成分，不再提供短语本身入口", async () => {
-  search.mockImplementation(async ({ q }) =>
-    q === "give"
-      ? giveEntryResponse()
-      : {
-          ...phraseResponse(),
-          matches: [...giveEntryResponse().matches, ...phraseResponse().matches]
-        }
-  );
-  render(
-    <V3TextAssociationPicker
-      kind="phrase"
-      segments={segments}
-      onSelect={vi.fn()}
-    />
-  );
-  await openPhraseComponent();
-  expect(search).toHaveBeenCalledWith(
-    expect.objectContaining({
-      q: "give up",
-      kind: "phrase",
-      match: "exact"
-    })
-  );
-  // 成分展开的子查询同样按词形等值，仅查询发布目标。
-  for (const [input] of search.mock.calls) {
-    expect(input).not.toHaveProperty("include_drafts");
-  }
-  expect(search).toHaveBeenCalledWith(
-    expect.objectContaining({
-      q: "give",
-      match: "exact"
-    })
-  );
-  expect(
-    column(0).queryByText("give", { exact: true })
-  ).not.toBeInTheDocument();
-  expect(screen.queryByText("短语本身")).not.toBeInTheDocument();
-});
-
-it("没有释义级成分的短语不能当作可提交叶子", async () => {
+it("关联短语不依赖成分用词，只检索短语且包含草稿", async () => {
   const response = phraseResponse();
   response.matches.forEach((candidate) =>
     candidate.senses.forEach((sense) => {
       sense.component_usages = [];
     })
   );
+  search.mockClear();
+  search.mockResolvedValue({
+    ...response,
+    matches: [...giveEntryResponse().matches, ...response.matches]
+  });
+  const onSelect = vi.fn();
+  render(
+    <V3TextAssociationPicker
+      kind="phrase"
+      segments={segments}
+      onSelect={onSelect}
+    />
+  );
+  await selectPhrase();
+  expect(search).toHaveBeenCalledTimes(1);
+  expect(search).toHaveBeenCalledWith(
+    expect.objectContaining({
+      q: "give up",
+      kind: "phrase",
+      match: "exact",
+      include_drafts: true
+    })
+  );
+  expect(
+    column(0).queryByText("give", { exact: true })
+  ).not.toBeInTheDocument();
+  expect(onSelect.mock.lastCall![0].target_word_id).toBe("phrase");
+  expect(screen.queryByText(/待关联/)).not.toBeInTheDocument();
+});
+
+it("短语查询失败不提交关联，可原位重试后继续选择", async () => {
+  search.mockRejectedValue(new Error("offline"));
+  const onSelect = vi.fn();
+  render(
+    <V3TextAssociationPicker
+      kind="phrase"
+      segments={segments}
+      onSelect={onSelect}
+    />
+  );
+  await screen.findByRole("button", { name: "重新加载" });
+  expect(onSelect).not.toHaveBeenCalled();
+  search.mockResolvedValue(phraseResponse());
+  fireEvent.click(screen.getByRole("button", { name: "重新加载" }));
+  await selectPhrase();
+  expect(onSelect.mock.lastCall![0].target_sense_id).toBe("phrase-sense");
+});
+
+it("多个短语词义保留所选词义身份，不转关联到同名成分", async () => {
+  const response = phraseResponse();
+  for (const candidate of response.matches) {
+    candidate.senses.push({
+      ...candidate.senses[0]!,
+      sense_id: "second-sense",
+      gloss: "交出"
+    });
+  }
   search.mockResolvedValue(response);
   const onSelect = vi.fn();
   render(
@@ -402,73 +603,12 @@ it("没有释义级成分的短语不能当作可提交叶子", async () => {
       onSelect={onSelect}
     />
   );
-  const phrase = await screen.findByText(/give up（未配置成分用词）/);
-  expect(phrase.closest(".ant-cascader-menu-item")).toHaveClass(
-    "ant-cascader-menu-item-disabled"
-  );
-  fireEvent.click(phrase);
-  expect(onSelect).not.toHaveBeenCalled();
-});
-
-it("成分查询失败不提交关联，可原位重试后继续选择", async () => {
-  search.mockImplementation(async ({ q }) => {
-    if (q === "give") throw new Error("offline");
-    return phraseResponse();
+  await selectPhrase("交出");
+  expect(onSelect.mock.lastCall![0]).toMatchObject({
+    target_word_id: "phrase",
+    target_sense_id: "second-sense"
   });
-  const onSelect = vi.fn();
-  render(
-    <V3TextAssociationPicker
-      kind="phrase"
-      segments={segments}
-      onSelect={onSelect}
-    />
-  );
-  await openPhraseComponent();
-  await screen.findByRole("button", { name: /重\s*试/ });
-  expect(onSelect).not.toHaveBeenCalled();
-  mockPhraseSearch();
-  fireEvent.click(await screen.findByRole("button", { name: /重\s*试/ }));
-  fireEvent.click(await screen.findByText("原形 give", { exact: true }));
-  fireEvent.click(column(3).getByText("给；交给"));
-  expect(onSelect.mock.lastCall![0].via_phrase.component_id).toBe("component");
-});
-
-it("不同短语词义的同名成分分别展示，选择保留对应来源", async () => {
-  const response = phraseResponse();
-  for (const candidate of response.matches) {
-    const first = candidate.senses[0]!;
-    candidate.senses.push({
-      ...first,
-      sense_id: "second-sense",
-      gloss: "交出",
-      component_usages: [
-        { ...first.component_usages[0]!, id: "second-component" }
-      ]
-    });
-  }
-  search.mockImplementation(async ({ q }) =>
-    q === "give" ? giveEntryResponse() : response
-  );
-  const onSelect = vi.fn();
-  render(
-    <V3TextAssociationPicker
-      kind="phrase"
-      segments={segments}
-      onSelect={onSelect}
-    />
-  );
-  await waitFor(() => {
-    fireEvent.click(column(0).getByText("give up", { exact: true }));
-    expect(column(1).getByText("give（交出）")).toBeVisible();
-  });
-  expect(column(1).getAllByText("give（放弃）")).toHaveLength(1);
-  fireEvent.click(column(1).getByText("give（交出）"));
-  fireEvent.click(await screen.findByText("原形 give", { exact: true }));
-  fireEvent.click(column(3).getByText("给；交给"));
-  expect(onSelect.mock.lastCall![0].via_phrase).toMatchObject({
-    sense_id: "second-sense",
-    component_id: "second-component"
-  });
+  expect(onSelect.mock.lastCall![0]).not.toHaveProperty("via_phrase");
 });
 
 function draftify<T extends { publication_id?: string }>(
@@ -556,19 +696,15 @@ it("还没保存词义的草稿列成禁用行并说明原因", async () => {
   expect(onSelect).not.toHaveBeenCalled();
 });
 
-it("草稿短语的成分转关联：via_phrase 不带发布版本，词条行带草稿标记", async () => {
-  const phrase = phraseResponse();
-  search.mockImplementation(async ({ q }) =>
-    q === "give"
-      ? giveEntryResponse()
-      : {
-          ...phrase,
-          matches: phrase.matches.map((candidate) => ({
-            ...draftify(candidate),
-            senses: candidate.senses.map(draftify)
-          }))
-        }
-  );
+it("草稿短语直接关联，不写发布版本或成分来源", async () => {
+  const response = phraseResponse();
+  search.mockResolvedValue({
+    ...response,
+    matches: response.matches.map((candidate) => ({
+      ...draftify(candidate),
+      senses: candidate.senses.map(draftify)
+    }))
+  });
   const onSelect = vi.fn();
   render(
     <V3TextAssociationPicker
@@ -577,39 +713,37 @@ it("草稿短语的成分转关联：via_phrase 不带发布版本，词条行�
       onSelect={onSelect}
     />
   );
-  await screen.findByText("give up", { exact: true });
+  await selectPhrase();
   expect(column(0).getByText("草稿")).toBeVisible();
-  await openPhraseComponent();
-  fireEvent.click(await screen.findByText("原形 give", { exact: true }));
-  fireEvent.click(column(3).getByText("给；交给"));
-  const link = onSelect.mock.lastCall![0];
-  expect(link).toMatchObject({
-    target_word_id: "entry-give",
-    target_publication_id: "pub-give",
-    via_phrase: {
-      word_id: "phrase",
-      sense_id: "phrase-sense",
-      component_id: "component"
-    }
+  expect(onSelect.mock.lastCall![0]).toMatchObject({
+    target_word_id: "phrase",
+    target_sense_id: "phrase-sense"
   });
-  expect(link.via_phrase).not.toHaveProperty("publication_id");
+  expect(onSelect.mock.lastCall![0]).not.toHaveProperty(
+    "target_publication_id"
+  );
+  expect(onSelect.mock.lastCall![0]).not.toHaveProperty("via_phrase");
 });
 
-it("短语成分按目标词条检索并读完其后续候选，后页词义可选", async () => {
+it("短语后页词义可直接关联，翻页仍包含草稿", async () => {
   search.mockClear();
   search.mockImplementation(async (input) => {
-    if (input.q !== "give") return phraseResponse();
-    const response = giveEntryResponse();
+    const response = phraseResponse();
     if (!input.cursor)
-      return { ...response, next_cursor: "target-page-2", truncated: true };
-    response.matches[0]!.senses = [
-      {
-        ...response.matches[0]!.senses[0]!,
-        sense_id: "later-sense",
-        gloss: "后页词义"
-      }
-    ];
-    return response;
+      return { ...response, next_cursor: "page-2", truncated: true };
+    return {
+      ...response,
+      matches: response.matches.map((candidate) => ({
+        ...candidate,
+        senses: [
+          {
+            ...candidate.senses[0]!,
+            sense_id: "later-sense",
+            gloss: "后页词义"
+          }
+        ]
+      }))
+    };
   });
   const onSelect = vi.fn();
   render(
@@ -619,24 +753,17 @@ it("短语成分按目标词条检索并读完其后续候选，后页词义可�
       onSelect={onSelect}
     />
   );
-  await openPhraseComponent();
-  fireEvent.click(await screen.findByText("原形 give", { exact: true }));
-  fireEvent.click(await screen.findByText("后页词义"));
-  expect(
-    search.mock.calls
-      .filter(([input]) => input.q === "give")
-      .map(([input]) => ({ entry_id: input.entry_id, cursor: input.cursor }))
-  ).toEqual([
-    { entry_id: "entry-give", cursor: undefined },
-    { entry_id: "entry-give", cursor: "target-page-2" }
-  ]);
-  expect(onSelect).toHaveBeenCalledWith(
-    expect.objectContaining({
-      target_word_id: "entry-give",
-      target_sense_id: "later-sense",
-      via_phrase: expect.objectContaining({ component_id: "component" })
-    })
+  fireEvent.click(await screen.findByRole("button", { name: /加载更多/ }));
+  await waitFor(() =>
+    expect(search).toHaveBeenCalledWith(
+      expect.objectContaining({ cursor: "page-2", include_drafts: true })
+    )
   );
+  await selectPhrase("后页词义");
+  expect(onSelect.mock.lastCall![0]).toMatchObject({
+    target_word_id: "phrase",
+    target_sense_id: "later-sense"
+  });
 });
 
 it.each(["word", "phrase"] as const)(
@@ -672,11 +799,13 @@ it.each(["word", "phrase"] as const)(
         allowed_sense_ids: []
       }
     );
-    search.mockImplementation(async ({ q }) =>
-      q === "give"
-        ? { ...giveEntryResponse(), matches: [candidate] }
-        : phraseResponse()
-    );
+    const headword = kind === "word" ? "give" : "give up";
+    candidate.kind = kind;
+    candidate.headword = headword;
+    for (const form of candidate.forms) {
+      if (form.spelling === "give") form.spelling = headword;
+    }
+    search.mockResolvedValue({ ...giveEntryResponse(), matches: [candidate] });
     const onSelect = vi.fn();
     render(
       <V3TextAssociationPicker
@@ -685,30 +814,21 @@ it.each(["word", "phrase"] as const)(
         onSelect={onSelect}
       />
     );
-    if (kind === "phrase") await openPhraseComponent();
-    else
-      await waitFor(() => {
-        fireEvent.click(column(0).getByText("give", { exact: true }));
-        expect(column(1).getAllByText("原形 give")).toHaveLength(2);
-      });
-    const formColumn = kind === "word" ? 1 : 2;
-    await waitFor(() =>
-      expect(column(formColumn).getAllByText("原形 give")).toHaveLength(2)
-    );
-    fireEvent.click(column(formColumn).getAllByText("原形 give")[0]!);
+    await waitFor(() => {
+      fireEvent.click(column(0).getByText(headword, { exact: true }));
+      expect(column(1).getAllByText(`原形 ${headword}`)).toHaveLength(2);
+    });
+    const formColumn = 1;
+    fireEvent.click(column(formColumn).getAllByText(`原形 ${headword}`)[0]!);
     expect(column(formColumn + 1).getByText("给；交给")).toBeVisible();
     expect(column(formColumn + 1).getByText("专用词义 2")).toBeVisible();
     expect(column(formColumn + 1).getByText("专用词义 3")).toBeVisible();
-    fireEvent.click(column(formColumn).getAllByText("原形 give")[1]!);
+    fireEvent.click(column(formColumn).getAllByText(`原形 ${headword}`)[1]!);
     expect(
       column(formColumn + 1).queryByText("给；交给")
     ).not.toBeInTheDocument();
     expect(column(formColumn + 1).getByText("专用词义 3")).toBeVisible();
-    expect(
-      column(formColumn)
-        .getByText(/unused.*暂无可关联词义/)
-        .closest(".ant-cascader-menu-item")
-    ).toHaveClass("ant-cascader-menu-item-disabled");
+    expect(column(formColumn).queryByText(/unused/)).not.toBeInTheDocument();
     fireEvent.click(column(formColumn + 1).getByText("专用词义 2"));
     expect(onSelect).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -720,7 +840,7 @@ it.each(["word", "phrase"] as const)(
   }
 );
 
-it("关联短语只展开命中短语词形允许的词义成分", async () => {
+it("关联短语的命中词形没有可用词义时不能选择", async () => {
   const response = phraseResponse();
   const matches: PublishedSentenceTargetCandidateV3[] = response.matches.map(
     (candidate) => ({
@@ -736,7 +856,11 @@ it("关联短语只展开命中短语词形允许的词义成分", async () => {
       onSelect={vi.fn()}
     />
   );
-  const item = await screen.findByText(/give up（未配置成分用词）/);
+  await waitFor(() => {
+    fireEvent.click(column(0).getByText("give up", { exact: true }));
+    expect(column(1).getByText(/原形 give up/)).toBeVisible();
+  });
+  const item = column(1).getByText(/原形 give up/);
   expect(item.closest(".ant-cascader-menu-item")).toHaveClass(
     "ant-cascader-menu-item-disabled"
   );
