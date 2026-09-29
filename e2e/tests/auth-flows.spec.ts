@@ -122,7 +122,7 @@ test.describe("鉴权与引导端到端流程", () => {
     });
     await page.goto("/login?redirect=%2Fstudent%2Fpractice");
     await page
-      .getByPlaceholder("请输入手机号/邮箱号码")
+      .getByRole("textbox", { name: "手机号或邮箱" })
       .fill("Student@EXAMPLE.com");
     await page.getByPlaceholder("请输入登录密码").fill("abc12345678");
     await page.getByRole("button", { name: "立即登录" }).click();
@@ -200,7 +200,7 @@ test.describe("鉴权与引导端到端流程", () => {
     await mockApi(page, { authenticated: false });
     await page.goto("/login");
     await page
-      .getByPlaceholder("请输入手机号/邮箱号码")
+      .getByRole("textbox", { name: "手机号或邮箱" })
       .fill("Student@EXAMPLE.com");
     await page.getByPlaceholder("请输入登录密码").fill("OldPass!");
     const login = page.waitForRequest("**/api/v1/auth/login");
@@ -235,8 +235,10 @@ test.describe("鉴权与引导端到端流程", () => {
     await mockApi(page, { authenticated: false });
 
     await page.goto("/login");
-    // 默认即「账号密码」tab，直接填账号密码登录。
-    await page.getByPlaceholder("请输入手机号/邮箱号码").fill("13800138000");
+    // 登录页仅提供手机号或邮箱 + 密码。
+    await page
+      .getByRole("textbox", { name: "手机号或邮箱" })
+      .fill("13800138000");
     await page.getByPlaceholder("请输入登录密码").fill("abc123");
     await page.getByRole("button", { name: "立即登录" }).click();
 
@@ -247,19 +249,23 @@ test.describe("鉴权与引导端到端流程", () => {
     await expect(page.getByRole("button", { name: "立即登录" })).toBeVisible();
   });
 
-  test("手机验证码登录 → 主页", async ({ page }) => {
+  test("手机号密码登录不会请求登录验证码", async ({ page }) => {
     await mockApi(page, { authenticated: false });
+    const otpRequests: string[] = [];
+    page.on("request", (request) => {
+      if (/\/otp\/send|\/auth\/login-otp/.test(new URL(request.url()).pathname))
+        otpRequests.push(request.url());
+    });
 
     await page.goto("/login");
-    // 切到「手机验证」tab：手机号 → 获取验证码 → 填验证码 → 登录。
-    await page.getByRole("button", { name: "手机验证" }).click();
-    await page.getByPlaceholder("请输入手机号").fill("13800138000");
-    await page.getByRole("button", { name: "获取验证码" }).click();
-    await page.getByPlaceholder("请输入验证码").fill("123456");
+    await page
+      .getByRole("textbox", { name: "手机号或邮箱" })
+      .fill("13800138000");
+    await page.getByLabel("密码", { exact: true }).fill("abc123");
     await page.getByRole("button", { name: "立即登录" }).click();
 
-    // 老用户（已引导）直接进主页：顶栏出现账户菜单。
     await expect(page.getByRole("button", { name: "账户菜单" })).toBeVisible();
+    expect(otpRequests).toEqual([]);
   });
 
   test("已登录用户访问 /login 被自动跳走", async ({ page }) => {
@@ -298,7 +304,9 @@ test.describe("鉴权与引导端到端流程", () => {
         navigations.push(new URL(frame.url()).pathname);
       }
     });
-    await page.getByPlaceholder("请输入手机号/邮箱号码").fill("13800138000");
+    await page
+      .getByRole("textbox", { name: "手机号或邮箱" })
+      .fill("13800138000");
     await page.getByPlaceholder("请输入登录密码").fill("abc123");
     const requestedMe = page.waitForRequest("**/api/v1/auth/me");
     await page.getByRole("button", { name: "立即登录" }).click();
@@ -324,7 +332,9 @@ test.describe("鉴权与引导端到端流程", () => {
     test(`登录后拒绝危险或循环回跳 ${redirect}`, async ({ page }) => {
       await mockApi(page, { authenticated: false });
       await page.goto(`/login?redirect=${encodeURIComponent(redirect)}`);
-      await page.getByPlaceholder("请输入手机号/邮箱号码").fill("13800138000");
+      await page
+        .getByRole("textbox", { name: "手机号或邮箱" })
+        .fill("13800138000");
       await page.getByPlaceholder("请输入登录密码").fill("abc123");
       await page.getByRole("button", { name: "立即登录" }).click();
       await expect(page).toHaveURL(/\/$/);

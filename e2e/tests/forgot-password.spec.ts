@@ -80,8 +80,10 @@ test.describe("找回密码端到端流程", () => {
 
     await expect(page).toHaveURL(/\/login\?reset=success/);
 
-    // 用新密码登录（默认即「账号密码」tab）。
-    await page.getByPlaceholder("请输入手机号/邮箱号码").fill("13800138000");
+    // 使用重置后的新密码登录。
+    await page
+      .getByRole("textbox", { name: "手机号或邮箱" })
+      .fill("13800138000");
     await page.getByPlaceholder("请输入登录密码").fill("abc12345678");
     await page.getByRole("button", { name: "立即登录" }).click();
 

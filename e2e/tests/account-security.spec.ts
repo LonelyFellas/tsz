@@ -69,8 +69,8 @@ async function securityApi(
 }
 
 async function fillBind(page: Page, oldCode = "123456", newCode = "654321") {
-  await page.getByLabel("原联系方式验证码").fill(oldCode);
-  await page.getByLabel("新联系方式验证码").fill(newCode);
+  await page.getByLabel("手机号验证码").fill(oldCode);
+  await page.getByLabel("新邮箱验证码").fill(newCode);
 }
 
 test.describe("账号安全", () => {
@@ -127,10 +127,12 @@ test.describe("账号安全", () => {
     ).toBeDisabled();
     await page.getByRole("button", { name: "绑定邮箱", exact: true }).click();
     await page.getByLabel("新邮箱", { exact: true }).fill(" New@EXAMPLE.com ");
-    await page.getByRole("button", { name: "验证原渠道" }).click();
+    await page
+      .getByRole("button", { name: "向已绑定手机号发送验证码" })
+      .click();
     await expect(page.getByLabel("新邮箱", { exact: true })).toBeEnabled();
-    await page.getByRole("button", { name: "验证新渠道" }).click();
-    await expect(page.getByLabel("新联系方式验证码")).toBeEnabled();
+    await page.getByRole("button", { name: "向新邮箱发送验证码" }).click();
+    await expect(page.getByLabel("新邮箱验证码")).toBeEnabled();
     await fillBind(page);
     await page.getByRole("button", { name: "确认绑定邮箱" }).click();
     await expect(page).toHaveURL(/\/login\?security=success$/);
@@ -161,16 +163,20 @@ test.describe("账号安全", () => {
     const requests = await securityApi(page);
     await page.goto("/account/security");
     await page.getByRole("button", { name: "解绑手机号", exact: true }).click();
-    await page.getByLabel("身份验证渠道").selectOption("email");
+    await page.getByRole("combobox", { name: "当前账号的验证方式" }).click();
+    await page.getByRole("option", { name: /邮箱：/ }).click();
+    await expect(
+      page.getByRole("combobox", { name: "当前账号的验证方式" })
+    ).toContainText(TEST_USER.email);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth
       )
     ).toBe(true);
-    await page.getByRole("button", { name: "验证原渠道" }).click();
-    await expect(page.getByLabel("原联系方式验证码")).toBeEnabled();
-    await page.getByLabel("原联系方式验证码").fill("123456");
-    await expect(page.getByLabel("新联系方式验证码")).toHaveCount(0);
+    await page.getByRole("button", { name: "向已绑定邮箱发送验证码" }).click();
+    await expect(page.getByLabel("邮箱验证码")).toBeEnabled();
+    await page.getByLabel("邮箱验证码").fill("123456");
+    await expect(page.getByLabel("新手机号验证码")).toHaveCount(0);
     await page.getByRole("button", { name: "确认解绑手机号" }).click();
     await expect(page).toHaveURL(/\/login\?security=success$/);
     expect(requests).toEqual([
@@ -215,12 +221,14 @@ test.describe("账号安全", () => {
     expect(requests.filter((r) => r.path === "/me/contact/bind")).toHaveLength(
       1
     );
-    await expect(page.getByLabel("原联系方式验证码")).toHaveValue("");
-    await expect(page.getByLabel("新联系方式验证码")).toHaveValue("");
-    await page.getByRole("button", { name: "验证原渠道" }).click();
+    await expect(page.getByLabel("手机号验证码")).toHaveValue("");
+    await expect(page.getByLabel("新邮箱验证码")).toHaveValue("");
+    await page
+      .getByRole("button", { name: "向已绑定手机号发送验证码" })
+      .click();
     await expect(page.getByLabel("新邮箱", { exact: true })).toBeEnabled();
-    await page.getByRole("button", { name: "验证新渠道" }).click();
-    await expect(page.getByLabel("新联系方式验证码")).toBeEnabled();
+    await page.getByRole("button", { name: "向新邮箱发送验证码" }).click();
+    await expect(page.getByLabel("新邮箱验证码")).toBeEnabled();
     await fillBind(page);
     await page.getByRole("button", { name: "确认换绑邮箱" }).click();
     await expect(page).toHaveURL(/\/login\?security=success$/);

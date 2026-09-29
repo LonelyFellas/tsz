@@ -1,11 +1,12 @@
 "use client";
 
-import { isEmail, isPhone, isValidAccount } from "@tsz/shared";
+import { isValidAccount } from "@tsz/shared";
 import type { AuthResponse } from "@tsz/api-client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/request";
 import { AuthBranding } from "./AuthBranding";
+import { PasswordVisibilityIcon } from "./PasswordVisibilityIcon";
 import {
   AUTH_INPUT_CLASS,
   completeAuthentication,
@@ -13,113 +14,44 @@ import {
   translateAuthError
 } from "../shared";
 
-type Tab = "password" | "phone" | "email";
-
-// 后端(tsz-rust)对「账号不存在」与「密码错误」返回逐字节一致的 401
-// invalid credentials(防枚举),前端不区分;403 forbidden = 密码对但账号被禁。
+// 后端对「账号不存在」与「密码错误」返回相同的 401，避免账号枚举。
 const LOGIN_ERRORS: Record<string, string> = {
   "invalid credentials": "账号或密码错误，请重新输入",
   "identifier is invalid": "手机号或邮箱格式错误，请检查后重试",
   forbidden: "该账号已被禁用，请联系客服"
 };
 
-// 验证码登录的错误文案,对齐后端 /otp/send + /auth/login-otp 的真实 message。
-const CODE_ERRORS: Record<string, string> = {
-  "invalid code": "验证码错误或已失效，请重新获取",
-  "invalid credentials": "登录凭据无效；尚未注册请先注册",
-  "invalid identifier": "手机号或邮箱格式错误，请检查后重试",
-  "invalid email": "邮箱格式错误，请检查后重试",
-  "invalid phone": "手机号码错误，请检查后重试",
-  "otp unavailable": "验证码服务暂时不可用，请稍后再试",
-  forbidden: "该账号已被禁用，请联系客服",
-  "too many requests": "验证码发送过于频繁，请稍后再试",
-  "service unavailable": "验证码服务暂时不可用，请稍后再试"
-};
-
-const CODE_COUNTDOWN = 60;
-
-const TABS: { id: Tab; label: string }[] = [
-  { id: "password", label: "账号密码" },
-  { id: "email", label: "邮箱验证" },
-  { id: "phone", label: "手机验证" }
-];
-
 export function LoginForm() {
-  const [tab, setTab] = useState<Tab>("password");
   const [account, setAccount] = useState("");
   const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [countdown, setCountdown] = useState(0);
-  const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   const [error, setError] = useState("");
 
   const router = useRouter();
   const searchParams = useSearchParams();
-
-  // 验证码倒计时（与注册/找回密码一致）。
-  useEffect(() => {
-    if (countdown <= 0) return;
-    const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [countdown]);
-
   const identifier = account.includes("@")
     ? account.trim().toLowerCase()
     : account.trim();
-  const accountValid = isValidAccount(identifier);
-  const passwordValid = password.length > 0;
   const canSubmit =
-    (authenticated || (accountValid && passwordValid)) && !loading;
+    (authenticated || (isValidAccount(identifier) && password.length > 0)) &&
+    !loading;
 
-  // 验证码 tab：手机号 tab 校验手机号，邮箱 tab 校验邮箱。
-  const identifierValid =
-    tab === "phone" ? isPhone(identifier) : isEmail(identifier);
-  const codeValid = /^\d{6}$/.test(code);
-  const canSendCode =
-    identifierValid &&
-    countdown === 0 &&
-    !sending &&
-    !loading &&
-    !authenticated;
-  const canCodeSubmit =
-    (authenticated || (identifierValid && codeValid)) && !loading && !sending;
-
-  // 从找回密码流程跳回时展示成功提示，引导用户用新密码登录。
   const resetSuccess = searchParams.get("reset") === "success";
   const securitySuccess = searchParams.get("security") === "success";
-  // 从注销账号流程跳回时展示成功提示。
   const deletedSuccess = searchParams.get("deleted") === "success";
-  // 注册成功但自动登录失败(网络抖动等)跳回时展示成功提示，避免误以为注册失败。
   const registeredSuccess = searchParams.get("registered") === "success";
-
-  function switchTab(id: Tab) {
-    if (tab === id) return;
-    setTab(id);
-    setError("");
-    setCode("");
-    setCountdown(0);
-  }
-
-  function changeAccount(value: string) {
-    setAccount(value);
-    setCode("");
-    setCountdown(0);
-    setError("");
-  }
 
   function openRegistration() {
     const params = new URLSearchParams();
-    if (tab === "email" || (tab === "password" && identifier.includes("@")))
-      params.set("method", "email");
+    if (identifier.includes("@")) params.set("method", "email");
     const redirect = searchParams.get("redirect");
     if (redirect) params.set("redirect", redirect);
     router.push(params.size ? `/register?${params}` : "/register");
   }
 
-  // 认证已成功时只重试资料，不能再次消费登录验证码。
+  // 登录成功后仅重试资料加载，不重复提交密码；由 GuestGuard 负责导航。
   async function loadProfile() {
     try {
       await completeAuthentication();
@@ -128,7 +60,6 @@ export function LoginForm() {
     }
   }
 
-  // 资料准备完整后再发布登录态，由 GuestGuard 统一导航。
   async function onAuthSuccess(auth: AuthResponse) {
     persistSession(auth);
     setAuthenticated(true);
@@ -154,50 +85,14 @@ export function LoginForm() {
     }
   }
 
-  async function handleSendCode() {
-    if (!canSendCode) return;
-    setError("");
-    setSending(true);
-    try {
-      await api.auth.sendCode(identifier);
-      setCountdown(CODE_COUNTDOWN);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "";
-      setError(
-        translateAuthError(msg, CODE_ERRORS, "验证码发送失败，请稍后重试")
-      );
-    } finally {
-      setSending(false);
-    }
-  }
-
-  async function handleCodeLogin() {
-    if (!canCodeSubmit) return;
-    setError("");
-    setLoading(true);
-    try {
-      if (authenticated) {
-        await loadProfile();
-      } else {
-        const auth = await api.auth.loginWithCode(identifier, code);
-        await onAuthSuccess(auth);
-      }
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "";
-      setError(translateAuthError(msg, CODE_ERRORS, "登录失败，请稍后重试"));
-    } finally {
-      setLoading(false);
-    }
-  }
-
   return (
-    <div className="flex min-h-screen">
+    <main className="flex min-h-screen">
       <AuthBranding />
-
-      {/* Right panel */}
-      <div className="flex flex-1 items-center justify-center px-8 py-16 bg-surface">
-        <div className="w-full max-w-sm">
-          <h1 className="text-3xl font-bold text-foreground mb-8">欢迎回来</h1>
+      <div className="flex min-w-0 flex-1 items-center justify-center bg-surface px-6 py-20">
+        <div className="w-full max-w-[400px]">
+          <h1 className="mb-10 text-3xl font-semibold tracking-tight text-foreground">
+            欢迎回来
+          </h1>
 
           {securitySuccess && (
             <p
@@ -207,195 +102,128 @@ export function LoginForm() {
               账号安全信息已更新，请使用当前绑定的手机号或邮箱重新登录。
             </p>
           )}
-
           {resetSuccess && (
-            <p className="mb-6 rounded-lg bg-success/10 px-4 py-3 text-sm text-success">
+            <p
+              role="status"
+              className="mb-6 rounded-lg bg-success/10 px-4 py-3 text-sm text-success"
+            >
               密码重置成功，请用新密码登录。
             </p>
           )}
-
           {deletedSuccess && (
-            <p className="mb-6 rounded-lg bg-success/10 px-4 py-3 text-sm text-success">
+            <p
+              role="status"
+              className="mb-6 rounded-lg bg-success/10 px-4 py-3 text-sm text-success"
+            >
               账号已注销成功。
             </p>
           )}
-
           {registeredSuccess && (
-            <p className="mb-6 rounded-lg bg-success/10 px-4 py-3 text-sm text-success">
+            <p
+              role="status"
+              className="mb-6 rounded-lg bg-success/10 px-4 py-3 text-sm text-success"
+            >
               注册成功，请用刚设置的账号密码登录。
             </p>
           )}
 
-          {/* Tabs */}
-          <div className="flex gap-6 mb-8 border-b border-border">
-            {TABS.map(({ id, label }) => (
-              <button
-                key={id}
-                onClick={() => switchTab(id)}
-                disabled={sending || loading || authenticated}
-                className={`pb-3 text-sm font-medium transition-colors ${
-                  tab === id
-                    ? "text-primary border-b-2 border-primary"
-                    : "text-foreground-subtle hover:text-foreground-muted"
-                }`}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleLogin();
+            }}
+            className="space-y-5"
+          >
+            <div>
+              <label
+                htmlFor="login-account"
+                className="mb-2 ml-4 block text-sm font-medium text-foreground"
               >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {tab === "password" ? (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-foreground-muted mb-1">
-                  手机号/邮箱号码
-                </label>
+                手机号或邮箱
+              </label>
+              <input
+                id="login-account"
+                type="text"
+                autoComplete="username"
+                placeholder="请输入手机号或邮箱"
+                value={account}
+                disabled={loading || authenticated}
+                onChange={(e) => {
+                  setAccount(e.target.value);
+                  setError("");
+                }}
+                className={AUTH_INPUT_CLASS}
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="login-password"
+                className="mb-2 ml-4 block text-sm font-medium text-foreground"
+              >
+                密码
+              </label>
+              <div className="relative">
                 <input
-                  type="text"
-                  placeholder="请输入手机号/邮箱号码"
-                  value={account}
-                  disabled={sending || loading || authenticated}
-                  onChange={(e) => changeAccount(e.target.value)}
-                  className={AUTH_INPUT_CLASS}
+                  id="login-password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  placeholder="请输入登录密码"
+                  value={password}
+                  disabled={loading || authenticated}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setError("");
+                  }}
+                  className={`${AUTH_INPUT_CLASS} pr-14`}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  disabled={loading || authenticated}
+                  className="absolute right-3 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full text-foreground-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
+                  aria-label={showPassword ? "隐藏密码" : "显示密码"}
+                >
+                  <PasswordVisibilityIcon visible={showPassword} />
+                </button>
               </div>
-              <div>
-                <label className="block text-sm text-foreground-muted mb-1">
-                  密码
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    placeholder="请输入登录密码"
-                    value={password}
-                    disabled={sending || loading || authenticated}
-                    onChange={(e) => setPassword(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                    className={`${AUTH_INPUT_CLASS} pr-12`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-foreground-subtle hover:text-foreground-muted"
-                    aria-label={showPassword ? "隐藏密码" : "显示密码"}
-                  >
-                    {showPassword ? "🙈" : "👁"}
-                  </button>
-                </div>
-              </div>
-
-              {error && <p className="text-sm text-danger">{error}</p>}
-
-              <button
-                onClick={handleLogin}
-                disabled={!canSubmit}
-                className="w-full rounded-full bg-primary py-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {loading
-                  ? "登录中..."
-                  : authenticated
-                    ? "重试加载"
-                    : "立即登录"}
-              </button>
             </div>
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-foreground-muted mb-1">
-                  {tab === "phone" ? "手机号码" : "邮箱"}
-                </label>
-                <div className="relative">
-                  <input
-                    type={tab === "email" ? "email" : "tel"}
-                    placeholder={
-                      tab === "phone" ? "请输入手机号" : "请输入邮箱"
-                    }
-                    value={account}
-                    disabled={sending || loading || authenticated}
-                    onChange={(e) => changeAccount(e.target.value)}
-                    className={AUTH_INPUT_CLASS}
-                  />
-                  {account && !identifierValid && (
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-danger">
-                      {tab === "phone" ? "手机号码错误" : "邮箱格式错误"}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm text-foreground-muted mb-1">
-                  验证码
-                </label>
-                <div className="flex gap-3">
-                  <div className="relative min-w-0 flex-1">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="请输入验证码"
-                      value={code}
-                      disabled={sending || loading || authenticated}
-                      onChange={(e) => setCode(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleCodeLogin()}
-                      className={`${AUTH_INPUT_CLASS} pr-20`}
-                    />
-                    {code && !codeValid && (
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-danger">
-                        验证码错误
-                      </span>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleSendCode}
-                    disabled={!canSendCode}
-                    className="shrink-0 rounded-full bg-primary-muted px-4 py-3 text-sm font-medium text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    {countdown > 0
-                      ? `${countdown}s 后重发`
-                      : sending
-                        ? "发送中..."
-                        : "获取验证码"}
-                  </button>
-                </div>
-              </div>
-
-              {error && <p className="text-sm text-danger">{error}</p>}
-
-              <button
-                onClick={handleCodeLogin}
-                disabled={!canCodeSubmit}
-                className="w-full rounded-full bg-primary py-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {loading
-                  ? "登录中..."
-                  : authenticated
-                    ? "重试加载"
-                    : "立即登录"}
-              </button>
-            </div>
-          )}
-
-          {/* 两种登录方式共用的页脚：注册入口 + 忘记密码（对齐设计稿）。 */}
-          <div className="mt-4 space-y-4">
+            {error && (
+              <p role="alert" className="text-sm text-danger">
+                {error}
+              </p>
+            )}
             <button
-              onClick={openRegistration}
-              disabled={sending || loading || authenticated}
-              className="w-full rounded-full border border-border py-3 text-sm text-foreground-muted hover:bg-muted transition-colors"
+              type="submit"
+              disabled={!canSubmit}
+              className="min-h-12 w-full rounded-full bg-primary px-5 text-sm font-semibold text-white transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
             >
-              没有账号，立即注册
+              {loading ? "登录中..." : authenticated ? "重试加载" : "立即登录"}
             </button>
+          </form>
 
+          <div className="mt-7 flex items-center justify-between gap-4 text-sm">
+            <div className="text-foreground-muted">
+              没有账号？{" "}
+              <button
+                type="button"
+                onClick={openRegistration}
+                disabled={loading || authenticated}
+                aria-label="没有账号，立即注册"
+                className="rounded-sm font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
+              >
+                注册账号
+              </button>
+            </div>
             <button
               type="button"
               onClick={() => router.push("/forgot-password")}
-              className="w-full text-center text-sm text-primary hover:underline"
+              className="shrink-0 rounded-sm text-foreground-muted hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               忘记密码
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/request";
 import { AuthBranding } from "./AuthBranding";
+import { PasswordVisibilityIcon } from "./PasswordVisibilityIcon";
 import { AUTH_INPUT_CLASS, securityErrorMessage } from "../shared";
 
 type Tab = "phone" | "email";
@@ -89,39 +90,32 @@ export function ForgotPasswordForm() {
   }
 
   return (
-    <div className="flex min-h-screen">
+    <main className="flex min-h-screen">
       <AuthBranding />
-
-      {/* Right panel */}
-      <div className="flex flex-1 items-center justify-center px-8 py-16 bg-surface">
-        <div className="w-full max-w-sm">
-          <div className="mb-8 flex items-center justify-between">
-            <h1 className="text-3xl font-bold text-foreground">找回密码</h1>
-            <button
-              type="button"
-              onClick={() => router.push("/login")}
-              className="text-sm text-foreground-subtle hover:text-foreground-muted"
-            >
-              ← 返回登录
-            </button>
-          </div>
-
-          <p className="mb-6 text-sm text-foreground-subtle">
-            输入账号当前绑定的手机号或邮箱，获取验证码后设置新密码。
+      <div className="flex min-w-0 flex-1 items-center justify-center bg-surface px-6 py-20">
+        <div className="w-full max-w-[400px]">
+          <h1 className="mb-3 text-3xl font-semibold tracking-tight text-foreground">
+            找回密码
+          </h1>
+          <p className="mb-8 text-sm leading-6 text-foreground-muted">
+            使用账号绑定的手机号或邮箱验证身份。
           </p>
 
-          {/* Tabs：手机 / 邮箱二选一，与注册页一致 */}
-          <div className="flex gap-6 mb-8 border-b border-border">
+          <div
+            className="mb-7 flex gap-6 border-b border-border"
+            aria-label="验证方式"
+          >
             {TABS.map(({ id, label }) => (
               <button
                 key={id}
                 type="button"
                 disabled={busy}
                 onClick={() => switchTab(id)}
-                className={`pb-3 text-sm font-medium transition-colors ${
+                aria-pressed={tab === id}
+                className={`border-b-2 px-1 pb-3 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed ${
                   tab === id
-                    ? "text-primary border-b-2 border-primary"
-                    : "text-foreground-subtle hover:text-foreground-muted"
+                    ? "border-primary text-foreground"
+                    : "border-transparent text-foreground-muted hover:text-foreground"
                 }`}
               >
                 {label}
@@ -129,14 +123,19 @@ export function ForgotPasswordForm() {
             ))}
           </div>
 
-          <form noValidate className="space-y-4" onSubmit={handleReset}>
+          <form noValidate className="space-y-5" onSubmit={handleReset}>
             {/* 账号 */}
             <div>
-              <label className="block text-sm text-foreground-muted mb-1">
+              <label
+                htmlFor="reset-account"
+                className="mb-2 ml-4 block text-sm font-medium text-foreground"
+              >
                 {tab === "phone" ? "手机号码" : "邮箱"}
               </label>
               <input
+                id="reset-account"
                 type={tab === "phone" ? "tel" : "email"}
+                autoComplete={tab === "phone" ? "tel" : "email"}
                 placeholder={tab === "phone" ? "请输入手机号" : "请输入邮箱"}
                 value={account}
                 disabled={busy}
@@ -160,13 +159,18 @@ export function ForgotPasswordForm() {
 
             {/* 验证码 */}
             <div>
-              <label className="block text-sm text-foreground-muted mb-1">
+              <label
+                htmlFor="reset-code"
+                className="mb-2 ml-4 block text-sm font-medium text-foreground"
+              >
                 验证码
               </label>
               <div className="flex gap-3">
                 <input
+                  id="reset-code"
                   type="text"
                   inputMode="numeric"
+                  autoComplete="one-time-code"
                   placeholder="请输入验证码"
                   value={code}
                   maxLength={6}
@@ -178,7 +182,7 @@ export function ForgotPasswordForm() {
                   type="button"
                   onClick={handleSendCode}
                   disabled={!canSendCode}
-                  className="shrink-0 rounded-full bg-primary-muted px-4 py-3 text-sm font-medium text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="shrink-0 rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {countdown > 0
                     ? `${countdown}s 后重发`
@@ -191,51 +195,67 @@ export function ForgotPasswordForm() {
 
             {/* 新密码 */}
             <div>
-              <label className="block text-sm text-foreground-muted mb-1">
+              <label
+                htmlFor="reset-password"
+                className="mb-2 ml-4 block text-sm font-medium text-foreground"
+              >
                 新密码
               </label>
               <div className="relative">
                 <input
+                  id="reset-password"
                   type={showPassword ? "text" : "password"}
                   placeholder="请输入新密码"
                   value={password}
                   disabled={busy}
                   autoComplete="new-password"
                   onChange={(e) => setPassword(e.target.value)}
-                  className={`${AUTH_INPUT_CLASS} pr-12`}
+                  className={`${AUTH_INPUT_CLASS} pr-14`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-foreground-subtle hover:text-foreground-muted"
+                  disabled={busy}
+                  className="absolute right-3 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full text-foreground-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
                   aria-label={showPassword ? "隐藏密码" : "显示密码"}
                 >
-                  {showPassword ? "🙈" : "👁"}
+                  <PasswordVisibilityIcon visible={showPassword} />
                 </button>
               </div>
               <p
-                className={`mt-1 text-xs ${
+                className={`mt-3 ml-4 text-xs ${
                   password && !passwordValid
                     ? "text-danger"
-                    : "text-foreground-subtle"
+                    : "text-foreground-muted"
                 }`}
               >
                 11-20位,数字+字母,不区分大小写
               </p>
             </div>
 
-            {error && <p className="text-sm text-danger">{error}</p>}
+            {error && (
+              <p role="alert" className="text-sm text-danger">
+                {error}
+              </p>
+            )}
 
             <button
               type="submit"
               disabled={!canSubmit}
-              className="w-full rounded-full bg-primary py-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="min-h-12 w-full rounded-full bg-primary px-5 text-sm font-semibold text-white transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? "重置中..." : "重置密码"}
             </button>
           </form>
+          <button
+            type="button"
+            onClick={() => router.push("/login")}
+            className="mt-7 w-full rounded-sm text-center text-sm text-foreground-muted hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          >
+            返回登录
+          </button>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

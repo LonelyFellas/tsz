@@ -6,49 +6,21 @@ import { LoginForm } from "./LoginForm";
 import { useUserStore } from "@/stores/user";
 
 const mockPush = vi.fn();
-// 可变的查询参数，便于覆盖「找回密码 / 注销账号跳回」的成功提示分支
-// 与登录后回跳 redirect 目标分支。
-let mockResetParam: string | null = null;
-let mockDeletedParam: string | null = null;
-let mockRedirectParam: string | null = null;
-let mockRegisteredParam: string | null = null;
+const params: Record<string, string | null> = {};
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
-  useSearchParams: () => ({
-    get: (key: string) =>
-      key === "reset"
-        ? mockResetParam
-        : key === "deleted"
-          ? mockDeletedParam
-          : key === "redirect"
-            ? mockRedirectParam
-            : key === "registered"
-              ? mockRegisteredParam
-              : null
-  })
+  useSearchParams: () => ({ get: (key: string) => params[key] ?? null })
 }));
-
 vi.mock("@/lib/request", () => ({
   setAccessToken: vi.fn(),
   scheduleRefresh: vi.fn(),
-  api: {
-    auth: {
-      login: vi.fn(),
-      sendCode: vi.fn(),
-      loginWithCode: vi.fn(),
-      me: vi.fn()
-    }
-  }
+  api: { auth: { login: vi.fn(), me: vi.fn() } }
 }));
 
-// 引入 mock 后拿到有类型的引用
 import { api } from "@/lib/request";
 const mockLogin = vi.mocked(api.auth.login);
-const mockSendCode = vi.mocked(api.auth.sendCode);
-const mockLoginWithCode = vi.mocked(api.auth.loginWithCode);
 const mockMe = vi.mocked(api.auth.me);
-
 const ME_USER = {
   id: "1",
   display_name: "Alice",
@@ -56,16 +28,17 @@ const ME_USER = {
   avatar_url: "",
   active_role: "student"
 };
+const AUTH_OK = {
+  user: ME_USER,
+  access_token: "at",
+  expires_in: 900,
+  refresh_token_expires_at: 9999999999
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
+  for (const key of Object.keys(params)) delete params[key];
   useUserStore.setState({ user: null, onboarded: null, hydrated: false });
-  mockPush.mockReset();
-  mockResetParam = null;
-  mockDeletedParam = null;
-  mockRedirectParam = null;
-  mockRegisteredParam = null;
-  // 默认：老用户（已 onboarded），登录后进目标页。
   mockMe.mockResolvedValue({
     user: ME_USER,
     active_role: "student",
@@ -74,161 +47,45 @@ beforeEach(() => {
   } as never);
 });
 
-describe("LoginForm — 注册登录边界", () => {
-  it.each(["1234", "12345", "1234567", "12345678"])(
-    "拒绝非六位验证码 %s",
-    async (code) => {
-      renderWithProviders(<LoginForm />);
-      const user = userEvent.setup();
-      await user.click(screen.getByRole("button", { name: "手机验证" }));
-      await user.type(
-        screen.getByPlaceholderText("请输入手机号"),
-        "13800138000"
-      );
-      await user.type(
-        screen.getByPlaceholderText("请输入验证码"),
-        code + "{Enter}"
-      );
-      expect(screen.getByRole("button", { name: "立即登录" })).toBeDisabled();
-      expect(mockLoginWithCode).not.toHaveBeenCalled();
-    }
-  );
+async function fillLogin(account = "13800138000", password = "abc123") {
+  const user = userEvent.setup();
+  await user.type(screen.getByLabelText("手机号或邮箱"), account);
+  await user.type(screen.getByLabelText("密码"), password);
+  return user;
+}
 
-  it("邮箱失败引导邮箱注册并保留回跳，不传联系方式或密码到URL", async () => {
-    mockRedirectParam = "/student/practice";
-    mockLogin.mockRejectedValueOnce(new Error("invalid credentials"));
+describe("LoginForm — 唯一登录方式", () => {
+  it("只展示手机号或邮箱 + 密码，不提供验证码登录入口", () => {
+    renderWithProviders(<LoginForm />);
+    expect(screen.getByLabelText("手机号或邮箱")).toBeInTheDocument();
+    expect(screen.getByLabelText("密码")).toHaveAttribute("type", "password");
+    expect(
+      screen.queryByRole("button", { name: "邮箱验证" })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "手机验证" })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "获取验证码" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("账号或密码不完整时不可提交，回车也不发送请求", async () => {
     renderWithProviders(<LoginForm />);
     const user = userEvent.setup();
-    await user.type(
-      screen.getByPlaceholderText("请输入手机号/邮箱号码"),
-      "Student@EXAMPLE.com"
-    );
-    await user.type(screen.getByPlaceholderText("请输入登录密码"), "OldPass!");
-    await user.click(screen.getByRole("button", { name: "立即登录" }));
-    await screen.findByText("账号或密码错误，请重新输入");
-    expect(mockLogin).toHaveBeenCalledWith("student@example.com", "OldPass!");
-    await user.click(
-      screen.getByRole("button", { name: "没有账号，立即注册" })
-    );
-    expect(mockPush).toHaveBeenCalledWith(
-      "/register?method=email&redirect=%2Fstudent%2Fpractice"
-    );
-  });
-
-  it("验证码登录失败保留防枚举提示并提供注册入口", async () => {
-    mockLoginWithCode.mockRejectedValueOnce(new Error("invalid credentials"));
-    renderWithProviders(<LoginForm />);
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "邮箱验证" }));
-    await user.type(
-      screen.getByPlaceholderText("请输入邮箱"),
-      "user@example.com"
-    );
-    await user.type(screen.getByPlaceholderText("请输入验证码"), "123456");
-    await user.click(screen.getByRole("button", { name: "立即登录" }));
-    await screen.findByText("登录凭据无效；尚未注册请先注册");
-    await user.click(
-      screen.getByRole("button", { name: "没有账号，立即注册" })
-    );
-    expect(mockPush).toHaveBeenCalledWith("/register?method=email");
-  });
-
-  it("发码时不能改账号或切换，换号后清空旧验证码及冷却", async () => {
-    let finish!: () => void;
-    mockSendCode.mockReturnValueOnce(
-      new Promise<void>((resolve) => {
-        finish = resolve;
-      })
-    );
-    renderWithProviders(<LoginForm />);
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "手机验证" }));
-    const input = screen.getByPlaceholderText("请输入手机号");
-    await user.type(input, "13800138000");
-    await user.click(screen.getByRole("button", { name: "获取验证码" }));
-    expect(input).toBeDisabled();
-    expect(screen.getByRole("button", { name: "邮箱验证" })).toBeDisabled();
-    finish();
-    await screen.findByRole("button", { name: "60s 后重发" });
-    await user.type(screen.getByPlaceholderText("请输入验证码"), "123456");
-    await user.clear(input);
-    await user.type(input, "13900139000");
-    expect(screen.getByPlaceholderText("请输入验证码")).toHaveValue("");
-    expect(screen.getByRole("button", { name: "获取验证码" })).toBeEnabled();
-  });
-});
-
-// ── 按钮状态 ──────────────────────────────────────────
-describe("LoginForm — 按钮状态", () => {
-  // 默认 tab 即为「账号密码」，无需再切换。
-  beforeEach(() => {
-    renderWithProviders(<LoginForm />);
-  });
-
-  it("初始状态下立即登录按钮禁用", () => {
+    expect(screen.getByRole("button", { name: "立即登录" })).toBeDisabled();
+    await user.type(screen.getByLabelText("密码"), "abc123{Enter}");
+    expect(mockLogin).not.toHaveBeenCalled();
+    await user.type(screen.getByLabelText("手机号或邮箱"), "notvalid{Enter}");
+    expect(mockLogin).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "立即登录" })).toBeDisabled();
   });
 
-  it("填入合法手机号但无密码 → 按钮仍禁用", async () => {
-    const user = userEvent.setup();
-    await user.type(
-      screen.getByPlaceholderText("请输入手机号/邮箱号码"),
-      "13800138000"
-    );
-    expect(screen.getByRole("button", { name: "立即登录" })).toBeDisabled();
-  });
-
-  it("填入合法账号和密码 → 按钮可用", async () => {
-    const user = userEvent.setup();
-    await user.type(
-      screen.getByPlaceholderText("请输入手机号/邮箱号码"),
-      "13800138000"
-    );
-    await user.type(screen.getByPlaceholderText("请输入登录密码"), "abc123");
-    expect(screen.getByRole("button", { name: "立即登录" })).toBeEnabled();
-  });
-
-  it("填入非法账号 + 密码 → 按钮禁用", async () => {
-    const user = userEvent.setup();
-    await user.type(
-      screen.getByPlaceholderText("请输入手机号/邮箱号码"),
-      "notvalid"
-    );
-    await user.type(screen.getByPlaceholderText("请输入登录密码"), "abc123");
-    expect(screen.getByRole("button", { name: "立即登录" })).toBeDisabled();
-  });
-});
-
-// ── 登录流程 ──────────────────────────────────────────
-describe("LoginForm — 登录流程", () => {
-  async function fillAndSubmit(account = "13800138000", password = "abc123") {
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "账号密码" }));
-    await user.type(
-      screen.getByPlaceholderText("请输入手机号/邮箱号码"),
-      account
-    );
-    await user.type(screen.getByPlaceholderText("请输入登录密码"), password);
-    await user.click(screen.getByRole("button", { name: "立即登录" }));
-  }
-
-  it("登录成功 → 发布完整用户态，交给守卫导航", async () => {
-    mockLogin.mockResolvedValueOnce({
-      user: {
-        id: "1",
-        display_name: "Alice",
-        roles: ["student"],
-        avatar_url: "",
-        active_role: "student"
-      },
-      access_token: "at",
-      expires_in: 900,
-      refresh_token_expires_at: 9999999999
-    });
+  it("手机号和密码回车登录并发布完整用户态，交给守卫导航", async () => {
+    mockLogin.mockResolvedValueOnce(AUTH_OK as never);
     renderWithProviders(<LoginForm />);
-
-    await fillAndSubmit();
-
+    const user = await fillLogin();
+    await user.type(screen.getByLabelText("密码"), "{Enter}");
     await waitFor(() => {
       expect(mockLogin).toHaveBeenCalledWith("13800138000", "abc123");
       expect(useUserStore.getState()).toMatchObject({
@@ -240,14 +97,8 @@ describe("LoginForm — 登录流程", () => {
     });
   });
 
-  it("新用户登录 → 发布未完成引导的用户态", async () => {
-    mockLogin.mockResolvedValueOnce({
-      user: ME_USER,
-      access_token: "at",
-      active_role: "student",
-      expires_in: 900,
-      refresh_token_expires_at: 9999999999
-    } as never);
+  it("新用户登录发布未完成引导状态", async () => {
+    mockLogin.mockResolvedValueOnce(AUTH_OK as never);
     mockMe.mockResolvedValueOnce({
       user: ME_USER,
       active_role: "student",
@@ -255,440 +106,87 @@ describe("LoginForm — 登录流程", () => {
       onboarded: false
     } as never);
     renderWithProviders(<LoginForm />);
-
-    await fillAndSubmit();
-
-    await waitFor(() => {
+    const user = await fillLogin();
+    await user.click(screen.getByRole("button", { name: "立即登录" }));
+    await waitFor(() =>
       expect(useUserStore.getState()).toMatchObject({
         user: ME_USER,
         onboarded: false,
         hydrated: true
-      });
-      expect(mockPush).not.toHaveBeenCalled();
-    });
+      })
+    );
   });
 
-  it("登录失败 → 显示中文错误提示", async () => {
+  it("邮箱规范化后登录失败，保留邮箱注册方式及安全回跳", async () => {
+    params.redirect = "/student/practice";
     mockLogin.mockRejectedValueOnce(new Error("invalid credentials"));
     renderWithProviders(<LoginForm />);
-
-    await fillAndSubmit();
-
-    await waitFor(() => {
-      expect(
-        screen.getByText("账号或密码错误，请重新输入")
-      ).toBeInTheDocument();
-    });
-    expect(mockPush).not.toHaveBeenCalled();
-  });
-
-  it("登录失败 → 按钮恢复可用", async () => {
-    mockLogin.mockRejectedValueOnce(new Error("invalid credentials"));
-    renderWithProviders(<LoginForm />);
-
-    await fillAndSubmit();
-
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "立即登录" })).toBeEnabled();
-    });
-  });
-
-  it("未知错误 → 显示兜底提示", async () => {
-    mockLogin.mockRejectedValueOnce(new Error(""));
-    renderWithProviders(<LoginForm />);
-
-    await fillAndSubmit();
-
-    await waitFor(() => {
-      expect(screen.getByText("登录失败，请稍后重试")).toBeInTheDocument();
-    });
-  });
-
-  it("URL 带 redirect → 表单只发布状态，不自行导航", async () => {
-    mockRedirectParam = "/student/practice";
-    mockLogin.mockResolvedValueOnce({
-      user: ME_USER,
-      access_token: "at",
-      active_role: "student",
-      expires_in: 900,
-      refresh_token_expires_at: 9999999999
-    } as never);
-    renderWithProviders(<LoginForm />);
-
-    await fillAndSubmit();
-
-    await waitFor(() => {
-      expect(useUserStore.getState().user).toEqual(ME_USER);
-      expect(mockPush).not.toHaveBeenCalled();
-    });
-  });
-});
-
-// ── 错误映射 ──────────────────────────────────────────
-describe("LoginForm — 错误映射", () => {
-  const cases: [string, string][] = [
-    ["invalid credentials", "账号或密码错误，请重新输入"],
-    // 后端对「账号不存在/密码错误」返回同一条 401(防枚举),没有单独的 user not found;
-    // 403 forbidden = 密码正确但账号被禁用。
-    ["forbidden", "该账号已被禁用，请联系客服"],
-    ["session expired", "登录已过期，请重新登录"],
-    ["invalid refresh token", "登录已过期，请重新登录"]
-  ];
-
-  it.each(cases)('后端返回 "%s" → 显示 "%s"', async (backendMsg, uiMsg) => {
-    mockLogin.mockRejectedValueOnce(new Error(backendMsg));
-    renderWithProviders(<LoginForm />);
-
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "账号密码" }));
-    await user.type(
-      screen.getByPlaceholderText("请输入手机号/邮箱号码"),
-      "13800138000"
-    );
-    await user.type(screen.getByPlaceholderText("请输入登录密码"), "abc123");
+    const user = await fillLogin("Student@EXAMPLE.com", "OldPass!");
     await user.click(screen.getByRole("button", { name: "立即登录" }));
-
-    await waitFor(() => {
-      expect(screen.getByText(uiMsg)).toBeInTheDocument();
-    });
-  });
-});
-
-// ── Tab 切换 ──────────────────────────────────────────
-describe("LoginForm — tab 切换", () => {
-  it("默认展示「账号密码」tab → 显示密码输入框", () => {
-    renderWithProviders(<LoginForm />);
-
-    expect(screen.getByPlaceholderText("请输入登录密码")).toBeInTheDocument();
-  });
-
-  it("切换到账号密码 tab → 显示密码输入框", async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<LoginForm />);
-
-    await user.click(screen.getByRole("button", { name: "账号密码" }));
-
-    expect(screen.getByPlaceholderText("请输入登录密码")).toBeInTheDocument();
-  });
-
-  it("切换到邮箱验证 tab → 显示邮箱输入框", async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<LoginForm />);
-
-    await user.click(screen.getByRole("button", { name: "邮箱验证" }));
-
-    expect(screen.getByPlaceholderText("请输入邮箱")).toBeInTheDocument();
-  });
-
-  it("切换 tab 后清除错误提示", async () => {
-    mockLogin.mockRejectedValueOnce(new Error("invalid credentials"));
-    renderWithProviders(<LoginForm />);
-
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "账号密码" }));
-    await user.type(
-      screen.getByPlaceholderText("请输入手机号/邮箱号码"),
-      "13800138000"
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "账号或密码错误，请重新输入"
     );
-    await user.type(screen.getByPlaceholderText("请输入登录密码"), "abc123");
-    await user.click(screen.getByRole("button", { name: "立即登录" }));
-    await waitFor(() => {
-      expect(
-        screen.getByText("账号或密码错误，请重新输入")
-      ).toBeInTheDocument();
-    });
-
-    await user.click(screen.getByRole("button", { name: "手机验证" }));
-
-    expect(
-      screen.queryByText("账号或密码错误，请重新输入")
-    ).not.toBeInTheDocument();
-  });
-});
-
-// ── 验证码登录 ────────────────────────────────────────
-describe("LoginForm — 验证码登录", () => {
-  const AUTH_OK = {
-    user: ME_USER,
-    access_token: "at",
-    active_role: "student",
-    expires_in: 900,
-    refresh_token_expires_at: 9999999999
-  };
-
-  it("合法手机号 → 获取验证码按钮可用，点击后调用 sendCode 并进入倒计时", async () => {
-    const user = userEvent.setup();
-    mockSendCode.mockResolvedValueOnce(undefined); // otp/send 202 无 body
-    renderWithProviders(<LoginForm />);
-
-    await user.click(screen.getByRole("button", { name: "手机验证" }));
-    const sendBtn = screen.getByRole("button", { name: "获取验证码" });
-    expect(sendBtn).toBeDisabled();
-
-    await user.type(screen.getByPlaceholderText("请输入手机号"), "13800138000");
-    expect(sendBtn).toBeEnabled();
-
-    await user.click(sendBtn);
-
-    await waitFor(() => {
-      expect(mockSendCode).toHaveBeenCalledWith("13800138000");
-      expect(screen.getByText(/后重发/)).toBeInTheDocument();
-    });
-  });
-
-  it("非法手机号 → 获取验证码按钮禁用", async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<LoginForm />);
-
-    await user.click(screen.getByRole("button", { name: "手机验证" }));
-    await user.type(screen.getByPlaceholderText("请输入手机号"), "123");
-
-    expect(screen.getByRole("button", { name: "获取验证码" })).toBeDisabled();
-  });
-
-  it("手机号 + 验证码登录成功 → 调用 loginWithCode 并发布用户态", async () => {
-    const user = userEvent.setup();
-    mockLoginWithCode.mockResolvedValueOnce(AUTH_OK as never);
-    renderWithProviders(<LoginForm />);
-
-    await user.click(screen.getByRole("button", { name: "手机验证" }));
-    await user.type(screen.getByPlaceholderText("请输入手机号"), "13800138000");
-    await user.type(screen.getByPlaceholderText("请输入验证码"), "123456");
-    await user.click(screen.getByRole("button", { name: "立即登录" }));
-
-    await waitFor(() => {
-      expect(mockLoginWithCode).toHaveBeenCalledWith("13800138000", "123456");
-      expect(useUserStore.getState()).toMatchObject({
-        user: ME_USER,
-        onboarded: true,
-        hydrated: true
-      });
-      expect(mockPush).not.toHaveBeenCalled();
-    });
-  });
-
-  it("验证码错误 → 显示中文错误提示", async () => {
-    const user = userEvent.setup();
-    // tsz-rust /auth/login-otp 的验证码错误文案是 "invalid code"。
-    mockLoginWithCode.mockRejectedValueOnce(new Error("invalid code"));
-    renderWithProviders(<LoginForm />);
-
-    await user.click(screen.getByRole("button", { name: "手机验证" }));
-    await user.type(screen.getByPlaceholderText("请输入手机号"), "13800138000");
-    await user.type(screen.getByPlaceholderText("请输入验证码"), "123456");
-    await user.click(screen.getByRole("button", { name: "立即登录" }));
-
-    await waitFor(() => {
-      expect(
-        screen.getByText("验证码错误或已失效，请重新获取")
-      ).toBeInTheDocument();
-    });
-  });
-
-  it("发送过于频繁 → 显示限流提示", async () => {
-    const user = userEvent.setup();
-    // tsz-rust 429 统一文案 "too many requests"。
-    mockSendCode.mockRejectedValueOnce(new Error("too many requests"));
-    renderWithProviders(<LoginForm />);
-
-    await user.click(screen.getByRole("button", { name: "手机验证" }));
-    await user.type(screen.getByPlaceholderText("请输入手机号"), "13800138000");
-    await user.click(screen.getByRole("button", { name: "获取验证码" }));
-
-    await waitFor(() => {
-      expect(
-        screen.getByText("验证码发送过于频繁，请稍后再试")
-      ).toBeInTheDocument();
-    });
-  });
-
-  it("邮箱验证码 tab → 用邮箱作为 identifier 调用 sendCode", async () => {
-    const user = userEvent.setup();
-    mockSendCode.mockResolvedValueOnce(undefined); // otp/send 202 无 body
-    renderWithProviders(<LoginForm />);
-
-    await user.click(screen.getByRole("button", { name: "邮箱验证" }));
-    await user.type(
-      screen.getByPlaceholderText("请输入邮箱"),
-      "alice@example.com"
-    );
-    await user.click(screen.getByRole("button", { name: "获取验证码" }));
-
-    await waitFor(() => {
-      expect(mockSendCode).toHaveBeenCalledWith("alice@example.com");
-    });
-  });
-});
-
-// 回车提交是与按钮并行的一条入口：按钮 disabled 挡不住键盘，故 handleLogin /
-// handleCodeLogin 里的 canSubmit 兜底必须在回车路径上验证。
-describe("LoginForm — 回车提交", () => {
-  const AUTH_OK = {
-    user: ME_USER,
-    access_token: "at",
-    active_role: "student",
-    expires_in: 900,
-    refresh_token_expires_at: 9999999999
-  };
-
-  it("密码框回车即登录", async () => {
-    const user = userEvent.setup();
-    mockLogin.mockResolvedValueOnce(AUTH_OK as never);
-    renderWithProviders(<LoginForm />);
-
-    await user.type(
-      screen.getByPlaceholderText("请输入手机号/邮箱号码"),
-      "13800138000"
-    );
-    await user.type(screen.getByPlaceholderText("请输入登录密码"), "abc123");
-    await user.type(screen.getByPlaceholderText("请输入登录密码"), "{Enter}");
-
-    await waitFor(() =>
-      expect(mockLogin).toHaveBeenCalledWith("13800138000", "abc123")
-    );
-  });
-
-  it("未填完整时密码框回车不发登录请求（键盘绕不过 canSubmit）", async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<LoginForm />);
-
-    await user.type(screen.getByPlaceholderText("请输入登录密码"), "abc123");
-    await user.type(screen.getByPlaceholderText("请输入登录密码"), "{Enter}");
-
-    expect(mockLogin).not.toHaveBeenCalled();
-  });
-
-  it("验证码框回车即登录", async () => {
-    const user = userEvent.setup();
-    mockLoginWithCode.mockResolvedValueOnce(AUTH_OK as never);
-    renderWithProviders(<LoginForm />);
-
-    await user.click(screen.getByRole("button", { name: "手机验证" }));
-    await user.type(screen.getByPlaceholderText("请输入手机号"), "13800138000");
-    await user.type(screen.getByPlaceholderText("请输入验证码"), "123456");
-    await user.type(screen.getByPlaceholderText("请输入验证码"), "{Enter}");
-
-    await waitFor(() =>
-      expect(mockLoginWithCode).toHaveBeenCalledWith("13800138000", "123456")
-    );
-  });
-
-  it("验证码不足六位时回车不发请求", async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<LoginForm />);
-
-    await user.click(screen.getByRole("button", { name: "手机验证" }));
-    await user.type(screen.getByPlaceholderText("请输入手机号"), "13800138000");
-    await user.type(screen.getByPlaceholderText("请输入验证码"), "123");
-    await user.type(screen.getByPlaceholderText("请输入验证码"), "{Enter}");
-
-    expect(mockLoginWithCode).not.toHaveBeenCalled();
-  });
-});
-
-// 三条请求路径都用 `e instanceof Error ? e.message : ""` 取文案，
-// 非 Error 拒绝（如后端层抛出字符串）必须落到各自的兜底文案而不是空白提示。
-describe("LoginForm — 非 Error 拒绝的兜底文案", () => {
-  it("密码登录：登录失败，请稍后重试", async () => {
-    const user = userEvent.setup();
-    mockLogin.mockRejectedValueOnce("boom");
-    renderWithProviders(<LoginForm />);
-
-    await user.type(
-      screen.getByPlaceholderText("请输入手机号/邮箱号码"),
-      "13800138000"
-    );
-    await user.type(screen.getByPlaceholderText("请输入登录密码"), "abc123");
-    await user.click(screen.getByRole("button", { name: "立即登录" }));
-
-    expect(await screen.findByText("登录失败，请稍后重试")).toBeInTheDocument();
-  });
-
-  it("发码：验证码发送失败，请稍后重试", async () => {
-    const user = userEvent.setup();
-    mockSendCode.mockRejectedValueOnce("boom");
-    renderWithProviders(<LoginForm />);
-
-    await user.click(screen.getByRole("button", { name: "手机验证" }));
-    await user.type(screen.getByPlaceholderText("请输入手机号"), "13800138000");
-    await user.click(screen.getByRole("button", { name: "获取验证码" }));
-
-    expect(
-      await screen.findByText("验证码发送失败，请稍后重试")
-    ).toBeInTheDocument();
-  });
-
-  it("验证码登录：登录失败，请稍后重试", async () => {
-    const user = userEvent.setup();
-    mockLoginWithCode.mockRejectedValueOnce("boom");
-    renderWithProviders(<LoginForm />);
-
-    await user.click(screen.getByRole("button", { name: "手机验证" }));
-    await user.type(screen.getByPlaceholderText("请输入手机号"), "13800138000");
-    await user.type(screen.getByPlaceholderText("请输入验证码"), "123456");
-    await user.click(screen.getByRole("button", { name: "立即登录" }));
-
-    expect(await screen.findByText("登录失败，请稍后重试")).toBeInTheDocument();
-  });
-});
-
-// ── 交互细节 ──────────────────────────────────────────
-describe("LoginForm — 交互细节", () => {
-  it("点击眼睛图标 → 切换密码明文/密文", async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<LoginForm />);
-
-    await user.click(screen.getByRole("button", { name: "账号密码" }));
-    const pwd = screen.getByPlaceholderText("请输入登录密码");
-    expect(pwd).toHaveAttribute("type", "password");
-
-    await user.click(screen.getByRole("button", { name: "显示密码" }));
-    expect(pwd).toHaveAttribute("type", "text");
-
-    await user.click(screen.getByRole("button", { name: "隐藏密码" }));
-    expect(pwd).toHaveAttribute("type", "password");
-  });
-
-  it("点击「没有账号，立即注册」→ 跳 /register", async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<LoginForm />);
-
     await user.click(
       screen.getByRole("button", { name: "没有账号，立即注册" })
     );
-    expect(mockPush).toHaveBeenCalledWith("/register");
+    expect(mockLogin).toHaveBeenCalledWith("student@example.com", "OldPass!");
+    expect(mockPush).toHaveBeenCalledWith(
+      "/register?method=email&redirect=%2Fstudent%2Fpractice"
+    );
   });
 
-  it("点击「忘记密码」→ 跳 /forgot-password", async () => {
-    const user = userEvent.setup();
+  it.each([
+    ["forbidden", "该账号已被禁用，请联系客服"],
+    ["session expired", "登录已过期，请重新登录"],
+    ["invalid refresh token", "登录已过期，请重新登录"]
+  ])("错误 %s 显示 %s", async (backend, message) => {
+    mockLogin.mockRejectedValueOnce(new Error(backend));
     renderWithProviders(<LoginForm />);
+    const user = await fillLogin();
+    await user.click(screen.getByRole("button", { name: "立即登录" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(message);
+    expect(screen.getByRole("button", { name: "立即登录" })).toBeEnabled();
+  });
 
+  it("非 Error 拒绝显示兜底提示", async () => {
+    mockLogin.mockRejectedValueOnce("boom");
+    renderWithProviders(<LoginForm />);
+    const user = await fillLogin();
+    await user.click(screen.getByRole("button", { name: "立即登录" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "登录失败，请稍后重试"
+    );
+  });
+
+  it("密码显示切换不提交表单", async () => {
+    renderWithProviders(<LoginForm />);
+    const user = await fillLogin();
+    await user.click(screen.getByRole("button", { name: "显示密码" }));
+    expect(screen.getByLabelText("密码")).toHaveAttribute("type", "text");
+    expect(mockLogin).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "隐藏密码" }));
+    expect(screen.getByLabelText("密码")).toHaveAttribute("type", "password");
+  });
+
+  it("手机号码注册与找回密码仍可访问", async () => {
+    renderWithProviders(<LoginForm />);
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole("button", { name: "没有账号，立即注册" })
+    );
     await user.click(screen.getByRole("button", { name: "忘记密码" }));
+    expect(mockPush).toHaveBeenCalledWith("/register");
     expect(mockPush).toHaveBeenCalledWith("/forgot-password");
   });
 
-  it("URL 带 reset=success → 顶部显示重置成功提示", () => {
-    mockResetParam = "success";
+  it.each([
+    ["reset", "密码重置成功，请用新密码登录。"],
+    ["deleted", "账号已注销成功。"],
+    ["registered", "注册成功，请用刚设置的账号密码登录。"],
+    ["security", "账号安全信息已更新，请使用当前绑定的手机号或邮箱重新登录。"]
+  ])("%s=success 显示结果提示", (key, message) => {
+    params[key] = "success";
     renderWithProviders(<LoginForm />);
-
-    expect(
-      screen.getByText("密码重置成功，请用新密码登录。")
-    ).toBeInTheDocument();
-  });
-
-  it("URL 带 deleted=success → 顶部显示注销成功提示", () => {
-    mockDeletedParam = "success";
-    renderWithProviders(<LoginForm />);
-
-    expect(screen.getByText("账号已注销成功。")).toBeInTheDocument();
-  });
-
-  it("URL 带 registered=success → 顶部显示注册成功提示(注册后自动登录失败跳回)", () => {
-    mockRegisteredParam = "success";
-    renderWithProviders(<LoginForm />);
-
-    expect(
-      screen.getByText("注册成功，请用刚设置的账号密码登录。")
-    ).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(message);
   });
 });
