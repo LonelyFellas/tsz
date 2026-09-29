@@ -7,7 +7,7 @@ import type {
 /**
  * 音频资产上传（OSS 预签名直传三步）的 wire。
  * 形状刻意与 @tsz/api-client 的头像直传许可 AvatarUpload、试听的 AdminSpeechPreviewResponse 对齐；
- * 契约见 docs/features/voice-editor-audio-upload/design.md「后端对接」。
+ * 契约见 tsz-rust/docs/openapi.json 与 tsz-rust/docs/object-storage-design.md。
  */
 
 /** 音频 MIME 白名单（被签进预签名 URL，直传时 Content-Type 必须完全一致）。 */

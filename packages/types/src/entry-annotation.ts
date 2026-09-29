@@ -2,7 +2,7 @@ import type { MatchedEntryContextV3 } from "./surface-match";
 
 /**
  * 词条标注：同原型组（相同 dialect_scope + normalized_surface）内区分同形词条的短标签。
- * 契约见 tsz-rust docs/features/entry-annotations/design.md 与 frontend-integration.md §22。
+ * 契约见 tsz-rust/docs/openapi.json 与 tsz-rust/docs/api-errors.md 的词条标注约定。
  */
 
 /** `409 annotation_conflict` 的原因。 */

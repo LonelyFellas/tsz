@@ -288,7 +288,7 @@ export type AudioAssetGenderV3 = "female" | "male";
 /**
  * 一条已上传的音频资产（真人录音）。元数据由服务端在 confirm 时生成，前端原样回传；
  * 不含可播放 URL——试听要按 id 另取短期签名 URL，签名 URL 不进 aggregate / publication。
- * 契约见 docs/features/voice-editor-audio-upload/design.md「后端对接」。
+ * 契约见 tsz-rust/docs/openapi.json 与 tsz-rust/docs/object-storage-design.md。
  */
 export interface AudioAssetV3 {
   id: string;
