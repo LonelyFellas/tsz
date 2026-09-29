@@ -425,7 +425,9 @@ describe("V3FormsAndPronunciationStep 被引用节点保护", () => {
     // TASK#58：改类型保护式放开——可点，但给漂移提示。
     expect(screen.getByLabelText("变化组 1 词形 1 类型")).not.toBeDisabled();
     // 漂移提示收成警示图标 + 悬停说明，可及名保留完整文案。
-    await screen.findByLabelText(/修改词形类型会让 1 处引用漂移/);
+    await screen.findByLabelText(
+      "存在 1 处关联，修改词形类型后，请检查关联内容是否正确"
+    );
     const deletePos = screen.getByLabelText("删除名词");
     expect(deletePos).toBeEnabled();
     // 同组没被引用的第 2 个词形不受影响（它非本组唯一原形，不受锁删规则影响）。
@@ -434,7 +436,7 @@ describe("V3FormsAndPronunciationStep 被引用节点保护", () => {
     expect(deleteOther.closest(".v3-disabled-reason")).toBeNull();
     expect(screen.getByLabelText("变化组 1 词形 2 类型")).not.toBeDisabled();
 
-    const badges = screen.getAllByRole("button", { name: "被引用 1" });
+    const badges = screen.getAllByRole("button", { name: "查看 1 处关联" });
     expect(badges.length).toBeGreaterThanOrEqual(2);
     fireEvent.click(badges[0]!);
     fireEvent.click(await screen.findByRole("button", { name: "查看例句" }));
@@ -530,10 +532,12 @@ describe("V3FormsAndPronunciationStep 被引用节点保护", () => {
     expect(spelling).not.toHaveAttribute("aria-invalid", "true");
     await changeVoiceText(spelling, { target: { value: "orbits" } });
     expect(spelling).toHaveAttribute("aria-invalid", "true");
-    expect(screen.getByText(/与被引用片段“orbit”不一致/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/与关联内容中的文字“orbit”不一致/)
+    ).toBeInTheDocument();
     await changeVoiceText(spelling, { target: { value: " ORBIT " } });
     expect(spelling).not.toHaveAttribute("aria-invalid", "true");
-    expect(screen.queryByText(/与被引用片段/)).toBeNull();
+    expect(screen.queryByText(/与关联内容中的文字/)).toBeNull();
   });
 });
 
@@ -1923,7 +1927,7 @@ describe("V3FormsAndPronunciationStep", () => {
 
     expect(screen.getByText("草稿可暂时保留空变化组")).toBeInTheDocument();
     expect(
-      screen.getByText("该变化组引用的词形不存在，已停止编辑。")
+      screen.getByText("该变化组关联的词形已不存在，请刷新页面后重试。")
     ).toBeInTheDocument();
     expect(screen.getByLabelText("新增名词变化组")).toHaveTextContent(
       "增加一组词性变化"
@@ -2150,7 +2154,7 @@ describe("V3FormsAndPronunciationStep", () => {
     );
     // 引用的词形已不在草稿里：整行换成错误提示，删除入口随之消失。
     expect(
-      screen.getAllByText("该变化组引用的词形不存在，已停止编辑。")
+      screen.getAllByText("该变化组关联的词形已不存在，请刷新页面后重试。")
     ).toHaveLength(2);
     expect(screen.queryByLabelText("删除变化组 1 的词形 1")).toBeNull();
     expect(onChange).not.toHaveBeenCalled();

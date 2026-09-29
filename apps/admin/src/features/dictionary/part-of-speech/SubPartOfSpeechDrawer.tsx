@@ -243,7 +243,7 @@ export function SubPartOfSpeechPanel({
   const removeItem = (item: SubPartOfSpeechConfig) => {
     modal.confirm({
       title: `删除细分词性“${item.name_zh}”？`,
-      content: "删除后不可恢复，词条中已引用的细分词性不会允许删除。",
+      content: "删除后不可恢复。如果仍有词义关联此细分词性，将无法删除。",
       okText: "删 除",
       okButtonProps: { danger: true },
       cancelText: "取 消",
@@ -282,10 +282,10 @@ export function SubPartOfSpeechPanel({
       render: (id: string) => parentById.get(id)?.name_zh
     },
     {
-      title: "引用",
+      title: "关联",
       dataIndex: "usage_count",
       width: 100,
-      render: (count: number) => (count > 0 ? `${count} 个词义` : "未引用")
+      render: (count: number) => (count > 0 ? `${count} 个词义` : "无关联")
     },
     {
       title: "创建人",
@@ -318,7 +318,7 @@ export function SubPartOfSpeechPanel({
           <Tooltip
             title={
               item.usage_count > 0
-                ? `已有 ${item.usage_count} 个词义引用，只能修改`
+                ? `已关联 ${item.usage_count} 个词义，可以修改，但不能删除`
                 : undefined
             }
           >

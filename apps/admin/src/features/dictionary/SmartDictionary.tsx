@@ -110,7 +110,7 @@ const ENTRY_REFERENCE_KIND_LABEL: Record<EntryReferenceKind, string> = {
   relation: "关联词",
   relation_prebound: "关联词待物化",
   sentence_link: "例句关联",
-  publication_sense_ref: "已发布引用",
+  publication_sense_ref: "已发布内容关联",
   sentence_association: "例句关联待认领",
   phrase_component: "短语成分"
 };
@@ -439,7 +439,7 @@ export function SmartDictionary({
       return "只能永久删除自己创建的词条";
     }
     if (code === "entry_not_deletable") {
-      return "该词条已发布过或仍被其他草稿引用，不能永久删除";
+      return "该词条有发布记录或仍与其他草稿有关联，不能永久删除";
     }
     if (code === "entry_has_inbound_prebound_relations") {
       return "该词条被其他草稿的关联词选中，请先解除后再删除";
@@ -572,7 +572,7 @@ export function SmartDictionary({
       title: `${restoring ? "恢复" : "移入垃圾桶"}「${label}」？`,
       content: restoring
         ? "恢复后词条重新进入正常列表；现有发布记录保持不变。"
-        : "移入垃圾桶不会删除当前或历史发布记录；存在有效入站引用时服务端会安全拒绝。",
+        : "移入垃圾桶会保留当前和历史发布记录；若仍有其他内容关联此词条，需先解除关联才能移入垃圾桶。",
       okText: restoring ? "恢 复" : "移入垃圾桶",
       okButtonProps: { danger: !restoring },
       cancelText: "取消",
@@ -817,7 +817,7 @@ export function SmartDictionary({
       }
     },
     {
-      title: "引用",
+      title: "关联",
       key: "references",
       width: 80,
       responsive: ["sm"],
@@ -849,11 +849,15 @@ export function SmartDictionary({
           </Space>
         );
         return (
-          <Popover content={content} title="被以下内容引用" trigger="click">
+          <Popover
+            content={content}
+            title="以下内容关联了此词条"
+            trigger="click"
+          >
             <Button
               type="link"
               size="small"
-              aria-label={`查看「${wordListLabel(record)}」的 ${total} 条引用`}
+              aria-label={`查看「${wordListLabel(record)}」的 ${total} 处关联`}
             >
               {total}
             </Button>

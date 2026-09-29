@@ -325,7 +325,7 @@ describe("PartOfSpeechSettings", () => {
     expect(referencedDelete).toBeDisabled();
     expect(referencedDelete.parentElement).toHaveAttribute(
       "data-tooltip",
-      "已有 3 个单词或短语引用，只能修改"
+      "已关联 3 个单词或短语，可以修改，但不能删除"
     );
 
     const particleRow = screen.getByText("小品词").closest("tr")!;
@@ -584,7 +584,10 @@ describe("PartOfSpeechSettings", () => {
   it.each([
     ["part_of_speech_conflict", "基本词性名称已存在"],
     ["sub_part_of_speech_conflict", "细分词性名称已存在"],
-    ["part_of_speech_in_use", "该基本词性已被单词或短语引用，只能修改"],
+    [
+      "part_of_speech_in_use",
+      "该基本词性仍与单词或短语有关联，可以修改，但不能删除"
+    ],
     [
       "part_of_speech_has_sub_parts",
       "该基本词性下还有细分词性，请先删除细分词性"
@@ -595,7 +598,7 @@ describe("PartOfSpeechSettings", () => {
     ],
     [
       "sub_part_of_speech_in_use",
-      "该细分词性已被词义引用，不能删除，编码也不能再改"
+      "该细分词性仍与词义有关联，不能删除或修改编码"
     ],
     ["sub_part_of_speech_not_allowed", "该基本词性不支持细分词性"],
     ["part_of_speech_not_found", "基本词性不存在或已被删除，请刷新后重试"],

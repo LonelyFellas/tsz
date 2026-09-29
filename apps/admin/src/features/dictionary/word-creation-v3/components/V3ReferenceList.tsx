@@ -32,7 +32,7 @@ function targetLabel(reference: InboundReferenceV3): string {
   if (target.form_id) return "词形";
   if (target.sense_id) return "词义";
   if (target.pos_id) return "词性";
-  return "本词条";
+  return "内容";
 }
 
 /** 片段下标是码点：直接 slice 字符串会把代理对切坏。 */
@@ -136,7 +136,7 @@ function ReferenceActions({ reference }: { reference: InboundReferenceV3 }) {
 export function V3ReferenceList({
   references,
   total,
-  emptyText = "暂无引用",
+  emptyText = "暂无关联",
   staleLabel = "已失效"
 }: {
   references: readonly InboundReferenceV3[];
@@ -174,7 +174,7 @@ export function V3ReferenceList({
           <Flex vertical gap={2} style={{ flex: "1 1 240px", minWidth: 0 }}>
             {sourceSummary(reference)}
             <Typography.Text type="secondary">
-              指向本词条：{targetLabel(reference)}
+              关联本词条的{targetLabel(reference)}
             </Typography.Text>
           </Flex>
           <ReferenceActions reference={reference} />

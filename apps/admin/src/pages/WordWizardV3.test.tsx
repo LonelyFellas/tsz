@@ -234,14 +234,14 @@ describe("WordWizardV3Page", () => {
       `/words/${WORD_ID}/v3/wizard/preview?focus_node=removed-source`,
       createV3WordRequests(endpoints)
     );
-    expect(await screen.findByText("引用来源节点已不存在")).toBeVisible();
+    expect(await screen.findByText("未找到关联来源内容")).toBeVisible();
     expect(router.state.location.pathname).toContain("/wizard/meanings");
     expect(
       new URLSearchParams(router.state.location.search).get("focus_node")
     ).toBe("removed-source");
-    expect(screen.getByText(/请核对当前草稿和发布版本/)).toBeVisible();
+    expect(screen.getByText(/请检查来源词条的草稿和已发布内容/)).toBeVisible();
     await act(() => router.navigate(`/words/${WORD_ID}/v3/wizard/forms`));
-    expect(screen.queryByText("引用来源节点已不存在")).not.toBeInTheDocument();
+    expect(screen.queryByText("未找到关联来源内容")).not.toBeInTheDocument();
   });
 
   it("有效来源节点不会提示丢失", async () => {
@@ -252,7 +252,7 @@ describe("WordWizardV3Page", () => {
       createV3WordRequests(endpoints)
     );
     await screen.findByLabelText("原形英美通用拼写");
-    expect(screen.queryByText("引用来源节点已不存在")).not.toBeInTheDocument();
+    expect(screen.queryByText("未找到关联来源内容")).not.toBeInTheDocument();
   });
 
   it.each(["forms", "meanings"])(
@@ -883,14 +883,18 @@ describe("WordWizardV3Page", () => {
     );
 
     // 整页按角色查会逐个元素算继承样式，jsdom 里这一页会卡死；徽标的可及名就是 aria-label，按标签查。
-    expect(await screen.findAllByLabelText("被引用 1")).not.toHaveLength(0);
+    expect(await screen.findAllByLabelText("查看 1 处关联")).not.toHaveLength(
+      0
+    );
     // TASK#58：被引用不再锁英美结构开关（引用按语义坐标重解析）。
     expect(screen.getByLabelText("英美拼写有区别")).not.toBeDisabled();
     await changeVoiceText(await screen.findByLabelText("原形英美通用拼写"), {
       target: { value: "center" }
     });
     expect(screen.getByText("保存草稿").closest("button")).toBeEnabled();
-    expect(screen.getByText("拼写变更会影响引用，发布前需修复")).toBeVisible();
+    expect(
+      screen.getByText("修改后的拼写与关联内容不一致，处理后才能发布")
+    ).toBeVisible();
     fireEvent.click(screen.getByText("保存草稿"));
     await waitFor(() =>
       expect(endpoints.previewFormsImpactV3).toHaveBeenCalledTimes(1)
@@ -992,14 +996,18 @@ describe("WordWizardV3Page", () => {
     );
 
     expect(
-      await screen.findByText("当前草稿有 1 条引用待修复，暂不可发布")
+      await screen.findByText("存在 1 处关联失效，处理后才能发布")
     ).toBeInTheDocument();
     // 输入框旁的即时标红照常；顶部只是不再多出一条列同一引用的红条。
-    expect(screen.getByText(/与被引用片段“center”不一致/)).toBeInTheDocument();
-    expect(screen.queryByText("拼写变更会影响引用，发布前需修复")).toBeNull();
+    expect(
+      screen.getByText(/与关联内容中的文字“center”不一致/)
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("修改后的拼写与关联内容不一致，处理后才能发布")
+    ).toBeNull();
     expect(document.querySelectorAll(".v3-reference-item")).toHaveLength(1);
     // 草稿保存只拦本次改动破坏的引用：旧的失效引用只挡发布，保存按钮不因它禁用、不挂原因提示。
-    expect(screen.getByText(/修复引用后才能发布/)).toBeInTheDocument();
+    expect(screen.getByText(/处理完这些关联后才能发布/)).toBeInTheDocument();
     expect(
       screen.getByText("保存草稿").closest(".v3-disabled-reason")
     ).toBeNull();
@@ -1023,7 +1031,7 @@ describe("WordWizardV3Page", () => {
       `/words/${WORD_ID}/v3/wizard/forms`,
       createV3WordRequests(endpoints)
     );
-    expect(await screen.findByText("引用信息暂不可用")).toBeInTheDocument();
+    expect(await screen.findByText("暂时无法查看关联信息")).toBeInTheDocument();
     await changeVoiceText(await screen.findByLabelText("原形英美通用拼写"), {
       target: { value: "centre-edited" }
     });

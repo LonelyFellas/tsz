@@ -889,7 +889,7 @@ export function validateFormsContent(
               "form_group_membership_invalid",
               "form_id",
               member.id,
-              "同组不能重复引用同一 form",
+              "同一变化组不能重复添加同一个词形",
               memberLocation
             )
           );
@@ -903,7 +903,7 @@ export function validateFormsContent(
               "form_id",
               member.id,
               owner === undefined
-                ? "membership 引用的 form 不存在"
+                ? "变化组关联的词形不存在，请重新选择"
                 : "membership 不能跨 POS",
               memberLocation
             )

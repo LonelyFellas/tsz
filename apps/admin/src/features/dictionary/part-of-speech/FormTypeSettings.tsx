@@ -151,10 +151,10 @@ export function FormTypeSettings() {
         partId ? (partNameById.get(partId) ?? partId) : "所有词性"
     },
     {
-      title: "引用",
+      title: "关联",
       dataIndex: "usage_count",
       width: 100,
-      render: (count: number) => (count ? `${count} 个词条` : "未引用")
+      render: (count: number) => (count ? `${count} 个词条` : "无关联")
     },
     {
       title: "创建人",
@@ -186,7 +186,7 @@ export function FormTypeSettings() {
               item.code === "base"
                 ? "原形为必需类型，不能删除"
                 : item.usage_count
-                  ? "已被词条引用，只能修改"
+                  ? "仍与词条有关联，可以修改，但不能删除"
                   : undefined
             }
           >

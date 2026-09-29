@@ -1104,6 +1104,8 @@ describe("V3MeaningsAndExamplesStep", () => {
     );
   });
 
+  // 覆盖率环境下还需加载编辑器并清空正文，沿用相邻编辑器交互测试的单项上限。
+  // changeVoiceText 对异步编辑器的等待上限为 10 秒，不能被默认的 5 秒整项超时截断。
   it("语法结构和英文释义在输入框前提供整段试听", async () => {
     const previous = env.VOICE_PREVIEW;
     Object.assign(env, { VOICE_PREVIEW: true });
@@ -1172,7 +1174,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       synthesize.mockRestore();
       Object.assign(env, { VOICE_PREVIEW: previous });
     }
-  });
+  }, 15_000);
 
   it("语法结构挂上语音编辑器，标注实时回写且不丢正文", async () => {
     // 关联编辑器共存时，语法结构仍使用原来的标注工具。
