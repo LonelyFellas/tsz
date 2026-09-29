@@ -293,7 +293,7 @@ export function createAdminEndpoints(http: HttpClient) {
         )
     },
     /**
-     * 智能词库（词条创编）。字段与状态码见 docs/admin-wordlist-frontend-integration.md；
+     * 智能词库（词条创编）。字段与状态码见 tsz-rust/docs/openapi.json；
      * 树内节点 id 由前端生成（UUID v4）且跨保存稳定，updated_at 兼作乐观锁 token。
      */
     words: {
@@ -656,7 +656,7 @@ export function createAdminEndpoints(http: HttpClient) {
     },
     /**
      * 后台 RBAC「角色治理」（`super_admin` 专属；普通 admin 调用得 403 super admin required）。
-     * 契约见 openapi `Admin (roles)` 标签、docs/admin-rbac-frontend-integration.md。
+     * 契约见 openapi `Admin (roles)` 标签、tsz-rust/docs/openapi.json。
      */
     roles: {
       /** GET /admin/permissions — 权限目录（渲染勾选框；顺序即侧栏顺序，别硬编码 key）。 */

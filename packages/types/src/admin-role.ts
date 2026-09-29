@@ -2,7 +2,7 @@
 // schema，字段一律 snake_case。这是 RBAC 第二段：超管建角色 / 配权限子集 / 派给管理员
 // （第一段「按角色渲染菜单」的 profile.permissions 见 ./admin AdminProfile）。
 //
-// 全部接口超管专属（super_admin），详见 docs/admin-rbac-frontend-integration.md。
+// 全部接口超管专属（super_admin），详见 tsz-rust/docs/openapi.json。
 import type { MenuPermission } from "./admin";
 
 /**

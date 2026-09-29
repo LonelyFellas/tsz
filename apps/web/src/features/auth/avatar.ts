@@ -3,7 +3,7 @@ import { AVATAR_CONTENT_TYPES, HttpError } from "@tsz/api-client";
 import type { User } from "@tsz/types";
 import { api } from "@/lib/request";
 
-// 头像上传三步流程(OSS 预签名直传,对接文档 web-avatar-upload-frontend-integration.md):
+// 头像上传三步流程(OSS 预签名直传,对接文档 tsz-rust/docs/object-storage-design.md):
 // ① POST /me/avatar/upload-url 申请许可 → ② PUT 裸字节直传 OSS → ③ POST /me/avatar confirm 落库。
 // 文件不经过后端;PUT 成功 ≠ 生效,不 confirm 头像永远不会变。
 
