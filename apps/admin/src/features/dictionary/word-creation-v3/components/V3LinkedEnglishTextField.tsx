@@ -8,6 +8,7 @@ import type {
   DraftMeaningsStepContentWritableV3
 } from "@tsz/types";
 import { Flex } from "antd";
+import type { ReactNode } from "react";
 import { editableEnglishText } from "../meaningsModel";
 import { dialectLabel } from "../presentation";
 import { V3VoiceTextField } from "./V3VoiceTextField";
@@ -28,6 +29,7 @@ export function V3LinkedEnglishTextField({
   value,
   label,
   suffix,
+  renderEditorTitle,
   placeholder,
   wordId,
   forms,
@@ -39,6 +41,7 @@ export function V3LinkedEnglishTextField({
   value: EnglishTextV3;
   label: string;
   suffix: string;
+  renderEditorTitle?: (dialect: Dialect) => ReactNode;
   placeholder?: string;
   wordId?: string;
   forms?: DraftFormsStepContentV3;
@@ -76,6 +79,7 @@ export function V3LinkedEnglishTextField({
             }
             textLinks={variant.text_links}
             ariaLabel={`${label} ${dialectLabel(row.dialect)}${suffix}`}
+            editorTitle={renderEditorTitle?.(row.dialect)}
             nodeId={row.variant_id}
             field="value"
             readOnly={readOnly}

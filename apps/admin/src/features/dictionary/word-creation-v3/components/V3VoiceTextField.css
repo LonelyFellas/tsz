@@ -91,18 +91,23 @@
   padding-top: 0;
 }
 
-/* 普通英文与实际发音不默认加粗；语法标记由只读渲染器按分类控制字重。 */
+/* 收起态与周围输入框同字号；编辑器的大字只留在编辑态，标注字重仍由只读渲染器控制。 */
 textarea.v3-voice-text-large-preview.ant-input {
-  font-size: 20px;
+  font-size: var(--ant-font-size, 14px);
   font-weight: 400;
-  line-height: 1.6;
-  padding: 8px 12px;
+  line-height: var(--ant-line-height, 1.5714285714);
+  padding: 4px 11px;
 }
 
 /* 语法结构收起态保持紧凑，聚焦输入与富文本预览使用同样的行高和内边距。 */
 textarea.v3-grammar-input.ant-input {
   line-height: 1.5;
   padding: 4px 12px;
+}
+
+/* antd 默认 transition: all 会让 autoSize 测到连读留白的动画中间值；仅保留颜色和焦点过渡。 */
+textarea.word-pronunciation-phonetic-input.ant-input {
+  transition-property: color, background-color, border-color, box-shadow;
 }
 
 /* grammar 用真实富文本排版撑高；透明输入框保留边框、点击和可访问焦点。 */
@@ -125,19 +130,10 @@ textarea.v3-grammar-input.ant-input {
   width: 100%;
   padding: 4px 12px;
   border: 1px solid transparent;
-  font-size: 20px;
+  font-size: var(--ant-font-size, 14px);
   font-weight: 400;
   line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   pointer-events: none;
-}
-
-@media (max-width: 600px) {
-  .v3-grammar-preview-content {
-    font-size: 18px;
-  }
-  textarea.v3-voice-text-large-preview.ant-input {
-    font-size: 18px;
-  }
 }

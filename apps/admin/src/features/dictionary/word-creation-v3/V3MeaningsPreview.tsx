@@ -219,7 +219,7 @@ export function V3MeaningsPreview({
                               >
                                 <div className="v3-dictionary-definition-meta">
                                   <Tag>{definition.level || "未设等级"}</Tag>
-                                  <span>{chinese ? "中文" : "EN"}</span>
+                                  <span>{chinese ? "中文" : "英文"}</span>
                                   <span>
                                     {definition.definition_mode.endsWith(
                                       "_sentence"

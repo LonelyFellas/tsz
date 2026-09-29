@@ -1,7 +1,7 @@
 import { boundFormGroupIds, setFormGroupBindings } from "./meaningsModel";
 import {
   RelationSortScope,
-  RelationDeleteMenu
+  RelationDeleteButton
 } from "./components/V3RelationSorting";
 import { toRichTextV2 } from "@tsz/voice-editor/core";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
@@ -89,6 +89,8 @@ import {
   type SortableRowsController
 } from "./sortableRows";
 import { SortableDragHandle } from "./components/SortableDragHandle";
+import { V3RowIndex } from "./components/V3RowIndex";
+import { V3EditorTitle } from "./components/V3EditorTitle";
 import { reorderPos } from "./operations";
 import "./posTabs.css";
 import { v3IssueMessage } from "./presentationErrors";
@@ -287,6 +289,7 @@ function SenseEditorShell({
   onExpandedChange,
   onDelete,
   confirmDelete,
+  canDelete,
   nodeId,
   referenceCount = 0
 }: {
@@ -300,6 +303,7 @@ function SenseEditorShell({
   onExpandedChange: (expanded: boolean) => void;
   onDelete: () => void;
   confirmDelete: boolean;
+  canDelete: boolean;
   nodeId: string;
   /** 指向本词义的引用数；大于 0 时不能删除。 */
   referenceCount?: number;
@@ -331,6 +335,19 @@ function SenseEditorShell({
             label: (
               <div className="word-sense-header-label">
                 <div className="word-sense-header-content">
+                  <span
+                    className="word-sort-leading"
+                    onClick={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => event.stopPropagation()}
+                  >
+                    <SortableDragHandle
+                      sorting={sorting}
+                      index={index}
+                      label={`拖动词义 ${index + 1}`}
+                      singleItemTitle="至少需要两个词义"
+                      dragImageSelector=".word-sense-sortable"
+                    />
+                  </span>
                   <Tag className="word-sense-level-badge">{level}</Tag>
                   <Typography.Text className="word-sense-summary tsz-entry-en">
                     {index + 1}. {summary}
@@ -349,28 +366,29 @@ function SenseEditorShell({
               </div>
             ),
             extra: (
-              <Space size={2} onClick={(event) => event.stopPropagation()}>
-                <SortableDragHandle
-                  sorting={sorting}
-                  index={index}
-                  label={`拖动词义 ${index + 1}`}
-                  singleItemTitle="至少需要两个词义"
-                  dragImageSelector=".word-sense-sortable"
-                />
+              <Space
+                className="word-sense-header-actions"
+                size={2}
+                onClick={(event) => event.stopPropagation()}
+              >
                 <Tooltip
                   title={
-                    referenceCount > 0
-                      ? referenceBlockedHint(referenceCount)
-                      : undefined
+                    !canDelete
+                      ? "至少保留一条词义"
+                      : referenceCount > 0
+                        ? referenceBlockedHint(referenceCount)
+                        : undefined
                   }
                 >
                   <Button
                     aria-label={`删除词义 ${index + 1}`}
                     icon={<DeleteOutlined />}
+                    disabled={!canDelete || undefined}
                     danger
                     size="small"
                     type="text"
                     onClick={() => {
+                      if (!canDelete) return;
                       if (confirmDelete) setDeleteOpen(true);
                       else onDelete();
                     }}
@@ -389,12 +407,12 @@ function SenseEditorShell({
         maskClosable={false}
         okText="确认删除"
         cancelText="取消"
-        okButtonProps={{ danger: true }}
+        okButtonProps={{ danger: true, disabled: !canDelete }}
         cancelButtonProps={{ autoFocus: true }}
         onCancel={() => setDeleteOpen(false)}
         onOk={() => {
           setDeleteOpen(false);
-          onDelete();
+          if (canDelete) onDelete();
         }}
       >
         <Typography.Text>{summary}</Typography.Text>
@@ -436,27 +454,7 @@ function GrammarStructuresCard({
       })
   });
   return (
-    <Card
-      className="word-grammar-card"
-      extra={
-        <Button
-          icon={<PlusOutlined aria-hidden />}
-          onClick={() =>
-            change((draft) => {
-              draft.pos[posIndex]!.grammar_structures.push(
-                newGrammarStructure(idFactory, spellingMode)
-              );
-            })
-          }
-          size="small"
-          type="text"
-        >
-          添加语法结构
-        </Button>
-      }
-      size="small"
-      title="语法结构"
-    >
+    <Card className="word-grammar-card" size="small" title="语法结构">
       {pos.grammar_structures.length === 0 ? (
         <Typography.Text type="secondary">暂无语法结构</Typography.Text>
       ) : (
@@ -478,7 +476,16 @@ function GrammarStructuresCard({
               onDrop={(event) => sorting.handleDrop(event, structureIndex)}
               tabIndex={-1}
             >
-              <span className="word-grammar-index">{structureIndex + 1}</span>
+              <span className="word-sort-leading">
+                <SortableDragHandle
+                  dragImageSelector={SORTABLE_ROW_SELECTOR}
+                  index={structureIndex}
+                  label={`拖动语法结构 ${structureIndex + 1}`}
+                  singleItemTitle="至少需要两条语法结构"
+                  sorting={sorting}
+                />
+                <V3RowIndex index={structureIndex} />
+              </span>
               <div className="word-grammar-variants">
                 {structure.variants.map((variant, variantIndex) => (
                   <div
@@ -496,6 +503,13 @@ function GrammarStructuresCard({
                       textLinks={variant.form_links}
                       dialect={variant.dialect}
                       ariaLabel={`语法结构 ${structureIndex + 1} ${dialectLabel(variant.dialect)}内容`}
+                      editorTitle={
+                        <V3EditorTitle
+                          index={structureIndex}
+                          title="语法结构"
+                          details={dialectLabel(variant.dialect)}
+                        />
+                      }
                       field="content"
                       nodeId={variant.id}
                       onChange={(next, links) =>
@@ -539,19 +553,20 @@ function GrammarStructuresCard({
                 orientation="horizontal"
                 size={8}
               >
-                <SortableDragHandle
-                  dragImageSelector={SORTABLE_ROW_SELECTOR}
-                  index={structureIndex}
-                  label={`拖动语法结构 ${structureIndex + 1}`}
-                  singleItemTitle="至少需要两条语法结构"
-                  sorting={sorting}
-                />
                 <Button
                   aria-label={`删除语法结构 ${structureIndex + 1}`}
                   danger
+                  disabled={pos.grammar_structures.length <= 1 || undefined}
+                  title={
+                    pos.grammar_structures.length <= 1
+                      ? "至少保留一条语法结构"
+                      : undefined
+                  }
                   icon={<DeleteOutlined />}
                   onClick={() =>
                     change((draft) => {
+                      if (draft.pos[posIndex]!.grammar_structures.length <= 1)
+                        return;
                       draft.pos[posIndex]!.grammar_structures.splice(
                         structureIndex,
                         1
@@ -575,6 +590,21 @@ function GrammarStructuresCard({
           ))}
         </Flex>
       )}
+      <Button
+        block
+        className="word-section-add-button"
+        icon={<PlusOutlined aria-hidden />}
+        onClick={() =>
+          change((draft) => {
+            draft.pos[posIndex]!.grammar_structures.push(
+              newGrammarStructure(idFactory, spellingMode)
+            );
+          })
+        }
+        type="dashed"
+      >
+        添加语法结构
+      </Button>
     </Card>
   );
 }
@@ -634,24 +664,6 @@ function SenseGroupsCard({
       data-v3-node-id={wordId ?? "current-entry"}
       size="small"
       title="语义区间"
-      extra={
-        <Button
-          icon={<PlusOutlined aria-hidden />}
-          onClick={() =>
-            change((draft) => {
-              draft.sense_groups.push({
-                id: idFactory(),
-                name_zh: "",
-                name_en: ""
-              });
-            })
-          }
-          size="small"
-          type="text"
-        >
-          添加语义区间
-        </Button>
-      }
     >
       <div className="word-sense-group-list">
         {/* 列名只出一次：每行都重复「中文 / 英文」会把下一行的输入框推远，
@@ -675,11 +687,20 @@ function SenseGroupsCard({
             onDragOver={(event) => sorting.handleDragOver(event, groupIndex)}
             onDrop={(event) => sorting.handleDrop(event, groupIndex)}
           >
-            <span
-              aria-label={`第 ${groupIndex + 1} 个语义区间`}
-              className="word-sense-group-index"
-            >
-              {groupIndex + 1}
+            <span className="word-sort-leading">
+              <SortableDragHandle
+                dragImageSelector={SORTABLE_ROW_SELECTOR}
+                index={groupIndex}
+                label={`拖动语义区间 ${groupIndex + 1}`}
+                singleItemTitle="至少需要两个语义区间"
+                sorting={sorting}
+              />
+              <span
+                aria-label={`第 ${groupIndex + 1} 个语义区间`}
+                className="word-sense-group-index"
+              >
+                {groupIndex + 1}
+              </span>
             </span>
             <div className="word-sense-group-field">
               <Input
@@ -730,13 +751,6 @@ function SenseGroupsCard({
               orientation="horizontal"
               size={8}
             >
-              <SortableDragHandle
-                dragImageSelector={SORTABLE_ROW_SELECTOR}
-                index={groupIndex}
-                label={`拖动语义区间 ${groupIndex + 1}`}
-                singleItemTitle="至少需要两个语义区间"
-                sorting={sorting}
-              />
               <Button
                 aria-label={`删除语义区间 ${groupIndex + 1}`}
                 danger
@@ -766,6 +780,23 @@ function SenseGroupsCard({
           </div>
         ))}
       </div>
+      <Button
+        block
+        className="word-section-add-button"
+        icon={<PlusOutlined aria-hidden />}
+        onClick={() =>
+          change((draft) => {
+            draft.sense_groups.push({
+              id: idFactory(),
+              name_zh: "",
+              name_en: ""
+            });
+          })
+        }
+        type="dashed"
+      >
+        添加语义区间
+      </Button>
     </Card>
   );
 }
@@ -978,7 +1009,7 @@ const DEFINITION_LANGUAGE_OPTIONS: Array<{
   value: DefinitionLanguageV3;
 }> = [
   { label: "中文", value: "zh" },
-  { label: "EN", value: "en" }
+  { label: "英文", value: "en" }
 ];
 
 const DEFINITION_STYLE_OPTIONS: Array<{
@@ -1949,7 +1980,7 @@ function RelationsGrid({
                                           />
 
                                           {group.length > 1 ? (
-                                            <RelationDeleteMenu
+                                            <RelationDeleteButton
                                               label={`${relationLabel(relationType)}词义 ${glossIndex + 1}`}
                                               onDelete={() => {
                                                 const remaining = group.filter(
@@ -2318,7 +2349,7 @@ function RelationsGrid({
                                                   一条词义，整条关联去掉走行级删除。想清空也可以
                                                   在上面的多选里取消最后一条，那等于删整条。 */}
                                             {group.length > 1 ? (
-                                              <RelationDeleteMenu
+                                              <RelationDeleteButton
                                                 label={`${relationLabel(relationType)}词义 ${glossIndex + 1}`}
                                                 onDelete={() => {
                                                   const remaining =
@@ -2365,7 +2396,7 @@ function RelationsGrid({
                                 {relationInputIssue(relation)}
                               </div>
                             ) : null}
-                            <RelationDeleteMenu
+                            <RelationDeleteButton
                               label={relationLabel(relationType)}
                               onDelete={() =>
                                 change((draft) => {
@@ -2852,6 +2883,7 @@ function V3MeaningsAndExamplesStepContent({
                                 }
                                 level={sense.level}
                                 nodeId={sense.id}
+                                canDelete={pos.senses.length > 1}
                                 confirmDelete={senseNeedsDeleteConfirmation(
                                   sense,
                                   inheritedSenseGroups.current.get(sense.id)
@@ -2865,6 +2897,8 @@ function V3MeaningsAndExamplesStepContent({
                                 )}
                                 onDelete={() =>
                                   change((draft) => {
+                                    if (draft.pos[posIndex]!.senses.length <= 1)
+                                      return;
                                     draft.pos[posIndex]!.senses.splice(
                                       senseIndex,
                                       1
@@ -2950,10 +2984,18 @@ function V3MeaningsAndExamplesStepContent({
                                             : (senseGroupOptions.find(
                                                 (option) =>
                                                   option.value === selectedId
-                                              )?.label ?? "未命名语义区间")
+                                              )?.label ?? "")
                                         }
-                                        placeholder="选择语义区间"
-                                        value={sense.sense_group_id}
+                                        placeholder="请选择语义区间"
+                                        value={
+                                          senseGroupOptions.some(
+                                            (option) =>
+                                              option.value ===
+                                              sense.sense_group_id
+                                          )
+                                            ? sense.sense_group_id
+                                            : undefined
+                                        }
                                       />
                                     </label>
                                     {(subPosExtensible ||
@@ -3240,9 +3282,6 @@ function V3MeaningsAndExamplesStepContent({
                                         {sense.definitions.length > 0 ? (
                                           <div className="word-list-header word-definition-list-header">
                                             <span aria-hidden="true" />
-                                            <span aria-hidden="true" />
-                                            <span aria-hidden="true" />
-                                            <span aria-hidden="true" />
                                             <span>释义语句</span>
                                             <span>语法结构</span>
                                             <span aria-hidden="true" />
@@ -3289,113 +3328,138 @@ function V3MeaningsAndExamplesStepContent({
                                                     )
                                                   }
                                                 >
-                                                  <span className="word-number-cell">
-                                                    <span className="word-grammar-index">
-                                                      {definitionIndex + 1}
+                                                  <div className="word-definition-meta">
+                                                    <span className="word-number-cell word-sort-leading">
+                                                      <SortableDragHandle
+                                                        dragImageSelector={
+                                                          SORTABLE_ROW_SELECTOR
+                                                        }
+                                                        index={definitionIndex}
+                                                        label={`拖动定义 ${definitionIndex + 1}`}
+                                                        singleItemTitle="至少需要两条释义"
+                                                        sorting={
+                                                          definitionSorting
+                                                        }
+                                                      />
+                                                      <V3RowIndex
+                                                        index={definitionIndex}
+                                                      />
                                                     </span>
-                                                  </span>
-                                                  <>
-                                                    <Select
-                                                      {...DEFINITION_TEXT_SELECT_PROPS}
-                                                      aria-label={`定义 ${definitionIndex + 1} 等级`}
-                                                      data-v3-field="level"
-                                                      data-v3-node-id={
-                                                        definition.id
-                                                      }
-                                                      onChange={(
-                                                        level: string
-                                                      ) =>
-                                                        change((draft) => {
-                                                          draft.pos[
-                                                            posIndex
-                                                          ]!.senses[
-                                                            senseIndex
-                                                          ]!.definitions[
-                                                            definitionIndex
-                                                          ]!.level = level;
-                                                        })
-                                                      }
-                                                      options={CEFR_OPTIONS}
-                                                      value={definition.level}
-                                                    />
-                                                    <Select
-                                                      {...DEFINITION_TEXT_SELECT_PROPS}
-                                                      aria-label={`定义 ${definitionIndex + 1} 语言`}
-                                                      data-v3-field="definition_mode"
-                                                      data-v3-node-id={
-                                                        definition.id
-                                                      }
-                                                      onChange={(
-                                                        language: DefinitionLanguageV3
-                                                      ) =>
-                                                        requestDefinitionMode(
-                                                          definition,
-                                                          DEFINITION_MODE_BY_PARTS[
-                                                            language
-                                                          ][
-                                                            definitionStyleOf(
-                                                              definition.definition_mode
-                                                            )
-                                                          ],
-                                                          idFactory,
-                                                          modal,
-                                                          (next) =>
-                                                            change((draft) => {
-                                                              draft.pos[
-                                                                posIndex
-                                                              ]!.senses[
-                                                                senseIndex
-                                                              ]!.definitions[
-                                                                definitionIndex
-                                                              ] = next;
-                                                            })
-                                                        )
-                                                      }
-                                                      options={
-                                                        DEFINITION_LANGUAGE_OPTIONS
-                                                      }
-                                                      value={definitionLanguageOf(
-                                                        definition.definition_mode
-                                                      )}
-                                                    />
-                                                    <Select
-                                                      {...DEFINITION_TEXT_SELECT_PROPS}
-                                                      aria-label={`定义 ${definitionIndex + 1} 释义方式`}
-                                                      data-v3-node-id={
-                                                        definition.id
-                                                      }
-                                                      onChange={(
-                                                        style: DefinitionStyleV3
-                                                      ) =>
-                                                        requestDefinitionMode(
-                                                          definition,
-                                                          DEFINITION_MODE_BY_PARTS[
-                                                            definitionLanguageOf(
-                                                              definition.definition_mode
-                                                            )
-                                                          ][style],
-                                                          idFactory,
-                                                          modal,
-                                                          (next) =>
-                                                            change((draft) => {
-                                                              draft.pos[
-                                                                posIndex
-                                                              ]!.senses[
-                                                                senseIndex
-                                                              ]!.definitions[
-                                                                definitionIndex
-                                                              ] = next;
-                                                            })
-                                                        )
-                                                      }
-                                                      options={
-                                                        DEFINITION_STYLE_OPTIONS
-                                                      }
-                                                      value={definitionStyleOf(
-                                                        definition.definition_mode
-                                                      )}
-                                                    />
-                                                  </>
+                                                    <div className="word-definition-options">
+                                                      <Select
+                                                        {...DEFINITION_TEXT_SELECT_PROPS}
+                                                        aria-label={`定义 ${definitionIndex + 1} 等级`}
+                                                        data-v3-field="level"
+                                                        data-v3-node-id={
+                                                          definition.id
+                                                        }
+                                                        onChange={(
+                                                          level: string
+                                                        ) =>
+                                                          change((draft) => {
+                                                            draft.pos[
+                                                              posIndex
+                                                            ]!.senses[
+                                                              senseIndex
+                                                            ]!.definitions[
+                                                              definitionIndex
+                                                            ]!.level = level;
+                                                          })
+                                                        }
+                                                        options={CEFR_OPTIONS}
+                                                        value={definition.level}
+                                                      />
+                                                      <span
+                                                        className="word-definition-meta-divider"
+                                                        aria-hidden
+                                                      />
+                                                      <Select
+                                                        {...DEFINITION_TEXT_SELECT_PROPS}
+                                                        aria-label={`定义 ${definitionIndex + 1} 语言`}
+                                                        data-v3-field="definition_mode"
+                                                        data-v3-node-id={
+                                                          definition.id
+                                                        }
+                                                        onChange={(
+                                                          language: DefinitionLanguageV3
+                                                        ) =>
+                                                          requestDefinitionMode(
+                                                            definition,
+                                                            DEFINITION_MODE_BY_PARTS[
+                                                              language
+                                                            ][
+                                                              definitionStyleOf(
+                                                                definition.definition_mode
+                                                              )
+                                                            ],
+                                                            idFactory,
+                                                            modal,
+                                                            (next) =>
+                                                              change(
+                                                                (draft) => {
+                                                                  draft.pos[
+                                                                    posIndex
+                                                                  ]!.senses[
+                                                                    senseIndex
+                                                                  ]!.definitions[
+                                                                    definitionIndex
+                                                                  ] = next;
+                                                                }
+                                                              )
+                                                          )
+                                                        }
+                                                        options={
+                                                          DEFINITION_LANGUAGE_OPTIONS
+                                                        }
+                                                        value={definitionLanguageOf(
+                                                          definition.definition_mode
+                                                        )}
+                                                      />
+                                                      <span
+                                                        className="word-definition-meta-divider"
+                                                        aria-hidden
+                                                      />
+                                                      <Select
+                                                        {...DEFINITION_TEXT_SELECT_PROPS}
+                                                        aria-label={`定义 ${definitionIndex + 1} 释义方式`}
+                                                        data-v3-node-id={
+                                                          definition.id
+                                                        }
+                                                        onChange={(
+                                                          style: DefinitionStyleV3
+                                                        ) =>
+                                                          requestDefinitionMode(
+                                                            definition,
+                                                            DEFINITION_MODE_BY_PARTS[
+                                                              definitionLanguageOf(
+                                                                definition.definition_mode
+                                                              )
+                                                            ][style],
+                                                            idFactory,
+                                                            modal,
+                                                            (next) =>
+                                                              change(
+                                                                (draft) => {
+                                                                  draft.pos[
+                                                                    posIndex
+                                                                  ]!.senses[
+                                                                    senseIndex
+                                                                  ]!.definitions[
+                                                                    definitionIndex
+                                                                  ] = next;
+                                                                }
+                                                              )
+                                                          )
+                                                        }
+                                                        options={
+                                                          DEFINITION_STYLE_OPTIONS
+                                                        }
+                                                        value={definitionStyleOf(
+                                                          definition.definition_mode
+                                                        )}
+                                                      />
+                                                    </div>
+                                                  </div>
                                                   <div className="word-definition-content-cell">
                                                     {definition.definition_mode ===
                                                       "zh_definition" ||
@@ -3463,6 +3527,17 @@ function V3MeaningsAndExamplesStepContent({
                                                         }
                                                         label={`定义 ${definitionIndex + 1}`}
                                                         suffix="内容"
+                                                        renderEditorTitle={(
+                                                          dialect
+                                                        ) => (
+                                                          <V3EditorTitle
+                                                            index={
+                                                              definitionIndex
+                                                            }
+                                                            title="多维释义"
+                                                            details={`${definitionStyleOf(definition.definition_mode) === "sentence" ? "整句释义" : "定义释义"} · ${dialectLabel(dialect)}`}
+                                                          />
+                                                        )}
                                                         placeholder={
                                                           definition.definition_mode ===
                                                           "en_sentence"
@@ -3727,17 +3802,6 @@ function V3MeaningsAndExamplesStepContent({
                                                     className="word-sort-actions"
                                                     orientation="horizontal"
                                                   >
-                                                    <SortableDragHandle
-                                                      dragImageSelector={
-                                                        SORTABLE_ROW_SELECTOR
-                                                      }
-                                                      index={definitionIndex}
-                                                      label={`拖动定义 ${definitionIndex + 1}`}
-                                                      singleItemTitle="至少需要两条释义"
-                                                      sorting={
-                                                        definitionSorting
-                                                      }
-                                                    />
                                                     <Button
                                                       aria-label={`删除定义 ${definitionIndex + 1}`}
                                                       danger
