@@ -12,6 +12,7 @@ import {
 } from "antd";
 import type {
   AdminWordV3,
+  DraftMeaningsStepContentWritableV3,
   PhraseComponentUsageV3,
   PublishedSentenceTargetCandidateV3,
   TextLinkViaPhraseV3
@@ -22,6 +23,7 @@ import type { AdminDialectPreference } from "@tsz/shared";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { createV3WordRequests } from "../api";
 import { dialectLabel } from "../presentation";
+import { boundFormGroupIds } from "../meaningsModel";
 import "./V3SentenceTargetDiscovery.css";
 import { HttpError } from "@tsz/api-client/http";
 
@@ -461,8 +463,14 @@ export function V3TargetCascader({
   phraseSelection = "components",
   sourceDialect,
   readOnly = false,
-  selectedTarget
+  selectedTarget,
+  currentDraft
 }: {
+  currentDraft?: {
+    id: string;
+    forms?: AdminWordV3["forms"];
+    meanings?: DraftMeaningsStepContentWritableV3;
+  };
   literal: string;
   readOnly?: boolean;
   selectedTarget?: TargetIdentity;
@@ -535,6 +543,7 @@ export function V3TargetCascader({
             schema_version: 3,
             q: literal,
             match: "exact",
+            ...(phraseSelection === "entry" ? { include_drafts: true } : {}),
             ...(targetKind ? { kind: targetKind } : {}),
             page_size: 50,
             ...(cursor ? { cursor } : {})
@@ -587,7 +596,7 @@ export function V3TargetCascader({
       searchActions.current = null;
       controller.abort();
     };
-  }, [literal, targetKind, requests]);
+  }, [literal, targetKind, phraseSelection, requests]);
 
   const state = {
     ...searchState,
@@ -607,8 +616,102 @@ export function V3TargetCascader({
     };
   }, [literal, targetKind]);
 
+  const candidates = useMemo(
+    () =>
+      state.candidates.flatMap((candidate) => {
+        if (candidate.entry_id !== currentDraft?.id) return [candidate];
+        if (candidate.publication_id) return [];
+        const pos = currentDraft.forms?.pos.find(
+          (item) => item.pos_id === candidate.pos_id
+        );
+        const senses = currentDraft.meanings?.pos.find(
+          (item) => item.pos_id === candidate.pos_id
+        )?.senses;
+        return [
+          {
+            ...candidate,
+            senses: currentDraft.meanings
+              ? candidate.senses.flatMap((sense) => {
+                  const current = senses?.find(
+                    (item) => item.id === sense.sense_id
+                  );
+                  if (!current) return [];
+                  const definition = current.definitions.find(
+                    (item) =>
+                      item.definition_mode === "zh_definition" ||
+                      item.definition_mode === "zh_sentence"
+                  );
+                  return [
+                    {
+                      ...sense,
+                      gloss:
+                        definition && "text" in definition.content
+                          ? definition.content.text
+                          : ""
+                    }
+                  ];
+                })
+              : candidate.senses,
+            forms: currentDraft.forms
+              ? candidate.forms.flatMap((form) => {
+                  const current = pos?.forms.find(
+                    (item) => item.id === form.form_id
+                  );
+                  if (!current) return [];
+                  const variants = current.regional_variants;
+                  const variant = (
+                    variants.mode === "common"
+                      ? [variants.common]
+                      : [variants.uk, variants.us]
+                  ).find(
+                    (item) =>
+                      item.id === form.variant_id &&
+                      item.spelling === form.spelling
+                  );
+                  if (!variant) return [];
+                  const group = pos?.form_groups.find((item) =>
+                    item.members.some(
+                      (member) => member.form_id === form.form_id
+                    )
+                  );
+                  return [
+                    {
+                      ...form,
+                      base_form_ids: form.base_form_ids.filter(
+                        (id) =>
+                          pos?.forms.some((item) => item.id === id) &&
+                          (id === form.form_id ||
+                            group?.members.some(
+                              (member) => member.form_id === id
+                            ))
+                      ),
+                      ...(currentDraft.meanings
+                        ? {
+                            allowed_sense_ids:
+                              senses
+                                ?.filter(
+                                  (sense) =>
+                                    group &&
+                                    (group.scope === "general" ||
+                                      boundFormGroupIds(sense).includes(
+                                        group.id
+                                      ))
+                                )
+                                .map((sense) => sense.id) ?? []
+                          }
+                        : {})
+                    }
+                  ];
+                })
+              : candidate.forms
+          }
+        ];
+      }),
+    [state.candidates, currentDraft]
+  );
+
   const directCandidates = useMemo(() => {
-    if (phraseSelection !== "entry") return state.candidates;
+    if (phraseSelection !== "entry") return candidates;
     const normalize = (text: string) =>
       text
         .normalize("NFKC")
@@ -617,7 +720,7 @@ export function V3TargetCascader({
         .replace(/[‘’ʼ]/gu, "'")
         .replace(/[‐‑‒–—−]/gu, "-")
         .toLowerCase();
-    return state.candidates.map((candidate) => ({
+    return candidates.map((candidate) => ({
       ...candidate,
       forms: candidate.forms.filter(
         (form) =>
@@ -628,7 +731,7 @@ export function V3TargetCascader({
             form.dialect === sourceDialect)
       )
     }));
-  }, [state.candidates, phraseSelection, sourceDialect, literal]);
+  }, [candidates, phraseSelection, sourceDialect, literal]);
   const availableVariantIds = useMemo(
     () =>
       phraseSelection === "entry"
@@ -651,7 +754,7 @@ export function V3TargetCascader({
           selfEntryId,
           formTypeLabel,
           posLabelOf,
-          state.candidates
+          candidates
         ),
         prioritizedEntryId,
         prioritizedSenseId,
@@ -663,7 +766,7 @@ export function V3TargetCascader({
       availableVariantIds,
       selfEntryId,
       directCandidates,
-      state.candidates,
+      candidates,
       formTypeLabel,
       posLabelOf,
       prioritizedEntryId,
