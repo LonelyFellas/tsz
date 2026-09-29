@@ -460,7 +460,7 @@ export interface PublishedSentenceTargetCandidateV3 {
   senses: SentenceTargetSenseV3[];
 }
 
-/** 按关键字检索短语成分目标：对已发布词面做包含匹配。 */
+/** 按关键字检索关联目标，默认仅查询发布内容。 */
 export interface SearchComponentTargetsV3Input {
   schema_version: 3;
   /** 关键字，1..=100 码点且两端不留空白；带空白后端直接 422。 */
@@ -477,6 +477,7 @@ export interface SearchComponentTargetsV3Input {
    * 屈折词形（jobs / gave）照样命中原形词条。例句里点词做关联要用 `exact`。
    */
   match?: "contains" | "exact";
+  include_drafts?: boolean;
 }
 
 export interface SearchComponentTargetsV3Response {

@@ -1,5 +1,10 @@
 import { Button, Flex, Typography } from "antd";
 import type { AssociationPickerProps } from "@tsz/voice-editor/types";
+import type {
+  Dialect,
+  DraftFormsStepContentV3,
+  DraftMeaningsStepContentWritableV3
+} from "@tsz/types";
 import { V3TargetCascader } from "./V3TargetCascader";
 import { newWordNodeId } from "../../word-model/primitives";
 
@@ -8,8 +13,16 @@ export function V3TextAssociationPicker({
   segments,
   selected,
   onSelect,
-  wordId
-}: AssociationPickerProps & { wordId?: string }) {
+  wordId,
+  dialect,
+  forms,
+  meanings
+}: AssociationPickerProps & {
+  wordId?: string;
+  dialect?: Dialect;
+  forms?: DraftFormsStepContentV3;
+  meanings?: DraftMeaningsStepContentWritableV3;
+}) {
   const literal = segments.map((segment) => segment.surface).join(" ");
   if (selected) {
     return (
@@ -20,7 +33,11 @@ export function V3TextAssociationPicker({
         <Typography.Text className="tsz-entry-en">
           已关联：{selected.target_headword ?? "词条"} ·{" "}
           {selected.target_gloss ?? "词义"}
-          {selected.target_publication_id ? null : "（草稿）"}
+          {selected.target_word_id === wordId
+            ? "（当前词条）"
+            : selected.target_publication_id
+              ? null
+              : "（草稿）"}
         </Typography.Text>
         <Typography.Text type="secondary">
           这些单词已有关联，请先清除原关联再重新选择。
@@ -40,9 +57,12 @@ export function V3TextAssociationPicker({
         key={`${kind}:${literal}`}
         literal={literal.trim()}
         targets={[]}
-        selfEntryId={wordId}
+        prioritizedEntryId={wordId}
+        currentDraft={wordId ? { id: wordId, forms, meanings } : undefined}
         targetKind={kind}
-        onReplace={(next, viaPhrase) => {
+        phraseSelection="entry"
+        sourceDialect={dialect}
+        onReplace={(next) => {
           const chosen = next[0];
           if (!chosen) {
             onSelect(undefined);
@@ -66,8 +86,7 @@ export function V3TextAssociationPicker({
               : {}),
             target_sense_id: chosen.target_sense_id,
             target_headword: chosen.target_headword,
-            target_gloss: chosen.target_gloss,
-            ...(viaPhrase ? { via_phrase: viaPhrase } : {})
+            target_gloss: chosen.target_gloss
           });
         }}
       />

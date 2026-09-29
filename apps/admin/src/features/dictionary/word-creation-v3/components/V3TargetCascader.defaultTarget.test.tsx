@@ -199,17 +199,19 @@ it.each(["pronoun", "noun"])(
     const input = multiPosCandidates();
     const original = structuredClone(input);
     search.mockResolvedValue({ matches: input, truncated: false });
-    render(
-      <V3TargetCascader
-        literal="some"
-        targets={[]}
-        onReplace={vi.fn()}
-        prioritizedEntryId="some"
-        prioritizedSenseId={`${pos}-current`}
-        prioritizedPosId={pos}
-        prioritizedForms={step2}
-      />
-    );
+    await act(async () => {
+      render(
+        <V3TargetCascader
+          literal="some"
+          targets={[]}
+          onReplace={vi.fn()}
+          prioritizedEntryId="some"
+          prioritizedSenseId={`${pos}-current`}
+          prioritizedPosId={pos}
+          prioritizedForms={step2}
+        />
+      );
+    });
     await clickOption(await screen.findByText("some"));
     const orderedPos = [
       pos,
@@ -233,17 +235,19 @@ it.each(["pronoun", "noun"])(
 
 it("当前词义未进入候选时仍能按当前词性置顶", async () => {
   search.mockResolvedValue({ matches: multiPosCandidates(), truncated: false });
-  render(
-    <V3TargetCascader
-      literal="some"
-      targets={[]}
-      onReplace={vi.fn()}
-      prioritizedEntryId="some"
-      prioritizedSenseId="unpublished-sense"
-      prioritizedPosId="pronoun"
-      prioritizedForms={step2}
-    />
-  );
+  await act(async () => {
+    render(
+      <V3TargetCascader
+        literal="some"
+        targets={[]}
+        onReplace={vi.fn()}
+        prioritizedEntryId="some"
+        prioritizedSenseId="unpublished-sense"
+        prioritizedPosId="pronoun"
+        prioritizedForms={step2}
+      />
+    );
+  });
   await clickOption(await screen.findByText("some"));
   await waitFor(() => {
     expect(columnTexts(1)[0]).toContain("some-pronoun-2");

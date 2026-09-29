@@ -9,6 +9,167 @@ import {
 } from "./support/mockAdminV3Api";
 
 test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () => {
+  for (const kind of ["word", "phrase"] as const) {
+    test(`多维释义直接关联当前草稿 ${kind}，完成回显和取消恢复`, async ({
+      page
+    }, testInfo) => {
+      test.skip(process.env.VITE_VOICE_EDITOR !== "true", "需要启用语音编辑器");
+      const api = await mockAdminV3Api(page, { entryKind: kind });
+      const word = api.getWord();
+      const literal = kind === "word" ? "orbit" : "give up";
+      const pos = word.forms.pos[0]!;
+      const form = pos.forms[0]!;
+      const regional = form.regional_variants;
+      const variant =
+        regional.mode === "common" ? regional.common : regional.uk;
+      const sense = word.meanings.pos[0]!.senses[0]!;
+      word.capabilities.text_links = true;
+      variant.spelling = literal;
+      sense.definitions[0]!.content = {
+        version: 2,
+        text: "关联目标释义",
+        annotations: []
+      };
+      sense.definitions.push({
+        id: "01990000-0000-7000-8000-000000000950",
+        level: "B1",
+        grammar_structure_id: word.meanings.pos[0]!.grammar_structures[0]!.id,
+        definition_mode: "en_sentence",
+        content: {
+          mode: "unified",
+          common: {
+            id: "01990000-0000-7000-8000-000000000951",
+            origin: "manual",
+            value: { version: 2, text: literal, annotations: [] },
+            text_links: []
+          }
+        }
+      });
+      await page.route(`**/lexicon/entries/${word.id}`, (route) =>
+        route.fulfill({ json: { word, retired_stable_nodes: [] } })
+      );
+      await page.route(
+        "**/lexicon/entries/component-targets/search",
+        async (route) => {
+          expect(route.request().postDataJSON()).toMatchObject({
+            q: literal,
+            kind,
+            match: "exact",
+            include_drafts: true
+          });
+          await route.fulfill({
+            json: {
+              schema_version: 3,
+              total: 1,
+              truncated: false,
+              matches: [
+                {
+                  entry_id: word.id,
+                  pos_id: pos.pos_id,
+                  base_form_id: form.id,
+                  headword: literal,
+                  kind,
+                  pos: pos.pos,
+                  matched_form_id: form.id,
+                  matched_variant_id: variant.id,
+                  matched_dialect: variant.dialect,
+                  matched_form_type: form.form_type,
+                  component_usages: [],
+                  matches: [],
+                  forms: [
+                    {
+                      form_id: form.id,
+                      variant_id: variant.id,
+                      form_type: form.form_type,
+                      spelling: literal,
+                      dialect: variant.dialect,
+                      base_form_ids: [form.id],
+                      allowed_sense_ids: [sense.id]
+                    }
+                  ],
+                  senses: [
+                    {
+                      sense_id: sense.id,
+                      pos_id: pos.pos_id,
+                      base_form_id: form.id,
+                      level: "B1",
+                      gloss: "关联目标释义"
+                    }
+                  ]
+                }
+              ]
+            }
+          });
+        }
+      );
+      const errors: string[] = [];
+      page.on("pageerror", (error) => errors.push(error.message));
+      await page.goto(`/words/${word.id}/v3/wizard/meanings`);
+      const opener = page
+        .getByRole("button", { name: /^打开.*定义 2.*编辑器$/ })
+        .first();
+      await opener.click();
+      const dialog = page
+        .getByRole("dialog")
+        .filter({ has: page.locator(".tsz-ve-editor") });
+      const openPicker = async (linked = false) => {
+        await dialog
+          .getByRole("button", {
+            name: kind === "word" ? "关联单词" : "关联短语",
+            exact: true
+          })
+          .click();
+        const tokens = literal.split(" ");
+        for (const [index, token] of (linked
+          ? tokens.slice(0, 1)
+          : tokens
+        ).entries()) {
+          await dialog
+            .getByLabel(`关联 ${token}（${index + 1}）`, { exact: true })
+            .click();
+        }
+        if (kind === "phrase" && !linked)
+          await page.getByText("选择关联短语", { exact: true }).click();
+      };
+      await openPicker();
+      await page
+        .locator(".ant-cascader-menu")
+        .first()
+        .getByText(literal, { exact: true })
+        .click();
+      await page.getByText(`原形 ${literal}`, { exact: true }).click();
+      await expect(page.getByText(/待关联/)).toHaveCount(0);
+      await page
+        .locator(".ant-cascader-menu")
+        .nth(2)
+        .getByText("关联目标释义")
+        .click();
+      await dialog.getByRole("button", { name: /^完成.*编辑$/ }).click();
+      await opener.click();
+      await openPicker(true);
+      await expect(
+        page.getByText(`已关联：${literal} · 关联目标释义（当前词条）`, {
+          exact: true
+        })
+      ).toBeVisible();
+      await page.screenshot({
+        path: testInfo.outputPath(`definition-${kind}-linked.png`),
+        fullPage: false,
+        animations: "disabled"
+      });
+      await page.getByRole("button", { name: "清除关联", exact: true }).click();
+      await dialog.getByRole("button", { name: /^取消.*编辑$/ }).click();
+      await opener.click();
+      await openPicker(true);
+      await expect(
+        page.getByText(`已关联：${literal} · 关联目标释义（当前词条）`, {
+          exact: true
+        })
+      ).toBeVisible();
+      expect(errors).toEqual([]);
+    });
+  }
+
   test("语法结构关联词形：不选释义、完成回显和取消恢复", async ({ page }) => {
     test.skip(process.env.VITE_VOICE_EDITOR !== "true", "需要启用语音编辑器");
     const api = await mockAdminV3Api(page);
