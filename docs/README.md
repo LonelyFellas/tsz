@@ -4,8 +4,8 @@
 
 - [开发规范](../AGENTS.md)、[本地环境](../.agents/skills/dev-env/SKILL.md)、[部署流程](../.agents/skills/deploy/SKILL.md)。
 - [词条编辑指南](word-editor.md)：保留跨任务仍有效的交互和数据约束。
-- [契约同步](../.agents/skills/contract-sync/SKILL.md)、[后端对接](../../tsz-rust/docs/frontend-integration.md)、[OpenAPI](../../tsz-rust/docs/openapi.json)。
-- [产品范围](../../docs/product.md)、[品牌规范](../../docs/visual.md)：统一维护在总文档仓库。
+- [契约同步](../.agents/skills/contract-sync/SKILL.md)、[后端对接](https://github.com/LonelyFellas/tsz-rust/blob/main/docs/frontend-integration.md)、[OpenAPI](https://github.com/LonelyFellas/tsz-rust/blob/main/docs/openapi.json)。
+- 产品范围与品牌规范统一维护在配套总文档仓库的 `product.md`、`visual.md`；该仓库暂无远端，需取得本地 checkout 后阅读。
 
 ## 尚未关闭或需重新核实的事项
 

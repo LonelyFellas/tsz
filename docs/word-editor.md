@@ -1,6 +1,6 @@
 # 词条编辑指南
 
-本页汇总仍有效的前端规则，不再为已经落地的每个编辑器改动维护一组需求、设计和测试矩阵。接口结构由后端 [OpenAPI](../../tsz-rust/docs/openapi.json)维护，业务模型见 [V3 模型](../../tsz-rust/docs/word-data-model.md)。
+本页汇总仍有效的前端规则，不再为已经落地的每个编辑器改动维护一组需求、设计和测试矩阵。接口结构由后端 [OpenAPI](https://github.com/LonelyFellas/tsz-rust/blob/main/docs/openapi.json)维护，业务模型见 [V3 模型](https://github.com/LonelyFellas/tsz-rust/blob/main/docs/word-data-model.md)。
 
 ## 编辑与完成情况
 
@@ -9,6 +9,7 @@
 - 词频是选填项，不因缺少可信词频而阻断完成与发布，也不能为了通过校验编造数据。
 - 管理员方言偏好是账号设置，不等同于词条本身的地区拼写事实；不要重新引入旧第 3 步的英美内容双份编辑流程。
 - 表单状态、草稿内容与服务器修订号共同决定能否安全保存。切页、刷新、恢复草稿不能静默丢弃未保存内容，也不能将过期草稿覆盖新版本。
+- 跨步骤保存先保存 forms，再用响应中的新修订号保存 meanings；后者失败时保留已保存的 forms 与本地 meanings，允许重试，不宣称两次请求具备数据库级原子性。
 
 ## 词形与词义
 
@@ -20,7 +21,7 @@
 
 ## 引用与发布
 
-- 候选搜索仅返回当前发布内容，不能再发送 `include_drafts`，包括 `false`。现有草稿引用的回显与新候选搜索是两回事，兼容边界见[对接指南](../../tsz-rust/docs/frontend-integration.md)。
+- 候选搜索仅返回当前发布内容，不能再发送 `include_drafts`，包括 `false`。现有草稿引用的回显与新候选搜索是两回事，兼容边界见[对接指南](https://github.com/LonelyFellas/tsz-rust/blob/main/docs/frontend-integration.md)。
 - 候选分页需使用服务端游标，不把首批结果当成全量，也不在前端硬截断结果集。
 - 被引用节点的编辑或删除受后端引用保护约束；前端不能靠换 UUID 或仅隐藏控件绕过校验。
 - 保存、校验、发布、历史版本回退、归档和永久删除是不同操作，各自遵守权限、修订号和能力响应，不能只改变页面状态模拟成功。
@@ -28,10 +29,10 @@
 
 ## 语音与音频
 
-- 复用 `@tsz/voice-editor`，字典音标、实际发音、Azure IPA/UPS 的边界见后端[IPA/UPS 指南](../../tsz-rust/docs/ipa-ups-integration.md)；不重新加入 SAPI 或旧来源选择链。
+- 复用 `@tsz/voice-editor`，字典音标、实际发音、Azure IPA/UPS 的边界见后端[IPA/UPS 指南](https://github.com/LonelyFellas/tsz-rust/blob/main/docs/ipa-ups-integration.md)；不重新加入 SAPI 或旧来源选择链。
 - 临时 TTS 试听与持久化音频资产不同。上传必须完成“申请许可 → 直传 → 确认”，对象上传成功不等于业务已关联。
 - 音色语速与勾选状态分别处理，试听、调速不应意外改变业务选择。请求失败或部分完成时保留人工输入。
-- 上传与生命周期规则见后端[对象存储](../../tsz-rust/docs/object-storage-design.md)和[音频资产运维](../../tsz-rust/ops/audio-asset-lifecycle/README.md)。
+- 上传与生命周期规则见后端[对象存储](https://github.com/LonelyFellas/tsz-rust/blob/main/docs/object-storage-design.md)和[音频资产运维](https://github.com/LonelyFellas/tsz-rust/blob/main/ops/audio-asset-lifecycle/README.md)。
 
 ## 验证
 

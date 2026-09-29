@@ -5,4 +5,4 @@
 - [文档导航](docs/README.md)：开发入口、接口对接、功能设计与验收记录。
 - [开发规范](AGENTS.md)：技术约束、常用命令和质量门。
 - [本地环境](.agents/skills/dev-env/SKILL.md)：依赖、启动与联调要求。
-- [跨仓总文档](../docs/README.md)：文档归属与前后端入口，同级检出时可用。
+- 产品范围与品牌规范统一维护在配套总文档仓库的 `product.md`、`visual.md`；该仓库暂无远端，需取得本地 checkout 后阅读。

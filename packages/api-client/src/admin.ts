@@ -269,8 +269,7 @@ export function createAdminEndpoints(http: HttpClient) {
     },
     /**
      * 音频资产（真人录音）：OSS 预签名直传三步——申请许可 → 前端直传 → confirm 落库。
-     * 契约见 docs/features/voice-editor-audio-upload/design.md；后端落地前在契约测试的
-     * PENDING 白名单里。
+     * 契约以 tsz-rust/docs/openapi.json 与 tsz-rust/docs/object-storage-design.md 为准。
      */
     audioAssets: {
       /** POST /admin/lexicon/audio-assets/upload-url — 三步之①；存储未开通返回 501。 */
