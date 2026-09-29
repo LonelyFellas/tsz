@@ -37,7 +37,8 @@ function SpellingConflictNote({ literals }: { literals: readonly string[] }) {
       role="status"
       type="danger"
     >
-      与被引用片段“{literals.join("”“")}”不一致，需改回一致或先解除引用
+      与关联内容中的文字“{literals.join("”“")}
+      ”不一致，请改回相同拼写，或先解除关联
     </Typography.Text>
   );
 }

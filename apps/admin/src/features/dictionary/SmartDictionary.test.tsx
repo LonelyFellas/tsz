@@ -1294,10 +1294,10 @@ describe("SmartDictionary", () => {
       </MemoryRouter>
     );
 
-    const trigger = screen.getByLabelText("查看「referenced」的 7 条引用");
+    const trigger = screen.getByLabelText("查看「referenced」的 7 处关联");
     fireEvent.click(trigger);
 
-    await screen.findByText("被以下内容引用");
+    await screen.findByText("以下内容关联了此词条");
     expect(screen.getByText("holiday")).toBeInTheDocument();
     expect(screen.getByText("take off")).toBeInTheDocument();
     // 来源类型要能区分「被短语当成分」和「被设为关联词」。

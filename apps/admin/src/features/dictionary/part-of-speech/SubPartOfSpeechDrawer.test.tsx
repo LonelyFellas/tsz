@@ -188,7 +188,7 @@ describe("SubPartOfSpeechPanel", () => {
     expect(referencedDelete).toBeDisabled();
     expect(referencedDelete.parentElement).toHaveAttribute(
       "data-tooltip",
-      "已有 4 个词义引用，只能修改"
+      "已关联 4 个词义，可以修改，但不能删除"
     );
     const unreferencedRow = screen.getByText("集合名词").closest("tr")!;
     expect(

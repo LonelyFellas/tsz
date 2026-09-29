@@ -177,7 +177,7 @@ export function V3FormGroupCard({
     // 改类型的提示：告知会影响多少处引用，但不阻断编辑。
     const formTypeChangeHint =
       formReferences > 0
-        ? `修改词形类型会让 ${formReferences} 处引用漂移，保存后请核对`
+        ? `存在 ${formReferences} 处关联，修改词形类型后，请检查关联内容是否正确`
         : undefined;
     const baseLabel = formTypeLabel(form.form_type);
     const formMembershipCount = membershipCounts.get(form.id) ?? 0;
@@ -395,7 +395,7 @@ export function V3FormGroupCard({
                     icon: <DeleteOutlined />,
                     label:
                       deleteBlockedByReferences > 0
-                        ? "删除草稿词形组（发布前需修复引用）"
+                        ? "删除草稿词形组（发布前需处理受影响的关联）"
                         : deleteDisabled
                           ? "至少保留一个词形"
                           : "删除本组",
@@ -464,7 +464,7 @@ export function V3FormGroupCard({
                 return (
                   <Alert
                     key={member.id}
-                    title="该变化组引用的词形不存在，已停止编辑。"
+                    title="该变化组关联的词形已不存在，请刷新页面后重试。"
                     type="error"
                   />
                 );

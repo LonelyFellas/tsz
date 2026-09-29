@@ -30,7 +30,7 @@ export interface DeleteActor {
 export const DELETE_BLOCK_REASON_TEXT: Record<DeleteBlockReason, string> = {
   not_archived: "只有垃圾桶中的词条可以永久删除",
   published: "该词条已发布过，发布历史必须保留，不能永久删除",
-  referenced: "该词条被其他内容引用，需先解除引用才能删除",
+  referenced: "该词条与其他内容存在关联，解除所有关联后才能删除",
   read_only: "当前账号仅有读取权限",
   unknown_identity: "无法确认当前管理员身份，请刷新后重试",
   missing_revision: "该行缺少并发版本信息，请刷新列表后重试"

@@ -159,7 +159,7 @@ describe("V3WordCreationLayout", () => {
     expect(onIssueNavigate).toHaveBeenCalledWith(currentIssue);
   });
 
-  it("引用冲突 409 展示后端原因与引用列表，而不是「操作未完成」", () => {
+  it("关联冲突 409 展示操作建议与关联列表，不直接显示后端技术文案", () => {
     renderLayout({
       problem: {
         kind: "inbound_reference",
@@ -188,8 +188,14 @@ describe("V3WordCreationLayout", () => {
     });
 
     expect(
-      screen.getByText("本次修改会破坏其他内容对本词条的引用")
+      screen.getByText("本次修改会导致关联内容不匹配，暂时无法完成操作")
     ).toBeVisible();
+    expect(
+      screen.getByText(/请检查关联内容，调整内容或解除关联后再试/)
+    ).toBeVisible();
+    expect(
+      screen.queryByText(/本次修改会破坏其他内容对本词条的引用/)
+    ).toBeNull();
     expect(screen.queryByText("操作未完成")).toBeNull();
     expect(screen.getByText("反义词")).toBeVisible();
     expect(screen.getByText("circle")).toBeVisible();

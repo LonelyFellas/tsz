@@ -801,7 +801,9 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(firstGroup.getByLabel("英美拼写有区别")).toBeEnabled();
     await expect(firstGroup.getByLabel("英美音标有区别")).toBeEnabled();
     await expect(
-      firstGroup.getByLabel(/修改词形类型会让 \d+ 处引用漂移/)
+      firstGroup.getByLabel(
+        /存在 \d+ 处关联，修改词形类型后，请检查关联内容是否正确/
+      )
     ).toBeVisible();
     const deleteForm = firstGroup.getByRole("button", {
       name: "删除变化组 1 的词形 1"
@@ -835,7 +837,10 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
         .getByLabel("英美拼写有区别")
     ).toBeEnabled();
 
-    await firstGroup.getByRole("button", { name: "被引用 1" }).first().click();
+    await firstGroup
+      .getByRole("button", { name: "查看 1 处关联" })
+      .first()
+      .click();
     const popover = page.locator(".ant-popover:visible");
     await expect(
       popover.getByText("The satellite entered orbit.")

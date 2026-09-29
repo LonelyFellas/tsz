@@ -61,7 +61,7 @@ export function errorMessage(error: unknown): string {
     if (error.code === "form_type_conflict")
       return conflictMessage("词形变化", error.problem?.field);
     if (error.code === "form_type_in_use")
-      return "该词形类型已被词条或历史发布引用，只能修改";
+      return "该词形类型仍与词条或历史发布内容有关联，可以修改，但不能删除";
     if (error.code === "form_type_required") return "原形为必需类型，不能删除";
     if (error.code === "form_type_not_found")
       return "词形类型不存在或已被删除，请刷新后重试";
@@ -74,13 +74,13 @@ export function errorMessage(error: unknown): string {
         ? "内部标识冲突，请重新提交"
         : conflictMessage("细分词性", error.problem?.field);
     if (error.code === "part_of_speech_in_use")
-      return "该基本词性已被单词或短语引用，只能修改";
+      return "该基本词性仍与单词或短语有关联，可以修改，但不能删除";
     if (error.code === "part_of_speech_has_form_types")
       return "该基本词性下还有词形变化，请先删除词形变化";
     if (error.code === "part_of_speech_has_sub_parts")
       return "该基本词性下还有细分词性，请先删除细分词性";
     if (error.code === "sub_part_of_speech_in_use")
-      return "该细分词性已被词义引用，不能删除，编码也不能再改";
+      return "该细分词性仍与词义有关联，不能删除或修改编码";
     if (error.code === "sub_part_of_speech_not_allowed")
       return "该基本词性不支持细分词性";
     if (error.code === "revision_conflict")
@@ -192,11 +192,11 @@ export function PartOfSpeechSettings() {
         types ? `${types.length} 项` : "—"
     },
     {
-      title: "引用",
+      title: "关联",
       dataIndex: "usage_count",
       width: 100,
       render: (count: number) =>
-        count > 0 ? <Tag color="blue">{count} 个词条</Tag> : "未引用"
+        count > 0 ? <Tag color="blue">{count} 个词条</Tag> : "无关联"
     },
     {
       title: "创建人",
@@ -229,7 +229,7 @@ export function PartOfSpeechSettings() {
           <Tooltip
             title={
               item.usage_count > 0
-                ? `已有 ${item.usage_count} 个单词或短语引用，只能修改`
+                ? `已关联 ${item.usage_count} 个单词或短语，可以修改，但不能删除`
                 : item.sub_part_count > 0
                   ? `还有 ${item.sub_part_count} 项细分词性，请先删除细分词性`
                   : (item.allowed_form_types?.length ?? 0) > 0

@@ -48,17 +48,18 @@ function renderWithGuard(
 describe("V3ReferenceBadge", () => {
   it("没有引用时不渲染", () => {
     renderWithGuard(<V3ReferenceBadge nodeIds={["unreferenced"]} />);
-    expect(screen.queryByRole("button", { name: /被引用/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /查看.*处关联/ })).toBeNull();
   });
 
   it("按完整计数显示，点开列出引用、高亮片段并提供跳转", () => {
     const guard = renderWithGuard(
       <V3ReferenceBadge label="词义" nodeIds={["sense-1"]} />
     );
-    const badge = screen.getByRole("button", { name: "被引用 2" });
+    const badge = screen.getByRole("button", { name: "查看 2 处关联" });
+    expect(badge).toHaveAttribute("title", "存在 2 处关联，点击查看关联内容");
     fireEvent.click(badge);
     // jsdom 里 antd 弹层的进场动画不结束，只能断言内容已挂到 DOM。
-    expect(screen.getByText("词义被 2 处引用")).toBeInTheDocument();
+    expect(screen.getByText("词义存在 2 处关联")).toBeInTheDocument();
     expect(screen.getByText("多维例句")).toBeInTheDocument();
     expect(screen.getByText("近义词")).toBeInTheDocument();
     expect(document.querySelector("mark")?.textContent).toBe("wonderful");
