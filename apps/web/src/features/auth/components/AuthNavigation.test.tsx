@@ -70,25 +70,22 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-function submit(mode: "password" | "phone" | "register") {
+function submit(mode: "password" | "register") {
   render(
     <GuestGuard>
       {mode === "register" ? <RegisterForm /> : <LoginForm />}
     </GuestGuard>
   );
-  if (mode === "phone") fireEvent.click(screen.getByText("手机验证"));
   fireEvent.change(
     screen.getByPlaceholderText(
-      mode === "password" ? "请输入手机号/邮箱号码" : "请输入手机号"
+      mode === "password" ? "请输入手机号或邮箱" : "请输入手机号"
     ),
     { target: { value: "13800138000" } }
   );
-  if (mode !== "phone") {
-    fireEvent.change(screen.getByPlaceholderText("请输入登录密码"), {
-      target: { value: "abc12345678" }
-    });
-  }
-  if (mode !== "password") {
+  fireEvent.change(screen.getByPlaceholderText("请输入登录密码"), {
+    target: { value: "abc12345678" }
+  });
+  if (mode === "register") {
     fireEvent.change(screen.getByPlaceholderText("请输入验证码"), {
       target: { value: "123456" }
     });
@@ -110,13 +107,12 @@ beforeEach(() => {
     hydrated: true
   });
   vi.mocked(api.auth.login).mockResolvedValue(AUTH);
-  vi.mocked(api.auth.loginWithCode).mockResolvedValue(AUTH);
   vi.mocked(api.auth.register).mockResolvedValue(AUTH);
   vi.mocked(api.auth.me).mockResolvedValue(me());
 });
 
 describe("认证表单与访客守卫的导航装配", () => {
-  it.each(["password", "phone", "register"] as const)(
+  it.each(["password", "register"] as const)(
     "%s：资料未返回不跳转，完成后只去一次目标页",
     async (mode) => {
       const pending = deferred<MeResponse>();
@@ -162,7 +158,7 @@ describe("认证表单与访客守卫的导航装配", () => {
     }
   );
 
-  it.each(["password", "phone", "register"] as const)(
+  it.each(["password", "register"] as const)(
     "%s：认证成功后资料失败，只重试资料、不重复消费凭证或注册",
     async (mode) => {
       vi.mocked(api.auth.me)
@@ -175,7 +171,7 @@ describe("认证表单与访客守卫的导航装配", () => {
       expect(useUserStore.getState().user).toBeNull();
       expect(
         screen.getByPlaceholderText(
-          mode === "password" ? "请输入手机号/邮箱号码" : "请输入手机号"
+          mode === "password" ? "请输入手机号或邮箱" : "请输入手机号"
         )
       ).toBeDisabled();
 
@@ -187,9 +183,6 @@ describe("认证表单与访客守卫的导航装配", () => {
       expect(api.auth.me).toHaveBeenCalledTimes(3);
       expect(api.auth.register).toHaveBeenCalledTimes(
         mode === "register" ? 1 : 0
-      );
-      expect(api.auth.loginWithCode).toHaveBeenCalledTimes(
-        mode === "phone" ? 1 : 0
       );
       expect(api.auth.login).toHaveBeenCalledTimes(mode === "password" ? 1 : 0);
       expect(navigation.replace).toHaveBeenCalledTimes(1);

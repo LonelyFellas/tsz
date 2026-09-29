@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/request";
 import { AuthBranding } from "./AuthBranding";
+import { PasswordVisibilityIcon } from "./PasswordVisibilityIcon";
 import {
   AUTH_INPUT_CLASS,
   completeAuthentication,
@@ -142,23 +143,25 @@ export function RegisterForm({
   }
 
   return (
-    <div className="flex min-h-screen">
+    <main className="flex min-h-screen">
       <AuthBranding />
+      <div className="flex min-w-0 flex-1 items-center justify-center bg-surface px-6 py-20">
+        <div className="w-full max-w-[400px]">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="mb-6 rounded-sm text-sm text-foreground-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          >
+            ← 返回
+          </button>
+          <h1 className="mb-8 text-3xl font-semibold tracking-tight text-foreground">
+            注册账号
+          </h1>
 
-      <div className="flex flex-1 items-center justify-center bg-surface px-8 py-16">
-        <div className="w-full max-w-sm">
-          <div className="mb-8 flex items-center justify-between">
-            <h1 className="text-3xl font-bold text-foreground">注册账号</h1>
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="text-sm text-foreground-subtle hover:text-foreground-muted"
-            >
-              ← 返回
-            </button>
-          </div>
-
-          <div className="mb-8 flex gap-6 border-b border-border">
+          <div
+            className="mb-7 flex gap-6 border-b border-border"
+            aria-label="注册方式"
+          >
             {(["phone", "email"] as const).map((value) => (
               <button
                 key={value}
@@ -166,18 +169,18 @@ export function RegisterForm({
                 disabled={sending || loading || registered}
                 onClick={() => switchMethod(value)}
                 aria-pressed={method === value}
-                className={`pb-3 text-sm font-medium disabled:cursor-not-allowed ${method === value ? "border-b-2 border-primary text-primary" : "text-foreground-subtle hover:text-foreground-muted"}`}
+                className={`border-b-2 px-1 pb-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed ${method === value ? "border-primary text-foreground" : "border-transparent text-foreground-muted hover:text-foreground"}`}
               >
                 {value === "phone" ? "手机" : "邮箱"}
               </button>
             ))}
           </div>
 
-          <form noValidate className="space-y-4" onSubmit={handleRegister}>
+          <form noValidate className="space-y-5" onSubmit={handleRegister}>
             <div>
               <label
                 htmlFor="register-contact"
-                className="mb-1 block text-sm text-foreground-muted"
+                className="mb-2 ml-4 block text-sm font-medium text-foreground"
               >
                 {method === "email" ? "邮箱" : "手机号码"}
               </label>
@@ -200,11 +203,15 @@ export function RegisterForm({
             </div>
 
             <div>
-              <label className="mb-1 block text-sm text-foreground-muted">
+              <label
+                htmlFor="register-code"
+                className="mb-2 ml-4 block text-sm font-medium text-foreground"
+              >
                 验证码
               </label>
               <div className="flex gap-3">
                 <input
+                  id="register-code"
                   type="text"
                   inputMode="numeric"
                   autoComplete="one-time-code"
@@ -218,7 +225,7 @@ export function RegisterForm({
                   type="button"
                   disabled={!canSendCode}
                   onClick={handleSendCode}
-                  className="shrink-0 rounded-full border border-primary px-4 text-sm font-medium text-primary transition-opacity hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="shrink-0 rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {sending
                     ? "发送中..."
@@ -235,45 +242,54 @@ export function RegisterForm({
             </div>
 
             <div>
-              <label className="mb-1 block text-sm text-foreground-muted">
+              <label
+                htmlFor="register-password"
+                className="mb-2 ml-4 block text-sm font-medium text-foreground"
+              >
                 密码
               </label>
               <div className="relative">
                 <input
+                  id="register-password"
                   type={showPassword ? "text" : "password"}
                   autoComplete="new-password"
                   placeholder="请输入登录密码"
                   value={password}
                   disabled={loading || registered}
                   onChange={(event) => setPassword(event.target.value)}
-                  className={`${AUTH_INPUT_CLASS} pr-12`}
+                  className={`${AUTH_INPUT_CLASS} pr-14`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((value) => !value)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-foreground-subtle hover:text-foreground-muted"
+                  disabled={loading || registered}
+                  className="absolute right-3 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full text-foreground-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
                   aria-label={showPassword ? "隐藏密码" : "显示密码"}
                 >
-                  {showPassword ? "🙈" : "👁"}
+                  <PasswordVisibilityIcon visible={showPassword} />
                 </button>
               </div>
               <p
-                className={`mt-1 text-xs ${
+                className={`mt-3 ml-4 text-xs ${
                   password && !passwordValid
                     ? "text-danger"
-                    : "text-foreground-subtle"
+                    : "text-foreground-muted"
                 }`}
               >
                 11-20位,数字+字母,不区分大小写
               </p>
             </div>
 
-            {error && <p className="text-sm text-danger">{error}</p>}
+            {error && (
+              <p role="alert" className="text-sm text-danger">
+                {error}
+              </p>
+            )}
 
             <button
               type="submit"
               disabled={!canSubmit}
-              className="w-full rounded-full bg-primary py-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              className="min-h-12 w-full rounded-full bg-primary px-5 text-sm font-semibold text-white transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading
                 ? registered
@@ -284,7 +300,8 @@ export function RegisterForm({
                   : "立即注册"}
             </button>
 
-            <p className="text-center text-sm">
+            <p className="pt-2 text-center text-sm text-foreground-muted">
+              已有账号？{" "}
               <button
                 type="button"
                 onClick={() =>
@@ -294,14 +311,15 @@ export function RegisterForm({
                       : "/login"
                   )
                 }
-                className="font-medium text-primary hover:underline"
+                className="rounded-sm font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                aria-label="已有账号,去登录"
               >
-                已有账号,去登录
+                登录
               </button>
             </p>
           </form>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

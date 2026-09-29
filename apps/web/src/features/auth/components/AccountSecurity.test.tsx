@@ -5,7 +5,16 @@ import {
   screen,
   waitFor
 } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi
+} from "vitest";
 import { HttpError } from "@tsz/api-client";
 import type { User } from "@tsz/types";
 import { AccountSecurity } from "./AccountSecurity";
@@ -30,6 +39,15 @@ const replace = vi.fn();
 const originalLocation = window.location;
 const PHONE = "13899997777";
 const EMAIL = "alice@example.com";
+const originalScrollIntoView = Element.prototype.scrollIntoView;
+
+beforeAll(() => {
+  Element.prototype.scrollIntoView = vi.fn();
+});
+
+afterAll(() => {
+  Element.prototype.scrollIntoView = originalScrollIntoView;
+});
 
 function seed(overrides: Partial<User> = {}) {
   const user: User = {
@@ -60,8 +78,17 @@ async function open(name: string) {
 
 function fillBind(email = "new@example.com") {
   fill("新邮箱", email);
-  fill("原联系方式验证码", "123456");
-  fill("新联系方式验证码", "654321");
+  fill("手机号验证码", "123456");
+  fill("新邮箱验证码", "654321");
+}
+
+async function chooseVerificationEmail() {
+  const trigger = screen.getByRole("combobox", { name: "当前账号的验证方式" });
+  fireEvent.click(trigger);
+  fireEvent.click(
+    await screen.findByRole("option", { name: `邮箱：${EMAIL}` })
+  );
+  await waitFor(() => expect(trigger).toHaveTextContent(EMAIL));
 }
 
 beforeEach(() => {
@@ -86,33 +113,64 @@ afterEach(() => {
 });
 
 describe("AccountSecurity", () => {
+  it("操作视图使用独立标题并能返回账号安全总览", async () => {
+    render(<AccountSecurity />);
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "账号安全" })
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "绑定邮箱" }));
+    expect(
+      screen.getByRole("heading", { level: 1, name: "绑定邮箱" })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "返回个人中心" })
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "← 返回账号安全" }));
+    expect(
+      screen.getByRole("heading", { level: 1, name: "账号安全" })
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "修改密码" }));
+    expect(
+      screen.getByRole("heading", { level: 1, name: "修改密码" })
+    ).toBeInTheDocument();
+  });
+
   it("新目标和验证渠道各自重置倒计时，不重置未变化的收件人", async () => {
     seed({ email: EMAIL });
     await open("换绑邮箱");
     fill("新邮箱", "first@example.com");
-    fireEvent.click(screen.getByRole("button", { name: "验证原渠道" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "向已绑定手机号发送验证码" })
+    );
     await waitFor(() => expect(screen.getByLabelText("新邮箱")).toBeEnabled());
-    fireEvent.click(screen.getByRole("button", { name: "验证新渠道" }));
+    fireEvent.click(screen.getByRole("button", { name: "向新邮箱发送验证码" }));
     await waitFor(() =>
       expect(screen.getAllByRole("button", { name: /后重发/ })).toHaveLength(2)
     );
     fill("新邮箱", "FIRST@example.com");
     expect(screen.getAllByRole("button", { name: /后重发/ })).toHaveLength(2);
     fill("新邮箱", "second@example.com");
-    expect(screen.getByRole("button", { name: "验证新渠道" })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "向新邮箱发送验证码" })
+    ).toBeEnabled();
     expect(screen.getByRole("button", { name: /后重发/ })).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "验证新渠道" }));
+    fireEvent.click(screen.getByRole("button", { name: "向新邮箱发送验证码" }));
     await waitFor(() =>
       expect(auth.requestContactBindCode).toHaveBeenLastCalledWith(
         "second@example.com"
       )
     );
     await waitFor(() =>
-      expect(screen.getByLabelText("身份验证渠道")).toBeEnabled()
+      expect(screen.getByLabelText("当前账号的验证方式")).toBeEnabled()
     );
-    fill("身份验证渠道", "email");
-    expect(screen.getByRole("button", { name: "验证原渠道" })).toBeEnabled();
-    fireEvent.click(screen.getByRole("button", { name: "验证原渠道" }));
+    await chooseVerificationEmail();
+    expect(screen.getByLabelText("邮箱验证码")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "向已绑定邮箱发送验证码" })
+    ).toBeEnabled();
+    fireEvent.click(
+      screen.getByRole("button", { name: "向已绑定邮箱发送验证码" })
+    );
     await waitFor(() =>
       expect(auth.requestContactVerificationCode).toHaveBeenLastCalledWith({
         operation: "bind",
@@ -143,23 +201,54 @@ describe("AccountSecurity", () => {
     }
   );
 
+  it("仅有一种已绑定方式时不显示下拉选择", async () => {
+    await open("绑定邮箱");
+    expect(
+      screen.queryByRole("combobox", { name: "当前账号的验证方式" })
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(`手机号：${PHONE}`)).toHaveClass(
+      "rounded-full",
+      "border-border",
+      "bg-surface"
+    );
+  });
+
   it("双渠道账号分别提供换绑和解绑入口", async () => {
     seed({ email: EMAIL });
     render(<AccountSecurity />);
     for (const name of ["换绑手机号", "换绑邮箱", "解绑手机号", "解绑邮箱"]) {
       expect(await screen.findByRole("button", { name })).toBeEnabled();
     }
+    expect(
+      screen.getByRole("button", { name: "换绑手机号" })
+    ).toHaveTextContent(/^换绑$/);
+    expect(
+      screen.getByRole("button", { name: "解绑手机号" })
+    ).toHaveTextContent(/^解绑$/);
     fireEvent.click(screen.getByRole("button", { name: "换绑手机号" }));
     expect(screen.getByLabelText("新手机号")).toBeInTheDocument();
+    expect(screen.getByLabelText("新手机号验证码")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "取消" }));
     fireEvent.click(screen.getByRole("button", { name: "换绑邮箱" }));
     expect(screen.getByLabelText("新邮箱")).toBeInTheDocument();
+    expect(screen.getByLabelText("新邮箱验证码")).toBeInTheDocument();
   });
 
   it("绑定规范化新邮箱，原/新渠道使用不同发码请求", async () => {
     await open("绑定邮箱");
+    expect(screen.getAllByRole("button", { name: /发送验证码/ })).toHaveLength(
+      2
+    );
+    expect(
+      screen.getByRole("button", { name: "向已绑定手机号发送验证码" })
+    ).toHaveTextContent(/^验证$/);
+    expect(
+      screen.getByRole("button", { name: "向新邮箱发送验证码" })
+    ).toHaveTextContent(/^验证$/);
     fill("新邮箱", "New@EXAMPLE.com");
-    fireEvent.click(screen.getByRole("button", { name: "验证原渠道" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "向已绑定手机号发送验证码" })
+    );
     await waitFor(() =>
       expect(auth.requestContactVerificationCode).toHaveBeenCalledWith({
         operation: "bind",
@@ -168,7 +257,7 @@ describe("AccountSecurity", () => {
       })
     );
     await waitFor(() => expect(screen.getByLabelText("新邮箱")).toBeEnabled());
-    fireEvent.click(screen.getByRole("button", { name: "验证新渠道" }));
+    fireEvent.click(screen.getByRole("button", { name: "向新邮箱发送验证码" }));
     await waitFor(() =>
       expect(auth.requestContactBindCode).toHaveBeenCalledWith(
         "new@example.com"
@@ -185,13 +274,13 @@ describe("AccountSecurity", () => {
     const submit = screen.getByRole("button", { name: "确认绑定邮箱" });
     expect(submit).toBeDisabled();
     fill("新邮箱", "new@example.com");
-    fill("原联系方式验证码", "123456");
+    fill("手机号验证码", "123456");
     expect(submit).toBeDisabled();
-    fill("新联系方式验证码", "12345");
+    fill("新邮箱验证码", "12345");
     expect(submit).toBeDisabled();
     fireEvent.submit(submit.closest("form")!);
     expect(auth.bindContact).not.toHaveBeenCalled();
-    fill("新联系方式验证码", "123456");
+    fill("新邮箱验证码", "123456");
     expect(submit).toBeEnabled();
   });
 
@@ -200,12 +289,12 @@ describe("AccountSecurity", () => {
     await open("换绑邮箱");
     fillBind();
     fill("新邮箱", "other@example.com");
-    expect(screen.getByLabelText("原联系方式验证码")).toHaveValue("");
-    expect(screen.getByLabelText("新联系方式验证码")).toHaveValue("");
-    fill("原联系方式验证码", "123456");
-    fill("新联系方式验证码", "654321");
-    fill("身份验证渠道", "email");
-    expect(screen.getByLabelText("原联系方式验证码")).toHaveValue("");
+    expect(screen.getByLabelText("手机号验证码")).toHaveValue("");
+    expect(screen.getByLabelText("新邮箱验证码")).toHaveValue("");
+    fill("手机号验证码", "123456");
+    fill("新邮箱验证码", "654321");
+    await chooseVerificationEmail();
+    expect(screen.getByLabelText("邮箱验证码")).toHaveValue("");
     expect(screen.getByRole("button", { name: "确认换绑邮箱" })).toBeDisabled();
   });
 
@@ -232,8 +321,10 @@ describe("AccountSecurity", () => {
   it("解绑允许使用另一在档渠道，发码绑定被解绑的实际联系方式", async () => {
     seed({ email: EMAIL });
     await open("解绑手机号");
-    fill("身份验证渠道", "email");
-    fireEvent.click(screen.getByRole("button", { name: "验证原渠道" }));
+    await chooseVerificationEmail();
+    fireEvent.click(
+      screen.getByRole("button", { name: "向已绑定邮箱发送验证码" })
+    );
     await waitFor(() =>
       expect(auth.requestContactVerificationCode).toHaveBeenCalledWith({
         operation: "unbind",
@@ -242,10 +333,10 @@ describe("AccountSecurity", () => {
       })
     );
     await waitFor(() =>
-      expect(screen.getByLabelText("原联系方式验证码")).toBeEnabled()
+      expect(screen.getByLabelText("邮箱验证码")).toBeEnabled()
     );
-    fill("原联系方式验证码", "123456");
-    expect(screen.queryByLabelText("新联系方式验证码")).not.toBeInTheDocument();
+    fill("邮箱验证码", "123456");
+    expect(screen.queryByLabelText("新邮箱验证码")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "确认解绑手机号" }));
     await waitFor(() =>
       expect(auth.unbindContact).toHaveBeenCalledWith({
@@ -266,15 +357,21 @@ describe("AccountSecurity", () => {
         resolve = r;
       })
     );
-    await open("绑定邮箱");
+    seed({ email: EMAIL });
+    await open("换绑邮箱");
     fillBind();
-    const submit = screen.getByRole("button", { name: "确认绑定邮箱" });
+    const submit = screen.getByRole("button", { name: "确认换绑邮箱" });
     fireEvent.click(submit);
     fireEvent.submit(submit.closest("form")!);
     expect(auth.bindContact).toHaveBeenCalledTimes(1);
     expect(screen.getByLabelText("新邮箱")).toBeDisabled();
-    expect(screen.getByLabelText("身份验证渠道")).toBeDisabled();
+    expect(
+      screen.getByRole("combobox", { name: "当前账号的验证方式" })
+    ).toBeDisabled();
     expect(screen.getByRole("button", { name: "取消" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "← 返回账号安全" })
+    ).toBeDisabled();
     await act(async () => {
       resolve();
     });
@@ -290,7 +387,7 @@ describe("AccountSecurity", () => {
     );
     await open("绑定邮箱");
     fillBind();
-    fireEvent.click(screen.getByRole("button", { name: "验证新渠道" }));
+    fireEvent.click(screen.getByRole("button", { name: "向新邮箱发送验证码" }));
     fireEvent.submit(
       screen.getByRole("button", { name: "确认绑定邮箱" }).closest("form")!
     );
@@ -299,7 +396,7 @@ describe("AccountSecurity", () => {
     await act(async () => {
       resolve();
     });
-    expect(screen.getByLabelText("新联系方式验证码")).toHaveValue("");
+    expect(screen.getByLabelText("新邮箱验证码")).toHaveValue("");
   });
 
   it("验证码错误清两组码并允许重试，但不清会话", async () => {
@@ -312,8 +409,8 @@ describe("AccountSecurity", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "验证码错误或已失效"
     );
-    expect(screen.getByLabelText("原联系方式验证码")).toHaveValue("");
-    expect(screen.getByLabelText("新联系方式验证码")).toHaveValue("");
+    expect(screen.getByLabelText("手机号验证码")).toHaveValue("");
+    expect(screen.getByLabelText("新邮箱验证码")).toHaveValue("");
     expect(screen.getByLabelText("新邮箱")).toBeEnabled();
     expect(clearSession).not.toHaveBeenCalled();
     expect(replace).not.toHaveBeenCalled();
@@ -330,6 +427,26 @@ describe("AccountSecurity", () => {
       expect(replace).toHaveBeenCalledWith("/login?session=expired")
     );
     expect(clearSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("修改密码的三个字段可分别切换显隐", async () => {
+    await open("修改密码");
+    const current = screen.getByLabelText("当前密码");
+    const next = screen.getByLabelText("新密码");
+    const confirm = screen.getByLabelText("确认新密码");
+    expect(current).toHaveAttribute("type", "password");
+    expect(next).toHaveAttribute("type", "password");
+    expect(confirm).toHaveAttribute("type", "password");
+    fireEvent.click(screen.getByRole("button", { name: "显示当前密码" }));
+    expect(current).toHaveAttribute("type", "text");
+    expect(next).toHaveAttribute("type", "password");
+    fireEvent.click(screen.getByRole("button", { name: "显示新密码" }));
+    expect(next).toHaveAttribute("type", "text");
+    fireEvent.click(screen.getByRole("button", { name: "显示确认新密码" }));
+    expect(confirm).toHaveAttribute("type", "text");
+    fireEvent.click(screen.getByRole("button", { name: "隐藏当前密码" }));
+    expect(current).toHaveAttribute("type", "password");
+    expect(confirm).toHaveAttribute("type", "text");
   });
 
   it("新密码需确认一致，当前密码原串提交，成功退出", async () => {
@@ -380,8 +497,8 @@ describe("AccountSecurity", () => {
   });
 
   it.each([
-    ["验证原渠道", "requestContactVerificationCode"],
-    ["验证新渠道", "requestContactBindCode"]
+    ["向已绑定手机号发送验证码", "requestContactVerificationCode"],
+    ["向新邮箱发送验证码", "requestContactBindCode"]
   ] as const)("%s 快速重复点击只发送一次请求", async (name, method) => {
     let resolve!: () => void;
     auth[method].mockReturnValueOnce(
@@ -416,18 +533,24 @@ describe("AccountSecurity", () => {
     );
     await open("绑定邮箱");
     fill("新邮箱", "new@example.com");
-    fireEvent.click(screen.getByRole("button", { name: "验证原渠道" }));
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "验证新渠道" })).toBeDisabled()
+    fireEvent.click(
+      screen.getByRole("button", { name: "向已绑定手机号发送验证码" })
     );
-    fireEvent.click(screen.getByRole("button", { name: "验证新渠道" }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "向新邮箱发送验证码" })
+      ).toBeDisabled()
+    );
+    fireEvent.click(screen.getByRole("button", { name: "向新邮箱发送验证码" }));
     expect(auth.requestContactBindCode).not.toHaveBeenCalled();
     await act(async () => {
       resolve();
     });
     expect(auth.requestContactBindCode).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "60s 后重发" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "验证新渠道" })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "向新邮箱发送验证码" })
+    ).toBeEnabled();
   });
 
   it("新渠道发码进行中时，原渠道按钮不可点击", async () => {
@@ -439,23 +562,29 @@ describe("AccountSecurity", () => {
     );
     await open("绑定邮箱");
     fill("新邮箱", "new@example.com");
-    fireEvent.click(screen.getByRole("button", { name: "验证新渠道" }));
+    fireEvent.click(screen.getByRole("button", { name: "向新邮箱发送验证码" }));
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "验证原渠道" })).toBeDisabled()
+      expect(
+        screen.getByRole("button", { name: "向已绑定手机号发送验证码" })
+      ).toBeDisabled()
     );
-    fireEvent.click(screen.getByRole("button", { name: "验证原渠道" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "向已绑定手机号发送验证码" })
+    );
     expect(auth.requestContactVerificationCode).not.toHaveBeenCalled();
     await act(async () => {
       resolve();
     });
     expect(auth.requestContactVerificationCode).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "60s 后重发" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "验证原渠道" })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "向已绑定手机号发送验证码" })
+    ).toBeEnabled();
   });
 
   it.each([
-    ["验证原渠道", "requestContactVerificationCode"],
-    ["验证新渠道", "requestContactBindCode"]
+    ["向已绑定手机号发送验证码", "requestContactVerificationCode"],
+    ["向新邮箱发送验证码", "requestContactBindCode"]
   ] as const)("%s 请求失败后两个按钮恢复且可重试", async (name, method) => {
     let reject!: (error: Error) => void;
     auth[method].mockReturnValueOnce(
@@ -466,14 +595,22 @@ describe("AccountSecurity", () => {
     await open("绑定邮箱");
     fill("新邮箱", "new@example.com");
     fireEvent.click(screen.getByRole("button", { name }));
-    expect(screen.getByRole("button", { name: "验证原渠道" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "验证新渠道" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "向已绑定手机号发送验证码" })
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "向新邮箱发送验证码" })
+    ).toBeDisabled();
     await act(async () => {
       reject(new HttpError(401, "changed", [], "invalid_otp_code"));
     });
     expect(screen.getByRole("alert")).toHaveTextContent("验证码错误或已失效");
-    expect(screen.getByRole("button", { name: "验证原渠道" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "验证新渠道" })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "向已绑定手机号发送验证码" })
+    ).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "向新邮箱发送验证码" })
+    ).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name }));
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "60s 后重发" })).toBeDisabled()

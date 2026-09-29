@@ -248,11 +248,11 @@ describe("ForgotPasswordForm — 重置流程", () => {
 
 // ── 交互细节 ──────────────────────────────────────────
 describe("ForgotPasswordForm — 交互细节", () => {
-  it("点击「← 返回登录」→ 跳转 /login", async () => {
+  it("点击「返回登录」→ 跳转 /login", async () => {
     renderWithProviders(<ForgotPasswordForm />);
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: "← 返回登录" }));
+    await user.click(screen.getByRole("button", { name: "返回登录" }));
 
     expect(mockPush).toHaveBeenCalledWith("/login");
   });
