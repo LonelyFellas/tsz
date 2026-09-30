@@ -979,7 +979,7 @@ export function V3TargetCascader({
     readOnly,
     formTypeLabel
   ]);
-  const value = useMemo(() => {
+  const selectedFormKey = useMemo(() => {
     if (!displayedTarget) return undefined;
     if (includePhraseComponents) return undefined;
     const form = groups
@@ -991,14 +991,18 @@ export function V3TargetCascader({
           )
         )
       );
-    return form
-      ? [
-          displayedTarget.target_word_id,
-          form.formKey,
-          displayedTarget.target_sense_id
-        ]
-      : undefined;
+    return form?.formKey;
   }, [displayedTarget, includePhraseComponents, groups]);
+  const selectedEntryId = displayedTarget?.target_word_id;
+  const selectedSenseId = displayedTarget?.target_sense_id;
+  // 追加候选不改变选中路径，保持数组引用以免级联自动滚回选中行。
+  const value = useMemo(
+    () =>
+      selectedEntryId && selectedFormKey && selectedSenseId
+        ? [selectedEntryId, selectedFormKey, selectedSenseId]
+        : undefined,
+    [selectedEntryId, selectedFormKey, selectedSenseId]
+  );
 
   // 单选没有「反选」：已有关联的解除全靠这个入口，把该单词的关联整组清空。
   // 无候选/查询失败时也要出现——否则指向已下架目标的孤儿关联再也删不掉。

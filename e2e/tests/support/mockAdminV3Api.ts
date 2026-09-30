@@ -499,7 +499,7 @@ function inboundReferencesFixture(
   };
 }
 
-function sharedSentenceFixture(word: AdminWordV3): SharedSentence {
+export function sharedSentenceFixture(word: AdminWordV3): SharedSentence {
   return {
     id: ADMIN_V3_REFERENCED_SENTENCE_ID,
     revision: 1,
