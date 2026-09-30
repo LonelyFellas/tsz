@@ -75,6 +75,7 @@ describe("LifecycleSurfaceConfirmation", () => {
           entry_id: "v3-entry-12345678",
           annotation: null,
           annotation_revision: 1,
+          created_by_name: "词库管理员",
           presentation: {
             label: "colour · color",
             matched_surfaces: ["colour", "color"],

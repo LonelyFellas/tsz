@@ -545,6 +545,122 @@
   padding-bottom: 10px;
 }
 
+/* 创建入口与草稿第一步共用间距，卡片根节点不叠加内边距。 */
+.word-basics-workflow {
+  --word-card-padding: 20px;
+}
+
+.word-basics-workflow .word-step-heading {
+  margin-bottom: 24px;
+}
+
+.word-basics-workflow
+  :is(
+    .word-basics-input-card,
+    .word-detection-result-card,
+    .word-headword-confirmation-card
+  ) {
+  padding: 0;
+}
+
+.word-basics-workflow
+  :is(
+    .word-basics-input-card,
+    .word-detection-result-card,
+    .word-headword-confirmation-card
+  )
+  > .ant-card-head {
+  min-height: 48px;
+  padding: 0 var(--word-card-padding);
+}
+
+.word-basics-workflow
+  :is(
+    .word-basics-input-card,
+    .word-detection-result-card,
+    .word-headword-confirmation-card
+  )
+  > .ant-card-body {
+  padding: var(--word-card-padding);
+}
+
+.word-basics-workflow .word-basics-input-card .ant-form-item {
+  margin-bottom: 20px;
+}
+
+.word-basics-workflow .word-basics-input-card .ant-form-item:last-of-type {
+  margin-bottom: 8px;
+}
+
+.word-basics-workflow .word-basics-result-grid {
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.word-basics-workflow .word-entry-actions {
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.word-basics-workflow
+  .word-headword-confirmation-card
+  .word-dialect-detection-row {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+}
+
+.word-basics-workflow .word-dialect-detection-row > div {
+  gap: 4px;
+}
+
+.word-basics-workflow .word-headword-confirmation-card .dialect-panel {
+  padding: 16px;
+}
+
+.word-basics-workflow .word-headword-confirmation-card .ant-form-item {
+  margin-bottom: 0;
+}
+
+.word-basics-workflow
+  .word-headword-confirmation-card
+  .word-headword-lock-note {
+  margin: 0 0 12px;
+}
+
+.word-basics-workflow
+  .word-detection-result-card
+  .ant-descriptions-row:last-child
+  > :is(th, td) {
+  padding-bottom: 0;
+}
+
+.word-basics-workflow .word-smart-match-summary {
+  padding-top: 0;
+}
+
+.word-basics-workflow .word-smart-match-summary-entry {
+  padding: 12px 0;
+}
+
+.word-basics-workflow .word-smart-match-summary-entry:last-child {
+  padding-bottom: 0;
+}
+
+@container word-creation-content (max-width: 640px) {
+  .word-basics-workflow {
+    --word-card-padding: 16px;
+  }
+}
+
+.v3-basics-step .word-basics-input-card .word-field-help {
+  margin-top: 8px;
+}
+
+.v3-basics-step .word-detection-empty-state {
+  margin-top: 16px;
+  padding: 12px 16px;
+}
+
 .word-forms-tabs > .ant-tabs-nav {
   padding: 0 2px;
 }

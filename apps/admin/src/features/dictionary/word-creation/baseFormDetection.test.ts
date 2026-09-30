@@ -95,6 +95,7 @@ function entryContext(): SurfaceMatchPageV3["matched_entry_contexts"][number] {
     entry_id: "entry-v3",
     annotation: null,
     annotation_revision: 1,
+    created_by_name: "词库管理员",
     presentation: {
       label: "centre / center",
       matched_surfaces: ["centre", "center"],
