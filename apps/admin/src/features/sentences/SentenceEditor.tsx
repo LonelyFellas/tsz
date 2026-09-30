@@ -37,6 +37,8 @@ import { SharedSentenceAssociationPicker } from "./SharedSentenceAssociationPick
 import { newSentence } from "./model";
 import "./SentenceEditor.css";
 import { VoiceEditorModal } from "../dictionary/word-creation-v3/components/VoiceEditorModal";
+import { V3EditorTitle } from "../dictionary/word-creation-v3/components/V3EditorTitle";
+import { dialectLabel } from "../dictionary/word-creation-v3/presentation";
 const LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"].map((value) => ({
   value,
   label: value
@@ -46,6 +48,7 @@ export function SentenceEditor({
   sentence,
   sourceWord,
   sourceSenseId,
+  rowIndex,
   initialLevel,
   registerLeaveGuard,
   onClose,
@@ -54,6 +57,7 @@ export function SentenceEditor({
   sentence?: SharedSentence;
   sourceWord?: AdminWordV3;
   sourceSenseId?: string;
+  rowIndex?: number;
   initialLevel?: SharedSentence["content"]["sentence"]["level"];
   registerLeaveGuard?: (guard?: () => Promise<boolean>) => void;
   onClose: () => void;
@@ -362,7 +366,13 @@ export function SentenceEditor({
     <PronunciationPreviewProvider>
       <VoiceEditorModal
         open
-        title="编辑例句"
+        title={
+          <V3EditorTitle
+            index={rowIndex}
+            title="多维例句"
+            details={`${sentence ? "" : "新建 · "}${content.sentence.level} · ${dialectLabel(row.dialect)}`}
+          />
+        }
         footer={null}
         onCancel={close}
         closable={!saving}

@@ -1196,7 +1196,7 @@
   width: 32px;
 }
 
-.word-sort-actions .word-sort-drag-handle.ant-btn {
+:is(.word-sort-actions, .word-sort-leading) .word-sort-drag-handle.ant-btn {
   color: #7f8998;
   cursor: grab;
   user-select: none;
@@ -1206,18 +1206,22 @@
     transform 140ms ease;
 }
 
-.word-sort-actions .word-sort-drag-handle.ant-btn:hover:not(:disabled),
-.word-sort-actions .word-sort-drag-handle.ant-btn:focus-visible {
+:is(.word-sort-actions, .word-sort-leading)
+  .word-sort-drag-handle.ant-btn:hover:not(:disabled),
+:is(.word-sort-actions, .word-sort-leading)
+  .word-sort-drag-handle.ant-btn:focus-visible {
   color: #1677ff;
   background: rgba(22, 119, 255, 0.1);
 }
 
-.word-sort-actions .word-sort-drag-handle.ant-btn:active:not(:disabled) {
+:is(.word-sort-actions, .word-sort-leading)
+  .word-sort-drag-handle.ant-btn:active:not(:disabled) {
   cursor: grabbing;
   transform: scale(1.06);
 }
 
-.word-sort-actions .word-sort-drag-handle.ant-btn:disabled {
+:is(.word-sort-actions, .word-sort-leading)
+  .word-sort-drag-handle.ant-btn:disabled {
   color: #c4cad4;
   cursor: default;
 }
@@ -1371,7 +1375,21 @@
 }
 
 .word-sense-editor-v3 > .ant-collapse-item > .ant-collapse-header {
+  padding: 8px 12px !important;
   background: color-mix(in srgb, var(--sense-accent) 24%, white);
+}
+
+.word-sense-editor-v3 > .ant-collapse-item > .ant-collapse-panel {
+  border-top: 0;
+}
+
+.word-sense-editor-v3 .word-sense-header-label,
+.word-sense-editor-v3 .word-sense-header-content {
+  gap: 8px;
+}
+
+.word-sense-editor-v3 .word-sense-header-actions {
+  margin-inline-start: 8px;
 }
 
 .word-sense-header-content {
@@ -1734,19 +1752,19 @@
   pointer-events: auto;
 }
 
-.word-relations-grid-stacked .word-relation-row > .word-relation-more {
+.word-relations-grid-stacked .word-relation-row > .word-relation-delete {
   grid-column: 5;
   grid-row: 1;
   align-self: start;
 }
 
-.word-relation-gloss-row > .word-relation-more {
+.word-relation-gloss-row > .word-relation-delete {
   opacity: 0;
   transition: opacity 120ms ease;
 }
 
-.word-relation-gloss-row:hover > .word-relation-more,
-.word-relation-gloss-row:focus-within > .word-relation-more {
+.word-relation-gloss-row:hover > .word-relation-delete,
+.word-relation-gloss-row:focus-within > .word-relation-delete {
   opacity: 1;
 }
 

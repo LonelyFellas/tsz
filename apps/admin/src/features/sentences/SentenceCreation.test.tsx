@@ -157,8 +157,24 @@ describe("按词条关联反查共享多维例句", () => {
         onClose={vi.fn()}
       />
     );
-    expect(screen.getByText("先保存词义，再添加例句。")).toBeVisible();
-    expect(screen.getByRole("button", { name: "添加例句" })).toBeDisabled();
+    expect(screen.queryByText("先保存词义，再添加例句。")).toBeNull();
+    const add = screen.getByRole("button", { name: "添加例句" });
+    expect(add).toBeDisabled();
+    fireEvent.click(add);
+    expect(open).not.toHaveBeenCalled();
+    const hintTarget = add.parentElement!;
+    expect(hintTarget).toHaveAttribute("tabindex", "0");
+    expect(hintTarget).toHaveStyle({ cursor: "not-allowed" });
+    fireEvent.mouseEnter(hintTarget);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(
+      "先保存词义，再添加例句。"
+    );
+    fireEvent.mouseLeave(hintTarget);
+    await waitFor(() => expect(screen.queryByRole("tooltip")).toBeNull());
+    fireEvent.focus(hintTarget);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(
+      "先保存词义，再添加例句。"
+    );
     expect(api.sentences.list).not.toHaveBeenCalled();
     view.unmount();
     word.meanings.pos[0]!.senses = [original];
@@ -180,7 +196,13 @@ describe("按词条关联反查共享多维例句", () => {
         page_size: 5
       })
     );
-    expect(screen.getByRole("button", { name: "添加例句" })).toBeEnabled();
+    const enabledAdd = screen.getByRole("button", { name: "添加例句" });
+    expect(enabledAdd).toBeEnabled();
+    expect(enabledAdd.parentElement).not.toHaveAttribute("tabindex");
+    fireEvent.mouseEnter(enabledAdd.parentElement!);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+    fireEvent.click(enabledAdd);
+    expect(open).toHaveBeenCalledWith("new");
   });
   it("待关联词面锁定选中的 make，提交不接受自由输入的其他词面", async () => {
     const select = vi.fn();

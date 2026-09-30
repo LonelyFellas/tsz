@@ -69,7 +69,27 @@
 }
 
 .v3-meanings-v2 {
+  --word-leading-width: 50px;
+  --word-leading-gap: 2px;
+  --word-row-gap: 8px;
+  --word-row-padding: 8px;
   min-width: 0;
+}
+
+/* 字段标签和表头统一轻微内缩，落在输入框圆角起点略偏左的位置。 */
+.v3-meanings-v2 .word-sense-field > .ant-typography:first-child,
+.v3-meanings-v2 .word-sense-context-toggle > .ant-typography:first-child,
+.v3-meanings-v2 .word-sense-group-heads > span:not(:empty),
+.v3-meanings-v2 .word-list-header > span:not(:empty),
+.v3-meanings-v2 .word-relation-column-heads > span:not(:empty) {
+  display: block;
+  box-sizing: border-box;
+  padding-inline-start: 6px;
+  color: var(--ant-color-text-secondary, #6f7785);
+  font-family: var(--ant-font-family, inherit);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 20px;
 }
 
 .v3-meanings-v2 .word-sense-meta-grid > .word-sense-field:first-child {
@@ -113,14 +133,61 @@
   display: block;
 }
 
-.v3-meanings-v2 .word-table-row.word-grammar-row {
-  --word-ops-col: 56px;
-  grid-template-columns: 28px minmax(0, 1fr) var(--word-ops-col);
+/* 与拓展词一致：拖动和序号在前，行尾只留删除。 */
+.v3-meanings-v2 .word-sort-leading {
+  display: flex;
+  align-items: center;
+  align-self: center;
+  gap: var(--word-leading-gap);
+  min-height: 32px;
 }
 
-.v3-meanings-v2 .word-grammar-row > .word-grammar-index {
-  align-self: start;
-  margin-top: 4px;
+.v3-meanings-v2 .word-sort-leading > * {
+  flex-shrink: 0;
+}
+
+.v3-meanings-v2 .word-sort-leading .word-sort-drag-handle {
+  width: 24px;
+  min-width: 24px;
+}
+
+.v3-meanings-v2
+  :is(
+    .word-sense-group-item,
+    .word-definition-row,
+    .word-definition-list-header
+  ) {
+  --word-ops-col: 24px;
+}
+
+.v3-meanings-v2
+  :is(.word-sense-group-item, .word-definition-row)
+  > .word-sort-actions {
+  justify-self: end;
+}
+
+.v3-meanings-v2 .word-sense-group-item {
+  padding-block: var(--word-row-padding);
+}
+
+@media (min-width: 901px) {
+  .v3-meanings-v2 .word-sense-group-heads,
+  .v3-meanings-v2 .word-sense-group-item {
+    grid-template-columns:
+      var(--word-leading-width) minmax(0, 1fr) minmax(0, 1fr)
+      24px;
+    column-gap: var(--word-row-gap);
+  }
+}
+
+.v3-meanings-v2 .word-table-row.word-grammar-row {
+  --word-ops-col: 24px;
+  grid-template-columns: var(--word-leading-width) minmax(0, 1fr) var(
+      --word-ops-col
+    );
+  column-gap: var(--word-row-gap);
+  padding-block: var(--word-row-padding);
+  align-items: center;
 }
 
 .v3-meanings-v2 .word-grammar-row > .word-sort-actions {
@@ -130,7 +197,7 @@
 /* 区分英美式词条下，一条语法结构承载英式/美式两个文本面板，左右两栏平分中间列。 */
 .v3-meanings-v2 .word-grammar-variants {
   display: flex;
-  gap: 8px;
+  gap: var(--word-row-gap);
   min-width: 0;
 }
 
@@ -239,9 +306,7 @@
   width: 100%;
 }
 
-/* 释义行与例句行的控件都是 32px 单行，操作列竖排（24+2+24=50px）反而成了行高瓶颈：
-   改横排并把列放宽到两颗小按钮加默认间距（24+8+24=56px）。变量挂在两张表共同的 section 上，
-   表头、行、操作列一起继承；语法结构行在 section 之外单独配置相同列宽，语义区间沿用自身布局。 */
+/* 词义区块默认保留双按钮操作列；释义行的拖动已前移，行级覆盖为单个删除按钮的宽度。 */
 .v3-meanings-v2 .word-sense-section {
   --word-ops-col: 56px;
 }
@@ -258,14 +323,82 @@
   min-height: 32px;
 }
 
-/* 行号盒与 32px 控件同高、数字随之居中（共享规则的 6px 上边距是按 22px 行盒凑的近似）。
-   窄容器（共享规则 max-width: 640px）下行已退化为单列堆叠，沿用紧凑行号；用区间语法与之严格互补。 */
+/* 前缀作为整体：分隔线两侧留 8px，序号与属性组沿用各行统一的主列间距。 */
+.v3-meanings-v2 .word-definition-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--word-row-padding) var(--word-row-gap);
+}
+
+.v3-meanings-v2 .word-definition-options {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 每个选择器两侧统一 2px padding；宽度包含文字、padding 和透明边框，不再额外补空白。 */
+.v3-meanings-v2 .word-definition-options > .word-definition-text-select {
+  flex: none;
+  padding-inline: 2px;
+}
+
+.v3-meanings-v2
+  .word-definition-options
+  > .word-definition-text-select:nth-child(1) {
+  width: 24px;
+}
+
+.v3-meanings-v2
+  .word-definition-options
+  > .word-definition-text-select:nth-child(3) {
+  width: 34px;
+}
+
+.v3-meanings-v2
+  .word-definition-options
+  > .word-definition-text-select:nth-child(5) {
+  width: 62px;
+}
+
+.v3-meanings-v2 .word-definition-meta-divider {
+  flex: none;
+  width: 1px;
+  height: 12px;
+  background: var(--ant-color-border, #d9d9d9);
+  pointer-events: none;
+}
+
 @container (width > 640px) {
+  .v3-meanings-v2 .word-definition-list-header,
+  .v3-meanings-v2 .word-table-row.word-definition-row {
+    /* 拖动/序号 + 主列间距 + 154px 属性组。表头与行共用同一套尺寸。 */
+    grid-template-columns:
+      calc(var(--word-leading-width) + var(--word-row-gap) + 154px)
+      minmax(0, 1fr) minmax(180px, 260px) 24px;
+    column-gap: var(--word-row-gap);
+  }
+
+  .v3-meanings-v2 .word-table-row.word-definition-row {
+    align-items: center;
+    padding-block: var(--word-row-padding);
+  }
+
   .v3-meanings-v2 .word-definition-row .word-number-cell,
   .v3-meanings-v2 .word-sentence-row .word-number-cell {
     line-height: 32px;
     padding-top: 0;
   }
+}
+
+/* 关联词输入错误归到目标词列，不能从序号/关联度列下面开始。 */
+.v3-meanings-v2 .word-relation-row:has(> .word-relation-input-error) {
+  row-gap: 4px;
+}
+
+.v3-meanings-v2 .word-relation-input-error {
+  grid-column: 3;
+  align-self: start;
 }
 
 .v3-meanings-v2 .word-relation-sound-disabled {
@@ -315,13 +448,17 @@
   flex: none;
 }
 
-/* 无论有无连读均预留 1em 弧线空间，窄屏仍在正文边界内省略。 */
+/* 普通语法与同行输入框等高；只在实际有连读时留弧线空间，长文本仍在正文边界内省略。 */
 .word-grammar-reference-text {
   min-width: 0;
-  padding-top: 1em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.word-grammar-reference-text:has(.has-liaison) {
+  /* 额外覆盖弧线描边，避免长连读的顶端被省略容器裁掉。 */
+  padding-top: calc(0.5em + 2px);
 }
 
 .tsz-ve-readonly.word-grammar-reference {
@@ -335,7 +472,7 @@
 
 .word-grammar-select.ant-select {
   height: auto;
-  min-height: 42px;
+  min-height: var(--ant-control-height, 32px);
 }
 
 /* 弧线按 DOM 坐标测量，此浮层禁用缩放，避免首次测量落在动画中间帧。 */

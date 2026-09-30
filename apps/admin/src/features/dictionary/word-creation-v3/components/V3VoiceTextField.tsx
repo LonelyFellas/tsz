@@ -83,6 +83,7 @@ export interface V3VoiceTextFieldProps<
   previewAdapter?: VoiceEditorProps<TLink>["previewAdapter"];
   value: RichTextV3;
   ariaLabel: string;
+  editorTitle?: ReactNode;
   nodeId: string;
   nodeAliases?: string;
   field: string;
@@ -119,6 +120,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   previewAdapter,
   value,
   ariaLabel,
+  editorTitle,
   nodeId,
   nodeAliases,
   field,
@@ -261,8 +263,12 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       aria-label={expanded ? `${ariaLabel}预览` : ariaLabel}
       aria-invalid={invalid}
       status={invalid ? "error" : undefined}
-      // 有连读时为弧线留出高度；增删标注也会触发自动重新测量。
-      autoSize={{ minRows: liaisons && !largePreview ? 2 : 1, maxRows: 6 }}
+      // 无连读时用自然高度；有连读时显式设置最小行数。
+      // 单改 padding 不会触发 antd autoSize，须切换 minRows，确保只增删标记也重测且不重挂输入框。
+      autoSize={{
+        minRows: liaisons ? (largePreview ? 1 : 2) : undefined,
+        maxRows: 6
+      }}
       style={
         liaisons
           ? { paddingTop: mode === "grammar" ? "calc(4px + 0.5em)" : "1em" }
@@ -453,7 +459,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       {fieldView}
       {editing && (
         <VoiceEditorModal
-          title={`编辑${ariaLabel}`}
+          title={editorTitle ?? `编辑${ariaLabel}`}
           open={editing}
           footer={null}
           onCancel={cancelEditing}

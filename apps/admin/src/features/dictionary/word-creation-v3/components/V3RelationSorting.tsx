@@ -1,5 +1,5 @@
-import { DeleteOutlined, EllipsisOutlined } from "@ant-design/icons";
-import { Button, Dropdown } from "antd";
+import { DeleteOutlined } from "@ant-design/icons";
+import { Button } from "antd";
 import type { ReactNode } from "react";
 import { useSortableRows, type SortableRowsController } from "../sortableRows";
 
@@ -23,7 +23,7 @@ export function RelationSortScope<T>({
   return children(sorting);
 }
 
-export function RelationDeleteMenu({
+export function RelationDeleteButton({
   label,
   onDelete
 }: {
@@ -31,27 +31,14 @@ export function RelationDeleteMenu({
   onDelete: () => void;
 }) {
   return (
-    <Dropdown
-      trigger={["click"]}
-      menu={{
-        items: [
-          {
-            key: "delete",
-            label: <span aria-label={`删除${label}`}>删除</span>,
-            icon: <DeleteOutlined />,
-            danger: true
-          }
-        ],
-        onClick: onDelete
-      }}
-    >
-      <Button
-        aria-label={`管理${label}`}
-        icon={<EllipsisOutlined />}
-        size="small"
-        type="text"
-        className="word-relation-more"
-      />
-    </Dropdown>
+    <Button
+      aria-label={`删除${label}`}
+      icon={<DeleteOutlined />}
+      danger
+      size="small"
+      type="text"
+      className="word-relation-delete"
+      onClick={onDelete}
+    />
   );
 }

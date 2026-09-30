@@ -253,6 +253,8 @@ describe("V3MeaningsPreview", () => {
     expect(screen.getByText("依赖上下文")).toBeVisible();
     expect(screen.getByRole("heading", { name: "中心位置" })).toBeVisible();
     expect(screen.getByText("the middle point")).toBeVisible();
+    expect(screen.getByText("英文", { exact: true })).toBeVisible();
+    expect(screen.queryByText("EN", { exact: true })).toBeNull();
     expect(screen.getByText("Stand in the center.")).toBeVisible();
     expect(screen.getByText("站在中心。")).toBeVisible();
     expect(screen.getByText("中")).toBeVisible();

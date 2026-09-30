@@ -11,6 +11,7 @@ import {
   Popover,
   Space,
   Tag,
+  Tooltip,
   Typography
 } from "antd";
 import type { AdminWordV3, SharedSentence } from "@tsz/types";
@@ -21,8 +22,10 @@ import {
 } from "../dictionary/word-creation-v3/V3MeaningsAndExamplesStep";
 import { V3EnglishTextPreview } from "../dictionary/word-creation-v3/components/V3EnglishTextPreview";
 import { SentenceEditor } from "./SentenceEditor";
+import { V3RowIndex } from "../dictionary/word-creation-v3/components/V3RowIndex";
 import "./WordSentences.css";
 
+const PAGE_SIZE = 5;
 const TRANSLATION_BANDS = [
   { band: "word_for_word", label: "初" },
   { band: "balanced_fluency", label: "中" },
@@ -74,11 +77,17 @@ export function WordSentences({
         entry_id: entryId,
         sense_id: senseId,
         page,
-        page_size: 5
+        page_size: PAGE_SIZE
       }),
     enabled: !!savedSense
   });
   const rows = query.data?.items ?? [];
+  const selectedIndex =
+    typeof editor === "object"
+      ? rows.findIndex((item) => item.id === editor.id)
+      : -1;
+  const editorIndex =
+    selectedIndex < 0 ? undefined : (page - 1) * PAGE_SIZE + selectedIndex;
   const refresh = () => {
     void client.invalidateQueries({ queryKey: ["shared-sentences"] });
     // 例句关联改了，本词条被引用的节点也跟着变：让向导的引用索引重取，禁用态即时更新。
@@ -170,6 +179,7 @@ export function WordSentences({
             key={editor === "new" ? "new" : `${editor.id}:${editor.revision}`}
             sourceWord={sourceWord}
             sourceSenseId={senseId}
+            rowIndex={editorIndex}
             initialLevel={savedSense?.level}
             registerLeaveGuard={registerLeaveGuard}
             sentence={editor === "new" ? undefined : editor}
@@ -182,11 +192,11 @@ export function WordSentences({
           />
         )}
         <Flex vertical gap="small">
-          <Typography.Text type="secondary">
-            {savedSense
-              ? "保存只更新例句草稿；例句发布后才更新展示。局部移除随词条发布生效。"
-              : "先保存词义，再添加例句。"}
-          </Typography.Text>
+          {savedSense && (
+            <Typography.Text type="secondary">
+              保存只更新例句草稿；例句发布后才更新展示。局部移除随词条发布生效。
+            </Typography.Text>
+          )}
           {query.isError && (
             <Alert
               type="error"
@@ -202,7 +212,7 @@ export function WordSentences({
               description="暂无关联例句"
             />
           )}
-          {rows.map((item) => (
+          {rows.map((item, index) => (
             <Flex
               key={item.id}
               vertical
@@ -215,7 +225,10 @@ export function WordSentences({
                 gap="small"
                 className="shared-sentence-header"
               >
-                <Tag>{item.content.sentence.level}</Tag>
+                <Space size={8}>
+                  <V3RowIndex index={(page - 1) * PAGE_SIZE + index} />
+                  <Tag>{item.content.sentence.level}</Tag>
+                </Space>
                 {!readOnly && (
                   <Space>
                     <Button size="small" onClick={() => void edit(item)}>
@@ -276,27 +289,41 @@ export function WordSentences({
               </Flex>
             </Flex>
           ))}
-          {(query.data?.total ?? 0) > 5 && (
+          {(query.data?.total ?? 0) > PAGE_SIZE && (
             <Pagination
               size="small"
               current={page}
-              pageSize={5}
+              pageSize={PAGE_SIZE}
               total={query.data?.total}
               onChange={setPage}
               showSizeChanger={false}
             />
           )}
           {!readOnly && (
-            <Button
-              block
-              type="dashed"
-              className="word-section-add-button"
-              icon={<PlusOutlined aria-hidden />}
-              disabled={!savedSense}
-              onClick={() => onOpen("new")}
+            <Tooltip
+              title={!savedSense ? "先保存词义，再添加例句。" : undefined}
+              trigger={["hover", "focus"]}
             >
-              添加例句
-            </Button>
+              <span
+                style={{
+                  display: "block",
+                  cursor: !savedSense ? "not-allowed" : undefined
+                }}
+                tabIndex={!savedSense ? 0 : undefined}
+              >
+                <Button
+                  block
+                  type="dashed"
+                  className="word-section-add-button"
+                  icon={<PlusOutlined aria-hidden />}
+                  disabled={!savedSense}
+                  style={!savedSense ? { pointerEvents: "none" } : undefined}
+                  onClick={() => onOpen("new")}
+                >
+                  添加例句
+                </Button>
+              </span>
+            </Tooltip>
           )}
         </Flex>
       </SenseSectionBody>

@@ -216,8 +216,7 @@ const meaningsFixture: DraftMeaningsStepContentWritableV3 = {
 };
 
 function deleteRelationItem(label: string, index = 0) {
-  fireEvent.click(screen.getAllByLabelText(`管理${label}`)[index]!);
-  fireEvent.click(screen.getByLabelText(`删除${label}`));
+  fireEvent.click(screen.getAllByLabelText(`删除${label}`)[index]!);
 }
 
 function Harness({
@@ -308,6 +307,7 @@ function formsValue(): DraftFormsStepContentV3 {
 describe("V3MeaningsAndExamplesStep", () => {
   it("有内容的词义在页面顶部弹窗确认，取消保留内容和展开状态，确认后才删除", () => {
     const { container } = render(<Harness />);
+    fireEvent.click(screen.getByText("添加词义"));
     const before = value();
     const expanded = document.querySelector(
       ".word-sense-editor .ant-collapse-item"
@@ -332,15 +332,23 @@ describe("V3MeaningsAndExamplesStep", () => {
     fireEvent.click(
       screen.getByText("确认删除", { selector: ".ant-modal button span" })
     );
-    expect(value().pos[0]!.senses).toHaveLength(0);
+    expect(value().pos[0]!.senses).toHaveLength(1);
+    expect(value().pos[0]!.senses[0]!.id).toBe(before.pos[0]!.senses[1]!.id);
+    expect(screen.getByLabelText("删除词义 1")).toBeDisabled();
   });
 
-  it("新增空白词义直接删除，不弹确认", () => {
+  it("最后一条词义不可删除，新增空白词义可直接删除", () => {
     render(<Harness />);
+    const before = value();
+    expect(screen.getByLabelText("删除词义 1")).toBeDisabled();
+    fireEvent.click(screen.getByLabelText("删除词义 1"));
+    expect(value()).toEqual(before);
+    expect(screen.queryByText("确定删除该词义吗？")).not.toBeInTheDocument();
     fireEvent.click(screen.getByText("添加词义"));
     expect(value().pos[0]!.senses).toHaveLength(2);
     fireEvent.click(screen.getByLabelText("删除词义 2"));
     expect(value().pos[0]!.senses).toHaveLength(1);
+    expect(screen.getByLabelText("删除词义 1")).toBeDisabled();
     expect(screen.queryByText("确定删除该词义吗？")).not.toBeInTheDocument();
   });
 
@@ -392,12 +400,14 @@ describe("V3MeaningsAndExamplesStep", () => {
     };
     expect(senseNeedsDeleteConfirmation(sense)).toBe(true);
     render(<Harness initial={initial} />);
+    fireEvent.click(screen.getByText("添加词义"));
+    const before = value();
     fireEvent.click(screen.getByLabelText("删除词义 1"));
     expect(screen.getByText("确定删除该词义吗？")).toBeInTheDocument();
     fireEvent.click(
       screen.getByText(/取\s*消/u, { selector: ".ant-modal button span" })
     );
-    expect(value()).toEqual(initial);
+    expect(value()).toEqual(before);
   });
 
   it("仅编辑配置或添加关联内容也需要删除确认", () => {
@@ -1344,8 +1354,15 @@ describe("V3MeaningsAndExamplesStep", () => {
     const addGrammar = within(
       container.querySelector(".word-grammar-card") as HTMLElement
     ).getByRole("button", { name: "添加语法结构" });
-    expect(addGrammar.closest(".ant-card-extra")).not.toBeNull();
-    expect(addGrammar).toHaveClass("ant-btn-text");
+    expect(addGrammar.closest(".ant-card-extra")).toBeNull();
+    expect(addGrammar).toHaveClass(
+      "word-section-add-button",
+      "ant-btn-dashed",
+      "ant-btn-block"
+    );
+    expect(addGrammar.closest(".ant-card-body")?.lastElementChild).toBe(
+      addGrammar
+    );
     expect(container.querySelector(".word-grammar-add")).toBeNull();
   });
 
@@ -1433,7 +1450,9 @@ describe("V3MeaningsAndExamplesStep", () => {
     ];
     render(<Harness initial={initial} />);
     const select = screen.getByLabelText("释义 1 所属语义区间");
-    expect(select.closest(".ant-select")).toHaveTextContent("未命名语义区间");
+    expect(select.closest(".ant-select")?.textContent?.trim()).toBe(
+      "请选择语义区间"
+    );
     expect(select.closest(".ant-select")).not.toHaveTextContent(
       "sense-group-1"
     );
@@ -1456,7 +1475,9 @@ describe("V3MeaningsAndExamplesStep", () => {
     fireEvent.change(screen.getByLabelText("语义区间 4 英文"), {
       target: { value: "  " }
     });
-    expect(select.closest(".ant-select")).toHaveTextContent("未命名语义区间");
+    expect(select.closest(".ant-select")?.textContent?.trim()).toBe(
+      "请选择语义区间"
+    );
     expect(value().pos[0]!.senses[0]!.sense_group_id).toBe("en");
     fireEvent.mouseDown(select);
     fireEvent.click(
@@ -1546,7 +1567,10 @@ describe("V3MeaningsAndExamplesStep", () => {
       /\.word-grammar-reference-label\s*\{[^}]*align-items:\s*baseline;/su
     );
     expect(v3LayoutCss).toMatch(
-      /\.word-grammar-reference-text\s*\{[^}]*padding-top:\s*1em;[^}]*overflow:\s*hidden;/su
+      /\.word-grammar-reference-text\s*\{[^}]*overflow:\s*hidden;/su
+    );
+    expect(v3LayoutCss).toMatch(
+      /\.word-grammar-reference-text:has\(\.has-liaison\)\s*\{[^}]*padding-top:\s*calc\(0\.5em \+ 2px\);/su
     );
     expect(value()).toEqual(initial);
   });
@@ -1630,9 +1654,6 @@ describe("V3MeaningsAndExamplesStep", () => {
     ) as HTMLElement;
     expect([...header.children].map((item) => item.textContent)).toEqual([
       "",
-      "",
-      "",
-      "",
       "释义语句",
       "语法结构",
       ""
@@ -1640,18 +1661,20 @@ describe("V3MeaningsAndExamplesStep", () => {
     const row = container.querySelector(".word-definition-row") as HTMLElement;
     expect(row).not.toBeNull();
     const columns = [...row.children] as HTMLElement[];
-    expect(columns).toHaveLength(7);
-    const level = columns[1]!;
-    const language = columns[2]!;
-    const style = columns[3]!;
-    const body = columns[4]!;
-    const grammarCell = columns[5]!;
-    const actions = columns[6]!;
-    expect(columns[0]).toHaveClass("word-number-cell");
-    expect(columns[0]).not.toHaveClass("word-definition-index");
-    expect(within(level).getByLabelText("定义 1 等级")).toBeVisible();
-    expect(within(language).getByLabelText("定义 1 语言")).toBeVisible();
-    expect(within(style).getByLabelText("定义 1 释义方式")).toBeVisible();
+    expect(columns).toHaveLength(4);
+    const meta = columns[0]!;
+    expect(meta).toHaveClass("word-definition-meta");
+    const [level, language, style] = [
+      ...meta.querySelectorAll<HTMLElement>(".word-definition-text-select")
+    ];
+    const body = columns[1]!;
+    const grammarCell = columns[2]!;
+    const actions = columns[3]!;
+    expect(meta.querySelector(".word-number-cell")).not.toBeNull();
+    expect(meta.querySelector(".word-definition-index")).toBeNull();
+    expect(within(level!).getByLabelText("定义 1 等级")).toBeVisible();
+    expect(within(language!).getByLabelText("定义 1 语言")).toBeVisible();
+    expect(within(style!).getByLabelText("定义 1 释义方式")).toBeVisible();
     const content = within(body).getByLabelText("定义 1 内容");
     const grammar = within(grammarCell).getByLabelText("定义 1 语法结构");
     expect(content.tagName).toBe("TEXTAREA");
@@ -2455,7 +2478,7 @@ describe("V3MeaningsAndExamplesStep", () => {
         document.querySelectorAll(
           ".word-relation-row > .ant-btn-dangerous, .word-relation-gloss-row > .ant-btn-dangerous"
         )
-      ).toHaveLength(0);
+      ).toHaveLength(5);
       fireEvent.keyDown(screen.getByLabelText(`拖动${label}词义 2`), {
         key: "ArrowUp"
       });
@@ -3562,15 +3585,18 @@ describe("V3MeaningsAndExamplesStep", () => {
     });
   });
 
-  it("拖拽手柄与删除按钮共用同一条 32px 中心线", () => {
+  it("拖拽手柄前置，删除按钮独立保留在行尾", () => {
     render(<Harness wordId="entry-align" />);
 
-    for (const label of ["语义区间", "语法结构"]) {
+    for (const label of ["语义区间", "语法结构", "定义", "词义"]) {
       const drag = screen.getByLabelText(`拖动${label} 1`);
       const remove = screen.getByLabelText(`删除${label} 1`);
-      const actions = drag.closest(".word-sort-actions");
-      expect(actions).not.toBeNull();
-      expect(remove.closest(".word-sort-actions")).toBe(actions);
+      expect(drag.closest(".word-sort-leading")).not.toBeNull();
+      expect(drag.closest(".word-sort-actions")).toBeNull();
+      expect(remove.closest(".word-sort-leading")).toBeNull();
+      expect(
+        drag.compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
     }
     expect(meaningsCss).toMatch(
       /\.word-sort-actions\s*\{[^}]*align-items:\s*center;[^}]*width:\s*var\(--word-ops-col,\s*32px\);/su
@@ -3632,9 +3658,16 @@ describe("V3MeaningsAndExamplesStep", () => {
 
   it("新增语义区间只追加词条级区间，不改动任何词义归属", () => {
     const ids = ["sense-group-new"];
-    render(<Harness idFactory={() => ids.shift()!} wordId="entry-add-group" />);
-
-    fireEvent.click(screen.getByRole("button", { name: "添加语义区间" }));
+    const { container } = render(
+      <Harness idFactory={() => ids.shift()!} wordId="entry-add-group" />
+    );
+    // 覆盖率环境里全页角色查询会遍历大量编辑器按钮；只在所属卡片内查找添加入口。
+    const groupCard = container.querySelector<HTMLElement>(
+      ".word-sense-groups-card"
+    )!;
+    fireEvent.click(
+      within(groupCard).getByRole("button", { name: "添加语义区间" })
+    );
     expect(value().sense_groups.map((group) => group.id)).toEqual([
       "sense-group-1",
       "sense-group-new"
@@ -3928,11 +3961,11 @@ describe("V3MeaningsAndExamplesStep", () => {
 
     // 语言与释义方式各自独立选，四个组合都要能走到。
     fireEvent.mouseDown(screen.getByLabelText("定义 1 语言"));
-    expect(optionsIn("EN").map((option) => option.textContent)).toEqual([
+    expect(optionsIn("英文").map((option) => option.textContent)).toEqual([
       "中文",
-      "EN"
+      "英文"
     ]);
-    fireEvent.click(optionsIn("EN")[1]!);
+    fireEvent.click(optionsIn("英文")[1]!);
     expect(value().pos[0]!.senses[0]!.definitions[0]).toMatchObject({
       id: "en-definition",
       definition_mode: "en_definition",
@@ -3965,7 +3998,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     });
 
     fireEvent.mouseDown(screen.getByLabelText("定义 1 语言"));
-    fireEvent.click(optionsIn("EN")[0]!);
+    fireEvent.click(optionsIn("英文")[0]!);
     expect(value().pos[0]!.senses[0]!.definitions[0]).toMatchObject({
       id: "zh-sentence",
       definition_mode: "zh_sentence",
@@ -4388,7 +4421,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(screen.queryByLabelText("下移定义 1")).toBeNull();
     expect(screen.queryByLabelText("上移例句 1")).toBeNull();
     expect(screen.queryByLabelText("下移例句 1")).toBeNull();
-    expect(screen.getByLabelText("删除词义 1")).toBeEnabled();
+    expect(screen.getByLabelText("删除词义 1")).toBeDisabled();
     unmount();
     const { container: savingContainer, unmount: unmountSaving } = render(
       <AntApp>
@@ -4974,10 +5007,12 @@ describe("V3MeaningsAndExamplesStep 词形与发音绑定", () => {
     ]);
     expect(select.closest(".ant-select")).toHaveTextContent("第 1 组 · job");
     expect(select.closest(".ant-select")).toHaveTextContent("第 2 组 · Job");
+    fireEvent.click(screen.getByText("添加词义"));
     expect(screen.getByLabelText("删除词义 1")).toBeEnabled();
     fireEvent.click(screen.getByLabelText("删除词义 1"));
     fireEvent.click(await screen.findByText("确认删除"));
-    expect(value().pos[0]!.senses).toHaveLength(0);
+    expect(value().pos[0]!.senses).toHaveLength(1);
+    expect(screen.getByLabelText("删除词义 1")).toBeDisabled();
   });
 
   it("只列本词性专用组，最后一个绑定不能直接改回通用", async () => {
