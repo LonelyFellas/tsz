@@ -549,9 +549,6 @@ function V3MeaningsSlot({
         />
       ) : null}
       <V3MeaningsAndExamplesStep
-        multiGroupBindingsEnabled={
-          context.word.capabilities.multi_group_sense_bindings === true
-        }
         renderSentenceSection={(senseId) => (
           <WordSentences
             key={senseId}

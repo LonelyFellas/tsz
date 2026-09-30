@@ -1,4 +1,4 @@
-import { boundFormGroupIds, setFormGroupBindings } from "./meaningsModel";
+import { boundFormGroupIds } from "./meaningsModel";
 import {
   RelationSortScope,
   RelationDeleteButton
@@ -78,7 +78,6 @@ import {
   newDefinition,
   newGrammarStructure,
   replaceRichText,
-  formGroupLabel,
   spellingModeForPos,
   type RelationDisplaySnapshots
 } from "./meaningsModel";
@@ -140,7 +139,6 @@ export interface V3MeaningsAndExamplesStepProps {
   /** 后端释义级成分用词能力（capabilities.sense_component_usages）；关闭时成分区块只读、不发送。 */
   componentUsagesEnabled?: boolean;
   textLinksEnabled?: boolean;
-  multiGroupBindingsEnabled?: boolean;
 }
 
 function fieldIssue(
@@ -2483,8 +2481,7 @@ function V3MeaningsAndExamplesStepContent({
   idFactory = newWordNodeId,
   relationDisplaySnapshots,
   componentUsagesEnabled = false,
-  textLinksEnabled = false,
-  multiGroupBindingsEnabled = false
+  textLinksEnabled = false
 }: V3MeaningsAndExamplesStepProps) {
   const { modal } = App.useApp();
   // 仅本次新增词义的自动继承值可视为空白；已保存的归属保守地要求确认。
@@ -2796,57 +2793,6 @@ function V3MeaningsAndExamplesStepContent({
                               senseIssues,
                               sense.id,
                               "form_group_id"
-                            );
-                            const formsPos = forms?.pos.find(
-                              (item) => item.pos_id === pos.pos_id
-                            );
-                            const isLastDedicatedBinding = Boolean(
-                              sense.form_group_id &&
-                              pos.senses.filter(
-                                (item) =>
-                                  item.form_group_id === sense.form_group_id
-                              ).length === 1 &&
-                              formsPos?.form_groups.some(
-                                (group) =>
-                                  group.id === sense.form_group_id &&
-                                  group.scope === "dedicated"
-                              )
-                            );
-                            // 只列本词性的专用组。已绑定的组被删或改回通用时仍留一项，
-                            // 让校验问题有落点，也让人看见并改掉。
-                            const formGroupOptions = [
-                              { label: "通用（默认）", value: "" },
-                              ...(formsPos?.form_groups ?? [])
-                                .filter((group) => group.scope === "dedicated")
-                                .map((group) => ({
-                                  label: formGroupLabel(formsPos!, group.id)!,
-                                  value: group.id
-                                }))
-                            ];
-                            for (const groupId of boundFormGroupIds(sense)) {
-                              if (
-                                !formGroupOptions.some(
-                                  (option) => option.value === groupId
-                                )
-                              ) {
-                                formGroupOptions.push({
-                                  label: "已失效的变化组，请重新选择",
-                                  value: groupId
-                                });
-                              }
-                            }
-                            const lastBindingIds = boundFormGroupIds(
-                              sense
-                            ).filter(
-                              (id) =>
-                                formsPos?.form_groups.some(
-                                  (group) =>
-                                    group.id === id &&
-                                    group.scope === "dedicated"
-                                ) &&
-                                pos.senses.filter((item) =>
-                                  boundFormGroupIds(item).includes(id)
-                                ).length === 1
                             );
                             const catalogPos = catalogByCode.get(
                               formPosById.get(pos.pos_id) ?? ""
@@ -3167,106 +3113,21 @@ function V3MeaningsAndExamplesStepContent({
                                         />
                                       </div>
                                     </div>
-                                    {/* 没有专用组时通常不必选；但带着组相关问题时仍要渲染，问题定位才有落点。 */}
-                                    {formsPos &&
-                                    (formGroupOptions.length > 1 ||
-                                      formGroupIssue) ? (
-                                      <label
+                                    {formGroupIssue ? (
+                                      <div
                                         className="word-sense-field word-sense-field-form-group"
-                                        // antd Select 把 data-* 挂在不可聚焦的根节点上，问题定位 focus 不进去；
-                                        // 锚点放在可聚焦的外层，与英美规则行同一做法，且全局只留这一个。
                                         data-v3-field="form_group_id"
                                         data-v3-node-id={sense.id}
                                         tabIndex={-1}
                                       >
                                         <Typography.Text type="secondary">
-                                          词形与发音
+                                          请在第 2
+                                          步「词形与发音」调整专用词义设置。
                                         </Typography.Text>
-                                        {multiGroupBindingsEnabled ? (
-                                          <Select
-                                            mode="multiple"
-                                            aria-label={`释义 ${senseIndex + 1} 词形与发音`}
-                                            placeholder="通用（默认）"
-                                            value={[
-                                              ...boundFormGroupIds(sense)
-                                            ]}
-                                            options={formGroupOptions
-                                              .filter((option) => option.value)
-                                              .map((option) => ({
-                                                ...option,
-                                                disabled:
-                                                  lastBindingIds.includes(
-                                                    option.value
-                                                  )
-                                              }))}
-                                            status={
-                                              formGroupIssue
-                                                ? "error"
-                                                : undefined
-                                            }
-                                            onChange={(ids: string[]) => {
-                                              if (
-                                                lastBindingIds.some(
-                                                  (id) => !ids.includes(id)
-                                                )
-                                              )
-                                                return;
-                                              change((draft) =>
-                                                setFormGroupBindings(
-                                                  draft.pos[posIndex]!.senses[
-                                                    senseIndex
-                                                  ]!,
-                                                  ids
-                                                )
-                                              );
-                                            }}
-                                          />
-                                        ) : (
-                                          <Select
-                                            aria-label={`释义 ${senseIndex + 1} 词形与发音`}
-                                            onChange={(nextValue: string) =>
-                                              change((draft) => {
-                                                const target =
-                                                  draft.pos[posIndex]!.senses[
-                                                    senseIndex
-                                                  ]!;
-                                                if (!nextValue)
-                                                  delete target.form_group_id;
-                                                else
-                                                  target.form_group_id =
-                                                    nextValue;
-                                              })
-                                            }
-                                            options={formGroupOptions.map(
-                                              (option) => ({
-                                                ...option,
-                                                disabled:
-                                                  isLastDedicatedBinding &&
-                                                  option.value !==
-                                                    sense.form_group_id
-                                              })
-                                            )}
-                                            status={
-                                              formGroupIssue
-                                                ? "error"
-                                                : undefined
-                                            }
-                                            value={sense.form_group_id ?? ""}
-                                          />
-                                        )}
-                                        {(
-                                          multiGroupBindingsEnabled
-                                            ? lastBindingIds.length > 0
-                                            : isLastDedicatedBinding
-                                        ) ? (
-                                          <Typography.Text type="secondary">
-                                            这是专用组最后一个词义；解除限制请在词形组的“专用词义”中恢复适用全部词义。
-                                          </Typography.Text>
-                                        ) : null}
                                         <FieldIssueHelp
                                           issue={formGroupIssue}
                                         />
-                                      </label>
+                                      </div>
                                     ) : null}
                                   </div>
 

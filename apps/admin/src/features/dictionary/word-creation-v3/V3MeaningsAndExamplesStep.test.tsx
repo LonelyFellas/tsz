@@ -230,10 +230,8 @@ function Harness({
   partOfSpeechCatalogError,
   partOfSpeechCatalogPending,
   wordId,
-  relationSnapshots,
-  multiGroupBindingsEnabled = false
+  relationSnapshots
 }: {
-  multiGroupBindingsEnabled?: boolean;
   initial?: DraftMeaningsStepContentWritableV3;
   issues?: V3DraftValidationIssue[];
   onSave?: (
@@ -266,7 +264,6 @@ function Harness({
   return (
     <AntApp>
       <V3MeaningsAndExamplesStep
-        multiGroupBindingsEnabled={multiGroupBindingsEnabled}
         activePosId={activePosId}
         forms={formsValue}
         idFactory={idFactory}
@@ -350,13 +347,16 @@ describe("V3MeaningsAndExamplesStep", () => {
         grammar_structure_id: "grammar-2",
         content: { version: 2, text: "其他释义", annotations: [] }
       });
-      render(
+      const { container } = render(
         <ConfigProvider theme={{ token: { motion: false } }}>
           <Harness initial={initial} />
         </ConfigProvider>
       );
+      const deleteButton = container.querySelector<HTMLButtonElement>(
+        'button[aria-label="删除语法结构 1"]'
+      )!;
       const before = value();
-      fireEvent.click(screen.getByLabelText("删除语法结构 1"));
+      fireEvent.click(deleteButton);
       expect(value()).toEqual(before);
       const confirmationTitle = await screen.findByText("删除语法结构？", {
         selector: ".ant-modal-confirm-title"
@@ -369,8 +369,17 @@ describe("V3MeaningsAndExamplesStep", () => {
         within(confirmation).getByRole("button", { name: /^取\s*消$/ })
       );
       expect(value()).toEqual(before);
-      fireEvent.click(screen.getByLabelText("删除语法结构 1"));
-      fireEvent.click(await screen.findByRole("button", { name: /^删\s*除$/ }));
+      await waitFor(() => expect(confirmationTitle).not.toBeInTheDocument());
+      fireEvent.click(deleteButton);
+      const nextTitle = await screen.findByText("删除语法结构？", {
+        selector: ".ant-modal-confirm-title"
+      });
+      const nextConfirmation = nextTitle.closest(
+        '[role="dialog"]'
+      )! as HTMLElement;
+      fireEvent.click(
+        within(nextConfirmation).getByRole("button", { name: /^删\s*除$/ })
+      );
       await waitFor(() =>
         expect(value().pos[0]!.grammar_structures).toEqual([
           before.pos[0]!.grammar_structures[1]
@@ -388,7 +397,9 @@ describe("V3MeaningsAndExamplesStep", () => {
       expect(value().pos[0]!.senses[0]!.sentences).toEqual(
         before.pos[0]!.senses[0]!.sentences
       );
-      expect(screen.getByLabelText("删除语法结构 1")).toBeDisabled();
+      expect(
+        container.querySelector('button[aria-label="删除语法结构 1"]')
+      ).toBeDisabled();
     }
   );
 
@@ -5014,7 +5025,7 @@ it.each([false, true])(
   }
 );
 
-describe("V3MeaningsAndExamplesStep 词形与发音绑定", () => {
+describe("V3MeaningsAndExamplesStep 词形组设置归属", () => {
   const dedicatedGroupId = uuidFromInt(9_012);
   const dedicatedForms = () =>
     formsFixture({
@@ -5037,136 +5048,65 @@ describe("V3MeaningsAndExamplesStep 词形与发音绑定", () => {
         }
       ]
     });
-  const openOptions = (select: HTMLElement) => {
-    fireEvent.mouseDown(select);
-    return Array.from(
-      document.querySelectorAll<HTMLElement>(
-        ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
-      )
-    );
-  };
 
-  it("本词性没有专用组时不渲染选择器，带着组相关问题时仍渲染以便定位", () => {
-    const { unmount } = render(
-      <Harness forms={formsFixture({ pos_id: "pos-1" })} />
-    );
-    expect(screen.queryByLabelText("释义 1 词形与发音")).toBeNull();
-    unmount();
-
-    const senseId = meaningsFixture.pos[0]!.senses[0]!.id;
-    const issue: V3DraftValidationIssue = {
-      schema_version: 3,
-      step: "meanings",
-      node_id: senseId,
-      field: "form_group_id",
-      code: "sense_form_group_required",
-      message: "form group required",
-      node_location: { node_role: "sense", ancestor_node_ids: [] }
-    };
-    const { container } = render(
-      <Harness forms={formsFixture({ pos_id: "pos-1" })} issues={[issue]} />
-    );
-    expect(
-      container.querySelector(
-        `[data-v3-field="form_group_id"][data-v3-node-id="${senseId}"]`
-      )
-    ).not.toBeNull();
-    expect(
-      screen.getByText("本词性没有通用变化组，请为该词义选择专用组或添加通用组")
-    ).toBeInTheDocument();
-  });
-
-  it("多组模式下词义页可同时选择两个专用组并回显", async () => {
-    const forms = dedicatedForms();
-    forms.pos[0]!.form_groups[0]!.scope = "dedicated";
-    render(<Harness forms={forms} multiGroupBindingsEnabled />);
-    const select = screen.getByLabelText("释义 1 词形与发音");
-    const options = openOptions(select);
-    expect(options.map((option) => option.textContent)).toEqual([
-      "第 1 组 · job",
-      "第 2 组 · Job"
-    ]);
-    fireEvent.click(options[0]!);
-    fireEvent.click(options[1]!);
-    expect(value().pos[0]!.senses[0]!.form_group_ids).toEqual([
-      uuidFromInt(9_011),
-      dedicatedGroupId
-    ]);
-    expect(select.closest(".ant-select")).toHaveTextContent("第 1 组 · job");
-    expect(select.closest(".ant-select")).toHaveTextContent("第 2 组 · Job");
-    fireEvent.click(screen.getByText("添加词义"));
-    expect(screen.getByLabelText("删除词义 1")).toBeEnabled();
-    fireEvent.click(screen.getByLabelText("删除词义 1"));
-    fireEvent.click(await screen.findByText("确认删除"));
-    expect(value().pos[0]!.senses).toHaveLength(1);
-    expect(screen.getByLabelText("删除词义 1")).toBeDisabled();
-  });
-
-  it("只列本词性专用组，最后一个绑定不能直接改回通用", async () => {
-    render(<Harness forms={dedicatedForms()} />);
-    const select = screen.getByLabelText("释义 1 词形与发音");
-    expect(select.closest(".ant-select")).toHaveTextContent("通用（默认）");
-
-    const options = openOptions(select);
-    expect(options.map((option) => option.textContent)).toEqual([
-      "通用（默认）",
-      "第 2 组 · Job"
-    ]);
-    fireEvent.click(options[1]!);
-    expect(value().pos[0]!.senses[0]!.form_group_id).toBe(dedicatedGroupId);
-    expect(select.closest(".ant-select")).toHaveTextContent("第 2 组 · Job");
-
-    await waitFor(() =>
-      expect(
-        screen.getByText(
-          "这是专用组最后一个词义；解除限制请在词形组的“专用词义”中恢复适用全部词义。"
-        )
-      ).toBeVisible()
-    );
-    const generalOption = openOptions(select)[0]!;
-    await waitFor(() =>
-      expect(generalOption.closest(".ant-select-item-option")).toHaveClass(
-        "ant-select-item-option-disabled"
-      )
-    );
-    fireEvent.click(generalOption);
-    expect(value().pos[0]!.senses[0]!.form_group_id).toBe(dedicatedGroupId);
-  });
-
-  it("绑定失效时保留一项供改选，校验问题落在选择器锚点上", () => {
-    const initial = structuredClone(meaningsFixture);
-    initial.pos[0]!.senses[0]!.form_group_id = "deleted-group";
-    const senseId = initial.pos[0]!.senses[0]!.id;
-    const issue: V3DraftValidationIssue = {
-      schema_version: 3,
-      step: "meanings",
-      node_id: senseId,
-      field: "form_group_id",
-      code: "sense_form_group_invalid",
-      message: "form group invalid",
-      node_location: {
-        node_role: "sense",
-        ancestor_node_ids: ["pos-1"],
-        pos_id: "pos-1"
+  it.each(["form_group_id", "form_group_ids"] as const)(
+    "Step 3 不提供词形与发音选择器，编辑词义仍保留已有 %s",
+    (field) => {
+      const initial = structuredClone(meaningsFixture);
+      const sense = initial.pos[0]!.senses[0]!;
+      if (field === "form_group_id") sense.form_group_id = dedicatedGroupId;
+      else sense.form_group_ids = [uuidFromInt(9_011), dedicatedGroupId];
+      const forms = dedicatedForms();
+      if (field === "form_group_ids") {
+        forms.pos[0]!.form_groups[0]!.scope = "dedicated";
       }
-    };
-    const { container } = render(
-      <Harness
-        forms={formsFixture({ pos_id: "pos-1" })}
-        initial={initial}
-        issues={[issue]}
-      />
-    );
-    expect(
-      container.querySelector(
-        `[data-v3-field="form_group_id"][data-v3-node-id="${senseId}"]`
-      )
-    ).not.toBeNull();
-    expect(
-      screen.getByLabelText("释义 1 词形与发音").closest(".ant-select")
-    ).toHaveTextContent("已失效的变化组，请重新选择");
-    expect(
-      screen.getByText("词义绑定的词形变化组无效，请重新选择本词性的专用组")
-    ).toBeInTheDocument();
-  });
+      const { container } = render(<Harness initial={initial} forms={forms} />);
+      const before = value().pos[0]!.senses[0]!;
+      expect(screen.queryByLabelText("释义 1 词形与发音")).toBeNull();
+      expect(
+        container.querySelector(".word-sense-field-form-group .ant-select")
+      ).toBeNull();
+      fireEvent.click(screen.getByLabelText("释义 1 是否依赖语境"));
+      const after = value().pos[0]!.senses[0]!;
+      expect(after.depends_on_context).toBe(true);
+      expect(after.form_group_id).toEqual(before.form_group_id);
+      expect(after.form_group_ids).toEqual(before.form_group_ids);
+      expect(after.definitions).toEqual(before.definitions);
+    }
+  );
+
+  it.each(["sense_form_group_required", "sense_form_group_invalid"] as const)(
+    "Step 3 的 %s 问题仅保留定位提示并引导返回第 2 步",
+    (code) => {
+      const initial = structuredClone(meaningsFixture);
+      initial.pos[0]!.senses[0]!.form_group_id = "deleted-group";
+      const senseId = initial.pos[0]!.senses[0]!.id;
+      const issue: V3DraftValidationIssue = {
+        schema_version: 3,
+        step: "meanings",
+        node_id: senseId,
+        field: "form_group_id",
+        code,
+        message: "form group invalid",
+        node_location: {
+          node_role: "sense",
+          ancestor_node_ids: ["pos-1"],
+          pos_id: "pos-1"
+        }
+      };
+      const { container } = render(
+        <Harness forms={dedicatedForms()} initial={initial} issues={[issue]} />
+      );
+      expect(screen.queryByLabelText("释义 1 词形与发音")).toBeNull();
+      expect(
+        container.querySelector(
+          `[data-v3-field="form_group_id"][data-v3-node-id="${senseId}"]`
+        )
+      ).not.toBeNull();
+      expect(
+        screen.getByText("请在第 2 步「词形与发音」调整专用词义设置。")
+      ).toBeInTheDocument();
+      expect(value().pos[0]!.senses[0]!.form_group_id).toBe("deleted-group");
+    }
+  );
 });
