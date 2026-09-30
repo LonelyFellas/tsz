@@ -318,11 +318,25 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(dividers).toHaveCount(2);
     for (let i = 0; i < 3; i++) {
       const select = selects.nth(i);
+      // Select 含透明的原生焦点 input；scrollWidth 也会计入它，不能替代可见标签的裁切检查。
       await expect
         .poll(() =>
-          select
-            .locator(".ant-select-content")
-            .evaluate((node) => node.scrollWidth - node.clientWidth)
+          select.locator(".ant-select-content").evaluate((node) => {
+            const text = [...node.childNodes].find(
+              (child) =>
+                child.nodeType === Node.TEXT_NODE && child.textContent?.trim()
+            );
+            if (!text) throw new Error("Missing visible select label");
+            const range = document.createRange();
+            range.selectNodeContents(text);
+            const label = range.getBoundingClientRect();
+            const clip = node.getBoundingClientRect();
+            return Math.max(
+              0,
+              clip.left - label.left,
+              label.right - clip.right
+            );
+          })
         )
         .toBeLessThanOrEqual(1);
       if (i > 0) {
@@ -466,7 +480,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     const arc = select.locator(".tsz-ve-arc-layer path");
     await expect(arc).toBeVisible();
     const textBox = select.locator(".word-grammar-reference-text");
-    await expect(textBox).toHaveCSS("padding-top", "7px");
+    await expect(textBox).toHaveCSS("padding-top", "9px");
     await expect
       .poll(
         async () =>
@@ -1833,7 +1847,7 @@ test("任务74：释义文字居中、打开变蓝、关闭恢复且弹层不越
   });
 });
 
-test("语法引用：选中与下拉保留富文本、基线和稳定弧线空间", async ({ page }) => {
+test("语法引用：保留富文本和基线，按连读状态预留弧线空间", async ({ page }) => {
   const api = await mockAdminV3Api(page);
   const word = api.getWord();
   const pos = word.meanings.pos[0]!;
@@ -1887,8 +1901,22 @@ test("语法引用：选中与下拉保留富文本、基线和稳定弧线空�
   const heights = await labels.evaluateAll((nodes) =>
     nodes.map((node) => node.getBoundingClientRect().height)
   );
-  expect(heights[0]).toBe(heights[1]);
+  const arcPadding = await labels
+    .first()
+    .locator(".word-grammar-reference-text")
+    .evaluate((node) => parseFloat(getComputedStyle(node).paddingTop));
+  await expect(labels.nth(1).locator(".word-grammar-reference-text")).toHaveCSS(
+    "padding-top",
+    "0px"
+  );
+  expect(arcPadding).toBeGreaterThan(0);
+  expect(heights[0]! - heights[1]!).toBeCloseTo(arcPadding, 1);
+  expect(heights[2]).toBe(heights[0]);
   const selectedHeight = (await select.boundingBox())!.height;
+  const normalHeight = (await page
+    .getByLabel("定义 1 内容", { exact: true })
+    .boundingBox())!.height;
+  expect(selectedHeight).toBeGreaterThan(normalHeight);
 
   // 用真实排版基线探针与 SVG 几何验证，不依赖 jsdom 的零尺寸布局。
   async function checkLayout() {
@@ -1947,12 +1975,13 @@ test("语法引用：选中与下拉保留富文本、基线和稳定弧线空�
   await labels.nth(1).click();
   await expect(dropdown).not.toBeVisible();
   await expect(select.locator(".tsz-ve-arc")).toHaveCount(0);
-  expect((await select.boundingBox())!.height).toBe(selectedHeight);
+  expect((await select.boundingBox())!.height).toBe(normalHeight);
   await select.screenshot({ path: "/tmp/task62-grammar-plain-selected.png" });
   await input.click();
   await labels.first().click();
   await expect(dropdown).not.toBeVisible();
   await expect(select.locator(".tsz-ve-arc")).toHaveCount(1);
+  expect((await select.boundingBox())!.height).toBe(selectedHeight);
   await select.screenshot({ path: "/tmp/task62-grammar-desktop-selected.png" });
 
   await page.setViewportSize({ width: 320, height: 844 });

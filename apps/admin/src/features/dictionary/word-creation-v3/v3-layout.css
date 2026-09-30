@@ -457,7 +457,8 @@
 }
 
 .word-grammar-reference-text:has(.has-liaison) {
-  padding-top: 0.5em;
+  /* 额外覆盖弧线描边，避免长连读的顶端被省略容器裁掉。 */
+  padding-top: calc(0.5em + 2px);
 }
 
 .tsz-ve-readonly.word-grammar-reference {

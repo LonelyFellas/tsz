@@ -1570,7 +1570,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       /\.word-grammar-reference-text\s*\{[^}]*overflow:\s*hidden;/su
     );
     expect(v3LayoutCss).toMatch(
-      /\.word-grammar-reference-text:has\(\.has-liaison\)\s*\{[^}]*padding-top:\s*0\.5em;/su
+      /\.word-grammar-reference-text:has\(\.has-liaison\)\s*\{[^}]*padding-top:\s*calc\(0\.5em \+ 2px\);/su
     );
     expect(value()).toEqual(initial);
   });
@@ -3658,9 +3658,16 @@ describe("V3MeaningsAndExamplesStep", () => {
 
   it("新增语义区间只追加词条级区间，不改动任何词义归属", () => {
     const ids = ["sense-group-new"];
-    render(<Harness idFactory={() => ids.shift()!} wordId="entry-add-group" />);
-
-    fireEvent.click(screen.getByRole("button", { name: "添加语义区间" }));
+    const { container } = render(
+      <Harness idFactory={() => ids.shift()!} wordId="entry-add-group" />
+    );
+    // 覆盖率环境里全页角色查询会遍历大量编辑器按钮；只在所属卡片内查找添加入口。
+    const groupCard = container.querySelector<HTMLElement>(
+      ".word-sense-groups-card"
+    )!;
+    fireEvent.click(
+      within(groupCard).getByRole("button", { name: "添加语义区间" })
+    );
     expect(value().sense_groups.map((group) => group.id)).toEqual([
       "sense-group-1",
       "sense-group-new"
