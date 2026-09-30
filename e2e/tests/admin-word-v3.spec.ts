@@ -7,7 +7,8 @@ import {
   ADMIN_V3_MIXED_WORD_ID,
   ADMIN_V3_NEW_WORD_ID,
   ADMIN_V3_REFERENCED_SENTENCE_ID,
-  mockAdminV3Api
+  mockAdminV3Api,
+  sharedSentenceFixture
 } from "./support/mockAdminV3Api";
 
 test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () => {
@@ -793,6 +794,178 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await discard.getByRole("button", { name: /^确\s*定$/ }).click();
     await expect(sentenceDialog).toBeHidden();
   });
+
+  for (const viewport of [
+    { width: 1440, height: 1000 },
+    { width: 1280, height: 600 },
+    { width: 1280, height: 480 }
+  ]) {
+    test(`大量候选弹层保持在视口内，加载更多保留选择与滚动 ${viewport.height}`, async ({
+      page
+    }, testInfo) => {
+      test.skip(process.env.VITE_VOICE_EDITOR !== "true", "需要启用语音编辑器");
+      await page.setViewportSize(viewport);
+      const api = await mockAdminV3Api(page);
+      const word = api.getWord();
+      const sentence = sharedSentenceFixture(word);
+      sentence.content.annotations = [];
+      const pos = word.forms.pos[0]!;
+      const baseForm = pos.forms[0]!;
+      const sense = word.meanings.pos[0]!.senses[0]!;
+      const nodeId = (n: number) =>
+        `01990000-0000-7000-8000-${String(n).padStart(12, "0")}`;
+      const forms = Array.from({ length: 51 }, (_, index) => ({
+        form_id: nodeId(1000 + index),
+        variant_id: nodeId(2000 + index),
+        form_type: "plural",
+        spelling: "orbit",
+        dialect: "common",
+        base_form_ids: [baseForm.id],
+        allowed_sense_ids: [sense.id]
+      }));
+      const candidates = forms.map((form) => ({
+        entry_id: word.id,
+        publication_id: nodeId(3000),
+        pos_id: pos.pos_id,
+        base_form_id: baseForm.id,
+        headword: "orbit",
+        kind: "word",
+        pos: pos.pos,
+        matched_form_id: form.form_id,
+        matched_variant_id: form.variant_id,
+        matched_dialect: "common",
+        matched_form_type: "plural",
+        component_usages: [],
+        matches: [],
+        forms,
+        senses: [
+          {
+            sense_id: sense.id,
+            pos_id: pos.pos_id,
+            base_form_id: baseForm.id,
+            level: "B1",
+            gloss: "分页布局验收释义"
+          }
+        ]
+      }));
+      await page.route("**/lexicon/sentences**", async (route) => {
+        const pathname = new URL(route.request().url()).pathname;
+        if (pathname.endsWith("/sentences")) {
+          await route.fulfill({ json: { items: [sentence], total: 1 } });
+        } else if (pathname.endsWith(`/sentences/${sentence.id}`)) {
+          await route.fulfill({ json: sentence });
+        } else {
+          await route.fallback();
+        }
+      });
+      const cursors: Array<string | undefined> = [];
+      await page.route(
+        "**/lexicon/entries/component-targets/search",
+        async (route) => {
+          const input = route.request().postDataJSON();
+          expect(input).toMatchObject({
+            q: "orbit",
+            match: "exact",
+            page_size: 50
+          });
+          cursors.push(input.cursor);
+          expect(
+            input.cursor === undefined || input.cursor === "layout-page-2"
+          ).toBe(true);
+          await route.fulfill({
+            json: {
+              schema_version: 3,
+              total: 51,
+              matches: input.cursor
+                ? candidates.slice(50)
+                : candidates.slice(0, 50),
+              truncated: !input.cursor,
+              ...(input.cursor ? {} : { next_cursor: "layout-page-2" })
+            }
+          });
+        }
+      );
+      await page.goto("/sentences");
+      await page.getByRole("button", { name: /^编\s*辑$/ }).click();
+      const dialog = page
+        .getByRole("dialog")
+        .filter({ has: page.locator(".tsz-ve-editor") });
+      await dialog
+        .getByRole("button", { name: "关联单词", exact: true })
+        .click();
+      await dialog
+        .locator(".tsz-ve-token")
+        .filter({ hasText: "orbit" })
+        .click();
+      const picker = page.getByRole("group", {
+        name: "关联单词：orbit",
+        exact: true
+      });
+      const popup = page.locator(".ant-popover").filter({ has: picker });
+      await picker
+        .locator(".ant-cascader-menu")
+        .first()
+        .getByText("orbit", { exact: true })
+        .click();
+      const formMenu = picker.locator(".ant-cascader-menu").nth(1);
+      await formMenu.getByText("复数 orbit", { exact: true }).first().click();
+      await picker.getByText("分页布局验收释义").click();
+      const more = picker.getByRole("button", {
+        name: "加载更多",
+        exact: true
+      });
+      const confirm = picker.getByRole("button", {
+        name: "确认关联",
+        exact: true
+      });
+      await expect
+        .poll(async () => {
+          const box = await popup.boundingBox();
+          return (
+            !!box && box.y >= 8 && box.y + box.height <= viewport.height - 8
+          );
+        })
+        .toBe(true);
+      await expect(more).toBeInViewport({ ratio: 1 });
+      await expect(confirm).toBeInViewport({ ratio: 1 });
+      await expect(confirm).toBeEnabled();
+      await expect(
+        picker.locator(".v3-component-usage-radio.is-checked")
+      ).toHaveCount(1);
+      await formMenu.hover();
+      await page.mouse.wheel(0, 300);
+      await expect
+        .poll(() => formMenu.evaluate((el) => el.scrollTop))
+        .toBeGreaterThan(0);
+      const scrollTop = await formMenu.evaluate((el) => el.scrollTop);
+      await more.click();
+      await expect(
+        picker.getByRole("button", { name: /加载更多/ })
+      ).toHaveCount(0);
+      await expect(picker.getByRole("alert")).toHaveCount(0);
+      await expect
+        .poll(async () => {
+          const box = await popup.boundingBox();
+          return (
+            !!box && box.y >= 8 && box.y + box.height <= viewport.height - 8
+          );
+        })
+        .toBe(true);
+      expect(cursors).toEqual([undefined, "layout-page-2"]);
+      await expect(
+        picker.locator(".v3-component-usage-radio.is-checked")
+      ).toHaveCount(1);
+      await expect(confirm).toBeInViewport({ ratio: 1 });
+      await expect(confirm).toBeEnabled();
+      await expect
+        .poll(() => formMenu.evaluate((el) => el.scrollTop))
+        .toBe(scrollTop);
+      await page.screenshot({
+        path: testInfo.outputPath("candidate-popover.png"),
+        animations: "disabled"
+      });
+    });
+  }
 
   for (const kind of ["word", "phrase"] as const) {
     test(`多维释义直接关联当前草稿 ${kind}，完成回显和取消恢复`, async ({
