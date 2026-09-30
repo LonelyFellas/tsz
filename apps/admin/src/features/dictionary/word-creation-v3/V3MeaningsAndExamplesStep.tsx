@@ -444,6 +444,24 @@ function GrammarStructuresCard({
   change: (mutation: DraftMutation) => void;
   idFactory: () => string;
 }) {
+  const { modal } = App.useApp();
+  const removeStructure = (structureId: string) =>
+    change((draft) => {
+      const target = draft.pos[posIndex]!;
+      if (target.grammar_structures.length <= 1) return;
+      const index = target.grammar_structures.findIndex(
+        (structure) => structure.id === structureId
+      );
+      if (index < 0) return;
+      target.grammar_structures.splice(index, 1);
+      for (const sense of target.senses) {
+        for (const definition of sense.definitions) {
+          if (definition.grammar_structure_id === structureId) {
+            delete definition.grammar_structure_id;
+          }
+        }
+      }
+    });
   const sorting = useSortableRows({
     items: pos.grammar_structures,
     scopeId: pos.pos_id,
@@ -563,25 +581,26 @@ function GrammarStructuresCard({
                       : undefined
                   }
                   icon={<DeleteOutlined />}
-                  onClick={() =>
-                    change((draft) => {
-                      if (draft.pos[posIndex]!.grammar_structures.length <= 1)
-                        return;
-                      draft.pos[posIndex]!.grammar_structures.splice(
-                        structureIndex,
-                        1
-                      );
-                      for (const sense of draft.pos[posIndex]!.senses) {
-                        for (const definition of sense.definitions) {
-                          if (
-                            definition.grammar_structure_id === structure.id
-                          ) {
-                            delete definition.grammar_structure_id;
-                          }
-                        }
-                      }
-                    })
-                  }
+                  onClick={() => {
+                    if (
+                      structure.variants.some(
+                        (variant) => variant.form_links?.length
+                      )
+                    ) {
+                      modal.confirm({
+                        title: "删除语法结构？",
+                        content:
+                          "删除后，词形关联会被清除，相关释义不再引用此结构。",
+                        okText: "删除",
+                        cancelText: "取消",
+                        okButtonProps: { danger: true },
+                        autoFocusButton: "cancel",
+                        onOk: () => removeStructure(structure.id)
+                      });
+                    } else {
+                      removeStructure(structure.id);
+                    }
+                  }}
                   size="small"
                   type="text"
                 />

@@ -720,9 +720,14 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   const selectedLink = links.find((link) => link.id === inspectedLinkId);
   useEffect(() => {
     onAssociationPendingChange?.(
-      brush.kind === "association" && linkWords.length > 0 && !selectedLink
+      brush.kind === "association" && linkWords.length > 0 && !inspectedLinkId
     );
-  }, [brush.kind, linkWords.length, selectedLink, onAssociationPendingChange]);
+  }, [
+    brush.kind,
+    linkWords.length,
+    inspectedLinkId,
+    onAssociationPendingChange
+  ]);
   const selectWord = (range: { start: number; end: number }) => {
     if (readOnly || !renderAssociationPicker || brush.kind !== "association")
       return;
@@ -795,7 +800,17 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                   (link) => link.id !== selectedLink.id
                 )
           }));
-          resetTransient();
+          if (mode === "grammar" && !next) {
+            // 清除后继续浏览同一词段，不把已完成的解除操作当成待选择关联。
+            setLinkWords(
+              selectedLink.source_segments.map(({ start, end }) => ({
+                start,
+                end
+              }))
+            );
+          } else {
+            resetTransient();
+          }
           return;
         }
         if (!next) {

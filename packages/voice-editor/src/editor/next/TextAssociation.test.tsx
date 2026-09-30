@@ -7,7 +7,7 @@ import {
 import { ConfigProvider } from "antd";
 import { useState, type ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
-import type { RichTextV2, TextLinkV3 } from "@tsz/types";
+import type { GrammarFormLinkV3, RichTextV2, TextLinkV3 } from "@tsz/types";
 import type { AssociationPickerProps } from "../../types";
 import { VoiceEditor } from "./VoiceEditor";
 
@@ -132,6 +132,97 @@ it("语法结构保留标注工具，以完整单词关联词形并支持撤销"
   );
   fireEvent.click(screen.getByRole("button", { name: "上一步" }));
   await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([]));
+});
+
+it("清除语法词形关联后候选保持打开，可直接改选并撤销恢复", async () => {
+  const original: GrammarFormLinkV3 = {
+    id: "original-job",
+    source_segments: [{ start: 2, end: 5, surface: "job" }],
+    target_word_id: "job-word",
+    target_publication_id: "job-publication",
+    target_pos_id: "noun",
+    target_form_id: "base",
+    target_variant_id: "uk",
+    target_dialect: "uk"
+  };
+  const other = {
+    ...original,
+    id: "other-job",
+    source_segments: [{ start: 12, end: 15, surface: "job" }]
+  };
+  const value: RichTextV2 = {
+    version: 2,
+    text: "a job and a job",
+    annotations: [{ type: "pause", at: 1, duration_ms: 500 }]
+  };
+  const observe = vi.fn();
+  function Host() {
+    const [content, setContent] = useState(value);
+    const [links, setLinks] = useState([original, other]);
+    const [pending, setPending] = useState(false);
+    return (
+      <>
+        <button disabled={pending}>完成标注</button>
+        <VoiceEditor<GrammarFormLinkV3>
+          mode="grammar"
+          value={content}
+          textLinks={links}
+          onAssociationPendingChange={setPending}
+          renderAssociationPicker={({ selected, segments, onSelect }) =>
+            selected ? (
+              <button onClick={() => onSelect(undefined)}>清除词形关联</button>
+            ) : (
+              <button
+                onClick={() =>
+                  onSelect({
+                    ...original,
+                    id: "new-job",
+                    source_segments: segments,
+                    target_variant_id: "us",
+                    target_dialect: "us"
+                  })
+                }
+              >
+                选择美式词形
+              </button>
+            )
+          }
+          onChange={(next, nextLinks) => {
+            observe(next, nextLinks);
+            setContent(next);
+            setLinks(nextLinks ?? []);
+          }}
+        />
+      </>
+    );
+  }
+  render(<Host />);
+  fireEvent.click(screen.getByRole("button", { name: "关联词形" }));
+  fireEvent.mouseDown(screen.getByLabelText("关联 job（2）"), { button: 0 });
+  fireEvent.click(await screen.findByText("清除词形关联"));
+  await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([other]));
+  const choose = await screen.findByRole("button", {
+    name: "选择美式词形"
+  });
+  await waitFor(() => expect(choose.closest('[role="tooltip"]')).toBeVisible());
+  expect(screen.getByRole("button", { name: "完成标注" })).toBeEnabled();
+  fireEvent.click(choose);
+  const replacement = {
+    ...original,
+    id: "new-job",
+    target_variant_id: "us",
+    target_dialect: "us"
+  };
+  await waitFor(() =>
+    expect(observe.mock.lastCall).toEqual([value, [other, replacement]])
+  );
+  await waitFor(() => expect(choose).not.toBeVisible());
+  fireEvent.click(screen.getByRole("button", { name: "上一步" }));
+  await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([other]));
+  fireEvent.click(screen.getByRole("button", { name: "上一步" }));
+  await waitFor(() =>
+    expect(observe.mock.lastCall).toEqual([value, [original, other]])
+  );
 });
 
 it.each(["grammar", "association"] as const)(

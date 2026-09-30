@@ -305,6 +305,93 @@ function formsValue(): DraftFormsStepContentV3 {
 }
 
 describe("V3MeaningsAndExamplesStep", () => {
+  it.each(["common", "us"] as const)(
+    "删除含 %s 词形关联的语法结构需确认，取消保留数据，确认只清除该结构的绑定",
+    async (dialect) => {
+      const initial = structuredClone(meaningsFixture);
+      const pos = initial.pos[0]!;
+      const variant = pos.grammar_structures[0]!.variants[0]!;
+      variant.dialect = dialect;
+      variant.form_links = [
+        {
+          id: "grammar-form-link",
+          source_segments: [{ start: 0, end: 4, surface: "used" }],
+          target_word_id: "linked-word",
+          target_publication_id: "linked-publication",
+          target_pos_id: "linked-pos",
+          target_form_id: "linked-form",
+          target_variant_id: "linked-variant",
+          target_dialect: dialect
+        }
+      ];
+      if (dialect === "us") {
+        pos.grammar_structures[0]!.variants.unshift({
+          ...variant,
+          id: "unlinked-uk-variant",
+          dialect: "uk",
+          form_links: []
+        });
+      }
+      pos.grammar_structures.push({
+        id: "grammar-2",
+        variants: [
+          {
+            id: "grammar-variant-2",
+            dialect: "common",
+            content: { version: 2, text: "other grammar", annotations: [] }
+          }
+        ]
+      });
+      pos.senses[0]!.definitions.push({
+        id: "definition-2",
+        level: "A1",
+        definition_mode: "zh_definition",
+        content_id: "definition-content-2",
+        grammar_structure_id: "grammar-2",
+        content: { version: 2, text: "其他释义", annotations: [] }
+      });
+      render(
+        <ConfigProvider theme={{ token: { motion: false } }}>
+          <Harness initial={initial} />
+        </ConfigProvider>
+      );
+      const before = value();
+      fireEvent.click(screen.getByLabelText("删除语法结构 1"));
+      expect(value()).toEqual(before);
+      const confirmationTitle = await screen.findByText("删除语法结构？", {
+        selector: ".ant-modal-confirm-title"
+      });
+      const confirmation = confirmationTitle.closest(
+        '[role="dialog"]'
+      )! as HTMLElement;
+      await waitFor(() => expect(confirmation).toBeVisible());
+      fireEvent.click(
+        within(confirmation).getByRole("button", { name: /^取\s*消$/ })
+      );
+      expect(value()).toEqual(before);
+      fireEvent.click(screen.getByLabelText("删除语法结构 1"));
+      fireEvent.click(await screen.findByRole("button", { name: /^删\s*除$/ }));
+      await waitFor(() =>
+        expect(value().pos[0]!.grammar_structures).toEqual([
+          before.pos[0]!.grammar_structures[1]
+        ])
+      );
+      expect(value().pos[0]!.senses[0]!.definitions[0]).not.toHaveProperty(
+        "grammar_structure_id"
+      );
+      expect(value().pos[0]!.senses[0]!.definitions[1]).toEqual(
+        before.pos[0]!.senses[0]!.definitions[1]
+      );
+      expect(value().pos[0]!.senses[0]!.relations).toEqual(
+        before.pos[0]!.senses[0]!.relations
+      );
+      expect(value().pos[0]!.senses[0]!.sentences).toEqual(
+        before.pos[0]!.senses[0]!.sentences
+      );
+      expect(screen.getByLabelText("删除语法结构 1")).toBeDisabled();
+    }
+  );
+
   it("有内容的词义在页面顶部弹窗确认，取消保留内容和展开状态，确认后才删除", () => {
     const { container } = render(<Harness />);
     fireEvent.click(screen.getByText("添加词义"));
