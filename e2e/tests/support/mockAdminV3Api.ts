@@ -693,6 +693,7 @@ function surfaceMatchPage(
       // mock 里统一记在当前登录管理员名下（= 可改），与这些 fixture 的
       // created_by 保持一致。
       created_by: ACTOR_ID,
+      created_by_name: ADMIN_PROFILE.display_name,
       presentation: {
         label: spelling,
         matched_surfaces: [spelling],

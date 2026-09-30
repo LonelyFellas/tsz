@@ -63,7 +63,7 @@ test.describe("统一 V3 创建流程", () => {
     await input.fill("true color");
     await page.getByRole("button", { name: "词典检测" }).click();
 
-    await expect(page.getByText("原形检测")).toBeVisible();
+    await expect(page.getByText("词库检测")).toBeVisible();
     await expect(page.getByText("已发现")).toBeVisible();
     const duplicateButtons = page.getByText("查看已有原形");
     await expect(duplicateButtons).toHaveCount(2);
@@ -122,7 +122,7 @@ test.describe("统一 V3 创建流程", () => {
         }
       );
 
-      await expect(page.getByText("原形检测")).toBeVisible();
+      await expect(page.getByText("词库检测")).toBeVisible();
       const archivedButtons = page.getByText("查看已有原形");
       await expect(archivedButtons).toHaveCount(3);
       await expect(
