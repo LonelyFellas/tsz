@@ -317,10 +317,10 @@ function V3BasicsContent({
               value={entryLabel}
               style={{ marginTop: 8 }}
             />
+            <Typography.Text type="secondary" className="word-field-help">
+              词典检测已完成，建议内容已应用到当前草稿。
+            </Typography.Text>
           </div>
-          <Typography.Text type="secondary" className="word-field-help">
-            词典检测已完成，建议内容已应用到当前草稿。
-          </Typography.Text>
         </Space>
       </Card>
 

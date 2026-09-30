@@ -27,7 +27,12 @@ export function EditEntryAnnotation({
         key: item.entry_id,
         label: item.presentation.label,
         annotation: item.annotation,
-        gloss: [...item.pos_labels, ...item.gloss_previews].join(" · "),
+        posLabels: item.pos_labels,
+        glossPreviews: item.gloss_previews,
+        createdByName: item.created_by_name,
+        updatedAt: item.updated_at,
+        referenceCount: item.inbound_relations.total,
+        href: `/words/${item.entry_id}/v3/wizard/forms`,
         // 这条 PATCH 只改一个词条，同组的其他行一律只读——列出来是为了避重。
         readOnly: item.entry_id !== entry.id,
         readOnlyHint: item.entry_id === entry.id ? undefined : "仅供比对"
@@ -37,7 +42,11 @@ export function EditEntryAnnotation({
           key: entry.id,
           label: wordListLabel(entry),
           annotation: entry.annotation,
-          gloss: entry.gloss
+          posLabels: entry.pos_list,
+          glossPreviews: entry.gloss ? [entry.gloss] : [],
+          createdByName: entry.created_by_name,
+          updatedAt: entry.updated_at,
+          href: `/words/${entry.id}/v3/wizard/forms`
         }
       ];
   return (

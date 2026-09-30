@@ -41,6 +41,7 @@ function v3Context(entryId: string): MatchedEntryContextV3 {
     entry_id: entryId,
     annotation: null,
     annotation_revision: 1,
+    created_by_name: "词库管理员",
     presentation: {
       label: `V3 ${entryId}`,
       matched_surfaces: [`surface-${entryId}`],

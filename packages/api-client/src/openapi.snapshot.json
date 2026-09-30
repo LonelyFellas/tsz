@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/bugfix-20260929/docs/openapi.json",
-  "_generatedAt": "2026-09-29T05:31:57.808Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/local-bugfix-20260930/docs/openapi.json",
+  "_generatedAt": "2026-09-30T05:31:50.774Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -1134,12 +1134,6 @@
           "$ref": "#/components/schemas/WordHeadwordsV2",
           "description": "Step 1 最终确认值；兼容窗口内旧客户端可省略，由服务端按旧检测规则补齐。"
         },
-        "homograph_reason": {
-          "type": "string",
-          "description": "同原型组另建词条的区分说明，仅写入创建审计，不替代数字标注。",
-          "maxLength": 500,
-          "minLength": 1
-        },
         "kind": { "$ref": "#/components/schemas/WordEntryKindV3" },
         "schema_version": { "type": "integer", "enum": [3] }
       },
@@ -1443,6 +1437,7 @@
         "annotation",
         "annotation_revision",
         "entry_id",
+        "created_by_name",
         "presentation",
         "pos_labels",
         "gloss_previews",
@@ -1461,6 +1456,7 @@
           "format": "uuid",
           "description": "创建人 admin id，供前端判断「冲突弹窗里这一行我能不能改」——超管可改任何词条，\n其他管理员只能改自己创建的（含自己的草稿），见 §24.2「标注的修改权限」。\n\n**刻意是 `Option` 且不标 required**，两个方向各挡一种事故：\n- 对外（wire）：schema 不要求这个键，前端可以先 `sync:openapi` 并部署——旧后端不\n  下发时新前端按「可改」降级（等同本字段出现前的行为），之后再切后端二进制。\n  标成 required 则前后端两个方向都硬失败，只能同批部署。\n- 对内（Redis 快照）：本结构同时是 `V3SurfaceSnapshotPageData` 的存储格式。二进制\n  刚切换的那 ≤10 分钟里会读到升级前写的快照，那里没有这个键。用 `Uuid` + `default`\n  会静默填成 nil UUID，前端把本人的行误判成他人的；`None` 则是诚实的「不知道」，\n  序列化时整个键缺席，前端走同一条降级。\n\n`nullable = false` 是同一件事的另一半：未知时**整个键缺席、绝不会是 `null`**，\nschema 就不该描述一种不会发生的取值，否则前端要为一条永远走不到的分支写降级。\n\n正常路径上服务端始终下发。"
         },
+        "created_by_name": { "type": "string" },
         "entry_id": { "type": "string", "format": "uuid" },
         "gloss_previews": {
           "type": "array",

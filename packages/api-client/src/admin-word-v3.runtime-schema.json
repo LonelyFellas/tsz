@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/bugfix-20260929/docs/openapi.json",
-  "_source_sha256": "fbcde927e58fd4557467a623fe95f84f28780f8dc30a0ad7eebddad02ccedad1",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/local-bugfix-20260930/docs/openapi.json",
+  "_source_sha256": "00329bed7f546aedd0ceb9d8275cfcc212c780753700167619ca9b5a5be18759",
   "roots": [
     "SharedSentence",
     "SentencePublication",
@@ -991,6 +991,7 @@
         "annotation",
         "annotation_revision",
         "entry_id",
+        "created_by_name",
         "presentation",
         "pos_labels",
         "gloss_previews",
@@ -1001,6 +1002,7 @@
         "annotation": { "type": ["string", "null"] },
         "annotation_revision": { "type": "integer", "minimum": 1 },
         "created_by": { "type": "string", "format": "uuid" },
+        "created_by_name": { "type": "string" },
         "entry_id": { "type": "string", "format": "uuid" },
         "gloss_previews": {
           "type": "array",

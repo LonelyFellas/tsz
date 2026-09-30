@@ -15,6 +15,7 @@ const conflict = {
       // 归属标记必须能穿过严格 runtime schema：ProblemMeta 一旦校验失败会被整体丢弃，
       // 冲突弹窗就静默退化成普通报错。这条断言守的是 sync:openapi 有没有跟上后端。
       created_by: "018f47b8-e3c1-7bd1-9f0a-1234567890c7",
+      created_by_name: "张明",
       presentation: {
         label: "center",
         matched_surfaces: ["center"],
@@ -39,42 +40,10 @@ const conflict = {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("词条标注 wire 契约", () => {
-  it("同形说明按独立 snake_case 字段发送，字段校验错误不会被吞掉", async () => {
-    const fetch = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          type: "urn:tsz:problem:invalid_request_body",
-          title: "Invalid request body",
-          status: 400,
-          code: "invalid_request_body",
-          field: "homograph_reason",
-          detail: "invalid reason"
-        }),
-        { status: 400 }
-      )
-    );
-    vi.stubGlobal("fetch", fetch);
-    const api = createAdminEndpoints(
-      createHttpClient({ baseUrl: "/api/v1/admin" })
-    );
-    const input = {
-      schema_version: 3 as const,
-      detection_id: id,
-      kind: "word" as const,
-      homograph_reason: "独立含义",
-      annotation: "2"
-    };
-    await expect(api.words.createV3(id, input)).rejects.toMatchObject({
-      status: 400,
-      problem: { field: "homograph_reason" }
-    });
-    expect(fetch).toHaveBeenCalledWith(
-      "/api/v1/admin/lexicon/entries",
-      expect.objectContaining({ body: JSON.stringify(input) })
-    );
+  it("创建契约仅保留数字标注，不包含区分说明字段", () => {
     expect(
-      snapshot.schemas.CreateAdminWordV3Input.properties.homograph_reason
-    ).toMatchObject({ type: "string", minLength: 1, maxLength: 500 });
+      snapshot.schemas.CreateAdminWordV3Input.properties
+    ).not.toHaveProperty("homograph_reason");
   });
   it("PATCH来自权威OpenAPI，发送snake_case修订并解码响应", async () => {
     const response = {

@@ -191,6 +191,7 @@ export interface MatchedEntryContextV3 {
    * `ProblemMeta`，标注冲突弹窗会退化成普通报错。
    */
   created_by?: string;
+  created_by_name: string;
   presentation: EntryPresentationV3;
   pos_labels: string[];
   gloss_previews: string[];

@@ -138,7 +138,7 @@ function initialSurfacePage(pending?: PendingCreation) {
 function errorMessage(error: unknown): string {
   if (error instanceof HttpError) {
     if (error.status === 409 && error.code === "duplicate_word")
-      return "已有同名词条，无法重复创建。";
+      return "创建请求被服务拒绝，请重新检测。";
     if (error.status === 401) return "登录状态已失效，请重新登录。";
     // 403 分两种：改了别人的标注 vs. 压根没有建条权限。前者刷新重试也没用，
     // 得让管理员知道是哪一行越界了。
@@ -262,13 +262,15 @@ function DetectionPresentationCard({
   catalog,
   baseCandidates,
   surfaceCards,
-  snapshot
+  snapshot,
+  existingDraftId
 }: {
   pending: PendingCreation;
   catalog?: PartOfSpeechCatalogResponse;
   baseCandidates: DetectedBaseForm[];
   surfaceCards: ReturnType<typeof aggregateLifecycleSurfaceMatchCards>;
   snapshot: ReturnType<typeof useSurfaceSnapshot>;
+  existingDraftId?: string;
 }) {
   const [expanded, setExpanded] = useState<string>();
   const builtinStatus = pending.detection.builtin_dictionary.status;
@@ -334,10 +336,10 @@ function DetectionPresentationCard({
     <Card
       className="word-detection-result-card"
       size="small"
-      title="词典检测结果"
+      title="检测结果"
       extra={
         <Tag color={builtinStatus === "matched" ? "success" : "default"}>
-          {builtinStatus === "matched" ? "已匹配" : "未匹配"}
+          内置词典：{builtinStatus === "matched" ? "已匹配" : "未匹配"}
         </Tag>
       }
     >
@@ -346,9 +348,11 @@ function DetectionPresentationCard({
           <Descriptions.Item label="词条类型">
             {KIND_LABEL[pending.kind]}词条
           </Descriptions.Item>
-          <Descriptions.Item label="原形检测">
+          <Descriptions.Item label="词库检测">
             {hasMatches ? (
               "已发现"
+            ) : existingDraftId ? (
+              "同名草稿"
             ) : (
               <Space>
                 <CheckCircleFilled style={{ color: "#22a06b" }} />
@@ -397,7 +401,7 @@ function DetectionPresentationCard({
           ) : null}
         </Descriptions>
 
-        {displayEntries.length > 0 ? (
+        {displayEntries.length > 0 || existingDraftId ? (
           <div className="word-smart-match-summary">
             {displayEntries.map((entry) => (
               <div className="word-smart-match-summary-entry" key={entry.key}>
@@ -476,6 +480,30 @@ function DetectionPresentationCard({
                 ) : null}
               </div>
             ))}
+            {existingDraftId &&
+            !displayEntries.some(
+              (entry) => entry.entryId === existingDraftId
+            ) ? (
+              <div className="word-smart-match-summary-entry">
+                <div className="word-smart-match-summary-row">
+                  <Space size={8} wrap>
+                    <Typography.Text className="tsz-entry-en" strong>
+                      {pending.detection.normalized_surface}
+                    </Typography.Text>
+                    <Tag color="processing">未完成草稿</Tag>
+                  </Space>
+                  <Button
+                    type="link"
+                    href={`/words/${existingDraftId}/v3/wizard/forms`}
+                  >
+                    打开草稿
+                  </Button>
+                </div>
+                <Typography.Text type="secondary">
+                  继续编辑草稿，或新建词条。
+                </Typography.Text>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -550,13 +578,13 @@ function HeadwordConfirmationCard({
     >
       <div className="word-dialect-detection-row">
         <div>
-          <Typography.Text strong>区分英美词形</Typography.Text>
+          <Typography.Text strong>区分英美拼写</Typography.Text>
           <Typography.Text type="secondary">
-            开启后按个人方言偏好锁定一侧，另一侧可编辑
+            英美拼写不同时开启。
           </Typography.Text>
         </div>
         <Switch
-          aria-label="区分英美词形"
+          aria-label="区分英美拼写"
           checked={value.mode === "distinguish"}
           disabled={disabled}
           onChange={(checked) => {
@@ -602,8 +630,7 @@ function HeadwordConfirmationCard({
             type="secondary"
             className="word-field-help word-headword-lock-note"
           >
-            按个人偏好锁定{lockedLabel}
-            主词；如需调整锁定侧，请先修改个人方言偏好。
+            当前锁定{lockedLabel}拼写，可在个人偏好中切换。
           </Typography.Text>
           <Row gutter={16}>
             <Col xs={24} md={12}>
@@ -683,6 +710,7 @@ export function UnifiedCreateEntryStep({
   const [value, setValue] = useState("");
   const [fieldError, setFieldError] = useState<string>();
   const [error, setError] = useState<string>();
+  const [preparationBlocked, setPreparationBlocked] = useState(false);
   const [duplicateWord, setDuplicateWord] = useState<{ wordId?: string }>();
   const [busy, setBusy] = useState<"checking" | "creating">();
   const [pending, setPending] = useState<PendingCreation>();
@@ -696,10 +724,7 @@ export function UnifiedCreateEntryStep({
     version: number;
   }>();
   const annotationDraft = useRef<
-    Pick<
-      CreateAdminWordV3Input,
-      "annotation" | "annotation_updates" | "homograph_reason"
-    >
+    Pick<CreateAdminWordV3Input, "annotation" | "annotation_updates">
   >({});
   const [regionalDisplay, setRegionalDisplay] = useState<RegionalDisplayState>({
     status: "idle"
@@ -845,6 +870,7 @@ export function UnifiedCreateEntryStep({
     setValue(next);
     setFieldError(undefined);
     setDuplicateWord(undefined);
+    setPreparationBlocked(false);
     setError(undefined);
     setPending(undefined);
     setPrepared(undefined);
@@ -978,6 +1004,7 @@ export function UnifiedCreateEntryStep({
     setError(undefined);
     setFieldError(undefined);
     setDuplicateWord(undefined);
+    setPreparationBlocked(false);
     setBusy("checking");
     try {
       const detection = await requests.detectV3({
@@ -997,16 +1024,17 @@ export function UnifiedCreateEntryStep({
         throw new ProductError("词条检查结果不一致，请刷新后重试。");
       }
       assertFreshDetection(detection.expires_at);
-      if (
-        !detection.existing_draft_id &&
-        detection.builtin_dictionary.status === "unavailable"
-      ) {
+      const target: PendingCreation = {
+        kind,
+        detection,
+        idempotencyKey: keyState.key
+      };
+      setPrepared(target);
+      if (detection.builtin_dictionary.status === "unavailable") {
+        setPreparationBlocked(true);
         throw new ProductError("内置词典暂时不可用，请稍后重试。");
       }
-      if (
-        !detection.existing_draft_id &&
-        detection.builtin_dictionary.status === "matched"
-      ) {
+      if (detection.builtin_dictionary.status === "matched") {
         const configuredPos = new Set(
           catalog.data?.items.map((item) => item.code)
         );
@@ -1020,17 +1048,12 @@ export function UnifiedCreateEntryStep({
           !catalog.data ||
           [...suggestedPos].some((pos) => !configuredPos.has(pos))
         ) {
+          setPreparationBlocked(true);
           throw new ProductError(
             `词性配置尚未就绪，暂时不能创建该${KIND_LABEL[kind]}。`
           );
         }
       }
-      const target: PendingCreation = {
-        kind,
-        detection,
-        idempotencyKey: keyState.key
-      };
-      setPrepared(target);
       if (detection.requires_acknowledgement) {
         if (!detection.surface_match_page) {
           throw new ProductError("匹配信息不完整，已停止创建。");
@@ -1039,6 +1062,7 @@ export function UnifiedCreateEntryStep({
       }
     } catch (requestError) {
       if (mounted.current && generation.current === currentGeneration) {
+        setPreparationBlocked(true);
         setError(errorMessage(requestError));
       }
     } finally {
@@ -1051,7 +1075,7 @@ export function UnifiedCreateEntryStep({
     target: PendingCreation,
     confirmedSurfaceToken?: string
   ) => {
-    if (duplicateWord || target.detection.existing_draft_id) return;
+    if (preparationBlocked) return;
     const frozenAttempt =
       createAttempt?.target.idempotencyKey === target.idempotencyKey
         ? createAttempt
@@ -1134,7 +1158,7 @@ export function UnifiedCreateEntryStep({
           创建新词条
         </Typography.Title>
         <Typography.Paragraph className="word-step-description">
-          录入词条，系统将判断词条类型，检测智能词库中的已有原形，并从内置词典匹配英美词形和建议词性。
+          输入单词或短语，检测后确认主词。
         </Typography.Paragraph>
       </div>
 
@@ -1175,7 +1199,7 @@ export function UnifiedCreateEntryStep({
             />
           </Form.Item>
           <Typography.Text type="secondary" className="word-field-help">
-            按 Enter 或点击检测，只查询词典；确认结果后再创建并进入下一步。
+            按 Enter 检测，确认后创建。
           </Typography.Text>
         </Form>
       </Card>
@@ -1188,10 +1212,9 @@ export function UnifiedCreateEntryStep({
             baseCandidates={baseCandidates}
             surfaceCards={cards}
             snapshot={snapshot}
+            existingDraftId={existingDraftId}
           />
-          {snapshot.phase !== "disabled" &&
-          !existingDraftId &&
-          !duplicateWord ? (
+          {snapshot.phase !== "disabled" ? (
             <div className="word-headword-confirmation-wrap">
               <HeadwordConfirmationCard
                 state={regionalDisplay}
@@ -1213,7 +1236,7 @@ export function UnifiedCreateEntryStep({
         </div>
       ) : null}
 
-      {pending && !duplicateWord && !existingDraftId ? (
+      {pending ? (
         <div className="word-entry-actions">
           <Button onClick={() => changeValue(value)}>重新检测</Button>
           <Button
@@ -1221,6 +1244,7 @@ export function UnifiedCreateEntryStep({
             icon={<PlusOutlined aria-hidden />}
             loading={busy === "creating"}
             disabled={
+              preparationBlocked ||
               !canAcknowledgeSurfaceSnapshot(snapshot) ||
               regionalDisplay.status !== "ready"
             }
@@ -1231,7 +1255,7 @@ export function UnifiedCreateEntryStep({
         </div>
       ) : null}
 
-      {prepared && !pending && !duplicateWord && !existingDraftId ? (
+      {prepared && !pending ? (
         <div className="word-entry-actions">
           {createAttempt ? (
             <Button onClick={() => changeValue(value)}>重新检测</Button>
@@ -1239,7 +1263,11 @@ export function UnifiedCreateEntryStep({
           <Button
             type="primary"
             loading={busy === "creating"}
-            disabled={busy !== undefined || regionalDisplay.status !== "ready"}
+            disabled={
+              preparationBlocked ||
+              busy !== undefined ||
+              regionalDisplay.status !== "ready"
+            }
             onClick={() => beginCreation(prepared)}
           >
             {createAttempt && busy !== "creating"
@@ -1253,9 +1281,6 @@ export function UnifiedCreateEntryStep({
         <EntryAnnotationModal
           key={annotationSession.version}
           creating
-          initialCreationReason={
-            annotationSession.attempt.input.homograph_reason
-          }
           busy={busy === "creating"}
           frozen={createAttempt !== undefined && busy !== "creating"}
           error={error}
@@ -1274,9 +1299,12 @@ export function UnifiedCreateEntryStep({
                         (update) => update.entry_id === entry.entry_id
                       )?.annotation ?? entry.annotation)
                     : entry.annotation,
-                gloss: [...entry.pos_labels, ...entry.gloss_previews].join(
-                  " · "
-                ),
+                posLabels: entry.pos_labels,
+                glossPreviews: entry.gloss_previews,
+                createdByName: entry.created_by_name,
+                updatedAt: entry.updated_at,
+                referenceCount: entry.inbound_relations.total,
+                href: `/words/${entry.entry_id}/v3/wizard/forms`,
                 readOnly: !editable,
                 readOnlyHint: editable ? undefined : OTHERS_ENTRY_HINT
               };
@@ -1299,13 +1327,12 @@ export function UnifiedCreateEntryStep({
             annotationDraft.current = {};
             setError(undefined);
           }}
-          onSave={(values, creationReason) => {
+          onSave={(values) => {
             if (createAttempt) {
               void createPending(createAttempt);
               return;
             }
             const annotations = {
-              homograph_reason: creationReason,
               annotation: values.incoming ?? null,
               // 只提交自己有权改的：非超管带上别人的词条会被后端整单 403 驳回。
               annotation_updates: annotationSession.conflict.entries
@@ -1325,23 +1352,6 @@ export function UnifiedCreateEntryStep({
             setAnnotationSession({ ...annotationSession, attempt });
             void createPending(attempt);
           }}
-        />
-      ) : existingDraftId ? (
-        <Alert
-          showIcon
-          type="info"
-          // 这条草稿不一定是自己的：撞名检测 2026-09-08 起会报出任何人的空草稿。
-          // 文案与按钮都保持中性——别人的草稿点进去是只读预览（见 canWriteEntry），
-          // 说「继续创建」会让人以为接着做，结果落到一个改不动的页面。
-          title="已有同名的未完成草稿"
-          action={
-            <Button
-              type="link"
-              href={`/words/${existingDraftId}/v3/wizard/forms`}
-            >
-              打 开
-            </Button>
-          }
         />
       ) : error ? (
         <Alert showIcon type="error" title={error} />

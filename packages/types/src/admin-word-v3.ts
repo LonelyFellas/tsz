@@ -697,8 +697,6 @@ export interface CreateAdminWordV3Input {
   /** Step 1 最终确认值；兼容窗口内旧客户端可省略。 */
   headwords?: WordHeadwordsV2;
   confirmed_surface_match_token?: string;
-  /** 同原型组另建词条必填，1–500 字；仅记录创建审计，不替代数字标注。 */
-  homograph_reason?: string;
   /** 新词条标注；与已有词条同原型时必填，否则可省略。 */
   annotation?: string | null;
   /** 同原型已有词条的标注（含未改动的），须带上各自当前 annotation_revision。 */
@@ -1082,7 +1080,7 @@ export interface DetectionSurfaceRequestEchoV3 {
 }
 
 export interface DetectLexiconSurfaceResponseV3 {
-  /** Own unfinished draft without saved surface sources; not a surface match. */
+  /** An existing unfinished draft without saved surface sources; informational only and does not prevent creating another entry. */
   existing_draft_id?: string;
   schema_version: 3;
   detection_id: string;
