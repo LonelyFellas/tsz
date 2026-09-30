@@ -4133,10 +4133,15 @@ describe("V3WordCreationWizard", () => {
       )
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "检查发布条件" }));
-    const stalePublishButton = await screen.findByRole("button", {
-      name: "发布词条"
-    });
+    fireEvent.click(
+      screen
+        .getByText("检查发布条件", { selector: "button span" })
+        .closest("button")!
+    );
+    const stalePublishButton = (
+      await screen.findByText("发布词条", { selector: "button span" })
+    ).closest("button")!;
+    await waitFor(() => expect(stalePublishButton).toBeEnabled());
     fireEvent.click(stalePublishButton);
     await waitFor(() => expect(get).toHaveBeenCalledWith("word-1"));
     fireEvent.click(stalePublishButton);
@@ -4148,14 +4153,20 @@ describe("V3WordCreationWizard", () => {
     expect(screen.getByTestId("revision-conflict-revision")).toHaveTextContent(
       "9"
     );
-    expect(screen.queryByRole("button", { name: "发布词条" })).toBeNull();
+    expect(
+      screen.queryByText("发布词条", { selector: "button span" })
+    ).toBeNull();
 
     const prepareAfterRevisionRefresh = screen
       .getByText("检查发布条件")
       .closest("button")!;
     await waitFor(() => expect(prepareAfterRevisionRefresh).toBeEnabled());
     fireEvent.click(prepareAfterRevisionRefresh);
-    fireEvent.click(await screen.findByRole("button", { name: "发布词条" }));
+    const refreshedPublishButton = (
+      await screen.findByText("发布词条", { selector: "button span" })
+    ).closest("button")!;
+    await waitFor(() => expect(refreshedPublishButton).toBeEnabled());
+    fireEvent.click(refreshedPublishButton);
     await waitFor(() => expect(publish).toHaveBeenCalledTimes(2));
     expect(validate.mock.calls[1]?.[1]).toEqual({
       schema_version: 3,
