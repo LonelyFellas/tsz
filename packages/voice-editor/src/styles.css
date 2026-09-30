@@ -514,14 +514,6 @@
   text-underline-offset: 4px;
 }
 
-.tsz-ve-phoneme[data-phoneme]::after {
-  content: " /" attr(data-phoneme) "/";
-  color: #6d28d9;
-  font-family: "Charis SIL", ui-monospace, monospace;
-  font-size: 0.78em;
-  font-weight: 400;
-}
-
 /*
  * 只读视图的连读弧与编辑器共用同一层 SVG（.tsz-ve-arc-layer），不再用伪元素
  * 画半框：伪元素只能沿整段选区描一个圆角框，画不出从起点字母到终点字母的弧。

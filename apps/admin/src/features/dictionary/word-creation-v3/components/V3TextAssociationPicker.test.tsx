@@ -1,4 +1,7 @@
+import { useState } from "react";
+import { ConfigProvider } from "antd";
 import type {
+  GrammarFormLinkV3,
   PublishedSentenceTargetCandidateV3,
   DraftMeaningsStepContentWritableV3
 } from "@tsz/types";
@@ -119,7 +122,7 @@ it("语法结构选到词形即绑定，无释义的词形也可选择，且不�
 });
 
 it.each(["pub-give", undefined])(
-  "已关联词形仍查询列表并只读回显（%s）",
+  "已关联词形仍查询列表并回显当前选择（%s）",
   async (publicationId) => {
     const response = giveEntryResponse();
     search.mockClear();
@@ -162,21 +165,23 @@ it.each(["pub-give", undefined])(
     });
     const onSelect = vi.fn();
     render(
-      <V3GrammarFormPicker
-        kind="word"
-        segments={[segments[0]!]}
-        selected={{
-          id: "link-give",
-          source_segments: [segments[0]!],
-          target_word_id: "entry-give",
-          target_publication_id: publicationId,
-          target_pos_id: "pos-give",
-          target_form_id: "form-give",
-          target_variant_id: "variant-give",
-          target_dialect: "common"
-        }}
-        onSelect={onSelect}
-      />
+      <ConfigProvider theme={{ token: { motion: false } }}>
+        <V3GrammarFormPicker
+          kind="word"
+          segments={[segments[0]!]}
+          selected={{
+            id: "link-give",
+            source_segments: [segments[0]!],
+            target_word_id: "entry-give",
+            target_publication_id: publicationId,
+            target_pos_id: "pos-give",
+            target_form_id: "form-give",
+            target_variant_id: "variant-give",
+            target_dialect: "common"
+          }}
+          onSelect={onSelect}
+        />
+      </ConfigProvider>
     );
     await waitFor(() =>
       expect(search).toHaveBeenCalledWith(
@@ -197,9 +202,112 @@ it.each(["pub-give", undefined])(
     expect(onSelect).not.toHaveBeenCalled();
     expect(screen.queryByText("给；交给")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "清除关联" }));
+    expect(onSelect).not.toHaveBeenCalled();
+    const confirmation = await screen.findByRole("dialog", {
+      name: "清除词形关联？"
+    });
+    await waitFor(() => expect(confirmation).toBeVisible());
+    fireEvent.click(screen.getByRole("button", { name: /^取\s*消$/ }));
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(form.closest(".ant-cascader-menu-item")).toHaveAttribute(
+      "aria-checked",
+      "true"
+    );
+    fireEvent.click(screen.getByRole("button", { name: "清除关联" }));
+    fireEvent.click(await screen.findByRole("button", { name: /^清\s*除$/ }));
     expect(onSelect).toHaveBeenCalledWith(undefined);
   }
 );
+
+it("切换词形需确认，取消保留原关联，重复选择当前词形不提示", async () => {
+  const response = giveEntryResponse();
+  const alternative = {
+    ...response.matches[0]!.forms[0]!,
+    variant_id: "variant-give-us",
+    dialect: "us" as const
+  };
+  search.mockResolvedValue({
+    ...response,
+    matches: response.matches.map((candidate) => ({
+      ...candidate,
+      forms: [...candidate.forms, alternative]
+    }))
+  });
+  const original: GrammarFormLinkV3 = {
+    id: "link-give",
+    source_segments: [segments[0]!],
+    target_word_id: "entry-give",
+    target_publication_id: "pub-give",
+    target_pos_id: "pos-give",
+    target_form_id: "form-give",
+    target_variant_id: "variant-give",
+    target_dialect: "common"
+  };
+  const onSelect = vi.fn();
+  function Host() {
+    const [selected, setSelected] = useState<GrammarFormLinkV3 | undefined>(
+      original
+    );
+    return (
+      <V3GrammarFormPicker
+        kind="word"
+        segments={original.source_segments}
+        selected={selected}
+        onSelect={(next) => {
+          onSelect(next);
+          setSelected(next);
+        }}
+      />
+    );
+  }
+  render(
+    <ConfigProvider theme={{ token: { motion: false } }}>
+      <Host />
+    </ConfigProvider>
+  );
+  const alternativeLabel = await screen.findByText("原形 give · 美式");
+  fireEvent.click(alternativeLabel);
+  expect(onSelect).not.toHaveBeenCalled();
+  const confirmation = await screen.findByRole("dialog", {
+    name: "切换词形关联？"
+  });
+  await waitFor(() => expect(confirmation).toBeVisible());
+  expect(
+    screen.getByText("原形 give · 英美通用 → 原形 give · 美式")
+  ).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: /^取\s*消$/ }));
+  expect(onSelect).not.toHaveBeenCalled();
+  expect(screen.getByText("已关联 · 英美通用")).toBeVisible();
+  expect(
+    screen.getByText("原形 give · 英美通用").closest(".ant-cascader-menu-item")
+  ).toHaveAttribute("aria-checked", "true");
+  fireEvent.click(alternativeLabel);
+  fireEvent.click(await screen.findByRole("button", { name: /^切\s*换$/ }));
+  await waitFor(() =>
+    expect(onSelect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source_segments: original.source_segments,
+        target_word_id: "entry-give",
+        target_publication_id: "pub-give",
+        target_form_id: "form-give",
+        target_variant_id: "variant-give-us",
+        target_dialect: "us"
+      })
+    )
+  );
+  expect(screen.getByText("已关联 · 美式")).toBeVisible();
+  expect(alternativeLabel.closest(".ant-cascader-menu-item")).toHaveAttribute(
+    "aria-checked",
+    "true"
+  );
+  fireEvent.click(alternativeLabel);
+  expect(onSelect).toHaveBeenCalledTimes(1);
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("dialog", { name: "切换词形关联？" })
+    ).not.toBeInTheDocument()
+  );
+});
 
 it.each(["word", "phrase"] as const)(
   "释义允许直接关联当前草稿 %s，不提供待关联入口",

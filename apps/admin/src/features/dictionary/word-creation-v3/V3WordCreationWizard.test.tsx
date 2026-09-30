@@ -2339,7 +2339,7 @@ describe("V3WordCreationWizard", () => {
     await waitFor(() => expect(target).toHaveFocus());
   });
 
-  it("词义缺少可用变化组的问题定位到词义卡片的词形与发音选择", async () => {
+  it("词义缺少可用变化组的问题定位到只读提示，并引导返回第 2 步", async () => {
     const initialWord = word();
     const pos = initialWord.forms.pos[0]!;
     pos.form_groups[0]!.scope = "dedicated";
@@ -2363,7 +2363,7 @@ describe("V3WordCreationWizard", () => {
           <V3MeaningsAndExamplesStep
             activePosId={context.activePosId}
             forms={context.draftForms}
-            issues={context.issues}
+            issues={[issue]}
             onActivePosChange={context.setActivePosId}
             onChange={setContent}
             value={content}
@@ -2372,7 +2372,7 @@ describe("V3WordCreationWizard", () => {
             type="button"
             onClick={() => void context.actions.navigateIssue(issue)}
           >
-            定位词形与发音
+            定位词形组问题
           </button>
         </>
       );
@@ -2383,7 +2383,7 @@ describe("V3WordCreationWizard", () => {
       renderStep: (context) => <MeaningsSlot context={context} />
     });
 
-    fireEvent.click(screen.getByText("定位词形与发音"));
+    fireEvent.click(screen.getByText("定位词形组问题"));
 
     await waitFor(() => {
       const anchor = container.querySelector<HTMLElement>(
@@ -2395,6 +2395,10 @@ describe("V3WordCreationWizard", () => {
           anchor!.contains(document.activeElement)
       ).toBe(true);
     });
+    expect(screen.queryByLabelText("释义 1 词形与发音")).toBeNull();
+    expect(
+      screen.getByText("请在第 2 步「词形与发音」调整专用词义设置。")
+    ).toBeVisible();
   });
 
   it.each(["uk", "us"] as const)(
@@ -4129,10 +4133,15 @@ describe("V3WordCreationWizard", () => {
       )
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "检查发布条件" }));
-    const stalePublishButton = await screen.findByRole("button", {
-      name: "发布词条"
-    });
+    fireEvent.click(
+      screen
+        .getByText("检查发布条件", { selector: "button span" })
+        .closest("button")!
+    );
+    const stalePublishButton = (
+      await screen.findByText("发布词条", { selector: "button span" })
+    ).closest("button")!;
+    await waitFor(() => expect(stalePublishButton).toBeEnabled());
     fireEvent.click(stalePublishButton);
     await waitFor(() => expect(get).toHaveBeenCalledWith("word-1"));
     fireEvent.click(stalePublishButton);
@@ -4144,14 +4153,20 @@ describe("V3WordCreationWizard", () => {
     expect(screen.getByTestId("revision-conflict-revision")).toHaveTextContent(
       "9"
     );
-    expect(screen.queryByRole("button", { name: "发布词条" })).toBeNull();
+    expect(
+      screen.queryByText("发布词条", { selector: "button span" })
+    ).toBeNull();
 
     const prepareAfterRevisionRefresh = screen
       .getByText("检查发布条件")
       .closest("button")!;
     await waitFor(() => expect(prepareAfterRevisionRefresh).toBeEnabled());
     fireEvent.click(prepareAfterRevisionRefresh);
-    fireEvent.click(await screen.findByRole("button", { name: "发布词条" }));
+    const refreshedPublishButton = (
+      await screen.findByText("发布词条", { selector: "button span" })
+    ).closest("button")!;
+    await waitFor(() => expect(refreshedPublishButton).toBeEnabled());
+    fireEvent.click(refreshedPublishButton);
     await waitFor(() => expect(publish).toHaveBeenCalledTimes(2));
     expect(validate.mock.calls[1]?.[1]).toEqual({
       schema_version: 3,
