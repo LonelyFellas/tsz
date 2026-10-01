@@ -53,6 +53,11 @@ for (const forced of [false, true]) {
         const path = new URL(route.request().url()).pathname;
         if (path.endsWith("/auth/refresh")) {
           refreshes++;
+          if (changed)
+            return route.fulfill({
+              status: 401,
+              json: { code: "invalid_refresh_token", detail: "session revoked" }
+            });
           return route.fulfill({
             json: { access_token: `token-${refreshes}`, expires_in: 900 }
           });
@@ -112,12 +117,13 @@ for (const forced of [false, true]) {
           .fill("CorrectCurrent!731");
         await page.getByRole("button", { name: "确认修改" }).click();
       }
-      await expect(page).toHaveURL(/\/$/);
+      await expect(page).toHaveURL(/\/login\?reset=success$/);
       expect(changes).toBe(2);
       await expect
         .poll(() => refreshes)
-        .toBe(baseline + (code === "invalid_token" ? 1 : 0) + (forced ? 1 : 0));
+        .toBe(baseline + (code === "invalid_token" ? 1 : 0) + 1);
       await expect(page.getByText("加载中...", { exact: true })).toHaveCount(0);
+      await expect(page.getByLabel("登录密码", { exact: true })).toBeVisible();
     });
   }
 }
