@@ -15,7 +15,7 @@ Argon2id 使用 RustCrypto 实现，随机盐，PHC 字符串；TEXT 字段无�
 本地 SecLists 固定版本样本只保存符合新长度的 SHA-256，精确匹配、无网络请求，明确有限覆盖。
 前端 @tsz/shared 统一 15–128 code point 校验、提示和错误码翻译；不维护弱密码名单。
 注册/重置/改密业务 JSON 字段不变，新增 password_too_weak/password_compromised 400。
-弱密码检查在 OTP verify 前，管理员改密成功整页跳登录。
+通用弱密码检查在 OTP verify 前；重置时先不消费地验证 OTP，再检查全部已绑定联系方式，最后单次消费，兼顾反枚举和失败重试。管理员改密成功整页跳登录。
 管理员安全版本需要成对迁移；登录令牌携带版本，所有受保护请求校验版本，密码更新与 refresh 撤销同事务。
 
 ## 契约与发布
@@ -41,4 +41,4 @@ OpenAPI 与前端快照使用原生工具生成。密码格式语义改变、大
 - 真实前后端 API 验收：21 个步骤通过，包括同一码弱密码重试、大小写/空格、重置/改密后旧密码和 access/refresh 失效。
 - 本地预览：web 3004、admin 3005、backend 8384；PG 52155/tsz_password_policy、Redis 52156/0，均为本任务独立资源。已有样式服务未接管。
 - 本地泄露数据基于固定版本百万条样本，仅保留满足长度的 10,908 个不同哈希，属于有限覆盖；来源与许可见后端 src/platform/password-data。
-- 运行记录、二进制哈希和验收结果在 /tmp/tsz-password-policy-20261001/manifest.json 与 verification.json；本任务未提交、推送或部署。
+- 运行记录、二进制哈希和验收结果在 /tmp/tsz-password-policy-20261001/manifest.json 与 verification.json；以上为实现阶段记录，提交状态以 Git 历史为准，尚未推送或部署。
