@@ -33,7 +33,9 @@ test.describe("鉴权与引导端到端流程", () => {
     await page.getByPlaceholder("请输入手机号").fill("13800138000");
     await page.getByRole("button", { name: "获取验证码" }).click();
     await page.getByPlaceholder("请输入验证码").fill("123456");
-    await page.getByPlaceholder("请输入登录密码").fill("abc12345678");
+    await page
+      .getByPlaceholder("请输入登录密码")
+      .fill(" Mixed!密码🙂 river cloud ");
     await page.getByRole("button", { name: "立即注册" }).click();
 
     // /auth/register 直接返回会话；me() 适配器恒 onboarded:true，进入主页。
@@ -61,7 +63,9 @@ test.describe("鉴权与引导端到端流程", () => {
     await page.goto("/register");
     await page.getByPlaceholder("请输入手机号").fill("13800138000");
     await page.getByPlaceholder("请输入验证码").fill("123456");
-    await page.getByPlaceholder("请输入登录密码").fill("abc12345678");
+    await page
+      .getByPlaceholder("请输入登录密码")
+      .fill(" Mixed!密码🙂 river cloud ");
     await page.getByRole("button", { name: "立即注册" }).click();
     await expect(
       page.getByText("注册成功，但加载账号信息失败，请重试")
@@ -101,7 +105,7 @@ test.describe("鉴权与引导端到端流程", () => {
       registrations++;
       expect(route.request().postDataJSON()).toEqual({
         email: "student@example.com",
-        password: "ABC12345678",
+        password: " Mixed!密码🙂 river cloud ",
         code: "123456"
       });
       await route.fulfill({
@@ -124,7 +128,9 @@ test.describe("鉴权与引导端到端流程", () => {
     await page
       .getByRole("textbox", { name: "手机号或邮箱" })
       .fill("Student@EXAMPLE.com");
-    await page.getByPlaceholder("请输入登录密码").fill("abc12345678");
+    await page
+      .getByPlaceholder("请输入登录密码")
+      .fill(" Mixed!密码🙂 river cloud ");
     await page.getByRole("button", { name: "立即登录" }).click();
     await expect(page.getByText("账号或密码错误，请重新输入")).toBeVisible();
     expect(registrations).toBe(0);
@@ -137,7 +143,9 @@ test.describe("鉴权与引导端到端流程", () => {
       email: "student@example.com",
       purpose: "register"
     });
-    await page.getByPlaceholder("请输入登录密码").fill("abc12345678");
+    await page
+      .getByPlaceholder("请输入登录密码")
+      .fill(" Mixed!密码🙂 river cloud ");
     await page.getByPlaceholder("请输入验证码").fill("1234");
     await expect(page.getByRole("button", { name: "立即注册" })).toBeDisabled();
     await page.getByPlaceholder("请输入验证码").fill("123456");
@@ -181,7 +189,9 @@ test.describe("鉴权与引导端到端流程", () => {
     await expect(page.getByPlaceholder("请输入验证码")).toHaveValue("");
     await page.getByPlaceholder("请输入邮箱").fill("user@example.com");
     await page.getByPlaceholder("请输入验证码").fill("123456");
-    await page.getByPlaceholder("请输入登录密码").fill("abc12345678");
+    await page
+      .getByPlaceholder("请输入登录密码")
+      .fill(" Mixed!密码🙂 river cloud ");
     await page.getByRole("button", { name: "立即注册" }).click();
     await expect(page.getByText("该邮箱已注册，请直接登录")).toBeVisible();
     expect(

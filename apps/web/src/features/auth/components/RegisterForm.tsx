@@ -1,6 +1,14 @@
 "use client";
 
-import { isEmail, isPhone, isRegisterPassword } from "@tsz/shared";
+import { HttpError } from "@tsz/api-client";
+import { passwordErrorMessage } from "@tsz/shared/auth";
+import {
+  isEmail,
+  isPhone,
+  isRegisterPassword,
+  PASSWORD_HINT,
+  passwordLengthError
+} from "@tsz/shared";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/request";
@@ -20,10 +28,10 @@ const REGISTER_ERRORS: Record<string, string> = {
   "invalid code": "验证码错误或已失效，请重新获取",
   "invalid email": "邮箱格式错误，请检查后重试",
   "invalid phone": "手机号码错误，请检查后重试",
-  "password is too short": "密码须为 11–20 位字母和数字组合",
-  "password is too long": "密码须为 11–20 位字母和数字组合",
+  "password is too short": "密码须为 15–128 个字符，区分大小写，支持符号和空格",
+  "password is too long": "密码须为 15–128 个字符，区分大小写，支持符号和空格",
   "password must contain letters and digits only":
-    "密码须为 11–20 位字母和数字组合",
+    "密码须为 15–128 个字符，区分大小写，支持符号和空格",
   "otp unavailable": "验证码服务暂时不可用，请稍后再试",
   "too many requests": "验证码发送过于频繁，请稍后再试",
   "service unavailable": "验证码服务暂时不可用，请稍后再试"
@@ -69,6 +77,10 @@ export function RegisterForm({
     !sending;
 
   function translateError(value: unknown, fallback: string): string {
+    if (value instanceof HttpError) {
+      const passwordMessage = passwordErrorMessage(value.code);
+      if (passwordMessage) return passwordMessage;
+    }
     const message = value instanceof Error ? value.message : "";
     return translateAuthError(
       message,
@@ -123,7 +135,7 @@ export function RegisterForm({
           ...(method === "email"
             ? { email: identifier }
             : { phone: identifier }),
-          password: password.toUpperCase(),
+          password: password,
           code
         });
         accountCreated = true;
@@ -276,7 +288,9 @@ export function RegisterForm({
                     : "text-foreground-muted"
                 }`}
               >
-                11-20位,数字+字母,不区分大小写
+                {password
+                  ? (passwordLengthError(password) ?? PASSWORD_HINT)
+                  : PASSWORD_HINT}
               </p>
             </div>
 

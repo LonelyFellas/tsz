@@ -1,7 +1,13 @@
 "use client";
 
 import { HttpError } from "@tsz/api-client";
-import { isEmail, isPhone, isRegisterPassword } from "@tsz/shared";
+import {
+  isEmail,
+  isPhone,
+  isRegisterPassword,
+  PASSWORD_HINT,
+  passwordLengthError
+} from "@tsz/shared";
 import type { ContactChannel, User } from "@tsz/types";
 import {
   Select,
@@ -600,7 +606,9 @@ function ChangePasswordForm({ onCancel }: { onCancel: () => void }) {
           <p
             className={`mt-3 ml-4 text-xs ${newPassword && !isRegisterPassword(newPassword) ? "text-danger" : "text-foreground-muted"}`}
           >
-            11–20 位，须同时包含字母与数字
+            {newPassword
+              ? (passwordLengthError(newPassword) ?? PASSWORD_HINT)
+              : PASSWORD_HINT}
           </p>
         </div>
         <div>

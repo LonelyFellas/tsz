@@ -74,10 +74,10 @@ export function AdminLoginForm() {
     return () => clearTimeout(timer);
   }, [countdown]);
 
-  // 三要素 2FA：手机号 + 密码(≥8，后端 8–72) + 验证码(4–8 位数字) 齐全才可提交；锁定期间禁提交。
+  // 三要素 2FA：手机号 + 密码(必填，原样验证) + 验证码(4–8 位数字) 齐全才可提交；锁定期间禁提交。
   const canSubmit =
     isPhone(account) &&
-    password.length >= 8 &&
+    password.length > 0 &&
     isCode(code) &&
     !loading &&
     !locked;

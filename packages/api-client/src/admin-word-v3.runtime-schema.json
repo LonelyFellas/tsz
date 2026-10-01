@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/local-bugfix-20260930/docs/openapi.json",
-  "_source_sha256": "00329bed7f546aedd0ceb9d8275cfcc212c780753700167619ca9b5a5be18759",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/password-policy-20261001/docs/openapi.json",
+  "_source_sha256": "b34d8d4b985d5f6f7fd850dc0679b816aeecb7b4f308be5d0f3dec4e487e8fa4",
   "roots": [
     "SharedSentence",
     "SentencePublication",
@@ -651,6 +651,8 @@
         "password_missing",
         "password_too_short",
         "password_too_long",
+        "password_too_weak",
+        "password_compromised",
         "password_unchanged",
         "invalid_display_name",
         "invalid_otp_code",

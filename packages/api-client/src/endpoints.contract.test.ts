@@ -589,7 +589,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "00329bed7f546aedd0ceb9d8275cfcc212c780753700167619ca9b5a5be18759"
+      "b34d8d4b985d5f6f7fd850dc0679b816aeecb7b4f308be5d0f3dec4e487e8fa4"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1248,4 +1248,24 @@ it("成分定向查询 entry_id 是可选 UUID，保留分页游标契约", () =
   });
   expect(input.required).not.toContain("entry_id");
   expect(input.properties.cursor).toMatchObject({ type: "string" });
+});
+
+describe("统一新密码契约", () => {
+  it("注册、重置、改密一致使用 15–128 字符且错误码完整", () => {
+    for (const schema of [
+      snapshot.schemas.RegisterRequest.properties.password,
+      snapshot.schemas.PasswordResetRequest.properties.new_password,
+      snapshot.schemas.PasswordChangeRequest.properties.new_password,
+      snapshot.schemas.ChangePasswordRequest.properties.new_password
+    ]) {
+      expect(schema).toMatchObject({
+        type: "string",
+        minLength: 15,
+        maxLength: 128
+      });
+    }
+    expect(snapshot.schemas.ErrorCode.enum).toEqual(
+      expect.arrayContaining(["password_too_weak", "password_compromised"])
+    );
+  });
 });

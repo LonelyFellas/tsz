@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   accountToDisplayName,
-  findAdminPasswordWeakWord,
   hasDisplayNameForbiddenChars,
   isCode,
   isEmail,
@@ -81,44 +80,21 @@ describe("isCode", () => {
   });
 });
 
-describe("findAdminPasswordWeakWord", () => {
-  it.each([
-    ["Admin123admin!@", "admin123"],
-    ["S3cret-Password", "password"],
-    ["Qwerty-tunnel-9x", "qwerty"],
-    ["my-123456-key", "123456"],
-    ["WelcomeHome-2026", "welcome"]
-  ])("命中弱词的返回该词 %s → %s", (input, hit) => {
-    expect(findAdminPasswordWeakWord(input)).toBe(hit);
-  });
-
-  it("大小写不敏感", () => {
-    expect(findAdminPasswordWeakWord("PASSWORD-abc")).toBe("password");
-  });
-
-  it("无命中返回 null", () => {
-    expect(findAdminPasswordWeakWord("brand-new-pw-2026")).toBeNull();
-    expect(findAdminPasswordWeakWord("")).toBeNull();
-  });
-});
-
 describe("isRegisterPassword", () => {
-  it.each(["abc12345678", "Pass1234word", "aaaaaaaaaa1A"])(
-    "接受 11-20 位字母+数字 %s",
-    (v) => {
-      expect(isRegisterPassword(v)).toBe(true);
-    }
-  );
-
   it.each([
-    ["", "空串"],
-    ["abc1234567", "只有 10 位"],
-    ["abc123456789012345678", "超过 20 位"],
-    ["abcdefghijk", "缺少数字"],
-    ["12345678901", "缺少字母"],
-    ["abc1234567!", "含特殊字符"]
-  ])("拒绝 %s(%s)", (v) => {
-    expect(isRegisterPassword(v)).toBe(false);
+    " Mixed!密码🙂 river cloud ",
+    "orchard silver river cloud",
+    "941807362590418735",
+    "界🙂".repeat(64)
+  ])("支持原样自由字符 %s", (value) => {
+    expect(isRegisterPassword(value)).toBe(true);
+  });
+  it("按 Unicode 字符计数处理长度边界", () => {
+    expect(isRegisterPassword("🙂".repeat(14))).toBe(false);
+    expect(isRegisterPassword("🙂".repeat(15))).toBe(true);
+    expect(isRegisterPassword("🙂".repeat(128))).toBe(true);
+    expect(isRegisterPassword("🙂".repeat(129))).toBe(false);
+    expect(isRegisterPassword("")).toBe(false);
   });
 });
 

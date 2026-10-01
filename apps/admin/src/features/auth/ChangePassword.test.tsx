@@ -67,9 +67,12 @@ function fillCurrent(v: string) {
   fireEvent.change(el, { target: { value: v } });
 }
 function fillNew(v: string, confirm = v) {
-  fireEvent.change(screen.getByPlaceholderText("至少 12 位，非纯数字"), {
-    target: { value: v }
-  });
+  fireEvent.change(
+    screen.getByPlaceholderText("15–128 个字符，区分大小写，支持符号和空格"),
+    {
+      target: { value: v }
+    }
+  );
   fireEvent.change(screen.getByPlaceholderText("再次输入新密码"), {
     target: { value: confirm }
   });
@@ -87,7 +90,7 @@ beforeEach(() => {
   Object.defineProperty(window, "location", {
     configurable: true,
     writable: true,
-    value: { href: "" }
+    value: { href: "", replace: vi.fn() }
   });
 });
 afterEach(async () => {
@@ -104,34 +107,42 @@ afterEach(async () => {
 });
 
 describe("ChangePassword · 本地校验", () => {
-  it("新密码不足 12 位被拦截，不打后端", async () => {
+  it("新密码不足 15 个字符被拦截，不打后端", async () => {
     renderSelf();
     fillCurrent("current-real-pw-1");
     fillNew("short");
     submit();
-    expect(await screen.findByText("密码至少 12 位")).toBeInTheDocument();
-    expect(mockChange).not.toHaveBeenCalled();
-  });
-
-  it("纯数字新密码被拦截", async () => {
-    renderSelf();
-    fillCurrent("current-real-pw-1");
-    fillNew("123456789012");
-    submit();
-    expect(await screen.findByText("密码不能是纯数字")).toBeInTheDocument();
-    expect(mockChange).not.toHaveBeenCalled();
-  });
-
-  it("含弱词的新密码被前端预检拦截，不打后端", async () => {
-    renderSelf();
-    fillCurrent("current-real-pw-1");
-    // Admin123admin!@ → 小写含 "admin123"，命中弱词表。
-    fillNew("Admin123admin!@");
-    submit();
     expect(
-      await screen.findByText("密码包含常见弱词「admin123」，请更换")
+      await screen.findByText("密码至少需要 15 个字符")
     ).toBeInTheDocument();
     expect(mockChange).not.toHaveBeenCalled();
+  });
+
+  it("不设置字符组合门槛，保留原样密码提交", async () => {
+    mockChange.mockResolvedValue(undefined);
+    renderSelf();
+    fillCurrent("current-real-pw-1");
+    fillNew(" Mixed!密码🙂 river cloud ");
+    submit();
+    await waitFor(() =>
+      expect(mockChange).toHaveBeenCalledWith(
+        "current-real-pw-1",
+        " Mixed!密码🙂 river cloud "
+      )
+    );
+  });
+
+  it("泄露密码由后端拒绝并按错误码翻译", async () => {
+    mockChange.mockRejectedValue(
+      new HttpError(400, "changed detail", [], "password_compromised")
+    );
+    renderSelf();
+    fillCurrent("current-real-pw-1");
+    fillNew("brand-new-pw-2026");
+    submit();
+    expect(
+      await screen.findByText("该密码已出现在泄露记录中，请换一个")
+    ).toBeInTheDocument();
   });
 
   it("新密码与当前相同被拦截", async () => {
@@ -172,7 +183,7 @@ describe("ChangePassword · 强制改密（forced）", () => {
     );
   });
 
-  it("成功：整页跳首页（让会话恢复在标记清除后重建 profile）", async () => {
+  it("成功：整页回登录重新认证", async () => {
     mockState = { currentPassword: "temp-pass-123456" };
     mockChange.mockResolvedValue(undefined);
     renderForced();
@@ -184,7 +195,11 @@ describe("ChangePassword · 强制改密（forced）", () => {
         "brand-new-pw-2026"
       )
     );
-    await waitFor(() => expect(window.location.href).toBe("/"));
+    await waitFor(() =>
+      expect(window.location.replace).toHaveBeenCalledWith(
+        "/login?reset=success"
+      )
+    );
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
@@ -222,7 +237,7 @@ describe("ChangePassword · 自助改密", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("成功：提示成功并 SPA 回首页（不整页刷新）", async () => {
+  it("成功：撤销会话后整页回登录", async () => {
     mockChange.mockResolvedValue(undefined);
     renderSelf();
     fillCurrent("current-real-pw-1");
@@ -235,7 +250,9 @@ describe("ChangePassword · 自助改密", () => {
       )
     );
     await waitFor(() =>
-      expect(mockNavigate).toHaveBeenCalledWith("/", { replace: true })
+      expect(window.location.replace).toHaveBeenCalledWith(
+        "/login?reset=success"
+      )
     );
     expect(window.location.href).toBe("");
   });
@@ -257,15 +274,17 @@ describe("ChangePassword · 自助改密", () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  it("新密码不合规(400)：直接展示后端文案", async () => {
-    mockChange.mockRejectedValue(new HttpError(400, "password is too common"));
+  it("弱密码错误使用稳定中文提示", async () => {
+    mockChange.mockRejectedValue(
+      new HttpError(400, "changed detail", [], "password_too_weak")
+    );
     renderSelf();
     fillCurrent("current-real-pw-1");
     // 用一个能过前端预检的密码,以确保打到后端、验证 400 文案透传（而非被前端拦下）。
     fillNew("brand-new-pw-2026");
     submit();
     expect(
-      await screen.findByText("password is too common")
+      await screen.findByText("该密码过于常见或容易猜测，请换一个")
     ).toBeInTheDocument();
     expect(mockNavigate).not.toHaveBeenCalled();
   });

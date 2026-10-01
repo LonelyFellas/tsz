@@ -247,12 +247,15 @@ describe("AdminLoginForm — 2FA", () => {
 
   // ============================== 表单校验 / 防重 ==============================
 
-  it("密码不足 8 位：按钮禁用且原生提交不打后端（与后端 8–72 规则一致）", async () => {
+  it("登录只检查密码必填，不执行新密码长度策略", async () => {
+    mockLogin.mockResolvedValue(authResponse());
     const { container } = render(<AdminLoginForm />);
     fill({ password: "short12" }); // 7 位，手机/验证码合法
-    expect(screen.getByRole("button", { name: LOGIN_BUTTON })).toBeDisabled();
+    expect(screen.getByRole("button", { name: LOGIN_BUTTON })).toBeEnabled();
     fireEvent.submit(container.querySelector("form") as HTMLFormElement);
-    await waitFor(() => expect(mockLogin).not.toHaveBeenCalled());
+    await waitFor(() =>
+      expect(mockLogin).toHaveBeenCalledWith(PHONE, "short12", CODE)
+    );
   });
 
   it("手机号非法：按钮禁用，不打后端", () => {

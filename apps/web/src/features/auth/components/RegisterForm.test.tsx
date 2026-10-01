@@ -32,7 +32,7 @@ const mockSendCode = vi.mocked(api.auth.sendCode);
 const mockMe = vi.mocked(api.auth.me);
 
 const PHONE = "13800138000";
-const PASSWORD = "abc12345678";
+const PASSWORD = " Mixed!密码🙂 river cloud ";
 const CODE = "123456";
 
 function deferred<T>() {
@@ -114,7 +114,7 @@ describe("RegisterForm — 手机号验证码注册", () => {
     ).toBeInTheDocument();
     expect(mockRegister).toHaveBeenCalledWith({
       email: "student@example.com",
-      password: PASSWORD.toUpperCase(),
+      password: PASSWORD,
       code: CODE
     });
     expect(screen.getByRole("button", { name: "手机" })).toBeDisabled();
@@ -266,7 +266,7 @@ describe("RegisterForm — 手机号验证码注册", () => {
     await waitFor(() => {
       expect(mockRegister).toHaveBeenCalledWith({
         phone: PHONE,
-        password: PASSWORD.toUpperCase(),
+        password: PASSWORD,
         code: CODE
       });
       expect(useUserStore.getState().user).toEqual(authResult().user);
@@ -293,7 +293,10 @@ describe("RegisterForm — 手机号验证码注册", () => {
     ["user already exists", "该手机号已注册，请直接登录"],
     ["too many requests", "验证码发送过于频繁，请稍后再试"],
     ["invalid email", "邮箱格式错误，请检查后重试"],
-    ["password is too short", "密码须为 11–20 位字母和数字组合"],
+    [
+      "password is too short",
+      "密码须为 15–128 个字符，区分大小写，支持符号和空格"
+    ],
     ["OTP unavailable", "验证码服务暂时不可用，请稍后再试"]
   ])("注册错误 %s 映射为中文提示", async (message, expected) => {
     mockRegister.mockRejectedValueOnce(new Error(message));

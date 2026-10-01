@@ -26,7 +26,7 @@ const mockReset = vi.mocked(api.auth.resetPassword);
 
 const VALID_PHONE = "13800138000";
 const VALID_CODE = "123456";
-const VALID_PASSWORD = "abc12345678";
+const VALID_PASSWORD = " Mixed!密码🙂 river cloud ";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -83,7 +83,7 @@ describe("ForgotPasswordForm — 按钮状态", () => {
     expect(screen.getByRole("button", { name: "重置密码" })).toBeEnabled();
   });
 
-  it("新密码不满足 11-20 位字母+数字 → 按钮禁用", async () => {
+  it("新密码不满足 15–128 个字符 → 按钮禁用", async () => {
     const user = userEvent.setup();
     await fillForm(user, { password: "short1" });
     expect(screen.getByRole("button", { name: "重置密码" })).toBeDisabled();
@@ -157,19 +157,19 @@ describe("ForgotPasswordForm — 获取验证码", () => {
 
 // ── 重置流程 ──────────────────────────────────────────
 describe("ForgotPasswordForm — 重置流程", () => {
-  it("重置成功 → 提交转大写密码并跳转 /login?reset=success", async () => {
+  it("重置成功 → 原样提交大小写、符号、中文与空格并跳转 /login?reset=success", async () => {
     mockReset.mockResolvedValueOnce({ status: "reset" });
     renderWithProviders(<ForgotPasswordForm />);
     const user = userEvent.setup();
 
-    await fillForm(user, { password: "abcDEF12345" });
+    await fillForm(user, { password: " Mixed!密码🙂 river cloud " });
     await user.click(screen.getByRole("button", { name: "重置密码" }));
 
     await waitFor(() => {
       expect(mockReset).toHaveBeenCalledWith(
         VALID_PHONE,
         VALID_CODE,
-        "ABCDEF12345"
+        " Mixed!密码🙂 river cloud "
       );
       expect(mockPush).toHaveBeenCalledWith("/login?reset=success");
     });
@@ -236,11 +236,18 @@ describe("ForgotPasswordForm — 重置流程", () => {
     await waitFor(() => expect(mockForgot).toHaveBeenCalledWith(email));
 
     await user.type(screen.getByPlaceholderText("请输入验证码"), VALID_CODE);
-    await user.type(screen.getByPlaceholderText("请输入新密码"), "abcDEF12345");
+    await user.type(
+      screen.getByPlaceholderText("请输入新密码"),
+      " Mixed!密码🙂 river cloud "
+    );
     await user.click(screen.getByRole("button", { name: "重置密码" }));
 
     await waitFor(() => {
-      expect(mockReset).toHaveBeenCalledWith(email, VALID_CODE, "ABCDEF12345");
+      expect(mockReset).toHaveBeenCalledWith(
+        email,
+        VALID_CODE,
+        " Mixed!密码🙂 river cloud "
+      );
       expect(mockPush).toHaveBeenCalledWith("/login?reset=success");
     });
   });
@@ -324,7 +331,7 @@ describe("ForgotPasswordForm — 安全边界", () => {
     expect(mockReset).toHaveBeenCalledWith(
       "alice@example.com",
       VALID_CODE,
-      VALID_PASSWORD.toUpperCase()
+      VALID_PASSWORD
     );
   });
 
