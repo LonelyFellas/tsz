@@ -190,6 +190,6 @@ export interface ResetPasswordResponse {
 export interface AdminChangePasswordInput {
   /** 当前密码（重置后即为一次性临时密码）。 */
   current_password: string;
-  /** 新密码：≥12 位、非纯数字、非弱密码、不含手机号，且须与当前密码不同。违反 → 400。 */
+  /** 新密码：15–128 个字符、区分大小写、支持符号与空格，通过后端弱密码与泄露检查，且须与当前密码不同。违反 → 400。 */
   new_password: string;
 }

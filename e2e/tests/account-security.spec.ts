@@ -242,14 +242,18 @@ test.describe("账号安全", () => {
     await page.goto("/account/security");
     await page.getByRole("button", { name: "修改密码", exact: true }).click();
     await page.getByLabel("当前密码", { exact: true }).fill("RawCase!234");
-    await page.getByLabel("新密码", { exact: true }).fill("NewPassword123");
+    await page
+      .getByLabel("新密码", { exact: true })
+      .fill("New!密码🙂 river cloud");
     await page
       .getByLabel("确认新密码", { exact: true })
       .fill("WrongPassword123");
     await expect(
       page.getByRole("button", { name: "确认修改密码" })
     ).toBeDisabled();
-    await page.getByLabel("确认新密码", { exact: true }).fill("NewPassword123");
+    await page
+      .getByLabel("确认新密码", { exact: true })
+      .fill("New!密码🙂 river cloud");
     await page.getByRole("button", { name: "确认修改密码" }).click();
     await expect(page).toHaveURL(/\/login\?security=success$/);
     expect(requests).toEqual([
@@ -257,7 +261,7 @@ test.describe("账号安全", () => {
         path: "/auth/password/change",
         body: {
           current_password: "RawCase!234",
-          new_password: "NewPassword123"
+          new_password: "New!密码🙂 river cloud"
         }
       }
     ]);

@@ -477,6 +477,8 @@ for (const [rawPath, item] of Object.entries(spec.paths)) {
     if (
       rawPath.startsWith(ADMIN_LEXICON_PREFIX) ||
       rawPath.startsWith(`${API_PREFIX}/auth/password/`) ||
+      rawPath === `${API_PREFIX}/auth/register` ||
+      rawPath === `${API_PREFIX}/admin/auth/change-password` ||
       rawPath.startsWith(`${API_PREFIX}/me/contact/`) ||
       rawPath.startsWith(`${API_PREFIX}/admin/settings/form-types`) ||
       rawPath === `${API_PREFIX}/admin/settings/parts-of-speech/catalog`

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/local-bugfix-20260930/docs/openapi.json",
-  "_generatedAt": "2026-09-30T05:31:50.774Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/password-policy-20261001/docs/openapi.json",
+  "_generatedAt": "2026-10-01T01:17:29.868Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -311,6 +311,14 @@
     ]
   },
   "operationSchemas": {
+    "post /admin/auth/change-password": {
+      "request": { "$ref": "#/components/schemas/ChangePasswordRequest" },
+      "responses": {
+        "204": null,
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "post /admin/lexicon/audio-assets": {
       "request": { "$ref": "#/components/schemas/ConfirmAudioAssetRequest" },
       "responses": {
@@ -872,6 +880,18 @@
         "503": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
+    "post /auth/register": {
+      "request": { "$ref": "#/components/schemas/RegisterRequest" },
+      "responses": {
+        "201": { "$ref": "#/components/schemas/LoginResponse" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "429": { "$ref": "#/components/schemas/ProblemDetails" },
+        "500": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "post /me/contact/bind": {
       "request": { "$ref": "#/components/schemas/ContactBindRequest" },
       "responses": {
@@ -1035,6 +1055,8 @@
         "password_missing",
         "password_too_short",
         "password_too_long",
+        "password_too_weak",
+        "password_compromised",
         "password_unchanged",
         "invalid_display_name",
         "invalid_otp_code",
@@ -2972,6 +2994,23 @@
       },
       "additionalProperties": false
     },
+    "ChangePasswordRequest": {
+      "type": "object",
+      "required": ["current_password", "new_password"],
+      "properties": {
+        "current_password": {
+          "type": "string",
+          "description": "当前密码，用于在改密前重新验证管理员身份",
+          "example": "CurrentPassword123!"
+        },
+        "new_password": {
+          "type": "string",
+          "description": "15–128 个 Unicode 字符，区分大小写，支持符号与空格；须通过弱密码与泄露检查。",
+          "maxLength": 128,
+          "minLength": 15
+        }
+      }
+    },
     "CommonDialectV3": { "type": "string", "enum": ["common"] },
     "ComponentTargetMatchV3": {
       "type": "string",
@@ -3289,7 +3328,12 @@
       "required": ["current_password", "new_password"],
       "properties": {
         "current_password": { "type": "string" },
-        "new_password": { "type": "string" }
+        "new_password": {
+          "type": "string",
+          "description": "15–128 个 Unicode 字符，区分大小写，支持符号与空格；须通过弱密码与泄露检查。",
+          "maxLength": 128,
+          "minLength": 15
+        }
       },
       "additionalProperties": false
     },
@@ -3305,7 +3349,12 @@
       "properties": {
         "code": { "type": "string" },
         "identifier": { "type": "string" },
-        "new_password": { "type": "string" }
+        "new_password": {
+          "type": "string",
+          "description": "15–128 个 Unicode 字符，区分大小写，支持符号与空格；须通过弱密码与泄露检查。",
+          "maxLength": 128,
+          "minLength": 15
+        }
       },
       "additionalProperties": false
     },
@@ -3418,6 +3467,30 @@
         "schema_version": { "type": "integer", "enum": [3] }
       },
       "additionalProperties": false
+    },
+    "RegisterRequest": {
+      "type": "object",
+      "description": "联系方式恰好提供一种；验证码用途为 register。",
+      "required": ["password", "code"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "注册验证码（6 位）",
+          "example": "123456"
+        },
+        "email": {
+          "type": ["string", "null"],
+          "example": "student@example.com"
+        },
+        "password": {
+          "type": "string",
+          "description": "15–128 个 Unicode 字符，区分大小写，支持符号与空格；拒绝弱密码和已知泄露密码。",
+          "example": "Violet!River7294Cloud",
+          "maxLength": 128,
+          "minLength": 15
+        },
+        "phone": { "type": ["string", "null"], "example": "13800138000" }
+      }
     },
     "RichTextAnnotationV3": {
       "oneOf": [

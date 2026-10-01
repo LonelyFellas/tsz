@@ -452,17 +452,17 @@ describe("AccountSecurity", () => {
   it("新密码需确认一致，当前密码原串提交，成功退出", async () => {
     await open("修改密码");
     fill("当前密码", "RawCase!234");
-    fill("新密码", "NewPassword123");
+    fill("新密码", "New!密码🙂 river cloud");
     fill("确认新密码", "WrongPassword123");
     expect(screen.getByRole("button", { name: "确认修改密码" })).toBeDisabled();
-    fill("确认新密码", "NewPassword123");
+    fill("确认新密码", "New!密码🙂 river cloud");
     fireEvent.click(screen.getByRole("button", { name: "确认修改密码" }));
     await waitFor(() =>
       expect(replace).toHaveBeenCalledWith("/login?security=success")
     );
     expect(auth.changePassword).toHaveBeenCalledWith({
       current_password: "RawCase!234",
-      new_password: "NewPassword123"
+      new_password: "New!密码🙂 river cloud"
     });
     expect(clearSession).toHaveBeenCalledTimes(1);
   });
@@ -473,8 +473,8 @@ describe("AccountSecurity", () => {
     );
     await open("修改密码");
     fill("当前密码", "wrong");
-    fill("新密码", "NewPassword123");
-    fill("确认新密码", "NewPassword123");
+    fill("新密码", "New!密码🙂 river cloud");
+    fill("确认新密码", "New!密码🙂 river cloud");
     fireEvent.click(screen.getByRole("button", { name: "确认修改密码" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("当前密码错误");
     expect(screen.getByLabelText("当前密码")).toBeEnabled();

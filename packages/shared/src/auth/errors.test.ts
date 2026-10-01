@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { translateAuthError } from "./errors";
+import { passwordErrorMessage, translateAuthError } from "./errors";
 
 describe("translateAuthError", () => {
   it("优先用调用方传入的映射", () => {
@@ -38,5 +38,19 @@ describe("translateAuthError", () => {
 
   it("空消息回退到兜底文案", () => {
     expect(translateAuthError("", {}, "兜底")).toBe("兜底");
+  });
+});
+
+describe("passwordErrorMessage", () => {
+  it.each([
+    ["password_too_short", "密码至少需要 15 个字符"],
+    ["password_too_long", "密码不能超过 128 个字符"],
+    ["password_too_weak", "该密码过于常见或容易猜测，请换一个"],
+    ["password_compromised", "该密码已出现在泄露记录中，请换一个"]
+  ])("稳定翻译 %s", (code, message) => {
+    expect(passwordErrorMessage(code)).toBe(message);
+  });
+  it("不把未知错误伪装成密码策略失败", () => {
+    expect(passwordErrorMessage("invalid_token")).toBeUndefined();
   });
 });

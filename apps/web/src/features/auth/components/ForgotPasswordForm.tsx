@@ -1,6 +1,12 @@
 "use client";
 
-import { isEmail, isPhone, isRegisterPassword } from "@tsz/shared";
+import {
+  isEmail,
+  isPhone,
+  isRegisterPassword,
+  PASSWORD_HINT,
+  passwordLengthError
+} from "@tsz/shared";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/request";
@@ -78,8 +84,7 @@ export function ForgotPasswordForm() {
     setError("");
     setLoading(true);
     try {
-      // 业务规则:密码不区分大小写,与注册/登录一致统一转大写。
-      await api.auth.resetPassword(identifier, code, password.toUpperCase());
+      await api.auth.resetPassword(identifier, code, password);
       // 重置成功后服务端已吊销所有会话，需用新密码重新登录。
       router.push("/login?reset=success");
     } catch (e: unknown) {
@@ -229,7 +234,9 @@ export function ForgotPasswordForm() {
                     : "text-foreground-muted"
                 }`}
               >
-                11-20位,数字+字母,不区分大小写
+                {password
+                  ? (passwordLengthError(password) ?? PASSWORD_HINT)
+                  : PASSWORD_HINT}
               </p>
             </div>
 

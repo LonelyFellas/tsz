@@ -83,7 +83,7 @@ function submit(mode: "password" | "register") {
     { target: { value: "13800138000" } }
   );
   fireEvent.change(screen.getByPlaceholderText("请输入登录密码"), {
-    target: { value: "abc12345678" }
+    target: { value: " Mixed!密码🙂 river cloud " }
   });
   if (mode === "register") {
     fireEvent.change(screen.getByPlaceholderText("请输入验证码"), {
