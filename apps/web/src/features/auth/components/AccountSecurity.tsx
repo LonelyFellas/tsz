@@ -188,6 +188,22 @@ export function AccountSecurity() {
           )}
         </div>
       )}
+      {!action && (
+        <section className="mt-8 flex flex-col gap-4 rounded-3xl border border-border p-6 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">注销账号</h2>
+            <p className="mt-1 text-sm text-foreground-muted">
+              永久注销账号，继续前请仔细阅读注销说明。
+            </p>
+          </div>
+          <Link
+            href="/account/delete"
+            className="shrink-0 rounded-sm text-sm text-danger hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger"
+          >
+            了解注销流程
+          </Link>
+        </section>
+      )}
     </div>
   );
 }
