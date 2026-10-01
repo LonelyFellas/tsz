@@ -2,16 +2,19 @@ import { expect, test } from "@playwright/test";
 import { mockApi } from "./support/mockApi";
 
 test.describe("注销账号端到端流程", () => {
-  test("首页 → 注销账号 → 验证码 → 确认注销 → 跳回登录并提示", async ({
+  test("首页 → 个人中心 → 账号安全 → 注销 → 跳回登录并提示", async ({
     page
   }) => {
     await mockApi(page, { authenticated: true });
 
     await page.goto("/");
 
-    // 登录态下首页顶栏头像菜单内出现「注销账号」入口。
+    // 注销入口收在个人中心的账号安全页，头像菜单不直接暴露。
     await page.getByRole("button", { name: "账户菜单" }).click();
-    await page.getByRole("link", { name: "注销账号" }).click();
+    await expect(page.getByRole("link", { name: "注销账号" })).toHaveCount(0);
+    await page.getByRole("link", { name: "个人中心" }).click();
+    await page.getByRole("link", { name: /账号安全/ }).click();
+    await page.getByRole("link", { name: "了解注销流程" }).click();
     await expect(page).toHaveURL(/\/account\/delete/);
     await expect(page.getByRole("heading", { name: "注销账号" })).toBeVisible();
 

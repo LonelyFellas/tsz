@@ -62,7 +62,7 @@ it("requires all prototype fields and does not offer a role selector", async () 
   expect(screen.getByLabelText("学历证书")).toBeInTheDocument();
   expect(screen.getByLabelText("语言成绩")).toBeInTheDocument();
   expect(screen.queryByRole("radio")).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "提交审核" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "提交申请" })).toBeDisabled();
 });
 
 it("does not allow submission with text but without the required evidence", async () => {
@@ -71,7 +71,7 @@ it("does not allow submission with text but without the required evidence", asyn
   await user.type(await screen.findByLabelText("真实姓名"), "李老师");
   await user.type(screen.getByLabelText("联系方式"), "teacher@example.test");
   await user.type(screen.getByLabelText("认证说明"), "申请成为老师");
-  expect(screen.getByRole("button", { name: "提交审核" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "提交申请" })).toBeDisabled();
   expect(api.teacherCertification.submit).not.toHaveBeenCalled();
 });
 
@@ -96,7 +96,7 @@ it("shows a pending application without editable fields or a second submit", asy
   renderForm();
   expect(await screen.findByText("审核中")).toBeInTheDocument();
   expect(
-    screen.queryByRole("button", { name: "提交审核" })
+    screen.queryByRole("button", { name: "提交申请" })
   ).not.toBeInTheDocument();
   expect(screen.queryByLabelText("真实姓名")).not.toBeInTheDocument();
 });
@@ -136,13 +136,13 @@ it("keeps a retry action for failed old-material cleanup without losing the repl
     await waitFor(() => expect(screen.getByLabelText(label)).toBeEnabled());
   }
   const retry = await screen.findByRole("button", {
-    name: "重试清理身份证人像面"
+    name: "重试删除身份证人像面"
   });
   expect(api.teacherCertification.removeFile).toHaveBeenCalledWith(
     "id_front-1"
   );
-  expect(screen.getByRole("button", { name: "提交审核" })).toBeEnabled();
-  await user.click(screen.getByRole("button", { name: "提交审核" }));
+  expect(screen.getByRole("button", { name: "提交申请" })).toBeEnabled();
+  await user.click(screen.getByRole("button", { name: "提交申请" }));
   await screen.findByText("提交连接失败");
   expect(api.teacherCertification.submit).toHaveBeenCalledWith(
     expect.objectContaining({ id_front: "id_front-5" })
@@ -150,7 +150,7 @@ it("keeps a retry action for failed old-material cleanup without losing the repl
   await user.click(retry);
   await waitFor(() =>
     expect(
-      screen.queryByRole("button", { name: "重试清理身份证人像面" })
+      screen.queryByRole("button", { name: "重试删除身份证人像面" })
     ).not.toBeInTheDocument()
   );
   expect(api.teacherCertification.removeFile).toHaveBeenLastCalledWith(

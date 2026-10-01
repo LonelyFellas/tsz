@@ -7,7 +7,7 @@ import { displayNameOf } from "@/lib/user";
 import { useLogout } from "@/features/auth/hooks/useLogout";
 import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIdentityProvider";
 
-// 账户菜单——头像触发的下拉。把编辑资料/退出/注销等账户操作收纳起来,顶栏只露一个头像。
+// 账户菜单——头像触发的下拉。收纳工作台、个人中心、身份切换与退出入口。
 // 头像优先用后端 avatar_url 字段;缺失或加载失败时回退到昵称首字母色块作默认头像。
 export function AccountMenu() {
   const user = useUserStore((s) => s.user);
@@ -76,13 +76,13 @@ export function AccountMenu() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-48 overflow-hidden rounded-2xl border border-border bg-surface p-1 shadow-xl shadow-black/5">
+        <div className="absolute right-0 mt-2 w-56 overflow-hidden rounded-2xl border border-border bg-surface p-1 shadow-xl shadow-black/5">
           <div className="px-3 py-2">
             <p className="truncate text-sm font-medium text-foreground">
               {displayName}
             </p>
             <p className="truncate text-xs text-foreground-subtle">
-              {teacher.identity === "teacher" ? "教师工作台" : "学生工作台"}
+              当前身份：{teacher.identity === "teacher" ? "教师" : "学生"}
             </p>
             {teacher.verified && (
               <span className="mt-1 inline-block text-xs text-primary">
@@ -90,6 +90,34 @@ export function AccountMenu() {
               </span>
             )}
           </div>
+          <div className="my-1 h-px bg-border" />
+          <Link
+            href={
+              teacher.identity === "teacher"
+                ? "/teacher/classes"
+                : "/student/practice"
+            }
+            onClick={() => setOpen(false)}
+            className="block rounded-lg px-3 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+          >
+            {teacher.identity === "teacher"
+              ? "进入教师工作台"
+              : "进入学生工作台"}
+          </Link>
+          <Link
+            href="/account"
+            onClick={() => setOpen(false)}
+            className="block rounded-lg px-3 py-2 text-sm text-foreground-muted transition hover:bg-muted"
+          >
+            个人中心
+          </Link>
+          <Link
+            href="/account/notifications"
+            onClick={() => setOpen(false)}
+            className="block rounded-lg px-3 py-2 text-sm text-foreground-muted transition hover:bg-muted"
+          >
+            站内通知
+          </Link>
           <div className="my-1 h-px bg-border" />
           {teacher.verified && (
             <button
@@ -116,8 +144,8 @@ export function AccountMenu() {
               {switching
                 ? "正在切换…"
                 : teacher.identity === "teacher"
-                  ? "切换为学生身份"
-                  : "切换为教师身份"}
+                  ? "切换到学生工作台"
+                  : "切换到教师工作台"}
             </button>
           )}
           {switchError && (
@@ -125,27 +153,16 @@ export function AccountMenu() {
               {switchError}
             </p>
           )}
-          <Link
-            href="/apply-teacher"
-            onClick={() => setOpen(false)}
-            className="block rounded-lg px-3 py-2 text-sm text-foreground-muted hover:bg-muted"
-          >
-            教师认证
-          </Link>
-          <Link
-            href="/account/notifications"
-            onClick={() => setOpen(false)}
-            className="block rounded-lg px-3 py-2 text-sm text-foreground-muted hover:bg-muted"
-          >
-            站内通知
-          </Link>
-          <Link
-            href="/account"
-            onClick={() => setOpen(false)}
-            className="block rounded-lg px-3 py-2 text-sm text-foreground-muted transition hover:bg-muted"
-          >
-            个人中心
-          </Link>
+          {!teacher.verified && (
+            <Link
+              href="/apply-teacher"
+              onClick={() => setOpen(false)}
+              className="block rounded-lg px-3 py-2 text-sm text-foreground-muted transition hover:bg-muted"
+            >
+              申请教师认证
+            </Link>
+          )}
+          <div className="my-1 h-px bg-border" />
           <button
             type="button"
             onClick={handleLogout}
@@ -154,13 +171,6 @@ export function AccountMenu() {
           >
             {loading ? "退出中…" : "退出登录"}
           </button>
-          <Link
-            href="/account/delete"
-            onClick={() => setOpen(false)}
-            className="block rounded-lg px-3 py-2 text-sm text-foreground-muted transition hover:bg-danger/10 hover:text-danger"
-          >
-            注销账号
-          </Link>
         </div>
       )}
     </div>
