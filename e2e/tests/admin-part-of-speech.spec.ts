@@ -88,7 +88,10 @@ async function mockPartOfSpeechSettingsApi(page: Page) {
         display_name: actor.display_name,
         role: "super_admin",
         can_publish_lexicon: true,
-        permissions: []
+        permission_version: 1,
+        catalog_version: "permission-e2e-v1",
+        permissions: [],
+        preferences: { dialect: "uk" }
       });
     }
     if (
