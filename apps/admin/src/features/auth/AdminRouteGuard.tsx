@@ -16,12 +16,15 @@ import { useAuthStore } from "@/lib/auth";
 export function AdminRouteGuard({ children }: { children: ReactNode }) {
   const profile = useAuthStore((s) => s.profile);
   const hydrated = useAuthStore((s) => s.hydrated);
+  const permissionModelIncompatible = useAuthStore(
+    (s) => s.permissionModelIncompatible
+  );
   const navigate = useNavigate();
   const location = useLocation();
   // 完整回跳目标：含 query 与 hash，否则登录后会丢掉筛选/分页/锚点等上下文。
   const redirectTo = `${location.pathname}${location.search}${location.hash}`;
 
-  const needsLogin = hydrated && !profile;
+  const needsLogin = hydrated && !profile && !permissionModelIncompatible;
 
   useEffect(() => {
     if (needsLogin) {
@@ -31,6 +34,13 @@ export function AdminRouteGuard({ children }: { children: ReactNode }) {
     }
   }, [needsLogin, redirectTo, navigate]);
 
+  if (permissionModelIncompatible) {
+    return (
+      <FullscreenCenter>
+        <Typography.Text type="danger">后台服务暂不可用</Typography.Text>
+      </FullscreenCenter>
+    );
+  }
   if (!hydrated || needsLogin) {
     return (
       <FullscreenCenter>

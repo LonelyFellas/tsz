@@ -5,7 +5,7 @@ import { UserOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import type { AdminUserView } from "@tsz/types";
 import { CopyableText } from "@/components/CopyableText";
-import { useIsSuperAdmin } from "@/lib/auth";
+import { usePermission } from "@/lib/auth";
 import { RevokeTeacherButton } from "@/features/teacher-certification/RevokeTeacherButton";
 import { ROLE_LABEL, ROLE_TAG_COLOR, levelColor } from "./labels";
 
@@ -19,13 +19,14 @@ function fmt(t?: string): string {
 }
 
 export function UserDetailDrawer({ user, onClose }: Props) {
-  const isSuperAdmin = useIsSuperAdmin();
+  const canRevoke = usePermission("teacherapply.revoke");
+  const canReadSensitive = usePermission("users.read_sensitive");
   return (
     <Drawer
       open={!!user}
       onClose={onClose}
       extra={
-        isSuperAdmin && user?.teacher_verified ? (
+        canRevoke && user?.teacher_verified ? (
           <RevokeTeacherButton userId={user.id} onSuccess={onClose} />
         ) : undefined
       }
@@ -68,10 +69,10 @@ export function UserDetailDrawer({ user, onClose }: Props) {
             {user.coin_balance ?? "-"}
           </Descriptions.Item>
           <Descriptions.Item label="绑定电话">
-            <CopyableText value={user.phone} />
+            {canReadSensitive ? <CopyableText value={user.phone} /> : "未授权"}
           </Descriptions.Item>
           <Descriptions.Item label="绑定邮箱">
-            <CopyableText value={user.email} />
+            {canReadSensitive ? <CopyableText value={user.email} /> : "未授权"}
           </Descriptions.Item>
           <Descriptions.Item label="状态">
             <Badge

@@ -1,8 +1,5 @@
 import { useAuthStore } from "@/lib/auth";
-import {
-  canPublishEntry,
-  ENTRY_PUBLISH_BLOCKED_HINT
-} from "../entryWritePermission";
+import { canAdminResourceAction } from "@tsz/shared/auth";
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
 import { HttpError } from "@tsz/api-client";
@@ -539,7 +536,12 @@ export function V3PublicationHistory({
   const [confirming, setConfirming] = useState(false);
   const [activating, setActivating] = useState(false);
   const profile = useAuthStore((state) => state.profile);
-  const allowedToPublish = canPublishEntry(profile, currentWord);
+  const allowedToPublish = canAdminResourceAction(
+    profile,
+    "words",
+    "rollback",
+    currentWord.created_by
+  );
   const [activationError, setActivationError] = useState<string>();
   const [surfacePage, setSurfacePage] = useState<SurfaceMatchPageV3>();
   const [surfaceResetVersion, setSurfaceResetVersion] = useState(0);
@@ -943,7 +945,10 @@ export function V3PublicationHistory({
               <PublicationMetadata publication={detail} />
               <PublicationSnapshotBody publication={detail} />
               {!allowedToPublish ? (
-                <Alert type="info" title={ENTRY_PUBLISH_BLOCKED_HINT} />
+                <Alert
+                  type="info"
+                  title={"需要词条回滚权限；普通管理员仅能回滚本人词条"}
+                />
               ) : null}
               {surfacePage ? (
                 <LifecycleSurfaceConfirmation

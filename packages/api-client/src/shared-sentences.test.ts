@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { createSharedSentenceEndpoints } from "./shared-sentences";
 import type { HttpClient } from "./http";
+import runtimeSchemaBundleJson from "./admin-word-v3.runtime-schema.json";
+import { validateRuntimeSchema } from "./runtime-schema";
 
 const id = "00000000-0000-4000-8000-000000000001";
 const body = {
@@ -36,11 +38,63 @@ const body = {
   },
   entries: [],
   created_by: "测试管理员",
+  created_by_admin_id: "11111111-1111-4111-8111-111111111111",
   created_at: "2026-09-12T10:00:00Z",
   updated_at: "2026-09-12T10:00:00Z"
 };
 
 describe("shared sentence wire contract", () => {
+  it.each(["SharedSentence", "SentencePublication"] as const)(
+    "%s新字段保持真实owner，旧strict schema拒绝新增字段、新schema必需该字段",
+    (root) => {
+      const response =
+        root === "SharedSentence"
+          ? body
+          : {
+              id,
+              sentence_id: id,
+              publication_number: 1,
+              source_revision: 1,
+              snapshot: body.content,
+              published_at: body.created_at,
+              published_by_admin_id: id,
+              created_by_admin_id: body.created_by_admin_id
+            };
+      expect(validateRuntimeSchema(root, response)).toEqual({ valid: true });
+      const oldResponse: Record<string, unknown> = { ...response };
+      delete oldResponse.created_by_admin_id;
+      expect(validateRuntimeSchema(root, oldResponse)).toMatchObject({
+        valid: false,
+        path: "$.created_by_admin_id",
+        reason: "missing_required_property"
+      });
+      // 只在测试内复现新增字段前的真实strict定义，不修改生成文件或降低生产解析要求。
+      const definitions = runtimeSchemaBundleJson.$defs as unknown as Record<
+        string,
+        { properties: Record<string, unknown>; required: string[] }
+      >;
+      const current = definitions[root]!;
+      const oldSchema = structuredClone(current);
+      delete oldSchema.properties.created_by_admin_id;
+      oldSchema.required = oldSchema.required.filter(
+        (key) => key !== "created_by_admin_id"
+      );
+      definitions[root] = oldSchema;
+      try {
+        expect(validateRuntimeSchema(root, oldResponse)).toEqual({
+          valid: true
+        });
+        expect(validateRuntimeSchema(root, response)).toMatchObject({
+          valid: false,
+          path: "$",
+          reason: "unexpected_property"
+        });
+      } finally {
+        definitions[root] = current;
+      }
+      expect(validateRuntimeSchema(root, response)).toEqual({ valid: true });
+    }
+  );
   it("接受后端独立例句结构并编码列表筛选；拒绝缺 revision 和额外字段", async () => {
     const get = vi
       .fn()
@@ -157,7 +211,8 @@ it("编辑显式读取草稿，历史支持游标并拒绝畸形响应", async (
     source_revision: 1,
     snapshot: body.content,
     published_at: body.created_at,
-    published_by_admin_id: id
+    published_by_admin_id: id,
+    created_by_admin_id: body.created_by_admin_id
   };
   const get = vi
     .fn()

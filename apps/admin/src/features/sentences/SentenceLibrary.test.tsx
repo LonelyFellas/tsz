@@ -8,19 +8,32 @@ import type { SharedSentence } from "@tsz/types";
 import { SentenceLibrary } from "./SentenceLibrary";
 import { newSentence } from "./model";
 import { api } from "@/lib/auth";
-const auth = vi.hoisted(() => ({ role: "admin" }));
+const ownerId = "11111111-1111-4111-8111-111111111111";
+const auth = vi.hoisted(() => ({
+  role: "admin",
+  permissions: ["sentences.access"]
+}));
 vi.mock("@/lib/auth", () => ({
   useAuthStore: (
     select: (state: {
-      profile: { role: string; can_publish_lexicon: boolean };
+      profile: { id: string; role: string; permissions: string[] };
     }) => unknown
-  ) => select({ profile: { role: auth.role, can_publish_lexicon: false } }),
+  ) =>
+    select({
+      profile: {
+        id: "11111111-1111-4111-8111-111111111111",
+        role: auth.role,
+        permissions: auth.permissions
+      }
+    }),
   api: {
     sentences: {
       list: vi.fn(),
       get: vi.fn(),
       delete: vi.fn(),
-      setVisibility: vi.fn()
+      setVisibility: vi.fn(),
+      publications: vi.fn(),
+      rollback: vi.fn()
     }
   }
 }));
@@ -52,6 +65,7 @@ function fixture(): SharedSentence {
     content,
     entries: [],
     created_by: "测试管理员",
+    created_by_admin_id: ownerId,
     created_at: "2026-09-12T10:00:00Z",
     updated_at: "2026-09-12T10:00:00Z"
   };
@@ -77,9 +91,119 @@ function show(entryId?: string) {
 beforeEach(() => {
   vi.clearAllMocks();
   auth.role = "admin";
+  auth.permissions = ["sentences.access"];
 });
 
 describe("独立多维例句库", () => {
+  it.each([false, true])(
+    "昵称与UUID不同的本人例句仍有编辑、发布和生命周期操作（下架=%s）",
+    async (withdrawn) => {
+      auth.permissions = [
+        "sentences.access",
+        "sentences.edit",
+        "sentences.publish",
+        "sentences.withdraw",
+        "sentences.restore",
+        "sentences.rollback"
+      ];
+      const item = {
+        ...fixture(),
+        current_publication_id: "publication",
+        withdrawn_at: withdrawn ? "2026-10-01T00:00:00Z" : null
+      };
+      vi.mocked(api.sentences.list).mockResolvedValue({
+        items: [item],
+        total: 1
+      });
+      show();
+      await screen.findByText("A wonderful flower.");
+      expect(screen.getByText(/^编\s*辑$/).closest("button")).toBeVisible();
+      expect(screen.getByText(/^发\s*布$/).closest("button")).toBeVisible();
+      expect(
+        screen
+          .getByText(withdrawn ? /^恢\s*复$/ : /^下\s*架$/)
+          .closest("button")
+      ).toBeVisible();
+    }
+  );
+  it.each([true, false])(
+    "历史回滚按真实创建者UUID，不按发布者或昵称（本人=%s）",
+    async (own) => {
+      auth.permissions = [
+        "sentences.access",
+        "sentences.edit",
+        "sentences.edit_others",
+        "sentences.publish",
+        "sentences.rollback"
+      ];
+      const item = {
+        ...fixture(),
+        created_by_admin_id: own
+          ? ownerId
+          : "22222222-2222-4222-8222-222222222222",
+        current_publication_id: "publication"
+      };
+      vi.mocked(api.sentences.list).mockResolvedValue({
+        items: [item],
+        total: 1
+      });
+      vi.mocked(api.sentences.get).mockResolvedValue(item);
+      vi.mocked(api.sentences.publications).mockResolvedValue([
+        {
+          id: "old-publication",
+          sentence_id: item.id,
+          publication_number: 1,
+          source_revision: 1,
+          snapshot: item.content,
+          published_at: item.created_at,
+          published_by_admin_id: own ? "other-publisher" : ownerId,
+          created_by_admin_id: item.created_by_admin_id
+        }
+      ]);
+      show();
+      fireEvent.click(
+        (await screen.findByText(/^历\s*史$/)).closest("button")!
+      );
+      await screen.findByText(/版本 1/);
+      if (own) {
+        fireEvent.click(screen.getByText("选择回退").closest("button")!);
+        expect(
+          screen.getByText("将所选历史发布为新版本").closest("button")
+        ).toBeEnabled();
+      } else {
+        expect(screen.queryByText("选择回退")).toBeNull();
+        expect(
+          screen.getByText("将所选历史发布为新版本").closest("button")
+        ).toBeDisabled();
+      }
+      expect(api.sentences.rollback).not.toHaveBeenCalled();
+    }
+  );
+  it("编辑他人只扩展编辑，不扩展发布与生命周期", async () => {
+    auth.permissions = [
+      "sentences.access",
+      "sentences.edit",
+      "sentences.edit_others",
+      "sentences.publish",
+      "sentences.withdraw",
+      "sentences.restore",
+      "sentences.rollback"
+    ];
+    const item = {
+      ...fixture(),
+      created_by_admin_id: "22222222-2222-4222-8222-222222222222",
+      current_publication_id: "publication"
+    };
+    vi.mocked(api.sentences.list).mockResolvedValue({
+      items: [item],
+      total: 1
+    });
+    show();
+    await screen.findByText("A wonderful flower.");
+    expect(screen.getByText(/^编\s*辑$/).closest("button")).toBeVisible();
+    expect(screen.queryByText(/^发\s*布$/)).toBeNull();
+    expect(screen.queryByText(/^下\s*架$/)).toBeNull();
+  });
   it("列表与查看详情保留连读标注及英文展示字体类", async () => {
     const item = fixture();
     if (item.content.sentence.en_text.mode === "unified") {

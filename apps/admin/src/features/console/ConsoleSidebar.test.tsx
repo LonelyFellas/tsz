@@ -39,7 +39,8 @@ function setLevel(
           phone: "13800138000",
           display_name: "管理员",
           role: level,
-          can_publish_lexicon: false,
+          permission_version: 1,
+          catalog_version: "catalog-v1",
           permissions,
           preferences: { dialect: "uk" }
         }
@@ -66,18 +67,22 @@ function renderAt(path: string) {
 }
 
 describe("ConsoleSidebar", () => {
+  it("权限判断与共享内核一致：未知角色携带已知key也不显示业务菜单", () => {
+    const current = useAuthStore.getState().profile!;
+    useAuthStore.getState().setProfile({
+      ...current,
+      role: "unknown_role" as never,
+      permissions: ["words.access", "users.access"]
+    });
+    renderAt("/");
+    expect(screen.getByText("首页")).toBeInTheDocument();
+    expect(screen.queryByText("词库管理")).toBeNull();
+    expect(screen.queryByText("用户管理")).toBeNull();
+  });
   it("渲染 logo 与各分组标题", () => {
     renderAt("/");
     expect(screen.getByText("天生会背")).toBeInTheDocument();
-    for (const group of [
-      "用户管理",
-      "班级管理",
-      "词库管理",
-      "词表管理",
-      "任务管理",
-      "审核管理",
-      "天生币管理"
-    ]) {
+    for (const group of ["用户管理", "词库管理", "审核管理"]) {
       // 部分分组标题与同名子项重名，可能出现多次。
       expect(screen.getAllByText(group).length).toBeGreaterThan(0);
     }
@@ -130,23 +135,20 @@ describe("ConsoleSidebar", () => {
     expect(mockNavigate).toHaveBeenCalledWith("/admins");
   });
 
-  it("super_admin：「角色权限管理」渲染为禁用占位，点了不跳转", () => {
+  it("super_admin：权限管理真实入口跳转，不沿用角色占位", () => {
     setLevel("super_admin");
     renderAt("/");
     fireEvent.click(screen.getByText("用户管理"));
-    const entry = screen.getByText("角色权限管理");
-    expect(entry).toBeInTheDocument();
-    mockNavigate.mockClear();
-    fireEvent.click(entry);
-    expect(mockNavigate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("权限管理"));
+    expect(mockNavigate).toHaveBeenCalledWith("/permissions");
   });
 
-  it("普通 admin：用户管理分组下无「角色权限管理」入口", () => {
+  it("普通 admin：用户管理分组下无「权限管理」入口", () => {
     // 给普通 admin users.access 以便展开用户管理分组，验证 superOnly 叶子仍不渲染。
     setLevel("admin", ["users.access"]);
     renderAt("/");
     fireEvent.click(screen.getByText("用户管理"));
-    expect(screen.queryByText("角色权限管理")).toBeNull();
+    expect(screen.queryByText("权限管理")).toBeNull();
     expect(screen.queryByText("管理员管理")).toBeNull();
   });
 

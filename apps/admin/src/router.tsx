@@ -7,6 +7,7 @@ import {
 import { FullscreenCenter } from "@/layouts/FullscreenCenter";
 import { RouteErrorPage } from "@/pages/RouteError";
 import { RootProviders } from "./providers";
+import { ADMIN_PAGE_ROUTES } from "@/lib/adminPageRoutes";
 
 // 首屏兜底：路由全部走 route.lazy，首个匹配的 chunk 就绪前 react-router 需要
 // HydrateFallback（缺省会告警）。渲染在 RootProviders 之外（无 ConfigProvider，
@@ -23,29 +24,29 @@ function BootFallback() {
 /** Shared by browser routing and MemoryRouter contract tests. */
 export const wordRoutes: RouteObject[] = [
   {
-    path: "words",
+    ...ADMIN_PAGE_ROUTES.words,
     lazy: async () => ({
       Component: (await import("@/pages/Words")).WordsPage
     })
   },
   {
-    path: "words/trash",
+    ...ADMIN_PAGE_ROUTES.wordsTrash,
     lazy: async () => ({
       Component: (await import("@/pages/WordsTrash")).WordsTrashPage
     })
   },
   {
-    path: "words/new/v3",
+    ...ADMIN_PAGE_ROUTES.wordsNewV3,
     loader: () => redirect("/words/new")
   },
   {
-    path: "words/new",
+    ...ADMIN_PAGE_ROUTES.wordsNew,
     lazy: async () => ({
       Component: (await import("@/pages/WordCreate")).WordCreatePage
     })
   },
   {
-    path: "words/:wordId/v3/wizard/:step",
+    ...ADMIN_PAGE_ROUTES.wordWizard,
     lazy: async () => ({
       Component: (await import("@/pages/WordWizardV3")).WordWizardV3Page
     })
@@ -94,19 +95,19 @@ export const router = createBrowserRouter([
           },
           ...wordRoutes,
           {
-            path: "sentences",
+            ...ADMIN_PAGE_ROUTES.sentences,
             lazy: async () => ({
               Component: (await import("@/pages/Sentences")).SentencesPage
             })
           },
           {
-            path: "users",
+            ...ADMIN_PAGE_ROUTES.users,
             lazy: async () => ({
               Component: (await import("@/pages/Users")).UsersPage
             })
           },
           {
-            path: "teacher-applications",
+            ...ADMIN_PAGE_ROUTES.teacherApplications,
             lazy: async () => ({
               Component: (
                 await import("@/features/teacher-certification/TeacherApplications")
@@ -114,7 +115,15 @@ export const router = createBrowserRouter([
             })
           },
           {
-            path: "admins",
+            ...ADMIN_PAGE_ROUTES.permissions,
+            lazy: async () => ({
+              Component: (
+                await import("@/features/permissions/PermissionManagement")
+              ).PermissionManagement
+            })
+          },
+          {
+            ...ADMIN_PAGE_ROUTES.admins,
             lazy: async () => ({
               Component: (await import("@/pages/Admins")).AdminsPage
             })
@@ -125,14 +134,14 @@ export const router = createBrowserRouter([
           // features/roles 下不动，后端就绪后把这段接回来即可。
           {
             // 个人设置：入口在顶栏头像菜单，不进侧栏（侧栏由后端菜单权限驱动）。
-            path: "settings/profile",
+            ...ADMIN_PAGE_ROUTES.profileSettings,
             lazy: async () => ({
               Component: (await import("@/pages/ProfileSettings"))
                 .ProfileSettingsPage
             })
           },
           {
-            path: "settings/parts-of-speech",
+            ...ADMIN_PAGE_ROUTES.partsOfSpeech,
             lazy: async () => ({
               Component: (await import("@/pages/PartOfSpeechSettings"))
                 .PartOfSpeechSettingsPage

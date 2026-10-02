@@ -139,7 +139,7 @@ export function SentencePublicationModal({
                 ? "恢复前重新校验当前发布版本，草稿不会发布"
                 : "发布与回退都不覆盖草稿，也不会自动恢复已下架例句"
           }
-          description="需要词库发布权限；仅创建者或超管可操作，服务端会再次校验。"
+          description="需要对应的发布、下架、恢复或回滚权限；普通管理员仅能操作本人例句。"
         />
         {action === "publish" && (
           <V3EnglishTextPreview

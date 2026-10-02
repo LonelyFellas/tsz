@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/password-policy-20261001/docs/openapi.json",
-  "_source_sha256": "b34d8d4b985d5f6f7fd850dc0679b816aeecb7b4f308be5d0f3dec4e487e8fa4",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/permission-system-design/docs/openapi.json",
+  "_source_sha256": "5e732f282c0add0816f2e941c7c4da8b87f7b8825cb1d804c2fab955488ce2b7",
   "roots": [
     "SharedSentence",
     "SentencePublication",
@@ -1596,10 +1596,12 @@
         "publication_number",
         "source_revision",
         "snapshot",
+        "created_by_admin_id",
         "published_at",
         "published_by_admin_id"
       ],
       "properties": {
+        "created_by_admin_id": { "type": "string", "format": "uuid" },
         "id": { "type": "string", "format": "uuid" },
         "publication_number": { "type": "integer" },
         "published_at": { "type": "string", "format": "date-time" },
@@ -1801,6 +1803,7 @@
         "content",
         "entries",
         "created_by",
+        "created_by_admin_id",
         "created_at",
         "updated_at"
       ],
@@ -1808,6 +1811,7 @@
         "content": { "$ref": "#/$defs/SharedSentenceContent" },
         "created_at": { "type": "string", "format": "date-time" },
         "created_by": { "type": "string" },
+        "created_by_admin_id": { "type": "string", "format": "uuid" },
         "current_publication_id": {
           "type": ["string", "null"],
           "format": "uuid"

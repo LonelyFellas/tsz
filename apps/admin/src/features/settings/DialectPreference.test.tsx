@@ -1,5 +1,11 @@
 import type { AdminProfile } from "@tsz/api-client";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor
+} from "@testing-library/react";
 import { App as AntApp } from "antd";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -24,7 +30,8 @@ function signIn(id: string, dialect?: "uk" | "us"): AdminProfile {
     phone: "13800138000",
     display_name: "词库管理员",
     role: "admin",
-    can_publish_lexicon: true,
+    permission_version: 1,
+    catalog_version: "catalog-v1",
     permissions: [],
     ...(dialect === undefined ? {} : { preferences: { dialect } })
   } as AdminProfile;
@@ -54,6 +61,61 @@ beforeEach(() => {
 });
 
 describe("DialectPreference", () => {
+  it("偏好迟到成功只合并到最新同账号profile，不能把撤权后的版本8退回7", async () => {
+    const before = {
+      ...signIn("admin-current", "uk"),
+      permission_version: 7,
+      permissions: ["words.access", "users.access"]
+    };
+    useAuthStore.getState().setProfile(before);
+    let release!: (value: unknown) => void;
+    updateProfilePreferences.mockReturnValue(
+      new Promise((resolve) => {
+        release = resolve;
+      })
+    );
+    renderSetting();
+    fireEvent.click(usRadio());
+    await waitFor(() =>
+      expect(updateProfilePreferences).toHaveBeenCalledOnce()
+    );
+    const current = {
+      ...before,
+      permission_version: 8,
+      role: "super_admin" as const,
+      catalog_version: "v2",
+      permissions: ["words.access"]
+    };
+    act(() => useAuthStore.getState().setProfile(current));
+    release({ preferences: { dialect: "us" } });
+    await waitFor(() => expect(usRadio()).toBeChecked());
+    expect(useAuthStore.getState().profile).toEqual({
+      ...current,
+      preferences: { dialect: "us" }
+    });
+  });
+  it("账号切换或登出后迟到偏好不得复活旧profile与旧账号缓存", async () => {
+    signIn("old-admin", "uk");
+    let release!: (value: unknown) => void;
+    updateProfilePreferences.mockReturnValue(
+      new Promise((resolve) => {
+        release = resolve;
+      })
+    );
+    renderSetting();
+    fireEvent.click(usRadio());
+    await waitFor(() =>
+      expect(updateProfilePreferences).toHaveBeenCalledOnce()
+    );
+    act(() => signIn("new-admin", "uk"));
+    release({ preferences: { dialect: "us" } });
+    await screen.findByText(/方言偏好未能保存/);
+    expect(useAuthStore.getState().profile?.id).toBe("new-admin");
+    expect(ukRadio()).toBeChecked();
+    expect(
+      localStorage.getItem(dialectPreferenceStorageKey("old-admin"))
+    ).toBeNull();
+  });
   it("显示值取服务端 profile 里的偏好", () => {
     signIn("admin-server-us", "us");
     renderSetting();

@@ -77,7 +77,9 @@ export interface SharedSentence {
   view: "draft" | "published";
   content: SharedSentenceContent;
   entries: SharedSentenceEntry[];
+  /** 创建者显示昵称，不用于归属校验。 */
   created_by: string;
+  created_by_admin_id: string;
   created_at: string;
   updated_at: string;
 }
@@ -112,6 +114,7 @@ export interface SentencePublication {
   snapshot: SharedSentenceContent;
   published_at: string;
   published_by_admin_id: string;
+  created_by_admin_id: string;
   rollback_of_publication_id?: string | null;
 }
 export interface SentenceWithdrawalImpact {

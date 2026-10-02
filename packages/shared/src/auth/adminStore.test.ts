@@ -7,7 +7,8 @@ const PROFILE: AdminProfile = {
   phone: "13800138000",
   display_name: "Administrator",
   role: "super_admin",
-  can_publish_lexicon: true,
+  permission_version: 1,
+  catalog_version: "catalog-v1",
   permissions: [],
   preferences: { dialect: "uk" }
 };
@@ -33,6 +34,14 @@ describe("createAdminAuthStore", () => {
     store.getState().setProfile(null);
     expect(store.getState().profile).toBeNull();
     expect(store.getState().role).toBeNull();
+  });
+
+  it("明确不兼容状态只在有效本人profile或新登录生命周期中清除", () => {
+    const store = createAdminAuthStore();
+    store.setState({ permissionModelIncompatible: true });
+    store.getState().setProfile(PROFILE);
+    expect(store.getState().permissionModelIncompatible).toBe(false);
+    expect(store.getState().profile).toEqual(PROFILE);
   });
 
   it("setHydrated 标记会话恢复完成", () => {

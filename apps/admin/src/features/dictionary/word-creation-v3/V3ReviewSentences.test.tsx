@@ -5,7 +5,10 @@ import type { SharedSentence } from "@tsz/types";
 import { V3ReviewSentences } from "./V3ReviewSentences";
 
 const { list } = vi.hoisted(() => ({ list: vi.fn() }));
-vi.mock("@/lib/auth", () => ({ api: { sentences: { list } } }));
+vi.mock("@/lib/auth", () => ({
+  usePermission: () => true,
+  api: { sentences: { list } }
+}));
 vi.mock("./components/V3EnglishTextPreview", () => ({
   V3EnglishTextPreview: ({
     value
@@ -21,6 +24,7 @@ function sentence(id: string, text: string): SharedSentence {
     lifecycle_revision: 1,
     view: "draft",
     created_by: "admin",
+    created_by_admin_id: "11111111-1111-4111-8111-111111111111",
     created_at: "",
     updated_at: "",
     entries: [],

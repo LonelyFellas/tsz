@@ -26,7 +26,7 @@ export interface HttpClientOptions {
    * code==="must_change_password" 时整页跳改密页。仅通知、不吞错:请求仍照常抛 HttpError,
    * 调用方可继续 catch 做局部处理。web 端不传即维持原行为(向后兼容)。
    */
-  onForbidden?: (code: string | undefined) => void;
+  onForbidden?: (code: string | undefined, path: string) => void;
 }
 
 export class HttpError extends Error {
@@ -226,7 +226,7 @@ export function createHttpClient({
       const { message, details, code, problem, field_issues, meta } =
         parsedError;
       // 403 全局通知(如 must_change_password → 跳改密页)。只作副作用,不吞错:仍照常抛出。
-      if (res.status === 403) onForbidden?.(code);
+      if (res.status === 403) onForbidden?.(code, path);
       throw new HttpError(
         res.status,
         message,

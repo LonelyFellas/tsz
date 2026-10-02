@@ -33,8 +33,15 @@ vi.mock("../dictionary/word-creation/PronunciationPreview", () => ({
 }));
 vi.mock("@/lib/auth", () => ({
   useAuthStore: (
-    select: (state: { profile: null; setProfile: () => void }) => unknown
-  ) => select({ profile: null, setProfile: vi.fn() }),
+    select: (state: {
+      profile: { id: string; role: string; permissions: string[] };
+      setProfile: () => void;
+    }) => unknown
+  ) =>
+    select({
+      profile: { id: "test-super", role: "super_admin", permissions: [] },
+      setProfile: vi.fn()
+    }),
   api: {
     sentences: {
       get: vi.fn(),
@@ -70,6 +77,7 @@ function example(annotations: SharedSentenceAnnotation[] = []): SharedSentence {
     view: "draft",
     entries: [],
     created_by: "测试",
+    created_by_admin_id: "11111111-1111-4111-8111-111111111111",
     created_at: "2026-09-13T00:00:00Z",
     updated_at: "2026-09-13T00:00:00Z"
   };
@@ -171,7 +179,9 @@ describe("当前词条关联与离开保护", () => {
     expect(screen.queryByLabelText("草稿差异")).toBeNull();
     fireEvent.click(screen.getByLabelText("完成例句编辑"));
     expect(api.sentences.update).toHaveBeenCalledTimes(2);
-    expect(screen.getByLabelText("例句正文")).toHaveValue("We make stories.");
+    expect(await screen.findByLabelText("例句正文")).toHaveValue(
+      "We make stories."
+    );
   });
 
   it("放弃输入须二次确认，确认后改用最新内容但不自动保存", async () => {

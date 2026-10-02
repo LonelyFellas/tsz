@@ -702,9 +702,7 @@ export function UnifiedCreateEntryStep({
   const { modal } = App.useApp();
   // 冲突弹窗里哪几行能改由归属决定；门禁保证受保护页内 profile 必有值。
   const profile = useAuthStore((s) => s.profile);
-  const annotationActor = profile
-    ? { id: profile.id, role: profile.role }
-    : undefined;
+  const annotationActor = profile ?? undefined;
   const catalog = usePartOfSpeechCatalog();
   const { preference } = useDialectPreference();
   const [value, setValue] = useState("");
@@ -1288,7 +1286,10 @@ export function UnifiedCreateEntryStep({
           rows={[
             ...annotationSession.conflict.entries.map((entry) => {
               // 改不了的行照样列出来：标注要在整组内互不相同，看不见别人的值就没法避重。
-              const editable = canEditConflictEntry(annotationActor);
+              const editable = canEditConflictEntry(
+                annotationActor,
+                entry.created_by
+              );
               return {
                 key: entry.entry_id,
                 label: entry.presentation.label,
@@ -1336,7 +1337,9 @@ export function UnifiedCreateEntryStep({
               annotation: values.incoming ?? null,
               // 只提交自己有权改的：非超管带上别人的词条会被后端整单 403 驳回。
               annotation_updates: annotationSession.conflict.entries
-                .filter(() => canEditConflictEntry(annotationActor))
+                .filter((entry) =>
+                  canEditConflictEntry(annotationActor, entry.created_by)
+                )
                 .map((entry) => ({
                   entry_id: entry.entry_id,
                   annotation: values[entry.entry_id] ?? null,

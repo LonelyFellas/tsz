@@ -8,7 +8,8 @@ const profile = {
   phone: "13800138000",
   display_name: "Administrator",
   role: "super_admin",
-  can_publish_lexicon: true,
+  permission_version: 1,
+  catalog_version: "catalog-v1",
   permissions: [],
   preferences: { dialect: "uk" }
 };
@@ -21,7 +22,8 @@ beforeEach(() => {
     profile: null,
     role: null,
     hydrated: false,
-    connectionError: false
+    connectionError: false,
+    permissionModelIncompatible: false
   });
 });
 afterEach(() => {
@@ -30,6 +32,35 @@ afterEach(() => {
 });
 
 describe("useAdminSessionRestore + runtime + HTTP", () => {
+  it("旧profile缺字段是明确服务不兼容，不当作可重试的网络故障，也不建立身份", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        json({ access_token: "legacy-token", expires_in: 900 })
+      )
+      .mockResolvedValueOnce(
+        json({
+          id: "legacy",
+          role: "super_admin",
+          phone: "13800138000",
+          display_name: "旧超管",
+          can_publish_lexicon: true,
+          permissions: ["users.access", "words.access"],
+          preferences: { dialect: "uk" }
+        })
+      );
+    renderHook(() => useAdminSessionRestore());
+    await waitFor(() =>
+      expect(authRuntime.store.getState().permissionModelIncompatible).toBe(
+        true
+      )
+    );
+    expect(authRuntime.store.getState()).toMatchObject({
+      profile: null,
+      role: null,
+      hydrated: true,
+      connectionError: false
+    });
+  });
   it.each([503, "offline"])(
     "refresh %s 不判未登录，重试后恢复",
     async (failure) => {

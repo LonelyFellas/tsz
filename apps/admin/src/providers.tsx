@@ -1,5 +1,6 @@
 import { RecoverySession } from "@/features/recovery/RecoverySession";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ADMIN_PERMISSION_UPGRADE_MESSAGE } from "@tsz/api-client";
 import { browserQueryDefaults } from "@tsz/shared";
 import {
   Alert,
@@ -8,14 +9,21 @@ import {
   ConfigProvider,
   theme as antTheme
 } from "antd";
-import { useAuthStore } from "@/lib/auth";
+import { authRuntime, useAuthStore } from "@/lib/auth";
+import {
+  adminAccountIdentity,
+  bindAdminAuthorizationCache
+} from "@/lib/adminAuthorization";
+import { useEffect } from "react";
 import zhCN from "antd/locale/zh_CN";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { useAdminSessionRestore } from "@/features/auth/hooks/useAdminSessionRestore";
 
 // 单例 QueryClient：全局唯一，避免每次渲染重建缓存。默认项（staleTime 等）取自
 // @tsz/shared 的 browserQueryDefaults，与 web 共用同一份，避免两处漂移。
 const queryClient = new QueryClient({ defaultOptions: browserQueryDefaults });
+
+bindAdminAuthorizationCache(useAuthStore, queryClient);
 
 // antd 全局主题。色值与字体来自品牌规范（语雀《天生会背® 开发文档》第 1 章视觉系统），
 // 不是就手挑的。locale=zh_CN 让分页、表格空态、日期选择器等内建文案走中文。
@@ -61,15 +69,44 @@ const antdTheme = {
 // 挂载时用 admin refresh cookie 静默恢复会话，写入 profile / level / hydrated。
 // AntApp 提供 message/modal/notification 的 context 版（v6 起不建议再用静态方法）。
 export function RootProviders() {
+  const { pathname } = useLocation();
+  const permissionModelIncompatible = useAuthStore(
+    (s) => s.permissionModelIncompatible
+  );
+  useEffect(() => {
+    const refresh = () => {
+      if (authRuntime.tokens.getToken())
+        void authRuntime.refreshProfile().catch(() => undefined);
+    };
+    const visible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    document.addEventListener("visibilitychange", visible);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", refresh);
+      document.removeEventListener("visibilitychange", visible);
+    };
+  }, []);
+  const identity = useAuthStore((s) => adminAccountIdentity(s.profile));
   const { retry, retrying } = useAdminSessionRestore();
   const connectionError = useAuthStore((s) => s.connectionError);
   const hydrated = useAuthStore((s) => s.hydrated);
   return (
     <QueryClientProvider client={queryClient}>
       <ConfigProvider locale={zhCN} theme={antdTheme}>
-        <AntApp>
-          <RecoverySession />
-          {connectionError && (
+        <RecoverySession />
+        <AntApp key={identity}>
+          {permissionModelIncompatible && pathname !== "/login" && (
+            <Alert
+              type="error"
+              showIcon
+              title={ADMIN_PERMISSION_UPGRADE_MESSAGE}
+            />
+          )}
+          {!permissionModelIncompatible && connectionError && (
             <Alert
               type="warning"
               showIcon

@@ -54,7 +54,18 @@ describe.each(["web", "admin"] as const)("%s HTTP + auth runtime", (realm) => {
         }
         return new Headers(init?.headers).get("Authorization") === "Bearer old"
           ? response(401)
-          : response(200, {});
+          : response(
+              200,
+              realm === "admin"
+                ? {
+                    id: "admin-1",
+                    role: "admin",
+                    permission_version: 1,
+                    catalog_version: "v1",
+                    permissions: []
+                  }
+                : {}
+            );
       });
     const pending = Promise.all([request(), request(), request()]);
     await vi.waitFor(() => expect(refreshCount).toBe(1));
@@ -83,7 +94,18 @@ describe.each(["web", "admin"] as const)("%s HTTP + auth runtime", (realm) => {
           });
         return response(401);
       }
-      return response(200, {});
+      return response(
+        200,
+        realm === "admin"
+          ? {
+              id: "admin-1",
+              role: "admin",
+              permission_version: 1,
+              catalog_version: "v1",
+              permissions: []
+            }
+          : {}
+      );
     });
     const first = request();
     const second = request();

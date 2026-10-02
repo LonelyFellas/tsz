@@ -54,7 +54,7 @@ export function RoleFormModal({ open, role, onClose }: Props) {
   const invalidate = useInvalidateRoles();
 
   const isEdit = role !== null;
-  const items = catalog.data?.items ?? [];
+  const items = catalog.data?.permissions ?? [];
 
   // 打开时把表单灌成「新建=空 / 编辑=该角色现状」。用 effect 而非 Modal.afterOpenChange：
   // 后者依赖开场动画的 transitionend，在 jsdom（无动画）里不触发，会导致编辑态回填落空。

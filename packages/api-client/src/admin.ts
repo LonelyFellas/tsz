@@ -1,3 +1,7 @@
+import {
+  createPermissionEndpoints,
+  decodeAdminProfile
+} from "./admin-permissions";
 import { createSharedSentenceEndpoints } from "./shared-sentences";
 import { createAdminTeacherCertificationEndpoints } from "./teacher-certification";
 // 平台后台（admin）专用端点。后台是与 web 学员/教师**完全独立**的身份体系：
@@ -39,7 +43,6 @@ import type {
   SearchComponentTargetsV3Input,
   Admin,
   AdminAuthResponse,
-  AdminProfile,
   UpdateAdminPreferencesInput,
   UpdateAdminPreferencesResponse,
   PermissionCatalogResponse,
@@ -212,6 +215,7 @@ function requireLifecycleBatchIdentity<
  */
 export function createAdminEndpoints(http: HttpClient) {
   return {
+    permissionSystem: createPermissionEndpoints(http),
     teacherCertification: createAdminTeacherCertificationEndpoints(http),
     sentences: createSharedSentenceEndpoints(http),
     auth: {
@@ -250,7 +254,7 @@ export function createAdminEndpoints(http: HttpClient) {
         )
     },
     /** GET /admin/profile — 门禁探针：200=有效 admin / 401=未登录。 */
-    profile: () => http.get<AdminProfile>("/profile"),
+    profile: () => http.get<unknown>("/profile").then(decodeAdminProfile),
     /**
      * PATCH /admin/profile/preferences — 改**自己的**个人偏好。
      * 目标恒为 token subject，请求体里没有管理员 ID，改不到别人。
@@ -612,14 +616,6 @@ export function createAdminEndpoints(http: HttpClient) {
     admins: {
       update: (adminId: string, input: UpdateAdminInput) =>
         http.patch<Admin>(`/admins/${adminId}`, input),
-      setPublicationPermission: (
-        adminId: string,
-        can_publish_lexicon: boolean
-      ) =>
-        http.patch<{ can_publish_lexicon: boolean }>(
-          `/admins/${adminId}/lexicon-publication-permission`,
-          { can_publish_lexicon }
-        ),
       /** GET /admin/admins — 列表：role/手机号/昵称筛选 + 分页。 */
       list: (query: AdminListQuery = {}) =>
         http.get<AdminListResponse>(`/admins${qs({ ...query })}`),

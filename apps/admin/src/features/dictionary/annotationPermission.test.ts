@@ -71,6 +71,36 @@ describe("标注写权限", () => {
   });
 });
 
+describe("标注授权范围", () => {
+  it("本人编辑和他人范围各自检查，未知权限不授权", () => {
+    const editor = { ...owner, permissions: ["words.access", "words.edit"] };
+    expect(canEditRowAnnotation(editor, row())).toBe(true);
+    expect(canEditConflictEntry(editor, owner.id)).toBe(true);
+    expect(canEditRowAnnotation(editor, row({ created_by: stranger.id }))).toBe(
+      false
+    );
+    expect(canEditConflictEntry(editor, stranger.id)).toBe(false);
+    expect(
+      canEditRowAnnotation(
+        {
+          ...editor,
+          permissions: [...editor.permissions, "words.edit_others"]
+        },
+        row({ created_by: stranger.id })
+      )
+    ).toBe(true);
+    expect(
+      canEditRowAnnotation(
+        { ...editor, permissions: ["words.edit_others"] },
+        row()
+      )
+    ).toBe(false);
+    expect(
+      canEditRowAnnotation({ ...editor, permissions: ["words.*"] }, row())
+    ).toBe(false);
+  });
+});
+
 describe("403 文案", () => {
   it("归属越权给出确切原因", () => {
     expect(isAnnotationOwnershipError("entry_annotation_forbidden")).toBe(true);

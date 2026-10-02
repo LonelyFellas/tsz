@@ -37,7 +37,7 @@ const authMocks = vi.hoisted(() => ({
   profile: { id: "admin-1", role: "super_admin" } as {
     id: string;
     role: string;
-    can_publish_lexicon?: boolean;
+    permissions?: string[];
   } | null
 }));
 
@@ -411,11 +411,11 @@ describe("SmartDictionary", () => {
     expect(screen.getByLabelText("移入垃圾桶「center」")).toBeDisabled();
   });
 
-  it("普通发布者的归档提示按生命周期权限而非编辑权限显示", async () => {
+  it("普通管理员归档按钮按独立归档权限显示，不借编辑或发布权限", async () => {
     authMocks.profile = {
       id: "admin-1",
       role: "admin",
-      can_publish_lexicon: true
+      permissions: ["words.access", "words.archive"]
     };
     apiMocks.useWordList.mockReturnValue({
       data: {

@@ -50,9 +50,13 @@ export function useDialectPreference(): DialectPreferenceHandle {
       const { preferences } = await api.updateProfilePreferences({
         dialect: value
       });
-      // 回填的是**服务端落库后的值**而不是我们提交的值：默认值与取值都由后端说了算。
-      setProfile({ ...profile, preferences });
-      cache.write(profile.id, preferences.dialect);
+      // 偏好请求可能晚于权限刷新；只合并到同账号的最新身份，不能复活旧授权。
+      const current = useAuthStore.getState().profile;
+      if (!current || current.id !== profile.id) {
+        throw new Error("当前会话已变化，请重试");
+      }
+      setProfile({ ...current, preferences });
+      cache.write(current.id, preferences.dialect);
     },
     [profile, setProfile]
   );

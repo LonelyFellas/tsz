@@ -35,6 +35,7 @@ const sentence: SharedSentence = {
   content: newSentence(),
   entries: [],
   created_by: "创建人",
+  created_by_admin_id: "11111111-1111-4111-8111-111111111111",
   created_at: "2026-09-23T00:00:00Z",
   updated_at: "2026-09-23T00:00:00Z"
 };
@@ -130,7 +131,8 @@ describe("共享例句独立发布操作", () => {
         source_revision: 2,
         snapshot: newSentence(),
         published_at: "2026-09-23T00:00:00Z",
-        published_by_admin_id: "admin"
+        published_by_admin_id: "admin",
+        created_by_admin_id: sentence.created_by_admin_id
       }
     ]);
     vi.mocked(api.sentences.rollback).mockResolvedValue(sentence);

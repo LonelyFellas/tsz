@@ -12,11 +12,13 @@ import {
 } from "@ant-design/icons";
 import { Menu } from "antd";
 import type { MenuProps } from "antd";
-import type { MenuPermission } from "@tsz/types";
+import type { AdminProfile, MenuPermission } from "@tsz/types";
 import type { ReactNode } from "react";
 import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useAuthStore, useIsSuperAdmin } from "@/lib/auth";
+import { hasAdminPermission } from "@tsz/shared/auth";
+import { useAuthStore } from "@/lib/auth";
+import { ADMIN_PAGE_ROUTES } from "@/lib/adminPageRoutes";
 
 /**
  * 后台侧栏导航（antd Menu）。**由后端驱动**：每个叶子挂一个菜单权限 key（RBAC，
@@ -46,22 +48,30 @@ interface Group {
 
 // 分组与叶子的静态定义（label/icon/path 属前端关注点，不由后端下发）。可见性在 buildNav
 // 里按权限过滤：叶子不可见就从分组剔除，分组无可见叶子则整组不渲染。
+function pageLeaf(
+  route: {
+    path: string;
+    handle: { permission?: MenuPermission; superOnly?: boolean };
+  },
+  label: string
+): Leaf {
+  return {
+    key: `/${route.path}`,
+    label,
+    perm: route.handle.permission,
+    superOnly: route.handle.superOnly
+  };
+}
+
 const GROUPS: Group[] = [
   {
     key: "grp-user",
     icon: <UserOutlined />,
     label: "用户管理",
     leaves: [
-      { key: "/users", label: "用户管理", perm: "users.access" },
-      { key: "/admins", label: "管理员管理", superOnly: true },
-      // RBAC 后端未实现（/admin/roles 与权限目录都是 404），先按未落地功能处理：
-      // 渲染成禁用占位，不给入口也不发请求。后端落地后把 key 改回 "/roles" 并恢复路由。
-      {
-        key: "todo:roles",
-        label: "角色权限管理",
-        superOnly: true,
-        disabled: true
-      }
+      pageLeaf(ADMIN_PAGE_ROUTES.users, "用户管理"),
+      pageLeaf(ADMIN_PAGE_ROUTES.admins, "管理员管理"),
+      pageLeaf(ADMIN_PAGE_ROUTES.permissions, "权限管理")
     ]
   },
   {
@@ -82,19 +92,15 @@ const GROUPS: Group[] = [
     icon: <BookOutlined />,
     label: "词库管理",
     leaves: [
-      { key: "/words", label: "智能词库", perm: "words.access" },
-      { key: "/words/trash", label: "垃圾桶", perm: "words.access" },
+      pageLeaf(ADMIN_PAGE_ROUTES.words, "智能词库"),
+      pageLeaf(ADMIN_PAGE_ROUTES.wordsTrash, "垃圾桶"),
       {
         key: "todo:custom-dict",
         label: "自定义词库",
         perm: "customdict.access",
         disabled: true
       },
-      {
-        key: "/sentences",
-        label: "多维例句",
-        perm: "sentences.access"
-      }
+      pageLeaf(ADMIN_PAGE_ROUTES.sentences, "多维例句")
     ]
   },
   {
@@ -142,11 +148,7 @@ const GROUPS: Group[] = [
         perm: "reviews.access",
         disabled: true
       },
-      {
-        key: "/teacher-applications",
-        label: "教师申请审核",
-        superOnly: true
-      },
+      pageLeaf(ADMIN_PAGE_ROUTES.teacherApplications, "教师申请审核"),
       {
         key: "todo:comments",
         label: "评论审核",
@@ -159,13 +161,7 @@ const GROUPS: Group[] = [
     key: "grp-settings",
     icon: <SettingOutlined />,
     label: "系统设置",
-    leaves: [
-      {
-        key: "/settings/parts-of-speech",
-        label: "词性配置",
-        superOnly: true
-      }
-    ]
+    leaves: [pageLeaf(ADMIN_PAGE_ROUTES.partsOfSpeech, "词性配置")]
   },
   {
     key: "grp-coin",
@@ -187,14 +183,11 @@ const GROUPS: Group[] = [
  * 当 super_admin 或 permissions 含其 key 时可见（super 隐式全权，即便 permissions 为空也放行）。
  * 分组过滤掉不可见叶子后若为空则整组不渲染。
  */
-function buildNav(
-  permissions: ReadonlySet<string>,
-  isSuperAdmin: boolean
-): MenuItem[] {
+function buildNav(profile: AdminProfile | null): MenuItem[] {
   const visible = (l: Leaf): boolean =>
     l.superOnly
-      ? isSuperAdmin
-      : isSuperAdmin || (l.perm !== undefined && permissions.has(l.perm));
+      ? profile?.role === "super_admin"
+      : l.perm !== undefined && hasAdminPermission(profile, l.perm);
 
   const items: MenuItem[] = [
     { key: "/", icon: <HomeOutlined />, label: "首页" }
@@ -220,17 +213,8 @@ export function ConsoleSidebar({
 }) {
   const pathname = useLocation().pathname;
   const navigate = useNavigate();
-  const isSuperAdmin = useIsSuperAdmin();
-  const permissions = useAuthStore((s) => s.profile?.permissions);
-  // permissions 引用随 profile 变化而变；Set 只在其变化时重建。
-  const permSet = useMemo(
-    () => new Set<string>(permissions ?? []),
-    [permissions]
-  );
-  const nav = useMemo(
-    () => buildNav(permSet, isSuperAdmin),
-    [permSet, isSuperAdmin]
-  );
+  const profile = useAuthStore((s) => s.profile);
+  const nav = useMemo(() => buildNav(profile), [profile]);
 
   const onClick: MenuProps["onClick"] = ({ key }) => {
     // 占位项以 todo: 前缀标记（且已 disabled，正常点不到），保险起见再拦一次。
