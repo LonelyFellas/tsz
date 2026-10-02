@@ -10,6 +10,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { User } from "@tsz/types";
 import { AccountMenu } from "./AccountMenu";
 import { useUserStore } from "@/stores/user";
+import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIdentityProvider";
+
+vi.mock("@/features/teacher-certification/TeacherIdentityProvider", () => ({
+  useTeacherIdentity: vi.fn()
+}));
 
 const mockPush = vi.fn();
 
@@ -36,6 +41,13 @@ const USER: User = {
 beforeEach(() => {
   vi.clearAllMocks();
   mockPush.mockReset();
+  vi.mocked(useTeacherIdentity).mockReturnValue({
+    identity: "student",
+    verified: false,
+    ready: true,
+    error: false,
+    select: vi.fn().mockResolvedValue(undefined)
+  });
   useUserStore.setState({ user: null, onboarded: null, hydrated: true });
 });
 
@@ -97,7 +109,7 @@ describe("AccountMenu", () => {
     );
   });
 
-  it("点击头像 → 展开菜单(退出登录 / 注销账号)", async () => {
+  it("点击头像 → 展开常用入口，注销移至账号安全", async () => {
     useUserStore.setState({ user: USER });
     const user = userEvent.setup();
     render(<AccountMenu />);
@@ -105,11 +117,54 @@ describe("AccountMenu", () => {
     expect(screen.queryByText("退出登录")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "账户菜单" }));
     expect(screen.getByText("退出登录")).toBeInTheDocument();
-    expect(screen.getByText("注销账号").closest("a")).toHaveAttribute(
-      "href",
-      "/account/delete"
+    expect(screen.getByText("当前身份：学生")).toBeInTheDocument();
+    expect(screen.getAllByRole("link").map((link) => link.textContent)).toEqual(
+      ["进入学生工作台", "个人中心", "站内通知", "申请教师认证"]
     );
+    expect(
+      screen.getByRole("link", { name: "进入学生工作台" })
+    ).toHaveAttribute("href", "/student/practice");
+    expect(screen.queryByText("注销账号")).not.toBeInTheDocument();
   });
+
+  it.each(["student", "teacher"] as const)(
+    "已认证教师在 %s 工作台 → 显示当前入口和另一工作台切换",
+    async (identity) => {
+      const select = vi.fn().mockResolvedValue(undefined);
+      vi.mocked(useTeacherIdentity).mockReturnValue({
+        identity,
+        verified: true,
+        ready: true,
+        error: false,
+        select
+      });
+      useUserStore.setState({ user: USER });
+      const user = userEvent.setup();
+      render(<AccountMenu />);
+      await user.click(screen.getByRole("button", { name: "账户菜单" }));
+      expect(
+        screen.getByRole("link", {
+          name: identity === "teacher" ? "进入教师工作台" : "进入学生工作台"
+        })
+      ).toHaveAttribute(
+        "href",
+        identity === "teacher" ? "/teacher/classes" : "/student/practice"
+      );
+      expect(screen.queryByText("申请教师认证")).not.toBeInTheDocument();
+      await user.click(
+        screen.getByRole("button", {
+          name: identity === "teacher" ? "切换到学生工作台" : "切换到教师工作台"
+        })
+      );
+      expect(select).toHaveBeenCalledWith(
+        identity === "teacher" ? "student" : "teacher"
+      );
+      expect(screen.getByRole("button", { name: "账户菜单" })).toHaveAttribute(
+        "aria-expanded",
+        "false"
+      );
+    }
+  );
 
   it("点击退出登录 → 调后端登出、清 token、跳登录页", async () => {
     useUserStore.setState({ user: USER });

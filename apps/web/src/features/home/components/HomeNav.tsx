@@ -6,7 +6,7 @@ import { ThemeToggle } from "@/features/theme/ThemeToggle";
 import { AccountMenu } from "./AccountMenu";
 
 // 首页吸顶导航——Apple 风毛玻璃细顶栏。
-// 已登录时账户操作(退出 / 注销)收进右上角头像菜单,不再平铺在顶栏。
+// 已登录时工作台和账户入口收进右上角头像菜单,不再平铺在顶栏。
 export function HomeNav() {
   const user = useUserStore((s) => s.user);
   const hydrated = useUserStore((s) => s.hydrated);

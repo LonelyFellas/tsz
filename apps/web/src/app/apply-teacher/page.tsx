@@ -14,19 +14,24 @@ export const metadata: Metadata = {
 export default function ApplyTeacherPage() {
   return (
     <RouteGuard>
-      <main className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
-        <div className="mb-8 flex items-center justify-between">
-          <Link href="/" className="text-sm text-foreground-muted">
-            返回首页
+      <main className="mx-auto max-w-4xl px-5 pb-12 pt-6 sm:px-8 sm:pb-16 sm:pt-8">
+        <div className="mb-8 flex items-center justify-between border-b border-border/70 pb-5">
+          <Link
+            href="/"
+            className="rounded-sm text-sm text-foreground-muted transition hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          >
+            ← 返回首页
           </Link>
           <AccountMenu />
         </div>
-        <h1 className="mb-3 text-3xl font-semibold tracking-tight">
-          申请成为老师
-        </h1>
-        <p className="mb-8 text-foreground-muted">
-          审核通过后获得教师身份，原有学生身份与学习数据保持不变。
-        </p>
+        <div className="mb-7 sm:mb-8">
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+            申请成为老师
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-foreground-muted">
+            通过认证后，可以创建班级、布置任务。你仍可用学生身份学习，原有记录会保留。
+          </p>
+        </div>
         <ApplyTeacherForm />
       </main>
     </RouteGuard>

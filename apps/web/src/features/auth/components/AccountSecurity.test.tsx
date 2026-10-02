@@ -112,6 +112,13 @@ afterEach(() => {
   });
 });
 
+it("账号安全保留注销流程入口", async () => {
+  render(<AccountSecurity />);
+  expect(
+    await screen.findByRole("link", { name: "了解注销流程" })
+  ).toHaveAttribute("href", "/account/delete");
+});
+
 describe("AccountSecurity", () => {
   it("操作视图使用独立标题并能返回账号安全总览", async () => {
     render(<AccountSecurity />);
