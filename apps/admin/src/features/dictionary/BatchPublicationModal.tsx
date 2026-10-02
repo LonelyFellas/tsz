@@ -18,7 +18,9 @@ import type {
   SharedSentence,
   SurfaceMatchPageV3
 } from "@tsz/types";
-import { api } from "@/lib/auth";
+import { canAdminResourceAction, hasAdminPermission } from "@tsz/shared/auth";
+import { canPublishEntry } from "./entryWritePermission";
+import { api, useAuthStore } from "@/lib/auth";
 import { wordKeys } from "./api";
 import { editableEnglishText } from "./word-creation-v3/meaningsModel";
 import { wordListLabel } from "./presentation";
@@ -41,12 +43,25 @@ export function BatchPublicationModal({
   onClose: () => void;
   onPublished: () => void;
 }) {
+  const profile = useAuthStore((state) => state.profile);
+  const canReadSentences = hasAdminPermission(profile, "sentences.access");
+  const canPublishSentence = (sentence: SharedSentence) =>
+    canAdminResourceAction(
+      profile,
+      "sentences",
+      "publish",
+      sentence.created_by_admin_id
+    );
   const qc = useQueryClient();
   const [sentenceRows, setSentenceRows] = useState(sentences);
+  const allowed =
+    rows.every((row) => canPublishEntry(profile, row)) &&
+    sentenceRows.every(canPublishSentence);
   const [keyword, setKeyword] = useState("");
   const [page, setPage] = useState(1);
   const [started, setStarted] = useState(false);
   const candidates = useQuery({
+    enabled: canReadSentences,
     queryKey: ["shared-sentences", "batch-candidates", keyword, page],
     queryFn: () =>
       api.sentences.list({
@@ -86,6 +101,7 @@ export function BatchPublicationModal({
   const submit = async (request = input) => {
     if (
       busy.current ||
+      !allowed ||
       conflict ||
       request.items.length + (request.sentences?.length ?? 0) === 0
     )
@@ -147,6 +163,7 @@ export function BatchPublicationModal({
       okButtonProps={{
         "aria-label": "发布所选",
         disabled:
+          !allowed ||
           conflict ||
           Boolean(surface) ||
           rows.length + sentenceRows.length === 0 ||
@@ -171,7 +188,7 @@ export function BatchPublicationModal({
         <Input
           aria-label="查找待发布例句"
           placeholder="按 ID 或正文查找例句"
-          disabled={started}
+          disabled={started || !canReadSentences}
           value={keyword}
           onChange={(event) => {
             setKeyword(event.target.value);
@@ -182,7 +199,7 @@ export function BatchPublicationModal({
           mode="multiple"
           aria-label="选择一起发布的例句"
           style={{ width: "100%" }}
-          disabled={started}
+          disabled={started || !canReadSentences}
           loading={candidates.isFetching}
           value={sentenceRows.map((row) => row.id)}
           optionFilterProp="label"
@@ -194,6 +211,7 @@ export function BatchPublicationModal({
             ).values()
           ).map((row) => ({
             value: row.id,
+            disabled: !canPublishSentence(row),
             label: `${editableEnglishText(row.content.sentence.en_text)
               .map((variant) => variant.text)
               .join(" / ")
@@ -235,7 +253,7 @@ export function BatchPublicationModal({
           current={page}
           pageSize={20}
           total={candidates.data?.total}
-          disabled={started}
+          disabled={started || !canReadSentences}
           showSizeChanger={false}
           onChange={setPage}
         />

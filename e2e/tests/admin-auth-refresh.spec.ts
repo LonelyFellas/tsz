@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import type { AdminProfile } from "@tsz/types";
 
 const profile = {
   id: "a1",
@@ -6,9 +7,35 @@ const profile = {
   display_name: "管理员",
   role: "super_admin",
   can_publish_lexicon: true,
+  permission_version: 1,
+  catalog_version: "permission-e2e-v1",
   permissions: [],
   preferences: { dialect: "uk" }
-};
+} satisfies AdminProfile;
+
+test("旧 profile 缺少权限版本时失败关闭，不请求业务数据", async ({ page }) => {
+  const legacyProfile: Partial<AdminProfile> = { ...profile };
+  delete legacyProfile.permission_version;
+  delete legacyProfile.catalog_version;
+  let businessRequests = 0;
+  await page.route("**/api/v1/admin/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/auth/refresh"))
+      return route.fulfill({
+        json: { access_token: "legacy-token", expires_in: 900 }
+      });
+    if (path.endsWith("/profile"))
+      return route.fulfill({ json: legacyProfile });
+    businessRequests++;
+    return route.fulfill({ status: 501 });
+  });
+  await page.goto("/words");
+  await expect(
+    page.getByText("当前后台版本不支持权限设置，请升级后台服务后再登录")
+  ).toBeVisible();
+  await expect(page.getByText("后台服务暂不可用")).toBeVisible();
+  expect(businessRequests).toBe(0);
+});
 
 test("初始恢复 503 后手动登录可进入后台，不永久停在加载态", async ({
   page

@@ -1839,7 +1839,10 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
   });
 
   test("Mock 发布者：已发布词条归档可用且提示与权限一致", async ({ page }) => {
-    await mockAdminV3Api(page, { viewerRole: "admin" });
+    await mockAdminV3Api(page, {
+      viewerRole: "admin",
+      viewerPermissions: ["words.access", "words.publish", "words.archive"]
+    });
     await page.goto("/words");
     const status = await page.evaluate(async (id) => {
       const response = await fetch(

@@ -651,6 +651,65 @@ describe("V3PreviewAndPublishStep", () => {
     }
   });
 
+  it.each(["words.edit", "words.validate"])(
+    "只有%s也可以校验，但校验结果不能开放发布或确认发布",
+    async (permission) => {
+      useAuthStore.getState().setProfile({
+        ...useAuthStore.getState().profile!,
+        permissions: ["words.access", permission]
+      });
+      const requests = allowedRequests({
+        impact: vi.fn().mockResolvedValue({
+          schema_version: 3,
+          base_revision: 7,
+          requires_confirmation: true,
+          affected: []
+        })
+      });
+      render(
+        <V3PreviewAndPublishStep
+          word={word({ mode: "native" })}
+          requests={requests}
+          onPublished={vi.fn()}
+        />
+      );
+      fireEvent.click(screen.getByText("检查发布条件"));
+      await screen.findByText("影响预览：0 项");
+      expect(requests.validate).toHaveBeenCalledWith("word-v3", {
+        schema_version: 3,
+        base_revision: 7
+      });
+      expect(requests.impact).toHaveBeenCalled();
+      expect(
+        screen.queryByText("发布词条", { selector: "button span" })
+      ).toBeNull();
+      expect(
+        screen.queryByText("确认影响并允许发布", { selector: "button span" })
+      ).toBeNull();
+      expect(requests.publish).not.toHaveBeenCalled();
+    }
+  );
+
+  it("只读查看权不自动允许调用校验API", () => {
+    useAuthStore.getState().setProfile({
+      ...useAuthStore.getState().profile!,
+      permissions: ["words.access"]
+    });
+    const requests = allowedRequests();
+    render(
+      <V3PreviewAndPublishStep
+        word={word({ mode: "native" })}
+        requests={requests}
+        onPublished={vi.fn()}
+      />
+    );
+    expect(
+      screen.queryByText("检查发布条件", { selector: "button span" })
+    ).toBeNull();
+    expect(requests.validate).not.toHaveBeenCalled();
+    expect(requests.publish).not.toHaveBeenCalled();
+  });
+
   it("native 发布能力下始终展示发布入口", () => {
     render(
       <V3PreviewAndPublishStep
@@ -1497,10 +1556,11 @@ beforeEach(() => {
     profile: {
       id: "admin-1",
       role: "admin",
-      can_publish_lexicon: true,
+      permission_version: 1,
+      catalog_version: "catalog-v1",
       phone: "13800138000",
       display_name: "发布测试",
-      permissions: [],
+      permissions: ["words.access", "words.publish"],
       preferences: { dialect: "uk" }
     }
   });

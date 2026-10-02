@@ -70,7 +70,8 @@ beforeEach(() => {
       phone: "13800138000",
       display_name: "测试超管",
       role: "super_admin",
-      can_publish_lexicon: true,
+      permission_version: 1,
+      catalog_version: "catalog-v1",
       permissions: ["words.access"],
       preferences: { dialect: "uk" }
     }
@@ -83,7 +84,7 @@ describe("WordCreatePage", () => {
       profile: {
         ...useAuthStore.getState().profile!,
         role: "admin",
-        can_publish_lexicon: false
+        permissions: ["words.access"]
       }
     });
     render(

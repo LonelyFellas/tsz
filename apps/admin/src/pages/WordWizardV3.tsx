@@ -51,9 +51,9 @@ import {
 import { resolveV3StepAccess } from "@/features/dictionary/word-creation-v3/stepAccess";
 import {
   canWriteEntry,
-  canPublishEntry
+  canCheckEntry
 } from "@/features/dictionary/entryWritePermission";
-import { api, useAuthStore } from "@/lib/auth";
+import { api, useAuthStore, usePermission } from "@/lib/auth";
 import { usePartOfSpeechCatalog } from "@/features/dictionary/part-of-speech/api";
 import { summarizeFormsImpact } from "@/features/dictionary/word-creation-v3/presentation";
 import {
@@ -651,7 +651,9 @@ function V3LiveReview({
   actions?: React.ReactNode;
   onEdit?: (nodeId: string) => void;
 }) {
+  const canReadSentences = usePermission("sentences.access");
   const sentences = useQuery({
+    enabled: canReadSentences,
     queryKey: ["shared-sentences", "count", word.id, "published"],
     queryFn: () =>
       api.sentences.list({ view: "published", entry_id: word.id, page_size: 1 })
@@ -829,7 +831,7 @@ function V3WizardSlots({
   if (context.readOnly) {
     return (
       <Flex vertical gap="middle">
-        {canPublishEntry(profile, context.word) && !canWriteEntry(profile) ? (
+        {canCheckEntry(profile) && !canWriteEntry(profile, context.word) ? (
           <V3PreviewAndPublishStep
             word={context.word}
             requests={requests}
@@ -839,7 +841,8 @@ function V3WizardSlots({
           <V3ReadOnlyPreview
             word={context.word}
             onEdit={
-              canWriteEntry(profile) && context.word.status === "published"
+              canWriteEntry(profile, context.word) &&
+              context.word.status === "published"
                 ? () =>
                     navigate(
                       `/words/${context.word.id}/v3/wizard/forms?${new URLSearchParams(
@@ -901,18 +904,17 @@ export function WordWizardV3Page({
   requests?: V3WordRequests;
   renderMeaningsStep?: V3MeaningsStepRenderer;
 } = {}) {
+  const canReadSentences = usePermission("sentences.access");
   const { wordId = "", step } = useParams();
   const sharedSentences = useQuery({
     queryKey: ["shared-sentences", "count", wordId, "draft"],
     queryFn: () =>
       api.sentences.list({ view: "draft", entry_id: wordId, page_size: 1 }),
-    enabled: !!wordId
+    enabled: !!wordId && canReadSentences
   });
   // 归属判定所需；门禁保证受保护页内 profile 必有值，缺失时判定一律不放行。
   const profile = useAuthStore((s) => s.profile);
-  const writeActor = profile
-    ? { id: profile.id, role: profile.role }
-    : undefined;
+  const writeActor = profile;
   const partOfSpeechCatalog = usePartOfSpeechCatalog();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -1023,7 +1025,7 @@ export function WordWizardV3Page({
     word,
     requestedStep,
     editingPublished,
-    canWriteEntry(writeActor)
+    canWriteEntry(writeActor, word)
   );
   const forcePreview = stepAccess.readOnly;
   const legalStep = stepAccess.effective;

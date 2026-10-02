@@ -93,7 +93,7 @@ import {
   LEGACY_SCHEMA_BLOCKED_HINT
 } from "./wordRouting";
 import {
-  ENTRY_WRITE_BLOCKED_HINT,
+  canCreateEntry,
   canWriteEntry,
   canTransitionEntry,
   entryWriteForbiddenMessage,
@@ -200,7 +200,7 @@ export function SmartDictionary({
   const deleteActor = profile
     ? { id: profile.id, role: profile.role }
     : undefined;
-  const annotationActor = deleteActor;
+  const annotationActor = profile ?? undefined;
   const writeActor = profile;
   const [searchParams, setSearchParams] = useSearchParams();
   const [annotationEntry, setAnnotationEntry] =
@@ -622,8 +622,19 @@ export function SmartDictionary({
     }
     // 整批原子：任意一条没有生命周期操作权限，后端会拒绝整批。
     // 与其让整批失败，不如提交前就把不归自己管的挑明。
-    if (selectedRows.some((row) => !canTransitionEntry(writeActor, row))) {
-      message.warning("当前账号没有操作所选词条的权限；已发布词条需要发布权限");
+    if (
+      selectedRows.some(
+        (row) =>
+          !canTransitionEntry(
+            writeActor,
+            row,
+            row.status === "archived" ? "restore" : "archive"
+          )
+      )
+    ) {
+      message.warning(
+        "当前账号缺少所选词条的归档或恢复权限，普通管理员仅可操作本人词条"
+      );
       return;
     }
     const restoring = restoringSelection;
@@ -905,7 +916,7 @@ export function SmartDictionary({
       fixed: "right",
       render: (_: unknown, record: AdminWordListItemAny) => {
         const rowName = `「${wordListLabel(record)}」`;
-        const rowWritable = canWriteEntry(writeActor);
+        const rowWritable = canWriteEntry(writeActor, record);
         return (
           // 左组是进入词条的入口、右组是生命周期动作，各自贴住一边：
           // 「标注」按行有无都不会让删除入口跟着左右跳。
@@ -963,8 +974,11 @@ export function SmartDictionary({
                         )
                       }
                       disabled={
-                        !canTransitionEntry(writeActor, record) ||
-                        lifecycleInput(record) === undefined
+                        !canTransitionEntry(
+                          writeActor,
+                          record,
+                          record.status === "archived" ? "restore" : "archive"
+                        ) || lifecycleInput(record) === undefined
                       }
                       loading={
                         lifecyclePending &&
@@ -985,10 +999,12 @@ export function SmartDictionary({
                   // 置灰时把原因摆出来，否则管理员只看到一个不能点的按钮。
                   // 缺 lifecycle 字段那种置灰不给 Tooltip：那是数据问题，刷新即可，
                   // 与「这条不归你管」不是一回事。
-                  const hint = !canTransitionEntry(writeActor, record)
-                    ? record.published_revision !== undefined
-                      ? "操作已发布词条需要词库发布权限"
-                      : ENTRY_WRITE_BLOCKED_HINT
+                  const hint = !canTransitionEntry(
+                    writeActor,
+                    record,
+                    record.status === "archived" ? "restore" : "archive"
+                  )
+                    ? "需要相应的归档或恢复权限；普通管理员仅可操作本人词条"
                     : record.status === "archived"
                       ? ""
                       : "移入垃圾桶";
@@ -1173,7 +1189,7 @@ export function SmartDictionary({
           style={{ marginBottom: 12 }}
         >
           <Space wrap>
-            {!trashMode && canWriteEntry(writeActor) && (
+            {!trashMode && canCreateEntry(writeActor) && (
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
@@ -1191,7 +1207,12 @@ export function SmartDictionary({
                 disabled={
                   selectedKeys.length === 0 ||
                   selectedRows.some(
-                    (row) => !canTransitionEntry(writeActor, row)
+                    (row) =>
+                      !canTransitionEntry(
+                        writeActor,
+                        row,
+                        row.status === "archived" ? "restore" : "archive"
+                      )
                   )
                 }
                 loading={archiveBatch.isPending || restoreBatch.isPending}
@@ -1207,7 +1228,8 @@ export function SmartDictionary({
                   danger
                   icon={<DeleteOutlined />}
                   disabled={
-                    selectedKeys.length === 0 || !canWriteEntry(writeActor)
+                    selectedKeys.length === 0 ||
+                    writeActor?.role !== "super_admin"
                   }
                   loading={deleteBatch.isPending}
                   onClick={deleteSelected}

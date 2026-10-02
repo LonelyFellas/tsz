@@ -10,6 +10,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { FormTypeConfig } from "@tsz/types";
 import { beforeEach, expect, it, vi } from "vitest";
 import { expectDisplayNamesNotDerived } from "./displayName.test.helper";
+import { useAuthStore } from "@/lib/auth";
 import { FormTypeSettings } from "./FormTypeSettings";
 
 const mock = vi.hoisted(() => ({
@@ -72,6 +73,16 @@ const base: FormTypeConfig = {
   updated_at: "2026-09-09T00:00:00Z"
 };
 beforeEach(() => {
+  useAuthStore.getState().setProfile({
+    id: "admin-1",
+    role: "super_admin",
+    phone: "",
+    display_name: "测试超管",
+    permission_version: 1,
+    catalog_version: "v1",
+    permissions: [],
+    preferences: { dialect: "uk" }
+  });
   mock.items = [{ ...base }];
   vi.clearAllMocks();
 });

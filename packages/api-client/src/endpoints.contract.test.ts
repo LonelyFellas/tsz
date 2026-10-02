@@ -61,12 +61,8 @@ const PENDING = new Set<string>([
   "post /comments",
   "get /tasks",
   "post /tasks",
-  // 平台后台(admin)RBAC:产品已定案不做(见 tsz-rust admin-design Q10),后端不会实现,
-  // 因此这几条不是「待实现」而是「已取消」。createEndpoints 目前仍会发出它们(Roles 页面在用),
-  // 白名单条目必须保留,否则「无臆造端点」断言会红。待前端下架 Roles 页面后,
-  // 连同 admin.ts 里对应的方法一起删。
+  // 角色治理尚未实现，页面保持未挂路由；统一权限目录已经实现，不在白名单中。
   "patch /admin/admins/_/role",
-  "get /admin/permissions",
   "get /admin/roles",
   "post /admin/roles",
   "patch /admin/roles/_",
@@ -589,7 +585,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "b34d8d4b985d5f6f7fd850dc0679b816aeecb7b4f308be5d0f3dec4e487e8fa4"
+      "5e732f282c0add0816f2e941c7c4da8b87f7b8825cb1d804c2fab955488ce2b7"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");

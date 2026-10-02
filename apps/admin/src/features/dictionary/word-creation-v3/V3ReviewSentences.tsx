@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Alert, Button, Empty, Pagination, Skeleton, Tag } from "antd";
-import { api } from "@/lib/auth";
+import { api, usePermission } from "@/lib/auth";
 import { V3EnglishTextPreview } from "./components/V3EnglishTextPreview";
 import { sentenceTranslationsV3 } from "./meaningsModel";
 
@@ -15,6 +15,7 @@ export function V3ReviewSentences({
   senseId: string;
   revision: number;
 }) {
+  const canRead = usePermission("sentences.access");
   const [page, setPage] = useState(1);
   const root = useRef<HTMLElement>(null);
   const [visible, setVisible] = useState(
@@ -35,7 +36,7 @@ export function V3ReviewSentences({
     return () => observer.disconnect();
   }, [visible]);
   const query = useQuery({
-    enabled: visible,
+    enabled: visible && canRead,
     queryKey: ["shared-sentences", "review", entryId, senseId, revision, page],
     queryFn: () =>
       api.sentences.list({
@@ -46,6 +47,7 @@ export function V3ReviewSentences({
         page_size: 5
       })
   });
+  if (!canRead) return <Alert type="info" title="未开通例句查看权限" />;
   return (
     <section
       ref={root}

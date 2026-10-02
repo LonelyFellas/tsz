@@ -10,6 +10,7 @@ export * from "./auth";
 export * from "./teacher-certification";
 export * from "./admin";
 export * from "./admin-user";
+export * from "./admin-permissions";
 export * from "./admin-role";
 export * from "./part-of-speech";
 export * from "./rich-text";

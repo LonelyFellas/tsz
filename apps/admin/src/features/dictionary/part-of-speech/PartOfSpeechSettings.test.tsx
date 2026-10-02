@@ -13,6 +13,7 @@ import type {
 } from "@tsz/types";
 import type { ReactNode, Ref } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useAuthStore } from "@/lib/auth";
 import { PartOfSpeechSettings } from "./PartOfSpeechSettings";
 
 vi.mock("antd", async (importOriginal) => {
@@ -274,6 +275,16 @@ function renderSettings() {
 }
 
 beforeEach(() => {
+  useAuthStore.getState().setProfile({
+    id: "admin-1",
+    role: "super_admin",
+    phone: "",
+    display_name: "测试超管",
+    permission_version: 1,
+    catalog_version: "v1",
+    permissions: [],
+    preferences: { dialect: "uk" }
+  });
   vi.clearAllMocks();
   mock.queries.length = 0;
   mock.list.isError = false;
@@ -305,6 +316,24 @@ beforeEach(() => {
 });
 
 describe("PartOfSpeechSettings", () => {
+  it("配置查看权不开放写操作；编辑授权才可新增、修改、删除", () => {
+    useAuthStore.getState().setProfile({
+      ...useAuthStore.getState().profile!,
+      role: "admin",
+      permissions: ["lexicon_settings.access"]
+    });
+    renderSettings();
+    expect(screen.getByText("新增基本词性").closest("button")).toBeDisabled();
+    for (const button of screen.getAllByText("修 改", {
+      selector: "button span"
+    }))
+      expect(button.closest("button")).toBeDisabled();
+    for (const button of screen.getAllByText("删 除", {
+      selector: "button span"
+    }))
+      expect(button.closest("button")).toBeDisabled();
+    expect(mock.remove).not.toHaveBeenCalled();
+  });
   it("配置页顶部显示基本/细分 Tab，默认展示基本词性管理", () => {
     renderSettings();
 

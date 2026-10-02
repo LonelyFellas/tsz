@@ -25,7 +25,7 @@ import {
   Typography
 } from "antd";
 import { useEffect, useState } from "react";
-import { api, useAuthStore, useIsSuperAdmin } from "@/lib/auth";
+import { api, useAuthStore, usePermission } from "@/lib/auth";
 import { RevokeTeacherButton } from "./RevokeTeacherButton";
 
 const statuses: Record<
@@ -45,15 +45,16 @@ const kinds = {
 };
 
 export function TeacherApplicationsPage() {
-  const allowed = useIsSuperAdmin();
+  const allowed = usePermission("teacherapply.access");
   return allowed ? (
     <ApplicationQueue />
   ) : (
-    <Result status="403" title="仅超级管理员可查看认证材料与审核" />
+    <Result status="403" title="未开通教师认证查看权限" />
   );
 }
 
 function PrivateMaterial({ file }: { file: CertificationFile }) {
+  const allowed = usePermission("teacherapply.read_sensitive");
   const owner = useAuthStore((state) => state.profile?.id);
   const [preview, setPreview] = useState<{
     id: string;
@@ -63,6 +64,7 @@ function PrivateMaterial({ file }: { file: CertificationFile }) {
   }>();
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
+    if (!allowed) return;
     const controller = new AbortController();
     let url: string | undefined;
     void api.teacherCertification
@@ -80,9 +82,10 @@ function PrivateMaterial({ file }: { file: CertificationFile }) {
       controller.abort();
       if (url) URL.revokeObjectURL(url);
     };
-  }, [file.id, owner, attempt]);
+  }, [file.id, owner, attempt, allowed]);
   const current =
     preview?.id === file.id && preview.owner === owner ? preview : undefined;
+  if (!allowed) return null;
   return (
     <div style={{ width: 160 }}>
       <Typography.Text type="secondary">{kinds[file.kind]}</Typography.Text>
@@ -108,6 +111,8 @@ function PrivateMaterial({ file }: { file: CertificationFile }) {
 }
 
 function ApplicationQueue() {
+  const canReview = usePermission("teacherapply.review");
+  const canReadSensitive = usePermission("teacherapply.read_sensitive");
   const adminId = useAuthStore((state) => state.profile?.id);
   const client = useQueryClient();
   const { message } = App.useApp();
@@ -171,7 +176,7 @@ function ApplicationQueue() {
             教师申请审核
           </Typography.Title>
           <Typography.Text type="secondary">
-            认证材料仅限超级管理员查看，审核结果将发送站内通知。
+            查看原件、审核申请和撤销资格需要分别开通权限。
           </Typography.Text>
         </div>
         <Space>
@@ -306,14 +311,18 @@ function ApplicationQueue() {
                   : [])
               ]}
             />
-            <Image.PreviewGroup>
-              <Flex wrap gap={16}>
-                {detail.data.files.map((file) => (
-                  <PrivateMaterial key={file.id} file={file} />
-                ))}
-              </Flex>
-            </Image.PreviewGroup>
-            {application.status === "pending" && (
+            {canReadSensitive ? (
+              <Image.PreviewGroup>
+                <Flex wrap gap={16}>
+                  {detail.data.files.map((file) => (
+                    <PrivateMaterial key={file.id} file={file} />
+                  ))}
+                </Flex>
+              </Image.PreviewGroup>
+            ) : (
+              <Alert type="info" title="未开通认证原件查看权限" />
+            )}
+            {canReview && application.status === "pending" && (
               <Space>
                 <Button
                   type="primary"
@@ -353,7 +362,9 @@ function ApplicationQueue() {
           form={form}
           layout="vertical"
           preserve={false}
-          onFinish={(value) => mutation.mutate(value)}
+          onFinish={(value) => {
+            if (canReview) mutation.mutate(value);
+          }}
         >
           {action?.decision === "reject" && (
             <Form.Item

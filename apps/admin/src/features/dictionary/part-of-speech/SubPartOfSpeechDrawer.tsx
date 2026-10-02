@@ -1,3 +1,4 @@
+import { usePermission } from "@/lib/auth";
 import {
   Alert,
   App,
@@ -87,6 +88,7 @@ function SubPartFormModal({
   onSaved: (message: string) => void;
   onError: (error: unknown) => void;
 }) {
+  const canEdit = usePermission("lexicon_settings.edit");
   const [form] = Form.useForm<SubPartFormValues>();
   const create = useCreateSubPartOfSpeech();
   const update = useUpdateSubPartOfSpeech();
@@ -123,6 +125,7 @@ function SubPartFormModal({
     part_of_speech_id,
     ...fields
   }: SubPartFormValues) => {
+    if (!canEdit) return;
     try {
       if (value) {
         await update.mutateAsync({
@@ -159,6 +162,7 @@ function SubPartFormModal({
       }
       okText={value ? "保 存" : "新 建"}
       cancelText="取 消"
+      okButtonProps={{ disabled: !canEdit }}
       confirmLoading={create.isPending || update.isPending}
       onOk={() => form.submit()}
       onCancel={onClose}
@@ -207,6 +211,7 @@ export function SubPartOfSpeechPanel({
   onError,
   ref
 }: Props) {
+  const canEdit = usePermission("lexicon_settings.edit");
   const { modal } = App.useApp();
   const [editing, setEditing] = useState<SubPartOfSpeechConfig>();
   const [formOpen, setFormOpen] = useState(false);
@@ -218,12 +223,12 @@ export function SubPartOfSpeechPanel({
     () => ({
       openCreate: () => {
         // 没有任何父级（目录未加载或为空）时不开弹窗；「全部」视图下父级由弹窗里的下拉选择。
-        if (parents.length === 0) return;
+        if (parents.length === 0 || !canEdit) return;
         setEditing(undefined);
         setFormOpen(true);
       }
     }),
-    [parents]
+    [parents, canEdit]
   );
   const parentIds = parents.map((item) => item.id);
   const parentById = new Map(parents.map((item) => [item.id, item]));
@@ -307,6 +312,7 @@ export function SubPartOfSpeechPanel({
       render: (_, item) => (
         <Space>
           <Button
+            disabled={!canEdit}
             size="small"
             onClick={() => {
               setEditing(item);
@@ -325,7 +331,7 @@ export function SubPartOfSpeechPanel({
             <Button
               size="small"
               danger
-              disabled={item.usage_count > 0}
+              disabled={!canEdit || item.usage_count > 0}
               onClick={() => removeItem(item)}
             >
               删 除

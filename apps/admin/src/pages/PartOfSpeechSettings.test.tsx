@@ -7,7 +7,7 @@ import { PartOfSpeechSettingsPage } from "./PartOfSpeechSettings";
 const auth = vi.hoisted(() => ({ isSuperAdmin: true }));
 
 vi.mock("@/lib/auth", () => ({
-  useIsSuperAdmin: () => auth.isSuperAdmin
+  usePermission: () => auth.isSuperAdmin
 }));
 
 vi.mock("@/features/dictionary/part-of-speech/PartOfSpeechSettings", () => ({
@@ -34,7 +34,7 @@ beforeEach(() => {
 });
 
 describe("PartOfSpeechSettingsPage", () => {
-  it("超级管理员可进入词性配置管理内容", () => {
+  it("词性配置查看权限已授权可进入管理内容", () => {
     renderPage();
     expect(screen.getByText("词性配置管理内容")).toBeInTheDocument();
   });
@@ -44,7 +44,7 @@ describe("PartOfSpeechSettingsPage", () => {
     renderPage();
 
     expect(screen.getByText("无权限")).toBeInTheDocument();
-    expect(screen.getByText("词性配置仅超级管理员可访问。")).toBeVisible();
+    expect(screen.getByText("需要词性配置查看权限。")).toBeVisible();
     fireEvent.click(screen.getByText("返回首页"));
     expect(screen.getByTestId("location")).toHaveTextContent("/");
   });

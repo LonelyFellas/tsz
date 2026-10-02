@@ -19,7 +19,6 @@ import {
   Select,
   Space,
   Table,
-  Switch,
   Tag
 } from "antd";
 import type { TableColumnsType } from "antd";
@@ -31,9 +30,9 @@ import {
   useAdminList,
   useUpdateAdmin,
   useResetAdminPassword,
-  useSetAdminStatus,
-  useSetPublicationPermission
+  useSetAdminStatus
 } from "./api";
+import { AdminPermissionEditor } from "@/features/permissions/AdminPermissionEditor";
 import { CreateAdminModal } from "./CreateAdminModal";
 import {
   ADMIN_LEVEL_LABEL,
@@ -53,6 +52,7 @@ export function AdminManagement() {
   const [form] = Form.useForm<FilterValues>();
   const [editForm] = Form.useForm<{ display_name: string }>();
   const [editingAdmin, setEditingAdmin] = useState<Admin | null>(null);
+  const [permissionAdmin, setPermissionAdmin] = useState<Admin | null>(null);
   const updateAdmin = useUpdateAdmin();
 
   const [filters, setFilters] = useState<FilterValues>({});
@@ -72,7 +72,6 @@ export function AdminManagement() {
   };
   const listQuery = useAdminList(query);
   const setStatus = useSetAdminStatus();
-  const setPublicationPermission = useSetPublicationPermission();
   const resetPassword = useResetAdminPassword();
 
   const rows = listQuery.data?.items ?? [];
@@ -142,26 +141,17 @@ export function AdminManagement() {
     { title: "手机号", dataIndex: "phone", width: 140, fixed: "left" },
     { title: "昵称", dataIndex: "display_name", width: 160 },
     {
-      title: "词库发布",
-      key: "can_publish_lexicon",
-      width: 120,
-      render: (_, record) => (
-        <Switch
-          aria-label={`允许${record.display_name}发布词库`}
-          checked={record.role === "super_admin" || record.can_publish_lexicon}
-          disabled={
-            record.role === "super_admin" || setPublicationPermission.isPending
-          }
-          onChange={(allowed) => {
-            void setPublicationPermission
-              .mutateAsync({ id: record.id, allowed })
-              .then(() =>
-                message.success(allowed ? "已授予发布权限" : "已收回发布权限")
-              )
-              .catch(() => message.error("更新发布权限失败"));
-          }}
-        />
-      )
+      title: "业务权限",
+      key: "permissions",
+      width: 140,
+      render: (_, record) =>
+        record.role === "super_admin" ? (
+          <Tag>全部权限</Tag>
+        ) : (
+          <Button type="link" onClick={() => setPermissionAdmin(record)}>
+            设置权限
+          </Button>
+        )
     },
     {
       title: "权限等级",
@@ -412,6 +402,13 @@ export function AdminManagement() {
         </Form>
       </Modal>
 
+      {permissionAdmin && (
+        <AdminPermissionEditor
+          adminId={permissionAdmin.id}
+          displayName={permissionAdmin.display_name}
+          onClose={() => setPermissionAdmin(null)}
+        />
+      )}
       <CreateAdminModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}

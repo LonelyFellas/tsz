@@ -28,7 +28,8 @@ import type {
 } from "@tsz/types";
 import { HttpError } from "@tsz/api-client";
 import { DraftComparison } from "../dictionary/DraftComparison";
-import { api } from "@/lib/auth";
+import { canAdminResourceAction, hasAdminPermission } from "@tsz/shared/auth";
+import { api, useAuthStore } from "@/lib/auth";
 import { PronunciationPreviewProvider } from "../dictionary/word-creation/PronunciationPreview";
 import { V3VoiceTextField } from "../dictionary/word-creation-v3/components/V3VoiceTextField";
 import { V3SentenceTranslationsField } from "../dictionary/word-creation-v3/components/V3SentenceTranslationsField";
@@ -63,6 +64,15 @@ export function SentenceEditor({
   onClose: () => void;
   onSaved: (sentence: SharedSentence) => void;
 }) {
+  const profile = useAuthStore((state) => state.profile);
+  const allowed = sentence
+    ? canAdminResourceAction(
+        profile,
+        "sentences",
+        "edit",
+        sentence.created_by_admin_id
+      )
+    : hasAdminPermission(profile, "sentences.create");
   const { modal } = App.useApp();
   const sourceEntryId = sourceWord?.id;
   const currentTargets =
@@ -139,7 +149,7 @@ export function SentenceEditor({
     setError("");
   };
   const finish = async (afterSave?: () => void) => {
-    if (conflict || saving) return false;
+    if (conflict || saving || !allowed) return false;
     if (pendingAnnotation) {
       setError("请先确认当前句内标注，或取消所选片段。");
       return;

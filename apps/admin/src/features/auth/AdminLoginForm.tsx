@@ -1,4 +1,8 @@
-import { HttpError } from "@tsz/api-client";
+import {
+  HttpError,
+  InvalidAdminProfileResponseError,
+  ADMIN_PERMISSION_UPGRADE_MESSAGE
+} from "@tsz/api-client";
 import { isCode, isPhone } from "@tsz/shared";
 import { translateAuthError } from "@tsz/shared/auth";
 import { Alert, Button, Form, Input } from "antd";
@@ -57,6 +61,9 @@ export function AdminLoginForm() {
 
   const setProfile = useAuthStore((s) => s.setProfile);
   const profile = useAuthStore((s) => s.profile);
+  const permissionModelIncompatible = useAuthStore(
+    (s) => s.permissionModelIncompatible
+  );
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -143,12 +150,16 @@ export function AdminLoginForm() {
       }
       try {
         await enterConsole();
-      } catch {
+      } catch (profileError) {
         // 登录本身已成功、persistSession 已建立 access token + 刷新定时器，但拉 /profile 失败。
         // 撤销刚建立的会话（setAccessToken(null) 连带 clearTimeout 清定时器），避免留下
         // 「token 活着自我续期、profile 恒 null」的挂起态；文案不与「凭证错误」混淆，提示重试。
         tokens.setAccessToken(null);
-        setError("登录成功但加载账号信息失败，请重试");
+        setError(
+          profileError instanceof InvalidAdminProfileResponseError
+            ? profileError.message
+            : "登录成功但加载账号信息失败，请重试"
+        );
       }
     } catch (e: unknown) {
       // 423 = 账号被临时锁定（连续失败触发）：区别于 401 凭证错，置灰按钮并提示 15 分钟后再试。
@@ -255,10 +266,14 @@ export function AdminLoginForm() {
               </div>
             </div>
 
-            {error && (
+            {(error || permissionModelIncompatible) && (
               <Alert
                 type="error"
-                title={error}
+                title={
+                  permissionModelIncompatible
+                    ? ADMIN_PERMISSION_UPGRADE_MESSAGE
+                    : error
+                }
                 showIcon
                 style={{ marginBottom: 16 }}
               />

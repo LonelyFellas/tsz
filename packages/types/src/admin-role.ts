@@ -3,13 +3,13 @@
 // （第一段「按角色渲染菜单」的 profile.permissions 见 ./admin AdminProfile）。
 //
 // 全部接口超管专属（super_admin），详见 tsz-rust/docs/openapi.json。
-import type { MenuPermission } from "./admin";
+import type { UnifiedPermissionCatalog } from "./admin-permissions";
 
 /**
  * 一个可委派权限 key —— 每个侧栏菜单叶子一个。与第一段的 `MenuPermission`（profile 下发的
  * 菜单 key）是同一份后端目录（internal/authz），故此处直接别名，避免两处枚举漂移。
  */
-export type PermissionKey = MenuPermission;
+export type PermissionKey = string;
 
 /** 权限目录项（GET /admin/permissions 的元素）：key + 中文菜单名，直接做勾选框文案。 */
 export interface PermissionCatalogItem {
@@ -19,9 +19,7 @@ export interface PermissionCatalogItem {
 }
 
 /** GET /admin/permissions 的响应：权限目录，顺序即侧栏自上而下顺序。 */
-export interface PermissionCatalogResponse {
-  items: PermissionCatalogItem[];
-}
+export type PermissionCatalogResponse = UnifiedPermissionCatalog;
 
 /**
  * 一个后台角色：一组可委派权限 key 的具名集合，派给普通管理员以驱动其侧栏菜单。

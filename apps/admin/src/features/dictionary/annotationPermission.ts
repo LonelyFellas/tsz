@@ -1,9 +1,10 @@
+import {
+  canAdminResourceAction,
+  type AdminPermissionActor
+} from "@tsz/shared/auth";
 import type { AdminWordListItemAny } from "@tsz/types";
 
-export interface AnnotationActor {
-  id: string;
-  role: string;
-}
+export type AnnotationActor = AdminPermissionActor;
 
 /** 后端对「非超管改别人的词条」的业务 code。 */
 const ANNOTATION_FORBIDDEN_CODES = new Set([
@@ -17,9 +18,10 @@ export function isAnnotationOwnershipError(code: string | undefined): boolean {
 }
 
 export function canEditAnnotationOf(
-  actor: AnnotationActor | undefined
+  actor: AnnotationActor | undefined,
+  createdBy?: string
 ): boolean {
-  return actor?.role === "super_admin";
+  return canAdminResourceAction(actor, "words", "edit", createdBy);
 }
 
 /** 重复原型才提供标注入口；空标注也允许由有权限的管理员补填。 */
@@ -28,13 +30,14 @@ export function canEditRowAnnotation(
   row: AdminWordListItemAny
 ): boolean {
   if (!row.annotation_visible) return false;
-  return canEditAnnotationOf(actor);
+  return canEditAnnotationOf(actor, row.created_by);
 }
 
 export function canEditConflictEntry(
-  actor: AnnotationActor | undefined
+  actor: AnnotationActor | undefined,
+  createdBy?: string
 ): boolean {
-  return canEditAnnotationOf(actor);
+  return canEditAnnotationOf(actor, createdBy);
 }
 
 export const OTHERS_ENTRY_HINT = "当前账号仅有读取权限";

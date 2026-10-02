@@ -1,3 +1,4 @@
+import { usePermission } from "@/lib/auth";
 import { Form, Modal } from "antd";
 import type {
   AdminWordKind,
@@ -72,6 +73,7 @@ export function PartOfSpeechFormModal({
   onSaved,
   onError
 }: Props) {
+  const canEdit = usePermission("lexicon_settings.edit");
   const [form] = Form.useForm<PartFormValues>();
   const create = useCreatePartOfSpeech();
   const update = useUpdatePartOfSpeech();
@@ -99,6 +101,7 @@ export function PartOfSpeechFormModal({
   }, [form, open, value]);
 
   const submit = async (values: PartFormValues) => {
+    if (!canEdit) return;
     try {
       let saved: PartOfSpeechConfig;
       if (value) {
@@ -127,6 +130,7 @@ export function PartOfSpeechFormModal({
       title={`${value ? "修改" : "新增"}${kind === "phrase" ? "短语" : "单词"}基本词性`}
       okText={value ? "保 存" : "新 建"}
       cancelText="取 消"
+      okButtonProps={{ disabled: !canEdit }}
       confirmLoading={pending}
       onOk={() => form.submit()}
       onCancel={onClose}

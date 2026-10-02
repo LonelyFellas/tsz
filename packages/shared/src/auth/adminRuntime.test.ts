@@ -32,7 +32,8 @@ const PROFILE_BODY = {
   phone: "13800138000",
   display_name: "Administrator",
   role: "admin",
-  can_publish_lexicon: true,
+  permission_version: 1,
+  catalog_version: "catalog-v1",
   permissions: []
 };
 
@@ -67,7 +68,8 @@ describe("createAdminAuthRuntime · 装配", () => {
       phone: "1",
       display_name: "X",
       role: "admin",
-      can_publish_lexicon: true,
+      permission_version: 1,
+      catalog_version: "catalog-v1",
       permissions: [],
       preferences: { dialect: "uk" }
     });

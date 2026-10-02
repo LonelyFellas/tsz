@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Alert, App, Button, Form, Input, Modal } from "antd";
 import { useState } from "react";
-import { api, useIsSuperAdmin } from "@/lib/auth";
+import { api, usePermission } from "@/lib/auth";
 
 export function RevokeTeacherButton({
   userId,
@@ -10,7 +10,7 @@ export function RevokeTeacherButton({
   userId: string;
   onSuccess?: () => void;
 }) {
-  const allowed = useIsSuperAdmin();
+  const allowed = usePermission("teacherapply.revoke");
   const client = useQueryClient();
   const { message } = App.useApp();
   const [open, setOpen] = useState(false);

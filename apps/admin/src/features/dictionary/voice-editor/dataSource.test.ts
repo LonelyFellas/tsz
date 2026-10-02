@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   env: { ADMIN_TTS_MOCK: false },
+  profile: { id: "a", role: "super_admin", permissions: [] as string[] },
   voices: vi.fn(),
   preview: vi.fn(),
   audioUrl: vi.fn(),
@@ -11,6 +12,7 @@ const state = vi.hoisted(() => ({
 
 vi.mock("@/lib/env", () => ({ env: state.env }));
 vi.mock("@/lib/auth", () => ({
+  useAuthStore: { getState: () => ({ profile: state.profile }) },
   api: {
     speech: { voices: state.voices, preview: state.preview },
     audioAssets: {
@@ -49,6 +51,7 @@ function stubRealSource() {
 }
 
 beforeEach(() => {
+  state.profile = { id: "a", role: "super_admin", permissions: [] };
   state.env.ADMIN_TTS_MOCK = false;
   state.voices.mockReset();
   state.preview.mockReset();
@@ -147,6 +150,30 @@ describe("admin voice preview data source", () => {
       gender: "female"
     });
     expect(asset).toMatchObject({ id: "mock-audio-1", original_name: "a.mp3" });
+    expect(state.audioCreateUpload).not.toHaveBeenCalled();
+    expect(state.audioConfirm).not.toHaveBeenCalled();
+  });
+
+  it("生成与上传在实际请求前检查各自权限，读取能力不自动消耗服务", async () => {
+    state.profile = { id: "a", role: "admin", permissions: ["words.access"] };
+    const { adminVoicePreviewAdapter, adminAudioUploadAdapter } =
+      await import("./dataSource");
+    await adminVoicePreviewAdapter.listVoices({ language: "en" });
+    await expect(
+      adminVoicePreviewAdapter.synthesize({
+        language: "en",
+        content: CONTENT,
+        voiceId: "real-voice"
+      })
+    ).rejects.toThrow("没有生成语音的权限");
+    await expect(
+      adminAudioUploadAdapter.upload({
+        file: new File([new Uint8Array(3)], "a.mp3", { type: "audio/mpeg" }),
+        locale: "en-GB",
+        gender: "female"
+      })
+    ).rejects.toThrow("没有上传音频的权限");
+    expect(state.preview).not.toHaveBeenCalled();
     expect(state.audioCreateUpload).not.toHaveBeenCalled();
     expect(state.audioConfirm).not.toHaveBeenCalled();
   });

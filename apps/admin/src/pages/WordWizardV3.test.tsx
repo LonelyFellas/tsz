@@ -42,9 +42,9 @@ import { WordWizardV3Page, type V3MeaningsStepRenderer } from "./WordWizardV3";
 const authMocks = vi.hoisted(() => ({
   profile: {
     id: "019d2c55-1f9e-7f88-a189-a2b8a07153fc",
-    can_publish_lexicon: true,
+    permissions: ["words.access", "words.publish"],
     role: "super_admin"
-  } as { id: string; role: string; can_publish_lexicon?: boolean } | null
+  } as { id: string; role: string; permissions?: string[] } | null
 }));
 
 // 只覆盖 useAuthStore：@/lib/auth 的其余导出被 api/dataSource 真实依赖，整体替换会让模块加载失败。
@@ -324,7 +324,7 @@ describe("WordWizardV3Page", () => {
       } finally {
         authMocks.profile = {
           id: "019d2c55-1f9e-7f88-a189-a2b8a07153fc",
-          can_publish_lexicon: true,
+          permissions: ["words.access", "words.publish"],
           role: "super_admin"
         };
       }
@@ -336,7 +336,7 @@ describe("WordWizardV3Page", () => {
     authMocks.profile = {
       id: "019d2c55-1f9e-7f88-a189-a2b8a07153fc",
       role: "admin",
-      can_publish_lexicon: true
+      permissions: ["words.access", "words.publish"]
     };
     try {
       const api = source({ word: word(), retired_stable_nodes: [] });
@@ -365,7 +365,7 @@ describe("WordWizardV3Page", () => {
     } finally {
       authMocks.profile = {
         id: "019d2c55-1f9e-7f88-a189-a2b8a07153fc",
-        can_publish_lexicon: true,
+        permissions: ["words.access", "words.publish"],
         role: "super_admin"
       };
     }

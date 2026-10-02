@@ -2,7 +2,11 @@
 // 独立 baseUrl（/api/v1/admin）、独立 token、独立 refresh cookie（path=/api/v1/admin）。
 // 复用 @tsz/shared/auth 的底层无状态机制（token 管理 / single-flight refresh），
 // 但端点与 store 都是 admin 专用的，与 web 端互不引用。
-import { createAdminAuthRuntime } from "@tsz/shared/auth";
+import {
+  createAdminAuthRuntime,
+  hasAdminPermission,
+  hasAnyAdminPermission
+} from "@tsz/shared/auth";
 import type { AdminAuthState } from "@tsz/shared/auth";
 import { env } from "./env";
 
@@ -25,6 +29,11 @@ export const selectIsSuperAdmin = (s: AdminAuthState): boolean =>
  * 避免 `profile?.role === "super_admin"` 散落各处——身份模型变化时只改这里一处。
  */
 export const useIsSuperAdmin = (): boolean => useAuthStore(selectIsSuperAdmin);
+
+export const usePermission = (key: string): boolean =>
+  useAuthStore((s) => hasAdminPermission(s.profile, key));
+export const useAnyPermission = (keys: readonly string[]): boolean =>
+  useAuthStore((s) => hasAnyAdminPermission(s.profile, keys));
 
 // dev-only：把 store 挂到 window，便于本地无后端时在控制台注入登录态调试受保护页。
 // 生产构建（import.meta.env.DEV=false）下整段被 tree-shake 掉，不会泄露。

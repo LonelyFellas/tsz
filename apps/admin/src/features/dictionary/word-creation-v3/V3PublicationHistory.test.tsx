@@ -2194,10 +2194,11 @@ beforeEach(() => {
     profile: {
       id: "admin-1",
       role: "admin",
-      can_publish_lexicon: true,
+      permission_version: 1,
+      catalog_version: "catalog-v1",
       phone: "13800138000",
       display_name: "发布测试",
-      permissions: [],
+      permissions: ["words.access", "words.rollback"],
       preferences: { dialect: "uk" }
     }
   });

@@ -42,7 +42,8 @@ const PROFILE = {
   phone: "13800138000",
   display_name: "审核员小王",
   role: "admin" as const,
-  can_publish_lexicon: true,
+  permission_version: 1,
+  catalog_version: "catalog-v1",
   permissions: [],
   preferences: { dialect: "uk" as const }
 };

@@ -4,6 +4,7 @@ import { App, Form, Input, Modal } from "antd";
 import { useEffect } from "react";
 import type { AdminUserView } from "@tsz/types";
 import { DISPLAY_NAME_MAX, hasDisplayNameForbiddenChars } from "@tsz/shared";
+import { usePermission } from "@/lib/auth";
 import { useUpdateUser } from "./api";
 import { userActionError } from "./labels";
 
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function EditUserModal({ user, onClose }: Props) {
+  const allowed = usePermission("users.edit");
   const { message } = App.useApp();
   const [form] = Form.useForm<{ display_name: string }>();
   const updateUser = useUpdateUser();
@@ -22,7 +24,7 @@ export function EditUserModal({ user, onClose }: Props) {
   }, [user, form]);
 
   const submit = async () => {
-    if (!user) return;
+    if (!user || !allowed) return;
     // validateFields 失败向上抛给 onOk 的 .catch（antd 就地飘红，不弹 toast）；
     // 只把「保存请求」的失败单独兜住给出明确提示，避免像 no-op 一样静默。
     const { display_name } = await form.validateFields();
@@ -45,6 +47,7 @@ export function EditUserModal({ user, onClose }: Props) {
       title="编辑用户"
       okText="保存"
       cancelText="取消"
+      okButtonProps={{ disabled: !allowed }}
       confirmLoading={updateUser.isPending}
       onOk={() => void submit().catch(() => undefined)}
       onCancel={onClose}

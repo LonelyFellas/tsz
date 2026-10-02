@@ -9,6 +9,8 @@ export interface AdminAuthState {
   /** 身份已确认或明确无会话；临时恢复故障保持 false。 */
   hydrated: boolean;
   connectionError: boolean;
+  /** 后端缺少新版授权事实；不当作临时网络故障或有效身份。 */
+  permissionModelIncompatible: boolean;
   setProfile: (profile: AdminProfile | null) => void;
   setHydrated: (hydrated: boolean) => void;
 }
@@ -26,10 +28,12 @@ export function createAdminAuthStore(): AdminAuthStore {
     role: null,
     hydrated: false,
     connectionError: false,
+    permissionModelIncompatible: false,
     setProfile: (profile) =>
       set({
         profile,
         role: profile?.role ?? null,
+        permissionModelIncompatible: false,
         ...(profile ? { hydrated: true, connectionError: false } : {})
       }),
     setHydrated: (hydrated) => set({ hydrated })

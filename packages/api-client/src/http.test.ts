@@ -1814,7 +1814,7 @@ describe("createHttpClient", () => {
       message: "password change required",
       code: "must_change_password"
     });
-    expect(onForbidden).toHaveBeenCalledWith("must_change_password");
+    expect(onForbidden).toHaveBeenCalledWith("must_change_password", "/words");
   });
 
   it("403 无 code：onForbidden 收到 undefined", async () => {
@@ -1836,7 +1836,7 @@ describe("createHttpClient", () => {
       status: 403,
       code: undefined
     });
-    expect(onForbidden).toHaveBeenCalledWith(undefined);
+    expect(onForbidden).toHaveBeenCalledWith(undefined, "/x");
   });
 
   it("非 403 错误不触发 onForbidden", async () => {
