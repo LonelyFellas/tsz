@@ -55,13 +55,53 @@ describe("统一授权事实", () => {
       hasAnyAdminPermission(actor, ["words.create", "sentences.edit"])
     ).toBe(false);
   });
+  it("例句编辑依赖目标只读权限，撤销后本人及他人编辑均失败关闭", () => {
+    const incomplete = {
+      ...actor,
+      permissions: [
+        "sentences.access",
+        "sentences.edit",
+        "sentences.edit_others"
+      ]
+    };
+    expect(hasAdminPermission(incomplete, "sentences.edit")).toBe(false);
+    expect(hasAdminPermission(incomplete, "sentences.edit_others")).toBe(false);
+    expect(
+      canAdminResourceAction(incomplete, "sentences", "edit", actor.id)
+    ).toBe(false);
+    const editor = {
+      ...actor,
+      permissions: ["sentences.access", "sentences.edit", "words.access"]
+    };
+    expect(hasAdminPermission(editor, "words.access")).toBe(true);
+    expect(canAdminResourceAction(editor, "sentences", "edit", actor.id)).toBe(
+      true
+    );
+    expect(canAdminResourceAction(editor, "sentences", "edit", "b")).toBe(
+      false
+    );
+    expect(hasAdminPermission(editor, "words.edit")).toBe(false);
+    expect(hasAdminPermission(editor, "words.publish")).toBe(false);
+    expect(
+      canAdminResourceAction(
+        {
+          ...editor,
+          permissions: [...editor.permissions, "sentences.edit_others"]
+        },
+        "sentences",
+        "edit",
+        "b"
+      )
+    ).toBe(true);
+  });
   it("他人编辑不隐含发布、恢复、回滚；各普通生命周期动作仅本人", () => {
     const editor = {
       ...actor,
       permissions: [
         "sentences.access",
         "sentences.edit",
-        "sentences.edit_others"
+        "sentences.edit_others",
+        "words.access"
       ]
     };
     expect(canAdminResourceAction(editor, "sentences", "edit", "b")).toBe(true);

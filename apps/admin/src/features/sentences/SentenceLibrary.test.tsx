@@ -101,6 +101,7 @@ describe("独立多维例句库", () => {
       auth.permissions = [
         "sentences.access",
         "sentences.edit",
+        "words.access",
         "sentences.publish",
         "sentences.withdraw",
         "sentences.restore",
@@ -132,6 +133,7 @@ describe("独立多维例句库", () => {
       auth.permissions = [
         "sentences.access",
         "sentences.edit",
+        "words.access",
         "sentences.edit_others",
         "sentences.publish",
         "sentences.rollback"
@@ -183,6 +185,7 @@ describe("独立多维例句库", () => {
     auth.permissions = [
       "sentences.access",
       "sentences.edit",
+      "words.access",
       "sentences.edit_others",
       "sentences.publish",
       "sentences.withdraw",

@@ -12,7 +12,7 @@ export const ADMIN_PERMISSION_DEPENDENCIES = {
   "words.rollback": ["words.access"],
   "sentences.access": [],
   "sentences.create": ["sentences.access"],
-  "sentences.edit": ["sentences.access"],
+  "sentences.edit": ["sentences.access", "words.access"],
   "sentences.edit_others": ["sentences.edit"],
   "sentences.publish": ["sentences.access"],
   "sentences.withdraw": ["sentences.access"],
