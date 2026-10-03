@@ -1,12 +1,18 @@
+import { ReloadOutlined } from "@ant-design/icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   App,
   Alert,
+  Breadcrumb,
   Button,
+  Card,
   DatePicker,
   Drawer,
+  Flex,
+  Form,
   Input,
   Modal,
+  Pagination,
   Popconfirm,
   Select,
   Space,
@@ -15,20 +21,13 @@ import {
   Typography
 } from "antd";
 import type { Dayjs } from "dayjs";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { HttpError } from "@tsz/api-client";
 import type { PermissionTag, UnifiedPermissionCatalog } from "@tsz/types";
+import { CopyableText } from "@/components/CopyableText";
 import { api } from "@/lib/auth";
 import { PermissionChangeDialog } from "./PermissionChangeDialog";
-
-const MODULE_LABELS: Record<string, string> = {
-  words: "智能词库",
-  sentences: "多维例句",
-  users: "用户管理",
-  teacherapply: "教师认证",
-  lexicon_settings: "词性设置",
-  speech: "语音生成"
-};
+import { MODULE_LABELS } from "./labels";
 const KIND_LABELS: Record<string, string> = {
   page: "页面",
   action: "操作",
@@ -38,6 +37,11 @@ const RISK_LABELS: Record<string, string> = {
   low: "低",
   medium: "中",
   high: "高"
+};
+const RISK_COLORS: Record<string, string> = {
+  low: "green",
+  medium: "orange",
+  high: "red"
 };
 
 function GrantedAdmins({
@@ -53,18 +57,7 @@ function GrantedAdmins({
     queryFn: () => api.permissionSystem.grantedAdmins(permissionKey, page)
   });
   return (
-    <Drawer
-      open
-      size={640}
-      title={`管理员名单 · ${permissionKey}`}
-      onClose={onClose}
-    >
-      {query.data?.super_admins_are_implicit && (
-        <Alert
-          type="info"
-          title="超级管理员无需单独分配权限，因此不在名单中。"
-        />
-      )}
+    <Drawer open size={640} title="管理员名单" onClose={onClose}>
       {query.isError && <Alert type="error" title={query.error.message} />}
       <Table
         rowKey="admin_id"
@@ -72,7 +65,11 @@ function GrantedAdmins({
         dataSource={query.data?.items ?? []}
         columns={[
           { title: "管理员", dataIndex: "display_name" },
-          { title: "账号 ID", dataIndex: "admin_id" },
+          {
+            title: "账号 ID",
+            dataIndex: "admin_id",
+            render: (id: string) => <CopyableText value={id} />
+          },
           { title: "权限版本", dataIndex: "permission_version" }
         ]}
         pagination={{
@@ -103,6 +100,10 @@ function BatchTargets({
   const [selected, setSelected] = useState<string[]>([]);
   const [adminNames, setAdminNames] = useState<Record<string, string>>({});
   const [previewing, setPreviewing] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (listRef.current) listRef.current.scrollTop = 0;
+  }, [page, search]);
   const query = useQuery({
     queryKey: ["permission-system", "targets", page, search],
     queryFn: () =>
@@ -118,74 +119,117 @@ function BatchTargets({
       open
       size={760}
       title={
-        action === "grant" ? "批量开通 · 选择管理员" : "批量取消 · 选择管理员"
+        action === "grant" ? "批量授权 · 选择管理员" : "撤销授权 · 选择管理员"
       }
       onClose={onClose}
+      styles={{
+        body: { display: "flex", flexDirection: "column", overflow: "hidden" }
+      }}
+      footer={
+        <Flex vertical gap={12}>
+          <Flex justify="flex-end">
+            <Pagination
+              size="small"
+              current={page}
+              pageSize={20}
+              total={query.data?.pagination.total ?? 0}
+              showSizeChanger={false}
+              showTotal={(total) => `共 ${total} 人`}
+              onChange={setPage}
+            />
+          </Flex>
+          <Flex justify="space-between" align="center" gap={12} wrap>
+            <Typography.Text>
+              已选 {selected.length} 人（单次最多选择 100 人）
+            </Typography.Text>
+            <Button
+              type="primary"
+              disabled={!selected.length || selected.length > 100}
+              onClick={() => setPreviewing(true)}
+            >
+              下一步：确认权限变更
+            </Button>
+          </Flex>
+        </Flex>
+      }
     >
-      <Typography.Paragraph title={keys.join("、")}>
-        所选权限：
-        {keys
-          .map(
-            (key) =>
-              catalog.permissions.find((p) => p.key === key)?.label ?? key
-          )
-          .join("、")}
-      </Typography.Paragraph>
-      <Input.Search
-        placeholder="搜索管理员名称"
-        onSearch={(value) => {
-          setSearch(value);
-          setPage(1);
-        }}
-        allowClear
-      />
-      {query.isError && <Alert type="error" title={query.error.message} />}
-      <Table
-        rowKey="id"
-        loading={query.isFetching}
-        dataSource={query.data?.items ?? []}
-        rowSelection={{
-          selectedRowKeys: selected,
-          preserveSelectedRowKeys: true,
-          onChange: (rows) => {
-            setSelected(rows as string[]);
-            setAdminNames((previous) => ({
-              ...previous,
-              ...Object.fromEntries(
-                (query.data?.items ?? []).map((admin) => [
-                  admin.id,
-                  admin.display_name
-                ])
-              )
-            }));
-          },
-          getCheckboxProps: (row) => ({ disabled: row.role === "super_admin" })
-        }}
-        columns={[
-          { title: "管理员", dataIndex: "display_name" },
-          { title: "手机号", dataIndex: "phone" },
-          { title: "状态", dataIndex: "status" }
-        ]}
-        pagination={{
-          current: page,
-          pageSize: 20,
-          total: query.data?.pagination.total ?? 0,
-          showSizeChanger: false,
-          onChange: setPage
-        }}
-      />
-      <Space>
-        <Typography.Text>
-          已选 {selected.length} 人（最多 100 人）
-        </Typography.Text>
-        <Button
-          type="primary"
-          disabled={!selected.length || selected.length > 100}
-          onClick={() => setPreviewing(true)}
+      <Flex vertical gap={16} style={{ flex: 1, minHeight: 0 }}>
+        <Typography.Paragraph
+          style={{
+            marginBottom: 0,
+            flexShrink: 0,
+            maxHeight: "20%",
+            overflowY: "auto"
+          }}
         >
-          查看调整
-        </Button>
-      </Space>
+          所选权限：
+          {keys
+            .map(
+              (key) =>
+                catalog.permissions.find((p) => p.key === key)?.label ?? key
+            )
+            .join("、")}
+        </Typography.Paragraph>
+        <Input.Search
+          placeholder="搜索管理员名称"
+          onSearch={(value) => {
+            setSearch(value);
+            setPage(1);
+          }}
+          allowClear
+          style={{ flexShrink: 0 }}
+        />
+        {query.isError && <Alert type="error" title={query.error.message} />}
+        <div ref={listRef} style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
+          <Table
+            rowKey="id"
+            size="middle"
+            sticky
+            loading={query.isFetching}
+            dataSource={query.data?.items ?? []}
+            rowSelection={{
+              selectedRowKeys: selected,
+              preserveSelectedRowKeys: true,
+              onChange: (rows) => {
+                setSelected(rows as string[]);
+                setAdminNames((previous) => ({
+                  ...previous,
+                  ...Object.fromEntries(
+                    (query.data?.items ?? []).map((admin) => [
+                      admin.id,
+                      admin.display_name
+                    ])
+                  )
+                }));
+              },
+              getCheckboxProps: (row) => ({
+                disabled: row.role === "super_admin"
+              })
+            }}
+            columns={[
+              { title: "管理员", dataIndex: "display_name" },
+              {
+                title: "手机号",
+                dataIndex: "phone",
+                render: (phone: string) =>
+                  phone.length > 7
+                    ? `${phone.slice(0, 3)}****${phone.slice(-4)}`
+                    : "****"
+              },
+              {
+                title: "状态",
+                dataIndex: "status",
+                render: (status: "active" | "disabled") => (
+                  <Tag color={status === "active" ? "green" : "default"}>
+                    {status === "active" ? "已启用" : "已禁用"}
+                  </Tag>
+                )
+              }
+            ]}
+            pagination={false}
+          />
+        </div>
+      </Flex>
       {previewing && (
         <PermissionChangeDialog
           catalogVersion={catalog.catalog_version}
@@ -290,6 +334,8 @@ export function PermissionManagement() {
   const [batchAction, setBatchAction] = useState<"grant" | "revoke">();
   const [grantedKey, setGrantedKey] = useState<string>();
   const [tagIds, setTagIds] = useState<string[]>([]);
+  const [managingTags, setManagingTags] = useState(false);
+  const [settingTags, setSettingTags] = useState(false);
   const [editingTag, setEditingTag] = useState<PermissionTag | "new">();
   const [tagName, setTagName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -309,8 +355,31 @@ export function PermissionManagement() {
     } catch (error) {
       if (error instanceof HttpError && error.status === 409) {
         await reload();
+        const current = client.getQueryData<UnifiedPermissionCatalog>([
+          "permission-system",
+          "catalog"
+        ]);
+        const duplicateName = current?.tags.some(
+          (tag) =>
+            tag.name === tagName.trim() &&
+            (editingTag === "new" || tag.id !== editingTag?.id)
+        );
+        const versionUnchanged =
+          editingTag === "new" ||
+          (editingTag &&
+            current?.tags.find((tag) => tag.id === editingTag.id)?.version ===
+              editingTag.version);
+        if (editingTag && duplicateName && versionUnchanged) {
+          message.warning("标签名称已存在，请使用其他名称");
+        } else {
+          setEditingTag(undefined);
+          message.warning("标签已被更新，请重新查看后再保存");
+        }
+      } else if (error instanceof HttpError && error.status === 404) {
+        await reload();
+        setTagIds([]);
         setEditingTag(undefined);
-        message.warning("标签已被更新，请重新查看后再保存");
+        message.warning("标签已被删除，请重新选择");
       } else {
         message.error(error instanceof Error ? error.message : "操作失败");
       }
@@ -352,194 +421,336 @@ export function PermissionManagement() {
               remove: remove ? selected : []
             }))
         }),
-      remove
-        ? "标签已移除，标签本身和管理员权限不变"
-        : "标签已添加，管理员权限未改变"
-    );
+      remove ? "标签已移除" : "标签已添加"
+    ).then((ok) => {
+      if (ok) setSettingTags(false);
+    });
   };
   return (
-    <Space orientation="vertical" size="middle" style={{ width: "100%" }}>
-      <Typography.Title level={3}>权限管理</Typography.Title>
-      <Alert
-        showIcon
-        type="info"
-        title="为管理员分配权限。标签用于整理，不影响已分配的权限。"
-      />
-      {catalog.isError && (
-        <Alert
-          type="error"
-          title={catalog.error.message}
-          action={<Button onClick={() => void catalog.refetch()}>重试</Button>}
-        />
-      )}
-      <Space wrap>
-        <Input
-          placeholder="搜索权限名称或标识"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <Select
-          aria-label="业务模块"
-          allowClear
-          placeholder="业务模块"
-          value={module}
-          onChange={setModule}
-          style={{ width: 160 }}
-          options={[
-            ...new Set(catalog.data?.permissions.map((p) => p.module_key) ?? [])
-          ].map((value) => ({ value, label: MODULE_LABELS[value] ?? value }))}
-        />
-        <Select
-          aria-label="标签筛选"
-          mode="multiple"
-          allowClear
-          placeholder="标签筛选"
-          value={tagFilter}
-          onChange={setTagFilter}
-          style={{ minWidth: 200 }}
-          options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
-        />
-        <Button
-          disabled={!selected.length}
-          onClick={() => setBatchAction("grant")}
-        >
-          批量开通
-        </Button>
-        <Button
-          danger
-          disabled={!selected.length}
-          onClick={() => setBatchAction("revoke")}
-        >
-          批量取消
-        </Button>
-        <Button onClick={() => setAudits(true)}>变更记录</Button>
-      </Space>
-      <Table
-        rowKey="key"
-        loading={catalog.isFetching}
-        dataSource={rows}
-        rowSelection={{
-          selectedRowKeys: selected,
-          preserveSelectedRowKeys: true,
-          onChange: (keys) => setSelected(keys as string[])
-        }}
-        columns={[
-          {
-            title: "权限",
-            render: (_, p) => (
-              <>
-                <div>{p.label}</div>
-                <Typography.Text type="secondary">{p.key}</Typography.Text>
-              </>
-            )
-          },
-          {
-            title: "所属功能 / 类型",
-            render: (_, p) =>
-              `${MODULE_LABELS[p.module_key] ?? p.module_key} / ${KIND_LABELS[p.kind] ?? p.kind}`
-          },
-          {
-            title: "需要同时开通",
-            render: (_, p) => (
-              <span title={p.requires.join("、")}>
-                {p.requires
-                  .map((key) => permissionLabels[key] ?? key)
-                  .join("、") || "无"}
-              </span>
-            )
-          },
-          {
-            title: "风险",
-            dataIndex: "risk_level",
-            render: (risk: string) => RISK_LABELS[risk] ?? risk
-          },
-          {
-            title: "标签",
-            render: (_, p) =>
-              tags
-                .filter((tag) => tag.permissions.includes(p.key))
-                .map((tag) => <Tag key={tag.id}>{tag.name}</Tag>)
-          },
-          {
-            title: "管理员",
-            render: (_, p) => (
-              <Button type="link" onClick={() => setGrantedKey(p.key)}>
-                查看管理员
-              </Button>
-            )
-          }
-        ]}
-        pagination={false}
-      />
-      <Space wrap>
-        <Typography.Text>已选 {selected.length} 项权限</Typography.Text>
-        <Select
-          aria-label="批量标签"
-          mode="multiple"
-          placeholder="选择标签"
-          value={tagIds}
-          onChange={setTagIds}
-          style={{ minWidth: 220 }}
-          options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
-        />
-        <Button
-          loading={busy}
-          disabled={!selected.length || !tagIds.length}
-          onClick={() => changeTags(false)}
-        >
-          批量打标签
-        </Button>
-        <Button
-          loading={busy}
-          disabled={!selected.length || !tagIds.length}
-          onClick={() => changeTags(true)}
-        >
-          移除标签
-        </Button>
-        <Button
-          onClick={() => {
-            setEditingTag("new");
-            setTagName("");
+    <Flex vertical gap={16}>
+      <Breadcrumb items={[{ title: "用户管理" }, { title: "权限管理" }]} />
+      <Card size="small" styles={{ body: { paddingBottom: 8 } }}>
+        <Form
+          layout="inline"
+          style={{
+            rowGap: 12,
+            columnGap: 8,
+            display: "flex",
+            flexWrap: "wrap"
           }}
         >
-          新建标签
-        </Button>
-      </Space>
-      <Typography.Text type="secondary">
-        移除标签只清除所选权限的标记，不会删除标签，也不会修改管理员权限。
-      </Typography.Text>
-      <Space wrap>
-        {tags.map((tag) => (
-          <Space key={tag.id}>
-            <Tag>{tag.name}</Tag>
+          <Form.Item label="关键词">
+            <Input
+              placeholder="权限名称 / 说明"
+              allowClear
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{ width: 240 }}
+            />
+          </Form.Item>
+          <Form.Item label="所属模块">
+            <Select
+              aria-label="所属模块"
+              allowClear
+              placeholder="全部"
+              value={module}
+              onChange={setModule}
+              style={{ width: 160 }}
+              options={[
+                ...new Set(
+                  catalog.data?.permissions.map((p) => p.module_key) ?? []
+                )
+              ].map((value) => ({
+                value,
+                label: MODULE_LABELS[value] ?? value
+              }))}
+            />
+          </Form.Item>
+          <Form.Item label="权限标签">
+            <Select
+              aria-label="权限标签"
+              mode="multiple"
+              allowClear
+              placeholder="全部"
+              value={tagFilter}
+              onChange={setTagFilter}
+              style={{ width: 200 }}
+              options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
+            />
+          </Form.Item>
+          <Form.Item>
             <Button
-              type="link"
+              icon={<ReloadOutlined />}
               onClick={() => {
-                setEditingTag(tag);
-                setTagName(tag.name);
+                setSearch("");
+                setModule(undefined);
+                setTagFilter([]);
               }}
             >
-              重命名
+              重置
             </Button>
-            <Popconfirm
-              title="删除标签？管理员已分配的权限不受影响。"
-              onConfirm={() =>
-                mutateTags(
-                  () => api.permissionSystem.deleteTag(tag.id, tag.version),
-                  "标签已删除，管理员权限未改变"
+          </Form.Item>
+        </Form>
+      </Card>
+      <Card size="small">
+        <Flex
+          justify="space-between"
+          align="center"
+          gap={12}
+          wrap
+          style={{ marginBottom: 12 }}
+        >
+          <Space wrap>
+            <Typography.Text type="secondary">
+              已选 {selected.length} 项
+            </Typography.Text>
+            <Button
+              type="primary"
+              disabled={!selected.length}
+              onClick={() => setBatchAction("grant")}
+            >
+              批量授权
+            </Button>
+            <Button
+              danger
+              disabled={!selected.length}
+              onClick={() => setBatchAction("revoke")}
+            >
+              撤销授权
+            </Button>
+            {selected.length > 0 && (
+              <Button
+                onClick={() => {
+                  setTagIds([]);
+                  setSettingTags(true);
+                }}
+              >
+                设置标签
+              </Button>
+            )}
+          </Space>
+          <Space>
+            <Button onClick={() => setManagingTags(true)}>管理标签</Button>
+            <Button onClick={() => setAudits(true)}>变更记录</Button>
+          </Space>
+        </Flex>
+        {catalog.isError && (
+          <Alert
+            type="error"
+            showIcon
+            title="权限列表加载失败"
+            description={catalog.error.message}
+            style={{ marginBottom: 12 }}
+            action={
+              <Button size="small" onClick={() => void catalog.refetch()}>
+                重试
+              </Button>
+            }
+          />
+        )}
+        <Table
+          rowKey="key"
+          size="middle"
+          scroll={{ x: 1400 }}
+          loading={catalog.isFetching}
+          dataSource={rows}
+          rowSelection={{
+            fixed: true,
+            selectedRowKeys: selected,
+            preserveSelectedRowKeys: true,
+            onChange: (keys) => setSelected(keys as string[])
+          }}
+          columns={[
+            {
+              title: "权限",
+              width: 220,
+              fixed: "left",
+              dataIndex: "label"
+            },
+            {
+              title: "范围 / 说明",
+              dataIndex: "description",
+              width: 340
+            },
+            {
+              title: "所属模块",
+              width: 140,
+              render: (_, p) => (
+                <>
+                  <div>{MODULE_LABELS[p.module_key] ?? p.module_key}</div>
+                  <Typography.Text type="secondary">
+                    {KIND_LABELS[p.kind] ?? p.kind}
+                  </Typography.Text>
+                </>
+              )
+            },
+            {
+              title: "前置权限",
+              width: 240,
+              render: (_, p) => (
+                <span title={p.requires.join("、")}>
+                  {p.requires
+                    .map((key) => permissionLabels[key] ?? key)
+                    .join("、") || "无"}
+                </span>
+              )
+            },
+            {
+              title: "风险",
+              width: 80,
+              dataIndex: "risk_level",
+              render: (risk: string) => (
+                <Tag color={RISK_COLORS[risk]}>{RISK_LABELS[risk] ?? risk}</Tag>
+              )
+            },
+            {
+              title: "标签",
+              width: 180,
+              render: (_, p) =>
+                tags
+                  .filter((tag) => tag.permissions.includes(p.key))
+                  .map((tag) => <Tag key={tag.id}>{tag.name}</Tag>)
+            },
+            {
+              title: "已授权管理员",
+              width: 160,
+              render: (_, p) => (
+                <Button type="link" onClick={() => setGrantedKey(p.key)}>
+                  查看管理员
+                </Button>
+              )
+            }
+          ]}
+          pagination={false}
+        />
+      </Card>
+      <Modal
+        open={settingTags}
+        title="设置标签"
+        closable={!busy}
+        mask={{ closable: !busy }}
+        keyboard={!busy}
+        onCancel={() => setSettingTags(false)}
+        footer={
+          <Space>
+            <Button disabled={busy} onClick={() => setSettingTags(false)}>
+              取消
+            </Button>
+            <Button
+              loading={busy}
+              disabled={!tagIds.length}
+              onClick={() => changeTags(true)}
+            >
+              移除标签
+            </Button>
+            <Button
+              type="primary"
+              loading={busy}
+              disabled={!tagIds.length}
+              onClick={() => changeTags(false)}
+            >
+              添加标签
+            </Button>
+          </Space>
+        }
+      >
+        <Flex vertical gap={12}>
+          <Typography.Text>已选 {selected.length} 项权限</Typography.Text>
+          <Typography.Text type="secondary">
+            标签仅用于分类，不影响管理员权限。
+          </Typography.Text>
+          {tags.length ? (
+            <Select
+              aria-label="批量标签"
+              mode="multiple"
+              placeholder="选择标签"
+              value={tagIds}
+              onChange={setTagIds}
+              disabled={busy}
+              style={{ width: "100%" }}
+              options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
+            />
+          ) : (
+            <Typography.Text type="secondary">
+              暂无标签，请先在“管理标签”中新建标签。
+            </Typography.Text>
+          )}
+        </Flex>
+      </Modal>
+      <Drawer
+        open={managingTags}
+        title="管理标签"
+        size={560}
+        onClose={() => setManagingTags(false)}
+      >
+        <Flex vertical gap={16}>
+          <Typography.Text type="secondary">
+            标签仅用于分类，不影响管理员权限。
+          </Typography.Text>
+          <div>
+            <Button
+              type="primary"
+              disabled={busy}
+              onClick={() => {
+                setEditingTag("new");
+                setTagName("");
+              }}
+            >
+              新建标签
+            </Button>
+          </div>
+          <Table<PermissionTag>
+            rowKey="id"
+            size="middle"
+            dataSource={tags}
+            pagination={false}
+            locale={{ emptyText: "暂无标签，可点击“新建标签”添加。" }}
+            columns={[
+              { title: "标签名称", dataIndex: "name" },
+              {
+                title: "操作",
+                width: 160,
+                render: (_, tag) => (
+                  <Space size={4}>
+                    <Button
+                      type="link"
+                      size="small"
+                      disabled={busy}
+                      onClick={() => {
+                        setEditingTag(tag);
+                        setTagName(tag.name);
+                      }}
+                    >
+                      重命名
+                    </Button>
+                    <Popconfirm
+                      title="删除标签？管理员已分配的权限不受影响。"
+                      okText="删除"
+                      cancelText="取消"
+                      onConfirm={() =>
+                        mutateTags(
+                          () =>
+                            api.permissionSystem.deleteTag(tag.id, tag.version),
+                          "标签已删除，管理员权限未改变"
+                        )
+                      }
+                    >
+                      <Button type="link" size="small" danger disabled={busy}>
+                        删除
+                      </Button>
+                    </Popconfirm>
+                  </Space>
                 )
               }
-            >
-              <Button type="link" danger disabled={busy}>
-                删除
-              </Button>
-            </Popconfirm>
-          </Space>
-        ))}
-      </Space>
+            ]}
+          />
+        </Flex>
+      </Drawer>
       <Modal
         open={editingTag !== undefined}
         title={editingTag === "new" ? "新建标签" : "重命名标签"}
+        okText="保存"
+        cancelText="取消"
         confirmLoading={busy}
         onCancel={() => setEditingTag(undefined)}
         onOk={() => {
@@ -581,6 +792,6 @@ export function PermissionManagement() {
         />
       )}
       {audits && <PermissionAudits onClose={() => setAudits(false)} />}
-    </Space>
+    </Flex>
   );
 }
