@@ -2,11 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Alert,
   Button,
-  Card,
   Checkbox,
+  Collapse,
   Divider,
   Drawer,
   Flex,
+  Select,
   Spin,
   Typography
 } from "antd";
@@ -31,6 +32,9 @@ function PermissionSelection({
     catalog.permissions.map((p) => [p.key, p.label])
   );
   const modules = [...new Set(catalog.permissions.map((p) => p.module_key))];
+  const hasAvailableTags = catalog.tags.some(
+    (tag) => tag.permissions.length > 0
+  );
   const [selected, setSelected] = useState<string[]>(snapshot.permissions);
   const [previewing, setPreviewing] = useState(false);
   const grant = selected.filter((key) => !snapshot.permissions.includes(key));
@@ -40,6 +44,34 @@ function PermissionSelection({
       <Typography.Text type="secondary">
         勾选权限后，确认变更再保存。
       </Typography.Text>
+      <Flex vertical gap={8} style={{ flexShrink: 0 }}>
+        <Typography.Text>按标签添加</Typography.Text>
+        <Select<string>
+          aria-label="按标签添加"
+          value={null}
+          disabled={!hasAvailableTags}
+          placeholder={
+            hasAvailableTags ? "选择标签，将权限加入勾选" : "暂无可用标签"
+          }
+          showSearch={{ optionFilterProp: "label" }}
+          style={{ width: "100%" }}
+          options={catalog.tags.map((tag) => ({
+            value: tag.id,
+            label: `${tag.name}（${tag.permissions.length} 项）`,
+            disabled: tag.permissions.length === 0
+          }))}
+          onSelect={(id) => {
+            const tag = catalog.tags.find((item) => item.id === id);
+            if (tag)
+              setSelected((current) => [
+                ...new Set([...current, ...tag.permissions])
+              ]);
+          }}
+        />
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          只追加权限，可继续逐项调整，确认后才会保存。
+        </Typography.Text>
+      </Flex>
       {snapshot.permissions.length === 0 && (
         <Typography.Text type="secondary">当前尚未分配权限</Typography.Text>
       )}
@@ -54,17 +86,33 @@ function PermissionSelection({
           overflowY: "auto"
         }}
       >
-        <Flex vertical gap={12}>
-          {modules.map((module) => (
-            <Card
-              key={module}
-              size="small"
-              title={MODULE_LABELS[module] ?? module}
-            >
-              <Flex vertical gap={16}>
-                {catalog.permissions
-                  .filter((p) => p.module_key === module)
-                  .map((permission) => (
+        <Collapse
+          size="small"
+          defaultActiveKey={[]}
+          expandIconPlacement="end"
+          items={modules.map((module) => {
+            const permissions = catalog.permissions.filter(
+              (p) => p.module_key === module
+            );
+            return {
+              key: module,
+              label: (
+                <Flex justify="space-between" align="center" gap={12}>
+                  <Typography.Text>
+                    {MODULE_LABELS[module] ?? module}
+                  </Typography.Text>
+                  <Typography.Text type="secondary">
+                    已选{" "}
+                    {permissions.filter((p) => selected.includes(p.key)).length}{" "}
+                    / {permissions.length} 项
+                  </Typography.Text>
+                </Flex>
+              ),
+              // 未展开的选项也需注册，否则 Checkbox.Group 会丢失隐藏模块的已选权限。
+              forceRender: true,
+              children: (
+                <Flex vertical gap={16}>
+                  {permissions.map((permission) => (
                     <Checkbox
                       key={permission.key}
                       value={permission.key}
@@ -91,10 +139,11 @@ function PermissionSelection({
                       </Flex>
                     </Checkbox>
                   ))}
-              </Flex>
-            </Card>
-          ))}
-        </Flex>
+                </Flex>
+              )
+            };
+          })}
+        />
       </Checkbox.Group>
       <Divider style={{ margin: 0 }} />
       <Flex justify="space-between" align="center" gap={12} wrap>
