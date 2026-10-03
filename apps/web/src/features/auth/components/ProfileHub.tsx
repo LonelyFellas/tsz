@@ -95,7 +95,7 @@ export function ProfileHub() {
 
   const { user, learning_settings } = me;
   const displayName = displayNameOf(user);
-  const initial = displayName.charAt(0).toUpperCase();
+  const initial = Array.from(displayName)[0]!.toUpperCase();
   const contact = user.phone ?? user.email ?? "";
 
   return (

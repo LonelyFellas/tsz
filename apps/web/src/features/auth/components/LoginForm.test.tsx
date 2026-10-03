@@ -1,9 +1,10 @@
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderWithProviders } from "@/test/render";
 import { LoginForm } from "./LoginForm";
 import { useUserStore } from "@/stores/user";
+import type { User } from "@tsz/types";
 
 const mockPush = vi.fn();
 const params: Record<string, string | null> = {};
@@ -13,15 +14,14 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => ({ get: (key: string) => params[key] ?? null })
 }));
 vi.mock("@/lib/request", () => ({
-  setAccessToken: vi.fn(),
-  scheduleRefresh: vi.fn(),
+  persistSession: vi.fn(),
   api: { auth: { login: vi.fn(), me: vi.fn() } }
 }));
 
 import { api } from "@/lib/request";
 const mockLogin = vi.mocked(api.auth.login);
 const mockMe = vi.mocked(api.auth.me);
-const ME_USER = {
+const ME_USER: User = {
   id: "1",
   display_name: "Alice",
   roles: ["student"],
@@ -36,7 +36,7 @@ const AUTH_OK = {
 };
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
   for (const key of Object.keys(params)) delete params[key];
   useUserStore.setState({ user: null, onboarded: null, hydrated: false });
   mockMe.mockResolvedValue({
@@ -81,13 +81,54 @@ describe("LoginForm — 唯一登录方式", () => {
     expect(screen.getByRole("button", { name: "立即登录" })).toBeDisabled();
   });
 
+  it("登录及资料加载等待期间不能进入找回密码", async () => {
+    let resolveAuth!: (value: typeof AUTH_OK) => void;
+    let resolveMe!: (value: Awaited<ReturnType<typeof api.auth.me>>) => void;
+    mockLogin.mockReturnValueOnce(new Promise((done) => (resolveAuth = done)));
+    mockMe.mockReturnValueOnce(new Promise((done) => (resolveMe = done)));
+    renderWithProviders(<LoginForm />);
+    const user = await fillLogin();
+    await user.click(screen.getByRole("button", { name: "立即登录" }));
+    const forgot = screen.getByRole("button", { name: "忘记密码" });
+    expect(forgot).toBeDisabled();
+    await user.click(forgot);
+    expect(mockPush).not.toHaveBeenCalled();
+    resolveAuth(AUTH_OK);
+    await waitFor(() => expect(mockMe).toHaveBeenCalled());
+    expect(forgot).toBeDisabled();
+    resolveMe({
+      user: ME_USER,
+      active_role: "student",
+      learning_settings: null,
+      onboarded: true
+    });
+    await waitFor(() => expect(useUserStore.getState().user).toEqual(ME_USER));
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("登录页卸载后的迟到响应不能读取资料或覆盖新会话", async () => {
+    let resolve!: (value: typeof AUTH_OK) => void;
+    mockLogin.mockReturnValueOnce(new Promise((done) => (resolve = done)));
+    const { unmount } = renderWithProviders(<LoginForm />);
+    const user = await fillLogin();
+    await user.click(screen.getByRole("button", { name: "立即登录" }));
+    unmount();
+    const next = { ...ME_USER, id: "new-user", display_name: "Bob" };
+    useUserStore.setState({ user: next, onboarded: true });
+    await act(async () => resolve(AUTH_OK));
+    expect(mockMe).not.toHaveBeenCalled();
+    expect(useUserStore.getState().user).toEqual(next);
+  });
+
   it("手机号和密码回车登录并发布完整用户态，交给守卫导航", async () => {
     mockLogin.mockResolvedValueOnce(AUTH_OK as never);
     renderWithProviders(<LoginForm />);
     const user = await fillLogin();
     await user.type(screen.getByLabelText("密码"), "{Enter}");
     await waitFor(() => {
-      expect(mockLogin).toHaveBeenCalledWith("13800138000", "abc123");
+      expect(mockLogin).toHaveBeenCalledWith("13800138000", "abc123", {
+        signal: expect.any(AbortSignal)
+      });
       expect(useUserStore.getState()).toMatchObject({
         user: ME_USER,
         onboarded: true,
@@ -129,7 +170,9 @@ describe("LoginForm — 唯一登录方式", () => {
     await user.click(
       screen.getByRole("button", { name: "没有账号，立即注册" })
     );
-    expect(mockLogin).toHaveBeenCalledWith("student@example.com", "OldPass!");
+    expect(mockLogin).toHaveBeenCalledWith("student@example.com", "OldPass!", {
+      signal: expect.any(AbortSignal)
+    });
     expect(mockPush).toHaveBeenCalledWith(
       "/register?method=email&redirect=%2Fstudent%2Fpractice"
     );

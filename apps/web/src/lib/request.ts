@@ -6,6 +6,7 @@ import { authRuntime } from "./auth";
 const { tokens } = authRuntime;
 
 export const api = authRuntime.api;
+export const persistSession = authRuntime.persistSession;
 
 /** 写入 / 清除内存 access token；清除时同步取消刷新定时器。 */
 export function setAccessToken(token: string | null) {

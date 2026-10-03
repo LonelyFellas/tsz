@@ -1,7 +1,8 @@
 import { HttpError, type AuthResponse } from "@tsz/api-client";
 import { passwordErrorMessage } from "@tsz/shared/auth";
+import { PASSWORD_MIN_LENGTH } from "@tsz/shared";
 import { safeRedirectPath } from "@tsz/shared/auth";
-import { api, setAccessToken, scheduleRefresh } from "@/lib/request";
+import { api, persistSession as persistRuntimeSession } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
 
 // 后端错误翻译下沉到 @tsz/shared/auth（与 admin 共用通用会话错误映射）。
@@ -9,6 +10,8 @@ export { translateAuthError } from "@tsz/shared/auth";
 
 /** 新用户引导页路径（选择难度等级 + 英式/美式）。 */
 export const ONBOARDING_PATH = "/onboarding";
+
+export const AUTH_PASSWORD_HINT = `密码至少 ${PASSWORD_MIN_LENGTH} 位`;
 
 // 登录 / 注册表单共用的输入框样式。
 export const AUTH_INPUT_CLASS =
@@ -18,13 +21,16 @@ export const AUTH_INPUT_CLASS =
 export function persistSession(
   auth: Pick<AuthResponse, "access_token" | "expires_in">
 ): void {
-  setAccessToken(auth.access_token);
-  scheduleRefresh(auth.expires_in);
+  persistRuntimeSession(auth);
 }
 
 /** 认证成功后一次性发布完整用户态；导航只由 GuestGuard 执行。 */
-export async function completeAuthentication(): Promise<void> {
-  const me = await api.auth.me();
+export async function completeAuthentication(
+  signal?: AbortSignal
+): Promise<void> {
+  if (signal?.aborted) return;
+  const me = await api.auth.me({ signal });
+  if (signal?.aborted) return;
   useUserStore.getState().setSession(me.user, me.onboarded);
 }
 

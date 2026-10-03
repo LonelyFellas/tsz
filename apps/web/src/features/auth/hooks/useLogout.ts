@@ -1,11 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { api, clearSession } from "@/lib/request";
 
 export function useLogout() {
-  const router = useRouter();
-
   return async function logout() {
     try {
       // 通知后端吊销 refresh token（cookie 自动携带）。
@@ -16,7 +13,7 @@ export function useLogout() {
     } finally {
       // 无论后端是否成功，本地状态必须清除。
       clearSession();
-      router.push("/login");
+      window.location.assign("/login");
     }
   };
 }

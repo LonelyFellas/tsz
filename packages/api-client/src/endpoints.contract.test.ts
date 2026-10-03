@@ -47,11 +47,8 @@ const PENDING = new Set<string>([
   // ---- 后端已切换为 tsz-rust(重写进行中),spec 只含 auth 核心 7 条路由。 ----
   // 以下按 tsz-rust 落地节奏逐步从白名单移除(T 系列见 tsz-rust/docs/frontend-integration.md §6)。
 
-  // 个人资料 / 学习设置 / 头像(tsz-rust 未实现)。
-  "patch /me",
+  // 学习设置(tsz-rust 未实现)。
   "put /me/learning-settings",
-  "post /me/avatar/upload-url",
-  "post /me/avatar",
   // 词库 / 词表 / 评论 / 任务:目前全是前端 mock(useWordLists 等),后端未实现。
   "get /words",
   "get /wordlists",
@@ -164,6 +161,98 @@ function collectComponentSchemaRefs(value: unknown): Set<string> {
 
   return refs;
 }
+
+describe("昵称保存契约", () => {
+  it("PATCH /me 仅允许 display_name，成功响应为安全的完整 user", () => {
+    const operation = snapshot.operationSchemas["patch /me"];
+    expect(operation.request).toEqual({
+      $ref: "#/components/schemas/UpdateProfileRequest"
+    });
+    expect(operation.responses["200"]).toEqual({
+      $ref: "#/components/schemas/UpdateProfileResponse"
+    });
+    const request = snapshot.schemas.UpdateProfileRequest;
+    expect(request.additionalProperties).toBe(false);
+    expect(request.required).toEqual(["display_name"]);
+    expect(Object.keys(request.properties)).toEqual(["display_name"]);
+    expect(snapshot.schemas.UpdateProfileResponse.properties.user).toEqual({
+      $ref: "#/components/schemas/UserProfile"
+    });
+    const profile = snapshot.schemas.UserProfile;
+    expect(Object.keys(profile.properties).sort()).toEqual(
+      [
+        "id",
+        "display_name",
+        "avatar_url",
+        "phone",
+        "email",
+        "roles",
+        "active_role"
+      ].sort()
+    );
+    expect(profile.required.sort()).toEqual(
+      ["id", "display_name", "avatar_url", "roles", "active_role"].sort()
+    );
+  });
+});
+
+describe("头像直传与确认契约", () => {
+  it("两个写端点已实现，成功响应保持 upload/user 包裹及完整引用闭包", () => {
+    const permit = snapshot.operationSchemas["post /me/avatar/upload-url"];
+    const confirm = snapshot.operationSchemas["post /me/avatar"];
+    expect(permit.request).toEqual({
+      $ref: "#/components/schemas/AvatarUploadRequest"
+    });
+    expect(permit.responses["200"]).toEqual({
+      $ref: "#/components/schemas/AvatarUploadResponse"
+    });
+    expect(confirm.responses["200"]).toEqual({
+      $ref: "#/components/schemas/AvatarConfirmResponse"
+    });
+    expect(snapshot.schemas.AvatarUploadResponse.required).toContain("upload");
+    expect(snapshot.schemas.AvatarConfirmResponse.required).toContain("user");
+    expect(snapshot.schemas.AvatarConfirmResponse.properties.user).toEqual({
+      $ref: "#/components/schemas/UserProfile"
+    });
+    expect(snapshot.schemas.AvatarUpload.required).toEqual(
+      expect.arrayContaining([
+        "key",
+        "url",
+        "headers",
+        "expires_in",
+        "max_bytes"
+      ])
+    );
+    expect(snapshot.schemas.UserProfile.required).toEqual(
+      expect.arrayContaining([
+        "id",
+        "display_name",
+        "avatar_url",
+        "roles",
+        "active_role"
+      ])
+    );
+    expect(specPaths["/avatars/{id}"]).toContain("get");
+    for (const operation of [permit, confirm]) {
+      for (const ref of collectComponentSchemaRefs(operation)) {
+        expect(snapshot.schemas).toHaveProperty(ref);
+      }
+    }
+    expect(snapshot.schemas.ErrorCode.enum).toEqual(
+      expect.arrayContaining([
+        "unsupported_avatar_content_type",
+        "invalid_avatar_size",
+        "avatar_invalid_image",
+        "avatar_file_too_large",
+        "invalid_avatar_key",
+        "avatar_upload_not_completed",
+        "avatar_upload_rate_limited",
+        "avatar_storage_not_configured",
+        "avatar_storage_unavailable"
+      ])
+    );
+  });
+});
 
 describe("账号安全请求与状态码契约", () => {
   const cases = [
@@ -585,7 +674,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "5e732f282c0add0816f2e941c7c4da8b87f7b8825cb1d804c2fab955488ce2b7"
+      "4cf221d998c41d7f171decf3b117def60acbbb42329b8b678888ed9a53d955a5"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");

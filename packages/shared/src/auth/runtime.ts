@@ -52,39 +52,62 @@ export function createAuthRuntime({
     onSessionExpired: tokens.redirectToLogin
   });
   const api = createEndpoints(http);
+  const logoutKey = `tsz.auth.logged-out:${baseUrl}`;
+  let locallyLoggedOut = false;
+  try {
+    locallyLoggedOut =
+      typeof sessionStorage !== "undefined" &&
+      sessionStorage.getItem(logoutKey) === "1";
+  } catch {
+    // Web Storage 可能被浏览器禁用，不能阻断内存会话操作。
+  }
+  function markLoggedOut(value: boolean) {
+    locallyLoggedOut = value;
+    try {
+      if (typeof sessionStorage === "undefined") return;
+      if (value) sessionStorage.setItem(logoutKey, "1");
+      else sessionStorage.removeItem(logoutKey);
+    } catch {
+      // 内存中的登出状态仍须生效。
+    }
+  }
+  const clearUser = () =>
+    store.setState({
+      user: null,
+      activeRole: null,
+      onboarded: null,
+      hydrated: true,
+      connectionError: false
+    });
+  const restoreSession = createSessionRestore(
+    tokens,
+    () => api.auth.me(),
+    ({ user, onboarded }) => store.getState().setSession(user, onboarded),
+    clearUser,
+    () => store.setState({ connectionError: true })
+  );
 
   return {
     api,
     store,
     tokens,
-    restoreSession: createSessionRestore(
-      tokens,
-      () => api.auth.me(),
-      ({ user, onboarded }) => store.getState().setSession(user, onboarded),
-      () =>
-        store.setState({
-          user: null,
-          activeRole: null,
-          onboarded: null,
-          hydrated: true,
-          connectionError: false
-        }),
-      () => store.setState({ connectionError: true })
-    ),
+    restoreSession: () => {
+      if (locallyLoggedOut) {
+        clearUser();
+        return Promise.resolve();
+      }
+      return restoreSession();
+    },
     persistSession: (auth) => {
+      markLoggedOut(false);
       tokens.setAccessToken(auth.access_token);
       store.setState({ connectionError: false });
       tokens.scheduleRefresh(auth.expires_in);
     },
     clearSession: () => {
+      markLoggedOut(true);
       tokens.setAccessToken(null);
-      store.setState({
-        user: null,
-        activeRole: null,
-        onboarded: null,
-        hydrated: true,
-        connectionError: false
-      });
+      clearUser();
     }
   };
 }

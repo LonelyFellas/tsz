@@ -110,8 +110,8 @@ export function createEndpoints(http: HttpClient) {
        * GET /auth/me — 当前登录用户信息。后端返回扁平 UserProfile,
        * 此处装配成 MeResponse(见类型注释;T2 落地后删适配直连 /me)。
        */
-      me: (): Promise<MeResponse> =>
-        http.get<User>("/auth/me").then((user) => ({
+      me: (opts?: { signal?: AbortSignal }): Promise<MeResponse> =>
+        http.get<User>("/auth/me", opts).then((user) => ({
           user,
           active_role: user.active_role,
           learning_settings: null,
@@ -137,16 +137,21 @@ export function createEndpoints(http: HttpClient) {
           retryOnUnauthorized: (code) => code === "invalid_token"
         }),
       /** POST /auth/register — 手机或邮箱验证码注册，成功直接建立会话。 */
-      register: (payload: RegisterPayload) =>
+      register: (payload: RegisterPayload, opts?: { signal?: AbortSignal }) =>
         http.post<AuthResponse>("/auth/register", payload, {
+          ...opts,
           skipAuth: true
         }),
       /** POST /auth/login — 账号密码登录 */
-      login: (identifier: string, password: string) =>
+      login: (
+        identifier: string,
+        password: string,
+        opts?: { signal?: AbortSignal }
+      ) =>
         http.post<AuthResponse>(
           "/auth/login",
           { identifier, password },
-          { skipAuth: true }
+          { ...opts, skipAuth: true }
         ),
       /** POST /auth/refresh — 刷新 access token（refresh token 由 cookie 自动携带，无需 body） */
       refresh: () => http.post<RefreshResponse>("/auth/refresh"),

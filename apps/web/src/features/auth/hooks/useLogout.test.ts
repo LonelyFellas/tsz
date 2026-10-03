@@ -3,13 +3,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useLogout } from "./useLogout";
 import { authRuntime } from "@/lib/auth";
 
-const mockPush = vi.fn();
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: mockPush })
-}));
+const mockAssign = vi.fn();
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubGlobal(
+    "window",
+    new Proxy(window, {
+      get(target, key) {
+        return key === "location"
+          ? { ...target.location, assign: mockAssign }
+          : Reflect.get(target, key, target);
+      }
+    })
+  );
   authRuntime.tokens.setAccessToken("token");
   authRuntime.store.setState({
     user: {
@@ -28,6 +35,7 @@ beforeEach(() => {
 afterEach(() => {
   authRuntime.clearSession();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("useLogout + runtime + HTTP", () => {
@@ -38,7 +46,7 @@ describe("useLogout + runtime + HTTP", () => {
       if (outcome === "success")
         fetch.mockResolvedValue(new Response(null, { status: 204 }));
       else fetch.mockRejectedValue(new TypeError("network error"));
-      mockPush.mockImplementation(() => {
+      mockAssign.mockImplementation(() => {
         expect(authRuntime.tokens.getToken()).toBeUndefined();
         expect(authRuntime.store.getState()).toMatchObject({
           user: null,
@@ -53,7 +61,7 @@ describe("useLogout + runtime + HTTP", () => {
         await expect(result.current()).resolves.toBeUndefined();
       });
       expect(fetch).toHaveBeenCalledTimes(1);
-      expect(mockPush).toHaveBeenCalledWith("/login");
+      expect(mockAssign).toHaveBeenCalledWith("/login");
     }
   );
 });

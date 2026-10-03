@@ -61,6 +61,9 @@ export async function uploadAvatar(file: File): Promise<User> {
   if (!contentType) {
     throw new Error("unsupported avatar content type");
   }
+  if (file.size === 0) {
+    throw new Error("invalid avatar size");
+  }
   if (file.size > AVATAR_MAX_BYTES) {
     throw new Error("avatar file too large");
   }

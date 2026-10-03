@@ -1,12 +1,15 @@
 @import "tailwindcss";
 
 @source '../../../../packages/ui/src/**/*.{ts,tsx}';
-/* 排除 admin 迁移期沉淀的 shadcn 组件目录(继承自 v3 tailwind.config.ts 的排除项):
-   它们用 web 未定义的 hsl 语义 token(bg-card/border-input/ring-ring 等),
-   扫入只会白白增重 CSS;且 web 侧若误引用会静默渲染成透明/黑色而无构建报错,
-   保持不生成这些类可让误引用更快暴露。Select 使用 web 自身的语义色 token，单独放行。 */
+/* 尚未适配 C 端的旧组件仍保持排除，逐个放行已接入主题变量的组件。 */
 @source not '../../../../packages/ui/src/components';
 @source '../../../../packages/ui/src/components/ui/select.tsx';
+@source '../../../../packages/ui/src/components/ui/input.tsx';
+@source '../../../../packages/ui/src/components/ui/button.tsx';
+@source '../../../../packages/ui/src/components/ui/label.tsx';
+@source '../../../../packages/ui/src/components/ui/form-field.tsx';
+@source '../../../../packages/ui/src/components/ui/tabs.tsx';
+@source '../../../../packages/ui/src/components/ui/dropdown-menu.tsx';
 
 @custom-variant dark (&:is(.dark *));
 

@@ -25,8 +25,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/lib/request", () => ({
-  setAccessToken: vi.fn(),
-  scheduleRefresh: vi.fn(),
+  persistSession: vi.fn(),
   api: {
     auth: {
       login: vi.fn(),

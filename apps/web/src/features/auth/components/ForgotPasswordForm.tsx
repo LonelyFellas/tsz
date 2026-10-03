@@ -4,15 +4,23 @@ import {
   isEmail,
   isPhone,
   isRegisterPassword,
-  PASSWORD_HINT,
   passwordLengthError
 } from "@tsz/shared";
+import {
+  Button,
+  FormField,
+  Input,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent
+} from "@tsz/ui/components";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/request";
 import { AuthBranding } from "./AuthBranding";
 import { PasswordVisibilityIcon } from "./PasswordVisibilityIcon";
-import { AUTH_INPUT_CLASS, securityErrorMessage } from "../shared";
+import { AUTH_PASSWORD_HINT, securityErrorMessage } from "../shared";
 
 type Tab = "phone" | "email";
 
@@ -49,6 +57,15 @@ export function ForgotPasswordForm() {
     tab === "phone" ? isPhone(identifier) : isEmail(identifier);
   const codeValid = /^\d{6}$/.test(code);
   const passwordValid = isRegisterPassword(password);
+  const accountError =
+    account && !accountValid
+      ? tab === "phone"
+        ? "手机号码错误"
+        : "邮箱格式错误"
+      : undefined;
+  const passwordError = password
+    ? (passwordLengthError(password) ?? undefined)
+    : undefined;
   const busy = sending || loading;
   const canSendCode = accountValid && countdown === 0 && !busy;
   const canSubmit = accountValid && codeValid && passwordValid && !busy;
@@ -106,154 +123,135 @@ export function ForgotPasswordForm() {
             使用账号绑定的手机号或邮箱验证身份。
           </p>
 
-          <div
-            className="mb-7 flex gap-6 border-b border-border"
-            aria-label="验证方式"
+          <Tabs
+            value={tab}
+            onValueChange={(value) => switchTab(value as Tab)}
+            activationMode="manual"
           >
-            {TABS.map(({ id, label }) => (
-              <button
-                key={id}
-                type="button"
-                disabled={busy}
-                onClick={() => switchTab(id)}
-                aria-pressed={tab === id}
-                className={`border-b-2 px-1 pb-3 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed ${
-                  tab === id
-                    ? "border-primary text-foreground"
-                    : "border-transparent text-foreground-muted hover:text-foreground"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          <form noValidate className="space-y-5" onSubmit={handleReset}>
-            {/* 账号 */}
-            <div>
-              <label
-                htmlFor="reset-account"
-                className="mb-2 ml-4 block text-sm font-medium text-foreground"
-              >
-                {tab === "phone" ? "手机号码" : "邮箱"}
-              </label>
-              <input
-                id="reset-account"
-                type={tab === "phone" ? "tel" : "email"}
-                autoComplete={tab === "phone" ? "tel" : "email"}
-                placeholder={tab === "phone" ? "请输入手机号" : "请输入邮箱"}
-                value={account}
-                disabled={busy}
-                onChange={(e) => {
-                  const next = e.target.value;
-                  const normalized =
-                    tab === "email" ? next.trim().toLowerCase() : next.trim();
-                  if (normalized !== identifier) setCountdown(0);
-                  setAccount(next);
-                  setCode("");
-                  setError("");
-                }}
-                className={AUTH_INPUT_CLASS}
-              />
-              {account && !accountValid && (
-                <p className="mt-1 text-xs text-danger">
-                  {tab === "phone" ? "手机号码错误" : "邮箱格式错误"}
-                </p>
-              )}
-            </div>
-
-            {/* 验证码 */}
-            <div>
-              <label
-                htmlFor="reset-code"
-                className="mb-2 ml-4 block text-sm font-medium text-foreground"
-              >
-                验证码
-              </label>
-              <div className="flex gap-3">
-                <input
-                  id="reset-code"
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  placeholder="请输入验证码"
-                  value={code}
-                  maxLength={6}
-                  disabled={busy}
-                  onChange={(e) => setCode(e.target.value)}
-                  className={`${AUTH_INPUT_CLASS} min-w-0`}
-                />
-                <button
-                  type="button"
-                  onClick={handleSendCode}
-                  disabled={!canSendCode}
-                  className="shrink-0 rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
+            <TabsList className="mb-7" aria-label="验证方式">
+              {TABS.map(({ id, label }) => (
+                <TabsTrigger key={id} value={id} disabled={busy}>
+                  {label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            {/* 保留非激活面板，保证两个标签的 aria-controls 都有目标。 */}
+            <TabsContent value={tab === "phone" ? "email" : "phone"} />
+            <TabsContent value={tab}>
+              <form noValidate className="space-y-5" onSubmit={handleReset}>
+                {/* 账号 */}
+                <FormField
+                  htmlFor="reset-account"
+                  label={tab === "phone" ? "手机号码" : "邮箱"}
+                  error={accountError}
                 >
-                  {countdown > 0
-                    ? `${countdown}s 后重发`
-                    : sending
-                      ? "发送中..."
-                      : "获取验证码"}
-                </button>
-              </div>
-            </div>
+                  <Input
+                    id="reset-account"
+                    type={tab === "phone" ? "tel" : "email"}
+                    autoComplete={tab === "phone" ? "tel" : "email"}
+                    placeholder={
+                      tab === "phone" ? "请输入手机号" : "请输入邮箱"
+                    }
+                    value={account}
+                    disabled={busy}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      const normalized =
+                        tab === "email"
+                          ? next.trim().toLowerCase()
+                          : next.trim();
+                      if (normalized !== identifier) setCountdown(0);
+                      setAccount(next);
+                      setCode("");
+                      setError("");
+                    }}
+                    aria-invalid={Boolean(accountError)}
+                    aria-describedby={
+                      accountError ? "reset-account-message" : undefined
+                    }
+                  />
+                </FormField>
 
-            {/* 新密码 */}
-            <div>
-              <label
-                htmlFor="reset-password"
-                className="mb-2 ml-4 block text-sm font-medium text-foreground"
-              >
-                新密码
-              </label>
-              <div className="relative">
-                <input
-                  id="reset-password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="请输入新密码"
-                  value={password}
-                  disabled={busy}
-                  autoComplete="new-password"
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={`${AUTH_INPUT_CLASS} pr-14`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  disabled={busy}
-                  className="absolute right-3 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full text-foreground-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
-                  aria-label={showPassword ? "隐藏密码" : "显示密码"}
+                {/* 验证码 */}
+                <FormField htmlFor="reset-code" label="验证码">
+                  <div className="flex gap-3">
+                    <Input
+                      id="reset-code"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      placeholder="请输入验证码"
+                      value={code}
+                      maxLength={6}
+                      disabled={busy}
+                      onChange={(e) => setCode(e.target.value)}
+                      className="min-w-0 flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleSendCode}
+                      disabled={!canSendCode}
+                      className="shrink-0 px-4 font-medium"
+                    >
+                      {countdown > 0
+                        ? `${countdown}s 后重发`
+                        : sending
+                          ? "发送中..."
+                          : "获取验证码"}
+                    </Button>
+                  </div>
+                </FormField>
+
+                {/* 新密码 */}
+                <FormField
+                  htmlFor="reset-password"
+                  label="新密码"
+                  hint={AUTH_PASSWORD_HINT}
+                  error={passwordError}
                 >
-                  <PasswordVisibilityIcon visible={showPassword} />
-                </button>
-              </div>
-              <p
-                className={`mt-3 ml-4 text-xs ${
-                  password && !passwordValid
-                    ? "text-danger"
-                    : "text-foreground-muted"
-                }`}
-              >
-                {password
-                  ? (passwordLengthError(password) ?? PASSWORD_HINT)
-                  : PASSWORD_HINT}
-              </p>
-            </div>
+                  <div className="relative">
+                    <Input
+                      id="reset-password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="请输入新密码"
+                      value={password}
+                      disabled={busy}
+                      autoComplete="new-password"
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pr-14"
+                      aria-invalid={Boolean(passwordError)}
+                      aria-describedby="reset-password-message"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setShowPassword((v) => !v)}
+                      disabled={busy}
+                      className="absolute right-1 top-1/2 -translate-y-1/2"
+                      aria-label={showPassword ? "隐藏密码" : "显示密码"}
+                    >
+                      <PasswordVisibilityIcon visible={showPassword} />
+                    </Button>
+                  </div>
+                </FormField>
 
-            {error && (
-              <p role="alert" className="text-sm text-danger">
-                {error}
-              </p>
-            )}
+                {error && (
+                  <p
+                    role="alert"
+                    className="mx-4 text-sm leading-5 text-danger"
+                  >
+                    {error}
+                  </p>
+                )}
 
-            <button
-              type="submit"
-              disabled={!canSubmit}
-              className="min-h-12 w-full rounded-full bg-primary px-5 text-sm font-semibold text-white transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {loading ? "重置中..." : "重置密码"}
-            </button>
-          </form>
+                <Button type="submit" disabled={!canSubmit} className="w-full">
+                  {loading ? "重置中..." : "重置密码"}
+                </Button>
+              </form>
+            </TabsContent>
+          </Tabs>
           <button
             type="button"
             onClick={() => router.push("/login")}

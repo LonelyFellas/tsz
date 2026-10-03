@@ -1,14 +1,14 @@
 "use client";
 
 import { isValidAccount } from "@tsz/shared";
+import { Button, FormField, Input } from "@tsz/ui/components";
 import type { AuthResponse } from "@tsz/api-client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/request";
 import { AuthBranding } from "./AuthBranding";
 import { PasswordVisibilityIcon } from "./PasswordVisibilityIcon";
 import {
-  AUTH_INPUT_CLASS,
   completeAuthentication,
   persistSession,
   translateAuthError
@@ -28,6 +28,8 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   const [error, setError] = useState("");
+  const pendingRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => pendingRequest.current?.abort(), []);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -44,6 +46,7 @@ export function LoginForm() {
   const registeredSuccess = searchParams.get("registered") === "success";
 
   function openRegistration() {
+    if (loading || authenticated) return;
     const params = new URLSearchParams();
     if (identifier.includes("@")) params.set("method", "email");
     const redirect = searchParams.get("redirect");
@@ -52,36 +55,42 @@ export function LoginForm() {
   }
 
   // 登录成功后仅重试资料加载，不重复提交密码；由 GuestGuard 负责导航。
-  async function loadProfile() {
+  async function loadProfile(signal: AbortSignal) {
     try {
-      await completeAuthentication();
+      await completeAuthentication(signal);
     } catch {
-      setError("登录成功，但加载账号信息失败，请重试");
+      if (!signal.aborted) setError("登录成功，但加载账号信息失败，请重试");
     }
   }
 
-  async function onAuthSuccess(auth: AuthResponse) {
+  async function onAuthSuccess(auth: AuthResponse, signal: AbortSignal) {
+    if (signal.aborted) return;
     persistSession(auth);
     setAuthenticated(true);
-    await loadProfile();
+    await loadProfile(signal);
   }
 
   async function handleLogin() {
     if (!canSubmit) return;
+    const controller = new AbortController();
+    pendingRequest.current = controller;
+    const { signal } = controller;
     setError("");
     setLoading(true);
     try {
       if (authenticated) {
-        await loadProfile();
+        await loadProfile(signal);
       } else {
-        const auth = await api.auth.login(identifier, password);
-        await onAuthSuccess(auth);
+        const auth = await api.auth.login(identifier, password, { signal });
+        await onAuthSuccess(auth, signal);
       }
     } catch (e: unknown) {
+      if (signal.aborted) return;
       const msg = e instanceof Error ? e.message : "";
       setError(translateAuthError(msg, LOGIN_ERRORS, "登录失败，请稍后重试"));
     } finally {
-      setLoading(false);
+      if (!signal.aborted) setLoading(false);
+      if (pendingRequest.current === controller) pendingRequest.current = null;
     }
   }
 
@@ -134,14 +143,8 @@ export function LoginForm() {
             }}
             className="space-y-5"
           >
-            <div>
-              <label
-                htmlFor="login-account"
-                className="mb-2 ml-4 block text-sm font-medium text-foreground"
-              >
-                手机号或邮箱
-              </label>
-              <input
+            <FormField htmlFor="login-account" label="手机号或邮箱">
+              <Input
                 id="login-account"
                 type="text"
                 autoComplete="username"
@@ -152,18 +155,11 @@ export function LoginForm() {
                   setAccount(e.target.value);
                   setError("");
                 }}
-                className={AUTH_INPUT_CLASS}
               />
-            </div>
-            <div>
-              <label
-                htmlFor="login-password"
-                className="mb-2 ml-4 block text-sm font-medium text-foreground"
-              >
-                密码
-              </label>
+            </FormField>
+            <FormField htmlFor="login-password" label="密码">
               <div className="relative">
-                <input
+                <Input
                   id="login-password"
                   type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
@@ -174,31 +170,29 @@ export function LoginForm() {
                     setPassword(e.target.value);
                     setError("");
                   }}
-                  className={`${AUTH_INPUT_CLASS} pr-14`}
+                  className="pr-14"
                 />
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon"
                   onClick={() => setShowPassword((v) => !v)}
                   disabled={loading || authenticated}
-                  className="absolute right-3 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full text-foreground-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
+                  className="absolute right-1 top-1/2 -translate-y-1/2"
                   aria-label={showPassword ? "隐藏密码" : "显示密码"}
                 >
                   <PasswordVisibilityIcon visible={showPassword} />
-                </button>
+                </Button>
               </div>
-            </div>
+            </FormField>
             {error && (
-              <p role="alert" className="text-sm text-danger">
+              <p role="alert" className="mx-4 text-sm leading-5 text-danger">
                 {error}
               </p>
             )}
-            <button
-              type="submit"
-              disabled={!canSubmit}
-              className="min-h-12 w-full rounded-full bg-primary px-5 text-sm font-semibold text-white transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
-            >
+            <Button type="submit" disabled={!canSubmit} className="w-full">
               {loading ? "登录中..." : authenticated ? "重试加载" : "立即登录"}
-            </button>
+            </Button>
           </form>
 
           <div className="mt-7 flex items-center justify-between gap-4 text-sm">
@@ -216,8 +210,11 @@ export function LoginForm() {
             </div>
             <button
               type="button"
-              onClick={() => router.push("/forgot-password")}
-              className="shrink-0 rounded-sm text-foreground-muted hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              disabled={loading || authenticated}
+              onClick={() => {
+                if (!loading && !authenticated) router.push("/forgot-password");
+              }}
+              className="shrink-0 rounded-sm text-foreground-muted hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
             >
               忘记密码
             </button>

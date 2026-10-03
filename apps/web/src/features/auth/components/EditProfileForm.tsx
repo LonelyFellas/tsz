@@ -1,7 +1,12 @@
 "use client";
 
-import type { MeResponse } from "@tsz/api-client";
-import { DISPLAY_NAME_MAX, hasDisplayNameForbiddenChars } from "@tsz/shared";
+import { HttpError, type MeResponse } from "@tsz/api-client";
+import {
+  DISPLAY_NAME_MAX,
+  displayNameError,
+  displayNameLength,
+  normalizeDisplayName
+} from "@tsz/shared";
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -24,9 +29,10 @@ const INPUT_CLASS =
 // hasDisplayNameForbiddenChars,与后端 validateDisplayName 对齐)。
 const NICKNAME_FORBIDDEN_MSG = "昵称不能包含 < > 或不可见字符";
 
-// 改昵称(PATCH /me)错误。键须与后端返回的英文原文逐字一致(translateAuthError
-// 精确匹配),原文见 tsz-go docs/api.md。
 const PROFILE_ERRORS: Record<string, string> = {
+  "display name cannot be empty": "昵称需为 1–50 个字符",
+  "display name cannot be longer than 50 characters": "昵称不能超过 50 个字符",
+  "display name contains forbidden characters": NICKNAME_FORBIDDEN_MSG,
   "display name cannot be blank": "昵称需为 1–50 个字符",
   "display name cannot contain < > or invisible characters":
     NICKNAME_FORBIDDEN_MSG,
@@ -37,7 +43,20 @@ const PROFILE_ERRORS: Record<string, string> = {
 const AVATAR_UNAVAILABLE_MSG = "头像功能即将上线";
 
 // 头像上传三步流程错误(对接文档 §5;前端预检抛的文案与后端一致,共用此表)。
+const AVATAR_CODE_ERRORS: Record<string, string> = {
+  unsupported_avatar_content_type: "仅支持 JPG / PNG / WebP 格式图片",
+  invalid_avatar_size: "图片大小无效,请重新选择",
+  avatar_invalid_image: "图片损坏或像素过大,请重新选择",
+  avatar_file_too_large: "图片不能超过 5MB",
+  invalid_avatar_key: "上传凭证已失效,请重试",
+  avatar_upload_not_completed: "上传未完成,请重试",
+  avatar_upload_rate_limited: "上传过于频繁,请稍后再试",
+  avatar_storage_not_configured: AVATAR_UNAVAILABLE_MSG,
+  avatar_storage_unavailable: "头像存储暂不可用,请稍后重试"
+};
+
 const AVATAR_ERRORS: Record<string, string> = {
+  "invalid avatar size": AVATAR_CODE_ERRORS.invalid_avatar_size!,
   "unsupported avatar content type": "仅支持 JPG / PNG / WebP 格式图片",
   "avatar file too large": "图片不能超过 5MB",
   "avatar storage not configured": AVATAR_UNAVAILABLE_MSG,
@@ -111,19 +130,16 @@ export function EditProfileForm() {
 
   // 与 trimmedName 同口径 trim:遗留数据/其他客户端可能存入带首尾空格的
   // 昵称,原样比较会把未编辑的表单误判为「已修改」。
-  const nameInitial = (user.display_name ?? "").trim();
-  const trimmedName = displayName.trim();
-  const nameChanged = trimmedName !== "" && trimmedName !== nameInitial;
-  // 禁字符预检,与后端 display_name 规则对齐;命中即禁用保存,不发请求。
-  const nameForbidden =
-    nameChanged && hasDisplayNameForbiddenChars(trimmedName);
-  // 昵称槽位单条提示:预检命中优先于后端返回的 nameError。
-  const nameMessage = nameForbidden ? NICKNAME_FORBIDDEN_MSG : nameError;
+  const nameInitial = normalizeDisplayName(user.display_name ?? "");
+  const trimmedName = normalizeDisplayName(displayName);
+  const nameChanged = trimmedName !== nameInitial;
+  const validationError = nameChanged ? displayNameError(displayName) : null;
+  const nameMessage = validationError ?? nameError;
   const topContact = user.phone ?? user.email ?? "";
-  const avatarInitial = displayNameOf(user).charAt(0).toUpperCase();
+  const avatarInitial = Array.from(displayNameOf(user))[0]!.toUpperCase();
 
   const canSubmit =
-    nameChanged && !nameForbidden && !saving && !avatarUploading;
+    nameChanged && !validationError && !saving && !avatarUploading;
 
   function clearMessages() {
     setNameError("");
@@ -160,7 +176,10 @@ export function EditProfileForm() {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "";
       setAvatarError(
-        translateAuthError(msg, AVATAR_ERRORS, "头像上传失败,请稍后再试")
+        (e instanceof HttpError && e.code
+          ? AVATAR_CODE_ERRORS[e.code]
+          : undefined) ??
+          translateAuthError(msg, AVATAR_ERRORS, "头像上传失败,请稍后再试")
       );
     } finally {
       setAvatarUploading(false);
@@ -178,6 +197,10 @@ export function EditProfileForm() {
       setNameError("没有需要保存的修改");
       return;
     }
+    if (validationError) {
+      setNameError(validationError);
+      return;
+    }
 
     setSaving(true);
     try {
@@ -187,9 +210,19 @@ export function EditProfileForm() {
           commit(r.user);
         } catch (e: unknown) {
           const msg = e instanceof Error ? e.message : "";
-          setNameError(
-            translateAuthError(msg, PROFILE_ERRORS, "昵称保存失败,请稍后再试")
-          );
+          if (e instanceof HttpError && e.code === "invalid_display_name") {
+            setNameError(
+              PROFILE_ERRORS[msg] ??
+                "昵称需为 1–50 个字符，且不能包含 < > 或不可见字符"
+            );
+          } else {
+            setNameError(
+              PROFILE_ERRORS[msg] ??
+                (e instanceof HttpError && e.status === 404
+                  ? "该功能暂未开放，敬请期待"
+                  : "昵称保存失败，请稍后再试")
+            );
+          }
           return;
         }
       }
@@ -200,22 +233,21 @@ export function EditProfileForm() {
   }
 
   return (
-    <div className="animate-in mx-auto max-w-md px-6 py-10">
-      <div className="mb-8 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="-ml-2 rounded-full px-3 py-1.5 text-sm font-medium text-foreground-muted transition hover:bg-muted hover:text-foreground"
-        >
-          ← 返回
-        </button>
-        <h1 className="flex-1 text-center text-2xl font-semibold tracking-tight text-foreground">
-          编辑资料
-        </h1>
-        <span className="w-12" aria-hidden />
-      </div>
+    <div className="animate-in mx-auto max-w-2xl px-6 py-10 sm:py-14">
+      <Link
+        href="/account"
+        className="rounded-sm text-sm text-foreground-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+      >
+        ← 返回个人中心
+      </Link>
+      <h1 className="mt-7 text-3xl font-semibold tracking-tight text-foreground">
+        编辑资料
+      </h1>
+      <p className="mt-3 text-sm leading-6 text-foreground-muted">
+        修改头像和昵称。
+      </p>
 
-      <div className="rounded-3xl border border-border bg-surface p-8 shadow-xl shadow-black/5">
+      <div className="mt-8 rounded-3xl border border-border bg-surface p-5 shadow-xl shadow-black/5 sm:p-8">
         {/* 头像:点击选图 → OSS 直传三步流程(../avatar) */}
         <div className="mb-7 flex flex-col items-center gap-3">
           <input
@@ -282,7 +314,7 @@ export function EditProfileForm() {
             </div>
           )}
           <p className="text-xs text-foreground-subtle">
-            若要修改等级,请联系平台客服
+            修改学习等级请联系客服
           </p>
         </div>
 
@@ -291,42 +323,48 @@ export function EditProfileForm() {
         <form className="space-y-5" onSubmit={handleSubmit}>
           {/* 昵称 */}
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-foreground-muted">
+            <label
+              htmlFor="profile-display-name"
+              className="mb-1.5 block text-sm font-medium text-foreground-muted"
+            >
               昵称
             </label>
             <div className="relative">
               <input
+                id="profile-display-name"
                 type="text"
                 placeholder="请输入昵称"
-                maxLength={NICKNAME_MAX}
                 value={displayName}
+                disabled={saving}
+                aria-invalid={Boolean(nameMessage)}
+                aria-describedby={
+                  nameMessage ? "profile-display-name-error" : undefined
+                }
                 onChange={(e) => {
-                  // 一编辑就清掉上次提交失败的红字,避免对新输入展示陈旧错误。
                   setNameError("");
+                  setSuccess(false);
                   setDisplayName(e.target.value);
                 }}
                 className={`${INPUT_CLASS} pr-14`}
               />
               <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-foreground-subtle">
-                {displayName.length}/{NICKNAME_MAX}
+                {displayNameLength(displayName)}/{NICKNAME_MAX}
               </span>
             </div>
             {nameMessage && (
-              <p className="mt-1.5 text-sm text-danger">{nameMessage}</p>
+              <p
+                id="profile-display-name-error"
+                className="mt-1.5 text-sm text-danger"
+              >
+                {nameMessage}
+              </p>
             )}
           </div>
-
-          <Link
-            href="/account/security"
-            className="block text-sm font-medium text-primary hover:underline"
-          >
-            账号安全：绑定、换绑、解绑与修改密码 →
-          </Link>
 
           {success && (
             <p className="flex items-center justify-center gap-1.5 rounded-2xl bg-success/10 px-4 py-3 text-center text-sm font-medium text-success">
               <CheckIcon />
-              操作成功
+              已保存
             </p>
           )}
 
@@ -343,7 +381,7 @@ export function EditProfileForm() {
               disabled={!canSubmit}
               className="flex-1 rounded-full bg-primary py-3 text-sm font-medium text-white transition hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {saving ? "保存中..." : "确定"}
+              {saving ? "保存中..." : "保存"}
             </button>
           </div>
         </form>

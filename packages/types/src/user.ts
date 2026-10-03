@@ -15,7 +15,7 @@ export interface User {
   email?: string;
   /** 昵称(后端 display_name) */
   display_name: string;
-  /** 头像绝对地址。后端头像功能未实现,现恒为 "";前端用默认图兜底 */
+  /** 当前头像的版本化绝对地址；无头像时为空字符串 */
   avatar_url: string;
   roles: Role[];
   /** 当前活跃角色(在 user 内,顶层没有——契约 0.1 拍板) */
