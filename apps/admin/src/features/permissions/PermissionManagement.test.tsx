@@ -444,6 +444,34 @@ describe("权限目录、标签和授权人员", () => {
     );
     expect(api.permissionSystem.commit).not.toHaveBeenCalled();
   });
+  it.each([
+    ["12345", "****"],
+    ["1234567", "****"],
+    ["12345678", "123****5678"]
+  ])("手机号 %s 脱敏时至少隐藏一个字符", async (phone, masked) => {
+    vi.mocked(api.admins.list).mockResolvedValue({
+      items: [
+        {
+          id: "a",
+          role: "admin",
+          status: "active",
+          phone,
+          display_name: "边界测试账号",
+          can_publish_lexicon: false,
+          created_at: "2026-10-01",
+          updated_at: "2026-10-01"
+        }
+      ],
+      pagination: { page: 1, page_size: 20, total: 1, total_pages: 1 }
+    });
+    mount();
+    await screen.findByText("编辑本人词条");
+    chooseRow("编辑本人词条");
+    fireEvent.click(screen.getByText("批量授权"));
+    await screen.findByText("边界测试账号");
+    expect(screen.getByText(masked)).toBeInTheDocument();
+    expect(screen.queryByText(phone)).toBeNull();
+  });
   it("撤销授权沿用预览流程，不直接提交", async () => {
     mount();
     await screen.findByText("编辑本人词条");

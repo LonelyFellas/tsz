@@ -212,7 +212,9 @@ function BatchTargets({
                 title: "手机号",
                 dataIndex: "phone",
                 render: (phone: string) =>
-                  `${phone.slice(0, 3)}****${phone.slice(-4)}`
+                  phone.length > 7
+                    ? `${phone.slice(0, 3)}****${phone.slice(-4)}`
+                    : "****"
               },
               {
                 title: "状态",
