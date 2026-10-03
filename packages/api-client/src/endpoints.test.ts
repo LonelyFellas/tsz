@@ -30,7 +30,7 @@ describe("createEndpoints · auth", () => {
     http.get.mockResolvedValueOnce(user);
     const api = createEndpoints(http);
     const me = await api.auth.me();
-    expect(http.get).toHaveBeenCalledWith("/auth/me");
+    expect(http.get).toHaveBeenCalledWith("/auth/me", undefined);
     // 后端未实现 learning_settings/onboarded,适配器填 null/true(见 endpoints.ts)。
     expect(me).toEqual({
       user,
@@ -38,6 +38,33 @@ describe("createEndpoints · auth", () => {
       learning_settings: null,
       onboarded: true
     });
+  });
+
+  it("鉴权读写将取消signal传给请求层", async () => {
+    const api = createEndpoints(http);
+    const controller = new AbortController();
+    http.get.mockResolvedValueOnce({ active_role: "student" });
+    await api.auth.me({ signal: controller.signal });
+    api.auth.login("alice@example.com", "password", {
+      signal: controller.signal
+    });
+    api.auth.register(
+      { phone: "13800138000", password: "password", code: "123456" },
+      { signal: controller.signal }
+    );
+    expect(http.get).toHaveBeenCalledWith("/auth/me", {
+      signal: controller.signal
+    });
+    expect(http.post).toHaveBeenCalledWith(
+      "/auth/login",
+      { identifier: "alice@example.com", password: "password" },
+      { skipAuth: true, signal: controller.signal }
+    );
+    expect(http.post).toHaveBeenCalledWith(
+      "/auth/register",
+      { phone: "13800138000", password: "password", code: "123456" },
+      { skipAuth: true, signal: controller.signal }
+    );
   });
 
   it("updateProfile → PATCH /me 带 display_name", () => {

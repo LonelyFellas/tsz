@@ -2,6 +2,36 @@ import { expect, test } from "@playwright/test";
 import { mockApi, TEST_USER } from "./support/mockApi";
 
 test.describe("鉴权与引导端到端流程", () => {
+  for (const path of ["/register", "/forgot-password"]) {
+    test(`${path} 取消渠道点击保留输入，click-only确认才清空`, async ({
+      page
+    }) => {
+      await mockApi(page);
+      await page.goto(path);
+      const phone = page.getByPlaceholder("请输入手机号");
+      const code = page.getByPlaceholder("请输入验证码");
+      await phone.fill("13800138000");
+      await code.fill("123456");
+      const email = page.getByRole("tab", { name: "邮箱" });
+      const box = await email.boundingBox();
+      expect(box).not.toBeNull();
+      await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(0, 0);
+      await page.mouse.up();
+      await expect(page.getByRole("tab", { name: "手机" })).toHaveAttribute(
+        "aria-selected",
+        "true"
+      );
+      await expect(phone).toHaveValue("13800138000");
+      await expect(code).toHaveValue("123456");
+      await email.evaluate((element) => (element as HTMLElement).click());
+      await expect(email).toHaveAttribute("aria-selected", "true");
+      await expect(page.getByPlaceholder("请输入邮箱")).toHaveValue("");
+      await expect(code).toHaveValue("");
+    });
+  }
+
   for (const [path, title] of [
     ["/register", "注册账号"],
     ["/forgot-password", "找回密码"]
@@ -157,7 +187,7 @@ test.describe("鉴权与引导端到端流程", () => {
       page.getByText("注册成功，但加载账号信息失败，请重试")
     ).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "手机", exact: true })
+      page.getByRole("tab", { name: "手机", exact: true })
     ).toBeDisabled();
     await page.getByRole("button", { name: "重试加载" }).click();
     await expect(page).toHaveURL(/\/student\/practice$/);
@@ -185,7 +215,7 @@ test.describe("鉴权与引导端到端流程", () => {
     await page.goto("/register");
     await page.getByPlaceholder("请输入手机号").fill("13800138000");
     await page.getByPlaceholder("请输入验证码").fill("123456");
-    await page.getByRole("button", { name: "邮箱", exact: true }).click();
+    await page.getByRole("tab", { name: "邮箱", exact: true }).click();
     await expect(page.getByPlaceholder("请输入验证码")).toHaveValue("");
     await page.getByPlaceholder("请输入邮箱").fill("user@example.com");
     await page.getByPlaceholder("请输入验证码").fill("123456");

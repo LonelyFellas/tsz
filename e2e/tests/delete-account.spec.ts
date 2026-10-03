@@ -1,6 +1,43 @@
 import { expect, test } from "@playwright/test";
 import { mockApi } from "./support/mockApi";
 
+for (const width of [375, 1280]) {
+  test(`个人中心账户菜单不被资料卡遮挡（${width}px）`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await mockApi(page, { authenticated: true });
+    await page.goto("/account");
+    await expect(page.getByRole("heading", { name: "个人中心" })).toBeVisible();
+    await page.getByRole("button", { name: "账户菜单" }).click();
+    const menu = page.getByRole("menu");
+    await expect(menu).toBeVisible();
+    const measurement = await menu.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        outsidePage: !element.closest("header, main"),
+        zIndex: getComputedStyle(element).zIndex,
+        fitsViewport: rect.left >= 0 && rect.right <= innerWidth,
+        hits: Array.from(
+          element.querySelectorAll<HTMLElement>("[role='menuitem']")
+        ).map((item) => {
+          const r = item.getBoundingClientRect();
+          return [r.left + 16, r.left + r.width / 2].every((x) => {
+            const hit = document.elementFromPoint(x, r.top + r.height / 2);
+            return hit !== null && item.contains(hit);
+          });
+        })
+      };
+    });
+    expect(measurement.outsidePage).toBe(true);
+    expect(measurement.zIndex).toBe("50");
+    expect(measurement.fitsViewport).toBe(true);
+    expect(measurement.hits).toHaveLength(5);
+    expect(measurement.hits.every(Boolean)).toBe(true);
+    await page.getByRole("menuitem", { name: "站内通知" }).click();
+    await expect(page).toHaveURL(/\/account\/notifications$/);
+    await expect(page.getByRole("menu")).toHaveCount(0);
+  });
+}
+
 test.describe("注销账号端到端流程", () => {
   test("首页 → 个人中心 → 账号安全 → 注销 → 跳回登录并提示", async ({
     page
@@ -11,8 +48,10 @@ test.describe("注销账号端到端流程", () => {
 
     // 注销入口收在个人中心的账号安全页，头像菜单不直接暴露。
     await page.getByRole("button", { name: "账户菜单" }).click();
-    await expect(page.getByRole("link", { name: "注销账号" })).toHaveCount(0);
-    await page.getByRole("link", { name: "个人中心" }).click();
+    await expect(page.getByRole("menuitem", { name: "注销账号" })).toHaveCount(
+      0
+    );
+    await page.getByRole("menuitem", { name: "个人中心" }).click();
     await page.getByRole("link", { name: /账号安全/ }).click();
     await page.getByRole("link", { name: "了解注销流程" }).click();
     await expect(page).toHaveURL(/\/account\/delete/);

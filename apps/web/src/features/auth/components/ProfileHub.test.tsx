@@ -47,6 +47,26 @@ beforeEach(() => {
 });
 
 describe("ProfileHub — 渲染", () => {
+  it.each([
+    ["alice", "A"],
+    ["中文昵称", "中"],
+    ["😀😃", "😀"],
+    ["", "用"],
+    ["   ", "用"]
+  ])("默认头像展示完整首码点：%j → %s", async (displayName, initial) => {
+    mockMe.mockResolvedValue(
+      meResponse({ user: userWith({ display_name: displayName }) })
+    );
+    render(<ProfileHub />);
+
+    expect(
+      await screen.findByText(initial, { selector: "span" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(displayName.trim() || "用户", { selector: "p" })
+    ).toBeInTheDocument();
+  });
+
   it("展示昵称 / 联系方式 / ID / 等级口音徽标 / 编辑资料入口", async () => {
     render(<ProfileHub />);
 

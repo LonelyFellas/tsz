@@ -60,14 +60,15 @@ describe("translateAuthError", () => {
 
 describe("persistSession", () => {
   beforeEach(() => {
-    vi.spyOn(request, "setAccessToken");
+    vi.spyOn(request, "persistSession");
   });
 
   it("将 access token 写入内存并启动刷新定时器，不操作 cookie", () => {
-    vi.spyOn(request, "scheduleRefresh");
     persistSession({ access_token: "at-123", expires_in: 900 });
-    expect(request.setAccessToken).toHaveBeenCalledWith("at-123");
-    expect(request.scheduleRefresh).toHaveBeenCalledWith(900);
+    expect(request.persistSession).toHaveBeenCalledWith({
+      access_token: "at-123",
+      expires_in: 900
+    });
     expect(document.cookie).not.toContain("at-123");
   });
 });
@@ -101,6 +102,38 @@ describe("completeAuthentication", () => {
       }
     }
   );
+
+  it("取消资料读取后迟到响应不能覆盖后续会话", async () => {
+    let resolve!: (
+      value: Awaited<ReturnType<typeof request.api.auth.me>>
+    ) => void;
+    vi.spyOn(request.api.auth, "me").mockReturnValueOnce(
+      new Promise((done) => (resolve = done))
+    );
+    const controller = new AbortController();
+    const pending = completeAuthentication(controller.signal);
+    controller.abort();
+    const next = { ...ME_USER, id: "new-user", display_name: "Bob" };
+    useUserStore.setState({ user: next, onboarded: true });
+    resolve({
+      user: ME_USER,
+      active_role: "student",
+      learning_settings: null,
+      onboarded: true
+    });
+    await pending;
+    expect(useUserStore.getState().user).toEqual(next);
+  });
+
+  it("取消后不再启动资料读取", async () => {
+    const me = vi.spyOn(request.api.auth, "me");
+    me.mockClear();
+    const controller = new AbortController();
+    controller.abort();
+    await completeAuthentication(controller.signal);
+    expect(me).not.toHaveBeenCalled();
+    expect(useUserStore.getState().user).toBeNull();
+  });
 
   it("资料读取失败不发布用户态", async () => {
     vi.spyOn(request.api.auth, "me").mockRejectedValueOnce(

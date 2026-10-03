@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/permission-system-design/docs/openapi.json",
-  "_source_sha256": "5e732f282c0add0816f2e941c7c4da8b87f7b8825cb1d804c2fab955488ce2b7",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/web-profile-integration-20261003/docs/openapi.json",
+  "_source_sha256": "4cf221d998c41d7f171decf3b117def60acbbb42329b8b678888ed9a53d955a5",
   "roots": [
     "SharedSentence",
     "SentencePublication",
@@ -729,6 +729,15 @@
         "audio_upload_not_completed",
         "invalid_audio_key",
         "audio_storage_not_configured",
+        "unsupported_avatar_content_type",
+        "invalid_avatar_size",
+        "avatar_invalid_image",
+        "avatar_file_too_large",
+        "invalid_avatar_key",
+        "avatar_upload_not_completed",
+        "avatar_upload_rate_limited",
+        "avatar_storage_not_configured",
+        "avatar_storage_unavailable",
         "audio_asset_not_found",
         "service_unavailable",
         "internal_error"

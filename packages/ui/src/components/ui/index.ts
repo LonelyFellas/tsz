@@ -11,6 +11,16 @@ export {
 } from "./card";
 export { Input } from "./input";
 export { Label } from "./label";
+export { FormField, type FormFieldProps } from "./form-field";
+export { Tabs, TabsList, TabsTrigger, TabsContent } from "./tabs";
+export {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator
+} from "./dropdown-menu";
 export {
   Select,
   SelectContent,

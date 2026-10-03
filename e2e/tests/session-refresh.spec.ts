@@ -14,7 +14,7 @@ test("离线登出后 online 不会用残留 cookie 重新登录", async ({ page
   await page.goto("/student/practice");
   await expect(page.getByRole("heading", { name: "今日练习" })).toBeVisible();
   await page.getByRole("button", { name: "账户菜单" }).click();
-  await page.getByRole("button", { name: "退出登录" }).click();
+  await page.getByRole("menuitem", { name: "退出登录" }).click();
   await expect(page).toHaveURL(/\/login(?:\?|$)/);
   await expect(page.getByRole("button", { name: "立即登录" })).toBeVisible();
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
@@ -27,6 +27,13 @@ test("离线登出后 online 不会用残留 cookie 重新登录", async ({ page
   expect(refreshes).toBe(1);
   await expect(page).toHaveURL(/\/login(?:\?|$)/);
   await expect(page.getByRole("button", { name: "立即登录" })).toBeVisible();
+  await page.getByLabel("手机号或邮箱").fill("student@example.com");
+  await page.getByLabel("密码", { exact: true }).fill("RawCase!234");
+  await page.getByRole("button", { name: "立即登录" }).click();
+  await expect(page.getByRole("button", { name: "账户菜单" })).toBeVisible();
+  await page.goto("/student/practice");
+  await expect(page.getByRole("heading", { name: "今日练习" })).toBeVisible();
+  expect(refreshes).toBe(2);
 });
 
 for (const failure of ["503", "offline"] as const) {

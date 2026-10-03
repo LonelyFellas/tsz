@@ -40,14 +40,38 @@ export function isRegisterPassword(value: string): boolean {
   return passwordLengthError(value) === null;
 }
 
-// 昵称禁字符:与后端 validateDisplayName 对齐(tsz-go internal/user/service.go,
-// 规则同见 docs/api.md)——只拒标签字符 < > 与控制/不可见字符(Cc/Cf:NUL、
-// 零宽空格、BOM、bidi 覆盖等);" ' & 是合法昵称字符(O'Brien、Tom&Jerry),不拦。
+// 昵称与 Rust DisplayName::parse 对齐，先 trim 再检查码点长度和 Cc/Cf。
 const DISPLAY_NAME_FORBIDDEN_RE = /[<>\p{Cc}\p{Cf}]/u;
 const DISPLAY_NAME_FORBIDDEN_RE_G = /[<>\p{Cc}\p{Cf}]/gu;
 
 // 后端 display_name 长度上限(1–50 字符,docs/api.md)。
 export const DISPLAY_NAME_MAX = 50;
+
+const DISPLAY_NAME_WHITESPACE_RE = /\p{White_Space}/u;
+
+export function normalizeDisplayName(value: string): string {
+  let start = 0;
+  let end = value.length;
+  while (start < end && DISPLAY_NAME_WHITESPACE_RE.test(value[start]!))
+    start += 1;
+  while (end > start && DISPLAY_NAME_WHITESPACE_RE.test(value[end - 1]!))
+    end -= 1;
+  return value.slice(start, end);
+}
+
+export function displayNameLength(value: string): number {
+  return Array.from(normalizeDisplayName(value)).length;
+}
+
+export function displayNameError(value: string): string | null {
+  const normalized = normalizeDisplayName(value);
+  const length = displayNameLength(normalized);
+  if (!length) return "昵称需为 1–50 个字符";
+  if (length > DISPLAY_NAME_MAX) return "昵称不能超过 50 个字符";
+  if (hasDisplayNameForbiddenChars(normalized))
+    return "昵称不能包含 < > 或不可见字符";
+  return null;
+}
 
 export function hasDisplayNameForbiddenChars(v: string): boolean {
   return DISPLAY_NAME_FORBIDDEN_RE.test(v);

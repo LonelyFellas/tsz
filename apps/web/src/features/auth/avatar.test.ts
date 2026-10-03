@@ -37,7 +37,14 @@ const UPLOAD = {
   max_bytes: AVATAR_MAX_BYTES
 };
 
-const NEW_USER = { id: "u1", avatar_url: "https://cdn/x.webp" } as User;
+const NEW_USER: User = {
+  id: "u1",
+  email: "avatar@example.test",
+  display_name: "Avatar",
+  avatar_url: "https://api.example/avatars/new",
+  roles: ["student", "teacher"],
+  active_role: "student"
+};
 
 /** 构造指定 MIME/大小的 File(不真分配字节,size 用 defineProperty 伪造)。 */
 function fileOf(type: string, size = 1024, name = "avatar"): File {
@@ -96,6 +103,14 @@ describe("uploadAvatar — 前端预检", () => {
       uploadAvatar(fileOf("image/png", AVATAR_MAX_BYTES + 1))
     ).rejects.toThrow("avatar file too large");
     expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it("空文件 → 不申请许可、不直传", async () => {
+    await expect(uploadAvatar(fileOf("image/png", 0))).rejects.toThrow(
+      "invalid avatar size"
+    );
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it("恰好等于 5 MiB → 通过预检(上限为闭区间)", async () => {
@@ -190,6 +205,22 @@ describe("uploadAvatar — 三步流程", () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
+  it("confirm 500 后旧许可已失效 → 停止重试且不返回可提交的用户快照", async () => {
+    mockConfirm
+      .mockRejectedValueOnce(new HttpError(500, "internal error"))
+      .mockRejectedValueOnce(
+        new HttpError(400, "invalid avatar key", [], "invalid_avatar_key")
+      );
+    await expect(uploadAvatar(fileOf("image/png"))).rejects.toMatchObject({
+      status: 400,
+      code: "invalid_avatar_key"
+    });
+    expect(mockConfirm).toHaveBeenCalledTimes(2);
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(isAvatarStorageUnavailable()).toBe(false);
+  });
+
   it("confirm 连续两次 500 → 原样抛出(UI 走「保存失败,请重试」)", async () => {
     mockConfirm.mockRejectedValue(new HttpError(500, "internal error"));
     await expect(uploadAvatar(fileOf("image/png"))).rejects.toThrow(
@@ -228,6 +259,34 @@ describe("uploadAvatar — 501 功能开关", () => {
       "avatar file too large"
     );
     expect(isAvatarStorageUnavailable()).toBe(false);
+  });
+
+  it("503 是暂时故障，不缓存为 501 功能关闭", async () => {
+    mockCreate.mockRejectedValue(
+      new HttpError(
+        503,
+        "avatar storage unavailable",
+        [],
+        "avatar_storage_unavailable"
+      )
+    );
+    await expect(uploadAvatar(fileOf("image/png"))).rejects.toMatchObject({
+      status: 503,
+      code: "avatar_storage_unavailable"
+    });
+    expect(isAvatarStorageUnavailable()).toBe(false);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("新前端遇到旧 API 的 404 保留可降级错误，不执行 PUT", async () => {
+    mockCreate.mockRejectedValue(new HttpError(404, "Not Found"));
+    await expect(uploadAvatar(fileOf("image/png"))).rejects.toMatchObject({
+      status: 404,
+      message: "Not Found"
+    });
+    expect(isAvatarStorageUnavailable()).toBe(false);
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockConfirm).not.toHaveBeenCalled();
   });
 
   it("resetAvatarStorageFlag → 复位 501 记忆", async () => {

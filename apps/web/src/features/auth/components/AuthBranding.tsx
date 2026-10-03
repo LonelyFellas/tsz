@@ -1,7 +1,7 @@
 // 认证页共用的桌面品牌区；移动端让表单独占屏幕。
 export function AuthBranding() {
   return (
-    <aside className="hidden min-h-screen flex-col justify-between bg-primary px-10 py-12 text-white lg:flex lg:w-[40%] xl:px-16 xl:py-16">
+    <aside className="hidden min-h-screen flex-col justify-between bg-primary px-10 py-12 text-white lg:flex lg:w-[40%] xl:px-16 xl:py-16 dark:bg-primary-muted">
       <div className="flex items-center gap-3">
         <span
           className="flex size-10 items-center justify-center rounded-xl bg-white text-lg font-semibold text-primary"

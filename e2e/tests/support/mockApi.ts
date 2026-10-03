@@ -1,4 +1,4 @@
-import type { Page, Route } from "@playwright/test";
+import type { BrowserContext, Page, Route } from "@playwright/test";
 
 // 前端 E2E 在不启动真实后端的前提下，拦截 /api/v1/** 并返回可控的桩响应。
 // 路径与响应形状对齐 tsz-rust(见 api-client openapi.snapshot.json):
@@ -36,7 +36,10 @@ interface MockOptions {
   authenticated?: boolean;
 }
 
-export async function mockApi(page: Page, opts: MockOptions = {}) {
+export async function mockApi(
+  page: Page | BrowserContext,
+  opts: MockOptions = {}
+) {
   const { authenticated = false } = opts;
   // 可变：账号注销后会话失效，后续 /auth/refresh 应 401（模拟账号已删）。
   let deleted = false;

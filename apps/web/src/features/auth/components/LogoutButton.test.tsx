@@ -1,13 +1,9 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LogoutButton } from "./LogoutButton";
 
-const mockPush = vi.fn();
-
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: mockPush })
-}));
+const mockAssign = vi.fn();
 
 vi.mock("@/lib/request", () => ({
   clearSession: vi.fn(),
@@ -18,8 +14,19 @@ import { api, clearSession } from "@/lib/request";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockPush.mockReset();
+  vi.stubGlobal(
+    "window",
+    new Proxy(window, {
+      get(target, key) {
+        return key === "location"
+          ? { ...target.location, assign: mockAssign }
+          : Reflect.get(target, key, target);
+      }
+    })
+  );
 });
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("LogoutButton", () => {
   it("点击 → 调后端登出、清 token、跳登录页", async () => {
@@ -31,7 +38,7 @@ describe("LogoutButton", () => {
     await waitFor(() => {
       expect(api.auth.logout).toHaveBeenCalled();
       expect(clearSession).toHaveBeenCalledTimes(1);
-      expect(mockPush).toHaveBeenCalledWith("/login");
+      expect(mockAssign).toHaveBeenCalledWith("/login");
     });
   });
 
@@ -44,7 +51,7 @@ describe("LogoutButton", () => {
 
     await waitFor(() => {
       expect(clearSession).toHaveBeenCalledTimes(1);
-      expect(mockPush).toHaveBeenCalledWith("/login");
+      expect(mockAssign).toHaveBeenCalledWith("/login");
     });
   });
 });
