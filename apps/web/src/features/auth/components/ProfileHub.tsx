@@ -1,6 +1,7 @@
 "use client";
 
 import type { MeResponse } from "@tsz/api-client";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
@@ -39,7 +40,8 @@ const TILES: { label: string; href: string; icon: ReactNode }[] = [
 
 export function ProfileHub() {
   const router = useRouter();
-  const { identity, ready } = useTeacherIdentity();
+  const queryClient = useQueryClient();
+  const { identity, ready, error } = useTeacherIdentity();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [loadError, setLoadError] = useState(false);
   // 复制 ID 的就地反馈:"idle" | "copied" | "failed",1.5s 后自动还原。
@@ -114,6 +116,25 @@ export function ProfileHub() {
       >
         ← 返回工作台
       </button>
+      {error && (
+        <div
+          role="alert"
+          className="mb-4 flex flex-wrap items-center gap-3 text-sm text-foreground-muted"
+        >
+          <p>暂时无法确认工作台身份。</p>
+          <button
+            type="button"
+            onClick={() =>
+              void queryClient.invalidateQueries({
+                queryKey: ["teacher-certification", user.id]
+              })
+            }
+            className="text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          >
+            重新核验身份
+          </button>
+        </div>
+      )}
       <h1 className="mb-6 text-2xl font-semibold tracking-tight text-foreground">
         个人中心
       </h1>

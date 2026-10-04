@@ -8,6 +8,11 @@ import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIden
 
 const mockBack = vi.fn();
 const mockReplace = vi.fn();
+const mockInvalidate = vi.fn().mockResolvedValue(undefined);
+
+vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({ invalidateQueries: mockInvalidate })
+}));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ back: mockBack, replace: mockReplace })
@@ -268,6 +273,42 @@ describe("ProfileHub — 交互", () => {
     await waitFor(() => {
       expect(screen.getByText("复制失败")).toBeInTheDocument();
     });
+  });
+
+  it("身份查询失败可重新核验，恢复后返回已确认的教师工作台", async () => {
+    vi.mocked(useTeacherIdentity).mockReturnValue({
+      identity: "student",
+      verified: false,
+      ready: false,
+      error: true,
+      select: vi.fn()
+    });
+    const { rerender } = render(<ProfileHub />);
+    await screen.findByText("Along");
+    const user = userEvent.setup();
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "暂时无法确认工作台身份"
+    );
+    expect(screen.getByRole("button", { name: /← 返回/ })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "重新核验身份" }));
+    expect(mockInvalidate).toHaveBeenCalledWith({
+      queryKey: ["teacher-certification", "u-123"]
+    });
+
+    vi.mocked(useTeacherIdentity).mockReturnValue({
+      identity: "teacher",
+      verified: true,
+      ready: true,
+      error: false,
+      select: vi.fn()
+    });
+    rerender(<ProfileHub />);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    const back = screen.getByRole("button", { name: /← 返回/ });
+    expect(back).toBeEnabled();
+    await user.click(back);
+    expect(mockReplace).toHaveBeenCalledWith("/teacher/classes");
   });
 
   it("身份加载期间禁止返回，确认教师身份后再返回教师工作台", async () => {

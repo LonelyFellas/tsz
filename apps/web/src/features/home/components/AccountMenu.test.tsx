@@ -204,7 +204,10 @@ describe("AccountMenu", () => {
     expect(screen.queryByText("退出登录")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "账户菜单" }));
     expect(screen.getByText("退出登录")).toBeInTheDocument();
-    expect(screen.getByText("当前身份：学生")).toBeInTheDocument();
+    expect(screen.getByText("学生身份")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("img", { name: "已认证教师" })
+    ).not.toBeInTheDocument();
     expect(
       screen.getAllByRole("menuitem").map((item) => item.textContent)
     ).toEqual([
@@ -212,7 +215,7 @@ describe("AccountMenu", () => {
       "个人中心",
       "站内通知",
       "申请教师认证",
-      "切换到深色模式",
+      "深色模式",
       "退出登录"
     ]);
     expect(
@@ -245,11 +248,20 @@ describe("AccountMenu", () => {
         identity === "teacher" ? "/teacher/classes" : "/student/practice"
       );
       expect(screen.queryByText("申请教师认证")).not.toBeInTheDocument();
-      await user.click(
-        screen.getByRole("menuitem", {
-          name: identity === "teacher" ? "切换到学生工作台" : "切换到教师工作台"
-        })
+      expect(
+        screen.getByRole("img", { name: "已认证教师" })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(identity === "teacher" ? "教师身份" : "学生身份")
+      ).toBeInTheDocument();
+      const switchItem = screen.getByRole("menuitem", {
+        name: identity === "teacher" ? "切换为学生" : "切换为教师"
+      });
+      expect(switchItem.querySelector("svg")).toHaveAttribute(
+        "aria-hidden",
+        "true"
       );
+      await user.click(switchItem);
       expect(select).toHaveBeenCalledWith(
         identity === "teacher" ? "student" : "teacher"
       );
@@ -266,10 +278,22 @@ describe("AccountMenu", () => {
     render(<AccountMenu />);
 
     await user.click(screen.getByRole("button", { name: "账户菜单" }));
-    await user.click(screen.getByRole("menuitem", { name: "切换到深色模式" }));
+    const darkItem = screen.getByRole("menuitem", { name: "深色模式" });
+    expect(darkItem.querySelector("svg")).toHaveAttribute(
+      "aria-hidden",
+      "true"
+    );
+    expect(darkItem.querySelector("circle")).toBeNull();
+    await user.click(darkItem);
     expect(document.documentElement).toHaveClass("dark");
     await user.click(screen.getByRole("button", { name: "账户菜单" }));
-    await user.click(screen.getByRole("menuitem", { name: "切换到浅色模式" }));
+    const lightItem = screen.getByRole("menuitem", { name: "浅色模式" });
+    expect(lightItem.querySelector("svg")).toHaveAttribute(
+      "aria-hidden",
+      "true"
+    );
+    expect(lightItem.querySelector("circle")).toBeInTheDocument();
+    await user.click(lightItem);
     expect(document.documentElement).not.toHaveClass("dark");
   });
 
@@ -347,16 +371,12 @@ describe("AccountMenu", () => {
     const user = userEvent.setup();
     render(<AccountMenu />);
     await user.click(screen.getByRole("button", { name: "账户菜单" }));
-    await user.click(
-      screen.getByRole("menuitem", { name: "切换到教师工作台" })
-    );
+    await user.click(screen.getByRole("menuitem", { name: "切换为教师" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "切换失败，请重试"
     );
     expect(screen.getByRole("menu")).toBeVisible();
-    await user.click(
-      screen.getByRole("menuitem", { name: "切换到教师工作台" })
-    );
+    await user.click(screen.getByRole("menuitem", { name: "切换为教师" }));
     await waitFor(() =>
       expect(screen.queryByRole("menu")).not.toBeInTheDocument()
     );
@@ -380,9 +400,7 @@ describe("AccountMenu", () => {
     const user = userEvent.setup();
     render(<AccountMenu />);
     await user.click(screen.getByRole("button", { name: "账户菜单" }));
-    await user.click(
-      screen.getByRole("menuitem", { name: "切换到教师工作台" })
-    );
+    await user.click(screen.getByRole("menuitem", { name: "切换为教师" }));
     expect(screen.getByRole("menuitem", { name: "正在切换…" })).toHaveAttribute(
       "aria-disabled",
       "true"
@@ -442,7 +460,7 @@ describe("AccountMenu", () => {
       "true"
     );
     expect(
-      screen.getByRole("menuitem", { name: "切换到教师工作台" })
+      screen.getByRole("menuitem", { name: "切换为教师" })
     ).toHaveAttribute("aria-disabled", "true");
     await user.keyboard("{Enter}");
     expect(api.auth.logout).toHaveBeenCalledTimes(1);
