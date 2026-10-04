@@ -49,7 +49,8 @@ vi.mock("@tsz/voice-editor/editor", () => ({
     contextLabel,
     onChange,
     onVoiceProfileChange,
-    onAudioAssetsChange
+    onAudioAssetsChange,
+    renderActions
   }: VoiceEditorProps) => (
     <div>
       <div role="toolbar" aria-label="标注工具栏" />
@@ -90,6 +91,7 @@ vi.mock("@tsz/voice-editor/editor", () => ({
       >
         保存录音
       </button>
+      {renderActions?.(true)}
     </div>
   )
 }));
@@ -131,6 +133,22 @@ const rows = () =>
   JSON.parse(screen.getByTestId("wire").textContent!).pos[0].forms[0]
     .regional_variants.common.pronunciations;
 describe("独立发音输入", () => {
+  it("发音设置完成前不写回，关闭丢弃音色和录音，完成一次写回两项", async () => {
+    render(<Harness />);
+    const before = JSON.stringify(rows());
+    fireEvent.click(screen.getByLabelText("第 1 条发音发音设置与真人录音"));
+    fireEvent.click(await screen.findByText("配置音色"));
+    fireEvent.click(screen.getByText("保存录音"));
+    expect(JSON.stringify(rows())).toBe(before);
+    fireEvent.click(screen.getByLabelText("收起设置"));
+    expect(JSON.stringify(rows())).toBe(before);
+    fireEvent.click(screen.getByLabelText("第 1 条发音发音设置与真人录音"));
+    fireEvent.click(await screen.findByText("配置音色"));
+    fireEvent.click(screen.getByText("保存录音"));
+    fireEvent.click(screen.getByLabelText("完成第 1 条发音设置"));
+    expect(rows()[0].voice_profile.voices[0].voice_id).toBe("american-voice");
+    expect(rows()[0].audio_assets[0].original_name).toBe("test.mp3");
+  });
   it("实际发音与音素输入的转换按钮和右侧操作都位于输入组合内", () => {
     render(<Harness />);
     const actualGroup = field("实际发音").closest(".ant-space-compact");
@@ -185,10 +203,10 @@ describe("独立发音输入", () => {
       ipa_locale: "en-US",
       ups_locale: "en-US"
     });
+    fireEvent.click(screen.getByLabelText("完成第 1 条发音设置"));
     expect(rows()[0].voice_profile.voices[0].voice_id).toBe("american-voice");
     expect(rows()[0].audio_assets[0].original_name).toBe("test.mp3");
     expect(rows()[1].synthesis).toBeUndefined();
-    fireEvent.click(screen.getByLabelText("收起设置"));
     fireEvent.click(screen.getByLabelText("第 1 条发音发音设置与真人录音"));
     await waitFor(() =>
       expect(screen.getByTestId("editor-content")).toHaveTextContent(

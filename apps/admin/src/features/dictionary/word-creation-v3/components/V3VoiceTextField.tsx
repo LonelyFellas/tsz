@@ -67,6 +67,7 @@ export interface V3VoiceTextFieldProps<
   doneDisabled?: boolean;
   showDone?: boolean;
   onEditingChange?: (editing: boolean) => void;
+  onDraftPendingChange?: (pending: boolean) => void;
   onAssociationPendingChange?: (pending: boolean) => void;
   mode?: VoiceEditorProps<TLink>["mode"];
   editingEnabled?: boolean;
@@ -109,6 +110,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   doneDisabled,
   showDone = true,
   onEditingChange,
+  onDraftPendingChange,
   onAssociationPendingChange,
   mode,
   editingEnabled = mode !== "spelling",
@@ -144,7 +146,26 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   const [editorSession, setEditorSession] = useState(0);
   const captureSession = () =>
     structuredClone({ nodeId, value, textLinks, voiceProfile, audioAssets });
-  const session = useRef<ReturnType<typeof captureSession>>(captureSession());
+  const [draftState, setDraftState] = useState(captureSession);
+  const incomingKey = JSON.stringify({
+    nodeId,
+    value,
+    textLinks,
+    voiceProfile,
+    audioAssets
+  });
+  const incomingRef = useRef(incomingKey);
+  useEffect(() => {
+    if (incomingRef.current === incomingKey) return;
+    incomingRef.current = incomingKey;
+    const next = captureSession();
+    setDraftState(next);
+  }, [incomingKey]);
+  const draftPending = JSON.stringify(draftState) !== incomingKey;
+  useEffect(() => {
+    onDraftPendingChange?.(draftPending);
+    return () => onDraftPendingChange?.(false);
+  }, [draftPending, onDraftPendingChange]);
   const callbacks = useRef({
     onChange,
     onVoiceProfileChange,
@@ -155,42 +176,42 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   });
   const cancelEditing = () => {
     if (doneLoading) return;
-    const before = session.current;
-    // 切换到另一字段时，不允许把旧会话覆盖到新字段。
-    if (!readOnly && before.nodeId === nodeId) {
-      // 宿主三个回调可能各自捕获旧草稿；每次回写后刷新闭包，避免互相覆盖恢复结果。
-      if (
-        JSON.stringify([value, textLinks]) !==
-        JSON.stringify([before.value, before.textLinks])
-      ) {
-        flushSync(() =>
-          callbacks.current.onChange(
-            toRichTextV2(before.value),
-            before.textLinks
-          )
-        );
-      }
-      if (
-        JSON.stringify(voiceProfile) !== JSON.stringify(before.voiceProfile)
-      ) {
-        flushSync(() =>
-          callbacks.current.onVoiceProfileChange?.(
-            before.voiceProfile ?? { voices: [] }
-          )
-        );
-      }
-      if (JSON.stringify(audioAssets) !== JSON.stringify(before.audioAssets)) {
-        flushSync(() =>
-          callbacks.current.onAudioAssetsChange?.(before.audioAssets ?? [])
-        );
-      }
-    }
+    setDraftState(captureSession());
     history.current.past = [];
     history.current.future = [];
     setEditing(false);
     setEditorSession((current) => current + 1);
     onAssociationPendingChange?.(false);
     onCancel?.();
+  };
+  const completeEditing = () => {
+    if (doneLoading || doneDisabled || readOnly || draftState.nodeId !== nodeId)
+      return;
+    const next = draftState;
+    // 宿主回调可能捕获旧表单，逐项刷新闭包，避免正文、音色和录音互相覆盖。
+    if (
+      JSON.stringify([value, textLinks]) !==
+      JSON.stringify([next.value, next.textLinks])
+    ) {
+      flushSync(() =>
+        callbacks.current.onChange(toRichTextV2(next.value), next.textLinks)
+      );
+    }
+    if (JSON.stringify(voiceProfile) !== JSON.stringify(next.voiceProfile)) {
+      flushSync(() =>
+        callbacks.current.onVoiceProfileChange?.(
+          next.voiceProfile ?? { voices: [] }
+        )
+      );
+    }
+    if (JSON.stringify(audioAssets) !== JSON.stringify(next.audioAssets)) {
+      flushSync(() =>
+        callbacks.current.onAudioAssetsChange?.(next.audioAssets ?? [])
+      );
+    }
+    setDraftState(next);
+    if (onDone) onDone();
+    else setEditing(false);
   };
   const expanded = env.VOICE_EDITOR && (presentation === "editor" || editing);
   // 缓存住：每次渲染都新建对象会让弧线层跟着重量一遍。展开编辑时用不上，不算。
@@ -373,7 +394,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         disabled={readOnly}
         icon={<EditOutlined />}
         onClick={() => {
-          session.current = captureSession();
+          setDraftState(captureSession());
           setRecorded(true);
           setEditing(true);
         }}
@@ -382,17 +403,41 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     </Space.Compact>
   );
 
+  const renderActions = (canComplete: boolean) =>
+    showDone ? (
+      <Space className="v3-voice-text-editor-done" size={6}>
+        <Button
+          size="small"
+          aria-label={`取消${ariaLabel}编辑`}
+          disabled={doneLoading}
+          onClick={cancelEditing}
+        >
+          取消
+        </Button>
+        <Button
+          type="primary"
+          size="small"
+          aria-label={`完成${ariaLabel}编辑`}
+          loading={doneLoading}
+          disabled={doneDisabled || readOnly || !canComplete}
+          onClick={completeEditing}
+        >
+          完成
+        </Button>
+      </Space>
+    ) : null;
   const editor = (
     <div className="v3-voice-text-editor" style={{ minWidth: 0 }}>
       {feedbackHolder}
       <Suspense fallback={<div style={{ paddingBottom: 32 }}>{fallback}</div>}>
         <VoiceEditor<TLink>
           key={`${nodeId}:${editorSession}`}
+          renderActions={renderActions}
           onAssociationPendingChange={onAssociationPendingChange}
           textReadOnly={false}
           mode={mode}
           locale={voiceLocale(dialect)}
-          textLinks={textLinks}
+          textLinks={draftState.textLinks}
           restoreTextLinksOnCorrection={restoreTextLinksOnCorrection}
           renderAssociationPicker={renderAssociationPicker}
           contextLabel={ariaLabel}
@@ -403,53 +448,40 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           }}
           language="en"
           placeholder={placeholder}
-          onChange={(next: RichTextV2, nextLinks) => change(next, nextLinks)}
+          onChange={(next: RichTextV2, nextLinks) => {
+            if (!readOnly)
+              setDraftState((current) => ({
+                ...current,
+                value: next,
+                textLinks: nextLinks
+              }));
+          }}
           previewAdapter={
             env.VOICE_PREVIEW
               ? (previewAdapter ?? adminVoicePreviewAdapter)
               : undefined
           }
           previewIsMock={voicePreviewIsMock}
-          onVoiceProfileChange={onVoiceProfileChange}
+          onVoiceProfileChange={(next) => {
+            if (!readOnly)
+              setDraftState((current) => ({ ...current, voiceProfile: next }));
+          }}
           // 开关关着 = 不注入适配器：面板置灰说明原因，已有的音频引用仍列出来。
           audioUploadAdapter={
             env.VOICE_AUDIO_UPLOAD && audioUploadEnabled
               ? adminAudioUploadAdapter
               : undefined
           }
-          audioAssets={audioAssets ?? undefined}
-          onAudioAssetsChange={onAudioAssetsChange}
+          audioAssets={draftState.audioAssets ?? undefined}
+          onAudioAssetsChange={(next) => {
+            if (!readOnly)
+              setDraftState((current) => ({ ...current, audioAssets: next }));
+          }}
           readOnly={readOnly}
-          value={value}
-          voiceProfile={voiceProfile}
+          value={draftState.value}
+          voiceProfile={draftState.voiceProfile}
         />
       </Suspense>
-      {showDone && (
-        <Space className="v3-voice-text-editor-done" size={6}>
-          <Button
-            size="small"
-            aria-label={`取消${ariaLabel}编辑`}
-            disabled={doneLoading}
-            onClick={cancelEditing}
-          >
-            取消
-          </Button>
-          <Button
-            type="primary"
-            size="small"
-            aria-label={`完成${ariaLabel}编辑`}
-            loading={doneLoading}
-            disabled={doneDisabled}
-            onClick={() => {
-              session.current = captureSession();
-              if (onDone) onDone();
-              else setEditing(false);
-            }}
-          >
-            完成
-          </Button>
-        </Space>
-      )}
     </div>
   );
 

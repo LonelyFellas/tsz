@@ -186,6 +186,7 @@ export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
   restoreTextLinksOnCorrection?: boolean;
   renderAssociationPicker?: (props: AssociationPickerProps<TLink>) => ReactNode;
   onAssociationPendingChange?: (pending: boolean) => void;
+  renderActions?: (canComplete: boolean) => ReactNode;
   value: RichText;
   language?: string;
   /** 无障碍名，同时用于区分同一页面上的多个编辑器。 */
