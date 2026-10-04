@@ -43,10 +43,10 @@ export function HeroVisual() {
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
               <div className="fill-x h-full w-3/5 rounded-full bg-primary" />
             </div>
-            <p className="mt-6 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+            <p className="tsz-words mt-6 font-semibold tracking-tight text-foreground">
               vocabulary
             </p>
-            <p className="mt-1.5 text-sm text-foreground-subtle">
+            <p className="tsz-phonetics mt-1.5 text-sm text-foreground-subtle">
               /vəˈkæbjələri/
             </p>
             <p className="mt-4 text-base leading-relaxed text-foreground-muted">
@@ -96,7 +96,7 @@ export function HeroVisual() {
                     <span className="h-4 w-4 flex-none rounded-full border border-border" />
                   )}
                   <span
-                    className={`text-sm ${
+                    className={`tsz-words ${
                       item.s === "current"
                         ? "font-semibold text-foreground"
                         : item.s === "done"

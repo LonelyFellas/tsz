@@ -324,6 +324,7 @@ export function V3SynthesisInputs({
                       onClick={() => convert(alphabet)}
                     />
                     <Input.TextArea
+                      className="tsz-phonetics"
                       autoSize={{ minRows: 1, maxRows: 6 }}
                       aria-label={`${label}的${name}`}
                       data-v3-node-id={pronunciation.id}

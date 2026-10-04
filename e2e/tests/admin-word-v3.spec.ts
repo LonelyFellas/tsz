@@ -12,6 +12,79 @@ import {
 } from "./support/mockAdminV3Api";
 
 test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () => {
+  test("英文词语、音标与默认正文实际加载各自字体，补字不回退到系统字体", async ({
+    page
+  }) => {
+    await mockAdminV3Api(page);
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+    const spelling = page.locator("textarea.tsz-words").first();
+    const phonetic = page
+      .locator("textarea.tsz-phonetics:not(.tsz-actual-pronunciation)")
+      .first();
+    const actual = page.locator("textarea.tsz-actual-pronunciation").first();
+    await expect(spelling).toHaveCSS("font-size", "18.6667px");
+    await expect(spelling).toHaveCSS("font-family", /TSZ Words/);
+    await expect(phonetic).toHaveCSS("font-family", /TSZ Phonetics/);
+    await expect(actual).toHaveCSS("font-size", "18.6667px");
+    await expect(actual).toHaveCSS("font-family", /TSZ Phonetics/);
+    await page.evaluate(() => document.fonts.ready);
+    const faces = await page.evaluate(() =>
+      [...document.fonts]
+        .filter((font) => font.status === "loaded")
+        .map((font) => ({
+          family: font.family,
+          features: font.featureSettings,
+          variation: font.variationSettings
+        }))
+    );
+    expect(faces).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          family: "TSZ Words",
+          features: expect.stringContaining('"cv31"')
+        }),
+        expect.objectContaining({
+          family: "TSZ Phonetics",
+          features: expect.stringContaining('"liga" 0')
+        }),
+        expect.objectContaining({ family: "TSZ Text", variation: '"wght" 280' })
+      ])
+    );
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/preview`);
+    await expect(page.locator(".v3-review")).toBeVisible();
+    await page.evaluate(() => document.fonts.ready);
+    const session = await page.context().newCDPSession(page);
+    try {
+      await session.send("DOM.enable");
+      await session.send("CSS.enable");
+      const document = await session.send("DOM.getDocument");
+      const { nodeIds } = await session.send("DOM.querySelectorAll", {
+        nodeId: document.root.nodeId,
+        selector:
+          ".v3-review span, .v3-review strong, .v3-review p, .v3-review small, .v3-review h2"
+      });
+      const custom: string[] = [];
+      for (const nodeId of nodeIds) {
+        const { fonts } = await session.send("CSS.getPlatformFontsForNode", {
+          nodeId
+        });
+        custom.push(
+          ...fonts
+            .filter((font) => font.isCustomFont)
+            .map((font) => font.familyName)
+        );
+      }
+      expect(custom).toEqual(
+        expect.arrayContaining(["Geist", "Andika", "TSZPhoneticMarks"])
+      );
+      expect(custom.some((name) => name.startsWith("TSZTextSymbols"))).toBe(
+        true
+      );
+    } finally {
+      await session.detach();
+    }
+  });
+
   test("字段标签与表头统一字体颜色，并轻微内缩对齐", async ({ page }) => {
     await mockAdminV3Api(page);
     await page.setViewportSize({ width: 1440, height: 1000 });
@@ -399,7 +472,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(dividers.first()).toBeVisible();
   });
 
-  test("语法结构下拉无连读时与释义等高，有连读时按需留白且不裁弧线", async ({
+  test("语法结构下拉采用词语字号，有连读时按需留白且不裁弧线", async ({
     page
   }) => {
     test.skip(process.env.VITE_VOICE_EDITOR !== "true", "需要启用语音编辑器");
@@ -449,14 +522,18 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       exact: true
     });
     await expect(select).toContainText("center of the world");
-    const normalHeight = await chinese.evaluate(
+    await expect(select.locator(".word-grammar-reference-text")).toHaveCSS(
+      "font-size",
+      "18.6667px"
+    );
+    await expect(chinese).toHaveCSS("font-size", "14px");
+    await page.evaluate(() => document.fonts.ready);
+    const normalHeight = await select.evaluate(
       (node) => node.getBoundingClientRect().height
     );
-    await expect
-      .poll(() =>
-        select.evaluate((node) => node.getBoundingClientRect().height)
-      )
-      .toBe(normalHeight);
+    expect(normalHeight).toBeGreaterThanOrEqual(
+      await chinese.evaluate((node) => node.getBoundingClientRect().height)
+    );
     await expect(select.locator(".word-grammar-reference-text")).toHaveCSS(
       "padding-top",
       "0px"
@@ -481,7 +558,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     const arc = select.locator(".tsz-ve-arc-layer path");
     await expect(arc).toBeVisible();
     const textBox = select.locator(".word-grammar-reference-text");
-    await expect(textBox).toHaveCSS("padding-top", "9px");
+    await expect(textBox).toHaveCSS("padding-top", "11.3333px");
     await expect
       .poll(
         async () =>
@@ -560,6 +637,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       },
       entries: [],
       created_by: "字号回归测试",
+      created_by_admin_id: "01990000-0000-7000-8000-000000000001",
       created_at: "2026-09-01T00:00:00Z",
       updated_at: "2026-09-01T00:00:00Z"
     };
@@ -600,12 +678,15 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     for (const width of [1280, 390]) {
       await page.setViewportSize({ width, height: 900 });
       await expect(english).toHaveCSS("font-size", normalSize);
-      await expect(grammar).toHaveCSS("font-size", normalSize);
+      await expect(grammar).toHaveCSS("font-size", "18.6667px");
       await expect(example).toHaveCSS("font-size", normalSize);
       await expect(example).toHaveCSS("font-weight", "400");
       for (const preview of [grammar, example]) {
         const emphasis = preview.locator('strong[data-level="core"]').first();
-        await expect(emphasis).toHaveCSS("font-size", normalSize);
+        await expect(emphasis).toHaveCSS(
+          "font-size",
+          preview === grammar ? "18.6667px" : normalSize
+        );
         await expect(emphasis).toHaveCSS("font-weight", "600");
         await expect(emphasis).toHaveCSS("color", "rgb(47, 84, 255)");
         await expect(
@@ -623,7 +704,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       await dialog.getByRole("button", { name: /^完成.*编辑$/ }).click();
       await expect(dialog).toBeHidden();
       await expect(english).toHaveCSS("font-size", normalSize);
-      await expect(grammar).toHaveCSS("font-size", normalSize);
+      await expect(grammar).toHaveCSS("font-size", "18.6667px");
       await expect(
         grammar.locator('strong[data-level="core"]').first()
       ).toHaveCSS("font-weight", "600");
@@ -745,7 +826,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     ).toBe(true);
     await page.reload();
     await expect(english).toHaveCSS("font-size", normalSize);
-    await expect(grammar).toHaveCSS("font-size", normalSize);
+    await expect(grammar).toHaveCSS("font-size", "18.6667px");
     await expect(example).toHaveCSS("font-size", normalSize);
     await expect(example).toHaveCSS("font-weight", "400");
     await expect(
@@ -1188,11 +1269,23 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await dialog.locator(".tsz-ve-canvas-input").fill("a job");
     await dialog.getByRole("button", { name: "关联词形", exact: true }).click();
     await dialog.getByLabel("关联 job（2）").click();
+    await expect(page.getByText(/^job ·/).last()).toHaveCSS(
+      "font-family",
+      /TSZ Words/
+    );
+    await expect(page.getByText(/^job ·/).last()).toHaveCSS(
+      "font-size",
+      "18.6667px"
+    );
     await page
       .locator(".ant-cascader-menu-item-content")
       .filter({ hasText: /^job ·/ })
       .click();
     await expect(page.getByText(/原形 job/)).toBeVisible();
+    await expect(page.getByText(/原形 job/)).toHaveCSS(
+      "font-family",
+      /TSZ Words/
+    );
     await page.screenshot({
       path: "/tmp/grammar-form-picker.png",
       fullPage: false,
@@ -1204,9 +1297,9 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await opener.click();
     await dialog.getByRole("button", { name: "关联词形", exact: true }).click();
     await dialog.getByLabel("关联 job（2）").click();
-    await expect(page.getByText(/已关联词形/)).toBeVisible();
+    await expect(page.getByText(/已关联 ·/)).toBeVisible();
     await expect(
-      page.getByText(/整段合成仅使用该词形的第一个发音/)
+      page.getByText("点击词形可替换", { exact: true })
     ).toBeVisible();
     await page.screenshot({
       path: "/tmp/grammar-form-linked.png",
@@ -1214,11 +1307,12 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       animations: "disabled"
     });
     await page.getByRole("button", { name: "清除关联", exact: true }).click();
+    await page.getByRole("button", { name: /^清\s*除$/ }).click();
     await dialog.getByRole("button", { name: /^取消.*编辑$/ }).click();
     await opener.click();
     await dialog.getByRole("button", { name: "关联词形", exact: true }).click();
     await dialog.getByLabel("关联 job（2）").click();
-    await expect(page.getByText(/已关联词形/)).toBeVisible();
+    await expect(page.getByText(/已关联 ·/)).toBeVisible();
   });
 
   test("统一富文本弹窗：保持布局、拖动、选区连读、改字确认和取消恢复", async ({

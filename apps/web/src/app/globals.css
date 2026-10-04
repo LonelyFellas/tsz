@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "@tsz/shared/fonts.css";
 
 @source '../../../../packages/ui/src/**/*.{ts,tsx}';
 /* 尚未适配 C 端的旧组件仍保持排除，逐个放行已接入主题变量的组件。 */
@@ -27,9 +28,7 @@
   --color-success: rgb(var(--ch-success));
   --color-danger: rgb(var(--ch-danger));
 
-  --font-sans:
-    ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "PingFang SC",
-    "Microsoft YaHei", "Hiragino Sans GB", "Noto Sans CJK SC", sans-serif;
+  --font-sans: var(--tsz-font-text);
 }
 
 /*
@@ -55,6 +54,9 @@
    故原始通道必须用 --ch-* 前缀，与 --color-* token 不同名（同名会循环/覆盖）。
    透明度修饰(bg-surface/80)由 v4 的 color-mix 处理；切 .dark 时整体翻转。 */
 :root {
+  --tsz-font-fallback:
+    ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "PingFang SC",
+    "Microsoft YaHei", "Hiragino Sans GB", "Noto Sans CJK SC", sans-serif;
   --ch-background: 249 250 251; /* gray-50 页面底 */
   --ch-surface: 255 255 255; /* white 卡片面 */
   --ch-muted: 243 244 246; /* gray-100 次级填充 */

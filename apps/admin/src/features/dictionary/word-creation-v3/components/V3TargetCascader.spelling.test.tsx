@@ -112,7 +112,7 @@ it.each([false, true])(
     );
     await expandJob();
     const labels = Array.from(
-      document.querySelectorAll(".ant-cascader-menu .tsz-entry-en")
+      document.querySelectorAll(".ant-cascader-menu .tsz-words")
     )
       .map((node) => node.textContent)
       .filter((text) => text !== "job");

@@ -36,10 +36,10 @@
 }
 .word-actual-pronunciation-control
   textarea.v3-voice-text-large-preview.ant-input {
-  font-size: 14px;
+  font-size: 14pt;
   font-weight: 400;
   padding: 4px 11px;
-  line-height: 22px;
+  line-height: var(--ant-line-height, 1.5714285714);
 }
 
 .word-synthesis-input {

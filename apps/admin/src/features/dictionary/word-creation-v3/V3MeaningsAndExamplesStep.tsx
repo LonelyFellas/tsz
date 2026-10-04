@@ -1732,7 +1732,7 @@ function RelationsGrid({
                                       return {
                                         label: (
                                           <Flex align="center" gap={6}>
-                                            <span className="tsz-entry-en">
+                                            <span className="tsz-words">
                                               {word.headword}
                                             </span>
                                             <Tag
@@ -1798,7 +1798,7 @@ function RelationsGrid({
                             >
                               <Input
                                 aria-label={`${relationLabel(relationType)}目标词条`}
-                                className="word-relation-target tsz-entry-en"
+                                className="word-relation-target tsz-words"
                                 prefix={
                                   relation.target_word_id ? (
                                     <SoundOutlined />
@@ -3464,7 +3464,7 @@ function V3MeaningsAndExamplesStepContent({
                                                     <Select
                                                       aria-required="true"
                                                       aria-label={`定义 ${definitionIndex + 1} 语法结构`}
-                                                      className="tsz-entry-en word-grammar-select"
+                                                      className="tsz-words word-grammar-select"
                                                       classNames={{
                                                         popup: {
                                                           root: "word-grammar-dropdown"
@@ -3560,7 +3560,7 @@ function V3MeaningsAndExamplesStepContent({
                                                               )
                                                             }
                                                           >
-                                                            <span className="word-grammar-option-label tsz-entry-en">
+                                                            <span className="word-grammar-option-label tsz-words">
                                                               {renderGrammarStructureLabel(
                                                                 pos.grammar_structures,
                                                                 String(

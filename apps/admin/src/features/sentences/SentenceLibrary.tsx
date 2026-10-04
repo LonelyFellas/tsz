@@ -378,7 +378,7 @@ export function SentenceLibrary({
                 render: (_, row) => (
                   <Flex vertical>
                     {row.entries.slice(0, 2).map((e) => (
-                      <span className="tsz-entry-en" key={e.id}>
+                      <span className="tsz-words" key={e.id}>
                         {entryLink(e)}{" "}
                       </span>
                     ))}
@@ -546,7 +546,7 @@ export function SentenceLibrary({
             ))}
             <Space wrap>
               {detail.entries.map((e) => (
-                <span className="tsz-entry-en" key={e.id}>
+                <span className="tsz-words" key={e.id}>
                   {entryLink(e)}
                 </span>
               ))}

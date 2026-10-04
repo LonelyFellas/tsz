@@ -108,11 +108,7 @@ export function EntryAnnotationModal({
       <div key={row.key} className="entry-annotation-row" data-annotation-row>
         <div className="entry-annotation-details">
           <Space size={8} wrap>
-            <Typography.Text
-              className="tsz-entry-en"
-              strong
-              style={{ fontSize: 17 }}
-            >
+            <Typography.Text className="tsz-words" strong>
               {row.label}
             </Typography.Text>
             {!row.incoming ? <Tag>{`已有词条 ${index + 1}`}</Tag> : null}

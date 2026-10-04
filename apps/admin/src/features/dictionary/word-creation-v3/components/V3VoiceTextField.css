@@ -99,6 +99,11 @@ textarea.v3-voice-text-large-preview.ant-input {
   padding: 4px 11px;
 }
 
+textarea.word-pronunciation-phonetic-input.tsz-words.ant-input,
+textarea.word-pronunciation-phonetic-input.tsz-actual-pronunciation.ant-input {
+  font-size: 14pt;
+}
+
 /* 语法结构收起态保持紧凑，聚焦输入与富文本预览使用同样的行高和内边距。 */
 textarea.v3-grammar-input.ant-input {
   line-height: 1.5;
@@ -130,7 +135,7 @@ textarea.word-pronunciation-phonetic-input.ant-input {
   width: 100%;
   padding: 4px 12px;
   border: 1px solid transparent;
-  font-size: var(--ant-font-size, 14px);
+  font-size: 14pt;
   font-weight: 400;
   line-height: 1.5;
   white-space: pre-wrap;

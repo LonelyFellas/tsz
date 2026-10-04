@@ -131,7 +131,7 @@ function cascaderOptionsFromGroups(
         isLeaf: true,
         label: (
           <span className="v3-component-usage-entry">
-            <Typography.Text className="tsz-entry-en" type="secondary">
+            <Typography.Text className="tsz-words" type="secondary">
               {group.headword}（暂无词义）
             </Typography.Text>
             {draftTag}
@@ -146,7 +146,7 @@ function cascaderOptionsFromGroups(
       value: group.entryId,
       label: (
         <span className="v3-component-usage-entry">
-          <Typography.Text className="tsz-entry-en" strong>
+          <Typography.Text className="tsz-words" strong>
             {group.headword}
           </Typography.Text>
           {draftTag}
@@ -171,8 +171,8 @@ function cascaderOptionsFromGroups(
             <span
               className={
                 formGroup.matched
-                  ? "tsz-entry-en v3-component-usage-matched-form"
-                  : "tsz-entry-en"
+                  ? "tsz-words v3-component-usage-matched-form"
+                  : "tsz-words"
               }
             >
               {posLabels.size > 1
@@ -899,7 +899,7 @@ export function V3TargetCascader({
         label:
           components.length === 0 ? (
             <span className="v3-component-usage-entry">
-              <Typography.Text className="tsz-entry-en" type="secondary">
+              <Typography.Text className="tsz-words" type="secondary">
                 {groups[index]!.headword}（未配置成分用词）
               </Typography.Text>
               {groups[index]!.draft ? (

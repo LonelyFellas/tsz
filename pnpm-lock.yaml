@@ -381,6 +381,9 @@ importers:
 
   packages/voice-editor:
     dependencies:
+      '@tsz/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@tsz/types':
         specifier: workspace:*
         version: link:../types

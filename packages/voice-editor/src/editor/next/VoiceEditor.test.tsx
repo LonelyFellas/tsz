@@ -478,6 +478,29 @@ it("先选两个词再打开连读，选区生成端点并在确认后保存", (
 });
 
 describe("VoiceEditor 标注带", () => {
+  it.each([
+    ["grammar", "var(--tsz-font-words)", "18.6667px"],
+    ["spelling", "var(--tsz-font-words)", "18.6667px"],
+    ["actual-pron", "var(--tsz-font-phonetics)", "18.6667px"],
+    ["dict-phonetic", "var(--tsz-font-phonetics)", "26px"],
+    ["association", "var(--tsz-font-text)", "26px"],
+    ["pronunciation", "var(--tsz-font-text)", "26px"]
+  ] as const)("%s 输入层与标注层使用一致的字体和字号", (mode, family, size) => {
+    const style = document.createElement("style");
+    style.textContent = stylesSource;
+    document.head.append(style);
+    try {
+      const { container } = render(<VoiceEditor {...props({ mode })} />);
+      for (const selector of [".tsz-ve-strip", ".tsz-ve-canvas-input"]) {
+        const computed = getComputedStyle(container.querySelector(selector)!);
+        expect(computed.fontFamily).toBe(family);
+        expect(computed.fontSize).toBe(size);
+      }
+    } finally {
+      style.remove();
+    }
+  });
+
   it("未标注文本默认常规字重，设置分类后才加粗，清除后恢复", () => {
     const style = document.createElement("style");
     style.textContent = stylesSource;
