@@ -105,6 +105,31 @@ beforeEach(() => {
   });
 });
 describe("当前词条关联与离开保护", () => {
+  it("正文修改须先完成编辑才能保存例句，取消正文修改不影响原表单", async () => {
+    const current = example();
+    show(
+      <SentenceEditor sentence={current} onClose={vi.fn()} onSaved={vi.fn()} />
+    );
+    const input = await screen.findByLabelText("例句正文");
+    fireEvent.change(input, { target: { value: "We write stories." } });
+    expect(screen.getByLabelText("完成例句编辑")).toBeDisabled();
+    expect(api.sentences.update).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByLabelText("取消例句正文编辑"));
+    expect(screen.getByLabelText("例句正文")).toHaveValue("We make stories.");
+    expect(screen.getByLabelText("完成例句编辑")).toBeEnabled();
+    fireEvent.change(screen.getByLabelText("例句正文"), {
+      target: { value: "We write stories." }
+    });
+    fireEvent.click(screen.getByLabelText("完成例句正文编辑"));
+    vi.mocked(api.sentences.update).mockImplementation(
+      async (_id, payload) => ({ ...current, content: payload.content })
+    );
+    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    await waitFor(() => expect(api.sentences.update).toHaveBeenCalledOnce());
+    expect(
+      vi.mocked(api.sentences.update).mock.calls[0]![1].content.sentence.en_text
+    ).toMatchObject({ common: { value: { text: "We write stories." } } });
+  });
   it("冲突后保留输入，比较最新草稿，显式确认后用最新 revision 重提", async () => {
     const current = example();
     const latest = structuredClone(current);
@@ -369,8 +394,8 @@ describe("当前词条关联与离开保护", () => {
         onSaved={vi.fn()}
       />
     );
-    const toolbar = await screen.findByRole("toolbar", { name: "标注工具栏" });
-    fireEvent.click(within(toolbar).getByRole("button", { name: "关联单词" }));
+    await screen.findByRole("toolbar", { name: "标注工具栏" });
+    fireEvent.click(screen.getByLabelText("关联单词"));
     fireEvent.mouseDown(screen.getByLabelText("关联 make（2）"), { button: 0 });
     await screen.findByText("旧关联尚未选择具体词义，请补全或清除。");
     fireEvent.click(
@@ -383,6 +408,7 @@ describe("当前词条关联与离开保护", () => {
     );
     fireEvent.click(await screen.findByText("编造（故事、借口等）"));
     fireEvent.click(screen.getByRole("button", { name: "确认关联" }));
+    fireEvent.click(screen.getByLabelText("完成例句正文编辑"));
     const done = screen.getByRole("button", { name: "完成例句编辑" });
     await waitFor(() => expect(done).toBeEnabled());
     fireEvent.click(done);

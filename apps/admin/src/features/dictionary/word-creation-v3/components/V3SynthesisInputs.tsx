@@ -67,6 +67,12 @@ export function V3SynthesisInputs({
   const localeLabel = pronunciationLocaleLabel(locale);
   const requireLocaleConfirmation = dialect === "common";
   const [expanded, setExpanded] = useState(false);
+  const captureSettings = () =>
+    structuredClone({
+      voice_profile: pronunciation.voice_profile,
+      audio_assets: pronunciation.audio_assets
+    });
+  const [settingsDraft, setSettingsDraft] = useState(captureSettings);
   const settingsTrigger = useRef<HTMLButtonElement>(null);
   const closeSettings = () => {
     setExpanded(false);
@@ -186,7 +192,10 @@ export function V3SynthesisInputs({
       trigger="click"
       placement="topRight"
       open={expanded}
-      onOpenChange={setExpanded}
+      onOpenChange={(open) => {
+        if (open) setSettingsDraft(captureSettings());
+        setExpanded(open);
+      }}
       destroyOnHidden
       content={
         <div
@@ -242,14 +251,37 @@ export function V3SynthesisInputs({
                 locale={locale}
                 value={content ?? { version: 2, text: "", annotations: [] }}
                 onChange={() => {}}
-                voiceProfile={pronunciation.voice_profile}
+                voiceProfile={settingsDraft.voice_profile}
                 onVoiceProfileChange={(voice_profile) =>
-                  onChange({ voice_profile })
+                  setSettingsDraft((current) => ({ ...current, voice_profile }))
                 }
-                audioAssets={pronunciation.audio_assets}
+                audioAssets={settingsDraft.audio_assets}
                 onAudioAssetsChange={(audio_assets) =>
-                  onChange({ audio_assets })
+                  setSettingsDraft((current) => ({ ...current, audio_assets }))
                 }
+                renderActions={(canComplete) => (
+                  <Space>
+                    <Button
+                      size="small"
+                      aria-label={`取消${label}设置`}
+                      onClick={closeSettings}
+                    >
+                      取消
+                    </Button>
+                    <Button
+                      size="small"
+                      type="primary"
+                      aria-label={`完成${label}设置`}
+                      disabled={!canComplete}
+                      onClick={() => {
+                        onChange(settingsDraft);
+                        closeSettings();
+                      }}
+                    >
+                      完成
+                    </Button>
+                  </Space>
+                )}
                 previewAdapter={
                   env.VOICE_PREVIEW ? adminVoicePreviewAdapter : undefined
                 }

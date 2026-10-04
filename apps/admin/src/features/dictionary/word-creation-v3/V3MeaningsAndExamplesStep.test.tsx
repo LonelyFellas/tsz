@@ -1284,7 +1284,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     }
   }, 15_000);
 
-  it("语法结构挂上语音编辑器，标注实时回写且不丢正文", async () => {
+  it("语法结构挂上语音编辑器，完成后回写标注且不丢正文", async () => {
     // 关联编辑器共存时，语法结构仍使用原来的标注工具。
     render(<Harness initial={meaningsFixture} />);
 
@@ -1310,7 +1310,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       value().pos[0]!.grammar_structures[0]!.variants[0]!.content.text
     ).toBe("a centre of the city");
 
-    // 显式开启连续标注后，原有字母画笔仍应实时回写草稿。
+    // 连续标注仍在编辑器本地草稿内，完成之前不影响外层。
     const activeEditor = input.closest(".tsz-ve-editor") as HTMLElement;
     fireEvent.click(activeEditor.querySelector(".tsz-ve-role-button")!);
     // 只查询当前编辑器，避免全页大量字段的可及名计算拖慢并发测试。
@@ -1326,13 +1326,15 @@ describe("V3MeaningsAndExamplesStep", () => {
     fireEvent.mouseEnter(letters[letters.length - 1]!, { buttons: 1 });
     fireEvent.mouseUp(letters[letters.length - 1]!);
 
+    const before = value().pos[0]!.grammar_structures[0]!.variants[0]!.content;
+    expect(before.version === 2 ? before.annotations : []).toEqual([]);
+    fireEvent.click(screen.getByLabelText("完成语法结构 1 英美通用内容编辑"));
     const content = value().pos[0]!.grammar_structures[0]!.variants[0]!.content;
     expect(content.text).toBe("a centre of the city");
     expect(content.version).toBe(2);
     expect(content.version === 2 ? content.annotations : []).toEqual([
       { type: "emphasis", start: 2, end: 8, level: "core" }
     ]);
-    fireEvent.click(screen.getByLabelText("完成语法结构 1 英美通用内容编辑"));
     expect(
       document.querySelector('.v3-grammar-preview strong[data-level="core"]')
     ).toHaveTextContent("centre");
@@ -1374,6 +1376,10 @@ describe("V3MeaningsAndExamplesStep", () => {
     fireEvent.click(confirm);
     expect(
       value().pos[0]!.grammar_structures[0]!.variants[0]!.audio_assets
+    ).toEqual(initial.pos[0]!.grammar_structures[0]!.variants[0]!.audio_assets);
+    fireEvent.click(screen.getByLabelText("完成语法结构 1 英美通用内容编辑"));
+    expect(
+      value().pos[0]!.grammar_structures[0]!.variants[0]!.audio_assets
     ).toEqual([]);
   }, 30_000);
 
@@ -1413,6 +1419,8 @@ describe("V3MeaningsAndExamplesStep", () => {
       const rateButtons = await screen.findAllByLabelText(/^设置 .* 的语速$/);
       fireEvent.click(rateButtons[0]!);
       fireEvent.click(await screen.findByLabelText("语速 1.25 倍"));
+      expect(variant().voice_profile).toBeUndefined();
+      fireEvent.click(screen.getByLabelText("完成语法结构 1 英美通用内容编辑"));
       expect(variant().voice_profile).toEqual({
         voices: [
           { voice_id: expect.any(String), enabled: false, rate_percent: 25 }

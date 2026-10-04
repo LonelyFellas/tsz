@@ -88,8 +88,10 @@ export function SentenceEditor({
     if (initialLevel) fresh.sentence.level = initialLevel;
     return fresh;
   });
+  const [pendingEditor, setPendingEditor] = useState(false);
   const initialContent = useRef(JSON.stringify(content));
-  const dirty = JSON.stringify(content) !== initialContent.current;
+  const dirty =
+    pendingEditor || JSON.stringify(content) !== initialContent.current;
   const router = useContext(UNSAFE_DataRouterContext);
   useEffect(() => {
     if (!dirty) return;
@@ -150,6 +152,10 @@ export function SentenceEditor({
   };
   const finish = async (afterSave?: () => void) => {
     if (conflict || saving || !allowed) return false;
+    if (pendingEditor) {
+      setError("请先完成或取消正文编辑，再保存例句。");
+      return false;
+    }
     if (pendingAnnotation) {
       setError("请先确认当前句内标注，或取消所选片段。");
       return;
@@ -265,6 +271,7 @@ export function SentenceEditor({
       ).length === 1
   );
   const canSave =
+    !pendingEditor &&
     !pendingAnnotation &&
     !content.annotations.some(
       (annotation) => annotation.target.state === "entry_only"
@@ -496,7 +503,7 @@ export function SentenceEditor({
                 <Button
                   key={segments[0]!.start}
                   size="small"
-                  disabled={saving || pendingAnnotation}
+                  disabled={saving || pendingEditor || pendingAnnotation}
                   onClick={() => {
                     setTargetLabels((labels) => ({
                       ...labels,
@@ -526,7 +533,7 @@ export function SentenceEditor({
             <Radio.Group
               aria-label="例句方言"
               value={row.dialect}
-              disabled={saving}
+              disabled={saving || pendingEditor}
               onChange={(event) => setDialect(event.target.value)}
               options={rows.map((item) => ({
                 value: item.dialect,
@@ -552,7 +559,7 @@ export function SentenceEditor({
               dialect={row.dialect}
               readOnly={saving}
               onAssociationPendingChange={setPendingAnnotation}
-              showDone={false}
+              onDraftPendingChange={setPendingEditor}
               onChange={(value, annotations) =>
                 changeVariant({ value }, annotations)
               }

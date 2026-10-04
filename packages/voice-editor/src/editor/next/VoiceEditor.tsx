@@ -135,6 +135,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   restoreTextLinksOnCorrection = false,
   renderAssociationPicker,
   onAssociationPendingChange,
+  renderActions,
   language = "en",
   contextLabel = "语音编辑器",
   previewAdapter,
@@ -181,7 +182,6 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   }>();
   const [caretPosition, setCaretPosition] = useState<number>();
   const [pauseGap, setPauseGap] = useState<number>();
-  const [pauseFromMarker, setPauseFromMarker] = useState(false);
   const [pendingConflict, setPendingConflict] = useState<
     | { kind: "pause"; gap: number; durationMs: number; links: number[] }
     | { kind: "liaison"; link: LiaisonLink; gaps: number[] }
@@ -202,7 +202,6 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     setTextSelection(undefined);
     setCaretPosition(undefined);
     setPauseGap(undefined);
-    setPauseFromMarker(false);
     setPendingConflict(undefined);
     setPendingText(undefined);
     setLinkWords([]);
@@ -219,7 +218,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     const index = tokens.findIndex(
       (token, index) =>
         index < tokens.length - 1 &&
-        position >= token.start &&
+        position >= token.end &&
         position <= tokens[index + 1]!.start &&
         !/[\r\n]/.test(
           Array.from(text)
@@ -266,12 +265,6 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   );
   const [customPause, setCustomPause] = useState("");
   const [openTool, setOpenTool] = useState<string>();
-  /*
-   * 音色清单要到「音色」面板第一次打开才拉：内联后同一页可能挂着多个编辑器，
-   * 若像抽屉时代那样一挂载就拉，会变成 N 个并发的 listVoices 请求。
-   * 拉过就一直留着，收起面板不该把已经拿到的清单丢掉。
-   */
-  const [voicesRequested, setVoicesRequested] = useState(false);
 
   /**
    * 撤销/重做栈。快照存「文本 + 全部标注」，因为改文本会连带重挂标注，
@@ -468,7 +461,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     audition,
     stop: stopAudition
   } = useVoiceAudition({
-    open: mode === "synthesis" || voicesRequested,
+    open: mode !== "actual-pron" && mode !== "spelling",
     language,
     content: mode === "synthesis" ? toRichTextV2(value) : workingValue,
     settings: voiceSettings,
@@ -547,7 +540,6 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     }
     if (key === "pause") {
       if (brush.kind === "pause") {
-        setPauseFromMarker(false);
         setOpenTool("pause");
         return;
       }
@@ -562,7 +554,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     if (mode === "grammar" && key === "roles") {
       // 打开分类不自动拿起画笔；保留正文选区，连续标注由面板显式开启。
       if (brush.kind !== "none" && brush.kind !== "role") {
+        const selection = textSelection;
         changeBrush({ kind: "none" });
+        setTextSelection(selection);
       }
       setOpenTool("roles");
       return;
@@ -573,7 +567,6 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       return;
     }
     setOpenTool(key);
-    if (key === "voices") setVoicesRequested(true);
     /* 已经是这支笔就不重复换：再换一次会把当前分类/时长打回记忆值。 */
     if (key === "roles" && brush.kind !== "role") {
       changeBrush({ kind: "role", level: lastRoleRef.current });
@@ -906,7 +899,6 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     if (readOnly) return;
     changeBrush({ kind: "none" });
     setPauseGap(gapIndex);
-    setPauseFromMarker(marks.pauses[gapIndex] !== undefined);
     setCustomPause("");
     setOpenTool("pause");
   };
@@ -1310,17 +1302,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     },
     {
       key: "roles",
-      dividerBefore: true,
       label: "语法结构",
       ariaLabel: `语法结构 ${roleLabel}`,
       className: `tsz-ve-role-button is-${roleLevel}`,
-      active:
-        mode === "grammar" ||
-        brush.kind === "role" ||
-        openTool === "roles" ||
-        !!textSelection,
-      inline: mode === "grammar",
-      alwaysVisible: mode === "grammar",
+      active: !!textSelection || brush.kind === "role",
+      disabled: !textSelection && brush.kind !== "role",
       icon: (
         <span
           className={`tsz-ve-pop-swatch is-${roleLevel} tsz-ve-role-dot`}
@@ -1386,10 +1372,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       label: "连读",
       icon: <LiaisonIcon />,
       className: "tsz-ve-liaison-button",
-      active: true,
-      dividerBefore: true,
-      inline: true,
-      alwaysVisible: true,
+      active: !!textSelection,
+      disabled: !textSelection,
       content: (
         <div
           className="tsz-ve-selection-liaison"
@@ -1433,7 +1417,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               });
             }}
           >
-            确认添加
+            一次性添加
           </Button>
           <ColorPicker
             size="small"
@@ -1464,11 +1448,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       summary:
         brush.kind === "pause" ? formatPauseLabel(pauseDuration) : undefined,
       className: "tsz-ve-pause-button",
-      active: brush.kind === "pause" || openTool === "pause",
-      suppressPopup: pauseFromMarker,
+      active: pauseGap !== undefined || brush.kind === "pause",
+      disabled: pauseGap === undefined && brush.kind !== "pause",
       placement: "topLeft" as const,
       stayOpen: true,
-      dividerBefore: true,
       content: (
         <PausePanel
           readOnly={readOnly}
@@ -1512,7 +1495,6 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     },
     {
       key: "voices",
-      dividerBefore: true,
       label: "发音",
       className: "tsz-ve-speech-tool",
       // 「已选」两字在窄容器里就是一行的代价，去掉后语义不减。
@@ -1630,6 +1612,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               )}
             </div>
           ))}
+        {renderActions && (
+          <div className="tsz-ve-editor-actions">
+            {renderActions(!pendingUploads.some((item) => !item.error))}
+          </div>
+        )}
       </section>
     );
   }
@@ -1738,18 +1725,20 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         onGapClick={handleGapClick}
         onInspectPause={inspectPause}
         selectedPauseGap={pauseGap}
-        pausePopover={
-          pauseFromMarker && openTool === "pause" && pauseGap !== undefined
-            ? {
-                gap: pauseGap,
-                content: tools.find((tool) => tool.key === "pause")?.content
-              }
-            : undefined
-        }
+        actions={renderActions?.(
+          !blockingError &&
+            pendingText === undefined &&
+            !pendingConflict &&
+            conflictCount === 0 &&
+            !associationPickerOpen &&
+            linkWords.length === 0 &&
+            !draft.start &&
+            !draft.end &&
+            !pendingUploads.some((item) => !item.error)
+        )}
         onCaretChange={(position) => {
           setCaretPosition(position);
-          if (openTool === "pause" && brush.kind === "none")
-            setPauseGap(gapAtCaret(position));
+          if (brush.kind === "none") setPauseGap(gapAtCaret(position));
         }}
         onLetterClick={handleLetterClick}
         onLiaisonClick={handleLiaisonClick}
@@ -1786,7 +1775,6 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                         active:
                           brush.kind === "association" &&
                           brush.targetKind === targetKind,
-                        dividerBefore: targetKind === "word",
                         placement: "topLeft",
                         stayOpen: true,
                         content: (
@@ -1822,12 +1810,6 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             : tools
         }
         openTool={openTool}
-        showRoleSelection={
-          mode === "grammar" &&
-          brush.kind === "none" &&
-          !!textSelection &&
-          !openTool
-        }
         onOpenToolChange={openToolAndArm}
       />
     </section>

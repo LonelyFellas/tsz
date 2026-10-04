@@ -317,6 +317,7 @@ describe("按词条关联反查共享多维例句", () => {
     const english = screen.getByRole("textbox", { name: "例句正文" });
     expect(english).not.toHaveAttribute("readonly");
     fireEvent.change(english, { target: { value: "An updated example." } });
+    fireEvent.click(screen.getByLabelText("完成例句正文编辑"));
     for (const tier of ["中阶", "高阶"]) {
       fireEvent.click(screen.getByLabelText("添加例句 1 译文"));
       fireEvent.click(
@@ -449,6 +450,7 @@ describe("按词条关联反查共享多维例句", () => {
     const text = screen.getByRole("textbox", { name: "例句正文" });
     expect(text).not.toHaveAttribute("readonly");
     fireEvent.change(text, { target: { value: "We make up stories." } });
+    fireEvent.click(screen.getByLabelText("完成例句正文编辑"));
     fireEvent.change(
       screen.getAllByPlaceholderText("请输入对应的中文译文")[0]!,
       { target: { value: "我们编故事。" } }
@@ -484,13 +486,14 @@ describe("按词条关联反查共享多维例句", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "例句正文" }), {
       target: { value: "We make the story up." }
     });
+    fireEvent.click(screen.getByLabelText("完成例句正文编辑"));
     fireEvent.change(
       screen.getAllByPlaceholderText("请输入对应的中文译文")[0]!,
       { target: { value: "我们编造这个故事。" } }
     );
-    const toolbar = await screen.findByRole("toolbar", { name: "标注工具栏" });
+    await screen.findByRole("toolbar", { name: "标注工具栏" });
     expect(screen.queryByText("句内关联")).toBeNull();
-    fireEvent.click(within(toolbar).getByLabelText("关联单词"));
+    fireEvent.click(screen.getByLabelText("关联单词"));
     fireEvent.mouseDown(screen.getByLabelText("关联 story（4）"), {
       button: 0
     });
@@ -509,7 +512,7 @@ describe("按词条关联反查共享多维例句", () => {
     fireEvent.click(
       within(wordPicker).getByRole("button", { name: "确认关联" })
     );
-    fireEvent.click(within(toolbar).getByLabelText("关联短语"));
+    fireEvent.click(screen.getByLabelText("关联短语"));
     fireEvent.mouseDown(screen.getByLabelText("关联 make（2）"), { button: 0 });
     fireEvent.mouseDown(screen.getByLabelText("关联 up.（5）"), { button: 0 });
     fireEvent.click(await screen.findByText("选择关联短语"));
@@ -531,6 +534,7 @@ describe("按词条关联反查共享多维例句", () => {
     fireEvent.click(
       within(phrasePicker).getByRole("button", { name: "确认关联" })
     );
+    fireEvent.click(screen.getByLabelText("完成例句正文编辑"));
     fireEvent.click(screen.getByLabelText("完成例句编辑"));
     await waitFor(() => expect(api.sentences.create).toHaveBeenCalledOnce());
     const annotations = vi.mocked(api.sentences.create).mock.calls[0]![0]

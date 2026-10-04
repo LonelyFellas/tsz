@@ -52,7 +52,7 @@ export interface AnnotationStripProps {
   /** 停顿面板打开时显示词间插入位，不必预先拿起连续画笔。 */
   pausePlacement?: boolean;
   selectedPauseGap?: number;
-  onCaretChange?: (position: number) => void;
+  onCaretChange?: (position?: number) => void;
   onInspectPause?: (gap: number) => void;
   pausePopover?: { gap: number; content: ReactNode };
   onTextSelection?: (range?: { start: number; end: number }) => void;
@@ -465,11 +465,15 @@ export function AnnotationStrip({
           const start = Array.from(text.slice(0, input.selectionStart)).length;
           const end = Array.from(text.slice(0, input.selectionEnd)).length;
           onTextSelection?.(end > start ? { start, end } : undefined);
-          onCaretChange?.(end);
+          onCaretChange?.(end > start ? undefined : end);
         }}
         onClick={(event) =>
           onCaretChange?.(
-            Array.from(text.slice(0, event.currentTarget.selectionEnd)).length
+            event.currentTarget.selectionStart ===
+              event.currentTarget.selectionEnd
+              ? Array.from(text.slice(0, event.currentTarget.selectionEnd))
+                  .length
+              : undefined
           )
         }
         onChange={(event) => onTextChange(event.target.value)}

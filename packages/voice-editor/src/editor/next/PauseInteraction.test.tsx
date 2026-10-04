@@ -73,8 +73,28 @@ function button(name: string) {
 }
 
 describe("停顿定位与显式编辑", () => {
+  it("停顿常驻且只在词间光标启用，新增预设写入正确毫秒", () => {
+    render(<Host value={{ ...initial, annotations: [] }} />);
+    expect(button("停顿 0.75 秒")).toBeDisabled();
+    select(4);
+    expect(button("停顿 0.75 秒")).toBeDisabled();
+    select(8, 10);
+    expect(button("停顿 0.75 秒")).toBeDisabled();
+    select(8);
+    expect(button("停顿 0.75 秒")).toBeEnabled();
+    fireEvent.click(button("停顿 0.75 秒"));
+    expect(data().annotations).toEqual([
+      { type: "pause", at: 8, duration_ms: 750 }
+    ]);
+    fireEvent.click(screen.getByLabelText("编辑第 2 处停顿 0.75 秒"));
+    fireEvent.click(button("停顿 3 秒"));
+    expect(data().annotations).toEqual([
+      { type: "pause", at: 8, duration_ms: 3000 }
+    ]);
+  });
   it("打开停顿即可点击词间插入位，选中位置高亮，选择时长后原位显示标记", async () => {
     render(<Host value={{ ...initial, annotations: [] }} />);
+    select(8);
     openPause();
     expect(document.querySelector(".tsz-ve-canvas")).toHaveAttribute(
       "data-target",
@@ -152,11 +172,7 @@ describe("停顿定位与显式编辑", () => {
           { type: "pause", at: 8, duration_ms: 500 }
         ])
       );
-      await waitFor(() =>
-        expect(
-          screen.queryByRole("button", { name: "停顿 1 秒" })
-        ).not.toBeInTheDocument()
-      );
+      expect(button("停顿 1 秒")).toBeInTheDocument();
       fireEvent.click(screen.getByLabelText("编辑第 2 处停顿 0.5 秒"));
       fireEvent.click(button("停顿 1 秒"));
       expect(data().annotations).toEqual([
@@ -198,7 +214,7 @@ describe("停顿定位与显式编辑", () => {
   it("添加连读跨过停顿也必须确认，取消保留原标注", async () => {
     render(<Host />);
     select(12, 19);
-    fireEvent.click(button("确认添加"));
+    fireEvent.click(button("一次性添加"));
     expect(data()).toEqual(initial);
     fireEvent.click(
       await screen.findByRole("button", { name: "移除冲突停顿，添加连读" })

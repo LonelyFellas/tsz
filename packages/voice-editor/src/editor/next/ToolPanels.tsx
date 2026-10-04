@@ -162,7 +162,11 @@ export function VoicePanel({
       const group = items.filter((voice) => voice.locale === locale);
       if (group.length === 0) return null;
       return (
-        <PopSection key={locale} title={badge} locale={locale}>
+        <PopSection
+          key={locale}
+          title={`${badge} · ${locale === "en-GB" ? "英式发音" : "美式发音"}`}
+          locale={locale}
+        >
           <div className="tsz-ve-voice-columns">
             {[
               ...VOICE_GENDERS,
@@ -694,9 +698,9 @@ const ROLE_DESCRIPTIONS: Record<string, string> = {
 };
 
 const ROLE_SHORT_LABELS: Record<string, string> = {
-  function: "可替换",
-  core: "核心词",
-  grammar: "词性"
+  function: "可替换搭配",
+  core: "固定核心词",
+  grammar: "词性提示符"
 };
 
 /** 默认先选文字再分类；连续画笔需要显式开启，原有精细落笔能力保留。 */
@@ -987,7 +991,7 @@ export function PausePanel({
 }: PausePanelProps) {
   const continuous = brush.kind === "pause";
   const current = continuous ? brush.durationMs : duration;
-  const choices = [250, 500, 1000, 2000];
+  const choices = [250, 500, 750, 1000, 2000, 3000];
   const disabled = readOnly || !hasWords || (!continuous && !location);
   const submit = () => {
     const raw = customPause.trim();
