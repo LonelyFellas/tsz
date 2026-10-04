@@ -70,6 +70,12 @@ export async function mockApi(
       // tsz-rust 返回扁平 UserProfile(active_role 在 user 内,无包壳)
       return json(route, 200, TEST_USER);
     }
+    if (path === "/me/teacher-certification" && method === "GET") {
+      return json(route, 200, { teacher_verified: false, application: null });
+    }
+    if (path === "/me/notifications" && method === "GET") {
+      return json(route, 200, { items: [], total: 0, unread_count: 0 });
+    }
     if (path === "/auth/login" && method === "POST") {
       return json(route, 200, AUTH_RESPONSE);
     }

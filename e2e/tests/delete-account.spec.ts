@@ -10,6 +10,15 @@ for (const width of [375, 1280]) {
     await page.getByRole("button", { name: "账户菜单" }).click();
     const menu = page.getByRole("menu");
     await expect(menu).toBeVisible();
+    const expectedItems = [
+      "进入学生工作台",
+      "个人中心",
+      "站内通知",
+      "申请教师认证",
+      "深色模式",
+      "退出登录"
+    ];
+    await expect(menu.getByRole("menuitem")).toHaveText(expectedItems);
     const measurement = await menu.evaluate((element) => {
       const rect = element.getBoundingClientRect();
       return {
@@ -30,11 +39,14 @@ for (const width of [375, 1280]) {
     expect(measurement.outsidePage).toBe(true);
     expect(measurement.zIndex).toBe("50");
     expect(measurement.fitsViewport).toBe(true);
-    expect(measurement.hits).toHaveLength(5);
+    expect(measurement.hits).toHaveLength(expectedItems.length);
     expect(measurement.hits.every(Boolean)).toBe(true);
     await page.getByRole("menuitem", { name: "站内通知" }).click();
     await expect(page).toHaveURL(/\/account\/notifications$/);
     await expect(page.getByRole("menu")).toHaveCount(0);
+    await expect(
+      page.getByText("暂无站内通知，认证结果会显示在这里。")
+    ).toBeVisible();
   });
 }
 
