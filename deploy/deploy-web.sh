@@ -65,6 +65,9 @@ artifact_stage="$deploy_tmp/artifact"
 mkdir -p "$artifact_stage/apps/web/.next/static"
 rsync -a "$DEPLOY_BUILD_ROOT/apps/web/.next/standalone/" "$artifact_stage/"
 rsync -a "$DEPLOY_BUILD_ROOT/apps/web/.next/static/" "$artifact_stage/apps/web/.next/static/"
+if [[ -d "$DEPLOY_BUILD_ROOT/apps/web/public" ]]; then
+  rsync -a "$DEPLOY_BUILD_ROOT/apps/web/public/" "$artifact_stage/apps/web/public/"
+fi
 
 node -e 'require("fs").writeFileSync(process.argv[1], JSON.stringify({release_id: process.argv[2]}))' "$artifact_stage/version.json" "$release_id"
 echo "==> boot staged standalone artifact locally"
