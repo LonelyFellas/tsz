@@ -173,7 +173,7 @@ function FormsReview({
                           <td>
                             {index === 0 && (
                               <>
-                                <strong className="tsz-entry-en">
+                                <strong className="tsz-words">
                                   {variant.spelling || "待填写拼写"}
                                 </strong>
                                 <small>{dialectLabel(variant.dialect)}</small>
@@ -199,6 +199,7 @@ function FormsReview({
                                       />
                                     ))}
                                   <RichTextReadOnly
+                                    className="tsz-phonetics"
                                     value={
                                       pronunciation.dict_phonetic_rich ?? {
                                         version: 2,
@@ -233,6 +234,7 @@ function FormsReview({
                           <td>
                             {pronunciation && (
                               <RichTextReadOnly
+                                className="tsz-phonetics tsz-actual-pronunciation"
                                 value={
                                   pronunciation.actual_pron_rich ?? {
                                     version: 2,
@@ -333,7 +335,7 @@ export function V3ReviewContent({
             <Typography.Text className="v3-review-kicker">
               当前词条
             </Typography.Text>
-            <Typography.Title className="tsz-entry-en" level={2}>
+            <Typography.Title className="tsz-words" level={2}>
               {model.identity.label}
             </Typography.Title>
             <Flex gap="small" wrap>

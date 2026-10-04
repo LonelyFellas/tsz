@@ -451,10 +451,10 @@ describe("V3PublicationHistory", () => {
       within(detailView).getByText("historical-v3-spelling")
     ).toBeInTheDocument();
     expect(
-      within(detailView).getByText(
-        "词典音标 historical-v3-dict · 实际发音 historical-v3-actual · 强读"
-      )
-    ).toBeInTheDocument();
+      within(detailView).getByText("historical-v3-dict").parentElement
+    ).toHaveTextContent(
+      "词典音标 historical-v3-dict · 实际发音 historical-v3-actual · 强读"
+    );
     expect(
       within(detailView).getByText("historical-v3-meaning")
     ).toBeInTheDocument();
@@ -501,10 +501,10 @@ describe("V3PublicationHistory", () => {
       within(detail).getByText("historical-v2-spelling")
     ).toBeInTheDocument();
     expect(
-      within(detail).getByText(
-        "词典音标 historical-v2-dict · 实际发音 historical-v2-actual · 弱读"
-      )
-    ).toBeInTheDocument();
+      within(detail).getByText("historical-v2-dict").parentElement
+    ).toHaveTextContent(
+      "词典音标 historical-v2-dict · 实际发音 historical-v2-actual · 弱读"
+    );
     expect(
       within(detail).getByText("historical-v2-meaning")
     ).toBeInTheDocument();
@@ -528,10 +528,10 @@ describe("V3PublicationHistory", () => {
       within(v3Detail).getByText("historical-v3-spelling")
     ).toBeInTheDocument();
     expect(
-      within(v3Detail).getByText(
-        "词典音标 historical-v3-dict · 实际发音 historical-v3-actual · 强读"
-      )
-    ).toBeInTheDocument();
+      within(v3Detail).getByText("historical-v3-dict").parentElement
+    ).toHaveTextContent(
+      "词典音标 historical-v3-dict · 实际发音 historical-v3-actual · 强读"
+    );
     expect(
       within(v3Detail).getByText("historical-v3-meaning")
     ).toBeInTheDocument();
@@ -669,10 +669,10 @@ describe("V3PublicationHistory", () => {
     expect(snapshot.getByText("historical-v3-us-spelling")).toBeInTheDocument();
     expect(snapshot.getByText("无发音")).toBeInTheDocument();
     expect(
-      snapshot.getByText(
-        "词典音标 historical-v3-us-dict · 实际发音 historical-v3-us-actual"
-      )
-    ).toBeInTheDocument();
+      snapshot.getByText("historical-v3-us-dict").parentElement
+    ).toHaveTextContent(
+      "词典音标 historical-v3-us-dict · 实际发音 historical-v3-us-actual"
+    );
     expect(
       snapshot.getByText("historical-v3-unified-meaning")
     ).toBeInTheDocument();

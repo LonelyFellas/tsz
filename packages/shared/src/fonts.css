@@ -1,0 +1,183 @@
+@font-face {
+  font-family: "TSZ Text";
+  src: url("./fonts/Geist-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 500;
+  font-variation-settings: "wght" 280;
+  font-feature-settings: "ss04", "ss06", "ss07", "ss08";
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TSZ Text";
+  src: url("./fonts/Geist-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 501 900;
+  font-variation-settings: "wght" 650;
+  font-feature-settings: "ss04", "ss06", "ss07", "ss08";
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TSZ Text";
+  src: url("./fonts/Geist-Italic.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 100 500;
+  font-variation-settings: "wght" 280;
+  font-feature-settings: "ss02", "ss04", "ss06", "ss07", "ss08";
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TSZ Text";
+  src: url("./fonts/Geist-Italic.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 501 900;
+  font-variation-settings: "wght" 650;
+  font-feature-settings: "ss02", "ss04", "ss06", "ss07", "ss08";
+  font-display: swap;
+}
+
+/* 同名补字放在主字体之后，确保指定字符优先命中，而不是仅在缺字时回退。 */
+@font-face {
+  font-family: "TSZ Text";
+  src: url("./fonts/InterDisplay-Light.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 500;
+  font-feature-settings: "cv06", "ss01", "ss03";
+  unicode-range:
+    U+0027, U+002C-002E, U+0030-0039, U+003C-003E, U+2018-2019, U+201C-201D;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TSZ Text";
+  src: url("./fonts/InterDisplay-Bold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 501 900;
+  font-feature-settings: "cv06", "ss01", "ss03";
+  unicode-range:
+    U+0027, U+002C-002E, U+0030-0039, U+003C-003E, U+2018-2019, U+201C-201D;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TSZ Text";
+  src: url("./fonts/InterDisplay-LightItalic.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 100 500;
+  font-feature-settings: "cv06", "ss01", "ss03";
+  unicode-range:
+    U+0027, U+002C-002E, U+0030-0039, U+003C-003E, U+2018-2019, U+201C-201D;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TSZ Text";
+  src: url("./fonts/InterDisplay-BoldItalic.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 501 900;
+  font-feature-settings: "cv06", "ss01", "ss03";
+  unicode-range:
+    U+0027, U+002C-002E, U+0030-0039, U+003C-003E, U+2018-2019, U+201C-201D;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TSZ Words";
+  src: url("./fonts/Andika-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-feature-settings:
+    "cv01", "cv04", "cv06", "cv09", "cv31", "cv39", "cv52", "ss05";
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TSZ Words";
+  src: url("./fonts/Andika-Bold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-feature-settings:
+    "cv01", "cv04", "cv06", "cv09", "cv31", "cv39", "cv52", "ss05";
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TSZ Words";
+  src: url("./fonts/Andika-Italic.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 400;
+  font-feature-settings:
+    "cv01", "cv04", "cv06", "cv09", "cv31", "cv39", "cv52", "ss05";
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TSZ Words";
+  src: url("./fonts/Andika-BoldItalic.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 700;
+  font-feature-settings:
+    "cv01", "cv04", "cv06", "cv09", "cv31", "cv39", "cv52", "ss05";
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TSZ Phonetics";
+  src: url("./fonts/Andika-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-feature-settings:
+    "cv01",
+    "cv04",
+    "cv06",
+    "cv09",
+    "liga" 0,
+    "ss05";
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TSZ Phonetics";
+  src: url("./fonts/SourceSans3-Medium.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  unicode-range: U+02C8, U+02CC;
+  font-display: swap;
+}
+
+:root {
+  --tsz-font-fallback:
+    system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC",
+    "Microsoft YaHei", sans-serif;
+  --tsz-font-text: "TSZ Text", var(--tsz-font-fallback);
+  --tsz-font-words: "TSZ Words", var(--tsz-font-fallback);
+  --tsz-font-phonetics: "TSZ Phonetics", var(--tsz-font-fallback);
+}
+
+.tsz-entry-en,
+.tsz-entry-en input,
+.tsz-entry-en textarea {
+  font-family: var(--tsz-font-text);
+}
+
+.tsz-words,
+.tsz-words input,
+.tsz-words textarea {
+  font-family: var(--tsz-font-words);
+  font-size: 14pt;
+}
+
+.tsz-phonetics,
+.tsz-phonetics input,
+.tsz-phonetics textarea {
+  font-family: var(--tsz-font-phonetics);
+  font-style: normal;
+}
+
+.tsz-actual-pronunciation,
+.tsz-actual-pronunciation input,
+.tsz-actual-pronunciation textarea {
+  font-size: 14pt;
+}

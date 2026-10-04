@@ -8,7 +8,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./auth": "./src/auth/index.ts",
-    "./recovery": "./src/recovery/index.ts"
+    "./recovery": "./src/recovery/index.ts",
+    "./fonts.css": "./src/fonts.css"
   },
   "scripts": {
     "lint": "eslint .",

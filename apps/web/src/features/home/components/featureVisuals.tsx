@@ -99,7 +99,7 @@ export function WordbankVisual() {
             className="flex items-center justify-between px-3 py-2.5"
           >
             <span className="flex items-baseline gap-2">
-              <span className="text-sm font-semibold text-foreground">
+              <span className="tsz-words font-semibold text-foreground">
                 {r.w}
               </span>
               <span className="text-[11px] text-foreground-subtle">{r.t}</span>

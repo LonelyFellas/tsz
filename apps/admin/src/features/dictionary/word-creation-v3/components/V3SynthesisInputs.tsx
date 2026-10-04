@@ -385,6 +385,7 @@ export function V3SynthesisInputs({
                             {side === "uk" ? "BrE" : "AmE"}
                           </Button>
                           <Input.TextArea
+                            className="tsz-phonetics"
                             autoSize={{ minRows: 1, maxRows: 6 }}
                             aria-label={`${label}的${sideLabel} ${name}`}
                             data-v3-node-id={pronunciation.id}

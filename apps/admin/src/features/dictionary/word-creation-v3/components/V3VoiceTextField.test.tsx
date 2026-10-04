@@ -856,14 +856,15 @@ it("字典音标收起态不叠弧线层", () => {
   expect(container.querySelector(".tsz-ve-liaison-anchor")).toBeNull();
 });
 
-// Ubuntu 缺 ə ʌ ɪ 等音标字形：录词条英文的字段用 Ubuntu，两种音标字段不能用。
-// 类挂在外层包裹上也会经 globals.css 的后代选择器传到 textarea，所以查整条祖先链。
 it.each([
-  ["association", true],
-  ["grammar", true],
-  ["dict-phonetic", false],
-  ["actual-pron", false]
-] as const)("%s 收起态输入框使用词条英文字体：%s", (mode, english) => {
+  ["association", "tsz-entry-en"],
+  ["pronunciation", "tsz-entry-en"],
+  ["grammar", "tsz-words"],
+  ["spelling", "tsz-words"],
+  ["dict-phonetic", "tsz-phonetics"],
+  ["actual-pron", "tsz-phonetics"],
+  [undefined, "tsz-entry-en"]
+] as const)("%s 收起态输入框按内容角色选择字体", (mode, fontClass) => {
   render(
     <V3VoiceTextField
       mode={mode}
@@ -876,7 +877,14 @@ it.each([
   );
   const input = screen.getByLabelText("内容");
   expect(input.tagName).toBe("TEXTAREA");
-  expect(input.closest(".tsz-entry-en") !== null).toBe(english);
+  expect(input).toHaveClass(fontClass);
+  if (mode === "actual-pron")
+    expect(input).toHaveClass("tsz-actual-pronunciation");
+  else expect(input).not.toHaveClass("tsz-actual-pronunciation");
+  if (mode === "grammar")
+    expect(document.querySelector(".v3-grammar-preview-content")).toHaveClass(
+      "tsz-words"
+    );
 });
 
 it("弧线层内层扣掉输入框滚动条宽度，并随输入框滚动和尺寸变化跟进", () => {

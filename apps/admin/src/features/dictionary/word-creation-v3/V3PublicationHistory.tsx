@@ -291,7 +291,7 @@ function PublicationSnapshotBody({
                   <Tag>{partOfSpeechLabel(form.pos)}</Tag>
                   <Tag>{formTypeLabel(form.formType as never)}</Tag>
                   <Tag>{dialectLabel(form.dialect as never)}</Tag>
-                  <Typography.Text className="tsz-entry-en">
+                  <Typography.Text className="tsz-words">
                     {form.spelling}
                   </Typography.Text>
                 </Flex>
@@ -300,8 +300,14 @@ function PublicationSnapshotBody({
                 ) : (
                   form.pronunciations.map((pronunciation) => (
                     <Typography.Text key={pronunciation.id} type="secondary">
-                      词典音标 {pronunciation.dictPhonetic} · 实际发音{" "}
-                      {pronunciation.actualPron}
+                      词典音标{" "}
+                      <span className="tsz-phonetics">
+                        {pronunciation.dictPhonetic}
+                      </span>{" "}
+                      · 实际发音{" "}
+                      <span className="tsz-phonetics tsz-actual-pronunciation">
+                        {pronunciation.actualPron}
+                      </span>
                       {pronunciation.synthesis
                         ? pronunciation.synthesis.use_spelling
                           ? " · 词形拼写（语音来源）"
@@ -357,7 +363,7 @@ function PublicationSnapshotBody({
               <Flex key={grammar.id} gap="small" wrap>
                 <Tag>{partOfSpeechLabel(grammar.pos)}</Tag>
                 <Tag>{dialectLabel(grammar.dialect as never)}</Tag>
-                <Typography.Text className="tsz-entry-en">
+                <Typography.Text className="tsz-words">
                   {grammar.text}
                 </Typography.Text>
               </Flex>
@@ -888,7 +894,7 @@ export function V3PublicationHistory({
               >
                 <Flex vertical gap={2}>
                   <Flex align="center" gap="small" wrap>
-                    <Typography.Text className="tsz-entry-en" strong>
+                    <Typography.Text className="tsz-words" strong>
                       {publicationLabel(publication)}
                     </Typography.Text>
                     <Typography.Text type="secondary">
@@ -934,7 +940,7 @@ export function V3PublicationHistory({
             <>
               <Flex align="center" gap="small" wrap>
                 <Typography.Title
-                  className="tsz-entry-en"
+                  className="tsz-words"
                   level={5}
                   style={{ margin: 0 }}
                 >
