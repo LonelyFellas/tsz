@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Role, User } from "@tsz/types";
 import { MainNav } from "./MainNav";
@@ -41,6 +41,29 @@ beforeEach(() => {
 });
 
 describe("MainNav — 角色感知导航", () => {
+  it("移动端导航保持单排并允许横向滚动", () => {
+    render(<MainNav />);
+    const nav = screen.getByRole("navigation");
+
+    expect(nav).toHaveClass("overflow-x-auto", "whitespace-nowrap");
+    expect(nav).not.toHaveClass("flex-wrap");
+  });
+
+  it("已登录时主题入口放在头像菜单，未登录时仍保留主题按钮", () => {
+    render(<MainNav />);
+    expect(
+      screen.getByRole("button", { name: /切换到.*色模式/ })
+    ).toBeInTheDocument();
+
+    act(() => useUserStore.setState({ user: userWithRoles(["student"]) }));
+    expect(
+      screen.queryByRole("button", { name: /切换到.*色模式/ })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "账户菜单" })
+    ).toBeInTheDocument();
+  });
+
   it("学生 → 显示练习/天生币 + 申请成为老师，不显示教师入口", () => {
     useUserStore.setState({ user: userWithRoles(["student"]) });
     render(<MainNav />);

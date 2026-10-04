@@ -14,6 +14,7 @@ import { useUserStore } from "@/stores/user";
 import { displayNameOf } from "@/lib/user";
 import { useLogout } from "@/features/auth/hooks/useLogout";
 import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIdentityProvider";
+import { useTheme } from "@/features/theme/useTheme";
 
 // 账户菜单——头像触发的下拉。收纳工作台、个人中心、身份切换与退出入口。
 // 头像优先用后端 avatar_url 字段;缺失或加载失败时回退到昵称首字母色块作默认头像。
@@ -21,6 +22,7 @@ export function AccountMenu() {
   const user = useUserStore((s) => s.user);
   const logout = useLogout();
   const teacher = useTeacherIdentity();
+  const { resolved, toggle } = useTheme();
   const [switching, setSwitching] = useState(false);
   const [switchError, setSwitchError] = useState("");
   const [open, setOpen] = useState(false);
@@ -64,7 +66,7 @@ export function AccountMenu() {
             <img
               src={user.avatar_url}
               alt={displayName}
-              className="h-full w-full object-cover"
+              className="h-full w-full bg-white object-cover"
               onError={() => setErrorUrl(user.avatar_url)}
             />
           ) : (
@@ -91,17 +93,33 @@ export function AccountMenu() {
         }}
       >
         <DropdownMenuLabel>
-          <p className="truncate text-sm font-medium text-foreground">
-            {displayName}
+          <div className="flex items-center gap-1.5">
+            <p className="min-w-0 truncate text-sm font-medium text-foreground">
+              {displayName}
+            </p>
+            {teacher.verified && (
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="shrink-0 text-primary"
+                role="img"
+                aria-label="已认证教师"
+              >
+                <title>已认证教师</title>
+                <circle cx="12" cy="12" r="9" />
+                <path d="m8 12 3 3 5-6" />
+              </svg>
+            )}
+          </div>
+          <p className="text-xs text-foreground-subtle">
+            {teacher.identity === "teacher" ? "教师身份" : "学生身份"}
           </p>
-          <p className="truncate text-xs text-foreground-subtle">
-            当前身份：{teacher.identity === "teacher" ? "教师" : "学生"}
-          </p>
-          {teacher.verified && (
-            <span className="mt-1 inline-block text-xs text-primary">
-              已认证教师
-            </span>
-          )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem
@@ -145,7 +163,7 @@ export function AccountMenu() {
         {teacher.verified && (
           <DropdownMenuItem
             disabled={switching || loading}
-            className="text-primary"
+            className="gap-2.5 text-primary"
             onSelect={async (event) => {
               event.preventDefault();
               setSwitching(true);
@@ -164,11 +182,36 @@ export function AccountMenu() {
               }
             }}
           >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="shrink-0"
+              aria-hidden
+            >
+              {teacher.identity === "teacher" ? (
+                <>
+                  <path d="M12 7v14" />
+                  <path d="M3 4h4a5 5 0 0 1 5 3 5 5 0 0 1 5-3h4v16h-4a5 5 0 0 0-5 2 5 5 0 0 0-5-2H3Z" />
+                </>
+              ) : (
+                <>
+                  <path d="m2 9 10-5 10 5-10 5Z" />
+                  <path d="M6 11v5c3 3 9 3 12 0v-5" />
+                  <path d="M22 9v6" />
+                </>
+              )}
+            </svg>
             {switching
               ? "正在切换…"
               : teacher.identity === "teacher"
-                ? "切换到学生工作台"
-                : "切换到教师工作台"}
+                ? "切换为学生"
+                : "切换为教师"}
           </DropdownMenuItem>
         )}
         {switchError && (
@@ -187,6 +230,31 @@ export function AccountMenu() {
             </Link>
           </DropdownMenuItem>
         )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={toggle} className="gap-2.5">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="shrink-0"
+            aria-hidden
+          >
+            {resolved === "dark" ? (
+              <>
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+              </>
+            ) : (
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" />
+            )}
+          </svg>
+          {resolved === "dark" ? "浅色模式" : "深色模式"}
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onSelect={(event) => {
