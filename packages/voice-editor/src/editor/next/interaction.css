@@ -1,117 +1,280 @@
-.tsz-ve-selection-liaison {
+.tsz-ve-editor .tsz-ve-markup {
+  border: 1px solid #dfe5ef;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.tsz-ve-top-tools,
+.tsz-ve-bottom-tools {
+  padding: 10px 12px;
+}
+.tsz-ve-top-tools {
+  position: relative;
+  background: #f4faf8;
+  border-bottom: 1px solid #dfe5ef;
+}
+.tsz-ve-bottom-tools {
+  background: #fafbff;
+  border-top: 1px solid #dfe5ef;
+}
+.tsz-ve-tool-row {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
 }
-.tsz-ve-selection-liaison > span {
-  color: #7b8799;
-  font-size: 12px;
+.tsz-ve-tool-row + .tsz-ve-tool-row {
+  margin-top: 8px;
 }
-.tsz-ve-selection-liaison .ant-btn {
-  height: 28px;
-  padding-inline: 10px;
-  border-radius: 6px;
-  font-size: 12px;
+.tsz-ve-top-tools .tsz-ve-tool-row > .tsz-ve-tool-toggle {
+  flex: 0 0 96px;
+  justify-content: flex-start;
 }
-.tsz-ve-selection-liaison .ant-btn:disabled {
-  background: #f7f9fc;
-  border-color: #e2e7f0;
-  color: #99a3b2;
+.tsz-ve-tool-row[data-tool="roles"] {
+  padding-right: 96px;
 }
-
-/* 工具栏仅改变排布与视觉，功能面板复用原组件。 */
-.tsz-ve-editor .tsz-ve-toolbar {
-  box-sizing: border-box;
-  padding: 7px 10px;
-  gap: 5px;
-  background: #f8f9fc;
-  border-color: #dfe4ec;
-  min-height: 46px;
+.tsz-ve-tool-content {
+  flex: 1;
+  min-width: 0;
 }
-.tsz-ve-editor .tsz-ve-toolbar .ant-btn.ant-btn {
+.tsz-ve-editor .tsz-ve-tool-toggle.ant-btn {
+  flex-shrink: 0;
   height: 30px;
-  border-radius: 6px;
   padding-inline: 8px;
-  font-weight: 400;
-  color: #657286;
+  border-color: transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #68768b;
   box-shadow: none;
 }
-.tsz-ve-toolbar .tsz-ve-tool-toggle.ant-btn {
+.tsz-ve-editor .tsz-ve-tool-toggle.ant-btn[aria-pressed="true"] {
+  border-color: #cfdcff;
+  background: #edf2ff;
+  color: #2053ff;
+}
+.tsz-ve-editor .tsz-ve-tool-toggle.ant-btn:disabled {
+  color: #a0a9b7;
   border-color: transparent;
   background: transparent;
-  gap: 6px;
 }
-.tsz-ve-toolbar .tsz-ve-tool-toggle.ant-btn:hover:not(:disabled),
-.tsz-ve-toolbar .tsz-ve-icon-button.ant-btn:hover:not(:disabled) {
-  background: #fff;
-  border-color: #e1e6ef;
-  color: #354a6b;
-}
-.tsz-ve-toolbar .tsz-ve-tool-toggle.ant-btn[aria-pressed="true"] {
-  border-color: #d0dcf7;
-  background: #eaf0ff;
-  color: #315ce1;
-  box-shadow: 0 1px 2px #23468208;
-}
-.tsz-ve-toolbar .tsz-ve-tool-summary {
-  background: transparent;
-  color: #98a1b0;
-  font-size: 11px;
-}
-.tsz-ve-toolbar .ant-btn.ant-btn:disabled {
-  color: #b7c0ce;
-  background: transparent;
-  border-color: transparent;
-  box-shadow: none;
-  opacity: 0.65;
-}
-.tsz-ve-editor .tsz-ve-toolbar-divider {
-  height: 15px;
-  align-self: center;
-  margin: 0 2px;
+.tsz-ve-toolbar-divider {
+  align-self: flex-start;
+  flex-shrink: 0;
+  width: 1px;
+  height: 18px;
+  margin: 6px 0;
   background: #e0e5ed;
 }
-.tsz-ve-toolbar-actions {
+.tsz-ve-top-tools > .tsz-ve-toolbar-actions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
   display: flex;
-  align-items: center;
   gap: 2px;
-  margin-left: auto;
-  flex-shrink: 0;
 }
-.tsz-ve-toolbar .tsz-ve-icon-button.ant-btn {
-  width: 30px;
-  min-width: 30px;
-  padding: 0;
-  background: transparent;
-  border: 1px solid transparent;
-}
-.tsz-ve-markup[data-compact="true"] .tsz-ve-toolbar {
-  padding: 7px 6px;
-  gap: 3px;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  scrollbar-width: thin;
-}
-.tsz-ve-markup[data-compact="true"] .tsz-ve-toolbar button {
-  flex-shrink: 0;
-}
-.tsz-ve-markup[data-compact="true"] .tsz-ve-toolbar-divider,
-.tsz-ve-markup[data-compact="true"] .tsz-ve-tool-label,
-.tsz-ve-markup[data-compact="true"] .tsz-ve-tool-summary {
-  display: none;
-}
-.tsz-ve-markup[data-compact="true"] .tsz-ve-toolbar .tsz-ve-icon-tool.ant-btn,
-.tsz-ve-markup[data-compact="true"]
-  .tsz-ve-toolbar
-  .tsz-ve-icon-button.ant-btn {
+.tsz-ve-top-tools .tsz-ve-icon-button.ant-btn {
   width: 28px;
   min-width: 28px;
   height: 30px;
   padding: 0;
-  gap: 0;
+  color: #718099;
 }
-/* 停顿定位时显示词间灰色插入位；绝对定位，不改变字距和连读端点。 */
+.tsz-ve-top-tools .tsz-ve-icon-button.ant-btn:disabled {
+  color: #bdc6d5;
+}
+.tsz-ve-top-hint {
+  padding: 6px 96px 6px 0;
+  color: #8a96a8;
+  font-size: 12px;
+}
+.tsz-ve-editing-area {
+  background: #f5f5f5;
+}
+.tsz-ve-editor .tsz-ve-markup .tsz-ve-canvas {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.tsz-ve-editor .tsz-ve-strip {
+  min-height: 140px;
+  box-sizing: border-box;
+}
+.tsz-ve-editor .tsz-ve-strip,
+.tsz-ve-editor .tsz-ve-canvas-input {
+  line-height: 2.25;
+}
+.tsz-ve-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 12px 10px;
+}
+.tsz-ve-selection-liaison {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tsz-ve-selection-liaison > span,
+.tsz-ve-grammar-hint {
+  color: #8794a6;
+  font-size: 12px;
+}
+.tsz-ve-selection-liaison > span {
+  flex-basis: 100%;
+}
+.tsz-ve-editor .tsz-ve-grammar-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.tsz-ve-editor .tsz-ve-grammar-hint {
+  display: none;
+}
+.tsz-ve-editor .tsz-ve-grammar-option.ant-btn,
+.tsz-ve-selection-liaison .ant-btn {
+  height: 30px;
+  font-size: 12px;
+  padding-inline: 10px;
+}
+.tsz-ve-selection-liaison .ant-btn {
+  border-radius: 6px;
+}
+.tsz-ve-editor .tsz-ve-grammar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+}
+.tsz-ve-grammar-actions .ant-btn {
+  font-size: 12px;
+}
+.tsz-ve-footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border-top: 1px solid #e7eaf1;
+  background: #fafbff;
+}
+.tsz-ve-secondary-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tsz-ve-footer .tsz-ve-editor-actions {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 0;
+}
+.tsz-ve-bottom-tools .tsz-ve-pause-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+  max-width: none;
+}
+.tsz-ve-pause-editor-head,
+.tsz-ve-pause-note,
+.tsz-ve-pause-location {
+  font-size: 12px;
+  color: #8794a6;
+}
+.tsz-ve-bottom-tools .tsz-ve-pause-editor-head {
+  display: none;
+}
+.tsz-ve-pause-presets,
+.tsz-ve-pause-custom,
+.tsz-ve-pause-editor-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.tsz-ve-pause-presets .ant-btn {
+  padding-inline: 6px;
+}
+.tsz-ve-pause-custom .ant-input {
+  width: 88px;
+}
+.tsz-ve-pause-location {
+  flex-basis: 100%;
+  order: 1;
+}
+.tsz-ve-pause-location b {
+  font-weight: 400;
+  color: #67758a;
+}
+.tsz-ve-pause-editor-foot {
+  order: 2;
+}
+.tsz-ve-pause-note {
+  order: 3;
+}
+.tsz-ve-bottom-tools [data-tool="voices"] {
+  flex-wrap: wrap;
+}
+.tsz-ve-bottom-tools [data-tool="voices"] > .tsz-ve-tool-content {
+  flex-basis: 100%;
+}
+.tsz-ve-bottom-tools .tsz-ve-speech-panel,
+.tsz-ve-bottom-tools .tsz-ve-pop-voices {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  box-sizing: border-box;
+}
+.tsz-ve-bottom-tools .tsz-ve-speech-panel-title {
+  display: none;
+}
+.tsz-ve-bottom-tools .tsz-ve-pop-voices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 8px;
+  max-height: 280px;
+  border: 1px solid #dfe3eb;
+  border-radius: 8px;
+  background: #fff;
+}
+.tsz-ve-bottom-tools .tsz-ve-pop-section + .tsz-ve-pop-section {
+  margin-top: 0;
+}
+.tsz-ve-bottom-tools .tsz-ve-more-voices,
+.tsz-ve-bottom-tools .tsz-ve-pop-status,
+.tsz-ve-bottom-tools .tsz-ve-pop-loading {
+  grid-column: 1 / -1;
+}
+.tsz-ve-bottom-tools .tsz-ve-more-voices[open] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.tsz-ve-bottom-tools
+  .tsz-ve-pop-voices:not(:has(> .tsz-ve-pop-section ~ .tsz-ve-pop-section)),
+.tsz-ve-bottom-tools
+  .tsz-ve-more-voices[open]:not(
+    :has(> .tsz-ve-pop-section ~ .tsz-ve-pop-section)
+  ) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.tsz-ve-more-voices > summary {
+  grid-column: 1 / -1;
+}
+.tsz-ve-bottom-tools .tsz-ve-voice-columns {
+  gap: 8px;
+}
+.tsz-ve-bottom-tools .tsz-ve-pop-hit {
+  font-size: 12px;
+  padding-inline: 2px;
+  gap: 4px;
+}
+.tsz-ve-bottom-tools .tsz-ve-pop-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .tsz-ve-editor .tsz-ve-gap[aria-disabled="false"]:not(.has-pause)::before {
   top: 50%;
   bottom: auto;
@@ -121,133 +284,11 @@
   transform: translateY(-50%);
   border-radius: 3px;
   background: #d7dce5;
-  box-shadow: inset 0 0 0 1px #cbd2de;
 }
 .tsz-ve-editor .tsz-ve-gap[aria-disabled="false"]:not(.has-pause):hover::before,
 .tsz-ve-editor .tsz-ve-gap.is-pause-selected:not(.has-pause)::before {
   background: #7b9eff;
   box-shadow: 0 0 0 2px #2053ff20;
-}
-.tsz-ve-editor .tsz-ve-gap.is-pause-selected .tsz-ve-pause-chip {
-  background: #2053ff;
-  box-shadow: 0 0 0 2px #2053ff20;
-}
-.tsz-ve-editor .tsz-ve-inline-tools {
-  padding: 12px 14px 10px;
-  border-top: 1px solid #e8ecf2;
-  border-bottom: 1px solid #e8ecf2;
-  background: #fbfcff;
-}
-.tsz-ve-inline-tools[data-combined] {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  gap: 8px 12px;
-  align-items: center;
-}
-.tsz-ve-inline-tools[data-combined] > [data-tool="roles"],
-.tsz-ve-inline-tools[data-combined] .tsz-ve-grammar-panel {
-  display: contents;
-}
-.tsz-ve-inline-tools[data-combined] .tsz-ve-grammar-panel > [role="group"] {
-  grid-column: 1;
-  grid-row: 1;
-}
-.tsz-ve-inline-tools[data-combined] > [data-tool="liaison"] {
-  grid-column: 2;
-  grid-row: 1;
-  border-left: 1px solid #dfe4ec;
-  padding-left: 12px;
-  min-width: 0;
-}
-.tsz-ve-inline-tools[data-combined] .tsz-ve-grammar-actions {
-  grid-column: 1;
-  grid-row: 2;
-}
-.tsz-ve-inline-tools[data-combined] .tsz-ve-grammar-hint {
-  grid-column: 2;
-  grid-row: 2;
-}
-@container tsz-voice-editor (max-width: 640px) {
-  .tsz-ve-inline-tools[data-combined] {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .tsz-ve-inline-tools[data-combined] > [data-tool="liaison"] {
-    grid-column: 1;
-    grid-row: 2;
-    border-left: 0;
-    padding-left: 0;
-  }
-  .tsz-ve-inline-tools[data-combined] .tsz-ve-grammar-actions {
-    grid-row: 3;
-  }
-  .tsz-ve-inline-tools[data-combined] .tsz-ve-grammar-hint {
-    grid-column: 1;
-    grid-row: 4;
-  }
-}
-.tsz-ve-editor .tsz-ve-grammar-panel {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  gap: 8px 12px;
-  align-items: center;
-}
-.tsz-ve-editor .tsz-ve-grammar-hint {
-  font-size: 11px;
-  color: #929aaa;
-}
-.tsz-ve-editor .tsz-ve-grammar-option.ant-btn {
-  font-size: 12px;
-  height: 28px;
-  padding-inline: 10px;
-}
-.tsz-ve-editor .tsz-ve-grammar-option.ant-btn:disabled {
-  background: #fff;
-  border-color: #e4e8ef;
-  opacity: 1;
-  color: #9da6b5;
-}
-.tsz-ve-editor .tsz-ve-grammar-option:disabled .tsz-ve-pop-swatch {
-  opacity: 0.5;
-}
-.tsz-ve-editor .tsz-ve-grammar-actions {
-  grid-column: 1 / -1;
-  justify-content: flex-start;
-  margin-left: 0;
-  min-height: 26px;
-  gap: 6px;
-}
-.tsz-ve-editor .tsz-ve-grammar-actions .ant-btn {
-  height: 26px;
-  padding-inline: 6px;
-  font-size: 12px;
-  color: #788499;
-}
-.tsz-ve-editor .tsz-ve-grammar-actions .ant-btn:disabled {
-  color: #b6bfcc;
-}
-@container tsz-voice-editor (max-width: 340px) {
-  .tsz-ve-editor .tsz-ve-grammar-panel {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 6px;
-  }
-  .tsz-ve-editor .tsz-ve-grammar-hint {
-    display: none;
-  }
-  .tsz-ve-editor .tsz-ve-grammar-option.ant-btn {
-    padding-inline: 6px;
-  }
-  .tsz-ve-editor .tsz-ve-grammar-actions {
-    gap: 0;
-  }
-  .tsz-ve-editor .tsz-ve-grammar-actions .ant-btn {
-    padding-inline: 3px;
-    font-size: 11px;
-  }
-}
-/* 双层正文保持相同度量；固定行距给上下标记留通道，不加行内占位、不改变词缝。 */
-.tsz-ve-editor .tsz-ve-strip,
-.tsz-ve-editor .tsz-ve-canvas-input {
-  line-height: 2.25;
 }
 .tsz-ve-editor .tsz-ve-gap-pause {
   z-index: 3;
@@ -271,7 +312,8 @@
   margin-top: 0;
 }
 .tsz-ve-editor .tsz-ve-pause-chip:hover,
-.tsz-ve-editor .tsz-ve-pause-chip:focus-visible {
+.tsz-ve-editor .tsz-ve-pause-chip:focus-visible,
+.tsz-ve-editor .tsz-ve-gap.is-pause-selected .tsz-ve-pause-chip {
   background: #2053ff;
   outline: 2px solid #bed0ff;
   outline-offset: 1px;
@@ -280,64 +322,18 @@
   pointer-events: none;
   opacity: 0.6;
 }
-.tsz-ve-pause-editor {
-  width: 258px;
-  max-width: calc(100vw - 48px);
-  font-size: 12px;
-  color: #364259;
-}
-.tsz-ve-pause-editor-head,
-.tsz-ve-pause-editor-foot {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-.tsz-ve-pause-editor-head strong {
-  font-size: 13px;
-  font-weight: 550;
-}
-.tsz-ve-pause-location {
-  font-size: 12px;
-  color: #8a93a2;
-  margin: 5px 0;
-  overflow-wrap: anywhere;
-}
-.tsz-ve-pause-location b {
-  font-weight: 400;
-  color: #67758a;
-}
-.tsz-ve-pause-location span {
-  margin: 0 5px;
-  color: #849bc1;
-}
-.tsz-ve-pause-presets {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-  margin: 12px 0;
-}
-.tsz-ve-pause-custom {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-.tsz-ve-pause-custom .ant-input {
-  min-width: 0;
-  width: 100%;
-  flex: 1;
-}
-.tsz-ve-pause-unit {
-  color: #8992a0;
-  font-size: 12px;
-}
-.tsz-ve-pause-note {
-  color: #a0a7b1;
-  font-size: 11px;
-  margin: 6px 0;
-}
-.tsz-ve-pause-editor-foot {
-  border-top: 1px solid #f0f2f5;
-  padding-top: 7px;
-  margin-top: 7px;
+@container tsz-voice-editor (max-width: 600px) {
+  .tsz-ve-tool-row {
+    flex-wrap: wrap;
+  }
+  .tsz-ve-tool-row[data-tool="roles"] {
+    padding-right: 0;
+  }
+  .tsz-ve-top-tools .tsz-ve-tool-row > .tsz-ve-tool-content {
+    flex-basis: 100%;
+  }
+  .tsz-ve-bottom-tools .tsz-ve-pop-voices,
+  .tsz-ve-bottom-tools .tsz-ve-more-voices[open] {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

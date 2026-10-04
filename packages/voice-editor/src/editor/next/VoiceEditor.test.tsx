@@ -137,6 +137,42 @@ function props(overrides: Record<string, unknown> = {}) {
   };
 }
 
+it.each(["grammar", "actual-pron"] as const)(
+  "%s 的确认操作位于所有编辑工具之后，并与次级工具共用底栏",
+  (mode) => {
+    const onComplete = vi.fn();
+    render(
+      <VoiceEditor
+        {...props()}
+        mode={mode}
+        renderActions={(canComplete) => (
+          <button
+            aria-label="完成确认"
+            disabled={!canComplete}
+            onClick={onComplete}
+          >
+            完成
+          </button>
+        )}
+      />
+    );
+    const complete = screen.getByLabelText("完成确认");
+    const footer = document.querySelector(".tsz-ve-footer");
+    expect(footer).toContainElement(complete);
+    expect(footer).toContainElement(screen.getByLabelText("编辑文本"));
+    expect(document.querySelector(".tsz-ve-editing-area")).not.toContainElement(
+      complete
+    );
+    const tools = document.querySelector(".tsz-ve-bottom-tools");
+    if (tools)
+      expect(tools.compareDocumentPosition(footer!)).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING
+      );
+    fireEvent.click(complete);
+    expect(onComplete).toHaveBeenCalledOnce();
+  }
+);
+
 function button(label: string): HTMLButtonElement {
   const found = [
     ...document.querySelectorAll<HTMLButtonElement>("button")
@@ -384,6 +420,19 @@ it("选区标注按码点跨段落应用，移除后可重做；只读不能修�
   expect(view.onChange).toHaveBeenCalledTimes(calls);
 });
 
+it("从连续停顿切到语法结构时保留键盘选中的文本", () => {
+  const view = props();
+  render(<VoiceEditor {...view} />);
+  usePauseBrush();
+  selectText(2, 8);
+  fireEvent.click(document.querySelector(".tsz-ve-role-button")!);
+  expect(button("标记为固定核心词")).toBeEnabled();
+  fireEvent.click(button("标记为固定核心词"));
+  expect(applied(view).annotations).toEqual([
+    { type: "emphasis", start: 2, end: 8, level: "core" }
+  ]);
+});
+
 it("连续标注明确进入和退出，收起分类不残留画笔", () => {
   render(<VoiceEditor {...props()} />);
   openRoles();
@@ -467,7 +516,7 @@ it("先选两个词再打开连读，选区生成端点并在确认后保存", (
   fireEvent.select(input);
   useLiaisonBrush();
   expect(view.onChange).not.toHaveBeenCalled();
-  fireEvent.click(button("确认添加"));
+  fireEvent.click(button("一次性添加"));
   expect(view.onChange).toHaveBeenLastCalledWith(
     expect.objectContaining({
       annotations: [
@@ -590,6 +639,7 @@ describe("VoiceEditor 标注带", () => {
     expect(gap(0)).toHaveAttribute("aria-disabled", "true");
 
     // 连读保持文本可选，不接管鼠标为字母画笔。
+    fireEvent.keyDown(button("退出连续标注"), { key: "Escape" });
     useLiaisonBrush();
     expect(word("a").tagName).toBe("SPAN");
     expect(letter(0, 0)).toHaveAttribute("aria-disabled", "true");
@@ -604,9 +654,9 @@ describe("VoiceEditor 标注带", () => {
   it("连读默认可用：选中整段文本直接添加首尾连读", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
-    expect(button("确认添加")).toBeDisabled();
+    expect(button("一次性添加")).toBeDisabled();
     selectText(7, 10);
-    fireEvent.click(button("确认添加"));
+    fireEvent.click(button("一次性添加"));
     expect(applied(view).annotations).toEqual([
       { type: "liaison", start: 7, end: 10, start_len: 1, end_len: 1 }
     ]);
@@ -683,7 +733,7 @@ describe("VoiceEditor 标注带", () => {
     render(<VoiceEditor {...view} />);
     selectText(2, 8);
     fireEvent.click(button("标记为固定核心词"));
-    fireEvent.click(button("确认添加"));
+    fireEvent.click(button("一次性添加"));
     expect(applied(view).annotations).toEqual(
       expect.arrayContaining([
         { type: "emphasis", start: 2, end: 8, level: "core" },
@@ -1449,7 +1499,7 @@ describe("VoiceEditor 文本与落盘", () => {
     expect(button("连读起点")).toBeInTheDocument();
     useLiaisonBrush();
     expect(canvas).toHaveAttribute("data-target", "none");
-    expect(button("确认添加")).toBeInTheDocument();
+    expect(button("一次性添加")).toBeInTheDocument();
   });
 
   it("焦点在工具栏上时 Esc 也能收笔", () => {
@@ -1574,7 +1624,7 @@ describe("VoiceEditor 发音区", () => {
       [...document.querySelectorAll(".tsz-ve-pop-section-head")].map(
         (head) => head.textContent
       )
-    ).toEqual(["BrE", "AmE"]);
+    ).toEqual(["BrE · 英式发音", "AmE · 美式发音"]);
     expect(screen.getByLabelText("BrE 女声 ♀")).toContainElement(
       screen.getByText("Sonia")
     );
@@ -1595,7 +1645,7 @@ describe("VoiceEditor 发音区", () => {
       [...document.querySelectorAll(".tsz-ve-pop-section-head")].map(
         (head) => head.textContent
       )
-    ).toEqual(["BrE"]);
+    ).toEqual(["BrE · 英式发音"]);
     expect(screen.queryByText("Guy")).toBeNull();
     unmount();
 
@@ -1623,7 +1673,7 @@ describe("VoiceEditor 发音区", () => {
       [...document.querySelectorAll(".tsz-ve-pop-section-head")].map(
         (head) => head.textContent
       )
-    ).toEqual(["BrE", "AmE"]);
+    ).toEqual(["BrE · 英式发音", "AmE · 美式发音"]);
   });
 
   it("修改停顿使在飞试听失效，新请求携带最新时长而不播放旧回包", async () => {
