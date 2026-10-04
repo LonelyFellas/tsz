@@ -2183,9 +2183,15 @@ test("语法引用：保留富文本和基线，按连读状态预留弧线空�
   expect(heights[0]! - heights[1]!).toBeCloseTo(arcPadding, 1);
   expect(heights[2]).toBe(heights[0]);
   const selectedHeight = (await select.boundingBox())!.height;
-  const normalHeight = (await page
-    .getByLabel("定义 1 内容", { exact: true })
-    .boundingBox())!.height;
+  await expect(select.locator(".word-grammar-reference-text")).toHaveCSS(
+    "font-size",
+    "18.6667px"
+  );
+  await expect(labels.nth(1).locator(".word-grammar-reference-text")).toHaveCSS(
+    "font-size",
+    "18.6667px"
+  );
+  const normalHeight = selectedHeight - (heights[0]! - heights[1]!);
   expect(selectedHeight).toBeGreaterThan(normalHeight);
 
   // 用真实排版基线探针与 SVG 几何验证，不依赖 jsdom 的零尺寸布局。
