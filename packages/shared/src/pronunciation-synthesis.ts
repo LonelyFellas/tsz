@@ -74,6 +74,23 @@ export function synthesisForLocale(
   };
 }
 
+export function pronunciationSynthesisLabel(
+  synthesis: PronunciationSynthesisV3,
+  dialect: Dialect
+): string {
+  if (synthesis.use_spelling) return "词形拼写（语音来源）";
+  const name = `Azure ${synthesis.alphabet.toUpperCase()}`;
+  if (!synthesis.uk && !synthesis.us)
+    return `${name}：${synthesis[synthesis.alphabet] || "未填写"}`;
+  const uk = synthesisForLocale(synthesis, "en-GB", dialect)[
+    synthesis.alphabet
+  ];
+  const us = synthesisForLocale(synthesis, "en-US", dialect)[
+    synthesis.alphabet
+  ];
+  return `${name} · 英式：${uk || "未填写"} · 美式：${us || "未填写"}`;
+}
+
 export function synthesisLocaleIssue(
   synthesis: PronunciationSynthesisV3,
   alphabet: "ipa" | "ups",

@@ -13,7 +13,8 @@ import {
   Space,
   Typography
 } from "antd";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import type { VoicePreviewAdapter } from "@tsz/voice-editor/types";
 import type {
   Dialect,
   PronunciationSynthesisCandidateV3,
@@ -153,6 +154,52 @@ export function V3SynthesisInputs({
         requireLocaleConfirmation
       ));
   const source = synthesis.use_spelling ? "spelling" : synthesis.alphabet;
+  const settingsVoiceLocales = useRef(new Map<string, "en-GB" | "en-US">());
+  const settingsPreviewAdapter = useMemo<VoicePreviewAdapter>(
+    () => ({
+      async listVoices(input) {
+        const voices = await adminVoicePreviewAdapter.listVoices(input);
+        settingsVoiceLocales.current.clear();
+        for (const voice of voices) {
+          if (voice.locale === "en-GB" || voice.locale === "en-US")
+            settingsVoiceLocales.current.set(voice.id, voice.locale);
+        }
+        return voices;
+      },
+      async synthesize(input, options) {
+        const targetLocale = settingsVoiceLocales.current.get(input.voiceId);
+        if (!targetLocale) throw new Error("请选择英式或美式音色");
+        const selected = synthesisForLocale(synthesis, targetLocale, dialect);
+        const targetContent = pronunciationSynthesisContent(
+          spelling,
+          selected,
+          targetLocale,
+          requireLocaleConfirmation
+        );
+        if (!targetContent)
+          throw new Error(
+            `${pronunciationLocaleLabel(targetLocale)}：${
+              synthesisInputIssue(
+                selected.alphabet,
+                selected[selected.alphabet]
+              ) ??
+              synthesisLocaleIssue(
+                selected,
+                selected.alphabet,
+                targetLocale,
+                requireLocaleConfirmation
+              ) ??
+              "请检查合成输入与逐词边界"
+            }`
+          );
+        return adminVoicePreviewAdapter.synthesize(
+          { ...input, content: targetContent },
+          options
+        );
+      }
+    }),
+    [dialect, requireLocaleConfirmation, spelling, synthesis]
+  );
   const writeCandidate = (
     side: Side,
     candidate: PronunciationSynthesisCandidateV3
@@ -240,7 +287,7 @@ export function V3SynthesisInputs({
                 type="secondary"
                 className="word-synthesis-settings-source"
               >
-                当前口音：{localeLabel} · {locale}；当前来源：
+                英式、美式音色 · 当前来源：
                 {source === "spelling"
                   ? "词形拼写"
                   : `Azure ${source.toUpperCase()}`}
@@ -261,7 +308,8 @@ export function V3SynthesisInputs({
                 type="secondary"
                 className="word-synthesis-settings-hint"
               >
-                {selectedIssue ?? "请先填写有效正文和合成输入"}。音色可先配置。
+                {localeLabel}：{selectedIssue ?? "请先填写有效正文和合成输入"}
+                。音色可先配置。
               </Typography.Text>
             )}
             <Suspense
@@ -271,8 +319,9 @@ export function V3SynthesisInputs({
                 mode="synthesis"
                 contextLabel={`${label}发音设置`}
                 language="en"
-                locale={locale}
-                value={content ?? { version: 2, text: "", annotations: [] }}
+                value={
+                  content ?? { version: 2, text: spelling, annotations: [] }
+                }
                 onChange={() => {}}
                 voiceProfile={settingsDraft.voice_profile}
                 onVoiceProfileChange={(voice_profile) =>
@@ -306,7 +355,7 @@ export function V3SynthesisInputs({
                   </Space>
                 )}
                 previewAdapter={
-                  env.VOICE_PREVIEW ? adminVoicePreviewAdapter : undefined
+                  env.VOICE_PREVIEW ? settingsPreviewAdapter : undefined
                 }
                 previewIsMock={voicePreviewIsMock}
                 audioUploadAdapter={
@@ -358,7 +407,8 @@ export function V3SynthesisInputs({
                       spelling,
                       {
                         alphabet,
-                        use_spelling: false,
+                        use_spelling:
+                          synthesis.use_spelling == null ? undefined : false,
                         ...candidate,
                         ipa_locale: sideLocale,
                         ups_locale: sideLocale

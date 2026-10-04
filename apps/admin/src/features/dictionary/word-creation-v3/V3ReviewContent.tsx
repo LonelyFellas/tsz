@@ -5,7 +5,8 @@ import {
   synthesisInputIssue,
   synthesisLocaleIssue,
   pronunciationLocale,
-  synthesisForLocale
+  synthesisForLocale,
+  pronunciationSynthesisLabel
 } from "@tsz/shared";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { PronunciationPreviewControls } from "../word-creation/PronunciationPreview";
@@ -218,12 +219,10 @@ function FormsReview({
                                 </small>
                                 {pronunciation.synthesis && (
                                   <small>
-                                    {pronunciation.synthesis.use_spelling
-                                      ? "词形拼写（语音来源）"
-                                      : pronunciation.synthesis.uk ||
-                                          pronunciation.synthesis.us
-                                        ? `Azure ${pronunciation.synthesis.alphabet.toUpperCase()} · 英式：${pronunciation.synthesis.uk?.[pronunciation.synthesis.alphabet] || "未填写"} · 美式：${pronunciation.synthesis.us?.[pronunciation.synthesis.alphabet] || "未填写"}`
-                                        : `Azure ${pronunciation.synthesis.alphabet.toUpperCase()}：${pronunciation.synthesis[pronunciation.synthesis.alphabet] || "未填写"}`}
+                                    {pronunciationSynthesisLabel(
+                                      pronunciation.synthesis,
+                                      variant.dialect
+                                    )}
                                   </small>
                                 )}
                               </>

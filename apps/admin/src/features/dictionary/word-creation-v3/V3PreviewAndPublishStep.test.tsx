@@ -26,6 +26,7 @@ import {
   uuidFromInt,
   UUIDS
 } from "./fixtures";
+import { V3ReviewContent } from "./V3ReviewContent";
 import { createV3SaveFlow } from "./saveFlow";
 import {
   V3PreviewAndPublishStep,
@@ -151,6 +152,24 @@ function validationIssue(): V3DraftValidationIssue {
 }
 
 describe("V3PreviewAndPublishStep", () => {
+  it("混合旧字段与新候选的摘要仍展示已保存的英式音素", () => {
+    const current = word();
+    const form = current.forms.pos[0]!.forms[0]!;
+    if (form.regional_variants.mode !== "common")
+      throw new Error("expected common fixture");
+    form.regional_variants.common.pronunciations[0]!.synthesis = {
+      alphabet: "ipa",
+      use_spelling: false,
+      ipa: "fɑː",
+      ups: "",
+      ipa_locale: "en-GB",
+      us: { ipa: "fɑɹ", ups: "" }
+    };
+    render(<V3ReviewContent word={current} />);
+    expect(
+      screen.getByText("Azure IPA · 英式：fɑː · 美式：fɑɹ")
+    ).toBeInTheDocument();
+  });
   it("uses only controlled Wizard state/actions and never creates a second request flow", async () => {
     const current = word({ mode: "native" });
     let resolvePublish!: () => void;
