@@ -42,6 +42,38 @@ export function pronunciationLocale(
 export function pronunciationLocaleLabel(locale: PhonemeLocaleV3): string {
   return locale === "en-GB" ? "英式" : "美式";
 }
+export function synthesisForLocale(
+  synthesis: PronunciationSynthesisV3,
+  locale: PhonemeLocaleV3,
+  legacyDialect: Dialect = "common"
+): PronunciationSynthesisV3 {
+  const candidate = synthesis[locale === "en-GB" ? "uk" : "us"];
+  if (candidate)
+    return {
+      alphabet: synthesis.alphabet,
+      use_spelling: synthesis.use_spelling,
+      ...candidate,
+      ipa_locale: locale,
+      ups_locale: locale
+    };
+  const legacyLocale =
+    legacyDialect === "common"
+      ? undefined
+      : pronunciationLocale(legacyDialect, "uk");
+  const ipaLocale = synthesis.ipa_locale ?? legacyLocale;
+  const upsLocale = synthesis.ups_locale ?? legacyLocale;
+  const dual = synthesis.uk || synthesis.us;
+  return {
+    alphabet: synthesis.alphabet,
+    use_spelling: synthesis.use_spelling,
+    ipa: !dual || ipaLocale === locale ? synthesis.ipa : "",
+    ups: !dual || upsLocale === locale ? synthesis.ups : "",
+    ipa_locale: ipaLocale,
+    ups_locale: upsLocale,
+    ups_words: !dual || upsLocale === locale ? synthesis.ups_words : undefined
+  };
+}
+
 export function synthesisLocaleIssue(
   synthesis: PronunciationSynthesisV3,
   alphabet: "ipa" | "ups",
@@ -63,6 +95,8 @@ export function pronunciationSynthesisContent(
   targetLocale?: PhonemeLocaleV3,
   requireLocaleConfirmation = false
 ): RichTextV2 | undefined {
+  if (targetLocale && synthesis)
+    synthesis = synthesisForLocale(synthesis, targetLocale);
   if (!spelling.trim()) return undefined;
   if (synthesis?.use_spelling)
     return { version: 2, text: spelling, annotations: [] };
@@ -152,7 +186,9 @@ export function grammarSynthesisContent(
       throw new Error("词形关联已失效，请重新关联");
     }
     const first = binding.pronunciations[0];
-    const synthesis = first?.synthesis;
+    const synthesis = first?.synthesis
+      ? synthesisForLocale(first.synthesis, locale, binding.dialect)
+      : undefined;
     const anchoredSynthesis =
       synthesis?.ups_words?.length === 1
         ? {
@@ -169,6 +205,7 @@ export function grammarSynthesisContent(
     if (
       !resolved ||
       (!first?.synthesis?.use_spelling &&
+        !first?.synthesis?.[locale === "en-GB" ? "uk" : "us"] &&
         binding.dialect !== "common" &&
         pronunciationLocale(binding.dialect, "uk") !== locale)
     ) {

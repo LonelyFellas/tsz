@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/web-profile-integration-20261003/docs/openapi.json",
-  "_source_sha256": "4cf221d998c41d7f171decf3b117def60acbbb42329b8b678888ed9a53d955a5",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/pronunciation-dual-accent-20261004/docs/openapi.json",
+  "_source_sha256": "156d5a03a8baf392f1c00aa298d0cc347199b32f141d19524567a3c1fc0461e7",
   "roots": [
     "SharedSentence",
     "SentencePublication",
@@ -1165,6 +1165,20 @@
       "type": "string",
       "enum": ["normal", "strong", "weak"]
     },
+    "PronunciationSynthesisCandidateV3": {
+      "type": "object",
+      "required": ["ipa", "ups"],
+      "properties": {
+        "ipa": { "type": "string", "maxLength": 200 },
+        "ups": { "type": "string", "maxLength": 1600 },
+        "ups_words": {
+          "type": ["array", "null"],
+          "items": { "$ref": "#/$defs/UpsWordV3" },
+          "maxItems": 30
+        }
+      },
+      "additionalProperties": false
+    },
     "PronunciationSynthesisV3": {
       "type": "object",
       "required": ["alphabet", "ipa", "ups"],
@@ -1174,6 +1188,7 @@
         "ipa_locale": {
           "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/PhonemeLocaleV3" }]
         },
+        "uk": { "$ref": "#/$defs/PronunciationSynthesisCandidateV3" },
         "ups": { "type": "string", "maxLength": 1600 },
         "ups_locale": {
           "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/PhonemeLocaleV3" }]
@@ -1183,6 +1198,7 @@
           "items": { "$ref": "#/$defs/UpsWordV3" },
           "maxItems": 30
         },
+        "us": { "$ref": "#/$defs/PronunciationSynthesisCandidateV3" },
         "use_spelling": { "type": ["boolean", "null"] }
       },
       "additionalProperties": false

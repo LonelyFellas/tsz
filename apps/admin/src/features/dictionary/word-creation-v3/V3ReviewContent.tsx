@@ -4,7 +4,8 @@ import {
   pronunciationSynthesisContent,
   synthesisInputIssue,
   synthesisLocaleIssue,
-  pronunciationLocale
+  pronunciationLocale,
+  synthesisForLocale
 } from "@tsz/shared";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { PronunciationPreviewControls } from "../word-creation/PronunciationPreview";
@@ -32,18 +33,24 @@ interface Props {
 function ReviewPronunciationPlayback({
   pronunciation,
   spelling,
-  dialect
+  dialect,
+  legacyDialect
 }: {
   pronunciation: WordPronunciationV3;
   spelling: string;
   dialect: Dialect;
+  legacyDialect: Dialect;
 }) {
-  const synthesis = pronunciation.synthesis ?? EMPTY_SYNTHESIS;
   const { preference } = useDialectPreference();
   const locale = pronunciationLocale(dialect, preference);
+  const synthesis = synthesisForLocale(
+    pronunciation.synthesis ?? EMPTY_SYNTHESIS,
+    locale,
+    legacyDialect
+  );
   const content = pronunciationSynthesisContent(
     spelling,
-    pronunciation.synthesis,
+    pronunciation.synthesis ? synthesis : undefined,
     locale,
     dialect === "common"
   );
@@ -52,7 +59,7 @@ function ReviewPronunciationPlayback({
       playbackOnly
       pronunciationId={pronunciation.id}
       dialect={dialect}
-      ariaLabelPrefix={`${spelling} 最终读音`}
+      ariaLabelPrefix={`${spelling} ${pronunciation.synthesis?.uk || pronunciation.synthesis?.us ? `${dialect === "uk" ? "英式" : "美式"} ` : ""}最终读音`}
       disabled={!content}
       disabledReason={
         content
@@ -177,13 +184,20 @@ function FormsReview({
                             {pronunciation ? (
                               <>
                                 <div className="v3-review-pronunciation-cell">
-                                  {playback && (
-                                    <ReviewPronunciationPlayback
-                                      pronunciation={pronunciation}
-                                      spelling={variant.spelling}
-                                      dialect={variant.dialect}
-                                    />
-                                  )}
+                                  {playback &&
+                                    (pronunciation.synthesis?.uk ||
+                                    pronunciation.synthesis?.us
+                                      ? (["uk", "us"] as const)
+                                      : [variant.dialect]
+                                    ).map((dialect) => (
+                                      <ReviewPronunciationPlayback
+                                        key={dialect}
+                                        pronunciation={pronunciation}
+                                        spelling={variant.spelling}
+                                        dialect={dialect}
+                                        legacyDialect={variant.dialect}
+                                      />
+                                    ))}
                                   <RichTextReadOnly
                                     value={
                                       pronunciation.dict_phonetic_rich ?? {
@@ -205,7 +219,10 @@ function FormsReview({
                                   <small>
                                     {pronunciation.synthesis.use_spelling
                                       ? "词形拼写（语音来源）"
-                                      : `Azure ${pronunciation.synthesis.alphabet.toUpperCase()}：${pronunciation.synthesis[pronunciation.synthesis.alphabet] || "未填写"}`}
+                                      : pronunciation.synthesis.uk ||
+                                          pronunciation.synthesis.us
+                                        ? `Azure ${pronunciation.synthesis.alphabet.toUpperCase()} · 英式：${pronunciation.synthesis.uk?.[pronunciation.synthesis.alphabet] || "未填写"} · 美式：${pronunciation.synthesis.us?.[pronunciation.synthesis.alphabet] || "未填写"}`
+                                        : `Azure ${pronunciation.synthesis.alphabet.toUpperCase()}：${pronunciation.synthesis[pronunciation.synthesis.alphabet] || "未填写"}`}
                                   </small>
                                 )}
                               </>

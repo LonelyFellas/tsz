@@ -147,6 +147,88 @@ describe("语法结构整段合成", () => {
   });
 });
 
+describe("英美独立合成候选", () => {
+  const synthesis = {
+    alphabet: "ipa" as const,
+    use_spelling: false,
+    ipa: "",
+    ups: "",
+    uk: { ipa: "fɑː", ups: "F AA" },
+    us: { ipa: "fɑɹ", ups: "F AA R" }
+  };
+  it("按目标口音使用对应候选，不将英式借给美式", () => {
+    expect(
+      pronunciationSynthesisContent("far", synthesis, "en-GB")?.annotations
+    ).toEqual([
+      { type: "phoneme", start: 0, end: 3, alphabet: "ipa", phoneme: "fɑː" }
+    ]);
+    expect(
+      pronunciationSynthesisContent("far", synthesis, "en-US")?.annotations
+    ).toEqual([
+      { type: "phoneme", start: 0, end: 3, alphabet: "ipa", phoneme: "fɑɹ" }
+    ]);
+    expect(
+      pronunciationSynthesisContent(
+        "far",
+        { ...synthesis, us: { ipa: "", ups: "" } },
+        "en-US"
+      )
+    ).toBeUndefined();
+  });
+  it("双口音记录缺少一侧时，不借用未确认的旧顶层音素", () => {
+    expect(
+      pronunciationSynthesisContent(
+        "far",
+        { ...synthesis, ipa: "legacy-unknown", us: undefined },
+        "en-US"
+      )
+    ).toBeUndefined();
+  });
+  it("补美式候选后保留明确英式词形的历史英式音素", () => {
+    expect(
+      grammarSynthesisContent(
+        { version: 2, text: "far", annotations: [] },
+        [
+          {
+            dialect: "uk",
+            source_segments: [{ start: 0, end: 3, surface: "far" }],
+            pronunciations: [
+              {
+                id: "p",
+                dict_phonetic: "",
+                actual_pron: "",
+                synthesis: { ...synthesis, uk: undefined, ipa: "fɑː" }
+              }
+            ]
+          }
+        ],
+        "en-GB"
+      ).annotations
+    ).toEqual([
+      { type: "phoneme", start: 0, end: 3, alphabet: "ipa", phoneme: "fɑː" }
+    ]);
+  });
+  it("词形地区不限制已独立配置的另一口音，语法整段合成取目标侧", () => {
+    expect(
+      grammarSynthesisContent(
+        { version: 2, text: "far", annotations: [] },
+        [
+          {
+            dialect: "uk",
+            source_segments: [{ start: 0, end: 3, surface: "far" }],
+            pronunciations: [
+              { id: "p", dict_phonetic: "fɑː", actual_pron: "fɑː", synthesis }
+            ]
+          }
+        ],
+        "en-US"
+      ).annotations
+    ).toEqual([
+      { type: "phoneme", start: 0, end: 3, alphabet: "ipa", phoneme: "fɑɹ" }
+    ]);
+  });
+});
+
 describe("独立合成输入", () => {
   it("拼写是正文，选中音素是覆盖全码点区间的参数；未选中候选不参与", () => {
     const synthesis = {

@@ -124,15 +124,42 @@ function Harness({
     </>
   );
 }
-const field = (name: string) => screen.getByLabelText(`第 1 条发音的${name}`);
+const field = (name: string) =>
+  screen.getByLabelText(
+    `第 1 条发音的${name.startsWith("Azure ") ? `美式 ${name}` : name}`
+  );
 const convert = (name: string) =>
-  fireEvent.click(screen.getByLabelText(`第 1 条发音转换为 Azure ${name}`));
+  fireEvent.click(screen.getByLabelText(`第 1 条发音转换为美式 Azure ${name}`));
 const change = (name: string, value: string) =>
   changeVoiceText(field(name), { target: { value } });
 const rows = () =>
   JSON.parse(screen.getByTestId("wire").textContent!).pos[0].forms[0]
     .regional_variants.common.pronunciations;
 describe("独立发音输入", () => {
+  it("通用音标也同时保留四个英美候选，切换偏好不覆盖内容", () => {
+    const view = render(<Harness />);
+    for (const side of ["英式", "美式"]) {
+      for (const alphabet of ["IPA", "UPS"]) {
+        expect(field(`${side} Azure ${alphabet}`)).toHaveValue("");
+      }
+    }
+    change("英式 Azure IPA", "fɑː");
+    change("美式 Azure IPA", "fɑɹ");
+    change("英式 Azure UPS", "F AA");
+    change("美式 Azure UPS", "F AA R");
+    expect(rows()[0].synthesis).toMatchObject({
+      uk: { ipa: "fɑː", ups: "F AA" },
+      us: { ipa: "fɑɹ", ups: "F AA R" },
+      use_spelling: true
+    });
+    accent.value = "uk";
+    view.rerender(<Harness />);
+    expect(field("英式 Azure IPA")).toHaveValue("fɑː");
+    expect(field("美式 Azure IPA")).toHaveValue("fɑɹ");
+    fireEvent.keyDown(field("英式 Azure IPA"), { key: "z", ctrlKey: true });
+    expect(field("英式 Azure IPA")).toHaveValue("");
+    expect(field("美式 Azure IPA")).toHaveValue("fɑɹ");
+  });
   it("发音设置完成前不写回，关闭丢弃音色和录音，完成一次写回两项", async () => {
     render(<Harness />);
     const before = JSON.stringify(rows());
@@ -161,10 +188,10 @@ describe("独立发音输入", () => {
     for (const alphabet of ["IPA", "UPS"]) {
       const group = field(`Azure ${alphabet}`).closest(".ant-space-compact");
       expect(group).toContainElement(
-        screen.getByLabelText(`第 1 条发音转换为 Azure ${alphabet}`)
+        screen.getByLabelText(`第 1 条发音转换为美式 Azure ${alphabet}`)
       );
       expect(group).toContainElement(
-        screen.getByLabelText(`第 1 条发音 Azure ${alphabet} 最终读音`)
+        screen.getByLabelText(`第 1 条发音 美式 Azure ${alphabet} 最终读音`)
       );
     }
   });
@@ -196,12 +223,10 @@ describe("独立发音输入", () => {
     });
     expect(rows()[0].synthesis).toEqual({
       alphabet: "ups",
-      ipa: "kæt",
-      ups: "K AE T",
+      ipa: "",
+      ups: "",
       use_spelling: false,
-      ups_words: null,
-      ipa_locale: "en-US",
-      ups_locale: "en-US"
+      us: { ipa: "kæt", ups: "K AE T", ups_words: null }
     });
     fireEvent.click(screen.getByLabelText("完成第 1 条发音设置"));
     expect(rows()[0].voice_profile.voices[0].voice_id).toBe("american-voice");
@@ -252,7 +277,7 @@ describe("独立发音输入", () => {
       ]) {
         const content = JSON.parse(
           screen
-            .getByLabelText(`第 1 条发音 Azure ${source} 最终读音`)
+            .getByLabelText(`第 1 条发音 美式 Azure ${source} 最终读音`)
             .getAttribute("data-content")!
         );
         expect(content.annotations).toEqual([
@@ -265,11 +290,13 @@ describe("独立发音输入", () => {
     render(<Harness phrase />);
     convert("UPS");
     expect(field("Azure UPS")).toHaveValue("H AX . S1 L O K AE T");
-    expect(rows()[0].synthesis.ups_words).toEqual([
+    expect(rows()[0].synthesis.us.ups_words).toEqual([
       { text: "hello", phoneme: "H AX . S1 L O" },
       { text: "cat", phoneme: "K AE T" }
     ]);
-    const preview = screen.getByLabelText("第 1 条发音 Azure UPS 最终读音");
+    const preview = screen.getByLabelText(
+      "第 1 条发音 美式 Azure UPS 最终读音"
+    );
     expect(preview).toBeEnabled();
     expect(
       JSON.parse(preview.getAttribute("data-content")!).annotations
@@ -278,7 +305,7 @@ describe("独立发音输入", () => {
     expect(preview).toBeDisabled();
     fireEvent.keyDown(field("Azure UPS"), { key: "z", ctrlKey: true });
     expect(preview).toBeEnabled();
-    expect(rows()[0].synthesis.ups_words).toHaveLength(2);
+    expect(rows()[0].synthesis.us.ups_words).toHaveLength(2);
   });
   it("撤销 UPS 内容不会撤销后来主动选择的语音来源", () => {
     render(<Harness />);
@@ -318,35 +345,31 @@ describe("独立发音输入", () => {
     expect(trigger).toHaveFocus();
     expect(trigger).toHaveAttribute("aria-expanded", "false");
   });
-  it("通用栏旧候选先确认口音，偏好改变不重标音标；两套候选口音独立", () => {
+  it("通用栏旧候选确认后只归入对应口音，偏好改变不重标", () => {
     const view = render(<Harness configured />);
     const preview = () =>
-      screen.getByLabelText("第 1 条发音 Azure UPS 最终读音");
+      screen.getByLabelText("第 1 条发音 美式 Azure UPS 最终读音");
     expect(preview()).toBeDisabled();
+    expect(field("英式 Azure UPS")).toHaveValue("");
+    expect(field("美式 Azure UPS")).toHaveValue("");
     fireEvent.click(screen.getByLabelText("第 1 条发音确认 Azure UPS 为美式"));
     expect(preview()).toBeEnabled();
-    expect(rows()[0].synthesis.ups_locale).toBe("en-US");
+    expect(rows()[0].synthesis.us.ups).toBe("K AE T");
+    expect(rows()[0].synthesis.ups).toBe("");
     accent.value = "uk";
     view.rerender(<Harness configured />);
-    expect(preview()).toBeDisabled();
-    expect(field("Azure UPS")).toHaveValue("K AE T");
-    expect(
-      view.container.querySelector(".word-pronunciation-synthesis")
-    ).toHaveAttribute("data-phoneme-locale", "en-GB");
-    expect(screen.queryByText(/当前发音：/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/^英式$/)).not.toBeInTheDocument();
-    expect(
-      screen.queryByText(/英式 UPS 自动转换暂未支持/)
-    ).not.toBeInTheDocument();
-    change("Azure IPA", "kɛt");
-    expect(rows()[0].synthesis.ipa_locale).toBe("en-GB");
-    expect(rows()[0].synthesis.ups_locale).toBe("en-US");
-    expect(preview()).toBeDisabled();
-    convert("UPS");
+    expect(preview()).toBeEnabled();
+    expect(field("美式 Azure UPS")).toHaveValue("K AE T");
+    expect(field("英式 Azure UPS")).toHaveValue("");
+    change("英式 Azure IPA", "kɛt");
+    expect(rows()[0].synthesis.uk.ipa).toBe("kɛt");
+    expect(rows()[0].synthesis.us.ups).toBe("K AE T");
+    fireEvent.click(screen.getByLabelText("第 1 条发音转换为英式 Azure UPS"));
     expect(
       screen.getByText(/UPS 自动转换目前仅验证 en-US/)
     ).toBeInTheDocument();
-    expect(field("Azure UPS")).toHaveValue("K AE T");
+    expect(field("美式 Azure UPS")).toHaveValue("K AE T");
+    expect(field("英式 Azure UPS")).toHaveValue("");
   });
   it("来源改变后取消过期的覆盖确认", async () => {
     render(<Harness />);

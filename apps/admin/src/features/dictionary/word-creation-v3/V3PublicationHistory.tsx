@@ -305,7 +305,10 @@ function PublicationSnapshotBody({
                       {pronunciation.synthesis
                         ? pronunciation.synthesis.use_spelling
                           ? " · 词形拼写（语音来源）"
-                          : ` · Azure ${pronunciation.synthesis.alphabet.toUpperCase()}：${pronunciation.synthesis[pronunciation.synthesis.alphabet] || "未填写"}`
+                          : pronunciation.synthesis.uk ||
+                              pronunciation.synthesis.us
+                            ? ` · Azure ${pronunciation.synthesis.alphabet.toUpperCase()} · 英式：${pronunciation.synthesis.uk?.[pronunciation.synthesis.alphabet] || "未填写"} · 美式：${pronunciation.synthesis.us?.[pronunciation.synthesis.alphabet] || "未填写"}`
+                            : ` · Azure ${pronunciation.synthesis.alphabet.toUpperCase()}：${pronunciation.synthesis[pronunciation.synthesis.alphabet] || "未填写"}`
                         : ""}
                       {pronunciation.style
                         ? ` · ${pronunciationStyleLabel(pronunciation.style as never)}`
