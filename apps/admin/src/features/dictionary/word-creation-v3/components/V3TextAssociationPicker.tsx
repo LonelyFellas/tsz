@@ -27,7 +27,7 @@ export function V3TextAssociationPicker({
   if (selected) {
     return (
       <Flex vertical gap="small" style={{ maxWidth: "min(360px, 85vw)" }}>
-        <Typography.Text className="tsz-entry-en" strong>
+        <Typography.Text className="tsz-words" strong>
           {literal}
         </Typography.Text>
         <Typography.Text className="tsz-entry-en">
@@ -50,7 +50,7 @@ export function V3TextAssociationPicker({
   }
   return (
     <Flex vertical gap="small" style={{ maxWidth: "min(760px, 85vw)" }}>
-      <Typography.Text className="tsz-entry-en" strong>
+      <Typography.Text className="tsz-words" strong>
         {literal}
       </Typography.Text>
       <V3TargetCascader

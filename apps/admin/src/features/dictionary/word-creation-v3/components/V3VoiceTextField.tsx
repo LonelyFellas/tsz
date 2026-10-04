@@ -54,10 +54,6 @@ function voiceLocale(dialect?: Dialect): AudioAssetLocaleV3 | undefined {
   return undefined;
 }
 
-/** 录词条英文的字段（释义、例句、语法结构）用 Ubuntu；两种音标字段不能用，Ubuntu 缺音标字形。 */
-const ENTRY_ENGLISH_MODES: ReadonlySet<NonNullable<VoiceEditorProps["mode"]>> =
-  new Set(["grammar", "association", "spelling"]);
-
 export interface V3VoiceTextFieldProps<
   TLink extends VoiceAssociation = TextLinkV3
 > {
@@ -268,9 +264,14 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     destination.push({ value, links: textLinks });
     publish(snapshot.value, snapshot.links);
   };
-  const englishContent = mode !== undefined && ENTRY_ENGLISH_MODES.has(mode);
+  const fontClass =
+    mode === "grammar" || mode === "spelling"
+      ? "tsz-words"
+      : mode === "dict-phonetic" || mode === "actual-pron"
+        ? "tsz-phonetics"
+        : "tsz-entry-en";
   const largePreview =
-    (englishContent && mode !== "spelling") || mode === "actual-pron";
+    mode === "grammar" || mode === "association" || mode === "actual-pron";
   const grammarPreview =
     mode === "grammar" && !expanded && !focused && value.text !== "";
   const fallback = (
@@ -295,7 +296,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           ? { paddingTop: mode === "grammar" ? "calc(4px + 0.5em)" : "1em" }
           : undefined
       }
-      className={`word-pronunciation-phonetic-input${englishContent ? " tsz-entry-en" : ""}${largePreview ? " v3-voice-text-large-preview" : ""}${mode === "grammar" ? " v3-grammar-input" : ""}`}
+      className={`word-pronunciation-phonetic-input ${fontClass}${mode === "actual-pron" ? " tsz-actual-pronunciation" : ""}${largePreview ? " v3-voice-text-large-preview" : ""}${mode === "grammar" ? " v3-grammar-input" : ""}`}
       data-v3-field={expanded ? undefined : field}
       data-v3-node-id={expanded ? undefined : nodeId}
       data-v3-node-aliases={expanded ? undefined : nodeAliases}
@@ -348,7 +349,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     >
       {fallback}
       {grammarPreview ? (
-        <div className="v3-grammar-preview-content tsz-entry-en" aria-hidden>
+        <div className="v3-grammar-preview-content tsz-words" aria-hidden>
           <RichTextReadOnly
             value={
               value.version === 2

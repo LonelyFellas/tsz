@@ -173,7 +173,7 @@ export function V3GrammarFormPicker({
   return (
     <Flex vertical gap="small" style={{ maxWidth: "min(760px, 85vw)" }}>
       {contextHolder}
-      <Typography.Text strong className="tsz-entry-en">
+      <Typography.Text strong className="tsz-words">
         {literal}
       </Typography.Text>
       {selected && (
@@ -190,6 +190,9 @@ export function V3GrammarFormPicker({
       {options.length > 0 && (
         <Cascader.Panel
           options={options}
+          optionRender={(option) => (
+            <span className="tsz-words">{option.label}</span>
+          )}
           value={
             selected
               ? [
@@ -221,7 +224,7 @@ export function V3GrammarFormPicker({
                 modal.confirm({
                   title: "切换词形关联？",
                   content: (
-                    <Typography.Text>
+                    <Typography.Text className="tsz-words">
                       {current?.label ?? dialectLabel(selected.target_dialect)}
                       {" → "}
                       {option.label}

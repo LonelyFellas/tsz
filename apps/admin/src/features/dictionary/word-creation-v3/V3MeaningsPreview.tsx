@@ -122,10 +122,7 @@ export function V3MeaningsPreview({
                     <Flex key={structure.id} gap="small" wrap>
                       <Tag>语法结构 {index + 1}</Tag>
                       {structure.variants.map((variant) => (
-                        <Typography.Text
-                          className="tsz-entry-en"
-                          key={variant.id}
-                        >
+                        <Typography.Text className="tsz-words" key={variant.id}>
                           {dialectLabel(variant.dialect)}：
                           {variant.content.text}
                           {variant.audio_assets?.length ? (
@@ -188,7 +185,7 @@ export function V3MeaningsPreview({
                           {boundFormGroupIds(sense).map((groupId) => (
                             <Tag
                               key={groupId}
-                              className="tsz-entry-en"
+                              className="tsz-words"
                               color="cyan"
                             >
                               词形与发音：
@@ -240,6 +237,7 @@ export function V3MeaningsPreview({
                                             {dialectLabel(variant.dialect)}
                                           </small>
                                           <RichTextReadOnly
+                                            className="tsz-words"
                                             value={variant.content}
                                           />
                                         </div>

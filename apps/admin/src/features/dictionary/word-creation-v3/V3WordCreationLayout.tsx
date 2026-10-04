@@ -242,7 +242,7 @@ function V3WordCreationLayoutContent({
         breadcrumbTitle: `${visibleLabel} · ${STEP_TITLE[activeStep]}`,
         completedSteps: word.completed_steps,
         summaryHeadword: (
-          <strong className="v3-summary-headword tsz-entry-en">
+          <strong className="v3-summary-headword tsz-words">
             {visibleLabel}
           </strong>
         ),

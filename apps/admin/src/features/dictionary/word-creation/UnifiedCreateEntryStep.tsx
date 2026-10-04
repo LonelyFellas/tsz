@@ -407,7 +407,7 @@ function DetectionPresentationCard({
               <div className="word-smart-match-summary-entry" key={entry.key}>
                 <div className="word-smart-match-summary-row">
                   <Space size={8} wrap>
-                    <Typography.Text className="tsz-entry-en" strong>
+                    <Typography.Text className="tsz-words" strong>
                       {entry.label}
                     </Typography.Text>
                     <Tag
@@ -452,13 +452,13 @@ function DetectionPresentationCard({
                 {expanded === entry.key ? (
                   <div className="word-smart-match-context-meta">
                     {entry.baseSpellings.map((spelling) => (
-                      <div className="tsz-entry-en" key={spelling}>
+                      <div className="tsz-words" key={spelling}>
                         原形：{spelling}
                       </div>
                     ))}
                     {entry.baseSpellings.length === 0
                       ? entry.otherMatches.map((match) => (
-                          <div className="tsz-entry-en" key={match}>
+                          <div className="tsz-words" key={match}>
                             命中：{match}
                           </div>
                         ))
@@ -487,7 +487,7 @@ function DetectionPresentationCard({
               <div className="word-smart-match-summary-entry">
                 <div className="word-smart-match-summary-row">
                   <Space size={8} wrap>
-                    <Typography.Text className="tsz-entry-en" strong>
+                    <Typography.Text className="tsz-words" strong>
                       {pending.detection.normalized_surface}
                     </Typography.Text>
                     <Tag color="processing">未完成草稿</Tag>
@@ -615,7 +615,7 @@ function HeadwordConfirmationCard({
           >
             <Input
               aria-label="英美通用主词"
-              className="tsz-entry-en"
+              className="tsz-words"
               disabled={disabled}
               value={value.common}
               onChange={(event) =>
@@ -645,7 +645,7 @@ function HeadwordConfirmationCard({
                 >
                   <Input
                     aria-label="英式主词"
-                    className="tsz-entry-en"
+                    className="tsz-words"
                     value={value.uk}
                     disabled={disabled || preference === "uk"}
                     onChange={(event) =>
@@ -667,7 +667,7 @@ function HeadwordConfirmationCard({
                 >
                   <Input
                     aria-label="美式主词"
-                    className="tsz-entry-en"
+                    className="tsz-words"
                     value={value.us}
                     disabled={disabled || preference === "us"}
                     onChange={(event) =>
@@ -1175,7 +1175,7 @@ export function UnifiedCreateEntryStep({
           >
             <Input.Search
               autoComplete="off"
-              className="tsz-entry-en"
+              className="tsz-words"
               autoFocus
               disabled={
                 busy !== undefined ||

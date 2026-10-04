@@ -58,7 +58,7 @@ export function WelcomeScreen({
             style={{ transform }}
             className={`absolute top-1/2 left-1/2 flex h-24 w-40 flex-col items-center justify-center gap-1 rounded-2xl bg-surface shadow-md ${z ? "z-10" : ""}`}
           >
-            <span className="font-serif text-lg">{word}</span>
+            <span className="tsz-words">{word}</span>
             <span className="font-mono text-[10px] tracking-widest text-foreground-subtle">
               {tag}
             </span>

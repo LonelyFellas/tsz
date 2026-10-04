@@ -495,8 +495,16 @@ describe("WordWizardV3Page", () => {
     expect(screen.getByText("美式英语 · AmE")).toBeVisible();
     expect(screen.getByDisplayValue("centres")).toHaveAttribute("readonly");
     expect(screen.getByDisplayValue("centers")).toHaveAttribute("readonly");
-    expect(screen.getByText("词典音标：/ˈsen.tər/")).toBeVisible();
-    expect(screen.getByText("实际发音：SEN-truh")).toBeVisible();
+    expect(screen.getByText("/ˈsen.tər/").parentElement).toHaveTextContent(
+      "词典音标：/ˈsen.tər/"
+    );
+    expect(screen.getByText("/ˈsen.tər/")).toHaveClass("tsz-phonetics");
+    expect(screen.getByText("SEN-truh").parentElement).toHaveTextContent(
+      "实际发音：SEN-truh"
+    );
+    expect(screen.getByText("SEN-truh")).toHaveClass(
+      "tsz-actual-pronunciation"
+    );
     expect(screen.queryByText(uuidFromInt(301))).toBeNull();
     expect(screen.queryByText("membership")).toBeNull();
     expect(screen.queryByText("form_type")).toBeNull();

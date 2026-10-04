@@ -18,7 +18,7 @@
   padding: 24px 0;
 }
 .v3-review-header h2.ant-typography {
-  font-size: 48px;
+  font-size: 14pt;
   line-height: 1.15;
   letter-spacing: -1.5px;
   margin: 8px 0 16px;
@@ -427,7 +427,7 @@
     border-radius: 8px;
   }
   .v3-review-header h2.ant-typography {
-    font-size: 36px;
+    font-size: 14pt;
   }
   .v3-dictionary-definition {
     grid-template-columns: 1fr;

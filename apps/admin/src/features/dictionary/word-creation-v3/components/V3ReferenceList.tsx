@@ -80,7 +80,7 @@ function sourceSummary(reference: InboundReferenceV3): ReactNode {
         : "草稿";
   return (
     <Space size={4} wrap>
-      <Typography.Text className="tsz-entry-en" strong>
+      <Typography.Text className="tsz-words" strong>
         {source.entry_headword || source.entry_id || "未知词条"}
       </Typography.Text>
       {source.form_group_label ? (

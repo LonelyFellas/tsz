@@ -178,7 +178,7 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(
         >
           不认识
         </span>
-        <span className="max-w-full break-words px-6 text-center font-serif text-4xl">
+        <span className="tsz-words max-w-full break-words px-6 text-center">
           {word}
         </span>
         <span className="text-xs text-foreground-subtle">

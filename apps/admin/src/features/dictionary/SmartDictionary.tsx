@@ -714,7 +714,7 @@ export function SmartDictionary({
                 lineHeight: 1.6
               }}
             >
-              <span className="tsz-entry-en" style={{ fontWeight: 600 }}>
+              <span className="tsz-words" style={{ fontWeight: 600 }}>
                 {label}
               </span>
               {annotation ? (
@@ -843,7 +843,7 @@ export function SmartDictionary({
           <Space direction="vertical" size={2}>
             {summary.previews.map((preview) => (
               <Typography.Text
-                className="tsz-entry-en"
+                className="tsz-words"
                 key={preview.source_word_id}
               >
                 {preview.source_headword || preview.source_word_id}

@@ -51,13 +51,7 @@ const antdTheme = {
     // Alert 的警告态会退化成一个看不见的框。铬黄要用就在具体组件里当背景色用，不当种子。
 
     // ── 字体 ────────────────────────────────────────────────
-    // 界面保持系统字体栈。规范要求西文用 Ubuntu，现只落在词条英文内容上（globals.css
-    // 的 .tsz-entry-en）：Ubuntu 连未裁剪的 TTF 都缺 ə ʌ ɪ ʊ ɔ ɑ ɜ ɒ ː ˈ ˌ 等常用音标字形，
-    // 全局启用会让一串音标里部分字符回退到系统字体、基线与 x-height 对不齐，
-    // 而音标是词典后台的核心内容。Ubuntu 的 @font-face 只在 @tsz/voice-editor/fonts.css
-    // 声明一处，别再引第二套同名字体，否则谁生效取决于 CSS chunk 注入顺序。
-    fontFamily:
-      'system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif',
+    fontFamily: "var(--tsz-font-text)",
 
     // ── 形状 ────────────────────────────────────────────────
     // 与品牌标记的圆角语言一致：那个「天」字方块的圆角占边长 18.75%。
