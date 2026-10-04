@@ -277,7 +277,7 @@ export function EditProfileForm() {
                 <img
                   src={user.avatar_url}
                   alt="头像"
-                  className="h-full w-full object-cover"
+                  className="h-full w-full bg-white object-cover"
                   onError={() => setAvatarFailedUrl(user.avatar_url)}
                 />
               ) : (

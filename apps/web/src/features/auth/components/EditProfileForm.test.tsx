@@ -590,6 +590,7 @@ describe("EditProfileForm — 头像上传", () => {
       expect(screen.getByAltText("头像")).toHaveAttribute("src", AVATAR_URL);
     });
     expect(useUserStore.getState().user?.avatar_url).toBe(AVATAR_URL);
+    expect(screen.getByAltText("头像")).toHaveClass("bg-white");
   });
 
   it("上传中 → 头像按钮与「保存」都禁用(与保存互斥),完成后恢复", async () => {

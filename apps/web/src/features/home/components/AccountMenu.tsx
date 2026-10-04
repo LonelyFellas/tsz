@@ -14,6 +14,7 @@ import { useUserStore } from "@/stores/user";
 import { displayNameOf } from "@/lib/user";
 import { useLogout } from "@/features/auth/hooks/useLogout";
 import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIdentityProvider";
+import { useTheme } from "@/features/theme/useTheme";
 
 // 账户菜单——头像触发的下拉。收纳工作台、个人中心、身份切换与退出入口。
 // 头像优先用后端 avatar_url 字段;缺失或加载失败时回退到昵称首字母色块作默认头像。
@@ -21,6 +22,7 @@ export function AccountMenu() {
   const user = useUserStore((s) => s.user);
   const logout = useLogout();
   const teacher = useTeacherIdentity();
+  const { resolved, toggle } = useTheme();
   const [switching, setSwitching] = useState(false);
   const [switchError, setSwitchError] = useState("");
   const [open, setOpen] = useState(false);
@@ -64,7 +66,7 @@ export function AccountMenu() {
             <img
               src={user.avatar_url}
               alt={displayName}
-              className="h-full w-full object-cover"
+              className="h-full w-full bg-white object-cover"
               onError={() => setErrorUrl(user.avatar_url)}
             />
           ) : (
@@ -187,6 +189,10 @@ export function AccountMenu() {
             </Link>
           </DropdownMenuItem>
         )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={toggle}>
+          {resolved === "dark" ? "切换到浅色模式" : "切换到深色模式"}
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onSelect={(event) => {

@@ -11,6 +11,7 @@ import type { User } from "@tsz/types";
 import { AccountMenu } from "./AccountMenu";
 import { useUserStore } from "@/stores/user";
 import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIdentityProvider";
+import { setTheme } from "@/lib/theme";
 
 vi.mock("@/features/teacher-certification/TeacherIdentityProvider", () => ({
   useTeacherIdentity: vi.fn()
@@ -40,6 +41,7 @@ const USER: User = {
 };
 
 beforeEach(() => {
+  setTheme("light");
   vi.clearAllMocks();
   mockPush.mockReset();
   vi.stubGlobal(
@@ -62,7 +64,10 @@ beforeEach(() => {
   useUserStore.setState({ user: null, onboarded: null, hydrated: true });
 });
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  setTheme("light");
+  vi.unstubAllGlobals();
+});
 
 describe("AccountMenu", () => {
   it("未登录 → 不渲染任何东西", () => {
@@ -110,6 +115,7 @@ describe("AccountMenu", () => {
     render(<AccountMenu />);
     const img = screen.getByRole("img", { name: "Alice" });
     expect(img).toHaveAttribute("src", "https://example.com/a.png");
+    expect(img).toHaveClass("bg-white");
   });
 
   it("头像加载失败 → 回退首字母;avatar_url 更新(换头像)后自动重试新图", () => {
@@ -206,6 +212,7 @@ describe("AccountMenu", () => {
       "个人中心",
       "站内通知",
       "申请教师认证",
+      "切换到深色模式",
       "退出登录"
     ]);
     expect(
@@ -252,6 +259,19 @@ describe("AccountMenu", () => {
       );
     }
   );
+
+  it("头像菜单切换深色和浅色模式，并更新下次操作文案", async () => {
+    useUserStore.setState({ user: USER });
+    const user = userEvent.setup();
+    render(<AccountMenu />);
+
+    await user.click(screen.getByRole("button", { name: "账户菜单" }));
+    await user.click(screen.getByRole("menuitem", { name: "切换到深色模式" }));
+    expect(document.documentElement).toHaveClass("dark");
+    await user.click(screen.getByRole("button", { name: "账户菜单" }));
+    await user.click(screen.getByRole("menuitem", { name: "切换到浅色模式" }));
+    expect(document.documentElement).not.toHaveClass("dark");
+  });
 
   it("点击退出登录 → 调后端登出、清 token、跳登录页", async () => {
     useUserStore.setState({ user: USER });
