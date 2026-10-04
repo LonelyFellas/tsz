@@ -3249,10 +3249,6 @@ function V3MeaningsAndExamplesStepContent({
                                                         options={CEFR_OPTIONS}
                                                         value={definition.level}
                                                       />
-                                                      <span
-                                                        className="word-definition-meta-divider"
-                                                        aria-hidden
-                                                      />
                                                       <Select
                                                         {...DEFINITION_TEXT_SELECT_PROPS}
                                                         aria-label={`定义 ${definitionIndex + 1} 语言`}
@@ -3294,10 +3290,6 @@ function V3MeaningsAndExamplesStepContent({
                                                         value={definitionLanguageOf(
                                                           definition.definition_mode
                                                         )}
-                                                      />
-                                                      <span
-                                                        className="word-definition-meta-divider"
-                                                        aria-hidden
                                                       />
                                                       <Select
                                                         {...DEFINITION_TEXT_SELECT_PROPS}
