@@ -1,5 +1,6 @@
 import { useAuthStore } from "@/lib/auth";
 import { canAdminResourceAction } from "@tsz/shared/auth";
+import { pronunciationSynthesisLabel } from "@tsz/shared";
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
 import { HttpError } from "@tsz/api-client";
@@ -8,6 +9,7 @@ import type {
   AdminWordPublicationEnvelope,
   AdminWordPublicationListResponse,
   AdminWordV3,
+  Dialect,
   EnglishTextV3,
   PronunciationSynthesisV3,
   SurfaceMatchPageV3
@@ -68,7 +70,7 @@ interface SnapshotFormLine {
   id: string;
   pos: string;
   formType: string;
-  dialect: string;
+  dialect: Dialect;
   spelling: string;
   pronunciations: Array<{
     id: string;
@@ -309,9 +311,7 @@ function PublicationSnapshotBody({
                         {pronunciation.actualPron}
                       </span>
                       {pronunciation.synthesis
-                        ? pronunciation.synthesis.use_spelling
-                          ? " · 词形拼写（语音来源）"
-                          : ` · Azure ${pronunciation.synthesis.alphabet.toUpperCase()}：${pronunciation.synthesis[pronunciation.synthesis.alphabet] || "未填写"}`
+                        ? ` · ${pronunciationSynthesisLabel(pronunciation.synthesis, form.dialect)}`
                         : ""}
                       {pronunciation.style
                         ? ` · ${pronunciationStyleLabel(pronunciation.style as never)}`

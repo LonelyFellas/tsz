@@ -413,6 +413,36 @@ function activationSurfacePage(
 }
 
 describe("V3PublicationHistory", () => {
+  it("历史摘要按旧字段归属展示英式回退和新增美式候选", async () => {
+    const api = requests();
+    const detail = v3PublicationWithSnapshotBody();
+    const form = detail.word.forms.pos[0]!.forms[0]!;
+    if (form.regional_variants.mode !== "common")
+      throw new Error("expected common fixture");
+    form.regional_variants.common.pronunciations[0]!.synthesis = {
+      alphabet: "ipa",
+      use_spelling: false,
+      ipa: "fɑː",
+      ups: "",
+      ipa_locale: "en-GB",
+      us: { ipa: "fɑɹ", ups: "" }
+    };
+    api.listPublications.mockResolvedValue({ publications: [detail] });
+    api.getPublication.mockResolvedValue({ publication: detail });
+    render(
+      <V3PublicationHistory
+        currentWord={v3Word()}
+        onActivated={vi.fn()}
+        requests={api}
+      />
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "查看第 2 次发布" })
+    );
+    expect(
+      await screen.findByTestId("publication-snapshot-body")
+    ).toHaveTextContent("Azure IPA · 英式：fɑː · 美式：fɑɹ");
+  });
   it("renders a successful history response after StrictMode replays lifecycle effects", async () => {
     const api = requests();
     const detail = v3PublicationWithSnapshotBody();

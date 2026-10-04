@@ -3,7 +3,8 @@ import {
   SYNTHESIS_LIMITS,
   pronunciationSynthesisContent,
   synthesisLocaleIssue,
-  pronunciationLocale
+  pronunciationLocale,
+  synthesisForLocale
 } from "@tsz/shared";
 import type {
   Dialect,
@@ -170,8 +171,29 @@ function isPronunciationShape(value: unknown): value is WordPronunciationV3 {
             "use_spelling",
             "ups_words",
             "ipa_locale",
-            "ups_locale"
+            "ups_locale",
+            "uk",
+            "us"
           ].includes(key)
+        ) &&
+        [value.synthesis.uk, value.synthesis.us].every(
+          (candidate) =>
+            candidate === undefined ||
+            (isObject(candidate) &&
+              Object.keys(candidate).every((key) =>
+                ["ipa", "ups", "ups_words"].includes(key)
+              ) &&
+              typeof candidate.ipa === "string" &&
+              typeof candidate.ups === "string" &&
+              (candidate.ups_words == null ||
+                (Array.isArray(candidate.ups_words) &&
+                  candidate.ups_words.every(
+                    (word) =>
+                      isObject(word) &&
+                      Object.keys(word).length === 2 &&
+                      typeof word.text === "string" &&
+                      typeof word.phoneme === "string"
+                  ))))
         ) &&
         (value.synthesis.use_spelling == null ||
           typeof value.synthesis.use_spelling === "boolean") &&
@@ -579,6 +601,86 @@ function variantIssues(
     }
     const synthesis = pronunciation.synthesis;
     if (synthesis) {
+      if (synthesis.uk || synthesis.us) {
+        for (const side of ["uk", "us"] as const) {
+          const locale = pronunciationLocale(side, "uk");
+          const candidate = synthesisForLocale(
+            synthesis,
+            locale,
+            variant.dialect
+          );
+          for (const alphabet of ["ipa", "ups"] as const) {
+            const value = candidate[alphabet];
+            if (
+              Array.from(value).length > SYNTHESIS_LIMITS[alphabet] ||
+              /\p{Cc}/u.test(value)
+            ) {
+              issues.push(
+                issue(
+                  "content_limit_exceeded",
+                  `synthesis.${side}.${alphabet}`,
+                  pronunciation.id,
+                  `Azure ${alphabet.toUpperCase()} 超长或包含控制字符`,
+                  pronunciationLocation
+                )
+              );
+            }
+          }
+          if (
+            candidate.ups_words != null &&
+            (candidate.ups_words.length === 0 ||
+              candidate.ups_words.length > 30 ||
+              candidate.ups_words.some(
+                (word) =>
+                  !word.text.trim() ||
+                  codePointLength(word.text) > 200 ||
+                  /\p{Cc}/u.test(word.text) ||
+                  synthesisInputIssue("ups", word.phoneme)
+              ))
+          ) {
+            issues.push(
+              issue(
+                "content_limit_exceeded",
+                `synthesis.${side}.ups`,
+                pronunciation.id,
+                "UPS 逐词边界需要有效的正文与音素",
+                pronunciationLocation
+              )
+            );
+          }
+          if (intent === "complete" && !synthesis.use_spelling) {
+            const problem =
+              synthesisInputIssue(
+                synthesis.alphabet,
+                candidate[synthesis.alphabet]
+              ) ??
+              synthesisLocaleIssue(
+                candidate,
+                synthesis.alphabet,
+                locale,
+                true
+              ) ??
+              (!pronunciationSynthesisContent(
+                variant.spelling,
+                candidate,
+                locale,
+                true
+              )
+                ? "短语 UPS 词界缺失或已失效，请重新转换"
+                : undefined);
+            if (problem)
+              issues.push(
+                issue(
+                  "pronunciation_required",
+                  `synthesis.${side}.${synthesis.alphabet}`,
+                  pronunciation.id,
+                  `${side === "uk" ? "英式" : "美式"}：${problem}`,
+                  pronunciationLocation
+                )
+              );
+          }
+        }
+      }
       for (const alphabet of ["ipa", "ups"] as const) {
         const value = synthesis[alphabet];
         if (
@@ -598,6 +700,8 @@ function variantIssues(
       }
       if (
         intent === "complete" &&
+        !synthesis.uk &&
+        !synthesis.us &&
         !synthesis.use_spelling &&
         (synthesis.use_spelling === false ||
           synthesis.ipa.trim() ||

@@ -13,9 +13,11 @@ import {
   Space,
   Typography
 } from "antd";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import type { VoicePreviewAdapter } from "@tsz/voice-editor/types";
 import type {
   Dialect,
+  PronunciationSynthesisCandidateV3,
   PronunciationSynthesisV3,
   V3DraftValidationIssue,
   WordPronunciationV3
@@ -27,7 +29,8 @@ import {
   synthesisInputIssue,
   pronunciationLocale,
   pronunciationLocaleLabel,
-  synthesisLocaleIssue
+  synthesisLocaleIssue,
+  synthesisForLocale
 } from "@tsz/shared";
 import { PronunciationPreviewControls } from "../../word-creation/PronunciationPreview";
 import {
@@ -44,6 +47,27 @@ const VoiceEditor = lazy(() =>
   }))
 );
 type Alphabet = "ipa" | "ups";
+type Side = "uk" | "us";
+const SIDES = ["uk", "us"] as const;
+function candidateForSide(
+  synthesis: PronunciationSynthesisV3,
+  side: Side,
+  dialect: Dialect
+): PronunciationSynthesisCandidateV3 {
+  if (synthesis[side]) return synthesis[side];
+  const locale = pronunciationLocale(side, "uk");
+  const ipaMatches = synthesis.ipa_locale
+    ? synthesis.ipa_locale === locale
+    : dialect === side;
+  const upsMatches = synthesis.ups_locale
+    ? synthesis.ups_locale === locale
+    : dialect === side;
+  return {
+    ipa: ipaMatches ? synthesis.ipa : "",
+    ups: upsMatches ? synthesis.ups : "",
+    ...(upsMatches ? { ups_words: synthesis.ups_words } : {})
+  };
+}
 export function V3SynthesisInputs({
   pronunciation,
   synthesisEditable,
@@ -80,112 +104,158 @@ export function V3SynthesisInputs({
   };
   const [diagnostic, setDiagnostic] = useState("");
   const [pending, setPending] = useState<{
+    side: Side;
     alphabet: Alphabet;
     value: string;
     words: PronunciationSynthesisV3["ups_words"];
     previous: string;
     actual: string;
     spelling: string;
-    locale: string;
   }>();
-  const history = useRef<{
-    ipa: PronunciationSynthesisV3[];
-    ups: PronunciationSynthesisV3[];
-  }>({ ipa: [], ups: [] });
+  const history = useRef<
+    Record<`${Side}.${Alphabet}`, PronunciationSynthesisCandidateV3[]>
+  >({
+    "uk.ipa": [],
+    "uk.ups": [],
+    "us.ipa": [],
+    "us.ups": []
+  });
   const expected = useRef(synthesis);
   useEffect(() => {
-    for (const alphabet of ["ipa", "ups"] as const)
-      if (expected.current[alphabet] !== synthesis[alphabet])
-        history.current[alphabet] = [];
+    for (const side of SIDES) {
+      for (const alphabet of ["ipa", "ups"] as const) {
+        if (
+          candidateForSide(expected.current, side, dialect)[alphabet] !==
+          candidateForSide(synthesis, side, dialect)[alphabet]
+        )
+          history.current[`${side}.${alphabet}`] = [];
+      }
+    }
     expected.current = synthesis;
-  }, [synthesis]);
+  }, [synthesis, dialect]);
   const label = `第 ${index + 1} 条发音`;
+  const selectedSynthesis = synthesisForLocale(synthesis, locale, dialect);
   const content = pronunciationSynthesisContent(
     spelling,
-    synthesis,
+    selectedSynthesis,
     locale,
     requireLocaleConfirmation
   );
   const selectedIssue = synthesis.use_spelling
     ? undefined
-    : (synthesisInputIssue(synthesis.alphabet, synthesis[synthesis.alphabet]) ??
+    : (synthesisInputIssue(
+        synthesis.alphabet,
+        selectedSynthesis[synthesis.alphabet]
+      ) ??
       synthesisLocaleIssue(
-        synthesis,
+        selectedSynthesis,
         synthesis.alphabet,
         locale,
         requireLocaleConfirmation
       ));
   const source = synthesis.use_spelling ? "spelling" : synthesis.alphabet;
-  const change = (
-    alphabet: Alphabet,
-    value: string,
-    words?: PronunciationSynthesisV3["ups_words"]
+  const settingsVoiceLocales = useRef(new Map<string, "en-GB" | "en-US">());
+  const settingsPreviewAdapter = useMemo<VoicePreviewAdapter>(
+    () => ({
+      async listVoices(input) {
+        const voices = await adminVoicePreviewAdapter.listVoices(input);
+        settingsVoiceLocales.current.clear();
+        for (const voice of voices) {
+          if (voice.locale === "en-GB" || voice.locale === "en-US")
+            settingsVoiceLocales.current.set(voice.id, voice.locale);
+        }
+        return voices;
+      },
+      async synthesize(input, options) {
+        const targetLocale = settingsVoiceLocales.current.get(input.voiceId);
+        if (!targetLocale) throw new Error("请选择英式或美式音色");
+        const selected = synthesisForLocale(synthesis, targetLocale, dialect);
+        const targetContent = pronunciationSynthesisContent(
+          spelling,
+          selected,
+          targetLocale,
+          requireLocaleConfirmation
+        );
+        if (!targetContent)
+          throw new Error(
+            `${pronunciationLocaleLabel(targetLocale)}：${
+              synthesisInputIssue(
+                selected.alphabet,
+                selected[selected.alphabet]
+              ) ??
+              synthesisLocaleIssue(
+                selected,
+                selected.alphabet,
+                targetLocale,
+                requireLocaleConfirmation
+              ) ??
+              "请检查合成输入与逐词边界"
+            }`
+          );
+        return adminVoicePreviewAdapter.synthesize(
+          { ...input, content: targetContent },
+          options
+        );
+      }
+    }),
+    [dialect, requireLocaleConfirmation, spelling, synthesis]
+  );
+  const writeCandidate = (
+    side: Side,
+    candidate: PronunciationSynthesisCandidateV3
   ) => {
-    history.current[alphabet] = [
-      ...history.current[alphabet].slice(-99),
-      synthesis
-    ];
-    const next = {
-      ...synthesis,
-      use_spelling:
-        alphabet === "ups"
-          ? (synthesis.use_spelling ?? false)
-          : synthesis.use_spelling,
-      [alphabet]: value,
-      [alphabet === "ipa" ? "ipa_locale" : "ups_locale"]: locale,
-      ...(alphabet === "ups" ? { ups_words: words ?? null } : {})
-    };
+    const next = { ...synthesis, [side]: candidate };
     expected.current = next;
     onChange({ synthesis: next });
     setDiagnostic("");
   };
-  const undo = (alphabet: Alphabet) => {
-    const previous = history.current[alphabet].pop();
-    if (previous) {
-      const next = {
-        ...synthesis,
-        [alphabet]: previous[alphabet],
-        [alphabet === "ipa" ? "ipa_locale" : "ups_locale"]:
-          previous[alphabet === "ipa" ? "ipa_locale" : "ups_locale"],
-        ...(alphabet === "ups"
-          ? {
-              ups_words: previous.ups_words,
-              use_spelling:
-                synthesis.use_spelling === false &&
-                previous.use_spelling == null
-                  ? previous.use_spelling
-                  : synthesis.use_spelling
-            }
-          : {})
-      };
-      expected.current = next;
-      onChange({ synthesis: next });
-      setDiagnostic("");
-    }
+  const change = (
+    side: Side,
+    alphabet: Alphabet,
+    value: string,
+    words?: PronunciationSynthesisV3["ups_words"]
+  ) => {
+    const key = `${side}.${alphabet}` as const;
+    const candidate = candidateForSide(synthesis, side, dialect);
+    history.current[key] = [...history.current[key].slice(-99), candidate];
+    writeCandidate(side, {
+      ...candidate,
+      [alphabet]: value,
+      ...(alphabet === "ups" ? { ups_words: words ?? null } : {})
+    });
   };
-  const convert = (alphabet: Alphabet) => {
+  const undo = (side: Side, alphabet: Alphabet) => {
+    const previous = history.current[`${side}.${alphabet}`].pop();
+    if (previous)
+      writeCandidate(side, {
+        ...candidateForSide(synthesis, side, dialect),
+        [alphabet]: previous[alphabet],
+        ...(alphabet === "ups" ? { ups_words: previous.ups_words } : {})
+      });
+  };
+  const convert = (side: Side, alphabet: Alphabet) => {
     const result = convertActualPronunciation(
       pronunciation.actual_pron,
       spelling,
       alphabet,
-      locale
+      pronunciationLocale(side, "uk")
     );
     if (!result.ok) {
       setDiagnostic(result.message);
       return;
     }
-    const previous = synthesis[alphabet] ?? "";
+    const previous = candidateForSide(synthesis, side, dialect)[alphabet];
     if (previous && previous !== result.value)
       setPending({
+        side,
         alphabet,
         value: result.value,
         words: result.ups_words,
         previous,
         actual: pronunciation.actual_pron,
-        spelling,
-        locale
+        spelling
       });
-    else change(alphabet, result.value, result.ups_words);
+    else change(side, alphabet, result.value, result.ups_words);
   };
   const settingsButton = (
     <Popover
@@ -217,7 +287,7 @@ export function V3SynthesisInputs({
                 type="secondary"
                 className="word-synthesis-settings-source"
               >
-                当前口音：{localeLabel} · {locale}；当前来源：
+                英式、美式音色 · 当前来源：
                 {source === "spelling"
                   ? "词形拼写"
                   : `Azure ${source.toUpperCase()}`}
@@ -238,7 +308,8 @@ export function V3SynthesisInputs({
                 type="secondary"
                 className="word-synthesis-settings-hint"
               >
-                {selectedIssue ?? "请先填写有效正文和合成输入"}。音色可先配置。
+                {localeLabel}：{selectedIssue ?? "请先填写有效正文和合成输入"}
+                。音色可先配置。
               </Typography.Text>
             )}
             <Suspense
@@ -248,8 +319,9 @@ export function V3SynthesisInputs({
                 mode="synthesis"
                 contextLabel={`${label}发音设置`}
                 language="en"
-                locale={locale}
-                value={content ?? { version: 2, text: "", annotations: [] }}
+                value={
+                  content ?? { version: 2, text: spelling, annotations: [] }
+                }
                 onChange={() => {}}
                 voiceProfile={settingsDraft.voice_profile}
                 onVoiceProfileChange={(voice_profile) =>
@@ -283,7 +355,7 @@ export function V3SynthesisInputs({
                   </Space>
                 )}
                 previewAdapter={
-                  env.VOICE_PREVIEW ? adminVoicePreviewAdapter : undefined
+                  env.VOICE_PREVIEW ? settingsPreviewAdapter : undefined
                 }
                 previewIsMock={voicePreviewIsMock}
                 audioUploadAdapter={
@@ -317,118 +389,160 @@ export function V3SynthesisInputs({
         <>
           {(["ipa", "ups"] as const).map((alphabet) => {
             const name = `Azure ${alphabet.toUpperCase()}`;
-            const rowContent = pronunciationSynthesisContent(
-              spelling,
-              {
-                ...synthesis,
-                alphabet,
-                use_spelling: synthesis.use_spelling == null ? undefined : false
-              },
-              locale,
-              requireLocaleConfirmation
-            );
-            const localeIssue = synthesisLocaleIssue(
-              synthesis,
-              alphabet,
-              locale,
-              requireLocaleConfirmation
-            );
-            const candidateLocale =
-              synthesis[alphabet === "ipa" ? "ipa_locale" : "ups_locale"];
-            const invalid = issues.some(
-              (issue) => issue.field === `synthesis.${alphabet}`
-            );
             return (
               <div className="word-pronunciation-row" key={alphabet}>
                 <Typography.Text className="word-pronunciation-label">
                   {name}
                 </Typography.Text>
-                <div className="word-synthesis-input">
-                  <Space.Compact className="word-synthesis-control">
-                    <Button
-                      icon={<SwapOutlined />}
-                      aria-label={`${label}转换为 ${name}`}
-                      title={
-                        alphabet === "ups" && locale !== "en-US"
-                          ? "英式 UPS 自动转换尚未支持，请手工填写已确认的音素或使用 IPA"
-                          : `从${localeLabel}实际发音转换为 ${name}`
-                      }
-                      onClick={() => convert(alphabet)}
-                    />
-                    <Input.TextArea
-                      className="tsz-phonetics"
-                      autoSize={{ minRows: 1, maxRows: 6 }}
-                      aria-label={`${label}的${name}`}
-                      data-v3-node-id={pronunciation.id}
-                      data-v3-field={`synthesis.${alphabet}`}
-                      status={invalid ? "error" : undefined}
-                      aria-invalid={invalid}
-                      value={synthesis[alphabet] ?? ""}
-                      placeholder={`输入 ${alphabet.toUpperCase()} ${alphabet === "ups" ? "音素编码" : "音素"}`}
-                      onChange={(event) => change(alphabet, event.target.value)}
-                      onKeyDown={(event) => {
-                        if (
-                          (event.metaKey || event.ctrlKey) &&
-                          event.key.toLowerCase() === "z" &&
-                          !event.shiftKey
-                        ) {
-                          event.preventDefault();
-                          undo(alphabet);
-                        }
-                      }}
-                    />
-                    <PronunciationPreviewControls
-                      playbackOnly
-                      pronunciationId={pronunciation.id}
-                      dialect={dialect}
-                      ariaLabelPrefix={`${label} ${name} 最终读音`}
-                      disabled={!rowContent}
-                      disabledReason={
-                        synthesisInputIssue(alphabet, synthesis[alphabet]) ??
-                        localeIssue ??
-                        (!rowContent
-                          ? "短语 UPS 词界缺失或与正文不一致，请重新从实际发音转换"
-                          : undefined)
-                      }
-                      content={
-                        rowContent ?? { version: 2, text: "", annotations: [] }
-                      }
-                      voiceProfile={pronunciation.voice_profile}
-                    />
-                  </Space.Compact>
-                </div>
-                {localeIssue && (
-                  <div className="word-synthesis-locale-warning">
-                    <Typography.Text type="warning">
-                      {localeIssue}
-                    </Typography.Text>
-                    {!candidateLocale && synthesis[alphabet].trim() && (
-                      <Button
-                        type="link"
-                        size="small"
-                        aria-label={`${label}确认 ${name} 为${localeLabel}`}
-                        onClick={() =>
-                          onChange({
-                            synthesis: {
-                              ...synthesis,
-                              [alphabet === "ipa"
-                                ? "ipa_locale"
-                                : "ups_locale"]: locale
+                <div className="word-synthesis-candidates">
+                  {SIDES.map((side) => {
+                    const sideLocale = pronunciationLocale(side, "uk");
+                    const sideLabel = pronunciationLocaleLabel(sideLocale);
+                    const candidate = candidateForSide(
+                      synthesis,
+                      side,
+                      dialect
+                    );
+                    const rowContent = pronunciationSynthesisContent(
+                      spelling,
+                      {
+                        alphabet,
+                        use_spelling:
+                          synthesis.use_spelling == null ? undefined : false,
+                        ...candidate,
+                        ipa_locale: sideLocale,
+                        ups_locale: sideLocale
+                      },
+                      sideLocale
+                    );
+                    const invalid = issues.some(
+                      (issue) => issue.field === `synthesis.${side}.${alphabet}`
+                    );
+                    return (
+                      <div className="word-synthesis-candidate" key={side}>
+                        <Space.Compact className="word-synthesis-control">
+                          <Button
+                            className={`word-synthesis-accent word-synthesis-accent-${side}`}
+                            icon={<SwapOutlined />}
+                            aria-label={`${label}转换为${sideLabel} ${name}`}
+                            title={
+                              alphabet === "ups" && side === "uk"
+                                ? "英式 UPS 自动转换尚未支持，请手工填写已确认的音素或使用 IPA"
+                                : `从实际发音转换为${sideLabel} ${name}`
                             }
-                          })
-                        }
-                      >
-                        确认此音标为{localeLabel}
-                      </Button>
-                    )}
-                  </div>
-                )}
-                {invalid && (
-                  <Typography.Text className="word-field-help" type="danger">
-                    {synthesisInputIssue(alphabet, synthesis[alphabet]) ??
-                      "请检查合成输入与逐词边界"}
-                  </Typography.Text>
-                )}
+                            onClick={() => convert(side, alphabet)}
+                          >
+                            {side === "uk" ? "BrE" : "AmE"}
+                          </Button>
+                          <Input.TextArea
+                            className="tsz-phonetics"
+                            autoSize={{ minRows: 1, maxRows: 6 }}
+                            aria-label={`${label}的${sideLabel} ${name}`}
+                            data-v3-node-id={pronunciation.id}
+                            data-v3-field={`synthesis.${side}.${alphabet}`}
+                            status={invalid ? "error" : undefined}
+                            aria-invalid={invalid}
+                            value={candidate[alphabet]}
+                            placeholder={`输入${sideLabel} ${alphabet.toUpperCase()} ${alphabet === "ups" ? "音素编码" : "音素"}`}
+                            onChange={(event) =>
+                              change(side, alphabet, event.target.value)
+                            }
+                            onKeyDown={(event) => {
+                              if (
+                                (event.metaKey || event.ctrlKey) &&
+                                event.key.toLowerCase() === "z" &&
+                                !event.shiftKey
+                              ) {
+                                event.preventDefault();
+                                undo(side, alphabet);
+                              }
+                            }}
+                          />
+                          <PronunciationPreviewControls
+                            playbackOnly
+                            pronunciationId={pronunciation.id}
+                            dialect={side}
+                            ariaLabelPrefix={`${label} ${sideLabel} ${name} 最终读音`}
+                            disabled={!rowContent}
+                            disabledReason={
+                              synthesisInputIssue(
+                                alphabet,
+                                candidate[alphabet]
+                              ) ??
+                              (!rowContent
+                                ? "短语 UPS 词界缺失或与正文不一致，请重新从实际发音转换"
+                                : undefined)
+                            }
+                            content={
+                              rowContent ?? {
+                                version: 2,
+                                text: "",
+                                annotations: []
+                              }
+                            }
+                            voiceProfile={pronunciation.voice_profile}
+                          />
+                        </Space.Compact>
+                        {invalid && (
+                          <Typography.Text
+                            className="word-field-help"
+                            type="danger"
+                          >
+                            {synthesisInputIssue(
+                              alphabet,
+                              candidate[alphabet]
+                            ) ?? "请检查合成输入与逐词边界"}
+                          </Typography.Text>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {dialect === "common" &&
+                  synthesis[alphabet].trim() &&
+                  !synthesis[
+                    alphabet === "ipa" ? "ipa_locale" : "ups_locale"
+                  ] && (
+                    <div className="word-synthesis-locale-warning">
+                      <Typography.Text type="warning">
+                        旧 {name}：{synthesis[alphabet]}
+                        ，请确认口音后保留到对应一侧。
+                      </Typography.Text>
+                      {SIDES.map((side) => (
+                        <Button
+                          key={side}
+                          type="link"
+                          size="small"
+                          aria-label={`${label}确认 ${name} 为${side === "uk" ? "英式" : "美式"}`}
+                          disabled={Boolean(
+                            synthesis[side]?.[alphabet]?.trim()
+                          )}
+                          onClick={() => {
+                            const candidate = candidateForSide(
+                              synthesis,
+                              side,
+                              dialect
+                            );
+                            const next = {
+                              ...synthesis,
+                              [alphabet]: "",
+                              [side]: {
+                                ...candidate,
+                                [alphabet]: synthesis[alphabet],
+                                ...(alphabet === "ups"
+                                  ? { ups_words: synthesis.ups_words }
+                                  : {})
+                              }
+                            };
+                            expected.current = next;
+                            onChange({ synthesis: next });
+                          }}
+                        >
+                          确认此音标为{side === "uk" ? "英式" : "美式"}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
               </div>
             );
           })}
@@ -487,13 +601,20 @@ export function V3SynthesisInputs({
         onOk={() => {
           if (!pending) return;
           if (
-            (synthesis[pending.alphabet] ?? "") !== pending.previous ||
+            candidateForSide(synthesis, pending.side, dialect)[
+              pending.alphabet
+            ] !== pending.previous ||
             pronunciation.actual_pron !== pending.actual ||
-            spelling !== pending.spelling ||
-            locale !== pending.locale
+            spelling !== pending.spelling
           )
             setDiagnostic("来源、口音或目标内容已变化，请重新转换");
-          else change(pending.alphabet, pending.value, pending.words);
+          else
+            change(
+              pending.side,
+              pending.alphabet,
+              pending.value,
+              pending.words
+            );
           setPending(undefined);
         }}
       >

@@ -52,8 +52,15 @@ export interface UpsWordV3 {
   phoneme: string;
 }
 export type PhonemeLocaleV3 = "en-GB" | "en-US";
+export interface PronunciationSynthesisCandidateV3 {
+  ipa: string;
+  ups: string;
+  ups_words?: UpsWordV3[] | null;
+}
 export interface PronunciationSynthesisV3 {
   alphabet: "ipa" | "ups";
+  uk?: PronunciationSynthesisCandidateV3;
+  us?: PronunciationSynthesisCandidateV3;
   ipa: string;
   ups: string;
   use_spelling?: boolean | null;

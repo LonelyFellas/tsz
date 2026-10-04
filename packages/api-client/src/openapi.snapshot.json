@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/web-profile-integration-20261003/docs/openapi.json",
-  "_generatedAt": "2026-10-03T05:31:25.542Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/pronunciation-dual-accent-20261004/docs/openapi.json",
+  "_generatedAt": "2026-10-04T09:50:08.518Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -3534,6 +3534,20 @@
       "type": "string",
       "enum": ["normal", "strong", "weak"]
     },
+    "PronunciationSynthesisCandidateV3": {
+      "type": "object",
+      "required": ["ipa", "ups"],
+      "properties": {
+        "ipa": { "type": "string", "maxLength": 200 },
+        "ups": { "type": "string", "maxLength": 1600 },
+        "ups_words": {
+          "type": ["array", "null"],
+          "items": { "$ref": "#/components/schemas/UpsWordV3" },
+          "maxItems": 30
+        }
+      },
+      "additionalProperties": false
+    },
     "PronunciationSynthesisV3": {
       "type": "object",
       "description": "Independent Azure synthesis candidates; dictionary notation remains display-only.",
@@ -3550,6 +3564,9 @@
             }
           ]
         },
+        "uk": {
+          "$ref": "#/components/schemas/PronunciationSynthesisCandidateV3"
+        },
         "ups": { "type": "string", "maxLength": 1600 },
         "ups_locale": {
           "oneOf": [
@@ -3562,6 +3579,9 @@
           "items": { "$ref": "#/components/schemas/UpsWordV3" },
           "description": "Word boundaries for the single-line UPS candidate, never inferred from phone spaces.",
           "maxItems": 30
+        },
+        "us": {
+          "$ref": "#/components/schemas/PronunciationSynthesisCandidateV3"
         },
         "use_spelling": {
           "type": ["boolean", "null"],
