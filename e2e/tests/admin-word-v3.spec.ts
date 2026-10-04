@@ -366,7 +366,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(page.getByRole("tooltip")).toHaveText(hint);
   });
 
-  test("释义行前缀紧凑分隔，表头对齐且下拉仍可操作", async ({ page }) => {
+  test("释义行前缀无分隔线且紧凑，表头对齐且下拉仍可操作", async ({ page }) => {
     await mockAdminV3Api(page);
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/meanings`);
@@ -375,7 +375,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(text).toBeVisible();
     const prefixWidth =
       (await text.boundingBox())!.x - (await row.boundingBox())!.x;
-    expect(prefixWidth).toBe(220);
+    expect(prefixWidth).toBe(202);
     const heading = page
       .locator(".word-definition-list-header")
       .first()
@@ -389,7 +389,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     );
     const dividers = row.locator(".word-definition-meta-divider");
     await expect(selects).toHaveCount(3);
-    await expect(dividers).toHaveCount(2);
+    await expect(dividers).toHaveCount(0);
     for (let i = 0; i < 3; i++) {
       const select = selects.nth(i);
       // Select 含透明的原生焦点 input；scrollWidth 也会计入它，不能替代可见标签的裁切检查。
@@ -414,8 +414,10 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
         )
         .toBeLessThanOrEqual(1);
       if (i > 0) {
-        await expect(dividers.nth(i - 1)).toHaveCSS("width", "1px");
-        await expect(dividers.nth(i - 1)).toHaveCSS("pointer-events", "none");
+        const previous = (await selects.nth(i - 1).boundingBox())!;
+        const current = (await select.boundingBox())!;
+        expect(current.x - previous.x - previous.width).toBe(8);
+        expect(current.y).toBe(previous.y);
       }
       await select.click();
       const combo = select.getByRole("combobox");
@@ -447,21 +449,20 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
           }
           throw new Error("Missing visible select label");
         };
-        return [
-          ...group.querySelectorAll(".word-definition-meta-divider")
-        ].flatMap((divider) => {
-          const box = divider.getBoundingClientRect();
-          return [
-            box.x - textRect(divider.previousElementSibling!).right,
-            textRect(divider.nextElementSibling!).x - box.right
-          ];
+        const controls = [
+          ...group.querySelectorAll(".word-definition-text-select")
+        ];
+        return controls.slice(1).map((control, index) => {
+          return textRect(control).x - textRect(controls[index]!).right;
         });
       });
-    // 拉丁等级与汉字的字形宽度有亚像素差异，实际文字到分隔线的留白应接近一致。
+    // 字形宽度有亚像素差异，字段间实际文字留白保持紧凑且接近一致。
+    expect(textGaps).toHaveLength(2);
     expect(Math.max(...textGaps) - Math.min(...textGaps)).toBeLessThanOrEqual(
       2
     );
-    expect(Math.min(...textGaps)).toBeGreaterThanOrEqual(10);
+    expect(Math.min(...textGaps)).toBeGreaterThanOrEqual(8);
+    expect(Math.max(...textGaps)).toBeLessThanOrEqual(16);
     await row.screenshot({
       path: test.info().outputPath("definition-prefix-compact.png")
     });
@@ -469,7 +470,8 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect
       .poll(() => row.evaluate((node) => node.scrollWidth - node.clientWidth))
       .toBeLessThanOrEqual(1);
-    await expect(dividers.first()).toBeVisible();
+    await expect(dividers).toHaveCount(0);
+    await expect(selects).toHaveCount(3);
   });
 
   test("语法结构下拉采用词语字号，有连读时按需留白且不裁弧线", async ({

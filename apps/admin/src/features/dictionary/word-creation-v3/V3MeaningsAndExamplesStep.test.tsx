@@ -1809,6 +1809,7 @@ describe("V3MeaningsAndExamplesStep", () => {
 
   it("释义文字选择器保留选择、Escape 和外部点击关闭，语法结构不受影响", async () => {
     render(<Harness />);
+    expect(document.querySelector(".word-definition-meta-divider")).toBeNull();
     const level = screen.getByLabelText("定义 1 等级");
     const language = screen.getByLabelText("定义 1 语言");
     const style = screen.getByLabelText("定义 1 释义方式");
