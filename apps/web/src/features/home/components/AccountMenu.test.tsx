@@ -11,6 +11,7 @@ import type { User } from "@tsz/types";
 import { AccountMenu } from "./AccountMenu";
 import { useUserStore } from "@/stores/user";
 import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIdentityProvider";
+import { setTheme } from "@/lib/theme";
 
 vi.mock("@/features/teacher-certification/TeacherIdentityProvider", () => ({
   useTeacherIdentity: vi.fn()
@@ -40,6 +41,7 @@ const USER: User = {
 };
 
 beforeEach(() => {
+  setTheme("light");
   vi.clearAllMocks();
   mockPush.mockReset();
   vi.stubGlobal(
@@ -62,7 +64,10 @@ beforeEach(() => {
   useUserStore.setState({ user: null, onboarded: null, hydrated: true });
 });
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  setTheme("light");
+  vi.unstubAllGlobals();
+});
 
 describe("AccountMenu", () => {
   it("未登录 → 不渲染任何东西", () => {
@@ -110,6 +115,7 @@ describe("AccountMenu", () => {
     render(<AccountMenu />);
     const img = screen.getByRole("img", { name: "Alice" });
     expect(img).toHaveAttribute("src", "https://example.com/a.png");
+    expect(img).toHaveClass("bg-white");
   });
 
   it("头像加载失败 → 回退首字母;avatar_url 更新(换头像)后自动重试新图", () => {
@@ -198,7 +204,10 @@ describe("AccountMenu", () => {
     expect(screen.queryByText("退出登录")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "账户菜单" }));
     expect(screen.getByText("退出登录")).toBeInTheDocument();
-    expect(screen.getByText("当前身份：学生")).toBeInTheDocument();
+    expect(screen.getByText("学生身份")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("img", { name: "已认证教师" })
+    ).not.toBeInTheDocument();
     expect(
       screen.getAllByRole("menuitem").map((item) => item.textContent)
     ).toEqual([
@@ -206,6 +215,7 @@ describe("AccountMenu", () => {
       "个人中心",
       "站内通知",
       "申请教师认证",
+      "深色模式",
       "退出登录"
     ]);
     expect(
@@ -238,11 +248,20 @@ describe("AccountMenu", () => {
         identity === "teacher" ? "/teacher/classes" : "/student/practice"
       );
       expect(screen.queryByText("申请教师认证")).not.toBeInTheDocument();
-      await user.click(
-        screen.getByRole("menuitem", {
-          name: identity === "teacher" ? "切换到学生工作台" : "切换到教师工作台"
-        })
+      expect(
+        screen.getByRole("img", { name: "已认证教师" })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(identity === "teacher" ? "教师身份" : "学生身份")
+      ).toBeInTheDocument();
+      const switchItem = screen.getByRole("menuitem", {
+        name: identity === "teacher" ? "切换为学生" : "切换为教师"
+      });
+      expect(switchItem.querySelector("svg")).toHaveAttribute(
+        "aria-hidden",
+        "true"
       );
+      await user.click(switchItem);
       expect(select).toHaveBeenCalledWith(
         identity === "teacher" ? "student" : "teacher"
       );
@@ -252,6 +271,31 @@ describe("AccountMenu", () => {
       );
     }
   );
+
+  it("头像菜单切换深色和浅色模式，并更新下次操作文案", async () => {
+    useUserStore.setState({ user: USER });
+    const user = userEvent.setup();
+    render(<AccountMenu />);
+
+    await user.click(screen.getByRole("button", { name: "账户菜单" }));
+    const darkItem = screen.getByRole("menuitem", { name: "深色模式" });
+    expect(darkItem.querySelector("svg")).toHaveAttribute(
+      "aria-hidden",
+      "true"
+    );
+    expect(darkItem.querySelector("circle")).toBeNull();
+    await user.click(darkItem);
+    expect(document.documentElement).toHaveClass("dark");
+    await user.click(screen.getByRole("button", { name: "账户菜单" }));
+    const lightItem = screen.getByRole("menuitem", { name: "浅色模式" });
+    expect(lightItem.querySelector("svg")).toHaveAttribute(
+      "aria-hidden",
+      "true"
+    );
+    expect(lightItem.querySelector("circle")).toBeInTheDocument();
+    await user.click(lightItem);
+    expect(document.documentElement).not.toHaveClass("dark");
+  });
 
   it("点击退出登录 → 调后端登出、清 token、跳登录页", async () => {
     useUserStore.setState({ user: USER });
@@ -327,16 +371,12 @@ describe("AccountMenu", () => {
     const user = userEvent.setup();
     render(<AccountMenu />);
     await user.click(screen.getByRole("button", { name: "账户菜单" }));
-    await user.click(
-      screen.getByRole("menuitem", { name: "切换到教师工作台" })
-    );
+    await user.click(screen.getByRole("menuitem", { name: "切换为教师" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "切换失败，请重试"
     );
     expect(screen.getByRole("menu")).toBeVisible();
-    await user.click(
-      screen.getByRole("menuitem", { name: "切换到教师工作台" })
-    );
+    await user.click(screen.getByRole("menuitem", { name: "切换为教师" }));
     await waitFor(() =>
       expect(screen.queryByRole("menu")).not.toBeInTheDocument()
     );
@@ -360,9 +400,7 @@ describe("AccountMenu", () => {
     const user = userEvent.setup();
     render(<AccountMenu />);
     await user.click(screen.getByRole("button", { name: "账户菜单" }));
-    await user.click(
-      screen.getByRole("menuitem", { name: "切换到教师工作台" })
-    );
+    await user.click(screen.getByRole("menuitem", { name: "切换为教师" }));
     expect(screen.getByRole("menuitem", { name: "正在切换…" })).toHaveAttribute(
       "aria-disabled",
       "true"
@@ -422,7 +460,7 @@ describe("AccountMenu", () => {
       "true"
     );
     expect(
-      screen.getByRole("menuitem", { name: "切换到教师工作台" })
+      screen.getByRole("menuitem", { name: "切换为教师" })
     ).toHaveAttribute("aria-disabled", "true");
     await user.keyboard("{Enter}");
     expect(api.auth.logout).toHaveBeenCalledTimes(1);

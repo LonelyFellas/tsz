@@ -51,5 +51,8 @@ describe("HomeNav", () => {
       screen.getByRole("button", { name: "账户菜单" })
     ).toBeInTheDocument();
     expect(screen.queryByText("登录")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /切换到.*色模式/ })
+    ).not.toBeInTheDocument();
   });
 });

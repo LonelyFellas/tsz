@@ -19,7 +19,7 @@ export function HomeNav() {
         </Link>
 
         <div className="flex items-center gap-3">
-          <ThemeToggle />
+          {!user && <ThemeToggle />}
           {/* 账户区:会话恢复完成前占位(尺寸同头像),避免登录态闪烁与布局抖动 */}
           {!hydrated ? (
             <div className="h-8 w-8" aria-hidden />
