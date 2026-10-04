@@ -135,11 +135,11 @@ export function ProfileHub() {
           </button>
         </div>
       )}
-      <h1 className="mb-6 text-2xl font-semibold tracking-tight text-foreground">
+      <h1 className="mb-5 text-2xl font-semibold tracking-tight text-foreground">
         个人中心
       </h1>
 
-      <div className="border-b border-border pb-6">
+      <div className="border-b border-border pb-5">
         <div className="flex items-start gap-4">
           <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full ring-1 ring-border sm:h-16 sm:w-16">
             {user.avatar_url && user.avatar_url !== avatarFailedUrl ? (
@@ -167,41 +167,43 @@ export function ProfileHub() {
             )}
           </div>
         </div>
-        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
-          <span className="inline-flex max-w-full items-start gap-1.5 text-xs leading-5 text-foreground-muted">
-            <span className="min-w-0 break-all">ID:{user.id}</span>
-            <button
-              type="button"
-              onClick={() => copyId(user.id)}
-              aria-label="复制 ID"
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-foreground-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            >
-              {copyState === "copied" ? <CheckIcon /> : <CopyIcon />}
-            </button>
-          </span>
-          {copyState === "copied" && (
-            <span className="text-xs text-primary">已复制</span>
-          )}
-          {copyState === "failed" && (
-            <span className="text-xs text-danger">复制失败</span>
-          )}
-          {learning_settings && (
-            <>
-              <span className="rounded-md bg-muted px-2 py-0.5 text-xs text-foreground-muted">
-                {learning_settings.cefr_level}
-              </span>
-              <span className="rounded-md bg-muted px-2 py-0.5 text-xs text-foreground-muted">
-                {VARIANT_LABEL[learning_settings.english_variant]}
-              </span>
-            </>
-          )}
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-5">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
+            <span className="inline-flex max-w-full items-start gap-1.5 text-xs leading-5 text-foreground-muted">
+              <span className="min-w-0 break-all">ID:{user.id}</span>
+              <button
+                type="button"
+                onClick={() => copyId(user.id)}
+                aria-label="复制 ID"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-foreground-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              >
+                {copyState === "copied" ? <CheckIcon /> : <CopyIcon />}
+              </button>
+            </span>
+            {copyState === "copied" && (
+              <span className="text-xs text-primary">已复制</span>
+            )}
+            {copyState === "failed" && (
+              <span className="text-xs text-danger">复制失败</span>
+            )}
+            {learning_settings && (
+              <>
+                <span className="rounded-md bg-muted px-2 py-0.5 text-xs text-foreground-muted">
+                  {learning_settings.cefr_level}
+                </span>
+                <span className="rounded-md bg-muted px-2 py-0.5 text-xs text-foreground-muted">
+                  {VARIANT_LABEL[learning_settings.english_variant]}
+                </span>
+              </>
+            )}
+          </div>
+          <Link
+            href="/account/profile"
+            className="inline-flex min-h-10 shrink-0 items-center justify-center self-end rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:bg-primary/85 sm:self-auto"
+          >
+            编辑资料
+          </Link>
         </div>
-        <Link
-          href="/account/profile"
-          className="mt-5 inline-flex min-h-10 items-center rounded-lg border border-border bg-surface px-4 text-sm font-medium text-foreground transition-colors hover:border-foreground-subtle hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-        >
-          编辑资料
-        </Link>
       </div>
 
       <div className="divide-y divide-border">

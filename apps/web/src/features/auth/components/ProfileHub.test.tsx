@@ -94,10 +94,10 @@ describe("ProfileHub — 渲染", () => {
     expect(screen.getByText("ID:u-123")).toBeInTheDocument();
     expect(screen.getByText("A1")).toBeInTheDocument();
     expect(screen.getByText("英式")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "编辑资料" })).toHaveAttribute(
-      "href",
-      "/account/profile"
-    );
+    const editLink = screen.getByRole("link", { name: "编辑资料" });
+    expect(editLink).toHaveAttribute("href", "/account/profile");
+    expect(editLink).toHaveClass("rounded-full", "bg-primary");
+    expect(editLink.parentElement).toHaveClass("flex-col", "sm:flex-row");
   });
 
   it("长昵称、邮箱和完整 ID 不使用单行截断", async () => {
