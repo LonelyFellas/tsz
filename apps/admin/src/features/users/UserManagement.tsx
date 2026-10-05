@@ -24,7 +24,7 @@ import { useState } from "react";
 import type { AdminUserView, Role } from "@tsz/types";
 import { CopyableText } from "@/components/CopyableText";
 import { GatedButton } from "@/components/GatedButton";
-import { useIsSuperAdmin } from "@/lib/auth";
+import { usePermission } from "@/lib/auth";
 import { useSetUserStatus, useUserList } from "./api";
 import { EditUserModal } from "./EditUserModal";
 import {
@@ -46,7 +46,9 @@ const ROLE_TABS = [
 export function UserManagement() {
   const { message, modal } = App.useApp();
   // 编辑 / 启禁用后端限 super_admin：普通 admin 整行置灰，不让点了才吃 403。
-  const isSuperAdmin = useIsSuperAdmin();
+  const canEdit = usePermission("users.edit");
+  const canSetStatus = usePermission("users.set_status");
+  const canReadSensitive = usePermission("users.read_sensitive");
 
   const [filters, setFilters] = useState<UserFilterValues>({});
   const [role, setRole] = useState<UserRoleTab>("all");
@@ -173,13 +175,15 @@ export function UserManagement() {
       title: "绑定电话",
       dataIndex: "phone",
       width: 150,
-      render: (p?: string) => <CopyableText value={p} />
+      render: (p?: string) =>
+        canReadSensitive ? <CopyableText value={p} /> : "未授权"
     },
     {
       title: "绑定邮箱",
       dataIndex: "email",
       width: 200,
-      render: (e?: string) => <CopyableText value={e} ellipsis={150} />
+      render: (e?: string) =>
+        canReadSensitive ? <CopyableText value={e} ellipsis={150} /> : "未授权"
     },
     {
       title: "注册时间",
@@ -227,8 +231,8 @@ export function UserManagement() {
           <GatedButton
             type="link"
             size="small"
-            reason="需超级管理员权限"
-            disabled={!isSuperAdmin}
+            reason="需用户编辑权限"
+            disabled={!canEdit}
             onClick={() => setEditingUser(record)}
           >
             编辑
@@ -238,8 +242,8 @@ export function UserManagement() {
             size="small"
             // 禁用是破坏性动作，置红警示；启用是恢复性动作，保持常规蓝。
             danger={record.status === "active"}
-            reason="需超级管理员权限"
-            disabled={!isSuperAdmin}
+            reason="需用户状态变更权限"
+            disabled={!canSetStatus}
             loading={
               setStatus.isPending && setStatus.variables?.id === record.id
             }

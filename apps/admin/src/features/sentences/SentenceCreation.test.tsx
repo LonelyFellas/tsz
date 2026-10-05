@@ -24,8 +24,15 @@ vi.mock("@/lib/env", () => ({
 }));
 vi.mock("@/lib/auth", () => ({
   useAuthStore: (
-    select: (state: { profile: null; setProfile: () => void }) => unknown
-  ) => select({ profile: null, setProfile: vi.fn() }),
+    select: (state: {
+      profile: { id: string; role: string; permissions: string[] };
+      setProfile: () => void;
+    }) => unknown
+  ) =>
+    select({
+      profile: { id: "test-super", role: "super_admin", permissions: [] },
+      setProfile: vi.fn()
+    }),
   api: {
     sentences: {
       list: vi.fn(),
@@ -73,6 +80,7 @@ function shared(content: SharedSentenceContent): SharedSentence {
     content,
     entries: [],
     created_by: "测试",
+    created_by_admin_id: "11111111-1111-4111-8111-111111111111",
     created_at: "2026-09-12T00:00:00Z",
     updated_at: "2026-09-12T00:00:00Z"
   };
@@ -157,8 +165,24 @@ describe("按词条关联反查共享多维例句", () => {
         onClose={vi.fn()}
       />
     );
-    expect(screen.getByText("先保存词义，再添加例句。")).toBeVisible();
-    expect(screen.getByRole("button", { name: "添加例句" })).toBeDisabled();
+    expect(screen.queryByText("先保存词义，再添加例句。")).toBeNull();
+    const add = screen.getByRole("button", { name: "添加例句" });
+    expect(add).toBeDisabled();
+    fireEvent.click(add);
+    expect(open).not.toHaveBeenCalled();
+    const hintTarget = add.parentElement!;
+    expect(hintTarget).toHaveAttribute("tabindex", "0");
+    expect(hintTarget).toHaveStyle({ cursor: "not-allowed" });
+    fireEvent.mouseEnter(hintTarget);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(
+      "先保存词义，再添加例句。"
+    );
+    fireEvent.mouseLeave(hintTarget);
+    await waitFor(() => expect(screen.queryByRole("tooltip")).toBeNull());
+    fireEvent.focus(hintTarget);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(
+      "先保存词义，再添加例句。"
+    );
     expect(api.sentences.list).not.toHaveBeenCalled();
     view.unmount();
     word.meanings.pos[0]!.senses = [original];
@@ -180,7 +204,13 @@ describe("按词条关联反查共享多维例句", () => {
         page_size: 5
       })
     );
-    expect(screen.getByRole("button", { name: "添加例句" })).toBeEnabled();
+    const enabledAdd = screen.getByRole("button", { name: "添加例句" });
+    expect(enabledAdd).toBeEnabled();
+    expect(enabledAdd.parentElement).not.toHaveAttribute("tabindex");
+    fireEvent.mouseEnter(enabledAdd.parentElement!);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+    fireEvent.click(enabledAdd);
+    expect(open).toHaveBeenCalledWith("new");
   });
   it("待关联词面锁定选中的 make，提交不接受自由输入的其他词面", async () => {
     const select = vi.fn();
@@ -287,6 +317,7 @@ describe("按词条关联反查共享多维例句", () => {
     const english = screen.getByRole("textbox", { name: "例句正文" });
     expect(english).not.toHaveAttribute("readonly");
     fireEvent.change(english, { target: { value: "An updated example." } });
+    fireEvent.click(screen.getByLabelText("完成例句正文编辑"));
     for (const tier of ["中阶", "高阶"]) {
       fireEvent.click(screen.getByLabelText("添加例句 1 译文"));
       fireEvent.click(
@@ -419,6 +450,7 @@ describe("按词条关联反查共享多维例句", () => {
     const text = screen.getByRole("textbox", { name: "例句正文" });
     expect(text).not.toHaveAttribute("readonly");
     fireEvent.change(text, { target: { value: "We make up stories." } });
+    fireEvent.click(screen.getByLabelText("完成例句正文编辑"));
     fireEvent.change(
       screen.getAllByPlaceholderText("请输入对应的中文译文")[0]!,
       { target: { value: "我们编故事。" } }
@@ -454,13 +486,14 @@ describe("按词条关联反查共享多维例句", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "例句正文" }), {
       target: { value: "We make the story up." }
     });
+    fireEvent.click(screen.getByLabelText("完成例句正文编辑"));
     fireEvent.change(
       screen.getAllByPlaceholderText("请输入对应的中文译文")[0]!,
       { target: { value: "我们编造这个故事。" } }
     );
-    const toolbar = await screen.findByRole("toolbar", { name: "标注工具栏" });
+    await screen.findByRole("toolbar", { name: "标注工具栏" });
     expect(screen.queryByText("句内关联")).toBeNull();
-    fireEvent.click(within(toolbar).getByLabelText("关联单词"));
+    fireEvent.click(screen.getByLabelText("关联单词"));
     fireEvent.mouseDown(screen.getByLabelText("关联 story（4）"), {
       button: 0
     });
@@ -479,7 +512,7 @@ describe("按词条关联反查共享多维例句", () => {
     fireEvent.click(
       within(wordPicker).getByRole("button", { name: "确认关联" })
     );
-    fireEvent.click(within(toolbar).getByLabelText("关联短语"));
+    fireEvent.click(screen.getByLabelText("关联短语"));
     fireEvent.mouseDown(screen.getByLabelText("关联 make（2）"), { button: 0 });
     fireEvent.mouseDown(screen.getByLabelText("关联 up.（5）"), { button: 0 });
     fireEvent.click(await screen.findByText("选择关联短语"));
@@ -501,6 +534,7 @@ describe("按词条关联反查共享多维例句", () => {
     fireEvent.click(
       within(phrasePicker).getByRole("button", { name: "确认关联" })
     );
+    fireEvent.click(screen.getByLabelText("完成例句正文编辑"));
     fireEvent.click(screen.getByLabelText("完成例句编辑"));
     await waitFor(() => expect(api.sentences.create).toHaveBeenCalledOnce());
     const annotations = vi.mocked(api.sentences.create).mock.calls[0]![0]

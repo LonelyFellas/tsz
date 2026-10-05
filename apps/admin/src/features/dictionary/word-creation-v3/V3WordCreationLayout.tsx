@@ -81,8 +81,8 @@ function problemTitle(problem: V3Problem) {
       return "词形影响需要重新确认";
     case "inbound_reference":
       return problem.references.length > 0
-        ? "本次修改会破坏其他内容对本词条的引用"
-        : "引用目标正在变更或仍被引用";
+        ? "本次修改会导致关联内容不匹配，暂时无法完成操作"
+        : "关联内容正在修改或尚未解除关联，暂时无法完成操作";
     case "network":
     case "server":
     case "service_unavailable":
@@ -242,7 +242,7 @@ function V3WordCreationLayoutContent({
         breadcrumbTitle: `${visibleLabel} · ${STEP_TITLE[activeStep]}`,
         completedSteps: word.completed_steps,
         summaryHeadword: (
-          <strong className="v3-summary-headword tsz-entry-en">
+          <strong className="v3-summary-headword tsz-words">
             {visibleLabel}
           </strong>
         ),
@@ -337,11 +337,11 @@ function V3WordCreationLayoutContent({
                   </Flex>
                 ) : inboundReferenceProblem ? (
                   <Flex vertical gap={4}>
-                    {inboundReferenceProblem.detail ? (
-                      <span>{inboundReferenceProblem.detail}</span>
-                    ) : null}
+                    <span>
+                      请刷新页面后重试；若仍无法完成，请检查关联内容，调整内容或解除关联后再试。
+                    </span>
                     <V3ReferenceList
-                      emptyText="后端未返回引用明细；请刷新页面后重试，仍失败时到来源处解除引用。"
+                      emptyText="暂时无法查看具体关联，请刷新页面后重试。"
                       references={inboundReferenceProblem.references}
                     />
                   </Flex>

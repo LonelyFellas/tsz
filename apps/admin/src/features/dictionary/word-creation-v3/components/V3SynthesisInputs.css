@@ -36,10 +36,10 @@
 }
 .word-actual-pronunciation-control
   textarea.v3-voice-text-large-preview.ant-input {
-  font-size: 14px;
+  font-size: 14pt;
   font-weight: 400;
   padding: 4px 11px;
-  line-height: 22px;
+  line-height: var(--ant-line-height, 1.5714285714);
 }
 
 .word-synthesis-input {
@@ -85,6 +85,35 @@
 
   .word-synthesis-locale-warning {
     grid-column: 1;
+  }
+}
+
+.word-synthesis-candidates {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+.word-synthesis-candidate {
+  min-width: 0;
+}
+.word-synthesis-candidate .word-synthesis-control {
+  display: flex;
+  width: 100%;
+}
+.word-synthesis-control > .word-synthesis-accent:first-child {
+  width: auto;
+  padding-inline: 8px;
+}
+.word-synthesis-accent-uk {
+  color: var(--ant-color-primary, #2053ff);
+}
+.word-synthesis-accent-us {
+  color: var(--ant-magenta-6, #c41d7f);
+}
+@container (max-width: 600px) {
+  .word-synthesis-candidates {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

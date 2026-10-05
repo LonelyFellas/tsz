@@ -1,21 +1,10 @@
-// 修改密码页：一页服务两种场景。
-// - 强制改密（forced）：管理员被超管重置后 must_change_password=true。此态下 profile 为空
-//   （登录时不 setProfile；刷新时会话恢复探 /profile 也被 403 守卫拦下，profile 仍空），
-//   故用 `!profile` 判定 forced。成功后整页跳首页，让会话恢复在标记已清除后重建 profile。
-// - 自助改密：已登录管理员从顶栏进入，profile 有值。成功后 SPA 提示 + 回首页。
-// change-password 是 must_change 期间少数可达端点之一，不会被全局 403 拦截，故本页不产生自循环。
-//
-// ⚠ 跨仓库耦合：强制流程「整页重载靠会话恢复重建 profile」静默依赖后端**改自己密码时保留当前会话**。
-// tsz-go `ChangeOwnPassword`（internal/admin/service.go）当前只更新密码 hash + 清 must_change 标记，
-// 明确「current session is intentionally left intact」、不吊销 refresh 会话——故重载后 refresh cookie
-// 仍有效、会话可恢复。但该处注释把「改密后轮换会话」列为待办的 hardening follow-up：一旦后端启用
-// 改密即吊销当前会话，本页整页重载会在改密成功后把管理员弹回 /login（refresh 401 → redirectToLogin）。
-// 届时须改为：后端在 204 前返回新 token → 前端 persistSession 后 SPA 落地，去掉对 refresh cookie 的依赖。
+// 自助与强制改密均撤销已有会话，成功后整页跳回登录。
 import { HttpError } from "@tsz/api-client";
-import { findAdminPasswordWeakWord } from "@tsz/shared";
+import { PASSWORD_HINT, passwordLengthError } from "@tsz/shared";
+import { passwordErrorMessage } from "@tsz/shared/auth";
 import { App, Button, Card, Form, Input, Typography } from "antd";
 import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { FullscreenCenter } from "@/layouts/FullscreenCenter";
 import { api, useAuthStore } from "@/lib/auth";
 import { useAdminLogout } from "./useAdminLogout";
@@ -32,7 +21,6 @@ export function ChangePassword() {
   const [submitting, setSubmitting] = useState(false);
 
   const profile = useAuthStore((s) => s.profile);
-  const navigate = useNavigate();
   const location = useLocation();
   const logout = useAdminLogout();
   // 强制改密：登录/刷新两条强制路径下 profile 均为空；自助改密时 profile 有值。
@@ -48,13 +36,8 @@ export function ChangePassword() {
     setSubmitting(true);
     try {
       await api.auth.changePassword(current_password, new_password);
-      if (forced) {
-        // 标记已清除：整页跳首页（与终止/跨态操作整页跳转约定一致），会话恢复重建 profile 后进后台。
-        window.location.href = "/";
-      } else {
-        message.success("密码修改成功");
-        navigate("/", { replace: true });
-      }
+      message.success("密码修改成功，请重新登录");
+      window.location.replace("/login?reset=success");
     } catch (err) {
       if (
         err instanceof HttpError &&
@@ -74,7 +57,10 @@ export function ChangePassword() {
       form.setFields([
         {
           name: "new_password",
-          errors: [err instanceof Error ? err.message : "修改失败"]
+          errors: [
+            (err instanceof HttpError && passwordErrorMessage(err.code)) ||
+              "修改失败，请稍后重试"
+          ]
         }
       ]);
     } finally {
@@ -90,7 +76,7 @@ export function ChangePassword() {
         </Typography.Title>
         <Typography.Paragraph type="secondary" style={{ marginBottom: 24 }}>
           {forced
-            ? "你的密码由管理员重置，请用临时密码设置新密码后进入后台。"
+            ? "你的密码由管理员重置，请用临时密码设置新密码后重新登录后台。"
             : "为账号设置一个新的登录密码。"}
         </Typography.Paragraph>
 
@@ -116,21 +102,11 @@ export function ChangePassword() {
             dependencies={["current_password"]}
             rules={[
               { required: true, message: "请输入新密码" },
-              { min: 12, max: 72, message: "密码至少 12 位" },
               {
-                validator: (_, v: string) =>
-                  v && /^\d+$/.test(v)
-                    ? Promise.reject(new Error("密码不能是纯数字"))
-                    : Promise.resolve()
-              },
-              {
-                // 弱词预检:与后端策略对齐,提交前即提示,不必等 400。后端仍是权威校验。
-                validator: (_, v: string) => {
-                  const weak = v && findAdminPasswordWeakWord(v);
-                  return weak
-                    ? Promise.reject(
-                        new Error(`密码包含常见弱词「${weak}」，请更换`)
-                      )
+                validator: (_, value: string) => {
+                  const error = value && passwordLengthError(value);
+                  return error
+                    ? Promise.reject(new Error(error))
                     : Promise.resolve();
                 }
               },
@@ -143,7 +119,7 @@ export function ChangePassword() {
             ]}
           >
             <Input.Password
-              placeholder="至少 12 位，非纯数字"
+              placeholder={PASSWORD_HINT}
               autoComplete="new-password"
               allowClear
             />

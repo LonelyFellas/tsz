@@ -154,7 +154,18 @@ async function pickOption(selectRoot: Element, text: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockPermissions.mockResolvedValue({ items: CATALOG });
+  mockPermissions.mockResolvedValue({
+    catalog_version: "v1",
+    tags: [],
+    permissions: CATALOG.map((p) => ({
+      ...p,
+      module_key: p.key.split(".")[0]!,
+      description: p.label,
+      requires: [],
+      kind: "page",
+      risk_level: "low"
+    }))
+  });
   mockList.mockResolvedValue({
     items: [systemRole, libRole, emptyRole, manyRole]
   });
@@ -305,7 +316,18 @@ describe("RoleManagement — 建角色", () => {
     mockPermissions.mockReset();
     mockPermissions
       .mockRejectedValueOnce(new Error("目录炸了"))
-      .mockResolvedValue({ items: CATALOG });
+      .mockResolvedValue({
+        catalog_version: "v1",
+        tags: [],
+        permissions: CATALOG.map((p) => ({
+          ...p,
+          module_key: p.key.split(".")[0]!,
+          description: p.label,
+          requires: [],
+          kind: "page",
+          risk_level: "low"
+        }))
+      });
     renderPage();
     await screen.findByText("全功能管理员");
     fireEvent.click(screen.getByRole("button", { name: /新建角色/ }));

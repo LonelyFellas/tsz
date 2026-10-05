@@ -13,11 +13,11 @@ export function MainNav() {
   const isStudent = !!user && !isTeacher;
 
   return (
-    <header className="flex flex-wrap items-center gap-4 border-b border-border py-4">
-      <Link href="/" className="font-bold">
+    <header className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 border-b border-border py-3 sm:flex sm:flex-wrap sm:gap-4 sm:py-4">
+      <Link href="/" className="whitespace-nowrap font-bold">
         天生会背
       </Link>
-      <nav className="flex flex-1 flex-wrap gap-4 text-sm">
+      <nav className="col-span-2 row-start-2 flex min-w-0 items-center gap-5 overflow-x-auto whitespace-nowrap py-1 text-sm sm:flex-1 sm:flex-wrap sm:gap-4 sm:overflow-visible sm:py-0">
         <Link href="/wordlists">词表</Link>
         {isTeacher && (
           <>
@@ -38,8 +38,10 @@ export function MainNav() {
           </Link>
         )}
       </nav>
-      <ThemeToggle />
-      <AccountMenu />
+      <div className="col-start-2 row-start-1 flex shrink-0 items-center gap-3 sm:gap-4">
+        {!user && <ThemeToggle />}
+        <AccountMenu />
+      </div>
     </header>
   );
 }

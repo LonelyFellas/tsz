@@ -4,11 +4,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MeResponse } from "@tsz/api-client";
 import type { User } from "@tsz/types";
 import { ProfileHub } from "./ProfileHub";
+import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIdentityProvider";
 
 const mockBack = vi.fn();
+const mockReplace = vi.fn();
+const mockInvalidate = vi.fn().mockResolvedValue(undefined);
+
+vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({ invalidateQueries: mockInvalidate })
+}));
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ back: mockBack })
+  useRouter: () => ({ back: mockBack, replace: mockReplace })
+}));
+
+vi.mock("@/features/teacher-certification/TeacherIdentityProvider", () => ({
+  useTeacherIdentity: vi.fn()
 }));
 
 vi.mock("@/lib/request", () => ({
@@ -43,10 +54,38 @@ function meResponse(overrides: Partial<MeResponse> = {}): MeResponse {
 beforeEach(() => {
   vi.clearAllMocks();
   mockBack.mockReset();
+  mockReplace.mockReset();
+  vi.mocked(useTeacherIdentity).mockReturnValue({
+    identity: "student",
+    verified: false,
+    ready: true,
+    error: false,
+    select: vi.fn()
+  });
   mockMe.mockResolvedValue(meResponse());
 });
 
 describe("ProfileHub — 渲染", () => {
+  it.each([
+    ["alice", "A"],
+    ["中文昵称", "中"],
+    ["😀😃", "😀"],
+    ["", "用"],
+    ["   ", "用"]
+  ])("默认头像展示完整首码点：%j → %s", async (displayName, initial) => {
+    mockMe.mockResolvedValue(
+      meResponse({ user: userWith({ display_name: displayName }) })
+    );
+    render(<ProfileHub />);
+
+    expect(
+      await screen.findByText(initial, { selector: "span" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(displayName.trim() || "用户", { selector: "p" })
+    ).toBeInTheDocument();
+  });
+
   it("展示昵称 / 联系方式 / ID / 等级口音徽标 / 编辑资料入口", async () => {
     render(<ProfileHub />);
 
@@ -55,10 +94,31 @@ describe("ProfileHub — 渲染", () => {
     expect(screen.getByText("ID:u-123")).toBeInTheDocument();
     expect(screen.getByText("A1")).toBeInTheDocument();
     expect(screen.getByText("英式")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "编辑资料" })).toHaveAttribute(
-      "href",
-      "/account/profile"
+    const editLink = screen.getByRole("link", { name: "编辑资料" });
+    expect(editLink).toHaveAttribute("href", "/account/profile");
+    expect(editLink).toHaveClass("rounded-full", "bg-primary");
+    expect(editLink.parentElement).toHaveClass("flex-col", "sm:flex-row");
+  });
+
+  it("长昵称、邮箱和完整 ID 不使用单行截断", async () => {
+    const displayName = "认真学英语的同学今天也要坚持练习";
+    const email = "a-long-learning-account@example.com";
+    const id = "01a0e092-58a0-79c3-a195-2449bc94ed78";
+    mockMe.mockResolvedValue(
+      meResponse({
+        user: userWith({
+          display_name: displayName,
+          phone: undefined,
+          email,
+          id
+        })
+      })
     );
+    render(<ProfileHub />);
+
+    expect(await screen.findByText(displayName)).not.toHaveClass("truncate");
+    expect(screen.getByText(email)).not.toHaveClass("truncate");
+    expect(screen.getByText(`ID:${id}`)).not.toHaveClass("truncate");
   });
 
   it("learning_settings 为 null → 不渲染徽标", async () => {
@@ -170,6 +230,7 @@ describe("ProfileHub — 渲染", () => {
 
     const img = screen.getByRole("img", { name: "Along" });
     expect(img).toHaveAttribute("src", "https://example.com/a.png");
+    expect(img).toHaveClass("bg-white");
 
     fireEvent.error(img);
     expect(
@@ -214,12 +275,93 @@ describe("ProfileHub — 交互", () => {
     });
   });
 
-  it("点击返回 → router.back()", async () => {
-    render(<ProfileHub />);
+  it("身份查询失败可重新核验，恢复后返回已确认的教师工作台", async () => {
+    vi.mocked(useTeacherIdentity).mockReturnValue({
+      identity: "student",
+      verified: false,
+      ready: false,
+      error: true,
+      select: vi.fn()
+    });
+    const { rerender } = render(<ProfileHub />);
     await screen.findByText("Along");
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: "← 返回" }));
-    expect(mockBack).toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "暂时无法确认工作台身份"
+    );
+    expect(screen.getByRole("button", { name: /← 返回/ })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "重新核验身份" }));
+    expect(mockInvalidate).toHaveBeenCalledWith({
+      queryKey: ["teacher-certification", "u-123"]
+    });
+
+    vi.mocked(useTeacherIdentity).mockReturnValue({
+      identity: "teacher",
+      verified: true,
+      ready: true,
+      error: false,
+      select: vi.fn()
+    });
+    rerender(<ProfileHub />);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    const back = screen.getByRole("button", { name: /← 返回/ });
+    expect(back).toBeEnabled();
+    await user.click(back);
+    expect(mockReplace).toHaveBeenCalledWith("/teacher/classes");
   });
+
+  it("身份加载期间禁止返回，确认教师身份后再返回教师工作台", async () => {
+    vi.mocked(useTeacherIdentity).mockReturnValue({
+      identity: "student",
+      verified: false,
+      ready: false,
+      error: false,
+      select: vi.fn()
+    });
+    const { rerender } = render(<ProfileHub />);
+    await screen.findByText("Along");
+    const user = userEvent.setup();
+    const back = screen.getByRole("button", { name: /← 返回/ });
+
+    expect(back).toBeDisabled();
+    await user.click(back);
+    expect(mockReplace).not.toHaveBeenCalled();
+
+    vi.mocked(useTeacherIdentity).mockReturnValue({
+      identity: "teacher",
+      verified: true,
+      ready: true,
+      error: false,
+      select: vi.fn()
+    });
+    rerender(<ProfileHub />);
+    expect(back).toBeEnabled();
+    await user.click(back);
+    expect(mockReplace).toHaveBeenCalledWith("/teacher/classes");
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["student", false, "/student/practice"],
+    ["teacher", true, "/teacher/classes"]
+  ] as const)(
+    "%s 身份返回对应工作台，不使用浏览器后退",
+    async (identity, verified, destination) => {
+      vi.mocked(useTeacherIdentity).mockReturnValue({
+        identity,
+        verified,
+        ready: true,
+        error: false,
+        select: vi.fn()
+      });
+      render(<ProfileHub />);
+      await screen.findByText("Along");
+      const user = userEvent.setup();
+
+      await user.click(screen.getByRole("button", { name: /← 返回/ }));
+      expect(mockReplace).toHaveBeenCalledWith(destination);
+      expect(mockBack).not.toHaveBeenCalled();
+    }
+  );
 });

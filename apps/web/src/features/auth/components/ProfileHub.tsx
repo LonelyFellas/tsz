@@ -1,11 +1,13 @@
 "use client";
 
 import type { MeResponse } from "@tsz/api-client";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/request";
 import { VARIANT_LABEL, displayNameOf } from "@/lib/user";
+import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIdentityProvider";
 
 // 个人中心:头像菜单进入的中转页。聚合资料卡 + 常用入口 + 申请成为老师。
 // 资料卡的「编辑资料」跳 /account/profile(EditProfileForm)。
@@ -38,6 +40,8 @@ const TILES: { label: string; href: string; icon: ReactNode }[] = [
 
 export function ProfileHub() {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const { identity, ready, error } = useTeacherIdentity();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [loadError, setLoadError] = useState(false);
   // 复制 ID 的就地反馈:"idle" | "copied" | "failed",1.5s 后自动还原。
@@ -95,111 +99,138 @@ export function ProfileHub() {
 
   const { user, learning_settings } = me;
   const displayName = displayNameOf(user);
-  const initial = displayName.charAt(0).toUpperCase();
+  const initial = Array.from(displayName)[0]!.toUpperCase();
   const contact = user.phone ?? user.email ?? "";
 
   return (
-    <div className="animate-in mx-auto max-w-2xl px-6 py-10">
-      <div className="mb-8 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="-ml-2 rounded-full px-3 py-1.5 text-sm font-medium text-foreground-muted transition hover:bg-muted hover:text-foreground"
+    <div className="mx-auto max-w-2xl px-4 py-2 sm:px-6 sm:py-6">
+      <button
+        type="button"
+        disabled={!ready}
+        onClick={() =>
+          router.replace(
+            identity === "teacher" ? "/teacher/classes" : "/student/practice"
+          )
+        }
+        className="mb-3 inline-flex min-h-10 items-center rounded-md text-sm text-foreground-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        ← 返回工作台
+      </button>
+      {error && (
+        <div
+          role="alert"
+          className="mb-4 flex flex-wrap items-center gap-3 text-sm text-foreground-muted"
         >
-          ← 返回
-        </button>
-        <h1 className="flex-1 text-center text-2xl font-semibold tracking-tight text-foreground">
-          个人中心
-        </h1>
-        <span className="w-12" aria-hidden />
-      </div>
-
-      {/* 资料卡 */}
-      <div className="mb-4 flex items-center gap-5 rounded-3xl border border-border bg-surface p-6 shadow-xl shadow-black/5">
-        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full ring-1 ring-border">
-          {user.avatar_url && user.avatar_url !== avatarFailedUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={user.avatar_url}
-              alt={displayName}
-              className="h-full w-full object-cover"
-              onError={() => setAvatarFailedUrl(user.avatar_url)}
-            />
-          ) : (
-            <span className="flex h-full w-full items-center justify-center bg-linear-to-br from-gray-700 to-gray-900 text-2xl font-semibold text-white">
-              {initial}
-            </span>
-          )}
+          <p>暂时无法确认工作台身份。</p>
+          <button
+            type="button"
+            onClick={() =>
+              void queryClient.invalidateQueries({
+                queryKey: ["teacher-certification", user.id]
+              })
+            }
+            className="text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          >
+            重新核验身份
+          </button>
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-lg font-semibold tracking-tight text-foreground">
-            {displayName}
-          </p>
-          {contact && (
-            <p className="truncate text-sm text-foreground-muted">{contact}</p>
-          )}
-          <div className="mt-1.5 flex flex-wrap items-center gap-2">
-            <span className="inline-flex max-w-60 items-center gap-1 text-xs text-foreground-subtle">
-              <span className="min-w-0 truncate">ID:{user.id}</span>
+      )}
+      <h1 className="mb-5 text-2xl font-semibold tracking-tight text-foreground">
+        个人中心
+      </h1>
+
+      <div className="border-b border-border pb-5">
+        <div className="flex items-start gap-4">
+          <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full ring-1 ring-border sm:h-16 sm:w-16">
+            {user.avatar_url && user.avatar_url !== avatarFailedUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={user.avatar_url}
+                alt={displayName}
+                className="h-full w-full bg-white object-cover"
+                onError={() => setAvatarFailedUrl(user.avatar_url)}
+              />
+            ) : (
+              <span className="flex h-full w-full items-center justify-center bg-foreground text-xl font-semibold text-background">
+                {initial}
+              </span>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="break-words text-lg font-semibold leading-7 text-foreground [overflow-wrap:anywhere]">
+              {displayName}
+            </p>
+            {contact && (
+              <p className="mt-1 break-words text-sm leading-6 text-foreground-muted [overflow-wrap:anywhere]">
+                {contact}
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-5">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
+            <span className="inline-flex max-w-full items-start gap-1.5 text-xs leading-5 text-foreground-muted">
+              <span className="min-w-0 break-all">ID:{user.id}</span>
               <button
                 type="button"
                 onClick={() => copyId(user.id)}
                 aria-label="复制 ID"
-                className="shrink-0 text-foreground-subtle transition-colors hover:text-foreground-muted"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-foreground-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               >
                 {copyState === "copied" ? <CheckIcon /> : <CopyIcon />}
               </button>
-              {copyState === "copied" && (
-                <span className="shrink-0 whitespace-nowrap font-medium text-primary">
-                  已复制
-                </span>
-              )}
-              {copyState === "failed" && (
-                <span className="shrink-0 whitespace-nowrap font-medium text-danger">
-                  复制失败
-                </span>
-              )}
             </span>
+            {copyState === "copied" && (
+              <span className="text-xs text-primary">已复制</span>
+            )}
+            {copyState === "failed" && (
+              <span className="text-xs text-danger">复制失败</span>
+            )}
             {learning_settings && (
               <>
-                <span className="rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold text-white">
+                <span className="rounded-md bg-muted px-2 py-0.5 text-xs text-foreground-muted">
                   {learning_settings.cefr_level}
                 </span>
-                <span className="rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold text-white">
+                <span className="rounded-md bg-muted px-2 py-0.5 text-xs text-foreground-muted">
                   {VARIANT_LABEL[learning_settings.english_variant]}
                 </span>
               </>
             )}
           </div>
+          <Link
+            href="/account/profile"
+            className="inline-flex min-h-10 shrink-0 items-center justify-center self-end rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:bg-primary/85 sm:self-auto"
+          >
+            编辑资料
+          </Link>
         </div>
-        <Link
-          href="/account/profile"
-          className="shrink-0 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-white transition hover:opacity-90 active:scale-95"
-        >
-          编辑资料
-        </Link>
       </div>
 
-      {/* 常用快捷入口 */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="divide-y divide-border">
         {TILES.map((tile) => (
           <Link
             key={tile.label}
             href={tile.href}
-            className="group flex items-center gap-3.5 rounded-3xl border border-border bg-surface p-5 shadow-xs transition duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/5"
+            className="flex min-h-16 items-center gap-3 py-4 transition-colors hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-muted transition group-hover:bg-primary/10">
-              {tile.icon}
-            </span>
+            <span className="shrink-0 text-foreground-muted">{tile.icon}</span>
             <span className="flex-1 text-sm font-medium text-foreground">
               {tile.label}
             </span>
-            <span
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-foreground-subtle"
               aria-hidden
-              className="text-foreground-subtle transition group-hover:translate-x-0.5 group-hover:text-foreground-subtle"
             >
-              →
-            </span>
+              <path d="m9 5 7 7-7 7" />
+            </svg>
           </Link>
         ))}
       </div>
@@ -247,8 +278,12 @@ function CheckIcon() {
 function CoinIcon() {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M12 3l9 9-9 9-9-9 9-9z" fill="#111827" />
-      <circle cx="12" cy="12" r="3" fill="#fff" />
+      <path
+        d="M12 3l9 9-9 9-9-9 9-9z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <circle cx="12" cy="12" r="3" fill="currentColor" />
     </svg>
   );
 }
@@ -262,12 +297,12 @@ function ListIcon() {
         width="18"
         height="17"
         rx="2"
-        stroke="#111827"
+        stroke="currentColor"
         strokeWidth="2"
       />
       <path
         d="M7 9h10M7 13h10M7 17h6"
-        stroke="#111827"
+        stroke="currentColor"
         strokeWidth="2"
         strokeLinecap="round"
       />

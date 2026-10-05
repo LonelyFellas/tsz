@@ -14,7 +14,9 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status });
 
 beforeEach(() => {
-  authRuntime.clearSession();
+  // 模拟可恢复 cookie 的新文档，而不是用户主动登出。
+  authRuntime.persistSession({ access_token: "fixture", expires_in: 900 });
+  authRuntime.tokens.setAccessToken(null);
   authRuntime.store.setState({ hydrated: false, connectionError: false });
 });
 afterEach(() => {

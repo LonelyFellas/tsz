@@ -1,6 +1,7 @@
 import { useAuthStore } from "@/lib/auth";
 import {
   canPublishEntry,
+  canCheckEntry,
   ENTRY_PUBLISH_BLOCKED_HINT
 } from "../entryWritePermission";
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
@@ -306,13 +307,16 @@ function ControlledV3PreviewAndPublishStep({
     fetchPage ?? unavailablePage
   );
   const profile = useAuthStore((state) => state.profile);
-  const unavailableMessage = !canPublishEntry(profile, word)
-    ? ENTRY_PUBLISH_BLOCKED_HINT
-    : publicationUnavailableMessage(word);
+  const canPrepare = canCheckEntry(profile);
+  const allowedToPublish = canPublishEntry(profile, word);
+  const unavailableMessage =
+    publicationUnavailableMessage(word) ??
+    (!canPrepare ? "未开通词条检查权限" : undefined);
   const requiresImpactConfirmation = Boolean(
     controller.impact && (controller.impact.requires_confirmation || impactPage)
   );
   const readyToPublish = Boolean(
+    allowedToPublish &&
     !unavailableMessage &&
     controller.issues.length === 0 &&
     controller.validation?.valid &&
@@ -321,11 +325,12 @@ function ControlledV3PreviewAndPublishStep({
   );
 
   const prepare = async () => {
+    if (!canPrepare) return;
     const validation = await controller.actions.validate();
     if (validation?.valid) await controller.actions.previewFormsImpact();
   };
   const publish = async (token?: string) => {
-    if (publishLock.current) return;
+    if (publishLock.current || !allowedToPublish) return;
     publishLock.current = true;
     try {
       await controller.actions.publish(token);
@@ -380,6 +385,13 @@ function ControlledV3PreviewAndPublishStep({
           title="发布检查"
         >
           <Space orientation="vertical" style={{ width: "100%" }}>
+            {!allowedToPublish && (
+              <Alert
+                type="info"
+                title="当前账号不能发布这条词条"
+                description={ENTRY_PUBLISH_BLOCKED_HINT}
+              />
+            )}
             <Button
               loading={
                 controller.isPending("validate") ||
@@ -415,7 +427,9 @@ function ControlledV3PreviewAndPublishStep({
                 }
               />
             ) : null}
-            {requiresImpactConfirmation && !controller.impactConfirmed ? (
+            {allowedToPublish &&
+            requiresImpactConfirmation &&
+            !controller.impactConfirmed ? (
               <Button
                 disabled={
                   impactPage
@@ -440,7 +454,7 @@ function ControlledV3PreviewAndPublishStep({
           </Space>
         </Card>
       )}
-      {publishPage ? (
+      {allowedToPublish && publishPage ? (
         <Card size="small" title="发布同形提示">
           <Button
             type="primary"
@@ -502,13 +516,17 @@ function StandaloneV3PreviewAndPublishStep({
     requests.surfacePage
   );
   const profile = useAuthStore((state) => state.profile);
-  const unavailableMessage = !canPublishEntry(profile, currentWord)
-    ? ENTRY_PUBLISH_BLOCKED_HINT
-    : publicationUnavailableMessage(currentWord);
+  const canPrepare = canCheckEntry(profile);
+  const allowedToPublish = canPublishEntry(profile, currentWord);
+  const unavailableMessage =
+    publicationUnavailableMessage(currentWord) ??
+    (!canPrepare ? "未开通词条检查权限" : undefined);
   const needsImpactAcknowledgement = Boolean(
     impact && (impact.requires_confirmation || impact.surface_match_page)
   );
   const readyToPublish = Boolean(
+    allowedToPublish &&
+    !unavailableMessage &&
     impact &&
     validationIssues.length === 0 &&
     (!needsImpactAcknowledgement || impactAccepted)
@@ -612,6 +630,7 @@ function StandaloneV3PreviewAndPublishStep({
   const handlePrepare = async () => {
     if (
       prepareLock.current ||
+      !canPrepare ||
       reconciliationRequiredRef.current ||
       reconciliationLockRef.current
     ) {
@@ -698,6 +717,7 @@ function StandaloneV3PreviewAndPublishStep({
   const runPublish = async (surfaceToken?: string) => {
     if (
       publishLock.current ||
+      !allowedToPublish ||
       reconciliationRequiredRef.current ||
       reconciliationLockRef.current
     ) {
@@ -813,6 +833,13 @@ function StandaloneV3PreviewAndPublishStep({
           title="发布检查"
         >
           <Space orientation="vertical" style={{ width: "100%" }}>
+            {!allowedToPublish && (
+              <Alert
+                type="info"
+                title="当前账号不能发布这条词条"
+                description={ENTRY_PUBLISH_BLOCKED_HINT}
+              />
+            )}
             <Button
               disabled={reconciliationRequired}
               loading={preparing || refreshingCanonical}
@@ -845,7 +872,9 @@ function StandaloneV3PreviewAndPublishStep({
                 }
               />
             ) : null}
-            {needsImpactAcknowledgement && !impactAccepted ? (
+            {allowedToPublish &&
+            needsImpactAcknowledgement &&
+            !impactAccepted ? (
               <Button
                 disabled={
                   Boolean(impact?.surface_match_page) &&
@@ -868,7 +897,7 @@ function StandaloneV3PreviewAndPublishStep({
           </Space>
         </Card>
       )}
-      {publishSurfacePage ? (
+      {allowedToPublish && publishSurfacePage ? (
         <Card size="small" title="发布同形提示">
           <Space orientation="vertical">
             <Typography.Text>

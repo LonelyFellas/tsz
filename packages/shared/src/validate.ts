@@ -23,44 +23,55 @@ export function isCode(v: string): boolean {
   return CODE_RE.test(v);
 }
 
-// 注册密码:11-20 位,字母 + 数字组合,不区分大小写。
-const REGISTER_PASSWORD_RE = /^(?=.*[a-zA-Z])(?=.*\d)[a-zA-Z\d]{11,20}$/;
+export const PASSWORD_MIN_LENGTH = 15;
+export const PASSWORD_MAX_LENGTH = 128;
+export const PASSWORD_HINT = "15–128 个字符，区分大小写，支持符号和空格";
 
-export function isRegisterPassword(v: string): boolean {
-  return REGISTER_PASSWORD_RE.test(v);
+export function passwordLengthError(value: string): string | null {
+  const length = Array.from(value).length;
+  if (!length) return "请输入密码";
+  if (length < PASSWORD_MIN_LENGTH) return "密码至少需要 15 个字符";
+  if (length > PASSWORD_MAX_LENGTH) return "密码不能超过 128 个字符";
+  return null;
 }
 
-// 后台管理员密码弱词黑名单:与后端 validateAdminPassword 对齐(tsz-go
-// internal/admin/service.go 的 commonWeakSubstrings)。前端做提交前预检、即时提示,
-// 后端仍是权威把关——这张表只镜像那 7 个词,后端增删时须两处同步。
-// 注意后端注释:"admin" 是本域合法 token,故意不在表内,只拦更具体的 "admin123"。
-const ADMIN_PASSWORD_WEAK_SUBSTRINGS = [
-  "password",
-  "qwerty",
-  "123456",
-  "letmein",
-  "iloveyou",
-  "welcome",
-  "admin123"
-];
-
-/**
- * 后台密码若命中弱词黑名单(子串,不区分大小写)返回命中的词,否则 null。
- * 返回命中词而非布尔,便于前端提示「包含常见弱词『admin123』」。
- */
-export function findAdminPasswordWeakWord(v: string): string | null {
-  const lower = v.toLowerCase();
-  return ADMIN_PASSWORD_WEAK_SUBSTRINGS.find((w) => lower.includes(w)) ?? null;
+// 前端只检查长度，弱密码和泄露名单由后端权威校验。
+export function isRegisterPassword(value: string): boolean {
+  return passwordLengthError(value) === null;
 }
 
-// 昵称禁字符:与后端 validateDisplayName 对齐(tsz-go internal/user/service.go,
-// 规则同见 docs/api.md)——只拒标签字符 < > 与控制/不可见字符(Cc/Cf:NUL、
-// 零宽空格、BOM、bidi 覆盖等);" ' & 是合法昵称字符(O'Brien、Tom&Jerry),不拦。
+// 昵称与 Rust DisplayName::parse 对齐，先 trim 再检查码点长度和 Cc/Cf。
 const DISPLAY_NAME_FORBIDDEN_RE = /[<>\p{Cc}\p{Cf}]/u;
 const DISPLAY_NAME_FORBIDDEN_RE_G = /[<>\p{Cc}\p{Cf}]/gu;
 
 // 后端 display_name 长度上限(1–50 字符,docs/api.md)。
 export const DISPLAY_NAME_MAX = 50;
+
+const DISPLAY_NAME_WHITESPACE_RE = /\p{White_Space}/u;
+
+export function normalizeDisplayName(value: string): string {
+  let start = 0;
+  let end = value.length;
+  while (start < end && DISPLAY_NAME_WHITESPACE_RE.test(value[start]!))
+    start += 1;
+  while (end > start && DISPLAY_NAME_WHITESPACE_RE.test(value[end - 1]!))
+    end -= 1;
+  return value.slice(start, end);
+}
+
+export function displayNameLength(value: string): number {
+  return Array.from(normalizeDisplayName(value)).length;
+}
+
+export function displayNameError(value: string): string | null {
+  const normalized = normalizeDisplayName(value);
+  const length = displayNameLength(normalized);
+  if (!length) return "昵称需为 1–50 个字符";
+  if (length > DISPLAY_NAME_MAX) return "昵称不能超过 50 个字符";
+  if (hasDisplayNameForbiddenChars(normalized))
+    return "昵称不能包含 < > 或不可见字符";
+  return null;
+}
 
 export function hasDisplayNameForbiddenChars(v: string): boolean {
   return DISPLAY_NAME_FORBIDDEN_RE.test(v);

@@ -54,10 +54,6 @@ function voiceLocale(dialect?: Dialect): AudioAssetLocaleV3 | undefined {
   return undefined;
 }
 
-/** 录词条英文的字段（释义、例句、语法结构）用 Ubuntu；两种音标字段不能用，Ubuntu 缺音标字形。 */
-const ENTRY_ENGLISH_MODES: ReadonlySet<NonNullable<VoiceEditorProps["mode"]>> =
-  new Set(["grammar", "association", "spelling"]);
-
 export interface V3VoiceTextFieldProps<
   TLink extends VoiceAssociation = TextLinkV3
 > {
@@ -67,6 +63,7 @@ export interface V3VoiceTextFieldProps<
   doneDisabled?: boolean;
   showDone?: boolean;
   onEditingChange?: (editing: boolean) => void;
+  onDraftPendingChange?: (pending: boolean) => void;
   onAssociationPendingChange?: (pending: boolean) => void;
   mode?: VoiceEditorProps<TLink>["mode"];
   editingEnabled?: boolean;
@@ -83,6 +80,7 @@ export interface V3VoiceTextFieldProps<
   previewAdapter?: VoiceEditorProps<TLink>["previewAdapter"];
   value: RichTextV3;
   ariaLabel: string;
+  editorTitle?: ReactNode;
   nodeId: string;
   nodeAliases?: string;
   field: string;
@@ -108,6 +106,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   doneDisabled,
   showDone = true,
   onEditingChange,
+  onDraftPendingChange,
   onAssociationPendingChange,
   mode,
   editingEnabled = mode !== "spelling",
@@ -119,6 +118,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   previewAdapter,
   value,
   ariaLabel,
+  editorTitle,
   nodeId,
   nodeAliases,
   field,
@@ -142,7 +142,26 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   const [editorSession, setEditorSession] = useState(0);
   const captureSession = () =>
     structuredClone({ nodeId, value, textLinks, voiceProfile, audioAssets });
-  const session = useRef<ReturnType<typeof captureSession>>(captureSession());
+  const [draftState, setDraftState] = useState(captureSession);
+  const incomingKey = JSON.stringify({
+    nodeId,
+    value,
+    textLinks,
+    voiceProfile,
+    audioAssets
+  });
+  const incomingRef = useRef(incomingKey);
+  useEffect(() => {
+    if (incomingRef.current === incomingKey) return;
+    incomingRef.current = incomingKey;
+    const next = captureSession();
+    setDraftState(next);
+  }, [incomingKey]);
+  const draftPending = JSON.stringify(draftState) !== incomingKey;
+  useEffect(() => {
+    onDraftPendingChange?.(draftPending);
+    return () => onDraftPendingChange?.(false);
+  }, [draftPending, onDraftPendingChange]);
   const callbacks = useRef({
     onChange,
     onVoiceProfileChange,
@@ -153,42 +172,42 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   });
   const cancelEditing = () => {
     if (doneLoading) return;
-    const before = session.current;
-    // 切换到另一字段时，不允许把旧会话覆盖到新字段。
-    if (!readOnly && before.nodeId === nodeId) {
-      // 宿主三个回调可能各自捕获旧草稿；每次回写后刷新闭包，避免互相覆盖恢复结果。
-      if (
-        JSON.stringify([value, textLinks]) !==
-        JSON.stringify([before.value, before.textLinks])
-      ) {
-        flushSync(() =>
-          callbacks.current.onChange(
-            toRichTextV2(before.value),
-            before.textLinks
-          )
-        );
-      }
-      if (
-        JSON.stringify(voiceProfile) !== JSON.stringify(before.voiceProfile)
-      ) {
-        flushSync(() =>
-          callbacks.current.onVoiceProfileChange?.(
-            before.voiceProfile ?? { voices: [] }
-          )
-        );
-      }
-      if (JSON.stringify(audioAssets) !== JSON.stringify(before.audioAssets)) {
-        flushSync(() =>
-          callbacks.current.onAudioAssetsChange?.(before.audioAssets ?? [])
-        );
-      }
-    }
+    setDraftState(captureSession());
     history.current.past = [];
     history.current.future = [];
     setEditing(false);
     setEditorSession((current) => current + 1);
     onAssociationPendingChange?.(false);
     onCancel?.();
+  };
+  const completeEditing = () => {
+    if (doneLoading || doneDisabled || readOnly || draftState.nodeId !== nodeId)
+      return;
+    const next = draftState;
+    // 宿主回调可能捕获旧表单，逐项刷新闭包，避免正文、音色和录音互相覆盖。
+    if (
+      JSON.stringify([value, textLinks]) !==
+      JSON.stringify([next.value, next.textLinks])
+    ) {
+      flushSync(() =>
+        callbacks.current.onChange(toRichTextV2(next.value), next.textLinks)
+      );
+    }
+    if (JSON.stringify(voiceProfile) !== JSON.stringify(next.voiceProfile)) {
+      flushSync(() =>
+        callbacks.current.onVoiceProfileChange?.(
+          next.voiceProfile ?? { voices: [] }
+        )
+      );
+    }
+    if (JSON.stringify(audioAssets) !== JSON.stringify(next.audioAssets)) {
+      flushSync(() =>
+        callbacks.current.onAudioAssetsChange?.(next.audioAssets ?? [])
+      );
+    }
+    setDraftState(next);
+    if (onDone) onDone();
+    else setEditing(false);
   };
   const expanded = env.VOICE_EDITOR && (presentation === "editor" || editing);
   // 缓存住：每次渲染都新建对象会让弧线层跟着重量一遍。展开编辑时用不上，不算。
@@ -245,9 +264,14 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     destination.push({ value, links: textLinks });
     publish(snapshot.value, snapshot.links);
   };
-  const englishContent = mode !== undefined && ENTRY_ENGLISH_MODES.has(mode);
+  const fontClass =
+    mode === "grammar" || mode === "spelling"
+      ? "tsz-words"
+      : mode === "dict-phonetic" || mode === "actual-pron"
+        ? "tsz-phonetics"
+        : "tsz-entry-en";
   const largePreview =
-    (englishContent && mode !== "spelling") || mode === "actual-pron";
+    mode === "grammar" || mode === "association" || mode === "actual-pron";
   const grammarPreview =
     mode === "grammar" && !expanded && !focused && value.text !== "";
   const fallback = (
@@ -261,14 +285,18 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       aria-label={expanded ? `${ariaLabel}预览` : ariaLabel}
       aria-invalid={invalid}
       status={invalid ? "error" : undefined}
-      // 有连读时为弧线留出高度；增删标注也会触发自动重新测量。
-      autoSize={{ minRows: liaisons && !largePreview ? 2 : 1, maxRows: 6 }}
+      // 无连读时用自然高度；有连读时显式设置最小行数。
+      // 单改 padding 不会触发 antd autoSize，须切换 minRows，确保只增删标记也重测且不重挂输入框。
+      autoSize={{
+        minRows: liaisons ? (largePreview ? 1 : 2) : undefined,
+        maxRows: 6
+      }}
       style={
         liaisons
           ? { paddingTop: mode === "grammar" ? "calc(4px + 0.5em)" : "1em" }
           : undefined
       }
-      className={`word-pronunciation-phonetic-input${englishContent ? " tsz-entry-en" : ""}${largePreview ? " v3-voice-text-large-preview" : ""}${mode === "grammar" ? " v3-grammar-input" : ""}`}
+      className={`word-pronunciation-phonetic-input ${fontClass}${mode === "actual-pron" ? " tsz-actual-pronunciation" : ""}${largePreview ? " v3-voice-text-large-preview" : ""}${mode === "grammar" ? " v3-grammar-input" : ""}`}
       data-v3-field={expanded ? undefined : field}
       data-v3-node-id={expanded ? undefined : nodeId}
       data-v3-node-aliases={expanded ? undefined : nodeAliases}
@@ -321,7 +349,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     >
       {fallback}
       {grammarPreview ? (
-        <div className="v3-grammar-preview-content tsz-entry-en" aria-hidden>
+        <div className="v3-grammar-preview-content tsz-words" aria-hidden>
           <RichTextReadOnly
             value={
               value.version === 2
@@ -367,7 +395,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         disabled={readOnly}
         icon={<EditOutlined />}
         onClick={() => {
-          session.current = captureSession();
+          setDraftState(captureSession());
           setRecorded(true);
           setEditing(true);
         }}
@@ -376,17 +404,41 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     </Space.Compact>
   );
 
+  const renderActions = (canComplete: boolean) =>
+    showDone ? (
+      <Space className="v3-voice-text-editor-done" size={6}>
+        <Button
+          size="small"
+          aria-label={`取消${ariaLabel}编辑`}
+          disabled={doneLoading}
+          onClick={cancelEditing}
+        >
+          取消
+        </Button>
+        <Button
+          type="primary"
+          size="small"
+          aria-label={`完成${ariaLabel}编辑`}
+          loading={doneLoading}
+          disabled={doneDisabled || readOnly || !canComplete}
+          onClick={completeEditing}
+        >
+          完成
+        </Button>
+      </Space>
+    ) : null;
   const editor = (
     <div className="v3-voice-text-editor" style={{ minWidth: 0 }}>
       {feedbackHolder}
       <Suspense fallback={<div style={{ paddingBottom: 32 }}>{fallback}</div>}>
         <VoiceEditor<TLink>
           key={`${nodeId}:${editorSession}`}
+          renderActions={renderActions}
           onAssociationPendingChange={onAssociationPendingChange}
           textReadOnly={false}
           mode={mode}
           locale={voiceLocale(dialect)}
-          textLinks={textLinks}
+          textLinks={draftState.textLinks}
           restoreTextLinksOnCorrection={restoreTextLinksOnCorrection}
           renderAssociationPicker={renderAssociationPicker}
           contextLabel={ariaLabel}
@@ -397,53 +449,40 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           }}
           language="en"
           placeholder={placeholder}
-          onChange={(next: RichTextV2, nextLinks) => change(next, nextLinks)}
+          onChange={(next: RichTextV2, nextLinks) => {
+            if (!readOnly)
+              setDraftState((current) => ({
+                ...current,
+                value: next,
+                textLinks: nextLinks
+              }));
+          }}
           previewAdapter={
             env.VOICE_PREVIEW
               ? (previewAdapter ?? adminVoicePreviewAdapter)
               : undefined
           }
           previewIsMock={voicePreviewIsMock}
-          onVoiceProfileChange={onVoiceProfileChange}
+          onVoiceProfileChange={(next) => {
+            if (!readOnly)
+              setDraftState((current) => ({ ...current, voiceProfile: next }));
+          }}
           // 开关关着 = 不注入适配器：面板置灰说明原因，已有的音频引用仍列出来。
           audioUploadAdapter={
             env.VOICE_AUDIO_UPLOAD && audioUploadEnabled
               ? adminAudioUploadAdapter
               : undefined
           }
-          audioAssets={audioAssets ?? undefined}
-          onAudioAssetsChange={onAudioAssetsChange}
+          audioAssets={draftState.audioAssets ?? undefined}
+          onAudioAssetsChange={(next) => {
+            if (!readOnly)
+              setDraftState((current) => ({ ...current, audioAssets: next }));
+          }}
           readOnly={readOnly}
-          value={value}
-          voiceProfile={voiceProfile}
+          value={draftState.value}
+          voiceProfile={draftState.voiceProfile}
         />
       </Suspense>
-      {showDone && (
-        <Space className="v3-voice-text-editor-done" size={6}>
-          <Button
-            size="small"
-            aria-label={`取消${ariaLabel}编辑`}
-            disabled={doneLoading}
-            onClick={cancelEditing}
-          >
-            取消
-          </Button>
-          <Button
-            type="primary"
-            size="small"
-            aria-label={`完成${ariaLabel}编辑`}
-            loading={doneLoading}
-            disabled={doneDisabled}
-            onClick={() => {
-              session.current = captureSession();
-              if (onDone) onDone();
-              else setEditing(false);
-            }}
-          >
-            完成
-          </Button>
-        </Space>
-      )}
     </div>
   );
 
@@ -453,7 +492,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       {fieldView}
       {editing && (
         <VoiceEditorModal
-          title={`编辑${ariaLabel}`}
+          title={editorTitle ?? `编辑${ariaLabel}`}
           open={editing}
           footer={null}
           onCancel={cancelEditing}

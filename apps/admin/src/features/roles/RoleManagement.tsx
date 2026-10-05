@@ -49,7 +49,7 @@ export function RoleManagement() {
 
   // 权限 key → 中文 label，以及目录（=侧栏）顺序，用于把角色权限集按侧栏顺序渲染成标签。
   const { labelOf, catalogOrder } = useMemo(() => {
-    const items = catalog.data?.items ?? [];
+    const items = catalog.data?.permissions ?? [];
     return {
       labelOf: new Map(items.map((i) => [i.key, i.label])),
       catalogOrder: items.map((i) => i.key)

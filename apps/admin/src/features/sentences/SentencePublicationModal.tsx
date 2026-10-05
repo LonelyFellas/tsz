@@ -134,12 +134,12 @@ export function SentencePublicationModal({
           type="info"
           title={
             action === "withdraw"
-              ? "下架影响所有引用方，保留草稿、历史和关联"
+              ? "下架会影响所有关联此例句的内容；草稿、历史版本和关联仍会保留"
               : action === "restore"
                 ? "恢复前重新校验当前发布版本，草稿不会发布"
                 : "发布与回退都不覆盖草稿，也不会自动恢复已下架例句"
           }
-          description="需要词库发布权限；仅创建者或超管可操作，服务端会再次校验。"
+          description="需要对应的发布、下架、恢复或回滚权限；普通管理员仅能操作本人例句。"
         />
         {action === "publish" && (
           <V3EnglishTextPreview

@@ -1,0 +1,28 @@
+.dialog {
+  position: fixed;
+  inset: 0;
+  margin: 0;
+  display: none;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  padding: 0 0 env(safe-area-inset-bottom);
+  border: 0;
+  border-radius: 0;
+}
+
+.dialog[open] {
+  display: grid;
+}
+
+@media (min-width: 1280px) and (hover: hover) and (pointer: fine) {
+  .dialog {
+    margin: auto;
+    width: min(64rem, calc(100vw - 2rem));
+    height: min(80dvh, 52rem);
+    border: 1px solid rgb(var(--ch-border));
+    border-radius: 1.5rem;
+  }
+}

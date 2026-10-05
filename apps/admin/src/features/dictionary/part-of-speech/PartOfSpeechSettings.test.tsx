@@ -13,6 +13,7 @@ import type {
 } from "@tsz/types";
 import type { ReactNode, Ref } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useAuthStore } from "@/lib/auth";
 import { PartOfSpeechSettings } from "./PartOfSpeechSettings";
 
 vi.mock("antd", async (importOriginal) => {
@@ -274,6 +275,16 @@ function renderSettings() {
 }
 
 beforeEach(() => {
+  useAuthStore.getState().setProfile({
+    id: "admin-1",
+    role: "super_admin",
+    phone: "",
+    display_name: "测试超管",
+    permission_version: 1,
+    catalog_version: "v1",
+    permissions: [],
+    preferences: { dialect: "uk" }
+  });
   vi.clearAllMocks();
   mock.queries.length = 0;
   mock.list.isError = false;
@@ -305,6 +316,24 @@ beforeEach(() => {
 });
 
 describe("PartOfSpeechSettings", () => {
+  it("配置查看权不开放写操作；编辑授权才可新增、修改、删除", () => {
+    useAuthStore.getState().setProfile({
+      ...useAuthStore.getState().profile!,
+      role: "admin",
+      permissions: ["lexicon_settings.access"]
+    });
+    renderSettings();
+    expect(screen.getByText("新增基本词性").closest("button")).toBeDisabled();
+    for (const button of screen.getAllByText("修 改", {
+      selector: "button span"
+    }))
+      expect(button.closest("button")).toBeDisabled();
+    for (const button of screen.getAllByText("删 除", {
+      selector: "button span"
+    }))
+      expect(button.closest("button")).toBeDisabled();
+    expect(mock.remove).not.toHaveBeenCalled();
+  });
   it("配置页顶部显示基本/细分 Tab，默认展示基本词性管理", () => {
     renderSettings();
 
@@ -325,7 +354,7 @@ describe("PartOfSpeechSettings", () => {
     expect(referencedDelete).toBeDisabled();
     expect(referencedDelete.parentElement).toHaveAttribute(
       "data-tooltip",
-      "已有 3 个单词或短语引用，只能修改"
+      "已关联 3 个单词或短语，可以修改，但不能删除"
     );
 
     const particleRow = screen.getByText("小品词").closest("tr")!;
@@ -584,7 +613,10 @@ describe("PartOfSpeechSettings", () => {
   it.each([
     ["part_of_speech_conflict", "基本词性名称已存在"],
     ["sub_part_of_speech_conflict", "细分词性名称已存在"],
-    ["part_of_speech_in_use", "该基本词性已被单词或短语引用，只能修改"],
+    [
+      "part_of_speech_in_use",
+      "该基本词性仍与单词或短语有关联，可以修改，但不能删除"
+    ],
     [
       "part_of_speech_has_sub_parts",
       "该基本词性下还有细分词性，请先删除细分词性"
@@ -595,7 +627,7 @@ describe("PartOfSpeechSettings", () => {
     ],
     [
       "sub_part_of_speech_in_use",
-      "该细分词性已被词义引用，不能删除，编码也不能再改"
+      "该细分词性仍与词义有关联，不能删除或修改编码"
     ],
     ["sub_part_of_speech_not_allowed", "该基本词性不支持细分词性"],
     ["part_of_speech_not_found", "基本词性不存在或已被删除，请刷新后重试"],

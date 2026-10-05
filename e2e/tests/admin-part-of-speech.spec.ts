@@ -88,7 +88,10 @@ async function mockPartOfSpeechSettingsApi(page: Page) {
         display_name: actor.display_name,
         role: "super_admin",
         can_publish_lexicon: true,
-        permissions: []
+        permission_version: 1,
+        catalog_version: "permission-e2e-v1",
+        permissions: [],
+        preferences: { dialect: "uk" }
       });
     }
     if (
@@ -120,7 +123,8 @@ test("基本词性表按原型列展示，弹窗只有展示字段、不暴露�
     "简洁显示",
     "正式英文",
     "英文缩写",
-    "英文全称"
+    "英文全称",
+    "关联"
   ]) {
     await expect(
       page.getByRole("columnheader", { name: header, exact: true })
@@ -131,7 +135,7 @@ test("基本词性表按原型列展示，弹窗只有展示字段、不暴露�
   ).toHaveCount(0);
 
   const row = page.getByRole("row").filter({ hasText: "小品词" });
-  await expect(row.getByText("未引用", { exact: true })).toBeVisible();
+  await expect(row.getByText("无关联", { exact: true })).toBeVisible();
   await expect(row.getByText("0 项", { exact: true })).toBeVisible();
   await row.getByRole("button", { name: "修 改" }).click();
 

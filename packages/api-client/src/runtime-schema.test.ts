@@ -623,6 +623,34 @@ it("新 reader 接受缺省旧记录和新 synthesis，同时仍拒绝未知格�
     ups_locale: "en-AU"
   };
   expect(validateRuntimeSchema("AdminWordV3", value).valid).toBe(false);
+  row.synthesis = {
+    alphabet: "ups",
+    ipa: "",
+    ups: "",
+    use_spelling: false,
+    uk: {
+      ipa: "fɑː",
+      ups: "F AA",
+      ups_words: [{ text: "far", phoneme: "F AA" }]
+    },
+    us: {
+      ipa: "fɑɹ",
+      ups: "F AA R",
+      ups_words: [{ text: "far", phoneme: "F AA R" }]
+    }
+  };
+  expect(validateRuntimeSchema("AdminWordV3", value)).toEqual({ valid: true });
+  const dual = row.synthesis as {
+    uk: Record<string, unknown>;
+    us: Record<string, unknown>;
+  };
+  dual.us.ipa = "a".repeat(201);
+  expect(validateRuntimeSchema("AdminWordV3", value).valid).toBe(false);
+  dual.us.ipa = "fɑɹ";
+  dual.uk.unexpected = "not allowed";
+  expect(validateRuntimeSchema("AdminWordV3", value).valid).toBe(false);
+  delete dual.uk.unexpected;
+  expect(validateRuntimeSchema("AdminWordV3", value)).toEqual({ valid: true });
   row.synthesis = { alphabet: "sapi", ipa: "kæt", ups: "K AE T" };
   expect(validateRuntimeSchema("AdminWordV3", value).valid).toBe(false);
 });

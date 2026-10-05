@@ -2,7 +2,8 @@ import type {
   AudioUploadAdapter,
   VoicePreviewAdapter
 } from "@tsz/voice-editor/types";
-import { api } from "@/lib/auth";
+import { hasAdminPermission, hasAnyAdminPermission } from "@tsz/shared/auth";
+import { api, useAuthStore } from "@/lib/auth";
 import { env } from "@/lib/env";
 import { createAdminVoicePreviewAdapter } from "./adapter";
 import { createAdminAudioUploadAdapter } from "./audioUploadAdapter";
@@ -36,6 +37,8 @@ export const adminVoicePreviewAdapter: VoicePreviewAdapter = {
     return (await resolveAdapter()).listVoices(input);
   },
   async synthesize(input, options) {
+    if (!hasAdminPermission(useAuthStore.getState().profile, "speech.generate"))
+      throw new Error("没有生成语音的权限");
     return (await resolveAdapter()).synthesize(input, options);
   }
 };
@@ -51,6 +54,15 @@ async function resolveAudioAdapter(): Promise<AudioUploadAdapter> {
 
 export const adminAudioUploadAdapter: AudioUploadAdapter = {
   async upload(input) {
+    if (
+      !hasAnyAdminPermission(useAuthStore.getState().profile, [
+        "words.create",
+        "words.edit",
+        "sentences.create",
+        "sentences.edit"
+      ])
+    )
+      throw new Error("没有上传音频的权限");
     return (await resolveAudioAdapter()).upload(input);
   },
   async resolveUrl(assetId, options) {

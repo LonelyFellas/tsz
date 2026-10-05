@@ -13,7 +13,10 @@ import { HttpError } from "@tsz/api-client";
 import type { AdminUserListQuery, AdminUserView } from "@tsz/types";
 
 // 编辑 / 启禁用按后台身份置灰：逐例可切超管与普通 admin 两种身份。
-const auth = vi.hoisted(() => ({ isSuperAdmin: true }));
+const auth = vi.hoisted(() => ({
+  isSuperAdmin: true,
+  permissions: undefined as string[] | undefined
+}));
 
 vi.mock("@/lib/auth", () => ({
   api: {
@@ -24,7 +27,8 @@ vi.mock("@/lib/auth", () => ({
       update: vi.fn()
     }
   },
-  useIsSuperAdmin: () => auth.isSuperAdmin
+  usePermission: (key: string) =>
+    auth.permissions ? auth.permissions.includes(key) : auth.isSuperAdmin
 }));
 
 import { api } from "@/lib/auth";
@@ -124,6 +128,7 @@ function fakeList(query: AdminUserListQuery = {}) {
 
 beforeEach(() => {
   auth.isSuperAdmin = true;
+  auth.permissions = undefined;
   users = seed();
   mockList.mockImplementation(async (q) => fakeList(q));
   // 写操作落回本地数据源：mutation 成功后列表失效重取，能看到状态/昵称真的变了。
@@ -169,6 +174,24 @@ function clickRowButton(label: RegExp, idx = 0) {
 }
 
 describe("UserManagement", () => {
+  it("资料编辑、状态变更与敏感联系方式分别控制，不因一项授权开放全部动作", async () => {
+    auth.permissions = ["users.edit"];
+    renderPage();
+    const row = (await screen.findByText("record")).closest("tr")!;
+    expect(
+      within(row)
+        .getByText(/编\s?辑/)
+        .closest("button")
+    ).toBeEnabled();
+    expect(
+      within(row)
+        .getByText(/禁\s?用/)
+        .closest("button")
+    ).toBeDisabled();
+    expect(screen.queryByText("13800000001")).toBeNull();
+    expect(screen.queryByText("record@qq.com")).toBeNull();
+    expect(api.users.setStatus).not.toHaveBeenCalled();
+  });
   it("渲染搜索行、角色 tab 与用户行；等级/余额缺省列显示「-」", async () => {
     renderPage();
     expect(await screen.findByText("record")).toBeInTheDocument();

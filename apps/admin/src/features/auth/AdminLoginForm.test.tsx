@@ -1,5 +1,9 @@
 import type { AdminAuthResponse, AdminProfile } from "@tsz/api-client";
-import { HttpError } from "@tsz/api-client";
+import {
+  HttpError,
+  decodeAdminProfile,
+  ADMIN_PERMISSION_UPGRADE_MESSAGE
+} from "@tsz/api-client";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -75,7 +79,8 @@ function profileResponse(role: "admin" | "super_admin"): AdminProfile {
     phone: "13800138000",
     display_name: "审核员小王",
     role,
-    can_publish_lexicon: role === "super_admin",
+    permission_version: 1,
+    catalog_version: "catalog-v1",
     permissions: role === "super_admin" ? [] : ["users.access"],
     preferences: { dialect: "uk" }
   };
@@ -111,10 +116,47 @@ beforeEach(() => {
   mockRedirect = null;
   // enterConsole 默认拿到一个普通管理员 profile；需要超管的用例各自覆盖。
   mockProfile.mockResolvedValue(profileResponse("admin"));
-  useAuthStore.setState({ profile: null, role: null });
+  useAuthStore.setState({
+    profile: null,
+    role: null,
+    permissionModelIncompatible: false
+  });
 });
 
 describe("AdminLoginForm — 2FA", () => {
+  it("登录成功但旧profile缺授权版本时明确要求升级，而不是诱导网络重试", async () => {
+    mockLogin.mockResolvedValueOnce(authResponse());
+    mockProfile.mockImplementationOnce(async () =>
+      decodeAdminProfile({
+        id: "a1",
+        role: "admin",
+        phone: PHONE,
+        display_name: "旧管理员",
+        can_publish_lexicon: true,
+        permissions: ["users.access", "words.access", "classes.access"],
+        preferences: { dialect: "uk" }
+      })
+    );
+    render(<AdminLoginForm />);
+    fill();
+    fireEvent.click(screen.getByRole("button", { name: LOGIN_BUTTON }));
+    expect(
+      await screen.findByText(ADMIN_PERMISSION_UPGRADE_MESSAGE)
+    ).toBeInTheDocument();
+    expect(screen.queryByText("登录成功但加载账号信息失败，请重试")).toBeNull();
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(useAuthStore.getState().profile).toBeNull();
+    expect(mockSetAccessToken).toHaveBeenCalledWith(null);
+  });
+
+  it("自动恢复已确认不兼容时，登录页直接展示同一升级说明", () => {
+    useAuthStore.setState({ permissionModelIncompatible: true });
+    render(<AdminLoginForm />);
+    expect(
+      screen.getByText(ADMIN_PERMISSION_UPGRADE_MESSAGE)
+    ).toBeInTheDocument();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
   // ============================== 发码（2FA 第一步）==============================
 
   it("合法手机号 → 获取验证码可用，点击调 requestLoginCode 并进入倒计时", async () => {
@@ -247,12 +289,15 @@ describe("AdminLoginForm — 2FA", () => {
 
   // ============================== 表单校验 / 防重 ==============================
 
-  it("密码不足 8 位：按钮禁用且原生提交不打后端（与后端 8–72 规则一致）", async () => {
+  it("登录只检查密码必填，不执行新密码长度策略", async () => {
+    mockLogin.mockResolvedValue(authResponse());
     const { container } = render(<AdminLoginForm />);
     fill({ password: "short12" }); // 7 位，手机/验证码合法
-    expect(screen.getByRole("button", { name: LOGIN_BUTTON })).toBeDisabled();
+    expect(screen.getByRole("button", { name: LOGIN_BUTTON })).toBeEnabled();
     fireEvent.submit(container.querySelector("form") as HTMLFormElement);
-    await waitFor(() => expect(mockLogin).not.toHaveBeenCalled());
+    await waitFor(() =>
+      expect(mockLogin).toHaveBeenCalledWith(PHONE, "short12", CODE)
+    );
   });
 
   it("手机号非法：按钮禁用，不打后端", () => {
@@ -424,7 +469,8 @@ describe("AdminLoginForm — 2FA", () => {
         phone: "1",
         display_name: "X",
         role: "admin",
-        can_publish_lexicon: true,
+        permission_version: 1,
+        catalog_version: "catalog-v1",
         permissions: [],
         preferences: { dialect: "uk" }
       },
@@ -444,7 +490,8 @@ describe("AdminLoginForm — 2FA", () => {
           phone: "1",
           display_name: "X",
           role: "admin",
-          can_publish_lexicon: true,
+          permission_version: 1,
+          catalog_version: "catalog-v1",
           permissions: [],
           preferences: { dialect: "uk" }
         },

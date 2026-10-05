@@ -1,0 +1,93 @@
+.entry-annotation-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-height: calc(100dvh - 180px);
+  overflow-y: auto;
+  padding-inline-end: 4px;
+}
+
+.entry-annotation-intro {
+  line-height: 1.7;
+}
+
+.entry-annotation-section-title {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.entry-annotation-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px;
+  align-items: start;
+  gap: 24px;
+  padding: 18px;
+}
+
+.entry-annotation-row + .entry-annotation-row {
+  border-top: 1px solid #f0f0f0;
+}
+
+.entry-annotation-details {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.entry-annotation-meta {
+  display: grid;
+  grid-template-columns: minmax(0, 160px) max-content max-content;
+  justify-content: start;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.entry-annotation-meta .ant-typography {
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.entry-annotation-creator {
+  grid-column: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entry-annotation-updated {
+  grid-column: 2;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.entry-annotation-meta .entry-annotation-view {
+  grid-column: 3;
+  height: 20px;
+  padding: 0;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.entry-annotation-incoming {
+  background: #f5f8ff;
+  border-color: #b6c8ff;
+}
+
+.entry-annotation-input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 575px) {
+  .entry-annotation-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    padding: 14px;
+  }
+}

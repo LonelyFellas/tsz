@@ -1,4 +1,14 @@
-import { Alert, Button, Cascader, Empty, Flex, Spin, Typography } from "antd";
+import {
+  Alert,
+  Button,
+  Cascader,
+  Empty,
+  Flex,
+  Modal,
+  Spin,
+  Tooltip,
+  Typography
+} from "antd";
 import { useEffect, useMemo, useState } from "react";
 import type {
   GrammarFormLinkV3,
@@ -16,6 +26,7 @@ export function V3GrammarFormPicker({
   selected,
   onSelect
 }: AssociationPickerProps<GrammarFormLinkV3>) {
+  const [modal, contextHolder] = Modal.useModal();
   const requests = useMemo(() => createV3WordRequests(), []);
   const formLabel = useFormTypeLabel();
   const posLabel = usePartOfSpeechLabel();
@@ -161,23 +172,27 @@ export function V3GrammarFormPicker({
   }
   return (
     <Flex vertical gap="small" style={{ maxWidth: "min(760px, 85vw)" }}>
-      <Typography.Text strong className="tsz-entry-en">
+      {contextHolder}
+      <Typography.Text strong className="tsz-words">
         {literal}
       </Typography.Text>
       {selected && (
         <Typography.Text>
-          已关联词形 · {dialectLabel(selected.target_dialect)}
+          已关联 · {dialectLabel(selected.target_dialect)}
           {selected.target_publication_id ? "" : "（草稿）"}
         </Typography.Text>
       )}
-      <Typography.Text type="secondary">
-        {selected
-          ? "可查看关联列表，清除后可以重新选择词形；合成只取该词形的第一个发音。"
-          : "选择词形即可关联，不选释义；合成只取该词形的第一个发音。"}
-      </Typography.Text>
+      <Tooltip title="使用词形的首条发音">
+        <Typography.Text type="secondary">
+          {selected ? "点击词形可替换" : "选择词形关联"}
+        </Typography.Text>
+      </Tooltip>
       {options.length > 0 && (
         <Cascader.Panel
           options={options}
+          optionRender={(option) => (
+            <span className="tsz-words">{option.label}</span>
+          )}
           value={
             selected
               ? [
@@ -187,10 +202,42 @@ export function V3GrammarFormPicker({
               : undefined
           }
           onChange={(_value, selectedOptions) => {
-            if (selected) return;
             const option = selectedOptions[selectedOptions.length - 1];
-            if (option && "link" in option)
-              onSelect(option.link as GrammarFormLinkV3);
+            if (option && "link" in option) {
+              const next = option.link as GrammarFormLinkV3;
+              if (
+                selected?.target_word_id === next.target_word_id &&
+                selected.target_publication_id === next.target_publication_id &&
+                selected.target_variant_id === next.target_variant_id
+              )
+                return;
+              if (selected) {
+                const current = options
+                  .find(
+                    (item) =>
+                      item.value ===
+                      `${selected.target_word_id}:${selected.target_publication_id ?? "draft"}:${selected.target_pos_id}`
+                  )
+                  ?.children.find(
+                    (item) => item.value === selected.target_variant_id
+                  );
+                modal.confirm({
+                  title: "切换词形关联？",
+                  content: (
+                    <Typography.Text className="tsz-words">
+                      {current?.label ?? dialectLabel(selected.target_dialect)}
+                      {" → "}
+                      {option.label}
+                    </Typography.Text>
+                  ),
+                  okText: "切换",
+                  cancelText: "取消",
+                  onOk: () => onSelect(next)
+                });
+                return;
+              }
+              onSelect(next);
+            }
           }}
         />
       )}
@@ -202,7 +249,18 @@ export function V3GrammarFormPicker({
         />
       )}
       {selected && (
-        <Button size="small" onClick={() => onSelect(undefined)}>
+        <Button
+          size="small"
+          onClick={() =>
+            modal.confirm({
+              title: "清除词形关联？",
+              content: "将不再使用该词形的发音。",
+              okText: "清除",
+              cancelText: "取消",
+              onOk: () => onSelect(undefined)
+            })
+          }
+        >
           清除关联
         </Button>
       )}

@@ -51,9 +51,9 @@ import {
 import { resolveV3StepAccess } from "@/features/dictionary/word-creation-v3/stepAccess";
 import {
   canWriteEntry,
-  canPublishEntry
+  canCheckEntry
 } from "@/features/dictionary/entryWritePermission";
-import { api, useAuthStore } from "@/lib/auth";
+import { api, useAuthStore, usePermission } from "@/lib/auth";
 import { usePartOfSpeechCatalog } from "@/features/dictionary/part-of-speech/api";
 import { summarizeFormsImpact } from "@/features/dictionary/word-creation-v3/presentation";
 import {
@@ -133,19 +133,19 @@ function V3ReferenceNotices() {
         <Alert
           showIcon
           type="info"
-          title="引用信息暂不可用"
-          description="引用影响信息暂不可用；可以编辑草稿，发布前仍由服务端严格校验。"
+          title="暂时无法查看关联信息"
+          description="请刷新页面后重试。你可以继续编辑和保存草稿，发布时系统会再次检查关联内容是否正确。"
         />
       ) : null}
       {index.stale.length > 0 ? (
         <Alert
           showIcon
           type="error"
-          title={`当前草稿有 ${index.stale.length} 条引用待修复，暂不可发布`}
+          title={`存在 ${index.stale.length} 处关联失效，处理后才能发布`}
           description={
             <Flex vertical gap={4}>
               <span>
-                这些引用在当前草稿里已不成立。草稿可继续保存，当前发布内容不受影响；修复引用后才能发布。
+                以下内容关联的词形或词义已发生变化，请打开对应内容，重新选择或解除关联。你可以继续保存草稿，已发布的内容不受影响；处理完这些关联后才能发布。
               </span>
               <V3ReferenceList
                 references={index.stale}
@@ -170,10 +170,12 @@ function V3BlockedReferencesAlert({
     <Alert
       showIcon
       type="error"
-      title={`本次词形变更会影响 ${references.length} 处引用，发布前需修复`}
+      title={`本次词形修改会影响 ${references.length} 处关联，处理后才能发布`}
       description={
         <Flex vertical gap={4}>
-          <span>可先保存草稿，再到来源处调整这些引用；修复前不能发布。</span>
+          <span>
+            可以先保存草稿，再打开以下关联内容，重新选择或解除关联；处理完成后才能发布。
+          </span>
           <V3ReferenceList references={references} staleLabel="将失效" />
         </Flex>
       }
@@ -276,11 +278,11 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
         <Alert
           showIcon
           type="error"
-          title="拼写变更会影响引用，发布前需修复"
+          title="修改后的拼写与关联内容不一致，处理后才能发布"
           description={
             <Flex vertical gap={4}>
               <span>
-                可以先保存草稿，再到引用来源修复；当前发布内容不随草稿保存改变。
+                可以先保存草稿，再打开以下关联内容，调整文字或重新选择关联词形。处理完成后才能发布，已发布的内容不受草稿修改影响。
               </span>
               <V3ReferenceList references={conflictNoticeReferences} />
             </Flex>
@@ -333,7 +335,7 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
               <span>
                 {impactPage
                   ? `正在核对同形匹配：已加载 ${snapshot.items.length}/${snapshot.total}`
-                  : `本次变更影响 ${context.impact.affected.length} 个引用节点。`}
+                  : `本次修改会影响 ${context.impact.affected.length} 项关联内容。`}
               </span>
               {summarizeFormsImpact(context.impact.affected).map((group) => (
                 <Typography.Text key={group.reason} type="secondary">
@@ -523,7 +525,7 @@ function V3MeaningsSlot({
           title="保存前请确认词形影响"
           description={
             <Flex vertical gap={4}>
-              <span>{`本次词形变更影响 ${context.impact.affected.length} 个引用节点。`}</span>
+              <span>{`本次词形修改会影响 ${context.impact.affected.length} 项关联内容。`}</span>
               {summarizeFormsImpact(context.impact.affected).map((group) => (
                 <Typography.Text key={group.reason} type="secondary">
                   {group.reasonLabel}：
@@ -547,9 +549,6 @@ function V3MeaningsSlot({
         />
       ) : null}
       <V3MeaningsAndExamplesStep
-        multiGroupBindingsEnabled={
-          context.word.capabilities.multi_group_sense_bindings === true
-        }
         renderSentenceSection={(senseId) => (
           <WordSentences
             key={senseId}
@@ -652,7 +651,9 @@ function V3LiveReview({
   actions?: React.ReactNode;
   onEdit?: (nodeId: string) => void;
 }) {
+  const canReadSentences = usePermission("sentences.access");
   const sentences = useQuery({
+    enabled: canReadSentences,
     queryKey: ["shared-sentences", "count", word.id, "published"],
     queryFn: () =>
       api.sentences.list({ view: "published", entry_id: word.id, page_size: 1 })
@@ -830,7 +831,7 @@ function V3WizardSlots({
   if (context.readOnly) {
     return (
       <Flex vertical gap="middle">
-        {canPublishEntry(profile, context.word) && !canWriteEntry(profile) ? (
+        {canCheckEntry(profile) && !canWriteEntry(profile, context.word) ? (
           <V3PreviewAndPublishStep
             word={context.word}
             requests={requests}
@@ -840,7 +841,8 @@ function V3WizardSlots({
           <V3ReadOnlyPreview
             word={context.word}
             onEdit={
-              canWriteEntry(profile) && context.word.status === "published"
+              canWriteEntry(profile, context.word) &&
+              context.word.status === "published"
                 ? () =>
                     navigate(
                       `/words/${context.word.id}/v3/wizard/forms?${new URLSearchParams(
@@ -902,18 +904,17 @@ export function WordWizardV3Page({
   requests?: V3WordRequests;
   renderMeaningsStep?: V3MeaningsStepRenderer;
 } = {}) {
+  const canReadSentences = usePermission("sentences.access");
   const { wordId = "", step } = useParams();
   const sharedSentences = useQuery({
     queryKey: ["shared-sentences", "count", wordId, "draft"],
     queryFn: () =>
       api.sentences.list({ view: "draft", entry_id: wordId, page_size: 1 }),
-    enabled: !!wordId
+    enabled: !!wordId && canReadSentences
   });
   // 归属判定所需；门禁保证受保护页内 profile 必有值，缺失时判定一律不放行。
   const profile = useAuthStore((s) => s.profile);
-  const writeActor = profile
-    ? { id: profile.id, role: profile.role }
-    : undefined;
+  const writeActor = profile;
   const partOfSpeechCatalog = usePartOfSpeechCatalog();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -1024,7 +1025,7 @@ export function WordWizardV3Page({
     word,
     requestedStep,
     editingPublished,
-    canWriteEntry(writeActor)
+    canWriteEntry(writeActor, word)
   );
   const forcePreview = stepAccess.readOnly;
   const legalStep = stepAccess.effective;
@@ -1045,8 +1046,8 @@ export function WordWizardV3Page({
           <Alert
             showIcon
             type="warning"
-            title="引用来源节点已不存在"
-            description="该引用来源节点未出现在当前内容中，可能已被删除或修改。请核对当前草稿和发布版本，修复后返回目标词条刷新引用；本提示不代表引用已解除。"
+            title="未找到关联来源内容"
+            description="来源内容可能已被删除或修改，但关联不一定已解除。请检查来源词条的草稿和已发布内容，重新选择或解除关联后，返回本词条刷新页面。"
           />
         )}
       <V3ReferenceGuardProvider value={referenceGuard}>

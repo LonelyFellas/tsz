@@ -17,12 +17,12 @@ test.describe("找回密码端到端流程", () => {
       });
     });
     await page.goto("/forgot-password");
-    await page.getByRole("button", { name: "邮箱", exact: true }).click();
+    await page.getByRole("tab", { name: "邮箱", exact: true }).click();
     await page.getByPlaceholder("请输入邮箱").fill(" Recovery@EXAMPLE.com ");
     await page.getByRole("button", { name: "获取验证码" }).click();
     await expect(page.getByText(/后重发/)).toBeVisible();
     await page.getByPlaceholder("请输入验证码").fill("000000");
-    await page.getByPlaceholder("请输入新密码").fill("NewPassword123");
+    await page.getByPlaceholder("请输入新密码").fill("New!密码🙂 river cloud");
     await page.getByRole("button", { name: "重置密码" }).click();
     await expect(page).toHaveURL(/\/login\?reset=success$/);
     expect(requests).toEqual([
@@ -35,7 +35,7 @@ test.describe("找回密码端到端流程", () => {
         body: {
           identifier: "recovery@example.com",
           code: "000000",
-          new_password: "NEWPASSWORD123"
+          new_password: "New!密码🙂 river cloud"
         }
       }
     ]);
@@ -57,7 +57,9 @@ test.describe("找回密码端到端流程", () => {
     await expect(page.getByText(/后重发/)).toBeVisible();
 
     await page.getByPlaceholder("请输入验证码").fill("123456");
-    await page.getByPlaceholder("请输入新密码").fill("abc12345678");
+    await page
+      .getByPlaceholder("请输入新密码")
+      .fill(" Mixed!密码🙂 river cloud ");
     await page.getByRole("button", { name: "重置密码" }).click();
 
     // 重置成功后跳回登录页并展示成功提示。
@@ -75,14 +77,20 @@ test.describe("找回密码端到端流程", () => {
     await page.getByPlaceholder("请输入手机号").fill("13800138000");
     await page.getByRole("button", { name: "获取验证码" }).click();
     await page.getByPlaceholder("请输入验证码").fill("123456");
-    await page.getByPlaceholder("请输入新密码").fill("abc12345678");
+    await page
+      .getByPlaceholder("请输入新密码")
+      .fill(" Mixed!密码🙂 river cloud ");
     await page.getByRole("button", { name: "重置密码" }).click();
 
     await expect(page).toHaveURL(/\/login\?reset=success/);
 
-    // 用新密码登录（默认即「账号密码」tab）。
-    await page.getByPlaceholder("请输入手机号/邮箱号码").fill("13800138000");
-    await page.getByPlaceholder("请输入登录密码").fill("abc12345678");
+    // 使用重置后的新密码登录。
+    await page
+      .getByRole("textbox", { name: "手机号或邮箱" })
+      .fill("13800138000");
+    await page
+      .getByPlaceholder("请输入登录密码")
+      .fill(" Mixed!密码🙂 river cloud ");
     await page.getByRole("button", { name: "立即登录" }).click();
 
     await expect(page.getByRole("button", { name: "账户菜单" })).toBeVisible();

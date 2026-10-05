@@ -52,8 +52,15 @@ export interface UpsWordV3 {
   phoneme: string;
 }
 export type PhonemeLocaleV3 = "en-GB" | "en-US";
+export interface PronunciationSynthesisCandidateV3 {
+  ipa: string;
+  ups: string;
+  ups_words?: UpsWordV3[] | null;
+}
 export interface PronunciationSynthesisV3 {
   alphabet: "ipa" | "ups";
+  uk?: PronunciationSynthesisCandidateV3;
+  us?: PronunciationSynthesisCandidateV3;
   ipa: string;
   ups: string;
   use_spelling?: boolean | null;
@@ -288,7 +295,7 @@ export type AudioAssetGenderV3 = "female" | "male";
 /**
  * 一条已上传的音频资产（真人录音）。元数据由服务端在 confirm 时生成，前端原样回传；
  * 不含可播放 URL——试听要按 id 另取短期签名 URL，签名 URL 不进 aggregate / publication。
- * 契约见 docs/features/voice-editor-audio-upload/design.md「后端对接」。
+ * 契约见 tsz-rust/docs/openapi.json 与 tsz-rust/docs/object-storage-design.md。
  */
 export interface AudioAssetV3 {
   id: string;
@@ -460,7 +467,7 @@ export interface PublishedSentenceTargetCandidateV3 {
   senses: SentenceTargetSenseV3[];
 }
 
-/** 按关键字检索短语成分目标：对已发布词面做包含匹配。 */
+/** 按关键字检索关联目标，默认仅查询发布内容。 */
 export interface SearchComponentTargetsV3Input {
   schema_version: 3;
   /** 关键字，1..=100 码点且两端不留空白；带空白后端直接 422。 */
@@ -477,6 +484,7 @@ export interface SearchComponentTargetsV3Input {
    * 屈折词形（jobs / gave）照样命中原形词条。例句里点词做关联要用 `exact`。
    */
   match?: "contains" | "exact";
+  include_drafts?: boolean;
 }
 
 export interface SearchComponentTargetsV3Response {
@@ -696,8 +704,6 @@ export interface CreateAdminWordV3Input {
   /** Step 1 最终确认值；兼容窗口内旧客户端可省略。 */
   headwords?: WordHeadwordsV2;
   confirmed_surface_match_token?: string;
-  /** 同原型组另建词条必填，1–500 字；仅记录创建审计，不替代数字标注。 */
-  homograph_reason?: string;
   /** 新词条标注；与已有词条同原型时必填，否则可省略。 */
   annotation?: string | null;
   /** 同原型已有词条的标注（含未改动的），须带上各自当前 annotation_revision。 */
@@ -1081,7 +1087,7 @@ export interface DetectionSurfaceRequestEchoV3 {
 }
 
 export interface DetectLexiconSurfaceResponseV3 {
-  /** Own unfinished draft without saved surface sources; not a surface match. */
+  /** An existing unfinished draft without saved surface sources; informational only and does not prevent creating another entry. */
   existing_draft_id?: string;
   schema_version: 3;
   detection_id: string;

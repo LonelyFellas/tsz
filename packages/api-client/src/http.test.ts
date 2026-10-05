@@ -176,6 +176,7 @@ function relationSummaryFixture(overrides: Record<string, unknown> = {}) {
 function matchedEntryContextFixture(overrides: Record<string, unknown> = {}) {
   return {
     entry_id: UUIDS.entry,
+    created_by_name: "词库管理员",
     annotation: null,
     annotation_revision: 1,
     presentation: {
@@ -290,6 +291,7 @@ function v3SurfacePageFixture(overrides: Record<string, unknown> = {}) {
         entry_id: UUIDS.entry,
         annotation: null,
         annotation_revision: 1,
+        created_by_name: "词库管理员",
         presentation: {
           label: "run",
           matched_surfaces: ["run"],
@@ -1812,7 +1814,7 @@ describe("createHttpClient", () => {
       message: "password change required",
       code: "must_change_password"
     });
-    expect(onForbidden).toHaveBeenCalledWith("must_change_password");
+    expect(onForbidden).toHaveBeenCalledWith("must_change_password", "/words");
   });
 
   it("403 无 code：onForbidden 收到 undefined", async () => {
@@ -1834,7 +1836,7 @@ describe("createHttpClient", () => {
       status: 403,
       code: undefined
     });
-    expect(onForbidden).toHaveBeenCalledWith(undefined);
+    expect(onForbidden).toHaveBeenCalledWith(undefined, "/x");
   });
 
   it("非 403 错误不触发 onForbidden", async () => {

@@ -28,7 +28,8 @@ import type {
 } from "@tsz/types";
 import { HttpError } from "@tsz/api-client";
 import { DraftComparison } from "../dictionary/DraftComparison";
-import { api } from "@/lib/auth";
+import { canAdminResourceAction, hasAdminPermission } from "@tsz/shared/auth";
+import { api, useAuthStore } from "@/lib/auth";
 import { PronunciationPreviewProvider } from "../dictionary/word-creation/PronunciationPreview";
 import { V3VoiceTextField } from "../dictionary/word-creation-v3/components/V3VoiceTextField";
 import { V3SentenceTranslationsField } from "../dictionary/word-creation-v3/components/V3SentenceTranslationsField";
@@ -37,6 +38,8 @@ import { SharedSentenceAssociationPicker } from "./SharedSentenceAssociationPick
 import { newSentence } from "./model";
 import "./SentenceEditor.css";
 import { VoiceEditorModal } from "../dictionary/word-creation-v3/components/VoiceEditorModal";
+import { V3EditorTitle } from "../dictionary/word-creation-v3/components/V3EditorTitle";
+import { dialectLabel } from "../dictionary/word-creation-v3/presentation";
 const LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"].map((value) => ({
   value,
   label: value
@@ -46,6 +49,7 @@ export function SentenceEditor({
   sentence,
   sourceWord,
   sourceSenseId,
+  rowIndex,
   initialLevel,
   registerLeaveGuard,
   onClose,
@@ -54,11 +58,21 @@ export function SentenceEditor({
   sentence?: SharedSentence;
   sourceWord?: AdminWordV3;
   sourceSenseId?: string;
+  rowIndex?: number;
   initialLevel?: SharedSentence["content"]["sentence"]["level"];
   registerLeaveGuard?: (guard?: () => Promise<boolean>) => void;
   onClose: () => void;
   onSaved: (sentence: SharedSentence) => void;
 }) {
+  const profile = useAuthStore((state) => state.profile);
+  const allowed = sentence
+    ? canAdminResourceAction(
+        profile,
+        "sentences",
+        "edit",
+        sentence.created_by_admin_id
+      )
+    : hasAdminPermission(profile, "sentences.create");
   const { modal } = App.useApp();
   const sourceEntryId = sourceWord?.id;
   const currentTargets =
@@ -74,8 +88,10 @@ export function SentenceEditor({
     if (initialLevel) fresh.sentence.level = initialLevel;
     return fresh;
   });
+  const [pendingEditor, setPendingEditor] = useState(false);
   const initialContent = useRef(JSON.stringify(content));
-  const dirty = JSON.stringify(content) !== initialContent.current;
+  const dirty =
+    pendingEditor || JSON.stringify(content) !== initialContent.current;
   const router = useContext(UNSAFE_DataRouterContext);
   useEffect(() => {
     if (!dirty) return;
@@ -135,7 +151,11 @@ export function SentenceEditor({
     setError("");
   };
   const finish = async (afterSave?: () => void) => {
-    if (conflict || saving) return false;
+    if (conflict || saving || !allowed) return false;
+    if (pendingEditor) {
+      setError("请先完成或取消正文编辑，再保存例句。");
+      return false;
+    }
     if (pendingAnnotation) {
       setError("请先确认当前句内标注，或取消所选片段。");
       return;
@@ -251,6 +271,7 @@ export function SentenceEditor({
       ).length === 1
   );
   const canSave =
+    !pendingEditor &&
     !pendingAnnotation &&
     !content.annotations.some(
       (annotation) => annotation.target.state === "entry_only"
@@ -362,7 +383,13 @@ export function SentenceEditor({
     <PronunciationPreviewProvider>
       <VoiceEditorModal
         open
-        title="编辑例句"
+        title={
+          <V3EditorTitle
+            index={rowIndex}
+            title="多维例句"
+            details={`${sentence ? "" : "新建 · "}${content.sentence.level} · ${dialectLabel(row.dialect)}`}
+          />
+        }
         footer={null}
         onCancel={close}
         closable={!saving}
@@ -476,7 +503,7 @@ export function SentenceEditor({
                 <Button
                   key={segments[0]!.start}
                   size="small"
-                  disabled={saving || pendingAnnotation}
+                  disabled={saving || pendingEditor || pendingAnnotation}
                   onClick={() => {
                     setTargetLabels((labels) => ({
                       ...labels,
@@ -506,7 +533,7 @@ export function SentenceEditor({
             <Radio.Group
               aria-label="例句方言"
               value={row.dialect}
-              disabled={saving}
+              disabled={saving || pendingEditor}
               onChange={(event) => setDialect(event.target.value)}
               options={rows.map((item) => ({
                 value: item.dialect,
@@ -532,7 +559,7 @@ export function SentenceEditor({
               dialect={row.dialect}
               readOnly={saving}
               onAssociationPendingChange={setPendingAnnotation}
-              showDone={false}
+              onDraftPendingChange={setPendingEditor}
               onChange={(value, annotations) =>
                 changeVariant({ value }, annotations)
               }

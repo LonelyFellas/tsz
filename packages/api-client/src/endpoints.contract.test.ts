@@ -47,11 +47,8 @@ const PENDING = new Set<string>([
   // ---- 后端已切换为 tsz-rust(重写进行中),spec 只含 auth 核心 7 条路由。 ----
   // 以下按 tsz-rust 落地节奏逐步从白名单移除(T 系列见 tsz-rust/docs/frontend-integration.md §6)。
 
-  // 个人资料 / 学习设置 / 头像(tsz-rust 未实现)。
-  "patch /me",
+  // 学习设置(tsz-rust 未实现)。
   "put /me/learning-settings",
-  "post /me/avatar/upload-url",
-  "post /me/avatar",
   // 词库 / 词表 / 评论 / 任务:目前全是前端 mock(useWordLists 等),后端未实现。
   "get /words",
   "get /wordlists",
@@ -61,12 +58,8 @@ const PENDING = new Set<string>([
   "post /comments",
   "get /tasks",
   "post /tasks",
-  // 平台后台(admin)RBAC:产品已定案不做(见 tsz-rust admin-design Q10),后端不会实现,
-  // 因此这几条不是「待实现」而是「已取消」。createEndpoints 目前仍会发出它们(Roles 页面在用),
-  // 白名单条目必须保留,否则「无臆造端点」断言会红。待前端下架 Roles 页面后,
-  // 连同 admin.ts 里对应的方法一起删。
+  // 角色治理尚未实现，页面保持未挂路由；统一权限目录已经实现，不在白名单中。
   "patch /admin/admins/_/role",
-  "get /admin/permissions",
   "get /admin/roles",
   "post /admin/roles",
   "patch /admin/roles/_",
@@ -168,6 +161,98 @@ function collectComponentSchemaRefs(value: unknown): Set<string> {
 
   return refs;
 }
+
+describe("昵称保存契约", () => {
+  it("PATCH /me 仅允许 display_name，成功响应为安全的完整 user", () => {
+    const operation = snapshot.operationSchemas["patch /me"];
+    expect(operation.request).toEqual({
+      $ref: "#/components/schemas/UpdateProfileRequest"
+    });
+    expect(operation.responses["200"]).toEqual({
+      $ref: "#/components/schemas/UpdateProfileResponse"
+    });
+    const request = snapshot.schemas.UpdateProfileRequest;
+    expect(request.additionalProperties).toBe(false);
+    expect(request.required).toEqual(["display_name"]);
+    expect(Object.keys(request.properties)).toEqual(["display_name"]);
+    expect(snapshot.schemas.UpdateProfileResponse.properties.user).toEqual({
+      $ref: "#/components/schemas/UserProfile"
+    });
+    const profile = snapshot.schemas.UserProfile;
+    expect(Object.keys(profile.properties).sort()).toEqual(
+      [
+        "id",
+        "display_name",
+        "avatar_url",
+        "phone",
+        "email",
+        "roles",
+        "active_role"
+      ].sort()
+    );
+    expect(profile.required.sort()).toEqual(
+      ["id", "display_name", "avatar_url", "roles", "active_role"].sort()
+    );
+  });
+});
+
+describe("头像直传与确认契约", () => {
+  it("两个写端点已实现，成功响应保持 upload/user 包裹及完整引用闭包", () => {
+    const permit = snapshot.operationSchemas["post /me/avatar/upload-url"];
+    const confirm = snapshot.operationSchemas["post /me/avatar"];
+    expect(permit.request).toEqual({
+      $ref: "#/components/schemas/AvatarUploadRequest"
+    });
+    expect(permit.responses["200"]).toEqual({
+      $ref: "#/components/schemas/AvatarUploadResponse"
+    });
+    expect(confirm.responses["200"]).toEqual({
+      $ref: "#/components/schemas/AvatarConfirmResponse"
+    });
+    expect(snapshot.schemas.AvatarUploadResponse.required).toContain("upload");
+    expect(snapshot.schemas.AvatarConfirmResponse.required).toContain("user");
+    expect(snapshot.schemas.AvatarConfirmResponse.properties.user).toEqual({
+      $ref: "#/components/schemas/UserProfile"
+    });
+    expect(snapshot.schemas.AvatarUpload.required).toEqual(
+      expect.arrayContaining([
+        "key",
+        "url",
+        "headers",
+        "expires_in",
+        "max_bytes"
+      ])
+    );
+    expect(snapshot.schemas.UserProfile.required).toEqual(
+      expect.arrayContaining([
+        "id",
+        "display_name",
+        "avatar_url",
+        "roles",
+        "active_role"
+      ])
+    );
+    expect(specPaths["/avatars/{id}"]).toContain("get");
+    for (const operation of [permit, confirm]) {
+      for (const ref of collectComponentSchemaRefs(operation)) {
+        expect(snapshot.schemas).toHaveProperty(ref);
+      }
+    }
+    expect(snapshot.schemas.ErrorCode.enum).toEqual(
+      expect.arrayContaining([
+        "unsupported_avatar_content_type",
+        "invalid_avatar_size",
+        "avatar_invalid_image",
+        "avatar_file_too_large",
+        "invalid_avatar_key",
+        "avatar_upload_not_completed",
+        "avatar_upload_rate_limited",
+        "avatar_storage_not_configured",
+        "avatar_storage_unavailable"
+      ])
+    );
+  });
+});
 
 describe("账号安全请求与状态码契约", () => {
   const cases = [
@@ -589,7 +674,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "af9b0cdce58bb7ea7092eaff30daad73093441df02f4467479dec7f66ce6b02c"
+      "156d5a03a8baf392f1c00aa298d0cc347199b32f141d19524567a3c1fc0461e7"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1248,4 +1333,24 @@ it("成分定向查询 entry_id 是可选 UUID，保留分页游标契约", () =
   });
   expect(input.required).not.toContain("entry_id");
   expect(input.properties.cursor).toMatchObject({ type: "string" });
+});
+
+describe("统一新密码契约", () => {
+  it("注册、重置、改密一致使用 15–128 字符且错误码完整", () => {
+    for (const schema of [
+      snapshot.schemas.RegisterRequest.properties.password,
+      snapshot.schemas.PasswordResetRequest.properties.new_password,
+      snapshot.schemas.PasswordChangeRequest.properties.new_password,
+      snapshot.schemas.ChangePasswordRequest.properties.new_password
+    ]) {
+      expect(schema).toMatchObject({
+        type: "string",
+        minLength: 15,
+        maxLength: 128
+      });
+    }
+    expect(snapshot.schemas.ErrorCode.enum).toEqual(
+      expect.arrayContaining(["password_too_weak", "password_compromised"])
+    );
+  });
 });

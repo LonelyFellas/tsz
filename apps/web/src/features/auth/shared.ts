@@ -1,6 +1,8 @@
 import { HttpError, type AuthResponse } from "@tsz/api-client";
+import { passwordErrorMessage } from "@tsz/shared/auth";
+import { PASSWORD_MIN_LENGTH } from "@tsz/shared";
 import { safeRedirectPath } from "@tsz/shared/auth";
-import { api, setAccessToken, scheduleRefresh } from "@/lib/request";
+import { api, persistSession as persistRuntimeSession } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
 
 // 后端错误翻译下沉到 @tsz/shared/auth（与 admin 共用通用会话错误映射）。
@@ -8,6 +10,8 @@ export { translateAuthError } from "@tsz/shared/auth";
 
 /** 新用户引导页路径（选择难度等级 + 英式/美式）。 */
 export const ONBOARDING_PATH = "/onboarding";
+
+export const AUTH_PASSWORD_HINT = `密码至少 ${PASSWORD_MIN_LENGTH} 位`;
 
 // 登录 / 注册表单共用的输入框样式。
 export const AUTH_INPUT_CLASS =
@@ -17,18 +21,23 @@ export const AUTH_INPUT_CLASS =
 export function persistSession(
   auth: Pick<AuthResponse, "access_token" | "expires_in">
 ): void {
-  setAccessToken(auth.access_token);
-  scheduleRefresh(auth.expires_in);
+  persistRuntimeSession(auth);
 }
 
 /** 认证成功后一次性发布完整用户态；导航只由 GuestGuard 执行。 */
-export async function completeAuthentication(): Promise<void> {
-  const me = await api.auth.me();
+export async function completeAuthentication(
+  signal?: AbortSignal
+): Promise<void> {
+  if (signal?.aborted) return;
+  const me = await api.auth.me({ signal });
+  if (signal?.aborted) return;
   useUserStore.getState().setSession(me.user, me.onboarded);
 }
 
 export function securityErrorMessage(error: unknown): string {
   if (!(error instanceof HttpError)) return "网络异常，请稍后重试";
+  const passwordMessage = passwordErrorMessage(error.code);
+  if (passwordMessage) return passwordMessage;
   const messages: Record<string, string> = {
     invalid_otp_code: "验证码错误或已失效，请重新获取所需的全部验证码",
     invalid_identifier:
@@ -39,10 +48,7 @@ export function securityErrorMessage(error: unknown): string {
     user_already_exists: "该联系方式已被其他账号使用",
     otp_rate_limited: "验证码发送过于频繁，请稍后再试",
     otp_unavailable: "验证码服务暂不可用，请稍后再试",
-    password_unchanged: "新密码不能与当前密码相同",
-    invalid_password: "密码需为11–20位字母和数字的组合",
-    password_too_short: "密码需为11–20位字母和数字的组合",
-    password_too_long: "密码需为11–20位字母和数字的组合",
+    invalid_password: "密码须为 15–128 个字符，区分大小写，支持符号和空格",
     account_disabled: "账号已停用，请联系平台客服",
     forbidden: "不能移除最后一种登录方式",
     revision_conflict: "账号信息已变化，请刷新页面后重试"

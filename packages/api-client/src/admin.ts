@@ -1,3 +1,7 @@
+import {
+  createPermissionEndpoints,
+  decodeAdminProfile
+} from "./admin-permissions";
 import { createSharedSentenceEndpoints } from "./shared-sentences";
 import { createAdminTeacherCertificationEndpoints } from "./teacher-certification";
 // 平台后台（admin）专用端点。后台是与 web 学员/教师**完全独立**的身份体系：
@@ -39,7 +43,6 @@ import type {
   SearchComponentTargetsV3Input,
   Admin,
   AdminAuthResponse,
-  AdminProfile,
   UpdateAdminPreferencesInput,
   UpdateAdminPreferencesResponse,
   PermissionCatalogResponse,
@@ -212,6 +215,7 @@ function requireLifecycleBatchIdentity<
  */
 export function createAdminEndpoints(http: HttpClient) {
   return {
+    permissionSystem: createPermissionEndpoints(http),
     teacherCertification: createAdminTeacherCertificationEndpoints(http),
     sentences: createSharedSentenceEndpoints(http),
     auth: {
@@ -250,7 +254,7 @@ export function createAdminEndpoints(http: HttpClient) {
         )
     },
     /** GET /admin/profile — 门禁探针：200=有效 admin / 401=未登录。 */
-    profile: () => http.get<AdminProfile>("/profile"),
+    profile: () => http.get<unknown>("/profile").then(decodeAdminProfile),
     /**
      * PATCH /admin/profile/preferences — 改**自己的**个人偏好。
      * 目标恒为 token subject，请求体里没有管理员 ID，改不到别人。
@@ -269,8 +273,7 @@ export function createAdminEndpoints(http: HttpClient) {
     },
     /**
      * 音频资产（真人录音）：OSS 预签名直传三步——申请许可 → 前端直传 → confirm 落库。
-     * 契约见 docs/features/voice-editor-audio-upload/design.md；后端落地前在契约测试的
-     * PENDING 白名单里。
+     * 契约以 tsz-rust/docs/openapi.json 与 tsz-rust/docs/object-storage-design.md 为准。
      */
     audioAssets: {
       /** POST /admin/lexicon/audio-assets/upload-url — 三步之①；存储未开通返回 501。 */
@@ -293,7 +296,7 @@ export function createAdminEndpoints(http: HttpClient) {
         )
     },
     /**
-     * 智能词库（词条创编）。字段与状态码见 docs/admin-wordlist-frontend-integration.md；
+     * 智能词库（词条创编）。字段与状态码见 tsz-rust/docs/openapi.json；
      * 树内节点 id 由前端生成（UUID v4）且跨保存稳定，updated_at 兼作乐观锁 token。
      */
     words: {
@@ -613,14 +616,6 @@ export function createAdminEndpoints(http: HttpClient) {
     admins: {
       update: (adminId: string, input: UpdateAdminInput) =>
         http.patch<Admin>(`/admins/${adminId}`, input),
-      setPublicationPermission: (
-        adminId: string,
-        can_publish_lexicon: boolean
-      ) =>
-        http.patch<{ can_publish_lexicon: boolean }>(
-          `/admins/${adminId}/lexicon-publication-permission`,
-          { can_publish_lexicon }
-        ),
       /** GET /admin/admins — 列表：role/手机号/昵称筛选 + 分页。 */
       list: (query: AdminListQuery = {}) =>
         http.get<AdminListResponse>(`/admins${qs({ ...query })}`),
@@ -656,7 +651,7 @@ export function createAdminEndpoints(http: HttpClient) {
     },
     /**
      * 后台 RBAC「角色治理」（`super_admin` 专属；普通 admin 调用得 403 super admin required）。
-     * 契约见 openapi `Admin (roles)` 标签、docs/admin-rbac-frontend-integration.md。
+     * 契约见 openapi `Admin (roles)` 标签、tsz-rust/docs/openapi.json。
      */
     roles: {
       /** GET /admin/permissions — 权限目录（渲染勾选框；顺序即侧栏顺序，别硬编码 key）。 */

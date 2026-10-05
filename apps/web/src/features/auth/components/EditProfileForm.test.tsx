@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { MeResponse } from "@tsz/api-client";
+import { HttpError, type MeResponse } from "@tsz/api-client";
 import type { User } from "@tsz/types";
 import { EditProfileForm } from "./EditProfileForm";
 import { useUserStore } from "@/stores/user";
@@ -73,8 +73,73 @@ beforeEach(() => {
   mockUnavailable.mockReturnValue(false);
 });
 
+describe("头像错误码", () => {
+  it("旧 API 的 404 在新页面中文降级，不改变用户资料", async () => {
+    const old = userWith();
+    useUserStore.setState({ user: old });
+    mockUploadAvatar.mockRejectedValue(new HttpError(404, "Not Found"));
+    render(<EditProfileForm />);
+    await screen.findByDisplayValue("Alice");
+    fireEvent.change(screen.getByLabelText("选择头像图片"), {
+      target: {
+        files: [new File(["image"], "avatar.png", { type: "image/png" })]
+      }
+    });
+    expect(
+      await screen.findByText("该功能暂未开放，敬请期待")
+    ).toBeInTheDocument();
+    expect(useUserStore.getState().user).toEqual(old);
+  });
+
+  it.each([
+    ["unsupported_avatar_content_type", "仅支持 JPG / PNG / WebP 格式图片"],
+    ["invalid_avatar_size", "图片大小无效,请重新选择"],
+    ["avatar_invalid_image", "图片损坏或像素过大,请重新选择"],
+    ["avatar_file_too_large", "图片不能超过 5MB"],
+    ["invalid_avatar_key", "上传凭证已失效,请重试"],
+    ["avatar_upload_not_completed", "上传未完成,请重试"],
+    ["avatar_upload_rate_limited", "上传过于频繁,请稍后再试"],
+    ["avatar_storage_not_configured", "头像功能即将上线"],
+    ["avatar_storage_unavailable", "头像存储暂不可用,请稍后重试"]
+  ])("%s 优先于服务端英文 detail，失败不更新头像", async (code, message) => {
+    const old = userWith({ avatar_url: "https://api.example/avatars/old" });
+    mockMe.mockResolvedValue(meResponse({ user: old }));
+    useUserStore.setState({ user: old });
+    mockUploadAvatar.mockRejectedValue(
+      new HttpError(400, "changed English detail", [], code)
+    );
+    render(<EditProfileForm />);
+    await screen.findByDisplayValue("Alice");
+    fireEvent.change(screen.getByLabelText("选择头像图片"), {
+      target: {
+        files: [new File(["image"], "avatar.png", { type: "image/png" })]
+      }
+    });
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(useUserStore.getState().user?.avatar_url).toBe(old.avatar_url);
+    expect(screen.getByAltText("头像")).toHaveAttribute("src", old.avatar_url);
+  });
+});
+
 // ── 加载与渲染 ────────────────────────────────────────
 describe("EditProfileForm — 加载与渲染", () => {
+  it.each([
+    ["alice", "A"],
+    ["中文昵称", "中"],
+    ["😀😃", "😀"],
+    ["", "用"],
+    ["   ", "用"]
+  ])("默认头像展示完整首码点：%j → %s", async (displayName, initial) => {
+    mockMe.mockResolvedValue(
+      meResponse({ user: userWith({ display_name: displayName }) })
+    );
+    render(<EditProfileForm />);
+
+    expect(
+      (await screen.findByRole("button", { name: "更换头像" })).textContent
+    ).toBe(initial);
+  });
+
   it("挂载即拉取 /me,展示联系方式 / 等级口音徽标 / 昵称回填", async () => {
     render(<EditProfileForm />);
 
@@ -98,12 +163,14 @@ describe("EditProfileForm — 加载与渲染", () => {
     { phone: PHONE },
     { phone: undefined, email: "a@b.com" },
     { phone: PHONE, email: "a@b.com" }
-  ])("联系方式维护统一进入账号安全页：%j", async (contact) => {
+  ])("资料页不提供账号设置快捷入口：%j", async (contact) => {
     mockMe.mockResolvedValue(meResponse({ user: userWith(contact) }));
-    render(<EditProfileForm />);
+    const { container } = render(<EditProfileForm />);
+    await screen.findByDisplayValue("Alice");
+    expect(container.querySelector('a[href="/account/security"]')).toBeNull();
     expect(
-      await screen.findByRole("link", { name: /账号安全/ })
-    ).toHaveAttribute("href", "/account/security");
+      screen.queryByRole("link", { name: "账号与密码设置" })
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByPlaceholderText("请输入验证码")
     ).not.toBeInTheDocument();
@@ -120,17 +187,198 @@ describe("EditProfileForm — 加载与渲染", () => {
 
 // ── 昵称 ──────────────────────────────────────────────
 describe("EditProfileForm — 昵称", () => {
+  it("保存等待锁住昵称，保存后再编辑立即清除成功提示", async () => {
+    let resolve!: (value: { user: User }) => void;
+    mockUpdate.mockReturnValue(new Promise((done) => (resolve = done)));
+    render(<EditProfileForm />);
+    const input = await screen.findByDisplayValue("Alice");
+    const user = userEvent.setup();
+    await user.clear(input);
+    await user.type(input, "Bob");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+    expect(input).toBeDisabled();
+    await user.type(input, "Carol");
+    expect(input).toHaveValue("Bob");
+    resolve({ user: userWith({ display_name: "Bob" }) });
+    await screen.findByText("已保存");
+    expect(input).toBeEnabled();
+    await user.type(input, "by");
+    expect(screen.queryByText("已保存")).not.toBeInTheDocument();
+    expect(useUserStore.getState().user?.display_name).toBe("Bob");
+  });
+
+  it("emoji昵称保存后默认头像保留完整首码点", async () => {
+    mockUpdate.mockResolvedValue({ user: userWith({ display_name: "😀😃" }) });
+    render(<EditProfileForm />);
+    const input = await screen.findByDisplayValue("Alice");
+    fireEvent.change(input, { target: { value: "😀😃" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    await screen.findByText("已保存");
+    expect(screen.getByRole("button", { name: "更换头像" })).toHaveTextContent(
+      "😀"
+    );
+    expect(
+      screen.getByRole("button", { name: "更换头像" })
+    ).not.toHaveTextContent("�");
+  });
+
+  it.each([
+    [
+      400,
+      "invalid_display_name",
+      "new backend detail",
+      "昵称需为 1–50 个字符，且不能包含 < > 或不可见字符"
+    ],
+    [
+      400,
+      "invalid_display_name",
+      "display name cannot be longer than 50 characters",
+      "昵称不能超过 50 个字符"
+    ],
+    [500, "internal_error", "private cause", "昵称保存失败，请稍后再试"],
+    [404, undefined, "Not Found", "该功能暂未开放，敬请期待"]
+  ] as const)(
+    "稳定 code/状态映射中文且失败不覆盖资料：%s %s",
+    async (status, code, detail, message) => {
+      mockUpdate.mockRejectedValue(new HttpError(status, detail, [], code));
+      useUserStore.setState({ user: userWith() });
+      render(<EditProfileForm />);
+      const input = await screen.findByDisplayValue("Alice");
+      fireEvent.change(input, { target: { value: "Bob" } });
+      fireEvent.click(screen.getByRole("button", { name: "保存" }));
+      expect(await screen.findByText(message)).toBeInTheDocument();
+      expect(useUserStore.getState().user?.display_name).toBe("Alice");
+      expect(screen.queryByText("已保存")).not.toBeInTheDocument();
+    }
+  );
+
+  it("50 个 emoji 按码点计数且不受 DOM maxLength 截断", async () => {
+    const name = "😀".repeat(50);
+    mockUpdate.mockResolvedValue({ user: userWith({ display_name: name }) });
+    render(<EditProfileForm />);
+    const input = await screen.findByDisplayValue("Alice");
+    expect(input).not.toHaveAttribute("maxlength");
+    fireEvent.change(input, { target: { value: name } });
+    expect(screen.getByText("50/50")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledWith(name));
+  });
+
+  it("51 个码点提示超限，直接 submit 也不发请求", async () => {
+    const { container } = render(<EditProfileForm />);
+    const input = await screen.findByDisplayValue("Alice");
+    fireEvent.change(input, { target: { value: "字".repeat(51) } });
+    expect(screen.getByText("昵称不能超过 50 个字符")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
+    fireEvent.submit(container.querySelector("form")!);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it.each(["﻿Bob", "a\u0085b", "👨‍👩"])(
+    "剩余 Cf/Cc 不因 JS trim 被放过：%s",
+    async (name) => {
+      const { container } = render(<EditProfileForm />);
+      const input = await screen.findByDisplayValue("Alice");
+      fireEvent.change(input, { target: { value: name } });
+      expect(
+        screen.getByText("昵称不能包含 < > 或不可见字符")
+      ).toBeInTheDocument();
+      fireEvent.submit(container.querySelector("form")!);
+      expect(mockUpdate).not.toHaveBeenCalled();
+    }
+  );
+
+  it("按 Rust trim 去掉首尾 U+0085 后提交", async () => {
+    mockUpdate.mockResolvedValue({ user: userWith({ display_name: "Bob" }) });
+    render(<EditProfileForm />);
+    const input = await screen.findByDisplayValue("Alice");
+    fireEvent.change(input, { target: { value: "\u0085Bob\u0085" } });
+    expect(screen.getByText("3/50")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledWith("Bob"));
+  });
+
+  it("空白昵称有明确提示且直接 submit 不发请求", async () => {
+    const { container } = render(<EditProfileForm />);
+    const input = await screen.findByDisplayValue("Alice");
+    fireEvent.change(input, { target: { value: " \u0085 " } });
+    expect(screen.getByText("昵称需为 1–50 个字符")).toBeInTheDocument();
+    fireEvent.submit(container.querySelector("form")!);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
   it("实时显示字数计数", async () => {
     render(<EditProfileForm />);
     await screen.findByDisplayValue("Alice");
     expect(screen.getByText("5/50")).toBeInTheDocument();
   });
 
-  it("无任何改动 → 确定按钮禁用,不发请求", async () => {
+  it("昵称标签聚焦输入框", async () => {
+    render(<EditProfileForm />);
+    await screen.findByDisplayValue("Alice");
+    const user = userEvent.setup();
+    const input = screen.getByRole("textbox", { name: "昵称" });
+    await user.click(screen.getByText("昵称", { selector: "label" }));
+    expect(input).toHaveFocus();
+  });
+
+  it("再次编辑昵称立即清除已保存提示", async () => {
+    mockUpdate.mockResolvedValue({ user: userWith({ display_name: "Bob" }) });
+    render(<EditProfileForm />);
+    const input = await screen.findByDisplayValue("Alice");
+    const user = userEvent.setup();
+    await user.clear(input);
+    await user.type(input, "Bob");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+    await screen.findByText("已保存");
+    await user.type(input, "by");
+    expect(screen.queryByText("已保存")).not.toBeInTheDocument();
+    expect(input).toHaveValue("Bobby");
+    expect(screen.getByRole("button", { name: "保存" })).toBeEnabled();
+  });
+
+  it("保存等待中锁住昵称，回包后恢复编辑且提示只对应保存值", async () => {
+    let resolve!: (value: { user: User }) => void;
+    mockUpdate.mockReturnValue(new Promise((done) => (resolve = done)));
+    render(<EditProfileForm />);
+    const input = await screen.findByDisplayValue("Alice");
+    const user = userEvent.setup();
+    await user.clear(input);
+    await user.type(input, "Bob");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+    expect(input).toBeDisabled();
+    await user.type(input, "Carol");
+    expect(input).toHaveValue("Bob");
+    resolve({ user: userWith({ display_name: "Bob" }) });
+    await screen.findByText("已保存");
+    expect(input).toBeEnabled();
+    expect(useUserStore.getState().user?.display_name).toBe("Bob");
+  });
+
+  it("允许50码点emoji昵称，超限不截断且禁止回车提交", async () => {
+    mockUpdate.mockResolvedValue({
+      user: userWith({ display_name: "🙂".repeat(50) })
+    });
+    render(<EditProfileForm />);
+    const input = await screen.findByDisplayValue("Alice");
+    const user = userEvent.setup();
+    await user.clear(input);
+    await user.type(input, "🙂".repeat(50));
+    expect(input).toHaveValue("🙂".repeat(50));
+    expect(screen.getByText("50/50")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "保存" })).toBeEnabled();
+    await user.type(input, "🙂{Enter}");
+    expect(input).toHaveValue("🙂".repeat(51));
+    expect(screen.getByText("51/50")).toBeInTheDocument();
+    expect(screen.getByText("昵称不能超过 50 个字符")).toBeInTheDocument();
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("无任何改动 → 保存按钮禁用,不发请求", async () => {
     render(<EditProfileForm />);
     await screen.findByDisplayValue("Alice");
 
-    expect(screen.getByRole("button", { name: "确定" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
@@ -143,7 +391,7 @@ describe("EditProfileForm — 昵称", () => {
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
-  it("仅改昵称 → 调 updateProfile、刷新 store、显示「操作成功」", async () => {
+  it("仅改昵称 → 调 updateProfile、刷新 store、显示「已保存」", async () => {
     mockUpdate.mockResolvedValue({ user: userWith({ display_name: "Bob" }) });
     render(<EditProfileForm />);
     await screen.findByDisplayValue("Alice");
@@ -152,16 +400,16 @@ describe("EditProfileForm — 昵称", () => {
     const input = screen.getByDisplayValue("Alice");
     await user.clear(input);
     await user.type(input, "Bob");
-    await user.click(screen.getByRole("button", { name: "确定" }));
+    await user.click(screen.getByRole("button", { name: "保存" }));
 
     await waitFor(() => {
       expect(mockUpdate).toHaveBeenCalledWith("Bob");
-      expect(screen.getByText("操作成功")).toBeInTheDocument();
+      expect(screen.getByText("已保存")).toBeInTheDocument();
     });
     expect(useUserStore.getState().user?.display_name).toBe("Bob");
   });
 
-  it("昵称含禁字符 → 实时红字提示且确定禁用,不发请求", async () => {
+  it("昵称含禁字符 → 实时红字提示且保存禁用,不发请求", async () => {
     render(<EditProfileForm />);
     await screen.findByDisplayValue("Alice");
     const user = userEvent.setup();
@@ -173,7 +421,7 @@ describe("EditProfileForm — 昵称", () => {
     expect(
       screen.getByText("昵称不能包含 < > 或不可见字符")
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "确定" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
@@ -192,7 +440,7 @@ describe("EditProfileForm — 昵称", () => {
     expect(
       screen.queryByText("昵称不能包含 < > 或不可见字符")
     ).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "确定" }));
+    await user.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() => {
       expect(mockUpdate).toHaveBeenCalledWith("Tom&Jerry");
     });
@@ -211,7 +459,7 @@ describe("EditProfileForm — 昵称", () => {
     // 零宽空格(U+200B)预检同样能拦;此处直接走后端拒绝路径,
     // 验证 PROFILE_ERRORS 的键与后端原文逐字一致。
     await user.type(input, "Bob");
-    await user.click(screen.getByRole("button", { name: "确定" }));
+    await user.click(screen.getByRole("button", { name: "保存" }));
 
     await waitFor(() => {
       expect(
@@ -220,7 +468,7 @@ describe("EditProfileForm — 昵称", () => {
     });
   });
 
-  it("遗留昵称含禁字符但未改动 → 不提示且保留账号安全入口", async () => {
+  it("遗留昵称含禁字符但未改动 → 不提示且保存禁用", async () => {
     mockMe.mockResolvedValue(
       meResponse({ user: userWith({ display_name: "A<lice" }) })
     );
@@ -229,10 +477,7 @@ describe("EditProfileForm — 昵称", () => {
     expect(
       screen.queryByText("昵称不能包含 < > 或不可见字符")
     ).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /账号安全/ })).toHaveAttribute(
-      "href",
-      "/account/security"
-    );
+    expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
@@ -245,7 +490,7 @@ describe("EditProfileForm — 昵称", () => {
     const input = screen.getByDisplayValue("Alice");
     await user.clear(input);
     await user.type(input, "Bob");
-    await user.click(screen.getByRole("button", { name: "确定" }));
+    await user.click(screen.getByRole("button", { name: "保存" }));
 
     await waitFor(() => {
       expect(screen.getByText("昵称需为 1–50 个字符")).toBeInTheDocument();
@@ -261,7 +506,7 @@ describe("EditProfileForm — 昵称", () => {
     const input = screen.getByDisplayValue("Alice");
     await user.clear(input);
     await user.type(input, "Bob");
-    await user.click(screen.getByRole("button", { name: "确定" }));
+    await user.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() => {
       expect(screen.getByText("昵称需为 1–50 个字符")).toBeInTheDocument();
     });
@@ -271,7 +516,7 @@ describe("EditProfileForm — 昵称", () => {
     expect(screen.queryByText("昵称需为 1–50 个字符")).not.toBeInTheDocument();
   });
 
-  it("遗留昵称带首尾空格且未编辑 → 不误判为已修改,确定保持禁用", async () => {
+  it("遗留昵称带首尾空格且未编辑 → 不误判为已修改,保存保持禁用", async () => {
     mockMe.mockResolvedValue(
       meResponse({ user: userWith({ display_name: " Alice " }) })
     );
@@ -279,7 +524,7 @@ describe("EditProfileForm — 昵称", () => {
     // testing-library 默认 normalizer 会 trim,能匹配到 " Alice "。
     await screen.findByDisplayValue("Alice");
 
-    expect(screen.getByRole("button", { name: "确定" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
@@ -320,16 +565,16 @@ describe("EditProfileForm — 头像上传", () => {
     await screen.findByDisplayValue("Alice");
     const user = userEvent.setup();
 
-    // 先改昵称保存出「操作成功」。
+    // 先改昵称保存出「已保存」。
     const input = screen.getByDisplayValue("Alice");
     await user.clear(input);
     await user.type(input, "Bob");
-    await user.click(screen.getByRole("button", { name: "确定" }));
-    await screen.findByText("操作成功");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+    await screen.findByText("已保存");
 
     // 点头像只是弹选图框,用户可能直接取消——提示应保留。
     await user.click(screen.getByRole("button", { name: "更换头像" }));
-    expect(screen.getByText("操作成功")).toBeInTheDocument();
+    expect(screen.getByText("已保存")).toBeInTheDocument();
   });
 
   it("选图成功 → 调 uploadAvatar、store 与页面头像更新为新 avatar_url", async () => {
@@ -345,30 +590,31 @@ describe("EditProfileForm — 头像上传", () => {
       expect(screen.getByAltText("头像")).toHaveAttribute("src", AVATAR_URL);
     });
     expect(useUserStore.getState().user?.avatar_url).toBe(AVATAR_URL);
+    expect(screen.getByAltText("头像")).toHaveClass("bg-white");
   });
 
-  it("上传中 → 头像按钮与「确定」都禁用(与保存互斥),完成后恢复", async () => {
+  it("上传中 → 头像按钮与「保存」都禁用(与保存互斥),完成后恢复", async () => {
     let resolve!: (u: User) => void;
     mockUploadAvatar.mockReturnValue(new Promise((r) => (resolve = r)));
     render(<EditProfileForm />);
     await screen.findByDisplayValue("Alice");
     const user = userEvent.setup();
 
-    // 先制造「确定」本可提交的条件(昵称有改动)。
+    // 先制造「保存」本可提交的条件(昵称有改动)。
     const input = screen.getByDisplayValue("Alice");
     await user.clear(input);
     await user.type(input, "Bob");
-    expect(screen.getByRole("button", { name: "确定" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "保存" })).toBeEnabled();
 
     await pickFile(user);
     expect(screen.getByRole("button", { name: "更换头像" })).toBeDisabled();
     // 并发 commit 会互相覆盖,上传中保存必须锁死。
-    expect(screen.getByRole("button", { name: "确定" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
 
     resolve(userWith({ avatar_url: AVATAR_URL }));
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "更换头像" })).toBeEnabled();
-      expect(screen.getByRole("button", { name: "确定" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "保存" })).toBeEnabled();
     });
   });
 
@@ -386,13 +632,13 @@ describe("EditProfileForm — 头像上传", () => {
 
     // requestSubmit()/回车隐式提交可绕过按钮 disabled,handleSubmit 必须自己拦。
     fireEvent.submit(
-      screen.getByRole("button", { name: "确定" }).closest("form")!
+      screen.getByRole("button", { name: "保存" }).closest("form")!
     );
     expect(mockUpdate).not.toHaveBeenCalled();
 
     resolve(userWith({ avatar_url: AVATAR_URL }));
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "确定" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "保存" })).toBeEnabled();
     });
   });
 
@@ -406,7 +652,7 @@ describe("EditProfileForm — 头像上传", () => {
     const input = screen.getByDisplayValue("Alice");
     await user.clear(input);
     await user.type(input, "Bob");
-    await user.click(screen.getByRole("button", { name: "确定" }));
+    await user.click(screen.getByRole("button", { name: "保存" }));
 
     const clickSpy = vi.spyOn(
       screen.getByLabelText<HTMLInputElement>("选择头像图片"),
@@ -416,7 +662,7 @@ describe("EditProfileForm — 头像上传", () => {
     expect(clickSpy).not.toHaveBeenCalled();
 
     resolve({ user: userWith({ display_name: "Bob" }) });
-    await screen.findByText("操作成功");
+    await screen.findByText("已保存");
   });
 
   it("上传失败 → 头像下方红字翻译文案,原头像不变(仍显示首字母占位)", async () => {
@@ -503,13 +749,20 @@ describe("EditProfileForm — 头像上传", () => {
 
 // ── 交互 ──────────────────────────────────────────────
 describe("EditProfileForm — 交互", () => {
-  it("点击「← 返回」/「取消」→ 调 router.back()", async () => {
+  it("返回个人中心使用固定入口，取消返回上一页", async () => {
     render(<EditProfileForm />);
     await screen.findByDisplayValue("Alice");
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: "← 返回" }));
+    expect(
+      screen.getByRole("heading", { level: 1, name: "编辑资料" })
+    ).toBeInTheDocument();
+    expect(screen.getByText("修改头像和昵称。")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "← 返回个人中心" })
+    ).toHaveAttribute("href", "/account");
+    expect(screen.getByText("修改学习等级请联系客服")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "取消" }));
-    expect(mockBack).toHaveBeenCalledTimes(2);
+    expect(mockBack).toHaveBeenCalledTimes(1);
   });
 });

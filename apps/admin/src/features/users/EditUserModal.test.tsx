@@ -6,6 +6,7 @@ import { HttpError } from "@tsz/api-client";
 import type { AdminUserView } from "@tsz/types";
 
 vi.mock("@/lib/auth", () => ({
+  usePermission: () => true,
   api: { users: { update: vi.fn() } }
 }));
 

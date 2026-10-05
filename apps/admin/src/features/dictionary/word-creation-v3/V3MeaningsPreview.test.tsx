@@ -249,10 +249,15 @@ describe("V3MeaningsPreview", () => {
     expect(screen.getByText("语义区间 1：空间位置 / Place")).toBeVisible();
     expect(screen.getByText("名词")).toBeVisible();
     expect(screen.getByText("英美通用：at the center of")).toBeVisible();
+    expect(screen.getByText("英美通用：at the center of")).toHaveClass(
+      "tsz-words"
+    );
     expect(screen.getByText("可数名词")).toBeVisible();
     expect(screen.getByText("依赖上下文")).toBeVisible();
     expect(screen.getByRole("heading", { name: "中心位置" })).toBeVisible();
     expect(screen.getByText("the middle point")).toBeVisible();
+    expect(screen.getByText("英文", { exact: true })).toBeVisible();
+    expect(screen.queryByText("EN", { exact: true })).toBeNull();
     expect(screen.getByText("Stand in the center.")).toBeVisible();
     expect(screen.getByText("站在中心。")).toBeVisible();
     expect(screen.getByText("中")).toBeVisible();

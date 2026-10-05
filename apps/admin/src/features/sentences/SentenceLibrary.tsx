@@ -20,6 +20,7 @@ import {
 import type { Dayjs } from "dayjs";
 import type { SharedSentence, SentenceListQuery } from "@tsz/types";
 import { Link, useSearchParams } from "react-router-dom";
+import { canAdminResourceAction, hasAdminPermission } from "@tsz/shared/auth";
 import { api, useAuthStore } from "@/lib/auth";
 import { BatchPublicationModal } from "../dictionary/BatchPublicationModal";
 import {
@@ -58,11 +59,20 @@ export function SentenceLibrary({
 }) {
   const { modal, message } = App.useApp();
   const profile = useAuthStore((state) => state.profile);
-  const canEdit = !readOnly && profile?.role === "super_admin";
+  const canEdit = !readOnly && hasAdminPermission(profile, "sentences.edit");
+  const canDelete = !readOnly && profile?.role === "super_admin";
   const canPublish =
+    !readOnly && hasAdminPermission(profile, "sentences.publish");
+  const canAction = (
+    row: SharedSentence,
+    action: "edit" | "publish" | "withdraw" | "restore" | "rollback"
+  ) =>
     !readOnly &&
-    Boolean(
-      profile && (profile.role === "super_admin" || profile.can_publish_lexicon)
+    canAdminResourceAction(
+      profile,
+      "sentences",
+      action,
+      row.created_by_admin_id
     );
   const [publication, setPublication] = useState<{
     sentence: SharedSentence;
@@ -255,7 +265,13 @@ export function SentenceLibrary({
           </Button>
           {canPublish && (
             <Button
-              disabled={!selected.length}
+              disabled={
+                !selected.length ||
+                rows.some(
+                  (row) =>
+                    selected.includes(row.id) && !canAction(row, "publish")
+                )
+              }
               onClick={() =>
                 setBatch(rows.filter((row) => selected.includes(row.id)))
               }
@@ -266,7 +282,7 @@ export function SentenceLibrary({
           <Button
             danger
             disabled={
-              !canEdit ||
+              !canDelete ||
               !selected.length ||
               rows.some(
                 (row) =>
@@ -362,7 +378,7 @@ export function SentenceLibrary({
                 render: (_, row) => (
                   <Flex vertical>
                     {row.entries.slice(0, 2).map((e) => (
-                      <span className="tsz-entry-en" key={e.id}>
+                      <span className="tsz-words" key={e.id}>
                         {entryLink(e)}{" "}
                       </span>
                     ))}
@@ -416,7 +432,7 @@ export function SentenceLibrary({
                     </Button>
                     {!readOnly && (
                       <>
-                        {canEdit && (
+                        {canAction(row, "edit") && (
                           <Button
                             size="small"
                             onClick={() => void open(row.id, true)}
@@ -424,41 +440,43 @@ export function SentenceLibrary({
                             编辑
                           </Button>
                         )}
-                        {canPublish && (
-                          <>
-                            <Button
-                              size="small"
-                              onClick={() =>
-                                void openPublication(row, "publish")
-                              }
-                            >
-                              发布
-                            </Button>
-                            {row.current_publication_id && (
-                              <Button
-                                size="small"
-                                danger={!row.withdrawn_at}
-                                onClick={() =>
-                                  void openPublication(
-                                    row,
-                                    row.withdrawn_at ? "restore" : "withdraw"
-                                  )
-                                }
-                              >
-                                {row.withdrawn_at ? "恢复" : "下架"}
-                              </Button>
-                            )}
-                          </>
-                        )}
-                        {canEdit && !entryId && !row.current_publication_id && (
+                        {canAction(row, "publish") && (
                           <Button
                             size="small"
-                            danger
-                            onClick={() => remove([row])}
+                            onClick={() => void openPublication(row, "publish")}
                           >
-                            删除
+                            发布
                           </Button>
                         )}
+                        {row.current_publication_id &&
+                          canAction(
+                            row,
+                            row.withdrawn_at ? "restore" : "withdraw"
+                          ) && (
+                            <Button
+                              size="small"
+                              danger={!row.withdrawn_at}
+                              onClick={() =>
+                                void openPublication(
+                                  row,
+                                  row.withdrawn_at ? "restore" : "withdraw"
+                                )
+                              }
+                            >
+                              {row.withdrawn_at ? "恢复" : "下架"}
+                            </Button>
+                          )}
+                        {canDelete &&
+                          !entryId &&
+                          !row.current_publication_id && (
+                            <Button
+                              size="small"
+                              danger
+                              onClick={() => remove([row])}
+                            >
+                              删除
+                            </Button>
+                          )}
                       </>
                     )}
                   </Space>
@@ -485,7 +503,10 @@ export function SentenceLibrary({
           key={`${publication.sentence.id}:${publication.action}`}
           sentence={publication.sentence}
           action={publication.action}
-          canPublish={canPublish}
+          canPublish={canAction(
+            publication.sentence,
+            publication.action === "history" ? "rollback" : publication.action
+          )}
           onClose={() => setPublication(undefined)}
           onChanged={refresh}
         />
@@ -525,7 +546,7 @@ export function SentenceLibrary({
             ))}
             <Space wrap>
               {detail.entries.map((e) => (
-                <span className="tsz-entry-en" key={e.id}>
+                <span className="tsz-words" key={e.id}>
                   {entryLink(e)}
                 </span>
               ))}

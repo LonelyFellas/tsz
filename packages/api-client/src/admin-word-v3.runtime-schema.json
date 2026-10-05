@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/teacher-certification-batch-5/docs/openapi.json",
-  "_source_sha256": "af9b0cdce58bb7ea7092eaff30daad73093441df02f4467479dec7f66ce6b02c",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/pronunciation-dual-accent-20261004/docs/openapi.json",
+  "_source_sha256": "156d5a03a8baf392f1c00aa298d0cc347199b32f141d19524567a3c1fc0461e7",
   "roots": [
     "SharedSentence",
     "SentencePublication",
@@ -651,6 +651,8 @@
         "password_missing",
         "password_too_short",
         "password_too_long",
+        "password_too_weak",
+        "password_compromised",
         "password_unchanged",
         "invalid_display_name",
         "invalid_otp_code",
@@ -727,6 +729,15 @@
         "audio_upload_not_completed",
         "invalid_audio_key",
         "audio_storage_not_configured",
+        "unsupported_avatar_content_type",
+        "invalid_avatar_size",
+        "avatar_invalid_image",
+        "avatar_file_too_large",
+        "invalid_avatar_key",
+        "avatar_upload_not_completed",
+        "avatar_upload_rate_limited",
+        "avatar_storage_not_configured",
+        "avatar_storage_unavailable",
         "audio_asset_not_found",
         "service_unavailable",
         "internal_error"
@@ -991,6 +1002,7 @@
         "annotation",
         "annotation_revision",
         "entry_id",
+        "created_by_name",
         "presentation",
         "pos_labels",
         "gloss_previews",
@@ -1001,6 +1013,7 @@
         "annotation": { "type": ["string", "null"] },
         "annotation_revision": { "type": "integer", "minimum": 1 },
         "created_by": { "type": "string", "format": "uuid" },
+        "created_by_name": { "type": "string" },
         "entry_id": { "type": "string", "format": "uuid" },
         "gloss_previews": {
           "type": "array",
@@ -1152,6 +1165,20 @@
       "type": "string",
       "enum": ["normal", "strong", "weak"]
     },
+    "PronunciationSynthesisCandidateV3": {
+      "type": "object",
+      "required": ["ipa", "ups"],
+      "properties": {
+        "ipa": { "type": "string", "maxLength": 200 },
+        "ups": { "type": "string", "maxLength": 1600 },
+        "ups_words": {
+          "type": ["array", "null"],
+          "items": { "$ref": "#/$defs/UpsWordV3" },
+          "maxItems": 30
+        }
+      },
+      "additionalProperties": false
+    },
     "PronunciationSynthesisV3": {
       "type": "object",
       "required": ["alphabet", "ipa", "ups"],
@@ -1161,6 +1188,7 @@
         "ipa_locale": {
           "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/PhonemeLocaleV3" }]
         },
+        "uk": { "$ref": "#/$defs/PronunciationSynthesisCandidateV3" },
         "ups": { "type": "string", "maxLength": 1600 },
         "ups_locale": {
           "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/PhonemeLocaleV3" }]
@@ -1170,6 +1198,7 @@
           "items": { "$ref": "#/$defs/UpsWordV3" },
           "maxItems": 30
         },
+        "us": { "$ref": "#/$defs/PronunciationSynthesisCandidateV3" },
         "use_spelling": { "type": ["boolean", "null"] }
       },
       "additionalProperties": false
@@ -1592,10 +1621,12 @@
         "publication_number",
         "source_revision",
         "snapshot",
+        "created_by_admin_id",
         "published_at",
         "published_by_admin_id"
       ],
       "properties": {
+        "created_by_admin_id": { "type": "string", "format": "uuid" },
         "id": { "type": "string", "format": "uuid" },
         "publication_number": { "type": "integer" },
         "published_at": { "type": "string", "format": "date-time" },
@@ -1797,6 +1828,7 @@
         "content",
         "entries",
         "created_by",
+        "created_by_admin_id",
         "created_at",
         "updated_at"
       ],
@@ -1804,6 +1836,7 @@
         "content": { "$ref": "#/$defs/SharedSentenceContent" },
         "created_at": { "type": "string", "format": "date-time" },
         "created_by": { "type": "string" },
+        "created_by_admin_id": { "type": "string", "format": "uuid" },
         "current_publication_id": {
           "type": ["string", "null"],
           "format": "uuid"

@@ -1,7 +1,14 @@
 import { toRichTextV2 } from "@tsz/voice-editor/core";
 import { PronunciationPreviewControls } from "../../word-creation/PronunciationPreview";
-import type { Dialect, EnglishTextV3, RichTextVariantV3 } from "@tsz/types";
+import type {
+  Dialect,
+  EnglishTextV3,
+  RichTextVariantV3,
+  DraftFormsStepContentV3,
+  DraftMeaningsStepContentWritableV3
+} from "@tsz/types";
 import { Flex } from "antd";
+import type { ReactNode } from "react";
 import { editableEnglishText } from "../meaningsModel";
 import { dialectLabel } from "../presentation";
 import { V3VoiceTextField } from "./V3VoiceTextField";
@@ -22,8 +29,11 @@ export function V3LinkedEnglishTextField({
   value,
   label,
   suffix,
+  renderEditorTitle,
   placeholder,
   wordId,
+  forms,
+  meanings,
   readOnly,
   linksEnabled,
   onChange
@@ -31,8 +41,11 @@ export function V3LinkedEnglishTextField({
   value: EnglishTextV3;
   label: string;
   suffix: string;
+  renderEditorTitle?: (dialect: Dialect) => ReactNode;
   placeholder?: string;
   wordId?: string;
+  forms?: DraftFormsStepContentV3;
+  meanings?: DraftMeaningsStepContentWritableV3;
   readOnly?: boolean;
   linksEnabled: boolean;
   onChange: (next: EnglishTextV3) => void;
@@ -66,6 +79,7 @@ export function V3LinkedEnglishTextField({
             }
             textLinks={variant.text_links}
             ariaLabel={`${label} ${dialectLabel(row.dialect)}${suffix}`}
+            editorTitle={renderEditorTitle?.(row.dialect)}
             nodeId={row.variant_id}
             field="value"
             readOnly={readOnly}
@@ -80,7 +94,13 @@ export function V3LinkedEnglishTextField({
             renderAssociationPicker={
               linksEnabled
                 ? (props) => (
-                    <V3TextAssociationPicker {...props} wordId={wordId} />
+                    <V3TextAssociationPicker
+                      {...props}
+                      wordId={wordId}
+                      forms={forms}
+                      meanings={meanings}
+                      dialect={row.dialect}
+                    />
                   )
                 : undefined
             }

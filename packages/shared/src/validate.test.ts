@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   accountToDisplayName,
-  findAdminPasswordWeakWord,
+  displayNameError,
+  displayNameLength,
+  normalizeDisplayName,
   hasDisplayNameForbiddenChars,
   isCode,
   isEmail,
@@ -81,44 +83,92 @@ describe("isCode", () => {
   });
 });
 
-describe("findAdminPasswordWeakWord", () => {
+describe("isRegisterPassword", () => {
   it.each([
-    ["Admin123admin!@", "admin123"],
-    ["S3cret-Password", "password"],
-    ["Qwerty-tunnel-9x", "qwerty"],
-    ["my-123456-key", "123456"],
-    ["WelcomeHome-2026", "welcome"]
-  ])("命中弱词的返回该词 %s → %s", (input, hit) => {
-    expect(findAdminPasswordWeakWord(input)).toBe(hit);
+    " Mixed!密码🙂 river cloud ",
+    "orchard silver river cloud",
+    "941807362590418735",
+    "界🙂".repeat(64)
+  ])("支持原样自由字符 %s", (value) => {
+    expect(isRegisterPassword(value)).toBe(true);
   });
-
-  it("大小写不敏感", () => {
-    expect(findAdminPasswordWeakWord("PASSWORD-abc")).toBe("password");
-  });
-
-  it("无命中返回 null", () => {
-    expect(findAdminPasswordWeakWord("brand-new-pw-2026")).toBeNull();
-    expect(findAdminPasswordWeakWord("")).toBeNull();
+  it("按 Unicode 字符计数处理长度边界", () => {
+    expect(isRegisterPassword("🙂".repeat(14))).toBe(false);
+    expect(isRegisterPassword("🙂".repeat(15))).toBe(true);
+    expect(isRegisterPassword("🙂".repeat(128))).toBe(true);
+    expect(isRegisterPassword("🙂".repeat(129))).toBe(false);
+    expect(isRegisterPassword("")).toBe(false);
   });
 });
 
-describe("isRegisterPassword", () => {
-  it.each(["abc12345678", "Pass1234word", "aaaaaaaaaa1A"])(
-    "接受 11-20 位字母+数字 %s",
-    (v) => {
-      expect(isRegisterPassword(v)).toBe(true);
+describe("displayNameError", () => {
+  it("按码点校验50/51字符边界而不截断", () => {
+    expect(displayNameLength("🙂".repeat(50))).toBe(50);
+    expect(displayNameError("🙂".repeat(50))).toBeNull();
+    expect(displayNameError("🙂".repeat(51))).toBe("昵称不能超过 50 个字符");
+  });
+
+  it("按Rust的White_Space裁剪边界，保留BOM供禁字符校验", () => {
+    expect(normalizeDisplayName("\u0085 小明　\u0085")).toBe("小明");
+    expect(displayNameError("\u0085🙂\u0085")).toBeNull();
+    const bom = String.fromCharCode(0xfeff);
+    expect(normalizeDisplayName(`${bom}Alice${bom}`)).toBe(`${bom}Alice${bom}`);
+    expect(displayNameError(`${bom}Alice`)).toBe(
+      "昵称不能包含 < > 或不可见字符"
+    );
+    expect(displayNameError(" \u0085 ")).toBe("昵称需为 1–50 个字符");
+  });
+
+  it("长内部空白保留原样，长边界空白只裁剪边界", () => {
+    const spaces = " ".repeat(40_000);
+    const internal = `a${spaces}b`;
+    expect(normalizeDisplayName(internal)).toBe(internal);
+    expect(displayNameError(internal)).toBe("昵称不能超过 50 个字符");
+    expect(normalizeDisplayName(`${spaces}🙂${spaces}`)).toBe("🙂");
+  });
+});
+
+describe("displayNameError", () => {
+  it("长内部空白不回溯，规范化和校验保持响应预算", () => {
+    const value = `a${" ".repeat(80_000)}b`;
+    const start = performance.now();
+    expect(normalizeDisplayName(value)).toBe(value);
+    expect(displayNameError(value)).toBe("昵称不能超过 50 个字符");
+    expect(performance.now() - start).toBeLessThan(1_000);
+  });
+
+  it("长边界空白仅裁剪边界，保留合法首码点", () => {
+    const spaces = " ".repeat(40_000);
+    expect(normalizeDisplayName(`${spaces}😀${spaces}`)).toBe("😀");
+  });
+
+  it("按 Rust White_Space trim，不移除 BOM", () => {
+    expect(normalizeDisplayName(" \u0085 Alice　\u0085 ")).toBe("Alice");
+    expect(normalizeDisplayName("﻿Alice﻿")).toBe("﻿Alice﻿");
+    expect(displayNameError("﻿Alice")).toBe("昵称不能包含 < > 或不可见字符");
+    expect(displayNameError(" \u0085 ")).toBe("昵称需为 1–50 个字符");
+  });
+
+  it("trim 后按码点计数，允许 50 个 emoji/中文/组合字符", () => {
+    for (const name of ["😀".repeat(50), "字".repeat(50), "é".repeat(25)]) {
+      expect(displayNameLength(` \u0085${name}\u0085 `)).toBe(50);
+      expect(displayNameError(` \u0085${name}\u0085 `)).toBeNull();
+      expect(displayNameError(`${name}a`)).toBe("昵称不能超过 50 个字符");
+    }
+  });
+
+  it.each(["a\u0085b", "a‍b", "a\u0000b", "<b>"])(
+    "拒绝剩余 Cc/Cf/尖括号 %s",
+    (name) => {
+      expect(displayNameError(name)).toBe("昵称不能包含 < > 或不可见字符");
     }
   );
 
-  it.each([
-    ["", "空串"],
-    ["abc1234567", "只有 10 位"],
-    ["abc123456789012345678", "超过 20 位"],
-    ["abcdefghijk", "缺少数字"],
-    ["12345678901", "缺少字母"],
-    ["abc1234567!", "含特殊字符"]
-  ])("拒绝 %s(%s)", (v) => {
-    expect(isRegisterPassword(v)).toBe(false);
+  it("沿用先长度再禁字符，不做 NFC 规范化", () => {
+    expect(displayNameError(`${"a".repeat(50)}<`)).toBe(
+      "昵称不能超过 50 个字符"
+    );
+    expect(normalizeDisplayName("é")).toBe("é");
   });
 });
 

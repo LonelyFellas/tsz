@@ -1,3 +1,4 @@
+import { usePermission } from "@/lib/auth";
 import { PlusOutlined } from "@ant-design/icons";
 import {
   Alert,
@@ -41,6 +42,7 @@ function deriveFormTypeCode(parentCode: string, fullNameEn: string): string {
 }
 
 export function FormTypeSettings() {
+  const canEdit = usePermission("lexicon_settings.edit");
   const { message, modal } = App.useApp();
   const client = useQueryClient();
   const catalog = usePartOfSpeechCatalog();
@@ -151,10 +153,10 @@ export function FormTypeSettings() {
         partId ? (partNameById.get(partId) ?? partId) : "所有词性"
     },
     {
-      title: "引用",
+      title: "关联",
       dataIndex: "usage_count",
       width: 100,
-      render: (count: number) => (count ? `${count} 个词条` : "未引用")
+      render: (count: number) => (count ? `${count} 个词条` : "无关联")
     },
     {
       title: "创建人",
@@ -173,6 +175,7 @@ export function FormTypeSettings() {
       render: (_, item) => (
         <Space>
           <Button
+            disabled={!canEdit}
             size="small"
             onClick={() => {
               setEditing(item);
@@ -186,14 +189,16 @@ export function FormTypeSettings() {
               item.code === "base"
                 ? "原形为必需类型，不能删除"
                 : item.usage_count
-                  ? "已被词条引用，只能修改"
+                  ? "仍与词条有关联，可以修改，但不能删除"
                   : undefined
             }
           >
             <Button
               size="small"
               danger
-              disabled={item.code === "base" || item.usage_count > 0}
+              disabled={
+                !canEdit || item.code === "base" || item.usage_count > 0
+              }
               onClick={() => remove(item)}
             >
               删 除
@@ -250,7 +255,7 @@ export function FormTypeSettings() {
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            disabled={!ready}
+            disabled={!canEdit || !ready}
             onClick={() => {
               setEditing(undefined);
               setOpen(true);
@@ -299,6 +304,7 @@ export function FormTypeSettings() {
         width={720}
         okText={editing ? "保 存" : "新 建"}
         cancelText="取 消"
+        okButtonProps={{ disabled: !canEdit }}
         confirmLoading={save.isPending}
         onOk={() => form.submit()}
         onCancel={() => setOpen(false)}
@@ -307,7 +313,9 @@ export function FormTypeSettings() {
         <Form
           form={form}
           layout="vertical"
-          onFinish={(values) => save.mutate(values)}
+          onFinish={(values) => {
+            if (canEdit) save.mutate(values);
+          }}
         >
           {editing?.code === "base" ? (
             <Alert

@@ -545,6 +545,122 @@
   padding-bottom: 10px;
 }
 
+/* 创建入口与草稿第一步共用间距，卡片根节点不叠加内边距。 */
+.word-basics-workflow {
+  --word-card-padding: 20px;
+}
+
+.word-basics-workflow .word-step-heading {
+  margin-bottom: 24px;
+}
+
+.word-basics-workflow
+  :is(
+    .word-basics-input-card,
+    .word-detection-result-card,
+    .word-headword-confirmation-card
+  ) {
+  padding: 0;
+}
+
+.word-basics-workflow
+  :is(
+    .word-basics-input-card,
+    .word-detection-result-card,
+    .word-headword-confirmation-card
+  )
+  > .ant-card-head {
+  min-height: 48px;
+  padding: 0 var(--word-card-padding);
+}
+
+.word-basics-workflow
+  :is(
+    .word-basics-input-card,
+    .word-detection-result-card,
+    .word-headword-confirmation-card
+  )
+  > .ant-card-body {
+  padding: var(--word-card-padding);
+}
+
+.word-basics-workflow .word-basics-input-card .ant-form-item {
+  margin-bottom: 20px;
+}
+
+.word-basics-workflow .word-basics-input-card .ant-form-item:last-of-type {
+  margin-bottom: 8px;
+}
+
+.word-basics-workflow .word-basics-result-grid {
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.word-basics-workflow .word-entry-actions {
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.word-basics-workflow
+  .word-headword-confirmation-card
+  .word-dialect-detection-row {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+}
+
+.word-basics-workflow .word-dialect-detection-row > div {
+  gap: 4px;
+}
+
+.word-basics-workflow .word-headword-confirmation-card .dialect-panel {
+  padding: 16px;
+}
+
+.word-basics-workflow .word-headword-confirmation-card .ant-form-item {
+  margin-bottom: 0;
+}
+
+.word-basics-workflow
+  .word-headword-confirmation-card
+  .word-headword-lock-note {
+  margin: 0 0 12px;
+}
+
+.word-basics-workflow
+  .word-detection-result-card
+  .ant-descriptions-row:last-child
+  > :is(th, td) {
+  padding-bottom: 0;
+}
+
+.word-basics-workflow .word-smart-match-summary {
+  padding-top: 0;
+}
+
+.word-basics-workflow .word-smart-match-summary-entry {
+  padding: 12px 0;
+}
+
+.word-basics-workflow .word-smart-match-summary-entry:last-child {
+  padding-bottom: 0;
+}
+
+@container word-creation-content (max-width: 640px) {
+  .word-basics-workflow {
+    --word-card-padding: 16px;
+  }
+}
+
+.v3-basics-step .word-basics-input-card .word-field-help {
+  margin-top: 8px;
+}
+
+.v3-basics-step .word-detection-empty-state {
+  margin-top: 16px;
+  padding: 12px 16px;
+}
+
 .word-forms-tabs > .ant-tabs-nav {
   padding: 0 2px;
 }
@@ -1196,7 +1312,7 @@
   width: 32px;
 }
 
-.word-sort-actions .word-sort-drag-handle.ant-btn {
+:is(.word-sort-actions, .word-sort-leading) .word-sort-drag-handle.ant-btn {
   color: #7f8998;
   cursor: grab;
   user-select: none;
@@ -1206,18 +1322,22 @@
     transform 140ms ease;
 }
 
-.word-sort-actions .word-sort-drag-handle.ant-btn:hover:not(:disabled),
-.word-sort-actions .word-sort-drag-handle.ant-btn:focus-visible {
+:is(.word-sort-actions, .word-sort-leading)
+  .word-sort-drag-handle.ant-btn:hover:not(:disabled),
+:is(.word-sort-actions, .word-sort-leading)
+  .word-sort-drag-handle.ant-btn:focus-visible {
   color: #1677ff;
   background: rgba(22, 119, 255, 0.1);
 }
 
-.word-sort-actions .word-sort-drag-handle.ant-btn:active:not(:disabled) {
+:is(.word-sort-actions, .word-sort-leading)
+  .word-sort-drag-handle.ant-btn:active:not(:disabled) {
   cursor: grabbing;
   transform: scale(1.06);
 }
 
-.word-sort-actions .word-sort-drag-handle.ant-btn:disabled {
+:is(.word-sort-actions, .word-sort-leading)
+  .word-sort-drag-handle.ant-btn:disabled {
   color: #c4cad4;
   cursor: default;
 }
@@ -1371,7 +1491,21 @@
 }
 
 .word-sense-editor-v3 > .ant-collapse-item > .ant-collapse-header {
+  padding: 8px 12px !important;
   background: color-mix(in srgb, var(--sense-accent) 24%, white);
+}
+
+.word-sense-editor-v3 > .ant-collapse-item > .ant-collapse-panel {
+  border-top: 0;
+}
+
+.word-sense-editor-v3 .word-sense-header-label,
+.word-sense-editor-v3 .word-sense-header-content {
+  gap: 8px;
+}
+
+.word-sense-editor-v3 .word-sense-header-actions {
+  margin-inline-start: 8px;
 }
 
 .word-sense-header-content {
@@ -1734,19 +1868,19 @@
   pointer-events: auto;
 }
 
-.word-relations-grid-stacked .word-relation-row > .word-relation-more {
+.word-relations-grid-stacked .word-relation-row > .word-relation-delete {
   grid-column: 5;
   grid-row: 1;
   align-self: start;
 }
 
-.word-relation-gloss-row > .word-relation-more {
+.word-relation-gloss-row > .word-relation-delete {
   opacity: 0;
   transition: opacity 120ms ease;
 }
 
-.word-relation-gloss-row:hover > .word-relation-more,
-.word-relation-gloss-row:focus-within > .word-relation-more {
+.word-relation-gloss-row:hover > .word-relation-delete,
+.word-relation-gloss-row:focus-within > .word-relation-delete {
   opacity: 1;
 }
 

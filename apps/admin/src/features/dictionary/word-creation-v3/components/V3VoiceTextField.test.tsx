@@ -168,7 +168,8 @@ describe("V3VoiceTextField 取消和收起态", () => {
     expect(
       JSON.parse(screen.getByTestId("cancel-value").textContent!).annotations[0]
         .duration_ms
-    ).toBe(1000);
+    ).toBe(500);
+    expect(screen.getByLabelText("编辑第 1 处停顿 1 秒")).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("取消测试语法编辑"));
     expect(screen.queryByRole("toolbar")).not.toBeInTheDocument();
     expect(
@@ -283,6 +284,9 @@ describe("V3VoiceTextField 上传音频", () => {
         files: [new File([new Uint8Array(3)], "a.mp3", { type: "audio/mpeg" })]
       }
     });
+    await screen.findByLabelText("试听 a.mp3");
+    expect(onAudioAssetsChange).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByLabelText("完成语法结构 1 通用内容编辑"));
     await waitFor(() => expect(onAudioAssetsChange).toHaveBeenCalledTimes(1));
     expect(onAudioAssetsChange).toHaveBeenCalledWith([
       {
@@ -580,14 +584,18 @@ it("外部改字移除关联后，撤销和重做同时恢复正文、标注与�
     target: { value: "hello friend" }
   });
   fireEvent.click(screen.getByRole("button", { name: "确认修改" }));
-  expect(observe.mock.lastCall![1]).toEqual([]);
+  expect(observe).not.toHaveBeenCalled();
+  expect(screen.getByLabelText("正文撤销")).toHaveValue("hello friend");
+  expect(document.querySelectorAll(".tsz-ve-letter.is-linked")).toHaveLength(0);
   fireEvent.click(screen.getByLabelText("上一步"));
-  expect(observe.mock.lastCall).toEqual([initial, originalLinks]);
+  expect(screen.getByLabelText("正文撤销")).toHaveValue("hello there");
+  expect(document.querySelectorAll(".tsz-ve-letter.is-linked")).toHaveLength(5);
   fireEvent.click(screen.getByLabelText("下一步"));
-  expect(observe.mock.lastCall![0].text).toBe("hello friend");
-  expect(observe.mock.lastCall![1]).toEqual([]);
+  expect(screen.getByLabelText("正文撤销")).toHaveValue("hello friend");
+  expect(document.querySelectorAll(".tsz-ve-letter.is-linked")).toHaveLength(0);
   fireEvent.click(screen.getByLabelText("取消正文撤销编辑"));
-  expect(observe.mock.lastCall).toEqual([initial, originalLinks]);
+  expect(observe).not.toHaveBeenCalled();
+  expect(screen.getByLabelText("正文撤销")).toHaveValue("hello there");
 });
 
 it("关闭编辑器能力时，旧版正文撤销保留标注并可重做", () => {
@@ -670,12 +678,14 @@ it.each([false, true])(
     fireEvent.change(input, { target: { value: "hello there" } });
     fireEvent.click(screen.getByLabelText("上一步"));
     expect(input).toHaveValue("hello");
-    const variant = observe.mock.lastCall![0].common;
-    // 关闭能力时仍省略 wire 字段；支持关联时，恢复空关联须明确发送 []，不能让后端保留旧关联。
-    if (linksEnabled) expect(variant.text_links).toEqual([]);
-    else expect(variant).not.toHaveProperty("text_links");
+    expect(observe).not.toHaveBeenCalled();
     fireEvent.click(screen.getByLabelText("下一步"));
     expect(input).toHaveValue("hello there");
+    fireEvent.click(screen.getByRole("button", { name: /^完成.*编辑$/ }));
+    const variant = observe.mock.lastCall![0].common;
+    // 关闭能力时省略 wire 字段；支持关联时恢复空关联须明确发送 []。
+    if (linksEnabled) expect(variant.text_links).toEqual([]);
+    else expect(variant).not.toHaveProperty("text_links");
   }
 );
 
@@ -846,14 +856,15 @@ it("字典音标收起态不叠弧线层", () => {
   expect(container.querySelector(".tsz-ve-liaison-anchor")).toBeNull();
 });
 
-// Ubuntu 缺 ə ʌ ɪ 等音标字形：录词条英文的字段用 Ubuntu，两种音标字段不能用。
-// 类挂在外层包裹上也会经 globals.css 的后代选择器传到 textarea，所以查整条祖先链。
 it.each([
-  ["association", true],
-  ["grammar", true],
-  ["dict-phonetic", false],
-  ["actual-pron", false]
-] as const)("%s 收起态输入框使用词条英文字体：%s", (mode, english) => {
+  ["association", "tsz-entry-en"],
+  ["pronunciation", "tsz-entry-en"],
+  ["grammar", "tsz-words"],
+  ["spelling", "tsz-words"],
+  ["dict-phonetic", "tsz-phonetics"],
+  ["actual-pron", "tsz-phonetics"],
+  [undefined, "tsz-entry-en"]
+] as const)("%s 收起态输入框按内容角色选择字体", (mode, fontClass) => {
   render(
     <V3VoiceTextField
       mode={mode}
@@ -866,7 +877,14 @@ it.each([
   );
   const input = screen.getByLabelText("内容");
   expect(input.tagName).toBe("TEXTAREA");
-  expect(input.closest(".tsz-entry-en") !== null).toBe(english);
+  expect(input).toHaveClass(fontClass);
+  if (mode === "actual-pron")
+    expect(input).toHaveClass("tsz-actual-pronunciation");
+  else expect(input).not.toHaveClass("tsz-actual-pronunciation");
+  if (mode === "grammar")
+    expect(document.querySelector(".v3-grammar-preview-content")).toHaveClass(
+      "tsz-words"
+    );
 });
 
 it("弧线层内层扣掉输入框滚动条宽度，并随输入框滚动和尺寸变化跟进", () => {

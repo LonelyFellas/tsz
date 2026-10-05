@@ -413,6 +413,36 @@ function activationSurfacePage(
 }
 
 describe("V3PublicationHistory", () => {
+  it("历史摘要按旧字段归属展示英式回退和新增美式候选", async () => {
+    const api = requests();
+    const detail = v3PublicationWithSnapshotBody();
+    const form = detail.word.forms.pos[0]!.forms[0]!;
+    if (form.regional_variants.mode !== "common")
+      throw new Error("expected common fixture");
+    form.regional_variants.common.pronunciations[0]!.synthesis = {
+      alphabet: "ipa",
+      use_spelling: false,
+      ipa: "fɑː",
+      ups: "",
+      ipa_locale: "en-GB",
+      us: { ipa: "fɑɹ", ups: "" }
+    };
+    api.listPublications.mockResolvedValue({ publications: [detail] });
+    api.getPublication.mockResolvedValue({ publication: detail });
+    render(
+      <V3PublicationHistory
+        currentWord={v3Word()}
+        onActivated={vi.fn()}
+        requests={api}
+      />
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "查看第 2 次发布" })
+    );
+    expect(
+      await screen.findByTestId("publication-snapshot-body")
+    ).toHaveTextContent("Azure IPA · 英式：fɑː · 美式：fɑɹ");
+  });
   it("renders a successful history response after StrictMode replays lifecycle effects", async () => {
     const api = requests();
     const detail = v3PublicationWithSnapshotBody();
@@ -451,10 +481,10 @@ describe("V3PublicationHistory", () => {
       within(detailView).getByText("historical-v3-spelling")
     ).toBeInTheDocument();
     expect(
-      within(detailView).getByText(
-        "词典音标 historical-v3-dict · 实际发音 historical-v3-actual · 强读"
-      )
-    ).toBeInTheDocument();
+      within(detailView).getByText("historical-v3-dict").parentElement
+    ).toHaveTextContent(
+      "词典音标 historical-v3-dict · 实际发音 historical-v3-actual · 强读"
+    );
     expect(
       within(detailView).getByText("historical-v3-meaning")
     ).toBeInTheDocument();
@@ -501,10 +531,10 @@ describe("V3PublicationHistory", () => {
       within(detail).getByText("historical-v2-spelling")
     ).toBeInTheDocument();
     expect(
-      within(detail).getByText(
-        "词典音标 historical-v2-dict · 实际发音 historical-v2-actual · 弱读"
-      )
-    ).toBeInTheDocument();
+      within(detail).getByText("historical-v2-dict").parentElement
+    ).toHaveTextContent(
+      "词典音标 historical-v2-dict · 实际发音 historical-v2-actual · 弱读"
+    );
     expect(
       within(detail).getByText("historical-v2-meaning")
     ).toBeInTheDocument();
@@ -528,10 +558,10 @@ describe("V3PublicationHistory", () => {
       within(v3Detail).getByText("historical-v3-spelling")
     ).toBeInTheDocument();
     expect(
-      within(v3Detail).getByText(
-        "词典音标 historical-v3-dict · 实际发音 historical-v3-actual · 强读"
-      )
-    ).toBeInTheDocument();
+      within(v3Detail).getByText("historical-v3-dict").parentElement
+    ).toHaveTextContent(
+      "词典音标 historical-v3-dict · 实际发音 historical-v3-actual · 强读"
+    );
     expect(
       within(v3Detail).getByText("historical-v3-meaning")
     ).toBeInTheDocument();
@@ -669,10 +699,10 @@ describe("V3PublicationHistory", () => {
     expect(snapshot.getByText("historical-v3-us-spelling")).toBeInTheDocument();
     expect(snapshot.getByText("无发音")).toBeInTheDocument();
     expect(
-      snapshot.getByText(
-        "词典音标 historical-v3-us-dict · 实际发音 historical-v3-us-actual"
-      )
-    ).toBeInTheDocument();
+      snapshot.getByText("historical-v3-us-dict").parentElement
+    ).toHaveTextContent(
+      "词典音标 historical-v3-us-dict · 实际发音 historical-v3-us-actual"
+    );
     expect(
       snapshot.getByText("historical-v3-unified-meaning")
     ).toBeInTheDocument();
@@ -2194,10 +2224,11 @@ beforeEach(() => {
     profile: {
       id: "admin-1",
       role: "admin",
-      can_publish_lexicon: true,
+      permission_version: 1,
+      catalog_version: "catalog-v1",
       phone: "13800138000",
       display_name: "发布测试",
-      permissions: [],
+      permissions: ["words.access", "words.rollback"],
       preferences: { dialect: "uk" }
     }
   });

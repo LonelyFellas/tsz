@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   cpSync,
+  existsSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
@@ -76,6 +77,11 @@ function run(component, scenario, approved = true) {
     echo artifact > apps/admin/dist/index.html
     echo artifact > apps/web/.next/standalone/apps/web/server.js
     echo static > apps/web/.next/static/test.js
+    if [[ '${scenario}' = public ]]; then
+      mkdir -p apps/web/public/font-licenses apps/web/public/images
+      printf 'font license from build tree\\n' > apps/web/public/font-licenses/Andika-OFL.txt
+      printf '<svg/>\\n' > apps/web/public/images/icon.svg
+    fi
     [[ '${scenario}' != *-build ]] || touch '${phase}'`
   );
   script(
@@ -91,10 +97,15 @@ function run(component, scenario, approved = true) {
   script(
     "rsync",
     `printf 'rsync %s\\n' "$*" >> '${log}'
+    args=("$@"); count=\${#args[@]}
     if [[ "$*" = *tshb-test:* ]]; then
+      if [[ '${scenario}' = public && "$*" = *tshb-test:/opt/tsz-release-stage.ABC123/artifact/ ]]; then
+        public="\${args[count-2]%/}/apps/web/public"
+        [[ ! -d "$public" ]] || cp -R "$public" '${root}/uploaded-public'
+      fi
       [[ '${scenario}' != *-upload ]] || touch '${phase}'
     else
-      args=("$@"); count=\${#args[@]}; cp -R "\${args[count-2]}." "\${args[count-1]}"
+      cp -R "\${args[count-2]}." "\${args[count-1]}"
     fi`
   );
   try {
@@ -118,11 +129,34 @@ function run(component, scenario, approved = true) {
     try {
       calls = readFileSync(log, "utf8");
     } catch {}
-    return { ...result, calls };
+    const uploaded = join(root, "uploaded-public");
+    return {
+      ...result,
+      calls,
+      publicFiles: existsSync(uploaded)
+        ? {
+            license: readFileSync(
+              join(uploaded, "font-licenses/Andika-OFL.txt"),
+              "utf8"
+            ),
+            icon: readFileSync(join(uploaded, "images/icon.svg"), "utf8")
+          }
+        : undefined
+    };
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 }
+
+test("web: public assets are included in the uploaded standalone artifact", () => {
+  const result = run("web", "public");
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.deepEqual(result.publicFiles, {
+    license: "font license from build tree\n",
+    icon: "<svg/>\n"
+  });
+  assert.match(result.calls, /ssh .*publish-release.sh/);
+});
 
 for (const component of ["admin", "web"]) {
   for (const approved of [true, false])

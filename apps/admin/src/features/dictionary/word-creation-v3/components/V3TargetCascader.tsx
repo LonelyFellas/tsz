@@ -12,6 +12,7 @@ import {
 } from "antd";
 import type {
   AdminWordV3,
+  DraftMeaningsStepContentWritableV3,
   PhraseComponentUsageV3,
   PublishedSentenceTargetCandidateV3,
   TextLinkViaPhraseV3
@@ -22,6 +23,7 @@ import type { AdminDialectPreference } from "@tsz/shared";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { createV3WordRequests } from "../api";
 import { dialectLabel } from "../presentation";
+import { boundFormGroupIds } from "../meaningsModel";
 import "./V3SentenceTargetDiscovery.css";
 import { HttpError } from "@tsz/api-client/http";
 
@@ -129,7 +131,7 @@ function cascaderOptionsFromGroups(
         isLeaf: true,
         label: (
           <span className="v3-component-usage-entry">
-            <Typography.Text className="tsz-entry-en" type="secondary">
+            <Typography.Text className="tsz-words" type="secondary">
               {group.headword}（暂无词义）
             </Typography.Text>
             {draftTag}
@@ -144,7 +146,7 @@ function cascaderOptionsFromGroups(
       value: group.entryId,
       label: (
         <span className="v3-component-usage-entry">
-          <Typography.Text className="tsz-entry-en" strong>
+          <Typography.Text className="tsz-words" strong>
             {group.headword}
           </Typography.Text>
           {draftTag}
@@ -169,8 +171,8 @@ function cascaderOptionsFromGroups(
             <span
               className={
                 formGroup.matched
-                  ? "tsz-entry-en v3-component-usage-matched-form"
-                  : "tsz-entry-en"
+                  ? "tsz-words v3-component-usage-matched-form"
+                  : "tsz-words"
               }
             >
               {posLabels.size > 1
@@ -461,8 +463,14 @@ export function V3TargetCascader({
   phraseSelection = "components",
   sourceDialect,
   readOnly = false,
-  selectedTarget
+  selectedTarget,
+  currentDraft
 }: {
+  currentDraft?: {
+    id: string;
+    forms?: AdminWordV3["forms"];
+    meanings?: DraftMeaningsStepContentWritableV3;
+  };
   literal: string;
   readOnly?: boolean;
   selectedTarget?: TargetIdentity;
@@ -535,6 +543,7 @@ export function V3TargetCascader({
             schema_version: 3,
             q: literal,
             match: "exact",
+            ...(phraseSelection === "entry" ? { include_drafts: true } : {}),
             ...(targetKind ? { kind: targetKind } : {}),
             page_size: 50,
             ...(cursor ? { cursor } : {})
@@ -587,7 +596,7 @@ export function V3TargetCascader({
       searchActions.current = null;
       controller.abort();
     };
-  }, [literal, targetKind, requests]);
+  }, [literal, targetKind, phraseSelection, requests]);
 
   const state = {
     ...searchState,
@@ -607,8 +616,102 @@ export function V3TargetCascader({
     };
   }, [literal, targetKind]);
 
+  const candidates = useMemo(
+    () =>
+      state.candidates.flatMap((candidate) => {
+        if (candidate.entry_id !== currentDraft?.id) return [candidate];
+        if (candidate.publication_id) return [];
+        const pos = currentDraft.forms?.pos.find(
+          (item) => item.pos_id === candidate.pos_id
+        );
+        const senses = currentDraft.meanings?.pos.find(
+          (item) => item.pos_id === candidate.pos_id
+        )?.senses;
+        return [
+          {
+            ...candidate,
+            senses: currentDraft.meanings
+              ? candidate.senses.flatMap((sense) => {
+                  const current = senses?.find(
+                    (item) => item.id === sense.sense_id
+                  );
+                  if (!current) return [];
+                  const definition = current.definitions.find(
+                    (item) =>
+                      item.definition_mode === "zh_definition" ||
+                      item.definition_mode === "zh_sentence"
+                  );
+                  return [
+                    {
+                      ...sense,
+                      gloss:
+                        definition && "text" in definition.content
+                          ? definition.content.text
+                          : ""
+                    }
+                  ];
+                })
+              : candidate.senses,
+            forms: currentDraft.forms
+              ? candidate.forms.flatMap((form) => {
+                  const current = pos?.forms.find(
+                    (item) => item.id === form.form_id
+                  );
+                  if (!current) return [];
+                  const variants = current.regional_variants;
+                  const variant = (
+                    variants.mode === "common"
+                      ? [variants.common]
+                      : [variants.uk, variants.us]
+                  ).find(
+                    (item) =>
+                      item.id === form.variant_id &&
+                      item.spelling === form.spelling
+                  );
+                  if (!variant) return [];
+                  const group = pos?.form_groups.find((item) =>
+                    item.members.some(
+                      (member) => member.form_id === form.form_id
+                    )
+                  );
+                  return [
+                    {
+                      ...form,
+                      base_form_ids: form.base_form_ids.filter(
+                        (id) =>
+                          pos?.forms.some((item) => item.id === id) &&
+                          (id === form.form_id ||
+                            group?.members.some(
+                              (member) => member.form_id === id
+                            ))
+                      ),
+                      ...(currentDraft.meanings
+                        ? {
+                            allowed_sense_ids:
+                              senses
+                                ?.filter(
+                                  (sense) =>
+                                    group &&
+                                    (group.scope === "general" ||
+                                      boundFormGroupIds(sense).includes(
+                                        group.id
+                                      ))
+                                )
+                                .map((sense) => sense.id) ?? []
+                          }
+                        : {})
+                    }
+                  ];
+                })
+              : candidate.forms
+          }
+        ];
+      }),
+    [state.candidates, currentDraft]
+  );
+
   const directCandidates = useMemo(() => {
-    if (phraseSelection !== "entry") return state.candidates;
+    if (phraseSelection !== "entry") return candidates;
     const normalize = (text: string) =>
       text
         .normalize("NFKC")
@@ -617,7 +720,7 @@ export function V3TargetCascader({
         .replace(/[‘’ʼ]/gu, "'")
         .replace(/[‐‑‒–—−]/gu, "-")
         .toLowerCase();
-    return state.candidates.map((candidate) => ({
+    return candidates.map((candidate) => ({
       ...candidate,
       forms: candidate.forms.filter(
         (form) =>
@@ -628,7 +731,7 @@ export function V3TargetCascader({
             form.dialect === sourceDialect)
       )
     }));
-  }, [state.candidates, phraseSelection, sourceDialect, literal]);
+  }, [candidates, phraseSelection, sourceDialect, literal]);
   const availableVariantIds = useMemo(
     () =>
       phraseSelection === "entry"
@@ -651,7 +754,7 @@ export function V3TargetCascader({
           selfEntryId,
           formTypeLabel,
           posLabelOf,
-          state.candidates
+          candidates
         ),
         prioritizedEntryId,
         prioritizedSenseId,
@@ -663,7 +766,7 @@ export function V3TargetCascader({
       availableVariantIds,
       selfEntryId,
       directCandidates,
-      state.candidates,
+      candidates,
       formTypeLabel,
       posLabelOf,
       prioritizedEntryId,
@@ -796,7 +899,7 @@ export function V3TargetCascader({
         label:
           components.length === 0 ? (
             <span className="v3-component-usage-entry">
-              <Typography.Text className="tsz-entry-en" type="secondary">
+              <Typography.Text className="tsz-words" type="secondary">
                 {groups[index]!.headword}（未配置成分用词）
               </Typography.Text>
               {groups[index]!.draft ? (
@@ -876,7 +979,7 @@ export function V3TargetCascader({
     readOnly,
     formTypeLabel
   ]);
-  const value = useMemo(() => {
+  const selectedFormKey = useMemo(() => {
     if (!displayedTarget) return undefined;
     if (includePhraseComponents) return undefined;
     const form = groups
@@ -888,14 +991,18 @@ export function V3TargetCascader({
           )
         )
       );
-    return form
-      ? [
-          displayedTarget.target_word_id,
-          form.formKey,
-          displayedTarget.target_sense_id
-        ]
-      : undefined;
+    return form?.formKey;
   }, [displayedTarget, includePhraseComponents, groups]);
+  const selectedEntryId = displayedTarget?.target_word_id;
+  const selectedSenseId = displayedTarget?.target_sense_id;
+  // 追加候选不改变选中路径，保持数组引用以免级联自动滚回选中行。
+  const value = useMemo(
+    () =>
+      selectedEntryId && selectedFormKey && selectedSenseId
+        ? [selectedEntryId, selectedFormKey, selectedSenseId]
+        : undefined,
+    [selectedEntryId, selectedFormKey, selectedSenseId]
+  );
 
   // 单选没有「反选」：已有关联的解除全靠这个入口，把该单词的关联整组清空。
   // 无候选/查询失败时也要出现——否则指向已下架目标的孤儿关联再也删不掉。

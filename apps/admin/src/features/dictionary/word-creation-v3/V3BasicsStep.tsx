@@ -85,12 +85,18 @@ function Pronunciations({
           <Typography.Text type="secondary">发音 {index + 1}</Typography.Text>
           {pronunciation.dict_phonetic ? (
             <Typography.Text>
-              词典音标：{pronunciation.dict_phonetic}
+              词典音标：
+              <span className="tsz-phonetics">
+                {pronunciation.dict_phonetic}
+              </span>
             </Typography.Text>
           ) : null}
           {pronunciation.actual_pron ? (
             <Typography.Text>
-              实际发音：{pronunciation.actual_pron}
+              实际发音：
+              <span className="tsz-phonetics tsz-actual-pronunciation">
+                {pronunciation.actual_pron}
+              </span>
             </Typography.Text>
           ) : null}
           {pronunciation.style ? (
@@ -119,7 +125,7 @@ function VariantPanel({
         <Typography.Text strong>{label}</Typography.Text>
         <Input
           aria-label={label}
-          className="tsz-entry-en"
+          className="tsz-words"
           readOnly
           value={spelling}
         />
@@ -309,7 +315,7 @@ function V3BasicsContent({
             <Typography.Text>录入词条</Typography.Text>
             <Input
               aria-label="录入词条"
-              className="tsz-entry-en"
+              className="tsz-words"
               readOnly
               placeholder="暂无词条名称"
               size="large"
@@ -317,10 +323,10 @@ function V3BasicsContent({
               value={entryLabel}
               style={{ marginTop: 8 }}
             />
+            <Typography.Text type="secondary" className="word-field-help">
+              词典检测已完成，建议内容已应用到当前草稿。
+            </Typography.Text>
           </div>
-          <Typography.Text type="secondary" className="word-field-help">
-            词典检测已完成，建议内容已应用到当前草稿。
-          </Typography.Text>
         </Space>
       </Card>
 
@@ -411,7 +417,7 @@ export function V3BasicsStep({
         breadcrumbTitle: entryLabel ? `${entryLabel} · 创建新词条` : "创建词条",
         completedSteps: word.completed_steps,
         summaryHeadword: (
-          <strong className="v3-summary-headword tsz-entry-en">
+          <strong className="v3-summary-headword tsz-words">
             {entryLabel || "新词条"}
           </strong>
         ),

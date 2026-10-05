@@ -1,4 +1,4 @@
-import type { Page, Route } from "@playwright/test";
+import type { BrowserContext, Page, Route } from "@playwright/test";
 
 // 前端 E2E 在不启动真实后端的前提下，拦截 /api/v1/** 并返回可控的桩响应。
 // 路径与响应形状对齐 tsz-rust(见 api-client openapi.snapshot.json):
@@ -36,7 +36,10 @@ interface MockOptions {
   authenticated?: boolean;
 }
 
-export async function mockApi(page: Page, opts: MockOptions = {}) {
+export async function mockApi(
+  page: Page | BrowserContext,
+  opts: MockOptions = {}
+) {
   const { authenticated = false } = opts;
   // 可变：账号注销后会话失效，后续 /auth/refresh 应 401（模拟账号已删）。
   let deleted = false;
@@ -66,6 +69,12 @@ export async function mockApi(page: Page, opts: MockOptions = {}) {
     if (path === "/auth/me" && method === "GET") {
       // tsz-rust 返回扁平 UserProfile(active_role 在 user 内,无包壳)
       return json(route, 200, TEST_USER);
+    }
+    if (path === "/me/teacher-certification" && method === "GET") {
+      return json(route, 200, { teacher_verified: false, application: null });
+    }
+    if (path === "/me/notifications" && method === "GET") {
+      return json(route, 200, { items: [], total: 0, unread_count: 0 });
     }
     if (path === "/auth/login" && method === "POST") {
       return json(route, 200, AUTH_RESPONSE);

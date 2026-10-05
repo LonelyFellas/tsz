@@ -5,6 +5,9 @@ import { Button, Drawer, Layout, Tooltip } from "antd";
 import { useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { AdminHeader } from "@/features/auth/AdminHeader";
+import { BusinessPermissionGuard } from "@/features/auth/BusinessPermissionGuard";
+import { adminAccountIdentity } from "@/lib/adminAuthorization";
+import { useAuthStore } from "@/lib/auth";
 import { AdminRouteGuard } from "@/features/auth/AdminRouteGuard";
 import { ConsoleSidebar } from "@/features/console/ConsoleSidebar";
 
@@ -61,6 +64,7 @@ function useLayoutMode(isWordCreationWorkspace: boolean): LayoutMode {
 // 受保护的后台壳：门禁守卫 + antd Layout（侧栏 Sider + 顶栏 Header），子路由渲染在 <Outlet/>。
 // Sider 固定不滚动，仅内容区随主体滚动；整壳撑满视口高度。仅登录的 admin 可见。
 export function ConsoleLayout() {
+  const identity = useAuthStore((s) => adminAccountIdentity(s.profile));
   const { pathname } = useLocation();
   const isWordCreationWorkspace = isWordCreationWorkspacePath(pathname);
   const mode = useLayoutMode(isWordCreationWorkspace);
@@ -159,15 +163,17 @@ export function ConsoleLayout() {
             </div>
           </Header>
           <Content style={{ padding: isDrawer ? 16 : 24 }}>
-            {pathname.startsWith("/words") ? (
-              <DictionaryFormTypeLabels>
-                <DictionaryPartOfSpeechLabels>
-                  <Outlet />
-                </DictionaryPartOfSpeechLabels>
-              </DictionaryFormTypeLabels>
-            ) : (
-              <Outlet />
-            )}
+            <BusinessPermissionGuard key={identity}>
+              {pathname.startsWith("/words") ? (
+                <DictionaryFormTypeLabels>
+                  <DictionaryPartOfSpeechLabels>
+                    <Outlet />
+                  </DictionaryPartOfSpeechLabels>
+                </DictionaryFormTypeLabels>
+              ) : (
+                <Outlet />
+              )}
+            </BusinessPermissionGuard>
           </Content>
         </Layout>
       </Layout>

@@ -2,15 +2,17 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { App } from "antd";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api, useIsSuperAdmin } from "@/lib/auth";
+import { api, usePermission } from "@/lib/auth";
 
 vi.mock("@/lib/auth", () => ({
-  useIsSuperAdmin: vi.fn(),
+  usePermission: vi.fn(),
   api: { teacherCertification: { revoke: vi.fn() } }
 }));
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(useIsSuperAdmin).mockReturnValue(false);
+  vi.mocked(usePermission).mockImplementation(
+    (key) => key === "users.read_sensitive"
+  );
 });
 import type { AdminUserView } from "@tsz/types";
 import { UserDetailDrawer } from "./UserDetailDrawer";
@@ -27,6 +29,18 @@ const base: AdminUserView = {
 };
 
 describe("UserDetailDrawer", () => {
+  it("没有敏感资料权限时，即使旧缓存含完整联系方式也不展示或复制", () => {
+    vi.mocked(usePermission).mockReturnValue(false);
+    render(
+      <UserDetailDrawer
+        user={{ ...base, phone: "13800138000", email: "private@example.test" }}
+        onClose={vi.fn()}
+      />
+    );
+    expect(screen.queryByText("13800138000")).toBeNull();
+    expect(screen.queryByText("private@example.test")).toBeNull();
+    expect(screen.getAllByText("未授权")).toHaveLength(2);
+  });
   it("普通管理员只能查看认证状态", () => {
     render(
       <UserDetailDrawer
@@ -39,7 +53,7 @@ describe("UserDetailDrawer", () => {
   });
 
   it("超管可以填写原因撤销历史认证并关闭旧详情", async () => {
-    vi.mocked(useIsSuperAdmin).mockReturnValue(true);
+    vi.mocked(usePermission).mockReturnValue(true);
     vi.mocked(api.teacherCertification.revoke).mockResolvedValue({
       teacher_verified: false
     });

@@ -98,6 +98,9 @@ if (!spec?.paths) {
   throw new Error(`spec 无 paths 字段: ${source}`);
 }
 const contractSchemaNames = [
+  "UserProfile",
+  "UserRole",
+  "UpdateProfileResponse",
   "PasswordStatus",
   "FormTypeConfig",
   "FormTypeCatalogItem",
@@ -477,6 +480,10 @@ for (const [rawPath, item] of Object.entries(spec.paths)) {
     if (
       rawPath.startsWith(ADMIN_LEXICON_PREFIX) ||
       rawPath.startsWith(`${API_PREFIX}/auth/password/`) ||
+      rawPath === `${API_PREFIX}/auth/register` ||
+      rawPath === `${API_PREFIX}/admin/auth/change-password` ||
+      rawPath === `${API_PREFIX}/me` ||
+      rawPath.startsWith(`${API_PREFIX}/me/avatar`) ||
       rawPath.startsWith(`${API_PREFIX}/me/contact/`) ||
       rawPath.startsWith(`${API_PREFIX}/admin/settings/form-types`) ||
       rawPath === `${API_PREFIX}/admin/settings/parts-of-speech/catalog`
@@ -525,8 +532,23 @@ const operationRequestSchemaNames = collectComponentSchemaClosure(
     })),
   spec.components.schemas
 );
+const avatarResponseSchemaNames = collectComponentSchemaClosure(
+  Object.entries(operationSchemas)
+    .filter(([key]) => key.startsWith("post /me/avatar"))
+    .flatMap(([key, operation]) =>
+      Object.entries(operation.responses).map(([status, schema]) => ({
+        schema,
+        path: `operationSchemas.${key}.responses.${status}`
+      }))
+    ),
+  spec.components.schemas
+);
 const snapshotSchemaNames = [
-  ...new Set([...contractSchemaNames, ...operationRequestSchemaNames])
+  ...new Set([
+    ...contractSchemaNames,
+    ...operationRequestSchemaNames,
+    ...avatarResponseSchemaNames
+  ])
 ];
 
 const snapshotBase = {

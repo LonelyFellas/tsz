@@ -1,8 +1,4 @@
-/*
- * 标注正文使用 Ubuntu：固定核心词和可替换搭配加粗，词性提示符使用常规字重。
- * 连读弧的落点按字形墨迹量，字体一换弧的观感就变，
- * 编辑器与只读视图必须同一副字体才对得上。@font-face 见 fonts.css。
- */
+/* 连读弧按字形度量，输入层和标注层必须使用同一字体。 */
 @import "./fonts.css";
 
 .tsz-ve-field {
@@ -29,9 +25,6 @@
 
 /* 语法结构三分类的配色单一来源：按钮与正文标记共用。 */
 :root {
-  --tsz-ve-text-font:
-    "Ubuntu", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    "PingFang SC", "Microsoft YaHei", sans-serif;
   --tsz-ve-role-function: #000000;
   --tsz-ve-role-core: #2f54ff;
   --tsz-ve-role-grammar: #b4b4b4;
@@ -142,7 +135,7 @@
 .tsz-ve-canvas-input {
   /* 上方留给连读弧，下方留给上下两排停顿记号。 */
   padding: 34px 14px 46px;
-  font-family: var(--tsz-ve-text-font);
+  font-family: var(--tsz-font-text);
   font-weight: 700;
   font-size: 26px;
   /* 行高必须写死数值：textarea 的 normal 与 div 的 normal 不一定同值。 */
@@ -155,6 +148,26 @@
   overflow-wrap: break-word;
   white-space: pre-wrap;
   word-break: normal;
+}
+
+.tsz-ve-editor[data-mode="grammar"] .tsz-ve-strip,
+.tsz-ve-editor[data-mode="grammar"] .tsz-ve-canvas-input,
+.tsz-ve-editor[data-mode="spelling"] .tsz-ve-strip,
+.tsz-ve-editor[data-mode="spelling"] .tsz-ve-canvas-input {
+  font-family: var(--tsz-font-words);
+  font-size: 14pt;
+}
+
+.tsz-ve-editor[data-mode="dict-phonetic"] .tsz-ve-strip,
+.tsz-ve-editor[data-mode="dict-phonetic"] .tsz-ve-canvas-input,
+.tsz-ve-editor[data-mode="actual-pron"] .tsz-ve-strip,
+.tsz-ve-editor[data-mode="actual-pron"] .tsz-ve-canvas-input {
+  font-family: var(--tsz-font-phonetics);
+}
+
+.tsz-ve-editor[data-mode="actual-pron"] .tsz-ve-strip,
+.tsz-ve-editor[data-mode="actual-pron"] .tsz-ve-canvas-input {
+  font-size: 14pt;
 }
 
 .tsz-ve-strip {
@@ -512,14 +525,6 @@
   border-radius: 3px;
   text-decoration: underline dotted #6d28d9 2px;
   text-underline-offset: 4px;
-}
-
-.tsz-ve-phoneme[data-phoneme]::after {
-  content: " /" attr(data-phoneme) "/";
-  color: #6d28d9;
-  font-family: "Charis SIL", ui-monospace, monospace;
-  font-size: 0.78em;
-  font-weight: 400;
 }
 
 /*

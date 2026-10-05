@@ -17,7 +17,8 @@ const ISSUE_MESSAGES = {
   pos_required: "请至少添加一个词性",
   part_of_speech_kind_mismatch:
     "该词性不属于当前词条所在的目录，请改选同一侧的词性",
-  form_group_membership_invalid: "词形变化组中的词形引用无效",
+  form_group_membership_invalid:
+    "词形变化组关联的词形已不可用，请检查并重新选择",
   orphan_form: "每个词形都必须加入至少一个词形变化组",
   form_group_required: "每个词性都需要至少一个词形变化组",
   empty_form_group: "词形变化组不能为空",
@@ -50,7 +51,7 @@ const ISSUE_MESSAGES = {
   definition_level_invalid: "请选择有效的释义等级",
   definition_invalid: "请完整填写释义并选择语法结构",
   phonetic_rich_text_invalid: "音标正文与标注不一致或标注范围无效，请重新编辑",
-  audio_asset_invalid: "音频资产不可用、格式错误或无权引用",
+  audio_asset_invalid: "音频不可用、格式错误或你没有使用权限，请重新选择",
   native_definition_required: "请至少填写一条中文释义",
   sentence_level_invalid: "请选择有效的例句等级",
   sentence_incomplete: "请完整填写中英文例句并关联当前词义",
@@ -84,7 +85,8 @@ const ISSUE_MESSAGES = {
   node_binding_changed: "内容结构已变化，请刷新后重试",
   meanings_storage_unsafe: "词义内容暂时无法安全保存，请刷新后重试",
   pos_meanings_required: "每个词性都需要填写词义",
-  sense_has_inbound_publication_refs: "该词义已被发布内容引用，暂时不能移除",
+  sense_has_inbound_publication_refs:
+    "该词义仍与已发布内容有关联，解除关联后才能移除",
   phrase_component_not_allowed: "只有短语词条可以设置成分用词",
   phrase_component_limit_exceeded: "单条释义最多设置 100 个成分用词",
   phrase_component_literal_invalid: "成分用词的词面不合法，请重新选词",

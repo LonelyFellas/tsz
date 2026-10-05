@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { PartOfSpeechConfig } from "@tsz/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { expectDisplayNamesNotDerived } from "./displayName.test.helper";
+import { useAuthStore } from "@/lib/auth";
 import { PartOfSpeechFormModal } from "./PartOfSpeechFormModal";
 
 const api = vi.hoisted(() => ({
@@ -59,6 +60,16 @@ function renderModal(editing?: PartOfSpeechConfig) {
 }
 
 beforeEach(() => {
+  useAuthStore.getState().setProfile({
+    id: "admin-1",
+    role: "super_admin",
+    phone: "",
+    display_name: "测试超管",
+    permission_version: 1,
+    catalog_version: "v1",
+    permissions: [],
+    preferences: { dialect: "uk" }
+  });
   vi.clearAllMocks();
   api.createPending = false;
   api.updatePending = false;

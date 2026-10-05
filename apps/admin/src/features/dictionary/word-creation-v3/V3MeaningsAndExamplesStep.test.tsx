@@ -216,8 +216,7 @@ const meaningsFixture: DraftMeaningsStepContentWritableV3 = {
 };
 
 function deleteRelationItem(label: string, index = 0) {
-  fireEvent.click(screen.getAllByLabelText(`管理${label}`)[index]!);
-  fireEvent.click(screen.getByLabelText(`删除${label}`));
+  fireEvent.click(screen.getAllByLabelText(`删除${label}`)[index]!);
 }
 
 function Harness({
@@ -231,10 +230,8 @@ function Harness({
   partOfSpeechCatalogError,
   partOfSpeechCatalogPending,
   wordId,
-  relationSnapshots,
-  multiGroupBindingsEnabled = false
+  relationSnapshots
 }: {
-  multiGroupBindingsEnabled?: boolean;
   initial?: DraftMeaningsStepContentWritableV3;
   issues?: V3DraftValidationIssue[];
   onSave?: (
@@ -267,7 +264,6 @@ function Harness({
   return (
     <AntApp>
       <V3MeaningsAndExamplesStep
-        multiGroupBindingsEnabled={multiGroupBindingsEnabled}
         activePosId={activePosId}
         forms={formsValue}
         idFactory={idFactory}
@@ -306,8 +302,110 @@ function formsValue(): DraftFormsStepContentV3 {
 }
 
 describe("V3MeaningsAndExamplesStep", () => {
+  it.each(["common", "us"] as const)(
+    "删除含 %s 词形关联的语法结构需确认，取消保留数据，确认只清除该结构的绑定",
+    async (dialect) => {
+      const initial = structuredClone(meaningsFixture);
+      const pos = initial.pos[0]!;
+      const variant = pos.grammar_structures[0]!.variants[0]!;
+      variant.dialect = dialect;
+      variant.form_links = [
+        {
+          id: "grammar-form-link",
+          source_segments: [{ start: 0, end: 4, surface: "used" }],
+          target_word_id: "linked-word",
+          target_publication_id: "linked-publication",
+          target_pos_id: "linked-pos",
+          target_form_id: "linked-form",
+          target_variant_id: "linked-variant",
+          target_dialect: dialect
+        }
+      ];
+      if (dialect === "us") {
+        pos.grammar_structures[0]!.variants.unshift({
+          ...variant,
+          id: "unlinked-uk-variant",
+          dialect: "uk",
+          form_links: []
+        });
+      }
+      pos.grammar_structures.push({
+        id: "grammar-2",
+        variants: [
+          {
+            id: "grammar-variant-2",
+            dialect: "common",
+            content: { version: 2, text: "other grammar", annotations: [] }
+          }
+        ]
+      });
+      pos.senses[0]!.definitions.push({
+        id: "definition-2",
+        level: "A1",
+        definition_mode: "zh_definition",
+        content_id: "definition-content-2",
+        grammar_structure_id: "grammar-2",
+        content: { version: 2, text: "其他释义", annotations: [] }
+      });
+      const { container } = render(
+        <ConfigProvider theme={{ token: { motion: false } }}>
+          <Harness initial={initial} />
+        </ConfigProvider>
+      );
+      const deleteButton = container.querySelector<HTMLButtonElement>(
+        'button[aria-label="删除语法结构 1"]'
+      )!;
+      const before = value();
+      fireEvent.click(deleteButton);
+      expect(value()).toEqual(before);
+      const confirmationTitle = await screen.findByText("删除语法结构？", {
+        selector: ".ant-modal-confirm-title"
+      });
+      const confirmation = confirmationTitle.closest(
+        '[role="dialog"]'
+      )! as HTMLElement;
+      await waitFor(() => expect(confirmation).toBeVisible());
+      fireEvent.click(
+        within(confirmation).getByRole("button", { name: /^取\s*消$/ })
+      );
+      expect(value()).toEqual(before);
+      await waitFor(() => expect(confirmationTitle).not.toBeInTheDocument());
+      fireEvent.click(deleteButton);
+      const nextTitle = await screen.findByText("删除语法结构？", {
+        selector: ".ant-modal-confirm-title"
+      });
+      const nextConfirmation = nextTitle.closest(
+        '[role="dialog"]'
+      )! as HTMLElement;
+      fireEvent.click(
+        within(nextConfirmation).getByRole("button", { name: /^删\s*除$/ })
+      );
+      await waitFor(() =>
+        expect(value().pos[0]!.grammar_structures).toEqual([
+          before.pos[0]!.grammar_structures[1]
+        ])
+      );
+      expect(value().pos[0]!.senses[0]!.definitions[0]).not.toHaveProperty(
+        "grammar_structure_id"
+      );
+      expect(value().pos[0]!.senses[0]!.definitions[1]).toEqual(
+        before.pos[0]!.senses[0]!.definitions[1]
+      );
+      expect(value().pos[0]!.senses[0]!.relations).toEqual(
+        before.pos[0]!.senses[0]!.relations
+      );
+      expect(value().pos[0]!.senses[0]!.sentences).toEqual(
+        before.pos[0]!.senses[0]!.sentences
+      );
+      expect(
+        container.querySelector('button[aria-label="删除语法结构 1"]')
+      ).toBeDisabled();
+    }
+  );
+
   it("有内容的词义在页面顶部弹窗确认，取消保留内容和展开状态，确认后才删除", () => {
     const { container } = render(<Harness />);
+    fireEvent.click(screen.getByText("添加词义"));
     const before = value();
     const expanded = document.querySelector(
       ".word-sense-editor .ant-collapse-item"
@@ -332,15 +430,23 @@ describe("V3MeaningsAndExamplesStep", () => {
     fireEvent.click(
       screen.getByText("确认删除", { selector: ".ant-modal button span" })
     );
-    expect(value().pos[0]!.senses).toHaveLength(0);
+    expect(value().pos[0]!.senses).toHaveLength(1);
+    expect(value().pos[0]!.senses[0]!.id).toBe(before.pos[0]!.senses[1]!.id);
+    expect(screen.getByLabelText("删除词义 1")).toBeDisabled();
   });
 
-  it("新增空白词义直接删除，不弹确认", () => {
+  it("最后一条词义不可删除，新增空白词义可直接删除", () => {
     render(<Harness />);
+    const before = value();
+    expect(screen.getByLabelText("删除词义 1")).toBeDisabled();
+    fireEvent.click(screen.getByLabelText("删除词义 1"));
+    expect(value()).toEqual(before);
+    expect(screen.queryByText("确定删除该词义吗？")).not.toBeInTheDocument();
     fireEvent.click(screen.getByText("添加词义"));
     expect(value().pos[0]!.senses).toHaveLength(2);
     fireEvent.click(screen.getByLabelText("删除词义 2"));
     expect(value().pos[0]!.senses).toHaveLength(1);
+    expect(screen.getByLabelText("删除词义 1")).toBeDisabled();
     expect(screen.queryByText("确定删除该词义吗？")).not.toBeInTheDocument();
   });
 
@@ -392,12 +498,14 @@ describe("V3MeaningsAndExamplesStep", () => {
     };
     expect(senseNeedsDeleteConfirmation(sense)).toBe(true);
     render(<Harness initial={initial} />);
+    fireEvent.click(screen.getByText("添加词义"));
+    const before = value();
     fireEvent.click(screen.getByLabelText("删除词义 1"));
     expect(screen.getByText("确定删除该词义吗？")).toBeInTheDocument();
     fireEvent.click(
       screen.getByText(/取\s*消/u, { selector: ".ant-modal button span" })
     );
-    expect(value()).toEqual(initial);
+    expect(value()).toEqual(before);
   });
 
   it("仅编辑配置或添加关联内容也需要删除确认", () => {
@@ -1104,6 +1212,8 @@ describe("V3MeaningsAndExamplesStep", () => {
     );
   });
 
+  // 覆盖率环境下还需加载编辑器并清空正文，沿用相邻编辑器交互测试的单项上限。
+  // changeVoiceText 对异步编辑器的等待上限为 10 秒，不能被默认的 5 秒整项超时截断。
   it("语法结构和英文释义在输入框前提供整段试听", async () => {
     const previous = env.VOICE_PREVIEW;
     Object.assign(env, { VOICE_PREVIEW: true });
@@ -1172,9 +1282,9 @@ describe("V3MeaningsAndExamplesStep", () => {
       synthesize.mockRestore();
       Object.assign(env, { VOICE_PREVIEW: previous });
     }
-  });
+  }, 15_000);
 
-  it("语法结构挂上语音编辑器，标注实时回写且不丢正文", async () => {
+  it("语法结构挂上语音编辑器，完成后回写标注且不丢正文", async () => {
     // 关联编辑器共存时，语法结构仍使用原来的标注工具。
     render(<Harness initial={meaningsFixture} />);
 
@@ -1200,7 +1310,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       value().pos[0]!.grammar_structures[0]!.variants[0]!.content.text
     ).toBe("a centre of the city");
 
-    // 显式开启连续标注后，原有字母画笔仍应实时回写草稿。
+    // 连续标注仍在编辑器本地草稿内，完成之前不影响外层。
     const activeEditor = input.closest(".tsz-ve-editor") as HTMLElement;
     fireEvent.click(activeEditor.querySelector(".tsz-ve-role-button")!);
     // 只查询当前编辑器，避免全页大量字段的可及名计算拖慢并发测试。
@@ -1216,13 +1326,15 @@ describe("V3MeaningsAndExamplesStep", () => {
     fireEvent.mouseEnter(letters[letters.length - 1]!, { buttons: 1 });
     fireEvent.mouseUp(letters[letters.length - 1]!);
 
+    const before = value().pos[0]!.grammar_structures[0]!.variants[0]!.content;
+    expect(before.version === 2 ? before.annotations : []).toEqual([]);
+    fireEvent.click(screen.getByLabelText("完成语法结构 1 英美通用内容编辑"));
     const content = value().pos[0]!.grammar_structures[0]!.variants[0]!.content;
     expect(content.text).toBe("a centre of the city");
     expect(content.version).toBe(2);
     expect(content.version === 2 ? content.annotations : []).toEqual([
       { type: "emphasis", start: 2, end: 8, level: "core" }
     ]);
-    fireEvent.click(screen.getByLabelText("完成语法结构 1 英美通用内容编辑"));
     expect(
       document.querySelector('.v3-grammar-preview strong[data-level="core"]')
     ).toHaveTextContent("centre");
@@ -1264,6 +1376,10 @@ describe("V3MeaningsAndExamplesStep", () => {
     fireEvent.click(confirm);
     expect(
       value().pos[0]!.grammar_structures[0]!.variants[0]!.audio_assets
+    ).toEqual(initial.pos[0]!.grammar_structures[0]!.variants[0]!.audio_assets);
+    fireEvent.click(screen.getByLabelText("完成语法结构 1 英美通用内容编辑"));
+    expect(
+      value().pos[0]!.grammar_structures[0]!.variants[0]!.audio_assets
     ).toEqual([]);
   }, 30_000);
 
@@ -1303,6 +1419,8 @@ describe("V3MeaningsAndExamplesStep", () => {
       const rateButtons = await screen.findAllByLabelText(/^设置 .* 的语速$/);
       fireEvent.click(rateButtons[0]!);
       fireEvent.click(await screen.findByLabelText("语速 1.25 倍"));
+      expect(variant().voice_profile).toBeUndefined();
+      fireEvent.click(screen.getByLabelText("完成语法结构 1 英美通用内容编辑"));
       expect(variant().voice_profile).toEqual({
         voices: [
           { voice_id: expect.any(String), enabled: false, rate_percent: 25 }
@@ -1342,8 +1460,15 @@ describe("V3MeaningsAndExamplesStep", () => {
     const addGrammar = within(
       container.querySelector(".word-grammar-card") as HTMLElement
     ).getByRole("button", { name: "添加语法结构" });
-    expect(addGrammar.closest(".ant-card-extra")).not.toBeNull();
-    expect(addGrammar).toHaveClass("ant-btn-text");
+    expect(addGrammar.closest(".ant-card-extra")).toBeNull();
+    expect(addGrammar).toHaveClass(
+      "word-section-add-button",
+      "ant-btn-dashed",
+      "ant-btn-block"
+    );
+    expect(addGrammar.closest(".ant-card-body")?.lastElementChild).toBe(
+      addGrammar
+    );
     expect(container.querySelector(".word-grammar-add")).toBeNull();
   });
 
@@ -1431,7 +1556,9 @@ describe("V3MeaningsAndExamplesStep", () => {
     ];
     render(<Harness initial={initial} />);
     const select = screen.getByLabelText("释义 1 所属语义区间");
-    expect(select.closest(".ant-select")).toHaveTextContent("未命名语义区间");
+    expect(select.closest(".ant-select")?.textContent?.trim()).toBe(
+      "请选择语义区间"
+    );
     expect(select.closest(".ant-select")).not.toHaveTextContent(
       "sense-group-1"
     );
@@ -1454,7 +1581,9 @@ describe("V3MeaningsAndExamplesStep", () => {
     fireEvent.change(screen.getByLabelText("语义区间 4 英文"), {
       target: { value: "  " }
     });
-    expect(select.closest(".ant-select")).toHaveTextContent("未命名语义区间");
+    expect(select.closest(".ant-select")?.textContent?.trim()).toBe(
+      "请选择语义区间"
+    );
     expect(value().pos[0]!.senses[0]!.sense_group_id).toBe("en");
     fireEvent.mouseDown(select);
     fireEvent.click(
@@ -1544,7 +1673,10 @@ describe("V3MeaningsAndExamplesStep", () => {
       /\.word-grammar-reference-label\s*\{[^}]*align-items:\s*baseline;/su
     );
     expect(v3LayoutCss).toMatch(
-      /\.word-grammar-reference-text\s*\{[^}]*padding-top:\s*1em;[^}]*overflow:\s*hidden;/su
+      /\.word-grammar-reference-text\s*\{[^}]*overflow:\s*hidden;/su
+    );
+    expect(v3LayoutCss).toMatch(
+      /\.word-grammar-reference-text:has\(\.has-liaison\)\s*\{[^}]*padding-top:\s*calc\(0\.5em \+ 2px\);/su
     );
     expect(value()).toEqual(initial);
   });
@@ -1628,9 +1760,6 @@ describe("V3MeaningsAndExamplesStep", () => {
     ) as HTMLElement;
     expect([...header.children].map((item) => item.textContent)).toEqual([
       "",
-      "",
-      "",
-      "",
       "释义语句",
       "语法结构",
       ""
@@ -1638,18 +1767,20 @@ describe("V3MeaningsAndExamplesStep", () => {
     const row = container.querySelector(".word-definition-row") as HTMLElement;
     expect(row).not.toBeNull();
     const columns = [...row.children] as HTMLElement[];
-    expect(columns).toHaveLength(7);
-    const level = columns[1]!;
-    const language = columns[2]!;
-    const style = columns[3]!;
-    const body = columns[4]!;
-    const grammarCell = columns[5]!;
-    const actions = columns[6]!;
-    expect(columns[0]).toHaveClass("word-number-cell");
-    expect(columns[0]).not.toHaveClass("word-definition-index");
-    expect(within(level).getByLabelText("定义 1 等级")).toBeVisible();
-    expect(within(language).getByLabelText("定义 1 语言")).toBeVisible();
-    expect(within(style).getByLabelText("定义 1 释义方式")).toBeVisible();
+    expect(columns).toHaveLength(4);
+    const meta = columns[0]!;
+    expect(meta).toHaveClass("word-definition-meta");
+    const [level, language, style] = [
+      ...meta.querySelectorAll<HTMLElement>(".word-definition-text-select")
+    ];
+    const body = columns[1]!;
+    const grammarCell = columns[2]!;
+    const actions = columns[3]!;
+    expect(meta.querySelector(".word-number-cell")).not.toBeNull();
+    expect(meta.querySelector(".word-definition-index")).toBeNull();
+    expect(within(level!).getByLabelText("定义 1 等级")).toBeVisible();
+    expect(within(language!).getByLabelText("定义 1 语言")).toBeVisible();
+    expect(within(style!).getByLabelText("定义 1 释义方式")).toBeVisible();
     const content = within(body).getByLabelText("定义 1 内容");
     const grammar = within(grammarCell).getByLabelText("定义 1 语法结构");
     expect(content.tagName).toBe("TEXTAREA");
@@ -1678,6 +1809,7 @@ describe("V3MeaningsAndExamplesStep", () => {
 
   it("释义文字选择器保留选择、Escape 和外部点击关闭，语法结构不受影响", async () => {
     render(<Harness />);
+    expect(document.querySelector(".word-definition-meta-divider")).toBeNull();
     const level = screen.getByLabelText("定义 1 等级");
     const language = screen.getByLabelText("定义 1 语言");
     const style = screen.getByLabelText("定义 1 释义方式");
@@ -2453,7 +2585,7 @@ describe("V3MeaningsAndExamplesStep", () => {
         document.querySelectorAll(
           ".word-relation-row > .ant-btn-dangerous, .word-relation-gloss-row > .ant-btn-dangerous"
         )
-      ).toHaveLength(0);
+      ).toHaveLength(5);
       fireEvent.keyDown(screen.getByLabelText(`拖动${label}词义 2`), {
         key: "ArrowUp"
       });
@@ -3560,15 +3692,18 @@ describe("V3MeaningsAndExamplesStep", () => {
     });
   });
 
-  it("拖拽手柄与删除按钮共用同一条 32px 中心线", () => {
+  it("拖拽手柄前置，删除按钮独立保留在行尾", () => {
     render(<Harness wordId="entry-align" />);
 
-    for (const label of ["语义区间", "语法结构"]) {
+    for (const label of ["语义区间", "语法结构", "定义", "词义"]) {
       const drag = screen.getByLabelText(`拖动${label} 1`);
       const remove = screen.getByLabelText(`删除${label} 1`);
-      const actions = drag.closest(".word-sort-actions");
-      expect(actions).not.toBeNull();
-      expect(remove.closest(".word-sort-actions")).toBe(actions);
+      expect(drag.closest(".word-sort-leading")).not.toBeNull();
+      expect(drag.closest(".word-sort-actions")).toBeNull();
+      expect(remove.closest(".word-sort-leading")).toBeNull();
+      expect(
+        drag.compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
     }
     expect(meaningsCss).toMatch(
       /\.word-sort-actions\s*\{[^}]*align-items:\s*center;[^}]*width:\s*var\(--word-ops-col,\s*32px\);/su
@@ -3630,9 +3765,16 @@ describe("V3MeaningsAndExamplesStep", () => {
 
   it("新增语义区间只追加词条级区间，不改动任何词义归属", () => {
     const ids = ["sense-group-new"];
-    render(<Harness idFactory={() => ids.shift()!} wordId="entry-add-group" />);
-
-    fireEvent.click(screen.getByRole("button", { name: "添加语义区间" }));
+    const { container } = render(
+      <Harness idFactory={() => ids.shift()!} wordId="entry-add-group" />
+    );
+    // 覆盖率环境里全页角色查询会遍历大量编辑器按钮；只在所属卡片内查找添加入口。
+    const groupCard = container.querySelector<HTMLElement>(
+      ".word-sense-groups-card"
+    )!;
+    fireEvent.click(
+      within(groupCard).getByRole("button", { name: "添加语义区间" })
+    );
     expect(value().sense_groups.map((group) => group.id)).toEqual([
       "sense-group-1",
       "sense-group-new"
@@ -3926,11 +4068,11 @@ describe("V3MeaningsAndExamplesStep", () => {
 
     // 语言与释义方式各自独立选，四个组合都要能走到。
     fireEvent.mouseDown(screen.getByLabelText("定义 1 语言"));
-    expect(optionsIn("EN").map((option) => option.textContent)).toEqual([
+    expect(optionsIn("英文").map((option) => option.textContent)).toEqual([
       "中文",
-      "EN"
+      "英文"
     ]);
-    fireEvent.click(optionsIn("EN")[1]!);
+    fireEvent.click(optionsIn("英文")[1]!);
     expect(value().pos[0]!.senses[0]!.definitions[0]).toMatchObject({
       id: "en-definition",
       definition_mode: "en_definition",
@@ -3963,7 +4105,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     });
 
     fireEvent.mouseDown(screen.getByLabelText("定义 1 语言"));
-    fireEvent.click(optionsIn("EN")[0]!);
+    fireEvent.click(optionsIn("英文")[0]!);
     expect(value().pos[0]!.senses[0]!.definitions[0]).toMatchObject({
       id: "zh-sentence",
       definition_mode: "zh_sentence",
@@ -4386,7 +4528,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(screen.queryByLabelText("下移定义 1")).toBeNull();
     expect(screen.queryByLabelText("上移例句 1")).toBeNull();
     expect(screen.queryByLabelText("下移例句 1")).toBeNull();
-    expect(screen.getByLabelText("删除词义 1")).toBeEnabled();
+    expect(screen.getByLabelText("删除词义 1")).toBeDisabled();
     unmount();
     const { container: savingContainer, unmount: unmountSaving } = render(
       <AntApp>
@@ -4892,7 +5034,7 @@ it.each([false, true])(
   }
 );
 
-describe("V3MeaningsAndExamplesStep 词形与发音绑定", () => {
+describe("V3MeaningsAndExamplesStep 词形组设置归属", () => {
   const dedicatedGroupId = uuidFromInt(9_012);
   const dedicatedForms = () =>
     formsFixture({
@@ -4915,134 +5057,65 @@ describe("V3MeaningsAndExamplesStep 词形与发音绑定", () => {
         }
       ]
     });
-  const openOptions = (select: HTMLElement) => {
-    fireEvent.mouseDown(select);
-    return Array.from(
-      document.querySelectorAll<HTMLElement>(
-        ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
-      )
-    );
-  };
 
-  it("本词性没有专用组时不渲染选择器，带着组相关问题时仍渲染以便定位", () => {
-    const { unmount } = render(
-      <Harness forms={formsFixture({ pos_id: "pos-1" })} />
-    );
-    expect(screen.queryByLabelText("释义 1 词形与发音")).toBeNull();
-    unmount();
-
-    const senseId = meaningsFixture.pos[0]!.senses[0]!.id;
-    const issue: V3DraftValidationIssue = {
-      schema_version: 3,
-      step: "meanings",
-      node_id: senseId,
-      field: "form_group_id",
-      code: "sense_form_group_required",
-      message: "form group required",
-      node_location: { node_role: "sense", ancestor_node_ids: [] }
-    };
-    const { container } = render(
-      <Harness forms={formsFixture({ pos_id: "pos-1" })} issues={[issue]} />
-    );
-    expect(
-      container.querySelector(
-        `[data-v3-field="form_group_id"][data-v3-node-id="${senseId}"]`
-      )
-    ).not.toBeNull();
-    expect(
-      screen.getByText("本词性没有通用变化组，请为该词义选择专用组或添加通用组")
-    ).toBeInTheDocument();
-  });
-
-  it("多组模式下词义页可同时选择两个专用组并回显", async () => {
-    const forms = dedicatedForms();
-    forms.pos[0]!.form_groups[0]!.scope = "dedicated";
-    render(<Harness forms={forms} multiGroupBindingsEnabled />);
-    const select = screen.getByLabelText("释义 1 词形与发音");
-    const options = openOptions(select);
-    expect(options.map((option) => option.textContent)).toEqual([
-      "第 1 组 · job",
-      "第 2 组 · Job"
-    ]);
-    fireEvent.click(options[0]!);
-    fireEvent.click(options[1]!);
-    expect(value().pos[0]!.senses[0]!.form_group_ids).toEqual([
-      uuidFromInt(9_011),
-      dedicatedGroupId
-    ]);
-    expect(select.closest(".ant-select")).toHaveTextContent("第 1 组 · job");
-    expect(select.closest(".ant-select")).toHaveTextContent("第 2 组 · Job");
-    expect(screen.getByLabelText("删除词义 1")).toBeEnabled();
-    fireEvent.click(screen.getByLabelText("删除词义 1"));
-    fireEvent.click(await screen.findByText("确认删除"));
-    expect(value().pos[0]!.senses).toHaveLength(0);
-  });
-
-  it("只列本词性专用组，最后一个绑定不能直接改回通用", async () => {
-    render(<Harness forms={dedicatedForms()} />);
-    const select = screen.getByLabelText("释义 1 词形与发音");
-    expect(select.closest(".ant-select")).toHaveTextContent("通用（默认）");
-
-    const options = openOptions(select);
-    expect(options.map((option) => option.textContent)).toEqual([
-      "通用（默认）",
-      "第 2 组 · Job"
-    ]);
-    fireEvent.click(options[1]!);
-    expect(value().pos[0]!.senses[0]!.form_group_id).toBe(dedicatedGroupId);
-    expect(select.closest(".ant-select")).toHaveTextContent("第 2 组 · Job");
-
-    await waitFor(() =>
-      expect(
-        screen.getByText(
-          "这是专用组最后一个词义；解除限制请在词形组的“专用词义”中恢复适用全部词义。"
-        )
-      ).toBeVisible()
-    );
-    const generalOption = openOptions(select)[0]!;
-    await waitFor(() =>
-      expect(generalOption.closest(".ant-select-item-option")).toHaveClass(
-        "ant-select-item-option-disabled"
-      )
-    );
-    fireEvent.click(generalOption);
-    expect(value().pos[0]!.senses[0]!.form_group_id).toBe(dedicatedGroupId);
-  });
-
-  it("绑定失效时保留一项供改选，校验问题落在选择器锚点上", () => {
-    const initial = structuredClone(meaningsFixture);
-    initial.pos[0]!.senses[0]!.form_group_id = "deleted-group";
-    const senseId = initial.pos[0]!.senses[0]!.id;
-    const issue: V3DraftValidationIssue = {
-      schema_version: 3,
-      step: "meanings",
-      node_id: senseId,
-      field: "form_group_id",
-      code: "sense_form_group_invalid",
-      message: "form group invalid",
-      node_location: {
-        node_role: "sense",
-        ancestor_node_ids: ["pos-1"],
-        pos_id: "pos-1"
+  it.each(["form_group_id", "form_group_ids"] as const)(
+    "Step 3 不提供词形与发音选择器，编辑词义仍保留已有 %s",
+    (field) => {
+      const initial = structuredClone(meaningsFixture);
+      const sense = initial.pos[0]!.senses[0]!;
+      if (field === "form_group_id") sense.form_group_id = dedicatedGroupId;
+      else sense.form_group_ids = [uuidFromInt(9_011), dedicatedGroupId];
+      const forms = dedicatedForms();
+      if (field === "form_group_ids") {
+        forms.pos[0]!.form_groups[0]!.scope = "dedicated";
       }
-    };
-    const { container } = render(
-      <Harness
-        forms={formsFixture({ pos_id: "pos-1" })}
-        initial={initial}
-        issues={[issue]}
-      />
-    );
-    expect(
-      container.querySelector(
-        `[data-v3-field="form_group_id"][data-v3-node-id="${senseId}"]`
-      )
-    ).not.toBeNull();
-    expect(
-      screen.getByLabelText("释义 1 词形与发音").closest(".ant-select")
-    ).toHaveTextContent("已失效的变化组，请重新选择");
-    expect(
-      screen.getByText("词义绑定的词形变化组无效，请重新选择本词性的专用组")
-    ).toBeInTheDocument();
-  });
+      const { container } = render(<Harness initial={initial} forms={forms} />);
+      const before = value().pos[0]!.senses[0]!;
+      expect(screen.queryByLabelText("释义 1 词形与发音")).toBeNull();
+      expect(
+        container.querySelector(".word-sense-field-form-group .ant-select")
+      ).toBeNull();
+      fireEvent.click(screen.getByLabelText("释义 1 是否依赖语境"));
+      const after = value().pos[0]!.senses[0]!;
+      expect(after.depends_on_context).toBe(true);
+      expect(after.form_group_id).toEqual(before.form_group_id);
+      expect(after.form_group_ids).toEqual(before.form_group_ids);
+      expect(after.definitions).toEqual(before.definitions);
+    }
+  );
+
+  it.each(["sense_form_group_required", "sense_form_group_invalid"] as const)(
+    "Step 3 的 %s 问题仅保留定位提示并引导返回第 2 步",
+    (code) => {
+      const initial = structuredClone(meaningsFixture);
+      initial.pos[0]!.senses[0]!.form_group_id = "deleted-group";
+      const senseId = initial.pos[0]!.senses[0]!.id;
+      const issue: V3DraftValidationIssue = {
+        schema_version: 3,
+        step: "meanings",
+        node_id: senseId,
+        field: "form_group_id",
+        code,
+        message: "form group invalid",
+        node_location: {
+          node_role: "sense",
+          ancestor_node_ids: ["pos-1"],
+          pos_id: "pos-1"
+        }
+      };
+      const { container } = render(
+        <Harness forms={dedicatedForms()} initial={initial} issues={[issue]} />
+      );
+      expect(screen.queryByLabelText("释义 1 词形与发音")).toBeNull();
+      expect(
+        container.querySelector(
+          `[data-v3-field="form_group_id"][data-v3-node-id="${senseId}"]`
+        )
+      ).not.toBeNull();
+      expect(
+        screen.getByText("请在第 2 步「词形与发音」调整专用词义设置。")
+      ).toBeInTheDocument();
+      expect(value().pos[0]!.senses[0]!.form_group_id).toBe("deleted-group");
+    }
+  );
 });

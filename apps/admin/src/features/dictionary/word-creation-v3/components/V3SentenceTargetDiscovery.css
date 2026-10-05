@@ -250,6 +250,13 @@
   background: #2053ff;
 }
 
+/* 上下翻转时也能容纳候选：预留半屏内的标题、分页、确认操作与箭头间距。 */
+.v3-component-usage-cascader .ant-cascader-menu {
+  max-height: clamp(40px, calc(50dvh - 200px), 320px);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+
 /* resolve 命中的那一行：原来挂一个「命中」标签，占宽且把词形文本挤窄，改成只换文字颜色。 */
 .v3-component-usage-cascader .v3-component-usage-matched-form {
   color: #d48806;

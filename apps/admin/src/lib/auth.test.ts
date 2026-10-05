@@ -18,7 +18,8 @@ function stateWith(level: AdminProfile["role"] | null): AdminAuthState {
           phone: "13800138000",
           display_name: "管理员",
           role: level,
-          can_publish_lexicon: true,
+          permission_version: 1,
+          catalog_version: "catalog-v1",
           permissions: [],
           preferences: { dialect: "uk" as const }
         }
@@ -26,6 +27,7 @@ function stateWith(level: AdminProfile["role"] | null): AdminAuthState {
     role: level,
     hydrated: true,
     connectionError: false,
+    permissionModelIncompatible: false,
     setProfile: () => {},
     setHydrated: () => {}
   };

@@ -16,7 +16,7 @@ async function confirmDetectedCreation(page: Page): Promise<void> {
 }
 
 test.describe("统一 V3 创建流程", () => {
-  test("普通管理员默认只读，直接访问创建页也不能发起写请求", async ({
+  test("普通管理员仅查看权限，直接访问创建页也不能发起写请求", async ({
     page
   }) => {
     const api = await mockAdminV3Api(page, { viewerRole: "admin" });
@@ -25,14 +25,14 @@ test.describe("统一 V3 创建流程", () => {
     await expect(page.getByRole("button", { name: "创建词条" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /^编辑/ })).toHaveCount(0);
     await page.goto("/words/new");
-    await expect(page).toHaveURL(/\/words$/);
+    await expect(page).toHaveURL(/\/words\/new$/);
+    await expect(page.getByText("没有访问权限", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "词典检测" })).toHaveCount(0);
     expect(api.count("POST", ADMIN_V3_DETECTIONS_PATH)).toBe(0);
     expect(api.count("POST", ADMIN_V3_ENTRIES_PATH)).toBe(0);
     await page.goto("/admins");
-    await expect(
-      page.getByText("管理员管理仅超级管理员可访问。")
-    ).toBeVisible();
+    await expect(page.getByText("没有访问权限", { exact: true })).toBeVisible();
+    expect(api.count("GET", "/admins")).toBe(0);
   });
 
   test("创建入口统一输入并自动分流单词与短语", async ({ page }) => {
@@ -63,7 +63,7 @@ test.describe("统一 V3 创建流程", () => {
     await input.fill("true color");
     await page.getByRole("button", { name: "词典检测" }).click();
 
-    await expect(page.getByText("原形检测")).toBeVisible();
+    await expect(page.getByText("词库检测")).toBeVisible();
     await expect(page.getByText("已发现")).toBeVisible();
     const duplicateButtons = page.getByText("查看已有原形");
     await expect(duplicateButtons).toHaveCount(2);
@@ -122,7 +122,7 @@ test.describe("统一 V3 创建流程", () => {
         }
       );
 
-      await expect(page.getByText("原形检测")).toBeVisible();
+      await expect(page.getByText("词库检测")).toBeVisible();
       const archivedButtons = page.getByText("查看已有原形");
       await expect(archivedButtons).toHaveCount(3);
       await expect(

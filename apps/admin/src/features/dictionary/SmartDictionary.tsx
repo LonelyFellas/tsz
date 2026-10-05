@@ -93,7 +93,7 @@ import {
   LEGACY_SCHEMA_BLOCKED_HINT
 } from "./wordRouting";
 import {
-  ENTRY_WRITE_BLOCKED_HINT,
+  canCreateEntry,
   canWriteEntry,
   canTransitionEntry,
   entryWriteForbiddenMessage,
@@ -110,7 +110,7 @@ const ENTRY_REFERENCE_KIND_LABEL: Record<EntryReferenceKind, string> = {
   relation: "关联词",
   relation_prebound: "关联词待物化",
   sentence_link: "例句关联",
-  publication_sense_ref: "已发布引用",
+  publication_sense_ref: "已发布内容关联",
   sentence_association: "例句关联待认领",
   phrase_component: "短语成分"
 };
@@ -200,7 +200,7 @@ export function SmartDictionary({
   const deleteActor = profile
     ? { id: profile.id, role: profile.role }
     : undefined;
-  const annotationActor = deleteActor;
+  const annotationActor = profile ?? undefined;
   const writeActor = profile;
   const [searchParams, setSearchParams] = useSearchParams();
   const [annotationEntry, setAnnotationEntry] =
@@ -439,7 +439,7 @@ export function SmartDictionary({
       return "只能永久删除自己创建的词条";
     }
     if (code === "entry_not_deletable") {
-      return "该词条已发布过或仍被其他草稿引用，不能永久删除";
+      return "该词条有发布记录或仍与其他草稿有关联，不能永久删除";
     }
     if (code === "entry_has_inbound_prebound_relations") {
       return "该词条被其他草稿的关联词选中，请先解除后再删除";
@@ -572,7 +572,7 @@ export function SmartDictionary({
       title: `${restoring ? "恢复" : "移入垃圾桶"}「${label}」？`,
       content: restoring
         ? "恢复后词条重新进入正常列表；现有发布记录保持不变。"
-        : "移入垃圾桶不会删除当前或历史发布记录；存在有效入站引用时服务端会安全拒绝。",
+        : "移入垃圾桶会保留当前和历史发布记录；若仍有其他内容关联此词条，需先解除关联才能移入垃圾桶。",
       okText: restoring ? "恢 复" : "移入垃圾桶",
       okButtonProps: { danger: !restoring },
       cancelText: "取消",
@@ -622,8 +622,19 @@ export function SmartDictionary({
     }
     // 整批原子：任意一条没有生命周期操作权限，后端会拒绝整批。
     // 与其让整批失败，不如提交前就把不归自己管的挑明。
-    if (selectedRows.some((row) => !canTransitionEntry(writeActor, row))) {
-      message.warning("当前账号没有操作所选词条的权限；已发布词条需要发布权限");
+    if (
+      selectedRows.some(
+        (row) =>
+          !canTransitionEntry(
+            writeActor,
+            row,
+            row.status === "archived" ? "restore" : "archive"
+          )
+      )
+    ) {
+      message.warning(
+        "当前账号缺少所选词条的归档或恢复权限，普通管理员仅可操作本人词条"
+      );
       return;
     }
     const restoring = restoringSelection;
@@ -703,7 +714,7 @@ export function SmartDictionary({
                 lineHeight: 1.6
               }}
             >
-              <span className="tsz-entry-en" style={{ fontWeight: 600 }}>
+              <span className="tsz-words" style={{ fontWeight: 600 }}>
                 {label}
               </span>
               {annotation ? (
@@ -817,7 +828,7 @@ export function SmartDictionary({
       }
     },
     {
-      title: "引用",
+      title: "关联",
       key: "references",
       width: 80,
       responsive: ["sm"],
@@ -832,7 +843,7 @@ export function SmartDictionary({
           <Space direction="vertical" size={2}>
             {summary.previews.map((preview) => (
               <Typography.Text
-                className="tsz-entry-en"
+                className="tsz-words"
                 key={preview.source_word_id}
               >
                 {preview.source_headword || preview.source_word_id}
@@ -849,11 +860,15 @@ export function SmartDictionary({
           </Space>
         );
         return (
-          <Popover content={content} title="被以下内容引用" trigger="click">
+          <Popover
+            content={content}
+            title="以下内容关联了此词条"
+            trigger="click"
+          >
             <Button
               type="link"
               size="small"
-              aria-label={`查看「${wordListLabel(record)}」的 ${total} 条引用`}
+              aria-label={`查看「${wordListLabel(record)}」的 ${total} 处关联`}
             >
               {total}
             </Button>
@@ -901,7 +916,7 @@ export function SmartDictionary({
       fixed: "right",
       render: (_: unknown, record: AdminWordListItemAny) => {
         const rowName = `「${wordListLabel(record)}」`;
-        const rowWritable = canWriteEntry(writeActor);
+        const rowWritable = canWriteEntry(writeActor, record);
         return (
           // 左组是进入词条的入口、右组是生命周期动作，各自贴住一边：
           // 「标注」按行有无都不会让删除入口跟着左右跳。
@@ -959,8 +974,11 @@ export function SmartDictionary({
                         )
                       }
                       disabled={
-                        !canTransitionEntry(writeActor, record) ||
-                        lifecycleInput(record) === undefined
+                        !canTransitionEntry(
+                          writeActor,
+                          record,
+                          record.status === "archived" ? "restore" : "archive"
+                        ) || lifecycleInput(record) === undefined
                       }
                       loading={
                         lifecyclePending &&
@@ -981,10 +999,12 @@ export function SmartDictionary({
                   // 置灰时把原因摆出来，否则管理员只看到一个不能点的按钮。
                   // 缺 lifecycle 字段那种置灰不给 Tooltip：那是数据问题，刷新即可，
                   // 与「这条不归你管」不是一回事。
-                  const hint = !canTransitionEntry(writeActor, record)
-                    ? record.published_revision !== undefined
-                      ? "操作已发布词条需要词库发布权限"
-                      : ENTRY_WRITE_BLOCKED_HINT
+                  const hint = !canTransitionEntry(
+                    writeActor,
+                    record,
+                    record.status === "archived" ? "restore" : "archive"
+                  )
+                    ? "需要相应的归档或恢复权限；普通管理员仅可操作本人词条"
                     : record.status === "archived"
                       ? ""
                       : "移入垃圾桶";
@@ -1169,7 +1189,7 @@ export function SmartDictionary({
           style={{ marginBottom: 12 }}
         >
           <Space wrap>
-            {!trashMode && canWriteEntry(writeActor) && (
+            {!trashMode && canCreateEntry(writeActor) && (
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
@@ -1187,7 +1207,12 @@ export function SmartDictionary({
                 disabled={
                   selectedKeys.length === 0 ||
                   selectedRows.some(
-                    (row) => !canTransitionEntry(writeActor, row)
+                    (row) =>
+                      !canTransitionEntry(
+                        writeActor,
+                        row,
+                        row.status === "archived" ? "restore" : "archive"
+                      )
                   )
                 }
                 loading={archiveBatch.isPending || restoreBatch.isPending}
@@ -1203,7 +1228,8 @@ export function SmartDictionary({
                   danger
                   icon={<DeleteOutlined />}
                   disabled={
-                    selectedKeys.length === 0 || !canWriteEntry(writeActor)
+                    selectedKeys.length === 0 ||
+                    writeActor?.role !== "super_admin"
                   }
                   loading={deleteBatch.isPending}
                   onClick={deleteSelected}

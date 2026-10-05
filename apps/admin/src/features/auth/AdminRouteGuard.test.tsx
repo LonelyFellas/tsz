@@ -26,7 +26,8 @@ const PROFILE: AdminProfile = {
   phone: "13800138000",
   display_name: "Admin",
   role: "super_admin",
-  can_publish_lexicon: true,
+  permission_version: 1,
+  catalog_version: "catalog-v1",
   permissions: [],
   preferences: { dialect: "uk" as const }
 };
@@ -38,10 +39,32 @@ function setState(s: Partial<ReturnType<typeof useAuthStore.getState>>) {
 beforeEach(() => {
   vi.clearAllMocks();
   mockLocation = { pathname: "/users", search: "", hash: "" };
-  setState({ profile: null, role: null, hydrated: false });
+  setState({
+    profile: null,
+    role: null,
+    hydrated: false,
+    permissionModelIncompatible: false
+  });
 });
 
 describe("AdminRouteGuard", () => {
+  it("不兼容后台停留不可用，既不进业务组件也不当临时掉线跳登录", () => {
+    setState({
+      hydrated: true,
+      profile: null,
+      role: null,
+      permissionModelIncompatible: true
+    });
+    render(
+      <AdminRouteGuard>
+        <div>后台内容</div>
+      </AdminRouteGuard>
+    );
+    expect(screen.getByText("后台服务暂不可用")).toBeInTheDocument();
+    expect(screen.queryByText("加载中...")).toBeNull();
+    expect(screen.queryByText("后台内容")).toBeNull();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
   it("会话恢复未完成时显示加载态", () => {
     setState({ hydrated: false });
     render(

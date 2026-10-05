@@ -1,6 +1,7 @@
 import type { Page, Route } from "@playwright/test";
 import { validateRuntimeSchema, type RuntimeSchemaRoot } from "@tsz/api-client";
 import type {
+  AdminProfile,
   AdminWordListItemAny,
   AdminWordPublicationAny,
   AdminWordV3,
@@ -36,12 +37,14 @@ const ACTOR_ID = "01990000-0000-7000-8000-000000000099";
 const nodeId = (value: number) =>
   `01990000-0000-7000-8000-${String(value).padStart(12, "0")}`;
 
-const ADMIN_PROFILE = {
+const ADMIN_PROFILE: AdminProfile = {
   id: ACTOR_ID,
   phone: "13800138000",
   display_name: "V3 Mock E2E Admin",
   role: "admin",
-  can_publish_lexicon: true,
+  can_publish_lexicon: false,
+  permission_version: 1,
+  catalog_version: "permission-e2e-v1",
   permissions: ["words.access"],
   preferences: { dialect: "uk" }
 };
@@ -436,6 +439,8 @@ export interface MockAdminV3ApiOptions {
   formsFailureOnce?: boolean;
   /** 编辑流程默认使用超级管理员；只读验收显式使用 admin。 */
   viewerRole?: "admin" | "super_admin";
+  /** 普通管理员默认仅词条查看；发布者等场景必须显式提供闭合权限集合。 */
+  viewerPermissions?: string[];
   /**
    * 初始那条 mock 词条（列表行与详情）由谁创建，默认当前登录管理员本人；
    * "other" 用来测「他人未发布草稿」的只读分支。本页新建的词条始终记在当前管理员名下，
@@ -499,7 +504,7 @@ function inboundReferencesFixture(
   };
 }
 
-function sharedSentenceFixture(word: AdminWordV3): SharedSentence {
+export function sharedSentenceFixture(word: AdminWordV3): SharedSentence {
   return {
     id: ADMIN_V3_REFERENCED_SENTENCE_ID,
     revision: 1,
@@ -548,6 +553,7 @@ function sharedSentenceFixture(word: AdminWordV3): SharedSentence {
       }
     ],
     created_by: ADMIN_PROFILE.display_name,
+    created_by_admin_id: ACTOR_ID,
     created_at: NOW,
     updated_at: NOW
   };
@@ -693,6 +699,7 @@ function surfaceMatchPage(
       // mock 里统一记在当前登录管理员名下（= 可改），与这些 fixture 的
       // created_by 保持一致。
       created_by: ACTOR_ID,
+      created_by_name: ADMIN_PROFILE.display_name,
       presentation: {
         label: spelling,
         matched_surfaces: [spelling],
@@ -868,7 +875,8 @@ export async function mockAdminV3Api(
     if (method === "GET" && path === "/profile") {
       return json(route, 200, {
         ...ADMIN_PROFILE,
-        role: options.viewerRole ?? "super_admin"
+        role: options.viewerRole ?? "super_admin",
+        permissions: options.viewerPermissions ?? ADMIN_PROFILE.permissions
       });
     }
     if (method === "GET" && path === "/settings/parts-of-speech/catalog") {

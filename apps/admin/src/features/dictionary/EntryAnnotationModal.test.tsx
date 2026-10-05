@@ -1,5 +1,12 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within
+} from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { ConfigProvider } from "antd";
 import {
   annotationErrors,
   EntryAnnotationModal,
@@ -16,7 +23,7 @@ const groups = [
 ];
 
 describe("词条标注", () => {
-  it("服务端同原型分组消失后不扩大说明必填范围", () => {
+  it("服务端同原型分组消失后仍可仅保存数字标注", () => {
     const save = vi.fn();
     render(
       <EntryAnnotationModal
@@ -30,9 +37,9 @@ describe("词条标注", () => {
       />
     );
     fireEvent.click(screen.getByText("保存标注并创建"));
-    expect(save).toHaveBeenCalledWith({ incoming: "3" }, undefined);
+    expect(save).toHaveBeenCalledWith({ incoming: "3" });
   });
-  it("同原型新建必须填写独立文本说明，不能用数字标注替代", () => {
+  it("同原型新建只需数字标注，不显示或要求区分说明", () => {
     const save = vi.fn();
     render(
       <EntryAnnotationModal
@@ -45,17 +52,79 @@ describe("词条标注", () => {
         onClose={vi.fn()}
       />
     );
+    expect(screen.queryByLabelText("区分说明")).not.toBeInTheDocument();
     const button = screen.getByText("保存标注并创建").closest("button")!;
-    const reason = screen.getByLabelText("区分说明");
-    for (const value of ["", "   ", "x".repeat(501), "bad\u0000reason"]) {
-      fireEvent.change(reason, { target: { value } });
-      expect(button).toBeDisabled();
-      fireEvent.click(button);
-      expect(save).not.toHaveBeenCalled();
-    }
-    fireEvent.change(reason, { target: { value: "  独立术语含义  " } });
+    expect(button).toBeEnabled();
     fireEvent.click(button);
-    expect(save).toHaveBeenCalledWith({ incoming: "3" }, "独立术语含义");
+    expect(save).toHaveBeenCalledWith({ incoming: "3" });
+  });
+  it("展示词性、释义、创建人和更新时间，合并空内容提示并去除重复文案", async () => {
+    const updatedAt = new Date(2026, 8, 30, 10, 20).toISOString();
+    render(
+      <ConfigProvider theme={{ token: { motion: false } }}>
+        <EntryAnnotationModal
+          rows={[
+            {
+              key: "a",
+              label: "center",
+              annotation: "001",
+              posLabels: ["noun"],
+              glossPreviews: ["中心"],
+              createdByName: "张明",
+              updatedAt,
+              referenceCount: 2,
+              href: "/words/a/v3/wizard/forms"
+            },
+            {
+              key: "b",
+              label: "center",
+              annotation: null,
+              posLabels: [],
+              glossPreviews: []
+            },
+            rows[2]!
+          ]}
+          groups={groups}
+          creating
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </ConfigProvider>
+    );
+    const existing = screen.getByRole("region", { name: "已有词条" });
+    const incoming = screen.getByRole("region", { name: "本次新建" });
+    await waitFor(() =>
+      expect(within(existing).getByText("已有词条 1")).toBeVisible()
+    );
+    expect(within(existing).getByText("已有词条 2")).toBeVisible();
+    expect(within(existing).getByText("名词")).toBeVisible();
+    expect(within(existing).getByText("中心")).toBeVisible();
+    expect(within(existing).getByText("张明")).toHaveAttribute(
+      "title",
+      "创建人：张明"
+    );
+    expect(within(existing).getByText("09-30 10:20")).toHaveAttribute(
+      "title",
+      "更新于 2026-09-30 10:20"
+    );
+    expect(within(existing).getByText("09-30 10:20")).toHaveAttribute(
+      "datetime",
+      updatedAt
+    );
+    expect(within(existing).getByText("关联引用：2 处")).toBeVisible();
+    expect(within(existing).getByText("暂无词性、释义")).toBeVisible();
+    expect(
+      within(existing).getByRole("link", { name: "查看词条 center" })
+    ).toHaveAttribute("target", "_blank");
+    expect(within(incoming).getByLabelText("新建词条标注")).toBeEnabled();
+    expect(within(incoming).getAllByText("本次新建")).toHaveLength(1);
+    expect(
+      screen.getByText("同原形词条需使用不同的数字标注，最多 20 位。")
+    ).toBeVisible();
+    expect(
+      screen.queryByText("确认后保存标注，并进入词形与发音。")
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("区分说明")).not.toBeInTheDocument();
   });
   it("第三条校验旧旧、旧新重复和空白，trim后保持前导0字符串", () => {
     const save = vi.fn();
@@ -64,7 +133,6 @@ describe("词条标注", () => {
         rows={rows}
         groups={groups}
         creating
-        initialCreationReason="独立词义"
         onSave={save}
         onClose={vi.fn()}
       />
@@ -82,10 +150,7 @@ describe("词条标注", () => {
     expect(button).toBeDisabled();
     fireEvent.change(incoming, { target: { value: " 1 " } });
     fireEvent.click(button);
-    expect(save).toHaveBeenCalledWith(
-      { a: "01", b: "02", incoming: "1" },
-      "独立词义"
-    );
+    expect(save).toHaveBeenCalledWith({ a: "01", b: "02", incoming: "1" });
   });
 
   it.each([true, false])(
@@ -97,7 +162,6 @@ describe("词条标注", () => {
           rows={[{ key: "a", label: "center", annotation: null }]}
           groups={[]}
           creating={creating}
-          initialCreationReason="独立词义"
           onSave={save}
           onClose={vi.fn()}
         />
@@ -131,9 +195,7 @@ describe("词条标注", () => {
       expect(button).toBeDisabled();
       fireEvent.change(input, { target: { value: ` ${"0".repeat(20)} ` } });
       fireEvent.click(button);
-      if (creating)
-        expect(save).toHaveBeenCalledWith({ a: "0".repeat(20) }, "独立词义");
-      else expect(save).toHaveBeenCalledWith({ a: "0".repeat(20) });
+      expect(save).toHaveBeenCalledWith({ a: "0".repeat(20) });
     }
   );
 
@@ -176,7 +238,6 @@ describe("词条标注", () => {
         rows={historical}
         groups={groups}
         creating
-        initialCreationReason="独立词义"
         onSave={save}
         onClose={close}
       />
@@ -199,7 +260,6 @@ describe("词条标注", () => {
         rows={historical}
         groups={groups}
         creating
-        initialCreationReason="独立词义"
         onSave={save}
         onClose={close}
       />
@@ -222,7 +282,6 @@ describe("词条标注", () => {
         ]}
         groups={groups}
         creating
-        initialCreationReason="独立词义"
         onSave={vi.fn()}
         onClose={vi.fn()}
       />
@@ -231,10 +290,12 @@ describe("词条标注", () => {
     expect(readOnly).toBeDisabled();
     // 「请输入标注」挂在一个改不了的框上是误导。
     expect(readOnly).toHaveAttribute("placeholder", "未标注");
-    expect(within(readOnly.closest("tr")!).getByText("他人词条")).toBeTruthy();
+    expect(
+      within(readOnly.closest("[data-annotation-row]")!).getByText("他人词条")
+    ).toBeTruthy();
     expect(screen.getByLabelText("新建词条标注")).toHaveAttribute(
       "placeholder",
-      "请输入标注"
+      "例如 001"
     );
     // 只读行空着也不该挡住提交。
     fireEvent.change(screen.getByLabelText("新建词条标注"), {

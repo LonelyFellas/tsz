@@ -26,7 +26,8 @@ export type MenuPermission =
   | "reviews.access"
   | "teacherapply.access"
   | "comments.access"
-  | "coins.access";
+  | "coins.access"
+  | "lexicon_settings.access";
 
 /** admin 账号状态。disabled 的账号无法登录 / 刷新。 */
 export type AdminStatus = "active" | "disabled";
@@ -62,17 +63,17 @@ export interface AdminPreferences {
 
 /** GET /admin/profile 的响应：登录管理员自身身份，用于门禁探针 + 顶栏「已登录为 X」+ 动态菜单。 */
 export interface AdminProfile {
-  can_publish_lexicon: boolean;
+  /** 兼容旧响应的弃用字段；授权决策只能读取 permissions。 */
+  can_publish_lexicon?: boolean;
+  permission_version: number;
+  catalog_version: string;
   id: string;
   phone: string;
   display_name: string;
   /** 身份等级——后端字段名统一为 role（Q11），值域同 AdminLevel。 */
   role: AdminLevel;
-  /**
-   * 菜单权限 key 目录。Q10 取消 RBAC 后为全量死数据（全员全功能），保留仅为菜单渲染
-   * 零改动；恒为数组，顺序即侧栏顺序。「管理员管理」不走 key，按 role 判定。
-   */
-  permissions: MenuPermission[];
+  /** 本人的有效权限；未知 key 不匹配前端业务门禁。空数组为零业务权限。 */
+  permissions: string[];
   /** 个人偏好；字段恒在，从未设置过的管理员返回后端默认值。 */
   preferences: AdminPreferences;
 }
@@ -190,6 +191,6 @@ export interface ResetPasswordResponse {
 export interface AdminChangePasswordInput {
   /** 当前密码（重置后即为一次性临时密码）。 */
   current_password: string;
-  /** 新密码：≥12 位、非纯数字、非弱密码、不含手机号，且须与当前密码不同。违反 → 400。 */
+  /** 新密码：15–128 个字符、区分大小写、支持符号与空格，通过后端弱密码与泄露检查，且须与当前密码不同。违反 → 400。 */
   new_password: string;
 }

@@ -6,8 +6,19 @@ import { newSentence } from "../sentences/model";
 import type { SharedSentence, AdminWordListItemAny } from "@tsz/types";
 import { BatchPublicationModal } from "./BatchPublicationModal";
 
-const { publish } = vi.hoisted(() => ({ publish: vi.fn() }));
+const { publish, auth } = vi.hoisted(() => ({
+  publish: vi.fn(),
+  auth: { role: "super_admin", permissions: [] as string[] }
+}));
 vi.mock("@/lib/auth", () => ({
+  useAuthStore: (selector: (state: unknown) => unknown) =>
+    selector({
+      profile: {
+        id: "11111111-1111-4111-8111-111111111111",
+        role: auth.role,
+        permissions: auth.permissions
+      }
+    }),
   api: {
     sentences: { list: vi.fn(async () => ({ items: [], total: 0 })) },
     words: { publishBatchV3: publish }
@@ -19,6 +30,7 @@ function row(id: string, revision: number): AdminWordListItemAny {
     id,
     revision,
     lifecycle_revision: 2,
+    created_by: "11111111-1111-4111-8111-111111111111",
     presentation: {
       label: id,
       matched_surfaces: [id],
@@ -45,9 +57,44 @@ function mount(sentences: SharedSentence[] = []) {
 }
 beforeEach(() => {
   publish.mockReset();
+  auth.role = "super_admin";
+  auth.permissions = [];
 });
 
 describe("原子批次发布确认", () => {
+  it.each([true, false])(
+    "普通管理员批次发布例句按owner UUID，不借edit_others扩发布（本人=%s）",
+    async (own) => {
+      auth.role = "admin";
+      auth.permissions = [
+        "words.access",
+        "words.publish",
+        "sentences.access",
+        "sentences.publish",
+        "sentences.edit",
+        "sentences.edit_others"
+      ];
+      const sentence: SharedSentence = {
+        id: "selected-sentence",
+        revision: 9,
+        lifecycle_revision: 4,
+        view: "draft",
+        content: newSentence(),
+        entries: [],
+        created_by: "创建人昵称",
+        created_by_admin_id: own
+          ? "11111111-1111-4111-8111-111111111111"
+          : "22222222-2222-4222-8222-222222222222",
+        created_at: "2026-09-23T00:00:00Z",
+        updated_at: "2026-09-23T00:00:00Z"
+      };
+      mount([sentence]);
+      const button = await screen.findByRole("button", { name: "发布所选" });
+      if (own) expect(button).toBeEnabled();
+      else expect(button).toBeDisabled();
+      expect(publish).not.toHaveBeenCalled();
+    }
+  );
   it("只提交显式选中范围及确认时版本，成功后统一刷新", async () => {
     publish.mockResolvedValue({ words: [] });
     const done = mount();
@@ -108,6 +155,7 @@ it("混合范围同一次提交，例句使用自己的双 revision", async () =
     content: newSentence(),
     entries: [],
     created_by: "创建人",
+    created_by_admin_id: "11111111-1111-4111-8111-111111111111",
     created_at: "2026-09-23T00:00:00Z",
     updated_at: "2026-09-23T00:00:00Z"
   };

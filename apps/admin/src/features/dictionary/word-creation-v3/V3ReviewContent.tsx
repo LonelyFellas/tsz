@@ -4,7 +4,9 @@ import {
   pronunciationSynthesisContent,
   synthesisInputIssue,
   synthesisLocaleIssue,
-  pronunciationLocale
+  pronunciationLocale,
+  synthesisForLocale,
+  pronunciationSynthesisLabel
 } from "@tsz/shared";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { PronunciationPreviewControls } from "../word-creation/PronunciationPreview";
@@ -32,18 +34,24 @@ interface Props {
 function ReviewPronunciationPlayback({
   pronunciation,
   spelling,
-  dialect
+  dialect,
+  legacyDialect
 }: {
   pronunciation: WordPronunciationV3;
   spelling: string;
   dialect: Dialect;
+  legacyDialect: Dialect;
 }) {
-  const synthesis = pronunciation.synthesis ?? EMPTY_SYNTHESIS;
   const { preference } = useDialectPreference();
   const locale = pronunciationLocale(dialect, preference);
+  const synthesis = synthesisForLocale(
+    pronunciation.synthesis ?? EMPTY_SYNTHESIS,
+    locale,
+    legacyDialect
+  );
   const content = pronunciationSynthesisContent(
     spelling,
-    pronunciation.synthesis,
+    pronunciation.synthesis ? synthesis : undefined,
     locale,
     dialect === "common"
   );
@@ -52,7 +60,7 @@ function ReviewPronunciationPlayback({
       playbackOnly
       pronunciationId={pronunciation.id}
       dialect={dialect}
-      ariaLabelPrefix={`${spelling} 最终读音`}
+      ariaLabelPrefix={`${spelling} ${pronunciation.synthesis?.uk || pronunciation.synthesis?.us ? `${dialect === "uk" ? "英式" : "美式"} ` : ""}最终读音`}
       disabled={!content}
       disabledReason={
         content
@@ -166,7 +174,7 @@ function FormsReview({
                           <td>
                             {index === 0 && (
                               <>
-                                <strong className="tsz-entry-en">
+                                <strong className="tsz-words">
                                   {variant.spelling || "待填写拼写"}
                                 </strong>
                                 <small>{dialectLabel(variant.dialect)}</small>
@@ -177,14 +185,22 @@ function FormsReview({
                             {pronunciation ? (
                               <>
                                 <div className="v3-review-pronunciation-cell">
-                                  {playback && (
-                                    <ReviewPronunciationPlayback
-                                      pronunciation={pronunciation}
-                                      spelling={variant.spelling}
-                                      dialect={variant.dialect}
-                                    />
-                                  )}
+                                  {playback &&
+                                    (pronunciation.synthesis?.uk ||
+                                    pronunciation.synthesis?.us
+                                      ? (["uk", "us"] as const)
+                                      : [variant.dialect]
+                                    ).map((dialect) => (
+                                      <ReviewPronunciationPlayback
+                                        key={dialect}
+                                        pronunciation={pronunciation}
+                                        spelling={variant.spelling}
+                                        dialect={dialect}
+                                        legacyDialect={variant.dialect}
+                                      />
+                                    ))}
                                   <RichTextReadOnly
+                                    className="tsz-phonetics"
                                     value={
                                       pronunciation.dict_phonetic_rich ?? {
                                         version: 2,
@@ -203,9 +219,10 @@ function FormsReview({
                                 </small>
                                 {pronunciation.synthesis && (
                                   <small>
-                                    {pronunciation.synthesis.use_spelling
-                                      ? "词形拼写（语音来源）"
-                                      : `Azure ${pronunciation.synthesis.alphabet.toUpperCase()}：${pronunciation.synthesis[pronunciation.synthesis.alphabet] || "未填写"}`}
+                                    {pronunciationSynthesisLabel(
+                                      pronunciation.synthesis,
+                                      variant.dialect
+                                    )}
                                   </small>
                                 )}
                               </>
@@ -216,6 +233,7 @@ function FormsReview({
                           <td>
                             {pronunciation && (
                               <RichTextReadOnly
+                                className="tsz-phonetics tsz-actual-pronunciation"
                                 value={
                                   pronunciation.actual_pron_rich ?? {
                                     version: 2,
@@ -316,7 +334,7 @@ export function V3ReviewContent({
             <Typography.Text className="v3-review-kicker">
               当前词条
             </Typography.Text>
-            <Typography.Title className="tsz-entry-en" level={2}>
+            <Typography.Title className="tsz-words" level={2}>
               {model.identity.label}
             </Typography.Title>
             <Flex gap="small" wrap>

@@ -116,6 +116,7 @@ describe("编辑标注", () => {
                 entry_id: "entry",
                 annotation: "003",
                 annotation_revision: 2,
+                created_by_name: "admin",
                 presentation: entry.presentation,
                 pos_labels: [],
                 gloss_previews: [],

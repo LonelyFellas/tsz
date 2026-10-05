@@ -74,12 +74,3 @@ export function useResetAdminPassword() {
     mutationFn: (id: string) => api.admins.resetPassword(id)
   });
 }
-
-export function useSetPublicationPermission() {
-  const invalidate = useInvalidateAdmins();
-  return useMutation({
-    mutationFn: (vars: { id: string; allowed: boolean }) =>
-      api.admins.setPublicationPermission(vars.id, vars.allowed),
-    onSuccess: invalidate
-  });
-}

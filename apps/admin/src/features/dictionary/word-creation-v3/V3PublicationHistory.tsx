@@ -1,8 +1,6 @@
 import { useAuthStore } from "@/lib/auth";
-import {
-  canPublishEntry,
-  ENTRY_PUBLISH_BLOCKED_HINT
-} from "../entryWritePermission";
+import { canAdminResourceAction } from "@tsz/shared/auth";
+import { pronunciationSynthesisLabel } from "@tsz/shared";
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
 import { HttpError } from "@tsz/api-client";
@@ -11,6 +9,7 @@ import type {
   AdminWordPublicationEnvelope,
   AdminWordPublicationListResponse,
   AdminWordV3,
+  Dialect,
   EnglishTextV3,
   PronunciationSynthesisV3,
   SurfaceMatchPageV3
@@ -71,7 +70,7 @@ interface SnapshotFormLine {
   id: string;
   pos: string;
   formType: string;
-  dialect: string;
+  dialect: Dialect;
   spelling: string;
   pronunciations: Array<{
     id: string;
@@ -294,7 +293,7 @@ function PublicationSnapshotBody({
                   <Tag>{partOfSpeechLabel(form.pos)}</Tag>
                   <Tag>{formTypeLabel(form.formType as never)}</Tag>
                   <Tag>{dialectLabel(form.dialect as never)}</Tag>
-                  <Typography.Text className="tsz-entry-en">
+                  <Typography.Text className="tsz-words">
                     {form.spelling}
                   </Typography.Text>
                 </Flex>
@@ -303,12 +302,16 @@ function PublicationSnapshotBody({
                 ) : (
                   form.pronunciations.map((pronunciation) => (
                     <Typography.Text key={pronunciation.id} type="secondary">
-                      词典音标 {pronunciation.dictPhonetic} · 实际发音{" "}
-                      {pronunciation.actualPron}
+                      词典音标{" "}
+                      <span className="tsz-phonetics">
+                        {pronunciation.dictPhonetic}
+                      </span>{" "}
+                      · 实际发音{" "}
+                      <span className="tsz-phonetics tsz-actual-pronunciation">
+                        {pronunciation.actualPron}
+                      </span>
                       {pronunciation.synthesis
-                        ? pronunciation.synthesis.use_spelling
-                          ? " · 词形拼写（语音来源）"
-                          : ` · Azure ${pronunciation.synthesis.alphabet.toUpperCase()}：${pronunciation.synthesis[pronunciation.synthesis.alphabet] || "未填写"}`
+                        ? ` · ${pronunciationSynthesisLabel(pronunciation.synthesis, form.dialect)}`
                         : ""}
                       {pronunciation.style
                         ? ` · ${pronunciationStyleLabel(pronunciation.style as never)}`
@@ -357,7 +360,7 @@ function PublicationSnapshotBody({
               <Flex key={grammar.id} gap="small" wrap>
                 <Tag>{partOfSpeechLabel(grammar.pos)}</Tag>
                 <Tag>{dialectLabel(grammar.dialect as never)}</Tag>
-                <Typography.Text className="tsz-entry-en">
+                <Typography.Text className="tsz-words">
                   {grammar.text}
                 </Typography.Text>
               </Flex>
@@ -539,7 +542,12 @@ export function V3PublicationHistory({
   const [confirming, setConfirming] = useState(false);
   const [activating, setActivating] = useState(false);
   const profile = useAuthStore((state) => state.profile);
-  const allowedToPublish = canPublishEntry(profile, currentWord);
+  const allowedToPublish = canAdminResourceAction(
+    profile,
+    "words",
+    "rollback",
+    currentWord.created_by
+  );
   const [activationError, setActivationError] = useState<string>();
   const [surfacePage, setSurfacePage] = useState<SurfaceMatchPageV3>();
   const [surfaceResetVersion, setSurfaceResetVersion] = useState(0);
@@ -883,7 +891,7 @@ export function V3PublicationHistory({
               >
                 <Flex vertical gap={2}>
                   <Flex align="center" gap="small" wrap>
-                    <Typography.Text className="tsz-entry-en" strong>
+                    <Typography.Text className="tsz-words" strong>
                       {publicationLabel(publication)}
                     </Typography.Text>
                     <Typography.Text type="secondary">
@@ -929,7 +937,7 @@ export function V3PublicationHistory({
             <>
               <Flex align="center" gap="small" wrap>
                 <Typography.Title
-                  className="tsz-entry-en"
+                  className="tsz-words"
                   level={5}
                   style={{ margin: 0 }}
                 >
@@ -943,7 +951,10 @@ export function V3PublicationHistory({
               <PublicationMetadata publication={detail} />
               <PublicationSnapshotBody publication={detail} />
               {!allowedToPublish ? (
-                <Alert type="info" title={ENTRY_PUBLISH_BLOCKED_HINT} />
+                <Alert
+                  type="info"
+                  title={"需要词条回滚权限；普通管理员仅能回滚本人词条"}
+                />
               ) : null}
               {surfacePage ? (
                 <LifecycleSurfaceConfirmation

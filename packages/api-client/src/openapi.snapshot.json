@@ -1,12 +1,13 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/teacher-certification-batch-5/docs/openapi.json",
-  "_generatedAt": "2026-09-28T05:56:47.080Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/pronunciation-dual-accent-20261004/docs/openapi.json",
+  "_generatedAt": "2026-10-04T09:50:08.518Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
     "/admin/admins/{admin_id}": ["patch"],
     "/admin/admins/{admin_id}/lexicon-publication-permission": ["patch"],
+    "/admin/admins/{admin_id}/permissions": ["get"],
     "/admin/admins/{admin_id}/reset-password": ["post"],
     "/admin/admins/{admin_id}/status": ["patch"],
     "/admin/auth/change-password": ["post"],
@@ -56,6 +57,14 @@
     "/admin/lexicon/sentences/{id}/withdraw": ["post"],
     "/admin/lexicon/sentences/{id}/withdrawal-impact": ["get"],
     "/admin/lexicon/surface-match-snapshots/{snapshot_id}": ["get"],
+    "/admin/permission-audits": ["get"],
+    "/admin/permission-changes": ["post"],
+    "/admin/permission-changes/preview": ["post"],
+    "/admin/permission-tag-changes": ["post"],
+    "/admin/permission-tags": ["get", "post"],
+    "/admin/permission-tags/{tag_id}": ["delete", "patch"],
+    "/admin/permissions": ["get"],
+    "/admin/permissions/{permission_key}/admins": ["get"],
     "/admin/profile": ["get"],
     "/admin/profile/preferences": ["patch"],
     "/admin/settings/form-types": ["get", "post"],
@@ -89,6 +98,10 @@
     "/auth/password/reset": ["post"],
     "/auth/refresh": ["post"],
     "/auth/register": ["post"],
+    "/avatars/{id}": ["get"],
+    "/me": ["patch"],
+    "/me/avatar": ["post"],
+    "/me/avatar/upload-url": ["post"],
     "/me/contact/bind": ["post"],
     "/me/contact/bind-code": ["post"],
     "/me/contact/unbind": ["post"],
@@ -311,6 +324,14 @@
     ]
   },
   "operationSchemas": {
+    "post /admin/auth/change-password": {
+      "request": { "$ref": "#/components/schemas/ChangePasswordRequest" },
+      "responses": {
+        "204": null,
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "post /admin/lexicon/audio-assets": {
       "request": { "$ref": "#/components/schemas/ConfirmAudioAssetRequest" },
       "responses": {
@@ -872,6 +893,57 @@
         "503": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
+    "post /auth/register": {
+      "request": { "$ref": "#/components/schemas/RegisterRequest" },
+      "responses": {
+        "201": { "$ref": "#/components/schemas/LoginResponse" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "429": { "$ref": "#/components/schemas/ProblemDetails" },
+        "500": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "patch /me": {
+      "request": { "$ref": "#/components/schemas/UpdateProfileRequest" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/UpdateProfileResponse" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "413": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "500": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /me/avatar": {
+      "request": { "$ref": "#/components/schemas/AvatarConfirmRequest" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/AvatarConfirmResponse" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "413": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "500": { "$ref": "#/components/schemas/ProblemDetails" },
+        "501": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /me/avatar/upload-url": {
+      "request": { "$ref": "#/components/schemas/AvatarUploadRequest" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/AvatarUploadResponse" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "413": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "429": { "$ref": "#/components/schemas/ProblemDetails" },
+        "500": { "$ref": "#/components/schemas/ProblemDetails" },
+        "501": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "post /me/contact/bind": {
       "request": { "$ref": "#/components/schemas/ContactBindRequest" },
       "responses": {
@@ -917,6 +989,39 @@
     }
   },
   "schemas": {
+    "UserProfile": {
+      "type": "object",
+      "required": ["id", "display_name", "avatar_url", "roles", "active_role"],
+      "properties": {
+        "active_role": { "$ref": "#/components/schemas/UserRole" },
+        "avatar_url": {
+          "type": "string",
+          "description": "无头像时为空字符串。",
+          "example": ""
+        },
+        "display_name": { "type": "string", "example": "同学1234" },
+        "email": {
+          "type": ["string", "null"],
+          "example": "student@example.com"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "example": "0198f2a1-3b4c-7d5e-8f90-1a2b3c4d5e6f"
+        },
+        "phone": { "type": ["string", "null"], "example": "13800138000" },
+        "roles": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/UserRole" }
+        }
+      }
+    },
+    "UserRole": { "type": "string", "enum": ["student", "teacher"] },
+    "UpdateProfileResponse": {
+      "type": "object",
+      "required": ["user"],
+      "properties": { "user": { "$ref": "#/components/schemas/UserProfile" } }
+    },
     "PasswordStatus": {
       "type": "object",
       "required": ["status"],
@@ -1035,6 +1140,8 @@
         "password_missing",
         "password_too_short",
         "password_too_long",
+        "password_too_weak",
+        "password_compromised",
         "password_unchanged",
         "invalid_display_name",
         "invalid_otp_code",
@@ -1111,6 +1218,15 @@
         "audio_upload_not_completed",
         "invalid_audio_key",
         "audio_storage_not_configured",
+        "unsupported_avatar_content_type",
+        "invalid_avatar_size",
+        "avatar_invalid_image",
+        "avatar_file_too_large",
+        "invalid_avatar_key",
+        "avatar_upload_not_completed",
+        "avatar_upload_rate_limited",
+        "avatar_storage_not_configured",
+        "avatar_storage_unavailable",
         "audio_asset_not_found",
         "service_unavailable",
         "internal_error"
@@ -1133,12 +1249,6 @@
         "headwords": {
           "$ref": "#/components/schemas/WordHeadwordsV2",
           "description": "Step 1 最终确认值；兼容窗口内旧客户端可省略，由服务端按旧检测规则补齐。"
-        },
-        "homograph_reason": {
-          "type": "string",
-          "description": "同原型组另建词条的区分说明，仅写入创建审计，不替代数字标注。",
-          "maxLength": 500,
-          "minLength": 1
         },
         "kind": { "$ref": "#/components/schemas/WordEntryKindV3" },
         "schema_version": { "type": "integer", "enum": [3] }
@@ -1443,6 +1553,7 @@
         "annotation",
         "annotation_revision",
         "entry_id",
+        "created_by_name",
         "presentation",
         "pos_labels",
         "gloss_previews",
@@ -1461,6 +1572,7 @@
           "format": "uuid",
           "description": "创建人 admin id，供前端判断「冲突弹窗里这一行我能不能改」——超管可改任何词条，\n其他管理员只能改自己创建的（含自己的草稿），见 §24.2「标注的修改权限」。\n\n**刻意是 `Option` 且不标 required**，两个方向各挡一种事故：\n- 对外（wire）：schema 不要求这个键，前端可以先 `sync:openapi` 并部署——旧后端不\n  下发时新前端按「可改」降级（等同本字段出现前的行为），之后再切后端二进制。\n  标成 required 则前后端两个方向都硬失败，只能同批部署。\n- 对内（Redis 快照）：本结构同时是 `V3SurfaceSnapshotPageData` 的存储格式。二进制\n  刚切换的那 ≤10 分钟里会读到升级前写的快照，那里没有这个键。用 `Uuid` + `default`\n  会静默填成 nil UUID，前端把本人的行误判成他人的；`None` 则是诚实的「不知道」，\n  序列化时整个键缺席，前端走同一条降级。\n\n`nullable = false` 是同一件事的另一半：未知时**整个键缺席、绝不会是 `null`**，\nschema 就不该描述一种不会发生的取值，否则前端要为一条永远走不到的分支写降级。\n\n正常路径上服务端始终下发。"
         },
+        "created_by_name": { "type": "string" },
         "entry_id": { "type": "string", "format": "uuid" },
         "gloss_previews": {
           "type": "array",
@@ -2677,12 +2789,16 @@
       "properties": {
         "cursor": {
           "type": "string",
-          "description": "上一页返回的 `next_cursor`。绑定 `q` / `kind` / `match` / `entry_id`\n及最后返回的稳定节点排序键；查询条件改变或游标无效返回 400 `invalid_query`。\n无关保存、发布及归档不会使游标失效；并发修改下搜索弱一致，保存/发布仍严格验证。"
+          "description": "上一页返回的 `next_cursor`。绑定 `q` / `kind` / `match` / `entry_id` / `include_drafts`\n及最后返回的稳定节点排序键；查询条件改变或游标无效返回 400 `invalid_query`。\n无关保存、发布及归档不会使游标失效；并发修改下搜索弱一致，保存/发布仍严格验证。"
         },
         "entry_id": {
           "type": "string",
           "format": "uuid",
           "description": "已知目标词条时直接限定该词条；仍校验词面、类型、发布/草稿与归档状态。"
+        },
+        "include_drafts": {
+          "type": "boolean",
+          "description": "同时查询已保存的草稿节点；缺省仅查询已发布内容。"
         },
         "kind": {
           "$ref": "#/components/schemas/EntryKind",
@@ -2700,7 +2816,7 @@
         },
         "q": {
           "type": "string",
-          "description": "关键字：对已发布词面做大小写不敏感的包含匹配，1..=100 码点且两端不留空白。",
+          "description": "关键字：对词面做大小写不敏感的包含匹配，1..=100 码点且两端不留空白。",
           "maxLength": 100,
           "minLength": 1
         },
@@ -2957,6 +3073,24 @@
     },
     "AudioAssetGender": { "type": "string", "enum": ["female", "male"] },
     "AudioAssetLocale": { "type": "string", "enum": ["en-GB", "en-US"] },
+    "AvatarConfirmRequest": {
+      "type": "object",
+      "required": ["key"],
+      "properties": { "key": { "type": "string" } }
+    },
+    "AvatarUploadRequest": {
+      "type": "object",
+      "required": ["content_type", "size"],
+      "properties": {
+        "content_type": { "type": "string" },
+        "size": {
+          "type": "integer",
+          "format": "int64",
+          "maximum": 5242880,
+          "minimum": 1
+        }
+      }
+    },
     "BatchPublicationItemV3": {
       "type": "object",
       "required": ["entry_id", "base_revision", "base_lifecycle_revision"],
@@ -2971,6 +3105,23 @@
         "entry_id": { "type": "string", "format": "uuid" }
       },
       "additionalProperties": false
+    },
+    "ChangePasswordRequest": {
+      "type": "object",
+      "required": ["current_password", "new_password"],
+      "properties": {
+        "current_password": {
+          "type": "string",
+          "description": "当前密码，用于在改密前重新验证管理员身份",
+          "example": "CurrentPassword123!"
+        },
+        "new_password": {
+          "type": "string",
+          "description": "15–128 个 Unicode 字符，区分大小写，支持符号与空格；须通过弱密码与泄露检查。",
+          "maxLength": 128,
+          "minLength": 15
+        }
+      }
     },
     "CommonDialectV3": { "type": "string", "enum": ["common"] },
     "ComponentTargetMatchV3": {
@@ -3289,7 +3440,12 @@
       "required": ["current_password", "new_password"],
       "properties": {
         "current_password": { "type": "string" },
-        "new_password": { "type": "string" }
+        "new_password": {
+          "type": "string",
+          "description": "15–128 个 Unicode 字符，区分大小写，支持符号与空格；须通过弱密码与泄露检查。",
+          "maxLength": 128,
+          "minLength": 15
+        }
       },
       "additionalProperties": false
     },
@@ -3305,7 +3461,12 @@
       "properties": {
         "code": { "type": "string" },
         "identifier": { "type": "string" },
-        "new_password": { "type": "string" }
+        "new_password": {
+          "type": "string",
+          "description": "15–128 个 Unicode 字符，区分大小写，支持符号与空格；须通过弱密码与泄露检查。",
+          "maxLength": 128,
+          "minLength": 15
+        }
       },
       "additionalProperties": false
     },
@@ -3373,6 +3534,20 @@
       "type": "string",
       "enum": ["normal", "strong", "weak"]
     },
+    "PronunciationSynthesisCandidateV3": {
+      "type": "object",
+      "required": ["ipa", "ups"],
+      "properties": {
+        "ipa": { "type": "string", "maxLength": 200 },
+        "ups": { "type": "string", "maxLength": 1600 },
+        "ups_words": {
+          "type": ["array", "null"],
+          "items": { "$ref": "#/components/schemas/UpsWordV3" },
+          "maxItems": 30
+        }
+      },
+      "additionalProperties": false
+    },
     "PronunciationSynthesisV3": {
       "type": "object",
       "description": "Independent Azure synthesis candidates; dictionary notation remains display-only.",
@@ -3389,6 +3564,9 @@
             }
           ]
         },
+        "uk": {
+          "$ref": "#/components/schemas/PronunciationSynthesisCandidateV3"
+        },
         "ups": { "type": "string", "maxLength": 1600 },
         "ups_locale": {
           "oneOf": [
@@ -3401,6 +3579,9 @@
           "items": { "$ref": "#/components/schemas/UpsWordV3" },
           "description": "Word boundaries for the single-line UPS candidate, never inferred from phone spaces.",
           "maxItems": 30
+        },
+        "us": {
+          "$ref": "#/components/schemas/PronunciationSynthesisCandidateV3"
         },
         "use_spelling": {
           "type": ["boolean", "null"],
@@ -3418,6 +3599,30 @@
         "schema_version": { "type": "integer", "enum": [3] }
       },
       "additionalProperties": false
+    },
+    "RegisterRequest": {
+      "type": "object",
+      "description": "联系方式恰好提供一种；验证码用途为 register。",
+      "required": ["password", "code"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "注册验证码（6 位）",
+          "example": "123456"
+        },
+        "email": {
+          "type": ["string", "null"],
+          "example": "student@example.com"
+        },
+        "password": {
+          "type": "string",
+          "description": "15–128 个 Unicode 字符，区分大小写，支持符号与空格；拒绝弱密码和已知泄露密码。",
+          "example": "Violet!River7294Cloud",
+          "maxLength": 128,
+          "minLength": 15
+        },
+        "phone": { "type": ["string", "null"], "example": "13800138000" }
+      }
     },
     "RichTextAnnotationV3": {
       "oneOf": [
@@ -3842,6 +4047,14 @@
         "short_name_zh": { "type": "string", "maxLength": 16, "minLength": 1 },
         "sort_order": { "type": "integer", "format": "int32" }
       }
+    },
+    "UpdateProfileRequest": {
+      "type": "object",
+      "required": ["display_name"],
+      "properties": {
+        "display_name": { "type": "string", "example": "新昵称" }
+      },
+      "additionalProperties": false
     },
     "UpdateSharedSentence": {
       "type": "object",
@@ -4382,6 +4595,227 @@
           "maxItems": 2000
         },
         "spelling": { "type": "string", "maxLength": 200 }
+      },
+      "additionalProperties": false
+    },
+    "AdminWordStatus": {
+      "type": "string",
+      "enum": ["draft", "published", "archived"]
+    },
+    "AvatarConfirmResponse": {
+      "type": "object",
+      "required": ["user"],
+      "properties": { "user": { "$ref": "#/components/schemas/UserProfile" } }
+    },
+    "AvatarUpload": {
+      "type": "object",
+      "required": ["key", "url", "headers", "expires_in", "max_bytes"],
+      "properties": {
+        "expires_in": { "type": "integer", "format": "int64", "minimum": 0 },
+        "headers": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "propertyNames": { "type": "string" }
+        },
+        "key": { "type": "string" },
+        "max_bytes": { "type": "integer", "format": "int64", "minimum": 0 },
+        "url": { "type": "string" }
+      }
+    },
+    "AvatarUploadResponse": {
+      "type": "object",
+      "required": ["upload"],
+      "properties": {
+        "upload": { "$ref": "#/components/schemas/AvatarUpload" }
+      }
+    },
+    "EntryAnnotationConflict": {
+      "type": "object",
+      "required": ["reason", "entries", "groups"],
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/MatchedEntryContextV3" }
+        },
+        "groups": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/EntryAnnotationGroup" }
+        },
+        "reason": {
+          "$ref": "#/components/schemas/EntryAnnotationConflictReason"
+        }
+      },
+      "additionalProperties": false
+    },
+    "EntryAnnotationConflictReason": {
+      "type": "string",
+      "enum": ["required", "duplicate", "revision_conflict", "group_changed"]
+    },
+    "EntryAnnotationGroup": {
+      "type": "object",
+      "required": ["dialect_scope", "normalized_surface", "entry_ids"],
+      "properties": {
+        "dialect_scope": { "type": "string" },
+        "entry_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" }
+        },
+        "normalized_surface": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "EntryPresentationV3": {
+      "type": "object",
+      "required": ["label", "matched_surfaces", "strategy_version"],
+      "properties": {
+        "label": { "type": "string" },
+        "matched_surfaces": { "type": "array", "items": { "type": "string" } },
+        "strategy_version": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "PersistedWordStep": {
+      "type": "string",
+      "enum": ["basics", "forms", "meanings"]
+    },
+    "ProblemDetails": {
+      "type": "object",
+      "required": ["type", "title", "status", "detail", "code"],
+      "properties": {
+        "code": { "$ref": "#/components/schemas/ErrorCode" },
+        "detail": {
+          "type": "string",
+          "description": "本次错误的安全说明；客户端不得据此分支。"
+        },
+        "field": {
+          "type": ["string", "null"],
+          "description": "表单错误对应的请求字段；非字段错误省略。",
+          "example": "phone"
+        },
+        "field_issues": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/V3DraftValidationIssue" },
+          "description": "多字段/多节点校验问题；智能词库等复杂表单按稳定 node_id 定位。"
+        },
+        "meta": {
+          "$ref": "#/components/schemas/ProblemMeta",
+          "description": "领域错误的结构化上下文；客户端不得解析 detail 文案。"
+        },
+        "status": {
+          "type": "integer",
+          "format": "int32",
+          "description": "与 HTTP 状态行一致。",
+          "minimum": 0
+        },
+        "title": {
+          "type": "string",
+          "description": "类型级稳定短标题；客户端不得据此分支。"
+        },
+        "type": {
+          "type": "string",
+          "description": "RFC 9457 问题类型；同一 code 永久映射到同一 URI。",
+          "example": "urn:tsz:problem:invalid_phone"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ProblemReferenceLocation": {
+      "type": "object",
+      "required": [
+        "target_sense_id",
+        "source_entry_id",
+        "source_publication_id",
+        "source_node_id",
+        "reference_kind"
+      ],
+      "properties": {
+        "reference_kind": { "type": "string" },
+        "source_entry_id": { "type": "string", "format": "uuid" },
+        "source_node_id": { "type": "string", "format": "uuid" },
+        "source_publication_id": { "type": "string", "format": "uuid" },
+        "target_sense_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "RelationReferencePreviewV3": {
+      "type": "object",
+      "required": [
+        "source_entry_id",
+        "source_presentation",
+        "source_status",
+        "relation"
+      ],
+      "properties": {
+        "relation": { "$ref": "#/components/schemas/RelationTypeV2" },
+        "source_entry_id": { "type": "string", "format": "uuid" },
+        "source_presentation": {
+          "$ref": "#/components/schemas/EntryPresentationV3"
+        },
+        "source_status": { "$ref": "#/components/schemas/AdminWordStatus" }
+      },
+      "additionalProperties": false
+    },
+    "RelationReferenceSummaryV3": {
+      "type": "object",
+      "required": ["total", "by_type", "previews", "truncated"],
+      "properties": {
+        "by_type": { "$ref": "#/components/schemas/RelationReferenceCountsV2" },
+        "previews": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/RelationReferencePreviewV3"
+          },
+          "maxItems": 5
+        },
+        "total": { "type": "integer", "format": "int32", "minimum": 0 },
+        "truncated": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "V3DraftNodeLocation": {
+      "type": "object",
+      "required": ["node_role", "ancestor_node_ids"],
+      "properties": {
+        "ancestor_node_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" }
+        },
+        "dialect": { "$ref": "#/components/schemas/Dialect" },
+        "form_group_id": { "type": "string", "format": "uuid" },
+        "form_id": { "type": "string", "format": "uuid" },
+        "form_type": {
+          "type": "string",
+          "maxLength": 32,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]{0,31}$"
+        },
+        "membership_id": { "type": "string", "format": "uuid" },
+        "node_role": { "type": "string" },
+        "pos_id": { "type": "string", "format": "uuid" },
+        "pronunciation_id": { "type": "string", "format": "uuid" },
+        "variant_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "V3DraftValidationIssue": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "step",
+        "node_id",
+        "field",
+        "code",
+        "message",
+        "node_location"
+      ],
+      "properties": {
+        "code": { "$ref": "#/components/schemas/V3ValidationIssueCode" },
+        "field": { "type": "string" },
+        "message": { "type": "string" },
+        "node_id": { "type": "string", "format": "uuid" },
+        "node_location": { "$ref": "#/components/schemas/V3DraftNodeLocation" },
+        "schema_version": { "type": "integer", "enum": [3] },
+        "step": { "$ref": "#/components/schemas/PersistedWordStep" }
       },
       "additionalProperties": false
     }

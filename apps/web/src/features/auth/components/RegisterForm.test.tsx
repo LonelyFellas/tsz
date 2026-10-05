@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthResponse } from "@tsz/api-client";
@@ -14,8 +14,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/lib/request", () => ({
-  setAccessToken: vi.fn(),
-  scheduleRefresh: vi.fn(),
+  persistSession: vi.fn(),
   api: {
     auth: {
       register: vi.fn(),
@@ -32,7 +31,7 @@ const mockSendCode = vi.mocked(api.auth.sendCode);
 const mockMe = vi.mocked(api.auth.me);
 
 const PHONE = "13800138000";
-const PASSWORD = "abc12345678";
+const PASSWORD = " Mixed!密码🙂 river cloud ";
 const CODE = "123456";
 
 function deferred<T>() {
@@ -79,12 +78,95 @@ async function fillForm(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("RegisterForm — 手机号验证码注册", () => {
+  it("注册等待中锁住返回和去登录入口", async () => {
+    const registration = deferred<AuthResponse>();
+    mockRegister.mockReturnValueOnce(registration.promise);
+    renderWithProviders(<RegisterForm />);
+    const user = userEvent.setup();
+    await fillForm(user);
+    await user.click(screen.getByRole("button", { name: "立即注册" }));
+    const back = screen.getByRole("button", { name: "← 返回" });
+    const login = screen.getByRole("button", { name: "已有账号,去登录" });
+    expect(back).toBeDisabled();
+    expect(login).toBeDisabled();
+    await user.click(back);
+    await user.click(login);
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+    await act(async () => registration.resolve(authResult()));
+  });
+
+  it("注册页卸载后迟到响应不能覆盖新会话", async () => {
+    const registration = deferred<AuthResponse>();
+    mockRegister.mockReturnValueOnce(registration.promise);
+    const { unmount } = renderWithProviders(<RegisterForm />);
+    const user = userEvent.setup();
+    await fillForm(user);
+    await user.click(screen.getByRole("button", { name: "立即注册" }));
+    unmount();
+    const next = { ...authResult().user, id: "new-user", display_name: "Bob" };
+    useUserStore.setState({ user: next, onboarded: true });
+    await act(async () => registration.resolve(authResult()));
+    expect(mockMe).not.toHaveBeenCalled();
+    expect(useUserStore.getState().user).toEqual(next);
+  });
+
+  it("注册资料加载期间卸载，旧资料不能覆盖新会话", async () => {
+    const profile = deferred<Awaited<ReturnType<typeof api.auth.me>>>();
+    mockMe.mockReturnValueOnce(profile.promise);
+    const { unmount } = renderWithProviders(<RegisterForm />);
+    const user = userEvent.setup();
+    await fillForm(user);
+    await user.click(screen.getByRole("button", { name: "立即注册" }));
+    await waitFor(() => expect(mockMe).toHaveBeenCalled());
+    unmount();
+    const next = { ...authResult().user, id: "new-user", display_name: "Bob" };
+    useUserStore.setState({ user: next, onboarded: true });
+    await act(async () =>
+      profile.resolve({
+        user: authResult().user,
+        active_role: "student",
+        learning_settings: null,
+        onboarded: true
+      })
+    );
+    expect(useUserStore.getState().user).toEqual(next);
+  });
+
   it("手机号和邮箱注册入口均可用", async () => {
     renderWithProviders(<RegisterForm />);
     expect(screen.getByPlaceholderText("请输入手机号")).toBeInTheDocument();
-    await userEvent.setup().click(screen.getByRole("button", { name: "邮箱" }));
+    await userEvent.setup().click(screen.getByRole("tab", { name: "邮箱" }));
     expect(screen.getByPlaceholderText("请输入邮箱")).toBeInTheDocument();
     expect(screen.queryByPlaceholderText("请输入手机号")).toBeNull();
+  });
+
+  it("方向键不清空表单，确认切换后只保留一个活动表单", async () => {
+    renderWithProviders(<RegisterForm />);
+    const user = userEvent.setup();
+    await fillForm(user);
+    const phone = screen.getByRole("tab", { name: "手机" });
+    const email = screen.getByRole("tab", { name: "邮箱" });
+    await user.click(phone);
+    await user.keyboard("{ArrowRight}");
+    await waitFor(() => expect(email).toHaveFocus());
+    expect(phone).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByPlaceholderText("请输入手机号")).toHaveValue(PHONE);
+    expect(screen.getByPlaceholderText("请输入验证码")).toHaveValue(CODE);
+    await user.keyboard("{Enter}");
+    expect(email).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel")).toHaveAccessibleName("邮箱");
+    expect(screen.getByPlaceholderText("请输入邮箱")).toHaveValue("");
+    expect(screen.getByPlaceholderText("请输入验证码")).toHaveValue("");
+    expect(screen.getByPlaceholderText("请输入登录密码")).toHaveValue(PASSWORD);
+    for (const tab of [phone, email]) {
+      expect(
+        document.getElementById(tab.getAttribute("aria-controls")!)
+      ).not.toBeNull();
+    }
+    expect(document.querySelectorAll("#register-contact")).toHaveLength(1);
+    expect(mockRegister).not.toHaveBeenCalled();
+    expect(mockSendCode).not.toHaveBeenCalled();
   });
 
   it("邮箱发码和注册使用同一归一化地址，资料失败只重试加载", async () => {
@@ -112,12 +194,15 @@ describe("RegisterForm — 手机号验证码注册", () => {
     expect(
       await screen.findByText("注册成功，但加载账号信息失败，请重试")
     ).toBeInTheDocument();
-    expect(mockRegister).toHaveBeenCalledWith({
-      email: "student@example.com",
-      password: PASSWORD.toUpperCase(),
-      code: CODE
-    });
-    expect(screen.getByRole("button", { name: "手机" })).toBeDisabled();
+    expect(mockRegister).toHaveBeenCalledWith(
+      {
+        email: "student@example.com",
+        password: PASSWORD,
+        code: CODE
+      },
+      { signal: expect.any(AbortSignal) }
+    );
+    expect(screen.getByRole("tab", { name: "手机" })).toBeDisabled();
     mockMe.mockResolvedValueOnce({
       user: emailUser,
       active_role: "student",
@@ -138,10 +223,10 @@ describe("RegisterForm — 手机号验证码注册", () => {
     const user = userEvent.setup();
     await fillForm(user);
     await user.click(screen.getByRole("button", { name: "获取验证码" }));
-    expect(screen.getByRole("button", { name: "邮箱" })).toBeDisabled();
+    expect(screen.getByRole("tab", { name: "邮箱" })).toBeDisabled();
     send.resolve();
     await screen.findByRole("button", { name: "60s 后重发" });
-    await user.click(screen.getByRole("button", { name: "邮箱" }));
+    await user.click(screen.getByRole("tab", { name: "邮箱" }));
     expect(screen.getByPlaceholderText("请输入邮箱")).toHaveValue("");
     expect(screen.getByPlaceholderText("请输入验证码")).toHaveValue("");
     expect(screen.getByRole("button", { name: "立即注册" })).toBeDisabled();
@@ -207,6 +292,28 @@ describe("RegisterForm — 手机号验证码注册", () => {
     });
   });
 
+  it("同一规范化邮箱的大小写和空白修改保留验证码与冷却", async () => {
+    renderWithProviders(<RegisterForm initialMethod="email" />);
+    const user = userEvent.setup();
+    const email = screen.getByPlaceholderText("请输入邮箱");
+    await user.type(email, "Student@EXAMPLE.com");
+    await user.click(screen.getByRole("button", { name: "获取验证码" }));
+    await screen.findByRole("button", { name: "60s 后重发" });
+    const code = screen.getByPlaceholderText("请输入验证码");
+    await user.type(code, CODE);
+    fireEvent.change(email, { target: { value: " student@example.com " } });
+    expect(email).toHaveValue("student@example.com");
+    expect(code).toHaveValue(CODE);
+    expect(screen.getByRole("button", { name: /后重发/ })).toBeDisabled();
+    expect(mockSendCode).toHaveBeenCalledExactlyOnceWith(
+      "student@example.com",
+      "register"
+    );
+    fireEvent.change(email, { target: { value: "other@example.com" } });
+    expect(code).toHaveValue("");
+    expect(screen.getByRole("button", { name: "获取验证码" })).toBeEnabled();
+  });
+
   it("发码后修改手机号会清空旧验证码和倒计时", async () => {
     renderWithProviders(<RegisterForm />);
     const user = userEvent.setup();
@@ -249,12 +356,35 @@ describe("RegisterForm — 手机号验证码注册", () => {
     );
   });
 
-  it("非法手机号不能发送验证码", async () => {
+  it("非法手机号不能发送验证码，错误描述与输入框关联", async () => {
     renderWithProviders(<RegisterForm />);
     const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText("请输入手机号"), "12345");
-    expect(screen.getByText("手机号码错误")).toBeInTheDocument();
+    const phone = screen.getByLabelText("手机号码");
+    await user.type(phone, "12345");
+    expect(phone).toHaveAttribute("aria-invalid", "true");
+    expect(phone).toHaveAccessibleDescription("手机号码错误");
     expect(screen.getByRole("button", { name: "获取验证码" })).toBeDisabled();
+    await user.clear(phone);
+    await user.type(phone, PHONE);
+    expect(phone).toHaveAttribute("aria-invalid", "false");
+    expect(phone).not.toHaveAttribute("aria-describedby");
+    expect(screen.queryByText("手机号码错误")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "获取验证码" })).toBeEnabled();
+  });
+
+  it("密码帮助与错误使用同一描述位置，不重复显示", async () => {
+    renderWithProviders(<RegisterForm />);
+    const user = userEvent.setup();
+    const password = screen.getByLabelText("密码");
+    expect(password).toHaveAccessibleDescription("密码至少 15 位");
+    await user.type(password, "short");
+    expect(password).toHaveAttribute("aria-invalid", "true");
+    expect(password).toHaveAccessibleDescription("密码至少需要 15 个字符");
+    expect(screen.queryByText("密码至少 15 位")).not.toBeInTheDocument();
+    await user.clear(password);
+    await user.type(password, PASSWORD);
+    expect(password).toHaveAttribute("aria-invalid", "false");
+    expect(password).toHaveAccessibleDescription("密码至少 15 位");
   });
 
   it("注册成功直接使用返回会话并发布用户态", async () => {
@@ -264,11 +394,14 @@ describe("RegisterForm — 手机号验证码注册", () => {
     await user.click(screen.getByRole("button", { name: "立即注册" }));
 
     await waitFor(() => {
-      expect(mockRegister).toHaveBeenCalledWith({
-        phone: PHONE,
-        password: PASSWORD.toUpperCase(),
-        code: CODE
-      });
+      expect(mockRegister).toHaveBeenCalledWith(
+        {
+          phone: PHONE,
+          password: PASSWORD,
+          code: CODE
+        },
+        { signal: expect.any(AbortSignal) }
+      );
       expect(useUserStore.getState().user).toEqual(authResult().user);
     });
   });
@@ -293,7 +426,10 @@ describe("RegisterForm — 手机号验证码注册", () => {
     ["user already exists", "该手机号已注册，请直接登录"],
     ["too many requests", "验证码发送过于频繁，请稍后再试"],
     ["invalid email", "邮箱格式错误，请检查后重试"],
-    ["password is too short", "密码须为 11–20 位字母和数字组合"],
+    [
+      "password is too short",
+      "密码须为 15–128 个字符，区分大小写，支持符号和空格"
+    ],
     ["OTP unavailable", "验证码服务暂时不可用，请稍后再试"]
   ])("注册错误 %s 映射为中文提示", async (message, expected) => {
     mockRegister.mockRejectedValueOnce(new Error(message));

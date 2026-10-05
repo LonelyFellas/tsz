@@ -6,13 +6,13 @@
   min-width: 0;
 }
 
-.shared-sentence-header > .ant-tag {
+.shared-sentence-header .ant-tag {
   margin: 0;
 }
 
 .shared-sentence-english {
-  font-size: 20px;
-  font-weight: 700;
+  font-size: var(--ant-font-size, 14px);
+  font-weight: 400;
   line-height: 1.6;
   border: 1px solid var(--ant-color-border, #d9d9d9);
   border-radius: var(--ant-border-radius, 6px);
@@ -36,10 +36,6 @@
 @media (max-width: 600px) {
   .shared-sentence-row {
     padding: 12px;
-  }
-
-  .shared-sentence-english {
-    font-size: 18px;
   }
 
   .shared-sentence-translations {

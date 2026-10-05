@@ -16,7 +16,8 @@ const smokeProfile = vi.hoisted(() => ({
   phone: "13800138000",
   display_name: "测试超管",
   role: "super_admin" as const,
-  can_publish_lexicon: true,
+  permission_version: 1,
+  catalog_version: "v1",
   permissions: ["words.access"],
   preferences: { dialect: "uk" as const }
 }));
@@ -60,6 +61,7 @@ vi.mock("@/lib/auth", () => ({
     }
   ),
   // 用户管理页据 useIsSuperAdmin 决定写操作是否置灰；烟雾测试给个超管即可。
+  usePermission: () => true,
   useIsSuperAdmin: () => true
 }));
 

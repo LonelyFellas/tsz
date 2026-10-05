@@ -6,6 +6,7 @@ import {
   createAdminEndpoints,
   createHttpClient,
   HttpError,
+  InvalidAdminProfileResponseError,
   type AdminEndpoints
 } from "@tsz/api-client";
 import type { AdminAuthResponse } from "@tsz/types";
@@ -18,6 +19,7 @@ export interface AdminAuthRuntime {
   store: AdminAuthStore;
   tokens: TokenManager;
   restoreSession: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
   /** 登录成功后：access token 存内存并启动主动刷新定时器。 */
   persistSession: (
     auth: Pick<AdminAuthResponse, "access_token" | "expires_in">
@@ -65,46 +67,122 @@ export function createAdminAuthRuntime({
     }
   });
 
+  let loadingProfile: number | undefined;
+  let profileDirty = false;
   const http = createHttpClient({
     baseUrl,
     getToken: tokens.getToken,
     getSessionGeneration: tokens.getSessionGeneration,
     onRefresh: tokens.refreshTokens,
-    onSessionExpired: tokens.redirectToLogin,
-    onForbidden: (code) => redirectToChangePassword(code, changePasswordPath)
+    onSessionExpired: () => {
+      store.getState().setProfile(null);
+      tokens.redirectToLogin();
+    },
+    onForbidden: (code, path) => {
+      if (code === "must_change_password") {
+        store.getState().setProfile(null);
+        redirectToChangePassword(code, changePasswordPath);
+      } else if (code === "account_disabled") {
+        store.getState().setProfile(null);
+        tokens.redirectToLogin();
+      } else if (path !== "/profile" && tokens.getToken()) {
+        if (loadingProfile === tokens.getSessionGeneration())
+          profileDirty = true;
+        else void refreshProfile().catch(() => undefined);
+      }
+    }
   });
   const api = createAdminEndpoints(http);
+  const readProfile = api.profile;
+  api.profile = async () => {
+    const generation = tokens.getSessionGeneration();
+    try {
+      return await readProfile();
+    } catch (error) {
+      if (
+        error instanceof InvalidAdminProfileResponseError &&
+        generation === tokens.getSessionGeneration()
+      ) {
+        store.setState({
+          profile: null,
+          role: null,
+          hydrated: true,
+          connectionError: false,
+          permissionModelIncompatible: true
+        });
+      }
+      throw error;
+    }
+  };
+  const restoreProfile = createSessionRestore(
+    tokens,
+    async () => {
+      try {
+        return await api.profile();
+      } catch (error) {
+        if (
+          error instanceof HttpError &&
+          error.status === 403 &&
+          (error.code === "must_change_password" ||
+            error.code === "account_disabled")
+        )
+          return null;
+        throw error;
+      }
+    },
+    (profile) => {
+      store.getState().setProfile(profile);
+      store.setState({ hydrated: true, connectionError: false });
+    },
+    () =>
+      store.setState({
+        profile: null,
+        role: null,
+        hydrated: true,
+        connectionError: false,
+        permissionModelIncompatible: false
+      }),
+    () =>
+      store.setState({
+        connectionError: !store.getState().permissionModelIncompatible
+      })
+  );
+
+  let pendingProfile:
+    { generation: number; promise: Promise<void> } | undefined;
+  function refreshProfile(): Promise<void> {
+    const generation = tokens.getSessionGeneration();
+    if (pendingProfile?.generation === generation)
+      return pendingProfile.promise;
+    loadingProfile = generation;
+    const promise = (async () => {
+      do {
+        profileDirty = false;
+        await restoreProfile();
+      } while (generation === tokens.getSessionGeneration() && profileDirty);
+    })().finally(() => {
+      if (pendingProfile?.promise !== promise) return;
+      const reread =
+        profileDirty && generation === tokens.getSessionGeneration();
+      pendingProfile = undefined;
+      loadingProfile = undefined;
+      profileDirty = false;
+      if (reread && tokens.getToken()) return refreshProfile();
+    });
+    pendingProfile = { generation, promise };
+    return promise;
+  }
 
   return {
     api,
     store,
     tokens,
-    restoreSession: createSessionRestore(
-      tokens,
-      () =>
-        api.profile().catch((error: unknown) => {
-          if (
-            error instanceof HttpError &&
-            error.status === 403 &&
-            error.code === "must_change_password"
-          )
-            return null;
-          throw error;
-        }),
-      (profile) => {
-        store.getState().setProfile(profile);
-        store.setState({ hydrated: true, connectionError: false });
-      },
-      () =>
-        store.setState({
-          profile: null,
-          role: null,
-          hydrated: true,
-          connectionError: false
-        }),
-      () => store.setState({ connectionError: true })
-    ),
+    restoreSession: refreshProfile,
+    refreshProfile,
     persistSession: (auth) => {
+      store.getState().setProfile(null);
+      loadingProfile = undefined;
+      profileDirty = false;
       tokens.setAccessToken(auth.access_token);
       store.setState({ connectionError: false });
       tokens.scheduleRefresh(auth.expires_in);
