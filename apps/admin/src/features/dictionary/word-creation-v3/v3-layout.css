@@ -339,7 +339,7 @@
 .v3-meanings-v2 .word-definition-options {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 /* 每个选择器两侧统一 2px padding；宽度包含文字、padding 和透明边框，不再额外补空白。 */
@@ -369,9 +369,9 @@
 @container (width > 640px) {
   .v3-meanings-v2 .word-definition-list-header,
   .v3-meanings-v2 .word-table-row.word-definition-row {
-    /* 拖动/序号 + 主列间距 + 136px 属性组。表头与行共用同一套尺寸。 */
+    /* 拖动/序号 + 主列间距 + 132px 属性组。表头与行共用同一套尺寸。 */
     grid-template-columns:
-      calc(var(--word-leading-width) + var(--word-row-gap) + 136px)
+      calc(var(--word-leading-width) + var(--word-row-gap) + 132px)
       minmax(0, 1fr) minmax(180px, 260px) 24px;
     column-gap: var(--word-row-gap);
   }

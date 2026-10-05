@@ -375,7 +375,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(text).toBeVisible();
     const prefixWidth =
       (await text.boundingBox())!.x - (await row.boundingBox())!.x;
-    expect(prefixWidth).toBe(202);
+    expect(prefixWidth).toBe(198);
     const heading = page
       .locator(".word-definition-list-header")
       .first()
@@ -416,7 +416,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       if (i > 0) {
         const previous = (await selects.nth(i - 1).boundingBox())!;
         const current = (await select.boundingBox())!;
-        expect(current.x - previous.x - previous.width).toBe(8);
+        expect(current.x - previous.x - previous.width).toBe(6);
         expect(current.y).toBe(previous.y);
       }
       await select.click();
