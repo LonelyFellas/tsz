@@ -27,12 +27,25 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(phonetic).toHaveCSS("font-family", /TSZ Phonetics/);
     await expect(actual).toHaveCSS("font-size", "18.6667px");
     await expect(actual).toHaveCSS("font-family", /TSZ Phonetics/);
-    await page.evaluate(() => document.fonts.ready);
+    await page.evaluate(async () => {
+      await Promise.all(
+        ["normal", "italic"].flatMap((style) =>
+          [400, 800].map((weight) =>
+            document.fonts.load(
+              `${style} ${weight} 16px "TSZ Text"`,
+              "Abc ,.-'‘’“”=<>0123456789"
+            )
+          )
+        )
+      );
+      await document.fonts.ready;
+    });
     const faces = await page.evaluate(() =>
       [...document.fonts]
         .filter((font) => font.status === "loaded")
         .map((font) => ({
           family: font.family,
+          style: font.style,
           features: font.featureSettings,
           variation: font.variationSettings
         }))
@@ -47,7 +60,19 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
           family: "TSZ Phonetics",
           features: expect.stringContaining('"liga" 0')
         }),
-        expect.objectContaining({ family: "TSZ Text", variation: '"wght" 280' })
+        ...["normal", "italic"].flatMap((style) =>
+          ['"wght" 400', '"wght" 800'].map((variation) =>
+            expect.objectContaining({
+              family: "TSZ Text",
+              style,
+              variation,
+              features:
+                style === "normal"
+                  ? '"ss04", "ss07", "ss08"'
+                  : '"ss02", "ss04", "ss06", "ss07", "ss08"'
+            })
+          )
+        )
       ])
     );
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/preview`);

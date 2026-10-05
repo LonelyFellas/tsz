@@ -3,8 +3,8 @@
   src: url("./fonts/Geist-Regular.woff2") format("woff2");
   font-style: normal;
   font-weight: 100 500;
-  font-variation-settings: "wght" 280;
-  font-feature-settings: "ss04", "ss06", "ss07", "ss08";
+  font-variation-settings: "wght" 400;
+  font-feature-settings: "ss04", "ss07", "ss08";
   font-display: swap;
 }
 
@@ -13,8 +13,8 @@
   src: url("./fonts/Geist-Regular.woff2") format("woff2");
   font-style: normal;
   font-weight: 501 900;
-  font-variation-settings: "wght" 650;
-  font-feature-settings: "ss04", "ss06", "ss07", "ss08";
+  font-variation-settings: "wght" 800;
+  font-feature-settings: "ss04", "ss07", "ss08";
   font-display: swap;
 }
 
@@ -23,7 +23,7 @@
   src: url("./fonts/Geist-Italic.woff2") format("woff2");
   font-style: italic;
   font-weight: 100 500;
-  font-variation-settings: "wght" 280;
+  font-variation-settings: "wght" 400;
   font-feature-settings: "ss02", "ss04", "ss06", "ss07", "ss08";
   font-display: swap;
 }
@@ -33,7 +33,7 @@
   src: url("./fonts/Geist-Italic.woff2") format("woff2");
   font-style: italic;
   font-weight: 501 900;
-  font-variation-settings: "wght" 650;
+  font-variation-settings: "wght" 800;
   font-feature-settings: "ss02", "ss04", "ss06", "ss07", "ss08";
   font-display: swap;
 }
@@ -41,7 +41,7 @@
 /* 同名补字放在主字体之后，确保指定字符优先命中，而不是仅在缺字时回退。 */
 @font-face {
   font-family: "TSZ Text";
-  src: url("./fonts/InterDisplay-Light.woff2") format("woff2");
+  src: url("./fonts/InterDisplay-Regular.woff2") format("woff2");
   font-style: normal;
   font-weight: 100 500;
   font-feature-settings: "cv06", "ss01", "ss03";
@@ -52,7 +52,7 @@
 
 @font-face {
   font-family: "TSZ Text";
-  src: url("./fonts/InterDisplay-Bold.woff2") format("woff2");
+  src: url("./fonts/InterDisplay-ExtraBold.woff2") format("woff2");
   font-style: normal;
   font-weight: 501 900;
   font-feature-settings: "cv06", "ss01", "ss03";
@@ -63,7 +63,7 @@
 
 @font-face {
   font-family: "TSZ Text";
-  src: url("./fonts/InterDisplay-LightItalic.woff2") format("woff2");
+  src: url("./fonts/InterDisplay-RegularItalic.woff2") format("woff2");
   font-style: italic;
   font-weight: 100 500;
   font-feature-settings: "cv06", "ss01", "ss03";
@@ -74,7 +74,7 @@
 
 @font-face {
   font-family: "TSZ Text";
-  src: url("./fonts/InterDisplay-BoldItalic.woff2") format("woff2");
+  src: url("./fonts/InterDisplay-ExtraBoldItalic.woff2") format("woff2");
   font-style: italic;
   font-weight: 501 900;
   font-feature-settings: "cv06", "ss01", "ss03";
