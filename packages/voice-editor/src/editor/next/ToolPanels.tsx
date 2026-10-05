@@ -262,7 +262,9 @@ export function VoicePanel({
                 更多音色（{uncommon.length}）
                 {selectedUncommon > 0 ? ` · 已选 ${selectedUncommon}` : ""}
               </summary>
-              {renderGroups(uncommon)}
+              <div className="tsz-ve-more-voice-groups">
+                {renderGroups(uncommon)}
+              </div>
             </details>
           )}
         </>

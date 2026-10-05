@@ -246,7 +246,7 @@
 .tsz-ve-bottom-tools .tsz-ve-pop-loading {
   grid-column: 1 / -1;
 }
-.tsz-ve-bottom-tools .tsz-ve-more-voices[open] {
+.tsz-ve-bottom-tools .tsz-ve-more-voice-groups {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
@@ -254,13 +254,10 @@
 .tsz-ve-bottom-tools
   .tsz-ve-pop-voices:not(:has(> .tsz-ve-pop-section ~ .tsz-ve-pop-section)),
 .tsz-ve-bottom-tools
-  .tsz-ve-more-voices[open]:not(
+  .tsz-ve-more-voice-groups:not(
     :has(> .tsz-ve-pop-section ~ .tsz-ve-pop-section)
   ) {
   grid-template-columns: minmax(0, 1fr);
-}
-.tsz-ve-more-voices > summary {
-  grid-column: 1 / -1;
 }
 .tsz-ve-bottom-tools .tsz-ve-voice-columns {
   gap: 8px;
@@ -333,7 +330,7 @@
     flex-basis: 100%;
   }
   .tsz-ve-bottom-tools .tsz-ve-pop-voices,
-  .tsz-ve-bottom-tools .tsz-ve-more-voices[open] {
+  .tsz-ve-bottom-tools .tsz-ve-more-voice-groups {
     grid-template-columns: minmax(0, 1fr);
   }
 }

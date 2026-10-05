@@ -98,6 +98,18 @@ function Harness({
 }
 
 describe("双口音真实试听控件", () => {
+  it.each([
+    ["英式", "IPA"],
+    ["美式", "IPA"],
+    ["英式", "UPS"],
+    ["美式", "UPS"]
+  ])("%s %s 提示使用统一的简短文案", (accent, alphabet) => {
+    render(<Harness dialect="common" />);
+    expect(
+      screen.getByLabelText(`第 1 条发音的${accent} Azure ${alphabet}`)
+    ).toHaveAttribute("placeholder", `请输入${accent}${alphabet}`);
+  });
+
   it.each(["common", "uk", "us"] as const)(
     "%s 词形的四个候选分别发送对应音素和口音，不受全局来源影响",
     async (dialect) => {
