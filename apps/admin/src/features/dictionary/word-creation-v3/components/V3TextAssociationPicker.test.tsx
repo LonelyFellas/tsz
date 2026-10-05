@@ -5,7 +5,7 @@ import type {
   PublishedSentenceTargetCandidateV3,
   DraftMeaningsStepContentWritableV3
 } from "@tsz/types";
-import { commonFormFixture, formsFixture } from "../fixtures";
+import { commonFormFixture, formsFixture, ukUsFormFixture } from "../fixtures";
 import {
   fireEvent,
   render,
@@ -121,6 +121,277 @@ it("语法结构选到词形即绑定，无释义的词形也可选择，且不�
   expect(screen.queryByText("暂无可关联词义")).toBeNull();
 });
 
+it("语法结构可关联当前未保存词形，服务端没有候选也可选择", async () => {
+  search.mockResolvedValue({ total: 0, truncated: false, matches: [] });
+  const onSelect = vi.fn();
+  render(
+    <V3GrammarFormPicker
+      kind="word"
+      wordId="entry-job"
+      forms={formsFixture({
+        pos_id: "pos-job",
+        forms: [
+          commonFormFixture({
+            id: "form-job",
+            variant_id: "variant-job",
+            spelling: "job"
+          })
+        ]
+      })}
+      segments={[{ start: 2, end: 5, surface: "job" }]}
+      onSelect={onSelect}
+    />
+  );
+  await waitFor(() => {
+    fireEvent.click(screen.getByText(/job.*当前词条/));
+    expect(screen.getByText("原形 job · 英美通用")).toBeVisible();
+  });
+  fireEvent.click(screen.getByText("原形 job · 英美通用"));
+  expect(onSelect).toHaveBeenCalledWith({
+    id: expect.any(String),
+    source_segments: [{ start: 2, end: 5, surface: "job" }],
+    target_word_id: "entry-job",
+    target_pos_id: "pos-job",
+    target_form_id: "form-job",
+    target_variant_id: "variant-job",
+    target_dialect: "common"
+  });
+  expect(screen.queryByText("没有匹配的词形")).toBeNull();
+});
+
+it("语法结构搜索包含其他词条的已保存草稿", async () => {
+  const candidate = draftify(giveEntryResponse().matches[0]!);
+  search.mockImplementation((input) =>
+    Promise.resolve({
+      total: input.include_drafts ? 1 : 0,
+      truncated: false,
+      matches: input.include_drafts ? [candidate] : []
+    })
+  );
+  const onSelect = vi.fn();
+  render(
+    <V3GrammarFormPicker
+      kind="word"
+      segments={[segments[0]!]}
+      onSelect={onSelect}
+    />
+  );
+  await waitFor(() => {
+    fireEvent.click(screen.getByText("give · 动词（草稿）"));
+    expect(screen.getByText("原形 give · 英美通用")).toBeVisible();
+  });
+  fireEvent.click(screen.getByText("原形 give · 英美通用"));
+  expect(onSelect).toHaveBeenCalledWith(
+    expect.objectContaining({ target_word_id: "entry-give" })
+  );
+  expect(onSelect.mock.lastCall![0]).not.toHaveProperty(
+    "target_publication_id"
+  );
+});
+
+it("当前词条只展示编辑中的词形，不重复展示已保存草稿或旧发布版本", async () => {
+  const published = giveEntryResponse().matches[0]!;
+  search.mockResolvedValue({
+    total: 3,
+    truncated: false,
+    matches: [
+      published,
+      draftify(published),
+      { ...published, entry_id: "entry-other", headword: "other give" }
+    ]
+  });
+  const forms = formsFixture({
+    pos_id: "pos-give",
+    pos: "verb",
+    forms: [
+      commonFormFixture({
+        id: "form-new",
+        variant_id: "variant-new",
+        spelling: "give"
+      })
+    ]
+  });
+  const props = {
+    kind: "word" as const,
+    wordId: "entry-give",
+    forms,
+    segments: [segments[0]!],
+    onSelect: vi.fn()
+  };
+  const { rerender } = render(<V3GrammarFormPicker {...props} />);
+  await screen.findByText("other give · 动词");
+  expect(screen.queryByText("give · 动词")).toBeNull();
+  expect(screen.queryByText("give · 动词（草稿）")).toBeNull();
+  await waitFor(() => {
+    fireEvent.click(screen.getByText(/give.*当前词条/));
+    expect(screen.getByText("原形 give · 英美通用")).toBeVisible();
+  });
+  fireEvent.click(screen.getByText("原形 give · 英美通用"));
+  expect(props.onSelect).toHaveBeenCalledWith(
+    expect.objectContaining({
+      target_word_id: "entry-give",
+      target_form_id: "form-new",
+      target_variant_id: "variant-new"
+    })
+  );
+  expect(props.onSelect.mock.lastCall![0]).not.toHaveProperty(
+    "target_publication_id"
+  );
+  rerender(<V3GrammarFormPicker {...props} forms={{ pos: [] }} />);
+  expect(screen.queryByText(/当前词条/)).toBeNull();
+  expect(screen.getByText("other give · 动词")).toBeVisible();
+});
+
+it.each(["uk", "us"] as const)(
+  "当前未保存词形按归一化词面匹配，保留 %s 变体身份",
+  async (dialect) => {
+    search.mockResolvedValue({ total: 0, truncated: false, matches: [] });
+    const onSelect = vi.fn();
+    render(
+      <V3GrammarFormPicker
+        kind="word"
+        wordId="entry-job"
+        forms={formsFixture({
+          pos_id: "pos-job",
+          forms: [
+            commonFormFixture({ spelling: "job" }),
+            ukUsFormFixture({
+              id: "form-jobs",
+              form_type: "plural",
+              uk: { id: "variant-uk", spelling: "jobs" },
+              us: { id: "variant-us", spelling: "jobs" }
+            })
+          ]
+        })}
+        segments={[{ start: 0, end: 4, surface: "ＪＯＢＳ" }]}
+        onSelect={onSelect}
+      />
+    );
+    await waitFor(() => {
+      fireEvent.click(screen.getByText(/当前词条/));
+      expect(screen.getByText("复数 jobs · 英式")).toBeVisible();
+    });
+    expect(screen.queryByText("原形 job · 英美通用")).toBeNull();
+    fireEvent.click(
+      screen.getByText(`复数 jobs · ${dialect === "uk" ? "英式" : "美式"}`)
+    );
+    expect(onSelect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target_word_id: "entry-job",
+        target_pos_id: "pos-job",
+        target_form_id: "form-jobs",
+        target_variant_id: `variant-${dialect}`,
+        target_dialect: dialect
+      })
+    );
+  }
+);
+
+it("已关联当前词条从编辑中词形回显，不再读取服务端旧草稿", async () => {
+  search.mockResolvedValue({ total: 0, truncated: false, matches: [] });
+  get.mockClear();
+  get.mockRejectedValue(new Error("当前未保存词形不在服务端草稿中"));
+  const selected: GrammarFormLinkV3 = {
+    id: "link-job",
+    source_segments: [{ start: 2, end: 5, surface: "job" }],
+    target_word_id: "entry-job",
+    target_pos_id: "pos-job",
+    target_form_id: "form-job",
+    target_variant_id: "variant-job",
+    target_dialect: "common"
+  };
+  render(
+    <V3GrammarFormPicker
+      kind="word"
+      wordId="entry-job"
+      forms={formsFixture({
+        pos_id: "pos-job",
+        forms: [
+          commonFormFixture({
+            id: "form-job",
+            variant_id: "variant-job",
+            spelling: "job"
+          })
+        ]
+      })}
+      segments={selected.source_segments}
+      selected={selected}
+      onSelect={vi.fn()}
+    />
+  );
+  const form = await screen.findByText("原形 job · 英美通用");
+  expect(form.closest(".ant-cascader-menu-item")).toHaveAttribute(
+    "aria-checked",
+    "true"
+  );
+  expect(screen.getAllByText("原形 job · 英美通用")).toHaveLength(1);
+  expect(get).not.toHaveBeenCalled();
+});
+
+it("已有发布版自关联仍回显，确认后可切换为当前编辑词形", async () => {
+  search.mockResolvedValue(giveEntryResponse());
+  const onSelect = vi.fn();
+  render(
+    <ConfigProvider theme={{ token: { motion: false } }}>
+      <V3GrammarFormPicker
+        kind="word"
+        wordId="entry-give"
+        forms={formsFixture({
+          pos_id: "pos-give",
+          pos: "verb",
+          forms: [
+            commonFormFixture({
+              id: "form-new",
+              variant_id: "variant-new",
+              spelling: "give"
+            })
+          ]
+        })}
+        segments={[segments[0]!]}
+        selected={{
+          id: "link-old",
+          source_segments: [segments[0]!],
+          target_word_id: "entry-give",
+          target_publication_id: "pub-give",
+          target_pos_id: "pos-give",
+          target_form_id: "form-give",
+          target_variant_id: "variant-give",
+          target_dialect: "common"
+        }}
+        onSelect={onSelect}
+      />
+    </ConfigProvider>
+  );
+  const selectedForm = await screen.findByText("原形 give · 英美通用");
+  expect(selectedForm.closest(".ant-cascader-menu-item")).toHaveAttribute(
+    "aria-checked",
+    "true"
+  );
+  fireEvent.click(selectedForm);
+  expect(onSelect).not.toHaveBeenCalled();
+  await waitFor(() => {
+    fireEvent.click(screen.getByText("give · 动词（当前词条）"));
+    expect(
+      screen
+        .getByText("原形 give · 英美通用")
+        .closest(".ant-cascader-menu-item")
+    ).toHaveAttribute("aria-checked", "false");
+  });
+  fireEvent.click(screen.getByText("原形 give · 英美通用"));
+  expect(onSelect).not.toHaveBeenCalled();
+  fireEvent.click(await screen.findByRole("button", { name: /^切\s*换$/ }));
+  expect(onSelect).toHaveBeenCalledWith(
+    expect.objectContaining({
+      target_word_id: "entry-give",
+      target_form_id: "form-new",
+      target_variant_id: "variant-new"
+    })
+  );
+  expect(onSelect.mock.lastCall![0]).not.toHaveProperty(
+    "target_publication_id"
+  );
+});
+
 it.each(["pub-give", undefined])(
   "已关联词形仍查询列表并回显当前选择（%s）",
   async (publicationId) => {
@@ -191,7 +462,7 @@ it.each(["pub-give", undefined])(
         })
       )
     );
-    expect(search.mock.lastCall?.[0]).not.toHaveProperty("include_drafts");
+    expect(search.mock.lastCall?.[0]).toHaveProperty("include_drafts", true);
     expect(screen.queryByText("显示草稿候选")).toBeNull();
     const form = await screen.findByText(/原形 give/);
     expect(form.closest(".ant-cascader-menu-item")).toHaveAttribute(
