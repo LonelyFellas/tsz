@@ -11,6 +11,7 @@ import {
 } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import type {
+  DraftFormsStepContentV3,
   GrammarFormLinkV3,
   PublishedSentenceTargetCandidateV3
 } from "@tsz/types";
@@ -20,12 +21,18 @@ import { newWordNodeId } from "../../word-model/primitives";
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
 import { usePartOfSpeechLabel } from "../../part-of-speech/PartOfSpeechLabels";
 import { dialectLabel } from "../presentation";
+import { normalizeSentenceSurface } from "@/features/sentences/associationModel";
 
 export function V3GrammarFormPicker({
   segments,
   selected,
-  onSelect
-}: AssociationPickerProps<GrammarFormLinkV3>) {
+  onSelect,
+  wordId,
+  forms
+}: AssociationPickerProps<GrammarFormLinkV3> & {
+  wordId?: string;
+  forms?: DraftFormsStepContentV3;
+}) {
   const [modal, contextHolder] = Modal.useModal();
   const requests = useMemo(() => createV3WordRequests(), []);
   const formLabel = useFormTypeLabel();
@@ -42,7 +49,13 @@ export function V3GrammarFormPicker({
     spelling: string;
   }>();
   useEffect(() => {
-    if (!selected || selected.target_publication_id) return;
+    setLinkedForm(undefined);
+    if (
+      !selected ||
+      selected.target_publication_id ||
+      (selected.target_word_id === wordId && forms)
+    )
+      return;
     let active = true;
     void requests
       .get(selected.target_word_id)
@@ -79,7 +92,7 @@ export function V3GrammarFormPicker({
     return () => {
       active = false;
     };
-  }, [requests, selected, revision]);
+  }, [requests, selected, revision, wordId, forms]);
   const [cursor, setCursor] = useState<string>();
   const [nextCursor, setNextCursor] = useState<string>();
   const [candidates, setCandidates] = useState<
@@ -99,6 +112,7 @@ export function V3GrammarFormPicker({
           q: literal,
           kind: "word",
           match: "exact",
+          include_drafts: true,
           page_size: 50,
           ...(cursor ? { cursor } : {})
         },
@@ -124,7 +138,16 @@ export function V3GrammarFormPicker({
   const unique = [
     ...new Map(
       candidates
-        .filter((candidate) => candidate.kind === "word")
+        .filter(
+          (candidate) =>
+            candidate.kind === "word" &&
+            (!wordId ||
+              !forms ||
+              candidate.entry_id !== wordId ||
+              (candidate.publication_id !== undefined &&
+                candidate.publication_id === selected?.target_publication_id &&
+                candidate.pos_id === selected.target_pos_id))
+        )
         .map((candidate) => [
           `${candidate.entry_id}:${candidate.publication_id ?? "draft"}:${candidate.pos_id}`,
           candidate
@@ -134,26 +157,83 @@ export function V3GrammarFormPicker({
   const options = unique.map((candidate) => ({
     value: `${candidate.entry_id}:${candidate.publication_id ?? "draft"}:${candidate.pos_id}`,
     label: `${candidate.headword} · ${posLabel(candidate.pos)}${candidate.publication_id ? "" : "（草稿）"}`,
-    children: candidate.forms.map((form) => ({
-      value: form.variant_id,
-      label: `${formLabel(form.form_type)} ${form.spelling} · ${dialectLabel(form.dialect)}`,
-      link: {
-        id: newWordNodeId(),
-        source_segments: segments,
-        target_word_id: candidate.entry_id,
-        ...(candidate.publication_id
-          ? { target_publication_id: candidate.publication_id }
-          : {}),
-        target_pos_id: candidate.pos_id,
-        target_form_id: form.form_id,
-        target_variant_id: form.variant_id,
-        target_dialect: form.dialect
-      } satisfies GrammarFormLinkV3
-    }))
+    children: candidate.forms
+      .filter(
+        (form) =>
+          !wordId ||
+          !forms ||
+          candidate.entry_id !== wordId ||
+          form.variant_id === selected?.target_variant_id
+      )
+      .map((form) => ({
+        value: form.variant_id,
+        label: `${formLabel(form.form_type)} ${form.spelling} · ${dialectLabel(form.dialect)}`,
+        link: {
+          id: newWordNodeId(),
+          source_segments: segments,
+          target_word_id: candidate.entry_id,
+          ...(candidate.publication_id
+            ? { target_publication_id: candidate.publication_id }
+            : {}),
+          target_pos_id: candidate.pos_id,
+          target_form_id: form.form_id,
+          target_variant_id: form.variant_id,
+          target_dialect: form.dialect
+        } satisfies GrammarFormLinkV3
+      }))
   }));
+  if (wordId && forms) {
+    const surface = normalizeSentenceSurface(literal);
+    const localOptions = forms.pos.flatMap((pos) => {
+      const children = pos.forms.flatMap((form) => {
+        const regional = form.regional_variants;
+        const variants =
+          regional.mode === "common"
+            ? [regional.common]
+            : [regional.uk, regional.us];
+        return variants
+          .filter(
+            (variant) =>
+              surface !== "" &&
+              normalizeSentenceSurface(variant.spelling) === surface
+          )
+          .map((variant) => ({
+            value: variant.id,
+            label: `${formLabel(form.form_type)} ${variant.spelling} · ${dialectLabel(variant.dialect)}`,
+            link: {
+              id: newWordNodeId(),
+              source_segments: segments,
+              target_word_id: wordId,
+              target_pos_id: pos.pos_id,
+              target_form_id: form.id,
+              target_variant_id: variant.id,
+              target_dialect: variant.dialect
+            } satisfies GrammarFormLinkV3
+          }));
+      });
+      return children.length
+        ? [
+            {
+              value: `${wordId}:draft:${pos.pos_id}`,
+              label: `${literal} · ${posLabel(pos.pos)}（当前词条）`,
+              children
+            }
+          ]
+        : [];
+    });
+    options.unshift(...localOptions);
+  }
   if (
     selected &&
     !selected.target_publication_id &&
+    !options.some(
+      (option) =>
+        option.value ===
+          `${selected.target_word_id}:draft:${selected.target_pos_id}` &&
+        option.children.some(
+          (form) => form.value === selected.target_variant_id
+        )
+    ) &&
     linkedForm?.wordId === selected.target_word_id &&
     linkedForm.posId === selected.target_pos_id &&
     linkedForm.variantId === selected.target_variant_id
