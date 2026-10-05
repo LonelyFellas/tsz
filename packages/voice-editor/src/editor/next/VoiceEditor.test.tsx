@@ -1754,6 +1754,28 @@ describe("VoiceEditor 发音区", () => {
     });
   });
 
+  it("更多音色的英美分组放在独立的分栏容器内", () => {
+    const { container } = render(
+      <VoicePanel
+        voices={VOICES.map((voice) => ({ ...voice, isCommon: false }))}
+        voicesLoading={false}
+        enabledVoiceIds={[]}
+        onToggleVoice={vi.fn()}
+        canAudition={true}
+        onAudition={vi.fn()}
+        auditionStatus=""
+      />
+    );
+    fireEvent.click(screen.getByText("更多音色（2）"));
+    const groups = container.querySelector(
+      ".tsz-ve-more-voices > .tsz-ve-more-voice-groups"
+    );
+    expect(groups).not.toBeNull();
+    expect(
+      [...groups!.children].map((group) => group.getAttribute("data-locale"))
+    ).toEqual(["en-GB", "en-US"]);
+  });
+
   it("更多音色默认折叠，展开可选择且收起不丢失选择", () => {
     const onToggleVoice = vi.fn();
     const view = {

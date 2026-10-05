@@ -443,7 +443,7 @@ export function V3SynthesisInputs({
                             status={invalid ? "error" : undefined}
                             aria-invalid={invalid}
                             value={candidate[alphabet]}
-                            placeholder={`输入${sideLabel} ${alphabet.toUpperCase()} ${alphabet === "ups" ? "音素编码" : "音素"}`}
+                            placeholder={`请输入${sideLabel}${alphabet.toUpperCase()}`}
                             onChange={(event) =>
                               change(side, alphabet, event.target.value)
                             }
