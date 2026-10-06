@@ -92,6 +92,17 @@ export function AdminHeader() {
         <Button
           type="text"
           block
+          style={{ justifyContent: "flex-start" }}
+          onClick={() => {
+            setOpen(false);
+            navigate("/account/coins");
+          }}
+        >
+          我的天生币
+        </Button>
+        <Button
+          type="text"
+          block
           icon={<LockOutlined />}
           style={{ justifyContent: "flex-start" }}
           onClick={goChangePassword}

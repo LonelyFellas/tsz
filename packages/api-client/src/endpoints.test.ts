@@ -359,32 +359,6 @@ describe("createEndpoints · word", () => {
   });
 });
 
-describe("createEndpoints · wordList", () => {
-  it("list 默认 page=1", () => {
-    const api = createEndpoints(http);
-    api.wordList.list();
-    expect(http.get).toHaveBeenCalledWith("/wordlists?page=1");
-  });
-
-  it("get → GET /wordlists/:id", () => {
-    const api = createEndpoints(http);
-    api.wordList.get("wl1");
-    expect(http.get).toHaveBeenCalledWith("/wordlists/wl1");
-  });
-
-  it("create → POST /wordlists 带 data", () => {
-    const api = createEndpoints(http);
-    api.wordList.create({ name: "n" });
-    expect(http.post).toHaveBeenCalledWith("/wordlists", { name: "n" });
-  });
-
-  it("publish → POST /wordlists/:id/publish", () => {
-    const api = createEndpoints(http);
-    api.wordList.publish("wl1");
-    expect(http.post).toHaveBeenCalledWith("/wordlists/wl1/publish");
-  });
-});
-
 describe("createEndpoints · comment", () => {
   it("create → POST /comments 带 data", () => {
     const api = createEndpoints(http);

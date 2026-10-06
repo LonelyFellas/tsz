@@ -49,10 +49,6 @@ const PENDING = new Set<string>([
 
   // 词库 / 词表 / 评论 / 任务:目前全是前端 mock(useWordLists 等),后端未实现。
   "get /words",
-  "get /wordlists",
-  "get /wordlists/_",
-  "post /wordlists",
-  "post /wordlists/_/publish",
   "post /comments",
   "get /tasks",
   "post /tasks",
@@ -706,7 +702,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "39b62ad47851d7f29faf116bb5ef135c71bcbde5e4e65c806214869933a22a66"
+      "5f5d22474d2e315fbab33929d032819351868ca8793cf8c4cfcf30be6d86395b"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");

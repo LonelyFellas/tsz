@@ -31,12 +31,46 @@ const API_PREFIX = "/api/v1";
 const ADMIN_LEXICON_PREFIX = `${API_PREFIX}/admin/lexicon`;
 const HTTP_METHODS = ["get", "post", "put", "patch", "delete"];
 const QUERY_CONTRACT_OPERATIONS = new Set([
+  "get /me/wordlist-tips",
+  "get /wordlists",
+  "get /wordlists/catalog",
+  "get /wordlists/{id}/items",
+  "get /me/wordlists",
+  "get /me/wordlists/{id}/items",
+  "get /admin/wordlists",
+  "get /admin/wordlists/{id}/review-requests/{request_id}/items",
+  "get /me/invitations/records",
+  "get /admin/coins/accounts",
+  "get /admin/coins/accounts/{owner_type}/{owner_id}/entries",
+  "get /admin/coins/operations",
+  "get /me/coins/entries",
+  "get /admin/me/coins/entries",
   "get /admin/lexicon/entries/related-search",
   "get /admin/settings/form-types",
   "delete /admin/settings/form-types/{id}"
 ]);
 
 const RUNTIME_SCHEMA_ROOTS = [
+  "WordlistTip",
+  "WordlistTipPage",
+  "Wordlist",
+  "WordlistPage",
+  "WordlistItems",
+  "MyWordlistItems",
+  "WordlistCatalog",
+  "WordlistEditSnapshot",
+  "WordlistReview",
+  "WordlistReviews",
+  "InvitationCode",
+  "InvitationOverview",
+  "InvitationRecordPage",
+  "AccountDeletionRequest",
+  "AccountDeletionState",
+  "CoinAccountPage",
+  "ManualCoinOperation",
+  "ManualCoinOperationPage",
+  "CoinWallet",
+  "CoinEntryPage",
   "SharedSentence",
   "SentencePublication",
   "SentenceWithdrawalImpact",
@@ -98,6 +132,24 @@ if (!spec?.paths) {
   throw new Error(`spec 无 paths 字段: ${source}`);
 }
 const contractSchemaNames = [
+  "ManualCreditCategory",
+  "ManualCreditRequest",
+  "ManualReversalRequest",
+  "CoinAccount",
+  "AccountDeletionRequest",
+  "AccountDeletionState",
+  "CreateAccountDeletionRequest",
+  "DeletionStatus",
+  "PaginationMeta",
+  "CoinAccountPage",
+  "ManualCoinOperation",
+  "ManualCoinOperationPage",
+  "CoinWallet",
+  "CoinEntry",
+  "CoinEntryPage",
+  "OwnerType",
+  "WalletStatus",
+  "OperationKind",
   "UserProfile",
   "UserRole",
   "MeResponse",
@@ -484,6 +536,11 @@ for (const [rawPath, item] of Object.entries(spec.paths)) {
     const operationKey = `${method} ${path}`;
     if (
       rawPath.startsWith(ADMIN_LEXICON_PREFIX) ||
+      rawPath.startsWith(`${API_PREFIX}/me/account-deletion`) ||
+      rawPath === `${API_PREFIX}/auth/account` ||
+      rawPath.startsWith(`${API_PREFIX}/me/coins/`) ||
+      rawPath.startsWith(`${API_PREFIX}/admin/me/coins/`) ||
+      rawPath.startsWith(`${API_PREFIX}/admin/coins/`) ||
       rawPath.startsWith(`${API_PREFIX}/auth/password/`) ||
       rawPath === `${API_PREFIX}/auth/register` ||
       rawPath === `${API_PREFIX}/admin/auth/change-password` ||

@@ -133,7 +133,7 @@ describe("ProfileHub — 渲染", () => {
     await screen.findByText("Along");
     expect(screen.getByRole("link", { name: /我的天生币/ })).toHaveAttribute(
       "href",
-      "/student/coins"
+      "/account/coins"
     );
     expect(screen.getByRole("link", { name: /账号安全/ })).toHaveAttribute(
       "href",
@@ -141,15 +141,18 @@ describe("ProfileHub — 渲染", () => {
     );
     expect(screen.getByRole("link", { name: /我的词表/ })).toHaveAttribute(
       "href",
-      "/wordlists"
+      "/account/wordlists"
     );
   });
 
-  it("不重复暴露导航已有的入口(申请成为老师 / 邀请好友占位)", async () => {
+  it("不重复暴露导航已有的入口，邀请提供真实入口", async () => {
     render(<ProfileHub />);
     await screen.findByText("Along");
     expect(screen.queryByText("申请成为老师")).not.toBeInTheDocument();
-    expect(screen.queryByText("邀请好友")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /邀请好友/ })).toHaveAttribute(
+      "href",
+      "/account/invitations"
+    );
     expect(screen.queryByText("设置")).not.toBeInTheDocument();
   });
 

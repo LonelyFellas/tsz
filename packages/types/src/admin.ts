@@ -26,6 +26,8 @@ export type MenuPermission =
   | "reviews.access"
   | "teacherapply.access"
   | "comments.access"
+  | "wordlists.review"
+  | "wordlists.withdraw"
   | "coins.access"
   | "lexicon_settings.access";
 

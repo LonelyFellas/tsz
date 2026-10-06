@@ -1,97 +1,283 @@
-import { screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { beforeEach, expect, it, vi } from "vitest";
 import { renderWithProviders } from "@/test/render";
+import { useUserStore } from "@/stores/user";
 import { WordListCreator } from "./WordListCreator";
-
-// jsdom 下 useRouter 必须 mock,否则 done 步的按钮渲染会报 app router 未挂载。
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() })
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock("@/lib/request", () => ({
+  api: {
+    wordList: {
+      catalog: vi.fn(),
+      create: vi.fn(),
+      edit: vi.fn(),
+      myItems: vi.fn(),
+      update: vi.fn()
+    }
+  }
 }));
-
-describe("WordListCreator", () => {
-  it("未选词时「下一步」禁用,选词后可进入命名步", async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<WordListCreator />);
-
-    const next = screen.getByRole("button", { name: "下一步" });
-    expect(next).toBeDisabled();
-
-    await user.click(screen.getAllByRole("checkbox")[0]!);
-    expect(next).toBeEnabled();
-
-    await user.click(next);
-    expect(
-      screen.getByPlaceholderText("例如:小学一年级核心词")
-    ).toBeInTheDocument();
+import { api } from "@/lib/request";
+const candidate = {
+  entry_id: "entry-one",
+  publication_id: "pub-one",
+  label: "apple",
+  glosses: ["苹果"]
+};
+beforeEach(() => {
+  vi.clearAllMocks();
+  useUserStore.setState({
+    user: {
+      id: "one",
+      display_name: "one",
+      avatar_url: "",
+      roles: ["student"],
+      active_role: "student"
+    }
   });
-
-  it("命名为空时「下一步」禁用", async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<WordListCreator />);
-
-    await user.click(screen.getAllByRole("checkbox")[0]!);
-    await user.click(screen.getByRole("button", { name: "下一步" }));
-
-    const next = screen.getByRole("button", { name: "下一步" });
-    expect(next).toBeDisabled();
-
-    await user.type(
-      screen.getByPlaceholderText("例如:小学一年级核心词"),
-      "我的词表"
-    );
-    expect(next).toBeEnabled();
+  vi.mocked(api.wordList.catalog).mockResolvedValue({
+    items: [candidate],
+    pagination: { page: 1, page_size: 3, total: 1, total_pages: 1 }
   });
-
-  it("公开 + 自定义词汇 → 出现审核提示,完成后进入成功页", async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<WordListCreator />);
-
-    // 选词 + 添加一个自定义词。
-    await user.click(screen.getAllByRole("checkbox")[0]!);
-    await user.type(screen.getByPlaceholderText("输入一个词后点添加"), "彩虹");
-    await user.click(screen.getByRole("button", { name: "添加" }));
-
-    // 进入命名步并填名。
-    await user.click(screen.getByRole("button", { name: "下一步" }));
-    await user.type(
-      screen.getByPlaceholderText("例如:小学一年级核心词"),
-      "公开含自定义"
-    );
-
-    // 进入公开设置步,选公开 → 审核提示出现。
-    await user.click(screen.getByRole("button", { name: "下一步" }));
-    await user.click(screen.getByRole("radio", { name: /公开/ }));
-    expect(screen.getByText(/提交后将进入敏感词审核/)).toBeInTheDocument();
-
-    // 完成创建 → done 步显示成功文案与公开结果文案。
-    await user.click(screen.getByRole("button", { name: "完成创建" }));
-    await waitFor(() =>
-      expect(
-        screen.getByRole("heading", { name: /创建成功/ })
-      ).toBeInTheDocument()
-    );
-    expect(
-      screen.getByText("已提交审核,通过后将对师生可见。")
-    ).toBeInTheDocument();
+});
+it("changing a selected spelling clears the entry ID and blocks save", async () => {
+  renderWithProviders(<WordListCreator />);
+  fireEvent.change(screen.getByLabelText("词表名称"), {
+    target: { value: "真实词表" }
   });
-
-  it("私密词表完成后显示私密结果文案", async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<WordListCreator />);
-
-    await user.click(screen.getAllByRole("checkbox")[0]!);
-    await user.click(screen.getByRole("button", { name: "下一步" }));
-    await user.type(
-      screen.getByPlaceholderText("例如:小学一年级核心词"),
-      "私密词表"
-    );
-    await user.click(screen.getByRole("button", { name: "下一步" }));
-    // 默认就是私密,直接完成。
-    await user.click(screen.getByRole("button", { name: "完成创建" }));
-
-    await waitFor(() =>
-      expect(screen.getByText("已保存为私密词表。")).toBeInTheDocument()
-    );
+  const input = screen.getByPlaceholderText("输入单词或短语");
+  fireEvent.change(input, { target: { value: "app" } });
+  fireEvent.click(await screen.findByRole("button", { name: /apple\s*苹果/ }));
+  fireEvent.change(input, { target: { value: "other" } });
+  fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "每行都需选定平台词条"
+  );
+  expect(api.wordList.create).not.toHaveBeenCalled();
+});
+it("unknown create result freezes changes and retries exactly the same request", async () => {
+  vi.mocked(api.wordList.create).mockRejectedValue(new Error("lost response"));
+  renderWithProviders(<WordListCreator />);
+  fireEvent.change(screen.getByLabelText("词表名称"), {
+    target: { value: "真实词表" }
   });
+  fireEvent.change(screen.getByPlaceholderText("输入单词或短语"), {
+    target: { value: "app" }
+  });
+  fireEvent.click(await screen.findByRole("button", { name: /apple\s*苹果/ }));
+  fireEvent.change(screen.getByLabelText("私密备注 1"), {
+    target: { value: "我的想法" }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
+  await screen.findByRole("button", { name: "重试保存" });
+  expect(screen.getByLabelText("词表名称")).toBeDisabled();
+  const first = vi.mocked(api.wordList.create).mock.calls[0]![0];
+  fireEvent.click(screen.getByRole("button", { name: "重试保存" }));
+  await waitFor(() => expect(api.wordList.create).toHaveBeenCalledTimes(2));
+  expect(vi.mocked(api.wordList.create).mock.calls[1]![0]).toEqual(first);
+  expect(first.items[0]?.private_note).toBe("我的想法");
+});
+
+it("late item responses populate notes without advancing the frozen edit revision", async () => {
+  const { QueryClient, QueryClientProvider } =
+    await import("@tanstack/react-query");
+  const { render } = await import("@testing-library/react");
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  const meta = {
+    id: "list",
+    owner_user_id: "one",
+    owner_name: "作者",
+    name: "旧名称",
+    state: "draft" as const,
+    revision: 1,
+    item_count: 1,
+    created_at: "",
+    updated_at: ""
+  };
+  const snapshot = { wordlist: meta, entry_ids: [candidate.entry_id] };
+  client.setQueryData(["wordlists", "user", "one", "edit", "list"], snapshot);
+  vi.mocked(api.wordList.edit).mockResolvedValue({
+    wordlist: { ...meta, name: "其他页面的新名称", revision: 2 },
+    entry_ids: [candidate.entry_id]
+  });
+  vi.mocked(api.wordList.myItems).mockResolvedValue({
+    items: [
+      {
+        entry_id: candidate.entry_id,
+        position: 0,
+        entry: { ...candidate, kind: "word", pos: [] },
+        private_note: "已有备注",
+        note_revision: 7
+      }
+    ],
+    revision: 2,
+    pagination: { page: 1, page_size: 100, total: 1, total_pages: 1 }
+  });
+  vi.mocked(api.wordList.update).mockResolvedValue({ ...meta, revision: 2 });
+  render(
+    <QueryClientProvider client={client}>
+      <WordListCreator id="list" />
+    </QueryClientProvider>
+  );
+  await waitFor(() =>
+    expect(screen.getByLabelText("私密备注 1")).toHaveValue("已有备注")
+  );
+  fireEvent.change(screen.getByLabelText("词表名称"), {
+    target: { value: "本页更改" }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
+  await waitFor(() =>
+    expect(api.wordList.update).toHaveBeenCalledWith(
+      "list",
+      expect.objectContaining({ expected_revision: 1, note_updates: [] })
+    )
+  );
+});
+
+it("selecting another entry and returning preserves the original note version", async () => {
+  const meta = {
+    id: "list",
+    owner_user_id: "one",
+    owner_name: "作者",
+    name: "词表",
+    state: "draft" as const,
+    revision: 1,
+    item_count: 1,
+    created_at: "",
+    updated_at: ""
+  };
+  vi.mocked(api.wordList.edit).mockResolvedValue({
+    wordlist: meta,
+    entry_ids: [candidate.entry_id]
+  });
+  vi.mocked(api.wordList.myItems).mockResolvedValue({
+    items: [
+      {
+        entry_id: candidate.entry_id,
+        position: 0,
+        entry: { ...candidate, kind: "word", pos: [] },
+        private_note: "原备注",
+        note_revision: 7
+      }
+    ],
+    revision: 1,
+    pagination: { page: 1, page_size: 100, total: 1, total_pages: 1 }
+  });
+  vi.mocked(api.wordList.catalog).mockImplementation(async (query) => ({
+    items:
+      query?.q === "banana"
+        ? [
+            {
+              entry_id: "entry-two",
+              publication_id: "pub-two",
+              label: "banana",
+              glosses: ["香蕉"]
+            }
+          ]
+        : [candidate],
+    pagination: { page: 1, page_size: 3, total: 1, total_pages: 1 }
+  }));
+  vi.mocked(api.wordList.update).mockResolvedValue(meta);
+  renderWithProviders(<WordListCreator id="list" />);
+  await waitFor(() =>
+    expect(screen.getByLabelText("私密备注 1")).toHaveValue("原备注")
+  );
+  const input = screen.getByPlaceholderText("输入单词或短语");
+  fireEvent.change(input, { target: { value: "banana" } });
+  fireEvent.click(await screen.findByRole("button", { name: /banana\s*香蕉/ }));
+  fireEvent.change(input, { target: { value: "apple" } });
+  fireEvent.click(await screen.findByRole("button", { name: /apple\s*苹果/ }));
+  fireEvent.change(screen.getByLabelText("私密备注 1"), {
+    target: { value: "更新备注" }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
+  await waitFor(() => expect(api.wordList.update).toHaveBeenCalled());
+  expect(vi.mocked(api.wordList.update).mock.calls[0]![1].note_updates).toEqual(
+    [
+      {
+        entry_id: candidate.entry_id,
+        expected_note_revision: 7,
+        private_note: "更新备注"
+      }
+    ]
+  );
+});
+
+it("newly readded entries ignore obsolete pages from the prior editing session", async () => {
+  const { QueryClient, QueryClientProvider } =
+    await import("@tanstack/react-query");
+  const { render } = await import("@testing-library/react");
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  const other = {
+    entry_id: "remaining",
+    publication_id: "pub-remaining",
+    label: "banana",
+    kind: "word" as const,
+    pos: []
+  };
+  const meta = {
+    id: "list",
+    owner_user_id: "one",
+    owner_name: "作者",
+    name: "词表",
+    state: "draft" as const,
+    revision: 3,
+    item_count: 1,
+    created_at: "",
+    updated_at: ""
+  };
+  client.setQueryData(["wordlists", "user", "one", "edit-items", "list", 2], {
+    items: [
+      {
+        entry_id: candidate.entry_id,
+        position: 100,
+        entry: { ...candidate, kind: "word", pos: [] },
+        private_note: "旧备注",
+        note_revision: 7
+      }
+    ],
+    revision: 1,
+    pagination: { page: 2, page_size: 100, total: 101, total_pages: 2 }
+  });
+  vi.mocked(api.wordList.edit).mockResolvedValue({
+    wordlist: meta,
+    entry_ids: [other.entry_id]
+  });
+  vi.mocked(api.wordList.myItems).mockResolvedValue({
+    items: [
+      {
+        entry_id: other.entry_id,
+        position: 0,
+        entry: other,
+        private_note: "",
+        note_revision: 5
+      }
+    ],
+    revision: 3,
+    pagination: { page: 1, page_size: 100, total: 1, total_pages: 1 }
+  });
+  vi.mocked(api.wordList.update).mockResolvedValue(meta);
+  render(
+    <QueryClientProvider client={client}>
+      <WordListCreator id="list" />
+    </QueryClientProvider>
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "增加一行" }));
+  fireEvent.change(screen.getAllByPlaceholderText("输入单词或短语")[1]!, {
+    target: { value: "apple" }
+  });
+  fireEvent.click(await screen.findByRole("button", { name: /apple\s*苹果/ }));
+  fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
+  await waitFor(() => expect(api.wordList.update).toHaveBeenCalled());
+  expect(vi.mocked(api.wordList.update).mock.calls[0]![1].note_updates).toEqual(
+    [
+      {
+        entry_id: candidate.entry_id,
+        expected_note_revision: 1,
+        private_note: ""
+      }
+    ]
+  );
 });

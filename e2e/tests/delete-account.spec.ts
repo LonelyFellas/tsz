@@ -50,60 +50,42 @@ for (const width of [375, 1280]) {
   });
 }
 
-test.describe("注销账号端到端流程", () => {
-  test("首页 → 个人中心 → 账号安全 → 注销 → 跳回登录并提示", async ({
-    page
-  }) => {
-    await mockApi(page, { authenticated: true });
-
-    await page.goto("/");
-
-    // 注销入口收在个人中心的账号安全页，头像菜单不直接暴露。
-    await page.getByRole("button", { name: "账户菜单" }).click();
-    await expect(page.getByRole("menuitem", { name: "注销账号" })).toHaveCount(
-      0
-    );
-    await page.getByRole("menuitem", { name: "个人中心" }).click();
-    await page.getByRole("link", { name: /账号安全/ }).click();
-    await page.getByRole("link", { name: "了解注销流程" }).click();
-    await expect(page).toHaveURL(/\/account\/delete/);
-    await expect(page.getByRole("heading", { name: "注销账号" })).toBeVisible();
-
-    // 默认手机渠道：获取验证码 → 填验证码 → 确认注销。
-    await page.getByRole("button", { name: "获取验证码" }).click();
-    await expect(page.getByRole("status")).toContainText("验证码申请已受理");
-    await page.getByPlaceholder("6 位数字验证码").fill("000000");
-    await page.getByRole("button", { name: "继续注销" }).click();
-    const dialog = page.getByRole("dialog", { name: /最后确认/ });
-    await expect(dialog).toBeVisible();
-    await dialog.getByRole("button", { name: "确认永久注销" }).click();
-
-    // 注销成功后跳回登录页并展示成功提示。
-    await expect(page).toHaveURL(/\/login\?deleted=success/);
-    await expect(page.getByText("账号已注销成功。")).toBeVisible();
-  });
-
-  test("同时绑定手机/邮箱时可切换渠道注销", async ({ page }) => {
-    await page.setViewportSize({ width: 375, height: 812 });
-    await mockApi(page, { authenticated: true });
-
-    await page.goto("/account/delete");
-    await expect(page.getByRole("heading", { name: "注销账号" })).toBeVisible();
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= window.innerWidth
-      )
-    ).toBe(true);
-
-    // 切到邮箱渠道，展示在档邮箱并完成注销。
-    await page.getByLabel(/邮箱验证/).check();
-    await expect(page.getByText("alice@example.com")).toBeVisible();
-
-    await page.getByRole("button", { name: "获取验证码" }).click();
-    await page.getByPlaceholder("6 位数字验证码").fill("000000");
-    await page.getByRole("button", { name: "继续注销" }).click();
-    await page.getByRole("button", { name: "确认永久注销" }).click();
-
-    await expect(page).toHaveURL(/\/login\?deleted=success/);
-  });
+test.describe("注销申请与撤销", () => {
+  for (const width of [375, 1280]) {
+    test(`主动确认72小时规则，刷新恢复申请并撤销（${width}px）`, async ({
+      page
+    }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await mockApi(page, { authenticated: true });
+      await page.goto("/account/delete");
+      await page.getByRole("button", { name: "获取验证码" }).click();
+      await page.getByPlaceholder("6 位数字验证码").fill("000000");
+      await page.getByRole("button", { name: "继续注销" }).click();
+      const dialog = page.getByRole("dialog", { name: "确认提交注销申请？" });
+      await expect(dialog.getByRole("checkbox")).not.toBeChecked();
+      await expect(
+        dialog.getByRole("button", { name: "提交注销申请" })
+      ).toBeDisabled();
+      await dialog.getByRole("checkbox").check();
+      await dialog.getByRole("button", { name: "提交注销申请" }).click();
+      await expect(
+        page.getByRole("heading", { name: "注销申请等待生效" })
+      ).toBeVisible();
+      await expect(page).toHaveURL(/\/account\/delete$/);
+      await page.reload();
+      await expect(
+        page.getByRole("heading", { name: "注销申请等待生效" })
+      ).toBeVisible();
+      await page.getByRole("button", { name: "撤销注销申请" }).click();
+      await expect(
+        page.getByRole("heading", { name: "注销账号" })
+      ).toBeVisible();
+      await expect(page.getByRole("status")).toContainText("余额保持不变");
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth
+        )
+      ).toBe(true);
+    });
+  }
 });

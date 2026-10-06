@@ -94,6 +94,8 @@ export function LoginForm() {
     if (loading || sending || authenticated) return;
     const params = new URLSearchParams();
     if (identifier.includes("@")) params.set("method", "email");
+    const invite = searchParams.get("invite");
+    if (invite) params.set("invite", invite);
     const redirect = searchParams.get("redirect");
     if (redirect) params.set("redirect", redirect);
     router.push(params.size ? `/register?${params}` : "/register");

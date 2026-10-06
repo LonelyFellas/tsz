@@ -68,7 +68,17 @@ export function postAuthPath(
   const pathname = decodeURIComponent(target.split(/[?#]/)[0]!);
   const teacherReturn =
     roles.includes("teacher") && /^\/teacher(\/|$)/.test(pathname);
-  if (!onboarded && !teacherReturn) {
+  if (
+    !onboarded &&
+    !teacherReturn &&
+    pathname !== "/account/coins" &&
+    pathname !== "/account/invitations" &&
+    pathname !== "/student/coins" &&
+    pathname !== "/wordlists/new" &&
+    pathname !== "/account/wordlist-tips" &&
+    !/^\/wordlists\/[^/]+$/.test(pathname) &&
+    !/^\/account\/wordlists(\/|$)/.test(pathname)
+  ) {
     return target === "/"
       ? ONBOARDING_PATH
       : `${ONBOARDING_PATH}?redirect=${encodeURIComponent(target)}`;

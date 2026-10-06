@@ -108,13 +108,7 @@ const GROUPS: Group[] = [
     icon: <ReadOutlined />,
     label: "词表管理",
     leaves: [
-      // 页面是只有标题的空壳，后端也没有 wordlists 端点，先按未落地处理。
-      {
-        key: "todo:wordlists",
-        label: "智能词表",
-        perm: "wordlists.access",
-        disabled: true
-      },
+      pageLeaf(ADMIN_PAGE_ROUTES.wordlists, "智能词表"),
       {
         key: "todo:custom-wordlist",
         label: "自定义词表",
@@ -167,14 +161,7 @@ const GROUPS: Group[] = [
     key: "grp-coin",
     icon: <DollarOutlined />,
     label: "天生币管理",
-    leaves: [
-      {
-        key: "todo:coins",
-        label: "天生币管理",
-        perm: "coins.access",
-        disabled: true
-      }
-    ]
+    leaves: [pageLeaf(ADMIN_PAGE_ROUTES.coins, "天生币管理")]
   }
 ];
 

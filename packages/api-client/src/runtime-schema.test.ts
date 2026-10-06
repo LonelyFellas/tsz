@@ -17,6 +17,7 @@ type RuntimeSchema = {
   anyOf?: RuntimeSchema[];
   allOf?: RuntimeSchema[];
   format?: string;
+  pattern?: string;
   minimum?: number;
   maximum?: number;
   minLength?: number;
@@ -34,6 +35,26 @@ const runtimeSchemaBundle =
   runtimeSchemaBundleJson as unknown as RuntimeSchemaBundle;
 
 const ROOTS = [
+  "WordlistTip",
+  "WordlistTipPage",
+  "Wordlist",
+  "WordlistPage",
+  "WordlistItems",
+  "MyWordlistItems",
+  "WordlistCatalog",
+  "WordlistEditSnapshot",
+  "WordlistReview",
+  "WordlistReviews",
+  "InvitationCode",
+  "InvitationOverview",
+  "InvitationRecordPage",
+  "AccountDeletionRequest",
+  "AccountDeletionState",
+  "CoinAccountPage",
+  "ManualCoinOperation",
+  "ManualCoinOperationPage",
+  "CoinWallet",
+  "CoinEntryPage",
   "SharedSentence",
   "SentencePublication",
   "SentenceWithdrawalImpact",
@@ -129,6 +150,8 @@ function buildValidValue(
         buildValidValue(schema.items!, activeRefs)
       );
     case "string":
+      if (schema.pattern === "^[A-F0-9]{16}$") return "0123456789ABCDEF";
+      if (schema.pattern && new RegExp(schema.pattern).test("1")) return "1";
       if (schema.format === "uuid") return UUID_V4;
       if (schema.format === "date-time") return RFC3339;
       return "x".repeat(Math.max(schema.minLength ?? 0, 1));

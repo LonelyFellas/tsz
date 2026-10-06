@@ -25,6 +25,7 @@ export interface ChangePasswordRequest {
 }
 
 export type RegisterPayload = {
+  invite_code?: string;
   password: string;
   code: string;
 } & ({ phone: string; email?: never } | { email: string; phone?: never });
@@ -41,4 +42,33 @@ export interface AccountDeletionCodeRequest {
 export interface ConfirmAccountDeletionRequest {
   channel: AccountDeletionChannel;
   code: string;
+}
+
+export interface AccountDeletionRequest {
+  id: string;
+  status: "pending" | "cancelled" | "completed";
+  requested_at: string;
+  effective_at: string;
+  cancelled_at: string | null;
+  completed_at: string | null;
+  confirmed_balance: string;
+  waive_balance: boolean;
+  consent_version: string;
+  consent_text: string;
+}
+export interface AccountDeletionState {
+  request: AccountDeletionRequest | null;
+  coin_balance: string;
+  consent_version: string;
+  consent_text: string;
+  server_time: string;
+}
+export interface CreateAccountDeletionRequest {
+  channel: AccountDeletionChannel;
+  code: string;
+  expected_coin_balance: string;
+  waive_balance: boolean;
+  confirm_deletion: boolean;
+  consent_version: string;
+  idempotency_key: string;
 }

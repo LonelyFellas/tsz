@@ -169,3 +169,24 @@ describe("统一授权事实", () => {
     ).toBe(true);
   });
 });
+
+it("wordlist review and withdraw require the access permission", () => {
+  const actor = {
+    id: "reviewer",
+    role: "admin",
+    permissions: ["wordlists.review", "wordlists.withdraw"]
+  };
+  expect(hasAdminPermission(actor, "wordlists.review")).toBe(false);
+  expect(
+    hasAdminPermission(
+      { ...actor, permissions: [...actor.permissions, "wordlists.access"] },
+      "wordlists.review"
+    )
+  ).toBe(true);
+  expect(
+    hasAdminPermission(
+      { ...actor, permissions: ["wordlists.access"] },
+      "wordlists.withdraw"
+    )
+  ).toBe(false);
+});

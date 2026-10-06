@@ -1,3 +1,6 @@
+import { createAdminWordlistEndpoints } from "./wordlists";
+import { createAdminCoinEndpoints } from "./admin-coins";
+import { createCoinEndpoints } from "./coins";
 import {
   createPermissionEndpoints,
   decodeAdminProfile
@@ -215,6 +218,9 @@ function requireLifecycleBatchIdentity<
  */
 export function createAdminEndpoints(http: HttpClient) {
   return {
+    coins: createCoinEndpoints(http),
+    wordlists: createAdminWordlistEndpoints(http),
+    coinManagement: createAdminCoinEndpoints(http),
     permissionSystem: createPermissionEndpoints(http),
     teacherCertification: createAdminTeacherCertificationEndpoints(http),
     sentences: createSharedSentenceEndpoints(http),

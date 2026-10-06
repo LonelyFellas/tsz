@@ -1,51 +1,84 @@
 "use client";
-
-import { Button, Card } from "@tsz/ui";
 import Link from "next/link";
+import { useState } from "react";
 import { useWordLists } from "../hooks/useWordLists";
-
-// 词表浏览 —— 师生共用。数据走 TanStack Query。
-// 是否能发布公开、能否建任务等差异交给各操作内部的权限判断。
-export function WordListBrowser() {
-  const { data: lists, isPending, isError, error } = useWordLists();
-
+import { STATE_LABEL, buttonClass } from "../reading";
+export function WordListBrowser({ mine = false }: { mine?: boolean }) {
+  const [page, setPage] = useState(1);
+  const [q, setQ] = useState("");
+  const result = useWordLists(mine, page, q);
   return (
-    <section>
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-bold">词表</h1>
-        <Link href="/wordlists/new">
-          <Button>创建词表</Button>
-        </Link>
+    <div className="animate-in mx-auto max-w-5xl px-6 py-10">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="text-3xl font-semibold">
+          {mine ? "我的词表" : "公开词表"}
+        </h1>
+        <div className="flex gap-3">
+          <Link
+            className={buttonClass}
+            href={mine ? "/wordlists" : "/account/wordlists"}
+          >
+            {mine ? "浏览公开词表" : "我的词表"}
+          </Link>
+          <Link className={buttonClass} href="/wordlists/new">
+            创建词表
+          </Link>
+        </div>
       </div>
-
-      {isPending ? (
-        <p className="text-foreground-muted">加载中…</p>
-      ) : isError ? (
-        <p className="text-danger">加载失败:{(error as Error).message}</p>
-      ) : lists.length === 0 ? (
-        <p className="text-foreground-muted">暂无词表。</p>
+      <input
+        className="my-6 w-full rounded-full border border-border bg-surface px-5 py-3"
+        aria-label="搜索词表"
+        placeholder="搜索词表名称"
+        value={q}
+        onChange={(e) => {
+          setQ(e.target.value);
+          setPage(1);
+        }}
+      />
+      {result.isError ? (
+        <p role="alert">
+          词表加载失败，请
+          <button onClick={() => void result.refetch()}>重试</button>。
+        </p>
+      ) : result.isPending ? (
+        <p>正在加载词表…</p>
       ) : (
-        <ul className="grid gap-3">
-          {lists.map((l) => (
-            <li key={l.id}>
-              <Link href={`/wordlists/${l.id}`}>
-                <Card className="transition-colors hover:border-primary">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium">{l.name}</span>
-                    <span className="text-xs text-foreground-subtle">
-                      {l.visibility === "public" ? "公开" : "私密"}
-                      {l.review_status === "pending" && " · 审核中"}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-xs text-foreground-subtle">
-                    {l.word_ids.length + l.custom_words.length} 个词
-                  </p>
-                </Card>
+        <>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {result.data.items.map((list) => (
+              <Link
+                key={list.id}
+                href={`${mine ? "/account" : ""}/wordlists/${list.id}`}
+                className="rounded-3xl border border-border bg-surface p-6 transition hover:border-primary"
+              >
+                <h2 className="text-xl font-semibold">{list.name}</h2>
+                <p className="mt-3 text-sm text-foreground-muted">
+                  {list.owner_name} · {list.item_count} 个词条 ·{" "}
+                  {STATE_LABEL[list.state]}
+                </p>
               </Link>
-            </li>
-          ))}
-        </ul>
+            ))}
+          </div>
+          {result.data.items.length === 0 && <p>暂无词表</p>}
+          <div className="mt-6 flex items-center gap-4">
+            <button
+              className={buttonClass}
+              disabled={page === 1}
+              onClick={() => setPage(page - 1)}
+            >
+              上一页
+            </button>
+            <span>第 {page} 页</span>
+            <button
+              className={buttonClass}
+              disabled={page >= result.data.pagination.total_pages}
+              onClick={() => setPage(page + 1)}
+            >
+              下一页
+            </button>
+          </div>
+        </>
       )}
-    </section>
+    </div>
   );
 }

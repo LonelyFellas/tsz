@@ -1,6 +1,13 @@
 import { WordListCreator } from "@/features/wordlist";
-
-// 创建词表向导(师生共用)。
-export default function NewWordListPage() {
-  return <WordListCreator />;
+import { RouteGuard } from "@/features/auth/components/RouteGuard";
+export const metadata = {
+  title: "我的词表",
+  robots: { index: false, follow: false }
+};
+export default function Page() {
+  return (
+    <RouteGuard>
+      <WordListCreator />
+    </RouteGuard>
+  );
 }
