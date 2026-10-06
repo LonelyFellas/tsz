@@ -1,3 +1,4 @@
+import { createCoinEndpoints } from "./coins";
 // 按业务域组织的接口定义(纯函数,接受 HttpClient)。
 // features/*/api.ts 负责把这些绑定到具体的 client 实例。
 import type {
@@ -75,6 +76,7 @@ export type OtpPurpose =
 
 export function createEndpoints(http: HttpClient) {
   return {
+    coins: createCoinEndpoints(http),
     teacherCertification: createTeacherCertificationEndpoints(http),
     auth: {
       me: (opts?: { signal?: AbortSignal }): Promise<MeResponse> =>

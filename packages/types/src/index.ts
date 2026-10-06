@@ -49,3 +49,5 @@ export type {
 } from "./admin-word";
 
 export * from "./shared-sentences";
+
+export * from "./coins";
