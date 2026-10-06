@@ -1,8 +1,11 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/.codex/worktrees/coins-b1a/tsz-rust/docs/openapi.json",
-  "_source_sha256": "ca6d57c4fe542f150fd72e5f9f53abe4c660bf4a820945414fffa2086cf7eb92",
+  "_source_sha256": "8bf959574542286788f300d31d7f1d53145978a7a2122889990f0eab9dacc5a1",
   "roots": [
+    "InvitationCode",
+    "InvitationOverview",
+    "InvitationRecordPage",
     "AccountDeletionRequest",
     "AccountDeletionState",
     "CoinAccountPage",
@@ -802,6 +805,7 @@
         "password_unchanged",
         "invalid_display_name",
         "invalid_otp_code",
+        "invalid_invitation_code",
         "invalid_credentials",
         "invalid_token",
         "invalid_refresh_token",
@@ -1155,6 +1159,67 @@
         "target": { "$ref": "#/$defs/InboundReferenceTargetV3" }
       },
       "additionalProperties": false
+    },
+    "InvitationCode": {
+      "type": "object",
+      "required": ["invite_code"],
+      "properties": {
+        "invite_code": { "type": "string", "pattern": "^[A-F0-9]{16}$" }
+      },
+      "additionalProperties": false
+    },
+    "InvitationOverview": {
+      "type": "object",
+      "required": ["invite_code", "reward_amount", "can_receive_reward"],
+      "properties": {
+        "can_receive_reward": { "type": "boolean" },
+        "invite_code": {
+          "type": ["string", "null"],
+          "pattern": "^[A-F0-9]{16}$"
+        },
+        "reward_amount": {
+          "type": ["string", "null"],
+          "pattern": "^[1-9][0-9]{0,18}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "InvitationRecord": {
+      "type": "object",
+      "required": [
+        "invitee_user_id",
+        "invitee_name",
+        "reward_status",
+        "reward_amount",
+        "created_at"
+      ],
+      "properties": {
+        "created_at": { "type": "string", "format": "date-time" },
+        "invitee_name": { "type": ["string", "null"] },
+        "invitee_user_id": { "type": "string", "format": "uuid" },
+        "reward_amount": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$"
+        },
+        "reward_status": { "$ref": "#/$defs/InvitationRewardStatus" }
+      },
+      "additionalProperties": false
+    },
+    "InvitationRecordPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/InvitationRecord" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "InvitationRewardStatus": {
+      "type": "string",
+      "enum": ["awarded", "reward_disabled", "inviter_unavailable"]
     },
     "ManualCoinOperation": {
       "type": "object",

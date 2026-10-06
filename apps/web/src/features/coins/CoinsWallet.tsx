@@ -8,6 +8,7 @@ import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
 
 const SOURCES: Record<string, string> = {
+  invitation_reward: "邀请奖励",
   manual_purchase: "购买入账",
   manual_reward: "人工奖励",
   manual_reversal: "人工入账冲正",
@@ -156,8 +157,14 @@ function Wallet({ id }: { id: string }) {
       <section className="mt-8 rounded-3xl bg-muted p-6">
         <h2 className="text-xl font-semibold">获取与使用</h2>
         <p className="mt-3 text-sm leading-7 text-foreground-muted">
-          每日任务、邀请好友、词表获得投币：尚未开放。词表投币等消费功能准备中，开放后会在这里说明。
+          每日任务、词表获得投币：尚未开放。词表投币等消费功能准备中，开放后会在这里说明。
         </p>
+        <Link
+          href="/account/invitations"
+          className="mt-4 inline-block text-sm text-primary"
+        >
+          邀请好友，查看奖励规则 →
+        </Link>
         <h3 className="mt-5 font-medium">联系客服</h3>
         {contact ? (
           <p className="mt-2 break-words text-sm">{contact}</p>

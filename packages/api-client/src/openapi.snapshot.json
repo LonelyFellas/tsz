@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/.codex/worktrees/coins-b1a/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-06T09:28:44.227Z",
+  "_generatedAt": "2026-10-06T10:21:42.841Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -117,6 +117,9 @@
     "/me/contact/bind-code": ["post"],
     "/me/contact/unbind": ["post"],
     "/me/contact/verification-code": ["post"],
+    "/me/invitations": ["get"],
+    "/me/invitations/code": ["post"],
+    "/me/invitations/records": ["get"],
     "/me/learning-settings": ["put"],
     "/me/notifications": ["get"],
     "/me/notifications/{id}/read": ["patch"],
@@ -501,6 +504,31 @@
         "in": "query",
         "required": false,
         "schema": { "type": "string", "pattern": "^(0|[1-9][0-9]{0,18})$" }
+      }
+    ],
+    "get /me/invitations/records": [
+      {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int32",
+          "default": 1,
+          "minimum": 1
+        }
+      },
+      {
+        "name": "page_size",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int32",
+          "default": 20,
+          "maximum": 100,
+          "minimum": 1
+        }
       }
     ]
   },
@@ -1808,6 +1836,7 @@
         "password_unchanged",
         "invalid_display_name",
         "invalid_otp_code",
+        "invalid_invitation_code",
         "invalid_credentials",
         "invalid_token",
         "invalid_refresh_token",
@@ -4303,6 +4332,11 @@
         "email": {
           "type": ["string", "null"],
           "example": "student@example.com"
+        },
+        "invite_code": {
+          "type": ["string", "null"],
+          "description": "最终确认的邀请码；缺省不归因，注册后不可修改。",
+          "maxLength": 16
         },
         "password": {
           "type": "string",

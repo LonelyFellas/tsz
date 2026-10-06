@@ -3,6 +3,8 @@
 维护位置：`/Users/darwish/Dev/tsz-core/tsz-coins-b1a/docs/features/coins-system/` 是本次实施的唯一维护目录；`9adc` 工作区保留为只读评估来源。
 状态：2026-10-06 B1a（COIN-01～03）已实现并验收；B1b（COIN-04～05）也已完成，见 [B1b 验收](b1b-acceptance.md)。B1a 记录见 [b1a-acceptance.md](b1a-acceptance.md)。B2（COIN-06～09）实现与验收见 [b2-acceptance.md](b2-acceptance.md)。业务范围、批次和决定记录见 [requirements.md](requirements.md)。
 
+B4（COIN-10）已完成实现和验收，见 [b4-acceptance.md](b4-acceptance.md)；验收后已获两仓本地提交授权，未推送或部署。
+
 实施任务、依赖和状态见 [tasks.md](tasks.md)。
 
 注销规则已按用户后续要求替换：有余额须签署放弃，申请成功起等待连续 72 小时，期间允许撤销并暂停钱包收支；到期生效并记余额作废。本文不再采用“非零余额不能申请注销”。
@@ -189,9 +191,27 @@ coins 核心建议三张表；B1b 在账号模块另加持久化注销申请表�
 - 权限目录回退也需核对已有新权限授予数据和旧代码兼容性。应用回退、schema 回退分别评估；不把恢复旧数据库快照当作日常回退方案。
 - 未涉及本次实现的共享接口保持原样；各业务批次各自同步 OpenAPI，使用原生 hooks/CI 与部署门禁，不额外建平行发布机制。
 
+## COIN-10 开工核对（2026-10-06）
+
+- 复用后端 `codex/coins-b1a@1bf9ddb`、前端 `codex/coins-b1a@d528d47` 两个原任务工作区；fetch 后 origin/main 与交接一致，保留尚未推送的 B1/B2 依赖。
+- 可复用：账号/角色/refresh 注册事务、coins 的单笔事务内 credit、身份域隔离、注销锁后时钟门禁。新增：邀请码、唯一注册关系、注册奖励配置与记录、本人邀请页面。
+- 服务端配置 `INVITATION_REWARD_ENABLED` 默认 false；`INVITATION_REWARD_AMOUNT` 是可选正 i64。缺少金额时即使开关为 true 也不发放；非法金额拒绝启动。前端不携带奖励数量，不采用历史常量；测试独立配置不表示生产金额批准。
+- 注册 API 仅增加可选 `invite_code` 请求字段，登录/注册响应保持原样。新增 GET `/me/invitations`（码/有效奖励金额/本人可收奖状态）、POST `/me/invitations/code`（幂等生成固定随机码）、GET `/me/invitations/records`（本人邀请记录分页）。不提供绑定修改或补发接口。
+- 迁移 `20261006030000_invitations`：邀请码以 user UUID 唯一、随机公开码唯一；关系以新账号 UUID 唯一、禁止自邀。关系记录最终发放状态、实际金额和账本操作 UUID；已发必须有正金额及操作，未发必须为零且无操作。双方 UUID 不外键到会被物理删除的 users；保留历史且不复制联系方式。关系及邀请码不可更新/删除；down 仅在两表无记录时允许。
+- 用户已确认：链接预填邀请码，可修改/清空，仅最终提交码生效；无效码报错且不消费 OTP。有效码的邀请人停用、待注销或已删除时正常注册、保留归因、记录 inviter_unavailable，不发奖、不补发。正常邀请人但开关关闭/金额缺失记录 reward_disabled；业务不符合条件和技术失败严格区分，后者整体回滚。
+- 前端新增 `/account/invitations`，不依赖学习引导；钱包与个人中心提供入口。邀请码通过 URL 和表单传递，不使用长期隐式存储；登录与注册切换保留当前表单码。资料/记录失败显示未知或错误，不伪造金额或空记录。
+- 混合版本：旧注册响应保持原状；旧后端可能忽略 invite_code，因此必须后端先发布、前端后发布，不能提前开放新注册归因入口。回退时关闭奖励可停止新发放，但已有邀请码/记录须保留，不回退到忽略归因的旧后端。
+- 先锁唯一现有邀请人，再创建新用户（新行未提交，不是其他事务可见参与主体），随后邀请关系、一次系统 credit、refresh 同事务。不可先锁邀请码或配置行再锁账号。最终锁设计随异常规则收口。
+- 验收已收口：后端完整 82 个集成 target、863 项通过，331 项单元/二进制测试通过；前端及七条无 API mock 真实浏览器链通过。详细覆盖、超时复验、隔离数据和清理结果统一记录于 [B4 验收](b4-acceptance.md)。
+- 本批关键路径已完成；剩余为生产奖励金额配置及另行授权的交付阶段。词表/任务上游仍未就绪，不纳入 COIN-10。
+
 ## 8. 验收
 
 以下是实施后的验收方案，不是本轮已执行的测试报告。拟新增测试目标在对应批次创建后才能运行。
+
+COIN-10 注册/查询验收：`SQLX_OFFLINE=true cargo test --locked --all-features --test invitations_handler --test user_register_handler --test account_deletion_gate --test account_deletion_worker`，验证同一账号一次归因、并发注册、配置关闭、失效邀请人不发、技术失败整体回滚、记录与个人流水一致、身份隔离和到期锁等待。前端执行 invitations 契约、邀请页与 RegisterForm/AuthNavigation 定向测试，批末按下列原生质量门统一检查，并通过生产构建浏览器走真实“生成链接→新用户注册→邀请记录→钱包奖励”，测试开关/金额只用于隔离进程。
+
+COIN-10 当前独立基础验收：`SQLX_OFFLINE=true cargo test --locked --all-features --lib config::tests::invitation_reward_requires_explicit_positive_amount_and_enablement` 验证默认关闭、启用但金额缺失仍关闭、金额边界；`--test invitations_schema` 在独立 sqlx 库验证 up/down、唯一归属、不可改绑、自邀/金额形状约束、用户删除后保留。整批验收结果见 B4 记录。
 
 ### 8.1 风险断言
 

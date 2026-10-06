@@ -25,6 +25,7 @@ export interface ChangePasswordRequest {
 }
 
 export type RegisterPayload = {
+  invite_code?: string;
   password: string;
   code: string;
 } & ({ phone: string; email?: never } | { email: string; phone?: never });

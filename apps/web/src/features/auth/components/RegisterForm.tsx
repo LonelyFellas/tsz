@@ -47,11 +47,14 @@ const REGISTER_ERRORS: Record<string, string> = {
 
 export function RegisterForm({
   initialMethod = "phone",
+  initialInviteCode = "",
   redirect
 }: {
   initialMethod?: "phone" | "email";
+  initialInviteCode?: string;
   redirect?: string;
 }) {
+  const [inviteCode, setInviteCode] = useState(initialInviteCode);
   const [method, setMethod] = useState(initialMethod);
   const [contact, setContact] = useState("");
   const [code, setCode] = useState("");
@@ -98,6 +101,8 @@ export function RegisterForm({
 
   function translateError(value: unknown, fallback: string): string {
     if (value instanceof HttpError) {
+      if (value.code === "invalid_invitation_code")
+        return "邀请码无效，请修改或清空后重试";
       const passwordMessage = passwordErrorMessage(value.code);
       if (passwordMessage) return passwordMessage;
     }
@@ -165,6 +170,7 @@ export function RegisterForm({
             ...(method === "email"
               ? { email: identifier }
               : { phone: identifier }),
+            ...(inviteCode.trim() ? { invite_code: inviteCode.trim() } : {}),
             password: password,
             code
           },
@@ -323,6 +329,20 @@ export function RegisterForm({
                   </div>
                 </FormField>
 
+                <FormField
+                  htmlFor="register-invite"
+                  label="邀请码（选填）"
+                  hint="可修改或清空；注册成功后不能补绑或改绑。"
+                >
+                  <Input
+                    id="register-invite"
+                    value={inviteCode}
+                    autoComplete="off"
+                    disabled={loading || registered}
+                    onChange={(event) => setInviteCode(event.target.value)}
+                  />
+                </FormField>
+
                 {error && (
                   <p
                     role="alert"
@@ -349,11 +369,11 @@ export function RegisterForm({
                     disabled={sending || loading}
                     onClick={() => {
                       if (sending || loading) return;
-                      router.push(
-                        redirect
-                          ? `/login?${new URLSearchParams({ redirect })}`
-                          : "/login"
-                      );
+                      const params = new URLSearchParams();
+                      if (redirect) params.set("redirect", redirect);
+                      if (inviteCode.trim())
+                        params.set("invite", inviteCode.trim());
+                      router.push(params.size ? `/login?${params}` : "/login");
                     }}
                     className="rounded-sm font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
                     aria-label="已有账号,去登录"

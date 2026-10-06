@@ -469,3 +469,23 @@ describe("RegisterForm — 手机号验证码注册", () => {
     expect(mockPush).toHaveBeenCalledWith("/login");
   });
 });
+
+it.each(["FEDCBA9876543210", ""])(
+  "邀请码预填后可修改或清空，最终提交 %s",
+  async (finalCode) => {
+    renderWithProviders(<RegisterForm initialInviteCode="0123456789ABCDEF" />);
+    const input = screen.getByLabelText("邀请码（选填）");
+    expect(input).toHaveValue("0123456789ABCDEF");
+    fireEvent.change(input, { target: { value: finalCode } });
+    const user = userEvent.setup();
+    await fillForm(user);
+    await user.click(screen.getByRole("button", { name: "立即注册" }));
+    await waitFor(() => expect(mockRegister).toHaveBeenCalledOnce());
+    expect(mockRegister.mock.calls[0]![0]).toEqual({
+      phone: PHONE,
+      password: PASSWORD,
+      code: CODE,
+      ...(finalCode ? { invite_code: finalCode } : {})
+    });
+  }
+);

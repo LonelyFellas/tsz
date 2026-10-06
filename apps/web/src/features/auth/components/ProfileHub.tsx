@@ -11,11 +11,12 @@ import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIden
 
 // 个人中心:头像菜单进入的中转页。聚合资料卡 + 常用入口 + 申请成为老师。
 // 资料卡的「编辑资料」跳 /account/profile(EditProfileForm)。
-// 部分入口(我的任务 / 设置 / 邀请好友)后端/路由未就绪,先占位提示「即将上线」。
+// 部分入口(我的任务 / 设置)后端/路由未就绪,先占位提示「即将上线」。
 
 // 常用快捷入口。仅保留有真实去处的项;申请成为老师 / 各功能入口已在顶部 MainNav 暴露,
-// 不在本页重复。占位类(邀请好友 / 我的任务 / 设置)待后端就绪再加。
+// 不在本页重复。占位类(我的任务 / 设置)待后端就绪再加。
 const TILES: { label: string; href: string; icon: ReactNode }[] = [
+  { label: "邀请好友", href: "/account/invitations", icon: <CoinIcon /> },
   { label: "我的天生币", href: "/account/coins", icon: <CoinIcon /> },
   { label: "我的词表", href: "/wordlists", icon: <ListIcon /> },
   {

@@ -31,6 +31,7 @@ const API_PREFIX = "/api/v1";
 const ADMIN_LEXICON_PREFIX = `${API_PREFIX}/admin/lexicon`;
 const HTTP_METHODS = ["get", "post", "put", "patch", "delete"];
 const QUERY_CONTRACT_OPERATIONS = new Set([
+  "get /me/invitations/records",
   "get /admin/coins/accounts",
   "get /admin/coins/accounts/{owner_type}/{owner_id}/entries",
   "get /admin/coins/operations",
@@ -42,6 +43,9 @@ const QUERY_CONTRACT_OPERATIONS = new Set([
 ]);
 
 const RUNTIME_SCHEMA_ROOTS = [
+  "InvitationCode",
+  "InvitationOverview",
+  "InvitationRecordPage",
   "AccountDeletionRequest",
   "AccountDeletionState",
   "CoinAccountPage",

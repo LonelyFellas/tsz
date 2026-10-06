@@ -195,5 +195,8 @@ describe("postAuthPath", () => {
 
 it("账号钱包回跳不依赖学习引导", () => {
   expect(postAuthPath(false, "/account/coins")).toBe("/account/coins");
+  expect(postAuthPath(false, "/account/invitations")).toBe(
+    "/account/invitations"
+  );
   expect(postAuthPath(false, "/student/coins")).toBe("/student/coins");
 });

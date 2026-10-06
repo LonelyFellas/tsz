@@ -70,6 +70,7 @@ export function postAuthPath(
     !onboarded &&
     !teacherReturn &&
     pathname !== "/account/coins" &&
+    pathname !== "/account/invitations" &&
     pathname !== "/student/coins"
   ) {
     return target === "/"

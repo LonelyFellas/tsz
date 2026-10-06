@@ -35,6 +35,9 @@ const runtimeSchemaBundle =
   runtimeSchemaBundleJson as unknown as RuntimeSchemaBundle;
 
 const ROOTS = [
+  "InvitationCode",
+  "InvitationOverview",
+  "InvitationRecordPage",
   "AccountDeletionRequest",
   "AccountDeletionState",
   "CoinAccountPage",
@@ -137,6 +140,7 @@ function buildValidValue(
         buildValidValue(schema.items!, activeRefs)
       );
     case "string":
+      if (schema.pattern === "^[A-F0-9]{16}$") return "0123456789ABCDEF";
       if (schema.pattern && new RegExp(schema.pattern).test("1")) return "1";
       if (schema.format === "uuid") return UUID_V4;
       if (schema.format === "date-time") return RFC3339;
