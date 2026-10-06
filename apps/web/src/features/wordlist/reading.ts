@@ -20,8 +20,8 @@ export function selectDefinition(
     candidates.find((d) => d.definition_mode.startsWith("zh_")) ?? candidates[0]
   );
 }
-export function selectTexts(
-  texts: WordlistText[],
+export function selectTexts<T extends Pick<WordlistText, "dialect">>(
+  texts: T[],
   variant: EnglishVariant | null
 ) {
   if (!variant) return texts;
@@ -40,3 +40,11 @@ export const STATE_LABEL: Record<WordlistState, string> = {
 };
 export const buttonClass =
   "rounded-full border border-border px-4 py-2 text-sm disabled:opacity-40";
+
+export function phoneticDelimiters(text: string) {
+  const value = text.trim();
+  return (value.startsWith("/") && value.endsWith("/")) ||
+    (value.startsWith("[") && value.endsWith("]"))
+    ? (["", ""] as const)
+    : (["/", "/"] as const);
+}

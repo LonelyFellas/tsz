@@ -1,6 +1,14 @@
 # WL-01 / WL-02 / COIN-11 验收记录
 
-日期：2026-10-06。最小词表闭环及真实投币已实现并验收；完整阅读模式等增强继续留在 WL-03。本阶段未提交、推送、创建 PR、合并或部署。
+日期：2026-10-07 更新。WL-01/02/COIN-11 已完成发布，完整模式进入独立 WL-03 实施。下方本地实施、交付和发布准备段落保留为历史证据，其“未发布”描述由本节取代。
+
+## 已完成发布（2026-10-06）
+
+- 后端 PR207 已合并；main/部署 `b017f0243c0ef176e305cc2eac01d9f0200ddad4`，CI `37485828474` attempt 1 success。
+- 前端 PR368 已合并；main/Web/Admin `693353d731ecbef3a88e083be3b2461f50c08d46`，CI `37486905177` attempt 1 success。
+- backend → Web → Admin 原生发布、manifest 与实际制品复算通过，无回退；锁和事务已释放。迁移共 96 条，末值 `20261006050000`；31 个词库发布均 V3。HTTPS 登录/刷新/退出及 Secure Cookie 通过；业务页面可达、Web active。
+- 邀请奖励缺省关闭，未改 .env。已有账本、词表和注销签署证据必须保留，禁止 destructive down 或回退旧即时注销版本。
+- 2026-10-07 两仓 fetch 的 origin/main 与上述 SHA 一致。发布证据复用 `/tmp/coins-release-integration/`；本轮不重复部署。
 
 ## 输入与范围
 
@@ -101,3 +109,54 @@ pnpm lint
 - 发布顺序为后端→Web→Admin；旧客户端注销入口会要求升级刷新，不能恢复即时删号旁路。新前端不能先发给旧 API，以免邀请字段被静默忽略。不得回退或删除已经存在的新签署/财务证据。
 
 整合证据在 `/tmp/coins-release-integration/`；完整/定向测试日志部分复用 `/tmp/wordlists-runtime/phone-integration-*.log`。线上仅做 SSH、manifest/artifact verify、配置开关存在性和计数预检，没有服务器写入。候选需完成精确提交审查，随后才能按独立授权推送 PR、等待 CI、合并并部署。
+
+## WL-03 完整阅读与统一验收（2026-10-07）
+
+状态：本地实现与验收完成；两仓 `codex/wordlists-wl03` 本轮按用户授权本地提交，实际 SHA 和精确提交审查结果以 Git 历史及交付回复为准。未推送、创建 PR、合并或部署，GitHub CI 尚未运行；以下为本地真实结果。旧 checkout 未改动。
+
+| 完成标准            | 实现与证据                                                                                                                                                                                                                             |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 标准/完整是真实模式 | 默认标准；完整显式请求 view=full。ReadingEntry 共享安全 RichText、CEFR、语言及 definition 级语法选择，无空模式按钮。                                                                                                                   |
+| 词形/音标/细分词性  | 后端按白名单输出 form ID/type、catalog 名称、sense_ids、地区拼写及全部字典音标。复用真实 general/dedicated 映射；多 base/多发音保留，顶部用第一个基本词性的第一个 base；短语隐藏词形行。无 synthesis、actual_pron、音频或 annotation。 |
+| 只读查询与排序      | 作者顺序/词面 A–Z/Z–A；全表匹配排序后分页，同词面稳定，不可用词条排最后；revision、原 entry_ids 与 position 不变。                                                                                                                     |
+| 身份/偏好/备注      | 学生真实 CEFR，教师当前视角 C2，游客/null 设置 C2 预览；方言与身份切换重算呈现。公共/个人查询族隔离，个人缓存带 user ID；其他账号/游客私密 full 为 404，公开和审核不含备注。                                                           |
+| 更新与归档          | full 和标准沿用 active/current V3 与现有资格/锁；新 publication 自动读取，归档无旧内容，恢复读当前稿。原有投币归档重审、注销清理及财务历史测试继续通过。                                                                               |
+| 手机与真实链路      | build + next start，真实隔离 API，无 page.route/API mock；8 条新增浏览器流程通过，375px 无横向溢出，桌面/手机截图目视通过。                                                                                                            |
+| 契约与发布          | 默认和审核实际响应通过已部署旧 runtime；full 只供新消费者显式请求。原生 OpenAPI + snapshot/runtime 同步。后端先发、Web 后发；Admin 默认接口不变，无迁移。                                                                              |
+
+### 自动检查与失败处理
+
+- 后端 `wordlists_handler/review/tips/schema` 共 14 项通过；补充词形 fixture 合法地区组结构、catalog 展示名断言后，`full_reading` 定向复验通过。fmt、all-targets/all-features clippy（`-D warnings`）与 bins 构建通过。SQLx prepare 实际执行，无 .sqlx 变更；不新增测试 target 或迁移。
+- 前端全仓测试 235 文件、3410 项：3407 通过、2 个既有 skip、1 个契约 SHA canary 失败。原因是本次原生 OpenAPI 同步后固定哈希仍为旧值；核对输入后更新 canary，api-client 全包 481 项通过。该修复仅改测试常量，未重复不变的全仓测试。wordlist 7 文件/17 项通过，包含模式、设置/角色/方言、备注、接口错误、查询页码复位及安全呈现。
+- 全仓 typecheck/lint 通过；lint 仅既有 useLogout warning。Web/Admin 生产构建通过。CI 模块/工作流测试通过，改动代码 prettier 与 git diff 检查通过。曾直接调用需三个 CI 产物目录参数的 inventory 命令，只返回 usage；未把该调用记为通过。新前端测试由既有 web 模块扫描覆盖。
+- 两仓只读独立核对无 P0–P2；后端复核发现测试 fixture 的组规则不一致，已修正并复验。fixture 只用于发布投影读取，不冒充完整词库创编/发布 UI 验收。
+
+定向命令（先重新核实隔离容器端口；cwd 为对应 WL-03 worktree）：
+
+```bash
+python3 /tmp/wordlists-runtime/run.py cargo test --locked --all-features --test wordlists_handler --test wordlists_review --test wordlists_tips --test wordlists_schema
+python3 /tmp/wordlists-runtime/run.py cargo clippy --locked --all-targets --all-features -- -D warnings
+pnpm --filter @tsz/api-client test
+pnpm --filter @tsz/web test src/features/wordlist
+pnpm typecheck
+pnpm lint
+pnpm test
+pnpm test:ci-modules
+```
+
+### 真实环境、数据和兼容证据
+
+- Rust `127.0.0.1:57829`：本批 `b017f024... + 工作区差异` 构建并复制至 `/tmp/wl03-runtime/tsz-rust`；Web `:57830` 使用本批前端 `693353d... + 工作区差异` 的生产构建。实际代理为该 Rust `/api/v1`。运行时来源、binary SHA、BUILD_ID 和文件哈希在 `final-provenance.json`。
+- 实际 Postgres/Redis 为任务容器回环 `:56541/:56542`，数据库仍为 `coins_prepare`；SQLx 集成测试创建自己的隔离库。保留旧财务/签署，未执行 down、清库或 FLUSH。线上只读 GET `/api/v1/wordlists` 为 200，发布来源复用上一批原生证据及本轮 fetch。
+- 浏览器通过正式注册/API 创建两批隔离用户及 WL03 前缀词表（第一批因脚本误查 `/auth/me` 而停止，修正为 `/me` 后第二批全通过）；表清单在 `created-wordlists.json`。词库两条 V3 snapshot 与其中新发布/归档/恢复、该 fixture 用户的教师认证状态由 SQL 准备，仅用于已标记的本地验收。它们不是共享/生产词典或词库创编 UI 证据。
+- 8 条流程：私密完整/备注与越权 → 学生等级/方言 → 师生切换且学习设置仍 A1 → 游客公开完整 → 只读排序/搜索 → 短语无词形行 → 手机无溢出 → 新发布/归档/恢复。全程没有充值/投币/注销写入，coins operations 保持 26，coin entries 33。
+- `compatibility.json` 使用 origin/main 原版 runtime 校验候选真实 public-standard/review-standard，均通过；新 runtime 接受上述响应及 full。旧 runtime 按预期拒绝未请求过的 full 附加字段，服务端不会默认发送。新 Web 默认标准/作者顺序保留旧请求；旧 API 的 deny_unknown_fields 会拒绝新 view/sort，页面明确失败、可切回默认，不伪造完整或排序。反向组合按源码/契约及组件错误测试核对，未额外启动旧后端浏览器组。
+- OpenAPI SHA-256：`07ef4a5842de6d8139a49ffaa3c9b3ddb197a2096e5d3b2c9e5a7c263eddc394`。只变更 public/my items 两条路径的查询参数及五个阅读 schema；无新增路径、迁移、权限或写接口。
+
+证据集中于 `/tmp/wl03-runtime/`：`browser-result.json`、`compatibility.json`、`public-standard.json`、`review-standard.json`、`public-full.json`、`full-desktop.png`、`full-mobile.png`、`final-provenance.json`、`final-counts.json`、`cleanup.json`。检查日志为 `/tmp/wl03-*.log`；凭据 `private.json` 不对外展示。
+
+任务 Rust/Web 进程已核对身份后停止；两项原本停止的专用容器已恢复停止，数据保留。未使用测试站真实账号产生业务数据。下一步是按新授权交付；本批不继承 PR207/368 的合并和部署授权。COIN-12、简洁模式、词类筛选和其余明确排除项仍未实施。
+
+### WL-03 本地交付
+
+用户于本轮明确要求提交，两仓复用现有任务 worktree。fetch 后 origin/main 仍为上述基线；已验收文件哈希与本次输入一致。后端补充对接指南中的 opt-in 契约与 backend → Web 发布顺序，前端同步本地交付状态。提交运行原生 hooks；提交后按两仓 ship 技能对精确 SHA 作独立只读审查。该授权不包括推送、PR、合并或部署。

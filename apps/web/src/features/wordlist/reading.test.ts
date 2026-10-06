@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import type { WordlistDefinition } from "@tsz/types";
-import { selectDefinition } from "./reading";
+import { selectDefinition, selectTexts, phoneticDelimiters } from "./reading";
 const def = (
   id: string,
   level: string,
@@ -24,4 +24,15 @@ it("chooses definition level before language and never raises the reader level",
     selectDefinition([chinese, def("other", "B1", "zh_definition")], "B1")
       ?.grammar_structure_id
   ).toBe("grammar-zh");
+});
+
+it("keeps real dialect variants and avoids duplicate phonetic delimiters", () => {
+  const texts = [{ dialect: "uk" as const }, { dialect: "us" as const }];
+  expect(selectTexts(texts, "BrE")).toEqual([texts[0]]);
+  expect(selectTexts(texts, "AmE")).toEqual([texts[1]]);
+  expect(selectTexts(texts, null)).toEqual(texts);
+  expect(selectTexts([texts[0]!], "AmE")).toEqual([texts[0]]);
+  expect(phoneticDelimiters("/riːd/")).toEqual(["", ""]);
+  expect(phoneticDelimiters("[riːd]")).toEqual(["", ""]);
+  expect(phoneticDelimiters("riːd")).toEqual(["/", "/"]);
 });

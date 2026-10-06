@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/coins-b1a/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-06T14:25:28.267Z",
+  "_source": "/Users/darwish/.codex/worktrees/wordlists-wl03/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-10-06T16:10:59.107Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -697,6 +697,18 @@
         "in": "query",
         "required": false,
         "schema": { "type": "string", "maxLength": 100 }
+      },
+      {
+        "name": "sort",
+        "in": "query",
+        "required": false,
+        "schema": { "$ref": "#/components/schemas/WordlistSort" }
+      },
+      {
+        "name": "view",
+        "in": "query",
+        "required": false,
+        "schema": { "$ref": "#/components/schemas/WordlistView" }
       }
     ],
     "get /wordlists": [
@@ -790,6 +802,18 @@
         "in": "query",
         "required": false,
         "schema": { "type": "string", "maxLength": 100 }
+      },
+      {
+        "name": "sort",
+        "in": "query",
+        "required": false,
+        "schema": { "$ref": "#/components/schemas/WordlistSort" }
+      },
+      {
+        "name": "view",
+        "in": "query",
+        "required": false,
+        "schema": { "$ref": "#/components/schemas/WordlistView" }
       }
     ]
   },

@@ -3,12 +3,17 @@ import { TipPanel } from "./WordlistTips";
 import { useState } from "react";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { RichTextReadOnly } from "@tsz/voice-editor/reader";
+import { ReadingEntry } from "./ReadingEntry";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem
+} from "@tsz/ui/components";
 import type {
   CEFRLevel,
-  EnglishVariant,
-  WordlistEntry,
-  WordlistText,
+  WordlistView,
+  WordlistSort,
   MyWordlistItem,
   SubmitWordlist
 } from "@tsz/types";
@@ -16,13 +21,13 @@ import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
 import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIdentityProvider";
 import { wordListKeys } from "../hooks/useWordLists";
-import {
-  selectDefinition,
-  selectTexts,
-  STATE_LABEL,
-  buttonClass
-} from "../reading";
+import { STATE_LABEL, buttonClass } from "../reading";
 import "@tsz/voice-editor/styles.css";
+const SORT_LABELS: Record<WordlistSort, string> = {
+  author: "作者顺序",
+  label_asc: "词面 A–Z",
+  label_desc: "词面 Z–A"
+};
 export function WordListDetail({
   id,
   mine = false
@@ -54,6 +59,8 @@ function Detail({
   const hydrated = useUserStore((s) => s.hydrated);
   const [page, setPage] = useState(1);
   const [q, setQ] = useState("");
+  const [view, setView] = useState<WordlistView>("standard");
+  const [sort, setSort] = useState<WordlistSort>("author");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [submit, setSubmit] = useState<SubmitWordlist | null>(null);
@@ -68,12 +75,31 @@ function Detail({
         : api.wordList.get(id, { signal })
   });
   const items = useQuery({
-    queryKey: [...keys, "items", id, page, q],
+    queryKey: [...keys, "items", id, page, q, view, sort],
     enabled: meta.isSuccess,
+    refetchOnMount: "always",
     queryFn: ({ signal }) =>
       mine
-        ? api.wordList.myItems(id, { page, q }, { signal })
-        : api.wordList.items(id, { page, q }, { signal })
+        ? api.wordList.myItems(
+            id,
+            {
+              page,
+              q,
+              ...(view === "full" ? { view } : {}),
+              ...(sort !== "author" ? { sort } : {})
+            },
+            { signal }
+          )
+        : api.wordList.items(
+            id,
+            {
+              page,
+              q,
+              ...(view === "full" ? { view } : {}),
+              ...(sort !== "author" ? { sort } : {})
+            },
+            { signal }
+          )
   });
   const profile = useQuery({
     queryKey: [...wordListKeys.mine(userId), "reading-settings"],
@@ -216,8 +242,44 @@ function Detail({
             setPage(1);
           }}
         />
+        <div
+          className="flex rounded-full border border-border p-1"
+          role="group"
+          aria-label="阅读模式"
+        >
+          {(["standard", "full"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              aria-pressed={view === mode}
+              className={`rounded-full px-4 py-2 text-sm ${view === mode ? "bg-primary text-white" : ""}`}
+              onClick={() => setView(mode)}
+            >
+              {mode === "standard" ? "标准模式" : "完整模式"}
+            </button>
+          ))}
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className={buttonClass}>排序：{SORT_LABELS[sort]}</button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {Object.entries(SORT_LABELS).map(([value, label]) => (
+              <DropdownMenuItem
+                key={value}
+                role="menuitemradio"
+                aria-checked={sort === value}
+                onSelect={() => {
+                  setSort(value as WordlistSort);
+                  setPage(1);
+                }}
+              >
+                {label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
         <span className="text-sm text-foreground-muted">
-          标准模式
           {ready
             ? ` · ${level}${!profile.data?.learning_settings && identity.identity !== "teacher" ? " 预览" : ""}`
             : ""}
@@ -233,7 +295,9 @@ function Detail({
         )
       ) : items.isError ? (
         <p role="alert">
-          条目加载失败，
+          {view === "full"
+            ? "完整内容暂不可用，可切回标准模式，或"
+            : "条目加载失败，"}
           <button onClick={() => void items.refetch()}>重试</button>。
         </p>
       ) : !items.data ? (
@@ -250,7 +314,8 @@ function Detail({
                   {item.position + 1}
                 </div>
                 {item.entry ? (
-                  <StandardEntry
+                  <ReadingEntry
+                    full={view === "full"}
                     entry={item.entry}
                     level={level}
                     variant={variant}
@@ -289,85 +354,5 @@ function Detail({
         </>
       )}
     </article>
-  );
-}
-function Texts({
-  texts,
-  variant
-}: {
-  texts: WordlistText[];
-  variant: EnglishVariant | null;
-}) {
-  return (
-    <>
-      {selectTexts(texts, variant).map((text, i) => (
-        <div key={`${text.dialect}:${i}`} className="break-words">
-          {text.dialect !== "common" && (
-            <span className="mr-2 text-xs text-foreground-muted">
-              {text.dialect === "uk" ? "英" : "美"}
-            </span>
-          )}
-          <RichTextReadOnly value={text.content} />
-        </div>
-      ))}
-    </>
-  );
-}
-export function StandardEntry({
-  entry,
-  level,
-  variant
-}: {
-  entry: WordlistEntry;
-  level: CEFRLevel;
-  variant: EnglishVariant | null;
-}) {
-  return (
-    <>
-      <h2 className="break-words text-2xl font-semibold">{entry.label}</h2>
-      {entry.pos.map((pos) => (
-        <div key={pos.pos_id} className="mt-4">
-          <h3 className="text-sm font-medium text-foreground-muted">
-            {pos.pos}
-          </h3>
-          {pos.senses.map((sense) => {
-            const definition = selectDefinition(sense.definitions, level);
-            const grammar = pos.grammar_structures.find(
-              (g) => g.id === definition?.grammar_structure_id
-            );
-            return (
-              <div
-                key={sense.id}
-                className="mt-3 grid gap-3 border-t border-border pt-3 sm:grid-cols-[1fr_1fr]"
-              >
-                <div>
-                  {definition ? (
-                    <>
-                      <span className="mb-2 inline-block rounded-full bg-background px-2 py-1 text-xs">
-                        {definition.level}
-                      </span>
-                      <Texts texts={definition.texts} variant={variant} />
-                      {definition.texts.length === 0 && (
-                        <p>此释义暂无可用文本</p>
-                      )}
-                    </>
-                  ) : (
-                    <p>暂无适合当前等级的释义</p>
-                  )}
-                </div>
-                {grammar && (
-                  <div>
-                    <p className="mb-2 text-xs text-foreground-muted">
-                      语法结构
-                    </p>
-                    <Texts texts={grammar.variants} variant={variant} />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      ))}
-    </>
   );
 }
