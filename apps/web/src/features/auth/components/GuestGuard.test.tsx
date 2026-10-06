@@ -99,3 +99,26 @@ describe("GuestGuard", () => {
     });
   });
 });
+
+it.each([true, false])(
+  "纯邮箱账号（onboarded=%s）优先补绑，保留回跳目标",
+  async (onboarded) => {
+    searchParams.set("redirect", "/student/practice?unit=2");
+    useUserStore.setState({
+      user: { ...USER, phone: undefined, email: "only@example.com" },
+      hydrated: true,
+      onboarded
+    });
+    render(
+      <GuestGuard>
+        <p>登录表单</p>
+      </GuestGuard>
+    );
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith(
+        "/bind-phone?redirect=%2Fstudent%2Fpractice%3Funit%3D2"
+      )
+    );
+    expect(screen.queryByText("登录表单")).not.toBeInTheDocument();
+  }
+);

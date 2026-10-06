@@ -47,6 +47,7 @@ function subscribePreference(callback: () => void) {
 export function TeacherIdentityProvider({ children }: { children: ReactNode }) {
   const userId = useUserStore((s) => s.user?.id);
   const hydrated = useUserStore((s) => s.hydrated);
+  const phone = useUserStore((s) => s.user?.phone);
   const pathname = usePathname();
   const router = useRouter();
   const client = useQueryClient();
@@ -63,7 +64,7 @@ export function TeacherIdentityProvider({ children }: { children: ReactNode }) {
   const query = useQuery({
     queryKey: ["teacher-certification", userId],
     queryFn: ({ signal }) => api.teacherCertification.mine({ signal }),
-    enabled: hydrated && !!userId,
+    enabled: hydrated && !!userId && !!phone,
     retry: false,
     staleTime: 0,
     refetchOnWindowFocus: "always"

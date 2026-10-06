@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/web-onboarding-settings/docs/openapi.json",
-  "_source_sha256": "e97df67ee54ea7fd45a22f1130e4e6ff01690b95b12c4657d39e2d6cea753522",
+  "_source": "/Users/darwish/.codex/worktrees/require-phone-binding/tsz-rust/docs/openapi.json",
+  "_source_sha256": "39b62ad47851d7f29faf116bb5ef135c71bcbde5e4e65c806214869933a22a66",
   "roots": [
     "SharedSentence",
     "SentencePublication",
@@ -665,6 +665,8 @@
         "account_locked",
         "must_change_password",
         "forbidden",
+        "phone_binding_required",
+        "phone_unbind_forbidden",
         "otp_rate_limited",
         "otp_unavailable",
         "account_deletion_channel_unavailable",

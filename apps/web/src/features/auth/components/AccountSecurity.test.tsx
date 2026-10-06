@@ -202,8 +202,12 @@ describe("AccountSecurity", () => {
       expect(
         await screen.findByRole("button", { name: binding })
       ).toBeEnabled();
-      expect(screen.getByRole("button", { name: unlink })).toBeDisabled();
-      expect(screen.getByText(/至少保留一种登录方式/)).toBeInTheDocument();
+      if (unlink === "解绑手机号")
+        expect(
+          screen.queryByRole("button", { name: unlink })
+        ).not.toBeInTheDocument();
+      else expect(screen.getByRole("button", { name: unlink })).toBeDisabled();
+      expect(screen.getByText(/手机号必须保留/)).toBeInTheDocument();
       expect(auth.unbindContact).not.toHaveBeenCalled();
     }
   );
@@ -220,18 +224,18 @@ describe("AccountSecurity", () => {
     );
   });
 
-  it("双渠道账号分别提供换绑和解绑入口", async () => {
+  it("手机号只能换绑，邮箱可以换绑或解绑", async () => {
     seed({ email: EMAIL });
     render(<AccountSecurity />);
-    for (const name of ["换绑手机号", "换绑邮箱", "解绑手机号", "解绑邮箱"]) {
+    for (const name of ["换绑手机号", "换绑邮箱", "解绑邮箱"]) {
       expect(await screen.findByRole("button", { name })).toBeEnabled();
     }
     expect(
       screen.getByRole("button", { name: "换绑手机号" })
     ).toHaveTextContent(/^换绑$/);
     expect(
-      screen.getByRole("button", { name: "解绑手机号" })
-    ).toHaveTextContent(/^解绑$/);
+      screen.queryByRole("button", { name: "解绑手机号" })
+    ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "换绑手机号" }));
     expect(screen.getByLabelText("新手机号")).toBeInTheDocument();
     expect(screen.getByLabelText("新手机号验证码")).toBeInTheDocument();
@@ -325,30 +329,28 @@ describe("AccountSecurity", () => {
     }
   );
 
-  it("解绑允许使用另一在档渠道，发码绑定被解绑的实际联系方式", async () => {
+  it("解绑邮箱保留手机号作为登录方式", async () => {
     seed({ email: EMAIL });
-    await open("解绑手机号");
-    await chooseVerificationEmail();
+    await open("解绑邮箱");
     fireEvent.click(
-      screen.getByRole("button", { name: "向已绑定邮箱发送验证码" })
+      screen.getByRole("button", { name: "向已绑定手机号发送验证码" })
     );
     await waitFor(() =>
       expect(auth.requestContactVerificationCode).toHaveBeenCalledWith({
         operation: "unbind",
-        contact: PHONE,
-        verification_channel: "email"
+        contact: EMAIL,
+        verification_channel: "phone"
       })
     );
     await waitFor(() =>
-      expect(screen.getByLabelText("邮箱验证码")).toBeEnabled()
+      expect(screen.getByLabelText("手机号验证码")).toBeEnabled()
     );
-    fill("邮箱验证码", "123456");
-    expect(screen.queryByLabelText("新邮箱验证码")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "确认解绑手机号" }));
+    fill("手机号验证码", "123456");
+    fireEvent.click(screen.getByRole("button", { name: "确认解绑邮箱" }));
     await waitFor(() =>
       expect(auth.unbindContact).toHaveBeenCalledWith({
-        channel: "phone",
-        verification_channel: "email",
+        channel: "email",
+        verification_channel: "phone",
         verification_code: "123456"
       })
     );

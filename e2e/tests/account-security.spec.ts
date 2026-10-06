@@ -303,9 +303,9 @@ test.describe("账号安全", () => {
     await page.goto("/account");
     await page.getByRole("link", { name: /账号安全/ }).click();
     await expect(page).toHaveURL(/\/account\/security$/);
-    await expect(
-      page.getByRole("button", { name: "解绑手机号" })
-    ).toBeDisabled();
+    await expect(page.getByRole("button", { name: "解绑手机号" })).toHaveCount(
+      0
+    );
     await page.getByRole("button", { name: "绑定邮箱", exact: true }).click();
     await page.getByLabel("新邮箱", { exact: true }).fill(" New@EXAMPLE.com ");
     await page
@@ -339,11 +339,13 @@ test.describe("账号安全", () => {
     ]);
   });
 
-  test("双渠道可用邮箱验证解绑手机，窄屏无横向溢出", async ({ page }) => {
+  test("双渠道可用邮箱验证解绑邮箱，手机号只允许换绑，窄屏无横向溢出", async ({
+    page
+  }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     const requests = await securityApi(page);
     await page.goto("/account/security");
-    await page.getByRole("button", { name: "解绑手机号", exact: true }).click();
+    await page.getByRole("button", { name: "解绑邮箱", exact: true }).click();
     await page.getByRole("combobox", { name: "当前账号的验证方式" }).click();
     await page.getByRole("option", { name: /邮箱：/ }).click();
     await expect(
@@ -358,21 +360,21 @@ test.describe("账号安全", () => {
     await expect(page.getByLabel("邮箱验证码")).toBeEnabled();
     await page.getByLabel("邮箱验证码").fill("123456");
     await expect(page.getByLabel("新手机号验证码")).toHaveCount(0);
-    await page.getByRole("button", { name: "确认解绑手机号" }).click();
+    await page.getByRole("button", { name: "确认解绑邮箱" }).click();
     await expect(page).toHaveURL(/\/login\?security=success$/);
     expect(requests).toEqual([
       {
         path: "/me/contact/verification-code",
         body: {
           operation: "unbind",
-          contact: TEST_USER.phone,
+          contact: TEST_USER.email,
           verification_channel: "email"
         }
       },
       {
         path: "/me/contact/unbind",
         body: {
-          channel: "phone",
+          channel: "email",
           verification_channel: "email",
           verification_code: "123456"
         }

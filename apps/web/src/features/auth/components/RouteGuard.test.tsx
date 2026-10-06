@@ -92,3 +92,31 @@ describe("RouteGuard", () => {
     expect(mockReplace).not.toHaveBeenCalled();
   });
 });
+
+it("未绑手机的旧会话不能访问业务，注销仍可访问", async () => {
+  setState({
+    user: { ...USER, phone: undefined, email: "only@example.com" },
+    hydrated: true,
+    onboarded: true
+  });
+  const { rerender } = render(
+    <RouteGuard>
+      <p>受保护内容</p>
+    </RouteGuard>
+  );
+  await waitFor(() =>
+    expect(mockReplace).toHaveBeenCalledWith(
+      "/bind-phone?redirect=%2Fwordlists"
+    )
+  );
+  expect(screen.queryByText("受保护内容")).not.toBeInTheDocument();
+  mockPathname = "/account/delete";
+  mockReplace.mockClear();
+  rerender(
+    <RouteGuard>
+      <p>注销账号</p>
+    </RouteGuard>
+  );
+  expect(screen.getByText("注销账号")).toBeVisible();
+  expect(mockReplace).not.toHaveBeenCalled();
+});

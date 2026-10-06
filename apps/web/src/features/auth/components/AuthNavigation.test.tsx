@@ -204,3 +204,21 @@ describe("认证表单与访客守卫的导航装配", () => {
     expect(navigation.push).not.toHaveBeenCalled();
   });
 });
+
+it.each(["password", "register"] as const)(
+  "%s 完成后纯邮箱账号必须先绑定手机号",
+  async (mode) => {
+    const response = me(false);
+    response.user = {
+      ...response.user,
+      phone: undefined,
+      email: "only@example.com"
+    };
+    vi.mocked(api.auth.me).mockResolvedValue(response);
+    submit(mode);
+    await waitFor(() =>
+      expect(navigation.replace).toHaveBeenCalledWith("/bind-phone")
+    );
+    expect(navigation.replace).toHaveBeenCalledTimes(1);
+  }
+);

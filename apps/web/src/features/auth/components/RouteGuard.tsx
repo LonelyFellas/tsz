@@ -3,6 +3,7 @@
 import { useEffect, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useUserStore } from "@/stores/user";
+import { phoneBindingRedirect } from "@tsz/shared/auth";
 import { postAuthPath } from "../shared";
 
 interface RouteGuardProps {
@@ -27,6 +28,7 @@ export function RouteGuard({
   const router = useRouter();
   const pathname = usePathname();
 
+  const bindingTarget = hydrated ? phoneBindingRedirect(user, pathname) : null;
   const needsLogin = hydrated && !user;
   const needsOnboarding =
     hydrated && !!user && requireOnboarding && onboarded === false;
@@ -34,13 +36,15 @@ export function RouteGuard({
   useEffect(() => {
     if (needsLogin) {
       router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
+    } else if (bindingTarget) {
+      router.replace(bindingTarget);
     } else if (needsOnboarding) {
       router.replace(postAuthPath(false, pathname));
     }
-  }, [needsLogin, needsOnboarding, pathname, router]);
+  }, [needsLogin, bindingTarget, needsOnboarding, pathname, router]);
 
   // 恢复中或即将跳转：不渲染受保护内容。
-  if (!hydrated || needsLogin || needsOnboarding) {
+  if (!hydrated || needsLogin || bindingTarget || needsOnboarding) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-sm text-foreground-subtle">
         加载中...

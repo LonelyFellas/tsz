@@ -706,7 +706,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "e97df67ee54ea7fd45a22f1130e4e6ff01690b95b12c4657d39e2d6cea753522"
+      "39b62ad47851d7f29faf116bb5ef135c71bcbde5e4e65c806214869933a22a66"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1385,4 +1385,27 @@ describe("统一新密码契约", () => {
       expect.arrayContaining(["password_too_weak", "password_compromised"])
     );
   });
+});
+
+it("手机号必绑错误与业务 403 保持契约，补绑和资料读取端点仍可用", () => {
+  expect(snapshot.schemas.ErrorCode.enum).toEqual(
+    expect.arrayContaining(["phone_binding_required", "phone_unbind_forbidden"])
+  );
+  for (const operation of [
+    "patch /me",
+    "put /me/learning-settings",
+    "post /me/avatar",
+    "post /me/avatar/upload-url",
+    "post /me/contact/unbind"
+  ]) {
+    expect(
+      snapshot.operationSchemas[
+        operation as keyof typeof snapshot.operationSchemas
+      ].responses
+    ).toHaveProperty("403");
+  }
+  expect(snapshot.operationSchemas["get /me"].responses).toHaveProperty("200");
+  expect(
+    snapshot.operationSchemas["post /me/contact/bind"].responses
+  ).toHaveProperty("204");
 });
