@@ -1,6 +1,4 @@
-import { CoinsPanel } from "@/features/practice";
-
-// 学生:天生币余额与获取记录。
+import { redirect } from "next/navigation";
 export default function StudentCoinsPage() {
-  return <CoinsPanel />;
+  redirect("/account/coins");
 }

@@ -16,7 +16,7 @@ import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIden
 // 常用快捷入口。仅保留有真实去处的项;申请成为老师 / 各功能入口已在顶部 MainNav 暴露,
 // 不在本页重复。占位类(邀请好友 / 我的任务 / 设置)待后端就绪再加。
 const TILES: { label: string; href: string; icon: ReactNode }[] = [
-  { label: "我的天生币", href: "/student/coins", icon: <CoinIcon /> },
+  { label: "我的天生币", href: "/account/coins", icon: <CoinIcon /> },
   { label: "我的词表", href: "/wordlists", icon: <ListIcon /> },
   {
     label: "账号安全",

@@ -31,6 +31,9 @@ const API_PREFIX = "/api/v1";
 const ADMIN_LEXICON_PREFIX = `${API_PREFIX}/admin/lexicon`;
 const HTTP_METHODS = ["get", "post", "put", "patch", "delete"];
 const QUERY_CONTRACT_OPERATIONS = new Set([
+  "get /admin/coins/accounts",
+  "get /admin/coins/accounts/{owner_type}/{owner_id}/entries",
+  "get /admin/coins/operations",
   "get /me/coins/entries",
   "get /admin/me/coins/entries",
   "get /admin/lexicon/entries/related-search",
@@ -41,6 +44,9 @@ const QUERY_CONTRACT_OPERATIONS = new Set([
 const RUNTIME_SCHEMA_ROOTS = [
   "AccountDeletionRequest",
   "AccountDeletionState",
+  "CoinAccountPage",
+  "ManualCoinOperation",
+  "ManualCoinOperationPage",
   "CoinWallet",
   "CoinEntryPage",
   "SharedSentence",
@@ -104,11 +110,18 @@ if (!spec?.paths) {
   throw new Error(`spec 无 paths 字段: ${source}`);
 }
 const contractSchemaNames = [
+  "ManualCreditCategory",
+  "ManualCreditRequest",
+  "ManualReversalRequest",
+  "CoinAccount",
   "AccountDeletionRequest",
   "AccountDeletionState",
   "CreateAccountDeletionRequest",
   "DeletionStatus",
   "PaginationMeta",
+  "CoinAccountPage",
+  "ManualCoinOperation",
+  "ManualCoinOperationPage",
   "CoinWallet",
   "CoinEntry",
   "CoinEntryPage",
@@ -505,6 +518,7 @@ for (const [rawPath, item] of Object.entries(spec.paths)) {
       rawPath === `${API_PREFIX}/auth/account` ||
       rawPath.startsWith(`${API_PREFIX}/me/coins/`) ||
       rawPath.startsWith(`${API_PREFIX}/admin/me/coins/`) ||
+      rawPath.startsWith(`${API_PREFIX}/admin/coins/`) ||
       rawPath.startsWith(`${API_PREFIX}/auth/password/`) ||
       rawPath === `${API_PREFIX}/auth/register` ||
       rawPath === `${API_PREFIX}/admin/auth/change-password` ||

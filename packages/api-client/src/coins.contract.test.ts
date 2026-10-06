@@ -115,7 +115,7 @@ describe("coins contract", () => {
   });
   it("generated OpenAPI has exactly four read endpoints and strict amount schemas", () => {
     const paths = Object.entries(snapshot.paths).filter(([path]) =>
-      path.includes("/coins/")
+      path.includes("/me/coins/")
     );
     expect(paths.map(([path]) => path).sort()).toEqual([
       "/admin/me/coins/entries",

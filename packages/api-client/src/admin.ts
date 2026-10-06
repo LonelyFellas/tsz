@@ -1,3 +1,4 @@
+import { createAdminCoinEndpoints } from "./admin-coins";
 import { createCoinEndpoints } from "./coins";
 import {
   createPermissionEndpoints,
@@ -217,6 +218,7 @@ function requireLifecycleBatchIdentity<
 export function createAdminEndpoints(http: HttpClient) {
   return {
     coins: createCoinEndpoints(http),
+    coinManagement: createAdminCoinEndpoints(http),
     permissionSystem: createPermissionEndpoints(http),
     teacherCertification: createAdminTeacherCertificationEndpoints(http),
     sentences: createSharedSentenceEndpoints(http),

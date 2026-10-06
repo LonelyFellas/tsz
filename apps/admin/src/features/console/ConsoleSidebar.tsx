@@ -167,14 +167,7 @@ const GROUPS: Group[] = [
     key: "grp-coin",
     icon: <DollarOutlined />,
     label: "天生币管理",
-    leaves: [
-      {
-        key: "todo:coins",
-        label: "天生币管理",
-        perm: "coins.access",
-        disabled: true
-      }
-    ]
+    leaves: [pageLeaf(ADMIN_PAGE_ROUTES.coins, "天生币管理")]
   }
 ];
 

@@ -1,10 +1,13 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/.codex/worktrees/coins-b1a/tsz-rust/docs/openapi.json",
-  "_source_sha256": "fdeca5bd8536ec0155e307aec3c6a3612971303dd5aecb40d79f6ace106f4e11",
+  "_source_sha256": "ca6d57c4fe542f150fd72e5f9f53abe4c660bf4a820945414fffa2086cf7eb92",
   "roots": [
     "AccountDeletionRequest",
     "AccountDeletionState",
+    "CoinAccountPage",
+    "ManualCoinOperation",
+    "ManualCoinOperationPage",
     "CoinWallet",
     "CoinEntryPage",
     "SharedSentence",
@@ -388,6 +391,38 @@
           "additionalProperties": false
         }
       ]
+    },
+    "CoinAccount": {
+      "type": "object",
+      "required": [
+        "owner_type",
+        "owner_id",
+        "display_name",
+        "account_status",
+        "balance",
+        "status"
+      ],
+      "properties": {
+        "account_status": { "type": "string" },
+        "balance": { "type": "string", "pattern": "^(0|[1-9][0-9]{0,18})$" },
+        "display_name": { "type": "string" },
+        "owner_id": { "type": "string", "format": "uuid" },
+        "owner_type": { "$ref": "#/$defs/OwnerType" },
+        "status": { "$ref": "#/$defs/WalletStatus" }
+      },
+      "additionalProperties": false
+    },
+    "CoinAccountPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/CoinAccount" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
     },
     "CoinEntry": {
       "type": "object",
@@ -778,6 +813,13 @@
         "forbidden",
         "otp_rate_limited",
         "otp_unavailable",
+        "coin_invalid_amount",
+        "coin_account_unavailable",
+        "coin_wallet_unavailable",
+        "coin_insufficient_balance",
+        "coin_idempotency_conflict",
+        "coin_source_conflict",
+        "coin_reversal_invalid",
         "account_deletion_upgrade_required",
         "account_deletion_consent_required",
         "account_deletion_consent_outdated",
@@ -1111,6 +1153,58 @@
         "source": { "$ref": "#/$defs/InboundReferenceSourceV3" },
         "stale": { "type": "boolean" },
         "target": { "$ref": "#/$defs/InboundReferenceTargetV3" }
+      },
+      "additionalProperties": false
+    },
+    "ManualCoinOperation": {
+      "type": "object",
+      "required": [
+        "id",
+        "owner_type",
+        "owner_id",
+        "actor_id",
+        "source_type",
+        "event_id",
+        "delta",
+        "balance_after",
+        "reason",
+        "created_at"
+      ],
+      "properties": {
+        "actor_id": { "type": "string", "format": "uuid" },
+        "balance_after": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$"
+        },
+        "created_at": { "type": "string", "format": "date-time" },
+        "delta": { "type": "string", "pattern": "^-?[1-9][0-9]{0,18}$" },
+        "event_id": { "type": "string" },
+        "evidence_ref": { "type": ["string", "null"] },
+        "id": { "type": "string", "format": "uuid" },
+        "owner_id": { "type": "string", "format": "uuid" },
+        "owner_type": { "$ref": "#/$defs/OwnerType" },
+        "reason": { "type": "string" },
+        "reversed_by_operation_id": {
+          "type": ["string", "null"],
+          "format": "uuid"
+        },
+        "reverses_operation_id": {
+          "type": ["string", "null"],
+          "format": "uuid"
+        },
+        "source_type": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "ManualCoinOperationPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ManualCoinOperation" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
       },
       "additionalProperties": false
     },

@@ -133,7 +133,7 @@ describe("ProfileHub — 渲染", () => {
     await screen.findByText("Along");
     expect(screen.getByRole("link", { name: /我的天生币/ })).toHaveAttribute(
       "href",
-      "/student/coins"
+      "/account/coins"
     );
     expect(screen.getByRole("link", { name: /账号安全/ })).toHaveAttribute(
       "href",

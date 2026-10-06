@@ -1,5 +1,8 @@
 /** 前端只匹配已实现的稳定业务 key，未知 key（包括通配符）永不授权。 */
 export const ADMIN_PERMISSION_DEPENDENCIES = {
+  "coins.access": [],
+  "coins.credit": ["coins.access"],
+  "coins.reverse": ["coins.access"],
   "words.access": [],
   "words.create": ["words.access"],
   "words.detect": ["words.access"],

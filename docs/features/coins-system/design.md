@@ -1,7 +1,7 @@
 # 天生币系统技术方案
 
 维护位置：`/Users/darwish/Dev/tsz-core/tsz-coins-b1a/docs/features/coins-system/` 是本次实施的唯一维护目录；`9adc` 工作区保留为只读评估来源。
-状态：2026-10-06 B1a（COIN-01～03）已实现并验收；B1b（COIN-04～05）也已完成，见 [B1b 验收](b1b-acceptance.md)。B1a 记录见 [b1a-acceptance.md](b1a-acceptance.md)。业务范围、批次和决定记录见 [requirements.md](requirements.md)。
+状态：2026-10-06 B1a（COIN-01～03）已实现并验收；B1b（COIN-04～05）也已完成，见 [B1b 验收](b1b-acceptance.md)。B1a 记录见 [b1a-acceptance.md](b1a-acceptance.md)。B2（COIN-06～09）实现与验收见 [b2-acceptance.md](b2-acceptance.md)。业务范围、批次和决定记录见 [requirements.md](requirements.md)。
 
 实施任务、依赖和状态见 [tasks.md](tasks.md)。
 
@@ -135,7 +135,7 @@ coins 核心建议三张表；B1b 在账号模块另加持久化注销申请表�
 
 ## 5. API 与前端接入草案
 
-下列均为拟新增端点，不代表当前后端已有。最终契约由后端 OpenAPI 生成，前端不能先将臆造路径当成可用。
+下表中 B1/B1b/B2 端点已实现并由原生 OpenAPI 生成链同步；B3 端点仍为草案。具体 wire 和验收记录以相应批次生成契约为准。
 
 | 批次 | 方法与路径（统一前缀 `/api/v1`）                            | 边界                                                                                 |
 | ---- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------ |

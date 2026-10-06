@@ -29,9 +29,9 @@ export function MainNav() {
         {isStudent && (
           <>
             <Link href="/student/practice">练习</Link>
-            <Link href="/student/coins">天生币</Link>
           </>
         )}
+        {user && <Link href="/account/coins">天生币</Link>}
         {!teacher.verified && (
           <Link href="/apply-teacher" className="text-primary">
             申请成为老师

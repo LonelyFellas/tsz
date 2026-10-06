@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/.codex/worktrees/coins-b1a/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-06T07:46:49.855Z",
+  "_generatedAt": "2026-10-06T09:28:44.227Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -16,6 +16,11 @@
     "/admin/auth/logout": ["post"],
     "/admin/auth/logout-all": ["post"],
     "/admin/auth/refresh": ["post"],
+    "/admin/coins/accounts": ["get"],
+    "/admin/coins/accounts/{owner_type}/{owner_id}/entries": ["get"],
+    "/admin/coins/manual-credits": ["post"],
+    "/admin/coins/manual-credits/{operation_id}/reversal": ["post"],
+    "/admin/coins/operations": ["get"],
     "/admin/lexicon/audio-assets": ["post"],
     "/admin/lexicon/audio-assets/upload-url": ["post"],
     "/admin/lexicon/audio-assets/{id}/url": ["get"],
@@ -229,6 +234,113 @@
     ]
   },
   "operationQueryParameters": {
+    "get /admin/coins/accounts": [
+      {
+        "name": "owner_type",
+        "in": "query",
+        "required": true,
+        "schema": { "$ref": "#/components/schemas/OwnerType" }
+      },
+      {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "format": "int32", "minimum": 0 }
+      },
+      {
+        "name": "page_size",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "format": "int32", "minimum": 0 }
+      },
+      {
+        "name": "search",
+        "in": "query",
+        "required": true,
+        "schema": { "type": "string" }
+      }
+    ],
+    "get /admin/coins/accounts/{owner_type}/{owner_id}/entries": [
+      {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int32",
+          "default": 1,
+          "minimum": 1
+        }
+      },
+      {
+        "name": "page_size",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int32",
+          "default": 20,
+          "maximum": 100,
+          "minimum": 1
+        }
+      },
+      {
+        "name": "snapshot",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "pattern": "^(0|[1-9][0-9]{0,18})$" }
+      }
+    ],
+    "get /admin/coins/operations": [
+      {
+        "name": "actor_id",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      {
+        "name": "created_from",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "format": "date-time" }
+      },
+      {
+        "name": "created_to",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "format": "date-time" }
+      },
+      {
+        "name": "owner_id",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      {
+        "name": "owner_type",
+        "in": "query",
+        "required": false,
+        "schema": { "$ref": "#/components/schemas/OwnerType" }
+      },
+      {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "format": "int32", "minimum": 0 }
+      },
+      {
+        "name": "page_size",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "format": "int32", "minimum": 0 }
+      },
+      {
+        "name": "source_type",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      }
+    ],
     "get /admin/lexicon/entries/related-search": [
       {
         "name": "cursor",
@@ -399,6 +511,54 @@
         "204": null,
         "400": { "$ref": "#/components/schemas/ProblemDetails" },
         "401": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/coins/accounts": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/CoinAccountPage" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/coins/accounts/{owner_type}/{owner_id}/entries": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/CoinEntryPage" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/coins/manual-credits": {
+      "request": { "$ref": "#/components/schemas/ManualCreditRequest" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/ManualCoinOperation" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/coins/manual-credits/{operation_id}/reversal": {
+      "request": { "$ref": "#/components/schemas/ManualReversalRequest" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/ManualCoinOperation" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/coins/operations": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/ManualCoinOperationPage" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
     "post /admin/lexicon/audio-assets": {
@@ -1162,6 +1322,67 @@
     }
   },
   "schemas": {
+    "ManualCreditCategory": {
+      "type": "string",
+      "enum": ["purchase", "reward"]
+    },
+    "ManualCreditRequest": {
+      "type": "object",
+      "required": [
+        "owner_type",
+        "owner_id",
+        "amount",
+        "category",
+        "event_id",
+        "reason",
+        "idempotency_key"
+      ],
+      "properties": {
+        "amount": { "type": "string", "pattern": "^[1-9][0-9]{0,18}$" },
+        "category": { "$ref": "#/components/schemas/ManualCreditCategory" },
+        "event_id": {
+          "type": "string",
+          "description": "Stable verification number for purchases, stable business event ID for rewards.",
+          "maxLength": 200,
+          "minLength": 1
+        },
+        "evidence_ref": { "type": ["string", "null"], "maxLength": 500 },
+        "idempotency_key": { "type": "string", "format": "uuid" },
+        "owner_id": { "type": "string", "format": "uuid" },
+        "owner_type": { "$ref": "#/components/schemas/OwnerType" },
+        "reason": { "type": "string", "maxLength": 1000, "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "ManualReversalRequest": {
+      "type": "object",
+      "required": ["idempotency_key", "reason"],
+      "properties": {
+        "idempotency_key": { "type": "string", "format": "uuid" },
+        "reason": { "type": "string", "maxLength": 1000, "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "CoinAccount": {
+      "type": "object",
+      "required": [
+        "owner_type",
+        "owner_id",
+        "display_name",
+        "account_status",
+        "balance",
+        "status"
+      ],
+      "properties": {
+        "account_status": { "type": "string" },
+        "balance": { "type": "string", "pattern": "^(0|[1-9][0-9]{0,18})$" },
+        "display_name": { "type": "string" },
+        "owner_id": { "type": "string", "format": "uuid" },
+        "owner_type": { "$ref": "#/components/schemas/OwnerType" },
+        "status": { "$ref": "#/components/schemas/WalletStatus" }
+      },
+      "additionalProperties": false
+    },
     "AccountDeletionRequest": {
       "type": "object",
       "required": [
@@ -1262,6 +1483,70 @@
         "total": { "type": "integer", "format": "int64" },
         "total_pages": { "type": "integer", "format": "int64" }
       }
+    },
+    "CoinAccountPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/CoinAccount" }
+        },
+        "pagination": { "$ref": "#/components/schemas/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "ManualCoinOperation": {
+      "type": "object",
+      "required": [
+        "id",
+        "owner_type",
+        "owner_id",
+        "actor_id",
+        "source_type",
+        "event_id",
+        "delta",
+        "balance_after",
+        "reason",
+        "created_at"
+      ],
+      "properties": {
+        "actor_id": { "type": "string", "format": "uuid" },
+        "balance_after": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$"
+        },
+        "created_at": { "type": "string", "format": "date-time" },
+        "delta": { "type": "string", "pattern": "^-?[1-9][0-9]{0,18}$" },
+        "event_id": { "type": "string" },
+        "evidence_ref": { "type": ["string", "null"] },
+        "id": { "type": "string", "format": "uuid" },
+        "owner_id": { "type": "string", "format": "uuid" },
+        "owner_type": { "$ref": "#/components/schemas/OwnerType" },
+        "reason": { "type": "string" },
+        "reversed_by_operation_id": {
+          "type": ["string", "null"],
+          "format": "uuid"
+        },
+        "reverses_operation_id": {
+          "type": ["string", "null"],
+          "format": "uuid"
+        },
+        "source_type": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "ManualCoinOperationPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/ManualCoinOperation" }
+        },
+        "pagination": { "$ref": "#/components/schemas/PaginationMeta" }
+      },
+      "additionalProperties": false
     },
     "CoinWallet": {
       "type": "object",
@@ -1534,6 +1819,13 @@
         "forbidden",
         "otp_rate_limited",
         "otp_unavailable",
+        "coin_invalid_amount",
+        "coin_account_unavailable",
+        "coin_wallet_unavailable",
+        "coin_insufficient_balance",
+        "coin_idempotency_conflict",
+        "coin_source_conflict",
+        "coin_reversal_invalid",
         "account_deletion_upgrade_required",
         "account_deletion_consent_required",
         "account_deletion_consent_outdated",

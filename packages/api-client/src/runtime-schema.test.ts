@@ -37,6 +37,9 @@ const runtimeSchemaBundle =
 const ROOTS = [
   "AccountDeletionRequest",
   "AccountDeletionState",
+  "CoinAccountPage",
+  "ManualCoinOperation",
+  "ManualCoinOperationPage",
   "CoinWallet",
   "CoinEntryPage",
   "SharedSentence",

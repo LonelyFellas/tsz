@@ -61,6 +61,16 @@ function SessionRestorer() {
 export function Providers({ children }: { children: React.ReactNode }) {
   // getQueryClient 在浏览器端返回单例,不放进 useState 也安全。
   const queryClient = getQueryClient();
+  useEffect(
+    () =>
+      useUserStore.subscribe((state, previous) => {
+        if (state.user?.id !== previous.user?.id) {
+          void queryClient.cancelQueries({ queryKey: ["coins"] });
+          queryClient.removeQueries({ queryKey: ["coins"] });
+        }
+      }),
+    [queryClient]
+  );
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -2,7 +2,7 @@ import type { CoinEntriesQuery, CoinEntryPage, CoinWallet } from "@tsz/types";
 import type { HttpClient } from "./http";
 import { validateRuntimeSchema } from "./runtime-schema";
 
-function checkInteger(value: string) {
+export function checkInteger(value: string) {
   const amount = BigInt(value);
   // Entry deltas originate from positive i64 amounts, so i64::MIN is also excluded.
   if (amount < -9223372036854775807n || amount > 9223372036854775807n)

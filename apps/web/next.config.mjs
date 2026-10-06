@@ -40,6 +40,15 @@ const nextConfig = {
     "@tsz/types",
     "@tsz/api-client"
   ],
+  async redirects() {
+    return [
+      {
+        source: "/student/coins",
+        destination: "/account/coins",
+        permanent: true
+      }
+    ];
+  },
   async rewrites() {
     // 默认指向本地 tsz-rust(cargo run,端口 8383);生产部署用 BACKEND_API_URL 覆盖。
     const backendBase =
