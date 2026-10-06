@@ -47,8 +47,6 @@ const PENDING = new Set<string>([
   // ---- 后端已切换为 tsz-rust(重写进行中),spec 只含 auth 核心 7 条路由。 ----
   // 以下按 tsz-rust 落地节奏逐步从白名单移除(T 系列见 tsz-rust/docs/frontend-integration.md §6)。
 
-  // 学习设置(tsz-rust 未实现)。
-  "put /me/learning-settings",
   // 词库 / 词表 / 评论 / 任务:目前全是前端 mock(useWordLists 等),后端未实现。
   "get /words",
   "get /wordlists",
@@ -161,6 +159,40 @@ function collectComponentSchemaRefs(value: unknown): Set<string> {
 
   return refs;
 }
+
+describe("个人学习配置契约", () => {
+  it("真实读取为必填可空配置，保存严格成对字段并公开锁定错误", () => {
+    expect(specPaths["/me"]).toContain("get");
+    expect(specPaths["/me/learning-settings"]).toContain("put");
+    expect(snapshot.schemas.MeResponse.required.slice().sort()).toEqual(
+      ["user", "active_role", "learning_settings", "onboarded"].sort()
+    );
+    expect(snapshot.schemas.MeResponse.properties.learning_settings).toEqual({
+      oneOf: [
+        { type: "null" },
+        { $ref: "#/components/schemas/LearningSettings" }
+      ]
+    });
+    expect(snapshot.schemas.LearningSettings.additionalProperties).toBe(false);
+    expect(snapshot.schemas.LearningSettings.required.slice().sort()).toEqual([
+      "cefr_level",
+      "english_variant"
+    ]);
+    expect(snapshot.schemas.CefrLevel.enum).toEqual([
+      "A1",
+      "A2",
+      "B1",
+      "B2",
+      "C1",
+      "C2"
+    ]);
+    expect(snapshot.schemas.EnglishVariant.enum).toEqual(["BrE", "AmE"]);
+    expect(snapshot.schemas.ErrorCode.enum).toContain("cefr_level_locked");
+    expect(
+      snapshot.operationSchemas["put /me/learning-settings"].responses
+    ).toHaveProperty("409");
+  });
+});
 
 describe("昵称保存契约", () => {
   it("PATCH /me 仅允许 display_name，成功响应为安全的完整 user", () => {
@@ -674,7 +706,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "156d5a03a8baf392f1c00aa298d0cc347199b32f141d19524567a3c1fc0461e7"
+      "e97df67ee54ea7fd45a22f1130e4e6ff01690b95b12c4657d39e2d6cea753522"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");

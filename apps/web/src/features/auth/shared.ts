@@ -2,6 +2,7 @@ import { HttpError, type AuthResponse } from "@tsz/api-client";
 import { passwordErrorMessage } from "@tsz/shared/auth";
 import { PASSWORD_MIN_LENGTH } from "@tsz/shared";
 import { safeRedirectPath } from "@tsz/shared/auth";
+import type { Role } from "@tsz/types";
 import { api, persistSession as persistRuntimeSession } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
 
@@ -58,13 +59,20 @@ export function securityErrorMessage(error: unknown): string {
 
 export function postAuthPath(
   onboarded: boolean,
-  redirect: string | null
+  redirect: string | null,
+  roles: readonly Role[] = []
 ): string {
-  if (!onboarded) return ONBOARDING_PATH;
   const target = safeRedirectPath(redirect);
   const pathname = decodeURIComponent(target.split(/[?#]/)[0]!);
-  // 登录/注册/找回密码共享访客守卫，回跳到这些页面会形成导航循环。
-  return /^\/(login|register|forgot-password)(\/|$)/i.test(pathname)
+  const teacherReturn =
+    roles.includes("teacher") && /^\/teacher(\/|$)/.test(pathname);
+  if (!onboarded && !teacherReturn) {
+    return target === "/"
+      ? ONBOARDING_PATH
+      : `${ONBOARDING_PATH}?redirect=${encodeURIComponent(target)}`;
+  }
+  // 完成后的回跳不能再次落入认证或引导流程。
+  return /^\/(login|register|forgot-password|onboarding)(\/|$)/i.test(pathname)
     ? "/"
     : target;
 }

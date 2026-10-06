@@ -6,7 +6,8 @@ import {
   waitFor
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AuthResponse, MeResponse } from "@tsz/api-client";
+import type { AuthResponse } from "@tsz/api-client";
+import type { MeResponse } from "@tsz/types";
 import { GuestGuard } from "./GuestGuard";
 import { LoginForm } from "./LoginForm";
 import { RegisterForm } from "./RegisterForm";
@@ -150,7 +151,9 @@ describe("认证表单与访客守卫的导航装配", () => {
       vi.mocked(api.auth.me).mockResolvedValue(me(false));
       submit(mode);
       await waitFor(() =>
-        expect(navigation.replace).toHaveBeenCalledWith("/onboarding")
+        expect(navigation.replace).toHaveBeenCalledWith(
+          "/onboarding?redirect=%2Fstudent%2Fpractice"
+        )
       );
       expect(navigation.replace).toHaveBeenCalledTimes(1);
       expect(navigation.push).not.toHaveBeenCalled();

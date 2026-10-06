@@ -1,6 +1,6 @@
 "use client";
 
-import { HttpError, type MeResponse } from "@tsz/api-client";
+import { HttpError } from "@tsz/api-client";
 import {
   DISPLAY_NAME_MAX,
   displayNameError,
@@ -10,7 +10,7 @@ import {
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import type { User } from "@tsz/types";
+import type { EnglishVariant, MeResponse, User } from "@tsz/types";
 import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
 import { VARIANT_LABEL, displayNameOf } from "@/lib/user";
@@ -78,6 +78,32 @@ export function EditProfileForm() {
   // 进入页面拉取的最新资料(含 learning_settings,store 不持有它)。
   const [me, setMe] = useState<MeResponse | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const [variant, setVariant] = useState<EnglishVariant | null>(null);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsError, setSettingsError] = useState("");
+  const [settingsSuccess, setSettingsSuccess] = useState(false);
+  const [difficultyHelpOpen, setDifficultyHelpOpen] = useState(false);
+  const difficultyHelpRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!difficultyHelpOpen) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (!difficultyHelpRef.current?.contains(event.target as Node)) {
+        setDifficultyHelpOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setDifficultyHelpOpen(false);
+      difficultyHelpRef.current?.querySelector("button")?.focus();
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [difficultyHelpOpen]);
 
   // 表单字段。
   const [displayName, setDisplayName] = useState("");
@@ -101,6 +127,7 @@ export function EditProfileForm() {
         if (!alive) return;
         setMe(data);
         setDisplayName(data.user.display_name ?? "");
+        setVariant(data.learning_settings?.english_variant ?? null);
       })
       .catch(() => {
         if (alive) setLoadError(true);
@@ -186,6 +213,45 @@ export function EditProfileForm() {
     }
   }
 
+  async function handleLearningSettingsSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (
+      !learning_settings ||
+      variant === null ||
+      settingsSaving ||
+      variant === learning_settings.english_variant
+    )
+      return;
+    setSettingsError("");
+    setSettingsSuccess(false);
+    setSettingsSaving(true);
+    try {
+      const result = await api.auth.updateLearningSettings({
+        cefr_level: learning_settings.cefr_level,
+        english_variant: variant
+      });
+      setMe((prev) =>
+        prev
+          ? {
+              ...prev,
+              learning_settings: result.learning_settings,
+              onboarded: result.onboarded
+            }
+          : prev
+      );
+      setVariant(result.learning_settings.english_variant);
+      setSettingsSuccess(true);
+    } catch (error: unknown) {
+      setSettingsError(
+        error instanceof HttpError && error.code === "cefr_level_locked"
+          ? "难度首次确认后不可修改，请刷新页面后重试"
+          : "英美偏好保存失败，请稍后重试"
+      );
+    } finally {
+      setSettingsSaving(false);
+    }
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     // avatarUploading 同样拦截:互斥不能只靠按钮 disabled,
@@ -244,7 +310,7 @@ export function EditProfileForm() {
         编辑资料
       </h1>
       <p className="mt-3 text-sm leading-6 text-foreground-muted">
-        修改头像和昵称。
+        修改头像、昵称和英美偏好。
       </p>
 
       <div className="mt-8 rounded-3xl border border-border bg-surface p-5 shadow-xl shadow-black/5 sm:p-8">
@@ -301,26 +367,132 @@ export function EditProfileForm() {
               {topContact}
             </p>
           )}
-
-          {/* 等级 / 口音:本页只读 */}
-          {learning_settings && (
-            <div className="flex items-center justify-center gap-2">
-              <span className="rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold text-white">
-                {learning_settings.cefr_level}
-              </span>
-              <span className="rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold text-white">
-                {VARIANT_LABEL[learning_settings.english_variant]}
-              </span>
-            </div>
-          )}
-          <p className="text-xs text-foreground-subtle">
-            修改学习等级请联系客服
-          </p>
         </div>
 
         <div className="mb-7 h-px bg-muted" />
 
-        <form className="space-y-5" onSubmit={handleSubmit}>
+        {user.roles.includes("student") && (
+          <section
+            className="mb-7 border-b border-border pb-7"
+            aria-labelledby="learning-settings-title"
+          >
+            <h2
+              id="learning-settings-title"
+              className="text-base font-semibold"
+            >
+              个人学习配置
+            </h2>
+            {learning_settings ? (
+              <form
+                onSubmit={handleLearningSettingsSubmit}
+                className="mt-4 space-y-4"
+              >
+                <div
+                  ref={difficultyHelpRef}
+                  className="relative flex items-center gap-2 text-sm"
+                >
+                  <span className="text-foreground-muted">难度级别</span>
+                  <span className="font-semibold text-foreground">
+                    {learning_settings.cefr_level}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="难度级别说明"
+                    aria-expanded={difficultyHelpOpen}
+                    aria-controls="difficulty-help"
+                    onClick={() => setDifficultyHelpOpen((open) => !open)}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-full text-foreground-muted hover:bg-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      aria-hidden
+                    >
+                      <circle cx="12" cy="12" r="9" />
+                      <path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2.5 1.5-2.5 3" />
+                      <path d="M12 16h.01" />
+                    </svg>
+                  </button>
+                  {difficultyHelpOpen && (
+                    <div
+                      id="difficulty-help"
+                      role="tooltip"
+                      className="absolute left-0 top-full z-10 mt-2 w-60 max-w-full rounded-xl border border-border bg-surface px-4 py-3 text-xs leading-6 text-foreground shadow-lg shadow-black/10"
+                    >
+                      如需修改，请联系官方客服
+                    </div>
+                  )}
+                </div>
+                <fieldset disabled={settingsSaving}>
+                  <legend className="mb-2 text-sm font-medium text-foreground-muted">
+                    英美偏好
+                  </legend>
+                  <div className="flex flex-wrap gap-5">
+                    {(["BrE", "AmE"] as const).map((value) => (
+                      <label
+                        key={value}
+                        className="flex cursor-pointer items-center gap-2 text-sm"
+                      >
+                        <input
+                          type="radio"
+                          name="profile-english-variant"
+                          value={value}
+                          checked={variant === value}
+                          onChange={() => {
+                            setVariant(value);
+                            setSettingsError("");
+                            setSettingsSuccess(false);
+                          }}
+                          className="h-4 w-4 accent-primary"
+                        />
+                        {VARIANT_LABEL[value]}英语（{value}）
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                {settingsError && (
+                  <p role="alert" className="text-sm text-danger">
+                    {settingsError}
+                  </p>
+                )}
+                {settingsSuccess && (
+                  <p role="status" className="text-sm text-success">
+                    偏好已保存
+                  </p>
+                )}
+                <button
+                  type="submit"
+                  disabled={
+                    settingsSaving ||
+                    variant === null ||
+                    variant === learning_settings.english_variant
+                  }
+                  className="rounded-full bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {settingsSaving ? "保存中…" : "保存偏好"}
+                </button>
+              </form>
+            ) : (
+              <Link
+                href="/onboarding"
+                className="mt-3 inline-block text-sm text-primary hover:underline"
+              >
+                完成学习配置
+              </Link>
+            )}
+          </section>
+        )}
+
+        <form
+          aria-label="修改昵称"
+          className="space-y-5"
+          onSubmit={handleSubmit}
+        >
           {/* 昵称 */}
           <div>
             <label

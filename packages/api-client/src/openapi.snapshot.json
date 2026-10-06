@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/pronunciation-dual-accent-20261004/docs/openapi.json",
-  "_generatedAt": "2026-10-04T09:50:08.518Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/web-onboarding-settings/docs/openapi.json",
+  "_generatedAt": "2026-10-05T15:21:00.402Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -99,13 +99,14 @@
     "/auth/refresh": ["post"],
     "/auth/register": ["post"],
     "/avatars/{id}": ["get"],
-    "/me": ["patch"],
+    "/me": ["get", "patch"],
     "/me/avatar": ["post"],
     "/me/avatar/upload-url": ["post"],
     "/me/contact/bind": ["post"],
     "/me/contact/bind-code": ["post"],
     "/me/contact/unbind": ["post"],
     "/me/contact/verification-code": ["post"],
+    "/me/learning-settings": ["put"],
     "/me/notifications": ["get"],
     "/me/notifications/{id}/read": ["patch"],
     "/me/teacher-certification": ["get"],
@@ -905,6 +906,14 @@
         "503": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
+    "get /me": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/MeResponse" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "500": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "patch /me": {
       "request": { "$ref": "#/components/schemas/UpdateProfileRequest" },
       "responses": {
@@ -986,6 +995,19 @@
         "429": { "$ref": "#/components/schemas/ProblemDetails" },
         "503": { "$ref": "#/components/schemas/ProblemDetails" }
       }
+    },
+    "put /me/learning-settings": {
+      "request": { "$ref": "#/components/schemas/LearningSettings" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/LearningSettingsResponse" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "413": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "500": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
     }
   },
   "schemas": {
@@ -1017,6 +1039,45 @@
       }
     },
     "UserRole": { "type": "string", "enum": ["student", "teacher"] },
+    "MeResponse": {
+      "type": "object",
+      "required": ["user", "active_role", "learning_settings", "onboarded"],
+      "properties": {
+        "active_role": { "$ref": "#/components/schemas/UserRole" },
+        "learning_settings": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/components/schemas/LearningSettings" }
+          ]
+        },
+        "onboarded": { "type": "boolean" },
+        "user": { "$ref": "#/components/schemas/UserProfile" }
+      }
+    },
+    "LearningSettings": {
+      "type": "object",
+      "required": ["cefr_level", "english_variant"],
+      "properties": {
+        "cefr_level": { "$ref": "#/components/schemas/CefrLevel" },
+        "english_variant": { "$ref": "#/components/schemas/EnglishVariant" }
+      },
+      "additionalProperties": false
+    },
+    "LearningSettingsResponse": {
+      "type": "object",
+      "required": ["learning_settings", "onboarded"],
+      "properties": {
+        "learning_settings": {
+          "$ref": "#/components/schemas/LearningSettings"
+        },
+        "onboarded": { "type": "boolean" }
+      }
+    },
+    "CefrLevel": {
+      "type": "string",
+      "enum": ["A1", "A2", "B1", "B2", "C1", "C2"]
+    },
+    "EnglishVariant": { "type": "string", "enum": ["BrE", "AmE"] },
     "UpdateProfileResponse": {
       "type": "object",
       "required": ["user"],
@@ -1167,6 +1228,7 @@
         "sub_part_of_speech_conflict",
         "annotation_conflict",
         "revision_conflict",
+        "cefr_level_locked",
         "reference_conflict",
         "relation_prebinding_fanout_exceeded",
         "stable_node_id_changed",

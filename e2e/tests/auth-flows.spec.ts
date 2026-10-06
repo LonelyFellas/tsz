@@ -54,7 +54,7 @@ test.describe("鉴权与引导端到端流程", () => {
       }
     });
   }
-  test("新用户验证码注册 → 直接建立会话进入主页", async ({ page }) => {
+  test("新用户验证码注册 → 直接建立会话进入首次引导", async ({ page }) => {
     await mockApi(page, { authenticated: false });
 
     await page.goto("/register");
@@ -68,9 +68,10 @@ test.describe("鉴权与引导端到端流程", () => {
       .fill(" Mixed!密码🙂 river cloud ");
     await page.getByRole("button", { name: "立即注册" }).click();
 
-    // /auth/register 直接返回会话；me() 适配器恒 onboarded:true，进入主页。
-    await expect(page).toHaveURL(/\/$/);
-    await expect(page.getByRole("button", { name: "账户菜单" })).toBeVisible();
+    await expect(page).toHaveURL(/\/onboarding$/);
+    await expect(
+      page.getByRole("heading", { name: "1. 选择难度级别" })
+    ).toBeVisible();
   });
 
   test("注册成功后的资料失败可重试，不再次提交注册", async ({ page }) => {
@@ -82,7 +83,7 @@ test.describe("鉴权与引导端到端流程", () => {
         registerCount++;
       }
     });
-    await page.route("**/api/v1/auth/me", async (route) => {
+    await page.route("**/api/v1/me", async (route) => {
       meCount++;
       if (meCount === 1) {
         await route.fulfill({ status: 503, body: "unavailable" });
@@ -102,7 +103,7 @@ test.describe("鉴权与引导端到端流程", () => {
     ).toBeVisible();
     await expect(page.getByPlaceholder("请输入手机号")).toBeDisabled();
     await page.getByRole("button", { name: "重试加载" }).click();
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/onboarding$/);
     expect(registerCount).toBe(1);
     expect(meCount).toBe(2);
   });
@@ -148,10 +149,19 @@ test.describe("鉴权与引导端到端流程", () => {
         }
       });
     });
-    await page.route("**/api/v1/auth/me", async (route) => {
+    await page.route("**/api/v1/me", async (route) => {
       profiles++;
       await route.fulfill(
-        profiles === 1 ? { status: 503, body: "unavailable" } : { json: user }
+        profiles === 1
+          ? { status: 503, body: "unavailable" }
+          : {
+              json: {
+                user,
+                active_role: user.active_role,
+                learning_settings: null,
+                onboarded: false
+              }
+            }
       );
     });
     await page.goto("/login?redirect=%2Fstudent%2Fpractice");
@@ -190,7 +200,9 @@ test.describe("鉴权与引导端到端流程", () => {
       page.getByRole("tab", { name: "手机", exact: true })
     ).toBeDisabled();
     await page.getByRole("button", { name: "重试加载" }).click();
-    await expect(page).toHaveURL(/\/student\/practice$/);
+    await expect(page).toHaveURL(
+      /\/onboarding\?redirect=%2Fstudent%2Fpractice$/
+    );
     expect(registrations).toBe(1);
     expect(profiles).toBe(2);
   });
@@ -252,23 +264,83 @@ test.describe("鉴权与引导端到端流程", () => {
     await expect(page.getByRole("button", { name: "账户菜单" })).toBeVisible();
   });
 
-  test("显式访问引导页 → 选择难度与口音 → 保存后进入主页", async ({ page }) => {
-    await mockApi(page, { authenticated: true });
-
-    // 引导页不再对已 onboarded 用户自动弹回:定级测试 CTA / 直接访问一律放行。
+  test("未配置账号 → 确认难度与口音 → 保存后进入主页", async ({ page }) => {
+    await mockApi(page, { authenticated: true, onboarded: false });
     await page.goto("/onboarding");
     await expect(
       page.getByRole("heading", { name: "1. 选择难度级别" })
     ).toBeVisible();
-
-    // 选难度等级 + 英式，提交。
     await page.getByText("B1", { exact: true }).click();
-    await page.getByRole("button", { name: /英式英语/ }).click();
+    await page.getByText("英式英语", { exact: true }).click();
     await page.getByRole("button", { name: "完成，开始学习" }).click();
-
-    // 完成后进入主页，顶栏出现账户菜单（已登录态）。
+    await expect(
+      page.getByText("难度确认后不可修改；英美偏好之后仍可调整。")
+    ).toBeVisible();
+    const saved = page.waitForRequest("**/api/v1/me/learning-settings");
+    await page.getByRole("button", { name: "确认并开始学习" }).click();
+    expect((await saved).postDataJSON()).toEqual({
+      cefr_level: "B1",
+      english_variant: "BrE"
+    });
     await expect(page).toHaveURL(/\/$/);
     await expect(page.getByRole("button", { name: "账户菜单" })).toBeVisible();
+    await page.goto("/onboarding?level=C2");
+    await expect(page).toHaveURL(/\/account\/profile$/);
+    await expect(page.getByText("B1", { exact: true })).toBeVisible();
+    await expect(page.getByRole("radio", { name: /C2/ })).toHaveCount(0);
+  });
+
+  test("首次确认保留学生专区回跳，英美偏好修改后刷新仍持久化", async ({
+    page
+  }) => {
+    await mockApi(page, { authenticated: true, onboarded: false });
+    await page.goto("/student/practice");
+    await expect(page).toHaveURL(
+      /\/onboarding\?redirect=%2Fstudent%2Fpractice$/
+    );
+    await page.getByText("A2", { exact: true }).click();
+    await page.getByText("英式英语", { exact: true }).click();
+    await page.getByRole("button", { name: "完成，开始学习" }).click();
+    await page.getByRole("button", { name: "确认并开始学习" }).click();
+    await expect(page).toHaveURL(/\/student\/practice$/);
+    await page.goto("/account/profile");
+    await page.getByRole("radio", { name: "美式英语（AmE）" }).check();
+    const saved = page.waitForRequest("**/api/v1/me/learning-settings");
+    await page.getByRole("button", { name: "保存偏好" }).click();
+    expect((await saved).postDataJSON()).toEqual({
+      cefr_level: "A2",
+      english_variant: "AmE"
+    });
+    await expect(page.getByText("偏好已保存")).toBeVisible();
+    await page.reload();
+    await expect(
+      page.getByRole("radio", { name: "美式英语（AmE）" })
+    ).toBeChecked();
+    await expect(page.getByText("A2", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "难度级别说明" }).click();
+    await expect(page.getByRole("tooltip")).toHaveText(
+      "如需修改，请联系官方客服"
+    );
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
+  });
+
+  test("进入测评后跳过，首次确认仍返回原学生页", async ({ page }) => {
+    await mockApi(page, { authenticated: true, onboarded: false });
+    await page.goto("/student/practice");
+    await page.getByRole("link", { name: /1 分钟测一测/ }).click();
+    await expect(page).toHaveURL(
+      /\/placement\?redirect=%2Fstudent%2Fpractice$/
+    );
+    await page.getByRole("button", { name: "跳过，手动选择等级" }).click();
+    await expect(page).toHaveURL(
+      /\/onboarding\?redirect=%2Fstudent%2Fpractice$/
+    );
+    await page.getByText("B1", { exact: true }).click();
+    await page.getByText("英式英语", { exact: true }).click();
+    await page.getByRole("button", { name: "完成，开始学习" }).click();
+    await page.getByRole("button", { name: "确认并开始学习" }).click();
+    await expect(page).toHaveURL(/\/student\/practice$/);
   });
 
   test("登录 → 主页 → 退出登录回到登录页", async ({ page }) => {
@@ -331,7 +403,7 @@ test.describe("鉴权与引导端到端流程", () => {
     const holdMe = new Promise<void>((resolve) => {
       releaseMe = resolve;
     });
-    await page.route("**/api/v1/auth/me", async (route) => {
+    await page.route("**/api/v1/me", async (route) => {
       await holdMe;
       await route.fallback();
     });
@@ -348,7 +420,7 @@ test.describe("鉴权与引导端到端流程", () => {
       .getByRole("textbox", { name: "手机号或邮箱" })
       .fill("13800138000");
     await page.getByPlaceholder("请输入登录密码").fill("abc123");
-    const requestedMe = page.waitForRequest("**/api/v1/auth/me");
+    const requestedMe = page.waitForRequest("**/api/v1/me");
     await page.getByRole("button", { name: "立即登录" }).click();
     await requestedMe;
     try {

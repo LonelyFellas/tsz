@@ -3,11 +3,16 @@
 // 作答无效屏(假词误报过多):文案给台阶,不指责;无效不消耗测试机会。
 
 interface InvalidScreenProps {
+  onboarded: boolean;
   onRetry: () => void;
   onManual: () => void;
 }
 
-export function InvalidScreen({ onRetry, onManual }: InvalidScreenProps) {
+export function InvalidScreen({
+  onboarded,
+  onRetry,
+  onManual
+}: InvalidScreenProps) {
   return (
     <div className="flex min-h-full flex-1 flex-col text-center">
       <div className="flex-1" />
@@ -31,7 +36,7 @@ export function InvalidScreen({ onRetry, onManual }: InvalidScreenProps) {
         onClick={onManual}
         className="mt-2 w-full py-2 text-sm text-foreground-muted transition-colors hover:text-foreground"
       >
-        跳过，手动选择等级
+        {onboarded ? "返回学习" : "跳过，手动选择等级"}
       </button>
       <p className="mt-3 text-xs text-foreground-subtle">无效测试不计入次数</p>
     </div>

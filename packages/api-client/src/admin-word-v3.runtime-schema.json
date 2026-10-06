@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/pronunciation-dual-accent-20261004/docs/openapi.json",
-  "_source_sha256": "156d5a03a8baf392f1c00aa298d0cc347199b32f141d19524567a3c1fc0461e7",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/web-onboarding-settings/docs/openapi.json",
+  "_source_sha256": "e97df67ee54ea7fd45a22f1130e4e6ff01690b95b12c4657d39e2d6cea753522",
   "roots": [
     "SharedSentence",
     "SentencePublication",
@@ -678,6 +678,7 @@
         "sub_part_of_speech_conflict",
         "annotation_conflict",
         "revision_conflict",
+        "cefr_level_locked",
         "reference_conflict",
         "relation_prebinding_fanout_exceeded",
         "stable_node_id_changed",

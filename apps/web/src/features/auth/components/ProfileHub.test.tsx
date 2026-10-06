@@ -1,8 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { MeResponse } from "@tsz/api-client";
-import type { User } from "@tsz/types";
+import type { MeResponse, User } from "@tsz/types";
 import { ProfileHub } from "./ProfileHub";
 import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIdentityProvider";
 

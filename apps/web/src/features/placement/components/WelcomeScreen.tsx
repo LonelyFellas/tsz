@@ -29,6 +29,7 @@ interface WelcomeScreenProps {
   quota: QuotaState;
   starting: boolean;
   error: string;
+  onboarded: boolean;
   onStart: () => void;
   onSkip: () => void;
 }
@@ -37,6 +38,7 @@ export function WelcomeScreen({
   quota,
   starting,
   error,
+  onboarded,
   onStart,
   onSkip
 }: WelcomeScreenProps) {
@@ -70,7 +72,9 @@ export function WelcomeScreen({
         <>
           <h1 className="text-2xl font-bold">你的词汇档案</h1>
           <p className="mt-1 text-sm text-foreground-muted">
-            等级决定词书推荐与每日计划。
+            {onboarded
+              ? "测评记录仅作参考，不会修改已保存的学习难度。"
+              : "等级决定词书推荐与每日计划。"}
           </p>
           <div className="mt-5 flex items-center gap-3 rounded-2xl bg-surface p-4 shadow-xs">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-muted font-serif text-lg font-bold text-primary">
@@ -90,7 +94,9 @@ export function WelcomeScreen({
         <>
           <h1 className="text-2xl font-bold">1 分钟，测出你的词汇量</h1>
           <p className="mt-1 text-sm text-foreground-muted">
-            根据结果为你推荐合适的难度与学习计划。
+            {onboarded
+              ? "了解当前词汇水平，学习难度不会随测评结果改变。"
+              : "根据结果为你推荐合适的难度与学习计划。"}
           </p>
           <ul className="mt-5 space-y-3 text-sm leading-relaxed">
             {[
@@ -137,7 +143,7 @@ export function WelcomeScreen({
             onClick={onSkip}
             className="mt-2 w-full py-2 text-sm text-foreground-muted transition-colors hover:text-foreground"
           >
-            跳过，手动选择等级
+            {onboarded ? "返回学习" : "跳过，手动选择等级"}
           </button>
         )}
         <p className="mt-3 text-center text-xs text-foreground-subtle">

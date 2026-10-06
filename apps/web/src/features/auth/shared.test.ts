@@ -155,8 +155,23 @@ describe("postAuthPath", () => {
     );
   });
 
-  it("新用户仍优先进入引导页", () => {
-    expect(postAuthPath(false, "/wordlists")).toBe("/onboarding");
+  it("新用户先进入引导页并保留回跳目标", () => {
+    expect(postAuthPath(false, "/wordlists")).toBe(
+      "/onboarding?redirect=%2Fwordlists"
+    );
+    expect(postAuthPath(false, null)).toBe("/onboarding");
+  });
+
+  it("教师安全回跳不依赖个人学习配置，学生不能借路径跳过引导", () => {
+    expect(
+      postAuthPath(false, "/teacher/classes", ["student", "teacher"])
+    ).toBe("/teacher/classes");
+    expect(postAuthPath(false, "/teacher/classes", ["student"])).toBe(
+      "/onboarding?redirect=%2Fteacher%2Fclasses"
+    );
+    expect(
+      postAuthPath(false, "//outside.example/teacher/classes", ["teacher"])
+    ).toBe("/onboarding");
   });
 
   it.each([
@@ -164,6 +179,9 @@ describe("postAuthPath", () => {
     "/login/?redirect=/wordlists",
     "/register",
     "/forgot-password#reset",
+    "/onboarding",
+    "/onboarding?level=C2",
+    "/onboarding%2f",
     "/wordlists/../login",
     "/%6cogin",
     "/register%2f",

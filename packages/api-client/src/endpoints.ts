@@ -11,6 +11,9 @@ import type {
   ConfirmAccountDeletionRequest,
   Paginated,
   RegisterPayload,
+  LearningSettings,
+  LearningSettingsResponse,
+  MeResponse,
   Task,
   User,
   Word,
@@ -34,38 +37,6 @@ export interface RefreshResponse {
   access_token: string;
   expires_in: number;
   refresh_token_expires_at: number;
-}
-
-/** CEFR 难度等级，A1 最简单 … C2 最难。 */
-export type CEFRLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
-
-/** 英语口音 / 拼写习惯：英式或美式。 */
-export type EnglishVariant = "BrE" | "AmE";
-
-/** 学习者的两项基础设置（onboarding 选择），始终成对写入。 */
-export interface LearningSettings {
-  cefr_level: CEFRLevel;
-  english_variant: EnglishVariant;
-}
-
-/**
- * me() 的前端装配形状。后端现返回扁平 UserProfile(GET /auth/me)；
- * learning_settings / onboarded 后端尚未实现,由 me() 适配器暂时填充
- * (null / true)。后端 T2(/me + MeResponse 包壳)落地后删除适配、直连即可。
- */
-export interface MeResponse {
-  user: User;
-  active_role: string;
-  /** 后端未实现学习设置,暂恒 null。 */
-  learning_settings: LearningSettings | null;
-  /** 后端未实现 onboarding,暂恒 true(跳过引导页)。 */
-  onboarded: boolean;
-}
-
-export interface LearningSettingsResponse {
-  learning_settings: LearningSettings;
-  /** 此处恒为 true —— 设置刚刚写入。 */
-  onboarded: boolean;
 }
 
 /**
@@ -106,17 +77,8 @@ export function createEndpoints(http: HttpClient) {
   return {
     teacherCertification: createTeacherCertificationEndpoints(http),
     auth: {
-      /**
-       * GET /auth/me — 当前登录用户信息。后端返回扁平 UserProfile,
-       * 此处装配成 MeResponse(见类型注释;T2 落地后删适配直连 /me)。
-       */
       me: (opts?: { signal?: AbortSignal }): Promise<MeResponse> =>
-        http.get<User>("/auth/me", opts).then((user) => ({
-          user,
-          active_role: user.active_role,
-          learning_settings: null,
-          onboarded: true
-        })),
+        http.get<MeResponse>("/me", opts),
       /** PATCH /me — 改昵称(去空格后 1–50 字符);返回刷新后的 user */
       updateProfile: (display_name: string) =>
         http.patch<{ user: User }>("/me", { display_name }),
@@ -214,7 +176,7 @@ export function createEndpoints(http: HttpClient) {
         http.del<void>("/auth/account", input, {
           retryOnUnauthorized: false
         }),
-      /** PUT /me/learning-settings — 设置 CEFR 等级 + 英式/美式（新用户 onboarding 与后续修改共用） */
+      /** PUT /me/learning-settings — 首次配置或在固定难度下修改英美偏好。 */
       updateLearningSettings: (settings: LearningSettings) =>
         http.put<LearningSettingsResponse>("/me/learning-settings", settings),
       /**
