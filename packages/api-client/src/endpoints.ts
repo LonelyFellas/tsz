@@ -1,3 +1,4 @@
+import { createAccountDeletionEndpoints } from "./account-deletion";
 import { createCoinEndpoints } from "./coins";
 // 按业务域组织的接口定义(纯函数,接受 HttpClient)。
 // features/*/api.ts 负责把这些绑定到具体的 client 实例。
@@ -79,6 +80,7 @@ export function createEndpoints(http: HttpClient) {
     coins: createCoinEndpoints(http),
     teacherCertification: createTeacherCertificationEndpoints(http),
     auth: {
+      ...createAccountDeletionEndpoints(http),
       me: (opts?: { signal?: AbortSignal }): Promise<MeResponse> =>
         http.get<MeResponse>("/me", opts),
       /** PATCH /me — 改昵称(去空格后 1–50 字符);返回刷新后的 user */
@@ -169,8 +171,8 @@ export function createEndpoints(http: HttpClient) {
       requestDeletionCode: (input: AccountDeletionCodeRequest) =>
         http.post<void>("/auth/account/deletion-code", input),
       /**
-       * DELETE /auth/account — 校验验证码后永久删除当前账号。
-       * 不可恢复：级联清除角色/资料/会话，用户全端登出，手机号/邮箱释放可重新注册。
+       * @deprecated 旧客户端兼容请求；新后端固定返回 409 升级错误。
+       * 新流程使用 requestAccountDeletion，不能回退到本接口。
        */
       deleteAccount: (input: ConfirmAccountDeletionRequest) =>
         // 本端点的 401 既可能是验证码错误，也可能是 invalid_token；不能在

@@ -1,36 +1,55 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpError } from "@tsz/api-client";
-import type { User } from "@tsz/types";
+import type {
+  AccountDeletionState,
+  AccountDeletionRequest,
+  User
+} from "@tsz/types";
 import { useUserStore } from "@/stores/user";
 import { DeleteAccountForm } from "./DeleteAccountForm";
-
 const mockBack = vi.fn();
 const mockReplace = vi.fn();
-
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ back: mockBack })
-}));
-
+vi.mock("next/navigation", () => ({ useRouter: () => ({ back: mockBack }) }));
 vi.mock("@/lib/request", () => ({
   clearSession: vi.fn(),
   api: {
     auth: {
       requestDeletionCode: vi.fn(),
-      deleteAccount: vi.fn()
+      deleteAccount: vi.fn(),
+      accountDeletion: vi.fn(),
+      requestAccountDeletion: vi.fn(),
+      cancelAccountDeletion: vi.fn()
     }
   }
 }));
-
 import { api, clearSession } from "@/lib/request";
-
-const requestDeletionCode = vi.mocked(api.auth.requestDeletionCode);
-const deleteAccount = vi.mocked(api.auth.deleteAccount);
-const PHONE = "13899997777";
-const EMAIL = "alice@example.com";
-
-function seedUser(input: { phone?: string; email?: string }) {
+const initial: AccountDeletionState = {
+  request: null,
+  coin_balance: "100",
+  consent_version: "v1",
+  consent_text: "申请等待连续72小时，期间可撤销且暂停钱包收支，到期余额作废。",
+  server_time: "2026-10-06T00:00:00Z"
+};
+const pending: AccountDeletionRequest = {
+  id: "request-1",
+  status: "pending",
+  requested_at: "2026-10-06T00:00:00Z",
+  effective_at: "2026-10-09T00:00:00Z",
+  cancelled_at: null,
+  completed_at: null,
+  confirmed_balance: "100",
+  waive_balance: true,
+  consent_version: "v1",
+  consent_text: initial.consent_text
+};
+function seedUser(
+  input: { phone?: string; email?: string } = {
+    phone: "13899997777",
+    email: "alice@example.com"
+  }
+) {
   const user: User = {
     id: "u1",
     display_name: "Alice",
@@ -41,295 +60,220 @@ function seedUser(input: { phone?: string; email?: string }) {
   };
   useUserStore.setState({ user });
 }
-
-function problem(status: number, code: string) {
-  return new HttpError(status, "variable detail", [], code);
-}
-
-async function requestCodeAndFill(code = "000000") {
+async function openConfirmation() {
   const user = userEvent.setup();
-  await user.click(screen.getByRole("button", { name: "获取验证码" }));
-  await user.type(screen.getByPlaceholderText("6 位数字验证码"), code);
+  await user.click(await screen.findByRole("button", { name: "获取验证码" }));
+  await user.type(screen.getByPlaceholderText("6 位数字验证码"), "000000");
+  await user.click(screen.getByRole("button", { name: "继续注销" }));
   return user;
 }
-
 beforeEach(() => {
-  vi.clearAllMocks();
-  requestDeletionCode.mockResolvedValue(undefined);
-  deleteAccount.mockResolvedValue(undefined);
-  useUserStore.setState({ user: null });
+  vi.resetAllMocks();
+  seedUser();
+  vi.mocked(api.auth.accountDeletion).mockResolvedValue(
+    structuredClone(initial)
+  );
+  vi.mocked(api.auth.requestDeletionCode).mockResolvedValue(undefined);
+  vi.mocked(api.auth.requestAccountDeletion).mockResolvedValue(
+    structuredClone(pending)
+  );
+  vi.mocked(api.auth.cancelAccountDeletion).mockResolvedValue({
+    ...pending,
+    status: "cancelled",
+    cancelled_at: "2026-10-06T01:00:00Z"
+  });
   Object.defineProperty(window, "location", {
     configurable: true,
     value: { replace: mockReplace }
   });
 });
-
-describe("DeleteAccountForm", () => {
-  it("只展示账号真实拥有的渠道，无渠道时阻止注销", () => {
-    seedUser({ email: EMAIL });
-    const { unmount } = render(<DeleteAccountForm />);
-    expect(screen.getByText("邮箱验证")).toBeInTheDocument();
-    expect(screen.queryByText("手机验证")).not.toBeInTheDocument();
-    unmount();
-
-    seedUser({});
+describe("DeleteAccountForm 72小时注销", () => {
+  it("主动签署精确余额后提交，成功保留会话且不宣称已删除", async () => {
     render(<DeleteAccountForm />);
+    const user = await openConfirmation();
+    const checkbox = screen.getByRole("checkbox", {
+      name: /主动放弃本次确认的 100 天生币/
+    });
+    expect(checkbox).not.toBeChecked();
+    const submit = screen.getByRole("button", { name: "提交注销申请" });
+    expect(submit).toBeDisabled();
+    await user.click(checkbox);
+    await user.click(submit);
     expect(
-      screen.getByRole("heading", { name: "无法注销账号" })
+      await screen.findByRole("heading", { name: "注销申请等待生效" })
     ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "获取验证码" })
-    ).not.toBeInTheDocument();
-  });
-
-  it("双渠道可切换，切换时清除旧验证码和已申请状态", async () => {
-    seedUser({ phone: PHONE, email: EMAIL });
-    render(<DeleteAccountForm />);
-    const user = await requestCodeAndFill();
-
-    expect(requestDeletionCode).toHaveBeenCalledWith({ channel: "phone" });
-    await user.click(screen.getByLabelText(/邮箱验证/));
-
-    expect(screen.getByPlaceholderText("6 位数字验证码")).toHaveValue("");
-    expect(screen.getByRole("button", { name: "获取验证码" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "继续注销" })).toBeDisabled();
-  });
-
-  it("申请期间阻止重复请求，202 后展示成功态和倒计时", async () => {
-    let resolveRequest!: () => void;
-    requestDeletionCode.mockReturnValue(
-      new Promise<void>((resolve) => {
-        resolveRequest = resolve;
+    expect(api.auth.requestAccountDeletion).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expected_coin_balance: "100",
+        waive_balance: true,
+        confirm_deletion: true,
+        idempotency_key: expect.any(String)
       })
     );
-    seedUser({ phone: PHONE });
-    render(<DeleteAccountForm />);
-    const button = screen.getByRole("button", { name: "获取验证码" });
-
-    fireEvent.click(button);
-    fireEvent.click(button);
-    expect(requestDeletionCode).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("button", { name: "申请中…" })).toBeDisabled();
-
-    resolveRequest();
-    await waitFor(() => {
-      expect(screen.getByRole("status")).toHaveTextContent("验证码申请已受理");
-      expect(screen.getByRole("button", { name: /60s 后重试/ })).toBeDisabled();
+    expect(clearSession).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(api.auth.deleteAccount).not.toHaveBeenCalled();
+  });
+  it("零余额同样主动确认72小时规则，且保持整数精度", async () => {
+    vi.mocked(api.auth.accountDeletion).mockResolvedValue({
+      ...initial,
+      coin_balance: "0"
     });
-  });
-
-  it("验证码必须先申请且为六位数字，输入过滤非数字", async () => {
-    seedUser({ phone: PHONE });
     render(<DeleteAccountForm />);
-    const user = userEvent.setup();
-    const input = screen.getByPlaceholderText("6 位数字验证码");
-
-    await user.type(input, "12ab3456");
-    expect(input).toHaveValue("123456");
-    expect(screen.getByRole("button", { name: "继续注销" })).toBeDisabled();
-
-    await user.click(screen.getByRole("button", { name: "获取验证码" }));
-    expect(screen.getByRole("button", { name: "继续注销" })).toBeEnabled();
-    expect(screen.getByText(/当前测试环境验证码为 000000/)).toBeInTheDocument();
-  });
-
-  it("继续注销只打开可访问确认层，取消和 Escape 均不发 DELETE", async () => {
-    seedUser({ phone: PHONE });
-    render(<DeleteAccountForm />);
-    const user = await requestCodeAndFill();
-    await user.click(screen.getByRole("button", { name: "继续注销" }));
-
-    const dialog = screen.getByRole("dialog", { name: /最后确认/ });
-    expect(dialog).toHaveFocus();
-    expect(screen.getByTestId("account-deletion-content")).toHaveAttribute(
-      "inert"
+    const user = await openConfirmation();
+    await user.click(
+      screen.getByRole("checkbox", { name: /零余额也等待连续 72 小时/ })
     );
-    await user.tab({ shift: true });
-    expect(screen.getByRole("button", { name: "确认永久注销" })).toHaveFocus();
-    await user.tab();
-    expect(screen.getByRole("button", { name: "取消" })).toHaveFocus();
-    await user.click(screen.getByRole("button", { name: "取消" }));
-    expect(deleteAccount).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "继续注销" })).toHaveFocus();
-
-    await user.click(screen.getByRole("button", { name: "继续注销" }));
-    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(deleteAccount).not.toHaveBeenCalled();
-  });
-
-  it("最终确认只提交 channel/code，阻止重复 DELETE", async () => {
-    let resolveDelete!: () => void;
-    deleteAccount.mockReturnValue(
-      new Promise<void>((resolve) => {
-        resolveDelete = resolve;
-      })
-    );
-    seedUser({ phone: PHONE });
-    render(<DeleteAccountForm />);
-    const user = await requestCodeAndFill();
-    await user.click(screen.getByRole("button", { name: "继续注销" }));
-    const confirm = screen.getByRole("button", { name: "确认永久注销" });
-
-    fireEvent.click(confirm);
-    fireEvent.click(confirm);
-    expect(deleteAccount).toHaveBeenCalledTimes(1);
-    expect(deleteAccount).toHaveBeenCalledWith({
-      channel: "phone",
-      code: "000000"
-    });
-    expect(screen.getByRole("button", { name: "正在注销…" })).toBeDisabled();
-    resolveDelete();
-  });
-
-  it("注销成功清理完整会话并整页跳转登录页", async () => {
-    seedUser({ phone: PHONE });
-    render(<DeleteAccountForm />);
-    const user = await requestCodeAndFill();
-    await user.click(screen.getByRole("button", { name: "继续注销" }));
-    await user.click(screen.getByRole("button", { name: "确认永久注销" }));
-
-    await waitFor(() => {
-      expect(clearSession).toHaveBeenCalledTimes(1);
-      expect(mockReplace).toHaveBeenCalledWith("/login?deleted=success");
-    });
-  });
-
-  it.each([
-    ["invalid_account_deletion_code", 401, "验证码错误、已失效或已使用"],
-    [
-      "account_deletion_channel_unavailable",
-      409,
-      "当前账号没有可用于验证的该渠道"
-    ],
-    ["otp_rate_limited", 429, "验证码申请过于频繁"],
-    ["otp_unavailable", 503, "验证码服务暂时不可用"],
-    ["invalid_request_body", 422, "提交内容不完整"],
-    ["internal_error", 500, "服务暂时异常"]
-  ])(
-    "按 RFC 9457 code %s 显示稳定错误并恢复操作",
-    async (code, status, text) => {
-      requestDeletionCode.mockRejectedValueOnce(
-        problem(status as number, code as string)
-      );
-      seedUser({ phone: PHONE });
-      render(<DeleteAccountForm />);
-      await userEvent
-        .setup()
-        .click(screen.getByRole("button", { name: "获取验证码" }));
-
-      expect(await screen.findByRole("alert")).toHaveTextContent(
-        text as string
-      );
-      expect(screen.getByRole("button", { name: "获取验证码" })).toBeEnabled();
-    }
-  );
-
-  it("invalid_token 清会话并整页跳转，不显示普通错误", async () => {
-    requestDeletionCode.mockRejectedValueOnce(problem(401, "invalid_token"));
-    seedUser({ phone: PHONE });
-    render(<DeleteAccountForm />);
-    await userEvent
-      .setup()
-      .click(screen.getByRole("button", { name: "获取验证码" }));
-
-    await waitFor(() => {
-      expect(clearSession).toHaveBeenCalledTimes(1);
-      expect(mockReplace).toHaveBeenCalledWith("/login?session=expired");
-    });
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-  });
-
-  it("DELETE 失败保留确认层并恢复按钮，可再次确认", async () => {
-    deleteAccount.mockRejectedValueOnce(
-      problem(401, "invalid_account_deletion_code")
-    );
-    seedUser({ phone: PHONE });
-    render(<DeleteAccountForm />);
-    const user = await requestCodeAndFill();
-    await user.click(screen.getByRole("button", { name: "继续注销" }));
-    await user.click(screen.getByRole("button", { name: "确认永久注销" }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent("验证码错误");
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "确认永久注销" })).toBeEnabled();
-  });
-
-  it("400/422 提示提交内容有误（后端 detail 文案不直接外露）", async () => {
-    requestDeletionCode.mockRejectedValueOnce(new HttpError(422, "bad input"));
-    seedUser({ phone: PHONE });
-    render(<DeleteAccountForm />);
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "获取验证码" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "提交内容有误，请检查后重试"
+    await user.click(screen.getByRole("button", { name: "提交注销申请" }));
+    await waitFor(() =>
+      expect(api.auth.requestAccountDeletion).toHaveBeenCalledWith(
+        expect.objectContaining({
+          expected_coin_balance: "0",
+          waive_balance: false,
+          confirm_deletion: true
+        })
+      )
     );
   });
-
-  it("500 提示服务暂时异常", async () => {
-    requestDeletionCode.mockRejectedValueOnce(new HttpError(500, "boom"));
-    seedUser({ phone: PHONE });
-    render(<DeleteAccountForm />);
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "获取验证码" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "服务暂时异常，请稍后重试"
-    );
-  });
-
-  it("其它状态码回落到通用失败文案", async () => {
-    requestDeletionCode.mockRejectedValueOnce(new HttpError(403, "forbidden"));
-    seedUser({ phone: PHONE });
-    render(<DeleteAccountForm />);
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "获取验证码" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "操作失败，请稍后重试"
-    );
-  });
-
-  it("无可用渠道页的返回按钮回到上一页", async () => {
+  it("重新进入恢复待注销状态，无联系方式仍能显式撤销", async () => {
     seedUser({});
+    vi.mocked(api.auth.accountDeletion).mockResolvedValue({
+      ...initial,
+      request: pending
+    });
     render(<DeleteAccountForm />);
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "返回" }));
-    expect(mockBack).toHaveBeenCalledTimes(1);
+    await user.click(
+      await screen.findByRole("button", { name: "撤销注销申请" })
+    );
+    await waitFor(() =>
+      expect(api.auth.cancelAccountDeletion).toHaveBeenCalledWith("request-1")
+    );
+    expect(
+      await screen.findByRole("heading", { name: "无法注销账号" })
+    ).toBeInTheDocument();
+    expect(clearSession).not.toHaveBeenCalled();
   });
-
-  it("点确认层遮罩关闭弹层，不发 DELETE", async () => {
-    seedUser({ phone: PHONE });
+  it("余额冲突重新加载金额并清除旧签署", async () => {
+    vi.mocked(api.auth.accountDeletion)
+      .mockResolvedValueOnce(initial)
+      .mockResolvedValue({ ...initial, coin_balance: "9007199254740993" });
+    vi.mocked(api.auth.requestAccountDeletion).mockRejectedValueOnce(
+      new HttpError(409, "changed", [], "account_deletion_balance_changed")
+    );
     render(<DeleteAccountForm />);
-    const user = await requestCodeAndFill();
-    await user.click(screen.getByRole("button", { name: "继续注销" }));
-
-    const overlay = screen.getByRole("dialog").parentElement as HTMLElement;
-    fireEvent.mouseDown(overlay);
-
+    const user = await openConfirmation();
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: "提交注销申请" }));
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
     );
-    expect(deleteAccount).not.toHaveBeenCalled();
-  });
-
-  it("点确认层内部不会误关弹层", async () => {
-    seedUser({ phone: PHONE });
-    render(<DeleteAccountForm />);
-    const user = await requestCodeAndFill();
     await user.click(screen.getByRole("button", { name: "继续注销" }));
-
-    fireEvent.mouseDown(screen.getByRole("dialog"));
-
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox")).not.toBeChecked();
+    expect(
+      screen.getByText("本次确认余额：9007199254740993 天生币")
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: "提交注销申请" }));
+    const calls = vi.mocked(api.auth.requestAccountDeletion).mock.calls;
+    expect(calls[1]![0].idempotency_key).not.toBe(calls[0]![0].idempotency_key);
   });
-
-  it("非 HttpError 使用网络异常兜底，返回按钮调用 router.back", async () => {
-    requestDeletionCode.mockRejectedValueOnce(new Error("boom"));
-    seedUser({ phone: PHONE });
+  it("网络未知结果保留意图键，恢复查询后可安全重试", async () => {
+    vi.mocked(api.auth.requestAccountDeletion)
+      .mockRejectedValueOnce(new TypeError("network"))
+      .mockResolvedValueOnce(pending);
     render(<DeleteAccountForm />);
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "获取验证码" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("网络异常");
-    await user.click(screen.getByRole("button", { name: "← 返回" }));
-    expect(mockBack).toHaveBeenCalledTimes(1);
+    const user = await openConfirmation();
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: "提交注销申请" }));
+    await screen.findByRole("alert");
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "提交注销申请" })).toBeEnabled()
+    );
+    await user.click(screen.getByRole("button", { name: "提交注销申请" }));
+    await screen.findByRole("heading", { name: "注销申请等待生效" });
+    const calls = vi.mocked(api.auth.requestAccountDeletion).mock.calls;
+    expect(calls[1]![0].idempotency_key).toBe(calls[0]![0].idempotency_key);
   });
+  it("旧后端404显示不可用，不回退旧DELETE或伪造余额", async () => {
+    vi.mocked(api.auth.accountDeletion).mockRejectedValue(
+      new HttpError(404, "missing")
+    );
+    render(<DeleteAccountForm />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "注销申请服务暂不可用"
+    );
+    expect(
+      screen.queryByRole("button", { name: "获取验证码" })
+    ).not.toBeInTheDocument();
+    expect(api.auth.deleteAccount).not.toHaveBeenCalled();
+  });
+  it("键盘焦点覆盖新增签署项；验证码错误不清会话", async () => {
+    vi.mocked(api.auth.requestAccountDeletion).mockRejectedValue(
+      new HttpError(401, "wrong", [], "invalid_account_deletion_code")
+    );
+    render(<DeleteAccountForm />);
+    const user = await openConfirmation();
+    await user.tab();
+    expect(screen.getByRole("checkbox")).toHaveFocus();
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: "提交注销申请" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("验证码错误");
+    expect(clearSession).not.toHaveBeenCalled();
+  });
+});
+
+it.each([
+  { coin_balance: "200" },
+  { consent_version: "v2", consent_text: "更新后的声明" }
+])("网络失败恢复后的签署内容变化必须重新主动确认 %j", async (change) => {
+  vi.mocked(api.auth.accountDeletion)
+    .mockResolvedValueOnce(initial)
+    .mockResolvedValue({ ...initial, ...change });
+  vi.mocked(api.auth.requestAccountDeletion).mockRejectedValueOnce(
+    new TypeError("response lost")
+  );
+  render(<DeleteAccountForm />);
+  const user = await openConfirmation();
+  await user.click(screen.getByRole("checkbox"));
+  await user.click(screen.getByRole("button", { name: "提交注销申请" }));
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+  );
+  await user.click(screen.getByRole("button", { name: "继续注销" }));
+  expect(screen.getByRole("checkbox")).not.toBeChecked();
+  expect(screen.getByRole("button", { name: "提交注销申请" })).toBeDisabled();
+});
+
+it("另一页撤销后，旧键重放的cancelled结果不冒充新申请成功", async () => {
+  const cancelled: AccountDeletionRequest = {
+    ...pending,
+    status: "cancelled",
+    cancelled_at: "2026-10-06T01:00:00Z"
+  };
+  vi.mocked(api.auth.accountDeletion)
+    .mockResolvedValueOnce(initial)
+    .mockResolvedValue({ ...initial, request: cancelled });
+  vi.mocked(api.auth.requestAccountDeletion)
+    .mockRejectedValueOnce(new TypeError("response lost"))
+    .mockResolvedValueOnce(cancelled);
+  render(<DeleteAccountForm />);
+  const user = await openConfirmation();
+  await user.click(screen.getByRole("checkbox"));
+  await user.click(screen.getByRole("button", { name: "提交注销申请" }));
+  await screen.findByRole("alert");
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "提交注销申请" })).toBeEnabled()
+  );
+  await user.click(screen.getByRole("button", { name: "提交注销申请" }));
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+  );
+  const calls = vi.mocked(api.auth.requestAccountDeletion).mock.calls;
+  expect(calls[1]![0].idempotency_key).toBe(calls[0]![0].idempotency_key);
+  expect(screen.getByRole("status")).toHaveTextContent("已撤销");
+  expect(screen.getByRole("status")).not.toHaveTextContent("申请已保存");
+  expect(screen.getByPlaceholderText("6 位数字验证码")).toHaveValue("");
+  expect(screen.getByRole("button", { name: "继续注销" })).toBeDisabled();
+  expect(clearSession).not.toHaveBeenCalled();
 });

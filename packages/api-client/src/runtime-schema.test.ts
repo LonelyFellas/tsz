@@ -35,6 +35,8 @@ const runtimeSchemaBundle =
   runtimeSchemaBundleJson as unknown as RuntimeSchemaBundle;
 
 const ROOTS = [
+  "AccountDeletionRequest",
+  "AccountDeletionState",
   "CoinWallet",
   "CoinEntryPage",
   "SharedSentence",

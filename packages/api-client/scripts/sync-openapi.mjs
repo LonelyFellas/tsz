@@ -39,6 +39,8 @@ const QUERY_CONTRACT_OPERATIONS = new Set([
 ]);
 
 const RUNTIME_SCHEMA_ROOTS = [
+  "AccountDeletionRequest",
+  "AccountDeletionState",
   "CoinWallet",
   "CoinEntryPage",
   "SharedSentence",
@@ -102,6 +104,10 @@ if (!spec?.paths) {
   throw new Error(`spec 无 paths 字段: ${source}`);
 }
 const contractSchemaNames = [
+  "AccountDeletionRequest",
+  "AccountDeletionState",
+  "CreateAccountDeletionRequest",
+  "DeletionStatus",
   "PaginationMeta",
   "CoinWallet",
   "CoinEntry",
@@ -495,6 +501,8 @@ for (const [rawPath, item] of Object.entries(spec.paths)) {
     const operationKey = `${method} ${path}`;
     if (
       rawPath.startsWith(ADMIN_LEXICON_PREFIX) ||
+      rawPath.startsWith(`${API_PREFIX}/me/account-deletion`) ||
+      rawPath === `${API_PREFIX}/auth/account` ||
       rawPath.startsWith(`${API_PREFIX}/me/coins/`) ||
       rawPath.startsWith(`${API_PREFIX}/admin/me/coins/`) ||
       rawPath.startsWith(`${API_PREFIX}/auth/password/`) ||

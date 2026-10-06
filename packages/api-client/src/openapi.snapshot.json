@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/.codex/worktrees/coins-b1a/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-06T07:08:11.553Z",
+  "_generatedAt": "2026-10-06T07:46:49.855Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -102,6 +102,8 @@
     "/auth/register": ["post"],
     "/avatars/{id}": ["get"],
     "/me": ["get", "patch"],
+    "/me/account-deletion": ["get", "post"],
+    "/me/account-deletion/{id}/cancel": ["post"],
     "/me/avatar": ["post"],
     "/me/avatar/upload-url": ["post"],
     "/me/coins/entries": ["get"],
@@ -953,6 +955,15 @@
         "500": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
+    "delete /auth/account": {
+      "request": {
+        "$ref": "#/components/schemas/ConfirmAccountDeletionRequest"
+      },
+      "responses": {
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "post /auth/password/change": {
       "request": { "$ref": "#/components/schemas/PasswordChangeRequest" },
       "responses": {
@@ -1008,6 +1019,40 @@
         "401": { "$ref": "#/components/schemas/ProblemDetails" },
         "413": { "$ref": "#/components/schemas/ProblemDetails" },
         "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "500": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /me/account-deletion": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/AccountDeletionState" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "500": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /me/account-deletion": {
+      "request": {
+        "$ref": "#/components/schemas/CreateAccountDeletionRequest"
+      },
+      "responses": {
+        "202": { "$ref": "#/components/schemas/AccountDeletionRequest" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "429": { "$ref": "#/components/schemas/ProblemDetails" },
+        "500": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /me/account-deletion/{id}/cancel": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/AccountDeletionRequest" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
         "500": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
@@ -1117,6 +1162,97 @@
     }
   },
   "schemas": {
+    "AccountDeletionRequest": {
+      "type": "object",
+      "required": [
+        "id",
+        "status",
+        "requested_at",
+        "effective_at",
+        "cancelled_at",
+        "completed_at",
+        "confirmed_balance",
+        "waive_balance",
+        "consent_version",
+        "consent_text"
+      ],
+      "properties": {
+        "cancelled_at": { "type": ["string", "null"], "format": "date-time" },
+        "completed_at": { "type": ["string", "null"], "format": "date-time" },
+        "confirmed_balance": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$"
+        },
+        "consent_text": { "type": "string" },
+        "consent_version": { "type": "string" },
+        "effective_at": { "type": "string", "format": "date-time" },
+        "id": { "type": "string", "format": "uuid" },
+        "requested_at": { "type": "string", "format": "date-time" },
+        "status": { "$ref": "#/components/schemas/DeletionStatus" },
+        "waive_balance": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "AccountDeletionState": {
+      "type": "object",
+      "required": [
+        "request",
+        "coin_balance",
+        "consent_version",
+        "consent_text",
+        "server_time"
+      ],
+      "properties": {
+        "coin_balance": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$"
+        },
+        "consent_text": { "type": "string" },
+        "consent_version": { "type": "string" },
+        "request": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/components/schemas/AccountDeletionRequest" }
+          ]
+        },
+        "server_time": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "CreateAccountDeletionRequest": {
+      "type": "object",
+      "required": [
+        "channel",
+        "code",
+        "expected_coin_balance",
+        "waive_balance",
+        "confirm_deletion",
+        "consent_version",
+        "idempotency_key"
+      ],
+      "properties": {
+        "channel": { "$ref": "#/components/schemas/AccountDeletionChannel" },
+        "code": {
+          "type": "string",
+          "maxLength": 6,
+          "minLength": 6,
+          "pattern": "^[0-9]{6}$"
+        },
+        "confirm_deletion": { "type": "boolean" },
+        "consent_version": { "type": "string" },
+        "expected_coin_balance": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$"
+        },
+        "idempotency_key": { "type": "string", "format": "uuid" },
+        "waive_balance": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "DeletionStatus": {
+      "type": "string",
+      "enum": ["pending", "cancelled", "completed"]
+    },
     "PaginationMeta": {
       "type": "object",
       "required": ["page", "page_size", "total", "total_pages"],
@@ -1398,6 +1534,12 @@
         "forbidden",
         "otp_rate_limited",
         "otp_unavailable",
+        "account_deletion_upgrade_required",
+        "account_deletion_consent_required",
+        "account_deletion_consent_outdated",
+        "account_deletion_balance_changed",
+        "account_deletion_pending",
+        "account_deletion_expired",
         "account_deletion_channel_unavailable",
         "invalid_account_deletion_code",
         "password_hash_unavailable",
@@ -3286,6 +3428,7 @@
         }
       }
     },
+    "AccountDeletionChannel": { "type": "string", "enum": ["phone", "email"] },
     "AudioAsset": {
       "type": "object",
       "description": "一条已登记的音频资产。既是 confirm 的响应体，也内嵌在 `GrammarVariantV3.audio_assets` 里。\n除 `id` 外的字段都是服务端权威元数据：保存词义时按 id 重新灌入，客户端回传的值不作数。",
@@ -3370,6 +3513,18 @@
     "ComponentTargetMatchV3": {
       "type": "string",
       "enum": ["contains", "exact"]
+    },
+    "ConfirmAccountDeletionRequest": {
+      "type": "object",
+      "required": ["channel", "code"],
+      "properties": {
+        "channel": { "$ref": "#/components/schemas/AccountDeletionChannel" },
+        "code": {
+          "type": "string",
+          "description": "仅接受以 account_deletion purpose 签发到本人所选联系方式的验证码。",
+          "example": "123456"
+        }
+      }
     },
     "ConfirmAudioAssetRequest": {
       "type": "object",

@@ -1,3 +1,4 @@
+import type { AccountDeletionRequest } from "@tsz/types";
 import type { LearningSettings } from "@tsz/types";
 import type { BrowserContext, Page, Route } from "@playwright/test";
 
@@ -41,8 +42,7 @@ export async function mockApi(
   let learningSettings: LearningSettings | null = onboarded
     ? { cefr_level: "A1", english_variant: "BrE" }
     : null;
-  // 可变：账号注销后会话失效，后续 /auth/refresh 应 401（模拟账号已删）。
-  let deleted = false;
+  let deletionRequest: AccountDeletionRequest | null = null;
 
   await page.route("**/api/v1/**", async (route) => {
     const path = new URL(route.request().url()).pathname.replace(
@@ -52,7 +52,7 @@ export async function mockApi(
     const method = route.request().method();
 
     if (path === "/auth/refresh" && method === "POST") {
-      return authenticated && !deleted
+      return authenticated
         ? json(route, 200, {
             access_token: "test-access-token",
             expires_in: 900,
@@ -135,23 +135,66 @@ export async function mockApi(
       }
       return route.fulfill({ status: 202, body: "" });
     }
-    if (path === "/auth/account" && method === "DELETE") {
+    if (path === "/me/account-deletion" && method === "GET") {
+      return json(route, 200, {
+        request: deletionRequest,
+        coin_balance: "0",
+        consent_version: "account-deletion-72h-v1",
+        consent_text:
+          "所有注销申请等待连续72小时，期间可撤销且钱包全部收支暂停，到期剩余余额作废。",
+        server_time: "2026-10-06T00:00:00Z"
+      });
+    }
+    if (path === "/me/account-deletion" && method === "POST") {
       const body = route.request().postDataJSON() as Record<string, unknown>;
       if (
-        !["phone", "email"].includes(String(body.channel)) ||
-        body.code !== "000000" ||
-        Object.keys(body).sort().join(",") !== "channel,code"
+        !body.confirm_deletion ||
+        body.expected_coin_balance !== "0" ||
+        body.code !== "000000"
       ) {
-        return json(route, 422, {
-          type: "urn:tsz:problem:invalid_request_body",
-          title: "Invalid request body",
-          status: 422,
-          detail: "unexpected account deletion payload",
-          code: "invalid_request_body"
+        return json(route, 400, {
+          type: "urn:tsz:problem:account_deletion_consent_required",
+          title: "Consent required",
+          status: 400,
+          detail: "consent required",
+          code: "account_deletion_consent_required"
         });
       }
-      deleted = true;
-      return route.fulfill({ status: 204, body: "" });
+      deletionRequest = {
+        id: "00000000-0000-4000-8000-000000000001",
+        status: "pending",
+        requested_at: "2026-10-06T00:00:00Z",
+        effective_at: "2026-10-09T00:00:00Z",
+        cancelled_at: null,
+        completed_at: null,
+        confirmed_balance: "0",
+        waive_balance: false,
+        consent_version: "account-deletion-72h-v1",
+        consent_text: "所有注销申请等待连续72小时。"
+      };
+      return json(route, 202, deletionRequest);
+    }
+    if (
+      path ===
+        "/me/account-deletion/00000000-0000-4000-8000-000000000001/cancel" &&
+      method === "POST" &&
+      deletionRequest
+    ) {
+      deletionRequest = {
+        ...deletionRequest,
+        status: "cancelled",
+        cancelled_at: "2026-10-06T01:00:00Z"
+      };
+      return json(route, 200, deletionRequest);
+    }
+    if (path === "/auth/account" && method === "DELETE") {
+      return json(route, 409, {
+        type: "urn:tsz:problem:account_deletion_upgrade_required",
+        title: "Upgrade required",
+        status: 409,
+        detail: "use account deletion requests",
+        code: "account_deletion_upgrade_required"
+      });
     }
     // 其他端点返回空体，避免命中真实网络。
     return json(route, 200, {});

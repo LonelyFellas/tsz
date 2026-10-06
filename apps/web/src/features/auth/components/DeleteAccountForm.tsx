@@ -1,7 +1,11 @@
 "use client";
 
 import { Button, Card } from "@tsz/ui";
-import type { AccountDeletionChannel } from "@tsz/types";
+import type {
+  AccountDeletionChannel,
+  AccountDeletionState,
+  CreateAccountDeletionRequest
+} from "@tsz/types";
 import { HttpError } from "@tsz/api-client";
 import { isCode } from "@tsz/shared";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
@@ -18,6 +22,11 @@ const CHANNEL_LABEL: Record<AccountDeletionChannel, string> = {
 };
 
 const ERROR_BY_CODE: Record<string, string> = {
+  account_deletion_balance_changed: "余额已变化，请核对最新金额并重新签署",
+  account_deletion_consent_outdated: "注销声明已更新，请重新阅读并签署",
+  account_deletion_pending: "已有待生效的注销申请，请查看当前状态",
+  account_deletion_expired: "已到注销生效时间，无法撤销",
+  account_deletion_consent_required: "请主动确认注销规则及余额放弃声明",
   invalid_account_deletion_code: "验证码错误、已失效或已使用，请重新获取",
   account_deletion_channel_unavailable:
     "当前账号没有可用于验证的该渠道，请选择其他方式",
@@ -30,6 +39,7 @@ const ERROR_BY_CODE: Record<string, string> = {
 
 function accountDeletionError(error: unknown): string {
   if (!(error instanceof HttpError)) return "网络异常，请检查连接后重试";
+  if (error.status === 404) return "注销申请服务暂不可用，请稍后重试";
   const mapped = error.code ? ERROR_BY_CODE[error.code] : undefined;
   if (mapped) return mapped;
   if (error.status === 400 || error.status === 422) {
@@ -40,6 +50,11 @@ function accountDeletionError(error: unknown): string {
 }
 
 export function DeleteAccountForm() {
+  const user = useUserStore((state) => state.user);
+  return <AccountDeletionForm key={user?.id ?? "anonymous"} />;
+}
+
+function AccountDeletionForm() {
   const user = useUserStore((state) => state.user);
   const router = useRouter();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -62,6 +77,57 @@ export function DeleteAccountForm() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [deletionState, setDeletionState] =
+    useState<AccountDeletionState | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [consentChecked, setConsentChecked] = useState(false);
+  const intentRef = useRef<{ value: string; key: string } | null>(null);
+  useEffect(() => {
+    let active = true;
+    api.auth
+      .accountDeletion()
+      .then((value) => {
+        if (active) {
+          setDeletionState(value);
+          setLoading(false);
+        }
+      })
+      .catch((cause: unknown) => {
+        if (active) {
+          setError(accountDeletionError(cause));
+          setLoading(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
+
+  async function reloadState() {
+    const value = await api.auth.accountDeletion();
+    setDeletionState(value);
+    return value;
+  }
+  async function cancelDeletion() {
+    if (!deletionState?.request || deleting) return;
+    setDeleting(true);
+    setError("");
+    try {
+      const request = await api.auth.cancelAccountDeletion(
+        deletionState.request.id
+      );
+      setDeletionState({ ...deletionState, request });
+      intentRef.current = null;
+      setCode("");
+      setCodeRequested(false);
+      setConsentChecked(false);
+      setMessage("注销申请已撤销，天生币余额保持不变。");
+    } catch (cause: unknown) {
+      handleRequestError(cause);
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   const channel: AccountDeletionChannel = channels.includes(selectedChannel)
     ? selectedChannel
@@ -133,21 +199,157 @@ export function DeleteAccountForm() {
     event.preventDefault();
     if (!canContinue) return;
     setError("");
+    setConsentChecked(false);
     setConfirmOpen(true);
   }
 
   async function confirmDeletion() {
-    if (deleting || !canContinue) return;
+    if (deleting || !canContinue || !deletionState || !consentChecked) return;
     setDeleting(true);
     setError("");
+    const intent = {
+      channel,
+      expected_coin_balance: deletionState.coin_balance,
+      waive_balance: deletionState.coin_balance !== "0",
+      confirm_deletion: true,
+      consent_version: deletionState.consent_version
+    };
+    const value = JSON.stringify(intent);
+    if (intentRef.current?.value !== value)
+      intentRef.current = { value, key: crypto.randomUUID() };
+    const input: CreateAccountDeletionRequest = {
+      ...intent,
+      code,
+      idempotency_key: intentRef.current.key
+    };
     try {
-      await api.auth.deleteAccount({ channel, code });
-      clearSession();
-      window.location.replace("/login?deleted=success");
+      const request = await api.auth.requestAccountDeletion(input);
+      setDeletionState({ ...deletionState, request });
+      setConfirmOpen(false);
+      if (request.status === "pending") {
+        setMessage("注销申请已保存，当前会话保留。");
+      } else {
+        // A replay can return a historical request cancelled in another tab.
+        intentRef.current = null;
+        setCode("");
+        setCodeRequested(false);
+        setConsentChecked(false);
+        setMessage(
+          request.status === "cancelled"
+            ? "这份注销申请已撤销。如需重新申请，请重新获取验证码并签署。"
+            : "这份注销申请已结束，请重新读取账号状态。"
+        );
+      }
     } catch (cause: unknown) {
-      handleRequestError(cause);
+      if (cause instanceof HttpError && cause.code === "invalid_token") {
+        expireSession();
+        return;
+      }
+      setError(accountDeletionError(cause));
+      // Recover an uncertain response from persisted state, never from a guessed success.
+      try {
+        const restored = await reloadState();
+        // A cancelled GET result may belong to an older intent. Only replaying
+        // this exact key can establish that our own uncertain request ended.
+        if (restored.request?.status === "pending") {
+          setConfirmOpen(false);
+        }
+        const consentChanged =
+          restored.coin_balance !== deletionState.coin_balance ||
+          restored.consent_version !== deletionState.consent_version ||
+          restored.consent_text !== deletionState.consent_text;
+        if (
+          consentChanged ||
+          (cause instanceof HttpError &&
+            [
+              "account_deletion_balance_changed",
+              "account_deletion_consent_outdated"
+            ].includes(cause.code ?? ""))
+        ) {
+          setError("余额或注销声明已变化，请核对最新内容并重新签署");
+          setConsentChecked(false);
+          intentRef.current = null;
+          setConfirmOpen(false);
+        }
+      } catch {
+        /* Keep the error and the same intent key for a safe retry. */
+      }
+    } finally {
       setDeleting(false);
     }
+  }
+
+  if (loading || !deletionState) {
+    return (
+      <main className="mx-auto max-w-lg px-4 py-12">
+        <h1 className="text-xl font-bold">注销账号</h1>
+        {loading ? (
+          <p role="status">正在读取注销状态…</p>
+        ) : (
+          <>
+            <p role="alert" className="mt-4 text-danger">
+              {error}
+            </p>
+            <Button
+              className="mt-4"
+              onClick={() => {
+                setLoading(true);
+                reloadState()
+                  .catch((cause: unknown) =>
+                    setError(accountDeletionError(cause))
+                  )
+                  .finally(() => setLoading(false));
+              }}
+            >
+              重新加载
+            </Button>
+          </>
+        )}
+      </main>
+    );
+  }
+  if (deletionState.request?.status === "pending") {
+    const request = deletionState.request;
+    return (
+      <main className="mx-auto max-w-lg px-4 py-12">
+        <Card className="rounded-3xl p-6">
+          <h1 className="text-xl font-bold">注销申请等待生效</h1>
+          <p className="mt-4">
+            申请成功后等待连续 72 小时，期间可继续登录并撤销申请。
+          </p>
+          <p className="mt-3">
+            生效时间：
+            <time dateTime={request.effective_at}>
+              {new Date(request.effective_at).toLocaleString("zh-CN", {
+                timeZoneName: "short"
+              })}
+            </time>
+          </p>
+          <p className="mt-3">
+            已确认天生币余额：{request.confirmed_balance}
+            。钱包全部收支已暂停，撤销后余额保持不变。
+          </p>
+          <p className="mt-3 text-sm text-foreground-muted">
+            到期后账号不可再使用，剩余天生币作废，个人数据随后完成清理。是否仍可撤销以服务器判定为准。
+          </p>
+          {error && (
+            <p role="alert" className="mt-3 text-danger">
+              {error}
+            </p>
+          )}
+          <Button className="mt-6" disabled={deleting} onClick={cancelDeletion}>
+            {deleting ? "正在撤销…" : "撤销注销申请"}
+          </Button>
+          <Button
+            className="mt-3"
+            variant="secondary"
+            onClick={() => router.back()}
+          >
+            返回
+          </Button>
+        </Card>
+      </main>
+    );
   }
 
   if (channels.length === 0) {
@@ -194,10 +396,11 @@ export function DeleteAccountForm() {
             className="mb-7 rounded-2xl bg-danger/10 p-4 text-danger"
           >
             <h2 id="deletion-warning-title" className="font-semibold">
-              注销后不可恢复
+              注销申请等待 72 小时生效
             </h2>
             <p className="mt-2 text-sm leading-6">
-              账号资料、学习记录及相关权益将永久清除；以后重新注册也无法找回这些数据。
+              所有申请均等待连续 72
+              小时，期间可撤销，钱包全部收支暂停。到期后账号不可再使用，剩余天生币作废，个人数据随后清理。
             </p>
           </section>
 
@@ -331,8 +534,8 @@ export function DeleteAccountForm() {
               }
               if (event.key !== "Tab") return;
               const buttons = Array.from(
-                event.currentTarget.querySelectorAll<HTMLButtonElement>(
-                  "button:not(:disabled)"
+                event.currentTarget.querySelectorAll<HTMLElement>(
+                  "button:not(:disabled), input:not(:disabled)"
                 )
               );
               const first = buttons[0];
@@ -359,14 +562,33 @@ export function DeleteAccountForm() {
               id="confirm-deletion-title"
               className="text-lg font-bold text-foreground"
             >
-              最后确认：永久注销账号？
+              确认提交注销申请？
             </h2>
             <p
               id="confirm-deletion-description"
               className="mt-3 text-sm leading-6 text-foreground-muted"
             >
-              此操作无法撤销。确认后账号数据会被永久删除，并立即退出当前登录状态。
+              {deletionState.consent_text}
             </p>
+            <p className="mt-3 font-medium">
+              本次确认余额：{deletionState.coin_balance} 天生币
+            </p>
+            <label className="mt-4 flex items-start gap-3 text-sm leading-6">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={consentChecked}
+                disabled={deleting}
+                onChange={(event) => setConsentChecked(event.target.checked)}
+              />
+              <span>
+                我已阅读并同意以上注销规则
+                {deletionState.coin_balance !== "0"
+                  ? `，主动放弃本次确认的 ${deletionState.coin_balance} 天生币`
+                  : "，确认零余额也等待连续 72 小时"}
+                。
+              </span>
+            </label>
             {error && (
               <p role="alert" className="mt-3 text-sm text-danger">
                 {error}
@@ -385,10 +607,10 @@ export function DeleteAccountForm() {
               <Button
                 type="button"
                 className="min-h-11 rounded-full bg-danger text-white hover:bg-danger/90"
-                disabled={deleting}
+                disabled={deleting || !consentChecked}
                 onClick={confirmDeletion}
               >
-                {deleting ? "正在注销…" : "确认永久注销"}
+                {deleting ? "正在提交…" : "提交注销申请"}
               </Button>
             </div>
           </div>

@@ -1,7 +1,7 @@
 # 天生币系统需求与分批范围
 
 维护位置：`/Users/darwish/Dev/tsz-core/tsz-coins-b1a/docs/features/coins-system/` 是本次实施的唯一维护目录；`9adc` 工作区保留为只读评估来源。
-评估日期：2026-10-06。状态：B1a（COIN-01～03）已实现并验收，记录见 [b1a-acceptance.md](b1a-acceptance.md)；B1b/B2 未实施。后续用户已授权实施 B1a（COIN-01～03），允许在本任务隔离测试库执行迁移与验证；用户随后已授权 B1a 本地提交；未授权推送、PR、合并或部署。
+评估日期：2026-10-06。状态：B1a（COIN-01～03）已实现并验收，记录见 [b1a-acceptance.md](b1a-acceptance.md)；B1b 已验收，见 [b1b-acceptance.md](b1b-acceptance.md)；B2 未实施。后续用户已授权实施 B1a（COIN-01～03），允许在本任务隔离测试库执行迁移与验证；用户随后已授权 B1a 本地提交；未授权推送、PR、合并或部署。
 
 执行任务及排队顺序见 [tasks.md](tasks.md)，以可验收的批次组织工作。
 

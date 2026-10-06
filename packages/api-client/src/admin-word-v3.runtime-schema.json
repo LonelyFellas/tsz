@@ -1,8 +1,10 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/.codex/worktrees/coins-b1a/tsz-rust/docs/openapi.json",
-  "_source_sha256": "ce1e483e5b77f7e90cfe3b0210dd98f0b096196a64dcb71f318a6628a168cd33",
+  "_source_sha256": "fdeca5bd8536ec0155e307aec3c6a3612971303dd5aecb40d79f6ace106f4e11",
   "roots": [
+    "AccountDeletionRequest",
+    "AccountDeletionState",
     "CoinWallet",
     "CoinEntryPage",
     "SharedSentence",
@@ -32,6 +34,63 @@
     "ProblemDetails"
   ],
   "$defs": {
+    "AccountDeletionRequest": {
+      "type": "object",
+      "required": [
+        "id",
+        "status",
+        "requested_at",
+        "effective_at",
+        "cancelled_at",
+        "completed_at",
+        "confirmed_balance",
+        "waive_balance",
+        "consent_version",
+        "consent_text"
+      ],
+      "properties": {
+        "cancelled_at": { "type": ["string", "null"], "format": "date-time" },
+        "completed_at": { "type": ["string", "null"], "format": "date-time" },
+        "confirmed_balance": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$"
+        },
+        "consent_text": { "type": "string" },
+        "consent_version": { "type": "string" },
+        "effective_at": { "type": "string", "format": "date-time" },
+        "id": { "type": "string", "format": "uuid" },
+        "requested_at": { "type": "string", "format": "date-time" },
+        "status": { "$ref": "#/$defs/DeletionStatus" },
+        "waive_balance": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "AccountDeletionState": {
+      "type": "object",
+      "required": [
+        "request",
+        "coin_balance",
+        "consent_version",
+        "consent_text",
+        "server_time"
+      ],
+      "properties": {
+        "coin_balance": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$"
+        },
+        "consent_text": { "type": "string" },
+        "consent_version": { "type": "string" },
+        "request": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/AccountDeletionRequest" }
+          ]
+        },
+        "server_time": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
     "AdminWordDraftV3Envelope": {
       "type": "object",
       "required": ["word", "retired_stable_nodes"],
@@ -377,6 +436,10 @@
       "additionalProperties": false
     },
     "CommonDialectV3": { "type": "string", "enum": ["common"] },
+    "DeletionStatus": {
+      "type": "string",
+      "enum": ["pending", "cancelled", "completed"]
+    },
     "DetectionSurfaceRequestEchoV3": {
       "type": "object",
       "required": ["language", "kind", "surface"],
@@ -715,6 +778,12 @@
         "forbidden",
         "otp_rate_limited",
         "otp_unavailable",
+        "account_deletion_upgrade_required",
+        "account_deletion_consent_required",
+        "account_deletion_consent_outdated",
+        "account_deletion_balance_changed",
+        "account_deletion_pending",
+        "account_deletion_expired",
         "account_deletion_channel_unavailable",
         "invalid_account_deletion_code",
         "password_hash_unavailable",

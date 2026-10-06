@@ -193,7 +193,7 @@ export function AccountSecurity() {
           <div>
             <h2 className="text-sm font-semibold text-foreground">注销账号</h2>
             <p className="mt-1 text-sm text-foreground-muted">
-              永久注销账号，继续前请仔细阅读注销说明。
+              申请注销账号，继续前请仔细阅读注销说明。
             </p>
           </div>
           <Link
