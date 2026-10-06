@@ -74,3 +74,5 @@ pnpm test --maxWorkers=4
 ```
 
 真实脚本需先按 provenance 重建/启动本任务服务；每次运行创建新的 batch fixture，不能连接共享环境或把 37 币测试参数用于生产。
+
+提交审查补充：独立 reviewer 在前端 `f2c0f21` 发现人工操作筛选误收录 `invitation_reward`，该值会被后台人工查询接口拒绝。筛选现已显式限定为 `manual_purchase/manual_reward/manual_reversal`，个人账户流水继续展示邀请奖励。新增回归先复现错误选项，修复后 Coins 页面 3 项与 Admin typecheck 通过；原全仓证据复用，最终修复提交由同一 reviewer 增量复查。

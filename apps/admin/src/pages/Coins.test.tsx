@@ -147,3 +147,19 @@ it("query-only admin cannot credit and loss of access removes private data", asy
   expect(screen.queryByText("收款人")).not.toBeInTheDocument();
   expect(screen.getByText("没有天生币管理查询权限")).toBeInTheDocument();
 });
+it("manual operation filters exclude automatic rewards and submit supported source types", async () => {
+  open();
+  fireEvent.click(screen.getByText("操作记录与冲正"));
+  fireEvent.mouseDown(screen.getByLabelText("类型"));
+  await screen.findByText("人工奖励");
+  expect(screen.queryByText("邀请奖励")).not.toBeInTheDocument();
+  expect(screen.queryByText("注销余额作废")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByText("人工奖励"));
+  fireEvent.click(screen.getByRole("button", { name: /筛\s*选/ }));
+  await waitFor(() =>
+    expect(api.coinManagement.operations).toHaveBeenLastCalledWith(
+      expect.objectContaining({ source_type: "manual_reward" }),
+      expect.anything()
+    )
+  );
+});

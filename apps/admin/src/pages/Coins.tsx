@@ -419,9 +419,11 @@ function Management({ profile }: { profile: AdminProfile }) {
           <Select
             allowClear
             style={{ width: 140 }}
-            options={Object.entries(coinSourceLabels)
-              .filter(([v]) => v !== "account_closure")
-              .map(([value, label]) => ({ value, label }))}
+            options={[
+              "manual_purchase",
+              "manual_reward",
+              "manual_reversal"
+            ].map((value) => ({ value, label: coinSourceLabels[value] }))}
           />
         </Form.Item>
         <Form.Item name="time" label="时间">
