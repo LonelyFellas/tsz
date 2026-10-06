@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/.codex/worktrees/wordlists-wl03/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-06T16:10:59.107Z",
+  "_generatedAt": "2026-10-06T16:38:06.364Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -1638,6 +1638,11 @@
     }
   },
   "schemas": {
+    "WordlistView": { "type": "string", "enum": ["standard", "full"] },
+    "WordlistSort": {
+      "type": "string",
+      "enum": ["author", "label_asc", "label_desc"]
+    },
     "ManualCreditCategory": {
       "type": "string",
       "enum": ["purchase", "reward"]

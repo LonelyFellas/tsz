@@ -1,4 +1,5 @@
 import { expect, it, vi } from "vitest";
+import snapshot from "./openapi.snapshot.json";
 import {
   createWordlistEndpoints,
   createAdminWordlistEndpoints,
@@ -148,4 +149,22 @@ it("accepts standard and opted-in full shapes while rejecting internal pronuncia
   expect(() =>
     decodeWordlistResponse("WordlistItems", response(full))
   ).toThrow();
+});
+
+it("resolves the optional reading query enums from the generated contract", () => {
+  for (const operation of [
+    "get /wordlists/{id}/items",
+    "get /me/wordlists/{id}/items"
+  ] as const) {
+    const params = snapshot.operationQueryParameters[operation];
+    for (const [name, schema, values] of [
+      ["view", "WordlistView", ["standard", "full"]],
+      ["sort", "WordlistSort", ["author", "label_asc", "label_desc"]]
+    ] as const) {
+      const param = params.find((value) => value.name === name);
+      expect(param?.required).toBe(false);
+      expect(param?.schema).toEqual({ $ref: `#/components/schemas/${schema}` });
+      expect(snapshot.schemas[schema].enum).toEqual(values);
+    }
+  }
 });

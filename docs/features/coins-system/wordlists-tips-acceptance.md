@@ -151,7 +151,7 @@ pnpm test:ci-modules
 - 浏览器通过正式注册/API 创建两批隔离用户及 WL03 前缀词表（第一批因脚本误查 `/auth/me` 而停止，修正为 `/me` 后第二批全通过）；表清单在 `created-wordlists.json`。词库两条 V3 snapshot 与其中新发布/归档/恢复、该 fixture 用户的教师认证状态由 SQL 准备，仅用于已标记的本地验收。它们不是共享/生产词典或词库创编 UI 证据。
 - 8 条流程：私密完整/备注与越权 → 学生等级/方言 → 师生切换且学习设置仍 A1 → 游客公开完整 → 只读排序/搜索 → 短语无词形行 → 手机无溢出 → 新发布/归档/恢复。全程没有充值/投币/注销写入，coins operations 保持 26，coin entries 33。
 - `compatibility.json` 使用 origin/main 原版 runtime 校验候选真实 public-standard/review-standard，均通过；新 runtime 接受上述响应及 full。旧 runtime 按预期拒绝未请求过的 full 附加字段，服务端不会默认发送。新 Web 默认标准/作者顺序保留旧请求；旧 API 的 deny_unknown_fields 会拒绝新 view/sort，页面明确失败、可切回默认，不伪造完整或排序。反向组合按源码/契约及组件错误测试核对，未额外启动旧后端浏览器组。
-- OpenAPI SHA-256：`07ef4a5842de6d8139a49ffaa3c9b3ddb197a2096e5d3b2c9e5a7c263eddc394`。只变更 public/my items 两条路径的查询参数及五个阅读 schema；无新增路径、迁移、权限或写接口。
+- OpenAPI SHA-256：`67eab91fc7cb20810ac2a4fb22eaac59e50f19b346e61799e4135340ae127fa3`。只变更 public/my items 两条路径的查询参数及七个阅读 schema（含两个查询枚举）；无新增路径、迁移、权限或写接口。
 
 证据集中于 `/tmp/wl03-runtime/`：`browser-result.json`、`compatibility.json`、`public-standard.json`、`review-standard.json`、`public-full.json`、`full-desktop.png`、`full-mobile.png`、`final-provenance.json`、`final-counts.json`、`cleanup.json`。检查日志为 `/tmp/wl03-*.log`；凭据 `private.json` 不对外展示。
 
@@ -160,3 +160,5 @@ pnpm test:ci-modules
 ### WL-03 本地交付
 
 用户于本轮明确要求提交，两仓复用现有任务 worktree。fetch 后 origin/main 仍为上述基线；已验收文件哈希与本次输入一致。后端补充对接指南中的 opt-in 契约与 backend → Web 发布顺序，前端同步本地交付状态。提交运行原生 hooks；提交后按两仓 ship 技能对精确 SHA 作独立只读审查。该授权不包括推送、PR、合并或部署。
+
+精确提交审查发现并修复一项 P2：新增查询参数引用的 WordlistView/WordlistSort 未登记 OpenAPI components。回归先复现悬空引用，再注册两项 schema 并原生导出；前端同步脚本显式保留两个查询枚举，同步 snapshot/runtime 和哈希 canary，并验证两条 items 路径的可选参数均引用可解析枚举。修复仅涉及契约声明、生成物及测试，不改变业务响应或页面行为；由同一 reviewer 对新提交增量复查。
