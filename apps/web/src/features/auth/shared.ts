@@ -71,7 +71,11 @@ export function postAuthPath(
     !teacherReturn &&
     pathname !== "/account/coins" &&
     pathname !== "/account/invitations" &&
-    pathname !== "/student/coins"
+    pathname !== "/student/coins" &&
+    pathname !== "/wordlists/new" &&
+    pathname !== "/account/wordlist-tips" &&
+    !/^\/wordlists\/[^/]+$/.test(pathname) &&
+    !/^\/account\/wordlists(\/|$)/.test(pathname)
   ) {
     return target === "/"
       ? ONBOARDING_PATH

@@ -8,6 +8,7 @@ import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
 
 const SOURCES: Record<string, string> = {
+  wordlist_tip: "词表投币",
   invitation_reward: "邀请奖励",
   manual_purchase: "购买入账",
   manual_reward: "人工奖励",
@@ -157,8 +158,14 @@ function Wallet({ id }: { id: string }) {
       <section className="mt-8 rounded-3xl bg-muted p-6">
         <h2 className="text-xl font-semibold">获取与使用</h2>
         <p className="mt-3 text-sm leading-7 text-foreground-muted">
-          每日任务、词表获得投币：尚未开放。词表投币等消费功能准备中，开放后会在这里说明。
+          可向他人已公开且全部词条可用的词表投币，数量由你确认，全额进入作者钱包。每日任务奖励尚未开放。
         </p>
+        <Link
+          href="/account/wordlist-tips"
+          className="mt-4 mr-5 inline-block text-sm text-primary"
+        >
+          投出与收到的词表投币 →
+        </Link>
         <Link
           href="/account/invitations"
           className="mt-4 inline-block text-sm text-primary"

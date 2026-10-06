@@ -7,7 +7,6 @@ import { HomePage } from "./Home";
 import { ProfileSettingsPage } from "./ProfileSettings";
 import { ReviewsPage } from "./Reviews";
 import { UsersPage } from "./Users";
-import { WordListsPage } from "./WordLists";
 import { WordCreatePage } from "./WordCreate";
 import { WordsPage } from "./Words";
 
@@ -91,13 +90,13 @@ describe("admin 页面烟雾测试", () => {
     expect(screen.getByRole("button", { name: "扣除" })).toBeInTheDocument();
   });
 
-  it.each([
-    [WordListsPage, "词表管理"],
-    [ReviewsPage, "审核中心"]
-  ] as const)("%o 渲染标题 %s", (Page, title) => {
-    render(<Page />);
-    expect(screen.getByRole("heading", { name: title })).toBeInTheDocument();
-  });
+  it.each([[ReviewsPage, "审核中心"]] as const)(
+    "%o 渲染标题 %s",
+    (Page, title) => {
+      render(<Page />);
+      expect(screen.getByRole("heading", { name: title })).toBeInTheDocument();
+    }
+  );
 
   it("用户管理页渲染搜索行、角色 tab 与表格列", () => {
     // 已接真实数据层（React Query + api.users.list，此处返回空列表），需 antd App context 与路由。

@@ -95,6 +95,12 @@ export const router = createBrowserRouter([
           },
           ...wordRoutes,
           {
+            ...ADMIN_PAGE_ROUTES.wordlists,
+            lazy: async () => ({
+              Component: (await import("@/pages/WordLists")).WordListsPage
+            })
+          },
+          {
             ...ADMIN_PAGE_ROUTES.coins,
             lazy: async () => ({
               Component: (await import("@/pages/Coins")).CoinsPage

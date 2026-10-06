@@ -38,7 +38,8 @@ const nextConfig = {
     "@tsz/ui",
     "@tsz/shared",
     "@tsz/types",
-    "@tsz/api-client"
+    "@tsz/api-client",
+    "@tsz/voice-editor"
   ],
   async redirects() {
     return [

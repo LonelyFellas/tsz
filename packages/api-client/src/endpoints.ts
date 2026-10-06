@@ -1,3 +1,4 @@
+import { createWordlistEndpoints } from "./wordlists";
 import { createAccountDeletionEndpoints } from "./account-deletion";
 import { createInvitationEndpoints } from "./invitations";
 import { createCoinEndpoints } from "./coins";
@@ -19,8 +20,7 @@ import type {
   MeResponse,
   Task,
   User,
-  Word,
-  WordList
+  Word
 } from "@tsz/types";
 import type { HttpClient } from "./http";
 import { createTeacherCertificationEndpoints } from "./teacher-certification";
@@ -206,14 +206,7 @@ export function createEndpoints(http: HttpClient) {
     word: {
       list: (page = 1) => http.get<Paginated<Word>>(`/words?page=${page}`)
     },
-    wordList: {
-      list: (page = 1) =>
-        http.get<Paginated<WordList>>(`/wordlists?page=${page}`),
-      get: (id: string) => http.get<WordList>(`/wordlists/${id}`),
-      create: (data: Partial<WordList>) =>
-        http.post<WordList>("/wordlists", data),
-      publish: (id: string) => http.post<WordList>(`/wordlists/${id}/publish`)
-    },
+    wordList: createWordlistEndpoints(http),
     comment: {
       create: (data: Pick<Comment, "target_type" | "target_id" | "content">) =>
         http.post<Comment>("/comments", data)

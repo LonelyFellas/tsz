@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/.codex/worktrees/coins-b1a/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-06T10:21:42.841Z",
+  "_generatedAt": "2026-10-06T12:42:27.703Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -94,6 +94,11 @@
     "/admin/users/{id}": ["get", "patch"],
     "/admin/users/{id}/status": ["patch"],
     "/admin/users/{id}/teacher-certification": ["delete"],
+    "/admin/wordlists": ["get"],
+    "/admin/wordlists/{id}/review-requests": ["get"],
+    "/admin/wordlists/{id}/review-requests/{request_id}/decision": ["post"],
+    "/admin/wordlists/{id}/review-requests/{request_id}/items": ["get"],
+    "/admin/wordlists/{id}/withdraw": ["post"],
     "/auth/account": ["delete"],
     "/auth/account/deletion-code": ["post"],
     "/auth/login": ["post"],
@@ -128,7 +133,20 @@
     "/me/teacher-certification/applications/{id}": ["get"],
     "/me/teacher-certification/files": ["post"],
     "/me/teacher-certification/files/{id}": ["delete", "get"],
-    "/otp/send": ["post"]
+    "/me/wordlist-tips": ["get"],
+    "/me/wordlist-tips/{event_id}": ["get"],
+    "/me/wordlists": ["get", "post"],
+    "/me/wordlists/{id}": ["get", "put"],
+    "/me/wordlists/{id}/edit": ["get"],
+    "/me/wordlists/{id}/items": ["get"],
+    "/me/wordlists/{id}/review-requests": ["get", "post"],
+    "/me/wordlists/{id}/withdraw": ["post"],
+    "/otp/send": ["post"],
+    "/wordlists": ["get"],
+    "/wordlists/catalog": ["get"],
+    "/wordlists/{id}": ["get"],
+    "/wordlists/{id}/items": ["get"],
+    "/wordlists/{id}/tips": ["post"]
   },
   "operationHeaders": {
     "post /admin/lexicon/entries": [
@@ -475,6 +493,63 @@
         "schema": { "type": "integer", "format": "int64", "minimum": 1 }
       }
     ],
+    "get /admin/wordlists": [
+      {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "format": "int32", "minimum": 0 }
+      },
+      {
+        "name": "page_size",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "format": "int32", "minimum": 0 }
+      },
+      {
+        "name": "q",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "state",
+        "in": "query",
+        "required": false,
+        "schema": { "$ref": "#/components/schemas/WordlistState" }
+      }
+    ],
+    "get /admin/wordlists/{id}/review-requests/{request_id}/items": [
+      {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int32",
+          "default": 1,
+          "minimum": 1
+        }
+      },
+      {
+        "name": "page_size",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int32",
+          "default": 50,
+          "maximum": 100,
+          "minimum": 1
+        }
+      },
+      {
+        "name": "q",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "maxLength": 100 }
+      }
+    ],
     "get /me/coins/entries": [
       {
         "name": "page",
@@ -529,6 +604,192 @@
           "maximum": 100,
           "minimum": 1
         }
+      }
+    ],
+    "get /me/wordlist-tips": [
+      {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int32",
+          "default": 1,
+          "minimum": 1
+        }
+      },
+      {
+        "name": "page_size",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int32",
+          "default": 50,
+          "maximum": 100,
+          "minimum": 1
+        }
+      },
+      {
+        "name": "q",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "maxLength": 100 }
+      }
+    ],
+    "get /me/wordlists": [
+      {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int32",
+          "default": 1,
+          "minimum": 1
+        }
+      },
+      {
+        "name": "page_size",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int32",
+          "default": 50,
+          "maximum": 100,
+          "minimum": 1
+        }
+      },
+      {
+        "name": "q",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "maxLength": 100 }
+      }
+    ],
+    "get /me/wordlists/{id}/items": [
+      {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int32",
+          "default": 1,
+          "minimum": 1
+        }
+      },
+      {
+        "name": "page_size",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int32",
+          "default": 50,
+          "maximum": 100,
+          "minimum": 1
+        }
+      },
+      {
+        "name": "q",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "maxLength": 100 }
+      }
+    ],
+    "get /wordlists": [
+      {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int32",
+          "default": 1,
+          "minimum": 1
+        }
+      },
+      {
+        "name": "page_size",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int32",
+          "default": 50,
+          "maximum": 100,
+          "minimum": 1
+        }
+      },
+      {
+        "name": "q",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "maxLength": 100 }
+      }
+    ],
+    "get /wordlists/catalog": [
+      {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int32",
+          "default": 1,
+          "minimum": 1
+        }
+      },
+      {
+        "name": "page_size",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int32",
+          "default": 50,
+          "maximum": 100,
+          "minimum": 1
+        }
+      },
+      {
+        "name": "q",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "maxLength": 100 }
+      }
+    ],
+    "get /wordlists/{id}/items": [
+      {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int32",
+          "default": 1,
+          "minimum": 1
+        }
+      },
+      {
+        "name": "page_size",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int32",
+          "default": 50,
+          "maximum": 100,
+          "minimum": 1
+        }
+      },
+      {
+        "name": "q",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "maxLength": 100 }
       }
     ]
   },
@@ -1837,6 +2098,8 @@
         "invalid_display_name",
         "invalid_otp_code",
         "invalid_invitation_code",
+        "word_list_conflict",
+        "word_list_entry_unavailable",
         "invalid_credentials",
         "invalid_token",
         "invalid_refresh_token",

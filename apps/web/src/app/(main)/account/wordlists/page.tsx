@@ -1,4 +1,4 @@
-import { WordListCreator } from "@/features/wordlist";
+import { WordListBrowser } from "@/features/wordlist";
 import { RouteGuard } from "@/features/auth/components/RouteGuard";
 export const metadata = {
   title: "我的词表",
@@ -7,7 +7,7 @@ export const metadata = {
 export default function Page() {
   return (
     <RouteGuard>
-      <WordListCreator />
+      <WordListBrowser mine />
     </RouteGuard>
   );
 }

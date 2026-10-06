@@ -65,6 +65,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
     () =>
       useUserStore.subscribe((state, previous) => {
         if (state.user?.id !== previous.user?.id) {
+          void queryClient.cancelQueries({ queryKey: ["wordlists", "user"] });
+          queryClient.removeQueries({ queryKey: ["wordlists", "user"] });
           void queryClient.cancelQueries({ queryKey: ["coins"] });
           queryClient.removeQueries({ queryKey: ["coins"] });
         }

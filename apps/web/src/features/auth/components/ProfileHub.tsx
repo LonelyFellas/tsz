@@ -18,7 +18,7 @@ import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIden
 const TILES: { label: string; href: string; icon: ReactNode }[] = [
   { label: "邀请好友", href: "/account/invitations", icon: <CoinIcon /> },
   { label: "我的天生币", href: "/account/coins", icon: <CoinIcon /> },
-  { label: "我的词表", href: "/wordlists", icon: <ListIcon /> },
+  { label: "我的词表", href: "/account/wordlists", icon: <ListIcon /> },
   {
     label: "账号安全",
     href: "/account/security",

@@ -141,7 +141,7 @@ describe("ProfileHub — 渲染", () => {
     );
     expect(screen.getByRole("link", { name: /我的词表/ })).toHaveAttribute(
       "href",
-      "/wordlists"
+      "/account/wordlists"
     );
   });
 

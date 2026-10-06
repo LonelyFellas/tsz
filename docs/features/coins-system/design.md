@@ -5,7 +5,7 @@
 
 B4（COIN-10）已完成实现和验收，见 [b4-acceptance.md](b4-acceptance.md)；验收后已获两仓本地提交授权，未推送或部署。
 
-实施任务、依赖和状态见 [tasks.md](tasks.md)。
+实施任务、依赖和状态见 [tasks.md](tasks.md)。COIN-11 所依赖的真实词表已完成独立前置评估，见 [词表基础设计](wordlist-foundation-design.md)；最小词表闭环及 COIN-11 已实现并验收，见 [本批验收](wordlists-tips-acceptance.md)。
 
 注销规则已按用户后续要求替换：有余额须签署放弃，申请成功起等待连续 72 小时，期间允许撤销并暂停钱包收支；到期生效并记余额作废。本文不再采用“非零余额不能申请注销”。
 

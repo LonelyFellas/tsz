@@ -35,6 +35,16 @@ const runtimeSchemaBundle =
   runtimeSchemaBundleJson as unknown as RuntimeSchemaBundle;
 
 const ROOTS = [
+  "WordlistTip",
+  "WordlistTipPage",
+  "Wordlist",
+  "WordlistPage",
+  "WordlistItems",
+  "MyWordlistItems",
+  "WordlistCatalog",
+  "WordlistEditSnapshot",
+  "WordlistReview",
+  "WordlistReviews",
   "InvitationCode",
   "InvitationOverview",
   "InvitationRecordPage",

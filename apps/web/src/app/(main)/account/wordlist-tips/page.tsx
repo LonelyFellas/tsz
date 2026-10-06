@@ -1,13 +1,13 @@
-import { WordListCreator } from "@/features/wordlist";
 import { RouteGuard } from "@/features/auth/components/RouteGuard";
+import { WordlistTips } from "@/features/wordlist/components/WordlistTips";
 export const metadata = {
-  title: "我的词表",
+  title: "词表投币记录",
   robots: { index: false, follow: false }
 };
 export default function Page() {
   return (
     <RouteGuard>
-      <WordListCreator />
+      <WordlistTips />
     </RouteGuard>
   );
 }

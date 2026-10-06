@@ -146,6 +146,9 @@ importers:
       '@tsz/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@tsz/voice-editor':
+        specifier: workspace:*
+        version: link:../../packages/voice-editor
       next:
         specifier: ^16.3.2
         version: 16.3.2(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)

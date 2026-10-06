@@ -1,8 +1,18 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/.codex/worktrees/coins-b1a/tsz-rust/docs/openapi.json",
-  "_source_sha256": "8bf959574542286788f300d31d7f1d53145978a7a2122889990f0eab9dacc5a1",
+  "_source_sha256": "e0f746a10f2a0a49971ba24f694ed31c7dddef286e9723b8b4e34ddc98f97f81",
   "roots": [
+    "WordlistTip",
+    "WordlistTipPage",
+    "Wordlist",
+    "WordlistPage",
+    "WordlistItems",
+    "MyWordlistItems",
+    "WordlistCatalog",
+    "WordlistEditSnapshot",
+    "WordlistReview",
+    "WordlistReviews",
     "InvitationCode",
     "InvitationOverview",
     "InvitationRecordPage",
@@ -806,6 +816,8 @@
         "invalid_display_name",
         "invalid_otp_code",
         "invalid_invitation_code",
+        "word_list_conflict",
+        "word_list_entry_unavailable",
         "invalid_credentials",
         "invalid_token",
         "invalid_refresh_token",
@@ -1305,6 +1317,39 @@
         },
         "presentation": { "$ref": "#/$defs/EntryPresentationV3" },
         "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "MyWordlistItem": {
+      "type": "object",
+      "required": [
+        "entry_id",
+        "position",
+        "entry",
+        "private_note",
+        "note_revision"
+      ],
+      "properties": {
+        "entry": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/WordlistEntry" }]
+        },
+        "entry_id": { "type": "string", "format": "uuid" },
+        "note_revision": { "type": "integer" },
+        "position": { "type": "integer" },
+        "private_note": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "MyWordlistItems": {
+      "type": "object",
+      "required": ["items", "revision", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/MyWordlistItem" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" },
+        "revision": { "type": "integer" }
       },
       "additionalProperties": false
     },
@@ -2831,6 +2876,291 @@
           "maxItems": 2000
         },
         "scope": { "$ref": "#/$defs/FormGroupScopeV3" }
+      },
+      "additionalProperties": false
+    },
+    "Wordlist": {
+      "type": "object",
+      "required": [
+        "id",
+        "owner_user_id",
+        "owner_name",
+        "name",
+        "state",
+        "revision",
+        "item_count",
+        "created_at",
+        "updated_at"
+      ],
+      "properties": {
+        "created_at": { "type": "string", "format": "date-time" },
+        "id": { "type": "string", "format": "uuid" },
+        "item_count": { "type": "integer" },
+        "name": { "type": "string" },
+        "owner_name": { "type": "string" },
+        "owner_user_id": { "type": "string", "format": "uuid" },
+        "revision": { "type": "integer" },
+        "state": { "$ref": "#/$defs/WordlistState" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistCandidate": {
+      "type": "object",
+      "required": ["entry_id", "publication_id", "label", "glosses"],
+      "properties": {
+        "entry_id": { "type": "string", "format": "uuid" },
+        "glosses": { "type": "array", "items": { "type": "string" } },
+        "label": { "type": "string" },
+        "publication_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistCatalog": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistCandidate" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistDefinition": {
+      "type": "object",
+      "required": [
+        "id",
+        "definition_mode",
+        "level",
+        "grammar_structure_id",
+        "texts"
+      ],
+      "properties": {
+        "definition_mode": { "type": "string" },
+        "grammar_structure_id": {
+          "type": ["string", "null"],
+          "format": "uuid"
+        },
+        "id": { "type": "string", "format": "uuid" },
+        "level": { "type": "string" },
+        "texts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistText" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "WordlistEditSnapshot": {
+      "type": "object",
+      "required": ["wordlist", "entry_ids"],
+      "properties": {
+        "entry_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" }
+        },
+        "wordlist": { "$ref": "#/$defs/Wordlist" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistEntry": {
+      "type": "object",
+      "required": ["entry_id", "publication_id", "label", "kind", "pos"],
+      "properties": {
+        "entry_id": { "type": "string", "format": "uuid" },
+        "kind": { "$ref": "#/$defs/WordEntryKindV3" },
+        "label": { "type": "string" },
+        "pos": { "type": "array", "items": { "$ref": "#/$defs/WordlistPos" } },
+        "publication_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistGrammar": {
+      "type": "object",
+      "required": ["id", "variants"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "variants": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistText" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "WordlistItem": {
+      "type": "object",
+      "required": ["entry_id", "position", "entry"],
+      "properties": {
+        "entry": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/WordlistEntry" }]
+        },
+        "entry_id": { "type": "string", "format": "uuid" },
+        "position": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistItems": {
+      "type": "object",
+      "required": ["items", "revision", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistItem" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" },
+        "revision": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": { "type": "array", "items": { "$ref": "#/$defs/Wordlist" } },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistPos": {
+      "type": "object",
+      "required": ["pos_id", "pos", "senses", "grammar_structures"],
+      "properties": {
+        "grammar_structures": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistGrammar" }
+        },
+        "pos": { "type": "string" },
+        "pos_id": { "type": "string", "format": "uuid" },
+        "senses": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistSense" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "WordlistReview": {
+      "type": "object",
+      "required": [
+        "id",
+        "wordlist_id",
+        "submitted_revision",
+        "name",
+        "state",
+        "reason",
+        "created_at",
+        "decided_at"
+      ],
+      "properties": {
+        "created_at": { "type": "string", "format": "date-time" },
+        "decided_at": { "type": ["string", "null"], "format": "date-time" },
+        "id": { "type": "string", "format": "uuid" },
+        "name": { "type": "string" },
+        "reason": { "type": ["string", "null"] },
+        "state": { "type": "string" },
+        "submitted_revision": { "type": "integer" },
+        "wordlist_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistReviews": {
+      "type": "object",
+      "required": ["withdraw_reason", "items"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistReview" }
+        },
+        "withdraw_reason": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "WordlistSense": {
+      "type": "object",
+      "required": ["id", "sub_pos", "level", "definitions"],
+      "properties": {
+        "definitions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistDefinition" }
+        },
+        "id": { "type": "string", "format": "uuid" },
+        "level": { "type": "string" },
+        "sub_pos": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistState": {
+      "type": "string",
+      "enum": ["draft", "pending", "published", "rejected", "withdrawn"]
+    },
+    "WordlistText": {
+      "type": "object",
+      "required": ["dialect", "content"],
+      "properties": {
+        "content": { "$ref": "#/$defs/RichTextV3" },
+        "dialect": { "$ref": "#/$defs/Dialect" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistTip": {
+      "type": "object",
+      "required": [
+        "event_id",
+        "wordlist_id",
+        "payer_user_id",
+        "author_user_id",
+        "amount",
+        "operation_id",
+        "created_at"
+      ],
+      "properties": {
+        "amount": { "type": "string", "pattern": "^[1-9][0-9]{0,18}$" },
+        "author_user_id": { "type": "string", "format": "uuid" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "event_id": { "type": "string", "format": "uuid" },
+        "operation_id": { "type": "string", "format": "uuid" },
+        "payer_user_id": { "type": "string", "format": "uuid" },
+        "wordlist_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistTipPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistTipRecord" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistTipRecord": {
+      "type": "object",
+      "required": [
+        "event_id",
+        "wordlist_id",
+        "payer_user_id",
+        "author_user_id",
+        "amount",
+        "operation_id",
+        "created_at",
+        "wordlist_name",
+        "wordlist_accessible",
+        "counterparty_name"
+      ],
+      "properties": {
+        "amount": { "type": "string", "pattern": "^[1-9][0-9]{0,18}$" },
+        "author_user_id": { "type": "string", "format": "uuid" },
+        "counterparty_name": { "type": ["string", "null"] },
+        "created_at": { "type": "string", "format": "date-time" },
+        "event_id": { "type": "string", "format": "uuid" },
+        "operation_id": { "type": "string", "format": "uuid" },
+        "payer_user_id": { "type": "string", "format": "uuid" },
+        "wordlist_accessible": { "type": "boolean" },
+        "wordlist_id": { "type": "string", "format": "uuid" },
+        "wordlist_name": { "type": ["string", "null"] }
       },
       "additionalProperties": false
     },

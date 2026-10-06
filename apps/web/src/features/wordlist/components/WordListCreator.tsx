@@ -1,262 +1,467 @@
 "use client";
-
-import { useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { Button, Card } from "@tsz/ui";
-import type { WordListCustomWord, WordListVisibility } from "@tsz/types";
-import { MOCK_WORDS } from "../data/mockWords";
-import { useCreateWordList } from "../hooks/useWordLists";
-
-// 对应流程图「创建词表」分支:
-// 选智能词库词汇 + 完善自定义词汇 → 填写名称 → 完成创建私密词表
-// → 公开?→(有自定义词汇则)敏感词审核 → 通过后公开,师生可见。
-type Step = "words" | "name" | "visibility" | "done";
-
-const STEP_TITLES: Record<Step, string> = {
-  words: "1 / 3 · 选择词汇",
-  name: "2 / 3 · 词表命名",
-  visibility: "3 / 3 · 公开设置",
-  done: "完成"
+import { HttpError } from "@tsz/api-client";
+import type {
+  CreateWordlist,
+  MyWordlistItem,
+  WordlistCandidate,
+  WordlistEditSnapshot,
+  MyWordlistItems
+} from "@tsz/types";
+import { api } from "@/lib/request";
+import { useUserStore } from "@/stores/user";
+import { wordListKeys } from "../hooks/useWordLists";
+import { buttonClass } from "../reading";
+type Row = {
+  id: string;
+  entryId: string | null;
+  text?: string;
+  candidate?: WordlistCandidate;
+  note?: string;
+  noteRevision?: number;
+  originalEntryId?: string;
+  noteDirty?: boolean;
 };
-
-export function WordListCreator() {
-  const router = useRouter();
-  const [step, setStep] = useState<Step>("words");
-
-  // 选词状态
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [customWords, setCustomWords] = useState<WordListCustomWord[]>([]);
-  const [customDraft, setCustomDraft] = useState("");
-
-  // 词表信息
-  const [name, setName] = useState("");
-  const [visibility, setVisibility] = useState<WordListVisibility>("private");
-
-  const createWordList = useCreateWordList();
-  const submitting = createWordList.isPending;
-
-  const totalWords = selectedIds.size + customWords.length;
-  const hasCustom = customWords.length > 0;
-  // 公开 + 有自定义词汇 → 需走敏感词审核(对应流程图分支)。
-  const needsReview = visibility === "public" && hasCustom;
-
-  const selectedWords = useMemo(
-    () => MOCK_WORDS.filter((w) => selectedIds.has(w.id)),
-    [selectedIds]
+const emptyRow = (): Row => ({
+  id: crypto.randomUUID(),
+  entryId: null,
+  text: "",
+  note: ""
+});
+const field = "w-full rounded-xl border border-border bg-background px-3 py-2";
+export function WordListCreator({ id }: { id?: string }) {
+  const userId = useUserStore((s) => s.user?.id);
+  const snapshot = useQuery({
+    queryKey: [...wordListKeys.mine(userId), "edit", id],
+    queryFn: ({ signal }) => api.wordList.edit(id!, { signal }),
+    enabled: !!userId && !!id,
+    refetchOnWindowFocus: false,
+    refetchOnMount: "always"
+  });
+  if (!userId) return null;
+  if (id && snapshot.isError)
+    return (
+      <p role="alert" className="p-8">
+        读取编辑数据失败。
+        <button onClick={() => void snapshot.refetch()}>重试</button>
+      </p>
+    );
+  if (id && !snapshot.data) return <p className="p-8">正在读取词表…</p>;
+  return (
+    <Editor
+      key={`${userId}:${id ?? "new"}`}
+      userId={userId}
+      id={id}
+      initial={snapshot.data}
+    />
   );
-
-  function toggleWord(id: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+}
+function Editor({
+  userId,
+  id,
+  initial: snapshot
+}: {
+  userId: string;
+  id?: string;
+  initial?: WordlistEditSnapshot;
+}) {
+  const [initial] = useState(snapshot);
+  const router = useRouter();
+  const client = useQueryClient();
+  const [name, setName] = useState(initial?.wordlist.name ?? "");
+  const [rows, setRows] = useState<Row[]>(() =>
+    initial
+      ? initial.entry_ids.map((entryId) => ({
+          id: crypto.randomUUID(),
+          entryId
+        }))
+      : [emptyRow()]
+  );
+  const [page, setPage] = useState(1);
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [uncertain, setUncertain] = useState(false);
+  const pending = useRef<CreateWordlist | null>(null);
+  const drag = useRef<string | null>(null);
+  const locked =
+    initial?.wordlist.state === "published" ||
+    initial?.wordlist.state === "pending";
+  const [loadPage, setLoadPage] = useState(1);
+  const loaded = useQuery({
+    queryKey: [...wordListKeys.mine(userId), "edit-items", id, loadPage],
+    queryFn: ({ signal }) =>
+      api.wordList.myItems(id!, { page: loadPage, page_size: 100 }, { signal }),
+    enabled: !!id,
+    refetchOnWindowFocus: false
+  });
+  // Keep loaded pages for stable row IDs when users reorder the full lightweight snapshot.
+  const cache = new Map<string, MyWordlistItem>();
+  for (const [, data] of client.getQueriesData<MyWordlistItems>({
+    queryKey: [...wordListKeys.mine(userId), "edit-items", id]
+  }))
+    if (data) for (const item of data.items) cache.set(item.entry_id, item);
+  if (loaded.data)
+    for (const item of loaded.data.items) cache.set(item.entry_id, item);
+  useEffect(() => {
+    if (!dirty) return;
+    const prevent = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", prevent);
+    return () => window.removeEventListener("beforeunload", prevent);
+  }, [dirty]);
+  function change(rowId: string, patch: Partial<Row>) {
+    setRows((current) =>
+      current.map((row) => (row.id === rowId ? { ...row, ...patch } : row))
+    );
+    setDirty(true);
+    setError("");
+  }
+  function move(rowId: string, target: string) {
+    setRows((current) => {
+      const a = current.findIndex((r) => r.id === rowId),
+        b = current.findIndex((r) => r.id === target);
+      if (a < 0 || b < 0) return current;
+      const next = [...current];
+      const [row] = next.splice(a, 1);
+      next.splice(b, 0, row!);
       return next;
     });
+    setDirty(true);
   }
-
-  function addCustomWord() {
-    const text = customDraft.trim();
-    if (!text) return;
-    setCustomWords((prev) => [...prev, { text }]);
-    setCustomDraft("");
+  async function save() {
+    if (!name.trim() || [...name].length > 100) {
+      setError("名称须为 1–100 字");
+      return;
+    }
+    if (rows.some((r) => !r.entryId)) {
+      setError("每行都需选定平台词条，请选择候选或删除未匹配行");
+      return;
+    }
+    if (new Set(rows.map((r) => r.entryId)).size !== rows.length) {
+      setError("词条不能重复");
+      return;
+    }
+    if (rows.some((r) => [...(r.note ?? "")].length > 1000)) {
+      setError("备注不能超过 1000 字");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      let result;
+      if (id && initial) {
+        const same =
+          name === initial.wordlist.name &&
+          JSON.stringify(rows.map((r) => r.entryId)) ===
+            JSON.stringify(initial.entry_ids);
+        result = await api.wordList.update(id, {
+          expected_revision: initial.wordlist.revision,
+          content: same
+            ? null
+            : {
+                name,
+                entry_ids: rows.map((r) => r.entryId!)
+              },
+          note_updates: rows
+            .filter(
+              (r) =>
+                r.note !== undefined &&
+                (r.noteDirty || !initial.entry_ids.includes(r.entryId!))
+            )
+            .map((r) => ({
+              entry_id: r.entryId!,
+              private_note: r.note!,
+              expected_note_revision: r.noteRevision ?? 1
+            }))
+        });
+      } else {
+        pending.current ??= {
+          idempotency_key: crypto.randomUUID(),
+          name,
+          items: rows.map((r) => ({
+            entry_id: r.entryId!,
+            private_note: r.note ?? ""
+          }))
+        };
+        result = await api.wordList.create(pending.current);
+      }
+      setDirty(false);
+      await client.invalidateQueries({ queryKey: wordListKeys.all });
+      router.push(`/account/wordlists/${result.id}`);
+    } catch (e) {
+      const unknown = !(e instanceof HttpError) || e.status >= 500;
+      if (!id && !unknown) pending.current = null;
+      setUncertain(!id && unknown);
+      setError(
+        unknown
+          ? "保存结果暂未确认，请保留当前内容并重试。创建重试使用同一个请求键。"
+          : "保存失败：内容、版本或词条状态已变化。请检查输入；版本冲突时重新打开词表。"
+      );
+    } finally {
+      setSaving(false);
+    }
   }
-
-  async function submit() {
-    await createWordList.mutateAsync({
-      name: name.trim(),
-      word_ids: [...selectedIds],
-      custom_words: customWords,
-      visibility
-    });
-    setStep("done");
-  }
-
+  const visible = rows.slice((page - 1) * 50, page * 50);
   return (
-    <section className="mx-auto max-w-2xl">
-      <header className="mb-4">
-        <h1 className="text-xl font-bold">创建词表</h1>
-        <p className="text-sm text-foreground-muted">{STEP_TITLES[step]}</p>
+    <div className="mx-auto max-w-5xl px-4 pb-16">
+      <header className="sticky top-0 z-20 flex flex-wrap items-center gap-3 border-b border-border bg-background/95 py-4 backdrop-blur">
+        <button
+          className={buttonClass}
+          onClick={() => {
+            if (!dirty || window.confirm("尚未保存，确定离开？"))
+              router.push(
+                id ? `/account/wordlists/${id}` : "/account/wordlists"
+              );
+          }}
+        >
+          返回
+        </button>
+        <input
+          aria-label="词表名称"
+          placeholder="词表名称（最多 100 字）"
+          value={name}
+          maxLength={100}
+          disabled={locked || saving || uncertain}
+          onChange={(e) => {
+            setName(e.target.value);
+            setDirty(true);
+          }}
+          className={`${field} min-w-40 flex-1`}
+        />
+        <button
+          className={`${buttonClass} bg-primary text-white`}
+          disabled={saving}
+          onClick={() => void save()}
+        >
+          {saving ? "保存中…" : uncertain ? "重试保存" : "保存私密词表"}
+        </button>
       </header>
-
-      {step === "words" && (
-        <Card className="flex flex-col gap-4">
-          <div>
-            <h2 className="mb-2 font-medium">从智能词库选择</h2>
-            <ul className="grid grid-cols-2 gap-2">
-              {MOCK_WORDS.map((w) => {
-                const checked = selectedIds.has(w.id);
-                return (
-                  <li key={w.id}>
-                    <label
-                      className={`flex cursor-pointer items-center gap-2 rounded border border-border bg-surface px-3 py-2 text-foreground placeholder:text-foreground-subtle ${
-                        checked
-                          ? "border-primary bg-primary-muted"
-                          : "border-border"
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleWord(w.id)}
-                      />
-                      <span className="font-medium">{w.text}</span>
-                      <span className="text-xs text-foreground-subtle">
-                        {w.phonetic}
-                      </span>
-                    </label>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-
-          <div>
-            <h2 className="mb-2 font-medium">自定义词汇(可选)</h2>
-            <div className="flex gap-2">
-              <input
-                className="flex-1 rounded-sm border border-border bg-surface px-3 py-2 text-foreground placeholder:text-foreground-subtle"
-                placeholder="输入一个词后点添加"
-                value={customDraft}
-                onChange={(e) => setCustomDraft(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && addCustomWord()}
-              />
-              <Button variant="secondary" onClick={addCustomWord}>
-                添加
-              </Button>
-            </div>
-            {hasCustom && (
-              <div className="mt-2 flex flex-wrap gap-2">
-                {customWords.map((c, i) => (
-                  <span
-                    key={`${c.text}-${i}`}
-                    className="rounded-sm bg-muted px-2 py-1 text-sm"
-                  >
-                    {c.text}
-                  </span>
-                ))}
-              </div>
-            )}
-            {hasCustom && (
-              <p className="mt-2 text-xs text-amber-600">
-                含自定义词汇,若选择公开将需要敏感词审核。
-              </p>
-            )}
-          </div>
-
-          <div className="flex justify-between">
-            <span className="self-center text-sm text-foreground-muted">
-              已选 {totalWords} 个词
+      <h1 className="mt-6 text-2xl font-semibold">
+        {id ? "编辑词表" : "创建词表"}
+      </h1>
+      <p className="my-4 text-sm text-foreground-muted">
+        从平台已发布词库逐行选词。备注仅自己可见。
+        {locked && "当前只能修改备注；修改名称或选词前请先撤回。"}
+      </p>
+      {error && (
+        <p role="alert" className="my-4 text-red-600">
+          {error}
+        </p>
+      )}
+      {id && (
+        <div className="mb-4 flex flex-wrap gap-3 text-sm">
+          <span>词义和备注分批读取：</span>
+          <button
+            className={buttonClass}
+            disabled={loadPage === 1}
+            onClick={() => setLoadPage(loadPage - 1)}
+          >
+            上一批
+          </button>
+          <span>第 {loadPage} 批</span>
+          <button
+            className={buttonClass}
+            disabled={
+              loadPage >= Math.ceil((initial?.entry_ids.length ?? 0) / 100)
+            }
+            onClick={() => setLoadPage(loadPage + 1)}
+          >
+            下一批
+          </button>
+          {loaded.isError && (
+            <span role="alert">
+              本批加载失败，
+              <button onClick={() => void loaded.refetch()}>重试</button>
             </span>
-            <Button disabled={totalWords === 0} onClick={() => setStep("name")}>
-              下一步
-            </Button>
-          </div>
-        </Card>
+          )}
+        </div>
       )}
-
-      {step === "name" && (
-        <Card className="flex flex-col gap-4">
-          <div>
-            <label className="mb-1 block text-sm">词表名称</label>
-            <input
-              className="w-full rounded-sm border border-border bg-surface px-3 py-2 text-foreground placeholder:text-foreground-subtle"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="例如:小学一年级核心词"
+      <fieldset disabled={saving || uncertain} className="space-y-4">
+        {visible.map((row, index) => (
+          <div
+            key={row.id}
+            draggable={!locked}
+            onDragStart={() => {
+              drag.current = row.id;
+            }}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              if (drag.current && !locked) move(drag.current, row.id);
+              drag.current = null;
+            }}
+          >
+            <WordRow
+              row={row}
+              stored={row.entryId ? cache.get(row.entryId) : undefined}
+              locked={!!locked}
+              index={(page - 1) * 50 + index + 1}
+              change={(patch) => change(row.id, patch)}
             />
-          </div>
-          <p className="text-sm text-foreground-muted">
-            共 {totalWords} 个词({selectedWords.length} 智能 +{" "}
-            {customWords.length} 自定义)
-          </p>
-          <div className="flex justify-between">
-            <Button variant="ghost" onClick={() => setStep("words")}>
-              上一步
-            </Button>
-            <Button
-              disabled={!name.trim()}
-              onClick={() => setStep("visibility")}
-            >
-              下一步
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {step === "visibility" && (
-        <Card className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            {(["private", "public"] as const).map((v) => (
-              <label
-                key={v}
-                className={`flex cursor-pointer items-start gap-2 rounded border border-border bg-surface px-3 py-2 text-foreground placeholder:text-foreground-subtle ${
-                  visibility === v
-                    ? "border-primary bg-primary-muted"
-                    : "border-border"
-                }`}
+            <div className="mt-2 flex gap-3">
+              <button
+                className={buttonClass}
+                disabled={locked || rows.indexOf(row) === 0}
+                onClick={() => move(row.id, rows[rows.indexOf(row) - 1]!.id)}
               >
-                <input
-                  type="radio"
-                  name="visibility"
-                  checked={visibility === v}
-                  onChange={() => setVisibility(v)}
-                />
-                <span>
-                  <span className="font-medium">
-                    {v === "private" ? "私密" : "公开"}
-                  </span>
-                  <span className="block text-xs text-foreground-muted">
-                    {v === "private"
-                      ? "仅自己可见"
-                      : "发布到老师/学生可浏览(需审核)"}
-                  </span>
-                </span>
-              </label>
-            ))}
+                上移
+              </button>
+              <button
+                className={buttonClass}
+                disabled={locked || rows.indexOf(row) === rows.length - 1}
+                onClick={() => move(row.id, rows[rows.indexOf(row) + 1]!.id)}
+              >
+                下移
+              </button>
+              <button
+                className={buttonClass}
+                disabled={locked || rows.length === 1}
+                onClick={() => {
+                  if (window.confirm("删除此行及其备注？")) {
+                    setRows((rs) => rs.filter((r) => r.id !== row.id));
+                    setDirty(true);
+                  }
+                }}
+              >
+                删除
+              </button>
+            </div>
           </div>
-          {needsReview && (
-            <p className="rounded-sm bg-amber-50 p-3 text-sm text-amber-700">
-              公开 + 含自定义词汇 →
-              提交后将进入敏感词审核,通过后才会对师生可见。
-            </p>
-          )}
-          {createWordList.isError && (
-            <p className="text-sm text-danger">
-              创建失败:{(createWordList.error as Error).message}
-            </p>
-          )}
-          <div className="flex justify-between">
-            <Button variant="ghost" onClick={() => setStep("name")}>
-              上一步
-            </Button>
-            <Button disabled={submitting} onClick={submit}>
-              {submitting ? "提交中…" : "完成创建"}
-            </Button>
-          </div>
-        </Card>
+        ))}
+      </fieldset>
+      <div className="mt-6 flex flex-wrap gap-3">
+        <button
+          className={buttonClass}
+          disabled={locked || saving || uncertain || rows.length >= 10000}
+          onClick={() => {
+            setRows((rs) => [...rs, emptyRow()]);
+            setPage(Math.ceil((rows.length + 1) / 50));
+            setDirty(true);
+          }}
+        >
+          增加一行
+        </button>
+        <button
+          className={buttonClass}
+          disabled={page === 1}
+          onClick={() => setPage(page - 1)}
+        >
+          上一页
+        </button>
+        <span className="py-2">
+          {page} / {Math.ceil(rows.length / 50)} 页 · {rows.length} 个词条
+        </span>
+        <button
+          className={buttonClass}
+          disabled={page >= Math.ceil(rows.length / 50)}
+          onClick={() => setPage(page + 1)}
+        >
+          下一页
+        </button>
+      </div>
+    </div>
+  );
+}
+function WordRow({
+  row,
+  stored,
+  locked,
+  index,
+  change
+}: {
+  row: Row;
+  stored?: MyWordlistItem;
+  locked: boolean;
+  index: number;
+  change: (patch: Partial<Row>) => void;
+}) {
+  const userId = useUserStore((s) => s.user?.id);
+  const text = row.text ?? stored?.entry?.label ?? row.entryId ?? "";
+  const search = useQuery({
+    queryKey: [...wordListKeys.mine(userId), "catalog", row.id, text],
+    enabled: !row.entryId && text.trim().length > 0,
+    queryFn: ({ signal }) =>
+      api.wordList.catalog({ q: text, page_size: 3 }, { signal })
+  });
+  const note = row.note ?? stored?.private_note ?? "";
+  const unloaded = row.entryId && !row.candidate && !stored;
+  return (
+    <section className="rounded-3xl border border-border bg-surface p-5">
+      <label className="mb-2 block text-sm">
+        词条 {index}
+        <input
+          className={`${field} mt-2`}
+          value={text}
+          disabled={locked}
+          placeholder="输入单词或短语"
+          onChange={(e) =>
+            change({
+              text: e.target.value,
+              entryId: null,
+              candidate: undefined,
+              noteRevision: row.noteRevision ?? stored?.note_revision,
+              originalEntryId: row.originalEntryId ?? row.entryId ?? undefined,
+              note: row.note ?? stored?.private_note ?? ""
+            })
+          }
+        />
+      </label>
+      {!row.entryId && search.isFetching && <p>正在搜索…</p>}
+      {!row.entryId && search.isError && (
+        <p role="alert">搜索失败，请重试输入。</p>
       )}
-
-      {step === "done" && (
-        <Card className="flex flex-col items-center gap-4 py-8 text-center">
-          <h2 className="text-lg font-bold">「{name}」创建成功</h2>
-          <p className="text-foreground-muted">
-            {visibility === "private"
-              ? "已保存为私密词表。"
-              : needsReview
-                ? "已提交审核,通过后将对师生可见。"
-                : "已公开,师生现在可以浏览。"}
-          </p>
-          <div className="flex gap-3">
-            <Button
-              variant="secondary"
-              onClick={() => router.push("/wordlists")}
-            >
-              返回词表
-            </Button>
-            <Button onClick={() => router.refresh()}>再建一个</Button>
-          </div>
-        </Card>
+      {!row.entryId &&
+        search.data?.items.map((candidate) => (
+          <button
+            key={candidate.entry_id}
+            className="block w-full rounded-xl p-3 text-left hover:bg-background"
+            onClick={() =>
+              change({
+                entryId: candidate.entry_id,
+                text: candidate.label,
+                candidate,
+                noteRevision:
+                  candidate.entry_id === row.originalEntryId
+                    ? row.noteRevision
+                    : 1
+              })
+            }
+          >
+            {candidate.label}
+            <span className="ml-3 text-sm text-foreground-muted">
+              {candidate.glosses.join("；")}
+            </span>
+          </button>
+        ))}
+      {!row.entryId && search.isSuccess && search.data.items.length === 0 && (
+        <p>没有匹配词条，请修改输入或删除此行。</p>
       )}
+      {row.candidate && (
+        <p className="my-3 text-sm text-foreground-muted">
+          {row.candidate.glosses.join("；")}
+        </p>
+      )}
+      {stored && !stored.entry && <p>内容不可用，请删除或替换此项。</p>}
+      <label className="mt-3 block text-sm">
+        私密备注
+        <textarea
+          className={`${field} mt-2`}
+          aria-label={`私密备注 ${index}`}
+          maxLength={1000}
+          disabled={!!unloaded}
+          placeholder={unloaded ? "请加载此条目的备注批次" : "仅自己可见"}
+          value={note}
+          onChange={(e) =>
+            change({
+              note: e.target.value,
+              noteDirty: true,
+              noteRevision: row.noteRevision ?? stored?.note_revision ?? 1
+            })
+          }
+        />
+      </label>
     </section>
   );
 }

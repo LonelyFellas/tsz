@@ -31,6 +31,14 @@ const API_PREFIX = "/api/v1";
 const ADMIN_LEXICON_PREFIX = `${API_PREFIX}/admin/lexicon`;
 const HTTP_METHODS = ["get", "post", "put", "patch", "delete"];
 const QUERY_CONTRACT_OPERATIONS = new Set([
+  "get /me/wordlist-tips",
+  "get /wordlists",
+  "get /wordlists/catalog",
+  "get /wordlists/{id}/items",
+  "get /me/wordlists",
+  "get /me/wordlists/{id}/items",
+  "get /admin/wordlists",
+  "get /admin/wordlists/{id}/review-requests/{request_id}/items",
   "get /me/invitations/records",
   "get /admin/coins/accounts",
   "get /admin/coins/accounts/{owner_type}/{owner_id}/entries",
@@ -43,6 +51,16 @@ const QUERY_CONTRACT_OPERATIONS = new Set([
 ]);
 
 const RUNTIME_SCHEMA_ROOTS = [
+  "WordlistTip",
+  "WordlistTipPage",
+  "Wordlist",
+  "WordlistPage",
+  "WordlistItems",
+  "MyWordlistItems",
+  "WordlistCatalog",
+  "WordlistEditSnapshot",
+  "WordlistReview",
+  "WordlistReviews",
   "InvitationCode",
   "InvitationOverview",
   "InvitationRecordPage",
