@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/.codex/worktrees/coins-b1a/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-06T12:42:27.703Z",
+  "_generatedAt": "2026-10-06T14:25:28.267Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -1466,6 +1466,7 @@
         "200": { "$ref": "#/components/schemas/UpdateProfileResponse" },
         "400": { "$ref": "#/components/schemas/ProblemDetails" },
         "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
         "413": { "$ref": "#/components/schemas/ProblemDetails" },
         "422": { "$ref": "#/components/schemas/ProblemDetails" },
         "500": { "$ref": "#/components/schemas/ProblemDetails" }
@@ -1511,6 +1512,7 @@
         "200": { "$ref": "#/components/schemas/AvatarConfirmResponse" },
         "400": { "$ref": "#/components/schemas/ProblemDetails" },
         "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
         "409": { "$ref": "#/components/schemas/ProblemDetails" },
         "413": { "$ref": "#/components/schemas/ProblemDetails" },
         "422": { "$ref": "#/components/schemas/ProblemDetails" },
@@ -1525,6 +1527,7 @@
         "200": { "$ref": "#/components/schemas/AvatarUploadResponse" },
         "400": { "$ref": "#/components/schemas/ProblemDetails" },
         "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
         "413": { "$ref": "#/components/schemas/ProblemDetails" },
         "422": { "$ref": "#/components/schemas/ProblemDetails" },
         "429": { "$ref": "#/components/schemas/ProblemDetails" },
@@ -2109,6 +2112,8 @@
         "account_locked",
         "must_change_password",
         "forbidden",
+        "phone_binding_required",
+        "phone_unbind_forbidden",
         "otp_rate_limited",
         "otp_unavailable",
         "coin_invalid_amount",

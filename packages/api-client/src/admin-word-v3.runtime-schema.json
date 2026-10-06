@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/.codex/worktrees/coins-b1a/tsz-rust/docs/openapi.json",
-  "_source_sha256": "e0f746a10f2a0a49971ba24f694ed31c7dddef286e9723b8b4e34ddc98f97f81",
+  "_source_sha256": "5f5d22474d2e315fbab33929d032819351868ca8793cf8c4cfcf30be6d86395b",
   "roots": [
     "WordlistTip",
     "WordlistTipPage",
@@ -827,6 +827,8 @@
         "account_locked",
         "must_change_password",
         "forbidden",
+        "phone_binding_required",
+        "phone_unbind_forbidden",
         "otp_rate_limited",
         "otp_unavailable",
         "coin_invalid_amount",

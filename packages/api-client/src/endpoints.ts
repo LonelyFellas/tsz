@@ -128,7 +128,7 @@ export function createEndpoints(http: HttpClient) {
       /**
        * POST /otp/send — 发送验证码(202 无 body)。后端按 phone/email 字段
        * 二选一收目标,前端把 identifier 按「含 @ → 邮箱」拆分。
-       * 短信/邮件 provider 未接通前是 Mock:验证码只打在后端日志里。
+       * 短信/邮件 provider 未接通前是 Mock:不发送真实短信/邮件。
        */
       sendCode: (identifier: string, purpose: OtpPurpose = "login") =>
         http.post<void>(
@@ -139,11 +139,15 @@ export function createEndpoints(http: HttpClient) {
           { skipAuth: true }
         ),
       /** POST /auth/login-otp — 验证码登录 */
-      loginWithCode: (identifier: string, code: string) =>
+      loginWithCode: (
+        identifier: string,
+        code: string,
+        opts?: { signal?: AbortSignal }
+      ) =>
         http.post<AuthResponse>(
           "/auth/login-otp",
           { identifier, code },
-          { skipAuth: true }
+          { ...opts, skipAuth: true }
         ),
       /**
        * POST /auth/password/forgot — 找回密码：向 identifier（手机号→短信，邮箱→邮件）

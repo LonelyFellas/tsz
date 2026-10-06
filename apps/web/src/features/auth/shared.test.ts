@@ -200,3 +200,14 @@ it("账号钱包回跳不依赖学习引导", () => {
   );
   expect(postAuthPath(false, "/student/coins")).toBe("/student/coins");
 });
+
+it.each([
+  "/account/coins",
+  "/account/invitations",
+  "/account/wordlists",
+  "/wordlists/new",
+  "/wordlists/list-id",
+  "/account/wordlist-tips"
+])("bound users returning to %s do not need learning onboarding", (path) => {
+  expect(postAuthPath(false, path, ["student"])).toBe(path);
+});

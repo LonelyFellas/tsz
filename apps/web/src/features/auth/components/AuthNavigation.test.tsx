@@ -227,3 +227,21 @@ it("登录和注册之间保留最终邀请码，清空后不恢复旧链接归�
   fireEvent.click(screen.getByRole("button", { name: "已有账号,去登录" }));
   expect(navigation.push).toHaveBeenLastCalledWith("/login");
 });
+
+it.each(["password", "register"] as const)(
+  "%s 完成后纯邮箱账号必须先绑定手机号",
+  async (mode) => {
+    const response = me(false);
+    response.user = {
+      ...response.user,
+      phone: undefined,
+      email: "only@example.com"
+    };
+    vi.mocked(api.auth.me).mockResolvedValue(response);
+    submit(mode);
+    await waitFor(() =>
+      expect(navigation.replace).toHaveBeenCalledWith("/bind-phone")
+    );
+    expect(navigation.replace).toHaveBeenCalledTimes(1);
+  }
+);
