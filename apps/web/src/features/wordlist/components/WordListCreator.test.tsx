@@ -133,3 +133,72 @@ it("late item responses populate notes without advancing the frozen edit revisio
     )
   );
 });
+
+it("selecting another entry and returning preserves the original note version", async () => {
+  const meta = {
+    id: "list",
+    owner_user_id: "one",
+    owner_name: "作者",
+    name: "词表",
+    state: "draft" as const,
+    revision: 1,
+    item_count: 1,
+    created_at: "",
+    updated_at: ""
+  };
+  vi.mocked(api.wordList.edit).mockResolvedValue({
+    wordlist: meta,
+    entry_ids: [candidate.entry_id]
+  });
+  vi.mocked(api.wordList.myItems).mockResolvedValue({
+    items: [
+      {
+        entry_id: candidate.entry_id,
+        position: 0,
+        entry: { ...candidate, kind: "word", pos: [] },
+        private_note: "原备注",
+        note_revision: 7
+      }
+    ],
+    revision: 1,
+    pagination: { page: 1, page_size: 100, total: 1, total_pages: 1 }
+  });
+  vi.mocked(api.wordList.catalog).mockImplementation(async (query) => ({
+    items:
+      query?.q === "banana"
+        ? [
+            {
+              entry_id: "entry-two",
+              publication_id: "pub-two",
+              label: "banana",
+              glosses: ["香蕉"]
+            }
+          ]
+        : [candidate],
+    pagination: { page: 1, page_size: 3, total: 1, total_pages: 1 }
+  }));
+  vi.mocked(api.wordList.update).mockResolvedValue(meta);
+  renderWithProviders(<WordListCreator id="list" />);
+  await waitFor(() =>
+    expect(screen.getByLabelText("私密备注 1")).toHaveValue("原备注")
+  );
+  const input = screen.getByPlaceholderText("输入单词或短语");
+  fireEvent.change(input, { target: { value: "banana" } });
+  fireEvent.click(await screen.findByRole("button", { name: /banana\s*香蕉/ }));
+  fireEvent.change(input, { target: { value: "apple" } });
+  fireEvent.click(await screen.findByRole("button", { name: /apple\s*苹果/ }));
+  fireEvent.change(screen.getByLabelText("私密备注 1"), {
+    target: { value: "更新备注" }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
+  await waitFor(() => expect(api.wordList.update).toHaveBeenCalled());
+  expect(vi.mocked(api.wordList.update).mock.calls[0]![1].note_updates).toEqual(
+    [
+      {
+        entry_id: candidate.entry_id,
+        expected_note_revision: 7,
+        private_note: "更新备注"
+      }
+    ]
+  );
+});

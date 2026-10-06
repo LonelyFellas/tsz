@@ -21,7 +21,7 @@ type Row = {
   candidate?: WordlistCandidate;
   note?: string;
   noteRevision?: number;
-  originalEntryId?: string;
+  noteVersions?: Record<string, number | undefined>;
   noteDirty?: boolean;
 };
 const emptyRow = (): Row => ({
@@ -68,6 +68,7 @@ function Editor({
   initial?: WordlistEditSnapshot;
 }) {
   const [initial] = useState(snapshot);
+  const [originalIds] = useState(() => new Set(initial?.entry_ids));
   const router = useRouter();
   const client = useQueryClient();
   const [name, setName] = useState(initial?.wordlist.name ?? "");
@@ -105,6 +106,12 @@ function Editor({
     if (data) for (const item of data.items) cache.set(item.entry_id, item);
   if (loaded.data)
     for (const item of loaded.data.items) cache.set(item.entry_id, item);
+  function noteRevisionFor(entryId: string) {
+    return (
+      cache.get(entryId)?.note_revision ??
+      (originalIds.has(entryId) ? undefined : 1)
+    );
+  }
   useEffect(() => {
     if (!dirty) return;
     const prevent = (e: BeforeUnloadEvent) => e.preventDefault();
@@ -147,6 +154,17 @@ function Editor({
       setError("备注不能超过 1000 字");
       return;
     }
+    if (
+      rows.some(
+        (r) =>
+          r.noteDirty &&
+          r.entryId &&
+          (r.noteRevision ?? noteRevisionFor(r.entryId)) === undefined
+      )
+    ) {
+      setError("请先加载所选词条的备注批次，再保存备注");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
@@ -168,12 +186,13 @@ function Editor({
             .filter(
               (r) =>
                 r.note !== undefined &&
-                (r.noteDirty || !initial.entry_ids.includes(r.entryId!))
+                (r.noteDirty || !originalIds.has(r.entryId!))
             )
             .map((r) => ({
               entry_id: r.entryId!,
               private_note: r.note!,
-              expected_note_revision: r.noteRevision ?? 1
+              expected_note_revision:
+                r.noteRevision ?? noteRevisionFor(r.entryId!)!
             }))
         });
       } else {
@@ -296,6 +315,7 @@ function Editor({
             <WordRow
               row={row}
               stored={row.entryId ? cache.get(row.entryId) : undefined}
+              noteRevisionFor={noteRevisionFor}
               locked={!!locked}
               index={(page - 1) * 50 + index + 1}
               change={(patch) => change(row.id, patch)}
@@ -367,12 +387,14 @@ function Editor({
 function WordRow({
   row,
   stored,
+  noteRevisionFor,
   locked,
   index,
   change
 }: {
   row: Row;
   stored?: MyWordlistItem;
+  noteRevisionFor: (entryId: string) => number | undefined;
   locked: boolean;
   index: number;
   change: (patch: Partial<Row>) => void;
@@ -386,7 +408,9 @@ function WordRow({
       api.wordList.catalog({ q: text, page_size: 3 }, { signal })
   });
   const note = row.note ?? stored?.private_note ?? "";
-  const unloaded = row.entryId && !row.candidate && !stored;
+  const unloaded =
+    row.entryId &&
+    (row.noteRevision ?? noteRevisionFor(row.entryId)) === undefined;
   return (
     <section className="rounded-3xl border border-border bg-surface p-5">
       <label className="mb-2 block text-sm">
@@ -402,7 +426,13 @@ function WordRow({
               entryId: null,
               candidate: undefined,
               noteRevision: row.noteRevision ?? stored?.note_revision,
-              originalEntryId: row.originalEntryId ?? row.entryId ?? undefined,
+              noteVersions: row.entryId
+                ? {
+                    ...row.noteVersions,
+                    [row.entryId]:
+                      row.noteRevision ?? noteRevisionFor(row.entryId)
+                  }
+                : row.noteVersions,
               note: row.note ?? stored?.private_note ?? ""
             })
           }
@@ -423,9 +453,8 @@ function WordRow({
                 text: candidate.label,
                 candidate,
                 noteRevision:
-                  candidate.entry_id === row.originalEntryId
-                    ? row.noteRevision
-                    : 1
+                  row.noteVersions?.[candidate.entry_id] ??
+                  noteRevisionFor(candidate.entry_id)
               })
             }
           >
@@ -457,7 +486,7 @@ function WordRow({
             change({
               note: e.target.value,
               noteDirty: true,
-              noteRevision: row.noteRevision ?? stored?.note_revision ?? 1
+              noteRevision: row.noteRevision ?? noteRevisionFor(row.entryId!)
             })
           }
         />
