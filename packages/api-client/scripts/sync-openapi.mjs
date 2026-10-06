@@ -100,6 +100,11 @@ if (!spec?.paths) {
 const contractSchemaNames = [
   "UserProfile",
   "UserRole",
+  "MeResponse",
+  "LearningSettings",
+  "LearningSettingsResponse",
+  "CefrLevel",
+  "EnglishVariant",
   "UpdateProfileResponse",
   "PasswordStatus",
   "FormTypeConfig",
@@ -483,6 +488,7 @@ for (const [rawPath, item] of Object.entries(spec.paths)) {
       rawPath === `${API_PREFIX}/auth/register` ||
       rawPath === `${API_PREFIX}/admin/auth/change-password` ||
       rawPath === `${API_PREFIX}/me` ||
+      rawPath === `${API_PREFIX}/me/learning-settings` ||
       rawPath.startsWith(`${API_PREFIX}/me/avatar`) ||
       rawPath.startsWith(`${API_PREFIX}/me/contact/`) ||
       rawPath.startsWith(`${API_PREFIX}/admin/settings/form-types`) ||

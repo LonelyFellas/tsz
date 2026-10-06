@@ -19,26 +19,29 @@ beforeEach(() => {
 });
 
 describe("createEndpoints · auth", () => {
-  it("me → GET /auth/me,扁平 UserProfile 装配成 MeResponse", async () => {
-    const user = {
-      id: "u1",
-      display_name: "同学1234",
-      avatar_url: "",
-      roles: ["student"],
-      active_role: "student"
-    };
-    http.get.mockResolvedValueOnce(user);
-    const api = createEndpoints(http);
-    const me = await api.auth.me();
-    expect(http.get).toHaveBeenCalledWith("/auth/me", undefined);
-    // 后端未实现 learning_settings/onboarded,适配器填 null/true(见 endpoints.ts)。
-    expect(me).toEqual({
-      user,
-      active_role: "student",
-      learning_settings: null,
-      onboarded: true
-    });
-  });
+  it.each([false, true])(
+    "me → GET /me,保留服务端真实引导状态 %s",
+    async (onboarded) => {
+      const result = {
+        user: {
+          id: "u1",
+          display_name: "同学1234",
+          avatar_url: "",
+          roles: ["student"],
+          active_role: "student"
+        },
+        active_role: "student",
+        learning_settings: onboarded
+          ? { cefr_level: "B1", english_variant: "AmE" }
+          : null,
+        onboarded
+      };
+      http.get.mockResolvedValueOnce(result);
+      const api = createEndpoints(http);
+      expect(await api.auth.me()).toBe(result);
+      expect(http.get).toHaveBeenCalledWith("/me", undefined);
+    }
+  );
 
   it("鉴权读写将取消signal传给请求层", async () => {
     const api = createEndpoints(http);
@@ -52,7 +55,7 @@ describe("createEndpoints · auth", () => {
       { phone: "13800138000", password: "password", code: "123456" },
       { signal: controller.signal }
     );
-    expect(http.get).toHaveBeenCalledWith("/auth/me", {
+    expect(http.get).toHaveBeenCalledWith("/me", {
       signal: controller.signal
     });
     expect(http.post).toHaveBeenCalledWith(

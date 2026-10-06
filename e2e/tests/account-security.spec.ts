@@ -29,11 +29,16 @@ async function securityApi(
         })
       });
     }
-    if (path === "/auth/me") {
+    if (path === "/me") {
       return route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(user)
+        body: JSON.stringify({
+          user,
+          active_role: user.active_role,
+          learning_settings: { cefr_level: "A1", english_variant: "BrE" },
+          onboarded: true
+        })
       });
     }
     if (path.startsWith("/me/contact/") || path === "/auth/password/change") {
@@ -129,7 +134,7 @@ for (const width of [375, 1280]) {
     await page.goto("/account/profile");
     const title = page.getByRole("heading", { name: "编辑资料", level: 1 });
     await expect(title).toBeVisible();
-    await expect(page.getByText("修改头像和昵称。")).toBeVisible();
+    await expect(page.getByText("修改头像、昵称和英美偏好。")).toBeVisible();
     await expect(
       page.getByRole("link", { name: "← 返回个人中心" })
     ).toHaveAttribute("href", "/account");
@@ -185,6 +190,10 @@ test.describe("昵称修复浏览器复核", () => {
     let release!: () => void;
     const pending = new Promise<void>((done) => (release = done));
     await page.route("**/api/v1/me", async (route) => {
+      if (route.request().method() !== "PATCH") {
+        await route.fallback();
+        return;
+      }
       const name = route.request().postDataJSON().display_name as string;
       await pending;
       await route.fulfill({
@@ -211,6 +220,10 @@ test.describe("昵称修复浏览器复核", () => {
   test("emoji昵称保存后的资料头像不是孤立代理项", async ({ page }) => {
     await mockApi(page, { authenticated: true });
     await page.route("**/api/v1/me", async (route) => {
+      if (route.request().method() !== "PATCH") {
+        await route.fallback();
+        return;
+      }
       const name = route.request().postDataJSON().display_name as string;
       await route.fulfill({
         status: 200,
@@ -262,7 +275,7 @@ test.describe("账号安全", () => {
       await pending;
       await route.fallback();
     });
-    await page.route("**/api/v1/auth/me", async (route) => {
+    await page.route("**/api/v1/me", async (route) => {
       meRequests += 1;
       expect(route.request().headers().authorization).toBe(
         "Bearer test-access-token"

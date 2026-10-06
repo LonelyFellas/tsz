@@ -64,7 +64,9 @@ describe("RouteGuard", () => {
       </RouteGuard>
     );
     await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith("/onboarding");
+      expect(mockReplace).toHaveBeenCalledWith(
+        "/onboarding?redirect=%2Fwordlists"
+      );
     });
   });
 

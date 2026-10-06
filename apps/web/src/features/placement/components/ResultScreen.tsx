@@ -11,6 +11,7 @@ interface ResultScreenProps {
   band: Band;
   quota: QuotaState;
   fresh: boolean;
+  onboarded: boolean;
   onApply: () => void;
   onRetest: () => void;
 }
@@ -19,6 +20,7 @@ export function ResultScreen({
   band,
   quota,
   fresh,
+  onboarded,
   onApply,
   onRetest
 }: ResultScreenProps) {
@@ -76,8 +78,13 @@ export function ResultScreen({
         onClick={onApply}
         className="w-full rounded-full bg-primary py-3 text-sm font-medium text-white transition-opacity hover:opacity-90"
       >
-        应用该等级，继续设置
+        {onboarded ? "返回学习" : "应用该等级，继续设置"}
       </button>
+      {onboarded && (
+        <p className="mt-3 text-xs leading-6 text-foreground-muted">
+          测评结果仅供参考，不会修改已保存的学习难度。
+        </p>
+      )}
       {left > 0 ? (
         <button
           type="button"

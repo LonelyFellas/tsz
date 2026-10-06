@@ -18,6 +18,27 @@ export interface User {
   /** 当前头像的版本化绝对地址；无头像时为空字符串 */
   avatar_url: string;
   roles: Role[];
-  /** 当前活跃角色(在 user 内,顶层没有——契约 0.1 拍板) */
+  /** 用户档案中的当前活跃角色。 */
   active_role: Role;
+}
+
+export type CEFRLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
+
+export type EnglishVariant = "BrE" | "AmE";
+
+export interface LearningSettings {
+  cefr_level: CEFRLevel;
+  english_variant: EnglishVariant;
+}
+
+export interface MeResponse {
+  user: User;
+  active_role: "student" | "teacher";
+  learning_settings: LearningSettings | null;
+  onboarded: boolean;
+}
+
+export interface LearningSettingsResponse {
+  learning_settings: LearningSettings;
+  onboarded: boolean;
 }

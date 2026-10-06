@@ -1,6 +1,6 @@
 "use client";
 
-import type { MeResponse } from "@tsz/api-client";
+import type { MeResponse } from "@tsz/types";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";

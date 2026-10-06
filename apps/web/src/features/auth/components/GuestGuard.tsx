@@ -8,7 +8,8 @@ import { postAuthPath } from "../shared";
 function AuthRedirect({ onboarded }: { onboarded: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const target = postAuthPath(onboarded, searchParams.get("redirect"));
+  const roles = useUserStore((s) => s.user?.roles);
+  const target = postAuthPath(onboarded, searchParams.get("redirect"), roles);
 
   useEffect(() => {
     router.replace(target);

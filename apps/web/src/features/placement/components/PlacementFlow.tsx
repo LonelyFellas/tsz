@@ -2,7 +2,9 @@
 
 import { useUnsavedChanges } from "@tsz/shared/recovery";
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { postAuthPath } from "@/features/auth/shared";
+import { useUserStore } from "@/stores/user";
 import { assessmentClient } from "../lib/client";
 import { MAX_TESTS, readQuota, type QuotaState } from "../lib/quota";
 import {
@@ -32,6 +34,9 @@ interface ConfirmState {
 
 export function PlacementFlow() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnTo = postAuthPath(true, searchParams.get("redirect"));
+  const onboarded = useUserStore((s) => s.onboarded);
 
   const [screen, setScreen] = useState<Screen>("welcome");
   // RouteGuard 在 hydrated 前不渲染子树,本组件只在客户端挂载,
@@ -149,7 +154,9 @@ export function PlacementFlow() {
     if (quota.last) {
       setConfirm({
         title: "重新测试？",
-        desc: `新结果将覆盖当前的 ${quota.last.band} 等级，以最后一次为准。剩余 ${left} 次机会。`,
+        desc: onboarded
+          ? `新的测评结果仅供参考，不会修改已保存的学习难度。剩余 ${left} 次机会。`
+          : `新结果将覆盖当前的 ${quota.last.band} 等级，以最后一次为准。剩余 ${left} 次机会。`,
         ok: "确认重测",
         action: () => void startTest()
       });
@@ -173,7 +180,16 @@ export function PlacementFlow() {
   }
 
   function goOnboarding(level?: Band) {
-    router.push(level ? `/onboarding?level=${level}` : "/onboarding");
+    if (onboarded) {
+      router.push(returnTo === "/" ? "/student/practice" : returnTo);
+      return;
+    }
+    const params = new URLSearchParams();
+    if (level) params.set("level", level);
+    if (returnTo !== "/") params.set("redirect", returnTo);
+    router.push(
+      params.size ? `/onboarding?${params.toString()}` : "/onboarding"
+    );
   }
 
   return (
@@ -184,6 +200,7 @@ export function PlacementFlow() {
             quota={quota}
             starting={starting}
             error={startError}
+            onboarded={onboarded === true}
             onStart={requestStart}
             onSkip={() => goOnboarding()}
           />
@@ -206,12 +223,14 @@ export function PlacementFlow() {
             band={resultBand}
             quota={quota}
             fresh={fresh}
+            onboarded={onboarded === true}
             onApply={() => goOnboarding(resultBand)}
             onRetest={requestStart}
           />
         )}
         {screen === "invalid" && (
           <InvalidScreen
+            onboarded={onboarded === true}
             onRetry={() => void startTest()}
             onManual={() => goOnboarding()}
           />

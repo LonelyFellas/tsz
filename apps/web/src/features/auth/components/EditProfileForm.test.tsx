@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { HttpError, type MeResponse } from "@tsz/api-client";
-import type { User } from "@tsz/types";
+import { HttpError } from "@tsz/api-client";
+import type { MeResponse, User } from "@tsz/types";
 import { EditProfileForm } from "./EditProfileForm";
 import { useUserStore } from "@/stores/user";
 
@@ -16,7 +16,8 @@ vi.mock("@/lib/request", () => ({
   api: {
     auth: {
       me: vi.fn(),
-      updateProfile: vi.fn()
+      updateProfile: vi.fn(),
+      updateLearningSettings: vi.fn()
     }
   }
 }));
@@ -71,6 +72,101 @@ beforeEach(() => {
   useUserStore.setState({ user: null });
   mockMe.mockResolvedValue(meResponse());
   mockUnavailable.mockReturnValue(false);
+});
+
+describe("个人学习配置", () => {
+  it("难度说明通过 help 图标弹出，Escape 和点外部可关闭，不提交表单", async () => {
+    const user = userEvent.setup();
+    render(<EditProfileForm />);
+    await screen.findByDisplayValue("Alice");
+    const trigger = screen.getByRole("button", { name: "难度级别说明" });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.queryByText("难度首次确认后不可修改。")
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    await user.click(trigger);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(
+      "如需修改，请联系官方客服"
+    );
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+    await user.click(trigger);
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(api.auth.updateLearningSettings).not.toHaveBeenCalled();
+  });
+  it("难度只读，保存偏好沿用已锁定难度，不提交昵称", async () => {
+    const save = vi.mocked(api.auth.updateLearningSettings);
+    save.mockResolvedValue({
+      learning_settings: { cefr_level: "A1", english_variant: "AmE" },
+      onboarded: true
+    });
+    const user = userEvent.setup();
+    render(<EditProfileForm />);
+    await screen.findByDisplayValue("Alice");
+    expect(
+      screen.getByRole("button", { name: "难度级别说明" })
+    ).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("A1")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "保存偏好" })).toBeDisabled();
+    await user.click(screen.getByRole("radio", { name: "美式英语（AmE）" }));
+    await user.click(screen.getByRole("button", { name: "保存偏好" }));
+    expect(await screen.findByText("偏好已保存")).toBeVisible();
+    expect(save).toHaveBeenCalledExactlyOnceWith({
+      cefr_level: "A1",
+      english_variant: "AmE"
+    });
+    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(screen.getByText("A1")).toBeInTheDocument();
+    expect(
+      screen.getByRole("radio", { name: "美式英语（AmE）" })
+    ).toBeChecked();
+    expect(screen.getByRole("button", { name: "保存偏好" })).toBeDisabled();
+  });
+
+  it("失败不丢失选择或改变难度，允许重试", async () => {
+    const save = vi.mocked(api.auth.updateLearningSettings);
+    save.mockRejectedValueOnce(new Error("offline"));
+    save.mockResolvedValueOnce({
+      learning_settings: { cefr_level: "A1", english_variant: "AmE" },
+      onboarded: true
+    });
+    const user = userEvent.setup();
+    render(<EditProfileForm />);
+    await screen.findByDisplayValue("Alice");
+    await user.click(screen.getByRole("radio", { name: "美式英语（AmE）" }));
+    await user.click(screen.getByRole("button", { name: "保存偏好" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "英美偏好保存失败，请稍后重试"
+    );
+    expect(
+      screen.getByRole("radio", { name: "美式英语（AmE）" })
+    ).toBeChecked();
+    expect(screen.getByText("A1")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "保存偏好" }));
+    expect(await screen.findByText("偏好已保存")).toBeVisible();
+    expect(save).toHaveBeenCalledTimes(2);
+  });
+
+  it("未配置账号有引导入口，不显示默认难度", async () => {
+    mockMe.mockResolvedValue(
+      meResponse({ learning_settings: null, onboarded: false })
+    );
+    render(<EditProfileForm />);
+    await screen.findByDisplayValue("Alice");
+    expect(screen.getByRole("link", { name: "完成学习配置" })).toHaveAttribute(
+      "href",
+      "/onboarding"
+    );
+    expect(screen.queryByText("A1")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "保存偏好" })
+    ).not.toBeInTheDocument();
+  });
 });
 
 describe("头像错误码", () => {
@@ -145,7 +241,9 @@ describe("EditProfileForm — 加载与渲染", () => {
 
     expect(await screen.findByText(PHONE)).toBeInTheDocument();
     expect(screen.getByText("A1")).toBeInTheDocument();
-    expect(screen.getByText("英式")).toBeInTheDocument();
+    expect(
+      screen.getByRole("radio", { name: "英式英语（BrE）" })
+    ).toBeChecked();
     expect(screen.getByDisplayValue("Alice")).toBeInTheDocument();
     expect(mockMe).toHaveBeenCalledTimes(1);
   });
@@ -270,7 +368,7 @@ describe("EditProfileForm — 昵称", () => {
     fireEvent.change(input, { target: { value: "字".repeat(51) } });
     expect(screen.getByText("昵称不能超过 50 个字符")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
-    fireEvent.submit(container.querySelector("form")!);
+    fireEvent.submit(container.querySelector('form[aria-label="修改昵称"]')!);
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
@@ -283,7 +381,7 @@ describe("EditProfileForm — 昵称", () => {
       expect(
         screen.getByText("昵称不能包含 < > 或不可见字符")
       ).toBeInTheDocument();
-      fireEvent.submit(container.querySelector("form")!);
+      fireEvent.submit(container.querySelector('form[aria-label="修改昵称"]')!);
       expect(mockUpdate).not.toHaveBeenCalled();
     }
   );
@@ -303,7 +401,7 @@ describe("EditProfileForm — 昵称", () => {
     const input = await screen.findByDisplayValue("Alice");
     fireEvent.change(input, { target: { value: " \u0085 " } });
     expect(screen.getByText("昵称需为 1–50 个字符")).toBeInTheDocument();
-    fireEvent.submit(container.querySelector("form")!);
+    fireEvent.submit(container.querySelector('form[aria-label="修改昵称"]')!);
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
@@ -386,7 +484,7 @@ describe("EditProfileForm — 昵称", () => {
     const { container } = render(<EditProfileForm />);
     await screen.findByDisplayValue("Alice");
 
-    fireEvent.submit(container.querySelector("form")!);
+    fireEvent.submit(container.querySelector('form[aria-label="修改昵称"]')!);
     expect(screen.getByText("没有需要保存的修改")).toBeInTheDocument();
     expect(mockUpdate).not.toHaveBeenCalled();
   });
@@ -757,11 +855,13 @@ describe("EditProfileForm — 交互", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "编辑资料" })
     ).toBeInTheDocument();
-    expect(screen.getByText("修改头像和昵称。")).toBeInTheDocument();
+    expect(screen.getByText("修改头像、昵称和英美偏好。")).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "← 返回个人中心" })
     ).toHaveAttribute("href", "/account");
-    expect(screen.getByText("修改学习等级请联系客服")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "难度级别说明" })
+    ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "取消" }));
     expect(mockBack).toHaveBeenCalledTimes(1);
   });

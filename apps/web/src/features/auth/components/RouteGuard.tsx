@@ -3,6 +3,7 @@
 import { useEffect, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useUserStore } from "@/stores/user";
+import { postAuthPath } from "../shared";
 
 interface RouteGuardProps {
   children: ReactNode;
@@ -34,7 +35,7 @@ export function RouteGuard({
     if (needsLogin) {
       router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
     } else if (needsOnboarding) {
-      router.replace("/onboarding");
+      router.replace(postAuthPath(false, pathname));
     }
   }, [needsLogin, needsOnboarding, pathname, router]);
 
