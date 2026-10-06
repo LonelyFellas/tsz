@@ -107,10 +107,7 @@ function Editor({
   if (loaded.data)
     for (const item of loaded.data.items) cache.set(item.entry_id, item);
   function noteRevisionFor(entryId: string) {
-    return (
-      cache.get(entryId)?.note_revision ??
-      (originalIds.has(entryId) ? undefined : 1)
-    );
+    return originalIds.has(entryId) ? cache.get(entryId)?.note_revision : 1;
   }
   useEffect(() => {
     if (!dirty) return;

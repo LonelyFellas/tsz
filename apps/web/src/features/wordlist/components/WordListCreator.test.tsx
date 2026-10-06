@@ -202,3 +202,82 @@ it("selecting another entry and returning preserves the original note version", 
     ]
   );
 });
+
+it("newly readded entries ignore obsolete pages from the prior editing session", async () => {
+  const { QueryClient, QueryClientProvider } =
+    await import("@tanstack/react-query");
+  const { render } = await import("@testing-library/react");
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  const other = {
+    entry_id: "remaining",
+    publication_id: "pub-remaining",
+    label: "banana",
+    kind: "word" as const,
+    pos: []
+  };
+  const meta = {
+    id: "list",
+    owner_user_id: "one",
+    owner_name: "作者",
+    name: "词表",
+    state: "draft" as const,
+    revision: 3,
+    item_count: 1,
+    created_at: "",
+    updated_at: ""
+  };
+  client.setQueryData(["wordlists", "user", "one", "edit-items", "list", 2], {
+    items: [
+      {
+        entry_id: candidate.entry_id,
+        position: 100,
+        entry: { ...candidate, kind: "word", pos: [] },
+        private_note: "旧备注",
+        note_revision: 7
+      }
+    ],
+    revision: 1,
+    pagination: { page: 2, page_size: 100, total: 101, total_pages: 2 }
+  });
+  vi.mocked(api.wordList.edit).mockResolvedValue({
+    wordlist: meta,
+    entry_ids: [other.entry_id]
+  });
+  vi.mocked(api.wordList.myItems).mockResolvedValue({
+    items: [
+      {
+        entry_id: other.entry_id,
+        position: 0,
+        entry: other,
+        private_note: "",
+        note_revision: 5
+      }
+    ],
+    revision: 3,
+    pagination: { page: 1, page_size: 100, total: 1, total_pages: 1 }
+  });
+  vi.mocked(api.wordList.update).mockResolvedValue(meta);
+  render(
+    <QueryClientProvider client={client}>
+      <WordListCreator id="list" />
+    </QueryClientProvider>
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "增加一行" }));
+  fireEvent.change(screen.getAllByPlaceholderText("输入单词或短语")[1]!, {
+    target: { value: "apple" }
+  });
+  fireEvent.click(await screen.findByRole("button", { name: /apple\s*苹果/ }));
+  fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
+  await waitFor(() => expect(api.wordList.update).toHaveBeenCalled());
+  expect(vi.mocked(api.wordList.update).mock.calls[0]![1].note_updates).toEqual(
+    [
+      {
+        entry_id: candidate.entry_id,
+        expected_note_revision: 1,
+        private_note: ""
+      }
+    ]
+  );
+});
