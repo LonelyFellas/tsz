@@ -52,6 +52,8 @@ export function securityErrorMessage(error: unknown): string {
     invalid_password: "密码须为 15–128 个字符，区分大小写，支持符号和空格",
     account_disabled: "账号已停用，请联系平台客服",
     forbidden: "不能移除最后一种登录方式",
+    phone_binding_required: "请先验证并绑定手机号",
+    phone_unbind_forbidden: "手机号不能解绑，请使用换绑手机号",
     revision_conflict: "账号信息已变化，请刷新页面后重试"
   };
   return messages[error.code ?? ""] ?? "操作失败，请稍后重试";
@@ -72,7 +74,9 @@ export function postAuthPath(
       : `${ONBOARDING_PATH}?redirect=${encodeURIComponent(target)}`;
   }
   // 完成后的回跳不能再次落入认证或引导流程。
-  return /^\/(login|register|forgot-password|onboarding)(\/|$)/i.test(pathname)
+  return /^\/(login|register|forgot-password|onboarding|bind-phone)(\/|$)/i.test(
+    pathname
+  )
     ? "/"
     : target;
 }

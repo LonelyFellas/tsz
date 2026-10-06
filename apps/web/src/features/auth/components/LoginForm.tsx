@@ -1,8 +1,8 @@
 "use client";
 
-import { isValidAccount } from "@tsz/shared";
+import { isPhone, isValidAccount } from "@tsz/shared";
 import { Button, FormField, Input } from "@tsz/ui/components";
-import type { AuthResponse } from "@tsz/api-client";
+import { HttpError, type AuthResponse } from "@tsz/api-client";
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/request";
@@ -11,6 +11,7 @@ import { PasswordVisibilityIcon } from "./PasswordVisibilityIcon";
 import {
   completeAuthentication,
   persistSession,
+  securityErrorMessage,
   translateAuthError
 } from "../shared";
 
@@ -22,6 +23,11 @@ const LOGIN_ERRORS: Record<string, string> = {
 };
 
 export function LoginForm() {
+  const [method, setMethod] = useState<"password" | "code">("password");
+  const [code, setCode] = useState("");
+  const [countdown, setCountdown] = useState(0);
+  const [sending, setSending] = useState(false);
+  const pending = useRef(false);
   const [account, setAccount] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -36,9 +42,48 @@ export function LoginForm() {
   const identifier = account.includes("@")
     ? account.trim().toLowerCase()
     : account.trim();
+  const codeLogin = method === "code";
   const canSubmit =
-    (authenticated || (isValidAccount(identifier) && password.length > 0)) &&
-    !loading;
+    (authenticated ||
+      (codeLogin
+        ? isPhone(identifier) && /^\d{6}$/.test(code)
+        : isValidAccount(identifier) && password.length > 0)) &&
+    !loading &&
+    !sending;
+  const canSend =
+    codeLogin &&
+    isPhone(identifier) &&
+    countdown === 0 &&
+    !loading &&
+    !sending &&
+    !authenticated;
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const timer = setTimeout(() => setCountdown((value) => value - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [countdown]);
+
+  async function sendCode() {
+    if (!canSend || pending.current) return;
+    pending.current = true;
+    const controller = new AbortController();
+    pendingRequest.current = controller;
+    setSending(true);
+    setError("");
+    try {
+      await api.auth.sendCode(identifier, "login");
+      if (!controller.signal.aborted) {
+        setCode("");
+        setCountdown(60);
+      }
+    } catch (error) {
+      if (!controller.signal.aborted) setError(securityErrorMessage(error));
+    } finally {
+      pending.current = false;
+      if (!controller.signal.aborted) setSending(false);
+      if (pendingRequest.current === controller) pendingRequest.current = null;
+    }
+  }
 
   const resetSuccess = searchParams.get("reset") === "success";
   const securitySuccess = searchParams.get("security") === "success";
@@ -46,7 +91,7 @@ export function LoginForm() {
   const registeredSuccess = searchParams.get("registered") === "success";
 
   function openRegistration() {
-    if (loading || authenticated) return;
+    if (loading || sending || authenticated) return;
     const params = new URLSearchParams();
     if (identifier.includes("@")) params.set("method", "email");
     const redirect = searchParams.get("redirect");
@@ -71,7 +116,8 @@ export function LoginForm() {
   }
 
   async function handleLogin() {
-    if (!canSubmit) return;
+    if (!canSubmit || pending.current) return;
+    pending.current = true;
     const controller = new AbortController();
     pendingRequest.current = controller;
     const { signal } = controller;
@@ -81,14 +127,26 @@ export function LoginForm() {
       if (authenticated) {
         await loadProfile(signal);
       } else {
-        const auth = await api.auth.login(identifier, password, { signal });
+        const auth = codeLogin
+          ? await api.auth.loginWithCode(identifier, code, { signal })
+          : await api.auth.login(identifier, password, { signal });
         await onAuthSuccess(auth, signal);
       }
     } catch (e: unknown) {
       if (signal.aborted) return;
-      const msg = e instanceof Error ? e.message : "";
-      setError(translateAuthError(msg, LOGIN_ERRORS, "登录失败，请稍后重试"));
+      if (codeLogin && e instanceof HttpError) {
+        setError(
+          e.code === "invalid_credentials"
+            ? "手机号或验证码错误，请检查后重试"
+            : securityErrorMessage(e)
+        );
+        setCode("");
+      } else {
+        const msg = e instanceof Error ? e.message : "";
+        setError(translateAuthError(msg, LOGIN_ERRORS, "登录失败，请稍后重试"));
+      }
     } finally {
+      pending.current = false;
       if (!signal.aborted) setLoading(false);
       if (pendingRequest.current === controller) pendingRequest.current = null;
     }
@@ -136,6 +194,25 @@ export function LoginForm() {
             </p>
           )}
 
+          <div className="mb-6 flex gap-2" aria-label="登录方式">
+            {(["password", "code"] as const).map((value) => (
+              <Button
+                key={value}
+                type="button"
+                variant={method === value ? "default" : "ghost"}
+                aria-pressed={method === value}
+                disabled={loading || sending || authenticated}
+                onClick={() => {
+                  setMethod(value);
+                  setCode("");
+                  setPassword("");
+                  setError("");
+                }}
+              >
+                {value === "password" ? "密码登录" : "手机验证码登录"}
+              </Button>
+            ))}
+          </div>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -143,48 +220,88 @@ export function LoginForm() {
             }}
             className="space-y-5"
           >
-            <FormField htmlFor="login-account" label="手机号或邮箱">
+            <FormField
+              htmlFor="login-account"
+              label={codeLogin ? "手机号" : "手机号或邮箱"}
+            >
               <Input
                 id="login-account"
-                type="text"
+                type={codeLogin ? "tel" : "text"}
                 autoComplete="username"
-                placeholder="请输入手机号或邮箱"
+                placeholder={codeLogin ? "请输入手机号" : "请输入手机号或邮箱"}
                 value={account}
-                disabled={loading || authenticated}
+                disabled={loading || sending || authenticated}
                 onChange={(e) => {
+                  if (e.target.value.trim() !== identifier) {
+                    setCode("");
+                    setCountdown(0);
+                  }
                   setAccount(e.target.value);
                   setError("");
                 }}
               />
             </FormField>
-            <FormField htmlFor="login-password" label="密码">
-              <div className="relative">
-                <Input
-                  id="login-password"
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="current-password"
-                  placeholder="请输入登录密码"
-                  value={password}
-                  disabled={loading || authenticated}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    setError("");
-                  }}
-                  className="pr-14"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowPassword((v) => !v)}
-                  disabled={loading || authenticated}
-                  className="absolute right-1 top-1/2 -translate-y-1/2"
-                  aria-label={showPassword ? "隐藏密码" : "显示密码"}
-                >
-                  <PasswordVisibilityIcon visible={showPassword} />
-                </Button>
-              </div>
-            </FormField>
+            {codeLogin ? (
+              <FormField htmlFor="login-code" label="验证码">
+                <div className="flex gap-2">
+                  <Input
+                    id="login-code"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    placeholder="请输入 6 位验证码"
+                    value={code}
+                    disabled={loading || sending || authenticated}
+                    onChange={(event) => {
+                      setCode(event.target.value);
+                      setError("");
+                    }}
+                    className="min-w-0 flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!canSend}
+                    onClick={() => void sendCode()}
+                  >
+                    {sending
+                      ? "发送中…"
+                      : countdown
+                        ? `${countdown}s 后重发`
+                        : "获取验证码"}
+                  </Button>
+                </div>
+              </FormField>
+            ) : (
+              <FormField htmlFor="login-password" label="密码">
+                <div className="relative">
+                  <Input
+                    id="login-password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    placeholder="请输入登录密码"
+                    value={password}
+                    disabled={loading || sending || authenticated}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setError("");
+                    }}
+                    className="pr-14"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowPassword((v) => !v)}
+                    disabled={loading || sending || authenticated}
+                    className="absolute right-1 top-1/2 -translate-y-1/2"
+                    aria-label={showPassword ? "隐藏密码" : "显示密码"}
+                  >
+                    <PasswordVisibilityIcon visible={showPassword} />
+                  </Button>
+                </div>
+              </FormField>
+            )}
             {error && (
               <p role="alert" className="mx-4 text-sm leading-5 text-danger">
                 {error}
@@ -201,7 +318,7 @@ export function LoginForm() {
               <button
                 type="button"
                 onClick={openRegistration}
-                disabled={loading || authenticated}
+                disabled={loading || sending || authenticated}
                 aria-label="没有账号，立即注册"
                 className="rounded-sm font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
               >
@@ -210,9 +327,10 @@ export function LoginForm() {
             </div>
             <button
               type="button"
-              disabled={loading || authenticated}
+              disabled={loading || sending || authenticated}
               onClick={() => {
-                if (!loading && !authenticated) router.push("/forgot-password");
+                if (!loading && !sending && !authenticated)
+                  router.push("/forgot-password");
               }}
               className="shrink-0 rounded-sm text-foreground-muted hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
             >

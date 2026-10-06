@@ -2,6 +2,7 @@ import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderWithProviders } from "@/test/render";
+import { HttpError } from "@tsz/api-client";
 import { LoginForm } from "./LoginForm";
 import { useUserStore } from "@/stores/user";
 import type { User } from "@tsz/types";
@@ -15,7 +16,14 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/lib/request", () => ({
   persistSession: vi.fn(),
-  api: { auth: { login: vi.fn(), me: vi.fn() } }
+  api: {
+    auth: {
+      login: vi.fn(),
+      loginWithCode: vi.fn(),
+      sendCode: vi.fn(),
+      me: vi.fn()
+    }
+  }
 }));
 
 import { api } from "@/lib/request";
@@ -54,11 +62,14 @@ async function fillLogin(account = "13800138000", password = "abc123") {
   return user;
 }
 
-describe("LoginForm — 唯一登录方式", () => {
-  it("只展示手机号或邮箱 + 密码，不提供验证码登录入口", () => {
+describe("LoginForm — 密码与手机验证码登录", () => {
+  it("默认密码登录并提供手机验证码切换", () => {
     renderWithProviders(<LoginForm />);
     expect(screen.getByLabelText("手机号或邮箱")).toBeInTheDocument();
     expect(screen.getByLabelText("密码")).toHaveAttribute("type", "password");
+    expect(
+      screen.getByRole("button", { name: "手机验证码登录" })
+    ).toBeEnabled();
     expect(
       screen.queryByRole("button", { name: "邮箱验证" })
     ).not.toBeInTheDocument();
@@ -232,4 +243,82 @@ describe("LoginForm — 唯一登录方式", () => {
     renderWithProviders(<LoginForm />);
     expect(screen.getByRole("status")).toHaveTextContent(message);
   });
+});
+
+async function openCodeLogin() {
+  renderWithProviders(<LoginForm />);
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "手机验证码登录" }));
+  await user.type(screen.getByLabelText("手机号"), "13800138000");
+  return user;
+}
+
+it("手机验证码登录严格验证手机号和六位码，发码后冷却并进入同一会话流程", async () => {
+  vi.mocked(api.auth.loginWithCode).mockResolvedValue(AUTH_OK);
+  const user = await openCodeLogin();
+  await user.clear(screen.getByLabelText("手机号"));
+  await user.type(screen.getByLabelText("手机号"), "user@example.com");
+  expect(screen.getByRole("button", { name: "获取验证码" })).toBeDisabled();
+  await user.clear(screen.getByLabelText("手机号"));
+  await user.type(screen.getByLabelText("手机号"), "13800138000");
+  await user.click(screen.getByRole("button", { name: "获取验证码" }));
+  expect(api.auth.sendCode).toHaveBeenCalledWith("13800138000", "login");
+  expect(screen.getByRole("button", { name: /后重发/ })).toBeDisabled();
+  await user.type(screen.getByLabelText("验证码"), "12345");
+  expect(screen.getByRole("button", { name: "立即登录" })).toBeDisabled();
+  await user.type(screen.getByLabelText("验证码"), "6{Enter}");
+  await waitFor(() => expect(useUserStore.getState().user).toEqual(ME_USER));
+  expect(api.auth.loginWithCode).toHaveBeenCalledWith("13800138000", "123456", {
+    signal: expect.any(AbortSignal)
+  });
+  expect(api.auth.login).not.toHaveBeenCalled();
+});
+
+it("OTP 消费成功但资料失败时，只重试资料，不再次提交验证码", async () => {
+  vi.mocked(api.auth.loginWithCode).mockResolvedValue(AUTH_OK);
+  mockMe.mockRejectedValueOnce(new Error("network"));
+  const user = await openCodeLogin();
+  await user.type(screen.getByLabelText("验证码"), "123456{Enter}");
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "登录成功，但加载账号信息失败"
+  );
+  await user.click(screen.getByRole("button", { name: "重试加载" }));
+  await waitFor(() => expect(useUserStore.getState().user).toEqual(ME_USER));
+  expect(api.auth.loginWithCode).toHaveBeenCalledTimes(1);
+  expect(mockMe).toHaveBeenCalledTimes(2);
+});
+
+it("错误验证码清除并保留手机号，允许再次输入", async () => {
+  vi.mocked(api.auth.loginWithCode).mockRejectedValueOnce(
+    new HttpError(401, "invalid code", [], "invalid_otp_code")
+  );
+  const user = await openCodeLogin();
+  await user.type(screen.getByLabelText("验证码"), "123456{Enter}");
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "验证码错误或已失效"
+  );
+  expect(screen.getByLabelText("验证码")).toHaveValue("");
+  expect(screen.getByLabelText("手机号")).toHaveValue("13800138000");
+  expect(mockMe).not.toHaveBeenCalled();
+});
+
+it("验证码发码在途禁止切换、提交和重复发码；失败后允许重试", async () => {
+  let reject!: (error: Error) => void;
+  vi.mocked(api.auth.sendCode).mockReturnValueOnce(
+    new Promise((_, fail) => {
+      reject = fail;
+    })
+  );
+  const user = await openCodeLogin();
+  await user.type(screen.getByLabelText("验证码"), "123456");
+  await user.click(screen.getByRole("button", { name: "获取验证码" }));
+  expect(screen.getByRole("button", { name: "密码登录" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "立即登录" })).toBeDisabled();
+  await user.click(screen.getByRole("button", { name: "发送中…" }));
+  expect(api.auth.sendCode).toHaveBeenCalledTimes(1);
+  await act(async () =>
+    reject(new HttpError(503, "unavailable", [], "otp_unavailable"))
+  );
+  expect(screen.getByRole("alert")).toHaveTextContent("验证码服务暂不可用");
+  expect(screen.getByRole("button", { name: "获取验证码" })).toBeEnabled();
 });

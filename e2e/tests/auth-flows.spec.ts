@@ -201,7 +201,7 @@ test.describe("鉴权与引导端到端流程", () => {
     ).toBeDisabled();
     await page.getByRole("button", { name: "重试加载" }).click();
     await expect(page).toHaveURL(
-      /\/onboarding\?redirect=%2Fstudent%2Fpractice$/
+      /\/bind-phone\?redirect=%2Fstudent%2Fpractice$/
     );
     expect(registrations).toBe(1);
     expect(profiles).toBe(2);

@@ -146,7 +146,7 @@ export function AccountSecurity() {
                     >
                       {user[channel] ? "换绑" : `绑定${LABELS[channel]}`}
                     </button>
-                    {user[channel] && (
+                    {channel === "email" && user[channel] && (
                       <button
                         type="button"
                         disabled={!user.phone || !user.email}
@@ -179,11 +179,9 @@ export function AccountSecurity() {
                   修改密码
                 </button>
               </section>
-              {(!user.phone || !user.email) && (
-                <p className="pt-5 text-xs leading-5 text-foreground-muted">
-                  至少保留一种登录方式。绑定另一种联系方式后，才能解绑当前联系方式。
-                </p>
-              )}
+              <p className="pt-5 text-xs leading-5 text-foreground-muted">
+                手机号必须保留，可验证后换绑；邮箱可按需绑定或解绑。
+              </p>
             </div>
           )}
         </div>
@@ -208,14 +206,16 @@ export function AccountSecurity() {
   );
 }
 
-function ContactForm({
+export function ContactForm({
   user,
   action,
-  onCancel
+  onCancel,
+  onSuccess = finishSecurityChange
 }: {
   user: User;
   action: ContactAction;
-  onCancel: () => void;
+  onCancel?: () => void;
+  onSuccess?: () => void;
 }) {
   const [contact, setContact] = useState("");
   const [verificationChannel, setVerificationChannel] =
@@ -226,6 +226,13 @@ function ContactForm({
   const [newCountdown, setNewCountdown] = useState(0);
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const [error, setError] = useState("");
   const unbind = action.operation === "unbind";
   const target = unbind
@@ -270,18 +277,21 @@ function ContactForm({
           contact: target,
           verification_channel: verificationChannel
         });
+        if (!mounted.current) return;
         setVerificationCode("");
         setOldCountdown(60);
       } else {
         await api.auth.requestContactBindCode(target);
+        if (!mounted.current) return;
         setCode("");
         setNewCountdown(60);
       }
     } catch (e) {
+      if (!mounted.current) return;
       setError(handleSecurityError(e));
     } finally {
       pending.current = false;
-      setBusy(false);
+      if (mounted.current) setBusy(false);
     }
   }
 
@@ -303,8 +313,9 @@ function ContactForm({
         });
       else
         await api.auth.bindContact({ contact: target, code, ...verification });
-      finishSecurityChange();
+      if (mounted.current) onSuccess();
     } catch (e) {
+      if (!mounted.current) return;
       setError(handleSecurityError(e));
       setVerificationCode("");
       setCode("");
@@ -315,14 +326,16 @@ function ContactForm({
 
   return (
     <form noValidate onSubmit={submit} className="space-y-5">
-      <button
-        type="button"
-        onClick={onCancel}
-        disabled={busy}
-        className="rounded-sm text-sm text-foreground-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        ← 返回账号安全
-      </button>
+      {onCancel && (
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={busy}
+          className="rounded-sm text-sm text-foreground-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          ← 返回账号安全
+        </button>
+      )}
       <p className="text-sm leading-6 text-foreground-muted">
         {unbind
           ? "先验证已绑定的联系方式。解绑后，该联系方式将不能用于登录或找回密码。"
@@ -482,13 +495,15 @@ function ContactForm({
           </p>
         )}
         <div className="flex gap-3 border-t border-border pt-5">
-          <button
-            type="button"
-            className="min-h-12 rounded-full border border-border px-5 text-sm text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            onClick={onCancel}
-          >
-            取消
-          </button>
+          {onCancel && (
+            <button
+              type="button"
+              className="min-h-12 rounded-full border border-border px-5 text-sm text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              onClick={onCancel}
+            >
+              取消
+            </button>
+          )}
           <button
             type="submit"
             className={`${BUTTON} flex-1`}
