@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/wordlists-wl03/tsz-rust/docs/openapi.json",
-  "_source_sha256": "67eab91fc7cb20810ac2a4fb22eaac59e50f19b346e61799e4135340ae127fa3",
+  "_source": "/Users/darwish/.codex/worktrees/admin-multi-session/tsz-rust/docs/openapi.json",
+  "_source_sha256": "f859eb102aa638f835669a6de150656341268a06fd565ff89b475c4b638b1c80",
   "roots": [
     "WordlistTip",
     "WordlistTipPage",
