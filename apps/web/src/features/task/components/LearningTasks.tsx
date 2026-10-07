@@ -622,11 +622,13 @@ export function LearningPractice({ id }: { id: string }) {
 function Practice({ userId, id }: { userId: string; id: string }) {
   const op = useOperation(userId);
   const [page, setPage] = useState(1);
-  const [answer, setAnswer] = useState("");
+  const [draft, setDraft] = useState<{
+    questionId: string;
+    value: string;
+  } | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [uncertain, setUncertain] = useState(false);
-  const intent = useRef<SubmitLearningAnswer | null>(null);
+  const [pending, setPending] = useState<SubmitLearningAnswer | null>(null);
   const run = useQuery({
     queryKey: ["learning", userId, "run", id],
     refetchOnMount: "always",
@@ -640,21 +642,29 @@ function Practice({ userId, id }: { userId: string; id: string }) {
       api.learning.questions(id, { page, page_size: 20 }, { signal })
   });
   const next = qs.data?.items.find((q) => !q.answered && q.content_available);
+  const pendingAccepted =
+    !!pending &&
+    !!qs.data?.items.some((q) => q.id === pending.question_id && q.answered);
+  const uncertain = !!pending && !pendingAccepted && !busy;
+  const answer = draft?.questionId === next?.id ? (draft?.value ?? "") : "";
   async function submit() {
     if (!next) return;
+    const submission =
+      pending && !pendingAccepted
+        ? pending
+        : {
+            idempotency_key: crypto.randomUUID(),
+            question_id: next.id,
+            answer
+          };
+    setPending(submission);
     setBusy(true);
     setError("");
     try {
-      intent.current ??= {
-        idempotency_key: crypto.randomUUID(),
-        question_id: next.id,
-        answer
-      };
-      await api.learning.answer(id, intent.current, op.options());
+      await api.learning.answer(id, submission, op.options());
       if (op.current()) {
-        intent.current = null;
-        setUncertain(false);
-        setAnswer("");
+        setPending(null);
+        setDraft(null);
         await Promise.all([run.refetch(), qs.refetch()]);
       }
     } catch (e) {
@@ -663,19 +673,18 @@ function Practice({ userId, id }: { userId: string; id: string }) {
         const [, refreshed] = await Promise.all([run.refetch(), qs.refetch()]);
         if (!op.current()) return;
         const accepted = refreshed.data?.items.some(
-          (q) => q.id === intent.current?.question_id && q.answered
+          (q) => q.id === submission.question_id && q.answered
         );
         if (accepted) {
-          setAnswer("");
+          setDraft(null);
           setError("");
         }
         if (
           (e instanceof HttpError && e.status < 500 && e.status !== 408) ||
           accepted
         ) {
-          intent.current = null;
-          setUncertain(false);
-        } else setUncertain(true);
+          setPending(null);
+        }
       }
     } finally {
       if (op.current()) setBusy(false);
@@ -741,7 +750,9 @@ function Practice({ userId, id }: { userId: string; id: string }) {
               maxLength={200}
               value={answer}
               disabled={busy || uncertain}
-              onChange={(e) => setAnswer(e.target.value)}
+              onChange={(e) =>
+                setDraft({ questionId: next.id, value: e.target.value })
+              }
             />
             <button
               className={`${buttonClass} bg-[#0071e3] text-white`}
@@ -760,7 +771,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
         ) : (
           <p>已保存本轮完成记录。</p>
         )}
-        {error && <p role="alert">{error}</p>}
+        {error && !pendingAccepted && <p role="alert">{error}</p>}
         {uncertain && <p>结果未确认，输入已保留；重试将沿用原请求。</p>}
       </div>
       <div className={box}>
@@ -789,8 +800,9 @@ function Practice({ userId, id }: { userId: string; id: string }) {
           total={qs.data.pagination.total_pages}
           disabled={busy || uncertain}
           onChange={(p) => {
+            setPending(null);
             setPage(p);
-            setAnswer("");
+            setDraft(null);
             setError("");
           }}
         />

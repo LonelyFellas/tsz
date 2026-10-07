@@ -61,14 +61,14 @@ fn business_window(at: DateTime<Utc>) -> (NaiveDate, DateTime<Utc>, DateTime<Utc
 
 已新增 `20261007010000_learning_tasks.up.sql/.down.sql`，编号已核对。首期六张窄业务表；不是通用事件平台。
 
-| 表                          | 关键数据                                                                                                                                                                                      | 约束与用途                                                                                                                     |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| learning_tasks              | id、user_id、name、task_type、question_type、ordered wordlist_ids、daily_question_count、ends_at、state、revision、create_key/hash、created_at                                                | user FK CASCADE；(user_id,create_key) 唯一；daily 需要正题量，longterm 题量/null截止约束；只允许 active/archived               |
-| learning_runs               | id、task_id/user_id、task_revision、task_type、business_day、window_start/end、expires_at、settings_snapshot、seed、target_count、state、generation/grading_version、started_at               | 外键随任务删除；同 daily task/day 最多一条 active，同 longterm task 最多一条 active；expired 由 expires_at 判定；至少 1 题     |
-| learning_questions          | id、run_id、position、source_wordlist_id/revision、entry_id、entry_archive_generation、publication_id、pos/sense/definition/form IDs、unit_key、prompt_snapshot、answer_snapshot、fingerprint | (run_id,position)、(run_id,unit_key) 唯一；允许答案不进入公共 DTO；判定所需数据冻结                                            |
-| learning_answers            | id、run_id/question_id、request_key/hash、submitted_answer、normalized_answer、is_correct、accepted_at、grading_version                                                                       | question_id 唯一；(run_id,request_key) 唯一；复合 FK 保证 question 属于该 run；首次有效结果不可覆盖                            |
-| learning_completions        | id、run_id、task_id/user_id、task_type、business_day、task_revision、固定题量、answered/correct_count、completed_at、规则版本                                                                 | run_id 唯一；daily 的 (task_id,business_day) 唯一；answered_count=target_count 且 0≤correct≤answered；只在最后有效首答事务生成 |
-| learning_run_start_requests | user_id、request_key、task_id、request_hash、run_id、created_at                                                                                                                               | (user_id,request_key) 唯一，FK run CASCADE；记录并发开始请求到同一轮次的映射，确保旧请求跨日重放不新建下一轮                   |
+| 表                          | 关键数据                                                                                                                                                                                                                                     | 约束与用途                                                                                                                     |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| learning_tasks              | id、user_id、name、task_type、question_type、ordered wordlist_ids、daily_question_count、ends_at、state、revision、create_key/hash、created_at                                                                                               | user FK CASCADE；(user_id,create_key) 唯一；daily 需要正题量，longterm 题量/null截止约束；只允许 active/archived               |
+| learning_runs               | id、task_id/user_id、task_revision、task_type、business_day、window_start/end、expires_at、settings_snapshot、seed、target_count、state、generation/grading_version、started_at                                                              | 外键随任务删除；同 daily task/day 最多一条 active，同 longterm task 最多一条 active；expired 由 expires_at 判定；至少 1 题     |
+| learning_questions          | id、run_id、position、source_wordlist_id/revision、source_membership_id/source_public_generation、entry_id、entry_archive_generation、publication_id、pos/sense/definition/form IDs、unit_key、prompt_snapshot、answer_snapshot、fingerprint | (run_id,position)、(run_id,unit_key) 唯一；允许答案不进入公共 DTO；判定所需数据冻结                                            |
+| learning_answers            | id、run_id/question_id、request_key/hash、submitted_answer、normalized_answer、is_correct、accepted_at、grading_version                                                                                                                      | question_id 唯一；(run_id,request_key) 唯一；复合 FK 保证 question 属于该 run；首次有效结果不可覆盖                            |
+| learning_completions        | id、run_id、task_id/user_id、task_type、business_day、task_revision、固定题量、answered/correct_count、completed_at、规则版本                                                                                                                | run_id 唯一；daily 的 (task_id,business_day) 唯一；answered_count=target_count 且 0≤correct≤answered；只在最后有效首答事务生成 |
+| learning_run_start_requests | user_id、request_key、task_id、request_hash、run_id、created_at                                                                                                                                                                              | (user_id,request_key) 唯一，FK run CASCADE；记录并发开始请求到同一轮次的映射，确保旧请求跨日重放不新建下一轮                   |
 
 - task.wordlist_ids 是有序、非空、去重 UUID 引用，服务端校验来源权限；不对他人词表设置会阻止删除/注销的 RESTRICT FK。Question 的词库来源 UUID 同样是出处，不以 FK 强行永久保留平台内容。
 - run/task/user、answer/run/question、completion/run 的归属必须由复合约束或写入查询保证，不允许从请求填充其他学生 ID。创建请求 hash 对原始意图冻结，重命名后原键仍定位原任务。
@@ -91,7 +91,7 @@ fn business_window(at: DateTime<Utc>) -> (NaiveDate, DateTime<Utc>, DateTime<Utc
 
 复用 AuthUser 的 security_version、绑定及账号状态语义，事务中核实 learner 身份和所有必要 source owner 可用性，提交末尾重查注销到期。不可在取得 task/run 后调用一个会倒序补锁用户的通用 helper。源词表/词条修改、归档和删除与 FOR SHARE 检查串行，确保完成或失效有确定顺序。
 
-每次读取题面/提交都核对当前来源仍可访问、题目 entry 仍在指定源词表、entry 当前 active/V3。`wordlist_archive_generation` 已在主线，可只读记录/比较它以识别归档后恢复；普通 publication/lifecycle 更新不等于归档，不能用 lifecycle_revision 误杀正常更新。wordlist revision 仅作为出处，不要求与当前值全等：仅重命名或追加与本轮无关的词条继续原轮；移除本轮固定 entry 才属于来源失效。私密 note_revision 变化也不影响轮次。
+每次读取题面/提交都核对当前来源仍可访问、题目 entry 仍在指定源词表、entry 当前 active/V3。`wordlist_archive_generation` 已在主线，可只读记录/比较它以识别归档后恢复；普通 publication/lifecycle 更新不等于归档，不能用 lifecycle_revision 误杀正常更新。题目另存成员 UUID 与借用公开词表的访问代次：删除再加入会得到新的成员 UUID，公开撤回再发布会改变访问代次；本人词表撤回不会影响作者本人的读取资格。wordlist revision 仅作为出处，不要求与当前值全等：仅重命名或追加与本轮无关的词条继续原轮；移除本轮固定 entry 才属于来源失效。私密 note_revision 变化也不影响轮次。
 
 ### 开始与再开
 
@@ -222,3 +222,14 @@ pnpm --filter @tsz/web build
 - 本批不产生奖励、不调用 coins 写账；COIN-12 的金额、单位、上限和重复学习政策仍另批确认。
 
 - 验收收尾已停止 API/Web/旧 API，删除本任务两个容器及其隔离 fixture 数据，清理独立 Cargo 缓存；保留脱敏证据、截图、脚本和验收二进制。复验需重建独立容器/fixture。未改动其他任务服务，未触碰测试站数据。
+
+### 交付前独立审查修复
+
+独立 pre-push 审查发现并修复四个边界，均先复现失败再回归：
+
+- 词表成员移除后重新加入、借用公开词表撤回后重新发布不会复活旧轮；迁移给词表增加公开访问代次、给成员增加稳定 UUID，题目冻结这些标识。普通重命名、备注、追加和作者本人撤回不误伤轮次，也不在词表变更中反向锁学习轮次。
+- 条目锁等待跨过来源作者注销截止时，题面/反馈装配前重查资格；既有首答收据仍返回事实，内容隐藏。
+- 作答响应及即时恢复请求都失败后，后续成功恢复仍可确认已答并解锁分页。
+- 草稿与题目 ID 绑定，另一设备完成当前题后，刷新到下一题不会携带上一题草稿。
+
+修复后学习数据库场景为 14 项（run 9、task 3、schema 2），相关词表读取/审核/投币 13 项通过；学习 UI 8 项通过，Web lint/typecheck/生产构建复验通过。契约形状未变化。提交的独立增量审查与原生推送门禁结果以配套 PR 为准。

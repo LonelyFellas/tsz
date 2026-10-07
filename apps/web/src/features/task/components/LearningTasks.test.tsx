@@ -145,3 +145,64 @@ it("a lost response confirmed by server progress clears input before the next fi
   );
   expect(screen.getByRole("button", { name: "提交答案" })).toBeDisabled();
 });
+
+it("delayed server recovery of the last answer unlocks the next page", async () => {
+  mocks.run.mockResolvedValue({ ...run, target_count: 21 });
+  mocks.questions.mockResolvedValue({
+    items: [{ ...question, position: 19 }],
+    pagination: { total_pages: 2 }
+  });
+  mocks.answer.mockImplementation(async () => {
+    mocks.questions.mockRejectedValue(new Error("questions offline"));
+    throw new Error("response lost");
+  });
+  renderWithProviders(<LearningPractice id="run" />);
+  fireEvent.change(await screen.findByLabelText("英文拼写"), {
+    target: { value: "apple" }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "提交答案" }));
+  await screen.findByRole("button", { name: "重试" });
+  mocks.questions.mockResolvedValue({
+    items: [{ ...question, position: 19, answered: true }],
+    pagination: { total_pages: 2 }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "重试" }));
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "下一页" })).toBeEnabled()
+  );
+  expect(screen.queryByText(/结果未确认/)).not.toBeInTheDocument();
+});
+it("a background question advance cannot submit the previous question's draft", async () => {
+  const { QueryClient, QueryClientProvider } =
+    await import("@tanstack/react-query");
+  const { render, act } = await import("@testing-library/react");
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  render(
+    <QueryClientProvider client={client}>
+      <LearningPractice id="run" />
+    </QueryClientProvider>
+  );
+  fireEvent.change(await screen.findByLabelText("英文拼写"), {
+    target: { value: "apple" }
+  });
+  await act(async () => {
+    client.setQueryData(["learning", "learner-a", "questions", "run", 1], {
+      items: [
+        { ...question, answered: true },
+        {
+          ...question,
+          id: "q2",
+          position: 1,
+          prompt: { definition: "香蕉", part_of_speech: "noun" }
+        }
+      ],
+      pagination: { total_pages: 1 }
+    });
+  });
+  await screen.findByRole("heading", { name: /第 2 题/ });
+  expect(screen.getByLabelText("英文拼写")).toHaveValue("");
+  expect(screen.getByRole("button", { name: "提交答案" })).toBeDisabled();
+  expect(mocks.answer).not.toHaveBeenCalled();
+});
