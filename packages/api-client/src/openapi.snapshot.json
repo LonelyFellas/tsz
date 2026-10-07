@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/.codex/worktrees/learning-task-foundation/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-07T01:06:25.966Z",
+  "_generatedAt": "2026-10-07T01:54:00.577Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],

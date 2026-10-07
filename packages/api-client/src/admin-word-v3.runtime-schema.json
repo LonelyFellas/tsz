@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/.codex/worktrees/learning-task-foundation/tsz-rust/docs/openapi.json",
-  "_source_sha256": "b8fea1b54faa0d73e63df9fbb9901733bcfa920d64bbd3fcb5ca93914cd83124",
+  "_source_sha256": "6771a7a062ce69d6c5c7338fa716e99054cb7c9ddbf0be203b3581505767be6b",
   "roots": [
     "LearningPreview",
     "LearningTask",
