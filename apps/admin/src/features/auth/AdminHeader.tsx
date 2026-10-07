@@ -47,14 +47,27 @@ export function AdminHeader() {
   // 「退出所有设备」会把当前这台一起踢下线，误点代价高：二次确认。
   const doLogoutAll = () => {
     setOpen(false);
-    modal.confirm({
+    const confirmation = modal.confirm({
       title: "退出所有设备",
       content:
         "将吊销你在全部设备上的登录会话，包括当前这台——确认后需要重新登录。确认退出？",
       okText: "全部退出",
       okButtonProps: { danger: true },
       cancelText: "取消",
-      onOk: () => logoutAll()
+      // 使用 close 回调自行收尾，避免 antd 再次抛出拒绝的 Promise。
+      onOk: (close: () => void) => {
+        confirmation.update({ okButtonProps: { danger: true, loading: true } });
+        void logoutAll().then(close, () => {
+          confirmation.update({
+            content: (
+              <Typography.Text type="danger" role="alert">
+                未能确认所有设备已退出，请重试。
+              </Typography.Text>
+            ),
+            okButtonProps: { danger: true, loading: false }
+          });
+        });
+      }
     });
   };
 

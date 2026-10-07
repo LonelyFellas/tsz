@@ -1,5 +1,6 @@
 import type { AdminProfile } from "@tsz/api-client";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -186,9 +187,24 @@ describe("AdminHeader — 退出所有设备", () => {
     fireEvent.click(within(btns as HTMLElement).getByText(/全部退出/));
   }
 
-  it("确认后吊销全部会话、清 token、清 profile、整页跳登录页", async () => {
+  it("确认后等待后端成功再清 token、清 profile、整页跳登录页", async () => {
+    let completeLogout!: () => void;
+    mockLogoutAll.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        completeLogout = resolve;
+      })
+    );
     await openLogoutAllConfirm();
     clickConfirmOk();
+
+    expect(mockLogoutAll).toHaveBeenCalledTimes(1);
+    expect(mockSetToken).not.toHaveBeenCalled();
+    expect(window.location.replace).not.toHaveBeenCalled();
+    expect(useAuthStore.getState().profile).toEqual(PROFILE);
+    // 请求进行中再次点击不能重复提交。
+    clickConfirmOk();
+    expect(mockLogoutAll).toHaveBeenCalledTimes(1);
+    await act(async () => completeLogout());
 
     await waitFor(() =>
       expect(window.location.replace).toHaveBeenCalledWith("/login")
@@ -212,14 +228,24 @@ describe("AdminHeader — 退出所有设备", () => {
     expect(useAuthStore.getState().profile).not.toBeNull();
   });
 
-  it("后端吊销失败也完成本地登出", async () => {
+  it("全部退出失败保留登录并提示未确认完成，重试成功后才清态跳转", async () => {
     mockLogoutAll.mockRejectedValueOnce(new Error("network"));
     await openLogoutAllConfirm();
     clickConfirmOk();
 
+    await screen.findByText("未能确认所有设备已退出，请重试。");
+    expect(mockLogoutAll).toHaveBeenCalledTimes(1);
+    expect(mockSetToken).not.toHaveBeenCalled();
+    expect(window.location.replace).not.toHaveBeenCalled();
+    expect(useAuthStore.getState().profile).toEqual(PROFILE);
+
+    clickConfirmOk();
     await waitFor(() =>
       expect(window.location.replace).toHaveBeenCalledWith("/login")
     );
+    expect(mockLogoutAll).toHaveBeenCalledTimes(2);
+    expect(mockLogout).not.toHaveBeenCalled();
     expect(mockSetToken).toHaveBeenCalledWith(null);
+    expect(useAuthStore.getState().profile).toBeNull();
   });
 });
