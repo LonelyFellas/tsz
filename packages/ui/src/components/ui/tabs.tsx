@@ -72,6 +72,7 @@ const TabsTrigger = forwardRef<
       onClick,
       onKeyDown,
       onFocus,
+      onBlur,
       ...props
     },
     ref
@@ -85,7 +86,7 @@ const TabsTrigger = forwardRef<
         disabled={disabled}
         ref={ref}
         className={cn(
-          "inline-flex min-h-11 items-center justify-center border-b-2 border-transparent px-1 pb-3 text-sm font-medium text-foreground-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50 data-[state=active]:border-primary data-[state=active]:text-foreground",
+          "inline-flex min-h-11 items-center justify-center border-b-2 border-transparent px-1 pb-3 text-sm font-medium text-foreground-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary data-[pointer-focus=true]:focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 data-[state=active]:border-primary data-[state=active]:text-foreground",
           className
         )}
         onMouseDown={(event) => {
@@ -98,6 +99,7 @@ const TabsTrigger = forwardRef<
           )
             return;
           event.preventDefault();
+          event.currentTarget.dataset.pointerFocus = "true";
           pointerFocusing.current = true;
           event.currentTarget.focus();
           pointerFocusing.current = false;
@@ -107,6 +109,7 @@ const TabsTrigger = forwardRef<
           if (!event.defaultPrevented && !disabled) selection.select(value);
         }}
         onKeyDown={(event) => {
+          delete event.currentTarget.dataset.pointerFocus;
           onKeyDown?.(event);
           if (
             event.defaultPrevented ||
@@ -128,6 +131,10 @@ const TabsTrigger = forwardRef<
             selection.activationMode !== "manual"
           )
             selection.select(value);
+        }}
+        onBlur={(event) => {
+          onBlur?.(event);
+          delete event.currentTarget.dataset.pointerFocus;
         }}
       />
     );

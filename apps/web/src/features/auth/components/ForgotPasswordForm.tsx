@@ -16,6 +16,7 @@ import {
   TabsContent
 } from "@tsz/ui/components";
 import { useEffect, useState, type FormEvent } from "react";
+import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/request";
 import { AuthBranding } from "./AuthBranding";
@@ -116,6 +117,15 @@ export function ForgotPasswordForm() {
       <AuthBranding />
       <div className="flex min-w-0 flex-1 items-center justify-center bg-surface px-6 py-20">
         <div className="w-full max-w-[400px]">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => router.push("/login")}
+            className="mb-6 inline-flex items-center gap-2.5 rounded-sm text-sm text-foreground-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
+          >
+            <ArrowLeft aria-hidden="true" size={18} strokeWidth={1.5} />
+            返回登录
+          </button>
           <h1 className="mb-3 text-3xl font-semibold tracking-tight text-foreground">
             找回密码
           </h1>
@@ -252,13 +262,6 @@ export function ForgotPasswordForm() {
               </form>
             </TabsContent>
           </Tabs>
-          <button
-            type="button"
-            onClick={() => router.push("/login")}
-            className="mt-7 w-full rounded-sm text-center text-sm text-foreground-muted hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-          >
-            返回登录
-          </button>
         </div>
       </div>
     </main>

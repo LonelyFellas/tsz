@@ -1,7 +1,15 @@
 "use client";
 
 import { isPhone, isValidAccount } from "@tsz/shared";
-import { Button, FormField, Input } from "@tsz/ui/components";
+import {
+  Button,
+  FormField,
+  Input,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger
+} from "@tsz/ui/components";
 import { HttpError, type AuthResponse } from "@tsz/api-client";
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -21,6 +29,20 @@ const LOGIN_ERRORS: Record<string, string> = {
   "identifier is invalid": "手机号或邮箱格式错误，请检查后重试",
   forbidden: "该账号已被禁用，请联系客服"
 };
+
+const CODE_COUNTDOWN = 60;
+const cooldownKey = (phone: string) => `tsz:login-code-cooldown:${phone}`;
+
+function savedCooldown(phone: string): number {
+  try {
+    const expiresAt = Number(sessionStorage.getItem(cooldownKey(phone)));
+    return Number.isFinite(expiresAt)
+      ? Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000))
+      : 0;
+  } catch {
+    return 0;
+  }
+}
 
 export function LoginForm() {
   const [method, setMethod] = useState<"password" | "code">("password");
@@ -69,12 +91,21 @@ export function LoginForm() {
     const controller = new AbortController();
     pendingRequest.current = controller;
     setSending(true);
-    setError("");
     try {
       await api.auth.sendCode(identifier, "login");
       if (!controller.signal.aborted) {
+        setError("");
+        // 新码会替换旧码，避免误提交之前输入的验证码。
         setCode("");
-        setCountdown(60);
+        try {
+          sessionStorage.setItem(
+            cooldownKey(identifier),
+            String(Date.now() + CODE_COUNTDOWN * 1000)
+          );
+        } catch {
+          // 浏览器禁用存储时仍使用本页倒计时。
+        }
+        setCountdown(CODE_COUNTDOWN);
       }
     } catch (error) {
       if (!controller.signal.aborted) setError(securityErrorMessage(error));
@@ -196,123 +227,147 @@ export function LoginForm() {
             </p>
           )}
 
-          <div className="mb-6 flex gap-2" aria-label="登录方式">
-            {(["password", "code"] as const).map((value) => (
-              <Button
-                key={value}
-                type="button"
-                variant={method === value ? "default" : "ghost"}
-                aria-pressed={method === value}
-                disabled={loading || sending || authenticated}
-                onClick={() => {
-                  setMethod(value);
-                  setCode("");
-                  setPassword("");
-                  setError("");
-                }}
-              >
-                {value === "password" ? "密码登录" : "手机验证码登录"}
-              </Button>
-            ))}
-          </div>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void handleLogin();
+          <Tabs
+            value={method}
+            activationMode="manual"
+            onValueChange={(value) => {
+              if (loading || sending || authenticated) return;
+              setMethod(value as "password" | "code");
+              setCode("");
+              setPassword("");
+              setError("");
             }}
-            className="space-y-5"
           >
-            <FormField
-              htmlFor="login-account"
-              label={codeLogin ? "手机号" : "手机号或邮箱"}
-            >
-              <Input
-                id="login-account"
-                type={codeLogin ? "tel" : "text"}
-                autoComplete="username"
-                placeholder={codeLogin ? "请输入手机号" : "请输入手机号或邮箱"}
-                value={account}
+            <TabsList className="mb-7" aria-label="登录方式">
+              <TabsTrigger
+                value="password"
                 disabled={loading || sending || authenticated}
-                onChange={(e) => {
-                  if (e.target.value.trim() !== identifier) {
-                    setCode("");
-                    setCountdown(0);
-                  }
-                  setAccount(e.target.value);
-                  setError("");
+                className={sending ? "disabled:opacity-100" : undefined}
+              >
+                密码登录
+              </TabsTrigger>
+              <TabsTrigger
+                value="code"
+                disabled={loading || sending || authenticated}
+                className={sending ? "disabled:opacity-100" : undefined}
+              >
+                验证码登录
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value={method === "password" ? "code" : "password"} />
+            <TabsContent value={method}>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void handleLogin();
                 }}
-              />
-            </FormField>
-            {codeLogin ? (
-              <FormField htmlFor="login-code" label="验证码">
-                <div className="flex gap-2">
+                className="space-y-5"
+              >
+                <FormField
+                  htmlFor="login-account"
+                  label={codeLogin ? "手机号" : "手机号或邮箱"}
+                >
                   <Input
-                    id="login-code"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    maxLength={6}
-                    placeholder="请输入 6 位验证码"
-                    value={code}
-                    disabled={loading || sending || authenticated}
-                    onChange={(event) => {
-                      setCode(event.target.value);
-                      setError("");
-                    }}
-                    className="min-w-0 flex-1"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={!canSend}
-                    onClick={() => void sendCode()}
-                  >
-                    {sending
-                      ? "发送中…"
-                      : countdown
-                        ? `${countdown}s 后重发`
-                        : "获取验证码"}
-                  </Button>
-                </div>
-              </FormField>
-            ) : (
-              <FormField htmlFor="login-password" label="密码">
-                <div className="relative">
-                  <Input
-                    id="login-password"
-                    type={showPassword ? "text" : "password"}
-                    autoComplete="current-password"
-                    placeholder="请输入登录密码"
-                    value={password}
-                    disabled={loading || sending || authenticated}
+                    id="login-account"
+                    type={codeLogin ? "tel" : "text"}
+                    autoComplete="username"
+                    placeholder={
+                      codeLogin ? "请输入手机号" : "请输入手机号或邮箱"
+                    }
+                    value={account}
+                    readOnly={sending}
+                    disabled={loading || authenticated}
                     onChange={(e) => {
-                      setPassword(e.target.value);
+                      const next = e.target.value.trim();
+                      if (next !== identifier) {
+                        setCode("");
+                        setCountdown(isPhone(next) ? savedCooldown(next) : 0);
+                      }
+                      setAccount(e.target.value);
                       setError("");
                     }}
-                    className="pr-14"
                   />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setShowPassword((v) => !v)}
-                    disabled={loading || sending || authenticated}
-                    className="absolute right-1 top-1/2 -translate-y-1/2"
-                    aria-label={showPassword ? "隐藏密码" : "显示密码"}
+                </FormField>
+                {codeLogin ? (
+                  <FormField htmlFor="login-code" label="验证码">
+                    <div className="flex gap-2">
+                      <Input
+                        id="login-code"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        maxLength={6}
+                        placeholder="请输入 6 位验证码"
+                        value={code}
+                        readOnly={sending}
+                        disabled={loading || authenticated}
+                        onChange={(event) => {
+                          setCode(event.target.value);
+                          setError("");
+                        }}
+                        className="min-w-0 flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={!canSend}
+                        onClick={() => void sendCode()}
+                      >
+                        {sending
+                          ? "发送中…"
+                          : countdown
+                            ? `${countdown}s 后重发`
+                            : "获取验证码"}
+                      </Button>
+                    </div>
+                  </FormField>
+                ) : (
+                  <FormField htmlFor="login-password" label="密码">
+                    <div className="relative">
+                      <Input
+                        id="login-password"
+                        type={showPassword ? "text" : "password"}
+                        autoComplete="current-password"
+                        placeholder="请输入登录密码"
+                        value={password}
+                        disabled={loading || sending || authenticated}
+                        onChange={(e) => {
+                          setPassword(e.target.value);
+                          setError("");
+                        }}
+                        className="pr-14"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setShowPassword((v) => !v)}
+                        disabled={loading || sending || authenticated}
+                        className="absolute right-1 top-1/2 -translate-y-1/2"
+                        aria-label={showPassword ? "隐藏密码" : "显示密码"}
+                      >
+                        <PasswordVisibilityIcon visible={showPassword} />
+                      </Button>
+                    </div>
+                  </FormField>
+                )}
+                {error && (
+                  <p
+                    role="alert"
+                    className="mx-4 text-sm leading-5 text-danger"
                   >
-                    <PasswordVisibilityIcon visible={showPassword} />
-                  </Button>
-                </div>
-              </FormField>
-            )}
-            {error && (
-              <p role="alert" className="mx-4 text-sm leading-5 text-danger">
-                {error}
-              </p>
-            )}
-            <Button type="submit" disabled={!canSubmit} className="w-full">
-              {loading ? "登录中..." : authenticated ? "重试加载" : "立即登录"}
-            </Button>
-          </form>
+                    {error}
+                  </p>
+                )}
+                <Button type="submit" disabled={!canSubmit} className="w-full">
+                  {loading
+                    ? "登录中..."
+                    : authenticated
+                      ? "重试加载"
+                      : "立即登录"}
+                </Button>
+              </form>
+            </TabsContent>
+          </Tabs>
 
           <div className="mt-7 flex items-center justify-between gap-4 text-sm">
             <div className="text-foreground-muted">

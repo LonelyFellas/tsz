@@ -18,6 +18,7 @@ import {
   TabsContent
 } from "@tsz/ui/components";
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/request";
 import { AuthBranding } from "./AuthBranding";
@@ -206,9 +207,10 @@ export function RegisterForm({
             onClick={() => {
               if (!sending && !loading) router.back();
             }}
-            className="mb-6 rounded-sm text-sm text-foreground-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
+            className="mb-6 inline-flex items-center gap-2.5 rounded-sm text-sm text-foreground-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
           >
-            ← 返回
+            <ArrowLeft aria-hidden="true" size={18} strokeWidth={1.5} />
+            返回
           </button>
           <h1 className="mb-8 text-3xl font-semibold tracking-tight text-foreground">
             注册账号
@@ -329,14 +331,11 @@ export function RegisterForm({
                   </div>
                 </FormField>
 
-                <FormField
-                  htmlFor="register-invite"
-                  label="邀请码（选填）"
-                  hint="可修改或清空；注册成功后不能补绑或改绑。"
-                >
+                <FormField htmlFor="register-invite" label="邀请码（选填）">
                   <Input
                     id="register-invite"
                     value={inviteCode}
+                    placeholder="请输入邀请码"
                     autoComplete="off"
                     disabled={loading || registered}
                     onChange={(event) => setInviteCode(event.target.value)}

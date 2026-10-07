@@ -266,7 +266,9 @@ describe("ForgotPasswordForm — 交互细节", () => {
     renderWithProviders(<ForgotPasswordForm />);
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: "返回登录" }));
+    const back = screen.getByRole("button", { name: "返回登录" });
+    expect(back.querySelector("svg")).toHaveClass("lucide-arrow-left");
+    await user.click(back);
 
     expect(mockPush).toHaveBeenCalledWith("/login");
   });
@@ -357,12 +359,14 @@ describe("ForgotPasswordForm — 安全边界", () => {
     expect(screen.getByPlaceholderText("请输入验证码")).toBeDisabled();
     expect(screen.getByPlaceholderText("请输入新密码")).toBeDisabled();
     expect(screen.getByRole("tab", { name: "邮箱" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "返回登录" })).toBeDisabled();
     fireEvent.submit(container.querySelector("form")!);
     expect(mockReset).not.toHaveBeenCalled();
     release({ status: "ok" });
     await waitFor(() =>
       expect(screen.getByPlaceholderText("请输入手机号")).toBeEnabled()
     );
+    expect(screen.getByRole("button", { name: "返回登录" })).toBeEnabled();
     expect(screen.getByPlaceholderText("请输入验证码")).toHaveValue("");
   });
 
