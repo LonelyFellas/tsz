@@ -85,7 +85,9 @@ describe("RegisterForm — 手机号验证码注册", () => {
     const user = userEvent.setup();
     await fillForm(user);
     await user.click(screen.getByRole("button", { name: "立即注册" }));
-    const back = screen.getByRole("button", { name: "← 返回" });
+    const back = screen.getByRole("button", { name: "返回" });
+    expect(back.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    expect(back.querySelector("svg")).toHaveClass("lucide-arrow-left");
     const login = screen.getByRole("button", { name: "已有账号,去登录" });
     expect(back).toBeDisabled();
     expect(login).toBeDisabled();
@@ -463,7 +465,7 @@ describe("RegisterForm — 手机号验证码注册", () => {
     await user.type(password, "{Enter}");
     await waitFor(() => expect(mockRegister).toHaveBeenCalledOnce());
 
-    await user.click(screen.getByRole("button", { name: "← 返回" }));
+    await user.click(screen.getByRole("button", { name: "返回" }));
     expect(mockBack).toHaveBeenCalledOnce();
     await user.click(screen.getByRole("button", { name: "已有账号,去登录" }));
     expect(mockPush).toHaveBeenCalledWith("/login");
