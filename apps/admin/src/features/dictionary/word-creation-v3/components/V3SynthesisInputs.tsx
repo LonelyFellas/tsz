@@ -395,7 +395,7 @@ export function V3SynthesisInputs({
                   {name}
                 </Typography.Text>
                 <div className="word-synthesis-candidates">
-                  {SIDES.map((side) => {
+                  {(dialect === "common" ? SIDES : [dialect]).map((side) => {
                     const sideLocale = pronunciationLocale(side, "uk");
                     const sideLabel = pronunciationLocaleLabel(sideLocale);
                     const candidate = candidateForSide(
@@ -422,7 +422,7 @@ export function V3SynthesisInputs({
                       <div className="word-synthesis-candidate" key={side}>
                         <Space.Compact className="word-synthesis-control">
                           <Button
-                            className={`word-synthesis-accent word-synthesis-accent-${side}`}
+                            className={`word-synthesis-accent word-synthesis-accent-${side}${dialect === "common" ? "" : " word-synthesis-accent-compact"}`}
                             icon={<SwapOutlined />}
                             aria-label={`${label}转换为${sideLabel} ${name}`}
                             title={
@@ -432,7 +432,11 @@ export function V3SynthesisInputs({
                             }
                             onClick={() => convert(side, alphabet)}
                           >
-                            {side === "uk" ? "BrE" : "AmE"}
+                            {dialect === "common"
+                              ? side === "uk"
+                                ? "BrE"
+                                : "AmE"
+                              : null}
                           </Button>
                           <Input.TextArea
                             className="tsz-phonetics"

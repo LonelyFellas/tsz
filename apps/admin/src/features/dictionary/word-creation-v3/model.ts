@@ -648,7 +648,11 @@ function variantIssues(
               )
             );
           }
-          if (intent === "complete" && !synthesis.use_spelling) {
+          if (
+            intent === "complete" &&
+            !synthesis.use_spelling &&
+            (variant.dialect === "common" || variant.dialect === side)
+          ) {
             const problem =
               synthesisInputIssue(
                 synthesis.alphabet,

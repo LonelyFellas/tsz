@@ -3,8 +3,30 @@ import {
   convertDictionaryPhonetic,
   grammarSynthesisContent,
   pronunciationSynthesisContent,
+  pronunciationSynthesisLabel,
   synthesisInputIssue
 } from "./pronunciation-synthesis";
+
+it("区分词形的合成摘要只显示自身方言", () => {
+  const uk = {
+    alphabet: "ipa" as const,
+    ipa: "",
+    ups: "",
+    uk: { ipa: "sɛn.tə", ups: "" }
+  };
+  const us = {
+    alphabet: "ipa" as const,
+    ipa: "",
+    ups: "",
+    us: { ipa: "sɛn.tɚ", ups: "" }
+  };
+  expect(pronunciationSynthesisLabel(uk, "uk")).toBe(
+    "Azure IPA · 英式：sɛn.tə"
+  );
+  expect(pronunciationSynthesisLabel(us, "us")).toBe(
+    "Azure IPA · 美式：sɛn.tɚ"
+  );
+});
 
 describe("语法结构整段合成", () => {
   const first = {

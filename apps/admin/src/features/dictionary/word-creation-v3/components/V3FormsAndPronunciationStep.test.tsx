@@ -706,8 +706,8 @@ describe("V3FormsAndPronunciationStep", () => {
       container.querySelector(".word-form-matrix, .v3-dialect-separated-matrix")
     ).not.toBeNull();
     expect(screen.getByText("词形类型")).toBeVisible();
-    expect(screen.getByText("英式英语 · BrE")).toBeVisible();
-    expect(screen.getByText("美式英语 · AmE")).toBeVisible();
+    expect(screen.getByText("英式英语")).toBeVisible();
+    expect(screen.getByText("美式英语")).toBeVisible();
     expect(await screen.findByText("名词")).toBeVisible();
   });
 
@@ -860,8 +860,8 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(container.querySelector(".v3-dialect-separated-matrix")).toBeNull();
     expect(screen.queryByLabelText("原形英式拼写")).toBeNull();
     expect(screen.queryByLabelText("原形美式拼写")).toBeNull();
-    expect(screen.getByText("英式英语 · BrE")).toBeVisible();
-    expect(screen.getByText("美式英语 · AmE")).toBeVisible();
+    expect(screen.getByText("英式英语")).toBeVisible();
+    expect(screen.getByText("美式英语")).toBeVisible();
     expect(
       container.querySelectorAll(".word-pronunciation-editor")
     ).toHaveLength(2);
@@ -1338,12 +1338,8 @@ describe("V3FormsAndPronunciationStep", () => {
       screen.getByLabelText("英美音标有区别").closest(".ant-radio-wrapper")
     ).toHaveClass("ant-radio-wrapper-checked");
     expect(screen.getByLabelText("英美音标无区别")).toBeDisabled();
-    expect(
-      screen.getAllByText("英式英语 · BrE", { exact: true })[0]
-    ).toBeVisible();
-    expect(
-      screen.getAllByText("美式英语 · AmE", { exact: true })[0]
-    ).toBeVisible();
+    expect(screen.getAllByText("英式英语", { exact: true })[0]).toBeVisible();
+    expect(screen.getAllByText("美式英语", { exact: true })[0]).toBeVisible();
     const converted = canonicalValue().pos[0]!.forms;
     expect(converted.map((form) => form.id)).toEqual([base.id, comparative.id]);
     expect(

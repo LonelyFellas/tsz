@@ -730,6 +730,33 @@ it("synthesis 保真，草稿可缺选中侧，完成定位缺失，旧记录不
   expect(toFormsWire(content)).toEqual(content);
 });
 
+it("区分英美词形时完成只要求各词形自身的 Azure 候选", () => {
+  const form = ukUsFormFixture();
+  form.regional_variants.uk.pronunciations[0]!.synthesis = {
+    alphabet: "ipa",
+    ipa: "",
+    ups: "",
+    use_spelling: false,
+    uk: { ipa: "sɛn.tə", ups: "S EH N T AH" }
+  };
+  form.regional_variants.us.pronunciations[0]!.synthesis = {
+    alphabet: "ipa",
+    ipa: "",
+    ups: "",
+    use_spelling: false,
+    us: { ipa: "sɛn.tɚ", ups: "S EH N T ER" }
+  };
+  const content = formsFixture({ forms: [form] });
+  expect(validateFormsContent(content, "complete")).toEqual([]);
+  form.regional_variants.us.pronunciations[0]!.synthesis!.us!.ipa = "";
+  expect(validateFormsContent(content, "complete")).toContainEqual(
+    expect.objectContaining({
+      field: "synthesis.us.ipa",
+      node_id: form.regional_variants.us.pronunciations[0]!.id
+    })
+  );
+});
+
 it("拼写规则标记通过显式 wire 投影且统一拼写不得保存矛盾值", () => {
   const form = ukUsFormFixture();
   form.regional_variants.uk.is_regular = false;
