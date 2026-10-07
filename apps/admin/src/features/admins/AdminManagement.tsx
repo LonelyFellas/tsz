@@ -148,7 +148,11 @@ export function AdminManagement() {
         record.role === "super_admin" ? (
           <Tag>全部权限</Tag>
         ) : (
-          <Button type="link" onClick={() => setPermissionAdmin(record)}>
+          <Button
+            type="link"
+            style={{ paddingInline: 0 }}
+            onClick={() => setPermissionAdmin(record)}
+          >
             设置权限
           </Button>
         )

@@ -1,5 +1,14 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { App, Alert, Button, Modal, Space, Table, Typography } from "antd";
+import {
+  App,
+  Alert,
+  Button,
+  Flex,
+  Modal,
+  Space,
+  Table,
+  Typography
+} from "antd";
 import { useEffect, useRef, useState } from "react";
 import { HttpError } from "@tsz/api-client";
 import type { PermissionPreviewResponse } from "@tsz/types";
@@ -141,6 +150,29 @@ export function PermissionChangeDialog({
   };
   const describePermissions = (keys: string[]) =>
     keys.map((key) => permissionLabels?.[key] ?? key).join("、") || "无";
+  const renderChanges = (
+    keys: string[],
+    dependencies: string[],
+    automaticLabel: "自动补齐" | "自动取消"
+  ) => {
+    const direct = keys.filter((key) => !dependencies.includes(key));
+    return (
+      <Flex vertical gap={4}>
+        {(direct.length > 0 || dependencies.length === 0) && (
+          <span title={direct.join("、")}>{describePermissions(direct)}</span>
+        )}
+        {dependencies.length > 0 && (
+          <Typography.Text
+            title={dependencies.join("、")}
+            type={automaticLabel === "自动补齐" ? "warning" : "danger"}
+            style={{ fontSize: 12 }}
+          >
+            {automaticLabel}：<span>{describePermissions(dependencies)}</span>
+          </Typography.Text>
+        )}
+      </Flex>
+    );
+  };
   const adminColumn = {
     title: "管理员",
     render: (_: unknown, row: PermissionPreviewResponse["targets"][number]) => (
@@ -153,8 +185,8 @@ export function PermissionChangeDialog({
   return (
     <Modal
       open
-      title="确认修改"
-      width={880}
+      title="权限变更预览"
+      width={720}
       closable={!saving && recovery !== "reading"}
       onCancel={close}
       footer={
@@ -173,17 +205,12 @@ export function PermissionChangeDialog({
               loading={saving}
               onClick={() => void commit()}
             >
-              保存修改
+              保存变更
             </Button>
           )}
         </Space>
       }
     >
-      <Alert
-        type="info"
-        showIcon
-        title="请核对每位管理员的调整，以及需要同时开通或取消的权限。"
-      />
       {recovery === "reading" && (
         <Alert type="info" title="正在确认当前权限，请勿重复保存。" />
       )}
@@ -241,41 +268,17 @@ export function PermissionChangeDialog({
             adminColumn,
             {
               title: "开通",
-              render: (_, row) => (
-                <span title={row.grant.join("、")}>
-                  {describePermissions(row.grant)}
-                </span>
-              )
+              render: (_, row) =>
+                renderChanges(row.grant, row.dependency_grants, "自动补齐")
             },
             {
               title: "取消",
-              render: (_, row) => (
-                <span title={row.revoke.join("、")}>
-                  {describePermissions(row.revoke)}
-                </span>
-              )
-            },
-            {
-              title: "同时开通",
-              render: (_, row) => (
-                <Typography.Text
-                  title={row.dependency_grants.join("、")}
-                  type="warning"
-                >
-                  {describePermissions(row.dependency_grants)}
-                </Typography.Text>
-              )
-            },
-            {
-              title: "同时取消",
-              render: (_, row) => (
-                <Typography.Text
-                  title={row.dependency_revocations.join("、")}
-                  type="danger"
-                >
-                  {describePermissions(row.dependency_revocations)}
-                </Typography.Text>
-              )
+              render: (_, row) =>
+                renderChanges(
+                  row.revoke,
+                  row.dependency_revocations,
+                  "自动取消"
+                )
             }
           ]}
         />

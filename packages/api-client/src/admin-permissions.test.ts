@@ -177,8 +177,8 @@ describe("真实请求层权限 API method/path/wire", () => {
     await api.forAdmin("a");
     await api.grantedAdmins("words.edit", 2, 10);
     expect(await api.tags()).toEqual([]);
-    await api.createTag("编辑");
-    await api.renameTag("tag", "新标签", 3);
+    await api.createTag("编辑", "blue");
+    await api.updateTag("tag", "新标签", "purple", 3);
     await api.deleteTag("tag", 4);
     const tagChanges = {
       catalog_version: "v1",
@@ -214,6 +214,7 @@ describe("真实请求层权限 API method/path/wire", () => {
     ]);
     expect(JSON.parse(fetch.mock.calls[5]![1]?.body as string)).toEqual({
       name: "新标签",
+      color: "purple",
       expected_version: 3
     });
     expect(JSON.parse(fetch.mock.calls[7]![1]?.body as string)).toEqual(

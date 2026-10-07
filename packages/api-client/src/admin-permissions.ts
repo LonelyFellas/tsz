@@ -141,11 +141,17 @@ export function createPermissionEndpoints(http: HttpClient) {
         .post<unknown>("/permission-changes", input)
         .then((value) => decodeChange(value, input)),
     tags: () => http.get<PermissionTag[]>("/permission-tags"),
-    createTag: (name: string) =>
-      http.post<PermissionTag>("/permission-tags", { name }),
-    renameTag: (id: string, name: string, expected_version: number) =>
+    createTag: (name: string, color: string) =>
+      http.post<PermissionTag>("/permission-tags", { name, color }),
+    updateTag: (
+      id: string,
+      name: string,
+      color: string,
+      expected_version: number
+    ) =>
       http.patch<void>(`/permission-tags/${encodeURIComponent(id)}`, {
         name,
+        color,
         expected_version
       }),
     deleteTag: (id: string, expected_version: number) =>
