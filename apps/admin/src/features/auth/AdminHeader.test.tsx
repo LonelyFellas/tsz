@@ -233,13 +233,21 @@ describe("AdminHeader — 退出所有设备", () => {
     await openLogoutAllConfirm();
     clickConfirmOk();
 
-    await screen.findByText("未能确认所有设备已退出，请重试。");
+    const failure = await screen.findByText("未能确认所有设备已退出，请重试。");
     expect(mockLogoutAll).toHaveBeenCalledTimes(1);
     expect(mockSetToken).not.toHaveBeenCalled();
     expect(window.location.replace).not.toHaveBeenCalled();
     expect(useAuthStore.getState().profile).toEqual(PROFILE);
 
-    clickConfirmOk();
+    const dialog = failure.closest(".ant-modal-confirm")!;
+    const retry = within(dialog as HTMLElement).getByRole("button", {
+      name: /全部退出/
+    });
+    await waitFor(() => {
+      expect(retry).toBeEnabled();
+      expect(retry).not.toHaveClass("ant-btn-loading");
+    });
+    fireEvent.click(retry);
     await waitFor(() =>
       expect(window.location.replace).toHaveBeenCalledWith("/login")
     );
