@@ -8,6 +8,7 @@ import type {
   Wordlist,
   WordlistPage,
   WordlistQuery,
+  WordlistItemsQuery,
   CreateWordlist,
   UpdateWordlist,
   WordlistEditSnapshot,
@@ -73,7 +74,7 @@ export function createWordlistEndpoints(http: HttpClient) {
       http
         .get<unknown>(`/wordlists/${id}`, o)
         .then((v) => decodeWordlistResponse<Wordlist>("Wordlist", v)),
-    items: (id: string, q: WordlistQuery = {}, o?: Options) =>
+    items: (id: string, q: WordlistItemsQuery = {}, o?: Options) =>
       http
         .get<unknown>(`/wordlists/${id}/items${query(q)}`, o)
         .then((v) => decodeWordlistResponse<WordlistItems>("WordlistItems", v)),
@@ -91,7 +92,7 @@ export function createWordlistEndpoints(http: HttpClient) {
       http
         .get<unknown>(`/me/wordlists/${id}`, o)
         .then((v) => decodeWordlistResponse<Wordlist>("Wordlist", v)),
-    myItems: (id: string, q: WordlistQuery = {}, o?: Options) =>
+    myItems: (id: string, q: WordlistItemsQuery = {}, o?: Options) =>
       http
         .get<unknown>(`/me/wordlists/${id}/items${query(q)}`, o)
         .then((v) =>

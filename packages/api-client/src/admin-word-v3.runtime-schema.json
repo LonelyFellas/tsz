@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/coins-b1a/tsz-rust/docs/openapi.json",
-  "_source_sha256": "5f5d22474d2e315fbab33929d032819351868ca8793cf8c4cfcf30be6d86395b",
+  "_source": "/Users/darwish/.codex/worktrees/wordlists-wl03/tsz-rust/docs/openapi.json",
+  "_source_sha256": "67eab91fc7cb20810ac2a4fb22eaac59e50f19b346e61799e4135340ae127fa3",
   "roots": [
     "WordlistTip",
     "WordlistTipPage",
@@ -2978,6 +2978,38 @@
       },
       "additionalProperties": false
     },
+    "WordlistForm": {
+      "type": "object",
+      "required": ["id", "form_type", "label", "sense_ids", "variants"],
+      "properties": {
+        "form_type": { "type": "string" },
+        "id": { "type": "string", "format": "uuid" },
+        "label": { "type": "string" },
+        "sense_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" }
+        },
+        "variants": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistFormVariant" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "WordlistFormVariant": {
+      "type": "object",
+      "required": ["id", "dialect", "spelling", "pronunciations"],
+      "properties": {
+        "dialect": { "$ref": "#/$defs/Dialect" },
+        "id": { "type": "string", "format": "uuid" },
+        "pronunciations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistPronunciation" }
+        },
+        "spelling": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
     "WordlistGrammar": {
       "type": "object",
       "required": ["id", "variants"],
@@ -3028,16 +3060,31 @@
       "type": "object",
       "required": ["pos_id", "pos", "senses", "grammar_structures"],
       "properties": {
+        "forms": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistForm" }
+        },
         "grammar_structures": {
           "type": "array",
           "items": { "$ref": "#/$defs/WordlistGrammar" }
         },
+        "label": { "type": "string" },
         "pos": { "type": "string" },
         "pos_id": { "type": "string", "format": "uuid" },
         "senses": {
           "type": "array",
           "items": { "$ref": "#/$defs/WordlistSense" }
         }
+      },
+      "additionalProperties": false
+    },
+    "WordlistPronunciation": {
+      "type": "object",
+      "required": ["id", "dict_phonetic"],
+      "properties": {
+        "dict_phonetic": { "type": "string" },
+        "dict_phonetic_rich": { "$ref": "#/$defs/RichTextV3" },
+        "id": { "type": "string", "format": "uuid" }
       },
       "additionalProperties": false
     },
@@ -3087,7 +3134,8 @@
         },
         "id": { "type": "string", "format": "uuid" },
         "level": { "type": "string" },
-        "sub_pos": { "type": "string" }
+        "sub_pos": { "type": "string" },
+        "sub_pos_label": { "type": "string" }
       },
       "additionalProperties": false
     },

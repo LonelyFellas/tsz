@@ -22,6 +22,12 @@ export interface WordlistQuery {
   page?: number;
   page_size?: number;
 }
+export type WordlistView = "standard" | "full";
+export type WordlistSort = "author" | "label_asc" | "label_desc";
+export interface WordlistItemsQuery extends WordlistQuery {
+  view?: WordlistView;
+  sort?: WordlistSort;
+}
 export interface CreateWordlist {
   idempotency_key: string;
   name: string;
@@ -56,6 +62,7 @@ export interface WordlistDefinition {
   texts: WordlistText[];
 }
 export interface WordlistSense {
+  sub_pos_label?: string;
   id: string;
   sub_pos: string;
   level: string;
@@ -66,6 +73,8 @@ export interface WordlistGrammar {
   variants: WordlistText[];
 }
 export interface WordlistPos {
+  label?: string;
+  forms?: WordlistForm[];
   pos_id: string;
   pos: string;
   senses: WordlistSense[];
@@ -152,4 +161,23 @@ export interface WordlistTipRecord extends WordlistTip {
 export interface WordlistTipPage {
   items: WordlistTipRecord[];
   pagination: CoinEntryPage["pagination"];
+}
+
+export interface WordlistPronunciation {
+  id: string;
+  dict_phonetic: string;
+  dict_phonetic_rich?: RichTextV3;
+}
+export interface WordlistFormVariant {
+  id: string;
+  dialect: "common" | "uk" | "us";
+  spelling: string;
+  pronunciations: WordlistPronunciation[];
+}
+export interface WordlistForm {
+  id: string;
+  form_type: string;
+  label: string;
+  sense_ids: string[];
+  variants: WordlistFormVariant[];
 }

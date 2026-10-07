@@ -1,4 +1,5 @@
 import { expect, it, vi } from "vitest";
+import snapshot from "./openapi.snapshot.json";
 import {
   createWordlistEndpoints,
   createAdminWordlistEndpoints,
@@ -73,4 +74,97 @@ it("rejects accidental private-note fields in a public response", () => {
       pagination
     })
   ).not.toThrow();
+});
+
+it("accepts standard and opted-in full shapes while rejecting internal pronunciation fields", async () => {
+  const standardPos = {
+    pos_id: id,
+    pos: "noun",
+    senses: [],
+    grammar_structures: []
+  };
+  const entry = {
+    entry_id: id,
+    publication_id: id,
+    label: "apple",
+    kind: "word",
+    pos: [standardPos]
+  };
+  const response = (value: unknown) => ({
+    items: [{ entry_id: id, position: 0, entry: value }],
+    revision: 1,
+    pagination
+  });
+  expect(() =>
+    decodeWordlistResponse("WordlistItems", response(entry))
+  ).not.toThrow();
+  const pronunciation = { id, dict_phonetic: "/æpəl/" };
+  const full = {
+    ...entry,
+    pos: [
+      {
+        ...standardPos,
+        label: "名词",
+        forms: [
+          {
+            id,
+            form_type: "base",
+            label: "原形",
+            sense_ids: [],
+            variants: [
+              {
+                id,
+                dialect: "common",
+                spelling: "apple",
+                pronunciations: [pronunciation]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  };
+  expect(() =>
+    decodeWordlistResponse("WordlistItems", response(full))
+  ).not.toThrow();
+  expect(() =>
+    decodeWordlistResponse(
+      "WordlistItems",
+      response({ ...entry, pos: [{ ...standardPos, forms: null }] })
+    )
+  ).toThrow();
+  const http = {
+    get: vi.fn().mockResolvedValue(response(full))
+  } as unknown as HttpClient;
+  await createWordlistEndpoints(http).items(id, {
+    view: "full",
+    sort: "label_asc",
+    page: 2
+  });
+  expect(http.get).toHaveBeenCalledWith(
+    `/wordlists/${id}/items?view=full&sort=label_asc&page=2`,
+    undefined
+  );
+  Object.assign(pronunciation, { actual_pron: "internal" });
+  expect(() =>
+    decodeWordlistResponse("WordlistItems", response(full))
+  ).toThrow();
+});
+
+it("resolves the optional reading query enums from the generated contract", () => {
+  for (const operation of [
+    "get /wordlists/{id}/items",
+    "get /me/wordlists/{id}/items"
+  ] as const) {
+    const params = snapshot.operationQueryParameters[operation];
+    for (const [name, schema, values] of [
+      ["view", "WordlistView", ["standard", "full"]],
+      ["sort", "WordlistSort", ["author", "label_asc", "label_desc"]]
+    ] as const) {
+      const param = params.find((value) => value.name === name);
+      expect(param?.required).toBe(false);
+      expect(param?.schema).toEqual({ $ref: `#/components/schemas/${schema}` });
+      expect(snapshot.schemas[schema].enum).toEqual(values);
+    }
+  }
 });
