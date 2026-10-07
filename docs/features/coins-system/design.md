@@ -1,8 +1,10 @@
 # 天生币系统技术方案
 
+当前 COIN-12 评估入口：[奖励需求（待确认）](learning-rewards-requirements.md)、[奖励技术设计](learning-rewards-design.md)。LT 已合并部署，见 [发布事实](learning-task-foundation-design.md#11-lt-发布记录2026-10-07)；本文保留原分批设计，不把历史未就绪状态作为当前缺口。
+
 当前维护位置：本任务前端 worktree 的 `docs/features/coins-system/`。2026-10-07：coins 核心、钱包/人工操作、注销、邀请、词表及投币、完整阅读均已合并部署；当前状态见 [tasks.md](tasks.md) 和 [词表验收](wordlists-tips-acceptance.md)。本文件保留 coins 初始技术方案与历史基线，不将旧状态当作当前依赖缺口。
 
-[真实学习任务基础](learning-task-foundation-design.md) LT-01～LT-04 已实现并验收，已建立题目→首答→唯一完成事实及学习迁移；COIN-12 仍等待结算规则确认，本轮不改奖励账本。
+[真实学习任务基础](learning-task-foundation-design.md) LT-01～LT-04 已实现、验收并合并部署，已建立题目→首答→唯一完成事实及学习迁移；COIN-12 本地实现与隔离验收见奖励设计；生产 A/N 和启用日期仍待确认，默认不发币。
 
 注销规则已按用户后续要求替换：有余额须签署放弃，申请成功起等待连续 72 小时，期间允许撤销并暂停钱包收支；到期生效并记余额作废。本文不再采用“非零余额不能申请注销”。
 

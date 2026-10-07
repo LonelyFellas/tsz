@@ -4,7 +4,10 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { useUserStore } from "@/stores/user";
 import { CoinsWallet } from "./CoinsWallet";
 vi.mock("@/lib/request", () => ({
-  api: { coins: { wallet: vi.fn(), entries: vi.fn() } }
+  api: {
+    coins: { wallet: vi.fn(), entries: vi.fn() },
+    learningRewards: { day: vi.fn() }
+  }
 }));
 import { api } from "@/lib/request";
 function seed(id: string) {
@@ -31,6 +34,18 @@ function open() {
 beforeEach(() => {
   vi.resetAllMocks();
   seed("u1");
+  vi.mocked(api.learningRewards.day).mockResolvedValue({
+    business_day: "2026-10-07",
+    server_time: "2026-10-07T06:00:00Z",
+    status: "reward_disabled",
+    rule_version: null,
+    minimum_units: null,
+    daily_amount: null,
+    qualifying_units: 0,
+    awarded_amount: "0",
+    operation_id: null,
+    settled_at: null
+  });
   vi.mocked(api.coins.entries).mockResolvedValue({
     items: [],
     snapshot: "0",
@@ -175,4 +190,52 @@ it("returning from account deletion reloads status even inside the cache freshne
   );
   expect(await screen.findByText(/钱包已暂停全部/)).toBeInTheDocument();
   expect(api.coins.wallet).toHaveBeenCalledOnce();
+});
+it("manual refresh also reloads rewards earned on another device", async () => {
+  vi.mocked(api.coins.wallet).mockResolvedValue({
+    owner_type: "user",
+    owner_id: "u1",
+    balance: "0",
+    status: "open"
+  });
+  vi.mocked(api.learningRewards.day).mockResolvedValue({
+    business_day: "2026-10-07",
+    server_time: "2026-10-07T01:00:00Z",
+    status: "in_progress",
+    rule_version: "v1",
+    minimum_units: 2,
+    daily_amount: "13",
+    qualifying_units: 0,
+    awarded_amount: "0",
+    operation_id: null,
+    settled_at: null
+  });
+  open();
+  await screen.findByText(/奖励进度 0\/2/);
+  vi.mocked(api.learningRewards.day).mockResolvedValue({
+    business_day: "2026-10-07",
+    server_time: "2026-10-07T01:00:00Z",
+    status: "awarded",
+    rule_version: "v1",
+    minimum_units: 2,
+    daily_amount: "13",
+    qualifying_units: 2,
+    awarded_amount: "13",
+    operation_id: "op",
+    settled_at: "2026-10-07T01:00:00Z"
+  });
+  vi.mocked(api.coins.wallet).mockResolvedValue({
+    owner_type: "user",
+    owner_id: "u1",
+    balance: "13",
+    status: "open"
+  });
+  await act(async () => {
+    screen.getByRole("button", { name: "刷新" }).click();
+  });
+  await screen.findByText(/该日奖励已到账 13/);
+  await screen.findByText("13 天生币");
+  expect(
+    vi.mocked(api.coins.entries).mock.lastCall?.[0]?.snapshot
+  ).toBeUndefined();
 });

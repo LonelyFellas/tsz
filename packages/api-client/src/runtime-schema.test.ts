@@ -35,6 +35,7 @@ const runtimeSchemaBundle =
   runtimeSchemaBundleJson as unknown as RuntimeSchemaBundle;
 
 const ROOTS = [
+  "LearningRewardDay",
   "LearningPreview",
   "LearningTask",
   "LearningTaskDetail",

@@ -2,13 +2,16 @@ import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { renderWithProviders } from "@/test/render";
 const mocks = vi.hoisted(() => ({
+  day: vi.fn(),
   run: vi.fn(),
   questions: vi.fn(),
   answer: vi.fn(),
   list: vi.fn(),
   user: { id: "learner-a", roles: ["student"] }
 }));
-vi.mock("@/lib/request", () => ({ api: { learning: mocks } }));
+vi.mock("@/lib/request", () => ({
+  api: { learning: mocks, learningRewards: { day: mocks.day } }
+}));
 vi.mock("@/stores/user", () => ({
   useUserStore: Object.assign(
     (selector: (s: unknown) => unknown) => selector({ user: mocks.user }),
@@ -37,6 +40,10 @@ const question = {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.user = { id: "learner-a", roles: ["student"] };
+  mocks.day.mockResolvedValue({
+    status: "reward_disabled",
+    business_day: "2026-10-07"
+  });
   mocks.run.mockResolvedValue(run);
   mocks.questions.mockResolvedValue({
     items: [question],

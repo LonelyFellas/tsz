@@ -113,7 +113,7 @@ describe("coins contract", () => {
       await expect(endpoints.coins.entries()).rejects.toMatchObject({ status });
     }
   });
-  it("generated OpenAPI has exactly four read endpoints and strict amount schemas", () => {
+  it("generated OpenAPI has wallet and reward read endpoints with strict amount schemas", () => {
     const paths = Object.entries(snapshot.paths).filter(([path]) =>
       path.includes("/me/coins/")
     );
@@ -121,6 +121,7 @@ describe("coins contract", () => {
       "/admin/me/coins/entries",
       "/admin/me/coins/wallet",
       "/me/coins/entries",
+      "/me/coins/learning-rewards",
       "/me/coins/wallet"
     ]);
     for (const [path, methods] of paths) {
@@ -129,7 +130,7 @@ describe("coins contract", () => {
       const operations: Record<string, { responses: Record<string, unknown> }> =
         snapshot.operationSchemas;
       expect(operations[key]!.responses["200"]).toEqual({
-        $ref: `#/components/schemas/${path.endsWith("wallet") ? "CoinWallet" : "CoinEntryPage"}`
+        $ref: `#/components/schemas/${path.endsWith("wallet") ? "CoinWallet" : path.endsWith("learning-rewards") ? "LearningRewardDay" : "CoinEntryPage"}`
       });
     }
     expect(snapshot.schemas.CoinWallet.additionalProperties).toBe(false);

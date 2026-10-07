@@ -12,6 +12,7 @@ import type {
   SubmitLearningAnswer
 } from "@tsz/types";
 import { api } from "@/lib/request";
+import { LearningRewardSummary } from "@/features/coins/LearningRewardSummary";
 import { useUserStore } from "@/stores/user";
 import { buttonClass } from "@/features/wordlist/reading";
 const field = "w-full rounded-xl border border-border bg-background px-3 py-2";
@@ -109,6 +110,7 @@ function TaskList({ userId }: { userId: string }) {
         看中文释义，拼写英文。每题有效作答后计入进度，正确率单独统计。每日北京时间
         04:00 换日。
       </p>
+      <LearningRewardSummary key={userId} userId={userId} />
       <label className="flex gap-2">
         <input
           type="checkbox"
@@ -704,6 +706,14 @@ function Practice({ userId, id }: { userId: string; id: string }) {
   return (
     <section className="mx-auto max-w-3xl space-y-6 p-4">
       <Link href={`/student/tasks/${r.task_id}`}>← 任务与历史</Link>
+      {r.task_type === "daily" && r.business_day && (
+        <LearningRewardSummary
+          key={`${userId}:${r.business_day}`}
+          userId={userId}
+          businessDay={r.business_day}
+          completionId={r.completion_id}
+        />
+      )}
       <div className={box}>
         <h1 className="text-2xl font-bold">
           {r.state === "completed" ? "本轮已完成" : "中文释义拼写"}
