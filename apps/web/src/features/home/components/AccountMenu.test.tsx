@@ -1,13 +1,15 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement } from "react";
 import {
   act,
   fireEvent,
-  render,
+  render as renderUI,
   screen,
   waitFor
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { User } from "@tsz/types";
+import type { CoinWallet, User } from "@tsz/types";
 import { AccountMenu } from "./AccountMenu";
 import { useUserStore } from "@/stores/user";
 import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIdentityProvider";
@@ -26,7 +28,10 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/lib/request", () => ({
   clearSession: vi.fn(),
-  api: { auth: { logout: vi.fn().mockResolvedValue(undefined) } }
+  api: {
+    auth: { logout: vi.fn().mockResolvedValue(undefined) },
+    coins: { wallet: vi.fn() }
+  }
 }));
 
 import { api, clearSession } from "@/lib/request";
@@ -44,6 +49,13 @@ beforeEach(() => {
   setTheme("light");
   vi.clearAllMocks();
   mockPush.mockReset();
+  vi.mocked(api.coins.wallet).mockReset();
+  vi.mocked(api.coins.wallet).mockResolvedValue({
+    owner_type: "user",
+    owner_id: USER.id,
+    balance: "5",
+    status: "open"
+  });
   vi.stubGlobal(
     "window",
     new Proxy(window, {
@@ -65,11 +77,212 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   setTheme("light");
   vi.unstubAllGlobals();
 });
 
+function render(ui: ReactElement) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  return renderUI(
+    <QueryClientProvider client={client}>{ui}</QueryClientProvider>
+  );
+}
+
+function pointer(target: Element, type: string, pointerType = "mouse") {
+  const event = new MouseEvent(type, { bubbles: true, button: 0 });
+  Object.defineProperty(event, "pointerType", { value: pointerType });
+  fireEvent(target, event);
+}
+
 describe("AccountMenu", () => {
+  it("仅展开时读取余额，重开会刷新；读取失败不伪造零余额或保留旧值", async () => {
+    useUserStore.setState({ user: USER });
+    const user = userEvent.setup();
+    render(<AccountMenu />);
+    expect(api.coins.wallet).not.toHaveBeenCalled();
+    const trigger = screen.getByRole("button", { name: "账户菜单" });
+    await user.click(trigger);
+    expect(
+      await screen.findByRole("menuitem", { name: "天生币：5" })
+    ).toHaveAttribute("href", "/account/coins");
+    await user.keyboard("{Escape}");
+    vi.mocked(api.coins.wallet).mockRejectedValueOnce(new Error("offline"));
+    await user.click(trigger);
+    expect(
+      await screen.findByRole("menuitem", { name: "余额暂不可用" })
+    ).toHaveAttribute("href", "/account/coins");
+    expect(screen.queryByText("天生币：0")).not.toBeInTheDocument();
+    expect(screen.queryByText("天生币：5")).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    vi.mocked(api.coins.wallet).mockResolvedValueOnce({
+      owner_type: "user",
+      owner_id: USER.id,
+      balance: "9007199254740993",
+      status: "open"
+    });
+    await user.click(trigger);
+    expect(
+      await screen.findByRole("menuitem", {
+        name: "天生币：9,007,199,254,740,993"
+      })
+    ).toBeInTheDocument();
+    expect(api.coins.wallet).toHaveBeenCalledTimes(3);
+  });
+
+  it("切换账号后，旧账号的迟到余额不会覆盖当前账号", async () => {
+    let resolve!: (wallet: CoinWallet) => void;
+    vi.mocked(api.coins.wallet)
+      .mockImplementationOnce(
+        () =>
+          new Promise((r) => {
+            resolve = r;
+          })
+      )
+      .mockResolvedValueOnce({
+        owner_type: "user",
+        owner_id: "u2",
+        balance: "7",
+        status: "open"
+      });
+    useUserStore.setState({ user: USER });
+    const user = userEvent.setup();
+    render(<AccountMenu />);
+    await user.click(screen.getByRole("button", { name: "账户菜单" }));
+    expect(screen.getByText("读取余额…")).toBeInTheDocument();
+    act(() =>
+      useUserStore.setState({
+        user: { ...USER, id: "u2", display_name: "Bob" }
+      })
+    );
+    expect(await screen.findByText("天生币：7")).toBeInTheDocument();
+    await act(async () =>
+      resolve({
+        owner_type: "user",
+        owner_id: USER.id,
+        balance: "999",
+        status: "open"
+      })
+    );
+    expect(screen.queryByText("天生币：999")).not.toBeInTheDocument();
+    expect(screen.getByText("天生币：7")).toBeInTheDocument();
+  });
+
+  it("鼠标悬停展开不抢焦点，移入菜单保持打开，离开后延迟收起", async () => {
+    vi.useFakeTimers();
+    useUserStore.setState({ user: USER });
+    render(
+      <>
+        <input aria-label="页面输入" />
+        <AccountMenu />
+      </>
+    );
+    const input = screen.getByRole("textbox", { name: "页面输入" });
+    input.focus();
+    const trigger = screen.getByRole("button", { name: "账户菜单" });
+    pointer(trigger, "pointerover");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(120);
+    });
+    const menu = screen.getByRole("menu");
+    expect(menu).toBeVisible();
+    expect(input).toHaveFocus();
+    pointer(trigger, "pointerout");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    pointer(menu, "pointerover");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(menu).toBeVisible();
+    pointer(menu, "pointerout");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(159);
+    });
+    expect(menu).toBeVisible();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(input).toHaveFocus();
+  });
+
+  it("快速经过不展开，触摸只通过点击展开", async () => {
+    vi.useFakeTimers();
+    useUserStore.setState({ user: USER });
+    render(<AccountMenu />);
+    const trigger = screen.getByRole("button", { name: "账户菜单" });
+    pointer(trigger, "pointerover");
+    pointer(trigger, "pointerout");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    pointer(trigger, "pointerover", "touch");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    pointer(trigger, "pointerdown", "touch");
+    expect(screen.getByRole("menu")).toBeVisible();
+  });
+
+  it("悬停期间直接点击后按 Esc，不被待执行的悬停计时重新打开", async () => {
+    vi.useFakeTimers();
+    useUserStore.setState({ user: USER });
+    render(<AccountMenu />);
+    const trigger = screen.getByRole("button", { name: "账户菜单" });
+    pointer(trigger, "pointerover");
+    fireEvent.click(trigger, { detail: 0 });
+    expect(screen.getByRole("menu")).toBeVisible();
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
+
+  it("悬停展开后使用键盘，鼠标离开不会打断菜单操作", async () => {
+    vi.useFakeTimers();
+    useUserStore.setState({ user: USER });
+    render(<AccountMenu />);
+    const trigger = screen.getByRole("button", { name: "账户菜单" });
+    pointer(trigger, "pointerover");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(120);
+    });
+    const menu = screen.getByRole("menu");
+    pointer(trigger, "pointerout");
+    fireEvent.keyDown(menu, { key: "ArrowDown" });
+    pointer(menu, "pointerout");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    expect(menu).toBeVisible();
+  });
+
+  it("头像已有焦点时，悬停展开后方向键可进入菜单首项", async () => {
+    vi.useFakeTimers();
+    useUserStore.setState({ user: USER });
+    render(<AccountMenu />);
+    const trigger = screen.getByRole("button", { name: "账户菜单" });
+    trigger.focus();
+    pointer(trigger, "pointerover");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(120);
+    });
+    expect(trigger).toHaveFocus();
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    const first = screen.getAllByRole("menuitem")[0]!;
+    expect(first).toHaveAttribute("href", "/account/coins");
+    expect(first).toHaveFocus();
+  });
+
   it("未登录 → 不渲染任何东西", () => {
     const { container } = render(<AccountMenu />);
     expect(container).toBeEmptyDOMElement();
@@ -204,14 +417,16 @@ describe("AccountMenu", () => {
     expect(screen.queryByText("退出登录")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "账户菜单" }));
     expect(screen.getByText("退出登录")).toBeInTheDocument();
-    expect(screen.getByText("学生身份")).toBeInTheDocument();
+    await screen.findByRole("menuitem", { name: "天生币：5" });
+    expect(screen.getByText("学")).toBeVisible();
     expect(
       screen.queryByRole("img", { name: "已认证教师" })
     ).not.toBeInTheDocument();
     expect(
       screen.getAllByRole("menuitem").map((item) => item.textContent)
     ).toEqual([
-      "进入学生工作台",
+      "天生币：5",
+      "学习工作台",
       "个人中心",
       "站内通知",
       "申请教师认证",
@@ -219,7 +434,7 @@ describe("AccountMenu", () => {
       "退出登录"
     ]);
     expect(
-      screen.getByRole("menuitem", { name: "进入学生工作台" })
+      screen.getByRole("menuitem", { name: "学习工作台" })
     ).toHaveAttribute("href", "/student/practice");
     expect(screen.queryByText("注销账号")).not.toBeInTheDocument();
   });
@@ -241,7 +456,7 @@ describe("AccountMenu", () => {
       await user.click(screen.getByRole("button", { name: "账户菜单" }));
       expect(
         screen.getByRole("menuitem", {
-          name: identity === "teacher" ? "进入教师工作台" : "进入学生工作台"
+          name: identity === "teacher" ? "教学工作台" : "学习工作台"
         })
       ).toHaveAttribute(
         "href",
@@ -249,10 +464,10 @@ describe("AccountMenu", () => {
       );
       expect(screen.queryByText("申请教师认证")).not.toBeInTheDocument();
       expect(
-        screen.getByRole("img", { name: "已认证教师" })
-      ).toBeInTheDocument();
+        screen.getByText(identity === "teacher" ? "师" : "学")
+      ).toBeVisible();
       expect(
-        screen.getByText(identity === "teacher" ? "教师身份" : "学生身份")
+        screen.getByRole("img", { name: "已认证教师" })
       ).toBeInTheDocument();
       const switchItem = screen.getByRole("menuitem", {
         name: identity === "teacher" ? "切换为学生" : "切换为教师"
@@ -342,12 +557,10 @@ describe("AccountMenu", () => {
     expect(trigger).toHaveFocus();
     await user.keyboard("{ArrowDown}");
     await waitFor(() =>
-      expect(
-        screen.getByRole("menuitem", { name: "进入学生工作台" })
-      ).toHaveFocus()
+      expect(screen.getByRole("menuitem", { name: "天生币：5" })).toHaveFocus()
     );
     await user.keyboard("{ArrowDown}");
-    expect(screen.getByRole("menuitem", { name: "个人中心" })).toHaveFocus();
+    expect(screen.getByRole("menuitem", { name: "学习工作台" })).toHaveFocus();
     await user.keyboard("{Escape}");
     await waitFor(() => {
       expect(screen.queryByRole("menu")).not.toBeInTheDocument();
@@ -409,7 +622,7 @@ describe("AccountMenu", () => {
       "aria-disabled",
       "true"
     );
-    for (const name of ["进入学生工作台", "个人中心", "站内通知"]) {
+    for (const name of ["天生币：5", "学习工作台", "个人中心", "站内通知"]) {
       const link = screen.getByRole("menuitem", { name });
       expect(link).toHaveAttribute("aria-disabled", "true");
       expect(fireEvent.click(link)).toBe(false);

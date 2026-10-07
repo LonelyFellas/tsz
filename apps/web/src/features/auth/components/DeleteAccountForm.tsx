@@ -1,6 +1,7 @@
 "use client";
 
-import { Button, Card } from "@tsz/ui";
+import { Card } from "@tsz/ui";
+import { Button } from "@tsz/ui/components";
 import type {
   AccountDeletionChannel,
   AccountDeletionState,
@@ -185,9 +186,7 @@ function AccountDeletionForm() {
       await api.auth.requestDeletionCode({ channel });
       setCodeRequested(true);
       setCountdown(CODE_COUNTDOWN);
-      setMessage(
-        `验证码申请已受理，将发送至当前账号的${CHANNEL_LABEL[channel]}`
-      );
+      setMessage(`验证码已发送至绑定的${CHANNEL_LABEL[channel]}，请查收。`);
     } catch (cause: unknown) {
       handleRequestError(cause);
     } finally {
@@ -342,7 +341,7 @@ function AccountDeletionForm() {
           </Button>
           <Button
             className="mt-3"
-            variant="secondary"
+            variant="outline"
             onClick={() => router.back()}
           >
             返回
@@ -361,7 +360,7 @@ function AccountDeletionForm() {
         </p>
         <Button
           className="mt-6"
-          variant="secondary"
+          variant="outline"
           onClick={() => router.back()}
         >
           返回
@@ -380,6 +379,7 @@ function AccountDeletionForm() {
         <div className="mb-6 flex items-center gap-3">
           <Button
             variant="ghost"
+            size="sm"
             className="-ml-3 px-3"
             onClick={() => router.back()}
           >
@@ -396,11 +396,11 @@ function AccountDeletionForm() {
             className="mb-7 rounded-2xl bg-danger/10 p-4 text-danger"
           >
             <h2 id="deletion-warning-title" className="font-semibold">
-              注销申请等待 72 小时生效
+              注销前请确认
             </h2>
             <p className="mt-2 text-sm leading-6">
-              所有申请均等待连续 72
-              小时，期间可撤销，钱包全部收支暂停。到期后账号不可再使用，剩余天生币作废，个人数据随后清理。
+              提交申请后 72 小时生效，期间可撤销，天生币收支将暂停。
+              注销生效后，账号无法使用，剩余天生币作废，个人数据将被清理。
             </p>
           </section>
 
@@ -465,17 +465,17 @@ function AccountDeletionForm() {
                 />
                 <Button
                   type="button"
-                  variant="secondary"
-                  className="min-h-11 shrink-0 rounded-full"
+                  variant="outline"
+                  className="shrink-0"
                   onClick={requestCode}
                   disabled={!canSendCode}
                 >
                   {sending
-                    ? "申请中…"
+                    ? "发送中…"
                     : countdown > 0
-                      ? `${countdown}s 后重试`
+                      ? `${countdown} 秒后重发`
                       : codeRequested
-                        ? "重新获取"
+                        ? "重新发送"
                         : "获取验证码"}
                 </Button>
               </div>
@@ -483,8 +483,7 @@ function AccountDeletionForm() {
                 id="deletion-code-help"
                 className="mt-2 text-xs leading-5 text-foreground-subtle"
               >
-                开发测试提示：当前测试环境验证码为
-                000000；正式验证码策略切换后无需更改此流程。
+                请先获取验证码，再填写收到的 6 位数字。
               </p>
             </div>
 
@@ -502,10 +501,10 @@ function AccountDeletionForm() {
             <Button
               id="continue-account-deletion"
               type="submit"
-              className="min-h-12 w-full rounded-full bg-danger text-white hover:bg-danger/90"
+              className="w-full"
               disabled={!canContinue}
             >
-              继续注销
+              下一步
             </Button>
           </form>
         </Card>
@@ -597,8 +596,7 @@ function AccountDeletionForm() {
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <Button
                 type="button"
-                variant="secondary"
-                className="min-h-11 rounded-full"
+                variant="outline"
                 disabled={deleting}
                 onClick={() => setConfirmOpen(false)}
               >
@@ -606,7 +604,7 @@ function AccountDeletionForm() {
               </Button>
               <Button
                 type="button"
-                className="min-h-11 rounded-full bg-danger text-white hover:bg-danger/90"
+                variant="destructive"
                 disabled={deleting || !consentChecked}
                 onClick={confirmDeletion}
               >

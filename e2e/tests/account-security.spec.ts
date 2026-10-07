@@ -115,7 +115,7 @@ for (const width of [375, 1280]) {
       await trigger.focus();
       await page.keyboard.press("ArrowDown");
       await expect(
-        page.getByRole("menuitem", { name: "进入学生工作台" })
+        page.getByRole("menuitem", { name: "天生币：0" })
       ).toBeFocused();
       await page.keyboard.press(shift ? "Shift+Tab" : "Tab");
       await expect(page.getByRole("menu")).toHaveCount(0);

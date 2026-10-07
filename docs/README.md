@@ -3,7 +3,7 @@
 ## 日常入口
 
 - [开发规范](../AGENTS.md)、[本地环境](../.agents/skills/dev-env/SKILL.md)、[部署流程](../.agents/skills/deploy/SKILL.md)。
-- [C 端设计规范](web-design-system.md)：统一组件、明暗主题、表单状态与文案；新页面和逐步迁移按此接入。
+- [C 端设计规范](../apps/web/style.md)：统一颜色、排版、布局、按钮、菜单、表单状态与文案；新页面和逐步迁移按此接入。
 - [词条编辑指南](word-editor.md)：保留跨任务仍有效的交互和数据约束。
 - [契约同步](../.agents/skills/contract-sync/SKILL.md)、[后端对接](https://github.com/LonelyFellas/tsz-rust/blob/main/docs/frontend-integration.md)、[OpenAPI](https://github.com/LonelyFellas/tsz-rust/blob/main/docs/openapi.json)。
 - 产品范围与品牌规范统一维护在配套总文档仓库的 `product.md`、`visual.md`；该仓库暂无远端，需取得本地 checkout 后阅读。

@@ -3,7 +3,7 @@ import type { LearningSettings } from "@tsz/types";
 import type { BrowserContext, Page, Route } from "@playwright/test";
 
 export const TEST_USER = {
-  id: "u1",
+  id: "00000000-0000-4000-8000-000000000001",
   phone: "13800138000",
   email: "alice@example.com",
   display_name: "Alice",
@@ -76,6 +76,14 @@ export async function mockApi(
     }
     if (path === "/me/teacher-certification" && method === "GET") {
       return json(route, 200, { teacher_verified: false, application: null });
+    }
+    if (path === "/me/coins/wallet" && method === "GET") {
+      return json(route, 200, {
+        owner_type: "user",
+        owner_id: TEST_USER.id,
+        balance: "0",
+        status: "open"
+      });
     }
     if (path === "/me/notifications" && method === "GET") {
       return json(route, 200, { items: [], total: 0, unread_count: 0 });
