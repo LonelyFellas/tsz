@@ -7,14 +7,16 @@ test.describe("登录页", () => {
     await page.goto("/login");
   });
 
-  test("登录页默认密码登录，可切换手机验证码登录", async ({ page }) => {
+  test("登录页默认密码登录，可切换验证码登录", async ({ page }) => {
     await expect(
       page.getByRole("textbox", { name: "手机号或邮箱" })
     ).toBeVisible();
     await expect(page.getByLabel("密码", { exact: true })).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "手机验证码登录" })
-    ).toBeVisible();
+    await expect(page.getByRole("tab", { name: "密码登录" })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+    await expect(page.getByRole("tab", { name: "验证码登录" })).toBeVisible();
     await expect(page.getByRole("button", { name: "邮箱验证" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "获取验证码" })).toHaveCount(
       0
@@ -60,10 +62,10 @@ test.describe("登录页", () => {
   });
 });
 
-test("手机验证码登录发码带 login 用途并进入业务页", async ({ page }) => {
+test("验证码登录发码带 login 用途并进入业务页", async ({ page }) => {
   await mockApi(page, { authenticated: false });
   await page.goto("/login?redirect=%2Fstudent%2Fpractice");
-  await page.getByRole("button", { name: "手机验证码登录" }).click();
+  await page.getByRole("tab", { name: "验证码登录" }).click();
   await page.getByLabel("手机号", { exact: true }).fill("13800138000");
   const sent = page.waitForRequest("**/api/v1/otp/send");
   await page.getByRole("button", { name: "获取验证码" }).click();
