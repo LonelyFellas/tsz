@@ -12,7 +12,9 @@ test("离线登出后 online 不会用残留 cookie 重新登录", async ({ page
     route.abort("internetdisconnected")
   );
   await page.goto("/student/practice");
-  await expect(page.getByRole("heading", { name: "今日练习" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "我的学习任务" })
+  ).toBeVisible();
   await page.getByRole("button", { name: "账户菜单" }).click();
   await page.getByRole("menuitem", { name: "退出登录" }).click();
   await expect(page).toHaveURL(/\/login(?:\?|$)/);
@@ -32,7 +34,9 @@ test("离线登出后 online 不会用残留 cookie 重新登录", async ({ page
   await page.getByRole("button", { name: "立即登录" }).click();
   await expect(page.getByRole("button", { name: "账户菜单" })).toBeVisible();
   await page.goto("/student/practice");
-  await expect(page.getByRole("heading", { name: "今日练习" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "我的学习任务" })
+  ).toBeVisible();
   expect(refreshes).toBe(2);
 });
 
@@ -54,14 +58,16 @@ for (const failure of ["503", "offline"] as const) {
       path: test.info().outputPath("restore-error.png")
     });
     await expect(page).toHaveURL(/\/student\/practice$/);
-    await expect(page.getByRole("heading", { name: "今日练习" })).toHaveCount(
-      0
-    );
+    await expect(
+      page.getByRole("heading", { name: "我的学习任务" })
+    ).toHaveCount(0);
     expect(refreshes).toBe(1);
     available = true;
     await page.getByRole("button", { name: "重试连接" }).click();
     await expect(page.getByText("暂时无法恢复会话，请重试")).toHaveCount(0);
-    await expect(page.getByRole("heading", { name: "今日练习" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "我的学习任务" })
+    ).toBeVisible();
     expect(refreshes).toBe(2);
     await expect(page).toHaveURL(/\/student\/practice$/);
   });

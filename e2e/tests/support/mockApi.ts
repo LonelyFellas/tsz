@@ -93,6 +93,12 @@ export async function mockApi(
     if (path === "/otp/send" && method === "POST") {
       return route.fulfill({ status: 202, body: "" });
     }
+    if (path === "/me/learning-tasks" && method === "GET") {
+      return json(route, 200, {
+        items: [],
+        pagination: { page: 1, page_size: 20, total: 0, total_pages: 0 }
+      });
+    }
     if (path === "/me/learning-settings" && method === "PUT") {
       const next = route.request().postDataJSON() as LearningSettings;
       if (learningSettings && learningSettings.cefr_level !== next.cefr_level) {
