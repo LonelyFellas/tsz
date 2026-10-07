@@ -45,10 +45,17 @@ const catalog: UnifiedPermissionCatalog = {
     }
   ],
   tags: [
-    { id: "t1", name: "内容编辑", version: 3, permissions: ["words.edit"] },
+    {
+      id: "t1",
+      name: "内容编辑",
+      color: "blue",
+      version: 3,
+      permissions: ["words.edit"]
+    },
     {
       id: "t2",
       name: "高频操作",
+      color: "purple",
       version: 5,
       permissions: ["words.edit", "users.access"]
     }
@@ -122,8 +129,105 @@ async function selectTag(label: string, name: string) {
     document.querySelector(`.ant-select-item-option[title="${name}"]`)!
   );
 }
+function chooseTagRow(name: string) {
+  const drawer = within(document.querySelector(".ant-drawer")!);
+  const row = drawer.getByText(name).closest("tr")!;
+  fireEvent.click(row.querySelector('input[type="checkbox"]')!);
+  return row;
+}
+function confirmTagChange(action: "添加" | "移除") {
+  fireEvent.click(screen.getByRole("button", { name: `确认${action}` }));
+}
 
 describe("权限目录、标签和授权人员", () => {
+  it("单一标签管理入口在同一抽屉提供批量设置与标签目录", async () => {
+    mount();
+    await screen.findByText("编辑本人词条");
+    chooseRow("编辑本人词条");
+    expect(screen.getAllByRole("button", { name: "标签管理" })).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "标签管理" }));
+    const drawer = within(await screen.findByRole("dialog"));
+    expect(drawer.getByText("标签管理")).toBeInTheDocument();
+    expect(
+      within(drawer.getByText("内容编辑").closest("tr")!).getByRole("checkbox")
+    ).toBeChecked();
+    expect(drawer.getByText("勾选后确认")).toBeInTheDocument();
+    expect(drawer.getByText("新建标签")).toBeVisible();
+    expect(drawer.getByText("内容编辑")).toBeVisible();
+    expect(screen.queryByRole("dialog", { name: "设置标签" })).toBeNull();
+  });
+
+  it("标签列表回显已选权限的归属状态", async () => {
+    mount();
+    await screen.findByText("编辑本人词条");
+    chooseRow("编辑本人词条");
+    fireEvent.click(screen.getByRole("button", { name: "标签管理" }));
+    const drawer = within(await screen.findByRole("dialog"));
+    expect(
+      within(drawer.getByText("内容编辑").closest("tr")!).getByRole("checkbox")
+    ).toBeChecked();
+    expect(
+      within(drawer.getByText("高频操作").closest("tr")!).getByRole("checkbox")
+    ).toBeChecked();
+  });
+
+  it("权限列表按标签保存的颜色显示", async () => {
+    mount();
+    const row = (await screen.findByText("编辑本人词条")).closest("tr")!;
+    expect(within(row).getByText("内容编辑").closest(".ant-tag")).toHaveClass(
+      "ant-tag-blue"
+    );
+    expect(within(row).getByText("高频操作").closest(".ant-tag")).toHaveClass(
+      "ant-tag-purple"
+    );
+  });
+
+  it("新建标签可选择自定义颜色", async () => {
+    const create = vi
+      .spyOn(api.permissionSystem, "createTag")
+      .mockResolvedValue({
+        id: "custom",
+        name: "自定义标签",
+        color: "#2053FF",
+        version: 0,
+        permissions: []
+      });
+    mount();
+    await screen.findByText("编辑本人词条");
+    fireEvent.click(screen.getByRole("button", { name: "标签管理" }));
+    fireEvent.click(screen.getByRole("button", { name: "新建标签" }));
+    fireEvent.change(screen.getByLabelText("标签名称"), {
+      target: { value: "自定义标签" }
+    });
+    fireEvent.click(screen.getByRole("radio", { name: "自定义" }));
+    expect(screen.getByRole("radio", { name: "自定义" })).toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: /保\s*存/ }));
+    await waitFor(() =>
+      expect(create).toHaveBeenCalledWith("自定义标签", "#2053FF")
+    );
+  });
+
+  it("添加标签需二次确认，取消确认不写入", async () => {
+    mount();
+    await screen.findByText("编辑本人词条");
+    fireEvent.click(
+      document.querySelector(
+        'tr[data-row-key="words.access"] input[type="checkbox"]'
+      )!
+    );
+    fireEvent.click(screen.getByText("标签管理"));
+    const row = within(document.querySelector(".ant-drawer")!)
+      .getByText("内容编辑")
+      .closest("tr")!;
+    expect(within(row).getByRole("checkbox")).not.toBeChecked();
+    chooseTagRow("内容编辑");
+    expect(screen.getByText("确认添加至标签")).toBeInTheDocument();
+    expect(api.permissionSystem.changeTags).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /取\s*消/ }));
+    expect(within(row).getByRole("checkbox")).not.toBeChecked();
+    expect(api.permissionSystem.changeTags).not.toHaveBeenCalled();
+  });
+
   it("权限列只显示名称，不展示技术标识，勾选仍使用原权限键", async () => {
     mount();
     await screen.findByText("编辑本人词条");
@@ -137,33 +241,28 @@ describe("权限目录、标签和授权人员", () => {
     chooseRow("编辑本人词条");
     expect(screen.getByText("已选 1 项")).toBeInTheDocument();
   });
-  it("未勾选时隐藏设置标签，勾选后可弹窗操作，取消不发请求", async () => {
+  it("权限行可直接移除单个标签，保留其他标签和管理员授权", async () => {
+    vi.mocked(api.permissionSystem.catalog)
+      .mockResolvedValueOnce(catalog)
+      .mockResolvedValue({
+        ...catalog,
+        tags: catalog.tags.map((tag) =>
+          tag.id === "t1" ? { ...tag, version: 4, permissions: [] } : tag
+        )
+      });
     mount();
-    await screen.findByText("编辑本人词条");
-    expect(screen.queryByText("设置标签")).toBeNull();
-    expect(screen.queryByText("新建标签")).toBeNull();
-    chooseRow("编辑本人词条");
-    fireEvent.click(screen.getByText("设置标签"));
-    const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("已选 1 项权限")).toBeInTheDocument();
-    expect(
-      within(dialog).getByText("添加标签").closest("button")
-    ).toBeDisabled();
-    expect(
-      within(dialog).getByText("移除标签").closest("button")
-    ).toBeDisabled();
-    await selectTag("批量标签", "内容编辑");
-    fireEvent.click(within(dialog).getByRole("button", { name: /取\s*消/ }));
+    const row = (await screen.findByText("编辑本人词条")).closest("tr")!;
+    fireEvent.click(
+      within(row).getByRole("button", { name: "从内容编辑移除编辑本人词条" })
+    );
     expect(api.permissionSystem.changeTags).not.toHaveBeenCalled();
-    expect(api.permissionSystem.commit).not.toHaveBeenCalled();
-  });
-  it("设置标签支持移除，传入标签版本并保留管理员授权", async () => {
-    mount();
-    await screen.findByText("编辑本人词条");
-    chooseRow("编辑本人词条");
-    fireEvent.click(screen.getByText("设置标签"));
-    await selectTag("批量标签", "内容编辑");
-    fireEvent.click(screen.getByText("移除标签"));
+    expect(screen.getByText("确认从标签移除")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /取\s*消/ }));
+    expect(api.permissionSystem.changeTags).not.toHaveBeenCalled();
+    fireEvent.click(
+      within(row).getByRole("button", { name: "从内容编辑移除编辑本人词条" })
+    );
+    fireEvent.click(screen.getByRole("button", { name: "确认移除" }));
     await waitFor(() =>
       expect(api.permissionSystem.changeTags).toHaveBeenCalledWith({
         catalog_version: "v1",
@@ -172,48 +271,124 @@ describe("权限目录、标签和授权人员", () => {
         ]
       })
     );
+    await waitFor(() => expect(within(row).queryByText("内容编辑")).toBeNull());
+    expect(within(row).getByText("高频操作")).toBeInTheDocument();
+    expect(api.permissionSystem.preview).not.toHaveBeenCalled();
+    expect(api.permissionSystem.commit).not.toHaveBeenCalled();
+  });
+  it("权限行的标签摘要入口打开同一抽屉，不覆盖表格原有选择", async () => {
+    mount();
+    await screen.findByText("编辑本人词条");
+    const selectedRow = chooseRow("查看用户");
+    const row = screen.getByText("编辑本人词条").closest("tr")!;
+    fireEvent.click(
+      within(row).getByRole("button", {
+        name: "设置编辑本人词条标签"
+      })
+    );
+    const drawer = within(await screen.findByRole("dialog"));
+    expect(drawer.getByText("设置标签 · 编辑本人词条")).toBeInTheDocument();
+    expect(
+      within(drawer.getByText("内容编辑").closest("tr")!).getByRole("checkbox")
+    ).toBeChecked();
+    expect(selectedRow.querySelector('input[type="checkbox"]')).toBeChecked();
+    expect(api.permissionSystem.changeTags).not.toHaveBeenCalled();
+  });
+  it("关闭标签管理时不修改标签归属", async () => {
+    mount();
+    await screen.findByText("编辑本人词条");
+    expect(screen.queryByText("设置标签")).toBeNull();
+    expect(screen.queryByText("新建标签")).toBeNull();
+    chooseRow("编辑本人词条");
+    fireEvent.click(screen.getByText("标签管理"));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("已选 1 项权限")).toBeInTheDocument();
+    fireEvent.change(within(dialog).getByLabelText("搜索标签"), {
+      target: { value: "内容" }
+    });
+    expect(within(dialog).queryByText("高频操作")).toBeNull();
+    fireEvent.click(dialog.querySelector(".ant-drawer-close")!);
+    expect(api.permissionSystem.changeTags).not.toHaveBeenCalled();
+    expect(api.permissionSystem.commit).not.toHaveBeenCalled();
+  });
+  it("取消已勾选标签即移除所选权限，保留抽屉和管理员授权", async () => {
+    vi.mocked(api.permissionSystem.catalog)
+      .mockResolvedValueOnce(catalog)
+      .mockResolvedValue({
+        ...catalog,
+        tags: catalog.tags.map((tag) =>
+          tag.id === "t1" ? { ...tag, version: 4, permissions: [] } : tag
+        )
+      });
+    mount();
+    await screen.findByText("编辑本人词条");
+    chooseRow("编辑本人词条");
+    fireEvent.click(screen.getByText("标签管理"));
+    chooseTagRow("内容编辑");
+    expect(api.permissionSystem.changeTags).not.toHaveBeenCalled();
+    confirmTagChange("移除");
     await waitFor(() =>
-      expect(screen.getByLabelText("批量标签")).not.toBeVisible()
+      expect(api.permissionSystem.changeTags).toHaveBeenCalledWith({
+        catalog_version: "v1",
+        targets: [
+          { tag_id: "t1", expected_version: 3, add: [], remove: ["words.edit"] }
+        ]
+      })
+    );
+    expect(screen.getByText("标签列表")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        within(
+          within(document.querySelector(".ant-drawer")!)
+            .getByText("内容编辑")
+            .closest("tr")!
+        ).getByRole("checkbox")
+      ).not.toBeChecked()
     );
     expect(api.permissionSystem.preview).not.toHaveBeenCalled();
     expect(api.permissionSystem.commit).not.toHaveBeenCalled();
   });
-  it("管理标签抽屉提供新建、重命名和删除，独立于权限选择", async () => {
+  it("标签目录提供新建、编辑和删除，不修改管理员授权", async () => {
     const create = vi
       .spyOn(api.permissionSystem, "createTag")
       .mockResolvedValue({
         id: "t3",
         name: "审核",
+        color: "default",
         version: 1,
         permissions: []
       });
-    const rename = vi
-      .spyOn(api.permissionSystem, "renameTag")
+    const update = vi
+      .spyOn(api.permissionSystem, "updateTag")
       .mockResolvedValue(undefined);
     const remove = vi
       .spyOn(api.permissionSystem, "deleteTag")
       .mockResolvedValue(undefined);
     mount();
     await screen.findByText("编辑本人词条");
-    fireEvent.click(screen.getByText("管理标签"));
+    fireEvent.click(screen.getByText("标签管理"));
     const drawer = await screen.findByRole("dialog");
+    expect(within(drawer).queryByRole("checkbox")).toBeNull();
     fireEvent.click(within(drawer).getByText("新建标签"));
     fireEvent.change(screen.getByLabelText("标签名称"), {
       target: { value: "审核" }
     });
+    fireEvent.click(screen.getByRole("radio", { name: "绿色" }));
     fireEvent.click(screen.getByRole("button", { name: /保\s*存/ }));
-    await waitFor(() => expect(create).toHaveBeenCalledWith("审核"));
+    await waitFor(() => expect(create).toHaveBeenCalledWith("审核", "green"));
     await waitFor(() =>
       expect(screen.getByLabelText("标签名称")).not.toBeVisible()
     );
     const row = within(drawer).getByText("内容编辑").closest("tr")!;
-    fireEvent.click(within(row).getByText("重命名"));
+    fireEvent.click(within(row).getByText("编辑"));
+    expect(screen.getByRole("radio", { name: "蓝色" })).toBeChecked();
     fireEvent.change(screen.getByLabelText("标签名称"), {
       target: { value: "词条维护" }
     });
+    fireEvent.click(screen.getByRole("radio", { name: "紫色" }));
     fireEvent.click(screen.getByRole("button", { name: /保\s*存/ }));
     await waitFor(() =>
-      expect(rename).toHaveBeenCalledWith("t1", "词条维护", 3)
+      expect(update).toHaveBeenCalledWith("t1", "词条维护", "purple", 3)
     );
     await waitFor(() =>
       expect(screen.getByLabelText("标签名称")).not.toBeVisible()
@@ -229,6 +404,57 @@ describe("权限目录、标签和授权人员", () => {
     expect(api.permissionSystem.changeTags).not.toHaveBeenCalled();
     expect(api.permissionSystem.commit).not.toHaveBeenCalled();
   });
+  it("新建标签后可在同一抽屉为已选权限打标", async () => {
+    const newTag = {
+      id: "t3",
+      name: "审核标签",
+      color: "default",
+      version: 0,
+      permissions: []
+    };
+    vi.mocked(api.permissionSystem.catalog)
+      .mockResolvedValueOnce(catalog)
+      .mockResolvedValueOnce({ ...catalog, tags: [...catalog.tags, newTag] })
+      .mockResolvedValue({
+        ...catalog,
+        tags: [
+          ...catalog.tags,
+          { ...newTag, version: 1, permissions: ["words.edit"] }
+        ]
+      });
+    vi.spyOn(api.permissionSystem, "createTag").mockResolvedValue(newTag);
+    mount();
+    await screen.findByText("编辑本人词条");
+    chooseRow("编辑本人词条");
+    fireEvent.click(screen.getByText("标签管理"));
+    fireEvent.click(screen.getByText("新建标签"));
+    fireEvent.change(screen.getByLabelText("标签名称"), {
+      target: { value: "审核标签" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: /保\s*存/ }));
+    await screen.findByText("审核标签");
+    chooseTagRow("审核标签");
+    confirmTagChange("添加");
+    await waitFor(() =>
+      expect(api.permissionSystem.changeTags).toHaveBeenCalledWith({
+        catalog_version: "v1",
+        targets: [
+          { tag_id: "t3", expected_version: 0, add: ["words.edit"], remove: [] }
+        ]
+      })
+    );
+    await waitFor(() =>
+      expect(
+        within(
+          within(document.querySelector(".ant-drawer")!)
+            .getByText("审核标签")
+            .closest("tr")!
+        ).getByRole("checkbox")
+      ).toBeChecked()
+    );
+    expect(screen.getByText("标签列表")).toBeInTheDocument();
+    expect(api.permissionSystem.commit).not.toHaveBeenCalled();
+  });
   it("标签重名时保留新建表单和输入，允许修改后重试", async () => {
     const create = vi
       .spyOn(api.permissionSystem, "createTag")
@@ -236,12 +462,13 @@ describe("权限目录、标签和授权人员", () => {
       .mockResolvedValue({
         id: "t3",
         name: "新的标签",
+        color: "default",
         version: 0,
         permissions: []
       });
     mount();
     await screen.findByText("编辑本人词条");
-    fireEvent.click(screen.getByText("管理标签"));
+    fireEvent.click(screen.getByText("标签管理"));
     fireEvent.click(screen.getByText("新建标签"));
     fireEvent.change(screen.getByLabelText("标签名称"), {
       target: { value: "内容编辑" }
@@ -256,25 +483,27 @@ describe("权限目录、标签和授权人员", () => {
       target: { value: "新的标签" }
     });
     fireEvent.click(screen.getByRole("button", { name: /保\s*存/ }));
-    await waitFor(() => expect(create).toHaveBeenLastCalledWith("新的标签"));
+    await waitFor(() =>
+      expect(create).toHaveBeenLastCalledWith("新的标签", "default")
+    );
     await waitFor(() =>
       expect(screen.getByLabelText("标签名称")).not.toBeVisible()
     );
   });
-  it("重命名的名称冲突保留表单，但版本冲突仍要求重新查看", async () => {
-    vi.spyOn(api.permissionSystem, "renameTag").mockRejectedValue(
+  it("编辑名称冲突保留表单，但版本冲突仍要求重新查看", async () => {
+    vi.spyOn(api.permissionSystem, "updateTag").mockRejectedValue(
       new HttpError(409, "conflict")
     );
     mount();
     await screen.findByText("编辑本人词条");
-    fireEvent.click(screen.getByText("管理标签"));
+    fireEvent.click(screen.getByText("标签管理"));
     const drawer = document.querySelector(".ant-drawer")!;
     fireEvent.click(
       within(
         within(drawer as HTMLElement)
           .getByText("内容编辑")
           .closest("tr")!
-      ).getByText("重命名")
+      ).getByText("编辑")
     );
     fireEvent.change(screen.getByLabelText("标签名称"), {
       target: { value: "高频操作" }
@@ -296,7 +525,7 @@ describe("权限目录、标签和授权人员", () => {
       expect(screen.getByLabelText("标签名称")).not.toBeVisible()
     );
   });
-  it("标签被他人删除时刷新目录并清除失效选择，可选择剩余标签重试", async () => {
+  it("标签被他人删除时刷新列表，可在剩余标签重试", async () => {
     vi.mocked(api.permissionSystem.catalog)
       .mockResolvedValueOnce(catalog)
       .mockResolvedValue({ ...catalog, tags: [catalog.tags[1]!] });
@@ -305,21 +534,31 @@ describe("权限目录、标签和授权人员", () => {
     );
     mount();
     await screen.findByText("编辑本人词条");
-    chooseRow("编辑本人词条");
-    fireEvent.click(screen.getByText("设置标签"));
-    await selectTag("批量标签", "内容编辑");
-    fireEvent.click(screen.getByText("添加标签"));
+    fireEvent.click(
+      document.querySelector(
+        'tr[data-row-key="words.access"] input[type="checkbox"]'
+      )!
+    );
+    fireEvent.click(screen.getByText("标签管理"));
+    chooseTagRow("内容编辑");
+    confirmTagChange("添加");
     await screen.findByText("标签已被删除，请重新选择");
-    expect(screen.getByText("添加标签").closest("button")).toBeDisabled();
-    expect(screen.getByText("移除标签").closest("button")).toBeDisabled();
+    expect(
+      within(document.querySelector(".ant-drawer")!).queryByText("内容编辑")
+    ).toBeNull();
     expect(api.permissionSystem.catalog).toHaveBeenCalledTimes(2);
-    await selectTag("批量标签", "高频操作");
-    fireEvent.click(screen.getByText("添加标签"));
+    chooseTagRow("高频操作");
+    confirmTagChange("添加");
     await waitFor(() =>
       expect(api.permissionSystem.changeTags).toHaveBeenLastCalledWith({
         catalog_version: "v1",
         targets: [
-          { tag_id: "t2", expected_version: 5, add: ["words.edit"], remove: [] }
+          {
+            tag_id: "t2",
+            expected_version: 5,
+            add: ["words.access"],
+            remove: []
+          }
         ]
       })
     );
@@ -514,6 +753,9 @@ describe("权限目录、标签和授权人员", () => {
     expect(screen.getAllByText("高频操作")).toHaveLength(2);
     await selectTag("权限标签", "内容编辑");
     expect(screen.getByText("编辑本人词条")).toBeInTheDocument();
+    const row = document.querySelector('tr[data-row-key="words.edit"]')!;
+    expect(within(row as HTMLElement).getByText("内容编辑")).toBeVisible();
+    expect(within(row as HTMLElement).getByText("高频操作")).toBeVisible();
     expect(
       document.querySelector('tr[data-row-key="words.access"]')
     ).toBeNull();
@@ -521,15 +763,68 @@ describe("权限目录、标签和授权人员", () => {
     expect(api.permissionSystem.preview).not.toHaveBeenCalled();
     expect(api.permissionSystem.commit).not.toHaveBeenCalled();
   });
-  it("选多个权限、多个标签批量打标，传每个标签版本且不修改授权", async () => {
+  it("按标签筛选时优先显示命中的标签", async () => {
+    mount();
+    await screen.findByText("编辑本人词条");
+    await selectTag("权限标签", "高频操作");
+    const row = document.querySelector('tr[data-row-key="words.edit"]')!;
+    expect(within(row as HTMLElement).getByText("高频操作")).toBeVisible();
+    expect(within(row as HTMLElement).getByText("内容编辑")).toBeVisible();
+    expect(
+      row.querySelectorAll("td")[6]?.querySelector(".ant-tag")?.textContent
+    ).toContain("高频操作");
+  });
+  it("两个标签在单元格中同一行展示", async () => {
+    mount();
+    const row = (await screen.findByText("编辑本人词条")).closest("tr")!;
+    expect(within(row).getByText("内容编辑")).toBeVisible();
+    expect(within(row).getByText("高频操作")).toBeVisible();
+    expect(
+      within(row).queryByRole("button", {
+        name: "查看编辑本人词条其余1个标签"
+      })
+    ).toBeNull();
+    expect(
+      within(row).getByRole("button", { name: "设置编辑本人词条标签" })
+    ).toBeVisible();
+  });
+  it("十几个标签在表格中保持单行，并可打开完整列表", async () => {
+    const manyTags = Array.from({ length: 13 }, (_, index) => ({
+      id: `many-${index}`,
+      name: `测试标签${index + 1}`,
+      color: "default",
+      version: 0,
+      permissions: ["words.edit"]
+    }));
+    vi.mocked(api.permissionSystem.catalog).mockResolvedValue({
+      ...catalog,
+      tags: manyTags
+    });
+    mount();
+    const row = (await screen.findByText("编辑本人词条")).closest("tr")!;
+    expect(within(row).getByText("测试标签1")).toBeVisible();
+    expect(within(row).getByText("测试标签2")).toBeVisible();
+    expect(within(row).queryByText("测试标签13")).toBeNull();
+    fireEvent.click(
+      within(row).getByRole("button", { name: "查看编辑本人词条其余11个标签" })
+    );
+    const drawer = within(await screen.findByRole("dialog"));
+    expect(drawer.getByText("设置标签 · 编辑本人词条")).toBeInTheDocument();
+    expect(drawer.getAllByRole("checkbox")).toHaveLength(13);
+  });
+  it("多权限部分归属显示半选，勾选时只补齐缺失权限", async () => {
     mount();
     await screen.findByText("编辑本人词条");
     chooseRow("编辑本人词条");
     chooseRow("查看用户");
-    fireEvent.click(screen.getByText("设置标签"));
-    await selectTag("批量标签", "内容编辑");
-    await selectTag("批量标签", "高频操作");
-    fireEvent.click(screen.getByText("添加标签"));
+    fireEvent.click(screen.getByText("标签管理"));
+    const row = within(document.querySelector(".ant-drawer")!)
+      .getByText("内容编辑")
+      .closest("tr")!;
+    expect(row.querySelector(".ant-checkbox-indeterminate")).not.toBeNull();
+    expect(within(row).getByText("1/2")).toBeInTheDocument();
+    chooseTagRow("内容编辑");
+    confirmTagChange("添加");
     await waitFor(() =>
       expect(api.permissionSystem.changeTags).toHaveBeenCalledOnce()
     );
@@ -539,13 +834,7 @@ describe("权限目录、标签和授权人员", () => {
         {
           tag_id: "t1",
           expected_version: 3,
-          add: ["words.edit", "users.access"],
-          remove: []
-        },
-        {
-          tag_id: "t2",
-          expected_version: 5,
-          add: ["words.edit", "users.access"],
+          add: ["users.access"],
           remove: []
         }
       ]

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/coin12-reward-assessment/tsz-rust/docs/openapi.json",
-  "_source_sha256": "dbc5a948d13ee47707561eb1ef37cd43f33702e74e19c20080c77dda8bc4334f",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/permission-tag-colors/docs/openapi.json",
+  "_source_sha256": "88dac9da21bdce458df6c2751adb284cbd796e8bf2f4b92e568663d59a7c2387",
   "roots": [
     "LearningRewardDay",
     "LearningPreview",
