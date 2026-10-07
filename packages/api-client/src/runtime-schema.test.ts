@@ -35,6 +35,15 @@ const runtimeSchemaBundle =
   runtimeSchemaBundleJson as unknown as RuntimeSchemaBundle;
 
 const ROOTS = [
+  "LearningPreview",
+  "LearningTask",
+  "LearningTaskDetail",
+  "LearningTaskPage",
+  "LearningRun",
+  "LearningRunPage",
+  "LearningQuestionPage",
+  "LearningAnswerReceipt",
+
   "WordlistTip",
   "WordlistTipPage",
   "Wordlist",
@@ -154,6 +163,7 @@ function buildValidValue(
       if (schema.pattern && new RegExp(schema.pattern).test("1")) return "1";
       if (schema.format === "uuid") return UUID_V4;
       if (schema.format === "date-time") return RFC3339;
+      if (schema.format === "date") return "2026-10-07";
       return "x".repeat(Math.max(schema.minLength ?? 0, 1));
     case "integer":
     case "number":

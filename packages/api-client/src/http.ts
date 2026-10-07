@@ -303,8 +303,12 @@ export function createHttpClient({
         ...(opts?.headers ? { headers: opts.headers } : {}),
         ...(opts?.signal ? { signal: opts.signal } : {})
       }),
-    patch: <T>(path: string, data?: unknown) =>
-      request<T>(path, { method: "PATCH", body: JSON.stringify(data) }),
+    patch: <T>(path: string, data?: unknown, opts?: { signal?: AbortSignal }) =>
+      request<T>(path, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+        ...(opts?.signal ? { signal: opts.signal } : {})
+      }),
     del: <T>(
       path: string,
       data?: unknown,

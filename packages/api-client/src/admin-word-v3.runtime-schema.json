@@ -1,8 +1,16 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/wordlists-wl03/tsz-rust/docs/openapi.json",
-  "_source_sha256": "67eab91fc7cb20810ac2a4fb22eaac59e50f19b346e61799e4135340ae127fa3",
+  "_source": "/Users/darwish/.codex/worktrees/learning-task-foundation/tsz-rust/docs/openapi.json",
+  "_source_sha256": "b8fea1b54faa0d73e63df9fbb9901733bcfa920d64bbd3fcb5ca93914cd83124",
   "roots": [
+    "LearningPreview",
+    "LearningTask",
+    "LearningTaskDetail",
+    "LearningTaskPage",
+    "LearningRun",
+    "LearningRunPage",
+    "LearningQuestionPage",
+    "LearningAnswerReceipt",
     "WordlistTip",
     "WordlistTipPage",
     "Wordlist",
@@ -816,6 +824,11 @@
         "invalid_display_name",
         "invalid_otp_code",
         "invalid_invitation_code",
+        "learning_task_conflict",
+        "learning_run_unavailable",
+        "learning_settings_required",
+        "learning_insufficient_questions",
+        "learning_already_answered",
         "word_list_conflict",
         "word_list_entry_unavailable",
         "invalid_credentials",
@@ -1235,6 +1248,258 @@
       "type": "string",
       "enum": ["awarded", "reward_disabled", "inviter_unavailable"]
     },
+    "LearningAnswerFeedback": {
+      "type": "object",
+      "required": [
+        "answer_id",
+        "submitted_answer",
+        "is_correct",
+        "accepted_at",
+        "accepted_answers"
+      ],
+      "properties": {
+        "accepted_answers": { "type": "array", "items": { "type": "string" } },
+        "accepted_at": { "type": "string", "format": "date-time" },
+        "answer_id": { "type": "string", "format": "uuid" },
+        "is_correct": { "type": "boolean" },
+        "submitted_answer": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "LearningAnswerReceipt": {
+      "type": "object",
+      "required": [
+        "answer_id",
+        "question_id",
+        "is_correct",
+        "accepted_at",
+        "run",
+        "question"
+      ],
+      "properties": {
+        "accepted_at": { "type": "string", "format": "date-time" },
+        "answer_id": { "type": "string", "format": "uuid" },
+        "is_correct": { "type": "boolean" },
+        "question": { "$ref": "#/$defs/LearningQuestion" },
+        "question_id": { "type": "string", "format": "uuid" },
+        "run": { "$ref": "#/$defs/LearningRun" }
+      },
+      "additionalProperties": false
+    },
+    "LearningContext": {
+      "type": "object",
+      "required": ["cefr_level", "english_variant"],
+      "properties": {
+        "cefr_level": { "type": "string" },
+        "english_variant": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "LearningExclusions": {
+      "type": "object",
+      "required": [
+        "unavailable_entries",
+        "context_dependent",
+        "no_chinese_definition",
+        "no_base_form",
+        "answer_in_prompt"
+      ],
+      "properties": {
+        "answer_in_prompt": { "type": "integer" },
+        "context_dependent": { "type": "integer" },
+        "no_base_form": { "type": "integer" },
+        "no_chinese_definition": { "type": "integer" },
+        "unavailable_entries": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "LearningPreview": {
+      "type": "object",
+      "required": [
+        "eligible_count",
+        "entry_count",
+        "exclusions",
+        "settings",
+        "can_start"
+      ],
+      "properties": {
+        "can_start": { "type": "boolean" },
+        "eligible_count": { "type": "integer" },
+        "entry_count": { "type": "integer" },
+        "exclusions": { "$ref": "#/$defs/LearningExclusions" },
+        "settings": { "$ref": "#/$defs/LearningContext" }
+      },
+      "additionalProperties": false
+    },
+    "LearningPrompt": {
+      "type": "object",
+      "required": ["definition", "part_of_speech"],
+      "properties": {
+        "definition": { "type": "string" },
+        "part_of_speech": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "LearningQuestion": {
+      "type": "object",
+      "required": [
+        "id",
+        "position",
+        "answered",
+        "content_available",
+        "prompt",
+        "feedback"
+      ],
+      "properties": {
+        "answered": { "type": "boolean" },
+        "content_available": { "type": "boolean" },
+        "feedback": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/LearningAnswerFeedback" }
+          ]
+        },
+        "id": { "type": "string", "format": "uuid" },
+        "position": { "type": "integer" },
+        "prompt": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/LearningPrompt" }]
+        }
+      },
+      "additionalProperties": false
+    },
+    "LearningQuestionPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LearningQuestion" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "LearningRun": {
+      "type": "object",
+      "required": [
+        "id",
+        "task_id",
+        "task_type",
+        "state",
+        "question_type",
+        "task_revision",
+        "business_day",
+        "expires_at",
+        "started_at",
+        "server_time",
+        "settings",
+        "target_count",
+        "answered_count",
+        "correct_count",
+        "generation_version",
+        "grading_version",
+        "completion_id"
+      ],
+      "properties": {
+        "answered_count": { "type": "integer" },
+        "business_day": { "type": ["string", "null"], "format": "date" },
+        "completion_id": { "type": ["string", "null"], "format": "uuid" },
+        "correct_count": { "type": "integer" },
+        "expires_at": { "type": ["string", "null"], "format": "date-time" },
+        "generation_version": { "type": "string" },
+        "grading_version": { "type": "string" },
+        "id": { "type": "string", "format": "uuid" },
+        "question_type": { "type": "string" },
+        "server_time": { "type": "string", "format": "date-time" },
+        "settings": { "$ref": "#/$defs/LearningContext" },
+        "started_at": { "type": "string", "format": "date-time" },
+        "state": { "$ref": "#/$defs/LearningRunState" },
+        "target_count": { "type": "integer" },
+        "task_id": { "type": "string", "format": "uuid" },
+        "task_revision": { "type": "integer" },
+        "task_type": { "$ref": "#/$defs/LearningTaskType" }
+      },
+      "additionalProperties": false
+    },
+    "LearningRunPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LearningRun" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "LearningRunState": {
+      "type": "string",
+      "enum": ["active", "completed", "expired", "invalidated", "cancelled"]
+    },
+    "LearningTask": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "task_type",
+        "wordlist_ids",
+        "daily_question_count",
+        "ends_at",
+        "state",
+        "revision",
+        "created_at"
+      ],
+      "properties": {
+        "created_at": { "type": "string", "format": "date-time" },
+        "daily_question_count": { "type": ["integer", "null"] },
+        "ends_at": { "type": ["string", "null"], "format": "date-time" },
+        "id": { "type": "string", "format": "uuid" },
+        "name": { "type": "string" },
+        "revision": { "type": "integer" },
+        "state": { "$ref": "#/$defs/LearningTaskState" },
+        "task_type": { "$ref": "#/$defs/LearningTaskType" },
+        "wordlist_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "LearningTaskDetail": {
+      "type": "object",
+      "required": [
+        "task",
+        "server_time",
+        "business_day",
+        "timezone",
+        "current_run"
+      ],
+      "properties": {
+        "business_day": { "type": "string", "format": "date" },
+        "current_run": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/LearningRun" }]
+        },
+        "server_time": { "type": "string", "format": "date-time" },
+        "task": { "$ref": "#/$defs/LearningTask" },
+        "timezone": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "LearningTaskPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LearningTaskDetail" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "LearningTaskState": { "type": "string", "enum": ["active", "archived"] },
+    "LearningTaskType": { "type": "string", "enum": ["daily", "longterm"] },
     "ManualCoinOperation": {
       "type": "object",
       "required": [

@@ -55,3 +55,5 @@ export * from "./coins";
 export * from "./invitations";
 
 export * from "./wordlists";
+
+export * from "./learning-tasks";

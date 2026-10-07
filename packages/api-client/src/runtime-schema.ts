@@ -1,6 +1,15 @@
 import runtimeSchemaBundleJson from "./admin-word-v3.runtime-schema.json";
 
 export const RUNTIME_SCHEMA_ROOTS = [
+  "LearningPreview",
+  "LearningTask",
+  "LearningTaskDetail",
+  "LearningTaskPage",
+  "LearningRun",
+  "LearningRunPage",
+  "LearningQuestionPage",
+  "LearningAnswerReceipt",
+
   "AccountDeletionRequest",
   "AccountDeletionState",
   "CoinAccountPage",
@@ -89,7 +98,7 @@ type RuntimeSchema = {
   oneOf?: RuntimeSchema[];
   anyOf?: RuntimeSchema[];
   allOf?: RuntimeSchema[];
-  format?: "date-time" | "uuid";
+  format?: "date" | "date-time" | "uuid";
   minimum?: number;
   maximum?: number;
   pattern?: string;
@@ -294,7 +303,10 @@ function validateSchema(
       schema.format !== undefined &&
       !(
         (schema.format === "uuid" && isUuid(value)) ||
-        (schema.format === "date-time" && isRfc3339(value))
+        (schema.format === "date-time" && isRfc3339(value)) ||
+        (schema.format === "date" &&
+          /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+          isRfc3339(`${value}T00:00:00Z`))
       )
     ) {
       return failure(path, "invalid_format", value);
