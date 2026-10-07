@@ -228,6 +228,26 @@ describe("权限目录、标签和授权人员", () => {
     expect(api.permissionSystem.changeTags).not.toHaveBeenCalled();
   });
 
+  it("标签写入暂时失败后保留确认弹窗，可直接重试", async () => {
+    const change = vi
+      .mocked(api.permissionSystem.changeTags)
+      .mockRejectedValueOnce(new Error("网络异常"))
+      .mockResolvedValue(catalog.tags);
+    mount();
+    const row = (await screen.findByText("编辑本人词条")).closest("tr")!;
+    fireEvent.click(
+      within(row).getByRole("button", { name: "从内容编辑移除编辑本人词条" })
+    );
+    fireEvent.click(screen.getByRole("button", { name: "确认移除" }));
+    await screen.findByText("网络异常");
+    expect(screen.getByText("确认从标签移除")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "确认移除" }));
+    await waitFor(() => expect(change).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(screen.getByText("确认从标签移除")).not.toBeVisible()
+    );
+  });
+
   it("权限列只显示名称，不展示技术标识，勾选仍使用原权限键", async () => {
     mount();
     await screen.findByText("编辑本人词条");

@@ -376,6 +376,7 @@ export function PermissionManagement() {
     } catch (error) {
       if (error instanceof HttpError && error.status === 409) {
         await reload();
+        setPendingTagChange(undefined);
         const current = client.getQueryData<UnifiedPermissionCatalog>([
           "permission-system",
           "catalog"
@@ -398,6 +399,7 @@ export function PermissionManagement() {
         }
       } else if (error instanceof HttpError && error.status === 404) {
         await reload();
+        setPendingTagChange(undefined);
         setEditingTag(undefined);
         message.warning("标签已被删除，请重新选择");
       } else {
@@ -913,7 +915,9 @@ export function PermissionManagement() {
             pendingTagChange.tag,
             pendingTagChange.keys,
             pendingTagChange.checked
-          ).then(() => setPendingTagChange(undefined));
+          ).then((ok) => {
+            if (ok) setPendingTagChange(undefined);
+          });
         }}
       >
         {pendingTagChange && (
