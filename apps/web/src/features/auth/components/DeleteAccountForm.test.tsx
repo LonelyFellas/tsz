@@ -64,7 +64,7 @@ async function openConfirmation() {
   const user = userEvent.setup();
   await user.click(await screen.findByRole("button", { name: "获取验证码" }));
   await user.type(screen.getByPlaceholderText("6 位数字验证码"), "000000");
-  await user.click(screen.getByRole("button", { name: "继续注销" }));
+  await user.click(screen.getByRole("button", { name: "下一步" }));
   return user;
 }
 beforeEach(() => {
@@ -168,7 +168,7 @@ describe("DeleteAccountForm 72小时注销", () => {
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
     );
-    await user.click(screen.getByRole("button", { name: "继续注销" }));
+    await user.click(screen.getByRole("button", { name: "下一步" }));
     expect(screen.getByRole("checkbox")).not.toBeChecked();
     expect(
       screen.getByText("本次确认余额：9007199254740993 天生币")
@@ -240,7 +240,7 @@ it.each([
   await waitFor(() =>
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
   );
-  await user.click(screen.getByRole("button", { name: "继续注销" }));
+  await user.click(screen.getByRole("button", { name: "下一步" }));
   expect(screen.getByRole("checkbox")).not.toBeChecked();
   expect(screen.getByRole("button", { name: "提交注销申请" })).toBeDisabled();
 });
@@ -274,6 +274,6 @@ it("另一页撤销后，旧键重放的cancelled结果不冒充新申请成功"
   expect(screen.getByRole("status")).toHaveTextContent("已撤销");
   expect(screen.getByRole("status")).not.toHaveTextContent("申请已保存");
   expect(screen.getByPlaceholderText("6 位数字验证码")).toHaveValue("");
-  expect(screen.getByRole("button", { name: "继续注销" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "下一步" })).toBeDisabled();
   expect(clearSession).not.toHaveBeenCalled();
 });

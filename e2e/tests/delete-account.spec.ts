@@ -11,7 +11,8 @@ for (const width of [375, 1280]) {
     const menu = page.getByRole("menu");
     await expect(menu).toBeVisible();
     const expectedItems = [
-      "进入学生工作台",
+      "天生币：0",
+      "学习工作台",
       "个人中心",
       "站内通知",
       "申请教师认证",
@@ -37,7 +38,7 @@ for (const width of [375, 1280]) {
       };
     });
     expect(measurement.outsidePage).toBe(true);
-    expect(measurement.zIndex).toBe("50");
+    expect(measurement.zIndex).toBe("40");
     expect(measurement.fitsViewport).toBe(true);
     expect(measurement.hits).toHaveLength(expectedItems.length);
     expect(measurement.hits.every(Boolean)).toBe(true);
@@ -60,7 +61,7 @@ test.describe("注销申请与撤销", () => {
       await page.goto("/account/delete");
       await page.getByRole("button", { name: "获取验证码" }).click();
       await page.getByPlaceholder("6 位数字验证码").fill("000000");
-      await page.getByRole("button", { name: "继续注销" }).click();
+      await page.getByRole("button", { name: "下一步" }).click();
       const dialog = page.getByRole("dialog", { name: "确认提交注销申请？" });
       await expect(dialog.getByRole("checkbox")).not.toBeChecked();
       await expect(

@@ -39,6 +39,7 @@ PENDING 白名单为准。本仓库负责前端与部署编排。
 
 ### web（Next）
 
+- C 端视觉与交互统一遵循 [apps/web/style.md](apps/web/style.md)；新增页面与正在调整的组件按此接入。
 - UI 按落地页设计体系做：Apple 风 token（#0071e3 / rounded-3xl / animate-in）；
   原型图只作功能参照，不照搬视觉，功能不能少。
 - `.dark` 主题 class 加在 `<html>` 上会被 React 水合剥掉：须在水合后的 layout effect

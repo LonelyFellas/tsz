@@ -2,6 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatCoins } from "@tsz/shared";
+import { Button } from "@tsz/ui/components";
 import Link from "next/link";
 import { useState } from "react";
 import { api } from "@/lib/request";
@@ -17,8 +18,6 @@ const SOURCES: Record<string, string> = {
   manual_reversal: "人工入账冲正",
   account_closure: "注销余额作废"
 };
-const BUTTON =
-  "rounded-full border border-border px-4 py-2 text-sm disabled:opacity-40";
 export function CoinsWallet() {
   const id = useUserStore((s) => s.user?.id);
   return id ? <Wallet key={id} id={id} /> : null;
@@ -52,9 +51,9 @@ function Wallet({ id }: { id: string }) {
       </Link>
       <div className="mt-7 flex items-center justify-between gap-4">
         <h1 className="text-3xl font-semibold tracking-tight">我的天生币</h1>
-        <button className={BUTTON} onClick={refresh}>
+        <Button variant="outline" onClick={refresh}>
           刷新
-        </button>
+        </Button>
       </div>
       <section
         aria-label="钱包余额"
@@ -137,16 +136,16 @@ function Wallet({ id }: { id: string }) {
               </ul>
             )}
             <div className="mt-4 flex items-center justify-end gap-3">
-              <button
-                className={BUTTON}
+              <Button
+                variant="outline"
                 disabled={page === 1}
                 onClick={() => setPage(page - 1)}
               >
                 上一页
-              </button>
+              </Button>
               <span className="text-sm">第 {page} 页</span>
-              <button
-                className={BUTTON}
+              <Button
+                variant="outline"
                 disabled={page >= entries.data.pagination.total_pages}
                 onClick={() => {
                   setSnapshot(entries.data.snapshot);
@@ -154,7 +153,7 @@ function Wallet({ id }: { id: string }) {
                 }}
               >
                 下一页
-              </button>
+              </Button>
             </div>
           </>
         )}

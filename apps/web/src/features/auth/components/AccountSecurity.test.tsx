@@ -114,9 +114,10 @@ afterEach(() => {
 
 it("账号安全保留注销流程入口", async () => {
   render(<AccountSecurity />);
-  expect(
-    await screen.findByRole("link", { name: "了解注销流程" })
-  ).toHaveAttribute("href", "/account/delete");
+  expect(await screen.findByRole("link", { name: "申请注销" })).toHaveAttribute(
+    "href",
+    "/account/delete"
+  );
 });
 
 describe("AccountSecurity", () => {
@@ -207,7 +208,6 @@ describe("AccountSecurity", () => {
           screen.queryByRole("button", { name: unlink })
         ).not.toBeInTheDocument();
       else expect(screen.getByRole("button", { name: unlink })).toBeDisabled();
-      expect(screen.getByText(/手机号必须保留/)).toBeInTheDocument();
       expect(auth.unbindContact).not.toHaveBeenCalled();
     }
   );

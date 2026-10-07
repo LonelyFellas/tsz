@@ -162,7 +162,7 @@ export function AccountSecurity() {
                   </div>
                 </section>
               ))}
-              <section className="flex items-center justify-between gap-4 py-6">
+              <section className="flex items-center justify-between gap-4 pt-6">
                 <div>
                   <h2 className="text-sm font-semibold text-foreground">
                     登录密码
@@ -179,9 +179,6 @@ export function AccountSecurity() {
                   修改密码
                 </button>
               </section>
-              <p className="pt-5 text-xs leading-5 text-foreground-muted">
-                手机号必须保留，可验证后换绑；邮箱可按需绑定或解绑。
-              </p>
             </div>
           )}
         </div>
@@ -191,14 +188,14 @@ export function AccountSecurity() {
           <div>
             <h2 className="text-sm font-semibold text-foreground">注销账号</h2>
             <p className="mt-1 text-sm text-foreground-muted">
-              申请注销账号，继续前请仔细阅读注销说明。
+              提交申请后 72 小时生效，期间可撤销。
             </p>
           </div>
           <Link
             href="/account/delete"
             className="shrink-0 rounded-sm text-sm text-danger hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger"
           >
-            了解注销流程
+            申请注销
           </Link>
         </section>
       )}
