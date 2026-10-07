@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/learning-task-foundation/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-07T01:54:00.577Z",
+  "_source": "/Users/darwish/.codex/worktrees/coin12-reward-assessment/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-10-07T03:01:32.045Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -117,6 +117,7 @@
     "/me/avatar": ["post"],
     "/me/avatar/upload-url": ["post"],
     "/me/coins/entries": ["get"],
+    "/me/coins/learning-rewards": ["get"],
     "/me/coins/wallet": ["get"],
     "/me/contact/bind": ["post"],
     "/me/contact/bind-code": ["post"],
@@ -587,6 +588,14 @@
         "in": "query",
         "required": false,
         "schema": { "type": "string", "pattern": "^(0|[1-9][0-9]{0,18})$" }
+      }
+    ],
+    "get /me/coins/learning-rewards": [
+      {
+        "name": "business_day",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "format": "date" }
       }
     ],
     "get /me/invitations/records": [
@@ -1576,6 +1585,16 @@
         "401": { "$ref": "#/components/schemas/ProblemDetails" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" },
         "500": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /me/coins/learning-rewards": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/LearningRewardDay" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
     "get /me/coins/wallet": {

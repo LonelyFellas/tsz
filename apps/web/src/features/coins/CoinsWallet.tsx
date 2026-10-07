@@ -5,11 +5,13 @@ import { formatCoins } from "@tsz/shared";
 import Link from "next/link";
 import { useState } from "react";
 import { api } from "@/lib/request";
+import { LearningRewardSummary } from "./LearningRewardSummary";
 import { useUserStore } from "@/stores/user";
 
 const SOURCES: Record<string, string> = {
   wordlist_tip: "词表投币",
   invitation_reward: "邀请奖励",
+  learning_reward: "每日学习奖励",
   manual_purchase: "购买入账",
   manual_reward: "人工奖励",
   manual_reversal: "人工入账冲正",
@@ -23,6 +25,7 @@ export function CoinsWallet() {
 }
 function Wallet({ id }: { id: string }) {
   const client = useQueryClient();
+  const isStudent = useUserStore((s) => s.user?.roles.includes("student"));
   const [page, setPage] = useState(1);
   const [snapshot, setSnapshot] = useState<string>();
   const wallet = useQuery({
@@ -40,6 +43,7 @@ function Wallet({ id }: { id: string }) {
     setPage(1);
     setSnapshot(undefined);
     void client.invalidateQueries({ queryKey: ["coins", "user", id] });
+    void client.invalidateQueries({ queryKey: ["learning-rewards", id] });
   }
   return (
     <div className="animate-in mx-auto max-w-3xl px-6 py-10 sm:py-14">
@@ -158,7 +162,7 @@ function Wallet({ id }: { id: string }) {
       <section className="mt-8 rounded-3xl bg-muted p-6">
         <h2 className="text-xl font-semibold">获取与使用</h2>
         <p className="mt-3 text-sm leading-7 text-foreground-muted">
-          可向他人已公开且全部词条可用的词表投币，数量由你确认，全额进入作者钱包。每日任务奖励尚未开放。
+          可向他人已公开且全部词条可用的词表投币，数量由你确认，全额进入作者钱包。
         </p>
         <Link
           href="/account/wordlist-tips"
@@ -172,6 +176,11 @@ function Wallet({ id }: { id: string }) {
         >
           邀请好友，查看奖励规则 →
         </Link>
+        {isStudent && (
+          <div className="mt-5">
+            <LearningRewardSummary key={id} userId={id} onAward={refresh} />
+          </div>
+        )}
         <h3 className="mt-5 font-medium">联系客服</h3>
         {contact ? (
           <p className="mt-2 break-words text-sm">{contact}</p>

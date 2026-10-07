@@ -57,3 +57,5 @@ export * from "./invitations";
 export * from "./wordlists";
 
 export * from "./learning-tasks";
+
+export * from "./learning-rewards";

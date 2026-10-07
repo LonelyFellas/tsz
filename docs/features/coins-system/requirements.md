@@ -1,8 +1,10 @@
 # 天生币系统需求与分批范围
 
+当前 COIN-12 评估入口：[奖励需求（待确认）](learning-rewards-requirements.md)、[奖励技术设计](learning-rewards-design.md)。LT 已合并部署，见 [发布事实](learning-task-foundation-design.md#11-lt-发布记录2026-10-07)；本文保留原分批设计，不把历史未就绪状态作为当前缺口。
+
 当前维护位置：本任务前端 worktree 的 `docs/features/coins-system/`。更新日期：2026-10-07。COIN-01～11（不含 COIN-12）及 WL-01～03 已合并部署；原评估与各批历史实现证据保留，当前发布状态见 [词表验收](wordlists-tips-acceptance.md)。
 
-真实学习任务基础 LT-01～LT-04 已实现并完成隔离验收，已确认范围与完成规则见 [学习任务需求](learning-task-foundation-requirements.md)，可信记录、迁移/契约与验收证据见 [学习任务设计](learning-task-foundation-design.md)。COIN-12 的学习前置已完成，奖励政策仍待确定，本轮不发币。
+真实学习任务基础 LT-01～LT-04 已实现、验收并合并部署，已确认范围与完成规则见 [学习任务需求](learning-task-foundation-requirements.md)，可信记录、迁移/契约与验收证据见 [学习任务设计](learning-task-foundation-design.md)。COIN-12 的学习前置已完成；奖励接入已按当前会话授权实现，生产金额/题量和启用日期待确认，默认不发币。
 
 执行任务及排队顺序见 [tasks.md](tasks.md)，以可验收的批次组织工作。
 

@@ -44,6 +44,7 @@ const QUERY_CONTRACT_OPERATIONS = new Set([
   "get /admin/coins/accounts/{owner_type}/{owner_id}/entries",
   "get /admin/coins/operations",
   "get /me/coins/entries",
+  "get /me/coins/learning-rewards",
   "get /admin/me/coins/entries",
   "get /admin/lexicon/entries/related-search",
   "get /admin/settings/form-types",
@@ -51,6 +52,7 @@ const QUERY_CONTRACT_OPERATIONS = new Set([
 ]);
 
 const RUNTIME_SCHEMA_ROOTS = [
+  "LearningRewardDay",
   "LearningPreview",
   "LearningTask",
   "LearningTaskDetail",

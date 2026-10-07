@@ -3,6 +3,7 @@ import { formatCoins } from "@tsz/shared";
 import type { CoinEntryPage } from "@tsz/types";
 export const coinSourceLabels: Record<string, string> = {
   invitation_reward: "邀请奖励",
+  learning_reward: "每日学习奖励",
   manual_purchase: "购买入账",
   manual_reward: "人工奖励",
   manual_reversal: "人工入账冲正",

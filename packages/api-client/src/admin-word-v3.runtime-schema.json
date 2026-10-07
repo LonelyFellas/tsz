@@ -1,8 +1,9 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/learning-task-foundation/tsz-rust/docs/openapi.json",
-  "_source_sha256": "6771a7a062ce69d6c5c7338fa716e99054cb7c9ddbf0be203b3581505767be6b",
+  "_source": "/Users/darwish/.codex/worktrees/coin12-reward-assessment/tsz-rust/docs/openapi.json",
+  "_source_sha256": "dbc5a948d13ee47707561eb1ef37cd43f33702e74e19c20080c77dda8bc4334f",
   "roots": [
+    "LearningRewardDay",
     "LearningPreview",
     "LearningTask",
     "LearningTaskDetail",
@@ -1378,6 +1379,50 @@
         "pagination": { "$ref": "#/$defs/PaginationMeta" }
       },
       "additionalProperties": false
+    },
+    "LearningRewardDay": {
+      "type": "object",
+      "required": [
+        "business_day",
+        "server_time",
+        "rule_version",
+        "minimum_units",
+        "daily_amount",
+        "qualifying_units",
+        "status",
+        "awarded_amount",
+        "operation_id",
+        "settled_at"
+      ],
+      "properties": {
+        "awarded_amount": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$"
+        },
+        "business_day": { "type": "string", "format": "date" },
+        "daily_amount": {
+          "type": ["string", "null"],
+          "pattern": "^[1-9][0-9]{0,18}$"
+        },
+        "minimum_units": { "type": ["integer", "null"] },
+        "operation_id": { "type": ["string", "null"], "format": "uuid" },
+        "qualifying_units": { "type": "integer", "maximum": 200, "minimum": 0 },
+        "rule_version": { "type": ["string", "null"] },
+        "server_time": { "type": "string", "format": "date-time" },
+        "settled_at": { "type": ["string", "null"], "format": "date-time" },
+        "status": { "$ref": "#/$defs/LearningRewardStatus" }
+      },
+      "additionalProperties": false
+    },
+    "LearningRewardStatus": {
+      "type": "string",
+      "enum": [
+        "in_progress",
+        "threshold_not_met",
+        "awarded",
+        "reward_disabled",
+        "wallet_unavailable"
+      ]
     },
     "LearningRun": {
       "type": "object",
