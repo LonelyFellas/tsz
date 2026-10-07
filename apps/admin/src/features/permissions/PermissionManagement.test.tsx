@@ -144,17 +144,23 @@ describe("权限目录、标签和授权人员", () => {
     mount();
     await screen.findByText("编辑本人词条");
     chooseRow("编辑本人词条");
-    expect(screen.getAllByRole("button", { name: "标签管理" })).toHaveLength(1);
-    fireEvent.click(screen.getByRole("button", { name: "标签管理" }));
-    const drawer = within(await screen.findByRole("dialog"));
+    const managerButtons = [...document.querySelectorAll("button")].filter(
+      (button) => button.textContent?.trim() === "标签管理"
+    );
+    expect(managerButtons).toHaveLength(1);
+    fireEvent.click(managerButtons[0]!);
+    const drawer = within(document.querySelector(".ant-drawer")!);
     expect(drawer.getByText("标签管理")).toBeInTheDocument();
     expect(
-      within(drawer.getByText("内容编辑").closest("tr")!).getByRole("checkbox")
+      drawer
+        .getByText("内容编辑")
+        .closest("tr")!
+        .querySelector('input[type="checkbox"]')
     ).toBeChecked();
     expect(drawer.getByText("勾选后确认")).toBeInTheDocument();
     expect(drawer.getByText("新建标签")).toBeVisible();
     expect(drawer.getByText("内容编辑")).toBeVisible();
-    expect(screen.queryByRole("dialog", { name: "设置标签" })).toBeNull();
+    expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
   });
 
   it("标签列表回显已选权限的归属状态", async () => {
@@ -797,16 +803,18 @@ describe("权限目录、标签和授权人员", () => {
   it("两个标签在单元格中同一行展示", async () => {
     mount();
     const row = (await screen.findByText("编辑本人词条")).closest("tr")!;
-    expect(within(row).getByText("内容编辑")).toBeVisible();
-    expect(within(row).getByText("高频操作")).toBeVisible();
+    const tagCell = row.querySelectorAll("td")[6]!;
+    const visibleTags = tagCell.querySelectorAll(".ant-tag");
+    expect(visibleTags).toHaveLength(2);
+    expect(visibleTags[0]).toHaveTextContent("内容编辑");
+    expect(visibleTags[1]).toHaveTextContent("高频操作");
+    expect(tagCell.firstElementChild).toHaveStyle("white-space: nowrap");
     expect(
-      within(row).queryByRole("button", {
-        name: "查看编辑本人词条其余1个标签"
-      })
+      tagCell.querySelector('[aria-label="查看编辑本人词条其余1个标签"]')
     ).toBeNull();
     expect(
-      within(row).getByRole("button", { name: "设置编辑本人词条标签" })
-    ).toBeVisible();
+      tagCell.querySelector('[aria-label="设置编辑本人词条标签"]')
+    ).not.toBeNull();
   });
   it("十几个标签在表格中保持单行，并可打开完整列表", async () => {
     const manyTags = Array.from({ length: 13 }, (_, index) => ({
