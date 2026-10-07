@@ -1,3 +1,4 @@
+import { createLearningTaskEndpoints } from "./learning-tasks";
 import { createWordlistEndpoints } from "./wordlists";
 import { createAccountDeletionEndpoints } from "./account-deletion";
 import { createInvitationEndpoints } from "./invitations";
@@ -18,7 +19,6 @@ import type {
   LearningSettings,
   LearningSettingsResponse,
   MeResponse,
-  Task,
   User,
   Word
 } from "@tsz/types";
@@ -215,10 +215,7 @@ export function createEndpoints(http: HttpClient) {
       create: (data: Pick<Comment, "target_type" | "target_id" | "content">) =>
         http.post<Comment>("/comments", data)
     },
-    task: {
-      list: () => http.get<Task[]>("/tasks"),
-      create: (data: Partial<Task>) => http.post<Task>("/tasks", data)
-    }
+    learning: createLearningTaskEndpoints(http)
   };
 }
 

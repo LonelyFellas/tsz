@@ -371,23 +371,3 @@ describe("createEndpoints · comment", () => {
     expect(http.post).toHaveBeenCalledWith("/comments", payload);
   });
 });
-
-describe("createEndpoints · task", () => {
-  it("list → GET /tasks", () => {
-    const api = createEndpoints(http);
-    api.task.list();
-    expect(http.get).toHaveBeenCalledWith("/tasks");
-  });
-
-  it("create → POST /tasks 带 data", () => {
-    const api = createEndpoints(http);
-    api.task.create({ type: "daily" });
-    expect(http.post).toHaveBeenCalledWith("/tasks", { type: "daily" });
-  });
-
-  it("返回值透传 http 的结果", () => {
-    (http.get as ReturnType<typeof vi.fn>).mockReturnValueOnce("RESULT");
-    const api = createEndpoints(http);
-    expect(api.task.list()).toBe("RESULT");
-  });
-});

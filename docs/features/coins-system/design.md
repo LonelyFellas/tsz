@@ -1,11 +1,8 @@
 # 天生币系统技术方案
 
-维护位置：`/Users/darwish/Dev/tsz-core/tsz-coins-b1a/docs/features/coins-system/` 是本次实施的唯一维护目录；`9adc` 工作区保留为只读评估来源。
-状态：2026-10-06 B1a（COIN-01～03）已实现并验收；B1b（COIN-04～05）也已完成，见 [B1b 验收](b1b-acceptance.md)。B1a 记录见 [b1a-acceptance.md](b1a-acceptance.md)。B2（COIN-06～09）实现与验收见 [b2-acceptance.md](b2-acceptance.md)。业务范围、批次和决定记录见 [requirements.md](requirements.md)。
+当前维护位置：本任务前端 worktree 的 `docs/features/coins-system/`。2026-10-07：coins 核心、钱包/人工操作、注销、邀请、词表及投币、完整阅读均已合并部署；当前状态见 [tasks.md](tasks.md) 和 [词表验收](wordlists-tips-acceptance.md)。本文件保留 coins 初始技术方案与历史基线，不将旧状态当作当前依赖缺口。
 
-B4（COIN-10）已完成实现和验收，见 [b4-acceptance.md](b4-acceptance.md)；验收后已获两仓本地提交授权，未推送或部署。
-
-实施任务、依赖和状态见 [tasks.md](tasks.md)。COIN-11 所依赖的真实词表已完成独立前置评估，见 [词表基础设计](wordlist-foundation-design.md)；最小词表闭环及 COIN-11 已实现并验收，见 [本批验收](wordlists-tips-acceptance.md)。
+[真实学习任务基础](learning-task-foundation-design.md) LT-01～LT-04 已实现并验收，已建立题目→首答→唯一完成事实及学习迁移；COIN-12 仍等待结算规则确认，本轮不改奖励账本。
 
 注销规则已按用户后续要求替换：有余额须签署放弃，申请成功起等待连续 72 小时，期间允许撤销并暂停钱包收支；到期生效并记余额作废。本文不再采用“非零余额不能申请注销”。
 

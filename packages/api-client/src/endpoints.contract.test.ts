@@ -47,11 +47,9 @@ const PENDING = new Set<string>([
   // ---- 后端已切换为 tsz-rust(重写进行中),spec 只含 auth 核心 7 条路由。 ----
   // 以下按 tsz-rust 落地节奏逐步从白名单移除(T 系列见 tsz-rust/docs/frontend-integration.md §6)。
 
-  // 词库 / 词表 / 评论 / 任务:目前全是前端 mock(useWordLists 等),后端未实现。
+  // 尚未提供的旧词库列表与评论接口。
   "get /words",
   "post /comments",
-  "get /tasks",
-  "post /tasks",
   // 角色治理尚未实现，页面保持未挂路由；统一权限目录已经实现，不在白名单中。
   "patch /admin/admins/_/role",
   "get /admin/roles",
@@ -702,7 +700,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "f859eb102aa638f835669a6de150656341268a06fd565ff89b475c4b638b1c80"
+      "6771a7a062ce69d6c5c7338fa716e99054cb7c9ddbf0be203b3581505767be6b"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");

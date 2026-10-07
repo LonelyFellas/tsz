@@ -10,6 +10,16 @@
 - 邀请奖励缺省关闭，未改 .env。已有账本、词表和注销签署证据必须保留，禁止 destructive down 或回退旧即时注销版本。
 - 2026-10-07 两仓 fetch 的 origin/main 与上述 SHA 一致。发布证据复用 `/tmp/coins-release-integration/`；本轮不重复部署。
 
+## WL-03 完成发布（2026-10-07）
+
+此前本地提交/审查段落是历史记录，下列实际事实取代其“尚未部署”状态：
+
+- 后端 PR208 合并，main/部署 `b1bb101565a0d566917b3b48aac8753a63c215b4`；main CI `37550551161` attempt 1 success。
+- 前端 PR369 合并，main/Web/Admin `5b2c993a4a68eef5f51cd279b2cb80eed4c47599`；main CI `37550578998` attempt 1 success。
+- 按 backend → Web → Admin 原生部署。后端 health/ready、完整 HTTPS 登录/刷新/退出及 Secure Cookie 通过；Web/Admin 页面/API 门禁及 manifest 实物复算通过。无回退，锁/事务已释放。
+- 无新增迁移，未改 .env；数据库保持 96 条迁移，末值 20261006050000。线上暂无公开词表，完整内容/角色/手机行为复用本批隔离真实 API 验收，未创建测试站业务 fixture。
+- 部署证据 `/tmp/wl03-deployment/deployment-result.json` 及原生组件日志。新 LT 评估从这两份 main 开始，旧 checkout 保留。
+
 ## 输入与范围
 
 - 后端：`/Users/darwish/.codex/worktrees/coins-b1a/tsz-rust`，`codex/coins-b1a@9459b845b4f9059837b3f819c47d9cbeb66b299b` + 本批工作区差异。

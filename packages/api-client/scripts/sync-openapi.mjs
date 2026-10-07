@@ -51,6 +51,15 @@ const QUERY_CONTRACT_OPERATIONS = new Set([
 ]);
 
 const RUNTIME_SCHEMA_ROOTS = [
+  "LearningPreview",
+  "LearningTask",
+  "LearningTaskDetail",
+  "LearningTaskPage",
+  "LearningRun",
+  "LearningRunPage",
+  "LearningQuestionPage",
+  "LearningAnswerReceipt",
+
   "WordlistTip",
   "WordlistTipPage",
   "Wordlist",
@@ -124,7 +133,7 @@ const IGNORED_ANNOTATION_KEYWORDS = new Set([
   "readOnly"
 ]);
 const IGNORED_ANNOTATION_FORMATS = new Set(["int32", "int64"]);
-const SUPPORTED_VALIDATION_FORMATS = new Set(["date-time", "uuid"]);
+const SUPPORTED_VALIDATION_FORMATS = new Set(["date", "date-time", "uuid"]);
 
 const sourceText = readFileSync(source, "utf8");
 const spec = load(sourceText);
