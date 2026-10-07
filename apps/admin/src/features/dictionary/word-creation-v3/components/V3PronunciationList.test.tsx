@@ -1,12 +1,18 @@
 import { changeVoiceText } from "./V3VoiceTextField.test-helper";
 import { env } from "@/lib/env";
 import { ConfigProvider } from "antd";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within
+} from "@testing-library/react";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { RichTextV2 } from "@tsz/types";
 import type { VoiceEditorProps } from "@tsz/voice-editor/types";
-import { formsFixture, commonFormFixture } from "../fixtures";
+import { formsFixture, commonFormFixture, ukUsFormFixture } from "../fixtures";
 import { toFormsWire } from "../model";
 import { V3PronunciationList } from "./V3PronunciationList";
 vi.mock("@/lib/env", () => ({
@@ -124,6 +130,32 @@ function Harness({
     </>
   );
 }
+function RegionalHarness() {
+  const [content, setContent] = useState(() =>
+    formsFixture({ forms: [ukUsFormFixture()] })
+  );
+  const form = content.pos[0]!.forms[0]!;
+  const variants = form.regional_variants;
+  if (variants.mode !== "uk_us") throw Error();
+  return (
+    <>
+      {(["uk", "us"] as const).map((side) => (
+        <section aria-label={side} key={side}>
+          <V3PronunciationList
+            content={content}
+            variant={variants[side]}
+            issues={[]}
+            idFactory={() => crypto.randomUUID()}
+            onChange={setContent}
+          />
+        </section>
+      ))}
+      <output data-testid="regional-wire">
+        {JSON.stringify(toFormsWire(content))}
+      </output>
+    </>
+  );
+}
 const field = (name: string) =>
   screen.getByLabelText(
     `第 1 条发音的${name.startsWith("Azure ") ? `美式 ${name}` : name}`
@@ -136,6 +168,38 @@ const rows = () =>
   JSON.parse(screen.getByTestId("wire").textContent!).pos[0].forms[0]
     .regional_variants.common.pronunciations;
 describe("独立发音输入", () => {
+  it("区分词形时英式和美式各只编辑自身的 IPA、UPS", () => {
+    render(<RegionalHarness />);
+    const uk = screen.getByRole("region", { name: "uk" });
+    const us = screen.getByRole("region", { name: "us" });
+    for (const alphabet of ["IPA", "UPS"]) {
+      expect(uk).toContainElement(
+        within(uk).getByLabelText(`第 1 条发音的英式 Azure ${alphabet}`)
+      );
+      expect(us).toContainElement(
+        within(us).getByLabelText(`第 1 条发音的美式 Azure ${alphabet}`)
+      );
+      expect(
+        uk.querySelectorAll("textarea[aria-label*='美式 Azure']")
+      ).toHaveLength(0);
+      expect(
+        us.querySelectorAll("textarea[aria-label*='英式 Azure']")
+      ).toHaveLength(0);
+    }
+    changeVoiceText(screen.getByLabelText("第 1 条发音的英式 Azure IPA"), {
+      target: { value: "sɛn.tə" }
+    });
+    changeVoiceText(screen.getByLabelText("第 1 条发音的美式 Azure UPS"), {
+      target: { value: "S EH N T ER" }
+    });
+    const variants = JSON.parse(
+      screen.getByTestId("regional-wire").textContent!
+    ).pos[0].forms[0].regional_variants;
+    expect(variants.uk.pronunciations[0].synthesis.uk.ipa).toBe("sɛn.tə");
+    expect(variants.uk.pronunciations[0].synthesis.us).toBeUndefined();
+    expect(variants.us.pronunciations[0].synthesis.us.ups).toBe("S EH N T ER");
+    expect(variants.us.pronunciations[0].synthesis.uk).toBeUndefined();
+  });
   it("通用音标也同时保留四个英美候选，切换偏好不覆盖内容", () => {
     const view = render(<Harness />);
     for (const side of ["英式", "美式"]) {

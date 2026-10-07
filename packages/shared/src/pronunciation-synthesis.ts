@@ -88,6 +88,8 @@ export function pronunciationSynthesisLabel(
   const us = synthesisForLocale(synthesis, "en-US", dialect)[
     synthesis.alphabet
   ];
+  if (dialect === "uk") return `${name} · 英式：${uk || "未填写"}`;
+  if (dialect === "us") return `${name} · 美式：${us || "未填写"}`;
   return `${name} · 英式：${uk || "未填写"} · 美式：${us || "未填写"}`;
 }
 

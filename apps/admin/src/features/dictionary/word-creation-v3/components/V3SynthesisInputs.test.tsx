@@ -111,7 +111,7 @@ describe("双口音真实试听控件", () => {
   });
 
   it.each(["common", "uk", "us"] as const)(
-    "%s 词形的四个候选分别发送对应音素和口音，不受全局来源影响",
+    "%s 词形只试听可见的对应口音候选，不受全局来源影响",
     async (dialect) => {
       render(<Harness dialect={dialect} />);
       for (const source of ["词形拼写", "Azure IPA", "Azure UPS"]) {
@@ -122,6 +122,17 @@ describe("双口音真实试听控件", () => {
           ["英式", "UPS", "en-gb-sonia", "F AA"],
           ["美式", "UPS", "en-us-aria", "F AA R"]
         ] as const) {
+          if (
+            (dialect === "uk" && accent === "美式") ||
+            (dialect === "us" && accent === "英式")
+          ) {
+            expect(
+              screen.queryByLabelText(
+                `第 1 条发音 ${accent} Azure ${alphabet} 最终读音 播放语音`
+              )
+            ).toBeNull();
+            continue;
+          }
           const play = screen.getByLabelText(
             `第 1 条发音 ${accent} Azure ${alphabet} 最终读音 播放语音`
           );
@@ -156,10 +167,9 @@ describe("双口音真实试听控件", () => {
   );
   it("明确英式词形也能补选美式音色，设置试听使用美式候选而不覆盖英式音色", async () => {
     render(<Harness dialect="uk" profiled />);
-    const american = screen.getByLabelText(
-      "第 1 条发音 美式 Azure IPA 最终读音 播放语音"
-    );
-    await waitFor(() => expect(american).toBeDisabled());
+    expect(
+      screen.queryByLabelText("第 1 条发音 美式 Azure IPA 最终读音 播放语音")
+    ).toBeNull();
     fireEvent.click(screen.getByLabelText("第 1 条发音发音设置与真人录音"));
     expect(
       await screen.findByRole("checkbox", { name: "启用 Sonia" })
@@ -191,7 +201,9 @@ describe("双口音真实试听控件", () => {
       )
     );
     fireEvent.click(screen.getByLabelText("完成第 1 条发音设置"));
-    await waitFor(() => expect(american).toBeEnabled());
+    expect(
+      screen.queryByLabelText("第 1 条发音 美式 Azure IPA 最终读音 播放语音")
+    ).toBeNull();
     expect(
       screen.getByLabelText("第 1 条发音 英式 Azure IPA 最终读音 播放语音")
     ).toBeEnabled();

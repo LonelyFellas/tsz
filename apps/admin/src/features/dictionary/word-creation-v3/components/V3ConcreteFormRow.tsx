@@ -433,19 +433,19 @@ export function V3ConcreteFormRow({
             ) : unifiedSpellingVariants ? (
               <div className="word-form-matrix-shared-header">
                 <span className="word-form-matrix-shared-header-uk">
-                  英式英语 · BrE
+                  英式英语
                 </span>
                 <span className="word-form-matrix-shared-header-us">
-                  美式英语 · AmE
+                  美式英语
                 </span>
               </div>
             ) : (
               <>
                 <div className="word-form-matrix-dialect-header word-form-matrix-dialect-header-uk">
-                  英式英语 · BrE
+                  英式英语
                 </div>
                 <div className="word-form-matrix-dialect-header word-form-matrix-dialect-header-us">
-                  美式英语 · AmE
+                  美式英语
                 </div>
               </>
             )}
@@ -684,7 +684,7 @@ export function V3DialectSeparatedFormMatrix({
           <div
             className={`v3-dialect-panel-header v3-dialect-panel-header-${dialect}`}
           >
-            {dialect === "uk" ? "英式英语 · BrE" : "美式英语 · AmE"}
+            {dialect === "uk" ? "英式英语" : "美式英语"}
           </div>
           {rows.map((row, index) => (
             <V3DialectFormCell

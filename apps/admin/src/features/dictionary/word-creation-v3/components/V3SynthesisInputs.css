@@ -101,6 +101,9 @@
   gap: 12px;
   min-width: 0;
 }
+.word-synthesis-candidates:has(> .word-synthesis-candidate:only-child) {
+  grid-template-columns: minmax(0, 1fr);
+}
 .word-synthesis-candidate {
   min-width: 0;
 }
@@ -116,6 +119,11 @@
   width: 70px;
   flex: 0 0 70px;
   padding-inline: 8px;
+}
+.word-synthesis-control > .word-synthesis-accent-compact:first-child {
+  width: 32px;
+  flex-basis: 32px;
+  padding-inline: 0;
 }
 .word-synthesis-accent-uk {
   color: var(--ant-color-primary, #2053ff);
@@ -136,14 +144,24 @@
   justify-content: space-between;
   gap: 8px 16px;
   min-width: 0;
+  container-type: inline-size;
 }
 .word-synthesis-source-actions > .ant-radio-group {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px 0;
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 .word-synthesis-source-actions > .ant-btn {
   flex-shrink: 0;
+  margin-left: auto;
+  align-self: flex-end;
+}
+@container (max-width: 420px) {
+  .word-synthesis-source-actions > .ant-radio-group {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
 }
 
 .word-synthesis-settings {
