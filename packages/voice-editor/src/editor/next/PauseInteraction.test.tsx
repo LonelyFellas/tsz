@@ -73,7 +73,136 @@ function button(name: string) {
 }
 
 describe("停顿定位与显式编辑", () => {
-  it("停顿常驻且只在词间光标启用，新增预设写入正确毫秒", () => {
+  it("选中停顿立即显示插入位并启用秒数，也支持先选位置再选时长", () => {
+    render(<Host value={{ ...initial, annotations: [] }} />);
+    expect(button("停顿")).toBeEnabled();
+    expect(button("停顿 0.5 秒")).toBeDisabled();
+    openPause();
+    expect(button("停顿")).toHaveAttribute("aria-pressed", "true");
+    expect(document.querySelector(".tsz-ve-canvas")).toHaveAttribute(
+      "data-target",
+      "gap"
+    );
+    expect(
+      document.querySelectorAll(
+        '.tsz-ve-gap:not(.has-pause)[aria-disabled="false"]'
+      )
+    ).toHaveLength(4);
+    expect(button("停顿 0.5 秒")).toBeEnabled();
+    expect(screen.getByLabelText("自定义停顿秒")).toBeEnabled();
+    const gaps = document.querySelectorAll(".tsz-ve-gap");
+    fireEvent.mouseDown(gaps[2]!, { button: 0 });
+    expect(button("停顿 0.5 秒")).toBeEnabled();
+    fireEvent.click(button("停顿 0.5 秒"));
+    expect(data().annotations).toEqual([
+      { type: "pause", at: 11, duration_ms: 500 }
+    ]);
+    expect(
+      document.querySelectorAll(
+        '.tsz-ve-gap:not(.has-pause)[aria-disabled="false"]'
+      )
+    ).toHaveLength(0);
+  });
+  it.each([
+    ["预设", 750],
+    ["自定义", 350]
+  ] as const)("先选%s时长，再点词缝写入停顿", (kind, duration) => {
+    render(<Host value={{ ...initial, annotations: [] }} />);
+    openPause();
+    if (kind === "预设") fireEvent.click(button("停顿 0.75 秒"));
+    else {
+      fireEvent.change(screen.getByLabelText("自定义停顿秒"), {
+        target: { value: "0.35" }
+      });
+      fireEvent.click(screen.getByRole("button", { name: /^应\s*用$/ }));
+    }
+    expect(data().annotations).toEqual([]);
+    expect(button("停顿")).toHaveAttribute("aria-pressed", "true");
+    fireEvent.mouseDown(document.querySelectorAll(".tsz-ve-gap")[2]!, {
+      button: 0
+    });
+    expect(data().annotations).toEqual([
+      { type: "pause", at: 11, duration_ms: duration }
+    ]);
+    openPause();
+    expect(button("停顿 0.5 秒")).toBeDisabled();
+    expect(document.querySelector(".tsz-ve-canvas")).toHaveAttribute(
+      "data-target",
+      "none"
+    );
+  });
+  it("未选中停顿时，词间光标也不能启用秒数；关闭后自定义和预设都不能写入", () => {
+    const changed = vi.fn();
+    const value = { ...initial, annotations: [] };
+    render(<Host value={value} onChange={changed} />);
+    select(15);
+    expect(button("停顿")).toHaveAttribute("aria-pressed", "false");
+    expect(button("停顿 0.25 秒")).toBeDisabled();
+    expect(screen.getByLabelText("自定义停顿秒")).toBeDisabled();
+    openPause();
+    expect(button("停顿")).toHaveAttribute("aria-pressed", "true");
+    expect(button("停顿 0.25 秒")).toBeEnabled();
+    expect(screen.getByLabelText("自定义停顿秒")).toBeEnabled();
+    fireEvent.change(screen.getByLabelText("自定义停顿秒"), {
+      target: { value: "0.35" }
+    });
+    openPause();
+    select(15);
+    expect(button("停顿 0.25 秒")).toBeDisabled();
+    expect(screen.getByLabelText("自定义停顿秒")).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^应\s*用$/ })).toBeDisabled();
+    fireEvent.click(button("停顿 0.25 秒"));
+    fireEvent.keyDown(screen.getByLabelText("自定义停顿秒"), { key: "Enter" });
+    expect(changed).not.toHaveBeenCalled();
+    expect(data()).toEqual(value);
+  });
+  it.each(["先选择时长", "只开启停顿"])(
+    "通过%s退出停顿模式后，空词缝恢复普通空格",
+    (exit) => {
+      render(<Host />);
+      openPause();
+      if (exit === "先选择时长") fireEvent.click(button("停顿 0.5 秒"));
+      expect(document.querySelector(".tsz-ve-canvas")).toHaveAttribute(
+        "data-target",
+        "gap"
+      );
+      fireEvent.click(button("停顿"));
+      expect(document.querySelector(".tsz-ve-canvas")).toHaveAttribute(
+        "data-target",
+        "none"
+      );
+      expect(
+        document.querySelectorAll(
+          '.tsz-ve-gap:not(.has-pause)[aria-disabled="false"]'
+        )
+      ).toHaveLength(0);
+      expect(
+        screen.getByLabelText("编辑第 4 处停顿 0.5 秒")
+      ).toBeInTheDocument();
+      expect(data()).toEqual(initial);
+    }
+  );
+
+  it("停顿选中时，即使没有词间光标也保留插入位，取消选中才隐藏", () => {
+    render(<Host />);
+    select(15);
+    openPause();
+    select(9, 11);
+    expect(document.querySelector(".tsz-ve-canvas")).toHaveAttribute(
+      "data-target",
+      "gap"
+    );
+    expect(button("停顿 0.5 秒")).toBeEnabled();
+    expect(button("停顿")).toBeEnabled();
+    fireEvent.click(button("停顿"));
+    expect(button("停顿")).toHaveAttribute("aria-pressed", "false");
+    expect(document.querySelector(".tsz-ve-canvas")).toHaveAttribute(
+      "data-target",
+      "none"
+    );
+    expect(data()).toEqual(initial);
+  });
+  it("选中停顿且光标位于词间后，新增预设写入正确毫秒", () => {
     render(<Host value={{ ...initial, annotations: [] }} />);
     expect(button("停顿 0.75 秒")).toBeDisabled();
     select(4);
@@ -81,6 +210,8 @@ describe("停顿定位与显式编辑", () => {
     select(8, 10);
     expect(button("停顿 0.75 秒")).toBeDisabled();
     select(8);
+    expect(button("停顿 0.75 秒")).toBeDisabled();
+    openPause();
     expect(button("停顿 0.75 秒")).toBeEnabled();
     fireEvent.click(button("停顿 0.75 秒"));
     expect(data().annotations).toEqual([
@@ -160,7 +291,7 @@ describe("停顿定位与显式编辑", () => {
         />
       );
       openPause();
-      expect(button("停顿 0.5 秒")).toBeDisabled();
+      expect(button("停顿 0.5 秒")).toBeEnabled();
       expect(document.querySelector(".tsz-ve-canvas")).toHaveAttribute(
         "data-brush",
         "none"

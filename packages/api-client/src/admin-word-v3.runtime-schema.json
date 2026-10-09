@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/permission-tag-colors/docs/openapi.json",
-  "_source_sha256": "88dac9da21bdce458df6c2751adb284cbd796e8bf2f4b92e568663d59a7c2387",
+  "_source": "/Users/darwish/.codex/worktrees/grammar-italic/tsz-rust/docs/openapi.json",
+  "_source_sha256": "340fee8e1dc15012de4ea09c7fa53a9439d462af7ddb7e3025f7dd5ec89d3933",
   "roots": [
     "LearningRewardDay",
     "LearningPreview",
@@ -2110,6 +2110,16 @@
             "at": { "type": "integer", "minimum": 0 },
             "duration_ms": { "type": "integer", "minimum": 0 },
             "type": { "type": "string", "enum": ["pause"] }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "type"],
+          "properties": {
+            "end": { "type": "integer", "minimum": 0 },
+            "start": { "type": "integer", "minimum": 0 },
+            "type": { "type": "string", "enum": ["italic"] }
           },
           "additionalProperties": false
         }

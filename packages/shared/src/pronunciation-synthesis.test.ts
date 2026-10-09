@@ -99,6 +99,25 @@ describe("语法结构整段合成", () => {
       ]
     });
   });
+  it("词形发音注入保留斜体和加粗，正文与音素不因视觉标注改变", () => {
+    const visual = [
+      { type: "italic" as const, start: 5, end: 7 },
+      { type: "emphasis" as const, start: 4, end: 7, level: "core" as const }
+    ];
+    const plain = grammarSynthesisContent(content, [binding], "en-GB");
+    const styled = grammarSynthesisContent(
+      { ...content, annotations: visual },
+      [binding],
+      "en-GB"
+    );
+    expect(styled.text).toBe(plain.text);
+    expect(
+      styled.annotations.filter((item) => item.type === "phoneme")
+    ).toEqual(plain.annotations);
+    expect(
+      styled.annotations.filter((item) => item.type !== "phoneme")
+    ).toEqual(visual);
+  });
   it("首条未配置或口音不匹配时明确报错，不跳到第二条或默认发音", () => {
     expect(() =>
       grammarSynthesisContent(

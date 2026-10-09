@@ -497,7 +497,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           footer={null}
           onCancel={cancelEditing}
           closable={!doneLoading}
-          keyboard={!doneLoading}
+          keyboard={!doneLoading && !draftPending}
         >
           {editor}
         </VoiceEditorModal>

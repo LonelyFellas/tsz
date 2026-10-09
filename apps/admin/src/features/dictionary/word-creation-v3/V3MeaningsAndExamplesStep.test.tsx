@@ -1310,21 +1310,16 @@ describe("V3MeaningsAndExamplesStep", () => {
       value().pos[0]!.grammar_structures[0]!.variants[0]!.content.text
     ).toBe("a centre of the city");
 
-    // 连续标注仍在编辑器本地草稿内，完成之前不影响外层。
+    // 选区标注保留在编辑器本地草稿内，完成之前不影响外层。
     const activeEditor = input.closest(".tsz-ve-editor") as HTMLElement;
-    fireEvent.click(activeEditor.querySelector(".tsz-ve-role-button")!);
+    input.focus();
+    (input as HTMLTextAreaElement).setSelectionRange(2, 8);
+    fireEvent.mouseUp(input);
+    fireEvent.select(input);
     // 只查询当前编辑器，避免全页大量字段的可及名计算拖慢并发测试。
-    fireEvent.click(
-      within(activeEditor).getByText("连续标注", { exact: true })
-    );
-    fireEvent.click(within(activeEditor).getByLabelText("用固定核心词画笔"));
-    const word = [
-      ...input.closest(".tsz-ve-editor")!.querySelectorAll(".tsz-ve-token")
-    ].find((node) => node.textContent === "centre")!;
-    const letters = [...word.querySelectorAll(".tsz-ve-letter")];
-    fireEvent.mouseDown(letters[0]!);
-    fireEvent.mouseEnter(letters[letters.length - 1]!, { buttons: 1 });
-    fireEvent.mouseUp(letters[letters.length - 1]!);
+    const core = within(activeEditor).getByLabelText("标记为固定核心词");
+    expect(core).toBeEnabled();
+    fireEvent.click(core);
 
     const before = value().pos[0]!.grammar_structures[0]!.variants[0]!.content;
     expect(before.version === 2 ? before.annotations : []).toEqual([]);

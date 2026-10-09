@@ -347,6 +347,53 @@ describe("decodeEntryDeleteBatchResponse", () => {
 });
 
 describe("admin word V3/Any runtime decoder", () => {
+  it("词条语法斜体完整读回，缺范围或额外字段仍拒绝", () => {
+    const annotation: Record<string, unknown> = {
+      type: "italic",
+      start: 2,
+      end: 5
+    };
+    const response = {
+      word: {
+        ...validAdminWordV3(),
+        meanings: {
+          sense_groups: [],
+          pos: [
+            {
+              pos_id: IDS.pos,
+              senses: [],
+              grammar_structures: [
+                {
+                  id: IDS.group1,
+                  variants: [
+                    {
+                      id: IDS.uk,
+                      dialect: "common",
+                      content: {
+                        version: 2,
+                        text: "a job",
+                        annotations: [annotation]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    };
+    expect(decodeAdminWordV3Envelope(response)).toEqual(response);
+    delete annotation.end;
+    expect(() => decodeAdminWordV3Envelope(response)).toThrow(
+      InvalidAdminWordResponseError
+    );
+    annotation.end = 5;
+    annotation.affects_speech = true;
+    expect(() => decodeAdminWordV3Envelope(response)).toThrow(
+      InvalidAdminWordResponseError
+    );
+  });
   it("解码草稿正文引用并保留完整目标与来源定位", () => {
     const response = {
       entry_id: IDS.entry,

@@ -133,7 +133,7 @@
 
 .tsz-ve-strip,
 .tsz-ve-canvas-input {
-  /* 上方留给连读弧，下方留给上下两排停顿记号。 */
+  /* 为连读弧与正文编辑保留上下留白。 */
   padding: 34px 14px 46px;
   font-family: var(--tsz-font-text);
   font-weight: 700;
@@ -220,10 +220,10 @@
   pointer-events: none;
 }
 
-/* 颜色来自弧线层上的 CSS 变量（本机偏好，见 marks/liaisonColor），缺省沿用连读粉。 */
+/* 连读弧跟随正文默认字色，编辑器、只读预览和导出保持一致。 */
 .tsz-ve-arc {
   fill: none;
-  stroke: var(--tsz-ve-liaison, #db2777);
+  stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -235,10 +235,6 @@
   stroke-linecap: round;
   cursor: pointer;
   pointer-events: stroke;
-}
-
-.tsz-ve-arc-hit:hover + .tsz-ve-arc {
-  stroke: color-mix(in srgb, var(--tsz-ve-liaison, #db2777) 70%, black);
 }
 
 /*
@@ -388,6 +384,21 @@
 .tsz-ve-letter.is-core {
   font-weight: 700;
   color: var(--tsz-ve-role-core);
+}
+
+.tsz-ve-letter.is-italic {
+  position: relative;
+}
+.tsz-ve-letter.is-italic::after {
+  content: attr(data-letter);
+  font-weight: 700;
+  font-style: normal;
+  visibility: hidden;
+}
+.tsz-ve-letter.is-italic > .tsz-ve-letter-text {
+  position: absolute;
+  inset-inline-start: 0;
+  font-style: italic;
 }
 .tsz-ve-letter:not([data-level]),
 .tsz-ve-letter.is-grammar {
@@ -569,13 +580,25 @@
 .tsz-ve-pause {
   display: inline-block;
   margin: 0 3px;
-  padding: 0 7px;
-  border: 1px solid #b45309;
-  border-radius: 999px;
-  background: rgba(180, 83, 9, 0.1);
-  color: #b45309;
-  font-size: 11px;
-  line-height: 20px;
+}
+
+.tsz-ve-pause,
+.tsz-ve-editor .tsz-ve-pause-chip {
+  box-sizing: border-box;
+  min-width: max-content;
+  height: 16px;
+  padding: 0 3px;
+  border: 0;
+  border-radius: 4px;
+  background: #648cff;
+  color: #fff;
+  font-family: Arial, sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+  vertical-align: middle;
+  white-space: nowrap;
   user-select: none;
 }
 
@@ -1129,12 +1152,6 @@
 
 .tsz-ve-anchor-field:disabled {
   cursor: default;
-}
-
-.tsz-ve-liaison-color {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
 }
 
 .tsz-ve-liaison-arrow {
