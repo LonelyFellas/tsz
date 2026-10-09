@@ -1,5 +1,6 @@
 import {
   HttpError,
+  RequestTimeoutError,
   InvalidAdminWordResponseError,
   UnsupportedAdminWordSchemaVersionError
 } from "@tsz/api-client";
@@ -194,7 +195,7 @@ export function presentV3DetailError(
     }
     return { title, description: "词条暂时无法打开", retryable: false };
   }
-  if (error instanceof TypeError) {
+  if (error instanceof TypeError || error instanceof RequestTimeoutError) {
     return {
       title,
       description: "网络异常，请检查连接后重试",

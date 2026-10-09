@@ -1,5 +1,5 @@
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
-import { HttpError } from "@tsz/api-client/http";
+import { HttpError, RequestTimeoutError } from "@tsz/api-client/http";
 import type {
   AdminWordV3Envelope,
   EntryAnnotationConflict,
@@ -149,7 +149,7 @@ function errorMessage(error: unknown): string {
     if (error.status === 503) return "词条服务暂时不可用，请稍后重试。";
     if (error.status === 410) return "检查结果已过期，请重新提交。";
   }
-  if (error instanceof TypeError) {
+  if (error instanceof TypeError || error instanceof RequestTimeoutError) {
     return "网络异常，创建结果未知。请原样重试。";
   }
   return error instanceof ProductError
@@ -158,7 +158,7 @@ function errorMessage(error: unknown): string {
 }
 
 function createErrorMessage(error: unknown): string {
-  if (error instanceof TypeError) {
+  if (error instanceof TypeError || error instanceof RequestTimeoutError) {
     return "网络异常，创建结果未知。请原样重试。";
   }
   if (!(error instanceof HttpError)) {

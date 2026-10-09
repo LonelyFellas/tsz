@@ -112,12 +112,12 @@ function terminalPage(
 function requestErrorMessage(error: unknown): string {
   const problem = classifyV3Problem(error, "publish");
   if (problem.kind === "network") {
-    return "网络异常，发布失败，可原样重试。";
+    return "网络异常，发布结果尚未确认，可原样重试确认。";
   }
   if (problem.kind === "authentication") return "登录已失效，请重新登录。";
   if (problem.kind === "authorization") return "当前账号没有发布权限。";
   if (problem.kind === "service_unavailable") {
-    return "发布服务暂不可用，请稍后重试。";
+    return "发布结果尚未确认，请刷新查看结果或原样重试确认。";
   }
   if (problem.kind === "validation") return "发布校验未通过。";
   return "发布失败，请检查当前内容后重试。";

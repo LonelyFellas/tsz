@@ -3,7 +3,7 @@ import { canAdminResourceAction } from "@tsz/shared/auth";
 import { pronunciationSynthesisLabel } from "@tsz/shared";
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
-import { HttpError } from "@tsz/api-client";
+import { HttpError, RequestTimeoutError } from "@tsz/api-client";
 import type {
   AdminWordPublicationAny,
   AdminWordPublicationEnvelope,
@@ -505,12 +505,12 @@ function activationErrorMessage(error: unknown): string {
       case 422:
         return "回退请求校验未通过。";
       case 503:
-        return "发布服务暂不可用，请稍后重试。";
+        return "发布结果尚未确认，请刷新查看结果或原样重试确认。";
       default:
         return "回退发布版本失败，请稍后重试。";
     }
   }
-  if (error instanceof TypeError) {
+  if (error instanceof TypeError || error instanceof RequestTimeoutError) {
     return "网络异常，回退状态未知，请刷新发布历史后再重试。";
   }
   return "回退发布版本失败，请稍后重试。";

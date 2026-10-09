@@ -1,5 +1,5 @@
 import { useAuthStore } from "@/lib/auth";
-import { HttpError } from "@tsz/api-client";
+import { HttpError, RequestTimeoutError } from "@tsz/api-client";
 import type {
   AdminWordV3,
   DraftFormsStepContentV3,
@@ -852,7 +852,7 @@ describe("V3PreviewAndPublishStep", () => {
           input: PublishAdminWordV3Input
         ) => Promise<{ word: AdminWordV3 }>
       >()
-      .mockRejectedValueOnce(new TypeError("offline"))
+      .mockRejectedValueOnce(new RequestTimeoutError("POST"))
       .mockResolvedValueOnce({ word: { ...current, revision: 8 } });
 
     render(
@@ -868,12 +868,13 @@ describe("V3PreviewAndPublishStep", () => {
     });
     fireEvent.click(publishButton);
     expect(
-      await screen.findByText("网络异常，发布失败，可原样重试。")
+      await screen.findByText("网络异常，发布结果尚未确认，可原样重试确认。")
     ).toBeInTheDocument();
     fireEvent.click(publishButton);
     await waitFor(() => expect(publish).toHaveBeenCalledTimes(2));
 
     expect(publish.mock.calls[1]?.[1]).toBe(publish.mock.calls[0]?.[1]);
+    expect(publish.mock.calls[1]?.[2]).toEqual(publish.mock.calls[0]?.[2]);
   });
 
   it("starts a new standalone publish key after a known successful response", async () => {
@@ -958,7 +959,7 @@ describe("V3PreviewAndPublishStep", () => {
       confirmed_surface_match_token: "publish-token"
     });
     expect(
-      await screen.findByText("网络异常，发布失败，可原样重试。")
+      await screen.findByText("网络异常，发布结果尚未确认，可原样重试确认。")
     ).toBeInTheDocument();
     expect(screen.getByText("learn / learnt")).toBeInTheDocument();
   });
@@ -1099,7 +1100,10 @@ describe("V3PreviewAndPublishStep", () => {
   it.each([
     [new HttpError(401, "expired"), "登录已失效，请重新登录。"],
     [new HttpError(403, "forbidden"), "当前账号没有发布权限。"],
-    [new HttpError(503, "off"), "发布服务暂不可用，请稍后重试。"]
+    [
+      new HttpError(503, "off"),
+      "发布结果尚未确认，请刷新查看结果或原样重试确认。"
+    ]
   ])(
     "maps preparation errors without dropping the preview",
     async (failure, message) => {

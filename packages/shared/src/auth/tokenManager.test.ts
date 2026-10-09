@@ -211,3 +211,81 @@ describe("createTokenManager", () => {
     expect(tm.getToken()).toBeUndefined();
   });
 });
+
+it("refresh body timeout releases waiters and blocks Cookie replay until new login", async () => {
+  vi.useFakeTimers();
+  let deliver!: (value: unknown) => void;
+  const body = new Promise((resolve) => {
+    deliver = resolve;
+  });
+  const fetch = vi
+    .spyOn(globalThis, "fetch")
+    .mockResolvedValue({ ok: true, json: () => body } as Response);
+  const manager = createTokenManager({ baseUrl: "/api" });
+  manager.setAccessToken("old");
+  const first = manager.refreshTokens();
+  expect(manager.refreshTokens()).toBe(first);
+  const rejected = expect(first).rejects.toThrow("请重新登录");
+  await vi.advanceTimersByTimeAsync(10_000);
+  await rejected;
+  await expect(manager.refreshTokens()).rejects.toThrow("请重新登录");
+  expect(fetch).toHaveBeenCalledTimes(1);
+  deliver({ access_token: "late", expires_in: 900 });
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(manager.getToken()).toBe("old");
+  expect(fetch).toHaveBeenCalledTimes(1);
+  manager.setAccessToken("new-login");
+  fetch.mockResolvedValueOnce(
+    new Response(
+      JSON.stringify({ access_token: "new-session", expires_in: 900 })
+    )
+  );
+  await expect(manager.refreshTokens()).resolves.toBe("new-session");
+  manager.setAccessToken(null);
+  expect(vi.getTimerCount()).toBe(0);
+  vi.useRealTimers();
+});
+
+it("unknown Cookie rotation survives runtime recreation but explicit login clears it", async () => {
+  vi.restoreAllMocks();
+  const values = new Map<string, string>();
+  vi.stubGlobal("sessionStorage", {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key)
+  });
+  const fetch = vi
+    .spyOn(globalThis, "fetch")
+    .mockRejectedValueOnce(new TypeError("offline"));
+  const first = createTokenManager({ baseUrl: "/api/reliability" });
+  await expect(first.refreshTokens()).rejects.toThrow("请重新登录");
+  first.setAccessToken(null);
+  expect(first.getToken()).toBeUndefined();
+  await expect(first.refreshTokens()).rejects.toThrow("请重新登录");
+  const restored = createTokenManager({ baseUrl: "/api/reliability" });
+  await expect(restored.refreshTokens()).rejects.toThrow("请重新登录");
+  expect(fetch).toHaveBeenCalledTimes(1);
+  restored.setAccessToken("explicit-login");
+  expect(values.size).toBe(0);
+  vi.unstubAllGlobals();
+});
+
+it.each([500, 502, 503, 504])(
+  "refresh %s cannot prove rotation failed and must not replay",
+  async (status) => {
+    vi.restoreAllMocks();
+    vi.useFakeTimers();
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(null, { status }));
+    const manager = createTokenManager({ baseUrl: "/unknown-rotation" });
+    manager.setAccessToken("valid-access-token");
+    await expect(manager.refreshTokens()).rejects.toThrow("请重新登录");
+    await vi.advanceTimersByTimeAsync(600_000);
+    await expect(manager.refreshTokens()).rejects.toThrow("请重新登录");
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(manager.getToken()).toBe("valid-access-token");
+    manager.setAccessToken(null);
+    vi.useRealTimers();
+  }
+);

@@ -20,7 +20,9 @@ export default function GlobalError({
     <html lang="zh-CN">
       <body className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background text-foreground">
         <h1 className="text-xl font-bold">页面出错了</h1>
-        <p className="text-sm text-foreground-muted">{error.message}</p>
+        <p className="text-sm text-foreground-muted">
+          页面暂时无法显示，请刷新后重试
+        </p>
         <button
           className="rounded-sm bg-primary px-4 py-2 text-primary-foreground"
           onClick={reset}

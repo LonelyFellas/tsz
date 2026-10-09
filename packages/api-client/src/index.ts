@@ -7,3 +7,5 @@ export * from "./admin-word-schema";
 export * from "./runtime-schema";
 
 export { decodeCoinWallet, decodeCoinEntryPage } from "./coins";
+
+export { createRequestDeadline, RequestTimeoutError } from "./deadline";

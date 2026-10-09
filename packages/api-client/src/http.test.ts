@@ -479,7 +479,7 @@ describe("createHttpClient", () => {
     expect(init.body).toBe(JSON.stringify({ name: "a" }));
   });
 
-  it("get/post:把 AbortSignal 原样传给 fetch", async () => {
+  it("get/post:合并调用方取消信号", async () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse(null))
       .mockResolvedValueOnce(jsonResponse(null));
@@ -489,8 +489,8 @@ describe("createHttpClient", () => {
     await http.get("/items", { signal: controller.signal });
     await http.post("/items", { name: "a" }, { signal: controller.signal });
 
-    expect(fetchMock.mock.calls[0]![1].signal).toBe(controller.signal);
-    expect(fetchMock.mock.calls[1]![1].signal).toBe(controller.signal);
+    expect(fetchMock.mock.calls[0]![1].signal.aborted).toBe(false);
+    expect(fetchMock.mock.calls[1]![1].signal.aborted).toBe(false);
   });
 
   it("put:method=PUT 且 body 为 JSON 字符串", async () => {
@@ -502,7 +502,7 @@ describe("createHttpClient", () => {
     expect(init.body).toBe(JSON.stringify({ name: "b" }));
   });
 
-  it("put:把自定义 header 与 AbortSignal 原样传给 fetch", async () => {
+  it("put:保留自定义 header 并合并取消信号", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(null));
     const http = createHttpClient({ baseUrl: "" });
     const controller = new AbortController();
@@ -517,7 +517,7 @@ describe("createHttpClient", () => {
     );
 
     const init = fetchMock.mock.calls[0]![1];
-    expect(init.signal).toBe(controller.signal);
+    expect(init.signal.aborted).toBe(false);
     expect(new Headers(init.headers).get("Idempotency-Key")).toBe("key-1");
   });
 

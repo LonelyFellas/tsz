@@ -1,0 +1,27 @@
+{
+  "status": "passed",
+  "started_at": 1791529891.702541,
+  "target": "tsz-restore-drill-b03a4d49bde2478d8541e6691248f4a1",
+  "code_revision": "960ab72b1d3832179bf428b829cfaa7b43c706f5",
+  "tool_sha256": "2ef40113d6b32b499b8723598ac822dcdd4ca14ebb75bb799bc21da05b19d9ad",
+  "image": "sha256:e013e867e712fec275706a6c51c966f0bb0c93cfa8f51000f85a15f9865a28cb",
+  "pg_dump_version": "pg_dump (PostgreSQL) 16.14",
+  "pg_restore_version": "pg_restore (PostgreSQL) 16.14",
+  "postgres_version": "16.14",
+  "backup_sha256": "9b2f968e5e6ab425be37868cc586e6362c249076f821d58290a195b2dd57e69a",
+  "evidence": {
+    "table_count": 101,
+    "migration_count": 100,
+    "schema_sha256": "2b779d16781f14e4e7a761b07c833ccc5538ac36bd7c86be765b62359fa0fb99",
+    "ledger": {
+      "wallet_mismatches": 0,
+      "running_balance_mismatches": 0,
+      "operation_mismatches": 0,
+      "total_balance": "100",
+      "net_issuance": "100"
+    }
+  },
+  "target_removed": true,
+  "completed_at": 1791529911.156536,
+  "elapsed_seconds": 19.454
+}
