@@ -118,8 +118,11 @@ it("语法结构保留标注工具，以完整单词关联词形并支持撤销"
     />
   );
   expect(screen.getByRole("button", { name: /^语法结构/ })).toBeVisible();
+  expect(document.querySelector(".tsz-ve-primary-tools")).toContainElement(
+    screen.getByRole("button", { name: "关联单词" })
+  );
   expect(screen.queryByRole("button", { name: "关联短语" })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "关联词形" }));
+  fireEvent.click(screen.getByRole("button", { name: "关联单词" }));
   fireEvent.mouseDown(screen.getByLabelText("关联 job（2）"), { button: 0 });
   fireEvent.click(await screen.findByText("选择词形"));
   await waitFor(() =>
@@ -197,7 +200,7 @@ it("清除语法词形关联后候选保持打开，可直接改选并撤销恢�
     );
   }
   render(<Host />);
-  fireEvent.click(screen.getByRole("button", { name: "关联词形" }));
+  fireEvent.click(screen.getByRole("button", { name: "关联单词" }));
   fireEvent.mouseDown(screen.getByLabelText("关联 job（2）"), { button: 0 });
   fireEvent.click(await screen.findByText("清除词形关联"));
   await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([other]));
@@ -246,7 +249,6 @@ it.each(["grammar", "association"] as const)(
     fireEvent.change(input, { target: { value: "不可写入" } });
     expect(observe).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "停顿" }));
-    fireEvent.click(screen.getByRole("button", { name: "连续添加" }));
     fireEvent.click(screen.getByLabelText("停顿 0.5 秒"));
     fireEvent.mouseDown(screen.getByLabelText("第 1 处词缝"), { button: 0 });
     await waitFor(() =>

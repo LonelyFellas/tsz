@@ -1,5 +1,4 @@
-import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
-import { useLiaisonColor } from "./liaisonColor";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import type { LiaisonArc } from "./liaisonGeometry";
 
 export interface LiaisonArcLayerProps {
@@ -15,15 +14,8 @@ export function LiaisonArcLayer({
   strokeWidth,
   onArcMouseDown
 }: LiaisonArcLayerProps) {
-  // 颜色是本机偏好：写成 CSS 变量，弧线与悬停色都从这里取。
-  const color = useLiaisonColor();
   return (
-    <svg
-      className="tsz-ve-arc-layer"
-      aria-hidden
-      focusable="false"
-      style={{ "--tsz-ve-liaison": color } as CSSProperties}
-    >
+    <svg className="tsz-ve-arc-layer" aria-hidden focusable="false">
       {arcs.map((arc) => (
         <g key={arc.key}>
           {onArcMouseDown && (

@@ -7,7 +7,7 @@ import {
   screen,
   waitFor
 } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EnglishTextV3, RichTextV3, TextLinkV3 } from "@tsz/types";
 import { useState } from "react";
 import type { AudioUploadAdapter } from "@tsz/voice-editor/types";
@@ -113,6 +113,9 @@ it("词形拼写使用可直接编辑的普通输入框，不显示语音编辑�
 });
 
 describe("V3VoiceTextField 取消和收起态", () => {
+  // rc-util 的 test-id 会让嵌套弹窗清除外层的 Esc 栈；使用开发环境的真实唯一 ID。
+  beforeEach(() => vi.stubEnv("NODE_ENV", "development"));
+  afterEach(() => vi.unstubAllEnvs());
   function Host() {
     const [value, setValue] = useState<RichTextV3>({
       version: 2,
@@ -189,6 +192,79 @@ describe("V3VoiceTextField 取消和收起态", () => {
         .duration_ms
     ).toBe(2000);
   });
+
+  it.each(["正文", "停顿", "音色"])(
+    "%s 改动未完成时 Esc 不关闭弹窗或丢失改动",
+    async (kind) => {
+      state.flags.VOICE_PREVIEW = true;
+      render(<Host />);
+      fireEvent.click(screen.getByLabelText("打开测试语法编辑器"));
+      await screen.findByRole(
+        "toolbar",
+        { name: "标注工具栏" },
+        { timeout: 10000 }
+      );
+      if (kind === "正文") {
+        fireEvent.change(screen.getByLabelText("测试语法"), {
+          target: { value: "hello there again" }
+        });
+      } else if (kind === "停顿") {
+        fireEvent.click(screen.getByLabelText("编辑第 1 处停顿 0.5 秒"));
+        fireEvent.click(screen.getByRole("button", { name: "移除停顿" }));
+      } else {
+        fireEvent.click(await screen.findByLabelText("启用 Sonia"));
+      }
+      const escape = () =>
+        fireEvent.keyDown(screen.getByRole("dialog"), {
+          key: "Escape",
+          keyCode: 27
+        });
+      escape();
+      expect(screen.getByRole("toolbar")).toBeInTheDocument();
+      escape();
+      expect(screen.getByRole("toolbar")).toBeInTheDocument();
+      if (kind === "正文")
+        expect(screen.getByLabelText("测试语法")).toHaveValue(
+          "hello there again"
+        );
+      else if (kind === "停顿")
+        expect(screen.queryByLabelText("编辑第 1 处停顿 0.5 秒")).toBeNull();
+      else expect(screen.getByLabelText("启用 Sonia")).toBeChecked();
+      fireEvent.click(screen.getByLabelText("完成测试语法编辑"));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      const saved = JSON.parse(screen.getByTestId("cancel-value").textContent!);
+      if (kind === "正文") expect(saved.text).toBe("hello there again");
+      else if (kind === "停顿") expect(saved.annotations).toEqual([]);
+    }
+  );
+
+  it("没有改动或撤销回原内容后 Esc 仍可关闭弹窗", async () => {
+    render(<Host />);
+    const open = async () => {
+      fireEvent.click(screen.getByLabelText("打开测试语法编辑器"));
+      await screen.findByRole(
+        "toolbar",
+        { name: "标注工具栏" },
+        { timeout: 10000 }
+      );
+    };
+    const escape = () =>
+      fireEvent.keyDown(screen.getByRole("dialog"), {
+        key: "Escape",
+        keyCode: 27
+      });
+    await open();
+    escape();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await open();
+    fireEvent.change(screen.getByLabelText("测试语法"), {
+      target: { value: "hello there again" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "上一步" }));
+    expect(screen.getByLabelText("测试语法")).toHaveValue("hello there");
+    escape();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
 });
 
 describe("V3VoiceTextField 语种筛选", () => {
@@ -199,7 +275,9 @@ describe("V3VoiceTextField 语种筛选", () => {
       { name: "标注工具栏" },
       { timeout: 10_000 }
     );
-    fireEvent.click(screen.getByRole("button", { name: /发音/ }));
+    const voices = screen.getByRole("button", { name: /发音/ });
+    if (voices.getAttribute("aria-expanded") !== "true")
+      fireEvent.click(voices);
   }
 
   // uk 必须落 en-GB、us 必须落 en-US：映射写反了不会报错，只会静默上线。

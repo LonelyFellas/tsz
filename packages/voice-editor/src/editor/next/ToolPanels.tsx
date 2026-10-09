@@ -1,7 +1,6 @@
 import { CheckOutlined, SoundOutlined } from "@ant-design/icons";
 import {
   Button,
-  ColorPicker,
   Input,
   Popconfirm,
   Popover,
@@ -14,7 +13,6 @@ import {
 } from "antd";
 import type { ReactNode } from "react";
 import { Fragment, useRef, useState } from "react";
-import { setLiaisonColor, useLiaisonColor } from "../../marks";
 import type {
   AudioAsset,
   AudioAssetGender,
@@ -660,18 +658,24 @@ export function UploadPanel({
 }
 
 /** 连读弧图标：与标注带上真正画出来的那条弧同形，按钮和结果能对上。 */
-export function LiaisonIcon() {
+export function LiaisonIcon({ part }: { part?: "start" | "end" } = {}) {
   return (
     <svg
-      viewBox="0 0 24 12"
-      width="22"
+      viewBox={part ? "0 0 14 12" : "0 0 24 12"}
+      width={part ? "14" : "22"}
       height="11"
       aria-hidden
       focusable="false"
       className="tsz-ve-liaison-icon"
     >
       <path
-        d="M2 11 C 6 1, 18 1, 22 11"
+        d={
+          part === "start"
+            ? "M2 11 C 4 6, 8 3.5, 12 3.5"
+            : part === "end"
+              ? "M2 3.5 C 6 3.5, 10 6, 12 11"
+              : "M2 11 C 6 1, 18 1, 22 11"
+        }
         fill="none"
         stroke="currentColor"
         strokeWidth="2.4"
@@ -684,13 +688,9 @@ export function LiaisonIcon() {
 export interface RolePanelProps {
   readOnly?: boolean;
   hasWords: boolean;
-  brush: Brush;
   onBrushChange: (brush: Brush) => void;
   selectionText?: string;
   selectedLevel?: string;
-  canRemove: boolean;
-  onRemove: () => void;
-  onContinuousChange: () => void;
 }
 
 const ROLE_DESCRIPTIONS: Record<string, string> = {
@@ -705,19 +705,14 @@ const ROLE_SHORT_LABELS: Record<string, string> = {
   grammar: "词性提示符"
 };
 
-/** 默认先选文字再分类；连续画笔需要显式开启，原有精细落笔能力保留。 */
+/** 先选文字再设置语法分类。 */
 export function RolePanel({
   readOnly,
   hasWords,
-  brush,
   onBrushChange,
   selectionText,
-  selectedLevel,
-  canRemove,
-  onRemove,
-  onContinuousChange
+  selectedLevel
 }: RolePanelProps) {
-  const continuous = brush.kind === "role";
   return (
     <div
       className="tsz-ve-grammar-panel"
@@ -732,37 +727,11 @@ export function RolePanel({
           >
             <Button
               className="tsz-ve-grammar-option"
-              color={
-                (
-                  continuous
-                    ? brush.level === role.level
-                    : selectedLevel === role.level
-                )
-                  ? "primary"
-                  : "default"
-              }
-              variant={
-                (
-                  continuous
-                    ? brush.level === role.level
-                    : selectedLevel === role.level
-                )
-                  ? "filled"
-                  : "outlined"
-              }
-              aria-label={
-                continuous ? `用${role.label}画笔` : `标记为${role.label}`
-              }
-              aria-pressed={
-                continuous
-                  ? brush.level === role.level
-                  : selectedLevel === role.level
-              }
-              disabled={
-                readOnly ||
-                !hasWords ||
-                (!continuous && selectionText === undefined)
-              }
+              color={selectedLevel === role.level ? "primary" : "default"}
+              variant={selectedLevel === role.level ? "filled" : "outlined"}
+              aria-label={`标记为${role.label}`}
+              aria-pressed={selectedLevel === role.level}
+              disabled={readOnly || !hasWords || selectionText === undefined}
               onClick={() => onBrushChange({ kind: "role", level: role.level })}
             >
               <span
@@ -778,16 +747,12 @@ export function RolePanel({
         className="tsz-ve-grammar-hint"
         role="status"
         title={
-          continuous
-            ? "连续标注中：点击或拖过字母上色，按 Esc 退出"
-            : selectionText !== undefined
-              ? `已选中「${selectionText}」`
-              : "拖选文字或双击选词，再设置类别；选中已有标注可修改或移除"
+          selectionText !== undefined
+            ? `已选中「${selectionText}」`
+            : "拖选文字或双击选词，再设置类别；选中已有标注可修改类别"
         }
       >
-        {continuous ? (
-          <>连续标注中：点击或拖过字母上色，按 Esc 退出</>
-        ) : selectionText !== undefined ? (
+        {selectionText !== undefined ? (
           <>
             已选中 <strong title={selectionText}>「{selectionText}」</strong>
           </>
@@ -796,27 +761,6 @@ export function RolePanel({
         ) : (
           <>先输入句型或短语，再选中文字标注</>
         )}
-      </div>
-      <div className="tsz-ve-grammar-actions">
-        {!continuous && (
-          <Button
-            size="small"
-            type="text"
-            disabled={readOnly || !canRemove}
-            onClick={onRemove}
-          >
-            移除选区标注
-          </Button>
-        )}
-        <Button
-          size="small"
-          type="text"
-          disabled={readOnly || !hasWords}
-          aria-pressed={continuous}
-          onClick={onContinuousChange}
-        >
-          {continuous ? "退出连续标注" : "连续标注"}
-        </Button>
       </div>
     </div>
   );
@@ -892,11 +836,6 @@ export function LiaisonPanel({
   onCommit,
   onResetDraft
 }: LiaisonPanelProps) {
-  /*
-   * 颜色订阅放在面板里而不是编辑器根上：拖取色器时每个 mousemove 都会改色，
-   * 订阅挂在根上会让同一页的几十个编辑器整树重渲染。弧线层自己订阅，不经这里。
-   */
-  const color = useLiaisonColor();
   const bothPicked = Boolean(draft.start && draft.end);
   const canCommit = bothPicked;
   const hint = !draft.start && !draft.end ? "点下面文字里的字母" : undefined;
@@ -924,17 +863,6 @@ export function LiaisonPanel({
         ))}
       </div>
       <div className="tsz-ve-liaison-actions">
-        <span className="tsz-ve-liaison-color">
-          <Typography.Text type="secondary">颜色</Typography.Text>
-          {/* 显示偏好而非内容：wire 的 liaison 没有颜色字段，见 marks/liaisonColor。 */}
-          <ColorPicker
-            size="small"
-            value={color}
-            disabledAlpha
-            disabled={readOnly}
-            onChange={(value) => setLiaisonColor(value.toHexString())}
-          />
-        </span>
         {/* 未选择端点时提示操作方式。 */}
         {hint && <span className="tsz-ve-pop-hint">{hint}</span>}
         <Button
@@ -962,6 +890,7 @@ export function LiaisonPanel({
 }
 
 export interface PausePanelProps {
+  active: boolean;
   readOnly?: boolean;
   hasWords: boolean;
   brush: Brush;
@@ -969,15 +898,15 @@ export interface PausePanelProps {
   duration?: number;
   onApply: (duration: number) => void;
   onRemove: () => void;
-  onContinuousChange: () => void;
   onClose: () => void;
   customPause: string;
   onCustomPauseChange: (value: string) => void;
   onCustomPauseSubmit: (raw: string) => void;
 }
 
-/** 定位、插入和编辑同一个停顿对象；连续画笔保留为次级入口。 */
+/** 选择时长后点词缝添加，也可直接编辑已有停顿。 */
 export function PausePanel({
+  active,
   readOnly,
   hasWords,
   brush,
@@ -985,7 +914,6 @@ export function PausePanel({
   duration,
   onApply,
   onRemove,
-  onContinuousChange,
   onClose,
   customPause,
   onCustomPauseChange,
@@ -994,8 +922,9 @@ export function PausePanel({
   const continuous = brush.kind === "pause";
   const current = continuous ? brush.durationMs : duration;
   const choices = [250, 500, 750, 1000, 2000, 3000];
-  const disabled = readOnly || !hasWords || (!continuous && !location);
+  const disabled = readOnly || !active || !hasWords;
   const submit = () => {
+    if (disabled) return;
     const raw = customPause.trim();
     // 仅接收最多三位小数的秒数；避免 1.001 * 1000 的浮点尾差误判非法毫秒。
     const valid = /^(?:\d+(?:\.\d{1,3})?|\.\d{1,3})$/.test(raw);
@@ -1029,8 +958,10 @@ export function PausePanel({
             <span> Ⅱ </span>
             <b>{location.after}</b>
           </>
+        ) : active ? (
+          "选择停顿时长后，点击词间的灰色插入位"
         ) : (
-          "点击正文词间的灰色插入位，再选择停顿时长"
+          "先选中“停顿”，再选择时长并点击词间插入位"
         )}
       </div>
       <div className="tsz-ve-pause-presets">
@@ -1070,17 +1001,8 @@ export function PausePanel({
           应用
         </Button>
       </div>
-      <div className="tsz-ve-pause-note">0.001–5 秒 · Enter 确认</div>
-      <div className="tsz-ve-pause-editor-foot">
-        <Button
-          size="small"
-          type="text"
-          onClick={onContinuousChange}
-          disabled={readOnly || !hasWords}
-        >
-          {continuous ? "退出连续添加" : "连续添加"}
-        </Button>
-        {!continuous && duration !== undefined && (
+      {!continuous && duration !== undefined && (
+        <div className="tsz-ve-pause-editor-foot">
           <Button
             size="small"
             type="text"
@@ -1090,8 +1012,8 @@ export function PausePanel({
           >
             移除停顿
           </Button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

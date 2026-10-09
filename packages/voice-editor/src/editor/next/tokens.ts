@@ -29,7 +29,7 @@ export interface MarkState {
   /** 词缝序号 → 停顿毫秒。 */
   pauses: Record<number, number>;
   /**
-   * 本编辑器不建模、但必须原样带回去的注解（音标、彩色高亮）。
+   * 其他区间注解：斜体，以及必须原样带回去的历史音标、彩色高亮。
    * 界面按原型砍掉了这两类入口，但历史数据里可能有——不透传就会在
    * 「载入 → 保存」时被静默丢弃，而丢标注比标错更难被发现。
    */
@@ -402,7 +402,11 @@ export function annotationsToMarks(value: RichTextV2): MarkState {
   const passthrough: RichTextAnnotation[] = [];
 
   for (const annotation of value.annotations) {
-    if (annotation.type === "phoneme" || annotation.type === "highlight") {
+    if (
+      annotation.type === "phoneme" ||
+      annotation.type === "highlight" ||
+      annotation.type === "italic"
+    ) {
       passthrough.push(annotation);
       continue;
     }
@@ -673,6 +677,18 @@ function remapPassthrough(
   const kept: RichTextAnnotation[] = [];
   for (const annotation of annotations) {
     if (annotation.type === "pause") continue;
+    if (annotation.type === "italic") {
+      if (annotation.start < prefix) {
+        const end = Math.min(annotation.end, prefix);
+        if (end > annotation.start) kept.push({ ...annotation, end });
+      }
+      if (annotation.end > changedEnd) {
+        const start = Math.max(annotation.start, changedEnd) + delta;
+        const end = annotation.end + delta;
+        if (end > start) kept.push({ ...annotation, start, end });
+      }
+      continue;
+    }
     if (annotation.end <= prefix) {
       kept.push(annotation);
     } else if (annotation.start >= changedEnd) {

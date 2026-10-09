@@ -870,6 +870,7 @@ function grammarStructurePreview(structure: GrammarStructureV3, index: number) {
     if (
       annotation.type !== "emphasis" &&
       annotation.type !== "highlight" &&
+      annotation.type !== "italic" &&
       annotation.type !== "liaison"
     )
       return [];

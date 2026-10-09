@@ -167,6 +167,11 @@ export interface RichTextSpanV3 {
 
 export type RichTextAnnotationV3 =
   | {
+      type: "italic";
+      start: number;
+      end: number;
+    }
+  | {
       type: "emphasis";
       start: number;
       end: number;

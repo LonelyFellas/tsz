@@ -2,12 +2,12 @@ import "./interaction.css";
 import {
   AudioOutlined,
   EditOutlined,
+  ItalicOutlined,
   LinkOutlined,
   PauseOutlined,
   SoundOutlined
 } from "@ant-design/icons";
-import { Alert, Button, ColorPicker, Modal, Tag, Tooltip } from "antd";
-import { setLiaisonColor, useLiaisonColor } from "../../marks";
+import { Alert, Button, Modal, Tag, Tooltip } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RichText, RichTextV2, TextLinkV3 } from "@tsz/types";
 import { AUDIO_ASSETS_PER_VARIANT_MAX } from "@tsz/types";
@@ -156,7 +156,6 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
    * 初值直接从 value 灌，而不是先置空再由 effect 补。先置空的话，首帧折算出的是
    * 空内容，实时回调会把这份空值抛给宿主——一挂载就把表单里原有的文本清掉。
    */
-  const liaisonColor = useLiaisonColor();
   const [initial] = useState(() => parseValue(value));
   const [text, setText] = useState(initial.value.text);
   const [links, setLinks] = useState<TLink[]>(textLinks ?? []);
@@ -265,6 +264,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   );
   const [customPause, setCustomPause] = useState("");
   const [openTool, setOpenTool] = useState<string>();
+  const pauseActive = openTool === "pause" || brush.kind === "pause";
 
   /**
    * 撤销/重做栈。快照存「文本 + 全部标注」，因为改文本会连带重挂标注，
@@ -511,6 +511,17 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
    * 既可能是想收笔、也可能是想重新打开面板换个分类，同一个手势两个意思。
    */
   const openToolAndArm = (key?: string) => {
+    if (key === "italic") {
+      toggleItalic();
+      return;
+    }
+    if (key === "erase") {
+      setOpenTool(undefined);
+      changeBrush(
+        brush.kind === "erase" ? { kind: "none" } : { kind: "erase" }
+      );
+      return;
+    }
     if (key === "association-word" || key === "association-phrase") {
       const targetKind = key === "association-word" ? "word" : "phrase";
       setOpenTool(key);
@@ -539,8 +550,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       return;
     }
     if (key === "pause") {
-      if (brush.kind === "pause") {
-        setOpenTool("pause");
+      if (openTool === "pause" || brush.kind === "pause") {
+        setOpenTool(undefined);
+        changeBrush({ kind: "none" });
         return;
       }
       // 光标在词内时明确展示“在该词后”，不把停顿写进单词内部。
@@ -552,7 +564,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       return;
     }
     if (mode === "grammar" && key === "roles") {
-      // 打开分类不自动拿起画笔；保留正文选区，连续标注由面板显式开启。
+      // 打开分类保留正文选区，不自动拿起画笔。
       if (brush.kind !== "none" && brush.kind !== "role") {
         const selection = textSelection;
         changeBrush({ kind: "none" });
@@ -895,8 +907,89 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     );
   };
 
+  const selectionRanges = textSelection
+    ? splitRangeAtParagraphs(text, textSelection.start, textSelection.end)
+    : [];
+  const selectionIsItalic =
+    selectionRanges.length > 0 &&
+    selectionRanges.every((range) => {
+      let coveredEnd = range.start;
+      const italics = marks.passthrough
+        .filter((annotation) => annotation.type === "italic")
+        .sort((left, right) => left.start - right.start);
+      for (const annotation of italics) {
+        if (annotation.start > coveredEnd) return false;
+        coveredEnd = Math.max(coveredEnd, annotation.end);
+        if (coveredEnd >= range.end) return true;
+      }
+      return false;
+    });
+  const toggleItalic = () => {
+    if (readOnly || !textSelection) return;
+    let passthrough = marks.passthrough;
+    if (selectionIsItalic) {
+      for (const range of selectionRanges) {
+        passthrough = passthrough.flatMap((annotation) => {
+          if (
+            annotation.type !== "italic" ||
+            annotation.end <= range.start ||
+            annotation.start >= range.end
+          )
+            return [annotation];
+          return [
+            ...(annotation.start < range.start
+              ? [{ ...annotation, end: range.start }]
+              : []),
+            ...(annotation.end > range.end
+              ? [{ ...annotation, start: range.end }]
+              : [])
+          ];
+        });
+      }
+    } else {
+      passthrough = [
+        ...passthrough,
+        ...selectionRanges.map((range) => ({
+          type: "italic" as const,
+          ...range
+        }))
+      ];
+    }
+    const issues = validateRichTextV2({
+      version: 2,
+      text,
+      annotations: marksToAnnotations(text, { ...marks, passthrough })
+    });
+    if (issues.length > 0) {
+      setValidationMessage(issues[0]!.message);
+      return;
+    }
+    const normalized = normalizeRichTextV2({
+      version: 2,
+      text,
+      annotations: passthrough
+    }).annotations;
+    commit((current) => ({
+      ...current,
+      marks: { ...current.marks, passthrough: normalized }
+    }));
+  };
+
+  const removePause = (gapIndex: number) => {
+    if (readOnly || marks.pauses[gapIndex] === undefined) return;
+    commit((current) => {
+      const pauses = { ...current.marks.pauses };
+      delete pauses[gapIndex];
+      return { ...current, marks: { ...current.marks, pauses } };
+    });
+  };
+
   const inspectPause = (gapIndex: number) => {
     if (readOnly) return;
+    if (brush.kind === "erase") {
+      removePause(gapIndex);
+      return;
+    }
     changeBrush({ kind: "none" });
     setPauseGap(gapIndex);
     setCustomPause("");
@@ -931,6 +1024,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         }
       }));
     }
+    changeBrush({ kind: "pause", durationMs });
   };
 
   const confirmConflict = () => {
@@ -962,21 +1056,28 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         }
       };
     });
-    resetTransient();
+    if (pending.kind === "pause") {
+      changeBrush({ kind: "pause", durationMs: pending.durationMs });
+    } else {
+      resetTransient();
+    }
   };
 
   const applyPause = (durationMs: number) => {
-    if (readOnly) return;
-    if (brush.kind === "pause") {
+    if (readOnly || !pauseActive) return;
+    if (brush.kind === "pause" || pauseGap === undefined) {
       changeBrush({ kind: "pause", durationMs });
       setOpenTool(undefined);
       return;
     }
-    if (pauseGap === undefined) return;
     requestPause(pauseGap, durationMs);
   };
 
   const handleGapClick = (gapIndex: number) => {
+    if (brush.kind === "erase") {
+      removePause(gapIndex);
+      return;
+    }
     if (brush.kind === "none" && openTool === "pause") {
       inspectPause(gapIndex);
       return;
@@ -1054,6 +1155,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   const resetDraft = resetTransient;
 
   const handleLiaisonClick = (index: number) => {
+    if (readOnly || (brush.kind !== "liaison" && brush.kind !== "erase"))
+      return;
     commit((current) => ({
       ...current,
       marks: {
@@ -1066,10 +1169,18 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   };
 
   const clearAll = () => {
-    // 透传注解不是用户在这里标的，清空标注不该把它们一并抹掉。
+    // 历史音标、高亮原样保留；斜体是本编辑器设置的视觉标注，随其他标注清空。
     commit((current) => ({
       ...current,
-      marks: { ...current.marks, roles: [], liaisons: [], pauses: {} }
+      marks: {
+        ...current.marks,
+        roles: [],
+        liaisons: [],
+        pauses: {},
+        passthrough: current.marks.passthrough.filter(
+          (annotation) => annotation.type !== "italic"
+        )
+      }
     }));
     resetDraft();
   };
@@ -1083,6 +1194,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
 
   /** 自定义停顿按毫秒输入，与底层模型同单位，避免多一层换算。 */
   const applyCustomPause = (raw: string) => {
+    if (readOnly || !pauseActive) return;
     const durationMs = Number(raw.trim());
     if (
       !raw.trim() ||
@@ -1292,14 +1404,35 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     audioUploadAdapter?.isStorageUnavailable?.() ?? false;
 
   const tools = [
+    ...(mode === "grammar"
+      ? [
+          {
+            key: "erase",
+            label: "清除模式",
+            className: "tsz-ve-clear-mode",
+            active: brush.kind === "erase"
+          }
+        ]
+      : []),
     {
       key: "text",
-      label: "文本",
+      label: mode === "grammar" ? "文本编辑" : "文本",
       ariaLabel: "编辑文本",
       icon: <EditOutlined />,
       active: brush.kind === "none",
       className: "tsz-ve-text-button"
     },
+    ...(mode === "grammar"
+      ? [
+          {
+            key: "italic",
+            label: "斜体",
+            icon: <ItalicOutlined />,
+            active: selectionIsItalic,
+            disabled: !textSelection
+          }
+        ]
+      : []),
     {
       key: "roles",
       label: "语法结构",
@@ -1317,7 +1450,6 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         <RolePanel
           readOnly={readOnly}
           hasWords={tokens.length > 0}
-          brush={brush}
           onBrushChange={pickBrush}
           selectionText={
             textSelection
@@ -1335,35 +1467,6 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                 )?.level
               : undefined
           }
-          canRemove={
-            !!textSelection &&
-            marks.roles.some(
-              (role) =>
-                role.start < textSelection.end && role.end > textSelection.start
-            )
-          }
-          onRemove={() => {
-            if (readOnly || !textSelection) return;
-            const { start, end } = textSelection;
-            paintRoles(
-              marks.roles.flatMap((role) =>
-                role.end <= start || role.start >= end
-                  ? [role]
-                  : [
-                      ...(role.start < start ? [{ ...role, end: start }] : []),
-                      ...(role.end > end ? [{ ...role, start: end }] : [])
-                    ]
-              )
-            );
-          }}
-          onContinuousChange={() => {
-            changeBrush(
-              brush.kind === "role"
-                ? { kind: "none" }
-                : { kind: "role", level: lastRoleRef.current }
-            );
-            setOpenTool("roles");
-          }}
         />
       )
     },
@@ -1381,6 +1484,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         >
           <Button
             size="small"
+            icon={<LiaisonIcon part="start" />}
+            iconPlacement="end"
             disabled={readOnly || !textSelection}
             onClick={() => {
               if (!textSelection) return;
@@ -1391,6 +1496,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           </Button>
           <Button
             size="small"
+            icon={<LiaisonIcon part="end" />}
+            iconPlacement="start"
             disabled={readOnly || !draft.start || !textSelection}
             onClick={() => {
               if (textSelection)
@@ -1404,6 +1511,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           </Button>
           <Button
             size="small"
+            icon={<LiaisonIcon />}
+            iconPlacement="end"
             disabled={
               readOnly ||
               !textSelection ||
@@ -1419,13 +1528,6 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           >
             一次性添加
           </Button>
-          <ColorPicker
-            size="small"
-            value={liaisonColor}
-            disabledAlpha
-            disabled={readOnly}
-            onChange={(color) => setLiaisonColor(color.toHexString())}
-          />
           {draft.start && (
             <Button size="small" onClick={resetDraft}>
               取消起点
@@ -1448,12 +1550,13 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       summary:
         brush.kind === "pause" ? formatPauseLabel(pauseDuration) : undefined,
       className: "tsz-ve-pause-button",
-      active: pauseGap !== undefined || brush.kind === "pause",
-      disabled: pauseGap === undefined && brush.kind !== "pause",
+      active: pauseActive,
+      disabled: tokens.length < 2,
       placement: "topLeft" as const,
       stayOpen: true,
       content: (
         <PausePanel
+          active={pauseActive}
           readOnly={readOnly}
           hasWords={tokens.length > 1}
           brush={brush}
@@ -1469,19 +1572,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           onApply={applyPause}
           onRemove={() => {
             if (readOnly || pauseGap === undefined) return;
-            commit((current) => {
-              const pauses = { ...current.marks.pauses };
-              delete pauses[pauseGap];
-              return { ...current, marks: { ...current.marks, pauses } };
-            });
+            removePause(pauseGap);
             setOpenTool(undefined);
-          }}
-          onContinuousChange={() => {
-            changeBrush(
-              brush.kind === "pause"
-                ? { kind: "none" }
-                : { kind: "pause", durationMs: lastPauseRef.current }
-            );
           }}
           onClose={() => {
             setOpenTool(undefined);
@@ -1544,7 +1636,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     },
     {
       key: "uploads",
-      label: "音频",
+      label: mode === "grammar" ? "上传音频" : "音频",
+      ariaLabel: "音频",
       summary: assets.length > 0 ? String(assets.length) : undefined,
       icon: <AudioOutlined />,
       content: (
@@ -1709,6 +1802,14 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       </div>
 
       <MarkupPanel
+        grammarMode={mode === "grammar"}
+        selectionText={
+          textSelection
+            ? Array.from(text)
+                .slice(textSelection.start, textSelection.end)
+                .join("")
+            : undefined
+        }
         associationContent={associationContent || undefined}
         associationAnchor={linkAnchor}
         selectedLinkRanges={selectedLink?.source_segments ?? linkSegments}
@@ -1766,12 +1867,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                         : (["word", "phrase"] as const)
                       ).map((targetKind): DropdownTool => ({
                         key: `association-${targetKind}`,
-                        label:
-                          mode === "grammar"
-                            ? "关联词形"
-                            : targetKind === "word"
-                              ? "关联单词"
-                              : "关联短语",
+                        label: targetKind === "word" ? "关联单词" : "关联短语",
                         icon: <LinkOutlined />,
                         active:
                           brush.kind === "association" &&

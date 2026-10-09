@@ -1,4 +1,8 @@
-import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
+import type {
+  MouseEvent as ReactMouseEvent,
+  KeyboardEvent as ReactKeyboardEvent,
+  ReactNode
+} from "react";
 import { Popover, Tooltip } from "antd";
 import { associationWords } from "../../core/text-links";
 import {
@@ -16,6 +20,10 @@ import {
   type LiaisonLinkElements
 } from "../../marks";
 import { brushTarget, formatPauseLabel, type Brush } from "./roles";
+import {
+  pauseMarkerLabel,
+  pauseMarkerWidth
+} from "../../marks/pausePresentation";
 import {
   graphemes,
   tokenize,
@@ -86,7 +94,7 @@ export interface AnnotationStripProps {
 /**
  * 画布：文字和标注共用同一块地方，看到哪儿就在哪儿改。
  *
- * 两层严格同域叠放——
+ * 两层共用原文——
  * - 下层 `.tsz-ve-strip` 渲染同一份文本，负责显色、连读弧、停顿记号和命中区；
  * - 上层是一个**文字透明**的原生 textarea，负责打字、光标、选区、IME、粘贴。
  *
@@ -94,9 +102,8 @@ export interface AnnotationStripProps {
  * 双向文本都不用自己实现），而逐词上色、跨词画弧是它做不到的。让 textarea 只留
  * 光标和选区、把字交给下层画，两边就各做各最擅长的。
  *
- * 代价是**两层的排版必须逐像素一致**：字体、字号、行高、字距、内边距、换行规则
- * 都得对齐，下层的词也不能带内边距——inline 元素的横向内边距会累计成偏移，
- * 一个词偏 4px，一行下来就错开半个字。
+ * 没有停顿时，两层排版逐像素一致。有停顿时，行内标签占据真实宽度，鼠标在显示层
+ * 原生选字后映射到文本框；键盘输入仍使用原文，显示层回显选区和光标。
  *
  * 鼠标归谁由当前画笔决定：空手时归 textarea（放光标），拿起笔时归标注层。
  */
@@ -129,21 +136,17 @@ export function AnnotationStrip({
   onLiaisonClick
 }: AnnotationStripProps) {
   const tokens = tokenize(text);
+  const textPoints = Array.from(text);
   const target = readOnly
     ? "none"
     : pausePlacement
       ? "gap"
       : brushTarget(brush);
   const painting = target !== "none";
-  /*
-   * 停顿标签按「相邻两条交替上下」排布：500ms 这类标签比词缝间距还宽，同一行
-   * 会直接叠字。按词缝奇偶交替不行——隔一个词缝的两条仍可能同排，故按停顿自身
-   * 的先后次序交替。
-   */
-  const pausedGaps = Object.keys(marks.pauses)
-    .map(Number)
-    .sort((left, right) => left - right);
+  const inlinePauses = Object.keys(marks.pauses).length > 0;
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const [textRange, setTextRange] = useState<CodeSpan>();
   const letterRefs = useRef(new Map<number, HTMLElement>());
 
   const registerLetter = useCallback(
@@ -228,8 +231,174 @@ export function AnnotationStrip({
     run();
   };
 
+  const syncTextSelection = (input: HTMLTextAreaElement) => {
+    const start = Array.from(text.slice(0, input.selectionStart)).length;
+    const end = Array.from(text.slice(0, input.selectionEnd)).length;
+    setTextRange({ start, end });
+    onTextSelection?.(end > start ? { start, end } : undefined);
+    onCaretChange?.(end > start ? undefined : end);
+  };
+
+  const sourceOffset = (node: Node, boundary: number) => {
+    const container = containerRef.current;
+    if (!container?.contains(node)) return undefined;
+    const prefix = document.createRange();
+    prefix.setStart(container, 0);
+    prefix.setEnd(node, boundary);
+    const contents = prefix.cloneContents();
+    contents
+      .querySelectorAll(".tsz-ve-gap-pause")
+      .forEach((label) => label.remove());
+    return (contents.textContent ?? "").length;
+  };
+
+  // 行内标签占据真实宽度。鼠标选区由显示层定位，键盘、输入法和剪贴板仍交给原生文本框。
+  const selectInlineText = (event: ReactMouseEvent) => {
+    if (!inlinePauses || target !== "none" || event.button !== 0) return;
+    const container = containerRef.current;
+    const input = inputRef.current;
+    const selection = window.getSelection();
+    if (!container || !input || !selection?.rangeCount) return;
+    const range = selection.getRangeAt(0);
+    if (
+      !container.contains(range.startContainer) ||
+      !container.contains(range.endContainer)
+    )
+      return;
+    const hit = range.collapsed
+      ? document.caretRangeFromPoint?.(event.clientX, event.clientY)
+      : undefined;
+    const selected =
+      hit && container.contains(hit.startContainer) ? hit : range;
+    const start = sourceOffset(selected.startContainer, selected.startOffset)!;
+    const end = sourceOffset(selected.endContainer, selected.endOffset)!;
+    const anchor = sourceOffset(selection.anchorNode!, selection.anchorOffset)!;
+    const focus = sourceOffset(selection.focusNode!, selection.focusOffset)!;
+    input.focus({ preventScroll: true });
+    input.setSelectionRange(
+      start,
+      end,
+      focus < anchor ? "backward" : "forward"
+    );
+    syncTextSelection(input);
+  };
+
+  const renderWhitespace = (value: string, from: number) =>
+    !inlinePauses
+      ? value
+      : graphemes(value).map(({ text: space, offset }) => {
+          const start = from + offset;
+          const end = start + Array.from(space).length;
+          const lineBreak = /[\r\n]/u.test(space);
+          const collapsed = textRange?.start === textRange?.end;
+          const caretBefore =
+            collapsed &&
+            textRange?.end === start &&
+            (start === 0 || /\s/u.test(textPoints[start - 1]!));
+          const caretAfter =
+            collapsed &&
+            textRange?.end === end &&
+            end === textPoints.length &&
+            !lineBreak;
+          return (
+            <Fragment key={start}>
+              <span
+                ref={registerLetter(start)}
+                className={`tsz-ve-whitespace${lineBreak ? " is-caret-anchor" : ""}${target === "none" && covers(textRange, start, end) ? " is-text-selected" : ""}`}
+                data-codepoint={start}
+                data-letter={space}
+              >
+                {!lineBreak && space}
+                {(caretBefore || caretAfter) && (
+                  <span
+                    className="tsz-ve-inline-caret"
+                    data-edge={caretBefore ? "before" : "after"}
+                    aria-hidden
+                  />
+                )}
+              </span>
+              {lineBreak && space}
+            </Fragment>
+          );
+        });
+
+  const navigateInlineText = (
+    event: ReactKeyboardEvent<HTMLTextAreaElement>
+  ) => {
+    if (
+      !inlinePauses ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey ||
+      !["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)
+    )
+      return;
+    const input = event.currentTarget;
+    const container = containerRef.current;
+    if (!container) return;
+    const backward = input.selectionDirection === "backward";
+    const focus = backward ? input.selectionStart : input.selectionEnd;
+    const point = Array.from(text.slice(0, focus)).length;
+    const letters = [...letterRefs.current.entries()].sort(
+      (left, right) => left[0] - right[0]
+    );
+    const letter =
+      letters.find(([start]) => start === point) ??
+      letters.reverse().find(([start]) => start < point);
+    if (!letter) return;
+    const box = letter[1].getBoundingClientRect();
+    const centerY = (box.top + box.bottom) / 2;
+    let next: number | undefined;
+    if (event.key === "Home" || event.key === "End") {
+      // 在当前可见行内取真实字符边界，避免浏览器把行尾空白命中到上一行。
+      const line = letters.filter(([, element]) => {
+        const rect = element.getBoundingClientRect();
+        return rect.top <= centerY && rect.bottom >= centerY;
+      });
+      if (!line.length) return;
+      const boundary =
+        event.key === "Home"
+          ? Math.min(...line.map(([start]) => start))
+          : Math.max(
+              ...line.map(([start, element]) =>
+                /[\r\n]/u.test(element.dataset.letter!)
+                  ? start
+                  : start + Array.from(element.dataset.letter!).length
+              )
+            );
+      next = textPoints.slice(0, boundary).join("").length;
+    } else {
+      const x = point === letter[0] ? box.left : box.right;
+      const y =
+        centerY +
+        (event.key === "ArrowUp" ? -1 : 1) *
+          parseFloat(getComputedStyle(container).lineHeight);
+      const hit = document.caretRangeFromPoint?.(x, y);
+      next = hit
+        ? sourceOffset(hit.startContainer, hit.startOffset)
+        : undefined;
+    }
+    if (next === undefined || next === null) return;
+    event.preventDefault();
+    const anchor = event.shiftKey
+      ? backward
+        ? input.selectionEnd
+        : input.selectionStart
+      : next;
+    input.setSelectionRange(
+      Math.min(anchor, next),
+      Math.max(anchor, next),
+      next < anchor ? "backward" : "forward"
+    );
+    syncTextSelection(input);
+  };
+
   return (
-    <div className="tsz-ve-canvas" data-target={target} data-brush={brush.kind}>
+    <div
+      className={`tsz-ve-canvas${inlinePauses ? " has-inline-pauses" : ""}`}
+      data-target={target}
+      data-brush={brush.kind}
+    >
       {/*
        * 标注层对读屏隐藏：正文由下面那个 textarea 提供，两边都念的话同一句话会被
        * 读两遍，连读模式下还会逐字母念「xxx 的第 1 个字母 p」。
@@ -243,25 +412,24 @@ export function AnnotationStrip({
         className="tsz-ve-strip"
         ref={containerRef}
         data-target={target}
+        onMouseUp={selectInlineText}
         aria-hidden
       >
         <LiaisonArcLayer
           arcs={arcs}
           strokeWidth={strokeWidth}
           onArcMouseDown={
-            // 只有连读画笔才能点弧线删除：语法结构画笔也落在字母上，弧线的命中带
-            // 压在字母上方，不限画笔的话给弧线端点附近的字母上色会把连读点掉。
-            brush.kind === "liaison"
+            // 只在连读或清除模式开放删除，避免语法画笔误删端点附近的弧线。
+            brush.kind === "liaison" || brush.kind === "erase"
               ? (index, event) => paint(() => onLiaisonClick(index))(event)
               : undefined
           }
         />
 
         {/*
-         * 词与词之间渲染的是**真正的空格字符**，不是一个占位方块：下层要和
-         * textarea 逐字对齐，少一个空格整行就错开一个字宽。
+         * 保留词间原始空白，输入和显示层选区映射使用同一份正文。
          */}
-        {leadingSpace(text, tokens)}
+        {renderWhitespace(leadingSpace(text, tokens), 0)}
         {tokens.map((token, position) => {
           const hasNext = position < tokens.length - 1;
           const nextToken = tokens[position + 1];
@@ -299,6 +467,16 @@ export function AnnotationStrip({
               >
                 <span
                   className={`tsz-ve-token is-letters${linkedRanges?.some((range) => covers(range, token.start, token.end)) ? " is-linked" : ""}${selectedLinkRanges?.some((range) => covers(range, token.start, token.end)) ? " is-link-selected" : ""}`}
+                  onDoubleClick={() => {
+                    const input = inputRef.current;
+                    if (!inlinePauses || target !== "none" || !input) return;
+                    input.focus({ preventScroll: true });
+                    input.setSelectionRange(
+                      textPoints.slice(0, token.start).join("").length,
+                      textPoints.slice(0, token.end).join("").length
+                    );
+                    syncTextSelection(input);
+                  }}
                   role={target === "word" ? "button" : undefined}
                   aria-label={
                     target === "word"
@@ -328,18 +506,42 @@ export function AnnotationStrip({
                     const end = start + Array.from(letter).length;
                     const unit = unitAt(marks.roles, start);
                     const roleClass = unit ? ` is-${unit.level}` : "";
+                    const italicClass = marks.passthrough.some(
+                      (annotation) =>
+                        annotation.type === "italic" &&
+                        annotation.start <= start &&
+                        annotation.end >= end
+                    )
+                      ? " is-italic"
+                      : "";
                     // 注意与 unit 的 level（语法分类）区分：这里是连读草稿的端别。
                     const anchorRole = draftRole(draft, start);
                     const selectedClass = covers(selectedRange, start, end)
                       ? " is-selecting"
                       : "";
+                    const textSelectedClass =
+                      inlinePauses &&
+                      target === "none" &&
+                      covers(textRange, start, end)
+                        ? " is-text-selected"
+                        : "";
+                    const caretBefore =
+                      inlinePauses &&
+                      textRange?.start === textRange?.end &&
+                      textRange?.end === start;
+                    const caretAfter =
+                      inlinePauses &&
+                      textRange?.start === textRange?.end &&
+                      textRange?.end === end &&
+                      (end === textPoints.length ||
+                        /\s/u.test(textPoints[end]!));
                     const anchorClass =
                       roleAnchorStart === start ? " is-role-anchor" : "";
                     return (
                       <span
                         key={offset}
                         ref={registerLetter(start)}
-                        className={`tsz-ve-letter${roleClass}${anchorRole ? ` is-anchor-${anchorRole}` : ""}${selectedClass}${anchorClass}${linkedRanges?.some((range) => covers(range, start, end)) ? " is-linked" : ""}${selectedLinkRanges?.some((range) => covers(range, start, end)) ? " is-link-selected" : ""}`}
+                        className={`tsz-ve-letter${roleClass}${italicClass}${textSelectedClass}${anchorRole ? ` is-anchor-${anchorRole}` : ""}${selectedClass}${anchorClass}${linkedRanges?.some((range) => covers(range, start, end)) ? " is-linked" : ""}${selectedLinkRanges?.some((range) => covers(range, start, end)) ? " is-link-selected" : ""}`}
                         role="button"
                         aria-label={`${token.text} 的第 ${offset + 1} 个字母 ${letter}`}
                         aria-pressed={Boolean(anchorRole)}
@@ -371,6 +573,13 @@ export function AnnotationStrip({
                         }}
                       >
                         <span className="tsz-ve-letter-text">{letter}</span>
+                        {(caretBefore || caretAfter) && (
+                          <span
+                            className="tsz-ve-inline-caret"
+                            data-edge={caretBefore ? "before" : "after"}
+                            aria-hidden
+                          />
+                        )}
                       </span>
                     );
                   })}
@@ -386,22 +595,20 @@ export function AnnotationStrip({
                   aria-disabled={
                     pause !== undefined && brush.kind === "none"
                       ? undefined
-                      : target !== "gap"
+                      : target !== "gap" &&
+                        !(target === "mark" && pause !== undefined)
                   }
                   onMouseDown={paint(() => {
-                    if (target === "gap") onGapClick(position);
+                    if (
+                      target === "gap" ||
+                      (target === "mark" && pause !== undefined)
+                    )
+                      onGapClick(position);
                   })}
                 >
-                  {/*
-                   * 已添加的停顿在同一词间插入位点亮；绝对定位不撑开文字，
-                   * 时长由悬停提示与编辑浮层显示，不再额外绘制下方标记。
-                   */}
+                  {/* 标签直接占据词缝宽度；原始空白仍保留，保存与复制不包含标签文字。 */}
                   {pause !== undefined && (
-                    <span
-                      className="tsz-ve-gap-pause"
-                      data-row={pausedGaps.indexOf(position) % 2}
-                      aria-hidden
-                    >
+                    <span className="tsz-ve-gap-pause" aria-hidden>
                       <Popover
                         open={pausePopover?.gap === position}
                         content={
@@ -416,16 +623,20 @@ export function AnnotationStrip({
                           title={
                             pausePopover?.gap === position
                               ? null
-                              : `停顿 ${pause / 1000} 秒 · 点击调整`
+                              : `停顿 ${pause / 1000} 秒 · 点击${brush.kind === "erase" ? "取消" : "调整"}`
                           }
                         >
                           <button
                             type="button"
                             className="tsz-ve-gap-pause-value tsz-ve-pause-chip"
-                            aria-label={`编辑第 ${position + 1} 处停顿 ${pause / 1000} 秒`}
+                            data-duration-ms={pause}
+                            style={{ minWidth: pauseMarkerWidth(pause) }}
+                            aria-label={`${brush.kind === "erase" ? "清除" : "编辑"}第 ${position + 1} 处停顿 ${pause / 1000} 秒`}
                             disabled={
                               readOnly ||
-                              (brush.kind !== "none" && brush.kind !== "pause")
+                              (brush.kind !== "none" &&
+                                brush.kind !== "pause" &&
+                                brush.kind !== "erase")
                             }
                             onMouseDown={(event) => {
                               event.preventDefault();
@@ -435,22 +646,45 @@ export function AnnotationStrip({
                               event.stopPropagation();
                               onInspectPause?.(position);
                             }}
-                          />
+                          >
+                            {pauseMarkerLabel(pause)}
+                          </button>
                         </Tooltip>
                       </Popover>
                     </span>
                   )}
-                  {textBetween(text, token.end, tokens[position + 1]!.start)}
+                  {renderWhitespace(
+                    textBetween(text, token.end, tokens[position + 1]!.start),
+                    token.end
+                  )}
                 </span>
               )}
             </Fragment>
           );
         })}
         {/* 末尾的空白也要渲染出来，否则光标停在行尾时两层会差一个字宽。 */}
-        {trailingSpace(text, tokens)}
+        {renderWhitespace(trailingSpace(text, tokens), tokens.at(-1)?.end ?? 0)}
+        {inlinePauses && /[\r\n]$/u.test(text) && (
+          <span
+            className="tsz-ve-whitespace is-caret-anchor"
+            ref={registerLetter(textPoints.length)}
+            data-codepoint={textPoints.length}
+            data-letter=""
+          >
+            {textRange?.start === textPoints.length &&
+              textRange.end === textPoints.length && (
+                <span
+                  className="tsz-ve-inline-caret"
+                  data-edge="before"
+                  aria-hidden
+                />
+              )}
+          </span>
+        )}
       </div>
 
       <textarea
+        ref={inputRef}
         {...inputDataAttributes}
         className="tsz-ve-canvas-input"
         aria-label={inputLabel}
@@ -460,22 +694,9 @@ export function AnnotationStrip({
         placeholder={
           inputPlaceholder ?? "在这里直接输入英文，然后用上面的工具在字上标注"
         }
-        onSelect={(event) => {
-          const input = event.currentTarget;
-          const start = Array.from(text.slice(0, input.selectionStart)).length;
-          const end = Array.from(text.slice(0, input.selectionEnd)).length;
-          onTextSelection?.(end > start ? { start, end } : undefined);
-          onCaretChange?.(end > start ? undefined : end);
-        }}
-        onClick={(event) =>
-          onCaretChange?.(
-            event.currentTarget.selectionStart ===
-              event.currentTarget.selectionEnd
-              ? Array.from(text.slice(0, event.currentTarget.selectionEnd))
-                  .length
-              : undefined
-          )
-        }
+        onSelect={(event) => syncTextSelection(event.currentTarget)}
+        onClick={(event) => syncTextSelection(event.currentTarget)}
+        onKeyDown={navigateInlineText}
         onChange={(event) => onTextChange(event.target.value)}
       />
     </div>
