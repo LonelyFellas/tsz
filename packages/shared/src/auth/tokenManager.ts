@@ -68,6 +68,10 @@ export function createTokenManager({
     if (token !== null) {
       unconfirmed = null;
       rememberUnconfirmed(false);
+    } else if (refreshController) {
+      // Rotation may already be committed; the old generation's catch cannot record it.
+      unconfirmed ??= new RefreshUnconfirmedError();
+      rememberUnconfirmed(true);
     }
     refreshController?.abort();
     refreshController = null;

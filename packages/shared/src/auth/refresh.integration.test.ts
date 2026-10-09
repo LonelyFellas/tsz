@@ -393,6 +393,47 @@ describe("admin 改密真实请求层", () => {
 });
 
 describe("failed admin logout after an uncertain Cookie rotation", () => {
+  it("records the pause before cancelling an in-flight refresh on local logout", async () => {
+    vi.useFakeTimers();
+    const values = new Map<string, string>();
+    vi.stubGlobal("sessionStorage", {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key)
+    });
+    const baseUrl = "/api/v1/admin";
+    const runtime = createAdminAuthRuntime({ baseUrl });
+    runtime.persistSession({ access_token: "old", expires_in: 900 });
+    let deliver!: (response: Response) => void;
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            deliver = resolve;
+          })
+      )
+      .mockRejectedValueOnce(new TypeError("offline"));
+    const refreshing = runtime.tokens.refreshTokens();
+    const cancelled = expect(refreshing).rejects.toThrow("session changed");
+    await expect(runtime.api.auth.logout()).rejects.toThrow("offline");
+    runtime.tokens.setAccessToken(null);
+    runtime.store.getState().setProfile(null);
+    await cancelled;
+    expect(values.get(`tsz:refresh-unconfirmed:${baseUrl}`)).toBe("1");
+    const loginPage = createAdminAuthRuntime({ baseUrl });
+    await expect(loginPage.restoreSession()).rejects.toThrow("请重新登录");
+    expect(fetch).toHaveBeenCalledTimes(2);
+    deliver(response(200, { access_token: "late-rotation", expires_in: 900 }));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(runtime.tokens.getToken()).toBeUndefined();
+    expect(values.get(`tsz:refresh-unconfirmed:${baseUrl}`)).toBe("1");
+    loginPage.persistSession({ access_token: "new-login", expires_in: 900 });
+    expect(values.has(`tsz:refresh-unconfirmed:${baseUrl}`)).toBe(false);
+    loginPage.tokens.setAccessToken(null);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it("preserves the pause through local logout and a new login-page runtime", async () => {
     vi.useFakeTimers();
     const values = new Map<string, string>();
