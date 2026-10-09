@@ -17,6 +17,7 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status });
 
 beforeEach(() => {
+  authRuntime.persistSession({ access_token: "fixture", expires_in: 900 });
   authRuntime.tokens.setAccessToken(null);
   authRuntime.store.setState({
     profile: null,

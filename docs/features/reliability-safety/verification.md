@@ -88,6 +88,10 @@ python3 ops/backup_restore_drill.py \
 
 可用 `--backup <prior-test-dump>` 验证已有测试备份，`--target tsz-restore-drill-<name>` 验证已有目标拒绝。工具不接受真实服务器 DSN，不执行覆盖恢复。
 
+## 交付审查增补
+
+独立 pre-push 审查发现：后台登出吊销失败后，清空 access token 不能证明 Cookie 已失效。已修补为本地清空 token 保留未知轮换暂停标记，仅明确新登录成功时解除；补跨实例和后台退出失败回归，受影响鉴权 158 项通过。后端恢复演练 Python 安全测试加入 CI 质量作业，演练安全 3 项和工作流结构 11 项通过。原生 hooks 和精确提交复查按两仓 ship 流程执行，最终状态见 PR。
+
 ## 限制与清理
 
 - 外部 OSS 生命周期、供应商真实网络、反向代理和采集平台未进行线上验证；本次覆盖应用边界、受控依赖故障和本地恢复，不声称生产 RPO/RTO。

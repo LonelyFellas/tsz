@@ -64,8 +64,11 @@ export function createTokenManager({
 
   function setAccessToken(token: string | null) {
     sessionGeneration += 1;
-    unconfirmed = null;
-    rememberUnconfirmed(false);
+    // Local logout cannot prove that the rotating Cookie was revoked.
+    if (token !== null) {
+      unconfirmed = null;
+      rememberUnconfirmed(false);
+    }
     refreshController?.abort();
     refreshController = null;
     accessToken = token;

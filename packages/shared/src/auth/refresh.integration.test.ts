@@ -391,3 +391,44 @@ describe("admin 改密真实请求层", () => {
     rt.tokens.setAccessToken(null);
   });
 });
+
+describe("failed admin logout after an uncertain Cookie rotation", () => {
+  it("preserves the pause through local logout and a new login-page runtime", async () => {
+    vi.useFakeTimers();
+    const values = new Map<string, string>();
+    vi.stubGlobal("sessionStorage", {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key)
+    });
+    const baseUrl = "/api/v1/admin";
+    const runtime = createAdminAuthRuntime({ baseUrl });
+    runtime.persistSession({ access_token: "old", expires_in: 900 });
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValue(new TypeError("offline"));
+    await expect(runtime.tokens.refreshTokens()).rejects.toThrow("请重新登录");
+    await expect(runtime.api.auth.logout()).rejects.toThrow("offline");
+    // The normal logout hook performs this local cleanup even if revocation failed.
+    runtime.tokens.setAccessToken(null);
+    runtime.store.getState().setProfile(null);
+    expect(runtime.tokens.getToken()).toBeUndefined();
+    const loginPage = createAdminAuthRuntime({ baseUrl });
+    await expect(loginPage.restoreSession()).rejects.toThrow("请重新登录");
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(loginPage.store.getState().refreshUnconfirmed).toBe(true);
+    expect(values.get(`tsz:refresh-unconfirmed:${baseUrl}`)).toBe("1");
+    loginPage.persistSession({
+      access_token: "explicit-login",
+      expires_in: 900
+    });
+    expect(values.has(`tsz:refresh-unconfirmed:${baseUrl}`)).toBe(false);
+    fetch.mockResolvedValueOnce(
+      response(200, { access_token: "refreshed", expires_in: 900 })
+    );
+    await expect(loginPage.tokens.refreshTokens()).resolves.toBe("refreshed");
+    expect(fetch).toHaveBeenCalledTimes(3);
+    loginPage.tokens.setAccessToken(null);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});

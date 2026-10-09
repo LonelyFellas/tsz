@@ -259,6 +259,9 @@ it("unknown Cookie rotation survives runtime recreation but explicit login clear
     .mockRejectedValueOnce(new TypeError("offline"));
   const first = createTokenManager({ baseUrl: "/api/reliability" });
   await expect(first.refreshTokens()).rejects.toThrow("请重新登录");
+  first.setAccessToken(null);
+  expect(first.getToken()).toBeUndefined();
+  await expect(first.refreshTokens()).rejects.toThrow("请重新登录");
   const restored = createTokenManager({ baseUrl: "/api/reliability" });
   await expect(restored.refreshTokens()).rejects.toThrow("请重新登录");
   expect(fetch).toHaveBeenCalledTimes(1);
