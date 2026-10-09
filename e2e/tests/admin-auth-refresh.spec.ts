@@ -55,7 +55,9 @@ test("初始恢复 503 后手动登录可进入后台，不永久停在加载态
     return route.fulfill({ json: {} });
   });
   await page.goto("/login?redirect=/settings/profile");
-  await expect(page.getByText("暂时无法恢复会话，请重试")).toBeVisible();
+  await expect(
+    page.getByText("会话刷新结果尚未确认，请重新登录；当前操作请先查看结果")
+  ).toBeVisible();
   await page.getByLabel("手机号", { exact: true }).fill("13800138000");
   await page
     .getByLabel("登录密码", { exact: true })
@@ -64,7 +66,9 @@ test("初始恢复 503 后手动登录可进入后台，不永久停在加载态
   await page.getByRole("button", { name: "登 录", exact: true }).click();
   await expect(page).toHaveURL(/\/settings\/profile$/);
   await expect(page.getByText("加载中...", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("暂时无法恢复会话，请重试")).toHaveCount(0);
+  await expect(
+    page.getByText("会话刷新结果尚未确认，请重新登录；当前操作请先查看结果")
+  ).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "个人设置" })).toBeVisible();
 });
 
@@ -155,7 +159,7 @@ for (const forced of [false, true]) {
   }
 }
 
-test("主动刷新 503 不丢表单，联网恢复后继续会话", async ({ page }) => {
+test("主动刷新 503 保留当前表单，联网后仍须重新登录", async ({ page }) => {
   await page.clock.install();
   let refreshes = 0;
   let available = false;
@@ -169,13 +173,22 @@ test("主动刷新 503 不丢表单，联网恢复后继续会话", async ({ pag
       return route.fulfill({ json: { access_token: "token", expires_in: 60 } });
     }
     if (path.endsWith("/profile")) return route.fulfill({ json: profile });
+    if (path.endsWith("/auth/login"))
+      return route.fulfill({
+        json: {
+          access_token: "login",
+          expires_in: 900,
+          must_change_password: false
+        }
+      });
     return route.fulfill({ json: {} });
   });
   await page.goto("/change-password");
   await expect(page.getByLabel("当前密码", { exact: true })).toBeVisible();
   await page.getByLabel("当前密码", { exact: true }).fill("Unsubmitted!731");
   await page.clock.fastForward(30_000);
-  await expect(page.getByText("连接暂时中断，当前内容已保留")).toBeVisible();
+  const message = "会话刷新结果尚未确认，请重新登录；当前操作请先查看结果";
+  await expect(page.getByText(message)).toBeVisible();
   await expect(page.getByLabel("当前密码", { exact: true })).toHaveValue(
     "Unsubmitted!731"
   );
@@ -184,33 +197,105 @@ test("主动刷新 503 不丢表单，联网恢复后继续会话", async ({ pag
   });
   await expect(page).toHaveURL(/\/change-password$/);
   available = true;
+  const reread = page.waitForResponse((response) =>
+    new URL(response.url()).pathname.endsWith("/profile")
+  );
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
-  await expect(page.getByText("连接暂时中断，当前内容已保留")).toHaveCount(0);
-  await expect.poll(() => refreshes).toBe(3);
+  await reread;
+  await page.clock.fastForward(60_000);
+  await expect(page.getByText(message)).toBeVisible();
+  expect(refreshes).toBe(2);
   await expect(page.getByLabel("当前密码", { exact: true })).toHaveValue(
     "Unsubmitted!731"
   );
+  await page.getByRole("button", { name: "重新登录" }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await page.getByLabel("手机号", { exact: true }).fill("13800138000");
+  await page
+    .getByLabel("登录密码", { exact: true })
+    .fill("Correct!Password731");
+  await page.getByLabel("验证码", { exact: true }).fill("000000");
+  await page.getByRole("button", { name: "登 录", exact: true }).click();
+  await expect(page).not.toHaveURL(/\/login/);
+  expect(
+    await page.evaluate(() =>
+      sessionStorage.getItem("tsz:refresh-unconfirmed:/api/v1/admin")
+    )
+  ).toBeNull();
+  expect(refreshes).toBe(2);
+  await page.goto("/settings/profile");
+  await expect(page.getByRole("heading", { name: "个人设置" })).toBeVisible();
+  expect(refreshes).toBe(3);
   expect(errors).toEqual([]);
 });
 
-test("恢复 503 保留原 URL 且不放行后台，重试后恢复", async ({ page }) => {
-  let available = false;
-  await page.route("**/api/v1/admin/**", async (route) => {
-    const path = new URL(route.request().url()).pathname;
-    if (path.endsWith("/auth/refresh"))
-      return available
-        ? route.fulfill({ json: { access_token: "token", expires_in: 900 } })
-        : route.fulfill({ status: 503 });
-    if (path.endsWith("/profile")) return route.fulfill({ json: profile });
-    return route.fulfill({ json: {} });
+for (const failure of ["429", "503", "offline"] as const) {
+  test(`恢复 ${failure} 保留原 URL 且不放行后台`, async ({ page }) => {
+    let available = false;
+    let refreshes = 0;
+    await page.route("**/api/v1/admin/**", async (route) => {
+      const path = new URL(route.request().url()).pathname;
+      if (path.endsWith("/auth/refresh")) {
+        refreshes++;
+        if (available)
+          return route.fulfill({
+            json: { access_token: "token", expires_in: 900 }
+          });
+        return failure === "offline"
+          ? route.abort("internetdisconnected")
+          : route.fulfill({ status: Number(failure) });
+      }
+      if (path.endsWith("/auth/login"))
+        return route.fulfill({
+          json: {
+            access_token: "login",
+            expires_in: 900,
+            must_change_password: false
+          }
+        });
+      if (path.endsWith("/profile")) return route.fulfill({ json: profile });
+      return route.fulfill({ json: {} });
+    });
+    await page.goto("/settings/profile");
+    const message =
+      failure === "429"
+        ? "暂时无法恢复会话，请重试"
+        : "会话刷新结果尚未确认，请重新登录；当前操作请先查看结果";
+    await expect(page.getByText(message)).toBeVisible();
+    await expect(page).toHaveURL(/\/settings\/profile$/);
+    await expect(page.getByRole("heading", { name: "个人设置" })).toHaveCount(
+      0
+    );
+    expect(refreshes).toBe(1);
+    available = true;
+    if (failure === "429") {
+      await page.getByRole("button", { name: "重试连接" }).click();
+    } else {
+      await page.evaluate(() => window.dispatchEvent(new Event("online")));
+      await page.reload();
+      await expect(page.getByText(message)).toBeVisible();
+      expect(refreshes).toBe(1);
+      await page.getByRole("button", { name: "重新登录" }).click();
+      await expect(page).toHaveURL(/\/login$/);
+      await page.getByLabel("手机号", { exact: true }).fill("13800138000");
+      await page
+        .getByLabel("登录密码", { exact: true })
+        .fill("Correct!Password731");
+      await page.getByLabel("验证码", { exact: true }).fill("000000");
+      await page.getByRole("button", { name: "登 录", exact: true }).click();
+      await expect(page).not.toHaveURL(/\/login/);
+      expect(
+        await page.evaluate(() =>
+          sessionStorage.getItem("tsz:refresh-unconfirmed:/api/v1/admin")
+        )
+      ).toBeNull();
+      expect(refreshes).toBe(1);
+      await page.goto("/settings/profile");
+    }
+    await expect(page.getByText(message)).toHaveCount(0);
+    await expect(page.getByText("加载中...", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "个人设置" })).toBeVisible();
+    expect(refreshes).toBe(2);
+    await expect(page).toHaveURL(/\/settings\/profile$/);
   });
-  await page.goto("/settings/profile");
-  await expect(page.getByText("暂时无法恢复会话，请重试")).toBeVisible();
-  await expect(page).toHaveURL(/\/settings\/profile$/);
-  await expect(page.getByRole("button", { name: "重试连接" })).toBeEnabled();
-  available = true;
-  await page.getByRole("button", { name: "重试连接" }).click();
-  await expect(page.getByText("暂时无法恢复会话，请重试")).toHaveCount(0);
-  await expect(page.getByText("加载中...", { exact: true })).toHaveCount(0);
-  await expect(page).toHaveURL(/\/settings\/profile$/);
-});
+}

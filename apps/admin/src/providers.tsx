@@ -101,31 +101,32 @@ export function RootProviders() {
               title={ADMIN_PERMISSION_UPGRADE_MESSAGE}
             />
           )}
-          {!permissionModelIncompatible && connectionError && (
-            <Alert
-              type="warning"
-              showIcon
-              title={
-                refreshUnconfirmed
-                  ? "会话刷新结果尚未确认，请重新登录；当前操作请先查看结果"
-                  : hydrated
-                    ? "连接暂时中断，当前内容已保留"
-                    : "暂时无法恢复会话，请重试"
-              }
-              action={
-                <Button
-                  loading={retrying}
-                  onClick={() =>
-                    refreshUnconfirmed
-                      ? window.location.assign("/login")
-                      : void retry()
-                  }
-                >
-                  {refreshUnconfirmed ? "重新登录" : "重试连接"}
-                </Button>
-              }
-            />
-          )}
+          {!permissionModelIncompatible &&
+            (connectionError || refreshUnconfirmed) && (
+              <Alert
+                type="warning"
+                showIcon
+                title={
+                  refreshUnconfirmed
+                    ? "会话刷新结果尚未确认，请重新登录；当前操作请先查看结果"
+                    : hydrated
+                      ? "连接暂时中断，当前内容已保留"
+                      : "暂时无法恢复会话，请重试"
+                }
+                action={
+                  <Button
+                    loading={retrying}
+                    onClick={() =>
+                      refreshUnconfirmed
+                        ? window.location.assign("/login")
+                        : void retry()
+                    }
+                  >
+                    {refreshUnconfirmed ? "重新登录" : "重试连接"}
+                  </Button>
+                }
+              />
+            )}
           <Outlet />
         </AntApp>
       </ConfigProvider>

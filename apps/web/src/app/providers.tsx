@@ -39,7 +39,7 @@ function SessionRestorer() {
   useEffect(() => {
     window.dispatchEvent(new Event("tsz:app-ready"));
   }, []);
-  if (!connectionError) return null;
+  if (!connectionError && !refreshUnconfirmed) return null;
   return (
     <div
       role="alert"
