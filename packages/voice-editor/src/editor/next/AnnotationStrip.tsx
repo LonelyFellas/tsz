@@ -181,7 +181,14 @@ export function AnnotationStrip({
       const end = elementsOf(link.end);
       return start && end ? { start, end } : undefined;
     });
-  }, [marks.liaisons, marks.roles, marks.pauses, target, text]);
+  }, [
+    marks.liaisons,
+    marks.roles,
+    marks.pauses,
+    marks.passthrough,
+    target,
+    text
+  ]);
 
   const { arcs, strokeWidth } = useLiaisonArcs(containerRef, collectLinks);
 
@@ -284,7 +291,13 @@ export function AnnotationStrip({
   };
 
   const renderWhitespace = (value: string, from: number) =>
-    !inlinePauses
+    !inlinePauses &&
+    !marks.passthrough.some(
+      (annotation) =>
+        annotation.type === "underline" &&
+        annotation.start < from + Array.from(value).length &&
+        annotation.end > from
+    )
       ? value
       : graphemes(value).map(({ text: space, offset }) => {
           const start = from + offset;
@@ -304,7 +317,7 @@ export function AnnotationStrip({
             <Fragment key={start}>
               <span
                 ref={registerLetter(start)}
-                className={`tsz-ve-whitespace${lineBreak ? " is-caret-anchor" : ""}${target === "none" && covers(textRange, start, end) ? " is-text-selected" : ""}`}
+                className={`tsz-ve-whitespace${marks.passthrough.some((annotation) => annotation.type === "underline" && annotation.start <= start && annotation.end >= end) ? " tsz-ve-underline" : ""}${lineBreak ? " is-caret-anchor" : ""}${target === "none" && covers(textRange, start, end) ? " is-text-selected" : ""}`}
                 data-codepoint={start}
                 data-letter={space}
               >
@@ -506,14 +519,19 @@ export function AnnotationStrip({
                     const end = start + Array.from(letter).length;
                     const unit = unitAt(marks.roles, start);
                     const roleClass = unit ? ` is-${unit.level}` : "";
-                    const italicClass = marks.passthrough.some(
-                      (annotation) =>
-                        annotation.type === "italic" &&
-                        annotation.start <= start &&
-                        annotation.end >= end
+                    const formatClass = (
+                      ["bold", "italic", "underline"] as const
                     )
-                      ? " is-italic"
-                      : "";
+                      .filter((type) =>
+                        marks.passthrough.some(
+                          (annotation) =>
+                            annotation.type === type &&
+                            annotation.start <= start &&
+                            annotation.end >= end
+                        )
+                      )
+                      .map((type) => ` is-${type}`)
+                      .join("");
                     // 注意与 unit 的 level（语法分类）区分：这里是连读草稿的端别。
                     const anchorRole = draftRole(draft, start);
                     const selectedClass = covers(selectedRange, start, end)
@@ -541,7 +559,7 @@ export function AnnotationStrip({
                       <span
                         key={offset}
                         ref={registerLetter(start)}
-                        className={`tsz-ve-letter${roleClass}${italicClass}${textSelectedClass}${anchorRole ? ` is-anchor-${anchorRole}` : ""}${selectedClass}${anchorClass}${linkedRanges?.some((range) => covers(range, start, end)) ? " is-linked" : ""}${selectedLinkRanges?.some((range) => covers(range, start, end)) ? " is-link-selected" : ""}`}
+                        className={`tsz-ve-letter${roleClass}${formatClass}${textSelectedClass}${anchorRole ? ` is-anchor-${anchorRole}` : ""}${selectedClass}${anchorClass}${linkedRanges?.some((range) => covers(range, start, end)) ? " is-linked" : ""}${selectedLinkRanges?.some((range) => covers(range, start, end)) ? " is-link-selected" : ""}`}
                         role="button"
                         aria-label={`${token.text} 的第 ${offset + 1} 个字母 ${letter}`}
                         aria-pressed={Boolean(anchorRole)}

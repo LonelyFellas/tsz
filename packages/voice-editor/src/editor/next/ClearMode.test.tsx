@@ -39,61 +39,64 @@ const link: GrammarFormLinkV3 = {
   target_dialect: "common"
 };
 
-it("清除模式逐个取消连读与停顿，保留正文、语法标注和词形关联，并支持撤销", () => {
-  const onChange = vi.fn();
-  render(
-    <VoiceEditor<GrammarFormLinkV3>
-      mode="grammar"
-      value={value}
-      textLinks={[link]}
-      onChange={onChange}
-    />
-  );
-  const toggle = screen.getByRole("button", { name: "清除模式" });
-  expect(toggle).toHaveAttribute("aria-pressed", "false");
-  fireEvent.click(toggle);
-  expect(toggle).toHaveAttribute("aria-pressed", "true");
-  expect(onChange).not.toHaveBeenCalled();
-  fireEvent.mouseDown(screen.getByLabelText("第 1 处词缝"), { button: 0 });
-  fireEvent.mouseDown(screen.getByLabelText("job 的第 1 个字母 j"), {
-    button: 0
-  });
-  expect(onChange).not.toHaveBeenCalled();
+it.each(["grammar", "association"] as const)(
+  "%s 清除模式逐个取消连读与停顿，保留正文、格式和关联，并支持撤销",
+  (mode) => {
+    const onChange = vi.fn();
+    render(
+      <VoiceEditor<GrammarFormLinkV3>
+        mode={mode}
+        value={value}
+        textLinks={[link]}
+        onChange={onChange}
+      />
+    );
+    const toggle = screen.getByRole("button", { name: "清除模式" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.mouseDown(screen.getByLabelText("第 1 处词缝"), { button: 0 });
+    fireEvent.mouseDown(screen.getByLabelText("job 的第 1 个字母 j"), {
+      button: 0
+    });
+    expect(onChange).not.toHaveBeenCalled();
 
-  fireEvent.click(screen.getByLabelText("清除第 2 处停顿 0.5 秒"));
-  expect(onChange.mock.lastCall).toEqual([
-    {
-      ...value,
-      annotations: value.annotations.filter(
-        (item) => item.type !== "pause" || item.at !== 5
-      )
-    },
-    [link]
-  ]);
-  expect(toggle).toHaveAttribute("aria-pressed", "true");
-  fireEvent.mouseDown(document.querySelector(".tsz-ve-arc-hit")!, {
-    button: 2
-  });
-  expect(onChange).toHaveBeenCalledTimes(1);
-  fireEvent.mouseDown(document.querySelector(".tsz-ve-arc-hit")!, {
-    button: 0
-  });
-  expect(onChange.mock.lastCall?.[0].annotations).toEqual([
-    value.annotations[1],
-    value.annotations[3]
-  ]);
-  expect(toggle).toHaveAttribute("aria-pressed", "true");
-  fireEvent.mouseDown(screen.getByLabelText("第 3 处词缝：停顿 1s"), {
-    button: 0
-  });
-  expect(onChange.mock.lastCall).toEqual([
-    { ...value, annotations: [value.annotations[1]] },
-    [link]
-  ]);
-  for (let step = 0; step < 3; step += 1)
-    fireEvent.click(screen.getByRole("button", { name: "上一步" }));
-  expect(onChange.mock.lastCall).toEqual([value, [link]]);
-});
+    fireEvent.click(screen.getByLabelText("清除第 2 处停顿 0.5 秒"));
+    expect(onChange.mock.lastCall).toEqual([
+      {
+        ...value,
+        annotations: value.annotations.filter(
+          (item) => item.type !== "pause" || item.at !== 5
+        )
+      },
+      [link]
+    ]);
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    fireEvent.mouseDown(document.querySelector(".tsz-ve-arc-hit")!, {
+      button: 2
+    });
+    expect(onChange).toHaveBeenCalledTimes(1);
+    fireEvent.mouseDown(document.querySelector(".tsz-ve-arc-hit")!, {
+      button: 0
+    });
+    expect(onChange.mock.lastCall?.[0].annotations).toEqual([
+      value.annotations[1],
+      value.annotations[3]
+    ]);
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    fireEvent.mouseDown(screen.getByLabelText("第 3 处词缝：停顿 1s"), {
+      button: 0
+    });
+    expect(onChange.mock.lastCall).toEqual([
+      { ...value, annotations: [value.annotations[1]] },
+      [link]
+    ]);
+    for (let step = 0; step < 3; step += 1)
+      fireEvent.click(screen.getByRole("button", { name: "上一步" }));
+    expect(onChange.mock.lastCall).toEqual([value, [link]]);
+  }
+);
 
 it("清除模式可再次点击或按 Esc 退出，切换工具后恢复停顿调整", () => {
   const onChange = vi.fn();

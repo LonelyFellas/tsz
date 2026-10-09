@@ -272,8 +272,21 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         : "tsz-entry-en";
   const largePreview =
     mode === "grammar" || mode === "association" || mode === "actual-pron";
+  const associationPreview =
+    mode === "association" &&
+    toRichTextV2(value).annotations.some(
+      (annotation) =>
+        annotation.type === "bold" ||
+        annotation.type === "italic" ||
+        annotation.type === "underline"
+    );
   const grammarPreview =
-    mode === "grammar" && !expanded && !focused && value.text !== "";
+    (mode === "grammar" || associationPreview) &&
+    (!focused ||
+      readOnly ||
+      (env.VOICE_EDITOR && editingEnabled && recorded)) &&
+    !expanded &&
+    value.text !== "";
   const fallback = (
     <Input.TextArea
       key={largePreview ? "large" : "standard"}
@@ -349,7 +362,10 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     >
       {fallback}
       {grammarPreview ? (
-        <div className="v3-grammar-preview-content tsz-words" aria-hidden>
+        <div
+          className={`v3-grammar-preview-content ${fontClass}${mode === "association" ? " v3-association-preview-content" : ""}`}
+          aria-hidden
+        >
           <RichTextReadOnly
             value={
               value.version === 2
@@ -376,9 +392,11 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         {leadingAction ? (
           <Space.Compact block className="v3-voice-text-field-compact">
             {leadingAction}
-            {mode === "grammar" ? collapsedField : fallback}
+            {mode === "grammar" || associationPreview
+              ? collapsedField
+              : fallback}
           </Space.Compact>
-        ) : mode === "grammar" ? (
+        ) : mode === "grammar" || associationPreview ? (
           collapsedField
         ) : (
           fallback
@@ -437,6 +455,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           onAssociationPendingChange={onAssociationPendingChange}
           textReadOnly={false}
           mode={mode}
+          textFormattingEnabled={env.SENTENCE_FORMATTING}
           locale={voiceLocale(dialect)}
           textLinks={draftState.textLinks}
           restoreTextLinksOnCorrection={restoreTextLinksOnCorrection}

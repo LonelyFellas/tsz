@@ -33,6 +33,7 @@ export interface MarkupPanelProps extends Pick<
   | "selectedPauseGap"
 > {
   grammarMode?: boolean;
+  associationMode?: boolean;
   selectionText?: string;
   text: string;
   marks: MarkState;
@@ -61,6 +62,7 @@ export interface MarkupPanelProps extends Pick<
 
 export function MarkupPanel({
   grammarMode,
+  associationMode,
   selectionText,
   associationContent,
   associationAnchor,
@@ -98,21 +100,36 @@ export function MarkupPanel({
 }: MarkupPanelProps) {
   const [voicesExpanded, setVoicesExpanded] = useState(true);
   const voicesPanelId = useId();
-  const headerTools = grammarMode
+  const composedMode = grammarMode || associationMode;
+  const headerTools = composedMode
     ? tools.filter(
         (tool) =>
           tool.key === "text" ||
+          tool.key === "bold" ||
           tool.key === "italic" ||
+          tool.key === "underline" ||
           tool.key.startsWith("association-")
       )
     : [];
+  const formatOrder = [
+    "text",
+    "bold",
+    "italic",
+    "underline",
+    "association-word",
+    "association-phrase"
+  ];
+  headerTools.sort(
+    (left, right) =>
+      formatOrder.indexOf(left.key) - formatOrder.indexOf(right.key)
+  );
   const topTools = tools.filter(
     (tool) => tool.key === "roles" || tool.key === "liaison"
   );
   const bottomTools = tools.filter(
     (tool) => tool.key === "pause" || tool.key === "voices"
   );
-  const uploadTool = grammarMode
+  const uploadTool = composedMode
     ? tools.find((tool) => tool.key === "uploads")
     : undefined;
   const secondaryTools = tools.filter(
@@ -127,8 +144,12 @@ export function MarkupPanel({
   const marked =
     marks.roles.length +
     marks.liaisons.length +
-    marks.passthrough.filter((annotation) => annotation.type === "italic")
-      .length +
+    marks.passthrough.filter(
+      (annotation) =>
+        annotation.type === "italic" ||
+        annotation.type === "bold" ||
+        annotation.type === "underline"
+    ).length +
     Object.keys(marks.pauses).length;
   const trigger = (tool: DropdownTool, inline: boolean) => {
     const isVoices = inline && tool.key === "voices";
@@ -150,7 +171,10 @@ export function MarkupPanel({
         aria-controls={isVoices ? voicesPanelId : undefined}
         disabled={readOnly || tool.disabled}
         onMouseDown={
-          inline || tool.key === "italic"
+          inline ||
+          tool.key === "italic" ||
+          tool.key === "bold" ||
+          tool.key === "underline"
             ? (event) => event.preventDefault()
             : undefined
         }
@@ -195,7 +219,7 @@ export function MarkupPanel({
   return (
     <div className="tsz-ve-markup">
       <div
-        className={`tsz-ve-top-tools${grammarMode ? " is-grammar" : ""}`}
+        className={`tsz-ve-top-tools${composedMode ? " is-grammar" : ""}`}
         role="toolbar"
         aria-label="标注工具栏"
       >
@@ -253,17 +277,20 @@ export function MarkupPanel({
             </Tooltip>
           </div>
         )}
-        {grammarMode && (
+        {composedMode && (
           <div className="tsz-ve-selection-status" role="status">
             {brush.kind === "erase" ? (
               "清除模式：点击已有连读或停顿即可取消。"
             ) : selectionText ? (
               <>
                 已选中 <strong>{selectionText}</strong>
-                ，可配置“语法结构”和“连读符号”。
+                ，可配置{grammarMode ? "“语法结构”" : "“文本格式”"}
+                和“连读符号”。
               </>
-            ) : (
+            ) : grammarMode ? (
               "选中文字，可配置“语法结构”和“连读符号”。"
+            ) : (
+              "选中文字，可配置“文本格式”和“连读符号”。"
             )}
           </div>
         )}
@@ -301,7 +328,7 @@ export function MarkupPanel({
           onLetterClick={onLetterClick}
           onLiaisonClick={onLiaisonClick}
         />
-        {grammarMode && actions && (
+        {composedMode && actions && (
           <div className="tsz-ve-editor-actions">{actions}</div>
         )}
       </div>
@@ -327,14 +354,14 @@ export function MarkupPanel({
           ))}
         </div>
       )}
-      {(secondaryTools.length > 0 || (!grammarMode && actions)) && (
+      {(secondaryTools.length > 0 || (!composedMode && actions)) && (
         <div className="tsz-ve-footer">
           {secondaryTools.length > 0 && (
             <div className="tsz-ve-secondary-tools">
               {secondaryTools.map(renderTool)}
             </div>
           )}
-          {!grammarMode && actions && (
+          {!composedMode && actions && (
             <div className="tsz-ve-editor-actions">{actions}</div>
           )}
         </div>

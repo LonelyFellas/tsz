@@ -45,6 +45,12 @@ function renderMarkedText(segment: TextSegment, key: string): ReactNode {
   if (annotations.some((item) => item.type === "italic")) {
     node = <i className="tsz-ve-italic">{node}</i>;
   }
+  if (annotations.some((item) => item.type === "bold")) {
+    node = <strong className="tsz-ve-bold">{node}</strong>;
+  }
+  if (annotations.some((item) => item.type === "underline")) {
+    node = <span className="tsz-ve-underline">{node}</span>;
+  }
   const phoneme = annotations.find((item) => item.type === "phoneme");
   const emphasis = annotations.find((item) => item.type === "emphasis");
   const liaisons = annotations.filter(
