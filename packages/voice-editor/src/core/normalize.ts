@@ -45,7 +45,7 @@ type RangeAnnotation = Exclude<RichTextAnnotation, { type: "pause" }>;
 type LiaisonAnnotation = Extract<RichTextAnnotation, { type: "liaison" }>;
 type MergeableAnnotation = Extract<
   RangeAnnotation,
-  { type: "emphasis" | "highlight" | "italic" }
+  { type: "emphasis" | "highlight" | "italic" | "bold" | "underline" }
 >;
 
 function positionOf(annotation: RichTextAnnotation): number {
@@ -59,7 +59,9 @@ function typeRank(annotation: RichTextAnnotation): number {
     "liaison",
     "emphasis",
     "phoneme",
-    "italic"
+    "italic",
+    "bold",
+    "underline"
   ].indexOf(annotation.type);
 }
 
@@ -68,7 +70,12 @@ function sameMergeAttributes(
   right: MergeableAnnotation
 ): boolean {
   if (left.type !== right.type) return false;
-  if (left.type === "italic") return true;
+  if (
+    left.type === "italic" ||
+    left.type === "bold" ||
+    left.type === "underline"
+  )
+    return true;
   if (left.type === "emphasis" && right.type === "emphasis") {
     return left.level === right.level;
   }
@@ -285,7 +292,9 @@ export function normalizeRichTextV2(value: RichTextV2): RichTextV2 {
         (candidate): candidate is MergeableAnnotation =>
           (candidate.type === "emphasis" ||
             candidate.type === "highlight" ||
-            candidate.type === "italic") &&
+            candidate.type === "italic" ||
+            candidate.type === "bold" ||
+            candidate.type === "underline") &&
           sameMergeAttributes(candidate, annotation)
       );
     if (previous && annotation.start <= previous.end) {

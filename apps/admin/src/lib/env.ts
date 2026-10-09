@@ -19,6 +19,12 @@ const VOICE_EDITOR = parseBooleanEnvFlag(
   "VITE_VOICE_EDITOR",
   !import.meta.env.PROD
 );
+// 新格式需要读取端与后端契约同时就绪后再开放生产写入。
+const SENTENCE_FORMATTING = parseBooleanEnvFlag(
+  import.meta.env.VITE_SENTENCE_FORMATTING,
+  "VITE_SENTENCE_FORMATTING",
+  !import.meta.env.PROD
+);
 const VOICE_PREVIEW = parseBooleanEnvFlag(
   import.meta.env.VITE_VOICE_PREVIEW,
   "VITE_VOICE_PREVIEW",
@@ -60,6 +66,7 @@ export const env = {
   AZURE_PRONUNCIATION_INPUTS,
   API_BASE_URL: import.meta.env.VITE_API_BASE_URL ?? "/api/v1",
   VOICE_EDITOR,
+  SENTENCE_FORMATTING,
   VOICE_PREVIEW,
   ADMIN_TTS_MOCK,
   RELATED_SEARCH_V2,

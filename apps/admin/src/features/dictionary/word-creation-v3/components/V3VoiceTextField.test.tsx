@@ -13,7 +13,12 @@ import { useState } from "react";
 import type { AudioUploadAdapter } from "@tsz/voice-editor/types";
 
 const state = vi.hoisted(() => ({
-  flags: { VOICE_EDITOR: true, VOICE_PREVIEW: false, VOICE_AUDIO_UPLOAD: true },
+  flags: {
+    VOICE_EDITOR: true,
+    VOICE_PREVIEW: false,
+    VOICE_AUDIO_UPLOAD: true,
+    SENTENCE_FORMATTING: true
+  },
   listVoices: vi.fn(),
   upload: vi.fn(),
   resolveUrl: vi.fn()
@@ -67,6 +72,7 @@ async function openAudioPanel() {
 
 beforeEach(() => {
   state.flags.VOICE_EDITOR = true;
+  state.flags.SENTENCE_FORMATTING = true;
   state.flags.VOICE_PREVIEW = false;
   state.listVoices.mockResolvedValue([
     {
@@ -832,7 +838,69 @@ it.each([
   }
 );
 
-it("grammar 未聚焦展示颜色粗体和连读，聚焦改字、撤销后失焦恢复且不重挂输入框", () => {
+it.each([
+  { editor: true, readOnly: false },
+  { editor: true, readOnly: true },
+  { editor: false, readOnly: true }
+])(
+  "grammar 只读预览聚焦保留颜色、粗体、斜体、下划线和连读 editor=$editor readOnly=$readOnly",
+  ({ editor, readOnly }) => {
+    state.flags.VOICE_EDITOR = editor;
+    const onChange = vi.fn();
+    const { container } = render(
+      <V3VoiceTextField
+        mode="grammar"
+        ariaLabel="聚焦语法"
+        nodeId="focus-grammar"
+        field="content"
+        readOnly={readOnly}
+        value={{
+          ...LIAISON_TEXT,
+          version: 2,
+          annotations: [
+            ...LIAISON_TEXT.annotations,
+            { type: "emphasis", start: 0, end: 4, level: "core" },
+            { type: "italic", start: 0, end: 4 },
+            { type: "underline", start: 0, end: 4 }
+          ]
+        }}
+        onChange={onChange}
+      />
+    );
+    const input = screen.getByLabelText("聚焦语法");
+    const preview = container.querySelector(".v3-grammar-preview-content");
+    const anchors = Array.from(
+      container.querySelectorAll(".tsz-ve-liaison-anchor")
+    );
+    expect(input).toHaveAttribute("readonly");
+    expect(preview).not.toBeNull();
+    expect(anchors).toHaveLength(2);
+    fireEvent.focus(input);
+    expect(container.querySelector(".v3-grammar-preview-content")).toBe(
+      preview
+    );
+    expect(
+      Array.from(container.querySelectorAll('strong[data-level="core"]'))
+        .map((node) => node.textContent)
+        .join("")
+    ).toBe("pick");
+    expect(container.querySelector(".tsz-ve-italic")).not.toBeNull();
+    expect(container.querySelector(".tsz-ve-underline")).not.toBeNull();
+    expect(
+      Array.from(container.querySelectorAll(".tsz-ve-liaison-anchor"))
+    ).toEqual(anchors);
+    fireEvent.change(input, { target: { value: "changed" } });
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.blur(input);
+    expect(container.querySelector(".v3-grammar-preview-content")).toBe(
+      preview
+    );
+    expect(screen.getByLabelText("聚焦语法")).toBe(input);
+  }
+);
+
+it("grammar 降级输入可聚焦改字、撤销，失焦恢复格式且不重挂输入框", () => {
+  state.flags.VOICE_EDITOR = false;
   const initial: RichTextV3 = {
     ...LIAISON_TEXT,
     version: 2,
@@ -1042,3 +1110,135 @@ it("弧线层压在紧凑组员之上、点击穿透，并按输入框视口裁�
     /\.v3-voice-text-field-input\s*\{[^}]*margin-inline-end:\s*-1px;/su
   );
 });
+
+it("释义完成后显示三种格式，重开取消保持保存内容和另一方言", async () => {
+  const initial: Extract<EnglishTextV3, { mode: "distinguish" }> = {
+    mode: "distinguish",
+    source_dialect: "uk",
+    uk: {
+      state: "ready",
+      variant: {
+        id: "uk",
+        origin: "manual",
+        value: { version: 2, text: "a job", annotations: [] }
+      }
+    },
+    us: {
+      state: "ready",
+      variant: {
+        id: "us",
+        origin: "manual",
+        value: {
+          version: 2,
+          text: "a job",
+          annotations: [{ type: "italic", start: 2, end: 5 }]
+        }
+      }
+    }
+  };
+  function Host() {
+    const [value, setValue] = useState<EnglishTextV3>(initial);
+    return (
+      <>
+        <V3LinkedEnglishTextField
+          value={value}
+          label="释义"
+          suffix="正文"
+          linksEnabled={false}
+          onChange={setValue}
+        />
+        <output data-testid="sentence-format">{JSON.stringify(value)}</output>
+      </>
+    );
+  }
+  const view = render(<Host />);
+  fireEvent.click(screen.getByLabelText("打开释义 英式正文编辑器"));
+  await screen.findByRole(
+    "toolbar",
+    { name: "标注工具栏" },
+    { timeout: 10000 }
+  );
+  const input = screen.getByLabelText("释义 英式正文") as HTMLTextAreaElement;
+  input.focus();
+  input.setSelectionRange(2, 5);
+  fireEvent.mouseUp(input);
+  fireEvent.select(input);
+  for (const name of ["加粗", "斜体", "下划线"])
+    fireEvent.click(screen.getByRole("button", { name }));
+  expect(
+    JSON.parse(screen.getByTestId("sentence-format").textContent!)
+  ).toEqual(initial);
+  fireEvent.click(screen.getByLabelText("完成释义 英式正文编辑"));
+  const saved = JSON.parse(screen.getByTestId("sentence-format").textContent!);
+  expect(saved.uk.variant.value.annotations).toEqual([
+    { type: "italic", start: 2, end: 5 },
+    { type: "bold", start: 2, end: 5 },
+    { type: "underline", start: 2, end: 5 }
+  ]);
+  expect(saved.us).toEqual(initial.us);
+  expect(
+    view.container.querySelector(".v3-association-preview-content .tsz-ve-bold")
+  ).toHaveTextContent("job");
+  expect(
+    view.container.querySelector(
+      ".v3-association-preview-content .tsz-ve-underline"
+    )
+  ).toHaveTextContent("job");
+  fireEvent.click(screen.getByLabelText("打开释义 英式正文编辑器"));
+  await screen.findByRole(
+    "toolbar",
+    { name: "标注工具栏" },
+    { timeout: 10000 }
+  );
+  fireEvent.click(screen.getByRole("button", { name: "清空标注" }));
+  fireEvent.click(screen.getByLabelText("取消释义 英式正文编辑"));
+  expect(
+    JSON.parse(screen.getByTestId("sentence-format").textContent!)
+  ).toEqual(saved);
+  expect(
+    view.container.querySelector(".v3-association-preview-content .tsz-ve-bold")
+  ).toHaveTextContent("job");
+});
+
+it.each([
+  { editor: false, editing: true, leading: true },
+  { editor: true, editing: false, leading: false }
+])(
+  "读取端 editor=$editor editing=$editing 关闭写入仍显示格式，聚焦降级输入仍可见",
+  ({ editor, editing, leading }) => {
+    state.flags.VOICE_EDITOR = editor;
+    state.flags.SENTENCE_FORMATTING = false;
+    const value: RichTextV3 = {
+      version: 2,
+      text: "jobs",
+      annotations: [
+        { type: "bold", start: 0, end: 4 },
+        { type: "underline", start: 0, end: 4 }
+      ]
+    };
+    const { container } = render(
+      <V3VoiceTextField
+        mode="association"
+        ariaLabel="格式读取"
+        nodeId="format-reader"
+        field="value"
+        value={value}
+        editingEnabled={editing}
+        leadingAction={leading ? <button>播放</button> : undefined}
+        onChange={vi.fn()}
+      />
+    );
+    const input = screen.getByLabelText("格式读取");
+    expect(container.querySelector(".tsz-ve-bold")).toHaveTextContent("jobs");
+    expect(container.querySelector(".tsz-ve-underline")).toHaveTextContent(
+      "jobs"
+    );
+    expect(screen.queryByLabelText("打开格式读取编辑器")).toBeNull();
+    fireEvent.focus(input);
+    expect(container.querySelector(".v3-grammar-preview-content")).toBeNull();
+    expect(input).not.toHaveAttribute("readonly");
+    fireEvent.blur(input);
+    expect(container.querySelector(".tsz-ve-bold")).toHaveTextContent("jobs");
+    expect(screen.getByLabelText("格式读取")).toBe(input);
+  }
+);

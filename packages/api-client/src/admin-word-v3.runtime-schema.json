@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/grammar-italic/tsz-rust/docs/openapi.json",
-  "_source_sha256": "340fee8e1dc15012de4ea09c7fa53a9439d462af7ddb7e3025f7dd5ec89d3933",
+  "_source": "/Users/darwish/.codex/worktrees/sentence-formatting/tsz-rust/docs/openapi.json",
+  "_source_sha256": "64ea33128067dbfffb8c184a933112426877bf336ef051c8a8fb76a8bd4ce3e1",
   "roots": [
     "LearningRewardDay",
     "LearningPreview",
@@ -2120,6 +2120,26 @@
             "end": { "type": "integer", "minimum": 0 },
             "start": { "type": "integer", "minimum": 0 },
             "type": { "type": "string", "enum": ["italic"] }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "type"],
+          "properties": {
+            "end": { "type": "integer", "minimum": 0 },
+            "start": { "type": "integer", "minimum": 0 },
+            "type": { "type": "string", "enum": ["bold"] }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "type"],
+          "properties": {
+            "end": { "type": "integer", "minimum": 0 },
+            "start": { "type": "integer", "minimum": 0 },
+            "type": { "type": "string", "enum": ["underline"] }
           },
           "additionalProperties": false
         }

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/grammar-italic/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-08T12:43:12.329Z",
+  "_source": "/Users/darwish/.codex/worktrees/sentence-formatting/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-10-09T11:47:30.371Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -4758,6 +4758,26 @@
             "end": { "type": "integer", "minimum": 0 },
             "start": { "type": "integer", "minimum": 0 },
             "type": { "type": "string", "enum": ["italic"] }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "type"],
+          "properties": {
+            "end": { "type": "integer", "minimum": 0 },
+            "start": { "type": "integer", "minimum": 0 },
+            "type": { "type": "string", "enum": ["bold"] }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "type"],
+          "properties": {
+            "end": { "type": "integer", "minimum": 0 },
+            "start": { "type": "integer", "minimum": 0 },
+            "type": { "type": "string", "enum": ["underline"] }
           },
           "additionalProperties": false
         }
