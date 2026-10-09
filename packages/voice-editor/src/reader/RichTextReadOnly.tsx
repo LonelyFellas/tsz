@@ -181,7 +181,7 @@ export function RichTextReadOnly({
           <span
             className="tsz-ve-pause"
             data-duration-ms={segment.durationMs}
-            style={{ width: pauseMarkerWidth(segment.durationMs) }}
+            style={{ minWidth: pauseMarkerWidth(segment.durationMs) }}
             key={`pause-${segment.at}`}
           >
             {pauseMarkerLabel(segment.durationMs)}

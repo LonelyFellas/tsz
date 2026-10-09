@@ -1513,6 +1513,44 @@ describe("VoiceEditor 文本与落盘", () => {
 });
 
 describe("VoiceEditor 发音区", () => {
+  it("音色默认展开，收起后保留配置和上传入口，展开不打断停顿模式", async () => {
+    const onVoiceProfileChange = vi.fn();
+    render(
+      <VoiceEditor
+        {...props({
+          previewAdapter: adapter(),
+          onVoiceProfileChange,
+          voiceProfile: {
+            voices: [{ voice_id: "guy", enabled: true, rate_percent: -25 }]
+          }
+        })}
+      />
+    );
+    const trigger = button("发音");
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(trigger).toHaveTextContent("1 个音色");
+    const panel = document.getElementById(
+      trigger.getAttribute("aria-controls")!
+    )!;
+    expect(panel).not.toHaveAttribute("hidden");
+    await screen.findByLabelText("启用 Guy · 美式男声");
+    usePauseBrush();
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(panel).toHaveAttribute("hidden");
+    expect(button("音频")).toBeVisible();
+    expect(trigger).toHaveTextContent("1 个音色");
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(panel).not.toHaveAttribute("hidden");
+    expect(screen.getByLabelText("启用 Guy · 美式男声")).toBeChecked();
+    expect(
+      screen.getByLabelText("设置 Guy · 美式男声 的语速")
+    ).toHaveTextContent("0.75×");
+    expect(button("停顿")).toHaveAttribute("aria-pressed", "true");
+    expect(onVoiceProfileChange).not.toHaveBeenCalled();
+  });
+
   it("音色按语种分组，再按男女声分列", async () => {
     render(<VoiceEditor {...props({ previewAdapter: adapter() })} />);
     openVoices();

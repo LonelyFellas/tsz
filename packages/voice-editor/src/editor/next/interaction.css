@@ -46,7 +46,8 @@
   color: #68768b;
   box-shadow: none;
 }
-.tsz-ve-editor .tsz-ve-tool-toggle.ant-btn[aria-pressed="true"] {
+.tsz-ve-editor .tsz-ve-tool-toggle.ant-btn[aria-pressed="true"],
+.tsz-ve-editor .tsz-ve-speech-tool.ant-btn[aria-expanded="true"] {
   border-color: #cfdcff;
   background: #edf2ff;
   color: #2053ff;
@@ -348,11 +349,18 @@
 .tsz-ve-canvas.has-inline-pauses .tsz-ve-canvas-input::selection {
   background: transparent;
 }
-.tsz-ve-letter.is-text-selected {
+.tsz-ve-letter.is-text-selected,
+.tsz-ve-whitespace.is-text-selected {
   background: #b2d7ff;
 }
-.tsz-ve-canvas.has-inline-pauses .tsz-ve-letter {
+.tsz-ve-canvas.has-inline-pauses .tsz-ve-letter,
+.tsz-ve-whitespace {
   position: relative;
+}
+.tsz-ve-whitespace.is-caret-anchor {
+  display: inline-block;
+  width: 0;
+  height: 1em;
 }
 .tsz-ve-inline-caret {
   display: none;

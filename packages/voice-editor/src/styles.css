@@ -1227,7 +1227,7 @@
   font-weight: 400;
 }
 
-.tsz-ve-speech-tool[aria-pressed="true"] .tsz-ve-tool-summary {
+.tsz-ve-speech-tool[aria-expanded="true"] .tsz-ve-tool-summary {
   background: transparent;
   color: var(--ant-color-primary, #0071e3);
 }
@@ -1242,6 +1242,11 @@
   border-bottom: 1px solid currentColor;
   transform: rotate(45deg);
   opacity: 0.5;
+}
+
+.tsz-ve-speech-tool[aria-expanded="true"]::after {
+  margin-top: 2px;
+  transform: rotate(225deg);
 }
 
 @media (max-width: 600px) {

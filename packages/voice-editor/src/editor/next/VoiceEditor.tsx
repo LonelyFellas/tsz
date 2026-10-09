@@ -1024,6 +1024,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         }
       }));
     }
+    changeBrush({ kind: "pause", durationMs });
   };
 
   const confirmConflict = () => {
@@ -1055,7 +1056,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         }
       };
     });
-    resetTransient();
+    if (pending.kind === "pause") {
+      changeBrush({ kind: "pause", durationMs: pending.durationMs });
+    } else {
+      resetTransient();
+    }
   };
 
   const applyPause = (durationMs: number) => {

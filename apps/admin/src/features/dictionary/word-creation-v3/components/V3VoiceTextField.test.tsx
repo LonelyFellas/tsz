@@ -275,7 +275,9 @@ describe("V3VoiceTextField 语种筛选", () => {
       { name: "标注工具栏" },
       { timeout: 10_000 }
     );
-    fireEvent.click(screen.getByRole("button", { name: /发音/ }));
+    const voices = screen.getByRole("button", { name: /发音/ });
+    if (voices.getAttribute("aria-expanded") !== "true")
+      fireEvent.click(voices);
   }
 
   // uk 必须落 en-GB、us 必须落 en-US：映射写反了不会报错，只会静默上线。

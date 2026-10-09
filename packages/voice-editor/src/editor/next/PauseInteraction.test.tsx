@@ -97,11 +97,20 @@ describe("停顿定位与显式编辑", () => {
     expect(data().annotations).toEqual([
       { type: "pause", at: 11, duration_ms: 500 }
     ]);
+    expect(button("停顿")).toHaveAttribute("aria-pressed", "true");
     expect(
       document.querySelectorAll(
         '.tsz-ve-gap:not(.has-pause)[aria-disabled="false"]'
       )
-    ).toHaveLength(0);
+    ).toHaveLength(3);
+    fireEvent.mouseDown(document.querySelectorAll(".tsz-ve-gap")[0]!, {
+      button: 0
+    });
+    expect(data().annotations).toEqual([
+      { type: "pause", at: 1, duration_ms: 500 },
+      { type: "pause", at: 11, duration_ms: 500 }
+    ]);
+    expect(button("停顿")).toHaveAttribute("aria-pressed", "true");
   });
   it.each([
     ["预设", 750],
@@ -249,7 +258,7 @@ describe("停顿定位与显式编辑", () => {
     ]);
     expect(document.querySelector(".tsz-ve-canvas")).toHaveAttribute(
       "data-target",
-      "none"
+      "gap"
     );
   });
   it("历史冲突只提示，不在载入时自动清理数据", () => {
@@ -278,6 +287,15 @@ describe("停顿定位与显式编辑", () => {
     expect(data().annotations).toContainEqual({
       type: "pause",
       at: 15,
+      duration_ms: 1001
+    });
+    expect(button("停顿")).toHaveAttribute("aria-pressed", "true");
+    fireEvent.mouseDown(document.querySelectorAll(".tsz-ve-gap")[0]!, {
+      button: 0
+    });
+    expect(data().annotations).toContainEqual({
+      type: "pause",
+      at: 1,
       duration_ms: 1001
     });
   });
@@ -338,6 +356,9 @@ describe("停顿定位与显式编辑", () => {
         { type: "pause", at: 15, duration_ms: 500 }
       ])
     );
+    expect(button("停顿")).toHaveAttribute("aria-pressed", "true");
+    fireEvent.keyDown(button("停顿"), { key: "Escape" });
+    expect(button("停顿")).toHaveAttribute("aria-pressed", "false");
     fireEvent.click(button("上一步"));
     expect(data()).toEqual(initial);
   });

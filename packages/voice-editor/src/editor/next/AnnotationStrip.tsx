@@ -265,34 +265,13 @@ export function AnnotationStrip({
       !container.contains(range.endContainer)
     )
       return;
-    let start = sourceOffset(range.startContainer, range.startOffset)!;
-    let end = sourceOffset(range.endContainer, range.endOffset)!;
-    if (range.collapsed) {
-      const nearest = [...letterRefs.current.entries()]
-        .map(([point, element]) => {
-          const box = element.getBoundingClientRect();
-          return {
-            point,
-            element,
-            box,
-            dy: Math.max(
-              box.top - event.clientY,
-              event.clientY - box.bottom,
-              0
-            ),
-            dx: Math.max(box.left - event.clientX, event.clientX - box.right, 0)
-          };
-        })
-        .sort((left, right) => left.dy - right.dy || left.dx - right.dx)[0];
-      if (nearest) {
-        const point =
-          nearest.point +
-          (event.clientX >= (nearest.box.left + nearest.box.right) / 2
-            ? Array.from(nearest.element.dataset.letter!).length
-            : 0);
-        start = end = textPoints.slice(0, point).join("").length;
-      }
-    }
+    const hit = range.collapsed
+      ? document.caretRangeFromPoint?.(event.clientX, event.clientY)
+      : undefined;
+    const selected =
+      hit && container.contains(hit.startContainer) ? hit : range;
+    const start = sourceOffset(selected.startContainer, selected.startOffset)!;
+    const end = sourceOffset(selected.endContainer, selected.endOffset)!;
     const anchor = sourceOffset(selection.anchorNode!, selection.anchorOffset)!;
     const focus = sourceOffset(selection.focusNode!, selection.focusOffset)!;
     input.focus({ preventScroll: true });
@@ -303,6 +282,45 @@ export function AnnotationStrip({
     );
     syncTextSelection(input);
   };
+
+  const renderWhitespace = (value: string, from: number) =>
+    !inlinePauses
+      ? value
+      : graphemes(value).map(({ text: space, offset }) => {
+          const start = from + offset;
+          const end = start + Array.from(space).length;
+          const lineBreak = /[\r\n]/u.test(space);
+          const collapsed = textRange?.start === textRange?.end;
+          const caretBefore =
+            collapsed &&
+            textRange?.end === start &&
+            (start === 0 || /\s/u.test(textPoints[start - 1]!));
+          const caretAfter =
+            collapsed &&
+            textRange?.end === end &&
+            end === textPoints.length &&
+            !lineBreak;
+          return (
+            <Fragment key={start}>
+              <span
+                ref={registerLetter(start)}
+                className={`tsz-ve-whitespace${lineBreak ? " is-caret-anchor" : ""}${target === "none" && covers(textRange, start, end) ? " is-text-selected" : ""}`}
+                data-codepoint={start}
+                data-letter={space}
+              >
+                {!lineBreak && space}
+                {(caretBefore || caretAfter) && (
+                  <span
+                    className="tsz-ve-inline-caret"
+                    data-edge={caretBefore ? "before" : "after"}
+                    aria-hidden
+                  />
+                )}
+              </span>
+              {lineBreak && space}
+            </Fragment>
+          );
+        });
 
   const navigateInlineText = (
     event: ReactKeyboardEvent<HTMLTextAreaElement>
@@ -317,7 +335,7 @@ export function AnnotationStrip({
       return;
     const input = event.currentTarget;
     const container = containerRef.current;
-    if (!container || !document.caretRangeFromPoint) return;
+    if (!container) return;
     const backward = input.selectionDirection === "backward";
     const focus = backward ? input.selectionStart : input.selectionEnd;
     const point = Array.from(text.slice(0, focus)).length;
@@ -329,22 +347,37 @@ export function AnnotationStrip({
       letters.reverse().find(([start]) => start < point);
     if (!letter) return;
     const box = letter[1].getBoundingClientRect();
-    const bounds = container.getBoundingClientRect();
-    const style = getComputedStyle(container);
-    const x =
-      event.key === "Home"
-        ? bounds.left + parseFloat(style.paddingLeft)
-        : event.key === "End"
-          ? bounds.right - parseFloat(style.paddingRight)
-          : point === letter[0]
-            ? box.left
-            : box.right;
-    const y =
-      (box.top + box.bottom) / 2 +
-      (event.key === "ArrowUp" ? -1 : event.key === "ArrowDown" ? 1 : 0) *
-        parseFloat(style.lineHeight);
-    const hit = document.caretRangeFromPoint(x, y);
-    const next = hit && sourceOffset(hit.startContainer, hit.startOffset);
+    const centerY = (box.top + box.bottom) / 2;
+    let next: number | undefined;
+    if (event.key === "Home" || event.key === "End") {
+      // 在当前可见行内取真实字符边界，避免浏览器把行尾空白命中到上一行。
+      const line = letters.filter(([, element]) => {
+        const rect = element.getBoundingClientRect();
+        return rect.top <= centerY && rect.bottom >= centerY;
+      });
+      if (!line.length) return;
+      const boundary =
+        event.key === "Home"
+          ? Math.min(...line.map(([start]) => start))
+          : Math.max(
+              ...line.map(([start, element]) =>
+                /[\r\n]/u.test(element.dataset.letter!)
+                  ? start
+                  : start + Array.from(element.dataset.letter!).length
+              )
+            );
+      next = textPoints.slice(0, boundary).join("").length;
+    } else {
+      const x = point === letter[0] ? box.left : box.right;
+      const y =
+        centerY +
+        (event.key === "ArrowUp" ? -1 : 1) *
+          parseFloat(getComputedStyle(container).lineHeight);
+      const hit = document.caretRangeFromPoint?.(x, y);
+      next = hit
+        ? sourceOffset(hit.startContainer, hit.startOffset)
+        : undefined;
+    }
     if (next === undefined || next === null) return;
     event.preventDefault();
     const anchor = event.shiftKey
@@ -396,7 +429,7 @@ export function AnnotationStrip({
         {/*
          * 保留词间原始空白，输入和显示层选区映射使用同一份正文。
          */}
-        {leadingSpace(text, tokens)}
+        {renderWhitespace(leadingSpace(text, tokens), 0)}
         {tokens.map((token, position) => {
           const hasNext = position < tokens.length - 1;
           const nextToken = tokens[position + 1];
@@ -597,7 +630,7 @@ export function AnnotationStrip({
                             type="button"
                             className="tsz-ve-gap-pause-value tsz-ve-pause-chip"
                             data-duration-ms={pause}
-                            style={{ width: pauseMarkerWidth(pause) }}
+                            style={{ minWidth: pauseMarkerWidth(pause) }}
                             aria-label={`${brush.kind === "erase" ? "清除" : "编辑"}第 ${position + 1} 处停顿 ${pause / 1000} 秒`}
                             disabled={
                               readOnly ||
@@ -620,14 +653,34 @@ export function AnnotationStrip({
                       </Popover>
                     </span>
                   )}
-                  {textBetween(text, token.end, tokens[position + 1]!.start)}
+                  {renderWhitespace(
+                    textBetween(text, token.end, tokens[position + 1]!.start),
+                    token.end
+                  )}
                 </span>
               )}
             </Fragment>
           );
         })}
         {/* 末尾的空白也要渲染出来，否则光标停在行尾时两层会差一个字宽。 */}
-        {trailingSpace(text, tokens)}
+        {renderWhitespace(trailingSpace(text, tokens), tokens.at(-1)?.end ?? 0)}
+        {inlinePauses && /[\r\n]$/u.test(text) && (
+          <span
+            className="tsz-ve-whitespace is-caret-anchor"
+            ref={registerLetter(textPoints.length)}
+            data-codepoint={textPoints.length}
+            data-letter=""
+          >
+            {textRange?.start === textPoints.length &&
+              textRange.end === textPoints.length && (
+                <span
+                  className="tsz-ve-inline-caret"
+                  data-edge="before"
+                  aria-hidden
+                />
+              )}
+          </span>
+        )}
       </div>
 
       <textarea
