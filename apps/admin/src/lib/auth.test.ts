@@ -27,6 +27,7 @@ function stateWith(level: AdminProfile["role"] | null): AdminAuthState {
     role: level,
     hydrated: true,
     connectionError: false,
+    refreshUnconfirmed: false,
     permissionModelIncompatible: false,
     setProfile: () => {},
     setHydrated: () => {}

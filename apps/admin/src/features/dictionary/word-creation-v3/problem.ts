@@ -1,5 +1,6 @@
 import {
   HttpError,
+  RequestTimeoutError,
   InvalidAdminWordResponseError,
   UnsupportedAdminWordSchemaVersionError
 } from "@tsz/api-client";
@@ -143,6 +144,7 @@ export function classifyV3Problem(
     }
     if (
       error instanceof TypeError ||
+      error instanceof RequestTimeoutError ||
       name === "TimeoutError" ||
       name === "NetworkError"
     ) {

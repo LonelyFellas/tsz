@@ -7,7 +7,7 @@ import type {
   AccountDeletionState,
   CreateAccountDeletionRequest
 } from "@tsz/types";
-import { HttpError } from "@tsz/api-client";
+import { HttpError, RequestTimeoutError } from "@tsz/api-client";
 import { isCode } from "@tsz/shared";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -39,7 +39,9 @@ const ERROR_BY_CODE: Record<string, string> = {
 };
 
 function accountDeletionError(error: unknown): string {
-  if (!(error instanceof HttpError)) return "网络异常，请检查连接后重试";
+  if (error instanceof RequestTimeoutError) return error.message;
+  if (!(error instanceof HttpError))
+    return "网络异常，操作结果尚未确认，请先刷新查看状态";
   if (error.status === 404) return "注销申请服务暂不可用，请稍后重试";
   const mapped = error.code ? ERROR_BY_CODE[error.code] : undefined;
   if (mapped) return mapped;

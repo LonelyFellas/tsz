@@ -33,6 +33,7 @@ const ReactQueryDevtools = dynamic(
 
 function SessionRestorer() {
   const { retry, retrying } = useSessionRestore();
+  const refreshUnconfirmed = useUserStore((s) => s.refreshUnconfirmed);
   const connectionError = useUserStore((s) => s.connectionError);
   const hydrated = useUserStore((s) => s.hydrated);
   useEffect(() => {
@@ -45,15 +46,21 @@ function SessionRestorer() {
       className="fixed inset-x-4 top-4 z-50 mx-auto max-w-lg rounded-3xl border border-gray-200 bg-white p-4 text-center text-gray-900 shadow-lg dark:border-gray-700 dark:bg-gray-900 dark:text-white"
     >
       <p>
-        {hydrated ? "连接暂时中断，当前内容已保留" : "暂时无法恢复会话，请重试"}
+        {refreshUnconfirmed
+          ? "会话刷新结果尚未确认，请重新登录；当前操作请先查看结果"
+          : hydrated
+            ? "连接暂时中断，当前内容已保留"
+            : "暂时无法恢复会话，请重试"}
       </p>
       <button
         type="button"
         disabled={retrying}
-        onClick={() => void retry()}
+        onClick={() =>
+          refreshUnconfirmed ? (window.location.href = "/login") : void retry()
+        }
         className="mt-3 rounded-full bg-[#0071e3] px-5 py-2 text-white disabled:opacity-50"
       >
-        {retrying ? "重试中…" : "重试连接"}
+        {refreshUnconfirmed ? "重新登录" : retrying ? "重试中…" : "重试连接"}
       </button>
     </div>
   );

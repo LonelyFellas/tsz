@@ -137,8 +137,8 @@ describe.each(["web", "admin"] as const)("%s HTTP + auth runtime", (realm) => {
     rt.tokens.setAccessToken(null);
   });
 
-  it.each([503, "offline"])(
-    "页面恢复可见时 refresh %s 保留会话，online 后恢复",
+  it.each([429, "offline", 503])(
+    "页面恢复可见时 refresh %s 保留会话，未知轮换结果禁止重放",
     async (failure) => {
       vi.useFakeTimers();
       const location = { href: "" };
@@ -155,7 +155,8 @@ describe.each(["web", "admin"] as const)("%s HTTP + auth runtime", (realm) => {
       rt.persistSession({ access_token: "old", expires_in: 10 });
       rt.store.getState().setHydrated(true);
       const fetch = vi.spyOn(globalThis, "fetch");
-      if (failure === 503) fetch.mockResolvedValueOnce(response(503));
+      if (typeof failure === "number")
+        fetch.mockResolvedValueOnce(response(failure));
       else fetch.mockRejectedValueOnce(new TypeError("offline"));
       doc.dispatchEvent(new Event("visibilitychange"));
       await vi.waitFor(() =>
@@ -167,8 +168,15 @@ describe.each(["web", "admin"] as const)("%s HTTP + auth runtime", (realm) => {
         response(200, { access_token: "new", expires_in: 900 })
       );
       win.dispatchEvent(new Event("online"));
-      await vi.waitFor(() => expect(rt.tokens.getToken()).toBe("new"));
-      expect(rt.store.getState().connectionError).toBe(false);
+      if (failure !== 429) {
+        await vi.advanceTimersByTimeAsync(60_000);
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(rt.tokens.getToken()).toBe("old");
+        expect(rt.store.getState().refreshUnconfirmed).toBe(true);
+      } else {
+        await vi.waitFor(() => expect(rt.tokens.getToken()).toBe("new"));
+        expect(rt.store.getState().connectionError).toBe(false);
+      }
       rt.tokens.setAccessToken(null);
     }
   );
@@ -177,7 +185,7 @@ describe.each(["web", "admin"] as const)("%s HTTP + auth runtime", (realm) => {
     const { rt, location } = setup();
     const fetch = vi
       .spyOn(globalThis, "fetch")
-      .mockRejectedValue(new TypeError("offline"));
+      .mockResolvedValue(response(429));
     await vi.advanceTimersByTimeAsync(30_000);
     expect(fetch).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(5_000);
@@ -199,14 +207,15 @@ describe.each(["web", "admin"] as const)("%s HTTP + auth runtime", (realm) => {
     rt.tokens.setAccessToken(null);
   });
 
-  it.each([503, "offline"])(
-    "业务 401 后 refresh %s 不登出、不重放，恢复后可刷新",
+  it.each([429, "offline", 503])(
+    "业务 401 后 refresh %s 不登出，断网后需重新登录",
     async (failure) => {
       const { rt, request, location } = setup();
       const fetch = vi
         .spyOn(globalThis, "fetch")
         .mockResolvedValueOnce(response(401, { code: "invalid_token" }));
-      if (failure === 503) fetch.mockResolvedValueOnce(response(503));
+      if (typeof failure === "number")
+        fetch.mockResolvedValueOnce(response(failure));
       else fetch.mockRejectedValueOnce(new TypeError("Failed to fetch"));
       await expect(request()).rejects.toThrow();
       expect(fetch).toHaveBeenCalledTimes(2);
@@ -215,6 +224,11 @@ describe.each(["web", "admin"] as const)("%s HTTP + auth runtime", (realm) => {
       fetch.mockResolvedValueOnce(
         response(200, { access_token: "new", expires_in: 900 })
       );
+      if (failure !== 429) {
+        await expect(rt.tokens.refreshTokens()).rejects.toThrow("请重新登录");
+        expect(fetch).toHaveBeenCalledTimes(2);
+        rt.tokens.setAccessToken("new-login");
+      }
       await expect(rt.tokens.refreshTokens()).resolves.toBe("new");
       expect(rt.tokens.getToken()).toBe("new");
       rt.tokens.setAccessToken(null);

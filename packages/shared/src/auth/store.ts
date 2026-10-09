@@ -10,6 +10,7 @@ export interface AuthState {
   /** 身份已确认或明确无会话；临时恢复故障保持 false。 */
   hydrated: boolean;
   connectionError: boolean;
+  refreshUnconfirmed: boolean;
   /** 一次性发布已准备好的登录态，避免守卫读到 user/onboarded 的中间状态。 */
   setSession: (user: User, onboarded: boolean) => void;
   setUser: (user: User | null) => void;
@@ -32,6 +33,7 @@ export function createAuthStore(): AuthStore {
     onboarded: null,
     hydrated: false,
     connectionError: false,
+    refreshUnconfirmed: false,
     setSession: (user, onboarded) =>
       set({
         user,

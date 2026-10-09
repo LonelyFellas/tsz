@@ -1,5 +1,9 @@
 import type { AvatarContentType } from "@tsz/api-client";
-import { AVATAR_CONTENT_TYPES, HttpError } from "@tsz/api-client";
+import {
+  AVATAR_CONTENT_TYPES,
+  HttpError,
+  createRequestDeadline
+} from "@tsz/api-client";
 import type { User } from "@tsz/types";
 import { api } from "@/lib/request";
 
@@ -80,23 +84,26 @@ export async function uploadAvatar(file: File): Promise<User> {
     // 网络级失败(CORS 拦截/断网时 fetch 直接 reject)与非 2xx 一并归一化,
     // 避免浏览器原生英文报错(Failed to fetch 等)透传到 UI;
     // 超时对齐预签名有效期——过期后连接再挂着也不可能成功。
-    // expires_in 兜底 600s(后端默认值):字段缺失/为 0 时 NaN/0ms 会让 PUT 立即中止;
-    // AbortSignal.timeout 较新(Safari 16+),旧 WebView 缺失时宁可不设超时
-    // 也不能让上传必挂(同 PR #38 的特性检测教训,localhost/jsdom 复现不了)。
-    const timeoutMs = (upload.expires_in > 0 ? upload.expires_in : 600) * 1000;
+    // 上传最多等待 90 秒；签名更早过期时使用更短预算。
+    const timeoutMs = Math.min(
+      upload.expires_in > 0 ? upload.expires_in * 1000 : 90_000,
+      90_000
+    );
+    const deadline = createRequestDeadline(timeoutMs, "PUT");
     let res: Response;
     try {
-      res = await fetch(upload.url, {
-        method: "PUT",
-        headers: upload.headers,
-        body: file,
-        signal:
-          typeof AbortSignal.timeout === "function"
-            ? AbortSignal.timeout(timeoutMs)
-            : undefined
-      });
+      res = await deadline.wait(() =>
+        fetch(upload.url, {
+          method: "PUT",
+          headers: upload.headers,
+          body: file,
+          signal: deadline.signal
+        })
+      );
     } catch {
       throw new Error("oss upload failed");
+    } finally {
+      deadline.dispose();
     }
     // 403 = URL 过期或 Content-Type 不符,旧 URL 不可续期,整个流程重来即可。
     if (!res.ok) {

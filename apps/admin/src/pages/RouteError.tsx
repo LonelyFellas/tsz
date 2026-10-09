@@ -15,9 +15,7 @@ export function RouteErrorPage() {
   }, [resourceError]);
   const message = resourceError
     ? "页面资源加载失败，请检查网络或刷新重试。编辑备份可在原页面恢复。"
-    : error instanceof Error
-      ? error.message
-      : "发生了未知错误，请稍后重试。";
+    : "页面暂时无法显示，请刷新后重试。";
 
   return (
     <FullscreenCenter>

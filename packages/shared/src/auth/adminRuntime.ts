@@ -1,3 +1,4 @@
+import { RefreshUnconfirmedError } from "./tokenManager";
 // 把 admin 端点、token 管理器、后台 store 装配成一份 admin 鉴权 runtime。
 // 与 web 的 createAuthRuntime 互不引用：端点、refresh cookie path、store 形状都不同。
 // 复用底层 createHttpClient / createTokenManager（无状态机制，按 baseUrl 参数化），
@@ -61,8 +62,13 @@ export function createAdminAuthRuntime({
     baseUrl,
     loginPath,
     onRefreshError: (error) => {
+      store.setState({
+        refreshUnconfirmed: error instanceof RefreshUnconfirmedError
+      });
       if (error !== null || store.getState().hydrated) {
-        store.setState({ connectionError: error !== null });
+        store.setState({
+          connectionError: error !== null
+        });
       }
     }
   });

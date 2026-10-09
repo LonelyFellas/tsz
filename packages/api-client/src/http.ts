@@ -5,6 +5,7 @@ import type {
   ProblemDetails,
   ProblemMeta
 } from "@tsz/types";
+import { createRequestDeadline } from "./deadline";
 import { validateRuntimeSchema } from "./runtime-schema";
 
 export interface HttpClientOptions {
@@ -162,20 +163,22 @@ export function createHttpClient({
   onSessionExpired,
   onForbidden
 }: HttpClientOptions) {
-  async function request<T>(
+  async function performRequest<T>(
     path: string,
     init: RequestInit = {},
     retrying = false,
     skipAuth = false,
     retryOnUnauthorized:
       boolean | ((code: string | undefined) => boolean) = true,
-    responseType: "json" | "blob" = "json"
+    responseType: "json" | "blob" = "json",
+    deadline?: ReturnType<typeof createRequestDeadline>
   ): Promise<T> {
     const generation = getSessionGeneration?.();
     const isCurrent = () => generation === getSessionGeneration?.();
     // 公开端点(登录/注册等)不带 access token，避免遗留的旧 token 污染请求。
     const token = skipAuth ? undefined : await getToken?.();
     if (!skipAuth && !isCurrent()) throw new Error("session changed");
+    init.signal?.throwIfAborted();
     const headers = new Headers(init.headers);
     if (!headers.has("Content-Type")) {
       headers.set("Content-Type", "application/json");
@@ -190,7 +193,9 @@ export function createHttpClient({
     });
 
     if (!skipAuth && !isCurrent()) throw new Error("session changed");
+    init.signal?.throwIfAborted();
     const parsedError = res.ok ? undefined : await parseError(res);
+    init.signal?.throwIfAborted();
     if (!skipAuth && !isCurrent()) throw new Error("session changed");
     if (
       res.status === 401 &&
@@ -204,7 +209,7 @@ export function createHttpClient({
       try {
         const currentToken = await getToken?.();
         if (!isCurrent()) throw new Error("session changed");
-        if (currentToken === token) await onRefresh();
+        if (currentToken === token) await deadline!.wait(onRefresh);
       } catch (error) {
         if (isCurrent() && error instanceof HttpError && error.status === 401) {
           onSessionExpired?.();
@@ -212,13 +217,14 @@ export function createHttpClient({
         throw error;
       }
       if (!isCurrent()) throw new Error("session changed");
-      return request<T>(
+      return performRequest<T>(
         path,
         init,
         true,
         skipAuth,
         retryOnUnauthorized,
-        responseType
+        responseType,
+        deadline
       );
     }
 
@@ -249,6 +255,43 @@ export function createHttpClient({
     const text = await res.text();
     if (!skipAuth && !isCurrent()) throw new Error("session changed");
     return (text ? JSON.parse(text) : undefined) as T;
+  }
+
+  async function request<T>(
+    path: string,
+    init: RequestInit = {},
+    retrying = false,
+    skipAuth = false,
+    retryOnUnauthorized:
+      boolean | ((code: string | undefined) => boolean) = true,
+    responseType: "json" | "blob" = "json"
+  ): Promise<T> {
+    const method = init.method ?? "GET";
+    const longOperation =
+      init.body instanceof Blob ||
+      /\/(speech|audio|avatar|teacher-certification|teacher-applications)/.test(
+        path
+      );
+    const deadline = createRequestDeadline(
+      longOperation ? 90_000 : 30_000,
+      method,
+      init.signal
+    );
+    try {
+      return await deadline.wait(() =>
+        performRequest<T>(
+          path,
+          { ...init, signal: deadline.signal },
+          retrying,
+          skipAuth,
+          retryOnUnauthorized,
+          responseType,
+          deadline
+        )
+      );
+    } finally {
+      deadline.dispose();
+    }
   }
 
   return {
@@ -329,3 +372,5 @@ export function createHttpClient({
 }
 
 export type HttpClient = ReturnType<typeof createHttpClient>;
+
+export { RequestTimeoutError } from "./deadline";

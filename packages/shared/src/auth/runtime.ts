@@ -1,3 +1,4 @@
+import { RefreshUnconfirmedError } from "./tokenManager";
 // 把 api-client、token 管理器、用户 store 装配成一份应用级鉴权 runtime。
 // web 与 admin 各实例化一次（注入各自 baseUrl）。
 import {
@@ -38,8 +39,13 @@ export function createAuthRuntime({
     baseUrl,
     loginPath,
     onRefreshError: (error) => {
+      store.setState({
+        refreshUnconfirmed: error instanceof RefreshUnconfirmedError
+      });
       if (error !== null || store.getState().hydrated) {
-        store.setState({ connectionError: error !== null });
+        store.setState({
+          connectionError: error !== null
+        });
       }
     }
   });
