@@ -38,6 +38,22 @@ const IDEMPOTENT_LEXICON_OPERATIONS = [
   "post /admin/lexicon/entries/publications/batch"
 ] as const;
 
+const SPELLING_MARKUP_OPERATIONS: readonly string[] = [
+  "get /admin/lexicon/entries/{id}",
+  "get /admin/lexicon/entries/{id}/publications",
+  "get /admin/lexicon/entries/{id}/publications/{publication_id}",
+  "post /admin/lexicon/entries",
+  "put /admin/lexicon/entries/{id}/steps/forms",
+  "put /admin/lexicon/entries/{id}/steps/meanings",
+  "post /admin/lexicon/entries/{id}/publications",
+  "post /admin/lexicon/entries/{id}/publications/{publication_id}/rollback",
+  "post /admin/lexicon/entries/publications/batch",
+  "post /admin/lexicon/entries/{id}/archive",
+  "post /admin/lexicon/entries/{id}/restore",
+  "post /admin/lexicon/entries/archive-batch",
+  "post /admin/lexicon/entries/restore-batch"
+];
+
 // 已知「后端尚未提供 / 待对接」的端点白名单。每条都必须真不在 spec 里——
 // 等后端实现后,本测试会反过来要求你把它从这里删掉(见下方「台账保鲜」断言),
 // 删掉后它就自动纳入正式校验。新增端点若既不在 spec 也不在此处,测试会红。
@@ -700,7 +716,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "4647d0bc9c90ce91e9dff1749562b91673d8f716f1c61bfd66395c89ad346af5"
+      "7e445f6e0e85535743b9545df3fd91ef38ec12c1d31ff1e88f4ca7f9550fd124"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -953,7 +969,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     );
   });
 
-  it("词库命令端点的 Idempotency-Key 必须是必填 UUID header", () => {
+  it("词库幂等 UUID 头与可选拼写能力头保持独立契约", () => {
     const expectedHeader = {
       name: "Idempotency-Key",
       in: "header",
@@ -963,9 +979,30 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
 
     expect(snapshot.operationHeaders).toEqual(
       Object.fromEntries(
-        IDEMPOTENT_LEXICON_OPERATIONS.map((operation) => [
+        [
+          ...new Set([
+            ...IDEMPOTENT_LEXICON_OPERATIONS,
+            ...SPELLING_MARKUP_OPERATIONS
+          ])
+        ].map((operation) => [
           operation,
-          [expectedHeader]
+          [
+            ...(IDEMPOTENT_LEXICON_OPERATIONS.includes(
+              operation as (typeof IDEMPOTENT_LEXICON_OPERATIONS)[number]
+            )
+              ? [expectedHeader]
+              : []),
+            ...(SPELLING_MARKUP_OPERATIONS.includes(operation)
+              ? [
+                  {
+                    name: "X-TSZ-Spelling-Markup",
+                    in: "header",
+                    required: false,
+                    schema: { type: ["string", "null"] }
+                  }
+                ]
+              : [])
+          ]
         ])
       )
     );

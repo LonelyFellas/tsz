@@ -311,8 +311,14 @@ export function createHttpClient({
         headers: { "Content-Type": body.type || "application/octet-stream" },
         signal: opts?.signal
       }),
-    get: <T>(path: string, opts?: { signal?: AbortSignal }) =>
-      request<T>(path, opts?.signal ? { signal: opts.signal } : {}),
+    get: <T>(
+      path: string,
+      opts?: { signal?: AbortSignal; headers?: HeadersInit }
+    ) =>
+      request<T>(path, {
+        ...(opts?.signal ? { signal: opts.signal } : {}),
+        ...(opts?.headers ? { headers: opts.headers } : {})
+      }),
     post: <T>(
       path: string,
       data?: unknown,
