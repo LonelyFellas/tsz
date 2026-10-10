@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 
-function runDeploy(value, synthesis, regularity) {
+function runDeploy(value, synthesis, regularity, formatting) {
   const root = mkdtempSync(join(tmpdir(), "tsz-admin-flag-test."));
   try {
     mkdirSync(join(root, "deploy"));
@@ -55,6 +55,8 @@ run_sanitized_build() { printf '%s\\n' "$@" > "$TEST_CAPTURE"; exit 73; }
     delete env.DEPLOY_FORM_SPELLING_REGULARITY;
     if (regularity !== undefined)
       env.DEPLOY_FORM_SPELLING_REGULARITY = regularity;
+    delete env.DEPLOY_SENTENCE_FORMATTING;
+    if (formatting !== undefined) env.DEPLOY_SENTENCE_FORMATTING = formatting;
     delete env.DEPLOY_VOICE_EDITOR;
     if (value !== undefined) env.DEPLOY_VOICE_EDITOR = value;
     const result = spawnSync("bash", [join(root, "deploy/deploy-admin.sh")], {
@@ -136,6 +138,27 @@ test("invalid spelling regularity flag fails before server writes", () => {
   assert.match(
     result.stderr,
     /DEPLOY_FORM_SPELLING_REGULARITY 必须为 true 或 false/
+  );
+  assert.deepEqual(result.args, []);
+});
+
+for (const [input, expected] of [
+  [undefined, "false"],
+  ["false", "false"],
+  ["true", "true"]
+]) {
+  test(`sentence formatting rollout passes ${expected} to sanitized build (${input ?? "default"})`, () => {
+    const result = runDeploy(undefined, undefined, undefined, input);
+    assert.equal(result.status, 73, result.stderr);
+    assert.ok(result.args.includes(`VITE_SENTENCE_FORMATTING=${expected}`));
+  });
+}
+test("invalid sentence formatting flag fails before server writes", () => {
+  const result = runDeploy(undefined, undefined, undefined, "TRUE");
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /DEPLOY_SENTENCE_FORMATTING 必须为 true 或 false/
   );
   assert.deepEqual(result.args, []);
 });

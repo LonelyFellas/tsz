@@ -28,6 +28,13 @@ case "$deploy_form_spelling_regularity" in
   *) echo "!! DEPLOY_FORM_SPELLING_REGULARITY 必须为 true 或 false" >&2; exit 1 ;;
 esac
 
+# 新格式先升级读取端和后端，验收后再显式开放写入。
+deploy_sentence_formatting="${DEPLOY_SENTENCE_FORMATTING:-false}"
+case "$deploy_sentence_formatting" in
+  true|false) ;;
+  *) echo "!! DEPLOY_SENTENCE_FORMATTING 必须为 true 或 false" >&2; exit 1 ;;
+esac
+
 prepare_deploy_source admin
 release_id="${DEPLOY_GIT_SHA}-$(node -e 'console.log(require("crypto").randomUUID())')"
 
@@ -72,6 +79,7 @@ echo "==> build @tsz/admin"
   run_sanitized_build \
     TSZ_RELEASE_ID="$release_id" \
     VITE_FORM_SPELLING_REGULARITY="$deploy_form_spelling_regularity" \
+    VITE_SENTENCE_FORMATTING="$deploy_sentence_formatting" \
     VITE_VOICE_EDITOR="$deploy_voice_editor" \
     VITE_AZURE_PRONUNCIATION_INPUTS="$deploy_azure_pronunciation_inputs" \
     VITE_VOICE_PREVIEW=true \
