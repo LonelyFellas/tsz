@@ -181,6 +181,8 @@ export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
    * 不分英美（通用栏）的字段不传，此时不做筛选。
    */
   locale?: AudioAssetLocale;
+  /** 释义/例句新增格式写入口；关闭时仍读取已有格式。 */
+  textFormattingEnabled?: boolean;
   textLinks?: TLink[];
   /** 改字失效的关联在改回原文时恢复；显式清除不自动恢复。 */
   restoreTextLinksOnCorrection?: boolean;

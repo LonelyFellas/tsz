@@ -1,6 +1,8 @@
 import "./interaction.css";
 import {
   AudioOutlined,
+  BoldOutlined,
+  UnderlineOutlined,
   EditOutlined,
   ItalicOutlined,
   LinkOutlined,
@@ -132,6 +134,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   value,
   mode = "pronunciation",
   locale,
+  textFormattingEnabled = true,
   textLinks,
   restoreTextLinksOnCorrection = false,
   renderAssociationPicker,
@@ -514,8 +517,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
    * 既可能是想收笔、也可能是想重新打开面板换个分类，同一个手势两个意思。
    */
   const openToolAndArm = (key?: string) => {
-    if (key === "italic") {
-      toggleItalic();
+    if (key === "italic" || key === "bold" || key === "underline") {
+      toggleTextFormat(key);
       return;
     }
     if (key === "erase") {
@@ -932,28 +935,35 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   const selectionRanges = textSelection
     ? splitRangeAtParagraphs(text, textSelection.start, textSelection.end)
     : [];
-  const selectionIsItalic =
+  const selectionHasFormat = (type: "italic" | "bold" | "underline") =>
     selectionRanges.length > 0 &&
     selectionRanges.every((range) => {
       let coveredEnd = range.start;
-      const italics = marks.passthrough
-        .filter((annotation) => annotation.type === "italic")
+      const formats = marks.passthrough
+        .filter(
+          (
+            annotation
+          ): annotation is Exclude<
+            RichTextV2["annotations"][number],
+            { type: "pause" }
+          > => annotation.type === type
+        )
         .sort((left, right) => left.start - right.start);
-      for (const annotation of italics) {
+      for (const annotation of formats) {
         if (annotation.start > coveredEnd) return false;
         coveredEnd = Math.max(coveredEnd, annotation.end);
         if (coveredEnd >= range.end) return true;
       }
       return false;
     });
-  const toggleItalic = () => {
+  const toggleTextFormat = (type: "italic" | "bold" | "underline") => {
     if (readOnly || !textSelection) return;
     let passthrough = marks.passthrough;
-    if (selectionIsItalic) {
+    if (selectionHasFormat(type)) {
       for (const range of selectionRanges) {
         passthrough = passthrough.flatMap((annotation) => {
           if (
-            annotation.type !== "italic" ||
+            annotation.type !== type ||
             annotation.end <= range.start ||
             annotation.start >= range.end
           )
@@ -972,7 +982,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       passthrough = [
         ...passthrough,
         ...selectionRanges.map((range) => ({
-          type: "italic" as const,
+          type,
           ...range
         }))
       ];
@@ -1191,7 +1201,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   };
 
   const clearAll = () => {
-    // 历史音标、高亮原样保留；斜体是本编辑器设置的视觉标注，随其他标注清空。
+    // 历史音标、高亮原样保留；文本格式是本编辑器设置的视觉标注，随其他标注清空。
     commit((current) => ({
       ...current,
       marks: {
@@ -1200,7 +1210,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         liaisons: [],
         pauses: {},
         passthrough: current.marks.passthrough.filter(
-          (annotation) => annotation.type !== "italic"
+          (annotation) =>
+            annotation.type !== "italic" &&
+            annotation.type !== "bold" &&
+            annotation.type !== "underline"
         )
       }
     }));
@@ -1426,7 +1439,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     audioUploadAdapter?.isStorageUnavailable?.() ?? false;
 
   const tools = [
-    ...(mode === "grammar" || mode === "spelling" || mode === "actual-pron"
+    ...(mode === "grammar" ||
+    mode === "association" ||
+    mode === "spelling" ||
+    mode === "actual-pron"
       ? [
           {
             key: "erase",
@@ -1439,21 +1455,45 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     {
       key: "text",
       label:
-        mode === "grammar" || mode === "spelling" || mode === "actual-pron"
+        mode === "grammar" ||
+        mode === "association" ||
+        mode === "spelling" ||
+        mode === "actual-pron"
           ? "文本编辑"
           : "文本",
+
       ariaLabel: "编辑文本",
       icon: <EditOutlined />,
       active: brush.kind === "none",
       className: "tsz-ve-text-button"
     },
-    ...(mode === "grammar" || mode === "spelling"
+    ...(mode === "grammar" ||
+    mode === "spelling" ||
+    (mode === "association" && textFormattingEnabled)
       ? [
           {
             key: "italic",
             label: "斜体",
             icon: <ItalicOutlined />,
-            active: selectionIsItalic,
+            active: selectionHasFormat("italic"),
+            disabled: !textSelection
+          }
+        ]
+      : []),
+    ...(mode === "association" && textFormattingEnabled
+      ? [
+          {
+            key: "bold",
+            label: "加粗",
+            icon: <BoldOutlined />,
+            active: selectionHasFormat("bold"),
+            disabled: !textSelection
+          },
+          {
+            key: "underline",
+            label: "下划线",
+            icon: <UnderlineOutlined />,
+            active: selectionHasFormat("underline"),
             disabled: !textSelection
           }
         ]
@@ -1835,6 +1875,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
 
       <MarkupPanel
         mode={mode}
+
         selectionText={
           textSelection
             ? Array.from(text)

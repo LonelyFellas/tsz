@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/.codex/worktrees/spelling-pronunciation/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-09T12:36:16.776Z",
+  "_generatedAt": "2026-10-10T01:16:12.975Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -4759,6 +4759,26 @@
             "end": { "type": "integer", "minimum": 0 },
             "start": { "type": "integer", "minimum": 0 },
             "type": { "type": "string", "enum": ["italic"] }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "type"],
+          "properties": {
+            "end": { "type": "integer", "minimum": 0 },
+            "start": { "type": "integer", "minimum": 0 },
+            "type": { "type": "string", "enum": ["bold"] }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "type"],
+          "properties": {
+            "end": { "type": "integer", "minimum": 0 },
+            "start": { "type": "integer", "minimum": 0 },
+            "type": { "type": "string", "enum": ["underline"] }
           },
           "additionalProperties": false
         }

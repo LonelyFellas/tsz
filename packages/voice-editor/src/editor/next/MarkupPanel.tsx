@@ -34,6 +34,7 @@ export interface MarkupPanelProps extends Pick<
   | "selectedPauseGap"
 > {
   mode: VoiceEditorProps["mode"];
+
   selectionText?: string;
   text: string;
   marks: MarkState;
@@ -62,6 +63,7 @@ export interface MarkupPanelProps extends Pick<
 
 export function MarkupPanel({
   mode,
+
   selectionText,
   associationContent,
   associationAnchor,
@@ -98,30 +100,51 @@ export function MarkupPanel({
   onOpenToolChange
 }: MarkupPanelProps) {
   const grammarMode = mode === "grammar";
+  const associationMode = mode === "association";
+  const composedMode = grammarMode || associationMode;
   const selectionMode =
-    grammarMode || mode === "spelling" || mode === "actual-pron";
+    grammarMode ||
+    associationMode ||
+    mode === "spelling" ||
+    mode === "actual-pron";
   const selectionToolsLabel = grammarMode
     ? "“语法结构”和“连读符号”"
-    : mode === "spelling"
-      ? "“斜体”和“连读符号”"
-      : "“连读符号”";
+    : associationMode
+      ? "“文本格式”和“连读符号”"
+      : mode === "spelling"
+        ? "“斜体”和“连读符号”"
+        : "“连读符号”";
   const [voicesExpanded, setVoicesExpanded] = useState(true);
   const voicesPanelId = useId();
   const headerTools = selectionMode
     ? tools.filter(
         (tool) =>
           tool.key === "text" ||
+          tool.key === "bold" ||
           tool.key === "italic" ||
+          tool.key === "underline" ||
           tool.key.startsWith("association-")
       )
     : [];
+  const formatOrder = [
+    "text",
+    "bold",
+    "italic",
+    "underline",
+    "association-word",
+    "association-phrase"
+  ];
+  headerTools.sort(
+    (left, right) =>
+      formatOrder.indexOf(left.key) - formatOrder.indexOf(right.key)
+  );
   const topTools = tools.filter(
     (tool) => tool.key === "roles" || tool.key === "liaison"
   );
   const bottomTools = tools.filter(
     (tool) => tool.key === "pause" || tool.key === "voices"
   );
-  const uploadTool = grammarMode
+  const uploadTool = composedMode
     ? tools.find((tool) => tool.key === "uploads")
     : undefined;
   const secondaryTools = tools.filter(
@@ -136,8 +159,12 @@ export function MarkupPanel({
   const marked =
     marks.roles.length +
     marks.liaisons.length +
-    marks.passthrough.filter((annotation) => annotation.type === "italic")
-      .length +
+    marks.passthrough.filter(
+      (annotation) =>
+        annotation.type === "italic" ||
+        annotation.type === "bold" ||
+        annotation.type === "underline"
+    ).length +
     Object.keys(marks.pauses).length;
   const trigger = (tool: DropdownTool, inline: boolean) => {
     const isVoices = inline && tool.key === "voices";
@@ -159,7 +186,10 @@ export function MarkupPanel({
         aria-controls={isVoices ? voicesPanelId : undefined}
         disabled={readOnly || tool.disabled}
         onMouseDown={
-          inline || tool.key === "italic"
+          inline ||
+          tool.key === "italic" ||
+          tool.key === "bold" ||
+          tool.key === "underline"
             ? (event) => event.preventDefault()
             : undefined
         }
@@ -205,6 +235,7 @@ export function MarkupPanel({
     <div className="tsz-ve-markup">
       <div
         className={`tsz-ve-top-tools${selectionMode ? " is-selection" : ""}`}
+
         role="toolbar"
         aria-label="标注工具栏"
       >
@@ -259,7 +290,7 @@ export function MarkupPanel({
           <div className="tsz-ve-erase-action">
             <Tooltip
               title={
-                grammarMode
+                composedMode
                   ? "开启后点击已有连读或停顿即可取消，再次点击退出"
                   : "开启后点击已有连读即可取消，再次点击退出"
               }
@@ -271,7 +302,7 @@ export function MarkupPanel({
         {selectionMode && (
           <div className="tsz-ve-selection-status" role="status">
             {brush.kind === "erase" ? (
-              grammarMode ? (
+              composedMode ? (
                 "清除模式：点击已有连读或停顿即可取消。"
               ) : (
                 "清除模式：点击已有连读即可取消。"
@@ -282,7 +313,7 @@ export function MarkupPanel({
                 ，可配置{selectionToolsLabel}。
               </>
             ) : (
-              "选中文字，可配置{selectionToolsLabel}。"
+              `选中文字，可配置${selectionToolsLabel}。`
             )}
           </div>
         )}

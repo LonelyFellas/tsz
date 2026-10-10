@@ -174,6 +174,16 @@ export type RichTextAnnotationV3 =
       end: number;
     }
   | {
+      type: "bold";
+      start: number;
+      end: number;
+    }
+  | {
+      type: "underline";
+      start: number;
+      end: number;
+    }
+  | {
       type: "emphasis";
       start: number;
       end: number;

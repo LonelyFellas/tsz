@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/.codex/worktrees/spelling-pronunciation/tsz-rust/docs/openapi.json",
-  "_source_sha256": "e66eea2d21da60ec2538fc1e9178583abe9c3386a6d9776bb4997db5199ba5ad",
+  "_source_sha256": "4647d0bc9c90ce91e9dff1749562b91673d8f716f1c61bfd66395c89ad346af5",
   "roots": [
     "LearningRewardDay",
     "LearningPreview",
@@ -2120,6 +2120,26 @@
             "end": { "type": "integer", "minimum": 0 },
             "start": { "type": "integer", "minimum": 0 },
             "type": { "type": "string", "enum": ["italic"] }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "type"],
+          "properties": {
+            "end": { "type": "integer", "minimum": 0 },
+            "start": { "type": "integer", "minimum": 0 },
+            "type": { "type": "string", "enum": ["bold"] }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "type"],
+          "properties": {
+            "end": { "type": "integer", "minimum": 0 },
+            "start": { "type": "integer", "minimum": 0 },
+            "type": { "type": "string", "enum": ["underline"] }
           },
           "additionalProperties": false
         }

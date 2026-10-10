@@ -405,7 +405,9 @@ export function annotationsToMarks(value: RichTextV2): MarkState {
     if (
       annotation.type === "phoneme" ||
       annotation.type === "highlight" ||
-      annotation.type === "italic"
+      annotation.type === "italic" ||
+      annotation.type === "bold" ||
+      annotation.type === "underline"
     ) {
       passthrough.push(annotation);
       continue;
@@ -677,7 +679,11 @@ function remapPassthrough(
   const kept: RichTextAnnotation[] = [];
   for (const annotation of annotations) {
     if (annotation.type === "pause") continue;
-    if (annotation.type === "italic") {
+    if (
+      annotation.type === "italic" ||
+      annotation.type === "bold" ||
+      annotation.type === "underline"
+    ) {
       if (annotation.start < prefix) {
         const end = Math.min(annotation.end, prefix);
         if (end > annotation.start) kept.push({ ...annotation, end });

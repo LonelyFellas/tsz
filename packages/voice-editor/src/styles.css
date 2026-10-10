@@ -422,6 +422,17 @@
   inset-inline-start: 0;
 }
 
+/* 字宽沿用隐藏粗体占位；格式只作用于可见字形。 */
+.tsz-ve-letter.is-bold > .tsz-ve-letter-text,
+.tsz-ve-bold {
+  font-weight: 700;
+}
+.tsz-ve-letter.is-underline > .tsz-ve-letter-text,
+.tsz-ve-underline {
+  text-decoration: underline solid;
+  text-underline-offset: 0.12em;
+}
+
 /* 上一次单击上色的字母：点一下虚线，提示同词里再点一个字母会把中间接上。 */
 .tsz-ve-letter.is-role-anchor {
   text-decoration: underline dotted currentColor;

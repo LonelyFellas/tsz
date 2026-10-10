@@ -72,3 +72,11 @@
 修复后 core 的 3 项测试、后台 operations/model 的 76 项回归通过；包含实际规则合并与直接统一拼写路径。voice-editor/admin 类型检查、voice-editor lint、改动测试文件 eslint、Prettier 与 diff 空白检查通过。修复后完整前端回归以两个 worker 执行：245 个文件全部通过，3527 项通过、2 项既有跳过；本次没有新增跳过或弱化断言。
 
 本次修复后的后台生产构建通过，沿用既定验收构建开关（voice editor 开启，TTS mock/preview 关闭）。未提交、推送或部署。
+
+## 2026-10-10：配套 PR 准备
+
+交付前同步最新 main：前端基线 `62086660541fca722d5ab51589bb88d590144b41`，后端基线 `edc879546a23eaf8342e4f15908dc2ab68d32013`。合并保留主线句子格式、聚焦预览修复与本次拼写标注。重新导出的配套 OpenAPI 源 SHA256 为 `4647d0bc9c90ce91e9dff1749562b91673d8f716f1c61bfd66395c89ad346af5`。
+
+Docker 仍不可用，改用本机已有 PostgreSQL 16.15 与 Redis 8.10.2 启动本任务独立原生实例，绑定 loopback 动态端口，数据、配置和日志位于权限受限的 `/tmp/tsz-spelling-pronunciation/ship/`。已在本任务空库应用仓库迁移，后端原生 hooks 使用该隔离连接；未访问其他任务业务库或 Redis，也未重启全局 Docker。
+
+本节是后续交付状态，前文的未提交/环境阻塞描述保留为对应时间的历史记录。提交后的独立审查、hooks 和配套 PR 状态以 PR 正文为准；本次开 PR 不包含合并或部署。真实浏览器保存/刷新链路仍未完成，PR 中明确记录该限制。

@@ -241,6 +241,32 @@ describe("OpenAPI generated runtime schema", () => {
 });
 
 describe("runtime schema fail-closed diagnostics", () => {
+  it("新格式可在真实响应形状中组合，未知格式与额外属性继续被拒绝", () => {
+    const word = validFixture("AdminWordV3") as {
+      meanings: { sense_groups: unknown[] };
+    };
+    const group = buildValidValue(
+      runtimeSchemaBundle.$defs.SenseGroupV3!
+    ) as Record<string, unknown>;
+    const rich = {
+      version: 2,
+      text: "a job",
+      annotations: [
+        { type: "bold", start: 2, end: 5 },
+        { type: "italic", start: 2, end: 5 },
+        { type: "underline", start: 2, end: 5 }
+      ]
+    };
+    group.name_en_rich = rich;
+    word.meanings.sense_groups = [group];
+    expect(validateRuntimeSchema("AdminWordV3", word)).toEqual({ valid: true });
+    rich.annotations[0]!.type = "unknown-format";
+    expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(false);
+    rich.annotations[0]!.type = "bold";
+    Object.assign(rich.annotations[0]!, { color: "blue" });
+    expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(false);
+  });
+
   it.each(["common", "uk", "us"] as const)(
     "拼写规则标记接受 %s 的布尔值、兼容缺省并拒绝 null",
     (dialect) => {
