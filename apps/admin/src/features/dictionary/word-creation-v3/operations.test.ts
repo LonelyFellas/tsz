@@ -1,6 +1,6 @@
 import { env } from "../../../lib/env";
 import { toFormsWire } from "./model";
-import type { WordConcreteFormV3 } from "@tsz/types";
+import type { RichTextV2V3, WordConcreteFormV3 } from "@tsz/types";
 import { describe, expect, it, vi } from "vitest";
 import {
   addConcreteForm,
@@ -2218,4 +2218,142 @@ it("兼容发布保留新 API 已有规则值，拆分和合并也不丢失 fals
   } finally {
     env.FORM_SPELLING_REGULARITY = enabled;
   }
+});
+
+it("拼写完整标注保存、改字重定位和清空均保留节点，wire 不丢字段", () => {
+  const original = formsFixture();
+  const rich: RichTextV2V3 = {
+    version: 2,
+    text: "boiled potatoes",
+    annotations: [
+      { type: "liaison", start: 3, end: 9, start_len: 3, end_len: 2 },
+      { type: "italic", start: 7, end: 15 }
+    ]
+  };
+  const edited = updateVariantSpelling(original, UUIDS.common_variant, rich);
+  expect(
+    commonVariant(toFormsWire(edited).pos[0]!.forms[0]!).spelling_rich
+  ).toEqual(rich);
+  expect(commonVariant(edited.pos[0]!.forms[0]!).id).toBe(UUIDS.common_variant);
+  const shifted = updateVariantSpelling(
+    edited,
+    UUIDS.common_variant,
+    "fresh boiled potatoes"
+  );
+  expect(
+    commonVariant(shifted.pos[0]!.forms[0]!).spelling_rich?.annotations
+  ).toEqual([
+    { type: "liaison", start: 9, end: 15, start_len: 3, end_len: 2 },
+    { type: "italic", start: 13, end: 21 }
+  ]);
+  const cleared = updateVariantSpelling(edited, UUIDS.common_variant, {
+    ...rich,
+    annotations: []
+  });
+  expect(
+    commonVariant(toFormsWire(cleared).pos[0]!.forms[0]!).spelling_rich
+  ).toEqual({ ...rich, annotations: [] });
+  expect(
+    commonVariant(original.pos[0]!.forms[0]!).spelling_rich
+  ).toBeUndefined();
+});
+
+it("方言显式拆合携带拼写标注，统一拼写同步两侧，规则合并不覆盖矛盾标注", () => {
+  const rich: RichTextV2V3 = {
+    version: 2,
+    text: "boiled potatoes",
+    annotations: [{ type: "italic", start: 7, end: 15 }]
+  };
+  const form = commonFormFixture({ spelling: rich.text });
+  form.regional_variants.common.spelling_rich = rich;
+  const mapping = {
+    spelling: rich.text,
+    spelling_rich: rich,
+    origin: "manual" as const,
+    pronunciations: []
+  };
+  const split = convertCommonToUkUs(form, {
+    confirmed: true,
+    uk: mapping,
+    us: mapping
+  });
+  if (!split.ok || split.value.regional_variants.mode !== "uk_us")
+    throw new Error("expected split");
+  expect(split.value.regional_variants.uk.spelling_rich).toEqual(rich);
+  expect(split.value.regional_variants.us.spelling_rich).toEqual(rich);
+  const merged = convertUkUsToCommon(split.value, {
+    confirmed: true,
+    common: mapping
+  });
+  if (!merged.ok) throw new Error("expected merge");
+  expect(commonVariant(merged.value).spelling_rich).toEqual(rich);
+  const next: RichTextV2V3 = {
+    ...rich,
+    annotations: [{ type: "liaison", start: 5, end: 8 }]
+  };
+  const unified = unifyUkUsSpelling(split.value, next);
+  if (!unified.ok || unified.value.regional_variants.mode !== "uk_us")
+    throw new Error("expected unified");
+  expect(unified.value.regional_variants.uk.spelling_rich).toEqual(next);
+  expect(unified.value.regional_variants.us.spelling_rich).toEqual(next);
+  split.value.regional_variants.us.spelling_rich = { ...rich, annotations: [] };
+  const content = formsFixture({ forms: [split.value] });
+  expect(
+    normalizeGroupDialectRules(
+      content,
+      UUIDS.pos,
+      content.pos[0]!.form_groups[0]!.id,
+      { spelling_mode: "unified", phonetic_mode: "distinguish" }
+    )
+  ).toEqual({ ok: false, reason: "spelling_marks_merge_required" });
+});
+
+it("逐字拼写输入保留尾空格，第二个词可以继续录入", () => {
+  const content = updateVariantSpelling(
+    formsFixture(),
+    UUIDS.common_variant,
+    "boiled "
+  );
+  expect(commonVariant(content.pos[0]!.forms[0]!).spelling).toBe("boiled ");
+  const next = updateVariantSpelling(
+    content,
+    UUIDS.common_variant,
+    "boiled potatoes"
+  );
+  expect(commonVariant(next.pos[0]!.forms[0]!).spelling).toBe(
+    "boiled potatoes"
+  );
+});
+
+it("英美相同连读的省略与显式默认端宽不阻止统一拼写", () => {
+  const loaded: RichTextV2V3 = {
+    version: 2,
+    text: "boiled potatoes",
+    annotations: [{ type: "liaison", start: 5, end: 8 }]
+  };
+  const edited: RichTextV2V3 = {
+    ...loaded,
+    annotations: [
+      { type: "liaison", start: 5, end: 8, start_len: 1, end_len: 1 }
+    ]
+  };
+  const form = ukUsFormFixture({
+    uk: { spelling: loaded.text, spelling_rich: loaded },
+    us: { spelling: edited.text, spelling_rich: edited }
+  });
+  const content = formsFixture({ forms: [form] });
+  const result = normalizeGroupDialectRules(
+    content,
+    UUIDS.pos,
+    content.pos[0]!.form_groups[0]!.id,
+    { spelling_mode: "unified", phonetic_mode: "distinguish" }
+  );
+  expect(result.ok).toBe(true);
+  if (!result.ok) throw new Error(result.reason);
+  const merged = result.value.pos[0]!.forms[0]!.regional_variants;
+  if (merged.mode !== "uk_us") throw new Error("expected uk_us");
+  expect(merged.uk.spelling_rich).toEqual(edited);
+  expect(merged.us.spelling_rich).toEqual(edited);
+  expect(unifyUkUsSpelling(form, loaded.text).ok).toBe(true);
+  expect(form.regional_variants.uk.spelling_rich).toEqual(loaded);
 });

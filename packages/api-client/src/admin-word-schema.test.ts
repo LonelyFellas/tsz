@@ -1174,3 +1174,29 @@ it("混合批次响应分别核对词条和例句身份，不接受漏项或重�
     )
   ).toThrow();
 });
+
+it("旧纯文本词形与新 V2 拼写标注均能读取，严格拒绝 null/V1 和未知字段", () => {
+  const word = validAdminWordV3();
+  expect(decodeAdminWordV3Envelope({ word })).toEqual({ word });
+  const variant = word.forms.pos[0]!.forms[0]!.regional_variants.common!;
+  const rich = {
+    version: 2,
+    text: variant.spelling,
+    annotations: [
+      { type: "italic", start: 0, end: 2 },
+      { type: "liaison", start: 1, end: 4, start_len: 2 }
+    ]
+  };
+  Object.assign(variant, { spelling_rich: rich });
+  expect(decodeAdminWordV3Envelope({ word })).toEqual({ word });
+  for (const invalid of [
+    null,
+    { version: 1, text: variant.spelling, spans: [], liaisons: [] },
+    { ...rich, unexpected: true }
+  ]) {
+    Object.assign(variant, { spelling_rich: invalid });
+    expect(() => decodeAdminWordV3Envelope({ word })).toThrow(
+      InvalidAdminWordResponseError
+    );
+  }
+});

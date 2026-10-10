@@ -5,3 +5,4 @@ export * from "./hash";
 export * from "./liaison";
 export * from "./text-links";
 export * from "./edit-text";
+export * from "./spelling";

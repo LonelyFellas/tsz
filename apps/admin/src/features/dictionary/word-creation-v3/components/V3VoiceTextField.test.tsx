@@ -85,12 +85,12 @@ beforeEach(() => {
   state.resolveUrl.mockReset();
 });
 
-it("词形拼写使用可直接编辑的普通输入框，不显示语音编辑器入口", () => {
+it("未录入词形拼写可直接输入，并提供编辑器入口", () => {
   const onChange = vi.fn();
   render(
     <V3VoiceTextField
       mode="spelling"
-      value={{ version: 2, text: "translate", annotations: [] }}
+      value={{ version: 2, text: "", annotations: [] }}
       onChange={onChange}
       ariaLabel="英式拼写"
       nodeId="spelling-uk"
@@ -101,8 +101,8 @@ it("词形拼写使用可直接编辑的普通输入框，不显示语音编辑�
   expect(input).not.toHaveAttribute("readonly");
   expect(input).not.toHaveClass("v3-voice-text-large-preview");
   expect(
-    screen.queryByRole("button", { name: "打开英式拼写编辑器" })
-  ).not.toBeInTheDocument();
+    screen.getByRole("button", { name: "打开英式拼写编辑器" })
+  ).toBeInTheDocument();
   fireEvent.change(input, { target: { value: "translated" } });
   expect(onChange).toHaveBeenCalledWith(
     { version: 2, text: "translated", annotations: [] },
@@ -1040,5 +1040,102 @@ it("弧线层压在紧凑组员之上、点击穿透，并按输入框视口裁�
   expect(overlayRule).toMatch(/color:\s*transparent;/u);
   expect(fieldCss).toMatch(
     /\.v3-voice-text-field-input\s*\{[^}]*margin-inline-end:\s*-1px;/su
+  );
+});
+
+it("拼写编辑取消不改原值，完成保留斜体并在收起态回显", async () => {
+  const changed = vi.fn();
+  function Host() {
+    const [value, setValue] = useState<RichTextV3>({
+      version: 2,
+      text: "boiled potatoes",
+      annotations: []
+    });
+    return (
+      <V3VoiceTextField
+        mode="spelling"
+        value={value}
+        ariaLabel="拼写"
+        nodeId="spelling"
+        field="spelling"
+        onChange={(next) => {
+          setValue(next);
+          changed(next);
+        }}
+      />
+    );
+  }
+  const { container } = render(<Host />);
+  fireEvent.click(screen.getByRole("button", { name: "打开拼写编辑器" }));
+  const input = await screen.findByLabelText<HTMLTextAreaElement>("拼写");
+  input.focus();
+  input.setSelectionRange(7, 15);
+  fireEvent.mouseUp(input);
+  fireEvent.select(input);
+  fireEvent.click(screen.getByRole("button", { name: "斜体" }));
+  fireEvent.click(screen.getByLabelText("取消拼写编辑"));
+  expect(changed).not.toHaveBeenCalled();
+  expect(screen.getByLabelText("拼写")).toHaveValue("boiled potatoes");
+  fireEvent.click(screen.getByRole("button", { name: "打开拼写编辑器" }));
+  const again = await screen.findByLabelText<HTMLTextAreaElement>("拼写");
+  again.focus();
+  again.setSelectionRange(7, 15);
+  fireEvent.mouseUp(again);
+  fireEvent.select(again);
+  fireEvent.click(screen.getByRole("button", { name: "斜体" }));
+  fireEvent.click(screen.getByLabelText("完成拼写编辑"));
+  await waitFor(() =>
+    expect(changed).toHaveBeenCalledWith({
+      version: 2,
+      text: "boiled potatoes",
+      annotations: [{ type: "italic", start: 7, end: 15 }]
+    })
+  );
+  expect(
+    container.querySelector(".v3-grammar-preview-content i")
+  ).toHaveTextContent("potatoes");
+});
+
+it("关闭编辑器时拼写标注仍只读回显，降级改字保留未受影响的标注", () => {
+  state.flags.VOICE_EDITOR = false;
+  const rich: RichTextV3 = {
+    version: 2,
+    text: "boiled potatoes",
+    annotations: [
+      { type: "italic", start: 7, end: 15 },
+      { type: "liaison", start: 5, end: 8 }
+    ]
+  };
+  const changed = vi.fn();
+  const { container } = render(
+    <V3VoiceTextField
+      mode="spelling"
+      value={rich}
+      ariaLabel="拼写"
+      nodeId="spelling"
+      field="spelling"
+      onChange={changed}
+    />
+  );
+  expect(
+    Array.from(container.querySelectorAll(".v3-grammar-preview-content i"))
+      .map((node) => node.textContent)
+      .join("")
+  ).toBe("potatoes");
+  expect(container.querySelector(".tsz-ve-liaison-anchor")).not.toBeNull();
+  expect(screen.queryByRole("button", { name: "打开拼写编辑器" })).toBeNull();
+  const input = screen.getByLabelText("拼写");
+  fireEvent.focus(input);
+  fireEvent.change(input, { target: { value: "boiled potatoes today" } });
+  expect(changed).toHaveBeenCalledWith(
+    {
+      version: 2,
+      text: "boiled potatoes today",
+      annotations: [
+        { type: "liaison", start: 5, end: 8, start_len: 1, end_len: 1 },
+        { type: "italic", start: 7, end: 15 }
+      ]
+    },
+    undefined
   );
 });

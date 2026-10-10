@@ -79,7 +79,7 @@
   padding-right: 96px;
   margin-bottom: 8px;
 }
-.tsz-ve-top-tools.is-grammar .tsz-ve-tool-row {
+.tsz-ve-top-tools.is-selection .tsz-ve-tool-row {
   padding-right: 80px;
 }
 .tsz-ve-erase-action {
@@ -381,7 +381,7 @@
   display: block;
 }
 @container tsz-voice-editor (max-width: 600px) {
-  .tsz-ve-top-tools.is-grammar .tsz-ve-tool-row {
+  .tsz-ve-top-tools.is-selection .tsz-ve-tool-row {
     padding-right: 0;
   }
   .tsz-ve-erase-action {

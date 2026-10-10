@@ -15,6 +15,7 @@ import {
   MAX_PAUSE_MS,
   MIN_PAUSE_MS,
   normalizeRichTextV2,
+  normalizeSpellingRich,
   toRichTextV2,
   validateRichTextV2
 } from "../../core";
@@ -179,6 +180,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     start: number;
     end: number;
   }>();
+  const [spellingNotice, setSpellingNotice] = useState("");
   const [caretPosition, setCaretPosition] = useState<number>();
   const [pauseGap, setPauseGap] = useState<number>();
   const [pendingConflict, setPendingConflict] = useState<
@@ -199,6 +201,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   /** 换笔、改文本、撤销重做、连读成线……凡是字母会挪或语义失效的时刻，瞬态状态一起清。 */
   const resetTransient = useCallback(() => {
     setTextSelection(undefined);
+    setSpellingNotice("");
     setCaretPosition(undefined);
     setPauseGap(undefined);
     setPendingConflict(undefined);
@@ -625,6 +628,25 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     setLinks(after.textLinks ?? []);
     setRecoverableLinks(after.recoverableTextLinks ?? []);
     setValidationMessage("");
+    setSpellingNotice("");
+  };
+
+  const prepareComplete = () => {
+    if (mode !== "spelling" || readOnly) return true;
+    const normalized = normalizeSpellingRich(workingValue);
+    if (normalized.text === text) return true;
+    commit((current) => ({
+      ...current,
+      text: normalized.text,
+      marks: annotationsToMarks(normalized)
+    }));
+    resetTransient();
+    setSpellingNotice(
+      normalized.annotations.length < workingValue.annotations.length
+        ? "已规范化拼写并移除受影响的标注，请检查后完成；可撤销恢复"
+        : "已规范化拼写，请检查后完成；可撤销恢复"
+    );
+    return false;
   };
 
   const undo = () => {
@@ -1404,7 +1426,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     audioUploadAdapter?.isStorageUnavailable?.() ?? false;
 
   const tools = [
-    ...(mode === "grammar"
+    ...(mode === "grammar" || mode === "spelling" || mode === "actual-pron"
       ? [
           {
             key: "erase",
@@ -1416,13 +1438,16 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       : []),
     {
       key: "text",
-      label: mode === "grammar" ? "文本编辑" : "文本",
+      label:
+        mode === "grammar" || mode === "spelling" || mode === "actual-pron"
+          ? "文本编辑"
+          : "文本",
       ariaLabel: "编辑文本",
       icon: <EditOutlined />,
       active: brush.kind === "none",
       className: "tsz-ve-text-button"
     },
-    ...(mode === "grammar"
+    ...(mode === "grammar" || mode === "spelling"
       ? [
           {
             key: "italic",
@@ -1672,12 +1697,15 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     // 字典音标只负责喂语音合成，连读是展示用的标注，归实际发音那一侧。
     // 判据必须是这个显式取值：默认的 pronunciation 还挂着别的调用方，
     // 摘在默认值上会连带把它们的连读也拿掉。
-    if (mode === "spelling") return tool.key === "text";
+    if (mode === "spelling")
+      return ["text", "italic", "liaison", "erase"].includes(tool.key);
     if (mode === "dict-phonetic")
       return tool.key !== "roles" && tool.key !== "liaison";
     // 实际发音只用于展示，其余工具都是冲着合成去的。
     if (mode === "actual-pron")
-      return tool.key === "text" || tool.key === "liaison";
+      return (
+        tool.key === "text" || tool.key === "liaison" || tool.key === "erase"
+      );
     if (mode === "pronunciation") return tool.key !== "roles";
     return true;
   });
@@ -1707,7 +1735,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           ))}
         {renderActions && (
           <div className="tsz-ve-editor-actions">
-            {renderActions(!pendingUploads.some((item) => !item.error))}
+            {renderActions(
+              !pendingUploads.some((item) => !item.error),
+              prepareComplete
+            )}
           </div>
         )}
       </section>
@@ -1783,6 +1814,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           showIcon
         />
       )}
+      {spellingNotice && <Alert type="info" title={spellingNotice} showIcon />}
       {blockingError && <Alert type="error" title={blockingError} showIcon />}
       {linkNotice && <Alert type="warning" title={linkNotice} showIcon />}
 
@@ -1802,7 +1834,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       </div>
 
       <MarkupPanel
-        grammarMode={mode === "grammar"}
+        mode={mode}
         selectionText={
           textSelection
             ? Array.from(text)
@@ -1836,7 +1868,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             linkWords.length === 0 &&
             !draft.start &&
             !draft.end &&
-            !pendingUploads.some((item) => !item.error)
+            !pendingUploads.some((item) => !item.error),
+          prepareComplete
         )}
         onCaretChange={(position) => {
           setCaretPosition(position);

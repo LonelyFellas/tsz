@@ -1,6 +1,7 @@
 import { env } from "../../../lib/env";
 import type {
   PronunciationStyle,
+  RichTextV2V3,
   DialectRulesV3,
   DraftFormsStepContentV3,
   FormGroupScopeV3,
@@ -15,6 +16,7 @@ import type {
   WordUkFormVariantV3,
   WordUsFormVariantV3
 } from "@tsz/types";
+import { editRichText, spellingAnnotationsEqual } from "@tsz/voice-editor/core";
 import { variantRegularity } from "./model";
 import { newWordNodeId } from "../word-model/primitives";
 
@@ -42,6 +44,7 @@ type OperationFailureReason =
   | "regularity_merge_required"
   | "component_merge_required"
   | "pronunciation_merge_required"
+  | "spelling_marks_merge_required"
   | "last_form_required"
   | "last_pos_required"
   | "wrong_regional_mode";
@@ -63,6 +66,7 @@ export type OperationResult<T> =
 export type PronunciationMapping = Omit<WordPronunciationV3, "id">;
 
 export interface VariantMapping {
+  spelling_rich?: RichTextV2V3;
   is_regular?: boolean;
   spelling: string;
   origin: TextOriginV3;
@@ -278,6 +282,9 @@ export function convertCommonToUkUs(
           id: ukId,
           dialect: "uk",
           spelling: mapping.uk.spelling,
+          ...(mapping.uk.spelling_rich === undefined
+            ? {}
+            : { spelling_rich: structuredClone(mapping.uk.spelling_rich) }),
           is_regular:
             mapping.uk.is_regular ??
             form.regional_variants.common.is_regular ??
@@ -294,6 +301,9 @@ export function convertCommonToUkUs(
           id: usId,
           dialect: "us",
           spelling: mapping.us.spelling,
+          ...(mapping.us.spelling_rich === undefined
+            ? {}
+            : { spelling_rich: structuredClone(mapping.us.spelling_rich) }),
           is_regular:
             mapping.us.is_regular ??
             form.regional_variants.common.is_regular ??
@@ -355,6 +365,9 @@ export function convertUkUsToCommon(
           id: commonId,
           dialect: "common",
           spelling: mapping.common.spelling,
+          ...(mapping.common.spelling_rich === undefined
+            ? {}
+            : { spelling_rich: structuredClone(mapping.common.spelling_rich) }),
           is_regular:
             mapping.common.is_regular ??
             form.regional_variants.uk.is_regular ??
@@ -428,6 +441,9 @@ function variantMappingFrom(
 ): VariantMapping {
   return {
     spelling: variant.spelling,
+    ...(variant.spelling_rich === undefined
+      ? {}
+      : { spelling_rich: structuredClone(variant.spelling_rich) }),
     is_regular: variant.is_regular,
     origin: variant.origin,
     pronunciations: variant.pronunciations.map((pronunciation) => ({
@@ -462,6 +478,13 @@ function variantMappingFrom(
 }
 
 /** 英美规则按组生效：只转换本组成员词形，同词性其他组的词形与规则原样保留。 */
+function spellingMarksEqual(uk: VariantMapping, us: VariantMapping): boolean {
+  return spellingAnnotationsEqual(
+    uk.spelling_rich ?? { version: 2, text: uk.spelling, annotations: [] },
+    us.spelling_rich ?? { version: 2, text: us.spelling, annotations: [] }
+  );
+}
+
 export function normalizeGroupDialectRules(
   content: DraftFormsStepContentV3,
   posId: string,
@@ -506,6 +529,13 @@ export function normalizeGroupDialectRules(
       if (env.FORM_SPELLING_REGULARITY) {
         variant.is_regular = variantRegularity(content, form.id, variant);
       }
+    }
+    if (
+      rules.spelling_mode === "unified" &&
+      form.regional_variants.mode === "uk_us" &&
+      !spellingMarksEqual(form.regional_variants.uk, form.regional_variants.us)
+    ) {
+      return { ok: false, reason: "spelling_marks_merge_required" };
     }
     if (
       rules.spelling_mode === "unified" &&
@@ -569,7 +599,8 @@ export function normalizeGroupDialectRules(
     }
 
     if (rules.spelling_mode === "unified") {
-      const spelling = form.regional_variants[preferredDialect].spelling;
+      const source = form.regional_variants[preferredDialect];
+      const spelling = source.spelling_rich ?? source.spelling;
       const converted = unifyUkUsSpelling(form, spelling);
       if (!converted.ok) return converted;
       pos.forms[index] = converted.value;
@@ -582,20 +613,43 @@ export function normalizeGroupDialectRules(
 
 export function unifyUkUsSpelling(
   form: WordConcreteFormV3,
-  spelling: string
+  spelling: string | RichTextV2V3
 ): OperationResult<WordConcreteFormV3> {
   if (form.regional_variants.mode !== "uk_us") {
     return { ok: false, reason: "wrong_regional_mode" };
   }
+  if (
+    typeof spelling === "string" &&
+    !spellingMarksEqual(form.regional_variants.uk, form.regional_variants.us)
+  ) {
+    return { ok: false, reason: "spelling_marks_merge_required" };
+  }
   const regionalVariants = clone(form.regional_variants);
-  regionalVariants.uk.spelling = spelling;
-  regionalVariants.uk.origin = "manual";
-  regionalVariants.us.spelling = spelling;
-  regionalVariants.us.origin = "manual";
-  return {
-    ok: true,
-    value: { ...form, regional_variants: regionalVariants }
-  };
+  for (const variant of [regionalVariants.uk, regionalVariants.us]) {
+    applyVariantSpelling(variant, spelling);
+    variant.origin = "manual";
+  }
+  return { ok: true, value: { ...form, regional_variants: regionalVariants } };
+}
+
+function applyVariantSpelling(
+  variant: { spelling: string; spelling_rich?: RichTextV2V3 },
+  value: string | RichTextV2V3
+) {
+  const rich =
+    typeof value === "string"
+      ? editRichText(
+          variant.spelling_rich ?? {
+            version: 2,
+            text: variant.spelling,
+            annotations: []
+          },
+          value
+        )
+      : value;
+  variant.spelling = rich.text;
+  if (variant.spelling_rich || rich.annotations.length > 0)
+    variant.spelling_rich = rich;
 }
 
 /** 在草稿副本里定位变体并就地改写；找不到抛错，与其余写操作的约定一致。 */
@@ -653,10 +707,10 @@ export function updateFormRegularity(
 export function updateVariantSpelling(
   content: DraftFormsStepContentV3,
   variantId: string,
-  spelling: string
+  spelling: string | RichTextV2V3
 ): DraftFormsStepContentV3 {
   return mutateVariant(content, variantId, (variant) => {
-    variant.spelling = spelling;
+    applyVariantSpelling(variant, spelling);
   });
 }
 
