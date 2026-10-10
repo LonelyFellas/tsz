@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/.codex/worktrees/spelling-pronunciation/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-10T01:16:12.975Z",
+  "_generatedAt": "2026-10-10T05:00:25.142Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -164,6 +164,12 @@
         "in": "header",
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
+      },
+      {
+        "name": "X-TSZ-Spelling-Markup",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "post /admin/lexicon/entries/archive-batch": [
@@ -172,6 +178,12 @@
         "in": "header",
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
+      },
+      {
+        "name": "X-TSZ-Spelling-Markup",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "post /admin/lexicon/entries/delete-batch": [
@@ -188,6 +200,12 @@
         "in": "header",
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
+      },
+      {
+        "name": "X-TSZ-Spelling-Markup",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "post /admin/lexicon/entries/restore-batch": [
@@ -196,6 +214,20 @@
         "in": "header",
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
+      },
+      {
+        "name": "X-TSZ-Spelling-Markup",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "get /admin/lexicon/entries/{id}": [
+      {
+        "name": "X-TSZ-Spelling-Markup",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "post /admin/lexicon/entries/{id}/archive": [
@@ -204,6 +236,20 @@
         "in": "header",
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
+      },
+      {
+        "name": "X-TSZ-Spelling-Markup",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "get /admin/lexicon/entries/{id}/publications": [
+      {
+        "name": "X-TSZ-Spelling-Markup",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "post /admin/lexicon/entries/{id}/publications": [
@@ -212,6 +258,20 @@
         "in": "header",
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
+      },
+      {
+        "name": "X-TSZ-Spelling-Markup",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "get /admin/lexicon/entries/{id}/publications/{publication_id}": [
+      {
+        "name": "X-TSZ-Spelling-Markup",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "post /admin/lexicon/entries/{id}/publications/{publication_id}/rollback": [
@@ -220,6 +280,12 @@
         "in": "header",
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
+      },
+      {
+        "name": "X-TSZ-Spelling-Markup",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "post /admin/lexicon/entries/{id}/restore": [
@@ -228,6 +294,28 @@
         "in": "header",
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
+      },
+      {
+        "name": "X-TSZ-Spelling-Markup",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "put /admin/lexicon/entries/{id}/steps/forms": [
+      {
+        "name": "X-TSZ-Spelling-Markup",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "put /admin/lexicon/entries/{id}/steps/meanings": [
+      {
+        "name": "X-TSZ-Spelling-Markup",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "post /admin/lexicon/sentences/{id}/publications": [

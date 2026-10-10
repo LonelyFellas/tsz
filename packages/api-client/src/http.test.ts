@@ -417,6 +417,18 @@ describe("HttpError", () => {
 });
 
 describe("createHttpClient", () => {
+  it("GET forwards spelling markup negotiation with the existing authorization", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({}));
+    const http = createHttpClient({
+      baseUrl: "/api/v1/admin",
+      getToken: () => "abc"
+    });
+    await http.get("/lexicon/entries/word", {
+      headers: { "X-TSZ-Spelling-Markup": "v1" }
+    });
+    expect(requestHeaders().get("X-TSZ-Spelling-Markup")).toBe("v1");
+    expect(requestHeaders().get("Authorization")).toBe("Bearer abc");
+  });
   it("get:拼接 baseUrl + path,带默认 Content-Type,返回响应体", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ id: "1" }));
     const http = createHttpClient({ baseUrl: "https://api.test" });

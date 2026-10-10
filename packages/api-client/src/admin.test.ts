@@ -441,7 +441,9 @@ describe("createAdminEndpoints — 智能词库 words", () => {
   it("get → GET /lexicon/entries/{id}", () => {
     const api = createAdminEndpoints(http);
     api.words.get("w-1");
-    expect(http.get).toHaveBeenCalledWith("/lexicon/entries/w-1");
+    expect(http.get).toHaveBeenCalledWith("/lexicon/entries/w-1", {
+      headers: { "X-TSZ-Spelling-Markup": "v1" }
+    });
   });
 
   it("get 在详情进入缓存前拒绝缺失 schema_version 的响应", async () => {
@@ -466,7 +468,10 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     };
     api.words[method]("w-2", `${method}-key`, input);
     expect(http.post).toHaveBeenCalledWith(path, input, {
-      headers: { "Idempotency-Key": `${method}-key` }
+      headers: {
+        "X-TSZ-Spelling-Markup": "v1",
+        "Idempotency-Key": `${method}-key`
+      }
     });
   });
 
@@ -480,7 +485,10 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     };
     api.words[method](`${method}-key`, input);
     expect(http.post).toHaveBeenCalledWith(path, input, {
-      headers: { "Idempotency-Key": `${method}-key` }
+      headers: {
+        "X-TSZ-Spelling-Markup": "v1",
+        "Idempotency-Key": `${method}-key`
+      }
     });
   });
 
@@ -722,6 +730,14 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     api.words.validateV3("w-3", { schema_version: 3, base_revision: 7 });
     api.words.listPublications("w-3");
     api.words.getPublication("w-3", "publication-3");
+    api.words.publishBatchV3("batch-publish-key", {
+      schema_version: 3,
+      items: [{ entry_id: "w-3", base_revision: 7, base_lifecycle_revision: 1 }]
+    });
+    api.words.publishBatchV3("batch-publication-key", {
+      schema_version: 3,
+      items: [{ entry_id: "w-3", base_revision: 7, base_lifecycle_revision: 2 }]
+    });
     api.words.publishV3("w-3", "publish-v3-key", {
       schema_version: 3,
       base_revision: 7
@@ -761,19 +777,30 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         kind: "word",
         headwords: { mode: "unified", common: "center" }
       },
-      { headers: { "Idempotency-Key": "create-v3-key" } }
+      {
+        headers: {
+          "X-TSZ-Spelling-Markup": "v1",
+          "Idempotency-Key": "create-v3-key"
+        }
+      }
     );
-    expect(http.get).toHaveBeenCalledWith("/lexicon/entries/w-3");
+    expect(http.get).toHaveBeenCalledWith("/lexicon/entries/w-3", {
+      headers: { "X-TSZ-Spelling-Markup": "v1" }
+    });
     expect(http.post).toHaveBeenCalledWith(
       "/lexicon/entries/w-3/steps/forms/impact",
       { schema_version: 3, base_revision: 7, content: forms }
     );
-    expect(http.put).toHaveBeenCalledWith("/lexicon/entries/w-3/steps/forms", {
-      schema_version: 3,
-      base_revision: 7,
-      intent: "save",
-      content: forms
-    });
+    expect(http.put).toHaveBeenCalledWith(
+      "/lexicon/entries/w-3/steps/forms",
+      {
+        schema_version: 3,
+        base_revision: 7,
+        intent: "save",
+        content: forms
+      },
+      { headers: { "X-TSZ-Spelling-Markup": "v1" } }
+    );
     expect(http.put).toHaveBeenCalledWith(
       "/lexicon/entries/w-3/steps/meanings",
       {
@@ -781,45 +808,109 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         base_revision: 7,
         intent: "save",
         content: meanings
-      }
+      },
+      { headers: { "X-TSZ-Spelling-Markup": "v1" } }
     );
     expect(http.post).toHaveBeenCalledWith("/lexicon/entries/w-3/validate", {
       schema_version: 3,
       base_revision: 7
     });
-    expect(http.get).toHaveBeenCalledWith("/lexicon/entries/w-3/publications");
+    expect(http.get).toHaveBeenCalledWith("/lexicon/entries/w-3/publications", {
+      headers: { "X-TSZ-Spelling-Markup": "v1" }
+    });
     expect(http.get).toHaveBeenCalledWith(
-      "/lexicon/entries/w-3/publications/publication-3"
+      "/lexicon/entries/w-3/publications/publication-3",
+      { headers: { "X-TSZ-Spelling-Markup": "v1" } }
+    );
+    expect(http.post).toHaveBeenCalledWith(
+      "/lexicon/entries/publications/batch",
+      {
+        schema_version: 3,
+        items: [
+          { entry_id: "w-3", base_revision: 7, base_lifecycle_revision: 1 }
+        ]
+      },
+      {
+        headers: {
+          "X-TSZ-Spelling-Markup": "v1",
+          "Idempotency-Key": "batch-publish-key"
+        }
+      }
     );
     expect(http.post).toHaveBeenCalledWith(
       "/lexicon/entries/w-3/publications",
       { schema_version: 3, base_revision: 7 },
-      { headers: { "Idempotency-Key": "publish-v3-key" } }
+      {
+        headers: {
+          "X-TSZ-Spelling-Markup": "v1",
+          "Idempotency-Key": "publish-v3-key"
+        }
+      }
     );
     expect(http.post).toHaveBeenCalledWith(
       "/lexicon/entries/w-3/publications/publication-3/rollback",
       { schema_version: 3, ...lifecycle },
-      { headers: { "Idempotency-Key": "activate-v3-key" } }
+      {
+        headers: {
+          "X-TSZ-Spelling-Markup": "v1",
+          "Idempotency-Key": "activate-v3-key"
+        }
+      }
     );
     expect(http.post).toHaveBeenCalledWith(
       "/lexicon/entries/w-3/archive",
       lifecycle,
-      { headers: { "Idempotency-Key": "archive-any-key" } }
+      {
+        headers: {
+          "X-TSZ-Spelling-Markup": "v1",
+          "Idempotency-Key": "archive-any-key"
+        }
+      }
     );
     expect(http.post).toHaveBeenCalledWith(
       "/lexicon/entries/w-3/restore",
       lifecycle,
-      { headers: { "Idempotency-Key": "restore-any-key" } }
+      {
+        headers: {
+          "X-TSZ-Spelling-Markup": "v1",
+          "Idempotency-Key": "restore-any-key"
+        }
+      }
     );
     expect(http.post).toHaveBeenCalledWith(
       "/lexicon/entries/archive-batch",
       batch,
-      { headers: { "Idempotency-Key": "archive-batch-any-key" } }
+      {
+        headers: {
+          "X-TSZ-Spelling-Markup": "v1",
+          "Idempotency-Key": "archive-batch-any-key"
+        }
+      }
     );
     expect(http.post).toHaveBeenCalledWith(
       "/lexicon/entries/restore-batch",
       batch,
-      { headers: { "Idempotency-Key": "restore-batch-any-key" } }
+      {
+        headers: {
+          "X-TSZ-Spelling-Markup": "v1",
+          "Idempotency-Key": "restore-batch-any-key"
+        }
+      }
+    );
+    expect(http.post).toHaveBeenCalledWith(
+      "/lexicon/entries/publications/batch",
+      {
+        schema_version: 3,
+        items: [
+          { entry_id: "w-3", base_revision: 7, base_lifecycle_revision: 2 }
+        ]
+      },
+      {
+        headers: {
+          "X-TSZ-Spelling-Markup": "v1",
+          "Idempotency-Key": "batch-publication-key"
+        }
+      }
     );
     const relatedPath = http.get.mock.calls
       .map((call) => call[0] as string)

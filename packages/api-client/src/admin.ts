@@ -96,6 +96,8 @@ import {
 } from "./admin-word-schema";
 import type { HttpClient } from "./http";
 
+const SPELLING_MARKUP_HEADERS = { "X-TSZ-Spelling-Markup": "v1" };
+
 // admin 账号体系的 wire 类型已收敛到 @tsz/types（wire 类型唯一家）。此处 re-export，
 // 保持既有 `import { AdminProfile, ... } from "@tsz/api-client"` 的消费方不破。
 export type {
@@ -338,13 +340,18 @@ export function createAdminEndpoints(http: HttpClient) {
       createV3: (idempotencyKey: string, input: CreateAdminWordV3Input) =>
         http
           .post<unknown>("/lexicon/entries", input, {
-            headers: { "Idempotency-Key": idempotencyKey }
+            headers: {
+              ...SPELLING_MARKUP_HEADERS,
+              "Idempotency-Key": idempotencyKey
+            }
           })
           .then(decodeAdminWordV3Envelope),
       /** GET /admin/lexicon/entries/{id} — 草稿详情。 */
       get: (wordId: string) =>
         http
-          .get<unknown>(`/lexicon/entries/${wordId}`)
+          .get<unknown>(`/lexicon/entries/${wordId}`, {
+            headers: SPELLING_MARKUP_HEADERS
+          })
           .then(decodeAdminWordDraftAnyEnvelope)
           .then((response) =>
             requireWordPathIdentity(response, wordId, "get.word.id")
@@ -363,11 +370,15 @@ export function createAdminEndpoints(http: HttpClient) {
           .then(decodeFormsImpactResponseV3),
       saveFormsStepV3: (wordId: string, input: SaveFormsStepInputV3) =>
         http
-          .put<unknown>(`/lexicon/entries/${wordId}/steps/forms`, input)
+          .put<unknown>(`/lexicon/entries/${wordId}/steps/forms`, input, {
+            headers: SPELLING_MARKUP_HEADERS
+          })
           .then(decodeAdminWordV3Envelope),
       saveMeaningsStepV3: (wordId: string, input: SaveMeaningsStepInputV3) =>
         http
-          .put<unknown>(`/lexicon/entries/${wordId}/steps/meanings`, input)
+          .put<unknown>(`/lexicon/entries/${wordId}/steps/meanings`, input, {
+            headers: SPELLING_MARKUP_HEADERS
+          })
           .then(decodeAdminWordV3Envelope),
       /** 按关键字检索可做短语成分目标的已发布词条。 */
       searchComponentTargetsV3: (
@@ -392,13 +403,16 @@ export function createAdminEndpoints(http: HttpClient) {
       /** 历史 publication 双版本只读列表。 */
       listPublications: (wordId: string) =>
         http
-          .get<unknown>(`/lexicon/entries/${wordId}/publications`)
+          .get<unknown>(`/lexicon/entries/${wordId}/publications`, {
+            headers: SPELLING_MARKUP_HEADERS
+          })
           .then(decodeAdminWordPublicationListResponse),
       /** 历史 publication 双版本只读详情。 */
       getPublication: (wordId: string, publicationId: string) =>
         http
           .get<unknown>(
-            `/lexicon/entries/${wordId}/publications/${publicationId}`
+            `/lexicon/entries/${wordId}/publications/${publicationId}`,
+            { headers: SPELLING_MARKUP_HEADERS }
           )
           .then(decodeAdminWordPublicationEnvelope),
       publishBatchV3: (
@@ -407,7 +421,10 @@ export function createAdminEndpoints(http: HttpClient) {
       ) =>
         http
           .post<unknown>("/lexicon/entries/publications/batch", input, {
-            headers: { "Idempotency-Key": idempotencyKey }
+            headers: {
+              ...SPELLING_MARKUP_HEADERS,
+              "Idempotency-Key": idempotencyKey
+            }
           })
           .then((response) =>
             decodeBatchPublicationResponseV3(
@@ -423,7 +440,10 @@ export function createAdminEndpoints(http: HttpClient) {
       ) =>
         http
           .post<unknown>(`/lexicon/entries/${wordId}/publications`, input, {
-            headers: { "Idempotency-Key": idempotencyKey }
+            headers: {
+              ...SPELLING_MARKUP_HEADERS,
+              "Idempotency-Key": idempotencyKey
+            }
           })
           .then(decodeAdminWordV3Envelope),
       rollbackPublicationV3: (
@@ -436,7 +456,12 @@ export function createAdminEndpoints(http: HttpClient) {
           .post<unknown>(
             `/lexicon/entries/${wordId}/publications/${publicationId}/rollback`,
             input,
-            { headers: { "Idempotency-Key": idempotencyKey } }
+            {
+              headers: {
+                ...SPELLING_MARKUP_HEADERS,
+                "Idempotency-Key": idempotencyKey
+              }
+            }
           )
           .then(decodeAdminWordV3Envelope),
       archive: (
@@ -446,7 +471,10 @@ export function createAdminEndpoints(http: HttpClient) {
       ) =>
         http
           .post<unknown>(`/lexicon/entries/${wordId}/archive`, input, {
-            headers: { "Idempotency-Key": idempotencyKey }
+            headers: {
+              ...SPELLING_MARKUP_HEADERS,
+              "Idempotency-Key": idempotencyKey
+            }
           })
           .then(decodeAdminWordAnyEnvelope)
           .then((response) =>
@@ -459,7 +487,10 @@ export function createAdminEndpoints(http: HttpClient) {
       ) =>
         http
           .post<unknown>(`/lexicon/entries/${wordId}/restore`, input, {
-            headers: { "Idempotency-Key": idempotencyKey }
+            headers: {
+              ...SPELLING_MARKUP_HEADERS,
+              "Idempotency-Key": idempotencyKey
+            }
           })
           .then(decodeAdminWordAnyEnvelope)
           .then((response) =>
@@ -468,7 +499,10 @@ export function createAdminEndpoints(http: HttpClient) {
       archiveBatch: (idempotencyKey: string, input: EntryLifecycleBatchInput) =>
         http
           .post<unknown>("/lexicon/entries/archive-batch", input, {
-            headers: { "Idempotency-Key": idempotencyKey }
+            headers: {
+              ...SPELLING_MARKUP_HEADERS,
+              "Idempotency-Key": idempotencyKey
+            }
           })
           .then(decodeEntryLifecycleBatchAnyResponse)
           .then((response) =>
@@ -477,7 +511,10 @@ export function createAdminEndpoints(http: HttpClient) {
       restoreBatch: (idempotencyKey: string, input: EntryLifecycleBatchInput) =>
         http
           .post<unknown>("/lexicon/entries/restore-batch", input, {
-            headers: { "Idempotency-Key": idempotencyKey }
+            headers: {
+              ...SPELLING_MARKUP_HEADERS,
+              "Idempotency-Key": idempotencyKey
+            }
           })
           .then(decodeEntryLifecycleBatchAnyResponse)
           .then((response) =>
