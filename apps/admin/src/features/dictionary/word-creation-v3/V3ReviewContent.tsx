@@ -175,7 +175,16 @@ function FormsReview({
                             {index === 0 && (
                               <>
                                 <strong className="tsz-words">
-                                  {variant.spelling || "待填写拼写"}
+                                  <RichTextReadOnly
+                                    value={
+                                      variant.spelling_rich ?? {
+                                        version: 2,
+                                        text: variant.spelling,
+                                        annotations: []
+                                      }
+                                    }
+                                    emptyText="待填写拼写"
+                                  />
                                 </strong>
                                 <small>{dialectLabel(variant.dialect)}</small>
                               </>

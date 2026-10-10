@@ -2,6 +2,7 @@ import { ClearOutlined, RedoOutlined, UndoOutlined } from "@ant-design/icons";
 import { Button, Popover, Tooltip } from "antd";
 import { useId, useState, type ReactNode } from "react";
 import { AnnotationStrip, type AnnotationStripProps } from "./AnnotationStrip";
+import type { VoiceEditorProps } from "../../types";
 import type { Brush } from "./roles";
 import type { LiaisonAnchor, LiaisonDraft, MarkState } from "./tokens";
 
@@ -32,8 +33,8 @@ export interface MarkupPanelProps extends Pick<
   | "onInspectPause"
   | "selectedPauseGap"
 > {
-  grammarMode?: boolean;
-  associationMode?: boolean;
+  mode: VoiceEditorProps["mode"];
+
   selectionText?: string;
   text: string;
   marks: MarkState;
@@ -61,8 +62,8 @@ export interface MarkupPanelProps extends Pick<
 }
 
 export function MarkupPanel({
-  grammarMode,
-  associationMode,
+  mode,
+
   selectionText,
   associationContent,
   associationAnchor,
@@ -98,10 +99,24 @@ export function MarkupPanel({
   actions,
   onOpenToolChange
 }: MarkupPanelProps) {
+  const grammarMode = mode === "grammar";
+  const associationMode = mode === "association";
+  const composedMode = grammarMode || associationMode;
+  const selectionMode =
+    grammarMode ||
+    associationMode ||
+    mode === "spelling" ||
+    mode === "actual-pron";
+  const selectionToolsLabel = grammarMode
+    ? "“语法结构”和“连读符号”"
+    : associationMode
+      ? "“文本格式”和“连读符号”"
+      : mode === "spelling"
+        ? "“斜体”和“连读符号”"
+        : "“连读符号”";
   const [voicesExpanded, setVoicesExpanded] = useState(true);
   const voicesPanelId = useId();
-  const composedMode = grammarMode || associationMode;
-  const headerTools = composedMode
+  const headerTools = selectionMode
     ? tools.filter(
         (tool) =>
           tool.key === "text" ||
@@ -219,7 +234,8 @@ export function MarkupPanel({
   return (
     <div className="tsz-ve-markup">
       <div
-        className={`tsz-ve-top-tools${composedMode ? " is-grammar" : ""}`}
+        className={`tsz-ve-top-tools${selectionMode ? " is-selection" : ""}`}
+
         role="toolbar"
         aria-label="标注工具栏"
       >
@@ -272,25 +288,32 @@ export function MarkupPanel({
         ))}
         {eraseTool && (
           <div className="tsz-ve-erase-action">
-            <Tooltip title="开启后点击已有连读或停顿即可取消，再次点击退出">
+            <Tooltip
+              title={
+                composedMode
+                  ? "开启后点击已有连读或停顿即可取消，再次点击退出"
+                  : "开启后点击已有连读即可取消，再次点击退出"
+              }
+            >
               {trigger(eraseTool, false)}
             </Tooltip>
           </div>
         )}
-        {composedMode && (
+        {selectionMode && (
           <div className="tsz-ve-selection-status" role="status">
             {brush.kind === "erase" ? (
-              "清除模式：点击已有连读或停顿即可取消。"
+              composedMode ? (
+                "清除模式：点击已有连读或停顿即可取消。"
+              ) : (
+                "清除模式：点击已有连读即可取消。"
+              )
             ) : selectionText ? (
               <>
                 已选中 <strong>{selectionText}</strong>
-                ，可配置{grammarMode ? "“语法结构”" : "“文本格式”"}
-                和“连读符号”。
+                ，可配置{selectionToolsLabel}。
               </>
-            ) : grammarMode ? (
-              "选中文字，可配置“语法结构”和“连读符号”。"
             ) : (
-              "选中文字，可配置“文本格式”和“连读符号”。"
+              `选中文字，可配置${selectionToolsLabel}。`
             )}
           </div>
         )}
@@ -328,7 +351,7 @@ export function MarkupPanel({
           onLetterClick={onLetterClick}
           onLiaisonClick={onLiaisonClick}
         />
-        {composedMode && actions && (
+        {selectionMode && actions && (
           <div className="tsz-ve-editor-actions">{actions}</div>
         )}
       </div>
@@ -354,14 +377,14 @@ export function MarkupPanel({
           ))}
         </div>
       )}
-      {(secondaryTools.length > 0 || (!composedMode && actions)) && (
+      {(secondaryTools.length > 0 || (!selectionMode && actions)) && (
         <div className="tsz-ve-footer">
           {secondaryTools.length > 0 && (
             <div className="tsz-ve-secondary-tools">
               {secondaryTools.map(renderTool)}
             </div>
           )}
-          {!composedMode && actions && (
+          {!selectionMode && actions && (
             <div className="tsz-ve-editor-actions">{actions}</div>
           )}
         </div>

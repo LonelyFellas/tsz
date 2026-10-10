@@ -171,15 +171,13 @@ it.each(["grammar", "actual-pron"] as const)(
         Node.DOCUMENT_POSITION_FOLLOWING
       );
     } else {
-      expect(footer).toContainElement(complete);
-      expect(footer).toContainElement(screen.getByLabelText("编辑文本"));
-      expect(
-        document.querySelector(".tsz-ve-editing-area")
-      ).not.toContainElement(complete);
-      if (tools)
-        expect(tools.compareDocumentPosition(footer!)).toBe(
-          Node.DOCUMENT_POSITION_FOLLOWING
-        );
+      expect(footer).toBeNull();
+      expect(document.querySelector(".tsz-ve-top-tools")).toContainElement(
+        screen.getByLabelText("编辑文本")
+      );
+      expect(document.querySelector(".tsz-ve-editing-area")).toContainElement(
+        complete
+      );
     }
     fireEvent.click(complete);
     expect(onComplete).toHaveBeenCalledOnce();

@@ -289,7 +289,7 @@ function V3DialectFormCell({
     issues.some(
       (issue) =>
         issue.node_location.variant_id === variant.id &&
-        issue.field === "spelling"
+        (issue.field === "spelling" || issue.field === "spelling_rich")
     );
   const style = {
     "--v3-narrow-grid-row": narrowGridRow
@@ -321,13 +321,19 @@ function V3DialectFormCell({
           placeholder={`${dialectLabel(dialect)}拼写`}
           onChange={(next) => {
             if (dialectRules.spelling_mode === "unified") {
-              const result = unifyUkUsSpelling(form, next.text);
+              const result = unifyUkUsSpelling(form, next);
               if (result.ok) onChange(replaceForm(content, result.value));
               return;
             }
-            onChange(updateVariantSpelling(content, variant.id, next.text));
+            onChange(updateVariantSpelling(content, variant.id, next));
           }}
-          value={{ version: 2, text: variant.spelling, annotations: [] }}
+          value={
+            variant.spelling_rich ?? {
+              version: 2,
+              text: variant.spelling,
+              annotations: []
+            }
+          }
         />
         <SpellingConflictNote literals={conflictLiteralList} />
         <V3PronunciationList
@@ -394,7 +400,7 @@ export function V3ConcreteFormRow({
     unifiedConflictLiterals.length > 0 ||
     issues.some(
       (issue) =>
-        issue.field === "spelling" &&
+        (issue.field === "spelling" || issue.field === "spelling_rich") &&
         issue.node_location.variant_id !== undefined &&
         unifiedSpellingVariantIds.includes(issue.node_location.variant_id)
     );
@@ -489,7 +495,8 @@ export function V3ConcreteFormRow({
                   issues.some(
                     (issue) =>
                       issue.node_location.variant_id === commonVariant.id &&
-                      issue.field === "spelling"
+                      (issue.field === "spelling" ||
+                        issue.field === "spelling_rich")
                   )
                 }
                 ariaLabel={`${formLabel}英美通用拼写`}
@@ -497,15 +504,17 @@ export function V3ConcreteFormRow({
                 nodeId={commonVariant.id}
                 onChange={(next) =>
                   onChange(
-                    updateVariantSpelling(content, commonVariant.id, next.text)
+                    updateVariantSpelling(content, commonVariant.id, next)
                   )
                 }
                 placeholder="词形拼写"
-                value={{
-                  version: 2,
-                  text: commonVariant.spelling,
-                  annotations: []
-                }}
+                value={
+                  commonVariant.spelling_rich ?? {
+                    version: 2,
+                    text: commonVariant.spelling,
+                    annotations: []
+                  }
+                }
               />
               <SpellingConflictNote literals={commonConflictLiterals} />
             </div>
@@ -546,15 +555,17 @@ export function V3ConcreteFormRow({
                 nodeAliases={unifiedSpellingVariantIds.join(" ")}
                 nodeId={form.id}
                 onChange={(next) => {
-                  const result = unifyUkUsSpelling(form, next.text);
+                  const result = unifyUkUsSpelling(form, next);
                   if (result.ok) onChange(replaceForm(content, result.value));
                 }}
                 placeholder="词形拼写"
-                value={{
-                  version: 2,
-                  text: unifiedSpellingVariants.uk.spelling,
-                  annotations: []
-                }}
+                value={
+                  unifiedSpellingVariants.uk.spelling_rich ?? {
+                    version: 2,
+                    text: unifiedSpellingVariants.uk.spelling,
+                    annotations: []
+                  }
+                }
               />
               <SpellingConflictNote literals={unifiedConflictLiterals} />
             </div>

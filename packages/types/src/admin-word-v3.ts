@@ -111,6 +111,8 @@ interface WordFormVariantBaseV3<TDialect extends Dialect> {
   id: string;
   dialect: TDialect;
   spelling: string;
+  /** 拼写展示标注；正文与 spelling 一致，仅含斜体和连读。 */
+  spelling_rich?: RichTextV2V3;
   /** 是否规则变化；旧数据缺省时沿用所属组的历史值。 */
   is_regular?: boolean;
   origin: TextOriginV3;
@@ -810,6 +812,7 @@ export const V3_VALIDATION_ISSUE_CODES = [
   "empty_form_group",
   "base_form_required_in_group",
   "variant_spelling_required",
+  "spelling_rich_text_invalid",
   "pronunciation_required",
   "duplicate_pronunciation",
   "content_limit_exceeded",

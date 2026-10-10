@@ -776,3 +776,51 @@ it("拼写规则标记通过显式 wire 投影且统一拼写不得保存矛盾�
   form.regional_variants.us.is_regular = false;
   expect(validateFormsContent(content, "save")).toEqual([]);
 });
+
+it("拼写标注 wire 保留并校验正文、范围及展示类型，未知字段仍被拒", () => {
+  const form = commonFormFixture();
+  const variant = form.regional_variants.common;
+  variant.spelling_rich = {
+    version: 2,
+    text: variant.spelling,
+    annotations: [{ type: "italic", start: 0, end: 2 }]
+  };
+  const content = formsFixture({ forms: [form] });
+  expect(validateFormsContent(content, "save")).toEqual([]);
+  expect(
+    commonVariant(toFormsWire(content).pos[0]!.forms[0]!).spelling_rich
+  ).toEqual(variant.spelling_rich);
+  for (const rich of [
+    { ...variant.spelling_rich, text: "wrong" },
+    {
+      ...variant.spelling_rich,
+      annotations: [{ type: "italic", start: 0, end: 99 }]
+    },
+    {
+      ...variant.spelling_rich,
+      annotations: [{ type: "pause", at: 0, duration_ms: 500 }]
+    },
+    { ...variant.spelling_rich, annotations: [null] }
+  ]) {
+    const input = structuredClone(content);
+    const target = commonVariant(input.pos[0]!.forms[0]!);
+    Object.assign(target, { spelling_rich: rich });
+    expect(validateFormsContent(input, "save")).toContainEqual(
+      expect.objectContaining({
+        code: "spelling_rich_text_invalid",
+        field: "spelling_rich",
+        node_id: variant.id
+      })
+    );
+  }
+  const input = structuredClone(content);
+  Object.assign(commonVariant(input.pos[0]!.forms[0]!), {
+    spelling_rich: null
+  });
+  expect(codes(input)).toContain("invalid_regional_variant_shape");
+  Object.assign(commonVariant(input.pos[0]!.forms[0]!), {
+    spelling_rich: variant.spelling_rich,
+    unexpected: true
+  });
+  expect(codes(input)).toContain("invalid_regional_variant_shape");
+});

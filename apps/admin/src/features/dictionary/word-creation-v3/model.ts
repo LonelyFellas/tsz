@@ -1,4 +1,8 @@
 import {
+  spellingAnnotationsEqual,
+  validateRichTextV2
+} from "@tsz/voice-editor/core";
+import {
   synthesisInputIssue,
   SYNTHESIS_LIMITS,
   pronunciationSynthesisContent,
@@ -11,6 +15,7 @@ import type {
   DialectRulesV3,
   DraftFormsStepContentV3,
   PhraseComponentUsageV3,
+  RichTextV2V3,
   TextOriginV3,
   V3DraftNodeLocation,
   V3DraftValidationIssue,
@@ -267,14 +272,21 @@ function isVariantShape(
         "is_regular",
         "origin",
         "pronunciations",
-        "spelling"
+        "spelling",
+        "spelling_rich"
       ].includes(key)
     ) &&
     Object.keys(value).length >= 5 &&
-    Object.keys(value).length <= 7 &&
+    Object.keys(value).length <= 8 &&
     typeof value.id === "string" &&
     value.dialect === dialect &&
     typeof value.spelling === "string" &&
+    (value.spelling_rich === undefined ||
+      (isObject(value.spelling_rich) &&
+        ownKeysAre(value.spelling_rich, ["annotations", "text", "version"]) &&
+        value.spelling_rich.version === 2 &&
+        typeof value.spelling_rich.text === "string" &&
+        Array.isArray(value.spelling_rich.annotations))) &&
     (value.is_regular === undefined || typeof value.is_regular === "boolean") &&
     (value.origin === "dictionary" ||
       value.origin === "converted" ||
@@ -388,7 +400,19 @@ function regionalVariantsMatchRules(
   return (
     rules.spelling_mode === "distinguish" ||
     (variants.uk.spelling === variants.us.spelling &&
-      variants.uk.is_regular === variants.us.is_regular)
+      variants.uk.is_regular === variants.us.is_regular &&
+      spellingAnnotationsEqual(
+        variants.uk.spelling_rich ?? {
+          version: 2,
+          text: variants.uk.spelling,
+          annotations: []
+        },
+        variants.us.spelling_rich ?? {
+          version: 2,
+          text: variants.us.spelling,
+          annotations: []
+        }
+      ))
   );
 }
 
@@ -508,6 +532,7 @@ function variantIssues(
     id: string;
     dialect: Dialect;
     spelling: string;
+    spelling_rich?: RichTextV2V3;
     pronunciations: WordPronunciationV3[];
   },
   posId: string,
@@ -553,6 +578,31 @@ function variantIssues(
         variantLocation
       )
     );
+  }
+  if (variant.spelling_rich) {
+    const rich = variant.spelling_rich;
+    let valid = false;
+    try {
+      valid =
+        rich.text === variant.spelling &&
+        rich.annotations.every(
+          (annotation) =>
+            annotation.type === "italic" || annotation.type === "liaison"
+        );
+      valid = valid && validateRichTextV2(rich).length === 0;
+    } catch {
+      valid = false;
+    }
+    if (!valid)
+      issues.push(
+        issue(
+          "spelling_rich_text_invalid",
+          "spelling_rich",
+          variant.id,
+          "拼写正文与标注不一致或包含无效标注",
+          variantLocation
+        )
+      );
   }
   if (intent === "complete" && variant.pronunciations.length === 0) {
     issues.push(
@@ -1110,6 +1160,7 @@ function variantWire<TDialect extends Dialect>(variant: {
   id: string;
   dialect: TDialect;
   spelling: string;
+  spelling_rich?: RichTextV2V3;
   origin: TextOriginV3;
   pronunciations: WordPronunciationV3[];
   component_usages?: PhraseComponentUsageV3[];
@@ -1118,6 +1169,9 @@ function variantWire<TDialect extends Dialect>(variant: {
     id: variant.id,
     dialect: variant.dialect,
     spelling: variant.spelling,
+    ...(variant.spelling_rich === undefined
+      ? {}
+      : { spelling_rich: variant.spelling_rich }),
     ...(variant.is_regular === undefined
       ? {}
       : { is_regular: variant.is_regular }),

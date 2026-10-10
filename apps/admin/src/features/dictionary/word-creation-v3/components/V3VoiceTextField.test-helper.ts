@@ -20,4 +20,7 @@ export async function changeVoiceText(
   const confirm = screen.queryByText("确认修改", { selector: "button span" });
   if (confirm) fireEvent.click(confirm);
   fireEvent.click(within(dialog).getByLabelText(`完成${label}编辑`));
+  if (within(dialog).queryByText(/已规范化拼写/)) {
+    fireEvent.click(within(dialog).getByLabelText(`完成${label}编辑`));
+  }
 }

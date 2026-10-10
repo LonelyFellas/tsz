@@ -700,7 +700,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "64ea33128067dbfffb8c184a933112426877bf336ef051c8a8fb76a8bd4ce3e1"
+      "4647d0bc9c90ce91e9dff1749562b91673d8f716f1c61bfd66395c89ad346af5"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1402,4 +1402,24 @@ it("手机号必绑错误与业务 403 保持契约，补绑和资料读取端�
   expect(
     snapshot.operationSchemas["post /me/contact/bind"].responses
   ).toHaveProperty("204");
+});
+
+it("拼写展示字段可选且不接受 null，三种地区变体复用 V2 契约", () => {
+  for (const name of [
+    "WordCommonFormVariantV3",
+    "WordUkFormVariantV3",
+    "WordUsFormVariantV3"
+  ] as const) {
+    const schema = snapshot.schemas[name];
+    expect(schema.required).not.toContain("spelling_rich");
+    expect(schema.properties.spelling_rich).toEqual(
+      expect.objectContaining({ $ref: "#/components/schemas/RichTextV2V3" })
+    );
+    expect(runtimeSchemaBundle.$defs[name].properties.spelling_rich).toEqual({
+      $ref: "#/$defs/RichTextV2V3"
+    });
+  }
+  expect(snapshot.schemas.V3ValidationIssueCode.enum).toContain(
+    "spelling_rich_text_invalid"
+  );
 });

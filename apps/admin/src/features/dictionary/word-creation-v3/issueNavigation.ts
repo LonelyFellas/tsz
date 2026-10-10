@@ -47,7 +47,7 @@ export function v3IssueNavigationTarget(
   return {
     step: issue.step,
     node_id,
-    field: issue.field,
+    field: issue.field === "spelling_rich" ? "spelling" : issue.field,
     ancestor_node_ids: [...location.ancestor_node_ids],
     ...(location.pos_id ? { pos_id: location.pos_id } : {}),
     ...(location.form_group_id

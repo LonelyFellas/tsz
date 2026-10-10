@@ -13,6 +13,7 @@ import type {
 } from "@tsz/voice-editor/types";
 import {
   editRichText,
+  normalizeSpellingRich,
   remapTextLinks,
   toRichTextV2
 } from "@tsz/voice-editor/core";
@@ -109,7 +110,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   onDraftPendingChange,
   onAssociationPendingChange,
   mode,
-  editingEnabled = mode !== "spelling",
+  editingEnabled = true,
   presentation = "field",
   dialect,
   textLinks,
@@ -281,7 +282,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         annotation.type === "underline"
     );
   const grammarPreview =
-    (mode === "grammar" || associationPreview) &&
+    (mode === "grammar" || mode === "spelling" || associationPreview) &&
     (!focused ||
       readOnly ||
       (env.VOICE_EDITOR && editingEnabled && recorded)) &&
@@ -292,6 +293,17 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       key={largePreview ? "large" : "standard"}
       onFocus={() => setFocused(true)}
       onBlur={() => {
+        if (mode === "spelling" && !expanded && !readOnly) {
+          const normalized = normalizeSpellingRich(toRichTextV2(value));
+          if (normalized.text !== value.text) {
+            change(normalized, textLinks);
+            if (
+              normalized.annotations.length <
+              toRichTextV2(value).annotations.length
+            )
+              void feedback.info("已规范化拼写并移除受影响的标注，可撤销恢复");
+          }
+        }
         setFocused(false);
         if (value.text.trim()) setRecorded(true);
       }}
@@ -392,11 +404,11 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         {leadingAction ? (
           <Space.Compact block className="v3-voice-text-field-compact">
             {leadingAction}
-            {mode === "grammar" || associationPreview
+            {mode === "grammar" || mode === "spelling" || associationPreview
               ? collapsedField
               : fallback}
           </Space.Compact>
-        ) : mode === "grammar" || associationPreview ? (
+        ) : mode === "grammar" || mode === "spelling" || associationPreview ? (
           collapsedField
         ) : (
           fallback
@@ -422,7 +434,10 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     </Space.Compact>
   );
 
-  const renderActions = (canComplete: boolean) =>
+  const renderActions = (
+    canComplete: boolean,
+    prepareComplete: () => boolean = () => true
+  ) =>
     showDone ? (
       <Space className="v3-voice-text-editor-done" size={6}>
         <Button
@@ -439,7 +454,9 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           aria-label={`完成${ariaLabel}编辑`}
           loading={doneLoading}
           disabled={doneDisabled || readOnly || !canComplete}
-          onClick={completeEditing}
+          onClick={() => {
+            if (prepareComplete()) completeEditing();
+          }}
         >
           完成
         </Button>

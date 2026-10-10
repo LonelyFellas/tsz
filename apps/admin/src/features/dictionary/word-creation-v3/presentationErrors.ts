@@ -24,6 +24,7 @@ const ISSUE_MESSAGES = {
   form_group_required: "每个词性都需要至少一个词形变化组",
   empty_form_group: "词形变化组不能为空",
   base_form_required_in_group: "第 1 组词形变化需要至少一个原形",
+  spelling_rich_text_invalid: "拼写正文与标注不一致或标注范围无效，请重新编辑",
   variant_spelling_required: "请填写词形拼写",
   pronunciation_required: "请完整填写发音方式、字典音标和实际发音",
   duplicate_pronunciation: "同一词形下不能添加重复发音",

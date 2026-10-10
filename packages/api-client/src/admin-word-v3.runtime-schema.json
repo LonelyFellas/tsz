@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/sentence-formatting/tsz-rust/docs/openapi.json",
-  "_source_sha256": "64ea33128067dbfffb8c184a933112426877bf336ef051c8a8fb76a8bd4ce3e1",
+  "_source": "/Users/darwish/.codex/worktrees/spelling-pronunciation/tsz-rust/docs/openapi.json",
+  "_source_sha256": "4647d0bc9c90ce91e9dff1749562b91673d8f716f1c61bfd66395c89ad346af5",
   "roots": [
     "LearningRewardDay",
     "LearningPreview",
@@ -2995,6 +2995,7 @@
         "empty_form_group",
         "base_form_required_in_group",
         "variant_spelling_required",
+        "spelling_rich_text_invalid",
         "pronunciation_required",
         "duplicate_pronunciation",
         "content_limit_exceeded",
@@ -3106,7 +3107,8 @@
           "items": { "$ref": "#/$defs/WordPronunciationV3" },
           "maxItems": 2000
         },
-        "spelling": { "type": "string", "maxLength": 200 }
+        "spelling": { "type": "string", "maxLength": 200 },
+        "spelling_rich": { "$ref": "#/$defs/RichTextV2V3" }
       },
       "additionalProperties": false
     },
@@ -3910,7 +3912,8 @@
           "items": { "$ref": "#/$defs/WordPronunciationV3" },
           "maxItems": 2000
         },
-        "spelling": { "type": "string", "maxLength": 200 }
+        "spelling": { "type": "string", "maxLength": 200 },
+        "spelling_rich": { "$ref": "#/$defs/RichTextV2V3" }
       },
       "additionalProperties": false
     },
@@ -3932,7 +3935,8 @@
           "items": { "$ref": "#/$defs/WordPronunciationV3" },
           "maxItems": 2000
         },
-        "spelling": { "type": "string", "maxLength": 200 }
+        "spelling": { "type": "string", "maxLength": 200 },
+        "spelling_rich": { "$ref": "#/$defs/RichTextV2V3" }
       },
       "additionalProperties": false
     }
