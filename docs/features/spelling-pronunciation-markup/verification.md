@@ -87,6 +87,6 @@ Docker 仍不可用，改用本机已有 PostgreSQL 16.15 与 Redis 8.10.2 启�
 
 当前输入：前端基线 `ec8cc227008bc986b890212e207f2de96589a7e1`、后端基线 `272a588db1681a023688d7fbf96fd857e2d43170` 加本任务工作区改动。OpenAPI 源 SHA256 为 `7e445f6e0e85535743b9545df3fd91ef38ec12c1d31ff1e88f4ca7f9550fd124`。冻结了上线前端 `62086660541fca722d5ab51589bb88d590144b41` 的三个区域变体 schema，证实新增字段原先被拒绝、省略后的视图通过旧 strict reader。
 
-已通过 API-client 定向、全包与类型检查，实际 GET 请求透传能力头及 Authorization；后端三地区/未知能力投影单元测试，以及真实 PostgreSQL/Redis 保存读回、旧客户端保存、发布历史回滚、跨客户端幂等重试、单条/批量 lifecycle 和批量发布测试通过。测试使用本任务隔离原生 PG/Redis；首次 PG 启动误用默认端口造成连接失败，改回 loopback 57681 后实际复验通过，环境失败不计为业务验证。
+已通过 API-client 定向、全包与类型检查，实际 GET 请求透传能力头及 Authorization；后端三地区/未知能力投影单元测试，以及真实 PostgreSQL/Redis 保存读回、旧客户端保存、发布历史回滚、跨客户端幂等重试、单条/批量 lifecycle 和批量发布测试通过。测试使用本任务隔离原生 PG/Redis；首次测试依赖未就绪导致 `PoolTimedOut`；核实本任务 loopback PostgreSQL 57681 与 Redis 57682 后复验通过，环境失败不计为业务验证。
 
 无新增 migration/SQL。提交后的正常 hooks、独立审查和配套 PR/CI 证据以 PR 正文为准。尚未发布此补丁；现网仍为前端 `ec8cc227…` 的兼容后台（编辑入口关闭）与后端 `272a588d…`。新版本按兼容后端 → 新 api-client 前端发布，不再要求用户证明所有旧标签页已刷新。
