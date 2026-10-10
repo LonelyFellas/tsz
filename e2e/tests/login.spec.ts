@@ -55,11 +55,13 @@ test.describe("登录页", () => {
     await page.getByRole("button", { name: "没有账号，立即注册" }).click();
     await expect(page).toHaveURL(/\/register/);
   });
+});
 
-  test("未登录访问受保护页面重定向到登录页", async ({ page }) => {
-    await page.goto("/student/practice");
-    await expect(page).toHaveURL(/\/login\?redirect=/);
-  });
+test("未登录访问受保护页面重定向到登录页", async ({ page }) => {
+  await mockApi(page, { authenticated: false });
+  // 直接访问目标页，避免中断登录页仍在进行的会话恢复。
+  await page.goto("/student/practice");
+  await expect(page).toHaveURL(/\/login\?redirect=%2Fstudent%2Fpractice$/);
 });
 
 test("验证码登录发码带 login 用途并进入业务页", async ({ page }) => {

@@ -47,6 +47,14 @@ const authMocks = vi.hoisted(() => ({
   } as { id: string; role: string; permissions?: string[] } | null
 }));
 
+// 页面测试验证词形编辑与保存编排；Azure 合成面板由 V3SynthesisInputs 测试覆盖。
+vi.mock(
+  "@/features/dictionary/word-creation-v3/components/V3SynthesisInputs",
+  () => ({
+    V3SynthesisInputs: () => null
+  })
+);
+
 // 只覆盖 useAuthStore：@/lib/auth 的其余导出被 api/dataSource 真实依赖，整体替换会让模块加载失败。
 vi.mock("@/lib/auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/auth")>()),
