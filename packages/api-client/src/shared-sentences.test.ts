@@ -1,3 +1,4 @@
+import { SENTENCE_FORMATTING_HEADERS } from "./sentence-formatting";
 import { describe, expect, it, vi } from "vitest";
 import { createSharedSentenceEndpoints } from "./shared-sentences";
 import type { HttpClient } from "./http";
@@ -109,7 +110,8 @@ describe("shared sentence wire contract", () => {
       total: 1
     });
     expect(get).toHaveBeenCalledWith(
-      `/lexicon/sentences?q=give+up&entry_id=${id}&sense_id=${id}`
+      `/lexicon/sentences?q=give+up&entry_id=${id}&sense_id=${id}`,
+      { headers: SENTENCE_FORMATTING_HEADERS }
     );
     await expect(api.get(id)).rejects.toThrow("revision");
     await expect(api.get(id)).rejects.toThrow("unexpected_property");
@@ -164,7 +166,8 @@ describe("shared sentence wire contract", () => {
     });
     expect(put).toHaveBeenCalledWith(
       `/lexicon/sentences/${id}`,
-      expect.objectContaining({ context_entry_id: id, base_revision: 1 })
+      expect.objectContaining({ context_entry_id: id, base_revision: 1 }),
+      { headers: SENTENCE_FORMATTING_HEADERS }
     );
     await expect(
       api.targets({ q: "flower", context_entry_id: id, page: 2 })
@@ -182,7 +185,12 @@ it("发布、回退、下架、恢复分别走独立路径并携带双版本与�
   const post = vi.fn().mockResolvedValue(body);
   const api = createSharedSentenceEndpoints({ post } as unknown as HttpClient);
   const input = { base_revision: 1, base_lifecycle_revision: 2 };
-  const headers = { headers: { "Idempotency-Key": "command-key" } };
+  const headers = {
+    headers: {
+      ...SENTENCE_FORMATTING_HEADERS,
+      "Idempotency-Key": "command-key"
+    }
+  };
   await api.publish(id, "command-key", input);
   await api.rollback(id, id, "command-key", input);
   await api.withdraw(id, "command-key", {
@@ -223,10 +231,13 @@ it("编辑显式读取草稿，历史支持游标并拒绝畸形响应", async (
     .mockResolvedValueOnce([{ ...publication, snapshot: null }]);
   const api = createSharedSentenceEndpoints({ get } as unknown as HttpClient);
   await api.get(id, "draft");
-  expect(get).toHaveBeenLastCalledWith(`/lexicon/sentences/${id}?view=draft`);
+  expect(get).toHaveBeenLastCalledWith(`/lexicon/sentences/${id}?view=draft`, {
+    headers: SENTENCE_FORMATTING_HEADERS
+  });
   await expect(api.publications(id, 5)).resolves.toEqual([publication]);
   expect(get).toHaveBeenLastCalledWith(
-    `/lexicon/sentences/${id}/publications?before_number=5`
+    `/lexicon/sentences/${id}/publications?before_number=5`,
+    { headers: SENTENCE_FORMATTING_HEADERS }
   );
   await expect(api.publication(id, id)).resolves.toEqual(publication);
   await expect(api.publications(id)).rejects.toThrow("数组");
@@ -253,4 +264,36 @@ it("下架影响预览保持目标身份并拒绝缺失指纹", async () => {
     `/lexicon/sentences/${id}/withdrawal-impact`
   );
   await expect(api.withdrawalImpact(id)).rejects.toThrow("fingerprint");
+});
+
+it("creation and historical detail negotiate the same response capability", async () => {
+  const post = vi.fn().mockResolvedValue(body);
+  const get = vi.fn().mockResolvedValue({
+    id,
+    sentence_id: id,
+    publication_number: 1,
+    source_revision: 1,
+    snapshot: body.content,
+    published_at: body.created_at,
+    published_by_admin_id: id,
+    created_by_admin_id: id
+  });
+  const api = createSharedSentenceEndpoints({
+    post,
+    get
+  } as unknown as HttpClient);
+  const input = {
+    source_entry_id: id,
+    source_sense_id: id,
+    content: body.content
+  };
+  await api.create(input as never);
+  expect(post).toHaveBeenCalledWith("/lexicon/sentences", input, {
+    headers: SENTENCE_FORMATTING_HEADERS
+  });
+  await api.publication(id, id);
+  expect(get).toHaveBeenCalledWith(
+    `/lexicon/sentences/${id}/publications/${id}`,
+    { headers: SENTENCE_FORMATTING_HEADERS }
+  );
 });

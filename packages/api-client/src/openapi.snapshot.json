@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/spelling-pronunciation/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-10T05:00:25.142Z",
+  "_source": "/Users/darwish/.codex/worktrees/sentence-formatting-compatibility/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-10-10T06:55:55.371Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -166,6 +166,12 @@
         "schema": { "type": "string", "format": "uuid" }
       },
       {
+        "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Spelling-Markup",
         "in": "header",
         "required": false,
@@ -178,6 +184,12 @@
         "in": "header",
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
+      },
+      {
+        "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       },
       {
         "name": "X-TSZ-Spelling-Markup",
@@ -202,6 +214,12 @@
         "schema": { "type": "string", "format": "uuid" }
       },
       {
+        "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Spelling-Markup",
         "in": "header",
         "required": false,
@@ -216,6 +234,12 @@
         "schema": { "type": "string", "format": "uuid" }
       },
       {
+        "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Spelling-Markup",
         "in": "header",
         "required": false,
@@ -223,6 +247,12 @@
       }
     ],
     "get /admin/lexicon/entries/{id}": [
+      {
+        "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
       {
         "name": "X-TSZ-Spelling-Markup",
         "in": "header",
@@ -238,6 +268,12 @@
         "schema": { "type": "string", "format": "uuid" }
       },
       {
+        "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Spelling-Markup",
         "in": "header",
         "required": false,
@@ -245,6 +281,12 @@
       }
     ],
     "get /admin/lexicon/entries/{id}/publications": [
+      {
+        "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
       {
         "name": "X-TSZ-Spelling-Markup",
         "in": "header",
@@ -260,6 +302,12 @@
         "schema": { "type": "string", "format": "uuid" }
       },
       {
+        "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Spelling-Markup",
         "in": "header",
         "required": false,
@@ -267,6 +315,12 @@
       }
     ],
     "get /admin/lexicon/entries/{id}/publications/{publication_id}": [
+      {
+        "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
       {
         "name": "X-TSZ-Spelling-Markup",
         "in": "header",
@@ -280,6 +334,12 @@
         "in": "header",
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
+      },
+      {
+        "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       },
       {
         "name": "X-TSZ-Spelling-Markup",
@@ -296,6 +356,12 @@
         "schema": { "type": "string", "format": "uuid" }
       },
       {
+        "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Spelling-Markup",
         "in": "header",
         "required": false,
@@ -303,6 +369,12 @@
       }
     ],
     "put /admin/lexicon/entries/{id}/steps/forms": [
+      {
+        "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
       {
         "name": "X-TSZ-Spelling-Markup",
         "in": "header",
@@ -312,7 +384,53 @@
     ],
     "put /admin/lexicon/entries/{id}/steps/meanings": [
       {
+        "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Spelling-Markup",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "get /admin/lexicon/sentences": [
+      {
+        "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "post /admin/lexicon/sentences": [
+      {
+        "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "get /admin/lexicon/sentences/{id}": [
+      {
+        "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "put /admin/lexicon/sentences/{id}": [
+      {
+        "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "get /admin/lexicon/sentences/{id}/publications": [
+      {
+        "name": "X-TSZ-Sentence-Formatting",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -324,6 +442,20 @@
         "in": "header",
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
+      },
+      {
+        "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "get /admin/lexicon/sentences/{id}/publications/{publication_id}": [
+      {
+        "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "post /admin/lexicon/sentences/{id}/publications/{publication_id}/rollback": [
@@ -332,6 +464,12 @@
         "in": "header",
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
+      },
+      {
+        "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "post /admin/lexicon/sentences/{id}/restore": [
@@ -340,6 +478,12 @@
         "in": "header",
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
+      },
+      {
+        "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "post /admin/lexicon/sentences/{id}/withdraw": [
@@ -348,6 +492,36 @@
         "in": "header",
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
+      },
+      {
+        "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "get /admin/wordlists/{id}/review-requests/{request_id}/items": [
+      {
+        "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "get /me/wordlists/{id}/items": [
+      {
+        "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "get /wordlists/{id}/items": [
+      {
+        "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ]
   },

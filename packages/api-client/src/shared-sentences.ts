@@ -1,3 +1,4 @@
+import { SENTENCE_FORMATTING_HEADERS } from "./sentence-formatting";
 import { validateRuntimeSchema } from "./runtime-schema";
 import type {
   CreateSharedSentence,
@@ -54,14 +55,28 @@ export function createSharedSentenceEndpoints(http: HttpClient) {
       const params = new URLSearchParams();
       for (const [key, value] of Object.entries(query))
         if (value !== undefined) params.set(key, String(value));
-      return http.get<unknown>(`${root}?${params}`).then(decodeList);
+      return http
+        .get<unknown>(`${root}?${params}`, {
+          headers: SENTENCE_FORMATTING_HEADERS
+        })
+        .then(decodeList);
     },
     get: (id: string, view: "draft" | "published" = "published") =>
-      http.get<unknown>(`${root}/${id}?view=${view}`).then(decodeSentence),
+      http
+        .get<unknown>(`${root}/${id}?view=${view}`, {
+          headers: SENTENCE_FORMATTING_HEADERS
+        })
+        .then(decodeSentence),
     create: (input: CreateSharedSentence) =>
-      http.post<unknown>(root, input).then(decodeSentence),
+      http
+        .post<unknown>(root, input, { headers: SENTENCE_FORMATTING_HEADERS })
+        .then(decodeSentence),
     update: (id: string, input: UpdateSharedSentence) =>
-      http.put<unknown>(`${root}/${id}`, input).then(decodeSentence),
+      http
+        .put<unknown>(`${root}/${id}`, input, {
+          headers: SENTENCE_FORMATTING_HEADERS
+        })
+        .then(decodeSentence),
     delete: (id: string, input: SentenceRevision) =>
       http.del<void>(`${root}/${id}`, input),
     setVisibility: (
@@ -83,7 +98,8 @@ export function createSharedSentenceEndpoints(http: HttpClient) {
     publications: (id: string, beforeNumber?: number) =>
       http
         .get<unknown>(
-          `${root}/${id}/publications${beforeNumber === undefined ? "" : `?before_number=${beforeNumber}`}`
+          `${root}/${id}/publications${beforeNumber === undefined ? "" : `?before_number=${beforeNumber}`}`,
+          { headers: SENTENCE_FORMATTING_HEADERS }
         )
         .then((value) => {
           if (!Array.isArray(value)) throw new Error("例句历史响应必须为数组");
@@ -93,14 +109,16 @@ export function createSharedSentenceEndpoints(http: HttpClient) {
         }),
     publication: (id: string, publicationId: string) =>
       http
-        .get<unknown>(`${root}/${id}/publications/${publicationId}`)
+        .get<unknown>(`${root}/${id}/publications/${publicationId}`, {
+          headers: SENTENCE_FORMATTING_HEADERS
+        })
         .then((value) =>
           decodeContract<SentencePublication>("SentencePublication", value)
         ),
     publish: (id: string, key: string, input: SentencePublicationInput) =>
       http
         .post<unknown>(`${root}/${id}/publications`, input, {
-          headers: { "Idempotency-Key": key }
+          headers: { ...SENTENCE_FORMATTING_HEADERS, "Idempotency-Key": key }
         })
         .then(decodeSentence),
     rollback: (
@@ -113,7 +131,9 @@ export function createSharedSentenceEndpoints(http: HttpClient) {
         .post<unknown>(
           `${root}/${id}/publications/${publicationId}/rollback`,
           input,
-          { headers: { "Idempotency-Key": key } }
+          {
+            headers: { ...SENTENCE_FORMATTING_HEADERS, "Idempotency-Key": key }
+          }
         )
         .then(decodeSentence),
     withdrawalImpact: (id: string) =>
@@ -128,13 +148,13 @@ export function createSharedSentenceEndpoints(http: HttpClient) {
     withdraw: (id: string, key: string, input: WithdrawSentenceInput) =>
       http
         .post<unknown>(`${root}/${id}/withdraw`, input, {
-          headers: { "Idempotency-Key": key }
+          headers: { ...SENTENCE_FORMATTING_HEADERS, "Idempotency-Key": key }
         })
         .then(decodeSentence),
     restore: (id: string, key: string, input: SentencePublicationInput) =>
       http
         .post<unknown>(`${root}/${id}/restore`, input, {
-          headers: { "Idempotency-Key": key }
+          headers: { ...SENTENCE_FORMATTING_HEADERS, "Idempotency-Key": key }
         })
         .then(decodeSentence),
     targets: (query: SentenceTargetQuery) => {
