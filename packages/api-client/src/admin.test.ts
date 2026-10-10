@@ -442,7 +442,10 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     const api = createAdminEndpoints(http);
     api.words.get("w-1");
     expect(http.get).toHaveBeenCalledWith("/lexicon/entries/w-1", {
-      headers: { "X-TSZ-Spelling-Markup": "v1" }
+      headers: {
+        "X-TSZ-Spelling-Markup": "v1",
+        "X-TSZ-Sentence-Formatting": "v1"
+      }
     });
   });
 
@@ -470,6 +473,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     expect(http.post).toHaveBeenCalledWith(path, input, {
       headers: {
         "X-TSZ-Spelling-Markup": "v1",
+        "X-TSZ-Sentence-Formatting": "v1",
         "Idempotency-Key": `${method}-key`
       }
     });
@@ -487,6 +491,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     expect(http.post).toHaveBeenCalledWith(path, input, {
       headers: {
         "X-TSZ-Spelling-Markup": "v1",
+        "X-TSZ-Sentence-Formatting": "v1",
         "Idempotency-Key": `${method}-key`
       }
     });
@@ -780,12 +785,16 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       {
         headers: {
           "X-TSZ-Spelling-Markup": "v1",
+          "X-TSZ-Sentence-Formatting": "v1",
           "Idempotency-Key": "create-v3-key"
         }
       }
     );
     expect(http.get).toHaveBeenCalledWith("/lexicon/entries/w-3", {
-      headers: { "X-TSZ-Spelling-Markup": "v1" }
+      headers: {
+        "X-TSZ-Spelling-Markup": "v1",
+        "X-TSZ-Sentence-Formatting": "v1"
+      }
     });
     expect(http.post).toHaveBeenCalledWith(
       "/lexicon/entries/w-3/steps/forms/impact",
@@ -799,7 +808,12 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         intent: "save",
         content: forms
       },
-      { headers: { "X-TSZ-Spelling-Markup": "v1" } }
+      {
+        headers: {
+          "X-TSZ-Spelling-Markup": "v1",
+          "X-TSZ-Sentence-Formatting": "v1"
+        }
+      }
     );
     expect(http.put).toHaveBeenCalledWith(
       "/lexicon/entries/w-3/steps/meanings",
@@ -809,18 +823,31 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         intent: "save",
         content: meanings
       },
-      { headers: { "X-TSZ-Spelling-Markup": "v1" } }
+      {
+        headers: {
+          "X-TSZ-Spelling-Markup": "v1",
+          "X-TSZ-Sentence-Formatting": "v1"
+        }
+      }
     );
     expect(http.post).toHaveBeenCalledWith("/lexicon/entries/w-3/validate", {
       schema_version: 3,
       base_revision: 7
     });
     expect(http.get).toHaveBeenCalledWith("/lexicon/entries/w-3/publications", {
-      headers: { "X-TSZ-Spelling-Markup": "v1" }
+      headers: {
+        "X-TSZ-Spelling-Markup": "v1",
+        "X-TSZ-Sentence-Formatting": "v1"
+      }
     });
     expect(http.get).toHaveBeenCalledWith(
       "/lexicon/entries/w-3/publications/publication-3",
-      { headers: { "X-TSZ-Spelling-Markup": "v1" } }
+      {
+        headers: {
+          "X-TSZ-Spelling-Markup": "v1",
+          "X-TSZ-Sentence-Formatting": "v1"
+        }
+      }
     );
     expect(http.post).toHaveBeenCalledWith(
       "/lexicon/entries/publications/batch",
@@ -833,6 +860,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       {
         headers: {
           "X-TSZ-Spelling-Markup": "v1",
+          "X-TSZ-Sentence-Formatting": "v1",
           "Idempotency-Key": "batch-publish-key"
         }
       }
@@ -843,6 +871,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       {
         headers: {
           "X-TSZ-Spelling-Markup": "v1",
+          "X-TSZ-Sentence-Formatting": "v1",
           "Idempotency-Key": "publish-v3-key"
         }
       }
@@ -853,6 +882,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       {
         headers: {
           "X-TSZ-Spelling-Markup": "v1",
+          "X-TSZ-Sentence-Formatting": "v1",
           "Idempotency-Key": "activate-v3-key"
         }
       }
@@ -863,6 +893,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       {
         headers: {
           "X-TSZ-Spelling-Markup": "v1",
+          "X-TSZ-Sentence-Formatting": "v1",
           "Idempotency-Key": "archive-any-key"
         }
       }
@@ -873,6 +904,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       {
         headers: {
           "X-TSZ-Spelling-Markup": "v1",
+          "X-TSZ-Sentence-Formatting": "v1",
           "Idempotency-Key": "restore-any-key"
         }
       }
@@ -883,6 +915,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       {
         headers: {
           "X-TSZ-Spelling-Markup": "v1",
+          "X-TSZ-Sentence-Formatting": "v1",
           "Idempotency-Key": "archive-batch-any-key"
         }
       }
@@ -893,6 +926,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       {
         headers: {
           "X-TSZ-Spelling-Markup": "v1",
+          "X-TSZ-Sentence-Formatting": "v1",
           "Idempotency-Key": "restore-batch-any-key"
         }
       }
@@ -908,6 +942,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       {
         headers: {
           "X-TSZ-Spelling-Markup": "v1",
+          "X-TSZ-Sentence-Formatting": "v1",
           "Idempotency-Key": "batch-publication-key"
         }
       }

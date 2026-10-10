@@ -1,3 +1,4 @@
+import { SENTENCE_FORMATTING_HEADERS } from "./sentence-formatting";
 import type {
   CreateWordlistTip,
   WordlistTip,
@@ -76,7 +77,10 @@ export function createWordlistEndpoints(http: HttpClient) {
         .then((v) => decodeWordlistResponse<Wordlist>("Wordlist", v)),
     items: (id: string, q: WordlistItemsQuery = {}, o?: Options) =>
       http
-        .get<unknown>(`/wordlists/${id}/items${query(q)}`, o)
+        .get<unknown>(`/wordlists/${id}/items${query(q)}`, {
+          ...o,
+          headers: SENTENCE_FORMATTING_HEADERS
+        })
         .then((v) => decodeWordlistResponse<WordlistItems>("WordlistItems", v)),
     catalog: (q: WordlistQuery = {}, o?: Options) =>
       http
@@ -94,7 +98,10 @@ export function createWordlistEndpoints(http: HttpClient) {
         .then((v) => decodeWordlistResponse<Wordlist>("Wordlist", v)),
     myItems: (id: string, q: WordlistItemsQuery = {}, o?: Options) =>
       http
-        .get<unknown>(`/me/wordlists/${id}/items${query(q)}`, o)
+        .get<unknown>(`/me/wordlists/${id}/items${query(q)}`, {
+          ...o,
+          headers: SENTENCE_FORMATTING_HEADERS
+        })
         .then((v) =>
           decodeWordlistResponse<MyWordlistItems>("MyWordlistItems", v)
         ),
@@ -152,7 +159,7 @@ export function createAdminWordlistEndpoints(http: HttpClient) {
       http
         .get<unknown>(
           `/wordlists/${id}/review-requests/${request}/items${query(q)}`,
-          o
+          { ...o, headers: SENTENCE_FORMATTING_HEADERS }
         )
         .then((v) => decodeWordlistResponse<WordlistItems>("WordlistItems", v)),
     decision: (id: string, request: string, data: WordlistDecision) =>

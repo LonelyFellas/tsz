@@ -1245,7 +1245,11 @@ describe("UnifiedCreateEntryStep", () => {
     expect(
       await screen.findByText("匹配结果已更新，请重新确认后继续创建。")
     ).toBeVisible();
-    fireEvent.click(screen.getByText("确认并创建，进入词形与发音"));
+    const confirmButton = await screen.findByRole("button", {
+      name: "确认并创建，进入词形与发音"
+    });
+    await waitFor(() => expect(confirmButton).toBeEnabled());
+    fireEvent.click(confirmButton);
     await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(2));
 
     const calls = vi.mocked(supplied.createV3).mock.calls;

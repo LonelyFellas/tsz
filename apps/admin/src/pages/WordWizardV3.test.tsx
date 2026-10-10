@@ -264,7 +264,31 @@ describe("WordWizardV3Page", () => {
   });
 
   it.each(["forms", "meanings"])(
-    "%s 保存按钮随未保存修改变化，失败可重试，成功后禁用",
+    "%s 保存按钮在修改后启用，还原原值后禁用",
+    async (step) => {
+      const current = word();
+      const endpoints = source({ word: current, retired_stable_nodes: [] });
+      renderPage(
+        `/words/${WORD_ID}/v3/wizard/${step}`,
+        createV3WordRequests(endpoints)
+      );
+      const input = await screen.findByLabelText(
+        step === "forms" ? "原形英美通用拼写" : "语义区间 1 中文"
+      );
+      const save = screen.getByText("保存草稿").closest("button")!;
+      const original = (input as HTMLInputElement).value;
+      expect(save).toBeDisabled();
+      await changeVoiceText(input, { target: { value: "edited" } });
+      expect(save).toBeEnabled();
+      await changeVoiceText(input, { target: { value: original } });
+      expect(save).toBeDisabled();
+      expect(endpoints.saveFormsStepV3).not.toHaveBeenCalled();
+      expect(endpoints.saveMeaningsStepV3).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(["forms", "meanings"])(
+    "%s 保存失败可重试，成功后禁用并保留输入",
     async (step) => {
       const current = word();
       const endpoints = source({ word: current, retired_stable_nodes: [] });
@@ -293,13 +317,9 @@ describe("WordWizardV3Page", () => {
         step === "forms" ? "原形英美通用拼写" : "语义区间 1 中文"
       );
       const save = screen.getByText("保存草稿").closest("button")!;
-      const original = (input as HTMLInputElement).value;
       expect(save).toBeDisabled();
       await changeVoiceText(input, { target: { value: "edited" } });
       expect(save).toBeEnabled();
-      await changeVoiceText(input, { target: { value: original } });
-      expect(save).toBeDisabled();
-      await changeVoiceText(input, { target: { value: "edited" } });
       fireEvent.click(save);
       const request =
         step === "forms"

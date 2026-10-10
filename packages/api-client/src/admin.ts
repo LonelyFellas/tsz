@@ -1,3 +1,4 @@
+import { SENTENCE_FORMATTING_HEADERS } from "./sentence-formatting";
 import { createAdminWordlistEndpoints } from "./wordlists";
 import { createAdminCoinEndpoints } from "./admin-coins";
 import { createCoinEndpoints } from "./coins";
@@ -96,7 +97,10 @@ import {
 } from "./admin-word-schema";
 import type { HttpClient } from "./http";
 
-const SPELLING_MARKUP_HEADERS = { "X-TSZ-Spelling-Markup": "v1" };
+const SPELLING_MARKUP_HEADERS = {
+  ...SENTENCE_FORMATTING_HEADERS,
+  "X-TSZ-Spelling-Markup": "v1"
+};
 
 // admin 账号体系的 wire 类型已收敛到 @tsz/types（wire 类型唯一家）。此处 re-export，
 // 保持既有 `import { AdminProfile, ... } from "@tsz/api-client"` 的消费方不破。

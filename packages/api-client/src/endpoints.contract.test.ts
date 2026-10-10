@@ -54,6 +54,23 @@ const SPELLING_MARKUP_OPERATIONS: readonly string[] = [
   "post /admin/lexicon/entries/restore-batch"
 ];
 
+const SENTENCE_FORMATTING_OPERATIONS: readonly string[] = [
+  ...SPELLING_MARKUP_OPERATIONS,
+  "get /admin/lexicon/sentences",
+  "get /admin/lexicon/sentences/{id}",
+  "post /admin/lexicon/sentences",
+  "put /admin/lexicon/sentences/{id}",
+  "get /admin/lexicon/sentences/{id}/publications",
+  "get /admin/lexicon/sentences/{id}/publications/{publication_id}",
+  "post /admin/lexicon/sentences/{id}/publications",
+  "post /admin/lexicon/sentences/{id}/publications/{publication_id}/rollback",
+  "post /admin/lexicon/sentences/{id}/withdraw",
+  "post /admin/lexicon/sentences/{id}/restore",
+  "get /wordlists/{id}/items",
+  "get /me/wordlists/{id}/items",
+  "get /admin/wordlists/{id}/review-requests/{request_id}/items"
+];
+
 // 已知「后端尚未提供 / 待对接」的端点白名单。每条都必须真不在 spec 里——
 // 等后端实现后,本测试会反过来要求你把它从这里删掉(见下方「台账保鲜」断言),
 // 删掉后它就自动纳入正式校验。新增端点若既不在 spec 也不在此处,测试会红。
@@ -716,7 +733,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "7e445f6e0e85535743b9545df3fd91ef38ec12c1d31ff1e88f4ca7f9550fd124"
+      "271302d77f5ce6ef1900f6cd22953b1936e9f8fd7ff6eed00b5b5b9385db3700"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -982,7 +999,8 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
         [
           ...new Set([
             ...IDEMPOTENT_LEXICON_OPERATIONS,
-            ...SPELLING_MARKUP_OPERATIONS
+            ...SPELLING_MARKUP_OPERATIONS,
+            ...SENTENCE_FORMATTING_OPERATIONS
           ])
         ].map((operation) => [
           operation,
@@ -1001,8 +1019,18 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
                     schema: { type: ["string", "null"] }
                   }
                 ]
+              : []),
+            ...(SENTENCE_FORMATTING_OPERATIONS.includes(operation)
+              ? [
+                  {
+                    name: "X-TSZ-Sentence-Formatting",
+                    in: "header",
+                    required: false,
+                    schema: { type: ["string", "null"] }
+                  }
+                ]
               : [])
-          ]
+          ].sort((a, b) => a.name.localeCompare(b.name))
         ])
       )
     );

@@ -47,7 +47,7 @@ web 同理。`DEPLOY_EXPECTED_SHA` 必须等于入口首次读取的当前 main�
 
 需要先发兼容前端时，可用 `DEPLOY_VOICE_EDITOR=false ./deploy/deploy-admin.sh` 暂关语音编辑入口；后端验收后再按默认 `true` 重发 admin。开关只接受 `true` / `false`，不影响精确 main、CI、隔离构建或 manifest 门禁。
 
-释义与例句的新格式写入口通过 `DEPLOY_SENTENCE_FORMATTING` 传入隔离构建，默认 `false`。读取端与后端均完成验收、录入人员已保存并更新旧标签页后，用 `DEPLOY_SENTENCE_FORMATTING=true ./deploy/deploy-admin.sh` 开启。只接受 `true` / `false`，不改变精确 main、CI 或制品来源校验。
+释义与例句的新格式写入口通过 `DEPLOY_SENTENCE_FORMATTING` 传入隔离构建，默认 `false`。句子格式能力协商与旧保存保护后端已验收、配套读取客户端就绪后，用 `DEPLOY_SENTENCE_FORMATTING=true ./deploy/deploy-admin.sh` 开启。旧客户端获得兼容视图，可能覆盖新格式的保存由后端拒绝，不要求人工确认所有标签页刷新。只接受 `true` / `false`，不改变精确 main、CI 或制品来源校验。
 
 规则变化标记配套发布：旧后端不接受变体 `is_regular`。先用
 `DEPLOY_FORM_SPELLING_REGULARITY=false ./deploy/deploy-admin.sh` 发布兼容前端；它隐藏新开关，不向旧后端生成新字段，但保留新后端已返回的值。

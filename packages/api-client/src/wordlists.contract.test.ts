@@ -1,3 +1,4 @@
+import { SENTENCE_FORMATTING_HEADERS } from "./sentence-formatting";
 import { expect, it, vi } from "vitest";
 import snapshot from "./openapi.snapshot.json";
 import {
@@ -26,16 +27,16 @@ it("keeps public, personal and review item routes separate", async () => {
     put: vi.fn().mockResolvedValue(meta)
   } as unknown as HttpClient;
   const api = createWordlistEndpoints(http);
-  await api.items(id);
-  expect(http.get).toHaveBeenLastCalledWith(
-    `/wordlists/${id}/items`,
-    undefined
-  );
+  const signal = new AbortController().signal;
+  await api.items(id, {}, { signal });
+  expect(http.get).toHaveBeenLastCalledWith(`/wordlists/${id}/items`, {
+    signal,
+    headers: SENTENCE_FORMATTING_HEADERS
+  });
   await api.myItems(id);
-  expect(http.get).toHaveBeenLastCalledWith(
-    `/me/wordlists/${id}/items`,
-    undefined
-  );
+  expect(http.get).toHaveBeenLastCalledWith(`/me/wordlists/${id}/items`, {
+    headers: SENTENCE_FORMATTING_HEADERS
+  });
   await api.create({
     idempotency_key: id,
     name: "词表",
@@ -48,7 +49,7 @@ it("keeps public, personal and review item routes separate", async () => {
   await createAdminWordlistEndpoints(http).items(id, id);
   expect(http.get).toHaveBeenLastCalledWith(
     `/wordlists/${id}/review-requests/${id}/items`,
-    undefined
+    { headers: SENTENCE_FORMATTING_HEADERS }
   );
 });
 it("rejects accidental private-note fields in a public response", () => {
@@ -143,7 +144,7 @@ it("accepts standard and opted-in full shapes while rejecting internal pronuncia
   });
   expect(http.get).toHaveBeenCalledWith(
     `/wordlists/${id}/items?view=full&sort=label_asc&page=2`,
-    undefined
+    { headers: SENTENCE_FORMATTING_HEADERS }
   );
   Object.assign(pronunciation, { actual_pron: "internal" });
   expect(() =>

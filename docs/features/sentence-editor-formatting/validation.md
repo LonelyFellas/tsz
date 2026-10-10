@@ -28,3 +28,18 @@
 新格式生产写入口 `VITE_SENTENCE_FORMATTING` 默认 false，开发默认 true。读取支持独立于此开关和 `VITE_VOICE_EDITOR`。先升级读取端与后端，再启用新格式写入；旧浏览器标签页需更新。有新数据后只关闭写入口回退，不回退读取枚举。
 
 首次验收用的临时浏览器、前后端进程及隔离数据已清理。随后按用户请求重建本任务隔离环境，保留后台预览及前后端服务运行；运行配置与当前 fixture 在本机任务临时目录中，不纳入 Git。截图、源码、设计与脱敏验证记录保留。
+
+## 安全开启补丁验证（2026-10-10，尚未部署）
+
+前端隔离 checkout `/Users/darwish/.codex/worktrees/sentence-formatting-compatibility/tsz`，基线 `7a4cc16`；后端同目录 `tsz-rust`，基线 `3e8fe50`。均为 `codex/sentence-formatting-client-compatibility`，当前为未提交改动。
+
+- 后端 cargo check/fmt 通过。共享叶子投影测试验证 nested words/sentences/snapshots，V1 spans、italic、连读和停顿保持，canonical 不变。
+- 真实 Axum/Postgres/Redis 测试：旧读取移除 B/U，旧 meanings 保存与删除带格式 POS 被拒绝且 audit/revision/content 不变；普通旧词形保存保留格式；词条与独立句子发布旧→新同键重放、草稿/发布/历史读取、旧句子更新拒写及新客户端清除格式通过。已有相关词条/句子集成共 9 项通过。
+- 公开、个人 full-view、后台审核三类词表实际接口旧/新读取通过，publication snapshot 未被裁剪，私密备注边界保持。
+- api-client 22 文件/507 项通过，包级 typecheck 通过；冻结前端 `7b0f0e5` 的真实 annotation/validation-code 定义验证旧 reader 拒绝完整新格式、接受投影视图与既有刷新验证码。
+- 旧词条 layout 26 项通过，安全拒写显示既有刷新提示，不调用自动刷新或丢弃输入回调。
+- 原生 OpenAPI 导出/同步通过，source SHA-256 `271302d77f5ce6ef1900f6cd22953b1936e9f8fd7ff6eed00b5b5b9385db3700`；body schema 与 main 相同，仅新增 26 个可选能力头声明。
+
+Postgres 与 Redis 复用本会话自有隔离服务 `127.0.0.1:57681`/`57682`；数据库测试由 SQLx 创建独立测试库，不使用生产数据。未在本轮重复原编辑器的真实浏览器 B/I/U 操作；编辑器源码没有修改，其已有浏览器证据见上文。本次协议/存储保护以真实 handler、数据库、旧 reader 和 UI 错误路径证明；全量门由原生 hooks/CI 承接，部署后再核对线上制品、能力头、开关和完整 smoke。
+
+发布必须先兼容后端，再配套 web 读取客户端，最后后台 `DEPLOY_SENTENCE_FORMATTING=true`。当前线上仍为 `false`；此记录不把准备完成写成已经开启。

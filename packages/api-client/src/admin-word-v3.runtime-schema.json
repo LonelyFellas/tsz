@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/spelling-pronunciation/tsz-rust/docs/openapi.json",
-  "_source_sha256": "7e445f6e0e85535743b9545df3fd91ef38ec12c1d31ff1e88f4ca7f9550fd124",
+  "_source": "/Users/darwish/.codex/worktrees/sentence-formatting-compatibility/tsz-rust/docs/openapi.json",
+  "_source_sha256": "271302d77f5ce6ef1900f6cd22953b1936e9f8fd7ff6eed00b5b5b9385db3700",
   "roots": [
     "LearningRewardDay",
     "LearningPreview",
