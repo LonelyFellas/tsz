@@ -396,23 +396,29 @@ describe("权限目录、标签和授权人员", () => {
     const drawer = await screen.findByRole("dialog");
     expect(within(drawer).queryByRole("checkbox")).toBeNull();
     fireEvent.click(within(drawer).getByText("新建标签"));
-    fireEvent.change(screen.getByLabelText("标签名称"), {
-      target: { value: "审核" }
-    });
-    fireEvent.click(screen.getByRole("radio", { name: "绿色" }));
-    fireEvent.click(screen.getByRole("button", { name: /保\s*存/ }));
+    const tagName = screen.getByLabelText("标签名称");
+    await waitFor(() => expect(tagName).toBeVisible());
+    const modal = within(tagName.closest(".ant-modal")!);
+    fireEvent.change(tagName, { target: { value: "审核" } });
+    const green = modal.getByLabelText("绿色");
+    expect(green.closest("label")).toBeVisible();
+    fireEvent.click(green);
+    fireEvent.click(modal.getByRole("button", { name: /保\s*存/ }));
     await waitFor(() => expect(create).toHaveBeenCalledWith("审核", "green"));
     await waitFor(() =>
       expect(screen.getByLabelText("标签名称")).not.toBeVisible()
     );
     const row = within(drawer).getByText("内容编辑").closest("tr")!;
     fireEvent.click(within(row).getByText("编辑"));
-    expect(screen.getByRole("radio", { name: "蓝色" })).toBeChecked();
+    await waitFor(() => expect(tagName).toBeVisible());
+    expect(modal.getByLabelText("蓝色")).toBeChecked();
     fireEvent.change(screen.getByLabelText("标签名称"), {
       target: { value: "词条维护" }
     });
-    fireEvent.click(screen.getByRole("radio", { name: "紫色" }));
-    fireEvent.click(screen.getByRole("button", { name: /保\s*存/ }));
+    const purple = modal.getByLabelText("紫色");
+    expect(purple.closest("label")).toBeVisible();
+    fireEvent.click(purple);
+    fireEvent.click(modal.getByRole("button", { name: /保\s*存/ }));
     await waitFor(() =>
       expect(update).toHaveBeenCalledWith("t1", "词条维护", "purple", 3)
     );
