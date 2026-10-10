@@ -5,6 +5,8 @@ description: 将已合入 GitHub main 且精确 CI 成功的 tsz 前端部署到
 
 # 前端部署到 tshb-test
 
+通用授权与主任务记录遵循 [AGENTS.md](../../../AGENTS.md)。复用已确认的范围、配套发布依据和同状态验收，不重新评估需求；下列执行时门禁仍逐项运行，已有授权不等于已有 CI/版本证据。
+
 ## 必须保留的约束
 
 - 只部署 GitHub 当前 main；精确 SHA 的最新 `CI` 工作流必须 `completed/success`。零散 check 的 skipped/neutral、无 CI、查询失败或状态未知都不能放行。
