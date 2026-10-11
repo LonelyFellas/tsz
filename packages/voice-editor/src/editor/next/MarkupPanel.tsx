@@ -5,6 +5,13 @@ import { AnnotationStrip, type AnnotationStripProps } from "./AnnotationStrip";
 import type { VoiceEditorProps } from "../../types";
 import type { Brush } from "./roles";
 import type { LiaisonAnchor, LiaisonDraft, MarkState } from "./tokens";
+import { ClipboardShortcutHint, ShortcutHint } from "./ShortcutHint";
+
+const FORMAT_SHORTCUTS: Record<string, string> = {
+  bold: "B",
+  italic: "I",
+  underline: "U"
+};
 
 export interface DropdownTool {
   key: string;
@@ -51,7 +58,7 @@ export interface MarkupPanelProps extends Pick<
   inputLabel: string;
   inputDataAttributes?: Record<string, string>;
   inputPlaceholder?: string;
-  onTextChange: (value: string) => void;
+  onTextChange: AnnotationStripProps["onTextChange"];
   canUndo: boolean;
   canRedo: boolean;
   onUndo: () => void;
@@ -170,7 +177,7 @@ export function MarkupPanel({
     Object.keys(marks.pauses).length;
   const trigger = (tool: DropdownTool, inline: boolean) => {
     const isVoices = inline && tool.key === "voices";
-    return (
+    const button = (
       <Button
         size="small"
         className={`tsz-ve-tool-toggle ${tool.icon ? "tsz-ve-icon-tool" : ""} ${tool.className ?? ""}`}
@@ -212,6 +219,15 @@ export function MarkupPanel({
         )}
       </Button>
     );
+    const shortcut = FORMAT_SHORTCUTS[tool.key];
+    const hint = shortcut ? (
+      <ShortcutHint shortcut={shortcut} />
+    ) : tool.key === "text" ? (
+      <ClipboardShortcutHint
+        readOnly={readOnly || contentReadOnly || textReadOnly}
+      />
+    ) : undefined;
+    return hint ? <Tooltip title={hint}>{button}</Tooltip> : button;
   };
   const renderTool = (tool: DropdownTool) =>
     tool.content ? (
@@ -247,7 +263,14 @@ export function MarkupPanel({
           </div>
         )}
         <div className="tsz-ve-toolbar-actions">
-          <Tooltip title="撤销">
+          <Tooltip
+            title={
+              <>
+                <span>撤销</span>
+                <ShortcutHint shortcut="Z" />
+              </>
+            }
+          >
             <Button
               size="small"
               type="text"

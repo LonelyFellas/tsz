@@ -1,9 +1,11 @@
 import { createEvent, fireEvent, render, screen } from "@testing-library/react";
-import { expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import type { RichTextV2 } from "@tsz/types";
 import { VoiceEditor } from "./VoiceEditor";
+
+afterEach(() => vi.restoreAllMocks());
 
 const value: RichTextV2 = {
   version: 2,
@@ -404,4 +406,194 @@ it("受控值回灌保留快捷键历史，外部替换正文后不能撤销回�
   expect(screen.getByLabelText("语音编辑器")).toHaveValue("new content");
   expect(screen.getByRole("button", { name: "上一步" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "下一步" })).toBeDisabled();
+});
+
+it.each([
+  ["加粗", "B"],
+  ["斜体", "I"],
+  ["下划线", "U"],
+  ["一次性添加", "L"],
+  ["上一步", "Z"]
+])("Mac 悬停 %s 只显示 ⌘ + %s 快捷键", async (name, key) => {
+  vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
+  render(<VoiceEditor mode="association" value={value} onChange={vi.fn()} />);
+  select(5, 8);
+  fireEvent.click(screen.getByRole("button", { name: "加粗" }));
+  fireEvent.mouseOver(screen.getByRole("button", { name }));
+  const tooltip = await screen.findByRole("tooltip");
+  expect(tooltip).toHaveTextContent(`⌘ + ${key}`);
+  expect(tooltip).not.toHaveTextContent("Ctrl");
+  expect(tooltip).not.toHaveTextContent("Mac");
+  expect(tooltip).not.toHaveTextContent("Win");
+});
+
+it.each([false, true])(
+  "正文只读=%s 的剪贴板提示与权限一致",
+  async (readOnly) => {
+    vi.spyOn(navigator, "platform", "get").mockReturnValue("Win32");
+    render(
+      <VoiceEditor
+        mode="association"
+        readOnly={readOnly}
+        value={value}
+        onChange={vi.fn()}
+      />
+    );
+    fireEvent.mouseOver(screen.getByLabelText("语音编辑器"));
+    const tooltip = await screen.findByRole("tooltip");
+    expect(tooltip).not.toHaveTextContent("⌘");
+    expect(tooltip).not.toHaveTextContent("Mac");
+    expect(tooltip).not.toHaveTextContent("Win");
+    expect(tooltip).toHaveTextContent("Ctrl + C");
+    if (readOnly) {
+      expect(tooltip).not.toHaveTextContent("Ctrl + V");
+      expect(tooltip).not.toHaveTextContent("Ctrl + X");
+    } else {
+      expect(tooltip).toHaveTextContent("Ctrl + V");
+      expect(tooltip).toHaveTextContent("Ctrl + X");
+    }
+  }
+);
+
+it("连续剪切、粘贴和键入分别撤销，不合并为一次打字", () => {
+  const changed = vi.fn();
+  render(<VoiceEditor mode="association" value={value} onChange={changed} />);
+  const input = screen.getByLabelText("语音编辑器");
+  fireEvent.input(input, { target: { value: "" }, inputType: "deleteByCut" });
+  fireEvent.input(input, {
+    target: { value: "a job" },
+    inputType: "insertFromPaste"
+  });
+  fireEvent.input(input, {
+    target: { value: "a jobs" },
+    inputType: "insertText"
+  });
+  shortcut(input, "z");
+  expect(changed.mock.lastCall?.[0].text).toBe("a job");
+  shortcut(input, "z");
+  expect(changed.mock.lastCall?.[0].text).toBe("");
+  shortcut(input, "z");
+  expect(changed.mock.lastCall?.[0]).toEqual(value);
+});
+
+it.each([false, true])(
+  "含停顿正文只读=%s 时悬停显示层可查看剪贴板提示",
+  async (readOnly) => {
+    vi.spyOn(navigator, "platform", "get").mockReturnValue("Win32");
+    const { container } = render(
+      <VoiceEditor
+        mode="grammar"
+        readOnly={readOnly}
+        value={{
+          version: 2,
+          text: "a job",
+          annotations: [{ type: "pause", at: 1, duration_ms: 200 }]
+        }}
+        onChange={vi.fn()}
+      />
+    );
+    const strip = container.querySelector(".tsz-ve-strip")!;
+    fireEvent.mouseOver(strip);
+    const tooltip = await screen.findByRole("tooltip");
+    expect(tooltip).toHaveTextContent("Ctrl + C");
+    if (readOnly) {
+      expect(tooltip).not.toHaveTextContent("Ctrl + V");
+      expect(tooltip).not.toHaveTextContent("Ctrl + X");
+    } else {
+      expect(tooltip).toHaveTextContent("Ctrl + V");
+      expect(tooltip).toHaveTextContent("Ctrl + X");
+    }
+  }
+);
+
+it("清除画笔下显示层仍显示提示，点击停顿可正常清除", async () => {
+  vi.spyOn(navigator, "platform", "get").mockReturnValue("Win32");
+  const changed = vi.fn();
+  const { container } = render(
+    <VoiceEditor
+      mode="grammar"
+      value={{
+        version: 2,
+        text: "a job",
+        annotations: [{ type: "pause", at: 1, duration_ms: 200 }]
+      }}
+      onChange={changed}
+    />
+  );
+  fireEvent.click(screen.getByRole("button", { name: "清除模式" }));
+  fireEvent.mouseOver(container.querySelector(".tsz-ve-strip")!);
+  expect(await screen.findByRole("tooltip")).toHaveTextContent("Ctrl + C");
+  const pause = container.querySelector(".tsz-ve-pause-chip")!;
+  expect(pause).toHaveAttribute("aria-label", "清除第 1 处停顿 0.2 秒");
+  fireEvent.click(pause);
+  expect(changed.mock.lastCall?.[0]).toEqual({
+    version: 2,
+    text: "a job",
+    annotations: []
+  });
+});
+
+it("剪切带连读的正文保留改字确认，取消不写入，确认后可一次撤销", async () => {
+  const annotated: RichTextV2 = {
+    version: 2,
+    text: "a job",
+    annotations: [
+      { type: "liaison", start: 0, end: 5, start_len: 1, end_len: 1 },
+      { type: "italic", start: 2, end: 5 }
+    ]
+  };
+  const changed = vi.fn();
+  render(
+    <VoiceEditor mode="association" value={annotated} onChange={changed} />
+  );
+  const input = screen.getByLabelText("语音编辑器");
+  fireEvent.input(input, { target: { value: "" }, inputType: "deleteByCut" });
+  fireEvent.click(await screen.findByRole("button", { name: "保留原文" }));
+  expect(changed).not.toHaveBeenCalled();
+  expect(input).toHaveValue("a job");
+  fireEvent.input(input, { target: { value: "" }, inputType: "deleteByCut" });
+  fireEvent.click(await screen.findByRole("button", { name: "确认修改" }));
+  expect(changed.mock.lastCall?.[0]).toEqual({
+    version: 2,
+    text: "",
+    annotations: []
+  });
+  shortcut(input, "z");
+  expect(changed.mock.lastCall?.[0]).toEqual(annotated);
+});
+
+it("粘贴改错再粘贴原文可恢复句内关联，并能逐步撤销", async () => {
+  const original: RichTextV2 = { version: 2, text: "a job", annotations: [] };
+  const link = {
+    id: "job",
+    source_segments: [{ start: 2, end: 5, surface: "job" }]
+  };
+  const changed = vi.fn();
+  render(
+    <VoiceEditor
+      mode="association"
+      value={original}
+      textLinks={[link]}
+      restoreTextLinksOnCorrection
+      onChange={changed}
+    />
+  );
+  const input = screen.getByLabelText("语音编辑器");
+  fireEvent.input(input, {
+    target: { value: "a work" },
+    inputType: "insertFromPaste"
+  });
+  fireEvent.click(await screen.findByRole("button", { name: "确认修改" }));
+  expect(changed.mock.lastCall?.[1]).toEqual([]);
+  expect(screen.getByText(/部分关联暂时失效/)).toBeVisible();
+  fireEvent.input(input, {
+    target: { value: "a job" },
+    inputType: "insertFromPaste"
+  });
+  expect(changed.mock.lastCall?.[1]).toEqual([link]);
+  shortcut(input, "z");
+  expect(changed.mock.lastCall?.[0].text).toBe("a work");
+  expect(changed.mock.lastCall?.[1]).toEqual([]);
+  shortcut(input, "z");
+  expect(changed.mock.lastCall).toEqual([original, [link]]);
 });
