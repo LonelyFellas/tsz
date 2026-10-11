@@ -425,11 +425,7 @@ export function V3SynthesisInputs({
                             className={`word-synthesis-accent word-synthesis-accent-${side}${dialect === "common" ? "" : " word-synthesis-accent-compact"}`}
                             icon={<SwapOutlined />}
                             aria-label={`${label}转换为${sideLabel} ${name}`}
-                            title={
-                              alphabet === "ups" && side === "uk"
-                                ? "英式 UPS 自动转换尚未支持，请手工填写已确认的音素或使用 IPA"
-                                : `从实际发音转换为${sideLabel} ${name}`
-                            }
+                            title={`按统一音标规则转换为${sideLabel} ${name}`}
                             onClick={() => convert(side, alphabet)}
                           >
                             {dialect === "common"

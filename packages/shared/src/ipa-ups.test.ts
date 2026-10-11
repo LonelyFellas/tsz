@@ -63,17 +63,20 @@ test("unsupported and malformed notation is not guessed", () => {
     "hˈloʊ",
     "həˈləʊ",
     "kɑːt",
-    "ɝ",
     "rɛd",
     "k\tæt"
   ])
     assert.isFalse(ipaWordToUps(input).ok, input);
-  assert.isFalse(ipaWordToUps("kæt", "en-GB").ok);
+  assert.deepEqual(ipaWordToUps("wɜːld", "en-GB"), {
+    ok: true,
+    value: "W ER lng L D"
+  });
+  assert.deepEqual(ipaWordToUps("ɝ", "en-US"), { ok: true, value: "ER R" });
 });
-test("actual conversion preserves original IPA stress notation; no experimental dot insertion", () => {
+test("actual conversion marks the known syllable boundary before Azure IPA stress", () => {
   const result = convertActualPronunciation("gɪˈtɑɹ", "guitar", "ipa", "en-US");
   assert.isTrue(result.ok);
-  if (result.ok) assert.equal(result.value, "gɪˈtɑɹ");
+  if (result.ok) assert.equal(result.value, "gɪ.ˈtɑɹ");
   assert.isFalse(convertActualPronunciation("", "cat", "ups", "en-US").ok);
 });
 test("phrase conversion is atomic and stores word boundaries separately", () => {
@@ -121,7 +124,7 @@ test("phrase conversion is atomic and stores word boundaries separately", () => 
     })
   );
   assert.isFalse(
-    convertActualPronunciation("həˈloʊ kɑːt", "hello cat", "ups", "en-US").ok
+    convertActualPronunciation("həˈloʊ kɑːt😀", "hello cat", "ups", "en-US").ok
   );
 });
 test("spelling and legacy source behavior are independent of inactive candidates", () => {

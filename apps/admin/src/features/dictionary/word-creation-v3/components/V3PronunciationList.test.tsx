@@ -103,13 +103,20 @@ vi.mock("@tsz/voice-editor/editor", () => ({
 }));
 function Harness({
   configured = false,
-  phrase = false
-}: { configured?: boolean; phrase?: boolean } = {}) {
+  phrase = false,
+  word = "cat",
+  phonetic = "kæt"
+}: {
+  configured?: boolean;
+  phrase?: boolean;
+  word?: string;
+  phonetic?: string;
+} = {}) {
   const [content, setContent] = useState(() => {
     const form = commonFormFixture();
-    form.regional_variants.common.spelling = phrase ? "hello cat" : "cat";
+    form.regional_variants.common.spelling = phrase ? "hello cat" : word;
     const row = form.regional_variants.common.pronunciations[0]!;
-    row.dict_phonetic = "kæt";
+    row.dict_phonetic = phonetic;
     row.actual_pron = phrase ? "həˈloʊ kæt" : "kæt";
     if (configured)
       row.synthesis = { alphabet: "ups", ipa: "kæt", ups: "K AE T" };
@@ -429,11 +436,8 @@ describe("独立发音输入", () => {
     expect(rows()[0].synthesis.uk.ipa).toBe("kɛt");
     expect(rows()[0].synthesis.us.ups).toBe("K AE T");
     fireEvent.click(screen.getByLabelText("第 1 条发音转换为英式 Azure UPS"));
-    expect(
-      screen.getByText(/UPS 自动转换目前仅验证 en-US/)
-    ).toBeInTheDocument();
     expect(field("美式 Azure UPS")).toHaveValue("K AE T");
-    expect(field("英式 Azure UPS")).toHaveValue("");
+    expect(field("英式 Azure UPS")).toHaveValue("K AE T");
   });
   it("来源改变后取消过期的覆盖确认", async () => {
     render(<Harness />);
@@ -472,4 +476,43 @@ it("实际发音填入需确认并保留可撤销快照", async () => {
   expect(field("实际发音")).toHaveValue("kæt");
   fireEvent.click(screen.getByLabelText("撤销实际发音填入"));
   expect(field("实际发音")).toHaveValue("dɔg");
+});
+it("字典音标经统一规则生成实际发音，再分别转换英美 IPA 和 UPS", () => {
+  render(<Harness word="school" phonetic="/skuːl/" />);
+  fireEvent.click(screen.getByLabelText("从字典音标填入实际发音"));
+  expect(screen.getByText("sguːl")).toBeInTheDocument();
+  fireEvent.click(screen.getByText(/^应\s*用$/));
+  expect(field("实际发音")).toHaveValue("sguːl");
+  for (const [accent, ipa, ups] of [
+    ["英式", "sguːl", "S G U lng L"],
+    ["美式", "sgul", "S G U L"]
+  ]) {
+    fireEvent.click(
+      screen.getByLabelText(`第 1 条发音转换为${accent} Azure IPA`)
+    );
+    fireEvent.click(
+      screen.getByLabelText(`第 1 条发音转换为${accent} Azure UPS`)
+    );
+    expect(field(`${accent} Azure IPA`)).toHaveValue(ipa);
+    expect(field(`${accent} Azure UPS`)).toHaveValue(ups);
+  }
+  expect(field("字典音标")).toHaveValue("/skuːl/");
+  expect(rows()[0].synthesis.use_spelling).not.toBe(false);
+  fireEvent.click(screen.getByLabelText("撤销实际发音填入"));
+  expect(field("实际发音")).toHaveValue("kæt");
+});
+it("字典转换失败保留目标，确认期间编辑目标会阻止覆盖", async () => {
+  const view = render(<Harness phonetic="kæt😀" />);
+  fireEvent.click(screen.getByLabelText("从字典音标填入实际发音"));
+  expect(screen.getByText(/第 1 个词包含未支持的音标/)).toBeInTheDocument();
+  expect(field("实际发音")).toHaveValue("kæt");
+  view.unmount();
+  render(<Harness word="school" phonetic="skuːl" />);
+  fireEvent.click(screen.getByLabelText("从字典音标填入实际发音"));
+  await change("实际发音", "dɒg");
+  fireEvent.click(screen.getByText(/^应\s*用$/));
+  expect(field("实际发音")).toHaveValue("dɒg");
+  expect(
+    screen.getByText(/来源、口音、发音方式或目标内容已变化/)
+  ).toBeInTheDocument();
 });
