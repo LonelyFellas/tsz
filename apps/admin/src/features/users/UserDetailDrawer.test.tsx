@@ -10,8 +10,8 @@ vi.mock("@/lib/auth", () => ({
 }));
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(usePermission).mockImplementation(
-    (key) => key === "users.read_sensitive"
+  vi.mocked(usePermission).mockImplementation((key) =>
+    ["users.read_sensitive", "users.read_basic"].includes(key)
   );
 });
 import type { AdminUserView } from "@tsz/types";
@@ -85,14 +85,13 @@ describe("UserDetailDrawer", () => {
       screen.getByText("教师资格已撤销，学生身份与原有数据保留")
     ).toBeInTheDocument();
   });
-  it("完整用户：联系方式/等级/余额/禁用态全部展示", () => {
+  it("完整用户：联系方式/等级/禁用态全部展示", () => {
     const user: AdminUserView = {
       ...base,
       phone: "13800000009",
       email: "full@qq.com",
       roles: ["student", "teacher"],
       status: "disabled",
-      coin_balance: 1234,
       level: "B2"
     };
     render(<UserDetailDrawer user={user} onClose={vi.fn()} />);
@@ -100,7 +99,6 @@ describe("UserDetailDrawer", () => {
     expect(screen.getByText("full@qq.com")).toBeInTheDocument();
     // 等级 Tag：level 存在时渲染「B2等级」而非占位。
     expect(screen.getByText("B2等级")).toBeInTheDocument();
-    expect(screen.getByText("1234")).toBeInTheDocument();
     expect(screen.getByText("已禁用")).toBeInTheDocument();
     // 师生合一：两个角色 tag 都在。
     expect(screen.getByText("学生")).toBeInTheDocument();
@@ -119,7 +117,7 @@ describe("UserDetailDrawer", () => {
   it("最小用户：缺失字段显示占位「-」，状态正常", () => {
     render(<UserDetailDrawer user={base} onClose={vi.fn()} />);
     // phone / email / level / coin 四处缺省 → 至少 4 个占位「-」。
-    expect(screen.getAllByText("-").length).toBeGreaterThanOrEqual(4);
+    expect(screen.getAllByText("-").length).toBeGreaterThanOrEqual(3);
     expect(screen.getByText("正常")).toBeInTheDocument();
   });
 
@@ -131,7 +129,7 @@ describe("UserDetailDrawer", () => {
       />
     );
     // 注册时间 + 更新时间两处也变占位，占位总数进一步增加。
-    expect(screen.getAllByText("-").length).toBeGreaterThanOrEqual(6);
+    expect(screen.getAllByText("-").length).toBeGreaterThanOrEqual(5);
   });
 
   it("user 为 null 时抽屉关闭、不渲染内容", () => {

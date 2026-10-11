@@ -23,6 +23,7 @@ vi.mock("@/lib/env", () => ({
   env: { VOICE_EDITOR: true, VOICE_PREVIEW: false, VOICE_AUDIO_UPLOAD: false }
 }));
 vi.mock("@/lib/auth", () => ({
+  usePermission: () => true,
   useAuthStore: (
     select: (state: {
       profile: { id: string; role: string; permissions: string[] };

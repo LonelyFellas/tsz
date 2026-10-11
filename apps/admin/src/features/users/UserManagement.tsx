@@ -1,8 +1,4 @@
-// 用户管理（C 端用户，师生合一）：角色 tab + 搜索行 + 表格 + 详情 + 行操作。
-// 列表 / 编辑昵称 / 启禁用 均已对接真实接口；后两者后端限 super_admin，非超管整行置灰
-//（403 仍会在这里落成中文提示，前端门禁不是唯一防线）。删除后端无接口，恒置灰。
-// 等级/天生币余额两列后端不返回（恒显示「-」）。
-// 天生币/等级/方言管理是独立模块，本次仅占位（点击提示「功能待接入」）。
+// 用户目录按独立权限展示资料；敏感资源在详情中按需读取。
 import {
   Alert,
   App,
@@ -45,7 +41,7 @@ const ROLE_TABS = [
 
 export function UserManagement() {
   const { message, modal } = App.useApp();
-  // 编辑 / 启禁用后端限 super_admin：普通 admin 整行置灰，不让点了才吃 403。
+  const canReadBasic = usePermission("users.read_basic");
   const canEdit = usePermission("users.edit");
   const canSetStatus = usePermission("users.set_status");
   const canReadSensitive = usePermission("users.read_sensitive");
@@ -57,7 +53,12 @@ export function UserManagement() {
   const [detailUser, setDetailUser] = useState<AdminUserView | null>(null);
   const [editingUser, setEditingUser] = useState<AdminUserView | null>(null);
 
-  const listQuery = useUserList({ filters, role, page, pageSize });
+  const listQuery = useUserList({
+    filters,
+    role: canReadBasic ? role : "all",
+    page,
+    pageSize
+  });
   const setStatus = useSetUserStatus();
 
   const rows = listQuery.data?.items ?? [];
@@ -79,6 +80,7 @@ export function UserManagement() {
     message.info(`${label}功能待接入，接口开发中`);
 
   const confirmToggleStatus = (record: AdminUserView) => {
+    if (!canSetStatus || !record.status) return;
     const next = record.status === "active" ? "disabled" : "active";
     const verb = next === "disabled" ? "禁用" : "启用";
     modal.confirm({
@@ -139,7 +141,7 @@ export function UserManagement() {
       width: 110,
       render: (roles: Role[]) => (
         <Space size={[4, 4]} wrap>
-          {roles.map((r) => (
+          {(roles ?? []).map((r) => (
             <Tag key={r} color={ROLE_TAG_COLOR[r]} style={{ margin: 0 }}>
               {ROLE_LABEL[r]}
             </Tag>
@@ -163,13 +165,6 @@ export function UserManagement() {
       width: 100,
       render: (lv?: string) =>
         lv ? <Tag color={levelColor(lv)}>{lv}等级</Tag> : "-"
-    },
-    {
-      title: "天生币余额",
-      dataIndex: "coin_balance",
-      width: 110,
-      // 余额可选：缺失显示「-」，与其它可空列一致；0 是有效余额，故用 ?? 而非 ||。
-      render: (v?: number) => v ?? "-"
     },
     {
       title: "绑定电话",
@@ -218,9 +213,9 @@ export function UserManagement() {
           <Button
             type="link"
             size="small"
-            onClick={() => notReady("天生币管理")}
+            onClick={() => setDetailUser(record)}
           >
-            天生币管理
+            查看详情
           </Button>
           <Button type="link" size="small" onClick={() => notReady("等级管理")}>
             等级管理
@@ -243,13 +238,13 @@ export function UserManagement() {
             // 禁用是破坏性动作，置红警示；启用是恢复性动作，保持常规蓝。
             danger={record.status === "active"}
             reason="需用户状态变更权限"
-            disabled={!canSetStatus}
+            disabled={!canSetStatus || !record.status}
             loading={
               setStatus.isPending && setStatus.variables?.id === record.id
             }
             onClick={() => confirmToggleStatus(record)}
           >
-            {record.status === "active" ? "禁用" : "启用"}
+            {canReadBasic && record.status === "disabled" ? "启用" : "禁用"}
           </GatedButton>
           {/* 删除用户后端本轮 out of scope，暂无接口：占位置灰，待后端接口就绪再启用。 */}
           <GatedButton
@@ -265,6 +260,20 @@ export function UserManagement() {
       )
     }
   ];
+  const basicColumns = new Set([
+    "id",
+    "avatar_url",
+    "roles",
+    "teacher_verified",
+    "level",
+    "status",
+    "updated_at"
+  ]);
+  const visibleColumns = columns.filter(
+    (column) =>
+      canReadBasic ||
+      !("dataIndex" in column && basicColumns.has(String(column.dataIndex)))
+  );
 
   return (
     <Flex vertical gap={16}>
@@ -273,12 +282,14 @@ export function UserManagement() {
       <UserFilters onSearch={applyFilters} onReset={() => applyFilters({})} />
 
       <Card size="small">
-        <Segmented<UserRoleTab>
-          options={ROLE_TABS}
-          value={role}
-          onChange={changeRole}
-          style={{ marginBottom: 12 }}
-        />
+        {canReadBasic && (
+          <Segmented<UserRoleTab>
+            options={ROLE_TABS}
+            value={role}
+            onChange={changeRole}
+            style={{ marginBottom: 12 }}
+          />
+        )}
 
         {listQuery.isError && (
           <Alert
@@ -298,7 +309,7 @@ export function UserManagement() {
         <Table<AdminUserView>
           rowKey="id"
           size="middle"
-          columns={columns}
+          columns={visibleColumns}
           dataSource={rows}
           loading={listQuery.isPending}
           scroll={{ x: 1700 }}
@@ -317,7 +328,10 @@ export function UserManagement() {
         />
       </Card>
 
-      <UserDetailDrawer user={detailUser} onClose={() => setDetailUser(null)} />
+      <UserDetailDrawer
+        user={rows.find((row) => row.id === detailUser?.id) ?? null}
+        onClose={() => setDetailUser(null)}
+      />
       <EditUserModal user={editingUser} onClose={() => setEditingUser(null)} />
     </Flex>
   );

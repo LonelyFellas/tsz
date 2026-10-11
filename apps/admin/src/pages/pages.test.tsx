@@ -115,9 +115,9 @@ describe("admin 页面烟雾测试", () => {
     for (const tab of ["全部", "老师", "学生"]) {
       expect(screen.getByText(tab)).toBeInTheDocument();
     }
-    // 表格关键列（等级/天生币余额后端暂不填充但列头仍在）。fixed 列表头在 antd 下会重复渲染，
+    // 表格关键列；余额在详情中独立授权、按需请求。fixed 列表头在 antd 下会重复渲染，
     // 用 getAllByText 容纳多次出现。
-    for (const col of ["用户ID", "等级", "天生币余额", "更新时间"]) {
+    for (const col of ["用户ID", "等级", "更新时间"]) {
       expect(screen.getAllByText(col).length).toBeGreaterThan(0);
     }
   });

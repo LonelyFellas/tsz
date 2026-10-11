@@ -1,4 +1,9 @@
-import type { CoinEntriesQuery, CoinEntryPage, CoinWallet } from "@tsz/types";
+import type {
+  AdminUserCoinEntryPage,
+  CoinEntriesQuery,
+  CoinEntryPage,
+  CoinWallet
+} from "@tsz/types";
 import type { HttpClient } from "./http";
 import { validateRuntimeSchema } from "./runtime-schema";
 
@@ -51,4 +56,22 @@ export function createCoinEndpoints(http: HttpClient) {
         .then(decodeCoinEntryPage);
     }
   };
+}
+
+export function decodeUserCoinEntryPage(
+  value: unknown
+): AdminUserCoinEntryPage {
+  const result = validateRuntimeSchema("UserCoinEntryPage", value);
+  if (!result.valid)
+    throw new Error(
+      `用户账单响应不符合接口契约：${result.path} (${result.reason})`
+    );
+  const page = value as AdminUserCoinEntryPage;
+  checkInteger(page.snapshot);
+  for (const entry of page.items) {
+    checkInteger(entry.id);
+    checkInteger(entry.delta);
+    if (entry.balance_after !== undefined) checkInteger(entry.balance_after);
+  }
+  return page;
 }

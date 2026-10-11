@@ -496,9 +496,9 @@ export function PermissionManagement() {
               style={{ width: 240 }}
             />
           </Form.Item>
-          <Form.Item label="所属模块">
+          <Form.Item label="所属板块">
             <Select
-              aria-label="所属模块"
+              aria-label="所属板块"
               allowClear
               placeholder="全部"
               value={module}
@@ -600,18 +600,18 @@ export function PermissionManagement() {
           }}
           columns={[
             {
-              title: "权限",
+              title: "权限名称",
               width: 220,
               fixed: "left",
               dataIndex: "label"
             },
             {
-              title: "范围 / 说明",
+              title: "详细说明",
               dataIndex: "description",
               width: 340
             },
             {
-              title: "所属模块",
+              title: "所属板块",
               width: 140,
               render: (_, p) => (
                 <>

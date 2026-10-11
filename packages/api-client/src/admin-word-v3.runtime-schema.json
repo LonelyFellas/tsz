@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/sentence-formatting-compatibility/tsz-rust/docs/openapi.json",
-  "_source_sha256": "271302d77f5ce6ef1900f6cd22953b1936e9f8fd7ff6eed00b5b5b9385db3700",
+  "_source": "/Users/darwish/.codex/worktrees/zentao-88-user-permissions/tsz-rust/docs/openapi.json",
+  "_source_sha256": "c9d98479d5d4b3a72fb921a161f6042daf8c436cac9126be36195dbc864de0df",
   "roots": [
     "LearningRewardDay",
     "LearningPreview",
@@ -32,6 +32,7 @@
     "ManualCoinOperationPage",
     "CoinWallet",
     "CoinEntryPage",
+    "UserCoinEntryPage",
     "SharedSentence",
     "SentencePublication",
     "SentenceWithdrawalImpact",
@@ -2907,6 +2908,43 @@
       "additionalProperties": false
     },
     "UsDialectV3": { "type": "string", "enum": ["us"] },
+    "UserCoinEntry": {
+      "type": "object",
+      "required": [
+        "id",
+        "operation_id",
+        "kind",
+        "source_type",
+        "delta",
+        "created_at"
+      ],
+      "properties": {
+        "balance_after": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$"
+        },
+        "created_at": { "type": "string", "format": "date-time" },
+        "delta": { "type": "string", "pattern": "^-?[1-9][0-9]{0,18}$" },
+        "id": { "type": "string", "pattern": "^[1-9][0-9]{0,18}$" },
+        "kind": { "$ref": "#/$defs/OperationKind" },
+        "operation_id": { "type": "string", "format": "uuid" },
+        "source_type": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "UserCoinEntryPage": {
+      "type": "object",
+      "required": ["items", "pagination", "snapshot"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/UserCoinEntry" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" },
+        "snapshot": { "type": "string", "pattern": "^(0|[1-9][0-9]{0,18})$" }
+      },
+      "additionalProperties": false
+    },
     "V3DraftNodeLocation": {
       "type": "object",
       "required": ["node_role", "ancestor_node_ids"],

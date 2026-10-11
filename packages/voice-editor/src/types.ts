@@ -232,6 +232,8 @@ export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
    * 两套语义并存会让人分不清哪些音频真的保存了。
    */
   audioUploadAdapter?: AudioUploadAdapter;
+  /** 仅限制新增上传；已有音频仍可试听。 */
+  audioUploadAllowed?: boolean;
   /** 挂在这段文本上的音频资产；与 voiceProfile 一样是受控通道，改动实时抛出。 */
   audioAssets?: AudioAsset[];
   onAudioAssetsChange?: (next: AudioAsset[]) => void;

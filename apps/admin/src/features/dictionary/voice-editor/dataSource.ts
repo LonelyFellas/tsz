@@ -55,6 +55,10 @@ async function resolveAudioAdapter(): Promise<AudioUploadAdapter> {
 export const adminAudioUploadAdapter: AudioUploadAdapter = {
   async upload(input) {
     if (
+      !hasAdminPermission(
+        useAuthStore.getState().profile,
+        "speech.upload_audio"
+      ) ||
       !hasAnyAdminPermission(useAuthStore.getState().profile, [
         "words.create",
         "words.edit",

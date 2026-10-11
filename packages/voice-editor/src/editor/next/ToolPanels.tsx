@@ -418,6 +418,7 @@ export interface UploadDraft {
 }
 
 export interface UploadPanelProps {
+  uploadAllowed?: boolean;
   readOnly?: boolean;
   /** 只允许上传这一侧的录音；不传表示这段正文不分英美。 */
   locale?: AudioAssetLocale;
@@ -451,6 +452,7 @@ const genderLabel = (gender: string) =>
  * 上传本身在宿主注入的适配器里跑，这里只呈现队列。
  */
 export function UploadPanel({
+  uploadAllowed = true,
   readOnly,
   locale,
   available,
@@ -471,7 +473,7 @@ export function UploadPanel({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inFlight = pending.filter((item) => !item.error).length;
   const used = assets.length + inFlight;
-  const canAdd = available && !readOnly && used < limit;
+  const canAdd = available && uploadAllowed && !readOnly && used < limit;
   return (
     <div className="tsz-ve-pop tsz-ve-pop-upload" aria-label="音频">
       {/*
@@ -504,7 +506,7 @@ export function UploadPanel({
           optionType="button"
           aria-label="上传音频语种"
           value={upload.locale}
-          disabled={readOnly || !available}
+          disabled={readOnly || !available || !uploadAllowed}
           onChange={(event) => onUploadChange({ locale: event.target.value })}
           options={VOICE_LOCALES.filter(
             (entry) => !locale || entry.locale === locale
@@ -518,7 +520,7 @@ export function UploadPanel({
           optionType="button"
           aria-label="上传音频性别"
           value={upload.gender}
-          disabled={readOnly || !available}
+          disabled={readOnly || !available || !uploadAllowed}
           onChange={(event) => onUploadChange({ gender: event.target.value })}
           options={VOICE_GENDERS.map(({ gender, label }) => ({
             value: gender,
@@ -538,11 +540,13 @@ export function UploadPanel({
       <Typography.Text
         type="secondary"
         className="tsz-ve-upload-hint"
-        role={available ? undefined : "note"}
+        role={available && uploadAllowed ? undefined : "note"}
       >
-        {available
-          ? `${AUDIO_UPLOAD_HINT}，最多 ${limit} 条（已用 ${used}）`
-          : unavailableReason}
+        {!uploadAllowed
+          ? "没有上传音频的权限"
+          : available
+            ? `${AUDIO_UPLOAD_HINT}，最多 ${limit} 条（已用 ${used}）`
+            : unavailableReason}
       </Typography.Text>
       {playbackMessage && (
         <Typography.Text
@@ -587,7 +591,7 @@ export function UploadPanel({
                       size="small"
                       type="text"
                       aria-label={`重试 ${item.name}`}
-                      disabled={!available || readOnly}
+                      disabled={!available || readOnly || !uploadAllowed}
                       onClick={() => onRetryUpload(item.id)}
                     >
                       重试

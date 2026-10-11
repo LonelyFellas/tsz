@@ -7,6 +7,7 @@ import { PronunciationPreviewProvider } from "../../word-creation/PronunciationP
 import { V3SynthesisInputs } from "./V3SynthesisInputs";
 
 const speech = vi.hoisted(() => ({ synthesize: vi.fn() }));
+vi.mock("@/lib/auth", () => ({ usePermission: () => true }));
 vi.mock("@/lib/env", () => ({ env: { VOICE_PREVIEW: true } }));
 vi.mock("@/features/settings/useDialectPreference", () => ({
   useDialectPreference: () => ({ preference: "us" })

@@ -153,6 +153,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   voiceProfile,
   onVoiceProfileChange,
   audioUploadAdapter,
+  audioUploadAllowed = true,
   audioAssets,
   onAudioAssetsChange,
   audioAssetLimit = AUDIO_ASSETS_PER_VARIANT_MAX,
@@ -325,6 +326,23 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     },
     [stopAssetPlayback]
   );
+
+  useEffect(() => {
+    if (audioUploadAllowed && !readOnly) return;
+    if (!uploadControllersRef.current.size) return;
+    uploadControllersRef.current.forEach((controller) => controller.abort());
+    uploadControllersRef.current.clear();
+    setPendingUploads((current) =>
+      current.map((entry) =>
+        entry.error
+          ? entry
+          : {
+              ...entry,
+              error: { message: "当前没有上传音频的权限", retryable: true }
+            }
+      )
+    );
+  }, [audioUploadAllowed, readOnly]);
 
   /* 与 voiceProfile 同款：自己刚抛出去、又被父组件回灌的那份要跳过。 */
   const emittedAssetsRef = useRef<string | undefined>(undefined);
@@ -1347,7 +1365,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     setPendingUploads((current) => current.filter((item) => item.id !== id));
 
   const startUpload = (entry: PendingUpload) => {
-    if (!audioUploadAdapter) return;
+    if (!audioUploadAdapter || !audioUploadAllowed || readOnly) return;
     const controller = new AbortController();
     uploadControllersRef.current.set(entry.id, controller);
     patchPending(entry.id, { error: undefined, progress: 0 });
@@ -1375,21 +1393,21 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       })
       .then(
         (asset) => {
-          uploadControllersRef.current.delete(entry.id);
           if (controller.signal.aborted) return;
+          uploadControllersRef.current.delete(entry.id);
           dropPending(entry.id);
           emitAssets([...assetsRef.current, asset]);
         },
         (error: unknown) => {
-          uploadControllersRef.current.delete(entry.id);
           if (controller.signal.aborted) return;
+          uploadControllersRef.current.delete(entry.id);
           patchPending(entry.id, { error: describeUploadError(error) });
         }
       );
   };
 
   const addAudioFiles = (files: FileList) => {
-    if (!audioUploadAdapter || readOnly) return;
+    if (!audioUploadAdapter || !audioUploadAllowed || readOnly) return;
     // 名额 = 上限 − 已落成 − 还在路上的；预检不过的那些不占名额。
     const inFlight = pendingUploads.filter((item) => !item.error).length;
     let room = audioAssetLimit - assetsRef.current.length - inFlight;
@@ -1764,6 +1782,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       icon: <AudioOutlined />,
       content: (
         <UploadPanel
+          uploadAllowed={audioUploadAllowed}
           readOnly={readOnly}
           locale={locale}
           available={Boolean(audioUploadAdapter) && !storageUnavailable}
