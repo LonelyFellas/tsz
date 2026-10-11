@@ -375,6 +375,92 @@ function impactSurfacePage(nextCursor: string | null): SurfaceMatchPageV3 {
 }
 
 describe("V3WordCreationWizard", () => {
+  it("选择有效语法结构后立即清除对应警示，保留其他错误并在撤销选择后恢复", async () => {
+    const initialWord = word();
+    const grammarIssue: V3DraftValidationIssue = {
+      schema_version: 3,
+      step: "meanings",
+      node_id: "definition-canonical",
+      field: "grammar_structure_id",
+      code: "definition_invalid",
+      message: "请选择语法结构",
+      node_location: {
+        node_role: "meanings.definition",
+        pos_id: UUIDS.pos,
+        ancestor_node_ids: [UUIDS.pos, "sense-canonical"]
+      }
+    };
+    const contentIssue = {
+      ...grammarIssue,
+      field: "content",
+      message: "释义内容无效"
+    };
+    const source = requests({
+      saveMeanings: vi
+        .fn()
+        .mockRejectedValue(
+          new HttpError(422, "invalid", [], "validation_failed", [
+            grammarIssue,
+            contentIssue
+          ])
+        )
+    });
+    renderWizard(source, {
+      initialWord,
+      renderStep: (context) => (
+        <>
+          <output data-testid="grammar-issues">
+            {context.issues.map((issue) => issue.message).join(",")}
+          </output>
+          <select
+            aria-label="语法结构"
+            value={
+              context.draftMeanings.pos[0]!.senses[0]!.definitions[0]!
+                .grammar_structure_id ?? ""
+            }
+            onChange={(event) => {
+              const next = structuredClone(context.draftMeanings);
+              const definition = next.pos[0]!.senses[0]!.definitions[0]!;
+              if (event.target.value) {
+                definition.grammar_structure_id = event.target.value;
+              } else {
+                delete definition.grammar_structure_id;
+              }
+              context.setDraftMeanings(next);
+            }}
+          >
+            <option value="">未选择</option>
+            <option value="missing-grammar">失效结构</option>
+            <option value="grammar-canonical">有效结构</option>
+          </select>
+          <button
+            onClick={() =>
+              void context.actions.saveMeanings(
+                context.draftMeanings,
+                "complete"
+              )
+            }
+          >
+            完成词义
+          </button>
+        </>
+      )
+    });
+
+    fireEvent.click(screen.getByText("完成词义"));
+    const issues = screen.getByTestId("grammar-issues");
+    await waitFor(() => expect(issues).toHaveTextContent("请选择语法结构"));
+    const select = screen.getByLabelText("语法结构");
+    fireEvent.change(select, { target: { value: "missing-grammar" } });
+    expect(issues).toHaveTextContent("请选择语法结构");
+    fireEvent.change(select, { target: { value: "grammar-canonical" } });
+    expect(issues).not.toHaveTextContent("请选择语法结构");
+    expect(issues).toHaveTextContent("释义内容无效");
+    expect(source.saveMeanings).toHaveBeenCalledTimes(1);
+    fireEvent.change(select, { target: { value: "" } });
+    expect(issues).toHaveTextContent("请选择语法结构");
+  });
+
   // 这条渲染整个真实向导。实际发音改成编辑器字段后每条发音多一个组件，
   // CI 机器上会压着 5s 默认上限跑，给个明确上限而不是靠运气。
   it("短语拼写开关在真实向导中可以往返并保留成分配置", async () => {
