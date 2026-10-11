@@ -1,3 +1,5 @@
+import { ConfigProvider } from "antd";
+import { useContentEditPermissions } from "../../contentEditPermissions";
 import type {
   AudioAssetLocaleV3,
   AudioAssetV3,
@@ -87,6 +89,8 @@ export interface V3VoiceTextFieldProps<
   field: string;
   placeholder?: string;
   readOnly?: boolean;
+  contentReadOnly?: boolean;
+  associationsReadOnly?: boolean;
   invalid?: boolean;
   leadingAction?: ReactNode;
   audioUploadEnabled?: boolean;
@@ -97,6 +101,7 @@ export interface V3VoiceTextFieldProps<
   audioAssets?: AudioAssetV3[] | null;
   onAudioAssetsChange?: (next: AudioAssetV3[]) => void;
   onChange: VoiceEditorProps<TLink>["onChange"];
+  onAssociationsChange?: (textLinks: TLink[]) => void;
 }
 
 // 错误定位属性仅挂在当前编辑入口，避免弹窗与页面出现重复锚点。
@@ -124,7 +129,9 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   nodeAliases,
   field,
   placeholder,
-  readOnly,
+  readOnly: requestedReadOnly,
+  contentReadOnly: requestedContentReadOnly,
+  associationsReadOnly: requestedAssociationsReadOnly,
   invalid,
   leadingAction,
   audioUploadEnabled = mode !== "association",
@@ -132,8 +139,16 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   onVoiceProfileChange,
   audioAssets,
   onAudioAssetsChange,
-  onChange
+  onChange,
+  onAssociationsChange
 }: V3VoiceTextFieldProps<TLink>) {
+  const permissions = useContentEditPermissions();
+  const contentReadOnly = requestedContentReadOnly ?? !permissions.edit;
+  const associationsReadOnly =
+    requestedAssociationsReadOnly ?? !permissions.associate;
+  const readOnly =
+    requestedReadOnly ||
+    (contentReadOnly && (!renderAssociationPicker || associationsReadOnly));
   const [editing, setEditing] = useState(false);
   const [focused, setFocused] = useState(false);
   const [recorded, setRecorded] = useState(value.text.length > 0);
@@ -165,11 +180,17 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   }, [draftPending, onDraftPendingChange]);
   const callbacks = useRef({
     onChange,
+    onAssociationsChange,
     onVoiceProfileChange,
     onAudioAssetsChange
   });
   useLayoutEffect(() => {
-    callbacks.current = { onChange, onVoiceProfileChange, onAudioAssetsChange };
+    callbacks.current = {
+      onChange,
+      onAssociationsChange,
+      onVoiceProfileChange,
+      onAudioAssetsChange
+    };
   });
   const cancelEditing = () => {
     if (doneLoading) return;
@@ -191,7 +212,9 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       JSON.stringify([next.value, next.textLinks])
     ) {
       flushSync(() =>
-        callbacks.current.onChange(toRichTextV2(next.value), next.textLinks)
+        contentReadOnly
+          ? callbacks.current.onAssociationsChange?.(next.textLinks ?? [])
+          : callbacks.current.onChange(toRichTextV2(next.value), next.textLinks)
       );
     }
     if (JSON.stringify(voiceProfile) !== JSON.stringify(next.voiceProfile)) {
@@ -338,6 +361,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       onChange={(event) => {
         if (
           readOnly ||
+          contentReadOnly ||
           (env.VOICE_EDITOR && editingEnabled && (recorded || expanded))
         )
           return;
@@ -361,6 +385,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       placeholder={placeholder}
       readOnly={
         readOnly ||
+        contentReadOnly ||
         (env.VOICE_EDITOR && editingEnabled && (recorded || expanded))
       }
       value={value.text}
@@ -417,21 +442,27 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     );
 
   const fieldView = (
-    <Space.Compact block className="v3-voice-text-field-compact">
-      {leadingAction}
-      {collapsedField}
-      <Button
-        aria-label={`打开${ariaLabel}编辑器`}
-        disabled={readOnly}
-        icon={<EditOutlined />}
-        onClick={() => {
-          setDraftState(captureSession());
-          setRecorded(true);
-          setEditing(true);
-        }}
-        style={{ height: "auto" }}
-      />
-    </Space.Compact>
+    <ConfigProvider
+      componentDisabled={
+        contentReadOnly && !associationsReadOnly ? false : undefined
+      }
+    >
+      <Space.Compact block className="v3-voice-text-field-compact">
+        {leadingAction}
+        {collapsedField}
+        <Button
+          aria-label={`打开${ariaLabel}编辑器`}
+          disabled={readOnly}
+          icon={<EditOutlined />}
+          onClick={() => {
+            setDraftState(captureSession());
+            setRecorded(true);
+            setEditing(true);
+          }}
+          style={{ height: "auto" }}
+        />
+      </Space.Compact>
+    </ConfigProvider>
   );
 
   const renderActions = (
@@ -463,63 +494,76 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       </Space>
     ) : null;
   const editor = (
-    <div className="v3-voice-text-editor" style={{ minWidth: 0 }}>
-      {feedbackHolder}
-      <Suspense fallback={<div style={{ paddingBottom: 32 }}>{fallback}</div>}>
-        <VoiceEditor<TLink>
-          key={`${nodeId}:${editorSession}`}
-          renderActions={renderActions}
-          onAssociationPendingChange={onAssociationPendingChange}
-          textReadOnly={false}
-          mode={mode}
-          textFormattingEnabled={env.SENTENCE_FORMATTING}
-          locale={voiceLocale(dialect)}
-          textLinks={draftState.textLinks}
-          restoreTextLinksOnCorrection={restoreTextLinksOnCorrection}
-          renderAssociationPicker={renderAssociationPicker}
-          contextLabel={ariaLabel}
-          inputDataAttributes={{
-            "data-v3-node-id": nodeId,
-            "data-v3-field": field,
-            ...(nodeAliases ? { "data-v3-node-aliases": nodeAliases } : {})
-          }}
-          language="en"
-          placeholder={placeholder}
-          onChange={(next: RichTextV2, nextLinks) => {
-            if (!readOnly)
-              setDraftState((current) => ({
-                ...current,
-                value: next,
-                textLinks: nextLinks
-              }));
-          }}
-          previewAdapter={
-            env.VOICE_PREVIEW
-              ? (previewAdapter ?? adminVoicePreviewAdapter)
-              : undefined
-          }
-          previewIsMock={voicePreviewIsMock}
-          onVoiceProfileChange={(next) => {
-            if (!readOnly)
-              setDraftState((current) => ({ ...current, voiceProfile: next }));
-          }}
-          // 开关关着 = 不注入适配器：面板置灰说明原因，已有的音频引用仍列出来。
-          audioUploadAdapter={
-            env.VOICE_AUDIO_UPLOAD && audioUploadEnabled
-              ? adminAudioUploadAdapter
-              : undefined
-          }
-          audioAssets={draftState.audioAssets ?? undefined}
-          onAudioAssetsChange={(next) => {
-            if (!readOnly)
-              setDraftState((current) => ({ ...current, audioAssets: next }));
-          }}
-          readOnly={readOnly}
-          value={draftState.value}
-          voiceProfile={draftState.voiceProfile}
-        />
-      </Suspense>
-    </div>
+    <ConfigProvider
+      componentDisabled={
+        contentReadOnly && !associationsReadOnly ? false : undefined
+      }
+    >
+      <div className="v3-voice-text-editor" style={{ minWidth: 0 }}>
+        {feedbackHolder}
+        <Suspense
+          fallback={<div style={{ paddingBottom: 32 }}>{fallback}</div>}
+        >
+          <VoiceEditor<TLink>
+            key={`${nodeId}:${editorSession}`}
+            renderActions={renderActions}
+            onAssociationPendingChange={onAssociationPendingChange}
+            textReadOnly={contentReadOnly}
+            contentReadOnly={contentReadOnly}
+            associationsReadOnly={associationsReadOnly}
+            mode={mode}
+            textFormattingEnabled={env.SENTENCE_FORMATTING}
+            locale={voiceLocale(dialect)}
+            textLinks={draftState.textLinks}
+            restoreTextLinksOnCorrection={restoreTextLinksOnCorrection}
+            renderAssociationPicker={renderAssociationPicker}
+            contextLabel={ariaLabel}
+            inputDataAttributes={{
+              "data-v3-node-id": nodeId,
+              "data-v3-field": field,
+              ...(nodeAliases ? { "data-v3-node-aliases": nodeAliases } : {})
+            }}
+            language="en"
+            placeholder={placeholder}
+            onChange={(next: RichTextV2, nextLinks) => {
+              if (!readOnly)
+                setDraftState((current) => ({
+                  ...current,
+                  value: contentReadOnly ? current.value : next,
+                  textLinks: nextLinks
+                }));
+            }}
+            previewAdapter={
+              env.VOICE_PREVIEW
+                ? (previewAdapter ?? adminVoicePreviewAdapter)
+                : undefined
+            }
+            previewIsMock={voicePreviewIsMock}
+            onVoiceProfileChange={(next) => {
+              if (!readOnly && !contentReadOnly)
+                setDraftState((current) => ({
+                  ...current,
+                  voiceProfile: next
+                }));
+            }}
+            // 开关关着 = 不注入适配器：面板置灰说明原因，已有的音频引用仍列出来。
+            audioUploadAdapter={
+              env.VOICE_AUDIO_UPLOAD && audioUploadEnabled
+                ? adminAudioUploadAdapter
+                : undefined
+            }
+            audioAssets={draftState.audioAssets ?? undefined}
+            onAudioAssetsChange={(next) => {
+              if (!readOnly && !contentReadOnly)
+                setDraftState((current) => ({ ...current, audioAssets: next }));
+            }}
+            readOnly={readOnly}
+            value={draftState.value}
+            voiceProfile={draftState.voiceProfile}
+          />
+        </Suspense>
+      </div>
+    </ConfigProvider>
   );
 
   if (presentation === "editor") return editor;

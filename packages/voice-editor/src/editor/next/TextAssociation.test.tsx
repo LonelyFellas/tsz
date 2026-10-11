@@ -578,3 +578,70 @@ it.each([
     expect(screen.queryByText(/部分关联暂时失效/)).toBeNull();
   }
 );
+
+it("仅关联模式可改关联，正文和音频工具不可用", async () => {
+  const observe = vi.fn();
+  const value = { version: 2 as const, text: "hello world", annotations: [] };
+  render(
+    <VoiceEditor<TextLinkV3>
+      mode="association"
+      value={value}
+      textLinks={[]}
+      contentReadOnly
+      contextLabel="仅关联正文"
+      renderAssociationPicker={({ segments, onSelect }) => (
+        <button
+          onClick={() => onSelect({ ...target, source_segments: segments })}
+        >
+          选择目标
+        </button>
+      )}
+      onChange={observe}
+    />
+  );
+  expect(screen.queryByRole("button", { name: "编辑文本" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "音频" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "加粗" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "关联单词" }));
+  fireEvent.mouseDown(screen.getByLabelText("关联 hello（1）"), { button: 0 });
+  fireEvent.click(await screen.findByText("选择目标"));
+  await waitFor(() => expect(observe.mock.lastCall?.[1]).toHaveLength(1));
+  expect(observe.mock.lastCall?.[0]).toEqual(value);
+});
+it("仅正文模式禁用关联操作", () => {
+  render(
+    <VoiceEditor<TextLinkV3>
+      mode="association"
+      value={{ version: 2, text: "hello world", annotations: [] }}
+      textLinks={[]}
+      associationsReadOnly
+      onChange={vi.fn()}
+    />
+  );
+  expect(screen.getByRole("button", { name: "关联单词" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "关联短语" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "编辑文本" })).toBeEnabled();
+});
+
+it("仅关联模式可结束未完成的选择并继续保存", async () => {
+  render(
+    <VoiceEditor<TextLinkV3>
+      mode="grammar"
+      value={{ version: 2, text: "hello", annotations: [] }}
+      textLinks={[]}
+      contentReadOnly
+      onChange={vi.fn()}
+      renderAssociationPicker={() => <span>无可用目标</span>}
+      renderActions={(ready) => <button disabled={!ready}>保存关联</button>}
+    />
+  );
+  fireEvent.click(screen.getByRole("button", { name: "关联单词" }));
+  fireEvent.mouseDown(screen.getByLabelText("关联 hello（1）"), { button: 0 });
+  expect(screen.getByRole("button", { name: "保存关联" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "结束关联" }));
+  expect(screen.getByRole("button", { name: "保存关联" })).toBeEnabled();
+  await waitFor(() => {
+    const picker = screen.queryByText("无可用目标");
+    if (picker) expect(picker).not.toBeVisible();
+  });
+});

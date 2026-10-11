@@ -104,6 +104,9 @@ export function V3LinkedEnglishTextField({
                   )
                 : undefined
             }
+            onAssociationsChange={(text_links) =>
+              update(row.dialect, { text_links })
+            }
             onChange={(text, text_links) =>
               update(row.dialect, {
                 value: text,

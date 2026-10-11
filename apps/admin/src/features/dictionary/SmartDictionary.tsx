@@ -94,7 +94,7 @@ import {
 } from "./wordRouting";
 import {
   canCreateEntry,
-  canWriteEntry,
+  canModifyEntry,
   canTransitionEntry,
   entryWriteForbiddenMessage,
   isEntryOwnershipError
@@ -916,7 +916,7 @@ export function SmartDictionary({
       fixed: "right",
       render: (_: unknown, record: AdminWordListItemAny) => {
         const rowName = `「${wordListLabel(record)}」`;
-        const rowWritable = canWriteEntry(writeActor, record);
+        const rowWritable = canModifyEntry(writeActor, record);
         return (
           // 左组是进入词条的入口、右组是生命周期动作，各自贴住一边：
           // 「标注」按行有无都不会让删除入口跟着左右跳。

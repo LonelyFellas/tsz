@@ -1,9 +1,23 @@
+import {
+  ContentEditPermissions,
+  useContentEditPermissions,
+  onlyTextAssociationsChanged
+} from "@/features/dictionary/contentEditPermissions";
 import { PronunciationPreviewProvider } from "@/features/dictionary/word-creation/PronunciationPreview";
 import { V3ReviewSentences } from "@/features/dictionary/word-creation-v3/V3ReviewSentences";
 import { WordSentences } from "@/features/sentences/WordSentences";
 import { wordKeys } from "@/features/dictionary/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, Button, Flex, Result, Spin, Typography } from "antd";
+import {
+  Alert,
+  App,
+  Button,
+  ConfigProvider,
+  Flex,
+  Result,
+  Spin,
+  Typography
+} from "antd";
 import type {
   AdminWordDraftV3Envelope,
   AdminWordV3,
@@ -50,7 +64,9 @@ import {
 } from "@/features/dictionary/word-creation-v3/presentationErrors";
 import { resolveV3StepAccess } from "@/features/dictionary/word-creation-v3/stepAccess";
 import {
+  canModifyEntry,
   canWriteEntry,
+  canAssociateEntry,
   canCheckEntry
 } from "@/features/dictionary/entryWritePermission";
 import { api, useAuthStore, usePermission } from "@/lib/auth";
@@ -428,6 +444,8 @@ function V3MeaningsSlot({
   focusSentence?: V3FocusSentence;
   onFocusSentenceHandled?: () => void;
 }) {
+  const permissions = useContentEditPermissions();
+  const { message } = App.useApp();
   const [sentenceEditor, setSentenceEditor] = useState<{
     senseId: string;
     value: SharedSentence | "new";
@@ -475,7 +493,10 @@ function V3MeaningsSlot({
           return;
         }
       }
-      await context.actions.saveMeanings(content, intent);
+      await context.actions.saveMeanings(
+        content,
+        permissions.edit ? intent : "save"
+      );
     } finally {
       preparingRef.current = false;
     }
@@ -495,6 +516,12 @@ function V3MeaningsSlot({
 
   return (
     <Flex vertical gap="middle">
+      {!permissions.edit && (
+        <Alert
+          type="info"
+          title="仅可编辑单词与短语关联，文本、音频及其他内容只读"
+        />
+      )}
       <V3ReferenceNotices />
       <V3BlockedReferencesAlert references={blockedReferences} />
       {surfaceBlocked ? (
@@ -548,94 +575,106 @@ function V3MeaningsSlot({
           }
         />
       ) : null}
-      <V3MeaningsAndExamplesStep
-        renderSentenceSection={(senseId) => (
-          <WordSentences
-            key={senseId}
-            sourceWord={context.word}
-            senseId={senseId}
-            registerLeaveGuard={context.registerSentenceLeaveGuard}
-            editor={
-              sentenceEditor?.senseId === senseId
-                ? sentenceEditor.value
-                : undefined
+      <ConfigProvider componentDisabled={!permissions.edit}>
+        <V3MeaningsAndExamplesStep
+          renderSentenceSection={(senseId) => (
+            <ConfigProvider componentDisabled={false}>
+              <WordSentences
+                key={senseId}
+                sourceWord={context.word}
+                senseId={senseId}
+                registerLeaveGuard={context.registerSentenceLeaveGuard}
+                editor={
+                  sentenceEditor?.senseId === senseId
+                    ? sentenceEditor.value
+                    : undefined
+                }
+                onOpen={(value) => {
+                  void (async () => {
+                    if (await leaveSentence())
+                      setSentenceEditor({ senseId, value });
+                  })();
+                }}
+                onClose={() => setSentenceEditor(undefined)}
+                readOnly={context.readOnly}
+                focusSentenceId={
+                  focusSentence?.senseId === senseId
+                    ? focusSentence.sentenceId
+                    : undefined
+                }
+                onFocusHandled={onFocusSentenceHandled}
+              />
+            </ConfigProvider>
+          )}
+          textLinksEnabled={context.word.capabilities.text_links === true}
+          activePosId={context.activePosId}
+          componentUsagesEnabled={
+            context.word.capabilities.sense_component_usages === true
+          }
+          entryKind={context.word.kind}
+          forms={context.draftForms}
+          issues={context.issues.filter((issue) => issue.step === "meanings")}
+          onActivePosChange={(posId) => {
+            // 切词性同样会作废影响令牌，条子留着的话点确认是无反馈的空操作。
+            setPendingIntent(undefined);
+            void (async () => {
+              if (await leaveSentence()) context.setActivePosId(posId);
+            })();
+          }}
+          onChange={(next) => {
+            if (
+              !permissions.edit &&
+              !onlyTextAssociationsChanged(context.draftMeanings, next)
+            ) {
+              void message.warning("当前仅有单词与短语关联权限");
+              return;
             }
-            onOpen={(value) => {
+            if (
+              sentenceEditor &&
+              !next.pos.some((pos) =>
+                pos.senses.some((sense) => sense.id === sentenceEditor.senseId)
+              )
+            ) {
               void (async () => {
-                if (await leaveSentence())
-                  setSentenceEditor({ senseId, value });
+                if (await leaveSentence()) context.setDraftMeanings(next);
               })();
-            }}
-            onClose={() => setSentenceEditor(undefined)}
-            readOnly={context.readOnly}
-            focusSentenceId={
-              focusSentence?.senseId === senseId
-                ? focusSentence.sentenceId
-                : undefined
-            }
-            onFocusHandled={onFocusSentenceHandled}
-          />
-        )}
-        textLinksEnabled={context.word.capabilities.text_links === true}
-        activePosId={context.activePosId}
-        componentUsagesEnabled={
-          context.word.capabilities.sense_component_usages === true
-        }
-        entryKind={context.word.kind}
-        forms={context.draftForms}
-        issues={context.issues.filter((issue) => issue.step === "meanings")}
-        onActivePosChange={(posId) => {
-          // 切词性同样会作废影响令牌，条子留着的话点确认是无反馈的空操作。
-          setPendingIntent(undefined);
-          void (async () => {
-            if (await leaveSentence()) context.setActivePosId(posId);
-          })();
-        }}
-        onChange={(next) => {
-          if (
-            sentenceEditor &&
-            !next.pos.some((pos) =>
-              pos.senses.some((sense) => sense.id === sentenceEditor.senseId)
-            )
-          ) {
-            void (async () => {
-              if (await leaveSentence()) context.setDraftMeanings(next);
-            })();
-          } else context.setDraftMeanings(next);
-        }}
-        onFormsChange={(next) => {
-          // 词形一改，上一轮预览拿到的影响令牌就失效了，先把确认条收起来。
-          setPendingIntent(undefined);
-          const activeSensePos = context.draftMeanings.pos.find((pos) =>
-            pos.senses.some((sense) => sense.id === sentenceEditor?.senseId)
-          );
-          if (
-            sentenceEditor &&
-            activeSensePos &&
-            !next.pos.some((pos) => pos.pos_id === activeSensePos.pos_id)
-          ) {
-            void (async () => {
-              if (await leaveSentence()) context.setDraftForms(next);
-            })();
-          } else context.setDraftForms(next);
-        }}
-        onPrevious={() => context.setActiveStep("forms")}
-        onSave={saveMeanings}
-        canSave={context.hasUnsavedChanges}
-        partOfSpeechCatalog={context.partOfSpeechCatalog}
-        partOfSpeechCatalogError={context.partOfSpeechCatalogError}
-        partOfSpeechCatalogPending={context.partOfSpeechCatalogPending}
-        relationDisplaySnapshots={relationDisplaySnapshots(
-          context.word.meanings
-        )}
-        saving={
-          context.isPending("impact") ||
-          context.isPending("save_forms") ||
-          context.isPending("save_meanings")
-        }
-        value={context.draftMeanings}
-        wordId={context.word.id}
-      />
+            } else context.setDraftMeanings(next);
+          }}
+          onFormsChange={(next) => {
+            if (!permissions.edit) return;
+            // 词形一改，上一轮预览拿到的影响令牌就失效了，先把确认条收起来。
+            setPendingIntent(undefined);
+            const activeSensePos = context.draftMeanings.pos.find((pos) =>
+              pos.senses.some((sense) => sense.id === sentenceEditor?.senseId)
+            );
+            if (
+              sentenceEditor &&
+              activeSensePos &&
+              !next.pos.some((pos) => pos.pos_id === activeSensePos.pos_id)
+            ) {
+              void (async () => {
+                if (await leaveSentence()) context.setDraftForms(next);
+              })();
+            } else context.setDraftForms(next);
+          }}
+          onPrevious={() => context.setActiveStep("forms")}
+          onSave={saveMeanings}
+          canSave={context.hasUnsavedChanges}
+          partOfSpeechCatalog={context.partOfSpeechCatalog}
+          partOfSpeechCatalogError={context.partOfSpeechCatalogError}
+          partOfSpeechCatalogPending={context.partOfSpeechCatalogPending}
+          relationDisplaySnapshots={relationDisplaySnapshots(
+            context.word.meanings
+          )}
+          saving={
+            context.isPending("impact") ||
+            context.isPending("save_forms") ||
+            context.isPending("save_meanings")
+          }
+          value={context.draftMeanings}
+          wordId={context.word.id}
+        />
+      </ConfigProvider>
     </Flex>
   );
 }
@@ -831,7 +870,7 @@ function V3WizardSlots({
   if (context.readOnly) {
     return (
       <Flex vertical gap="middle">
-        {canCheckEntry(profile) && !canWriteEntry(profile, context.word) ? (
+        {canCheckEntry(profile) && !canModifyEntry(profile, context.word) ? (
           <V3PreviewAndPublishStep
             word={context.word}
             requests={requests}
@@ -841,7 +880,7 @@ function V3WizardSlots({
           <V3ReadOnlyPreview
             word={context.word}
             onEdit={
-              canWriteEntry(profile, context.word) &&
+              canModifyEntry(profile, context.word) &&
               context.word.status === "published"
                 ? () =>
                     navigate(
@@ -870,7 +909,16 @@ function V3WizardSlots({
     case "basics":
       return <V3BasicsSlot context={context} />;
     case "forms":
-      return <V3FormsSlot context={context} />;
+      return canWriteEntry(profile, context.word) ? (
+        <V3FormsSlot context={context} />
+      ) : (
+        <Flex vertical gap="middle">
+          <Alert type="info" title="当前仅有单词与短语关联权限" />
+          <Button onClick={() => context.setActiveStep("meanings")}>
+            进入词义与例句关联
+          </Button>
+        </Flex>
+      );
     case "meanings":
       return (
         renderMeaningsStep?.(context) ?? (
@@ -1025,7 +1073,7 @@ export function WordWizardV3Page({
     word,
     requestedStep,
     editingPublished,
-    canWriteEntry(writeActor, word)
+    canModifyEntry(writeActor, word)
   );
   const forcePreview = stepAccess.readOnly;
   const legalStep = stepAccess.effective;
@@ -1050,34 +1098,42 @@ export function WordWizardV3Page({
             description="来源内容可能已被删除或修改，但关联不一定已解除。请检查来源词条的草稿和已发布内容，重新选择或解除关联后，返回本词条刷新页面。"
           />
         )}
-      <V3ReferenceGuardProvider value={referenceGuard}>
-        <V3WordCreationWizard
-          key={`${word.id}:activation-${activationGeneration}:${editingPublished ? "edit" : "read"}`}
-          allowPublishedEditing={editingPublished}
-          initialStep={legalStep}
-          initialWord={word}
-          sharedSentenceCount={sharedSentences.data?.total ?? 0}
-          partOfSpeechCatalog={partOfSpeechCatalog.data}
-          prefillNewDraft={
-            creationSourceFromState(location.state) !== undefined
-          }
-          partOfSpeechCatalogError={partOfSpeechCatalog.isError}
-          partOfSpeechCatalogPending={partOfSpeechCatalog.isPending}
-          retiredStableNodes={detail.data.retired_stable_nodes}
-          readOnly={forcePreview}
-          requests={requests}
-          onWordChange={replaceCanonical}
-          renderStep={(context) => (
-            <V3WizardSlots
-              context={context}
-              onActivated={replaceActivatedCanonical}
-              renderMeaningsStep={renderMeaningsStep}
-              requests={requests}
-              wordId={word.id}
-            />
-          )}
-        />
-      </V3ReferenceGuardProvider>
+      <ContentEditPermissions
+        value={{
+          edit: canWriteEntry(writeActor, word),
+          associate: canAssociateEntry(writeActor, word)
+        }}
+      >
+        <V3ReferenceGuardProvider value={referenceGuard}>
+          <V3WordCreationWizard
+            key={`${word.id}:activation-${activationGeneration}:${editingPublished ? "edit" : "read"}`}
+            allowPublishedEditing={editingPublished}
+            initialStep={legalStep}
+            initialWord={word}
+            sharedSentenceCount={sharedSentences.data?.total ?? 0}
+            partOfSpeechCatalog={partOfSpeechCatalog.data}
+            prefillNewDraft={
+              creationSourceFromState(location.state) !== undefined
+            }
+            partOfSpeechCatalogError={partOfSpeechCatalog.isError}
+            partOfSpeechCatalogPending={partOfSpeechCatalog.isPending}
+            retiredStableNodes={detail.data.retired_stable_nodes}
+            readOnly={forcePreview}
+            contentEditing={canWriteEntry(writeActor, word)}
+            requests={requests}
+            onWordChange={replaceCanonical}
+            renderStep={(context) => (
+              <V3WizardSlots
+                context={context}
+                onActivated={replaceActivatedCanonical}
+                renderMeaningsStep={renderMeaningsStep}
+                requests={requests}
+                wordId={word.id}
+              />
+            )}
+          />
+        </V3ReferenceGuardProvider>
+      </ContentEditPermissions>
     </Flex>
   );
 }

@@ -64,11 +64,13 @@ export function WordSentences({
     canAdminResourceAction(profile, "words", "edit", sourceWord.created_by);
   const canEditSentence = (sentence: SharedSentence) =>
     !readOnly &&
-    canAdminResourceAction(
-      profile,
-      "sentences",
-      "edit",
-      sentence.created_by_admin_id
+    (["edit", "associate"] as const).some((action) =>
+      canAdminResourceAction(
+        profile,
+        "sentences",
+        action,
+        sentence.created_by_admin_id
+      )
     );
   const entryId = sourceWord.id;
   const savedSense = sourceWord.meanings.pos

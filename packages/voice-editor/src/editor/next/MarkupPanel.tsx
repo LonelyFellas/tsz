@@ -41,6 +41,7 @@ export interface MarkupPanelProps extends Pick<
   brush: Brush;
   draft: LiaisonDraft;
   readOnly?: boolean;
+  contentReadOnly?: boolean;
   onRoleRange: (start: number, end: number, mode: "click" | "drag") => void;
   roleAnchorStart?: number;
   onGapClick: (gapIndex: number) => void;
@@ -75,6 +76,7 @@ export function MarkupPanel({
   brush,
   draft,
   readOnly,
+  contentReadOnly,
   textReadOnly,
   onRoleRange,
   onTextSelection,
@@ -301,7 +303,9 @@ export function MarkupPanel({
         )}
         {selectionMode && (
           <div className="tsz-ve-selection-status" role="status">
-            {brush.kind === "erase" ? (
+            {contentReadOnly ? (
+              "正文只读，请选择单词或短语编辑关联。"
+            ) : brush.kind === "erase" ? (
               composedMode ? (
                 "清除模式：点击已有连读或停顿即可取消。"
               ) : (
@@ -317,7 +321,7 @@ export function MarkupPanel({
             )}
           </div>
         )}
-        {topTools.length === 0 && (
+        {topTools.length === 0 && !contentReadOnly && (
           <div className="tsz-ve-top-hint">
             直接编辑正文；光标停在词间可插入停顿
           </div>

@@ -11,7 +11,8 @@ export const ADMIN_PERMISSION_DEPENDENCIES = {
   "words.detect": ["words.access"],
   "words.validate": ["words.access"],
   "words.edit": ["words.access"],
-  "words.edit_others": ["words.edit"],
+  "words.associate": ["words.access"],
+  "words.edit_others": ["words.access"],
   "words.publish": ["words.access"],
   "words.archive": ["words.access"],
   "words.restore": ["words.access"],
@@ -19,7 +20,8 @@ export const ADMIN_PERMISSION_DEPENDENCIES = {
   "sentences.access": [],
   "sentences.create": ["sentences.access"],
   "sentences.edit": ["sentences.access", "words.access"],
-  "sentences.edit_others": ["sentences.edit"],
+  "sentences.associate": ["sentences.access", "words.access"],
+  "sentences.edit_others": ["sentences.access"],
   "sentences.publish": ["sentences.access"],
   "sentences.withdraw": ["sentences.access"],
   "sentences.restore": ["sentences.access"],
@@ -66,7 +68,14 @@ export function hasAnyAdminPermission(
 export function canAdminResourceAction(
   actor: AdminPermissionActor | null | undefined,
   module: "words" | "sentences",
-  action: "edit" | "publish" | "archive" | "withdraw" | "restore" | "rollback",
+  action:
+    | "edit"
+    | "associate"
+    | "publish"
+    | "archive"
+    | "withdraw"
+    | "restore"
+    | "rollback",
   createdBy: string | undefined
 ): boolean {
   return (
@@ -75,7 +84,7 @@ export function canAdminResourceAction(
       actor &&
       (actor.role === "super_admin" ||
         (Boolean(createdBy) && createdBy === actor.id) ||
-        (action === "edit" &&
+        ((action === "edit" || action === "associate") &&
           hasAdminPermission(actor, `${module}.edit_others`)))
     )
   );

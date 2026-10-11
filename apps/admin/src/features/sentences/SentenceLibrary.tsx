@@ -59,13 +59,17 @@ export function SentenceLibrary({
 }) {
   const { modal, message } = App.useApp();
   const profile = useAuthStore((state) => state.profile);
-  const canEdit = !readOnly && hasAdminPermission(profile, "sentences.edit");
+  const canEdit =
+    !readOnly &&
+    (hasAdminPermission(profile, "sentences.edit") ||
+      hasAdminPermission(profile, "sentences.associate"));
   const canDelete = !readOnly && profile?.role === "super_admin";
   const canPublish =
     !readOnly && hasAdminPermission(profile, "sentences.publish");
   const canAction = (
     row: SharedSentence,
-    action: "edit" | "publish" | "withdraw" | "restore" | "rollback"
+    action:
+      "edit" | "associate" | "publish" | "withdraw" | "restore" | "rollback"
   ) =>
     !readOnly &&
     canAdminResourceAction(
@@ -432,7 +436,8 @@ export function SentenceLibrary({
                     </Button>
                     {!readOnly && (
                       <>
-                        {canAction(row, "edit") && (
+                        {(canAction(row, "edit") ||
+                          canAction(row, "associate")) && (
                           <Button
                             size="small"
                             onClick={() => void open(row.id, true)}
