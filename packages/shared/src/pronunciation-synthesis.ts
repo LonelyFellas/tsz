@@ -8,6 +8,10 @@ import type {
 } from "@tsz/types";
 
 import { ipaWordToUps } from "./ipa-ups";
+import {
+  stripPhoneticDelimiters,
+  unifiedWordToAzureIpa
+} from "./unified-phonetic";
 export const SYNTHESIS_LIMITS = { ipa: 200, ups: 1600 } as const;
 export const EMPTY_SYNTHESIS: PronunciationSynthesisV3 = {
   alphabet: "ipa",
@@ -253,7 +257,7 @@ export function convertActualPronunciation(
 ) {
   if (/\p{Cc}/u.test(input))
     return { ok: false as const, message: "实际发音不能包含控制字符" };
-  const source = input.trim().replace(/^\/(.*)\/$/u, "$1");
+  const source = stripPhoneticDelimiters(input);
   const textWords = spelling.trim().split(/\s+/u).filter(Boolean);
   const phones = source.split(/\s+/u).filter(Boolean);
   if (!source) return { ok: false as const, message: "请先填写实际发音" };
@@ -269,10 +273,19 @@ export function convertActualPronunciation(
     };
   const values: string[] = [];
   for (const [index, phone] of phones.entries()) {
+    const adapted = unifiedWordToAzureIpa(
+      stripPhoneticDelimiters(phone),
+      locale
+    );
+    if (!adapted.ok)
+      return {
+        ok: false as const,
+        message: `第 ${index + 1} 个词：${adapted.message}`
+      };
     const result =
       alphabet === "ups"
-        ? ipaWordToUps(phone, locale)
-        : convertDictionaryPhonetic(phone, "ipa");
+        ? ipaWordToUps(adapted.value, locale)
+        : convertDictionaryPhonetic(adapted.value, "ipa");
     if (!result.ok)
       return {
         ok: false as const,

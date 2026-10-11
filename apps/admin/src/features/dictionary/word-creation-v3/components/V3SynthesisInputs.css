@@ -38,6 +38,9 @@
 .word-actual-pronunciation-control {
   min-width: 0;
 }
+.word-actual-pronunciation-control .v3-voice-text-field-compact > .ant-btn {
+  height: auto;
+}
 .word-actual-pronunciation-control textarea {
   font-weight: 400;
 }

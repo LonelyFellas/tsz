@@ -385,6 +385,8 @@ export function V3PronunciationList({
                               leadingAction={
                                 <V3ActualPronunciationCopy
                                   pronunciation={pronunciation}
+                                  spelling={variant.spelling}
+                                  dialect={variant.dialect}
                                   onChange={(patch) =>
                                     onChange(
                                       updatePronunciation(
