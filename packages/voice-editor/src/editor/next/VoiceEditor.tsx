@@ -966,34 +966,48 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     );
   };
 
-  const selectionRanges = textSelection
-    ? splitRangeAtParagraphs(text, textSelection.start, textSelection.end)
-    : [];
-  const selectionHasFormat = (type: "italic" | "bold" | "underline") =>
-    selectionRanges.length > 0 &&
-    selectionRanges.every((range) => {
-      let coveredEnd = range.start;
-      const formats = marks.passthrough
-        .filter(
-          (
-            annotation
-          ): annotation is Exclude<
-            RichTextV2["annotations"][number],
-            { type: "pause" }
-          > => annotation.type === type
-        )
-        .sort((left, right) => left.start - right.start);
-      for (const annotation of formats) {
-        if (annotation.start > coveredEnd) return false;
-        coveredEnd = Math.max(coveredEnd, annotation.end);
-        if (coveredEnd >= range.end) return true;
-      }
-      return false;
-    });
-  const toggleTextFormat = (type: "italic" | "bold" | "underline") => {
-    if (readOnly || !textSelection) return;
+  const selectionHasFormat = (
+    type: "italic" | "bold" | "underline",
+    selection = textSelection
+  ) => {
+    const ranges = selection
+      ? splitRangeAtParagraphs(text, selection.start, selection.end)
+      : [];
+    return (
+      ranges.length > 0 &&
+      ranges.every((range) => {
+        let coveredEnd = range.start;
+        const formats = marks.passthrough
+          .filter(
+            (
+              annotation
+            ): annotation is Exclude<
+              RichTextV2["annotations"][number],
+              { type: "pause" }
+            > => annotation.type === type
+          )
+          .sort((left, right) => left.start - right.start);
+        for (const annotation of formats) {
+          if (annotation.start > coveredEnd) return false;
+          coveredEnd = Math.max(coveredEnd, annotation.end);
+          if (coveredEnd >= range.end) return true;
+        }
+        return false;
+      })
+    );
+  };
+  const toggleTextFormat = (
+    type: "italic" | "bold" | "underline",
+    selection = textSelection
+  ) => {
+    if (readOnly || !selection) return;
+    const selectionRanges = splitRangeAtParagraphs(
+      text,
+      selection.start,
+      selection.end
+    );
     let passthrough = marks.passthrough;
-    if (selectionHasFormat(type)) {
+    if (selectionHasFormat(type, selection)) {
       for (const range of selectionRanges) {
         passthrough = passthrough.flatMap((annotation) => {
           if (
@@ -1172,7 +1186,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     });
   };
 
-  const commitLiaison = (selected: LiaisonDraft = draft) => {
+  const commitLiaison = (
+    selected: LiaisonDraft = draft,
+    selection = textSelection
+  ) => {
     if (readOnly || !selected.start || !selected.end) return;
     const link =
       selected.start.start <= selected.end.start
@@ -1215,10 +1232,21 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       marks: { ...current.marks, liaisons: [...current.marks.liaisons, link] }
     }));
     resetTransient();
-    setTextSelection(textSelection);
+    setTextSelection(selection);
   };
 
   const resetDraft = resetTransient;
+
+  const addSelectionLiaison = (selection = textSelection) => {
+    if (!selection || selection.end - selection.start < 2) return;
+    commitLiaison(
+      {
+        start: makeAnchor(selection.start),
+        end: makeAnchor(selection.end - 1)
+      },
+      selection
+    );
+  };
 
   const handleLiaisonClick = (index: number) => {
     if (readOnly || (brush.kind !== "liaison" && brush.kind !== "erase"))
@@ -1618,13 +1646,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               !textSelection ||
               textSelection.end - textSelection.start < 2
             }
-            onClick={() => {
-              if (!textSelection) return;
-              commitLiaison({
-                start: makeAnchor(textSelection.start),
-                end: makeAnchor(textSelection.end - 1)
-              });
-            }}
+            onClick={() => addSelectionLiaison()}
           >
             一次性添加
           </Button>
@@ -1833,6 +1855,61 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
        * 浮层渲染在 portal（不在本节点内），所以「Esc 关浮层」不受影响，仍归 antd。
        */
       onKeyDown={(event) => {
+        if (event.ctrlKey || event.metaKey) {
+          const target = event.target as HTMLElement;
+          // React portal 的事件也会冒泡；只处理当前编辑器，辅助输入保留原生快捷键。
+          if (
+            event.defaultPrevented ||
+            event.altKey ||
+            event.shiftKey ||
+            event.nativeEvent.isComposing ||
+            fullyReadOnly ||
+            pendingText !== undefined ||
+            pendingConflict ||
+            associationPickerOpen ||
+            !event.currentTarget.contains(target) ||
+            target.closest(".tsz-ve-editor") !== event.currentTarget ||
+            (target.closest("input, textarea, select, [contenteditable]") &&
+              !target.matches("textarea.tsz-ve-canvas-input"))
+          )
+            return;
+          const key = event.key.toLowerCase();
+          const format =
+            key === "b"
+              ? "bold"
+              : key === "i"
+                ? "italic"
+                : key === "u"
+                  ? "underline"
+                  : undefined;
+          const tool = tools.find(
+            (tool) =>
+              tool.key === (format ?? (key === "l" ? "liaison" : undefined))
+          );
+          if (key !== "z" && !tool) return;
+          event.preventDefault();
+          event.stopPropagation();
+          if (key === "z") undo();
+          else if (!readOnly) {
+            // 撤销后 DOM 可能仍保持原选区，再次全选不会触发 select，须读取实际选区。
+            const selection =
+              target instanceof HTMLTextAreaElement
+                ? target.selectionEnd > target.selectionStart
+                  ? {
+                      start: Array.from(text.slice(0, target.selectionStart))
+                        .length,
+                      end: Array.from(text.slice(0, target.selectionEnd)).length
+                    }
+                  : undefined
+                : textSelection;
+            setTextSelection(selection);
+            if (selection) {
+              if (format) toggleTextFormat(format, selection);
+              else addSelectionLiaison(selection);
+            }
+          }
+          return;
+        }
         if (event.key !== "Escape") return;
         if (
           brush.kind === "none" &&
