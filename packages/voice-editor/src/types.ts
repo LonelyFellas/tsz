@@ -206,6 +206,9 @@ export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
   readOnly?: boolean;
   /** 正文由宿主输入框编辑；隐藏文本工具并禁止改字，仍允许标注和发音配置。 */
   textReadOnly?: boolean;
+  /** Allow association changes while keeping text, formatting and audio unchanged. */
+  contentReadOnly?: boolean;
+  associationsReadOnly?: boolean;
   /**
    * 透传到正文输入框上的 data-* 属性。宿主（admin）用它做错误定位：拿
    * `[data-v3-node-id][data-v3-field]` 找到元素后要 `focus()` 并校验

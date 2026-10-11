@@ -40,7 +40,7 @@ describe("统一授权事实", () => {
         { ...actor, permissions: ["words.access", "words.edit_others"] },
         "words.edit_others"
       )
-    ).toBe(false);
+    ).toBe(true);
     expect(
       hasAdminPermission(
         {
@@ -65,7 +65,7 @@ describe("统一授权事实", () => {
       ]
     };
     expect(hasAdminPermission(incomplete, "sentences.edit")).toBe(false);
-    expect(hasAdminPermission(incomplete, "sentences.edit_others")).toBe(false);
+    expect(hasAdminPermission(incomplete, "sentences.edit_others")).toBe(true);
     expect(
       canAdminResourceAction(incomplete, "sentences", "edit", actor.id)
     ).toBe(false);
@@ -190,3 +190,39 @@ it("wordlist review and withdraw require the access permission", () => {
     )
   ).toBe(false);
 });
+
+it.each(["words", "sentences"] as const)(
+  "%s：关联和正文独立，共用他人范围开关",
+  (module) => {
+    const associate = {
+      ...actor,
+      permissions: ["words.access", "sentences.access", `${module}.associate`]
+    };
+    expect(canAdminResourceAction(associate, module, "associate", "a")).toBe(
+      true
+    );
+    expect(canAdminResourceAction(associate, module, "edit", "a")).toBe(false);
+    expect(canAdminResourceAction(associate, module, "associate", "b")).toBe(
+      false
+    );
+    const others = {
+      ...associate,
+      permissions: [...associate.permissions, `${module}.edit_others`]
+    };
+    expect(canAdminResourceAction(others, module, "associate", "b")).toBe(true);
+    expect(canAdminResourceAction(others, module, "edit", "b")).toBe(false);
+    expect(
+      canAdminResourceAction(
+        {
+          ...others,
+          permissions: others.permissions.filter(
+            (key) => !key.endsWith(".associate")
+          )
+        },
+        module,
+        "associate",
+        "b"
+      )
+    ).toBe(false);
+  }
+);

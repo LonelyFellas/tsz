@@ -528,6 +528,13 @@ function GrammarStructuresCard({
                       }
                       field="content"
                       nodeId={variant.id}
+                      onAssociationsChange={(links) =>
+                        change((draft) => {
+                          draft.pos[posIndex]!.grammar_structures[
+                            structureIndex
+                          ]!.variants[variantIndex]!.form_links = links;
+                        })
+                      }
                       onChange={(next, links) =>
                         change((draft) => {
                           const target =

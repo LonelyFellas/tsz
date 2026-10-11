@@ -1339,3 +1339,48 @@ it.each([
     expect(screen.getByLabelText("格式读取")).toBe(input);
   }
 );
+
+it("仅关联保存通过独立回调保留原正文 wire 格式", async () => {
+  const onChange = vi.fn();
+  const onAssociationsChange = vi.fn();
+  render(
+    <V3VoiceTextField<TextLinkV3>
+      mode="association"
+      value={{ version: 1, text: "hello there", spans: [], liaisons: [] }}
+      textLinks={[]}
+      contentReadOnly
+      ariaLabel="仅关联"
+      nodeId="v"
+      field="value"
+      onChange={onChange}
+      onAssociationsChange={onAssociationsChange}
+      renderAssociationPicker={({ segments, onSelect }) => (
+        <button
+          onClick={() =>
+            onSelect({
+              id: "l",
+              source_segments: segments,
+              target_word_id: "w",
+              target_pos_id: "p",
+              target_base_form_id: "b",
+              target_form_id: "f",
+              target_variant_id: "v",
+              target_sense_id: "s"
+            })
+          }
+        >
+          关联此词
+        </button>
+      )}
+    />
+  );
+  fireEvent.click(screen.getByRole("button", { name: "打开仅关联编辑器" }));
+  fireEvent.click(await screen.findByRole("button", { name: "关联单词" }));
+  fireEvent.mouseDown(screen.getByLabelText("关联 hello（1）"), { button: 0 });
+  fireEvent.click(await screen.findByText("关联此词"));
+  fireEvent.click(screen.getByRole("button", { name: "完成仅关联编辑" }));
+  expect(onChange).not.toHaveBeenCalled();
+  expect(onAssociationsChange).toHaveBeenCalledWith([
+    expect.objectContaining({ target_word_id: "w" })
+  ]);
+});

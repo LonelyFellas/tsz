@@ -296,6 +296,7 @@ function renderWizard(
     initialWord?: AdminWordV3;
     initialStep?: Parameters<typeof V3WordCreationWizard>[0]["initialStep"];
     readOnly?: boolean;
+    contentEditing?: boolean;
     allowPublishedEditing?: boolean;
     idempotencyKeyFactory?: () => string;
     renderStep?: (context: V3WizardSlotContext) => ReactNode;
@@ -317,6 +318,7 @@ function renderWizard(
         requests={source}
         initialStep={options.initialStep}
         readOnly={options.readOnly}
+        contentEditing={options.contentEditing}
         allowPublishedEditing={options.allowPublishedEditing}
         idempotencyKeyFactory={options.idempotencyKeyFactory}
         navigationAdapter={options.navigationAdapter}
@@ -2279,12 +2281,15 @@ describe("V3WordCreationWizard", () => {
       expect(element).not.toBeNull();
       return element!;
     });
-    await waitFor(() =>
-      expect(screen.getByRole("tab", { name: /动词/ })).toHaveAttribute(
-        "aria-selected",
-        "true"
-      )
-    );
+    await waitFor(() => {
+      // 已知词性 ID，直接锁定目标 tab，避免大表单的全局可访问名称计算。
+      const tab = container
+        .querySelector(`[data-pos-id="${UUIDS.pos_2}"]`)
+        ?.closest('[role="tab"]');
+      expect(tab).toBeVisible();
+      expect(tab).toHaveTextContent("动词");
+      expect(tab).toHaveAttribute("aria-selected", "true");
+    });
     await waitFor(() => expect(target).toHaveFocus());
   });
 
@@ -6564,4 +6569,69 @@ beforeEach(() => {
       preferences: { dialect: "uk" }
     }
   });
+});
+
+it("仅关联保存不自动拆分已有通用语法变体或重建节点", async () => {
+  const initial = word();
+  initial.forms.pos[0]!.form_groups[0]!.dialect_rules.spelling_mode =
+    "distinguish";
+  const variant = initial.meanings.pos[0]!.grammar_structures[0]!.variants[0]!;
+  variant.form_links = [
+    {
+      id: "link",
+      source_segments: [{ start: 0, end: 7, surface: "grammar" }],
+      target_word_id: initial.id,
+      target_pos_id: initial.forms.pos[0]!.pos_id,
+      target_form_id: "form",
+      target_variant_id: "variant",
+      target_dialect: "common"
+    }
+  ];
+  const saved = structuredClone(initial);
+  saved.revision = 2;
+  saved.meanings.pos[0]!.grammar_structures[0]!.variants[0]!.form_links = [];
+  const saveMeanings = vi.fn<V3WordRequests["saveMeanings"]>(async () => ({
+    word: saved
+  }));
+  renderWizard(requests({ saveMeanings }), {
+    initialWord: initial,
+    contentEditing: false,
+    renderStep: (context) => (
+      <>
+        <output data-testid="association-draft">
+          {JSON.stringify(context.draftMeanings)}
+        </output>
+        <button
+          onClick={() => {
+            const next = structuredClone(context.draftMeanings);
+            next.pos[0]!.grammar_structures[0]!.variants[0]!.form_links = [];
+            context.setDraftMeanings(next);
+          }}
+        >
+          清除词形关联
+        </button>
+        <button
+          onClick={() =>
+            void context.actions.saveMeanings(context.draftMeanings, "save")
+          }
+        >
+          保存关联
+        </button>
+      </>
+    )
+  });
+  expect(
+    JSON.parse(screen.getByTestId("association-draft").textContent!)
+  ).toEqual(toWritableMeanings(initial.meanings));
+  fireEvent.click(screen.getByText("清除词形关联"));
+  fireEvent.click(screen.getByText("保存关联"));
+  await waitFor(() => expect(saveMeanings).toHaveBeenCalledTimes(1));
+  expect(saveMeanings.mock.calls[0]?.[1].content).toEqual(
+    toWritableMeanings(saved.meanings)
+  );
+  await waitFor(() =>
+    expect(
+      JSON.parse(screen.getByTestId("association-draft").textContent!)
+    ).toEqual(toWritableMeanings(saved.meanings))
+  );
 });

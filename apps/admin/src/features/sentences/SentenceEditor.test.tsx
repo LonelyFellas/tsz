@@ -31,6 +31,13 @@ vi.mock("../dictionary/word-creation/PronunciationPreview", () => ({
     children: React.ReactNode;
   }) => <>{children}</>
 }));
+const testActor = vi.hoisted(() => ({
+  profile: {
+    id: "test-super",
+    role: "super_admin",
+    permissions: [] as string[]
+  }
+}));
 vi.mock("@/lib/auth", () => ({
   useAuthStore: (
     select: (state: {
@@ -39,7 +46,7 @@ vi.mock("@/lib/auth", () => ({
     }) => unknown
   ) =>
     select({
-      profile: { id: "test-super", role: "super_admin", permissions: [] },
+      profile: testActor.profile,
       setProfile: vi.fn()
     }),
   api: {
@@ -94,6 +101,11 @@ function show(ui: React.ReactNode) {
   );
 }
 beforeEach(() => {
+  testActor.profile = {
+    id: "test-super",
+    role: "super_admin",
+    permissions: []
+  };
   vi.resetAllMocks();
   searchTargets.mockResolvedValue({
     matches: [sentenceCandidate("source", "make")],
@@ -590,4 +602,21 @@ describe("当前词条关联与离开保护", () => {
       vi.mocked(api.sentences.update).mock.calls[0]![1]
     ).not.toHaveProperty("context_entry_id");
   });
+});
+
+it("仅关联账号打开本人例句，正文、等级和译文不可改，关联入口可用", async () => {
+  const sentence = example();
+  testActor.profile = {
+    id: sentence.created_by_admin_id,
+    role: "admin",
+    permissions: ["sentences.access", "words.access", "sentences.associate"]
+  };
+  show(
+    <SentenceEditor sentence={sentence} onClose={vi.fn()} onSaved={vi.fn()} />
+  );
+  // 工具已有明确 aria-label，避免覆盖率模式下反复计算整棵弹窗的可访问名称。
+  expect(screen.getByLabelText("例句等级")).toBeDisabled();
+  expect(await screen.findByLabelText("关联单词")).toBeEnabled();
+  expect(screen.queryByLabelText("编辑文本")).toBeNull();
+  expect(screen.queryByLabelText("音频")).toBeNull();
 });

@@ -144,7 +144,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   contextLabel = "语音编辑器",
   previewAdapter,
   previewIsMock,
-  readOnly,
+  readOnly: fullyReadOnly,
+  contentReadOnly = false,
+  associationsReadOnly = false,
   textReadOnly,
   inputDataAttributes,
   placeholder,
@@ -156,6 +158,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   audioAssetLimit = AUDIO_ASSETS_PER_VARIANT_MAX,
   onChange
 }: VoiceEditorProps<TLink>) {
+  const readOnly = fullyReadOnly || contentReadOnly;
+  const linksReadOnly = fullyReadOnly || associationsReadOnly;
   /*
    * 初值直接从 value 灌，而不是先置空再由 effect 补。先置空的话，首帧折算出的是
    * 空内容，实时回调会把这份空值抛给宿主——一挂载就把表单里原有的文本清掉。
@@ -406,7 +410,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       emittedRef.current = serialized;
       return;
     }
-    if (readOnly || mode === "synthesis" || working.error) return;
+    if (fullyReadOnly || mode === "synthesis" || working.error) return;
     if (serialized === emittedRef.current) return;
     emittedRef.current = serialized;
     // 自己抛出去的这份，等父组件回灌时不能再被当成外部改动。
@@ -419,7 +423,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     else onChange(workingValue);
   }, [
     onChange,
-    readOnly,
+    fullyReadOnly,
     serialized,
     working.error,
     workingValue,
@@ -601,6 +605,23 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
    * `typing` 表示这次是键入正文：连着敲的一串只占一步撤销，栈顶那一份就是
    * 这段输入开始之前的状态，所以续写时不再推新快照。
    */
+  const canApplySnapshot = (next: EditorSnapshot<TLink>) => {
+    if (fullyReadOnly) return false;
+    if (
+      contentReadOnly &&
+      (next.text !== text ||
+        JSON.stringify(next.marks) !== JSON.stringify(marks))
+    )
+      return false;
+    if (
+      associationsReadOnly &&
+      JSON.stringify(next.textLinks ?? []) !== JSON.stringify(links)
+    ) {
+      setLinkNotice("此修改会改变现有关联，需要单词与短语关联权限。");
+      return false;
+    }
+    return true;
+  };
   const commit = (
     next: (current: EditorSnapshot<TLink>) => EditorSnapshot<TLink>,
     options?: { typing?: boolean }
@@ -612,6 +633,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       recoverableTextLinks: recoverableLinks
     };
     const after = next(before);
+    if (!canApplySnapshot(after)) return;
     if (!options?.typing && after.textLinks !== before.textLinks) {
       // 主动改动关联后以新选择为准；只有撤销该操作才会恢复旧记录。
       after.recoverableTextLinks = [];
@@ -654,7 +676,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
 
   const undo = () => {
     const previous = past[past.length - 1];
-    if (!previous) return;
+    if (!previous || !canApplySnapshot(previous)) return;
     typingRunRef.current = 0;
     setPast((stack) => stack.slice(0, -1));
     setFuture((stack) =>
@@ -683,7 +705,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
 
   const redo = () => {
     const next = future[0];
-    if (!next) return;
+    if (!next || !canApplySnapshot(next)) return;
     setFuture((stack) => stack.slice(1));
     setPast((stack) =>
       [
@@ -759,7 +781,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     onAssociationPendingChange
   ]);
   const selectWord = (range: { start: number; end: number }) => {
-    if (readOnly || !renderAssociationPicker || brush.kind !== "association")
+    if (
+      linksReadOnly ||
+      !renderAssociationPicker ||
+      brush.kind !== "association"
+    )
       return;
     const existing = links.find((link) =>
       link.source_segments.some(
@@ -803,7 +829,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   };
   const associationContent =
     brush.kind === "association" &&
-    !readOnly &&
+    !linksReadOnly &&
     associationPickerOpen &&
     (selectedLink || linkSegments.length > 0) &&
     renderAssociationPicker?.({
@@ -811,7 +837,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       segments: selectedLink?.source_segments ?? linkSegments,
       selected: selectedLink,
       onSelect: (next) => {
-        if (readOnly) return;
+        if (linksReadOnly) return;
         if (selectedLink) {
           commit((current) => ({
             ...current,
@@ -1454,15 +1480,16 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       : []),
     {
       key: "text",
-      label:
-        mode === "grammar" ||
-        mode === "association" ||
-        mode === "spelling" ||
-        mode === "actual-pron"
+      label: contentReadOnly
+        ? "结束关联"
+        : mode === "grammar" ||
+            mode === "association" ||
+            mode === "spelling" ||
+            mode === "actual-pron"
           ? "文本编辑"
           : "文本",
 
-      ariaLabel: "编辑文本",
+      ariaLabel: contentReadOnly ? "结束关联" : "编辑文本",
       icon: <EditOutlined />,
       active: brush.kind === "none",
       className: "tsz-ve-text-button"
@@ -1733,6 +1760,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       )
     }
   ].filter((tool) => {
+    if (contentReadOnly) return tool.key === "roles" || tool.key === "text";
     if (textReadOnly && tool.key === "text") return false;
     // 字典音标只负责喂语音合成，连读是展示用的标注，归实际发音那一侧。
     // 判据必须是这个显式取值：默认的 pronunciation 还挂着别的调用方，
@@ -1875,7 +1903,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
 
       <MarkupPanel
         mode={mode}
-
+        contentReadOnly={contentReadOnly}
         selectionText={
           textSelection
             ? Array.from(text)
@@ -1892,8 +1920,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         marks={marks}
         brush={brush}
         draft={draft}
-        readOnly={readOnly}
-        textReadOnly={textReadOnly}
+        readOnly={fullyReadOnly}
+        textReadOnly={textReadOnly || contentReadOnly}
         onRoleRange={handleRoleRange}
         onTextSelection={setTextSelection}
         roleAnchorStart={roleAnchor?.start}
@@ -1922,7 +1950,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         inputLabel={contextLabel}
         inputDataAttributes={inputDataAttributes}
         inputPlaceholder={
-          textReadOnly ? "请先在外面的输入框填写文字" : placeholder
+          contentReadOnly
+            ? "正文只读，可编辑关联"
+            : textReadOnly
+              ? "请先在外面的输入框填写文字"
+              : placeholder
         }
         onTextChange={changeText}
         canUndo={past.length > 0}
@@ -1935,12 +1967,13 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             ? tools.flatMap<DropdownTool>((tool) =>
                 tool.key === "roles"
                   ? [
-                      ...(mode === "grammar" ? [tool] : []),
+                      ...(mode === "grammar" && !contentReadOnly ? [tool] : []),
                       ...(mode === "grammar"
                         ? (["word"] as const)
                         : (["word", "phrase"] as const)
                       ).map((targetKind): DropdownTool => ({
                         key: `association-${targetKind}`,
+                        disabled: linksReadOnly,
                         label: targetKind === "word" ? "关联单词" : "关联短语",
                         icon: <LinkOutlined />,
                         active:
@@ -1963,7 +1996,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                               targetKind === "phrase" && (
                                 <Button
                                   size="small"
-                                  disabled={readOnly || linkWords.length < 2}
+                                  disabled={
+                                    linksReadOnly || linkWords.length < 2
+                                  }
                                   onClick={() => {
                                     setOpenTool(undefined);
                                     setAssociationPickerOpen(true);

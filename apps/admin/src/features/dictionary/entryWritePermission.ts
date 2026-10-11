@@ -35,6 +35,18 @@ export function canWriteEntry(
 ): boolean {
   return canAdminResourceAction(actor, "words", "edit", entry?.created_by);
 }
+export function canAssociateEntry(
+  actor: EntryWriteActor | null | undefined,
+  entry?: WritableEntry
+): boolean {
+  return canAdminResourceAction(actor, "words", "associate", entry?.created_by);
+}
+export function canModifyEntry(
+  actor: EntryWriteActor | null | undefined,
+  entry?: WritableEntry
+): boolean {
+  return canWriteEntry(actor, entry) || canAssociateEntry(actor, entry);
+}
 export const ENTRY_WRITE_BLOCKED_HINT =
   "需要相应业务权限，普通管理员仅能操作本人内容；编辑他人内容需额外授权";
 export function entryWriteForbiddenMessage(code: string | undefined): string {
