@@ -2281,12 +2281,15 @@ describe("V3WordCreationWizard", () => {
       expect(element).not.toBeNull();
       return element!;
     });
-    await waitFor(() =>
-      expect(screen.getByRole("tab", { name: /动词/ })).toHaveAttribute(
-        "aria-selected",
-        "true"
-      )
-    );
+    await waitFor(() => {
+      // 已知词性 ID，直接锁定目标 tab，避免大表单的全局可访问名称计算。
+      const tab = container
+        .querySelector(`[data-pos-id="${UUIDS.pos_2}"]`)
+        ?.closest('[role="tab"]');
+      expect(tab).toBeVisible();
+      expect(tab).toHaveTextContent("动词");
+      expect(tab).toHaveAttribute("aria-selected", "true");
+    });
     await waitFor(() => expect(target).toHaveFocus());
   });
 
