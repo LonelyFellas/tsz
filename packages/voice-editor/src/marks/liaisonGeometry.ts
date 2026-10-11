@@ -148,7 +148,7 @@ export interface AnchorBox {
 /**
  * 锚点盒 → 弧线端点。
  *
- * 落点取中心附近的实际字母；起笔高度取该字母的**墨迹顶端**：字盒顶端是字体上伸
+ * 水平落点取锚点中心；起笔高度取中心附近字母的**墨迹顶端**：字盒顶端是字体上伸
  * 高度，比 x 高度字母（w、o、u）的墨迹高出半个字号，弧线会整体飘在字上方。
  * 按墨迹起笔，弧线两端才贴着字，与参考件一致。
  */
@@ -231,16 +231,19 @@ export function buildLiaisonArcs(
     const last = glyphs[glyphs.length - 1];
     if (!first || !last) return undefined;
     const middleX = (first.box.left + last.box.right) / 2;
-    // 贴着实际字母，而非选区中点的空隙或整段文字里最高的字母。
+    // 高度沿用中心附近字母的墨迹；水平位置保留整个锚点的宽度。
     const distance = (glyph: typeof first) =>
       Math.abs((glyph.box.left + glyph.box.right) / 2 - middleX);
     const chosen = glyphs.reduce(
       (best, glyph) => (distance(glyph) < distance(best) ? glyph : best),
       first
     );
+    const singleLine =
+      Math.abs(first.box.top - last.box.top) <
+      fontSize * SAME_LINE_TOLERANCE_EM;
     const box: AnchorBox = {
-      left: chosen.box.left - base.left,
-      right: chosen.box.right - base.left,
+      left: (singleLine ? first.box.left : chosen.box.left) - base.left,
+      right: (singleLine ? last.box.right : chosen.box.right) - base.left,
       top: chosen.box.top - base.top,
       bottom: chosen.box.bottom - base.top
     };

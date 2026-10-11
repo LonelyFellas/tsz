@@ -85,22 +85,27 @@ describe("buildLiaisonArcs", () => {
     ]);
   });
 
-  it("uses a real glyph near the centre of a multi-letter anchor", () => {
+  it("多字母起点和终点都落在完整选区中心，不吸附到单个字母", () => {
     vi.spyOn(window, "getComputedStyle").mockReturnValue(style);
     const link: LiaisonLinkElements = {
       start: {
         glyphs: [
-          ...anchor(rect(20, 50, 10, 25), "c").glyphs,
-          ...anchor(rect(30, 50, 10, 25), "k").glyphs
+          ...anchor(rect(20, 50, 10, 25), "o").glyphs,
+          ...anchor(rect(30, 50, 10, 25), "u").glyphs
         ]
       },
-      end: anchor(rect(120, 50, 10, 25), "i")
+      end: {
+        glyphs: [
+          ...anchor(rect(120, 50, 10, 25), "a").glyphs,
+          ...anchor(rect(130, 50, 10, 25), "r").glyphs
+        ]
+      }
     };
     const [arc] = buildLiaisonArcs(container, [link], measure).arcs;
-    expect(arc?.d.startsWith("M 25 ")).toBe(true);
+    expect(arc?.d).toBe(liaisonPath({ x: 30, tipY }, { x: 130, tipY }, 20));
   });
 
-  it("attaches a multi-letter anchor to the short glyph under its centre", () => {
+  it("多字母锚点居中，同时沿用中心附近字母的墨迹高度", () => {
     vi.spyOn(window, "getComputedStyle").mockReturnValue(style);
     const leftL = element(rect(20, 50, 6, 25), "l");
     const leftA = element(rect(26, 50, 20, 25), "a");
@@ -119,7 +124,7 @@ describe("buildLiaisonArcs", () => {
     });
     const [arc] = buildLiaisonArcs(container, [link], measured).arcs;
     expect(arc?.d).toBe(
-      liaisonPath({ x: 36, tipY: 58.8 }, { x: 125, tipY: 50.8 }, 20)
+      liaisonPath({ x: 33, tipY: 58.8 }, { x: 125, tipY: 50.8 }, 20)
     );
   });
 

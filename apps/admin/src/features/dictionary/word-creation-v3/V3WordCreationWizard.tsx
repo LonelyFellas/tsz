@@ -1756,6 +1756,30 @@ function V3WordCreationSession({
       ).reachable,
     [activeStep, allowPublishedEditing, sessionReadOnly, word]
   );
+  // 服务端的缺选提示属于上次校验快照；按本地选择投影，撤销选择时仍能恢复提示。
+  const currentPublicationIssues = useMemo(
+    () =>
+      publicationIssues.filter((issue) => {
+        if (
+          issue.step !== "meanings" ||
+          issue.code !== "definition_invalid" ||
+          issue.field !== "grammar_structure_id"
+        )
+          return true;
+        return !draftMeanings.pos.some((pos) =>
+          pos.senses.some((sense) =>
+            sense.definitions.some(
+              (definition) =>
+                definition.id === issue.node_id &&
+                pos.grammar_structures.some(
+                  (grammar) => grammar.id === definition.grammar_structure_id
+                )
+            )
+          )
+        );
+      }),
+    [draftMeanings, publicationIssues]
+  );
   const context: V3WizardSlotContext = {
     registerSentenceLeaveGuard,
     requestSentenceLeave,
@@ -1775,7 +1799,7 @@ function V3WordCreationSession({
     setActiveStep,
     ...(activePosId ? { activePosId } : {}),
     setActivePosId,
-    issues: publicationIssues,
+    issues: currentPublicationIssues,
     ...(validation ? { validation } : {}),
     ...(impact ? { impact } : {}),
     impactConfirmed,
