@@ -152,12 +152,12 @@ function clickConfirmOk(label: RegExp) {
   fireEvent.click(within(btns as HTMLElement).getByText(label));
 }
 
-function renderPage() {
+function renderPage(staleTime = 0) {
   // 关掉 query 重试：错误路径要能立刻看到失败态，而非等重试。
   const client = new QueryClient({
-    defaultOptions: { queries: { retry: false } }
+    defaultOptions: { queries: { retry: false, staleTime } }
   });
-  return render(
+  const view = () => (
     <MemoryRouter>
       <QueryClientProvider client={client}>
         <AntApp>
@@ -166,6 +166,8 @@ function renderPage() {
       </QueryClientProvider>
     </MemoryRouter>
   );
+  const result = render(view());
+  return { ...result, rerenderPage: () => result.rerender(view()) };
 }
 
 /** 整表内按可见文案点第 idx 个匹配按钮（避免 getByRole 扫全表，CLAUDE.md 超时陷阱）。 */
@@ -174,6 +176,55 @@ function clickRowButton(label: RegExp, idx = 0) {
 }
 
 describe("UserManagement", () => {
+  it("增授基本资料权限会重新请求，等待期间不使用裁剪记录，已打开详情同步更新", async () => {
+    auth.permissions = ["users.access"];
+    const response = {
+      ...fakeList(),
+      items: [
+        { id: "1", display_name: "record", created_at: "2026-06-01T08:00:00Z" }
+      ]
+    };
+    mockList.mockClear().mockResolvedValueOnce(response);
+    const view = renderPage(60000);
+    fireEvent.click(await screen.findByText("record"));
+    expect(screen.queryByText("用户 ID")).toBeNull();
+    let resolve!: (value: ReturnType<typeof fakeList>) => void;
+    mockList.mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        })
+    );
+    auth.permissions = [
+      "users.access",
+      "users.read_basic",
+      "users.read_sensitive",
+      "users.set_status"
+    ];
+    view.rerenderPage();
+    await waitFor(() => expect(mockList).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText("已禁用")).toBeNull();
+    expect(mockSetStatus).not.toHaveBeenCalled();
+    resolve({
+      ...response,
+      items: [{ ...users[0]!, status: "active", teacher_verified: true }]
+    });
+    expect(await screen.findByText("用户 ID")).toBeInTheDocument();
+    expect(screen.getAllByText("正常")).toHaveLength(2);
+    expect(screen.getAllByText("已认证")).toHaveLength(2);
+    fireEvent.click(screen.getByLabelText("Close"));
+    clickRowButton(/^禁\s?用$/);
+    expect(
+      await screen.findByText("禁用用户「record」", {
+        selector: ".ant-modal-confirm-title"
+      })
+    ).toBeInTheDocument();
+    clickConfirmOk(/^禁\s?用$/);
+    await waitFor(() =>
+      expect(mockSetStatus).toHaveBeenCalledWith("1", "disabled")
+    );
+  });
+
   it("资料编辑、状态变更与敏感联系方式分别控制，不因一项授权开放全部动作", async () => {
     auth.permissions = ["users.edit"];
     renderPage();

@@ -80,6 +80,7 @@ export function UserManagement() {
     message.info(`${label}功能待接入，接口开发中`);
 
   const confirmToggleStatus = (record: AdminUserView) => {
+    if (!canSetStatus || !record.status) return;
     const next = record.status === "active" ? "disabled" : "active";
     const verb = next === "disabled" ? "禁用" : "启用";
     modal.confirm({
@@ -237,7 +238,7 @@ export function UserManagement() {
             // 禁用是破坏性动作，置红警示；启用是恢复性动作，保持常规蓝。
             danger={record.status === "active"}
             reason="需用户状态变更权限"
-            disabled={!canSetStatus}
+            disabled={!canSetStatus || !record.status}
             loading={
               setStatus.isPending && setStatus.variables?.id === record.id
             }
@@ -327,7 +328,10 @@ export function UserManagement() {
         />
       </Card>
 
-      <UserDetailDrawer user={detailUser} onClose={() => setDetailUser(null)} />
+      <UserDetailDrawer
+        user={rows.find((row) => row.id === detailUser?.id) ?? null}
+        onClose={() => setDetailUser(null)}
+      />
       <EditUserModal user={editingUser} onClose={() => setEditingUser(null)} />
     </Flex>
   );
