@@ -428,9 +428,8 @@ it.each([
 });
 
 it.each([false, true])(
-  "正文只读=%s 的剪贴板提示与权限一致",
-  async (readOnly) => {
-    vi.spyOn(navigator, "platform", "get").mockReturnValue("Win32");
+  "正文只读=%s 时悬停正文和文本按钮不显示剪贴板提示",
+  (readOnly) => {
     render(
       <VoiceEditor
         mode="association"
@@ -440,18 +439,9 @@ it.each([false, true])(
       />
     );
     fireEvent.mouseOver(screen.getByLabelText("语音编辑器"));
-    const tooltip = await screen.findByRole("tooltip");
-    expect(tooltip).not.toHaveTextContent("⌘");
-    expect(tooltip).not.toHaveTextContent("Mac");
-    expect(tooltip).not.toHaveTextContent("Win");
-    expect(tooltip).toHaveTextContent("Ctrl + C");
-    if (readOnly) {
-      expect(tooltip).not.toHaveTextContent("Ctrl + V");
-      expect(tooltip).not.toHaveTextContent("Ctrl + X");
-    } else {
-      expect(tooltip).toHaveTextContent("Ctrl + V");
-      expect(tooltip).toHaveTextContent("Ctrl + X");
-    }
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    fireEvent.mouseOver(screen.getByRole("button", { name: "编辑文本" }));
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   }
 );
 
@@ -477,9 +467,8 @@ it("连续剪切、粘贴和键入分别撤销，不合并为一次打字", () =
 });
 
 it.each([false, true])(
-  "含停顿正文只读=%s 时悬停显示层可查看剪贴板提示",
-  async (readOnly) => {
-    vi.spyOn(navigator, "platform", "get").mockReturnValue("Win32");
+  "含停顿正文只读=%s 时悬停显示层不显示剪贴板提示",
+  (readOnly) => {
     const { container } = render(
       <VoiceEditor
         mode="grammar"
@@ -494,20 +483,11 @@ it.each([false, true])(
     );
     const strip = container.querySelector(".tsz-ve-strip")!;
     fireEvent.mouseOver(strip);
-    const tooltip = await screen.findByRole("tooltip");
-    expect(tooltip).toHaveTextContent("Ctrl + C");
-    if (readOnly) {
-      expect(tooltip).not.toHaveTextContent("Ctrl + V");
-      expect(tooltip).not.toHaveTextContent("Ctrl + X");
-    } else {
-      expect(tooltip).toHaveTextContent("Ctrl + V");
-      expect(tooltip).toHaveTextContent("Ctrl + X");
-    }
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   }
 );
 
-it("清除画笔下显示层仍显示提示，点击停顿可正常清除", async () => {
-  vi.spyOn(navigator, "platform", "get").mockReturnValue("Win32");
+it("清除画笔下显示层不显示剪贴板提示，点击停顿可正常清除", () => {
   const changed = vi.fn();
   const { container } = render(
     <VoiceEditor
@@ -522,7 +502,7 @@ it("清除画笔下显示层仍显示提示，点击停顿可正常清除", asyn
   );
   fireEvent.click(screen.getByRole("button", { name: "清除模式" }));
   fireEvent.mouseOver(container.querySelector(".tsz-ve-strip")!);
-  expect(await screen.findByRole("tooltip")).toHaveTextContent("Ctrl + C");
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   const pause = container.querySelector(".tsz-ve-pause-chip")!;
   expect(pause).toHaveAttribute("aria-label", "清除第 1 处停顿 0.2 秒");
   fireEvent.click(pause);

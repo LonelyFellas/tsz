@@ -2,15 +2,6 @@
   white-space: nowrap;
   text-align: left;
 }
-.tsz-ve-clipboard-hint {
-  display: grid;
-  gap: 4px;
-}
-.tsz-ve-clipboard-anchor {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
 
 .tsz-ve-editor .tsz-ve-markup {
   border: 1px solid #dfe5ef;
