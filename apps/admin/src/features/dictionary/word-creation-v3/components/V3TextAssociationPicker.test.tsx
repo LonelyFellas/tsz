@@ -89,7 +89,7 @@ async function selectGive() {
     )!
   );
 }
-it("语法结构选到词形即绑定，无释义的词形也可选择，且不发送释义字段", async () => {
+it("语法结构选到词形先暂存，确认才绑定，无释义的词形也可选择", async () => {
   const response = giveEntryResponse();
   response.matches[0]!.senses = [];
   search.mockResolvedValue(response);
@@ -108,6 +108,8 @@ it("语法结构选到词形即绑定，无释义的词形也可选择，且不�
   fireEvent.click(
     screen.getByText(/原形 give/).closest(".ant-cascader-menu-item-content")!
   );
+  expect(onSelect).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "确认词形关联" }));
   expect(onSelect).toHaveBeenCalledWith({
     id: expect.any(String),
     source_segments: [segments[0]],
@@ -119,6 +121,33 @@ it("语法结构选到词形即绑定，无释义的词形也可选择，且不�
     target_dialect: "common"
   });
   expect(screen.queryByText("暂无可关联词义")).toBeNull();
+});
+
+it("新词形关联取消不提交，并清除待确认状态", async () => {
+  search.mockResolvedValue(giveEntryResponse());
+  const onSelect = vi.fn();
+  const onCancel = vi.fn();
+  const onPendingChange = vi.fn();
+  render(
+    <V3GrammarFormPicker
+      kind="word"
+      segments={[segments[0]!]}
+      onSelect={onSelect}
+      onCancel={onCancel}
+      onPendingChange={onPendingChange}
+    />
+  );
+  expect(screen.getByRole("button", { name: "确认词形关联" })).toBeDisabled();
+  fireEvent.click(await screen.findByText("give · 动词"));
+  fireEvent.click(screen.getByText("原形 give · 英美通用"));
+  expect(onSelect).not.toHaveBeenCalled();
+  expect(onPendingChange).toHaveBeenLastCalledWith(true);
+  expect(screen.getByRole("button", { name: "确认词形关联" })).toBeEnabled();
+  fireEvent.click(screen.getByRole("button", { name: "取消词形关联" }));
+  expect(onCancel).toHaveBeenCalledTimes(1);
+  expect(onSelect).not.toHaveBeenCalled();
+  expect(onPendingChange).toHaveBeenLastCalledWith(false);
+  expect(screen.getByRole("button", { name: "确认词形关联" })).toBeDisabled();
 });
 
 it("语法结构可关联当前未保存词形，服务端没有候选也可选择", async () => {
@@ -147,6 +176,7 @@ it("语法结构可关联当前未保存词形，服务端没有候选也可选�
     expect(screen.getByText("原形 job · 英美通用")).toBeVisible();
   });
   fireEvent.click(screen.getByText("原形 job · 英美通用"));
+  fireEvent.click(screen.getByRole("button", { name: "确认词形关联" }));
   expect(onSelect).toHaveBeenCalledWith({
     id: expect.any(String),
     source_segments: [{ start: 2, end: 5, surface: "job" }],
@@ -181,6 +211,7 @@ it("语法结构搜索包含其他词条的已保存草稿", async () => {
     expect(screen.getByText("原形 give · 英美通用")).toBeVisible();
   });
   fireEvent.click(screen.getByText("原形 give · 英美通用"));
+  fireEvent.click(screen.getByRole("button", { name: "确认词形关联" }));
   expect(onSelect).toHaveBeenCalledWith(
     expect.objectContaining({ target_word_id: "entry-give" })
   );
@@ -227,6 +258,7 @@ it("当前词条只展示编辑中的词形，不重复展示已保存草稿或�
     expect(screen.getByText("原形 give · 英美通用")).toBeVisible();
   });
   fireEvent.click(screen.getByText("原形 give · 英美通用"));
+  fireEvent.click(screen.getByRole("button", { name: "确认词形关联" }));
   expect(props.onSelect).toHaveBeenCalledWith(
     expect.objectContaining({
       target_word_id: "entry-give",
@@ -242,8 +274,118 @@ it("当前词条只展示编辑中的词形，不重复展示已保存草稿或�
   expect(screen.getByText("other give · 动词")).toBeVisible();
 });
 
+it("同拼写、不同音标的 job/Job 各显示一条英美通用，关联沿用方言偏好", async () => {
+  search.mockResolvedValue({ total: 0, truncated: false, matches: [] });
+  const onSelect = vi.fn();
+  render(
+    <V3GrammarFormPicker
+      kind="word"
+      wordId="entry-job"
+      forms={formsFixture({
+        pos_id: "pos-job",
+        dialect_rules: {
+          spelling_mode: "unified",
+          phonetic_mode: "distinguish"
+        },
+        forms: [
+          ukUsFormFixture({
+            id: "form-job",
+            uk: { id: "job-uk", spelling: "job" },
+            us: { id: "job-us", spelling: "job" }
+          }),
+          ukUsFormFixture({
+            id: "form-Job",
+            uk: { id: "Job-uk", spelling: "Job" },
+            us: { id: "Job-us", spelling: "Job" }
+          })
+        ]
+      })}
+      segments={[{ start: 0, end: 3, surface: "job" }]}
+      onSelect={onSelect}
+    />
+  );
+  await waitFor(() => {
+    fireEvent.click(screen.getByText(/job.*当前词条/));
+    expect(screen.getByText("原形 job · 英美通用")).toBeVisible();
+  });
+  expect(screen.getAllByText("原形 job · 英美通用")).toHaveLength(1);
+  expect(screen.getAllByText("原形 Job · 英美通用")).toHaveLength(1);
+  expect(screen.queryByText(/原形 [jJ]ob · (英式|美式)/)).toBeNull();
+  fireEvent.click(screen.getByText("原形 job · 英美通用"));
+  fireEvent.click(screen.getByRole("button", { name: "确认词形关联" }));
+  expect(onSelect).toHaveBeenCalledWith(
+    expect.objectContaining({
+      target_form_id: "form-job",
+      target_variant_id: "job-uk",
+      target_dialect: "uk"
+    })
+  );
+});
+
+it("远端同拼写词形合并回显，保留已关联的美式变体；不同拼写仍区分", async () => {
+  const published = giveEntryResponse().matches[0]!;
+  const base = published.forms[0]!;
+  const candidate: PublishedSentenceTargetCandidateV3 = {
+    ...published,
+    forms: [
+      { ...base, variant_id: "give-uk", dialect: "uk" },
+      { ...base, variant_id: "give-us", dialect: "us" },
+      {
+        ...base,
+        form_id: "form-centre",
+        variant_id: "centre-uk",
+        spelling: "centre",
+        dialect: "uk"
+      },
+      {
+        ...base,
+        form_id: "form-centre",
+        variant_id: "centre-us",
+        spelling: "center",
+        dialect: "us"
+      }
+    ]
+  };
+  search.mockResolvedValue({
+    total: 1,
+    truncated: false,
+    matches: [candidate]
+  });
+  const onSelect = vi.fn();
+  render(
+    <V3GrammarFormPicker
+      kind="word"
+      segments={[segments[0]!]}
+      selected={{
+        id: "link-give",
+        source_segments: [segments[0]!],
+        target_word_id: "entry-give",
+        target_publication_id: "pub-give",
+        target_pos_id: "pos-give",
+        target_form_id: "form-give",
+        target_variant_id: "give-us",
+        target_dialect: "us"
+      }}
+      onSelect={onSelect}
+    />
+  );
+  const form = await screen.findByText("原形 give · 英美通用");
+  expect(screen.getAllByText("原形 give · 英美通用")).toHaveLength(1);
+  expect(screen.queryByText("原形 give · 英式")).toBeNull();
+  expect(screen.queryByText("原形 give · 美式")).toBeNull();
+  expect(screen.getByText("原形 centre · 英式")).toBeVisible();
+  expect(screen.getByText("原形 center · 美式")).toBeVisible();
+  expect(screen.getByText("已关联 · 英美通用")).toBeVisible();
+  expect(form.closest(".ant-cascader-menu-item")).toHaveAttribute(
+    "aria-checked",
+    "true"
+  );
+  fireEvent.click(form);
+  expect(onSelect).not.toHaveBeenCalled();
+});
+
 it.each(["uk", "us"] as const)(
-  "当前未保存词形按归一化词面匹配，保留 %s 变体身份",
+  "当前未保存词形按归一化词面匹配，合并显示后保留已关联 %s 变体身份",
   async (dialect) => {
     search.mockResolvedValue({ total: 0, truncated: false, matches: [] });
     const onSelect = vi.fn();
@@ -264,26 +406,30 @@ it.each(["uk", "us"] as const)(
           ]
         })}
         segments={[{ start: 0, end: 4, surface: "ＪＯＢＳ" }]}
+        selected={{
+          id: "link-jobs",
+          source_segments: [{ start: 0, end: 4, surface: "ＪＯＢＳ" }],
+          target_word_id: "entry-job",
+          target_pos_id: "pos-job",
+          target_form_id: "form-jobs",
+          target_variant_id: `variant-${dialect}`,
+          target_dialect: dialect
+        }}
         onSelect={onSelect}
       />
     );
     await waitFor(() => {
       fireEvent.click(screen.getByText(/当前词条/));
-      expect(screen.getByText("复数 jobs · 英式")).toBeVisible();
+      expect(screen.getByText("复数 jobs · 英美通用")).toBeVisible();
     });
     expect(screen.queryByText("原形 job · 英美通用")).toBeNull();
-    fireEvent.click(
-      screen.getByText(`复数 jobs · ${dialect === "uk" ? "英式" : "美式"}`)
+    const form = screen.getByText("复数 jobs · 英美通用");
+    expect(form.closest(".ant-cascader-menu-item")).toHaveAttribute(
+      "aria-checked",
+      "true"
     );
-    expect(onSelect).toHaveBeenCalledWith(
-      expect.objectContaining({
-        target_word_id: "entry-job",
-        target_pos_id: "pos-job",
-        target_form_id: "form-jobs",
-        target_variant_id: `variant-${dialect}`,
-        target_dialect: dialect
-      })
-    );
+    fireEvent.click(form);
+    expect(onSelect).not.toHaveBeenCalled();
   }
 );
 
@@ -379,7 +525,7 @@ it("已有发布版自关联仍回显，确认后可切换为当前编辑词形"
   });
   fireEvent.click(screen.getByText("原形 give · 英美通用"));
   expect(onSelect).not.toHaveBeenCalled();
-  fireEvent.click(await screen.findByRole("button", { name: /^切\s*换$/ }));
+  fireEvent.click(screen.getByRole("button", { name: "确认词形关联" }));
   expect(onSelect).toHaveBeenCalledWith(
     expect.objectContaining({
       target_word_id: "entry-give",
@@ -474,23 +620,21 @@ it.each(["pub-give", undefined])(
     expect(screen.queryByText("给；交给")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "清除关联" }));
     expect(onSelect).not.toHaveBeenCalled();
-    const confirmation = await screen.findByRole("dialog", {
-      name: "清除词形关联？"
-    });
-    await waitFor(() => expect(confirmation).toBeVisible());
-    fireEvent.click(screen.getByRole("button", { name: /^取\s*消$/ }));
+    expect(screen.getByText("确认后清除原关联")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "取消词形关联" }));
     expect(onSelect).not.toHaveBeenCalled();
-    expect(form.closest(".ant-cascader-menu-item")).toHaveAttribute(
-      "aria-checked",
-      "true"
+    await waitFor(() =>
+      expect(
+        screen.getByText(/原形 give/).closest(".ant-cascader-menu-item")
+      ).toHaveAttribute("aria-checked", "true")
     );
     fireEvent.click(screen.getByRole("button", { name: "清除关联" }));
-    fireEvent.click(await screen.findByRole("button", { name: /^清\s*除$/ }));
+    fireEvent.click(screen.getByRole("button", { name: "确认词形关联" }));
     expect(onSelect).toHaveBeenCalledWith(undefined);
   }
 );
 
-it("切换词形需确认，取消保留原关联，重复选择当前词形不提示", async () => {
+it("切换词形暂存到确认，取消保留原关联，重复确认当前词形不提交", async () => {
   const response = giveEntryResponse();
   const alternative = {
     ...response.matches[0]!.forms[0]!,
@@ -539,21 +683,15 @@ it("切换词形需确认，取消保留原关联，重复选择当前词形不�
   const alternativeLabel = await screen.findByText("原形 give · 美式");
   fireEvent.click(alternativeLabel);
   expect(onSelect).not.toHaveBeenCalled();
-  const confirmation = await screen.findByRole("dialog", {
-    name: "切换词形关联？"
-  });
-  await waitFor(() => expect(confirmation).toBeVisible());
-  expect(
-    screen.getByText("原形 give · 英美通用 → 原形 give · 美式")
-  ).toBeVisible();
-  fireEvent.click(screen.getByRole("button", { name: /^取\s*消$/ }));
+  expect(screen.getByText("待确认 · 美式")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "取消词形关联" }));
   expect(onSelect).not.toHaveBeenCalled();
   expect(screen.getByText("已关联 · 英美通用")).toBeVisible();
   expect(
     screen.getByText("原形 give · 英美通用").closest(".ant-cascader-menu-item")
   ).toHaveAttribute("aria-checked", "true");
   fireEvent.click(alternativeLabel);
-  fireEvent.click(await screen.findByRole("button", { name: /^切\s*换$/ }));
+  fireEvent.click(screen.getByRole("button", { name: "确认词形关联" }));
   await waitFor(() =>
     expect(onSelect).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -572,12 +710,8 @@ it("切换词形需确认，取消保留原关联，重复选择当前词形不�
     "true"
   );
   fireEvent.click(alternativeLabel);
+  fireEvent.click(screen.getByRole("button", { name: "确认词形关联" }));
   expect(onSelect).toHaveBeenCalledTimes(1);
-  await waitFor(() =>
-    expect(
-      screen.queryByRole("dialog", { name: "切换词形关联？" })
-    ).not.toBeInTheDocument()
-  );
 });
 
 it.each(["word", "phrase"] as const)(

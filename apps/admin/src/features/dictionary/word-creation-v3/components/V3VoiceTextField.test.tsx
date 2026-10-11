@@ -779,6 +779,74 @@ const LIAISON_TEXT: RichTextV3 = {
   annotations: [{ type: "liaison", start: 3, end: 6 }]
 };
 
+it.each([
+  ["association", false],
+  ["association", true],
+  ["grammar", true]
+] as const)(
+  "打开 %s 弹窗仍保留页面原有标注，取消或完成不改写正文 formatting=%s",
+  async (mode, formatting) => {
+    const label = mode === "grammar" ? "语法结构" : "释义语句";
+    const onChange = vi.fn();
+    const { container } = render(
+      <V3VoiceTextField
+        mode={mode}
+        ariaLabel={label}
+        nodeId="definition-preview"
+        field="content"
+        value={{
+          ...LIAISON_TEXT,
+          version: 2,
+          annotations: [
+            ...LIAISON_TEXT.annotations,
+            ...(mode === "grammar"
+              ? [
+                  {
+                    type: "emphasis" as const,
+                    start: 0,
+                    end: 4,
+                    level: "core" as const
+                  }
+                ]
+              : formatting
+                ? [{ type: "bold" as const, start: 0, end: 4 }]
+                : [])
+          ]
+        }}
+        onChange={onChange}
+      />
+    );
+    const assertAnnotations = () => {
+      expect(container.querySelectorAll(".tsz-ve-liaison-anchor")).toHaveLength(
+        2
+      );
+      if (formatting)
+        expect(
+          Array.from(container.querySelectorAll("strong"))
+            .map((node) => node.textContent)
+            .join("")
+        ).toBe("pick");
+      if (mode === "grammar")
+        expect(
+          container.querySelector('strong[data-level="core"]')
+        ).not.toBeNull();
+    };
+    assertAnnotations();
+    for (const action of ["取消", "完成"]) {
+      fireEvent.click(screen.getByLabelText(`打开${label}编辑器`));
+      await screen.findByRole(
+        "toolbar",
+        { name: "标注工具栏" },
+        { timeout: 10000 }
+      );
+      assertAnnotations();
+      fireEvent.click(screen.getByLabelText(`${action}${label}编辑`));
+      assertAnnotations();
+    }
+    expect(onChange).not.toHaveBeenCalled();
+  }
+);
+
 // 编辑器里怎么连，收起后就怎么显示：实际发音、语法结构、英文正文（释义）三类字段都叠。
 it.each([
   [undefined, "默认语音字段"],
@@ -1065,6 +1133,9 @@ it("弧线层内层扣掉输入框滚动条宽度，并随输入框滚动和尺�
       />
     );
     const input = screen.getByLabelText("英文例句");
+    const overlay = container.querySelector<HTMLElement>(
+      ".v3-voice-text-liaison-overlay"
+    );
     const content = container.querySelector<HTMLElement>(
       ".v3-voice-text-liaison-content"
     );
@@ -1072,6 +1143,9 @@ it("弧线层内层扣掉输入框滚动条宽度，并随输入框滚动和尺�
     // 宽度不能写死成取整的 clientWidth：内层自动撑满，只用右外边距扣滚动条。
     expect(content!.style.width).toBe("");
     const style = getComputedStyle(input);
+    expect(
+      overlay!.style.getPropertyValue("--v3-voice-text-liaison-color")
+    ).toBe(style.color);
     const borders =
       (Number.parseFloat(style.borderLeftWidth) || 0) +
       (Number.parseFloat(style.borderRightWidth) || 0);

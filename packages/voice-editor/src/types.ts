@@ -18,6 +18,10 @@ export interface AssociationPickerProps<
   /** 已有关联可查看、清除或补全目标；更新时保留原标注 ID 与片段。 */
   selected?: TLink;
   onSelect: (link?: TLink) => void;
+  /** 取消候选选择并关闭浮层，不修改原关联。 */
+  onCancel?: () => void;
+  /** 候选选择器内有待确认的变更时，阻止直接完成外层编辑。 */
+  onPendingChange?: (pending: boolean) => void;
 }
 
 export interface VoiceOption {
