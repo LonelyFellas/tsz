@@ -5,7 +5,7 @@ import { AnnotationStrip, type AnnotationStripProps } from "./AnnotationStrip";
 import type { VoiceEditorProps } from "../../types";
 import type { Brush } from "./roles";
 import type { LiaisonAnchor, LiaisonDraft, MarkState } from "./tokens";
-import { ClipboardShortcutHint, ShortcutHint } from "./ShortcutHint";
+import { ShortcutHint } from "./ShortcutHint";
 
 const FORMAT_SHORTCUTS: Record<string, string> = {
   bold: "B",
@@ -220,13 +220,7 @@ export function MarkupPanel({
       </Button>
     );
     const shortcut = FORMAT_SHORTCUTS[tool.key];
-    const hint = shortcut ? (
-      <ShortcutHint shortcut={shortcut} />
-    ) : tool.key === "text" ? (
-      <ClipboardShortcutHint
-        readOnly={readOnly || contentReadOnly || textReadOnly}
-      />
-    ) : undefined;
+    const hint = shortcut ? <ShortcutHint shortcut={shortcut} /> : undefined;
     return hint ? <Tooltip title={hint}>{button}</Tooltip> : button;
   };
   const renderTool = (tool: DropdownTool) =>

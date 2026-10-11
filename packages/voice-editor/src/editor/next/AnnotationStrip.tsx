@@ -24,7 +24,6 @@ import {
   pauseMarkerLabel,
   pauseMarkerWidth
 } from "../../marks/pausePresentation";
-import { ClipboardShortcutHint } from "./ShortcutHint";
 import {
   graphemes,
   tokenize,
@@ -147,7 +146,6 @@ export function AnnotationStrip({
   const inlinePauses = Object.keys(marks.pauses).length > 0;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
-  const [clipboardHintOpen, setClipboardHintOpen] = useState(false);
   const [textRange, setTextRange] = useState<CodeSpan>();
   const letterRefs = useRef(new Map<number, HTMLElement>());
 
@@ -413,16 +411,6 @@ export function AnnotationStrip({
       className={`tsz-ve-canvas${inlinePauses ? " has-inline-pauses" : ""}`}
       data-target={target}
       data-brush={brush.kind}
-      onMouseOver={(event) => {
-        const hovered = event.target as Element;
-        if (!event.currentTarget.contains(hovered)) {
-          if (!hovered.closest(".tsz-ve-clipboard-tooltip"))
-            setClipboardHintOpen(false);
-          return;
-        }
-        setClipboardHintOpen(!hovered.closest("button"));
-      }}
-      onMouseLeave={() => setClipboardHintOpen(false)}
     >
       {/*
        * 标注层对读屏隐藏：正文由下面那个 textarea 提供，两边都念的话同一句话会被
@@ -743,15 +731,6 @@ export function AnnotationStrip({
           else onTextChange(event.target.value);
         }}
       />
-      <Tooltip
-        title={<ClipboardShortcutHint readOnly={readOnly || textReadOnly} />}
-        classNames={{ root: "tsz-ve-clipboard-tooltip" }}
-        trigger={[]}
-        open={clipboardHintOpen && !associationContent && !pausePopover}
-      >
-        {/* 独立触发节点不包裹标注层，避免改变其嵌套 Popover 的事件上下文。 */}
-        <span className="tsz-ve-clipboard-anchor" aria-hidden />
-      </Tooltip>
     </div>
   );
 }
