@@ -81,6 +81,7 @@ import {
   type RoleUnit
 } from "./tokens";
 import { useVoiceAudition } from "./useVoiceAudition";
+import { ShortcutHint } from "./ShortcutHint";
 
 /** 历史栈上限：标注操作很轻，但长时间编辑也不该无限攒快照。 */
 const MAX_HISTORY = 100;
@@ -183,6 +184,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     annotationsToMarks(initial.value)
   );
   const [pendingText, setPendingText] = useState<string>();
+  const pendingTextCoalesceRef = useRef(true);
   const [loadError, setLoadError] = useState(initial.error ?? "");
   const [brush, setBrush] = useState<Brush>(DEFAULT_BRUSH);
   const [textSelection, setTextSelection] = useState<{
@@ -751,7 +753,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     setValidationMessage("");
   };
 
-  const changeText = (nextText: string, confirmed = false) => {
+  const changeText = (nextText: string, confirmed = false, coalesce = true) => {
     if (readOnly || textReadOnly) return;
     const nextMarks = remapMarks(text, nextText, marks);
     const mapped = restoreTextLinksOnCorrection
@@ -764,6 +766,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           Object.keys(marks.pauses).length ||
         mapped.links.length < links.length)
     ) {
+      pendingTextCoalesceRef.current = coalesce;
       setPendingText(nextText);
       return;
     }
@@ -776,6 +779,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           ? "被修改词段的关联已移除，请重新选择；可撤销恢复。"
           : ""
     );
+    // 剪切和粘贴仍是正文编辑，只在操作前后打断连续输入的历史合并。
+    if (!coalesce) typingRunRef.current = 0;
     commit(
       () => ({
         text: nextText,
@@ -785,6 +790,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       }),
       { typing: true }
     );
+    if (!coalesce) typingRunRef.current = 0;
     resetTransient();
   };
 
@@ -1655,19 +1661,21 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           >
             连读终点
           </Button>
-          <Button
-            size="small"
-            icon={<LiaisonIcon />}
-            iconPlacement="end"
-            disabled={
-              readOnly ||
-              !textSelection ||
-              textSelection.end - textSelection.start < 2
-            }
-            onClick={() => addSelectionLiaison()}
-          >
-            一次性添加
-          </Button>
+          <Tooltip title={<ShortcutHint shortcut="L" />}>
+            <Button
+              size="small"
+              icon={<LiaisonIcon />}
+              iconPlacement="end"
+              disabled={
+                readOnly ||
+                !textSelection ||
+                textSelection.end - textSelection.start < 2
+              }
+              onClick={() => addSelectionLiaison()}
+            >
+              一次性添加
+            </Button>
+          </Tooltip>
           {draft.start && (
             <Button size="small" onClick={resetDraft}>
               取消起点
@@ -1947,7 +1955,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         okText="确认修改"
         cancelText="保留原文"
         onOk={() => {
-          if (pendingText !== undefined) changeText(pendingText, true);
+          if (pendingText !== undefined)
+            changeText(pendingText, true, pendingTextCoalesceRef.current);
           setPendingText(undefined);
         }}
         onCancel={() => setPendingText(undefined)}
@@ -2060,7 +2069,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               ? "请先在外面的输入框填写文字"
               : placeholder
         }
-        onTextChange={changeText}
+        onTextChange={(nextText, coalesce) =>
+          changeText(nextText, false, coalesce)
+        }
         canUndo={past.length > 0}
         canRedo={future.length > 0}
         onUndo={undo}

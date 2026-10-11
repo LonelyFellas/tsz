@@ -1497,8 +1497,30 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       .getByRole("dialog")
       .filter({ has: page.locator(".tsz-ve-editor") });
     const input = dialog.locator(".tsz-ve-canvas-input");
+    const isMac = await page.evaluate(() => /Mac/i.test(navigator.platform));
+    const shortcutPrefix = isMac ? "⌘" : "Ctrl";
+    const otherPrefix = isMac ? "Ctrl" : "⌘";
+    await dialog.getByRole("button", { name: "加粗", exact: true }).hover();
+    await expect(
+      page.getByRole("tooltip").filter({ hasText: `${shortcutPrefix} + B` })
+    ).not.toContainText(`${otherPrefix} + B`);
     for (const modifier of ["Control", "Meta"]) {
       await input.press("ControlOrMeta+A");
+      await dialog.getByRole("button", { name: "加粗", exact: true }).hover();
+      const shortcutTooltip = page
+        .getByRole("tooltip")
+        .filter({ hasText: `${shortcutPrefix} + B` });
+      await expect(shortcutTooltip).not.toContainText(`${otherPrefix} + B`);
+      await expect(shortcutTooltip).not.toContainText("Mac");
+      await expect(shortcutTooltip).not.toContainText("Win");
+      await expect(shortcutTooltip.locator(".tsz-ve-shortcut-hint")).toHaveCSS(
+        "text-align",
+        "left"
+      );
+      await page.screenshot({
+        animations: "disabled",
+        path: test.info().outputPath(`shortcut-tooltip-${modifier}.png`)
+      });
       for (const key of ["b", "i", "u"])
         await input.press(`${modifier}+${key}`);
       await expect(
@@ -1599,6 +1621,143 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       await expect(dialog.locator(".tsz-ve-arc")).toHaveCount(0);
       await dialog.getByRole("button", { name: /^取消.*编辑$/ }).click();
     }
+  });
+
+  test("含停顿正文的剪贴板提示覆盖显示层，不干扰停顿编辑", async ({ page }) => {
+    test.skip(process.env.VITE_VOICE_EDITOR !== "true", "需要启用语音编辑器");
+    const api = await mockAdminV3Api(page);
+    const word = api.getWord();
+    word.meanings.pos[0]!.grammar_structures[0]!.variants[0]!.content = {
+      version: 2,
+      text: "a job",
+      annotations: [{ type: "pause", at: 1, duration_ms: 200 }]
+    };
+    await page.route(`**/lexicon/entries/${word.id}`, (route) =>
+      route.fulfill({ json: { word, retired_stable_nodes: [] } })
+    );
+    await page.goto(`/words/${word.id}/v3/wizard/meanings`);
+    await page
+      .getByRole("button", { name: /^打开.*语法结构.*编辑器$/ })
+      .first()
+      .click();
+    const dialog = page
+      .getByRole("dialog")
+      .filter({ has: page.locator(".tsz-ve-editor") });
+    await expect(dialog.locator(".tsz-ve-canvas-input")).toHaveCSS(
+      "pointer-events",
+      "none"
+    );
+    await dialog.locator(".tsz-ve-letter").first().hover();
+    const shortcutPrefix = await page.evaluate(() =>
+      /Mac/i.test(navigator.platform) ? "⌘" : "Ctrl"
+    );
+    const clipboardTooltip = page
+      .getByRole("tooltip")
+      .filter({ hasText: `${shortcutPrefix} + C` });
+    await expect(clipboardTooltip).toBeVisible();
+    await expect(clipboardTooltip).toContainText(`${shortcutPrefix} + V`);
+    const pause = dialog.locator(".tsz-ve-pause-chip");
+    await expect(pause).toHaveAttribute("aria-label", "编辑第 1 处停顿 0.2 秒");
+    await pause.hover();
+    await expect(clipboardTooltip).toBeHidden();
+    await pause.click();
+    await page
+      .getByRole("button", { name: "停顿 0.5 秒", exact: true })
+      .last()
+      .click();
+    await expect(pause).toHaveAttribute("aria-label", "编辑第 1 处停顿 0.5 秒");
+    await dialog.getByRole("button", { name: "编辑文本", exact: true }).click();
+    await page.mouse.move(0, 0);
+    await expect(clipboardTooltip).toBeHidden();
+    await dialog.locator(".tsz-ve-letter").first().hover();
+    await expect(clipboardTooltip).toBeVisible();
+    await expect(clipboardTooltip.locator("..")).toHaveCSS("transform", "none");
+    await expect(clipboardTooltip.locator("..")).toHaveCSS("opacity", "1");
+    await expect(clipboardTooltip).toBeVisible();
+    await expect(clipboardTooltip).toBeInViewport({ ratio: 1 });
+    await page.screenshot({
+      animations: "allow",
+      path: test.info().outputPath("paused-clipboard-tooltip.png")
+    });
+  });
+
+  test("编辑器剪贴板：原生复制、剪切、粘贴及独立撤销", async ({ page }) => {
+    test.skip(process.env.VITE_VOICE_EDITOR !== "true", "需要启用语音编辑器");
+    await mockAdminV3Api(page);
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+    await page
+      .getByRole("button", { name: /^打开.*拼写编辑器$/ })
+      .first()
+      .click();
+    const dialog = page
+      .getByRole("dialog")
+      .filter({ has: page.locator(".tsz-ve-editor") });
+    const input = dialog.locator(".tsz-ve-canvas-input");
+    const original = await input.inputValue();
+    const shortcutPrefix = await page.evaluate(() =>
+      /Mac/i.test(navigator.platform) ? "⌘" : "Ctrl"
+    );
+    await dialog.locator(".tsz-ve-canvas").hover();
+    const clipboardTooltip = page
+      .getByRole("tooltip")
+      .filter({ hasText: `${shortcutPrefix} + C` });
+    await expect(clipboardTooltip).toBeVisible();
+    await expect(clipboardTooltip).toContainText(`${shortcutPrefix} + V`);
+    await expect(clipboardTooltip).toContainText(`${shortcutPrefix} + X`);
+    await expect(clipboardTooltip).not.toContainText(
+      `${shortcutPrefix === "⌘" ? "Ctrl" : "⌘"} + C`
+    );
+    await clipboardTooltip.click({ trial: true });
+    await page.screenshot({
+      animations: "disabled",
+      path: test.info().outputPath("clipboard-shortcuts.png")
+    });
+    await input.press("ControlOrMeta+A");
+    await input.press("ControlOrMeta+C");
+    await input.press("ArrowRight");
+    await input.press("ControlOrMeta+V");
+    await expect(input).toHaveValue(`${original}${original}`);
+    await input.press("ControlOrMeta+Z");
+    await expect(input).toHaveValue(original);
+    await input.press("ControlOrMeta+A");
+    await input.press("ControlOrMeta+X");
+    await expect(input).toHaveValue("");
+    await input.press("ControlOrMeta+V");
+    await expect(input).toHaveValue(original);
+    await input.press("ControlOrMeta+Z");
+    await expect(input).toHaveValue("");
+    await input.press("ControlOrMeta+Z");
+    await expect(input).toHaveValue(original);
+    await input.press("ControlOrMeta+A");
+    await input.press("ControlOrMeta+I");
+    await input.press("ControlOrMeta+L");
+    await expect(dialog.locator(".tsz-ve-arc")).toHaveCount(1);
+    await input.press("ControlOrMeta+C");
+    await input.press("ArrowRight");
+    await input.press("ControlOrMeta+V");
+    await expect(input).toHaveValue(`${original}${original}`);
+    await input.press("ControlOrMeta+Z");
+    await expect(input).toHaveValue(original);
+    await input.press("ControlOrMeta+A");
+    await input.press("ControlOrMeta+X");
+    const confirmation = page.getByRole("dialog", {
+      name: "修改文字会移除已有标注"
+    });
+    await expect(confirmation).toBeVisible();
+    await confirmation
+      .getByRole("button", { name: "保留原文", exact: true })
+      .click();
+    await expect(input).toHaveValue(original);
+    await expect(dialog.locator(".tsz-ve-arc")).toHaveCount(1);
+    await input.press("ControlOrMeta+A");
+    await input.press("ControlOrMeta+X");
+    await confirmation
+      .getByRole("button", { name: "确认修改", exact: true })
+      .click();
+    await expect(input).toHaveValue("");
+    await input.press("ControlOrMeta+Z");
+    await expect(input).toHaveValue(original);
+    await expect(dialog.locator(".tsz-ve-arc")).toHaveCount(1);
   });
 
   test("统一富文本入口：拼写和实际发音可打开编辑并取消", async ({ page }) => {

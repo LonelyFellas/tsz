@@ -24,6 +24,7 @@ import {
   pauseMarkerLabel,
   pauseMarkerWidth
 } from "../../marks/pausePresentation";
+import { ClipboardShortcutHint } from "./ShortcutHint";
 import {
   graphemes,
   tokenize,
@@ -81,7 +82,7 @@ export interface AnnotationStripProps {
   /** 宿主用于错误定位的 data-* 属性；必须落在可聚焦的输入框上。 */
   inputDataAttributes?: Record<string, string>;
   inputPlaceholder?: string;
-  onTextChange: (value: string) => void;
+  onTextChange: (value: string, coalesce?: boolean) => void;
   /** 语法结构落笔：绝对码点区间 [start, end)；单击一个字母是 click，拖过一段是 drag。 */
   onRoleRange: (start: number, end: number, mode: "click" | "drag") => void;
   /** 语法结构画笔上一次单击上色的字母，标出来让人知道下一次同词单击会与它接上。 */
@@ -146,6 +147,7 @@ export function AnnotationStrip({
   const inlinePauses = Object.keys(marks.pauses).length > 0;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const [clipboardHintOpen, setClipboardHintOpen] = useState(false);
   const [textRange, setTextRange] = useState<CodeSpan>();
   const letterRefs = useRef(new Map<number, HTMLElement>());
 
@@ -411,6 +413,16 @@ export function AnnotationStrip({
       className={`tsz-ve-canvas${inlinePauses ? " has-inline-pauses" : ""}`}
       data-target={target}
       data-brush={brush.kind}
+      onMouseOver={(event) => {
+        const hovered = event.target as Element;
+        if (!event.currentTarget.contains(hovered)) {
+          if (!hovered.closest(".tsz-ve-clipboard-tooltip"))
+            setClipboardHintOpen(false);
+          return;
+        }
+        setClipboardHintOpen(!hovered.closest("button"));
+      }}
+      onMouseLeave={() => setClipboardHintOpen(false)}
     >
       {/*
        * 标注层对读屏隐藏：正文由下面那个 textarea 提供，两边都念的话同一句话会被
@@ -724,8 +736,22 @@ export function AnnotationStrip({
           )
             syncTextSelection(event.currentTarget);
         }}
-        onChange={(event) => onTextChange(event.target.value)}
+        onChange={(event) => {
+          const { inputType } = event.nativeEvent as InputEvent;
+          if (inputType === "insertFromPaste" || inputType === "deleteByCut")
+            onTextChange(event.target.value, false);
+          else onTextChange(event.target.value);
+        }}
       />
+      <Tooltip
+        title={<ClipboardShortcutHint readOnly={readOnly || textReadOnly} />}
+        classNames={{ root: "tsz-ve-clipboard-tooltip" }}
+        trigger={[]}
+        open={clipboardHintOpen && !associationContent && !pausePopover}
+      >
+        {/* 独立触发节点不包裹标注层，避免改变其嵌套 Popover 的事件上下文。 */}
+        <span className="tsz-ve-clipboard-anchor" aria-hidden />
+      </Tooltip>
     </div>
   );
 }
