@@ -176,6 +176,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   const [linkAnchor, setLinkAnchor] = useState<number>();
   const [inspectedLinkId, setInspectedLinkId] = useState<string>();
   const [associationPickerOpen, setAssociationPickerOpen] = useState(false);
+  const [associationDraftPending, setAssociationDraftPending] = useState(false);
   const [linkNotice, setLinkNotice] = useState("");
   const [marks, setMarks] = useState<MarkState>(() =>
     annotationsToMarks(initial.value)
@@ -217,6 +218,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     setLinkAnchor(undefined);
     setInspectedLinkId(undefined);
     setAssociationPickerOpen(false);
+    setAssociationDraftPending(false);
     setDraft({});
     setRoleAnchor(undefined);
     setLiaisonEnd("start");
@@ -772,12 +774,16 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   const selectedLink = links.find((link) => link.id === inspectedLinkId);
   useEffect(() => {
     onAssociationPendingChange?.(
-      brush.kind === "association" && linkWords.length > 0 && !inspectedLinkId
+      associationDraftPending ||
+        (brush.kind === "association" &&
+          linkWords.length > 0 &&
+          !inspectedLinkId)
     );
   }, [
     brush.kind,
     linkWords.length,
     inspectedLinkId,
+    associationDraftPending,
     onAssociationPendingChange
   ]);
   const selectWord = (range: { start: number; end: number }) => {
@@ -836,6 +842,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       kind: brush.targetKind,
       segments: selectedLink?.source_segments ?? linkSegments,
       selected: selectedLink,
+      onCancel: resetTransient,
+      onPendingChange: setAssociationDraftPending,
       onSelect: (next) => {
         if (linksReadOnly) return;
         if (selectedLink) {

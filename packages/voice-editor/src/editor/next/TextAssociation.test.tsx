@@ -96,6 +96,52 @@ describe("正文关联编辑器", () => {
   });
 });
 
+it("已关联词形的待确认选择阻止外层完成，取消只关闭候选并保留关联", async () => {
+  const observe = vi.fn();
+  const original = {
+    ...target,
+    source_segments: [{ start: 0, end: 3, surface: "job" }]
+  };
+  function Host() {
+    const [pending, setPending] = useState(false);
+    return (
+      <>
+        <button disabled={pending}>完成标注</button>
+        <VoiceEditor
+          mode="grammar"
+          value={{ version: 2, text: "job", annotations: [] }}
+          textLinks={[original]}
+          onChange={observe}
+          onAssociationPendingChange={setPending}
+          renderAssociationPicker={({ onCancel, onPendingChange }) => (
+            <>
+              <button onClick={() => onPendingChange?.(true)}>
+                暂选新词形
+              </button>
+              <button onClick={onCancel}>取消候选</button>
+            </>
+          )}
+        />
+      </>
+    );
+  }
+  render(<Host />);
+  fireEvent.click(screen.getByRole("button", { name: "关联单词" }));
+  fireEvent.mouseDown(screen.getByLabelText("关联 job（1）"), { button: 0 });
+  fireEvent.click(await screen.findByRole("button", { name: "暂选新词形" }));
+  expect(screen.getByRole("button", { name: "完成标注" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "取消候选" }));
+  expect(
+    screen.queryByRole("button", { name: "暂选新词形" })
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "完成标注" })).toBeEnabled();
+  expect(observe).not.toHaveBeenCalled();
+  fireEvent.mouseDown(screen.getByLabelText("关联 job（1）"), { button: 0 });
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "暂选新词形" })).toBeVisible()
+  );
+});
+
 it("语法结构保留标注工具，以完整单词关联词形并支持撤销", async () => {
   const observe = vi.fn();
   const formTarget: Pick<TextLinkV3, "id" | "source_segments"> = {

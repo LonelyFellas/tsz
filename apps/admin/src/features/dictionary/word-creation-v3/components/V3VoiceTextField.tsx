@@ -234,11 +234,10 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     else setEditing(false);
   };
   const expanded = env.VOICE_EDITOR && (presentation === "editor" || editing);
-  // 缓存住：每次渲染都新建对象会让弧线层跟着重量一遍。展开编辑时用不上，不算。
+  // 缓存住：每次渲染都新建对象会让弧线层跟着重量一遍。
   const liaisons = useMemo(
-    () =>
-      !expanded && mode !== "dict-phonetic" ? liaisonOnly(value) : undefined,
-    [expanded, mode, value]
+    () => (mode !== "dict-phonetic" ? liaisonOnly(value) : undefined),
+    [mode, value]
   );
   useEffect(() => {
     onEditingChange?.(expanded);
@@ -309,7 +308,6 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     (!focused ||
       readOnly ||
       (env.VOICE_EDITOR && editingEnabled && recorded)) &&
-    !expanded &&
     value.text !== "";
   const fallback = (
     <Input.TextArea
@@ -658,6 +656,10 @@ function LiaisonOverlay({ value }: { value: RichTextV2 }) {
       (Number.parseFloat(style.borderRightWidth) || 0);
     const follow = () => {
       const currentStyle = getComputedStyle(input);
+      overlay.style.setProperty(
+        "--v3-voice-text-liaison-color",
+        currentStyle.color
+      );
       for (const property of MIRRORED_OUTER_STYLES) {
         overlay.style.setProperty(
           property,
