@@ -1244,6 +1244,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     const form = pos.forms[0]!;
     const regional = form.regional_variants;
     const variant = regional.mode === "common" ? regional.common : regional.uk;
+    const targetEntryId = "01990000-0000-7000-8000-000000000999";
     await page.route(
       "**/lexicon/entries/component-targets/search",
       async (route) => {
@@ -1254,7 +1255,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
             truncated: false,
             matches: [
               {
-                entry_id: word.id,
+                entry_id: targetEntryId,
                 pos_id: pos.pos_id,
                 base_form_id: form.id,
                 publication_id: variant.id,
@@ -1294,16 +1295,20 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       .getByRole("dialog")
       .filter({ has: page.locator(".tsz-ve-editor") });
     await dialog.locator(".tsz-ve-canvas-input").fill("a job");
-    await dialog.getByRole("button", { name: "关联词形", exact: true }).click();
+    await dialog.getByRole("button", { name: "关联单词", exact: true }).click();
     await dialog.getByLabel("关联 job（2）").click();
     await expect(page.getByText(/^job ·/).last()).toHaveCSS(
       "font-family",
       /TSZ Words/
     );
-    await expect(page.getByText(/^job ·/).last()).toHaveCSS(
-      "font-size",
-      "18.6667px"
-    );
+    await expect
+      .poll(() =>
+        page
+          .getByText(/^job ·/)
+          .last()
+          .evaluate((node) => parseFloat(getComputedStyle(node).fontSize))
+      )
+      .toBeCloseTo(18.6667, 3);
     await page
       .locator(".ant-cascader-menu-item-content")
       .filter({ hasText: /^job ·/ })
@@ -1320,9 +1325,15 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     });
     await page.getByText(/原形 job/).click();
     await expect(page.getByText("选择词义", { exact: true })).toHaveCount(0);
+    await expect(
+      dialog.getByRole("button", { name: /^完成.*编辑$/ })
+    ).toBeDisabled();
+    await page
+      .getByRole("button", { name: "确认词形关联", exact: true })
+      .click();
     await dialog.getByRole("button", { name: /^完成.*编辑$/ }).click();
     await opener.click();
-    await dialog.getByRole("button", { name: "关联词形", exact: true }).click();
+    await dialog.getByRole("button", { name: "关联单词", exact: true }).click();
     await dialog.getByLabel("关联 job（2）").click();
     await expect(page.getByText(/已关联 ·/)).toBeVisible();
     await expect(
@@ -1334,10 +1345,12 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       animations: "disabled"
     });
     await page.getByRole("button", { name: "清除关联", exact: true }).click();
-    await page.getByRole("button", { name: /^清\s*除$/ }).click();
+    await page
+      .getByRole("button", { name: "确认词形关联", exact: true })
+      .click();
     await dialog.getByRole("button", { name: /^取消.*编辑$/ }).click();
     await opener.click();
-    await dialog.getByRole("button", { name: "关联词形", exact: true }).click();
+    await dialog.getByRole("button", { name: "关联单词", exact: true }).click();
     await dialog.getByLabel("关联 job（2）").click();
     await expect(page.getByText(/已关联 ·/)).toBeVisible();
   });
@@ -1446,6 +1459,146 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(opener).toBeVisible();
     await opener.click();
     await expect(dialog.locator(".tsz-ve-canvas-input")).toHaveValue(original);
+  });
+
+  test("编辑器快捷键：选区格式、一次性连读、撤销与完成重开", async ({
+    page
+  }) => {
+    test.skip(
+      process.env.VITE_VOICE_EDITOR !== "true" ||
+        process.env.VITE_SENTENCE_FORMATTING !== "true",
+      "需要启用语音编辑器和释义例句格式"
+    );
+    const api = await mockAdminV3Api(page);
+    const word = api.getWord();
+    word.meanings.pos[0]!.senses[0]!.definitions.push({
+      id: "01990000-0000-7000-8000-000000000950",
+      level: "B1",
+      grammar_structure_id: word.meanings.pos[0]!.grammar_structures[0]!.id,
+      definition_mode: "en_sentence",
+      content: {
+        mode: "unified",
+        common: {
+          id: "01990000-0000-7000-8000-000000000951",
+          origin: "manual",
+          value: { version: 2, text: "a job", annotations: [] }
+        }
+      }
+    });
+    await page.route(`**/lexicon/entries/${word.id}`, (route) =>
+      route.fulfill({ json: { word, retired_stable_nodes: [] } })
+    );
+    await page.goto(`/words/${word.id}/v3/wizard/meanings`);
+    const opener = page
+      .getByRole("button", { name: /^打开.*定义 2.*编辑器$/ })
+      .first();
+    await opener.click();
+    const dialog = page
+      .getByRole("dialog")
+      .filter({ has: page.locator(".tsz-ve-editor") });
+    const input = dialog.locator(".tsz-ve-canvas-input");
+    for (const modifier of ["Control", "Meta"]) {
+      await input.press("ControlOrMeta+A");
+      for (const key of ["b", "i", "u"])
+        await input.press(`${modifier}+${key}`);
+      await expect(
+        dialog.locator(".is-bold.is-italic.is-underline")
+      ).toHaveCount(4);
+      await input.press(`${modifier}+l`);
+      await expect(
+        dialog.locator(".tsz-ve-arc-layer path").first()
+      ).toBeVisible();
+      await expect(input).toBeFocused();
+      await input.press(`${modifier}+l`);
+      await expect(dialog.getByText("这两处已经连过了")).toBeVisible();
+      await expect(dialog.locator(".tsz-ve-arc")).toHaveCount(1);
+      await input.press(`${modifier}+z`);
+      await expect(dialog.locator(".tsz-ve-arc-layer path")).toHaveCount(0);
+      await expect(
+        dialog.locator(".is-bold.is-italic.is-underline")
+      ).toHaveCount(4);
+      for (let step = 0; step < 3; step++) await input.press(`${modifier}+z`);
+      await expect(
+        dialog.locator(".is-bold, .is-italic, .is-underline")
+      ).toHaveCount(0);
+      await expect(input).toHaveValue("a job");
+    }
+    await input.press("ControlOrMeta+A");
+    const boldButton = dialog.getByRole("button", {
+      name: "加粗",
+      exact: true
+    });
+    await expect(boldButton).toBeEnabled();
+    await boldButton.focus();
+    await boldButton.press("ControlOrMeta+b");
+    await dialog.getByRole("button", { name: "斜体", exact: true }).click();
+    await input.press("ControlOrMeta+z");
+    await expect(dialog.locator(".is-italic")).toHaveCount(0);
+    await expect(dialog.locator(".is-bold")).toHaveCount(4);
+    await input.press("ControlOrMeta+l");
+    await dialog.getByRole("button", { name: /^完成.*编辑$/ }).click();
+    await expect(dialog).toBeHidden();
+    await opener.click();
+    await expect(dialog.locator(".is-bold")).toHaveCount(4);
+    await expect(
+      dialog.locator(".tsz-ve-arc-layer path").first()
+    ).toBeVisible();
+    await input.click({ trial: true });
+    await page.screenshot({
+      animations: "disabled",
+      path: test.info().outputPath("editor-keyboard-shortcuts.png")
+    });
+  });
+
+  test("拼写与实际发音快捷键：键盘局部选区、正文撤销和取消恢复", async ({
+    page
+  }) => {
+    test.skip(process.env.VITE_VOICE_EDITOR !== "true", "需要启用语音编辑器");
+    await mockAdminV3Api(page);
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+    for (const name of [/^打开.*拼写编辑器$/, /^打开.*实际发音编辑器$/]) {
+      const opener = page.getByRole("button", { name }).first();
+      await opener.click();
+      const dialog = page
+        .getByRole("dialog")
+        .filter({ has: page.locator(".tsz-ve-editor") });
+      const input = dialog.locator(".tsz-ve-canvas-input");
+      const original = await input.inputValue();
+      await input.press("ControlOrMeta+A");
+      await input.press("ArrowLeft");
+      await input.press("Shift+ArrowRight");
+      await input.press("Shift+ArrowRight");
+      await input.press("ControlOrMeta+l");
+      await expect(dialog.locator(".tsz-ve-arc")).toHaveCount(1);
+      await input.press("ControlOrMeta+z");
+      await expect(dialog.locator(".tsz-ve-arc")).toHaveCount(0);
+      if (
+        (await dialog.locator(".tsz-ve-editor").getAttribute("data-mode")) ===
+        "spelling"
+      ) {
+        await input.press("ControlOrMeta+i");
+        await expect(dialog.locator(".is-italic")).toHaveCount(2);
+        await input.press("ControlOrMeta+z");
+        await expect(dialog.locator(".is-italic")).toHaveCount(0);
+      }
+      await input.press("ControlOrMeta+A");
+      await input.press("ArrowRight");
+      await input.press("x");
+      await expect(input).toHaveValue(`${original}x`);
+      await input.press("ControlOrMeta+z");
+      await expect(input).toHaveValue(original);
+      await input.press("ControlOrMeta+A");
+      await input.press("ControlOrMeta+l");
+      await expect(dialog.locator(".tsz-ve-arc")).toHaveCount(1);
+      await dialog.getByRole("button", { name: /^取消.*编辑$/ }).click();
+      await expect(dialog).toBeHidden();
+      await opener.click();
+      await expect(dialog.locator(".tsz-ve-canvas-input")).toHaveValue(
+        original
+      );
+      await expect(dialog.locator(".tsz-ve-arc")).toHaveCount(0);
+      await dialog.getByRole("button", { name: /^取消.*编辑$/ }).click();
+    }
   });
 
   test("统一富文本入口：拼写和实际发音可打开编辑并取消", async ({ page }) => {
