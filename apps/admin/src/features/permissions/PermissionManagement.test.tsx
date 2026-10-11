@@ -602,7 +602,7 @@ describe("权限目录、标签和授权人员", () => {
     const row = chooseRow("编辑本人词条");
     expect(row.querySelector('input[type="checkbox"]')).toBeChecked();
     await selectTag("权限标签", "内容编辑");
-    await selectTag("所属模块", "用户管理");
+    await selectTag("所属板块", "用户管理");
     fireEvent.change(screen.getByPlaceholderText("权限名称 / 说明"), {
       target: { value: "不存在的权限" }
     });
@@ -610,7 +610,7 @@ describe("权限目录、标签和授权人员", () => {
     expect(screen.getByText("已选 1 项")).toBeInTheDocument();
     fireEvent.click(screen.getByText("重置"));
     expect(screen.getByPlaceholderText("权限名称 / 说明")).toHaveValue("");
-    expect(screen.getByLabelText("所属模块")).toHaveValue("");
+    expect(screen.getByLabelText("所属板块")).toHaveValue("");
     expect(screen.getByLabelText("权限标签")).toHaveValue("");
     expect(
       document.querySelector('tr[data-row-key="users.access"]')
@@ -765,7 +765,7 @@ describe("权限目录、标签和授权人员", () => {
     mount();
     const permission = await screen.findByText("编辑本人词条");
     expect(
-      screen.getByText("范围 / 说明", { selector: "th" })
+      screen.getByText("详细说明", { selector: "th" })
     ).toBeInTheDocument();
     expect(
       within(permission.closest("tr")!).getByText("编辑词条")

@@ -101,7 +101,7 @@ let users: AdminUserView[];
 /** 模拟后端 GET /admin/users：role/q 过滤 + 分页，形状同 AdminUserListResponse。 */
 function fakeList(query: AdminUserListQuery = {}) {
   let items = users;
-  if (query.role) items = items.filter((u) => u.roles.includes(query.role!));
+  if (query.role) items = items.filter((u) => u.roles?.includes(query.role!));
   if (query.q) {
     const q = query.q.toLowerCase();
     items = items.filter(
@@ -190,6 +190,9 @@ describe("UserManagement", () => {
     ).toBeDisabled();
     expect(screen.queryByText("13800000001")).toBeNull();
     expect(screen.queryByText("record@qq.com")).toBeNull();
+    expect(screen.queryByText("B2等级")).toBeNull();
+    expect(screen.queryByText("教师认证")).toBeNull();
+    expect(screen.queryByRole("radio", { name: "老师" })).toBeNull();
     expect(api.users.setStatus).not.toHaveBeenCalled();
   });
   it("渲染搜索行、角色 tab 与用户行；等级/余额缺省列显示「-」", async () => {
@@ -373,13 +376,9 @@ describe("UserManagement", () => {
     expect(screen.getAllByText(/删\s?除/)[0]!.closest("button")).toBeDisabled();
   });
 
-  it("天生币/等级/方言管理点击提示功能待接入", async () => {
+  it("等级/方言管理点击提示功能待接入", async () => {
     renderPage();
     await screen.findByText("record");
-    clickRowButton(/^天生币管理$/);
-    expect(
-      await screen.findByText("天生币管理功能待接入，接口开发中")
-    ).toBeInTheDocument();
     clickRowButton(/^等级管理$/);
     expect(
       await screen.findByText("等级管理功能待接入，接口开发中")

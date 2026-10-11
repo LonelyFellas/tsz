@@ -13,6 +13,7 @@ import { useState } from "react";
 import type { AudioUploadAdapter } from "@tsz/voice-editor/types";
 
 const state = vi.hoisted(() => ({
+  canUpload: true,
   flags: {
     VOICE_EDITOR: true,
     VOICE_PREVIEW: false,
@@ -24,6 +25,10 @@ const state = vi.hoisted(() => ({
   resolveUrl: vi.fn()
 }));
 
+vi.mock("@/lib/auth", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/auth")>()),
+  usePermission: () => state.canUpload
+}));
 vi.mock("@/lib/env", () => ({ env: state.flags }));
 vi.mock("@/features/dictionary/voice-editor/dataSource", () => ({
   adminVoicePreviewAdapter: {
@@ -71,6 +76,7 @@ async function openAudioPanel() {
 }
 
 beforeEach(() => {
+  state.canUpload = true;
   state.flags.VOICE_EDITOR = true;
   state.flags.SENTENCE_FORMATTING = true;
   state.flags.VOICE_PREVIEW = false;
@@ -324,6 +330,24 @@ describe("V3VoiceTextField 语种筛选", () => {
 });
 
 describe("V3VoiceTextField 上传音频", () => {
+  it("未授予上传权限时宿主传入禁用状态", async () => {
+    state.canUpload = false;
+    render(
+      <V3VoiceTextField
+        ariaLabel="测试正文"
+        nodeId="task102"
+        field="text"
+        mode="grammar"
+        value={VALUE}
+        onChange={vi.fn()}
+      />
+    );
+    await openAudioPanel();
+    expect(screen.getByLabelText("上传音频")).toBeDisabled();
+    expect(screen.getByText("没有上传音频的权限")).toBeInTheDocument();
+    expect(state.upload).not.toHaveBeenCalled();
+  });
+
   it("后端仅支持语法结构音频时，正文关联模式不开放上传", async () => {
     render(
       <V3VoiceTextField

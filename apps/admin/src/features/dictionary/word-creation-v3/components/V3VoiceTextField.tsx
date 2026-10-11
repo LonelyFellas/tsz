@@ -1,3 +1,4 @@
+import { usePermission } from "@/lib/auth";
 import { ConfigProvider } from "antd";
 import { useContentEditPermissions } from "../../contentEditPermissions";
 import type {
@@ -142,6 +143,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   onChange,
   onAssociationsChange
 }: V3VoiceTextFieldProps<TLink>) {
+  const canUploadAudio = usePermission("speech.upload_audio");
   const permissions = useContentEditPermissions();
   const contentReadOnly = requestedContentReadOnly ?? !permissions.edit;
   const associationsReadOnly =
@@ -545,6 +547,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
                 }));
             }}
             // 开关关着 = 不注入适配器：面板置灰说明原因，已有的音频引用仍列出来。
+            audioUploadAllowed={canUploadAudio}
             audioUploadAdapter={
               env.VOICE_AUDIO_UPLOAD && audioUploadEnabled
                 ? adminAudioUploadAdapter

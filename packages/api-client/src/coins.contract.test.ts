@@ -146,3 +146,43 @@ describe("coins contract", () => {
     ).toEqual(["page", "page_size", "snapshot"]);
   });
 });
+
+describe("用户账单与余额独立契约", () => {
+  it("允许省略逐笔余额，但拒绝非整数字符串和额外私有字段", async () => {
+    const { decodeUserCoinEntryPage } = await import("./coins");
+    const entry = {
+      id: "1",
+      operation_id: "018f47b8-e3c1-7bd1-9f0a-123456789aa1",
+      kind: "credit",
+      source_type: "manual_purchase",
+      delta: "9007199254740993",
+      created_at: "2026-10-11T00:00:00Z"
+    };
+    const page = {
+      items: [entry],
+      pagination: { page: 1, page_size: 10, total: 1, total_pages: 1 },
+      snapshot: "1"
+    };
+    expect(decodeUserCoinEntryPage(page).items[0]?.delta).toBe(
+      "9007199254740993"
+    );
+    expect(decodeUserCoinEntryPage(page).items[0]).not.toHaveProperty(
+      "balance_after"
+    );
+    expect(() =>
+      decodeUserCoinEntryPage({ ...page, items: [{ ...entry, delta: "1.5" }] })
+    ).toThrow();
+    expect(() =>
+      decodeUserCoinEntryPage({
+        ...page,
+        items: [{ ...entry, reason: "private" }]
+      })
+    ).toThrow();
+    expect(() =>
+      decodeUserCoinEntryPage({
+        ...page,
+        items: [{ ...entry, balance_after: "9223372036854775808" }]
+      })
+    ).toThrow();
+  });
+});

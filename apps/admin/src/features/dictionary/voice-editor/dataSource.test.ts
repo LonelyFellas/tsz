@@ -178,6 +178,33 @@ describe("admin voice preview data source", () => {
     expect(state.audioConfirm).not.toHaveBeenCalled();
   });
 
+  it("词条编辑和语音合成均不隐含上传权限，额外授予后才可上传", async () => {
+    vi.stubEnv("PROD", false);
+    state.env.ADMIN_TTS_MOCK = true;
+    state.profile = {
+      id: "a",
+      role: "admin",
+      permissions: ["words.access", "words.edit", "speech.generate"]
+    };
+    const { adminAudioUploadAdapter } = await import("./dataSource");
+    const input = {
+      file: new File([new Uint8Array(3)], "a.mp3", { type: "audio/mpeg" }),
+      locale: "en-GB" as const,
+      gender: "female" as const
+    };
+    await expect(adminAudioUploadAdapter.upload(input)).rejects.toThrow(
+      "没有上传音频的权限"
+    );
+    state.profile.permissions.push("speech.upload_audio");
+    await expect(adminAudioUploadAdapter.upload(input)).resolves.toMatchObject({
+      original_name: "a.mp3"
+    });
+    state.profile.permissions = ["speech.upload_audio", "words.access"];
+    await expect(adminAudioUploadAdapter.upload(input)).rejects.toThrow(
+      "没有上传音频的权限"
+    );
+  });
+
   it("forces the real adapter in production even when the mock flag is true", async () => {
     vi.stubEnv("PROD", true);
     vi.stubEnv("MODE", "production");

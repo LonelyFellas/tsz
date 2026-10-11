@@ -27,8 +27,12 @@ export const ADMIN_PERMISSION_DEPENDENCIES = {
   "sentences.restore": ["sentences.access"],
   "sentences.rollback": ["sentences.access"],
   "users.access": [],
+  "users.read_basic": ["users.access"],
+  "users.read_coin_balance": ["users.access"],
+  "users.read_coin_entries": ["users.access"],
+  "users.read_identity": ["users.access"],
   "users.edit": ["users.access"],
-  "users.set_status": ["users.access"],
+  "users.set_status": ["users.read_basic"],
   "users.read_sensitive": ["users.access"],
   "teacherapply.access": [],
   "teacherapply.review": ["teacherapply.access"],
@@ -36,6 +40,7 @@ export const ADMIN_PERMISSION_DEPENDENCIES = {
   "teacherapply.read_sensitive": ["teacherapply.access"],
   "lexicon_settings.access": [],
   "lexicon_settings.edit": ["lexicon_settings.access"],
+  "speech.upload_audio": [],
   "speech.generate": ["words.access"]
 } as const;
 

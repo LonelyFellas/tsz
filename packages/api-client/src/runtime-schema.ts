@@ -18,6 +18,7 @@ export const RUNTIME_SCHEMA_ROOTS = [
   "ManualCoinOperationPage",
   "CoinWallet",
   "CoinEntryPage",
+  "UserCoinEntryPage",
   "WordlistTip",
   "WordlistTipPage",
   "Wordlist",

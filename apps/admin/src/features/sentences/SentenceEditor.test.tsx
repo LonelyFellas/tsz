@@ -39,6 +39,9 @@ const testActor = vi.hoisted(() => ({
   }
 }));
 vi.mock("@/lib/auth", () => ({
+  usePermission: (key: string) =>
+    testActor.profile.role === "super_admin" ||
+    testActor.profile.permissions.includes(key),
   useAuthStore: (
     select: (state: {
       profile: { id: string; role: string; permissions: string[] };

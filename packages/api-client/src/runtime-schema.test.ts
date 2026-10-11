@@ -65,6 +65,7 @@ const ROOTS = [
   "ManualCoinOperationPage",
   "CoinWallet",
   "CoinEntryPage",
+  "UserCoinEntryPage",
   "SharedSentence",
   "SentencePublication",
   "SentenceWithdrawalImpact",

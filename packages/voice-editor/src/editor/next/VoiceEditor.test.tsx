@@ -1854,6 +1854,55 @@ describe("VoiceEditor 发音区", () => {
     expect(screen.getByText("音频上传未启用")).toBeInTheDocument();
   });
 
+  it("上传权限独立于试听；上传中撤权会中止请求并忽略迟到结果", async () => {
+    let finish!: (value: AudioAsset) => void;
+    const adapter = audioAdapter({
+      upload: vi.fn(
+        () =>
+          new Promise<AudioAsset>((resolve) => {
+            finish = resolve;
+          })
+      )
+    });
+    const onAudioAssetsChange = vi.fn();
+    const view = props({
+      audioUploadAdapter: adapter,
+      audioAssets: [asset({ original_name: "existing.mp3" })],
+      onAudioAssetsChange
+    });
+    const { rerender } = render(
+      <VoiceEditor {...view} audioUploadAllowed={false} />
+    );
+    openTool("音频");
+    expect(screen.getByLabelText("上传音频")).toBeDisabled();
+    expect(screen.getByLabelText("试听 existing.mp3")).toBeEnabled();
+    expect(screen.getByText("没有上传音频的权限")).toBeInTheDocument();
+    chooseFiles([mp3("denied.mp3")]);
+    expect(adapter.upload).not.toHaveBeenCalled();
+    rerender(<VoiceEditor {...view} audioUploadAllowed />);
+    chooseFiles([mp3("slow.mp3")]);
+    await waitFor(() => expect(adapter.upload).toHaveBeenCalledOnce());
+    const signal = adapter.upload.mock.calls[0]![0].signal!;
+    rerender(<VoiceEditor {...view} audioUploadAllowed={false} />);
+    expect(signal.aborted).toBe(true);
+    expect(screen.getByLabelText("重试 slow.mp3")).toBeDisabled();
+    const finishAborted = finish;
+    rerender(<VoiceEditor {...view} audioUploadAllowed />);
+    fireEvent.click(screen.getByLabelText("重试 slow.mp3"));
+    await waitFor(() => expect(adapter.upload).toHaveBeenCalledTimes(2));
+    const retrySignal = adapter.upload.mock.calls[1]![0].signal!;
+    await act(async () => {
+      finishAborted(asset({ original_name: "slow.mp3" }));
+    });
+    // 旧请求迟到时不能清除新请求的 controller，否则再次撤权无法中止重试。
+    rerender(<VoiceEditor {...view} audioUploadAllowed={false} />);
+    expect(retrySignal.aborted).toBe(true);
+    await act(async () => {
+      finish(asset({ original_name: "slow.mp3" }));
+    });
+    expect(onAudioAssetsChange).not.toHaveBeenCalled();
+  });
+
   it("上传：预检不过的不发请求，合格的走适配器，成功后按当次归属落成资产并抛出", async () => {
     const adapter = audioAdapter();
     const onAudioAssetsChange = vi.fn();

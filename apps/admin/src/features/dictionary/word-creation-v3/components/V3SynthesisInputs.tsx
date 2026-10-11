@@ -1,3 +1,4 @@
+import { usePermission } from "@/lib/auth";
 import {
   SettingOutlined,
   SwapOutlined,
@@ -85,6 +86,7 @@ export function V3SynthesisInputs({
   issues: readonly V3DraftValidationIssue[];
   onChange: (patch: Partial<WordPronunciationV3>) => void;
 }) {
+  const canUploadAudio = usePermission("speech.upload_audio");
   const synthesis = pronunciation.synthesis ?? EMPTY_SYNTHESIS;
   const { preference } = useDialectPreference();
   const locale = pronunciationLocale(dialect, preference);
@@ -358,6 +360,7 @@ export function V3SynthesisInputs({
                   env.VOICE_PREVIEW ? settingsPreviewAdapter : undefined
                 }
                 previewIsMock={voicePreviewIsMock}
+                audioUploadAllowed={canUploadAudio}
                 audioUploadAdapter={
                   env.VOICE_AUDIO_UPLOAD ? adminAudioUploadAdapter : undefined
                 }

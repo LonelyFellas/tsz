@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/sentence-formatting-compatibility/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-10T06:55:55.371Z",
+  "_source": "/Users/darwish/.codex/worktrees/zentao-88-user-permissions/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-10-11T07:43:46.554Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -92,6 +92,10 @@
     "/admin/teacher-certification/files/{id}": ["get"],
     "/admin/users": ["get"],
     "/admin/users/{id}": ["get", "patch"],
+    "/admin/users/{id}/coin-entries": ["get"],
+    "/admin/users/{id}/coin-wallet": ["get"],
+    "/admin/users/{id}/identity-documents": ["get"],
+    "/admin/users/{id}/identity-documents/{file_id}": ["get"],
     "/admin/users/{id}/status": ["patch"],
     "/admin/users/{id}/teacher-certification": ["delete"],
     "/admin/wordlists": ["get"],
@@ -2211,6 +2215,19 @@
           "description": "Reuse this boundary on subsequent pages to exclude newly committed entries.",
           "pattern": "^(0|[1-9][0-9]{0,18})$"
         }
+      },
+      "additionalProperties": false
+    },
+    "UserCoinEntryPage": {
+      "type": "object",
+      "required": ["items", "pagination", "snapshot"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/UserCoinEntry" }
+        },
+        "pagination": { "$ref": "#/components/schemas/PaginationMeta" },
+        "snapshot": { "type": "string", "pattern": "^(0|[1-9][0-9]{0,18})$" }
       },
       "additionalProperties": false
     },
