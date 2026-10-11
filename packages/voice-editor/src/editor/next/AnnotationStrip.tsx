@@ -715,6 +715,15 @@ export function AnnotationStrip({
         onSelect={(event) => syncTextSelection(event.currentTarget)}
         onClick={(event) => syncTextSelection(event.currentTarget)}
         onKeyDown={navigateInlineText}
+        onKeyUp={(event) => {
+          // 全选范围未变时浏览器不一定派发 select，仍需恢复撤销后清空的工具栏选区。
+          if (
+            (event.ctrlKey || event.metaKey) &&
+            event.key.toLowerCase() === "a" &&
+            !event.nativeEvent.isComposing
+          )
+            syncTextSelection(event.currentTarget);
+        }}
         onChange={(event) => onTextChange(event.target.value)}
       />
     </div>
