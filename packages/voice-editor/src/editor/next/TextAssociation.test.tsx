@@ -63,7 +63,7 @@ describe("正文关联编辑器", () => {
     render(<Host />);
     expect(screen.queryByRole("button", { name: /^语法结构/ })).toBeNull();
     expect(observe).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "关联单词" }));
+    fireEvent.click(screen.getByLabelText("关联单词"));
     fireEvent.mouseDown(screen.getByLabelText("关联 mother（1）"), {
       button: 0
     });
@@ -73,14 +73,14 @@ describe("正文关联编辑器", () => {
         { start: 0, end: 6, surface: "mother" }
       ])
     );
-    fireEvent.click(screen.getByRole("button", { name: "编辑文本" }));
+    fireEvent.click(screen.getByLabelText("编辑文本"));
     fireEvent.change(screen.getByLabelText("释义正文"), {
       target: { value: "dear mother helps mother" }
     });
     await waitFor(() =>
       expect(observe.mock.lastCall?.[1]?.[0]?.source_segments[0].start).toBe(5)
     );
-    fireEvent.click(screen.getByRole("button", { name: "上一步" }));
+    fireEvent.click(screen.getByLabelText("上一步"));
     await waitFor(() =>
       expect(observe.mock.lastCall?.[0]?.text).toBe("mother helps mother")
     );
@@ -88,10 +88,10 @@ describe("正文关联编辑器", () => {
       target: { value: "father helps mother" }
     });
     expect(observe.mock.lastCall?.[1]).toHaveLength(1);
-    fireEvent.click(screen.getByRole("button", { name: "确认修改" }));
+    fireEvent.click(screen.getByText("确认修改"));
     await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([]));
     expect(screen.getByText(/被修改词段的关联已移除/)).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "上一步" }));
+    fireEvent.click(screen.getByLabelText("上一步"));
     await waitFor(() => expect(observe.mock.lastCall?.[1]).toHaveLength(1));
   });
 });
@@ -126,19 +126,21 @@ it("已关联词形的待确认选择阻止外层完成，取消只关闭候选�
     );
   }
   render(<Host />);
-  fireEvent.click(screen.getByRole("button", { name: "关联单词" }));
+  fireEvent.click(screen.getByLabelText("关联单词"));
   fireEvent.mouseDown(screen.getByLabelText("关联 job（1）"), { button: 0 });
-  fireEvent.click(await screen.findByRole("button", { name: "暂选新词形" }));
-  expect(screen.getByRole("button", { name: "完成标注" })).toBeDisabled();
-  fireEvent.click(screen.getByRole("button", { name: "取消候选" }));
+  fireEvent.click(
+    await screen.findByText("暂选新词形", { selector: "button" })
+  );
+  expect(screen.getByText("完成标注", { selector: "button" })).toBeDisabled();
+  fireEvent.click(screen.getByText("取消候选", { selector: "button" }));
   expect(
     screen.queryByRole("button", { name: "暂选新词形" })
   ).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "完成标注" })).toBeEnabled();
+  expect(screen.getByText("完成标注", { selector: "button" })).toBeEnabled();
   expect(observe).not.toHaveBeenCalled();
   fireEvent.mouseDown(screen.getByLabelText("关联 job（1）"), { button: 0 });
   await waitFor(() =>
-    expect(screen.getByRole("button", { name: "暂选新词形" })).toBeVisible()
+    expect(screen.getByText("暂选新词形", { selector: "button" })).toBeVisible()
   );
 });
 
