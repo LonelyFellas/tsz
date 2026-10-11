@@ -83,10 +83,12 @@ function dictionaryWord(input: string): string {
     .replaceAll("t͡ʃ", "tʃ")
     .replaceAll("d͡ʒ", "dʒ")
     .replaceAll("ʧ", "tʃ")
-    .replaceAll("ʤ", "dʒ");
+    .replaceAll("ʤ", "dʒ")
+    // Normalize equivalent short vowels before the rhotic/lexical rules.
+    .replace(/e(?!ɪ)/gu, "ɛ");
   // Match complete units once: ɑː and eɪ must survive short-vowel substitutions.
   let value = source.replace(
-    /ɑː|ɑr|iː|eɪ|ju(?!ː)|(?:ɪ(?:ʸ)?r|ʊ(?:ʷ|ʸ)?r|ɛr)(?![aɑæʌɔəɛɪɒʊuieɜ])|ɪə|ʊə|oʊ|[ɚɝɾɑe]/gu,
+    /ɑː|ɑr|iː|eɪ|ju(?!ː)|(?:ɪ(?:ʸ)?r|ʊ(?:ʷ|ʸ)?r|ɛr)(?![.ˈˌ]*[aɑæʌɔəɛɪɒʊuieɜɚɝ])|ɪə|ʊə|oʊ|[ɚɝɾɑ]/gu,
     (phone) =>
       ({
         ɑː: "ɑː",
@@ -106,8 +108,7 @@ function dictionaryWord(input: string): string {
         ɚ: "ər",
         ɝ: "ər",
         ɾ: "d",
-        ɑ: "ɒ",
-        e: "ɛ"
+        ɑ: "ɒ"
       })[phone]!
   );
   // Happy vowel: bare i after an earlier vowel, without an immediately preceding

@@ -6,6 +6,29 @@ import {
 } from "./pronunciation-synthesis";
 
 describe("语雀统一音标规则", () => {
+  it("音节及重音标记不把后接元音的 r 变成卷舌韵尾", () => {
+    for (const [input, expected] of [
+      ["ˈvɛr.i", "ˈvɛr.ɪ"],
+      ["vɛrˈi", "vɛrˈi"],
+      ["ˈvɪr.əl", "ˈvɪr.əl"],
+      ["ˈvɛrɚ", "ˈvɛrər"]
+    ])
+      expect(convertDictionaryToUnified(input!, "very", "uk")).toMatchObject({
+        ok: true,
+        value: expected
+      });
+  });
+  it("e 与 ɛ 的等价字典记法经过相同的卷舌和读法转换", () => {
+    for (const [word, first, second, expected] of [
+      ["careful", "ˈkerfʊl", "ˈkɛrfʊl", "ˈkɛərfəl"],
+      ["hair", "her", "hɛr", "hɛər"],
+      ["very", "ˈver.i", "ˈvɛr.i", "ˈvɛr.ɪ"]
+    ]) {
+      const result = convertDictionaryToUnified(first!, word!, "us");
+      expect(result).toMatchObject({ ok: true, value: expected });
+      expect(result).toEqual(convertDictionaryToUnified(second!, word!, "us"));
+    }
+  });
   it("与对象原型同名的词形按普通词处理，不命中例词规则", () => {
     expect(
       convertDictionaryToUnified("kənˈstrʌktər", "constructor", "us")
