@@ -28,8 +28,8 @@ case "$deploy_form_spelling_regularity" in
   *) echo "!! DEPLOY_FORM_SPELLING_REGULARITY 必须为 true 或 false" >&2; exit 1 ;;
 esac
 
-# 新格式先升级读取端和后端，验收后再显式开放写入。
-deploy_sentence_formatting="${DEPLOY_SENTENCE_FORMATTING:-false}"
+# 配套后端与读取端已上线验收，默认开放格式写入；兼容发布仍可显式关闭。
+deploy_sentence_formatting="${DEPLOY_SENTENCE_FORMATTING:-true}"
 case "$deploy_sentence_formatting" in
   true|false) ;;
   *) echo "!! DEPLOY_SENTENCE_FORMATTING 必须为 true 或 false" >&2; exit 1 ;;
