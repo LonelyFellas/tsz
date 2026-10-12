@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/.codex/worktrees/session-offline-recovery/tsz-rust/docs/openapi.json",
-  "_source_sha256": "85a7ab8be0b115aa4e50100777cbea766de9ce2a4985f208b23ce4aa5c0616ca",
+  "_source_sha256": "376b0daeb7f84e05dd9774c6474eb4388bcef300b48a6c76770884136fa14b15",
   "roots": [
     "LearningRewardDay",
     "LearningPreview",

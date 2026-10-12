@@ -459,14 +459,14 @@ describe("failed admin logout after an uncertain Cookie rotation", () => {
     runtime.tokens.setAccessToken(null);
     runtime.store.getState().setProfile(null);
     await cancelled;
-    expect(values.get(`tsz:refresh-unconfirmed:${baseUrl}`)).toBe("1");
+    expect(values.get(`tsz:refresh-unconfirmed:${baseUrl}`)).toBe("cancelled");
     const loginPage = createAdminAuthRuntime({ baseUrl });
     await expect(loginPage.restoreSession()).rejects.toThrow("请重新登录");
     expect(fetch).toHaveBeenCalledTimes(2);
     deliver(response(200, { access_token: "late-rotation", expires_in: 900 }));
     await vi.advanceTimersByTimeAsync(0);
     expect(runtime.tokens.getToken()).toBeUndefined();
-    expect(values.get(`tsz:refresh-unconfirmed:${baseUrl}`)).toBe("1");
+    expect(values.get(`tsz:refresh-unconfirmed:${baseUrl}`)).toBe("cancelled");
     loginPage.persistSession({ access_token: "new-login", expires_in: 900 });
     expect(values.has(`tsz:refresh-unconfirmed:${baseUrl}`)).toBe(false);
     loginPage.tokens.setAccessToken(null);
@@ -497,7 +497,7 @@ describe("failed admin logout after an uncertain Cookie rotation", () => {
     await expect(loginPage.restoreSession()).rejects.toThrow("请重新登录");
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(loginPage.store.getState().refreshUnconfirmed).toBe(true);
-    expect(values.get(`tsz:refresh-unconfirmed:${baseUrl}`)).toBe("1");
+    expect(values.get(`tsz:refresh-unconfirmed:${baseUrl}`)).toBe("cancelled");
     loginPage.persistSession({
       access_token: "explicit-login",
       expires_in: 900
@@ -511,4 +511,62 @@ describe("failed admin logout after an uncertain Cookie rotation", () => {
     loginPage.tokens.setAccessToken(null);
     expect(vi.getTimerCount()).toBe(0);
   });
+});
+
+describe("旧标签页标记迁移", () => {
+  it.each([200, 401])(
+    "恢复返回 %s 时退出加载态，成功加载资料、失效不复活身份",
+    async (status) => {
+      vi.useFakeTimers();
+      const baseUrl = "/api/v1/admin";
+      const marker = `tsz:refresh-unconfirmed:${baseUrl}`;
+      const values = new Map([[marker, "1"]]);
+      vi.stubGlobal("sessionStorage", {
+        getItem: (key: string) => values.get(key) ?? null,
+        setItem: (key: string, value: string) => values.set(key, value),
+        removeItem: (key: string) => values.delete(key)
+      });
+      const fetch = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(
+          new Response(null, {
+            status: 204,
+            headers: {
+              "x-refresh-recovery": "v1",
+              "x-refresh-current-only": "v1"
+            }
+          })
+        )
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({ access_token: "restored", expires_in: 900 }),
+            { status, headers: { "x-refresh-recovery": "v1" } }
+          )
+        )
+        .mockResolvedValueOnce(
+          response(200, {
+            id: "admin",
+            phone: "13800138000",
+            display_name: "测试管理员",
+            role: "super_admin",
+            can_publish_lexicon: true,
+            permission_version: 1,
+            catalog_version: "v1",
+            permissions: [],
+            preferences: { dialect: "uk" }
+          })
+        );
+      const runtime = createAdminAuthRuntime({ baseUrl });
+      await runtime.restoreSession();
+      expect(runtime.store.getState().hydrated).toBe(true);
+      expect(runtime.store.getState().connectionError).toBe(false);
+      expect(runtime.store.getState().refreshUnconfirmed).toBe(false);
+      expect(runtime.tokens.getToken()).toBe(
+        status === 200 ? "restored" : undefined
+      );
+      expect(fetch).toHaveBeenCalledTimes(status === 200 ? 3 : 2);
+      expect(values.has(marker)).toBe(false);
+      runtime.tokens.setAccessToken(null);
+    }
+  );
 });

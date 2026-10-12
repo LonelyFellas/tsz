@@ -46,20 +46,25 @@ export function createTokenManager({
   let requestId: string | null = null;
   const unconfirmedKey = `tsz:refresh-unconfirmed:${baseUrl}`;
   let unconfirmed: RefreshUnconfirmedError | null = null;
+  let legacyUnconfirmed = false;
   try {
-    if (
-      typeof sessionStorage !== "undefined" &&
-      sessionStorage.getItem(unconfirmedKey) === "1"
-    )
+    const marker =
+      typeof sessionStorage !== "undefined"
+        ? sessionStorage.getItem(unconfirmedKey)
+        : null;
+    if (marker === "1" || marker === "cancelled") {
       unconfirmed = new RefreshUnconfirmedError();
+      legacyUnconfirmed = marker === "1";
+    }
   } catch {
     /* In-memory protection still applies when storage is unavailable. */
   }
 
-  function rememberUnconfirmed(value: boolean) {
+  function rememberUnconfirmed(value: boolean, cancelled = false) {
     try {
       if (typeof sessionStorage === "undefined") return;
-      if (value) sessionStorage.setItem(unconfirmedKey, "1");
+      if (value)
+        sessionStorage.setItem(unconfirmedKey, cancelled ? "cancelled" : "1");
       else sessionStorage.removeItem(unconfirmedKey);
     } catch {
       /* No credentials are stored; storage failure must not replay a Cookie. */
@@ -98,12 +103,14 @@ export function createTokenManager({
     // Local logout cannot prove that the rotating Cookie was revoked.
     if (token !== null) {
       unconfirmed = null;
+      legacyUnconfirmed = false;
       rememberUnconfirmed(false);
       clearRequest(true);
-    } else if (refreshController || requestId) {
+    } else if (refreshController || requestId || unconfirmed) {
       // Rotation may already be committed; the old generation's catch cannot record it.
       unconfirmed ??= new RefreshUnconfirmedError();
-      rememberUnconfirmed(true);
+      legacyUnconfirmed = false;
+      rememberUnconfirmed(true, true);
     }
     refreshController?.abort();
     refreshController = null;
@@ -131,7 +138,7 @@ export function createTokenManager({
   }
 
   function refreshTokens(): Promise<string> {
-    if (unconfirmed) {
+    if (unconfirmed && !legacyUnconfirmed) {
       onRefreshError?.(unconfirmed);
       return Promise.reject(unconfirmed);
     }
@@ -162,7 +169,7 @@ export function createTokenManager({
       }
       const recovering = Boolean(stored || requestId);
       requestId = stored || requestId || crypto.randomUUID();
-      if (recovering) {
+      if (recovering || legacyUnconfirmed) {
         const capability = await fetch(`${baseUrl}/auth/refresh`, {
           method: "HEAD",
           credentials: "include",
@@ -175,7 +182,12 @@ export function createTokenManager({
         recoverySupported =
           capability.ok &&
           capability.headers.get("x-refresh-recovery") === "v1";
-        if (!recoverySupported) throw new RefreshUnconfirmedError();
+        if (
+          !recoverySupported ||
+          (legacyUnconfirmed &&
+            capability.headers.get("x-refresh-current-only") !== "v1")
+        )
+          throw new RefreshUnconfirmedError();
       }
       try {
         const storage = requestStorage();
@@ -188,7 +200,10 @@ export function createTokenManager({
       return fetch(`${baseUrl}/auth/refresh`, {
         method: "POST",
         credentials: "include",
-        headers: { "X-Refresh-Request-Id": requestId },
+        headers: {
+          "X-Refresh-Request-Id": requestId,
+          ...(legacyUnconfirmed ? { "X-Refresh-Current-Only": "v1" } : {})
+        },
         signal: deadline.signal
       }).then(async (res) => {
         assertCurrent();
@@ -210,7 +225,9 @@ export function createTokenManager({
           throw new Error("会话刷新响应异常，请重试");
         }
         accessToken = data.access_token;
-        const recovered = refreshNeeded;
+        const recovered = refreshNeeded || legacyUnconfirmed;
+        unconfirmed = null;
+        legacyUnconfirmed = false;
         refreshNeeded = false;
         clearRequest();
         rememberUnconfirmed(false);
@@ -249,6 +266,16 @@ export function createTokenManager({
           throw unconfirmed;
         }
         if (error instanceof HttpError && error.status < 500) clearRequest();
+        if (
+          error instanceof HttpError &&
+          error.status === 401 &&
+          legacyUnconfirmed
+        ) {
+          unconfirmed = null;
+          legacyUnconfirmed = false;
+          rememberUnconfirmed(false);
+          onRefreshError?.(null);
+        }
         if (!(error instanceof HttpError && error.status === 401)) {
           refreshNeeded = true;
           onRefreshError?.(error);

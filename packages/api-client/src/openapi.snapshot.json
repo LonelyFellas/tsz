@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/.codex/worktrees/session-offline-recovery/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-12T12:53:36.766Z",
+  "_generatedAt": "2026-10-12T15:17:23.983Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -177,6 +177,12 @@
   },
   "operationHeaders": {
     "post /admin/auth/refresh": [
+      {
+        "name": "X-Refresh-Current-Only",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
       {
         "name": "X-Refresh-Request-Id",
         "in": "header",
@@ -543,6 +549,12 @@
       }
     ],
     "post /auth/refresh": [
+      {
+        "name": "X-Refresh-Current-Only",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
       {
         "name": "X-Refresh-Request-Id",
         "in": "header",
