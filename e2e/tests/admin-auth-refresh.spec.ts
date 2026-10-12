@@ -191,7 +191,7 @@ test("主动刷新 503 自动恢复会话并保留未提交表单", async ({ pag
   available = true;
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
   await expect(page.getByText(message)).toHaveCount(0);
-  expect(refreshes).toBe(3);
+  await expect.poll(() => refreshes).toBe(3);
   expect(keys[2]).toBe(keys[1]);
   await expect(page).toHaveURL(/\/change-password$/);
   await expect(page.getByLabel("当前密码", { exact: true })).toHaveValue(
@@ -249,3 +249,47 @@ for (const failure of ["429", "503", "offline"] as const) {
     await expect(page).toHaveURL(/\/settings\/profile$/);
   });
 }
+
+test("旧标签页未知标记刷新后直接恢复，无需重新登录", async ({ page }) => {
+  const attempts: string[] = [];
+  await page.route("**/api/v1/admin/**", async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path.endsWith("/auth/refresh")) {
+      attempts.push(request.method());
+      if (request.method() === "HEAD")
+        return route.fulfill({
+          status: 204,
+          headers: {
+            "x-refresh-recovery": "v1",
+            "x-refresh-current-only": "v1"
+          }
+        });
+      if (attempts.length > 1)
+        expect(request.headers()["x-refresh-current-only"]).toBe("v1");
+      return route.fulfill({
+        headers: { "x-refresh-recovery": "v1" },
+        json: { access_token: "restored", expires_in: 900 }
+      });
+    }
+    if (path.endsWith("/profile")) return route.fulfill({ json: profile });
+    return route.fulfill({ json: {} });
+  });
+  await page.goto("/settings/profile");
+  await expect(page.getByRole("heading", { name: "个人设置" })).toBeVisible();
+  await page.evaluate(() =>
+    sessionStorage.setItem("tsz:refresh-unconfirmed:/api/v1/admin", "1")
+  );
+  attempts.length = 0;
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "个人设置" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "重新登录" })).toHaveCount(0);
+  await expect(page.getByText("加载中...", { exact: true })).toHaveCount(0);
+  await expect(page).toHaveURL(/\/settings\/profile$/);
+  expect(attempts).toEqual(["HEAD", "POST"]);
+  expect(
+    await page.evaluate(() =>
+      sessionStorage.getItem("tsz:refresh-unconfirmed:/api/v1/admin")
+    )
+  ).toBeNull();
+});

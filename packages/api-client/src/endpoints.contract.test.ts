@@ -734,7 +734,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "85a7ab8be0b115aa4e50100777cbea766de9ce2a4985f208b23ce4aa5c0616ca"
+      "376b0daeb7f84e05dd9774c6474eb4388bcef300b48a6c76770884136fa14b15"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1001,6 +1001,12 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       required: false,
       schema: { type: ["string", "null"], format: "uuid" }
     };
+    const currentOnlyHeader = {
+      name: "X-Refresh-Current-Only",
+      in: "header",
+      required: false,
+      schema: { type: ["string", "null"] }
+    };
     expect(specPaths["/auth/refresh"]?.slice().sort()).toEqual([
       "head",
       "post"
@@ -1010,8 +1016,8 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       "post"
     ]);
     expect(snapshot.operationHeaders).toEqual({
-      "post /auth/refresh": [refreshHeader],
-      "post /admin/auth/refresh": [refreshHeader],
+      "post /auth/refresh": [currentOnlyHeader, refreshHeader],
+      "post /admin/auth/refresh": [currentOnlyHeader, refreshHeader],
       ...Object.fromEntries(
         [
           ...new Set([
