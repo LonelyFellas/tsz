@@ -1001,6 +1001,12 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       required: false,
       schema: { type: ["string", "null"], format: "uuid" }
     };
+    const currentOnlyHeader = {
+      name: "X-Refresh-Current-Only",
+      in: "header",
+      required: false,
+      schema: { type: ["string", "null"] }
+    };
     expect(specPaths["/auth/refresh"]?.slice().sort()).toEqual([
       "head",
       "post"
@@ -1010,8 +1016,8 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       "post"
     ]);
     expect(snapshot.operationHeaders).toEqual({
-      "post /auth/refresh": [refreshHeader],
-      "post /admin/auth/refresh": [refreshHeader],
+      "post /auth/refresh": [currentOnlyHeader, refreshHeader],
+      "post /admin/auth/refresh": [currentOnlyHeader, refreshHeader],
       ...Object.fromEntries(
         [
           ...new Set([
