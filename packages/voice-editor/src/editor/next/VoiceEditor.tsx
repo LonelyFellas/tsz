@@ -279,7 +279,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   );
   const [customPause, setCustomPause] = useState("");
   const [openTool, setOpenTool] = useState<string>();
-  const pauseActive = openTool === "pause" || brush.kind === "pause";
+  const pauseActive =
+    openTool === "pause" ||
+    brush.kind === "pause" ||
+    (!readOnly && brush.kind === "none" && pauseGap !== undefined);
 
   /**
    * 撤销/重做栈。快照存「文本 + 全部标注」，因为改文本会连带重挂标注，
@@ -582,7 +585,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       return;
     }
     if (key === "pause") {
-      if (openTool === "pause" || brush.kind === "pause") {
+      if (pauseActive) {
         setOpenTool(undefined);
         changeBrush({ kind: "none" });
         return;
