@@ -1822,7 +1822,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     const api = await mockAdminV3Api(page);
     await page.goto("/words");
 
-    await page.getByRole("button", { name: "创建词条" }).click();
+    await page.getByRole("button", { name: "创建词汇" }).click();
     await expect(page).toHaveURL(/\/words\/new$/);
     await page.getByPlaceholder("例如 center 或 give up").fill("orbit");
     await page.getByRole("button", { name: "词典检测" }).click();
@@ -2115,7 +2115,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
   }) => {
     const api = await mockAdminV3Api(page, { formsFailureOnce: false });
     await page.goto("/words");
-    await page.getByRole("button", { name: "创建词条" }).click();
+    await page.getByRole("button", { name: "创建词汇" }).click();
     await page.getByPlaceholder("例如 center 或 give up").fill("orbit");
     await page.getByRole("button", { name: "词典检测" }).click();
     await page.getByRole("button", { name: "创建并进入词形与发音" }).click();

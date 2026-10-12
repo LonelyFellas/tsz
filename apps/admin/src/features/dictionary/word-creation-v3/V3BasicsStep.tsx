@@ -287,7 +287,7 @@ function V3BasicsContent({
       <div className="word-step-heading">
         <span className="word-step-number">STEP 01</span>
         <Typography.Title level={2} style={{ margin: 0 }}>
-          创建新词条
+          创建词汇
         </Typography.Title>
         <Typography.Paragraph className="word-step-description">
           录入词条，系统将判断词条类型，检测智能词库中的已有原形，并从内置词典匹配英美词形和建议词性。
@@ -414,7 +414,7 @@ export function V3BasicsStep({
       onStepChange={onStepChange}
       presentation={{
         wordExists: true,
-        breadcrumbTitle: entryLabel ? `${entryLabel} · 创建新词条` : "创建词条",
+        breadcrumbTitle: entryLabel ? `${entryLabel} · 创建词汇` : "创建词汇",
         completedSteps: word.completed_steps,
         summaryHeadword: (
           <strong className="v3-summary-headword tsz-words">
