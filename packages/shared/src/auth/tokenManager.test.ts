@@ -344,3 +344,29 @@ it("响应丢失后页面重载仍使用原刷新键，探明能力后续接", a
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
+
+it("曾支持恢复的后端回退后，必须重新探测而不能重放旧 Cookie", async () => {
+  vi.useFakeTimers();
+  const fetch = vi
+    .spyOn(globalThis, "fetch")
+    .mockResolvedValueOnce(
+      new Response(JSON.stringify({ access_token: "valid", expires_in: 900 }), {
+        headers: { "x-refresh-recovery": "v1" }
+      })
+    )
+    .mockRejectedValueOnce(new TypeError("response lost after rollback"))
+    .mockResolvedValueOnce(new Response(null, { status: 405 }));
+  const manager = createTokenManager({ baseUrl: "/rollback-recovery" });
+  await expect(manager.refreshTokens()).resolves.toBe("valid");
+  await expect(manager.refreshTokens()).rejects.toThrow("response lost");
+  await vi.advanceTimersByTimeAsync(600_000);
+  expect(fetch.mock.calls.map(([, init]) => init?.method)).toEqual([
+    "POST",
+    "POST",
+    "HEAD"
+  ]);
+  await expect(manager.refreshTokens()).rejects.toThrow("请重新登录");
+  expect(fetch).toHaveBeenCalledTimes(3);
+  expect(manager.getToken()).toBe("valid");
+  manager.setAccessToken(null);
+});

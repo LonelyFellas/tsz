@@ -162,7 +162,7 @@ export function createTokenManager({
       }
       const recovering = Boolean(stored || requestId);
       requestId = stored || requestId || crypto.randomUUID();
-      if (recovering && recoverySupported !== true) {
+      if (recovering) {
         const capability = await fetch(`${baseUrl}/auth/refresh`, {
           method: "HEAD",
           credentials: "include",
