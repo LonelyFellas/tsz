@@ -734,7 +734,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "b86979f96fe88dbb66bbee2d5a8370d78f13b332107889270145ddd6d124f102"
+      "85a7ab8be0b115aa4e50100777cbea766de9ce2a4985f208b23ce4aa5c0616ca"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -987,7 +987,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     );
   });
 
-  it("词库幂等 UUID 头与可选拼写能力头保持独立契约", () => {
+  it("请求幂等、会话恢复与格式能力头保持独立契约", () => {
     const expectedHeader = {
       name: "Idempotency-Key",
       in: "header",
@@ -995,8 +995,24 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       schema: { type: "string", format: "uuid" }
     };
 
-    expect(snapshot.operationHeaders).toEqual(
-      Object.fromEntries(
+    const refreshHeader = {
+      name: "X-Refresh-Request-Id",
+      in: "header",
+      required: false,
+      schema: { type: ["string", "null"], format: "uuid" }
+    };
+    expect(specPaths["/auth/refresh"]?.slice().sort()).toEqual([
+      "head",
+      "post"
+    ]);
+    expect(specPaths["/admin/auth/refresh"]?.slice().sort()).toEqual([
+      "head",
+      "post"
+    ]);
+    expect(snapshot.operationHeaders).toEqual({
+      "post /auth/refresh": [refreshHeader],
+      "post /admin/auth/refresh": [refreshHeader],
+      ...Object.fromEntries(
         [
           ...new Set([
             ...IDEMPOTENT_LEXICON_OPERATIONS,
@@ -1034,7 +1050,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
           ].sort((a, b) => a.name.localeCompare(b.name))
         ])
       )
-    );
+    });
   });
 
   it("词条发布与生命周期字段的 required/可选性和后端一致", () => {

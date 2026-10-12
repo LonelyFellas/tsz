@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTokenManager } from "./tokenManager";
 
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
+
 function jsonResponse(body: unknown, ok = true): Response {
   return {
     ok,
@@ -258,7 +264,7 @@ it("unknown Cookie rotation survives runtime recreation but explicit login clear
     .spyOn(globalThis, "fetch")
     .mockRejectedValueOnce(new TypeError("offline"));
   const first = createTokenManager({ baseUrl: "/api/reliability" });
-  await expect(first.refreshTokens()).rejects.toThrow("请重新登录");
+  await expect(first.refreshTokens()).rejects.toThrow("offline");
   first.setAccessToken(null);
   expect(first.getToken()).toBeUndefined();
   await expect(first.refreshTokens()).rejects.toThrow("请重新登录");
@@ -277,15 +283,90 @@ it.each([500, 502, 503, 504])(
     vi.useFakeTimers();
     const fetch = vi
       .spyOn(globalThis, "fetch")
-      .mockResolvedValue(new Response(null, { status }));
+      .mockImplementation(
+        async (_url, init) =>
+          new Response(null, { status: init?.method === "HEAD" ? 405 : status })
+      );
     const manager = createTokenManager({ baseUrl: "/unknown-rotation" });
     manager.setAccessToken("valid-access-token");
-    await expect(manager.refreshTokens()).rejects.toThrow("请重新登录");
+    await expect(manager.refreshTokens()).rejects.toThrow("会话刷新失败");
     await vi.advanceTimersByTimeAsync(600_000);
     await expect(manager.refreshTokens()).rejects.toThrow("请重新登录");
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(
+      fetch.mock.calls.filter(([, init]) => init?.method === "POST")
+    ).toHaveLength(1);
     expect(manager.getToken()).toBe("valid-access-token");
     manager.setAccessToken(null);
     vi.useRealTimers();
   }
 );
+
+it("响应丢失后页面重载仍使用原刷新键，探明能力后续接", async () => {
+  vi.useFakeTimers();
+  const values = new Map<string, string>();
+  vi.stubGlobal("sessionStorage", {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key)
+  });
+  const fetch = vi
+    .spyOn(globalThis, "fetch")
+    .mockRejectedValueOnce(new TypeError("response lost"))
+    .mockResolvedValueOnce(
+      new Response(null, {
+        status: 204,
+        headers: { "x-refresh-recovery": "v1" }
+      })
+    )
+    .mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ access_token: "recovered", expires_in: 900 }),
+        { headers: { "x-refresh-recovery": "v1" } }
+      )
+    );
+  const first = createTokenManager({ baseUrl: "/reload-recovery" });
+  await expect(first.refreshTokens()).rejects.toThrow("response lost");
+  vi.clearAllTimers(); // 旧页面已卸载。
+  const reloaded = createTokenManager({ baseUrl: "/reload-recovery" });
+  await expect(reloaded.refreshTokens()).resolves.toBe("recovered");
+  const key = new Headers(fetch.mock.calls[0]?.[1]?.headers).get(
+    "x-refresh-request-id"
+  );
+  expect(key).toMatch(/^[a-f0-9-]{36}$/);
+  expect(
+    new Headers(fetch.mock.calls[2]?.[1]?.headers).get("x-refresh-request-id")
+  ).toBe(key);
+  expect(fetch.mock.calls[1]?.[1]?.method).toBe("HEAD");
+  expect(values.size).toBe(0);
+  reloaded.setAccessToken(null);
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+it("曾支持恢复的后端回退后，必须重新探测而不能重放旧 Cookie", async () => {
+  vi.useFakeTimers();
+  const fetch = vi
+    .spyOn(globalThis, "fetch")
+    .mockResolvedValueOnce(
+      new Response(JSON.stringify({ access_token: "valid", expires_in: 900 }), {
+        headers: { "x-refresh-recovery": "v1" }
+      })
+    )
+    .mockRejectedValueOnce(new TypeError("response lost after rollback"))
+    .mockResolvedValueOnce(new Response(null, { status: 405 }));
+  const manager = createTokenManager({ baseUrl: "/rollback-recovery" });
+  await expect(manager.refreshTokens()).resolves.toBe("valid");
+  await expect(manager.refreshTokens()).rejects.toThrow("response lost");
+  await vi.advanceTimersByTimeAsync(600_000);
+  expect(fetch.mock.calls.map(([, init]) => init?.method)).toEqual([
+    "POST",
+    "POST",
+    "HEAD"
+  ]);
+  await expect(manager.refreshTokens()).rejects.toThrow("请重新登录");
+  expect(fetch).toHaveBeenCalledTimes(3);
+  expect(manager.getToken()).toBe("valid");
+  manager.setAccessToken(null);
+});

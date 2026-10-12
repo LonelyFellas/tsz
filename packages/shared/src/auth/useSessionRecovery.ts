@@ -22,7 +22,12 @@ export function useSessionRecovery(
       if (getState().connectionError) void retry();
     };
     window.addEventListener("online", online);
-    return () => window.removeEventListener("online", online);
+    const recovered = () => void retry();
+    window.addEventListener("tsz:session-recovered", recovered);
+    return () => {
+      window.removeEventListener("online", online);
+      window.removeEventListener("tsz:session-recovered", recovered);
+    };
   }, [retry, getState]);
 
   return { retry, retrying };

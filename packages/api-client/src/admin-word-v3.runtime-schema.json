@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/admin-wordbook-management/docs/openapi.json",
-  "_source_sha256": "b86979f96fe88dbb66bbee2d5a8370d78f13b332107889270145ddd6d124f102",
+  "_source": "/Users/darwish/.codex/worktrees/session-offline-recovery/tsz-rust/docs/openapi.json",
+  "_source_sha256": "85a7ab8be0b115aa4e50100777cbea766de9ce2a4985f208b23ce4aa5c0616ca",
   "roots": [
     "LearningRewardDay",
     "LearningPreview",

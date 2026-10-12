@@ -23,9 +23,36 @@ describe.each(["web", "admin"] as const)("%s HTTP + auth runtime", (realm) => {
     rt.persistSession({ access_token: "old", expires_in: 60 });
     rt.store.getState().setHydrated(true);
     const location = { href: "" };
-    vi.stubGlobal("window", { location });
+    vi.stubGlobal("window", Object.assign(new EventTarget(), { location }));
     return { rt, request, location };
   }
+
+  it("离线期间不消费刷新凭据，恢复联网后自动续期", async () => {
+    vi.useFakeTimers();
+    const location = { href: "" };
+    const win = Object.assign(new EventTarget(), { location });
+    vi.stubGlobal("window", win);
+    vi.stubGlobal("document", new EventTarget());
+    const navigator = { onLine: false };
+    vi.stubGlobal("navigator", navigator);
+    const rt =
+      realm === "web"
+        ? createAuthRuntime({ baseUrl: "/api/v1" })
+        : createAdminAuthRuntime({ baseUrl: "/api/v1/admin" });
+    rt.persistSession({ access_token: "old", expires_in: 60 });
+    const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+      if (!navigator.onLine) throw new TypeError("Failed to fetch");
+      return response(200, { access_token: "recovered", expires_in: 900 });
+    });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(rt.store.getState().refreshUnconfirmed).toBe(false);
+    navigator.onLine = true;
+    win.dispatchEvent(new Event("online"));
+    await vi.waitFor(() => expect(rt.tokens.getToken()).toBe("recovered"));
+    expect(location.href).toBe("");
+    rt.tokens.setAccessToken(null);
+  });
 
   it("取 token 后立即换会话时，不发送旧身份的写请求", async () => {
     const { rt } = setup();
@@ -138,7 +165,7 @@ describe.each(["web", "admin"] as const)("%s HTTP + auth runtime", (realm) => {
   });
 
   it.each([429, "offline", 503])(
-    "页面恢复可见时 refresh %s 保留会话，未知轮换结果禁止重放",
+    "页面恢复可见时 refresh %s 失败，联网后自动续接",
     async (failure) => {
       vi.useFakeTimers();
       const location = { href: "" };
@@ -154,29 +181,37 @@ describe.each(["web", "admin"] as const)("%s HTTP + auth runtime", (realm) => {
           : createAdminAuthRuntime({ baseUrl: "/api/v1/admin" });
       rt.persistSession({ access_token: "old", expires_in: 10 });
       rt.store.getState().setHydrated(true);
-      const fetch = vi.spyOn(globalThis, "fetch");
-      if (typeof failure === "number")
-        fetch.mockResolvedValueOnce(response(failure));
-      else fetch.mockRejectedValueOnce(new TypeError("offline"));
+      let available = false;
+      const keys: (string | null)[] = [];
+      vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
+        if (init?.method === "HEAD")
+          return new Response(null, {
+            status: 204,
+            headers: { "x-refresh-recovery": "v1" }
+          });
+        keys.push(new Headers(init?.headers).get("x-refresh-request-id"));
+        if (!available) {
+          if (typeof failure === "number") return response(failure);
+          throw new TypeError("offline");
+        }
+        return new Response(
+          JSON.stringify({ access_token: "new", expires_in: 900 }),
+          { headers: { "x-refresh-recovery": "v1" } }
+        );
+      });
       doc.dispatchEvent(new Event("visibilitychange"));
       await vi.waitFor(() =>
         expect(rt.store.getState().connectionError).toBe(true)
       );
       expect(rt.tokens.getToken()).toBe("old");
-      expect(location.href).toBe("");
-      fetch.mockResolvedValueOnce(
-        response(200, { access_token: "new", expires_in: 900 })
-      );
+      expect(rt.store.getState().refreshUnconfirmed).toBe(false);
+      available = true;
       win.dispatchEvent(new Event("online"));
-      if (failure !== 429) {
-        await vi.advanceTimersByTimeAsync(60_000);
-        expect(fetch).toHaveBeenCalledTimes(1);
-        expect(rt.tokens.getToken()).toBe("old");
-        expect(rt.store.getState().refreshUnconfirmed).toBe(true);
-      } else {
-        await vi.waitFor(() => expect(rt.tokens.getToken()).toBe("new"));
-        expect(rt.store.getState().connectionError).toBe(false);
-      }
+      await vi.waitFor(() => expect(rt.tokens.getToken()).toBe("new"));
+      expect(location.href).toBe("");
+      expect(rt.store.getState().connectionError).toBe(false);
+      expect(keys).toHaveLength(2);
+      if (failure !== 429) expect(keys[1]).toBe(keys[0]);
       rt.tokens.setAccessToken(null);
     }
   );
@@ -208,28 +243,32 @@ describe.each(["web", "admin"] as const)("%s HTTP + auth runtime", (realm) => {
   });
 
   it.each([429, "offline", 503])(
-    "业务 401 后 refresh %s 不登出，断网后需重新登录",
+    "业务 401 后 refresh %s 失败，安全续接且不登出",
     async (failure) => {
       const { rt, request, location } = setup();
-      const fetch = vi
-        .spyOn(globalThis, "fetch")
-        .mockResolvedValueOnce(response(401, { code: "invalid_token" }));
-      if (typeof failure === "number")
-        fetch.mockResolvedValueOnce(response(failure));
-      else fetch.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+      let available = false;
+      const keys: (string | null)[] = [];
+      vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
+        if (init?.method === "HEAD")
+          return new Response(null, {
+            status: 204,
+            headers: { "x-refresh-recovery": "v1" }
+          });
+        if (!String(url).endsWith("/auth/refresh"))
+          return response(401, { code: "invalid_token" });
+        keys.push(new Headers(init?.headers).get("x-refresh-request-id"));
+        if (!available) {
+          if (typeof failure === "number") return response(failure);
+          throw new TypeError("offline");
+        }
+        return response(200, { access_token: "new", expires_in: 900 });
+      });
       await expect(request()).rejects.toThrow();
-      expect(fetch).toHaveBeenCalledTimes(2);
-      expect(rt.tokens.getToken()).toBe("old");
       expect(location.href).toBe("");
-      fetch.mockResolvedValueOnce(
-        response(200, { access_token: "new", expires_in: 900 })
-      );
-      if (failure !== 429) {
-        await expect(rt.tokens.refreshTokens()).rejects.toThrow("请重新登录");
-        expect(fetch).toHaveBeenCalledTimes(2);
-        rt.tokens.setAccessToken("new-login");
-      }
+      available = true;
       await expect(rt.tokens.refreshTokens()).resolves.toBe("new");
+      expect(keys).toHaveLength(2);
+      if (failure !== 429) expect(keys[1]).toBe(keys[0]);
       expect(rt.tokens.getToken()).toBe("new");
       rt.tokens.setAccessToken(null);
     }
@@ -448,7 +487,7 @@ describe("failed admin logout after an uncertain Cookie rotation", () => {
     const fetch = vi
       .spyOn(globalThis, "fetch")
       .mockRejectedValue(new TypeError("offline"));
-    await expect(runtime.tokens.refreshTokens()).rejects.toThrow("请重新登录");
+    await expect(runtime.tokens.refreshTokens()).rejects.toThrow("offline");
     await expect(runtime.api.auth.logout()).rejects.toThrow("offline");
     // The normal logout hook performs this local cleanup even if revocation failed.
     runtime.tokens.setAccessToken(null);

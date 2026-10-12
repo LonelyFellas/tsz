@@ -20,7 +20,7 @@ import { useState } from "react";
 import type { AdminUserView, Role } from "@tsz/types";
 import { CopyableText } from "@/components/CopyableText";
 import { GatedButton } from "@/components/GatedButton";
-import { usePermission } from "@/lib/auth";
+import { useAuthStore, usePermission } from "@/lib/auth";
 import { useSetUserStatus, useUserList } from "./api";
 import { EditUserModal } from "./EditUserModal";
 import {
@@ -45,6 +45,7 @@ export function UserManagement() {
   const canEdit = usePermission("users.edit");
   const canSetStatus = usePermission("users.set_status");
   const canReadSensitive = usePermission("users.read_sensitive");
+  const connectionError = useAuthStore((state) => state.connectionError);
 
   const [filters, setFilters] = useState<UserFilterValues>({});
   const [role, setRole] = useState<UserRoleTab>("all");
@@ -291,7 +292,7 @@ export function UserManagement() {
           />
         )}
 
-        {listQuery.isError && (
+        {listQuery.isError && !connectionError && (
           <Alert
             type="error"
             showIcon

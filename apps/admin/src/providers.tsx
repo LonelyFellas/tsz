@@ -68,6 +68,13 @@ export function RootProviders() {
     (s) => s.permissionModelIncompatible
   );
   useEffect(() => {
+    const recovered = () => {
+      if (useAuthStore.getState().profile)
+        void queryClient.refetchQueries({
+          type: "active",
+          predicate: (query) => query.state.status === "error"
+        });
+    };
     const refresh = () => {
       if (authRuntime.tokens.getToken())
         void authRuntime.refreshProfile().catch(() => undefined);
@@ -77,10 +84,12 @@ export function RootProviders() {
     };
     window.addEventListener("focus", refresh);
     window.addEventListener("online", refresh);
+    window.addEventListener("tsz:session-recovered", recovered);
     document.addEventListener("visibilitychange", visible);
     return () => {
       window.removeEventListener("focus", refresh);
       window.removeEventListener("online", refresh);
+      window.removeEventListener("tsz:session-recovered", recovered);
       document.removeEventListener("visibilitychange", visible);
     };
   }, []);
@@ -110,8 +119,8 @@ export function RootProviders() {
                   refreshUnconfirmed
                     ? "会话刷新结果尚未确认，请重新登录；当前操作请先查看结果"
                     : hydrated
-                      ? "连接暂时中断，当前内容已保留"
-                      : "暂时无法恢复会话，请重试"
+                      ? "连接暂时中断，联网后将自动恢复；当前内容已保留"
+                      : "正在恢复连接，联网后将自动继续"
                 }
                 action={
                   <Button
