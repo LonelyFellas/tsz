@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import type { CreateWordlist, Wordlist } from "@tsz/types";
+import type { CreateWordlist, Wordlist, WordlistSuggestions } from "@tsz/types";
 import { TEST_USER, mockApi } from "./support/mockApi";
 
 test.beforeEach(async ({ page }) => {
@@ -38,7 +38,8 @@ test("登录后选词并保存私密词表", async ({ page }) => {
   const pagination = { page: 1, page_size: 20, total: 1, total_pages: 1 };
   let saved: CreateWordlist | undefined;
   let list: Wordlist | undefined;
-  await page.route("**/api/v1/wordlists/catalog?*", async (route) => {
+  await page.route("**/api/v1/wordlists/suggestions?*", async (route) => {
+    expect(new URL(route.request().url()).searchParams.get("q")).toBe("app");
     await route.fulfill({
       json: {
         items: [
@@ -48,9 +49,8 @@ test("登录后选词并保存私密词表", async ({ page }) => {
             label: "apple",
             glosses: ["苹果"]
           }
-        ],
-        pagination
-      }
+        ]
+      } satisfies WordlistSuggestions
     });
   });
   await page.route("**/api/v1/me/wordlists**", async (route) => {
