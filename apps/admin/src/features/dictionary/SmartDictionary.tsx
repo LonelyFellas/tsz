@@ -1195,7 +1195,7 @@ export function SmartDictionary({
                 icon={<PlusOutlined />}
                 onClick={() => navigate("/words/new")}
               >
-                创建词条
+                创建词汇
               </Button>
             )}
             {adminWordsDataSourceCapabilities.batchArchive && (

@@ -1371,7 +1371,7 @@ describe("SmartDictionary", () => {
 
     expect(screen.getByText("垃圾桶")).toBeInTheDocument();
     expect(screen.queryByText("状态")).toBeNull();
-    expect(screen.queryByText("创建词条")).toBeNull();
+    expect(screen.queryByText("创建词汇")).toBeNull();
     // 垃圾桶里全是归档词条，批量动作恒为恢复，不该出现「移入垃圾桶」。
     expect(screen.queryByText("移入垃圾桶")).toBeNull();
     expect(
@@ -1428,7 +1428,7 @@ describe("SmartDictionary", () => {
 
     expect(screen.getByText("智能词库")).toBeInTheDocument();
     expect(screen.getByText("状态")).toBeInTheDocument();
-    expect(screen.getByText("创建词条")).toBeInTheDocument();
+    expect(screen.getByText("创建词汇")).toBeInTheDocument();
   });
 
   it("垃圾桶行提供永久删除，确认后携带双 revision 调用", async () => {
