@@ -4,7 +4,7 @@ export type WordlistState =
   "draft" | "pending" | "published" | "rejected" | "withdrawn";
 export interface Wordlist {
   id: string;
-  owner_user_id: string;
+  owner_user_id: string | null;
   owner_name: string;
   name: string;
   state: WordlistState;
@@ -180,4 +180,46 @@ export interface WordlistForm {
   label: string;
   sense_ids: string[];
   variants: WordlistFormVariant[];
+}
+
+export interface AdminWordlist {
+  wordlist: Wordlist;
+  review_state: "none" | "pending" | "approved" | "rejected";
+  recommended: boolean;
+  tip_amount: string;
+}
+export interface AdminWordlistPage {
+  items: AdminWordlist[];
+  pagination: WordlistPage["pagination"];
+}
+export interface WordlistManagementQuery extends WordlistQuery {
+  public?: boolean;
+  recommended?: boolean;
+  created_from?: string;
+  created_before?: string;
+}
+export interface AdminWordlistItemInput {
+  entry_id: string;
+  admin_note: string;
+}
+export interface CreateAdminWordlist {
+  idempotency_key: string;
+  name: string;
+  items: AdminWordlistItemInput[];
+}
+export interface UpdateAdminWordlist {
+  expected_revision: number;
+  name: string;
+  items: AdminWordlistItemInput[];
+}
+export interface AdminWordlistEdit {
+  detail: AdminWordlist;
+  items: (AdminWordlistItemInput & { candidate: WordlistCandidate | null })[];
+}
+
+export interface WordlistSuggestionQuery {
+  q: string;
+}
+export interface WordlistSuggestions {
+  items: WordlistCandidate[];
 }

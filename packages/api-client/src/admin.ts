@@ -1,3 +1,4 @@
+import { createRelatedSuggestionEndpoints } from "./related-suggestions";
 import { SENTENCE_FORMATTING_HEADERS } from "./sentence-formatting";
 import { createAdminWordlistEndpoints } from "./wordlists";
 import { createAdminCoinEndpoints } from "./admin-coins";
@@ -318,6 +319,7 @@ export function createAdminEndpoints(http: HttpClient) {
      * 树内节点 id 由前端生成（UUID v4）且跨保存稳定，updated_at 兼作乐观锁 token。
      */
     words: {
+      ...createRelatedSuggestionEndpoints(http),
       /** GET /admin/lexicon/entries — 列表页：搜索行筛选 + 分页。 */
       list: (query: AdminWordListQuery = {}) =>
         http

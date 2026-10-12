@@ -94,6 +94,16 @@ export const router = createBrowserRouter([
             })
           },
           ...wordRoutes,
+          ...[
+            ADMIN_PAGE_ROUTES.wordlistsNew,
+            ADMIN_PAGE_ROUTES.wordlistsEdit
+          ].map((route) => ({
+            ...route,
+            lazy: async () => ({
+              Component: (await import("@/pages/WordListEditor"))
+                .WordListEditorPage
+            })
+          })),
           {
             ...ADMIN_PAGE_ROUTES.wordlists,
             lazy: async () => ({

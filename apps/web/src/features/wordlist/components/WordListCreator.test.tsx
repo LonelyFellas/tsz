@@ -7,7 +7,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/lib/request", () => ({
   api: {
     wordList: {
-      catalog: vi.fn(),
+      suggestions: vi.fn(),
       create: vi.fn(),
       edit: vi.fn(),
       myItems: vi.fn(),
@@ -33,9 +33,8 @@ beforeEach(() => {
       active_role: "student"
     }
   });
-  vi.mocked(api.wordList.catalog).mockResolvedValue({
-    items: [candidate],
-    pagination: { page: 1, page_size: 3, total: 1, total_pages: 1 }
+  vi.mocked(api.wordList.suggestions).mockResolvedValue({
+    items: [candidate]
   });
 });
 it("changing a selected spelling clears the entry ID and blocks save", async () => {
@@ -163,7 +162,7 @@ it("selecting another entry and returning preserves the original note version", 
     revision: 1,
     pagination: { page: 1, page_size: 100, total: 1, total_pages: 1 }
   });
-  vi.mocked(api.wordList.catalog).mockImplementation(async (query) => ({
+  vi.mocked(api.wordList.suggestions).mockImplementation(async (query) => ({
     items:
       query?.q === "banana"
         ? [
@@ -174,8 +173,7 @@ it("selecting another entry and returning preserves the original note version", 
               glosses: ["香蕉"]
             }
           ]
-        : [candidate],
-    pagination: { page: 1, page_size: 3, total: 1, total_pages: 1 }
+        : [candidate]
   }));
   vi.mocked(api.wordList.update).mockResolvedValue(meta);
   renderWithProviders(<WordListCreator id="list" />);

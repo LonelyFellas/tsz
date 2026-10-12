@@ -1,0 +1,256 @@
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  Alert,
+  Button,
+  Drawer,
+  Input,
+  Modal,
+  Pagination,
+  Space,
+  Tabs,
+  Typography
+} from "antd";
+import type { Wordlist, WordlistEntry, WordlistReview } from "@tsz/types";
+import { RichTextReadOnly } from "@tsz/voice-editor/reader";
+import { api, usePermission } from "@/lib/auth";
+
+export function WordlistEntryView({ entry }: { entry: WordlistEntry }) {
+  return (
+    <section style={{ padding: "16px 0", borderBottom: "1px solid #eee" }}>
+      <Typography.Title level={5}>{entry.label}</Typography.Title>
+      {entry.pos.map((pos) => (
+        <div key={pos.pos_id}>
+          <Typography.Text type="secondary">
+            {pos.label ?? pos.pos}
+          </Typography.Text>
+          {pos.senses.map((sense) => (
+            <div key={sense.id}>
+              {sense.definitions.map((def) => (
+                <div key={def.id}>
+                  {def.texts.map((text, i) => (
+                    <RichTextReadOnly key={i} value={text.content} />
+                  ))}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      ))}
+    </section>
+  );
+}
+const reviewLabels: Record<string, string> = {
+  pending: "待审核",
+  approved: "审核通过",
+  rejected: "审核未通过",
+  cancelled: "已取消"
+};
+export function WordlistDetails({
+  list,
+  adminId,
+  onClose
+}: {
+  list: Wordlist;
+  adminId: string;
+  onClose: () => void;
+}) {
+  const client = useQueryClient();
+  const canReview = usePermission("wordlists.review");
+  const [tab, setTab] = useState("current");
+  const [page, setPage] = useState(1);
+  const [requestId, setRequestId] = useState<string>();
+  const [action, setAction] = useState<"approve" | "reject" | null>(null);
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const key = ["admin-wordlists", adminId, list.id];
+  const reviews = useQuery({
+    queryKey: [...key, "reviews"],
+    queryFn: ({ signal }) => api.wordlists.reviews(list.id, { signal }),
+    enabled: tab === "reviews"
+  });
+  const current: WordlistReview | undefined =
+    reviews.data?.items.find((r) => r.id === requestId) ??
+    reviews.data?.items[0];
+  const items = useQuery({
+    queryKey: [...key, "items", tab, current?.id, page, list.revision],
+    enabled: tab === "current" || !!current,
+    queryFn: ({ signal }) =>
+      tab === "current"
+        ? api.wordlists.currentItems(
+            list.id,
+            { page, page_size: 20 },
+            { signal }
+          )
+        : api.wordlists.items(
+            list.id,
+            current!.id,
+            { page, page_size: 20 },
+            { signal }
+          )
+  });
+  async function decide() {
+    if (!current || !action || busy) return;
+    if (action === "reject" && !reason.trim()) {
+      setError("请填写驳回原因");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      await api.wordlists.decision(list.id, current.id, {
+        expected_revision: current.submitted_revision,
+        approve: action === "approve",
+        reason: action === "approve" ? null : reason.trim()
+      });
+      await client.invalidateQueries({
+        queryKey: ["admin-wordlists", adminId]
+      });
+      onClose();
+    } catch {
+      setError(
+        "操作失败或结果未确认，请刷新核对；旧审核不会覆盖已修改的内容。"
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <>
+      <Drawer
+        title={list.name}
+        open
+        size="large"
+        onClose={() => {
+          if (!busy) onClose();
+        }}
+      >
+        <Typography.Paragraph>
+          创建人：{list.owner_name} · ID：{list.id}
+        </Typography.Paragraph>
+        <Tabs
+          activeKey={tab}
+          onChange={(v) => {
+            setTab(v);
+            setPage(1);
+          }}
+          items={[
+            { key: "current", label: "当前内容" },
+            { key: "reviews", label: "审核记录" }
+          ]}
+        />
+        {tab === "reviews" && (
+          <>
+            {reviews.isError ? (
+              <Alert
+                type="error"
+                title="审核记录加载失败"
+                action={
+                  <Button onClick={() => void reviews.refetch()}>重试</Button>
+                }
+              />
+            ) : reviews.isPending ? (
+              <p>读取审核记录…</p>
+            ) : !current ? (
+              <p>尚未提交公开审核</p>
+            ) : (
+              <>
+                <Space wrap>
+                  {reviews.data.items.map((r) => (
+                    <Button
+                      key={r.id}
+                      type={r.id === current.id ? "primary" : "default"}
+                      onClick={() => {
+                        setRequestId(r.id);
+                        setPage(1);
+                      }}
+                    >
+                      {reviewLabels[r.state] ?? r.state} · v
+                      {r.submitted_revision}
+                    </Button>
+                  ))}
+                </Space>
+                <p>申请名称：{current.name}</p>
+                {current.reason && <p>审核意见：{current.reason}</p>}
+                {current.state === "pending" && canReview && (
+                  <Space>
+                    <Button
+                      type="primary"
+                      onClick={() => {
+                        setAction("approve");
+                        setError("");
+                      }}
+                    >
+                      通过审核
+                    </Button>
+                    <Button
+                      danger
+                      onClick={() => {
+                        setAction("reject");
+                        setError("");
+                      }}
+                    >
+                      驳回
+                    </Button>
+                  </Space>
+                )}
+              </>
+            )}
+          </>
+        )}
+        {(tab === "current" || current) &&
+          (items.isError ? (
+            <Alert
+              type="error"
+              title="词条加载失败"
+              action={
+                <Button onClick={() => void items.refetch()}>重试</Button>
+              }
+            />
+          ) : items.isPending ? (
+            <p>读取词条…</p>
+          ) : (
+            <>
+              {items.data.items.map((item) =>
+                item.entry ? (
+                  <WordlistEntryView key={item.entry_id} entry={item.entry} />
+                ) : (
+                  <p key={item.entry_id}>内容不可用</p>
+                )
+              )}
+              <Pagination
+                current={page}
+                pageSize={20}
+                total={items.data.pagination.total}
+                showSizeChanger={false}
+                onChange={setPage}
+              />
+            </>
+          ))}
+      </Drawer>
+      <Modal
+        title={action === "approve" ? "确认通过审核并公开" : "驳回词表"}
+        open={!!action}
+        confirmLoading={busy}
+        onCancel={() => {
+          if (!busy) setAction(null);
+        }}
+        onOk={() => void decide()}
+      >
+        <p>
+          {current?.name} · v{current?.submitted_revision}
+        </p>
+        {action === "reject" && (
+          <Input.TextArea
+            aria-label="操作原因"
+            maxLength={1000}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+          />
+        )}
+        {error && <Alert type="error" title={error} />}
+      </Modal>
+    </>
+  );
+}

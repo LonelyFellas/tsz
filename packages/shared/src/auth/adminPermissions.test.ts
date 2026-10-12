@@ -226,3 +226,26 @@ it.each(["words", "sentences"] as const)(
     ).toBe(false);
   }
 );
+
+it.each(["create", "edit", "visibility", "recommend", "delete"])(
+  "wordlist %s requires its explicit grant and access, while super admins can use it",
+  (action) => {
+    const key = `wordlists.${action}`;
+    const admin = { id: "admin", role: "admin" };
+    expect(hasAdminPermission({ ...admin, role: "super_admin" }, key)).toBe(
+      true
+    );
+    expect(
+      hasAdminPermission({ ...admin, permissions: ["wordlists.access"] }, key)
+    ).toBe(false);
+    expect(hasAdminPermission({ ...admin, permissions: [key] }, key)).toBe(
+      false
+    );
+    expect(
+      hasAdminPermission(
+        { ...admin, permissions: [key, "wordlists.access"] },
+        key
+      )
+    ).toBe(true);
+  }
+);

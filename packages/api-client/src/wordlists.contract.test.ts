@@ -169,3 +169,102 @@ it("resolves the optional reading query enums from the generated contract", () =
     }
   }
 });
+
+it("management wire supports platform authors and keeps private notes out of public DTOs", async () => {
+  const detail = {
+    wordlist: { ...meta, owner_user_id: null },
+    review_state: "none",
+    recommended: false,
+    tip_amount: "9007199254740993"
+  };
+  expect(() => decodeWordlistResponse("AdminWordlist", detail)).not.toThrow();
+  expect(() =>
+    decodeWordlistResponse("Wordlist", detail.wordlist)
+  ).not.toThrow();
+  expect(() =>
+    decodeWordlistResponse("Wordlist", {
+      ...detail.wordlist,
+      admin_note: "secret"
+    })
+  ).toThrow();
+  const http = {
+    get: vi.fn().mockResolvedValue({ items: [detail], pagination }),
+    post: vi.fn().mockResolvedValue(detail),
+    put: vi.fn().mockResolvedValue(detail)
+  } as unknown as HttpClient;
+  const admin = createAdminWordlistEndpoints(http);
+  await admin.management({
+    q: "作者",
+    public: false,
+    recommended: false,
+    created_from: "2026-10-12T00:00:00Z",
+    page: 2,
+    page_size: 20
+  });
+  const url = new URL(
+    vi.mocked(http.get).mock.calls[0]![0],
+    "https://example.test"
+  );
+  expect(url.pathname).toBe("/wordlists/management");
+  expect(Object.fromEntries(url.searchParams)).toEqual({
+    q: "作者",
+    public: "false",
+    recommended: "false",
+    created_from: "2026-10-12T00:00:00Z",
+    page: "2",
+    page_size: "20"
+  });
+  await admin.visibility(id, { expected_revision: 7, public: true });
+  expect(http.post).toHaveBeenLastCalledWith(`/wordlists/${id}/visibility`, {
+    expected_revision: 7,
+    public: true
+  });
+  await admin.recommend(id, { expected_revision: 8, recommended: true });
+  expect(http.post).toHaveBeenLastCalledWith(
+    `/wordlists/${id}/recommendation`,
+    { expected_revision: 8, recommended: true }
+  );
+  await admin.delete(id, { expected_revision: 9 });
+  expect(http.post).toHaveBeenLastCalledWith(`/wordlists/${id}/delete`, {
+    expected_revision: 9
+  });
+});
+
+it("autocomplete has a bounded response, no pagination and forwards cancellation", async () => {
+  const candidate = {
+    entry_id: id,
+    publication_id: id,
+    label: "apple",
+    glosses: ["苹果"]
+  };
+  const http = {
+    get: vi.fn().mockResolvedValue({ items: [candidate] })
+  } as unknown as HttpClient;
+  const signal = new AbortController().signal;
+  await createAdminWordlistEndpoints(http).suggestions(
+    { q: "appl" },
+    { signal }
+  );
+  expect(http.get).toHaveBeenLastCalledWith("/wordlists/suggestions?q=appl", {
+    signal
+  });
+  await createWordlistEndpoints(http).suggestions(
+    { q: "look forward" },
+    { signal }
+  );
+  expect(http.get).toHaveBeenLastCalledWith(
+    "/wordlists/suggestions?q=look+forward",
+    { signal }
+  );
+  expect(() =>
+    decodeWordlistResponse("WordlistSuggestions", {
+      items: [candidate, candidate, candidate, candidate]
+    })
+  ).toThrow();
+  expect(() =>
+    decodeWordlistResponse("WordlistSuggestions", {
+      items: [candidate],
+      pagination
+    })
+  ).toThrow();
+});

@@ -1,6 +1,12 @@
 /** 前端只匹配已实现的稳定业务 key，未知 key（包括通配符）永不授权。 */
 export const ADMIN_PERMISSION_DEPENDENCIES = {
   "wordlists.access": [],
+  "wordlists.create": ["wordlists.access"],
+  "wordlists.edit": ["wordlists.access"],
+  "wordlists.visibility": ["wordlists.access"],
+  "wordlists.recommend": ["wordlists.access"],
+  "wordlists.delete": ["wordlists.access"],
+
   "wordlists.review": ["wordlists.access"],
   "wordlists.withdraw": ["wordlists.access"],
   "coins.access": [],

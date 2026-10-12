@@ -4,6 +4,14 @@ import { hasAdminPermission } from "@tsz/shared/auth";
 
 /** Router、直链守卫与已落地菜单共用路径及页面权限。匹配采用 Router 默认语义。 */
 export const ADMIN_PAGE_ROUTES = {
+  wordlistsNew: {
+    path: "wordlists/new",
+    handle: { permission: "wordlists.create" }
+  },
+  wordlistsEdit: {
+    path: "wordlists/:id/edit",
+    handle: { permission: "wordlists.edit" }
+  },
   wordlists: { path: "wordlists", handle: { permission: "wordlists.access" } },
   coins: { path: "coins", handle: { permission: "coins.access" } },
   myCoins: { path: "account/coins", handle: {} },

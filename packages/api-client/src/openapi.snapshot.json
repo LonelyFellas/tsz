@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/zentao-88-user-permissions/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-11T07:43:46.554Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/admin-wordbook-management/docs/openapi.json",
+  "_generatedAt": "2026-10-12T06:27:45.856Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -31,6 +31,7 @@
     "/admin/lexicon/entries/delete-batch": ["post"],
     "/admin/lexicon/entries/publications/batch": ["post"],
     "/admin/lexicon/entries/related-search": ["get"],
+    "/admin/lexicon/entries/related-suggestions": ["get"],
     "/admin/lexicon/entries/restore-batch": ["post"],
     "/admin/lexicon/entries/stats": ["get"],
     "/admin/lexicon/entries/{entry_id}/sentences/{sentence_id}/visibility": [
@@ -45,6 +46,7 @@
     "/admin/lexicon/entries/{id}/publications/{publication_id}/rollback": [
       "post"
     ],
+    "/admin/lexicon/entries/{id}/relation-senses": ["get"],
     "/admin/lexicon/entries/{id}/restore": ["post"],
     "/admin/lexicon/entries/{id}/steps/forms": ["put"],
     "/admin/lexicon/entries/{id}/steps/forms/impact": ["post"],
@@ -98,10 +100,19 @@
     "/admin/users/{id}/identity-documents/{file_id}": ["get"],
     "/admin/users/{id}/status": ["patch"],
     "/admin/users/{id}/teacher-certification": ["delete"],
-    "/admin/wordlists": ["get"],
+    "/admin/wordlists": ["get", "post"],
+    "/admin/wordlists/catalog": ["get"],
+    "/admin/wordlists/management": ["get"],
+    "/admin/wordlists/suggestions": ["get"],
+    "/admin/wordlists/{id}": ["get", "put"],
+    "/admin/wordlists/{id}/delete": ["post"],
+    "/admin/wordlists/{id}/edit": ["get"],
+    "/admin/wordlists/{id}/items": ["get"],
+    "/admin/wordlists/{id}/recommendation": ["post"],
     "/admin/wordlists/{id}/review-requests": ["get"],
     "/admin/wordlists/{id}/review-requests/{request_id}/decision": ["post"],
     "/admin/wordlists/{id}/review-requests/{request_id}/items": ["get"],
+    "/admin/wordlists/{id}/visibility": ["post"],
     "/admin/wordlists/{id}/withdraw": ["post"],
     "/auth/account": ["delete"],
     "/auth/account/deletion-code": ["post"],
@@ -152,11 +163,14 @@
     "/me/wordlists/{id}": ["get", "put"],
     "/me/wordlists/{id}/edit": ["get"],
     "/me/wordlists/{id}/items": ["get"],
+    "/me/wordlists/{id}/publish": ["post"],
     "/me/wordlists/{id}/review-requests": ["get", "post"],
     "/me/wordlists/{id}/withdraw": ["post"],
     "/otp/send": ["post"],
     "/wordlists": ["get"],
     "/wordlists/catalog": ["get"],
+    "/wordlists/recommended": ["get"],
+    "/wordlists/suggestions": ["get"],
     "/wordlists/{id}": ["get"],
     "/wordlists/{id}/items": ["get"],
     "/wordlists/{id}/tips": ["post"]
@@ -504,6 +518,14 @@
         "schema": { "type": ["string", "null"] }
       }
     ],
+    "get /admin/wordlists/{id}/items": [
+      {
+        "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
     "get /admin/wordlists/{id}/review-requests/{request_id}/items": [
       {
         "name": "X-TSZ-Sentence-Formatting",
@@ -692,6 +714,28 @@
         "schema": { "type": "string" }
       }
     ],
+    "get /admin/lexicon/entries/related-suggestions": [
+      {
+        "name": "exclude_entry_id",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      {
+        "name": "q",
+        "in": "query",
+        "required": true,
+        "schema": { "type": "string", "maxLength": 200 }
+      }
+    ],
+    "get /admin/lexicon/entries/{id}/relation-senses": [
+      {
+        "name": "publication_id",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "format": "uuid" }
+      }
+    ],
     "get /admin/me/coins/entries": [
       {
         "name": "page",
@@ -792,6 +836,14 @@
         "in": "query",
         "required": false,
         "schema": { "$ref": "#/components/schemas/WordlistState" }
+      }
+    ],
+    "get /admin/wordlists/suggestions": [
+      {
+        "name": "q",
+        "in": "query",
+        "required": true,
+        "schema": { "type": "string", "maxLength": 200 }
       }
     ],
     "get /admin/wordlists/{id}/review-requests/{request_id}/items": [
@@ -1056,6 +1108,14 @@
         "schema": { "type": "string", "maxLength": 100 }
       }
     ],
+    "get /wordlists/suggestions": [
+      {
+        "name": "q",
+        "in": "query",
+        "required": true,
+        "schema": { "type": "string", "maxLength": 200 }
+      }
+    ],
     "get /wordlists/{id}/items": [
       {
         "name": "page",
@@ -1295,6 +1355,16 @@
         "500": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
+    "get /admin/lexicon/entries/related-suggestions": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/RelatedEntrySuggestions" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "post /admin/lexicon/entries/restore-batch": {
       "request": { "$ref": "#/components/schemas/EntryLifecycleBatchInput" },
       "responses": {
@@ -1438,6 +1508,18 @@
         "409": { "$ref": "#/components/schemas/ProblemDetails" },
         "410": { "$ref": "#/components/schemas/ProblemDetails" },
         "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/lexicon/entries/{id}/relation-senses": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/RelatedEntrySenses" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
         "503": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
@@ -3569,6 +3651,31 @@
         { "$ref": "#/components/schemas/RelatedSearchLegacyResponse" },
         { "$ref": "#/components/schemas/RelatedSearchV2Response" }
       ]
+    },
+    "RelatedEntrySuggestions": {
+      "type": "object",
+      "required": ["items"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/RelatedEntrySuggestion" },
+          "maxItems": 3
+        }
+      },
+      "additionalProperties": false
+    },
+    "RelatedEntrySenses": {
+      "type": "object",
+      "required": ["entry_id", "publication_id", "senses"],
+      "properties": {
+        "entry_id": { "type": "string", "format": "uuid" },
+        "publication_id": { "type": "string", "format": "uuid" },
+        "senses": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/RelatedWordSenseV3" }
+        }
+      },
+      "additionalProperties": false
     },
     "FormsImpactItemV3": {
       "type": "object",

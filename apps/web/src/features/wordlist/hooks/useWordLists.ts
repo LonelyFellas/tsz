@@ -6,20 +6,28 @@ export const wordListKeys = {
   public: ["wordlists", "public"] as const,
   mine: (id: string | undefined) => ["wordlists", "user", id] as const
 };
-export function useWordLists(mine = false, page = 1, q = "") {
+export function useWordLists(
+  mine = false,
+  page = 1,
+  q = "",
+  recommended = false
+) {
   const id = useUserStore((s) => s.user?.id);
   return useQuery({
     queryKey: [
       ...(mine ? wordListKeys.mine(id) : wordListKeys.public),
       "list",
       page,
-      q
+      q,
+      recommended
     ],
     enabled: !mine || !!id,
     refetchOnMount: "always",
     queryFn: ({ signal }) =>
       mine
         ? api.wordList.mine({ page, q }, { signal })
-        : api.wordList.list({ page, q }, { signal })
+        : recommended
+          ? api.wordList.recommended({ page, q }, { signal })
+          : api.wordList.list({ page, q }, { signal })
   });
 }
