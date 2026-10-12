@@ -1,14 +1,29 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor
+} from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
 import type { AdminWordlistEdit } from "@tsz/types";
-import { Editor } from "./WordListEditor";
+import { Editor, WordListEditorPage } from "./WordListEditor";
 vi.mock("@/lib/auth", () => ({
   api: {
-    wordlists: { create: vi.fn(), update: vi.fn(), suggestions: vi.fn() }
+    wordlists: {
+      create: vi.fn(),
+      update: vi.fn(),
+      suggestions: vi.fn(),
+      edit: vi.fn()
+    }
   },
-  useAuthStore: vi.fn(),
+  useAuthStore: (
+    select: (state: {
+      profile: { id: string; permission_version: number };
+    }) => unknown
+  ) => select({ profile: { id: "admin", permission_version: 1 } }),
   usePermission: () => true
 }));
 import { api } from "@/lib/auth";
@@ -160,4 +175,67 @@ it("changing the query cancels the old request and cannot show stale suggestions
       screen.queryByRole("button", { name: /apple.*苹果/ })
     ).not.toBeInTheDocument()
   );
+});
+
+it("opens from the refreshed snapshot and keeps its revision with dirty fields", async () => {
+  const refreshed: AdminWordlistEdit = {
+    ...initial,
+    detail: {
+      ...initial.detail,
+      wordlist: { ...initial.detail.wordlist, name: "最新词表", revision: 8 }
+    }
+  };
+  let resolveSnapshot!: (value: AdminWordlistEdit) => void;
+  vi.mocked(api.wordlists.edit).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        resolveSnapshot = resolve;
+      })
+  );
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  const key = ["admin-wordlists", "admin", "edit", "list", 1];
+  client.setQueryData(key, initial);
+  const router = createMemoryRouter(
+    [
+      { path: "/wordlists/:id/edit", element: <WordListEditorPage /> },
+      { path: "/wordlists", element: <p>返回列表成功</p> }
+    ],
+    { initialEntries: ["/wordlists/list/edit"] }
+  );
+  render(
+    <QueryClientProvider client={client}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
+  );
+  expect(screen.queryByLabelText("词表名称")).not.toBeInTheDocument();
+  await act(async () => {
+    resolveSnapshot(refreshed);
+  });
+  expect(await screen.findByLabelText("词表名称")).toHaveValue("最新词表");
+  fireEvent.change(screen.getByLabelText("后台备注 1"), {
+    target: { value: "本次备注" }
+  });
+  const concurrent: AdminWordlistEdit = {
+    ...refreshed,
+    detail: {
+      ...refreshed.detail,
+      wordlist: { ...refreshed.detail.wordlist, name: "他人更新", revision: 9 }
+    }
+  };
+  vi.mocked(api.wordlists.edit).mockResolvedValue(concurrent);
+  await act(async () => {
+    await client.invalidateQueries({ queryKey: key });
+  });
+  expect(screen.getByLabelText("词表名称")).toHaveValue("最新词表");
+  expect(screen.getByLabelText("后台备注 1")).toHaveValue("本次备注");
+  vi.mocked(api.wordlists.update).mockResolvedValue(refreshed.detail);
+  fireEvent.click(screen.getByText("保 存"));
+  await screen.findByText("返回列表成功");
+  expect(api.wordlists.update).toHaveBeenCalledWith("list", {
+    expected_revision: 8,
+    name: "最新词表",
+    items: [{ entry_id: "entry", admin_note: "本次备注" }]
+  });
 });

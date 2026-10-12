@@ -72,7 +72,8 @@ export function WordListEditorPage() {
         action={<Button onClick={() => void snapshot.refetch()}>重试</Button>}
       />
     );
-  if (id && !snapshot.data) return <p>正在加载…</p>;
+  if (id && (!snapshot.data || !snapshot.isFetchedAfterMount))
+    return <p>正在加载…</p>;
   return (
     <Editor
       key={`${profile.id}:${profile.permission_version}:${id ?? "new"}`}
@@ -83,11 +84,13 @@ export function WordListEditorPage() {
 }
 export function Editor({
   adminId,
-  initial
+  initial: snapshot
 }: {
   adminId: string;
   initial?: AdminWordlistEdit;
 }) {
+  // Keep the optimistic-lock revision tied to the fields the editor opened.
+  const [initial] = useState(snapshot);
   const navigate = useNavigate();
   const client = useQueryClient();
   const [name, setName] = useState(initial?.detail.wordlist.name ?? "");
