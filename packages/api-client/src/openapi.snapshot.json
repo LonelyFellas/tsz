@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/admin-wordbook-management/docs/openapi.json",
-  "_generatedAt": "2026-10-12T06:27:45.856Z",
+  "_source": "/Users/darwish/.codex/worktrees/session-offline-recovery/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-10-12T12:53:36.766Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -15,7 +15,7 @@
     "/admin/auth/login-code": ["post"],
     "/admin/auth/logout": ["post"],
     "/admin/auth/logout-all": ["post"],
-    "/admin/auth/refresh": ["post"],
+    "/admin/auth/refresh": ["head", "post"],
     "/admin/coins/accounts": ["get"],
     "/admin/coins/accounts/{owner_type}/{owner_id}/entries": ["get"],
     "/admin/coins/manual-credits": ["post"],
@@ -123,7 +123,7 @@
     "/auth/password/change": ["post"],
     "/auth/password/forgot": ["post"],
     "/auth/password/reset": ["post"],
-    "/auth/refresh": ["post"],
+    "/auth/refresh": ["head", "post"],
     "/auth/register": ["post"],
     "/avatars/{id}": ["get"],
     "/me": ["get", "patch"],
@@ -176,6 +176,14 @@
     "/wordlists/{id}/tips": ["post"]
   },
   "operationHeaders": {
+    "post /admin/auth/refresh": [
+      {
+        "name": "X-Refresh-Request-Id",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"], "format": "uuid" }
+      }
+    ],
     "post /admin/lexicon/entries": [
       {
         "name": "Idempotency-Key",
@@ -532,6 +540,14 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "post /auth/refresh": [
+      {
+        "name": "X-Refresh-Request-Id",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"], "format": "uuid" }
       }
     ],
     "get /me/wordlists/{id}/items": [

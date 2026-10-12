@@ -49,8 +49,8 @@ function SessionRestorer() {
         {refreshUnconfirmed
           ? "会话刷新结果尚未确认，请重新登录；当前操作请先查看结果"
           : hydrated
-            ? "连接暂时中断，当前内容已保留"
-            : "暂时无法恢复会话，请重试"}
+            ? "连接暂时中断，联网后将自动恢复；当前内容已保留"
+            : "正在恢复连接，联网后将自动继续"}
       </p>
       <button
         type="button"
@@ -69,6 +69,17 @@ function SessionRestorer() {
 export function Providers({ children }: { children: React.ReactNode }) {
   // getQueryClient 在浏览器端返回单例,不放进 useState 也安全。
   const queryClient = getQueryClient();
+  useEffect(() => {
+    const recovered = () => {
+      if (useUserStore.getState().user)
+        void queryClient.refetchQueries({
+          type: "active",
+          predicate: (query) => query.state.status === "error"
+        });
+    };
+    window.addEventListener("tsz:session-recovered", recovered);
+    return () => window.removeEventListener("tsz:session-recovered", recovered);
+  }, [queryClient]);
   useEffect(
     () =>
       useUserStore.subscribe((state, previous) => {

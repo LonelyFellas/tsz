@@ -15,6 +15,7 @@ import type { AdminUserListQuery, AdminUserView } from "@tsz/types";
 // 编辑 / 启禁用按后台身份置灰：逐例可切超管与普通 admin 两种身份。
 const auth = vi.hoisted(() => ({
   isSuperAdmin: true,
+  connectionError: false,
   permissions: undefined as string[] | undefined
 }));
 
@@ -28,7 +29,9 @@ vi.mock("@/lib/auth", () => ({
     }
   },
   usePermission: (key: string) =>
-    auth.permissions ? auth.permissions.includes(key) : auth.isSuperAdmin
+    auth.permissions ? auth.permissions.includes(key) : auth.isSuperAdmin,
+  useAuthStore: (selector: (state: { connectionError: boolean }) => unknown) =>
+    selector({ connectionError: auth.connectionError })
 }));
 
 import { api } from "@/lib/auth";
@@ -127,6 +130,7 @@ function fakeList(query: AdminUserListQuery = {}) {
 }
 
 beforeEach(() => {
+  auth.connectionError = false;
   auth.isSuperAdmin = true;
   auth.permissions = undefined;
   users = seed();
@@ -454,5 +458,14 @@ describe("UserManagement", () => {
     expect(screen.getByText("用户炸了")).toBeInTheDocument();
     fireEvent.click(screen.getByText(/重\s?试/));
     await waitFor(() => expect(screen.getByText("record")).toBeInTheDocument());
+  });
+
+  it("会话正在自动恢复时，不重复展示列表错误和无效重试", async () => {
+    auth.connectionError = true;
+    mockList.mockRejectedValue(new Error("会话连接中断"));
+    renderPage();
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    expect(screen.queryByText("用户列表加载失败")).not.toBeInTheDocument();
+    expect(screen.queryByText(/重\s?试/)).not.toBeInTheDocument();
   });
 });
