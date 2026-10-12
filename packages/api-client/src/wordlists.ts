@@ -6,6 +6,12 @@ import type {
 } from "@tsz/types";
 import { checkInteger } from "./coins";
 import type {
+  AdminWordlist,
+  AdminWordlistPage,
+  AdminWordlistEdit,
+  CreateAdminWordlist,
+  UpdateAdminWordlist,
+  WordlistManagementQuery,
   Wordlist,
   WordlistPage,
   WordlistQuery,
@@ -16,6 +22,8 @@ import type {
   WordlistItems,
   MyWordlistItems,
   WordlistCatalog,
+  WordlistSuggestionQuery,
+  WordlistSuggestions,
   SubmitWordlist,
   WordlistReview,
   WordlistReviews,
@@ -46,6 +54,16 @@ function query(q: WordlistQuery) {
 type Options = { signal?: AbortSignal };
 export function createWordlistEndpoints(http: HttpClient) {
   return {
+    recommended: (q: WordlistQuery = {}, o?: Options) =>
+      http
+        .get<unknown>(`/wordlists/recommended${query(q)}`, o)
+        .then((v) => decodeWordlistResponse<WordlistPage>("WordlistPage", v)),
+    publish: (id: string, data: SubmitWordlist) =>
+      http
+        .post<unknown>(`/me/wordlists/${id}/publish`, data)
+        .then((v) =>
+          decodeWordlistResponse<WordlistReview>("WordlistReview", v)
+        ),
     tipReceipt: (eventId: string, o?: Options) =>
       http.get<unknown>(`/me/wordlist-tips/${eventId}`, o).then((v) => {
         const result = decodeWordlistResponse<WordlistTip>("WordlistTip", v);
@@ -82,6 +100,12 @@ export function createWordlistEndpoints(http: HttpClient) {
           headers: SENTENCE_FORMATTING_HEADERS
         })
         .then((v) => decodeWordlistResponse<WordlistItems>("WordlistItems", v)),
+    suggestions: (q: WordlistSuggestionQuery, o?: Options) =>
+      http
+        .get<unknown>(`/wordlists/suggestions${query(q)}`, o)
+        .then((v) =>
+          decodeWordlistResponse<WordlistSuggestions>("WordlistSuggestions", v)
+        ),
     catalog: (q: WordlistQuery = {}, o?: Options) =>
       http
         .get<unknown>(`/wordlists/catalog${query(q)}`, o)
@@ -142,6 +166,65 @@ export function createWordlistEndpoints(http: HttpClient) {
 }
 export function createAdminWordlistEndpoints(http: HttpClient) {
   return {
+    management: (q: WordlistManagementQuery = {}, o?: Options) =>
+      http
+        .get<unknown>(`/wordlists/management${query(q)}`, o)
+        .then((v) =>
+          decodeWordlistResponse<AdminWordlistPage>("AdminWordlistPage", v)
+        ),
+    get: (id: string, o?: Options) =>
+      http
+        .get<unknown>(`/wordlists/${id}`, o)
+        .then((v) => decodeWordlistResponse<AdminWordlist>("AdminWordlist", v)),
+    edit: (id: string, o?: Options) =>
+      http
+        .get<unknown>(`/wordlists/${id}/edit`, o)
+        .then((v) =>
+          decodeWordlistResponse<AdminWordlistEdit>("AdminWordlistEdit", v)
+        ),
+    currentItems: (id: string, q: WordlistItemsQuery = {}, o?: Options) =>
+      http
+        .get<unknown>(`/wordlists/${id}/items${query(q)}`, {
+          ...o,
+          headers: SENTENCE_FORMATTING_HEADERS
+        })
+        .then((v) => decodeWordlistResponse<WordlistItems>("WordlistItems", v)),
+    suggestions: (q: WordlistSuggestionQuery, o?: Options) =>
+      http
+        .get<unknown>(`/wordlists/suggestions${query(q)}`, o)
+        .then((v) =>
+          decodeWordlistResponse<WordlistSuggestions>("WordlistSuggestions", v)
+        ),
+    catalog: (q: WordlistQuery = {}, o?: Options) =>
+      http
+        .get<unknown>(`/wordlists/catalog${query(q)}`, o)
+        .then((v) =>
+          decodeWordlistResponse<WordlistCatalog>("WordlistCatalog", v)
+        ),
+    create: (data: CreateAdminWordlist) =>
+      http
+        .post<unknown>("/wordlists", data)
+        .then((v) => decodeWordlistResponse<AdminWordlist>("AdminWordlist", v)),
+    update: (id: string, data: UpdateAdminWordlist) =>
+      http
+        .put<unknown>(`/wordlists/${id}`, data)
+        .then((v) => decodeWordlistResponse<AdminWordlist>("AdminWordlist", v)),
+    visibility: (
+      id: string,
+      data: { expected_revision: number; public: boolean }
+    ) =>
+      http
+        .post<unknown>(`/wordlists/${id}/visibility`, data)
+        .then((v) => decodeWordlistResponse<AdminWordlist>("AdminWordlist", v)),
+    recommend: (
+      id: string,
+      data: { expected_revision: number; recommended: boolean }
+    ) =>
+      http
+        .post<unknown>(`/wordlists/${id}/recommendation`, data)
+        .then((v) => decodeWordlistResponse<AdminWordlist>("AdminWordlist", v)),
+    delete: (id: string, data: { expected_revision: number }) =>
+      http.post<void>(`/wordlists/${id}/delete`, data),
     list: (
       q: WordlistQuery & { state?: Wordlist["state"] } = {},
       o?: Options

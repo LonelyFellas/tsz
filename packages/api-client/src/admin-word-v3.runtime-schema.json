@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/zentao-88-user-permissions/tsz-rust/docs/openapi.json",
-  "_source_sha256": "c9d98479d5d4b3a72fb921a161f6042daf8c436cac9126be36195dbc864de0df",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/admin-wordbook-management/docs/openapi.json",
+  "_source_sha256": "b86979f96fe88dbb66bbee2d5a8370d78f13b332107889270145ddd6d124f102",
   "roots": [
     "LearningRewardDay",
     "LearningPreview",
@@ -14,11 +14,15 @@
     "LearningAnswerReceipt",
     "WordlistTip",
     "WordlistTipPage",
+    "AdminWordlist",
+    "AdminWordlistPage",
+    "AdminWordlistEdit",
     "Wordlist",
     "WordlistPage",
     "WordlistItems",
     "MyWordlistItems",
     "WordlistCatalog",
+    "WordlistSuggestions",
     "WordlistEditSnapshot",
     "WordlistReview",
     "WordlistReviews",
@@ -51,6 +55,8 @@
     "InboundReferencesV3",
     "SurfaceMatchPageV3",
     "RelatedSearchResponse",
+    "RelatedEntrySuggestions",
+    "RelatedEntrySenses",
     "DetectLexiconSurfaceResponseV3",
     "SearchComponentTargetsV3Response",
     "AdminWordPublicationListResponse",
@@ -129,6 +135,41 @@
       },
       "additionalProperties": false
     },
+    "AdminWordlist": {
+      "type": "object",
+      "required": ["wordlist", "review_state", "recommended", "tip_amount"],
+      "properties": {
+        "recommended": { "type": "boolean" },
+        "review_state": { "type": "string" },
+        "tip_amount": { "type": "string" },
+        "wordlist": { "$ref": "#/$defs/Wordlist" }
+      },
+      "additionalProperties": false
+    },
+    "AdminWordlistEdit": {
+      "type": "object",
+      "required": ["detail", "items"],
+      "properties": {
+        "detail": { "$ref": "#/$defs/AdminWordlist" },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AdminWordlistEditItem" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "AdminWordlistEditItem": {
+      "type": "object",
+      "required": ["entry_id", "admin_note", "candidate"],
+      "properties": {
+        "admin_note": { "type": "string" },
+        "candidate": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/WordlistCandidate" }]
+        },
+        "entry_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
     "AdminWordListItemV3": {
       "type": "object",
       "required": [
@@ -177,6 +218,18 @@
         "schema_version": { "type": "integer", "enum": [3] },
         "status": { "$ref": "#/$defs/AdminWordStatus" },
         "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "AdminWordlistPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AdminWordlist" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
       },
       "additionalProperties": false
     },
@@ -1908,6 +1961,49 @@
       },
       "additionalProperties": false
     },
+    "RelatedEntrySenses": {
+      "type": "object",
+      "required": ["entry_id", "publication_id", "senses"],
+      "properties": {
+        "entry_id": { "type": "string", "format": "uuid" },
+        "publication_id": { "type": "string", "format": "uuid" },
+        "senses": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/RelatedWordSenseV3" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "RelatedEntrySuggestion": {
+      "type": "object",
+      "required": [
+        "entry_id",
+        "publication_id",
+        "label",
+        "glosses",
+        "sense_count"
+      ],
+      "properties": {
+        "entry_id": { "type": "string", "format": "uuid" },
+        "glosses": { "type": "array", "items": { "type": "string" } },
+        "label": { "type": "string" },
+        "publication_id": { "type": "string", "format": "uuid" },
+        "sense_count": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "RelatedEntrySuggestions": {
+      "type": "object",
+      "required": ["items"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/RelatedEntrySuggestion" },
+          "maxItems": 3
+        }
+      },
+      "additionalProperties": false
+    },
     "RelatedSearchLegacyResponse": {
       "type": "object",
       "required": ["results"],
@@ -3280,7 +3376,7 @@
         "item_count": { "type": "integer" },
         "name": { "type": "string" },
         "owner_name": { "type": "string" },
-        "owner_user_id": { "type": "string", "format": "uuid" },
+        "owner_user_id": { "type": ["string", "null"], "format": "uuid" },
         "revision": { "type": "integer" },
         "state": { "$ref": "#/$defs/WordlistState" },
         "updated_at": { "type": "string", "format": "date-time" }
@@ -3522,6 +3618,18 @@
     "WordlistState": {
       "type": "string",
       "enum": ["draft", "pending", "published", "rejected", "withdrawn"]
+    },
+    "WordlistSuggestions": {
+      "type": "object",
+      "required": ["items"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistCandidate" },
+          "maxItems": 3
+        }
+      },
+      "additionalProperties": false
     },
     "WordlistText": {
       "type": "object",

@@ -122,7 +122,9 @@ function Detail({
     if (!meta.data) return;
     if (
       kind === "withdraw" &&
-      !window.confirm("撤回后将立即转为私密，修改内容后需要重新审核。继续？")
+      !window.confirm(
+        "撤回后将立即转为私密并取消推荐。修改完成后可再次设为公开。继续？"
+      )
     )
       return;
     setBusy(true);
@@ -136,7 +138,7 @@ function Detail({
           idempotency_key: crypto.randomUUID()
         };
         setSubmit(payload);
-        await api.wordList.submit(id, payload);
+        await api.wordList.publish(id, payload);
         setSubmit(null);
       } else
         await api.wordList.withdraw(id, {
@@ -144,7 +146,7 @@ function Detail({
         });
       await client.invalidateQueries({ queryKey: wordListKeys.all });
     } catch {
-      setError("操作结果未确认，请刷新核对。提审重试会复用原请求键。");
+      setError("操作结果未确认，请刷新核对。公开重试会复用原请求键。");
     } finally {
       setBusy(false);
     }
@@ -200,7 +202,7 @@ function Detail({
                   disabled={busy}
                   onClick={() => void action("submit")}
                 >
-                  提交公开审核
+                  设为公开
                 </button>
               )}
               {list.state === "published" && (
@@ -229,7 +231,9 @@ function Detail({
           <p className="mt-4">审核意见：{reviews.data.items[0].reason}</p>
         )}
         {mine && reviews.isError && <p role="alert">审核记录加载失败。</p>}
-        {!mine && list.state === "published" && <TipPanel list={list} />}
+        {!mine && list.state === "published" && list.owner_user_id !== null && (
+          <TipPanel list={list} />
+        )}
       </header>
       <div className="my-6 flex flex-wrap items-center gap-3">
         <input

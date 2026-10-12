@@ -1,0 +1,488 @@
+{
+  "metadata": {
+    "timestamp": "2026-10-12T06:06:45.707074+00:00",
+    "host": "macOS-26.6-arm64-arm-64bit-Mach-O",
+    "cpu_count": 10,
+    "postgres": "PostgreSQL 16.15 (Homebrew) on aarch64-apple-darwin25.6.0, compiled by Apple clang version 21.0.0 (clang-2100.1.1.101), 64-bit",
+    "counts": {
+      "entries": 250000,
+      "surfaces": 600000,
+      "publications": 250000,
+      "publication_bytes": 516349952,
+      "surface_bytes": 683040768
+    },
+    "database": "tsz_wordlist_search_perf",
+    "worktree": "/Users/darwish/Dev/tsz-core/.worktrees/admin-wordbook-management",
+    "head": "e3ecf9520c1ea6aab6891323f2de3e54f67484d1",
+    "dirty": true,
+    "binary_sha256": "44151b0ddcc20765aaa1d61aff9d08415e9a1191f44a17650f0465eaabda4c23",
+    "build_profile": "dev (unoptimized)",
+    "sql_sha256": {
+      "suggest_exact.sql": "1409de1da765699d32782a73befc47721e2c569a06b4fc55747b68a91982421b",
+      "suggest_fuzzy.sql": "88c4baab7f38afcc57ae352bd552e01ee371021405eab18ded8d0b36b927e07c",
+      "suggest_fuzzy_word.sql": "01ea73dd15d431ad35759e149bccbae4456749c38372d2291910ecdcbf53ede4",
+      "suggest_prefix.sql": "4699ff4a5457ab38b94b61bbd1ac1cbeafbaca21ce2790259a47f1802b2d73f5",
+      "suggest_summary.sql": "d855a8d95033462aae5ed118769cbf14f46008bb82ebfb21d4d5c05117d3d3ba"
+    }
+  },
+  "endpoint": "http://127.0.0.1:8499/api/v1/admin/wordlists/suggestions",
+  "pool_connections": 10,
+  "phases": [
+    {
+      "concurrency": 1,
+      "seconds": 1.57,
+      "rps": 101.89,
+      "requests": 160,
+      "errors": 0,
+      "p50_ms": 4.397,
+      "p95_ms": 74.382,
+      "p99_ms": 93.384,
+      "max_ms": 97.031,
+      "max_response_bytes": 533,
+      "by_case": {
+        "dense_prefix": {
+          "requests": 2,
+          "errors": 0,
+          "p50_ms": 2.39,
+          "p95_ms": 2.812,
+          "p99_ms": 2.812,
+          "max_ms": 2.812,
+          "max_response_bytes": 494
+        },
+        "exact": {
+          "requests": 2,
+          "errors": 0,
+          "p50_ms": 5.827,
+          "p95_ms": 7.145,
+          "p99_ms": 7.145,
+          "max_ms": 7.145,
+          "max_response_bytes": 313
+        },
+        "literal": {
+          "requests": 2,
+          "errors": 0,
+          "p50_ms": 1.587,
+          "p95_ms": 1.692,
+          "p99_ms": 1.692,
+          "max_ms": 1.692,
+          "max_response_bytes": 12
+        },
+        "miss": {
+          "requests": 2,
+          "errors": 0,
+          "p50_ms": 2.578,
+          "p95_ms": 3.027,
+          "p99_ms": 3.027,
+          "max_ms": 3.027,
+          "max_response_bytes": 12
+        },
+        "phrase": {
+          "requests": 2,
+          "errors": 0,
+          "p50_ms": 1.902,
+          "p95_ms": 1.999,
+          "p99_ms": 1.999,
+          "max_ms": 1.999,
+          "max_response_bytes": 520
+        },
+        "phrase_typo": {
+          "requests": 2,
+          "errors": 0,
+          "p50_ms": 93.384,
+          "p95_ms": 97.031,
+          "p99_ms": 97.031,
+          "max_ms": 97.031,
+          "max_response_bytes": 172
+        },
+        "prefix": {
+          "requests": 2,
+          "errors": 0,
+          "p50_ms": 2.534,
+          "p95_ms": 2.858,
+          "p99_ms": 2.858,
+          "max_ms": 2.858,
+          "max_response_bytes": 478
+        },
+        "short": {
+          "requests": 2,
+          "errors": 0,
+          "p50_ms": 1.901,
+          "p95_ms": 1.901,
+          "p99_ms": 1.901,
+          "max_ms": 1.901,
+          "max_response_bytes": 158
+        },
+        "typo": {
+          "requests": 2,
+          "errors": 0,
+          "p50_ms": 4.722,
+          "p95_ms": 4.984,
+          "p99_ms": 4.984,
+          "max_ms": 4.984,
+          "max_response_bytes": 320
+        },
+        "varied_exact": {
+          "requests": 71,
+          "errors": 0,
+          "p50_ms": 4.05,
+          "p95_ms": 75.187,
+          "p99_ms": 79.704,
+          "max_ms": 79.704,
+          "max_response_bytes": 533
+        },
+        "varied_prefix": {
+          "requests": 71,
+          "errors": 0,
+          "p50_ms": 5.729,
+          "p95_ms": 8.092,
+          "p99_ms": 84.955,
+          "max_ms": 84.955,
+          "max_response_bytes": 520
+        }
+      },
+      "failures": []
+    },
+    {
+      "concurrency": 8,
+      "seconds": 2.174,
+      "rps": 588.74,
+      "requests": 1280,
+      "errors": 0,
+      "p50_ms": 6.25,
+      "p95_ms": 103.149,
+      "p99_ms": 126.633,
+      "max_ms": 154.409,
+      "max_response_bytes": 533,
+      "by_case": {
+        "dense_prefix": {
+          "requests": 9,
+          "errors": 0,
+          "p50_ms": 2.929,
+          "p95_ms": 3.163,
+          "p99_ms": 3.163,
+          "max_ms": 3.163,
+          "max_response_bytes": 494
+        },
+        "exact": {
+          "requests": 9,
+          "errors": 0,
+          "p50_ms": 6.994,
+          "p95_ms": 23.898,
+          "p99_ms": 23.898,
+          "max_ms": 23.898,
+          "max_response_bytes": 313
+        },
+        "literal": {
+          "requests": 10,
+          "errors": 0,
+          "p50_ms": 2.725,
+          "p95_ms": 3.395,
+          "p99_ms": 3.395,
+          "max_ms": 3.395,
+          "max_response_bytes": 12
+        },
+        "miss": {
+          "requests": 9,
+          "errors": 0,
+          "p50_ms": 3.214,
+          "p95_ms": 4.329,
+          "p99_ms": 4.329,
+          "max_ms": 4.329,
+          "max_response_bytes": 12
+        },
+        "phrase": {
+          "requests": 10,
+          "errors": 0,
+          "p50_ms": 2.359,
+          "p95_ms": 18.036,
+          "p99_ms": 18.036,
+          "max_ms": 18.036,
+          "max_response_bytes": 520
+        },
+        "phrase_typo": {
+          "requests": 9,
+          "errors": 0,
+          "p50_ms": 134.852,
+          "p95_ms": 154.409,
+          "p99_ms": 154.409,
+          "max_ms": 154.409,
+          "max_response_bytes": 172
+        },
+        "prefix": {
+          "requests": 9,
+          "errors": 0,
+          "p50_ms": 3.199,
+          "p95_ms": 4.223,
+          "p99_ms": 4.223,
+          "max_ms": 4.223,
+          "max_response_bytes": 478
+        },
+        "short": {
+          "requests": 9,
+          "errors": 0,
+          "p50_ms": 2.698,
+          "p95_ms": 3.182,
+          "p99_ms": 3.182,
+          "max_ms": 3.182,
+          "max_response_bytes": 158
+        },
+        "typo": {
+          "requests": 9,
+          "errors": 0,
+          "p50_ms": 6.546,
+          "p95_ms": 7.056,
+          "p99_ms": 7.056,
+          "max_ms": 7.056,
+          "max_response_bytes": 320
+        },
+        "varied_exact": {
+          "requests": 599,
+          "errors": 0,
+          "p50_ms": 5.653,
+          "p95_ms": 107.002,
+          "p99_ms": 118.774,
+          "max_ms": 127.317,
+          "max_response_bytes": 533
+        },
+        "varied_prefix": {
+          "requests": 598,
+          "errors": 0,
+          "p50_ms": 7.845,
+          "p95_ms": 10.915,
+          "p99_ms": 119.957,
+          "max_ms": 152.476,
+          "max_response_bytes": 520
+        }
+      },
+      "failures": []
+    },
+    {
+      "concurrency": 32,
+      "seconds": 8.113,
+      "rps": 631.08,
+      "requests": 5120,
+      "errors": 0,
+      "p50_ms": 39.662,
+      "p95_ms": 151.656,
+      "p99_ms": 193.543,
+      "max_ms": 280.764,
+      "max_response_bytes": 533,
+      "by_case": {
+        "dense_prefix": {
+          "requests": 36,
+          "errors": 0,
+          "p50_ms": 35.728,
+          "p95_ms": 64.438,
+          "p99_ms": 71.626,
+          "max_ms": 71.626,
+          "max_response_bytes": 494
+        },
+        "exact": {
+          "requests": 36,
+          "errors": 0,
+          "p50_ms": 41.537,
+          "p95_ms": 63.083,
+          "p99_ms": 81.947,
+          "max_ms": 81.947,
+          "max_response_bytes": 313
+        },
+        "literal": {
+          "requests": 37,
+          "errors": 0,
+          "p50_ms": 33.639,
+          "p95_ms": 63.444,
+          "p99_ms": 65.402,
+          "max_ms": 65.402,
+          "max_response_bytes": 12
+        },
+        "miss": {
+          "requests": 36,
+          "errors": 0,
+          "p50_ms": 33.824,
+          "p95_ms": 69.025,
+          "p99_ms": 80.118,
+          "max_ms": 80.118,
+          "max_response_bytes": 12
+        },
+        "phrase": {
+          "requests": 37,
+          "errors": 0,
+          "p50_ms": 36.103,
+          "p95_ms": 75.06,
+          "p99_ms": 75.211,
+          "max_ms": 75.211,
+          "max_response_bytes": 520
+        },
+        "phrase_typo": {
+          "requests": 37,
+          "errors": 0,
+          "p50_ms": 199.175,
+          "p95_ms": 264.607,
+          "p99_ms": 280.764,
+          "max_ms": 280.764,
+          "max_response_bytes": 172
+        },
+        "prefix": {
+          "requests": 36,
+          "errors": 0,
+          "p50_ms": 33.752,
+          "p95_ms": 61.251,
+          "p99_ms": 61.479,
+          "max_ms": 61.479,
+          "max_response_bytes": 478
+        },
+        "short": {
+          "requests": 36,
+          "errors": 0,
+          "p50_ms": 35.789,
+          "p95_ms": 71.48,
+          "p99_ms": 86.968,
+          "max_ms": 86.968,
+          "max_response_bytes": 158
+        },
+        "typo": {
+          "requests": 37,
+          "errors": 0,
+          "p50_ms": 38.084,
+          "p95_ms": 66.463,
+          "p99_ms": 66.661,
+          "max_ms": 66.661,
+          "max_response_bytes": 320
+        },
+        "varied_exact": {
+          "requests": 2396,
+          "errors": 0,
+          "p50_ms": 39.249,
+          "p95_ms": 165.559,
+          "p99_ms": 192.938,
+          "max_ms": 277.626,
+          "max_response_bytes": 533
+        },
+        "varied_prefix": {
+          "requests": 2396,
+          "errors": 0,
+          "p50_ms": 40.305,
+          "p95_ms": 64.429,
+          "p99_ms": 167.813,
+          "max_ms": 223.354,
+          "max_response_bytes": 520
+        }
+      },
+      "failures": []
+    },
+    {
+      "concurrency": 64,
+      "seconds": 16.084,
+      "rps": 636.67,
+      "requests": 10240,
+      "errors": 0,
+      "p50_ms": 91.391,
+      "p95_ms": 195.172,
+      "p99_ms": 244.522,
+      "max_ms": 325.632,
+      "max_response_bytes": 533,
+      "by_case": {
+        "dense_prefix": {
+          "requests": 75,
+          "errors": 0,
+          "p50_ms": 84.037,
+          "p95_ms": 121.872,
+          "p99_ms": 142.165,
+          "max_ms": 142.165,
+          "max_response_bytes": 494
+        },
+        "exact": {
+          "requests": 75,
+          "errors": 0,
+          "p50_ms": 86.607,
+          "p95_ms": 123.674,
+          "p99_ms": 131.072,
+          "max_ms": 131.072,
+          "max_response_bytes": 313
+        },
+        "literal": {
+          "requests": 75,
+          "errors": 0,
+          "p50_ms": 83.496,
+          "p95_ms": 141.754,
+          "p99_ms": 144.398,
+          "max_ms": 144.398,
+          "max_response_bytes": 12
+        },
+        "miss": {
+          "requests": 74,
+          "errors": 0,
+          "p50_ms": 83.084,
+          "p95_ms": 120.723,
+          "p99_ms": 136.185,
+          "max_ms": 136.185,
+          "max_response_bytes": 12
+        },
+        "phrase": {
+          "requests": 76,
+          "errors": 0,
+          "p50_ms": 86.129,
+          "p95_ms": 123.534,
+          "p99_ms": 153.987,
+          "max_ms": 153.987,
+          "max_response_bytes": 520
+        },
+        "phrase_typo": {
+          "requests": 75,
+          "errors": 0,
+          "p50_ms": 242.611,
+          "p95_ms": 299.995,
+          "p99_ms": 325.632,
+          "max_ms": 325.632,
+          "max_response_bytes": 172
+        },
+        "prefix": {
+          "requests": 74,
+          "errors": 0,
+          "p50_ms": 86.476,
+          "p95_ms": 127.852,
+          "p99_ms": 144.019,
+          "max_ms": 144.019,
+          "max_response_bytes": 478
+        },
+        "short": {
+          "requests": 75,
+          "errors": 0,
+          "p50_ms": 84.275,
+          "p95_ms": 117.11,
+          "p99_ms": 143.542,
+          "max_ms": 143.542,
+          "max_response_bytes": 158
+        },
+        "typo": {
+          "requests": 76,
+          "errors": 0,
+          "p50_ms": 86.985,
+          "p95_ms": 134.117,
+          "p99_ms": 140.994,
+          "max_ms": 140.994,
+          "max_response_bytes": 320
+        },
+        "varied_exact": {
+          "requests": 4782,
+          "errors": 0,
+          "p50_ms": 91.744,
+          "p95_ms": 210.962,
+          "p99_ms": 242.818,
+          "max_ms": 296.748,
+          "max_response_bytes": 533
+        },
+        "varied_prefix": {
+          "requests": 4783,
+          "errors": 0,
+          "p50_ms": 91.351,
+          "p95_ms": 131.968,
+          "p99_ms": 212.606,
+          "max_ms": 282.813,
+          "max_response_bytes": 520
+        }
+      },
+      "failures": []
+    }
+  ]
+}

@@ -23,11 +23,9 @@ import { StrictMode, useState } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
-vi.mock("../api", () => ({
-  useRelatedSearch: () => ({
-    exact: { data: undefined, isFetching: false },
-    contains: { data: undefined, isFetching: false }
-  })
+vi.mock("../relatedSuggestions", () => ({
+  useRelatedSuggestions: () => ({ words: [], isFetching: false }),
+  useRelatedWordSenses: () => ({ data: undefined, isFetching: false })
 }));
 
 import type { V3WordRequests } from "./api";

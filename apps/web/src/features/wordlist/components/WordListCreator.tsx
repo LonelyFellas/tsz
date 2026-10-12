@@ -398,11 +398,17 @@ function WordRow({
 }) {
   const userId = useUserStore((s) => s.user?.id);
   const text = row.text ?? stored?.entry?.label ?? row.entryId ?? "";
+  const [searchText, setSearchText] = useState(text);
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchText(text), 250);
+    return () => clearTimeout(timer);
+  }, [text]);
   const search = useQuery({
-    queryKey: [...wordListKeys.mine(userId), "catalog", row.id, text],
-    enabled: !row.entryId && text.trim().length > 0,
+    queryKey: [...wordListKeys.mine(userId), "suggestions", searchText],
+    enabled:
+      !row.entryId && searchText.trim().length > 0 && searchText === text,
     queryFn: ({ signal }) =>
-      api.wordList.catalog({ q: text, page_size: 3 }, { signal })
+      api.wordList.suggestions({ q: searchText }, { signal })
   });
   const note = row.note ?? stored?.private_note ?? "";
   const unloaded =
@@ -435,11 +441,14 @@ function WordRow({
           }
         />
       </label>
-      {!row.entryId && search.isFetching && <p>正在搜索…</p>}
-      {!row.entryId && search.isError && (
+      {!row.entryId && searchText === text && search.isFetching && (
+        <p>正在搜索…</p>
+      )}
+      {!row.entryId && searchText === text && search.isError && (
         <p role="alert">搜索失败，请重试输入。</p>
       )}
       {!row.entryId &&
+        searchText === text &&
         search.data?.items.map((candidate) => (
           <button
             key={candidate.entry_id}
@@ -461,9 +470,12 @@ function WordRow({
             </span>
           </button>
         ))}
-      {!row.entryId && search.isSuccess && search.data.items.length === 0 && (
-        <p>没有匹配词条，请修改输入或删除此行。</p>
-      )}
+      {!row.entryId &&
+        searchText === text &&
+        search.isSuccess &&
+        search.data.items.length === 0 && (
+          <p>没有匹配词条，请修改输入或删除此行。</p>
+        )}
       {row.candidate && (
         <p className="my-3 text-sm text-foreground-muted">
           {row.candidate.glosses.join("；")}

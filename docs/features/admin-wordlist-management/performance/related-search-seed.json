@@ -1,0 +1,28 @@
+{
+  "timestamp": "2026-10-12T06:39:34.155626+00:00",
+  "host": "macOS-26.6-arm64-arm-64bit-Mach-O",
+  "cpu_count": 10,
+  "postgres": "PostgreSQL 16.15 (Homebrew) on aarch64-apple-darwin25.6.0, compiled by Apple clang version 21.0.0 (clang-2100.1.1.101), 64-bit",
+  "counts": {
+    "entries": 250000,
+    "surfaces": 600000,
+    "publications": 250000,
+    "publication_bytes": 516349952,
+    "surface_bytes": 690364416
+  },
+  "database": "tsz_wordlist_search_related",
+  "worktree": "/Users/darwish/Dev/tsz-core/.worktrees/admin-wordbook-management",
+  "head": "e3ecf9520c1ea6aab6891323f2de3e54f67484d1",
+  "dirty": true,
+  "seed_seconds": 78.00171808339655,
+  "binary_sha256": "f376c7c53ecf9edd37dc95cfbd3a2a64f96441056d796b55bcdd1860c9ecfa91",
+  "profile": "dev (unoptimized + debuginfo)",
+  "sql_sha256": {
+    "suggest_exact.sql": "1409de1da765699d32782a73befc47721e2c569a06b4fc55747b68a91982421b",
+    "suggest_fuzzy.sql": "88c4baab7f38afcc57ae352bd552e01ee371021405eab18ded8d0b36b927e07c",
+    "suggest_fuzzy_word.sql": "01ea73dd15d431ad35759e149bccbae4456749c38372d2291910ecdcbf53ede4",
+    "suggest_prefix.sql": "4699ff4a5457ab38b94b61bbd1ac1cbeafbaca21ce2790259a47f1802b2d73f5",
+    "suggest_summary.sql": "0f3485bfc6b73b0565e2c6d418ef059ce93732da5fc47705aca810e65b8aed42"
+  },
+  "concurrent_activity": "No compilation or test suites during timing; low-rate UI acceptance on a separate database shared the host."
+}

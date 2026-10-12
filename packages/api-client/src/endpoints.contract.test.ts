@@ -68,6 +68,7 @@ const SENTENCE_FORMATTING_OPERATIONS: readonly string[] = [
   "post /admin/lexicon/sentences/{id}/restore",
   "get /wordlists/{id}/items",
   "get /me/wordlists/{id}/items",
+  "get /admin/wordlists/{id}/items",
   "get /admin/wordlists/{id}/review-requests/{request_id}/items"
 ];
 
@@ -733,7 +734,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "c9d98479d5d4b3a72fb921a161f6042daf8c436cac9126be36195dbc864de0df"
+      "b86979f96fe88dbb66bbee2d5a8370d78f13b332107889270145ddd6d124f102"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");

@@ -2,11 +2,13 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useWordLists } from "../hooks/useWordLists";
+import { Button } from "@tsz/ui/components";
 import { STATE_LABEL, buttonClass } from "../reading";
 export function WordListBrowser({ mine = false }: { mine?: boolean }) {
   const [page, setPage] = useState(1);
   const [q, setQ] = useState("");
-  const result = useWordLists(mine, page, q);
+  const [recommended, setRecommended] = useState(false);
+  const result = useWordLists(mine, page, q, recommended);
   return (
     <div className="animate-in mx-auto max-w-5xl px-6 py-10">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -25,6 +27,30 @@ export function WordListBrowser({ mine = false }: { mine?: boolean }) {
           </Link>
         </div>
       </div>
+      {!mine && (
+        <div className="mt-6 flex gap-3" role="group" aria-label="词表分类">
+          <Button
+            variant={recommended ? "outline" : "default"}
+            aria-pressed={!recommended}
+            onClick={() => {
+              setRecommended(false);
+              setPage(1);
+            }}
+          >
+            全部公开词表
+          </Button>
+          <Button
+            variant={recommended ? "default" : "outline"}
+            aria-pressed={recommended}
+            onClick={() => {
+              setRecommended(true);
+              setPage(1);
+            }}
+          >
+            系统推荐
+          </Button>
+        </div>
+      )}
       <input
         className="my-6 w-full rounded-full border border-border bg-surface px-5 py-3"
         aria-label="搜索词表"
@@ -53,8 +79,10 @@ export function WordListBrowser({ mine = false }: { mine?: boolean }) {
               >
                 <h2 className="text-xl font-semibold">{list.name}</h2>
                 <p className="mt-3 text-sm text-foreground-muted">
-                  {list.owner_name} · {list.item_count} 个词条 ·{" "}
-                  {STATE_LABEL[list.state]}
+                  {list.owner_user_id === null
+                    ? `平台 · ${list.owner_name}`
+                    : list.owner_name}{" "}
+                  · {list.item_count} 个词条 · {STATE_LABEL[list.state]}
                 </p>
               </Link>
             ))}
