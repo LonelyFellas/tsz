@@ -730,9 +730,10 @@ describe("VoiceEditor 标注带", () => {
         { type: "liaison", start: 3, end: 6, start_len: 1, end_len: 1 }
       ]);
       mounted.unmount();
-      render(<VoiceEditor {...props({ value: saved })} />);
+      const reopened = props({ value: saved });
+      render(<VoiceEditor {...reopened} />);
       connect(3, 5);
-      expect(screen.getByText("这两处已经连过了")).toBeInTheDocument();
+      expect(applied(reopened).annotations).toEqual([]);
     }
   );
 
@@ -1325,17 +1326,20 @@ describe("VoiceEditor 文本与落盘", () => {
     expect(applied(view).annotations).toEqual([]);
   });
 
-  it("同一对锚点不会被重复连读", () => {
+  it("再次选择相同的多字母端点取消连读，反向选择也可取消并撤销", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
-    useLiaisonBrush();
-    connect(7, 9);
-
-    // 添加成功后开关回到「起点」，第二条从头选
-    connect(7, 9);
-
-    expect(screen.getByText(/已经连过了/)).toBeInTheDocument();
-    expect(applied(view).annotations).toHaveLength(1);
+    connect(6, 9, 2, 2);
+    const linked = applied(view);
+    expect(linked.annotations).toEqual([
+      { type: "liaison", start: 6, end: 11, start_len: 2, end_len: 2 }
+    ]);
+    connect(9, 6, 2, 2);
+    expect(applied(view).annotations).toEqual([]);
+    fireEvent.click(button("上一步"));
+    expect(applied(view)).toEqual(linked);
+    fireEvent.click(button("下一步"));
+    expect(applied(view).annotations).toEqual([]);
   });
 
   it("连着敲的一串字只占一步撤销", () => {

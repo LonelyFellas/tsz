@@ -1213,6 +1213,22 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     });
   };
 
+  const findLiaison = (link: LiaisonLink) =>
+    marks.liaisons.findIndex(
+      (existing) =>
+        existing.start.start === link.start.start &&
+        existing.start.end === link.start.end &&
+        existing.end.start === link.end.start &&
+        existing.end.end === link.end.end
+    );
+
+  const selectionHasLiaison =
+    !!textSelection &&
+    findLiaison({
+      start: makeAnchor(textSelection.start),
+      end: makeAnchor(textSelection.end - 1)
+    }) >= 0;
+
   const commitLiaison = (
     selected: LiaisonDraft = draft,
     selection = textSelection
@@ -1226,18 +1242,19 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       setValidationMessage("请选择有效的连读端点");
       return;
     }
-    const sameAnchors = (a: LiaisonAnchor, b: LiaisonAnchor) =>
-      a.start === b.start && a.end === b.end;
-    if (
-      marks.liaisons.some(
-        (existing) =>
-          sameAnchors(existing.start, link.start) &&
-          sameAnchors(existing.end, link.end)
-      )
-    ) {
-      // 重复添加会画出两道重合的弧，落盘时被 normalize 去重成一条，数据与屏幕分叉。
-      setValidationMessage("这两处已经连过了");
+    const existingIndex = findLiaison(link);
+    if (existingIndex >= 0) {
+      commit((current) => ({
+        ...current,
+        marks: {
+          ...current.marks,
+          liaisons: current.marks.liaisons.filter(
+            (_, index) => index !== existingIndex
+          )
+        }
+      }));
       resetTransient();
+      setTextSelection(selection);
       return;
     }
     if (crossesParagraph(text, link)) {
@@ -1264,7 +1281,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
 
   const resetDraft = resetTransient;
 
-  const addSelectionLiaison = (selection = textSelection) => {
+  const toggleSelectionLiaison = (selection = textSelection) => {
     if (!selection || selection.end - selection.start < 2) return;
     commitLiaison(
       {
@@ -1674,9 +1691,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                 !textSelection ||
                 textSelection.end - textSelection.start < 2
               }
-              onClick={() => addSelectionLiaison()}
+              aria-pressed={selectionHasLiaison}
+              onClick={() => toggleSelectionLiaison()}
             >
-              一次性添加
+              {selectionHasLiaison ? "取消连读" : "一次性添加"}
             </Button>
           </Tooltip>
           {draft.start && (
@@ -1919,6 +1937,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           if (key !== "z" && !tool) return;
           event.preventDefault();
           event.stopPropagation();
+          if (key === "l" && event.repeat) return;
           if (key === "z") undo();
           else if (!readOnly) {
             // 撤销后 DOM 可能仍保持原选区，再次全选不会触发 select，须读取实际选区。
@@ -1935,7 +1954,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             setTextSelection(selection);
             if (selection) {
               if (format) toggleTextFormat(format, selection);
-              else addSelectionLiaison(selection);
+              else toggleSelectionLiaison(selection);
             }
           }
           return;

@@ -1532,7 +1532,12 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       ).toBeVisible();
       await expect(input).toBeFocused();
       await input.press(`${modifier}+l`);
-      await expect(dialog.getByText("这两处已经连过了")).toBeVisible();
+      await expect(dialog.locator(".tsz-ve-arc")).toHaveCount(0);
+      await expect(dialog.getByText("这两处已经连过了")).toHaveCount(0);
+      await expect(
+        dialog.locator(".is-bold.is-italic.is-underline")
+      ).toHaveCount(4);
+      await input.press(`${modifier}+z`);
       await expect(dialog.locator(".tsz-ve-arc")).toHaveCount(1);
       await input.press(`${modifier}+z`);
       await expect(dialog.locator(".tsz-ve-arc-layer path")).toHaveCount(0);
@@ -1546,6 +1551,13 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       await expect(input).toHaveValue("a job");
     }
     await input.press("ControlOrMeta+A");
+    await dialog
+      .getByRole("button", { name: "一次性添加", exact: true })
+      .click();
+    await expect(dialog.locator(".tsz-ve-arc")).toHaveCount(1);
+    await dialog.getByRole("button", { name: "取消连读", exact: true }).click();
+    await expect(dialog.locator(".tsz-ve-arc")).toHaveCount(0);
+    await expect(input).toBeFocused();
     const boldButton = dialog.getByRole("button", {
       name: "加粗",
       exact: true
