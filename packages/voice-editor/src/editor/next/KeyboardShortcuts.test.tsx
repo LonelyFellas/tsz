@@ -102,6 +102,57 @@ it.each(["grammar", "spelling", "actual-pron", "pronunciation"] as const)(
   }
 );
 
+it.each(["ctrlKey", "metaKey"])(
+  "%s 的 L 再次操作同一选区取消连读，保留其他标注并可撤销重做",
+  (modifier) => {
+    const changed = vi.fn();
+    const initial: RichTextV2 = {
+      ...value,
+      annotations: [
+        { type: "bold", start: 4, end: 7 },
+        { type: "liaison", start: 4, end: 7 }
+      ]
+    };
+    render(<VoiceEditor mode="grammar" value={initial} onChange={changed} />);
+    const input = select(3, 8);
+    const press = (key: string) => shortcut(input, key, { [modifier]: true });
+    press("l");
+    const linked = changed.mock.lastCall?.[0] as RichTextV2;
+    expect(linked.annotations).toHaveLength(3);
+    expect(press("l").defaultPrevented).toBe(true);
+    expect(changed.mock.lastCall?.[0].annotations).toEqual([
+      { type: "liaison", start: 4, end: 7, start_len: 1, end_len: 1 },
+      { type: "bold", start: 4, end: 7 }
+    ]);
+    expect(input.selectionStart).toBe(3);
+    expect(input.selectionEnd).toBe(8);
+    press("z");
+    expect(changed.mock.lastCall?.[0]).toEqual(linked);
+    fireEvent.click(screen.getByRole("button", { name: "下一步" }));
+    expect(changed.mock.lastCall?.[0].annotations).toHaveLength(2);
+    press("l");
+    expect(changed.mock.lastCall?.[0]).toEqual(linked);
+  }
+);
+
+it("一次性连读按钮连续操作同一选区可添加、取消，再由快捷键恢复", () => {
+  const changed = vi.fn();
+  render(<VoiceEditor mode="grammar" value={value} onChange={changed} />);
+  const input = select(3, 8);
+  fireEvent.click(screen.getByRole("button", { name: "一次性添加" }));
+  expect(changed.mock.lastCall?.[0].annotations).toHaveLength(1);
+  const cancel = screen.getByRole("button", { name: "取消连读" });
+  expect(cancel).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(cancel);
+  expect(changed.mock.lastCall?.[0]).toEqual(value);
+  expect(screen.getByRole("button", { name: "一次性添加" })).toHaveAttribute(
+    "aria-pressed",
+    "false"
+  );
+  shortcut(input, "l");
+  expect(changed.mock.lastCall?.[0].annotations).toHaveLength(1);
+});
+
 it("输入与格式共用撤销历史，格式后的新输入不会合并到之前的输入", () => {
   const changed = vi.fn();
   render(<VoiceEditor mode="spelling" value={value} onChange={changed} />);
@@ -329,7 +380,7 @@ it.each(["ctrlKey", "metaKey"])(
   }
 );
 
-it("重复 L 不生成重复连线或多余历史，仍可一次撤销", () => {
+it("按住 L 的自动重复不切换连读或产生多余历史，仍可一次撤销", () => {
   const changed = vi.fn();
   render(<VoiceEditor mode="association" value={value} onChange={changed} />);
   const input = select(3, 8);
@@ -340,7 +391,6 @@ it("重复 L 不生成重复连线或多余历史，仍可一次撤销", () => {
   changed.mockClear();
   shortcut(input, "l", { ctrlKey: true, repeat: true });
   expect(changed).not.toHaveBeenCalled();
-  expect(screen.getByText("这两处已经连过了")).toBeInTheDocument();
   shortcut(input, "z");
   expect(changed.mock.lastCall?.[0]).toEqual(value);
   expect(screen.getByRole("button", { name: "上一步" })).toBeDisabled();
