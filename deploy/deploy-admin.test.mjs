@@ -143,7 +143,7 @@ test("invalid spelling regularity flag fails before server writes", () => {
 });
 
 for (const [input, expected] of [
-  [undefined, "false"],
+  [undefined, "true"],
   ["false", "false"],
   ["true", "true"]
 ]) {
