@@ -165,6 +165,17 @@ it("首次进入教师页、资格核验返回前不闪出学习菜单", async (
   expect(screen.getByRole("button", { name: "设置" })).toBeInTheDocument();
 });
 
+it("已认证教师直接打开教师页时，工作台偏好尚未改写也显示教学菜单", () => {
+  identity.verified = true;
+  identity.identity = "student";
+  useUserStore.setState({ user: teacher, hydrated: true });
+  renderWithProviders(<AppTopbar />);
+  expect(screen.getByRole("button", { name: "教学菜单" })).toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "学习菜单" })
+  ).not.toBeInTheDocument();
+});
+
 it("左右浮层互斥：打开设置会关闭菜单", async () => {
   route.pathname = "/student/home";
   useUserStore.setState({ user: student, hydrated: true });

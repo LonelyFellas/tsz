@@ -371,151 +371,153 @@ function AccountDeletionForm() {
   }
 
   return (
-    <PageShell size="sm">
-      <div
-        data-testid="account-deletion-content"
-        inert={confirmOpen}
-        aria-hidden={confirmOpen || undefined}
-      >
-        <Button
-          variant="ghost"
-          size="sm"
-          className="-ml-3 mb-5 gap-1.5 px-3 font-normal text-foreground-muted"
-          onClick={() => router.back()}
+    <>
+      <PageShell size="sm">
+        <div
+          data-testid="account-deletion-content"
+          inert={confirmOpen}
+          aria-hidden={confirmOpen || undefined}
         >
-          <ArrowLeft className="size-4" strokeWidth={1.8} aria-hidden />
-          返回
-        </Button>
-        <p className="mb-3 text-xs font-medium tracking-[0.2em] text-foreground-muted">
-          账号安全
-        </p>
-        <h1 className="mb-8 text-3xl font-bold tracking-tight text-foreground sm:text-[34px]">
-          注销账号
-        </h1>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="-ml-3 mb-5 gap-1.5 px-3 font-normal text-foreground-muted"
+            onClick={() => router.back()}
+          >
+            <ArrowLeft className="size-4" strokeWidth={1.8} aria-hidden />
+            返回
+          </Button>
+          <p className="mb-3 text-xs font-medium tracking-[0.2em] text-foreground-muted">
+            账号安全
+          </p>
+          <h1 className="mb-8 text-3xl font-bold tracking-tight text-foreground sm:text-[34px]">
+            注销账号
+          </h1>
 
-        <div className="glass rounded-3xl p-2">
-          <div className="rounded-[20px] bg-surface/70 p-6 sm:p-8">
-            <section
-              aria-labelledby="deletion-warning-title"
-              className="mb-7 rounded-2xl border border-danger/20 bg-danger/5 p-4 text-danger"
-            >
-              <h2 id="deletion-warning-title" className="font-semibold">
-                注销前请确认
-              </h2>
-              <p className="mt-2 text-sm leading-6">
-                提交申请后 72 小时生效，期间可撤销，天生币收支将暂停。
-                注销生效后，账号无法使用，剩余天生币作废，个人数据将被清理。
-              </p>
-            </section>
-
-            <form className="space-y-6" onSubmit={continueDeletion}>
-              <fieldset disabled={sending || deleting}>
-                <legend className="mb-3 text-sm font-medium text-foreground">
-                  1. 选择验证方式
-                </legend>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {channels.map((item) => (
-                    <label
-                      key={item}
-                      className={cn(
-                        "flex min-h-16 cursor-pointer items-center gap-3 rounded-2xl border bg-surface p-4 text-sm transition-colors has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-primary",
-                        channel === item
-                          ? "border-primary/40 bg-primary-muted text-primary"
-                          : "border-border text-foreground-muted hover:border-primary/40"
-                      )}
-                    >
-                      <input
-                        type="radio"
-                        name="deletion-channel"
-                        value={item}
-                        checked={channel === item}
-                        onChange={() => switchChannel(item)}
-                        className="size-4 accent-primary"
-                      />
-                      <span className="min-w-0">
-                        <span className="block font-medium">
-                          {CHANNEL_LABEL[item]}验证
-                        </span>
-                        <span className="block truncate text-xs text-foreground-subtle">
-                          {item === "phone" ? user?.phone : user?.email}
-                        </span>
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-
-              <div>
-                <label
-                  htmlFor="account-deletion-code"
-                  className="mb-2 block text-sm font-medium text-foreground"
-                >
-                  2. 输入验证码
-                </label>
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <input
-                    id="account-deletion-code"
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    maxLength={6}
-                    pattern="[0-9]{6}"
-                    placeholder="6 位数字验证码"
-                    value={code}
-                    aria-describedby="deletion-code-help"
-                    disabled={sending || deleting}
-                    onChange={(event) =>
-                      setCode(event.target.value.replace(/\D/g, ""))
-                    }
-                    className={cn(AUTH_INPUT_CLASS, "min-w-0 flex-1")}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="shrink-0"
-                    onClick={requestCode}
-                    disabled={!canSendCode}
-                  >
-                    {sending
-                      ? "发送中…"
-                      : countdown > 0
-                        ? `${countdown} 秒后重发`
-                        : codeRequested
-                          ? "重新发送"
-                          : "获取验证码"}
-                  </Button>
-                </div>
-                <p
-                  id="deletion-code-help"
-                  className="mt-2 px-5 text-xs leading-5 text-foreground-muted"
-                >
-                  请先获取验证码，再填写收到的 6 位数字。
-                </p>
-              </div>
-
-              {message && (
-                <p role="status" className="text-sm text-success">
-                  {message}
-                </p>
-              )}
-              {error && !confirmOpen && (
-                <p role="alert" className="text-sm text-danger">
-                  {error}
-                </p>
-              )}
-
-              <Button
-                id="continue-account-deletion"
-                type="submit"
-                className="w-full"
-                disabled={!canContinue}
+          <div className="glass rounded-3xl p-2">
+            <div className="rounded-[20px] bg-surface/70 p-6 sm:p-8">
+              <section
+                aria-labelledby="deletion-warning-title"
+                className="mb-7 rounded-2xl border border-danger/20 bg-danger/5 p-4 text-danger"
               >
-                下一步
-              </Button>
-            </form>
+                <h2 id="deletion-warning-title" className="font-semibold">
+                  注销前请确认
+                </h2>
+                <p className="mt-2 text-sm leading-6">
+                  提交申请后 72 小时生效，期间可撤销，天生币收支将暂停。
+                  注销生效后，账号无法使用，剩余天生币作废，个人数据将被清理。
+                </p>
+              </section>
+
+              <form className="space-y-6" onSubmit={continueDeletion}>
+                <fieldset disabled={sending || deleting}>
+                  <legend className="mb-3 text-sm font-medium text-foreground">
+                    1. 选择验证方式
+                  </legend>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {channels.map((item) => (
+                      <label
+                        key={item}
+                        className={cn(
+                          "flex min-h-16 cursor-pointer items-center gap-3 rounded-2xl border bg-surface p-4 text-sm transition-colors has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-primary",
+                          channel === item
+                            ? "border-primary/40 bg-primary-muted text-primary"
+                            : "border-border text-foreground-muted hover:border-primary/40"
+                        )}
+                      >
+                        <input
+                          type="radio"
+                          name="deletion-channel"
+                          value={item}
+                          checked={channel === item}
+                          onChange={() => switchChannel(item)}
+                          className="size-4 accent-primary"
+                        />
+                        <span className="min-w-0">
+                          <span className="block font-medium">
+                            {CHANNEL_LABEL[item]}验证
+                          </span>
+                          <span className="block truncate text-xs text-foreground-subtle">
+                            {item === "phone" ? user?.phone : user?.email}
+                          </span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+
+                <div>
+                  <label
+                    htmlFor="account-deletion-code"
+                    className="mb-2 block text-sm font-medium text-foreground"
+                  >
+                    2. 输入验证码
+                  </label>
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <input
+                      id="account-deletion-code"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      maxLength={6}
+                      pattern="[0-9]{6}"
+                      placeholder="6 位数字验证码"
+                      value={code}
+                      aria-describedby="deletion-code-help"
+                      disabled={sending || deleting}
+                      onChange={(event) =>
+                        setCode(event.target.value.replace(/\D/g, ""))
+                      }
+                      className={cn(AUTH_INPUT_CLASS, "min-w-0 flex-1")}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="shrink-0"
+                      onClick={requestCode}
+                      disabled={!canSendCode}
+                    >
+                      {sending
+                        ? "发送中…"
+                        : countdown > 0
+                          ? `${countdown} 秒后重发`
+                          : codeRequested
+                            ? "重新发送"
+                            : "获取验证码"}
+                    </Button>
+                  </div>
+                  <p
+                    id="deletion-code-help"
+                    className="mt-2 px-5 text-xs leading-5 text-foreground-muted"
+                  >
+                    请先获取验证码，再填写收到的 6 位数字。
+                  </p>
+                </div>
+
+                {message && (
+                  <p role="status" className="text-sm text-success">
+                    {message}
+                  </p>
+                )}
+                {error && !confirmOpen && (
+                  <p role="alert" className="text-sm text-danger">
+                    {error}
+                  </p>
+                )}
+
+                <Button
+                  id="continue-account-deletion"
+                  type="submit"
+                  className="w-full"
+                  disabled={!canContinue}
+                >
+                  下一步
+                </Button>
+              </form>
+            </div>
           </div>
         </div>
-      </div>
+      </PageShell>
 
       {confirmOpen && (
         <div
@@ -621,6 +623,6 @@ function AccountDeletionForm() {
           </div>
         </div>
       )}
-    </PageShell>
+    </>
   );
 }

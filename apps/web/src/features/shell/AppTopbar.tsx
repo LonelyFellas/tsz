@@ -113,13 +113,13 @@ function TopbarPanels({ hydrated }: { hydrated: boolean }) {
   const pathname = usePathname() ?? "";
   const [panel, setPanel] = useState<"navigation" | "settings" | null>(null);
 
-  // 教师资格核验返回前，/teacher/* 已由 TeacherAccessGuard 拦住内容，顶栏按教学工作台展示，
-  // 避免先闪出学习菜单；核验不通过时守卫会跳回学生首页。
+  // /teacher/* 上不看工作台偏好：核验返回前内容已由 TeacherAccessGuard 拦住，核验通过后
+  // 偏好要等 Provider 的 effect 才改写为 teacher，两段都按教学工作台展示，避免闪出学习菜单。
   const teaching =
     !!user &&
-    (identity.ready
-      ? identity.verified && identity.identity === "teacher"
-      : pathname.startsWith("/teacher/"));
+    (pathname.startsWith("/teacher/")
+      ? !identity.ready || identity.verified
+      : identity.ready && identity.verified && identity.identity === "teacher");
   const studying = !!user && !teaching && user.roles.includes("student");
   const groups = !user
     ? GUEST_NAV
