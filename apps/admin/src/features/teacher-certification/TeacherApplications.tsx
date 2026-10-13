@@ -49,12 +49,16 @@ export function TeacherApplicationsPage() {
   return allowed ? (
     <ApplicationQueue />
   ) : (
-    <Result status="403" title="未开通教师认证查看权限" />
+    <Result status="403" title="未开通教师资格申请列表查看权限" />
   );
 }
 
 function PrivateMaterial({ file }: { file: CertificationFile }) {
-  const allowed = usePermission("teacherapply.read_sensitive");
+  const allowed = usePermission(
+    file.kind === "id_front" || file.kind === "id_back"
+      ? "teacherapply.read_identity"
+      : "teacherapply.read_certificates"
+  );
   const owner = useAuthStore((state) => state.profile?.id);
   const [preview, setPreview] = useState<{
     id: string;
@@ -112,7 +116,8 @@ function PrivateMaterial({ file }: { file: CertificationFile }) {
 
 function ApplicationQueue() {
   const canReview = usePermission("teacherapply.review");
-  const canReadSensitive = usePermission("teacherapply.read_sensitive");
+  const canReadCertificates = usePermission("teacherapply.read_certificates");
+  const canReadIdentity = usePermission("teacherapply.read_identity");
   const adminId = useAuthStore((state) => state.profile?.id);
   const client = useQueryClient();
   const { message } = App.useApp();
@@ -176,7 +181,7 @@ function ApplicationQueue() {
             教师申请审核
           </Typography.Title>
           <Typography.Text type="secondary">
-            查看原件、审核申请和撤销资格需要分别开通权限。
+            查看资格证书、查看身份证、审核申请和撤销资格需要分别开通权限。
           </Typography.Text>
         </div>
         <Space>
@@ -311,7 +316,7 @@ function ApplicationQueue() {
                   : [])
               ]}
             />
-            {canReadSensitive ? (
+            {canReadCertificates || canReadIdentity ? (
               <Image.PreviewGroup>
                 <Flex wrap gap={16}>
                   {detail.data.files.map((file) => (
@@ -320,7 +325,7 @@ function ApplicationQueue() {
                 </Flex>
               </Image.PreviewGroup>
             ) : (
-              <Alert type="info" title="未开通认证原件查看权限" />
+              <Alert type="info" title="未开通资格证书或身份证查看权限" />
             )}
             {canReview && application.status === "pending" && (
               <Space>

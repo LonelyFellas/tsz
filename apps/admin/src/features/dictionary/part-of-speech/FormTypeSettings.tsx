@@ -42,7 +42,8 @@ function deriveFormTypeCode(parentCode: string, fullNameEn: string): string {
 }
 
 export function FormTypeSettings() {
-  const canEdit = usePermission("lexicon_settings.edit");
+  const canEdit = usePermission("lexicon_settings.edit_forms");
+  const canDelete = usePermission("lexicon_settings.delete");
   const { message, modal } = App.useApp();
   const client = useQueryClient();
   const catalog = usePartOfSpeechCatalog();
@@ -197,7 +198,7 @@ export function FormTypeSettings() {
               size="small"
               danger
               disabled={
-                !canEdit || item.code === "base" || item.usage_count > 0
+                !canDelete || item.code === "base" || item.usage_count > 0
               }
               onClick={() => remove(item)}
             >

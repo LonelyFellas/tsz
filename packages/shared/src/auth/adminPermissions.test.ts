@@ -249,3 +249,42 @@ it.each(["create", "edit", "visibility", "recommend", "delete"])(
     ).toBe(true);
   }
 );
+
+it("教师材料和三类配置分别授权，废弃权限无效", () => {
+  const split = [
+    "teacherapply.read_certificates",
+    "teacherapply.read_identity",
+    "lexicon_settings.edit_basic",
+    "lexicon_settings.edit_sub",
+    "lexicon_settings.edit_forms",
+    "lexicon_settings.delete"
+  ];
+  for (const granted of split) {
+    const actor = {
+      id: "admin",
+      role: "admin",
+      permissions: ["teacherapply.access", "lexicon_settings.access", granted]
+    };
+    for (const key of split)
+      expect(hasAdminPermission(actor, key)).toBe(key === granted);
+    expect(
+      hasAdminPermission({ ...actor, permissions: [granted] }, granted)
+    ).toBe(false);
+  }
+  for (const role of ["admin", "super_admin"]) {
+    const actor = {
+      id: "admin",
+      role,
+      permissions: [
+        "teacherapply.access",
+        "lexicon_settings.access",
+        "teacherapply.read_sensitive",
+        "lexicon_settings.edit"
+      ]
+    };
+    expect(hasAdminPermission(actor, "teacherapply.read_sensitive")).toBe(
+      false
+    );
+    expect(hasAdminPermission(actor, "lexicon_settings.edit")).toBe(false);
+  }
+});

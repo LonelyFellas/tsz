@@ -43,9 +43,13 @@ export const ADMIN_PERMISSION_DEPENDENCIES = {
   "teacherapply.access": [],
   "teacherapply.review": ["teacherapply.access"],
   "teacherapply.revoke": ["teacherapply.access"],
-  "teacherapply.read_sensitive": ["teacherapply.access"],
+  "teacherapply.read_certificates": ["teacherapply.access"],
+  "teacherapply.read_identity": ["teacherapply.access"],
   "lexicon_settings.access": [],
-  "lexicon_settings.edit": ["lexicon_settings.access"],
+  "lexicon_settings.edit_basic": ["lexicon_settings.access"],
+  "lexicon_settings.edit_sub": ["lexicon_settings.access"],
+  "lexicon_settings.edit_forms": ["lexicon_settings.access"],
+  "lexicon_settings.delete": ["lexicon_settings.access"],
   "speech.upload_audio": [],
   "speech.generate": ["words.access"]
 } as const;

@@ -66,7 +66,9 @@ beforeEach(() => {
 it("does not request applications for an ordinary admin", () => {
   vi.mocked(usePermission).mockReturnValue(false);
   show();
-  expect(screen.getByText("未开通教师认证查看权限")).toBeInTheDocument();
+  expect(
+    screen.getByText("未开通教师资格申请列表查看权限")
+  ).toBeInTheDocument();
   expect(api.teacherCertification.list).not.toHaveBeenCalled();
 });
 
@@ -88,7 +90,7 @@ it("审核授权不包含认证原件读取或资格撤销，原件组件不挂�
   show();
   await screen.findByText("李老师");
   fireEvent.click(screen.getByText("查看材料"));
-  await screen.findByText("未开通认证原件查看权限");
+  await screen.findByText("未开通资格证书或身份证查看权限");
   expect(screen.getByRole("button", { name: "通 过" })).toBeEnabled();
   expect(api.teacherCertification.file).not.toHaveBeenCalled();
   expect(screen.queryByText("撤销教师资格")).toBeNull();
@@ -103,4 +105,67 @@ it("lets a super admin read an application and requires a rejection reason", asy
   fireEvent.click(screen.getByRole("button", { name: "确认驳回" }));
   expect(await screen.findByText("请填写驳回原因")).toBeInTheDocument();
   expect(api.teacherCertification.review).not.toHaveBeenCalled();
+});
+
+it.each([
+  ["teacherapply.read_certificates", "certificate"],
+  ["teacherapply.read_identity", "identity"]
+])("%s 只加载对应材料，撤权后移除预览", async (key, visibleId) => {
+  vi.mocked(usePermission).mockImplementation(
+    (permission) => permission === "teacherapply.access" || permission === key
+  );
+  vi.mocked(api.teacherCertification.file).mockResolvedValue(
+    new Blob(["image"])
+  );
+  const revoke = vi.fn();
+  vi.stubGlobal(
+    "URL",
+    class extends URL {
+      static createObjectURL = vi.fn(() => "blob:test");
+      static revokeObjectURL = revoke;
+    }
+  );
+  vi.mocked(api.teacherCertification.detail).mockResolvedValue({
+    application,
+    files: [
+      {
+        id: "identity",
+        kind: "id_front",
+        content_type: "image/png",
+        size_bytes: 10
+      },
+      {
+        id: "certificate",
+        kind: "education",
+        content_type: "image/png",
+        size_bytes: 10
+      }
+    ]
+  });
+  const view = show();
+  await screen.findByText("李老师");
+  fireEvent.click(screen.getByText("查看材料"));
+  await screen.findByRole("img", {
+    name: visibleId === "identity" ? "身份证人像面" : "学历证书"
+  });
+  expect(api.teacherCertification.file).toHaveBeenCalledTimes(1);
+  expect(api.teacherCertification.file).toHaveBeenCalledWith(
+    visibleId,
+    expect.objectContaining({ signal: expect.any(AbortSignal) })
+  );
+  vi.mocked(usePermission).mockImplementation(
+    (permission) => permission === "teacherapply.access"
+  );
+  view.rerender(
+    <QueryClientProvider client={new QueryClient()}>
+      <App>
+        <TeacherApplicationsPage />
+      </App>
+    </QueryClientProvider>
+  );
+  expect(
+    screen.queryByRole("img", { name: /身份证人像面|学历证书/ })
+  ).toBeNull();
+  expect(revoke).toHaveBeenCalledWith("blob:test");
+  vi.unstubAllGlobals();
 });

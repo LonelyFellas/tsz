@@ -250,3 +250,29 @@ it("原形及已引用类型禁止删除，修改使用当前revision", async ()
   );
   expect(mock.remove).not.toHaveBeenCalled();
 });
+
+it.each(["lexicon_settings.edit_forms", "lexicon_settings.delete"])(
+  "%s 只开放词形的对应操作",
+  async (key) => {
+    useAuthStore.getState().setProfile({
+      ...useAuthStore.getState().profile!,
+      role: "admin",
+      permissions: ["lexicon_settings.access", key]
+    });
+    mock.items = [
+      { ...base, code: "custom", name_zh: "测试词形", usage_count: 0 }
+    ];
+    setup();
+    const row = (await screen.findByText("测试词形")).closest("tr")!;
+    const edit = within(row).getByText("修 改").closest("button");
+    const remove = within(row).getByText("删 除").closest("button");
+    if (key === "lexicon_settings.delete") {
+      expect(edit).toBeDisabled();
+      expect(remove).toBeEnabled();
+      expect(screen.getByText("新增词形变化").closest("button")).toBeDisabled();
+    } else {
+      expect(edit).toBeEnabled();
+      expect(remove).toBeDisabled();
+    }
+  }
+);
