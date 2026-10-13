@@ -382,7 +382,7 @@ export function V3SynthesisInputs({
           expanded ? `speech-settings-${pronunciation.id}` : undefined
         }
       >
-        发音设置
+        {synthesisEditable ? "设置" : "发音设置"}
       </Button>
     </Popover>
   );
@@ -550,9 +550,12 @@ export function V3SynthesisInputs({
             );
           })}
           <div className="word-pronunciation-row">
-            <Typography.Text className="word-pronunciation-label">
-              语音来源
-            </Typography.Text>
+            <div className="word-synthesis-source-label">
+              <Typography.Text className="word-pronunciation-label">
+                语音来源
+              </Typography.Text>
+              {settingsButton}
+            </div>
             <div className="word-synthesis-source-actions">
               <Radio.Group
                 name={`synthesis-source-${pronunciation.id}`}
@@ -574,7 +577,6 @@ export function V3SynthesisInputs({
                 <Radio value="ipa">Azure IPA</Radio>
                 <Radio value="ups">Azure UPS</Radio>
               </Radio.Group>
-              {settingsButton}
             </div>
           </div>
           {diagnostic && <Alert type="warning" title={diagnostic} showIcon />}
