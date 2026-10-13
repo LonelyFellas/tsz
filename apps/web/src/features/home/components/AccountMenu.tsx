@@ -361,6 +361,8 @@ export function AccountMenu() {
                   error instanceof Error ? error.message : "切换失败，请重试"
                 );
               } finally {
+                // A failed or cancelled switch may leave an unsaved editor open.
+                window.dispatchEvent(new Event("tsz:page-leave-finished"));
                 setSwitching(false);
               }
             }}

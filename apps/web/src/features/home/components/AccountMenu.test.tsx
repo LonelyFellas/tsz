@@ -11,6 +11,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CoinWallet, User } from "@tsz/types";
 import { AccountMenu } from "./AccountMenu";
+import { WordListCreator } from "@/features/wordlist/components/WordListCreator";
 import { useUserStore } from "@/stores/user";
 import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIdentityProvider";
 import { setTheme } from "@/lib/theme";
@@ -696,4 +697,44 @@ describe("AccountMenu", () => {
       expect(screen.queryByText("退出登录")).not.toBeInTheDocument();
     });
   });
+});
+
+it("failed identity switch restores the unsaved editor's unload and back protection", async () => {
+  useUserStore.setState({ user: USER, onboarded: true });
+  vi.mocked(useTeacherIdentity).mockReturnValue({
+    identity: "student",
+    verified: true,
+    ready: true,
+    error: false,
+    select: vi.fn().mockRejectedValue(new Error("切换失败，请重试"))
+  });
+  const navigation = new EventTarget();
+  vi.stubGlobal("navigation", navigation);
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+  const user = userEvent.setup();
+  render(
+    <>
+      <WordListCreator />
+      <AccountMenu />
+    </>
+  );
+  fireEvent.change(screen.getByLabelText("词表名称"), {
+    target: { value: "保留草稿" }
+  });
+  await user.click(screen.getByRole("button", { name: "账户菜单" }));
+  await user.click(screen.getByRole("menuitem", { name: "切换为教师" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "切换失败，请重试"
+  );
+  expect(confirm).toHaveBeenCalledWith("尚未保存，确定离开？");
+  const unload = new Event("beforeunload", { cancelable: true });
+  window.dispatchEvent(unload);
+  expect(unload.defaultPrevented).toBe(true);
+  confirm.mockReturnValue(false);
+  const back = new Event("navigate", { cancelable: true });
+  Object.assign(back, { navigationType: "traverse", hashChange: false });
+  navigation.dispatchEvent(back);
+  expect(back.defaultPrevented).toBe(true);
+  expect(screen.getByLabelText("词表名称")).toHaveValue("保留草稿");
+  confirm.mockRestore();
 });

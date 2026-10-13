@@ -196,11 +196,16 @@ function Editor({
       if (!window.confirm("尚未保存，确定离开？")) e.preventDefault();
       else allowLeave.current = true;
     };
+    const restoreProtection = () => {
+      allowLeave.current = false;
+    };
+    window.addEventListener("tsz:page-leave-finished", restoreProtection);
     window.addEventListener("beforeunload", prevent);
     if (window.navigation)
       window.navigation.addEventListener("navigate", navigate);
     document.addEventListener("click", click, true);
     return () => {
+      window.removeEventListener("tsz:page-leave-finished", restoreProtection);
       window.removeEventListener("beforeunload", prevent);
       document.removeEventListener("click", click, true);
       window.navigation?.removeEventListener("navigate", navigate);
