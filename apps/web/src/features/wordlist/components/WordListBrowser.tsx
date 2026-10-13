@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Plus, Search } from "lucide-react";
 import { useWordLists } from "../hooks/useWordLists";
+import { cn } from "@tsz/ui/lib/cn";
 import { STATE_LABEL, buttonClass, primaryButtonClass } from "../reading";
 import {
   PageHeader,
@@ -36,7 +37,7 @@ export function WordListBrowser({ mine = false }: { mine?: boolean }) {
               {mine ? "浏览公开词表" : "我的词表"}
             </Link>
             <Link
-              className={`${primaryButtonClass} min-h-10 px-5`}
+              className={cn(primaryButtonClass, "min-h-10 px-5")}
               href="/wordlists/new"
             >
               <Plus className="size-4" strokeWidth={2} aria-hidden />

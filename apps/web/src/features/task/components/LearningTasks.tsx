@@ -12,6 +12,7 @@ import type {
   SubmitLearningAnswer
 } from "@tsz/types";
 import { api } from "@/lib/request";
+import { cn } from "@tsz/ui/lib/cn";
 import { LearningRewardSummary } from "@/features/coins/LearningRewardSummary";
 import { useUserStore } from "@/stores/user";
 import { buttonClass, primaryButtonClass } from "@/features/wordlist/reading";
@@ -45,13 +46,21 @@ function Stat({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-function ProgressBar({ value, max }: { value: number; max: number }) {
+function ProgressBar({
+  value,
+  max,
+  label = "本轮进度"
+}: {
+  value: number;
+  max: number;
+  label?: string;
+}) {
   const percent = max ? Math.min(100, Math.round((value / max) * 100)) : 0;
   return (
     <div
       className="h-1.5 overflow-hidden rounded-full bg-muted"
       role="progressbar"
-      aria-label="本轮进度"
+      aria-label={label}
       aria-valuemin={0}
       aria-valuemax={max}
       aria-valuenow={value}
@@ -123,7 +132,7 @@ function TaskList({ userId }: { userId: string }) {
         description="看中文释义，拼写英文。每题有效作答后计入进度，正确率单独统计。每日北京时间 04:00 换日。"
         actions={
           <Link
-            className={`${primaryButtonClass} min-h-10 px-5`}
+            className={cn(primaryButtonClass, "min-h-10 px-5")}
             href="/student/tasks/new"
           >
             创建任务
@@ -189,6 +198,7 @@ function TaskList({ userId }: { userId: string }) {
                         <ProgressBar
                           value={r.answered_count}
                           max={r.target_count}
+                          label={`${task.name} 本轮进度`}
                         />
                         <p className="text-sm tabular-nums text-foreground-muted">
                           {r.answered_count}/{r.target_count} 题
@@ -692,7 +702,7 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
               <div className="mt-5 space-y-5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                   <input
-                    className={`${field} mt-0 flex-1`}
+                    className={cn(field, "mt-0 flex-1")}
                     maxLength={100}
                     aria-label="新任务名称"
                     placeholder="新任务名称"
@@ -713,7 +723,7 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
                   </p>
                   <button
                     disabled={busy}
-                    className={`${buttonClass} text-danger`}
+                    className={cn(buttonClass, "text-danger")}
                     onClick={() => void update(true)}
                   >
                     归档任务

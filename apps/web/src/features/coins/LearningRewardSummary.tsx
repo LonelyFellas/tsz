@@ -64,6 +64,7 @@ export function LearningRewardSummary({
           每日学习奖励
           {d && !q.isError && (
             <span className="ml-2 text-sm font-normal tabular-nums text-foreground-muted">
+              <span className="sr-only"> · </span>
               {d.business_day}
             </span>
           )}
