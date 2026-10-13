@@ -73,7 +73,7 @@ export function PartOfSpeechFormModal({
   onSaved,
   onError
 }: Props) {
-  const canEdit = usePermission("lexicon_settings.edit");
+  const canEdit = usePermission("lexicon_settings.edit_basic");
   const [form] = Form.useForm<PartFormValues>();
   const create = useCreatePartOfSpeech();
   const update = useUpdatePartOfSpeech();

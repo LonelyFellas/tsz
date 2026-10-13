@@ -598,3 +598,25 @@ describe("SubPartOfSpeechPanel 分页", () => {
     expect(within(row).getByText("110")).toBeInTheDocument();
   });
 });
+
+it.each(["lexicon_settings.edit_sub", "lexicon_settings.delete"])(
+  "%s 只开放细分词性的对应操作",
+  (key) => {
+    useAuthStore.getState().setProfile({
+      ...useAuthStore.getState().profile!,
+      role: "admin",
+      permissions: ["lexicon_settings.access", key]
+    });
+    renderPanel();
+    const row = screen.getByText("集合名词").closest("tr")!;
+    const edit = within(row).getByText("修 改").closest("button");
+    const remove = within(row).getByText("删 除").closest("button");
+    if (key === "lexicon_settings.delete") {
+      expect(edit).toBeDisabled();
+      expect(remove).toBeEnabled();
+    } else {
+      expect(edit).toBeEnabled();
+      expect(remove).toBeDisabled();
+    }
+  }
+);

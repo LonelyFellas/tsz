@@ -88,7 +88,7 @@ function SubPartFormModal({
   onSaved: (message: string) => void;
   onError: (error: unknown) => void;
 }) {
-  const canEdit = usePermission("lexicon_settings.edit");
+  const canEdit = usePermission("lexicon_settings.edit_sub");
   const [form] = Form.useForm<SubPartFormValues>();
   const create = useCreateSubPartOfSpeech();
   const update = useUpdateSubPartOfSpeech();
@@ -211,7 +211,8 @@ export function SubPartOfSpeechPanel({
   onError,
   ref
 }: Props) {
-  const canEdit = usePermission("lexicon_settings.edit");
+  const canEdit = usePermission("lexicon_settings.edit_sub");
+  const canDelete = usePermission("lexicon_settings.delete");
   const { modal } = App.useApp();
   const [editing, setEditing] = useState<SubPartOfSpeechConfig>();
   const [formOpen, setFormOpen] = useState(false);
@@ -331,7 +332,7 @@ export function SubPartOfSpeechPanel({
             <Button
               size="small"
               danger
-              disabled={!canEdit || item.usage_count > 0}
+              disabled={!canDelete || item.usage_count > 0}
               onClick={() => removeItem(item)}
             >
               删 除

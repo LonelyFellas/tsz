@@ -130,15 +130,15 @@ describe("个人权限设置", () => {
   it("优先展示已授权模块，切换模块仍保留其他权限", async () => {
     mount();
     await screen.findByRole("group", { name: "权限模块" });
-    expect(modules().getByRole("button", { name: /智能词库/ })).toHaveAttribute(
+    expect(modules().getByRole("button", { name: /词库管理/ })).toHaveAttribute(
       "aria-pressed",
       "true"
     );
     expect(detail().getByText("编辑自己的词条及修订")).toBeVisible();
-    fireEvent.click(modules().getByRole("button", { name: /多维例句/ }));
+    fireEvent.click(modules().getByRole("button", { name: /例句管理/ }));
     expect(detail().getByText("查看后台共享例句")).toBeVisible();
     expect(detail().queryByText("编辑自己的词条及修订")).toBeNull();
-    fireEvent.click(modules().getByRole("button", { name: /智能词库/ }));
+    fireEvent.click(modules().getByRole("button", { name: /词库管理/ }));
     expect(detail().getByLabelText(/编辑词条/)).toBeChecked();
     expect(screen.getByRole("dialog", { name: "权限配置" })).toBeVisible();
     expect(screen.getByText("无变更")).toBeInTheDocument();
@@ -173,11 +173,11 @@ describe("个人权限设置", () => {
     mount(["words.access", "words.edit", "sentences.access"]);
     await screen.findByRole("group", { name: "权限模块" });
     fireEvent.click(detail().getByLabelText(/编辑词条/));
-    fireEvent.click(modules().getByRole("button", { name: /多维例句/ }));
+    fireEvent.click(modules().getByRole("button", { name: /例句管理/ }));
     expect(detail().getByLabelText(/例句查看/)).toBeChecked();
     expect(screen.getByText("开通 0 项 · 取消 1 项")).toBeInTheDocument();
     expect(
-      modules().getByRole("button", { name: /多维例句/ })
+      modules().getByRole("button", { name: /例句管理/ })
     ).toHaveTextContent("1/1");
     fireEvent.click(screen.getByRole("button", { name: "预览变更" }));
     await waitFor(() =>
@@ -214,7 +214,7 @@ describe("个人权限设置", () => {
     ).toHaveClass("ant-tag-blue");
     expect(screen.getByText("开通 2 项 · 取消 0 项")).toBeInTheDocument();
     expect(
-      modules().getByRole("button", { name: /多维例句/ })
+      modules().getByRole("button", { name: /例句管理/ })
     ).toHaveTextContent("1/1");
     expect(api.permissionSystem.changeTags).not.toHaveBeenCalled();
   });
@@ -267,7 +267,7 @@ describe("个人权限设置", () => {
       picker().getByRole("checkbox", { name: /词条编辑/ })
     ).not.toBeChecked();
     fireEvent.click(picker().getByRole("button", { name: /取\s*消/ }));
-    fireEvent.click(modules().getByRole("button", { name: /多维例句/ }));
+    fireEvent.click(modules().getByRole("button", { name: /例句管理/ }));
     fireEvent.click(detail().getByLabelText(/例句查看/));
     expect(selectedTags().queryByText("例句查看")).toBeNull();
   });

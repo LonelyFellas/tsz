@@ -1,4 +1,4 @@
-import { usePermission } from "@/lib/auth";
+import { useIsSuperAdmin, usePermission } from "@/lib/auth";
 import { FormTypeSettings } from "./FormTypeSettings";
 import {
   PlusOutlined,
@@ -101,7 +101,9 @@ export function errorMessage(error: unknown): string {
 }
 
 export function PartOfSpeechSettings() {
-  const canEdit = usePermission("lexicon_settings.edit");
+  const canEdit = usePermission("lexicon_settings.edit_basic");
+  const canEditSub = usePermission("lexicon_settings.edit_sub");
+  const canDelete = useIsSuperAdmin();
   const { message, modal } = App.useApp();
   const [form] = Form.useForm<{ q?: string }>();
   const [q, setQ] = useState("");
@@ -244,7 +246,7 @@ export function PartOfSpeechSettings() {
               size="small"
               danger
               disabled={
-                !canEdit ||
+                !canDelete ||
                 item.usage_count > 0 ||
                 item.sub_part_count > 0 ||
                 // 候选清单就是该词性名下的非原形词形，长度即数量。
@@ -446,7 +448,9 @@ export function PartOfSpeechSettings() {
                 <Button
                   type="primary"
                   icon={<PlusOutlined />}
-                  disabled={!canEdit || catalog.isError || parts.length === 0}
+                  disabled={
+                    !canEditSub || catalog.isError || parts.length === 0
+                  }
                   onClick={() => subPanelRef.current?.openCreate()}
                 >
                   新增细分词性
