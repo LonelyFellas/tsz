@@ -2,6 +2,14 @@
   width: 100%;
 }
 
+.v3-forms-step textarea.tsz-words.ant-input {
+  font-weight: 700;
+}
+
+.v3-forms-step .word-pronunciation-label {
+  font-weight: 400;
+}
+
 .v3-forms-step > .ant-tabs .ant-tabs-content-holder {
   min-width: 0;
 }
