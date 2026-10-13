@@ -435,7 +435,7 @@ describe("AccountMenu", () => {
     ]);
     expect(
       screen.getByRole("menuitem", { name: "学习工作台" })
-    ).toHaveAttribute("href", "/student/practice");
+    ).toHaveAttribute("href", "/student/home");
     expect(screen.queryByText("注销账号")).not.toBeInTheDocument();
   });
 
@@ -460,7 +460,7 @@ describe("AccountMenu", () => {
         })
       ).toHaveAttribute(
         "href",
-        identity === "teacher" ? "/teacher/classes" : "/student/practice"
+        identity === "teacher" ? "/teacher/classes" : "/student/home"
       );
       expect(screen.queryByText("申请教师认证")).not.toBeInTheDocument();
       expect(

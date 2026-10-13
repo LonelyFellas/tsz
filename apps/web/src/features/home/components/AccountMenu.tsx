@@ -304,7 +304,7 @@ export function AccountMenu() {
             href={
               teacher.identity === "teacher"
                 ? "/teacher/classes"
-                : "/student/practice"
+                : "/student/home"
             }
           >
             <MenuIcon>

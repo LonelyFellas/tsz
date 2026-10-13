@@ -14,6 +14,12 @@ export { Label } from "./label";
 export { FormField, type FormFieldProps } from "./form-field";
 export { Tabs, TabsList, TabsTrigger, TabsContent } from "./tabs";
 export {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  PopoverClose
+} from "./popover";
+export {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,

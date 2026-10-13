@@ -28,6 +28,7 @@ export function MainNav() {
         )}
         {isStudent && (
           <>
+            <Link href="/student/home">学习首页</Link>
             <Link href="/student/practice">练习</Link>
           </>
         )}
