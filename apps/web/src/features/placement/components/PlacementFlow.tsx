@@ -193,48 +193,50 @@ export function PlacementFlow() {
   }
 
   return (
-    <div className="min-h-screen bg-muted px-4 py-6">
-      <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-md flex-col">
-        {screen === "welcome" && (
-          <WelcomeScreen
-            quota={quota}
-            starting={starting}
-            error={startError}
-            onboarded={onboarded === true}
-            onStart={requestStart}
-            onSkip={() => goOnboarding()}
-          />
-        )}
-        {screen === "quiz" && (
-          <QuizScreen
-            word={block[idx]?.text ?? ""}
-            answered={answered}
-            submitting={submitting}
-            submitError={submitError}
-            showTeach={quota.used === 0 && answered === 0}
-            locked={confirm !== null}
-            onAnswer={handleAnswer}
-            onRetry={() => void submitBlock()}
-            onExit={requestExit}
-          />
-        )}
-        {screen === "result" && resultBand && (
-          <ResultScreen
-            band={resultBand}
-            quota={quota}
-            fresh={fresh}
-            onboarded={onboarded === true}
-            onApply={() => goOnboarding(resultBand)}
-            onRetest={requestStart}
-          />
-        )}
-        {screen === "invalid" && (
-          <InvalidScreen
-            onboarded={onboarded === true}
-            onRetry={() => void startTest()}
-            onManual={() => goOnboarding()}
-          />
-        )}
+    <div className="min-h-screen px-4 py-6 sm:py-10">
+      <div className="glass mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-md flex-col rounded-3xl p-2 sm:min-h-[calc(100vh-5rem)]">
+        <div className="animate-in flex flex-1 flex-col rounded-[20px] bg-surface/70 p-6">
+          {screen === "welcome" && (
+            <WelcomeScreen
+              quota={quota}
+              starting={starting}
+              error={startError}
+              onboarded={onboarded === true}
+              onStart={requestStart}
+              onSkip={() => goOnboarding()}
+            />
+          )}
+          {screen === "quiz" && (
+            <QuizScreen
+              word={block[idx]?.text ?? ""}
+              answered={answered}
+              submitting={submitting}
+              submitError={submitError}
+              showTeach={quota.used === 0 && answered === 0}
+              locked={confirm !== null}
+              onAnswer={handleAnswer}
+              onRetry={() => void submitBlock()}
+              onExit={requestExit}
+            />
+          )}
+          {screen === "result" && resultBand && (
+            <ResultScreen
+              band={resultBand}
+              quota={quota}
+              fresh={fresh}
+              onboarded={onboarded === true}
+              onApply={() => goOnboarding(resultBand)}
+              onRetest={requestStart}
+            />
+          )}
+          {screen === "invalid" && (
+            <InvalidScreen
+              onboarded={onboarded === true}
+              onRetry={() => void startTest()}
+              onManual={() => goOnboarding()}
+            />
+          )}
+        </div>
       </div>
 
       <ConfirmSheet

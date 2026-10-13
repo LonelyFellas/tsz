@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { cn } from "@tsz/ui/lib/cn";
+import { X } from "lucide-react";
+import { buttonClass, primaryButtonClass } from "@/features/shell/Page";
 import { EST_TOTAL } from "../lib/content";
 import { SwipeCard, type SwipeCardHandle } from "./SwipeCard";
 
@@ -57,11 +60,11 @@ export function QuizScreen({
           // 块提交在途时禁用退出:此刻退出无法兑现「不消耗测试机会」的承诺
           // (最后一块的提交可能已在服务端完成计次)。
           disabled={submitting}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground-muted transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
+          className="flex size-11 shrink-0 items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-40"
         >
-          ✕
+          <X className="size-5" strokeWidth={1.5} aria-hidden />
         </button>
-        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface shadow-xs">
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
           <div
             className="h-full rounded-full bg-primary transition-all duration-300"
             style={{ width: `${progress}%` }}
@@ -79,15 +82,15 @@ export function QuizScreen({
           {/* 背面两张:卡片堆的连续感 */}
           <div
             aria-hidden
-            className="absolute inset-0 translate-y-6 scale-[.89] rounded-3xl bg-surface opacity-40 shadow-sm"
+            className="absolute inset-0 translate-y-6 scale-[.89] rounded-3xl border border-border/60 bg-surface opacity-40"
           />
           <div
             aria-hidden
-            className="absolute inset-0 translate-y-3 scale-[.945] rounded-3xl bg-surface opacity-70 shadow-sm"
+            className="absolute inset-0 translate-y-3 scale-[.945] rounded-3xl border border-border/60 bg-surface opacity-70"
           />
 
           {submitError ? (
-            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 rounded-3xl bg-surface p-6 text-center shadow-lg">
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 rounded-3xl border border-border/60 bg-surface p-6 text-center shadow-float">
               <p className="text-sm font-medium">提交失败，请检查网络</p>
               <p className="text-xs text-foreground-muted">
                 这一组作答已保留，重试即可继续
@@ -95,13 +98,13 @@ export function QuizScreen({
               <button
                 type="button"
                 onClick={onRetry}
-                className="rounded-full bg-primary px-6 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+                className={cn(primaryButtonClass, "min-h-10")}
               >
                 重试
               </button>
             </div>
           ) : submitting ? (
-            <div className="absolute inset-0 z-10 flex animate-pulse flex-col items-center justify-center gap-3 rounded-3xl bg-surface shadow-lg">
+            <div className="absolute inset-0 z-10 flex animate-pulse flex-col items-center justify-center gap-3 rounded-3xl border border-border/60 bg-surface shadow-float">
               <div className="h-3 w-24 rounded bg-muted" />
               <div className="h-3 w-16 rounded bg-muted" />
               <p className="mt-2 text-xs text-foreground-subtle">
@@ -126,7 +129,10 @@ export function QuizScreen({
             type="button"
             disabled={busy || locked}
             onClick={() => cardRef.current?.fly(true)}
-            className="rounded-2xl bg-surface py-3.5 text-sm font-semibold shadow-xs transition-colors hover:bg-primary-muted disabled:opacity-40"
+            className={cn(
+              buttonClass,
+              "min-h-12 hover:bg-primary-muted hover:text-primary"
+            )}
           >
             ← 认识
           </button>
@@ -134,7 +140,7 @@ export function QuizScreen({
             type="button"
             disabled={busy || locked}
             onClick={() => cardRef.current?.fly(false)}
-            className="rounded-2xl bg-surface py-3.5 text-sm font-semibold shadow-xs transition-colors hover:bg-muted disabled:opacity-40"
+            className={cn(buttonClass, "min-h-12")}
           >
             不认识 →
           </button>

@@ -1,5 +1,7 @@
 "use client";
 
+import { cn } from "@tsz/ui/lib/cn";
+import { primaryButtonClass } from "@/features/shell/Page";
 import { BAND_DESC, VOCAB_RANGE } from "../lib/content";
 import { MAX_TESTS, type QuotaState } from "../lib/quota";
 import { BANDS, type Band } from "../lib/types";
@@ -30,7 +32,7 @@ export function ResultScreen({
   return (
     <div className="flex min-h-full flex-1 flex-col text-center">
       <div className="flex-1" />
-      <p className="text-xs font-semibold tracking-widest text-foreground-muted uppercase">
+      <p className="text-xs font-medium tracking-[0.2em] text-foreground-muted">
         你的词汇等级
       </p>
       <div className="relative mx-auto mt-5 mb-4 flex h-36 w-36 items-center justify-center rounded-full bg-primary-muted">
@@ -38,7 +40,7 @@ export function ResultScreen({
           aria-hidden
           className="absolute -inset-2 rounded-full border border-dashed border-primary/40"
         />
-        <span className="font-serif text-5xl font-semibold text-primary">
+        <span className="text-5xl font-bold tracking-tight text-primary">
           {band}
         </span>
       </div>
@@ -57,7 +59,10 @@ export function ResultScreen({
           <span
             key={b}
             aria-hidden
-            className={`h-1.5 rounded-full ${i <= bandIdx ? "bg-primary" : "bg-muted"}`}
+            className={cn(
+              "h-1.5 rounded-full",
+              i <= bandIdx ? "bg-primary" : "bg-muted"
+            )}
           />
         ))}
       </div>
@@ -76,7 +81,7 @@ export function ResultScreen({
       <button
         type="button"
         onClick={onApply}
-        className="w-full rounded-full bg-primary py-3 text-sm font-medium text-white transition-opacity hover:opacity-90"
+        className={cn(primaryButtonClass, "w-full")}
       >
         {onboarded ? "返回学习" : "应用该等级，继续设置"}
       </button>
@@ -89,7 +94,7 @@ export function ResultScreen({
         <button
           type="button"
           onClick={onRetest}
-          className="mt-2 w-full py-2 text-sm text-foreground-muted transition-colors hover:text-foreground"
+          className="mt-2 min-h-11 w-full rounded-full text-sm text-foreground-muted transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           重新测试
         </button>

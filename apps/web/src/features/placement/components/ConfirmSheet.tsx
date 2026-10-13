@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
+import { cn } from "@tsz/ui/lib/cn";
+import { buttonClass, primaryButtonClass } from "@/features/shell/Page";
 
 // 底部确认抽屉:重测覆盖 / 退出测试共用。Esc 或点遮罩取消。
 
@@ -37,13 +39,13 @@ export function ConfirmSheet({
       role="dialog"
       aria-modal="true"
       aria-label={title}
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-4 sm:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/30 p-4 backdrop-blur-sm sm:items-center"
       onClick={(e) => {
         if (e.target === e.currentTarget) onCancel();
       }}
     >
-      <div className="w-full max-w-md rounded-2xl bg-surface p-6 shadow-xl">
-        <h3 className="text-lg font-bold">{title}</h3>
+      <div className="w-full max-w-md rounded-3xl border border-border/60 bg-surface p-6 shadow-float sm:p-8">
+        <h3 className="text-xl font-bold tracking-tight">{title}</h3>
         <p className="mt-2 mb-5 text-sm leading-relaxed text-foreground-muted">
           {desc}
         </p>
@@ -51,14 +53,14 @@ export function ConfirmSheet({
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-full bg-muted py-2.5 text-sm font-medium transition-colors hover:bg-muted/70"
+            className={cn(buttonClass, "min-h-12")}
           >
             取消
           </button>
           <button
             type="button"
             onClick={onOk}
-            className="rounded-full bg-primary py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
+            className={cn(primaryButtonClass, "px-4")}
           >
             {okLabel}
           </button>

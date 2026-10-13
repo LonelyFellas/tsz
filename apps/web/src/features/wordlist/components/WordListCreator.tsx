@@ -14,6 +14,9 @@ import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
 import { wordListKeys } from "../hooks/useWordLists";
 import { Button, Input, FormField } from "@tsz/ui/components";
+import { cn } from "@tsz/ui/lib/cn";
+import { ArrowLeft } from "lucide-react";
+import { PageNotice, PageShell } from "@/features/shell/Page";
 type Row = {
   id: string;
   entryId: string | null;
@@ -32,7 +35,7 @@ const emptyRow = (): Row => ({
   note: ""
 });
 const field =
-  "w-full rounded-2xl border border-border bg-surface px-4 py-3 text-foreground focus-visible:outline-primary";
+  "min-h-24 w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm font-normal leading-6 text-foreground outline-hidden transition-shadow placeholder:text-foreground-subtle focus:border-primary/50 focus:ring-4 focus:ring-primary/15 disabled:cursor-not-allowed disabled:opacity-50";
 function glosses(entry?: WordlistEntry | null) {
   return (
     entry?.pos.flatMap((pos) =>
@@ -56,18 +59,27 @@ export function WordListCreator({ id }: { id?: string }) {
   if (!userId) return null;
   if (id && snapshot.isError)
     return (
-      <p role="alert" className="p-8">
-        读取编辑数据失败。
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => void snapshot.refetch()}
-        >
-          重试
-        </Button>
-      </p>
+      <PageShell size="lg">
+        <PageNotice tone="error">
+          读取编辑数据失败。
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="ml-2"
+            onClick={() => void snapshot.refetch()}
+          >
+            重试
+          </Button>
+        </PageNotice>
+      </PageShell>
     );
-  if (id && !snapshot.data) return <p className="p-8">正在读取词表…</p>;
+  if (id && !snapshot.data)
+    return (
+      <PageShell size="lg">
+        <PageNotice>正在读取词表…</PageNotice>
+      </PageShell>
+    );
   return (
     <Editor
       key={`${userId}:${id ?? "new"}`}
@@ -379,23 +391,32 @@ function Editor({
   const currentPage = Math.min(page, pages);
   const visible = matches.slice((currentPage - 1) * 50, currentPage * 50);
   return (
-    <div className="mx-auto max-w-5xl px-6 pb-16 animate-in">
-      <header className="sticky top-16 z-20 flex flex-wrap items-center gap-3 border-b border-border bg-background/95 py-4 backdrop-blur">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => {
-            if (!dirty || window.confirm("尚未保存，确定离开？")) {
-              allowLeave.current = true;
-              router.push(
-                id ? `/account/wordlists/${id}` : "/account/wordlists"
-              );
-            }
-          }}
-        >
-          返回
-        </Button>
-        <div className="min-w-40 flex-1">
+    <PageShell size="lg">
+      <button
+        type="button"
+        className="-ml-3 mb-5 inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 text-sm text-foreground-muted transition-colors hover:bg-surface/80 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
+        onClick={() => {
+          if (!dirty || window.confirm("尚未保存，确定离开？")) {
+            allowLeave.current = true;
+            router.push(id ? `/account/wordlists/${id}` : "/account/wordlists");
+          }
+        }}
+      >
+        <ArrowLeft className="size-4" strokeWidth={1.8} aria-hidden />
+        返回
+      </button>
+      <p className="mb-3 text-xs font-medium tracking-[0.2em] text-foreground-muted">
+        词表编辑器
+      </p>
+      <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-[34px]">
+        {id ? "编辑词表" : "创建词表"}
+      </h1>
+      <p className="mt-3 max-w-xl text-sm leading-6 text-foreground-muted">
+        从平台已发布词库逐行选词。“注”是给读者的补充说明，随词表展示。
+        {locked && "修改名称、选词或“注”前请先撤回；已有私密备注仍可单独修改。"}
+      </p>
+      <header className="glass sticky top-20 z-20 mt-8 flex flex-col gap-4 rounded-3xl p-4 sm:flex-row sm:items-end sm:p-5">
+        <div className="min-w-0 flex-1">
           <FormField htmlFor="wordlist-name" label="词表名称">
             <Input
               id="wordlist-name"
@@ -419,20 +440,19 @@ function Editor({
           {saving ? "保存中…" : uncertain ? "重试保存" : "保存私密词表"}
         </Button>
       </header>
-      <h1 className="mt-6 text-3xl font-semibold tracking-tight">
-        {id ? "编辑词表" : "创建词表"}
-      </h1>
-      <p className="my-4 text-sm text-foreground-muted">
-        从平台已发布词库逐行选词。“注”是给读者的补充说明，随词表展示。
-        {locked && "修改名称、选词或“注”前请先撤回；已有私密备注仍可单独修改。"}
-      </p>
       {error && (
-        <p role="alert" className="my-4 text-danger">
+        <p
+          role="alert"
+          className="mt-6 rounded-2xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger"
+        >
           {error}
         </p>
       )}
       {loadingItems && (
-        <p role={loaded.isError ? "alert" : "status"} className="my-4 text-sm">
+        <p
+          role={loaded.isError ? "alert" : "status"}
+          className="mt-6 flex flex-wrap items-center gap-3 rounded-2xl bg-muted/70 px-4 py-3 text-sm text-foreground-muted"
+        >
           {loaded.isError
             ? loaded.error instanceof Error
               ? loaded.error.message
@@ -442,6 +462,7 @@ function Editor({
             <Button
               type="button"
               variant="outline"
+              size="sm"
               onClick={() => void loaded.refetch()}
             >
               重试读取
@@ -449,7 +470,7 @@ function Editor({
           )}
         </p>
       )}
-      <div className="my-6">
+      <div className="my-8">
         <FormField
           htmlFor="wordlist-filter"
           label="表内搜索"
@@ -476,9 +497,10 @@ function Editor({
             key={row.id}
             id={`row-${row.id}`}
             tabIndex={-1}
-            className={
-              errorRow === row.id ? "rounded-3xl ring-2 ring-danger" : ""
-            }
+            className={cn(
+              "glass rounded-3xl p-2 outline-hidden",
+              errorRow === row.id && "ring-2 ring-danger"
+            )}
             draggable={
               !locked &&
               !saving &&
@@ -512,10 +534,11 @@ function Editor({
               index={rows.indexOf(row) + 1}
               change={(patch) => change(row.id, patch)}
             />
-            <div className="mt-2 flex gap-3">
+            <div className="flex flex-wrap gap-2 px-3 pb-2 pt-3">
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
                 disabled={locked || !!filter.trim() || rows.indexOf(row) === 0}
                 onClick={() => move(row.id, rows[rows.indexOf(row) - 1]!.id)}
               >
@@ -524,6 +547,7 @@ function Editor({
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
                 disabled={
                   locked ||
                   !!filter.trim() ||
@@ -535,7 +559,9 @@ function Editor({
               </Button>
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
+                size="sm"
+                className="ml-auto text-foreground-muted hover:text-danger"
                 disabled={locked || rows.length === 1}
                 onClick={() => {
                   if (window.confirm("删除此行及其备注？")) {
@@ -550,7 +576,7 @@ function Editor({
           </div>
         ))}
       </fieldset>
-      <div className="mt-6 flex flex-wrap gap-3">
+      <div className="mt-8 flex flex-wrap items-center gap-3">
         <Button
           type="button"
           variant="outline"
@@ -578,7 +604,7 @@ function Editor({
         >
           上一页
         </Button>
-        <span className="py-2">
+        <span className="px-1 text-sm tabular-nums text-foreground-muted">
           {currentPage} / {pages} 页 · {matches.length} / {rows.length} 个词条
         </span>
         <Button
@@ -590,7 +616,7 @@ function Editor({
           下一页
         </Button>
       </div>
-    </div>
+    </PageShell>
   );
 }
 function WordRow({
@@ -630,11 +656,19 @@ function WordRow({
     row.entryId &&
     (row.noteRevision ?? noteRevisionFor(row.entryId)) === undefined;
   return (
-    <section className="rounded-3xl border border-border bg-surface p-5">
-      <label className="mb-2 block text-sm">
-        词条 {index}
+    <section className="rounded-[20px] bg-surface/70 p-5">
+      <label className="block text-sm font-medium">
+        <span className="inline-flex items-center gap-2">
+          <span
+            aria-hidden
+            className="inline-flex size-6 items-center justify-center rounded-full bg-primary-muted text-xs tabular-nums text-primary"
+          >
+            {index}
+          </span>
+          词条 {index}
+        </span>
         <Input
-          className="mt-2"
+          className="tsz-words mt-2"
           value={text}
           disabled={locked}
           placeholder="输入单词或短语"
@@ -658,10 +692,12 @@ function WordRow({
         />
       </label>
       {!row.entryId && searchText === text && search.isFetching && (
-        <p>正在搜索…</p>
+        <p className="mt-2 text-sm text-foreground-muted">正在搜索…</p>
       )}
       {!row.entryId && searchText === text && search.isError && (
-        <p role="alert">搜索失败，请重试输入。</p>
+        <p role="alert" className="mt-2 text-sm text-danger">
+          搜索失败，请重试输入。
+        </p>
       )}
       {!row.entryId &&
         searchText === text &&
@@ -670,7 +706,7 @@ function WordRow({
             type="button"
             variant="ghost"
             key={candidate.entry_id}
-            className="my-2 h-auto w-full justify-start whitespace-normal text-left"
+            className="mt-2 h-auto min-h-11 w-full justify-start rounded-2xl whitespace-normal py-2.5 text-left"
             onClick={() =>
               change({
                 entryId: candidate.entry_id,
@@ -682,8 +718,8 @@ function WordRow({
               })
             }
           >
-            {candidate.label}
-            <span className="ml-3 text-sm text-foreground-muted">
+            <span className="tsz-words font-medium">{candidate.label}</span>
+            <span className="ml-3 text-sm font-normal text-foreground-muted">
               {candidate.glosses.join("；")}
             </span>
           </Button>
@@ -692,18 +728,24 @@ function WordRow({
         searchText === text &&
         search.isSuccess &&
         search.data.items.length === 0 && (
-          <p>没有匹配词条，请修改输入或删除此行。</p>
+          <p className="mt-2 text-sm text-foreground-muted">
+            没有匹配词条，请修改输入或删除此行。
+          </p>
         )}
       {(row.candidate || stored?.entry) && (
-        <p className="my-3 text-sm text-foreground-muted">
+        <p className="mt-3 rounded-2xl bg-muted/70 px-4 py-2.5 text-sm leading-6 text-foreground-muted">
           {(row.candidate?.glosses ?? glosses(stored?.entry)).join("；")}
         </p>
       )}
-      {stored && !stored.entry && <p>内容不可用，请删除或替换此项。</p>}
-      <label className="mt-3 block text-sm">
+      {stored && !stored.entry && (
+        <p className="mt-3 text-sm text-danger">
+          内容不可用，请删除或替换此项。
+        </p>
+      )}
+      <label className="mt-5 block text-sm font-medium">
         注
         <textarea
-          className={`${field} mt-2`}
+          className={cn(field, "mt-2")}
           aria-label={`注 ${index}`}
           aria-describedby={`author-note-${row.id}-message`}
           maxLength={1000}
@@ -720,10 +762,10 @@ function WordRow({
         </span>
       </label>
       {(stored?.private_note || row.note || row.noteDirty) && (
-        <label className="mt-3 block text-sm">
+        <label className="mt-5 block text-sm font-medium">
           已有私密备注（仅自己可见）
           <textarea
-            className={`${field} mt-2`}
+            className={cn(field, "mt-2")}
             aria-label={`私密备注 ${index}`}
             maxLength={1000}
             disabled={!!unloaded}

@@ -1,5 +1,7 @@
 "use client";
 
+import { cn } from "@tsz/ui/lib/cn";
+import { primaryButtonClass } from "@/features/shell/Page";
 import { VOCAB_RANGE } from "../lib/content";
 import { MAX_TESTS, type QuotaState } from "../lib/quota";
 
@@ -47,10 +49,9 @@ export function WelcomeScreen({
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
-      <div className="flex items-center gap-2 text-sm font-bold text-primary">
-        <span className="h-0.5 w-4 rounded bg-primary" aria-hidden />
+      <p className="text-xs font-medium tracking-[0.2em] text-foreground-muted">
         词汇定级
-      </div>
+      </p>
 
       {/* 三张示例词卡:一眼传达测试覆盖 A1 → C2 */}
       <div className="relative mx-auto my-8 h-36 w-full max-w-xs" aria-hidden>
@@ -58,7 +59,10 @@ export function WelcomeScreen({
           <div
             key={word}
             style={{ transform }}
-            className={`absolute top-1/2 left-1/2 flex h-24 w-40 flex-col items-center justify-center gap-1 rounded-2xl bg-surface shadow-md ${z ? "z-10" : ""}`}
+            className={cn(
+              "absolute top-1/2 left-1/2 flex h-24 w-40 flex-col items-center justify-center gap-1 rounded-2xl border border-border/60 bg-surface shadow-glass",
+              z && "z-10"
+            )}
           >
             <span className="tsz-words">{word}</span>
             <span className="font-mono text-[10px] tracking-widest text-foreground-subtle">
@@ -70,13 +74,13 @@ export function WelcomeScreen({
 
       {hasResult && quota.last ? (
         <>
-          <h1 className="text-2xl font-bold">你的词汇档案</h1>
-          <p className="mt-1 text-sm text-foreground-muted">
+          <h1 className="text-3xl font-bold tracking-tight">你的词汇档案</h1>
+          <p className="mt-2 text-sm leading-6 text-foreground-muted">
             {onboarded
               ? "测评记录仅作参考，不会修改已保存的学习难度。"
               : "等级决定词书推荐与每日计划。"}
           </p>
-          <div className="mt-5 flex items-center gap-3 rounded-2xl bg-surface p-4 shadow-xs">
+          <div className="mt-6 flex items-center gap-3 rounded-2xl border border-border/60 bg-muted/70 p-4">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-muted font-serif text-lg font-bold text-primary">
               {quota.last.band}
             </span>
@@ -92,13 +96,15 @@ export function WelcomeScreen({
         </>
       ) : (
         <>
-          <h1 className="text-2xl font-bold">1 分钟，测出你的词汇量</h1>
-          <p className="mt-1 text-sm text-foreground-muted">
+          <h1 className="text-3xl font-bold tracking-tight">
+            1 分钟，测出你的词汇量
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-foreground-muted">
             {onboarded
               ? "了解当前词汇水平，学习难度不会随测评结果改变。"
               : "根据结果为你推荐合适的难度与学习计划。"}
           </p>
-          <ul className="mt-5 space-y-3 text-sm leading-relaxed">
+          <ul className="mt-6 space-y-3 text-sm leading-6">
             {[
               ["看词滑卡，凭直觉作答", "认识左滑，不认识右滑"],
               ["15–30 题，难度自动调整", "答得越稳，结束得越快"],
@@ -127,7 +133,7 @@ export function WelcomeScreen({
           // 次数用尽且无留存结果(损坏的本地存储被 readQuota 清洗后可能出现):
           // 此时既不能开测也无结果可看,禁用避免「点了没反应」的死按钮。
           disabled={starting || (left <= 0 && !hasResult)}
-          className="w-full rounded-full bg-primary py-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+          className={cn(primaryButtonClass, "w-full")}
         >
           {starting
             ? "准备中..."
@@ -141,7 +147,7 @@ export function WelcomeScreen({
           <button
             type="button"
             onClick={onSkip}
-            className="mt-2 w-full py-2 text-sm text-foreground-muted transition-colors hover:text-foreground"
+            className="mt-2 min-h-11 w-full rounded-full text-sm text-foreground-muted transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             {onboarded ? "返回学习" : "跳过，手动选择等级"}
           </button>

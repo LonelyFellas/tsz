@@ -8,7 +8,20 @@ import type { CreateWordlistTip, Wordlist } from "@tsz/types";
 import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
 import { wordListKeys } from "../hooks/useWordLists";
-import { buttonClass } from "../reading";
+import { cn } from "@tsz/ui/lib/cn";
+import {
+  buttonClass,
+  inputClass,
+  primaryButtonClass,
+  textButtonClass
+} from "../reading";
+import {
+  PageHeader,
+  PageNotice,
+  PageShell,
+  Pager,
+  panelClass
+} from "@/features/shell/Page";
 function restore(key: string): CreateWordlistTip | null {
   const text = sessionStorage.getItem(key);
   if (!text) return null;
@@ -40,7 +53,7 @@ export function TipPanel({ list }: { list: Wordlist }) {
   if (!userId)
     return (
       <Link
-        className={buttonClass}
+        className={cn(buttonClass, "mt-6")}
         href={`/login?redirect=${encodeURIComponent(`/wordlists/${list.id}`)}`}
       >
         登录后投币
@@ -48,7 +61,7 @@ export function TipPanel({ list }: { list: Wordlist }) {
     );
   if (userId === list.owner_user_id)
     return (
-      <button className={buttonClass} disabled>
+      <button type="button" className={cn(buttonClass, "mt-6")} disabled>
         不能给自己的词表投币
       </button>
     );
@@ -182,44 +195,49 @@ function TipForm({ userId, list }: { userId: string; list: Wordlist }) {
   return (
     <section
       aria-label="词表投币"
-      className="mt-5 w-full rounded-2xl border border-border p-4"
+      className="mt-6 w-full rounded-2xl border border-border/60 bg-muted/70 p-5"
     >
-      <p className="text-sm">
+      <h2 className="text-sm font-medium">给作者投币</h2>
+      <p className="mt-1 text-xs leading-5 text-foreground-muted">
         投币将全额进入作者钱包。词条不可用或任一方暂停收支时无法投币。
       </p>
       {confirming ? (
         <>
-          <p className="my-3">
+          <p className="mt-4 text-sm leading-6">
             向作者 <strong>{list.owner_name}</strong> 投出{" "}
             <strong>{formatCoins(amount)}</strong>
           </p>
-          <p className="mb-3 break-all text-xs text-foreground-muted">
+          <p className="mt-1 break-all text-xs text-foreground-subtle">
             作者 ID：{list.owner_user_id}
           </p>
-          <button
-            className={buttonClass}
-            disabled={busy || recovery.error}
-            onClick={() => void send()}
-          >
-            {busy ? "正在确认…" : pending ? "重试这次投币" : "确认投出"}
-          </button>
-          {!pending && (
+          <div className="mt-4 flex flex-wrap gap-3">
             <button
-              className={`${buttonClass} ml-3`}
-              disabled={busy}
-              onClick={() => setConfirming(false)}
+              type="button"
+              className={cn(primaryButtonClass, "min-h-10 px-5")}
+              disabled={busy || recovery.error}
+              onClick={() => void send()}
             >
-              取消
+              {busy ? "正在确认…" : pending ? "重试这次投币" : "确认投出"}
             </button>
-          )}
+            {!pending && (
+              <button
+                type="button"
+                className={buttonClass}
+                disabled={busy}
+                onClick={() => setConfirming(false)}
+              >
+                取消
+              </button>
+            )}
+          </div>
         </>
       ) : (
-        <div className="mt-3 flex flex-wrap gap-3">
+        <div className="mt-4 flex flex-wrap gap-3">
           <input
             aria-label="投币数量"
             inputMode="numeric"
             maxLength={19}
-            className="min-w-0 rounded-full border border-border bg-background px-4 py-2"
+            className={cn(inputClass, "min-h-10 flex-1 sm:max-w-56")}
             placeholder="输入正整数数量"
             value={amount}
             disabled={recovery.error}
@@ -229,6 +247,7 @@ function TipForm({ userId, list }: { userId: string; list: Wordlist }) {
             }}
           />
           <button
+            type="button"
             className={buttonClass}
             disabled={recovery.error}
             onClick={confirm}
@@ -238,12 +257,18 @@ function TipForm({ userId, list }: { userId: string; list: Wordlist }) {
         </div>
       )}
       {message && (
-        <p role={success ? "status" : "alert"} className="mt-3">
+        <p
+          role={success ? "status" : "alert"}
+          className={cn(
+            "mt-3 text-sm leading-6",
+            success ? "text-success" : "text-danger"
+          )}
+        >
           {message}
         </p>
       )}
       <Link
-        className="mt-3 inline-block text-sm text-primary"
+        className="mt-4 inline-block text-sm text-primary underline-offset-4 hover:underline"
         href="/account/wordlist-tips"
       >
         查看我的投币记录 →
@@ -263,78 +288,75 @@ function TipHistory({ userId }: { userId: string }) {
     queryFn: ({ signal }) => api.wordList.tips({ page }, { signal })
   });
   return (
-    <div className="mx-auto max-w-3xl px-6 py-10">
-      <Link href="/account/coins" className="text-sm text-primary">
-        ← 我的天生币
-      </Link>
-      <h1 className="mt-6 text-3xl font-semibold">词表投币记录</h1>
-      <p className="my-4 text-sm text-foreground-muted">
-        投出和收到的记录均来自实际转账。
-      </p>
+    <PageShell>
+      <PageHeader
+        back={{ href: "/account/coins", label: "我的天生币" }}
+        eyebrow="天生币"
+        title="词表投币记录"
+        description="投出和收到的记录均来自实际转账。"
+      />
       {query.isError ? (
-        <p role="alert">
+        <PageNotice tone="error">
           记录读取失败，
-          <button onClick={() => void query.refetch()}>重试</button>。
-        </p>
+          <button
+            className={textButtonClass}
+            onClick={() => void query.refetch()}
+          >
+            重试
+          </button>
+          。
+        </PageNotice>
       ) : query.isPending ? (
-        <p>正在加载…</p>
+        <PageNotice>正在加载…</PageNotice>
       ) : (
         <>
-          <div className="space-y-4">
-            {query.data.items.map((tip) => {
-              const sent = tip.payer_user_id === userId;
-              return (
-                <section
-                  key={tip.event_id}
-                  className="rounded-3xl border border-border bg-surface p-5"
-                >
-                  <p className="font-semibold">
-                    {sent ? "投出" : "收到"} {formatCoins(tip.amount)}
-                  </p>
-                  <p className="mt-2">
-                    {sent ? "作者" : "投币人"}：
-                    {tip.counterparty_name ?? "账号已注销"}
-                  </p>
-                  {tip.wordlist_accessible ? (
-                    <Link
-                      className="mt-2 block text-primary"
-                      href={`${sent ? "" : "/account"}/wordlists/${tip.wordlist_id}`}
-                    >
-                      {tip.wordlist_name}
-                    </Link>
-                  ) : (
-                    <p className="mt-2">词表已删除或不可访问</p>
-                  )}
-                  <p className="mt-2 text-xs text-foreground-muted">
-                    {new Date(tip.created_at).toLocaleString("zh-CN")}
-                  </p>
-                  <p className="mt-2 break-all text-xs text-foreground-muted">
-                    事件 ID：{tip.event_id}
-                  </p>
-                </section>
-              );
-            })}
-          </div>
-          {!query.data.items.length && <p>暂无投币记录</p>}
-          <div className="mt-6 flex items-center gap-4">
-            <button
-              className={buttonClass}
-              disabled={page === 1}
-              onClick={() => setPage(page - 1)}
-            >
-              上一页
-            </button>
-            <span>第 {page} 页</span>
-            <button
-              className={buttonClass}
-              disabled={page >= query.data.pagination.total_pages}
-              onClick={() => setPage(page + 1)}
-            >
-              下一页
-            </button>
-          </div>
+          {query.data.items.length ? (
+            <ul className="space-y-3">
+              {query.data.items.map((tip) => {
+                const sent = tip.payer_user_id === userId;
+                return (
+                  <li key={tip.event_id} className={panelClass}>
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                      <p className="text-lg font-bold tabular-nums tracking-tight">
+                        {sent ? "投出" : "收到"} {formatCoins(tip.amount)}
+                      </p>
+                      <p className="text-xs text-foreground-muted">
+                        {new Date(tip.created_at).toLocaleString("zh-CN")}
+                      </p>
+                    </div>
+                    <p className="mt-3 text-sm">
+                      {sent ? "作者" : "投币人"}：
+                      {tip.counterparty_name ?? "账号已注销"}
+                    </p>
+                    {tip.wordlist_accessible ? (
+                      <Link
+                        className="mt-1 inline-block break-words text-sm text-primary underline-offset-4 hover:underline"
+                        href={`${sent ? "" : "/account"}/wordlists/${tip.wordlist_id}`}
+                      >
+                        {tip.wordlist_name}
+                      </Link>
+                    ) : (
+                      <p className="mt-1 text-sm text-foreground-muted">
+                        词表已删除或不可访问
+                      </p>
+                    )}
+                    <p className="mt-3 break-all text-xs text-foreground-subtle">
+                      事件 ID：{tip.event_id}
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <PageNotice>暂无投币记录</PageNotice>
+          )}
+          <Pager
+            page={page}
+            total={query.data.pagination.total_pages}
+            onChange={setPage}
+          />
         </>
       )}
-    </div>
+    </PageShell>
   );
 }

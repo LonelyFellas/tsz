@@ -16,7 +16,7 @@ export const AUTH_PASSWORD_HINT = `密码至少 ${PASSWORD_MIN_LENGTH} 位`;
 
 // 登录 / 注册表单共用的输入框样式。
 export const AUTH_INPUT_CLASS =
-  "w-full rounded-full border border-border bg-surface px-4 py-3 text-sm text-foreground outline-hidden placeholder:text-foreground-subtle focus:border-primary focus:ring-1 focus:ring-primary";
+  "min-h-12 w-full rounded-full border border-border bg-surface px-5 py-3 text-sm text-foreground outline-hidden transition-shadow placeholder:text-foreground-subtle focus:border-primary/50 focus:ring-4 focus:ring-primary/15 aria-invalid:border-danger";
 
 /** 登录 / 注册成功后，将 access token 存入内存并启动主动刷新定时器。 */
 export function persistSession(

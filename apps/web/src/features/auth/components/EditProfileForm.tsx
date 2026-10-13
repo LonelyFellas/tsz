@@ -20,10 +20,18 @@ import {
   uploadAvatar
 } from "../avatar";
 import { translateAuthError } from "../shared";
+import { cn } from "@tsz/ui/lib/cn";
+import {
+  PageHeader,
+  PageNotice,
+  PageShell,
+  buttonClass,
+  primaryButtonClass
+} from "@/features/shell/Page";
 
 // 精细化输入框:Apple 风圆角 + 品牌蓝聚焦环,贴合落地页设计体系。
 const INPUT_CLASS =
-  "w-full rounded-2xl border border-border bg-muted/60 px-4 py-3 text-sm text-foreground outline-hidden transition placeholder:text-foreground-subtle focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/15";
+  "min-h-12 w-full rounded-full border border-border bg-surface px-5 text-sm text-foreground outline-hidden transition-shadow placeholder:text-foreground-subtle focus:border-primary/50 focus:ring-4 focus:ring-primary/15 aria-invalid:border-danger disabled:cursor-not-allowed disabled:opacity-50";
 
 // 昵称禁字符提示:前端预检与后端 400 兜底共用同一句(规则见 @tsz/shared 的
 // hasDisplayNameForbiddenChars,与后端 validateDisplayName 对齐)。
@@ -139,17 +147,17 @@ export function EditProfileForm() {
 
   if (loadError) {
     return (
-      <div className="mx-auto max-w-md px-6 py-24 text-center text-sm text-foreground-subtle">
-        资料加载失败,请刷新重试。
-      </div>
+      <PageShell size="sm">
+        <PageNotice tone="error">资料加载失败,请刷新重试。</PageNotice>
+      </PageShell>
     );
   }
 
   if (!me) {
     return (
-      <div className="mx-auto max-w-md px-6 py-24 text-center text-sm text-foreground-subtle">
-        加载中…
-      </div>
+      <PageShell size="sm">
+        <PageNotice>加载中…</PageNotice>
+      </PageShell>
     );
   }
 
@@ -299,266 +307,262 @@ export function EditProfileForm() {
   }
 
   return (
-    <div className="animate-in mx-auto max-w-2xl px-6 py-10 sm:py-14">
-      <Link
-        href="/account"
-        className="rounded-sm text-sm text-foreground-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-      >
-        ← 返回个人中心
-      </Link>
-      <h1 className="mt-7 text-3xl font-semibold tracking-tight text-foreground">
-        编辑资料
-      </h1>
-      <p className="mt-3 text-sm leading-6 text-foreground-muted">
-        修改头像、昵称和英美偏好。
-      </p>
+    <PageShell size="sm">
+      <PageHeader
+        back={{ href: "/account", label: "返回个人中心" }}
+        eyebrow="个人中心"
+        title="编辑资料"
+        description="修改头像、昵称和英美偏好。"
+      />
 
-      <div className="mt-8 rounded-3xl border border-border bg-surface p-5 shadow-xl shadow-black/5 sm:p-8">
-        {/* 头像:点击选图 → OSS 直传三步流程(../avatar) */}
-        <div className="mb-7 flex flex-col items-center gap-3">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={AVATAR_ACCEPT}
-            className="hidden"
-            aria-label="选择头像图片"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              // 立即清空 value:同一张图重选(失败重试)也要触发 change。
-              e.target.value = "";
-              handleAvatarChange(file);
-            }}
-          />
-          <button
-            type="button"
-            onClick={handleAvatar}
-            disabled={avatarUploading}
-            aria-label="更换头像"
-            aria-busy={avatarUploading}
-            className="group relative h-24 w-24 transition active:scale-95 disabled:cursor-wait"
-          >
-            <span className="block h-full w-full overflow-hidden rounded-full ring-1 ring-border">
-              {user.avatar_url && user.avatar_url !== avatarFailedUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={user.avatar_url}
-                  alt="头像"
-                  className="h-full w-full bg-white object-cover"
-                  onError={() => setAvatarFailedUrl(user.avatar_url)}
-                />
-              ) : (
-                <span className="flex h-full w-full items-center justify-center bg-linear-to-br from-gray-700 to-gray-900 text-3xl font-semibold text-white">
-                  {avatarInitial}
-                </span>
-              )}
-              {avatarUploading && (
-                <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
-                  <SpinnerIcon />
-                </span>
-              )}
-            </span>
-            <span className="absolute bottom-0.5 right-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-white ring-2 ring-white transition group-hover:opacity-90">
-              <CameraIcon />
-            </span>
-          </button>
-          {avatarError && <p className="text-sm text-danger">{avatarError}</p>}
-          {topContact && (
-            <p className="text-sm font-medium text-foreground-muted">
-              {topContact}
-            </p>
-          )}
-        </div>
-
-        <div className="mb-7 h-px bg-muted" />
-
-        {user.roles.includes("student") && (
-          <section
-            className="mb-7 border-b border-border pb-7"
-            aria-labelledby="learning-settings-title"
-          >
-            <h2
-              id="learning-settings-title"
-              className="text-base font-semibold"
+      <div className="glass rounded-3xl p-2">
+        <div className="rounded-[20px] bg-surface/70 p-6 sm:p-8">
+          {/* 头像:点击选图 → OSS 直传三步流程(../avatar) */}
+          <div className="mb-7 flex flex-col items-center gap-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={AVATAR_ACCEPT}
+              className="hidden"
+              aria-label="选择头像图片"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                // 立即清空 value:同一张图重选(失败重试)也要触发 change。
+                e.target.value = "";
+                handleAvatarChange(file);
+              }}
+            />
+            <button
+              type="button"
+              onClick={handleAvatar}
+              disabled={avatarUploading}
+              aria-label="更换头像"
+              aria-busy={avatarUploading}
+              className="group relative size-24 rounded-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary disabled:cursor-wait"
             >
-              个人学习配置
-            </h2>
-            {learning_settings ? (
-              <form
-                onSubmit={handleLearningSettingsSubmit}
-                className="mt-4 space-y-4"
-              >
-                <div
-                  ref={difficultyHelpRef}
-                  className="relative flex items-center gap-2 text-sm"
-                >
-                  <span className="text-foreground-muted">难度级别</span>
-                  <span className="font-semibold text-foreground">
-                    {learning_settings.cefr_level}
+              <span className="block h-full w-full overflow-hidden rounded-full ring-4 ring-primary/10">
+                {user.avatar_url && user.avatar_url !== avatarFailedUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={user.avatar_url}
+                    alt="头像"
+                    className="h-full w-full bg-white object-cover"
+                    onError={() => setAvatarFailedUrl(user.avatar_url)}
+                  />
+                ) : (
+                  <span className="flex h-full w-full items-center justify-center bg-primary text-3xl font-bold text-primary-foreground">
+                    {avatarInitial}
                   </span>
-                  <button
-                    type="button"
-                    aria-label="难度级别说明"
-                    aria-expanded={difficultyHelpOpen}
-                    aria-controls="difficulty-help"
-                    onClick={() => setDifficultyHelpOpen((open) => !open)}
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-full text-foreground-muted hover:bg-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                  >
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      aria-hidden
-                    >
-                      <circle cx="12" cy="12" r="9" />
-                      <path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2.5 1.5-2.5 3" />
-                      <path d="M12 16h.01" />
-                    </svg>
-                  </button>
-                  {difficultyHelpOpen && (
-                    <div
-                      id="difficulty-help"
-                      role="tooltip"
-                      className="absolute left-0 top-full z-10 mt-2 w-60 max-w-full rounded-xl border border-border bg-surface px-4 py-3 text-xs leading-6 text-foreground shadow-lg shadow-black/10"
-                    >
-                      如需修改，请联系官方客服
-                    </div>
-                  )}
-                </div>
-                <fieldset disabled={settingsSaving}>
-                  <legend className="mb-2 text-sm font-medium text-foreground-muted">
-                    英美偏好
-                  </legend>
-                  <div className="flex flex-wrap gap-5">
-                    {(["BrE", "AmE"] as const).map((value) => (
-                      <label
-                        key={value}
-                        className="flex cursor-pointer items-center gap-2 text-sm"
-                      >
-                        <input
-                          type="radio"
-                          name="profile-english-variant"
-                          value={value}
-                          checked={variant === value}
-                          onChange={() => {
-                            setVariant(value);
-                            setSettingsError("");
-                            setSettingsSuccess(false);
-                          }}
-                          className="h-4 w-4 accent-primary"
-                        />
-                        {VARIANT_LABEL[value]}英语（{value}）
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-                {settingsError && (
-                  <p role="alert" className="text-sm text-danger">
-                    {settingsError}
-                  </p>
                 )}
-                {settingsSuccess && (
-                  <p role="status" className="text-sm text-success">
-                    偏好已保存
-                  </p>
+                {avatarUploading && (
+                  <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
+                    <SpinnerIcon />
+                  </span>
                 )}
-                <button
-                  type="submit"
-                  disabled={
-                    settingsSaving ||
-                    variant === null ||
-                    variant === learning_settings.english_variant
-                  }
-                  className="rounded-full bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  {settingsSaving ? "保存中…" : "保存偏好"}
-                </button>
-              </form>
-            ) : (
-              <Link
-                href="/onboarding"
-                className="mt-3 inline-block text-sm text-primary hover:underline"
-              >
-                完成学习配置
-              </Link>
-            )}
-          </section>
-        )}
-
-        <form
-          aria-label="修改昵称"
-          className="space-y-5"
-          onSubmit={handleSubmit}
-        >
-          {/* 昵称 */}
-          <div>
-            <label
-              htmlFor="profile-display-name"
-              className="mb-1.5 block text-sm font-medium text-foreground-muted"
-            >
-              昵称
-            </label>
-            <div className="relative">
-              <input
-                id="profile-display-name"
-                type="text"
-                placeholder="请输入昵称"
-                value={displayName}
-                disabled={saving}
-                aria-invalid={Boolean(nameMessage)}
-                aria-describedby={
-                  nameMessage ? "profile-display-name-error" : undefined
-                }
-                onChange={(e) => {
-                  setNameError("");
-                  setSuccess(false);
-                  setDisplayName(e.target.value);
-                }}
-                className={`${INPUT_CLASS} pr-14`}
-              />
-              <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-foreground-subtle">
-                {displayNameLength(displayName)}/{NICKNAME_MAX}
               </span>
-            </div>
-            {nameMessage && (
-              <p
-                id="profile-display-name-error"
-                className="mt-1.5 text-sm text-danger"
-              >
-                {nameMessage}
+              <span className="absolute bottom-0.5 right-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground ring-2 ring-surface transition-opacity group-hover:opacity-90">
+                <CameraIcon />
+              </span>
+            </button>
+            {avatarError && (
+              <p className="text-sm text-danger">{avatarError}</p>
+            )}
+            {topContact && (
+              <p className="text-sm font-medium text-foreground-muted">
+                {topContact}
               </p>
             )}
           </div>
 
-          {success && (
-            <p className="flex items-center justify-center gap-1.5 rounded-2xl bg-success/10 px-4 py-3 text-center text-sm font-medium text-success">
-              <CheckIcon />
-              已保存
-            </p>
+          {user.roles.includes("student") && (
+            <section
+              className="mb-7 border-y border-border/60 py-7"
+              aria-labelledby="learning-settings-title"
+            >
+              <h2
+                id="learning-settings-title"
+                className="text-xl font-semibold tracking-tight"
+              >
+                个人学习配置
+              </h2>
+              {learning_settings ? (
+                <form
+                  onSubmit={handleLearningSettingsSubmit}
+                  className="mt-4 space-y-4"
+                >
+                  <div
+                    ref={difficultyHelpRef}
+                    className="relative flex items-center gap-2 text-sm"
+                  >
+                    <span className="text-foreground-muted">难度级别</span>
+                    <span className="font-semibold text-foreground">
+                      {learning_settings.cefr_level}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label="难度级别说明"
+                      aria-expanded={difficultyHelpOpen}
+                      aria-controls="difficulty-help"
+                      onClick={() => setDifficultyHelpOpen((open) => !open)}
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-full text-foreground-muted hover:bg-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        aria-hidden
+                      >
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2.5 1.5-2.5 3" />
+                        <path d="M12 16h.01" />
+                      </svg>
+                    </button>
+                    {difficultyHelpOpen && (
+                      <div
+                        id="difficulty-help"
+                        role="tooltip"
+                        className="absolute left-0 top-full z-10 mt-2 w-60 max-w-full rounded-2xl border border-border/60 bg-surface px-4 py-3 text-xs leading-6 text-foreground shadow-float"
+                      >
+                        如需修改，请联系官方客服
+                      </div>
+                    )}
+                  </div>
+                  <fieldset disabled={settingsSaving}>
+                    <legend className="mb-2 text-sm font-medium text-foreground-muted">
+                      英美偏好
+                    </legend>
+                    <div className="flex flex-wrap gap-2">
+                      {(["BrE", "AmE"] as const).map((value) => (
+                        <label
+                          key={value}
+                          className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-border bg-surface px-5 text-sm text-foreground-muted transition-colors hover:text-foreground has-checked:border-primary/40 has-checked:bg-primary-muted has-checked:font-medium has-checked:text-primary has-disabled:cursor-not-allowed has-disabled:opacity-50"
+                        >
+                          <input
+                            type="radio"
+                            name="profile-english-variant"
+                            value={value}
+                            checked={variant === value}
+                            onChange={() => {
+                              setVariant(value);
+                              setSettingsError("");
+                              setSettingsSuccess(false);
+                            }}
+                            className="size-4 accent-primary"
+                          />
+                          {VARIANT_LABEL[value]}英语（{value}）
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                  {settingsError && (
+                    <p role="alert" className="text-sm text-danger">
+                      {settingsError}
+                    </p>
+                  )}
+                  {settingsSuccess && (
+                    <p role="status" className="text-sm text-success">
+                      偏好已保存
+                    </p>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={
+                      settingsSaving ||
+                      variant === null ||
+                      variant === learning_settings.english_variant
+                    }
+                    className={cn(primaryButtonClass, "min-h-10 px-5")}
+                  >
+                    {settingsSaving ? "保存中…" : "保存偏好"}
+                  </button>
+                </form>
+              ) : (
+                <Link
+                  href="/onboarding"
+                  className="mt-3 inline-block text-sm text-primary hover:underline"
+                >
+                  完成学习配置
+                </Link>
+              )}
+            </section>
           )}
 
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="flex-1 rounded-full border border-border py-3 text-sm font-medium text-foreground-muted transition hover:bg-muted active:scale-95"
-            >
-              取消
-            </button>
-            <button
-              type="submit"
-              disabled={!canSubmit}
-              className="flex-1 rounded-full bg-primary py-3 text-sm font-medium text-white transition hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {saving ? "保存中..." : "保存"}
-            </button>
-          </div>
-        </form>
+          <form
+            aria-label="修改昵称"
+            className="space-y-5"
+            onSubmit={handleSubmit}
+          >
+            {/* 昵称 */}
+            <div>
+              <label
+                htmlFor="profile-display-name"
+                className="mb-2 block px-4 text-sm font-medium text-foreground"
+              >
+                昵称
+              </label>
+              <div className="relative">
+                <input
+                  id="profile-display-name"
+                  type="text"
+                  placeholder="请输入昵称"
+                  value={displayName}
+                  disabled={saving}
+                  aria-invalid={Boolean(nameMessage)}
+                  aria-describedby={
+                    nameMessage ? "profile-display-name-error" : undefined
+                  }
+                  onChange={(e) => {
+                    setNameError("");
+                    setSuccess(false);
+                    setDisplayName(e.target.value);
+                  }}
+                  className={cn(INPUT_CLASS, "pr-16")}
+                />
+                <span className="pointer-events-none absolute right-5 top-1/2 -translate-y-1/2 text-xs text-foreground-subtle">
+                  {displayNameLength(displayName)}/{NICKNAME_MAX}
+                </span>
+              </div>
+              {nameMessage && (
+                <p
+                  id="profile-display-name-error"
+                  className="mt-2 px-4 text-sm text-danger"
+                >
+                  {nameMessage}
+                </p>
+              )}
+            </div>
+
+            {success && (
+              <p className="flex items-center justify-center gap-1.5 rounded-2xl bg-success/10 px-4 py-3 text-center text-sm font-medium text-success">
+                <CheckIcon />
+                已保存
+              </p>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className={cn(buttonClass, "min-h-12 flex-1")}
+              >
+                取消
+              </button>
+              <button
+                type="submit"
+                disabled={!canSubmit}
+                className={cn(primaryButtonClass, "flex-1")}
+              >
+                {saving ? "保存中..." : "保存"}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+    </PageShell>
   );
 }
 

@@ -25,7 +25,15 @@ import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
 import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIdentityProvider";
 import { wordListKeys } from "../hooks/useWordLists";
-import { STATE_LABEL, buttonClass } from "../reading";
+import { STATE_LABEL, buttonClass, textButtonClass } from "../reading";
+import { Search } from "lucide-react";
+import {
+  PageHeader,
+  PageNotice,
+  PageShell,
+  Segmented,
+  panelClass
+} from "@/features/shell/Page";
 import "@tsz/voice-editor/styles.css";
 const SORT_LABELS: Record<WordlistSort, string> = {
   author: "作者顺序",
@@ -192,169 +200,197 @@ function Detail({
       setBusy(false);
     }
   }
+  const back = {
+    href: mine ? "/account/wordlists" : "/wordlists",
+    label: "返回词表"
+  };
   if (meta.isError)
     return (
-      <div className="p-8" role="alert">
-        词表不存在、不可访问或暂时无法加载。
-        <button onClick={() => void meta.refetch()}>重试</button>
-      </div>
+      <PageShell size="lg">
+        <PageHeader back={back} title="词表" />
+        <PageNotice tone="error">
+          词表不存在、不可访问或暂时无法加载。
+          <button
+            className={textButtonClass}
+            onClick={() => void meta.refetch()}
+          >
+            重试
+          </button>
+        </PageNotice>
+      </PageShell>
     );
-  if (!meta.data) return <p className="p-8">正在读取词表…</p>;
+  if (!meta.data)
+    return (
+      <PageShell size="lg">
+        <PageNotice>正在读取词表…</PageNotice>
+      </PageShell>
+    );
   const list = meta.data;
   return (
-    <article className="animate-in mx-auto max-w-5xl px-6 py-10">
-      <Link
-        href={mine ? "/account/wordlists" : "/wordlists"}
-        className="text-sm text-foreground-muted"
-      >
-        ← 返回词表
-      </Link>
-      <header className="mt-6 rounded-3xl border border-border bg-surface p-6">
-        <h1 className="break-words text-3xl font-semibold">{list.name}</h1>
-        <p className="mt-4">
-          {list.owner_name} · {STATE_LABEL[list.state]} · {list.item_count}{" "}
-          个词条
-        </p>
-        <p className="mt-2 break-all text-xs text-foreground-muted">
-          ID：{list.id}
-        </p>
-        <div className="mt-5 flex flex-wrap gap-3">
-          {mine ? (
-            <>
-              <Link
-                className={buttonClass}
-                href={`/account/wordlists/${id}/edit`}
-              >
-                {list.state === "pending" || list.state === "published"
-                  ? "查看创编内容"
-                  : "编辑词表"}
-              </Link>
-              {list.state === "pending" || list.state === "published" ? (
-                <button
+    <PageShell size="lg">
+      <PageHeader
+        back={back}
+        eyebrow={mine ? "我的词表" : "词库广场"}
+        title={list.name}
+        description={`${list.owner_name} · ${STATE_LABEL[list.state]} · ${list.item_count} 个词条`}
+      />
+      <section className="glass rounded-3xl p-2">
+        <div className="rounded-[20px] bg-surface/70 p-6 sm:p-8">
+          <p className="break-all text-xs text-foreground-subtle">
+            ID：{list.id}
+          </p>
+          <div className="mt-6 flex flex-wrap gap-3 empty:hidden">
+            {mine ? (
+              <>
+                <Link
                   className={buttonClass}
-                  disabled={busy}
-                  onClick={() => void action("withdraw")}
+                  href={`/account/wordlists/${id}/edit`}
                 >
-                  撤回为私密
-                </button>
-              ) : (
-                <button
-                  className={buttonClass}
-                  disabled={busy}
-                  onClick={() => void action("submit")}
-                >
-                  设为公开
-                </button>
-              )}
-              {list.state === "published" && (
-                <Link className={buttonClass} href={`/wordlists/${id}`}>
-                  查看公开页面
+                  {list.state === "pending" || list.state === "published"
+                    ? "查看创编内容"
+                    : "编辑词表"}
                 </Link>
-              )}
-            </>
-          ) : (
-            list.owner_user_id === userId && (
-              <Link className={buttonClass} href={`/account/wordlists/${id}`}>
-                管理我的词表
-              </Link>
-            )
+                {list.state === "pending" || list.state === "published" ? (
+                  <button
+                    className={buttonClass}
+                    disabled={busy}
+                    onClick={() => void action("withdraw")}
+                  >
+                    撤回为私密
+                  </button>
+                ) : (
+                  <button
+                    className={buttonClass}
+                    disabled={busy}
+                    onClick={() => void action("submit")}
+                  >
+                    设为公开
+                  </button>
+                )}
+                {list.state === "published" && (
+                  <Link className={buttonClass} href={`/wordlists/${id}`}>
+                    查看公开页面
+                  </Link>
+                )}
+              </>
+            ) : (
+              list.owner_user_id === userId && (
+                <Link className={buttonClass} href={`/account/wordlists/${id}`}>
+                  管理我的词表
+                </Link>
+              )
+            )}
+          </div>
+          {error && (
+            <p role="alert" className="mt-4 text-sm text-danger">
+              {error}
+            </p>
+          )}
+          {mine && reviews.data?.withdraw_reason && (
+            <p className="mt-4 rounded-2xl bg-muted/70 px-4 py-3 text-sm leading-6">
+              下架原因：{reviews.data.withdraw_reason}
+            </p>
+          )}
+          {mine && reviews.data?.items[0]?.reason && (
+            <p className="mt-4 rounded-2xl bg-muted/70 px-4 py-3 text-sm leading-6">
+              审核意见：{reviews.data.items[0].reason}
+            </p>
+          )}
+          {mine && reviews.isError && (
+            <p role="alert" className="mt-4 text-sm text-danger">
+              审核记录加载失败。
+            </p>
+          )}
+          {!mine &&
+            list.state === "published" &&
+            list.owner_user_id !== null && <TipPanel list={list} />}
+        </div>
+      </section>
+      <div className="mb-6 mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <label className="glass relative flex min-h-11 min-w-40 flex-1 items-center rounded-full pl-11 pr-5 transition-shadow focus-within:ring-4 focus-within:ring-primary/15">
+          <Search
+            className="absolute left-4 size-4 text-foreground-subtle"
+            strokeWidth={1.8}
+            aria-hidden
+          />
+          <input
+            aria-label="搜索词条"
+            placeholder="搜索词面"
+            className="w-full bg-transparent py-2.5 text-sm text-foreground outline-hidden placeholder:text-foreground-subtle"
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+            }}
+          />
+        </label>
+        <div className="flex flex-wrap items-center gap-3">
+          <Segmented
+            label="阅读模式"
+            value={view}
+            options={[
+              { value: "standard", label: "标准模式" },
+              { value: "full", label: "完整模式" }
+            ]}
+            onChange={setView}
+          />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" className={buttonClass}>
+                排序：{SORT_LABELS[sort]}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {Object.entries(SORT_LABELS).map(([value, label]) => (
+                <DropdownMenuItem
+                  key={value}
+                  role="menuitemradio"
+                  aria-checked={sort === value}
+                  onSelect={() => {
+                    setSort(value as WordlistSort);
+                  }}
+                >
+                  {label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {ready && (
+            <span className="rounded-full bg-muted px-3 py-1.5 text-xs font-medium tracking-wide text-foreground-muted">
+              {`释义等级 ${level}${!profile.data?.learning_settings && identity.identity !== "teacher" ? " 预览" : ""}`}
+            </span>
           )}
         </div>
-        {error && (
-          <p role="alert" className="mt-4">
-            {error}
-          </p>
-        )}
-        {mine && reviews.data?.withdraw_reason && (
-          <p className="mt-4">下架原因：{reviews.data.withdraw_reason}</p>
-        )}
-        {mine && reviews.data?.items[0]?.reason && (
-          <p className="mt-4">审核意见：{reviews.data.items[0].reason}</p>
-        )}
-        {mine && reviews.isError && <p role="alert">审核记录加载失败。</p>}
-        {!mine && list.state === "published" && list.owner_user_id !== null && (
-          <TipPanel list={list} />
-        )}
-      </header>
-      <div className="my-6 flex flex-wrap items-center gap-3">
-        <input
-          aria-label="搜索词条"
-          placeholder="搜索词面"
-          className="min-w-40 flex-1 rounded-full border border-border bg-surface px-5 py-3"
-          value={q}
-          onChange={(e) => {
-            setQ(e.target.value);
-          }}
-        />
-        <div
-          className="flex rounded-full border border-border p-1"
-          role="group"
-          aria-label="阅读模式"
-        >
-          {(["standard", "full"] as const).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              aria-pressed={view === mode}
-              className={`rounded-full px-4 py-2 text-sm ${view === mode ? "bg-primary text-white" : ""}`}
-              onClick={() => setView(mode)}
-            >
-              {mode === "standard" ? "标准模式" : "完整模式"}
-            </button>
-          ))}
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className={buttonClass}>排序：{SORT_LABELS[sort]}</button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {Object.entries(SORT_LABELS).map(([value, label]) => (
-              <DropdownMenuItem
-                key={value}
-                role="menuitemradio"
-                aria-checked={sort === value}
-                onSelect={() => {
-                  setSort(value as WordlistSort);
-                }}
-              >
-                {label}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <span className="text-sm text-foreground-muted">
-          {ready
-            ? ` · ${level}${!profile.data?.learning_settings && identity.identity !== "teacher" ? " 预览" : ""}`
-            : ""}
-        </span>
       </div>
       {!ready ? (
         profile.isError || identity.error ? (
-          <p role="alert">
+          <PageNotice tone="error">
             阅读设置读取失败，请刷新；尚未显示未确认等级的释义。
-          </p>
+          </PageNotice>
         ) : (
-          <p>正在读取阅读设置…</p>
+          <PageNotice>正在读取阅读设置…</PageNotice>
         )
       ) : items.isError && !items.data ? (
-        <p role="alert">
+        <PageNotice tone="error">
           {view === "full"
             ? "完整内容暂不可用，可切回标准模式，或"
             : "条目加载失败，"}
-          <button onClick={() => void items.refetch()}>重试</button>。
-        </p>
+          <button
+            className={textButtonClass}
+            onClick={() => void items.refetch()}
+          >
+            重试
+          </button>
+          。
+        </PageNotice>
       ) : !items.data ? (
-        <p>正在读取条目…</p>
+        <PageNotice>正在读取条目…</PageNotice>
       ) : (
         <>
           <div className="space-y-4">
             {loadedItems.map((item) => (
-              <section
-                key={item.entry_id}
-                className="rounded-3xl border border-border bg-surface p-6"
-              >
-                <div className="mb-2 text-xs text-foreground-muted">
-                  {item.position + 1}
+              <section key={item.entry_id} className={panelClass}>
+                <div className="mb-3 text-xs font-medium tabular-nums tracking-wide text-foreground-subtle">
+                  {String(item.position + 1).padStart(2, "0")}
                 </div>
                 {item.entry ? (
                   <ReadingEntry
@@ -364,17 +400,17 @@ function Detail({
                     variant={variant}
                   />
                 ) : (
-                  <p>内容不可用</p>
+                  <p className="text-sm text-foreground-muted">内容不可用</p>
                 )}
                 {item.author_note && (
-                  <p className="mt-4 whitespace-pre-wrap border-t border-border pt-4 text-sm">
+                  <p className="mt-5 whitespace-pre-wrap rounded-2xl bg-muted/70 px-4 py-3 text-sm leading-6">
                     注：{item.author_note}
                   </p>
                 )}
                 {mine &&
                   "private_note" in item &&
                   (item as MyWordlistItem).private_note && (
-                    <p className="mt-4 whitespace-pre-wrap border-t border-border pt-4 text-sm">
+                    <p className="mt-3 whitespace-pre-wrap rounded-2xl border border-dashed border-border px-4 py-3 text-sm leading-6 text-foreground-muted">
                       私密备注：{(item as MyWordlistItem).private_note}
                     </p>
                   )}
@@ -382,7 +418,7 @@ function Detail({
             ))}
           </div>
           {loadedItems.length === 0 ? (
-            <p>没有匹配词条</p>
+            <PageNotice>没有匹配词条</PageNotice>
           ) : (
             <div
               ref={loadMoreRef}
@@ -394,7 +430,7 @@ function Detail({
                     ? CONTENT_CHANGED
                     : "后续词条加载失败，已加载的内容仍可阅读。"}{" "}
                   <button
-                    className="text-primary"
+                    className={textButtonClass}
                     disabled={items.isFetching}
                     onClick={() =>
                       void (items.isFetchNextPageError &&
@@ -421,6 +457,6 @@ function Detail({
           )}
         </>
       )}
-    </article>
+    </PageShell>
   );
 }

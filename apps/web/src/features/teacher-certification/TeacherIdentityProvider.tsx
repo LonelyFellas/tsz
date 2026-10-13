@@ -13,6 +13,8 @@ import {
 } from "react";
 import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
+import { cn } from "@tsz/ui/lib/cn";
+import { PageNotice, PageShell, textButtonClass } from "@/features/shell/Page";
 import {
   readWorkspaceIdentity,
   resolveWorkspaceIdentity,
@@ -154,21 +156,29 @@ export function TeacherAccessGuard({ children }: { children: ReactNode }) {
   const userId = useUserStore((s) => s.user?.id);
   if (identity.error)
     return (
-      <div role="alert">
-        <p>无法核验教师资格，请重试。</p>
-        <button
-          className="mt-3 text-primary"
-          onClick={() =>
-            void client.invalidateQueries({
-              queryKey: ["teacher-certification", userId]
-            })
-          }
-        >
-          重新核验
-        </button>
-      </div>
+      <PageShell>
+        <PageNotice tone="error">
+          <p>无法核验教师资格，请重试。</p>
+          <button
+            className={cn(textButtonClass, "mt-3")}
+            onClick={() =>
+              void client.invalidateQueries({
+                queryKey: ["teacher-certification", userId]
+              })
+            }
+          >
+            重新核验
+          </button>
+        </PageNotice>
+      </PageShell>
     );
   if (!identity.ready || !identity.verified)
-    return <p role="status">正在核验教师资格…</p>;
+    return (
+      <PageShell>
+        <div role="status">
+          <PageNotice>正在核验教师资格…</PageNotice>
+        </div>
+      </PageShell>
+    );
   return <>{children}</>;
 }

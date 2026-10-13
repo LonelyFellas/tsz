@@ -856,9 +856,10 @@ describe("EditProfileForm — 交互", () => {
       screen.getByRole("heading", { level: 1, name: "编辑资料" })
     ).toBeInTheDocument();
     expect(screen.getByText("修改头像、昵称和英美偏好。")).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: "← 返回个人中心" })
-    ).toHaveAttribute("href", "/account");
+    expect(screen.getByRole("link", { name: "返回个人中心" })).toHaveAttribute(
+      "href",
+      "/account"
+    );
     expect(
       screen.getByRole("button", { name: "难度级别说明" })
     ).toBeInTheDocument();

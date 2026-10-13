@@ -2,9 +2,13 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
 
-const WIDTH = { md: "max-w-3xl", lg: "max-w-5xl" } as const;
+const WIDTH = {
+  sm: "max-w-2xl",
+  md: "max-w-3xl",
+  lg: "max-w-5xl"
+} as const;
 
-// 功能页外框：统一宽度、页边距与入场动画。
+// 功能页外框：统一宽度、页边距与入场动画。sm 用于资料、安全等设置页，md 用于列表页，lg 用于宽内容。
 export function PageShell({
   size = "md",
   children
@@ -69,6 +73,16 @@ export function PageHeader({
 }
 
 // 毛玻璃内容卡；子区块之间用 space-y 控制节奏。
+// 共享按钮与输入样式：覆盖时用 cn 合并。
+export const buttonClass =
+  "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-full border border-border bg-surface px-4 text-sm font-medium tracking-wide text-foreground shadow-[0_1px_2px_rgb(0_0_0/0.04)] transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40 aria-pressed:border-primary/40 aria-pressed:bg-primary-muted aria-pressed:text-primary";
+export const primaryButtonClass =
+  "inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-primary px-6 text-sm font-medium tracking-wide text-primary-foreground shadow-[0_1px_2px_rgb(0_0_0/0.08)] transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40";
+export const textButtonClass =
+  "mx-1 rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40";
+export const inputClass =
+  "min-h-11 min-w-0 rounded-full border border-border bg-surface px-5 text-sm text-foreground outline-hidden transition-shadow placeholder:text-foreground-subtle focus:border-primary/50 focus:ring-4 focus:ring-primary/15 disabled:cursor-not-allowed disabled:opacity-50";
+
 export const panelClass = "glass rounded-3xl p-6 sm:p-8";
 
 // 可点击的列表卡片：悬停浮起阴影、描边提亮。
@@ -129,10 +143,10 @@ export function Segmented<T extends string | boolean>({
   );
 }
 
-// 翻页：只有一页时不渲染。
+// 翻页：只有一页时不渲染。数据变少导致当前页越界时仍保留“上一页”，直接退回最后一页。
 export function Pager({
   page,
-  total,
+  total: totalPages,
   onChange,
   disabled = false
 }: {
@@ -141,7 +155,8 @@ export function Pager({
   onChange: (page: number) => void;
   disabled?: boolean;
 }) {
-  if (total <= 1) return null;
+  const total = Math.max(totalPages, 1);
+  if (total <= 1 && page <= 1) return null;
   const button =
     "inline-flex min-h-10 items-center rounded-full border border-border bg-surface px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40";
   return (
@@ -153,7 +168,7 @@ export function Pager({
         type="button"
         className={button}
         disabled={disabled || page <= 1}
-        onClick={() => onChange(page - 1)}
+        onClick={() => onChange(Math.min(page - 1, total))}
       >
         上一页
       </button>
