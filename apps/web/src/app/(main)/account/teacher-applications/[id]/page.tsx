@@ -16,7 +16,7 @@ export default async function TeacherApplicationPage({
   const { id } = await params;
   return (
     <RouteGuard>
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-3xl px-6 py-10">
         <Link
           href="/account/notifications"
           className="text-sm text-foreground-muted"

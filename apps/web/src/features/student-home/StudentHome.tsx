@@ -95,7 +95,7 @@ function HomeWorkspace({ userId }: { userId: string }) {
 
   return (
     <div className="min-h-dvh bg-muted/50">
-      <header className="relative z-40 flex min-h-18 items-center justify-between gap-3 px-4 py-3 sm:px-6">
+      <header className="relative z-50 flex min-h-18 items-center justify-between gap-3 px-4 py-3 sm:px-6">
         <Popover
           open={panel === "navigation"}
           onOpenChange={(open) => togglePanel("navigation", open)}

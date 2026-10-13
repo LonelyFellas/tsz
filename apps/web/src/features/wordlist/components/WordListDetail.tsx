@@ -1,8 +1,12 @@
 "use client";
 import { TipPanel } from "./WordlistTips";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient
+} from "@tanstack/react-query";
 import { ReadingEntry } from "./ReadingEntry";
 import {
   DropdownMenu,
@@ -28,6 +32,7 @@ const SORT_LABELS: Record<WordlistSort, string> = {
   label_asc: "词面 A–Z",
   label_desc: "词面 Z–A"
 };
+const CONTENT_CHANGED = "词表内容已变化，请重新加载词条。";
 export function WordListDetail({
   id,
   mine = false
@@ -57,7 +62,7 @@ function Detail({
   const client = useQueryClient();
   const identity = useTeacherIdentity();
   const hydrated = useUserStore((s) => s.hydrated);
-  const [page, setPage] = useState(1);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
   const [q, setQ] = useState("");
   const [view, setView] = useState<WordlistView>("standard");
   const [sort, setSort] = useState<WordlistSort>("author");
@@ -74,16 +79,17 @@ function Detail({
         ? api.wordList.myDetail(id, { signal })
         : api.wordList.get(id, { signal })
   });
-  const items = useQuery({
-    queryKey: [...keys, "items", id, page, q, view, sort],
+  const items = useInfiniteQuery({
+    queryKey: [...keys, "items", "infinite", id, q, view, sort],
     enabled: meta.isSuccess,
     refetchOnMount: "always",
-    queryFn: ({ signal }) =>
-      mine
+    initialPageParam: { page: 1, revision: null as number | null },
+    queryFn: async ({ signal, pageParam }) => {
+      const result = await (mine
         ? api.wordList.myItems(
             id,
             {
-              page,
+              page: pageParam.page,
               q,
               ...(view === "full" ? { view } : {}),
               ...(sort !== "author" ? { sort } : {})
@@ -93,13 +99,21 @@ function Detail({
         : api.wordList.items(
             id,
             {
-              page,
+              page: pageParam.page,
               q,
               ...(view === "full" ? { view } : {}),
               ...(sort !== "author" ? { sort } : {})
             },
             { signal }
-          )
+          ));
+      if (pageParam.revision !== null && result.revision !== pageParam.revision)
+        throw new Error(CONTENT_CHANGED);
+      return result;
+    },
+    getNextPageParam: (lastPage) =>
+      lastPage.pagination.page < lastPage.pagination.total_pages
+        ? { page: lastPage.pagination.page + 1, revision: lastPage.revision }
+        : undefined
   });
   const profile = useQuery({
     queryKey: [...wordListKeys.mine(userId), "reading-settings"],
@@ -118,6 +132,33 @@ function Detail({
       ? "C2"
       : (profile.data?.learning_settings?.cefr_level ?? "C2");
   const variant = profile.data?.learning_settings?.english_variant ?? null;
+  const loadedItems = items.data?.pages.flatMap((page) => page.items) ?? [];
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (
+      !target ||
+      !ready ||
+      !items.hasNextPage ||
+      items.isFetching ||
+      items.isError
+    )
+      return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting)
+          void items.fetchNextPage({ cancelRefetch: false });
+      },
+      { rootMargin: "200px" }
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [
+    ready,
+    items.hasNextPage,
+    items.isFetching,
+    items.isError,
+    items.fetchNextPage
+  ]);
   async function action(kind: "submit" | "withdraw") {
     if (!meta.data) return;
     if (
@@ -161,7 +202,7 @@ function Detail({
   if (!meta.data) return <p className="p-8">正在读取词表…</p>;
   const list = meta.data;
   return (
-    <article className="animate-in mx-auto max-w-5xl px-4 py-10 sm:px-6">
+    <article className="animate-in mx-auto max-w-5xl px-6 py-10">
       <Link
         href={mine ? "/account/wordlists" : "/wordlists"}
         className="text-sm text-foreground-muted"
@@ -243,7 +284,6 @@ function Detail({
           value={q}
           onChange={(e) => {
             setQ(e.target.value);
-            setPage(1);
           }}
         />
         <div
@@ -275,7 +315,6 @@ function Detail({
                 aria-checked={sort === value}
                 onSelect={() => {
                   setSort(value as WordlistSort);
-                  setPage(1);
                 }}
               >
                 {label}
@@ -297,7 +336,7 @@ function Detail({
         ) : (
           <p>正在读取阅读设置…</p>
         )
-      ) : items.isError ? (
+      ) : items.isError && !items.data ? (
         <p role="alert">
           {view === "full"
             ? "完整内容暂不可用，可切回标准模式，或"
@@ -309,7 +348,7 @@ function Detail({
       ) : (
         <>
           <div className="space-y-4">
-            {items.data.items.map((item) => (
+            {loadedItems.map((item) => (
               <section
                 key={item.entry_id}
                 className="rounded-3xl border border-border bg-surface p-6"
@@ -342,24 +381,44 @@ function Detail({
               </section>
             ))}
           </div>
-          {items.data.items.length === 0 && <p>没有匹配词条</p>}
-          <div className="mt-6 flex items-center gap-4">
-            <button
-              className={buttonClass}
-              disabled={page === 1}
-              onClick={() => setPage(page - 1)}
+          {loadedItems.length === 0 ? (
+            <p>没有匹配词条</p>
+          ) : (
+            <div
+              ref={loadMoreRef}
+              className="mt-6 py-4 text-center text-sm text-foreground-muted"
             >
-              上一页
-            </button>
-            <span>第 {page} 页</span>
-            <button
-              className={buttonClass}
-              disabled={page >= items.data.pagination.total_pages}
-              onClick={() => setPage(page + 1)}
-            >
-              下一页
-            </button>
-          </div>
+              {items.isError ? (
+                <p role="alert">
+                  {items.error.message === CONTENT_CHANGED
+                    ? CONTENT_CHANGED
+                    : "后续词条加载失败，已加载的内容仍可阅读。"}{" "}
+                  <button
+                    className="text-primary"
+                    disabled={items.isFetching}
+                    onClick={() =>
+                      void (items.isFetchNextPageError &&
+                      items.error.message !== CONTENT_CHANGED
+                        ? items.fetchNextPage({ cancelRefetch: false })
+                        : items.refetch())
+                    }
+                  >
+                    {items.error.message === CONTENT_CHANGED
+                      ? "重新加载"
+                      : "重试"}
+                  </button>
+                </p>
+              ) : (
+                <p role="status">
+                  {items.isFetchingNextPage
+                    ? "正在加载更多词条…"
+                    : items.hasNextPage
+                      ? "继续向下滚动，自动加载更多词条"
+                      : `已加载全部 ${loadedItems.length} 个词条`}
+                </p>
+              )}
+            </div>
+          )}
         </>
       )}
     </article>
