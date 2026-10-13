@@ -787,7 +787,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       .locator(".tsz-ve-canvas-input")
       .press("ControlOrMeta+A");
     await liaisonDialog
-      .getByRole("button", { name: "确认添加", exact: true })
+      .getByRole("button", { name: "一次性添加", exact: true })
       .click();
     await liaisonDialog.getByRole("button", { name: /^完成.*编辑$/ }).click();
     const englishPreview = english.locator("..");
@@ -839,9 +839,19 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       path: test.info().outputPath("collapsed-added-liaison.png"),
       fullPage: true
     });
-    // 文字没变时撤销标记，也要恢复紧凑高度；不靠重挂输入框丢掉焦点来触发测量。
+    // 弹窗以完成为提交边界；重开取消连读后，原输入框应恢复紧凑高度而不重挂。
+    await page
+      .getByRole("button", { name: /^打开.*定义 2.*编辑器$/ })
+      .first()
+      .click();
+    await liaisonDialog
+      .locator(".tsz-ve-canvas-input")
+      .press("ControlOrMeta+A");
+    await liaisonDialog
+      .getByRole("button", { name: "取消连读", exact: true })
+      .click();
+    await liaisonDialog.getByRole("button", { name: /^完成.*编辑$/ }).click();
     await english.focus();
-    await english.press("ControlOrMeta+z");
     await expect(englishPreview.locator(".tsz-ve-arc-layer path")).toHaveCount(
       0
     );
@@ -1355,6 +1365,88 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(page.getByText(/已关联 ·/)).toBeVisible();
   });
 
+  test("连读在编辑器首次打开和重开动画中始终贴合文字", async ({ page }) => {
+    test.skip(process.env.VITE_VOICE_EDITOR !== "true", "需要启用语音编辑器");
+    const api = await mockAdminV3Api(page);
+    const word = api.getWord();
+    word.meanings.pos[0]!.grammar_structures[0]!.variants[0]!.content = {
+      version: 2,
+      text: "pick it up",
+      annotations: [{ type: "liaison", start: 3, end: 6 }]
+    };
+    await page.route(`**/lexicon/entries/${word.id}`, (route) =>
+      route.fulfill({ json: { word, retired_stable_nodes: [] } })
+    );
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/meanings`);
+    await page.evaluate(() => document.fonts.ready);
+    // 放慢真实的弹窗动画，检查中间帧；只检查动画结束会漏掉先错位再纠正的闪烁。
+    await page.addStyleTag({
+      content: ".ant-modal { animation-duration: 1s !important; }"
+    });
+    const opener = page
+      .getByRole("button", { name: /^打开.*语法结构.*编辑器$/ })
+      .first();
+    const dialog = page
+      .getByRole("dialog")
+      .filter({ has: page.locator(".tsz-ve-editor") });
+    for (let opening = 0; opening < 2; opening += 1) {
+      await opener.click();
+      const strip = dialog.locator(".tsz-ve-strip");
+      await expect(strip.locator(".tsz-ve-arc")).toHaveCount(1);
+      const frames = await strip.evaluate(async (node) => {
+        const samples: { scale: number; error: number; d: string }[] = [];
+        const start = performance.now();
+        while (performance.now() - start < 1200) {
+          await new Promise(requestAnimationFrame);
+          const svg = node.querySelector<SVGSVGElement>(".tsz-ve-arc-layer")!;
+          const matrix = svg.getScreenCTM()!;
+          const path = node.querySelector<SVGPathElement>(".tsz-ve-arc")!;
+          const points = path
+            .getAttribute("d")!
+            .match(/-?\d+(?:\.\d+)?/g)!
+            .map(Number);
+          const errors = [3, 5].map((point, index) => {
+            const letter = node.querySelector(
+              `[data-codepoint="${point}"] .tsz-ve-letter-text`
+            )!;
+            const range = document.createRange();
+            range.selectNodeContents(letter);
+            const rect = range.getBoundingClientRect();
+            const local = new DOMPoint(
+              (rect.left + rect.right) / 2,
+              rect.top
+            ).matrixTransform(matrix.inverse());
+            return Math.abs(points[index === 0 ? 0 : 6]! - local.x);
+          });
+          samples.push({
+            scale: matrix.a,
+            error: Math.max(...errors),
+            d: path.getAttribute("d")!
+          });
+        }
+        return samples;
+      });
+      expect(frames.some((frame) => frame.scale < 0.95)).toBe(true);
+      expect(Math.max(...frames.map((frame) => frame.error))).toBeLessThan(0.1);
+      const finalPoints = frames
+        .at(-1)!
+        .d.match(/-?\d+(?:\.\d+)?/g)!
+        .map(Number);
+      for (const frame of frames) {
+        const points = frame.d.match(/-?\d+(?:\.\d+)?/g)!.map(Number);
+        expect(
+          Math.max(
+            ...points.map((point, index) =>
+              Math.abs(point - finalPoints[index]!)
+            )
+          )
+        ).toBeLessThan(0.1);
+      }
+      await dialog.getByRole("button", { name: /^完成.*编辑$/ }).click();
+      await expect(dialog).toBeHidden();
+    }
+  });
+
   test("统一富文本弹窗：保持布局、拖动、选区连读、改字确认和取消恢复", async ({
     page
   }) => {
@@ -1390,33 +1482,28 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
           .evaluate((body) => body.scrollWidth - body.clientWidth)
       )
       .toBe(0);
-    await expect(dialog.locator(".tsz-ve-inline-tools")).toHaveAttribute(
-      "data-combined",
-      "true"
-    );
+    const actions = dialog.getByRole("toolbar", { name: "标注工具栏" });
+    await expect(actions).toHaveCount(1);
     const original = await input.inputValue();
     await input.fill("a job");
     await input.press("ControlOrMeta+A");
-    const actions = dialog.locator(".tsz-ve-inline-tools");
-    await expect(actions).toHaveCount(1);
-    await expect(actions).toHaveAttribute("data-combined", "true");
     const grammarActions = actions.getByRole("group", { name: "语法标注类别" });
     const liaisonActions = actions.locator(".tsz-ve-selection-liaison");
+    await expect(grammarActions).toBeVisible();
+    await expect(liaisonActions).toBeVisible();
+    // 当前工具栏按语法、连读分行排列，两行操作区左侧对齐。
     await expect
       .poll(async () => {
         const grammarBox = (await grammarActions.boundingBox())!;
         const liaisonBox = (await liaisonActions.boundingBox())!;
-        return Math.abs(
-          grammarBox.y +
-            grammarBox.height / 2 -
-            liaisonBox.y -
-            liaisonBox.height / 2
-        );
+        return Math.abs(grammarBox.x - liaisonBox.x);
       })
       .toBeLessThan(2);
     const grammarBox = (await grammarActions.boundingBox())!;
     const liaisonBox = (await liaisonActions.boundingBox())!;
-    expect(liaisonBox.x - grammarBox.x - grammarBox.width).toBeLessThan(35);
+    expect(liaisonBox.y).toBeGreaterThanOrEqual(
+      grammarBox.y + grammarBox.height
+    );
     const canvasBox = (await dialog.locator(".tsz-ve-canvas").boundingBox())!;
     const footerBox = (await dialog
       .locator(".v3-voice-text-editor-done")
@@ -1424,13 +1511,15 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     expect(footerBox.y).toBeGreaterThanOrEqual(
       canvasBox.y + canvasBox.height - 1
     );
-    await dialog.getByRole("button", { name: "确认添加", exact: true }).click();
+    await dialog
+      .getByRole("button", { name: "一次性添加", exact: true })
+      .click();
     await expect(
       dialog.locator(".tsz-ve-arc-layer path").first()
     ).toBeVisible();
-    await expect(actions).toHaveAttribute("data-combined", "true");
+    await expect(actions).toBeVisible();
     await input.press("Escape");
-    await expect(actions).toHaveAttribute("data-combined", "true");
+    await expect(actions).toBeVisible();
     await input.fill("new text");
     const confirmation = page.getByRole("dialog", {
       name: "修改文字会移除已有标注"
@@ -1450,6 +1539,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect
       .poll(async () => Math.round((await handle.boundingBox())!.x - box.x))
       .toBe(60);
+    await input.press("ControlOrMeta+A");
     await dialog.locator(".tsz-ve-role-button").click();
     await page.screenshot({
       path: test.info().outputPath("unified-rich-editor.png")
