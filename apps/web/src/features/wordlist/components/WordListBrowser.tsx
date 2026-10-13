@@ -1,112 +1,151 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
+import { Plus, Search } from "lucide-react";
 import { useWordLists } from "../hooks/useWordLists";
-import { Button } from "@tsz/ui/components";
-import { STATE_LABEL, buttonClass } from "../reading";
+import { STATE_LABEL, buttonClass, primaryButtonClass } from "../reading";
+import {
+  PageHeader,
+  PageNotice,
+  PageShell,
+  Pager,
+  Segmented,
+  listCardClass
+} from "@/features/shell/Page";
 export function WordListBrowser({ mine = false }: { mine?: boolean }) {
   const [page, setPage] = useState(1);
   const [q, setQ] = useState("");
   const [recommended, setRecommended] = useState(false);
   const result = useWordLists(mine, page, q, recommended);
   return (
-    <div className="animate-in mx-auto max-w-5xl px-6 py-10">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-3xl font-semibold">
-          {mine ? "我的词表" : "公开词表"}
-        </h1>
-        <div className="flex gap-3">
-          <Link
-            className={buttonClass}
-            href={mine ? "/wordlists" : "/account/wordlists"}
-          >
-            {mine ? "浏览公开词表" : "我的词表"}
-          </Link>
-          <Link className={buttonClass} href="/wordlists/new">
-            创建词表
-          </Link>
-        </div>
-      </div>
-      {!mine && (
-        <div className="mt-6 flex gap-3" role="group" aria-label="词表分类">
-          <Button
-            variant={recommended ? "outline" : "default"}
-            aria-pressed={!recommended}
-            onClick={() => {
-              setRecommended(false);
-              setPage(1);
-            }}
-          >
-            全部公开词表
-          </Button>
-          <Button
-            variant={recommended ? "default" : "outline"}
-            aria-pressed={recommended}
-            onClick={() => {
-              setRecommended(true);
-              setPage(1);
-            }}
-          >
-            系统推荐
-          </Button>
-        </div>
-      )}
-      <input
-        className="my-6 w-full rounded-full border border-border bg-surface px-5 py-3"
-        aria-label="搜索词表"
-        placeholder="搜索词表名称"
-        value={q}
-        onChange={(e) => {
-          setQ(e.target.value);
-          setPage(1);
-        }}
+    <PageShell size="lg">
+      <PageHeader
+        eyebrow={mine ? "我的学习" : "词库广场"}
+        title={mine ? "我的词表" : "公开词表"}
+        description={
+          mine
+            ? "自己整理的词表，可以随时编辑、提交公开，或直接用来创建学习任务。"
+            : "浏览平台精选和其他用户公开的词表，挑一份开始学习。"
+        }
+        actions={
+          <>
+            <Link
+              className={buttonClass}
+              href={mine ? "/wordlists" : "/account/wordlists"}
+            >
+              {mine ? "浏览公开词表" : "我的词表"}
+            </Link>
+            <Link
+              className={`${primaryButtonClass} min-h-10 px-5`}
+              href="/wordlists/new"
+            >
+              <Plus className="size-4" strokeWidth={2} aria-hidden />
+              创建词表
+            </Link>
+          </>
+        }
       />
+      <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+        {!mine && (
+          <Segmented
+            label="词表分类"
+            value={recommended}
+            options={[
+              { value: false, label: "全部公开词表" },
+              { value: true, label: "系统推荐" }
+            ]}
+            onChange={(value) => {
+              setRecommended(value);
+              setPage(1);
+            }}
+          />
+        )}
+        <label className="glass relative flex min-h-11 flex-1 items-center rounded-full pl-11 pr-5 transition-shadow focus-within:ring-4 focus-within:ring-primary/15">
+          <Search
+            className="absolute left-4 size-4 text-foreground-subtle"
+            strokeWidth={1.8}
+            aria-hidden
+          />
+          <input
+            className="w-full bg-transparent py-2.5 text-sm text-foreground outline-hidden placeholder:text-foreground-subtle"
+            aria-label="搜索词表"
+            placeholder="搜索词表名称"
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setPage(1);
+            }}
+          />
+        </label>
+      </div>
       {result.isError ? (
-        <p role="alert">
+        <PageNotice tone="error">
           词表加载失败，请
-          <button onClick={() => void result.refetch()}>重试</button>。
-        </p>
+          <button
+            className="mx-1 font-medium text-primary underline-offset-4 hover:underline"
+            onClick={() => void result.refetch()}
+          >
+            重试
+          </button>
+          。
+        </PageNotice>
       ) : result.isPending ? (
-        <p>正在加载词表…</p>
+        <div className="grid gap-4 sm:grid-cols-2" aria-busy>
+          <p className="sr-only">正在加载词表…</p>
+          {[0, 1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="glass h-[132px] animate-pulse rounded-3xl"
+            />
+          ))}
+        </div>
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {result.data.items.map((list) => (
-              <Link
-                key={list.id}
-                href={`${mine ? "/account" : ""}/wordlists/${list.id}`}
-                className="rounded-3xl border border-border bg-surface p-6 transition hover:border-primary"
-              >
-                <h2 className="text-xl font-semibold">{list.name}</h2>
-                <p className="mt-3 text-sm text-foreground-muted">
-                  {list.owner_user_id === null
-                    ? `平台 · ${list.owner_name}`
-                    : list.owner_name}{" "}
-                  · {list.item_count} 个词条 · {STATE_LABEL[list.state]}
-                </p>
-              </Link>
-            ))}
-          </div>
-          {result.data.items.length === 0 && <p>暂无词表</p>}
-          <div className="mt-6 flex items-center gap-4">
-            <button
-              className={buttonClass}
-              disabled={page === 1}
-              onClick={() => setPage(page - 1)}
-            >
-              上一页
-            </button>
-            <span>第 {page} 页</span>
-            <button
-              className={buttonClass}
-              disabled={page >= result.data.pagination.total_pages}
-              onClick={() => setPage(page + 1)}
-            >
-              下一页
-            </button>
-          </div>
+          {result.data.items.length === 0 ? (
+            <PageNotice>
+              {q ? `没有找到包含「${q}」的词表` : "暂无词表"}
+            </PageNotice>
+          ) : (
+            <ul className="grid gap-4 sm:grid-cols-2">
+              {result.data.items.map((list) => (
+                <li key={list.id}>
+                  <Link
+                    href={`${mine ? "/account" : ""}/wordlists/${list.id}`}
+                    className={`${listCardClass} group h-full`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <h2 className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+                        {list.name}
+                      </h2>
+                      <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs text-foreground-muted">
+                        {STATE_LABEL[list.state]}
+                      </span>
+                    </div>
+                    <p className="mt-6 flex items-baseline gap-1.5">
+                      <span className="text-3xl font-bold tabular-nums tracking-tight text-foreground">
+                        {list.item_count}
+                      </span>
+                      <span className="text-sm text-foreground-muted">
+                        个词条
+                      </span>
+                    </p>
+                    <p className="mt-2 truncate text-sm text-foreground-muted">
+                      {list.owner_user_id === null
+                        ? `平台 · ${list.owner_name}`
+                        : list.owner_name}
+                    </p>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+          <Pager
+            page={page}
+            total={result.data.pagination.total_pages}
+            onChange={setPage}
+          />
         </>
       )}
-    </div>
+    </PageShell>
   );
 }
