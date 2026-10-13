@@ -185,7 +185,7 @@ function Detail({
                 href={`/account/wordlists/${id}/edit`}
               >
                 {list.state === "pending" || list.state === "published"
-                  ? "编辑私密备注"
+                  ? "查看创编内容"
                   : "编辑词表"}
               </Link>
               {list.state === "pending" || list.state === "published" ? (
@@ -326,6 +326,11 @@ function Detail({
                   />
                 ) : (
                   <p>内容不可用</p>
+                )}
+                {item.author_note && (
+                  <p className="mt-4 whitespace-pre-wrap border-t border-border pt-4 text-sm">
+                    注：{item.author_note}
+                  </p>
                 )}
                 {mine &&
                   "private_note" in item &&

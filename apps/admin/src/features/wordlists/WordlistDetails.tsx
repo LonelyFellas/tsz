@@ -212,13 +212,20 @@ export function WordlistDetails({
             <p>读取词条…</p>
           ) : (
             <>
-              {items.data.items.map((item) =>
-                item.entry ? (
-                  <WordlistEntryView key={item.entry_id} entry={item.entry} />
-                ) : (
-                  <p key={item.entry_id}>内容不可用</p>
-                )
-              )}
+              {items.data.items.map((item) => (
+                <div key={item.entry_id}>
+                  {item.entry ? (
+                    <WordlistEntryView entry={item.entry} />
+                  ) : (
+                    <p>内容不可用</p>
+                  )}
+                  {item.author_note && (
+                    <Typography.Paragraph style={{ whiteSpace: "pre-wrap" }}>
+                      注：{item.author_note}
+                    </Typography.Paragraph>
+                  )}
+                </div>
+              ))}
               <Pagination
                 current={page}
                 pageSize={20}

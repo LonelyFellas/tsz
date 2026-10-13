@@ -31,7 +31,7 @@ export interface WordlistItemsQuery extends WordlistQuery {
 export interface CreateWordlist {
   idempotency_key: string;
   name: string;
-  items: { entry_id: string; private_note: string }[];
+  items: { entry_id: string; private_note: string; author_note?: string }[];
 }
 export interface WordlistNoteUpdate {
   entry_id: string;
@@ -43,6 +43,7 @@ export interface UpdateWordlist {
   content: {
     name: string;
     entry_ids: string[];
+    author_notes?: { entry_id: string; author_note: string }[] | null;
   } | null;
   note_updates: WordlistNoteUpdate[];
 }
@@ -90,6 +91,7 @@ export interface WordlistEntry {
 export interface WordlistItem {
   entry_id: string;
   position: number;
+  author_note?: string;
   entry: WordlistEntry | null;
 }
 export interface MyWordlistItem extends WordlistItem {
@@ -198,25 +200,6 @@ export interface WordlistManagementQuery extends WordlistQuery {
   created_from?: string;
   created_before?: string;
 }
-export interface AdminWordlistItemInput {
-  entry_id: string;
-  admin_note: string;
-}
-export interface CreateAdminWordlist {
-  idempotency_key: string;
-  name: string;
-  items: AdminWordlistItemInput[];
-}
-export interface UpdateAdminWordlist {
-  expected_revision: number;
-  name: string;
-  items: AdminWordlistItemInput[];
-}
-export interface AdminWordlistEdit {
-  detail: AdminWordlist;
-  items: (AdminWordlistItemInput & { candidate: WordlistCandidate | null })[];
-}
-
 export interface WordlistSuggestionQuery {
   q: string;
 }

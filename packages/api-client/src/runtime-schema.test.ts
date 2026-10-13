@@ -49,7 +49,6 @@ const ROOTS = [
   "WordlistTipPage",
   "AdminWordlist",
   "AdminWordlistPage",
-  "AdminWordlistEdit",
   "Wordlist",
   "WordlistPage",
   "WordlistItems",

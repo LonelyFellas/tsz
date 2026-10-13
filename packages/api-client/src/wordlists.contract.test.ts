@@ -1,4 +1,4 @@
-import { SENTENCE_FORMATTING_HEADERS } from "./sentence-formatting";
+import { WORDLIST_READING_HEADERS } from "./wordlists";
 import { expect, it, vi } from "vitest";
 import snapshot from "./openapi.snapshot.json";
 import {
@@ -31,11 +31,11 @@ it("keeps public, personal and review item routes separate", async () => {
   await api.items(id, {}, { signal });
   expect(http.get).toHaveBeenLastCalledWith(`/wordlists/${id}/items`, {
     signal,
-    headers: SENTENCE_FORMATTING_HEADERS
+    headers: WORDLIST_READING_HEADERS
   });
   await api.myItems(id);
   expect(http.get).toHaveBeenLastCalledWith(`/me/wordlists/${id}/items`, {
-    headers: SENTENCE_FORMATTING_HEADERS
+    headers: WORDLIST_READING_HEADERS
   });
   await api.create({
     idempotency_key: id,
@@ -49,7 +49,7 @@ it("keeps public, personal and review item routes separate", async () => {
   await createAdminWordlistEndpoints(http).items(id, id);
   expect(http.get).toHaveBeenLastCalledWith(
     `/wordlists/${id}/review-requests/${id}/items`,
-    { headers: SENTENCE_FORMATTING_HEADERS }
+    { headers: WORDLIST_READING_HEADERS }
   );
 });
 it("rejects accidental private-note fields in a public response", () => {
@@ -144,7 +144,7 @@ it("accepts standard and opted-in full shapes while rejecting internal pronuncia
   });
   expect(http.get).toHaveBeenCalledWith(
     `/wordlists/${id}/items?view=full&sort=label_asc&page=2`,
-    { headers: SENTENCE_FORMATTING_HEADERS }
+    { headers: WORDLIST_READING_HEADERS }
   );
   Object.assign(pronunciation, { actual_pron: "internal" });
   expect(() =>
@@ -241,10 +241,7 @@ it("autocomplete has a bounded response, no pagination and forwards cancellation
     get: vi.fn().mockResolvedValue({ items: [candidate] })
   } as unknown as HttpClient;
   const signal = new AbortController().signal;
-  await createAdminWordlistEndpoints(http).suggestions(
-    { q: "appl" },
-    { signal }
-  );
+  await createWordlistEndpoints(http).suggestions({ q: "appl" }, { signal });
   expect(http.get).toHaveBeenLastCalledWith("/wordlists/suggestions?q=appl", {
     signal
   });
@@ -265,6 +262,32 @@ it("autocomplete has a bounded response, no pagination and forwards cancellation
     decodeWordlistResponse("WordlistSuggestions", {
       items: [candidate],
       pagination
+    })
+  ).toThrow();
+});
+
+it("author annotation negotiation accepts legacy omission and never admits public private-note fields", () => {
+  expect(WORDLIST_READING_HEADERS["X-TSZ-Wordlist-Annotations"]).toBe("v1");
+  const response = (annotation: unknown) => ({
+    items: [
+      { entry_id: id, position: 0, entry: null, author_note: annotation }
+    ],
+    revision: 1,
+    pagination
+  });
+  expect(() =>
+    decodeWordlistResponse("WordlistItems", response("给读者的注"))
+  ).not.toThrow();
+  expect(() =>
+    decodeWordlistResponse("WordlistItems", response(null))
+  ).toThrow();
+  expect(() =>
+    decodeWordlistResponse("WordlistItems", response("字".repeat(1001)))
+  ).toThrow();
+  expect(() =>
+    decodeWordlistResponse("WordlistItems", {
+      ...response("说明"),
+      items: [{ ...response("说明").items[0], private_note: "机密" }]
     })
   ).toThrow();
 });

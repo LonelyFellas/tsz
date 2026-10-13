@@ -344,6 +344,7 @@ export function AccountMenu() {
         </DropdownMenuItem>
         {teacher.verified && (
           <DropdownMenuItem
+            data-leaves-page=""
             disabled={switching || loading}
             className={MENU_ITEM_CLASS}
             onSelect={async (event) => {
@@ -360,6 +361,8 @@ export function AccountMenu() {
                   error instanceof Error ? error.message : "切换失败，请重试"
                 );
               } finally {
+                // A failed or cancelled switch may leave an unsaved editor open.
+                window.dispatchEvent(new Event("tsz:page-leave-finished"));
                 setSwitching(false);
               }
             }}
@@ -421,6 +424,7 @@ export function AccountMenu() {
         </DropdownMenuItem>
         <DropdownMenuSeparator className="my-2" />
         <DropdownMenuItem
+          data-leaves-page=""
           onSelect={(event) => {
             event.preventDefault();
             void handleLogout();

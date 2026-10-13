@@ -222,7 +222,7 @@ it.each(["words", "sentences"] as const)(
   }
 );
 
-it.each(["create", "edit", "visibility", "recommend", "delete"])(
+it.each(["visibility", "recommend", "delete"])(
   "wordlist %s requires its explicit grant and access, while super admins can use it",
   (action) => {
     const key = `wordlists.${action}`;
@@ -295,3 +295,18 @@ it("公开只读权限不授予草稿或操作，废弃恢复权限不会继续�
     hasAdminPermission({ ...actor, role: "super_admin" }, "sentences.restore")
   ).toBe(false);
 });
+
+it.each(["create", "edit"])(
+  "removed wordlist %s permission stays invalid even with legacy grants",
+  (action) => {
+    const key = `wordlists.${action}`;
+    for (const role of ["admin", "super_admin"]) {
+      expect(
+        hasAdminPermission(
+          { id: "admin", role, permissions: [key, "wordlists.access"] },
+          key
+        )
+      ).toBe(false);
+    }
+  }
+);

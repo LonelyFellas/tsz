@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/sentence-permissions-124/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-13T03:05:54.146Z",
+  "_source": "/Users/darwish/.codex/worktrees/wordlist-authoring/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-10-13T07:25:36.575Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -100,13 +100,11 @@
     "/admin/users/{id}/identity-documents/{file_id}": ["get"],
     "/admin/users/{id}/status": ["patch"],
     "/admin/users/{id}/teacher-certification": ["delete"],
-    "/admin/wordlists": ["get", "post"],
+    "/admin/wordlists": ["get"],
     "/admin/wordlists/catalog": ["get"],
     "/admin/wordlists/management": ["get"],
-    "/admin/wordlists/suggestions": ["get"],
-    "/admin/wordlists/{id}": ["get", "put"],
+    "/admin/wordlists/{id}": ["get"],
     "/admin/wordlists/{id}/delete": ["post"],
-    "/admin/wordlists/{id}/edit": ["get"],
     "/admin/wordlists/{id}/items": ["get"],
     "/admin/wordlists/{id}/recommendation": ["post"],
     "/admin/wordlists/{id}/review-requests": ["get"],
@@ -538,11 +536,23 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Wordlist-Annotations",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "get /admin/wordlists/{id}/review-requests/{request_id}/items": [
       {
         "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Wordlist-Annotations",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -568,11 +578,23 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Wordlist-Annotations",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "get /wordlists/{id}/items": [
       {
         "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Wordlist-Annotations",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -864,14 +886,6 @@
         "in": "query",
         "required": false,
         "schema": { "$ref": "#/components/schemas/WordlistState" }
-      }
-    ],
-    "get /admin/wordlists/suggestions": [
-      {
-        "name": "q",
-        "in": "query",
-        "required": true,
-        "schema": { "type": "string", "maxLength": 200 }
       }
     ],
     "get /admin/wordlists/{id}/review-requests/{request_id}/items": [

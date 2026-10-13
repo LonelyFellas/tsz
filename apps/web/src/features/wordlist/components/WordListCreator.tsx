@@ -8,18 +8,19 @@ import type {
   MyWordlistItem,
   WordlistCandidate,
   WordlistEditSnapshot,
-  MyWordlistItems
+  WordlistEntry
 } from "@tsz/types";
 import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
 import { wordListKeys } from "../hooks/useWordLists";
-import { buttonClass } from "../reading";
+import { Button, Input, FormField } from "@tsz/ui/components";
 type Row = {
   id: string;
   entryId: string | null;
   text?: string;
   candidate?: WordlistCandidate;
   note?: string;
+  authorNote?: string;
   noteRevision?: number;
   noteVersions?: Record<string, number | undefined>;
   noteDirty?: boolean;
@@ -30,7 +31,19 @@ const emptyRow = (): Row => ({
   text: "",
   note: ""
 });
-const field = "w-full rounded-xl border border-border bg-background px-3 py-2";
+const field =
+  "w-full rounded-2xl border border-border bg-surface px-4 py-3 text-foreground focus-visible:outline-primary";
+function glosses(entry?: WordlistEntry | null) {
+  return (
+    entry?.pos.flatMap((pos) =>
+      pos.senses.flatMap((sense) =>
+        sense.definitions.flatMap((definition) =>
+          definition.texts.map((text) => text.content.text)
+        )
+      )
+    ) ?? []
+  );
+}
 export function WordListCreator({ id }: { id?: string }) {
   const userId = useUserStore((s) => s.user?.id);
   const snapshot = useQuery({
@@ -45,7 +58,13 @@ export function WordListCreator({ id }: { id?: string }) {
     return (
       <p role="alert" className="p-8">
         读取编辑数据失败。
-        <button onClick={() => void snapshot.refetch()}>重试</button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => void snapshot.refetch()}
+        >
+          重试
+        </Button>
       </p>
     );
   if (id && !snapshot.data) return <p className="p-8">正在读取词表…</p>;
@@ -87,33 +106,118 @@ function Editor({
   const [uncertain, setUncertain] = useState(false);
   const pending = useRef<CreateWordlist | null>(null);
   const drag = useRef<string | null>(null);
+  const allowLeave = useRef(false);
   const locked =
     initial?.wordlist.state === "published" ||
     initial?.wordlist.state === "pending";
-  const [loadPage, setLoadPage] = useState(1);
+  const [session] = useState(() => crypto.randomUUID());
+  const [filter, setFilter] = useState("");
+  const [errorRow, setErrorRow] = useState<string | null>(null);
   const loaded = useQuery({
-    queryKey: [...wordListKeys.mine(userId), "edit-items", id, loadPage],
-    queryFn: ({ signal }) =>
-      api.wordList.myItems(id!, { page: loadPage, page_size: 100 }, { signal }),
+    queryKey: [...wordListKeys.mine(userId), "edit-items", id, session],
+    queryFn: async ({ signal }) => {
+      const items: MyWordlistItem[] = [];
+      const ids = initial!.entry_ids;
+      for (
+        let batch = 1;
+        batch <= Math.max(1, Math.ceil(ids.length / 100));
+        batch++
+      ) {
+        const data = await api.wordList.myItems(
+          id!,
+          { page: batch, page_size: 100 },
+          { signal }
+        );
+        if (
+          data.revision !== initial!.wordlist.revision ||
+          data.pagination.total !== ids.length ||
+          data.items.length !== Math.min(100, ids.length - items.length) ||
+          data.items.some(
+            (item, offset) => item.entry_id !== ids[items.length + offset]
+          )
+        ) {
+          throw new Error("词表版本已变化，请重新打开后编辑。");
+        }
+        items.push(...data.items);
+      }
+      return items;
+    },
     enabled: !!id,
-    refetchOnWindowFocus: false
+    retry: false,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false
   });
-  // Keep loaded pages for stable row IDs when users reorder the full lightweight snapshot.
-  const cache = new Map<string, MyWordlistItem>();
-  for (const [, data] of client.getQueriesData<MyWordlistItems>({
-    queryKey: [...wordListKeys.mine(userId), "edit-items", id]
-  }))
-    if (data) for (const item of data.items) cache.set(item.entry_id, item);
-  if (loaded.data)
-    for (const item of loaded.data.items) cache.set(item.entry_id, item);
+  const loadingItems = !!id && !loaded.data;
+  // Only this editing session's complete, revision-checked response supplies notes.
+  const cache = new Map(loaded.data?.map((item) => [item.entry_id, item]));
+  function authorNoteFor(row: Row) {
+    return (
+      row.authorNote ??
+      (row.entryId ? cache.get(row.entryId)?.author_note : undefined) ??
+      ""
+    );
+  }
   function noteRevisionFor(entryId: string) {
     return originalIds.has(entryId) ? cache.get(entryId)?.note_revision : 1;
   }
   useEffect(() => {
     if (!dirty) return;
-    const prevent = (e: BeforeUnloadEvent) => e.preventDefault();
+    const prevent = (e: BeforeUnloadEvent) => {
+      if (!allowLeave.current) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    const click = (e: MouseEvent) => {
+      const link =
+        e.target instanceof Element
+          ? e.target.closest("a[href], [data-leaves-page]")
+          : null;
+      if (
+        !link ||
+        (link instanceof HTMLAnchorElement &&
+          (link.target === "_blank" ||
+            link.hasAttribute("download") ||
+            link.href === window.location.href)) ||
+        e.ctrlKey ||
+        e.metaKey ||
+        e.shiftKey ||
+        e.altKey
+      )
+        return;
+      if (!window.confirm("尚未保存，确定离开？")) {
+        e.preventDefault();
+        e.stopPropagation();
+      } else {
+        allowLeave.current = true;
+      }
+    };
+    const navigate = (e: NavigateEvent) => {
+      if (
+        e.navigationType !== "traverse" ||
+        allowLeave.current ||
+        e.hashChange ||
+        !e.cancelable
+      )
+        return;
+      if (!window.confirm("尚未保存，确定离开？")) e.preventDefault();
+      else allowLeave.current = true;
+    };
+    const restoreProtection = () => {
+      allowLeave.current = false;
+    };
+    window.addEventListener("tsz:page-leave-finished", restoreProtection);
     window.addEventListener("beforeunload", prevent);
-    return () => window.removeEventListener("beforeunload", prevent);
+    if (window.navigation)
+      window.navigation.addEventListener("navigate", navigate);
+    document.addEventListener("click", click, true);
+    return () => {
+      window.removeEventListener("tsz:page-leave-finished", restoreProtection);
+      window.removeEventListener("beforeunload", prevent);
+      document.removeEventListener("click", click, true);
+      window.navigation?.removeEventListener("navigate", navigate);
+    };
   }, [dirty]);
   function change(rowId: string, patch: Partial<Row>) {
     setRows((current) =>
@@ -121,6 +225,7 @@ function Editor({
     );
     setDirty(true);
     setError("");
+    setErrorRow(null);
   }
   function move(rowId: string, target: string) {
     setRows((current) => {
@@ -134,21 +239,42 @@ function Editor({
     });
     setDirty(true);
   }
+  function invalidRow(message: string, row: Row) {
+    setError(message);
+    setErrorRow(row.id);
+    setFilter("");
+    setPage(Math.floor(rows.indexOf(row) / 50) + 1);
+    requestAnimationFrame(() =>
+      document.getElementById(`row-${row.id}`)?.focus()
+    );
+  }
   async function save() {
+    if (saving || loadingItems) return;
     if (!name.trim() || [...name].length > 100) {
       setError("名称须为 1–100 字");
       return;
     }
-    if (rows.some((r) => !r.entryId)) {
-      setError("每行都需选定平台词条，请选择候选或删除未匹配行");
+    const unmatched = rows.find((r) => !r.entryId);
+    if (unmatched) {
+      invalidRow("每行都需选定平台词条，请选择候选或删除未匹配行", unmatched);
       return;
     }
-    if (new Set(rows.map((r) => r.entryId)).size !== rows.length) {
-      setError("词条不能重复");
+    const seenIds = new Set<string | null>();
+    const duplicate = rows.find((row) => {
+      if (seenIds.has(row.entryId)) return true;
+      seenIds.add(row.entryId);
+      return false;
+    });
+    if (duplicate) {
+      invalidRow("词条不能重复", duplicate);
       return;
     }
-    if (rows.some((r) => [...(r.note ?? "")].length > 1000)) {
-      setError("备注不能超过 1000 字");
+    const longNote = rows.find(
+      (r) =>
+        [...(r.note ?? "")].length > 1000 || [...authorNoteFor(r)].length > 1000
+    );
+    if (longNote) {
+      invalidRow("备注不能超过 1000 字", longNote);
       return;
     }
     if (
@@ -159,7 +285,7 @@ function Editor({
           (r.noteRevision ?? noteRevisionFor(r.entryId)) === undefined
       )
     ) {
-      setError("请先加载所选词条的备注批次，再保存备注");
+      setError("词义和备注尚未读取完成，请稍后重试");
       return;
     }
     setSaving(true);
@@ -170,14 +296,28 @@ function Editor({
         const same =
           name === initial.wordlist.name &&
           JSON.stringify(rows.map((r) => r.entryId)) ===
-            JSON.stringify(initial.entry_ids);
+            JSON.stringify(initial.entry_ids) &&
+          rows.every(
+            (row) =>
+              authorNoteFor(row) ===
+              (cache.get(row.entryId!)?.author_note ?? "")
+          );
         result = await api.wordList.update(id, {
           expected_revision: initial.wordlist.revision,
           content: same
             ? null
             : {
                 name,
-                entry_ids: rows.map((r) => r.entryId!)
+                entry_ids: rows.map((r) => r.entryId!),
+                ...(rows.some((row) => authorNoteFor(row)) ||
+                loaded.data?.some((item) => item.author_note)
+                  ? {
+                      author_notes: rows.map((row) => ({
+                        entry_id: row.entryId!,
+                        author_note: authorNoteFor(row)
+                      }))
+                    }
+                  : {})
               },
           note_updates: rows
             .filter(
@@ -198,11 +338,13 @@ function Editor({
           name,
           items: rows.map((r) => ({
             entry_id: r.entryId!,
-            private_note: r.note ?? ""
+            private_note: r.note ?? "",
+            ...(authorNoteFor(r) ? { author_note: authorNoteFor(r) } : {})
           }))
         };
         result = await api.wordList.create(pending.current);
       }
+      allowLeave.current = true;
       setDirty(false);
       await client.invalidateQueries({ queryKey: wordListKeys.all });
       router.push(`/account/wordlists/${result.id}`);
@@ -219,93 +361,146 @@ function Editor({
       setSaving(false);
     }
   }
-  const visible = rows.slice((page - 1) * 50, page * 50);
+  const searchTerm = filter.trim().toLowerCase();
+  const matches = rows.filter((row) => {
+    if (!searchTerm) return true;
+    const stored = row.entryId ? cache.get(row.entryId) : undefined;
+    return [
+      row.text ?? stored?.entry?.label ?? "",
+      authorNoteFor(row),
+      row.note ?? stored?.private_note ?? "",
+      ...(row.candidate?.glosses ?? glosses(stored?.entry))
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(searchTerm);
+  });
+  const pages = Math.max(1, Math.ceil(matches.length / 50));
+  const currentPage = Math.min(page, pages);
+  const visible = matches.slice((currentPage - 1) * 50, currentPage * 50);
   return (
-    <div className="mx-auto max-w-5xl px-4 pb-16">
+    <div className="mx-auto max-w-5xl px-6 pb-16 animate-in">
       <header className="sticky top-0 z-20 flex flex-wrap items-center gap-3 border-b border-border bg-background/95 py-4 backdrop-blur">
-        <button
-          className={buttonClass}
+        <Button
+          type="button"
+          variant="outline"
           onClick={() => {
-            if (!dirty || window.confirm("尚未保存，确定离开？"))
+            if (!dirty || window.confirm("尚未保存，确定离开？")) {
+              allowLeave.current = true;
               router.push(
                 id ? `/account/wordlists/${id}` : "/account/wordlists"
               );
+            }
           }}
         >
           返回
-        </button>
-        <input
-          aria-label="词表名称"
-          placeholder="词表名称（最多 100 字）"
-          value={name}
-          maxLength={100}
-          disabled={locked || saving || uncertain}
-          onChange={(e) => {
-            setName(e.target.value);
-            setDirty(true);
-          }}
-          className={`${field} min-w-40 flex-1`}
-        />
-        <button
-          className={`${buttonClass} bg-primary text-white`}
-          disabled={saving}
+        </Button>
+        <div className="min-w-40 flex-1">
+          <FormField htmlFor="wordlist-name" label="词表名称">
+            <Input
+              id="wordlist-name"
+              aria-label="词表名称"
+              placeholder="词表名称（最多 100 字）"
+              value={name}
+              maxLength={100}
+              disabled={locked || saving || uncertain}
+              onChange={(e) => {
+                setName(e.target.value);
+                setDirty(true);
+              }}
+            />
+          </FormField>
+        </div>
+        <Button
+          type="button"
+          disabled={saving || loadingItems}
           onClick={() => void save()}
         >
           {saving ? "保存中…" : uncertain ? "重试保存" : "保存私密词表"}
-        </button>
+        </Button>
       </header>
-      <h1 className="mt-6 text-2xl font-semibold">
+      <h1 className="mt-6 text-3xl font-semibold tracking-tight">
         {id ? "编辑词表" : "创建词表"}
       </h1>
       <p className="my-4 text-sm text-foreground-muted">
-        从平台已发布词库逐行选词。备注仅自己可见。
-        {locked && "当前只能修改备注；修改名称或选词前请先撤回。"}
+        从平台已发布词库逐行选词。“注”是给读者的补充说明，随词表展示。
+        {locked && "修改名称、选词或“注”前请先撤回；已有私密备注仍可单独修改。"}
       </p>
       {error && (
-        <p role="alert" className="my-4 text-red-600">
+        <p role="alert" className="my-4 text-danger">
           {error}
         </p>
       )}
-      {id && (
-        <div className="mb-4 flex flex-wrap gap-3 text-sm">
-          <span>词义和备注分批读取：</span>
-          <button
-            className={buttonClass}
-            disabled={loadPage === 1}
-            onClick={() => setLoadPage(loadPage - 1)}
-          >
-            上一批
-          </button>
-          <span>第 {loadPage} 批</span>
-          <button
-            className={buttonClass}
-            disabled={
-              loadPage >= Math.ceil((initial?.entry_ids.length ?? 0) / 100)
-            }
-            onClick={() => setLoadPage(loadPage + 1)}
-          >
-            下一批
-          </button>
+      {loadingItems && (
+        <p role={loaded.isError ? "alert" : "status"} className="my-4 text-sm">
+          {loaded.isError
+            ? loaded.error instanceof Error
+              ? loaded.error.message
+              : "词义和备注读取失败"
+            : "正在自动读取整张词表的词义和备注…"}
           {loaded.isError && (
-            <span role="alert">
-              本批加载失败，
-              <button onClick={() => void loaded.refetch()}>重试</button>
-            </span>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void loaded.refetch()}
+            >
+              重试读取
+            </Button>
           )}
-        </div>
+        </p>
       )}
-      <fieldset disabled={saving || uncertain} className="space-y-4">
-        {visible.map((row, index) => (
+      <div className="my-6">
+        <FormField
+          htmlFor="wordlist-filter"
+          label="表内搜索"
+          hint="搜索整张词表的词条、释义和备注"
+        >
+          <Input
+            id="wordlist-filter"
+            value={filter}
+            disabled={loadingItems}
+            placeholder="搜索本词表"
+            onChange={(e) => {
+              setFilter(e.target.value);
+              setPage(1);
+            }}
+          />
+        </FormField>
+      </div>
+      <fieldset
+        disabled={saving || uncertain || loadingItems}
+        className="space-y-4"
+      >
+        {visible.map((row) => (
           <div
             key={row.id}
-            draggable={!locked}
+            id={`row-${row.id}`}
+            tabIndex={-1}
+            className={
+              errorRow === row.id ? "rounded-3xl ring-2 ring-danger" : ""
+            }
+            draggable={
+              !locked &&
+              !saving &&
+              !uncertain &&
+              !loadingItems &&
+              !filter.trim()
+            }
             onDragStart={() => {
               drag.current = row.id;
             }}
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
               e.preventDefault();
-              if (drag.current && !locked) move(drag.current, row.id);
+              if (
+                drag.current &&
+                !locked &&
+                !saving &&
+                !uncertain &&
+                !loadingItems &&
+                !filter.trim()
+              )
+                move(drag.current, row.id);
               drag.current = null;
             }}
           >
@@ -314,26 +509,33 @@ function Editor({
               stored={row.entryId ? cache.get(row.entryId) : undefined}
               noteRevisionFor={noteRevisionFor}
               locked={!!locked}
-              index={(page - 1) * 50 + index + 1}
+              index={rows.indexOf(row) + 1}
               change={(patch) => change(row.id, patch)}
             />
             <div className="mt-2 flex gap-3">
-              <button
-                className={buttonClass}
-                disabled={locked || rows.indexOf(row) === 0}
+              <Button
+                type="button"
+                variant="outline"
+                disabled={locked || !!filter.trim() || rows.indexOf(row) === 0}
                 onClick={() => move(row.id, rows[rows.indexOf(row) - 1]!.id)}
               >
                 上移
-              </button>
-              <button
-                className={buttonClass}
-                disabled={locked || rows.indexOf(row) === rows.length - 1}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={
+                  locked ||
+                  !!filter.trim() ||
+                  rows.indexOf(row) === rows.length - 1
+                }
                 onClick={() => move(row.id, rows[rows.indexOf(row) + 1]!.id)}
               >
                 下移
-              </button>
-              <button
-                className={buttonClass}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
                 disabled={locked || rows.length === 1}
                 onClick={() => {
                   if (window.confirm("删除此行及其备注？")) {
@@ -343,40 +545,50 @@ function Editor({
                 }}
               >
                 删除
-              </button>
+              </Button>
             </div>
           </div>
         ))}
       </fieldset>
       <div className="mt-6 flex flex-wrap gap-3">
-        <button
-          className={buttonClass}
-          disabled={locked || saving || uncertain || rows.length >= 10000}
+        <Button
+          type="button"
+          variant="outline"
+          disabled={
+            locked ||
+            saving ||
+            uncertain ||
+            loadingItems ||
+            rows.length >= 10000
+          }
           onClick={() => {
+            setFilter("");
             setRows((rs) => [...rs, emptyRow()]);
             setPage(Math.ceil((rows.length + 1) / 50));
             setDirty(true);
           }}
         >
           增加一行
-        </button>
-        <button
-          className={buttonClass}
-          disabled={page === 1}
-          onClick={() => setPage(page - 1)}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={currentPage === 1}
+          onClick={() => setPage(currentPage - 1)}
         >
           上一页
-        </button>
+        </Button>
         <span className="py-2">
-          {page} / {Math.ceil(rows.length / 50)} 页 · {rows.length} 个词条
+          {currentPage} / {pages} 页 · {matches.length} / {rows.length} 个词条
         </span>
-        <button
-          className={buttonClass}
-          disabled={page >= Math.ceil(rows.length / 50)}
-          onClick={() => setPage(page + 1)}
+        <Button
+          type="button"
+          variant="outline"
+          disabled={currentPage >= pages}
+          onClick={() => setPage(currentPage + 1)}
         >
           下一页
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -397,7 +609,10 @@ function WordRow({
   change: (patch: Partial<Row>) => void;
 }) {
   const userId = useUserStore((s) => s.user?.id);
-  const text = row.text ?? stored?.entry?.label ?? row.entryId ?? "";
+  const text =
+    row.text ??
+    stored?.entry?.label ??
+    (stored ? "内容不可用" : row.entryId ? "正在读取词条…" : "");
   const [searchText, setSearchText] = useState(text);
   useEffect(() => {
     const timer = setTimeout(() => setSearchText(text), 250);
@@ -418,8 +633,8 @@ function WordRow({
     <section className="rounded-3xl border border-border bg-surface p-5">
       <label className="mb-2 block text-sm">
         词条 {index}
-        <input
-          className={`${field} mt-2`}
+        <Input
+          className="mt-2"
           value={text}
           disabled={locked}
           placeholder="输入单词或短语"
@@ -436,7 +651,8 @@ function WordRow({
                       row.noteRevision ?? noteRevisionFor(row.entryId)
                   }
                 : row.noteVersions,
-              note: row.note ?? stored?.private_note ?? ""
+              note: row.note ?? stored?.private_note ?? "",
+              authorNote: row.authorNote ?? stored?.author_note ?? ""
             })
           }
         />
@@ -450,9 +666,11 @@ function WordRow({
       {!row.entryId &&
         searchText === text &&
         search.data?.items.map((candidate) => (
-          <button
+          <Button
+            type="button"
+            variant="ghost"
             key={candidate.entry_id}
-            className="block w-full rounded-xl p-3 text-left hover:bg-background"
+            className="my-2 h-auto w-full justify-start whitespace-normal text-left"
             onClick={() =>
               change({
                 entryId: candidate.entry_id,
@@ -468,7 +686,7 @@ function WordRow({
             <span className="ml-3 text-sm text-foreground-muted">
               {candidate.glosses.join("；")}
             </span>
-          </button>
+          </Button>
         ))}
       {!row.entryId &&
         searchText === text &&
@@ -476,30 +694,51 @@ function WordRow({
         search.data.items.length === 0 && (
           <p>没有匹配词条，请修改输入或删除此行。</p>
         )}
-      {row.candidate && (
+      {(row.candidate || stored?.entry) && (
         <p className="my-3 text-sm text-foreground-muted">
-          {row.candidate.glosses.join("；")}
+          {(row.candidate?.glosses ?? glosses(stored?.entry)).join("；")}
         </p>
       )}
       {stored && !stored.entry && <p>内容不可用，请删除或替换此项。</p>}
       <label className="mt-3 block text-sm">
-        私密备注
+        注
         <textarea
           className={`${field} mt-2`}
-          aria-label={`私密备注 ${index}`}
+          aria-label={`注 ${index}`}
+          aria-describedby={`author-note-${row.id}-message`}
           maxLength={1000}
-          disabled={!!unloaded}
-          placeholder={unloaded ? "请加载此条目的备注批次" : "仅自己可见"}
-          value={note}
-          onChange={(e) =>
-            change({
-              note: e.target.value,
-              noteDirty: true,
-              noteRevision: row.noteRevision ?? noteRevisionFor(row.entryId!)
-            })
-          }
+          disabled={locked}
+          placeholder="给读者的补充说明"
+          value={row.authorNote ?? stored?.author_note ?? ""}
+          onChange={(e) => change({ authorNote: e.target.value })}
         />
+        <span
+          id={`author-note-${row.id}-message`}
+          className="mt-2 block text-xs text-foreground-muted"
+        >
+          随词表展示，公开词表的读者也能看到。
+        </span>
       </label>
+      {(stored?.private_note || row.note || row.noteDirty) && (
+        <label className="mt-3 block text-sm">
+          已有私密备注（仅自己可见）
+          <textarea
+            className={`${field} mt-2`}
+            aria-label={`私密备注 ${index}`}
+            maxLength={1000}
+            disabled={!!unloaded}
+            placeholder={unloaded ? "正在读取备注…" : "仅自己可见"}
+            value={note}
+            onChange={(e) =>
+              change({
+                note: e.target.value,
+                noteDirty: true,
+                noteRevision: row.noteRevision ?? noteRevisionFor(row.entryId!)
+              })
+            }
+          />
+        </label>
+      )}
     </section>
   );
 }

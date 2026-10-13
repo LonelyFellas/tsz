@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
@@ -46,10 +45,7 @@ export function WordListsPage() {
   );
 }
 function Management({ adminId }: { adminId: string }) {
-  const navigate = useNavigate();
   const client = useQueryClient();
-  const canCreate = usePermission("wordlists.create");
-  const canEdit = usePermission("wordlists.edit");
   const canDelete = usePermission("wordlists.delete");
   const canVisibility = usePermission("wordlists.visibility");
   const canRecommend = usePermission("wordlists.recommend");
@@ -180,15 +176,8 @@ function Management({ adminId }: { adminId: string }) {
         </Space>
       </Form>
       <Space>
-        <Button
-          type="primary"
-          disabled={!canCreate}
-          onClick={() => navigate("/wordlists/new")}
-        >
-          创建词表
-        </Button>
         <Typography.Text type="secondary">
-          当前支持智能词库词汇；自定义词汇尚未开放。题量、点赞与收藏统计暂未提供。
+          词表由用户在学习端创建和编辑。此处管理查看、审核、推荐及下架。
         </Typography.Text>
       </Space>
       {error && (
@@ -310,18 +299,17 @@ function Management({ adminId }: { adminId: string }) {
             render: (_, row) => (
               <Space>
                 <Button onClick={() => setSelected(row)}>查看</Button>
-                <Button
-                  disabled={!canVisibility || !!busy}
-                  onClick={() => setAction({ kind: "visibility", row })}
-                >
-                  {row.wordlist.state === "published" ? "设为私密" : "设为公开"}
-                </Button>
-                <Button
-                  disabled={!canEdit}
-                  onClick={() => navigate(`/wordlists/${row.wordlist.id}/edit`)}
-                >
-                  编辑
-                </Button>
+                {(row.wordlist.state === "published" ||
+                  row.wordlist.owner_user_id === null) && (
+                  <Button
+                    disabled={!canVisibility || !!busy}
+                    onClick={() => setAction({ kind: "visibility", row })}
+                  >
+                    {row.wordlist.state === "published"
+                      ? "设为私密"
+                      : "设为公开"}
+                  </Button>
+                )}
                 <Button
                   danger
                   disabled={!canDelete || !!busy}
