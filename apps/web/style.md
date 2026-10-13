@@ -12,6 +12,7 @@
 - 主题行为：[useTheme](src/features/theme/useTheme.ts)、[主题内核](src/lib/theme.ts)。页面通过 hook 使用主题，不自行操作存储或 `<html>`。
 - 品牌来源仍为配套总文档仓库的 `visual.md`；本文件规定 C 端的落地方式。
 - 质感工具类：`glass`（毛玻璃面板）、`grid-backdrop`（网格底纹，已由根布局铺在全站内容下方）、`shadow-glass`、`shadow-float`，均定义在 globals.css 并随主题切换。
+- 页面部件与共享样式串：[features/shell/Page.tsx](src/features/shell/Page.tsx)、[ComingSoon](src/features/shell/ComingSoon.tsx)、[AppTopbar](src/features/shell/AppTopbar.tsx)，用法见第 12 节。功能页优先组合这些部件，不在页面里重写一份页头、卡片或按钮样式。
 
 本规范用于新页面与正在调整的组件；存量页面按实际任务逐步接入。调整公共组件时应核对所有消费者，不为局部视觉修改影响其他页面。
 
@@ -42,16 +43,16 @@
 
 ## 3. 排版与信息层级
 
-| 层级               | 默认样式                                | 用途                             |
-| ------------------ | --------------------------------------- | -------------------------------- |
-| 落地/认证大标题    | `text-[40px] font-bold tracking-tight`  | 首页分区、认证页品牌区           |
-| 功能页标题         | `text-3xl font-semibold tracking-tight` | 每页一个主标题                   |
-| 小标（eyebrow）    | `text-xs font-medium tracking-[0.2em]`  | 标题上方或下方的分类说明，次级色 |
-| 内容区标题         | `text-xl font-semibold`                 | 钱包、列表、表单分区             |
-| 紧凑标题、字段标签 | `text-sm font-medium`                   | 设置项、菜单用户信息、表单标签   |
-| 普通正文           | `text-base leading-7`                   | 较长的阅读内容                   |
-| 表单、操作、说明   | `text-sm leading-6`                     | 功能页面的主要信息密度           |
-| 辅助说明、时间     | `text-xs leading-5`                     | 提示和元信息                     |
+| 层级               | 默认样式                                              | 用途                                 |
+| ------------------ | ----------------------------------------------------- | ------------------------------------ |
+| 落地/认证大标题    | `text-[40px] font-bold tracking-tight`                | 首页分区、认证页品牌区               |
+| 功能页标题         | `text-3xl font-bold tracking-tight`，`sm:text-[34px]` | 每页一个主标题，由 `PageHeader` 输出 |
+| 小标（eyebrow）    | `text-xs font-medium tracking-[0.2em]`                | 标题上方或下方的分类说明，次级色     |
+| 内容区标题         | `text-xl font-semibold`                               | 钱包、列表、表单分区                 |
+| 紧凑标题、字段标签 | `text-sm font-medium`                                 | 设置项、菜单用户信息、表单标签       |
+| 普通正文           | `text-base leading-7`                                 | 较长的阅读内容                       |
+| 表单、操作、说明   | `text-sm leading-6`                                   | 功能页面的主要信息密度               |
+| 辅助说明、时间     | `text-xs leading-5`                                   | 提示和元信息                         |
 
 - 不把所有文字加粗。同组导航项使用一致字重；主要按钮沿用共享组件的字重，不逐页覆盖。
 - 使用真实 `h1/h2/h3` 表达标题层级，不能只靠字号模拟标题。
@@ -60,14 +61,16 @@
 
 ## 4. 页面布局与间距
 
-| 场景                         | 默认容器                                        |
-| ---------------------------- | ----------------------------------------------- |
-| 账户资料、安全等设置页       | `mx-auto max-w-2xl px-6 py-10 sm:py-14`         |
-| 钱包、邀请、学习任务等列表页 | `mx-auto max-w-3xl px-6 py-10 sm:py-14`         |
-| 认证表单                     | 最大宽度 400px，输入框与主按钮占满表单宽度      |
-| 落地页主体和导航             | 沿用现有 `max-w-5xl` 等分区布局，不套窄表单宽度 |
+| 场景                           | 默认容器                                        |
+| ------------------------------ | ----------------------------------------------- |
+| 账户资料、安全、注销等设置页   | `<PageShell size="sm">`（`max-w-2xl`）          |
+| 钱包、邀请、通知、任务等列表页 | `<PageShell>`（默认 `md`，`max-w-3xl`）         |
+| 词表、详情、编辑器等宽内容页   | `<PageShell size="lg">`（`max-w-5xl`）          |
+| 认证表单                       | 最大宽度 400px，输入框与主按钮占满表单宽度      |
+| 落地页主体和导航               | 沿用现有 `max-w-5xl` 等分区布局，不套窄表单宽度 |
 
-- 功能页顺序：返回入口 → 标题 → 必要的简短说明 → 内容。页头左对齐，避免同类页面随意切换居中/左对齐。
+- 功能页顺序：返回入口 → 小标 → 粗体标题 → 必要的简短说明 → 内容，统一由 `PageHeader` 输出；页头左对齐，页面级操作放在 `actions`。
+- 主区布局已提供 `<main>`，页面内不再嵌套 `<main>`；不在主区布局下的独立页（如 `/apply-teacher`）自行挂 `AppTopbar` 与 `<main>`。新手引导、定级测试等专注流程可不挂完整顶栏，但保留品牌字标和返回入口。
 - 间距以 4px 为基础，优先使用 8、12、16、20、24、32px。同层级间距一致。
 - 页头到内容、主要内容区之间通常留 24–32px；相关信息之间留 8–16px。
 - 移动端保持单栏、24px 页面边距；密集练习区域可按阅读需要使用 16px。桌面并排的内容和操作在小屏自然换行或纵向排列。
@@ -84,15 +87,17 @@
 | 菜单项、紧凑选择项                  | `rounded-xl`     | 12px                             |
 | 标准按钮、单行输入框、Select 触发器 | `rounded-full`   | 胶囊形；多行输入区使用容器圆角   |
 
-- 普通卡片使用 `border border-border bg-surface p-6 sm:p-8`；通常靠边框和留白区分内容，不为所有卡片叠加阴影。
-- 页面焦点卡（认证表单、学习首页、落地页功能卡）使用 `glass rounded-3xl p-2` 外框包一层 `rounded-[20px] bg-surface/70` 内卡；说明性小卡使用 `rounded-2xl border border-border/60 bg-muted/70`，图标放在 40px 白底 `rounded-xl` 方块内。
+- 普通内容卡使用 `panelClass`（`glass rounded-3xl p-6 sm:p-8`）；可点击的列表卡使用 `listCardClass`，悬停时提亮描边并浮起阴影。
+- 页面焦点卡（认证表单、学习首页、落地页功能卡）使用 `glass rounded-3xl p-2` 外框包一层 `rounded-[20px] bg-surface/70` 内卡；说明性小卡使用 `rounded-2xl border border-border/60 bg-muted/70`，图标放在 40px 白底 `rounded-xl` 方块内。一页通常只有一张焦点卡，承载该页的主体信息或主表单。
+- 卡内的作者注、审核意见、确认摘要等次级信息使用 `rounded-2xl bg-muted/70 px-4 py-3`；仅自己可见的内容（如私密备注）用虚线描边区分。
+- 空态、加载、失败统一用 `PageNotice`（失败传 `tone="error"`，自带 `role="alert"`），不在页面里散写居中灰字。
 - 页面区块不铺整块背景色，让网格底纹透出；不使用整块深色卡片作对比。
 - 阴影主要用于菜单、弹层等浮动层，使用轻阴影；避免强阴影、重描边和高饱和背景同时出现。
 - 不为一行文字嵌套多层卡片。相关设置项可共用容器，必要时使用内部细分隔线；最后一项下方不保留多余分隔线和空白。
 
 ## 6. 按钮与链接
 
-统一使用 `@tsz/ui/components` 的 Button，通过 `variant` 和 `size` 表达层级，不通过追加相互冲突的背景色和圆角拼样式。
+表单内的按钮使用 `@tsz/ui/components` 的 Button，通过 `variant` 和 `size` 表达层级。链接型按钮、列表与工具栏里的紧凑操作使用 `features/shell/Page` 导出的样式串：`primaryButtonClass`（主操作，48px）、`buttonClass`（次要操作，40px，支持 `aria-pressed` 选中态）、`textButtonClass`（句中“重试”等文字操作）、`inputClass`（单行输入）。需要覆盖时一律用 `cn`（`@tsz/ui/lib/cn`）合并，不用模板字符串拼接，也不使用 `!` 强制覆盖。
 
 | variant       | 用途                                       |
 | ------------- | ------------------------------------------ |
@@ -129,6 +134,8 @@
 - 学习首页与主区页面统一使用 [AppTopbar](src/features/shell/AppTopbar.tsx)：左侧品牌按钮从左侧弹出“学习菜单/教学菜单”，右侧齿轮从右侧弹出“学习设置/设置”，再往右是账户菜单或登录入口。
 - 左右浮层互斥，宽 330px（小屏不超出视口），`rounded-3xl`、半透明表面与 `shadow-float`，从各自一侧滑入；Esc、外部点击和关闭按钮均可关闭并把焦点还给触发器，切换账号时自动关闭。
 - 浮层菜单按身份分组：学生为词表/任务/广场与首页/天生币/通知/资料，教师为班级/任务/数据与词表/广场/通知/资料，游客仅词库广场；当前页面用 `aria-current` 高亮。
+- 已登录但没有学生角色、也不在教学工作台的账号显示“网站菜单”精简版：词表/广场与天生币/通知/资料，不出现学习首页、我的任务等学生入口。
+- 进入 `/teacher/*` 时，教师资格核验返回前顶栏即按教学工作台展示，避免先闪出学习菜单；核验失败由 `TeacherAccessGuard` 处理并跳回学生首页。
 
 ## 9. 账户菜单与图标
 
@@ -162,3 +169,27 @@
 - 改动后核对默认、悬停、键盘聚焦、禁用、请求中、空态、失败和成功状态；纯视觉调整不改变请求、权限或业务规则。
 - 检查浅色/深色、手机窄屏和桌面布局，特别是长文案、大金额、验证码按钮及浮层边界。
 - 运行与改动相关的检查；页面验收按项目约定使用生产构建和 `next start`，用实际截图与 computed styles 验证尺寸和颜色，不以测试通过替代视觉检查。
+
+## 12. 页面部件速查
+
+均从 `@/features/shell/Page` 导入（`ComingSoon` 从 `@/features/shell/ComingSoon`）。
+
+| 部件 / 样式串                                                        | 用途                                                                 |
+| -------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `PageShell`                                                          | 功能页外框：宽度（`sm`/`md`/`lg`）、页边距与入场动画                 |
+| `PageHeader`                                                         | 返回入口 → 小标 → 标题 → 说明，右侧 `actions` 放页面级操作           |
+| `panelClass`                                                         | 普通毛玻璃内容卡                                                     |
+| `listCardClass`                                                      | 可点击的列表卡                                                       |
+| `PageNotice`                                                         | 空态、加载与失败                                                     |
+| `Segmented`                                                          | 同组互斥筛选（如阅读模式、词表分类），选中项通过 `aria-pressed` 暴露 |
+| `Pager`                                                              | 翻页；只有一页时不渲染，当前页越界时仍保留“上一页”                   |
+| `ComingSoon`                                                         | 尚未开放的功能页：说明现状并给出当前可用入口                         |
+| `primaryButtonClass`、`buttonClass`、`textButtonClass`、`inputClass` | 见第 6 节                                                            |
+
+常见写法：
+
+- 焦点卡：`<section className="glass rounded-3xl p-2"><div className="rounded-[20px] bg-surface/70 p-6 sm:p-8">…</div></section>`。
+- 卡内选项（单选、渠道选择）：真实 `<input type="radio">` 包在 `<label>` 里，默认保留可见的 `size-4 accent-primary` 圆点，选中态用 `has-checked:`。只有整张选项卡本身就表达选中态时（如新手引导的难度卡）才把单选框设为 `sr-only`，此时必须加 `has-focus-visible:outline-*`。两种写法都保留方向键选择，标题与选项文字不因装饰徽标改变可读名称。
+- 卡片内的英文词条与音标分别加 `tsz-words`、`tsz-phonetics`，只加在词面和音标本身，不加在“读音 1”“词形变化”等中文标签上。
+- 遮罩使用 `bg-foreground/30 backdrop-blur-sm`，弹层使用 `rounded-3xl border border-border/60 bg-surface shadow-float`；不用 `bg-black/*`、`shadow-xl`。叠在照片上的加载层和大图预览背景可用 `bg-black/*`，保证图片上的白色图标可见。
+- 不写 `text-white`、`bg-white`（头像透明底除外）、`rose-*`、`violet-*`、`amber-*` 等非语义色；实色主按钮文字用 `text-primary-foreground`。

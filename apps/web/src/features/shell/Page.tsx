@@ -2,9 +2,13 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
 
-const WIDTH = { md: "max-w-3xl", lg: "max-w-5xl" } as const;
+const WIDTH = {
+  sm: "max-w-2xl",
+  md: "max-w-3xl",
+  lg: "max-w-5xl"
+} as const;
 
-// 功能页外框：统一宽度、页边距与入场动画。
+// 功能页外框：统一宽度、页边距与入场动画。sm 用于资料、安全等设置页，md 用于列表页，lg 用于宽内容。
 export function PageShell({
   size = "md",
   children
@@ -129,10 +133,10 @@ export function Segmented<T extends string | boolean>({
   );
 }
 
-// 翻页：只有一页时不渲染。
+// 翻页：只有一页时不渲染。数据变少导致当前页越界时仍保留“上一页”，可以退回有内容的页。
 export function Pager({
   page,
-  total,
+  total: totalPages,
   onChange,
   disabled = false
 }: {
@@ -141,6 +145,7 @@ export function Pager({
   onChange: (page: number) => void;
   disabled?: boolean;
 }) {
+  const total = Math.max(totalPages, page);
   if (total <= 1) return null;
   const button =
     "inline-flex min-h-10 items-center rounded-full border border-border bg-surface px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40";

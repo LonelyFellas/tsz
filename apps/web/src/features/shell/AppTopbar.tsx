@@ -62,6 +62,19 @@ const TEACHER_NAV: NavItem[][] = [
   ]
 ];
 
+// 已登录但既非学生、也不在教学工作台：只保留与学习身份无关的入口。
+const ACCOUNT_NAV: NavItem[][] = [
+  [
+    { href: "/account/wordlists", label: "我的词表", icon: BookOpen },
+    { href: "/wordlists", label: "词库广场", icon: Globe }
+  ],
+  [
+    { href: "/account/coins", label: "天生币", icon: Wallet },
+    { href: "/account/notifications", label: "通知", icon: Bell },
+    { href: "/account/profile", label: "个人资料", icon: UserRound }
+  ]
+];
+
 const GUEST_NAV: NavItem[][] = [
   [{ href: "/wordlists", label: "词库广场", icon: Globe }]
 ];
@@ -100,11 +113,22 @@ function TopbarPanels({ hydrated }: { hydrated: boolean }) {
   const pathname = usePathname() ?? "";
   const [panel, setPanel] = useState<"navigation" | "settings" | null>(null);
 
+  // 教师资格核验返回前，/teacher/* 已由 TeacherAccessGuard 拦住内容，顶栏按教学工作台展示，
+  // 避免先闪出学习菜单；核验不通过时守卫会跳回学生首页。
   const teaching =
-    !!user && identity.verified && identity.identity === "teacher";
+    !!user &&
+    (identity.ready
+      ? identity.verified && identity.identity === "teacher"
+      : pathname.startsWith("/teacher/"));
   const studying = !!user && !teaching && user.roles.includes("student");
-  const groups = !user ? GUEST_NAV : teaching ? TEACHER_NAV : STUDENT_NAV;
-  const menuTitle = teaching ? "教学菜单" : user ? "学习菜单" : "网站菜单";
+  const groups = !user
+    ? GUEST_NAV
+    : teaching
+      ? TEACHER_NAV
+      : studying
+        ? STUDENT_NAV
+        : ACCOUNT_NAV;
+  const menuTitle = teaching ? "教学菜单" : studying ? "学习菜单" : "网站菜单";
   const settingsTitle = studying ? "学习设置" : "设置";
 
   function toggle(name: "navigation" | "settings", open: boolean) {

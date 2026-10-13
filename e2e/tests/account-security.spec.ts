@@ -136,14 +136,14 @@ for (const width of [375, 1280]) {
     await expect(title).toBeVisible();
     await expect(page.getByText("修改头像、昵称和英美偏好。")).toBeVisible();
     await expect(
-      page.getByRole("link", { name: "← 返回个人中心" })
+      page.getByRole("link", { name: "返回个人中心" })
     ).toHaveAttribute("href", "/account");
     await expect(
       page.getByRole("button", { name: "保存", exact: true })
     ).toBeDisabled();
     const editLayout = await title.evaluate((element) => {
       const style = getComputedStyle(element);
-      const back = element.parentElement!.querySelector("a")!;
+      const back = element.closest("header")!.querySelector("a")!;
       return {
         fontSize: style.fontSize,
         fontWeight: style.fontWeight,
@@ -165,7 +165,7 @@ for (const width of [375, 1280]) {
     await expect(
       page.getByRole("link", { name: "账号与密码设置" })
     ).toHaveCount(0);
-    await page.getByRole("link", { name: "← 返回个人中心" }).click();
+    await page.getByRole("link", { name: "返回个人中心" }).click();
     await page.getByRole("link", { name: "账号安全", exact: true }).click();
     const reference = page.getByRole("heading", { name: "账号安全", level: 1 });
     await expect(reference).toBeVisible();

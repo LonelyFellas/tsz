@@ -112,7 +112,7 @@ export function WordListBrowser({ mine = false }: { mine?: boolean }) {
                 <li key={list.id}>
                   <Link
                     href={`${mine ? "/account" : ""}/wordlists/${list.id}`}
-                    className={`${listCardClass} group h-full`}
+                    className={cn(listCardClass, "group h-full")}
                   >
                     <div className="flex items-start justify-between gap-4">
                       <h2 className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
