@@ -16,7 +16,7 @@ import type { AdminProfile, MenuPermission } from "@tsz/types";
 import type { ReactNode } from "react";
 import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { hasAdminPermission } from "@tsz/shared/auth";
+import { hasAdminPermission, hasAnyAdminPermission } from "@tsz/shared/auth";
 import { useAuthStore } from "@/lib/auth";
 import { ADMIN_PAGE_ROUTES } from "@/lib/adminPageRoutes";
 
@@ -35,6 +35,7 @@ interface Leaf {
   key: string;
   label: string;
   perm?: MenuPermission;
+  anyPermission?: readonly string[];
   superOnly?: boolean;
   disabled?: boolean;
 }
@@ -51,7 +52,11 @@ interface Group {
 function pageLeaf(
   route: {
     path: string;
-    handle: { permission?: MenuPermission; superOnly?: boolean };
+    handle: {
+      permission?: MenuPermission;
+      anyPermission?: readonly string[];
+      superOnly?: boolean;
+    };
   },
   label: string
 ): Leaf {
@@ -59,6 +64,7 @@ function pageLeaf(
     key: `/${route.path}`,
     label,
     perm: route.handle.permission,
+    anyPermission: route.handle.anyPermission,
     superOnly: route.handle.superOnly
   };
 }
@@ -174,7 +180,9 @@ function buildNav(profile: AdminProfile | null): MenuItem[] {
   const visible = (l: Leaf): boolean =>
     l.superOnly
       ? profile?.role === "super_admin"
-      : l.perm !== undefined && hasAdminPermission(profile, l.perm);
+      : l.anyPermission
+        ? hasAnyAdminPermission(profile, l.anyPermission)
+        : l.perm !== undefined && hasAdminPermission(profile, l.perm);
 
   const items: MenuItem[] = [
     { key: "/", icon: <HomeOutlined />, label: "首页" }

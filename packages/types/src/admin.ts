@@ -20,6 +20,7 @@ export type MenuPermission =
   | "words.access"
   | "customdict.access"
   | "sentences.access"
+  | "sentences.read_published"
   | "wordlists.access"
   | "customwordlist.access"
   | "tasks.access"

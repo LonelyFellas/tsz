@@ -122,7 +122,7 @@ describe("共享例句独立发布操作", () => {
     expect(screen.getByRole("button", { name: /确\s*认/ })).toBeDisabled();
     expect(api.sentences.publish).not.toHaveBeenCalled();
   });
-  it("历史回退调用独立命令，不把快照写入正在编辑的草稿", async () => {
+  it("历史恢复调用带双版本校验的独立草稿恢复命令", async () => {
     vi.mocked(api.sentences.publications).mockResolvedValue([
       {
         id: "old",
@@ -137,10 +137,8 @@ describe("共享例句独立发布操作", () => {
     ]);
     vi.mocked(api.sentences.rollback).mockResolvedValue(sentence);
     const done = show("history");
-    fireEvent.click(await screen.findByRole("button", { name: "选择回退" }));
-    fireEvent.click(
-      screen.getByRole("button", { name: "将所选历史发布为新版本" })
-    );
+    fireEvent.click(await screen.findByRole("button", { name: "选择恢复" }));
+    fireEvent.click(screen.getByRole("button", { name: "恢复所选历史到草稿" }));
     await waitFor(() => expect(done).toHaveBeenCalledOnce());
     expect(api.sentences.rollback).toHaveBeenCalledWith(
       "sentence",

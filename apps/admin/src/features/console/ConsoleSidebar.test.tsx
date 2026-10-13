@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { MenuPermission } from "@tsz/types";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -207,4 +207,19 @@ describe("ConsoleSidebar", () => {
     );
     expect(screen.queryByText("天生会背")).toBeNull();
   });
+});
+
+it("公开例句只读管理员可见例句菜单及直链，不能进入词库", async () => {
+  setLevel("admin", ["sentences.read_published"]);
+  renderAt("/sentences");
+  fireEvent.click(screen.getByText("词库管理"));
+  await waitFor(() => expect(screen.getByText("多维例句")).toBeVisible());
+  expect(screen.queryByText("智能词库")).toBeNull();
+  const { canVisitAdminRoute } = await import("@/lib/adminPageRoutes");
+  const profile = useAuthStore.getState().profile;
+  expect(canVisitAdminRoute(profile, "/sentences")).toBe(true);
+  expect(canVisitAdminRoute(profile, "/words")).toBe(false);
+  expect(
+    canVisitAdminRoute({ ...profile!, permissions: [] }, "/sentences")
+  ).toBe(false);
 });

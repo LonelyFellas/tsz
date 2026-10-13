@@ -39,7 +39,7 @@ export function WordSentences({
   editor,
   onOpen,
   onClose,
-  readOnly,
+  readOnly: requestedReadOnly,
   registerLeaveGuard,
   focusSentenceId,
   onFocusHandled
@@ -56,7 +56,10 @@ export function WordSentences({
   onFocusHandled?: () => void;
 }) {
   const profile = useAuthStore((state) => state.profile);
-  const canRead = hasAdminPermission(profile, "sentences.access");
+  const canReadAll = hasAdminPermission(profile, "sentences.access");
+  const readOnly = requestedReadOnly || !canReadAll;
+  const canRead =
+    canReadAll || hasAdminPermission(profile, "sentences.read_published");
   const canCreate =
     !readOnly && hasAdminPermission(profile, "sentences.create");
   const canEditWord =
@@ -130,7 +133,7 @@ export function WordSentences({
     let cancelled = false;
     setCollapsed(false);
     void api.sentences
-      .get(focusSentenceId, "draft")
+      .get(focusSentenceId, readOnly ? "published" : "draft")
       .then((sentence) => {
         if (!cancelled) onOpen(sentence);
       })
