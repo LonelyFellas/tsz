@@ -85,6 +85,55 @@ describe("buildLiaisonArcs", () => {
     ]);
   });
 
+  it("弹窗缩放和平移过程中，连读始终使用 SVG 局部坐标", () => {
+    vi.spyOn(window, "getComputedStyle").mockReturnValue(style);
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.classList.add("tsz-ve-arc-layer");
+    container.append(svg);
+    const originalRect = container.getBoundingClientRect;
+    try {
+      for (const [scaleX, scaleY] of [
+        [0.2, 0.2],
+        [0.65, 0.8],
+        [1, 1]
+      ]) {
+        const screenRect = (
+          left: number,
+          top: number,
+          width: number,
+          height: number
+        ) =>
+          rect(
+            80 + left * scaleX!,
+            120 + top * scaleY!,
+            width * scaleX!,
+            height * scaleY!
+          );
+        svg.getScreenCTM = () =>
+          ({
+            inverse: () => ({
+              a: 1 / scaleX!,
+              b: 0,
+              c: 0,
+              d: 1 / scaleY!,
+              e: -80 / scaleX!,
+              f: -120 / scaleY!
+            })
+          }) as DOMMatrix;
+        container.getBoundingClientRect = () => screenRect(0, 0, 400, 100);
+        const link = {
+          start: anchor(screenRect(20, 50, 10, 25)),
+          end: anchor(screenRect(120, 50, 10, 25), "o")
+        };
+        expect(buildLiaisonArcs(container, [link], measure).arcs[0]?.d).toBe(
+          liaisonPath({ x: 25, tipY }, { x: 125, tipY }, 20)
+        );
+      }
+    } finally {
+      container.getBoundingClientRect = originalRect;
+    }
+  });
+
   it("多字母起点和终点都落在完整选区中心，不吸附到单个字母", () => {
     vi.spyOn(window, "getComputedStyle").mockReturnValue(style);
     const link: LiaisonLinkElements = {
