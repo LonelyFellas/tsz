@@ -6,7 +6,7 @@ import { V3ReviewSentences } from "./V3ReviewSentences";
 
 const { list } = vi.hoisted(() => ({ list: vi.fn() }));
 vi.mock("@/lib/auth", () => ({
-  usePermission: () => true,
+  useAnyPermission: () => true,
   api: { sentences: { list } }
 }));
 vi.mock("./components/V3EnglishTextPreview", () => ({

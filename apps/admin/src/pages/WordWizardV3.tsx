@@ -690,7 +690,9 @@ function V3LiveReview({
   actions?: React.ReactNode;
   onEdit?: (nodeId: string) => void;
 }) {
-  const canReadSentences = usePermission("sentences.access");
+  const canReadAllSentences = usePermission("sentences.access");
+  const canReadPublishedSentences = usePermission("sentences.read_published");
+  const canReadSentences = canReadAllSentences || canReadPublishedSentences;
   const sentences = useQuery({
     enabled: canReadSentences,
     queryKey: ["shared-sentences", "count", word.id, "published"],

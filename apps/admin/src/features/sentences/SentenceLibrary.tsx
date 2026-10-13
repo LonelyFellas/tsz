@@ -52,13 +52,17 @@ function entryLink(entry: SharedSentence["entries"][number]) {
 
 export function SentenceLibrary({
   entryId,
-  readOnly = false
+  readOnly: requestedReadOnly = false
 }: {
   entryId?: string;
   readOnly?: boolean;
 }) {
   const { modal, message } = App.useApp();
   const profile = useAuthStore((state) => state.profile);
+  const canReadAll = hasAdminPermission(profile, "sentences.access");
+  const readOnly = requestedReadOnly || !canReadAll;
+  const canRead =
+    canReadAll || hasAdminPermission(profile, "sentences.read_published");
   const canEdit =
     !readOnly &&
     (hasAdminPermission(profile, "sentences.edit") ||
@@ -72,10 +76,13 @@ export function SentenceLibrary({
       "edit" | "associate" | "publish" | "withdraw" | "restore" | "rollback"
   ) =>
     !readOnly &&
+    (action !== "rollback" ||
+      !row.current_publication_id ||
+      !!row.withdrawn_at) &&
     canAdminResourceAction(
       profile,
       "sentences",
-      action,
+      action === "restore" ? "publish" : action,
       row.created_by_admin_id
     );
   const [publication, setPublication] = useState<{
@@ -96,6 +103,7 @@ export function SentenceLibrary({
   const [selected, setSelected] = useState<React.Key[]>([]);
   const query = useQuery({
     queryKey: ["shared-sentences", entryId, filters, readOnly],
+    enabled: canRead,
     queryFn: () =>
       api.sentences.list({
         ...filters,
@@ -354,10 +362,10 @@ export function SentenceLibrary({
                 render: (_, row) => (
                   <Tag>
                     {row.withdrawn_at
-                      ? "已下架"
+                      ? "草稿（已撤回）"
                       : row.current_publication_id
-                        ? "已有发布"
-                        : "未发布"}
+                        ? "已发布"
+                        : "草稿"}
                   </Tag>
                 )
               },
@@ -428,12 +436,14 @@ export function SentenceLibrary({
                     >
                       查看
                     </Button>
-                    <Button
-                      size="small"
-                      onClick={() => void openPublication(row, "history")}
-                    >
-                      历史
-                    </Button>
+                    {canReadAll && (
+                      <Button
+                        size="small"
+                        onClick={() => void openPublication(row, "history")}
+                      >
+                        历史
+                      </Button>
+                    )}
                     {!readOnly && (
                       <>
                         {(canAction(row, "edit") ||
@@ -468,7 +478,7 @@ export function SentenceLibrary({
                                 )
                               }
                             >
-                              {row.withdrawn_at ? "恢复" : "下架"}
+                              {row.withdrawn_at ? "重新展示原发布" : "撤回"}
                             </Button>
                           )}
                         {canDelete &&

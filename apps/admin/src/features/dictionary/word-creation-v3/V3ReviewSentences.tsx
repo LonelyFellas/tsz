@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Alert, Button, Empty, Pagination, Skeleton, Tag } from "antd";
-import { api, usePermission } from "@/lib/auth";
+import { api, useAnyPermission } from "@/lib/auth";
 import { V3EnglishTextPreview } from "./components/V3EnglishTextPreview";
 import { sentenceTranslationsV3 } from "./meaningsModel";
 
@@ -15,7 +15,10 @@ export function V3ReviewSentences({
   senseId: string;
   revision: number;
 }) {
-  const canRead = usePermission("sentences.access");
+  const canRead = useAnyPermission([
+    "sentences.access",
+    "sentences.read_published"
+  ]);
   const [page, setPage] = useState(1);
   const root = useRef<HTMLElement>(null);
   const [visible, setVisible] = useState(

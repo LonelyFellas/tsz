@@ -105,12 +105,7 @@ describe("统一授权事实", () => {
       ]
     };
     expect(canAdminResourceAction(editor, "sentences", "edit", "b")).toBe(true);
-    for (const action of [
-      "publish",
-      "withdraw",
-      "restore",
-      "rollback"
-    ] as const) {
+    for (const action of ["publish", "withdraw", "rollback"] as const) {
       expect(canAdminResourceAction(editor, "sentences", action, "a")).toBe(
         false
       );
@@ -287,4 +282,16 @@ it("教师材料和三类配置分别授权，废弃权限无效", () => {
     );
     expect(hasAdminPermission(actor, "lexicon_settings.edit")).toBe(false);
   }
+});
+
+it("公开只读权限不授予草稿或操作，废弃恢复权限不会继续授权", () => {
+  const reader = { ...actor, permissions: ["sentences.read_published"] };
+  expect(hasAdminPermission(reader, "sentences.read_published")).toBe(true);
+  expect(hasAdminPermission(reader, "sentences.access")).toBe(false);
+  expect(canAdminResourceAction(reader, "sentences", "publish", "a")).toBe(
+    false
+  );
+  expect(
+    hasAdminPermission({ ...actor, role: "super_admin" }, "sentences.restore")
+  ).toBe(false);
 });

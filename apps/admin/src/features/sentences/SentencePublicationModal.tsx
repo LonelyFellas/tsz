@@ -11,8 +11,8 @@ export type SentencePublicationAction =
 const titles = {
   publish: "发布例句草稿",
   history: "例句发布历史",
-  withdraw: "全局下架例句",
-  restore: "恢复例句展示"
+  withdraw: "撤回例句",
+  restore: "重新展示原发布"
 };
 
 /** 打开时冻结双 revision；确定性失败要求重新加载，未知结果复用原幂等请求。 */
@@ -29,6 +29,11 @@ export function SentencePublicationModal({
   onClose: () => void;
   onChanged: () => void;
 }) {
+  const canAct =
+    canPublish &&
+    (action !== "history" ||
+      !sentence.current_publication_id ||
+      !!sentence.withdrawn_at);
   const [reason, setReason] = useState("");
   const [selected, setSelected] = useState<SentencePublication>();
   const [pending, setPending] = useState(false);
@@ -66,7 +71,7 @@ export function SentencePublicationModal({
     base_lifecycle_revision: sentence.lifecycle_revision
   };
   const submit = async () => {
-    if (busy.current || blocked || !canPublish) return;
+    if (busy.current || blocked || !canAct) return;
     if (action === "history" && !selected) return;
     if (action === "withdraw" && (!impact.data || !reason.trim())) return;
     busy.current = true;
@@ -117,11 +122,11 @@ export function SentencePublicationModal({
       keyboard={!pending}
       mask={{ closable: false }}
       cancelButtonProps={{ disabled: pending }}
-      okText={action === "history" ? "将所选历史发布为新版本" : "确认"}
+      okText={action === "history" ? "恢复所选历史到草稿" : "确认"}
       confirmLoading={pending}
       okButtonProps={{
         disabled:
-          !canPublish ||
+          !canAct ||
           blocked ||
           (action === "history" && !selected) ||
           (action === "withdraw" &&
@@ -134,12 +139,14 @@ export function SentencePublicationModal({
           type="info"
           title={
             action === "withdraw"
-              ? "下架会影响所有关联此例句的内容；草稿、历史版本和关联仍会保留"
+              ? "撤回后例句不再公开展示，草稿、历史版本和关联仍会保留"
               : action === "restore"
                 ? "恢复前重新校验当前发布版本，草稿不会发布"
-                : "发布与回退都不覆盖草稿，也不会自动恢复已下架例句"
+                : action === "history"
+                  ? "恢复历史版本会覆盖当前草稿，已发布例句须先撤回；重新公开需另行发布"
+                  : "发布当前草稿为公开例句；已撤回例句会重新公开展示"
           }
-          description="需要对应的发布、下架、恢复或回滚权限；普通管理员仅能操作本人例句。"
+          description="需要对应的发布、撤回或历史恢复权限；普通管理员仅能操作本人例句。"
         />
         {action === "publish" && (
           <V3EnglishTextPreview
@@ -205,7 +212,7 @@ export function SentencePublicationModal({
               renderItem={(publication) => (
                 <List.Item
                   actions={
-                    canPublish
+                    canAct
                       ? [
                           <Button
                             key="select"
@@ -214,7 +221,7 @@ export function SentencePublicationModal({
                           >
                             {selected?.id === publication.id
                               ? "已选择"
-                              : "选择回退"}
+                              : "选择恢复"}
                           </Button>
                         ]
                       : []
