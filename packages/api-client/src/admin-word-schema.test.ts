@@ -577,7 +577,7 @@ describe("admin word V3/Any runtime decoder", () => {
     }
   });
 
-  it("同时接受旧 source_range 和新 source_segments，并为旧消费者补 range alias", () => {
+  it("只接受正式 source_segments，保留响应引用且不补旧字段", () => {
     const legacyWord = validAdminWordV3() as unknown as Record<string, unknown>;
     const pos = buildRuntimeFixture(
       runtimeFixtureBundle.$defs.WordPosMeaningsV3!
@@ -605,7 +605,9 @@ describe("admin word V3/Any runtime decoder", () => {
     pos.senses = [sense];
     legacyWord.meanings = { sense_groups: [], pos: [pos] };
     const legacyEnvelope = { word: legacyWord };
-    expect(decodeAdminWordV3Envelope(legacyEnvelope)).toBe(legacyEnvelope);
+    expect(() => decodeAdminWordV3Envelope(legacyEnvelope)).toThrow(
+      InvalidAdminWordResponseError
+    );
 
     const currentWord = validAdminWordV3() as unknown as Record<
       string,
@@ -634,18 +636,10 @@ describe("admin word V3/Any runtime decoder", () => {
     ];
     currentWord.meanings = { sense_groups: [], pos: [currentPos] };
     const currentEnvelope = { word: currentWord };
+    const originalEnvelope = structuredClone(currentEnvelope);
+    Object.freeze((currentSentence.associations as object[])[0]!);
     expect(decodeAdminWordV3Envelope(currentEnvelope)).toBe(currentEnvelope);
-    expect(
-      (
-        (currentPos.senses as Array<Record<string, unknown>>)[0]!
-          .sentences as Array<Record<string, unknown>>
-      )[0]!.associations as unknown
-    ).toEqual([
-      expect.objectContaining({
-        source_range: { start: 0, end: 6, surface: "center" },
-        source_segments: [{ start: 0, end: 6, surface: "center" }]
-      })
-    ]);
+    expect(currentEnvelope).toEqual(originalEnvelope);
     expect(decodeAdminWordV3Envelope(currentEnvelope)).toBe(currentEnvelope);
   });
 
@@ -707,7 +701,7 @@ describe("admin word V3/Any runtime decoder", () => {
     ["invalid segments", { source_segments: "center" }],
     ["invalid state", { state: "unknown" }],
     ["invalid components", { target_component_usages: "center" }]
-  ] as const)("旧 V3 兼容不会覆盖 %s", (_name, extraFields) => {
+  ] as const)("正式 V3 关联拒绝 %s", (_name, extraFields) => {
     const word = validAdminWordV3() as unknown as Record<string, unknown>;
     const pos = buildRuntimeFixture(
       runtimeFixtureBundle.$defs.WordPosMeaningsV3!
@@ -721,8 +715,11 @@ describe("admin word V3/Any runtime decoder", () => {
     sentence.associations = [
       {
         id: IDS.member1,
+        association_schema_version: 3,
         source_dialect: "common",
-        source_range: { start: 0, end: 6, surface: "center" },
+        source_segments: [{ start: 0, end: 6, surface: "center" }],
+        state: "linked",
+        target_component_usages: [],
         target_word_id: IDS.entry,
         target_sense_id: IDS.member2,
         origin: "manual",
@@ -741,7 +738,10 @@ describe("admin word V3/Any runtime decoder", () => {
     );
   });
 
-  it("新旧位置同时存在但不一致时 fail closed", () => {
+  it.each([
+    ["与新位置一致", { start: 0, end: 6, surface: "center" }],
+    ["与新位置不一致", { start: 1, end: 6, surface: "enter" }]
+  ])("拒绝 source_range，即使%s", (_name, sourceRange) => {
     const word = validAdminWordV3() as unknown as Record<string, unknown>;
     const pos = buildRuntimeFixture(
       runtimeFixtureBundle.$defs.WordPosMeaningsV3!
@@ -757,7 +757,7 @@ describe("admin word V3/Any runtime decoder", () => {
         id: IDS.member1,
         association_schema_version: 3,
         source_dialect: "common",
-        source_range: { start: 1, end: 6, surface: "enter" },
+        source_range: sourceRange,
         source_segments: [{ start: 0, end: 6, surface: "center" }],
         state: "linked",
         target_word_id: IDS.entry,
