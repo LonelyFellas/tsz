@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/.codex/worktrees/wordlist-authoring/tsz-rust/docs/openapi.json",
-  "_source_sha256": "97b43fb5a11dc77cc4530f8fac45a603cf78ead469b1776b27fecc19781eba2c",
+  "_source_sha256": "45211185d19a904a9bc917f17c0d88c4db7861581e41b5a4ca22352154a63b75",
   "roots": [
     "LearningRewardDay",
     "LearningPreview",
@@ -1671,6 +1671,7 @@
         "note_revision"
       ],
       "properties": {
+        "author_note": { "type": "string", "maxLength": 1000 },
         "entry": {
           "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/WordlistEntry" }]
         },
@@ -3477,6 +3478,7 @@
       "type": "object",
       "required": ["entry_id", "position", "entry"],
       "properties": {
+        "author_note": { "type": "string", "maxLength": 1000 },
         "entry": {
           "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/WordlistEntry" }]
         },

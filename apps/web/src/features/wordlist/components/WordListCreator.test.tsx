@@ -62,7 +62,7 @@ it("unknown create result freezes changes and retries exactly the same request",
     target: { value: "app" }
   });
   fireEvent.click(await screen.findByRole("button", { name: /apple\s*苹果/ }));
-  fireEvent.change(screen.getByLabelText("私密备注 1"), {
+  fireEvent.change(screen.getByLabelText("注 1"), {
     target: { value: "我的想法" }
   });
   fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
@@ -72,7 +72,7 @@ it("unknown create result freezes changes and retries exactly the same request",
   fireEvent.click(screen.getByRole("button", { name: "重试保存" }));
   await waitFor(() => expect(api.wordList.create).toHaveBeenCalledTimes(2));
   expect(vi.mocked(api.wordList.create).mock.calls[1]![0]).toEqual(first);
-  expect(first.items[0]?.private_note).toBe("我的想法");
+  expect(first.items[0]?.author_note).toBe("我的想法");
 });
 
 it("mixed item revisions cannot advance or save the frozen editing snapshot", async () => {
@@ -285,6 +285,7 @@ it("automatically loads every page, searches notes across pages and preserves hi
       kind: "word" as const,
       pos: []
     },
+    author_note: index === 100 ? "最后一页给读者的注" : "",
     private_note: index === 100 ? "最后一页的备注" : "",
     note_revision: 3
   }));
@@ -327,6 +328,9 @@ it("automatically loads every page, searches notes across pages and preserves hi
     target: { value: "最后一页" }
   });
   expect(screen.getByPlaceholderText("输入单词或短语")).toHaveValue("word100");
+  fireEvent.change(screen.getByLabelText("注 101"), {
+    target: { value: "最后一页给读者的新注" }
+  });
   fireEvent.change(screen.getByLabelText("私密备注 101"), {
     target: { value: "最后一页的新备注" }
   });
@@ -342,6 +346,11 @@ it("automatically loads every page, searches notes across pages and preserves hi
     items[0]!.entry_id,
     ...items.slice(2).map((item) => item.entry_id)
   ]);
+  expect(saved.content?.author_notes).toHaveLength(101);
+  expect(saved.content?.author_notes?.at(-1)).toEqual({
+    entry_id: "entry-100",
+    author_note: "最后一页给读者的新注"
+  });
   expect(saved.expected_revision).toBe(9);
   expect(saved.note_updates).toEqual([
     {
@@ -427,4 +436,60 @@ it("cancels account actions before they switch identity or clear the session", (
   expect(action).not.toHaveBeenCalled();
   expect(screen.getByLabelText("词表名称")).toHaveValue("保留草稿");
   confirm.mockRestore();
+});
+
+it("published author annotations require withdrawal while existing private notes stay independently editable", async () => {
+  const meta = {
+    id: "list",
+    owner_user_id: "one",
+    owner_name: "作者",
+    name: "已公开词表",
+    state: "published" as const,
+    revision: 8,
+    item_count: 1,
+    created_at: "",
+    updated_at: ""
+  };
+  vi.mocked(api.wordList.edit).mockResolvedValue({
+    wordlist: meta,
+    entry_ids: [candidate.entry_id]
+  });
+  vi.mocked(api.wordList.myItems).mockResolvedValue({
+    items: [
+      {
+        entry_id: candidate.entry_id,
+        position: 0,
+        entry: { ...candidate, kind: "word", pos: [] },
+        author_note: "给读者的注",
+        private_note: "历史私密备注",
+        note_revision: 3
+      }
+    ],
+    revision: 8,
+    pagination: { page: 1, page_size: 100, total: 1, total_pages: 1 }
+  });
+  vi.mocked(api.wordList.update).mockResolvedValue(meta);
+  renderWithProviders(<WordListCreator id="list" />);
+  await waitFor(() =>
+    expect(screen.getByLabelText("注 1")).toHaveValue("给读者的注")
+  );
+  expect(screen.getByLabelText("注 1")).toBeDisabled();
+  expect(screen.getByLabelText("私密备注 1")).toBeEnabled();
+  fireEvent.change(screen.getByLabelText("私密备注 1"), {
+    target: { value: "个人的新想法" }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
+  await waitFor(() =>
+    expect(api.wordList.update).toHaveBeenCalledWith("list", {
+      expected_revision: 8,
+      content: null,
+      note_updates: [
+        {
+          entry_id: candidate.entry_id,
+          expected_note_revision: 3,
+          private_note: "个人的新想法"
+        }
+      ]
+    })
+  );
 });

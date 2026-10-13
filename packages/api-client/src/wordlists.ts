@@ -48,6 +48,10 @@ function query(q: WordlistQuery) {
     if (v !== undefined) p.set(k, String(v));
   return p.size ? `?${p}` : "";
 }
+export const WORDLIST_READING_HEADERS = {
+  ...SENTENCE_FORMATTING_HEADERS,
+  "X-TSZ-Wordlist-Annotations": "v1"
+} as const;
 type Options = { signal?: AbortSignal };
 export function createWordlistEndpoints(http: HttpClient) {
   return {
@@ -94,7 +98,7 @@ export function createWordlistEndpoints(http: HttpClient) {
       http
         .get<unknown>(`/wordlists/${id}/items${query(q)}`, {
           ...o,
-          headers: SENTENCE_FORMATTING_HEADERS
+          headers: WORDLIST_READING_HEADERS
         })
         .then((v) => decodeWordlistResponse<WordlistItems>("WordlistItems", v)),
     suggestions: (q: WordlistSuggestionQuery, o?: Options) =>
@@ -121,7 +125,7 @@ export function createWordlistEndpoints(http: HttpClient) {
       http
         .get<unknown>(`/me/wordlists/${id}/items${query(q)}`, {
           ...o,
-          headers: SENTENCE_FORMATTING_HEADERS
+          headers: WORDLIST_READING_HEADERS
         })
         .then((v) =>
           decodeWordlistResponse<MyWordlistItems>("MyWordlistItems", v)
@@ -177,7 +181,7 @@ export function createAdminWordlistEndpoints(http: HttpClient) {
       http
         .get<unknown>(`/wordlists/${id}/items${query(q)}`, {
           ...o,
-          headers: SENTENCE_FORMATTING_HEADERS
+          headers: WORDLIST_READING_HEADERS
         })
         .then((v) => decodeWordlistResponse<WordlistItems>("WordlistItems", v)),
     catalog: (q: WordlistQuery = {}, o?: Options) =>
@@ -219,7 +223,7 @@ export function createAdminWordlistEndpoints(http: HttpClient) {
       http
         .get<unknown>(
           `/wordlists/${id}/review-requests/${request}/items${query(q)}`,
-          { ...o, headers: SENTENCE_FORMATTING_HEADERS }
+          { ...o, headers: WORDLIST_READING_HEADERS }
         )
         .then((v) => decodeWordlistResponse<WordlistItems>("WordlistItems", v)),
     decision: (id: string, request: string, data: WordlistDecision) =>

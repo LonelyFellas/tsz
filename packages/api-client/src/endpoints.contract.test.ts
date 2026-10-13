@@ -54,6 +54,12 @@ const SPELLING_MARKUP_OPERATIONS: readonly string[] = [
   "post /admin/lexicon/entries/restore-batch"
 ];
 
+const WORDLIST_ANNOTATION_OPERATIONS = [
+  "get /wordlists/{id}/items",
+  "get /me/wordlists/{id}/items",
+  "get /admin/wordlists/{id}/items",
+  "get /admin/wordlists/{id}/review-requests/{request_id}/items"
+];
 const SENTENCE_FORMATTING_OPERATIONS: readonly string[] = [
   ...SPELLING_MARKUP_OPERATIONS,
   "get /admin/lexicon/sentences",
@@ -734,7 +740,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "97b43fb5a11dc77cc4530f8fac45a603cf78ead469b1776b27fecc19781eba2c"
+      "45211185d19a904a9bc917f17c0d88c4db7861581e41b5a4ca22352154a63b75"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1023,7 +1029,8 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
           ...new Set([
             ...IDEMPOTENT_LEXICON_OPERATIONS,
             ...SPELLING_MARKUP_OPERATIONS,
-            ...SENTENCE_FORMATTING_OPERATIONS
+            ...SENTENCE_FORMATTING_OPERATIONS,
+            ...WORDLIST_ANNOTATION_OPERATIONS
           ])
         ].map((operation) => [
           operation,
@@ -1037,6 +1044,16 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
               ? [
                   {
                     name: "X-TSZ-Spelling-Markup",
+                    in: "header",
+                    required: false,
+                    schema: { type: ["string", "null"] }
+                  }
+                ]
+              : []),
+            ...(WORDLIST_ANNOTATION_OPERATIONS.includes(operation)
+              ? [
+                  {
+                    name: "X-TSZ-Wordlist-Annotations",
                     in: "header",
                     required: false,
                     schema: { type: ["string", "null"] }

@@ -94,9 +94,36 @@ beforeEach(() => {
   });
 });
 it("approval uses inspected snapshot revision even after visibility override", async () => {
+  vi.mocked(api.wordlists.currentItems).mockResolvedValue({
+    items: [
+      {
+        entry_id: "entry",
+        position: 0,
+        entry: null,
+        author_note: "当前词表注释"
+      }
+    ],
+    revision: 4,
+    pagination
+  });
+  vi.mocked(api.wordlists.items).mockResolvedValue({
+    items: [
+      {
+        entry_id: "entry",
+        position: 0,
+        entry: null,
+        author_note: "提交时冻结的注释"
+      }
+    ],
+    revision: 2,
+    pagination
+  });
   mount();
   fireEvent.click(await screen.findByText("查 看"));
+  expect(await screen.findByText("注：当前词表注释")).toBeVisible();
   fireEvent.click(await screen.findByText("审核记录"));
+  expect(await screen.findByText("注：提交时冻结的注释")).toBeVisible();
+  expect(screen.queryByText("注：当前词表注释")).not.toBeInTheDocument();
   fireEvent.click(await screen.findByText("通过审核"));
   fireEvent.click(await screen.findByText(/确.*定|OK/));
   await waitFor(() =>

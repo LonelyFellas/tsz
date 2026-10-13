@@ -20,6 +20,7 @@ type Row = {
   text?: string;
   candidate?: WordlistCandidate;
   note?: string;
+  authorNote?: string;
   noteRevision?: number;
   noteVersions?: Record<string, number | undefined>;
   noteDirty?: boolean;
@@ -150,6 +151,13 @@ function Editor({
   const loadingItems = !!id && !loaded.data;
   // Only this editing session's complete, revision-checked response supplies notes.
   const cache = new Map(loaded.data?.map((item) => [item.entry_id, item]));
+  function authorNoteFor(row: Row) {
+    return (
+      row.authorNote ??
+      (row.entryId ? cache.get(row.entryId)?.author_note : undefined) ??
+      ""
+    );
+  }
   function noteRevisionFor(entryId: string) {
     return originalIds.has(entryId) ? cache.get(entryId)?.note_revision : 1;
   }
@@ -261,7 +269,10 @@ function Editor({
       invalidRow("词条不能重复", duplicate);
       return;
     }
-    const longNote = rows.find((r) => [...(r.note ?? "")].length > 1000);
+    const longNote = rows.find(
+      (r) =>
+        [...(r.note ?? "")].length > 1000 || [...authorNoteFor(r)].length > 1000
+    );
     if (longNote) {
       invalidRow("备注不能超过 1000 字", longNote);
       return;
@@ -285,14 +296,28 @@ function Editor({
         const same =
           name === initial.wordlist.name &&
           JSON.stringify(rows.map((r) => r.entryId)) ===
-            JSON.stringify(initial.entry_ids);
+            JSON.stringify(initial.entry_ids) &&
+          rows.every(
+            (row) =>
+              authorNoteFor(row) ===
+              (cache.get(row.entryId!)?.author_note ?? "")
+          );
         result = await api.wordList.update(id, {
           expected_revision: initial.wordlist.revision,
           content: same
             ? null
             : {
                 name,
-                entry_ids: rows.map((r) => r.entryId!)
+                entry_ids: rows.map((r) => r.entryId!),
+                ...(rows.some((row) => authorNoteFor(row)) ||
+                loaded.data?.some((item) => item.author_note)
+                  ? {
+                      author_notes: rows.map((row) => ({
+                        entry_id: row.entryId!,
+                        author_note: authorNoteFor(row)
+                      }))
+                    }
+                  : {})
               },
           note_updates: rows
             .filter(
@@ -313,7 +338,8 @@ function Editor({
           name,
           items: rows.map((r) => ({
             entry_id: r.entryId!,
-            private_note: r.note ?? ""
+            private_note: r.note ?? "",
+            ...(authorNoteFor(r) ? { author_note: authorNoteFor(r) } : {})
           }))
         };
         result = await api.wordList.create(pending.current);
@@ -341,6 +367,7 @@ function Editor({
     const stored = row.entryId ? cache.get(row.entryId) : undefined;
     return [
       row.text ?? stored?.entry?.label ?? "",
+      authorNoteFor(row),
       row.note ?? stored?.private_note ?? "",
       ...(row.candidate?.glosses ?? glosses(stored?.entry))
     ]
@@ -396,8 +423,8 @@ function Editor({
         {id ? "编辑词表" : "创建词表"}
       </h1>
       <p className="my-4 text-sm text-foreground-muted">
-        从平台已发布词库逐行选词。备注仅自己可见。
-        {locked && "当前只能修改备注；修改名称或选词前请先撤回。"}
+        从平台已发布词库逐行选词。“注”是给读者的补充说明，随词表展示。
+        {locked && "修改名称、选词或“注”前请先撤回；已有私密备注仍可单独修改。"}
       </p>
       {error && (
         <p role="alert" className="my-4 text-danger">
@@ -426,7 +453,7 @@ function Editor({
         <FormField
           htmlFor="wordlist-filter"
           label="表内搜索"
-          hint="搜索整张词表的词条、释义和私密备注"
+          hint="搜索整张词表的词条、释义和备注"
         >
           <Input
             id="wordlist-filter"
@@ -624,7 +651,8 @@ function WordRow({
                       row.noteRevision ?? noteRevisionFor(row.entryId)
                   }
                 : row.noteVersions,
-              note: row.note ?? stored?.private_note ?? ""
+              note: row.note ?? stored?.private_note ?? "",
+              authorNote: row.authorNote ?? stored?.author_note ?? ""
             })
           }
         />
@@ -673,23 +701,44 @@ function WordRow({
       )}
       {stored && !stored.entry && <p>内容不可用，请删除或替换此项。</p>}
       <label className="mt-3 block text-sm">
-        私密备注
+        注
         <textarea
           className={`${field} mt-2`}
-          aria-label={`私密备注 ${index}`}
+          aria-label={`注 ${index}`}
+          aria-describedby={`author-note-${row.id}-message`}
           maxLength={1000}
-          disabled={!!unloaded}
-          placeholder={unloaded ? "正在读取备注…" : "仅自己可见"}
-          value={note}
-          onChange={(e) =>
-            change({
-              note: e.target.value,
-              noteDirty: true,
-              noteRevision: row.noteRevision ?? noteRevisionFor(row.entryId!)
-            })
-          }
+          disabled={locked}
+          placeholder="给读者的补充说明"
+          value={row.authorNote ?? stored?.author_note ?? ""}
+          onChange={(e) => change({ authorNote: e.target.value })}
         />
+        <span
+          id={`author-note-${row.id}-message`}
+          className="mt-2 block text-xs text-foreground-muted"
+        >
+          随词表展示，公开词表的读者也能看到。
+        </span>
       </label>
+      {(stored?.private_note || row.note || row.noteDirty) && (
+        <label className="mt-3 block text-sm">
+          已有私密备注（仅自己可见）
+          <textarea
+            className={`${field} mt-2`}
+            aria-label={`私密备注 ${index}`}
+            maxLength={1000}
+            disabled={!!unloaded}
+            placeholder={unloaded ? "正在读取备注…" : "仅自己可见"}
+            value={note}
+            onChange={(e) =>
+              change({
+                note: e.target.value,
+                noteDirty: true,
+                noteRevision: row.noteRevision ?? noteRevisionFor(row.entryId!)
+              })
+            }
+          />
+        </label>
+      )}
     </section>
   );
 }

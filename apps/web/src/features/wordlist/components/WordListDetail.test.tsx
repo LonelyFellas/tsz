@@ -93,7 +93,14 @@ beforeEach(() => {
   identity.identity = "student";
   useUserStore.setState({ hydrated: true, user: user("owner") });
   const result = {
-    items: [{ entry_id: "entry", position: 0, entry }],
+    items: [
+      {
+        entry_id: "entry",
+        position: 0,
+        entry,
+        author_note: "作者给读者的补充说明"
+      }
+    ],
     revision: 1,
     pagination: { page: 1, page_size: 50, total: 51, total_pages: 2 }
   };
@@ -130,6 +137,7 @@ it("switches real modes and reading context without writing preferences or leaki
   const view = open(true);
   await screen.findByText("A1-UK");
   expect(screen.getByText("私密备注：作者秘密")).toBeVisible();
+  expect(screen.getByText("注：作者给读者的补充说明")).toBeVisible();
   expect(screen.getByRole("button", { name: "标准模式" })).toHaveAttribute(
     "aria-pressed",
     "true"
@@ -170,6 +178,7 @@ it("switches real modes and reading context without writing preferences or leaki
   open();
   await screen.findByText("C2-UK");
   expect(screen.queryByText(/作者秘密/)).not.toBeInTheDocument();
+  expect(screen.getByText("注：作者给读者的补充说明")).toBeVisible();
   expect(api.wordList.items).toHaveBeenCalled();
 });
 it("search resets pagination and unsupported full mode can return to the standard response", async () => {
