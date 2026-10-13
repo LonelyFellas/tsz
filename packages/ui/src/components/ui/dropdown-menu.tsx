@@ -25,7 +25,7 @@ const DropdownMenuContent = forwardRef<
       sideOffset={sideOffset}
       collisionPadding={collisionPadding}
       className={cn(
-        "z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-32 overflow-y-auto rounded-2xl border border-border bg-surface p-1 text-foreground shadow-xl shadow-black/5 outline-hidden",
+        "z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-32 overflow-y-auto rounded-2xl border border-border/70 bg-surface p-1 text-foreground shadow-float outline-hidden",
         className
       )}
       {...props}

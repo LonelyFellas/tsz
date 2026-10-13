@@ -1,6 +1,5 @@
 // Hero 视觉主体——单词学习 App 预览(纯 CSS 拟物,无交互,占位用)。
-// 响应式比例:手机为竖向单词卡(紧凑);平板/PC 为更宽的窗口式横向布局
-// (左:单词学习区;右:今日清单),在大屏上撑满、饱满。宽度由父级控制。
+// 毛玻璃外框 + 白底内卡。手机为竖向单词卡;sm+ 左单词学习区、右今日清单。宽度由父级控制。
 
 // 今日清单:done 已学 / current 当前 / todo 待学。
 const SESSION = [
@@ -13,31 +12,15 @@ const SESSION = [
 
 export function HeroVisual() {
   return (
-    <div className="animate-float relative w-full">
-      {/* 背后柔光,纯氛围 */}
-      <div className="pointer-events-none absolute -inset-6 -z-10 rounded-[2.5rem] bg-linear-to-tr from-primary/30 via-primary/15 to-transparent blur-2xl" />
-
-      {/* 叠层卡:错位露出一角,营造层次景深 */}
-      <div className="absolute inset-x-4 -bottom-4 h-full rounded-[1.75rem] border border-border bg-surface/70 shadow-lg" />
-      <div className="absolute inset-x-2 -bottom-2 h-full rounded-[1.75rem] border border-border bg-surface/85 shadow-lg" />
-
-      {/* 主窗口卡 */}
-      <div className="relative overflow-hidden rounded-[1.75rem] border border-border bg-surface shadow-2xl shadow-black/10">
-        {/* 窗口顶栏 */}
-        <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
-          <div className="flex gap-1.5">
-            <span className="h-3 w-3 rounded-full bg-border" />
-            <span className="h-3 w-3 rounded-full bg-border" />
-            <span className="h-3 w-3 rounded-full bg-border" />
-          </div>
-          <span className="text-xs font-medium text-foreground-subtle">
-            今日学习 · 12 / 20
-          </span>
-          <span className="w-9" />
+    <div className="glass w-full rounded-3xl p-2">
+      <div className="overflow-hidden rounded-[20px] bg-surface/70">
+        <div className="flex items-center justify-between px-6 pt-5 text-xs font-medium text-foreground-muted sm:px-8 sm:pt-6">
+          <span className="tracking-[0.2em]">今日学习</span>
+          <span className="tabular-nums text-foreground-subtle">12 / 20</span>
         </div>
 
         {/* 主体:手机单列;sm+ 五列(左 3 单词 / 右 2 清单) */}
-        <div className="grid gap-6 p-6 text-left sm:grid-cols-5 sm:gap-8 sm:p-8">
+        <div className="grid gap-6 p-6 text-left sm:grid-cols-5 sm:gap-8 sm:px-8 sm:pb-8 sm:pt-6">
           {/* 左:单词学习区 */}
           <div className="sm:col-span-3">
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
@@ -53,20 +36,20 @@ export function HeroVisual() {
               <span className="text-foreground-subtle">n.</span> 词汇;词汇量
             </p>
             <div className="mt-8 grid grid-cols-3 gap-2 text-center text-sm font-medium">
-              <span className="rounded-xl bg-muted py-2.5 text-foreground-muted">
+              <span className="rounded-full bg-muted py-2.5 text-foreground-muted">
                 不认识
               </span>
-              <span className="rounded-xl bg-muted py-2.5 text-foreground-muted">
+              <span className="rounded-full bg-muted py-2.5 text-foreground-muted">
                 模糊
               </span>
-              <span className="rounded-xl bg-primary py-2.5 text-white">
+              <span className="rounded-full bg-primary py-2.5 text-primary-foreground">
                 认识
               </span>
             </div>
           </div>
 
           {/* 右:今日清单(手机隐藏,保持竖卡紧凑) */}
-          <div className="hidden rounded-2xl bg-muted p-4 sm:col-span-2 sm:block">
+          <div className="hidden rounded-2xl border border-border/60 bg-muted/70 p-4 sm:col-span-2 sm:block">
             <p className="text-[11px] font-medium text-foreground-subtle">
               今日清单
             </p>

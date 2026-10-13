@@ -3,6 +3,7 @@
 import type { MeResponse } from "@tsz/types";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import { UserPlus } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/request";
@@ -16,7 +17,11 @@ import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIden
 // 常用快捷入口。仅保留有真实去处的项;工作台和申请认证在头像菜单中,
 // 不在本页重复。占位类(我的任务 / 设置)待后端就绪再加。
 const TILES: { label: string; href: string; icon: ReactNode }[] = [
-  { label: "邀请好友", href: "/account/invitations", icon: <CoinIcon /> },
+  {
+    label: "邀请好友",
+    href: "/account/invitations",
+    icon: <UserPlus strokeWidth={1.6} aria-hidden />
+  },
   { label: "我的天生币", href: "/account/coins", icon: <CoinIcon /> },
   { label: "我的词表", href: "/account/wordlists", icon: <ListIcon /> },
   {
@@ -104,7 +109,7 @@ export function ProfileHub() {
   const contact = user.phone ?? user.email ?? "";
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-10">
+    <div className="animate-in mx-auto w-full max-w-3xl px-6 pb-16 pt-8 sm:pt-12">
       <button
         type="button"
         disabled={!ready}
@@ -113,7 +118,7 @@ export function ProfileHub() {
             identity === "teacher" ? "/teacher/classes" : "/student/practice"
           )
         }
-        className="mb-3 inline-flex min-h-10 items-center rounded-md text-sm text-foreground-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
+        className="-ml-3 mb-5 inline-flex min-h-10 items-center rounded-full px-3 text-sm text-foreground-muted transition-colors hover:bg-surface/80 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
       >
         ← 返回工作台
       </button>
@@ -136,85 +141,92 @@ export function ProfileHub() {
           </button>
         </div>
       )}
-      <h1 className="mb-5 text-2xl font-semibold tracking-tight text-foreground">
+      <p className="mb-3 text-xs font-medium tracking-[0.2em] text-foreground-muted">
+        我的账户
+      </p>
+      <h1 className="mb-8 text-3xl font-bold tracking-tight text-foreground sm:text-[34px]">
         个人中心
       </h1>
 
-      <div className="border-b border-border pb-5">
-        <div className="flex items-start gap-4">
-          <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full ring-1 ring-border sm:h-16 sm:w-16">
-            {user.avatar_url && user.avatar_url !== avatarFailedUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={user.avatar_url}
-                alt={displayName}
-                className="h-full w-full bg-white object-cover"
-                onError={() => setAvatarFailedUrl(user.avatar_url)}
-              />
-            ) : (
-              <span className="flex h-full w-full items-center justify-center bg-foreground text-xl font-semibold text-background">
-                {initial}
-              </span>
-            )}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="break-words text-lg font-semibold leading-7 text-foreground [overflow-wrap:anywhere]">
-              {displayName}
-            </p>
-            {contact && (
-              <p className="mt-1 break-words text-sm leading-6 text-foreground-muted [overflow-wrap:anywhere]">
-                {contact}
+      <div className="glass rounded-3xl p-2">
+        <div className="rounded-[20px] bg-surface/70 p-6 sm:p-8">
+          <div className="flex items-start gap-4">
+            <div className="size-16 shrink-0 overflow-hidden rounded-full ring-4 ring-primary/10 sm:size-[72px]">
+              {user.avatar_url && user.avatar_url !== avatarFailedUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={user.avatar_url}
+                  alt={displayName}
+                  className="h-full w-full bg-white object-cover"
+                  onError={() => setAvatarFailedUrl(user.avatar_url)}
+                />
+              ) : (
+                <span className="flex h-full w-full items-center justify-center bg-primary text-2xl font-bold text-primary-foreground">
+                  {initial}
+                </span>
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="break-words text-xl font-bold leading-8 tracking-tight text-foreground [overflow-wrap:anywhere]">
+                {displayName}
               </p>
-            )}
+              {contact && (
+                <p className="mt-1 break-words text-sm leading-6 text-foreground-muted [overflow-wrap:anywhere]">
+                  {contact}
+                </p>
+              )}
+            </div>
           </div>
-        </div>
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-5">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
-            <span className="inline-flex max-w-full items-start gap-1.5 text-xs leading-5 text-foreground-muted">
-              <span className="min-w-0 break-all">ID:{user.id}</span>
-              <button
-                type="button"
-                onClick={() => copyId(user.id)}
-                aria-label="复制 ID"
-                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-foreground-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-              >
-                {copyState === "copied" ? <CheckIcon /> : <CopyIcon />}
-              </button>
-            </span>
-            {copyState === "copied" && (
-              <span className="text-xs text-primary">已复制</span>
-            )}
-            {copyState === "failed" && (
-              <span className="text-xs text-danger">复制失败</span>
-            )}
-            {learning_settings && (
-              <>
-                <span className="rounded-md bg-muted px-2 py-0.5 text-xs text-foreground-muted">
-                  {learning_settings.cefr_level}
-                </span>
-                <span className="rounded-md bg-muted px-2 py-0.5 text-xs text-foreground-muted">
-                  {VARIANT_LABEL[learning_settings.english_variant]}
-                </span>
-              </>
-            )}
+          <div className="mt-6 flex flex-col gap-3 border-t border-border/60 pt-5 sm:flex-row sm:items-center sm:justify-between sm:gap-5">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
+              <span className="inline-flex max-w-full items-start gap-1.5 text-xs leading-5 text-foreground-muted">
+                <span className="min-w-0 break-all">ID:{user.id}</span>
+                <button
+                  type="button"
+                  onClick={() => copyId(user.id)}
+                  aria-label="复制 ID"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-foreground-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                >
+                  {copyState === "copied" ? <CheckIcon /> : <CopyIcon />}
+                </button>
+              </span>
+              {copyState === "copied" && (
+                <span className="text-xs text-primary">已复制</span>
+              )}
+              {copyState === "failed" && (
+                <span className="text-xs text-danger">复制失败</span>
+              )}
+              {learning_settings && (
+                <>
+                  <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-foreground-muted">
+                    {learning_settings.cefr_level}
+                  </span>
+                  <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-foreground-muted">
+                    {VARIANT_LABEL[learning_settings.english_variant]}
+                  </span>
+                </>
+              )}
+            </div>
+            <Link
+              href="/account/profile"
+              className="inline-flex min-h-10 shrink-0 items-center justify-center self-end rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground tracking-wide transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:self-auto"
+            >
+              编辑资料
+            </Link>
           </div>
-          <Link
-            href="/account/profile"
-            className="inline-flex min-h-10 shrink-0 items-center justify-center self-end rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:bg-primary/85 sm:self-auto"
-          >
-            编辑资料
-          </Link>
         </div>
       </div>
 
-      <div className="divide-y divide-border">
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
         {TILES.map((tile) => (
           <Link
             key={tile.label}
             href={tile.href}
-            className="flex min-h-16 items-center gap-3 py-4 transition-colors hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            className="glass group flex min-h-20 items-center gap-4 rounded-3xl px-5 transition-[box-shadow,border-color] duration-300 hover:border-primary/30 hover:shadow-float focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
-            <span className="shrink-0 text-foreground-muted">{tile.icon}</span>
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary-muted text-primary [&_svg]:size-5">
+              {tile.icon}
+            </span>
             <span className="flex-1 text-sm font-medium text-foreground">
               {tile.label}
             </span>
@@ -227,7 +239,7 @@ export function ProfileHub() {
               strokeWidth="1.5"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="text-foreground-subtle"
+              className="text-foreground-subtle transition-transform group-hover:translate-x-0.5"
               aria-hidden
             >
               <path d="m9 5 7 7-7 7" />

@@ -39,7 +39,9 @@ export const STATE_LABEL: Record<WordlistState, string> = {
   withdrawn: "已下架"
 };
 export const buttonClass =
-  "rounded-full border border-border px-4 py-2 text-sm disabled:opacity-40";
+  "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-full border border-border bg-surface px-4 text-sm font-medium tracking-wide text-foreground shadow-[0_1px_2px_rgb(0_0_0/0.04)] transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40 aria-pressed:border-primary/40 aria-pressed:bg-primary-muted aria-pressed:text-primary";
+export const primaryButtonClass =
+  "inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-primary px-6 text-sm font-medium tracking-wide text-primary-foreground shadow-[0_1px_2px_rgb(0_0_0/0.08)] transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40";
 
 export function phoneticDelimiters(text: string) {
   const value = text.trim();

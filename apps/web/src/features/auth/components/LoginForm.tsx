@@ -14,7 +14,7 @@ import { HttpError, type AuthResponse } from "@tsz/api-client";
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/request";
-import { AuthBranding } from "./AuthBranding";
+import { AuthShell } from "./AuthShell";
 import { PasswordVisibilityIcon } from "./PasswordVisibilityIcon";
 import {
   completeAuthentication,
@@ -186,216 +186,202 @@ export function LoginForm() {
   }
 
   return (
-    <main className="flex min-h-screen">
-      <AuthBranding />
-      <div className="flex min-w-0 flex-1 items-center justify-center bg-surface px-6 py-20">
-        <div className="w-full max-w-[400px]">
-          <h1 className="mb-10 text-3xl font-semibold tracking-tight text-foreground">
-            欢迎回来
-          </h1>
+    <AuthShell>
+      <h1 className="mb-8 text-2xl font-bold tracking-tight text-foreground">
+        欢迎回来
+      </h1>
 
-          {securitySuccess && (
-            <p
-              role="status"
-              className="mb-6 rounded-lg bg-success/10 px-4 py-3 text-sm text-success"
-            >
-              账号安全信息已更新，请使用当前绑定的手机号或邮箱重新登录。
-            </p>
-          )}
-          {resetSuccess && (
-            <p
-              role="status"
-              className="mb-6 rounded-lg bg-success/10 px-4 py-3 text-sm text-success"
-            >
-              密码重置成功，请用新密码登录。
-            </p>
-          )}
-          {deletedSuccess && (
-            <p
-              role="status"
-              className="mb-6 rounded-lg bg-success/10 px-4 py-3 text-sm text-success"
-            >
-              账号已注销成功。
-            </p>
-          )}
-          {registeredSuccess && (
-            <p
-              role="status"
-              className="mb-6 rounded-lg bg-success/10 px-4 py-3 text-sm text-success"
-            >
-              注册成功，请用刚设置的账号密码登录。
-            </p>
-          )}
+      {securitySuccess && (
+        <p
+          role="status"
+          className="mb-6 rounded-lg bg-success/10 px-4 py-3 text-sm text-success"
+        >
+          账号安全信息已更新，请使用当前绑定的手机号或邮箱重新登录。
+        </p>
+      )}
+      {resetSuccess && (
+        <p
+          role="status"
+          className="mb-6 rounded-lg bg-success/10 px-4 py-3 text-sm text-success"
+        >
+          密码重置成功，请用新密码登录。
+        </p>
+      )}
+      {deletedSuccess && (
+        <p
+          role="status"
+          className="mb-6 rounded-lg bg-success/10 px-4 py-3 text-sm text-success"
+        >
+          账号已注销成功。
+        </p>
+      )}
+      {registeredSuccess && (
+        <p
+          role="status"
+          className="mb-6 rounded-lg bg-success/10 px-4 py-3 text-sm text-success"
+        >
+          注册成功，请用刚设置的账号密码登录。
+        </p>
+      )}
 
-          <Tabs
-            value={method}
-            activationMode="manual"
-            onValueChange={(value) => {
-              if (loading || sending || authenticated) return;
-              setMethod(value as "password" | "code");
-              setCode("");
-              setPassword("");
-              setError("");
-            }}
+      <Tabs
+        value={method}
+        activationMode="manual"
+        onValueChange={(value) => {
+          if (loading || sending || authenticated) return;
+          setMethod(value as "password" | "code");
+          setCode("");
+          setPassword("");
+          setError("");
+        }}
+      >
+        <TabsList className="mb-7" aria-label="登录方式">
+          <TabsTrigger
+            value="password"
+            disabled={loading || sending || authenticated}
+            className={sending ? "disabled:opacity-100" : undefined}
           >
-            <TabsList className="mb-7" aria-label="登录方式">
-              <TabsTrigger
-                value="password"
-                disabled={loading || sending || authenticated}
-                className={sending ? "disabled:opacity-100" : undefined}
-              >
-                密码登录
-              </TabsTrigger>
-              <TabsTrigger
-                value="code"
-                disabled={loading || sending || authenticated}
-                className={sending ? "disabled:opacity-100" : undefined}
-              >
-                验证码登录
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value={method === "password" ? "code" : "password"} />
-            <TabsContent value={method}>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void handleLogin();
+            密码登录
+          </TabsTrigger>
+          <TabsTrigger
+            value="code"
+            disabled={loading || sending || authenticated}
+            className={sending ? "disabled:opacity-100" : undefined}
+          >
+            验证码登录
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value={method === "password" ? "code" : "password"} />
+        <TabsContent value={method}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleLogin();
+            }}
+            className="space-y-5"
+          >
+            <FormField
+              htmlFor="login-account"
+              label={codeLogin ? "手机号" : "手机号或邮箱"}
+            >
+              <Input
+                id="login-account"
+                type={codeLogin ? "tel" : "text"}
+                autoComplete="username"
+                placeholder={codeLogin ? "请输入手机号" : "请输入手机号或邮箱"}
+                value={account}
+                readOnly={sending}
+                disabled={loading || authenticated}
+                onChange={(e) => {
+                  const next = e.target.value.trim();
+                  if (next !== identifier) {
+                    setCode("");
+                    setCountdown(isPhone(next) ? savedCooldown(next) : 0);
+                  }
+                  setAccount(e.target.value);
+                  setError("");
                 }}
-                className="space-y-5"
-              >
-                <FormField
-                  htmlFor="login-account"
-                  label={codeLogin ? "手机号" : "手机号或邮箱"}
-                >
+              />
+            </FormField>
+            {codeLogin ? (
+              <FormField htmlFor="login-code" label="验证码">
+                <div className="flex gap-2">
                   <Input
-                    id="login-account"
-                    type={codeLogin ? "tel" : "text"}
-                    autoComplete="username"
-                    placeholder={
-                      codeLogin ? "请输入手机号" : "请输入手机号或邮箱"
-                    }
-                    value={account}
+                    id="login-code"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    placeholder="请输入 6 位验证码"
+                    value={code}
                     readOnly={sending}
                     disabled={loading || authenticated}
-                    onChange={(e) => {
-                      const next = e.target.value.trim();
-                      if (next !== identifier) {
-                        setCode("");
-                        setCountdown(isPhone(next) ? savedCooldown(next) : 0);
-                      }
-                      setAccount(e.target.value);
+                    onChange={(event) => {
+                      setCode(event.target.value);
                       setError("");
                     }}
+                    className="min-w-0 flex-1"
                   />
-                </FormField>
-                {codeLogin ? (
-                  <FormField htmlFor="login-code" label="验证码">
-                    <div className="flex gap-2">
-                      <Input
-                        id="login-code"
-                        inputMode="numeric"
-                        autoComplete="one-time-code"
-                        maxLength={6}
-                        placeholder="请输入 6 位验证码"
-                        value={code}
-                        readOnly={sending}
-                        disabled={loading || authenticated}
-                        onChange={(event) => {
-                          setCode(event.target.value);
-                          setError("");
-                        }}
-                        className="min-w-0 flex-1"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={!canSend}
-                        onClick={() => void sendCode()}
-                      >
-                        {sending
-                          ? "发送中…"
-                          : countdown
-                            ? `${countdown}s 后重发`
-                            : "获取验证码"}
-                      </Button>
-                    </div>
-                  </FormField>
-                ) : (
-                  <FormField htmlFor="login-password" label="密码">
-                    <div className="relative">
-                      <Input
-                        id="login-password"
-                        type={showPassword ? "text" : "password"}
-                        autoComplete="current-password"
-                        placeholder="请输入登录密码"
-                        value={password}
-                        disabled={loading || sending || authenticated}
-                        onChange={(e) => {
-                          setPassword(e.target.value);
-                          setError("");
-                        }}
-                        className="pr-14"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setShowPassword((v) => !v)}
-                        disabled={loading || sending || authenticated}
-                        className="absolute right-1 top-1/2 -translate-y-1/2"
-                        aria-label={showPassword ? "隐藏密码" : "显示密码"}
-                      >
-                        <PasswordVisibilityIcon visible={showPassword} />
-                      </Button>
-                    </div>
-                  </FormField>
-                )}
-                {error && (
-                  <p
-                    role="alert"
-                    className="mx-4 text-sm leading-5 text-danger"
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!canSend}
+                    onClick={() => void sendCode()}
                   >
-                    {error}
-                  </p>
-                )}
-                <Button type="submit" disabled={!canSubmit} className="w-full">
-                  {loading
-                    ? "登录中..."
-                    : authenticated
-                      ? "重试加载"
-                      : "立即登录"}
-                </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
+                    {sending
+                      ? "发送中…"
+                      : countdown
+                        ? `${countdown}s 后重发`
+                        : "获取验证码"}
+                  </Button>
+                </div>
+              </FormField>
+            ) : (
+              <FormField htmlFor="login-password" label="密码">
+                <div className="relative">
+                  <Input
+                    id="login-password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    placeholder="请输入登录密码"
+                    value={password}
+                    disabled={loading || sending || authenticated}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setError("");
+                    }}
+                    className="pr-14"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowPassword((v) => !v)}
+                    disabled={loading || sending || authenticated}
+                    className="absolute right-1 top-1/2 -translate-y-1/2"
+                    aria-label={showPassword ? "隐藏密码" : "显示密码"}
+                  >
+                    <PasswordVisibilityIcon visible={showPassword} />
+                  </Button>
+                </div>
+              </FormField>
+            )}
+            {error && (
+              <p role="alert" className="mx-4 text-sm leading-5 text-danger">
+                {error}
+              </p>
+            )}
+            <Button type="submit" disabled={!canSubmit} className="w-full">
+              {loading ? "登录中..." : authenticated ? "重试加载" : "立即登录"}
+            </Button>
+          </form>
+        </TabsContent>
+      </Tabs>
 
-          <div className="mt-7 flex items-center justify-between gap-4 text-sm">
-            <div className="text-foreground-muted">
-              没有账号？{" "}
-              <button
-                type="button"
-                onClick={openRegistration}
-                disabled={loading || sending || authenticated}
-                aria-label="没有账号，立即注册"
-                className="rounded-sm font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
-              >
-                注册账号
-              </button>
-            </div>
-            <button
-              type="button"
-              disabled={loading || sending || authenticated}
-              onClick={() => {
-                if (!loading && !sending && !authenticated)
-                  router.push("/forgot-password");
-              }}
-              className="shrink-0 rounded-sm text-foreground-muted hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
-            >
-              忘记密码
-            </button>
-          </div>
+      <div className="mt-7 flex items-center justify-between gap-4 text-sm">
+        <div className="text-foreground-muted">
+          没有账号？{" "}
+          <button
+            type="button"
+            onClick={openRegistration}
+            disabled={loading || sending || authenticated}
+            aria-label="没有账号，立即注册"
+            className="rounded-sm font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
+          >
+            注册账号
+          </button>
         </div>
+        <button
+          type="button"
+          disabled={loading || sending || authenticated}
+          onClick={() => {
+            if (!loading && !sending && !authenticated)
+              router.push("/forgot-password");
+          }}
+          className="shrink-0 rounded-sm text-foreground-muted hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
+        >
+          忘记密码
+        </button>
       </div>
-    </main>
+    </AuthShell>
   );
 }

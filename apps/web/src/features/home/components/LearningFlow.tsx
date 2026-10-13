@@ -1,5 +1,6 @@
-// 学习流程——圆形序号徽章 + 文案。
-// 响应式:手机横排(序号左、文案右)紧凑;桌面四列、徽章上方,带一条贯穿连接线。
+import { SectionHeading } from "./SectionHeading";
+
+// 学习流程：四张步骤卡,序号用等宽数字弱化,标题加粗。
 const STEPS = [
   { step: "01", title: "选词表", desc: "浏览或创建词表,确定学习范围。" },
   { step: "02", title: "接任务", desc: "接收老师下发或自建的练习任务。" },
@@ -9,40 +10,30 @@ const STEPS = [
 
 export function LearningFlow() {
   return (
-    <section className="bg-background py-16 sm:py-24 lg:py-32">
-      <div className="mx-auto w-full max-w-5xl px-6">
-        <div className="reveal mb-12 text-center sm:mb-16">
-          <h2 className="text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-            简单四步。
-          </h2>
-          <p className="mt-3 text-lg font-medium text-foreground-subtle sm:text-xl">
-            形成可持续的学习闭环。
-          </p>
-        </div>
-
-        <ol className="relative grid gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
-          {/* 桌面贯穿连接线,纯视觉 */}
-          <div className="pointer-events-none absolute inset-x-0 top-6 hidden h-px bg-linear-to-r from-transparent via-border to-transparent lg:block" />
-          {STEPS.map((s) => (
-            <li
-              key={s.step}
-              className="reveal relative flex items-start gap-4 lg:flex-col lg:gap-0"
-            >
-              <span className="relative z-10 flex h-12 w-12 flex-none items-center justify-center rounded-full bg-surface text-base font-semibold text-primary shadow-xs ring-1 ring-border">
-                {s.step}
-              </span>
-              <div className="lg:mt-5">
-                <h3 className="text-lg font-semibold tracking-tight text-foreground">
-                  {s.title}
-                </h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-foreground-muted">
-                  {s.desc}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </div>
+    <section className="mx-auto w-full max-w-5xl px-6 py-16 sm:py-24">
+      <SectionHeading
+        eyebrow="学习流程"
+        title="简单四步。"
+        desc="形成可持续的学习闭环。"
+      />
+      <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {STEPS.map((s) => (
+          <li
+            key={s.step}
+            className="reveal flex flex-col rounded-2xl border border-border/60 bg-muted/70 p-5 backdrop-blur-sm"
+          >
+            <span className="flex size-10 items-center justify-center rounded-xl border border-border/50 bg-surface text-sm font-semibold tabular-nums text-primary shadow-sm">
+              {s.step}
+            </span>
+            <h3 className="mt-5 text-base font-semibold text-foreground">
+              {s.title}
+            </h3>
+            <p className="mt-1.5 text-[13px] leading-relaxed text-foreground-muted">
+              {s.desc}
+            </p>
+          </li>
+        ))}
+      </ol>
     </section>
   );
 }

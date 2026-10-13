@@ -1,8 +1,6 @@
 // 首页迷你 UI 场景插画——每张卡的"视觉主角"(纯 CSS/SVG,无交互,占位用)。
 // 取代图标:用产品真实形态的小界面,贴近 Apple「每屏一个视觉」。
-// 深色卡(智能记忆 / 学生)用亮蓝 + 半透明白;浅色卡用 Apple 蓝 + 白底面板。
-
-const BLUE_BRIGHT = "#6aa8ff";
+// 统一浅色白底面板，配色全部取自主题 token。
 
 // 浅色卡通用面板
 function LightPanel({ children }: { children: React.ReactNode }) {
@@ -13,38 +11,34 @@ function LightPanel({ children }: { children: React.ReactNode }) {
   );
 }
 
-// 深色卡通用面板
-function DarkPanel({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-xl bg-white/5 text-left ring-1 ring-white/10">
-      {children}
-    </div>
-  );
-}
-
-/* 智能记忆(深色,宽):遗忘曲线 + 复习节点 + 间隔。 */
+/* 智能记忆:遗忘曲线 + 复习节点 + 间隔。 */
 export function MemoryVisual() {
   return (
-    <DarkPanel>
+    <LightPanel>
       <div className="p-4">
-        <div className="flex items-center justify-between text-[11px] text-white/50">
+        <div className="flex items-center justify-between text-[11px] text-foreground-subtle">
           <span>记忆强度</span>
           <span>复习节点</span>
         </div>
-        <svg viewBox="0 0 240 92" className="mt-2 w-full" aria-hidden>
+        <svg
+          viewBox="0 0 240 92"
+          className="mt-2 w-full text-primary"
+          aria-hidden
+        >
           <line
             x1="4"
             y1="84"
             x2="236"
             y2="84"
-            stroke="rgba(255,255,255,0.12)"
+            stroke="currentColor"
+            className="text-border"
           />
           <path
             className="draw-on"
             pathLength={1}
             d="M4,18 C30,42 52,62 74,66 L74,20 C100,38 130,52 150,56 L150,22 C178,36 210,44 236,46"
             fill="none"
-            stroke={BLUE_BRIGHT}
+            stroke="currentColor"
             strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -54,32 +48,32 @@ export function MemoryVisual() {
             cx="74"
             cy="20"
             r="3.5"
-            fill={BLUE_BRIGHT}
+            fill="currentColor"
           />
           <circle
             className="pop-in"
             cx="150"
             cy="22"
             r="3.5"
-            fill={BLUE_BRIGHT}
+            fill="currentColor"
           />
         </svg>
         <div className="mt-3 flex gap-1.5 text-[11px] font-medium">
           <span className="rounded-md bg-primary px-2 py-0.5 text-white">
             1 天
           </span>
-          <span className="rounded-md bg-white/10 px-2 py-0.5 text-white/60">
+          <span className="rounded-md bg-muted px-2 py-0.5 text-foreground-muted">
             3 天
           </span>
-          <span className="rounded-md bg-white/10 px-2 py-0.5 text-white/60">
+          <span className="rounded-md bg-muted px-2 py-0.5 text-foreground-muted">
             7 天
           </span>
-          <span className="rounded-md bg-white/10 px-2 py-0.5 text-white/60">
+          <span className="rounded-md bg-muted px-2 py-0.5 text-foreground-muted">
             14 天
           </span>
         </div>
       </div>
-    </DarkPanel>
+    </LightPanel>
   );
 }
 
@@ -269,26 +263,26 @@ export function CoinsVisual() {
   );
 }
 
-/* 学生(深色):练习选择题。 */
+/* 学生:练习选择题。 */
 export function StudentVisual() {
   return (
-    <DarkPanel>
+    <LightPanel>
       <div className="p-4">
-        <p className="text-[11px] text-white/50">选择正确释义</p>
-        <p className="mt-1 text-lg font-semibold text-white">diligent</p>
+        <p className="text-[11px] text-foreground-subtle">选择正确释义</p>
+        <p className="mt-1 text-lg font-semibold text-foreground">diligent</p>
         <div className="mt-3 space-y-1.5 text-xs">
           <p className="rounded-lg bg-primary px-3 py-1.5 text-white">
             adj. 勤奋的
           </p>
-          <p className="rounded-lg bg-white/10 px-3 py-1.5 text-white/60">
+          <p className="rounded-lg bg-muted px-3 py-1.5 text-foreground-muted">
             adj. 犹豫的
           </p>
-          <p className="rounded-lg bg-white/10 px-3 py-1.5 text-white/60">
+          <p className="rounded-lg bg-muted px-3 py-1.5 text-foreground-muted">
             adj. 慷慨的
           </p>
         </div>
       </div>
-    </DarkPanel>
+    </LightPanel>
   );
 }
 
