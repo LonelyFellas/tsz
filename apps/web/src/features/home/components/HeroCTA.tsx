@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIdentityProvider";
 import { useUserStore } from "@/stores/user";
 
 // Hero 主行动区——只保留「向前」的动作。
 // 账户/危险操作(退出、注销)在 HomeNav,不污染落地页焦点。
 export function HeroCTA() {
+  const identity = useTeacherIdentity();
   const user = useUserStore((s) => s.user);
-  const onboarded = useUserStore((s) => s.onboarded);
   const hydrated = useUserStore((s) => s.hydrated);
 
   // 会话恢复完成前占位,保持版式稳定,避免按钮闪烁。
@@ -15,15 +16,16 @@ export function HeroCTA() {
     return <div className="h-12" aria-hidden />;
   }
 
-  // 已登录:未完成引导先去 onboarding,否则进主区。
+  // 学习首页的守卫处理未完成引导并保留回跳地址；教师沿用教学入口。
   if (user) {
-    const studyHref = onboarded === false ? "/onboarding" : "/wordlists";
+    const teaching = identity.verified && identity.identity === "teacher";
+    const studyHref = teaching ? "/teacher/classes" : "/student/home";
     return (
       <Link
         href={studyHref}
         className="inline-flex items-center rounded-full bg-primary px-7 py-3 text-base font-medium text-primary-foreground transition hover:bg-primary/90 active:scale-95"
       >
-        进入学习
+        {teaching ? "进入教学" : "进入学习"}
       </Link>
     );
   }
