@@ -8,9 +8,6 @@ import { checkInteger } from "./coins";
 import type {
   AdminWordlist,
   AdminWordlistPage,
-  AdminWordlistEdit,
-  CreateAdminWordlist,
-  UpdateAdminWordlist,
   WordlistManagementQuery,
   Wordlist,
   WordlistPage,
@@ -176,12 +173,6 @@ export function createAdminWordlistEndpoints(http: HttpClient) {
       http
         .get<unknown>(`/wordlists/${id}`, o)
         .then((v) => decodeWordlistResponse<AdminWordlist>("AdminWordlist", v)),
-    edit: (id: string, o?: Options) =>
-      http
-        .get<unknown>(`/wordlists/${id}/edit`, o)
-        .then((v) =>
-          decodeWordlistResponse<AdminWordlistEdit>("AdminWordlistEdit", v)
-        ),
     currentItems: (id: string, q: WordlistItemsQuery = {}, o?: Options) =>
       http
         .get<unknown>(`/wordlists/${id}/items${query(q)}`, {
@@ -189,26 +180,12 @@ export function createAdminWordlistEndpoints(http: HttpClient) {
           headers: SENTENCE_FORMATTING_HEADERS
         })
         .then((v) => decodeWordlistResponse<WordlistItems>("WordlistItems", v)),
-    suggestions: (q: WordlistSuggestionQuery, o?: Options) =>
-      http
-        .get<unknown>(`/wordlists/suggestions${query(q)}`, o)
-        .then((v) =>
-          decodeWordlistResponse<WordlistSuggestions>("WordlistSuggestions", v)
-        ),
     catalog: (q: WordlistQuery = {}, o?: Options) =>
       http
         .get<unknown>(`/wordlists/catalog${query(q)}`, o)
         .then((v) =>
           decodeWordlistResponse<WordlistCatalog>("WordlistCatalog", v)
         ),
-    create: (data: CreateAdminWordlist) =>
-      http
-        .post<unknown>("/wordlists", data)
-        .then((v) => decodeWordlistResponse<AdminWordlist>("AdminWordlist", v)),
-    update: (id: string, data: UpdateAdminWordlist) =>
-      http
-        .put<unknown>(`/wordlists/${id}`, data)
-        .then((v) => decodeWordlistResponse<AdminWordlist>("AdminWordlist", v)),
     visibility: (
       id: string,
       data: { expected_revision: number; public: boolean }

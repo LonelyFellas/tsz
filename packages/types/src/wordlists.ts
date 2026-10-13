@@ -198,25 +198,6 @@ export interface WordlistManagementQuery extends WordlistQuery {
   created_from?: string;
   created_before?: string;
 }
-export interface AdminWordlistItemInput {
-  entry_id: string;
-  admin_note: string;
-}
-export interface CreateAdminWordlist {
-  idempotency_key: string;
-  name: string;
-  items: AdminWordlistItemInput[];
-}
-export interface UpdateAdminWordlist {
-  expected_revision: number;
-  name: string;
-  items: AdminWordlistItemInput[];
-}
-export interface AdminWordlistEdit {
-  detail: AdminWordlist;
-  items: (AdminWordlistItemInput & { candidate: WordlistCandidate | null })[];
-}
-
 export interface WordlistSuggestionQuery {
   q: string;
 }

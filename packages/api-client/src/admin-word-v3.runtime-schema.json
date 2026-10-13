@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/sentence-permissions-124/tsz-rust/docs/openapi.json",
-  "_source_sha256": "1a26ab872afc219456368a50cdfaf54c60c2905940c3e1a300e414bc7e726f83",
+  "_source": "/Users/darwish/.codex/worktrees/wordlist-authoring/tsz-rust/docs/openapi.json",
+  "_source_sha256": "97b43fb5a11dc77cc4530f8fac45a603cf78ead469b1776b27fecc19781eba2c",
   "roots": [
     "LearningRewardDay",
     "LearningPreview",
@@ -16,7 +16,6 @@
     "WordlistTipPage",
     "AdminWordlist",
     "AdminWordlistPage",
-    "AdminWordlistEdit",
     "Wordlist",
     "WordlistPage",
     "WordlistItems",
@@ -143,30 +142,6 @@
         "review_state": { "type": "string" },
         "tip_amount": { "type": "string" },
         "wordlist": { "$ref": "#/$defs/Wordlist" }
-      },
-      "additionalProperties": false
-    },
-    "AdminWordlistEdit": {
-      "type": "object",
-      "required": ["detail", "items"],
-      "properties": {
-        "detail": { "$ref": "#/$defs/AdminWordlist" },
-        "items": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/AdminWordlistEditItem" }
-        }
-      },
-      "additionalProperties": false
-    },
-    "AdminWordlistEditItem": {
-      "type": "object",
-      "required": ["entry_id", "admin_note", "candidate"],
-      "properties": {
-        "admin_note": { "type": "string" },
-        "candidate": {
-          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/WordlistCandidate" }]
-        },
-        "entry_id": { "type": "string", "format": "uuid" }
       },
       "additionalProperties": false
     },

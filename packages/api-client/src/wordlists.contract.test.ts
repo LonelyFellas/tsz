@@ -241,10 +241,7 @@ it("autocomplete has a bounded response, no pagination and forwards cancellation
     get: vi.fn().mockResolvedValue({ items: [candidate] })
   } as unknown as HttpClient;
   const signal = new AbortController().signal;
-  await createAdminWordlistEndpoints(http).suggestions(
-    { q: "appl" },
-    { signal }
-  );
+  await createWordlistEndpoints(http).suggestions({ q: "appl" }, { signal });
   expect(http.get).toHaveBeenLastCalledWith("/wordlists/suggestions?q=appl", {
     signal
   });

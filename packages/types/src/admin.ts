@@ -27,8 +27,6 @@ export type MenuPermission =
   | "reviews.access"
   | "teacherapply.access"
   | "comments.access"
-  | "wordlists.create"
-  | "wordlists.edit"
   | "wordlists.visibility"
   | "wordlists.recommend"
   | "wordlists.delete"

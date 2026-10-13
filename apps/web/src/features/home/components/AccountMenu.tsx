@@ -344,6 +344,7 @@ export function AccountMenu() {
         </DropdownMenuItem>
         {teacher.verified && (
           <DropdownMenuItem
+            data-leaves-page=""
             disabled={switching || loading}
             className={MENU_ITEM_CLASS}
             onSelect={async (event) => {
@@ -421,6 +422,7 @@ export function AccountMenu() {
         </DropdownMenuItem>
         <DropdownMenuSeparator className="my-2" />
         <DropdownMenuItem
+          data-leaves-page=""
           onSelect={(event) => {
             event.preventDefault();
             void handleLogout();

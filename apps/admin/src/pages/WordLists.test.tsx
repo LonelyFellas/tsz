@@ -107,20 +107,26 @@ it("approval uses inspected snapshot revision even after visibility override", a
     })
   );
 });
-it("private recommendation is disabled and public action preserves review semantics", async () => {
-  vi.mocked(api.wordlists.visibility).mockResolvedValue({
-    ...row,
-    wordlist: { ...row.wordlist, state: "published", revision: 5 }
-  });
+it("user private lists have no creation, edit or direct publication controls", async () => {
   mount();
   expect(await screen.findByLabelText("推荐 待审词表")).toBeDisabled();
-  fireEvent.click(screen.getByText("设为公开"));
+  for (const text of ["创建词表", "编 辑", "设为公开"]) {
+    expect(screen.queryByText(text)).not.toBeInTheDocument();
+  }
+});
+it("published user lists can be hidden without changing review semantics", async () => {
+  vi.mocked(api.wordlists.management).mockResolvedValue({
+    items: [{ ...row, wordlist: { ...row.wordlist, state: "published" } }],
+    pagination
+  });
+  mount();
+  fireEvent.click(await screen.findByText("设为私密"));
   expect(await screen.findByText(/审核状态保持不变/)).toBeInTheDocument();
   fireEvent.click(screen.getByText(/确.*定|OK/));
   await waitFor(() =>
     expect(api.wordlists.visibility).toHaveBeenCalledWith("list", {
       expected_revision: 4,
-      public: true
+      public: false
     })
   );
 });
@@ -150,7 +156,7 @@ it("read-only administrators cannot create, edit, publish, recommend or delete",
   permissions.allowed = false;
   mount();
   await screen.findByText("待审词表");
-  for (const text of ["创建词表", "编 辑", "设为公开", "删 除"]) {
+  for (const text of ["删 除"]) {
     expect(screen.getByText(text).closest("button")).toBeDisabled();
   }
   expect(screen.getByLabelText("推荐 待审词表")).toBeDisabled();
