@@ -6,6 +6,10 @@
  * `.word-sort-actions` 下，标签页没有那层容器，所以这里按同一组视觉参数复刻，
  * 而不是去动那个被多处共用的选择器。
  */
+.word-pos-tabs > .ant-tabs-nav .ant-tabs-tab-active {
+  background: #eef2fe;
+}
+
 .word-pos-tab-handle {
   display: inline-flex;
   align-items: center;
