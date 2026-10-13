@@ -89,7 +89,7 @@ export function TeacherIdentityProvider({ children }: { children: ReactNode }) {
       if (event.key !== `tsz:workspace:${userId}` && event.key !== null) return;
       const next = readWorkspaceIdentity(userId!);
       if (next === "student" && pathname.startsWith("/teacher/"))
-        router.replace("/student/practice");
+        router.replace("/student/home");
       if (next === "teacher" && verified && pathname.startsWith("/student/"))
         router.replace("/teacher/classes");
     }
@@ -101,7 +101,7 @@ export function TeacherIdentityProvider({ children }: { children: ReactNode }) {
     if (!userId || !ready) return;
     if (!verified) {
       writeWorkspaceIdentity(userId, "student");
-      if (pathname.startsWith("/teacher/")) router.replace("/student/practice");
+      if (pathname.startsWith("/teacher/")) router.replace("/student/home");
       return;
     }
     const mode = pathname.startsWith("/teacher/")
@@ -132,7 +132,7 @@ export function TeacherIdentityProvider({ children }: { children: ReactNode }) {
     }
     if (!writeWorkspaceIdentity(userId, next))
       throw new Error("无法保存工作台偏好，请检查浏览器存储设置后重试");
-    router.push(next === "teacher" ? "/teacher/classes" : "/student/practice");
+    router.push(next === "teacher" ? "/teacher/classes" : "/student/home");
   }
 
   return (

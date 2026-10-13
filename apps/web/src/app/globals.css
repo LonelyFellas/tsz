@@ -11,6 +11,39 @@
 @source '../../../../packages/ui/src/components/ui/form-field.tsx';
 @source '../../../../packages/ui/src/components/ui/tabs.tsx';
 @source '../../../../packages/ui/src/components/ui/dropdown-menu.tsx';
+@source '../../../../packages/ui/src/components/ui/popover.tsx';
+
+@keyframes popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes popover-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+}
+.tsz-popover[data-state="open"] {
+  animation: popover-in 180ms ease-out;
+}
+.tsz-popover[data-state="closed"] {
+  animation: popover-out 150ms ease-in;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tsz-popover {
+    animation: none !important;
+  }
+}
 
 @custom-variant dark (&:is(.dark *));
 

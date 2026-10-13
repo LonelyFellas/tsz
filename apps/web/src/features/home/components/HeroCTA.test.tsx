@@ -1,8 +1,13 @@
 import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { User } from "@tsz/types";
 import { HeroCTA } from "./HeroCTA";
 import { useUserStore } from "@/stores/user";
+
+const workspace = vi.hoisted(() => ({ identity: "student", verified: false }));
+vi.mock("@/features/teacher-certification/TeacherIdentityProvider", () => ({
+  useTeacherIdentity: () => workspace
+}));
 
 const USER: User = {
   id: "u1",
@@ -14,6 +19,8 @@ const USER: User = {
 };
 
 beforeEach(() => {
+  workspace.identity = "student";
+  workspace.verified = false;
   useUserStore.setState({ user: null, onboarded: null, hydrated: false });
 });
 
@@ -36,21 +43,32 @@ describe("HeroCTA", () => {
     );
   });
 
-  it("已登录且已引导 → 进入学习指向 /wordlists", () => {
+  it("已登录且已引导 → 进入学习指向学习首页", () => {
     useUserStore.setState({ hydrated: true, user: USER, onboarded: true });
     render(<HeroCTA />);
     expect(screen.getByText("进入学习").closest("a")).toHaveAttribute(
       "href",
-      "/wordlists"
+      "/student/home"
     );
   });
 
-  it("已登录但未引导 → 进入学习指向 /onboarding", () => {
+  it("未引导学生也进入学习首页，由守卫保留回跳地址", () => {
     useUserStore.setState({ hydrated: true, user: USER, onboarded: false });
     render(<HeroCTA />);
     expect(screen.getByText("进入学习").closest("a")).toHaveAttribute(
       "href",
-      "/onboarding"
+      "/student/home"
     );
   });
+});
+
+it("教师工作台使用教学入口", () => {
+  workspace.identity = "teacher";
+  workspace.verified = true;
+  useUserStore.setState({ hydrated: true, user: USER, onboarded: false });
+  render(<HeroCTA />);
+  expect(screen.getByRole("link", { name: "进入教学" })).toHaveAttribute(
+    "href",
+    "/teacher/classes"
+  );
 });
