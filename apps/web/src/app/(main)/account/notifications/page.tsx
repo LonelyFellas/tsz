@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default function NotificationsPage() {
   return (
     <RouteGuard>
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-3xl px-6 py-10">
         <h1 className="mb-8 text-3xl font-semibold tracking-tight">站内通知</h1>
         <Notifications />
       </div>

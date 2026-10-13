@@ -8,4 +8,3 @@ export { ApplyTeacherForm } from "./components/ApplyTeacherForm";
 export { OnboardingForm } from "./components/OnboardingForm";
 export { RouteGuard } from "./components/RouteGuard";
 export { GuestGuard } from "./components/GuestGuard";
-export { MainNav } from "./components/MainNav";

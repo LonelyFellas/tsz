@@ -13,7 +13,7 @@ import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIden
 // 资料卡的「编辑资料」跳 /account/profile(EditProfileForm)。
 // 部分入口(我的任务 / 设置)后端/路由未就绪,先占位提示「即将上线」。
 
-// 常用快捷入口。仅保留有真实去处的项;申请成为老师 / 各功能入口已在顶部 MainNav 暴露,
+// 常用快捷入口。仅保留有真实去处的项;工作台和申请认证在头像菜单中,
 // 不在本页重复。占位类(我的任务 / 设置)待后端就绪再加。
 const TILES: { label: string; href: string; icon: ReactNode }[] = [
   { label: "邀请好友", href: "/account/invitations", icon: <CoinIcon /> },
@@ -104,7 +104,7 @@ export function ProfileHub() {
   const contact = user.phone ?? user.email ?? "";
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-2 sm:px-6 sm:py-6">
+    <div className="mx-auto max-w-2xl px-6 py-10">
       <button
         type="button"
         disabled={!ready}

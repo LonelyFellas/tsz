@@ -202,7 +202,7 @@ function Detail({
   if (!meta.data) return <p className="p-8">正在读取词表…</p>;
   const list = meta.data;
   return (
-    <article className="animate-in mx-auto max-w-5xl px-4 py-10 sm:px-6">
+    <article className="animate-in mx-auto max-w-5xl px-6 py-10">
       <Link
         href={mine ? "/account/wordlists" : "/wordlists"}
         className="text-sm text-foreground-muted"

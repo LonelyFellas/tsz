@@ -380,7 +380,7 @@ function Editor({
   const visible = matches.slice((currentPage - 1) * 50, currentPage * 50);
   return (
     <div className="mx-auto max-w-5xl px-6 pb-16 animate-in">
-      <header className="sticky top-0 z-20 flex flex-wrap items-center gap-3 border-b border-border bg-background/95 py-4 backdrop-blur">
+      <header className="sticky top-[calc(3rem+1px)] z-20 flex flex-wrap items-center gap-3 border-b border-border bg-background/95 py-4 backdrop-blur">
         <Button
           type="button"
           variant="outline"
