@@ -5,14 +5,15 @@ import { forwardRef } from "react";
 import { cn } from "../../lib/cn";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-medium tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        default:
+          "bg-primary text-primary-foreground shadow-[0_1px_2px_rgb(0_0_0/0.08)] hover:bg-primary/90",
         destructive: "bg-danger text-white hover:bg-danger/90",
         outline:
-          "border border-border bg-surface text-foreground hover:bg-muted",
+          "border border-border bg-surface text-foreground shadow-[0_1px_2px_rgb(0_0_0/0.04)] hover:bg-muted",
         secondary: "bg-muted text-foreground hover:bg-muted/80",
         ghost: "text-foreground-muted hover:bg-muted hover:text-foreground",
         link: "text-primary underline-offset-4 hover:underline"

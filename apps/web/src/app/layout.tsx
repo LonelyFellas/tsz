@@ -66,6 +66,10 @@ export default function RootLayout({
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">
         {/* 首屏前置:在 paint 前给 <html> 打上明/暗 class,杜绝主题闪烁。 */}
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <div
+          className="grid-backdrop pointer-events-none fixed inset-0 -z-10"
+          aria-hidden
+        />
         <WebVitals />
         <Providers>{children}</Providers>
       </body>

@@ -8,11 +8,10 @@ import type { EnglishVariant, LearningSettings } from "@tsz/types";
 import { Button } from "@tsz/ui/components";
 import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
-import { useTheme } from "@/features/theme/useTheme";
+import { ThemeModeControl } from "@/features/theme/ThemeModeControl";
 import { wordListKeys } from "@/features/wordlist/hooks/useWordLists";
 
 export function LearningPreferences({ userId }: { userId: string }) {
-  const { theme, setTheme } = useTheme();
   const client = useQueryClient();
   const [draft, setDraft] = useState<EnglishVariant | null>(null);
   const key = ["student-home", userId, "profile"];
@@ -39,31 +38,11 @@ export function LearningPreferences({ userId }: { userId: string }) {
 
   return (
     <div className="space-y-6">
-      <fieldset>
-        <legend className="mb-3 text-sm font-medium">外观</legend>
-        <div className="flex gap-1 rounded-full bg-muted p-1">
-          {(
-            [
-              ["light", "浅色"],
-              ["dark", "深色"],
-              ["system", "跟随系统"]
-            ] as const
-          ).map(([value, label]) => (
-            <Button
-              key={value}
-              type="button"
-              size="sm"
-              variant={theme === value ? "outline" : "ghost"}
-              className="flex-1 px-2"
-              aria-pressed={theme === value}
-              onClick={() => setTheme(value)}
-            >
-              {label}
-            </Button>
-          ))}
-        </div>
-      </fieldset>
-      <div className="border-t border-border pt-5">
+      <ThemeModeControl />
+      <div className="border-t border-border/70 pt-5">
+        <p className="mb-3 text-xs font-medium tracking-[0.2em] text-foreground-muted">
+          学习偏好
+        </p>
         {profile.isPending ? (
           <p role="status">正在读取学习偏好…</p>
         ) : profile.isError ? (
@@ -105,7 +84,7 @@ export function LearningPreferences({ userId }: { userId: string }) {
               <p className="text-sm text-foreground-muted">
                 当前难度：{settings.cefr_level}（首次确认后固定）
               </p>
-              <div className="flex gap-4">
+              <div className="grid grid-cols-2 gap-1 rounded-full border border-border/60 bg-muted p-1">
                 {(
                   [
                     ["BrE", "英式英语"],
@@ -114,14 +93,14 @@ export function LearningPreferences({ userId }: { userId: string }) {
                 ).map(([value, label]) => (
                   <label
                     key={value}
-                    className="flex min-h-11 items-center gap-2 text-sm"
+                    className="relative flex min-h-10 cursor-pointer items-center justify-center rounded-full text-[13px] font-medium text-foreground-muted transition-[color,background-color,box-shadow] duration-200 hover:text-foreground has-checked:bg-surface has-checked:text-foreground has-checked:shadow-[0_2px_8px_rgb(0_0_0/0.06)] has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-primary"
                   >
                     <input
                       type="radio"
                       name="english-variant"
                       value={value}
                       checked={variant === value}
-                      className="accent-primary"
+                      className="sr-only"
                       onChange={() => {
                         setDraft(value);
                         save.reset();

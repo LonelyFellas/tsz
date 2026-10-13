@@ -11,7 +11,7 @@ export default function AuthLayout({
   return (
     <GuestGuard>
       <div className="relative min-h-screen">
-        <ThemeToggle className="fixed right-4 top-4 z-50" />
+        <ThemeToggle className="glass fixed right-6 top-6 z-50 sm:right-8" />
         {children}
       </div>
     </GuestGuard>

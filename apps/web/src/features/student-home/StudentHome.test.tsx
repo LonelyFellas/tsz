@@ -121,6 +121,17 @@ it("读取失败可重试，成功后的空态才提供创建任务入口", asyn
   ).toHaveAttribute("href", "/student/tasks/new");
 });
 
+it("重新读取失败时不沿用缓存任务的副标题", async () => {
+  const view = renderWithProviders(<StudentHome />);
+  await screen.findByRole("heading", { name: "日常英语" });
+  expect(screen.getByText("每日任务 · 1 个词表")).toBeInTheDocument();
+  mocks.list.mockRejectedValueOnce(new Error("offline"));
+  view.rerender(<StudentHome key="remount" />);
+  expect(await screen.findByRole("alert")).toHaveTextContent("读取失败");
+  expect(screen.queryByText("每日任务 · 1 个词表")).not.toBeInTheDocument();
+  expect(screen.getByText("学习首页")).toBeInTheDocument();
+});
+
 it.each(["expired", "invalidated", "cancelled"] as const)(
   "%s 轮次不提供继续练习",
   async (state) => {

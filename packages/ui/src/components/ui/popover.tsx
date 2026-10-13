@@ -21,7 +21,7 @@ const PopoverContent = forwardRef<
       sideOffset={sideOffset}
       collisionPadding={collisionPadding}
       className={cn(
-        "tsz-popover z-50 w-[330px] max-w-[calc(100vw-24px)] max-h-[var(--radix-popover-content-available-height)] overflow-y-auto overscroll-contain rounded-2xl border border-border bg-surface p-5 text-foreground shadow-xl shadow-black/10 outline-hidden",
+        "tsz-popover z-50 w-[330px] max-w-[calc(100vw-24px)] max-h-[var(--radix-popover-content-available-height)] overflow-y-auto overscroll-contain rounded-2xl border border-border/70 bg-surface p-5 text-foreground shadow-float outline-hidden",
         className
       )}
       {...props}
