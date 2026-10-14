@@ -655,6 +655,11 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
           ) : (
             <p className={hintText}>开始后，进度和正确率会显示在这里。</p>
           )}
+          {r?.state === "invalidated" && (
+            <p className={hintText}>
+              本轮词条或词表来源发生变化，无法继续。已提交的作答记录仍保留；请检查来源后重新开始一轮。恢复词条不会自动恢复旧轮次。
+            </p>
+          )}
           <div className="flex flex-wrap gap-3">
             {r && (
               <Link
@@ -884,7 +889,10 @@ function Practice({ userId, id }: { userId: string; id: string }) {
   return (
     <PageShell>
       <PageHeader
-        back={{ href: `/student/tasks/${r.task_id}`, label: "任务与历史" }}
+        back={{
+          href: `/student/tasks/${r.task_id}`,
+          label: r.state === "invalidated" ? "返回任务重新开始" : "任务与历史"
+        }}
         eyebrow={`${runLabels[r.state]} · ${r.settings.cefr_level} / ${r.settings.english_variant}`}
         title={r.state === "completed" ? "本轮已完成" : "中文释义拼写"}
         description={
@@ -971,9 +979,11 @@ function Practice({ userId, id }: { userId: string; id: string }) {
               <p className="py-6 text-center text-base text-foreground-muted">
                 {r.state === "active"
                   ? "本页已答完，请进入下一页继续。"
-                  : r.state !== "completed"
-                    ? "本轮无法继续。已答记录仍可查看；返回任务页可检查来源后重新开始。"
-                    : "已保存本轮完成记录。"}
+                  : r.state === "invalidated"
+                    ? "本轮词条或词表来源发生变化，无法继续。已提交的作答记录仍保留；返回任务页可检查来源后重新开始。恢复词条不会自动恢复旧轮次。"
+                    : r.state !== "completed"
+                      ? "本轮无法继续。已答记录仍可查看；返回任务页可检查来源后重新开始。"
+                      : "已保存本轮完成记录。"}
               </p>
             )}
             {error && !pendingAccepted && (

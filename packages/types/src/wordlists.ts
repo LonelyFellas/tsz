@@ -98,6 +98,11 @@ export interface MyWordlistItem extends WordlistItem {
   private_note: string;
   note_revision: number;
 }
+export interface WordlistAvailability {
+  revision: number;
+  available_count: number;
+  unavailable_count: number;
+}
 export interface WordlistItems {
   items: WordlistItem[];
   revision: number;

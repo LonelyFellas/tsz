@@ -1,4 +1,4 @@
-import type { EntryAnnotationResponse } from "@tsz/types";
+import type { EntryAnnotationResponse, EntryArchiveImpact } from "@tsz/types";
 import type {
   AdminWordV3Envelope,
   AdminWordDraftV3Envelope,
@@ -293,6 +293,11 @@ export function decodeFormsImpactResponseV3(
 export function decodeInboundReferencesV3(value: unknown): InboundReferencesV3 {
   assertRuntimeContract("InboundReferencesV3", value);
   return value as InboundReferencesV3;
+}
+
+export function decodeEntryArchiveImpact(value: unknown): EntryArchiveImpact {
+  assertRuntimeContract("EntryArchiveImpact", value);
+  return value as EntryArchiveImpact;
 }
 
 export function decodeSurfaceMatchPageAny(value: unknown): SurfaceMatchPageV3 {

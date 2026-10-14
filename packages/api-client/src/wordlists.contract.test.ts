@@ -20,6 +20,36 @@ const meta = {
   updated_at: "2026-10-06T00:00:00Z"
 };
 const pagination = { page: 1, page_size: 50, total: 1, total_pages: 1 };
+it("reads whole-list availability through separate authorized routes and rejects malformed counts", async () => {
+  const counts = { revision: 1, available_count: 50, unavailable_count: 1 };
+  const http = {
+    get: vi.fn().mockResolvedValue(counts)
+  } as unknown as HttpClient;
+  const api = createWordlistEndpoints(http);
+  const signal = new AbortController().signal;
+  expect(await api.availability(id, { signal })).toEqual(counts);
+  expect(http.get).toHaveBeenLastCalledWith(`/wordlists/${id}/availability`, {
+    signal
+  });
+  await api.myAvailability(id, { signal });
+  expect(http.get).toHaveBeenLastCalledWith(
+    `/me/wordlists/${id}/availability`,
+    { signal }
+  );
+  expect(() =>
+    decodeWordlistResponse("WordlistAvailability", {
+      ...counts,
+      unavailable_count: -1
+    })
+  ).toThrow();
+  expect(() =>
+    decodeWordlistResponse("WordlistAvailability", {
+      ...counts,
+      private_note: "secret"
+    })
+  ).toThrow();
+});
+
 it("keeps public, personal and review item routes separate", async () => {
   const http = {
     get: vi.fn().mockResolvedValue({ items: [], revision: 1, pagination }),

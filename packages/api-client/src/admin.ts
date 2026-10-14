@@ -47,6 +47,7 @@ import type {
   DeleteDraftInput,
   EntryDeleteBatchInput,
   DetectLexiconSurfaceV3Input,
+  EntryArchiveImpactInput,
   EntryLifecycleBatchInput,
   EntryLifecycleInput,
   PreviewFormsImpactInputV3,
@@ -95,6 +96,7 @@ import {
   decodeDraftValidationResponseV3,
   decodeEntryLifecycleBatchAnyResponse,
   decodeFormsImpactResponseV3,
+  decodeEntryArchiveImpact,
   decodeInboundReferencesV3,
   decodeSearchComponentTargetsV3Response,
   InvalidAdminWordResponseError,
@@ -476,6 +478,10 @@ export function createAdminEndpoints(http: HttpClient) {
             }
           )
           .then(decodeAdminWordV3Envelope),
+      archiveImpact: (input: EntryArchiveImpactInput) =>
+        http
+          .post<unknown>("/lexicon/entries/archive-impact", input)
+          .then(decodeEntryArchiveImpact),
       archive: (
         wordId: string,
         idempotencyKey: string,

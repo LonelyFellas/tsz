@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-wordlist-publication-review/docs/openapi.json",
-  "_source_sha256": "e93a7e7fafc95f4ff1aeb5595c888b9092ca05a75e271ed688ba5724a21ca06b",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/entry-withdrawal-ux/docs/openapi.json",
+  "_source_sha256": "f0acc07048162f0c13811af91b2bf40e49817aca6e0d7c09909a1130a58d6613",
   "roots": [
     "LearningRewardDay",
     "LearningPreview",
@@ -19,6 +19,8 @@
     "Wordlist",
     "WordlistPage",
     "WordlistItems",
+    "WordlistAvailability",
+    "EntryArchiveImpact",
     "MyWordlistItems",
     "WordlistCatalog",
     "WordlistSuggestions",
@@ -761,6 +763,15 @@
         "annotation": { "type": ["string", "null"] },
         "annotation_revision": { "type": "integer", "minimum": 1 },
         "entry_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "EntryArchiveImpact": {
+      "type": "object",
+      "required": ["wordlist_count", "active_run_count"],
+      "properties": {
+        "active_run_count": { "type": "integer", "minimum": 0 },
+        "wordlist_count": { "type": "integer", "minimum": 0 }
       },
       "additionalProperties": false
     },
@@ -3356,6 +3367,16 @@
         "revision": { "type": "integer" },
         "state": { "$ref": "#/$defs/WordlistState" },
         "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistAvailability": {
+      "type": "object",
+      "required": ["revision", "available_count", "unavailable_count"],
+      "properties": {
+        "available_count": { "type": "integer", "minimum": 0 },
+        "revision": { "type": "integer" },
+        "unavailable_count": { "type": "integer", "minimum": 0 }
       },
       "additionalProperties": false
     },

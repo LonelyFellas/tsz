@@ -28,7 +28,7 @@ import dayjs from "dayjs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "@/lib/auth";
-import { InvalidAdminWordResponseError } from "@tsz/api-client";
+import { HttpError, InvalidAdminWordResponseError } from "@tsz/api-client";
 import type {
   AdminWordKind,
   AdminWordV3Envelope,
@@ -36,6 +36,7 @@ import type {
   CefrLevel,
   Dialect,
   EntryLifecycleBatchResponse,
+  EntryLifecycleTarget,
   EntryReferenceKind,
   WordPosTag
 } from "@tsz/types";
@@ -557,6 +558,100 @@ export function SmartDictionary({
     });
   };
 
+  const confirmArchive = (
+    entries: EntryLifecycleTarget[],
+    title: string,
+    onOk: () => Promise<void>
+  ) => {
+    let closed = false;
+    let loaded = false;
+    let loading = false;
+    const dialog = modal.confirm({
+      title,
+      content: "正在检查词表和练习的影响…",
+      okText: "移入垃圾桶",
+      okButtonProps: { danger: true, disabled: true },
+      cancelText: "取消",
+      onCancel: () => {
+        closed = true;
+      },
+      afterClose: () => {
+        closed = true;
+      },
+      onOk: () => (loaded ? onOk() : Promise.reject(new Error("请先读取影响")))
+    });
+    const load = async () => {
+      if (loading || closed) return;
+      loading = true;
+      dialog.update({
+        content: "正在检查词表和练习的影响…",
+        okButtonProps: { danger: true, disabled: true }
+      });
+      try {
+        const impact = await adminWordsDataSource.archiveImpact({ entries });
+        if (closed) return;
+        loaded = true;
+        dialog.update({
+          content: (
+            <div>
+              <p>
+                将使 {impact.wordlist_count} 张词表中的引用不可用，可能影响{" "}
+                {impact.active_run_count} 轮尚未结束的练习。
+              </p>
+              <p>
+                发布记录会保留。恢复词条后，词表可以重新展示；已失效的练习需要重新开始。
+              </p>
+              <p>
+                如果只是修正内容，请取消并编辑词条。引用数量可能随新操作变化，其他关联仍须先解除。
+              </p>
+            </div>
+          ),
+          okButtonProps: { danger: true, disabled: false }
+        });
+      } catch (error) {
+        const refreshRequired =
+          error instanceof HttpError &&
+          (error.status === 409 || error.code === "word_not_found");
+        const retryable =
+          !refreshRequired &&
+          !(error instanceof HttpError && [401, 403].includes(error.status));
+        if (!closed)
+          dialog.update({
+            content: (
+              <div>
+                <p role="alert">
+                  {refreshRequired
+                    ? "词条已发生变化，请刷新列表后重新确认；尚未移入垃圾桶。"
+                    : retryable
+                      ? "无法读取影响，请重试；尚未移入垃圾桶。"
+                      : describeLifecycleFailure(error, "无法读取归档影响")}
+                </p>
+                {refreshRequired ? (
+                  <Button
+                    onClick={() => {
+                      closed = true;
+                      dialog.destroy();
+                      setSelectedKeys([]);
+                      setSelectedRecords({});
+                      void listQuery.refetch();
+                    }}
+                  >
+                    刷新列表并重新确认
+                  </Button>
+                ) : retryable ? (
+                  <Button onClick={() => void load()}>重试</Button>
+                ) : null}
+              </div>
+            ),
+            okButtonProps: { danger: true, disabled: true }
+          });
+      } finally {
+        loading = false;
+      }
+    };
+    void load();
+  };
+
   const transitionOne = (
     record: AdminWordListItemAny,
     target: "archive" | "restore"
@@ -568,11 +663,10 @@ export function SmartDictionary({
     }
     const restoring = target === "restore";
     const label = wordListLabel(record);
-    modal.confirm({
+    const confirmation = {
       title: `${restoring ? "恢复" : "移入垃圾桶"}「${label}」？`,
-      content: restoring
-        ? "恢复后词条重新进入正常列表；现有发布记录保持不变。"
-        : "移入垃圾桶会保留当前和历史发布记录；若仍有其他内容关联此词条，需先解除关联才能移入垃圾桶。",
+      content:
+        "恢复后词条重新进入正常列表，词表可以重新展示；已失效的练习不会自动恢复。",
       okText: restoring ? "恢 复" : "移入垃圾桶",
       okButtonProps: { danger: !restoring },
       cancelText: "取消",
@@ -602,7 +696,14 @@ export function SmartDictionary({
             );
           }
         })
-    });
+    };
+    if (restoring) modal.confirm(confirmation);
+    else
+      confirmArchive(
+        [{ id: record.id, ...input }],
+        confirmation.title,
+        confirmation.onOk
+      );
   };
 
   const transitionSelected = () => {
@@ -642,13 +743,12 @@ export function SmartDictionary({
       id: record.id,
       ...lifecycleInput(record)!
     }));
-    modal.confirm({
+    const confirmation = {
       title: restoring
         ? `恢复选中的 ${selectedKeys.length} 个词条？`
         : `将选中的 ${selectedKeys.length} 个词条移入垃圾桶？`,
-      content: restoring
-        ? "该批次将原子恢复：任意一条冲突时全部保持原状。"
-        : "该批次将原子移入垃圾桶且保留全部发布历史：任意一条冲突时全部保持原状。",
+      content:
+        "该批次将原子恢复：任意一条冲突时全部保持原状。已失效的练习不会自动恢复。",
       okText: restoring ? "恢 复" : "移入垃圾桶",
       okButtonProps: { danger: !restoring },
       cancelText: "取消",
@@ -682,7 +782,9 @@ export function SmartDictionary({
             );
           }
         })
-    });
+    };
+    if (restoring) modal.confirm(confirmation);
+    else confirmArchive(entries, confirmation.title, confirmation.onOk);
   };
 
   const columns: TableColumnsType<AdminWordListItemAny> = [

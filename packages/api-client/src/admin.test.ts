@@ -283,6 +283,34 @@ describe("createAdminEndpoints — 音频资产 audioAssets", () => {
 });
 
 describe("createAdminEndpoints — 智能词库 words", () => {
+  it("queries archive impact with revision targets and fails closed on malformed aggregates", async () => {
+    const api = createAdminEndpoints(http);
+    const input = {
+      entries: [
+        { id: LIFECYCLE_WORD_A, base_revision: 1, base_lifecycle_revision: 1 }
+      ]
+    };
+    http.post.mockResolvedValueOnce({ wordlist_count: 3, active_run_count: 2 });
+    expect(await api.words.archiveImpact(input)).toEqual({
+      wordlist_count: 3,
+      active_run_count: 2
+    });
+    expect(http.post).toHaveBeenLastCalledWith(
+      "/lexicon/entries/archive-impact",
+      input
+    );
+    http.post.mockResolvedValueOnce({
+      wordlist_count: -1,
+      active_run_count: 0
+    });
+    await expect(api.words.archiveImpact(input)).rejects.toThrow();
+    http.post.mockResolvedValueOnce({
+      wordlist_count: 3,
+      active_run_count: 2,
+      private_note: "secret"
+    });
+    await expect(api.words.archiveImpact(input)).rejects.toThrow();
+  });
   it("list 无参 → GET /lexicon/entries(不带 ?)", () => {
     const api = createAdminEndpoints(http);
     api.words.list();

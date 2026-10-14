@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-wordlist-publication-review/docs/openapi.json",
-  "_generatedAt": "2026-10-14T03:23:45.053Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/entry-withdrawal-ux/docs/openapi.json",
+  "_generatedAt": "2026-10-14T05:52:19.967Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -27,6 +27,7 @@
     "/admin/lexicon/detections": ["post"],
     "/admin/lexicon/entries": ["get", "post"],
     "/admin/lexicon/entries/archive-batch": ["post"],
+    "/admin/lexicon/entries/archive-impact": ["post"],
     "/admin/lexicon/entries/component-targets/search": ["post"],
     "/admin/lexicon/entries/delete-batch": ["post"],
     "/admin/lexicon/entries/publications/batch": ["post"],
@@ -159,6 +160,7 @@
     "/me/wordlist-tips/{event_id}": ["get"],
     "/me/wordlists": ["get", "post"],
     "/me/wordlists/{id}": ["get", "put"],
+    "/me/wordlists/{id}/availability": ["get"],
     "/me/wordlists/{id}/edit": ["get"],
     "/me/wordlists/{id}/items": ["get"],
     "/me/wordlists/{id}/publish": ["post"],
@@ -170,6 +172,7 @@
     "/wordlists/recommended": ["get"],
     "/wordlists/suggestions": ["get"],
     "/wordlists/{id}": ["get"],
+    "/wordlists/{id}/availability": ["get"],
     "/wordlists/{id}/items": ["get"],
     "/wordlists/{id}/tips": ["post"]
   },
@@ -1343,6 +1346,18 @@
         "404": { "$ref": "#/components/schemas/ProblemDetails" },
         "409": { "$ref": "#/components/schemas/ProblemDetails" },
         "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/lexicon/entries/archive-impact": {
+      "request": { "$ref": "#/components/schemas/EntryArchiveImpactInput" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/EntryArchiveImpact" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
     "post /admin/lexicon/entries/component-targets/search": {
@@ -4091,6 +4106,50 @@
         },
         "base_revision": { "type": "integer", "format": "int64", "minimum": 1 },
         "confirmed_surface_match_token": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "EntryArchiveImpactInput": {
+      "type": "object",
+      "required": ["entries"],
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/EntryLifecycleTarget" },
+          "maxItems": 100,
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "EntryArchiveImpact": {
+      "type": "object",
+      "required": ["wordlist_count", "active_run_count"],
+      "properties": {
+        "active_run_count": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 0
+        },
+        "wordlist_count": { "type": "integer", "format": "int64", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "WordlistAvailability": {
+      "type": "object",
+      "required": ["revision", "available_count", "unavailable_count"],
+      "properties": {
+        "available_count": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 0
+        },
+        "revision": { "type": "integer", "format": "int64" },
+        "unavailable_count": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 0
+        }
       },
       "additionalProperties": false
     },

@@ -5,7 +5,7 @@ import {
   screen,
   waitFor
 } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { App as AntApp, ConfigProvider } from "antd";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -30,7 +30,8 @@ const catalogMocks = vi.hoisted(() => ({
 }));
 
 const dataSourceMocks = vi.hoisted(() => ({
-  get: vi.fn()
+  get: vi.fn(),
+  archiveImpact: vi.fn()
 }));
 
 const authMocks = vi.hoisted(() => ({
@@ -51,7 +52,8 @@ vi.mock("./api", () => ({
 
 vi.mock("./dataSource", () => ({
   adminWordsDataSource: {
-    get: dataSourceMocks.get
+    get: dataSourceMocks.get,
+    archiveImpact: dataSourceMocks.archiveImpact
   },
   adminWordsDataSourceCapabilities: {
     archive: true,
@@ -193,6 +195,9 @@ function HistoryProbe() {
 beforeEach(() => {
   vi.clearAllMocks();
   dataSourceMocks.get.mockReset().mockResolvedValue(undefined);
+  dataSourceMocks.archiveImpact
+    .mockReset()
+    .mockResolvedValue({ wordlist_count: 0, active_run_count: 0 });
   authMocks.profile = { id: "admin-1", role: "super_admin" };
   catalogMocks.items = [];
   for (const hook of [
@@ -1094,6 +1099,140 @@ describe("SmartDictionary", () => {
     });
     expect(batchButton).not.toBeDisabled();
     expect(screen.queryByText("发布所选")).not.toBeInTheDocument();
+  });
+
+  it("旧后端影响查询 404 时禁止归档，重试后显示影响并允许确认", async () => {
+    const { HttpError } = await import("@tsz/api-client");
+    const mutateAsync = vi
+      .fn()
+      .mockResolvedValue({ word: word("word-1", "first") });
+    apiMocks.useArchiveWord.mockReturnValue({ ...idleMutation(), mutateAsync });
+    let resolve!: (value: unknown) => void;
+    dataSourceMocks.archiveImpact
+      .mockRejectedValueOnce(new HttpError(404, "not found"))
+      .mockImplementationOnce(
+        () =>
+          new Promise((done) => {
+            resolve = done;
+          })
+      );
+    render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByLabelText("移入垃圾桶「first」"));
+    await screen.findByText(/无法读取影响/);
+    const confirm = screen
+      .getAllByText("移入垃圾桶", { exact: true })
+      .map((item) => item.closest("button"))
+      .find((item) => item?.closest(".ant-modal"))!;
+    expect(confirm).toBeDisabled();
+    fireEvent.click(confirm);
+    expect(mutateAsync).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText(/^重\s*试$/, { exact: true }));
+    expect(confirm).toBeDisabled();
+    await act(async () => resolve({ wordlist_count: 3, active_run_count: 2 }));
+    await screen.findByText(/将使 3 张词表中的引用不可用，可能影响 2 轮/);
+    expect(confirm).toBeEnabled();
+    expect(dataSourceMocks.archiveImpact).toHaveBeenLastCalledWith({
+      entries: [{ id: "word-1", base_revision: 1, base_lifecycle_revision: 1 }]
+    });
+    fireEvent.click(confirm);
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledOnce());
+  });
+
+  it("影响预检版本冲突后刷新列表，重新确认使用新版本", async () => {
+    const { HttpError } = await import("@tsz/api-client");
+    let revision = 1;
+    const refetch = vi.fn(async () => {
+      revision = 2;
+    });
+    apiMocks.useWordList.mockImplementation(() => ({
+      data: {
+        words: [{ ...word("word-1", "first"), revision }],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      isPending: false,
+      refetch
+    }));
+    dataSourceMocks.archiveImpact.mockRejectedValueOnce(
+      new HttpError(409, "conflict", [], "revision_conflict")
+    );
+    const mutateAsync = vi.fn();
+    apiMocks.useArchiveWord.mockReturnValue({ ...idleMutation(), mutateAsync });
+    render(
+      <MemoryRouter>
+        <ConfigProvider theme={{ token: { motion: false } }}>
+          <AntApp>
+            <SmartDictionary />
+          </AntApp>
+        </ConfigProvider>
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByLabelText("移入垃圾桶「first」"));
+    await screen.findByText(/词条已发生变化/);
+    expect(screen.queryByText(/^重\s*试$/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("刷新列表并重新确认"));
+    await waitFor(() => expect(refetch).toHaveBeenCalledOnce());
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+    );
+    fireEvent.click(screen.getByLabelText("移入垃圾桶「first」"));
+    await screen.findByText(/将使 0 张词表/);
+    expect(dataSourceMocks.archiveImpact).toHaveBeenLastCalledWith({
+      entries: [{ id: "word-1", base_revision: 2, base_lifecycle_revision: 1 }]
+    });
+    expect(mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("影响预检权限拒绝显示原因且不提供无效重试", async () => {
+    const { HttpError } = await import("@tsz/api-client");
+    dataSourceMocks.archiveImpact.mockRejectedValueOnce(
+      new HttpError(403, "没有归档权限")
+    );
+    const mutateAsync = vi.fn();
+    apiMocks.useArchiveWord.mockReturnValue({ ...idleMutation(), mutateAsync });
+    render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByLabelText("移入垃圾桶「first」"));
+    await screen.findByText("没有归档权限");
+    expect(screen.queryByText(/^重\s*试$/)).not.toBeInTheDocument();
+    expect(mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("取消影响查询后晚到的结果不会归档", async () => {
+    let resolve!: (value: unknown) => void;
+    dataSourceMocks.archiveImpact.mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        })
+    );
+    const mutateAsync = vi.fn();
+    apiMocks.useArchiveWord.mockReturnValue({ ...idleMutation(), mutateAsync });
+    render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByLabelText("移入垃圾桶「first」"));
+    await screen.findByText("正在检查词表和练习的影响…");
+    fireEvent.click(screen.getByText(/取\s*消/, { exact: true }));
+    await act(async () => resolve({ wordlist_count: 3, active_run_count: 2 }));
+    await waitFor(() =>
+      expect(screen.queryByText(/将使 3 张词表/)).not.toBeInTheDocument()
+    );
+    expect(mutateAsync).not.toHaveBeenCalled();
   });
 
   it("HTTP 环境单条归档可降级生成幂等键，连续确认只发一次", async () => {
