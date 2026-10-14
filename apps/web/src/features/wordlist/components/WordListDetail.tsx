@@ -172,7 +172,7 @@ function Detail({
     if (
       kind === "withdraw" &&
       !window.confirm(
-        "撤回后将立即转为私密并取消推荐。修改完成后可再次设为公开。继续？"
+        "撤回后将立即转为私密并取消推荐。修改完成后可再次申请公开。继续？"
       )
     )
       return;
@@ -195,7 +195,7 @@ function Detail({
         });
       await client.invalidateQueries({ queryKey: wordListKeys.all });
     } catch {
-      setError("操作结果未确认，请刷新核对。公开重试会复用原请求键。");
+      setError("操作结果未确认，请刷新核对。申请重试会复用原请求键。");
     } finally {
       setBusy(false);
     }
@@ -264,7 +264,7 @@ function Detail({
                     disabled={busy}
                     onClick={() => void action("submit")}
                   >
-                    设为公开
+                    申请公开
                   </button>
                 )}
                 {list.state === "published" && (
@@ -281,6 +281,13 @@ function Detail({
               )
             )}
           </div>
+          {mine && list.state !== "published" && (
+            <p className="mt-4 text-sm text-foreground-subtle">
+              {list.state === "pending"
+                ? "公开申请正在审核中，审核通过前仅你可见。"
+                : "申请公开后需经管理员审核，通过后其他用户才能搜索和使用。"}
+            </p>
+          )}
           {error && (
             <p role="alert" className="mt-4 text-sm text-danger">
               {error}
