@@ -34,10 +34,12 @@ C 端按钮改为“申请公开”，说明待审仍仅作者可见；后台原
 - 全仓 `pnpm test` 首轮 3739 项通过、19 项失败、2 项跳过：18 项为未改动编辑器用例超时，1 项为同步期间旧契约哈希断言。同步哈希后，原失败的全部 12 个文件以 `--maxWorkers=2` 重跑：513 项通过、2 项跳过，不修改超时阈值。
 - Rust `cargo fmt --all -- --check`、`SQLX_OFFLINE=true cargo clippy --locked --all-targets --all-features -- -D warnings` 通过。
 - 隔离 Postgres 上 `SQLX_OFFLINE=true cargo test --locked --all-features --test wordlists_review --test wordlists_handler -- --test-threads=2`：18 项通过。初次复用的 Postgres 中途停止，初次测试中断，不计为有效验证；最终使用本任务独立实例。
-- OpenAPI 由本任务后端生成、显式 OPENAPI_SOURCE 同步；SHA256 `4554c7b52ac502ca92a7991fe1f6ebe1efd9ac44c01bda8c5f04863fbc231188`，生成输入与契约 canary 一致。
+- OpenAPI 由本任务后端生成、显式 OPENAPI_SOURCE 同步；SHA256 `e93a7e7fafc95f4ff1aeb5595c888b9092ca05a75e271ed688ba5724a21ca06b`，生成输入与契约 canary 一致。
 
 真实验收版本为上述基线加本任务工作区差异。Web `next start` 位于 127.0.0.1:13384，同源 `/api/v1` 代理到本任务构建的后端 127.0.0.1:18384；独立 Postgres 15384 / tsz_wordlist_review_20261014，独立 Redis 16384 / DB 0。使用本任务合成账号和词表 fixture，无 API mock/route 拦截。
 
 浏览器真实登录 → 打开私密词表 → 点击“申请公开” → publish 返回 200 → 重新请求显示 pending；匿名详情及 items 返回 404。管理员真实 decision API 审核通过后，页面刷新显示“已公开”及公开入口，匿名 items 返回 200 且无 private_note；独立 SQL 确认 published / approved / revision=3。另一份已公开 fixture 在新申请前后均可访问。后台筛选真实 HTTP 返回 pending 总数 1，后台筛选交互由组件测试验证；本次未额外执行后台浏览器审核操作。
 
 本任务测试进程、独立数据实例和临时会话凭据在验收后清理。
+
+独立审查发现新增审核状态查询枚举未注册到 OpenAPI，已补充 schema 注册以及引用可解析、枚举值与可选参数回归测试；该定向 Rust 单元测试通过。前端契约与哈希随修复重新生成同步。
