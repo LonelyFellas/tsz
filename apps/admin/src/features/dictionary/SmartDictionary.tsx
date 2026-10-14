@@ -28,7 +28,7 @@ import dayjs from "dayjs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "@/lib/auth";
-import { InvalidAdminWordResponseError } from "@tsz/api-client";
+import { HttpError, InvalidAdminWordResponseError } from "@tsz/api-client";
 import type {
   AdminWordKind,
   AdminWordV3Envelope,
@@ -608,13 +608,39 @@ export function SmartDictionary({
           ),
           okButtonProps: { danger: true, disabled: false }
         });
-      } catch {
+      } catch (error) {
+        const refreshRequired =
+          error instanceof HttpError &&
+          (error.status === 409 || error.code === "word_not_found");
+        const retryable =
+          !refreshRequired &&
+          !(error instanceof HttpError && [401, 403].includes(error.status));
         if (!closed)
           dialog.update({
             content: (
               <div>
-                <p role="alert">无法读取影响，请重试；尚未移入垃圾桶。</p>
-                <Button onClick={() => void load()}>重试</Button>
+                <p role="alert">
+                  {refreshRequired
+                    ? "词条已发生变化，请刷新列表后重新确认；尚未移入垃圾桶。"
+                    : retryable
+                      ? "无法读取影响，请重试；尚未移入垃圾桶。"
+                      : describeLifecycleFailure(error, "无法读取归档影响")}
+                </p>
+                {refreshRequired ? (
+                  <Button
+                    onClick={() => {
+                      closed = true;
+                      dialog.destroy();
+                      setSelectedKeys([]);
+                      setSelectedRecords({});
+                      void listQuery.refetch();
+                    }}
+                  >
+                    刷新列表并重新确认
+                  </Button>
+                ) : retryable ? (
+                  <Button onClick={() => void load()}>重试</Button>
+                ) : null}
               </div>
             ),
             okButtonProps: { danger: true, disabled: true }

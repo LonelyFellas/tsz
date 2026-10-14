@@ -5,7 +5,7 @@ import {
   screen,
   waitFor
 } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { App as AntApp, ConfigProvider } from "antd";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -1142,6 +1142,70 @@ describe("SmartDictionary", () => {
     });
     fireEvent.click(confirm);
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledOnce());
+  });
+
+  it("影响预检版本冲突后刷新列表，重新确认使用新版本", async () => {
+    const { HttpError } = await import("@tsz/api-client");
+    let revision = 1;
+    const refetch = vi.fn(async () => {
+      revision = 2;
+    });
+    apiMocks.useWordList.mockImplementation(() => ({
+      data: {
+        words: [{ ...word("word-1", "first"), revision }],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      isPending: false,
+      refetch
+    }));
+    dataSourceMocks.archiveImpact.mockRejectedValueOnce(
+      new HttpError(409, "conflict", [], "revision_conflict")
+    );
+    const mutateAsync = vi.fn();
+    apiMocks.useArchiveWord.mockReturnValue({ ...idleMutation(), mutateAsync });
+    render(
+      <MemoryRouter>
+        <ConfigProvider theme={{ token: { motion: false } }}>
+          <AntApp>
+            <SmartDictionary />
+          </AntApp>
+        </ConfigProvider>
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByLabelText("移入垃圾桶「first」"));
+    await screen.findByText(/词条已发生变化/);
+    expect(screen.queryByText(/^重\s*试$/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("刷新列表并重新确认"));
+    await waitFor(() => expect(refetch).toHaveBeenCalledOnce());
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+    );
+    fireEvent.click(screen.getByLabelText("移入垃圾桶「first」"));
+    await screen.findByText(/将使 0 张词表/);
+    expect(dataSourceMocks.archiveImpact).toHaveBeenLastCalledWith({
+      entries: [{ id: "word-1", base_revision: 2, base_lifecycle_revision: 1 }]
+    });
+    expect(mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("影响预检权限拒绝显示原因且不提供无效重试", async () => {
+    const { HttpError } = await import("@tsz/api-client");
+    dataSourceMocks.archiveImpact.mockRejectedValueOnce(
+      new HttpError(403, "没有归档权限")
+    );
+    const mutateAsync = vi.fn();
+    apiMocks.useArchiveWord.mockReturnValue({ ...idleMutation(), mutateAsync });
+    render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByLabelText("移入垃圾桶「first」"));
+    await screen.findByText("没有归档权限");
+    expect(screen.queryByText(/^重\s*试$/)).not.toBeInTheDocument();
+    expect(mutateAsync).not.toHaveBeenCalled();
   });
 
   it("取消影响查询后晚到的结果不会归档", async () => {

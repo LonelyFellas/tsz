@@ -197,8 +197,11 @@ it("collapses unavailable references, keeps notes and positions, and loads later
   await screen.findByText(/整张词表：49 个可用词条，2 个暂不可用/);
   const summary = await screen.findByText(/查看暂不可用的词条/);
   expect(summary.closest("details")).not.toHaveAttribute("open");
+  const details = summary.closest("details")!;
+  details.open = true;
+  fireEvent(details, new Event("toggle"));
   expect(screen.getByText(/原位置 1/)).toBeInTheDocument();
-  expect(screen.getByText("私密备注：作者秘密")).toBeInTheDocument();
+  expect(screen.getByText("私密备注：作者秘密")).toHaveClass("border-dashed");
   expect(screen.getByRole("link", { name: "移除或替换" })).toHaveAttribute(
     "href",
     "/account/wordlists/list/edit"
@@ -212,6 +215,84 @@ it("collapses unavailable references, keeps notes and positions, and loads later
   expect(
     screen.queryByText("当前已加载的词条均不可用。")
   ).not.toBeInTheDocument();
+});
+
+it("reloads metadata, entries and counts after an availability revision mismatch", async () => {
+  vi.mocked(api.wordList.myDetail)
+    .mockResolvedValueOnce(list)
+    .mockResolvedValue({ ...list, revision: 2 });
+  vi.mocked(api.wordList.myAvailability).mockResolvedValue({
+    revision: 2,
+    available_count: 51,
+    unavailable_count: 0
+  });
+  vi.mocked(api.wordList.myItems).mockImplementation(async (_id, query) => ({
+    ...myPageResult(query?.page ?? 1),
+    revision: 2
+  }));
+  open(true);
+  await screen.findByText(/可用数量暂时无法读取|词表内容已变化/);
+  fireEvent.click(screen.getByRole("button", { name: "重新加载词表" }));
+  await screen.findByText("整张词表：51 个可用词条");
+  expect(api.wordList.myDetail).toHaveBeenCalledTimes(2);
+  expect(api.wordList.myItems).toHaveBeenCalledTimes(2);
+  expect(api.wordList.myAvailability).toHaveBeenCalledTimes(2);
+  expect(api.wordList.availability).not.toHaveBeenCalled();
+});
+
+it("does not automatically page an entirely unavailable list and loads hidden references on demand", async () => {
+  vi.mocked(api.wordList.myAvailability).mockResolvedValue({
+    revision: 1,
+    available_count: 0,
+    unavailable_count: 51
+  });
+  vi.mocked(api.wordList.myItems).mockImplementation(async (_id, query) => {
+    const result = myPageResult(query?.page ?? 1);
+    return {
+      ...result,
+      items: result.items.map((item) => ({ ...item, entry: null }))
+    };
+  });
+  open(true);
+  const summary = await screen.findByText(/查看暂不可用的词条/);
+  await screen.findByText(/整张词表：0 个可用词条/);
+  expect(observers.every((observer) => !observer.connected)).toBe(true);
+  expect(api.wordList.myItems).toHaveBeenCalledOnce();
+  expect(screen.queryByText("私密备注：作者秘密")).not.toBeInTheDocument();
+  const details = summary.closest("details")!;
+  details.open = true;
+  fireEvent(details, new Event("toggle"));
+  expect(await screen.findByText("私密备注：作者秘密")).toHaveClass(
+    "border-dashed"
+  );
+  fireEvent.click(screen.getByRole("button", { name: "加载更多不可用词条" }));
+  await screen.findByText(/原位置 51/);
+  expect(api.wordList.myItems).toHaveBeenCalledTimes(2);
+  expect(observers.every((observer) => !observer.connected)).toBe(true);
+});
+
+it("rejects counts below loaded unavailable references and refreshes once without a retry loop", async () => {
+  vi.mocked(api.wordList.myItems).mockResolvedValue({
+    ...myPageResult(1),
+    items: [{ ...myPageResult(1).items[0]!, entry: null }]
+  });
+  open(true);
+  await screen.findByText(/查看暂不可用的词条.*已加载 1 个/);
+  await waitFor(() =>
+    expect(api.wordList.myAvailability).toHaveBeenCalledTimes(2)
+  );
+  await act(async () => {});
+  expect(api.wordList.myAvailability).toHaveBeenCalledTimes(2);
+  expect(screen.queryByText(/整张词表共 0 个/)).not.toBeInTheDocument();
+  expect(screen.queryByText("整张词表：51 个可用词条")).not.toBeInTheDocument();
+  vi.mocked(api.wordList.myAvailability).mockResolvedValue({
+    revision: 1,
+    available_count: 50,
+    unavailable_count: 1
+  });
+  fireEvent.click(screen.getByRole("button", { name: "重试" }));
+  await screen.findByText(/查看暂不可用的词条.*整张词表共 1 个/);
+  expect(api.wordList.myAvailability).toHaveBeenCalledTimes(3);
 });
 
 it("old backend availability 404 never invents zero counts or blocks reading, and can retry", async () => {

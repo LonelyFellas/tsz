@@ -71,6 +71,8 @@ function Detail({
   const identity = useTeacherIdentity();
   const hydrated = useUserStore((s) => s.hydrated);
   const loadMoreRef = useRef<HTMLDivElement>(null);
+  const lastAvailabilityRefresh = useRef(0);
+  const [unavailableOpen, setUnavailableOpen] = useState(false);
   const [q, setQ] = useState("");
   const [view, setView] = useState<WordlistView>("standard");
   const [sort, setSort] = useState<WordlistSort>("author");
@@ -151,36 +153,74 @@ function Detail({
   const variant = profile.data?.learning_settings?.english_variant ?? null;
   const loadedItems = items.data?.pages.flatMap((page) => page.items) ?? [];
   const unavailableItems = loadedItems.filter((item) => !item.entry);
+  const availabilityVersionChanged =
+    !!availability.data && availability.data.revision !== meta.data?.revision;
+  const availabilityCountsChanged =
+    !!availability.data &&
+    (availability.data.unavailable_count < unavailableItems.length ||
+      availability.data.available_count <
+        loadedItems.length - unavailableItems.length);
   const availabilityData =
-    availability.data?.revision === meta.data?.revision
+    !availabilityVersionChanged && !availabilityCountsChanged
       ? availability.data
       : undefined;
+  const allUnavailable = availabilityData?.available_count === 0;
+  const {
+    dataUpdatedAt: itemsUpdatedAt,
+    hasNextPage,
+    isFetching,
+    isError,
+    fetchNextPage
+  } = items;
+  const { isFetching: availabilityFetching, refetch: refetchAvailability } =
+    availability;
+  useEffect(() => {
+    if (
+      availabilityCountsChanged &&
+      !availabilityVersionChanged &&
+      !availabilityFetching &&
+      lastAvailabilityRefresh.current !== itemsUpdatedAt
+    ) {
+      lastAvailabilityRefresh.current = itemsUpdatedAt;
+      void refetchAvailability();
+    }
+  }, [
+    availabilityCountsChanged,
+    availabilityVersionChanged,
+    availabilityFetching,
+    itemsUpdatedAt,
+    refetchAvailability
+  ]);
   useEffect(() => {
     const target = loadMoreRef.current;
     if (
       !target ||
       !ready ||
-      !items.hasNextPage ||
-      items.isFetching ||
-      items.isError
+      allUnavailable ||
+      !hasNextPage ||
+      isFetching ||
+      isError
     )
       return;
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry?.isIntersecting)
-          void items.fetchNextPage({ cancelRefetch: false });
+        if (entry?.isIntersecting) void fetchNextPage({ cancelRefetch: false });
       },
       { rootMargin: "200px" }
     );
     observer.observe(target);
     return () => observer.disconnect();
-  }, [
-    ready,
-    items.hasNextPage,
-    items.isFetching,
-    items.isError,
-    items.fetchNextPage
-  ]);
+  }, [ready, allUnavailable, hasNextPage, isFetching, isError, fetchNextPage]);
+  async function reloadWordlist() {
+    await client.invalidateQueries({
+      queryKey: [...keys, "availability", id],
+      refetchType: "none"
+    });
+    await Promise.all([
+      meta.refetch(),
+      client.resetQueries({ queryKey: [...keys, "items", "infinite", id] })
+    ]);
+  }
   async function action(kind: "submit" | "withdraw") {
     if (!meta.data) return;
     if (
@@ -324,12 +364,18 @@ function Detail({
           ) : availability.isError ||
             (availability.isSuccess && !availabilityData) ? (
             <p role="alert" className="mt-4 text-sm text-foreground-muted">
-              可用数量暂时无法读取，已加载的词条仍可阅读。{" "}
+              {availabilityVersionChanged
+                ? "词表内容已变化，请重新加载词表。"
+                : "可用数量暂时无法读取，已加载的词条仍可阅读。"}{" "}
               <button
                 className={textButtonClass}
-                onClick={() => void availability.refetch()}
+                onClick={() =>
+                  void (availabilityVersionChanged
+                    ? reloadWordlist()
+                    : refetchAvailability())
+                }
               >
-                重试
+                {availabilityVersionChanged ? "重新加载词表" : "重试"}
               </button>
             </p>
           ) : null}
@@ -420,7 +466,11 @@ function Detail({
         <>
           {(unavailableItems.length > 0 ||
             (availabilityData?.unavailable_count ?? 0) > 0) && (
-            <details className="mb-6 rounded-2xl border border-border/60 bg-muted/70 px-4 py-3 text-sm leading-6">
+            <details
+              className="mb-6 rounded-2xl border border-border/60 bg-muted/70 px-4 py-3 text-sm leading-6"
+              open={unavailableOpen}
+              onToggle={(event) => setUnavailableOpen(event.currentTarget.open)}
+            >
               <summary className="cursor-pointer font-medium">
                 查看暂不可用的词条
                 {availabilityData
@@ -442,28 +492,39 @@ function Detail({
                     " · 请先撤回为私密，再编辑词表。"}
                 </p>
               )}
-              <ul className="mt-3 space-y-2">
-                {unavailableItems.map((item) => (
-                  <li
-                    key={item.entry_id}
-                    className="border-t border-border/60 pt-2"
-                  >
-                    原位置 {item.position + 1} · 词条暂不可用
-                    {item.author_note && (
-                      <p className="whitespace-pre-wrap">
-                        注：{item.author_note}
-                      </p>
-                    )}
-                    {mine &&
-                      "private_note" in item &&
-                      (item as MyWordlistItem).private_note && (
-                        <p className="whitespace-pre-wrap text-foreground-muted">
-                          私密备注：{(item as MyWordlistItem).private_note}
+              {unavailableOpen && (
+                <ul className="mt-3 space-y-2">
+                  {unavailableItems.map((item) => (
+                    <li
+                      key={item.entry_id}
+                      className="border-t border-border/60 pt-2"
+                    >
+                      原位置 {item.position + 1} · 词条暂不可用
+                      {item.author_note && (
+                        <p className="whitespace-pre-wrap">
+                          注：{item.author_note}
                         </p>
                       )}
-                  </li>
-                ))}
-              </ul>
+                      {mine &&
+                        "private_note" in item &&
+                        (item as MyWordlistItem).private_note && (
+                          <p className="whitespace-pre-wrap rounded-2xl border border-dashed border-border px-4 py-3 text-foreground-muted">
+                            私密备注：{(item as MyWordlistItem).private_note}
+                          </p>
+                        )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {unavailableOpen && allUnavailable && hasNextPage && !isError && (
+                <button
+                  className={textButtonClass}
+                  disabled={isFetching}
+                  onClick={() => void fetchNextPage({ cancelRefetch: false })}
+                >
+                  加载更多不可用词条
+                </button>
+              )}
               {(availabilityData?.unavailable_count ?? 0) >
                 unavailableItems.length && (
                 <p className="mt-2 text-foreground-muted">
@@ -537,7 +598,9 @@ function Detail({
                   {items.isFetchingNextPage
                     ? "正在加载更多词条…"
                     : items.hasNextPage
-                      ? "继续向下滚动，自动加载更多词条"
+                      ? allUnavailable
+                        ? "展开上方列表，按需加载不可用词条"
+                        : "继续向下滚动，自动加载更多词条"
                       : `已加载全部 ${loadedItems.length} 个词条`}
                 </p>
               )}
