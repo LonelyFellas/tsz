@@ -265,19 +265,6 @@ function decodeVersionedRoot<T>(
   return value as T;
 }
 
-function decodeV3VersionedRoot<T>(
-  rootName: RuntimeSchemaRoot,
-  value: unknown
-): T {
-  assertSupportedSchemaVersion(
-    value,
-    "schema_version",
-    SUPPORTED_ADMIN_WORD_V3_SCHEMA_VERSIONS
-  );
-  assertRuntimeContract(rootName, value);
-  return value as T;
-}
-
 export function decodeDraftValidationResponseAny(
   value: unknown
 ): DraftValidationResponseV3 {
@@ -287,7 +274,7 @@ export function decodeDraftValidationResponseAny(
 export function decodeDraftValidationResponseV3(
   value: unknown
 ): DraftValidationResponseV3 {
-  return decodeV3VersionedRoot("DraftValidationResponseV3", value);
+  return decodeVersionedRoot("DraftValidationResponseV3", value);
 }
 
 export function decodeFormsImpactResponseAny(
@@ -299,7 +286,7 @@ export function decodeFormsImpactResponseAny(
 export function decodeFormsImpactResponseV3(
   value: unknown
 ): FormsImpactResponseV3 {
-  return decodeV3VersionedRoot("FormsImpactResponseV3", value);
+  return decodeVersionedRoot("FormsImpactResponseV3", value);
 }
 
 /** 入站引用响应没有 schema_version：整棵按 runtime schema 严格校验即可。 */
@@ -313,7 +300,7 @@ export function decodeSurfaceMatchPageAny(value: unknown): SurfaceMatchPageV3 {
 }
 
 export function decodeSurfaceMatchPageV3(value: unknown): SurfaceMatchPageV3 {
-  return decodeV3VersionedRoot("SurfaceMatchPageV3", value);
+  return decodeVersionedRoot("SurfaceMatchPageV3", value);
 }
 
 export function decodeDetectLexiconResponseAny(
@@ -325,7 +312,7 @@ export function decodeDetectLexiconResponseAny(
 export function decodeDetectLexiconResponseV3(
   value: unknown
 ): DetectLexiconSurfaceResponseV3 {
-  return decodeV3VersionedRoot("DetectLexiconSurfaceResponseV3", value);
+  return decodeVersionedRoot("DetectLexiconSurfaceResponseV3", value);
 }
 
 export function decodeDraftValidationIssueAny(
