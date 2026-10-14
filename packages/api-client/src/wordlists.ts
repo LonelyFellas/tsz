@@ -16,6 +16,7 @@ import type {
   CreateWordlist,
   UpdateWordlist,
   WordlistEditSnapshot,
+  WordlistAvailability,
   WordlistItems,
   MyWordlistItems,
   WordlistCatalog,
@@ -94,6 +95,15 @@ export function createWordlistEndpoints(http: HttpClient) {
       http
         .get<unknown>(`/wordlists/${id}`, o)
         .then((v) => decodeWordlistResponse<Wordlist>("Wordlist", v)),
+    availability: (id: string, o?: Options) =>
+      http
+        .get<unknown>(`/wordlists/${id}/availability`, o)
+        .then((v) =>
+          decodeWordlistResponse<WordlistAvailability>(
+            "WordlistAvailability",
+            v
+          )
+        ),
     items: (id: string, q: WordlistItemsQuery = {}, o?: Options) =>
       http
         .get<unknown>(`/wordlists/${id}/items${query(q)}`, {
@@ -121,6 +131,15 @@ export function createWordlistEndpoints(http: HttpClient) {
       http
         .get<unknown>(`/me/wordlists/${id}`, o)
         .then((v) => decodeWordlistResponse<Wordlist>("Wordlist", v)),
+    myAvailability: (id: string, o?: Options) =>
+      http
+        .get<unknown>(`/me/wordlists/${id}/availability`, o)
+        .then((v) =>
+          decodeWordlistResponse<WordlistAvailability>(
+            "WordlistAvailability",
+            v
+          )
+        ),
     myItems: (id: string, q: WordlistItemsQuery = {}, o?: Options) =>
       http
         .get<unknown>(`/me/wordlists/${id}/items${query(q)}`, {

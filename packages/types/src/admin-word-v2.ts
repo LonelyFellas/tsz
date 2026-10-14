@@ -647,6 +647,15 @@ export interface EntryLifecycleTarget {
   base_lifecycle_revision: number;
 }
 
+export interface EntryArchiveImpactInput {
+  entries: EntryLifecycleTarget[];
+}
+
+export interface EntryArchiveImpact {
+  wordlist_count: number;
+  active_run_count: number;
+}
+
 export interface EntryLifecycleBatchInput {
   entries: EntryLifecycleTarget[];
   confirmed_surface_match_token?: string;

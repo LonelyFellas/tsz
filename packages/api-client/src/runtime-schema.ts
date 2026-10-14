@@ -26,6 +26,8 @@ export const RUNTIME_SCHEMA_ROOTS = [
   "Wordlist",
   "WordlistPage",
   "WordlistItems",
+  "WordlistAvailability",
+  "EntryArchiveImpact",
   "MyWordlistItems",
   "WordlistCatalog",
   "WordlistSuggestions",

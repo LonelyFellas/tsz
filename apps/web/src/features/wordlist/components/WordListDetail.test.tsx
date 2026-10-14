@@ -19,6 +19,8 @@ vi.mock("@/lib/request", () => ({
     wordList: {
       get: vi.fn(),
       myDetail: vi.fn(),
+      availability: vi.fn(),
+      myAvailability: vi.fn(),
       items: vi.fn(),
       myItems: vi.fn(),
       reviews: vi.fn()
@@ -146,6 +148,16 @@ beforeEach(() => {
   useUserStore.setState({ hydrated: true, user: user("owner") });
   vi.mocked(api.wordList.get).mockResolvedValue(list);
   vi.mocked(api.wordList.myDetail).mockResolvedValue(list);
+  vi.mocked(api.wordList.availability).mockResolvedValue({
+    revision: 1,
+    available_count: 51,
+    unavailable_count: 0
+  });
+  vi.mocked(api.wordList.myAvailability).mockResolvedValue({
+    revision: 1,
+    available_count: 51,
+    unavailable_count: 0
+  });
   vi.mocked(api.wordList.items).mockImplementation(async (_id, query) =>
     pageResult(query?.page ?? 1)
   );
@@ -171,6 +183,51 @@ function open(mine = false) {
   const result = render(element());
   return { client, ...result, refresh: () => result.rerender(element()) };
 }
+it("collapses unavailable references, keeps notes and positions, and loads later usable entries", async () => {
+  vi.mocked(api.wordList.myAvailability).mockResolvedValue({
+    revision: 1,
+    available_count: 49,
+    unavailable_count: 2
+  });
+  vi.mocked(api.wordList.myItems).mockResolvedValueOnce({
+    ...myPageResult(1),
+    items: [{ ...myPageResult(1).items[0]!, entry: null }]
+  });
+  open(true);
+  await screen.findByText(/整张词表：49 个可用词条，2 个暂不可用/);
+  const summary = await screen.findByText(/查看暂不可用的词条/);
+  expect(summary.closest("details")).not.toHaveAttribute("open");
+  expect(screen.getByText(/原位置 1/)).toBeInTheDocument();
+  expect(screen.getByText("私密备注：作者秘密")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "移除或替换" })).toHaveAttribute(
+    "href",
+    "/account/wordlists/list/edit"
+  );
+  expect(
+    screen.queryByRole("heading", { name: "apple" })
+  ).not.toBeInTheDocument();
+  expect(screen.getByText("当前已加载的词条均不可用。")).toBeVisible();
+  reachBottom();
+  await screen.findByRole("heading", { name: "banana" });
+  expect(
+    screen.queryByText("当前已加载的词条均不可用。")
+  ).not.toBeInTheDocument();
+});
+
+it("old backend availability 404 never invents zero counts or blocks reading, and can retry", async () => {
+  const { HttpError } = await import("@tsz/api-client");
+  vi.mocked(api.wordList.availability).mockRejectedValueOnce(
+    new HttpError(404, "not found")
+  );
+  open();
+  await screen.findByRole("heading", { name: "apple" });
+  await screen.findByText(/可用数量暂时无法读取/);
+  expect(screen.queryByText(/整张词表：/)).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "重试" }));
+  await screen.findByText("整张词表：51 个可用词条");
+  expect(api.wordList.myAvailability).not.toHaveBeenCalled();
+});
+
 it("switches real modes and reading context without writing preferences or leaking private responses", async () => {
   const view = open(true);
   await screen.findByText("A1-UK");

@@ -52,6 +52,8 @@ const ROOTS = [
   "Wordlist",
   "WordlistPage",
   "WordlistItems",
+  "WordlistAvailability",
+  "EntryArchiveImpact",
   "MyWordlistItems",
   "WordlistCatalog",
   "WordlistSuggestions",

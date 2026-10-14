@@ -50,6 +50,30 @@ beforeEach(() => {
     pagination: { total_pages: 1 }
   });
 });
+it("invalidated practice explains withdrawal, preserves progress and links to restarting without an answer form", async () => {
+  mocks.run.mockResolvedValue({
+    ...run,
+    state: "invalidated",
+    answered_count: 1
+  });
+  mocks.questions.mockResolvedValue({
+    items: [
+      { ...question, answered: true, content_available: false, prompt: null }
+    ],
+    pagination: { total_pages: 1 }
+  });
+  renderWithProviders(<LearningPractice id="run" />);
+  await screen.findByText(/恢复词条不会自动恢复旧轮次/);
+  expect(
+    screen.getByRole("link", { name: "返回任务重新开始" })
+  ).toHaveAttribute("href", "/student/tasks/task");
+  expect(screen.queryByLabelText("英文拼写")).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "提交答案" })
+  ).not.toBeInTheDocument();
+  expect(mocks.answer).not.toHaveBeenCalled();
+});
+
 it("unknown answer result retains input and retries the original intent", async () => {
   mocks.questions.mockResolvedValue({
     items: [question],

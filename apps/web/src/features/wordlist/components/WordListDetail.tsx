@@ -87,6 +87,15 @@ function Detail({
         ? api.wordList.myDetail(id, { signal })
         : api.wordList.get(id, { signal })
   });
+  const availability = useQuery({
+    queryKey: [...keys, "availability", id, meta.data?.revision],
+    enabled: meta.isSuccess,
+    refetchOnMount: "always",
+    queryFn: ({ signal }) =>
+      mine
+        ? api.wordList.myAvailability(id, { signal })
+        : api.wordList.availability(id, { signal })
+  });
   const items = useInfiniteQuery({
     queryKey: [...keys, "items", "infinite", id, q, view, sort],
     enabled: meta.isSuccess,
@@ -141,6 +150,11 @@ function Detail({
       : (profile.data?.learning_settings?.cefr_level ?? "C2");
   const variant = profile.data?.learning_settings?.english_variant ?? null;
   const loadedItems = items.data?.pages.flatMap((page) => page.items) ?? [];
+  const unavailableItems = loadedItems.filter((item) => !item.entry);
+  const availabilityData =
+    availability.data?.revision === meta.data?.revision
+      ? availability.data
+      : undefined;
   useEffect(() => {
     const target = loadMoreRef.current;
     if (
@@ -301,6 +315,24 @@ function Detail({
               审核记录加载失败。
             </p>
           )}
+          {availabilityData ? (
+            <p className="mt-4 text-sm text-foreground-muted">
+              整张词表：{availabilityData.available_count} 个可用词条
+              {availabilityData.unavailable_count > 0 &&
+                `，${availabilityData.unavailable_count} 个暂不可用，不参与出题`}
+            </p>
+          ) : availability.isError ||
+            (availability.isSuccess && !availabilityData) ? (
+            <p role="alert" className="mt-4 text-sm text-foreground-muted">
+              可用数量暂时无法读取，已加载的词条仍可阅读。{" "}
+              <button
+                className={textButtonClass}
+                onClick={() => void availability.refetch()}
+              >
+                重试
+              </button>
+            </p>
+          ) : null}
           {!mine &&
             list.state === "published" &&
             list.owner_user_id !== null && <TipPanel list={list} />}
@@ -386,37 +418,93 @@ function Detail({
         <PageNotice>正在读取条目…</PageNotice>
       ) : (
         <>
+          {(unavailableItems.length > 0 ||
+            (availabilityData?.unavailable_count ?? 0) > 0) && (
+            <details className="mb-6 rounded-2xl border border-border/60 bg-muted/70 px-4 py-3 text-sm leading-6">
+              <summary className="cursor-pointer font-medium">
+                查看暂不可用的词条
+                {availabilityData
+                  ? `（整张词表共 ${availabilityData.unavailable_count} 个）`
+                  : `（已加载 ${unavailableItems.length} 个）`}
+              </summary>
+              <p className="mt-3 text-foreground-muted">
+                这些词条目前不能阅读或用于出题。引用和备注仍保留，内容恢复可用后会重新显示。
+              </p>
+              {mine && (
+                <p className="mt-2">
+                  <Link
+                    className={textButtonClass}
+                    href={`/account/wordlists/${id}/edit`}
+                  >
+                    移除或替换
+                  </Link>
+                  {(list.state === "published" || list.state === "pending") &&
+                    " · 请先撤回为私密，再编辑词表。"}
+                </p>
+              )}
+              <ul className="mt-3 space-y-2">
+                {unavailableItems.map((item) => (
+                  <li
+                    key={item.entry_id}
+                    className="border-t border-border/60 pt-2"
+                  >
+                    原位置 {item.position + 1} · 词条暂不可用
+                    {item.author_note && (
+                      <p className="whitespace-pre-wrap">
+                        注：{item.author_note}
+                      </p>
+                    )}
+                    {mine &&
+                      "private_note" in item &&
+                      (item as MyWordlistItem).private_note && (
+                        <p className="whitespace-pre-wrap text-foreground-muted">
+                          私密备注：{(item as MyWordlistItem).private_note}
+                        </p>
+                      )}
+                  </li>
+                ))}
+              </ul>
+              {(availabilityData?.unavailable_count ?? 0) >
+                unavailableItems.length && (
+                <p className="mt-2 text-foreground-muted">
+                  这里只列出当前已加载且符合搜索条件的项目；其他项目会随词条加载显示。
+                </p>
+              )}
+            </details>
+          )}
           <div className="space-y-4">
-            {loadedItems.map((item) => (
-              <section key={item.entry_id} className={panelClass}>
-                <div className="mb-3 text-xs font-medium tabular-nums tracking-wide text-foreground-subtle">
-                  {String(item.position + 1).padStart(2, "0")}
-                </div>
-                {item.entry ? (
+            {loadedItems.map((item) =>
+              item.entry ? (
+                <section key={item.entry_id} className={panelClass}>
+                  <div className="mb-3 text-xs font-medium tabular-nums tracking-wide text-foreground-subtle">
+                    {String(item.position + 1).padStart(2, "0")}
+                  </div>
                   <ReadingEntry
                     full={view === "full"}
                     entry={item.entry}
                     level={level}
                     variant={variant}
                   />
-                ) : (
-                  <p className="text-sm text-foreground-muted">内容不可用</p>
-                )}
-                {item.author_note && (
-                  <p className="mt-5 whitespace-pre-wrap rounded-2xl bg-muted/70 px-4 py-3 text-sm leading-6">
-                    注：{item.author_note}
-                  </p>
-                )}
-                {mine &&
-                  "private_note" in item &&
-                  (item as MyWordlistItem).private_note && (
-                    <p className="mt-3 whitespace-pre-wrap rounded-2xl border border-dashed border-border px-4 py-3 text-sm leading-6 text-foreground-muted">
-                      私密备注：{(item as MyWordlistItem).private_note}
+                  {item.author_note && (
+                    <p className="mt-5 whitespace-pre-wrap rounded-2xl bg-muted/70 px-4 py-3 text-sm leading-6">
+                      注：{item.author_note}
                     </p>
                   )}
-              </section>
-            ))}
+                  {mine &&
+                    "private_note" in item &&
+                    (item as MyWordlistItem).private_note && (
+                      <p className="mt-3 whitespace-pre-wrap rounded-2xl border border-dashed border-border px-4 py-3 text-sm leading-6 text-foreground-muted">
+                        私密备注：{(item as MyWordlistItem).private_note}
+                      </p>
+                    )}
+                </section>
+              ) : null
+            )}
           </div>
+          {loadedItems.length > 0 &&
+            loadedItems.every((item) => !item.entry) && (
+              <PageNotice>当前已加载的词条均不可用。</PageNotice>
+            )}
           {loadedItems.length === 0 ? (
             <PageNotice>没有匹配词条</PageNotice>
           ) : (
