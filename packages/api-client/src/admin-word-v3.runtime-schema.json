@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/wordlist-authoring/tsz-rust/docs/openapi.json",
-  "_source_sha256": "45211185d19a904a9bc917f17c0d88c4db7861581e41b5a4ca22352154a63b75",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-wordlist-publication-review/docs/openapi.json",
+  "_source_sha256": "e93a7e7fafc95f4ff1aeb5595c888b9092ca05a75e271ed688ba5724a21ca06b",
   "roots": [
     "LearningRewardDay",
     "LearningPreview",

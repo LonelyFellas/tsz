@@ -195,6 +195,7 @@ it("management wire supports platform authors and keeps private notes out of pub
   const admin = createAdminWordlistEndpoints(http);
   await admin.management({
     q: "作者",
+    review_state: "pending",
     public: false,
     recommended: false,
     created_from: "2026-10-12T00:00:00Z",
@@ -208,6 +209,7 @@ it("management wire supports platform authors and keeps private notes out of pub
   expect(url.pathname).toBe("/wordlists/management");
   expect(Object.fromEntries(url.searchParams)).toEqual({
     q: "作者",
+    review_state: "pending",
     public: "false",
     recommended: "false",
     created_from: "2026-10-12T00:00:00Z",
