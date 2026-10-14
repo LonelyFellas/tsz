@@ -202,3 +202,28 @@ it("failed mutation reports unconfirmed state and refetches", async () => {
     1
   );
 });
+
+it("filters pending applications across the full management list and resets the filter", async () => {
+  mount();
+  await screen.findByText("待审词表");
+  fireEvent.mouseDown(screen.getByLabelText("审核状态"));
+  fireEvent.click(
+    await screen.findByText("待审核", {
+      selector: ".ant-select-item-option-content"
+    })
+  );
+  fireEvent.click(screen.getByRole("button", { name: /搜\s*索/ }));
+  await waitFor(() =>
+    expect(api.wordlists.management).toHaveBeenLastCalledWith(
+      expect.objectContaining({ review_state: "pending", page: 1 }),
+      expect.anything()
+    )
+  );
+  fireEvent.click(screen.getByRole("button", { name: /重\s*置/ }));
+  await waitFor(() =>
+    expect(api.wordlists.management).toHaveBeenLastCalledWith(
+      { page: 1, page_size: 20 },
+      expect.anything()
+    )
+  );
+});

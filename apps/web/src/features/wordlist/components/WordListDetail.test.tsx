@@ -23,7 +23,8 @@ vi.mock("@/lib/request", () => ({
       myAvailability: vi.fn(),
       items: vi.fn(),
       myItems: vi.fn(),
-      reviews: vi.fn()
+      reviews: vi.fn(),
+      publish: vi.fn()
     },
     auth: { me: vi.fn() }
   }
@@ -503,4 +504,41 @@ it("rejects changed content versions and reloads before appending the new versio
   reachBottom();
   await screen.findByRole("heading", { name: "banana" });
   expect(screen.getByText("已加载全部 2 个词条")).toBeVisible();
+});
+
+it("keeps a publication application private until manual approval", async () => {
+  vi.mocked(api.wordList.myDetail).mockResolvedValueOnce({
+    ...list,
+    state: "draft"
+  });
+  vi.mocked(api.wordList.publish).mockImplementation(async () => {
+    vi.mocked(api.wordList.myDetail).mockResolvedValue({
+      ...list,
+      state: "pending",
+      revision: 2
+    });
+    return {
+      id: "request",
+      wordlist_id: list.id,
+      submitted_revision: 2,
+      name: list.name,
+      state: "pending",
+      reason: null,
+      created_at: "",
+      decided_at: null
+    };
+  });
+  open(true);
+  fireEvent.click(await screen.findByRole("button", { name: "申请公开" }));
+  expect(
+    await screen.findByText("公开申请正在审核中，审核通过前仅你可见。")
+  ).toBeVisible();
+  expect(api.wordList.publish).toHaveBeenCalledWith("list", {
+    expected_revision: 1,
+    idempotency_key: expect.any(String)
+  });
+  expect(
+    screen.queryByRole("link", { name: "查看公开页面" })
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "撤回为私密" })).toBeEnabled();
 });

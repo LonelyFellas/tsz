@@ -200,6 +200,7 @@ export interface AdminWordlistPage {
   pagination: WordlistPage["pagination"];
 }
 export interface WordlistManagementQuery extends WordlistQuery {
+  review_state?: AdminWordlist["review_state"];
   public?: boolean;
   recommended?: boolean;
   created_from?: string;

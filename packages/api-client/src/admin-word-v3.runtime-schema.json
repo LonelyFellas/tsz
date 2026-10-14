@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/entry-withdrawal-ux/docs/openapi.json",
-  "_source_sha256": "8151c28ec9362756236d85c058c5634ab0d097d736c93b07baaadce1280c524b",
+  "_source_sha256": "f0acc07048162f0c13811af91b2bf40e49817aca6e0d7c09909a1130a58d6613",
   "roots": [
     "LearningRewardDay",
     "LearningPreview",

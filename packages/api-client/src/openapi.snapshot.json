@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/entry-withdrawal-ux/docs/openapi.json",
-  "_generatedAt": "2026-10-14T02:17:39.331Z",
+  "_generatedAt": "2026-10-14T05:52:19.967Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],

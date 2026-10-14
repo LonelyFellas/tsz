@@ -29,6 +29,7 @@ const reviewLabels: Record<string, string> = {
 type Filters = {
   q?: string;
   public?: boolean;
+  review_state?: AdminWordlist["review_state"];
   recommended?: boolean;
   dates?: [Dayjs, Dayjs];
 };
@@ -117,6 +118,7 @@ function Management({ adminId }: { adminId: string }) {
             page_size: query.page_size,
             q: values.q?.trim(),
             public: values.public,
+            review_state: values.review_state,
             recommended: values.recommended,
             created_from: values.dates?.[0].startOf("day").toISOString(),
             created_before: values.dates?.[1]
@@ -144,6 +146,18 @@ function Management({ adminId }: { adminId: string }) {
               { value: true, label: "公开" },
               { value: false, label: "私密" }
             ]}
+          />
+        </Form.Item>
+        <Form.Item name="review_state" label="审核状态">
+          <Select
+            aria-label="审核状态"
+            style={{ width: 140 }}
+            allowClear
+            placeholder="全部"
+            options={Object.entries(reviewLabels).map(([value, label]) => ({
+              value,
+              label: value === "none" ? "未申请" : label
+            }))}
           />
         </Form.Item>
         <Form.Item name="recommended" label="是否推荐">
