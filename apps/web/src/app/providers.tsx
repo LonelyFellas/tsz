@@ -8,6 +8,7 @@ import { syncThemeToDom } from "@/lib/theme";
 import { useSessionRestore } from "@/features/auth/hooks/useSessionRestore";
 import { useUserStore } from "@/stores/user";
 import { PhoneBindingGuard } from "@/features/auth/components/PhoneBindingGuard";
+import { NotificationTabBadge } from "@/features/teacher-certification/NotificationTabBadge";
 import { TeacherIdentityProvider } from "@/features/teacher-certification/TeacherIdentityProvider";
 
 // 服务端无 layout effect;客户端用 layoutEffect 在 paint 前补主题 class。
@@ -98,6 +99,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <ThemeSync />
       <SessionRestorer />
+      <NotificationTabBadge />
       <PhoneBindingGuard>
         <TeacherIdentityProvider>{children}</TeacherIdentityProvider>
       </PhoneBindingGuard>
