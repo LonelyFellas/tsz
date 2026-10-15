@@ -5,6 +5,8 @@ import { WordListBrowser } from "./WordListBrowser";
 vi.mock("@/lib/request", () => ({
   api: {
     wordList: {
+      interactionStats: vi.fn().mockResolvedValue({ items: [] }),
+      interactionStates: vi.fn().mockResolvedValue({ items: [] }),
       recommended: vi.fn(),
       list: vi.fn().mockRejectedValue(new Error("offline"))
     }

@@ -10,7 +10,8 @@ export function useWordLists(
   mine = false,
   page = 1,
   q = "",
-  recommended = false
+  recommended = false,
+  enabled = true
 ) {
   const id = useUserStore((s) => s.user?.id);
   return useQuery({
@@ -21,7 +22,7 @@ export function useWordLists(
       q,
       recommended
     ],
-    enabled: !mine || !!id,
+    enabled: enabled && (!mine || !!id),
     refetchOnMount: "always",
     queryFn: ({ signal }) =>
       mine

@@ -437,3 +437,60 @@ it("accepts current owner unavailability reasons without widening public or lega
     })
   ).toThrow();
 });
+
+it("keeps batched public stats separate from private state and decodes unavailable references", async () => {
+  const stats = {
+    items: [
+      {
+        wordlist_id: id,
+        like_count: 2,
+        favorite_count: 1,
+        tip_amount: "9007199254740993000"
+      }
+    ]
+  };
+  const state = { wordlist_id: id, liked: true, favorited: false };
+  const http = {
+    get: vi.fn().mockResolvedValue(stats),
+    put: vi.fn().mockResolvedValue(state)
+  } as unknown as HttpClient;
+  const api = createWordlistEndpoints(http);
+  expect(await api.interactionStats([id])).toEqual(stats);
+  expect(http.get).toHaveBeenLastCalledWith(
+    `/wordlists/interactions?ids=${id}`,
+    undefined
+  );
+  vi.mocked(http.get).mockResolvedValue({ items: [state] });
+  expect(await api.interactionStates([id])).toEqual({ items: [state] });
+  expect(http.get).toHaveBeenLastCalledWith(
+    `/me/wordlist-interactions?ids=${id}`,
+    undefined
+  );
+  expect(await api.setInteraction(id, { kind: "like", active: true })).toEqual(
+    state
+  );
+  expect(http.put).toHaveBeenCalledWith(
+    `/me/wordlists/${id}/interactions`,
+    { kind: "like", active: true },
+    undefined
+  );
+  vi.mocked(http.get).mockResolvedValue({
+    items: [{ wordlist_id: id, wordlist: null }],
+    pagination
+  });
+  expect((await api.favorites()).items[0]?.wordlist).toBeNull();
+  expect(() =>
+    decodeWordlistResponse("WordlistInteractionStatsBatch", {
+      items: [{ ...stats.items[0], tip_amount: "1.5" }]
+    })
+  ).toThrow();
+  expect(() =>
+    decodeWordlistResponse("WordlistFavoritePage", {
+      items: [{ wordlist_id: id, wordlist: null, name: "private" }],
+      pagination
+    })
+  ).toThrow();
+  expect(() =>
+    decodeWordlistResponse("Wordlist", { ...meta, like_count: 1 })
+  ).toThrow();
+});

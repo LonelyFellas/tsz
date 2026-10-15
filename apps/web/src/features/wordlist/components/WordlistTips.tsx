@@ -159,6 +159,7 @@ function TipForm({ userId, list }: { userId: string; list: Wordlist }) {
       setAmount("");
       setSuccess(true);
       setMessage(`已投出 ${formatCoins(receipt.amount)}，作者已收到。`);
+      await client.invalidateQueries({ queryKey: wordListKeys.all });
       await client.invalidateQueries({ queryKey: ["coins"] });
       if (!current()) return;
       await client.invalidateQueries({
