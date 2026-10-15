@@ -1193,7 +1193,12 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(groupCard).toHaveTextContent("发音方式");
     expect(groupCard).toHaveTextContent("字典音标");
     expect(groupCard).toHaveTextContent("实际发音");
-    expect(within(groupCard).getAllByLabelText(/播放语音/)).toHaveLength(3);
+    expect(within(groupCard).getAllByLabelText(/拼写 播放语音/)).toHaveLength(
+      3
+    );
+    expect(
+      within(groupCard).getAllByLabelText(/最终读音 播放语音/)
+    ).toHaveLength(3);
     expect(within(groupCard).queryAllByLabelText(/获取语音/)).toHaveLength(0);
     expect(
       within(groupCard).getAllByLabelText("第 1 条发音的字典音标", {
