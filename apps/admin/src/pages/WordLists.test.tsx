@@ -1,3 +1,4 @@
+import { ConfigProvider } from "antd";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   fireEvent,
@@ -10,10 +11,11 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
 import type { AdminWordlist } from "@tsz/types";
 import { WordListsPage } from "./WordLists";
-const permissions = vi.hoisted(() => ({ allowed: true }));
+import { ReviewsPage } from "./Reviews";
+const permissions = vi.hoisted(() => ({ allowed: true, access: true }));
 vi.mock("@/lib/auth", () => ({
   usePermission: (key: string) =>
-    key === "wordlists.access" || permissions.allowed,
+    key === "wordlists.access" ? permissions.access : permissions.allowed,
   useAuthStore: (selector: (s: unknown) => unknown) =>
     selector({ profile: { id: "admin", permission_version: 1 } }),
   api: {
@@ -47,7 +49,7 @@ const row: AdminWordlist = {
   recommended: false,
   tip_amount: "5"
 };
-function mount() {
+function mount(page = <WordListsPage />) {
   return render(
     <MemoryRouter>
       <QueryClientProvider
@@ -55,7 +57,9 @@ function mount() {
           new QueryClient({ defaultOptions: { queries: { retry: false } } })
         }
       >
-        <WordListsPage />
+        <ConfigProvider theme={{ token: { motion: false } }}>
+          {page}
+        </ConfigProvider>
       </QueryClientProvider>
     </MemoryRouter>
   );
@@ -63,6 +67,7 @@ function mount() {
 beforeEach(() => {
   vi.clearAllMocks();
   permissions.allowed = true;
+  permissions.access = true;
   vi.mocked(api.wordlists.management).mockResolvedValue({
     items: [row],
     pagination
@@ -93,7 +98,7 @@ beforeEach(() => {
     ]
   });
 });
-it("approval uses inspected snapshot revision even after visibility override", async () => {
+it("management shows one row per review without loading word details or decision controls", async () => {
   vi.mocked(api.wordlists.currentItems).mockResolvedValue({
     items: [
       {
@@ -118,12 +123,75 @@ it("approval uses inspected snapshot revision even after visibility override", a
     revision: 2,
     pagination
   });
+  vi.mocked(api.wordlists.reviews).mockResolvedValue({
+    withdraw_reason: null,
+    items: [
+      {
+        id: "request",
+        wordlist_id: "list",
+        name: "提交名称",
+        submitted_revision: 2,
+        state: "pending",
+        reason: null,
+        created_at: "2026-10-12T00:00:00Z",
+        decided_at: null
+      },
+      {
+        id: "previous",
+        wordlist_id: "list",
+        name: "旧申请名称",
+        reviewer_id: "reviewer",
+        reviewer_name: "审核老师",
+        submitted_revision: 1,
+        state: "rejected",
+        reason: "内容不完整",
+        created_at: "2026-10-11T00:00:00Z",
+        decided_at: "2026-10-11T01:00:00Z"
+      }
+    ]
+  });
   mount();
-  fireEvent.click(await screen.findByText("查 看"));
+  fireEvent.click(await screen.findByText(/^查\s*看$/));
   expect(await screen.findByText("注：当前词表注释")).toBeVisible();
   fireEvent.click(await screen.findByText("审核记录"));
-  expect(await screen.findByText("注：提交时冻结的注释")).toBeVisible();
+  expect(await screen.findByText("提交名称")).toBeVisible();
+  expect(screen.getByText("已驳回")).toBeVisible();
+  expect(screen.getByText("提交名称").closest("tr")).toHaveTextContent(
+    "待审核"
+  );
+  expect(screen.getByText("旧申请名称").closest("tr")).toHaveTextContent(
+    "内容不完整"
+  );
+  expect(screen.getByText("旧申请名称").closest("tr")).toHaveTextContent(
+    "审核老师"
+  );
+  expect(screen.queryByText("注：提交时冻结的注释")).not.toBeInTheDocument();
+  expect(api.wordlists.items).not.toHaveBeenCalled();
+  expect(screen.queryByText(/第\s*\d+\s*版/)).not.toBeInTheDocument();
+  expect(screen.queryByRole("radio")).not.toBeInTheDocument();
   expect(screen.queryByText("注：当前词表注释")).not.toBeInTheDocument();
+
+  expect(screen.queryByText("通过审核")).not.toBeInTheDocument();
+  expect(screen.queryByText("驳 回")).not.toBeInTheDocument();
+  expect(api.wordlists.decision).not.toHaveBeenCalled();
+});
+it("review approval uses the submitted snapshot revision instead of the current revision", async () => {
+  vi.mocked(api.wordlists.items).mockResolvedValue({
+    items: [
+      {
+        entry_id: "entry",
+        position: 0,
+        entry: null,
+        author_note: "提交时冻结的注释"
+      }
+    ],
+    revision: 2,
+    pagination
+  });
+  mount(<ReviewsPage />);
+  fireEvent.click(await screen.findByText(/^查\s*看$/));
+  expect(await screen.findByText("注：提交时冻结的注释")).toBeVisible();
+  expect(api.wordlists.currentItems).not.toHaveBeenCalled();
   fireEvent.click(await screen.findByText("通过审核"));
   fireEvent.click(await screen.findByText(/确.*定|OK/));
   await waitFor(() =>
@@ -132,6 +200,9 @@ it("approval uses inspected snapshot revision even after visibility override", a
       approve: true,
       reason: null
     })
+  );
+  expect(vi.mocked(api.wordlists.management).mock.calls.length).toBeGreaterThan(
+    1
   );
 });
 it("user private lists have no creation, edit or direct publication controls", async () => {
@@ -163,14 +234,14 @@ it("search commits filters and reset requests page one without stale query", asy
   fireEvent.change(screen.getByLabelText("搜索词表"), {
     target: { value: "作者" }
   });
-  fireEvent.click(screen.getByText("搜 索"));
+  fireEvent.click(screen.getByRole("button", { name: /搜\s*索/ }));
   await waitFor(() =>
     expect(api.wordlists.management).toHaveBeenLastCalledWith(
       expect.objectContaining({ q: "作者", page: 1 }),
       expect.anything()
     )
   );
-  fireEvent.click(screen.getByText("重 置"));
+  fireEvent.click(screen.getByRole("button", { name: /重\s*置/ }));
   await waitFor(() =>
     expect(screen.getByLabelText("搜索词表")).toHaveValue("")
   );
@@ -183,15 +254,13 @@ it("read-only administrators cannot create, edit, publish, recommend or delete",
   permissions.allowed = false;
   mount();
   await screen.findByText("待审词表");
-  for (const text of ["删 除"]) {
-    expect(screen.getByText(text).closest("button")).toBeDisabled();
-  }
+  expect(screen.getByLabelText("删除待审词表")).toBeDisabled();
   expect(screen.getByLabelText("推荐 待审词表")).toBeDisabled();
 });
 it("failed mutation reports unconfirmed state and refetches", async () => {
   vi.mocked(api.wordlists.delete).mockRejectedValue(new Error("offline"));
   mount();
-  fireEvent.click(await screen.findByText("删 除"));
+  fireEvent.click(await screen.findByLabelText("删除待审词表"));
   const dialog = await screen.findByRole("dialog");
   fireEvent.click(within(dialog).getByText(/确.*定|OK/));
   expect(await screen.findByText(/操作失败或结果未确认/)).toBeInTheDocument();
@@ -203,27 +272,184 @@ it("failed mutation reports unconfirmed state and refetches", async () => {
   );
 });
 
-it("filters pending applications across the full management list and resets the filter", async () => {
-  mount();
+it("review queue defaults to pending and filters on the server", async () => {
+  mount(<ReviewsPage />);
   await screen.findByText("待审词表");
+  expect(api.wordlists.management).toHaveBeenLastCalledWith(
+    { page: 1, page_size: 20, review_state: "pending" },
+    expect.anything()
+  );
   fireEvent.mouseDown(screen.getByLabelText("审核状态"));
   fireEvent.click(
-    await screen.findByText("待审核", {
+    await screen.findByText("审核通过", {
       selector: ".ant-select-item-option-content"
     })
   );
   fireEvent.click(screen.getByRole("button", { name: /搜\s*索/ }));
   await waitFor(() =>
     expect(api.wordlists.management).toHaveBeenLastCalledWith(
-      expect.objectContaining({ review_state: "pending", page: 1 }),
+      expect.objectContaining({ review_state: "approved", page: 1 }),
       expect.anything()
     )
   );
   fireEvent.click(screen.getByRole("button", { name: /重\s*置/ }));
   await waitFor(() =>
     expect(api.wordlists.management).toHaveBeenLastCalledWith(
-      { page: 1, page_size: 20 },
+      { page: 1, page_size: 20, review_state: "pending" },
       expect.anything()
     )
   );
 });
+
+it("review readers cannot decide applications", async () => {
+  permissions.allowed = false;
+  mount(<ReviewsPage />);
+  fireEvent.click(await screen.findByText(/^查\s*看$/));
+  expect(await screen.findByText("申请名称：提交名称")).toBeVisible();
+  expect(screen.queryByText("通过审核")).not.toBeInTheDocument();
+  expect(screen.queryByText("驳 回")).not.toBeInTheDocument();
+});
+it("rejection requires a reason and sends the inspected request revision", async () => {
+  mount(<ReviewsPage />);
+  fireEvent.click(await screen.findByText(/^查\s*看$/));
+  fireEvent.click(await screen.findByText("驳 回"));
+  const dialog = (await screen.findByText("驳回词表")).closest<HTMLElement>(
+    '[role="dialog"]'
+  )!;
+  fireEvent.click(within(dialog).getByText(/确.*定|OK/));
+  await waitFor(() => expect(screen.getByText("请填写驳回原因")).toBeVisible());
+  expect(api.wordlists.decision).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByLabelText("操作原因"), {
+    target: { value: " 内容不完整 " }
+  });
+  fireEvent.click(within(dialog).getByText(/确.*定|OK/));
+  await waitFor(() =>
+    expect(api.wordlists.decision).toHaveBeenCalledWith("list", "request", {
+      expected_revision: 2,
+      approve: false,
+      reason: "内容不完整"
+    })
+  );
+});
+
+it("review queue rejects direct access without wordlist read permission", async () => {
+  permissions.access = false;
+  mount(<ReviewsPage />);
+  expect(await screen.findByText("未开通词表查看权限")).toBeVisible();
+  expect(api.wordlists.management).not.toHaveBeenCalled();
+});
+it("completed review records remain readable without decision controls", async () => {
+  vi.mocked(api.wordlists.reviews).mockResolvedValue({
+    withdraw_reason: null,
+    items: [
+      {
+        id: "request",
+        wordlist_id: "list",
+        name: "提交名称",
+        submitted_revision: 2,
+        state: "rejected",
+        reason: "内容不完整",
+        created_at: "",
+        decided_at: ""
+      },
+      {
+        id: "approved-request",
+        wordlist_id: "list",
+        name: "第一版提交名称",
+        submitted_revision: 1,
+        state: "approved",
+        reason: null,
+        created_at: "",
+        decided_at: ""
+      }
+    ]
+  });
+  mount(<ReviewsPage />);
+  fireEvent.click(await screen.findByText(/^查\s*看$/));
+  expect(await screen.findByText("审核意见：内容不完整")).toBeVisible();
+  expect(screen.queryByText("通过审核")).not.toBeInTheDocument();
+  expect(screen.queryByText("驳 回")).not.toBeInTheDocument();
+  expect(screen.getByRole("radio", { name: "已驳回" })).toBeChecked();
+  const approved = screen.getByRole("radio", { name: "已通过" });
+  expect(
+    screen.queryByRole("button", { name: "已通过" })
+  ).not.toBeInTheDocument();
+  fireEvent.click(approved);
+  expect(approved).toBeChecked();
+  expect(await screen.findByText("申请名称：第一版提交名称")).toBeVisible();
+  await waitFor(() =>
+    expect(api.wordlists.items).toHaveBeenLastCalledWith(
+      "list",
+      "approved-request",
+      { page: 1, page_size: 20 },
+      expect.anything()
+    )
+  );
+  expect(api.wordlists.decision).not.toHaveBeenCalled();
+});
+it("failed review decision preserves the dialog and reports an unconfirmed result", async () => {
+  vi.mocked(api.wordlists.decision).mockRejectedValue(new Error("conflict"));
+  mount(<ReviewsPage />);
+  fireEvent.click(await screen.findByText(/^查\s*看$/));
+  fireEvent.click(await screen.findByText("通过审核"));
+  const dialog = (
+    await screen.findByText("确认通过审核并公开")
+  ).closest<HTMLElement>('[role="dialog"]')!;
+  fireEvent.click(within(dialog).getByText(/确.*定|OK/));
+  await waitFor(() =>
+    expect(within(dialog).getByText(/旧审核不会覆盖已修改的内容/)).toBeVisible()
+  );
+});
+
+it.each(["approve", "reject"] as const)(
+  "returns to the last valid page after %s removes the only pending item on page two",
+  async (decision) => {
+    let decided = false;
+    const remaining = Array.from({ length: 20 }, (_, i) => ({
+      ...row,
+      wordlist: {
+        ...row.wordlist,
+        id: `remaining-${i}`,
+        name: `剩余词表${i + 1}`
+      }
+    }));
+    vi.mocked(api.wordlists.management).mockImplementation(
+      async (query = {}) => ({
+        items: query.page === 2 ? (decided ? [] : [row]) : remaining,
+        pagination: {
+          page: query.page ?? 1,
+          page_size: 20,
+          total: decided ? 20 : 21,
+          total_pages: decided ? 1 : 2
+        }
+      })
+    );
+    vi.mocked(api.wordlists.decision).mockImplementation(async () => {
+      decided = true;
+      return row.wordlist;
+    });
+    mount(<ReviewsPage />);
+    await screen.findByText("剩余词表1");
+    fireEvent.click(screen.getByTitle("2"));
+    await screen.findByText("待审词表");
+    fireEvent.click(screen.getByText(/^查\s*看$/));
+    fireEvent.click(
+      await screen.findByText(decision === "approve" ? "通过审核" : "驳 回")
+    );
+    if (decision === "reject") {
+      fireEvent.change(screen.getByLabelText("操作原因"), {
+        target: { value: "内容不完整" }
+      });
+    }
+    fireEvent.click(screen.getByText(/确.*定|OK/));
+    await waitFor(() => expect(api.wordlists.decision).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(api.wordlists.management).toHaveBeenLastCalledWith(
+        { page: 1, page_size: 20, review_state: "pending" },
+        expect.anything()
+      )
+    );
+    expect(await screen.findByText("剩余词表1")).toBeVisible();
+    expect(screen.queryByText("待审词表")).not.toBeInTheDocument();
+  }
+);

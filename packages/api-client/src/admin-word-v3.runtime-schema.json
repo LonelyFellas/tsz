@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/entry-withdrawal-ux/docs/openapi.json",
-  "_source_sha256": "f0acc07048162f0c13811af91b2bf40e49817aca6e0d7c09909a1130a58d6613",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-review-management/docs/openapi.json",
+  "_source_sha256": "7eeb3b6aba3477dbf7ef5bbb65fb46ea8a1cad405149b76b9e963f65b59c6ed1",
   "roots": [
     "LearningRewardDay",
     "LearningPreview",
@@ -27,6 +27,7 @@
     "WordlistEditSnapshot",
     "WordlistReview",
     "WordlistReviews",
+    "AdminWordlistReviews",
     "InvitationCode",
     "InvitationOverview",
     "InvitationRecordPage",
@@ -229,6 +230,44 @@
           "type": "array",
           "items": { "$ref": "#/$defs/AdminWordListItemV3" }
         }
+      },
+      "additionalProperties": false
+    },
+    "AdminWordlistReview": {
+      "type": "object",
+      "required": [
+        "id",
+        "wordlist_id",
+        "submitted_revision",
+        "name",
+        "state",
+        "reason",
+        "created_at",
+        "decided_at"
+      ],
+      "properties": {
+        "created_at": { "type": "string", "format": "date-time" },
+        "decided_at": { "type": ["string", "null"], "format": "date-time" },
+        "id": { "type": "string", "format": "uuid" },
+        "name": { "type": "string" },
+        "reason": { "type": ["string", "null"] },
+        "reviewer_id": { "type": ["string", "null"], "format": "uuid" },
+        "reviewer_name": { "type": ["string", "null"] },
+        "state": { "type": "string" },
+        "submitted_revision": { "type": "integer" },
+        "wordlist_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "AdminWordlistReviews": {
+      "type": "object",
+      "required": ["withdraw_reason", "items"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AdminWordlistReview" }
+        },
+        "withdraw_reason": { "type": ["string", "null"] }
       },
       "additionalProperties": false
     },

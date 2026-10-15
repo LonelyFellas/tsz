@@ -141,6 +141,14 @@ export interface WordlistReviews {
   withdraw_reason: string | null;
   items: WordlistReview[];
 }
+export interface AdminWordlistReview extends WordlistReview {
+  reviewer_id?: string | null;
+  reviewer_name?: string | null;
+}
+export interface AdminWordlistReviews {
+  withdraw_reason: string | null;
+  items: AdminWordlistReview[];
+}
 export interface WordlistDecision {
   expected_revision: number;
   approve: boolean;

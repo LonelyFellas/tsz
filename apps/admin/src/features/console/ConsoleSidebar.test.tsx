@@ -22,7 +22,7 @@ const FULL_PERMISSIONS: MenuPermission[] = [
   "wordlists.access",
   "customwordlist.access",
   "tasks.access",
-  "reviews.access",
+  "wordlists.review",
   "teacherapply.access",
   "comments.access",
   "coins.access"
@@ -222,4 +222,23 @@ it("公开例句只读管理员可见例句菜单及直链，不能进入词库"
   expect(
     canVisitAdminRoute({ ...profile!, permissions: [] }, "/sentences")
   ).toBe(false);
+});
+
+it("词表查看权限可进入审核菜单及直链，审核操作权限不替代查看权限", async () => {
+  const { canVisitAdminRoute } = await import("@/lib/adminPageRoutes");
+  setLevel("admin", ["wordlists.access"]);
+  const view = renderAt("/");
+  fireEvent.click(screen.getByText("审核管理"));
+  fireEvent.click(screen.getByText("词表审核"));
+  expect(mockNavigate).toHaveBeenCalledWith("/reviews");
+  expect(canVisitAdminRoute(useAuthStore.getState().profile, "/reviews")).toBe(
+    true
+  );
+  view.unmount();
+  setLevel("admin", ["wordlists.review"]);
+  renderAt("/");
+  expect(screen.queryByText("审核管理")).toBeNull();
+  expect(canVisitAdminRoute(useAuthStore.getState().profile, "/reviews")).toBe(
+    false
+  );
 });

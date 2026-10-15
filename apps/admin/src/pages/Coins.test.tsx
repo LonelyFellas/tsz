@@ -82,7 +82,7 @@ async function prepare() {
     screen.getByPlaceholderText("姓名 / UUID / 完整手机或邮箱"),
     { target: { value: "user1" } }
   );
-  fireEvent.click(screen.getByText("查 找"));
+  fireEvent.click(screen.getByText("查找"));
   fireEvent.click(await screen.findByText("查看账户"));
   fireEvent.change(screen.getByLabelText("天生币数量"), {
     target: { value: "9007199254740993" }
@@ -138,7 +138,7 @@ it("query-only admin cannot credit and loss of access removes private data", asy
     screen.getByPlaceholderText("姓名 / UUID / 完整手机或邮箱"),
     { target: { value: "user1" } }
   );
-  fireEvent.click(screen.getByText("查 找"));
+  fireEvent.click(screen.getByText("查找"));
   fireEvent.click(await screen.findByText("查看账户"));
   expect(screen.queryByText("核对并入账")).not.toBeInTheDocument();
   act(() =>

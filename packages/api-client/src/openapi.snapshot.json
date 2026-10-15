@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/entry-withdrawal-ux/docs/openapi.json",
-  "_generatedAt": "2026-10-14T05:52:19.967Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-review-management/docs/openapi.json",
+  "_generatedAt": "2026-10-15T01:14:38.007Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -889,6 +889,14 @@
         "in": "query",
         "required": false,
         "schema": { "$ref": "#/components/schemas/WordlistState" }
+      }
+    ],
+    "get /admin/wordlists/{id}/review-requests": [
+      {
+        "name": "include_reviewer",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "boolean" }
       }
     ],
     "get /admin/wordlists/{id}/review-requests/{request_id}/items": [

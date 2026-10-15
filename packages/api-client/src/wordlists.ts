@@ -25,6 +25,7 @@ import type {
   SubmitWordlist,
   WordlistReview,
   WordlistReviews,
+  AdminWordlistReviews,
   WordlistDecision
 } from "@tsz/types";
 import type { HttpClient } from "./http";
@@ -234,9 +235,15 @@ export function createAdminWordlistEndpoints(http: HttpClient) {
         .then((v) => decodeWordlistResponse<WordlistPage>("WordlistPage", v)),
     reviews: (id: string, o?: Options) =>
       http
-        .get<unknown>(`/wordlists/${id}/review-requests`, o)
+        .get<unknown>(
+          `/wordlists/${id}/review-requests?include_reviewer=true`,
+          o
+        )
         .then((v) =>
-          decodeWordlistResponse<WordlistReviews>("WordlistReviews", v)
+          decodeWordlistResponse<AdminWordlistReviews>(
+            "AdminWordlistReviews",
+            v
+          )
         ),
     items: (id: string, request: string, q: WordlistQuery = {}, o?: Options) =>
       http
