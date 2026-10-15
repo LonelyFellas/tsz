@@ -48,7 +48,16 @@ export interface SubmitTeacherApplication {
 export interface UserNotification {
   id: string;
   application_id: string | null;
-  kind: "teacher_approved" | "teacher_rejected" | "teacher_revoked";
+  kind:
+    | "teacher_approved"
+    | "teacher_rejected"
+    | "teacher_revoked"
+    | "wordlist_liked"
+    | "wordlist_tipped";
+  wordlist_id?: string | null;
+  wordlist_name?: string | null;
+  actor_name?: string | null;
+  amount?: string | null;
   reason: string | null;
   created_at: string;
   read_at: string | null;

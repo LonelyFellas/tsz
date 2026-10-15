@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-interactions/docs/openapi.json",
-  "_source_sha256": "1bb13dfdbd1b8b08bcdbe33c1143f0525646b9b284b1b4a8463943c1838059ef",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-notifications/docs/openapi.json",
+  "_source_sha256": "5cef54678cf7fa8e7a082791a803d32876916082d7baf86be858327ae199c0d4",
   "roots": [
     "DictionaryPage",
     "DictionaryEntry",
