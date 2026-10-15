@@ -14,7 +14,7 @@ const identity = vi.hoisted(() => ({
 vi.mock("@/features/teacher-certification/TeacherIdentityProvider", () => ({
   useTeacherIdentity: () => identity
 }));
-vi.mock("./WordlistTips", () => ({ TipPanel: () => null }));
+vi.mock("./WordlistInteractions", () => ({ DetailInteractions: () => null }));
 vi.mock("@/lib/request", () => ({
   api: {
     wordList: {

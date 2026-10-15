@@ -69,6 +69,10 @@ const RUNTIME_SCHEMA_ROOTS = [
   "LearningQuestionPage",
   "LearningAnswerReceipt",
 
+  "WordlistInteractionStatsBatch",
+  "WordlistInteractionState",
+  "WordlistInteractionStates",
+  "WordlistFavoritePage",
   "WordlistTip",
   "WordlistTipPage",
   "AdminWordlist",

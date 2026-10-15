@@ -1,5 +1,10 @@
 import { SENTENCE_FORMATTING_HEADERS } from "./sentence-formatting";
 import type {
+  WordlistInteractionStatsBatch,
+  WordlistInteractionState,
+  WordlistInteractionStates,
+  WordlistFavoritePage,
+  SetWordlistInteraction,
   CreateWordlistTip,
   WordlistTip,
   WordlistTipPage
@@ -57,6 +62,48 @@ export const WORDLIST_READING_HEADERS = {
 type Options = { signal?: AbortSignal };
 export function createWordlistEndpoints(http: HttpClient) {
   return {
+    interactionStats: (ids: string[], o?: Options) =>
+      http
+        .get<unknown>(
+          `/wordlists/interactions?ids=${encodeURIComponent(ids.join(","))}`,
+          o
+        )
+        .then((v) =>
+          decodeWordlistResponse<WordlistInteractionStatsBatch>(
+            "WordlistInteractionStatsBatch",
+            v
+          )
+        ),
+    interactionStates: (ids: string[], o?: Options) =>
+      http
+        .get<unknown>(
+          `/me/wordlist-interactions?ids=${encodeURIComponent(ids.join(","))}`,
+          o
+        )
+        .then((v) =>
+          decodeWordlistResponse<WordlistInteractionStates>(
+            "WordlistInteractionStates",
+            v
+          )
+        ),
+    setInteraction: (id: string, data: SetWordlistInteraction, o?: Options) =>
+      http
+        .put<unknown>(`/me/wordlists/${id}/interactions`, data, o)
+        .then((v) =>
+          decodeWordlistResponse<WordlistInteractionState>(
+            "WordlistInteractionState",
+            v
+          )
+        ),
+    favorites: (q: WordlistQuery = {}, o?: Options) =>
+      http
+        .get<unknown>(`/me/wordlist-favorites${query(q)}`, o)
+        .then((v) =>
+          decodeWordlistResponse<WordlistFavoritePage>(
+            "WordlistFavoritePage",
+            v
+          )
+        ),
     recommended: (q: WordlistQuery = {}, o?: Options) =>
       http
         .get<unknown>(`/wordlists/recommended${query(q)}`, o)
