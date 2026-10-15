@@ -65,7 +65,10 @@ it("keeps public, personal and review item routes separate", async () => {
   });
   await api.myItems(id);
   expect(http.get).toHaveBeenLastCalledWith(`/me/wordlists/${id}/items`, {
-    headers: WORDLIST_READING_HEADERS
+    headers: {
+      ...WORDLIST_READING_HEADERS,
+      "X-TSZ-Wordlist-Entry-Labels": "v1"
+    }
   });
   await api.create({
     idempotency_key: id,
@@ -356,5 +359,41 @@ it("admin review history opts into reviewer identity while accepting older respo
       ...enriched,
       items: [{ ...enriched.items[0], reviewer_id: "invalid" }]
     })
+  ).toThrow();
+});
+
+it("accepts owner-only entry labels and stays compatible with older servers", () => {
+  const item = {
+    entry_id: id,
+    position: 0,
+    entry: null,
+    private_note: "",
+    note_revision: 1
+  };
+  const response = (value: unknown) => ({
+    items: [value],
+    revision: 1,
+    pagination
+  });
+  expect(() =>
+    decodeWordlistResponse("MyWordlistItems", response(item))
+  ).not.toThrow();
+  expect(() =>
+    decodeWordlistResponse(
+      "MyWordlistItems",
+      response({ ...item, entry_label: "apple" })
+    )
+  ).not.toThrow();
+  expect(() =>
+    decodeWordlistResponse(
+      "MyWordlistItems",
+      response({ ...item, entry_label: null })
+    )
+  ).toThrow();
+  expect(() =>
+    decodeWordlistResponse(
+      "WordlistItems",
+      response({ entry_id: id, position: 0, entry: null, entry_label: "apple" })
+    )
   ).toThrow();
 });

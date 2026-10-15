@@ -638,6 +638,7 @@ function WordRow({
   const text =
     row.text ??
     stored?.entry?.label ??
+    stored?.entry_label ??
     (stored ? "内容不可用" : row.entryId ? "正在读取词条…" : "");
   const [searchText, setSearchText] = useState(text);
   useEffect(() => {

@@ -192,7 +192,7 @@ it("collapses unavailable references, keeps notes and positions, and loads later
   });
   vi.mocked(api.wordList.myItems).mockResolvedValueOnce({
     ...myPageResult(1),
-    items: [{ ...myPageResult(1).items[0]!, entry: null }]
+    items: [{ ...myPageResult(1).items[0]!, entry: null, entry_label: "apple" }]
   });
   open(true);
   await screen.findByText(/整张词表：49 个可用词条，2 个暂不可用/);
@@ -201,7 +201,9 @@ it("collapses unavailable references, keeps notes and positions, and loads later
   const details = summary.closest("details")!;
   details.open = true;
   fireEvent(details, new Event("toggle"));
-  expect(screen.getByText(/原位置 1/)).toBeInTheDocument();
+  expect(screen.getByText(/原位置 1/)).toHaveTextContent(
+    "apple · 原位置 1 · 词条暂不可用"
+  );
   expect(screen.getByText("私密备注：作者秘密")).toHaveClass("border-dashed");
   expect(screen.getByRole("link", { name: "移除或替换" })).toHaveAttribute(
     "href",

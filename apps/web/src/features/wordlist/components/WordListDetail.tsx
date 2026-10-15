@@ -506,6 +506,13 @@ function Detail({
                       key={item.entry_id}
                       className="border-t border-border/60 pt-2"
                     >
+                      {mine &&
+                        typeof (item as MyWordlistItem).entry_label ===
+                          "string" && (
+                          <span className="tsz-words">
+                            {(item as MyWordlistItem).entry_label} ·{" "}
+                          </span>
+                        )}
                       原位置 {item.position + 1} · 词条暂不可用
                       {item.author_note && (
                         <p className="whitespace-pre-wrap">
