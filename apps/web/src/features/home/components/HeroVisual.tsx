@@ -19,10 +19,10 @@ export function HeroVisual() {
           <span className="tabular-nums text-foreground-subtle">12 / 20</span>
         </div>
 
-        {/* 主体:手机单列;sm+ 五列(左 3 单词 / 右 2 清单) */}
-        <div className="grid gap-6 p-6 text-left sm:grid-cols-5 sm:gap-8 sm:px-8 sm:pb-8 sm:pt-6">
+        {/* 主体:手机单列;sm+ 清单按内容占宽,左侧使用剩余空间 */}
+        <div className="grid gap-6 p-6 text-left sm:grid-cols-[minmax(0,1fr)_max-content] sm:px-8 sm:pb-8 sm:pt-6">
           {/* 左:单词学习区 */}
-          <div className="sm:col-span-3">
+          <div>
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
               <div className="fill-x h-full w-3/5 rounded-full bg-primary" />
             </div>
@@ -49,7 +49,7 @@ export function HeroVisual() {
           </div>
 
           {/* 右:今日清单(手机隐藏,保持竖卡紧凑) */}
-          <div className="hidden rounded-2xl border border-border/60 bg-muted/70 p-4 sm:col-span-2 sm:block">
+          <div className="hidden rounded-2xl border border-border/60 bg-muted/70 p-4 sm:block">
             <p className="text-[11px] font-medium text-foreground-subtle">
               今日清单
             </p>

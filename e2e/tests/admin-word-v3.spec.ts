@@ -27,6 +27,49 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(phonetic).toHaveCSS("font-family", /TSZ Phonetics/);
     await expect(actual).toHaveCSS("font-size", "18.6667px");
     await expect(actual).toHaveCSS("font-family", /TSZ Phonetics/);
+    const source = page.locator(".word-pronunciation-synthesis").first();
+    if (await source.locator(".word-synthesis-source-actions").isVisible()) {
+      const sourcePreviews = source.locator(".word-synthesis-choice-preview");
+      await expect(sourcePreviews).toHaveCount(3);
+      await source
+        .getByLabel("第 1 条发音的英式 Azure IPA", { exact: true })
+        .fill("ˈɔːbɪt");
+      await source
+        .getByLabel("第 1 条发音的英式 Azure UPS", { exact: true })
+        .fill("AO B IH T");
+      await expect(sourcePreviews.nth(0)).toHaveText(
+        await spelling.inputValue()
+      );
+      await expect(sourcePreviews.nth(1)).toHaveText("ˈɔːbɪt");
+      await expect(sourcePreviews.nth(2)).toHaveText("AO B IH T");
+      const spellingFont = await spelling.evaluate(
+        (node) => getComputedStyle(node).fontFamily
+      );
+      const synthesisFont = await source
+        .locator("textarea")
+        .first()
+        .evaluate((node) => getComputedStyle(node).fontFamily);
+      for (const name of ["词形拼写", "Azure IPA", "Azure UPS"]) {
+        await source.getByRole("radio", { name, exact: true }).check();
+        for (let index = 0; index < 3; index++) {
+          await expect(sourcePreviews.nth(index)).toHaveCSS(
+            "font-family",
+            index === 0 ? spellingFont : synthesisFont
+          );
+          await expect(sourcePreviews.nth(index)).toHaveCSS(
+            "font-weight",
+            "400"
+          );
+        }
+      }
+      await test.info().attach("语音来源样式", {
+        body: await source
+          .locator(".word-pronunciation-row")
+          .last()
+          .screenshot({ animations: "disabled" }),
+        contentType: "image/png"
+      });
+    }
     await page.evaluate(async () => {
       await Promise.all(
         ["normal", "italic"].flatMap((style) =>
