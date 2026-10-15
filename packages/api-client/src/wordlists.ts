@@ -147,7 +147,8 @@ export function createWordlistEndpoints(http: HttpClient) {
           ...o,
           headers: {
             ...WORDLIST_READING_HEADERS,
-            "X-TSZ-Wordlist-Entry-Labels": "v1"
+            "X-TSZ-Wordlist-Entry-Labels": "v1",
+            "X-TSZ-Wordlist-Entry-Reasons": "v1"
           }
         })
         .then((v) =>

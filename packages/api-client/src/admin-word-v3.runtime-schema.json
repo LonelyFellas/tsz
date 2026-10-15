@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-consumer-dictionary/docs/openapi.json",
-  "_source_sha256": "a52752fdfb17b6917bad386a6defc6f809bf40083b95fc5506080e728e4a8787",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/unavailable-entry-reason/docs/openapi.json",
+  "_source_sha256": "2d7f8cb9bd12e41399e5d9109e53c8416f4a48a9a8fab560bd90856a396f1936",
   "roots": [
     "DictionaryPage",
     "DictionaryEntry",
@@ -1793,7 +1793,8 @@
         "entry_label": { "type": "string" },
         "note_revision": { "type": "integer" },
         "position": { "type": "integer" },
-        "private_note": { "type": "string" }
+        "private_note": { "type": "string" },
+        "unavailable_reason": { "$ref": "#/$defs/WordlistUnavailableReason" }
       },
       "additionalProperties": false
     },
@@ -3803,6 +3804,10 @@
         "wordlist_name": { "type": ["string", "null"] }
       },
       "additionalProperties": false
+    },
+    "WordlistUnavailableReason": {
+      "type": "string",
+      "enum": ["archived", "unpublished", "unsupported_schema"]
     },
     "WordPosFormsV3": {
       "type": "object",

@@ -740,7 +740,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "a52752fdfb17b6917bad386a6defc6f809bf40083b95fc5506080e728e4a8787"
+      "2d7f8cb9bd12e41399e5d9109e53c8416f4a48a9a8fab560bd90856a396f1936"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1054,6 +1054,12 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
               ? [
                   {
                     name: "X-TSZ-Wordlist-Entry-Labels",
+                    in: "header",
+                    required: false,
+                    schema: { type: ["string", "null"] }
+                  },
+                  {
+                    name: "X-TSZ-Wordlist-Entry-Reasons",
                     in: "header",
                     required: false,
                     schema: { type: ["string", "null"] }

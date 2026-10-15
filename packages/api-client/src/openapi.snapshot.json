@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-consumer-dictionary/docs/openapi.json",
-  "_generatedAt": "2026-10-15T02:43:59.279Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/unavailable-entry-reason/docs/openapi.json",
+  "_generatedAt": "2026-10-15T04:15:21.508Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -593,6 +593,12 @@
       },
       {
         "name": "X-TSZ-Wordlist-Entry-Labels",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Wordlist-Entry-Reasons",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }

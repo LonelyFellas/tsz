@@ -1,4 +1,6 @@
 "use client";
+
+import { unavailableReasonLabels } from "../availability";
 import { TipPanel } from "./WordlistTips";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -514,6 +516,16 @@ function Detail({
                           </span>
                         )}
                       原位置 {item.position + 1} · 词条暂不可用
+                      {mine && (item as MyWordlistItem).unavailable_reason && (
+                        <p className="text-foreground-muted">
+                          原因：
+                          {
+                            unavailableReasonLabels[
+                              (item as MyWordlistItem).unavailable_reason!
+                            ]
+                          }
+                        </p>
+                      )}
                       {item.author_note && (
                         <p className="whitespace-pre-wrap">
                           注：{item.author_note}

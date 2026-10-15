@@ -94,7 +94,10 @@ export interface WordlistItem {
   author_note?: string;
   entry: WordlistEntry | null;
 }
+export type WordlistUnavailableReason =
+  "archived" | "unpublished" | "unsupported_schema";
 export interface MyWordlistItem extends WordlistItem {
+  unavailable_reason?: WordlistUnavailableReason;
   entry_label?: string;
   private_note: string;
   note_revision: number;
