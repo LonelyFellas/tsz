@@ -39,6 +39,27 @@ it("boot failure shows a native fallback even when the entry module never starts
   expect(dom.window.sessionStorage.getItem("tsz:resource-reload")).toBeNull();
   dom.window.close();
 });
+it("有新版本提示按版本记忆关闭，资源真的失败时仍然给出刷新入口", async () => {
+  const { dom } = await boot("B", "/words");
+  dom.window.dispatchEvent(new dom.window.Event("tsz:app-ready"));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const banner = () =>
+    dom.window.document.querySelector(
+      "[data-resource-recovery]"
+    ) as HTMLElement;
+  expect(banner().textContent).toContain("新版本");
+  // 关闭是记忆的：同一个版本不再反复打扰。
+  const close = banner().querySelector(".tsz-recovery-close") as HTMLElement;
+  close.click();
+  expect(dom.window.sessionStorage.getItem("tsz:resource-dismissed")).toBe("B");
+  expect(banner().style.display).toBe("none");
+  // 但资源确实加载失败时，刷新入口不能被「关掉」。
+  dom.window.dispatchEvent(new dom.window.Event("vite:preloadError"));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(banner().getAttribute("data-tone")).toBe("danger");
+  expect(banner().style.display).toBe("");
+  dom.window.close();
+});
 it("an image failure does not trigger whole-page recovery", async () => {
   const { dom, fetch } = await boot("A");
   const image = dom.window.document.createElement("img");
