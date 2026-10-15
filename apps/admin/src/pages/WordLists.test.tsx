@@ -151,7 +151,7 @@ it("management shows one row per review without loading word details or decision
     ]
   });
   mount();
-  fireEvent.click(await screen.findByRole("button", { name: /查\s*看/ }));
+  fireEvent.click(await screen.findByText(/^查\s*看$/));
   expect(await screen.findByText("注：当前词表注释")).toBeVisible();
   fireEvent.click(await screen.findByText("审核记录"));
   expect(await screen.findByText("提交名称")).toBeVisible();
@@ -189,7 +189,7 @@ it("review approval uses the submitted snapshot revision instead of the current 
     pagination
   });
   mount(<ReviewsPage />);
-  fireEvent.click(await screen.findByRole("button", { name: /查\s*看/ }));
+  fireEvent.click(await screen.findByText(/^查\s*看$/));
   expect(await screen.findByText("注：提交时冻结的注释")).toBeVisible();
   expect(api.wordlists.currentItems).not.toHaveBeenCalled();
   fireEvent.click(await screen.findByText("通过审核"));
@@ -254,13 +254,13 @@ it("read-only administrators cannot create, edit, publish, recommend or delete",
   permissions.allowed = false;
   mount();
   await screen.findByText("待审词表");
-  expect(screen.getByRole("button", { name: "删除待审词表" })).toBeDisabled();
+  expect(screen.getByLabelText("删除待审词表")).toBeDisabled();
   expect(screen.getByLabelText("推荐 待审词表")).toBeDisabled();
 });
 it("failed mutation reports unconfirmed state and refetches", async () => {
   vi.mocked(api.wordlists.delete).mockRejectedValue(new Error("offline"));
   mount();
-  fireEvent.click(await screen.findByRole("button", { name: "删除待审词表" }));
+  fireEvent.click(await screen.findByLabelText("删除待审词表"));
   const dialog = await screen.findByRole("dialog");
   fireEvent.click(within(dialog).getByText(/确.*定|OK/));
   expect(await screen.findByText(/操作失败或结果未确认/)).toBeInTheDocument();
@@ -304,14 +304,14 @@ it("review queue defaults to pending and filters on the server", async () => {
 it("review readers cannot decide applications", async () => {
   permissions.allowed = false;
   mount(<ReviewsPage />);
-  fireEvent.click(await screen.findByRole("button", { name: /查\s*看/ }));
+  fireEvent.click(await screen.findByText(/^查\s*看$/));
   expect(await screen.findByText("申请名称：提交名称")).toBeVisible();
   expect(screen.queryByText("通过审核")).not.toBeInTheDocument();
   expect(screen.queryByText("驳 回")).not.toBeInTheDocument();
 });
 it("rejection requires a reason and sends the inspected request revision", async () => {
   mount(<ReviewsPage />);
-  fireEvent.click(await screen.findByRole("button", { name: /查\s*看/ }));
+  fireEvent.click(await screen.findByText(/^查\s*看$/));
   fireEvent.click(await screen.findByText("驳 回"));
   const dialog = (await screen.findByText("驳回词表")).closest<HTMLElement>(
     '[role="dialog"]'
@@ -365,7 +365,7 @@ it("completed review records remain readable without decision controls", async (
     ]
   });
   mount(<ReviewsPage />);
-  fireEvent.click(await screen.findByRole("button", { name: /查\s*看/ }));
+  fireEvent.click(await screen.findByText(/^查\s*看$/));
   expect(await screen.findByText("审核意见：内容不完整")).toBeVisible();
   expect(screen.queryByText("通过审核")).not.toBeInTheDocument();
   expect(screen.queryByText("驳 回")).not.toBeInTheDocument();
@@ -390,7 +390,7 @@ it("completed review records remain readable without decision controls", async (
 it("failed review decision preserves the dialog and reports an unconfirmed result", async () => {
   vi.mocked(api.wordlists.decision).mockRejectedValue(new Error("conflict"));
   mount(<ReviewsPage />);
-  fireEvent.click(await screen.findByRole("button", { name: /查\s*看/ }));
+  fireEvent.click(await screen.findByText(/^查\s*看$/));
   fireEvent.click(await screen.findByText("通过审核"));
   const dialog = (
     await screen.findByText("确认通过审核并公开")
@@ -432,7 +432,7 @@ it.each(["approve", "reject"] as const)(
     await screen.findByText("剩余词表1");
     fireEvent.click(screen.getByTitle("2"));
     await screen.findByText("待审词表");
-    fireEvent.click(screen.getByRole("button", { name: /查\s*看/ }));
+    fireEvent.click(screen.getByText(/^查\s*看$/));
     fireEvent.click(
       await screen.findByText(decision === "approve" ? "通过审核" : "驳 回")
     );
