@@ -213,6 +213,33 @@
 
 .word-synthesis-choice.ant-radio-wrapper {
   margin-inline-end: 0;
+  font-weight: 400;
+}
+
+.word-synthesis-choice-content {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.word-synthesis-choice-tag {
+  flex-shrink: 0;
+  padding-inline: 4px;
+  border: 1px solid var(--ant-color-border, #d9d9d9);
+  border-radius: 4px;
+  line-height: 20px;
+}
+
+.word-synthesis-choice-preview {
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+
+.word-synthesis-choice.ant-radio-wrapper-checked .word-synthesis-choice-tag {
+  color: var(--ant-color-text-light-solid, #fff);
+  background: var(--ant-color-primary, #2053ff);
+  border-color: var(--ant-color-primary, #2053ff);
 }
 
 .word-synthesis-settings-header {

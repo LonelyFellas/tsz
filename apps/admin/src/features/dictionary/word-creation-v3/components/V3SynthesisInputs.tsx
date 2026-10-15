@@ -573,9 +573,44 @@ export function V3SynthesisInputs({
                   })
                 }
               >
-                <Radio value="spelling">词形拼写</Radio>
-                <Radio value="ipa">Azure IPA</Radio>
-                <Radio value="ups">Azure UPS</Radio>
+                {[
+                  {
+                    value: "spelling",
+                    name: "词形拼写",
+                    text: spelling,
+                    fontClass: "tsz-words"
+                  },
+                  {
+                    value: "ipa",
+                    name: "Azure IPA",
+                    text: selectedSynthesis.ipa,
+                    fontClass: "tsz-phonetics"
+                  },
+                  {
+                    value: "ups",
+                    name: "Azure UPS",
+                    text: selectedSynthesis.ups,
+                    fontClass: "tsz-phonetics"
+                  }
+                ].map((option) => (
+                  <Radio
+                    key={option.value}
+                    value={option.value}
+                    aria-label={option.name}
+                    className="word-synthesis-choice"
+                  >
+                    <span className="word-synthesis-choice-content">
+                      <span className="word-synthesis-choice-tag">
+                        {option.name}
+                      </span>
+                      <span
+                        className={`word-synthesis-choice-preview ${option.fontClass}`}
+                      >
+                        {option.text}
+                      </span>
+                    </span>
+                  </Radio>
+                ))}
               </Radio.Group>
             </div>
           </div>
