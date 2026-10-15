@@ -541,7 +541,9 @@ it("keeps a publication application private until manual approval", async () => 
     };
   });
   open(true);
-  fireEvent.click(await screen.findByRole("button", { name: "申请公开" }));
+  const applyButton = await screen.findByRole("button", { name: "申请公开" });
+  await waitFor(() => expect(applyButton).toBeEnabled());
+  fireEvent.click(applyButton);
   expect(
     await screen.findByText("公开申请正在审核中，审核通过前仅你可见。")
   ).toBeVisible();
@@ -555,44 +557,54 @@ it("keeps a publication application private until manual approval", async () => 
   expect(screen.getByRole("button", { name: "撤回为私密" })).toBeEnabled();
 });
 
-it("explains rejected unavailable entries, opens their reasons, and clears the failed application", async () => {
+it("handles entries becoming unavailable after precheck and allows a new attempt after recovery", async () => {
   vi.mocked(api.wordList.myDetail).mockResolvedValue({
     ...list,
     state: "draft"
   });
-  vi.mocked(api.wordList.myAvailability).mockResolvedValue({
-    revision: 1,
-    available_count: 50,
-    unavailable_count: 1
+  vi.mocked(api.wordList.publish).mockImplementation(async () => {
+    vi.mocked(api.wordList.myAvailability).mockResolvedValue({
+      revision: 1,
+      available_count: 50,
+      unavailable_count: 1
+    });
+    vi.mocked(api.wordList.myItems).mockResolvedValue({
+      ...myPageResult(1),
+      items: [
+        {
+          ...myPageResult(1).items[0]!,
+          entry: null,
+          entry_label: "tea",
+          unavailable_reason: "archived"
+        }
+      ]
+    });
+    throw new HttpError(400, "unavailable entries", [], "validation_failed");
   });
-  vi.mocked(api.wordList.myItems).mockResolvedValue({
-    ...myPageResult(1),
-    items: [
-      {
-        ...myPageResult(1).items[0]!,
-        entry: null,
-        entry_label: "tea",
-        unavailable_reason: "archived"
-      }
-    ]
-  });
-  vi.mocked(api.wordList.publish).mockRejectedValue(
-    new HttpError(400, "unavailable entries", [], "validation_failed")
-  );
-  open(true);
-  const summary = await screen.findByText(/查看暂不可用的词条/);
-  expect(summary.closest("details")).not.toHaveAttribute("open");
-  fireEvent.click(screen.getByRole("button", { name: "申请公开" }));
+  const { client } = open(true);
+  const button = await screen.findByRole("button", { name: "申请公开" });
+  await waitFor(() => expect(button).toBeEnabled());
+  fireEvent.click(button);
   await screen.findByText(
     "申请公开失败：词表中有暂不可用的词条。请在下方查看原因，移除或替换后再申请。"
   );
-  expect(summary.closest("details")).toHaveAttribute("open");
-  expect(screen.getByText("原因：已移入垃圾桶")).toBeVisible();
+  expect(await screen.findByText("原因：已移入垃圾桶")).toBeVisible();
+  expect(
+    screen.getByText(/查看暂不可用的词条/).closest("details")
+  ).toHaveAttribute("open");
+  expect(button).toBeDisabled();
   const first = vi.mocked(api.wordList.publish).mock.calls[0]![1];
-  await waitFor(() =>
-    expect(screen.getByRole("button", { name: "申请公开" })).toBeEnabled()
-  );
-  fireEvent.click(screen.getByRole("button", { name: "申请公开" }));
+  vi.mocked(api.wordList.myAvailability).mockResolvedValue({
+    revision: 1,
+    available_count: 51,
+    unavailable_count: 0
+  });
+  vi.mocked(api.wordList.myItems).mockResolvedValue(myPageResult(1));
+  await act(async () => {
+    await client.invalidateQueries();
+  });
+  await waitFor(() => expect(button).toBeEnabled());
+  fireEvent.click(button);
   await waitFor(() => expect(api.wordList.publish).toHaveBeenCalledTimes(2));
   expect(
     vi.mocked(api.wordList.publish).mock.calls[1]![1].idempotency_key
@@ -612,7 +624,9 @@ it.each([
     });
     vi.mocked(api.wordList.publish).mockRejectedValue(error);
     open(true);
-    fireEvent.click(await screen.findByRole("button", { name: "申请公开" }));
+    const applyButton = await screen.findByRole("button", { name: "申请公开" });
+    await waitFor(() => expect(applyButton).toBeEnabled());
+    fireEvent.click(applyButton);
     const notice = await screen.findByText(
       "暂时无法确认申请是否成功，请刷新页面查看词表状态后再试。"
     );
@@ -644,4 +658,155 @@ it("explains a rejected withdrawal as a changed wordlist instead of an uncertain
   } finally {
     confirm.mockRestore();
   }
+});
+
+it("explains unavailable entries before publication and prevents submission", async () => {
+  vi.mocked(api.wordList.myDetail).mockResolvedValue({
+    ...list,
+    state: "draft"
+  });
+  vi.mocked(api.wordList.myAvailability).mockResolvedValue({
+    revision: 1,
+    available_count: 50,
+    unavailable_count: 1
+  });
+  vi.mocked(api.wordList.myItems).mockResolvedValue({
+    ...myPageResult(1),
+    items: [
+      {
+        ...myPageResult(1).items[0]!,
+        entry: null,
+        entry_label: "tea",
+        unavailable_reason: "archived"
+      }
+    ]
+  });
+  open(true);
+  await screen.findByText(
+    "暂时不能申请公开：词表中有暂不可用的词条。请查看下方原因，移除或替换后再申请。"
+  );
+  expect(screen.getByText("原因：已移入垃圾桶")).toBeVisible();
+  expect(
+    screen.getByText(/查看暂不可用的词条/).closest("details")
+  ).toHaveAttribute("open");
+  const button = screen.getByRole("button", { name: "申请公开" });
+  expect(button).toBeDisabled();
+  fireEvent.click(button);
+  expect(api.wordList.publish).not.toHaveBeenCalled();
+});
+
+it("waits for whole-list availability before enabling publication", async () => {
+  vi.mocked(api.wordList.myDetail).mockResolvedValue({
+    ...list,
+    state: "draft"
+  });
+  let finish!: (value: {
+    revision: number;
+    available_count: number;
+    unavailable_count: number;
+  }) => void;
+  vi.mocked(api.wordList.myAvailability).mockReturnValue(
+    new Promise((resolve) => {
+      finish = resolve;
+    })
+  );
+  open(true);
+  const button = await screen.findByRole("button", { name: "申请公开" });
+  expect(button).toBeDisabled();
+  expect(screen.getByText("正在检查词条可用性，请稍候。")).toBeVisible();
+  await act(async () =>
+    finish({ revision: 1, available_count: 51, unavailable_count: 0 })
+  );
+  await waitFor(() => expect(button).toBeEnabled());
+});
+
+it("keeps publication disabled when counts cannot be verified and enables it after retry", async () => {
+  vi.mocked(api.wordList.myDetail).mockResolvedValue({
+    ...list,
+    state: "draft"
+  });
+  vi.mocked(api.wordList.myAvailability)
+    .mockRejectedValueOnce(new Error("offline"))
+    .mockResolvedValue({
+      revision: 1,
+      available_count: 51,
+      unavailable_count: 0
+    });
+  open(true);
+  await screen.findByText(
+    "暂时无法确认词条是否全部可用，请在下方重试后再申请。"
+  );
+  expect(screen.getByRole("button", { name: "申请公开" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "重试" }));
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "申请公开" })).toBeEnabled()
+  );
+});
+
+it("uses whole-list counts when unavailable entries are on another page or hidden by search", async () => {
+  vi.mocked(api.wordList.myDetail).mockResolvedValue({
+    ...list,
+    state: "draft"
+  });
+  vi.mocked(api.wordList.myAvailability).mockResolvedValue({
+    revision: 1,
+    available_count: 50,
+    unavailable_count: 1
+  });
+  vi.mocked(api.wordList.myItems).mockImplementation(async (_id, query) => {
+    const result = myPageResult(query?.page ?? 1);
+    return query?.page === 2
+      ? {
+          ...result,
+          items: [
+            {
+              ...result.items[0]!,
+              entry: null,
+              entry_label: "tea",
+              unavailable_reason: "archived"
+            }
+          ]
+        }
+      : result;
+  });
+  open(true);
+  await screen.findByText(/暂时不能申请公开/);
+  expect(screen.getByRole("button", { name: "申请公开" })).toBeDisabled();
+  expect(screen.queryByText("原因：已移入垃圾桶")).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "加载更多词条以查看原因" })
+  );
+  expect(await screen.findByText("原因：已移入垃圾桶")).toBeVisible();
+  fireEvent.change(screen.getByRole("textbox", { name: "搜索词条" }), {
+    target: { value: "apple" }
+  });
+  await waitFor(() =>
+    expect(
+      vi
+        .mocked(api.wordList.myItems)
+        .mock.calls.some(([, query]) => query?.q === "apple")
+    ).toBe(true)
+  );
+  expect(screen.getByRole("button", { name: "申请公开" })).toBeDisabled();
+  fireEvent.click(
+    await screen.findByRole("button", { name: "清空搜索查看原因" })
+  );
+  expect(screen.getByRole("textbox", { name: "搜索词条" })).toHaveValue("");
+  expect(await screen.findByText("原因：已移入垃圾桶")).toBeVisible();
+  expect(api.wordList.publish).not.toHaveBeenCalled();
+});
+
+it("blocks publication when availability belongs to a different wordlist revision", async () => {
+  vi.mocked(api.wordList.myDetail).mockResolvedValue({
+    ...list,
+    state: "draft"
+  });
+  vi.mocked(api.wordList.myAvailability).mockResolvedValue({
+    revision: 2,
+    available_count: 51,
+    unavailable_count: 0
+  });
+  open(true);
+  await screen.findByRole("button", { name: "重新加载词表" });
+  expect(screen.getByRole("button", { name: "申请公开" })).toBeDisabled();
 });
