@@ -51,7 +51,7 @@ export default function GlobalError({
             className="inline-flex min-h-12 items-center justify-center rounded-full bg-primary px-5 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             onClick={resourceError ? () => window.location.reload() : reset}
           >
-            重新加载
+            {resourceError ? "重新加载" : "重试"}
           </button>
           {/* 根 layout 已失败，这里用 Link 只是为了 href 语义：router 不存在时它会整页跳转。 */}
           <Link

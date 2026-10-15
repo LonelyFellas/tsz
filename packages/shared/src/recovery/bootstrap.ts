@@ -76,13 +76,14 @@ export function installResourceRecovery(releaseId: string, prefixes: string[]) {
       return false;
     }
   };
-  // 「有新版本」只在确有未保存输入时劝阻立即刷新，其余情况一句到底。
-  const versionNotice = (): Notice => ({
+  // 「有新版本」只在确有未保存输入时劝阻立即刷新，其余情况一句到底；
+  // 页面已经出现资源失败时不给关闭——那会把唯一的刷新入口关掉。
+  const versionNotice = (fatal = false): Notice => ({
     tone: "info",
     title: "有新版本可用",
     body: dirty() ? "请先保存当前修改，再刷新更新。" : "刷新即可使用最新内容。",
     action: "刷新更新",
-    dismissible: true,
+    dismissible: !fatal,
     version: latest || releaseId
   });
   // 资源已失败：页面随时可能不可用，不提供关闭，只留重新加载这条路。
@@ -127,6 +128,9 @@ export function installResourceRecovery(releaseId: string, prefixes: string[]) {
       banner = document.createElement("div");
       banner.className = "tsz-recovery";
       banner.setAttribute("data-resource-recovery", "");
+      // 先把 live region 以空内容挂进去，下一拍再填文案；否则首条提示常被读屏忽略。
+      banner.setAttribute("role", "status");
+      banner.setAttribute("aria-live", "polite");
       banner.style.display = "none";
       const icon = document.createElement("span");
       icon.className = "tsz-recovery-icon";
@@ -150,14 +154,13 @@ export function installResourceRecovery(releaseId: string, prefixes: string[]) {
         try {
           sessionStorage.setItem(dismissedKey, latest || releaseId);
         } catch {
-          /* 关不掉时保留提示，用户仍可刷新。 */
+          /* 存储不可用时本次照样关闭，只是不记忆，下次探测可能再提示。 */
         }
         if (banner) banner.style.display = "none";
       };
       banner.append(icon, text, action, close);
       layout = { icon, title, body, action };
       (document.body ?? document.documentElement).append(banner);
-      // 插入当拍就带文案的 live region 常被读屏忽略：先空挂，再在下一拍填内容。
       queued = notice;
       window.setTimeout(() => {
         const next = queued;
@@ -191,7 +194,7 @@ export function installResourceRecovery(releaseId: string, prefixes: string[]) {
           throw new Error("invalid version");
         latest = value.release_id;
         if (latest !== releaseId && (ready || failed)) {
-          show(versionNotice());
+          show(versionNotice(failed));
           // 只在明确没有编辑功能的入口自动恢复；其他页面必须人工选择。
           if (
             failed &&
@@ -304,7 +307,7 @@ export function installResourceRecovery(releaseId: string, prefixes: string[]) {
     "tsz:app-ready",
     () => {
       ready = true;
-      if (latest && latest !== releaseId) show(versionNotice());
+      if (latest && latest !== releaseId) show(versionNotice(failed));
       window.setTimeout(() => {
         if (ready && !failed) {
           try {
