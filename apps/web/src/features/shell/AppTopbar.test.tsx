@@ -62,7 +62,7 @@ beforeEach(() => {
   });
 });
 
-it("游客只看到词库广场、外观设置与登录入口", async () => {
+it("游客看到词典、词库广场、外观设置与登录入口", async () => {
   useUserStore.setState({ user: null, hydrated: true });
   const actions = userEvent.setup();
   renderWithProviders(<AppTopbar />);
@@ -76,7 +76,7 @@ it("游客只看到词库广场、外观设置与登录入口", async () => {
     within(menu)
       .getAllByRole("link")
       .map((link) => link.getAttribute("href"))
-  ).toEqual(["/wordlists", "/"]);
+  ).toEqual(["/dictionary", "/wordlists", "/"]);
   await actions.click(screen.getByRole("button", { name: "设置" }));
   const settings = screen.getByRole("dialog", { name: "设置" });
   expect(
@@ -143,6 +143,7 @@ it("没有学生角色且不在教学工作台的账号只看到精简菜单", a
   await actions.click(screen.getByRole("button", { name: "网站菜单" }));
   expect(menuLinks("网站菜单")).toEqual([
     "/account/wordlists",
+    "/dictionary",
     "/wordlists",
     "/account/coins",
     "/account/notifications",

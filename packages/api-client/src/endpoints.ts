@@ -1,3 +1,4 @@
+import { createDictionaryEndpoints } from "./dictionary";
 import { createLearningRewardEndpoints } from "./learning-rewards";
 import { createLearningTaskEndpoints } from "./learning-tasks";
 import { createWordlistEndpoints } from "./wordlists";
@@ -79,6 +80,7 @@ export type OtpPurpose =
 
 export function createEndpoints(http: HttpClient) {
   return {
+    dictionary: createDictionaryEndpoints(http),
     coins: createCoinEndpoints(http),
     learningRewards: createLearningRewardEndpoints(http),
     invitations: createInvitationEndpoints(http),
