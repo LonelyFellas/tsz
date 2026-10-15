@@ -46,7 +46,7 @@ for (const width of [375, 1280]) {
     await expect(page).toHaveURL(/\/account\/notifications$/);
     await expect(page.getByRole("menu")).toHaveCount(0);
     await expect(
-      page.getByText("暂无站内通知，认证结果会显示在这里。")
+      page.getByText("暂无站内通知，词表互动和认证结果会显示在这里。")
     ).toBeVisible();
   });
 }

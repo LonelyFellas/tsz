@@ -163,6 +163,8 @@ if (!spec?.paths) {
   throw new Error(`spec 无 paths 字段: ${source}`);
 }
 const contractSchemaNames = [
+  "UserNotification",
+  "NotificationList",
   "WordlistView",
   "WordlistSort",
   "ManualCreditCategory",

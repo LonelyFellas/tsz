@@ -79,3 +79,78 @@ it("offers a retry after a failed request", async () => {
   fireEvent.click(screen.getByRole("button", { name: "重试" }));
   expect(await screen.findByText("证件不清晰")).toBeInTheDocument();
 });
+
+it("shows wordlist likes and tips with author links and exact amounts", async () => {
+  vi.mocked(api.teacherCertification.notifications).mockResolvedValue({
+    items: [
+      {
+        ...notification,
+        id: "like",
+        application_id: null,
+        reason: null,
+        kind: "wordlist_liked",
+        actor_name: "小明",
+        wordlist_id: "list-1",
+        wordlist_name: "四级词汇"
+      },
+      {
+        ...notification,
+        id: "tip",
+        application_id: null,
+        reason: null,
+        kind: "wordlist_tipped",
+        actor_name: "小红",
+        wordlist_id: "list-1",
+        wordlist_name: "四级词汇",
+        amount: "9007199254740993"
+      }
+    ],
+    total: 2,
+    unread_count: 2
+  });
+  show();
+  expect(await screen.findByText("词表收到点赞")).toBeInTheDocument();
+  expect(
+    screen.getByText("小明赞了你的词表「四级词汇」。")
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText(/小红向你的词表.*9,007,199,254,740,993/)
+  ).toBeInTheDocument();
+  expect(screen.getAllByRole("link", { name: "查看词表" })[0]).toHaveAttribute(
+    "href",
+    "/account/wordlists/list-1"
+  );
+  expect(screen.getByRole("link", { name: "查看收币记录" })).toHaveAttribute(
+    "href",
+    "/account/wordlist-tips"
+  );
+  expect(
+    screen.queryByRole("link", { name: "查看对应申请" })
+  ).not.toBeInTheDocument();
+});
+
+it("keeps deleted wordlist notifications readable without a broken wordlist link", async () => {
+  vi.mocked(api.teacherCertification.notifications).mockResolvedValue({
+    items: [
+      {
+        ...notification,
+        application_id: null,
+        reason: null,
+        kind: "wordlist_tipped",
+        amount: "7"
+      }
+    ],
+    total: 1,
+    unread_count: 1
+  });
+  show();
+  expect(
+    await screen.findByText(/账号已注销向你的词表（已删除）投了/)
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByRole("link", { name: "查看词表" })
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("link", { name: "查看收币记录" })
+  ).toBeInTheDocument();
+});
