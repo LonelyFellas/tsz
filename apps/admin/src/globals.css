@@ -1,5 +1,13 @@
 @import "@tsz/shared/fonts.css";
 
+/* 版本恢复浮层（@tsz/shared/recovery 注入，见 vite.config.ts 的 release-identity）渲染在
+   ConfigProvider 之外，取不到 antd token，只能读 CSS 变量，读不到时回退 web 的 Apple 蓝。
+   这里补后台自己的品牌蓝与浅底，避免后台的「刷新重试」浮层用错品牌色。 */
+:root {
+  --ch-primary: 32 83 255; /* 与 ConfigProvider 的 colorPrimary 同值 */
+  --ch-primary-muted: 237 242 255;
+}
+
 body {
   margin: 0;
   -webkit-font-smoothing: antialiased;
