@@ -493,3 +493,41 @@ it("published author annotations require withdrawal while existing private notes
     })
   );
 });
+
+it("shows an unavailable entry's label when editing without treating it as readable", async () => {
+  const meta = {
+    id: "list",
+    owner_user_id: "one",
+    owner_name: "作者",
+    name: "词表",
+    state: "draft" as const,
+    revision: 1,
+    item_count: 1,
+    created_at: "",
+    updated_at: ""
+  };
+  vi.mocked(api.wordList.edit).mockResolvedValue({
+    wordlist: meta,
+    entry_ids: [candidate.entry_id]
+  });
+  vi.mocked(api.wordList.myItems).mockResolvedValue({
+    items: [
+      {
+        entry_id: candidate.entry_id,
+        position: 0,
+        entry: null,
+        entry_label: "apple",
+        private_note: "原备注",
+        note_revision: 7
+      }
+    ],
+    revision: 1,
+    pagination: { page: 1, page_size: 100, total: 1, total_pages: 1 }
+  });
+  renderWithProviders(<WordListCreator id="list" />);
+  await waitFor(() =>
+    expect(screen.getByPlaceholderText("输入单词或短语")).toHaveValue("apple")
+  );
+  expect(screen.getByLabelText("私密备注 1")).toHaveValue("原备注");
+  expect(api.wordList.suggestions).not.toHaveBeenCalled();
+});

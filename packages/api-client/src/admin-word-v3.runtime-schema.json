@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-review-management/docs/openapi.json",
-  "_source_sha256": "7eeb3b6aba3477dbf7ef5bbb65fb46ea8a1cad405149b76b9e963f65b59c6ed1",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/unavailable-entry-label/docs/openapi.json",
+  "_source_sha256": "b32c8021ac957217293ffc97ecca24250dac4be71a8003b0feae34a3a4a26b1d",
   "roots": [
     "LearningRewardDay",
     "LearningPreview",
@@ -1726,6 +1726,7 @@
           "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/WordlistEntry" }]
         },
         "entry_id": { "type": "string", "format": "uuid" },
+        "entry_label": { "type": "string" },
         "note_revision": { "type": "integer" },
         "position": { "type": "integer" },
         "private_note": { "type": "string" }

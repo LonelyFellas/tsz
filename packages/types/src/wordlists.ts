@@ -95,6 +95,7 @@ export interface WordlistItem {
   entry: WordlistEntry | null;
 }
 export interface MyWordlistItem extends WordlistItem {
+  entry_label?: string;
   private_note: string;
   note_revision: number;
 }

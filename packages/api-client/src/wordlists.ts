@@ -145,7 +145,10 @@ export function createWordlistEndpoints(http: HttpClient) {
       http
         .get<unknown>(`/me/wordlists/${id}/items${query(q)}`, {
           ...o,
-          headers: WORDLIST_READING_HEADERS
+          headers: {
+            ...WORDLIST_READING_HEADERS,
+            "X-TSZ-Wordlist-Entry-Labels": "v1"
+          }
         })
         .then((v) =>
           decodeWordlistResponse<MyWordlistItems>("MyWordlistItems", v)
