@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/unavailable-entry-label/docs/openapi.json",
-  "_generatedAt": "2026-10-15T02:21:54.718Z",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-consumer-dictionary/docs/openapi.json",
+  "_generatedAt": "2026-10-15T02:43:59.279Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -125,6 +125,9 @@
     "/auth/refresh": ["head", "post"],
     "/auth/register": ["post"],
     "/avatars/{id}": ["get"],
+    "/dictionary": ["get"],
+    "/dictionary/entries/{id}": ["get"],
+    "/dictionary/entries/{id}/audio/{asset_id}": ["get"],
     "/me": ["get", "patch"],
     "/me/account-deletion": ["get", "post"],
     "/me/account-deletion/{id}/cancel": ["post"],

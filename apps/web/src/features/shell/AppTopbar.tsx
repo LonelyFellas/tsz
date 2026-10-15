@@ -8,6 +8,7 @@ import {
   BarChart3,
   Bell,
   BookOpen,
+  BookSearch,
   ChevronDown,
   ClipboardList,
   Globe,
@@ -38,6 +39,7 @@ const STUDENT_NAV: NavItem[][] = [
   [
     { href: "/account/wordlists", label: "我的词表", icon: BookOpen },
     { href: "/student/practice", label: "我的任务", icon: ClipboardList },
+    { href: "/dictionary", label: "词典", icon: BookSearch },
     { href: "/wordlists", label: "词库广场", icon: Globe }
   ],
   [
@@ -56,6 +58,7 @@ const TEACHER_NAV: NavItem[][] = [
   ],
   [
     { href: "/account/wordlists", label: "我的词表", icon: BookOpen },
+    { href: "/dictionary", label: "词典", icon: BookSearch },
     { href: "/wordlists", label: "词库广场", icon: Globe },
     { href: "/account/notifications", label: "通知", icon: Bell },
     { href: "/account/profile", label: "个人资料", icon: UserRound }
@@ -66,6 +69,7 @@ const TEACHER_NAV: NavItem[][] = [
 const ACCOUNT_NAV: NavItem[][] = [
   [
     { href: "/account/wordlists", label: "我的词表", icon: BookOpen },
+    { href: "/dictionary", label: "词典", icon: BookSearch },
     { href: "/wordlists", label: "词库广场", icon: Globe }
   ],
   [
@@ -76,7 +80,10 @@ const ACCOUNT_NAV: NavItem[][] = [
 ];
 
 const GUEST_NAV: NavItem[][] = [
-  [{ href: "/wordlists", label: "词库广场", icon: Globe }]
+  [
+    { href: "/dictionary", label: "词典", icon: BookSearch },
+    { href: "/wordlists", label: "词库广场", icon: Globe }
+  ]
 ];
 
 const PANEL_CLASS =

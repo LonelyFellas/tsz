@@ -56,6 +56,9 @@ const QUERY_CONTRACT_OPERATIONS = new Set([
 ]);
 
 const RUNTIME_SCHEMA_ROOTS = [
+  "DictionaryPage",
+  "DictionaryEntry",
+  "AudioAssetUrlResponse",
   "LearningRewardDay",
   "LearningPreview",
   "LearningTask",

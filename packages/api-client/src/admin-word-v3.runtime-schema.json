@@ -1,8 +1,11 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/unavailable-entry-label/docs/openapi.json",
-  "_source_sha256": "b32c8021ac957217293ffc97ecca24250dac4be71a8003b0feae34a3a4a26b1d",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-consumer-dictionary/docs/openapi.json",
+  "_source_sha256": "a52752fdfb17b6917bad386a6defc6f809bf40083b95fc5506080e728e4a8787",
   "roots": [
+    "DictionaryPage",
+    "DictionaryEntry",
+    "AudioAssetUrlResponse",
     "LearningRewardDay",
     "LearningPreview",
     "LearningTask",
@@ -423,6 +426,15 @@
     },
     "AudioAssetGender": { "type": "string", "enum": ["female", "male"] },
     "AudioAssetLocale": { "type": "string", "enum": ["en-GB", "en-US"] },
+    "AudioAssetUrlResponse": {
+      "type": "object",
+      "required": ["url", "expires_at", "url_expires_in_seconds"],
+      "properties": {
+        "expires_at": { "type": "string", "format": "date-time" },
+        "url": { "type": "string" },
+        "url_expires_in_seconds": { "type": "integer", "minimum": 0 }
+      }
+    },
     "BatchPublicationResponseV3": {
       "type": "object",
       "required": ["words", "sentences"],
@@ -642,6 +654,16 @@
         }
       ]
     },
+    "DictionaryAudio": {
+      "type": "object",
+      "required": ["target_id", "asset_id", "locale"],
+      "properties": {
+        "asset_id": { "type": "string", "format": "uuid" },
+        "locale": { "type": "string" },
+        "target_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
     "DictionaryCoverageStateV2": {
       "type": "string",
       "enum": ["complete", "partial", "missing"]
@@ -661,6 +683,48 @@
         "frequency": { "$ref": "#/$defs/DictionaryCoverageStateV2" },
         "meanings": { "$ref": "#/$defs/DictionaryCoverageStateV2" },
         "pronunciations": { "$ref": "#/$defs/DictionaryCoverageStateV2" }
+      },
+      "additionalProperties": false
+    },
+    "DictionaryEntry": {
+      "type": "object",
+      "required": ["content", "audio", "examples"],
+      "properties": {
+        "audio": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/DictionaryAudio" }
+        },
+        "content": { "$ref": "#/$defs/WordlistEntry" },
+        "examples": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/DictionaryExample" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "DictionaryExample": {
+      "type": "object",
+      "required": ["id", "sense_id", "texts", "translation"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "sense_id": { "type": "string", "format": "uuid" },
+        "texts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistText" }
+        },
+        "translation": { "$ref": "#/$defs/RichTextV3" }
+      },
+      "additionalProperties": false
+    },
+    "DictionaryPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/DictionaryEntry" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
       },
       "additionalProperties": false
     },
