@@ -62,6 +62,50 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
           );
         }
       }
+      await page
+        .locator("[data-pos-id] .v3-form-group-card")
+        .first()
+        .getByLabel("英美音标有区别")
+        .check();
+      const usSource = page
+        .locator(".word-shared-pronunciation-us .word-pronunciation-synthesis")
+        .first();
+      await usSource.getByLabel("第 1 条发音的美式 Azure IPA").fill("ˈɔrbɪt");
+      await usSource
+        .getByLabel("第 1 条发音的美式 Azure UPS")
+        .fill("AO R B IH T");
+      const usColor = await page
+        .locator(".word-form-matrix-shared-header-us")
+        .first()
+        .evaluate((node) => getComputedStyle(node).backgroundColor);
+      for (const name of ["词形拼写", "Azure UPS", "Azure IPA"]) {
+        await usSource.getByRole("radio", { name, exact: true }).check();
+        const checked = usSource.locator(".ant-radio-wrapper-checked");
+        await expect(checked.locator(".ant-radio")).toHaveCSS(
+          "background-color",
+          usColor
+        );
+        await expect(checked.locator(".word-synthesis-choice-tag")).toHaveCSS(
+          "background-color",
+          usColor
+        );
+        await checked.hover();
+        await expect(checked.locator(".ant-radio")).toHaveCSS(
+          "background-color",
+          usColor
+        );
+      }
+      await expect(source.locator(".ant-radio-checked")).toHaveCSS(
+        "background-color",
+        "rgb(32, 83, 255)"
+      );
+      await test.info().attach("美式语音来源", {
+        body: await usSource
+          .locator(".word-pronunciation-row")
+          .last()
+          .screenshot({ animations: "disabled" }),
+        contentType: "image/png"
+      });
       await test.info().attach("语音来源样式", {
         body: await source
           .locator(".word-pronunciation-row")
@@ -69,6 +113,23 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
           .screenshot({ animations: "disabled" }),
         contentType: "image/png"
       });
+      await page
+        .locator("[data-pos-id] .v3-form-group-card")
+        .first()
+        .getByLabel("英美拼写有区别")
+        .check();
+      const separatedUs = page
+        .locator(".v3-dialect-panel-us .word-pronunciation-synthesis")
+        .first();
+      await expect(separatedUs.locator(".ant-radio-checked")).toHaveCSS(
+        "background-color",
+        usColor
+      );
+      await expect(
+        separatedUs.locator(
+          ".ant-radio-wrapper-checked .word-synthesis-choice-tag"
+        )
+      ).toHaveCSS("background-color", usColor);
     }
     await page.evaluate(async () => {
       await Promise.all(
