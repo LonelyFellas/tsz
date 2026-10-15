@@ -1,4 +1,6 @@
 "use client";
+
+import { unavailableReasonLabels } from "../availability";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
@@ -740,7 +742,11 @@ function WordRow({
       )}
       {stored && !stored.entry && (
         <p className="mt-3 text-sm text-danger">
-          内容不可用，请删除或替换此项。
+          内容不可用
+          {stored.unavailable_reason
+            ? `（${unavailableReasonLabels[stored.unavailable_reason]}）`
+            : ""}
+          ，请删除或替换此项。
         </p>
       )}
       <label className="mt-5 block text-sm font-medium">

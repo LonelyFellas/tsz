@@ -67,7 +67,8 @@ it("keeps public, personal and review item routes separate", async () => {
   expect(http.get).toHaveBeenLastCalledWith(`/me/wordlists/${id}/items`, {
     headers: {
       ...WORDLIST_READING_HEADERS,
-      "X-TSZ-Wordlist-Entry-Labels": "v1"
+      "X-TSZ-Wordlist-Entry-Labels": "v1",
+      "X-TSZ-Wordlist-Entry-Reasons": "v1"
     }
   });
   await api.create({
@@ -395,5 +396,44 @@ it("accepts owner-only entry labels and stays compatible with older servers", ()
       "WordlistItems",
       response({ entry_id: id, position: 0, entry: null, entry_label: "apple" })
     )
+  ).toThrow();
+});
+
+it("accepts current owner unavailability reasons without widening public or legacy responses", () => {
+  const item = {
+    entry_id: id,
+    position: 0,
+    entry: null,
+    private_note: "",
+    note_revision: 1
+  };
+  const response = (reason: unknown) => ({
+    items: [{ ...item, unavailable_reason: reason }],
+    revision: 1,
+    pagination
+  });
+  for (const reason of ["archived", "unpublished", "unsupported_schema"]) {
+    expect(() =>
+      decodeWordlistResponse("MyWordlistItems", response(reason))
+    ).not.toThrow();
+  }
+  for (const reason of [null, "deleted", ""]) {
+    expect(() =>
+      decodeWordlistResponse("MyWordlistItems", response(reason))
+    ).toThrow();
+  }
+  expect(() =>
+    decodeWordlistResponse("WordlistItems", {
+      items: [
+        {
+          entry_id: id,
+          position: 0,
+          entry: null,
+          unavailable_reason: "archived"
+        }
+      ],
+      revision: 1,
+      pagination
+    })
   ).toThrow();
 });

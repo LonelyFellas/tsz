@@ -517,6 +517,7 @@ it("shows an unavailable entry's label when editing without treating it as reada
         position: 0,
         entry: null,
         entry_label: "apple",
+        unavailable_reason: "archived",
         private_note: "原备注",
         note_revision: 7
       }
@@ -529,5 +530,8 @@ it("shows an unavailable entry's label when editing without treating it as reada
     expect(screen.getByPlaceholderText("输入单词或短语")).toHaveValue("apple")
   );
   expect(screen.getByLabelText("私密备注 1")).toHaveValue("原备注");
+  expect(
+    screen.getByText("内容不可用（已移入垃圾桶），请删除或替换此项。")
+  ).toBeVisible();
   expect(api.wordList.suggestions).not.toHaveBeenCalled();
 });
