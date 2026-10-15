@@ -4,6 +4,7 @@ import { unavailableReasonLabels } from "../availability";
 import { TipPanel } from "./WordlistTips";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { HttpError } from "@tsz/api-client";
 import {
   useInfiniteQuery,
   useQuery,
@@ -250,8 +251,38 @@ function Detail({
           expected_revision: meta.data.revision
         });
       await client.invalidateQueries({ queryKey: wordListKeys.all });
-    } catch {
-      setError("操作结果未确认，请刷新核对。申请重试会复用原请求键。");
+    } catch (cause) {
+      const rejected =
+        cause instanceof HttpError &&
+        cause.status >= 400 &&
+        cause.status < 500 &&
+        cause.status !== 408;
+      if (kind === "submit" && rejected) setSubmit(null);
+      if (!rejected) {
+        setError(
+          kind === "submit"
+            ? "暂时无法确认申请是否成功，请刷新页面查看词表状态后再试。"
+            : "暂时无法确认是否已撤回，请刷新页面查看词表状态后再试。"
+        );
+      } else if (
+        kind === "submit" &&
+        cause.status === 400 &&
+        cause.code === "validation_failed"
+      ) {
+        setError(
+          "申请公开失败：词表中有暂不可用的词条。请在下方查看原因，移除或替换后再申请。"
+        );
+        setUnavailableOpen(true);
+        void client.invalidateQueries({ queryKey: wordListKeys.all });
+      } else if (cause.status === 409) {
+        setError("词表已发生变化，请刷新页面后再操作。");
+      } else {
+        setError(
+          kind === "submit"
+            ? "申请公开失败，请刷新页面后再试。"
+            : "撤回失败，请刷新页面后再试。"
+        );
+      }
     } finally {
       setBusy(false);
     }
