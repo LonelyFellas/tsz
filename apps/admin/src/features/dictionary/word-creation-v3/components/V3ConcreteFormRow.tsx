@@ -27,6 +27,7 @@ import { spellingConflictReferences } from "../referenceGuard";
 import { useV3ReferenceGuard } from "../referenceGuardContext";
 import { V3DisabledReason } from "./V3DisabledReason";
 import { V3PronunciationList } from "./V3PronunciationList";
+import { PronunciationPreviewControls } from "../../word-creation/PronunciationPreview";
 
 /** 拼写与多维例句标注片段对不上时即时标红（Q2）：输入框照常可编辑，保存由确认条与后端拦。 */
 function SpellingConflictNote({ literals }: { literals: readonly string[] }) {
@@ -314,6 +315,16 @@ function V3DialectFormCell({
         </Flex>
         <V3VoiceTextField
           mode="spelling"
+          dialect={dialect}
+          leadingAction={
+            <PronunciationPreviewControls
+              playbackOnly
+              pronunciationId={variant.id}
+              spelling={variant.spelling}
+              dialect={dialect}
+              ariaLabelPrefix={`${formLabel}${dialectLabel(dialect)}拼写`}
+            />
+          }
           invalid={spellingInvalid}
           ariaLabel={`${formLabel}${dialectLabel(dialect)}拼写`}
           field="spelling"
@@ -490,6 +501,15 @@ export function V3ConcreteFormRow({
               </Flex>
               <V3VoiceTextField
                 mode="spelling"
+                leadingAction={
+                  <PronunciationPreviewControls
+                    playbackOnly
+                    pronunciationId={commonVariant.id}
+                    spelling={commonVariant.spelling}
+                    dialect="common"
+                    ariaLabelPrefix={`${formLabel}英美通用拼写`}
+                  />
+                }
                 invalid={
                   commonConflictLiterals.length > 0 ||
                   issues.some(
@@ -549,6 +569,15 @@ export function V3ConcreteFormRow({
               </Flex>
               <V3VoiceTextField
                 mode="spelling"
+                leadingAction={
+                  <PronunciationPreviewControls
+                    playbackOnly
+                    pronunciationId={form.id}
+                    spelling={unifiedSpellingVariants.uk.spelling}
+                    dialect="common"
+                    ariaLabelPrefix={`${formLabel}英美通用拼写`}
+                  />
+                }
                 invalid={unifiedSpellingInvalid}
                 ariaLabel={`${formLabel}英美通用拼写`}
                 field="spelling"

@@ -970,6 +970,20 @@
   font-size: 15px;
 }
 
+.word-pronunciation-play-action[data-playback-dialect="uk"] {
+  --word-playback-color: #2f5bff;
+}
+
+.word-pronunciation-play-action[data-playback-dialect="us"] {
+  --word-playback-color: #d42a91;
+}
+
+.word-pronunciation-play-action.ant-btn:not(:disabled),
+.word-pronunciation-play-action.ant-btn:not(:disabled):hover,
+.word-pronunciation-play-action.ant-btn:not(:disabled):active {
+  color: var(--word-playback-color);
+}
+
 .word-pronunciation-voice-action {
   width: 34px;
   flex: 0 0 34px;
