@@ -74,7 +74,7 @@ function Detail({
   const hydrated = useUserStore((s) => s.hydrated);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const lastAvailabilityRefresh = useRef(0);
-  const [unavailableOpen, setUnavailableOpen] = useState(false);
+  const [unavailableOpen, setUnavailableOpen] = useState<boolean>();
   const [q, setQ] = useState("");
   const [view, setView] = useState<WordlistView>("standard");
   const [sort, setSort] = useState<WordlistSort>("author");
@@ -167,6 +167,21 @@ function Detail({
       ? availability.data
       : undefined;
   const allUnavailable = availabilityData?.available_count === 0;
+  const showPublicationCheck =
+    mine &&
+    !!meta.data &&
+    meta.data.state !== "pending" &&
+    meta.data.state !== "published";
+  const publicationHasUnavailable =
+    (availabilityData?.unavailable_count ?? 0) > 0 ||
+    unavailableItems.length > 0;
+  const canSubmit =
+    !!availabilityData &&
+    !availability.isFetching &&
+    !availability.isError &&
+    !publicationHasUnavailable;
+  const unavailableExpanded =
+    unavailableOpen ?? (showPublicationCheck && publicationHasUnavailable);
   const {
     dataUpdatedAt: itemsUpdatedAt,
     hasNextPage,
@@ -224,7 +239,7 @@ function Detail({
     ]);
   }
   async function action(kind: "submit" | "withdraw") {
-    if (!meta.data) return;
+    if (!meta.data || (kind === "submit" && !canSubmit)) return;
     if (
       kind === "withdraw" &&
       !window.confirm(
@@ -347,7 +362,12 @@ function Detail({
                 ) : (
                   <button
                     className={buttonClass}
-                    disabled={busy}
+                    disabled={busy || !canSubmit}
+                    aria-describedby={
+                      !canSubmit
+                        ? "publication-availability-message"
+                        : undefined
+                    }
                     onClick={() => void action("submit")}
                   >
                     申请公开
@@ -372,6 +392,20 @@ function Detail({
               {list.state === "pending"
                 ? "公开申请正在审核中，审核通过前仅你可见。"
                 : "申请公开后需经管理员审核，通过后其他用户才能搜索和使用。"}
+            </p>
+          )}
+          {showPublicationCheck && !canSubmit && (
+            <p
+              id="publication-availability-message"
+              role="status"
+              className="mt-4 text-sm text-foreground-muted"
+            >
+              {publicationHasUnavailable
+                ? "暂时不能申请公开：词表中有暂不可用的词条。请查看下方原因，移除或替换后再申请。"
+                : availability.isError ||
+                    (availability.isSuccess && !availabilityData)
+                  ? "暂时无法确认词条是否全部可用，请在下方重试后再申请。"
+                  : "正在检查词条可用性，请稍候。"}
             </p>
           )}
           {error && (
@@ -507,7 +541,7 @@ function Detail({
             (availabilityData?.unavailable_count ?? 0) > 0) && (
             <details
               className="mb-6 rounded-2xl border border-border/60 bg-muted/70 px-4 py-3 text-sm leading-6"
-              open={unavailableOpen}
+              open={unavailableExpanded}
               onToggle={(event) => setUnavailableOpen(event.currentTarget.open)}
             >
               <summary className="cursor-pointer font-medium">
@@ -531,7 +565,7 @@ function Detail({
                     " · 请先撤回为私密，再编辑词表。"}
                 </p>
               )}
-              {unavailableOpen && (
+              {unavailableExpanded && (
                 <ul className="mt-3 space-y-2">
                   {unavailableItems.map((item) => (
                     <li
@@ -572,19 +606,35 @@ function Detail({
                   ))}
                 </ul>
               )}
-              {unavailableOpen && allUnavailable && hasNextPage && !isError && (
-                <button
-                  className={textButtonClass}
-                  disabled={isFetching}
-                  onClick={() => void fetchNextPage({ cancelRefetch: false })}
-                >
-                  加载更多不可用词条
-                </button>
-              )}
+              {unavailableExpanded &&
+                (allUnavailable ||
+                  (showPublicationCheck &&
+                    (availabilityData?.unavailable_count ?? 0) >
+                      unavailableItems.length)) &&
+                hasNextPage &&
+                !isError && (
+                  <button
+                    className={textButtonClass}
+                    disabled={isFetching}
+                    onClick={() => void fetchNextPage({ cancelRefetch: false })}
+                  >
+                    {allUnavailable
+                      ? "加载更多不可用词条"
+                      : "加载更多词条以查看原因"}
+                  </button>
+                )}
               {(availabilityData?.unavailable_count ?? 0) >
                 unavailableItems.length && (
                 <p className="mt-2 text-foreground-muted">
                   这里只列出当前已加载且符合搜索条件的项目；其他项目会随词条加载显示。
+                  {showPublicationCheck && q.trim() && (
+                    <button
+                      className={textButtonClass}
+                      onClick={() => setQ("")}
+                    >
+                      清空搜索查看原因
+                    </button>
+                  )}
                 </p>
               )}
             </details>
