@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import { formatCoins } from "@tsz/shared";
 import { useState } from "react";
 import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
@@ -17,7 +18,9 @@ import {
 const titles = {
   teacher_approved: "教师认证已通过",
   teacher_rejected: "教师申请已驳回",
-  teacher_revoked: "教师资格已撤销"
+  teacher_revoked: "教师资格已撤销",
+  wordlist_liked: "词表收到点赞",
+  wordlist_tipped: "词表收到投币"
 };
 
 export function Notifications() {
@@ -57,7 +60,9 @@ export function Notifications() {
               : "暂无未读通知"}
           </p>
           {query.data.items.length === 0 ? (
-            <PageNotice>暂无站内通知，认证结果会显示在这里。</PageNotice>
+            <PageNotice>
+              暂无站内通知，词表互动和认证结果会显示在这里。
+            </PageNotice>
           ) : (
             <ul className="space-y-3">
               {query.data.items.map((item) => (
@@ -94,12 +99,44 @@ export function Notifications() {
                       你已获得教师身份，可在账号菜单中切换工作台，原有学生身份保持不变。
                     </p>
                   )}
+                  {(item.kind === "wordlist_liked" ||
+                    item.kind === "wordlist_tipped") && (
+                    <p className="mt-3 text-sm leading-6">
+                      {item.actor_name ?? "账号已注销"}
+                      {item.kind === "wordlist_liked"
+                        ? "赞了你的词表"
+                        : "向你的词表"}
+                      {item.wordlist_name
+                        ? `「${item.wordlist_name}」`
+                        : "（已删除）"}
+                      {item.kind === "wordlist_tipped" && item.amount
+                        ? `投了 ${formatCoins(item.amount)}`
+                        : ""}
+                      。
+                    </p>
+                  )}
                   {item.reason && (
                     <p className="mt-3 whitespace-pre-wrap break-words rounded-2xl bg-muted/70 px-4 py-3 text-sm leading-6">
                       {item.reason}
                     </p>
                   )}
                   <div className="mt-4 flex flex-wrap gap-2 empty:hidden">
+                    {item.wordlist_id && item.wordlist_name && (
+                      <Link
+                        href={`/account/wordlists/${encodeURIComponent(item.wordlist_id)}`}
+                        className={buttonClass}
+                      >
+                        查看词表
+                      </Link>
+                    )}
+                    {item.kind === "wordlist_tipped" && (
+                      <Link
+                        href="/account/wordlist-tips"
+                        className={buttonClass}
+                      >
+                        查看收币记录
+                      </Link>
+                    )}
                     {item.application_id && (
                       <Link
                         href={`/account/teacher-applications/${encodeURIComponent(item.application_id)}`}

@@ -96,31 +96,40 @@ it("keeps page titles on navigation and restores the original icon and title at 
   );
 });
 
-it("shares the notification page cache and clears the badge after marking read", async () => {
-  const item = {
-    id: "n1",
-    kind: "teacher_approved" as const,
-    application_id: null,
-    reason: null,
-    created_at: "2026-10-15T00:00:00Z",
-    read_at: null
-  };
-  vi.mocked(api.teacherCertification.notifications).mockResolvedValue({
-    items: [item],
-    total: 1,
-    unread_count: 1
-  });
-  vi.mocked(api.teacherCertification.readNotification).mockResolvedValue({
-    ...item,
-    read_at: "2026-10-15T01:00:00Z"
-  });
-  render(tree(true));
-  await waitFor(() => expect(document.title).toBe("(1) 首页 | 天生会背"));
-  expect(api.teacherCertification.notifications).toHaveBeenCalledTimes(1);
-  vi.mocked(api.teacherCertification.notifications).mockResolvedValue(data(0));
-  fireEvent.click(screen.getByRole("button", { name: "标为已读" }));
-  await waitFor(() => expect(document.title).toBe("首页 | 天生会背"));
-});
+it.each(["wordlist_liked", "wordlist_tipped"] as const)(
+  "shares %s notifications with the page and clears the badge after marking read",
+  async (kind) => {
+    const item = {
+      id: "n1",
+      kind,
+      wordlist_id: "list-1",
+      wordlist_name: "四级词汇",
+      actor_name: "小明",
+      amount: kind === "wordlist_tipped" ? "7" : null,
+      application_id: null,
+      reason: null,
+      created_at: "2026-10-15T00:00:00Z",
+      read_at: null
+    };
+    vi.mocked(api.teacherCertification.notifications).mockResolvedValue({
+      items: [item],
+      total: 1,
+      unread_count: 1
+    });
+    vi.mocked(api.teacherCertification.readNotification).mockResolvedValue({
+      ...item,
+      read_at: "2026-10-15T01:00:00Z"
+    });
+    render(tree(true));
+    await waitFor(() => expect(document.title).toBe("(1) 首页 | 天生会背"));
+    expect(api.teacherCertification.notifications).toHaveBeenCalledTimes(1);
+    vi.mocked(api.teacherCertification.notifications).mockResolvedValue(
+      data(0)
+    );
+    fireEvent.click(screen.getByRole("button", { name: "标为已读" }));
+    await waitFor(() => expect(document.title).toBe("首页 | 天生会背"));
+  }
+);
 
 it("clears the previous account badge and ignores late image loads after logout", async () => {
   const view = render(tree());
