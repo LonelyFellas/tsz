@@ -127,16 +127,18 @@ function collectCalls(
   };
 
   // 遍历端点树,用哨兵参数调用每个函数,触发其内部的 http.* 记录。
-  const walk = (node: unknown) => {
+  const walk = (node: unknown, name = "") => {
     if (typeof node === "function") {
       (node as (...a: unknown[]) => unknown)(
-        SENTINEL,
+        name === "interactionStats" || name === "interactionStates"
+          ? [SENTINEL]
+          : SENTINEL,
         SENTINEL,
         SENTINEL,
         SENTINEL
       );
     } else if (node && typeof node === "object") {
-      Object.values(node).forEach(walk);
+      Object.entries(node).forEach(([key, value]) => walk(value, key));
     }
   };
   walk(factory(http as never));
@@ -740,7 +742,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "2d7f8cb9bd12e41399e5d9109e53c8416f4a48a9a8fab560bd90856a396f1936"
+      "1bb13dfdbd1b8b08bcdbe33c1143f0525646b9b284b1b4a8463943c1838059ef"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");

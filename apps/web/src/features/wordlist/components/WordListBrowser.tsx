@@ -2,6 +2,9 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Plus, Search } from "lucide-react";
+import { useWordlistInteractions } from "../hooks/useWordlistInteractions";
+import { WordlistInteractions } from "./WordlistInteractions";
+import { WordlistFavorites } from "./WordlistFavorites";
 import { useWordLists } from "../hooks/useWordLists";
 import { cn } from "@tsz/ui/lib/cn";
 import { STATE_LABEL, buttonClass, primaryButtonClass } from "../reading";
@@ -17,7 +20,11 @@ export function WordListBrowser({ mine = false }: { mine?: boolean }) {
   const [page, setPage] = useState(1);
   const [q, setQ] = useState("");
   const [recommended, setRecommended] = useState(false);
-  const result = useWordLists(mine, page, q, recommended);
+  const [favorites, setFavorites] = useState(false);
+  const result = useWordLists(mine, page, q, recommended, !favorites);
+  const interactions = useWordlistInteractions(
+    !mine ? (result.data?.items.map((w) => w.id) ?? []) : []
+  );
   return (
     <PageShell size="lg">
       <PageHeader
@@ -25,7 +32,7 @@ export function WordListBrowser({ mine = false }: { mine?: boolean }) {
         title={mine ? "我的词表" : "公开词表"}
         description={
           mine
-            ? "自己整理的词表，可以随时编辑、提交公开，或直接用来创建学习任务。"
+            ? "管理自己创建和收藏的词表。收藏引用原词表，内容随作者更新。"
             : "浏览平台精选和其他用户公开的词表，挑一份开始学习。"
         }
         actions={
@@ -47,6 +54,20 @@ export function WordListBrowser({ mine = false }: { mine?: boolean }) {
         }
       />
       <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+        {mine && (
+          <Segmented
+            label="我的词表分类"
+            value={favorites}
+            options={[
+              { value: false, label: "我创建的" },
+              { value: true, label: "我收藏的" }
+            ]}
+            onChange={(value) => {
+              setFavorites(value);
+              setPage(1);
+            }}
+          />
+        )}
         {!mine && (
           <Segmented
             label="词表分类"
@@ -79,7 +100,9 @@ export function WordListBrowser({ mine = false }: { mine?: boolean }) {
           />
         </label>
       </div>
-      {result.isError ? (
+      {favorites ? (
+        <WordlistFavorites page={page} q={q} onPageChange={setPage} />
+      ) : result.isError ? (
         <PageNotice tone="error">
           词表加载失败，请
           <button
@@ -110,32 +133,54 @@ export function WordListBrowser({ mine = false }: { mine?: boolean }) {
             <ul className="grid gap-4 sm:grid-cols-2">
               {result.data.items.map((list) => (
                 <li key={list.id}>
-                  <Link
-                    href={`${mine ? "/account" : ""}/wordlists/${list.id}`}
-                    className={cn(listCardClass, "group h-full")}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <h2 className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
-                        {list.name}
-                      </h2>
-                      <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs text-foreground-muted">
-                        {STATE_LABEL[list.state]}
-                      </span>
-                    </div>
-                    <p className="mt-6 flex items-baseline gap-1.5">
-                      <span className="text-3xl font-bold tabular-nums tracking-tight text-foreground">
-                        {list.item_count}
-                      </span>
-                      <span className="text-sm text-foreground-muted">
-                        个词条
-                      </span>
-                    </p>
-                    <p className="mt-2 truncate text-sm text-foreground-muted">
-                      {list.owner_user_id === null
-                        ? `平台 · ${list.owner_name}`
-                        : list.owner_name}
-                    </p>
-                  </Link>
+                  <div className={cn(listCardClass, "group h-full")}>
+                    <Link
+                      href={`${mine ? "/account" : ""}/wordlists/${list.id}`}
+                      className="block rounded-xl focus-visible:outline-2 focus-visible:outline-primary"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <h2 className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+                          {list.name}
+                        </h2>
+                        <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs text-foreground-muted">
+                          {STATE_LABEL[list.state]}
+                        </span>
+                      </div>
+                      <p className="mt-6 flex items-baseline gap-1.5">
+                        <span className="text-3xl font-bold tabular-nums tracking-tight text-foreground">
+                          {list.item_count}
+                        </span>
+                        <span className="text-sm text-foreground-muted">
+                          个词条
+                        </span>
+                      </p>
+                      <p className="mt-2 truncate text-sm text-foreground-muted">
+                        {list.owner_user_id === null
+                          ? `平台 · ${list.owner_name}`
+                          : list.owner_name}
+                      </p>
+                    </Link>
+                    {!mine && (
+                      <WordlistInteractions
+                        list={list}
+                        stats={interactions.stats.data?.items.find(
+                          (s) => s.wordlist_id === list.id
+                        )}
+                        state={interactions.states.data?.items.find(
+                          (s) => s.wordlist_id === list.id
+                        )}
+                        failed={
+                          interactions.stats.isError ||
+                          (!!interactions.userId && interactions.states.isError)
+                        }
+                        onRetry={() => {
+                          void interactions.stats.refetch();
+                          if (interactions.userId)
+                            void interactions.states.refetch();
+                        }}
+                      />
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>

@@ -1,7 +1,6 @@
 "use client";
-
 import { unavailableReasonLabels } from "../availability";
-import { TipPanel } from "./WordlistTips";
+import { DetailInteractions } from "./WordlistInteractions";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { HttpError } from "@tsz/api-client";
@@ -453,9 +452,9 @@ function Detail({
               </button>
             </p>
           ) : null}
-          {!mine &&
-            list.state === "published" &&
-            list.owner_user_id !== null && <TipPanel list={list} />}
+          {!mine && list.state === "published" && (
+            <DetailInteractions list={list} />
+          )}
         </div>
       </section>
       <div className="mb-6 mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">

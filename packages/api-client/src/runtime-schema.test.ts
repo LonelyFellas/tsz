@@ -48,6 +48,10 @@ const ROOTS = [
   "LearningQuestionPage",
   "LearningAnswerReceipt",
 
+  "WordlistInteractionStatsBatch",
+  "WordlistInteractionState",
+  "WordlistInteractionStates",
+  "WordlistFavoritePage",
   "WordlistTip",
   "WordlistTipPage",
   "AdminWordlist",

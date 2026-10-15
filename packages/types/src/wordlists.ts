@@ -224,3 +224,33 @@ export interface WordlistSuggestionQuery {
 export interface WordlistSuggestions {
   items: WordlistCandidate[];
 }
+
+export interface WordlistInteractionStats {
+  wordlist_id: string;
+  like_count: number;
+  favorite_count: number;
+  tip_amount: string;
+}
+export interface WordlistInteractionStatsBatch {
+  items: WordlistInteractionStats[];
+}
+export interface WordlistInteractionState {
+  wordlist_id: string;
+  liked: boolean;
+  favorited: boolean;
+}
+export interface WordlistInteractionStates {
+  items: WordlistInteractionState[];
+}
+export interface SetWordlistInteraction {
+  kind: "like" | "favorite";
+  active: boolean;
+}
+export interface WordlistFavorite {
+  wordlist_id: string;
+  wordlist: Wordlist | null;
+}
+export interface WordlistFavoritePage {
+  items: WordlistFavorite[];
+  pagination: WordlistPage["pagination"];
+}
