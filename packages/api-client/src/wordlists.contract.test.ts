@@ -323,3 +323,38 @@ it("author annotation negotiation accepts legacy omission and never admits publi
     })
   ).toThrow();
 });
+
+it("admin review history opts into reviewer identity while accepting older responses", async () => {
+  const review = {
+    id,
+    wordlist_id: id,
+    submitted_revision: 2,
+    name: "词表",
+    state: "approved",
+    reason: null,
+    created_at: "2026-10-06T00:00:00Z",
+    decided_at: "2026-10-07T00:00:00Z"
+  };
+  const legacy = { items: [review], withdraw_reason: null };
+  const enriched = {
+    items: [{ ...review, reviewer_id: id, reviewer_name: "审核老师" }],
+    withdraw_reason: null
+  };
+  const http = {
+    get: vi.fn().mockResolvedValueOnce(legacy).mockResolvedValueOnce(enriched)
+  } as unknown as HttpClient;
+  const api = createAdminWordlistEndpoints(http);
+  expect(await api.reviews(id)).toEqual(legacy);
+  expect(http.get).toHaveBeenLastCalledWith(
+    `/wordlists/${id}/review-requests?include_reviewer=true`,
+    undefined
+  );
+  expect(await api.reviews(id)).toEqual(enriched);
+  expect(() => decodeWordlistResponse("WordlistReviews", enriched)).toThrow();
+  expect(() =>
+    decodeWordlistResponse("AdminWordlistReviews", {
+      ...enriched,
+      items: [{ ...enriched.items[0], reviewer_id: "invalid" }]
+    })
+  ).toThrow();
+});

@@ -141,13 +141,7 @@ const GROUPS: Group[] = [
     icon: <AuditOutlined />,
     label: "审核管理",
     leaves: [
-      // 同上：审核中心页面是空壳，后端无对应端点。
-      {
-        key: "todo:reviews",
-        label: "词表审核",
-        perm: "reviews.access",
-        disabled: true
-      },
+      pageLeaf(ADMIN_PAGE_ROUTES.reviews, "词表审核"),
       pageLeaf(ADMIN_PAGE_ROUTES.teacherApplications, "教师申请审核"),
       {
         key: "todo:comments",

@@ -1,13 +1,17 @@
-import { useEffect, useState } from "react";
+import { ReloadOutlined, SearchOutlined } from "@ant-design/icons";
+import { Fragment, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
   App,
+  Breadcrumb,
   Button,
+  Card,
   Col,
   DatePicker,
   Descriptions,
   Flex,
+  Form,
   Input,
   Modal,
   Row,
@@ -194,6 +198,7 @@ export function SentenceLibrary({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linkedSentenceId]);
   const rows = query.data?.items ?? [];
+  const ContentContainer = entryId ? Fragment : Card;
   return (
     <Flex vertical gap="middle">
       {editor && (
@@ -207,300 +212,332 @@ export function SentenceLibrary({
           }}
         />
       )}
-      <Flex justify="space-between" align="center">
-        <Typography.Title level={entryId ? 4 : 2} style={{ margin: 0 }}>
+      {entryId ? (
+        <Typography.Title level={4} style={{ margin: 0 }}>
           多维例句
         </Typography.Title>
-      </Flex>
+      ) : (
+        <Breadcrumb items={[{ title: "词库管理" }, { title: "多维例句" }]} />
+      )}
       {entryId && (
         <Typography.Text type="secondary">
           展示句内关联到当前词条的例句。修改会同步到例句库。
         </Typography.Text>
       )}
       {!entryId && (
-        <Space wrap>
-          <Input
-            aria-label="例句关键词"
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            placeholder="输入 ID / 例句 / 创建人"
-            style={{ width: 250 }}
-            onPressEnter={() =>
-              setFilters({
-                ...filters,
-                page: 1,
-                q: keyword || undefined,
-                level,
-                created_from: dates?.[0]?.startOf("day").toISOString(),
-                created_to: dates?.[1]?.endOf("day").toISOString()
-              })
-            }
-          />
-          <Select
-            aria-label="筛选例句等级"
-            allowClear
-            placeholder="例句等级"
-            value={level}
-            onChange={setLevel}
-            style={{ width: 130 }}
-            options={["A1", "A2", "B1", "B2", "C1", "C2"].map((value) => ({
-              value,
-              label: value
-            }))}
-          />
-          <Typography.Text>创建时间</Typography.Text>
-          <DatePicker.RangePicker value={dates} onChange={setDates} />
-          <Button
-            type="primary"
-            onClick={() =>
-              setFilters({
-                ...filters,
-                page: 1,
-                q: keyword || undefined,
-                level,
-                created_from: dates?.[0]?.startOf("day").toISOString(),
-                created_to: dates?.[1]?.endOf("day").toISOString()
-              })
-            }
-          >
-            搜索
-          </Button>
-          <Button
-            onClick={() => {
-              setKeyword("");
-              setLevel(undefined);
-              setDates(null);
-              setFilters({ page: 1, page_size: 10 });
+        <Card size="small" styles={{ body: { paddingBottom: 8 } }}>
+          <Form
+            layout="inline"
+            style={{
+              rowGap: 12,
+              columnGap: 8,
+              display: "flex",
+              flexWrap: "wrap"
             }}
           >
-            重置
-          </Button>
-          {canPublish && (
+            <Form.Item label="关键词">
+              <Input
+                aria-label="例句关键词"
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                placeholder="输入 ID / 例句 / 创建人"
+                style={{ width: 250 }}
+                onPressEnter={() =>
+                  setFilters({
+                    ...filters,
+                    page: 1,
+                    q: keyword || undefined,
+                    level,
+                    created_from: dates?.[0]?.startOf("day").toISOString(),
+                    created_to: dates?.[1]?.endOf("day").toISOString()
+                  })
+                }
+              />
+            </Form.Item>
+            <Form.Item label="例句等级">
+              <Select
+                aria-label="筛选例句等级"
+                allowClear
+                placeholder="例句等级"
+                value={level}
+                onChange={setLevel}
+                style={{ width: 130 }}
+                options={["A1", "A2", "B1", "B2", "C1", "C2"].map((value) => ({
+                  value,
+                  label: value
+                }))}
+              />
+            </Form.Item>
+            <Form.Item label="创建时间">
+              <DatePicker.RangePicker value={dates} onChange={setDates} />
+            </Form.Item>
+            <Form.Item>
+              <Space>
+                <Button
+                  type="primary"
+                  icon={<SearchOutlined />}
+                  onClick={() =>
+                    setFilters({
+                      ...filters,
+                      page: 1,
+                      q: keyword || undefined,
+                      level,
+                      created_from: dates?.[0]?.startOf("day").toISOString(),
+                      created_to: dates?.[1]?.endOf("day").toISOString()
+                    })
+                  }
+                >
+                  搜索
+                </Button>
+                <Button
+                  icon={<ReloadOutlined />}
+                  onClick={() => {
+                    setKeyword("");
+                    setLevel(undefined);
+                    setDates(null);
+                    setFilters({ page: 1, page_size: 10 });
+                  }}
+                >
+                  重置
+                </Button>
+              </Space>
+            </Form.Item>
+          </Form>
+        </Card>
+      )}
+      <ContentContainer {...(!entryId ? { size: "small" as const } : {})}>
+        {!entryId && (
+          <Space wrap style={{ marginBottom: 12 }}>
+            {canPublish && (
+              <Button
+                disabled={
+                  !selected.length ||
+                  rows.some(
+                    (row) =>
+                      selected.includes(row.id) && !canAction(row, "publish")
+                  )
+                }
+                onClick={() =>
+                  setBatch(rows.filter((row) => selected.includes(row.id)))
+                }
+              >
+                发布所选
+              </Button>
+            )}
             <Button
+              danger
               disabled={
+                !canDelete ||
                 !selected.length ||
                 rows.some(
                   (row) =>
-                    selected.includes(row.id) && !canAction(row, "publish")
+                    selected.includes(row.id) &&
+                    row.current_publication_id != null
                 )
               }
               onClick={() =>
-                setBatch(rows.filter((row) => selected.includes(row.id)))
+                remove(rows.filter((row) => selected.includes(row.id)))
               }
             >
-              发布所选
+              删除所选
             </Button>
-          )}
-          <Button
-            danger
-            disabled={
-              !canDelete ||
-              !selected.length ||
-              rows.some(
-                (row) =>
-                  selected.includes(row.id) &&
-                  row.current_publication_id != null
-              )
-            }
-            onClick={() =>
-              remove(rows.filter((row) => selected.includes(row.id)))
-            }
-          >
-            删除所选
-          </Button>
-        </Space>
-      )}
-      {query.isError && (
-        <Alert
-          type="error"
-          title="例句加载失败"
-          action={<Button onClick={() => void query.refetch()}>重试</Button>}
-        />
-      )}
-      <Row gutter={[16, 16]}>
-        <Col xs={24} xl={24}>
-          <Table<SharedSentence>
-            rowKey="id"
-            dataSource={rows}
-            loading={query.isFetching}
-            scroll={{ x: entryId ? 700 : 1350 }}
-            rowSelection={
-              !entryId && (canEdit || canPublish)
-                ? { selectedRowKeys: selected, onChange: setSelected }
-                : undefined
-            }
-            pagination={{
-              current: filters.page,
-              pageSize: filters.page_size,
-              total: query.data?.total,
-              showSizeChanger: true,
-              pageSizeOptions: [10, 20, 50],
-              showTotal: (total) => `共 ${total} 条`,
-              onChange: (page, page_size) => {
-                setFilters((current) => ({ ...current, page, page_size }));
-                setSelected([]);
+          </Space>
+        )}
+
+        {query.isError && (
+          <Alert
+            type="error"
+            title="例句加载失败"
+            action={<Button onClick={() => void query.refetch()}>重试</Button>}
+          />
+        )}
+        <Row gutter={[16, 16]}>
+          <Col xs={24} xl={24}>
+            <Table<SharedSentence>
+              rowKey="id"
+              dataSource={rows}
+              loading={query.isFetching}
+              scroll={{ x: entryId ? 700 : 1350 }}
+              rowSelection={
+                !entryId && (canEdit || canPublish)
+                  ? { selectedRowKeys: selected, onChange: setSelected }
+                  : undefined
               }
-            }}
-            columns={[
-              ...(!entryId
-                ? [
-                    {
-                      title: "ID",
-                      dataIndex: "id",
-                      width: 125,
-                      render: (id: string) => (
-                        <Typography.Text copyable={{ text: id }} title={id}>
-                          {id.slice(0, 8)}
+              pagination={{
+                current: filters.page,
+                pageSize: filters.page_size,
+                total: query.data?.total,
+                showSizeChanger: true,
+                pageSizeOptions: [10, 20, 50],
+                showTotal: (total) => `共 ${total} 条`,
+                onChange: (page, page_size) => {
+                  setFilters((current) => ({ ...current, page, page_size }));
+                  setSelected([]);
+                }
+              }}
+              columns={[
+                ...(!entryId
+                  ? [
+                      {
+                        title: "ID",
+                        dataIndex: "id",
+                        width: 125,
+                        render: (id: string) => (
+                          <Typography.Text copyable={{ text: id }} title={id}>
+                            {id.slice(0, 8)}
+                          </Typography.Text>
+                        )
+                      }
+                    ]
+                  : []),
+                {
+                  title: "状态",
+                  width: 100,
+                  render: (_, row) => (
+                    <Tag>
+                      {row.withdrawn_at
+                        ? "草稿（已撤回）"
+                        : row.current_publication_id
+                          ? "已发布"
+                          : "草稿"}
+                    </Tag>
+                  )
+                },
+                {
+                  title: "等级",
+                  width: 65,
+                  render: (_, row) => row.content.sentence.level
+                },
+                {
+                  title: "例句",
+                  width: 350,
+                  render: (_, row) => (
+                    <V3EnglishTextPreview
+                      value={row.content.sentence.en_text}
+                      hideCommonDialect
+                    />
+                  )
+                },
+                {
+                  title: "关联词条",
+                  width: 190,
+                  render: (_, row) => (
+                    <Flex vertical>
+                      {row.entries.slice(0, 2).map((e) => (
+                        <span className="tsz-words" key={e.id}>
+                          {entryLink(e)}{" "}
+                        </span>
+                      ))}
+                      {row.entries.length > 2 && (
+                        <Typography.Text
+                          title={row.entries.map((e) => e.headword).join("、")}
+                        >
+                          …
                         </Typography.Text>
-                      )
-                    }
-                  ]
-                : []),
-              {
-                title: "状态",
-                width: 100,
-                render: (_, row) => (
-                  <Tag>
-                    {row.withdrawn_at
-                      ? "草稿（已撤回）"
-                      : row.current_publication_id
-                        ? "已发布"
-                        : "草稿"}
-                  </Tag>
-                )
-              },
-              {
-                title: "等级",
-                width: 65,
-                render: (_, row) => row.content.sentence.level
-              },
-              {
-                title: "例句",
-                width: 350,
-                render: (_, row) => (
-                  <V3EnglishTextPreview
-                    value={row.content.sentence.en_text}
-                    hideCommonDialect
-                  />
-                )
-              },
-              {
-                title: "关联词条",
-                width: 190,
-                render: (_, row) => (
-                  <Flex vertical>
-                    {row.entries.slice(0, 2).map((e) => (
-                      <span className="tsz-words" key={e.id}>
-                        {entryLink(e)}{" "}
-                      </span>
-                    ))}
-                    {row.entries.length > 2 && (
-                      <Typography.Text
-                        title={row.entries.map((e) => e.headword).join("、")}
-                      >
-                        …
-                      </Typography.Text>
-                    )}
-                    {row.content.annotations.some(
-                      (a) => a.target.state === "pending"
-                    ) && <Tag color="orange">含待关联</Tag>}
-                  </Flex>
-                )
-              },
-              ...(!entryId
-                ? [
-                    {
-                      title: "创建时间",
-                      width: 170,
-                      render: (_: unknown, row: SharedSentence) =>
-                        new Date(row.created_at).toLocaleString("zh-CN")
-                    },
-                    { title: "创建人", dataIndex: "created_by", width: 100 },
-                    {
-                      title: "更新时间",
-                      width: 170,
-                      render: (_: unknown, row: SharedSentence) =>
-                        new Date(row.updated_at).toLocaleString("zh-CN")
-                    }
-                  ]
-                : []),
-              {
-                title: "操作",
-                fixed: "right",
-                width: canEdit || canPublish ? 380 : 140,
-                render: (_, row) => (
-                  <Space>
-                    <Button
-                      size="small"
-                      onClick={() => void open(row.id, false)}
-                    >
-                      查看
-                    </Button>
-                    {canReadAll && (
+                      )}
+                      {row.content.annotations.some(
+                        (a) => a.target.state === "pending"
+                      ) && <Tag color="orange">含待关联</Tag>}
+                    </Flex>
+                  )
+                },
+                ...(!entryId
+                  ? [
+                      {
+                        title: "创建时间",
+                        width: 170,
+                        render: (_: unknown, row: SharedSentence) =>
+                          new Date(row.created_at).toLocaleString("zh-CN")
+                      },
+                      { title: "创建人", dataIndex: "created_by", width: 100 },
+                      {
+                        title: "更新时间",
+                        width: 170,
+                        render: (_: unknown, row: SharedSentence) =>
+                          new Date(row.updated_at).toLocaleString("zh-CN")
+                      }
+                    ]
+                  : []),
+                {
+                  title: "操作",
+                  fixed: "right",
+                  width: canEdit || canPublish ? 380 : 140,
+                  render: (_, row) => (
+                    <Space>
                       <Button
                         size="small"
-                        onClick={() => void openPublication(row, "history")}
+                        onClick={() => void open(row.id, false)}
                       >
-                        历史
+                        查看
                       </Button>
-                    )}
-                    {!readOnly && (
-                      <>
-                        {(canAction(row, "edit") ||
-                          canAction(row, "associate")) && (
-                          <Button
-                            size="small"
-                            onClick={() => void open(row.id, true)}
-                          >
-                            编辑
-                          </Button>
-                        )}
-                        {canAction(row, "publish") && (
-                          <Button
-                            size="small"
-                            onClick={() => void openPublication(row, "publish")}
-                          >
-                            发布
-                          </Button>
-                        )}
-                        {row.current_publication_id &&
-                          canAction(
-                            row,
-                            row.withdrawn_at ? "restore" : "withdraw"
-                          ) && (
+                      {canReadAll && (
+                        <Button
+                          size="small"
+                          onClick={() => void openPublication(row, "history")}
+                        >
+                          历史
+                        </Button>
+                      )}
+                      {!readOnly && (
+                        <>
+                          {(canAction(row, "edit") ||
+                            canAction(row, "associate")) && (
                             <Button
                               size="small"
-                              danger={!row.withdrawn_at}
+                              onClick={() => void open(row.id, true)}
+                            >
+                              编辑
+                            </Button>
+                          )}
+                          {canAction(row, "publish") && (
+                            <Button
+                              size="small"
                               onClick={() =>
-                                void openPublication(
-                                  row,
-                                  row.withdrawn_at ? "restore" : "withdraw"
-                                )
+                                void openPublication(row, "publish")
                               }
                             >
-                              {row.withdrawn_at ? "重新展示原发布" : "撤回"}
+                              发布
                             </Button>
                           )}
-                        {canDelete &&
-                          !entryId &&
-                          !row.current_publication_id && (
-                            <Button
-                              size="small"
-                              danger
-                              onClick={() => remove([row])}
-                            >
-                              删除
-                            </Button>
-                          )}
-                      </>
-                    )}
-                  </Space>
-                )
-              }
-            ]}
-          />
-        </Col>
-      </Row>
+                          {row.current_publication_id &&
+                            canAction(
+                              row,
+                              row.withdrawn_at ? "restore" : "withdraw"
+                            ) && (
+                              <Button
+                                size="small"
+                                danger={!row.withdrawn_at}
+                                onClick={() =>
+                                  void openPublication(
+                                    row,
+                                    row.withdrawn_at ? "restore" : "withdraw"
+                                  )
+                                }
+                              >
+                                {row.withdrawn_at ? "重新展示原发布" : "撤回"}
+                              </Button>
+                            )}
+                          {canDelete &&
+                            !entryId &&
+                            !row.current_publication_id && (
+                              <Button
+                                size="small"
+                                danger
+                                onClick={() => remove([row])}
+                              >
+                                删除
+                              </Button>
+                            )}
+                        </>
+                      )}
+                    </Space>
+                  )
+                }
+              ]}
+            />
+          </Col>
+        </Row>
+      </ContentContainer>
 
       {batch && (
         <BatchPublicationModal

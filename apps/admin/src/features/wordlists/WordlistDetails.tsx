@@ -7,11 +7,14 @@ import {
   Input,
   Modal,
   Pagination,
+  Radio,
   Space,
+  Table,
   Tabs,
+  Tag,
   Typography
 } from "antd";
-import type { Wordlist, WordlistEntry, WordlistReview } from "@tsz/types";
+import type { Wordlist, WordlistEntry, AdminWordlistReview } from "@tsz/types";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import { api, usePermission } from "@/lib/auth";
 
@@ -42,22 +45,30 @@ export function WordlistEntryView({ entry }: { entry: WordlistEntry }) {
 }
 const reviewLabels: Record<string, string> = {
   pending: "待审核",
-  approved: "审核通过",
-  rejected: "审核未通过",
+  approved: "已通过",
+  rejected: "已驳回",
   cancelled: "已取消"
+};
+const reviewColors: Record<string, string> = {
+  pending: "processing",
+  approved: "success",
+  rejected: "error",
+  cancelled: "default"
 };
 export function WordlistDetails({
   list,
   adminId,
+  reviewMode = false,
   onClose
 }: {
   list: Wordlist;
   adminId: string;
+  reviewMode?: boolean;
   onClose: () => void;
 }) {
   const client = useQueryClient();
   const canReview = usePermission("wordlists.review");
-  const [tab, setTab] = useState("current");
+  const [tab, setTab] = useState(reviewMode ? "reviews" : "current");
   const [page, setPage] = useState(1);
   const [requestId, setRequestId] = useState<string>();
   const [action, setAction] = useState<"approve" | "reject" | null>(null);
@@ -70,12 +81,12 @@ export function WordlistDetails({
     queryFn: ({ signal }) => api.wordlists.reviews(list.id, { signal }),
     enabled: tab === "reviews"
   });
-  const current: WordlistReview | undefined =
+  const current: AdminWordlistReview | undefined =
     reviews.data?.items.find((r) => r.id === requestId) ??
     reviews.data?.items[0];
   const items = useQuery({
     queryKey: [...key, "items", tab, current?.id, page, list.revision],
-    enabled: tab === "current" || !!current,
+    enabled: tab === "current" || (reviewMode && !!current),
     queryFn: ({ signal }) =>
       tab === "current"
         ? api.wordlists.currentItems(
@@ -91,7 +102,15 @@ export function WordlistDetails({
           )
   });
   async function decide() {
-    if (!current || !action || busy) return;
+    if (
+      !reviewMode ||
+      !canReview ||
+      !current ||
+      current.state !== "pending" ||
+      !action ||
+      busy
+    )
+      return;
     if (action === "reject" && !reason.trim()) {
       setError("请填写驳回原因");
       return;
@@ -154,26 +173,77 @@ export function WordlistDetails({
               <p>读取审核记录…</p>
             ) : !current ? (
               <p>尚未提交公开审核</p>
+            ) : !reviewMode ? (
+              <Table<AdminWordlistReview>
+                rowKey="id"
+                size="small"
+                pagination={false}
+                dataSource={reviews.data.items}
+                columns={[
+                  {
+                    title: "审核状态",
+                    render: (_, r) => (
+                      <Tag color={reviewColors[r.state]}>
+                        {reviewLabels[r.state] ?? r.state}
+                      </Tag>
+                    )
+                  },
+                  { title: "申请名称", dataIndex: "name" },
+                  {
+                    title: "提交时间",
+                    dataIndex: "created_at",
+                    render: (value: string) =>
+                      value ? new Date(value).toLocaleString("zh-CN") : "—"
+                  },
+                  {
+                    title: "审核人",
+                    render: (_, r) =>
+                      r.reviewer_name ||
+                      r.reviewer_id ||
+                      (r.decided_at ? "未提供" : "—")
+                  },
+                  {
+                    title: "审核时间",
+                    dataIndex: "decided_at",
+                    render: (value: string | null) =>
+                      value ? new Date(value).toLocaleString("zh-CN") : "—"
+                  },
+                  {
+                    title: "审核意见",
+                    dataIndex: "reason",
+                    render: (value: string | null) => value || "—"
+                  }
+                ]}
+              />
             ) : (
               <>
-                <Space wrap>
-                  {reviews.data.items.map((r) => (
-                    <Button
-                      key={r.id}
-                      type={r.id === current.id ? "primary" : "default"}
-                      onClick={() => {
-                        setRequestId(r.id);
-                        setPage(1);
-                      }}
-                    >
-                      {reviewLabels[r.state] ?? r.state} · v
-                      {r.submitted_revision}
-                    </Button>
-                  ))}
-                </Space>
+                <Radio.Group
+                  aria-label="审核记录"
+                  value={current.id}
+                  onChange={(e) => {
+                    setRequestId(e.target.value);
+                    setPage(1);
+                  }}
+                >
+                  <Space wrap>
+                    {reviews.data.items.map((r) => (
+                      <Radio key={r.id} value={r.id}>
+                        <Tag color={reviewColors[r.state]}>
+                          {reviewLabels[r.state] ?? r.state}
+                        </Tag>
+                      </Radio>
+                    ))}
+                  </Space>
+                </Radio.Group>
                 <p>申请名称：{current.name}</p>
+                <p>
+                  审核人：
+                  {current.reviewer_name ||
+                    current.reviewer_id ||
+                    (current.decided_at ? "未提供" : "—")}
+                </p>
                 {current.reason && <p>审核意见：{current.reason}</p>}
-                {current.state === "pending" && canReview && (
+                {reviewMode && current.state === "pending" && canReview && (
                   <Space>
                     <Button
                       type="primary"
@@ -199,7 +269,7 @@ export function WordlistDetails({
             )}
           </>
         )}
-        {(tab === "current" || current) &&
+        {(tab === "current" || (reviewMode && current)) &&
           (items.isError ? (
             <Alert
               type="error"
@@ -245,9 +315,7 @@ export function WordlistDetails({
         }}
         onOk={() => void decide()}
       >
-        <p>
-          {current?.name} · v{current?.submitted_revision}
-        </p>
+        <p>{current?.name}</p>
         {action === "reject" && (
           <Input.TextArea
             aria-label="操作原因"

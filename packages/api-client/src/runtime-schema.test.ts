@@ -60,6 +60,7 @@ const ROOTS = [
   "WordlistEditSnapshot",
   "WordlistReview",
   "WordlistReviews",
+  "AdminWordlistReviews",
   "InvitationCode",
   "InvitationOverview",
   "InvitationRecordPage",

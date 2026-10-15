@@ -101,6 +101,12 @@ export const router = createBrowserRouter([
             })
           },
           {
+            ...ADMIN_PAGE_ROUTES.reviews,
+            lazy: async () => ({
+              Component: (await import("@/pages/Reviews")).ReviewsPage
+            })
+          },
+          {
             ...ADMIN_PAGE_ROUTES.coins,
             lazy: async () => ({
               Component: (await import("@/pages/Coins")).CoinsPage
@@ -146,8 +152,6 @@ export const router = createBrowserRouter([
               Component: (await import("@/pages/Admins")).AdminsPage
             })
           },
-          // wordlists / reviews / roles 三条路由都待后端与页面落地：占位页与请求层
-          // 留在 pages/ 与 features/ 下不动，做好之后把路由接回来即可。
           // roles 路由随 RBAC 后端一起待定：页面与请求层留在 pages/Roles.tsx、
           // features/roles 下不动，后端就绪后把这段接回来即可。
           {

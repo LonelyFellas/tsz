@@ -43,6 +43,12 @@ vi.mock("@/lib/auth", () => ({
       }),
       stats: vi.fn().mockResolvedValue({ total: 0, today: 0, month: 0 })
     },
+    wordlists: {
+      management: vi.fn().mockResolvedValue({
+        items: [],
+        pagination: { page: 1, page_size: 20, total: 0, total_pages: 0 }
+      })
+    },
     users: {
       list: vi.fn().mockResolvedValue({
         items: [],
@@ -90,11 +96,18 @@ describe("admin 页面烟雾测试", () => {
     expect(screen.getByRole("button", { name: "扣除" })).toBeInTheDocument();
   });
 
-  it.each([[ReviewsPage, "审核中心"]] as const)(
-    "%o 渲染标题 %s",
+  it.each([[ReviewsPage, "词表审核"]] as const)(
+    "%o 显示面包屑 %s",
     (Page, title) => {
-      render(<Page />);
-      expect(screen.getByRole("heading", { name: title })).toBeInTheDocument();
+      render(
+        <QueryClientProvider client={new QueryClient()}>
+          <Page />
+        </QueryClientProvider>
+      );
+      expect(screen.getByText(title)).toBeInTheDocument();
+      expect(
+        screen.queryByRole("heading", { name: title })
+      ).not.toBeInTheDocument();
     }
   );
 

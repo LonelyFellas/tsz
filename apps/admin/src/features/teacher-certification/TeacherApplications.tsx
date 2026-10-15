@@ -1,3 +1,4 @@
+import { ReloadOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   CertificationFile,
@@ -7,7 +8,9 @@ import type {
 import {
   Alert,
   App,
+  Breadcrumb,
   Button,
+  Card,
   Descriptions,
   Drawer,
   Empty,
@@ -168,91 +171,97 @@ function ApplicationQueue() {
   }
   const application = detail.data?.application;
   return (
-    <>
-      <Flex
-        align="center"
-        justify="space-between"
-        wrap
-        gap={16}
-        style={{ marginBottom: 20 }}
-      >
-        <div>
-          <Typography.Title level={3} style={{ margin: 0 }}>
-            教师申请审核
-          </Typography.Title>
-          <Typography.Text type="secondary">
-            查看资格证书、查看身份证、审核申请和撤销资格需要分别开通权限。
-          </Typography.Text>
-        </div>
-        <Space>
-          <Select
-            aria-label="认证状态"
-            allowClear
-            placeholder="全部状态"
-            value={status}
-            style={{ width: 140 }}
-            options={Object.entries(statuses).map(([value, label]) => ({
-              value,
-              label: label.label
-            }))}
-            onChange={(value) => {
-              setStatus(value);
-              setPage(1);
-            }}
+    <Flex vertical gap={16}>
+      <Breadcrumb items={[{ title: "审核管理" }, { title: "教师申请审核" }]} />
+      <Card size="small" styles={{ body: { paddingBottom: 8 } }}>
+        <Form
+          layout="inline"
+          style={{
+            rowGap: 12,
+            columnGap: 8,
+            display: "flex",
+            flexWrap: "wrap"
+          }}
+        >
+          <Form.Item label="审核状态">
+            <Select
+              aria-label="认证状态"
+              allowClear
+              placeholder="全部状态"
+              value={status}
+              style={{ width: 140 }}
+              options={Object.entries(statuses).map(([value, label]) => ({
+                value,
+                label: label.label
+              }))}
+              onChange={(value) => {
+                setStatus(value);
+                setPage(1);
+              }}
+            />
+          </Form.Item>
+          <Form.Item>
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={() => void list.refetch()}
+            >
+              刷新
+            </Button>
+          </Form.Item>
+        </Form>
+      </Card>
+      <Card size="small">
+        {list.isError && (
+          <Alert
+            type="error"
+            title={list.error.message}
+            showIcon
+            style={{ marginBottom: 16 }}
           />
-          <Button onClick={() => void list.refetch()}>刷 新</Button>
-        </Space>
-      </Flex>
-      {list.isError && (
-        <Alert
-          type="error"
-          title={list.error.message}
-          showIcon
-          style={{ marginBottom: 16 }}
+        )}
+        <Table<TeacherApplication>
+          rowKey="id"
+          loading={list.isFetching}
+          dataSource={list.data?.items ?? []}
+          scroll={{ x: 760 }}
+          pagination={{
+            current: page,
+            pageSize,
+            total: list.data?.total ?? 0,
+            showSizeChanger: true,
+            pageSizeOptions: [10, 20, 50, 100],
+            onChange: (next, size) => {
+              setPage(next);
+              setPageSize(size);
+            }
+          }}
+          columns={[
+            { title: "姓名", dataIndex: "real_name" },
+            { title: "联系方式", dataIndex: "contact" },
+            {
+              title: "提交时间",
+              dataIndex: "submitted_at",
+              render: (value: string) => new Date(value).toLocaleString()
+            },
+            {
+              title: "状态",
+              dataIndex: "status",
+              render: (value: TeacherApplicationStatus) => (
+                <Tag color={statuses[value].color}>{statuses[value].label}</Tag>
+              )
+            },
+            {
+              title: "操作",
+              key: "actions",
+              render: (_, row) => (
+                <Button type="link" onClick={() => setSelected(row.id)}>
+                  查看材料
+                </Button>
+              )
+            }
+          ]}
         />
-      )}
-      <Table<TeacherApplication>
-        rowKey="id"
-        loading={list.isFetching}
-        dataSource={list.data?.items ?? []}
-        scroll={{ x: 760 }}
-        pagination={{
-          current: page,
-          pageSize,
-          total: list.data?.total ?? 0,
-          showSizeChanger: true,
-          pageSizeOptions: [10, 20, 50, 100],
-          onChange: (next, size) => {
-            setPage(next);
-            setPageSize(size);
-          }
-        }}
-        columns={[
-          { title: "姓名", dataIndex: "real_name" },
-          { title: "联系方式", dataIndex: "contact" },
-          {
-            title: "提交时间",
-            dataIndex: "submitted_at",
-            render: (value: string) => new Date(value).toLocaleString()
-          },
-          {
-            title: "状态",
-            dataIndex: "status",
-            render: (value: TeacherApplicationStatus) => (
-              <Tag color={statuses[value].color}>{statuses[value].label}</Tag>
-            )
-          },
-          {
-            title: "操作",
-            key: "actions",
-            render: (_, row) => (
-              <Button type="link" onClick={() => setSelected(row.id)}>
-                查看材料
-              </Button>
-            )
-          }
-        ]}
-      />
+      </Card>
       <Drawer
         title="认证资料"
         open={!!selected}
@@ -393,6 +402,6 @@ function ApplicationQueue() {
           <Alert type="error" title={mutation.error.message} showIcon />
         )}
       </Modal>
-    </>
+    </Flex>
   );
 }

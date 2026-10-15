@@ -34,6 +34,7 @@ export const RUNTIME_SCHEMA_ROOTS = [
   "WordlistEditSnapshot",
   "WordlistReview",
   "WordlistReviews",
+  "AdminWordlistReviews",
   "InvitationCode",
   "InvitationOverview",
   "InvitationRecordPage",
