@@ -206,7 +206,12 @@ function Library({ userId }: { userId: string }) {
   const activeItem = locateId
     ? items.find((item) => item.wordlist_id === locateId)
     : undefined;
-  const workspaceHref = (id?: string, nextMode = "read", folder = parent) => {
+  const currentFolder = activeItem ? activeItem.parent_id : (parent ?? null);
+  const workspaceHref = (
+    id?: string,
+    nextMode = "read",
+    folder: string | null = currentFolder
+  ) => {
     const p = new URLSearchParams({ space });
     if (folder) p.set("folder", folder);
     if (trash) p.set("trash", "true");
@@ -216,9 +221,7 @@ function Library({ userId }: { userId: string }) {
   };
   const openWordlist = (item: LibraryItem) => {
     if (!working.current && item.wordlist_id) {
-      router.push(
-        workspaceHref(item.wordlist_id, "read", item.parent_id ?? undefined)
-      );
+      router.push(workspaceHref(item.wordlist_id, "read", item.parent_id));
     }
   };
   function treeAction(action: LibraryTreeAction, item: LibraryItem) {
@@ -298,7 +301,7 @@ function Library({ userId }: { userId: string }) {
                   userId={userId}
                   space={space}
                   trash={trash}
-                  selectedFolder={activeItem?.parent_id ?? parent}
+                  selectedFolder={currentFolder ?? undefined}
                   selectedWordlist={locateId}
                   ancestorIds={(
                     activeItem?.path ??
@@ -325,7 +328,9 @@ function Library({ userId }: { userId: string }) {
                     });
                   }}
                   onCreateWordlist={(folder) => {
-                    router.push(workspaceHref(undefined, "new", folder));
+                    router.push(
+                      workspaceHref(undefined, "new", folder ?? null)
+                    );
                     closeDrawer();
                   }}
                   onAction={treeAction}
@@ -398,6 +403,13 @@ function Library({ userId }: { userId: string }) {
           )}
         </ResponsiveExplorer>
         <section aria-label="内容区域" className="min-w-0 p-4 sm:p-6 lg:p-8">
+          {error && <PageNotice tone="error">{error}</PageNotice>}
+          {notice && (
+            <p role="status" className="mb-4 text-sm text-success">
+              {notice}
+            </p>
+          )}
+
           {locateId || mode === "new" ? (
             <>
               <div className="mb-6 flex items-center justify-between gap-3 border-b border-border pb-3">
@@ -417,7 +429,7 @@ function Library({ userId }: { userId: string }) {
                   data-leaves-page
                   variant="ghost"
                   size="sm"
-                  onClick={() => go(parent)}
+                  onClick={() => go(currentFolder ?? undefined)}
                 >
                   关闭词表
                 </Button>
@@ -427,7 +439,7 @@ function Library({ userId }: { userId: string }) {
                   embedded
                   folderId={parent}
                   onSaved={(id) => router.push(workspaceHref(id))}
-                  onCancel={() => go(parent)}
+                  onCancel={() => go(currentFolder ?? undefined)}
                 />
               ) : result.isPending ? (
                 <PageNotice>正在读取词表…</PageNotice>
@@ -561,12 +573,6 @@ function Library({ userId }: { userId: string }) {
                   </Button>
                 )}
               </div>
-              {error && <PageNotice tone="error">{error}</PageNotice>}
-              {notice && (
-                <p role="status" className="mb-4 text-sm text-success">
-                  {notice}
-                </p>
-              )}
               <div className="mb-4 flex flex-wrap items-center gap-3">
                 <label className="flex items-center gap-2 text-sm">
                   <input
@@ -732,7 +738,7 @@ function Library({ userId }: { userId: string }) {
                             href={workspaceHref(
                               item.wordlist_id,
                               "read",
-                              item.parent_id ?? undefined
+                              item.parent_id
                             )}
                           >
                             {item.name}

@@ -10,6 +10,8 @@ interface RouteGuardProps {
   children: ReactNode;
   /** 是否要求已完成新用户引导（onboarding）。主区页面传 true。 */
   requireOnboarding?: boolean;
+  /** 工作区的目录、词表和编辑模式通过查询参数恢复。 */
+  preserveSearch?: boolean;
 }
 
 /**
@@ -20,7 +22,8 @@ interface RouteGuardProps {
  */
 export function RouteGuard({
   children,
-  requireOnboarding = false
+  requireOnboarding = false,
+  preserveSearch = false
 }: RouteGuardProps) {
   const user = useUserStore((s) => s.user);
   const onboarded = useUserStore((s) => s.onboarded);
@@ -34,14 +37,22 @@ export function RouteGuard({
     hydrated && !!user && requireOnboarding && onboarded === false;
 
   useEffect(() => {
+    const target = pathname + (preserveSearch ? window.location.search : "");
     if (needsLogin) {
-      router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
+      router.replace(`/login?redirect=${encodeURIComponent(target)}`);
     } else if (bindingTarget) {
-      router.replace(bindingTarget);
+      router.replace(phoneBindingRedirect(user, target) ?? bindingTarget);
     } else if (needsOnboarding) {
-      router.replace(postAuthPath(false, pathname));
+      router.replace(postAuthPath(false, target));
     }
-  }, [needsLogin, bindingTarget, needsOnboarding, pathname, router]);
+  }, [
+    needsLogin,
+    bindingTarget,
+    needsOnboarding,
+    pathname,
+    router,
+    preserveSearch
+  ]);
 
   // 恢复中或即将跳转：不渲染受保护内容。
   if (!hydrated || needsLogin || bindingTarget || needsOnboarding) {

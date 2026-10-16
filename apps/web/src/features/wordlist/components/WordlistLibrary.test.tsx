@@ -294,3 +294,56 @@ it("expands with the keyboard, collapses the explorer, and adjusts the pane widt
   fireEvent.keyDown(divider, { key: "ArrowRight" });
   expect(divider).toHaveAttribute("aria-valuenow", "276");
 });
+
+it("opens root wordlists from a subfolder without inheriting that folder and creates at root", async () => {
+  navigation.params = "space=owned&folder=other-folder";
+  const view = renderWithProviders(<WordlistLibrary />);
+  const tree = screen.getByRole("navigation", { name: "工程目录" });
+  fireEvent.click(
+    await within(tree).findByRole("button", { name: "我的备注" })
+  );
+  expect(navigation.push).toHaveBeenCalledWith(
+    "/account/wordlists?space=owned&wordlist=wordlist"
+  );
+  navigation.params = "space=owned&wordlist=wordlist";
+  view.rerender(<WordlistLibrary />);
+  await within(screen.getByRole("region", { name: "内容区域" })).findByText(
+    "原词表暂不可用，收藏位置和个人备注仍然保留。"
+  );
+  fireEvent.click(
+    within(tree).getByRole("button", { name: "在当前目录新建文件夹" })
+  );
+  const dialog = await screen.findByRole("dialog", { name: "新建文件夹" });
+  fireEvent.change(within(dialog).getByLabelText("名称"), {
+    target: { value: "根目录新文件夹" }
+  });
+  fireEvent.click(within(dialog).getByRole("button", { name: "保存" }));
+  await waitFor(() =>
+    expect(api.wordList.library.createFolder).toHaveBeenCalledWith("owned", {
+      expected_version: "v1",
+      parent_id: null,
+      name: "根目录新文件夹"
+    })
+  );
+});
+
+it("shows failed tree moves while a wordlist is open in the content pane", async () => {
+  navigation.params = "space=owned&wordlist=wordlist";
+  vi.mocked(api.wordList.library.operate).mockRejectedValue(
+    new Error("目录版本冲突")
+  );
+  renderWithProviders(<WordlistLibrary />);
+  const tree = screen.getByRole("navigation", { name: "工程目录" });
+  const target = (await within(tree).findByRole("button", { name: "英语" }))
+    .parentElement!;
+  fireEvent.drop(target, {
+    dataTransfer: {
+      getData: () => JSON.stringify({ space: "owned", ids: ["file"] })
+    }
+  });
+  expect(
+    await within(screen.getByRole("region", { name: "内容区域" })).findByRole(
+      "alert"
+    )
+  ).toHaveTextContent("目录版本冲突");
+});
