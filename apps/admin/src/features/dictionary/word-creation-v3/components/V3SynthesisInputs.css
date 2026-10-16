@@ -246,6 +246,10 @@
   text-overflow: ellipsis;
 }
 
+.word-synthesis-choice-preview.tsz-words {
+  font-weight: 700;
+}
+
 .word-synthesis-choice.ant-radio-wrapper-checked .word-synthesis-choice-tag {
   color: var(--ant-color-text-light-solid, #fff);
   background: var(--ant-color-primary, #2053ff);
