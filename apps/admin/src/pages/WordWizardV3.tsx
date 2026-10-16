@@ -245,6 +245,11 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
     preparingRef.current = true;
     setPendingIntent(intent);
     try {
+      if (intent === "save" && !context.dirtySteps.forms && !bindingsDirty) {
+        await context.actions.saveDraft();
+        setPendingIntent(undefined);
+        return;
+      }
       const impact = await context.actions.previewFormsSaveImpact();
       if (!impact) {
         setPendingIntent(undefined);
@@ -252,7 +257,8 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
       }
       if (!impact.requires_confirmation && !impact.surface_match_page) {
         setPendingIntent(undefined);
-        await context.actions.saveForms(intent);
+        if (intent === "save") await context.actions.saveDraft();
+        else await context.actions.saveForms(intent);
       }
     } finally {
       preparingRef.current = false;
@@ -283,7 +289,8 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
     if (!confirmed) return;
     const intent = pendingIntent;
     setPendingIntent(undefined);
-    await context.actions.saveForms(intent, confirmationContext);
+    if (intent === "save") await context.actions.saveDraft(confirmationContext);
+    else await context.actions.saveForms(intent, confirmationContext);
   };
 
   const resetConfirmation = () => setPendingIntent(undefined);
@@ -393,7 +400,7 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
         <Button
           disabled={
             Boolean(pendingIntent) ||
-            (!context.dirtySteps.forms && !bindingsDirty) ||
+            (!context.hasUnsavedChanges && !bindingsDirty) ||
             busy
           }
           loading={busy && pendingIntent === "save"}
