@@ -452,13 +452,21 @@ function DetectionPresentationCard({
                 {expanded === entry.key ? (
                   <div className="word-smart-match-context-meta">
                     {entry.baseSpellings.map((spelling) => (
-                      <div className="tsz-words" key={spelling}>
+                      <div
+                        className="tsz-words"
+                        key={spelling}
+                        style={{ fontWeight: 700 }}
+                      >
                         原形：{spelling}
                       </div>
                     ))}
                     {entry.baseSpellings.length === 0
                       ? entry.otherMatches.map((match) => (
-                          <div className="tsz-words" key={match}>
+                          <div
+                            className="tsz-words"
+                            key={match}
+                            style={{ fontWeight: 700 }}
+                          >
                             命中：{match}
                           </div>
                         ))

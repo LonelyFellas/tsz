@@ -128,6 +128,7 @@ function VariantPanel({
           className="tsz-words"
           readOnly
           value={spelling}
+          style={{ fontWeight: 700 }}
         />
         <Pronunciations pronunciations={pronunciations} />
       </Space>

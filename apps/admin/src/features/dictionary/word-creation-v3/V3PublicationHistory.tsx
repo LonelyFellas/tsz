@@ -293,7 +293,10 @@ function PublicationSnapshotBody({
                   <Tag>{partOfSpeechLabel(form.pos)}</Tag>
                   <Tag>{formTypeLabel(form.formType as never)}</Tag>
                   <Tag>{dialectLabel(form.dialect as never)}</Tag>
-                  <Typography.Text className="tsz-words">
+                  <Typography.Text
+                    className="tsz-words"
+                    style={{ fontWeight: 700 }}
+                  >
                     {form.spelling}
                   </Typography.Text>
                 </Flex>
