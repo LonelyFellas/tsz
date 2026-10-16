@@ -75,6 +75,12 @@ export interface V3WizardActions {
       "base_revision" | "impact_content"
     >
   ): Promise<void>;
+  saveDraft(
+    confirmationContext?: Omit<
+      V3ConfirmationContext,
+      "base_revision" | "impact_content"
+    >
+  ): Promise<void>;
   previewFormsImpact(): Promise<FormsImpactResponseV3 | undefined>;
   previewFormsSaveImpact(): Promise<FormsImpactResponseV3 | undefined>;
   saveMeanings(
@@ -1713,6 +1719,28 @@ function V3WordCreationSession({
     () => ({
       saveForms: async (intent, confirmationContext) => {
         await saveFormsContent(draftForms, intent, confirmationContext);
+      },
+      saveDraft: async (confirmationContext) => {
+        const flow = flowRef.current;
+        const scope = scopeRef.current;
+        const bindingsDirty =
+          flow.canonical().capabilities.atomic_form_sense_bindings === true &&
+          formGroupBindingPatches(
+            draftMeaningsRef.current,
+            flow.canonical().meanings
+          ).length > 0;
+        if (dirtyRef.current.forms || bindingsDirty) {
+          const saved = await saveFormsContent(
+            draftFormsRef.current,
+            "save",
+            confirmationContext
+          );
+          if (!saved || scope !== scopeRef.current || flowRef.current !== flow)
+            return;
+        }
+        if (dirtyRef.current.meanings) {
+          await saveMeanings(draftMeaningsRef.current, "save");
+        }
       },
       previewFormsImpact: () => previewFormsImpact("publish"),
       previewFormsSaveImpact: () => previewFormsImpact("save"),
