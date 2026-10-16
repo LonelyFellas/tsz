@@ -39,6 +39,8 @@ describe("V3 product presentation", () => {
     expect(formTypeLabel("base")).toBe("原形");
     expect(formTypeLabel("past_participle")).toBe("过去分词");
     expect(dialectLabel("common")).toBe("英美通用");
+    expect(pronunciationStyleLabel("normal")).toBe("语流连读");
+    expect(pronunciationStyleLabel("citation")).toBe("逐字正音");
     expect(pronunciationStyleLabel("weak")).toBe("弱读");
     expect(partOfSpeechLabel("noun")).toBe("名词");
     expect(partOfSpeechLabel("future-pos")).toBe("其他词性");
@@ -66,9 +68,7 @@ describe("V3 product presentation", () => {
   it("未知枚举统一回退到产品文案", () => {
     expect(formTypeLabel("future-form" as never)).toBe("未识别词形类型");
     expect(dialectLabel("future-dialect" as never)).toBe("未识别地区");
-    expect(pronunciationStyleLabel("future-style" as never)).toBe(
-      "未识别发音方式"
-    );
+    expect(pronunciationStyleLabel("future-style" as never)).toBe("未识别读法");
     expect(impactTypeLabel("future-impact" as never)).toBe("受影响内容");
     expect(definitionModeLabel("future-definition" as never)).toBe(
       "未识别内容方式"

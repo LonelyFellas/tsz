@@ -224,7 +224,7 @@ function FormsReview({
                                     ? pronunciationStyleLabel(
                                         pronunciation.style
                                       )
-                                    : "未选择发音方式"}
+                                    : "未选择读法"}
                                 </small>
                                 {pronunciation.synthesis && (
                                   <small>

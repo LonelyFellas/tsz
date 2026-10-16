@@ -33,7 +33,7 @@ function pronunciationFieldMessage(
   field: "style" | "dict_phonetic" | "actual_pron"
 ) {
   if (issue.code !== "pronunciation_required") return v3IssueMessage(issue);
-  if (field === "style") return "请选择发音方式";
+  if (field === "style") return "请选择读法";
   if (field === "dict_phonetic") return "请填写字典音标";
   return "请填写实际发音";
 }
@@ -279,11 +279,11 @@ export function V3PronunciationList({
                     <div className="word-pronunciation-fields">
                       <label className="word-pronunciation-row">
                         <Typography.Text className="word-pronunciation-label">
-                          发音方式
+                          读法
                         </Typography.Text>
                         <Form.Item noStyle>
                           <Select
-                            aria-label={`第 ${index + 1} 条发音的发音方式`}
+                            aria-label={`第 ${index + 1} 条发音的读法`}
                             className="word-pronunciation-style-select"
                             data-v3-field="style"
                             data-v3-node-id={pronunciation.id}
@@ -298,6 +298,10 @@ export function V3PronunciationList({
                               {
                                 value: "normal",
                                 label: pronunciationStyleLabel("normal")
+                              },
+                              {
+                                value: "citation",
+                                label: pronunciationStyleLabel("citation")
                               },
                               {
                                 value: "strong",

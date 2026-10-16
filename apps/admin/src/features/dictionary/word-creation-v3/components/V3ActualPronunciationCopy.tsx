@@ -62,7 +62,7 @@ export function V3ActualPronunciationCopy({
         type="default"
         icon={<SwapOutlined />}
         aria-label="从字典音标填入实际发音"
-        title="按天生之统一音标规则转换，使用当前口音与发音方式"
+        title="按天生之统一音标规则转换，使用当前口音与读法"
         disabled={!pronunciation.dict_phonetic.trim()}
         onClick={() => {
           const result = convertDictionaryToUnified(
@@ -120,7 +120,7 @@ export function V3ActualPronunciationCopy({
             apply(pending.value);
           else {
             setPending(undefined);
-            setDiagnostic("来源、口音、发音方式或目标内容已变化，请重新转换");
+            setDiagnostic("来源、口音、读法或目标内容已变化，请重新转换");
           }
         }}
       >

@@ -346,7 +346,7 @@ describe("V3PreviewAndPublishStep", () => {
     );
     expect(
       screen.getByTestId(`preview-pronunciation-${UUIDS.pronunciation}`)
-    ).toHaveTextContent(/sen\-tre.*常规.*centre/);
+    ).toHaveTextContent(/sen\-tre.*语流连读.*centre/);
     expect(
       screen.getByTestId(`preview-pronunciation-${UUIDS.pronunciation_2}`)
     ).toHaveTextContent(/sen\-tr.*强读.*centr/);
@@ -355,7 +355,7 @@ describe("V3PreviewAndPublishStep", () => {
     ).toHaveTextContent(/sen\-ter.*弱读.*center/);
     expect(
       screen.getByTestId(`preview-pronunciation-${uuidFromInt(904)}`)
-    ).toHaveTextContent(/sen\-tre\-uk.*常规.*centre\-uk/);
+    ).toHaveTextContent(/sen\-tre\-uk.*语流连读.*centre\-uk/);
   });
 
   it("keeps an empty group list and an empty pronunciation list explicit", () => {
@@ -403,9 +403,7 @@ describe("V3PreviewAndPublishStep", () => {
     expect(screen.getByText("暂无发音")).toBeInTheDocument();
     expect(
       screen.getByTestId(`preview-pronunciation-${uuidFromInt(905)}`)
-    ).toHaveTextContent(
-      /pending-phonetic.*未选择发音方式.*pending-pronunciation/
-    );
+    ).toHaveTextContent(/pending-phonetic.*未选择读法.*pending-pronunciation/);
   });
 
   it("缺失成员与空音标使用产品回退", () => {
@@ -438,7 +436,7 @@ describe("V3PreviewAndPublishStep", () => {
     ).toHaveTextContent("1. 未知词形");
     expect(
       screen.getByTestId(`preview-pronunciation-${uuidFromInt(906)}`)
-    ).toHaveTextContent("常规");
+    ).toHaveTextContent("语流连读");
   });
 
   it("受控校验问题统一按稳定 code 展示中文并隐藏内部代码", () => {
@@ -536,7 +534,7 @@ describe("V3PreviewAndPublishStep", () => {
       "动词11 项待完成"
     );
     expect(
-      within(summary).getAllByText("请完整填写发音方式、字典音标和实际发音", {
+      within(summary).getAllByText("请完整填写读法、字典音标和实际发音", {
         exact: true
       })
     ).toHaveLength(1);

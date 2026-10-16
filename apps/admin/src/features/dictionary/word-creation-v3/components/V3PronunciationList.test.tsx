@@ -513,6 +513,21 @@ it("字典转换失败保留目标，确认期间编辑目标会阻止覆盖", a
   fireEvent.click(screen.getByText(/^应\s*用$/));
   expect(field("实际发音")).toHaveValue("dɒg");
   expect(
-    screen.getByText(/来源、口音、发音方式或目标内容已变化/)
+    screen.getByText(/来源、口音、读法或目标内容已变化/)
   ).toBeInTheDocument();
+});
+
+it("读法按指定顺序展示，逐字正音使用独立 wire 值", () => {
+  render(<Harness />);
+  fireEvent.mouseDown(screen.getByLabelText("第 1 条发音的读法"));
+  expect(
+    Array.from(
+      document.querySelectorAll(".ant-select-item-option-content")
+    ).map((item) => item.textContent)
+  ).toEqual(["语流连读", "逐字正音", "强读", "弱读"]);
+  fireEvent.click(screen.getByText("逐字正音"));
+  const wire = JSON.parse(screen.getByTestId("wire").textContent!);
+  expect(
+    wire.pos[0].forms[0].regional_variants.common.pronunciations[0].style
+  ).toBe("citation");
 });

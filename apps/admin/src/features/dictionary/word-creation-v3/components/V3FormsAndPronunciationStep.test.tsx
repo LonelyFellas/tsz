@@ -1190,7 +1190,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(
       groupCard.querySelectorAll(".word-form-type-cell .v3-membership-actions")
     ).toHaveLength(3);
-    expect(groupCard).toHaveTextContent("发音方式");
+    expect(groupCard).toHaveTextContent("读法");
     expect(groupCard).toHaveTextContent("字典音标");
     expect(groupCard).toHaveTextContent("实际发音");
     expect(within(groupCard).getAllByLabelText(/拼写 播放语音/)).toHaveLength(
@@ -2277,7 +2277,7 @@ describe("V3FormsAndPronunciationStep", () => {
       "aria-invalid",
       "false"
     );
-    expect(screen.getByLabelText("第 1 条发音的发音方式")).toHaveValue("");
+    expect(screen.getByLabelText("第 1 条发音的读法")).toHaveValue("");
     expect(screen.queryByLabelText("新增发音")).toBeNull();
     expect(screen.getAllByLabelText(/在第 \d+ 条后新增发音/)).toHaveLength(2);
 
@@ -2287,7 +2287,7 @@ describe("V3FormsAndPronunciationStep", () => {
     await changeVoiceText(screen.getByLabelText("第 2 条发音的实际发音"), {
       target: { value: "edited-actual" }
     });
-    fireEvent.mouseDown(screen.getByLabelText("第 2 条发音的发音方式"));
+    fireEvent.mouseDown(screen.getByLabelText("第 2 条发音的读法"));
     fireEvent.click(screen.getAllByText("弱读").at(-1)!);
     fireEvent.click(screen.getByLabelText("在第 2 条后新增发音"));
     fireEvent.click(screen.getByLabelText("删除第 2 条发音"));
@@ -2314,7 +2314,7 @@ describe("V3FormsAndPronunciationStep", () => {
     ).toBe(false);
   });
 
-  it("把发布检查的发音方式与字典音标问题映射为各自短帮助文案", () => {
+  it("把发布检查的读法与字典音标问题映射为各自短帮助文案", () => {
     const pronunciation = pronunciationFixture({
       id: uuidFromInt(905),
       dict_phonetic: "",
@@ -2373,9 +2373,9 @@ describe("V3FormsAndPronunciationStep", () => {
     );
 
     expect(
-      screen.getByLabelText("第 1 条发音的发音方式").closest(".ant-select")
+      screen.getByLabelText("第 1 条发音的读法").closest(".ant-select")
     ).toHaveClass("ant-select-status-error");
-    expect(screen.getByText("请选择发音方式")).toBeVisible();
+    expect(screen.getByText("请选择读法")).toBeVisible();
     expect(screen.getByLabelText("第 1 条发音的字典音标")).toHaveClass(
       "ant-input-status-error"
     );

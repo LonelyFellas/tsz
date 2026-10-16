@@ -6,6 +6,15 @@ import {
 } from "./pronunciation-synthesis";
 
 describe("语雀统一音标规则", () => {
+  it("逐字正音不套用语流连读或强弱读例词替换", () => {
+    expect(
+      convertDictionaryToUnified("ˈfæmɪlɪ", "family", "uk", "citation")
+    ).toMatchObject({
+      ok: true,
+      value: "ˈfæmɪlɪ",
+      notices: [expect.stringContaining("文档未明确此词的该读法")]
+    });
+  });
   it("音节及重音标记不把后接元音的 r 变成卷舌韵尾", () => {
     for (const [input, expected] of [
       ["ˈvɛr.i", "ˈvɛr.ɪ"],

@@ -45,12 +45,13 @@ export const FORM_TYPE_LABEL: Record<WordFormType, string> = {
 
 export const FORM_TYPE_OPTIONS = recordToOptions(FORM_TYPE_LABEL);
 
-// 发音方式。
+// 读法。
 export const PRON_STYLE_OPTIONS: {
   value: PronunciationStyle;
   label: string;
 }[] = [
-  { value: "normal", label: "正常" },
+  { value: "normal", label: "语流连读" },
+  { value: "citation", label: "逐字正音" },
   { value: "strong", label: "强读" },
   { value: "weak", label: "弱读" }
 ];

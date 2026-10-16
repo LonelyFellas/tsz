@@ -177,7 +177,7 @@ export function convertDictionaryToUnified(
         ? STYLE_EXAMPLES[word]
         : undefined;
     let styleApplied = false;
-    if (example?.source.includes(value)) {
+    if (style !== "citation" && example?.source.includes(value)) {
       const selected = example[style];
       if (selected) {
         value = selected;
