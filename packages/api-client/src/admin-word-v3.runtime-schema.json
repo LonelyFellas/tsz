@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/spelling-synthesis/tsz-rust/docs/openapi.json",
-  "_source_sha256": "da6d62ebe0b673846542e1acf2740952f26d2263489dd0538e59b6c7ecaaef2f",
+  "_source": "/Users/darwish/.codex/worktrees/phoneme-speech/tsz-rust/docs/openapi.json",
+  "_source_sha256": "128c30462ed379f5d505b93b4ad4e5cc03d71b3cc80ff127fa4734d14802f73b",
   "roots": [
     "DictionaryPage",
     "DictionaryEntry",
@@ -1969,7 +1969,9 @@
       "required": ["ipa", "ups"],
       "properties": {
         "ipa": { "type": "string", "maxLength": 200 },
+        "ipa_speech": { "$ref": "#/$defs/SynthesisSpeechV3" },
         "ups": { "type": "string", "maxLength": 1600 },
+        "ups_speech": { "$ref": "#/$defs/SynthesisSpeechV3" },
         "ups_words": {
           "type": ["array", "null"],
           "items": { "$ref": "#/$defs/UpsWordV3" },
@@ -3047,6 +3049,15 @@
         "allow_new_exact_headword_entries",
         "allow_multiple_active_exact_headword_publications"
       ]
+    },
+    "SynthesisSpeechV3": {
+      "type": "object",
+      "required": ["content", "voice_profile"],
+      "properties": {
+        "content": { "$ref": "#/$defs/RichTextV2V3" },
+        "voice_profile": { "$ref": "#/$defs/VoiceProfileV3" }
+      },
+      "additionalProperties": false
     },
     "TextLinkV3": {
       "type": "object",

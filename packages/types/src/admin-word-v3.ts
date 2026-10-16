@@ -52,10 +52,16 @@ export interface UpsWordV3 {
   phoneme: string;
 }
 export type PhonemeLocaleV3 = "en-GB" | "en-US";
+export interface SynthesisSpeechV3 {
+  content: RichTextV2V3;
+  voice_profile: VoiceProfileV3;
+}
 export interface PronunciationSynthesisCandidateV3 {
   ipa: string;
   ups: string;
   ups_words?: UpsWordV3[] | null;
+  ipa_speech?: SynthesisSpeechV3;
+  ups_speech?: SynthesisSpeechV3;
 }
 export interface PronunciationSynthesisV3 {
   alphabet: "ipa" | "ups";

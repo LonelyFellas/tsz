@@ -318,31 +318,34 @@ describe("独立发音输入", () => {
       )
     );
   });
-  it("固定从实际发音转换，不读字典或另一候选；覆盖确认、取消、撤销且不改变来源", async () => {
+  it("IPA 读取字典，UPS 读取人工修正后的对应 IPA；实际发音不参与转换", async () => {
     render(<Harness />);
     await change("字典音标", "dɔg");
     await change("实际发音", "kæt");
     change("Azure UPS", "H U M");
-    change("Azure IPA", "human IPA");
+    change("Azure IPA", "kɛt");
     convert("UPS");
-    expect(await screen.findByText("K AE T")).toBeInTheDocument();
+    expect(await screen.findByText("K EH T")).toBeInTheDocument();
     fireEvent.click(screen.getByText(/取\s*消/));
     expect(field("Azure UPS")).toHaveValue("H U M");
     convert("UPS");
     fireEvent.click(screen.getByText("应用转换结果"));
-    expect(field("Azure UPS")).toHaveValue("K AE T");
-    expect(field("Azure IPA")).toHaveValue("human IPA");
+    expect(field("Azure UPS")).toHaveValue("K EH T");
+    expect(field("Azure IPA")).toHaveValue("kɛt");
     expect(screen.getByRole("radio", { name: "Azure IPA" })).toBeChecked();
     fireEvent.keyDown(field("Azure UPS"), { key: "z", ctrlKey: true });
     expect(field("Azure UPS")).toHaveValue("H U M");
-    await change("实际发音", "");
+    change("Azure IPA", "");
     convert("UPS");
-    expect(screen.getByText("请先填写实际发音")).toBeInTheDocument();
+    expect(
+      screen.getByText("请先填写对应口音的 Azure IPA")
+    ).toBeInTheDocument();
     expect(field("Azure UPS")).toHaveValue("H U M");
     await change("实际发音", "kæt?");
     convert("IPA");
-    expect(screen.getByText(/此符号或组合/)).toBeInTheDocument();
-    expect(field("Azure IPA")).toHaveValue("human IPA");
+    expect(field("Azure IPA")).toHaveValue("dɔg");
+    expect(field("实际发音")).toHaveValue("kæt?");
+    expect(field("Azure UPS")).toHaveValue("H U M");
   });
   it("两行试听各自使用对应候选，不受语音来源切换影响", () => {
     render(<Harness />);
@@ -367,6 +370,7 @@ describe("独立发音输入", () => {
   });
   it("短语连续显示，词界保存；手改后禁止复用，撤销恢复", () => {
     render(<Harness phrase />);
+    change("Azure IPA", "hə.ˈloʊ kæt");
     convert("UPS");
     expect(field("Azure UPS")).toHaveValue("H AX . S1 L O K AE T");
     expect(rows()[0].synthesis.us.ups_words).toEqual([
@@ -445,13 +449,14 @@ describe("独立发音输入", () => {
     expect(rows()[0].synthesis.us.ups).toBe("K AE T");
     fireEvent.click(screen.getByLabelText("第 1 条发音转换为英式 Azure UPS"));
     expect(field("美式 Azure UPS")).toHaveValue("K AE T");
-    expect(field("英式 Azure UPS")).toHaveValue("K AE T");
+    expect(field("英式 Azure UPS")).toHaveValue("K EH T");
   });
   it("来源改变后取消过期的覆盖确认", async () => {
     render(<Harness />);
     change("Azure UPS", "OLD");
+    change("Azure IPA", "kæt");
     convert("UPS");
-    await change("实际发音", "dɔg");
+    change("Azure IPA", "dɔg");
     fireEvent.click(screen.getByText("应用转换结果"));
     expect(field("Azure UPS")).toHaveValue("OLD");
     expect(screen.getByText(/来源、口音或目标内容已变化/)).toBeInTheDocument();
@@ -485,7 +490,7 @@ it("实际发音填入需确认并保留可撤销快照", async () => {
   fireEvent.click(screen.getByLabelText("撤销实际发音填入"));
   expect(field("实际发音")).toHaveValue("dɔg");
 });
-it("字典音标经统一规则生成实际发音，再分别转换英美 IPA 和 UPS", () => {
+it("字典独立生成实际发音和英美 IPA，UPS 从各自 IPA 转换", () => {
   render(<Harness word="school" phonetic="/skuːl/" />);
   fireEvent.click(screen.getByLabelText("从字典音标填入实际发音"));
   expect(screen.getByText("sguːl")).toBeInTheDocument();

@@ -179,7 +179,8 @@ export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
     | "dict-phonetic"
     | "actual-pron"
     | "spelling"
-    | "synthesis";
+    | "synthesis"
+    | "phoneme-settings";
   /**
    * 这段正文所属的语种。宿主按英美分栏时传进来，音色清单和录音归属都只留这一侧；
    * 不分英美（通用栏）的字段不传，此时不做筛选。

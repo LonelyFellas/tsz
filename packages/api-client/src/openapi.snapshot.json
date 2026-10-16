@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/spelling-synthesis/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-16T05:35:21.614Z",
+  "_source": "/Users/darwish/.codex/worktrees/phoneme-speech/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-10-16T08:02:16.288Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -206,6 +206,12 @@
         "schema": { "type": "string", "format": "uuid" }
       },
       {
+        "name": "X-TSZ-Phoneme-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Sentence-Formatting",
         "in": "header",
         "required": false,
@@ -230,6 +236,12 @@
         "in": "header",
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
+      },
+      {
+        "name": "X-TSZ-Phoneme-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       },
       {
         "name": "X-TSZ-Sentence-Formatting",
@@ -266,6 +278,12 @@
         "schema": { "type": "string", "format": "uuid" }
       },
       {
+        "name": "X-TSZ-Phoneme-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Sentence-Formatting",
         "in": "header",
         "required": false,
@@ -292,6 +310,12 @@
         "schema": { "type": "string", "format": "uuid" }
       },
       {
+        "name": "X-TSZ-Phoneme-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Sentence-Formatting",
         "in": "header",
         "required": false,
@@ -311,6 +335,12 @@
       }
     ],
     "get /admin/lexicon/entries/{id}": [
+      {
+        "name": "X-TSZ-Phoneme-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
       {
         "name": "X-TSZ-Sentence-Formatting",
         "in": "header",
@@ -338,6 +368,12 @@
         "schema": { "type": "string", "format": "uuid" }
       },
       {
+        "name": "X-TSZ-Phoneme-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Sentence-Formatting",
         "in": "header",
         "required": false,
@@ -357,6 +393,12 @@
       }
     ],
     "get /admin/lexicon/entries/{id}/publications": [
+      {
+        "name": "X-TSZ-Phoneme-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
       {
         "name": "X-TSZ-Sentence-Formatting",
         "in": "header",
@@ -384,6 +426,12 @@
         "schema": { "type": "string", "format": "uuid" }
       },
       {
+        "name": "X-TSZ-Phoneme-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Sentence-Formatting",
         "in": "header",
         "required": false,
@@ -403,6 +451,12 @@
       }
     ],
     "get /admin/lexicon/entries/{id}/publications/{publication_id}": [
+      {
+        "name": "X-TSZ-Phoneme-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
       {
         "name": "X-TSZ-Sentence-Formatting",
         "in": "header",
@@ -428,6 +482,12 @@
         "in": "header",
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
+      },
+      {
+        "name": "X-TSZ-Phoneme-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       },
       {
         "name": "X-TSZ-Sentence-Formatting",
@@ -456,6 +516,12 @@
         "schema": { "type": "string", "format": "uuid" }
       },
       {
+        "name": "X-TSZ-Phoneme-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Sentence-Formatting",
         "in": "header",
         "required": false,
@@ -476,6 +542,12 @@
     ],
     "put /admin/lexicon/entries/{id}/steps/forms": [
       {
+        "name": "X-TSZ-Phoneme-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Sentence-Formatting",
         "in": "header",
         "required": false,
@@ -495,6 +567,12 @@
       }
     ],
     "put /admin/lexicon/entries/{id}/steps/meanings": [
+      {
+        "name": "X-TSZ-Phoneme-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
       {
         "name": "X-TSZ-Sentence-Formatting",
         "in": "header",
@@ -5211,7 +5289,9 @@
       "required": ["ipa", "ups"],
       "properties": {
         "ipa": { "type": "string", "maxLength": 200 },
+        "ipa_speech": { "$ref": "#/components/schemas/SynthesisSpeechV3" },
         "ups": { "type": "string", "maxLength": 1600 },
+        "ups_speech": { "$ref": "#/components/schemas/SynthesisSpeechV3" },
         "ups_words": {
           "type": ["array", "null"],
           "items": { "$ref": "#/components/schemas/UpsWordV3" },
@@ -5660,6 +5740,18 @@
       "additionalProperties": false
     },
     "StepSaveIntent": { "type": "string", "enum": ["save", "complete"] },
+    "SynthesisSpeechV3": {
+      "type": "object",
+      "required": ["content", "voice_profile"],
+      "properties": {
+        "content": {
+          "$ref": "#/components/schemas/RichTextV2V3",
+          "description": "Same text as the owning spelling, containing only word-boundary pauses."
+        },
+        "voice_profile": { "$ref": "#/components/schemas/VoiceProfileV3" }
+      },
+      "additionalProperties": false
+    },
     "TextLinkV3": {
       "type": "object",
       "required": [

@@ -2,6 +2,7 @@ import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import {
   EMPTY_SYNTHESIS,
   pronunciationSynthesisContent,
+  pronunciationSynthesisSpeech,
   synthesisInputIssue,
   synthesisLocaleIssue,
   pronunciationLocale,
@@ -78,7 +79,10 @@ function ReviewPronunciationPlayback({
             (!spelling.trim() ? "请先填写词形拼写" : undefined))
       }
       content={content ?? { version: 2, text: "", annotations: [] }}
-      voiceProfile={pronunciation.voice_profile}
+      voiceProfile={
+        pronunciationSynthesisSpeech(synthesis)?.voice_profile ??
+        pronunciation.voice_profile
+      }
     />
   );
 }

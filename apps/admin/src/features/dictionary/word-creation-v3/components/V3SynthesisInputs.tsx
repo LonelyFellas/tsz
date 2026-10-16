@@ -1,3 +1,4 @@
+import { V3PhonemeSpeechSettings } from "./V3PhonemeSpeechSettings";
 import { usePermission } from "@/lib/auth";
 import {
   SettingOutlined,
@@ -24,7 +25,8 @@ import type {
   WordPronunciationV3
 } from "@tsz/types";
 import {
-  convertActualPronunciation,
+  convertDictionaryToAzureIpa,
+  convertAzureIpaToUps,
   EMPTY_SYNTHESIS,
   pronunciationSynthesisContent,
   synthesisInputIssue,
@@ -111,7 +113,8 @@ export function V3SynthesisInputs({
     value: string;
     words: PronunciationSynthesisV3["ups_words"];
     previous: string;
-    actual: string;
+    source: string;
+    style: WordPronunciationV3["style"];
     spelling: string;
   }>();
   const history = useRef<
@@ -236,12 +239,23 @@ export function V3SynthesisInputs({
       });
   };
   const convert = (side: Side, alphabet: Alphabet) => {
-    const result = convertActualPronunciation(
-      pronunciation.actual_pron,
-      spelling,
-      alphabet,
-      pronunciationLocale(side, "uk")
-    );
+    const source =
+      alphabet === "ipa"
+        ? pronunciation.dict_phonetic
+        : candidateForSide(synthesis, side, dialect).ipa;
+    const result =
+      alphabet === "ipa"
+        ? convertDictionaryToAzureIpa(
+            source,
+            spelling,
+            pronunciationLocale(side, "uk"),
+            pronunciation.style
+          )
+        : convertAzureIpaToUps(
+            source,
+            spelling,
+            pronunciationLocale(side, "uk")
+          );
     if (!result.ok) {
       setDiagnostic(result.message);
       return;
@@ -254,7 +268,8 @@ export function V3SynthesisInputs({
         value: result.value,
         words: result.ups_words,
         previous,
-        actual: pronunciation.actual_pron,
+        source,
+        style: pronunciation.style,
         spelling
       });
     else change(side, alphabet, result.value, result.ups_words);
@@ -419,24 +434,40 @@ export function V3SynthesisInputs({
                       sideLocale
                     );
                     const invalid = issues.some(
-                      (issue) => issue.field === `synthesis.${side}.${alphabet}`
+                      (issue) =>
+                        issue.field === `synthesis.${side}.${alphabet}` ||
+                        issue.field === `synthesis.${side}.${alphabet}_speech`
                     );
                     return (
                       <div className="word-synthesis-candidate" key={side}>
                         <Space.Compact className="word-synthesis-control">
-                          <Button
-                            className={`word-synthesis-accent word-synthesis-accent-${side}${dialect === "common" ? "" : " word-synthesis-accent-compact"}`}
-                            icon={<SwapOutlined />}
-                            aria-label={`${label}转换为${sideLabel} ${name}`}
-                            title={`按统一音标规则转换为${sideLabel} ${name}`}
-                            onClick={() => convert(side, alphabet)}
-                          >
-                            {dialect === "common"
-                              ? side === "uk"
-                                ? "BrE"
-                                : "AmE"
-                              : null}
-                          </Button>
+                          <PronunciationPreviewControls
+                            playbackOnly
+                            pronunciationId={pronunciation.id}
+                            dialect={side}
+                            ariaLabelPrefix={`${label} ${sideLabel} ${name} 最终读音`}
+                            disabled={!rowContent}
+                            disabledReason={
+                              synthesisInputIssue(
+                                alphabet,
+                                candidate[alphabet]
+                              ) ??
+                              (!rowContent
+                                ? "音素词界缺失或与正文不一致，请检查 IPA 或重新转换 UPS"
+                                : undefined)
+                            }
+                            content={
+                              rowContent ?? {
+                                version: 2,
+                                text: "",
+                                annotations: []
+                              }
+                            }
+                            voiceProfile={
+                              candidate[`${alphabet}_speech`]?.voice_profile ??
+                              pronunciation.voice_profile
+                            }
+                          />
                           <Input.TextArea
                             className="tsz-phonetics"
                             autoSize={{ minRows: 1, maxRows: 6 }}
@@ -461,29 +492,38 @@ export function V3SynthesisInputs({
                               }
                             }}
                           />
-                          <PronunciationPreviewControls
-                            playbackOnly
-                            pronunciationId={pronunciation.id}
-                            dialect={side}
-                            ariaLabelPrefix={`${label} ${sideLabel} ${name} 最终读音`}
-                            disabled={!rowContent}
-                            disabledReason={
-                              synthesisInputIssue(
-                                alphabet,
-                                candidate[alphabet]
-                              ) ??
-                              (!rowContent
-                                ? "短语 UPS 词界缺失或与正文不一致，请重新从实际发音转换"
-                                : undefined)
+                          <Button
+                            className={`word-synthesis-accent word-synthesis-accent-${side}${dialect === "common" ? "" : " word-synthesis-accent-compact"}`}
+                            icon={<SwapOutlined />}
+                            aria-label={`${label}转换为${sideLabel} ${name}`}
+                            title={
+                              alphabet === "ipa"
+                                ? `从字典音标转换为${sideLabel} ${name}`
+                                : `从当前${sideLabel} Azure IPA 转换为 ${name}`
                             }
-                            content={
-                              rowContent ?? {
-                                version: 2,
-                                text: "",
-                                annotations: []
-                              }
+                            onClick={() => convert(side, alphabet)}
+                          >
+                            {dialect === "common"
+                              ? side === "uk"
+                                ? "BrE"
+                                : "AmE"
+                              : null}
+                          </Button>
+                          <V3PhonemeSpeechSettings
+                            spelling={spelling}
+                            nodeId={pronunciation.id}
+                            field={`synthesis.${side}.${alphabet}_speech`}
+                            candidate={candidate}
+                            alphabet={alphabet}
+                            locale={sideLocale}
+                            label={`${label} ${sideLabel} ${name}`}
+                            fallbackVoiceProfile={pronunciation.voice_profile}
+                            onChange={(speech) =>
+                              writeCandidate(side, {
+                                ...candidate,
+                                [`${alphabet}_speech`]: speech
+                              })
                             }
-                            voiceProfile={pronunciation.voice_profile}
                           />
                         </Space.Compact>
                         {invalid && (
@@ -647,7 +687,11 @@ export function V3SynthesisInputs({
             candidateForSide(synthesis, pending.side, dialect)[
               pending.alphabet
             ] !== pending.previous ||
-            pronunciation.actual_pron !== pending.actual ||
+            (pending.alphabet === "ipa"
+              ? pronunciation.dict_phonetic
+              : candidateForSide(synthesis, pending.side, dialect).ipa) !==
+              pending.source ||
+            pronunciation.style !== pending.style ||
             spelling !== pending.spelling
           )
             setDiagnostic("来源、口音或目标内容已变化，请重新转换");

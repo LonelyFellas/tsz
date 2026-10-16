@@ -1774,7 +1774,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             <VoicePanel
               readOnly={readOnly}
               locale={locale}
-              auditionLocale={mode === "synthesis" ? locale : undefined}
+              auditionLocale={
+                mode === "synthesis" || mode === "phoneme-settings"
+                  ? locale
+                  : undefined
+              }
               voices={voices}
               voicesLoading={voicesLoading}
               enabledVoiceIds={enabledVoiceIds}
@@ -1843,6 +1847,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     // 字典音标只负责喂语音合成，连读是展示用的标注，归实际发音那一侧。
     // 判据必须是这个显式取值：默认的 pronunciation 还挂着别的调用方，
     // 摘在默认值上会连带把它们的连读也拿掉。
+    if (mode === "phoneme-settings")
+      return tool.key === "pause" || tool.key === "voices";
     if (mode === "spelling")
       return ["text", "italic", "liaison", "erase", "pause", "voices"].includes(
         tool.key
