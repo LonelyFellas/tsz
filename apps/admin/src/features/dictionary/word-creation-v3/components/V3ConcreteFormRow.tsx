@@ -18,9 +18,11 @@ import {
   unifyUkUsSpelling,
   updateConcreteFormType,
   updateVariantSpelling,
+  updateSpellingVoiceProfile,
   updateFormRegularity,
   type V3IdFactory
 } from "../operations";
+import { spellingEditorValue } from "../spellingSpeech";
 import { variantRegularity } from "../model";
 import { dialectLabel } from "../presentation";
 import { spellingConflictReferences } from "../referenceGuard";
@@ -290,7 +292,9 @@ function V3DialectFormCell({
     issues.some(
       (issue) =>
         issue.node_location.variant_id === variant.id &&
-        (issue.field === "spelling" || issue.field === "spelling_rich")
+        (issue.field === "spelling" ||
+          issue.field === "spelling_rich" ||
+          issue.field === "spelling_speech")
     );
   const style = {
     "--v3-narrow-grid-row": narrowGridRow
@@ -321,6 +325,8 @@ function V3DialectFormCell({
               playbackOnly
               pronunciationId={variant.id}
               spelling={variant.spelling}
+              content={spellingEditorValue(variant)}
+              voiceProfile={variant.spelling_speech?.voice_profile}
               dialect={dialect}
               ariaLabelPrefix={`${formLabel}${dialectLabel(dialect)}拼写`}
             />
@@ -329,6 +335,20 @@ function V3DialectFormCell({
           ariaLabel={`${formLabel}${dialectLabel(dialect)}拼写`}
           field="spelling"
           nodeId={variant.id}
+          audioUploadEnabled={false}
+          voiceProfile={variant.spelling_speech?.voice_profile}
+          onVoiceProfileChange={(profile) =>
+            onChange(
+              updateSpellingVoiceProfile(
+                content,
+                dialectRules.spelling_mode === "unified" &&
+                  form.regional_variants.mode === "uk_us"
+                  ? [form.regional_variants.uk.id, form.regional_variants.us.id]
+                  : [variant.id],
+                profile
+              )
+            )
+          }
           placeholder={`${dialectLabel(dialect)}拼写`}
           onChange={(next) => {
             if (dialectRules.spelling_mode === "unified") {
@@ -338,13 +358,7 @@ function V3DialectFormCell({
             }
             onChange(updateVariantSpelling(content, variant.id, next));
           }}
-          value={
-            variant.spelling_rich ?? {
-              version: 2,
-              text: variant.spelling,
-              annotations: []
-            }
-          }
+          value={spellingEditorValue(variant)}
         />
         <SpellingConflictNote literals={conflictLiteralList} />
         <V3PronunciationList
@@ -411,7 +425,9 @@ export function V3ConcreteFormRow({
     unifiedConflictLiterals.length > 0 ||
     issues.some(
       (issue) =>
-        (issue.field === "spelling" || issue.field === "spelling_rich") &&
+        (issue.field === "spelling" ||
+          issue.field === "spelling_rich" ||
+          issue.field === "spelling_speech") &&
         issue.node_location.variant_id !== undefined &&
         unifiedSpellingVariantIds.includes(issue.node_location.variant_id)
     );
@@ -506,6 +522,8 @@ export function V3ConcreteFormRow({
                     playbackOnly
                     pronunciationId={commonVariant.id}
                     spelling={commonVariant.spelling}
+                    content={spellingEditorValue(commonVariant)}
+                    voiceProfile={commonVariant.spelling_speech?.voice_profile}
                     dialect="common"
                     ariaLabelPrefix={`${formLabel}英美通用拼写`}
                   />
@@ -516,25 +534,31 @@ export function V3ConcreteFormRow({
                     (issue) =>
                       issue.node_location.variant_id === commonVariant.id &&
                       (issue.field === "spelling" ||
-                        issue.field === "spelling_rich")
+                        issue.field === "spelling_rich" ||
+                        issue.field === "spelling_speech")
                   )
                 }
                 ariaLabel={`${formLabel}英美通用拼写`}
                 field="spelling"
                 nodeId={commonVariant.id}
+                audioUploadEnabled={false}
+                voiceProfile={commonVariant.spelling_speech?.voice_profile}
+                onVoiceProfileChange={(profile) =>
+                  onChange(
+                    updateSpellingVoiceProfile(
+                      content,
+                      [commonVariant.id],
+                      profile
+                    )
+                  )
+                }
                 onChange={(next) =>
                   onChange(
                     updateVariantSpelling(content, commonVariant.id, next)
                   )
                 }
                 placeholder="词形拼写"
-                value={
-                  commonVariant.spelling_rich ?? {
-                    version: 2,
-                    text: commonVariant.spelling,
-                    annotations: []
-                  }
-                }
+                value={spellingEditorValue(commonVariant)}
               />
               <SpellingConflictNote literals={commonConflictLiterals} />
             </div>
@@ -574,6 +598,10 @@ export function V3ConcreteFormRow({
                     playbackOnly
                     pronunciationId={form.id}
                     spelling={unifiedSpellingVariants.uk.spelling}
+                    content={spellingEditorValue(unifiedSpellingVariants.uk)}
+                    voiceProfile={
+                      unifiedSpellingVariants.uk.spelling_speech?.voice_profile
+                    }
                     dialect="common"
                     ariaLabelPrefix={`${formLabel}英美通用拼写`}
                   />
@@ -583,18 +611,25 @@ export function V3ConcreteFormRow({
                 field="spelling"
                 nodeAliases={unifiedSpellingVariantIds.join(" ")}
                 nodeId={form.id}
+                audioUploadEnabled={false}
+                voiceProfile={
+                  unifiedSpellingVariants.uk.spelling_speech?.voice_profile
+                }
+                onVoiceProfileChange={(profile) =>
+                  onChange(
+                    updateSpellingVoiceProfile(
+                      content,
+                      unifiedSpellingVariantIds,
+                      profile
+                    )
+                  )
+                }
                 onChange={(next) => {
                   const result = unifyUkUsSpelling(form, next);
                   if (result.ok) onChange(replaceForm(content, result.value));
                 }}
                 placeholder="词形拼写"
-                value={
-                  unifiedSpellingVariants.uk.spelling_rich ?? {
-                    version: 2,
-                    text: unifiedSpellingVariants.uk.spelling,
-                    annotations: []
-                  }
-                }
+                value={spellingEditorValue(unifiedSpellingVariants.uk)}
               />
               <SpellingConflictNote literals={unifiedConflictLiterals} />
             </div>

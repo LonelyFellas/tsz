@@ -833,3 +833,57 @@ it("拼写标注 wire 保留并校验正文、范围及展示类型，未知字�
   });
   expect(codes(input)).toContain("invalid_regional_variant_shape");
 });
+
+it("独立拼写试听通过草稿与 wire 校验，拒绝错文、展示标注及非法音色", () => {
+  const content = formsFixture();
+  const variant = commonVariant(content.pos[0]!.forms[0]!);
+  variant.spelling = "hello there";
+  variant.spelling_speech = {
+    content: {
+      version: 2,
+      text: variant.spelling,
+      annotations: [{ type: "pause", at: 5, duration_ms: 500 }]
+    },
+    voice_profile: {
+      voices: [{ voice_id: "sonia", enabled: true, rate_percent: 0 }]
+    }
+  };
+  expect(validateFormsContent(content, "save")).toEqual([]);
+  expect(
+    commonVariant(toFormsWire(content).pos[0]!.forms[0]!).spelling_speech
+  ).toEqual(variant.spelling_speech);
+  for (const speech of [
+    {
+      ...variant.spelling_speech,
+      content: { ...variant.spelling_speech.content, text: "wrong" }
+    },
+    {
+      ...variant.spelling_speech,
+      content: {
+        ...variant.spelling_speech.content,
+        annotations: [{ type: "italic", start: 0, end: 2 }]
+      }
+    },
+    {
+      ...variant.spelling_speech,
+      voice_profile: {
+        voices: [{ voice_id: "sonia", enabled: true, rate_percent: 101 }]
+      }
+    }
+  ]) {
+    const invalid = structuredClone(content);
+    Object.assign(commonVariant(invalid.pos[0]!.forms[0]!), {
+      spelling_speech: speech
+    });
+    expect(validateFormsContent(invalid, "save")).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ field: "spelling_speech" })
+      ])
+    );
+  }
+  const invalid = structuredClone(content);
+  Object.assign(commonVariant(invalid.pos[0]!.forms[0]!), {
+    spelling_speech: null
+  });
+  expect(validateFormsContent(invalid, "save")).not.toEqual([]);
+});

@@ -742,7 +742,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "b9bc860deb686cf62c7966a78acbc039e8fd5cd145a5bb86c744b54a82623af9"
+      "da6d62ebe0b673846542e1acf2740952f26d2263489dd0538e59b6c7ecaaef2f"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -771,6 +771,22 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     expect(defs.AdminWordV3.properties.schema_version.enum).toEqual([3]);
     expect(defs.WordEntryKindV3.enum).toEqual(["word", "phrase"]);
     expect(defs.WordPosFormsV3.required).not.toContain("dialect_rules");
+    for (const schema of [
+      "WordCommonFormVariantV3",
+      "WordUkFormVariantV3",
+      "WordUsFormVariantV3"
+    ] as const) {
+      expect(defs[schema].required).not.toContain("spelling_speech");
+      expect(defs[schema].properties.spelling_speech).toMatchObject({
+        $ref: "#/$defs/SpellingSpeechV3"
+      });
+    }
+    expect(defs.SpellingSpeechV3.required).toEqual([
+      "content",
+      "voice_profile"
+    ]);
+    expect(defs.SpellingSpeechV3.additionalProperties).toBe(false);
+
     expect(defs.WordFormGroupV3.required).toEqual([
       "id",
       "is_regular",
@@ -1046,6 +1062,12 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
               ? [
                   {
                     name: "X-TSZ-Spelling-Markup",
+                    in: "header",
+                    required: false,
+                    schema: { type: ["string", "null"] }
+                  },
+                  {
+                    name: "X-TSZ-Spelling-Speech",
                     in: "header",
                     required: false,
                     schema: { type: ["string", "null"] }

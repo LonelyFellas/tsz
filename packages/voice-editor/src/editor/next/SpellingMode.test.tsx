@@ -75,7 +75,9 @@ it.each(["spelling", "actual-pron"] as const)(
     render(<VoiceEditor mode={mode} value={value} onChange={changed} />);
     if (mode === "actual-pron")
       expect(screen.queryByRole("button", { name: "斜体" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "停顿" })).toBeNull();
+    if (mode === "actual-pron")
+      expect(screen.queryByRole("button", { name: "停顿" })).toBeNull();
+    else expect(button("停顿")).toBeInTheDocument();
     select(5, 8);
     fireEvent.click(button("一次性添加"));
     expect(changed.mock.lastCall?.[0].annotations).toEqual([
@@ -173,4 +175,42 @@ it("规范化提示不阻断再次完成，无须撤销才能提交", () => {
   expect(screen.getByText(/已规范化拼写/)).toBeInTheDocument();
   fireEvent.click(button("完成"));
   expect(complete).toHaveBeenCalledOnce();
+});
+
+it("拼写可添加、清除与撤销停顿，清除不删除斜体或正文", () => {
+  const changed = vi.fn();
+  render(
+    <VoiceEditor
+      mode="spelling"
+      value={{
+        version: 2,
+        text: "hello there",
+        annotations: [{ type: "italic", start: 0, end: 5 }]
+      }}
+      onChange={changed}
+    />
+  );
+  fireEvent.click(button("停顿"));
+  fireEvent.click(button("停顿 0.5 秒"));
+  fireEvent.mouseDown(document.querySelector(".tsz-ve-gap")!);
+  expect(changed.mock.lastCall?.[0]).toEqual({
+    version: 2,
+    text: "hello there",
+    annotations: [
+      { type: "italic", start: 0, end: 5 },
+      { type: "pause", at: 5, duration_ms: 500 }
+    ]
+  });
+  fireEvent.click(button("清除模式"));
+  fireEvent.mouseDown(document.querySelector(".tsz-ve-gap")!);
+  expect(changed.mock.lastCall?.[0].annotations).toEqual([
+    { type: "italic", start: 0, end: 5 }
+  ]);
+  fireEvent.click(button("上一步"));
+  expect(changed.mock.lastCall?.[0].annotations).toContainEqual({
+    type: "pause",
+    at: 5,
+    duration_ms: 500
+  });
+  expect(screen.queryByRole("button", { name: "音频" })).toBeNull();
 });

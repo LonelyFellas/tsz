@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/task-133-reading/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-16T04:07:00.117Z",
+  "_source": "/Users/darwish/.codex/worktrees/spelling-synthesis/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-10-16T05:35:21.614Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -216,6 +216,12 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Spelling-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "post /admin/lexicon/entries/archive-batch": [
@@ -233,6 +239,12 @@
       },
       {
         "name": "X-TSZ-Spelling-Markup",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Spelling-Speech",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -264,6 +276,12 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Spelling-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "post /admin/lexicon/entries/restore-batch": [
@@ -284,6 +302,12 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Spelling-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "get /admin/lexicon/entries/{id}": [
@@ -295,6 +319,12 @@
       },
       {
         "name": "X-TSZ-Spelling-Markup",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Spelling-Speech",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -318,6 +348,12 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Spelling-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "get /admin/lexicon/entries/{id}/publications": [
@@ -329,6 +365,12 @@
       },
       {
         "name": "X-TSZ-Spelling-Markup",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Spelling-Speech",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -352,6 +394,12 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Spelling-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "get /admin/lexicon/entries/{id}/publications/{publication_id}": [
@@ -363,6 +411,12 @@
       },
       {
         "name": "X-TSZ-Spelling-Markup",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Spelling-Speech",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -386,6 +440,12 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Spelling-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "post /admin/lexicon/entries/{id}/restore": [
@@ -406,6 +466,12 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Spelling-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "put /admin/lexicon/entries/{id}/steps/forms": [
@@ -420,6 +486,12 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Spelling-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "put /admin/lexicon/entries/{id}/steps/meanings": [
@@ -431,6 +503,12 @@
       },
       {
         "name": "X-TSZ-Spelling-Markup",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Spelling-Speech",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -5571,6 +5649,16 @@
       "description": "`distinguish` 词条由管理员选择的主词侧；用于主词展示顺序及后续方言内容初始化，\n不要求与内置词典的命中方言相同。",
       "enum": ["uk", "us"]
     },
+    "SpellingSpeechV3": {
+      "type": "object",
+      "description": "独立的拼写试听配置；content 与 spelling 同文，仅允许停顿标注。",
+      "required": ["content", "voice_profile"],
+      "properties": {
+        "content": { "$ref": "#/components/schemas/RichTextV2V3" },
+        "voice_profile": { "$ref": "#/components/schemas/VoiceProfileV3" }
+      },
+      "additionalProperties": false
+    },
     "StepSaveIntent": { "type": "string", "enum": ["save", "complete"] },
     "TextLinkV3": {
       "type": "object",
@@ -5785,6 +5873,10 @@
         "spelling_rich": {
           "$ref": "#/components/schemas/RichTextV2V3",
           "description": "展示标注；正文与规范化后的 spelling 一致，缺键兼容旧记录。"
+        },
+        "spelling_speech": {
+          "$ref": "#/components/schemas/SpellingSpeechV3",
+          "description": "仅用于词形拼写试听，不影响 pronunciations 中的合成配置。"
         }
       },
       "additionalProperties": false
@@ -6206,6 +6298,10 @@
         "spelling_rich": {
           "$ref": "#/components/schemas/RichTextV2V3",
           "description": "展示标注；正文与规范化后的 spelling 一致，缺键兼容旧记录。"
+        },
+        "spelling_speech": {
+          "$ref": "#/components/schemas/SpellingSpeechV3",
+          "description": "仅用于词形拼写试听，不影响 pronunciations 中的合成配置。"
         }
       },
       "additionalProperties": false
@@ -6235,6 +6331,10 @@
         "spelling_rich": {
           "$ref": "#/components/schemas/RichTextV2V3",
           "description": "展示标注；正文与规范化后的 spelling 一致，缺键兼容旧记录。"
+        },
+        "spelling_speech": {
+          "$ref": "#/components/schemas/SpellingSpeechV3",
+          "description": "仅用于词形拼写试听，不影响 pronunciations 中的合成配置。"
         }
       },
       "additionalProperties": false

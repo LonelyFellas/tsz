@@ -1,6 +1,8 @@
 import { env } from "../../../lib/env";
 import type {
   PronunciationStyle,
+  SpellingSpeechV3,
+  VoiceProfileV3,
   RichTextV2V3,
   DialectRulesV3,
   DraftFormsStepContentV3,
@@ -17,6 +19,7 @@ import type {
   WordUsFormVariantV3
 } from "@tsz/types";
 import { editRichText, spellingAnnotationsEqual } from "@tsz/voice-editor/core";
+import { spellingEditorValue, spellingSpeechEqual } from "./spellingSpeech";
 import { variantRegularity } from "./model";
 import { newWordNodeId } from "../word-model/primitives";
 
@@ -67,6 +70,7 @@ export type PronunciationMapping = Omit<WordPronunciationV3, "id">;
 
 export interface VariantMapping {
   spelling_rich?: RichTextV2V3;
+  spelling_speech?: SpellingSpeechV3;
   is_regular?: boolean;
   spelling: string;
   origin: TextOriginV3;
@@ -286,6 +290,9 @@ export function convertCommonToUkUs(
           ...(mapping.uk.spelling_rich === undefined
             ? {}
             : { spelling_rich: structuredClone(mapping.uk.spelling_rich) }),
+          ...(mapping.uk.spelling_speech === undefined
+            ? {}
+            : { spelling_speech: structuredClone(mapping.uk.spelling_speech) }),
           is_regular:
             mapping.uk.is_regular ??
             form.regional_variants.common.is_regular ??
@@ -305,6 +312,9 @@ export function convertCommonToUkUs(
           ...(mapping.us.spelling_rich === undefined
             ? {}
             : { spelling_rich: structuredClone(mapping.us.spelling_rich) }),
+          ...(mapping.us.spelling_speech === undefined
+            ? {}
+            : { spelling_speech: structuredClone(mapping.us.spelling_speech) }),
           is_regular:
             mapping.us.is_regular ??
             form.regional_variants.common.is_regular ??
@@ -369,6 +379,11 @@ export function convertUkUsToCommon(
           ...(mapping.common.spelling_rich === undefined
             ? {}
             : { spelling_rich: structuredClone(mapping.common.spelling_rich) }),
+          ...(mapping.common.spelling_speech === undefined
+            ? {}
+            : {
+                spelling_speech: structuredClone(mapping.common.spelling_speech)
+              }),
           is_regular:
             mapping.common.is_regular ??
             form.regional_variants.uk.is_regular ??
@@ -445,6 +460,9 @@ function variantMappingFrom(
     ...(variant.spelling_rich === undefined
       ? {}
       : { spelling_rich: structuredClone(variant.spelling_rich) }),
+    ...(variant.spelling_speech === undefined
+      ? {}
+      : { spelling_speech: structuredClone(variant.spelling_speech) }),
     is_regular: variant.is_regular,
     origin: variant.origin,
     pronunciations: variant.pronunciations.map((pronunciation) => ({
@@ -480,9 +498,12 @@ function variantMappingFrom(
 
 /** 英美规则按组生效：只转换本组成员词形，同词性其他组的词形与规则原样保留。 */
 function spellingMarksEqual(uk: VariantMapping, us: VariantMapping): boolean {
-  return spellingAnnotationsEqual(
-    uk.spelling_rich ?? { version: 2, text: uk.spelling, annotations: [] },
-    us.spelling_rich ?? { version: 2, text: us.spelling, annotations: [] }
+  return (
+    spellingSpeechEqual(uk.spelling_speech, us.spelling_speech) &&
+    spellingAnnotationsEqual(
+      uk.spelling_rich ?? { version: 2, text: uk.spelling, annotations: [] },
+      us.spelling_rich ?? { version: 2, text: us.spelling, annotations: [] }
+    )
   );
 }
 
@@ -601,7 +622,7 @@ export function normalizeGroupDialectRules(
 
     if (rules.spelling_mode === "unified") {
       const source = form.regional_variants[preferredDialect];
-      const spelling = source.spelling_rich ?? source.spelling;
+      const spelling = spellingEditorValue(source);
       const converted = unifyUkUsSpelling(form, spelling);
       if (!converted.ok) return converted;
       pos.forms[index] = converted.value;
@@ -634,23 +655,31 @@ export function unifyUkUsSpelling(
 }
 
 function applyVariantSpelling(
-  variant: { spelling: string; spelling_rich?: RichTextV2V3 },
+  variant: {
+    spelling: string;
+    spelling_rich?: RichTextV2V3;
+    spelling_speech?: SpellingSpeechV3;
+  },
   value: string | RichTextV2V3
 ) {
   const rich =
     typeof value === "string"
-      ? editRichText(
-          variant.spelling_rich ?? {
-            version: 2,
-            text: variant.spelling,
-            annotations: []
-          },
-          value
-        )
+      ? editRichText(spellingEditorValue(variant), value)
       : value;
   variant.spelling = rich.text;
-  if (variant.spelling_rich || rich.annotations.length > 0)
-    variant.spelling_rich = rich;
+  const annotations = rich.annotations.filter(
+    (annotation) => annotation.type !== "pause"
+  );
+  if (variant.spelling_rich || annotations.length > 0)
+    variant.spelling_rich = { ...rich, annotations };
+  const pauses = rich.annotations.filter(
+    (annotation) => annotation.type === "pause"
+  );
+  if (variant.spelling_speech || pauses.length > 0)
+    variant.spelling_speech = {
+      content: { ...rich, annotations: pauses },
+      voice_profile: variant.spelling_speech?.voice_profile ?? { voices: [] }
+    };
 }
 
 /** 在草稿副本里定位变体并就地改写；找不到抛错，与其余写操作的约定一致。 */
@@ -713,6 +742,28 @@ export function updateVariantSpelling(
   return mutateVariant(content, variantId, (variant) => {
     applyVariantSpelling(variant, spelling);
   });
+}
+
+/** 独立拼写试听配置，不修改 pronunciations。统一拼写同时更新两侧。 */
+export function updateSpellingVoiceProfile(
+  content: DraftFormsStepContentV3,
+  variantIds: string[],
+  profile: VoiceProfileV3
+): DraftFormsStepContentV3 {
+  let next = content;
+  for (const id of variantIds) {
+    next = mutateVariant(next, id, (variant) => {
+      variant.spelling_speech = {
+        content: variant.spelling_speech?.content ?? {
+          version: 2,
+          text: variant.spelling,
+          annotations: []
+        },
+        voice_profile: structuredClone(profile)
+      };
+    });
+  }
+  return next;
 }
 
 export function updateConcreteFormType(

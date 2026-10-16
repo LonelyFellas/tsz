@@ -496,7 +496,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     audition,
     stop: stopAudition
   } = useVoiceAudition({
-    open: mode !== "actual-pron" && mode !== "spelling",
+    open: mode !== "actual-pron",
     language,
     content: mode === "synthesis" ? toRichTextV2(value) : workingValue,
     settings: voiceSettings,
@@ -1844,7 +1844,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     // 判据必须是这个显式取值：默认的 pronunciation 还挂着别的调用方，
     // 摘在默认值上会连带把它们的连读也拿掉。
     if (mode === "spelling")
-      return ["text", "italic", "liaison", "erase"].includes(tool.key);
+      return ["text", "italic", "liaison", "erase", "pause", "voices"].includes(
+        tool.key
+      );
     if (mode === "dict-phonetic")
       return tool.key !== "roles" && tool.key !== "liaison";
     // 实际发音只用于展示，其余工具都是冲着合成去的。
