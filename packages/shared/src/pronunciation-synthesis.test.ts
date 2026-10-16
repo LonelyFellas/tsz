@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   convertDictionaryPhonetic,
+  convertDictionaryToAzureIpa,
+  convertAzureIpaToUps,
+  synthesisForLocale,
   grammarSynthesisContent,
   pronunciationSynthesisContent,
   pronunciationSynthesisLabel,
@@ -358,5 +361,99 @@ describe("独立合成输入", () => {
     expect(synthesisInputIssue("ups", "A".repeat(1601))).toContain("1600");
     expect(synthesisInputIssue("ups", "kæt")).toContain("ASCII");
     expect(synthesisInputIssue("ipa", "k\nt")).toContain("控制字符");
+  });
+});
+
+describe("IPA/UPS 来源与独立停顿", () => {
+  it("字典括号不进入 IPA，UPS 直接保留人工 IPA 的音素", () => {
+    expect(
+      convertDictionaryToAzureIpa("/k(æ)t/", "cat", "en-US")
+    ).toMatchObject({ ok: true, value: "kæt" });
+    expect(convertAzureIpaToUps("kɛt", "cat", "en-US")).toEqual({
+      ok: true,
+      value: "K EH T",
+      ups_words: [{ text: "cat", phoneme: "K EH T" }]
+    });
+    expect(convertAzureIpaToUps("", "cat", "en-US")).toMatchObject({
+      ok: false
+    });
+    expect(convertAzureIpaToUps("kæt dɔg", "cat", "en-US")).toMatchObject({
+      ok: false
+    });
+  });
+  it("每种口音与格式仅应用自己的停顿；UPS 依据逐词元数据而非音素空格", () => {
+    const speech = (duration_ms: number) => ({
+      content: {
+        version: 2 as const,
+        text: "far away",
+        annotations: [{ type: "pause" as const, at: 3, duration_ms }]
+      },
+      voice_profile: { voices: [] }
+    });
+    const synthesis = {
+      alphabet: "ipa" as const,
+      use_spelling: false,
+      ipa: "",
+      ups: "",
+      uk: {
+        ipa: "fɑː əˈweɪ",
+        ups: "F AA lng AX W EY",
+        ups_words: [
+          { text: "far", phoneme: "F AA lng" },
+          { text: "away", phoneme: "AX W EY" }
+        ],
+        ipa_speech: speech(500),
+        ups_speech: speech(1000)
+      },
+      us: {
+        ipa: "fɑɹ əˈweɪ",
+        ups: "F AA R AX W EY",
+        ups_words: [
+          { text: "far", phoneme: "F AA R" },
+          { text: "away", phoneme: "AX W EY" }
+        ],
+        ipa_speech: speech(1500),
+        ups_speech: speech(2000)
+      }
+    };
+    for (const [locale, ipaPause, upsPause] of [
+      ["en-GB", 500, 1000],
+      ["en-US", 1500, 2000]
+    ] as const) {
+      for (const [alphabet, duration_ms] of [
+        ["ipa", ipaPause],
+        ["ups", upsPause]
+      ] as const) {
+        const selected = synthesisForLocale({ ...synthesis, alphabet }, locale);
+        const content = pronunciationSynthesisContent(
+          "far away",
+          selected,
+          locale
+        )!;
+        expect(content.annotations).toContainEqual({
+          type: "pause",
+          at: 3,
+          duration_ms
+        });
+        expect(
+          content.annotations.filter((mark) => mark.type === "phoneme")
+        ).toHaveLength(2);
+      }
+    }
+    expect(
+      pronunciationSynthesisContent(
+        "far away",
+        { ...synthesis, use_spelling: true },
+        "en-GB"
+      )?.annotations
+    ).toEqual([]);
+    const legacy = {
+      ...synthesis,
+      alphabet: "ups" as const,
+      uk: { ...synthesis.uk, ups_words: undefined }
+    };
+    expect(
+      pronunciationSynthesisContent("far away", legacy, "en-GB")
+    ).toBeUndefined();
   });
 });

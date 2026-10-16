@@ -340,6 +340,52 @@ describe("runtime schema fail-closed diagnostics", () => {
     }
   );
 
+  it("IPA/UPS 四份配置可选且不可为 null，保留严格字段校验", () => {
+    const word = validFixture("AdminWordV3") as { forms: { pos: unknown[] } };
+    const pronunciation = buildValidValue(
+      runtimeSchemaBundle.$defs.WordPronunciationV3!
+    ) as Record<string, unknown>;
+    const variant = buildValidValue(
+      runtimeSchemaBundle.$defs.WordCommonFormVariantV3!
+    ) as Record<string, unknown>;
+    variant.pronunciations = [pronunciation];
+    const form = buildValidValue(
+      runtimeSchemaBundle.$defs.WordConcreteFormV3!
+    ) as Record<string, unknown>;
+    form.regional_variants = { mode: "common", common: variant };
+    const pos = buildValidValue(
+      runtimeSchemaBundle.$defs.WordPosFormsV3!
+    ) as Record<string, unknown>;
+    pos.forms = [form];
+    word.forms.pos = [pos];
+    const speech = {
+      content: { version: 2, text: "cat", annotations: [] },
+      voice_profile: { voices: [] }
+    };
+    const synthesis = {
+      alphabet: "ipa",
+      ipa: "",
+      ups: "",
+      uk: { ipa: "kæt", ups: "K AE T", ipa_speech: speech, ups_speech: speech },
+      us: { ipa: "kæt", ups: "K AE T", ipa_speech: speech, ups_speech: speech }
+    };
+    pronunciation.synthesis = synthesis;
+    expect(validateRuntimeSchema("AdminWordV3", word)).toEqual({ valid: true });
+    for (const candidate of [synthesis.uk, synthesis.us]) {
+      for (const key of ["ipa_speech", "ups_speech"] as const) {
+        for (const invalid of [
+          null,
+          { ...speech, unknown: true },
+          { ...speech, content: { ...speech.content, version: 1 } }
+        ]) {
+          Object.assign(candidate, { [key]: invalid });
+          expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(false);
+          candidate[key] = speech;
+        }
+      }
+    }
+  });
+
   it.each(["common", "uk", "us"] as const)(
     "%s 拼写试听配置可选但不可为 null，严格保留正文与音色",
     (dialect) => {

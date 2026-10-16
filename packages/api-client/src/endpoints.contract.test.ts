@@ -742,7 +742,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "da6d62ebe0b673846542e1acf2740952f26d2263489dd0538e59b6c7ecaaef2f"
+      "128c30462ed379f5d505b93b4ad4e5cc03d71b3cc80ff127fa4734d14802f73b"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1060,6 +1060,12 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
               : []),
             ...(SPELLING_MARKUP_OPERATIONS.includes(operation)
               ? [
+                  {
+                    name: "X-TSZ-Phoneme-Speech",
+                    in: "header",
+                    required: false,
+                    schema: { type: ["string", "null"] }
+                  },
                   {
                     name: "X-TSZ-Spelling-Markup",
                     in: "header",

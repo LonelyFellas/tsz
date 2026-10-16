@@ -2516,3 +2516,64 @@ it("拼写试听比较兼容缺省空配置、音色顺序与字段顺序，保�
     spellingSpeechEqual(left, { ...empty, voice_profile: { voices: [sonia] } })
   ).toBe(false);
 });
+
+it("改拼写同步迁移四份音素设置的停顿，保留各自音色与音素", () => {
+  const original = formsFixture();
+  const variant = commonVariant(original.pos[0]!.forms[0]!);
+  variant.spelling = "hello there";
+  const speech = (duration_ms: number) => ({
+    content: {
+      version: 2 as const,
+      text: "hello there",
+      annotations: [{ type: "pause" as const, at: 5, duration_ms }]
+    },
+    voice_profile: {
+      voices: [
+        { voice_id: `voice-${duration_ms}`, enabled: true, rate_percent: 0 }
+      ]
+    }
+  });
+  variant.pronunciations[0]!.synthesis = {
+    alphabet: "ipa",
+    ipa: "",
+    ups: "",
+    uk: {
+      ipa: "hello",
+      ups: "H",
+      ipa_speech: speech(500),
+      ups_speech: speech(1000)
+    },
+    us: {
+      ipa: "there",
+      ups: "DH",
+      ipa_speech: speech(2000),
+      ups_speech: speech(3000)
+    }
+  };
+  const updated = updateVariantSpelling(
+    original,
+    UUIDS.common_variant,
+    "oh hello there"
+  );
+  const saved = commonVariant(toFormsWire(updated).pos[0]!.forms[0]!)
+    .pronunciations[0]!.synthesis!;
+  for (const [side, alphabet, duration_ms] of [
+    ["uk", "ipa", 500],
+    ["uk", "ups", 1000],
+    ["us", "ipa", 2000],
+    ["us", "ups", 3000]
+  ] as const) {
+    expect(saved[side]![`${alphabet}_speech`]).toEqual({
+      ...speech(duration_ms),
+      content: {
+        version: 2,
+        text: "oh hello there",
+        annotations: [{ type: "pause", at: 8, duration_ms }]
+      }
+    });
+    expect(saved[side]![alphabet]).toBe(
+      variant.pronunciations[0]!.synthesis![side]![alphabet]
+    );
+  }
+  expect(variant.spelling).toBe("hello there");
+});

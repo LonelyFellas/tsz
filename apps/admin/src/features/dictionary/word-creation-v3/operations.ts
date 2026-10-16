@@ -659,6 +659,7 @@ function applyVariantSpelling(
     spelling: string;
     spelling_rich?: RichTextV2V3;
     spelling_speech?: SpellingSpeechV3;
+    pronunciations?: WordPronunciationV3[];
   },
   value: string | RichTextV2V3
 ) {
@@ -666,6 +667,17 @@ function applyVariantSpelling(
     typeof value === "string"
       ? editRichText(spellingEditorValue(variant), value)
       : value;
+  for (const pronunciation of variant.pronunciations ?? []) {
+    for (const candidate of [
+      pronunciation.synthesis?.uk,
+      pronunciation.synthesis?.us
+    ]) {
+      if (!candidate) continue;
+      for (const speech of [candidate.ipa_speech, candidate.ups_speech]) {
+        if (speech) speech.content = editRichText(speech.content, rich.text);
+      }
+    }
+  }
   variant.spelling = rich.text;
   const annotations = rich.annotations.filter(
     (annotation) => annotation.type !== "pause"

@@ -1,5 +1,7 @@
 # 统一音标自动转换
 
+2026-10-16 转换来源及独立设置后续变更见 [IPA / UPS 独立设置](../phoneme-speech-settings/README.md)。以下为原阶段记录。
+
 范围：管理端现有「字典音标 → 实际发音 → Azure IPA / UPS」按钮内置规则，无规则配置界面、无 API 或存储结构变更，不批量改写历史数据。
 
 依据：用户提供的[天生之统一音标规范](https://www.yuque.com/tianshengzhi/cowork/ymutpyfg2e1ykvt4)，于 2026-10-11 读取。目标音素依据 [Azure 英美音素表](https://learn.microsoft.com/azure/ai-services/speech-service/speech-ssml-phonetic-sets)、[Azure UPS 表](https://learn.microsoft.com/azure/ai-services/speech-service/customize-pronunciation)及 [SSML 文档](https://learn.microsoft.com/azure/ai-services/speech-service/speech-synthesis-markup-pronunciation)链接的微软 UPS 参考（长音 `lng`、复合音 `+`、重音 `S1/S2`）。这些资料说明格式，不代替音色的真实合成试听。

@@ -188,7 +188,25 @@ function isPronunciationShape(value: unknown): value is WordPronunciationV3 {
             candidate === undefined ||
             (isObject(candidate) &&
               Object.keys(candidate).every((key) =>
-                ["ipa", "ups", "ups_words"].includes(key)
+                [
+                  "ipa",
+                  "ups",
+                  "ups_words",
+                  "ipa_speech",
+                  "ups_speech"
+                ].includes(key)
+              ) &&
+              [candidate.ipa_speech, candidate.ups_speech].every(
+                (speech) =>
+                  speech === undefined ||
+                  (isObject(speech) &&
+                    ownKeysAre(speech, ["content", "voice_profile"]) &&
+                    isObject(speech.content) &&
+                    speech.content.version === 2 &&
+                    typeof speech.content.text === "string" &&
+                    Array.isArray(speech.content.annotations) &&
+                    isObject(speech.voice_profile) &&
+                    Array.isArray(speech.voice_profile.voices))
               ) &&
               typeof candidate.ipa === "string" &&
               typeof candidate.ups === "string" &&

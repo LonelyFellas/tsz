@@ -340,7 +340,9 @@ export function MarkupPanel({
         )}
         {topTools.length === 0 && !contentReadOnly && (
           <div className="tsz-ve-top-hint">
-            直接编辑正文；光标停在词间可插入停顿
+            {mode === "phoneme-settings"
+              ? "选择词形拼写的词缝设置停顿；音素正文在外部输入框编辑"
+              : "直接编辑正文；光标停在词间可插入停顿"}
           </div>
         )}
       </div>

@@ -296,3 +296,12 @@
   color: var(--ant-color-text-secondary, #8c8c8c);
   font-size: 12px;
 }
+
+.word-synthesis-control
+  > .word-pronunciation-play-action[data-playback-dialect="uk"] {
+  color: var(--ant-color-primary, #2053ff);
+}
+.word-synthesis-control
+  > .word-pronunciation-play-action[data-playback-dialect="us"] {
+  color: var(--ant-magenta-6, #c41d7f);
+}

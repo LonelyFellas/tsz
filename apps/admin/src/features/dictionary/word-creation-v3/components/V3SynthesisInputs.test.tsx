@@ -37,36 +37,66 @@ function Harness({
   dialect,
   legacy = false,
   profiled = false,
-  legacyPhrase = false
+  legacyPhrase = false,
+  settingsPhrase = false
 }: {
   dialect: Dialect;
   legacy?: boolean;
   profiled?: boolean;
   legacyPhrase?: boolean;
+  settingsPhrase?: boolean;
 }) {
   const [pronunciation, setPronunciation] = useState<WordPronunciationV3>({
     id: "p",
     dict_phonetic: "fɑː",
     actual_pron: "fɑː",
     style: "normal",
-    synthesis: legacyPhrase
-      ? { alphabet: "ups", ipa: "", ups: "F AA R AX W EY", ups_locale: "en-US" }
-      : legacy
-        ? {
-            alphabet: "ipa",
-            use_spelling: false,
-            ipa: "fɑː",
-            ipa_locale: "en-GB",
-            ups: ""
-          }
-        : {
-            alphabet: "ipa",
-            use_spelling: !profiled,
-            ipa: "",
-            ups: "",
-            uk: { ipa: "fɑː", ups: "F AA" },
-            us: { ipa: "fɑɹ", ups: "F AA R" }
+    synthesis: settingsPhrase
+      ? {
+          alphabet: "ipa",
+          use_spelling: false,
+          ipa: "",
+          ups: "",
+          uk: {
+            ipa: "fɑː ə.ˈweɪ",
+            ups: "F AA lng AX . S1 W EY",
+            ups_words: [
+              { text: "far", phoneme: "F AA lng" },
+              { text: "away", phoneme: "AX . S1 W EY" }
+            ]
           },
+          us: {
+            ipa: "fɑɹ ə.ˈweɪ",
+            ups: "F AA R AX . S1 W EY",
+            ups_words: [
+              { text: "far", phoneme: "F AA R" },
+              { text: "away", phoneme: "AX . S1 W EY" }
+            ]
+          }
+        }
+      : legacyPhrase
+        ? {
+            alphabet: "ups",
+            ipa: "",
+            ups: "F AA R AX W EY",
+            ups_locale: "en-US"
+          }
+        : legacy
+          ? {
+              alphabet: "ipa",
+              use_spelling: false,
+              ipa: "fɑː",
+              ipa_locale: "en-GB",
+              ups: ""
+            }
+          : {
+              alphabet: "ipa",
+              use_spelling: !profiled,
+              ipa: "",
+              ups: "",
+              uk: { ipa: "fɑː", ups: "F AA" },
+              us: { ipa: "fɑɹ", ups: "F AA R" }
+            },
     ...(profiled
       ? {
           voice_profile: {
@@ -84,7 +114,7 @@ function Harness({
           <V3SynthesisInputs
             pronunciation={pronunciation}
             synthesisEditable
-            spelling={legacyPhrase ? "far away" : "far"}
+            spelling={legacyPhrase || settingsPhrase ? "far away" : "far"}
             dialect={dialect}
             index={0}
             issues={[]}
@@ -92,6 +122,9 @@ function Harness({
               setPronunciation((value) => ({ ...value, ...patch }))
             }
           />
+          <output data-testid="pronunciation-wire">
+            {JSON.stringify(pronunciation)}
+          </output>
         </PronunciationPreviewProvider>
       </App>
     </ConfigProvider>
@@ -268,3 +301,94 @@ describe("双口音真实试听控件", () => {
     ).toBeDisabled();
   });
 });
+
+it("四个 TTS 设置器只提供停顿和音色，完成各自保存；取消不影响字段试听", async () => {
+  render(<Harness dialect="common" settingsPhrase />);
+  const wire = () =>
+    JSON.parse(screen.getByTestId("pronunciation-wire").textContent!);
+  for (const [accent, side, alphabet, duration, voice, voiceId] of [
+    ["英式", "uk", "IPA", 500, "Sonia", "en-gb-sonia"],
+    ["美式", "us", "IPA", 1000, "Aria", "en-us-aria"],
+    ["英式", "uk", "UPS", 2000, "Sonia", "en-gb-sonia"],
+    ["美式", "us", "UPS", 3000, "Aria", "en-us-aria"]
+  ] as const) {
+    const label = `第 1 条发音 ${accent} Azure ${alphabet}`;
+    fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
+    const dialog = await screen.findByRole("dialog", {
+      name: `${label} · 停顿与音色`
+    });
+    const control = (label: string) =>
+      dialog.querySelector<HTMLElement>(`[aria-label="${label}"]`)!;
+    await waitFor(() => expect(control(`启用 ${voice}`)).not.toBeNull());
+    expect(control(`启用 ${voice}`)).not.toBeChecked();
+    for (const name of ["连读", "斜体", "语法结构", "音频", "编辑文本"])
+      expect(control(name)).toBeNull();
+    expect(control(`${label}停顿设置`)).toHaveAttribute("readonly");
+    fireEvent.click(control(`启用 ${voice}`));
+    fireEvent.click(control("停顿"));
+    fireEvent.click(control(`停顿 ${duration / 1000} 秒`));
+    fireEvent.mouseDown(dialog.querySelector(".tsz-ve-gap")!);
+    fireEvent.click(control(`试听 ${voice}`));
+    await waitFor(() =>
+      expect(speech.synthesize).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          voiceId,
+          content: expect.objectContaining({
+            text: "far away",
+            annotations: expect.arrayContaining([
+              { type: "pause", at: 3, duration_ms: duration }
+            ])
+          })
+        }),
+        { signal: expect.any(AbortSignal) }
+      )
+    );
+    expect(
+      wire().synthesis[side][`${alphabet.toLowerCase()}_speech`]
+    ).toBeUndefined();
+    fireEvent.click(control(`完成${label}设置`));
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
+    expect(
+      wire().synthesis[side][`${alphabet.toLowerCase()}_speech`].content
+        .annotations
+    ).toEqual([{ type: "pause", at: 3, duration_ms: duration }]);
+  }
+  const saved = wire();
+  const label = "第 1 条发音 英式 Azure IPA";
+  fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
+  const dialog = await screen.findByRole("dialog", {
+    name: `${label} · 停顿与音色`
+  });
+  const sonia = () =>
+    dialog.querySelector<HTMLElement>('[aria-label="启用 Sonia"]')!;
+  await waitFor(() => expect(sonia()).not.toBeNull());
+  expect(sonia()).toBeChecked();
+  fireEvent.click(sonia());
+  fireEvent.click(
+    dialog.querySelector<HTMLElement>(`[aria-label="取消${label}设置"]`)!
+  );
+  await waitFor(() => expect(dialog).not.toBeInTheDocument());
+  expect(wire()).toEqual(saved);
+  for (const [accent, duration] of [
+    ["英式", 500],
+    ["美式", 1000]
+  ] as const) {
+    const play = screen.getByLabelText(
+      `第 1 条发音 ${accent} Azure IPA 最终读音 播放语音`
+    );
+    await waitFor(() => expect(play).toBeEnabled());
+    fireEvent.click(play);
+    await waitFor(() =>
+      expect(speech.synthesize).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          content: expect.objectContaining({
+            annotations: expect.arrayContaining([
+              { type: "pause", at: 3, duration_ms: duration }
+            ])
+          })
+        }),
+        { signal: expect.any(AbortSignal) }
+      )
+    );
+  }
+}, 20000);
