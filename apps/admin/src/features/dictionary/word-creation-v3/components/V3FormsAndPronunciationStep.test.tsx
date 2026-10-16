@@ -1019,7 +1019,7 @@ describe("V3FormsAndPronunciationStep", () => {
     );
   });
 
-  it("以实际产品图为基准恢复词性 Tab 与同组词形矩阵层级", async () => {
+  function productMatrixFixture() {
     const base = commonFormFixture({
       id: uuidFromInt(701),
       variant_id: uuidFromInt(711),
@@ -1047,6 +1047,11 @@ describe("V3FormsAndPronunciationStep", () => {
       ],
       pos: "noun"
     });
+    return { content, base, secondBase, plural };
+  }
+
+  it("以实际产品图为基准恢复词性 Tab 与同组词形矩阵层级", async () => {
+    const { content, base, secondBase, plural } = productMatrixFixture();
     const { container } = render(<Harness initial={content} />);
 
     expect(await screen.findByText("名词")).toBeVisible();
@@ -1101,6 +1106,12 @@ describe("V3FormsAndPronunciationStep", () => {
         `[data-group-id="${content.pos[0]!.form_groups[0]!.id}"] [data-form-id="${plural.id}"]`
       )
     ).not.toBeNull();
+  });
+
+  it("多词形矩阵收起后可展开并恢复整组输入", async () => {
+    const { content } = productMatrixFixture();
+    const { container } = render(<Harness initial={content} />);
+    expect(await screen.findByText("名词")).toBeVisible();
 
     fireEvent.click(screen.getByLabelText("收起第 1 组词形变化"));
     expect(screen.getByLabelText("展开第 1 组词形变化")).toHaveAttribute(
@@ -1109,6 +1120,21 @@ describe("V3FormsAndPronunciationStep", () => {
     );
     expect(screen.queryByText("词形是否规则变化？")).toBeNull();
     fireEvent.click(screen.getByLabelText("展开第 1 组词形变化"));
+    expect(container.querySelectorAll(".v3-concrete-form-row")).toHaveLength(3);
+    expect(screen.getByLabelText("收起第 1 组词形变化")).toHaveAttribute(
+      "aria-expanded",
+      "true"
+    );
+  });
+
+  it("同组矩阵仅修改目标词形的规则性且可恢复", async () => {
+    const { content, base, secondBase } = productMatrixFixture();
+    const { container } = render(<Harness initial={content} />);
+    expect(await screen.findByText("名词")).toBeVisible();
+    const groupCard = container.querySelector(
+      `[data-group-id="${content.pos[0]!.form_groups[0]!.id}"]`
+    )!;
+
     const regularRadios = groupCard.querySelectorAll<HTMLInputElement>(
       '.v3-spelling-regularity input[type="radio"]'
     );
@@ -1526,7 +1552,7 @@ describe("V3FormsAndPronunciationStep", () => {
     );
 
     fireEvent.click(screen.getByLabelText("英美拼写有区别"));
-    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
 
     const converted = formById(canonicalValue(), form.id);
     expect(converted.id).toBe(form.id);
@@ -1546,7 +1572,7 @@ describe("V3FormsAndPronunciationStep", () => {
 
     expect(screen.getByLabelText("英美音标无区别")).toBeDisabled();
     fireEvent.click(screen.getByLabelText("英美拼写无区别"));
-    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
     expect(formById(canonicalValue(), form.id)).toMatchObject({
       id: form.id,
       regional_variants: {
@@ -1561,7 +1587,7 @@ describe("V3FormsAndPronunciationStep", () => {
     });
 
     fireEvent.click(screen.getByLabelText("英美音标无区别"));
-    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
 
     expect(formById(canonicalValue(), form.id)).toMatchObject({
       id: form.id,
