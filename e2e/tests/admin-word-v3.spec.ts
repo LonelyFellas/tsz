@@ -12,6 +12,23 @@ import {
 } from "./support/mockAdminV3Api";
 
 test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () => {
+  test("词形拼写收起态的可见文字与输入框都使用 Bold", async ({ page }) => {
+    await mockAdminV3Api(page);
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+    const spelling = page.locator("textarea.tsz-words").first();
+    const preview = page
+      .locator(".v3-forms-step .v3-grammar-preview-content.tsz-words")
+      .first();
+    const text = preview.locator(".tsz-ve-readonly > span").first();
+    await expect(preview).toHaveText(await spelling.inputValue());
+    await expect(text).toHaveCSS("font-weight", "700");
+    await expect(spelling).toHaveCSS("font-weight", "700");
+    await spelling.focus();
+    await expect(text).toHaveCSS("font-weight", "700");
+    await spelling.blur();
+    await expect(text).toHaveCSS("font-weight", "700");
+  });
+
   test("英文词语、音标与默认正文实际加载各自字体，补字不回退到系统字体", async ({
     page
   }) => {

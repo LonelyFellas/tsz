@@ -2,7 +2,8 @@
   width: 100%;
 }
 
-.v3-forms-step textarea.tsz-words.ant-input {
+.v3-forms-step textarea.tsz-words.ant-input,
+.v3-forms-step .v3-grammar-preview-content.tsz-words {
   font-weight: 700;
 }
 
