@@ -340,6 +340,73 @@ describe("runtime schema fail-closed diagnostics", () => {
     }
   );
 
+  it.each(["common", "uk", "us"] as const)(
+    "%s 拼写试听配置可选但不可为 null，严格保留正文与音色",
+    (dialect) => {
+      const word = validFixture("AdminWordV3") as { forms: { pos: unknown[] } };
+      const pos = buildValidValue(
+        runtimeSchemaBundle.$defs.WordPosFormsV3!
+      ) as { forms: unknown[] };
+      const form = buildValidValue(
+        runtimeSchemaBundle.$defs.WordConcreteFormV3!
+      ) as Record<string, unknown>;
+      const schemas = {
+        common: "WordCommonFormVariantV3",
+        uk: "WordUkFormVariantV3",
+        us: "WordUsFormVariantV3"
+      };
+      const variant = buildValidValue(
+        runtimeSchemaBundle.$defs[schemas[dialect]]!
+      ) as Record<string, unknown>;
+      const regions = {
+        mode: dialect === "common" ? "common" : "uk_us",
+        [dialect]: variant
+      };
+      if (dialect !== "common")
+        Object.assign(regions, {
+          [dialect === "uk" ? "us" : "uk"]: buildValidValue(
+            runtimeSchemaBundle.$defs[schemas[dialect === "uk" ? "us" : "uk"]]!
+          )
+        });
+      form.regional_variants = regions;
+      pos.forms = [form];
+      word.forms.pos = [pos];
+      expect(validateRuntimeSchema("AdminWordV3", word)).toEqual({
+        valid: true
+      });
+      const speech = {
+        content: {
+          version: 2,
+          text: "hello there",
+          annotations: [{ type: "pause", at: 5, duration_ms: 500 }]
+        },
+        voice_profile: {
+          voices: [{ voice_id: "sonia", enabled: true, rate_percent: 0 }]
+        }
+      };
+      variant.spelling_speech = speech;
+      expect(validateRuntimeSchema("AdminWordV3", word)).toEqual({
+        valid: true
+      });
+      for (const invalid of [
+        null,
+        { ...speech, unexpected: true },
+        { ...speech, content: { ...speech.content, version: 1 } },
+        {
+          ...speech,
+          voice_profile: {
+            voices: [{ voice_id: "sonia", enabled: true, rate_percent: 101 }]
+          }
+        }
+      ]) {
+        variant.spelling_speech = invalid;
+        expect(validateRuntimeSchema("AdminWordV3", word)).toMatchObject({
+          valid: false
+        });
+      }
+    }
+  );
+
   it.each([
     {
       name: "根类型错误",

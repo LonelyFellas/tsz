@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/task-133-reading/tsz-rust/docs/openapi.json",
-  "_source_sha256": "b9bc860deb686cf62c7966a78acbc039e8fd5cd145a5bb86c744b54a82623af9",
+  "_source": "/Users/darwish/.codex/worktrees/spelling-synthesis/tsz-rust/docs/openapi.json",
+  "_source_sha256": "da6d62ebe0b673846542e1acf2740952f26d2263489dd0538e59b6c7ecaaef2f",
   "roots": [
     "DictionaryPage",
     "DictionaryEntry",
@@ -2780,6 +2780,15 @@
       "additionalProperties": false
     },
     "SourceDialect": { "type": "string", "enum": ["uk", "us"] },
+    "SpellingSpeechV3": {
+      "type": "object",
+      "required": ["content", "voice_profile"],
+      "properties": {
+        "content": { "$ref": "#/$defs/RichTextV2V3" },
+        "voice_profile": { "$ref": "#/$defs/VoiceProfileV3" }
+      },
+      "additionalProperties": false
+    },
     "SuggestedCommonFormVariantV3": {
       "type": "object",
       "required": ["dialect", "spelling", "pronunciations"],
@@ -3338,7 +3347,8 @@
           "maxItems": 2000
         },
         "spelling": { "type": "string", "maxLength": 200 },
-        "spelling_rich": { "$ref": "#/$defs/RichTextV2V3" }
+        "spelling_rich": { "$ref": "#/$defs/RichTextV2V3" },
+        "spelling_speech": { "$ref": "#/$defs/SpellingSpeechV3" }
       },
       "additionalProperties": false
     },
@@ -4236,7 +4246,8 @@
           "maxItems": 2000
         },
         "spelling": { "type": "string", "maxLength": 200 },
-        "spelling_rich": { "$ref": "#/$defs/RichTextV2V3" }
+        "spelling_rich": { "$ref": "#/$defs/RichTextV2V3" },
+        "spelling_speech": { "$ref": "#/$defs/SpellingSpeechV3" }
       },
       "additionalProperties": false
     },
@@ -4259,7 +4270,8 @@
           "maxItems": 2000
         },
         "spelling": { "type": "string", "maxLength": 200 },
-        "spelling_rich": { "$ref": "#/$defs/RichTextV2V3" }
+        "spelling_rich": { "$ref": "#/$defs/RichTextV2V3" },
+        "spelling_speech": { "$ref": "#/$defs/SpellingSpeechV3" }
       },
       "additionalProperties": false
     }

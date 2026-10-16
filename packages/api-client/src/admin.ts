@@ -108,7 +108,8 @@ import type { HttpClient } from "./http";
 
 const SPELLING_MARKUP_HEADERS = {
   ...SENTENCE_FORMATTING_HEADERS,
-  "X-TSZ-Spelling-Markup": "v1"
+  "X-TSZ-Spelling-Markup": "v1",
+  "X-TSZ-Spelling-Speech": "v1"
 };
 
 // admin 账号体系的 wire 类型已收敛到 @tsz/types（wire 类型唯一家）。此处 re-export，

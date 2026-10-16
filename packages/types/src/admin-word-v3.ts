@@ -107,12 +107,19 @@ export type PhraseComponentUsageV3 =
       target_gloss: string;
     };
 
+/** 拼写独立试听；content 与 spelling 同文且仅含 pause。 */
+export interface SpellingSpeechV3 {
+  content: RichTextV2V3;
+  voice_profile: VoiceProfileV3;
+}
+
 interface WordFormVariantBaseV3<TDialect extends Dialect> {
   id: string;
   dialect: TDialect;
   spelling: string;
   /** 拼写展示标注；正文与 spelling 一致，仅含斜体和连读。 */
   spelling_rich?: RichTextV2V3;
+  spelling_speech?: SpellingSpeechV3;
   /** 是否规则变化；旧数据缺省时沿用所属组的历史值。 */
   is_regular?: boolean;
   origin: TextOriginV3;

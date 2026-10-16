@@ -1,3 +1,4 @@
+import { spellingSpeechEqual } from "./spellingSpeech";
 import {
   spellingAnnotationsEqual,
   validateRichTextV2
@@ -16,6 +17,7 @@ import type {
   DraftFormsStepContentV3,
   PhraseComponentUsageV3,
   RichTextV2V3,
+  SpellingSpeechV3,
   TextOriginV3,
   V3DraftNodeLocation,
   V3DraftValidationIssue,
@@ -274,11 +276,12 @@ function isVariantShape(
         "origin",
         "pronunciations",
         "spelling",
-        "spelling_rich"
+        "spelling_rich",
+        "spelling_speech"
       ].includes(key)
     ) &&
     Object.keys(value).length >= 5 &&
-    Object.keys(value).length <= 8 &&
+    Object.keys(value).length <= 9 &&
     typeof value.id === "string" &&
     value.dialect === dialect &&
     typeof value.spelling === "string" &&
@@ -288,6 +291,29 @@ function isVariantShape(
         value.spelling_rich.version === 2 &&
         typeof value.spelling_rich.text === "string" &&
         Array.isArray(value.spelling_rich.annotations))) &&
+    (value.spelling_speech === undefined ||
+      (isObject(value.spelling_speech) &&
+        ownKeysAre(value.spelling_speech, ["content", "voice_profile"]) &&
+        isObject(value.spelling_speech.content) &&
+        ownKeysAre(value.spelling_speech.content, [
+          "annotations",
+          "text",
+          "version"
+        ]) &&
+        value.spelling_speech.content.version === 2 &&
+        typeof value.spelling_speech.content.text === "string" &&
+        Array.isArray(value.spelling_speech.content.annotations) &&
+        isObject(value.spelling_speech.voice_profile) &&
+        ownKeysAre(value.spelling_speech.voice_profile, ["voices"]) &&
+        Array.isArray(value.spelling_speech.voice_profile.voices) &&
+        value.spelling_speech.voice_profile.voices.every(
+          (voice) =>
+            isObject(voice) &&
+            ownKeysAre(voice, ["enabled", "rate_percent", "voice_id"]) &&
+            typeof voice.voice_id === "string" &&
+            typeof voice.enabled === "boolean" &&
+            Number.isInteger(voice.rate_percent)
+        ))) &&
     (value.is_regular === undefined || typeof value.is_regular === "boolean") &&
     (value.origin === "dictionary" ||
       value.origin === "converted" ||
@@ -402,6 +428,10 @@ function regionalVariantsMatchRules(
     rules.spelling_mode === "distinguish" ||
     (variants.uk.spelling === variants.us.spelling &&
       variants.uk.is_regular === variants.us.is_regular &&
+      spellingSpeechEqual(
+        variants.uk.spelling_speech,
+        variants.us.spelling_speech
+      ) &&
       spellingAnnotationsEqual(
         variants.uk.spelling_rich ?? {
           version: 2,
@@ -534,6 +564,7 @@ function variantIssues(
     dialect: Dialect;
     spelling: string;
     spelling_rich?: RichTextV2V3;
+    spelling_speech?: SpellingSpeechV3;
     pronunciations: WordPronunciationV3[];
   },
   posId: string,
@@ -579,6 +610,48 @@ function variantIssues(
         variantLocation
       )
     );
+  }
+  if (variant.spelling_speech) {
+    const { content, voice_profile } = variant.spelling_speech;
+    let valid = false;
+    try {
+      valid =
+        content.text === variant.spelling &&
+        content.annotations.every(
+          (annotation) => annotation.type === "pause"
+        ) &&
+        validateRichTextV2(content).length === 0;
+    } catch {
+      valid = false;
+    }
+    const seen = new Set<string>();
+    valid =
+      valid &&
+      voice_profile.voices.length <= 2000 &&
+      voice_profile.voices.every((voice) => {
+        if (
+          !voice.voice_id.trim() ||
+          Array.from(voice.voice_id).length > 64 ||
+          voice.voice_id.includes("\0") ||
+          seen.has(voice.voice_id) ||
+          !Number.isInteger(voice.rate_percent) ||
+          voice.rate_percent < -50 ||
+          voice.rate_percent > 100
+        )
+          return false;
+        seen.add(voice.voice_id);
+        return true;
+      });
+    if (!valid)
+      issues.push(
+        issue(
+          "spelling_rich_text_invalid",
+          "spelling_speech",
+          variant.id,
+          "拼写试听配置包含无效停顿或音色",
+          variantLocation
+        )
+      );
   }
   if (variant.spelling_rich) {
     const rich = variant.spelling_rich;
@@ -1162,6 +1235,7 @@ function variantWire<TDialect extends Dialect>(variant: {
   dialect: TDialect;
   spelling: string;
   spelling_rich?: RichTextV2V3;
+  spelling_speech?: SpellingSpeechV3;
   origin: TextOriginV3;
   pronunciations: WordPronunciationV3[];
   component_usages?: PhraseComponentUsageV3[];
@@ -1173,6 +1247,9 @@ function variantWire<TDialect extends Dialect>(variant: {
     ...(variant.spelling_rich === undefined
       ? {}
       : { spelling_rich: variant.spelling_rich }),
+    ...(variant.spelling_speech === undefined
+      ? {}
+      : { spelling_speech: variant.spelling_speech }),
     ...(variant.is_regular === undefined
       ? {}
       : { is_regular: variant.is_regular }),

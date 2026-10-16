@@ -309,7 +309,7 @@ export function MarkupPanel({
           <div className="tsz-ve-erase-action">
             <Tooltip
               title={
-                composedMode
+                composedMode || mode === "spelling"
                   ? "开启后点击已有连读或停顿即可取消，再次点击退出"
                   : "开启后点击已有连读即可取消，再次点击退出"
               }
@@ -323,7 +323,7 @@ export function MarkupPanel({
             {contentReadOnly ? (
               "正文只读，请选择单词或短语编辑关联。"
             ) : brush.kind === "erase" ? (
-              composedMode ? (
+              composedMode || mode === "spelling" ? (
                 "清除模式：点击已有连读或停顿即可取消。"
               ) : (
                 "清除模式：点击已有连读即可取消。"

@@ -21,6 +21,7 @@ const state = vi.hoisted(() => ({
     SENTENCE_FORMATTING: true
   },
   listVoices: vi.fn(),
+  synthesize: vi.fn(),
   upload: vi.fn(),
   resolveUrl: vi.fn()
 }));
@@ -33,7 +34,7 @@ vi.mock("@/lib/env", () => ({ env: state.flags }));
 vi.mock("@/features/dictionary/voice-editor/dataSource", () => ({
   adminVoicePreviewAdapter: {
     listVoices: state.listVoices,
-    synthesize: vi.fn()
+    synthesize: state.synthesize
   },
   voicePreviewIsMock: false,
   adminAudioUploadAdapter: {
@@ -44,6 +45,13 @@ vi.mock("@/features/dictionary/voice-editor/dataSource", () => ({
   } satisfies AudioUploadAdapter
 }));
 
+import { formsFixture, UUIDS } from "../fixtures";
+import { spellingEditorValue } from "../spellingSpeech";
+import {
+  updateVariantSpelling,
+  updateSpellingVoiceProfile
+} from "../operations";
+import { toFormsWire } from "../model";
 import { V3VoiceTextField } from "./V3VoiceTextField";
 import { V3LinkedEnglishTextField } from "./V3LinkedEnglishTextField";
 
@@ -76,6 +84,7 @@ async function openAudioPanel() {
 }
 
 beforeEach(() => {
+  state.synthesize.mockReset();
   state.canUpload = true;
   state.flags.VOICE_EDITOR = true;
   state.flags.SENTENCE_FORMATTING = true;
@@ -1481,4 +1490,95 @@ it("仅关联保存通过独立回调保留原正文 wire 格式", async () => {
   expect(onAssociationsChange).toHaveBeenCalledWith([
     expect.objectContaining({ target_word_id: "w" })
   ]);
+});
+
+it("拼写停顿与音色同时编辑：取消恢复，完成同时写回且不改变读法配置", async () => {
+  state.flags.VOICE_PREVIEW = true;
+  state.synthesize.mockImplementation(() => new Promise(() => {}));
+  const initial = updateVariantSpelling(formsFixture(), UUIDS.common_variant, {
+    version: 2,
+    text: "hello there",
+    annotations: [
+      { type: "italic", start: 0, end: 5 },
+      { type: "pause", at: 5, duration_ms: 500 }
+    ]
+  });
+  const variantOf = (content: typeof initial) => {
+    const regions = content.pos[0]!.forms[0]!.regional_variants;
+    if (regions.mode !== "common") throw new Error("expected common");
+    return regions.common;
+  };
+  function Host() {
+    const [content, setContent] = useState(initial);
+    const variant = variantOf(content);
+    return (
+      <>
+        <V3VoiceTextField
+          mode="spelling"
+          ariaLabel="测试拼写"
+          field="spelling"
+          nodeId={variant.id}
+          audioUploadEnabled={false}
+          value={spellingEditorValue(variant)}
+          voiceProfile={variant.spelling_speech?.voice_profile}
+          onChange={(next) =>
+            setContent(updateVariantSpelling(content, variant.id, next))
+          }
+          onVoiceProfileChange={(profile) =>
+            setContent(
+              updateSpellingVoiceProfile(content, [variant.id], profile)
+            )
+          }
+        />
+        <output data-testid="spelling-wire">
+          {JSON.stringify(toFormsWire(content))}
+        </output>
+      </>
+    );
+  }
+  render(<Host />);
+  const saved = () =>
+    variantOf(JSON.parse(screen.getByTestId("spelling-wire").textContent!));
+  const edit = async () => {
+    fireEvent.click(screen.getByLabelText("打开测试拼写编辑器"));
+    fireEvent.click(await screen.findByLabelText("编辑第 1 处停顿 0.5 秒"));
+    fireEvent.click(screen.getByLabelText("停顿 1 秒"));
+    fireEvent.click(await screen.findByLabelText("启用 Sonia"));
+  };
+  await edit();
+  fireEvent.click(screen.getByLabelText("试听 Sonia"));
+  await waitFor(() => expect(state.synthesize).toHaveBeenCalled());
+  expect(state.synthesize.mock.lastCall?.[0]).toMatchObject({
+    voiceId: "sonia",
+    content: {
+      text: "hello there",
+      annotations: expect.arrayContaining([
+        { type: "pause", at: 5, duration_ms: 1000 }
+      ])
+    }
+  });
+  expect(saved()).toEqual(variantOf(initial));
+  fireEvent.click(screen.getByLabelText("取消测试拼写编辑"));
+  expect(saved()).toEqual(variantOf(initial));
+  await edit();
+  fireEvent.click(screen.getByLabelText("完成测试拼写编辑"));
+  expect(saved().spelling_speech).toEqual({
+    content: {
+      version: 2,
+      text: "hello there",
+      annotations: [{ type: "pause", at: 5, duration_ms: 1000 }]
+    },
+    voice_profile: {
+      voices: [{ voice_id: "sonia", enabled: true, rate_percent: 0 }]
+    }
+  });
+  expect(saved().spelling_rich?.annotations).toEqual([
+    { type: "italic", start: 0, end: 5 }
+  ]);
+  expect(saved().pronunciations).toEqual(variantOf(initial).pronunciations);
+  fireEvent.click(screen.getByLabelText("打开测试拼写编辑器"));
+  expect(
+    await screen.findByLabelText("编辑第 1 处停顿 1 秒")
+  ).toBeInTheDocument();
+  expect(await screen.findByLabelText("启用 Sonia")).toBeChecked();
 });
