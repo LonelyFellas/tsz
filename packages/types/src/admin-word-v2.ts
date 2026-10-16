@@ -698,13 +698,10 @@ export interface EntryDeleteBatchResponse {
   affected: number;
 }
 
-/** @deprecated 新代码统一使用通用 ProblemMeta。 */
-export type AdminWordApiErrorMeta = ProblemMeta;
-
 export interface AdminWordApiError {
   error: string;
   code: string;
   details?: string[];
   field_issues?: DraftValidationIssue[];
-  meta?: AdminWordApiErrorMeta;
+  meta?: ProblemMeta;
 }

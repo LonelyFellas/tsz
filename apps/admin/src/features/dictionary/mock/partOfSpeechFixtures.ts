@@ -1,11 +1,11 @@
 import type {
-  PartOfSpeechActor,
+  Actor,
   PartOfSpeechCode,
   PartOfSpeechConfig,
   SubPartOfSpeechConfig
 } from "@tsz/types";
 
-const SYSTEM_ACTOR: PartOfSpeechActor = {
+const SYSTEM_ACTOR: Actor = {
   id: "system",
   display_name: "系统"
 };
