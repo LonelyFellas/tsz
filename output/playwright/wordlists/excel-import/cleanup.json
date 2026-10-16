@@ -1,0 +1,31 @@
+{
+  "exclusive_postgres_cluster_removed": true,
+  "ports_closed": {
+    "13487": true,
+    "18487": true,
+    "55487": true,
+    "56487": true
+  },
+  "raw_workbooks_credentials_and_local_binary_removed": [
+    "runtime-env.json",
+    "fixture.json",
+    "api",
+    "import.xlsx",
+    "import.xls",
+    "corrections.xlsx",
+    "ten-thousand.xlsx",
+    "reopened-xlsx.png",
+    "saved-and-reopened.png",
+    "mobile-light.png",
+    "mobile-dark.png",
+    "api.pid",
+    "api.log",
+    "api-final.log",
+    "postgres.log",
+    "redis.log",
+    "initdb.log",
+    "downloaded blank template"
+  ],
+  "browser": "fixture account logged out through UI; temporary tab closed; viewport/media overrides restored",
+  "remaining": "task source, generated contracts, test logs, redacted acceptance receipt and screenshots"
+}

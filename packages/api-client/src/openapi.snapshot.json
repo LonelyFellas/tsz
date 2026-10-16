@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/0abd/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-16T12:07:57.150Z",
+  "_source": "/Users/darwish/.codex/worktrees/wordlist-excel-import/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-10-16T13:59:49.168Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -180,6 +180,7 @@
     "/otp/send": ["post"],
     "/wordlists": ["get"],
     "/wordlists/catalog": ["get"],
+    "/wordlists/import-matches": ["post"],
     "/wordlists/interactions": ["get"],
     "/wordlists/recommended": ["get"],
     "/wordlists/suggestions": ["get"],

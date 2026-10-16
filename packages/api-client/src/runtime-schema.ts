@@ -40,6 +40,7 @@ export const RUNTIME_SCHEMA_ROOTS = [
   "MyWordlistItems",
   "WordlistCatalog",
   "WordlistSuggestions",
+  "WordlistImportMatches",
   "WordlistEditSnapshot",
   "WordlistReview",
   "WordlistReviews",

@@ -20,6 +20,54 @@ const meta = {
   updated_at: "2026-10-06T00:00:00Z"
 };
 const pagination = { page: 1, page_size: 50, total: 1, total_pages: 1 };
+it("批量导入发送可取消的 POST，严格校验匹配状态、候选和批次上限", async () => {
+  const response = {
+    items: [
+      {
+        status: "matched",
+        candidates: [
+          {
+            entry_id: id,
+            publication_id: id,
+            label: "apple",
+            glosses: ["苹果"]
+          }
+        ]
+      }
+    ]
+  };
+  const http = {
+    post: vi.fn().mockResolvedValue(response)
+  } as unknown as HttpClient;
+  const signal = new AbortController().signal;
+  expect(
+    await createWordlistEndpoints(http).matchImport(
+      { words: ["apple"] },
+      { signal }
+    )
+  ).toEqual(response);
+  expect(http.post).toHaveBeenCalledWith(
+    "/wordlists/import-matches",
+    { words: ["apple"] },
+    { signal }
+  );
+  expect(snapshot.paths["/wordlists/import-matches"]).toEqual(["post"]);
+  expect(() =>
+    decodeWordlistResponse("WordlistImportMatches", {
+      items: [{ status: "first_candidate", candidates: [] }]
+    })
+  ).toThrow();
+  expect(() =>
+    decodeWordlistResponse("WordlistImportMatches", {
+      items: [{ status: "unmatched", candidates: [], private_note: "secret" }]
+    })
+  ).toThrow();
+  expect(() =>
+    decodeWordlistResponse("WordlistImportMatches", {
+      items: Array(101).fill(response.items[0])
+    })
+  ).toThrow();
+});
 it("reads whole-list availability through separate authorized routes and rejects malformed counts", async () => {
   const counts = { revision: 1, available_count: 50, unavailable_count: 1 };
   const http = {

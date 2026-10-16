@@ -19,6 +19,7 @@ import { Button, Input, FormField } from "@tsz/ui/components";
 import { cn } from "@tsz/ui/lib/cn";
 import { ArrowLeft } from "lucide-react";
 import { PageNotice, PageShell } from "@/features/shell/Page";
+import { ExcelImport } from "./ExcelImport";
 type Row = {
   id: string;
   entryId: string | null;
@@ -139,6 +140,7 @@ function Editor({
   );
   const [page, setPage] = useState(1);
   const [dirty, setDirty] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [uncertain, setUncertain] = useState(false);
@@ -200,7 +202,7 @@ function Editor({
     return originalIds.has(entryId) ? cache.get(entryId)?.note_revision : 1;
   }
   useEffect(() => {
-    if (!dirty) return;
+    if (!dirty && !importOpen) return;
     const prevent = (e: BeforeUnloadEvent) => {
       if (!allowLeave.current) {
         e.preventDefault();
@@ -256,7 +258,7 @@ function Editor({
       document.removeEventListener("click", click, true);
       window.navigation?.removeEventListener("navigate", navigate);
     };
-  }, [dirty]);
+  }, [dirty, importOpen]);
   function change(rowId: string, patch: Partial<Row>) {
     setRows((current) =>
       current.map((row) => (row.id === rowId ? { ...row, ...patch } : row))
@@ -393,9 +395,11 @@ function Editor({
       if (!id && !unknown) pending.current = null;
       setUncertain(!id && unknown);
       setError(
-        unknown
-          ? "保存结果暂未确认，请保留当前内容并重试。创建重试使用同一个请求键。"
-          : "保存失败：内容、版本或词条状态已变化。请检查输入；版本冲突时重新打开词表。"
+        e instanceof HttpError && e.status === 413
+          ? "词表内容过大，请减少词条或缩短注释后重试。当前编辑内容仍保留。"
+          : unknown
+            ? "保存结果暂未确认，请保留当前内容并重试。创建重试使用同一个请求键。"
+            : "保存失败：内容、版本或词条状态已变化。请检查输入；版本冲突时重新打开词表。"
       );
     } finally {
       setSaving(false);
@@ -418,6 +422,43 @@ function Editor({
   const pages = Math.max(1, Math.ceil(matches.length / 50));
   const currentPage = Math.min(page, pages);
   const visible = matches.slice((currentPage - 1) * 50, currentPage * 50);
+  const replaceEmpty =
+    rows.length === 1 &&
+    !rows[0]!.entryId &&
+    !rows[0]!.text &&
+    !rows[0]!.note &&
+    !rows[0]!.authorNote;
+  if (importOpen)
+    return (
+      <PageShell size="lg" embedded={embedded}>
+        <ExcelImport
+          existingIds={
+            new Set(rows.flatMap((row) => (row.entryId ? [row.entryId] : [])))
+          }
+          remaining={10000 - (replaceEmpty ? 0 : rows.length)}
+          onCancel={() => setImportOpen(false)}
+          onAppend={(words) => {
+            setRows((current) => [
+              ...(replaceEmpty ? [] : current),
+              ...words.map(({ candidate, authorNote }) => ({
+                id: crypto.randomUUID(),
+                entryId: candidate.entry_id,
+                text: candidate.label,
+                candidate,
+                note: "",
+                authorNote
+              }))
+            ]);
+            setFilter("");
+            setPage(Math.floor((replaceEmpty ? 0 : rows.length) / 50) + 1);
+            setDirty(true);
+            setError("");
+            setErrorRow(null);
+            setImportOpen(false);
+          }}
+        />
+      </PageShell>
+    );
   return (
     <PageShell size="lg" embedded={embedded}>
       <button
@@ -609,6 +650,20 @@ function Editor({
         ))}
       </fieldset>
       <div className="mt-8 flex flex-wrap items-center gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          disabled={
+            locked ||
+            saving ||
+            uncertain ||
+            loadingItems ||
+            rows.length >= 10000
+          }
+          onClick={() => setImportOpen(true)}
+        >
+          Excel 导入
+        </Button>
         <Button
           type="button"
           variant="outline"

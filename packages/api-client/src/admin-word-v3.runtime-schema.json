@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/0abd/tsz-rust/docs/openapi.json",
-  "_source_sha256": "9e26237f0d28fad9b0c1f4017bb7a0e1987a15032b669983e78406576f65934f",
+  "_source": "/Users/darwish/.codex/worktrees/wordlist-excel-import/tsz-rust/docs/openapi.json",
+  "_source_sha256": "0f9adc88ac4f63e91f9c75093a887451c7388df8e7d4f74b56f21237ea91935d",
   "roots": [
     "DictionaryPage",
     "DictionaryEntry",
@@ -33,6 +33,7 @@
     "MyWordlistItems",
     "WordlistCatalog",
     "WordlistSuggestions",
+    "WordlistImportMatches",
     "WordlistEditSnapshot",
     "WordlistReview",
     "WordlistReviews",
@@ -3714,6 +3715,36 @@
         }
       },
       "additionalProperties": false
+    },
+    "WordlistImportMatch": {
+      "type": "object",
+      "required": ["status", "candidates"],
+      "properties": {
+        "candidates": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistCandidate" },
+          "maxItems": 3
+        },
+        "status": { "$ref": "#/$defs/WordlistImportMatchStatus" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistImportMatches": {
+      "type": "object",
+      "required": ["items"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistImportMatch" },
+          "maxItems": 100,
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "WordlistImportMatchStatus": {
+      "type": "string",
+      "enum": ["matched", "ambiguous", "unmatched"]
     },
     "WordlistInteractionState": {
       "type": "object",

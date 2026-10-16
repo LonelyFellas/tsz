@@ -1,0 +1,31 @@
+{
+  "frontend_base": "216cb7da",
+  "backend_base": "618e000",
+  "source": "base + task working changes",
+  "api_binary_sha256": "1a40dc0db2db9dec93e8be6ab2cd5fe2aa862fc743ca068e09f9c89612518638",
+  "openapi_sha256": "0f9adc88ac4f63e91f9c75093a887451c7388df8e7d4f74b56f21237ea91935d",
+  "request_counts": {
+    "POST /api/v1/wordlists/import-matches 200": 104,
+    "POST /api/v1/me/wordlists 200": 2,
+    "GET /api/v1/me/wordlists/{id}/review-requests 200": 8,
+    "GET /api/v1/me/wordlists/{id} 200": 8,
+    "GET /api/v1/me/wordlists/{id}/availability 200": 9,
+    "GET /api/v1/me/wordlists/{id}/items 200": 16,
+    "GET /api/v1/me/wordlists/{id}/edit 200": 6,
+    "GET /api/v1/wordlists/suggestions 200": 1,
+    "PUT /api/v1/me/wordlists/{id} 200": 3
+  },
+  "fixture": "one synthetic user, five published entries, two private wordlists; exclusive task cluster",
+  "browser": "Codex IAB, excel-import.localhost:13487, production build + next start; API 18487; no wordlist mocks",
+  "max_file": "10000 data rows parsed; 100 batches, 100 import-match responses 200; unmatched rows cannot append",
+  "mobile": {
+    "viewport": 390,
+    "document_width": 390,
+    "light_and_dark": true
+  },
+  "template": {
+    "sheet": "词表",
+    "range": "A1:C1",
+    "headers": ["词汇", "释义", "注释"]
+  }
+}

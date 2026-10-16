@@ -28,6 +28,8 @@ import type {
   WordlistCatalog,
   WordlistSuggestionQuery,
   WordlistSuggestions,
+  WordlistImportMatchRequest,
+  WordlistImportMatches,
   SubmitWordlist,
   WordlistReview,
   WordlistReviews,
@@ -166,6 +168,15 @@ export function createWordlistEndpoints(http: HttpClient) {
         .get<unknown>(`/wordlists/suggestions${query(q)}`, o)
         .then((v) =>
           decodeWordlistResponse<WordlistSuggestions>("WordlistSuggestions", v)
+        ),
+    matchImport: (data: WordlistImportMatchRequest, o?: Options) =>
+      http
+        .post<unknown>("/wordlists/import-matches", data, o)
+        .then((v) =>
+          decodeWordlistResponse<WordlistImportMatches>(
+            "WordlistImportMatches",
+            v
+          )
         ),
     catalog: (q: WordlistQuery = {}, o?: Options) =>
       http
