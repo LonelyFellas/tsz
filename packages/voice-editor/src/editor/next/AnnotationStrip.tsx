@@ -102,7 +102,7 @@ export interface AnnotationStripProps {
  * 双向文本都不用自己实现），而逐词上色、跨词画弧是它做不到的。让 textarea 只留
  * 光标和选区、把字交给下层画，两边就各做各最擅长的。
  *
- * 没有停顿时，两层排版逐像素一致。有停顿时，行内标签占据真实宽度，鼠标在显示层
+ * 无变宽格式和停顿时，两层排版逐像素一致。加粗、斜体或行内停顿改变字宽时，鼠标在显示层
  * 原生选字后映射到文本框；键盘输入仍使用原文，显示层回显选区和光标。
  *
  * 鼠标归谁由当前画笔决定：空手时归 textarea（放光标），拿起笔时归标注层。
@@ -143,9 +143,15 @@ export function AnnotationStrip({
       ? "gap"
       : brushTarget(brush);
   const painting = target !== "none";
-  const inlinePauses = Object.keys(marks.pauses).length > 0;
+  const inlineLayout =
+    Object.keys(marks.pauses).length > 0 ||
+    marks.roles.some((role) => role.level !== "grammar") ||
+    marks.passthrough.some(
+      (annotation) => annotation.type === "bold" || annotation.type === "italic"
+    );
   const containerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const selectingTextRef = useRef(false);
   const [textRange, setTextRange] = useState<CodeSpan>();
   const letterRefs = useRef(new Map<number, HTMLElement>());
 
@@ -259,28 +265,31 @@ export function AnnotationStrip({
     return (contents.textContent ?? "").length;
   };
 
-  // 行内标签占据真实宽度。鼠标选区由显示层定位，键盘、输入法和剪贴板仍交给原生文本框。
-  const selectInlineText = (event: ReactMouseEvent) => {
-    if (!inlinePauses || target !== "none" || event.button !== 0) return;
+  // 格式与停顿按实际宽度排版。显示层定位选区，键盘、输入法和剪贴板仍交给原生文本框。
+  const selectInlineText = (
+    event: Pick<MouseEvent, "button" | "clientX" | "clientY">
+  ) => {
+    if (!inlineLayout || target !== "none" || event.button !== 0) return;
     const container = containerRef.current;
     const input = inputRef.current;
     const selection = window.getSelection();
     if (!container || !input || !selection?.rangeCount) return;
     const range = selection.getRangeAt(0);
-    if (
-      !container.contains(range.startContainer) ||
-      !container.contains(range.endContainer)
-    )
-      return;
+    if (!container.contains(selection.anchorNode)) return;
     const hit = range.collapsed
       ? document.caretRangeFromPoint?.(event.clientX, event.clientY)
       : undefined;
     const selected =
       hit && container.contains(hit.startContainer) ? hit : range;
-    const start = sourceOffset(selected.startContainer, selected.startOffset)!;
-    const end = sourceOffset(selected.endContainer, selected.endOffset)!;
-    const anchor = sourceOffset(selection.anchorNode!, selection.anchorOffset)!;
-    const focus = sourceOffset(selection.focusNode!, selection.focusOffset)!;
+    const bounds = document.createRange();
+    bounds.selectNodeContents(container);
+    const offsetOf = (node: Node, offset: number) =>
+      sourceOffset(node, offset) ??
+      (bounds.comparePoint(node, offset) < 0 ? 0 : text.length);
+    const start = offsetOf(selected.startContainer, selected.startOffset);
+    const end = offsetOf(selected.endContainer, selected.endOffset);
+    const anchor = offsetOf(selection.anchorNode!, selection.anchorOffset);
+    const focus = offsetOf(selection.focusNode!, selection.focusOffset);
     input.focus({ preventScroll: true });
     input.setSelectionRange(
       start,
@@ -290,8 +299,19 @@ export function AnnotationStrip({
     syncTextSelection(input);
   };
 
+  // 拖选可以在画布外松手；仅接管始于当前正文的手势，不抢走其他控件的焦点。
+  useEffect(() => {
+    const finish = (event: MouseEvent) => {
+      if (!selectingTextRef.current) return;
+      selectingTextRef.current = false;
+      selectInlineText(event);
+    };
+    document.addEventListener("mouseup", finish);
+    return () => document.removeEventListener("mouseup", finish);
+  });
+
   const renderWhitespace = (value: string, from: number) =>
-    !inlinePauses &&
+    !inlineLayout &&
     !marks.passthrough.some(
       (annotation) =>
         annotation.type === "underline" &&
@@ -339,7 +359,7 @@ export function AnnotationStrip({
     event: ReactKeyboardEvent<HTMLTextAreaElement>
   ) => {
     if (
-      !inlinePauses ||
+      !inlineLayout ||
       event.ctrlKey ||
       event.metaKey ||
       event.altKey ||
@@ -408,7 +428,7 @@ export function AnnotationStrip({
 
   return (
     <div
-      className={`tsz-ve-canvas${inlinePauses ? " has-inline-pauses" : ""}`}
+      className={`tsz-ve-canvas${inlineLayout ? " has-inline-layout" : ""}`}
       data-target={target}
       data-brush={brush.kind}
     >
@@ -425,7 +445,14 @@ export function AnnotationStrip({
         className="tsz-ve-strip"
         ref={containerRef}
         data-target={target}
-        onMouseUp={selectInlineText}
+        onMouseDown={(event) => {
+          selectingTextRef.current =
+            inlineLayout && target === "none" && event.button === 0;
+        }}
+        onMouseUp={(event) => {
+          selectingTextRef.current = false;
+          selectInlineText(event);
+        }}
         aria-hidden
       >
         <LiaisonArcLayer
@@ -482,7 +509,7 @@ export function AnnotationStrip({
                   className={`tsz-ve-token is-letters${linkedRanges?.some((range) => covers(range, token.start, token.end)) ? " is-linked" : ""}${selectedLinkRanges?.some((range) => covers(range, token.start, token.end)) ? " is-link-selected" : ""}`}
                   onDoubleClick={() => {
                     const input = inputRef.current;
-                    if (!inlinePauses || target !== "none" || !input) return;
+                    if (!inlineLayout || target !== "none" || !input) return;
                     input.focus({ preventScroll: true });
                     input.setSelectionRange(
                       textPoints.slice(0, token.start).join("").length,
@@ -538,17 +565,17 @@ export function AnnotationStrip({
                       ? " is-selecting"
                       : "";
                     const textSelectedClass =
-                      inlinePauses &&
+                      inlineLayout &&
                       target === "none" &&
                       covers(textRange, start, end)
                         ? " is-text-selected"
                         : "";
                     const caretBefore =
-                      inlinePauses &&
+                      inlineLayout &&
                       textRange?.start === textRange?.end &&
                       textRange?.end === start;
                     const caretAfter =
-                      inlinePauses &&
+                      inlineLayout &&
                       textRange?.start === textRange?.end &&
                       textRange?.end === end &&
                       (end === textPoints.length ||
@@ -682,7 +709,7 @@ export function AnnotationStrip({
         })}
         {/* 末尾的空白也要渲染出来，否则光标停在行尾时两层会差一个字宽。 */}
         {renderWhitespace(trailingSpace(text, tokens), tokens.at(-1)?.end ?? 0)}
-        {inlinePauses && /[\r\n]$/u.test(text) && (
+        {inlineLayout && /[\r\n]$/u.test(text) && (
           <span
             className="tsz-ve-whitespace is-caret-anchor"
             ref={registerLetter(textPoints.length)}
