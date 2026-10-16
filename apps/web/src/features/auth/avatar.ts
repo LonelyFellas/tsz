@@ -36,7 +36,7 @@ function isAllowedType(type: string): type is AvatarContentType {
  * 仍不在白名单则 undefined。签名/落库用的都是白名单值,不透传原始 type;
  * 声明与真实字节不符(如 gif 改名 .png)由后端 confirm 核验兜底。
  */
-function contentTypeOf(file: File): AvatarContentType | undefined {
+export function contentTypeOf(file: File): AvatarContentType | undefined {
   if (isAllowedType(file.type)) return file.type;
   return EXTENSION_TYPES[file.name.split(".").pop()?.toLowerCase() ?? ""];
 }

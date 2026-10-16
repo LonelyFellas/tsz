@@ -332,6 +332,35 @@ describe("AccountMenu", () => {
     expect(img).toHaveClass("bg-white");
   });
 
+  it("顶栏头像请求缩略图，下载完成前保留首字母", async () => {
+    const avatarUrl =
+      "https://test.tianshengzhi.com/api/v1/avatars/11111111-1111-4111-8111-111111111111";
+    useUserStore.setState({ user: { ...USER, avatar_url: avatarUrl } });
+    render(<AccountMenu />);
+    const img = screen.getByRole("img", { name: "Alice" });
+    expect(img.getAttribute("src")).toContain("/_next/image?");
+    expect(img.getAttribute("src")).toContain("w=128");
+    expect(img).toHaveAttribute("loading", "eager");
+    expect(img).toHaveAttribute("fetchpriority", "high");
+    expect(img).toHaveClass("opacity-0");
+    expect(screen.getByRole("button", { name: "账户菜单" })).toHaveTextContent(
+      "A"
+    );
+
+    fireEvent.load(img);
+    await waitFor(() => expect(img).toHaveClass("opacity-100"));
+
+    act(() => {
+      useUserStore.setState({
+        user: { ...USER, avatar_url: `${avatarUrl.slice(0, -1)}2` }
+      });
+    });
+    const nextImg = screen.getByRole("img", { name: "Alice" });
+    expect(nextImg).toHaveClass("opacity-0");
+    fireEvent.load(nextImg);
+    await waitFor(() => expect(nextImg).toHaveClass("opacity-100"));
+  });
+
   it("头像加载失败 → 回退首字母;avatar_url 更新(换头像)后自动重试新图", () => {
     useUserStore.setState({
       user: { ...USER, avatar_url: "https://example.com/old.png" }
