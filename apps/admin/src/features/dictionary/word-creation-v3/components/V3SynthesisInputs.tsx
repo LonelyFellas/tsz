@@ -583,7 +583,9 @@ export function V3SynthesisInputs({
                   {
                     value: "ipa",
                     name: "Azure IPA",
-                    text: selectedSynthesis.ipa,
+                    text: selectedSynthesis.ipa.trim()
+                      ? `/ ${selectedSynthesis.ipa.trim()} /`
+                      : "",
                     fontClass: "tsz-phonetics"
                   },
                   {
@@ -605,6 +607,7 @@ export function V3SynthesisInputs({
                       </span>
                       <span
                         className={`word-synthesis-choice-preview ${option.fontClass}`}
+                        title={option.text}
                       >
                         {option.text}
                       </span>

@@ -40,7 +40,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       await expect(sourcePreviews.nth(0)).toHaveText(
         await spelling.inputValue()
       );
-      await expect(sourcePreviews.nth(1)).toHaveText("ˈɔːbɪt");
+      await expect(sourcePreviews.nth(1)).toHaveText("/ ˈɔːbɪt /");
       await expect(sourcePreviews.nth(2)).toHaveText("AO B IH T");
       const spellingFont = await spelling.evaluate(
         (node) => getComputedStyle(node).fontFamily

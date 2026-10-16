@@ -221,7 +221,7 @@ describe("独立发音输入", () => {
     expect(rows()[0].synthesis).toMatchObject({
       uk: { ipa: "fɑː", ups: "F AA" },
       us: { ipa: "fɑɹ", ups: "F AA R" },
-      use_spelling: true
+      use_spelling: false
     });
     accent.value = "uk";
     view.rerender(<Harness />);
@@ -266,12 +266,20 @@ describe("独立发音输入", () => {
       );
     }
   });
-  it("默认拼写；两种音素预览、音色、录音及另一行保持独立", async () => {
+  it("默认 IPA；两种音素预览、音色、录音及另一行保持独立", async () => {
     render(<Harness />);
     fireEvent.click(screen.getByLabelText("在第 1 条后新增发音"));
     change("Azure IPA", "kæt");
     change("Azure UPS", "K AE T");
-    expect(screen.getAllByRole("radio", { name: "词形拼写" })[0]).toBeChecked();
+    for (const radio of screen.getAllByRole("radio", { name: "Azure IPA" })) {
+      expect(radio).toBeChecked();
+    }
+    expect(screen.getByText("/ kæt /")).toBeInTheDocument();
+    expect(rows()[0].synthesis).toMatchObject({
+      alphabet: "ipa",
+      use_spelling: false,
+      us: { ipa: "kæt" }
+    });
     fireEvent.click(screen.getAllByRole("radio", { name: "Azure UPS" })[0]!);
     fireEvent.click(screen.getByLabelText("第 1 条发音发音设置与真人录音"));
     fireEvent.click(await screen.findByText("配置音色"));
@@ -324,7 +332,7 @@ describe("独立发音输入", () => {
     fireEvent.click(screen.getByText("应用转换结果"));
     expect(field("Azure UPS")).toHaveValue("K AE T");
     expect(field("Azure IPA")).toHaveValue("human IPA");
-    expect(screen.getByRole("radio", { name: "词形拼写" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Azure IPA" })).toBeChecked();
     fireEvent.keyDown(field("Azure UPS"), { key: "z", ctrlKey: true });
     expect(field("Azure UPS")).toHaveValue("H U M");
     await change("实际发音", "");
@@ -497,7 +505,7 @@ it("字典音标经统一规则生成实际发音，再分别转换英美 IPA �
     expect(field(`${accent} Azure UPS`)).toHaveValue(ups);
   }
   expect(field("字典音标")).toHaveValue("/skuːl/");
-  expect(rows()[0].synthesis.use_spelling).not.toBe(false);
+  expect(rows()[0].synthesis.use_spelling).toBe(false);
   fireEvent.click(screen.getByLabelText("撤销实际发音填入"));
   expect(field("实际发音")).toHaveValue("kæt");
 });
