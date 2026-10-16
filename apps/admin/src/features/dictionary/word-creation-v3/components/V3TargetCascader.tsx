@@ -174,6 +174,7 @@ function cascaderOptionsFromGroups(
                   ? "tsz-words v3-component-usage-matched-form"
                   : "tsz-words"
               }
+              style={{ fontWeight: 700 }}
             >
               {posLabels.size > 1
                 ? `${formGroup.formLabel}（${formGroup.posLabel}）`

@@ -371,7 +371,9 @@ export function V3GrammarFormPicker({
         <Cascader.Panel
           options={options}
           optionRender={(option) => (
-            <span className="tsz-words">{option.label}</span>
+            <span className="tsz-words" style={{ fontWeight: 700 }}>
+              {option.label}
+            </span>
           )}
           value={
             selected

@@ -67,6 +67,10 @@ test.describe("统一 V3 创建流程", () => {
     await expect(duplicateButtons).toHaveCount(2);
     await duplicateButtons.first().click();
     await expect(page.getByText("原形：colour", { exact: true })).toBeVisible();
+    await expect(page.getByText("原形：colour", { exact: true })).toHaveCSS(
+      "font-weight",
+      "700"
+    );
     await expect(
       page.getByText("垃圾桶", { exact: true }).first()
     ).toBeVisible();

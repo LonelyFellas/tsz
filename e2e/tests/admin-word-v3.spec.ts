@@ -12,6 +12,40 @@ import {
 } from "./support/mockAdminV3Api";
 
 test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () => {
+  test("词形拼写在基础确认、摘要、预览和历史快照中统一为 700", async ({
+    page
+  }) => {
+    await mockAdminV3Api(page);
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/basics`);
+    await expect(page.locator(".v3-summary-headword")).toHaveCSS(
+      "font-weight",
+      "700"
+    );
+    const spellings = page.locator(".dialect-panel input.tsz-words");
+    await expect(spellings.first()).toBeVisible();
+    for (const spelling of await spellings.all())
+      await expect(spelling).toHaveCSS("font-weight", "700");
+    // 仅向本用例拦截的 Mock API 生成发布快照。
+    const status = await page.evaluate(async (id) => {
+      const response = await fetch(
+        `/api/v1/admin/lexicon/entries/${id}/publications`,
+        { method: "POST" }
+      );
+      return response.status;
+    }, ADMIN_V3_MIXED_WORD_ID);
+    expect(status).toBe(200);
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/preview`);
+    const chain = page.locator(".v3-review-form-chain .tsz-words");
+    await expect(chain.first()).toBeVisible();
+    for (const spelling of await chain.all())
+      await expect(spelling).toHaveCSS("font-weight", "700");
+    await page.getByRole("button", { name: "查看第 2 次发布" }).click();
+    const snapshot = page.getByTestId("publication-snapshot-body");
+    await expect(
+      snapshot.getByText("orbit", { exact: true }).first()
+    ).toHaveCSS("font-weight", "700");
+  });
+
   test("词形拼写收起态的可见文字与输入框都使用 Bold", async ({ page }) => {
     await mockAdminV3Api(page);
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
@@ -1147,6 +1181,9 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
         .getByText("orbit", { exact: true })
         .click();
       const formMenu = picker.locator(".ant-cascader-menu").nth(1);
+      await expect(
+        formMenu.getByText("复数 orbit", { exact: true }).first()
+      ).toHaveCSS("font-weight", "700");
       await formMenu.getByText("复数 orbit", { exact: true }).first().click();
       await picker.getByText("分页布局验收释义").click();
       const more = picker.getByRole("button", {
@@ -1449,6 +1486,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       "font-family",
       /TSZ Words/
     );
+    await expect(page.getByText(/原形 job/)).toHaveCSS("font-weight", "700");
     await page.screenshot({
       path: "/tmp/grammar-form-picker.png",
       fullPage: false,
@@ -1939,6 +1977,29 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
         .filter({ has: page.locator(".tsz-ve-editor") });
       const input = dialog.locator(".tsz-ve-canvas-input");
       const original = await input.inputValue();
+      if (
+        (await dialog.locator(".tsz-ve-editor").getAttribute("data-mode")) ===
+        "spelling"
+      ) {
+        await expect(input).toHaveCSS("font-weight", "700");
+        const letters = dialog.locator(".tsz-ve-letter-text");
+        for (const letter of await letters.all())
+          await expect(letter).toHaveCSS("font-weight", "700");
+        await page.evaluate(() => document.fonts.ready);
+        const box = await letters.nth(1).boundingBox();
+        expect(box).not.toBeNull();
+        await page.mouse.click(
+          box!.x + box!.width - 0.5,
+          box!.y + box!.height / 2
+        );
+        await expect
+          .poll(() =>
+            input.evaluate((node: HTMLTextAreaElement) => node.selectionStart)
+          )
+          .toBe(2);
+      } else {
+        await expect(input).toHaveCSS("font-weight", "400");
+      }
       await input.press("ControlOrMeta+A");
       await input.press("ArrowLeft");
       await input.press("Shift+ArrowRight");

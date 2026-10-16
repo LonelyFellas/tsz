@@ -251,8 +251,16 @@ describe("V3PreviewAndPublishStep", () => {
       />
     );
 
-    expect(screen.getByText("learn")).toBeInTheDocument();
-    expect(screen.getByText("learnt")).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId(`preview-form-${UUIDS.form}`)).getByText(
+        "learn"
+      )
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId(`preview-form-${UUIDS.form_2}`)).getByText(
+        "learnt"
+      )
+    ).toBeInTheDocument();
     expect(screen.getAllByText("原形")).toHaveLength(2);
     expect(screen.queryByText(/主词|主形|主原形/)).not.toBeInTheDocument();
   });
@@ -996,8 +1004,9 @@ describe("V3PreviewAndPublishStep", () => {
         onPublished={vi.fn()}
       />
     );
-    expect(screen.getByText("colour")).toBeInTheDocument();
-    expect(screen.getByText("color")).toBeInTheDocument();
+    const form = within(screen.getByTestId(`preview-form-${UUIDS.form}`));
+    expect(form.getByText("colour")).toBeInTheDocument();
+    expect(form.getByText("color")).toBeInTheDocument();
   });
 
   it("renders authoritative V3 validation issues and does not preview impact", async () => {

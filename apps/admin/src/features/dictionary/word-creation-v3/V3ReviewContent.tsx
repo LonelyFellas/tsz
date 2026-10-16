@@ -130,7 +130,17 @@ function FormsReview({
                         {i > 0 && <small> → </small>}
                         {i + 1}.{" "}
                         {form ? formTypeLabel(form.form_type) : "未知词形"}
-                        {variant ? ` · ${variant.spelling}` : ""}
+                        {variant ? (
+                          <>
+                            {" · "}
+                            <span
+                              className="tsz-words"
+                              style={{ fontWeight: 700 }}
+                            >
+                              {variant.spelling}
+                            </span>
+                          </>
+                        ) : null}
                       </span>
                     );
                   })}
