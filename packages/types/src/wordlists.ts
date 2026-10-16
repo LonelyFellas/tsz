@@ -226,6 +226,17 @@ export interface WordlistSuggestions {
   items: WordlistCandidate[];
 }
 
+export interface WordlistImportMatchRequest {
+  words: string[];
+}
+export interface WordlistImportMatch {
+  status: "matched" | "ambiguous" | "unmatched";
+  candidates: WordlistCandidate[];
+}
+export interface WordlistImportMatches {
+  items: WordlistImportMatch[];
+}
+
 export interface WordlistInteractionStats {
   wordlist_id: string;
   like_count: number;

@@ -8,6 +8,7 @@ vi.mock("@/lib/request", () => ({
   api: {
     wordList: {
       suggestions: vi.fn(),
+      matchImport: vi.fn(),
       create: vi.fn(),
       edit: vi.fn(),
       myItems: vi.fn(),
@@ -15,13 +16,36 @@ vi.mock("@/lib/request", () => ({
     }
   }
 }));
+vi.mock("../excel-client", () => ({
+  readExcelFile: vi.fn(),
+  downloadExcelTemplate: vi.fn()
+}));
+import { readExcelFile } from "../excel-client";
 import { api } from "@/lib/request";
+import { HttpError } from "@tsz/api-client";
 const candidate = {
   entry_id: "entry-one",
   publication_id: "pub-one",
   label: "apple",
   glosses: ["苹果"]
 };
+it("保存体积超限明确提示拆分，保留内容并允许继续修改", async () => {
+  vi.mocked(api.wordList.create).mockRejectedValue(
+    new HttpError(413, "request body too large")
+  );
+  renderWithProviders(<WordListCreator />);
+  fireEvent.change(screen.getByLabelText("词表名称"), {
+    target: { value: "大词表" }
+  });
+  fireEvent.change(screen.getByPlaceholderText("输入单词或短语"), {
+    target: { value: "apple" }
+  });
+  fireEvent.click(await screen.findByRole("button", { name: /apple\s*苹果/ }));
+  fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("词表内容过大");
+  expect(screen.getByLabelText("词表名称")).toHaveValue("大词表");
+  expect(screen.getByLabelText("词表名称")).toBeEnabled();
+});
 beforeEach(() => {
   vi.clearAllMocks();
   useUserStore.setState({
@@ -36,6 +60,53 @@ beforeEach(() => {
   vi.mocked(api.wordList.suggestions).mockResolvedValue({
     items: [candidate]
   });
+});
+it("Excel 追加替换初始空行，保存真实词条引用和作者注释；取消不改变原输入", async () => {
+  vi.mocked(readExcelFile).mockResolvedValue([
+    {
+      rowNumber: 2,
+      word: "apple",
+      gloss: "文件释义",
+      note: "公开给读者的注",
+      invalidFields: {}
+    }
+  ]);
+  vi.mocked(api.wordList.matchImport).mockResolvedValue({
+    items: [{ status: "matched", candidates: [candidate] }]
+  });
+  vi.mocked(api.wordList.create).mockResolvedValue({ id: "created" } as never);
+  const saved = vi.fn();
+  renderWithProviders(<WordListCreator onSaved={saved} />);
+  fireEvent.change(screen.getByLabelText("词表名称"), {
+    target: { value: "Excel 词表" }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Excel 导入" }));
+  fireEvent.click(screen.getByRole("button", { name: "取消导入" }));
+  expect(screen.getByLabelText("词表名称")).toHaveValue("Excel 词表");
+  expect(screen.getByPlaceholderText("输入单词或短语")).toHaveValue("");
+  fireEvent.click(screen.getByRole("button", { name: "Excel 导入" }));
+  fireEvent.change(screen.getByLabelText("选择 Excel 文件"), {
+    target: { files: [new File(["data"], "导入.xlsx")] }
+  });
+  fireEvent.click(await screen.findByRole("button", { name: "匹配词汇" }));
+  await screen.findByText(/已选定：apple/);
+  fireEvent.click(screen.getByRole("button", { name: "确认追加到词表" }));
+  expect(screen.getAllByPlaceholderText("输入单词或短语")).toHaveLength(1);
+  expect(screen.getByLabelText("注 1")).toHaveValue("公开给读者的注");
+  fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
+  await waitFor(() => expect(saved).toHaveBeenCalledWith("created"));
+  expect(api.wordList.create).toHaveBeenCalledWith(
+    expect.objectContaining({
+      name: "Excel 词表",
+      items: [
+        {
+          entry_id: candidate.entry_id,
+          private_note: "",
+          author_note: "公开给读者的注"
+        }
+      ]
+    })
+  );
 });
 it("changing a selected spelling clears the entry ID and blocks save", async () => {
   renderWithProviders(<WordListCreator />);
