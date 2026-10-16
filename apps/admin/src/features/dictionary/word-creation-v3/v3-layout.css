@@ -348,21 +348,22 @@
   padding-inline: 2px;
 }
 
+/* Select 聚焦且下拉关闭时会插入读屏用的 span；宽度顺序只计算选择器本身。 */
 .v3-meanings-v2
   .word-definition-options
-  > .word-definition-text-select:nth-child(1) {
+  > .word-definition-text-select:nth-child(1 of .word-definition-text-select) {
   width: 24px;
 }
 
 .v3-meanings-v2
   .word-definition-options
-  > .word-definition-text-select:nth-child(2) {
+  > .word-definition-text-select:nth-child(2 of .word-definition-text-select) {
   width: 34px;
 }
 
 .v3-meanings-v2
   .word-definition-options
-  > .word-definition-text-select:nth-child(3) {
+  > .word-definition-text-select:nth-child(3 of .word-definition-text-select) {
   width: 62px;
 }
 
