@@ -30,6 +30,33 @@ vi.mock("../avatar", async (importOriginal) => ({
   uploadAvatar: vi.fn()
 }));
 
+// 编码和手势由裁剪组件测试覆盖；这里验证资料页只上传确认后的文件。
+vi.mock("./AvatarCropDialog", () => ({
+  AvatarCropDialog: ({
+    onConfirm,
+    onCancel
+  }: {
+    onConfirm: (file: File) => void;
+    onCancel: () => void;
+  }) => (
+    <div role="dialog" aria-label="裁剪头像">
+      <button type="button" onClick={onCancel}>
+        取消裁剪
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          onConfirm(
+            new File(["cropped"], "avatar.webp", { type: "image/webp" })
+          )
+        }
+      >
+        确认并上传
+      </button>
+    </div>
+  )
+}));
+
 import { api } from "@/lib/request";
 import {
   AVATAR_ACCEPT,
@@ -181,6 +208,7 @@ describe("头像错误码", () => {
         files: [new File(["image"], "avatar.png", { type: "image/png" })]
       }
     });
+    fireEvent.click(screen.getByRole("button", { name: "确认并上传" }));
     expect(
       await screen.findByText("该功能暂未开放，敬请期待")
     ).toBeInTheDocument();
@@ -211,6 +239,7 @@ describe("头像错误码", () => {
         files: [new File(["image"], "avatar.png", { type: "image/png" })]
       }
     });
+    fireEvent.click(screen.getByRole("button", { name: "确认并上传" }));
     expect(await screen.findByText(message)).toBeInTheDocument();
     expect(useUserStore.getState().user?.avatar_url).toBe(old.avatar_url);
     expect(screen.getByAltText("头像")).toHaveAttribute("src", old.avatar_url);
@@ -639,8 +668,38 @@ describe("EditProfileForm — 头像上传", () => {
   async function pickFile(user: ReturnType<typeof userEvent.setup>) {
     const file = pngFile();
     await user.upload(screen.getByLabelText("选择头像图片"), file);
+    await user.click(screen.getByRole("button", { name: "确认并上传" }));
     return file;
   }
+
+  it("大原图先裁剪；取消不上传且可重选同一文件，确认仅上传裁剪结果", async () => {
+    mockUploadAvatar.mockResolvedValue(userWith({ avatar_url: AVATAR_URL }));
+    render(<EditProfileForm />);
+    const input = await screen.findByDisplayValue("Alice");
+    const user = userEvent.setup();
+    fireEvent.change(input, { target: { value: "Bob" } });
+    const source = pngFile();
+    Object.defineProperty(source, "size", { value: 6 * 1024 * 1024 });
+    await user.upload(screen.getByLabelText("选择头像图片"), source);
+    expect(screen.getByRole("dialog", { name: "裁剪头像" })).toBeVisible();
+    expect(mockUploadAvatar).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
+    fireEvent.submit(
+      screen.getByRole("button", { name: "保存" }).closest("form")!
+    );
+    expect(mockUpdate).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "取消裁剪" }));
+    expect(mockUploadAvatar).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "更换头像" })).toHaveFocus()
+    );
+    expect(screen.getByRole("button", { name: "保存" })).toBeEnabled();
+    await user.upload(screen.getByLabelText("选择头像图片"), source);
+    await user.click(screen.getByRole("button", { name: "确认并上传" }));
+    await waitFor(() => expect(mockUploadAvatar).toHaveBeenCalledTimes(1));
+    expect(mockUploadAvatar.mock.calls[0]![0]).not.toBe(source);
+    expect(mockUploadAvatar.mock.calls[0]![0].type).toBe("image/webp");
+  });
 
   it("点击「更换头像」→ 触发隐藏 file input(accept 收紧到白名单)", async () => {
     render(<EditProfileForm />);
@@ -684,7 +743,10 @@ describe("EditProfileForm — 头像上传", () => {
     const file = await pickFile(user);
 
     await waitFor(() => {
-      expect(mockUploadAvatar).toHaveBeenCalledWith(file);
+      expect(mockUploadAvatar).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "avatar.webp", type: "image/webp" })
+      );
+      expect(mockUploadAvatar.mock.calls[0]![0]).not.toBe(file);
       expect(screen.getByAltText("头像")).toHaveAttribute("src", AVATAR_URL);
     });
     expect(useUserStore.getState().user?.avatar_url).toBe(AVATAR_URL);

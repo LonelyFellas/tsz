@@ -10,6 +10,21 @@ const isBuild = process.env.NODE_ENV === "production";
 const nextConfig = {
   deploymentId: process.env.TSZ_RELEASE_ID,
   env: { TSZ_RELEASE_ID: process.env.TSZ_RELEASE_ID ?? "local" },
+  images: {
+    minimumCacheTTL: 300,
+    // 旧头像会被撤销；禁用磁盘缓存，避免源站 404 后 Next 继续续存旧图。
+    maximumDiskCacheSize: 0,
+    remotePatterns: [
+      "test.tianshengzhi.com",
+      "www.tianshengzhi.com",
+      "tianshengzhi.com"
+    ].map((hostname) => ({
+      protocol: "https",
+      hostname,
+      pathname: "/api/v1/avatars/*",
+      search: ""
+    }))
+  },
   // ⚠️ output:standalone + outputFileTracingRoot 仅「生产构建」需要
   // （standalone 要把 monorepo 的 workspace 依赖纳入自包含产物）。
   // 开发下若设 outputFileTracingRoot 指向 monorepo 根，会把 Turbopack 的

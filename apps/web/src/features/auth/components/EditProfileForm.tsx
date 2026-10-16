@@ -20,6 +20,8 @@ import {
   uploadAvatar
 } from "../avatar";
 import { translateAuthError } from "../shared";
+import { avatarSourceError } from "../avatar-crop";
+import { AvatarCropDialog } from "./AvatarCropDialog";
 import { cn } from "@tsz/ui/lib/cn";
 import {
   PageHeader,
@@ -121,8 +123,10 @@ export function EditProfileForm() {
 
   // 头像上传。整个三步流程是一个不可重入的提交动作(uploading 期间按钮禁用)。
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const avatarButtonRef = useRef<HTMLButtonElement>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarError, setAvatarError] = useState("");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   // 记录「哪个 URL」加载失败(与 AccountMenu 同模式):换头像后 URL 变化,新图自动重试。
   const [avatarFailedUrl, setAvatarFailedUrl] = useState("");
 
@@ -174,7 +178,11 @@ export function EditProfileForm() {
   const avatarInitial = Array.from(displayNameOf(user))[0]!.toUpperCase();
 
   const canSubmit =
-    nameChanged && !validationError && !saving && !avatarUploading;
+    nameChanged &&
+    !validationError &&
+    !saving &&
+    !avatarUploading &&
+    !avatarFile;
 
   function clearMessages() {
     setNameError("");
@@ -190,7 +198,7 @@ export function EditProfileForm() {
   function handleAvatar() {
     // 与表单保存互斥:两条流程都用服务端回传的完整 user 快照 commit,
     // 并发会互相覆盖(慢网上传中改昵称保存,后到的旧快照会盖掉新头像)。
-    if (avatarUploading || saving) return;
+    if (avatarUploading || saving || avatarFile) return;
     // 会话内已探测到存储未开通(501)→ 直接提示,不再弹选图、不再请求。
     if (isAvatarStorageUnavailable()) {
       clearMessages();
@@ -218,7 +226,19 @@ export function EditProfileForm() {
       );
     } finally {
       setAvatarUploading(false);
+      window.requestAnimationFrame(() => avatarButtonRef.current?.focus());
     }
+  }
+
+  function startAvatarCrop(file: File | undefined) {
+    if (!file || avatarUploading || saving || avatarFile) return;
+    clearMessages();
+    const error = avatarSourceError(file);
+    if (error) {
+      setAvatarError(error);
+      return;
+    }
+    setAvatarFile(file);
   }
 
   async function handleLearningSettingsSubmit(e: FormEvent) {
@@ -264,7 +284,7 @@ export function EditProfileForm() {
     e.preventDefault();
     // avatarUploading 同样拦截:互斥不能只靠按钮 disabled,
     // 表单还能经 requestSubmit()/回车隐式提交触发,慢网下旧快照会盖掉新头像。
-    if (saving || avatarUploading) return;
+    if (saving || avatarUploading || avatarFile) return;
     clearMessages();
 
     if (!nameChanged) {
@@ -317,7 +337,7 @@ export function EditProfileForm() {
 
       <div className="glass rounded-3xl p-2">
         <div className="rounded-[20px] bg-surface/70 p-6 sm:p-8">
-          {/* 头像:点击选图 → OSS 直传三步流程(../avatar) */}
+          {/* 选图 → 本地裁剪压缩 → OSS 直传三步流程(../avatar)。 */}
           <div className="mb-7 flex flex-col items-center gap-3">
             <input
               ref={fileInputRef}
@@ -329,13 +349,14 @@ export function EditProfileForm() {
                 const file = e.target.files?.[0];
                 // 立即清空 value:同一张图重选(失败重试)也要触发 change。
                 e.target.value = "";
-                handleAvatarChange(file);
+                startAvatarCrop(file);
               }}
             />
             <button
+              ref={avatarButtonRef}
               type="button"
               onClick={handleAvatar}
-              disabled={avatarUploading}
+              disabled={avatarUploading || saving || !!avatarFile}
               aria-label="更换头像"
               aria-busy={avatarUploading}
               className="group relative size-24 rounded-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary disabled:cursor-wait"
@@ -562,6 +583,21 @@ export function EditProfileForm() {
           </form>
         </div>
       </div>
+      {avatarFile && (
+        <AvatarCropDialog
+          file={avatarFile}
+          onCancel={() => {
+            setAvatarFile(null);
+            window.requestAnimationFrame(() =>
+              avatarButtonRef.current?.focus()
+            );
+          }}
+          onConfirm={(file) => {
+            setAvatarFile(null);
+            void handleAvatarChange(file);
+          }}
+        />
+      )}
     </PageShell>
   );
 }
