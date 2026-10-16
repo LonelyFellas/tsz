@@ -1,4 +1,5 @@
 import stylesSource from "../../styles.css?raw";
+import interactionSource from "./interaction.css?raw";
 import { VoicePanel } from "./ToolPanels";
 import {
   act,
@@ -534,6 +535,37 @@ it("先选两个词再打开连读，选区生成端点并在确认后保存", (
 });
 
 describe("VoiceEditor 标注带", () => {
+  it("选中带格式的连读文字时，弧线显示在选区背景上方且不改动内容", () => {
+    const style = document.createElement("style");
+    style.textContent = `${stylesSource}\n${interactionSource}`;
+    document.head.append(style);
+    try {
+      const view = props({
+        mode: "association",
+        value: {
+          version: 2,
+          text: "for doing this",
+          annotations: [
+            { type: "bold", start: 4, end: 9 },
+            { type: "liaison", start: 2, end: 5 }
+          ]
+        }
+      });
+      const { container } = render(<VoiceEditor {...view} />);
+      selectText(0, 14);
+      const selected = container.querySelector(".is-text-selected")!;
+      expect(selected).not.toBeNull();
+      const arcLayer = container.querySelector(".tsz-ve-arc-layer")!;
+      const stackLevel = (element: Element) =>
+        Number.parseInt(getComputedStyle(element).zIndex, 10) || 0;
+      expect(stackLevel(arcLayer)).toBeGreaterThan(stackLevel(selected));
+      expect(getComputedStyle(arcLayer).pointerEvents).toBe("none");
+      expect(view.onChange).not.toHaveBeenCalled();
+    } finally {
+      style.remove();
+    }
+  });
+
   it.each([
     ["grammar", "var(--tsz-font-words)", "18.6667px"],
     ["spelling", "var(--tsz-font-words)", "18.6667px"],
