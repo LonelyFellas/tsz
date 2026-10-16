@@ -212,12 +212,19 @@
 }
 
 .word-synthesis-choice.ant-radio-wrapper {
+  width: 100%;
+  min-width: 0;
   margin-inline-end: 0;
   font-weight: 400;
 }
 
+.word-synthesis-choice.ant-radio-wrapper > span:last-child {
+  flex: 1;
+  min-width: 0;
+}
+
 .word-synthesis-choice-content {
-  display: inline-flex;
+  display: flex;
   align-items: baseline;
   gap: 8px;
   min-width: 0;
@@ -232,8 +239,11 @@
 }
 
 .word-synthesis-choice-preview {
+  min-width: 0;
   font-weight: 400;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .word-synthesis-choice.ant-radio-wrapper-checked .word-synthesis-choice-tag {

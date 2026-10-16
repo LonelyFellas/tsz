@@ -17,7 +17,7 @@ export const EMPTY_SYNTHESIS: PronunciationSynthesisV3 = {
   alphabet: "ipa",
   ipa: "",
   ups: "",
-  use_spelling: true
+  use_spelling: false
 };
 
 /** Candidates may be unfinished in a draft; only the selected side is required to synthesize. */

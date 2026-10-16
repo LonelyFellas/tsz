@@ -131,6 +131,7 @@ test("spelling and legacy source behavior are independent of inactive candidates
   assert.deepEqual(
     pronunciationSynthesisContent("cat", {
       ...EMPTY_SYNTHESIS,
+      use_spelling: true,
       ups: "unfinished"
     }),
     { version: 2, text: "cat", annotations: [] }
