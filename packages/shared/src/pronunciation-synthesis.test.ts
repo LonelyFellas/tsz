@@ -7,6 +7,8 @@ import {
   grammarSynthesisContent,
   pronunciationSynthesisContent,
   pronunciationSynthesisLabel,
+  editSynthesisUpsWords,
+  synthesisPhonemeWordRanges,
   synthesisInputIssue
 } from "./pronunciation-synthesis";
 
@@ -365,6 +367,63 @@ describe("独立合成输入", () => {
 });
 
 describe("IPA/UPS 来源与独立停顿", () => {
+  it("将音标词界映射到正文词界，UPS 音素间空格不视为正文词界", () => {
+    const candidate = {
+      ipa: "fɑː ə.ˈweɪ",
+      ups: "F AA lng AX . S1 W EY",
+      ups_words: [
+        { text: "far", phoneme: "F AA lng" },
+        { text: "away", phoneme: "AX . S1 W EY" }
+      ]
+    };
+    expect(synthesisPhonemeWordRanges("far away", candidate, "ipa")).toEqual([
+      { textEnd: 3, start: 0, end: 3 },
+      { textEnd: 8, start: 4, end: 10 }
+    ]);
+    expect(synthesisPhonemeWordRanges("far away", candidate, "ups")).toEqual([
+      { textEnd: 3, start: 0, end: 8 },
+      { textEnd: 8, start: 9, end: 21 }
+    ]);
+    expect(
+      synthesisPhonemeWordRanges(
+        "far away",
+        { ...candidate, ups_words: null },
+        "ups"
+      )
+    ).toBeUndefined();
+    expect(
+      synthesisPhonemeWordRanges("job", { ipa: "dʒɒb", ups: "JH Q B" }, "ups")
+    ).toEqual([{ textEnd: 3, start: 0, end: 6 }]);
+  });
+  it("只在单个词的 UPS 音素内编辑时保留显式词界，不猜测跨词修改的归属", () => {
+    const candidate = {
+      ipa: "",
+      ups: "F AA lng AX W EY",
+      ups_words: [
+        { text: "far", phoneme: "F AA lng" },
+        { text: "away", phoneme: "AX W EY" }
+      ]
+    };
+    expect(
+      editSynthesisUpsWords("far away", candidate, "F AA R lng AX W EY")
+    ).toEqual([
+      { text: "far", phoneme: "F AA R lng" },
+      { text: "away", phoneme: "AX W EY" }
+    ]);
+    expect(
+      editSynthesisUpsWords("far away", candidate, "F AA lng AX W I")
+    ).toEqual([
+      { text: "far", phoneme: "F AA lng" },
+      { text: "away", phoneme: "AX W I" }
+    ]);
+    expect(editSynthesisUpsWords("far away", candidate, candidate.ups)).toBe(
+      candidate.ups_words
+    );
+    expect(editSynthesisUpsWords("far away", candidate, "JH Q B")).toBeNull();
+    expect(
+      editSynthesisUpsWords("far away", candidate, "F AA lngAX W EY")
+    ).toBeNull();
+  });
   it("字典括号不进入 IPA，UPS 直接保留人工 IPA 的音素", () => {
     expect(
       convertDictionaryToAzureIpa("/k(æ)t/", "cat", "en-US")

@@ -302,7 +302,149 @@ describe("双口音真实试听控件", () => {
   });
 });
 
-it("四个 TTS 设置器只提供停顿和音色，完成各自保存；取消不影响字段试听", async () => {
+it.each([
+  ["英式", "uk", "IPA", "fɑː", "dʒɒb"],
+  ["美式", "us", "UPS", "F AA R", "JH AA B"]
+] as const)(
+  "%s %s 编辑器编辑当前音标，完成回写，取消不保存",
+  async (accent, side, alphabet, initial, edited) => {
+    render(<Harness dialect="common" />);
+    const label = `第 1 条发音 ${accent} Azure ${alphabet}`;
+    const open = async () => {
+      fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
+      return screen.findByLabelText(`${label}音标编辑`);
+    };
+    const input = await open();
+    expect(input).toHaveValue(initial);
+    expect(input).not.toHaveAttribute("readonly");
+    fireEvent.change(input, { target: { value: edited } });
+    const voice = side === "uk" ? "Sonia" : "Aria";
+    fireEvent.click(await screen.findByLabelText(`启用 ${voice}`));
+    fireEvent.click(screen.getByLabelText(`试听 ${voice}`));
+    await waitFor(() =>
+      expect(speech.synthesize).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          content: {
+            version: 2,
+            text: "far",
+            annotations: [
+              {
+                type: "phoneme",
+                start: 0,
+                end: 3,
+                alphabet: alphabet.toLowerCase(),
+                phoneme: edited
+              }
+            ]
+          }
+        }),
+        { signal: expect.any(AbortSignal) }
+      )
+    );
+    fireEvent.click(screen.getByLabelText(`完成${label}设置`));
+    await waitFor(() => expect(input).not.toBeInTheDocument());
+    expect(
+      screen.getByLabelText(`第 1 条发音的${accent} Azure ${alphabet}`)
+    ).toHaveValue(edited);
+    const saved = JSON.parse(
+      screen.getByTestId("pronunciation-wire").textContent!
+    );
+    expect(saved.synthesis[side][alphabet.toLowerCase()]).toBe(edited);
+    expect(
+      saved.synthesis[side][`${alphabet.toLowerCase()}_speech`].content.text
+    ).toBe("far");
+    const reopened = await open();
+    expect(reopened).toHaveValue(edited);
+    fireEvent.change(reopened, { target: { value: initial } });
+    fireEvent.click(screen.getByLabelText(`取消${label}设置`));
+    await waitFor(() => expect(reopened).not.toBeInTheDocument());
+    expect(
+      JSON.parse(screen.getByTestId("pronunciation-wire").textContent!)
+    ).toEqual(saved);
+  }
+);
+
+it("短语 UPS 在一个词内增改音素后保留词界，停顿按正文位置保存并在重开时映射回音标", async () => {
+  render(<Harness dialect="common" settingsPhrase />);
+  const label = "第 1 条发音 英式 Azure UPS";
+  fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
+  const input = await screen.findByLabelText(`${label}音标编辑`);
+  fireEvent.input(input, {
+    target: { value: "F AA R lng AX . S1 W EY" },
+    inputType: "insertFromPaste"
+  });
+  fireEvent.input(input, {
+    target: { value: "JH Q B" },
+    inputType: "insertFromPaste"
+  });
+  fireEvent.keyDown(input, { key: "z", ctrlKey: true });
+  expect(input).toHaveValue("F AA R lng AX . S1 W EY");
+  fireEvent.click(screen.getByLabelText("停顿"));
+  fireEvent.click(screen.getByLabelText("停顿 0.5 秒"));
+  const dialog = screen.getByRole("dialog");
+  fireEvent.mouseDown(dialog.querySelectorAll(".tsz-ve-gap")[3]!);
+  fireEvent.click(screen.getByLabelText("启用 Sonia"));
+  fireEvent.click(screen.getByLabelText("试听 Sonia"));
+  await waitFor(() =>
+    expect(speech.synthesize).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        content: {
+          version: 2,
+          text: "far away",
+          annotations: [
+            {
+              type: "phoneme",
+              start: 0,
+              end: 3,
+              alphabet: "ups",
+              phoneme: "F AA R lng"
+            },
+            {
+              type: "phoneme",
+              start: 4,
+              end: 8,
+              alphabet: "ups",
+              phoneme: "AX . S1 W EY"
+            },
+            { type: "pause", at: 3, duration_ms: 500 }
+          ]
+        }
+      }),
+      { signal: expect.any(AbortSignal) }
+    )
+  );
+  fireEvent.click(screen.getByLabelText(`完成${label}设置`));
+  await waitFor(() => expect(input).not.toBeInTheDocument());
+  const saved = JSON.parse(
+    screen.getByTestId("pronunciation-wire").textContent!
+  ).synthesis.uk;
+  expect(saved.ups_words).toEqual([
+    { text: "far", phoneme: "F AA R lng" },
+    { text: "away", phoneme: "AX . S1 W EY" }
+  ]);
+  expect(saved.ups_speech.content.annotations).toEqual([
+    { type: "pause", at: 3, duration_ms: 500 }
+  ]);
+  fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
+  expect(await screen.findByLabelText(`${label}音标编辑`)).toHaveValue(
+    saved.ups
+  );
+  expect(screen.getByLabelText("编辑第 4 处停顿 0.5 秒")).toBeInTheDocument();
+});
+
+it("UPS 音素间空格不能被保存为英文词间停顿", async () => {
+  render(<Harness dialect="uk" />);
+  const label = "第 1 条发音 英式 Azure UPS";
+  fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
+  await screen.findByLabelText(`${label}音标编辑`);
+  fireEvent.click(screen.getByLabelText("停顿"));
+  fireEvent.click(screen.getByLabelText("停顿 0.5 秒"));
+  fireEvent.mouseDown(screen.getByRole("dialog").querySelector(".tsz-ve-gap")!);
+  expect(screen.getByText(/停顿只能设置在词间音标边界/)).toBeInTheDocument();
+  expect(screen.getByLabelText(`完成${label}设置`)).toBeDisabled();
+});
+
+it("四个 TTS 设置器提供音标编辑、停顿和音色，完成各自保存；取消不影响字段试听", async () => {
   render(<Harness dialect="common" settingsPhrase />);
   const wire = () =>
     JSON.parse(screen.getByTestId("pronunciation-wire").textContent!);
@@ -315,7 +457,7 @@ it("四个 TTS 设置器只提供停顿和音色，完成各自保存；取消�
     const label = `第 1 条发音 ${accent} Azure ${alphabet}`;
     fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
     const dialog = await screen.findByRole("dialog", {
-      name: `${label} · 停顿与音色`
+      name: `${label} · 音标、停顿与音色`
     });
     const control = (label: string) =>
       dialog.querySelector<HTMLElement>(`[aria-label="${label}"]`)!;
@@ -323,11 +465,16 @@ it("四个 TTS 设置器只提供停顿和音色，完成各自保存；取消�
     expect(control(`启用 ${voice}`)).not.toBeChecked();
     for (const name of ["连读", "斜体", "语法结构", "音频", "编辑文本"])
       expect(control(name)).toBeNull();
-    expect(control(`${label}停顿设置`)).toHaveAttribute("readonly");
+    expect(control(`${label}音标编辑`)).not.toHaveAttribute("readonly");
+    expect(control(`${label}音标编辑`)).toHaveValue(
+      wire().synthesis[side][alphabet.toLowerCase()]
+    );
     fireEvent.click(control(`启用 ${voice}`));
     fireEvent.click(control("停顿"));
     fireEvent.click(control(`停顿 ${duration / 1000} 秒`));
-    fireEvent.mouseDown(dialog.querySelector(".tsz-ve-gap")!);
+    fireEvent.mouseDown(
+      dialog.querySelectorAll(".tsz-ve-gap")[alphabet === "UPS" ? 2 : 0]!
+    );
     fireEvent.click(control(`试听 ${voice}`));
     await waitFor(() =>
       expect(speech.synthesize).toHaveBeenLastCalledWith(
@@ -357,7 +504,7 @@ it("四个 TTS 设置器只提供停顿和音色，完成各自保存；取消�
   const label = "第 1 条发音 英式 Azure IPA";
   fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
   const dialog = await screen.findByRole("dialog", {
-    name: `${label} · 停顿与音色`
+    name: `${label} · 音标、停顿与音色`
   });
   const sonia = () =>
     dialog.querySelector<HTMLElement>('[aria-label="启用 Sonia"]')!;

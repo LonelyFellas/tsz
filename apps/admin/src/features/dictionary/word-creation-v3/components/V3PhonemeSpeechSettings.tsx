@@ -1,5 +1,5 @@
 import { EditOutlined } from "@ant-design/icons";
-import { Button, Space, Typography } from "antd";
+import { Alert, Button, Space, Typography } from "antd";
 import {
   lazy,
   Suspense,
@@ -11,11 +11,17 @@ import {
 import type {
   PhonemeLocaleV3,
   PronunciationSynthesisCandidateV3,
-  SynthesisSpeechV3,
+  RichTextV2,
   VoiceProfileV3
 } from "@tsz/types";
 import type { VoicePreviewAdapter } from "@tsz/voice-editor/types";
-import { pronunciationSynthesisContent } from "@tsz/shared";
+import { toRichTextV2 } from "@tsz/voice-editor/core";
+import {
+  editSynthesisUpsWords,
+  pronunciationSynthesisContent,
+  synthesisInputIssue,
+  synthesisPhonemeWordRanges
+} from "@tsz/shared";
 import { env } from "@/lib/env";
 import {
   adminVoicePreviewAdapter,
@@ -50,40 +56,118 @@ export function V3PhonemeSpeechSettings({
   fallbackVoiceProfile?: VoiceProfileV3;
   nodeId: string;
   field: string;
-  onChange: (speech: SynthesisSpeechV3) => void;
+  onChange: (candidate: PronunciationSynthesisCandidateV3) => void;
 }) {
   const { edit: canEdit } = useContentEditPermissions();
   const [open, setOpen] = useState(false);
-  const capture = (): SynthesisSpeechV3 =>
-    structuredClone(
-      candidate[`${alphabet}_speech`] ?? {
-        content: { version: 2, text: spelling, annotations: [] },
-        voice_profile: fallbackVoiceProfile ?? { voices: [] }
-      }
-    );
-  const [draft, setDraft] = useState(capture);
+  const wordHistory = useRef(
+    new Map<string, PronunciationSynthesisCandidateV3["ups_words"]>()
+  );
+  const capture = () => {
+    wordHistory.current.clear();
+    wordHistory.current.set(candidate.ups, candidate.ups_words);
+    const speech = candidate[`${alphabet}_speech`];
+    const ranges = synthesisPhonemeWordRanges(spelling, candidate, alphabet);
+    return structuredClone({
+      content: {
+        version: 2 as const,
+        text: candidate[alphabet],
+        annotations: (speech?.content.text === spelling
+          ? speech.content.annotations
+          : []
+        ).flatMap((mark) => {
+          const range = ranges
+            ?.slice(0, -1)
+            .find(
+              (range) => mark.type === "pause" && range.textEnd === mark.at
+            );
+          return range && mark.type === "pause"
+            ? [{ ...mark, at: range.end }]
+            : [];
+        })
+      },
+      voice_profile: speech?.voice_profile ??
+        fallbackVoiceProfile ?? { voices: [] },
+      ups_words: candidate.ups_words
+    });
+  };
+  const [draft, setDraft] = useState<{
+    content: RichTextV2;
+    voice_profile: VoiceProfileV3;
+    ups_words: PronunciationSynthesisCandidateV3["ups_words"];
+  }>(capture);
   const [source, setSource] = useState("");
+  const editedCandidate = {
+    ...candidate,
+    [alphabet]: draft.content.text,
+    ...(alphabet === "ups" ? { ups_words: draft.ups_words } : {})
+  };
+  const ranges = synthesisPhonemeWordRanges(
+    spelling,
+    editedCandidate,
+    alphabet
+  );
+  const pauseIssue = draft.content.annotations.some(
+    (mark) =>
+      mark.type !== "pause" ||
+      !ranges?.slice(0, -1).some((range) => range.end === mark.at)
+  )
+    ? "停顿只能设置在词间音标边界；短语 UPS 请保留逐词边界或从 IPA 重新转换"
+    : undefined;
+  const inputIssue =
+    synthesisInputIssue(alphabet, draft.content.text) ?? pauseIssue;
+  const resolveCandidate = (content: RichTextV2) => ({
+    ...editedCandidate,
+    [`${alphabet}_speech`]: {
+      content: {
+        ...content,
+        text: spelling,
+        annotations: content.annotations.flatMap((mark) => {
+          const range = ranges
+            ?.slice(0, -1)
+            .find((range) => mark.type === "pause" && range.end === mark.at);
+          return range && mark.type === "pause"
+            ? [{ ...mark, at: range.textEnd }]
+            : [];
+        })
+      },
+      voice_profile: draft.voice_profile
+    }
+  });
   const sourceKey = JSON.stringify([
     spelling,
     candidate[alphabet],
     alphabet === "ups" ? candidate.ups_words : undefined
   ]);
-  const latest = useRef({ spelling, candidate, alphabet, locale, draft });
+  const latest = useRef({
+    spelling,
+    alphabet,
+    locale,
+    inputIssue,
+    resolveCandidate
+  });
   useLayoutEffect(() => {
-    latest.current = { spelling, candidate, alphabet, locale, draft };
+    latest.current = {
+      spelling,
+      alphabet,
+      locale,
+      inputIssue,
+      resolveCandidate
+    };
   });
   const adapter = useMemo<VoicePreviewAdapter>(
     () => ({
       listVoices: (input) => adminVoicePreviewAdapter.listVoices(input),
       async synthesize(input, options) {
-        const { spelling, candidate, alphabet, locale, draft } = latest.current;
+        const { spelling, alphabet, locale, inputIssue, resolveCandidate } =
+          latest.current;
+        if (inputIssue) throw new Error(inputIssue);
         const content = pronunciationSynthesisContent(spelling, {
           alphabet,
-          ...candidate,
+          ...resolveCandidate(input.content),
           use_spelling: false,
           ipa_locale: locale,
-          ups_locale: locale,
-          [`${alphabet}_speech`]: { ...draft, content: input.content }
+          ups_locale: locale
         });
         if (!content)
           throw new Error(
@@ -113,7 +197,7 @@ export function V3PhonemeSpeechSettings({
       />
       {open && (
         <VoiceEditorModal
-          title={`${label} · 停顿与音色`}
+          title={`${label} · 音标、停顿与音色`}
           open
           footer={null}
           onCancel={() => setOpen(false)}
@@ -126,11 +210,32 @@ export function V3PhonemeSpeechSettings({
               mode="phoneme-settings"
               locale={locale}
               language="en"
-              textReadOnly
-              contextLabel={`${label}停顿设置`}
+              contextLabel={`${label}音标编辑`}
               value={draft.content}
               onChange={(content) =>
-                setDraft((current) => ({ ...current, content }))
+                setDraft((current) => {
+                  const ups_words =
+                    alphabet !== "ups"
+                      ? current.ups_words
+                      : wordHistory.current.has(content.text)
+                        ? wordHistory.current.get(content.text)
+                        : editSynthesisUpsWords(
+                            spelling,
+                            {
+                              ...candidate,
+                              ups: current.content.text,
+                              ups_words: current.ups_words
+                            },
+                            content.text
+                          );
+                  if (alphabet === "ups")
+                    wordHistory.current.set(content.text, ups_words);
+                  return {
+                    ...current,
+                    content: toRichTextV2(content),
+                    ups_words
+                  };
+                })
               }
               voiceProfile={draft.voice_profile}
               onVoiceProfileChange={(voice_profile) =>
@@ -151,9 +256,14 @@ export function V3PhonemeSpeechSettings({
                   <Button
                     type="primary"
                     aria-label={`完成${label}设置`}
-                    disabled={!canEdit || !canComplete || source !== sourceKey}
+                    disabled={
+                      !canEdit ||
+                      !canComplete ||
+                      Boolean(inputIssue) ||
+                      source !== sourceKey
+                    }
                     onClick={() => {
-                      onChange(draft);
+                      onChange(resolveCandidate(draft.content));
                       setOpen(false);
                     }}
                   >
@@ -162,6 +272,7 @@ export function V3PhonemeSpeechSettings({
                 </Space>
               )}
             />
+            {inputIssue && <Alert type="warning" title={inputIssue} showIcon />}
           </Suspense>
         </VoiceEditorModal>
       )}
