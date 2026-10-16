@@ -75,7 +75,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
           );
           await expect(sourcePreviews.nth(index)).toHaveCSS(
             "font-weight",
-            "400"
+            index === 0 ? "700" : "400"
           );
         }
       }
