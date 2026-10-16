@@ -113,6 +113,10 @@
   font-weight: 500;
   text-decoration: underline;
 }
+/* 选区字母带定位与背景，弧线须在其上方，避免选中时被遮住。 */
+.tsz-ve-editor .tsz-ve-arc-layer {
+  z-index: 1;
+}
 .tsz-ve-canvas[data-target="mark"] .tsz-ve-arc-layer {
   z-index: 2;
 }
