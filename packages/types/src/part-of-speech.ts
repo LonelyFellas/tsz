@@ -12,9 +12,6 @@ import type { AdminWordKind, WordFormType } from "./admin-word";
 export type PartOfSpeechCode = string;
 export type SubPartOfSpeechCode = string;
 
-/** @deprecated OpenAPI 审计主体已统一为 Actor。 */
-export type PartOfSpeechActor = Actor;
-
 export interface PartOfSpeechConfig {
   id: string;
   /** 单词或短语一侧；两侧的展示名互不冲突，编码仍全局唯一。创建后不可修改。 */
