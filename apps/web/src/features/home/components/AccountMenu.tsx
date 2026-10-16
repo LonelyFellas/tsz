@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
 import { formatCoins } from "@tsz/shared";
 import {
@@ -82,6 +83,7 @@ export function AccountMenu() {
   const [avatarOffsetX, setAvatarOffsetX] = useState(0);
   // 记录「哪个 URL」加载失败而非布尔闩锁:换头像后 avatar_url 变化,新图自动重试。
   const [errorUrl, setErrorUrl] = useState("");
+  const [loadedUrl, setLoadedUrl] = useState("");
   const triggerRef = useRef<HTMLButtonElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const tabExiting = useRef(false);
@@ -202,18 +204,27 @@ export function AccountMenu() {
             style={open ? { translate: `${avatarOffsetX}px 32px` } : undefined}
             className={`relative flex h-full w-full items-center justify-center rounded-full bg-foreground text-xs font-semibold text-background transition-[scale,translate,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-focus-visible:ring-2 group-focus-visible:ring-primary group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-background motion-reduce:transition-none ${open ? "scale-[1.75] ring-4 ring-surface shadow-sm" : ""}`}
           >
-            <span className="flex h-full w-full items-center justify-center overflow-hidden rounded-full">
-              {showImage ? (
-                // 任意来源的远程头像,next/image 需维护域名白名单,脚手架阶段用原生 img。
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+            <span className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-full">
+              <span aria-hidden>{initial}</span>
+              {showImage && (
+                <Image
+                  key={user.avatar_url}
                   src={user.avatar_url}
                   alt={displayName}
-                  className="h-full w-full bg-white object-cover"
+                  width={56}
+                  height={56}
+                  loading="eager"
+                  fetchPriority="high"
+                  // 只优化本站公开头像端点；历史外部头像保持直连。
+                  unoptimized={
+                    !/^https:\/\/(?:test\.|www\.)?tianshengzhi\.com\/api\/v1\/avatars\/[^/?#]+$/.test(
+                      user.avatar_url
+                    )
+                  }
+                  className={`absolute inset-0 h-full w-full bg-white object-cover ${loadedUrl === user.avatar_url ? "opacity-100" : "opacity-0"}`}
+                  onLoad={() => setLoadedUrl(user.avatar_url)}
                   onError={() => setErrorUrl(user.avatar_url)}
                 />
-              ) : (
-                initial
               )}
             </span>
             {open && (
