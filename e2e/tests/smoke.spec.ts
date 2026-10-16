@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
-import type { CreateWordlist, Wordlist, WordlistSuggestions } from "@tsz/types";
+import type {
+  CreateWordlist,
+  LibraryPage,
+  Wordlist,
+  WordlistSuggestions
+} from "@tsz/types";
 import { TEST_USER, mockApi } from "./support/mockApi";
 
 test.beforeEach(async ({ page }) => {
@@ -16,7 +21,10 @@ test("首页可达并能进入词表", async ({ page }) => {
 
 test("未登录创建词表需先登录", async ({ page }) => {
   await page.goto("/wordlists/new");
-  await expect(page).toHaveURL(/\/login\?redirect=%2Fwordlists%2Fnew/);
+  await expect(page).toHaveURL(/\/login\?redirect=/);
+  expect(new URL(page.url()).searchParams.get("redirect")).toBe(
+    "/account/wordlists?space=owned&mode=new"
+  );
 });
 
 test("登录后选词并保存私密词表", async ({ page }) => {
@@ -53,6 +61,33 @@ test("登录后选词并保存私密词表", async ({ page }) => {
       } satisfies WordlistSuggestions
     });
   });
+  await page.route("**/api/v1/me/wordlist-library/owned**", (route) =>
+    route.fulfill({
+      json: {
+        version: "e2e-library",
+        ancestors: [],
+        items: list
+          ? [
+              {
+                id: listId,
+                parent_id: null,
+                wordlist_id: listId,
+                name: list.name,
+                revision: 1,
+                trashed_at: null,
+                path: [],
+                wordlist: list
+              }
+            ]
+          : [],
+        pagination: {
+          ...pagination,
+          total: list ? 1 : 0,
+          total_pages: list ? 1 : 0
+        }
+      } satisfies LibraryPage
+    })
+  );
   await page.route("**/api/v1/me/wordlists**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path.endsWith("/wordlists") && route.request().method() === "POST") {
@@ -104,7 +139,9 @@ test("登录后选词并保存私密词表", async ({ page }) => {
   await page.getByRole("button", { name: /apple\s*苹果/ }).click();
   await page.getByLabel("注 1").fill("给词表读者的说明");
   await page.getByRole("button", { name: "保存私密词表" }).click();
-  await expect(page).toHaveURL(`/account/wordlists/${listId}`);
+  await expect(page).toHaveURL(
+    `/account/wordlists?space=owned&wordlist=${listId}`
+  );
   expect(saved).toEqual({
     idempotency_key: expect.stringMatching(/^[0-9a-f-]{36}$/),
     name: "E2E 冒烟词表",

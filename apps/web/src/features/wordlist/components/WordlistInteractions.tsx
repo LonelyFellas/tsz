@@ -1,4 +1,6 @@
 "use client";
+import { LibraryDialog } from "./LibraryDialog";
+import { LibraryFolderPicker } from "./LibraryFolderPicker";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
@@ -50,10 +52,15 @@ function InteractionControls({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [tipOpen, setTipOpen] = useState(false);
+  const [favoriteOpen, setFavoriteOpen] = useState(false);
   const request = useRef<AbortController | null>(null);
   useEffect(() => () => request.current?.abort(), []);
   const own = userId === list.owner_user_id;
-  async function change(kind: "like" | "favorite", active: boolean) {
+  async function change(
+    kind: "like" | "favorite",
+    active: boolean,
+    folderId?: string | null
+  ) {
     if (
       request.current ||
       !userId ||
@@ -67,7 +74,7 @@ function InteractionControls({
     try {
       await api.wordList.setInteraction(
         list.id,
-        { kind, active },
+        { kind, active, ...(folderId ? { folder_id: folderId } : {}) },
         { signal: controller.signal }
       );
       if (
@@ -75,6 +82,7 @@ function InteractionControls({
         useUserStore.getState().user?.id !== userId
       )
         return;
+      setFavoriteOpen(false);
       await client.invalidateQueries({ queryKey: wordListKeys.all });
     } catch {
       if (
@@ -123,7 +131,11 @@ function InteractionControls({
               aria-label={
                 own ? `不能给自己的词表${label}` : active ? activeLabel : label
               }
-              onClick={() => void change(kind, !active)}
+              onClick={() =>
+                kind === "favorite"
+                  ? setFavoriteOpen(true)
+                  : void change(kind, !active)
+              }
             >
               <Icon
                 className={`size-4 ${active ? "fill-primary text-primary" : ""}`}
@@ -166,6 +178,45 @@ function InteractionControls({
         <p role="alert" className="mt-2 text-sm text-danger">
           {error}
         </p>
+      )}
+      {favoriteOpen && (
+        <LibraryDialog
+          title={state?.favorited ? "移入收藏回收站" : "收藏到文件夹"}
+          busy={busy}
+          onClose={() => setFavoriteOpen(false)}
+        >
+          {error && (
+            <p role="alert" className="mb-3 text-sm text-danger">
+              {error}
+            </p>
+          )}
+          {state?.favorited ? (
+            <>
+              <p className="mb-4">
+                这份收藏将移入「我收藏的」回收站，可以恢复。
+              </p>
+              <button
+                disabled={busy}
+                className={buttonClass}
+                onClick={() => void change("favorite", false)}
+              >
+                确认移入回收站
+              </button>
+              <Link
+                className={buttonClass}
+                href={`/account/wordlists?space=favorites&wordlist=${list.id}`}
+              >
+                定位已收藏词表
+              </Link>
+            </>
+          ) : (
+            <LibraryFolderPicker
+              space="favorites"
+              busy={busy}
+              onPick={(folder) => void change("favorite", true, folder)}
+            />
+          )}
+        </LibraryDialog>
       )}
       {tipOpen && <TipPanel list={list} />}
     </div>

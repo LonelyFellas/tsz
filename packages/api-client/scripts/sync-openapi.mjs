@@ -73,6 +73,8 @@ const RUNTIME_SCHEMA_ROOTS = [
   "WordlistInteractionState",
   "WordlistInteractionStates",
   "WordlistFavoritePage",
+  "LibraryPage",
+  "LibraryImpact",
   "WordlistTip",
   "WordlistTipPage",
   "AdminWordlist",
@@ -579,6 +581,7 @@ for (const [rawPath, item] of Object.entries(spec.paths)) {
       rawPath.startsWith(ADMIN_LEXICON_PREFIX) ||
       rawPath.startsWith(`${API_PREFIX}/me/account-deletion`) ||
       rawPath === `${API_PREFIX}/auth/account` ||
+      rawPath.startsWith(`${API_PREFIX}/me/wordlist-library/`) ||
       rawPath.startsWith(`${API_PREFIX}/me/coins/`) ||
       rawPath.startsWith(`${API_PREFIX}/admin/me/coins/`) ||
       rawPath.startsWith(`${API_PREFIX}/admin/coins/`) ||

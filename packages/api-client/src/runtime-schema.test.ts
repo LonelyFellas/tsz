@@ -52,6 +52,8 @@ const ROOTS = [
   "WordlistInteractionState",
   "WordlistInteractionStates",
   "WordlistFavoritePage",
+  "LibraryPage",
+  "LibraryImpact",
   "WordlistTip",
   "WordlistTipPage",
   "AdminWordlist",

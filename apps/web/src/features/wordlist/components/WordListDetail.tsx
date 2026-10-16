@@ -45,10 +45,14 @@ const SORT_LABELS: Record<WordlistSort, string> = {
 const CONTENT_CHANGED = "词表内容已变化，请重新加载词条。";
 export function WordListDetail({
   id,
-  mine = false
+  mine = false,
+  embedded = false,
+  editHref
 }: {
   id: string;
   mine?: boolean;
+  embedded?: boolean;
+  editHref?: string;
 }) {
   const userId = useUserStore((s) => s.user?.id);
   return (
@@ -57,17 +61,23 @@ export function WordListDetail({
       id={id}
       mine={mine}
       userId={userId}
+      embedded={embedded}
+      editHref={editHref}
     />
   );
 }
 function Detail({
   id,
   mine,
-  userId
+  userId,
+  embedded,
+  editHref
 }: {
   id: string;
   mine: boolean;
   userId?: string;
+  embedded?: boolean;
+  editHref?: string;
 }) {
   const client = useQueryClient();
   const identity = useTeacherIdentity();
@@ -307,7 +317,7 @@ function Detail({
   };
   if (meta.isError)
     return (
-      <PageShell size="lg">
+      <PageShell size="lg" embedded={embedded}>
         <PageHeader back={back} title="词表" />
         <PageNotice tone="error">
           词表不存在、不可访问或暂时无法加载。
@@ -322,15 +332,15 @@ function Detail({
     );
   if (!meta.data)
     return (
-      <PageShell size="lg">
+      <PageShell size="lg" embedded={embedded}>
         <PageNotice>正在读取词表…</PageNotice>
       </PageShell>
     );
   const list = meta.data;
   return (
-    <PageShell size="lg">
+    <PageShell size="lg" embedded={embedded}>
       <PageHeader
-        back={back}
+        back={embedded ? undefined : back}
         eyebrow={mine ? "我的词表" : "词库广场"}
         title={list.name}
         description={`${list.owner_name} · ${STATE_LABEL[list.state]} · ${list.item_count} 个词条`}
@@ -345,7 +355,7 @@ function Detail({
               <>
                 <Link
                   className={buttonClass}
-                  href={`/account/wordlists/${id}/edit`}
+                  href={editHref ?? `/account/wordlists/${id}/edit`}
                 >
                   {list.state === "pending" || list.state === "published"
                     ? "查看创编内容"
@@ -557,7 +567,7 @@ function Detail({
                 <p className="mt-2">
                   <Link
                     className={textButtonClass}
-                    href={`/account/wordlists/${id}/edit`}
+                    href={editHref ?? `/account/wordlists/${id}/edit`}
                   >
                     移除或替换
                   </Link>

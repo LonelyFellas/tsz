@@ -29,6 +29,7 @@ export interface WordlistItemsQuery extends WordlistQuery {
   sort?: WordlistSort;
 }
 export interface CreateWordlist {
+  folder_id?: string;
   idempotency_key: string;
   name: string;
   items: { entry_id: string; private_note: string; author_note?: string }[];
@@ -243,6 +244,7 @@ export interface WordlistInteractionStates {
   items: WordlistInteractionState[];
 }
 export interface SetWordlistInteraction {
+  folder_id?: string;
   kind: "like" | "favorite";
   active: boolean;
 }

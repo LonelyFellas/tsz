@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/phoneme-speech/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-16T08:02:16.288Z",
+  "_source": "/Users/darwish/.codex/worktrees/0abd/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-10-16T12:07:57.150Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -161,6 +161,11 @@
     "/me/teacher-certification/files/{id}": ["delete", "get"],
     "/me/wordlist-favorites": ["get"],
     "/me/wordlist-interactions": ["get"],
+    "/me/wordlist-library/{space}": ["get"],
+    "/me/wordlist-library/{space}/folders": ["post"],
+    "/me/wordlist-library/{space}/nodes/{id}": ["put"],
+    "/me/wordlist-library/{space}/operations": ["post"],
+    "/me/wordlist-library/{space}/preview": ["post"],
     "/me/wordlist-tips": ["get"],
     "/me/wordlist-tips/{event_id}": ["get"],
     "/me/wordlists": ["get", "post"],
@@ -2249,6 +2254,52 @@
         "413": { "$ref": "#/components/schemas/ProblemDetails" },
         "422": { "$ref": "#/components/schemas/ProblemDetails" },
         "500": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /me/wordlist-library/{space}": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/LibraryPage" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /me/wordlist-library/{space}/folders": {
+      "request": { "$ref": "#/components/schemas/LibraryFolderInput" },
+      "responses": {
+        "204": null,
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "put /me/wordlist-library/{space}/nodes/{id}": {
+      "request": { "$ref": "#/components/schemas/LibraryRename" },
+      "responses": {
+        "204": null,
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /me/wordlist-library/{space}/operations": {
+      "request": { "$ref": "#/components/schemas/LibraryOperation" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/LibraryImpact" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /me/wordlist-library/{space}/preview": {
+      "request": { "$ref": "#/components/schemas/LibraryOperation" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/LibraryImpact" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     }
   },
@@ -5182,6 +5233,52 @@
           "$ref": "#/components/schemas/VoiceProfileV3",
           "description": "缺省即「没配过」。未配置时不上 wire，存量内容重新序列化后逐字节不变。"
         }
+      },
+      "additionalProperties": false
+    },
+    "LibraryAction": {
+      "type": "string",
+      "enum": ["move", "trash", "restore", "purge"]
+    },
+    "LibraryFolderInput": {
+      "type": "object",
+      "required": ["expected_version", "name"],
+      "properties": {
+        "expected_version": { "type": "string" },
+        "name": { "type": "string", "maxLength": 100, "minLength": 1 },
+        "parent_id": { "type": ["string", "null"], "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "LibraryOperation": {
+      "type": "object",
+      "required": ["expected_version", "action", "ids"],
+      "properties": {
+        "action": { "$ref": "#/components/schemas/LibraryAction" },
+        "empty_trash": {
+          "type": "boolean",
+          "description": "Only valid for purge. Includes every trash batch in this system."
+        },
+        "expected_version": { "type": "string" },
+        "ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" },
+          "maxItems": 100
+        },
+        "original_location": {
+          "type": "boolean",
+          "description": "Restore at the original location when true; otherwise target_id (null = root)."
+        },
+        "target_id": { "type": ["string", "null"], "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "LibraryRename": {
+      "type": "object",
+      "required": ["expected_version", "name"],
+      "properties": {
+        "expected_version": { "type": "string" },
+        "name": { "type": "string", "maxLength": 100, "minLength": 1 }
       },
       "additionalProperties": false
     },

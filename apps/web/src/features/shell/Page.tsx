@@ -11,14 +11,20 @@ const WIDTH = {
 // 功能页外框：统一宽度、页边距与入场动画。sm 用于资料、安全等设置页，md 用于列表页，lg 用于宽内容。
 export function PageShell({
   size = "md",
+  embedded = false,
   children
 }: {
   size?: keyof typeof WIDTH;
+  embedded?: boolean;
   children: ReactNode;
 }) {
   return (
     <div
-      className={`animate-in mx-auto w-full ${WIDTH[size]} px-6 pb-16 pt-8 sm:pt-12`}
+      className={
+        embedded
+          ? "w-full"
+          : `animate-in mx-auto w-full ${WIDTH[size]} px-6 pb-16 pt-8 sm:pt-12`
+      }
     >
       {children}
     </div>
