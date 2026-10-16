@@ -12,6 +12,8 @@ const nextConfig = {
   env: { TSZ_RELEASE_ID: process.env.TSZ_RELEASE_ID ?? "local" },
   images: {
     minimumCacheTTL: 300,
+    // 旧头像会被撤销；禁用磁盘缓存，避免源站 404 后 Next 继续续存旧图。
+    maximumDiskCacheSize: 0,
     remotePatterns: [
       "test.tianshengzhi.com",
       "www.tianshengzhi.com",
