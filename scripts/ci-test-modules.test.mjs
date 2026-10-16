@@ -112,10 +112,17 @@ test("M04: artifact and output names are unique and path-safe", () => {
   );
 });
 
-test("M05: module arguments retain maxWorkers=2 and path selection", () => {
+test("M05: module arguments bound admin concurrency and retain path selection", () => {
+  for (const module of ciTestModules) {
+    const args = buildModuleVitestArgs(module.name, "artifacts", "/repo");
+    assert.deepEqual(
+      args.filter((argument) => argument.startsWith("--maxWorkers=")),
+      [module.projects.includes("admin") ? "--maxWorkers=1" : "--maxWorkers=2"]
+    );
+  }
   const args = buildModuleVitestArgs("admin-2", "artifacts", "/repo");
   assert.ok(args.includes("--coverage"));
-  assert.ok(args.includes("--maxWorkers=2"));
+  assert.ok(args.includes("--maxWorkers=1"));
   assert.ok(args.includes("/repo/apps/admin"));
   assert.ok(!args.some((argument) => argument.startsWith("--project=")));
   assert.ok(args.includes("--shard=2/3"));

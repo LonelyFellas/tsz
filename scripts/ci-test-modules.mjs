@@ -224,7 +224,11 @@ export function buildModuleVitestArgs(
     module.blobFile
   );
   return [
-    ...buildCoverageVitestArgs([]),
+    // antd 大表单在覆盖率 runner 中并行会争抢 CPU，连续触发不同用例的 5 秒超时。
+    // 后台分片串行执行文件，保留全部用例、原有超时和覆盖率收集策略。
+    ...buildCoverageVitestArgs(
+      module.projects.includes("admin") ? ["--maxWorkers=1"] : []
+    ),
     "--config=vitest.ci-shard.config.ts",
     "--reporter=blob",
     "--reporter=./scripts/ci-test-inventory-reporter.mjs",
