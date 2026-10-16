@@ -1,4 +1,5 @@
-import { WordListBrowser } from "@/features/wordlist";
+import { Suspense } from "react";
+import { WordlistLibrary } from "@/features/wordlist/components/WordlistLibrary";
 import { RouteGuard } from "@/features/auth/components/RouteGuard";
 export const metadata = {
   title: "我的词表",
@@ -7,7 +8,9 @@ export const metadata = {
 export default function Page() {
   return (
     <RouteGuard>
-      <WordListBrowser mine />
+      <Suspense>
+        <WordlistLibrary />
+      </Suspense>
     </RouteGuard>
   );
 }

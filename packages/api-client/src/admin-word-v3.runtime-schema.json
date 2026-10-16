@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/phoneme-speech/tsz-rust/docs/openapi.json",
-  "_source_sha256": "128c30462ed379f5d505b93b4ad4e5cc03d71b3cc80ff127fa4734d14802f73b",
+  "_source": "/Users/darwish/.codex/worktrees/0abd/tsz-rust/docs/openapi.json",
+  "_source_sha256": "9e26237f0d28fad9b0c1f4017bb7a0e1987a15032b669983e78406576f65934f",
   "roots": [
     "DictionaryPage",
     "DictionaryEntry",
@@ -19,6 +19,8 @@
     "WordlistInteractionState",
     "WordlistInteractionStates",
     "WordlistFavoritePage",
+    "LibraryPage",
+    "LibraryImpact",
     "WordlistTip",
     "WordlistTipPage",
     "AdminWordlist",
@@ -1692,6 +1694,71 @@
     },
     "LearningTaskState": { "type": "string", "enum": ["active", "archived"] },
     "LearningTaskType": { "type": "string", "enum": ["daily", "longterm"] },
+    "LibraryCrumb": {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "name": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "LibraryImpact": {
+      "type": "object",
+      "required": ["version", "folder_count", "wordlist_count"],
+      "properties": {
+        "folder_count": { "type": "integer" },
+        "version": { "type": "string" },
+        "wordlist_count": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "LibraryItem": {
+      "type": "object",
+      "required": [
+        "id",
+        "parent_id",
+        "wordlist_id",
+        "name",
+        "revision",
+        "trashed_at",
+        "path",
+        "wordlist"
+      ],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "name": { "type": "string" },
+        "parent_id": { "type": ["string", "null"], "format": "uuid" },
+        "path": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LibraryCrumb" }
+        },
+        "revision": { "type": "integer" },
+        "trashed_at": { "type": ["string", "null"], "format": "date-time" },
+        "wordlist": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/Wordlist" }]
+        },
+        "wordlist_id": { "type": ["string", "null"], "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "LibraryPage": {
+      "type": "object",
+      "required": ["version", "ancestors", "items", "pagination"],
+      "properties": {
+        "ancestors": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LibraryCrumb" }
+        },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LibraryItem" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" },
+        "version": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
     "ManualCoinOperation": {
       "type": "object",
       "required": [

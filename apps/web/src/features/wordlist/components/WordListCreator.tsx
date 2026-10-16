@@ -49,7 +49,19 @@ function glosses(entry?: WordlistEntry | null) {
     ) ?? []
   );
 }
-export function WordListCreator({ id }: { id?: string }) {
+export function WordListCreator({
+  id,
+  folderId,
+  embedded = false,
+  onSaved,
+  onCancel
+}: {
+  id?: string;
+  folderId?: string;
+  embedded?: boolean;
+  onSaved?: (id: string) => void;
+  onCancel?: () => void;
+}) {
   const userId = useUserStore((s) => s.user?.id);
   const snapshot = useQuery({
     queryKey: [...wordListKeys.mine(userId), "edit", id],
@@ -61,7 +73,7 @@ export function WordListCreator({ id }: { id?: string }) {
   if (!userId) return null;
   if (id && snapshot.isError)
     return (
-      <PageShell size="lg">
+      <PageShell size="lg" embedded={embedded}>
         <PageNotice tone="error">
           读取编辑数据失败。
           <Button
@@ -78,7 +90,7 @@ export function WordListCreator({ id }: { id?: string }) {
     );
   if (id && !snapshot.data)
     return (
-      <PageShell size="lg">
+      <PageShell size="lg" embedded={embedded}>
         <PageNotice>正在读取词表…</PageNotice>
       </PageShell>
     );
@@ -86,6 +98,10 @@ export function WordListCreator({ id }: { id?: string }) {
     <Editor
       key={`${userId}:${id ?? "new"}`}
       userId={userId}
+      folderId={folderId}
+      embedded={embedded}
+      onSaved={onSaved}
+      onCancel={onCancel}
       id={id}
       initial={snapshot.data}
     />
@@ -93,10 +109,18 @@ export function WordListCreator({ id }: { id?: string }) {
 }
 function Editor({
   userId,
+  folderId,
+  embedded,
+  onSaved,
+  onCancel,
   id,
   initial: snapshot
 }: {
   userId: string;
+  folderId?: string;
+  embedded?: boolean;
+  onSaved?: (id: string) => void;
+  onCancel?: () => void;
   id?: string;
   initial?: WordlistEditSnapshot;
 }) {
@@ -349,6 +373,7 @@ function Editor({
       } else {
         pending.current ??= {
           idempotency_key: crypto.randomUUID(),
+          ...(folderId ? { folder_id: folderId } : {}),
           name,
           items: rows.map((r) => ({
             entry_id: r.entryId!,
@@ -361,7 +386,8 @@ function Editor({
       allowLeave.current = true;
       setDirty(false);
       await client.invalidateQueries({ queryKey: wordListKeys.all });
-      router.push(`/account/wordlists/${result.id}`);
+      if (onSaved) onSaved(result.id);
+      else router.push(`/account/wordlists/${result.id}`);
     } catch (e) {
       const unknown = !(e instanceof HttpError) || e.status >= 500;
       if (!id && !unknown) pending.current = null;
@@ -393,14 +419,18 @@ function Editor({
   const currentPage = Math.min(page, pages);
   const visible = matches.slice((currentPage - 1) * 50, currentPage * 50);
   return (
-    <PageShell size="lg">
+    <PageShell size="lg" embedded={embedded}>
       <button
         type="button"
         className="-ml-3 mb-5 inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 text-sm text-foreground-muted transition-colors hover:bg-surface/80 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
         onClick={() => {
           if (!dirty || window.confirm("尚未保存，确定离开？")) {
             allowLeave.current = true;
-            router.push(id ? `/account/wordlists/${id}` : "/account/wordlists");
+            if (onCancel) onCancel();
+            else
+              router.push(
+                id ? `/account/wordlists/${id}` : "/account/wordlists"
+              );
           }
         }}
       >

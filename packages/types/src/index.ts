@@ -63,3 +63,5 @@ export * from "./learning-rewards";
 export * from "./related-suggestions";
 
 export * from "./dictionary";
+
+export * from "./wordlist-library";

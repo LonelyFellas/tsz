@@ -1,3 +1,4 @@
+import { createWordlistLibraryEndpoints } from "./wordlist-library";
 import { SENTENCE_FORMATTING_HEADERS } from "./sentence-formatting";
 import type {
   WordlistInteractionStatsBatch,
@@ -62,6 +63,7 @@ export const WORDLIST_READING_HEADERS = {
 type Options = { signal?: AbortSignal };
 export function createWordlistEndpoints(http: HttpClient) {
   return {
+    library: createWordlistLibraryEndpoints(http),
     interactionStats: (ids: string[], o?: Options) =>
       http
         .get<unknown>(
