@@ -36,7 +36,7 @@ describe("V3 product error presentation", () => {
       expect(message).toMatch(/[\u3400-\u9fff]/u);
     }
     expect(v3IssueMessage(issue("pronunciation_required"))).toBe(
-      "请完整填写发音方式、字典音标和实际发音"
+      "请完整填写读法、字典音标和实际发音"
     );
   });
 
@@ -48,7 +48,7 @@ describe("V3 product error presentation", () => {
         { ...issue("pos_required"), code: "future_code" as never }
       ])
     ).toEqual([
-      "请完整填写发音方式、字典音标和实际发音",
+      "请完整填写读法、字典音标和实际发音",
       "该内容暂时无法完成，请刷新后重试"
     ]);
   });

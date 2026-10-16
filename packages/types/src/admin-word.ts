@@ -19,7 +19,7 @@ export type WordFormType = string;
 export type WordSubPos = "" | SubPartOfSpeechCode;
 
 export type WordRelationType = "synonym" | "antonym" | "derivative";
-export type PronunciationStyle = "normal" | "strong" | "weak";
+export type PronunciationStyle = "normal" | "citation" | "strong" | "weak";
 
 /** GET /admin/lexicon/entries 查询参数。 */
 export interface AdminWordListQuery {

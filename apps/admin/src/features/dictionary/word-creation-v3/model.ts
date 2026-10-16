@@ -247,6 +247,7 @@ function isPronunciationShape(value: unknown): value is WordPronunciationV3 {
         ))) &&
     (value.style === undefined ||
       value.style === "normal" ||
+      value.style === "citation" ||
       value.style === "strong" ||
       value.style === "weak")
   );

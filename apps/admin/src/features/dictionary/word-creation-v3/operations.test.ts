@@ -2357,3 +2357,33 @@ it("英美相同连读的省略与显式默认端宽不阻止统一拼写", () =
   expect(unifyUkUsSpelling(form, loaded.text).ok).toBe(true);
   expect(form.regional_variants.uk.spelling_rich).toEqual(loaded);
 });
+
+it("方言显式拆合保留逐字正音", () => {
+  const form = commonFormFixture();
+  const mapping = {
+    spelling: "cat",
+    origin: "manual" as const,
+    pronunciations: [
+      { dict_phonetic: "kæt", actual_pron: "kæt", style: "citation" as const }
+    ]
+  };
+  const split = convertCommonToUkUs(form, {
+    confirmed: true,
+    uk: mapping,
+    us: mapping
+  });
+  if (!split.ok || split.value.regional_variants.mode !== "uk_us")
+    throw new Error("expected split");
+  expect(split.value.regional_variants.uk.pronunciations[0]?.style).toBe(
+    "citation"
+  );
+  expect(split.value.regional_variants.us.pronunciations[0]?.style).toBe(
+    "citation"
+  );
+  const merged = convertUkUsToCommon(split.value, {
+    confirmed: true,
+    common: mapping
+  });
+  if (!merged.ok) throw new Error("expected merge");
+  expect(commonVariant(merged.value).pronunciations[0]?.style).toBe("citation");
+});

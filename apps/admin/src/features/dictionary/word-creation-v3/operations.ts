@@ -93,6 +93,7 @@ const TEXT_ORIGINS = new Set<TextOriginV3>([
 ]);
 const PRONUNCIATION_STYLES = new Set<PronunciationStyle>([
   "normal",
+  "citation",
   "strong",
   "weak"
 ]);

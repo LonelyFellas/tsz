@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-notifications/docs/openapi.json",
-  "_source_sha256": "5cef54678cf7fa8e7a082791a803d32876916082d7baf86be858327ae199c0d4",
+  "_source": "/Users/darwish/.codex/worktrees/task-133-reading/tsz-rust/docs/openapi.json",
+  "_source_sha256": "b9bc860deb686cf62c7966a78acbc039e8fd5cd145a5bb86c744b54a82623af9",
   "roots": [
     "DictionaryPage",
     "DictionaryEntry",
@@ -1962,7 +1962,7 @@
     },
     "PronunciationStyle": {
       "type": "string",
-      "enum": ["normal", "strong", "weak"]
+      "enum": ["normal", "citation", "strong", "weak"]
     },
     "PronunciationSynthesisCandidateV3": {
       "type": "object",

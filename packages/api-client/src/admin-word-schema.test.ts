@@ -347,6 +347,19 @@ describe("decodeEntryDeleteBatchResponse", () => {
 });
 
 describe("admin word V3/Any runtime decoder", () => {
+  it("四种读法均能完整读回，未知读法仍拒绝", () => {
+    const word = validAdminWordV3();
+    const pronunciation =
+      word.forms.pos[0]!.forms[0]!.regional_variants.common!.pronunciations[0]!;
+    for (const style of ["normal", "citation", "strong", "weak"]) {
+      pronunciation.style = style;
+      expect(decodeAdminWordV3Envelope({ word })).toEqual({ word });
+    }
+    pronunciation.style = "unknown";
+    expect(() => decodeAdminWordV3Envelope({ word })).toThrow(
+      InvalidAdminWordResponseError
+    );
+  });
   it("词条语法斜体完整读回，缺范围或额外字段仍拒绝", () => {
     const annotation: Record<string, unknown> = {
       type: "italic",

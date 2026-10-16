@@ -64,7 +64,7 @@ it.each([
   fireEvent.click(screen.getByText(/^应\s*用$/));
   expect(onChange).not.toHaveBeenCalled();
   expect(
-    screen.getByText(/来源、口音、发音方式或目标内容已变化/)
+    screen.getByText(/来源、口音、读法或目标内容已变化/)
   ).toBeInTheDocument();
 });
 

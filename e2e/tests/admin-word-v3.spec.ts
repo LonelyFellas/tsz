@@ -2306,7 +2306,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       page
         .getByRole("alert")
         .filter({ hasText: "仍有内容需要完成" })
-        .getByText("请完整填写发音方式、字典音标和实际发音")
+        .getByText("请完整填写读法、字典音标和实际发音")
     ).toBeVisible();
 
     await page.getByRole("button", { name: "保存草稿" }).click();

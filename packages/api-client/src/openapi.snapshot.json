@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-notifications/docs/openapi.json",
-  "_generatedAt": "2026-10-15T06:44:55.811Z",
+  "_source": "/Users/darwish/.codex/worktrees/task-133-reading/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-10-16T04:07:00.117Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -5126,7 +5126,7 @@
     },
     "PronunciationStyle": {
       "type": "string",
-      "enum": ["normal", "strong", "weak"]
+      "enum": ["normal", "citation", "strong", "weak"]
     },
     "PronunciationSynthesisCandidateV3": {
       "type": "object",

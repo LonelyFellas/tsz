@@ -24,7 +24,8 @@ const DIALECT_LABEL: Record<Dialect, string> = {
 };
 
 const PRONUNCIATION_STYLE_LABEL: Record<PronunciationStyle, string> = {
-  normal: "常规",
+  normal: "语流连读",
+  citation: "逐字正音",
   strong: "强读",
   weak: "弱读"
 };
@@ -136,7 +137,7 @@ export function dialectLabel(value: Dialect): string {
 }
 
 export function pronunciationStyleLabel(value: PronunciationStyle): string {
-  return PRONUNCIATION_STYLE_LABEL[value] ?? "未识别发音方式";
+  return PRONUNCIATION_STYLE_LABEL[value] ?? "未识别读法";
 }
 
 export function partOfSpeechLabel(value: string): string {

@@ -2076,7 +2076,7 @@ describe("WordWizardV3Page", () => {
     );
     expect(
       screen.getByTestId(`preview-pronunciation-${UUIDS.pronunciation}`)
-    ).toHaveTextContent(/sen\-tre.*常规.*centre/);
+    ).toHaveTextContent(/sen\-tre.*语流连读.*centre/);
     expect(
       screen.getByTestId(`preview-pronunciation-${UUIDS.pronunciation_2}`)
     ).toHaveTextContent(/sen\-tr.*强读.*centr/);
@@ -2085,7 +2085,7 @@ describe("WordWizardV3Page", () => {
     ).toHaveTextContent(/sen\-ter.*弱读.*center/);
     expect(
       screen.getByTestId(`preview-pronunciation-${uuidFromInt(904)}`)
-    ).toHaveTextContent(/sen\-tre\-uk.*常规.*centre\-uk/);
+    ).toHaveTextContent(/sen\-tre\-uk.*语流连读.*centre\-uk/);
   });
 
   it("keeps empty read-only groups and pronunciations visible", async () => {
@@ -2341,7 +2341,7 @@ describe("WordWizardV3Page", () => {
       node_id: UUIDS.pronunciation,
       field: "dict_phonetic",
       code: "pronunciation_required",
-      message: "请完整填写发音方式、字典音标和实际发音",
+      message: "请完整填写读法、字典音标和实际发音",
       node_location: {
         node_role: "forms.pronunciation",
         ancestor_node_ids: [

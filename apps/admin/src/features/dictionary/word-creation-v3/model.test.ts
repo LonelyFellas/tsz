@@ -33,6 +33,15 @@ function commonVariant(form: WordConcreteFormV3) {
 }
 
 describe("V3 forms model", () => {
+  it("逐字正音通过草稿结构校验并无损序列化", () => {
+    const form = commonFormFixture({
+      pronunciations: [pronunciationFixture({ style: "citation" })]
+    });
+    const content = formsFixture({ forms: [form] });
+    expect(validateFormsContent(content, "complete")).toEqual([]);
+    expect(toFormsWire(content)).toEqual(content);
+  });
+
   it("U01/U02 common 与完整 uk_us 无损保留 form/variant/pronunciation 身份", () => {
     const common = commonFormFixture();
     const regional = ukUsFormFixture();
