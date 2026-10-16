@@ -3,6 +3,39 @@ import { expect, it, vi } from "vitest";
 import type { RichTextAnnotation } from "@tsz/types";
 import { VoiceEditor } from "./VoiceEditor";
 
+it("混合格式向编辑区外拖选后，裁切正文选区并恢复输入焦点", () => {
+  const { container } = render(
+    <>
+      <VoiceEditor
+        mode="association"
+        value={{
+          version: 2,
+          text: "jobs instead",
+          annotations: [{ type: "bold", start: 0, end: 4 }]
+        }}
+        onChange={vi.fn()}
+      />
+      <p>outside</p>
+    </>
+  );
+  const strip = container.querySelector(".tsz-ve-strip")!;
+  fireEvent.mouseDown(strip, { button: 0 });
+  const range = document.createRange();
+  range.setStart(
+    container.querySelector('[data-codepoint="1"] .tsz-ve-letter-text')!
+      .firstChild!,
+    0
+  );
+  range.setEnd(screen.getByText("outside").firstChild!, 3);
+  window.getSelection()!.removeAllRanges();
+  window.getSelection()!.addRange(range);
+  fireEvent.mouseUp(document.body, { button: 0 });
+  const input = screen.getByLabelText("语音编辑器") as HTMLTextAreaElement;
+  expect(document.activeElement === input).toBe(true);
+  expect(input.selectionStart).toBe(1);
+  expect(input.selectionEnd).toBe("jobs instead".length);
+});
+
 it.each<RichTextAnnotation>([
   { type: "bold", start: 2, end: 6 },
   { type: "italic", start: 2, end: 6 },

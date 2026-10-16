@@ -151,6 +151,7 @@ export function AnnotationStrip({
     );
   const containerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const selectingTextRef = useRef(false);
   const [textRange, setTextRange] = useState<CodeSpan>();
   const letterRefs = useRef(new Map<number, HTMLElement>());
 
@@ -265,27 +266,30 @@ export function AnnotationStrip({
   };
 
   // 格式与停顿按实际宽度排版。显示层定位选区，键盘、输入法和剪贴板仍交给原生文本框。
-  const selectInlineText = (event: ReactMouseEvent) => {
+  const selectInlineText = (
+    event: Pick<MouseEvent, "button" | "clientX" | "clientY">
+  ) => {
     if (!inlineLayout || target !== "none" || event.button !== 0) return;
     const container = containerRef.current;
     const input = inputRef.current;
     const selection = window.getSelection();
     if (!container || !input || !selection?.rangeCount) return;
     const range = selection.getRangeAt(0);
-    if (
-      !container.contains(range.startContainer) ||
-      !container.contains(range.endContainer)
-    )
-      return;
+    if (!container.contains(selection.anchorNode)) return;
     const hit = range.collapsed
       ? document.caretRangeFromPoint?.(event.clientX, event.clientY)
       : undefined;
     const selected =
       hit && container.contains(hit.startContainer) ? hit : range;
-    const start = sourceOffset(selected.startContainer, selected.startOffset)!;
-    const end = sourceOffset(selected.endContainer, selected.endOffset)!;
-    const anchor = sourceOffset(selection.anchorNode!, selection.anchorOffset)!;
-    const focus = sourceOffset(selection.focusNode!, selection.focusOffset)!;
+    const bounds = document.createRange();
+    bounds.selectNodeContents(container);
+    const offsetOf = (node: Node, offset: number) =>
+      sourceOffset(node, offset) ??
+      (bounds.comparePoint(node, offset) < 0 ? 0 : text.length);
+    const start = offsetOf(selected.startContainer, selected.startOffset);
+    const end = offsetOf(selected.endContainer, selected.endOffset);
+    const anchor = offsetOf(selection.anchorNode!, selection.anchorOffset);
+    const focus = offsetOf(selection.focusNode!, selection.focusOffset);
     input.focus({ preventScroll: true });
     input.setSelectionRange(
       start,
@@ -294,6 +298,17 @@ export function AnnotationStrip({
     );
     syncTextSelection(input);
   };
+
+  // 拖选可以在画布外松手；仅接管始于当前正文的手势，不抢走其他控件的焦点。
+  useEffect(() => {
+    const finish = (event: MouseEvent) => {
+      if (!selectingTextRef.current) return;
+      selectingTextRef.current = false;
+      selectInlineText(event);
+    };
+    document.addEventListener("mouseup", finish);
+    return () => document.removeEventListener("mouseup", finish);
+  });
 
   const renderWhitespace = (value: string, from: number) =>
     !inlineLayout &&
@@ -430,7 +445,14 @@ export function AnnotationStrip({
         className="tsz-ve-strip"
         ref={containerRef}
         data-target={target}
-        onMouseUp={selectInlineText}
+        onMouseDown={(event) => {
+          selectingTextRef.current =
+            inlineLayout && target === "none" && event.button === 0;
+        }}
+        onMouseUp={(event) => {
+          selectingTextRef.current = false;
+          selectInlineText(event);
+        }}
         aria-hidden
       >
         <LiaisonArcLayer

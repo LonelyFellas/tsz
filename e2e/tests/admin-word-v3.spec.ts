@@ -1561,6 +1561,32 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
         await input.press("ControlOrMeta+z");
         await expect(input).toHaveValue(text);
       }
+      const dragStart = (await dialog
+        .locator('[data-codepoint="3"] .tsz-ve-letter-text')
+        .boundingBox())!;
+      const stripBox = (await dialog.locator(".tsz-ve-strip").boundingBox())!;
+      await page.mouse.move(
+        dragStart.x + 1,
+        dragStart.y + dragStart.height / 2
+      );
+      await page.mouse.down();
+      await page.mouse.move(
+        stripBox.x + stripBox.width + 8,
+        stripBox.y + stripBox.height + 8,
+        { steps: 5 }
+      );
+      await page.mouse.up();
+      await expect(input).toBeFocused();
+      await expect
+        .poll(() => input.evaluate((node) => node.selectionStart))
+        .toBe(3);
+      await expect
+        .poll(() => input.evaluate((node) => node.selectionEnd))
+        .toBe(text.length);
+      await page.keyboard.type("X");
+      await expect(input).toHaveValue(`${text.slice(0, 3)}X`);
+      await input.press("ControlOrMeta+z");
+      await expect(input).toHaveValue(text);
       await dialog.screenshot({
         path: test
           .info()
