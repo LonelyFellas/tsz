@@ -1469,6 +1469,110 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(page.getByText(/已关联 ·/)).toBeVisible();
   });
 
+  test("富文本按实际字宽排版，混合格式后的点击和输入不偏移", async ({
+    page
+  }) => {
+    test.skip(
+      process.env.VITE_VOICE_EDITOR !== "true" ||
+        process.env.VITE_SENTENCE_FORMATTING !== "true",
+      "需要启用语音编辑器和释义例句格式"
+    );
+    const api = await mockAdminV3Api(page);
+    const word = api.getWord();
+    const text =
+      "If you have a job, you work for a person or organization and receive a regular salary for doing this.";
+    word.meanings.pos[0]!.grammar_structures[0]!.variants[0]!.content = {
+      version: 2,
+      text,
+      annotations: []
+    };
+    word.meanings.pos[0]!.senses[0]!.definitions.push({
+      id: "01990000-0000-7000-8000-000000000950",
+      level: "B1",
+      grammar_structure_id: word.meanings.pos[0]!.grammar_structures[0]!.id,
+      definition_mode: "en_sentence",
+      content: {
+        mode: "unified",
+        common: {
+          id: "01990000-0000-7000-8000-000000000951",
+          origin: "manual",
+          value: { version: 2, text, annotations: [] }
+        }
+      }
+    });
+    await page.route(`**/lexicon/entries/${word.id}`, (route) =>
+      route.fulfill({ json: { word, retired_stable_nodes: [] } })
+    );
+    await page.goto(`/words/${word.id}/v3/wizard/meanings`);
+    for (const name of [/^打开.*定义 2.*编辑器$/, /^打开.*语法结构.*编辑器$/]) {
+      await page.getByRole("button", { name }).first().click();
+      const dialog = page
+        .getByRole("dialog")
+        .filter({ has: page.locator(".tsz-ve-editor") });
+      const input = dialog.locator(".tsz-ve-canvas-input");
+      await page.evaluate(() => document.fonts.ready);
+      const extraGlyphWidth = () =>
+        dialog.locator(".tsz-ve-letter").evaluateAll((letters) =>
+          Math.max(
+            ...letters.map((letter) => {
+              const range = document.createRange();
+              range.selectNodeContents(
+                letter.querySelector(".tsz-ve-letter-text")!
+              );
+              return Math.abs(
+                letter.getBoundingClientRect().width -
+                  range.getBoundingClientRect().width
+              );
+            })
+          )
+        );
+      await expect.poll(extraGlyphWidth).toBeLessThan(0.1);
+      // 只格式化句首，后方文字必须按自己的字宽紧随其后。
+      await input.press("ControlOrMeta+Home");
+      await input.press("Shift+ArrowRight");
+      await input.press("Shift+ArrowRight");
+      if (
+        await dialog.getByRole("button", { name: "加粗", exact: true }).count()
+      )
+        await input.press("ControlOrMeta+b");
+      else
+        await dialog
+          .getByRole("button", { name: "标记为固定核心词", exact: true })
+          .click();
+      await input.press("ControlOrMeta+i");
+      await expect.poll(extraGlyphWidth).toBeLessThan(0.1);
+      for (const point of [15, text.length - 2]) {
+        const letter = dialog.locator(
+          `[data-codepoint="${point}"] .tsz-ve-letter-text`
+        );
+        const box = (await letter.boundingBox())!;
+        // aria-disabled 只禁用字母的标注操作；正文仍通过真实鼠标坐标选字。
+        await page.mouse.click(
+          box.x + box.width * 0.85,
+          box.y + box.height / 2
+        );
+        await expect
+          .poll(() => input.evaluate((node) => node.selectionStart))
+          .toBe(point + 1);
+        await input.press("x");
+        await expect(input).toHaveValue(
+          `${text.slice(0, point + 1)}x${text.slice(point + 1)}`
+        );
+        await input.press("ControlOrMeta+z");
+        await expect(input).toHaveValue(text);
+      }
+      await dialog.screenshot({
+        path: test
+          .info()
+          .outputPath(
+            `${name.source.includes("定义") ? "definition" : "grammar"}-natural-spacing.png`
+          ),
+        animations: "disabled"
+      });
+      await dialog.getByRole("button", { name: /^取消.*编辑$/ }).click();
+    }
+  });
+
   test("连读在编辑器首次打开和重开动画中始终贴合文字", async ({ page }) => {
     test.skip(process.env.VITE_VOICE_EDITOR !== "true", "需要启用语音编辑器");
     const api = await mockAdminV3Api(page);
@@ -1771,7 +1875,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(
       dialog.locator(".tsz-ve-arc-layer path").first()
     ).toBeVisible();
-    await input.click({ trial: true });
+    await dialog.locator(".tsz-ve-strip").click({ trial: true });
     await page.screenshot({
       animations: "disabled",
       path: test.info().outputPath("editor-keyboard-shortcuts.png")

@@ -1,6 +1,47 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
+import type { RichTextAnnotation } from "@tsz/types";
 import { VoiceEditor } from "./VoiceEditor";
+
+it.each<RichTextAnnotation>([
+  { type: "bold", start: 2, end: 6 },
+  { type: "italic", start: 2, end: 6 },
+  { type: "emphasis", start: 2, end: 6, level: "core" },
+  { type: "emphasis", start: 2, end: 6, level: "function" }
+])("无停顿的 $type 文本按可见字形映射选区和光标", (annotation) => {
+  const text = "😀 jobs instead";
+  const { container } = render(
+    <VoiceEditor
+      mode="association"
+      value={{ version: 2, text, annotations: [annotation] }}
+      onChange={vi.fn()}
+    />
+  );
+  const range = document.createRange();
+  range.setStart(
+    container.querySelector('[data-codepoint="7"] .tsz-ve-letter-text')!
+      .firstChild!,
+    0
+  );
+  range.setEnd(
+    container.querySelector('[data-codepoint="13"] .tsz-ve-letter-text')!
+      .firstChild!,
+    1
+  );
+  window.getSelection()!.removeAllRanges();
+  window.getSelection()!.addRange(range);
+  fireEvent.mouseUp(container.querySelector(".tsz-ve-strip")!, { button: 0 });
+  const input = screen.getByLabelText("语音编辑器") as HTMLTextAreaElement;
+  expect(document.activeElement).toBe(input);
+  expect(input.selectionStart).toBe(8);
+  expect(input.selectionEnd).toBe(text.length);
+  expect(container.querySelectorAll(".is-text-selected")).toHaveLength(7);
+  input.setSelectionRange(8, 8);
+  fireEvent.select(input);
+  expect(
+    container.querySelector(".tsz-ve-inline-caret")!.parentElement
+  ).toHaveAttribute("data-codepoint", "7");
+});
 
 it.each(["a b  ", "a b\n\n", "a b \n\n  "])(
   "点击尾部空白保留正文位置：%j",

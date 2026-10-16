@@ -569,9 +569,9 @@ describe("VoiceEditor 标注带", () => {
       const firstLetter = () =>
         mounted.container.querySelector<HTMLElement>(".tsz-ve-letter")!;
       expect(getComputedStyle(firstLetter()).fontWeight).toBe("400");
-      expect(getComputedStyle(firstLetter().firstElementChild!).position).toBe(
-        "absolute"
-      );
+      expect(
+        getComputedStyle(firstLetter().firstElementChild!).position
+      ).not.toBe("absolute");
       for (const [level, weight] of [
         ["core", "700"],
         ["function", "700"],
@@ -593,12 +593,12 @@ describe("VoiceEditor 标注带", () => {
       mounted.rerender(<VoiceEditor {...view} />);
       expect(firstLetter()).not.toHaveAttribute("data-level");
       expect(getComputedStyle(firstLetter()).fontWeight).toBe("400");
-      // 可视层和透明输入层继续共用粗体度量，样式切换不移动输入光标。
+      // 未标注时输入层使用正文的常规字重，不为粗体预留宽度。
       expect(
         getComputedStyle(
           mounted.container.querySelector(".tsz-ve-canvas-input")!
         ).fontWeight
-      ).toBe("700");
+      ).toBe("400");
       for (const selector of [".tsz-ve-strip", ".tsz-ve-canvas-input"]) {
         const computed = getComputedStyle(
           mounted.container.querySelector(selector)!
