@@ -192,6 +192,88 @@ function basePronunciationSynthesisContent(
   };
 }
 
+/** Pair visible phoneme ranges with spelling word ends for the settings editor. */
+export function synthesisPhonemeWordRanges(
+  spelling: string,
+  candidate: PronunciationSynthesisCandidateV3,
+  alphabet: "ipa" | "ups"
+): { textEnd: number; start: number; end: number }[] | undefined {
+  const words = [...spelling.matchAll(/\S+/gu)];
+  const value = candidate[alphabet];
+  const phones =
+    alphabet === "ipa"
+      ? [...value.matchAll(/\S+/gu)].map((match) => match[0])
+      : words.length === 1
+        ? [value.trim()]
+        : candidate.ups_words?.map((word, index) =>
+            word.text === words[index]?.[0] ? word.phoneme : ""
+          );
+  if (
+    !phones ||
+    phones.length !== words.length ||
+    phones.some((phone) => !phone) ||
+    (alphabet === "ups" && phones.join(" ") !== value.trim())
+  )
+    return undefined;
+  let offset = 0;
+  return phones.map((phone, index) => {
+    const start = value.indexOf(phone, offset);
+    offset = start + phone.length;
+    const word = words[index]!;
+    return {
+      textEnd: Array.from(spelling.slice(0, word.index + word[0].length))
+        .length,
+      start: Array.from(value.slice(0, start)).length,
+      end: Array.from(value.slice(0, offset)).length
+    };
+  });
+}
+
+/** Keep explicit UPS word ownership only when an edit stays inside one word's phones. */
+export function editSynthesisUpsWords(
+  spelling: string,
+  candidate: PronunciationSynthesisCandidateV3,
+  value: string
+): PronunciationSynthesisCandidateV3["ups_words"] {
+  if (value === candidate.ups) return candidate.ups_words;
+  const ranges = synthesisPhonemeWordRanges(spelling, candidate, "ups");
+  if (!ranges) return null;
+  const before = Array.from(candidate.ups);
+  const after = Array.from(value);
+  let start = 0;
+  while (start < before.length && before[start] === after[start]) start++;
+  let end = before.length;
+  let nextEnd = after.length;
+  while (
+    end > start &&
+    nextEnd > start &&
+    before[end - 1] === after[nextEnd - 1]
+  ) {
+    end--;
+    nextEnd--;
+  }
+  const changed = ranges.findIndex(
+    (range) => start >= range.start && end <= range.end
+  );
+  if (changed < 0) return null;
+  const words = [...spelling.matchAll(/\S+/gu)].map((match, index) => ({
+    text: match[0],
+    phoneme: before.slice(ranges[index]!.start, ranges[index]!.end).join("")
+  }));
+  const range = ranges[changed]!;
+  words[changed]!.phoneme = [
+    ...before.slice(range.start, start),
+    ...after.slice(start, nextEnd),
+    ...before.slice(end, range.end)
+  ]
+    .join("")
+    .trim();
+  return words.every((word) => word.phoneme) &&
+    words.map((word) => word.phoneme).join(" ") === value.trim()
+    ? words
+    : null;
+}
+
 /** Settings are anchored to spelling word boundaries, never to spaces between UPS phones. */
 export function pronunciationSynthesisSpeech(
   synthesis: SelectedSynthesis | undefined,
