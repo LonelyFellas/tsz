@@ -274,7 +274,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       expect.arrayContaining([
         expect.objectContaining({
           family: "TSZ Words",
-          features: expect.stringContaining('"cv31"')
+          features: '"cv01", "cv04", "cv06", "cv09", "cv39", "cv52", "ss05"'
         }),
         expect.objectContaining({
           family: "TSZ Phonetics",
@@ -288,7 +288,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
               variation,
               features:
                 style === "normal"
-                  ? '"ss04", "ss07", "ss08"'
+                  ? '"ss04", "ss06", "ss07", "ss08"'
                   : '"ss02", "ss04", "ss06", "ss07", "ss08"'
             })
           )

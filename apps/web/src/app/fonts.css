@@ -6,7 +6,7 @@
     format("woff2");
   font-style: normal;
   font-weight: 100 500;
-  font-feature-settings: "ss04", "ss07", "ss08";
+  font-feature-settings: "ss04", "ss06", "ss07", "ss08";
   unicode-range:
     U+0000-0026, U+0028-002B, U+002F, U+003A-003B, U+003F-00FF, U+2000-2017,
     U+201A-201B, U+201E-206F;
@@ -19,7 +19,7 @@
     format("woff2");
   font-style: normal;
   font-weight: 501 900;
-  font-feature-settings: "ss04", "ss07", "ss08";
+  font-feature-settings: "ss04", "ss06", "ss07", "ss08";
   unicode-range:
     U+0000-0026, U+0028-002B, U+002F, U+003A-003B, U+003F-00FF, U+2000-2017,
     U+201A-201B, U+201E-206F;
@@ -32,8 +32,7 @@
     format("woff2");
   font-style: normal;
   font-weight: 400;
-  font-feature-settings:
-    "cv01", "cv04", "cv06", "cv09", "cv31", "cv39", "cv52", "ss05";
+  font-feature-settings: "cv01", "cv04", "cv06", "cv09", "cv39", "cv52", "ss05";
   unicode-range:
     U+0000-00FF, U+014B, U+0251-0252, U+0254, U+0259-025D, U+0261, U+026A,
     U+0279, U+027B, U+027E, U+0283, U+028A, U+028C, U+0292, U+0294, U+02A4,
@@ -48,8 +47,7 @@
     format("woff2");
   font-style: normal;
   font-weight: 700;
-  font-feature-settings:
-    "cv01", "cv04", "cv06", "cv09", "cv31", "cv39", "cv52", "ss05";
+  font-feature-settings: "cv01", "cv04", "cv06", "cv09", "cv39", "cv52", "ss05";
   unicode-range: U+0000-00FF;
   font-display: swap;
 }
