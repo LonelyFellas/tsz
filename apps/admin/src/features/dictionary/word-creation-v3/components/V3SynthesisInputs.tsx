@@ -47,6 +47,7 @@ import {
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { env } from "@/lib/env";
 import "./V3SynthesisInputs.css";
+import "@/components/InputActionGroup.css";
 const VoiceEditor = lazy(() =>
   import("@tsz/voice-editor/editor").then((module) => ({
     default: module.VoiceEditor
@@ -444,13 +445,10 @@ export function V3SynthesisInputs({
           {(["ipa", "ups"] as const).map((alphabet) => {
             const name = `Azure ${alphabet.toUpperCase()}`;
             return (
-              <div className="word-pronunciation-row" key={alphabet}>
-                <MuiTypography
-                  className="word-pronunciation-label"
-                  component="span"
-                >
-                  {name}
-                </MuiTypography>
+              <div
+                className="word-pronunciation-row word-pronunciation-inline-label"
+                key={alphabet}
+              >
                 <div className="word-synthesis-candidates">
                   {(dialect === "common" ? SIDES : [dialect]).map((side) => {
                     const sideLocale = pronunciationLocale(side, "uk");
@@ -478,11 +476,20 @@ export function V3SynthesisInputs({
                         issue.field === `synthesis.${side}.${alphabet}_speech`
                     );
                     return (
-                      <div className="word-synthesis-candidate" key={side}>
+                      <div
+                        className="word-synthesis-candidate admin-input-action-container"
+                        key={side}
+                      >
+                        <MuiTypography
+                          className="word-pronunciation-floating-label"
+                          component="span"
+                        >
+                          {dialect === "common" ? `${sideLabel} ${name}` : name}
+                        </MuiTypography>
                         <MuiStack
-                          className="word-synthesis-control"
+                          className="word-synthesis-control admin-input-action-group"
                           direction="row"
-                          spacing={1}
+                          spacing={0}
                           alignItems="center"
                         >
                           <PronunciationPreviewControls
@@ -680,6 +687,7 @@ export function V3SynthesisInputs({
                     sx={{ m: 0 }}
                     control={
                       <MuiRadio
+                        size="small"
                         value={option.value}
                         className="word-synthesis-choice"
                         slotProps={{

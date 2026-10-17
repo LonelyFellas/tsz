@@ -47,6 +47,7 @@ import { env } from "@/lib/env";
 // 样式随组件一起引入：V3 这条路径此前从没挂过语音编辑器，不引的话两层各画各的、完全错位。
 import "@tsz/voice-editor/reader.css";
 import "./V3VoiceTextField.css";
+import "@/components/InputActionGroup.css";
 import { VoiceEditorModal } from "./VoiceEditorModal";
 
 const VoiceEditor = lazy(() =>
@@ -407,7 +408,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   // textarea 始终保留：Tab、错误定位 focus()、撤销和改字重映射仍走原来的输入路径。
   const collapsedField = (
     <div
-      className={`v3-voice-text-field-input${grammarPreview ? " v3-grammar-preview" : ""}`}
+      className={`v3-voice-text-field-input admin-input-action-value${grammarPreview ? " v3-grammar-preview" : ""}`}
     >
       {fallback}
       {grammarPreview ? (
@@ -438,19 +439,21 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     return (
       <>
         {leadingAction || trailingAction ? (
-          <MuiStack
-            className="v3-voice-text-field-compact"
-            direction="row"
-            spacing={0}
-            alignItems="stretch"
-            sx={{ width: "100%", minWidth: 0 }}
-          >
-            {leadingAction}
-            {mode === "grammar" || mode === "spelling" || associationPreview
-              ? collapsedField
-              : fallback}
-            {trailingAction}
-          </MuiStack>
+          <div className="admin-input-action-container">
+            <MuiStack
+              className="v3-voice-text-field-compact admin-input-action-group"
+              direction="row"
+              spacing={0}
+              alignItems="stretch"
+              sx={{ width: "100%", minWidth: 0 }}
+            >
+              {leadingAction}
+              {mode === "grammar" || mode === "spelling" || associationPreview
+                ? collapsedField
+                : fallback}
+              {trailingAction}
+            </MuiStack>
+          </div>
         ) : mode === "grammar" || mode === "spelling" || associationPreview ? (
           collapsedField
         ) : (
@@ -460,9 +463,9 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     );
 
   const fieldView = (
-    <>
+    <div className="admin-input-action-container">
       <MuiStack
-        className="v3-voice-text-field-compact"
+        className="v3-voice-text-field-compact admin-input-action-group"
         direction="row"
         spacing={0}
         alignItems="stretch"
@@ -484,7 +487,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           <EditOutlined fontSize="inherit" />
         </MuiIconButton>
       </MuiStack>
-    </>
+    </div>
   );
 
   const renderActions = (

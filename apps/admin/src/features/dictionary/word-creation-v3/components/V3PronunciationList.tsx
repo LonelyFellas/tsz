@@ -1,5 +1,6 @@
 import { IconButton as MuiIconButton } from "@mui/material";
 import { env } from "@/lib/env";
+import { EmptyStateHint } from "@/components/EmptyStateHint";
 import { V3SynthesisInputs } from "./V3SynthesisInputs";
 import { V3ActualPronunciationCopy } from "./V3ActualPronunciationCopy";
 import { V3VoiceTextField } from "./V3VoiceTextField";
@@ -239,10 +240,10 @@ export function V3PronunciationList({
               </MuiIconButton>
             </div>
             <div className="word-pronunciation-fields">
-              <label className="word-pronunciation-row">
+              <label className="word-pronunciation-row word-pronunciation-inline-label">
                 <Typography
                   component="span"
-                  className="word-pronunciation-label"
+                  className="word-pronunciation-label word-pronunciation-floating-label"
                 >
                   读法
                 </Typography>
@@ -289,10 +290,10 @@ export function V3PronunciationList({
                   </Typography>
                 ) : null}
               </label>
-              <div className="word-pronunciation-row">
+              <div className="word-pronunciation-row word-pronunciation-inline-label">
                 <Typography
                   component="span"
-                  className="word-pronunciation-label"
+                  className="word-pronunciation-label word-pronunciation-floating-label"
                 >
                   字典音标
                 </Typography>
@@ -340,10 +341,10 @@ export function V3PronunciationList({
                   ) : null}
                 </div>
               </div>
-              <div className="word-pronunciation-row">
+              <div className="word-pronunciation-row word-pronunciation-inline-label">
                 <Typography
                   component="span"
-                  className="word-pronunciation-label"
+                  className="word-pronunciation-label word-pronunciation-floating-label"
                 >
                   实际发音
                 </Typography>
@@ -421,10 +422,8 @@ export function V3PronunciationList({
         );
       })}
       {variant.pronunciations.length === 0 ? (
-        <>
-          <Typography component="span" color="text.secondary">
-            暂无发音
-          </Typography>
+        <div className="admin-empty-state">
+          <EmptyStateHint>暂无发音</EmptyStateHint>
           <Button
             aria-label="新增发音"
             startIcon={<AddCircleOutline />}
@@ -446,7 +445,7 @@ export function V3PronunciationList({
           >
             新增发音
           </Button>
-        </>
+        </div>
       ) : null}
     </Stack>
   );

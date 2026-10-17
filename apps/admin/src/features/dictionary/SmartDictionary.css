@@ -1,0 +1,93 @@
+.smart-dictionary .dictionary-actions > .MuiButton-root {
+  min-height: 40px;
+  white-space: nowrap;
+}
+
+.smart-dictionary .dictionary-stats > .MuiTypography-root {
+  white-space: nowrap;
+}
+
+.smart-dictionary .dictionary-results .MuiTableContainer-root {
+  border: 1px solid var(--admin-color-border-secondary);
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+.smart-dictionary .dictionary-results .MuiTableCell-root {
+  line-height: 1.5;
+}
+
+.smart-dictionary
+  .dictionary-results
+  .MuiTableCell-root:not(.MuiTableCell-paddingCheckbox) {
+  padding: 10px 12px;
+}
+
+.smart-dictionary .dictionary-results .MuiTableHead-root .MuiTableCell-root {
+  background: var(--admin-color-bg-layout);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.smart-dictionary .dictionary-results .MuiTableBody-root .MuiTableRow-root {
+  height: 56px;
+}
+
+.smart-dictionary
+  .dictionary-results
+  .MuiTableBody-root
+  .MuiTableRow-root:hover
+  > .MuiTableCell-root {
+  background: #f5f8ff;
+}
+
+.smart-dictionary .dictionary-results .MuiTableCell-root .MuiButton-root {
+  white-space: nowrap;
+}
+
+.smart-dictionary .dictionary-results .MuiTablePagination-toolbar {
+  padding-inline: 0;
+}
+
+@media (max-width: 575px) {
+  .smart-dictionary .dictionary-results .MuiTable-root {
+    table-layout: fixed;
+  }
+
+  .smart-dictionary .dictionary-results .MuiTableCell-root {
+    box-sizing: border-box;
+  }
+
+  .smart-dictionary .dictionary-results .MuiTableCell-paddingCheckbox {
+    position: static;
+  }
+
+  .smart-dictionary .dictionary-stats {
+    width: 100%;
+    justify-content: space-between;
+    row-gap: 4px;
+  }
+
+  .smart-dictionary .dictionary-stats > .MuiTypography-root {
+    font-size: 12px;
+  }
+
+  .smart-dictionary .dictionary-results .MuiTablePagination-toolbar {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    column-gap: 4px;
+  }
+
+  .smart-dictionary .dictionary-results .MuiTablePagination-spacer {
+    display: none;
+  }
+
+  .smart-dictionary .dictionary-results .MuiTablePagination-select {
+    margin-right: 4px;
+    margin-left: 4px;
+  }
+
+  .smart-dictionary .dictionary-results .MuiTablePagination-actions {
+    margin-left: 0;
+  }
+}

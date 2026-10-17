@@ -246,6 +246,7 @@ export function V3FormsAndPronunciationStep({
 
   const addPosSelect = (
     <V3AddBasicPosSelect
+      compact={value.pos.length > 0}
       catalog={catalog.data}
       entryKind={entryKind}
       forms={value}
@@ -294,7 +295,7 @@ export function V3FormsAndPronunciationStep({
                         草稿可暂时不添加词性
                       </MuiTypography>
                       <MuiTypography component="span" color="text.secondary">
-                        请从右上角添加词性。
+                        请从上方“添加词性”入口添加。
                       </MuiTypography>
                     </MuiStack>
                   }
@@ -339,28 +340,36 @@ export function V3FormsAndPronunciationStep({
                   />
                   <V3ReferenceBadge label={label} nodeIds={posNodeIds(pos)} />
                 </span>
-                {value.pos.length > 1 ? (
-                  <MuiTooltip
-                    describeChild
-                    title={
-                      posReferences > 0
-                        ? referenceBlockedHint(posReferences)
-                        : undefined
-                    }
-                  >
-                    <MuiIconButton
-                      aria-label={`删除${label}`}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setDeletingPos({ id: pos.pos_id, label });
-                      }}
-                      size="small"
-                      color={"error"}
+                <span
+                  className="word-pos-tab-actions"
+                  onClick={(event) => event.stopPropagation()}
+                  onMouseDown={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => event.stopPropagation()}
+                >
+                  {addPosSelect}
+                  {value.pos.length > 1 ? (
+                    <MuiTooltip
+                      describeChild
+                      title={
+                        posReferences > 0
+                          ? referenceBlockedHint(posReferences)
+                          : undefined
+                      }
                     >
-                      <MinusCircleOutlined fontSize="inherit" />
-                    </MuiIconButton>
-                  </MuiTooltip>
-                ) : null}
+                      <MuiIconButton
+                        aria-label={`删除${label}`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setDeletingPos({ id: pos.pos_id, label });
+                        }}
+                        size="small"
+                        color={"error"}
+                      >
+                        <MinusCircleOutlined fontSize="inherit" />
+                      </MuiIconButton>
+                    </MuiTooltip>
+                  ) : null}
+                </span>
               </span>
             ),
             children: (
@@ -435,15 +444,7 @@ export function V3FormsAndPronunciationStep({
           className="word-pos-tabs word-forms-tabs"
           key={value.pos.map((pos) => pos.pos_id).join(":")}
         >
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              minWidth: 0,
-              flexWrap: "wrap"
-            }}
-          >
+          <Box className="word-pos-tab-bar">
             <Tabs
               value={value.pos.length === 0 ? "empty" : (selectedPos ?? false)}
               onChange={(_, key: string) => {
@@ -452,7 +453,7 @@ export function V3FormsAndPronunciationStep({
               }}
               variant="scrollable"
               scrollButtons="auto"
-              sx={{ flex: 1, minWidth: 0 }}
+              sx={{ flex: "0 1 auto", minWidth: 0 }}
               aria-label="基本词性"
             >
               {tabItems.map((item) => (
@@ -467,7 +468,7 @@ export function V3FormsAndPronunciationStep({
                 />
               ))}
             </Tabs>
-            {addPosSelect}
+            {value.pos.length === 0 && addPosSelect}
           </Box>
           {tabItems.map((item) => (
             <LazyTabPanel

@@ -102,6 +102,7 @@ import { newWordNodeId } from "./word-model/primitives";
 
 import { EditEntryAnnotation } from "./EditEntryAnnotation";
 import { canEditRowAnnotation } from "./annotationPermission";
+import "./SmartDictionary.css";
 
 const ENTRY_REFERENCE_KIND_LABEL: Record<EntryReferenceKind, string> = {
   relation: "关联词",
@@ -759,7 +760,7 @@ export function SmartDictionary({
             (() => {
               const button = (
                 <Button
-                  sx={{ minWidth: 0 }}
+                  sx={{ minWidth: 32, height: 32, p: 0.5 }}
                   variant="text"
                   size="small"
                   color={record.status !== "archived" ? "error" : "primary"}
@@ -767,9 +768,7 @@ export function SmartDictionary({
                   startIcon={
                     record.status === "archived" ? (
                       <RestoreFromTrash />
-                    ) : (
-                      <Delete />
-                    )
+                    ) : undefined
                   }
                   disabled={
                     !canTransitionEntry(
@@ -790,7 +789,11 @@ export function SmartDictionary({
                     )
                   }
                 >
-                  {record.status === "archived" ? "恢复" : null}
+                  {record.status === "archived" ? (
+                    "恢复"
+                  ) : (
+                    <Delete fontSize="small" />
+                  )}
                 </Button>
               );
               // 移入垃圾桶只留图标：列表里它最不该抢眼，文案落到 Tooltip。
@@ -859,7 +862,7 @@ export function SmartDictionary({
     {
       id: "label",
       label: "词汇",
-      width: 150,
+      width: 180,
       sticky: "left",
       render: (record) => {
         const label = wordListLabel(record),
@@ -880,7 +883,8 @@ export function SmartDictionary({
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
-                lineHeight: 1.6
+                lineHeight: 1.6,
+                maxWidth: wideTable ? 156 : "100%"
               }}
             >
               <span className="tsz-words" style={{ fontWeight: 600 }}>
@@ -941,7 +945,7 @@ export function SmartDictionary({
     {
       id: "pos",
       label: "基本词性",
-      width: 180,
+      width: 120,
       render: (record) => (
         <Stack direction="row" useFlexGap flexWrap="wrap" spacing={0.5}>
           {record.pos_list.map((code) => (
@@ -967,7 +971,7 @@ export function SmartDictionary({
     {
       id: "levels",
       label: "难度",
-      width: 170,
+      width: 120,
       render: (record) => (
         <Stack direction="row" useFlexGap flexWrap="wrap" spacing={0.5}>
           {record.levels.map((level) => (
@@ -1013,10 +1017,11 @@ export function SmartDictionary({
     {
       id: "status",
       label: "状态",
-      width: 90,
+      width: 160,
       render: (record) => (
         <Stack direction="row" useFlexGap flexWrap="wrap" spacing={0.5}>
           <Chip
+            variant="outlined"
             label={STATUS_LABEL[record.status]}
             color={
               record.status === "published"
@@ -1027,7 +1032,7 @@ export function SmartDictionary({
             }
           />
           {record.has_unpublished_changes && (
-            <Chip label="有未发布修改" color="primary" />
+            <Chip label="有未发布修改" color="primary" variant="outlined" />
           )}
         </Stack>
       )
@@ -1055,10 +1060,12 @@ export function SmartDictionary({
       : [])
   ];
   return (
-    <Stack spacing={2}>
+    <Stack spacing={2} className="smart-dictionary" sx={{ minWidth: 0 }}>
       <Breadcrumbs>
         <Typography>词库管理</Typography>
-        <Typography>{trashMode ? "垃圾桶" : "智能词库"}</Typography>
+        <Typography color="text.primary" fontWeight={600} aria-current="page">
+          {trashMode ? "垃圾桶" : "智能词库"}
+        </Typography>
       </Breadcrumbs>
       <Paper variant="outlined" sx={{ p: 1.5 }}>
         <Stack
@@ -1159,7 +1166,11 @@ export function SmartDictionary({
           </Stack>
         </Stack>
       </Paper>
-      <Paper variant="outlined" sx={{ p: 2 }}>
+      <Paper
+        variant="outlined"
+        className="dictionary-results"
+        sx={{ p: { xs: 1.5, sm: 2 }, minWidth: 0 }}
+      >
         {restoreSurface.page && pendingRestore && (
           <Box sx={{ mb: 1.5 }}>
             <LifecycleSurfaceConfirmation
@@ -1193,7 +1204,13 @@ export function SmartDictionary({
           spacing={1.5}
           sx={{ mb: 1.5 }}
         >
-          <Stack direction="row" useFlexGap flexWrap="wrap" spacing={1}>
+          <Stack
+            direction="row"
+            useFlexGap
+            flexWrap="wrap"
+            spacing={1}
+            className="dictionary-actions"
+          >
             {!trashMode && canCreateEntry(writeActor) && (
               <Button
                 variant="contained"
@@ -1243,7 +1260,13 @@ export function SmartDictionary({
                 </Button>
               )}
           </Stack>
-          <Stack direction="row" useFlexGap flexWrap="wrap" spacing={3}>
+          <Stack
+            direction="row"
+            useFlexGap
+            flexWrap="wrap"
+            spacing={2}
+            className="dictionary-stats"
+          >
             {[
               ["累计智能词汇", stats.data?.total],
               ["今日创编", stats.data?.today],
@@ -1251,7 +1274,12 @@ export function SmartDictionary({
             ].map(([label, value]) => (
               <Typography key={label} variant="body2" color="text.secondary">
                 {label}:
-                <Typography component="span" fontWeight={600}>
+                <Typography
+                  component="span"
+                  fontWeight={600}
+                  color="text.primary"
+                  sx={{ ml: 0.75, fontVariantNumeric: "tabular-nums" }}
+                >
                   {value ?? "-"}
                 </Typography>
               </Typography>
@@ -1297,9 +1325,15 @@ export function SmartDictionary({
           columns={
             wideTable
               ? columns
-              : columns.filter(
-                  (column) => column.id === "label" || column.id === "action"
-                )
+              : columns
+                  .filter(
+                    (column) => column.id === "label" || column.id === "action"
+                  )
+                  .map((column) => ({
+                    ...column,
+                    width: column.id === "label" ? undefined : column.width,
+                    sticky: undefined
+                  }))
           }
           loading={listQuery.isFetching}
           minWidth={
@@ -1307,7 +1341,7 @@ export function SmartDictionary({
               ? 1600
               : effectiveFilters.status === "archived"
                 ? 478
-                : 378
+                : 320
           }
           selection={
             adminWordsDataSourceCapabilities.batchArchive
@@ -1405,7 +1439,7 @@ function ReferenceSummary({ record }: { record: AdminWordListItemAny }) {
         onClose={() => setAnchor(null)}
         anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
       >
-        <Box sx={{ p: 2, maxWidth: 400 }}>
+        <Box sx={{ p: 2, maxWidth: 400, overflowWrap: "anywhere" }}>
           <Typography fontWeight={600} sx={{ mb: 1 }}>
             以下内容关联了此词条
           </Typography>

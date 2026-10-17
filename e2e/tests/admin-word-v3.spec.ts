@@ -570,6 +570,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     const row = page.locator(".word-relation-row").filter({ has: target });
     const error = row.getByRole("alert");
     await expect(error).toContainText("仅支持英文词条");
+    await expect(row.getByRole("status")).toHaveCount(0);
     const control = row.locator(".word-relation-autocomplete");
     const box = (await control.boundingBox())!;
     const errorBox = (await error.boundingBox())!;

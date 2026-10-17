@@ -9,6 +9,14 @@
   background: #fff;
   resize: none;
 }
+/* 单独的字典音标框与带操作按钮的发音输入组统一为 40px 单行高度。 */
+.word-pronunciation-phonetic-control
+  > textarea.word-pronunciation-phonetic-input {
+  display: block;
+  line-height: 22px;
+  padding-block: 8px;
+}
+
 textarea.word-pronunciation-phonetic-input:focus {
   outline: 2px solid #2053ff;
   outline-offset: -2px;
@@ -93,8 +101,7 @@ textarea.word-pronunciation-phonetic-input:disabled {
   display: flex;
   flex: 1 1 auto;
   min-width: 0;
-  /* 紧凑组靠 -1px 让相邻两框共用一条边；外层成了组员，后面总跟着编辑器按钮，得由它来叠。 */
-  margin-inline-end: -1px;
+  margin-inline-end: 0;
 }
 
 .v3-voice-text-liaison-overlay {

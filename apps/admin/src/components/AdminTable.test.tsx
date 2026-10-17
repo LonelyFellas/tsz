@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { AdminThemeProvider } from "@/mui-theme";
 import { AdminTable } from "./AdminTable";
@@ -73,4 +73,50 @@ it("本页全选保留其他页选择，排除不可选行，取消本页选择�
   );
   fireEvent.click(screen.getByRole("checkbox", { name: "选择本页" }));
   expect(change).toHaveBeenLastCalledWith(["other-page"]);
+});
+
+it("选择列实际宽度变化后，左侧固定列跟随边界避免遮住词头", () => {
+  const OriginalResizeObserver = globalThis.ResizeObserver;
+  let resize = () => {};
+  globalThis.ResizeObserver = class implements ResizeObserver {
+    constructor(callback: ResizeObserverCallback) {
+      resize = () => callback([], this);
+    }
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+  try {
+    render(
+      <AdminTable
+        columns={[
+          {
+            id: "word",
+            label: "词汇",
+            width: 180,
+            sticky: "left",
+            render: () => "worker"
+          }
+        ]}
+        rows={[{ id: "worker" }]}
+        rowId={(row) => row.id}
+        selection={{ ids: [], onChange: vi.fn() }}
+      />
+    );
+    const selection = screen
+      .getByRole("checkbox", { name: "选择本页" })
+      .closest("th")!;
+    const measure = vi.spyOn(selection, "getBoundingClientRect");
+    const fixedCell = screen.getByText("worker").closest("td")!;
+    for (const width of [76, 54]) {
+      measure.mockReturnValue({ ...selection.getBoundingClientRect(), width });
+      act(() => resize());
+      expect(fixedCell).toHaveStyle({ left: `${width}px` });
+      expect(screen.getByRole("columnheader", { name: "词汇" })).toHaveStyle({
+        left: `${width}px`
+      });
+    }
+  } finally {
+    globalThis.ResizeObserver = OriginalResizeObserver;
+  }
 });

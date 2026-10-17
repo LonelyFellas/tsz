@@ -1,0 +1,103 @@
+.admin-input-action-container {
+  container: admin-input-actions / inline-size;
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-input-action-group {
+  --input-action-focus: var(--admin-color-primary, #2053ff);
+  display: flex;
+  align-items: stretch;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 40px;
+  overflow: hidden;
+  border: 1px solid #c4c4c4;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.admin-input-action-group:focus-within {
+  border-color: var(--input-action-focus);
+  box-shadow: 0 0 0 1px var(--input-action-focus);
+}
+
+.admin-input-action-group:has([aria-invalid="true"]) {
+  --input-action-focus: var(--admin-color-error, #d32f2f);
+  border-color: var(--input-action-focus);
+}
+
+.admin-input-action-group > .admin-input-action-value {
+  min-width: 0;
+  flex: 1;
+  margin-inline-end: 0;
+}
+
+/* 保留透明的 1px 内边框，让富文本预览、连读层与真实输入保持相同坐标。 */
+.admin-input-action-container .admin-input-action-group > textarea,
+.admin-input-action-container .admin-input-action-group > textarea:focus,
+.admin-input-action-container
+  .admin-input-action-group
+  .admin-input-action-value
+  > textarea,
+.admin-input-action-container
+  .admin-input-action-group
+  .admin-input-action-value
+  > textarea:focus {
+  align-self: center;
+  border: 1px solid transparent;
+  border-radius: 0;
+  outline: none;
+  background: transparent;
+}
+
+.admin-input-action-group > .MuiIconButton-root,
+.admin-input-action-group > .MuiButton-root,
+.admin-input-action-group > span > .word-pronunciation-play-action {
+  width: 36px;
+  min-height: 38px;
+  height: auto;
+  flex-shrink: 0;
+  padding: 0;
+  border-radius: 0;
+}
+
+.admin-input-action-group
+  > :is(.MuiIconButton-root, .MuiButton-root):not(:first-child) {
+  border-inline-start: 1px solid var(--admin-color-border-secondary, #e5e7eb);
+}
+
+.admin-input-action-group > span:has(> .word-pronunciation-play-action) {
+  display: flex;
+  flex-shrink: 0;
+  align-items: stretch;
+  border-inline-end: 1px solid var(--admin-color-border-secondary, #e5e7eb);
+}
+
+@container admin-input-actions (max-width: 260px) {
+  .admin-input-action-group {
+    flex-wrap: wrap;
+  }
+
+  .admin-input-action-group > .admin-input-action-value,
+  .admin-input-action-group > textarea {
+    flex-basis: 100%;
+    width: 100%;
+    order: -1;
+  }
+
+  .admin-input-action-group > .MuiIconButton-root,
+  .admin-input-action-group > .MuiButton-root,
+  .admin-input-action-group > span:has(> .word-pronunciation-play-action) {
+    flex: 1;
+    border-top: 1px solid var(--admin-color-border-secondary, #e5e7eb);
+  }
+
+  .admin-input-action-group > span:has(> .word-pronunciation-play-action) {
+    border-inline-end: 0;
+  }
+
+  .admin-input-action-group > span > .word-pronunciation-play-action {
+    width: 100%;
+  }
+}

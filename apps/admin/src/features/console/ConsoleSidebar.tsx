@@ -226,10 +226,18 @@ export function ConsoleSidebar({
       onNavigate?.();
     }
   };
-  const current = (key: string) =>
-    key === "/"
-      ? pathname === "/"
-      : pathname === key || pathname.startsWith(`${key}/`);
+  const selectedKey = nav
+    .flatMap((item) => item.children ?? [item])
+    .map((item) => item.key)
+    .filter(
+      (key) =>
+        pathname === key || (key !== "/" && pathname.startsWith(`${key}/`))
+    )
+    .reduce(
+      (selected, key) => (key.length > selected.length ? key : selected),
+      ""
+    );
+  const current = (key: string) => key === selectedKey;
   return (
     <Box
       component="nav"

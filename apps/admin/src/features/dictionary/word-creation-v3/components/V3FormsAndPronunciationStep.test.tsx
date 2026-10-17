@@ -284,7 +284,11 @@ function formById(content: DraftFormsStepContentV3, formId: string) {
 }
 
 function chooseOption(label: string, option: string) {
-  fireEvent.mouseDown(screen.getByLabelText(label));
+  const control =
+    label === "添加基本词性"
+      ? screen.getAllByLabelText(label)[0]!
+      : screen.getByLabelText(label);
+  fireEvent.mouseDown(control);
   const choice = [...screen.getAllByRole("option")].find(
     (item) => item.textContent === option
   );
@@ -596,7 +600,7 @@ describe("V3FormsAndPronunciationStep", () => {
     });
     render(<Harness initial={initial} />);
     await waitFor(() =>
-      expect(screen.getByLabelText("添加基本词性")).not.toHaveAttribute(
+      expect(screen.getAllByLabelText("添加基本词性")[0]!).not.toHaveAttribute(
         "aria-disabled",
         "true"
       )
@@ -682,10 +686,9 @@ describe("V3FormsAndPronunciationStep", () => {
       view.unmount();
       render(<Harness initial={JSON.parse(JSON.stringify(persisted))} />);
       await waitFor(() =>
-        expect(screen.getByLabelText("添加基本词性")).not.toHaveAttribute(
-          "aria-disabled",
-          "true"
-        )
+        expect(
+          screen.getAllByLabelText("添加基本词性")[0]!
+        ).not.toHaveAttribute("aria-disabled", "true")
       );
       expect(screen.queryByLabelText("复数英美通用拼写")).toBeNull();
       expect(canonicalValue()).toEqual(persisted);
@@ -1072,7 +1075,7 @@ describe("V3FormsAndPronunciationStep", () => {
         "先添加基本词性，再录入各种词形。录入词形时，不要遗漏 1) 英式或美式、2) 规则变化或不规则变化。字典音标用于展示与主动转换，选择 Azure IPA 或 UPS 输入进行合成。录入实际发音时需严格按照 “天生之®通用英语音标字母表” 进行操作。"
       )
     ).toBeVisible();
-    const addBasicPosSelect = screen.getByLabelText("添加基本词性");
+    const addBasicPosSelect = screen.getAllByLabelText("添加基本词性")[0]!;
     expect(
       addBasicPosSelect.closest(".word-add-basic-pos-select")
     ).not.toBeNull();
@@ -2688,7 +2691,7 @@ describe("V3FormsAndPronunciationStep", () => {
     render(<Harness initial={{ pos: [] }} idFactory={uuidSequence(...ids)} />);
 
     await waitFor(() =>
-      expect(screen.getByLabelText("添加基本词性")).not.toHaveAttribute(
+      expect(screen.getAllByLabelText("添加基本词性")[0]!).not.toHaveAttribute(
         "aria-disabled",
         "true"
       )
@@ -3326,7 +3329,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(
       await screen.findByText("词性目录不可用，已停止新增结构")
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("添加基本词性")).toHaveAttribute(
+    expect(screen.getAllByLabelText("添加基本词性")[0]!).toHaveAttribute(
       "aria-disabled",
       "true"
     );
@@ -3380,6 +3383,26 @@ describe("V3FormsAndPronunciationStep", () => {
     });
   });
 
+  it("每个词性 tab 内提供新增入口，打开未激活 tab 的入口不会切换词性", async () => {
+    render(<Harness initial={multiPosFixture()} />);
+    const additions = screen.getAllByLabelText("添加基本词性");
+    expect(additions).toHaveLength(2);
+    await waitFor(() =>
+      expect(additions[1]).not.toHaveAttribute("aria-disabled", "true")
+    );
+    const noun = screen.getByLabelText("拖动名词").closest('[role="tab"]')!;
+    const verb = screen.getByLabelText("拖动动词").closest('[role="tab"]')!;
+    expect(noun).toContainElement(additions[0]!);
+    expect(verb).toContainElement(additions[1]!);
+    fireEvent.mouseDown(additions[1]!);
+    fireEvent.click(additions[1]!);
+    expect(screen.getByRole("listbox")).toBeVisible();
+    expect(noun).toHaveAttribute("aria-selected", "true");
+    expect(verb).toHaveAttribute("aria-selected", "false");
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
+    expect(noun).toHaveAttribute("aria-selected", "true");
+  });
+
   it("删除受控活动 POS 后选择相邻项，删除最后一项时不发出非法 active key", async () => {
     const initial = multiPosFixture();
     const activeChanges = vi.fn();
@@ -3413,7 +3436,7 @@ describe("V3FormsAndPronunciationStep", () => {
 
     render(<ControlledHarness />);
     await waitFor(() =>
-      expect(screen.getByLabelText("添加基本词性")).not.toHaveAttribute(
+      expect(screen.getAllByLabelText("添加基本词性")[0]!).not.toHaveAttribute(
         "aria-disabled",
         "true"
       )

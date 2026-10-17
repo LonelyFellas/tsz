@@ -18,8 +18,8 @@ import {
   Typography as MuiTypography
 } from "@mui/material";
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
-import CaretDownFilled from "@mui/icons-material/ArrowDropDown";
-import CaretUpFilled from "@mui/icons-material/ArrowDropUp";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 
 import DownCircleOutlined from "@mui/icons-material/ArrowCircleDownOutlined";
 
@@ -375,9 +375,9 @@ export function V3FormGroupCard({
             >
               {collapsed ? "展开" : "收起"}
               {collapsed ? (
-                <CaretDownFilled fontSize="inherit" />
+                <ExpandMoreIcon fontSize="inherit" />
               ) : (
-                <CaretUpFilled fontSize="inherit" />
+                <ExpandLessIcon fontSize="inherit" />
               )}
             </MuiButton>
             {onDelete ? (
