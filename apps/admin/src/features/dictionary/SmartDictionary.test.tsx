@@ -1303,20 +1303,26 @@ describe("SmartDictionary", () => {
     );
 
     fireEvent.click(screen.getByText("移入垃圾桶(1)"));
-    fireEvent.click(
-      (await screen.findAllByText("移入垃圾桶", { exact: true }))
-        .map((item) => item.closest("button"))
-        .find((item) => item?.closest(".ant-modal"))!
-    );
+    const firstConfirm = (
+      await screen.findAllByText("移入垃圾桶", { exact: true })
+    )
+      .map((item) => item.closest("button"))
+      .find((item) => item?.closest(".ant-modal"))!;
+    await waitFor(() => expect(firstConfirm).toBeEnabled());
+    fireEvent.click(firstConfirm);
     expect(await screen.findByText("引用冲突")).toBeInTheDocument();
     expect(screen.getByText("移入垃圾桶(1)")).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("移入垃圾桶(1)"));
-    fireEvent.click(
-      (await screen.findAllByText("移入垃圾桶", { exact: true }))
+    const retryConfirm = await waitFor(() => {
+      const button = screen
+        .getAllByText("移入垃圾桶", { exact: true })
         .map((item) => item.closest("button"))
-        .find((item) => item?.closest(".ant-modal"))!
-    );
+        .find((item) => item !== firstConfirm && item?.closest(".ant-modal"));
+      expect(button).toBeEnabled();
+      return button!;
+    });
+    fireEvent.click(retryConfirm);
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(2));
     expect(mutateAsync.mock.calls[0]![0].input).toEqual({
       entries: [
