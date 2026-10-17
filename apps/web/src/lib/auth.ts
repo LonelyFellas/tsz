@@ -2,9 +2,11 @@
 // 来自 @tsz/shared/auth，与平台后台（admin）共用同一套实现。
 import { createAuthRuntime } from "@tsz/shared/auth";
 import { env } from "./env";
+import { readTestResourceRun } from "@tsz/shared";
 
 export const authRuntime = createAuthRuntime({
-  baseUrl: env.NEXT_PUBLIC_API_BASE_URL
+  baseUrl: env.NEXT_PUBLIC_API_BASE_URL,
+  getTestResourceRun: readTestResourceRun
 });
 
 let initialRestore: { generation: number; promise: Promise<void> } | undefined;
