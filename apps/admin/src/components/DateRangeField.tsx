@@ -9,12 +9,16 @@ export function DateRangeField({
   value,
   onChange,
   withTime = false,
-  disabled = false
+  disabled = false,
+  size,
+  className
 }: {
   value: DateRangeValue;
   onChange: (range: DateRangeValue) => void;
   withTime?: boolean;
   disabled?: boolean;
+  size?: "small" | "medium";
+  className?: string;
 }) {
   const [draft, setDraft] = useState<[Dayjs | null, Dayjs | null]>(
     value ?? [null, null]
@@ -39,6 +43,7 @@ export function DateRangeField({
   };
   return (
     <Stack
+      className={className}
       direction="row"
       useFlexGap
       flexWrap="wrap"
@@ -56,6 +61,7 @@ export function DateRangeField({
           slotProps={{
             field: { clearable: true },
             textField: {
+              size,
               error: reversed || (!!draft[index] && !draft[index]!.isValid()),
               helperText:
                 reversed && index === 1
