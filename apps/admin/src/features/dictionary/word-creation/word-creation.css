@@ -24,24 +24,26 @@
   overflow-x: auto;
 }
 
-.word-creation-stepper .ant-steps {
+.word-creation-stepper .MuiStepper-root {
   min-width: 0;
 }
 
-.word-creation-stepper .ant-steps-item-title {
+.word-creation-stepper .MuiStepLabel-label {
   font-weight: 700;
   font-size: 16px;
 }
 
-.word-creation-stepper .ant-steps-item-content {
+.word-creation-stepper .MuiStepLabel-labelContainer {
   font-size: 11px;
 }
 
-.word-creation-steps .ant-steps-item-icon {
+.word-creation-steps .MuiStepLabel-iconContainer {
   box-shadow: 0 4px 12px rgba(0, 113, 227, 0.1);
 }
 
-.word-creation-steps .ant-steps-item-process .ant-steps-item-title {
+.word-creation-steps
+  .MuiStep-root:has([aria-current="step"])
+  .MuiStepLabel-label {
   color: #111827;
 }
 
@@ -192,7 +194,7 @@
   color: #22a06b;
 }
 
-.word-creation-progress-row > .ant-typography:last-child {
+.word-creation-progress-row > .MuiTypography-root:last-child {
   min-width: 34px;
   margin: 0;
   padding: 1px 7px;
@@ -204,6 +206,7 @@
 
 .word-creation-content {
   container: word-creation-content / inline-size;
+  box-sizing: border-box;
   width: 100%;
   max-width: 1540px;
   min-width: 0;
@@ -221,7 +224,7 @@
   margin-bottom: 22px;
 }
 
-.word-step-heading .ant-typography-h2 {
+.word-step-heading h2 {
   color: #161b26;
   font-size: 30px;
   line-height: 1.25;
@@ -271,7 +274,7 @@
   backdrop-filter: blur(8px);
 }
 
-.word-step-actions .ant-btn {
+.word-step-actions :is(.MuiButton-root, .MuiIconButton-root) {
   min-width: 96px;
 }
 
@@ -314,34 +317,43 @@
   box-shadow: 0 10px 28px rgba(34, 43, 63, 0.06);
 }
 
-.word-form-card > .ant-card-head,
-.word-sense-card > .ant-card-head {
+.word-form-card > .admin-card-header,
+.word-sense-card > .admin-card-header {
   color: #fff;
   background: var(--word-ink);
 }
 
-.word-form-card > .ant-card-head .ant-card-extra,
-.word-sense-card > .ant-card-head .ant-card-extra {
+.word-form-card > .admin-card-header .MuiCardHeader-action,
+.word-sense-card > .admin-card-header .MuiCardHeader-action {
   color: #fff;
 }
 
-.word-form-card > .ant-card-head .ant-card-extra .ant-btn {
+.word-form-card
+  > .admin-card-header
+  .MuiCardHeader-action
+  :is(.MuiButton-root, .MuiIconButton-root) {
   color: rgba(255, 255, 255, 0.82);
 }
 
-.word-form-card > .ant-card-head .ant-card-extra .ant-btn:hover {
+.word-form-card
+  > .admin-card-header
+  .MuiCardHeader-action
+  :is(.MuiButton-root, .MuiIconButton-root):hover {
   color: #fff;
   background: rgba(255, 255, 255, 0.12);
 }
 
-.word-form-card > .ant-card-head .ant-card-extra .ant-btn:disabled {
+.word-form-card
+  > .admin-card-header
+  .MuiCardHeader-action
+  :is(.MuiButton-root, .MuiIconButton-root):disabled {
   color: rgba(255, 255, 255, 0.38);
 }
 
 .word-form-card
-  > .ant-card-head
-  .ant-card-extra
-  .ant-btn-dangerous:not(:disabled) {
+  > .admin-card-header
+  .MuiCardHeader-action
+  :is(.MuiButton-colorError, .MuiIconButton-colorError):not(:disabled) {
   color: #ffb3b3;
 }
 
@@ -353,17 +365,17 @@
 
 .word-basics-input-card,
 .word-detection-result-card,
-.word-basics-input-card > .ant-card-head,
-.word-detection-result-card > .ant-card-head,
-.word-basics-input-card > .ant-card-body {
+.word-basics-input-card > .admin-card-header,
+.word-detection-result-card > .admin-card-header,
+.word-basics-input-card > .admin-card-body {
   padding: 18px;
 }
 
-.word-basics-input-card .ant-form-item:last-of-type {
+.word-basics-input-card .MuiFormControl-root:last-of-type {
   margin-bottom: 12px;
 }
 
-.word-basics-input-card .ant-input-search-button {
+.word-basics-input-card button[type="submit"] {
   min-width: 128px;
 }
 
@@ -381,7 +393,7 @@
   box-shadow: 0 8px 24px rgba(32, 38, 54, 0.05);
 }
 
-.word-headword-confirmation-card > .ant-card-head {
+.word-headword-confirmation-card > .admin-card-header {
   min-height: 44px;
   padding-inline: 16px;
   background: #fafbfc;
@@ -409,11 +421,11 @@
   gap: 2px;
 }
 
-.word-dialect-detection-row .ant-typography-secondary {
+.word-dialect-detection-row .MuiTypography-root {
   font-size: 12px;
 }
 
-.word-headword-confirmation-card .ant-alert {
+.word-headword-confirmation-card .MuiAlert-root {
   border-radius: 9px;
 }
 
@@ -422,7 +434,7 @@
   border-radius: 10px;
 }
 
-.word-headword-confirmation-card .dialect-panel > .ant-typography {
+.word-headword-confirmation-card .dialect-panel > .MuiTypography-root {
   display: block;
   margin-bottom: 8px;
 }
@@ -464,13 +476,13 @@
   gap: 16px;
 }
 
-.word-smart-match-summary-row .ant-tag {
+.word-smart-match-summary-row .MuiChip-root {
   margin-inline-end: 0;
 }
 
 /* 「查看已有原形」是次要动作，去掉 antd 链接按钮的默认内边距，
    让它与主词在同一条基线上收边，不额外撑高整行。 */
-.word-smart-match-summary-row .ant-btn-link {
+.word-smart-match-summary-row .MuiButton-text {
   height: auto;
   padding: 0;
 }
@@ -486,7 +498,7 @@
   color: #98a2b3;
 }
 
-.word-smart-match-context-meta .ant-tag {
+.word-smart-match-context-meta .MuiChip-root {
   margin-inline-end: 0;
 }
 
@@ -502,7 +514,7 @@
   border-radius: 10px;
 }
 
-.word-detection-empty-state > .anticon {
+.word-detection-empty-state > .MuiSvgIcon-root {
   color: #7c8ca3;
   font-size: 16px;
 }
@@ -534,16 +546,16 @@
   margin-top: 14px;
 }
 
-.word-entry-actions .ant-btn {
+.word-entry-actions :is(.MuiButton-root, .MuiIconButton-root) {
   min-width: 112px;
 }
 
-.word-detection-result-card .ant-alert {
+.word-detection-result-card .MuiAlert-root {
   border-radius: 9px;
 }
 
-.word-detection-result-card .ant-descriptions-row > th,
-.word-detection-result-card .ant-descriptions-row > td {
+.word-detection-result-card dl > div > th,
+.word-detection-result-card dl > div > td {
   padding-bottom: 10px;
 }
 
@@ -571,7 +583,7 @@
     .word-detection-result-card,
     .word-headword-confirmation-card
   )
-  > .ant-card-head {
+  > .admin-card-header {
   min-height: 48px;
   padding: 0 var(--word-card-padding);
 }
@@ -582,15 +594,17 @@
     .word-detection-result-card,
     .word-headword-confirmation-card
   )
-  > .ant-card-body {
+  > .admin-card-body {
   padding: var(--word-card-padding);
 }
 
-.word-basics-workflow .word-basics-input-card .ant-form-item {
+.word-basics-workflow .word-basics-input-card .MuiFormControl-root {
   margin-bottom: 20px;
 }
 
-.word-basics-workflow .word-basics-input-card .ant-form-item:last-of-type {
+.word-basics-workflow
+  .word-basics-input-card
+  .MuiFormControl-root:last-of-type {
   margin-bottom: 8px;
 }
 
@@ -619,7 +633,7 @@
   padding: 16px;
 }
 
-.word-basics-workflow .word-headword-confirmation-card .ant-form-item {
+.word-basics-workflow .word-headword-confirmation-card .MuiFormControl-root {
   margin-bottom: 0;
 }
 
@@ -631,7 +645,8 @@
 
 .word-basics-workflow
   .word-detection-result-card
-  .ant-descriptions-row:last-child
+  dl
+  > div:last-child
   > :is(th, td) {
   padding-bottom: 0;
 }
@@ -663,7 +678,7 @@
   padding: 12px 16px;
 }
 
-.word-forms-tabs > .ant-tabs-nav {
+.word-forms-tabs > .MuiTabs-root {
   padding: 0 2px;
 }
 
@@ -672,18 +687,18 @@
   border-radius: 13px;
 }
 
-.word-form-card > .ant-card-head {
+.word-form-card > .admin-card-header {
   min-height: 48px;
   padding-inline: 14px;
   cursor: pointer;
 }
 
 /* 基准原形卡不可折叠(它是完成本步的硬要求,任何时候都得能改)。 */
-.word-form-base-card > .ant-card-head {
+.word-form-base-card > .admin-card-header {
   cursor: default;
 }
 
-.word-form-card > .ant-card-head .ant-card-head-title {
+.word-form-card > .admin-card-header .admin-card-title {
   min-width: 0;
 }
 
@@ -711,14 +726,14 @@
   font-weight: 400;
 }
 
-.word-form-card > .ant-card-body {
+.word-form-card > .admin-card-body {
   padding: 0;
 }
 
 /* 词形组卡的底部留白来自组内的「添加派生词形」行,基准原形卡没有那一行,
    自己补上,否则矩阵/折叠条会直接压在卡片底边上。必须排在上面那条
    padding:0 之后——同特异性,靠顺序取胜。 */
-.word-form-base-card > .ant-card-body {
+.word-form-base-card > .admin-card-body {
   padding-bottom: 16px;
 }
 
@@ -740,8 +755,8 @@
   background: #fff;
 }
 
-.word-shared-form-spelling .ant-tag,
-.word-shared-pronunciation .ant-tag {
+.word-shared-form-spelling .MuiChip-root,
+.word-shared-pronunciation .MuiChip-root {
   margin-inline-end: 0;
 }
 
@@ -803,17 +818,20 @@
   min-width: 0;
 }
 
-.word-pronunciation-actions .ant-btn {
+.word-pronunciation-actions :is(.MuiButton-root, .MuiIconButton-root) {
   width: 27px;
   padding-inline: 0;
 }
 
 .word-pronunciation-actions
-  .ant-btn:not(:disabled):where(:not(.word-pronunciation-remove)) {
+  :is(.MuiButton-root, .MuiIconButton-root):not(:disabled):where(
+    :not(.word-pronunciation-remove)
+  ) {
   color: var(--word-ink);
 }
 
-.word-pronunciation-actions .word-pronunciation-drag-handle.ant-btn {
+.word-pronunciation-actions
+  .word-pronunciation-drag-handle:is(.MuiButton-root, .MuiIconButton-root) {
   color: #7f8998;
   cursor: grab;
   user-select: none;
@@ -824,20 +842,33 @@
 }
 
 .word-pronunciation-actions
-  .word-pronunciation-drag-handle.ant-btn:hover:not(:disabled),
+  .word-pronunciation-drag-handle:is(
+    .MuiButton-root,
+    .MuiIconButton-root
+  ):hover:not(:disabled),
 .word-pronunciation-actions
-  .word-pronunciation-drag-handle.ant-btn:focus-visible {
+  .word-pronunciation-drag-handle:is(
+    .MuiButton-root,
+    .MuiIconButton-root
+  ):focus-visible {
   color: #1677ff;
   background: rgba(22, 119, 255, 0.1);
 }
 
 .word-pronunciation-actions
-  .word-pronunciation-drag-handle.ant-btn:active:not(:disabled) {
+  .word-pronunciation-drag-handle:is(
+    .MuiButton-root,
+    .MuiIconButton-root
+  ):active:not(:disabled) {
   cursor: grabbing;
   transform: scale(1.06);
 }
 
-.word-pronunciation-actions .word-pronunciation-drag-handle.ant-btn:disabled {
+.word-pronunciation-actions
+  .word-pronunciation-drag-handle:is(
+    .MuiButton-root,
+    .MuiIconButton-root
+  ):disabled {
   color: #c4cad4;
   cursor: default;
 }
@@ -955,7 +986,7 @@
   padding-left: 10px;
 }
 
-.word-pronunciation-phonetic-control .ant-space-compact {
+.word-pronunciation-phonetic-control .v3-voice-text-field-compact {
   width: 100%;
 }
 
@@ -980,9 +1011,15 @@
   --word-playback-color: #d42a91;
 }
 
-.word-pronunciation-play-action.ant-btn:not(:disabled),
-.word-pronunciation-play-action.ant-btn:not(:disabled):hover,
-.word-pronunciation-play-action.ant-btn:not(:disabled):active {
+.word-pronunciation-play-action:is(.MuiButton-root, .MuiIconButton-root):not(
+    :disabled
+  ),
+.word-pronunciation-play-action:is(.MuiButton-root, .MuiIconButton-root):not(
+    :disabled
+  ):hover,
+.word-pronunciation-play-action:is(.MuiButton-root, .MuiIconButton-root):not(
+    :disabled
+  ):active {
   color: var(--word-playback-color);
 }
 
@@ -1101,7 +1138,7 @@
   border-bottom: 1px solid #d9dee7;
 }
 
-.word-form-type-cell .ant-tag {
+.word-form-type-cell .MuiChip-root {
   margin-inline-end: 0;
 }
 
@@ -1183,8 +1220,8 @@
   box-shadow: 0 6px 18px rgba(32, 38, 54, 0.04);
 }
 
-.word-sense-groups-card > .ant-card-head,
-.word-grammar-card > .ant-card-head {
+.word-sense-groups-card > .admin-card-header,
+.word-grammar-card > .admin-card-header {
   min-height: 42px;
   padding-inline: 14px;
   background: #fafbfc;
@@ -1192,7 +1229,7 @@
 }
 
 /* 上下留白要和行间对齐：行自带 10px padding，卡片再给 14px 会让首末两条比行间多出 3px。 */
-.word-sense-groups-card > .ant-card-body {
+.word-sense-groups-card > .admin-card-body {
   padding: 10px 14px;
 }
 
@@ -1211,7 +1248,7 @@
   border-radius: 9px;
 }
 
-.word-meaning-dialect-panel .ant-tag {
+.word-meaning-dialect-panel .MuiChip-root {
   margin-inline-end: 0;
 }
 
@@ -1271,15 +1308,15 @@
   min-width: 0;
 }
 
-.word-pos-tabs > .ant-tabs-nav {
+.word-pos-tabs > .MuiTabs-root {
   margin-bottom: 16px;
 }
 
-.word-pos-tabs > .ant-tabs-nav .ant-tabs-tab {
+.word-pos-tabs > .MuiTabs-root [role="tab"] {
   padding-block: 9px;
 }
 
-.word-pos-tabs > .ant-tabs-nav .ant-tabs-tab-active {
+.word-pos-tabs > .MuiTabs-root [role="tab"][aria-selected="true"] {
   font-weight: 700;
 }
 
@@ -1294,7 +1331,7 @@
   box-shadow: 0 6px 18px rgba(32, 38, 54, 0.04);
 }
 
-.word-grammar-card > .ant-card-body {
+.word-grammar-card > .admin-card-body {
   padding: 10px 14px;
 }
 
@@ -1324,11 +1361,12 @@
   width: var(--word-ops-col, 32px);
 }
 
-.word-sort-actions > .ant-btn {
+.word-sort-actions > button {
   width: 32px;
 }
 
-:is(.word-sort-actions, .word-sort-leading) .word-sort-drag-handle.ant-btn {
+:is(.word-sort-actions, .word-sort-leading)
+  .word-sort-drag-handle:is(.MuiButton-root, .MuiIconButton-root) {
   color: #7f8998;
   cursor: grab;
   user-select: none;
@@ -1339,21 +1377,28 @@
 }
 
 :is(.word-sort-actions, .word-sort-leading)
-  .word-sort-drag-handle.ant-btn:hover:not(:disabled),
+  .word-sort-drag-handle:is(.MuiButton-root, .MuiIconButton-root):hover:not(
+    :disabled
+  ),
 :is(.word-sort-actions, .word-sort-leading)
-  .word-sort-drag-handle.ant-btn:focus-visible {
+  .word-sort-drag-handle:is(
+    .MuiButton-root,
+    .MuiIconButton-root
+  ):focus-visible {
   color: #1677ff;
   background: rgba(22, 119, 255, 0.1);
 }
 
 :is(.word-sort-actions, .word-sort-leading)
-  .word-sort-drag-handle.ant-btn:active:not(:disabled) {
+  .word-sort-drag-handle:is(.MuiButton-root, .MuiIconButton-root):active:not(
+    :disabled
+  ) {
   cursor: grabbing;
   transform: scale(1.06);
 }
 
 :is(.word-sort-actions, .word-sort-leading)
-  .word-sort-drag-handle.ant-btn:disabled {
+  .word-sort-drag-handle:is(.MuiButton-root, .MuiIconButton-root):disabled {
   color: #c4cad4;
   cursor: default;
 }
@@ -1461,7 +1506,7 @@
   --sense-accent: #d22d8d;
 }
 
-.word-sense-editor > .ant-collapse-item {
+.word-sense-editor > [data-admin-accordion] {
   overflow: hidden;
   background: #fff;
   border: 1px solid var(--sense-border) !important;
@@ -1470,21 +1515,18 @@
   box-shadow: 0 8px 22px rgba(32, 38, 54, 0.05);
 }
 
-.word-sense-editor > .ant-collapse-item > .ant-collapse-header {
+.word-sense-editor > [data-admin-accordion] .admin-section-header {
   align-items: center !important;
   min-height: 48px;
   padding: 9px 12px !important;
   background: var(--sense-soft);
 }
 
-.word-sense-editor
-  > .ant-collapse-item
-  > .ant-collapse-content
-  > .ant-collapse-content-box {
+.word-sense-editor > [data-admin-accordion] > .admin-section-body {
   padding: 14px !important;
 }
 
-.word-sense-editor .ant-collapse-header-text {
+.word-sense-editor .MuiAccordionSummary-content {
   min-width: 0;
 }
 
@@ -1497,7 +1539,7 @@
   min-width: 0;
 }
 
-.word-sense-editor .ant-collapse-header-text .ant-typography {
+.word-sense-editor .MuiAccordionSummary-content .MuiTypography-root {
   display: inline-block;
   max-width: min(720px, 58vw);
   overflow: hidden;
@@ -1506,12 +1548,12 @@
   vertical-align: middle;
 }
 
-.word-sense-editor-v3 > .ant-collapse-item > .ant-collapse-header {
+.word-sense-editor-v3 > [data-admin-accordion] .admin-section-header {
   padding: 8px 12px !important;
   background: color-mix(in srgb, var(--sense-accent) 24%, white);
 }
 
-.word-sense-editor-v3 > .ant-collapse-item > .ant-collapse-panel {
+.word-sense-editor-v3 > [data-admin-accordion] .MuiAccordionDetails-root {
   border-top: 0;
 }
 
@@ -1574,8 +1616,8 @@
   min-width: 0;
 }
 
-.word-sense-field > .ant-typography,
-.word-sense-context-toggle > .ant-typography {
+.word-sense-field > .MuiTypography-root,
+.word-sense-context-toggle > .MuiTypography-root {
   font-size: 12px;
 }
 
@@ -1590,7 +1632,7 @@
   margin-top: 6px;
 }
 
-.word-sense-context-control .ant-switch {
+.word-sense-context-control .MuiSwitch-root {
   width: auto;
   min-width: 44px;
 }
@@ -1601,11 +1643,11 @@
   gap: 6px;
 }
 
-.word-sense-field-frequency .ant-input-number {
+.word-sense-field-frequency [data-percentage-field] {
   width: 100%;
 }
 
-.word-sense-field-frequency .ant-input-number-suffix {
+.word-sense-field-frequency .MuiInputAdornment-positionEnd {
   color: #7f8794;
 }
 
@@ -1647,7 +1689,7 @@
   outline-offset: -2px;
 }
 
-.word-sense-section-title .ant-tag {
+.word-sense-section-title .MuiChip-root {
   margin-inline-end: 0;
   color: #737b89;
   background: #fff;
@@ -1691,7 +1733,7 @@
   color: #858c98;
 }
 
-.word-sense-section-collapse .anticon {
+.word-sense-section-collapse .MuiSvgIcon-root {
   font-size: 11px;
 }
 
@@ -1729,22 +1771,24 @@
   padding-block: 9px;
 }
 
-.word-definition-text-select.ant-select {
+.word-definition-text-select[data-admin-select] {
   padding-inline: 0;
 }
 
-.word-definition-text-select .ant-select-content {
+.word-definition-text-select .MuiSelect-select {
   margin-inline-end: 0;
   text-align: center;
 }
 
-.word-definition-text-select.ant-select.ant-select-open
-  .ant-select-content.ant-select-content-has-value {
-  color: var(--ant-color-primary, #2053ff);
+.word-definition-text-select[data-admin-select][data-admin-select]:has(
+    [aria-expanded="true"]
+  )
+  .MuiSelect-select.MuiSelect-select {
+  color: var(--admin-color-primary, #2053ff);
   opacity: 1;
 }
 
-.word-definition-text-options .ant-select-item-option-content {
+.word-definition-text-options [role="option"] {
   text-align: center;
 }
 
@@ -1823,30 +1867,32 @@
   place-items: center;
 }
 
-.word-forms-tabs-empty .ant-empty-description {
+.word-forms-tabs-empty .admin-empty-description {
   color: inherit;
 }
 
-.word-forms-tabs-empty .ant-empty-description strong {
+.word-forms-tabs-empty .admin-empty-description strong {
   color: #262626;
 }
 
-.word-add-basic-pos-select .ant-select-selector {
+.word-add-basic-pos-select .MuiSelect-select {
   background: #f5faff !important;
   border-color: #91caff !important;
 }
 
-.word-add-basic-pos-select .ant-select-selection-placeholder,
-.word-add-basic-pos-select .ant-select-arrow {
+.word-add-basic-pos-select .MuiSelect-select,
+.word-add-basic-pos-select .MuiSelect-icon {
   color: #1677ff !important;
 }
 
-.word-add-basic-pos-select .ant-select-selection-placeholder {
+.word-add-basic-pos-select .MuiSelect-select {
   font-weight: 500;
 }
 
-.word-add-basic-pos-select:not(.ant-select-disabled):hover
-  .ant-select-selector {
+.word-add-basic-pos-select:not(
+    [data-admin-select]:has([aria-disabled="true"])
+  ):hover
+  .MuiSelect-select {
   border-color: #4096ff !important;
 }
 
@@ -1876,7 +1922,9 @@
   display: block;
 }
 
-.word-relations-grid-stacked .word-relation-row > .ant-btn-dangerous {
+.word-relations-grid-stacked
+  .word-relation-row
+  > :is(.MuiButton-colorError, .MuiIconButton-colorError) {
   grid-column: 5;
   grid-row: 1;
   position: static;
@@ -1915,28 +1963,28 @@
   box-shadow: 0 9px 22px rgba(32, 83, 255, 0.1);
 }
 
-.word-relation-card > .ant-card-head {
+.word-relation-card > .admin-card-header {
   min-height: 44px;
   padding-inline: 12px 8px;
   background: #f5f6f8;
   border-bottom-color: #dfe3e8;
 }
 
-.word-relation-card > .ant-card-head .ant-card-head-title {
+.word-relation-card > .admin-card-header .admin-card-title {
   font-size: 15px;
   font-weight: 700;
 }
 
-.word-relation-card > .ant-card-body {
+.word-relation-card > .admin-card-body {
   padding: 10px;
 }
 
-.word-relation-card.is-collapsed > .ant-card-body {
+.word-relation-card.is-collapsed > .admin-card-body {
   display: none;
 }
 
 /* 关联词复用词义区块的高度与透明度动画，避免 display:none 截断过渡。 */
-.word-relation-card.word-relation-card-animated > .ant-card-body {
+.word-relation-card.word-relation-card-animated > .admin-card-body {
   display: block;
   padding: 0;
 }
@@ -1945,19 +1993,19 @@
   color: #858c98;
 }
 
-.word-relation-collapse .anticon {
+.word-relation-collapse .MuiSvgIcon-root {
   font-size: 11px;
 }
 
 .word-relations-grid-stacked .word-relation-row + .word-relation-row {
-  border-top: 1px solid var(--ant-color-border-secondary, #f0f0f0);
+  border-top: 1px solid var(--admin-color-border-secondary, #f0f0f0);
   padding-top: 6px;
 }
 
 .word-relation-index {
   min-width: 16px;
   flex-shrink: 0;
-  color: var(--ant-color-text-tertiary, #8c8c8c);
+  color: var(--admin-color-text-tertiary, #8c8c8c);
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
@@ -1974,12 +2022,12 @@
   padding-inline-start: 16px;
 }
 
-.word-relation-glosses-connected > .ant-flex {
+.word-relation-glosses-connected > .MuiStack-root {
   position: relative;
 }
 
-.word-relation-glosses-connected > .ant-flex::before,
-.word-relation-glosses-connected > .ant-flex::after {
+.word-relation-glosses-connected > .MuiStack-root::before,
+.word-relation-glosses-connected > .MuiStack-root::after {
   content: "";
   position: absolute;
   inset-inline-start: -16px;
@@ -1990,26 +2038,26 @@
   pointer-events: none;
 }
 
-.word-relation-glosses-connected > .ant-flex::before {
+.word-relation-glosses-connected > .MuiStack-root::before {
   top: -3px;
   bottom: -3px;
   border-inline-start-width: 1px;
 }
 
-.word-relation-glosses-connected > .ant-flex:first-child::before {
+.word-relation-glosses-connected > .MuiStack-root:first-child::before {
   top: 50%;
   border-top-width: 1px;
   border-start-start-radius: 6px;
 }
 
-.word-relation-glosses-connected > .ant-flex:last-child::before {
+.word-relation-glosses-connected > .MuiStack-root:last-child::before {
   bottom: 50%;
   border-bottom-width: 1px;
   border-end-start-radius: 6px;
 }
 
 .word-relation-glosses-connected
-  > .ant-flex:not(:first-child):not(:last-child)::after {
+  > .MuiStack-root:not(:first-child):not(:last-child)::after {
   top: 50%;
   border-top-width: 1px;
 }
@@ -2045,7 +2093,7 @@
   min-width: 0;
 }
 
-.word-relation-row .ant-input-number {
+.word-relation-row [data-percentage-field] {
   width: 100%;
 }
 
@@ -2055,12 +2103,12 @@
   min-width: 0;
 }
 
-.word-relation-row .ant-input,
-.word-relation-row .ant-input-number-input {
+.word-relation-row .MuiInputBase-input,
+.word-relation-row input {
   font-weight: 600;
 }
 
-.word-relation-target .ant-input-prefix {
+.word-relation-target .MuiInputAdornment-positionStart {
   color: #2563eb;
 }
 
@@ -2070,8 +2118,8 @@
   min-width: 0;
 }
 
-.word-relation-sense .ant-select-selection-item,
-.word-relation-sense .ant-select-selection-placeholder {
+.word-relation-sense .MuiSelect-select,
+.word-relation-sense .MuiSelect-select {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2089,7 +2137,7 @@
   white-space: nowrap;
 }
 
-.word-relation-row > .ant-btn-dangerous {
+.word-relation-row > :is(.MuiButton-colorError, .MuiIconButton-colorError) {
   position: absolute;
   top: -5px;
   right: -5px;
@@ -2102,13 +2150,16 @@
   transition: opacity 120ms ease;
 }
 
-.word-relation-row:hover > .ant-btn-dangerous,
-.word-relation-row:focus-within > .ant-btn-dangerous {
+.word-relation-row:hover
+  > :is(.MuiButton-colorError, .MuiIconButton-colorError),
+.word-relation-row:focus-within
+  > :is(.MuiButton-colorError, .MuiIconButton-colorError) {
   opacity: 1;
 }
 
-.word-section-add-button {
+.word-section-add-button.MuiButton-root {
   margin-top: 8px;
+  border-style: dashed;
 }
 
 .word-table-row {
@@ -2178,11 +2229,11 @@
     overflow-x: hidden;
   }
 
-  .word-creation-stepper .ant-steps-item-title {
+  .word-creation-stepper .MuiStepLabel-label {
     font-size: 14px;
   }
 
-  .word-creation-stepper .ant-steps-item-content {
+  .word-creation-stepper .MuiStepLabel-labelContainer {
     display: none;
   }
 
@@ -2258,39 +2309,39 @@
     padding: 12px 8px;
   }
 
-  .word-creation-steps.ant-steps-horizontal {
+  .word-creation-steps.MuiStepper-horizontal {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
-  .word-creation-steps .ant-steps-item {
+  .word-creation-steps .MuiStep-root {
     min-width: 0;
     padding-inline-start: 0;
   }
 
-  .word-creation-steps .ant-steps-item-wrapper {
+  .word-creation-steps .MuiStepButton-root {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 6px;
   }
 
-  .word-creation-steps .ant-steps-item-icon {
+  .word-creation-steps .MuiStepLabel-iconContainer {
     margin: 0;
   }
 
-  .word-creation-steps .ant-steps-item-section {
+  .word-creation-steps .MuiStepLabel-root {
     width: 100%;
     min-width: 0;
     text-align: center;
   }
 
-  .word-creation-steps .ant-steps-item-header {
+  .word-creation-steps .MuiStepLabel-root {
     display: block;
     width: 100%;
   }
 
-  .word-creation-stepper .word-creation-steps .ant-steps-item-title {
+  .word-creation-stepper .word-creation-steps .MuiStepLabel-label {
     width: 100%;
     padding-inline-end: 0;
     font-size: 12px;
@@ -2300,8 +2351,8 @@
     white-space: nowrap;
   }
 
-  .word-creation-steps .ant-steps-item-rail,
-  .word-creation-steps .ant-steps-item-content {
+  .word-creation-steps .MuiStepConnector-line,
+  .word-creation-steps .MuiStepLabel-labelContainer {
     display: none;
   }
 
@@ -2328,13 +2379,13 @@
     min-height: 0;
   }
 
-  .word-step-actions .ant-btn {
+  .word-step-actions :is(.MuiButton-root, .MuiIconButton-root) {
     width: 100%;
     min-width: 0;
     padding-inline: 8px;
   }
 
-  .word-step-actions .ant-btn-primary:last-child:nth-child(odd) {
+  .word-step-actions .MuiButton-containedPrimary:last-child:nth-child(odd) {
     grid-column: 1 / -1;
   }
 }
@@ -2403,7 +2454,7 @@
     display: none;
   }
 
-  .word-sense-group-item > .ant-btn {
+  .word-sense-group-item > :is(.MuiButton-root, .MuiIconButton-root) {
     width: 100%;
   }
 }
@@ -2458,10 +2509,7 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .word-sense-editor
-    > .ant-collapse-item
-    > .ant-collapse-content
-    > .ant-collapse-content-box {
+  .word-sense-editor > [data-admin-accordion] > .admin-section-body {
     padding: 10px !important;
   }
 
@@ -2489,14 +2537,14 @@
     min-width: 0;
   }
 
-  .word-definition-row > .ant-space,
-  .word-sentence-row > .ant-space {
+  .word-definition-row > .MuiStack-root,
+  .word-sentence-row > .MuiStack-root {
     width: 100%;
   }
 
-  .word-definition-row > .ant-space:last-child,
+  .word-definition-row > .MuiStack-root:last-child,
   .word-definition-row > .word-list-actions,
-  .word-sentence-row > .ant-space:last-child {
+  .word-sentence-row > .MuiStack-root:last-child {
     flex-direction: row;
     justify-content: flex-end;
   }

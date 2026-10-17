@@ -1,13 +1,22 @@
 // 详情资料按权限展示；余额、账单、证件分别按需请求。
-import { Avatar, Badge, Descriptions, Drawer, Space, Tag } from "antd";
-import { UserOutlined } from "@ant-design/icons";
+import {
+  Avatar,
+  Box,
+  Chip,
+  Drawer,
+  IconButton,
+  Stack,
+  Typography
+} from "@mui/material";
+import Person from "@mui/icons-material/Person";
+import Close from "@mui/icons-material/Close";
 import dayjs from "dayjs";
 import type { AdminUserView } from "@tsz/types";
 import { UserResources } from "./UserResources";
 import { CopyableText } from "@/components/CopyableText";
 import { usePermission } from "@/lib/auth";
 import { RevokeTeacherButton } from "@/features/teacher-certification/RevokeTeacherButton";
-import { ROLE_LABEL, ROLE_TAG_COLOR, levelColor } from "./labels";
+import { ROLE_LABEL } from "./labels";
 
 interface Props {
   user: AdminUserView | null;
@@ -35,29 +44,32 @@ export function UserDetailDrawer({ user, onClose }: Props) {
                 key: "roles",
                 label: "分类",
                 children: (
-                  <Space size={[4, 4]} wrap>
+                  <Stack direction="row" spacing={0.5}>
                     {(user.roles ?? []).map((r) => (
-                      <Tag key={r} color={ROLE_TAG_COLOR[r]}>
-                        {ROLE_LABEL[r]}
-                      </Tag>
+                      <Chip
+                        key={r}
+                        label={ROLE_LABEL[r]}
+                        color={r === "teacher" ? "primary" : "default"}
+                      />
                     ))}
-                  </Space>
+                  </Stack>
                 )
               },
               {
                 key: "teacher",
                 label: "教师认证",
                 children: (
-                  <Tag color={user.teacher_verified ? "success" : "default"}>
-                    {user.teacher_verified ? "已认证" : "未认证"}
-                  </Tag>
+                  <Chip
+                    color={user.teacher_verified ? "success" : "default"}
+                    label={user.teacher_verified ? "已认证" : "未认证"}
+                  />
                 )
               },
               {
                 key: "level",
                 label: "等级",
                 children: user.level ? (
-                  <Tag color={levelColor(user.level)}>{user.level}等级</Tag>
+                  <Chip label={`${user.level}等级`} />
                 ) : (
                   "-"
                 )
@@ -88,9 +100,9 @@ export function UserDetailDrawer({ user, onClose }: Props) {
                 key: "status",
                 label: "状态",
                 children: (
-                  <Badge
-                    status={user.status === "active" ? "success" : "default"}
-                    text={user.status === "active" ? "正常" : "已禁用"}
+                  <Chip
+                    color={user.status === "active" ? "success" : "default"}
+                    label={user.status === "active" ? "正常" : "已禁用"}
                   />
                 )
               }
@@ -110,28 +122,48 @@ export function UserDetailDrawer({ user, onClose }: Props) {
     : [];
   return (
     <Drawer
+      anchor="right"
       open={!!user}
       onClose={onClose}
-      extra={
-        canReadBasic && canRevoke && user?.teacher_verified ? (
-          <RevokeTeacherButton userId={user.id} onSuccess={onClose} />
-        ) : undefined
-      }
-      // antd v6 弃用 Drawer 的 width，改用 size（现接受 number）。
-      size={480}
-      title={
-        <Space>
-          <Avatar
-            src={canReadBasic ? user?.avatar_url || undefined : undefined}
-            icon={<UserOutlined />}
-          />
-          {user?.display_name}
-        </Space>
-      }
+      slotProps={{ paper: { sx: { width: 480, maxWidth: "100%", p: 2 } } }}
     >
+      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+        <Avatar src={canReadBasic ? user?.avatar_url || undefined : undefined}>
+          <Person />
+        </Avatar>
+        <Typography variant="h6" sx={{ flex: 1 }}>
+          {user?.display_name}
+        </Typography>
+        <IconButton aria-label="关闭详情" onClick={onClose}>
+          <Close />
+        </IconButton>
+      </Stack>
+      {canReadBasic && canRevoke && user?.teacher_verified && (
+        <RevokeTeacherButton userId={user.id} onSuccess={onClose} />
+      )}
       {user && (
         <>
-          <Descriptions column={1} bordered size="small" items={items} />
+          <Box component="dl" sx={{ m: 0 }}>
+            {items.map((item) => (
+              <Box
+                key={item.key}
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "100px minmax(0, 1fr)",
+                  borderBottom: 1,
+                  borderColor: "divider",
+                  py: 1
+                }}
+              >
+                <Typography component="dt" color="text.secondary">
+                  {item.label}
+                </Typography>
+                <Box component="dd" sx={{ m: 0, overflowWrap: "anywhere" }}>
+                  {item.children}
+                </Box>
+              </Box>
+            ))}
+          </Box>
           <UserResources key={user.id} userId={user.id} />
         </>
       )}

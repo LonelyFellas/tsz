@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { FeedbackProvider } from "@/components/FeedbackProvider";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/auth", () => ({
@@ -46,14 +46,14 @@ function renderModal(
 ) {
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <AntApp>
+      <FeedbackProvider>
         <CreateAdminModal
           open
           onClose={onClose}
           onPendingChange={onPendingChange}
           onCreated={onCreated}
         />
-      </AntApp>
+      </FeedbackProvider>
     </QueryClientProvider>
   );
   return { onCreated, onClose, onPendingChange };

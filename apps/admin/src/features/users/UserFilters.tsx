@@ -1,51 +1,81 @@
-// 用户管理搜索行：单一关键词（昵称 / 手机号 / 邮箱）+ 注册时间 + 搜索 / 重置。
-import { ReloadOutlined, SearchOutlined } from "@ant-design/icons";
-import { Button, Card, DatePicker, Form, Input, Space } from "antd";
+import Refresh from "@mui/icons-material/Refresh";
+import Search from "@mui/icons-material/Search";
+import { Button, Paper, Stack, TextField } from "@mui/material";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import { Controller, useForm } from "react-hook-form";
 import type { UserFilterValues } from "./listQuery";
 
-interface Props {
+export function UserFilters({
+  onSearch,
+  onReset
+}: {
   onSearch: (values: UserFilterValues) => void;
   onReset: () => void;
-}
-
-export function UserFilters({ onSearch, onReset }: Props) {
-  const [form] = Form.useForm<UserFilterValues>();
-
+}) {
+  const {
+    control,
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors }
+  } = useForm<UserFilterValues>({
+    defaultValues: { q: "", registeredDate: null }
+  });
   return (
-    <Card size="small" styles={{ body: { paddingBottom: 8 } }}>
-      <Form
-        form={form}
-        layout="inline"
-        onFinish={onSearch}
-        style={{ rowGap: 12, columnGap: 8, display: "flex", flexWrap: "wrap" }}
+    <Paper variant="outlined" sx={{ p: 2 }}>
+      <Stack
+        component="form"
+        direction="row"
+        useFlexGap
+        flexWrap="wrap"
+        spacing={1}
+        alignItems="start"
+        onSubmit={handleSubmit(onSearch)}
       >
-        <Form.Item name="q" label="关键词">
-          <Input
-            placeholder="手机号 / 邮箱 / 用户昵称"
-            allowClear
-            style={{ width: 240 }}
-          />
-        </Form.Item>
-        <Form.Item name="registeredDate" label="注册时间">
-          <DatePicker placeholder="请选择日期" style={{ width: 160 }} />
-        </Form.Item>
-        <Form.Item>
-          <Space>
-            <Button type="primary" icon={<SearchOutlined />} htmlType="submit">
-              搜索
-            </Button>
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={() => {
-                form.resetFields();
-                onReset();
+        <TextField
+          label="关键词"
+          placeholder="手机号 / 邮箱 / 用户昵称"
+          {...register("q")}
+          sx={{ width: 240 }}
+        />
+        <Controller
+          name="registeredDate"
+          control={control}
+          rules={{
+            validate: (value) => !value || value.isValid() || "请输入有效日期"
+          }}
+          render={({ field }) => (
+            <DatePicker
+              label="注册时间"
+              format="YYYY-MM-DD"
+              value={field.value}
+              onChange={field.onChange}
+              slotProps={{
+                field: { clearable: true },
+                textField: {
+                  onBlur: field.onBlur,
+                  inputRef: field.ref,
+                  error: !!errors.registeredDate,
+                  helperText: errors.registeredDate?.message,
+                  sx: { width: 190 }
+                }
               }}
-            >
-              重置
-            </Button>
-          </Space>
-        </Form.Item>
-      </Form>
-    </Card>
+            />
+          )}
+        />
+        <Button type="submit" variant="contained" startIcon={<Search />}>
+          搜索
+        </Button>
+        <Button
+          startIcon={<Refresh />}
+          onClick={() => {
+            reset();
+            onReset();
+          }}
+        >
+          重置
+        </Button>
+      </Stack>
+    </Paper>
   );
 }

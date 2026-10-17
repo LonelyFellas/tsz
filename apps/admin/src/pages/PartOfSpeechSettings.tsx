@@ -1,4 +1,5 @@
-import { Button, Result } from "antd";
+import { Button } from "@mui/material";
+import { PageStatus } from "@/components/PageStatus";
 import { useNavigate } from "react-router-dom";
 import { PartOfSpeechSettings } from "@/features/dictionary/part-of-speech/PartOfSpeechSettings";
 import { usePermission } from "@/lib/auth";
@@ -9,12 +10,11 @@ export function PartOfSpeechSettingsPage() {
 
   if (!isSuperAdmin) {
     return (
-      <Result
-        status="403"
+      <PageStatus
         title="无权限"
-        subTitle="需要词性配置查看权限。"
-        extra={
-          <Button type="primary" onClick={() => navigate("/")}>
+        description="需要词性配置查看权限。"
+        action={
+          <Button variant="contained" onClick={() => navigate("/")}>
             返回首页
           </Button>
         }

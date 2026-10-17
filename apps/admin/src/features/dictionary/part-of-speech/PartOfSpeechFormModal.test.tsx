@@ -97,7 +97,7 @@ describe("PartOfSpeechFormModal", () => {
     fireEvent.change(screen.getByLabelText("英文全称"), {
       target: { value: "particle" }
     });
-    fireEvent.click(screen.getByText("新 建"));
+    fireEvent.click(screen.getByText("新建"));
 
     await waitFor(() =>
       expect(api.create).toHaveBeenCalledWith({
@@ -143,7 +143,7 @@ describe("PartOfSpeechFormModal", () => {
     fireEvent.change(screen.getByLabelText("英文全称"), {
       target: { value: "noun" }
     });
-    fireEvent.click(screen.getByText("新 建"));
+    fireEvent.click(screen.getByText("新建"));
 
     await waitFor(() =>
       expect(api.create).toHaveBeenCalledWith(
@@ -160,7 +160,7 @@ describe("PartOfSpeechFormModal", () => {
       target: { value: "语气词" }
     });
     fireEvent.change(screen.getByLabelText("序号"), { target: { value: "5" } });
-    fireEvent.click(screen.getByText("保 存"));
+    fireEvent.click(screen.getByText("保存"));
 
     await waitFor(() =>
       expect(api.update).toHaveBeenCalledWith({
@@ -186,7 +186,7 @@ describe("PartOfSpeechFormModal", () => {
     fireEvent.change(screen.getByLabelText("英文全称"), {
       target: { value: "f".repeat(201) }
     });
-    fireEvent.click(screen.getByText("保 存"));
+    fireEvent.click(screen.getByText("保存"));
     expect(
       await screen.findByText("英文全称不能超过 200 个字符")
     ).toBeInTheDocument();
@@ -195,7 +195,7 @@ describe("PartOfSpeechFormModal", () => {
     fireEvent.change(screen.getByLabelText("英文全称"), {
       target: { value: "f".repeat(200) }
     });
-    fireEvent.click(screen.getByText("保 存"));
+    fireEvent.click(screen.getByText("保存"));
     await waitFor(() =>
       expect(api.update).toHaveBeenCalledWith({
         id: "pos-particle",
@@ -225,7 +225,7 @@ describe("PartOfSpeechFormModal", () => {
         target: { value: input }
       });
     }
-    fireEvent.click(screen.getByText("新 建"));
+    fireEvent.click(screen.getByText("新建"));
 
     await waitFor(() =>
       expect(callbacks.onError).toHaveBeenCalledWith(failure)
@@ -237,14 +237,12 @@ describe("PartOfSpeechFormModal", () => {
   it("pending 状态显示提交 loading", () => {
     api.createPending = true;
     renderModal();
-    expect(screen.getByText("新 建").closest("button")).toHaveClass(
-      "ant-btn-loading"
-    );
+    expect(screen.getByText("新建").closest("button")).toBeDisabled();
   });
 
   it("取消调用关闭", () => {
     const callbacks = renderModal();
-    fireEvent.click(screen.getByRole("button", { name: "取 消" }));
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
     expect(callbacks.onClose).toHaveBeenCalledTimes(1);
   });
 });
@@ -272,7 +270,7 @@ describe("PartOfSpeechFormModal 新建默认值", () => {
     fireEvent.change(screen.getByLabelText("英文全称"), {
       target: { value: "Focus Particle Word" }
     });
-    fireEvent.click(screen.getByText("新 建"));
+    fireEvent.click(screen.getByText("新建"));
     await waitFor(() =>
       expect(api.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -295,7 +293,7 @@ describe("PartOfSpeechFormModal 新建默认值", () => {
     fireEvent.change(screen.getByLabelText("英文缩写"), {
       target: { value: "part." }
     });
-    fireEvent.click(screen.getByText("新 建"));
+    fireEvent.click(screen.getByText("新建"));
 
     expect(await screen.findByText("请输入简洁显示名称")).toBeInTheDocument();
     expect(screen.getByText("请输入英文全称")).toBeInTheDocument();
@@ -313,7 +311,7 @@ describe("PartOfSpeechFormModal 新建默认值", () => {
         onError={vi.fn()}
       />
     );
-    expect(screen.getByLabelText("序号")).toHaveValue("60");
+    expect(screen.getByLabelText("序号")).toHaveValue(60);
     fireEvent.change(screen.getByLabelText("序号"), {
       target: { value: "35" }
     });
@@ -332,7 +330,7 @@ describe("PartOfSpeechFormModal 新建默认值", () => {
     fireEvent.change(screen.getByLabelText("英文全称"), {
       target: { value: "particle" }
     });
-    fireEvent.click(screen.getByText("新 建"));
+    fireEvent.click(screen.getByText("新建"));
     await waitFor(() =>
       expect(api.create).toHaveBeenCalledWith(
         expect.objectContaining({ sort_order: 35, code: "particle" })
@@ -341,7 +339,7 @@ describe("PartOfSpeechFormModal 新建默认值", () => {
     view.unmount();
 
     renderModal(value);
-    expect(screen.getByLabelText("序号")).toHaveValue("100");
+    expect(screen.getByLabelText("序号")).toHaveValue(100);
     fireEvent.change(screen.getByLabelText("正式中文"), {
       target: { value: "语气词" }
     });

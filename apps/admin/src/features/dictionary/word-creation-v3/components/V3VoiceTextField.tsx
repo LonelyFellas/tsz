@@ -1,5 +1,8 @@
+import { IconButton as MuiIconButton } from "@mui/material";
+import { TextareaAutosize } from "@mui/material";
+import { useFeedback } from "@/components/FeedbackProvider";
+import { Button as MuiButton, Stack as MuiStack } from "@mui/material";
 import { usePermission } from "@/lib/auth";
-import { ConfigProvider } from "antd";
 import { useContentEditPermissions } from "../../contentEditPermissions";
 import type {
   AudioAssetLocaleV3,
@@ -21,13 +24,14 @@ import {
   toRichTextV2
 } from "@tsz/voice-editor/core";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
-import { EditOutlined } from "@ant-design/icons";
+import EditOutlined from "@mui/icons-material/EditOutlined";
 import { flushSync } from "react-dom";
-import { Button, Input, Space, message } from "antd";
+
 import {
   type ReactNode,
   Suspense,
   lazy,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -41,7 +45,7 @@ import {
 } from "@/features/dictionary/voice-editor/dataSource";
 import { env } from "@/lib/env";
 // 样式随组件一起引入：V3 这条路径此前从没挂过语音编辑器，不引的话两层各画各的、完全错位。
-import "@tsz/voice-editor/styles.css";
+import "@tsz/voice-editor/reader.css";
 import "./V3VoiceTextField.css";
 import { VoiceEditorModal } from "./VoiceEditorModal";
 
@@ -161,8 +165,11 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     if (!editing && !focused && !value.text) setRecorded(false);
   }, [editing, focused, value.text]);
   const [editorSession, setEditorSession] = useState(0);
-  const captureSession = () =>
-    structuredClone({ nodeId, value, textLinks, voiceProfile, audioAssets });
+  const captureSession = useCallback(
+    () =>
+      structuredClone({ nodeId, value, textLinks, voiceProfile, audioAssets }),
+    [nodeId, value, textLinks, voiceProfile, audioAssets]
+  );
   const [draftState, setDraftState] = useState(captureSession);
   const incomingKey = JSON.stringify({
     nodeId,
@@ -177,7 +184,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     incomingRef.current = incomingKey;
     const next = captureSession();
     setDraftState(next);
-  }, [incomingKey]);
+  }, [incomingKey, captureSession]);
   const editorState = showDone
     ? draftState
     : { nodeId, value, textLinks, voiceProfile, audioAssets };
@@ -252,7 +259,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     onEditingChange?.(expanded);
     if (!expanded) onAssociationPendingChange?.(false);
   }, [expanded, onEditingChange, onAssociationPendingChange]);
-  const [feedback, feedbackHolder] = message.useMessage();
+  const notify = useFeedback();
   type Snapshot = { value: RichTextV3; links: typeof textLinks };
   const history = useRef<{
     past: Snapshot[];
@@ -319,7 +326,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       (env.VOICE_EDITOR && editingEnabled && recorded)) &&
     value.text !== "";
   const fallback = (
-    <Input.TextArea
+    <TextareaAutosize
       key={largePreview ? "large" : "standard"}
       onFocus={() => setFocused(true)}
       onBlur={() => {
@@ -331,7 +338,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
               normalized.annotations.length <
               toRichTextV2(value).annotations.length
             )
-              void feedback.info("已规范化拼写并移除受影响的标注，可撤销恢复");
+              void notify("已规范化拼写并移除受影响的标注，可撤销恢复", "info");
           }
         }
         setFocused(false);
@@ -339,13 +346,11 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       }}
       aria-label={expanded ? `${ariaLabel}预览` : ariaLabel}
       aria-invalid={invalid}
-      status={invalid ? "error" : undefined}
+
       // 无连读时用自然高度；有连读时显式设置最小行数。
       // 单改 padding 不会触发 antd autoSize，须切换 minRows，确保只增删标记也重测且不重挂输入框。
-      autoSize={{
-        minRows: liaisons ? (largePreview ? 1 : 2) : undefined,
-        maxRows: 6
-      }}
+      minRows={liaisons ? (largePreview ? 1 : 2) : undefined}
+      maxRows={6}
       style={
         liaisons
           ? { paddingTop: mode === "grammar" ? "calc(4px + 0.5em)" : "1em" }
@@ -387,7 +392,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           toRichTextV2(value).annotations.length > next.annotations.length;
         change(next, links);
         if (removed)
-          void feedback.info("已移除受改字影响的关联或标注，可撤销恢复");
+          void notify("已移除受改字影响的关联或标注，可撤销恢复", "info");
       }}
       placeholder={placeholder}
       readOnly={
@@ -432,15 +437,20 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   if (!env.VOICE_EDITOR || !editingEnabled)
     return (
       <>
-        {feedbackHolder}
         {leadingAction || trailingAction ? (
-          <Space.Compact block className="v3-voice-text-field-compact">
+          <MuiStack
+            className="v3-voice-text-field-compact"
+            direction="row"
+            spacing={0}
+            alignItems="stretch"
+            sx={{ width: "100%", minWidth: 0 }}
+          >
             {leadingAction}
             {mode === "grammar" || mode === "spelling" || associationPreview
               ? collapsedField
               : fallback}
             {trailingAction}
-          </Space.Compact>
+          </MuiStack>
         ) : mode === "grammar" || mode === "spelling" || associationPreview ? (
           collapsedField
         ) : (
@@ -450,28 +460,31 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     );
 
   const fieldView = (
-    <ConfigProvider
-      componentDisabled={
-        contentReadOnly && !associationsReadOnly ? false : undefined
-      }
-    >
-      <Space.Compact block className="v3-voice-text-field-compact">
+    <>
+      <MuiStack
+        className="v3-voice-text-field-compact"
+        direction="row"
+        spacing={0}
+        alignItems="stretch"
+        sx={{ width: "100%", minWidth: 0 }}
+      >
         {leadingAction}
         {collapsedField}
         {trailingAction}
-        <Button
+        <MuiIconButton
           aria-label={`打开${ariaLabel}编辑器`}
           disabled={readOnly}
-          icon={<EditOutlined />}
           onClick={() => {
             setDraftState(captureSession());
             setRecorded(true);
             setEditing(true);
           }}
           style={{ height: "auto" }}
-        />
-      </Space.Compact>
-    </ConfigProvider>
+        >
+          <EditOutlined fontSize="inherit" />
+        </MuiIconButton>
+      </MuiStack>
+    </>
   );
 
   const renderActions = (
@@ -479,17 +492,21 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     prepareComplete: () => boolean = () => true
   ) =>
     showDone ? (
-      <Space className="v3-voice-text-editor-done" size={6}>
-        <Button
+      <MuiStack
+        className="v3-voice-text-editor-done"
+        direction="row"
+        spacing={0.75}
+        alignItems="center"
+      >
+        <MuiButton
           size="small"
           aria-label={`取消${ariaLabel}编辑`}
           disabled={doneLoading}
           onClick={cancelEditing}
         >
           取消
-        </Button>
-        <Button
-          type="primary"
+        </MuiButton>
+        <MuiButton
           size="small"
           aria-label={`完成${ariaLabel}编辑`}
           loading={doneLoading}
@@ -497,10 +514,11 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           onClick={() => {
             if (prepareComplete()) completeEditing();
           }}
+          variant="contained"
         >
           完成
-        </Button>
-      </Space>
+        </MuiButton>
+      </MuiStack>
     ) : (
       <EditorPendingState
         pending={!canComplete}
@@ -508,13 +526,8 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       />
     );
   const editor = (
-    <ConfigProvider
-      componentDisabled={
-        contentReadOnly && !associationsReadOnly ? false : undefined
-      }
-    >
+    <>
       <div className="v3-voice-text-editor" style={{ minWidth: 0 }}>
-        {feedbackHolder}
         <Suspense
           fallback={<div style={{ paddingBottom: 32 }}>{fallback}</div>}
         >
@@ -586,7 +599,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           />
         </Suspense>
       </div>
-    </ConfigProvider>
+    </>
   );
 
   if (presentation === "editor") return editor;
@@ -598,9 +611,9 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           title={editorTitle ?? `编辑${ariaLabel}`}
           open={editing}
           footer={null}
-          onCancel={cancelEditing}
-          closable={!doneLoading}
-          keyboard={!doneLoading && !draftPending}
+          onClose={cancelEditing}
+          closeDisabled={doneLoading}
+          escapeDisabled={!(!doneLoading && !draftPending)}
         >
           {editor}
         </VoiceEditorModal>

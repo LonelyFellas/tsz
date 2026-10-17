@@ -1,7 +1,8 @@
 import { DictionaryFormTypeLabels } from "@/features/dictionary/part-of-speech/FormTypeLabels";
 import { DictionaryPartOfSpeechLabels } from "@/features/dictionary/part-of-speech/PartOfSpeechLabels";
-import { MenuFoldOutlined, MenuUnfoldOutlined } from "@ant-design/icons";
-import { Button, Drawer, Layout, Tooltip } from "antd";
+import MenuOpen from "@mui/icons-material/MenuOpen";
+import Menu from "@mui/icons-material/Menu";
+import { Box, IconButton, Drawer, Tooltip } from "@mui/material";
 import { useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { AdminHeader } from "@/features/auth/AdminHeader";
@@ -11,9 +12,7 @@ import { useAuthStore } from "@/lib/auth";
 import { AdminRouteGuard } from "@/features/auth/AdminRouteGuard";
 import { ConsoleSidebar } from "@/features/console/ConsoleSidebar";
 
-const { Header, Sider, Content } = Layout;
-
-// 普通后台沿用 antd 的 md/lg 三档。创建向导的完整导航阈值按可用内容宽度计算：
+// 普通后台沿用既有 md/lg 三档。创建向导的完整导航阈值按可用内容宽度计算：
 // 1200 内容区 + 220 完整导航 + 24 * 2 Content 边距 = 1468。
 // 未达到该宽度时使用 72px 图标轨，为复杂表单保留舒适编辑空间。
 const LG_BREAKPOINT = 992;
@@ -61,7 +60,7 @@ function useLayoutMode(isWordCreationWorkspace: boolean): LayoutMode {
   return mode;
 }
 
-// 受保护的后台壳：门禁守卫 + antd Layout（侧栏 Sider + 顶栏 Header），子路由渲染在 <Outlet/>。
+// 受保护的后台壳：门禁守卫 + MUI 导航壳（侧栏与顶栏），子路由渲染在 <Outlet/>。
 // Sider 固定不滚动，仅内容区随主体滚动；整壳撑满视口高度。仅登录的 admin 可见。
 export function ConsoleLayout() {
   const identity = useAuthStore((s) => adminAccountIdentity(s.profile));
@@ -89,45 +88,43 @@ export function ConsoleLayout() {
       ? "展开侧栏"
       : "收起侧栏";
   const toggleIcon = (isDrawer ? drawerOpen : !collapsed) ? (
-    <MenuFoldOutlined />
+    <MenuOpen />
   ) : (
-    <MenuUnfoldOutlined />
+    <Menu />
   );
   const onToggle = () =>
     isDrawer ? setDrawerOpen((v) => !v) : setCollapsed((v) => !v);
 
   return (
     <AdminRouteGuard>
-      <Layout style={{ minHeight: "100vh" }}>
+      <Box sx={{ minHeight: "100vh", display: "flex" }}>
         {/* 非手机档：in-flow 侧栏（展开/图标轨）。手机档不渲染，内容占满整宽。 */}
         {!isDrawer && (
-          <Sider
-            width={220}
-            collapsedWidth={72}
-            collapsed={collapsed}
-            trigger={null}
-            theme="light"
-            style={{
-              borderInlineEnd: "1px solid #f0f0f0",
+          <Box
+            component="aside"
+            sx={{
+              width: collapsed ? 72 : 220,
+              flexShrink: 0,
+              borderRight: 1,
+              borderColor: "divider",
               position: "sticky",
               top: 0,
               height: "100vh",
-              overflow: "auto"
+              overflow: "auto",
+              bgcolor: "background.paper"
             }}
           >
             <ConsoleSidebar collapsed={collapsed} />
-          </Sider>
+          </Box>
         )}
 
         {/* 手机档：抽屉侧栏，覆盖式展开/收起。 */}
         <Drawer
-          placement="left"
+          anchor="left"
           open={isDrawer && drawerOpen}
           onClose={() => setDrawerOpen(false)}
-          size={220}
-          closable={false}
-          styles={{ body: { padding: 0 } }}
-          rootClassName="console-mobile-drawer"
+          slotProps={{ paper: { sx: { width: 220 } } }}
+          className="console-mobile-drawer"
         >
           <ConsoleSidebar
             collapsed={false}
@@ -135,12 +132,14 @@ export function ConsoleLayout() {
           />
         </Drawer>
 
-        <Layout>
-          <Header
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Box
+            component="header"
             style={{
               display: "flex",
               alignItems: "center",
               gap: 8,
+              height: 64,
               background: "#fff",
               padding: "0 24px 0 8px",
               borderBottom: "1px solid #f0f0f0",
@@ -149,20 +148,20 @@ export function ConsoleLayout() {
               zIndex: 10
             }}
           >
-            <Tooltip title={toggleLabel} placement="right">
-              <Button
-                type="text"
+            <Tooltip describeChild title={toggleLabel} placement="right">
+              <IconButton
                 aria-label={toggleLabel}
-                icon={toggleIcon}
                 onClick={onToggle}
                 style={{ width: 40, height: 40, fontSize: 18 }}
-              />
+              >
+                {toggleIcon}
+              </IconButton>
             </Tooltip>
             <div style={{ flex: 1 }}>
               <AdminHeader />
             </div>
-          </Header>
-          <Content style={{ padding: isDrawer ? 16 : 24 }}>
+          </Box>
+          <Box component="main" sx={{ p: isDrawer ? 2 : 3 }}>
             <BusinessPermissionGuard key={identity}>
               {pathname.startsWith("/words") ? (
                 <DictionaryFormTypeLabels>
@@ -174,9 +173,9 @@ export function ConsoleLayout() {
                 <Outlet />
               )}
             </BusinessPermissionGuard>
-          </Content>
-        </Layout>
-      </Layout>
+          </Box>
+        </Box>
+      </Box>
     </AdminRouteGuard>
   );
 }

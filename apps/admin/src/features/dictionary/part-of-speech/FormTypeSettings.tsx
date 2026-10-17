@@ -1,21 +1,22 @@
 import { usePermission } from "@/lib/auth";
-import { PlusOutlined } from "@ant-design/icons";
 import {
   Alert,
-  App,
+  Autocomplete,
   Button,
-  Card,
-  Flex,
-  Form,
-  Modal,
-  Select,
-  Space,
-  Table,
-  Tooltip,
-  Typography
-} from "antd";
-import { FullNameEnCell } from "./FullNameEnCell";
-import type { TableColumnsType } from "antd";
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Paper,
+  Stack,
+  TextField
+} from "@mui/material";
+import { Controller, FormProvider, useForm } from "react-hook-form";
+import { AdminTable } from "@/components/AdminTable";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { PermissionButton } from "@/components/PermissionButton";
+import { useFeedback } from "@/components/FeedbackProvider";
+import { detailColumns } from "./detailColumns";
 import type { CreatePartOfSpeechInput, FormTypeConfig } from "@tsz/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
@@ -23,7 +24,10 @@ import { useEffect, useRef, useState } from "react";
 import { partOfSpeechDataSource } from "../dataSource";
 import { partOfSpeechKeys, usePartOfSpeechCatalog } from "./api";
 import { nextSortOrder } from "./catalog";
-import { PartOfSpeechSharedFields } from "./PartOfSpeechSharedFields";
+import {
+  PartOfSpeechSharedFields,
+  partFieldValues
+} from "./PartOfSpeechSharedFields";
 import { slugifyCode } from "./PartOfSpeechFormModal";
 import { errorMessage } from "./PartOfSpeechSettings";
 
@@ -41,10 +45,14 @@ function deriveFormTypeCode(parentCode: string, fullNameEn: string): string {
   return slugifyCode(`${parent} ${fullNameEn}`);
 }
 
+const ALL_PARTS = { id: "", name_zh: "全部" };
+
 export function FormTypeSettings() {
   const canEdit = usePermission("lexicon_settings.edit_forms");
   const canDelete = usePermission("lexicon_settings.delete");
-  const { message, modal } = App.useApp();
+  const notify = useFeedback();
+  const [removing, setRemoving] = useState<FormTypeConfig>();
+  const [deleting, setDeleting] = useState(false);
   const client = useQueryClient();
   const catalog = usePartOfSpeechCatalog();
   const ready = !catalog.isError && !!catalog.data?.form_types;
@@ -63,7 +71,8 @@ export function FormTypeSettings() {
   const nextSortOrderRef = useRef(0);
   nextSortOrderRef.current = nextSortOrder(catalog.data?.form_types ?? []);
   const partNameById = new Map(parts.map((item) => [item.id, item.name_zh]));
-  const [form] = Form.useForm<Values>();
+  const form = useForm<Values>({ shouldUnregister: true });
+  const { reset, handleSubmit } = form;
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<FormTypeConfig>();
   const list = useQuery({
@@ -97,165 +106,96 @@ export function FormTypeSettings() {
     onSuccess: async () => {
       await refresh();
       setOpen(false);
-      message.success(editing ? "词形变化已更新" : "词形变化已新增");
+      notify(editing ? "词形变化已更新" : "词形变化已新增", "success");
     },
-    onError: (error) => message.error(errorMessage(error))
+    onError: (error) => notify(errorMessage(error), "error")
   });
   useEffect(() => {
     if (!open) return;
-    if (editing) {
-      form.setFieldsValue(editing);
-      return;
+    reset(
+      editing
+        ? {
+            ...partFieldValues(editing),
+            part_of_speech_id: editing.part_of_speech_id
+          }
+        : {
+            name_zh: "",
+            short_name_zh: "",
+            name_en: "",
+            abbreviation: "",
+            full_name_en: "",
+            sort_order: nextSortOrderRef.current,
+            part_of_speech_id: query.part_of_speech_id
+          }
+    );
+  }, [editing, open, query.part_of_speech_id, reset]);
+  const remove = async () => {
+    if (!removing || deleting || !canDelete) return;
+    setDeleting(true);
+    try {
+      await partOfSpeechDataSource.removeFormType(removing.id, {
+        base_revision: removing.revision
+      });
+      await refresh();
+      notify("词形变化已删除", "success");
+    } catch (error) {
+      notify(errorMessage(error), "error");
+      await refresh();
+    } finally {
+      setDeleting(false);
+      setRemoving(undefined);
     }
-    form.resetFields();
-    form.setFieldValue("sort_order", nextSortOrderRef.current);
-    // 「全部」视图下留空由管理员选；已经筛到某个词性时直接带上，少点一次。
-    if (query.part_of_speech_id) {
-      form.setFieldValue("part_of_speech_id", query.part_of_speech_id);
-    }
-  }, [editing, form, open, query.part_of_speech_id]);
-  const remove = (item: FormTypeConfig) =>
-    modal.confirm({
-      title: `删除词形变化“${item.name_zh}”？`,
-      content: "该操作不可恢复。删除后，词条录入和词典建议不再提供此类型。",
-      okText: "删 除",
-      cancelText: "取 消",
-      okButtonProps: { danger: true },
-      onOk: async () => {
-        try {
-          await partOfSpeechDataSource.removeFormType(item.id, {
-            base_revision: item.revision
-          });
-          await refresh();
-          message.success("词形变化已删除");
-        } catch (error) {
-          message.error(errorMessage(error));
-          await refresh();
-        }
-      }
-    });
-  const columns: TableColumnsType<FormTypeConfig> = [
-    { title: "序号", dataIndex: "sort_order", width: 64 },
-    { title: "正式中文", dataIndex: "name_zh", width: 130 },
-    { title: "简洁显示", dataIndex: "short_name_zh", width: 120 },
-    { title: "正式英文", dataIndex: "name_en", width: 160 },
-    { title: "英文缩写", dataIndex: "abbreviation", width: 100 },
-    {
-      title: "英文全称",
-      dataIndex: "full_name_en",
-      width: 170,
-      render: (value: string) => <FullNameEnCell value={value} />
-    },
-    {
-      title: "所属基本词性",
-      dataIndex: "part_of_speech_id",
-      width: 120,
-      render: (partId?: string | null) =>
-        partId ? (partNameById.get(partId) ?? partId) : "所有词性"
-    },
-    {
-      title: "关联",
-      dataIndex: "usage_count",
-      width: 100,
-      render: (count: number) => (count ? `${count} 个词条` : "无关联")
-    },
-    {
-      title: "创建人",
-      render: (_, item) => item.created_by.display_name,
-      width: 100
-    },
-    {
-      title: "创建时间",
-      render: (_, item) => dayjs(item.created_at).format("YYYY-MM-DD HH:mm"),
-      width: 150
-    },
-    {
-      title: "操作",
-      fixed: "right",
-      width: 150,
-      render: (_, item) => (
-        <Space>
-          <Button
-            disabled={!canEdit}
-            size="small"
-            onClick={() => {
-              setEditing(item);
-              setOpen(true);
-            }}
-          >
-            修 改
-          </Button>
-          <Tooltip
-            title={
-              item.code === "base"
-                ? "原形为必需类型，不能删除"
-                : item.usage_count
-                  ? "仍与词条有关联，可以修改，但不能删除"
-                  : undefined
-            }
-          >
-            <Button
-              size="small"
-              danger
-              disabled={
-                !canDelete || item.code === "base" || item.usage_count > 0
-              }
-              onClick={() => remove(item)}
-            >
-              删 除
-            </Button>
-          </Tooltip>
-        </Space>
-      )
-    }
-  ];
+  };
+  const parentOptions = [ALL_PARTS, ...parts];
   return (
-    <Flex vertical gap={16}>
+    <Stack spacing={2}>
       {!ready && !catalog.isPending && (
         <Alert
-          showIcon
-          type={catalog.isError ? "error" : "info"}
-          title={
-            catalog.isError
-              ? "词形目录加载失败"
-              : "服务尚未提供词形配置，请更新后重试"
-          }
-          action={<Button onClick={() => void catalog.refetch()}>重 试</Button>}
-        />
+          severity={catalog.isError ? "error" : "info"}
+          action={<Button onClick={() => void catalog.refetch()}>重试</Button>}
+        >
+          {catalog.isError
+            ? "词形目录加载失败"
+            : "服务尚未提供词形配置，请更新后重试"}
+        </Alert>
       )}
-      <Card size="small">
-        <Flex justify="space-between" align="center" wrap gap={12}>
-          {/* 词形变化总量很小，一页就看完，不提供关键词搜索。 */}
-          <Flex align="center" gap={12} wrap>
-            <Typography.Text strong>所属基本词性</Typography.Text>
-            <Select
-              aria-label="所属基本词性"
-              value={query.part_of_speech_id ?? ""}
-              showSearch
-              optionFilterProp="label"
-              loading={catalog.isPending}
-              disabled={catalog.isError || parts.length === 0}
-              options={[
-                { value: "", label: "全部" },
-                ...parts.map((item) => ({
-                  value: item.id,
-                  label: item.name_zh
-                }))
-              ]}
-              onChange={(value) =>
-                setQuery({
-                  ...query,
-                  part_of_speech_id: value || undefined,
-                  page: 1
-                })
-              }
-              style={{ width: 200 }}
-              placeholder="请选择基本词性"
-            />
-          </Flex>
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          useFlexGap
+          flexWrap="wrap"
+          spacing={1}
+        >
+          <Autocomplete
+            options={parentOptions}
+            value={
+              parentOptions.find(
+                (part) => part.id === (query.part_of_speech_id ?? "")
+              ) ?? null
+            }
+            isOptionEqualToValue={(a, b) => a.id === b.id}
+            getOptionLabel={(part) => part.name_zh}
+            loading={catalog.isPending}
+            disabled={catalog.isError || !parts.length}
+            onChange={(_, part) =>
+              setQuery({
+                ...query,
+                part_of_speech_id: part?.id || undefined,
+                page: 1
+              })
+            }
+            sx={{ width: 220 }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="所属基本词性"
+                placeholder="请选择基本词性"
+              />
+            )}
+          />
           <Button
-            type="primary"
-            icon={<PlusOutlined />}
+            variant="contained"
             disabled={!canEdit || !ready}
             onClick={() => {
               setEditing(undefined);
@@ -264,96 +204,197 @@ export function FormTypeSettings() {
           >
             新增词形变化
           </Button>
-        </Flex>
-      </Card>
-      <Card size="small">
+        </Stack>
+      </Paper>
+      <Paper variant="outlined" sx={{ p: 2 }}>
         {list.isError && (
           <Alert
-            showIcon
-            type="error"
-            title="词形配置加载失败"
-            action={<Button onClick={() => void list.refetch()}>重 试</Button>}
-            style={{ marginBottom: 12 }}
-          />
+            severity="error"
+            action={<Button onClick={() => void list.refetch()}>重试</Button>}
+          >
+            词形配置加载失败
+          </Alert>
         )}
-        <Table<FormTypeConfig>
-          rowKey="id"
-          size="middle"
-          columns={columns}
-          dataSource={list.data?.items ?? []}
-          loading={catalog.isPending || (ready && list.isPending)}
-          scroll={{ x: 1300 }}
+        <AdminTable<FormTypeConfig>
+          rows={list.data?.items ?? []}
+          rowId={(item) => item.id}
+          loading={catalog.isPending || (ready && list.isFetching)}
+          minWidth={1300}
           pagination={{
-            current: query.page,
+            page: query.page,
             pageSize: query.page_size,
             total: list.data?.pagination.total ?? 0,
-            showSizeChanger: true,
-            pageSizeOptions: [10, 20, 50],
-            showTotal: (total) => `共 ${total} 条`,
+            pageSizes: [10, 20, 50],
             onChange: (page, page_size) =>
-              setQuery({
-                ...query,
-                page: page_size !== query.page_size ? 1 : page,
-                page_size
-              })
+              setQuery({ ...query, page, page_size })
           }}
+          columns={[
+            ...detailColumns,
+            {
+              id: "parent",
+              label: "所属基本词性",
+              width: 120,
+              render: (item) =>
+                item.part_of_speech_id
+                  ? (partNameById.get(item.part_of_speech_id) ??
+                    item.part_of_speech_id)
+                  : "所有词性"
+            },
+            {
+              id: "usage",
+              label: "关联",
+              width: 100,
+              render: (item) =>
+                item.usage_count ? `${item.usage_count} 个词条` : "无关联"
+            },
+            {
+              id: "creator",
+              label: "创建人",
+              width: 100,
+              render: (item) => item.created_by.display_name
+            },
+            {
+              id: "time",
+              label: "创建时间",
+              width: 150,
+              render: (item) =>
+                dayjs(item.created_at).format("YYYY-MM-DD HH:mm")
+            },
+            {
+              id: "action",
+              label: "操作",
+              width: 150,
+              sticky: "right",
+              render: (item) => (
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    disabled={!canEdit}
+                    onClick={() => {
+                      setEditing(item);
+                      setOpen(true);
+                    }}
+                  >
+                    修改
+                  </Button>
+                  <PermissionButton
+                    color="error"
+                    disabled={
+                      !canDelete || item.code === "base" || item.usage_count > 0
+                    }
+                    reason={
+                      item.code === "base"
+                        ? "原形为必需类型，不能删除"
+                        : item.usage_count
+                          ? "仍与词条有关联，可以修改，但不能删除"
+                          : undefined
+                    }
+                    onClick={() => setRemoving(item)}
+                  >
+                    删除
+                  </PermissionButton>
+                </Stack>
+              )
+            }
+          ]}
         />
-      </Card>
-      <Modal
+      </Paper>
+      <Dialog
         open={open}
-        title={editing ? "修改词形变化" : "新增词形变化"}
-        width={720}
-        okText={editing ? "保 存" : "新 建"}
-        cancelText="取 消"
-        okButtonProps={{ disabled: !canEdit }}
-        confirmLoading={save.isPending}
-        onOk={() => form.submit()}
-        onCancel={() => setOpen(false)}
-        destroyOnHidden
+        fullWidth
+        maxWidth="md"
+        aria-labelledby="form-type-title"
+        onClose={() => {
+          if (!save.isPending) setOpen(false);
+        }}
       >
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={(values) => {
-            if (canEdit) save.mutate(values);
-          }}
-        >
-          {editing?.code === "base" ? (
-            <Alert
-              type="info"
-              showIcon
-              title="原形对所有基本词性通用，不归属某一个词性。"
-              style={{ marginBottom: 16 }}
-            />
-          ) : (
-            <Form.Item
-              name="part_of_speech_id"
-              label="所属基本词性"
-              rules={[{ required: true, message: "请选择所属基本词性" }]}
+        <DialogTitle id="form-type-title">
+          {editing ? "修改词形变化" : "新增词形变化"}
+        </DialogTitle>
+        <DialogContent>
+          <FormProvider {...form}>
+            <Stack
+              component="form"
+              noValidate
+              id="form-type-form"
+              spacing={2}
+              sx={{ mt: 1 }}
+              onSubmit={handleSubmit((values) => {
+                if (canEdit && !save.isPending) save.mutate(values);
+              })}
             >
-              <Select
-                aria-label="所属基本词性"
-                showSearch
-                optionFilterProp="label"
-                options={parts.map((item) => ({
-                  value: item.id,
-                  label: item.name_zh
-                }))}
-                placeholder="请选择所属基本词性"
+              {editing?.code === "base" ? (
+                <Alert severity="info">
+                  原形对所有基本词性通用，不归属某一个词性。
+                </Alert>
+              ) : (
+                <Controller
+                  name="part_of_speech_id"
+                  control={form.control}
+                  rules={{ required: "请选择所属基本词性" }}
+                  render={({ field, fieldState }) => (
+                    <Autocomplete
+                      options={parts}
+                      value={
+                        parts.find((part) => part.id === field.value) ?? null
+                      }
+                      getOptionLabel={(part) => part.name_zh}
+                      isOptionEqualToValue={(a, b) => a.id === b.id}
+                      onChange={(_, part) => field.onChange(part?.id)}
+                      disabled={save.isPending}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="所属基本词性"
+                          placeholder="请选择所属基本词性"
+                          inputRef={field.ref}
+                          onBlur={field.onBlur}
+                          error={!!fieldState.error}
+                          helperText={fieldState.error?.message}
+                        />
+                      )}
+                    />
+                  )}
+                />
+              )}
+              <PartOfSpeechSharedFields
+                disabled={save.isPending}
+                placeholders={{
+                  name_zh: "例如 过去式",
+                  short_name_zh: "例如 过去式",
+                  name_en: "例如 Past tense",
+                  abbreviation: "例如 past",
+                  full_name_en: "例如 past tense"
+                }}
               />
-            </Form.Item>
-          )}
-          <PartOfSpeechSharedFields
-            placeholders={{
-              name_zh: "例如 过去式",
-              short_name_zh: "例如 过去式",
-              name_en: "例如 Past tense",
-              abbreviation: "例如 past",
-              full_name_en: "例如 past tense"
-            }}
-          />
-        </Form>
-      </Modal>
-    </Flex>
+            </Stack>
+          </FormProvider>
+        </DialogContent>
+        <DialogActions>
+          <Button disabled={save.isPending} onClick={() => setOpen(false)}>
+            取消
+          </Button>
+          <Button
+            type="submit"
+            form="form-type-form"
+            variant="contained"
+            disabled={!canEdit}
+            loading={save.isPending}
+          >
+            {editing ? "保存" : "新建"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <ConfirmDialog
+        open={!!removing}
+        title={`删除词形变化“${removing?.name_zh ?? ""}”？`}
+        confirmText="删除"
+        danger
+        pending={deleting}
+        onClose={() => setRemoving(undefined)}
+        onConfirm={() => void remove()}
+      >
+        该操作不可恢复。删除后，词条录入和词典建议不再提供此类型。
+      </ConfirmDialog>
+    </Stack>
   );
 }

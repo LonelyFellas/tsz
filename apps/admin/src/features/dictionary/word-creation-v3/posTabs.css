@@ -6,7 +6,7 @@
  * `.word-sort-actions` 下，标签页没有那层容器，所以这里按同一组视觉参数复刻，
  * 而不是去动那个被多处共用的选择器。
  */
-.word-pos-tabs > .ant-tabs-nav .ant-tabs-tab-active {
+.word-pos-tabs [role="tab"][aria-selected="true"] {
   background: #eef2fe;
 }
 
@@ -26,11 +26,7 @@
   align-items: center;
 }
 
-.word-pos-tab-label > .ant-badge:empty {
-  display: none;
-}
-
-.word-pos-tab-handle .word-sort-drag-handle.ant-btn {
+.word-pos-tab-handle .word-sort-drag-handle {
   width: 24px;
   min-width: 24px;
   color: #7f8998;
@@ -42,18 +38,18 @@
     transform 140ms ease;
 }
 
-.word-pos-tab-handle .word-sort-drag-handle.ant-btn:hover:not(:disabled),
-.word-pos-tab-handle .word-sort-drag-handle.ant-btn:focus-visible {
+.word-pos-tab-handle .word-sort-drag-handle:hover:not(:disabled),
+.word-pos-tab-handle .word-sort-drag-handle:focus-visible {
   color: #1677ff;
   background: rgba(22, 119, 255, 0.1);
 }
 
-.word-pos-tab-handle .word-sort-drag-handle.ant-btn:active:not(:disabled) {
+.word-pos-tab-handle .word-sort-drag-handle:active:not(:disabled) {
   cursor: grabbing;
   transform: scale(1.06);
 }
 
-.word-pos-tab-handle .word-sort-drag-handle.ant-btn:disabled {
+.word-pos-tab-handle .word-sort-drag-handle:disabled {
   color: #c4cad4;
   cursor: default;
 }

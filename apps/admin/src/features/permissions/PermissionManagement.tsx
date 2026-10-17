@@ -1,37 +1,42 @@
-import { CloseOutlined, PlusOutlined, ReloadOutlined } from "@ant-design/icons";
+import Add from "@mui/icons-material/Add";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  App,
   Alert,
-  Breadcrumb,
+  Autocomplete,
+  Box,
+  Breadcrumbs,
   Button,
-  Card,
   Checkbox,
-  ColorPicker,
-  DatePicker,
-  Drawer,
-  Flex,
-  Form,
-  Input,
-  Modal,
-  Pagination,
-  Popconfirm,
+  Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControlLabel,
+  IconButton,
+  MenuItem,
+  Paper,
   Radio,
-  Select,
-  Space,
-  Table,
-  Tag,
+  RadioGroup,
+  Stack,
+  TextField,
   Typography
-} from "antd";
-import type { Dayjs } from "dayjs";
+} from "@mui/material";
 import { useEffect, useRef, useState } from "react";
 import { HttpError } from "@tsz/api-client";
 import type { PermissionTag, UnifiedPermissionCatalog } from "@tsz/types";
 import { CopyableText } from "@/components/CopyableText";
+import { AdminDrawer } from "@/components/AdminDrawer";
+import { AdminTable, AdminPagination } from "@/components/AdminTable";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { DateRangeField } from "@/components/DateRangeField";
+import type { DateRangeValue } from "@/components/DateRangeField";
+import { useFeedback } from "@/components/FeedbackProvider";
 import { api } from "@/lib/auth";
 import { PermissionChangeDialog } from "./PermissionChangeDialog";
 import { MODULE_LABELS } from "./labels";
-import { tagTextColor } from "./tagColors";
+import { PermissionTagChip } from "./PermissionTagChip";
+
 const KIND_LABELS: Record<string, string> = {
   page: "页面",
   action: "操作",
@@ -42,11 +47,6 @@ const RISK_LABELS: Record<string, string> = {
   medium: "中",
   high: "高"
 };
-const RISK_COLORS: Record<string, string> = {
-  low: "green",
-  medium: "orange",
-  high: "red"
-};
 const TAG_COLORS = [
   { value: "default", label: "默认" },
   { value: "blue", label: "蓝色" },
@@ -56,8 +56,38 @@ const TAG_COLORS = [
   { value: "orange", label: "橙色" },
   { value: "red", label: "红色" },
   { value: "purple", label: "紫色" }
-] as const;
+];
 
+function SearchField({
+  placeholder,
+  onSearch
+}: {
+  placeholder: string;
+  onSearch: (value: string) => void;
+}) {
+  const [value, setValue] = useState("");
+  return (
+    <Stack
+      component="form"
+      direction="row"
+      spacing={1}
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSearch(value);
+      }}
+    >
+      <TextField
+        label={placeholder}
+        placeholder={placeholder}
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+      />
+      <Button type="submit" aria-label={`搜索${placeholder}`}>
+        搜索
+      </Button>
+    </Stack>
+  );
+}
 function GrantedAdmins({
   permissionKey,
   onClose
@@ -71,33 +101,35 @@ function GrantedAdmins({
     queryFn: () => api.permissionSystem.grantedAdmins(permissionKey, page)
   });
   return (
-    <Drawer open size={640} title="管理员名单" onClose={onClose}>
-      {query.isError && <Alert type="error" title={query.error.message} />}
-      <Table
-        rowKey="admin_id"
+    <AdminDrawer width={640} title="管理员名单" onClose={onClose}>
+      {query.isError && <Alert severity="error">{query.error.message}</Alert>}
+      <AdminTable
+        rows={query.data?.items ?? []}
+        rowId={(row) => row.admin_id}
         loading={query.isFetching}
-        dataSource={query.data?.items ?? []}
         columns={[
-          { title: "管理员", dataIndex: "display_name" },
+          { id: "name", label: "管理员", render: (row) => row.display_name },
           {
-            title: "账号 ID",
-            dataIndex: "admin_id",
-            render: (id: string) => <CopyableText value={id} />
+            id: "id",
+            label: "账号 ID",
+            render: (row) => <CopyableText value={row.admin_id} />
           },
-          { title: "权限版本", dataIndex: "permission_version" }
+          {
+            id: "version",
+            label: "权限版本",
+            render: (row) => row.permission_version
+          }
         ]}
         pagination={{
-          current: page,
+          page,
           pageSize: 20,
           total: query.data?.total ?? 0,
-          showSizeChanger: false,
           onChange: setPage
         }}
       />
-    </Drawer>
+    </AdminDrawer>
   );
 }
-
 function BatchTargets({
   catalog,
   keys,
@@ -109,8 +141,8 @@ function BatchTargets({
   action: "grant" | "revoke";
   onClose: () => void;
 }) {
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1),
+    [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [adminNames, setAdminNames] = useState<Record<string, string>>({});
   const [previewing, setPreviewing] = useState(false);
@@ -129,53 +161,43 @@ function BatchTargets({
       })
   });
   return (
-    <Drawer
-      open
-      size={760}
+    <AdminDrawer
+      width={760}
       title={
         action === "grant" ? "批量授权 · 选择管理员" : "撤销授权 · 选择管理员"
       }
       onClose={onClose}
-      styles={{
-        body: { display: "flex", flexDirection: "column", overflow: "hidden" }
-      }}
       footer={
-        <Flex vertical gap={12}>
-          <Flex justify="flex-end">
-            <Pagination
-              size="small"
-              current={page}
-              pageSize={20}
-              total={query.data?.pagination.total ?? 0}
-              showSizeChanger={false}
-              showTotal={(total) => `共 ${total} 人`}
-              onChange={setPage}
-            />
-          </Flex>
-          <Flex justify="space-between" align="center" gap={12} wrap>
-            <Typography.Text>
+        <Stack spacing={1.5}>
+          <AdminPagination
+            page={page}
+            pageSize={20}
+            total={query.data?.pagination.total ?? 0}
+            onChange={setPage}
+          />
+          <Stack
+            direction="row"
+            useFlexGap
+            flexWrap="wrap"
+            justifyContent="space-between"
+            spacing={1}
+          >
+            <Typography>
               已选 {selected.length} 人（单次最多选择 100 人）
-            </Typography.Text>
+            </Typography>
             <Button
-              type="primary"
+              variant="contained"
               disabled={!selected.length || selected.length > 100}
               onClick={() => setPreviewing(true)}
             >
               下一步：确认权限变更
             </Button>
-          </Flex>
-        </Flex>
+          </Stack>
+        </Stack>
       }
     >
-      <Flex vertical gap={16} style={{ flex: 1, minHeight: 0 }}>
-        <Typography.Paragraph
-          style={{
-            marginBottom: 0,
-            flexShrink: 0,
-            maxHeight: "20%",
-            overflowY: "auto"
-          }}
-        >
+      <Stack spacing={2} sx={{ height: "100%", minHeight: 0 }}>
+        <Typography sx={{ maxHeight: "20%", overflowY: "auto", flexShrink: 0 }}>
           所选权限：
           {keys
             .map(
@@ -183,29 +205,29 @@ function BatchTargets({
                 catalog.permissions.find((p) => p.key === key)?.label ?? key
             )
             .join("、")}
-        </Typography.Paragraph>
-        <Input.Search
+        </Typography>
+        <SearchField
           placeholder="搜索管理员名称"
           onSearch={(value) => {
             setSearch(value);
             setPage(1);
           }}
-          allowClear
-          style={{ flexShrink: 0 }}
         />
-        {query.isError && <Alert type="error" title={query.error.message} />}
-        <div ref={listRef} style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
-          <Table
-            rowKey="id"
-            size="middle"
-            sticky
+        {query.isError && <Alert severity="error">{query.error.message}</Alert>}
+        <div
+          ref={listRef}
+          data-batch-admin-list
+          style={{ overflow: "auto", flex: 1, minHeight: 0 }}
+        >
+          <AdminTable
+            rows={query.data?.items ?? []}
+            rowId={(row) => row.id}
             loading={query.isFetching}
-            dataSource={query.data?.items ?? []}
-            rowSelection={{
-              selectedRowKeys: selected,
-              preserveSelectedRowKeys: true,
-              onChange: (rows) => {
-                setSelected(rows as string[]);
+            selection={{
+              ids: selected,
+              disabled: (row) => row.role === "super_admin",
+              onChange: (ids) => {
+                setSelected(ids);
                 setAdminNames((previous) => ({
                   ...previous,
                   ...Object.fromEntries(
@@ -215,35 +237,36 @@ function BatchTargets({
                     ])
                   )
                 }));
-              },
-              getCheckboxProps: (row) => ({
-                disabled: row.role === "super_admin"
-              })
+              }
             }}
             columns={[
-              { title: "管理员", dataIndex: "display_name" },
               {
-                title: "手机号",
-                dataIndex: "phone",
-                render: (phone: string) =>
-                  phone.length > 7
-                    ? `${phone.slice(0, 3)}****${phone.slice(-4)}`
+                id: "name",
+                label: "管理员",
+                render: (row) => row.display_name
+              },
+              {
+                id: "phone",
+                label: "手机号",
+                render: (row) =>
+                  row.phone.length > 7
+                    ? `${row.phone.slice(0, 3)}****${row.phone.slice(-4)}`
                     : "****"
               },
               {
-                title: "状态",
-                dataIndex: "status",
-                render: (status: "active" | "disabled") => (
-                  <Tag color={status === "active" ? "green" : "default"}>
-                    {status === "active" ? "已启用" : "已禁用"}
-                  </Tag>
+                id: "status",
+                label: "状态",
+                render: (row) => (
+                  <Chip
+                    color={row.status === "active" ? "success" : "default"}
+                    label={row.status === "active" ? "已启用" : "已禁用"}
+                  />
                 )
               }
             ]}
-            pagination={false}
           />
         </div>
-      </Flex>
+      </Stack>
       {previewing && (
         <PermissionChangeDialog
           catalogVersion={catalog.catalog_version}
@@ -258,17 +281,16 @@ function BatchTargets({
           onCommitted={onClose}
         />
       )}
-    </Drawer>
+    </AdminDrawer>
   );
 }
-
 function PermissionAudits({ onClose }: { onClose: () => void }) {
-  const [page, setPage] = useState(1);
-  const [adminId, setAdminId] = useState("");
-  const [key, setKey] = useState("");
-  const [dates, setDates] = useState<[Dayjs | null, Dayjs | null] | null>(null);
-  const since = dates?.[0]?.startOf("day").toISOString();
-  const until = dates?.[1]?.endOf("day").toISOString();
+  const [page, setPage] = useState(1),
+    [adminId, setAdminId] = useState(""),
+    [key, setKey] = useState("");
+  const [dates, setDates] = useState<DateRangeValue>(null);
+  const since = dates?.[0]?.startOf("day").toISOString(),
+    until = dates?.[1]?.endOf("day").toISOString();
   const query = useQuery({
     queryKey: ["permission-system", "audits", page, adminId, key, since, until],
     queryFn: () =>
@@ -282,60 +304,60 @@ function PermissionAudits({ onClose }: { onClose: () => void }) {
       })
   });
   return (
-    <Drawer open size={960} title="权限与标签变更记录" onClose={onClose}>
-      <Space wrap>
-        <Input.Search
+    <AdminDrawer width={960} title="权限与标签变更记录" onClose={onClose}>
+      <Stack direction="row" useFlexGap flexWrap="wrap" spacing={1}>
+        <SearchField
           placeholder="管理员 ID"
           onSearch={(value) => {
             setAdminId(value);
             setPage(1);
           }}
         />
-        <Input.Search
+        <SearchField
           placeholder="权限标识"
           onSearch={(value) => {
             setKey(value);
             setPage(1);
           }}
         />
-        <DatePicker.RangePicker
+        <DateRangeField
           value={dates}
           onChange={(value) => {
             setDates(value);
             setPage(1);
           }}
         />
-      </Space>
-      {query.isError && <Alert type="error" title={query.error.message} />}
-      <Table
-        rowKey="id"
+      </Stack>
+      {query.isError && <Alert severity="error">{query.error.message}</Alert>}
+      <AdminTable
+        rows={query.data?.items ?? []}
+        rowId={(row) => row.id}
         loading={query.isFetching}
-        dataSource={query.data?.items ?? []}
         columns={[
-          { title: "时间", dataIndex: "occurred_at" },
-          { title: "操作者", dataIndex: "actor_admin_id" },
-          { title: "操作", dataIndex: "action" },
-          { title: "对象", dataIndex: "resource_id" },
-          { title: "请求", dataIndex: "request_id" },
+          { id: "time", label: "时间", render: (row) => row.occurred_at },
+          { id: "actor", label: "操作者", render: (row) => row.actor_admin_id },
+          { id: "action", label: "操作", render: (row) => row.action },
+          { id: "resource", label: "对象", render: (row) => row.resource_id },
+          { id: "request", label: "请求", render: (row) => row.request_id },
           {
-            title: "调整内容",
-            render: (_, row) => JSON.stringify(row.metadata)
+            id: "metadata",
+            label: "调整内容",
+            render: (row) => JSON.stringify(row.metadata)
           }
         ]}
         pagination={{
-          current: page,
+          page,
           pageSize: 20,
           total: query.data?.total ?? 0,
-          showSizeChanger: false,
           onChange: setPage
         }}
       />
-    </Drawer>
+    </AdminDrawer>
   );
 }
 
 export function PermissionManagement() {
-  const { message } = App.useApp();
+  const notify = useFeedback();
   const client = useQueryClient();
   const catalog = useQuery({
     queryKey: ["permission-system", "catalog"],
@@ -359,6 +381,7 @@ export function PermissionManagement() {
   const [tagName, setTagName] = useState("");
   const [tagColor, setTagColor] = useState("default");
   const [customColor, setCustomColor] = useState("#2053FF");
+  const [deletingTag, setDeletingTag] = useState<PermissionTag>();
   const [busy, setBusy] = useState(false);
   const [audits, setAudits] = useState(false);
   const reload = () =>
@@ -371,7 +394,7 @@ export function PermissionManagement() {
     try {
       await operation();
       await reload();
-      message.success(success);
+      notify(success, "success");
       return true;
     } catch (error) {
       if (error instanceof HttpError && error.status === 409) {
@@ -392,18 +415,18 @@ export function PermissionManagement() {
             current?.tags.find((tag) => tag.id === editingTag.id)?.version ===
               editingTag.version);
         if (editingTag && duplicateName && versionUnchanged) {
-          message.warning("标签名称已存在，请使用其他名称");
+          notify("标签名称已存在，请使用其他名称", "warning");
         } else {
           setEditingTag(undefined);
-          message.warning("标签已被更新，请重新查看后再保存");
+          notify("标签已被更新，请重新查看后再保存", "warning");
         }
       } else if (error instanceof HttpError && error.status === 404) {
         await reload();
         setPendingTagChange(undefined);
         setEditingTag(undefined);
-        message.warning("标签已被删除，请重新选择");
+        notify("标签已被删除，请重新选择", "warning");
       } else {
-        message.error(error instanceof Error ? error.message : "操作失败");
+        notify(error instanceof Error ? error.message : "操作失败", "error");
       }
       return false;
     } finally {
@@ -474,158 +497,178 @@ export function PermissionManagement() {
     setTagSearch("");
     setManagingTags(true);
   };
+  const validTagColor =
+    TAG_COLORS.some((color) => color.value === tagColor) ||
+    /^#[0-9a-f]{6}$/i.test(tagColor);
+  const saveTag = () => {
+    if (!editingTag || busy || !tagName.trim() || !validTagColor) return;
+    void mutateTags(
+      () =>
+        editingTag === "new"
+          ? api.permissionSystem.createTag(tagName.trim(), tagColor)
+          : api.permissionSystem.updateTag(
+              editingTag.id,
+              tagName.trim(),
+              tagColor,
+              editingTag.version
+            ),
+      "标签已保存"
+    ).then((ok) => {
+      if (ok) setEditingTag(undefined);
+    });
+  };
   return (
-    <Flex vertical gap={16}>
-      <Breadcrumb items={[{ title: "用户管理" }, { title: "权限管理" }]} />
-      <Card size="small" styles={{ body: { paddingBottom: 8 } }}>
-        <Form
-          layout="inline"
-          style={{
-            rowGap: 12,
-            columnGap: 8,
-            display: "flex",
-            flexWrap: "wrap"
-          }}
+    <Stack spacing={2}>
+      <Breadcrumbs>
+        <Typography>用户管理</Typography>
+        <Typography>权限管理</Typography>
+      </Breadcrumbs>
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Stack direction="row" useFlexGap flexWrap="wrap" spacing={1}>
+          <TextField
+            label="关键词"
+            placeholder="权限名称 / 说明"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            sx={{ width: 240 }}
+          />
+          <TextField
+            select
+            label="所属板块"
+            slotProps={{
+              select: {
+                displayEmpty: true,
+                renderValue: (value) =>
+                  value
+                    ? (MODULE_LABELS[String(value)] ?? String(value))
+                    : "全部"
+              },
+              inputLabel: { shrink: true }
+            }}
+            value={module ?? ""}
+            onChange={(event) => setModule(event.target.value || undefined)}
+            sx={{ width: 160 }}
+          >
+            <MenuItem value="">全部</MenuItem>
+            {[
+              ...new Set(
+                catalog.data?.permissions.map((p) => p.module_key) ?? []
+              )
+            ].map((value) => (
+              <MenuItem key={value} value={value}>
+                {MODULE_LABELS[value] ?? value}
+              </MenuItem>
+            ))}
+          </TextField>
+          <Autocomplete
+            multiple
+            options={tags}
+            value={tags.filter((tag) => tagFilter.includes(tag.id))}
+            getOptionLabel={(tag) => tag.name}
+            isOptionEqualToValue={(a, b) => a.id === b.id}
+            onChange={(_, values) => setTagFilter(values.map((tag) => tag.id))}
+            sx={{ width: 220 }}
+            renderInput={(params) => (
+              <TextField {...params} label="权限标签" placeholder="全部" />
+            )}
+          />
+          <Button
+            onClick={() => {
+              setSearch("");
+              setModule(undefined);
+              setTagFilter([]);
+            }}
+          >
+            重置
+          </Button>
+        </Stack>
+      </Paper>
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="center"
+          useFlexGap
+          flexWrap="wrap"
+          spacing={1}
+          sx={{ mb: 1.5 }}
         >
-          <Form.Item label="关键词">
-            <Input
-              placeholder="权限名称 / 说明"
-              allowClear
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{ width: 240 }}
-            />
-          </Form.Item>
-          <Form.Item label="所属板块">
-            <Select
-              aria-label="所属板块"
-              allowClear
-              placeholder="全部"
-              value={module}
-              onChange={setModule}
-              style={{ width: 160 }}
-              options={[
-                ...new Set(
-                  catalog.data?.permissions.map((p) => p.module_key) ?? []
-                )
-              ].map((value) => ({
-                value,
-                label: MODULE_LABELS[value] ?? value
-              }))}
-            />
-          </Form.Item>
-          <Form.Item label="权限标签">
-            <Select
-              aria-label="权限标签"
-              mode="multiple"
-              allowClear
-              placeholder="全部"
-              value={tagFilter}
-              onChange={setTagFilter}
-              style={{ width: 200 }}
-              options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
-            />
-          </Form.Item>
-          <Form.Item>
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={() => {
-                setSearch("");
-                setModule(undefined);
-                setTagFilter([]);
-              }}
-            >
-              重置
-            </Button>
-          </Form.Item>
-        </Form>
-      </Card>
-      <Card size="small">
-        <Flex
-          justify="space-between"
-          align="center"
-          gap={12}
-          wrap
-          style={{ marginBottom: 12 }}
-        >
-          <Space wrap>
-            <Typography.Text type="secondary">
+          <Stack
+            direction="row"
+            useFlexGap
+            flexWrap="wrap"
+            spacing={1}
+            alignItems="center"
+          >
+            <Typography color="text.secondary">
               已选 {selected.length} 项
-            </Typography.Text>
+            </Typography>
             <Button
-              type="primary"
+              variant="contained"
               disabled={!selected.length}
               onClick={() => setBatchAction("grant")}
             >
               批量授权
             </Button>
             <Button
-              danger
+              color="error"
               disabled={!selected.length}
               onClick={() => setBatchAction("revoke")}
             >
               撤销授权
             </Button>
             <Button onClick={() => openTagManager()}>标签管理</Button>
-          </Space>
-          <Space>
-            <Button onClick={() => setAudits(true)}>变更记录</Button>
-          </Space>
-        </Flex>
+          </Stack>
+          <Button onClick={() => setAudits(true)}>变更记录</Button>
+        </Stack>
         {catalog.isError && (
           <Alert
-            type="error"
-            showIcon
-            title="权限列表加载失败"
-            description={catalog.error.message}
-            style={{ marginBottom: 12 }}
+            severity="error"
             action={
-              <Button size="small" onClick={() => void catalog.refetch()}>
-                重试
-              </Button>
+              <Button onClick={() => void catalog.refetch()}>重试</Button>
             }
-          />
+          >
+            权限列表加载失败<Typography>{catalog.error.message}</Typography>
+          </Alert>
         )}
-        <Table
-          rowKey="key"
-          size="middle"
-          scroll={{ x: 1480 }}
+        <AdminTable
+          rows={rows}
+          rowId={(row) => row.key}
           loading={catalog.isFetching}
-          dataSource={rows}
-          rowSelection={{
-            fixed: true,
-            selectedRowKeys: selected,
-            preserveSelectedRowKeys: true,
-            onChange: (keys) => setSelected(keys as string[])
-          }}
+          minWidth={1480}
+          selection={{ ids: selected, onChange: setSelected }}
           columns={[
             {
-              title: "权限名称",
+              id: "label",
+              label: "权限名称",
               width: 220,
-              fixed: "left",
-              dataIndex: "label"
+              sticky: "left",
+              render: (p) => p.label
             },
             {
-              title: "详细说明",
-              dataIndex: "description",
-              width: 340
+              id: "description",
+              label: "详细说明",
+              width: 340,
+              render: (p) => p.description
             },
             {
-              title: "所属板块",
+              id: "module",
+              label: "所属板块",
               width: 140,
-              render: (_, p) => (
+              render: (p) => (
                 <>
                   <div>{MODULE_LABELS[p.module_key] ?? p.module_key}</div>
-                  <Typography.Text type="secondary">
+                  <Typography variant="caption" color="text.secondary">
                     {KIND_LABELS[p.kind] ?? p.kind}
-                  </Typography.Text>
+                  </Typography>
                 </>
               )
             },
             {
-              title: "前置权限",
+              id: "requires",
+              label: "前置权限",
               width: 240,
-              render: (_, p) => (
+              render: (p) => (
                 <span title={p.requires.join("、")}>
                   {p.requires
                     .map((key) => permissionLabels[key] ?? key)
@@ -634,283 +677,253 @@ export function PermissionManagement() {
               )
             },
             {
-              title: "风险",
+              id: "risk",
+              label: "风险",
               width: 80,
-              dataIndex: "risk_level",
-              render: (risk: string) => (
-                <Tag color={RISK_COLORS[risk]}>{RISK_LABELS[risk] ?? risk}</Tag>
+              render: (p) => (
+                <Chip
+                  label={RISK_LABELS[p.risk_level] ?? p.risk_level}
+                  color={
+                    p.risk_level === "high"
+                      ? "error"
+                      : p.risk_level === "medium"
+                        ? "warning"
+                        : "success"
+                  }
+                />
               )
             },
             {
-              title: "标签",
+              id: "tags",
+              label: "标签",
               width: 260,
-              render: (_, p) => {
+              render: (p) => {
                 const rowTags = tags.filter((tag) =>
                   tag.permissions.includes(p.key)
                 );
-                const orderedTags = [
+                const ordered = [
                   ...rowTags.filter((tag) => tagFilter.includes(tag.id)),
                   ...rowTags.filter((tag) => !tagFilter.includes(tag.id))
                 ];
-                const visibleTags = orderedTags.slice(0, 2);
-                const remainingTags = orderedTags.slice(2);
+                const visible = ordered.slice(0, 2),
+                  remaining = ordered.slice(2);
                 return (
-                  <Flex
-                    align="center"
-                    gap={4}
-                    wrap={false}
-                    style={{ minWidth: 0, whiteSpace: "nowrap" }}
+                  <Stack
+                    direction="row"
+                    spacing={0.5}
+                    alignItems="center"
+                    sx={{ whiteSpace: "nowrap" }}
                   >
-                    {visibleTags.map((tag) => (
-                      <Tag
+                    {visible.map((tag) => (
+                      <Box
                         key={tag.id}
-                        color={tag.color === "default" ? undefined : tag.color}
-                        style={{
-                          marginInlineEnd: 0,
-                          maxWidth: visibleTags.length === 2 ? 94 : 180,
-                          minWidth: 0,
+                        sx={{
                           display: "inline-flex",
                           alignItems: "center",
-                          gap: 4,
-                          color: tagTextColor(tag.color)
+                          minWidth: 0,
+                          maxWidth: visible.length === 2 ? 94 : 180
                         }}
                       >
-                        <span
-                          title={tag.name}
-                          style={{
-                            minWidth: 0,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap"
-                          }}
-                        >
-                          {tag.name}
-                        </span>
-                        <button
-                          type="button"
+                        <PermissionTagChip tag={tag} />
+                        <IconButton
+                          size="small"
                           aria-label={`从${tag.name}移除${p.label}`}
                           title={`仅从“${p.label}”移除“${tag.name}”标签`}
                           disabled={busy}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            queueTagChange(tag, [p.key], false);
-                          }}
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            flexShrink: 0,
-                            width: 16,
-                            height: 16,
-                            padding: 0,
-                            border: 0,
-                            background: "transparent",
-                            color: "inherit",
-                            cursor: busy ? "not-allowed" : "pointer"
-                          }}
+                          onClick={() => queueTagChange(tag, [p.key], false)}
                         >
-                          <CloseOutlined style={{ fontSize: 10 }} />
-                        </button>
-                      </Tag>
+                          ×
+                        </IconButton>
+                      </Box>
                     ))}
-                    {remainingTags.length > 0 ? (
+                    {remaining.length ? (
                       <Button
-                        type="text"
-                        size="small"
-                        aria-label={`查看${p.label}其余${remainingTags.length}个标签`}
-                        title={remainingTags.map((tag) => tag.name).join("、")}
+                        aria-label={`查看${p.label}其余${remaining.length}个标签`}
+                        title={remaining.map((tag) => tag.name).join("、")}
                         disabled={busy}
                         onClick={() => openTagManager(p.key)}
-                        style={{ paddingInline: 2 }}
                       >
-                        +{remainingTags.length}
+                        +{remaining.length}
                       </Button>
                     ) : (
-                      <Button
-                        type="text"
+                      <IconButton
                         size="small"
-                        icon={<PlusOutlined />}
                         aria-label={`设置${p.label}标签`}
                         title={`设置${p.label}标签`}
                         disabled={busy}
                         onClick={() => openTagManager(p.key)}
-                        style={{ paddingInline: 2, minWidth: 24 }}
-                      />
+                      >
+                        <Add fontSize="inherit" />
+                      </IconButton>
                     )}
-                  </Flex>
+                  </Stack>
                 );
               }
             },
             {
-              title: "已授权管理员",
+              id: "admins",
+              label: "已授权管理员",
               width: 160,
-              render: (_, p) => (
-                <Button type="link" onClick={() => setGrantedKey(p.key)}>
-                  查看管理员
-                </Button>
+              render: (p) => (
+                <Button onClick={() => setGrantedKey(p.key)}>查看管理员</Button>
               )
             }
           ]}
-          pagination={false}
         />
-      </Card>
-      <Drawer
-        open={managingTags}
-        title="标签管理"
-        size={640}
-        onClose={() => {
-          setManagingTags(false);
-          setTagTargetKey(undefined);
-        }}
-      >
-        <Flex vertical gap={16}>
-          <Typography.Text type="secondary">
-            标签仅用于权限分类，不影响管理员授权。
-          </Typography.Text>
-          {tagTargets.length > 0 && (
-            <Flex justify="space-between" align="center" gap={12} wrap>
-              <Typography.Text strong>
-                {tagTargetKey
-                  ? `设置标签 · ${permissionLabels[tagTargetKey] ?? tagTargetKey}`
-                  : `已选 ${selected.length} 项权限`}
-              </Typography.Text>
-              <Typography.Text type="secondary">勾选后确认</Typography.Text>
-            </Flex>
-          )}
-          <Flex justify="space-between" align="center">
-            <Typography.Text strong>标签列表</Typography.Text>
-            <Button
-              type="primary"
-              disabled={busy}
-              onClick={() => {
-                setEditingTag("new");
-                setTagName("");
-                setTagColor("default");
-                setCustomColor("#2053FF");
-              }}
-            >
-              新建标签
-            </Button>
-          </Flex>
-          <Input
-            aria-label="搜索标签"
-            placeholder="搜索标签"
-            allowClear
-            value={tagSearch}
-            onChange={(event) => setTagSearch(event.target.value)}
-          />
-          <Table<PermissionTag>
-            rowKey="id"
-            size="middle"
-            dataSource={tags.filter((tag) =>
-              tag.name.toLowerCase().includes(tagSearch.trim().toLowerCase())
+      </Paper>
+      {managingTags && (
+        <AdminDrawer
+          width={640}
+          title="标签管理"
+          onClose={() => {
+            if (!busy) {
+              setManagingTags(false);
+              setTagTargetKey(undefined);
+            }
+          }}
+        >
+          <Stack spacing={2}>
+            <Typography color="text.secondary">
+              标签仅用于权限分类，不影响管理员授权。
+            </Typography>
+            {!!tagTargets.length && (
+              <Stack direction="row" justifyContent="space-between">
+                <Typography fontWeight={600}>
+                  {tagTargetKey
+                    ? `设置标签 · ${permissionLabels[tagTargetKey] ?? tagTargetKey}`
+                    : `已选 ${selected.length} 项权限`}
+                </Typography>
+                <Typography color="text.secondary">勾选后确认</Typography>
+              </Stack>
             )}
-            pagination={false}
-            locale={{ emptyText: "暂无标签，可点击“新建标签”添加。" }}
-            columns={[
-              {
-                title: "标签名称",
-                render: (_, tag) => {
-                  const matched = tagTargets.filter((key) =>
-                    tag.permissions.includes(key)
-                  ).length;
-                  return tagTargets.length ? (
-                    <Checkbox
-                      checked={matched === tagTargets.length}
-                      indeterminate={matched > 0 && matched < tagTargets.length}
-                      disabled={busy}
-                      onChange={(event) =>
-                        queueTagChange(tag, tagTargets, event.target.checked)
-                      }
-                    >
-                      <Tag
-                        color={tag.color === "default" ? undefined : tag.color}
-                        style={{
-                          marginInlineStart: 4,
-                          marginInlineEnd: 0,
-                          color: tagTextColor(tag.color)
+            <Stack direction="row" justifyContent="space-between">
+              <Typography fontWeight={600}>标签列表</Typography>
+              <Button
+                variant="contained"
+                disabled={busy}
+                onClick={() => {
+                  setEditingTag("new");
+                  setTagName("");
+                  setTagColor("default");
+                  setCustomColor("#2053FF");
+                }}
+              >
+                新建标签
+              </Button>
+            </Stack>
+            <TextField
+              label="搜索标签"
+              placeholder="搜索标签"
+              value={tagSearch}
+              onChange={(event) => setTagSearch(event.target.value)}
+            />
+            <AdminTable
+              rows={tags.filter((tag) =>
+                tag.name.toLowerCase().includes(tagSearch.trim().toLowerCase())
+              )}
+              rowId={(tag) => tag.id}
+              columns={[
+                {
+                  id: "name",
+                  label: "标签名称",
+                  render: (tag) => {
+                    const matched = tagTargets.filter((key) =>
+                      tag.permissions.includes(key)
+                    ).length;
+                    return tagTargets.length ? (
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={matched === tagTargets.length}
+                            indeterminate={
+                              matched > 0 && matched < tagTargets.length
+                            }
+                            slotProps={{
+                              input: {
+                                "aria-checked":
+                                  matched > 0 && matched < tagTargets.length
+                                    ? "mixed"
+                                    : matched === tagTargets.length
+                              }
+                            }}
+                            disabled={busy}
+                            onChange={(event) =>
+                              queueTagChange(
+                                tag,
+                                tagTargets,
+                                event.target.checked
+                              )
+                            }
+                          />
+                        }
+                        label={
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            alignItems="center"
+                          >
+                            <PermissionTagChip tag={tag} />
+                            {tagTargets.length > 1 && (
+                              <Typography variant="caption">
+                                {matched}/{tagTargets.length}
+                              </Typography>
+                            )}
+                          </Stack>
+                        }
+                      />
+                    ) : (
+                      <PermissionTagChip tag={tag} />
+                    );
+                  }
+                },
+                {
+                  id: "actions",
+                  label: "操作",
+                  width: 160,
+                  render: (tag) => (
+                    <Stack direction="row" spacing={0.5}>
+                      <Button
+                        disabled={busy}
+                        onClick={() => {
+                          setEditingTag(tag);
+                          setTagName(tag.name);
+                          setTagColor(tag.color ?? "default");
+                          setCustomColor(
+                            tag.color?.startsWith("#") ? tag.color : "#2053FF"
+                          );
                         }}
                       >
-                        {tag.name}
-                      </Tag>
-                      {tagTargets.length > 1 && (
-                        <Typography.Text
-                          type="secondary"
-                          style={{ marginLeft: 8 }}
-                        >
-                          {matched}/{tagTargets.length}
-                        </Typography.Text>
-                      )}
-                    </Checkbox>
-                  ) : (
-                    <Tag
-                      color={tag.color === "default" ? undefined : tag.color}
-                      style={{ color: tagTextColor(tag.color) }}
-                    >
-                      {tag.name}
-                    </Tag>
-                  );
-                }
-              },
-              {
-                title: "操作",
-                width: 160,
-                render: (_, tag) => (
-                  <Space size={4}>
-                    <Button
-                      type="link"
-                      size="small"
-                      disabled={busy}
-                      onClick={() => {
-                        setEditingTag(tag);
-                        setTagName(tag.name);
-                        setTagColor(tag.color ?? "default");
-                        setCustomColor(
-                          tag.color?.startsWith("#") ? tag.color : "#2053FF"
-                        );
-                      }}
-                    >
-                      编辑
-                    </Button>
-                    <Popconfirm
-                      title="删除标签？管理员已分配的权限不受影响。"
-                      okText="删除"
-                      cancelText="取消"
-                      onConfirm={() =>
-                        mutateTags(
-                          () =>
-                            api.permissionSystem.deleteTag(tag.id, tag.version),
-                          "标签已删除，管理员权限未改变"
-                        )
-                      }
-                    >
-                      <Button type="link" size="small" danger disabled={busy}>
+                        编辑
+                      </Button>
+                      <Button
+                        color="error"
+                        disabled={busy}
+                        onClick={() => setDeletingTag(tag)}
+                      >
                         删除
                       </Button>
-                    </Popconfirm>
-                  </Space>
-                )
-              }
-            ]}
-          />
-        </Flex>
-      </Drawer>
-      <Modal
-        open={pendingTagChange !== undefined}
+                    </Stack>
+                  )
+                }
+              ]}
+            />
+            {!tags.length && (
+              <Typography color="text.secondary">
+                暂无标签，可点击“新建标签”添加。
+              </Typography>
+            )}
+          </Stack>
+        </AdminDrawer>
+      )}
+      <ConfirmDialog
+        open={!!pendingTagChange}
         title={pendingTagChange?.checked ? "确认添加至标签" : "确认从标签移除"}
-        okText={pendingTagChange?.checked ? "确认添加" : "确认移除"}
-        okButtonProps={{ danger: !pendingTagChange?.checked }}
-        cancelText="取消"
-        cancelButtonProps={{ disabled: busy }}
-        closable={!busy}
-        mask={{ closable: !busy }}
-        keyboard={!busy}
-        confirmLoading={busy}
-        onCancel={() => {
-          if (!busy) setPendingTagChange(undefined);
-        }}
-        onOk={() => {
-          if (!pendingTagChange) return;
+        confirmText={pendingTagChange?.checked ? "确认添加" : "确认移除"}
+        danger={!pendingTagChange?.checked}
+        pending={busy}
+        onClose={() => setPendingTagChange(undefined)}
+        onConfirm={() => {
+          if (!pendingTagChange || busy) return;
           void changeTagMembers(
             pendingTagChange.tag,
             pendingTagChange.keys,
@@ -921,7 +934,7 @@ export function PermissionManagement() {
         }}
       >
         {pendingTagChange && (
-          <Typography.Text>
+          <Typography>
             将
             {affectedTagKeys.length === 1
               ? `“${permissionLabels[affectedTagKeys[0]!] ?? affectedTagKeys[0]}”`
@@ -929,47 +942,71 @@ export function PermissionManagement() {
             {pendingTagChange.checked ? "添加至" : "从"}“
             {pendingTagChange.tag.name}”标签
             {pendingTagChange.checked ? "" : "移除"}？
-          </Typography.Text>
+          </Typography>
         )}
-      </Modal>
-      <Modal
-        open={editingTag !== undefined}
-        title={editingTag === "new" ? "新建标签" : "编辑标签"}
-        okText="保存"
-        cancelText="取消"
-        confirmLoading={busy}
-        onCancel={() => setEditingTag(undefined)}
-        onOk={() => {
-          if (!editingTag || !tagName.trim()) return;
+      </ConfirmDialog>
+      <ConfirmDialog
+        open={!!deletingTag}
+        title="删除标签？管理员已分配的权限不受影响。"
+        confirmText="删除"
+        danger
+        pending={busy}
+        onClose={() => setDeletingTag(undefined)}
+        onConfirm={() => {
+          if (!deletingTag || busy) return;
           void mutateTags(
             () =>
-              editingTag === "new"
-                ? api.permissionSystem.createTag(tagName.trim(), tagColor)
-                : api.permissionSystem.updateTag(
-                    editingTag.id,
-                    tagName.trim(),
-                    tagColor,
-                    editingTag.version
-                  ),
-            "标签已保存"
+              api.permissionSystem.deleteTag(
+                deletingTag.id,
+                deletingTag.version
+              ),
+            "标签已删除，管理员权限未改变"
           ).then((ok) => {
-            if (ok) setEditingTag(undefined);
+            if (ok) setDeletingTag(undefined);
           });
         }}
       >
-        <Flex vertical gap={16}>
-          <Input
-            aria-label="标签名称"
-            placeholder="标签名称"
-            value={tagName}
-            onChange={(e) => setTagName(e.target.value)}
-            maxLength={50}
-          />
-          <Flex vertical gap={8}>
-            <Typography.Text>标签颜色</Typography.Text>
-            <Radio.Group
+        确认删除“{deletingTag?.name}”标签？
+      </ConfirmDialog>
+      <Dialog
+        open={!!editingTag}
+        onClose={() => {
+          if (!busy) setEditingTag(undefined);
+        }}
+        fullWidth
+        maxWidth="sm"
+        aria-labelledby="edit-tag-title"
+      >
+        <DialogTitle id="edit-tag-title">
+          {editingTag === "new" ? "新建标签" : "编辑标签"}
+        </DialogTitle>
+        <DialogContent>
+          <Stack
+            component="form"
+            id="edit-tag-form"
+            spacing={2}
+            sx={{ mt: 1 }}
+            onSubmit={(event) => {
+              event.preventDefault();
+              saveTag();
+            }}
+          >
+            <TextField
+              label="标签名称"
+              placeholder="标签名称"
+              value={tagName}
+              disabled={busy}
+              onChange={(event) => setTagName(event.target.value)}
+              slotProps={{ htmlInput: { maxLength: 50 } }}
+            />
+            <Typography>标签颜色</Typography>
+            <RadioGroup
               aria-label="标签颜色"
-              value={tagColor.startsWith("#") ? "custom" : tagColor}
+              value={
+                TAG_COLORS.some((color) => color.value === tagColor)
+                  ? tagColor
+                  : "custom"
+              }
               onChange={(event) =>
                 setTagColor(
                   event.target.value === "custom"
@@ -978,49 +1015,76 @@ export function PermissionManagement() {
                 )
               }
             >
-              <Flex wrap gap={8}>
+              <Stack direction="row" useFlexGap flexWrap="wrap" spacing={1}>
                 {TAG_COLORS.map((color) => (
-                  <Radio
+                  <FormControlLabel
                     key={color.value}
                     value={color.value}
-                    style={{ width: 108, marginInlineEnd: 0 }}
-                  >
-                    <Tag
-                      color={
-                        color.value === "default" ? undefined : color.value
-                      }
-                      style={{ marginInlineEnd: 0 }}
-                    >
-                      {color.label}
-                    </Tag>
-                  </Radio>
-                ))}
-                <Flex align="center" gap={8} style={{ width: "100%" }}>
-                  <Radio value="custom" style={{ marginInlineEnd: 0 }}>
-                    自定义
-                  </Radio>
-                  <ColorPicker
-                    aria-label="自定义颜色"
-                    value={customColor}
-                    format="hex"
-                    disabledFormat
-                    disabledAlpha
-                    showText={(color) => color.toHexString().toUpperCase()}
-                    onOpenChange={(open) => {
-                      if (open) setTagColor(customColor);
-                    }}
-                    onChange={(color) => {
-                      const hex = color.toHexString().toUpperCase();
-                      setCustomColor(hex);
-                      setTagColor(hex);
-                    }}
+                    disabled={busy}
+                    control={<Radio />}
+                    label={
+                      <PermissionTagChip
+                        tag={{ name: color.label, color: color.value }}
+                      />
+                    }
                   />
-                </Flex>
-              </Flex>
-            </Radio.Group>
-          </Flex>
-        </Flex>
-      </Modal>
+                ))}
+              </Stack>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <FormControlLabel
+                  value="custom"
+                  control={<Radio />}
+                  disabled={busy}
+                  label="自定义"
+                />
+                <TextField
+                  label="自定义颜色"
+                  value={customColor}
+                  disabled={busy}
+                  error={!/^#[0-9a-f]{6}$/i.test(customColor)}
+                  helperText={
+                    !/^#[0-9a-f]{6}$/i.test(customColor)
+                      ? "请输入 #RRGGBB 颜色"
+                      : undefined
+                  }
+                  onChange={(event) => {
+                    setCustomColor(event.target.value);
+                    setTagColor(event.target.value);
+                  }}
+                />
+                <input
+                  type="color"
+                  aria-label="颜色色盘"
+                  value={
+                    /^#[0-9a-f]{6}$/i.test(customColor)
+                      ? customColor
+                      : "#2053FF"
+                  }
+                  disabled={busy}
+                  onChange={(event) => {
+                    setCustomColor(event.target.value.toUpperCase());
+                    setTagColor(event.target.value.toUpperCase());
+                  }}
+                />
+              </Stack>
+            </RadioGroup>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button disabled={busy} onClick={() => setEditingTag(undefined)}>
+            取消
+          </Button>
+          <Button
+            type="submit"
+            form="edit-tag-form"
+            variant="contained"
+            loading={busy}
+            disabled={!tagName.trim() || !validTagColor}
+          >
+            保存
+          </Button>
+        </DialogActions>
+      </Dialog>
       {batchAction && catalog.data && (
         <BatchTargets
           catalog={catalog.data}
@@ -1036,6 +1100,6 @@ export function PermissionManagement() {
         />
       )}
       {audits && <PermissionAudits onClose={() => setAudits(false)} />}
-    </Flex>
+    </Stack>
   );
 }

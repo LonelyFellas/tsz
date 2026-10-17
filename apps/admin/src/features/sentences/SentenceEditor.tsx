@@ -1,3 +1,12 @@
+import { AdminDialog } from "@/components/AdminDialog";
+import { Select as MuiSelect, MenuItem as MuiMenuItem } from "@mui/material";
+import {
+  Alert as MuiAlert,
+  AlertTitle as MuiAlertTitle,
+  Button as MuiButton,
+  Stack as MuiStack,
+  Typography as MuiTypography
+} from "@mui/material";
 import { useDraftRecovery } from "@/features/recovery/useDraftRecovery";
 import { useContext, useEffect, useRef, useState } from "react";
 import { UNSAFE_DataRouterContext, useBlocker } from "react-router-dom";
@@ -7,17 +16,8 @@ import {
   sameSentenceTarget,
   matchesSentenceTarget
 } from "./associationModel";
-import {
-  Alert,
-  App,
-  Button,
-  Flex,
-  Modal,
-  Radio,
-  Select,
-  Space,
-  Typography
-} from "antd";
+import { RadioGroup, FormControlLabel, Radio } from "@mui/material";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type {
   AdminWordV3,
   Dialect,
@@ -44,7 +44,6 @@ const LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"].map((value) => ({
   value,
   label: value
 }));
-
 export function SentenceEditor({
   sentence,
   sourceWord,
@@ -82,7 +81,28 @@ export function SentenceEditor({
       )
     : hasAdminPermission(profile, "sentences.create");
   const allowed = canEdit || canAssociate;
-  const { modal } = App.useApp();
+  const [confirmation, setConfirmation] = useState<{
+    title: string;
+    content: string;
+    run: () => void;
+  }>();
+  const [leaveRequested, setLeaveRequested] = useState(false);
+  const [leaveSaving, setLeaveSaving] = useState(false);
+  const leaveResolver = useRef<((leave: boolean) => void) | undefined>(
+    undefined
+  );
+  const settleLeave = (leave: boolean) => {
+    const resolve = leaveResolver.current;
+    leaveResolver.current = undefined;
+    setLeaveRequested(false);
+    resolve?.(leave);
+  };
+  useEffect(
+    () => () => {
+      leaveResolver.current?.(false);
+    },
+    []
+  );
   const sourceEntryId = sourceWord?.id;
   const currentTargets =
     sourceWord && sourceSenseId
@@ -231,10 +251,10 @@ export function SentenceEditor({
     }
   };
   const close = () =>
-    modal.confirm({
+    setConfirmation({
       title: "放弃本次未完成的例句编辑？",
       content: "尚未点完成的修改不会保存。此前已经完成的例句不受影响。",
-      onOk: () => {
+      run: () => {
         recovery.discard();
         onClose();
       }
@@ -296,48 +316,9 @@ export function SentenceEditor({
       dirty
         ? () =>
             new Promise<boolean>((resolve) => {
-              const dialog = modal.confirm({
-                title: "例句还有未保存的修改",
-                content: "例句独立保存，词义保存不会代为保存这里的修改。",
-                onCancel: () => resolve(false),
-                footer: (
-                  <Space>
-                    <Button
-                      onClick={() => {
-                        dialog.destroy();
-                        resolve(false);
-                      }}
-                    >
-                      继续编辑
-                    </Button>
-                    <Button
-                      disabled={saving}
-                      onClick={() => {
-                        dialog.destroy();
-                        resolve(true);
-                      }}
-                    >
-                      放弃修改
-                    </Button>
-                    <Button
-                      type="primary"
-                      disabled={!canSave || saving}
-                      onClick={async () => {
-                        dialog.update({
-                          closable: false,
-                          footer: null,
-                          content: "正在保存例句…"
-                        });
-                        const saved = await finish();
-                        dialog.destroy();
-                        resolve(saved === true);
-                      }}
-                    >
-                      保存例句后离开
-                    </Button>
-                  </Space>
-                )
-              });
+              leaveResolver.current?.(false);
+              leaveResolver.current = resolve;
+              setLeaveRequested(true);
             })
         : undefined
     );
@@ -392,14 +373,65 @@ export function SentenceEditor({
   };
   return (
     <PronunciationPreviewProvider>
+      <ConfirmDialog
+        open={!!confirmation}
+        title={confirmation?.title ?? ""}
+        onClose={() => setConfirmation(undefined)}
+        onConfirm={() => {
+          const action = confirmation;
+          setConfirmation(undefined);
+          action?.run();
+        }}
+      >
+        {confirmation?.content}
+      </ConfirmDialog>
+      <AdminDialog
+        open={leaveRequested}
+        title="例句还有未保存的修改"
+        closeDisabled={leaveSaving}
+        escapeDisabled={leaveSaving}
+        backdropDismiss={false}
+        onClose={() => settleLeave(false)}
+        actions={
+          <>
+            <MuiButton
+              disabled={leaveSaving}
+              onClick={() => settleLeave(false)}
+            >
+              继续编辑
+            </MuiButton>
+            <MuiButton
+              disabled={saving || leaveSaving}
+              onClick={() => settleLeave(true)}
+            >
+              放弃修改
+            </MuiButton>
+            <MuiButton
+              disabled={!canSave || saving}
+              loading={leaveSaving}
+              variant="contained"
+              onClick={async () => {
+                setLeaveSaving(true);
+                try {
+                  const saved = await finish(() => settleLeave(true));
+                  if (saved !== true) settleLeave(false);
+                } finally {
+                  setLeaveSaving(false);
+                }
+              }}
+            >
+              保存例句后离开
+            </MuiButton>
+          </>
+        }
+      >
+        例句独立保存，词义保存不会代为保存这里的修改。
+      </AdminDialog>
       <VoiceEditorModal
         open
-        centered
-        styles={{
-          body: {
-            maxHeight: "min(70vh, calc(100dvh - 160px))",
-            overflowY: "auto"
-          }
+        contentSx={{
+          maxHeight: "min(70vh, calc(100dvh - 160px))",
+          overflowY: "auto"
         }}
         title={
           <V3EditorTitle
@@ -409,26 +441,30 @@ export function SentenceEditor({
           />
         }
         footer={
-          <Flex justify="end" gap="small">
-            <Button aria-label="取消例句编辑" disabled={saving} onClick={close}>
+          <MuiStack direction="row" spacing={1} justifyContent={"end"}>
+            <MuiButton
+              aria-label="取消例句编辑"
+              disabled={saving}
+              onClick={close}
+            >
               取消
-            </Button>
-            <Button
+            </MuiButton>
+            <MuiButton
               aria-label="完成例句编辑"
-              type="primary"
               loading={saving}
               disabled={!canSave}
               onClick={() => void finish()}
+              variant={"contained"}
             >
               完成
-            </Button>
-          </Flex>
+            </MuiButton>
+          </MuiStack>
         }
-        onCancel={close}
-        closable={!saving}
-        keyboard={!saving}
+        onClose={close}
+        closeDisabled={saving}
+        escapeDisabled={saving}
       >
-        <Flex className="sentence-editor" vertical gap="middle">
+        <MuiStack className="sentence-editor" direction="column" spacing={2}>
           {recovery.notice}
           {router && !registerLeaveGuard && (
             <SentenceNavigationGuard
@@ -438,70 +474,101 @@ export function SentenceEditor({
               save={finish}
             />
           )}
-          <Flex justify="space-between" align="center">
-            <Typography.Text type="secondary">
+          <MuiStack
+            direction="row"
+            alignItems={"center"}
+            justifyContent={"space-between"}
+          >
+            <MuiTypography component="span" color="text.secondary">
               {sentence
                 ? `保存仅更新草稿；发布后影响 ${sentence.entries.length} 个词条的 ${sentence.entries.reduce((count, entry) => count + entry.senses.length, 0)} 个词义`
                 : "例句独立保存为草稿，发布后按句内关联展示到对应词义。"}
-            </Typography.Text>
-            <Space>
-              <Typography.Text>等级</Typography.Text>
-              <Select
-                aria-label="例句等级"
-                value={content.sentence.level}
-                options={LEVELS}
+            </MuiTypography>
+            <MuiStack direction="row" spacing={1} alignItems="center">
+              <MuiTypography component="span">等级</MuiTypography>
+              <MuiSelect
+                data-admin-select
                 disabled={saving || !canEdit}
-                onChange={(level) =>
-                  setContent((current) => ({
-                    ...current,
-                    sentence: { ...current.sentence, level }
-                  }))
+                size="small"
+                value={content.sentence.level ?? ""}
+                SelectDisplayProps={{
+                  "aria-label": "例句等级"
+                }}
+                onChange={(event) =>
+                  ((level: NonNullable<string>) =>
+                    setContent((current) => ({
+                      ...current,
+                      sentence: { ...current.sentence, level }
+                    })))(event.target.value as NonNullable<string>)
                 }
-              />
-            </Space>
-          </Flex>
+                displayEmpty
+              >
+                {LEVELS.map((option) => (
+                  <MuiMenuItem
+                    key={String(option.value)}
+                    value={option.value}
+                    disabled={Boolean("disabled" in option && option.disabled)}
+                  >
+                    {option.label}
+                  </MuiMenuItem>
+                ))}
+              </MuiSelect>
+            </MuiStack>
+          </MuiStack>
           {error && (
-            <Alert type="error" title={error} description="输入已保留。" />
+            <MuiAlert severity={"error"}>
+              <MuiAlertTitle>{error}</MuiAlertTitle>
+              {"输入已保留。"}
+            </MuiAlert>
           )}
           {conflict && (
-            <Alert
-              type="warning"
-              title="例句版本冲突"
-              description="本地输入仍已保留。比较最新草稿并选择保留或放弃后，才能再次保存。"
+            <MuiAlert
               action={
-                <Space wrap>
-                  <Button
+                <MuiStack
+                  direction="row"
+                  spacing={1}
+                  alignItems="center"
+                  useFlexGap
+                  flexWrap="wrap"
+                >
+                  <MuiButton
                     loading={saving}
                     onClick={() => void refreshConflict()}
                   >
                     刷新并比较
-                  </Button>
+                  </MuiButton>
                   {latest && (
                     <>
-                      <Button
+                      <MuiButton
                         disabled={saving}
                         onClick={() => resolveConflict(false)}
                       >
                         保留本地修改
-                      </Button>
-                      <Button
+                      </MuiButton>
+                      <MuiButton
                         disabled={saving}
-                        danger
                         onClick={() =>
-                          modal.confirm({
+                          setConfirmation({
                             title: "放弃本地修改？",
                             content: `未保存的输入会被丢弃，改用第 ${latest.revision} 版内容。`,
-                            onOk: () => resolveConflict(true)
+                            run: () => resolveConflict(true)
                           })
                         }
+                        color={"error"}
                       >
                         放弃本地修改
-                      </Button>
+                      </MuiButton>
                     </>
                   )}
-                </Space>
+                </MuiStack>
               }
-            />
+              severity={"warning"}
+            >
+              <MuiAlertTitle>{"例句版本冲突"}</MuiAlertTitle>
+              {
+                "本地输入仍已保留。比较最新草稿并选择保留或放弃后，才能再次保存。"
+              }
+            </MuiAlert>
           )}
           {latest && (
             <DraftComparison local={content} remote={latest.content} />
@@ -509,31 +576,33 @@ export function SentenceEditor({
           {content.annotations.some(
             (annotation) => annotation.target.state === "entry_only"
           ) && (
-            <Alert
-              type="warning"
-              title="旧关联待选择词义"
-              description="请点击原来的关联片段，补选具体词义或清除关联后再完成。"
-            />
+            <MuiAlert severity={"warning"}>
+              <MuiAlertTitle>{"旧关联待选择词义"}</MuiAlertTitle>
+              {"请点击原来的关联片段，补选具体词义或清除关联后再完成。"}
+            </MuiAlert>
           )}
           {sourceEntryId && (
-            <Alert
-              type={currentLinked ? "success" : "info"}
-              title={
-                currentLinked
+            <MuiAlert severity={currentLinked ? "success" : "info"}>
+              <MuiAlertTitle>
+                {currentLinked
                   ? `已关联当前词义：${contextLabel}`
-                  : `请关联当前词义：${contextLabel}`
-              }
-              description={
-                !currentLinked
-                  ? "至少一处单词或短语关联到此词义后才能完成。"
-                  : undefined
-              }
-            />
+                  : `请关联当前词义：${contextLabel}`}
+              </MuiAlertTitle>
+              {!currentLinked
+                ? "至少一处单词或短语关联到此词义后才能完成。"
+                : undefined}
+            </MuiAlert>
           )}
           {candidates.length > 0 && (
-            <Flex wrap gap="small" aria-label="当前词义匹配位置">
+            <MuiStack
+              aria-label="当前词义匹配位置"
+              direction="row"
+              spacing={1}
+              useFlexGap
+              flexWrap="wrap"
+            >
               {candidates.map(({ segments, target, gloss, surface }) => (
-                <Button
+                <MuiButton
                   key={segments[0]!.start}
                   size="small"
                   disabled={
@@ -563,21 +632,27 @@ export function SentenceEditor({
                 >
                   确认关联 {segments.map((s) => s.surface).join(" … ")}（位置{" "}
                   {segments[0]!.start + 1}）
-                </Button>
+                </MuiButton>
               ))}
-            </Flex>
+            </MuiStack>
           )}
           {rows.length > 1 && (
-            <Radio.Group
+            <RadioGroup
+              row
               aria-label="例句方言"
               value={row.dialect}
-              disabled={saving || pendingEditor}
-              onChange={(event) => setDialect(event.target.value)}
-              options={rows.map((item) => ({
-                value: item.dialect,
-                label: item.dialect === "uk" ? "英式" : "美式"
-              }))}
-            />
+              onChange={(_, value) => setDialect(value as Dialect)}
+            >
+              {rows.map((item) => (
+                <FormControlLabel
+                  key={item.dialect}
+                  value={item.dialect}
+                  disabled={saving || pendingEditor}
+                  control={<Radio />}
+                  label={item.dialect === "uk" ? "英式" : "美式"}
+                />
+              ))}
+            </RadioGroup>
           )}
           {variant && (
             <V3VoiceTextField<SharedSentenceAnnotation>
@@ -650,12 +725,11 @@ export function SentenceEditor({
               }))
             }
           />
-        </Flex>
+        </MuiStack>
       </VoiceEditorModal>
     </PronunciationPreviewProvider>
   );
 }
-
 function SentenceNavigationGuard({
   dirty,
   saving,
@@ -669,33 +743,33 @@ function SentenceNavigationGuard({
 }) {
   const blocker = useBlocker(dirty);
   return blocker.state === "blocked" ? (
-    <Modal
+    <AdminDialog
       open
       title="例句还有未保存的修改"
-      closable={!saving}
-      onCancel={() => blocker.reset()}
-      footer={
-        <Space>
-          <Button disabled={saving} onClick={() => blocker.reset()}>
+      closeDisabled={!!saving}
+      onClose={() => blocker.reset()}
+      actions={
+        <MuiStack direction="row" spacing={1} alignItems="center">
+          <MuiButton disabled={saving} onClick={() => blocker.reset()}>
             继续编辑
-          </Button>
-          <Button disabled={saving} onClick={() => blocker.proceed()}>
+          </MuiButton>
+          <MuiButton disabled={saving} onClick={() => blocker.proceed()}>
             放弃修改
-          </Button>
-          <Button
-            type="primary"
+          </MuiButton>
+          <MuiButton
             loading={saving}
             disabled={!canSave}
             onClick={async () => {
               if (!(await save(blocker.proceed))) blocker.reset();
             }}
+            variant={"contained"}
           >
             保存例句后离开
-          </Button>
-        </Space>
+          </MuiButton>
+        </MuiStack>
       }
     >
       例句独立保存，词义保存不会代为保存这里的修改。
-    </Modal>
+    </AdminDialog>
   ) : null;
 }

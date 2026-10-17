@@ -1,5 +1,5 @@
 "use client";
-import "@tsz/voice-editor/styles.css";
+import "@tsz/voice-editor/reader.css";
 import { useEffect, useRef, useState } from "react";
 import { Volume2 } from "lucide-react";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";

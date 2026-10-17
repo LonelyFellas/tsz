@@ -5,7 +5,8 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { FeedbackProvider } from "@/components/FeedbackProvider";
+import { AdminThemeProvider } from "@/mui-theme";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { FormTypeConfig } from "@tsz/types";
 import { beforeEach, expect, it, vi } from "vitest";
@@ -92,9 +93,11 @@ function setup() {
   });
   return render(
     <QueryClientProvider client={client}>
-      <AntApp>
-        <FormTypeSettings />
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <FormTypeSettings />
+        </FeedbackProvider>
+      </AdminThemeProvider>
     </QueryClientProvider>
   );
 }
@@ -133,7 +136,7 @@ it("新增沿用五名称字段，派生编码与排序并刷新列表", async (
     target: { value: "custom variant" }
   });
   // 序号按目录里的全局最大值 + 10 预填，管理员可以改。
-  expect(screen.getByLabelText("序号")).toHaveValue("10");
+  expect(screen.getByLabelText("序号")).toHaveValue(10);
   fireEvent.change(screen.getByLabelText("序号"), { target: { value: "12" } });
   fireEvent.click(screen.getByText(/^新\s*建$/));
   await waitFor(() =>
@@ -157,10 +160,10 @@ it("新增沿用五名称字段，派生编码与排序并刷新列表", async (
 it("序号列显示真实排序值，而不是行内位置", async () => {
   setup();
   await waitFor(() =>
-    expect(document.querySelector("tbody tr.ant-table-row")).not.toBeNull()
+    expect(document.querySelector("tbody tr[data-row-id]")).not.toBeNull()
   );
   // 原形的 sort_order 是 0，第 1 行——位置序号会显示 1。
-  const row = document.querySelector("tbody tr.ant-table-row")!;
+  const row = document.querySelector("tbody tr[data-row-id]")!;
   expect(row.querySelectorAll("td")[0]!.textContent).toBe("0");
 });
 
@@ -173,9 +176,9 @@ it("编辑原形时不给归属选择，也不把归属发给后端", async () =
   }));
   setup();
   await waitFor(() =>
-    expect(document.querySelector("tbody tr.ant-table-row")).not.toBeNull()
+    expect(document.querySelector("tbody tr[data-row-id]")).not.toBeNull()
   );
-  const row = document.querySelector("tbody tr.ant-table-row")!;
+  const row = document.querySelector("tbody tr[data-row-id]")!;
   fireEvent.click(row.querySelector("button")!);
 
   const dialog = await screen.findByRole("dialog");
@@ -264,8 +267,8 @@ it.each(["lexicon_settings.edit_forms", "lexicon_settings.delete"])(
     ];
     setup();
     const row = (await screen.findByText("测试词形")).closest("tr")!;
-    const edit = within(row).getByText("修 改").closest("button");
-    const remove = within(row).getByText("删 除").closest("button");
+    const edit = within(row).getByText("修改").closest("button");
+    const remove = within(row).getByText("删除").closest("button");
     if (key === "lexicon_settings.delete") {
       expect(edit).toBeDisabled();
       expect(remove).toBeEnabled();

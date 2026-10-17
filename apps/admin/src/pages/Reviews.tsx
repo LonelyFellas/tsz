@@ -1,19 +1,18 @@
 import { useEffect, useState } from "react";
-import { ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import {
   Alert,
-  Breadcrumb,
+  Breadcrumbs,
   Button,
-  Card,
-  Flex,
-  Form,
-  Input,
-  Result,
-  Select,
-  Space,
-  Table
-} from "antd";
+  MenuItem,
+  Paper,
+  Stack,
+  TextField,
+  Typography
+} from "@mui/material";
+import { Controller, useForm } from "react-hook-form";
+import { AdminTable } from "@/components/AdminTable";
+import { PageStatus } from "@/components/PageStatus";
 import type { AdminWordlist, WordlistManagementQuery } from "@tsz/types";
 import { api, useAuthStore, usePermission } from "@/lib/auth";
 import { WordlistDetails } from "@/features/wordlists/WordlistDetails";
@@ -40,12 +39,14 @@ export function ReviewsPage() {
       adminId={profile.id}
     />
   ) : (
-    <Result status="403" title="未开通词表查看权限" />
+    <PageStatus title="未开通词表查看权限" />
   );
 }
 
 function ReviewQueue({ adminId }: { adminId: string }) {
-  const [form] = Form.useForm<Filters>();
+  const { register, control, reset, handleSubmit } = useForm<Filters>({
+    defaultValues: { q: "", review_state: "pending" }
+  });
   const [query, setQuery] = useState(initialQuery);
   const [selected, setSelected] = useState<AdminWordlist | null>(null);
   const result = useQuery({
@@ -60,120 +61,115 @@ function ReviewQueue({ adminId }: { adminId: string }) {
     );
   }, [result.data, result.isFetching, result.isSuccess]);
   return (
-    <Flex vertical gap={16}>
-      <Breadcrumb items={[{ title: "审核管理" }, { title: "词表审核" }]} />
-      <Card size="small" styles={{ body: { paddingBottom: 8 } }}>
-        <Form
-          form={form}
-          layout="inline"
-          style={{
-            rowGap: 12,
-            columnGap: 8,
-            display: "flex",
-            flexWrap: "wrap"
-          }}
-          initialValues={{ review_state: "pending" }}
-          onFinish={(values) =>
+    <Stack spacing={2}>
+      <Breadcrumbs>
+        <Typography>审核管理</Typography>
+        <Typography>词表审核</Typography>
+      </Breadcrumbs>
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Stack
+          component="form"
+          direction="row"
+          useFlexGap
+          flexWrap="wrap"
+          spacing={1}
+          onSubmit={handleSubmit((values) =>
             setQuery({
               page: 1,
               page_size: query.page_size,
               q: values.q?.trim(),
               review_state: values.review_state
             })
-          }
+          )}
         >
-          <Form.Item name="q" label="关键词">
-            <Input
-              aria-label="搜索词表"
-              maxLength={100}
-              placeholder="词表名称 / 创建人"
-              style={{ width: 180 }}
-              allowClear
-            />
-          </Form.Item>
-          <Form.Item name="review_state" label="审核状态">
-            <Select
-              aria-label="审核状态"
-              style={{ width: 140 }}
-              options={Object.entries(reviewLabels).map(([value, label]) => ({
-                value,
-                label
-              }))}
-            />
-          </Form.Item>
-          <Form.Item>
-            <Space>
-              <Button
-                type="primary"
-                icon={<SearchOutlined />}
-                htmlType="submit"
-              >
-                搜索
-              </Button>
-              <Button
-                icon={<ReloadOutlined />}
-                onClick={() => {
-                  form.resetFields();
-                  setQuery(initialQuery);
-                }}
-              >
-                重置
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Card>
-      <Card size="small">
+          <TextField
+            label="搜索词表"
+            placeholder="词表名称 / 创建人"
+            sx={{ width: 200 }}
+            slotProps={{ htmlInput: { maxLength: 100 } }}
+            {...register("q")}
+          />
+          <Controller
+            name="review_state"
+            control={control}
+            render={({ field }) => (
+              <TextField {...field} select label="审核状态" sx={{ width: 160 }}>
+                {Object.entries(reviewLabels).map(([value, label]) => (
+                  <MenuItem key={value} value={value}>
+                    {label}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
+          />
+          <Button type="submit" variant="contained">
+            搜索
+          </Button>
+          <Button
+            onClick={() => {
+              reset();
+              setQuery(initialQuery);
+            }}
+          >
+            重置
+          </Button>
+        </Stack>
+      </Paper>
+      <Paper variant="outlined" sx={{ p: 2 }}>
         {result.isError && (
           <Alert
-            type="error"
-            title="审核词表加载失败"
+            severity="error"
             action={<Button onClick={() => void result.refetch()}>重试</Button>}
-          />
+          >
+            审核词表加载失败
+          </Alert>
         )}
-        <Table<AdminWordlist>
-          rowKey={(row) => row.wordlist.id}
+        <AdminTable
+          rows={result.data?.items ?? []}
+          rowId={(row) => row.wordlist.id}
           loading={result.isFetching}
-          dataSource={result.data?.items ?? []}
-          scroll={{ x: 800 }}
+          minWidth={800}
           pagination={{
-            current: query.page,
-            pageSize: query.page_size,
+            page: query.page ?? 1,
+            pageSize: query.page_size ?? 20,
             total: result.data?.pagination.total ?? 0,
-            showSizeChanger: true,
-            pageSizeOptions: [20, 50, 100],
+            pageSizes: [20, 50, 100],
             onChange: (page, page_size) =>
-              setQuery((q) => ({
-                ...q,
-                page: page_size !== q.page_size ? 1 : page,
-                page_size
-              }))
+              setQuery((q) => ({ ...q, page, page_size }))
           }}
           columns={[
-            { title: "词表名称", render: (_, row) => row.wordlist.name },
-            { title: "创建人", render: (_, row) => row.wordlist.owner_name },
-            { title: "词汇数量", render: (_, row) => row.wordlist.item_count },
             {
-              title: "审核状态",
-              render: (_, row) => reviewLabels[row.review_state]
+              id: "name",
+              label: "词表名称",
+              render: (row) => row.wordlist.name
             },
             {
-              title: "操作",
-              fixed: "right",
+              id: "owner",
+              label: "创建人",
+              render: (row) => row.wordlist.owner_name
+            },
+            {
+              id: "count",
+              label: "词汇数量",
+              render: (row) => row.wordlist.item_count
+            },
+            {
+              id: "review",
+              label: "审核状态",
+              render: (row) => reviewLabels[row.review_state]
+            },
+            {
+              id: "action",
+              label: "操作",
               width: 100,
-              render: (_, row) => (
-                <Button
-                  type="link"
-                  size="small"
-                  onClick={() => setSelected(row)}
-                >
-                  查看
-                </Button>
+              sticky: "right",
+              render: (row) => (
+                <Button onClick={() => setSelected(row)}>查看</Button>
               )
             }
           ]}
         />
-      </Card>
+      </Paper>
       {selected && (
         <WordlistDetails
           key={selected.wordlist.id}
@@ -183,6 +179,6 @@ function ReviewQueue({ adminId }: { adminId: string }) {
           onClose={() => setSelected(null)}
         />
       )}
-    </Flex>
+    </Stack>
   );
 }

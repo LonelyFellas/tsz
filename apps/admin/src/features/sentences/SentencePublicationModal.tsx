@@ -1,11 +1,26 @@
+import {
+  List as MuiList,
+  ListItem as MuiListItem,
+  Box as MuiBox,
+  LinearProgress as MuiLinearProgress
+} from "@mui/material";
+import { AdminDialog } from "@/components/AdminDialog";
+import { Button as MuiDialogButton } from "@mui/material";
+import { TextareaAutosize as MuiTextareaAutosize } from "@mui/material";
+import {
+  Alert as MuiAlert,
+  AlertTitle as MuiAlertTitle,
+  Button as MuiButton,
+  Stack as MuiStack,
+  Typography as MuiTypography
+} from "@mui/material";
 import { useRef, useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { Alert, Button, Input, List, Modal, Space, Typography } from "antd";
+
 import { HttpError } from "@tsz/api-client";
 import type { SharedSentence, SentencePublication } from "@tsz/types";
 import { api } from "@/lib/auth";
 import { V3EnglishTextPreview } from "../dictionary/word-creation-v3/components/V3EnglishTextPreview";
-
 export type SentencePublicationAction =
   "publish" | "history" | "withdraw" | "restore";
 const titles = {
@@ -14,7 +29,6 @@ const titles = {
   withdraw: "撤回例句",
   restore: "重新展示原发布"
 };
-
 /** 打开时冻结双 revision；确定性失败要求重新加载，未知结果复用原幂等请求。 */
 export function SentencePublicationModal({
   sentence,
@@ -113,41 +127,49 @@ export function SentencePublicationModal({
     }
   };
   return (
-    <Modal
+    <AdminDialog
       open
       title={titles[action]}
       width={800}
-      onCancel={onClose}
-      closable={!pending}
-      keyboard={!pending}
-      mask={{ closable: false }}
-      cancelButtonProps={{ disabled: pending }}
-      okText={action === "history" ? "恢复所选历史到草稿" : "确认"}
-      confirmLoading={pending}
-      okButtonProps={{
-        disabled:
-          !canAct ||
-          blocked ||
-          (action === "history" && !selected) ||
-          (action === "withdraw" &&
-            (!impact.data || impact.isError || !reason.trim()))
-      }}
-      onOk={() => void submit()}
+      onClose={onClose}
+      closeDisabled={!!pending}
+      escapeDisabled={!!pending}
+      backdropDismiss={false}
+      actions={
+        <>
+          <MuiDialogButton onClick={onClose} disabled={pending}>
+            {"\u53D6\u6D88"}
+          </MuiDialogButton>
+          <MuiDialogButton
+            variant="contained"
+            onClick={() => void submit()}
+            loading={pending}
+            disabled={
+              !canAct ||
+              blocked ||
+              (action === "history" && !selected) ||
+              (action === "withdraw" &&
+                (!impact.data || impact.isError || !reason.trim()))
+            }
+          >
+            {action === "history" ? "恢复所选历史到草稿" : "确认"}
+          </MuiDialogButton>
+        </>
+      }
     >
-      <Space orientation="vertical" style={{ width: "100%" }}>
-        <Alert
-          type="info"
-          title={
-            action === "withdraw"
+      <MuiStack style={{ width: "100%" }} direction="column" spacing={1}>
+        <MuiAlert severity={"info"}>
+          <MuiAlertTitle>
+            {action === "withdraw"
               ? "撤回后例句不再公开展示，草稿、历史版本和关联仍会保留"
               : action === "restore"
                 ? "恢复前重新校验当前发布版本，草稿不会发布"
                 : action === "history"
                   ? "恢复历史版本会覆盖当前草稿，已发布例句须先撤回；重新公开需另行发布"
-                  : "发布当前草稿为公开例句；已撤回例句会重新公开展示"
-          }
-          description="需要对应的发布、撤回或历史恢复权限；普通管理员仅能操作本人例句。"
-        />
+                  : "发布当前草稿为公开例句；已撤回例句会重新公开展示"}
+          </MuiAlertTitle>
+          {"需要对应的发布、撤回或历史恢复权限；普通管理员仅能操作本人例句。"}
+        </MuiAlert>
         {action === "publish" && (
           <V3EnglishTextPreview
             value={sentence.content.sentence.en_text}
@@ -157,103 +179,116 @@ export function SentencePublicationModal({
         {action === "withdraw" && (
           <>
             {impact.isPending && (
-              <Typography.Text>正在核对下架影响…</Typography.Text>
+              <MuiTypography component="span">正在核对下架影响…</MuiTypography>
             )}
             {impact.isError && (
-              <Alert
-                type="error"
-                title="影响确认加载失败"
+              <MuiAlert
                 action={
-                  <Button onClick={() => void impact.refetch()}>重试</Button>
+                  <MuiButton onClick={() => void impact.refetch()}>
+                    重试
+                  </MuiButton>
                 }
-              />
+                severity={"error"}
+              >
+                {"影响确认加载失败"}
+              </MuiAlert>
             )}
             {impact.data && (
               <>
-                <Typography.Text>
+                <MuiTypography component="span">
                   当前发布涉及 {impact.data.targets.length} 个词义：
-                </Typography.Text>
-                <List
-                  size="small"
-                  dataSource={impact.data.targets}
-                  renderItem={(target) => (
-                    <List.Item>
+                </MuiTypography>
+                <MuiList dense>
+                  {impact.data.targets.map((target) => (
+                    <MuiListItem
+                      key={`${target.entry_id}:${target.sense_id}`}
+                      divider
+                      sx={{ gap: 2, alignItems: "flex-start" }}
+                    >
                       {target.entry_id} / {target.sense_id}
                       {target.hidden ? "（宿主已隐藏）" : ""}
-                    </List.Item>
-                  )}
-                />
+                    </MuiListItem>
+                  ))}
+                </MuiList>
               </>
             )}
-            <Input.TextArea
+            <MuiTextareaAutosize
               aria-label="下架原因"
               value={reason}
               maxLength={2000}
               disabled={pending || uncertain || blocked}
               onChange={(event) => setReason(event.target.value)}
               placeholder="填写下架原因"
+              className="admin-textarea"
             />
           </>
         )}
         {action === "history" && (
           <>
             {history.isError && (
-              <Alert
-                type="error"
-                title="发布历史加载失败"
+              <MuiAlert
                 action={
-                  <Button onClick={() => void history.refetch()}>重试</Button>
+                  <MuiButton onClick={() => void history.refetch()}>
+                    重试
+                  </MuiButton>
                 }
-              />
+                severity={"error"}
+              >
+                {"发布历史加载失败"}
+              </MuiAlert>
             )}
-            <List
-              loading={history.isPending}
-              dataSource={history.data?.pages.flat() ?? []}
-              renderItem={(publication) => (
-                <List.Item
-                  actions={
-                    canAct
-                      ? [
-                          <Button
-                            key="select"
-                            disabled={pending || uncertain || blocked}
-                            onClick={() => setSelected(publication)}
-                          >
-                            {selected?.id === publication.id
-                              ? "已选择"
-                              : "选择恢复"}
-                          </Button>
-                        ]
-                      : []
-                  }
-                >
-                  <Space orientation="vertical">
-                    <Typography.Text>
-                      版本 {publication.publication_number} ·{" "}
-                      {new Date(publication.published_at).toLocaleString(
-                        "zh-CN"
-                      )}
-                    </Typography.Text>
-                    <V3EnglishTextPreview
-                      value={publication.snapshot.sentence.en_text}
-                      hideCommonDialect
-                    />
-                  </Space>
-                </List.Item>
-              )}
-            />
+            <MuiBox aria-busy={history.isPending}>
+              {history.isPending && <MuiLinearProgress aria-label="正在加载" />}
+              <MuiList dense>
+                {(history.data?.pages.flat() ?? []).map((publication) => (
+                  <MuiListItem
+                    key={publication.id}
+                    divider
+                    sx={{ gap: 2, alignItems: "flex-start" }}
+                  >
+                    <MuiStack direction="column" spacing={1}>
+                      <MuiTypography component="span">
+                        版本 {publication.publication_number} ·{" "}
+                        {new Date(publication.published_at).toLocaleString(
+                          "zh-CN"
+                        )}
+                      </MuiTypography>
+                      <V3EnglishTextPreview
+                        value={publication.snapshot.sentence.en_text}
+                        hideCommonDialect
+                      />
+                    </MuiStack>
+                    <MuiBox sx={{ ml: "auto" }}>
+                      {canAct
+                        ? [
+                            <MuiButton
+                              key="select"
+                              disabled={pending || uncertain || blocked}
+                              onClick={() => setSelected(publication)}
+                            >
+                              {selected?.id === publication.id
+                                ? "已选择"
+                                : "选择恢复"}
+                            </MuiButton>
+                          ]
+                        : []}
+                    </MuiBox>
+                  </MuiListItem>
+                ))}
+              </MuiList>
+            </MuiBox>
             {history.hasNextPage && (
-              <Button
+              <MuiButton
                 loading={history.isFetchingNextPage}
                 onClick={() => void history.fetchNextPage()}
               >
                 加载更早历史
-              </Button>
+              </MuiButton>
             )}
           </>
         )}
-        {error && <Alert type="error" title={error} />}
-      </Space>
-    </Modal>
+        {error && <MuiAlert severity={"error"}>{error}</MuiAlert>}
+      </MuiStack>
+    </AdminDialog>
   );
 }

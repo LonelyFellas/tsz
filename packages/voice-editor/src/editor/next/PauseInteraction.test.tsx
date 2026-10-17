@@ -4,15 +4,11 @@ import {
   screen,
   waitFor
 } from "@testing-library/react";
-import { ConfigProvider } from "antd";
+
 import { useState, type ReactElement } from "react";
 const render = (element: ReactElement) =>
   renderView(element, {
-    wrapper: ({ children }) => (
-      <ConfigProvider theme={{ token: { motion: false } }}>
-        {children}
-      </ConfigProvider>
-    )
+    wrapper: ({ children }) => <>{children}</>
   });
 import { describe, expect, it, vi } from "vitest";
 import type { RichTextV2 } from "@tsz/types";
@@ -403,6 +399,7 @@ describe("停顿定位与显式编辑", () => {
     expect(data()).toEqual(initial);
     fireEvent.click(button("取消，保留原标注"));
     expect(changed).not.toHaveBeenCalled();
+    await screen.findByRole("button", { name: "停顿 0.5 秒" });
     select(8);
     fireEvent.click(button("停顿 0.5 秒"));
     fireEvent.click(button("移除冲突连读，添加停顿"));
@@ -412,6 +409,7 @@ describe("停顿定位与显式编辑", () => {
         { type: "pause", at: 15, duration_ms: 500 }
       ])
     );
+    await screen.findByRole("button", { name: "停顿" });
     expect(button("停顿")).toHaveAttribute("aria-pressed", "true");
     fireEvent.keyDown(button("停顿"), { key: "Escape" });
     expect(button("停顿")).toHaveAttribute("aria-pressed", "false");
@@ -431,7 +429,7 @@ describe("停顿定位与显式编辑", () => {
     expect(data().annotations.filter((a) => a.type === "liaison")).toHaveLength(
       2
     );
-    fireEvent.click(button("上一步"));
+    fireEvent.click(await screen.findByRole("button", { name: "上一步" }));
     expect(data()).toEqual(initial);
   });
 

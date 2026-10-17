@@ -378,7 +378,7 @@ describe("AdminLoginForm — 2FA", () => {
   });
 
   const primaryButton = (c: HTMLElement) =>
-    c.querySelector("button.ant-btn-primary") as HTMLButtonElement;
+    c.querySelector('button[type="submit"]') as HTMLButtonElement;
 
   it("账号被锁定(423)：提示锁定并置灰登录按钮，改动密码后恢复可点", async () => {
     mockLogin.mockRejectedValue(
@@ -507,9 +507,9 @@ describe("AdminLoginForm — 2FA", () => {
     render(<AdminLoginForm />);
     const pwd = screen.getByPlaceholderText("请输入登录密码");
     expect(pwd).toHaveAttribute("type", "password");
-    fireEvent.click(screen.getByRole("img", { name: "eye-invisible" }));
+    fireEvent.click(screen.getByRole("button", { name: "显示密码" }));
     expect(pwd).toHaveAttribute("type", "text");
-    fireEvent.click(screen.getByRole("img", { name: "eye" }));
+    fireEvent.click(screen.getByRole("button", { name: "隐藏密码" }));
     expect(pwd).toHaveAttribute("type", "password");
   });
 });

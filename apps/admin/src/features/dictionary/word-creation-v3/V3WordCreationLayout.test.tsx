@@ -311,7 +311,17 @@ describe("V3WordCreationLayout", () => {
       "多维词义",
       "多维例句"
     ]);
-    expect(rows.map((row) => row.textContent)).toEqual([
+    expect(
+      rows.map((row) =>
+        [
+          ...row.querySelectorAll(
+            ".word-progress-index, .word-progress-label, .v3-product-progress-trailing"
+          )
+        ]
+          .map((node) => node.textContent)
+          .join("")
+      )
+    ).toEqual([
       "语言识别",
       "基本词性1 项",
       "词形变化2 项",
@@ -335,7 +345,17 @@ describe("V3WordCreationLayout", () => {
         .map((row) => row.querySelector(".word-progress-index")?.textContent)
     ).toEqual(["4", "5", "6", "7"]);
 
-    const progressText = rows.map((row) => row.textContent).join(" ");
+    const progressText = rows
+      .map((row) =>
+        [
+          ...row.querySelectorAll(
+            ".word-progress-index, .word-progress-label, .v3-product-progress-trailing"
+          )
+        ]
+          .map((node) => node.textContent)
+          .join("")
+      )
+      .join(" ");
     for (const forbidden of [
       "基础信息",
       "词形编辑",

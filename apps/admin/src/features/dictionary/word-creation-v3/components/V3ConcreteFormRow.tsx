@@ -1,7 +1,17 @@
+import {
+  Radio as MuiRadio,
+  RadioGroup as MuiRadioGroup,
+  FormControlLabel as MuiFormControlLabel
+} from "@mui/material";
+import {
+  Stack as MuiStack,
+  Tooltip as MuiTooltip,
+  Typography as MuiTypography
+} from "@mui/material";
 import { env } from "../../../../lib/env";
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
-import { WarningOutlined } from "@ant-design/icons";
-import { Flex, Radio, Select, Tooltip, Typography } from "antd";
+import WarningOutlined from "@mui/icons-material/WarningAmber";
+import { Select as MuiSelect, MenuItem as MuiMenuItem } from "@mui/material";
 import { V3VoiceTextField } from "./V3VoiceTextField";
 import type {
   DialectRulesV3,
@@ -35,14 +45,15 @@ import { PronunciationPreviewControls } from "../../word-creation/PronunciationP
 function SpellingConflictNote({ literals }: { literals: readonly string[] }) {
   if (literals.length === 0) return null;
   return (
-    <Typography.Text
+    <MuiTypography
       className="v3-spelling-conflict"
       role="status"
-      type="danger"
+      component="span"
+      color="error.main"
     >
       与关联内容中的文字“{literals.join("”“")}
       ”不一致，请改回相同拼写，或先解除关联
-    </Typography.Text>
+    </MuiTypography>
   );
 }
 
@@ -147,14 +158,15 @@ function V3ConcreteFormTypeCell({
         <div className="word-form-type-cell-header">
           {referenceBadge}
           {/* 改类型不换 form.id，引用按「词形 + 方言侧」重解析后仍成立，但引用记录里的类型会"漂移"。
-              文案长、类型列只有 112px，硬塞会折成好几行；收成警示图标 + 悬停说明。 */}
+  文案长、类型列只有 112px，硬塞会折成好几行；收成警示图标 + 悬停说明。 */}
           {formTypeChangeHint ? (
-            <Tooltip title={formTypeChangeHint}>
+            <MuiTooltip describeChild title={formTypeChangeHint}>
               <WarningOutlined
+                fontSize="inherit"
                 aria-label={formTypeChangeHint}
                 className="word-form-type-change-hint"
               />
-            </Tooltip>
+            </MuiTooltip>
           ) : null}
         </div>
         <V3DisabledReason
@@ -162,45 +174,58 @@ function V3ConcreteFormTypeCell({
           reason={formTypeDisabled ? formTypeDisabledReason : undefined}
         >
           <div className="word-form-type-select">
-            <Select
-              aria-label={formTypeAriaLabel}
-              classNames={{ popup: { root: "v3-form-type-popup" } }}
-              disabled={formTypeDisabled}
-              popupMatchSelectWidth={false}
-              popupAlign={{
-                overflow: { adjustX: true, adjustY: true, shiftX: true }
-              }}
-              styles={{
-                content: {
+            <MuiSelect
+              data-admin-select
+              SelectDisplayProps={{
+                "aria-label": formTypeAriaLabel,
+                style: {
                   whiteSpace: "normal",
                   overflowWrap: "anywhere",
                   textOverflow: "clip"
-                },
-                popup: {
-                  root: {
-                    width: "max-content",
-                    maxWidth: "calc(100vw - 32px)"
+                }
+              }}
+              disabled={formTypeDisabled}
+              autoWidth
+              MenuProps={{
+                slotProps: {
+                  paper: {
+                    className: "v3-form-type-popup",
+                    style: {
+                      width: "max-content",
+                      maxWidth: "calc(100vw - 32px)"
+                    }
                   }
                 }
               }}
-              virtual={false}
-              onChange={(formType) =>
-                onChange(updateConcreteFormType(content, form.id, formType))
+              onChange={(event) =>
+                onChange(
+                  updateConcreteFormType(
+                    content,
+                    form.id,
+                    event.target.value as WordConcreteFormV3["form_type"]
+                  )
+                )
               }
-              options={availableFormTypes.map((value) => ({
-                value,
-                label: formTypeLabel(value)
-              }))}
               size="small"
-              style={{ width: "100%" }}
+              sx={{ width: "100%" }}
               value={form.form_type}
-            />
+            >
+              {availableFormTypes.map((value) => (
+                <MuiMenuItem
+                  key={value}
+                  value={value}
+                  sx={{ whiteSpace: "normal", overflowWrap: "anywhere" }}
+                >
+                  {formTypeLabel(value)}
+                </MuiMenuItem>
+              ))}
+            </MuiSelect>
           </div>
         </V3DisabledReason>
         {membershipCount > 1 ? (
-          <Typography.Text type="secondary">
+          <MuiTypography component="span" color="text.secondary">
             已在 {membershipCount} 个变化组中使用
-          </Typography.Text>
+          </MuiTypography>
         ) : null}
         {actions}
       </div>
@@ -226,9 +251,14 @@ function SpellingRegularity({
   const name = useId();
   if (!env.FORM_SPELLING_REGULARITY) return null;
   return (
-    <Flex align="center" gap="small" className="v3-spelling-regularity">
-      <Typography.Text>是否规则变化？</Typography.Text>
-      <Radio.Group
+    <MuiStack
+      className="v3-spelling-regularity"
+      direction="row"
+      spacing={1}
+      alignItems={"center"}
+    >
+      <MuiTypography component="span">是否规则变化？</MuiTypography>
+      <MuiRadioGroup
         name={`${name}-${variant.id}-regularity`}
         aria-label={`${label}是否规则变化`}
         value={variantRegularity(content, form.id, variant)}
@@ -238,16 +268,25 @@ function SpellingRegularity({
               content,
               form.id,
               variant.dialect,
-              event.target.value,
+              event.target.value === "true",
               dialectRules.spelling_mode
             )
           )
         }
+        row
       >
-        <Radio value>是</Radio>
-        <Radio value={false}>否</Radio>
-      </Radio.Group>
-    </Flex>
+        <MuiFormControlLabel
+          sx={{ m: 0 }}
+          control={<MuiRadio value />}
+          label={<>是</>}
+        />
+        <MuiFormControlLabel
+          sx={{ m: 0 }}
+          control={<MuiRadio value={false} />}
+          label={<>否</>}
+        />
+      </MuiRadioGroup>
+    </MuiStack>
   );
 }
 
@@ -305,9 +344,18 @@ function V3DialectFormCell({
       data-v3-node-id={variant.id}
       style={style}
     >
-      <Flex vertical gap="small">
-        <Flex align="center" justify="space-between" gap="small" wrap>
-          <Typography.Text strong>{dialectLabel(dialect)}拼写</Typography.Text>
+      <MuiStack direction="column" spacing={1}>
+        <MuiStack
+          direction="row"
+          spacing={1}
+          alignItems={"center"}
+          justifyContent={"space-between"}
+          useFlexGap
+          flexWrap="wrap"
+        >
+          <MuiTypography component="span" fontWeight={600}>
+            {dialectLabel(dialect)}拼写
+          </MuiTypography>
           <SpellingRegularity
             content={content}
             form={form}
@@ -316,7 +364,7 @@ function V3DialectFormCell({
             label={`${formLabel}${dialectLabel(dialect)}拼写`}
             onChange={onChange}
           />
-        </Flex>
+        </MuiStack>
         <V3VoiceTextField
           mode="spelling"
           dialect={dialect}
@@ -368,7 +416,7 @@ function V3DialectFormCell({
           onChange={onChange}
           variant={variant}
         />
-      </Flex>
+      </MuiStack>
     </div>
   );
 }
@@ -504,8 +552,17 @@ export function V3ConcreteFormRow({
             data-v3-node-id={commonVariant.id}
           >
             <div className="word-shared-form-spelling">
-              <Flex align="center" justify="space-between" gap="small" wrap>
-                <Typography.Text strong>词形拼写</Typography.Text>
+              <MuiStack
+                direction="row"
+                spacing={1}
+                alignItems={"center"}
+                justifyContent={"space-between"}
+                useFlexGap
+                flexWrap="wrap"
+              >
+                <MuiTypography component="span" fontWeight={600}>
+                  词形拼写
+                </MuiTypography>
                 <SpellingRegularity
                   content={content}
                   form={form}
@@ -514,7 +571,7 @@ export function V3ConcreteFormRow({
                   label={`${formLabel}英美通用拼写`}
                   onChange={onChange}
                 />
-              </Flex>
+              </MuiStack>
               <V3VoiceTextField
                 mode="spelling"
                 leadingAction={
@@ -580,8 +637,17 @@ export function V3ConcreteFormRow({
             data-v3-node-id={form.id}
           >
             <div className="word-shared-form-spelling">
-              <Flex align="center" justify="space-between" gap="small" wrap>
-                <Typography.Text strong>词形拼写</Typography.Text>
+              <MuiStack
+                direction="row"
+                spacing={1}
+                alignItems={"center"}
+                justifyContent={"space-between"}
+                useFlexGap
+                flexWrap="wrap"
+              >
+                <MuiTypography component="span" fontWeight={600}>
+                  词形拼写
+                </MuiTypography>
                 <SpellingRegularity
                   content={content}
                   form={form}
@@ -590,7 +656,7 @@ export function V3ConcreteFormRow({
                   label={`${formLabel}英美通用拼写`}
                   onChange={onChange}
                 />
-              </Flex>
+              </MuiStack>
               <V3VoiceTextField
                 mode="spelling"
                 leadingAction={

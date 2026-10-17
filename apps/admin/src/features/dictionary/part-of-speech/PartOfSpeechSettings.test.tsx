@@ -5,7 +5,8 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { FeedbackProvider } from "@/components/FeedbackProvider";
+import { AdminThemeProvider } from "@/mui-theme";
 import { HttpError } from "@tsz/api-client";
 import type {
   PartOfSpeechCatalogResponse,
@@ -16,8 +17,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuthStore } from "@/lib/auth";
 import { PartOfSpeechSettings } from "./PartOfSpeechSettings";
 
-vi.mock("antd", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("antd")>();
+vi.mock("@mui/material", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@mui/material")>();
   return {
     ...actual,
     Tooltip: ({
@@ -27,7 +28,9 @@ vi.mock("antd", async (importOriginal) => {
       title?: ReactNode;
       children: ReactNode;
     }) => (
-      <span data-tooltip={typeof title === "string" ? title : undefined}>
+      <span
+        data-tooltip={typeof title === "string" && title ? title : undefined}
+      >
         {children}
       </span>
     )
@@ -268,9 +271,11 @@ const createdParticle: PartOfSpeechConfig = {
 
 function renderSettings() {
   return render(
-    <AntApp>
-      <PartOfSpeechSettings />
-    </AntApp>
+    <AdminThemeProvider>
+      <FeedbackProvider>
+        <PartOfSpeechSettings />
+      </FeedbackProvider>
+    </AdminThemeProvider>
   );
 }
 
@@ -324,12 +329,12 @@ describe("PartOfSpeechSettings", () => {
     });
     renderSettings();
     expect(screen.getByText("新增基本词性").closest("button")).toBeDisabled();
-    for (const button of screen.getAllByText("修 改", {
-      selector: "button span"
+    for (const button of screen.getAllByText("修改", {
+      selector: "button"
     }))
       expect(button.closest("button")).toBeDisabled();
-    for (const button of screen.getAllByText("删 除", {
-      selector: "button span"
+    for (const button of screen.getAllByText("删除", {
+      selector: "button"
     }))
       expect(button.closest("button")).toBeDisabled();
     expect(mock.remove).not.toHaveBeenCalled();
@@ -349,10 +354,10 @@ describe("PartOfSpeechSettings", () => {
     expect(within(nounRow).getByText("名")).toBeVisible();
     expect(within(nounRow).getByText("noun")).toBeVisible();
     const referencedDelete = within(nounRow)
-      .getByText("删 除")
+      .getByText("删除")
       .closest("button")!;
     expect(referencedDelete).toBeDisabled();
-    expect(referencedDelete.parentElement).toHaveAttribute(
+    expect(referencedDelete.closest("[data-tooltip]")).toHaveAttribute(
       "data-tooltip",
       "已关联 3 个单词或短语，可以修改，但不能删除"
     );
@@ -361,23 +366,23 @@ describe("PartOfSpeechSettings", () => {
     expect(within(particleRow).getByText("0 项")).toBeVisible();
     // 动词没有词条引用但还挂着 5 项细分词性：同样禁删并说明先删细分词性。
     const verbRow = screen.getByText("动词").closest("tr")!;
-    const verbDelete = within(verbRow).getByText("删 除").closest("button")!;
+    const verbDelete = within(verbRow).getByText("删除").closest("button")!;
     expect(verbDelete).toBeDisabled();
-    expect(verbDelete.parentElement).toHaveAttribute(
+    expect(verbDelete.closest("[data-tooltip]")).toHaveAttribute(
       "data-tooltip",
       "还有 5 项细分词性，请先删除细分词性"
     );
     expect(
-      within(particleRow).getByText("删 除").closest("button")
+      within(particleRow).getByText("删除").closest("button")
     ).toBeEnabled();
     expect(
-      within(particleRow).getByText("删 除").closest("button")?.parentElement
+      within(particleRow).getByText("删除").closest("button")?.parentElement
     ).not.toHaveAttribute("data-tooltip");
 
     fireEvent.click(screen.getByText("新增基本词性"));
     expect(screen.getByText("新增基本词性表单")).toBeVisible();
 
-    fireEvent.click(within(particleRow).getByText("修 改"));
+    fireEvent.click(within(particleRow).getByText("修改"));
     expect(screen.getByText("修改-particle")).toBeVisible();
   });
 
@@ -385,7 +390,9 @@ describe("PartOfSpeechSettings", () => {
     renderSettings();
 
     fireEvent.click(section("细分词性")!);
-    expect(screen.getByText("全部", { exact: true })).toBeVisible();
+    expect(screen.getByRole("combobox", { name: "所属基本词性" })).toHaveValue(
+      "全部"
+    );
     expect(screen.getByTestId("sub-panel")).toHaveTextContent(
       "细分-pos-noun,pos-particle,pos-verb/新建父级-无"
     );
@@ -402,8 +409,11 @@ describe("PartOfSpeechSettings", () => {
     fireEvent.click(section("细分词性")!);
     const selector = screen.getByLabelText("所属基本词性");
     fireEvent.mouseDown(selector);
+    fireEvent.focus(selector);
     fireEvent.change(selector, { target: { value: "动" } });
+    expect(selector).toHaveValue("动");
 
+    await screen.findByRole("option", { name: "动词" });
     const listbox = await screen.findByRole("listbox");
     expect(
       within(listbox).getByRole("option", { name: "动词" })
@@ -420,7 +430,9 @@ describe("PartOfSpeechSettings", () => {
     fireEvent.click(screen.getByText("模拟保存基本词性"));
 
     await waitFor(() => expect(sectionSelected("细分词性")).toBe(true));
-    expect(screen.getByText("新动词", { exact: true })).toBeVisible();
+    expect(screen.getByRole("combobox", { name: "所属基本词性" })).toHaveValue(
+      "新动词"
+    );
     expect(screen.getByTestId("sub-panel")).toHaveTextContent(
       "细分-pos-created"
     );
@@ -453,7 +465,7 @@ describe("PartOfSpeechSettings", () => {
 
     fireEvent.click(section("基本词性")!);
     const particleRow = screen.getByText("小品词").closest("tr")!;
-    fireEvent.click(within(particleRow).getByText("修 改"));
+    fireEvent.click(within(particleRow).getByText("修改"));
     fireEvent.click(screen.getByText("模拟保存基本词性"));
     expect(await screen.findByText("基本词性已更新")).toBeInTheDocument();
     fireEvent.click(screen.getByText("关闭基本词性表单"));
@@ -468,7 +480,7 @@ describe("PartOfSpeechSettings", () => {
   it("搜索和重置把中文关键词传给目录查询", async () => {
     renderSettings();
 
-    fireEvent.click(screen.getByText("搜 索"));
+    fireEvent.click(screen.getByText("搜索"));
     await waitFor(() =>
       expect(mock.queries.at(-1)).toMatchObject({ q: undefined, page: 1 })
     );
@@ -476,7 +488,7 @@ describe("PartOfSpeechSettings", () => {
     fireEvent.change(screen.getByLabelText("关键词"), {
       target: { value: "  名词  " }
     });
-    fireEvent.click(screen.getByText("搜 索"));
+    fireEvent.click(screen.getByText("搜索"));
     await waitFor(() =>
       expect(mock.queries.at(-1)).toMatchObject({ q: "名词", page: 1 })
     );
@@ -484,12 +496,12 @@ describe("PartOfSpeechSettings", () => {
     fireEvent.change(screen.getByLabelText("关键词"), {
       target: { value: "" }
     });
-    fireEvent.click(screen.getByText("搜 索"));
+    fireEvent.click(screen.getByText("搜索"));
     await waitFor(() =>
       expect(mock.queries.at(-1)).toMatchObject({ q: undefined, page: 1 })
     );
 
-    fireEvent.click(screen.getByText("重 置"));
+    fireEvent.click(screen.getByText("重置"));
     await waitFor(() =>
       expect(mock.queries.at(-1)).toMatchObject({ q: undefined, page: 1 })
     );
@@ -497,25 +509,19 @@ describe("PartOfSpeechSettings", () => {
 
   // 「词形变化」「细分词性」这些词在分区、表格列头上都出现，按 Segmented 的选项节点定位。
   const section = (label: string) =>
-    Array.from(
-      document.querySelectorAll<HTMLElement>(".ant-segmented-item-label")
-    ).find((node) => node.textContent?.trim() === label) ?? null;
-
+    screen.queryByRole("button", { name: label });
   const sectionSelected = (label: string) =>
-    !!section(label)
-      ?.closest(".ant-segmented-item")
-      ?.classList.contains("ant-segmented-item-selected");
+    section(label)?.getAttribute("aria-pressed") === "true";
 
   it("单词/短语是一级 Tab，分区降为二级", () => {
-    const { container } = renderSettings();
+    renderSettings();
     // jsdom 不做布局，量不了像素；能钉住的是 DOM 顺序——切换必须在 Tab 栏之前出现，
     // 否则它又会被摆回标题行右端那种扫不到的位置。
-    const nodes = Array.from(
-      container.querySelectorAll(".ant-tabs-nav, .ant-segmented")
-    );
-    // 一级（单词/短语）必须排在分区之前，否则层级又会反过来。
-    expect(nodes[0]?.className).toContain("ant-tabs-nav");
-    expect(nodes[1]?.className).toContain("ant-segmented");
+    const tabs = screen.getByRole("tablist", { name: "词性类别" });
+    const sections = screen.getByRole("group", { name: "配置分区" });
+    expect(
+      tabs.compareDocumentPosition(sections) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
     expect(screen.getByRole("tab", { name: "单词" })).toBeVisible();
     expect(screen.getByRole("tab", { name: "短语" })).toBeVisible();
   });
@@ -570,13 +576,13 @@ describe("PartOfSpeechSettings", () => {
   it("未引用基本词性二次确认后删除", async () => {
     renderSettings();
     const particleRow = screen.getByText("小品词").closest("tr")!;
-    fireEvent.click(within(particleRow).getByText("删 除"));
+    fireEvent.click(within(particleRow).getByText("删除"));
 
     const dialog = await screen.findByRole("dialog");
     expect(
       within(dialog).getAllByText("删除基本词性“小品词”？").length
     ).toBeGreaterThan(0);
-    fireEvent.click(within(dialog).getByText("删 除"));
+    fireEvent.click(within(dialog).getByText("删除"));
 
     await waitFor(() =>
       expect(mock.remove).toHaveBeenCalledWith({
@@ -602,9 +608,9 @@ describe("PartOfSpeechSettings", () => {
     renderSettings();
 
     const row = screen.getByText("小品词").closest("tr")!;
-    const remove = within(row).getByText("删 除").closest("button")!;
+    const remove = within(row).getByText("删除").closest("button")!;
     expect(remove).toBeDisabled();
-    expect(remove.parentElement).toHaveAttribute(
+    expect(remove.closest("[data-tooltip]")).toHaveAttribute(
       "data-tooltip",
       "还有 2 项词形变化，请先删除词形变化"
     );
@@ -640,9 +646,9 @@ describe("PartOfSpeechSettings", () => {
     mock.remove.mockRejectedValueOnce(new HttpError(409, "服务异常", [], code));
     renderSettings();
     const particleRow = screen.getByText("小品词").closest("tr")!;
-    fireEvent.click(within(particleRow).getByText("删 除"));
+    fireEvent.click(within(particleRow).getByText("删除"));
     const dialog = await screen.findByRole("dialog");
-    fireEvent.click(within(dialog).getByText("删 除"));
+    fireEvent.click(within(dialog).getByText("删除"));
 
     expect(await screen.findByText(text)).toBeInTheDocument();
     expect(mock.refetch).toHaveBeenCalledTimes(1);
@@ -661,9 +667,9 @@ describe("PartOfSpeechSettings", () => {
     );
     renderSettings();
     const particleRow = screen.getByText("小品词").closest("tr")!;
-    fireEvent.click(within(particleRow).getByText("删 除"));
+    fireEvent.click(within(particleRow).getByText("删除"));
     const dialog = await screen.findByRole("dialog");
-    fireEvent.click(within(dialog).getByText("删 除"));
+    fireEvent.click(within(dialog).getByText("删除"));
     expect(
       await screen.findByText("英文全称与已有基本词性过于接近，请调整英文全称")
     ).toBeInTheDocument();
@@ -691,9 +697,9 @@ describe("PartOfSpeechSettings", () => {
     );
     renderSettings();
     const particleRow = screen.getByText("小品词").closest("tr")!;
-    fireEvent.click(within(particleRow).getByText("删 除"));
+    fireEvent.click(within(particleRow).getByText("删除"));
     const dialog = await screen.findByRole("dialog");
-    fireEvent.click(within(dialog).getByText("删 除"));
+    fireEvent.click(within(dialog).getByText("删除"));
     expect(
       await screen.findByText("内部标识冲突，请重新提交")
     ).toBeInTheDocument();
@@ -703,9 +709,9 @@ describe("PartOfSpeechSettings", () => {
     mock.remove.mockRejectedValueOnce("unknown");
     renderSettings();
     const particleRow = screen.getByText("小品词").closest("tr")!;
-    fireEvent.click(within(particleRow).getByText("删 除"));
+    fireEvent.click(within(particleRow).getByText("删除"));
     const dialog = await screen.findByRole("dialog");
-    fireEvent.click(within(dialog).getByText("删 除"));
+    fireEvent.click(within(dialog).getByText("删除"));
 
     expect(await screen.findByText("操作失败")).toBeInTheDocument();
     expect(mock.refetch).toHaveBeenCalledTimes(1);
@@ -718,7 +724,7 @@ describe("PartOfSpeechSettings", () => {
     };
     renderSettings();
 
-    fireEvent.click(screen.getByTitle("2"));
+    fireEvent.click(screen.getByRole("button", { name: "下一页" }));
     await waitFor(() =>
       expect(mock.queries.at(-1)).toMatchObject({ page: 2, page_size: 10 })
     );
@@ -741,7 +747,7 @@ describe("PartOfSpeechSettings", () => {
     renderSettings();
 
     expect(screen.getByText("词性配置加载失败")).toBeVisible();
-    fireEvent.click(screen.getByText("重 试"));
+    fireEvent.click(screen.getByText("重试"));
     expect(mock.refetch).toHaveBeenCalledTimes(1);
   });
 
@@ -754,7 +760,7 @@ describe("PartOfSpeechSettings", () => {
     expect(screen.getByText("基本词性目录加载失败")).toBeVisible();
     expect(screen.getByLabelText("所属基本词性")).toBeDisabled();
     expect(screen.getByText("新增细分词性").closest("button")).toBeDisabled();
-    fireEvent.click(screen.getByText("重 试"));
+    fireEvent.click(screen.getByText("重试"));
     expect(mock.catalogRefetch).toHaveBeenCalledTimes(1);
   });
 
@@ -776,7 +782,7 @@ describe("PartOfSpeechSettings", () => {
     fireEvent.click(section("细分词性")!);
     const addButton = screen.getByText("新增细分词性").closest("button")!;
     expect(addButton).toBeDisabled();
-    expect(addButton.parentElement).toHaveAttribute(
+    expect(addButton.closest("[data-tooltip]")).toHaveAttribute(
       "data-tooltip",
       "暂无基本词性"
     );
@@ -795,16 +801,14 @@ it("基本词性编辑不开放细分词性新增，普通管理员即使持有�
   });
   renderSettings();
   expect(screen.getByText("新增基本词性").closest("button")).toBeEnabled();
-  for (const button of screen.getAllByText("修 改", {
-    selector: "button span"
+  for (const button of screen.getAllByText("修改", {
+    selector: "button"
   }))
     expect(button.closest("button")).toBeEnabled();
-  for (const button of screen.getAllByText("删 除", {
-    selector: "button span"
+  for (const button of screen.getAllByText("删除", {
+    selector: "button"
   }))
     expect(button.closest("button")).toBeDisabled();
-  fireEvent.click(
-    screen.getByText("细分词性", { selector: ".ant-segmented-item-label" })
-  );
+  fireEvent.click(screen.getByRole("button", { name: "细分词性" }));
   expect(screen.getByText("新增细分词性").closest("button")).toBeDisabled();
 });

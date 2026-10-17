@@ -1,5 +1,18 @@
-import { LeftOutlined, UnorderedListOutlined } from "@ant-design/icons";
-import { Breadcrumb, Button, Drawer, Steps, Typography } from "antd";
+import {
+  Button as MuiButton,
+  Typography as MuiTypography
+} from "@mui/material";
+import LeftOutlined from "@mui/icons-material/ArrowBack";
+import UnorderedListOutlined from "@mui/icons-material/FormatListBulleted";
+import {
+  Breadcrumbs,
+  Stepper,
+  Step,
+  StepButton,
+  Stack,
+  Typography
+} from "@mui/material";
+import { AdminDrawer } from "@/components/AdminDrawer";
 import type { WordCreationStep } from "@tsz/types";
 import {
   useEffect,
@@ -108,47 +121,68 @@ export function WordCreationLayout({
 
   return (
     <div className="word-creation-page" ref={pageRef}>
-      <Breadcrumb
-        className="word-creation-breadcrumb"
-        items={[
-          { title: "词库管理" },
-          {
-            title: <Link to="/words">智能词库</Link>
-          },
-          { title: presentation.breadcrumbTitle }
-        ]}
-      />
-
+      <Breadcrumbs className="word-creation-breadcrumb" aria-label="页面路径">
+        <span>词库管理</span>
+        <Link to="/words">智能词库</Link>
+        <span>{presentation.breadcrumbTitle}</span>
+      </Breadcrumbs>
       <section className="word-creation-stepper">
-        <Steps
+        <Stepper
           className="word-creation-steps"
-          current={currentIndex}
-          responsive={false}
-          items={steps}
-          onChange={(index) => onStepChange?.(WORD_STEP_ORDER[index]!)}
-        />
+          activeStep={currentIndex}
+          nonLinear
+        >
+          {steps.map((step, index) => (
+            <Step
+              data-wizard-step
+              aria-disabled={step.disabled}
+              data-step-status={step.status}
+              key={WORD_STEP_ORDER[index]}
+              completed={step.status === "finish"}
+              disabled={step.disabled}
+            >
+              <StepButton
+                onClick={() => onStepChange?.(WORD_STEP_ORDER[index]!)}
+                aria-current={index === currentIndex ? "step" : undefined}
+              >
+                <Stack alignItems="flex-start">
+                  <Typography fontWeight={600}>{step.title}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {step.content}
+                  </Typography>
+                </Stack>
+              </StepButton>
+            </Step>
+          ))}
+        </Stepper>
       </section>
 
       <div className="word-creation-shell">
         <section className="word-creation-summary" aria-label="词条摘要">
-          <Button
-            type="text"
-            icon={<LeftOutlined />}
+          <MuiButton
             onClick={() => navigate("/words")}
             className="word-creation-back"
+            variant={"text"}
+            startIcon={<LeftOutlined fontSize="inherit" />}
           >
             返回智能词库
-          </Button>
+          </MuiButton>
 
           {presentation.showEntrySummary !== false && (
             <div className="word-summary-entry-card">
-              <Typography.Text type="secondary" className="word-summary-kicker">
+              <MuiTypography
+                className="word-summary-kicker"
+                component="span"
+                color="text.secondary"
+              >
                 当前词条
-              </Typography.Text>
+              </MuiTypography>
               {presentation.summaryHeadword}
 
               <div className="word-summary-language">
-                <Typography.Text type="secondary">所属语言</Typography.Text>
+                <MuiTypography component="span" color="text.secondary">
+                  所属语言
+                </MuiTypography>
                 <strong>English</strong>
               </div>
 
@@ -157,24 +191,25 @@ export function WordCreationLayout({
           )}
 
           {narrowProgress ? (
-            <Button
-              // 图标的 anticon 会把「unordered-list」混进可及名，显式定名兜住。
+            <MuiButton
+              // 窄屏完成情况入口显式提供完整的可访问名称。
               aria-label={progressTriggerLabel}
               className="word-summary-progress-trigger"
-              icon={<UnorderedListOutlined />}
               onClick={() => setProgressOpen(true)}
+              startIcon={<UnorderedListOutlined fontSize="inherit" />}
             >
               {progressTriggerLabel}
-            </Button>
+            </MuiButton>
           ) : (
             <>
               <div className="word-summary-progress-title">
-                <Typography.Text
-                  type="secondary"
+                <MuiTypography
                   className="word-summary-kicker"
+                  component="span"
+                  color="text.secondary"
                 >
                   完成情况
-                </Typography.Text>
+                </MuiTypography>
               </div>
               {presentation.progress}
             </>
@@ -188,17 +223,16 @@ export function WordCreationLayout({
         </main>
       </div>
 
-      {narrowProgress && (
-        <Drawer
-          classNames={{ body: "word-creation-progress-drawer" }}
-          onClose={() => setProgressOpen(false)}
-          open={progressOpen}
-          placement="right"
-          size="min(360px, 86vw)"
+      {narrowProgress && progressOpen && (
+        <AdminDrawer
           title="完成情况"
+          width={360}
+          onClose={() => setProgressOpen(false)}
         >
-          {presentation.progress}
-        </Drawer>
+          <div className="word-creation-progress-drawer">
+            {presentation.progress}
+          </div>
+        </AdminDrawer>
       )}
     </div>
   );

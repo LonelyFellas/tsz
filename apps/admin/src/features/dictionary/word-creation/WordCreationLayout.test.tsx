@@ -1,5 +1,6 @@
+import { Typography as MuiTypography } from "@mui/material";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { ConfigProvider, Typography } from "antd";
+
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { WordCreationLayout } from "./WordCreationLayout";
@@ -36,14 +37,14 @@ function renderLayout(
 ) {
   // 关掉动画：抽屉的退场过渡在 jsdom 里不结束，关闭后面板会一直留在可见态。
   return render(
-    <ConfigProvider theme={{ token: { motion: false } }}>
+    <>
       <MemoryRouter initialEntries={[initialEntry]}>
         <WordCreationLayout {...props}>
           <div>step-content</div>
         </WordCreationLayout>
         <LocationProbe />
       </MemoryRouter>
-    </ConfigProvider>
+    </>
   );
 }
 
@@ -55,9 +56,12 @@ describe("WordCreationLayout", () => {
         breadcrumbTitle: "创建词汇",
         showEntrySummary: true,
         summaryHeadword: (
-          <Typography.Text className="word-summary-pending-detection">
+          <MuiTypography
+            className="word-summary-pending-detection"
+            component="span"
+          >
             待检测
-          </Typography.Text>
+          </MuiTypography>
         ),
         status: <span>草稿</span>
       })
@@ -98,8 +102,10 @@ describe("WordCreationLayout", () => {
       })
     });
 
-    const laterStep = screen.getByText("词形与发音").closest(".ant-steps-item");
-    expect(laterStep).toHaveClass("ant-steps-item-disabled");
+    const laterStep = screen
+      .getByText("词形与发音")
+      .closest("[data-wizard-step]");
+    expect(laterStep).toHaveAttribute("aria-disabled", "true");
     fireEvent.click(screen.getByText("词形与发音"));
     expect(onStepChange).not.toHaveBeenCalled();
   });
@@ -112,9 +118,9 @@ describe("WordCreationLayout", () => {
       presentation: presentation({ completedSteps: ["basics"] })
     });
 
-    expect(document.querySelectorAll(".ant-steps-item-disabled")).toHaveLength(
-      0
-    );
+    expect(
+      document.querySelectorAll("[data-wizard-step][aria-disabled=true]")
+    ).toHaveLength(0);
     fireEvent.click(screen.getByText("词义与例句"));
     expect(onStepChange).toHaveBeenNthCalledWith(1, "meanings");
     // 进度只到 forms，preview 越过当前进度——门禁取消后照样点得动。
@@ -131,12 +137,15 @@ describe("WordCreationLayout", () => {
     });
 
     const statusOf = (title: string) =>
-      screen.getByText(title).closest(".ant-steps-item")!.className;
+      screen
+        .getByText(title)
+        .closest("[data-wizard-step]")!
+        .getAttribute("data-step-status");
 
-    expect(statusOf("创建词汇")).toContain("ant-steps-item-finish");
-    expect(statusOf("词形与发音")).toContain("ant-steps-item-wait");
-    expect(statusOf("词义与例句")).toContain("ant-steps-item-wait");
-    expect(statusOf("预览并生效")).toContain("ant-steps-item-process");
+    expect(statusOf("创建词汇")).toBe("finish");
+    expect(statusOf("词形与发音")).toBe("wait");
+    expect(statusOf("词义与例句")).toBe("wait");
+    expect(statusOf("预览并生效")).toBe("process");
   });
 
   it("readOnly 时步骤条整体禁用，但仍可返回词库", () => {
@@ -149,7 +158,8 @@ describe("WordCreationLayout", () => {
     });
 
     expect(
-      view.container.querySelectorAll(".ant-steps-item-disabled").length
+      view.container.querySelectorAll("[data-wizard-step][aria-disabled=true]")
+        .length
     ).toBeGreaterThan(0);
     const summary = view.container.querySelector<HTMLElement>(
       ".word-creation-summary"

@@ -1,3 +1,14 @@
+import {
+  Card as MuiCard,
+  CardHeader as MuiCardHeader,
+  CardContent as MuiCardContent
+} from "@mui/material";
+import {
+  Button as MuiButton,
+  Chip as MuiChip,
+  Stack as MuiStack,
+  Typography as MuiTypography
+} from "@mui/material";
 import { boundFormGroupIds } from "./meaningsModel";
 import type {
   AdminWordV3,
@@ -7,7 +18,7 @@ import type {
   WordSenseV3,
   WordPosFormsV3
 } from "@tsz/types";
-import { Button, Card, Empty, Flex, Space, Tag, Typography } from "antd";
+
 import type { ReactNode } from "react";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import { formGroupLabel, sentenceTranslationsV3 } from "./meaningsModel";
@@ -22,7 +33,6 @@ import {
   usePartOfSpeechLabel,
   useSubPartOfSpeechLabel
 } from "../part-of-speech/PartOfSpeechLabels";
-
 export function reviewSenseTitle(sense: WordSenseV3): string {
   for (const definition of sense.definitions) {
     if (
@@ -34,7 +44,6 @@ export function reviewSenseTitle(sense: WordSenseV3): string {
   }
   return "待填写释义";
 }
-
 function DefinitionText({ definition }: { definition: WordDefinitionV3 }) {
   if (
     definition.definition_mode === "zh_definition" ||
@@ -49,17 +58,14 @@ function DefinitionText({ definition }: { definition: WordDefinitionV3 }) {
     />
   );
 }
-
 function boundFormGroupLabel(pos: WordPosFormsV3 | undefined, groupId: string) {
   return (pos && formGroupLabel(pos, groupId)) ?? "已失效的变化组";
 }
-
 function translationBandLabel(band: SentenceTranslationBandV3) {
   if (band === "word_for_word") return "初";
   if (band === "balanced_fluency") return "中";
   return "高";
 }
-
 export function V3MeaningsPreview({
   word,
   embedded = false,
@@ -88,21 +94,25 @@ export function V3MeaningsPreview({
       }
     ])
   );
-
   const content = (
-    <Flex vertical gap="middle">
+    <MuiStack direction="column" spacing={2}>
       {word.meanings.sense_groups.length > 0 ? (
-        <Flex gap="small" wrap>
+        <MuiStack direction="row" spacing={1} useFlexGap flexWrap="wrap">
           {word.meanings.sense_groups.map((group, index) => (
-            <Tag key={group.id}>
-              语义区间 {index + 1}：
-              {[group.name_zh, group.name_en].filter(Boolean).join(" / ")}
-            </Tag>
+            <MuiChip
+              key={group.id}
+              label={
+                <>
+                  语义区间 {index + 1}：
+                  {[group.name_zh, group.name_en].filter(Boolean).join(" / ")}
+                </>
+              }
+            />
           ))}
-        </Flex>
+        </MuiStack>
       ) : null}
       {word.meanings.pos.length === 0 ? (
-        <Empty description="暂无词义与例句" />
+        <MuiTypography color="text.secondary">{"暂无词义与例句"}</MuiTypography>
       ) : (
         word.meanings.pos.map((pos) => (
           <section
@@ -114,30 +124,45 @@ export function V3MeaningsPreview({
               <h2>{partOfSpeechLabel(posCodeById.get(pos.pos_id) ?? "")}</h2>
               <span>{pos.senses.length} 个词义</span>
             </header>
-            <Flex vertical gap="middle">
+            <MuiStack direction="column" spacing={2}>
               {pos.grammar_structures.length > 0 ? (
-                <Flex vertical gap="small">
-                  <Typography.Text strong>语法结构</Typography.Text>
+                <MuiStack direction="column" spacing={1}>
+                  <MuiTypography component="span" fontWeight={600}>
+                    语法结构
+                  </MuiTypography>
                   {pos.grammar_structures.map((structure, index) => (
-                    <Flex key={structure.id} gap="small" wrap>
-                      <Tag>语法结构 {index + 1}</Tag>
+                    <MuiStack
+                      key={structure.id}
+                      direction="row"
+                      spacing={1}
+                      useFlexGap
+                      flexWrap="wrap"
+                    >
+                      <MuiChip label={<>语法结构 {index + 1}</>} />
                       {structure.variants.map((variant) => (
-                        <Typography.Text className="tsz-words" key={variant.id}>
+                        <MuiTypography
+                          className="tsz-words"
+                          key={variant.id}
+                          component="span"
+                        >
                           {dialectLabel(variant.dialect)}：
                           {variant.content.text}
                           {variant.audio_assets?.length ? (
-                            <Tag style={{ marginInlineStart: 6 }}>
-                              音频 {variant.audio_assets.length} 条
-                            </Tag>
+                            <MuiChip
+                              style={{ marginInlineStart: 6 }}
+                              label={<>音频 {variant.audio_assets.length} 条</>}
+                            />
                           ) : null}
-                        </Typography.Text>
+                        </MuiTypography>
                       ))}
-                    </Flex>
+                    </MuiStack>
                   ))}
-                </Flex>
+                </MuiStack>
               ) : null}
               {pos.senses.length === 0 ? (
-                <Typography.Text type="secondary">暂无释义</Typography.Text>
+                <MuiTypography component="span" color="text.secondary">
+                  暂无释义
+                </MuiTypography>
               ) : (
                 pos.senses.map((sense, senseIndex) => {
                   const group = sense.sense_group_id
@@ -155,50 +180,71 @@ export function V3MeaningsPreview({
                         </span>
                         <h3>{reviewSenseTitle(sense)}</h3>
                         {onEdit && (
-                          <Button
-                            type="link"
+                          <MuiButton
                             onClick={() => onEdit(sense.id)}
                             aria-label={`编辑词义 ${senseIndex + 1}`}
+                            variant={"text"}
                           >
                             编辑
-                          </Button>
+                          </MuiButton>
                         )}
                       </header>
-                      <Flex vertical gap="small">
-                        <Space wrap>
+                      <MuiStack direction="column" spacing={1}>
+                        <MuiStack
+                          direction="row"
+                          spacing={1}
+                          alignItems="center"
+                          useFlexGap
+                          flexWrap="wrap"
+                        >
                           {sense.sub_pos ? (
-                            <Tag color="blue">
-                              {subPartOfSpeechLabel(sense.sub_pos)}
-                            </Tag>
+                            <MuiChip
+                              color={"primary"}
+                              label={<>{subPartOfSpeechLabel(sense.sub_pos)}</>}
+                            />
                           ) : null}
                           {sense.level ? (
-                            <Tag color="blue">{sense.level}</Tag>
+                            <MuiChip
+                              color={"primary"}
+                              label={<>{sense.level}</>}
+                            />
                           ) : null}
                           {sense.frequency !== undefined && (
-                            <Tag>词频 {sense.frequency}%</Tag>
+                            <MuiChip label={<>词频 {sense.frequency}%</>} />
                           )}
                           {group ? (
-                            <Tag color="purple">
-                              语义区间 {group.index}：{group.label}
-                            </Tag>
+                            <MuiChip
+                              color={"secondary"}
+                              label={
+                                <>
+                                  语义区间 {group.index}：{group.label}
+                                </>
+                              }
+                            />
                           ) : null}
                           {boundFormGroupIds(sense).map((groupId) => (
-                            <Tag
+                            <MuiChip
                               key={groupId}
                               className="tsz-words"
-                              color="cyan"
-                            >
-                              词形与发音：
-                              {boundFormGroupLabel(
-                                formsPosById.get(pos.pos_id),
-                                groupId
-                              )}
-                            </Tag>
+                              color={"info"}
+                              label={
+                                <>
+                                  词形与发音：
+                                  {boundFormGroupLabel(
+                                    formsPosById.get(pos.pos_id),
+                                    groupId
+                                  )}
+                                </>
+                              }
+                            />
                           ))}
                           {sense.depends_on_context ? (
-                            <Tag color="gold">依赖上下文</Tag>
+                            <MuiChip
+                              color={"warning"}
+                              label={<>依赖上下文</>}
+                            />
                           ) : null}
-                        </Space>
+                        </MuiStack>
                         <div
                           className="v3-dictionary-definitions"
                           aria-label="多维释义"
@@ -215,7 +261,11 @@ export function V3MeaningsPreview({
                                 key={definition.id}
                               >
                                 <div className="v3-dictionary-definition-meta">
-                                  <Tag>{definition.level || "未设等级"}</Tag>
+                                  <MuiChip
+                                    label={
+                                      <>{definition.level || "未设等级"}</>
+                                    }
+                                  />
                                   <span>{chinese ? "中文" : "英文"}</span>
                                   <span>
                                     {definition.definition_mode.endsWith(
@@ -246,7 +296,10 @@ export function V3MeaningsPreview({
                                   )}
                                   {definition.grammar_structure_id &&
                                     !grammar && (
-                                      <Tag color="warning">语法结构已失效</Tag>
+                                      <MuiChip
+                                        color={"warning"}
+                                        label={<>语法结构已失效</>}
+                                      />
                                     )}
                                 </div>
                               </section>
@@ -255,65 +308,113 @@ export function V3MeaningsPreview({
                         </div>
                         {renderSentences?.(sense.id)}
                         {sense.sentences.map((sentence, index) => (
-                          <Card
-                            key={sentence.id}
-                            size="small"
-                            title={`例句 ${index + 1}`}
-                          >
-                            <Flex vertical gap={4}>
-                              <V3EnglishTextPreview value={sentence.en_text} />
-                              {sentenceTranslationsV3(sentence).map(
-                                (translation) => (
-                                  <Typography.Text key={translation.id}>
-                                    <Tag>
-                                      {translationBandLabel(translation.band)}
-                                    </Tag>
-                                    {translation.content.text}
-                                  </Typography.Text>
-                                )
-                              )}
-                              {sentence.links.length > 0 ? (
-                                <Space wrap>
-                                  {sentence.links.map((link, linkIndex) => (
-                                    <Tag
-                                      key={`${sentence.id}-link-${linkIndex}`}
+                          <MuiCard key={sentence.id} variant="outlined">
+                            <MuiCardHeader
+                              className="admin-card-header"
+                              title={`例句 ${index + 1}`}
+                              slotProps={{
+                                title: {
+                                  variant: "subtitle1",
+                                  className: "admin-card-title"
+                                }
+                              }}
+                              sx={{
+                                p: 2,
+                                borderBottom: 1,
+                                borderColor: "divider"
+                              }}
+                            />
+                            <MuiCardContent className="admin-card-body">
+                              <MuiStack direction="column" spacing={0.5}>
+                                <V3EnglishTextPreview
+                                  value={sentence.en_text}
+                                />
+                                {sentenceTranslationsV3(sentence).map(
+                                  (translation) => (
+                                    <MuiTypography
+                                      key={translation.id}
+                                      component="span"
                                     >
-                                      {sentenceLinkRoleLabel(link.role)}
-                                    </Tag>
-                                  ))}
-                                </Space>
-                              ) : null}
-                              {sentence.associations.map((association) => {
-                                const pending = association.state === "pending";
-                                const headword = pending
-                                  ? association.pending_target_headword
-                                  : association.target_headword;
-                                const gloss = pending
-                                  ? association.pending_target_gloss
-                                  : association.target_gloss;
-                                return (
-                                  <Space key={association.id} size={4} wrap>
-                                    <Tag color={pending ? "orange" : "green"}>
-                                      {pending ? "待关联" : "已关联"}
-                                    </Tag>
-                                    <Typography.Text className="tsz-entry-en">
-                                      {pending ? "待关联词条" : "上下文关联"}：
-                                      {headword ??
-                                        association.source_segments
-                                          .map((segment) => segment.surface)
-                                          .join(" … ")}
-                                      {gloss ? ` · ${gloss}` : ""}
-                                    </Typography.Text>
-                                  </Space>
-                                );
-                              })}
-                            </Flex>
-                          </Card>
+                                      <MuiChip
+                                        label={
+                                          <>
+                                            {translationBandLabel(
+                                              translation.band
+                                            )}
+                                          </>
+                                        }
+                                      />
+                                      {translation.content.text}
+                                    </MuiTypography>
+                                  )
+                                )}
+                                {sentence.links.length > 0 ? (
+                                  <MuiStack
+                                    direction="row"
+                                    spacing={1}
+                                    alignItems="center"
+                                    useFlexGap
+                                    flexWrap="wrap"
+                                  >
+                                    {sentence.links.map((link, linkIndex) => (
+                                      <MuiChip
+                                        key={`${sentence.id}-link-${linkIndex}`}
+                                        label={
+                                          <>
+                                            {sentenceLinkRoleLabel(link.role)}
+                                          </>
+                                        }
+                                      />
+                                    ))}
+                                  </MuiStack>
+                                ) : null}
+                                {sentence.associations.map((association) => {
+                                  const pending =
+                                    association.state === "pending";
+                                  const headword = pending
+                                    ? association.pending_target_headword
+                                    : association.target_headword;
+                                  const gloss = pending
+                                    ? association.pending_target_gloss
+                                    : association.target_gloss;
+                                  return (
+                                    <MuiStack
+                                      key={association.id}
+                                      direction="row"
+                                      spacing={0.5}
+                                      alignItems="center"
+                                      useFlexGap
+                                      flexWrap="wrap"
+                                    >
+                                      <MuiChip
+                                        color={pending ? "warning" : "success"}
+                                        label={
+                                          <>{pending ? "待关联" : "已关联"}</>
+                                        }
+                                      />
+                                      <MuiTypography
+                                        className="tsz-entry-en"
+                                        component="span"
+                                      >
+                                        {pending ? "待关联词条" : "上下文关联"}
+                                        ：
+                                        {headword ??
+                                          association.source_segments
+                                            .map((segment) => segment.surface)
+                                            .join(" … ")}
+                                        {gloss ? ` · ${gloss}` : ""}
+                                      </MuiTypography>
+                                    </MuiStack>
+                                  );
+                                })}
+                              </MuiStack>
+                            </MuiCardContent>
+                          </MuiCard>
                         ))}
                         <div className="v3-dictionary-relations">
                           <h4>拓展词</h4>
                           {sense.relations.length > 0 ? (
-                            <Flex vertical gap={4}>
+                            <MuiStack direction="column" spacing={0.5}>
                               {groupRelations(sense.relations).map((group) => {
                                 const relation = group[0]!;
                                 const gloss = group
@@ -325,24 +426,30 @@ export function V3MeaningsPreview({
                                   .filter(Boolean)
                                   .join("；");
                                 return (
-                                  <Typography.Text
+                                  <MuiTypography
                                     className="tsz-entry-en"
                                     key={relation.id}
+                                    component="span"
                                   >
-                                    <Tag>
-                                      {relationLabel(relation.relation)}
-                                    </Tag>
-                                    <Tag
+                                    <MuiChip
+                                      label={
+                                        <>{relationLabel(relation.relation)}</>
+                                      }
+                                    />
+                                    <MuiChip
                                       color={
                                         relation.target_word_id
-                                          ? "green"
-                                          : "orange"
+                                          ? "success"
+                                          : "warning"
                                       }
-                                    >
-                                      {relation.target_word_id
-                                        ? "已关联"
-                                        : "待关联"}
-                                    </Tag>
+                                      label={
+                                        <>
+                                          {relation.target_word_id
+                                            ? "已关联"
+                                            : "待关联"}
+                                        </>
+                                      }
+                                    />
                                     <span className="v3-relation-score">
                                       {group
                                         .map((item) => `${item.score}%`)
@@ -352,10 +459,10 @@ export function V3MeaningsPreview({
                                       relation.pending_target_headword ??
                                       "待补充目标词条"}
                                     {gloss ? ` · ${gloss}` : ""}
-                                  </Typography.Text>
+                                  </MuiTypography>
                                 );
                               })}
-                            </Flex>
+                            </MuiStack>
                           ) : null}
                           {["derivative", "synonym", "antonym"]
                             .filter(
@@ -369,23 +476,34 @@ export function V3MeaningsPreview({
                             )
                             .map((type) => (
                               <div className="v3-relation-empty" key={type}>
-                                <Empty
-                                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                                  description={`暂无${relationLabel(type)}`}
-                                />
+                                <MuiTypography color="text.secondary">{`暂无${relationLabel(type)}`}</MuiTypography>
                               </div>
                             ))}
                         </div>
-                      </Flex>
+                      </MuiStack>
                     </article>
                   );
                 })
               )}
-            </Flex>
+            </MuiStack>
           </section>
         ))
       )}
-    </Flex>
+    </MuiStack>
   );
-  return embedded ? content : <Card title="词义与例句">{content}</Card>;
+  return embedded ? (
+    content
+  ) : (
+    <MuiCard variant="outlined">
+      <MuiCardHeader
+        className="admin-card-header"
+        title={"词义与例句"}
+        slotProps={{
+          title: { variant: "subtitle1", className: "admin-card-title" }
+        }}
+        sx={{ p: 2, borderBottom: 1, borderColor: "divider" }}
+      />
+      <MuiCardContent className="admin-card-body">{content}</MuiCardContent>
+    </MuiCard>
+  );
 }

@@ -1,3 +1,5 @@
+import { FeedbackProvider } from "@/components/FeedbackProvider";
+import { AdminThemeProvider } from "@/mui-theme";
 import { changeVoiceText } from "./V3VoiceTextField.test-helper";
 import { env } from "../../../../lib/env";
 import { FormTypeLabelsProvider } from "../../part-of-speech/FormTypeLabels";
@@ -9,7 +11,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { AdminTestProviders as AntApp } from "@/test-utils/AdminTestProviders";
 import type {
   DraftFormsStepContentV3,
   Dialect,
@@ -225,16 +227,20 @@ function Harness({
 }) {
   const [value, setValue] = useState(initial);
   return (
-    <AntApp>
-      <V3FormsAndPronunciationStep
-        value={value}
-        onChange={setValue}
-        issues={issues}
-        idFactory={idFactory}
-      />
-      <output data-testid="canonical-value">{JSON.stringify(value)}</output>
-      <ProgressCount value={value} />
-    </AntApp>
+    <AdminThemeProvider>
+      <FeedbackProvider>
+        <AntApp>
+          <V3FormsAndPronunciationStep
+            value={value}
+            onChange={setValue}
+            issues={issues}
+            idFactory={idFactory}
+          />
+          <output data-testid="canonical-value">{JSON.stringify(value)}</output>
+          <ProgressCount value={value} />
+        </AntApp>
+      </FeedbackProvider>
+    </AdminThemeProvider>
   );
 }
 
@@ -247,19 +253,23 @@ function DeepIssueHarness({
 }) {
   const [activePosId, setActivePosId] = useState(content.pos[0]!.pos_id);
   return (
-    <AntApp>
-      <button onClick={() => setActivePosId(issue.node_location.pos_id!)}>
-        定位深层 issue
-      </button>
-      <V3FormsAndPronunciationStep
-        activePosId={activePosId}
-        issues={[issue]}
-        onActivePosChange={setActivePosId}
-        onChange={() => undefined}
-        value={content}
-      />
-      <output data-testid="active-pos-id">{activePosId}</output>
-    </AntApp>
+    <AdminThemeProvider>
+      <FeedbackProvider>
+        <AntApp>
+          <button onClick={() => setActivePosId(issue.node_location.pos_id!)}>
+            定位深层 issue
+          </button>
+          <V3FormsAndPronunciationStep
+            activePosId={activePosId}
+            issues={[issue]}
+            onActivePosChange={setActivePosId}
+            onChange={() => undefined}
+            value={content}
+          />
+          <output data-testid="active-pos-id">{activePosId}</output>
+        </AntApp>
+      </FeedbackProvider>
+    </AdminThemeProvider>
   );
 }
 
@@ -275,19 +285,17 @@ function formById(content: DraftFormsStepContentV3, formId: string) {
 
 function chooseOption(label: string, option: string) {
   fireEvent.mouseDown(screen.getByLabelText(label));
-  const choice = [
-    ...document.querySelectorAll<HTMLElement>(
-      ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
-    )
-  ].find((item) => item.textContent === option);
+  const choice = [...screen.getAllByRole("option")].find(
+    (item) => item.textContent === option
+  );
   if (!choice) throw new Error(`option not found: ${option}`);
   fireEvent.click(choice);
 }
 
-// jsdom 里 antd 的收起动画不会结束，关掉的确认框停在 -leave 状态留在 DOM 里，开合只能按类名判断。
+// 按确认状态定位，避免退出动画期间残留的弹层影响业务断言。
 function openDeleteConfirm() {
-  return document.querySelector<HTMLElement>(
-    ".ant-popconfirm:not(.ant-zoom-big-leave)"
+  return document.querySelector(
+    '[data-form-delete-confirm-open="true"] [role="dialog"]'
   );
 }
 
@@ -423,7 +431,10 @@ describe("V3FormsAndPronunciationStep 被引用节点保护", () => {
     fireEvent.click(deleteForm);
     expect(openDeleteConfirm()).toBeNull();
     // TASK#58：改类型保护式放开——可点，但给漂移提示。
-    expect(screen.getByLabelText("变化组 1 词形 1 类型")).not.toBeDisabled();
+    expect(screen.getByLabelText("变化组 1 词形 1 类型")).not.toHaveAttribute(
+      "aria-disabled",
+      "true"
+    );
     // 漂移提示收成警示图标 + 悬停说明，可及名保留完整文案。
     await screen.findByLabelText(
       "存在 1 处关联，修改词形类型后，请检查关联内容是否正确"
@@ -434,7 +445,10 @@ describe("V3FormsAndPronunciationStep 被引用节点保护", () => {
     const deleteOther = screen.getByLabelText("删除变化组 1 的词形 2");
     expect(deleteOther).not.toBeDisabled();
     expect(deleteOther.closest(".v3-disabled-reason")).toBeNull();
-    expect(screen.getByLabelText("变化组 1 词形 2 类型")).not.toBeDisabled();
+    expect(screen.getByLabelText("变化组 1 词形 2 类型")).not.toHaveAttribute(
+      "aria-disabled",
+      "true"
+    );
 
     const badges = screen.getAllByRole("button", { name: "查看 1 处关联" });
     expect(badges.length).toBeGreaterThanOrEqual(2);
@@ -556,10 +570,7 @@ describe("V3FormsAndPronunciationStep", () => {
     await changeVoiceText(screen.getByLabelText("第 1 条发音的实际发音"), {
       target: { value: "centre" }
     });
-    expect(screen.getByTitle("该词性未填项")).toHaveAttribute(
-      "data-show",
-      "false"
-    );
+    expect(screen.queryByTitle("该词性未填项")).toBeNull();
     expect(screen.getByLabelText("第 1 条发音的实际发音")).not.toHaveAttribute(
       "aria-invalid",
       "true"
@@ -585,7 +596,10 @@ describe("V3FormsAndPronunciationStep", () => {
     });
     render(<Harness initial={initial} />);
     await waitFor(() =>
-      expect(screen.getByLabelText("添加基本词性")).not.toBeDisabled()
+      expect(screen.getByLabelText("添加基本词性")).not.toHaveAttribute(
+        "aria-disabled",
+        "true"
+      )
     );
     expect(screen.queryByLabelText("复数英美通用拼写")).toBeNull();
     expect(canonicalValue()).toEqual(initial);
@@ -622,18 +636,18 @@ describe("V3FormsAndPronunciationStep", () => {
     render(<Harness initial={initial} />);
     await screen.findByLabelText("复数英美通用拼写");
     fireEvent.click(screen.getByLabelText("上移变化组 1 的词形 2"));
-    expect(
-      screen.getByLabelText("变化组 1 词形 1 类型").closest(".ant-select")
-    ).toHaveTextContent("复数");
+    expect(screen.getByLabelText("变化组 1 词形 1 类型")).toHaveTextContent(
+      "复数"
+    );
     expect(
       canonicalValue().pos[0]!.form_groups[0]!.members.map(
         (member) => member.form_id
       )
     ).toEqual([...initial.pos[0]!.forms].reverse().map((form) => form.id));
     fireEvent.click(screen.getByLabelText("下移变化组 1 的词形 1"));
-    expect(
-      screen.getByLabelText("变化组 1 词形 2 类型").closest(".ant-select")
-    ).toHaveTextContent("复数");
+    expect(screen.getByLabelText("变化组 1 词形 2 类型")).toHaveTextContent(
+      "复数"
+    );
     fireEvent.click(screen.getByLabelText("在复数 1 下方添加同类型词形"));
     expect(screen.getByLabelText("复数 1英美通用拼写")).toHaveValue("");
     expect(screen.getByLabelText("复数 2英美通用拼写")).toHaveValue("");
@@ -668,7 +682,10 @@ describe("V3FormsAndPronunciationStep", () => {
       view.unmount();
       render(<Harness initial={JSON.parse(JSON.stringify(persisted))} />);
       await waitFor(() =>
-        expect(screen.getByLabelText("添加基本词性")).not.toBeDisabled()
+        expect(screen.getByLabelText("添加基本词性")).not.toHaveAttribute(
+          "aria-disabled",
+          "true"
+        )
       );
       expect(screen.queryByLabelText("复数英美通用拼写")).toBeNull();
       expect(canonicalValue()).toEqual(persisted);
@@ -771,14 +788,14 @@ describe("V3FormsAndPronunciationStep", () => {
       firstMatrix.querySelector(".word-form-matrix-distinguish")
     ).toBeNull();
     expect(
-      firstMatrix.querySelectorAll(".word-form-type-cell .ant-select")
+      firstMatrix.querySelectorAll(".word-form-type-cell [role=combobox]")
     ).toHaveLength(3);
-    expect(
-      screen.getByLabelText("变化组 1 词形 1 类型").closest(".ant-select")
-    ).toHaveTextContent("原形");
-    expect(
-      screen.getByLabelText("变化组 1 词形 2 类型").closest(".ant-select")
-    ).toHaveTextContent("原形");
+    expect(screen.getByLabelText("变化组 1 词形 1 类型")).toHaveTextContent(
+      "原形"
+    );
+    expect(screen.getByLabelText("变化组 1 词形 2 类型")).toHaveTextContent(
+      "原形"
+    );
     expect(matrices[1]!.querySelectorAll(".v3-membership-row")).toHaveLength(1);
     expect(canonicalValue()).toEqual(content);
   });
@@ -998,7 +1015,7 @@ describe("V3FormsAndPronunciationStep", () => {
 
   it("方言独立矩阵 CSS 固定宽屏留白/圆角并在窄屏按 V2 双行堆叠", () => {
     expect(formsCss).toMatch(
-      /\.v3-form-group-card\s*>\s*\.ant-card-body\s*>\s*\.ant-flex\s*\{[^}]*padding-bottom:\s*16px;/su
+      /\.v3-form-group-card\s*>\s*\.v3-form-group-body\s*>\s*\.v3-form-group-contents\s*\{[^}]*padding-bottom:\s*16px;/su
     );
     expect(formsCss).toContain(".v3-dialect-separated-matrix {");
     expect(formsCss).toContain(
@@ -1055,11 +1072,11 @@ describe("V3FormsAndPronunciationStep", () => {
         "先添加基本词性，再录入各种词形。录入词形时，不要遗漏 1) 英式或美式、2) 规则变化或不规则变化。字典音标用于展示与主动转换，选择 Azure IPA 或 UPS 输入进行合成。录入实际发音时需严格按照 “天生之®通用英语音标字母表” 进行操作。"
       )
     ).toBeVisible();
-    const addBasicPosSelect = screen
-      .getByLabelText("添加基本词性")
-      .closest(".ant-select");
-    expect(addBasicPosSelect).toHaveClass("word-add-basic-pos-select");
-    expect(addBasicPosSelect).toHaveTextContent("添加基本词性");
+    const addBasicPosSelect = screen.getByLabelText("添加基本词性");
+    expect(
+      addBasicPosSelect.closest(".word-add-basic-pos-select")
+    ).not.toBeNull();
+    expect(addBasicPosSelect).toHaveAccessibleName("添加基本词性");
     expect(screen.queryByLabelText("新增词性")).not.toBeInTheDocument();
 
     const groupCard = await waitFor(() => {
@@ -1130,8 +1147,8 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(await screen.findByText("名词")).toBeVisible();
     const deleteNoun = screen.getByLabelText("删除名词");
     const deleteVerb = screen.getByLabelText("删除动词");
-    expect(deleteNoun.closest(".ant-tabs-tab")).not.toBeNull();
-    expect(deleteVerb.closest(".ant-tabs-tab")).not.toBeNull();
+    expect(deleteNoun.closest('[role="tab"]')).not.toBeNull();
+    expect(deleteVerb.closest('[role="tab"]')).not.toBeNull();
     expect(
       container.querySelector(".v3-pos-tab > .v3-delete-pos-row")
     ).toBeNull();
@@ -1178,11 +1195,7 @@ describe("V3FormsAndPronunciationStep", () => {
     });
     expect(container.querySelector(".word-form-base-card")).toBeNull();
     expect(screen.queryByText("基准原形与发音")).toBeNull();
-    expect(
-      within(groupCard)
-        .getByLabelText("英美拼写无区别")
-        .closest(".ant-radio-wrapper")
-    ).toHaveClass("ant-radio-wrapper-checked");
+    expect(within(groupCard).getByLabelText("英美拼写无区别")).toBeChecked();
     expect(
       groupCard.querySelector(".word-form-matrix-shared-header")
     ).toHaveTextContent("英美通用");
@@ -1245,18 +1258,12 @@ describe("V3FormsAndPronunciationStep", () => {
       expect(card.getAllByText("是否规则变化？").length).toBeGreaterThan(0);
       expect(card.getByText("英美拼写是否有区别？")).toBeVisible();
       expect(card.getByText("英美音标是否有区别？")).toBeVisible();
-      expect(
-        card.getByLabelText("英美拼写无区别").closest(".ant-radio-wrapper")
-      ).toHaveClass("ant-radio-wrapper-checked");
+      expect(card.getByLabelText("英美拼写无区别")).toBeChecked();
     }
     // 英美规则按组生效：第 2 组切换不影响第 1 组。
     fireEvent.click(second.getByLabelText("英美拼写有区别"));
-    expect(
-      second.getByLabelText("英美拼写有区别").closest(".ant-radio-wrapper")
-    ).toHaveClass("ant-radio-wrapper-checked");
-    expect(
-      first.getByLabelText("英美拼写无区别").closest(".ant-radio-wrapper")
-    ).toHaveClass("ant-radio-wrapper-checked");
+    expect(second.getByLabelText("英美拼写有区别")).toBeChecked();
+    expect(first.getByLabelText("英美拼写无区别")).toBeChecked();
   });
 
   it("UD 规则独立回显拼写不区分、音标区分", async () => {
@@ -1276,14 +1283,8 @@ describe("V3FormsAndPronunciationStep", () => {
       />
     );
 
-    expect(
-      (await screen.findByLabelText("英美拼写无区别")).closest(
-        ".ant-radio-wrapper"
-      )
-    ).toHaveClass("ant-radio-wrapper-checked");
-    expect(
-      screen.getByLabelText("英美音标有区别").closest(".ant-radio-wrapper")
-    ).toHaveClass("ant-radio-wrapper-checked");
+    expect(await screen.findByLabelText("英美拼写无区别")).toBeChecked();
+    expect(screen.getByLabelText("英美音标有区别")).toBeChecked();
     expect(screen.getByLabelText("英美音标无区别")).not.toBeDisabled();
     expect(screen.getByLabelText("原形英美通用拼写")).toHaveValue("center");
     expect(container.querySelector(".v3-dialect-separated-matrix")).toBeNull();
@@ -1320,14 +1321,8 @@ describe("V3FormsAndPronunciationStep", () => {
       />
     );
 
-    expect(
-      (await screen.findByLabelText("英美拼写无区别")).closest(
-        ".ant-radio-wrapper"
-      )
-    ).toHaveClass("ant-radio-wrapper-checked");
-    expect(
-      screen.getByLabelText("英美音标无区别").closest(".ant-radio-wrapper")
-    ).toHaveClass("ant-radio-wrapper-checked");
+    expect(await screen.findByLabelText("英美拼写无区别")).toBeChecked();
+    expect(screen.getByLabelText("英美音标无区别")).toBeChecked();
     expect(screen.queryByLabelText("原形切换为英式和美式")).toBeNull();
     expect(screen.queryByLabelText("比较级切换为英式和美式")).toBeNull();
 
@@ -1335,13 +1330,9 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
 
     await waitFor(() =>
-      expect(
-        screen.getByLabelText("英美拼写有区别").closest(".ant-radio-wrapper")
-      ).toHaveClass("ant-radio-wrapper-checked")
+      expect(screen.getByLabelText("英美拼写有区别")).toBeChecked()
     );
-    expect(
-      screen.getByLabelText("英美音标有区别").closest(".ant-radio-wrapper")
-    ).toHaveClass("ant-radio-wrapper-checked");
+    expect(screen.getByLabelText("英美音标有区别")).toBeChecked();
     expect(screen.getByLabelText("英美音标无区别")).toBeDisabled();
     expect(screen.getAllByText("英式英语", { exact: true })[0]).toBeVisible();
     expect(screen.getAllByText("美式英语", { exact: true })[0]).toBeVisible();
@@ -1372,9 +1363,7 @@ describe("V3FormsAndPronunciationStep", () => {
     );
 
     expect(await screen.findByText("本组的英美结构待统一")).toBeVisible();
-    expect(
-      screen.getByLabelText("英美拼写有区别").closest(".ant-radio-wrapper")
-    ).toHaveClass("ant-radio-wrapper-checked");
+    expect(screen.getByLabelText("英美拼写有区别")).toBeChecked();
     fireEvent.click(screen.getByLabelText("英美拼写无区别"));
     await waitFor(() =>
       expect(screen.queryByText("本组的英美结构待统一")).toBeNull()
@@ -1483,9 +1472,7 @@ describe("V3FormsAndPronunciationStep", () => {
       );
       if (control === "拼写") {
         fireEvent.click(screen.getByLabelText("英美拼写无区别"));
-        expect(
-          screen.getByLabelText("英美拼写无区别").closest(".ant-radio-wrapper")
-        ).toHaveClass("ant-radio-wrapper-checked");
+        expect(screen.getByLabelText("英美拼写无区别")).toBeChecked();
         expect(canonicalValue().pos[0]!.form_groups[0]!.dialect_rules).toEqual({
           spelling_mode: "unified",
           phonetic_mode: "distinguish"
@@ -1588,8 +1575,9 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(screen.queryByLabelText("删除名词")).toBeNull();
     fireEvent.click(screen.getByLabelText("管理第 1 组词形变化"));
     const lastGroupDelete = await screen.findByText("至少保留一个词形");
-    expect(lastGroupDelete.closest("li")).toHaveClass(
-      "ant-dropdown-menu-item-disabled"
+    expect(lastGroupDelete.closest("li")).toHaveAttribute(
+      "aria-disabled",
+      "true"
     );
     expect(formById(canonicalValue(), form.id)).toBeDefined();
 
@@ -1707,25 +1695,33 @@ describe("V3FormsAndPronunciationStep", () => {
 
   it("I08 draft 空态可编辑但不误报完成；发布问题只显示简短状态", () => {
     const { rerender } = render(
-      <AntApp>
-        <V3FormsAndPronunciationStep
-          value={{ pos: [] }}
-          onChange={() => undefined}
-        />
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <AntApp>
+            <V3FormsAndPronunciationStep
+              value={{ pos: [] }}
+              onChange={() => undefined}
+            />
+          </AntApp>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
     expect(screen.getByText("草稿可暂时不添加词性")).toBeInTheDocument();
     expect(screen.queryByText(/已完成/)).toBeNull();
 
     const emptyIssues = validateFormsContent({ pos: [] }, "complete");
     rerender(
-      <AntApp>
-        <V3FormsAndPronunciationStep
-          value={{ pos: [] }}
-          onChange={() => undefined}
-          issues={emptyIssues}
-        />
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <AntApp>
+            <V3FormsAndPronunciationStep
+              value={{ pos: [] }}
+              onChange={() => undefined}
+              issues={emptyIssues}
+            />
+          </AntApp>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
     expect(
       screen.getByText(
@@ -1738,13 +1734,17 @@ describe("V3FormsAndPronunciationStep", () => {
     });
     const issues = validateFormsContent(incomplete, "complete");
     rerender(
-      <AntApp>
-        <V3FormsAndPronunciationStep
-          value={incomplete}
-          onChange={() => undefined}
-          issues={issues}
-        />
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <AntApp>
+            <V3FormsAndPronunciationStep
+              value={incomplete}
+              onChange={() => undefined}
+              issues={issues}
+            />
+          </AntApp>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
 
     expect(screen.getByText("词形与发音尚未完成")).toBeInTheDocument();
@@ -1877,9 +1877,16 @@ describe("V3FormsAndPronunciationStep", () => {
     const onChange = vi.fn();
     const emptyGroups = formsFixture({ groups: [] });
     const { rerender } = render(
-      <AntApp>
-        <V3FormsAndPronunciationStep onChange={onChange} value={emptyGroups} />
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <AntApp>
+            <V3FormsAndPronunciationStep
+              onChange={onChange}
+              value={emptyGroups}
+            />
+          </AntApp>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
 
     expect(screen.getByText("草稿可暂时不添加变化组")).toBeInTheDocument();
@@ -1915,15 +1922,19 @@ describe("V3FormsAndPronunciationStep", () => {
     };
     const content = { pos: [pos] };
     rerender(
-      <AntApp>
-        <V3PosTab
-          content={content}
-          idFactory={() => uuidFromInt(984)}
-          issues={[]}
-          onChange={onChange}
-          pos={pos}
-        />
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <AntApp>
+            <V3PosTab
+              content={content}
+              idFactory={() => uuidFromInt(984)}
+              issues={[]}
+              onChange={onChange}
+              pos={pos}
+            />
+          </AntApp>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
 
     expect(screen.getByText("草稿可暂时保留空变化组")).toBeInTheDocument();
@@ -1941,16 +1952,20 @@ describe("V3FormsAndPronunciationStep", () => {
       allowed_form_types: []
     };
     rerender(
-      <AntApp>
-        <V3PosTab
-          content={emptyGroups}
-          idFactory={() => uuidFromInt(985)}
-          issues={[]}
-          onChange={onChange}
-          pos={emptyGroups.pos[0]!}
-          posCatalog={catalogWithoutDerived}
-        />
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <AntApp>
+            <V3PosTab
+              content={emptyGroups}
+              idFactory={() => uuidFromInt(985)}
+              issues={[]}
+              onChange={onChange}
+              pos={emptyGroups.pos[0]!}
+              posCatalog={catalogWithoutDerived}
+            />
+          </AntApp>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
     expect(screen.queryByText("草稿可暂时不添加变化组")).toBeNull();
     expect(screen.queryByLabelText(/新增.*变化组/u)).toBeNull();
@@ -1964,18 +1979,22 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(adverbCatalog.allowed_form_types).toEqual([]);
 
     render(
-      <AntApp>
-        <PronunciationPreviewProvider>
-          <V3PosTab
-            content={content}
-            idFactory={() => uuidFromInt(978)}
-            issues={[]}
-            onChange={() => undefined}
-            pos={content.pos[0]!}
-            posCatalog={adverbCatalog}
-          />
-        </PronunciationPreviewProvider>
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <AntApp>
+            <PronunciationPreviewProvider>
+              <V3PosTab
+                content={content}
+                idFactory={() => uuidFromInt(978)}
+                issues={[]}
+                onChange={() => undefined}
+                pos={content.pos[0]!}
+                posCatalog={adverbCatalog}
+              />
+            </PronunciationPreviewProvider>
+          </AntApp>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
 
     // 副词、代词这类词性只有一个原形组，藏起来就没地方录拼写与发音。
@@ -1986,7 +2005,10 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(screen.getAllByLabelText(/^变化组 1 词形 \d+ 类型$/u)).toHaveLength(
       1
     );
-    expect(screen.getByLabelText("变化组 1 词形 1 类型")).toBeDisabled();
+    expect(screen.getByLabelText("变化组 1 词形 1 类型")).toHaveAttribute(
+      "aria-disabled",
+      "true"
+    );
     expect(screen.queryByLabelText(/新增.*变化组/u)).toBeNull();
   });
 
@@ -2002,22 +2024,26 @@ describe("V3FormsAndPronunciationStep", () => {
     )!;
 
     render(
-      <AntApp>
-        <PronunciationPreviewProvider>
-          <V3PosTab
-            content={content}
-            idFactory={() => uuidFromInt(976)}
-            issues={[]}
-            onChange={() => undefined}
-            pos={content.pos[0]!}
-            posCatalog={{
-              ...nounCatalog,
-              allowed_form_types: [],
-              default_form_types: []
-            }}
-          />
-        </PronunciationPreviewProvider>
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <AntApp>
+            <PronunciationPreviewProvider>
+              <V3PosTab
+                content={content}
+                idFactory={() => uuidFromInt(976)}
+                issues={[]}
+                onChange={() => undefined}
+                pos={content.pos[0]!}
+                posCatalog={{
+                  ...nounCatalog,
+                  allowed_form_types: [],
+                  default_form_types: []
+                }}
+              />
+            </PronunciationPreviewProvider>
+          </AntApp>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
 
     expect(screen.getByText("第 1 组 词形变化")).toBeVisible();
@@ -2045,20 +2071,24 @@ describe("V3FormsAndPronunciationStep", () => {
     const content = formsFixture({ forms, groups: [formGroup] });
     const onChange = vi.fn();
     render(
-      <AntApp>
-        <PronunciationPreviewProvider>
-          <V3FormGroupCard
-            content={content}
-            group={formGroup}
-            groupIndex={0}
-            idFactory={() => uuidFromInt(699)}
-            issues={[]}
-            membershipCounts={new Map()}
-            onChange={onChange}
-            pos={content.pos[0]!}
-          />
-        </PronunciationPreviewProvider>
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <AntApp>
+            <PronunciationPreviewProvider>
+              <V3FormGroupCard
+                content={content}
+                group={formGroup}
+                groupIndex={0}
+                idFactory={() => uuidFromInt(699)}
+                issues={[]}
+                membershipCounts={new Map()}
+                onChange={onChange}
+                pos={content.pos[0]!}
+              />
+            </PronunciationPreviewProvider>
+          </AntApp>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
 
     expect(screen.getByLabelText("上移变化组 1 的词形 1")).toBeDisabled();
@@ -2093,20 +2123,24 @@ describe("V3FormsAndPronunciationStep", () => {
     const stale = formsFixture({ forms: [form, keeper], groups: [] });
     const onChange = vi.fn();
     const { rerender } = render(
-      <AntApp>
-        <PronunciationPreviewProvider>
-          <V3FormGroupCard
-            content={stale}
-            group={displayedGroup}
-            groupIndex={0}
-            idFactory={() => uuidFromInt(702)}
-            issues={[]}
-            membershipCounts={new Map([[form.id, 1]])}
-            onChange={onChange}
-            pos={stale.pos[0]!}
-          />
-        </PronunciationPreviewProvider>
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <AntApp>
+            <PronunciationPreviewProvider>
+              <V3FormGroupCard
+                content={stale}
+                group={displayedGroup}
+                groupIndex={0}
+                idFactory={() => uuidFromInt(702)}
+                issues={[]}
+                membershipCounts={new Map([[form.id, 1]])}
+                onChange={onChange}
+                pos={stale.pos[0]!}
+              />
+            </PronunciationPreviewProvider>
+          </AntApp>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
 
     // 一形一组后点删除只弹确认，陈旧内容也不会提前改动草稿。
@@ -2115,20 +2149,24 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(openDeleteConfirm()).toHaveTextContent("确认删除此词形？");
 
     rerender(
-      <AntApp>
-        <PronunciationPreviewProvider>
-          <V3FormGroupCard
-            content={displayed}
-            group={displayedGroup}
-            groupIndex={0}
-            idFactory={() => uuidFromInt(702)}
-            issues={[]}
-            membershipCounts={new Map([[form.id, 1]])}
-            onChange={onChange}
-            pos={displayed.pos[0]!}
-          />
-        </PronunciationPreviewProvider>
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <AntApp>
+            <PronunciationPreviewProvider>
+              <V3FormGroupCard
+                content={displayed}
+                group={displayedGroup}
+                groupIndex={0}
+                idFactory={() => uuidFromInt(702)}
+                issues={[]}
+                membershipCounts={new Map([[form.id, 1]])}
+                onChange={onChange}
+                pos={displayed.pos[0]!}
+              />
+            </PronunciationPreviewProvider>
+          </AntApp>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
     // 内容刷新后确认框仍开着，取消不改动草稿。
     expect(openDeleteConfirm()).not.toBeNull();
@@ -2138,20 +2176,24 @@ describe("V3FormsAndPronunciationStep", () => {
 
     const missingForm = formsFixture({ forms: [], groups: [] });
     rerender(
-      <AntApp>
-        <PronunciationPreviewProvider>
-          <V3FormGroupCard
-            content={missingForm}
-            group={displayedGroup}
-            groupIndex={0}
-            idFactory={() => uuidFromInt(702)}
-            issues={[]}
-            membershipCounts={new Map()}
-            onChange={onChange}
-            pos={missingForm.pos[0]!}
-          />
-        </PronunciationPreviewProvider>
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <AntApp>
+            <PronunciationPreviewProvider>
+              <V3FormGroupCard
+                content={missingForm}
+                group={displayedGroup}
+                groupIndex={0}
+                idFactory={() => uuidFromInt(702)}
+                issues={[]}
+                membershipCounts={new Map()}
+                onChange={onChange}
+                pos={missingForm.pos[0]!}
+              />
+            </PronunciationPreviewProvider>
+          </AntApp>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
     // 引用的词形已不在草稿里：整行换成错误提示，删除入口随之消失。
     expect(
@@ -2182,22 +2224,26 @@ describe("V3FormsAndPronunciationStep", () => {
     };
     const onChange = vi.fn();
     render(
-      <AntApp>
-        <PronunciationPreviewProvider>
-          <V3ConcreteFormRow
-            content={content}
-            dialectRules={{
-              spelling_mode: "distinguish",
-              phonetic_mode: "distinguish"
-            }}
-            form={form}
-            idFactory={() => uuidFromInt(899)}
-            issues={[ukIssue]}
-            membershipCount={0}
-            onChange={onChange}
-          />
-        </PronunciationPreviewProvider>
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <AntApp>
+            <PronunciationPreviewProvider>
+              <V3ConcreteFormRow
+                content={content}
+                dialectRules={{
+                  spelling_mode: "distinguish",
+                  phonetic_mode: "distinguish"
+                }}
+                form={form}
+                idFactory={() => uuidFromInt(899)}
+                issues={[ukIssue]}
+                membershipCount={0}
+                onChange={onChange}
+              />
+            </PronunciationPreviewProvider>
+          </AntApp>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
 
     expect(screen.getByLabelText("词形英式拼写")).toHaveAttribute(
@@ -2254,17 +2300,21 @@ describe("V3FormsAndPronunciationStep", () => {
     const onChange = vi.fn();
     const addedId = uuidFromInt(904);
     render(
-      <AntApp>
-        <PronunciationPreviewProvider>
-          <V3PronunciationList
-            content={content}
-            idFactory={() => addedId}
-            issues={[issue]}
-            onChange={onChange}
-            variant={form.regional_variants.uk}
-          />
-        </PronunciationPreviewProvider>
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <AntApp>
+            <PronunciationPreviewProvider>
+              <V3PronunciationList
+                content={content}
+                idFactory={() => addedId}
+                issues={[issue]}
+                onChange={onChange}
+                variant={form.regional_variants.uk}
+              />
+            </PronunciationPreviewProvider>
+          </AntApp>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
 
     expect(screen.getAllByLabelText(/拖动第 \d+ 条发音/)).toHaveLength(2);
@@ -2277,7 +2327,9 @@ describe("V3FormsAndPronunciationStep", () => {
       "aria-invalid",
       "false"
     );
-    expect(screen.getByLabelText("第 1 条发音的读法")).toHaveValue("");
+    expect(screen.getByLabelText("第 1 条发音的读法")).toHaveTextContent(
+      "风格"
+    );
     expect(screen.queryByLabelText("新增发音")).toBeNull();
     expect(screen.getAllByLabelText(/在第 \d+ 条后新增发音/)).toHaveLength(2);
 
@@ -2359,25 +2411,31 @@ describe("V3FormsAndPronunciationStep", () => {
     ];
 
     render(
-      <AntApp>
-        <PronunciationPreviewProvider>
-          <V3PronunciationList
-            content={content}
-            idFactory={() => uuidFromInt(906)}
-            issues={issues}
-            onChange={() => undefined}
-            variant={form.regional_variants.common}
-          />
-        </PronunciationPreviewProvider>
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <AntApp>
+            <PronunciationPreviewProvider>
+              <V3PronunciationList
+                content={content}
+                idFactory={() => uuidFromInt(906)}
+                issues={issues}
+                onChange={() => undefined}
+                variant={form.regional_variants.common}
+              />
+            </PronunciationPreviewProvider>
+          </AntApp>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
 
-    expect(
-      screen.getByLabelText("第 1 条发音的读法").closest(".ant-select")
-    ).toHaveClass("ant-select-status-error");
+    expect(screen.getByLabelText("第 1 条发音的读法")).toHaveAttribute(
+      "aria-invalid",
+      "true"
+    );
     expect(screen.getByText("请选择读法")).toBeVisible();
-    expect(screen.getByLabelText("第 1 条发音的字典音标")).toHaveClass(
-      "ant-input-status-error"
+    expect(screen.getByLabelText("第 1 条发音的字典音标")).toHaveAttribute(
+      "aria-invalid",
+      "true"
     );
     expect(screen.getByText("请填写字典音标")).toBeVisible();
   });
@@ -2400,21 +2458,25 @@ describe("V3FormsAndPronunciationStep", () => {
     const content = formsFixture({ forms: [form] });
     const onChange = vi.fn();
     const { container } = render(
-      <AntApp>
-        <PronunciationPreviewProvider>
-          <V3PronunciationList
-            content={content}
-            idFactory={() => uuidFromInt(924)}
-            issues={[]}
-            onChange={onChange}
-            variant={form.regional_variants.uk}
-          />
-        </PronunciationPreviewProvider>
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <AntApp>
+            <PronunciationPreviewProvider>
+              <V3PronunciationList
+                content={content}
+                idFactory={() => uuidFromInt(924)}
+                issues={[]}
+                onChange={onChange}
+                variant={form.regional_variants.uk}
+              />
+            </PronunciationPreviewProvider>
+          </AntApp>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
     const handles = screen.getAllByLabelText(/拖动第 \d+ 条发音/);
     expect(handles).toHaveLength(2);
-    expect(handles[0]!.querySelector(".anticon-holder")).not.toBeNull();
+    expect(handles[0]!.querySelector("svg")).not.toBeNull();
     expect(handles.every((handle) => !handle.hasAttribute("disabled"))).toBe(
       true
     );
@@ -2514,17 +2576,21 @@ describe("V3FormsAndPronunciationStep", () => {
     const content = formsFixture({ forms: [form] });
     const onChange = vi.fn();
     const { rerender } = render(
-      <AntApp>
-        <PronunciationPreviewProvider>
-          <V3PronunciationList
-            content={content}
-            idFactory={() => uuidFromInt(952)}
-            issues={[]}
-            onChange={onChange}
-            variant={form.regional_variants.common}
-          />
-        </PronunciationPreviewProvider>
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <AntApp>
+            <PronunciationPreviewProvider>
+              <V3PronunciationList
+                content={content}
+                idFactory={() => uuidFromInt(952)}
+                issues={[]}
+                onChange={onChange}
+                variant={form.regional_variants.common}
+              />
+            </PronunciationPreviewProvider>
+          </AntApp>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
     expect(screen.getByLabelText("第 1 条发音的实际发音")).toBeInTheDocument();
 
@@ -2535,17 +2601,21 @@ describe("V3FormsAndPronunciationStep", () => {
     });
     const emptyContent = formsFixture({ forms: [emptyForm] });
     rerender(
-      <AntApp>
-        <PronunciationPreviewProvider>
-          <V3PronunciationList
-            content={emptyContent}
-            idFactory={() => uuidFromInt(952)}
-            issues={[]}
-            onChange={onChange}
-            variant={emptyForm.regional_variants.common}
-          />
-        </PronunciationPreviewProvider>
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <AntApp>
+            <PronunciationPreviewProvider>
+              <V3PronunciationList
+                content={emptyContent}
+                idFactory={() => uuidFromInt(952)}
+                issues={[]}
+                onChange={onChange}
+                variant={emptyForm.regional_variants.common}
+              />
+            </PronunciationPreviewProvider>
+          </AntApp>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
 
     expect(screen.getByText("暂无发音")).toBeInTheDocument();
@@ -2618,7 +2688,10 @@ describe("V3FormsAndPronunciationStep", () => {
     render(<Harness initial={{ pos: [] }} idFactory={uuidSequence(...ids)} />);
 
     await waitFor(() =>
-      expect(screen.getByLabelText("添加基本词性")).not.toBeDisabled()
+      expect(screen.getByLabelText("添加基本词性")).not.toHaveAttribute(
+        "aria-disabled",
+        "true"
+      )
     );
     chooseOption("添加基本词性", "名词");
     const addedNoun = canonicalValue().pos[0]!;
@@ -2715,9 +2788,12 @@ describe("V3FormsAndPronunciationStep", () => {
     await waitFor(() =>
       expect(
         screen.getAllByLabelText("变化组 1 词形 1 类型")[0]
-      ).not.toBeDisabled()
+      ).not.toHaveAttribute("aria-disabled", "true")
     );
-    expect(screen.getByLabelText("变化组 1 词形 2 类型")).not.toBeDisabled();
+    expect(screen.getByLabelText("变化组 1 词形 2 类型")).not.toHaveAttribute(
+      "aria-disabled",
+      "true"
+    );
     chooseOption("变化组 1 词形 1 类型", "复数");
     await waitFor(() =>
       expect(formById(canonicalValue(), original.id).form_type).toBe("plural")
@@ -2730,7 +2806,9 @@ describe("V3FormsAndPronunciationStep", () => {
     ).toEqual(["plural", "base", "base"]);
     expect(canonicalValue().pos[0]!.form_groups).toEqual(originalGroups);
     expect(screen.getAllByLabelText("变化组 1 词形 1 类型")).toHaveLength(1);
-    expect(screen.getByLabelText("变化组 2 词形 1 类型")).toHaveValue("");
+    expect(screen.getByLabelText("变化组 2 词形 1 类型")).toHaveTextContent(
+      "原形"
+    );
   });
 
   it("组内只剩一个原形时锁死类型，复制出第二个原形后才放开", async () => {
@@ -2752,15 +2830,21 @@ describe("V3FormsAndPronunciationStep", () => {
     );
 
     const locked = await screen.findByLabelText("变化组 1 词形 1 类型");
-    expect(locked).toBeDisabled();
+    expect(locked).toHaveAttribute("aria-disabled", "true");
     await expectDisabledReason(locked, "第 1 组词形变化至少保留一个原形");
 
     fireEvent.click(screen.getByLabelText("在原形 1 下方添加同类型词形"));
 
     await waitFor(() =>
-      expect(screen.getByLabelText("变化组 1 词形 2 类型")).not.toBeDisabled()
+      expect(screen.getByLabelText("变化组 1 词形 2 类型")).not.toHaveAttribute(
+        "aria-disabled",
+        "true"
+      )
     );
-    expect(screen.getByLabelText("变化组 1 词形 1 类型")).not.toBeDisabled();
+    expect(screen.getByLabelText("变化组 1 词形 1 类型")).not.toHaveAttribute(
+      "aria-disabled",
+      "true"
+    );
 
     chooseOption("变化组 1 词形 2 类型", "复数");
 
@@ -2770,7 +2854,7 @@ describe("V3FormsAndPronunciationStep", () => {
       ).toEqual(["base", "plural"])
     );
     const relocked = screen.getByLabelText("变化组 1 词形 1 类型");
-    expect(relocked).toBeDisabled();
+    expect(relocked).toHaveAttribute("aria-disabled", "true");
     await expectDisabledReason(relocked, "第 1 组词形变化至少保留一个原形");
   });
 
@@ -2797,7 +2881,10 @@ describe("V3FormsAndPronunciationStep", () => {
 
     // 组里两个原形，谁都没锁
     await waitFor(() =>
-      expect(screen.getByLabelText("变化组 1 词形 1 类型")).not.toBeDisabled()
+      expect(screen.getByLabelText("变化组 1 词形 1 类型")).not.toHaveAttribute(
+        "aria-disabled",
+        "true"
+      )
     );
     fireEvent.click(screen.getByLabelText("删除变化组 1 的词形 2"));
     expect(openDeleteConfirm()).not.toBeNull();
@@ -2811,15 +2898,16 @@ describe("V3FormsAndPronunciationStep", () => {
       which: 40
     });
     const pluralOption = [
-      ...document.querySelectorAll<HTMLElement>(
-        ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
-      )
+      ...document.querySelectorAll<HTMLElement>("[role=option]")
     ].find((item) => item.textContent === "复数");
     expect(pluralOption).toBeDefined();
     expect(openDeleteConfirm()).not.toBeNull();
     fireEvent.click(pluralOption!);
     await waitFor(() =>
-      expect(screen.getByLabelText("变化组 1 词形 2 类型")).toBeDisabled()
+      expect(screen.getByLabelText("变化组 1 词形 2 类型")).toHaveAttribute(
+        "aria-disabled",
+        "true"
+      )
     );
 
     // 确认框随之收起，删除按钮锁住并给出原因
@@ -3026,13 +3114,11 @@ describe("V3FormsAndPronunciationStep", () => {
     render(<Harness initial={formsFixture({ forms: [historical] })} />);
 
     const select = await screen.findByLabelText("变化组 1 词形 1 类型");
-    expect(select).not.toBeDisabled();
-    expect(select).toHaveValue("");
+    expect(select).not.toHaveAttribute("aria-disabled", "true");
+    expect(select).toHaveTextContent("复数");
     fireEvent.mouseDown(select);
     const choices = [
-      ...document.querySelectorAll<HTMLElement>(
-        ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
-      )
+      ...document.querySelectorAll<HTMLElement>("[role=option]")
     ].map((item) => item.textContent);
     expect(choices).toEqual(["复数", "原形", "比较级"]);
   });
@@ -3226,17 +3312,24 @@ describe("V3FormsAndPronunciationStep", () => {
     catalogState.data = undefined;
     catalogState.isError = true;
     const { unmount } = render(
-      <AntApp>
-        <V3FormsAndPronunciationStep
-          onChange={() => undefined}
-          value={{ pos: [] }}
-        />
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <AntApp>
+            <V3FormsAndPronunciationStep
+              onChange={() => undefined}
+              value={{ pos: [] }}
+            />
+          </AntApp>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
     expect(
       await screen.findByText("词性目录不可用，已停止新增结构")
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("添加基本词性")).toBeDisabled();
+    expect(screen.getByLabelText("添加基本词性")).toHaveAttribute(
+      "aria-disabled",
+      "true"
+    );
     unmount();
   }, 15_000);
 
@@ -3268,12 +3361,16 @@ describe("V3FormsAndPronunciationStep", () => {
       rejectCatalog = reject;
     });
     const { unmount } = render(
-      <AntApp>
-        <V3FormsAndPronunciationStep
-          onChange={() => undefined}
-          value={{ pos: [] }}
-        />
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <AntApp>
+            <V3FormsAndPronunciationStep
+              onChange={() => undefined}
+              value={{ pos: [] }}
+            />
+          </AntApp>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
 
     unmount();
@@ -3295,22 +3392,31 @@ describe("V3FormsAndPronunciationStep", () => {
         setActivePosId(posId);
       };
       return (
-        <AntApp>
-          <V3FormsAndPronunciationStep
-            activePosId={activePosId}
-            onActivePosChange={changeActivePos}
-            onChange={setValue}
-            value={value}
-          />
-          <output data-testid="controlled-active-pos">{activePosId}</output>
-          <output data-testid="controlled-pos-count">{value.pos.length}</output>
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <AntApp>
+              <V3FormsAndPronunciationStep
+                activePosId={activePosId}
+                onActivePosChange={changeActivePos}
+                onChange={setValue}
+                value={value}
+              />
+              <output data-testid="controlled-active-pos">{activePosId}</output>
+              <output data-testid="controlled-pos-count">
+                {value.pos.length}
+              </output>
+            </AntApp>
+          </FeedbackProvider>
+        </AdminThemeProvider>
       );
     }
 
     render(<ControlledHarness />);
     await waitFor(() =>
-      expect(screen.getByLabelText("添加基本词性")).not.toBeDisabled()
+      expect(screen.getByLabelText("添加基本词性")).not.toHaveAttribute(
+        "aria-disabled",
+        "true"
+      )
     );
 
     fireEvent.click(screen.getByLabelText("删除名词"));
@@ -3357,7 +3463,7 @@ describe("V3FormsAndPronunciationStep", () => {
       handle.querySelector<HTMLElement>(".word-sort-drag-handle")!
     );
     expect(grips.every((grip) => grip.draggable)).toBe(true);
-    expect(grips[0]!.querySelector(".anticon-holder")).not.toBeNull();
+    expect(grips[0]!.querySelector("svg")).not.toBeNull();
 
     const store = new Map<string, string>();
     const dataTransfer = {
@@ -3438,16 +3544,15 @@ it.each([false, true])(
       </FormTypeLabelsProvider>
     );
     await waitFor(() =>
-      expect(screen.getByLabelText("变化组 1 词形 2 类型")).not.toBeDisabled()
+      expect(screen.getByLabelText("变化组 1 词形 2 类型")).not.toHaveAttribute(
+        "aria-disabled",
+        "true"
+      )
     );
     for (const [index, label] of labels.entries()) {
-      const select = screen
-        .getByLabelText(`变化组 1 词形 ${index + 2} 类型`)
-        .closest(".ant-select")!;
-      expect(select.querySelector(".ant-select-content")).toHaveTextContent(
-        label
-      );
-      expect(select.querySelector(".ant-select-content")).toHaveStyle({
+      const select = screen.getByLabelText(`变化组 1 词形 ${index + 2} 类型`);
+      expect(select).toHaveTextContent(label);
+      expect(select).toHaveStyle({
         whiteSpace: "normal",
         overflowWrap: "anywhere",
         textOverflow: "clip"
@@ -3461,12 +3566,15 @@ it.each([false, true])(
     });
     expect(popup).toHaveStyle({ width: "max-content" });
     expect((popup as HTMLElement).style.maxWidth).toBe("calc(100vw - 32px)");
-    expect(popup).not.toHaveClass("ant-select-dropdown-hidden");
+    expect(popup).toHaveStyle({ maxWidth: `${window.innerWidth - 32}px` });
+    expect(popup).toBeVisible();
     for (const label of labels)
       expect(within(popup as HTMLElement).getByText(label)).toBeInTheDocument();
-    expect(formsCss).toMatch(
-      /\.v3-form-type-popup \.ant-select-item-option-content\s*\{[^}]*white-space: normal;[^}]*overflow-wrap: anywhere;/
-    );
+    for (const option of within(popup as HTMLElement).getAllByRole("option"))
+      expect(option).toHaveStyle({
+        whiteSpace: "normal",
+        overflowWrap: "anywhere"
+      });
   }
 );
 

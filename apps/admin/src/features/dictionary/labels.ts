@@ -8,7 +8,7 @@ import type {
   SurfaceMatchCategoryV2
 } from "@tsz/types";
 
-/** Record<wire 码, 标签> → antd Select options(码作 value,标签作 label)。 */
+/** Record<wire 码, 标签> → Select options(码作 value,标签作 label)。 */
 export const recordToOptions = <K extends string>(record: Record<K, string>) =>
   (Object.entries(record) as [K, string][]).map(([value, label]) => ({
     value,

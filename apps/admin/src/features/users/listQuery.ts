@@ -6,7 +6,7 @@ import type { Dayjs } from "dayjs";
 /** 角色 tab 选项（映射后端 role 参数：all=不传）。 */
 export type UserRoleTab = "all" | "student" | "teacher";
 
-/** 搜索行表单值（antd Form 收集，camelCase 属前端本地 state）。 */
+/** 搜索行表单值（camelCase 属前端本地 state）。 */
 export interface UserFilterValues {
   /** 手机号、邮箱或昵称的单一字面子串关键词。 */
   q?: string;

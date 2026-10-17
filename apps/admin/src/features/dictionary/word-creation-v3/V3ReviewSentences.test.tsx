@@ -90,7 +90,7 @@ describe("词义预览的独立例句", () => {
       page: 1,
       page_size: 5
     });
-    fireEvent.click(screen.getByTitle("2"));
+    fireEvent.click(screen.getByRole("button", { name: /2/ }));
     expect(await screen.findByText("Book a table.")).toBeVisible();
     expect(screen.queryByText("Book a room.")).toBeNull();
     expect(list).toHaveBeenLastCalledWith({

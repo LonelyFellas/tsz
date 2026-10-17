@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { AdminTestProviders as AntApp } from "@/test-utils/AdminTestProviders";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { HomePage } from "./Home";
@@ -112,7 +112,7 @@ describe("admin 页面烟雾测试", () => {
   );
 
   it("用户管理页渲染搜索行、角色 tab 与表格列", () => {
-    // 已接真实数据层（React Query + api.users.list，此处返回空列表），需 antd App context 与路由。
+    // 已接真实数据层（React Query + api.users.list，此处返回空列表），需后台 Theme/反馈 context 与路由。
     // 用文本查询而非 getByRole：表格每行含多个操作按钮，getByRole 会极慢。
     render(
       <MemoryRouter>
@@ -124,11 +124,11 @@ describe("admin 页面烟雾测试", () => {
       </MemoryRouter>
     );
     // 搜索行与角色 tab。
-    expect(screen.getByText("关键词")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "关键词" })).toBeInTheDocument();
     for (const tab of ["全部", "老师", "学生"]) {
       expect(screen.getByText(tab)).toBeInTheDocument();
     }
-    // 表格关键列；余额在详情中独立授权、按需请求。fixed 列表头在 antd 下会重复渲染，
+    // 表格关键列；余额在详情中独立授权、按需请求。固定列表头不应重复渲染，
     // 用 getAllByText 容纳多次出现。
     for (const col of ["用户ID", "等级", "更新时间"]) {
       expect(screen.getAllByText(col).length).toBeGreaterThan(0);
@@ -136,7 +136,7 @@ describe("admin 页面烟雾测试", () => {
   });
 
   it("智能词库真实模式开放 V2 短语与批量归档，隐藏物理删除", () => {
-    // 依赖 antd App context（App.useApp）与路由（列表用 useNavigate 跳创建页）。
+    // 依赖后台 Theme/反馈 context与路由（列表用 useNavigate 跳创建页）。
     // 用基于文本的查询而非 getByRole：表格有上百个按钮，getByRole 会逐个计算
     // 可访问名（jsdom 下大量 getComputedStyle）导致极慢。
     render(
@@ -162,7 +162,7 @@ describe("admin 页面烟雾测试", () => {
   });
 
   it("个人设置页渲染方言偏好，默认英式", () => {
-    // 依赖 antd App context（切换时用 message 反馈）。
+    // 依赖后台反馈 context（切换时提示）。
     render(
       <AntApp>
         <ProfileSettingsPage />

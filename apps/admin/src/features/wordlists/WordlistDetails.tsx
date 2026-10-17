@@ -3,17 +3,20 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
   Button,
-  Drawer,
-  Input,
-  Modal,
-  Pagination,
+  Chip,
+  FormControlLabel,
   Radio,
-  Space,
-  Table,
+  RadioGroup,
+  Stack,
+  Tab,
   Tabs,
-  Tag,
+  TextField,
   Typography
-} from "antd";
+} from "@mui/material";
+import { useForm } from "react-hook-form";
+import { AdminDrawer } from "@/components/AdminDrawer";
+import { AdminTable, AdminPagination } from "@/components/AdminTable";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type { Wordlist, WordlistEntry, AdminWordlistReview } from "@tsz/types";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import { api, usePermission } from "@/lib/auth";
@@ -21,12 +24,12 @@ import { api, usePermission } from "@/lib/auth";
 export function WordlistEntryView({ entry }: { entry: WordlistEntry }) {
   return (
     <section style={{ padding: "16px 0", borderBottom: "1px solid #eee" }}>
-      <Typography.Title level={5}>{entry.label}</Typography.Title>
+      <Typography variant="h6" component="h3">
+        {entry.label}
+      </Typography>
       {entry.pos.map((pos) => (
         <div key={pos.pos_id}>
-          <Typography.Text type="secondary">
-            {pos.label ?? pos.pos}
-          </Typography.Text>
+          <Typography color="text.secondary">{pos.label ?? pos.pos}</Typography>
           {pos.senses.map((sense) => (
             <div key={sense.id}>
               {sense.definitions.map((def) => (
@@ -49,12 +52,22 @@ const reviewLabels: Record<string, string> = {
   rejected: "已驳回",
   cancelled: "已取消"
 };
-const reviewColors: Record<string, string> = {
-  pending: "processing",
-  approved: "success",
-  rejected: "error",
-  cancelled: "default"
-};
+function reviewChip(state: string) {
+  return (
+    <Chip
+      label={reviewLabels[state] ?? state}
+      color={
+        state === "approved"
+          ? "success"
+          : state === "rejected"
+            ? "error"
+            : state === "pending"
+              ? "primary"
+              : "default"
+      }
+    />
+  );
+}
 export function WordlistDetails({
   list,
   adminId,
@@ -72,7 +85,10 @@ export function WordlistDetails({
   const [page, setPage] = useState(1);
   const [requestId, setRequestId] = useState<string>();
   const [action, setAction] = useState<"approve" | "reject" | null>(null);
-  const [reason, setReason] = useState("");
+  const { register, watch } = useForm<{ reason: string }>({
+    defaultValues: { reason: "" }
+  });
+  const reason = watch("reason");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const key = ["admin-wordlists", adminId, list.id];
@@ -137,147 +153,145 @@ export function WordlistDetails({
   }
   return (
     <>
-      <Drawer
+      <AdminDrawer
         title={list.name}
-        open
-        size="large"
+        width={736}
         onClose={() => {
           if (!busy) onClose();
         }}
       >
-        <Typography.Paragraph>
+        <Typography sx={{ mb: 2 }}>
           创建人：{list.owner_name} · ID：{list.id}
-        </Typography.Paragraph>
+        </Typography>
         <Tabs
-          activeKey={tab}
-          onChange={(v) => {
-            setTab(v);
+          value={tab}
+          onChange={(_, value: string) => {
+            setTab(value);
             setPage(1);
           }}
-          items={[
-            { key: "current", label: "当前内容" },
-            { key: "reviews", label: "审核记录" }
-          ]}
-        />
-        {tab === "reviews" && (
-          <>
-            {reviews.isError ? (
-              <Alert
-                type="error"
-                title="审核记录加载失败"
-                action={
-                  <Button onClick={() => void reviews.refetch()}>重试</Button>
+          aria-label="词表内容"
+        >
+          <Tab value="current" label="当前内容" />
+          <Tab value="reviews" label="审核记录" />
+        </Tabs>
+        {tab === "reviews" &&
+          (reviews.isError ? (
+            <Alert
+              severity="error"
+              action={
+                <Button onClick={() => void reviews.refetch()}>重试</Button>
+              }
+            >
+              审核记录加载失败
+            </Alert>
+          ) : reviews.isPending ? (
+            <p>读取审核记录…</p>
+          ) : !current ? (
+            <p>尚未提交公开审核</p>
+          ) : !reviewMode ? (
+            <AdminTable
+              rows={reviews.data.items}
+              rowId={(row) => row.id}
+              columns={[
+                {
+                  id: "state",
+                  label: "审核状态",
+                  render: (row) => reviewChip(row.state)
+                },
+                { id: "name", label: "申请名称", render: (row) => row.name },
+                {
+                  id: "created",
+                  label: "提交时间",
+                  render: (row) =>
+                    row.created_at
+                      ? new Date(row.created_at).toLocaleString("zh-CN")
+                      : "—"
+                },
+                {
+                  id: "reviewer",
+                  label: "审核人",
+                  render: (row) =>
+                    row.reviewer_name ||
+                    row.reviewer_id ||
+                    (row.decided_at ? "未提供" : "—")
+                },
+                {
+                  id: "decided",
+                  label: "审核时间",
+                  render: (row) =>
+                    row.decided_at
+                      ? new Date(row.decided_at).toLocaleString("zh-CN")
+                      : "—"
+                },
+                {
+                  id: "reason",
+                  label: "审核意见",
+                  render: (row) => row.reason || "—"
                 }
-              />
-            ) : reviews.isPending ? (
-              <p>读取审核记录…</p>
-            ) : !current ? (
-              <p>尚未提交公开审核</p>
-            ) : !reviewMode ? (
-              <Table<AdminWordlistReview>
-                rowKey="id"
-                size="small"
-                pagination={false}
-                dataSource={reviews.data.items}
-                columns={[
-                  {
-                    title: "审核状态",
-                    render: (_, r) => (
-                      <Tag color={reviewColors[r.state]}>
-                        {reviewLabels[r.state] ?? r.state}
-                      </Tag>
-                    )
-                  },
-                  { title: "申请名称", dataIndex: "name" },
-                  {
-                    title: "提交时间",
-                    dataIndex: "created_at",
-                    render: (value: string) =>
-                      value ? new Date(value).toLocaleString("zh-CN") : "—"
-                  },
-                  {
-                    title: "审核人",
-                    render: (_, r) =>
-                      r.reviewer_name ||
-                      r.reviewer_id ||
-                      (r.decided_at ? "未提供" : "—")
-                  },
-                  {
-                    title: "审核时间",
-                    dataIndex: "decided_at",
-                    render: (value: string | null) =>
-                      value ? new Date(value).toLocaleString("zh-CN") : "—"
-                  },
-                  {
-                    title: "审核意见",
-                    dataIndex: "reason",
-                    render: (value: string | null) => value || "—"
-                  }
-                ]}
-              />
-            ) : (
-              <>
-                <Radio.Group
-                  aria-label="审核记录"
-                  value={current.id}
-                  onChange={(e) => {
-                    setRequestId(e.target.value);
-                    setPage(1);
-                  }}
-                >
-                  <Space wrap>
-                    {reviews.data.items.map((r) => (
-                      <Radio key={r.id} value={r.id}>
-                        <Tag color={reviewColors[r.state]}>
-                          {reviewLabels[r.state] ?? r.state}
-                        </Tag>
-                      </Radio>
-                    ))}
-                  </Space>
-                </Radio.Group>
-                <p>申请名称：{current.name}</p>
-                <p>
-                  审核人：
-                  {current.reviewer_name ||
-                    current.reviewer_id ||
-                    (current.decided_at ? "未提供" : "—")}
-                </p>
-                {current.reason && <p>审核意见：{current.reason}</p>}
-                {reviewMode && current.state === "pending" && canReview && (
-                  <Space>
-                    <Button
-                      type="primary"
-                      onClick={() => {
-                        setAction("approve");
-                        setError("");
-                      }}
-                    >
-                      通过审核
-                    </Button>
-                    <Button
-                      danger
-                      onClick={() => {
-                        setAction("reject");
-                        setError("");
-                      }}
-                    >
-                      驳回
-                    </Button>
-                  </Space>
-                )}
-              </>
-            )}
-          </>
-        )}
+              ]}
+            />
+          ) : (
+            <>
+              <RadioGroup
+                row
+                aria-label="审核记录"
+                value={current.id}
+                onChange={(event) => {
+                  setRequestId(event.target.value);
+                  setPage(1);
+                }}
+              >
+                {reviews.data.items.map((row) => (
+                  <FormControlLabel
+                    key={row.id}
+                    value={row.id}
+                    control={<Radio />}
+                    label={reviewChip(row.state)}
+                  />
+                ))}
+              </RadioGroup>
+              <p>申请名称：{current.name}</p>
+              <p>
+                审核人：
+                {current.reviewer_name ||
+                  current.reviewer_id ||
+                  (current.decided_at ? "未提供" : "—")}
+              </p>
+              {current.reason && <p>审核意见：{current.reason}</p>}
+              {reviewMode && current.state === "pending" && canReview && (
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    variant="contained"
+                    onClick={() => {
+                      setAction("approve");
+                      setError("");
+                    }}
+                  >
+                    通过审核
+                  </Button>
+                  <Button
+                    color="error"
+                    onClick={() => {
+                      setAction("reject");
+                      setError("");
+                    }}
+                  >
+                    驳回
+                  </Button>
+                </Stack>
+              )}
+            </>
+          ))}
         {(tab === "current" || (reviewMode && current)) &&
           (items.isError ? (
             <Alert
-              type="error"
-              title="词条加载失败"
+              severity="error"
               action={
                 <Button onClick={() => void items.refetch()}>重试</Button>
               }
-            />
+            >
+              词条加载失败
+            </Alert>
           ) : items.isPending ? (
             <p>读取词条…</p>
           ) : (
@@ -290,42 +304,43 @@ export function WordlistDetails({
                     <p>内容不可用</p>
                   )}
                   {item.author_note && (
-                    <Typography.Paragraph style={{ whiteSpace: "pre-wrap" }}>
+                    <Typography sx={{ whiteSpace: "pre-wrap" }}>
                       注：{item.author_note}
-                    </Typography.Paragraph>
+                    </Typography>
                   )}
                 </div>
               ))}
-              <Pagination
-                current={page}
+              <AdminPagination
+                page={page}
                 pageSize={20}
                 total={items.data.pagination.total}
-                showSizeChanger={false}
                 onChange={setPage}
               />
             </>
           ))}
-      </Drawer>
-      <Modal
-        title={action === "approve" ? "确认通过审核并公开" : "驳回词表"}
+      </AdminDrawer>
+      <ConfirmDialog
         open={!!action}
-        confirmLoading={busy}
-        onCancel={() => {
-          if (!busy) setAction(null);
-        }}
-        onOk={() => void decide()}
+        title={action === "approve" ? "确认通过审核并公开" : "驳回词表"}
+        pending={busy}
+        error={error || undefined}
+        confirmText="确认"
+        onClose={() => setAction(null)}
+        onConfirm={() => void decide()}
       >
         <p>{current?.name}</p>
         {action === "reject" && (
-          <Input.TextArea
-            aria-label="操作原因"
-            maxLength={1000}
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
+          <TextField
+            label="操作原因"
+            multiline
+            minRows={3}
+            fullWidth
+            disabled={busy}
+            slotProps={{ htmlInput: { maxLength: 1000 } }}
+            {...register("reason")}
           />
         )}
-        {error && <Alert type="error" title={error} />}
-      </Modal>
+      </ConfirmDialog>
     </>
   );
 }

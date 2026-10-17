@@ -1,31 +1,28 @@
-// 管理员管理（super_admin 专属）：列表、筛选、验证码建号，以及行操作（启禁用 / 重置密码）。
-// 全对接真实接口；超管账号不可被互操作（后端 403），整行操作按钮前端先置灰。
-import {
-  PlusOutlined,
-  ReloadOutlined,
-  SearchOutlined
-} from "@ant-design/icons";
+import Add from "@mui/icons-material/Add";
 import {
   Alert,
-  App,
-  Badge,
-  Breadcrumb,
+  Breadcrumbs,
   Button,
-  Card,
-  Flex,
-  Form,
-  Input,
-  Modal,
-  Select,
-  Space,
-  Table,
-  Tag
-} from "antd";
-import type { TableColumnsType } from "antd";
+  Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  MenuItem,
+  Paper,
+  Stack,
+  TextField,
+  Typography
+} from "@mui/material";
 import dayjs from "dayjs";
 import { useState } from "react";
-import type { Admin, AdminLevel, AdminListQuery } from "@tsz/types";
-import { GatedButton } from "@/components/GatedButton";
+import { Controller, useForm } from "react-hook-form";
+import type { Admin, AdminLevel } from "@tsz/types";
+import { AdminTable } from "@/components/AdminTable";
+import type { AdminColumn } from "@/components/AdminTable";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { PermissionButton } from "@/components/PermissionButton";
+import { useFeedback } from "@/components/FeedbackProvider";
 import {
   useAdminList,
   useUpdateAdmin,
@@ -42,19 +39,22 @@ import {
 import { ResetPasswordResult } from "./ResetPasswordResult";
 
 interface FilterValues {
-  role?: AdminLevel;
+  role?: AdminLevel | "";
   phone?: string;
   display_name?: string;
 }
-
 export function AdminManagement() {
-  const { message, modal } = App.useApp();
-  const [form] = Form.useForm<FilterValues>();
-  const [editForm] = Form.useForm<{ display_name: string }>();
+  const notify = useFeedback();
+  const form = useForm<FilterValues>({
+    defaultValues: { role: "", phone: "", display_name: "" }
+  });
+  const editForm = useForm<{ display_name: string }>({
+    defaultValues: { display_name: "" }
+  });
   const [editingAdmin, setEditingAdmin] = useState<Admin | null>(null);
   const [permissionAdmin, setPermissionAdmin] = useState<Admin | null>(null);
+  const [editError, setEditError] = useState<string>();
   const updateAdmin = useUpdateAdmin();
-
   const [filters, setFilters] = useState<FilterValues>({});
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -64,348 +64,359 @@ export function AdminManagement() {
     password: string;
     name: string;
   } | null>(null);
-
-  const query: AdminListQuery = {
+  const [confirmation, setConfirmation] = useState<{
+    kind: "status" | "reset";
+    record: Admin;
+  }>();
+  const [actionError, setActionError] = useState<string>();
+  const listQuery = useAdminList({
     ...filters,
+    role: filters.role || undefined,
     page,
     page_size: pageSize
-  };
-  const listQuery = useAdminList(query);
+  });
   const setStatus = useSetAdminStatus();
   const resetPassword = useResetAdminPassword();
-
   const rows = listQuery.data?.items ?? [];
   const total = listQuery.data?.pagination.total ?? 0;
-
-  // 建号与重置密码都产出一次性临时密码，且共用同一个 ResetPasswordResult 弹窗展示。
-  // 两条流程交错时后 resolve 的 setResetResult 会覆盖前一个，让尚未复制的那枚永久丢失。
-  // 故：有临时密码正在生成（重置请求在飞）或已展示待确认（resetResult 未清）时，
-  // 禁掉全部「建号 / 重置密码」入口，把秘密的产生串行化。
+  // 一次性秘密的产生串行化，直到操作者处理上一枚临时密码。
   const secretBusy =
     createPending || resetPassword.isPending || resetResult !== null;
-
   const applyFilters = (values: FilterValues) => {
     setFilters(values);
     setPage(1);
   };
-
-  const confirmToggleStatus = (record: Admin) => {
-    const next = record.status === "active" ? "disabled" : "active";
-    const verb = next === "disabled" ? "禁用" : "启用";
-    modal.confirm({
-      title: `${verb}管理员「${record.display_name}」`,
-      content:
-        next === "disabled"
-          ? "禁用后该管理员无法再登录后台，已有登录态也不能继续访问后台数据。确认禁用？"
-          : "启用后该管理员可以重新登录后台。确认启用？",
-      okText: verb,
-      okButtonProps: { danger: next === "disabled" },
-      cancelText: "取消",
-      onOk: () =>
-        setStatus
-          .mutateAsync({ id: record.id, status: next })
-          .then(() =>
-            message.success(next === "disabled" ? "已禁用" : "已启用")
-          )
-          .catch((err: unknown) =>
-            message.error(adminActionError(err, "status", "操作失败"))
-          )
-    });
+  const actionPending = setStatus.isPending || resetPassword.isPending;
+  const statusVerb = confirmation?.record.status === "active" ? "禁用" : "启用";
+  const confirmAction = async () => {
+    if (
+      !confirmation ||
+      actionPending ||
+      confirmation.record.role === "super_admin"
+    )
+      return;
+    const { kind, record } = confirmation;
+    setActionError(undefined);
+    try {
+      if (kind === "status") {
+        const status = record.status === "active" ? "disabled" : "active";
+        await setStatus.mutateAsync({ id: record.id, status });
+        notify(status === "disabled" ? "已禁用" : "已启用", "success");
+      } else {
+        if (secretBusy) return;
+        const result = await resetPassword.mutateAsync(record.id);
+        setResetResult({
+          password: result.temporary_password,
+          name: record.display_name
+        });
+      }
+      setConfirmation(undefined);
+    } catch (err) {
+      setActionError(
+        adminActionError(err, kind, kind === "status" ? "操作失败" : "重置失败")
+      );
+    }
   };
-
-  // 重置会先吊销目标全部会话、再产出仅显示一次的临时密码，误点代价高，二次确认。
-  const confirmResetPassword = (record: Admin) => {
-    modal.confirm({
-      title: `重置「${record.display_name}」的密码`,
-      content:
-        "重置会立即吊销该管理员的全部登录会话，并生成一个只显示一次的临时密码，对方下次登录须改密。确认重置？",
-      okText: "重置",
-      okButtonProps: { danger: true },
-      cancelText: "取消",
-      onOk: () =>
-        resetPassword
-          .mutateAsync(record.id)
-          .then((res) =>
-            setResetResult({
-              password: res.temporary_password,
-              name: record.display_name
-            })
-          )
-          .catch((err: unknown) =>
-            message.error(adminActionError(err, "reset", "重置失败"))
-          )
-    });
-  };
-
-  const columns: TableColumnsType<Admin> = [
-    { title: "手机号", dataIndex: "phone", width: 140, fixed: "left" },
-    { title: "昵称", dataIndex: "display_name", width: 160 },
+  const columns: AdminColumn<Admin>[] = [
     {
-      title: "业务权限",
-      key: "permissions",
+      id: "phone",
+      label: "手机号",
       width: 140,
-      render: (_, record) =>
-        record.role === "super_admin" ? (
-          <Tag>全部权限</Tag>
+      sticky: "left",
+      render: (row) => row.phone
+    },
+    {
+      id: "display_name",
+      label: "昵称",
+      width: 160,
+      render: (row) => row.display_name
+    },
+    {
+      id: "permissions",
+      label: "业务权限",
+      width: 140,
+      render: (row) =>
+        row.role === "super_admin" ? (
+          <Chip label="全部权限" />
         ) : (
-          <Button
-            type="link"
-            style={{ paddingInline: 0 }}
-            onClick={() => setPermissionAdmin(record)}
-          >
-            设置权限
-          </Button>
+          <Button onClick={() => setPermissionAdmin(row)}>设置权限</Button>
         )
     },
     {
-      title: "权限等级",
-      dataIndex: "role",
+      id: "role",
+      label: "权限等级",
       width: 130,
-      render: (lv: AdminLevel) => (
-        <Tag color={lv === "super_admin" ? "purple" : "blue"}>
-          {ADMIN_LEVEL_LABEL[lv]}
-        </Tag>
-      )
-    },
-    {
-      title: "创建人",
-      dataIndex: "created_by",
-      width: 150,
-      render: (creator: Admin["created_by"]) =>
-        creator?.display_name ?? "系统 / 历史数据"
-    },
-    {
-      title: "状态",
-      dataIndex: "status",
-      width: 100,
-      render: (s: Admin["status"]) => (
-        <Badge
-          status={s === "active" ? "success" : "default"}
-          text={s === "active" ? "正常" : "已禁用"}
+      render: (row) => (
+        <Chip
+          color={row.role === "super_admin" ? "secondary" : "primary"}
+          label={ADMIN_LEVEL_LABEL[row.role]}
         />
       )
     },
     {
-      title: "创建时间",
-      dataIndex: "created_at",
-      width: 160,
-      render: (t: string) => dayjs(t).format("YYYY-MM-DD HH:mm")
+      id: "created_by",
+      label: "创建人",
+      width: 150,
+      render: (row) => row.created_by?.display_name ?? "系统 / 历史数据"
     },
     {
-      title: "操作",
-      key: "action",
-      width: 200,
-      fixed: "right",
-      render: (_: unknown, record) => {
-        // 超管拥有最高权限，超管账号不允许被互操作（含超管操作自己）：整行按钮置灰。
-        // 启禁用 / 重置密码只针对普通管理员；后端同样以 403 兜底。
-        const isSuper = record.role === "super_admin";
+      id: "status",
+      label: "状态",
+      width: 100,
+      render: (row) => (
+        <Chip
+          label={row.status === "active" ? "正常" : "已禁用"}
+          color={row.status === "active" ? "success" : "default"}
+        />
+      )
+    },
+    {
+      id: "created_at",
+      label: "创建时间",
+      width: 160,
+      render: (row) => dayjs(row.created_at).format("YYYY-MM-DD HH:mm")
+    },
+    {
+      id: "actions",
+      label: "操作",
+      width: 220,
+      sticky: "right",
+      render: (row) => {
+        const isSuper = row.role === "super_admin";
         return (
-          <Space size={4} wrap>
-            <GatedButton
-              type="link"
-              size="small"
-              reason="超级管理员不可操作"
+          <Stack direction="row" useFlexGap flexWrap="wrap" spacing={0.5}>
+            <PermissionButton
               disabled={isSuper}
+              reason="超级管理员不可操作"
               onClick={() => {
-                editForm.setFieldsValue({ display_name: record.display_name });
-                setEditingAdmin(record);
+                editForm.reset({ display_name: row.display_name });
+                setEditError(undefined);
+                setEditingAdmin(row);
               }}
             >
               编辑
-            </GatedButton>
-            <GatedButton
-              type="link"
-              size="small"
-              // 禁用是破坏性动作，置红警示；启用是恢复性动作，保持常规蓝。
-              danger={record.status === "active"}
-              reason="超级管理员不可操作"
+            </PermissionButton>
+            <PermissionButton
               disabled={isSuper}
+              reason="超级管理员不可操作"
+              color={row.status === "active" ? "error" : "primary"}
               loading={
-                setStatus.isPending && setStatus.variables?.id === record.id
+                setStatus.isPending && setStatus.variables?.id === row.id
               }
-              onClick={() => confirmToggleStatus(record)}
+              onClick={() => {
+                setActionError(undefined);
+                setConfirmation({ kind: "status", record: row });
+              }}
             >
-              {record.status === "active" ? "禁用" : "启用"}
-            </GatedButton>
-            {/* 重置会产出一次性临时密码：超管不可重置，且另一条秘密流程进行中时也禁用。 */}
-            <GatedButton
-              type="link"
-              size="small"
-              reason={isSuper ? "超级管理员不可操作" : "请先处理上一条临时密码"}
+              {row.status === "active" ? "禁用" : "启用"}
+            </PermissionButton>
+            <PermissionButton
               disabled={isSuper || secretBusy}
+              reason={isSuper ? "超级管理员不可操作" : "请先处理上一条临时密码"}
               loading={
-                resetPassword.isPending && resetPassword.variables === record.id
+                resetPassword.isPending && resetPassword.variables === row.id
               }
-              onClick={() => confirmResetPassword(record)}
+              onClick={() => {
+                setActionError(undefined);
+                setConfirmation({ kind: "reset", record: row });
+              }}
             >
               重置密码
-            </GatedButton>
-          </Space>
+            </PermissionButton>
+          </Stack>
         );
       }
     }
   ];
-
   return (
-    <Flex vertical gap={16}>
-      <Breadcrumb items={[{ title: "用户管理" }, { title: "管理员管理" }]} />
-
-      <Card size="small" styles={{ body: { paddingBottom: 8 } }}>
-        <Form
-          form={form}
-          layout="inline"
-          onFinish={applyFilters}
-          style={{
-            rowGap: 12,
-            columnGap: 8,
-            display: "flex",
-            flexWrap: "wrap"
-          }}
+    <Stack spacing={2}>
+      <Breadcrumbs>
+        <Typography>用户管理</Typography>
+        <Typography>管理员管理</Typography>
+      </Breadcrumbs>
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Stack
+          component="form"
+          direction="row"
+          useFlexGap
+          flexWrap="wrap"
+          spacing={1}
+          onSubmit={form.handleSubmit(applyFilters)}
         >
-          <Form.Item name="phone" label="手机号">
-            <Input placeholder="手机号包含" allowClear style={{ width: 160 }} />
-          </Form.Item>
-          <Form.Item name="display_name" label="昵称">
-            <Input placeholder="昵称包含" allowClear style={{ width: 160 }} />
-          </Form.Item>
-          <Form.Item name="role" label="权限等级">
-            <Select
-              placeholder="全部"
-              allowClear
-              style={{ width: 150 }}
-              options={ADMIN_LEVEL_OPTIONS}
-            />
-          </Form.Item>
-          <Form.Item>
-            <Space>
-              <Button
-                type="primary"
-                icon={<SearchOutlined />}
-                htmlType="submit"
-              >
-                搜索
-              </Button>
-              <Button
-                icon={<ReloadOutlined />}
-                onClick={() => {
-                  form.resetFields();
-                  applyFilters({});
-                }}
-              >
-                重置
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Card>
-
-      <Card size="small">
-        <Flex
-          justify="space-between"
-          align="center"
-          style={{ marginBottom: 12 }}
-        >
-          <GatedButton
-            type="primary"
-            icon={<PlusOutlined />}
-            reason="请先处理上一条临时密码"
-            disabled={secretBusy}
-            onClick={() => setCreateOpen(true)}
+          <TextField
+            label="手机号"
+            placeholder="手机号包含"
+            {...form.register("phone")}
+            sx={{ width: 160 }}
+          />
+          <TextField
+            label="昵称"
+            placeholder="昵称包含"
+            {...form.register("display_name")}
+            sx={{ width: 160 }}
+          />
+          <Controller
+            name="role"
+            control={form.control}
+            render={({ field }) => (
+              <TextField select label="权限等级" {...field} sx={{ width: 150 }}>
+                <MenuItem value="">全部</MenuItem>
+                {ADMIN_LEVEL_OPTIONS.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
+          />
+          <Button variant="contained" type="submit">
+            搜索
+          </Button>
+          <Button
+            onClick={() => {
+              form.reset();
+              applyFilters({});
+            }}
           >
-            新建管理员
-          </GatedButton>
-        </Flex>
-
+            重置
+          </Button>
+        </Stack>
+      </Paper>
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <PermissionButton
+          variant="contained"
+          startIcon={<Add />}
+          reason="请先处理上一条临时密码"
+          disabled={secretBusy}
+          onClick={() => setCreateOpen(true)}
+        >
+          新建管理员
+        </PermissionButton>
         {listQuery.isError && (
           <Alert
-            type="error"
-            showIcon
-            style={{ marginBottom: 12 }}
-            title="管理员列表加载失败"
-            description={listQuery.error.message}
+            severity="error"
+            sx={{ my: 1 }}
             action={
-              <Button size="small" onClick={() => void listQuery.refetch()}>
-                重试
-              </Button>
+              <Button onClick={() => void listQuery.refetch()}>重试</Button>
             }
-          />
+          >
+            管理员列表加载失败<Typography>{listQuery.error.message}</Typography>
+          </Alert>
         )}
-
-        <Table<Admin>
-          rowKey="id"
-          size="middle"
+        <AdminTable
           columns={columns}
-          dataSource={rows}
-          loading={listQuery.isPending}
-          scroll={{ x: 1200 }}
+          rows={rows}
+          rowId={(row) => row.id}
+          loading={listQuery.isFetching}
+          minWidth={1200}
           pagination={{
-            current: page,
+            page,
             pageSize,
             total,
-            showSizeChanger: true,
-            showTotal: (t) => `共 ${t} 条`,
-            pageSizeOptions: [10, 20, 50],
-            onChange: (nextPage, nextSize) => {
-              setPage(nextSize !== pageSize ? 1 : nextPage);
-              setPageSize(nextSize);
+            pageSizes: [10, 20, 50],
+            onChange: (next, size) => {
+              setPage(next);
+              setPageSize(size);
             }
           }}
         />
-      </Card>
-
-      <Modal
-        title="编辑管理员资料"
-        open={editingAdmin !== null}
-        onCancel={() => !updateAdmin.isPending && setEditingAdmin(null)}
-        onOk={() => editForm.submit()}
-        okText="保存"
-        cancelText="取消"
-        confirmLoading={updateAdmin.isPending}
-        cancelButtonProps={{ disabled: updateAdmin.isPending }}
-        closable={!updateAdmin.isPending}
+      </Paper>
+      <Dialog
+        open={!!editingAdmin}
+        onClose={() => {
+          if (!updateAdmin.isPending) setEditingAdmin(null);
+        }}
+        fullWidth
+        maxWidth="sm"
+        aria-labelledby="edit-admin-title"
       >
-        <Form
-          name="admin-edit"
-          form={editForm}
-          layout="vertical"
-          disabled={updateAdmin.isPending}
-          onFinish={(values) => {
-            if (!editingAdmin || updateAdmin.isPending) return;
-            void updateAdmin
-              .mutateAsync({
-                id: editingAdmin.id,
-                input: { display_name: values.display_name.trim() }
-              })
-              .then(() => {
+        <DialogTitle id="edit-admin-title">编辑管理员资料</DialogTitle>
+        <DialogContent>
+          <Stack
+            component="form"
+            id="admin-edit-form"
+            spacing={2}
+            sx={{ mt: 1 }}
+            onSubmit={editForm.handleSubmit(async (values) => {
+              if (!editingAdmin || updateAdmin.isPending) return;
+              setEditError(undefined);
+              try {
+                await updateAdmin.mutateAsync({
+                  id: editingAdmin.id,
+                  input: { display_name: values.display_name.trim() }
+                });
                 setEditingAdmin(null);
-                void message.success("管理员资料已更新");
-              })
-              .catch(() => message.error("更新管理员资料失败，请重试"));
-          }}
-        >
-          <Form.Item label="手机号">
-            <Input value={editingAdmin?.phone ?? ""} disabled />
-          </Form.Item>
-          <Form.Item
-            name="display_name"
-            label="昵称"
-            rules={[
-              { required: true, whitespace: true, message: "请输入昵称" },
-              { max: 50, message: "昵称最多 50 个字符" },
-              {
-                validator: (_, value: string) =>
-                  value && /[<>\p{Cc}\p{Cf}]/u.test(value)
-                    ? Promise.reject(new Error("昵称不能包含特殊或控制字符"))
-                    : Promise.resolve()
+                notify("管理员资料已更新", "success");
+              } catch {
+                setEditError("更新管理员资料失败，请重试");
               }
-            ]}
+            })}
           >
-            <Input maxLength={50} />
-          </Form.Item>
-        </Form>
-      </Modal>
-
+            <TextField
+              label="手机号"
+              value={editingAdmin?.phone ?? ""}
+              disabled
+            />
+            <TextField
+              label="昵称"
+              disabled={updateAdmin.isPending}
+              error={!!editForm.formState.errors.display_name}
+              helperText={editForm.formState.errors.display_name?.message}
+              slotProps={{ htmlInput: { maxLength: 50 } }}
+              {...editForm.register("display_name", {
+                validate: (value) =>
+                  !value.trim()
+                    ? "请输入昵称"
+                    : value.length > 50
+                      ? "昵称最多 50 个字符"
+                      : /[<>\p{Cc}\p{Cf}]/u.test(value)
+                        ? "昵称不能包含特殊或控制字符"
+                        : true
+              })}
+            />
+            {editError && <Alert severity="error">{editError}</Alert>}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            disabled={updateAdmin.isPending}
+            onClick={() => setEditingAdmin(null)}
+          >
+            取消
+          </Button>
+          <Button
+            type="submit"
+            form="admin-edit-form"
+            variant="contained"
+            loading={updateAdmin.isPending}
+          >
+            保存
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <ConfirmDialog
+        open={!!confirmation}
+        title={
+          confirmation?.kind === "reset"
+            ? `重置「${confirmation.record.display_name}」的密码`
+            : `${statusVerb}管理员「${confirmation?.record.display_name ?? ""}」`
+        }
+        confirmText={confirmation?.kind === "reset" ? "重置" : statusVerb}
+        danger={
+          confirmation?.kind === "reset" ||
+          confirmation?.record.status === "active"
+        }
+        pending={actionPending}
+        error={actionError}
+        onClose={() => setConfirmation(undefined)}
+        onConfirm={() => void confirmAction()}
+      >
+        {confirmation?.kind === "reset"
+          ? "重置会立即吊销该管理员的全部登录会话，并生成一个只显示一次的临时密码，对方下次登录须改密。确认重置？"
+          : confirmation?.record.status === "active"
+            ? "禁用后该管理员无法再登录后台，已有登录态也不能继续访问后台数据。确认禁用？"
+            : "启用后该管理员可以重新登录后台。确认启用？"}
+      </ConfirmDialog>
       {permissionAdmin && (
         <AdminPermissionEditor
           adminId={permissionAdmin.id}
@@ -417,13 +428,13 @@ export function AdminManagement() {
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onPendingChange={setCreatePending}
-        onCreated={(result) => setResetResult(result)}
+        onCreated={setResetResult}
       />
       <ResetPasswordResult
         password={resetResult?.password ?? null}
         adminName={resetResult?.name}
         onClose={() => setResetResult(null)}
       />
-    </Flex>
+    </Stack>
   );
 }

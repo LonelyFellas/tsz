@@ -7,7 +7,7 @@ import {
   screen,
   waitFor
 } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { FeedbackProvider } from "@/components/FeedbackProvider";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockNavigate = vi.fn();
@@ -51,9 +51,9 @@ const PROFILE = {
 // forced = profile 为空（登录/刷新两条强制路径）；自助改密时 profile 有值。
 function renderForced() {
   render(
-    <AntApp>
+    <FeedbackProvider>
       <ChangePassword />
-    </AntApp>
+    </FeedbackProvider>
   );
 }
 function renderSelf() {

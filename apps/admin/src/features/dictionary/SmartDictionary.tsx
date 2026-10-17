@@ -1,39 +1,38 @@
-import {
-  DeleteOutlined,
-  PlusOutlined,
-  ReloadOutlined,
-  RollbackOutlined,
-  SearchOutlined
-} from "@ant-design/icons";
+import Delete from "@mui/icons-material/Delete";
+import RestoreFromTrash from "@mui/icons-material/RestoreFromTrash";
+import Add from "@mui/icons-material/Add";
 import {
   Alert,
-  App,
-  Breadcrumb,
+  Box,
+  Breadcrumbs,
   Button,
-  Card,
-  DatePicker,
-  Flex,
-  Form,
-  Input,
+  Chip,
+  MenuItem,
+  Paper,
   Popover,
-  Select,
-  Space,
-  Table,
-  Tag,
+  Stack,
+  TextField,
   Tooltip,
-  Typography
-} from "antd";
-import type { TableColumnsType } from "antd";
+  Typography,
+  useMediaQuery
+} from "@mui/material";
+import { Controller, useForm } from "react-hook-form";
+import { AdminTable } from "@/components/AdminTable";
+import type { AdminColumn } from "@/components/AdminTable";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { DateRangeField } from "@/components/DateRangeField";
+import { useFeedback } from "@/components/FeedbackProvider";
+import { ArchiveImpactDialog } from "./ArchiveImpactDialog";
+import { CefrChip } from "./CefrChip";
+import type { ReactNode } from "react";
 import dayjs from "dayjs";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "@/lib/auth";
-import { HttpError, InvalidAdminWordResponseError } from "@tsz/api-client";
+import { InvalidAdminWordResponseError } from "@tsz/api-client";
 import type {
-  AdminWordKind,
   AdminWordV3Envelope,
   AdminWordListItemAny,
-  CefrLevel,
   Dialect,
   EntryLifecycleBatchResponse,
   EntryLifecycleTarget,
@@ -62,7 +61,6 @@ import {
 import { LifecycleSurfaceConfirmation } from "./LifecycleSurfaceConfirmation";
 import {
   CEFR_OPTIONS,
-  cefrColor,
   KIND_LABEL,
   KIND_OPTIONS,
   STATUS_LABEL,
@@ -105,8 +103,6 @@ import { newWordNodeId } from "./word-model/primitives";
 import { EditEntryAnnotation } from "./EditEntryAnnotation";
 import { canEditRowAnnotation } from "./annotationPermission";
 
-const { RangePicker } = DatePicker;
-
 const ENTRY_REFERENCE_KIND_LABEL: Record<EntryReferenceKind, string> = {
   relation: "关联词",
   relation_prebound: "关联词待物化",
@@ -141,14 +137,6 @@ function PartOfSpeechAbbreviation({
         )}
     </>
   );
-}
-
-const CEFR_LEVELS = new Set<CefrLevel>(["A1", "A2", "B1", "B2", "C1", "C2"]);
-
-function cefrLevelColor(level: string) {
-  return CEFR_LEVELS.has(level as CefrLevel)
-    ? cefrColor(level as CefrLevel)
-    : undefined;
 }
 
 type RestoreRequest =
@@ -194,7 +182,21 @@ export function SmartDictionary({
   mode?: SmartDictionaryMode;
 } = {}) {
   const trashMode = mode === "trash";
-  const { message, modal } = App.useApp();
+  const notify = useFeedback();
+  const wideTable = useMediaQuery("(min-width:576px)");
+  const [confirmation, setConfirmation] = useState<{
+    title: string;
+    content: ReactNode;
+    confirmText: string;
+    danger?: boolean;
+    submit: () => Promise<void>;
+  }>();
+  const [confirming, setConfirming] = useState(false);
+  const [archivePrompt, setArchivePrompt] = useState<{
+    entries: EntryLifecycleTarget[];
+    title: string;
+    submit: () => Promise<void>;
+  }>();
   const navigate = useNavigate();
   // 归属判定所需；门禁保证受保护页内 profile 必有值，缺失时判定一律不放行。
   const profile = useAuthStore((s) => s.profile);
@@ -206,7 +208,10 @@ export function SmartDictionary({
   const [searchParams, setSearchParams] = useSearchParams();
   const [annotationEntry, setAnnotationEntry] =
     useState<AdminWordListItemAny>();
-  const [form] = Form.useForm<WordFilterValues>();
+  const form = useForm<WordFilterValues>({
+    defaultValues: { keyword: "", gloss: "" }
+  });
+  const { reset, getValues, setValue } = form;
   const serializedSearchParams = searchParams.toString();
 
   const listSearch = useMemo(
@@ -217,7 +222,7 @@ export function SmartDictionary({
   const { filters, page, pageSize } = listSearch;
 
   // 服务端分页 + 筛选:三者共同构成列表查询,任何变化都触发重取。
-  const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([]);
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [selectedRecords, setSelectedRecords] = useState<
     Record<string, AdminWordListItemAny>
   >({});
@@ -231,9 +236,8 @@ export function SmartDictionary({
   );
 
   useEffect(() => {
-    form.resetFields();
-    form.setFieldsValue(filters);
-  }, [filters, form]);
+    reset({ keyword: "", gloss: "", ...filters });
+  }, [filters, reset]);
 
   // 垃圾桶页固定只看归档，不受 URL 上残留的 status 影响。
   const effectiveFilters = useMemo(
@@ -255,7 +259,7 @@ export function SmartDictionary({
   );
   // 选了词汇类型就把词性候选收到同一侧：单词词条不会挂短语词性，反过来也一样，
   // 两者交叉筛选只会得到空列表。
-  const filterKind = Form.useWatch("kind", form);
+  const filterKind = form.watch("kind");
   const partOfSpeechOptions = useMemo(
     () => availablePartOfSpeechOptions(partOfSpeechLookup, [], filterKind),
     [partOfSpeechLookup, filterKind]
@@ -263,11 +267,11 @@ export function SmartDictionary({
   // 收窄之后原来选中的词性可能已经不在候选里。不清掉的话 Select 会退化成显示原始编码，
   // 还会跟着新类型一起提交，搜出一个空列表而界面上看不出是哪个条件冲突。
   useEffect(() => {
-    const selected = form.getFieldValue("pos") as WordPosTag | undefined;
+    const selected = getValues("pos") as WordPosTag | undefined;
     if (!selected) return;
     if (partOfSpeechOptions.some((option) => option.value === selected)) return;
-    form.setFieldValue("pos", undefined);
-  }, [form, partOfSpeechOptions]);
+    setValue("pos", undefined);
+  }, [getValues, setValue, partOfSpeechOptions]);
   const kindOptions = adminWordsDataSourceCapabilities.phraseCreation
     ? KIND_OPTIONS
     : KIND_OPTIONS.filter((option) => option.value === "word");
@@ -345,14 +349,14 @@ export function SmartDictionary({
         );
         if (attemptGeneration !== restoreAttemptGeneration.current) return;
         if (latest.some((word) => !word)) {
-          message.error("无法加载所选词条的最新生命周期版本，请刷新后重试");
+          notify("无法加载所选词条的最新生命周期版本，请刷新后重试", "error");
           return;
         }
         const targets = latest.filter((word) => word !== undefined);
         if (targets.some((word) => word.status !== "archived")) {
           restoreSurface.clear();
           setPendingRestore(undefined);
-          message.warning("所选词条状态已变化，请重新确认选择");
+          notify("所选词条状态已变化，请重新确认选择", "warning");
           void listQuery.refetch();
           return;
         }
@@ -400,22 +404,22 @@ export function SmartDictionary({
         setSelectedKeys([]);
         setSelectedRecords({});
         setPendingRestore(undefined);
-        message.success(`已恢复 ${affected} 个词条`);
+        notify(`已恢复 ${affected} 个词条`, "success");
       } else if (
         outcome.error.code ===
         "multiple_active_exact_headword_publications_not_enabled"
       ) {
-        message.warning("学习端暂不支持多个同名公开词条");
+        notify("学习端暂不支持多个同名公开词条", "warning");
       } else if (outcome.refreshRequired) {
         restoreSurface.clear();
         setPendingRestore(undefined);
         void listQuery.refetch();
-        message.warning("词条状态或确认策略已变化，请重新发起恢复");
+        notify("词条状态或确认策略已变化，请重新发起恢复", "warning");
       } else {
-        message.warning("恢复条件已变化，请查看最新确认信息");
+        notify("恢复条件已变化，请查看最新确认信息", "warning");
       }
     } catch (error) {
-      message.error(error instanceof Error ? error.message : "恢复失败");
+      notify(error instanceof Error ? error.message : "恢复失败", "error");
     }
   };
 
@@ -456,32 +460,31 @@ export function SmartDictionary({
 
   // 归属越权（403 entry_edit_forbidden）与普通失败对管理员意味不同：前者重试也没用。
   // 后端 detail 是英文的，这里换成中文再显示。
-  const describeLifecycleFailure = (
-    error: unknown,
-    fallback: string
-  ): string => {
-    const code = (error as { code?: string } | undefined)?.code;
-    if (isEntryOwnershipError(code)) {
-      return entryWriteForbiddenMessage(code);
-    }
-    return error instanceof Error ? error.message : fallback;
-  };
+  const describeLifecycleFailure = useCallback(
+    (error: unknown, fallback: string): string => {
+      const code = (error as { code?: string } | undefined)?.code;
+      if (isEntryOwnershipError(code)) {
+        return entryWriteForbiddenMessage(code);
+      }
+      return error instanceof Error ? error.message : fallback;
+    },
+    []
+  );
 
   const deleteOne = (record: AdminWordListItemAny) => {
     const eligibility = evaluateDeleteEligibility(deleteActor, record);
     if (!eligibility.deletable) {
-      message.warning(DELETE_BLOCK_REASON_TEXT[eligibility.reason!]);
+      notify(DELETE_BLOCK_REASON_TEXT[eligibility.reason!], "warning");
       return;
     }
     const label = wordListLabel(record);
-    modal.confirm({
+    setConfirmation({
       title: `永久删除「${label}」？`,
       content:
         "此操作不可恢复：词条及其草稿内容会被彻底清除，占用的词头随之释放（之后可用同名重新创建）。",
-      okText: "永久删除",
-      okButtonProps: { danger: true },
-      cancelText: "取消",
-      onOk: () =>
+      confirmText: "永久删除",
+      danger: true,
+      submit: () =>
         runLifecycleCommandOnce(lifecycleCommandPending, async () => {
           try {
             await deleteWord.mutateAsync({
@@ -492,9 +495,9 @@ export function SmartDictionary({
             setSelectedKeys((keys) =>
               keys.filter((key) => String(key) !== record.id)
             );
-            message.success("词条已永久删除");
+            notify("词条已永久删除", "success");
           } catch (error) {
-            message.error(describeDeleteFailure(error));
+            notify(describeDeleteFailure(error), "error");
             void listQuery.refetch();
           }
         })
@@ -503,7 +506,7 @@ export function SmartDictionary({
 
   const deleteSelected = () => {
     if (selectedRows.length !== selectedKeys.length) {
-      message.error("所选词条缺少并发版本信息，请刷新列表后重试");
+      notify("所选词条缺少并发版本信息，请刷新列表后重试", "error");
       return;
     }
     const { deletable, blocked } = partitionDeletableRows(
@@ -519,22 +522,22 @@ export function SmartDictionary({
             `「${wordListLabel(row)}」${DELETE_BLOCK_REASON_TEXT[reason]}`
         )
         .join("；");
-      message.warning(
+      notify(
         blocked.length > 3
           ? `${detail}；另有 ${blocked.length - 3} 条不可删除`
-          : detail
+          : detail,
+        "warning"
       );
       return;
     }
     if (deletable.length === 0) return;
-    modal.confirm({
+    setConfirmation({
       title: `永久删除选中的 ${deletable.length} 个词条？`,
       content:
         "此操作不可恢复，且整批原子执行：任意一条不满足条件时全部保持原状。词条彻底清除后，占用的词头随之释放。",
-      okText: "永久删除",
-      okButtonProps: { danger: true },
-      cancelText: "取消",
-      onOk: () =>
+      confirmText: "永久删除",
+      danger: true,
+      submit: () =>
         runLifecycleCommandOnce(lifecycleCommandPending, async () => {
           try {
             const response = await deleteBatch.mutateAsync({
@@ -549,9 +552,9 @@ export function SmartDictionary({
             });
             setSelectedKeys([]);
             setSelectedRecords({});
-            message.success(`已永久删除 ${response.affected} 个词条`);
+            notify(`已永久删除 ${response.affected} 个词条`, "success");
           } catch (error) {
-            message.error(describeDeleteFailure(error));
+            notify(describeDeleteFailure(error), "error");
             void listQuery.refetch();
           }
         })
@@ -561,96 +564,8 @@ export function SmartDictionary({
   const confirmArchive = (
     entries: EntryLifecycleTarget[],
     title: string,
-    onOk: () => Promise<void>
-  ) => {
-    let closed = false;
-    let loaded = false;
-    let loading = false;
-    const dialog = modal.confirm({
-      title,
-      content: "正在检查词表和练习的影响…",
-      okText: "移入垃圾桶",
-      okButtonProps: { danger: true, disabled: true },
-      cancelText: "取消",
-      onCancel: () => {
-        closed = true;
-      },
-      afterClose: () => {
-        closed = true;
-      },
-      onOk: () => (loaded ? onOk() : Promise.reject(new Error("请先读取影响")))
-    });
-    const load = async () => {
-      if (loading || closed) return;
-      loading = true;
-      dialog.update({
-        content: "正在检查词表和练习的影响…",
-        okButtonProps: { danger: true, disabled: true }
-      });
-      try {
-        const impact = await adminWordsDataSource.archiveImpact({ entries });
-        if (closed) return;
-        loaded = true;
-        dialog.update({
-          content: (
-            <div>
-              <p>
-                将使 {impact.wordlist_count} 张词表中的引用不可用，可能影响{" "}
-                {impact.active_run_count} 轮尚未结束的练习。
-              </p>
-              <p>
-                发布记录会保留。恢复词条后，词表可以重新展示；已失效的练习需要重新开始。
-              </p>
-              <p>
-                如果只是修正内容，请取消并编辑词条。引用数量可能随新操作变化，其他关联仍须先解除。
-              </p>
-            </div>
-          ),
-          okButtonProps: { danger: true, disabled: false }
-        });
-      } catch (error) {
-        const refreshRequired =
-          error instanceof HttpError &&
-          (error.status === 409 || error.code === "word_not_found");
-        const retryable =
-          !refreshRequired &&
-          !(error instanceof HttpError && [401, 403].includes(error.status));
-        if (!closed)
-          dialog.update({
-            content: (
-              <div>
-                <p role="alert">
-                  {refreshRequired
-                    ? "词条已发生变化，请刷新列表后重新确认；尚未移入垃圾桶。"
-                    : retryable
-                      ? "无法读取影响，请重试；尚未移入垃圾桶。"
-                      : describeLifecycleFailure(error, "无法读取归档影响")}
-                </p>
-                {refreshRequired ? (
-                  <Button
-                    onClick={() => {
-                      closed = true;
-                      dialog.destroy();
-                      setSelectedKeys([]);
-                      setSelectedRecords({});
-                      void listQuery.refetch();
-                    }}
-                  >
-                    刷新列表并重新确认
-                  </Button>
-                ) : retryable ? (
-                  <Button onClick={() => void load()}>重试</Button>
-                ) : null}
-              </div>
-            ),
-            okButtonProps: { danger: true, disabled: true }
-          });
-      } finally {
-        loading = false;
-      }
-    };
-    void load();
-  };
+    submit: () => Promise<void>
+  ) => setArchivePrompt({ entries, title, submit });
 
   const transitionOne = (
     record: AdminWordListItemAny,
@@ -658,7 +573,7 @@ export function SmartDictionary({
   ) => {
     const input = lifecycleInput(record);
     if (!input) {
-      message.error("词条缺少并发版本信息，请刷新列表后重试");
+      notify("词条缺少并发版本信息，请刷新列表后重试", "error");
       return;
     }
     const restoring = target === "restore";
@@ -667,10 +582,9 @@ export function SmartDictionary({
       title: `${restoring ? "恢复" : "移入垃圾桶"}「${label}」？`,
       content:
         "恢复后词条重新进入正常列表，词表可以重新展示；已失效的练习不会自动恢复。",
-      okText: restoring ? "恢 复" : "移入垃圾桶",
-      okButtonProps: { danger: !restoring },
-      cancelText: "取消",
-      onOk: () =>
+      confirmText: restoring ? "恢复" : "移入垃圾桶",
+      danger: !restoring,
+      submit: () =>
         runLifecycleCommandOnce(lifecycleCommandPending, async () => {
           try {
             if (restoring) {
@@ -686,23 +600,24 @@ export function SmartDictionary({
             setSelectedKeys((previous) =>
               previous.filter((key) => key !== record.id)
             );
-            message.success(restoring ? "词条已恢复" : "词条已移入垃圾桶");
+            notify(restoring ? "词条已恢复" : "词条已移入垃圾桶", "success");
           } catch (error) {
-            message.error(
+            notify(
               describeLifecycleFailure(
                 error,
                 restoring ? "恢复失败" : "移入垃圾桶失败"
-              )
+              ),
+              "error"
             );
           }
         })
     };
-    if (restoring) modal.confirm(confirmation);
+    if (restoring) setConfirmation(confirmation);
     else
       confirmArchive(
         [{ id: record.id, ...input }],
         confirmation.title,
-        confirmation.onOk
+        confirmation.submit
       );
   };
 
@@ -712,13 +627,13 @@ export function SmartDictionary({
       selectedRows.length !== selectedKeys.length ||
       selectedRows.some((row) => lifecycleInput(row) === undefined)
     ) {
-      message.error("所选词条缺少并发版本信息，请刷新列表后重试");
+      notify("所选词条缺少并发版本信息，请刷新列表后重试", "error");
       return;
     }
     const hasArchived = selectedRows.some((row) => row.status === "archived");
     const hasActive = selectedRows.some((row) => row.status !== "archived");
     if (hasArchived && hasActive) {
-      message.warning("垃圾桶与正常词条不能在同一批次处理");
+      notify("垃圾桶与正常词条不能在同一批次处理", "warning");
       return;
     }
     // 整批原子：任意一条没有生命周期操作权限，后端会拒绝整批。
@@ -733,8 +648,9 @@ export function SmartDictionary({
           )
       )
     ) {
-      message.warning(
-        "当前账号缺少所选词条的归档或恢复权限，普通管理员仅可操作本人词条"
+      notify(
+        "当前账号缺少所选词条的归档或恢复权限，普通管理员仅可操作本人词条",
+        "warning"
       );
       return;
     }
@@ -749,10 +665,9 @@ export function SmartDictionary({
         : `将选中的 ${selectedKeys.length} 个词条移入垃圾桶？`,
       content:
         "该批次将原子恢复：任意一条冲突时全部保持原状。已失效的练习不会自动恢复。",
-      okText: restoring ? "恢 复" : "移入垃圾桶",
-      okButtonProps: { danger: !restoring },
-      cancelText: "取消",
-      onOk: () =>
+      confirmText: restoring ? "恢复" : "移入垃圾桶",
+      danger: !restoring,
+      submit: () =>
         runLifecycleCommandOnce(lifecycleCommandPending, async () => {
           try {
             if (restoring) {
@@ -768,42 +683,194 @@ export function SmartDictionary({
               input: { entries }
             });
             setSelectedKeys([]);
-            message.success(
+            notify(
               restoring
                 ? `已恢复 ${response.affected} 个词条`
-                : `已将 ${response.affected} 个词条移入垃圾桶`
+                : `已将 ${response.affected} 个词条移入垃圾桶`,
+              "success"
             );
           } catch (error) {
-            message.error(
+            notify(
               describeLifecycleFailure(
                 error,
                 restoring ? "批量恢复失败" : "批量移入垃圾桶失败"
-              )
+              ),
+              "error"
             );
           }
         })
     };
-    if (restoring) modal.confirm(confirmation);
-    else confirmArchive(entries, confirmation.title, confirmation.onOk);
+    if (restoring) setConfirmation(confirmation);
+    else confirmArchive(entries, confirmation.title, confirmation.submit);
   };
 
-  const columns: TableColumnsType<AdminWordListItemAny> = [
+  const renderRowActions = (record: AdminWordListItemAny) => {
+    const rowName = `「${wordListLabel(record)}」`;
+    const rowWritable = canModifyEntry(writeActor, record);
+    return (
+      // 左组是进入词条的入口、右组是生命周期动作，各自贴住一边：
+      // 「标注」按行有无都不会让删除入口跟着左右跳。
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        spacing={1}
+      >
+        <Stack direction="row" spacing={0.5}>
+          {(() => {
+            // 旧结构（V1/V2）的行没有向导可进：向导已整条下线，只剩 V3。
+            // 置灰并说明原因，比点进去撞上 404 或空白页好。
+            const route = getWordRowRoute(record);
+            const button = (
+              <Button
+                sx={{ minWidth: 0 }}
+                variant="text"
+                size="small"
+                disabled={route === undefined}
+                aria-label={`${getWordRowActionLabel(record, rowWritable)}${rowName}`}
+                onClick={() => route && navigate(route)}
+              >
+                {getWordRowActionLabel(record, rowWritable)}
+              </Button>
+            );
+            return route === undefined ? (
+              <Tooltip describeChild title={LEGACY_SCHEMA_BLOCKED_HINT}>
+                <span>{button}</span>
+              </Tooltip>
+            ) : (
+              button
+            );
+          })()}
+          {/* 重复原型按归属提供入口，尚未填写标注也能补充。 */}
+          {canEditRowAnnotation(annotationActor, record) ? (
+            <Button
+              sx={{ minWidth: 0 }}
+              variant="text"
+              size="small"
+              aria-label={`编辑标注${rowName}`}
+              onClick={() => setAnnotationEntry(record)}
+            >
+              标注
+            </Button>
+          ) : null}
+        </Stack>
+        <Stack direction="row" spacing={0.5}>
+          {adminWordsDataSourceCapabilities.archive &&
+            (() => {
+              const button = (
+                <Button
+                  sx={{ minWidth: 0 }}
+                  variant="text"
+                  size="small"
+                  color={record.status !== "archived" ? "error" : "primary"}
+                  aria-label={`${record.status === "archived" ? "恢复" : "移入垃圾桶"}${rowName}`}
+                  startIcon={
+                    record.status === "archived" ? (
+                      <RestoreFromTrash />
+                    ) : (
+                      <Delete />
+                    )
+                  }
+                  disabled={
+                    !canTransitionEntry(
+                      writeActor,
+                      record,
+                      record.status === "archived" ? "restore" : "archive"
+                    ) || lifecycleInput(record) === undefined
+                  }
+                  loading={
+                    lifecyclePending &&
+                    (archiveWord.variables?.wordId === record.id ||
+                      restoreWord.variables?.wordId === record.id)
+                  }
+                  onClick={() =>
+                    transitionOne(
+                      record,
+                      record.status === "archived" ? "restore" : "archive"
+                    )
+                  }
+                >
+                  {record.status === "archived" ? "恢复" : null}
+                </Button>
+              );
+              // 移入垃圾桶只留图标：列表里它最不该抢眼，文案落到 Tooltip。
+              // 置灰时把原因摆出来，否则管理员只看到一个不能点的按钮。
+              // 缺 lifecycle 字段那种置灰不给 Tooltip：那是数据问题，刷新即可，
+              // 与「这条不归你管」不是一回事。
+              const hint = !canTransitionEntry(
+                writeActor,
+                record,
+                record.status === "archived" ? "restore" : "archive"
+              )
+                ? "需要相应的归档或恢复权限；普通管理员仅可操作本人词条"
+                : record.status === "archived"
+                  ? ""
+                  : "移入垃圾桶";
+              return hint ? (
+                <Tooltip describeChild title={hint}>
+                  <span>{button}</span>
+                </Tooltip>
+              ) : (
+                button
+              );
+            })()}
+          {adminWordsDataSourceCapabilities.permanentDelete &&
+            record.status === "archived" &&
+            (() => {
+              const eligibility = evaluateDeleteEligibility(
+                deleteActor,
+                record
+              );
+              const button = (
+                <Button
+                  sx={{ minWidth: 0 }}
+                  variant="text"
+                  size="small"
+                  color="error"
+                  aria-label={`永久删除${rowName}`}
+                  startIcon={<Delete />}
+                  disabled={!eligibility.deletable}
+                  loading={
+                    deleteWord.isPending &&
+                    deleteWord.variables?.wordId === record.id
+                  }
+                  onClick={() => deleteOne(record)}
+                >
+                  永久删除
+                </Button>
+              );
+              // 置灰时把原因摆出来，否则管理员只看到一个不能点的按钮。
+              return eligibility.deletable ? (
+                button
+              ) : (
+                <Tooltip
+                  describeChild
+                  title={DELETE_BLOCK_REASON_TEXT[eligibility.reason!]}
+                >
+                  <span>{button}</span>
+                </Tooltip>
+              );
+            })()}
+        </Stack>
+      </Stack>
+    );
+  };
+  const columns: AdminColumn<AdminWordListItemAny>[] = [
     {
-      title: "词汇",
-      key: "label",
+      id: "label",
+      label: "词汇",
       width: 150,
-      fixed: "left",
-      ellipsis: { showTitle: false },
-      render: (_: unknown, record) => {
-        const label = wordListLabel(record);
-        const annotation = visibleWordAnnotation(record);
-        const dialects = wordListDialects(record);
-        const context =
-          dialects.length > 0
-            ? dialects.map((dialect) => DIALECT_LABEL[dialect]).join(" / ")
-            : "";
+      sticky: "left",
+      render: (record) => {
+        const label = wordListLabel(record),
+          annotation = visibleWordAnnotation(record),
+          dialects = wordListDialects(record);
+        const context = dialects
+          .map((dialect) => DIALECT_LABEL[dialect])
+          .join(" / ");
         return (
           <Tooltip
+            describeChild
             title={[label, annotation, context].filter(Boolean).join(" · ")}
           >
             <span
@@ -819,14 +886,14 @@ export function SmartDictionary({
               <span className="tsz-words" style={{ fontWeight: 600 }}>
                 {label}
               </span>
-              {annotation ? (
+              {annotation && (
                 <sup
                   style={{
                     display: "inline-block",
                     position: "relative",
                     top: "-0.4em",
                     marginInlineStart: 2,
-                    color: "rgba(0, 0, 0, 0.65)",
+                    color: "rgba(0,0,0,0.65)",
                     fontSize: 11,
                     fontWeight: 600,
                     lineHeight: 1,
@@ -835,432 +902,237 @@ export function SmartDictionary({
                 >
                   {annotation}
                 </sup>
-              ) : null}
+              )}
             </span>
           </Tooltip>
         );
       }
     },
     {
-      title: "类型",
-      dataIndex: "kind",
+      id: "kind",
+      label: "类型",
       width: 80,
-      responsive: ["sm"],
-      render: (k: AdminWordKind) => (
-        <Tag color={k === "phrase" ? "geekblue" : "default"}>
-          {KIND_LABEL[k]}
-        </Tag>
+      render: (record) => (
+        <Chip
+          label={KIND_LABEL[record.kind]}
+          color={record.kind === "phrase" ? "primary" : "default"}
+        />
       )
     },
     {
-      title: "方言",
-      key: "dialects",
+      id: "dialects",
+      label: "方言",
       width: 110,
-      responsive: ["sm"],
-      render: (_: unknown, record) => {
-        const dialects = wordListDialects(record);
-        return dialects.length > 0
-          ? dialects.map((dialect) => DIALECT_LABEL[dialect]).join(" / ")
-          : "-";
-      }
+      render: (record) =>
+        wordListDialects(record)
+          .map((dialect) => DIALECT_LABEL[dialect])
+          .join(" / ") || "-"
     },
     {
-      title: "释义",
-      dataIndex: "gloss",
+      id: "gloss",
+      label: "释义",
       width: 180,
-      ellipsis: true,
-      responsive: ["sm"]
+      render: (record) => (
+        <Typography noWrap title={record.gloss} sx={{ maxWidth: 180 }}>
+          {record.gloss}
+        </Typography>
+      )
     },
     {
-      title: "基本词性",
-      dataIndex: "pos_list",
+      id: "pos",
+      label: "基本词性",
       width: 180,
-      responsive: ["sm"],
-      render: (list: AdminWordListItemAny["pos_list"]) => (
-        <Space size={[4, 4]} wrap>
-          {list.map((p) => (
-            // 缩写不直观，悬停补正式中文；目录里没有的编码无名可补，不出浮层。
-            <Tooltip key={p} title={partOfSpeechLookup.byCode.get(p)?.name_zh}>
-              <Tag style={{ margin: 0 }}>
-                <PartOfSpeechAbbreviation
-                  lookup={partOfSpeechLookup}
-                  code={p}
-                />
-              </Tag>
+      render: (record) => (
+        <Stack direction="row" useFlexGap flexWrap="wrap" spacing={0.5}>
+          {record.pos_list.map((code) => (
+            <Tooltip
+              describeChild
+              key={code}
+              title={partOfSpeechLookup.byCode.get(code)?.name_zh ?? ""}
+            >
+              <Chip
+                data-word-pos={code}
+                label={
+                  <PartOfSpeechAbbreviation
+                    lookup={partOfSpeechLookup}
+                    code={code}
+                  />
+                }
+              />
             </Tooltip>
           ))}
-        </Space>
+        </Stack>
       )
     },
     {
-      title: "难度",
-      dataIndex: "levels",
+      id: "levels",
+      label: "难度",
       width: 170,
-      responsive: ["sm"],
-      render: (levels: string[]) => (
-        <Space size={[4, 4]} wrap>
-          {levels.map((lv) => (
-            <Tag key={lv} color={cefrLevelColor(lv)} style={{ margin: 0 }}>
-              {lv}
-            </Tag>
+      render: (record) => (
+        <Stack direction="row" useFlexGap flexWrap="wrap" spacing={0.5}>
+          {record.levels.map((level) => (
+            <CefrChip key={level} level={level} />
           ))}
-        </Space>
+        </Stack>
       )
     },
     {
-      title: "创建时间",
-      dataIndex: "created_at",
+      id: "created_at",
+      label: "创建时间",
       width: 150,
-      responsive: ["sm"],
-      render: (t: string) => dayjs(t).format("YYYY-MM-DD HH:mm")
+      render: (record) => dayjs(record.created_at).format("YYYY-MM-DD HH:mm")
     },
     {
-      title: "创建人",
-      dataIndex: "created_by_name",
+      id: "creator",
+      label: "创建人",
       width: 140,
-      ellipsis: { showTitle: false },
-      responsive: ["sm"],
-      render: (name?: string) => {
-        const label = name?.trim() || "-";
-        return (
-          <Tooltip title={name?.trim() || undefined}>
-            <span tabIndex={name?.trim() ? 0 : undefined}>{label}</span>
-          </Tooltip>
-        );
-      }
-    },
-    {
-      title: "关联",
-      key: "references",
-      width: 80,
-      responsive: ["sm"],
-      render: (_: unknown, record) => {
-        const summary = record.reference_summary;
-        const total = summary?.total ?? 0;
-        if (total === 0) {
-          return <Typography.Text type="secondary">-</Typography.Text>;
-        }
-        // 展开前 5 条「被谁引用」：管理员看到数字后的下一个问题永远是「谁」。
-        const content = (
-          <Space direction="vertical" size={2}>
-            {summary.previews.map((preview) => (
-              <Typography.Text
-                className="tsz-words"
-                key={preview.source_word_id}
-              >
-                {preview.source_headword || preview.source_word_id}
-                <Typography.Text type="secondary">
-                  {` · ${ENTRY_REFERENCE_KIND_LABEL[preview.source_kind]}`}
-                </Typography.Text>
-              </Typography.Text>
-            ))}
-            {summary.truncated && (
-              <Typography.Text type="secondary">
-                {`…共 ${total} 条，仅显示前 ${summary.previews.length} 条`}
-              </Typography.Text>
-            )}
-          </Space>
-        );
-        return (
-          <Popover
-            content={content}
-            title="以下内容关联了此词条"
-            trigger="click"
+      render: (record) => (
+        <Tooltip describeChild title={record.created_by_name?.trim() ?? ""}>
+          <span
+            data-word-creator
+            tabIndex={record.created_by_name?.trim() ? 0 : undefined}
+            style={{
+              display: "block",
+              maxWidth: 140,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap"
+            }}
           >
-            <Button
-              type="link"
-              size="small"
-              aria-label={`查看「${wordListLabel(record)}」的 ${total} 处关联`}
-            >
-              {total}
-            </Button>
-          </Popover>
-        );
-      }
+            {record.created_by_name?.trim() || "-"}
+          </span>
+        </Tooltip>
+      )
     },
     {
-      title: "状态",
-      dataIndex: "status",
+      id: "references",
+      label: "关联",
+      width: 80,
+      render: (record) => <ReferenceSummary record={record} />
+    },
+    {
+      id: "status",
+      label: "状态",
       width: 90,
-      responsive: ["sm"],
-      render: (s: AdminWordListItemAny["status"], record) => (
-        <Space size={4} wrap>
-          <Tag
+      render: (record) => (
+        <Stack direction="row" useFlexGap flexWrap="wrap" spacing={0.5}>
+          <Chip
+            label={STATUS_LABEL[record.status]}
             color={
-              s === "published"
+              record.status === "published"
                 ? "success"
-                : s === "archived"
+                : record.status === "archived"
                   ? "warning"
                   : "default"
             }
-          >
-            {STATUS_LABEL[s]}
-          </Tag>
+          />
           {record.has_unpublished_changes && (
-            <Tag color="processing">有未发布修改</Tag>
+            <Chip label="有未发布修改" color="primary" />
           )}
-        </Space>
+        </Stack>
       )
     },
     {
-      title: "更新时间",
-      dataIndex: "updated_at",
+      id: "updated_at",
+      label: "更新时间",
       width: 150,
-      responsive: ["sm"],
-      render: (t: string) => dayjs(t).format("YYYY-MM-DD HH:mm")
+      render: (record) => dayjs(record.updated_at).format("YYYY-MM-DD HH:mm")
     },
     {
-      title: "操作",
-      key: "action",
-      // 归档视图的右组是「恢 复 + 永久删除」两个文字按钮，实测比常规页宽一倍多；
-      // 两种视图各给够用的宽度，常规页就不必为归档动作长期留白。
+      id: "action",
+      label: "操作",
       width: effectiveFilters.status === "archived" ? 280 : 180,
-      fixed: "right",
-      render: (_: unknown, record: AdminWordListItemAny) => {
-        const rowName = `「${wordListLabel(record)}」`;
-        const rowWritable = canModifyEntry(writeActor, record);
-        return (
-          // 左组是进入词条的入口、右组是生命周期动作，各自贴住一边：
-          // 「标注」按行有无都不会让删除入口跟着左右跳。
-          <Flex align="center" justify="space-between" gap={8}>
-            <Space size={4}>
-              {(() => {
-                // 旧结构（V1/V2）的行没有向导可进：向导已整条下线，只剩 V3。
-                // 置灰并说明原因，比点进去撞上 404 或空白页好。
-                const route = getWordRowRoute(record);
-                const button = (
-                  <Button
-                    type="link"
-                    size="small"
-                    disabled={route === undefined}
-                    aria-label={`${getWordRowActionLabel(record, rowWritable)}${rowName}`}
-                    onClick={() => route && navigate(route)}
-                  >
-                    {getWordRowActionLabel(record, rowWritable)}
-                  </Button>
-                );
-                return route === undefined ? (
-                  <Tooltip title={LEGACY_SCHEMA_BLOCKED_HINT}>
-                    <span>{button}</span>
-                  </Tooltip>
-                ) : (
-                  button
-                );
-              })()}
-              {/* 重复原型按归属提供入口，尚未填写标注也能补充。 */}
-              {canEditRowAnnotation(annotationActor, record) ? (
-                <Button
-                  type="link"
-                  size="small"
-                  aria-label={`编辑标注${rowName}`}
-                  onClick={() => setAnnotationEntry(record)}
-                >
-                  标注
-                </Button>
-              ) : null}
-            </Space>
-            <Space size={4}>
-              {adminWordsDataSourceCapabilities.archive &&
-                (() => {
-                  const button = (
-                    <Button
-                      type="link"
-                      size="small"
-                      danger={record.status !== "archived"}
-                      aria-label={`${record.status === "archived" ? "恢复" : "移入垃圾桶"}${rowName}`}
-                      icon={
-                        record.status === "archived" ? (
-                          <RollbackOutlined />
-                        ) : (
-                          <DeleteOutlined />
-                        )
-                      }
-                      disabled={
-                        !canTransitionEntry(
-                          writeActor,
-                          record,
-                          record.status === "archived" ? "restore" : "archive"
-                        ) || lifecycleInput(record) === undefined
-                      }
-                      loading={
-                        lifecyclePending &&
-                        (archiveWord.variables?.wordId === record.id ||
-                          restoreWord.variables?.wordId === record.id)
-                      }
-                      onClick={() =>
-                        transitionOne(
-                          record,
-                          record.status === "archived" ? "restore" : "archive"
-                        )
-                      }
-                    >
-                      {record.status === "archived" ? "恢 复" : null}
-                    </Button>
-                  );
-                  // 移入垃圾桶只留图标：列表里它最不该抢眼，文案落到 Tooltip。
-                  // 置灰时把原因摆出来，否则管理员只看到一个不能点的按钮。
-                  // 缺 lifecycle 字段那种置灰不给 Tooltip：那是数据问题，刷新即可，
-                  // 与「这条不归你管」不是一回事。
-                  const hint = !canTransitionEntry(
-                    writeActor,
-                    record,
-                    record.status === "archived" ? "restore" : "archive"
-                  )
-                    ? "需要相应的归档或恢复权限；普通管理员仅可操作本人词条"
-                    : record.status === "archived"
-                      ? ""
-                      : "移入垃圾桶";
-                  return hint ? (
-                    <Tooltip title={hint}>
-                      <span>{button}</span>
-                    </Tooltip>
-                  ) : (
-                    button
-                  );
-                })()}
-              {adminWordsDataSourceCapabilities.permanentDelete &&
-                record.status === "archived" &&
-                (() => {
-                  const eligibility = evaluateDeleteEligibility(
-                    deleteActor,
-                    record
-                  );
-                  const button = (
-                    <Button
-                      type="link"
-                      size="small"
-                      danger
-                      aria-label={`永久删除${rowName}`}
-                      icon={<DeleteOutlined />}
-                      disabled={!eligibility.deletable}
-                      loading={
-                        deleteWord.isPending &&
-                        deleteWord.variables?.wordId === record.id
-                      }
-                      onClick={() => deleteOne(record)}
-                    >
-                      永久删除
-                    </Button>
-                  );
-                  // 置灰时把原因摆出来，否则管理员只看到一个不能点的按钮。
-                  return eligibility.deletable ? (
-                    button
-                  ) : (
-                    <Tooltip
-                      title={DELETE_BLOCK_REASON_TEXT[eligibility.reason!]}
-                    >
-                      <span>{button}</span>
-                    </Tooltip>
-                  );
-                })()}
-            </Space>
-          </Flex>
-        );
-      }
+      sticky: "right",
+      render: renderRowActions
     }
   ];
-
+  const selectOptions = [
+    { name: "kind" as const, label: "类型", options: kindOptions },
+    { name: "pos" as const, label: "基本词性", options: partOfSpeechOptions },
+    { name: "level" as const, label: "难度", options: CEFR_OPTIONS },
+    ...(!trashMode
+      ? [{ name: "status" as const, label: "状态", options: STATUS_OPTIONS }]
+      : [])
+  ];
   return (
-    <Flex vertical gap={16}>
-      <Breadcrumb
-        items={[
-          { title: "词库管理" },
-          { title: trashMode ? "垃圾桶" : "智能词库" }
-        ]}
-      />
-
-      <Card size="small" styles={{ body: { paddingBottom: 8 } }}>
-        <Form
-          form={form}
-          initialValues={filters}
-          layout="inline"
-          onFinish={applyFilters}
-          style={{
-            rowGap: 12,
-            columnGap: 8,
-            display: "flex",
-            flexWrap: "wrap"
-          }}
+    <Stack spacing={2}>
+      <Breadcrumbs>
+        <Typography>词库管理</Typography>
+        <Typography>{trashMode ? "垃圾桶" : "智能词库"}</Typography>
+      </Breadcrumbs>
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Stack
+          component="form"
+          direction="row"
+          useFlexGap
+          flexWrap="wrap"
+          spacing={1}
+          onSubmit={form.handleSubmit(applyFilters)}
         >
-          <Form.Item name="keyword" label="关键字">
-            <Input
-              placeholder="请输入词汇/创建人"
-              allowClear
-              style={{ width: 180 }}
+          <TextField
+            label="关键字"
+            placeholder="请输入词汇/创建人"
+            sx={{ width: 180 }}
+            {...form.register("keyword")}
+          />
+          <TextField
+            label="释义"
+            placeholder="请输入释义"
+            sx={{ width: 160 }}
+            {...form.register("gloss")}
+          />
+          {selectOptions.map(({ name, label, options }) => (
+            <Controller
+              key={name}
+              name={name}
+              control={form.control}
+              render={({ field }) => (
+                <TextField
+                  select
+                  label={label}
+                  value={field.value ?? ""}
+                  onChange={(event) =>
+                    field.onChange(event.target.value || undefined)
+                  }
+                  disabled={name === "pos" && partOfSpeechCatalog.isError}
+                  sx={{ width: 150 }}
+                >
+                  <MenuItem value="">全部</MenuItem>
+                  {options.map((option) => (
+                    <MenuItem key={option.value} value={option.value}>
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
             />
-          </Form.Item>
-          <Form.Item name="gloss" label="释义">
-            <Input placeholder="请输入释义" allowClear style={{ width: 160 }} />
-          </Form.Item>
-          <Form.Item name="kind" label="类型">
-            <Select
-              placeholder="请选择词汇类型"
-              options={kindOptions}
-              allowClear
-              style={{ width: 150 }}
-            />
-          </Form.Item>
-          <Form.Item name="pos" label="基本词性">
-            <Select
-              placeholder="请选择基本词性"
-              options={partOfSpeechOptions}
-              loading={partOfSpeechCatalog.isPending}
-              disabled={partOfSpeechCatalog.isError}
-              allowClear
-              style={{ width: 140 }}
-            />
-          </Form.Item>
-          <Form.Item name="level" label="难度">
-            <Select
-              placeholder="请选择难度"
-              options={CEFR_OPTIONS}
-              allowClear
-              style={{ width: 120 }}
-            />
-          </Form.Item>
-          {!trashMode && (
-            <Form.Item name="status" label="状态">
-              <Select
-                placeholder="请选择状态"
-                options={STATUS_OPTIONS}
-                allowClear
-                style={{ width: 120 }}
+          ))}
+          <Controller
+            name="range"
+            control={form.control}
+            render={({ field }) => (
+              <DateRangeField
+                value={field.value ?? null}
+                onChange={field.onChange}
               />
-            </Form.Item>
-          )}
-          <Form.Item name="range" label="创建时间">
-            <RangePicker />
-          </Form.Item>
-          <Form.Item>
-            <Space>
-              <Button
-                type="primary"
-                icon={<SearchOutlined />}
-                htmlType="submit"
-              >
-                搜索
-              </Button>
-              <Button
-                icon={<ReloadOutlined />}
-                onClick={() => {
-                  form.resetFields();
-                  form.setFieldsValue({
-                    keyword: undefined,
-                    status: undefined
-                  });
-                  applyFilters({});
-                }}
-              >
-                重置
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Card>
-
-      <Card size="small">
+            )}
+          />
+          <Button type="submit" variant="contained">
+            搜索
+          </Button>
+          <Button
+            onClick={() => {
+              reset({});
+              applyFilters({});
+            }}
+          >
+            重置
+          </Button>
+        </Stack>
+      </Paper>
+      <Paper variant="outlined" sx={{ p: 2 }}>
         {restoreSurface.page && pendingRestore && (
-          <div style={{ marginBottom: 12 }}>
+          <Box sx={{ mb: 1.5 }}>
             <LifecycleSurfaceConfirmation
               state={restoreSurface.snapshot}
               confirming={restoreWord.isPending || restoreBatch.isPending}
@@ -1281,20 +1153,22 @@ export function SmartDictionary({
                 );
               }}
             />
-          </div>
+          </Box>
         )}
-        <Flex
-          justify="space-between"
-          align="center"
-          wrap
-          gap={12}
-          style={{ marginBottom: 12 }}
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          useFlexGap
+          flexWrap="wrap"
+          spacing={1.5}
+          sx={{ mb: 1.5 }}
         >
-          <Space wrap>
+          <Stack direction="row" useFlexGap flexWrap="wrap" spacing={1}>
             {!trashMode && canCreateEntry(writeActor) && (
               <Button
-                type="primary"
-                icon={<PlusOutlined />}
+                variant="contained"
+                startIcon={<Add />}
                 onClick={() => navigate("/words/new")}
               >
                 创建词汇
@@ -1302,12 +1176,12 @@ export function SmartDictionary({
             )}
             {adminWordsDataSourceCapabilities.batchArchive && (
               <Button
-                danger={!showRestoreAction}
-                icon={
-                  showRestoreAction ? <RollbackOutlined /> : <DeleteOutlined />
+                color={showRestoreAction ? "primary" : "error"}
+                startIcon={
+                  showRestoreAction ? <RestoreFromTrash /> : <Delete />
                 }
                 disabled={
-                  selectedKeys.length === 0 ||
+                  !selectedKeys.length ||
                   selectedRows.some(
                     (row) =>
                       !canTransitionEntry(
@@ -1320,143 +1194,210 @@ export function SmartDictionary({
                 loading={archiveBatch.isPending || restoreBatch.isPending}
                 onClick={transitionSelected}
               >
-                {showRestoreAction ? "恢 复" : "移入垃圾桶"}
-                {selectedKeys.length > 0 ? `(${selectedKeys.length})` : ""}
+                {showRestoreAction ? "恢复" : "移入垃圾桶"}
+                {selectedKeys.length ? `(${selectedKeys.length})` : ""}
               </Button>
             )}
             {adminWordsDataSourceCapabilities.batchPermanentDelete &&
               restoringSelection && (
                 <Button
-                  danger
-                  icon={<DeleteOutlined />}
+                  color="error"
+                  startIcon={<Delete />}
                   disabled={
-                    selectedKeys.length === 0 ||
-                    writeActor?.role !== "super_admin"
+                    !selectedKeys.length || writeActor?.role !== "super_admin"
                   }
                   loading={deleteBatch.isPending}
                   onClick={deleteSelected}
                 >
                   永久删除
-                  {selectedKeys.length > 0 ? `(${selectedKeys.length})` : ""}
+                  {selectedKeys.length ? `(${selectedKeys.length})` : ""}
                 </Button>
               )}
-          </Space>
-          <Space size="large" wrap>
-            <Typography.Text type="secondary">
-              累计智能词汇:
-              <Typography.Text strong>
-                {stats.data?.total ?? "-"}
-              </Typography.Text>
-            </Typography.Text>
-            <Typography.Text type="secondary">
-              今日创编:
-              <Typography.Text strong>
-                {stats.data?.today ?? "-"}
-              </Typography.Text>
-            </Typography.Text>
-            <Typography.Text type="secondary">
-              本月创编:
-              <Typography.Text strong>
-                {stats.data?.month ?? "-"}
-              </Typography.Text>
-            </Typography.Text>
-          </Space>
-        </Flex>
-
+          </Stack>
+          <Stack direction="row" useFlexGap flexWrap="wrap" spacing={3}>
+            {[
+              ["累计智能词汇", stats.data?.total],
+              ["今日创编", stats.data?.today],
+              ["本月创编", stats.data?.month]
+            ].map(([label, value]) => (
+              <Typography key={label} variant="body2" color="text.secondary">
+                {label}:
+                <Typography component="span" fontWeight={600}>
+                  {value ?? "-"}
+                </Typography>
+              </Typography>
+            ))}
+          </Stack>
+        </Stack>
         {listQuery.isError && (
           <Alert
-            type="error"
-            showIcon
-            style={{ marginBottom: 12 }}
-            title="词条列表加载失败"
-            description={listQuery.error.message}
+            severity="error"
+            sx={{ mb: 1.5 }}
             action={
-              <Button size="small" onClick={() => void listQuery.refetch()}>
+              <Button onClick={() => void listQuery.refetch()}>重试</Button>
+            }
+          >
+            词条列表加载失败<Typography>{listQuery.error.message}</Typography>
+          </Alert>
+        )}
+        {partOfSpeechCatalog.isError && (
+          <Alert
+            severity="warning"
+            sx={{ mb: 1.5 }}
+            action={
+              <Button onClick={() => void partOfSpeechCatalog.refetch()}>
                 重试
               </Button>
             }
-          />
+          >
+            词性目录暂时不可用
+            <Typography>
+              现有词条将回退显示稳定编码，基本词性筛选暂不可用。
+            </Typography>
+          </Alert>
         )}
-
-        {partOfSpeechCatalog.isError && (
-          <Alert
-            type="warning"
-            showIcon
-            style={{ marginBottom: 12 }}
-            title="词性目录暂时不可用"
-            description="现有词条将回退显示稳定编码，基本词性筛选暂不可用。"
-            action={
-              <Button
-                size="small"
-                onClick={() => void partOfSpeechCatalog.refetch()}
-              >
-                重 试
-              </Button>
-            }
-          />
-        )}
-
-        {annotationEntry ? (
+        {annotationEntry && (
           <EditEntryAnnotation
             entry={annotationEntry}
             onClose={() => setAnnotationEntry(undefined)}
           />
-        ) : null}
-
-        <Table<AdminWordListItemAny>
-          rowKey="id"
-          size="middle"
-          columns={columns}
-          dataSource={rows}
-          loading={listQuery.isPending}
-          scroll={{ x: "max-content" }}
-          rowSelection={
+        )}
+        <AdminTable
+          rows={rows}
+          rowId={(row) => row.id}
+          columns={
+            wideTable
+              ? columns
+              : columns.filter(
+                  (column) => column.id === "label" || column.id === "action"
+                )
+          }
+          loading={listQuery.isFetching}
+          minWidth={
+            wideTable
+              ? 1600
+              : effectiveFilters.status === "archived"
+                ? 478
+                : 378
+          }
+          selection={
             adminWordsDataSourceCapabilities.batchArchive
               ? {
-                  selectedRowKeys: selectedKeys,
-                  preserveSelectedRowKeys: true,
-                  onChange: (keys, selected) => {
+                  ids: selectedKeys,
+                  label: wordListLabel,
+                  disabled: (record) => lifecycleInput(record) === undefined,
+                  onChange: (keys) => {
                     restoreAttemptGeneration.current += 1;
                     setSelectedKeys(keys);
                     setSelectedRecords((previous) => {
                       const kept = Object.fromEntries(
                         Object.entries(previous).filter(([id]) =>
-                          keys.some((key) => String(key) === id)
+                          keys.includes(id)
                         )
                       );
-                      for (const record of selected) kept[record.id] = record;
+                      for (const record of rows)
+                        if (keys.includes(record.id)) kept[record.id] = record;
                       return kept;
                     });
                     if (pendingRestore) {
                       restoreSurface.clear();
                       setPendingRestore(undefined);
                     }
-                  },
-                  getCheckboxProps: (record) => ({
-                    disabled: lifecycleInput(record) === undefined
-                  })
+                  }
                 }
               : undefined
           }
           pagination={{
-            current: page,
+            page,
             pageSize,
             total,
-            showSizeChanger: true,
-            showTotal: (t) => `共 ${t} 条`,
-            pageSizeOptions: [10, 20, 50, 100],
-            onChange: (nextPage, nextSize) => {
+            pageSizes: [10, 20, 50, 100],
+            onChange: (nextPage, nextSize) =>
               setSearchParams(
-                serializeWordListSearchParams(
-                  filters,
-                  nextSize !== pageSize ? 1 : nextPage,
-                  nextSize
-                )
-              );
-            }
+                serializeWordListSearchParams(filters, nextPage, nextSize)
+              )
           }}
         />
-      </Card>
-    </Flex>
+      </Paper>
+      <ConfirmDialog
+        open={!!confirmation}
+        title={confirmation?.title ?? ""}
+        confirmText={confirmation?.confirmText}
+        danger={confirmation?.danger}
+        pending={confirming}
+        onClose={() => setConfirmation(undefined)}
+        onConfirm={() => {
+          if (!confirmation || confirming) return;
+          setConfirming(true);
+          void confirmation
+            .submit()
+            .then(() => setConfirmation(undefined))
+            .finally(() => setConfirming(false));
+        }}
+      >
+        {confirmation?.content}
+      </ConfirmDialog>
+      {archivePrompt && (
+        <ArchiveImpactDialog
+          entries={archivePrompt.entries}
+          title={archivePrompt.title}
+          onClose={() => setArchivePrompt(undefined)}
+          onConfirm={archivePrompt.submit}
+          describeFailure={describeLifecycleFailure}
+          onRefresh={() => {
+            setArchivePrompt(undefined);
+            setSelectedKeys([]);
+            setSelectedRecords({});
+            void listQuery.refetch();
+          }}
+        />
+      )}
+    </Stack>
+  );
+}
+
+function ReferenceSummary({ record }: { record: AdminWordListItemAny }) {
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const summary = record.reference_summary,
+    total = summary?.total ?? 0;
+  if (!total || !summary)
+    return <Typography color="text.secondary">-</Typography>;
+  return (
+    <>
+      <Button
+        aria-label={`查看「${wordListLabel(record)}」的 ${total} 处关联`}
+        onClick={(event) => setAnchor(event.currentTarget)}
+      >
+        {total}
+      </Button>
+      <Popover
+        open={!!anchor}
+        anchorEl={anchor}
+        onClose={() => setAnchor(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+      >
+        <Box sx={{ p: 2, maxWidth: 400 }}>
+          <Typography fontWeight={600} sx={{ mb: 1 }}>
+            以下内容关联了此词条
+          </Typography>
+          <Stack spacing={0.25}>
+            {summary.previews.map((preview) => (
+              <Typography className="tsz-words" key={preview.source_word_id}>
+                {preview.source_headword || preview.source_word_id}
+                <Typography component="span" color="text.secondary">
+                  {" "}
+                  · {ENTRY_REFERENCE_KIND_LABEL[preview.source_kind]}
+                </Typography>
+              </Typography>
+            ))}
+            {summary.truncated && (
+              <Typography color="text.secondary">
+                …共 {total} 条，仅显示前 {summary.previews.length} 条
+              </Typography>
+            )}
+          </Stack>
+        </Box>
+      </Popover>
+    </>
   );
 }

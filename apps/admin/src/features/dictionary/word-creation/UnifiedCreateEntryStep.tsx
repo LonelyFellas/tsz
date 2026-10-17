@@ -1,3 +1,29 @@
+import { Switch as MuiSwitch } from "@mui/material";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import {
+  Box as MuiBox,
+  FormControl as MuiFormControl,
+  FormHelperText as MuiFormHelperText,
+  Grid as MuiGrid
+} from "@mui/material";
+import {
+  Card as MuiCard,
+  CardHeader as MuiCardHeader,
+  CardContent as MuiCardContent
+} from "@mui/material";
+import {
+  OutlinedInput as MuiOutlinedInput,
+  Select as MuiSelect,
+  MenuItem as MuiMenuItem
+} from "@mui/material";
+import {
+  Alert as MuiAlert,
+  AlertTitle as MuiAlertTitle,
+  Button as MuiButton,
+  Chip as MuiChip,
+  Stack as MuiStack,
+  Typography as MuiTypography
+} from "@mui/material";
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import { HttpError, RequestTimeoutError } from "@tsz/api-client/http";
 import type {
@@ -11,28 +37,10 @@ import type {
   SurfaceMatchPageV3,
   WordHeadwordsV2
 } from "@tsz/types";
-import {
-  CheckCircleFilled,
-  ExclamationCircleOutlined,
-  PlusOutlined,
-  SearchOutlined
-} from "@ant-design/icons";
-import {
-  Alert,
-  App,
-  Button,
-  Card,
-  Col,
-  Descriptions,
-  Form,
-  Input,
-  Row,
-  Select,
-  Space,
-  Switch,
-  Tag,
-  Typography
-} from "antd";
+import CheckCircleFilled from "@mui/icons-material/CheckCircle";
+
+import PlusOutlined from "@mui/icons-material/Add";
+import SearchOutlined from "@mui/icons-material/Search";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { adminWordsDataSource } from "../dataSource";
 import { usePartOfSpeechCatalog } from "../part-of-speech/api";
@@ -63,7 +71,6 @@ import {
 } from "../annotationPermission";
 import { useAuthStore } from "@/lib/auth";
 import "./word-creation.css";
-
 export interface UnifiedCreateRequests {
   detectV3: (
     input: DetectLexiconSurfaceV3Input
@@ -79,18 +86,15 @@ export interface UnifiedCreateRequests {
     signal: AbortSignal
   ) => Promise<SurfaceMatchPageV3>;
 }
-
 type PendingCreation = {
   kind: "word" | "phrase";
   detection: DetectLexiconSurfaceResponseV3;
   idempotencyKey: string;
 };
-
 type CreateAttempt = {
   target: PendingCreation;
   input: CreateAdminWordV3Input;
 };
-
 interface Props {
   requests?: UnifiedCreateRequests;
   onCreated: (
@@ -98,19 +102,22 @@ interface Props {
     navigationState: CreationNavigationState
   ) => void;
 }
-
 type RegionalDisplayState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "error" }
+  | {
+      status: "idle";
+    }
+  | {
+      status: "loading";
+    }
+  | {
+      status: "error";
+    }
   | {
       status: "ready";
       source: "database" | "builtin" | "input";
       value: WordHeadwordsV2;
     };
-
 class ProductError extends Error {}
-
 const v3Requests = createV3WordRequests();
 const defaultRequests: UnifiedCreateRequests = {
   detectV3: v3Requests.detect,
@@ -119,22 +126,18 @@ const defaultRequests: UnifiedCreateRequests = {
   surfacePage: (snapshotId, cursor, signal) =>
     adminWordsDataSource.surfaceMatchSnapshotPage(snapshotId, cursor, signal)
 };
-
 const STATUS_LABEL = {
   draft: "草稿",
   published: "已发布",
   archived: "垃圾桶"
 } as const;
-
 const KIND_LABEL = {
   word: "单词",
   phrase: "短语"
 } as const;
-
 function initialSurfacePage(pending?: PendingCreation) {
   return pending?.detection.surface_match_page;
 }
-
 function errorMessage(error: unknown): string {
   if (error instanceof HttpError) {
     if (error.status === 409 && error.code === "duplicate_word")
@@ -156,7 +159,6 @@ function errorMessage(error: unknown): string {
     ? error.message
     : "创建失败，请稍后重试。";
 }
-
 function createErrorMessage(error: unknown): string {
   if (error instanceof TypeError || error instanceof RequestTimeoutError) {
     return "网络异常，创建结果未知。请原样重试。";
@@ -166,7 +168,6 @@ function createErrorMessage(error: unknown): string {
   }
   return errorMessage(error);
 }
-
 function partOfSpeechLabel(
   code: string,
   catalog?: PartOfSpeechCatalogResponse
@@ -175,7 +176,6 @@ function partOfSpeechLabel(
     catalog?.items.find((item) => item.code === code)?.name_zh ?? "未识别词性"
   );
 }
-
 function dictionaryCoverageLabel(
   category: "词形" | "发音",
   state: "complete" | "partial" | "missing"
@@ -187,20 +187,17 @@ function dictionaryCoverageLabel(
   }[state];
   return `${category}：${status}`;
 }
-
 function assertFreshDetection(expiresAt: string) {
   const expiry = Date.parse(expiresAt);
   if (!Number.isFinite(expiry) || expiry <= Date.now()) {
     throw new ProductError("检查结果已过期，请重新提交。");
   }
 }
-
 function hasV3PrefilledForms(word: AdminWordV3): boolean {
   return word.forms.pos.some(
     (pos) => pos.forms.length > 0 && pos.form_groups.length > 0
   );
 }
-
 function builtinRegionalValue(pending: PendingCreation): {
   source: "builtin" | "input";
   value: WordHeadwordsV2;
@@ -236,7 +233,6 @@ function builtinRegionalValue(pending: PendingCreation): {
     value: { mode: "unified", common: pending.detection.normalized_surface }
   };
 }
-
 function regionalValueForDetection(
   value: WordHeadwordsV2,
   surface: string,
@@ -256,7 +252,6 @@ function regionalValueForDetection(
           : preference;
   return { ...value, source_dialect: sourceDialect };
 }
-
 function DetectionPresentationCard({
   pending,
   catalog,
@@ -331,209 +326,316 @@ function DetectionPresentationCard({
     smartPosLabels.length > 0 ? smartPosLabels : builtinPosLabels;
   const preferredPosSource =
     smartPosLabels.length > 0 ? "智能词库" : "内置词典";
-
   return (
-    <Card
-      className="word-detection-result-card"
-      size="small"
-      title="检测结果"
-      extra={
-        <Tag color={builtinStatus === "matched" ? "success" : "default"}>
-          内置词典：{builtinStatus === "matched" ? "已匹配" : "未匹配"}
-        </Tag>
-      }
-    >
-      <Space orientation="vertical" size={16} style={{ width: "100%" }}>
-        <Descriptions column={1} size="small">
-          <Descriptions.Item label="词条类型">
-            {KIND_LABEL[pending.kind]}词条
-          </Descriptions.Item>
-          <Descriptions.Item label="词库检测">
-            {hasMatches ? (
-              "已发现"
-            ) : existingDraftId ? (
-              "同名草稿"
-            ) : (
-              <Space>
-                <CheckCircleFilled style={{ color: "#22a06b" }} />
-                未发现
-              </Space>
-            )}
-          </Descriptions.Item>
-          {preferredPosLabels.length > 0 ? (
-            <Descriptions.Item label="建议词性">
-              <Space size={[6, 6]} wrap>
-                {preferredPosLabels.map((label) => (
-                  <Tag key={label} color="blue">
-                    {label}
-                  </Tag>
-                ))}
-                <Typography.Text type="secondary">
-                  来源：{preferredPosSource}
-                </Typography.Text>
-              </Space>
-            </Descriptions.Item>
-          ) : null}
-          {builtinCoverage ? (
-            <Descriptions.Item label="词典覆盖">
-              <Space size={[4, 4]} wrap>
-                <Tag
-                  color={
-                    builtinCoverage.forms === "missing" ? "default" : "blue"
-                  }
-                >
-                  {dictionaryCoverageLabel("词形", builtinCoverage.forms)}
-                </Tag>
-                <Tag
-                  color={
-                    builtinCoverage.pronunciations === "missing"
-                      ? "default"
-                      : "cyan"
-                  }
-                >
-                  {dictionaryCoverageLabel(
-                    "发音",
-                    builtinCoverage.pronunciations
-                  )}
-                </Tag>
-              </Space>
-            </Descriptions.Item>
-          ) : null}
-        </Descriptions>
-
-        {displayEntries.length > 0 || existingDraftId ? (
-          <div className="word-smart-match-summary">
-            {displayEntries.map((entry) => (
-              <div className="word-smart-match-summary-entry" key={entry.key}>
-                <div className="word-smart-match-summary-row">
-                  <Space size={8} wrap>
-                    <Typography.Text className="tsz-words" strong>
-                      {entry.label}
-                    </Typography.Text>
-                    <Tag
-                      color={
-                        entry.status === "published"
-                          ? "success"
-                          : entry.status === "draft"
-                            ? "processing"
-                            : "default"
-                      }
-                    >
-                      {STATUS_LABEL[entry.status]}
-                    </Tag>
-                    {entry.posLabels.map((label) => (
-                      <Tag key={label}>{label}</Tag>
-                    ))}
-                  </Space>
-                  {entry.status === "draft" ? (
-                    <Button
-                      type="link"
-                      href={
-                        entry.schemaVersion === 3
-                          ? `/words/${entry.entryId}/v3/wizard/forms`
-                          : `/words/${entry.entryId}/wizard/forms`
-                      }
-                    >
-                      继续创建
-                    </Button>
-                  ) : (
-                    <Button
-                      type="link"
-                      onClick={() =>
-                        setExpanded(
-                          expanded === entry.key ? undefined : entry.key
-                        )
-                      }
-                    >
-                      查看已有原形
-                    </Button>
-                  )}
-                </div>
-                {expanded === entry.key ? (
-                  <div className="word-smart-match-context-meta">
-                    {entry.baseSpellings.map((spelling) => (
-                      <div
-                        className="tsz-words"
-                        key={spelling}
-                        style={{ fontWeight: 700 }}
-                      >
-                        原形：{spelling}
-                      </div>
-                    ))}
-                    {entry.baseSpellings.length === 0
-                      ? entry.otherMatches.map((match) => (
-                          <div
-                            className="tsz-words"
-                            key={match}
-                            style={{ fontWeight: 700 }}
-                          >
-                            命中：{match}
-                          </div>
-                        ))
-                      : null}
-                    {entry.posLabels.length > 0 ? (
-                      <Space size={[4, 4]} wrap>
-                        <span className="word-smart-match-context-meta-label">
-                          基本词性：
-                        </span>
-                        {entry.posLabels.map((label) => (
-                          <Tag key={label}>{label}</Tag>
-                        ))}
-                      </Space>
-                    ) : null}
-                    {entry.glossPreviews.map((gloss) => (
-                      <div key={gloss}>释义：{gloss}</div>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            ))}
-            {existingDraftId &&
-            !displayEntries.some(
-              (entry) => entry.entryId === existingDraftId
-            ) ? (
-              <div className="word-smart-match-summary-entry">
-                <div className="word-smart-match-summary-row">
-                  <Space size={8} wrap>
-                    <Typography.Text className="tsz-words" strong>
-                      {pending.detection.normalized_surface}
-                    </Typography.Text>
-                    <Tag color="processing">未完成草稿</Tag>
-                  </Space>
-                  <Button
-                    type="link"
-                    href={`/words/${existingDraftId}/v3/wizard/forms`}
+    <MuiCard className="word-detection-result-card" variant="outlined">
+      <MuiCardHeader
+        className="admin-card-header"
+        title={"检测结果"}
+        action={
+          <MuiChip
+            color={builtinStatus === "matched" ? "success" : "default"}
+            label={
+              <>内置词典：{builtinStatus === "matched" ? "已匹配" : "未匹配"}</>
+            }
+          />
+        }
+        slotProps={{
+          title: { variant: "subtitle1", className: "admin-card-title" }
+        }}
+        sx={{ p: 2, borderBottom: 1, borderColor: "divider" }}
+      />
+      <MuiCardContent className="admin-card-body">
+        <MuiStack style={{ width: "100%" }} direction="column" spacing={2}>
+          <MuiBox component="dl" sx={{ m: 0 }}>
+            <MuiBox
+              component="div"
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "100px minmax(0,1fr)",
+                py: 1
+              }}
+            >
+              <MuiTypography component="dt" color="text.secondary">
+                {"词条类型"}
+              </MuiTypography>
+              <MuiBox component="dd" sx={{ m: 0 }}>
+                {KIND_LABEL[pending.kind]}词条
+              </MuiBox>
+            </MuiBox>
+            <MuiBox
+              component="div"
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "100px minmax(0,1fr)",
+                py: 1
+              }}
+            >
+              <MuiTypography component="dt" color="text.secondary">
+                {"词库检测"}
+              </MuiTypography>
+              <MuiBox component="dd" sx={{ m: 0 }}>
+                {hasMatches ? (
+                  "已发现"
+                ) : existingDraftId ? (
+                  "同名草稿"
+                ) : (
+                  <MuiStack direction="row" spacing={1} alignItems="center">
+                    <CheckCircleFilled
+                      fontSize="inherit"
+                      style={{ color: "#22a06b" }}
+                    />
+                    未发现
+                  </MuiStack>
+                )}
+              </MuiBox>
+            </MuiBox>
+            {preferredPosLabels.length > 0 ? (
+              <MuiBox
+                component="div"
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "100px minmax(0,1fr)",
+                  py: 1
+                }}
+              >
+                <MuiTypography component="dt" color="text.secondary">
+                  {"建议词性"}
+                </MuiTypography>
+                <MuiBox component="dd" sx={{ m: 0 }}>
+                  <MuiStack
+                    direction="row"
+                    columnGap={0.75}
+                    rowGap={0.75}
+                    alignItems="center"
+                    useFlexGap
+                    flexWrap="wrap"
                   >
-                    打开草稿
-                  </Button>
-                </div>
-                <Typography.Text type="secondary">
-                  继续编辑草稿，或新建词条。
-                </Typography.Text>
-              </div>
+                    {preferredPosLabels.map((label) => (
+                      <MuiChip
+                        key={label}
+                        color={"primary"}
+                        label={<>{label}</>}
+                      />
+                    ))}
+                    <MuiTypography component="span" color="text.secondary">
+                      来源：{preferredPosSource}
+                    </MuiTypography>
+                  </MuiStack>
+                </MuiBox>
+              </MuiBox>
             ) : null}
-          </div>
-        ) : null}
+            {builtinCoverage ? (
+              <MuiBox
+                component="div"
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "100px minmax(0,1fr)",
+                  py: 1
+                }}
+              >
+                <MuiTypography component="dt" color="text.secondary">
+                  {"词典覆盖"}
+                </MuiTypography>
+                <MuiBox component="dd" sx={{ m: 0 }}>
+                  <MuiStack
+                    direction="row"
+                    columnGap={0.5}
+                    rowGap={0.5}
+                    alignItems="center"
+                    useFlexGap
+                    flexWrap="wrap"
+                  >
+                    <MuiChip
+                      color={
+                        builtinCoverage.forms === "missing"
+                          ? "default"
+                          : "primary"
+                      }
+                      label={
+                        <>
+                          {dictionaryCoverageLabel(
+                            "词形",
+                            builtinCoverage.forms
+                          )}
+                        </>
+                      }
+                    />
+                    <MuiChip
+                      color={
+                        builtinCoverage.pronunciations === "missing"
+                          ? "default"
+                          : "info"
+                      }
+                      label={
+                        <>
+                          {dictionaryCoverageLabel(
+                            "发音",
+                            builtinCoverage.pronunciations
+                          )}
+                        </>
+                      }
+                    />
+                  </MuiStack>
+                </MuiBox>
+              </MuiBox>
+            ) : null}
+          </MuiBox>
 
-        {snapshot.phase === "error" || snapshot.phase === "expired" ? (
-          <Alert
-            showIcon
-            type="error"
-            title="匹配结果已失效，请返回修改后重新提交。"
-          />
-        ) : null}
-        {snapshot.phase === "disabled" ? (
-          <Alert
-            showIcon
-            type="error"
-            title="当前策略暂不允许继续创建该词条。"
-          />
-        ) : null}
-      </Space>
-    </Card>
+          {displayEntries.length > 0 || existingDraftId ? (
+            <div className="word-smart-match-summary">
+              {displayEntries.map((entry) => (
+                <div className="word-smart-match-summary-entry" key={entry.key}>
+                  <div className="word-smart-match-summary-row">
+                    <MuiStack
+                      direction="row"
+                      spacing={1}
+                      alignItems="center"
+                      useFlexGap
+                      flexWrap="wrap"
+                    >
+                      <MuiTypography
+                        className="tsz-words"
+                        component="span"
+                        fontWeight={600}
+                      >
+                        {entry.label}
+                      </MuiTypography>
+                      <MuiChip
+                        color={
+                          entry.status === "published"
+                            ? "success"
+                            : entry.status === "draft"
+                              ? "primary"
+                              : "default"
+                        }
+                        label={<>{STATUS_LABEL[entry.status]}</>}
+                      />
+                      {entry.posLabels.map((label) => (
+                        <MuiChip key={label} label={<>{label}</>} />
+                      ))}
+                    </MuiStack>
+                    {entry.status === "draft" ? (
+                      <MuiButton
+                        href={
+                          entry.schemaVersion === 3
+                            ? `/words/${entry.entryId}/v3/wizard/forms`
+                            : `/words/${entry.entryId}/wizard/forms`
+                        }
+                        variant={"text"}
+                      >
+                        继续创建
+                      </MuiButton>
+                    ) : (
+                      <MuiButton
+                        onClick={() =>
+                          setExpanded(
+                            expanded === entry.key ? undefined : entry.key
+                          )
+                        }
+                        variant={"text"}
+                      >
+                        查看已有原形
+                      </MuiButton>
+                    )}
+                  </div>
+                  {expanded === entry.key ? (
+                    <div className="word-smart-match-context-meta">
+                      {entry.baseSpellings.map((spelling) => (
+                        <div
+                          className="tsz-words"
+                          key={spelling}
+                          style={{ fontWeight: 700 }}
+                        >
+                          原形：{spelling}
+                        </div>
+                      ))}
+                      {entry.baseSpellings.length === 0
+                        ? entry.otherMatches.map((match) => (
+                            <div
+                              className="tsz-words"
+                              key={match}
+                              style={{ fontWeight: 700 }}
+                            >
+                              命中：{match}
+                            </div>
+                          ))
+                        : null}
+                      {entry.posLabels.length > 0 ? (
+                        <MuiStack
+                          direction="row"
+                          columnGap={0.5}
+                          rowGap={0.5}
+                          alignItems="center"
+                          useFlexGap
+                          flexWrap="wrap"
+                        >
+                          <span className="word-smart-match-context-meta-label">
+                            基本词性：
+                          </span>
+                          {entry.posLabels.map((label) => (
+                            <MuiChip key={label} label={<>{label}</>} />
+                          ))}
+                        </MuiStack>
+                      ) : null}
+                      {entry.glossPreviews.map((gloss) => (
+                        <div key={gloss}>释义：{gloss}</div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+              {existingDraftId &&
+              !displayEntries.some(
+                (entry) => entry.entryId === existingDraftId
+              ) ? (
+                <div className="word-smart-match-summary-entry">
+                  <div className="word-smart-match-summary-row">
+                    <MuiStack
+                      direction="row"
+                      spacing={1}
+                      alignItems="center"
+                      useFlexGap
+                      flexWrap="wrap"
+                    >
+                      <MuiTypography
+                        className="tsz-words"
+                        component="span"
+                        fontWeight={600}
+                      >
+                        {pending.detection.normalized_surface}
+                      </MuiTypography>
+                      <MuiChip color={"primary"} label={<>未完成草稿</>} />
+                    </MuiStack>
+                    <MuiButton
+                      href={`/words/${existingDraftId}/v3/wizard/forms`}
+                      variant={"text"}
+                    >
+                      打开草稿
+                    </MuiButton>
+                  </div>
+                  <MuiTypography component="span" color="text.secondary">
+                    继续编辑草稿，或新建词条。
+                  </MuiTypography>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {snapshot.phase === "error" || snapshot.phase === "expired" ? (
+            <MuiAlert severity={"error"}>
+              {"匹配结果已失效，请返回修改后重新提交。"}
+            </MuiAlert>
+          ) : null}
+          {snapshot.phase === "disabled" ? (
+            <MuiAlert severity={"error"}>
+              {"当前策略暂不允许继续创建该词条。"}
+            </MuiAlert>
+          ) : null}
+        </MuiStack>
+      </MuiCardContent>
+    </MuiCard>
   );
 }
-
 function HeadwordConfirmationCard({
   state,
   preference,
@@ -549,165 +651,233 @@ function HeadwordConfirmationCard({
 }) {
   if (state.status === "loading" || state.status === "idle") {
     return (
-      <Card
-        className="word-headword-confirmation-card"
-        size="small"
-        title="确认英美主词"
-      >
-        <Typography.Text type="secondary">正在加载原形…</Typography.Text>
-      </Card>
+      <MuiCard className="word-headword-confirmation-card" variant="outlined">
+        <MuiCardHeader
+          className="admin-card-header"
+          title={"确认英美主词"}
+          slotProps={{
+            title: { variant: "subtitle1", className: "admin-card-title" }
+          }}
+          sx={{ p: 2, borderBottom: 1, borderColor: "divider" }}
+        />
+        <MuiCardContent className="admin-card-body">
+          <MuiTypography component="span" color="text.secondary">
+            正在加载原形…
+          </MuiTypography>
+        </MuiCardContent>
+      </MuiCard>
     );
   }
   if (state.status === "error") {
     return (
-      <Card
-        className="word-headword-confirmation-card"
-        size="small"
-        title="确认英美主词"
-      >
-        <Alert
-          showIcon
-          type="error"
-          title="原形详情加载失败"
-          description="无法确认首个数据库原形，已停止创建。"
-          action={<Button onClick={onRetry}>重新加载</Button>}
+      <MuiCard className="word-headword-confirmation-card" variant="outlined">
+        <MuiCardHeader
+          className="admin-card-header"
+          title={"确认英美主词"}
+          slotProps={{
+            title: { variant: "subtitle1", className: "admin-card-title" }
+          }}
+          sx={{ p: 2, borderBottom: 1, borderColor: "divider" }}
         />
-      </Card>
+        <MuiCardContent className="admin-card-body">
+          <MuiAlert
+            action={<MuiButton onClick={onRetry}>重新加载</MuiButton>}
+            severity={"error"}
+          >
+            <MuiAlertTitle>{"原形详情加载失败"}</MuiAlertTitle>
+            {"无法确认首个数据库原形，已停止创建。"}
+          </MuiAlert>
+        </MuiCardContent>
+      </MuiCard>
     );
   }
   const value = state.value;
   const issues = headwordsIssues(value);
   const lockedLabel = preference === "uk" ? "英式" : "美式";
   return (
-    <Card
-      className="word-headword-confirmation-card"
-      size="small"
-      title="确认英美主词"
-    >
-      <div className="word-dialect-detection-row">
-        <div>
-          <Typography.Text strong>区分英美拼写</Typography.Text>
-          <Typography.Text type="secondary">
-            英美拼写不同时开启。
-          </Typography.Text>
-        </div>
-        <Switch
-          aria-label="区分英美拼写"
-          checked={value.mode === "distinguish"}
-          disabled={disabled}
-          onChange={(checked) => {
-            const confirmed =
-              value.mode === "distinguish" ? value[preference] : value.common;
-            onChange(
-              checked
-                ? {
-                    mode: "distinguish",
-                    uk: confirmed,
-                    us: confirmed,
-                    source_dialect: preference
-                  }
-                : { mode: "unified", common: confirmed }
-            );
-          }}
-        />
-      </div>
-      {value.mode === "unified" ? (
-        <div className="dialect-panel">
-          <Form.Item
-            label="英美通用主词"
-            required
-            validateStatus={
-              value.common.trim() === "" || issues.uk ? "error" : undefined
+    <MuiCard className="word-headword-confirmation-card" variant="outlined">
+      <MuiCardHeader
+        className="admin-card-header"
+        title={"确认英美主词"}
+        slotProps={{
+          title: { variant: "subtitle1", className: "admin-card-title" }
+        }}
+        sx={{ p: 2, borderBottom: 1, borderColor: "divider" }}
+      />
+      <MuiCardContent className="admin-card-body">
+        <div className="word-dialect-detection-row">
+          <div>
+            <MuiTypography component="span" fontWeight={600}>
+              区分英美拼写
+            </MuiTypography>
+            <MuiTypography component="span" color="text.secondary">
+              英美拼写不同时开启。
+            </MuiTypography>
+          </div>
+          <MuiSwitch
+            slotProps={{
+              input: { role: "switch", "aria-label": "区分英美拼写" }
+            }}
+
+            checked={value.mode === "distinguish"}
+            disabled={disabled}
+            onChange={(_, checked) =>
+              ((checked) => {
+                const confirmed =
+                  value.mode === "distinguish"
+                    ? value[preference]
+                    : value.common;
+                onChange(
+                  checked
+                    ? {
+                        mode: "distinguish",
+                        uk: confirmed,
+                        us: confirmed,
+                        source_dialect: preference
+                      }
+                    : { mode: "unified", common: confirmed }
+                );
+              })(checked)
             }
-            help={value.common.trim() === "" ? "请输入英美通用主词" : issues.uk}
-          >
-            <Input
-              aria-label="英美通用主词"
-              className="tsz-words"
-              disabled={disabled}
-              value={value.common}
-              onChange={(event) =>
-                onChange({ mode: "unified", common: event.target.value })
-              }
-            />
-          </Form.Item>
+          />
         </div>
-      ) : (
-        <>
-          <Typography.Text
-            type="secondary"
-            className="word-field-help word-headword-lock-note"
-          >
-            当前锁定{lockedLabel}拼写，可在个人偏好中切换。
-          </Typography.Text>
-          <Row gutter={16}>
-            <Col xs={24} md={12}>
-              <div className="dialect-panel dialect-panel-uk">
-                <Typography.Text strong>英式英语 · BrE</Typography.Text>
-                <Form.Item
-                  required
-                  validateStatus={
-                    value.uk.trim() === "" || issues.uk ? "error" : undefined
-                  }
-                  help={value.uk.trim() === "" ? "请输入英式主词" : issues.uk}
-                >
-                  <Input
-                    aria-label="英式主词"
-                    className="tsz-words"
-                    value={value.uk}
-                    disabled={disabled || preference === "uk"}
-                    onChange={(event) =>
-                      onChange({ ...value, uk: event.target.value })
+        {value.mode === "unified" ? (
+          <div className="dialect-panel">
+            <MuiFormControl
+              fullWidth
+              required
+              error={
+                (value.common.trim() === "" || issues.uk
+                  ? "error"
+                  : undefined) === "error"
+              }
+              sx={{ mb: 2 }}
+            >
+              <MuiTypography component="span" sx={{ mb: 1 }}>
+                {"英美通用主词"}
+              </MuiTypography>
+              <MuiOutlinedInput
+                data-admin-input
+                className="tsz-words"
+                disabled={disabled}
+                onChange={(event) =>
+                  onChange({ mode: "unified", common: event.target.value })
+                }
+                inputProps={{
+                  "aria-label": "英美通用主词"
+                }}
+                value={value.common ?? ""}
+                size="small"
+              />
+              <MuiFormHelperText>
+                {value.common.trim() === "" ? "请输入英美通用主词" : issues.uk}
+              </MuiFormHelperText>
+            </MuiFormControl>
+          </div>
+        ) : (
+          <>
+            <MuiTypography
+              className="word-field-help word-headword-lock-note"
+              component="span"
+              color="text.secondary"
+            >
+              当前锁定{lockedLabel}拼写，可在个人偏好中切换。
+            </MuiTypography>
+            <MuiGrid container spacing={2}>
+              <MuiGrid size={{ xs: 12, md: 6 }}>
+                <div className="dialect-panel dialect-panel-uk">
+                  <MuiTypography component="span" fontWeight={600}>
+                    英式英语 · BrE
+                  </MuiTypography>
+                  <MuiFormControl
+                    fullWidth
+                    required
+                    error={
+                      (value.uk.trim() === "" || issues.uk
+                        ? "error"
+                        : undefined) === "error"
                     }
-                  />
-                </Form.Item>
-              </div>
-            </Col>
-            <Col xs={24} md={12}>
-              <div className="dialect-panel dialect-panel-us">
-                <Typography.Text strong>美式英语 · AmE</Typography.Text>
-                <Form.Item
-                  required
-                  validateStatus={
-                    value.us.trim() === "" || issues.us ? "error" : undefined
-                  }
-                  help={value.us.trim() === "" ? "请输入美式主词" : issues.us}
-                >
-                  <Input
-                    aria-label="美式主词"
-                    className="tsz-words"
-                    value={value.us}
-                    disabled={disabled || preference === "us"}
-                    onChange={(event) =>
-                      onChange({ ...value, us: event.target.value })
+                    sx={{ mb: 2 }}
+                  >
+                    <MuiOutlinedInput
+                      data-admin-input
+                      className="tsz-words"
+                      disabled={disabled || preference === "uk"}
+                      onChange={(event) =>
+                        onChange({ ...value, uk: event.target.value })
+                      }
+                      inputProps={{
+                        "aria-label": "英式主词"
+                      }}
+                      value={value.uk ?? ""}
+                      size="small"
+                    />
+                    <MuiFormHelperText>
+                      {value.uk.trim() === "" ? "请输入英式主词" : issues.uk}
+                    </MuiFormHelperText>
+                  </MuiFormControl>
+                </div>
+              </MuiGrid>
+              <MuiGrid size={{ xs: 12, md: 6 }}>
+                <div className="dialect-panel dialect-panel-us">
+                  <MuiTypography component="span" fontWeight={600}>
+                    美式英语 · AmE
+                  </MuiTypography>
+                  <MuiFormControl
+                    fullWidth
+                    required
+                    error={
+                      (value.us.trim() === "" || issues.us
+                        ? "error"
+                        : undefined) === "error"
                     }
-                  />
-                </Form.Item>
-              </div>
-            </Col>
-          </Row>
-        </>
-      )}
-      <Typography.Text
-        type="secondary"
-        className="word-field-help word-headword-source"
-      >
-        来源：
-        {state.source === "database"
-          ? "智能词库原形"
-          : state.source === "builtin"
-            ? "内置词典"
-            : "本次输入"}
-      </Typography.Text>
-    </Card>
+                    sx={{ mb: 2 }}
+                  >
+                    <MuiOutlinedInput
+                      data-admin-input
+                      className="tsz-words"
+                      disabled={disabled || preference === "us"}
+                      onChange={(event) =>
+                        onChange({ ...value, us: event.target.value })
+                      }
+                      inputProps={{
+                        "aria-label": "美式主词"
+                      }}
+                      value={value.us ?? ""}
+                      size="small"
+                    />
+                    <MuiFormHelperText>
+                      {value.us.trim() === "" ? "请输入美式主词" : issues.us}
+                    </MuiFormHelperText>
+                  </MuiFormControl>
+                </div>
+              </MuiGrid>
+            </MuiGrid>
+          </>
+        )}
+        <MuiTypography
+          className="word-field-help word-headword-source"
+          component="span"
+          color="text.secondary"
+        >
+          来源：
+          {state.source === "database"
+            ? "智能词库原形"
+            : state.source === "builtin"
+              ? "内置词典"
+              : "本次输入"}
+        </MuiTypography>
+      </MuiCardContent>
+    </MuiCard>
   );
 }
-
 export function UnifiedCreateEntryStep({
   requests = defaultRequests,
   onCreated
 }: Props) {
-  const { modal } = App.useApp();
+  const [duplicateCreation, setDuplicateCreation] = useState<{
+    run: () => void;
+  }>();
   // 冲突弹窗里哪几行能改由归属决定；门禁保证受保护页内 profile 必有值。
   const profile = useAuthStore((s) => s.profile);
   const annotationActor = profile ?? undefined;
@@ -717,7 +887,9 @@ export function UnifiedCreateEntryStep({
   const [fieldError, setFieldError] = useState<string>();
   const [error, setError] = useState<string>();
   const [preparationBlocked, setPreparationBlocked] = useState(false);
-  const [duplicateWord, setDuplicateWord] = useState<{ wordId?: string }>();
+  const [duplicateWord, setDuplicateWord] = useState<{
+    wordId?: string;
+  }>();
   const [busy, setBusy] = useState<"checking" | "creating">();
   const [pending, setPending] = useState<PendingCreation>();
   const [prepared, setPrepared] = useState<PendingCreation>();
@@ -739,13 +911,22 @@ export function UnifiedCreateEntryStep({
   const generation = useRef(0);
   const mounted = useRef(true);
   const locked = useRef(false);
-  const retryKey = useRef<{ normalized: string; key: string } | undefined>(
-    undefined
-  );
-  const preservedRegionalDisplay = useRef<
-    Extract<RegionalDisplayState, { status: "ready" }> | undefined
+  const retryKey = useRef<
+    | {
+        normalized: string;
+        key: string;
+      }
+    | undefined
   >(undefined);
-
+  const preservedRegionalDisplay = useRef<
+    | Extract<
+        RegionalDisplayState,
+        {
+          status: "ready";
+        }
+      >
+    | undefined
+  >(undefined);
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -754,7 +935,6 @@ export function UnifiedCreateEntryStep({
       locked.current = false;
     };
   }, []);
-
   const page = initialSurfacePage(pending);
   const fetchSurfacePage = useCallback(
     (snapshotId: string, cursor: string, signal: AbortSignal) =>
@@ -790,7 +970,6 @@ export function UnifiedCreateEntryStep({
   ]);
   const candidateDiscoveryReady =
     prepared !== undefined && (!page || snapshot.phase === "ready");
-
   useEffect(() => {
     if (!prepared) {
       setRegionalDisplay({ status: "idle" });
@@ -866,7 +1045,6 @@ export function UnifiedCreateEntryStep({
     requests,
     snapshot.phase
   ]);
-
   const changeValue = (next: string) => {
     generation.current += 1;
     setAnnotationSession(undefined);
@@ -883,7 +1061,6 @@ export function UnifiedCreateEntryStep({
     setCreateAttempt(undefined);
     setRegionalDisplay({ status: "idle" });
   };
-
   const createPending = async (attempt: CreateAttempt) => {
     if (locked.current) return;
     const { target, input } = attempt;
@@ -987,7 +1164,6 @@ export function UnifiedCreateEntryStep({
       if (mounted.current) setBusy(undefined);
     }
   };
-
   const submit = async () => {
     if (locked.current) return;
     const { normalized, kind, issue } = validateEntryInput(value);
@@ -995,7 +1171,6 @@ export function UnifiedCreateEntryStep({
       setFieldError(issue);
       return;
     }
-
     const currentGeneration = ++generation.current;
     const keyState =
       retryKey.current?.normalized === normalized
@@ -1076,7 +1251,6 @@ export function UnifiedCreateEntryStep({
       if (mounted.current) setBusy(undefined);
     }
   };
-
   const beginCreation = (
     target: PendingCreation,
     confirmedSurfaceToken?: string
@@ -1131,7 +1305,6 @@ export function UnifiedCreateEntryStep({
     setCreateAttempt(attempt);
     void createPending(attempt);
   };
-
   const confirm = () => {
     if (!pending || !canAcknowledgeSurfaceSnapshot(snapshot)) return;
     const create = () =>
@@ -1143,72 +1316,124 @@ export function UnifiedCreateEntryStep({
     // 检测已经摆出了「已有原形」，这一步是让管理员显式承认「我要另建一条」。
     // 后端的 409 annotation_conflict 只覆盖真正同原型组的情况；词面命中但分属
     // 不同原型组时后端不拦，删掉这道确认就等于静默建重名条。
-    modal.confirm({
-      title: "确认创建新的独立词条？",
-      icon: <ExclamationCircleOutlined />,
-      content:
-        "检测到智能词库已有相同原形。继续后将创建一个新的独立词条，不会修改已有词条。",
-      okText: "继续创建",
-      cancelText: "取消",
-      onOk: create
-    });
+    setDuplicateCreation({ run: create });
   };
-
   return (
     <div
       className={`word-basics-workflow unified-entry-creation${prepared ? " is-detected" : ""}`}
     >
       <div className="word-step-heading">
         <span className="word-step-number">STEP 01</span>
-        <Typography.Title level={2} style={{ margin: 0 }}>
+        <MuiTypography style={{ margin: 0 }} component="h2" variant="h4">
           创建词汇
-        </Typography.Title>
-        <Typography.Paragraph className="word-step-description">
+        </MuiTypography>
+        <MuiTypography
+          className="word-step-description"
+          component="p"
+          paragraph
+        >
           利用内置词典检测单词或短语，确认主词后创建词汇。
-        </Typography.Paragraph>
+        </MuiTypography>
       </div>
 
-      <Card className="word-basics-input-card" size="small" title="录入与检测">
-        <Form layout="vertical" initialValues={{ language: "en" }}>
-          <Form.Item label="所属语言" name="language">
-            <Select
-              options={[{ value: "en", label: "English  英语" }]}
-              disabled
-            />
-          </Form.Item>
-          <Form.Item
-            label="录入词条"
-            validateStatus={fieldError ? "error" : undefined}
-            help={fieldError}
+      <MuiCard className="word-basics-input-card" variant="outlined">
+        <MuiCardHeader
+          className="admin-card-header"
+          title={"录入与检测"}
+          slotProps={{
+            title: { variant: "subtitle1", className: "admin-card-title" }
+          }}
+          sx={{ p: 2, borderBottom: 1, borderColor: "divider" }}
+        />
+        <MuiCardContent className="admin-card-body">
+          <MuiBox
+            component="form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void submit();
+            }}
           >
-            <Input.Search
-              autoComplete="off"
-              className="tsz-words"
-              autoFocus
-              disabled={
-                busy !== undefined ||
-                (pending !== undefined && !existingDraftId) ||
-                createAttempt !== undefined
-              }
-              enterButton={
-                <Space size={6}>
-                  <SearchOutlined />
-                  词典检测
-                </Space>
-              }
-              loading={busy === "checking"}
-              placeholder="例如 center 或 give up"
-              size="large"
-              value={value}
-              onChange={(event) => changeValue(event.target.value)}
-              onSearch={() => void submit()}
-            />
-          </Form.Item>
-          <Typography.Text type="secondary" className="word-field-help">
-            按 Enter 检测，确认后创建。
-          </Typography.Text>
-        </Form>
-      </Card>
+            <MuiFormControl fullWidth sx={{ mb: 2 }}>
+              <MuiTypography component="span" sx={{ mb: 1 }}>
+                {"所属语言"}
+              </MuiTypography>
+              <MuiSelect
+                value="en"
+                data-admin-select
+                disabled
+                size="small"
+                displayEmpty
+              >
+                {[{ value: "en", label: "English  英语" }].map((option) => (
+                  <MuiMenuItem
+                    key={String(option.value)}
+                    value={option.value}
+                    disabled={Boolean("disabled" in option && option.disabled)}
+                  >
+                    {option.label}
+                  </MuiMenuItem>
+                ))}
+              </MuiSelect>
+            </MuiFormControl>
+            <MuiFormControl
+              fullWidth
+              error={(fieldError ? "error" : undefined) === "error"}
+              sx={{ mb: 2 }}
+            >
+              <MuiTypography component="span" sx={{ mb: 1 }}>
+                {"录入词条"}
+              </MuiTypography>
+              <MuiOutlinedInput
+                data-admin-input
+                autoComplete="off"
+                className="tsz-words"
+                autoFocus
+                disabled={
+                  busy !== undefined ||
+                  (pending !== undefined && !existingDraftId) ||
+                  createAttempt !== undefined
+                }
+                placeholder="例如 center 或 give up"
+                value={value}
+                onChange={(event) => changeValue(event.target.value)}
+                size="medium"
+                inputProps={{ "aria-label": "录入词条" }}
+                endAdornment={
+                  <MuiButton
+                    type="submit"
+                    loading={busy === "checking"}
+                    disabled={
+                      busy !== undefined ||
+                      (pending !== undefined && !existingDraftId) ||
+                      createAttempt !== undefined
+                    }
+                    variant="contained"
+                  >
+                    {
+                      <MuiStack
+                        direction="row"
+                        spacing={0.75}
+                        alignItems="center"
+                      >
+                        <SearchOutlined fontSize="inherit" />
+                        词典检测
+                      </MuiStack>
+                    }
+                  </MuiButton>
+                }
+              />
+              <MuiFormHelperText>{fieldError}</MuiFormHelperText>
+            </MuiFormControl>
+            <MuiTypography
+              className="word-field-help"
+              component="span"
+              color="text.secondary"
+            >
+              按 Enter 检测，确认后创建。
+            </MuiTypography>
+          </MuiBox>
+        </MuiCardContent>
+      </MuiCard>
 
       {prepared ? (
         <div className="word-basics-result-grid" aria-live="polite">
@@ -1244,10 +1469,8 @@ export function UnifiedCreateEntryStep({
 
       {pending ? (
         <div className="word-entry-actions">
-          <Button onClick={() => changeValue(value)}>重新检测</Button>
-          <Button
-            type="primary"
-            icon={<PlusOutlined aria-hidden />}
+          <MuiButton onClick={() => changeValue(value)}>重新检测</MuiButton>
+          <MuiButton
             loading={busy === "creating"}
             disabled={
               preparationBlocked ||
@@ -1255,19 +1478,26 @@ export function UnifiedCreateEntryStep({
               regionalDisplay.status !== "ready"
             }
             onClick={confirm}
+            variant={"contained"}
+            startIcon={
+              <PlusOutlined
+                data-create-entry-icon
+                fontSize="inherit"
+                aria-hidden
+              />
+            }
           >
             确认并创建，进入词形与发音
-          </Button>
+          </MuiButton>
         </div>
       ) : null}
 
       {prepared && !pending ? (
         <div className="word-entry-actions">
           {createAttempt ? (
-            <Button onClick={() => changeValue(value)}>重新检测</Button>
+            <MuiButton onClick={() => changeValue(value)}>重新检测</MuiButton>
           ) : null}
-          <Button
-            type="primary"
+          <MuiButton
             loading={busy === "creating"}
             disabled={
               preparationBlocked ||
@@ -1275,11 +1505,12 @@ export function UnifiedCreateEntryStep({
               regionalDisplay.status !== "ready"
             }
             onClick={() => beginCreation(prepared)}
+            variant={"contained"}
           >
             {createAttempt && busy !== "creating"
               ? "原样重试创建"
               : "创建并进入词形与发音"}
-          </Button>
+          </MuiButton>
         </div>
       ) : null}
 
@@ -1365,8 +1596,21 @@ export function UnifiedCreateEntryStep({
           }}
         />
       ) : error ? (
-        <Alert showIcon type="error" title={error} />
+        <MuiAlert severity={"error"}>{error}</MuiAlert>
       ) : null}
+      <ConfirmDialog
+        open={!!duplicateCreation}
+        title="确认创建新的独立词条？"
+        confirmText="继续创建"
+        onClose={() => setDuplicateCreation(undefined)}
+        onConfirm={() => {
+          const action = duplicateCreation;
+          setDuplicateCreation(undefined);
+          action?.run();
+        }}
+      >
+        检测到智能词库已有相同原形。继续后将创建一个新的独立词条，不会修改已有词条。
+      </ConfirmDialog>
     </div>
   );
 }

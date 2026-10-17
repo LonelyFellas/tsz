@@ -1,16 +1,22 @@
-import { CheckOutlined, SoundOutlined } from "@ant-design/icons";
+import { IconButton as MuiIconButton } from "@mui/material";
+import { OutlinedInput as MuiOutlinedInput } from "@mui/material";
 import {
-  Button,
-  Input,
-  Popconfirm,
-  Popover,
-  Space,
-  Progress,
+  Button as MuiButton,
+  CircularProgress as MuiCircularProgress,
+  Stack as MuiStack,
+  Tooltip as MuiTooltip,
+  Typography as MuiTypography
+} from "@mui/material";
+import CheckOutlined from "@mui/icons-material/Check";
+import SoundOutlined from "@mui/icons-material/VolumeUpOutlined";
+import {
+  LinearProgress,
+  RadioGroup,
   Radio,
-  Spin,
-  Tooltip,
-  Typography
-} from "antd";
+  FormControlLabel
+} from "@mui/material";
+import { EditorConfirmation } from "./EditorConfirmation";
+import { SelectionPanel } from "./SelectionPanel";
 import type { ReactNode } from "react";
 import { Fragment, useRef, useState } from "react";
 import type {
@@ -73,7 +79,7 @@ function PopRow({
       >
         {/* 勾选位始终占宽，勾上勾下时行内其余文字不会左右跳。 */}
         <span className="tsz-ve-pop-check" aria-hidden>
-          <CheckOutlined />
+          <CheckOutlined fontSize="inherit" />
         </span>
         <span className="tsz-ve-pop-name">{label}</span>
         {meta !== undefined && <span className="tsz-ve-pop-meta">{meta}</span>}
@@ -189,7 +195,11 @@ export function VoicePanel({
                       disabled={readOnly}
                       onToggle={() => onToggleVoice(voice.id)}
                       trailing={
-                        <Space size={2}>
+                        <MuiStack
+                          direction="row"
+                          spacing={0.25}
+                          alignItems="center"
+                        >
                           {onRateChange && (
                             <VoiceRateControl
                               voice={voice}
@@ -204,13 +214,11 @@ export function VoicePanel({
                               }
                             />
                           )}
-                          <Button
+                          <MuiIconButton
                             size="small"
-                            type="text"
                             className="tsz-ve-audition-button"
                             aria-label={`试听 ${voice.label}`}
                             loading={pendingVoiceId === voice.id}
-                            icon={<SoundOutlined />}
                             aria-busy={pendingVoiceId === voice.id}
                             disabled={
                               !canAudition ||
@@ -229,8 +237,15 @@ export function VoicePanel({
                             }
                             data-playing={playingVoiceId === voice.id}
                             onClick={() => onAudition(voice)}
-                          />
-                        </Space>
+                          >
+                            {pendingVoiceId !== voice.id && (
+                              <SoundOutlined
+                                data-preview-speaker
+                                fontSize="inherit"
+                              />
+                            )}
+                          </MuiIconButton>
+                        </MuiStack>
                       }
                     />
                   ))}
@@ -244,7 +259,7 @@ export function VoicePanel({
     <div className="tsz-ve-pop tsz-ve-pop-voices" aria-label="音色清单">
       {voicesLoading ? (
         <div className="tsz-ve-pop-loading">
-          <Spin size="small" aria-label="正在加载音色" />
+          <MuiCircularProgress aria-label="正在加载音色" size={24} />
         </div>
       ) : (
         <>
@@ -301,11 +316,9 @@ function VoiceRateControl({
     setOpen(false);
   };
   return (
-    <Popover
-      trigger="click"
+    <SelectionPanel
       open={open}
-      onOpenChange={setOpen}
-      title={`${voiceShortName(voice)} · 语速`}
+      onDismiss={() => setOpen(false)}
       content={
         <div role="group" aria-label={`${voice.label} 语速设置`}>
           <RatePanel
@@ -332,22 +345,24 @@ function VoiceRateControl({
             }}
           />
           {error && (
-            <Typography.Text type="danger" role="alert">
+            <MuiTypography role="alert" component="span" color="error.main">
               {error}
-            </Typography.Text>
+            </MuiTypography>
           )}
         </div>
       }
     >
-      <Button
+      <MuiButton
         size="small"
         className="tsz-ve-voice-rate"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
         disabled={readOnly || !voice.supportsRate}
         aria-label={`设置 ${voice.label} 的语速`}
       >
         {(1 + ratePercent / 100).toFixed(2)}×
-      </Button>
-    </Popover>
+      </MuiButton>
+    </SelectionPanel>
   );
 }
 
@@ -386,25 +401,29 @@ export function RatePanel({
       ))}
       <div className="tsz-ve-pop-divider" aria-hidden />
       <div className="tsz-ve-pop-foot">
-        <Typography.Text type="secondary">自定义</Typography.Text>
-        <Input
+        <MuiTypography component="span" color="text.secondary">
+          自定义
+        </MuiTypography>
+        <MuiOutlinedInput
           size="small"
           className="tsz-ve-custom-input"
-          aria-label="自定义语速倍数"
           placeholder="例如 1.10，回车生效"
-          value={customRate}
           disabled={readOnly}
           onChange={(event) => onCustomRateChange(event.target.value)}
           /*
-           * 用 onKeyDown 自己判回车，不用 antd 的 onPressEnter：实测 v6 的
-           * onPressEnter **只触发一次**——同一个输入框第二次回车不再回调，裸
-           * Input 也复现（与 Popover 无关），表现为「自定义值只有第一次生效」。
-           * 值也直接从事件里取，免得再受闭包过期影响。
+           * Enter 只提交本字段；阻止默认动作，避免关闭后恢复焦点的按钮被再次激活。
+           * 直接读取事件值，连续编辑不会使用旧闭包。
            */
           onKeyDown={(event) => {
             if (event.key !== "Enter") return;
+            event.preventDefault();
+            event.stopPropagation();
             onCustomRateSubmit((event.target as HTMLInputElement).value);
           }}
+          inputProps={{
+            "aria-label": "自定义语速倍数"
+          }}
+          value={customRate ?? ""}
         />
       </div>
     </div>
@@ -470,12 +489,28 @@ export function UploadPanel({
   playingAssetId,
   playbackMessage
 }: UploadPanelProps) {
+  const [removingAsset, setRemovingAsset] = useState<AudioAsset>();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inFlight = pending.filter((item) => !item.error).length;
   const used = assets.length + inFlight;
   const canAdd = available && uploadAllowed && !readOnly && used < limit;
   return (
     <div className="tsz-ve-pop tsz-ve-pop-upload" aria-label="音频">
+      <EditorConfirmation
+        open={!!removingAsset}
+        title="移除这条音频？"
+        confirmLabel="移除"
+        disabled={readOnly}
+        danger
+        onCancel={() => setRemovingAsset(undefined)}
+        onConfirm={() => {
+          const asset = assets.find((item) => item.id === removingAsset?.id);
+          if (!readOnly && asset) onRemoveAsset(asset);
+          setRemovingAsset(undefined);
+        }}
+      >
+        保存草稿后生效
+      </EditorConfirmation>
       {/*
        * 原生 file input 藏起来、只用它的能力：默认控件是英文且无法定制，
        * 更要命的是我们每次添加后会清空 value（好让同名文件能再传一次），
@@ -500,62 +535,78 @@ export function UploadPanel({
        * 顺序本身说明了它只作用于接下来添加的那批，不必再写一句解释。
        */}
       <div className="tsz-ve-pop-field">
-        <Typography.Text type="secondary">归属</Typography.Text>
-        <Radio.Group
-          size="small"
-          optionType="button"
+        <MuiTypography component="span" color="text.secondary">
+          归属
+        </MuiTypography>
+        <RadioGroup
+          row
           aria-label="上传音频语种"
           value={upload.locale}
-          disabled={readOnly || !available || !uploadAllowed}
-          onChange={(event) => onUploadChange({ locale: event.target.value })}
-          options={VOICE_LOCALES.filter(
+          onChange={(_, value) =>
+            onUploadChange({ locale: value as AudioAssetLocale })
+          }
+        >
+          {VOICE_LOCALES.filter(
             (entry) => !locale || entry.locale === locale
-          ).map(({ locale: value, badge }) => ({
-            value,
-            label: badge
-          }))}
-        />
-        <Radio.Group
-          size="small"
-          optionType="button"
+          ).map((entry) => (
+            <FormControlLabel
+              key={entry.locale}
+              value={entry.locale}
+              disabled={readOnly || !available || !uploadAllowed}
+              control={<Radio size="small" />}
+              label={entry.badge}
+            />
+          ))}
+        </RadioGroup>
+        <RadioGroup
+          row
           aria-label="上传音频性别"
           value={upload.gender}
-          disabled={readOnly || !available || !uploadAllowed}
-          onChange={(event) => onUploadChange({ gender: event.target.value })}
-          options={VOICE_GENDERS.map(({ gender, label }) => ({
-            value: gender,
-            label
-          }))}
-        />
+          onChange={(_, value) =>
+            onUploadChange({ gender: value as AudioAssetGender })
+          }
+        >
+          {VOICE_GENDERS.map((entry) => (
+            <FormControlLabel
+              key={entry.gender}
+              value={entry.gender}
+              disabled={readOnly || !available || !uploadAllowed}
+              control={<Radio size="small" />}
+              label={entry.label}
+            />
+          ))}
+        </RadioGroup>
       </div>
 
-      <Button
-        block
+      <MuiButton
         size="small"
         disabled={!canAdd}
         onClick={() => fileInputRef.current?.click()}
+        fullWidth
       >
         选择音频文件
-      </Button>
-      <Typography.Text
-        type="secondary"
+      </MuiButton>
+      <MuiTypography
         className="tsz-ve-upload-hint"
         role={available && uploadAllowed ? undefined : "note"}
+        component="span"
+        color="text.secondary"
       >
         {!uploadAllowed
           ? "没有上传音频的权限"
           : available
             ? `${AUDIO_UPLOAD_HINT}，最多 ${limit} 条（已用 ${used}）`
             : unavailableReason}
-      </Typography.Text>
+      </MuiTypography>
       {playbackMessage && (
-        <Typography.Text
-          type="danger"
+        <MuiTypography
           className="tsz-ve-upload-hint"
           role="alert"
+          component="span"
+          color="error.main"
         >
           {playbackMessage}
-        </Typography.Text>
+        </MuiTypography>
       )}
 
       {(pending.length > 0 || assets.length > 0) && (
@@ -577,52 +628,51 @@ export function UploadPanel({
                     {item.error.message}
                   </span>
                 ) : (
-                  <Progress
+                  <LinearProgress
+                    variant="determinate"
                     className="tsz-ve-upload-progress"
-                    percent={progressPercent(item.progress)}
-                    size="small"
-                    showInfo={false}
+                    value={progressPercent(item.progress)}
                     aria-label={`上传进度 ${item.name}`}
                   />
                 )}
                 <span className="tsz-ve-upload-actions">
                   {item.error?.retryable && (
-                    <Button
+                    <MuiButton
                       size="small"
-                      type="text"
                       aria-label={`重试 ${item.name}`}
                       disabled={!available || readOnly || !uploadAllowed}
                       onClick={() => onRetryUpload(item.id)}
+                      variant={"text"}
                     >
                       重试
-                    </Button>
+                    </MuiButton>
                   )}
-                  <Button
+                  <MuiButton
                     size="small"
-                    type="text"
                     className="tsz-ve-upload-remove"
                     aria-label={`移除 ${item.name}`}
                     disabled={readOnly}
                     onClick={() => onDismissUpload(item.id)}
+                    variant={"text"}
                   >
                     移除
-                  </Button>
+                  </MuiButton>
                 </span>
               </li>
             ))}
             {assets.map((asset) => (
               <li key={asset.id} className="tsz-ve-upload-item">
-                <Button
+                <MuiButton
                   size="small"
-                  type="text"
                   className="tsz-ve-audition-button"
                   aria-label={`试听 ${asset.original_name}`}
                   data-playing={playingAssetId === asset.id}
                   disabled={!available}
                   onClick={() => onPlayAsset(asset)}
+                  variant={"text"}
                 >
-                  <SoundOutlined />
-                </Button>
+                  <SoundOutlined fontSize="inherit" />
+                </MuiButton>
                 <span
                   className="tsz-ve-upload-name"
                   title={asset.original_name}
@@ -633,25 +683,16 @@ export function UploadPanel({
                   {localeBadge(asset.locale)} · {genderLabel(asset.gender)}
                 </span>
                 {/* 移除只是从草稿里去掉引用、保存后才生效，但不进撤销栈，所以要确认一下 */}
-                <Popconfirm
-                  title="移除这条音频？"
-                  description="保存草稿后生效"
-                  okText="移除"
-                  cancelText="取消"
-                  okButtonProps={{ danger: true }}
+                <MuiButton
+                  size="small"
+                  className="tsz-ve-upload-remove"
+                  aria-label={`移除 ${asset.original_name}`}
+                  onClick={() => setRemovingAsset(asset)}
                   disabled={readOnly}
-                  onConfirm={() => onRemoveAsset(asset)}
+                  variant={"text"}
                 >
-                  <Button
-                    size="small"
-                    type="text"
-                    className="tsz-ve-upload-remove"
-                    aria-label={`移除 ${asset.original_name}`}
-                    disabled={readOnly}
-                  >
-                    移除
-                  </Button>
-                </Popconfirm>
+                  移除
+                </MuiButton>
               </li>
             ))}
           </ul>
@@ -723,16 +764,23 @@ export function RolePanel({
       aria-label="语法结构标注"
       onMouseDown={(event) => event.preventDefault()}
     >
-      <Space.Compact role="group" aria-label="语法标注类别" size="small">
+      <MuiStack
+        role="group"
+        aria-label="语法标注类别"
+        direction="row"
+        spacing={1}
+        alignItems="center"
+      >
         {GRAMMAR_ROLES.map((role) => (
-          <Tooltip
+          <MuiTooltip
+            describeChild
             key={role.level}
             title={`${role.label}：${ROLE_DESCRIPTIONS[role.level]}`}
           >
-            <Button
+            <MuiButton
               className="tsz-ve-grammar-option"
-              color={selectedLevel === role.level ? "primary" : "default"}
-              variant={selectedLevel === role.level ? "filled" : "outlined"}
+              color={selectedLevel === role.level ? "primary" : "inherit"}
+              variant={selectedLevel === role.level ? "contained" : "outlined"}
               aria-label={`标记为${role.label}`}
               aria-pressed={selectedLevel === role.level}
               disabled={readOnly || !hasWords || selectionText === undefined}
@@ -743,10 +791,10 @@ export function RolePanel({
                 aria-hidden
               />
               {ROLE_SHORT_LABELS[role.level]}
-            </Button>
-          </Tooltip>
+            </MuiButton>
+          </MuiTooltip>
         ))}
-      </Space.Compact>
+      </MuiStack>
       <div
         className="tsz-ve-grammar-hint"
         role="status"
@@ -802,13 +850,17 @@ function AnchorSlot({
       disabled={disabled}
       onClick={onSelect}
     >
-      <Typography.Text type="secondary">{label}</Typography.Text>
+      <MuiTypography component="span" color="text.secondary">
+        {label}
+      </MuiTypography>
       {letters ? (
         <span className={`tsz-ve-anchor-slot is-${slot}`}>
           <span className="tsz-ve-anchor-letters">{letters}</span>
         </span>
       ) : (
-        <Typography.Text type="secondary">—</Typography.Text>
+        <MuiTypography component="span" color="text.secondary">
+          —
+        </MuiTypography>
       )}
     </button>
   );
@@ -869,25 +921,25 @@ export function LiaisonPanel({
       <div className="tsz-ve-liaison-actions">
         {/* 未选择端点时提示操作方式。 */}
         {hint && <span className="tsz-ve-pop-hint">{hint}</span>}
-        <Button
+        <MuiButton
           size="small"
-          type="primary"
           className="tsz-ve-liaison-commit"
           aria-label="添加连读"
           disabled={readOnly || !canCommit}
           onClick={onCommit}
+          variant={"contained"}
         >
           添加
-        </Button>
-        <Button
+        </MuiButton>
+        <MuiButton
           size="small"
-          type="text"
           aria-label="重选"
           disabled={readOnly || (!draft.start && !draft.end)}
           onClick={onResetDraft}
+          variant={"text"}
         >
           重选
-        </Button>
+        </MuiButton>
       </div>
     </div>
   );
@@ -944,14 +996,14 @@ export function PausePanel({
               ? "编辑停顿"
               : "插入停顿"}
         </strong>
-        <Button
+        <MuiButton
           size="small"
-          type="text"
           aria-label="关闭停顿设置"
           onClick={onClose}
+          variant={"text"}
         >
           关闭
-        </Button>
+        </MuiButton>
       </div>
       <div className="tsz-ve-pause-location" role="status">
         {continuous ? (
@@ -970,52 +1022,54 @@ export function PausePanel({
       </div>
       <div className="tsz-ve-pause-presets">
         {choices.map((ms) => (
-          <Button
+          <MuiButton
             key={ms}
             size="small"
             disabled={disabled}
-            color={current === ms ? "primary" : "default"}
-            variant={current === ms ? "filled" : "outlined"}
+            color={current === ms ? "primary" : "inherit"}
+            variant={current === ms ? "contained" : "outlined"}
             aria-label={`停顿 ${ms / 1000} 秒`}
             aria-pressed={current === ms}
             onClick={() => onApply(ms)}
           >
             {ms / 1000} 秒
-          </Button>
+          </MuiButton>
         ))}
       </div>
       <div className="tsz-ve-pause-custom">
-        <Input
+        <MuiOutlinedInput
           size="small"
-          aria-label="自定义停顿秒"
           placeholder={current ? `${current / 1000}` : "自定义秒数"}
-          value={customPause}
           disabled={disabled}
           onChange={(e) => onCustomPauseChange(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") submit();
           }}
+          inputProps={{
+            "aria-label": "自定义停顿秒"
+          }}
+          value={customPause ?? ""}
         />
         <span className="tsz-ve-pause-unit">秒</span>
-        <Button
+        <MuiButton
           size="small"
           disabled={disabled || !customPause.trim()}
           onClick={submit}
         >
           应用
-        </Button>
+        </MuiButton>
       </div>
       {!continuous && duration !== undefined && (
         <div className="tsz-ve-pause-editor-foot">
-          <Button
+          <MuiButton
             size="small"
-            type="text"
-            danger
             disabled={readOnly}
             onClick={onRemove}
+            variant={"text"}
+            color={"error"}
           >
             移除停顿
-          </Button>
+          </MuiButton>
         </div>
       )}
     </div>

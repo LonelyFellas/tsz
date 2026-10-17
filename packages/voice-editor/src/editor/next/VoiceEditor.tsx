@@ -1,15 +1,21 @@
-import "./interaction.css";
+import "../../reader.css";
+import "../../editor.css";
 import {
-  AudioOutlined,
-  BoldOutlined,
-  UnderlineOutlined,
-  EditOutlined,
-  ItalicOutlined,
-  LinkOutlined,
-  PauseOutlined,
-  SoundOutlined
-} from "@ant-design/icons";
-import { Alert, Button, Modal, Tag, Tooltip } from "antd";
+  Alert as MuiAlert,
+  Button as MuiButton,
+  Chip as MuiChip,
+  Tooltip as MuiTooltip
+} from "@mui/material";
+import "./interaction.css";
+import AudioOutlined from "@mui/icons-material/MicNone";
+import BoldOutlined from "@mui/icons-material/FormatBold";
+import UnderlineOutlined from "@mui/icons-material/FormatUnderlined";
+import EditOutlined from "@mui/icons-material/EditOutlined";
+import ItalicOutlined from "@mui/icons-material/FormatItalic";
+import LinkOutlined from "@mui/icons-material/Link";
+import PauseOutlined from "@mui/icons-material/Pause";
+import SoundOutlined from "@mui/icons-material/VolumeUpOutlined";
+import { EditorConfirmation } from "./EditorConfirmation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RichText, RichTextV2, TextLinkV3 } from "@tsz/types";
 import { AUDIO_ASSETS_PER_VARIANT_MAX } from "@tsz/types";
@@ -1570,7 +1576,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           : "文本",
 
       ariaLabel: contentReadOnly ? "结束关联" : "编辑文本",
-      icon: <EditOutlined />,
+      icon: <EditOutlined fontSize="inherit" />,
       active: brush.kind === "none",
       className: "tsz-ve-text-button"
     },
@@ -1581,7 +1587,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           {
             key: "italic",
             label: "斜体",
-            icon: <ItalicOutlined />,
+            icon: <ItalicOutlined fontSize="inherit" />,
             active: selectionHasFormat("italic"),
             disabled: !textSelection
           }
@@ -1592,14 +1598,14 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           {
             key: "bold",
             label: "加粗",
-            icon: <BoldOutlined />,
+            icon: <BoldOutlined fontSize="inherit" />,
             active: selectionHasFormat("bold"),
             disabled: !textSelection
           },
           {
             key: "underline",
             label: "下划线",
-            icon: <UnderlineOutlined />,
+            icon: <UnderlineOutlined fontSize="inherit" />,
             active: selectionHasFormat("underline"),
             disabled: !textSelection
           }
@@ -1654,22 +1660,20 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           className="tsz-ve-selection-liaison"
           onMouseDown={(event) => event.preventDefault()}
         >
-          <Button
+          <MuiButton
             size="small"
-            icon={<LiaisonIcon part="start" />}
-            iconPlacement="end"
+
             disabled={readOnly || !textSelection}
             onClick={() => {
               if (!textSelection) return;
               setDraft({ start: { ...textSelection } });
             }}
+            startIcon={<LiaisonIcon part="start" />}
           >
             连读起点
-          </Button>
-          <Button
+          </MuiButton>
+          <MuiButton
             size="small"
-            icon={<LiaisonIcon part="end" />}
-            iconPlacement="start"
             disabled={readOnly || !draft.start || !textSelection}
             onClick={() => {
               if (textSelection)
@@ -1678,14 +1682,14 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                   end: { ...textSelection }
                 });
             }}
+            startIcon={<LiaisonIcon part="end" />}
           >
             连读终点
-          </Button>
-          <Tooltip title={<ShortcutHint shortcut="L" />}>
-            <Button
+          </MuiButton>
+          <MuiTooltip describeChild title={<ShortcutHint shortcut="L" />}>
+            <MuiButton
               size="small"
-              icon={<LiaisonIcon />}
-              iconPlacement="end"
+
               disabled={
                 readOnly ||
                 !textSelection ||
@@ -1693,14 +1697,15 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               }
               aria-pressed={selectionHasLiaison}
               onClick={() => toggleSelectionLiaison()}
+              startIcon={<LiaisonIcon />}
             >
               {selectionHasLiaison ? "取消连读" : "一次性添加"}
-            </Button>
-          </Tooltip>
+            </MuiButton>
+          </MuiTooltip>
           {draft.start && (
-            <Button size="small" onClick={resetDraft}>
+            <MuiButton size="small" onClick={resetDraft}>
               取消起点
-            </Button>
+            </MuiButton>
           )}
           <span>
             {draft.start
@@ -1715,7 +1720,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     {
       key: "pause",
       label: "停顿",
-      icon: <PauseOutlined />,
+      icon: <PauseOutlined fontSize="inherit" />,
       summary:
         brush.kind === "pause" ? formatPauseLabel(pauseDuration) : undefined,
       className: "tsz-ve-pause-button",
@@ -1760,7 +1765,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       className: "tsz-ve-speech-tool",
       // 「已选」两字在窄容器里就是一行的代价，去掉后语义不减。
       summary: `${enabledVoiceIds.length} 个音色`,
-      icon: <SoundOutlined />,
+      icon: <SoundOutlined fontSize="inherit" />,
       content: (
         <div className="tsz-ve-speech-panel" aria-label="发音设置与试听">
           <div>
@@ -1812,7 +1817,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       label: mode === "grammar" ? "上传音频" : "音频",
       ariaLabel: "音频",
       summary: assets.length > 0 ? String(assets.length) : undefined,
-      icon: <AudioOutlined />,
+      icon: <AudioOutlined fontSize="inherit" />,
       content: (
         <UploadPanel
           uploadAllowed={audioUploadAllowed}
@@ -1871,7 +1876,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         data-locale={locale}
         aria-label={contextLabel}
       >
-        {previewIsMock && <Tag color="warning">模拟试听</Tag>}
+        {previewIsMock && <MuiChip color={"warning"} label={<>模拟试听</>} />}
         {tools
           .filter((tool) => tool.key === "voices" || tool.key === "uploads")
           .map((tool) => (
@@ -1908,7 +1913,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       /*
        * Esc 收笔挂在编辑器根节点而不是画布上：拿着笔时鼠标点不了光标，得有个
        * 不用瞄按钮的退路，而这时焦点常常还落在工具栏按钮上——挂在画布上收不到。
-       * 浮层渲染在 portal（不在本节点内），所以「Esc 关浮层」不受影响，仍归 antd。
+       * 浮层渲染在 portal（不在本节点内），所以「Esc 关浮层」不受影响，由浮层自身处理。
        */
       onKeyDown={(event) => {
         if (event.ctrlKey || event.metaKey) {
@@ -1979,34 +1984,33 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         openToolAndArm("text");
       }}
     >
-      <Modal
+      <EditorConfirmation
         open={pendingText !== undefined}
         title="修改文字会移除已有标注"
-        okText="确认修改"
-        cancelText="保留原文"
-        onOk={() => {
+        confirmLabel="确认修改"
+        cancelLabel="保留原文"
+        onConfirm={() => {
           if (pendingText !== undefined)
             changeText(pendingText, true, pendingTextCoalesceRef.current);
           setPendingText(undefined);
         }}
         onCancel={() => setPendingText(undefined)}
-        okButtonProps={{ disabled: readOnly }}
+        disabled={readOnly}
       >
         此次修改会移除受影响的连读、关联或停顿。未受影响的标注会保留；确认后仍可撤销恢复。
-      </Modal>
-      <Modal
-        destroyOnHidden
+      </EditorConfirmation>
+      <EditorConfirmation
         open={!!pendingConflict}
         title="同一位置不能同时连读和停顿"
-        okText={
+        confirmLabel={
           pendingConflict?.kind === "pause"
             ? "移除冲突连读，添加停顿"
             : "移除冲突停顿，添加连读"
         }
-        cancelText="取消，保留原标注"
-        onOk={confirmConflict}
+        cancelLabel="取消，保留原标注"
+        onConfirm={confirmConflict}
         onCancel={() => setPendingConflict(undefined)}
-        okButtonProps={{ disabled: readOnly }}
+        disabled={readOnly}
         width={470}
       >
         <p>
@@ -2017,30 +2021,32 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         <p style={{ color: "#7c8593", fontSize: 12 }}>
           当前标注尚未改变。仅在确认后替换；可一次撤销恢复。
         </p>
-      </Modal>
+      </EditorConfirmation>
       {conflictCount > 0 && (
-        <Alert
-          type="warning"
-          title={`现有内容有 ${conflictCount} 处停顿与连读重叠，请选择保留哪一种标注`}
-          showIcon
-        />
+        <MuiAlert
+          severity={"warning"}
+        >{`现有内容有 ${conflictCount} 处停顿与连读重叠，请选择保留哪一种标注`}</MuiAlert>
       )}
-      {spellingNotice && <Alert type="info" title={spellingNotice} showIcon />}
-      {blockingError && <Alert type="error" title={blockingError} showIcon />}
-      {linkNotice && <Alert type="warning" title={linkNotice} showIcon />}
+      {spellingNotice && (
+        <MuiAlert severity={"info"}>{spellingNotice}</MuiAlert>
+      )}
+      {blockingError && <MuiAlert severity={"error"}>{blockingError}</MuiAlert>}
+      {linkNotice && <MuiAlert severity={"warning"}>{linkNotice}</MuiAlert>}
 
       <div className="tsz-ve-badge-row">
         {previewAdapter && previewIsMock && (
-          <Tooltip title="当前走本地 TTS mock，试听音频不是真实合成结果">
-            <Tag
+          <MuiTooltip
+            describeChild
+            title="当前走本地 TTS mock，试听音频不是真实合成结果"
+          >
+            <MuiChip
               className="tsz-ve-preview-mock-tag"
-              color="warning"
               role="note"
               aria-label="试听走本地 TTS mock，音频不是真实合成结果"
-            >
-              模拟
-            </Tag>
-          </Tooltip>
+              color={"warning"}
+              label={<>模拟</>}
+            />
+          </MuiTooltip>
         )}
       </div>
 
@@ -2120,7 +2126,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                         key: `association-${targetKind}`,
                         disabled: linksReadOnly,
                         label: targetKind === "word" ? "关联单词" : "关联短语",
-                        icon: <LinkOutlined />,
+                        icon: <LinkOutlined fontSize="inherit" />,
                         active:
                           brush.kind === "association" &&
                           brush.targetKind === targetKind,
@@ -2139,7 +2145,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                             </div>
                             {renderAssociationPicker &&
                               targetKind === "phrase" && (
-                                <Button
+                                <MuiButton
                                   size="small"
                                   disabled={
                                     linksReadOnly || linkWords.length < 2
@@ -2150,7 +2156,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                                   }}
                                 >
                                   选择关联短语
-                                </Button>
+                                </MuiButton>
                               )}
                           </div>
                         )

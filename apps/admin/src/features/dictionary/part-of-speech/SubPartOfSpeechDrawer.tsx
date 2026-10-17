@@ -1,21 +1,22 @@
 import { usePermission } from "@/lib/auth";
 import {
   Alert,
-  App,
+  Autocomplete,
   Button,
-  Card,
-  Col,
-  Empty,
-  Form,
-  Modal,
-  Row,
-  Select,
-  Space,
-  Table,
-  Tooltip
-} from "antd";
-import { FullNameEnCell } from "./FullNameEnCell";
-import type { TableColumnsType } from "antd";
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Paper,
+  Stack,
+  TextField,
+  Typography
+} from "@mui/material";
+import { Controller, FormProvider, useForm } from "react-hook-form";
+import { AdminTable } from "@/components/AdminTable";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { PermissionButton } from "@/components/PermissionButton";
+import { detailColumns } from "./detailColumns";
 import dayjs from "dayjs";
 import type {
   CreateSubPartOfSpeechInput,
@@ -32,7 +33,10 @@ import {
 } from "./api";
 import { nextSortOrder } from "./catalog";
 import { newWordNodeId } from "../word-model/primitives";
-import { PartOfSpeechSharedFields } from "./PartOfSpeechSharedFields";
+import {
+  PartOfSpeechSharedFields,
+  partFieldValues
+} from "./PartOfSpeechSharedFields";
 
 /** 供父级页面在自己的工具栏里触发"新增细分词性"，弹窗与编辑态仍由面板自己管。 */
 export interface SubPartOfSpeechPanelHandle {
@@ -89,7 +93,8 @@ function SubPartFormModal({
   onError: (error: unknown) => void;
 }) {
   const canEdit = usePermission("lexicon_settings.edit_sub");
-  const [form] = Form.useForm<SubPartFormValues>();
+  const form = useForm<SubPartFormValues>();
+  const { reset, handleSubmit, setValue } = form;
   const create = useCreateSubPartOfSpeech();
   const update = useUpdateSubPartOfSpeech();
   // 预填值放 ref 而不是 effect 依赖：列表随时可能重拉，跟着重跑那个 effect 会连带
@@ -101,26 +106,25 @@ function SubPartFormModal({
 
   useEffect(() => {
     if (!open) return;
-    if (value) {
-      form.setFieldsValue({
-        part_of_speech_id: value.part_of_speech_id,
-        name_zh: value.name_zh,
-        name_en: value.name_en,
-        short_name_zh: value.short_name_zh,
-        abbreviation: value.abbreviation,
-        full_name_en: value.full_name_en,
-        sort_order: value.sort_order
-      });
-    } else {
-      form.resetFields();
-      form.setFieldValue("part_of_speech_id", parentId);
-      // 「全部」视图下没有固定父级，序号等用户选完再预填。
-      if (parentId) {
-        form.setFieldValue("sort_order", nextSortOrderForRef.current(parentId));
-      }
-    }
-  }, [form, open, parentId, value]);
-
+    reset(
+      value
+        ? {
+            ...partFieldValues(value),
+            part_of_speech_id: value.part_of_speech_id
+          }
+        : {
+            name_zh: "",
+            short_name_zh: "",
+            name_en: "",
+            abbreviation: "",
+            full_name_en: "",
+            part_of_speech_id: parentId ?? "",
+            sort_order: parentId
+              ? nextSortOrderForRef.current(parentId)
+              : undefined
+          }
+    );
+  }, [open, parentId, value, reset]);
   const submit = async ({
     part_of_speech_id,
     ...fields
@@ -149,57 +153,94 @@ function SubPartFormModal({
     }
   };
 
+  const pending = create.isPending || update.isPending;
   return (
-    <Modal
+    <Dialog
       open={open}
-      width={720}
-      title={
-        value
+      fullWidth
+      maxWidth="md"
+      aria-labelledby="sub-part-title"
+      onClose={() => {
+        if (!pending) onClose();
+      }}
+    >
+      <DialogTitle id="sub-part-title">
+        {value
           ? "修改细分词性"
           : parent
             ? `为“${parent.name_zh}”新增细分词性`
-            : "新增细分词性"
-      }
-      okText={value ? "保 存" : "新 建"}
-      cancelText="取 消"
-      okButtonProps={{ disabled: !canEdit }}
-      confirmLoading={create.isPending || update.isPending}
-      onOk={() => form.submit()}
-      onCancel={onClose}
-      destroyOnHidden
-    >
-      <Form form={form} layout="vertical" onFinish={submit}>
-        <Row gutter={16}>
-          <Col span={12}>
-            <Form.Item
+            : "新增细分词性"}
+      </DialogTitle>
+      <DialogContent>
+        <FormProvider {...form}>
+          <Stack
+            component="form"
+            id="sub-part-form"
+            spacing={2}
+            sx={{ mt: 1 }}
+            onSubmit={handleSubmit((values) => {
+              if (!pending) void submit(values);
+            })}
+          >
+            <Controller
               name="part_of_speech_id"
-              label="所属基本词性"
-              rules={[{ required: true, message: "请选择所属基本词性" }]}
-            >
-              <Select
-                aria-label="所属基本词性"
-                disabled={Boolean(value) || Boolean(parent)}
-                options={parentOptions.map((item) => ({
-                  value: item.id,
-                  label: item.name_zh
-                }))}
-                placeholder="请选择所属基本词性"
-                // 序号在所属父级下才有意义，换父级就按新父级重新预填；
-                // 管理员已经手填过就别覆盖他。
-                onChange={(id: string) => {
-                  if (form.isFieldTouched("sort_order")) return;
-                  form.setFieldValue(
-                    "sort_order",
-                    nextSortOrderForRef.current(id)
-                  );
-                }}
-              />
-            </Form.Item>
-          </Col>
-        </Row>
-        <PartOfSpeechSharedFields placeholders={PLACEHOLDERS} />
-      </Form>
-    </Modal>
+              control={form.control}
+              rules={{ required: "请选择所属基本词性" }}
+              render={({ field, fieldState }) => (
+                <Autocomplete
+                  options={parentOptions}
+                  value={
+                    parentOptions.find((option) => option.id === field.value) ??
+                    null
+                  }
+                  isOptionEqualToValue={(a, b) => a.id === b.id}
+                  getOptionLabel={(option) => option.name_zh}
+                  disabled={!!value || !!parent || pending}
+                  onChange={(_, option) => {
+                    field.onChange(option?.id ?? "");
+                    const state = form.getFieldState("sort_order");
+                    if (option && !state.isDirty && !state.isTouched)
+                      setValue(
+                        "sort_order",
+                        nextSortOrderForRef.current(option.id)
+                      );
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="所属基本词性"
+                      placeholder="请选择所属基本词性"
+                      inputRef={field.ref}
+                      onBlur={field.onBlur}
+                      error={!!fieldState.error}
+                      helperText={fieldState.error?.message}
+                    />
+                  )}
+                />
+              )}
+            />
+            <PartOfSpeechSharedFields
+              placeholders={PLACEHOLDERS}
+              disabled={pending}
+            />
+          </Stack>
+        </FormProvider>
+      </DialogContent>
+      <DialogActions>
+        <Button disabled={pending} onClick={onClose}>
+          取消
+        </Button>
+        <Button
+          type="submit"
+          form="sub-part-form"
+          variant="contained"
+          disabled={!canEdit}
+          loading={pending}
+        >
+          {value ? "保存" : "新建"}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 
@@ -213,7 +254,7 @@ export function SubPartOfSpeechPanel({
 }: Props) {
   const canEdit = usePermission("lexicon_settings.edit_sub");
   const canDelete = usePermission("lexicon_settings.delete");
-  const { modal } = App.useApp();
+  const [deleting, setDeleting] = useState<SubPartOfSpeechConfig>();
   const [editing, setEditing] = useState<SubPartOfSpeechConfig>();
   const [formOpen, setFormOpen] = useState(false);
   // 数据已整页在前端，分页只是展示层的，和基本词性表保持一致。
@@ -246,150 +287,128 @@ export function SubPartOfSpeechPanel({
     setPage(1);
   }, [parentKey]);
 
-  const removeItem = (item: SubPartOfSpeechConfig) => {
-    modal.confirm({
-      title: `删除细分词性“${item.name_zh}”？`,
-      content: "删除后不可恢复。如果仍有词义关联此细分词性，将无法删除。",
-      okText: "删 除",
-      okButtonProps: { danger: true },
-      cancelText: "取 消",
-      onOk: async () => {
-        try {
-          await remove.mutateAsync({
-            partId: item.part_of_speech_id,
-            subId: item.id,
-            base_revision: item.revision
-          });
-          onSaved("细分词性已删除");
-        } catch (error) {
-          onError(error);
-          await list.refetch();
-        }
-      }
-    });
-  };
-
-  const columns: TableColumnsType<SubPartOfSpeechConfig> = [
-    { title: "序号", dataIndex: "sort_order", width: 64 },
-    { title: "正式中文", dataIndex: "name_zh", width: 120 },
-    { title: "简洁显示", dataIndex: "short_name_zh", width: 110 },
-    { title: "正式英文", dataIndex: "name_en", width: 150 },
-    { title: "英文缩写", dataIndex: "abbreviation", width: 90 },
-    {
-      title: "英文全称",
-      dataIndex: "full_name_en",
-      width: 160,
-      render: (value: string) => <FullNameEnCell value={value} />
-    },
-    {
-      title: "所属基本词性",
-      dataIndex: "part_of_speech_id",
-      width: 110,
-      render: (id: string) => parentById.get(id)?.name_zh
-    },
-    {
-      title: "关联",
-      dataIndex: "usage_count",
-      width: 100,
-      render: (count: number) => (count > 0 ? `${count} 个词义` : "无关联")
-    },
-    {
-      title: "创建人",
-      dataIndex: "created_by",
-      width: 100,
-      render: (actor: SubPartOfSpeechConfig["created_by"]) => actor.display_name
-    },
-    {
-      title: "创建时间",
-      dataIndex: "created_at",
-      width: 150,
-      render: (value: string) => dayjs(value).format("YYYY-MM-DD HH:mm")
-    },
-    {
-      title: "操作",
-      key: "actions",
-      fixed: "right",
-      width: 150,
-      render: (_, item) => (
-        <Space>
-          <Button
-            disabled={!canEdit}
-            size="small"
-            onClick={() => {
-              setEditing(item);
-              setFormOpen(true);
-            }}
-          >
-            修 改
-          </Button>
-          <Tooltip
-            title={
-              item.usage_count > 0
-                ? `已关联 ${item.usage_count} 个词义，可以修改，但不能删除`
-                : undefined
-            }
-          >
-            <Button
-              size="small"
-              danger
-              disabled={!canDelete || item.usage_count > 0}
-              onClick={() => removeItem(item)}
-            >
-              删 除
-            </Button>
-          </Tooltip>
-        </Space>
-      )
+  const removeItem = async () => {
+    if (!deleting || remove.isPending || !canDelete) return;
+    try {
+      await remove.mutateAsync({
+        partId: deleting.part_of_speech_id,
+        subId: deleting.id,
+        base_revision: deleting.revision
+      });
+      onSaved("细分词性已删除");
+    } catch (error) {
+      onError(error);
+      await list.refetch();
+    } finally {
+      setDeleting(undefined);
     }
-  ];
-
-  // 新建时排序值自动落在所选父级现有细分词性之后。
+  };
   const nextSortOrderFor = (parentId: string) =>
     nextSortOrder(
       list.items.filter((item) => item.part_of_speech_id === parentId)
     );
-
   return (
     <>
-      <Card size="small">
-        {!loading && parents.length === 0 ? (
-          <Empty description="暂无基本词性" />
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        {!loading && !parents.length ? (
+          <Typography color="text.secondary">暂无基本词性</Typography>
         ) : list.error ? (
           <Alert
-            type="error"
-            showIcon
-            title="细分词性加载失败"
-            description={list.error.message}
-            action={
-              <Button size="small" onClick={() => void list.refetch()}>
-                重 试
-              </Button>
-            }
-            style={{ marginBottom: 12 }}
-          />
+            severity="error"
+            action={<Button onClick={() => void list.refetch()}>重试</Button>}
+          >
+            细分词性加载失败<Typography>{list.error.message}</Typography>
+          </Alert>
         ) : (
-          <Table<SubPartOfSpeechConfig>
-            rowKey="id"
-            size="middle"
-            columns={columns}
-            dataSource={list.items}
-            loading={loading || list.isPending}
-            locale={{ emptyText: <Empty description="暂无细分词性" /> }}
-            pagination={{
-              current: currentPage,
-              pageSize,
-              showSizeChanger: true,
-              pageSizeOptions: [10, 20, 50],
-              showTotal: (total) => `共 ${total} 条`,
-              onChange: (nextPage, nextSize) => {
-                setPage(nextSize !== pageSize ? 1 : nextPage);
-                setPageSize(nextSize);
-              }
-            }}
-            scroll={{ x: 1450 }}
-          />
+          <>
+            <AdminTable<SubPartOfSpeechConfig>
+              rows={list.items.slice(
+                (currentPage - 1) * pageSize,
+                currentPage * pageSize
+              )}
+              rowId={(item) => item.id}
+              loading={loading || list.isPending}
+              minWidth={1450}
+              pagination={{
+                page: currentPage,
+                pageSize,
+                total: list.items.length,
+                pageSizes: [10, 20, 50],
+                onChange: (next, size) => {
+                  setPage(next);
+                  setPageSize(size);
+                }
+              }}
+              columns={[
+                ...detailColumns,
+                {
+                  id: "parent",
+                  label: "所属基本词性",
+                  width: 110,
+                  render: (item) =>
+                    parentById.get(item.part_of_speech_id)?.name_zh
+                },
+                {
+                  id: "usage",
+                  label: "关联",
+                  width: 100,
+                  render: (item) =>
+                    item.usage_count > 0
+                      ? `${item.usage_count} 个词义`
+                      : "无关联"
+                },
+                {
+                  id: "creator",
+                  label: "创建人",
+                  width: 100,
+                  render: (item) => item.created_by.display_name
+                },
+                {
+                  id: "created",
+                  label: "创建时间",
+                  width: 150,
+                  render: (item) =>
+                    dayjs(item.created_at).format("YYYY-MM-DD HH:mm")
+                },
+                {
+                  id: "actions",
+                  label: "操作",
+                  width: 150,
+                  sticky: "right",
+                  render: (item) => (
+                    <Stack direction="row" spacing={1}>
+                      <Button
+                        disabled={!canEdit}
+                        onClick={() => {
+                          setEditing(item);
+                          setFormOpen(true);
+                        }}
+                      >
+                        修改
+                      </Button>
+                      <PermissionButton
+                        color="error"
+                        disabled={!canDelete || item.usage_count > 0}
+                        reason={
+                          item.usage_count > 0
+                            ? `已关联 ${item.usage_count} 个词义，可以修改，但不能删除`
+                            : undefined
+                        }
+                        onClick={() => setDeleting(item)}
+                      >
+                        删除
+                      </PermissionButton>
+                    </Stack>
+                  )
+                }
+              ]}
+            />
+            {!list.isPending && !list.items.length && (
+              <Typography color="text.secondary">暂无细分词性</Typography>
+            )}
+          </>
         )}
-      </Card>
+      </Paper>
       <SubPartFormModal
         parent={createParent}
         parentOptions={parents}
@@ -400,6 +419,17 @@ export function SubPartOfSpeechPanel({
         onSaved={onSaved}
         onError={onError}
       />
+      <ConfirmDialog
+        open={!!deleting}
+        title={`删除细分词性“${deleting?.name_zh ?? ""}”？`}
+        confirmText="删除"
+        danger
+        pending={remove.isPending}
+        onClose={() => setDeleting(undefined)}
+        onConfirm={() => void removeItem()}
+      >
+        删除后不可恢复。如果仍有词义关联此细分词性，将无法删除。
+      </ConfirmDialog>
     </>
   );
 }

@@ -1,4 +1,10 @@
-import { Button, Flex, Space, Tag, Typography } from "antd";
+import {
+  Button as MuiButton,
+  Chip as MuiChip,
+  Stack as MuiStack,
+  Typography as MuiTypography
+} from "@mui/material";
+
 import type { InboundReferenceV3 } from "@tsz/types";
 import type { ReactNode } from "react";
 import { referenceLink } from "../referenceGuard";
@@ -65,11 +71,13 @@ function sourceSummary(reference: InboundReferenceV3): ReactNode {
   const { source } = reference;
   if (reference.kind === "shared_sentence") {
     return source.sentence_text ? (
-      <Typography.Text className="tsz-entry-en">
+      <MuiTypography className="tsz-entry-en" component="span">
         {highlightSegments(reference)}
-      </Typography.Text>
+      </MuiTypography>
     ) : (
-      <Typography.Text type="secondary">例句原文暂不可用</Typography.Text>
+      <MuiTypography component="span" color="text.secondary">
+        例句原文暂不可用
+      </MuiTypography>
     );
   }
   const status =
@@ -79,18 +87,28 @@ function sourceSummary(reference: InboundReferenceV3): ReactNode {
         ? "垃圾桶"
         : "草稿";
   return (
-    <Space size={4} wrap>
-      <Typography.Text className="tsz-words" strong>
+    <MuiStack
+      direction="row"
+      spacing={0.5}
+      alignItems="center"
+      useFlexGap
+      flexWrap="wrap"
+    >
+      <MuiTypography className="tsz-words" component="span" fontWeight={600}>
         {source.entry_headword || source.entry_id || "未知词条"}
-      </Typography.Text>
+      </MuiTypography>
       {source.form_group_label ? (
-        <Typography.Text>{source.form_group_label}</Typography.Text>
+        <MuiTypography component="span">
+          {source.form_group_label}
+        </MuiTypography>
       ) : null}
       {source.sense_gloss ? (
-        <Typography.Text type="secondary">{source.sense_gloss}</Typography.Text>
+        <MuiTypography component="span" color="text.secondary">
+          {source.sense_gloss}
+        </MuiTypography>
       ) : null}
-      <Tag>{status}</Tag>
-    </Space>
+      <MuiChip label={<>{status}</>} />
+    </MuiStack>
   );
 }
 
@@ -100,36 +118,42 @@ function ReferenceActions({ reference }: { reference: InboundReferenceV3 }) {
   if (link.kind === "none") return null;
   if (link.kind === "local_sentence") {
     return (
-      <Space size={4} wrap>
-        <Button
+      <MuiStack
+        direction="row"
+        spacing={0.5}
+        alignItems="center"
+        useFlexGap
+        flexWrap="wrap"
+      >
+        <MuiButton
           onClick={() => guard.openReference(reference)}
           size="small"
-          type="link"
+          variant="text"
         >
           查看例句
-        </Button>
-        <Button
+        </MuiButton>
+        <MuiButton
           href={link.libraryHref}
           rel="noopener"
           size="small"
           target="_blank"
-          type="link"
+          variant="text"
         >
           在例句库打开
-        </Button>
-      </Space>
+        </MuiButton>
+      </MuiStack>
     );
   }
   return (
-    <Button
+    <MuiButton
       href={link.href}
       rel="noopener"
       size="small"
       target="_blank"
-      type="link"
+      variant="text"
     >
       {link.kind === "entry" ? "打开来源词条" : "在例句库打开"}
-    </Button>
+    </MuiButton>
   );
 }
 
@@ -147,39 +171,52 @@ export function V3ReferenceList({
   staleLabel?: string;
 }) {
   if (references.length === 0) {
-    return <Typography.Text type="secondary">{emptyText}</Typography.Text>;
+    return (
+      <MuiTypography component="span" color="text.secondary">
+        {emptyText}
+      </MuiTypography>
+    );
   }
   return (
-    <Flex className="v3-reference-list" vertical gap="small">
+    <MuiStack className="v3-reference-list" direction="column" spacing={1}>
       {total !== undefined && total > references.length ? (
-        <Typography.Text type="secondary">
+        <MuiTypography component="span" color="text.secondary">
           共 {total} 处，显示前 {references.length} 条
-        </Typography.Text>
+        </MuiTypography>
       ) : null}
       {references.map((reference) => (
-        <Flex
-          align="start"
+        <MuiStack
           className="v3-reference-item"
           data-reference-id={reference.id}
-          gap="small"
           key={reference.id}
-          wrap
+          direction="row"
+          spacing={1}
+          alignItems={"flex-start"}
+          useFlexGap
+          flexWrap="wrap"
         >
-          <Space size={4}>
-            <Tag color={reference.stale ? "red" : "orange"}>
-              {referenceKindLabel(reference)}
-            </Tag>
-            {reference.stale ? <Tag color="red">{staleLabel}</Tag> : null}
-          </Space>
-          <Flex vertical gap={2} style={{ flex: "1 1 240px", minWidth: 0 }}>
+          <MuiStack direction="row" spacing={0.5} alignItems="center">
+            <MuiChip
+              color={reference.stale ? "error" : "warning"}
+              label={<>{referenceKindLabel(reference)}</>}
+            />
+            {reference.stale ? (
+              <MuiChip color={"error"} label={<>{staleLabel}</>} />
+            ) : null}
+          </MuiStack>
+          <MuiStack
+            style={{ flex: "1 1 240px", minWidth: 0 }}
+            direction="column"
+            spacing={0.25}
+          >
             {sourceSummary(reference)}
-            <Typography.Text type="secondary">
+            <MuiTypography component="span" color="text.secondary">
               关联本词条的{targetLabel(reference)}
-            </Typography.Text>
-          </Flex>
+            </MuiTypography>
+          </MuiStack>
           <ReferenceActions reference={reference} />
-        </Flex>
+        </MuiStack>
       ))}
-    </Flex>
+    </MuiStack>
   );
 }

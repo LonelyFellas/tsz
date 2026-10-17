@@ -1,20 +1,23 @@
+import {
+  Radio as MuiRadio,
+  RadioGroup as MuiRadioGroup,
+  FormControlLabel as MuiFormControlLabel
+} from "@mui/material";
+import { TextareaAutosize as MuiTextareaAutosize } from "@mui/material";
+import {
+  Alert as MuiAlert,
+  Button as MuiButton,
+  IconButton as MuiIconButton,
+  Stack as MuiStack,
+  Typography as MuiTypography
+} from "@mui/material";
 import { V3PhonemeSpeechSettings } from "./V3PhonemeSpeechSettings";
 import { usePermission } from "@/lib/auth";
-import {
-  SettingOutlined,
-  SwapOutlined,
-  CloseOutlined
-} from "@ant-design/icons";
-import {
-  Alert,
-  Button,
-  Input,
-  Modal,
-  Popover,
-  Radio,
-  Space,
-  Typography
-} from "antd";
+import SettingOutlined from "@mui/icons-material/SettingsOutlined";
+import SwapOutlined from "@mui/icons-material/SwapHoriz";
+import CloseOutlined from "@mui/icons-material/Close";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { AnchoredPanel } from "@/components/AnchoredPanel";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { VoicePreviewAdapter } from "@tsz/voice-editor/types";
 import type {
@@ -299,16 +302,32 @@ export function V3SynthesisInputs({
     else change(side, alphabet, result.value, result.ups_words);
   };
   const settingsButton = (
-    <Popover
-      trigger="click"
-      placement="topRight"
-      open={expanded}
-      onOpenChange={(open) => {
-        if (open) setSettingsDraft(captureSettings());
-        setExpanded(open);
-      }}
-      destroyOnHidden
-      content={
+    <>
+      <MuiButton
+        ref={settingsTrigger}
+        onClick={() => {
+          if (!expanded) setSettingsDraft(captureSettings());
+          setExpanded(!expanded);
+        }}
+        size="small"
+        aria-label={`${label}发音设置与真人录音`}
+        aria-expanded={expanded}
+        aria-haspopup="dialog"
+        aria-controls={
+          expanded ? `speech-settings-${pronunciation.id}` : undefined
+        }
+        variant="text"
+        startIcon={<SettingOutlined fontSize="inherit" />}
+      >
+        {synthesisEditable ? "设置" : "发音设置"}
+      </MuiButton>
+      <AnchoredPanel
+        anchor={settingsTrigger.current}
+        open={expanded}
+        label="发音设置面板"
+        onClose={closeSettings}
+        placement="top-end"
+      >
         <div
           className="word-synthesis-settings"
           id={`speech-settings-${pronunciation.id}`}
@@ -323,38 +342,46 @@ export function V3SynthesisInputs({
         >
           <div className="word-synthesis-settings-header">
             <div>
-              <Typography.Text strong>发音设置</Typography.Text>
-              <Typography.Text
-                type="secondary"
+              <MuiTypography component="span" fontWeight={600}>
+                发音设置
+              </MuiTypography>
+              <MuiTypography
                 className="word-synthesis-settings-source"
+                component="span"
+                color="text.secondary"
               >
                 英式、美式音色 · 当前来源：
                 {source === "spelling"
                   ? "词形拼写"
                   : `Azure ${source.toUpperCase()}`}
-              </Typography.Text>
+              </MuiTypography>
             </div>
-            <Button
-              type="text"
+            <MuiIconButton
               size="small"
-              icon={<CloseOutlined />}
               aria-label="收起设置"
               title="关闭发音设置"
               onClick={closeSettings}
-            />
+            >
+              <CloseOutlined fontSize="inherit" />
+            </MuiIconButton>
           </div>
           <div className="word-synthesis-settings-body">
             {!content && (
-              <Typography.Text
-                type="secondary"
+              <MuiTypography
                 className="word-synthesis-settings-hint"
+                component="span"
+                color="text.secondary"
               >
                 {localeLabel}：{selectedIssue ?? "请先填写有效正文和合成输入"}
                 。音色可先配置。
-              </Typography.Text>
+              </MuiTypography>
             )}
             <Suspense
-              fallback={<Typography.Text>正在加载发音设置…</Typography.Text>}
+              fallback={
+                <MuiTypography component="span">
+                  正在加载发音设置…
+                </MuiTypography>
+              }
             >
               <VoiceEditor
                 mode="synthesis"
@@ -373,27 +400,27 @@ export function V3SynthesisInputs({
                   setSettingsDraft((current) => ({ ...current, audio_assets }))
                 }
                 renderActions={(canComplete) => (
-                  <Space>
-                    <Button
+                  <MuiStack direction="row" spacing={1} alignItems="center">
+                    <MuiButton
                       size="small"
                       aria-label={`取消${label}设置`}
                       onClick={closeSettings}
                     >
                       取消
-                    </Button>
-                    <Button
+                    </MuiButton>
+                    <MuiButton
                       size="small"
-                      type="primary"
                       aria-label={`完成${label}设置`}
                       disabled={!canComplete}
                       onClick={() => {
                         onChange(settingsDraft);
                         closeSettings();
                       }}
+                      variant="contained"
                     >
                       完成
-                    </Button>
-                  </Space>
+                    </MuiButton>
+                  </MuiStack>
                 )}
                 previewAdapter={
                   env.VOICE_PREVIEW ? settingsPreviewAdapter : undefined
@@ -407,23 +434,8 @@ export function V3SynthesisInputs({
             </Suspense>
           </div>
         </div>
-      }
-    >
-      <Button
-        ref={settingsTrigger}
-        type="text"
-        size="small"
-        icon={<SettingOutlined />}
-        aria-label={`${label}发音设置与真人录音`}
-        aria-expanded={expanded}
-        aria-haspopup="dialog"
-        aria-controls={
-          expanded ? `speech-settings-${pronunciation.id}` : undefined
-        }
-      >
-        {synthesisEditable ? "设置" : "发音设置"}
-      </Button>
-    </Popover>
+      </AnchoredPanel>
+    </>
   );
   return (
     <div className="word-pronunciation-synthesis" data-phoneme-locale={locale}>
@@ -433,9 +445,12 @@ export function V3SynthesisInputs({
             const name = `Azure ${alphabet.toUpperCase()}`;
             return (
               <div className="word-pronunciation-row" key={alphabet}>
-                <Typography.Text className="word-pronunciation-label">
+                <MuiTypography
+                  className="word-pronunciation-label"
+                  component="span"
+                >
                   {name}
-                </Typography.Text>
+                </MuiTypography>
                 <div className="word-synthesis-candidates">
                   {(dialect === "common" ? SIDES : [dialect]).map((side) => {
                     const sideLocale = pronunciationLocale(side, "uk");
@@ -464,7 +479,12 @@ export function V3SynthesisInputs({
                     );
                     return (
                       <div className="word-synthesis-candidate" key={side}>
-                        <Space.Compact className="word-synthesis-control">
+                        <MuiStack
+                          className="word-synthesis-control"
+                          direction="row"
+                          spacing={1}
+                          alignItems="center"
+                        >
                           <PronunciationPreviewControls
                             playbackOnly
                             pronunciationId={pronunciation.id}
@@ -492,13 +512,10 @@ export function V3SynthesisInputs({
                               pronunciation.voice_profile
                             }
                           />
-                          <Input.TextArea
-                            className="tsz-phonetics"
-                            autoSize={{ minRows: 1, maxRows: 6 }}
+                          <MuiTextareaAutosize
                             aria-label={`${label}的${sideLabel} ${name}`}
                             data-v3-node-id={pronunciation.id}
                             data-v3-field={`synthesis.${side}.${alphabet}`}
-                            status={invalid ? "error" : undefined}
                             aria-invalid={invalid}
                             value={candidate[alphabet]}
                             placeholder={`请输入${sideLabel}${alphabet.toUpperCase()}`}
@@ -515,9 +532,11 @@ export function V3SynthesisInputs({
                                 undo(side, alphabet);
                               }
                             }}
+                            minRows={1}
+                            maxRows={6}
+                            className={"admin-textarea " + "tsz-phonetics"}
                           />
-                          <Button
-                            icon={<SwapOutlined />}
+                          <MuiIconButton
                             aria-label={`${label}转换为${sideLabel} ${name}`}
                             title={
                               alphabet === "ipa"
@@ -525,7 +544,9 @@ export function V3SynthesisInputs({
                                 : `从当前${sideLabel} Azure IPA 转换为 ${name}`
                             }
                             onClick={() => convert(side, alphabet)}
-                          />
+                          >
+                            <SwapOutlined fontSize="inherit" />
+                          </MuiIconButton>
                           <V3PhonemeSpeechSettings
                             spelling={spelling}
                             nodeId={pronunciation.id}
@@ -537,17 +558,18 @@ export function V3SynthesisInputs({
                             fallbackVoiceProfile={pronunciation.voice_profile}
                             onChange={(next) => writeCandidate(side, next)}
                           />
-                        </Space.Compact>
+                        </MuiStack>
                         {invalid && (
-                          <Typography.Text
+                          <MuiTypography
                             className="word-field-help"
-                            type="danger"
+                            component="span"
+                            color="error.main"
                           >
                             {synthesisInputIssue(
                               alphabet,
                               candidate[alphabet]
                             ) ?? "请检查合成输入与逐词边界"}
-                          </Typography.Text>
+                          </MuiTypography>
                         )}
                       </div>
                     );
@@ -559,14 +581,13 @@ export function V3SynthesisInputs({
                     alphabet === "ipa" ? "ipa_locale" : "ups_locale"
                   ] && (
                     <div className="word-synthesis-locale-warning">
-                      <Typography.Text type="warning">
+                      <MuiTypography component="span" color="warning.main">
                         旧 {name}：{synthesis[alphabet]}
                         ，请确认口音后保留到对应一侧。
-                      </Typography.Text>
+                      </MuiTypography>
                       {SIDES.map((side) => (
-                        <Button
+                        <MuiButton
                           key={side}
-                          type="link"
                           size="small"
                           aria-label={`${label}确认 ${name} 为${side === "uk" ? "英式" : "美式"}`}
                           disabled={Boolean(
@@ -592,9 +613,10 @@ export function V3SynthesisInputs({
                             expected.current = next;
                             onChange({ synthesis: next });
                           }}
+                          variant="text"
                         >
                           确认此音标为{side === "uk" ? "英式" : "美式"}
-                        </Button>
+                        </MuiButton>
                       ))}
                     </div>
                   )}
@@ -603,27 +625,33 @@ export function V3SynthesisInputs({
           })}
           <div className="word-pronunciation-row">
             <div className="word-synthesis-source-label">
-              <Typography.Text className="word-pronunciation-label">
+              <MuiTypography
+                className="word-pronunciation-label"
+                component="span"
+              >
                 语音来源
-              </Typography.Text>
+              </MuiTypography>
               {settingsButton}
             </div>
             <div className="word-synthesis-source-actions">
-              <Radio.Group
+              <MuiRadioGroup
                 name={`synthesis-source-${pronunciation.id}`}
                 aria-label={`${label}的合成来源`}
                 value={source}
-                onChange={(event) =>
+                onChange={(event) => {
+                  const nextSource = event.target.value as
+                    "ipa" | "ups" | "spelling";
                   onChange({
                     synthesis: {
                       ...synthesis,
-                      use_spelling: event.target.value === "spelling",
-                      ...(event.target.value !== "spelling"
-                        ? { alphabet: event.target.value }
+                      use_spelling: nextSource === "spelling",
+                      ...(nextSource !== "spelling"
+                        ? { alphabet: nextSource }
                         : {})
                     }
-                  })
-                }
+                  });
+                }}
+                row
               >
                 {[
                   {
@@ -647,57 +675,75 @@ export function V3SynthesisInputs({
                     fontClass: "tsz-phonetics"
                   }
                 ].map((option) => (
-                  <Radio
+                  <MuiFormControlLabel
                     key={option.value}
-                    value={option.value}
-                    aria-label={option.name}
-                    className="word-synthesis-choice"
-                  >
-                    <span className="word-synthesis-choice-content">
-                      <span className="word-synthesis-choice-tag">
-                        {option.name}
-                      </span>
-                      <span
-                        className={`word-synthesis-choice-preview ${option.fontClass}`}
-                        title={option.text}
-                      >
-                        {option.text}
-                      </span>
-                    </span>
-                  </Radio>
+                    sx={{ m: 0 }}
+                    control={
+                      <MuiRadio
+                        value={option.value}
+                        className="word-synthesis-choice"
+                        slotProps={{
+                          input: {
+                            "aria-label": option.name
+                          }
+                        }}
+                      />
+                    }
+                    label={
+                      <>
+                        <span className="word-synthesis-choice-content">
+                          <span className="word-synthesis-choice-tag">
+                            {option.name}
+                          </span>
+                          <span
+                            className={`word-synthesis-choice-preview ${option.fontClass}`}
+                            title={option.text}
+                          >
+                            {option.text}
+                          </span>
+                        </span>
+                      </>
+                    }
+                  />
                 ))}
-              </Radio.Group>
+              </MuiRadioGroup>
             </div>
           </div>
-          {diagnostic && <Alert type="warning" title={diagnostic} showIcon />}
+          {diagnostic && <MuiAlert severity={"warning"}>{diagnostic}</MuiAlert>}
           {!synthesis.use_spelling && !content && (
-            <Typography.Text type="warning">
+            <MuiTypography component="span" color="warning.main">
               {selectedIssue ?? "当前合成输入缺少有效词界，请重新转换"}
-            </Typography.Text>
+            </MuiTypography>
           )}
         </>
       ) : (
-        <Space wrap>
-          <Typography.Text>
+        <MuiStack
+          direction="row"
+          spacing={1}
+          alignItems="center"
+          useFlexGap
+          flexWrap="wrap"
+        >
+          <MuiTypography component="span">
             当前来源：
             {source === "spelling"
               ? "词形拼写"
               : `Azure ${source.toUpperCase()}`}
-          </Typography.Text>
+          </MuiTypography>
           {settingsButton}
-        </Space>
+        </MuiStack>
       )}
-      <Modal
+      <ConfirmDialog
         open={Boolean(pending)}
         title={
           pending?.normalizedIpa !== undefined
             ? "规范 Azure IPA 并转换 UPS"
             : `替换 Azure ${pending?.alphabet.toUpperCase() ?? ""}`
         }
-        okText="应用转换结果"
+        confirmText="应用转换结果"
         cancelText="取消"
-        onCancel={() => setPending(undefined)}
-        onOk={() => {
+        onClose={() => setPending(undefined)}
+        onConfirm={() => {
           if (!pending) return;
           if (
             candidateForSide(synthesis, pending.side, dialect)[
@@ -724,20 +770,25 @@ export function V3SynthesisInputs({
       >
         {pending?.normalizedIpa !== undefined && (
           <>
-            <Typography.Paragraph>
+            <MuiTypography component="p" paragraph>
               当前 Azure IPA 含字典记法 r。确认后将其改为英语音素 ɹ，再转换为
               UPS；其他音素保持原样。
-            </Typography.Paragraph>
-            <Typography.Paragraph className="tsz-phonetics">
+            </MuiTypography>
+            <MuiTypography className="tsz-phonetics" component="p" paragraph>
               IPA：{pending.source} → {pending.normalizedIpa}
-            </Typography.Paragraph>
+            </MuiTypography>
           </>
         )}
-        <Typography.Paragraph>
+        <MuiTypography component="p" paragraph>
           将用以下结果替换已有内容，应用后可撤销：
-        </Typography.Paragraph>
-        <Typography.Paragraph code>{pending?.value}</Typography.Paragraph>
-      </Modal>
+        </MuiTypography>
+        <MuiTypography
+          component="pre"
+          sx={{ fontFamily: "monospace", whiteSpace: "pre-wrap" }}
+        >
+          {pending?.value}
+        </MuiTypography>
+      </ConfirmDialog>
     </div>
   );
 }

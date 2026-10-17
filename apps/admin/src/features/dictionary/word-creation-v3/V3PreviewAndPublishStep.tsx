@@ -1,3 +1,16 @@
+import {
+  Card as MuiCard,
+  CardHeader as MuiCardHeader,
+  CardContent as MuiCardContent
+} from "@mui/material";
+import {
+  Alert as MuiAlert,
+  AlertTitle as MuiAlertTitle,
+  Button as MuiButton,
+  Chip as MuiChip,
+  Stack as MuiStack,
+  Typography as MuiTypography
+} from "@mui/material";
 import { useAuthStore } from "@/lib/auth";
 import {
   canPublishEntry,
@@ -14,7 +27,7 @@ import type {
   SurfaceMatchPageV3,
   V3DraftValidationIssue
 } from "@tsz/types";
-import { Alert, Button, Card, Space, Tag, Typography } from "antd";
+
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -30,12 +43,10 @@ import { impactReasonLabel, impactTypeLabel } from "./presentation";
 import { buildV3PublicationIssueSummary } from "./publicationIssueSummary";
 import { createV3SaveFlow, type V3SaveFlow } from "./saveFlow";
 import { V3ReviewContent } from "./V3ReviewContent";
-
 type PublishRequests = Pick<
   V3WordRequests,
   "get" | "validate" | "impact" | "surfacePage" | "publish"
 >;
-
 interface StandaloneProps {
   word: AdminWordV3;
   requests?: PublishRequests;
@@ -43,7 +54,6 @@ interface StandaloneProps {
   createFlow?: (word: AdminWordV3) => V3SaveFlow;
   onPublished: (word: AdminWordV3) => void;
 }
-
 export interface V3PreviewPublishController {
   renderPreview?: (readiness: ReactNode) => ReactNode;
   validation?: DraftValidationResponseV3;
@@ -66,7 +76,6 @@ export interface V3PreviewPublishController {
     ) => Promise<SurfaceMatchPageV3>;
   };
 }
-
 type Props =
   | {
       word: AdminWordV3;
@@ -76,8 +85,9 @@ type Props =
       flow?: V3SaveFlow;
       createFlow?: (word: AdminWordV3) => V3SaveFlow;
     }
-  | (StandaloneProps & { controller?: never });
-
+  | (StandaloneProps & {
+      controller?: never;
+    });
 function terminalPage(
   state: SurfaceSnapshotState<SurfaceMatchPageV3>
 ): SurfaceMatchEnabledTerminalPageV3 | undefined {
@@ -108,7 +118,6 @@ function terminalPage(
       : {})
   };
 }
-
 function requestErrorMessage(error: unknown): string {
   const problem = classifyV3Problem(error, "publish");
   if (problem.kind === "network") {
@@ -122,11 +131,9 @@ function requestErrorMessage(error: unknown): string {
   if (problem.kind === "validation") return "发布校验未通过。";
   return "发布失败，请检查当前内容后重试。";
 }
-
 function publicationUnavailableMessage(word: AdminWordV3): string | undefined {
   return word.status === "archived" ? "垃圾桶中的词条不能发布。" : undefined;
 }
-
 function V3WordPreview({
   word,
   readiness,
@@ -142,7 +149,6 @@ function V3WordPreview({
     <V3ReviewContent readiness={readiness} word={word} />
   );
 }
-
 function ImpactDescription({
   impact,
   summary
@@ -151,8 +157,8 @@ function ImpactDescription({
   summary: string;
 }) {
   return (
-    <Space orientation="vertical" size={4} style={{ width: "100%" }}>
-      <Typography.Text>{summary}</Typography.Text>
+    <MuiStack style={{ width: "100%" }} direction="column" spacing={0.5}>
+      <MuiTypography component="span">{summary}</MuiTypography>
       {impact.affected.length > 0 ? (
         <ul className="v3-review-list">
           {impact.affected.map((item) => (
@@ -161,20 +167,25 @@ function ImpactDescription({
               key={`${item.node_type}:${item.node_id}`}
               data-testid={`impact-item-${item.node_type}-${item.node_id}`}
             >
-              <Space wrap size={4}>
-                <Tag>{impactTypeLabel(item.node_type)}</Tag>
-                <Typography.Text>
+              <MuiStack
+                direction="row"
+                spacing={0.5}
+                alignItems="center"
+                useFlexGap
+                flexWrap="wrap"
+              >
+                <MuiChip label={<>{impactTypeLabel(item.node_type)}</>} />
+                <MuiTypography component="span">
                   {impactReasonLabel(item.reason)}
-                </Typography.Text>
-              </Space>
+                </MuiTypography>
+              </MuiStack>
             </li>
           ))}
         </ul>
       ) : null}
-    </Space>
+    </MuiStack>
   );
 }
-
 function ValidationIssueSummary({
   word,
   issues,
@@ -195,15 +206,15 @@ function ValidationIssueSummary({
   return (
     <section aria-label="发布待完成摘要" className="v3-validation-summary">
       <div className="v3-validation-summary__overview">
-        <Typography.Text type="danger" strong>
+        <MuiTypography component="span" color="error.main" fontWeight={600}>
           仍有未完成的内容
-        </Typography.Text>
-        <Typography.Title level={3}>
+        </MuiTypography>
+        <MuiTypography component="h3" variant="h5">
           还有 {summary.total} 项待完成
-        </Typography.Title>
-        <Typography.Text type="secondary">
+        </MuiTypography>
+        <MuiTypography component="span" color="text.secondary">
           发布条件保持不变。请先处理下列内容，再重新检查。
-        </Typography.Text>
+        </MuiTypography>
       </div>
 
       <div className="v3-validation-summary__positions">
@@ -223,25 +234,27 @@ function ValidationIssueSummary({
               key={position.key}
             >
               <div>
-                <Typography.Text strong>{position.label}</Typography.Text>
-                <Typography.Text type="secondary">
+                <MuiTypography component="span" fontWeight={600}>
+                  {position.label}
+                </MuiTypography>
+                <MuiTypography component="span" color="text.secondary">
                   {position.issues.length} 项待完成
-                </Typography.Text>
+                </MuiTypography>
                 {stepCounts.length > 0 ? (
-                  <Typography.Text type="secondary">
+                  <MuiTypography component="span" color="text.secondary">
                     {stepCounts.join(" · ")}
-                  </Typography.Text>
+                  </MuiTypography>
                 ) : null}
               </div>
               {onNavigate ? (
-                <Button
+                <MuiButton
                   aria-label={`填写${position.label}未完成项`}
                   size="small"
-                  type="link"
                   onClick={() => void onNavigate(position.issues[0]!)}
+                  variant={"text"}
                 >
                   去填写
-                </Button>
+                </MuiButton>
               ) : null}
             </div>
           );
@@ -249,27 +262,35 @@ function ValidationIssueSummary({
       </div>
 
       <div className="v3-validation-summary__types">
-        <Typography.Text strong>问题分布</Typography.Text>
+        <MuiTypography component="span" fontWeight={600}>
+          问题分布
+        </MuiTypography>
         {summary.types.map((type) => (
           <div className="v3-validation-summary__type" key={type.code}>
             <div className="v3-validation-summary__type-copy">
-              <Space size={6} wrap>
-                <Tag color="error">{type.count} 项</Tag>
-                <Typography.Text>{type.label}</Typography.Text>
-              </Space>
-              <Typography.Text type="secondary">
+              <MuiStack
+                direction="row"
+                spacing={0.75}
+                alignItems="center"
+                useFlexGap
+                flexWrap="wrap"
+              >
+                <MuiChip color={"error"} label={<>{type.count} 项</>} />
+                <MuiTypography component="span">{type.label}</MuiTypography>
+              </MuiStack>
+              <MuiTypography component="span" color="text.secondary">
                 {type.scopes.join(" · ")}
-              </Typography.Text>
+              </MuiTypography>
             </div>
             {onNavigate ? (
-              <Button
+              <MuiButton
                 aria-label={`填写${type.label}问题`}
                 size="small"
-                type="link"
                 onClick={() => void onNavigate(type.issues[0]!)}
+                variant={"text"}
               >
                 去填写
-              </Button>
+              </MuiButton>
             ) : null}
           </div>
         ))}
@@ -277,7 +298,6 @@ function ValidationIssueSummary({
     </section>
   );
 }
-
 function ControlledV3PreviewAndPublishStep({
   word,
   controller
@@ -323,7 +343,6 @@ function ControlledV3PreviewAndPublishStep({
     controller.impact &&
     (!requiresImpactConfirmation || controller.impactConfirmed)
   );
-
   const prepare = async () => {
     if (!canPrepare) return;
     const validation = await controller.actions.validate();
@@ -350,126 +369,146 @@ function ControlledV3PreviewAndPublishStep({
     const page = terminalPage(publishState);
     if (page) void publish(page.surface_confirmation_token);
   };
-
   return (
-    <Space orientation="vertical" size="middle" style={{ width: "100%" }}>
+    <MuiStack style={{ width: "100%" }} direction="column" spacing={2}>
       <V3WordPreview
         render={controller.renderPreview}
         readiness={
           unavailableMessage ? (
-            <Typography.Text type="secondary">当前词条不可发布</Typography.Text>
+            <MuiTypography component="span" color="text.secondary">
+              当前词条不可发布
+            </MuiTypography>
           ) : controller.issues.length > 0 ? (
-            <Typography.Text type="danger">有待完成内容</Typography.Text>
+            <MuiTypography component="span" color="error.main">
+              有待完成内容
+            </MuiTypography>
           ) : controller.validation?.valid ? (
-            <Typography.Text type="success">
+            <MuiTypography component="span" color="success.main">
               当前内容已通过发布检查
-            </Typography.Text>
+            </MuiTypography>
           ) : (
-            <Typography.Text type="secondary">尚未检查发布条件</Typography.Text>
+            <MuiTypography component="span" color="text.secondary">
+              尚未检查发布条件
+            </MuiTypography>
           )
         }
         word={word}
       />
       {unavailableMessage ? (
-        <Alert
-          showIcon
-          type="warning"
-          title="当前词条不可发布"
-          description={unavailableMessage}
-        />
+        <MuiAlert severity={"warning"}>
+          <MuiAlertTitle>{"当前词条不可发布"}</MuiAlertTitle>
+          {unavailableMessage}
+        </MuiAlert>
       ) : (
-        <Card
+        <MuiCard
           id="review-publish"
           className="v3-review-publish"
-          size="small"
-          title="发布检查"
+          variant="outlined"
         >
-          <Space orientation="vertical" style={{ width: "100%" }}>
-            {!allowedToPublish && (
-              <Alert
-                type="info"
-                title="当前账号不能发布这条词条"
-                description={ENTRY_PUBLISH_BLOCKED_HINT}
-              />
-            )}
-            <Button
-              loading={
-                controller.isPending("validate") ||
-                controller.isPending("impact")
-              }
-              onClick={() => void prepare()}
-            >
-              检查发布条件
-            </Button>
-            {controller.issues.length > 0 ? (
-              <ValidationIssueSummary
-                word={word}
-                issues={controller.issues}
-                onNavigate={controller.actions.navigateIssue}
-              />
-            ) : null}
-            {controller.impact ? (
-              <Alert
-                showIcon
-                type={requiresImpactConfirmation ? "warning" : "success"}
-                title={`影响预览：${controller.impact.affected.length} 项`}
-                description={
-                  <ImpactDescription
-                    impact={controller.impact}
-                    summary={
-                      impactPage
-                        ? `确认快照已加载 ${impactState.items.length}/${impactState.total}`
-                        : controller.impact.requires_confirmation
-                          ? "需要由向导确认当前影响。"
-                          : "未发现需要确认的影响。"
-                    }
-                  />
+          <MuiCardHeader
+            className="admin-card-header"
+            title={"发布检查"}
+            slotProps={{
+              title: { variant: "subtitle1", className: "admin-card-title" }
+            }}
+            sx={{ p: 2, borderBottom: 1, borderColor: "divider" }}
+          />
+          <MuiCardContent className="admin-card-body">
+            <MuiStack style={{ width: "100%" }} direction="column" spacing={1}>
+              {!allowedToPublish && (
+                <MuiAlert severity={"info"}>
+                  <MuiAlertTitle>{"当前账号不能发布这条词条"}</MuiAlertTitle>
+                  {ENTRY_PUBLISH_BLOCKED_HINT}
+                </MuiAlert>
+              )}
+              <MuiButton
+                loading={
+                  controller.isPending("validate") ||
+                  controller.isPending("impact")
                 }
-              />
-            ) : null}
-            {allowedToPublish &&
-            requiresImpactConfirmation &&
-            !controller.impactConfirmed ? (
-              <Button
-                disabled={
-                  impactPage
-                    ? !controller.actions.confirmImpactSurface ||
-                      !canAcknowledgeSurfaceSnapshot(impactState)
-                    : !controller.actions.confirmImpact
-                }
-                onClick={confirmImpact}
+                onClick={() => void prepare()}
               >
-                确认影响并允许发布
-              </Button>
-            ) : null}
-            {readyToPublish ? (
-              <Button
-                type="primary"
-                loading={controller.isPending("publish")}
-                onClick={() => void publish()}
-              >
-                发布词条
-              </Button>
-            ) : null}
-          </Space>
-        </Card>
+                检查发布条件
+              </MuiButton>
+              {controller.issues.length > 0 ? (
+                <ValidationIssueSummary
+                  word={word}
+                  issues={controller.issues}
+                  onNavigate={controller.actions.navigateIssue}
+                />
+              ) : null}
+              {controller.impact ? (
+                <MuiAlert
+                  severity={requiresImpactConfirmation ? "warning" : "success"}
+                >
+                  <MuiAlertTitle>{`影响预览：${controller.impact.affected.length} 项`}</MuiAlertTitle>
+                  {
+                    <ImpactDescription
+                      impact={controller.impact}
+                      summary={
+                        impactPage
+                          ? `确认快照已加载 ${impactState.items.length}/${impactState.total}`
+                          : controller.impact.requires_confirmation
+                            ? "需要由向导确认当前影响。"
+                            : "未发现需要确认的影响。"
+                      }
+                    />
+                  }
+                </MuiAlert>
+              ) : null}
+              {allowedToPublish &&
+              requiresImpactConfirmation &&
+              !controller.impactConfirmed ? (
+                <MuiButton
+                  disabled={
+                    impactPage
+                      ? !controller.actions.confirmImpactSurface ||
+                        !canAcknowledgeSurfaceSnapshot(impactState)
+                      : !controller.actions.confirmImpact
+                  }
+                  onClick={confirmImpact}
+                >
+                  确认影响并允许发布
+                </MuiButton>
+              ) : null}
+              {readyToPublish ? (
+                <MuiButton
+                  loading={controller.isPending("publish")}
+                  onClick={() => void publish()}
+                  variant={"contained"}
+                >
+                  发布词条
+                </MuiButton>
+              ) : null}
+            </MuiStack>
+          </MuiCardContent>
+        </MuiCard>
       )}
       {allowedToPublish && publishPage ? (
-        <Card size="small" title="发布同形提示">
-          <Button
-            type="primary"
-            loading={controller.isPending("publish")}
-            disabled={!canAcknowledgeSurfaceSnapshot(publishState)}
-            onClick={confirmPublishSurface}
-          >
-            确认同形提示并重试发布
-          </Button>
-        </Card>
+        <MuiCard variant="outlined">
+          <MuiCardHeader
+            className="admin-card-header"
+            title={"发布同形提示"}
+            slotProps={{
+              title: { variant: "subtitle1", className: "admin-card-title" }
+            }}
+            sx={{ p: 2, borderBottom: 1, borderColor: "divider" }}
+          />
+          <MuiCardContent className="admin-card-body">
+            <MuiButton
+              loading={controller.isPending("publish")}
+              disabled={!canAcknowledgeSurfaceSnapshot(publishState)}
+              onClick={confirmPublishSurface}
+              variant={"contained"}
+            >
+              确认同形提示并重试发布
+            </MuiButton>
+          </MuiCardContent>
+        </MuiCard>
       ) : null}
-    </Space>
+    </MuiStack>
   );
 }
-
 function StandaloneV3PreviewAndPublishStep({
   word,
   requests: suppliedRequests,
@@ -531,7 +570,6 @@ function StandaloneV3PreviewAndPublishStep({
     validationIssues.length === 0 &&
     (!needsImpactAcknowledgement || impactAccepted)
   );
-
   useEffect(() => {
     mountedRef.current = true;
     if (ownsFlowRef.current) {
@@ -543,7 +581,6 @@ function StandaloneV3PreviewAndPublishStep({
       if (ownsFlowRef.current) flowRef.current.dispose();
     };
   }, [createFlow]);
-
   useEffect(() => {
     setImpact(undefined);
     setImpactAccepted(false);
@@ -552,14 +589,12 @@ function StandaloneV3PreviewAndPublishStep({
     setError(undefined);
     publishKey.current = undefined;
   }, [word.id, word.revision]);
-
   const clearPreparedPublish = () => {
     setImpact(undefined);
     setImpactAccepted(false);
     setPublishSurfacePage(undefined);
     setValidationIssues([]);
   };
-
   const replaceFlow = useCallback(
     (latest: AdminWordV3) => {
       if (ownsFlowRef.current) flowRef.current.dispose();
@@ -568,7 +603,6 @@ function StandaloneV3PreviewAndPublishStep({
     },
     [createFlow]
   );
-
   useEffect(() => {
     if (propWordRef.current === word) return;
     propWordRef.current = word;
@@ -584,7 +618,6 @@ function StandaloneV3PreviewAndPublishStep({
     setError(undefined);
     publishKey.current = undefined;
   }, [replaceFlow, word]);
-
   const reconcilePublishConflict = async () => {
     if (!reconciliationRequiredRef.current || reconciliationLockRef.current) {
       return;
@@ -619,14 +652,12 @@ function StandaloneV3PreviewAndPublishStep({
       }
     }
   };
-
   const requireCanonicalReconciliation = async () => {
     reconciliationRequiredRef.current = true;
     setReconciliationRequired(true);
     clearPreparedPublish();
     await reconcilePublishConflict();
   };
-
   const handlePrepare = async () => {
     if (
       prepareLock.current ||
@@ -687,7 +718,6 @@ function StandaloneV3PreviewAndPublishStep({
       setPreparing(false);
     }
   };
-
   const handleAcceptImpact = () => {
     if (!impact) return;
     if (impact.surface_match_page) {
@@ -713,7 +743,6 @@ function StandaloneV3PreviewAndPublishStep({
     if (impact.requires_confirmation && !tokens.confirmed_impact_token) return;
     setImpactAccepted(true);
   };
-
   const runPublish = async (surfaceToken?: string) => {
     if (
       publishLock.current ||
@@ -781,7 +810,6 @@ function StandaloneV3PreviewAndPublishStep({
       setPublishing(false);
     }
   };
-
   const handleConfirmPublishSurface = () => {
     const terminal = terminalPage(publishSurfaceState);
     if (
@@ -799,142 +827,162 @@ function StandaloneV3PreviewAndPublishStep({
     }).confirmed_surface_match_token;
     if (token) void runPublish(token);
   };
-
   return (
-    <Space orientation="vertical" size="middle" style={{ width: "100%" }}>
+    <MuiStack style={{ width: "100%" }} direction="column" spacing={2}>
       <V3WordPreview
         readiness={
           unavailableMessage ? (
-            <Typography.Text type="secondary">当前词条不可发布</Typography.Text>
+            <MuiTypography component="span" color="text.secondary">
+              当前词条不可发布
+            </MuiTypography>
           ) : validationIssues.length > 0 ? (
-            <Typography.Text type="danger">有待完成内容</Typography.Text>
+            <MuiTypography component="span" color="error.main">
+              有待完成内容
+            </MuiTypography>
           ) : impact ? (
-            <Typography.Text type="success">
+            <MuiTypography component="span" color="success.main">
               当前内容已通过发布检查
-            </Typography.Text>
+            </MuiTypography>
           ) : (
-            <Typography.Text type="secondary">尚未检查发布条件</Typography.Text>
+            <MuiTypography component="span" color="text.secondary">
+              尚未检查发布条件
+            </MuiTypography>
           )
         }
         word={currentWord}
       />
       {unavailableMessage ? (
-        <Alert
-          showIcon
-          type="warning"
-          title="当前词条不可发布"
-          description={unavailableMessage}
-        />
+        <MuiAlert severity={"warning"}>
+          <MuiAlertTitle>{"当前词条不可发布"}</MuiAlertTitle>
+          {unavailableMessage}
+        </MuiAlert>
       ) : (
-        <Card
+        <MuiCard
           id="review-publish"
           className="v3-review-publish"
-          size="small"
-          title="发布检查"
+          variant="outlined"
         >
-          <Space orientation="vertical" style={{ width: "100%" }}>
-            {!allowedToPublish && (
-              <Alert
-                type="info"
-                title="当前账号不能发布这条词条"
-                description={ENTRY_PUBLISH_BLOCKED_HINT}
-              />
-            )}
-            <Button
-              disabled={reconciliationRequired}
-              loading={preparing || refreshingCanonical}
-              onClick={() => void handlePrepare()}
-            >
-              检查发布条件
-            </Button>
-            {validationIssues.length > 0 ? (
-              <ValidationIssueSummary
-                word={currentWord}
-                issues={validationIssues}
-              />
-            ) : null}
-            {impact ? (
-              <Alert
-                showIcon
-                type={needsImpactAcknowledgement ? "warning" : "success"}
-                title={`影响预览：${impact.affected.length} 项`}
-                description={
-                  <ImpactDescription
-                    impact={impact}
-                    summary={
-                      impact.surface_match_page
-                        ? `确认快照已加载 ${impactState.items.length}/${impactState.total}`
-                        : impact.requires_confirmation
-                          ? "需要显式确认当前影响。"
-                          : "未发现需要确认的影响。"
-                    }
-                  />
-                }
-              />
-            ) : null}
-            {allowedToPublish &&
-            needsImpactAcknowledgement &&
-            !impactAccepted ? (
-              <Button
-                disabled={
-                  Boolean(impact?.surface_match_page) &&
-                  !canAcknowledgeSurfaceSnapshot(impactState)
-                }
-                onClick={handleAcceptImpact}
+          <MuiCardHeader
+            className="admin-card-header"
+            title={"发布检查"}
+            slotProps={{
+              title: { variant: "subtitle1", className: "admin-card-title" }
+            }}
+            sx={{ p: 2, borderBottom: 1, borderColor: "divider" }}
+          />
+          <MuiCardContent className="admin-card-body">
+            <MuiStack style={{ width: "100%" }} direction="column" spacing={1}>
+              {!allowedToPublish && (
+                <MuiAlert severity={"info"}>
+                  <MuiAlertTitle>{"当前账号不能发布这条词条"}</MuiAlertTitle>
+                  {ENTRY_PUBLISH_BLOCKED_HINT}
+                </MuiAlert>
+              )}
+              <MuiButton
+                disabled={reconciliationRequired}
+                loading={preparing || refreshingCanonical}
+                onClick={() => void handlePrepare()}
               >
-                确认影响并允许发布
-              </Button>
-            ) : null}
-            {readyToPublish ? (
-              <Button
-                type="primary"
-                loading={publishing}
-                onClick={() => void runPublish()}
-              >
-                发布词条
-              </Button>
-            ) : null}
-          </Space>
-        </Card>
+                检查发布条件
+              </MuiButton>
+              {validationIssues.length > 0 ? (
+                <ValidationIssueSummary
+                  word={currentWord}
+                  issues={validationIssues}
+                />
+              ) : null}
+              {impact ? (
+                <MuiAlert
+                  severity={needsImpactAcknowledgement ? "warning" : "success"}
+                >
+                  <MuiAlertTitle>{`影响预览：${impact.affected.length} 项`}</MuiAlertTitle>
+                  {
+                    <ImpactDescription
+                      impact={impact}
+                      summary={
+                        impact.surface_match_page
+                          ? `确认快照已加载 ${impactState.items.length}/${impactState.total}`
+                          : impact.requires_confirmation
+                            ? "需要显式确认当前影响。"
+                            : "未发现需要确认的影响。"
+                      }
+                    />
+                  }
+                </MuiAlert>
+              ) : null}
+              {allowedToPublish &&
+              needsImpactAcknowledgement &&
+              !impactAccepted ? (
+                <MuiButton
+                  disabled={
+                    Boolean(impact?.surface_match_page) &&
+                    !canAcknowledgeSurfaceSnapshot(impactState)
+                  }
+                  onClick={handleAcceptImpact}
+                >
+                  确认影响并允许发布
+                </MuiButton>
+              ) : null}
+              {readyToPublish ? (
+                <MuiButton
+                  loading={publishing}
+                  onClick={() => void runPublish()}
+                  variant={"contained"}
+                >
+                  发布词条
+                </MuiButton>
+              ) : null}
+            </MuiStack>
+          </MuiCardContent>
+        </MuiCard>
       )}
       {allowedToPublish && publishSurfacePage ? (
-        <Card size="small" title="发布同形提示">
-          <Space orientation="vertical">
-            <Typography.Text>
-              已加载 {publishSurfaceState.items.length}/
-              {publishSurfaceState.total} 条匹配来源
-            </Typography.Text>
-            <Button
-              type="primary"
-              loading={publishing}
-              disabled={!canAcknowledgeSurfaceSnapshot(publishSurfaceState)}
-              onClick={handleConfirmPublishSurface}
-            >
-              确认同形提示并重试发布
-            </Button>
-          </Space>
-        </Card>
+        <MuiCard variant="outlined">
+          <MuiCardHeader
+            className="admin-card-header"
+            title={"发布同形提示"}
+            slotProps={{
+              title: { variant: "subtitle1", className: "admin-card-title" }
+            }}
+            sx={{ p: 2, borderBottom: 1, borderColor: "divider" }}
+          />
+          <MuiCardContent className="admin-card-body">
+            <MuiStack direction="column" spacing={1}>
+              <MuiTypography component="span">
+                已加载 {publishSurfaceState.items.length}/
+                {publishSurfaceState.total} 条匹配来源
+              </MuiTypography>
+              <MuiButton
+                loading={publishing}
+                disabled={!canAcknowledgeSurfaceSnapshot(publishSurfaceState)}
+                onClick={handleConfirmPublishSurface}
+                variant={"contained"}
+              >
+                确认同形提示并重试发布
+              </MuiButton>
+            </MuiStack>
+          </MuiCardContent>
+        </MuiCard>
       ) : null}
       {reconciliationError ? (
-        <Alert
-          showIcon
-          type="error"
-          title="刷新最新词条失败，请先重试对账。"
+        <MuiAlert
           action={
-            <Button
+            <MuiButton
               loading={refreshingCanonical}
               onClick={() => void reconcilePublishConflict()}
             >
               重新刷新最新词条
-            </Button>
+            </MuiButton>
           }
-        />
+          severity={"error"}
+        >
+          {"刷新最新词条失败，请先重试对账。"}
+        </MuiAlert>
       ) : null}
-      {error ? <Alert showIcon type="error" title={error} /> : null}
-    </Space>
+      {error ? <MuiAlert severity={"error"}>{error}</MuiAlert> : null}
+    </MuiStack>
   );
 }
-
 export function V3PreviewAndPublishStep(props: Props) {
   if (props.controller) {
     return (
@@ -951,5 +999,4 @@ export function V3PreviewAndPublishStep(props: Props) {
     />
   );
 }
-
 export type { PublishRequests as V3PreviewPublishRequests };
