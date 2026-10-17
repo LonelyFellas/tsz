@@ -162,7 +162,7 @@ export function SentenceEditor({
   const finish = async (afterSave?: () => void) => {
     if (conflict || saving || !allowed) return false;
     if (pendingEditor) {
-      setError("请先完成或取消正文编辑，再保存例句。");
+      setError("请先处理正文中的未完成操作，再保存例句。");
       return false;
     }
     if (pendingAnnotation) {
@@ -394,6 +394,13 @@ export function SentenceEditor({
     <PronunciationPreviewProvider>
       <VoiceEditorModal
         open
+        centered
+        styles={{
+          body: {
+            maxHeight: "min(70vh, calc(100dvh - 160px))",
+            overflowY: "auto"
+          }
+        }}
         title={
           <V3EditorTitle
             index={rowIndex}
@@ -401,7 +408,22 @@ export function SentenceEditor({
             details={`${sentence ? "" : "新建 · "}${content.sentence.level} · ${dialectLabel(row.dialect)}`}
           />
         }
-        footer={null}
+        footer={
+          <Flex justify="end" gap="small">
+            <Button aria-label="取消例句编辑" disabled={saving} onClick={close}>
+              取消
+            </Button>
+            <Button
+              aria-label="完成例句编辑"
+              type="primary"
+              loading={saving}
+              disabled={!canSave}
+              onClick={() => void finish()}
+            >
+              完成
+            </Button>
+          </Flex>
+        }
         onCancel={close}
         closable={!saving}
         keyboard={!saving}
@@ -562,6 +584,7 @@ export function SentenceEditor({
               key={row.variant_id}
               mode="association"
               presentation="editor"
+              showDone={false}
               restoreTextLinksOnCorrection
               audioUploadEnabled
               value={variant.value}
@@ -627,20 +650,6 @@ export function SentenceEditor({
               }))
             }
           />
-          <Flex justify="end" gap="small">
-            <Button disabled={saving} onClick={close}>
-              取消
-            </Button>
-            <Button
-              aria-label="完成例句编辑"
-              type="primary"
-              loading={saving}
-              disabled={!canSave}
-              onClick={() => void finish()}
-            >
-              完成
-            </Button>
-          </Flex>
         </Flex>
       </VoiceEditorModal>
     </PronunciationPreviewProvider>
