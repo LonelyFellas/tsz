@@ -65,3 +65,7 @@ uv run scripts/cleanup-test-oss.py --help
 ```
 
 测试使用内存 OSS 替身，覆盖范围隔离、完整分页预检、历史版本与删除标记、403 残留、并发写入、权限探测和回执失败时禁止删除。真实云权限和实际永久删除需在专用前缀完成验收，不能用替身通过代替。
+
+## 真实页面的批次接入
+
+已支持的后端版本可通过白名单账号和 `X-TSZ-Test-Run` 将新资源写入固定测试前缀。Web/Admin 专用标签页用 `?tsz_test_run=<run-id>` 开启，`?tsz_test_run=off` 退出；在操作前确认线上实际后端已部署该能力，旧后端会忽略未知请求头。先权限预检，再创建资源，最后在 finally/trap 中执行清理；不能仅设置 URL 参数就把清理视为完成。配置、覆盖端点和读取/回滚约束见 [临时资源接入](../../../../docs/features/test-resource-isolation/README.md)。

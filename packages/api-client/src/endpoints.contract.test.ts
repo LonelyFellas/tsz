@@ -742,7 +742,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "0f9adc88ac4f63e91f9c75093a887451c7388df8e7d4f74b56f21237ea91935d"
+      "cda0056e9fbb1e8268a2197957cb1a7dc290c718c84ad4e089c113e3a47e94ba"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1042,6 +1042,27 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     expect(snapshot.operationHeaders).toEqual({
       "post /auth/refresh": [currentOnlyHeader, refreshHeader],
       "post /admin/auth/refresh": [currentOnlyHeader, refreshHeader],
+      ...Object.fromEntries(
+        [
+          "post /admin/speech/previews",
+          "post /admin/lexicon/audio-assets/upload-url",
+          "post /admin/lexicon/audio-assets",
+          "get /admin/lexicon/audio-assets/{id}/url",
+          "post /me/avatar/upload-url",
+          "post /me/avatar",
+          "post /me/teacher-certification/files"
+        ].map((operation) => [
+          operation,
+          [
+            {
+              name: "X-TSZ-Test-Run",
+              in: "header",
+              required: false,
+              schema: { type: ["string", "null"] }
+            }
+          ]
+        ])
+      ),
       ...Object.fromEntries(
         [
           ...new Set([

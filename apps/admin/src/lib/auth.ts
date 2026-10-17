@@ -9,10 +9,12 @@ import {
 } from "@tsz/shared/auth";
 import type { AdminAuthState } from "@tsz/shared/auth";
 import { env } from "./env";
+import { readTestResourceRun } from "@tsz/shared";
 
 export const authRuntime = createAdminAuthRuntime({
   // 拼出后台前缀：login/refresh/profile 均落到 /api/v1/admin/*，refresh cookie path 天然匹配。
-  baseUrl: `${env.API_BASE_URL}/admin`
+  baseUrl: `${env.API_BASE_URL}/admin`,
+  getTestResourceRun: readTestResourceRun
 });
 
 export const { api, tokens, persistSession } = authRuntime;

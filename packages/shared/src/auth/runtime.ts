@@ -26,12 +26,14 @@ export interface AuthRuntime {
 
 export interface AuthRuntimeOptions {
   baseUrl: string;
+  getTestResourceRun?: () => string | undefined;
   /** refresh 失败后跳转的登录页路径。默认 /login。 */
   loginPath?: string;
 }
 
 export function createAuthRuntime({
   baseUrl,
+  getTestResourceRun,
   loginPath
 }: AuthRuntimeOptions): AuthRuntime {
   const store = createAuthStore();
@@ -52,6 +54,7 @@ export function createAuthRuntime({
 
   const http = createHttpClient({
     baseUrl,
+    getTestResourceRun,
     getToken: tokens.getToken,
     getSessionGeneration: tokens.getSessionGeneration,
     onRefresh: tokens.refreshTokens,
