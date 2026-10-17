@@ -424,6 +424,29 @@ describe("IPA/UPS 来源与独立停顿", () => {
       editSynthesisUpsWords("far away", candidate, "F AA lngAX W EY")
     ).toBeNull();
   });
+  it.each(["en-GB", "en-US"] as const)(
+    "%s 从 different 字典音标生成规范 IPA，严格 UPS 拒绝原始 r",
+    (locale) => {
+      expect(
+        convertDictionaryToAzureIpa("ˈdɪfrənt", "different", locale)
+      ).toMatchObject({
+        ok: true,
+        value: "ˈdɪfɹənt"
+      });
+      expect(
+        convertAzureIpaToUps("ˈdɪfrənt", "different", locale)
+      ).toMatchObject({
+        ok: false,
+        message: expect.stringContaining("第 5 个字符「r」")
+      });
+      expect(
+        convertAzureIpaToUps("ˈdɪfɹənt", "different", locale)
+      ).toMatchObject({
+        ok: true,
+        value: "S1 D IH F R AX N T"
+      });
+    }
+  );
   it("字典括号不进入 IPA，UPS 直接保留人工 IPA 的音素", () => {
     expect(
       convertDictionaryToAzureIpa("/k(æ)t/", "cat", "en-US")

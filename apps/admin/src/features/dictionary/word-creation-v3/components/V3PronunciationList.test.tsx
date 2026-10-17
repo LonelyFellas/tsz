@@ -10,7 +10,7 @@ import {
 } from "@testing-library/react";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { RichTextV2 } from "@tsz/types";
+import type { PronunciationSynthesisV3, RichTextV2 } from "@tsz/types";
 import type { VoiceEditorProps } from "@tsz/voice-editor/types";
 import { formsFixture, commonFormFixture, ukUsFormFixture } from "../fixtures";
 import { toFormsWire } from "../model";
@@ -105,12 +105,14 @@ function Harness({
   configured = false,
   phrase = false,
   word = "cat",
-  phonetic = "kæt"
+  phonetic = "kæt",
+  initialSynthesis
 }: {
   configured?: boolean;
   phrase?: boolean;
   word?: string;
   phonetic?: string;
+  initialSynthesis?: PronunciationSynthesisV3;
 } = {}) {
   const [content, setContent] = useState(() => {
     const form = commonFormFixture();
@@ -120,6 +122,7 @@ function Harness({
     row.actual_pron = phrase ? "həˈloʊ kæt" : "kæt";
     if (configured)
       row.synthesis = { alphabet: "ups", ipa: "kæt", ups: "K AE T" };
+    if (initialSynthesis) row.synthesis = initialSynthesis;
     return formsFixture({ forms: [form] });
   });
   const form = content.pos[0]!.forms[0]!;
@@ -513,6 +516,73 @@ it("字典独立生成实际发音和英美 IPA，UPS 从各自 IPA 转换", () 
   expect(rows()[0].synthesis.use_spelling).toBe(false);
   fireEvent.click(screen.getByLabelText("撤销实际发音填入"));
   expect(field("实际发音")).toHaveValue("kæt");
+});
+it.each(["英式", "美式"])(
+  "%s UPS 转换先确认字典 r 的规范化，再同步更新 IPA 和 UPS",
+  (side) => {
+    render(
+      <Harness
+        word="different"
+        initialSynthesis={{
+          alphabet: "ipa",
+          ipa: "",
+          ups: "",
+          use_spelling: false,
+          uk: { ipa: "ˈdɪfrənt", ups: "" },
+          us: { ipa: "ˈdɪfrənt", ups: "" }
+        }}
+      />
+    );
+    fireEvent.click(
+      screen.getByLabelText(`第 1 条发音转换为${side} Azure UPS`)
+    );
+    expect(screen.getByText("规范 Azure IPA 并转换 UPS")).toBeInTheDocument();
+    expect(field(`${side} Azure IPA`)).toHaveValue("ˈdɪfrənt");
+    expect(field(`${side} Azure UPS`)).toHaveValue("");
+    fireEvent.click(screen.getByText("应用转换结果"));
+    expect(field(`${side} Azure IPA`)).toHaveValue("ˈdɪfɹənt");
+    expect(field(`${side} Azure UPS`)).toHaveValue("S1 D IH F R AX N T");
+    const other = side === "英式" ? "美式" : "英式";
+    expect(field(`${other} Azure IPA`)).toHaveValue("ˈdɪfrənt");
+    expect(field(`${other} Azure UPS`)).toHaveValue("");
+    expect(field("字典音标")).toHaveValue("kæt");
+    expect(field("实际发音")).toHaveValue("kæt");
+    expect(
+      rows()[0].synthesis[side === "英式" ? "uk" : "us"].ups_words
+    ).toEqual([{ text: "different", phoneme: "S1 D IH F R AX N T" }]);
+    fireEvent.keyDown(field(`${side} Azure IPA`), { key: "z", ctrlKey: true });
+    fireEvent.keyDown(field(`${side} Azure UPS`), { key: "z", ctrlKey: true });
+    expect(field(`${side} Azure IPA`)).toHaveValue("ˈdɪfrənt");
+    expect(field(`${side} Azure UPS`)).toHaveValue("");
+  }
+);
+it("取消或 IPA 来源改变时不应用 r 规范化与 UPS 转换", () => {
+  render(<Harness word="different" />);
+  change("Azure IPA", "ˈdɪfrənt");
+  change("Azure UPS", "H U M");
+  convert("UPS");
+  expect(screen.getByText("规范 Azure IPA 并转换 UPS")).toBeInTheDocument();
+  fireEvent.click(screen.getByText(/取\s*消/));
+  expect(field("Azure IPA")).toHaveValue("ˈdɪfrənt");
+  expect(field("Azure UPS")).toHaveValue("H U M");
+  convert("UPS");
+  change("Azure IPA", "kɛt");
+  fireEvent.click(screen.getByText("应用转换结果"));
+  expect(field("Azure IPA")).toHaveValue("kɛt");
+  expect(field("Azure UPS")).toHaveValue("H U M");
+  expect(screen.getByText(/来源、口音或目标内容已变化/)).toBeInTheDocument();
+});
+it("r 规范化后仍有不支持音素时保持严格拒绝，不改写 IPA 或 UPS", () => {
+  render(<Harness />);
+  change("Azure IPA", "frɑː");
+  change("Azure UPS", "H U M");
+  convert("UPS");
+  expect(screen.getByText(/尚无确认规则/)).toBeInTheDocument();
+  expect(
+    screen.queryByText("规范 Azure IPA 并转换 UPS")
+  ).not.toBeInTheDocument();
+  expect(field("Azure IPA")).toHaveValue("frɑː");
+  expect(field("Azure UPS")).toHaveValue("H U M");
 });
 it("字典转换失败保留目标，确认期间编辑目标会阻止覆盖", async () => {
   const view = render(<Harness phonetic="kæt😀" />);

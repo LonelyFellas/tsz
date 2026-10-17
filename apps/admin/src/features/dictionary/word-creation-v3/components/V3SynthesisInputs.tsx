@@ -114,6 +114,7 @@ export function V3SynthesisInputs({
     words: PronunciationSynthesisV3["ups_words"];
     previous: string;
     source: string;
+    normalizedIpa?: string;
     style: WordPronunciationV3["style"];
     spelling: string;
   }>();
@@ -218,13 +219,20 @@ export function V3SynthesisInputs({
     side: Side,
     alphabet: Alphabet,
     value: string,
-    words?: PronunciationSynthesisV3["ups_words"]
+    words?: PronunciationSynthesisV3["ups_words"],
+    normalizedIpa?: string
   ) => {
     const key = `${side}.${alphabet}` as const;
     const candidate = candidateForSide(synthesis, side, dialect);
     history.current[key] = [...history.current[key].slice(-99), candidate];
+    if (normalizedIpa !== undefined)
+      history.current[`${side}.ipa`] = [
+        ...history.current[`${side}.ipa`].slice(-99),
+        candidate
+      ];
     writeCandidate(side, {
       ...candidate,
+      ...(normalizedIpa !== undefined ? { ipa: normalizedIpa } : {}),
       [alphabet]: value,
       ...(alphabet === "ups" ? { ups_words: words ?? null } : {})
     });
@@ -243,7 +251,7 @@ export function V3SynthesisInputs({
       alphabet === "ipa"
         ? pronunciation.dict_phonetic
         : candidateForSide(synthesis, side, dialect).ipa;
-    const result =
+    let result =
       alphabet === "ipa"
         ? convertDictionaryToAzureIpa(
             source,
@@ -256,12 +264,27 @@ export function V3SynthesisInputs({
             spelling,
             pronunciationLocale(side, "uk")
           );
+    let normalizedIpa: string | undefined;
+    // Dictionary shorthand needs explicit confirmation before entering strict IPA conversion.
+    if (alphabet === "ups" && !result.ok && source.includes("r")) {
+      const normalized = source.replaceAll("r", "ɹ");
+      const converted = convertAzureIpaToUps(
+        normalized,
+        spelling,
+        pronunciationLocale(side, "uk")
+      );
+      if (converted.ok) {
+        normalizedIpa = normalized;
+        result = converted;
+      }
+    }
     if (!result.ok) {
       setDiagnostic(result.message);
       return;
     }
     const previous = candidateForSide(synthesis, side, dialect)[alphabet];
-    if (previous && previous !== result.value)
+    setDiagnostic("");
+    if (normalizedIpa !== undefined || (previous && previous !== result.value))
       setPending({
         side,
         alphabet,
@@ -269,6 +292,7 @@ export function V3SynthesisInputs({
         words: result.ups_words,
         previous,
         source,
+        normalizedIpa,
         style: pronunciation.style,
         spelling
       });
@@ -672,7 +696,11 @@ export function V3SynthesisInputs({
       )}
       <Modal
         open={Boolean(pending)}
-        title={`替换 Azure ${pending?.alphabet.toUpperCase() ?? ""}`}
+        title={
+          pending?.normalizedIpa !== undefined
+            ? "规范 Azure IPA 并转换 UPS"
+            : `替换 Azure ${pending?.alphabet.toUpperCase() ?? ""}`
+        }
         okText="应用转换结果"
         cancelText="取消"
         onCancel={() => setPending(undefined)}
@@ -695,11 +723,23 @@ export function V3SynthesisInputs({
               pending.side,
               pending.alphabet,
               pending.value,
-              pending.words
+              pending.words,
+              pending.normalizedIpa
             );
           setPending(undefined);
         }}
       >
+        {pending?.normalizedIpa !== undefined && (
+          <>
+            <Typography.Paragraph>
+              当前 Azure IPA 含字典记法 r。确认后将其改为英语音素 ɹ，再转换为
+              UPS；其他音素保持原样。
+            </Typography.Paragraph>
+            <Typography.Paragraph className="tsz-phonetics">
+              IPA：{pending.source} → {pending.normalizedIpa}
+            </Typography.Paragraph>
+          </>
+        )}
         <Typography.Paragraph>
           将用以下结果替换已有内容，应用后可撤销：
         </Typography.Paragraph>
