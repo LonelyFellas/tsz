@@ -8,7 +8,10 @@ export interface InvitationCode {
   invite_code: string;
 }
 export type InvitationRewardStatus =
-  "awarded" | "reward_disabled" | "inviter_unavailable";
+  | "awarded"
+  | "reward_disabled"
+  | "inviter_unavailable"
+  | "pending_qualification";
 export interface InvitationRecord {
   invitee_user_id: string;
   invitee_name: string | null;

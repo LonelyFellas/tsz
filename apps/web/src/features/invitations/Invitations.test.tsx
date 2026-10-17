@@ -111,9 +111,7 @@ it("distinguishes actual awarded records from permanent skipped rewards and paus
     await screen.findByText("已发放 9,007,199,254,740,993 天生币")
   ).toBeInTheDocument();
   expect(screen.getByText(/你的账户当前不可接收奖励/)).toBeInTheDocument();
-  expect(
-    screen.getByText("未发放：注册时邀请人账户不可收奖")
-  ).toBeInTheDocument();
+  expect(screen.getByText("未发放：邀请人账户不可收奖")).toBeInTheDocument();
 });
 it("account changes and failed reads cannot expose the previous code or invent empty records", async () => {
   open();
@@ -125,4 +123,29 @@ it("account changes and failed reads cannot expose the previous code or invent e
   expect(await screen.findByText(/邀请记录加载失败/)).toBeInTheDocument();
   expect(screen.queryByText(overview.invite_code)).not.toBeInTheDocument();
   expect(screen.queryByText("暂无邀请记录")).not.toBeInTheDocument();
+});
+
+it("shows qualification pending without claiming coins were issued", async () => {
+  vi.mocked(api.invitations.overview).mockResolvedValue({
+    ...overview,
+    reward_amount: "10"
+  });
+  vi.mocked(api.invitations.records).mockResolvedValue({
+    items: [
+      {
+        invitee_user_id: "new",
+        invitee_name: "新同学",
+        reward_status: "pending_qualification",
+        reward_amount: "0",
+        created_at: "2026-10-18T00:00:00Z"
+      }
+    ],
+    pagination: { page: 1, page_size: 20, total: 1, total_pages: 1 }
+  });
+  open();
+  expect(
+    await screen.findByText("待达标：好友需绑定手机号并首次学习达标")
+  ).toBeInTheDocument();
+  expect(screen.getByText(/受邀者没有额外邀请奖励/)).toBeInTheDocument();
+  expect(screen.queryByText(/已发放/)).not.toBeInTheDocument();
 });

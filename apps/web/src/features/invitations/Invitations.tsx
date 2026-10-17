@@ -124,9 +124,9 @@ function InvitationContent({ id }: { id: string }) {
                   "邀请奖励暂未开启。好友仍可使用邀请码注册，邀请关系会被记录，本次不发奖，之后不会自动补发。"
                 ) : (
                   <>
-                    当前每位新用户通过你的邀请码成功注册，可获{" "}
+                    好友通过你的邀请码注册，绑定手机号并首次学习达标后，你可获得{" "}
                     {formatCoins(overview.data.reward_amount)}
-                    ，以注册时规则和账户状态为准。
+                    。每位受邀者仅奖励一次；受邀者没有额外邀请奖励，仍可正常获得每日登录与学习奖励。
                   </>
                 )}
               </p>
@@ -135,13 +135,14 @@ function InvitationContent({ id }: { id: string }) {
                   role="status"
                   className="mt-4 rounded-2xl bg-muted/70 p-4 text-sm leading-6"
                 >
-                  你的账户当前不可接收奖励。好友仍可注册并保留邀请关系，本次不发奖，之后不会自动补发。
+                  你的账户当前不可接收奖励。注册或达标结算时账户不可收奖，会记录为未发放，之后不会自动补发。
                 </p>
               )}
             </>
           )}
           <p className="mt-4 text-xs leading-5 text-foreground-muted">
-            好友可在注册前修改或清空邀请码；注册成功后不能补绑或改绑。已有账号登录不会产生邀请奖励。
+            学习达标指完成每日任务，累计达到当日学习奖励门槛（当前为 10
+            道不同题目）。好友可在注册前修改或清空邀请码；注册成功后不能补绑或改绑。已有账号登录不会产生邀请奖励。
           </p>
         </div>
       </section>
@@ -180,9 +181,11 @@ function InvitationContent({ id }: { id: string }) {
                     >
                       {record.reward_status === "awarded"
                         ? `已发放 ${formatCoins(record.reward_amount)}`
-                        : record.reward_status === "reward_disabled"
-                          ? "未发放：注册时奖励未开启"
-                          : "未发放：注册时邀请人账户不可收奖"}
+                        : record.reward_status === "pending_qualification"
+                          ? "待达标：好友需绑定手机号并首次学习达标"
+                          : record.reward_status === "reward_disabled"
+                            ? "未发放：奖励未开启"
+                            : "未发放：邀请人账户不可收奖"}
                     </p>
                   </li>
                 ))}
