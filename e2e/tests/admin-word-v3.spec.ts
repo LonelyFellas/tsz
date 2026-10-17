@@ -12,6 +12,71 @@ import {
 } from "./support/mockAdminV3Api";
 
 test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () => {
+  for (const { width, zoom } of [
+    { width: 1366, zoom: 1 },
+    { width: 1280, zoom: 0.8 },
+    { width: 1280, zoom: 1.25 },
+    { width: 1024, zoom: 1.5 },
+    { width: 390, zoom: 1 }
+  ]) {
+    test(`任务139：${width}px / ${zoom * 100}% 首次点击中文后标签保持同行`, async ({
+      page
+    }) => {
+      await mockAdminV3Api(page);
+      await page.setViewportSize({ width, height: 1000 });
+      // CSS zoom 验证缩放布局；不同视口宽度同时覆盖浏览器缩放后的可用空间。
+      await page.addInitScript((zoom) => {
+        document.addEventListener("DOMContentLoaded", () => {
+          document.documentElement.style.zoom = String(zoom);
+        });
+      }, zoom);
+      await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/meanings`);
+      const row = page.locator(".word-definition-row").first();
+      const language = row.getByLabel("定义 1 语言", { exact: true });
+      await expect(language).toBeVisible();
+      await language.scrollIntoViewIfNeeded();
+      const measure = () =>
+        row.evaluate((node) => {
+          const meta = node.querySelector(".word-definition-meta")!;
+          const number = meta
+            .querySelector(".word-number-cell")!
+            .getBoundingClientRect();
+          return [...meta.querySelectorAll(".word-definition-text-select")].map(
+            (el) => {
+              const rect = el.getBoundingClientRect();
+              return {
+                width: rect.width,
+                height: rect.height,
+                offsetY: rect.y - number.y
+              };
+            }
+          );
+        });
+      const before = await measure();
+      expect(before).toHaveLength(3);
+      for (const control of before)
+        expect(Math.abs(control.offsetY)).toBeLessThan(1);
+      // 必须先点中文；关闭下拉后焦点仍在该控件上，布局也应与初始状态相同。
+      for (const name of ["语言", "等级", "释义方式"]) {
+        const input = row.getByLabel(`定义 1 ${name}`, { exact: true });
+        await input.click();
+        await expect(input).toHaveAttribute("aria-expanded", "true");
+        await expect.poll(measure).toEqual(before);
+        await input.press("Escape");
+        await expect(input).toHaveAttribute("aria-expanded", "false");
+        await expect(
+          page.locator(".word-definition-text-options:visible")
+        ).toHaveCount(0);
+        await expect.poll(measure).toEqual(before);
+        if (name === "语言") {
+          await row.screenshot({
+            path: test.info().outputPath("definition-language-focused.png")
+          });
+        }
+      }
+    });
+  }
+
   test("词形拼写在基础确认、摘要、预览和历史快照中统一为 700", async ({
     page
   }) => {
