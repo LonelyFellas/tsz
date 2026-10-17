@@ -1,3 +1,4 @@
+import { ListFilterBar } from "@/components/ListFilterBar";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   CertificationFile,
@@ -183,8 +184,8 @@ function ApplicationQueue() {
         <Typography>审核管理</Typography>
         <Typography>教师申请审核</Typography>
       </Breadcrumbs>
-      <Paper variant="outlined" sx={{ p: 2 }}>
-        <Stack direction="row" spacing={1}>
+      <Paper variant="outlined" sx={{ p: 1.5 }}>
+        <ListFilterBar>
           <TextField
             select
             label="认证状态"
@@ -195,7 +196,6 @@ function ApplicationQueue() {
               );
               setPage(1);
             }}
-            sx={{ width: 160 }}
           >
             <MenuItem value="">全部状态</MenuItem>
             {Object.entries(statuses).map(([value, entry]) => (
@@ -205,7 +205,7 @@ function ApplicationQueue() {
             ))}
           </TextField>
           <Button onClick={() => void list.refetch()}>刷新</Button>
-        </Stack>
+        </ListFilterBar>
       </Paper>
       <Paper variant="outlined" sx={{ p: 2 }}>
         {list.isError && (

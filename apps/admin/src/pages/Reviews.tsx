@@ -1,3 +1,4 @@
+import { ListFilterBar } from "@/components/ListFilterBar";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -66,13 +67,8 @@ function ReviewQueue({ adminId }: { adminId: string }) {
         <Typography>审核管理</Typography>
         <Typography>词表审核</Typography>
       </Breadcrumbs>
-      <Paper variant="outlined" sx={{ p: 2 }}>
-        <Stack
-          component="form"
-          direction="row"
-          useFlexGap
-          flexWrap="wrap"
-          spacing={1}
+      <Paper variant="outlined" sx={{ p: 1.5 }}>
+        <ListFilterBar
           onSubmit={handleSubmit((values) =>
             setQuery({
               page: 1,
@@ -85,7 +81,6 @@ function ReviewQueue({ adminId }: { adminId: string }) {
           <TextField
             label="搜索词表"
             placeholder="词表名称 / 创建人"
-            sx={{ width: 200 }}
             slotProps={{ htmlInput: { maxLength: 100 } }}
             {...register("q")}
           />
@@ -93,7 +88,7 @@ function ReviewQueue({ adminId }: { adminId: string }) {
             name="review_state"
             control={control}
             render={({ field }) => (
-              <TextField {...field} select label="审核状态" sx={{ width: 160 }}>
+              <TextField {...field} select label="审核状态">
                 {Object.entries(reviewLabels).map(([value, label]) => (
                   <MenuItem key={value} value={value}>
                     {label}
@@ -113,7 +108,7 @@ function ReviewQueue({ adminId }: { adminId: string }) {
           >
             重置
           </Button>
-        </Stack>
+        </ListFilterBar>
       </Paper>
       <Paper variant="outlined" sx={{ p: 2 }}>
         {result.isError && (
