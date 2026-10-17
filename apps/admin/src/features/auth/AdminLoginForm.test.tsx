@@ -5,7 +5,7 @@ import {
   ADMIN_PERMISSION_UPGRADE_MESSAGE
 } from "@tsz/api-client";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ⚠️ 2FA 规格（红灯）：admin 登录 = 手机号 + 密码 + 验证码三要素（后端 AdminLoginRequest
 // 三字段全 required，先调 /admin/auth/login-code 发码）。本文件定死 form 的 DOM 约定与行为，
@@ -113,6 +113,7 @@ function fillAndSubmit() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockNavigate.mockReset();
   mockRedirect = null;
   // enterConsole 默认拿到一个普通管理员 profile；需要超管的用例各自覆盖。
   mockProfile.mockResolvedValue(profileResponse("admin"));
@@ -511,4 +512,40 @@ describe("AdminLoginForm — 2FA", () => {
     fireEvent.click(screen.getByRole("img", { name: "eye" }));
     expect(pwd).toHaveAttribute("type", "password");
   });
+});
+
+const initialLoginTestUrl = window.location.href;
+afterEach(() => {
+  window.history.replaceState({}, "", initialLoginTestUrl);
+  window.sessionStorage.removeItem("tsz:test-resource-run");
+});
+
+it("已有会话跳离登录页前保留显式测试批次", async () => {
+  window.history.replaceState({}, "", "/login?tsz_test_run=fixture-20261017");
+  useAuthStore.setState({ profile: profileResponse("admin"), role: "admin" });
+  const atNavigation: (string | null)[] = [];
+  mockNavigate.mockImplementation(() =>
+    atNavigation.push(window.sessionStorage.getItem("tsz:test-resource-run"))
+  );
+  render(<AdminLoginForm />);
+  await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
+  expect(atNavigation).toEqual(["fixture-20261017"]);
+});
+
+it("强制改密登录在不读取 profile 的跳转前保留测试批次", async () => {
+  window.history.replaceState({}, "", "/login?tsz_test_run=fixture-20261017");
+  mockLogin.mockResolvedValue(authResponse(true));
+  const atNavigation: (string | null)[] = [];
+  mockNavigate.mockImplementation(() =>
+    atNavigation.push(window.sessionStorage.getItem("tsz:test-resource-run"))
+  );
+  render(<AdminLoginForm />);
+  fillAndSubmit();
+  await waitFor(() =>
+    expect(mockNavigate).toHaveBeenCalledWith("/change-password", {
+      state: { currentPassword: PASSWORD }
+    })
+  );
+  expect(mockProfile).not.toHaveBeenCalled();
+  expect(atNavigation).toEqual(["fixture-20261017"]);
 });
