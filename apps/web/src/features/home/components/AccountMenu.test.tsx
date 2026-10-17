@@ -15,6 +15,7 @@ import { WordListCreator } from "@/features/wordlist/components/WordListCreator"
 import { useUserStore } from "@/stores/user";
 import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIdentityProvider";
 import { setTheme } from "@/lib/theme";
+import { env } from "@/lib/env";
 
 vi.mock("@/features/teacher-certification/TeacherIdentityProvider", () => ({
   useTeacherIdentity: vi.fn()
@@ -339,6 +340,7 @@ describe("AccountMenu", () => {
     render(<AccountMenu />);
     const img = screen.getByRole("img", { name: "Alice" });
     expect(img.getAttribute("src")).toContain("/_next/image?");
+    expect(img.getAttribute("src")).toContain(encodeURIComponent(avatarUrl));
     expect(img.getAttribute("src")).toContain("w=128");
     expect(img).toHaveAttribute("loading", "eager");
     expect(img).toHaveAttribute("fetchpriority", "high");
@@ -359,6 +361,19 @@ describe("AccountMenu", () => {
     expect(nextImg).toHaveClass("opacity-0");
     fireEvent.load(nextImg);
     await waitFor(() => expect(nextImg).toHaveClass("opacity-100"));
+  });
+
+  it("本站头像通过内部 API 生成缩略图，避免经公网下载大原图", () => {
+    const path = "/api/v1/avatars/11111111-1111-4111-8111-111111111111";
+    const avatarUrl = new URL(path, env.NEXT_PUBLIC_SITE_URL).href;
+    useUserStore.setState({ user: { ...USER, avatar_url: avatarUrl } });
+    render(<AccountMenu />);
+    const src = screen.getByRole("img", { name: "Alice" }).getAttribute("src");
+    expect(src).toContain("/_next/image?");
+    expect(new URL(src!, window.location.origin).searchParams.get("url")).toBe(
+      path
+    );
+    expect(useUserStore.getState().user?.avatar_url).toBe(avatarUrl);
   });
 
   it("头像加载失败 → 回退首字母;avatar_url 更新(换头像)后自动重试新图", () => {

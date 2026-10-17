@@ -27,9 +27,11 @@ import { api } from "@/lib/request";
 import { useLogout } from "@/features/auth/hooks/useLogout";
 import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIdentityProvider";
 import { useTheme } from "@/features/theme/useTheme";
+import { env } from "@/lib/env";
 
 const MENU_ITEM_CLASS =
   "gap-2.5 rounded-xl text-foreground data-[highlighted]:bg-primary-muted";
+const SITE_ORIGIN = new URL(env.NEXT_PUBLIC_SITE_URL).origin;
 
 function MenuIcon({ children }: { children: ReactNode }) {
   return (
@@ -156,6 +158,13 @@ export function AccountMenu() {
   const displayName = displayNameOf(user);
   const initial = Array.from(displayName)[0]!.toUpperCase();
   const showImage = !!user.avatar_url && user.avatar_url !== errorUrl;
+  // 本站原图走 Next 的内部 API 代理，避免缩略图回取再次占用公网出口。
+  const localAvatarPath = user.avatar_url.startsWith(`${SITE_ORIGIN}/`)
+    ? user.avatar_url.slice(SITE_ORIGIN.length)
+    : user.avatar_url;
+  const avatarSrc = /^\/api\/v1\/avatars\/[0-9a-f-]+$/i.test(localAvatarPath)
+    ? localAvatarPath
+    : user.avatar_url;
 
   async function handleLogout() {
     setLoading(true);
@@ -209,7 +218,7 @@ export function AccountMenu() {
               {showImage && (
                 <Image
                   key={user.avatar_url}
-                  src={user.avatar_url}
+                  src={avatarSrc}
                   alt={displayName}
                   width={56}
                   height={56}
@@ -217,8 +226,9 @@ export function AccountMenu() {
                   fetchPriority="high"
                   // 只优化本站公开头像端点；历史外部头像保持直连。
                   unoptimized={
+                    !/^\/api\/v1\/avatars\/[0-9a-f-]+$/i.test(avatarSrc) &&
                     !/^https:\/\/(?:test\.|www\.)?tianshengzhi\.com\/api\/v1\/avatars\/[^/?#]+$/.test(
-                      user.avatar_url
+                      avatarSrc
                     )
                   }
                   className={`absolute inset-0 h-full w-full bg-white object-cover ${loadedUrl === user.avatar_url ? "opacity-100" : "opacity-0"}`}
