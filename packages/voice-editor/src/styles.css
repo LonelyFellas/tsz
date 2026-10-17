@@ -167,7 +167,9 @@
 .tsz-ve-editor[data-mode="dict-phonetic"] .tsz-ve-strip,
 .tsz-ve-editor[data-mode="dict-phonetic"] .tsz-ve-canvas-input,
 .tsz-ve-editor[data-mode="actual-pron"] .tsz-ve-strip,
-.tsz-ve-editor[data-mode="actual-pron"] .tsz-ve-canvas-input {
+.tsz-ve-editor[data-mode="actual-pron"] .tsz-ve-canvas-input,
+.tsz-ve-editor[data-mode="phoneme-settings"] .tsz-ve-strip,
+.tsz-ve-editor[data-mode="phoneme-settings"] .tsz-ve-canvas-input {
   font-family: var(--tsz-font-phonetics);
 }
 

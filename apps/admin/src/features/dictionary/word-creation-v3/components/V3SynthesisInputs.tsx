@@ -518,12 +518,7 @@ export function V3SynthesisInputs({
                             locale={sideLocale}
                             label={`${label} ${sideLabel} ${name}`}
                             fallbackVoiceProfile={pronunciation.voice_profile}
-                            onChange={(speech) =>
-                              writeCandidate(side, {
-                                ...candidate,
-                                [`${alphabet}_speech`]: speech
-                              })
-                            }
+                            onChange={(next) => writeCandidate(side, next)}
                           />
                         </Space.Compact>
                         {invalid && (

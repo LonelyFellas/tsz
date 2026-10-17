@@ -1283,6 +1283,16 @@ describe("SmartDictionary", () => {
   });
 
   it("批量归档失败保留选择，再次确认成功后清空选择", async () => {
+    let resolveImpact!: (impact: {
+      wordlist_count: number;
+      active_run_count: number;
+    }) => void;
+    dataSourceMocks.archiveImpact.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveImpact = resolve;
+        })
+    );
     const mutateAsync = vi
       .fn()
       .mockRejectedValueOnce(new Error("引用冲突"))
@@ -1303,25 +1313,28 @@ describe("SmartDictionary", () => {
     );
 
     fireEvent.click(screen.getByText("移入垃圾桶(1)"));
-    const firstConfirm = (
-      await screen.findAllByText("移入垃圾桶", { exact: true })
-    )
+    const confirm = (await screen.findAllByText("移入垃圾桶", { exact: true }))
       .map((item) => item.closest("button"))
       .find((item) => item?.closest(".ant-modal"))!;
-    await waitFor(() => expect(firstConfirm).toBeEnabled());
-    fireEvent.click(firstConfirm);
+    expect(confirm).toBeDisabled();
+    fireEvent.click(confirm);
+    expect(mutateAsync).not.toHaveBeenCalled();
+    await act(async () =>
+      resolveImpact({ wordlist_count: 0, active_run_count: 0 })
+    );
+    await waitFor(() => expect(confirm).toBeEnabled());
+    fireEvent.click(confirm);
     expect(await screen.findByText("引用冲突")).toBeInTheDocument();
     expect(screen.getByText("移入垃圾桶(1)")).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("移入垃圾桶(1)"));
-    const retryConfirm = await waitFor(() => {
-      const button = screen
-        .getAllByText("移入垃圾桶", { exact: true })
-        .map((item) => item.closest("button"))
-        .find((item) => item !== firstConfirm && item?.closest(".ant-modal"));
-      expect(button).toBeEnabled();
-      return button!;
-    });
+    const retryConfirm = (
+      await screen.findAllByText("移入垃圾桶", { exact: true })
+    )
+      .map((item) => item.closest("button"))
+      .filter((item) => item?.closest(".ant-modal"))
+      .at(-1)!;
+    await waitFor(() => expect(retryConfirm).toBeEnabled());
     fireEvent.click(retryConfirm);
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(2));
     expect(mutateAsync.mock.calls[0]![0].input).toEqual({
