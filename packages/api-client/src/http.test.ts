@@ -417,6 +417,31 @@ describe("HttpError", () => {
 });
 
 describe("createHttpClient", () => {
+  it("测试批次只附加到业务请求，401 重试保留原批次", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ message: "expired" }, { ok: false, status: 401 })
+    );
+    fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true }));
+    let run = "fixture-20261017";
+    let token = "old";
+    const http = createHttpClient({
+      baseUrl: "/api/v1/admin",
+      getToken: () => token,
+      getTestResourceRun: () => run,
+      onRefresh: async () => {
+        run = "another-20261017";
+        token = "new";
+        return token;
+      }
+    });
+    await http.post("/speech/previews", {});
+    expect(requestHeaders(0).get("X-TSZ-Test-Run")).toBe("fixture-20261017");
+    expect(requestHeaders(1).get("X-TSZ-Test-Run")).toBe("fixture-20261017");
+    expect(requestHeaders(1).get("Authorization")).toBe("Bearer new");
+    fetchMock.mockResolvedValueOnce(jsonResponse({}));
+    await http.post("/login", {}, { skipAuth: true });
+    expect(requestHeaders(2).has("X-TSZ-Test-Run")).toBe(false);
+  });
   it("GET forwards spelling markup negotiation with the existing authorization", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({}));
     const http = createHttpClient({

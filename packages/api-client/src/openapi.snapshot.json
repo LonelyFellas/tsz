@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/wordlist-excel-import/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-16T13:59:49.168Z",
+  "_source": "/Users/darwish/.codex/worktrees/online-test-resources/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-10-17T04:40:49.547Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -202,6 +202,30 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"], "format": "uuid" }
+      }
+    ],
+    "post /admin/lexicon/audio-assets": [
+      {
+        "name": "X-TSZ-Test-Run",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "post /admin/lexicon/audio-assets/upload-url": [
+      {
+        "name": "X-TSZ-Test-Run",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "get /admin/lexicon/audio-assets/{id}/url": [
+      {
+        "name": "X-TSZ-Test-Run",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "post /admin/lexicon/entries": [
@@ -702,6 +726,14 @@
         "schema": { "type": ["string", "null"] }
       }
     ],
+    "post /admin/speech/previews": [
+      {
+        "name": "X-TSZ-Test-Run",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
     "get /admin/wordlists/{id}/items": [
       {
         "name": "X-TSZ-Sentence-Formatting",
@@ -742,6 +774,30 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"], "format": "uuid" }
+      }
+    ],
+    "post /me/avatar": [
+      {
+        "name": "X-TSZ-Test-Run",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "post /me/avatar/upload-url": [
+      {
+        "name": "X-TSZ-Test-Run",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "post /me/teacher-certification/files": [
+      {
+        "name": "X-TSZ-Test-Run",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "get /me/wordlists/{id}/items": [

@@ -12,6 +12,8 @@ export interface HttpClientOptions {
   baseUrl: string;
   /** 每次请求动态获取 access token。 */
   getToken?: () => string | undefined | Promise<string | undefined>;
+  /** 仅测试批次使用；后端仍须验证账号白名单。不会附加到 OSS 直传请求。 */
+  getTestResourceRun?: () => string | undefined;
   getSessionGeneration?: () => number;
   /**
    * access token 过期(401)时调用。实现应：
@@ -158,6 +160,7 @@ async function parseError(res: Response): Promise<ParsedError> {
 export function createHttpClient({
   baseUrl,
   getToken,
+  getTestResourceRun,
   getSessionGeneration,
   onRefresh,
   onSessionExpired,
@@ -173,6 +176,14 @@ export function createHttpClient({
     responseType: "json" | "blob" = "json",
     deadline?: ReturnType<typeof createRequestDeadline>
   ): Promise<T> {
+    if (!retrying && !skipAuth && getTestResourceRun) {
+      const run = getTestResourceRun();
+      if (run !== undefined) {
+        const scopedHeaders = new Headers(init.headers);
+        scopedHeaders.set("X-TSZ-Test-Run", run);
+        init = { ...init, headers: scopedHeaders };
+      }
+    }
     const generation = getSessionGeneration?.();
     const isCurrent = () => generation === getSessionGeneration?.();
     // 公开端点(登录/注册等)不带 access token，避免遗留的旧 token 污染请求。
