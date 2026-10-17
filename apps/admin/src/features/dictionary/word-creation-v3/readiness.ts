@@ -53,8 +53,9 @@ export interface V3ProductProgressDetail {
   key: string;
   label: string;
   count?: number;
+  pending?: boolean;
   dialect?: "uk" | "us" | "common";
-  items?: readonly { key: string; label: string }[];
+  items?: readonly { key: string; label: string; pending?: boolean }[];
 }
 
 export interface V3ProductProgressRow {
@@ -257,9 +258,10 @@ export function buildV3ProductProgress({
         label: pos.label,
         count: formCounts.get(pos.key) ?? 0
       })),
-    sense_groups: meanings.sense_groups.map((group, index) => ({
+    sense_groups: meanings.sense_groups.map((group) => ({
       key: group.id,
-      label: `${index + 1}. ${group.name_zh.trim() || group.name_en.trim() || "待填写语义区间"}`,
+      label: group.name_zh.trim() || group.name_en.trim() || "待填写语义区间",
+      pending: !group.name_zh.trim() && !group.name_en.trim(),
       count: senseEntries.filter(
         ({ sense }) => sense.sense_group_id === group.id
       ).length
@@ -275,7 +277,8 @@ export function buildV3ProductProgress({
       count: pos.meanings?.senses.length ?? 0,
       items: (pos.meanings?.senses ?? []).map((sense) => ({
         key: sense.id,
-        label: definitionSummary(sense)
+        label: definitionSummary(sense),
+        pending: definitionSummary(sense) === "待填写释义"
       }))
     })),
     sentences: [

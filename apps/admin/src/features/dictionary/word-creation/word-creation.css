@@ -182,7 +182,9 @@
   cursor: pointer;
 }
 
-.word-creation-progress-row:not(:disabled):hover > span {
+.word-creation-progress-list:not(.v3-product-progress-list)
+  .word-creation-progress-row:not(:disabled):hover
+  > span {
   color: #1677ff;
 }
 
