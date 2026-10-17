@@ -11,9 +11,23 @@
 }
 
 .word-pos-tab-handle {
-  display: inline-flex;
+  display: inline-grid;
+  grid-template-columns: 24px max-content 24px;
+  column-gap: 6px;
+  justify-content: center;
+  min-width: 120px;
   align-items: center;
   border-radius: 6px;
+}
+
+.word-pos-tab-label {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.word-pos-tab-label > .ant-badge:empty {
+  display: none;
 }
 
 .word-pos-tab-handle .word-sort-drag-handle.ant-btn {
