@@ -39,6 +39,7 @@ export function V3ProductProgressList({
         <section
           aria-label={`${row.label}摘要`}
           className="v3-product-progress-group"
+          data-progress-key={row.key}
           key={row.key}
         >
           <button
@@ -112,17 +113,18 @@ export function V3ProductProgressList({
                             )}
                           </div>
                           {detail.items && detail.items.length > 0 && (
-                            <ul className="v3-product-progress-items">
+                            <ol className="v3-product-progress-items">
                               {detail.items.map((item) => (
-                                <li
-                                  key={item.key}
-                                  className="v3-product-progress-text"
-                                  title={item.label}
-                                >
-                                  {item.label}
+                                <li key={item.key}>
+                                  <span
+                                    className="v3-product-progress-text"
+                                    title={item.label}
+                                  >
+                                    {item.label}
+                                  </span>
                                 </li>
                               ))}
-                            </ul>
+                            </ol>
                           )}
                         </li>
                       ))

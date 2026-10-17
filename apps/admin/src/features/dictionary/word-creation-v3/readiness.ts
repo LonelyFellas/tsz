@@ -273,9 +273,9 @@ export function buildV3ProductProgress({
       key: pos.key,
       label: pos.label,
       count: pos.meanings?.senses.length ?? 0,
-      items: (pos.meanings?.senses ?? []).map((sense, index) => ({
+      items: (pos.meanings?.senses ?? []).map((sense) => ({
         key: sense.id,
-        label: `${index + 1}. ${definitionSummary(sense)}`
+        label: definitionSummary(sense)
       }))
     })),
     sentences: [
