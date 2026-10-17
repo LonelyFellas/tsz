@@ -2,7 +2,7 @@
 
 更新：2026-10-17。源码基线：前端 `origin/main`，`095bb67e89b1820c41ef7d5108ed1098b1f7c716`。
 
-当前阶段：P0～P5 实施、本地质量门、完整 e2e 与实际 200% 缩放验收完成。用户已授权修复、提交、推送并创建 PR；按 ship 技能执行精确提交的独立审查与原生 hooks。未授权合并或部署。PR 交付结果随本次会话返回。
+当前阶段：P0～P5 实施、本地质量门、完整 e2e 与实际 200% 缩放验收完成。用户已授权修复、提交、推送并创建 PR；按 ship 技能执行精确提交的独立审查与原生 hooks。PR #471 已创建；用户进一步授权修复 CI、全绿后合并并部署测试环境，合并与部署均以精确 SHA 的 CI 为门禁。
 
 ## 1. 目标、范围与默认决策
 
@@ -340,7 +340,7 @@ pnpm -r why @ant-design/icons
 
 ## 10. 实施与验收结果（2026-10-17）
 
-P0–P5 实施与本地验收完成。改动位于 `codex/mui-migration` worktree；初始基线 `095bb67e89b1820c41ef7d5108ed1098b1f7c716`，交付前已同步主线 `7ce616b424a33363cd7cfb28775fa8fb5c0f989f` 并保留 #470 的发音按钮右端对齐改动。用户已授权提交、推送及 PR；未合并或部署。
+P0–P5 实施与本地验收完成。改动位于 `codex/mui-migration` worktree；初始基线 `095bb67e89b1820c41ef7d5108ed1098b1f7c716`，交付前已同步主线 `7ce616b424a33363cd7cfb28775fa8fb5c0f989f` 并保留 #470 的发音按钮右端对齐改动。PR #471 已提交；本轮继续修复 CI，并按新增授权在全绿后合并、部署测试环境。
 
 ### 实现范围
 
@@ -385,7 +385,7 @@ OSS 创建前通过列举、版本读取与永久删除预检，所有对象使�
 
 脱敏本地证据位于 `/tmp/tsz-mui-migration-evidence/`，包含登录、嵌套编辑器和 C 端发布详情截图。清理 receipt 为 `test-results/oss-cleanup/20261017-mui-86a964a28b.json`（gitignored）。代码/构建日志在 `/tmp/mui-p5-*.log`；批次 manifest 为 `/tmp/tsz-mui-test-run.json`。实际 200% 的截图为 `chrome-login-200-percent.png`、`chrome-fields-200-percent.png`、`chrome-table-200-percent.png` 和 `chrome-editor-200-percent.png`。临时基线导出、转换脚本、缩放 fixture 服务与窗口在收尾删除/关闭，不进入仓库。后续完整 e2e 全部使用 mock，没有新增业务或 OSS 资源。
 
-剩余外部阶段为 PR 远端 CI；本次交付按授权执行正常提交、精确 SHA 独立审查、原生 pre-push 与 PR。合并和部署不在本次授权内。
+交付推进：PR #471 的后台覆盖率分片发现过期用例在按钮准备完成前点击。现等待按钮真正可交互后再推进测试时钟，过期提示、禁止创建请求和移除创建入口的断言保留；该文件采用 CI 覆盖率配置的 56 项验证通过。随后按精确 SHA 独立增量审查、原生 pre-push、PR 全绿、合并后 main 精确 CI 成功的顺序推进 web/admin 测试环境部署。部署结果以原生来源 manifest 和本次会话回执为准。
 
 ## 参考来源
 

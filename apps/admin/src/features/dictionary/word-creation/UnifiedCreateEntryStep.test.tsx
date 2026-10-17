@@ -1327,6 +1327,8 @@ describe("UnifiedCreateEntryStep", () => {
     const createButton = await screen.findByRole("button", {
       name: "创建并进入词形与发音"
     });
+    // 检测结果先渲染，准备完成后才允许创建；在可交互边界再推进时钟。
+    await waitFor(() => expect(createButton).toBeEnabled());
     nowSpy.mockReturnValue(now + 2_000);
     fireEvent.click(createButton);
 
