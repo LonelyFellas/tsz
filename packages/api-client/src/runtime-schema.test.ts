@@ -39,6 +39,7 @@ const ROOTS = [
   "DictionaryEntry",
   "AudioAssetUrlResponse",
   "LearningRewardDay",
+  "LoginRewardDay",
   "LearningPreview",
   "LearningTask",
   "LearningTaskDetail",

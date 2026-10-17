@@ -1,5 +1,7 @@
 # 天生币实施任务清单
 
+2026-10-17 更新：用户已确认每日登录 1 币、每日学习达标 5 币（10 个去重单元）。登录奖励补齐与当前实施状态见 [每日奖励](daily-login-reward.md)；下文保留各批历史记录。
+
 维护位置：本任务前端 worktree 的 `docs/features/coins-system/`，当前为 `/Users/darwish/Dev/tsz-core/tsz-coin12-reward-assessment/docs/features/coins-system/`。旧 worktree 仅供只读交接。
 更新时间：2026-10-07。COIN-01～11（不含 COIN-12）、WL-01～03、LT-01～04 均已合并部署。LT 发布实证见 [学习设计发布记录](learning-task-foundation-design.md#11-lt-发布记录2026-10-07)。COIN-12 本地实现与隔离验收已完成，方案见 [奖励需求](learning-rewards-requirements.md) 与 [奖励设计](learning-rewards-design.md)；按已明示推荐口径实现；生产 A/N 和启用日期待确认，默认关闭。本轮不提交推送、合并、部署或真实发币。
 依据：[需求与决定记录](requirements.md)、[技术设计](design.md)。如有冲突，以最新用户决定为准；注销必须使用“主动签署余额放弃 + 连续 72 小时等待 + 可撤销 + 暂停收支 + 到期作废”方案。

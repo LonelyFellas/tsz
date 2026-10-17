@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/online-test-resources/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-17T04:40:49.547Z",
+  "_source": "/Users/darwish/.codex/worktrees/daily-login-reward/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-10-17T07:09:24.752Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -135,6 +135,7 @@
     "/me/avatar/upload-url": ["post"],
     "/me/coins/entries": ["get"],
     "/me/coins/learning-rewards": ["get"],
+    "/me/coins/login-reward": ["post"],
     "/me/coins/wallet": ["get"],
     "/me/contact/bind": ["post"],
     "/me/contact/bind-code": ["post"],
@@ -2247,6 +2248,18 @@
         "409": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
+    "post /me/coins/login-reward": {
+      "request": { "$ref": "#/components/schemas/LoginRewardRequest" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/LoginRewardDay" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "500": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "get /me/coins/wallet": {
       "request": null,
       "responses": {
@@ -2361,6 +2374,31 @@
     }
   },
   "schemas": {
+    "LoginRewardRequest": { "type": "object", "additionalProperties": false },
+    "LoginRewardDay": {
+      "type": "object",
+      "required": [
+        "business_day",
+        "server_time",
+        "next_day_starts_at",
+        "status",
+        "awarded_amount",
+        "operation_id"
+      ],
+      "properties": {
+        "awarded_amount": { "type": "string", "pattern": "^[01]$" },
+        "business_day": { "type": "string", "format": "date" },
+        "next_day_starts_at": { "type": "string", "format": "date-time" },
+        "operation_id": { "type": ["string", "null"], "format": "uuid" },
+        "server_time": { "type": "string", "format": "date-time" },
+        "status": { "$ref": "#/components/schemas/LoginRewardStatus" }
+      },
+      "additionalProperties": false
+    },
+    "LoginRewardStatus": {
+      "type": "string",
+      "enum": ["awarded", "wallet_unavailable", "reward_disabled"]
+    },
     "UserNotification": {
       "type": "object",
       "required": ["id", "kind", "created_at"],

@@ -65,3 +65,5 @@ export * from "./related-suggestions";
 export * from "./dictionary";
 
 export * from "./wordlist-library";
+
+export type { LoginRewardDay } from "./login-reward";

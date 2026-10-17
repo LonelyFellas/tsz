@@ -1,3 +1,4 @@
+import { createLoginRewardEndpoints } from "./login-reward";
 import { createDictionaryEndpoints } from "./dictionary";
 import { createLearningRewardEndpoints } from "./learning-rewards";
 import { createLearningTaskEndpoints } from "./learning-tasks";
@@ -83,6 +84,7 @@ export function createEndpoints(http: HttpClient) {
     dictionary: createDictionaryEndpoints(http),
     coins: createCoinEndpoints(http),
     learningRewards: createLearningRewardEndpoints(http),
+    loginReward: createLoginRewardEndpoints(http),
     invitations: createInvitationEndpoints(http),
     teacherCertification: createTeacherCertificationEndpoints(http),
     auth: {

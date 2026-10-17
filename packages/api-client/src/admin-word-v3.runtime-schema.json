@@ -1,12 +1,13 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/online-test-resources/tsz-rust/docs/openapi.json",
-  "_source_sha256": "cda0056e9fbb1e8268a2197957cb1a7dc290c718c84ad4e089c113e3a47e94ba",
+  "_source": "/Users/darwish/.codex/worktrees/daily-login-reward/tsz-rust/docs/openapi.json",
+  "_source_sha256": "bc7f0e4bfbd282a39d381befe7dff60c32037d7db3276b08d30a223a83e48563",
   "roots": [
     "DictionaryPage",
     "DictionaryEntry",
     "AudioAssetUrlResponse",
     "LearningRewardDay",
+    "LoginRewardDay",
     "LearningPreview",
     "LearningTask",
     "LearningTaskDetail",
@@ -1759,6 +1760,30 @@
         "version": { "type": "string" }
       },
       "additionalProperties": false
+    },
+    "LoginRewardDay": {
+      "type": "object",
+      "required": [
+        "business_day",
+        "server_time",
+        "next_day_starts_at",
+        "status",
+        "awarded_amount",
+        "operation_id"
+      ],
+      "properties": {
+        "awarded_amount": { "type": "string", "pattern": "^[01]$" },
+        "business_day": { "type": "string", "format": "date" },
+        "next_day_starts_at": { "type": "string", "format": "date-time" },
+        "operation_id": { "type": ["string", "null"], "format": "uuid" },
+        "server_time": { "type": "string", "format": "date-time" },
+        "status": { "$ref": "#/$defs/LoginRewardStatus" }
+      },
+      "additionalProperties": false
+    },
+    "LoginRewardStatus": {
+      "type": "string",
+      "enum": ["awarded", "wallet_unavailable", "reward_disabled"]
     },
     "ManualCoinOperation": {
       "type": "object",

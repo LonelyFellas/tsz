@@ -6,7 +6,8 @@ import { CoinsWallet } from "./CoinsWallet";
 vi.mock("@/lib/request", () => ({
   api: {
     coins: { wallet: vi.fn(), entries: vi.fn() },
-    learningRewards: { day: vi.fn() }
+    learningRewards: { day: vi.fn() },
+    loginReward: { claim: vi.fn() }
   }
 }));
 import { api } from "@/lib/request";
@@ -34,6 +35,14 @@ function open() {
 beforeEach(() => {
   vi.resetAllMocks();
   seed("u1");
+  vi.mocked(api.loginReward.claim).mockResolvedValue({
+    business_day: "2026-10-17",
+    server_time: "2026-10-17T05:00:00Z",
+    next_day_starts_at: "2026-10-17T20:00:00Z",
+    status: "reward_disabled",
+    awarded_amount: "0",
+    operation_id: null
+  });
   vi.mocked(api.learningRewards.day).mockResolvedValue({
     business_day: "2026-10-07",
     server_time: "2026-10-07T06:00:00Z",
