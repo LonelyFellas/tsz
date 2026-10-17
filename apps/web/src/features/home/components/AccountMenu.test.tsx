@@ -10,7 +10,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CoinWallet, User } from "@tsz/types";
-import { AccountMenu } from "./AccountMenu";
+import { AccountMenuPopover as AccountMenu } from "./AccountMenuPopover";
 import { WordListCreator } from "@/features/wordlist/components/WordListCreator";
 import { useUserStore } from "@/stores/user";
 import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIdentityProvider";
