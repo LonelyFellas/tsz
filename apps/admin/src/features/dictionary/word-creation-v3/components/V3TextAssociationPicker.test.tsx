@@ -7,6 +7,7 @@ import type {
 } from "@tsz/types";
 import { commonFormFixture, formsFixture, ukUsFormFixture } from "../fixtures";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -128,18 +129,21 @@ it("新词形关联取消不提交，并清除待确认状态", async () => {
   const onSelect = vi.fn();
   const onCancel = vi.fn();
   const onPendingChange = vi.fn();
-  render(
-    <V3GrammarFormPicker
-      kind="word"
-      segments={[segments[0]!]}
-      onSelect={onSelect}
-      onCancel={onCancel}
-      onPendingChange={onPendingChange}
-    />
-  );
+  // 等候选加载和 Cascader 初始化 effect 完成，避免首次点击被初始化重置。
+  await act(async () => {
+    render(
+      <V3GrammarFormPicker
+        kind="word"
+        segments={[segments[0]!]}
+        onSelect={onSelect}
+        onCancel={onCancel}
+        onPendingChange={onPendingChange}
+      />
+    );
+  });
   expect(screen.getByRole("button", { name: "确认词形关联" })).toBeDisabled();
   fireEvent.click(await screen.findByText("give · 动词"));
-  fireEvent.click(screen.getByText("原形 give · 英美通用"));
+  fireEvent.click(await screen.findByText("原形 give · 英美通用"));
   expect(onSelect).not.toHaveBeenCalled();
   expect(onPendingChange).toHaveBeenLastCalledWith(true);
   expect(screen.getByRole("button", { name: "确认词形关联" })).toBeEnabled();
