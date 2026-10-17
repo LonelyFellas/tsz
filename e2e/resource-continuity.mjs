@@ -141,6 +141,16 @@ try {
       [
         "--noproxy",
         "*",
+        // Docker 映射端口就绪时，Nginx 仍可能尚未监听并返回空响应。
+        "--retry",
+        "10",
+        "--retry-all-errors",
+        "--retry-delay",
+        "1",
+        "--retry-max-time",
+        "10",
+        "--max-time",
+        "2",
         "-sS",
         "-o",
         "/dev/null",
