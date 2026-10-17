@@ -114,8 +114,8 @@ describe("coins contract", () => {
     }
   });
   it("generated OpenAPI has wallet and reward read endpoints with strict amount schemas", () => {
-    const paths = Object.entries(snapshot.paths).filter(([path]) =>
-      path.includes("/me/coins/")
+    const paths = Object.entries(snapshot.paths).filter(
+      ([path]) => path.includes("/me/coins/") && !path.endsWith("/login-reward")
     );
     expect(paths.map(([path]) => path).sort()).toEqual([
       "/admin/me/coins/entries",

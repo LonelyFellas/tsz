@@ -1,6 +1,52 @@
 import { expect, test } from "@playwright/test";
 import { mockApi } from "./support/mockApi";
 
+test("首页恢复会话后再预取导航页面", async ({ page }) => {
+  await mockApi(page, { authenticated: true });
+  const profileGate = Promise.withResolvers<void>();
+  const profileStarted = Promise.withResolvers<void>();
+  await page.route("**/api/v1/me", async (route) => {
+    profileStarted.resolve();
+    await profileGate.promise;
+    await route.fallback();
+  });
+  const prefetched: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (
+      url.searchParams.has("_rsc") &&
+      ["/", "/wordlists", "/dictionary"].includes(url.pathname)
+    )
+      prefetched.push(url.pathname);
+  });
+  await page.addInitScript(() => {
+    window.addEventListener("tsz:app-ready", () => {
+      document.documentElement.dataset.sessionTestReady = "true";
+    });
+  });
+  try {
+    await page.goto("/");
+    await profileStarted.promise;
+    await expect(page.locator("html")).toHaveAttribute(
+      "data-session-test-ready",
+      "true"
+    );
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          requestIdleCallback(() =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+          );
+        })
+    );
+    expect(prefetched).toEqual([]);
+  } finally {
+    profileGate.resolve();
+  }
+  await expect(page.getByRole("button", { name: "账户菜单" })).toBeVisible();
+  await expect.poll(() => prefetched.includes("/dictionary")).toBe(true);
+});
+
 test("离线登出后 online 不会用残留 cookie 重新登录", async ({ page }) => {
   await mockApi(page, { authenticated: true });
   let refreshes = 0;

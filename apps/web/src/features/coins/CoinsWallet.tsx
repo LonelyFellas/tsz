@@ -8,6 +8,7 @@ import { useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { api } from "@/lib/request";
 import { PageHeader, PageShell, panelClass } from "@/features/shell/Page";
+import { LoginRewardSummary } from "./LoginReward";
 import { LearningRewardSummary } from "./LearningRewardSummary";
 import { useUserStore } from "@/stores/user";
 
@@ -15,6 +16,7 @@ const SOURCES: Record<string, string> = {
   wordlist_tip: "词表投币",
   invitation_reward: "邀请奖励",
   learning_reward: "每日学习奖励",
+  daily_login_reward: "每日登录奖励",
   manual_purchase: "购买入账",
   manual_reward: "人工奖励",
   manual_reversal: "人工入账冲正",
@@ -43,6 +45,15 @@ function Wallet({ id }: { id: string }) {
   function refresh() {
     setPage(1);
     setSnapshot(undefined);
+    void client
+      .fetchQuery({
+        queryKey: ["login-reward", id],
+        queryFn: ({ signal }) => api.loginReward.claim({ signal }),
+        staleTime: 0
+      })
+      .catch(() => {
+        /* Query keeps the error for the reward summary. */
+      });
     void client.invalidateQueries({ queryKey: ["coins", "user", id] });
     void client.invalidateQueries({ queryKey: ["learning-rewards", id] });
   }
@@ -174,6 +185,14 @@ function Wallet({ id }: { id: string }) {
           </>
         )}
       </section>
+      <div className="mt-6">
+        <LoginRewardSummary
+          onAward={() => {
+            setPage(1);
+            setSnapshot(undefined);
+          }}
+        />
+      </div>
       {isStudent && (
         <div className="mt-6">
           <LearningRewardSummary key={id} userId={id} onAward={refresh} />
