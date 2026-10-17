@@ -11,7 +11,7 @@ import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
 import { createCandidateManifest } from "../provenance.mjs";
 const file = (p) => readFile(p, "utf8");
-async function stage(component, id) {
+async function stage(component, id, withImageRuntime = true) {
   const dir = `/opt/stage-${id}`;
   const artifact = `${dir}/artifact`;
   await mkdir(artifact, { recursive: true });
@@ -46,6 +46,15 @@ async function stage(component, id) {
       `${artifact}/apps/web/server.js`,
       `require('http').createServer((req,res)=>res.end('${id}')).listen(Number(process.env.PORT),'127.0.0.1')`
     );
+    if (withImageRuntime) {
+      // HTTP fixture 复用挂载仓库中的真实 Next/Sharp，不复制整份依赖。
+      const runtime = `${artifact}/apps/web/node_modules/next/dist/server`;
+      await mkdir(runtime, { recursive: true });
+      await writeFile(
+        `${runtime}/image-optimizer.js`,
+        `module.exports = require('/repo/apps/web/node_modules/next/dist/server/image-optimizer.js');`
+      );
+    }
   }
   await createCandidateManifest({
     component,
@@ -77,6 +86,7 @@ function publish(dir, component, success) {
     }
   );
   assert.equal(result.status === 0, success, result.stdout + result.stderr);
+  return result;
 }
 const ipConfig = await file("/etc/nginx/conf.d/zentao-ip.conf");
 await stage("admin", "A");
@@ -168,6 +178,23 @@ const zentao = spawnSync(
 assert.equal(zentao.status, 0, zentao.stderr);
 assert.equal(zentao.stdout, "zentao");
 const webAccepted = await file("/opt/tsz-deploy-manifests/web.json");
+const systemCallsBeforeImages = await file("/tmp/systemctl-calls");
+const upstreamBeforeImages = await file("/etc/nginx/tsz-web-upstream.inc");
+await stage("web", "missing-images", false);
+const missingImages = publish("/opt/stage-missing-images", "web", false);
+assert.match(
+  missingImages.stderr,
+  /Cannot find module 'next\/dist\/server\/image-optimizer'/
+);
+assert.match(await readlink("/opt/tsz-releases/web/current"), /\/W1$/);
+assert.equal(await file("/opt/tsz-deploy-manifests/web.json"), webAccepted);
+assert.equal(
+  await file("/etc/nginx/tsz-web-upstream.inc"),
+  upstreamBeforeImages
+);
+assert.equal(await file("/tmp/systemctl-calls"), systemCallsBeforeImages);
+await assert.rejects(access("/opt/tsz-frontend-transaction"));
+await assert.rejects(access("/opt/tsz-releases/web/releases/missing-images"));
 await stage("web", "W2");
 await writeFile("/tmp/fail-api", "fail");
 publish("/opt/stage-W2", "web", false);
