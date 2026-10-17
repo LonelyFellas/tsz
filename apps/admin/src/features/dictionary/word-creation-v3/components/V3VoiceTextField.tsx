@@ -95,6 +95,7 @@ export interface V3VoiceTextFieldProps<
   associationsReadOnly?: boolean;
   invalid?: boolean;
   leadingAction?: ReactNode;
+  trailingAction?: ReactNode;
   audioUploadEnabled?: boolean;
   /** 发音配置；与正文分开走，因为它在 wire 上是正文的兄弟字段。 */
   voiceProfile?: VoiceProfileV3 | null;
@@ -136,6 +137,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   associationsReadOnly: requestedAssociationsReadOnly,
   invalid,
   leadingAction,
+  trailingAction,
   audioUploadEnabled = mode !== "association",
   voiceProfile,
   onVoiceProfileChange,
@@ -431,12 +433,13 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     return (
       <>
         {feedbackHolder}
-        {leadingAction ? (
+        {leadingAction || trailingAction ? (
           <Space.Compact block className="v3-voice-text-field-compact">
             {leadingAction}
             {mode === "grammar" || mode === "spelling" || associationPreview
               ? collapsedField
               : fallback}
+            {trailingAction}
           </Space.Compact>
         ) : mode === "grammar" || mode === "spelling" || associationPreview ? (
           collapsedField
@@ -455,6 +458,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       <Space.Compact block className="v3-voice-text-field-compact">
         {leadingAction}
         {collapsedField}
+        {trailingAction}
         <Button
           aria-label={`打开${ariaLabel}编辑器`}
           disabled={readOnly}

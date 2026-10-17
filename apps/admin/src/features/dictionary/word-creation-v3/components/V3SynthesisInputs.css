@@ -28,7 +28,7 @@
 }
 
 .word-actual-pronunciation-control .v3-voice-text-field-compact > .ant-btn,
-.word-synthesis-control > .ant-btn:first-child {
+.word-synthesis-control > .ant-btn {
   width: 32px;
   height: 32px;
   padding: 0;
@@ -71,7 +71,13 @@
 
 .word-actual-pronunciation-control
   .v3-voice-text-field-compact
-  textarea.ant-input,
+  textarea.ant-input {
+  border-start-start-radius: var(--ant-border-radius, 6px);
+  border-end-start-radius: var(--ant-border-radius, 6px);
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+
 .word-synthesis-control > textarea.ant-input {
   border-radius: 0;
 }
@@ -117,22 +123,6 @@
 }
 .word-synthesis-candidate .word-synthesis-control > .ant-btn {
   height: auto;
-}
-.word-synthesis-control > .word-synthesis-accent:first-child {
-  width: 70px;
-  flex: 0 0 70px;
-  padding-inline: 8px;
-}
-.word-synthesis-control > .word-synthesis-accent-compact:first-child {
-  width: 32px;
-  flex-basis: 32px;
-  padding-inline: 0;
-}
-.word-synthesis-accent-uk {
-  color: var(--ant-color-primary, #2053ff);
-}
-.word-synthesis-accent-us {
-  color: var(--ant-magenta-6, #c41d7f);
 }
 @container (max-width: 600px) {
   .word-synthesis-candidates {

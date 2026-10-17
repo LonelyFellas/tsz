@@ -386,7 +386,7 @@ export function V3PronunciationList({
                           <Form.Item noStyle>
                             <V3VoiceTextField
                               mode="actual-pron"
-                              leadingAction={
+                              trailingAction={
                                 <V3ActualPronunciationCopy
                                   pronunciation={pronunciation}
                                   spelling={variant.spelling}

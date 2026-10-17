@@ -250,7 +250,7 @@ describe("独立发音输入", () => {
     expect(rows()[0].voice_profile.voices[0].voice_id).toBe("american-voice");
     expect(rows()[0].audio_assets[0].original_name).toBe("test.mp3");
   });
-  it("实际发音与音素输入的转换按钮和右侧操作都位于输入组合内", () => {
+  it("实际发音与音素输入的右端依次排列转换和编辑按钮", () => {
     render(<Harness />);
     const actualGroup = field("实际发音").closest(".ant-space-compact");
     expect(actualGroup).toContainElement(
@@ -259,6 +259,16 @@ describe("独立发音输入", () => {
     expect(actualGroup).toContainElement(
       screen.getByLabelText("打开第 1 条发音的实际发音编辑器")
     );
+    const actualConvert = screen.getByLabelText("从字典音标填入实际发音");
+    const actualEdit = screen.getByLabelText("打开第 1 条发音的实际发音编辑器");
+    expect(
+      field("实际发音").compareDocumentPosition(actualConvert) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      actualConvert.compareDocumentPosition(actualEdit) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
     for (const alphabet of ["IPA", "UPS"]) {
       const group = field(`Azure ${alphabet}`).closest(".ant-space-compact");
       expect(group).toContainElement(
@@ -267,6 +277,21 @@ describe("独立发音输入", () => {
       expect(group).toContainElement(
         screen.getByLabelText(`第 1 条发音 美式 Azure ${alphabet} 最终读音`)
       );
+      const convert = screen.getByLabelText(
+        `第 1 条发音转换为美式 Azure ${alphabet}`
+      );
+      expect(convert.textContent).toBe("");
+      expect(
+        field(`Azure ${alphabet}`).compareDocumentPosition(convert) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+      expect(
+        convert.compareDocumentPosition(
+          screen.getByLabelText(
+            `打开第 1 条发音 美式 Azure ${alphabet} TTS 设置器`
+          )
+        ) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
     }
   });
   it("默认 IPA；两种音素预览、音色、录音及另一行保持独立", async () => {

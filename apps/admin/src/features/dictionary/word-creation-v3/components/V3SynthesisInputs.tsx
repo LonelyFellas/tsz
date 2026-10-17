@@ -517,7 +517,6 @@ export function V3SynthesisInputs({
                             }}
                           />
                           <Button
-                            className={`word-synthesis-accent word-synthesis-accent-${side}${dialect === "common" ? "" : " word-synthesis-accent-compact"}`}
                             icon={<SwapOutlined />}
                             aria-label={`${label}转换为${sideLabel} ${name}`}
                             title={
@@ -526,13 +525,7 @@ export function V3SynthesisInputs({
                                 : `从当前${sideLabel} Azure IPA 转换为 ${name}`
                             }
                             onClick={() => convert(side, alphabet)}
-                          >
-                            {dialect === "common"
-                              ? side === "uk"
-                                ? "BrE"
-                                : "AmE"
-                              : null}
-                          </Button>
+                          />
                           <V3PhonemeSpeechSettings
                             spelling={spelling}
                             nodeId={pronunciation.id}
