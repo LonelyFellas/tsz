@@ -2063,6 +2063,7 @@ function RelationsGrid({
                                   />
                                   {searching?.relationId === relation.id &&
                                     !searchWords.length &&
+                                    !relationInputIssue(relation) &&
                                     Boolean(searching.query.trim()) && (
                                       <MuiTypography
                                         component="span"
