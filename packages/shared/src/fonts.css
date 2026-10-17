@@ -4,7 +4,7 @@
   font-style: normal;
   font-weight: 100 500;
   font-variation-settings: "wght" 400;
-  font-feature-settings: "ss04", "ss07", "ss08";
+  font-feature-settings: "ss04", "ss06", "ss07", "ss08";
   /* 覆盖原字体实际字符范围；中文直接系统回退，避免为缺字下载完整字体。 */
   unicode-range:
     U+0000-052F, U+0E3F, U+1E00-27FF, U+3003, U+301C, U+A78B-A78C, U+F8FF,
@@ -18,7 +18,7 @@
   font-style: normal;
   font-weight: 501 900;
   font-variation-settings: "wght" 800;
-  font-feature-settings: "ss04", "ss07", "ss08";
+  font-feature-settings: "ss04", "ss06", "ss07", "ss08";
   /* 覆盖原字体实际字符范围；中文直接系统回退，避免为缺字下载完整字体。 */
   unicode-range:
     U+0000-052F, U+0E3F, U+1E00-27FF, U+3003, U+301C, U+A78B-A78C, U+F8FF,
@@ -104,8 +104,7 @@
   src: url("./fonts/Andika-Regular.woff2") format("woff2");
   font-style: normal;
   font-weight: 400;
-  font-feature-settings:
-    "cv01", "cv04", "cv06", "cv09", "cv31", "cv39", "cv52", "ss05";
+  font-feature-settings: "cv01", "cv04", "cv06", "cv09", "cv39", "cv52", "ss05";
   font-display: swap;
 }
 
@@ -114,8 +113,7 @@
   src: url("./fonts/Andika-Bold.woff2") format("woff2");
   font-style: normal;
   font-weight: 700;
-  font-feature-settings:
-    "cv01", "cv04", "cv06", "cv09", "cv31", "cv39", "cv52", "ss05";
+  font-feature-settings: "cv01", "cv04", "cv06", "cv09", "cv39", "cv52", "ss05";
   font-display: swap;
 }
 
@@ -124,8 +122,7 @@
   src: url("./fonts/Andika-Italic.woff2") format("woff2");
   font-style: italic;
   font-weight: 400;
-  font-feature-settings:
-    "cv01", "cv04", "cv06", "cv09", "cv31", "cv39", "cv52", "ss05";
+  font-feature-settings: "cv01", "cv04", "cv06", "cv09", "cv39", "cv52", "ss05";
   font-display: swap;
 }
 
@@ -134,8 +131,7 @@
   src: url("./fonts/Andika-BoldItalic.woff2") format("woff2");
   font-style: italic;
   font-weight: 700;
-  font-feature-settings:
-    "cv01", "cv04", "cv06", "cv09", "cv31", "cv39", "cv52", "ss05";
+  font-feature-settings: "cv01", "cv04", "cv06", "cv09", "cv39", "cv52", "ss05";
   font-display: swap;
 }
 

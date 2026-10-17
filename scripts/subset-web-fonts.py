@@ -15,7 +15,7 @@ LATIN = list(range(0x100))
 ENGLISH_IPA = [ord(char) for char in "ŋθɑʒɡʃʌɔəɛɪɒʊɜɹɻɚɝɾʔːˈˌʲʷʸ̩͡ʧʤ"]
 LATIN_MARKS = [0x0300, 0x0301, 0x0302, 0x0303, 0x0308, 0x030A, 0x0327]
 WORD_FEATURES = ["cv01", "cv04", "cv06", "cv09", "cv31", "cv39", "cv52", "ss05"]
-TEXT_FEATURES = ["ss04", "ss07", "ss08"]
+TEXT_FEATURES = ["ss04", "ss06", "ss07", "ss08"]
 
 for source, family, target_name, style, characters, weight in (
     ("Andika-Regular", "TSZ Common Words", "TSZCommonWords-Regular", "Regular", LATIN + ENGLISH_IPA + LATIN_MARKS, None),
