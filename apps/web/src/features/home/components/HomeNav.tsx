@@ -17,6 +17,7 @@ export function HomeNav() {
       <div className="mx-auto flex h-16 w-full max-w-5xl items-center justify-between px-3 sm:px-6">
         <Link
           href="/"
+          prefetch={hydrated ? null : false}
           className="inline-flex items-center gap-2 rounded-sm text-base sm:text-xl font-bold tracking-tight text-foreground transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
         >
           <BrandMark />
@@ -30,12 +31,14 @@ export function HomeNav() {
           >
             <Link
               href="/wordlists"
+              prefetch={hydrated ? null : false}
               className="inline-flex h-8 items-center rounded-full px-3 text-[13px] font-medium tracking-wide text-foreground-muted transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
             >
               词表
             </Link>
             <Link
               href="/dictionary"
+              prefetch={hydrated ? null : false}
               className="inline-flex h-8 items-center rounded-full px-3 text-[13px] font-medium tracking-wide text-foreground-muted transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
             >
               词典
