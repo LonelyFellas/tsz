@@ -1060,74 +1060,103 @@ export function SmartDictionary({
         <Typography>词库管理</Typography>
         <Typography>{trashMode ? "垃圾桶" : "智能词库"}</Typography>
       </Breadcrumbs>
-      <Paper variant="outlined" sx={{ p: 2 }}>
+      <Paper variant="outlined" sx={{ p: 1.5 }}>
         <Stack
           component="form"
-          direction="row"
-          useFlexGap
-          flexWrap="wrap"
           spacing={1}
           onSubmit={form.handleSubmit(applyFilters)}
         >
-          <TextField
-            label="关键字"
-            placeholder="请输入词汇/创建人"
-            sx={{ width: 180 }}
-            {...form.register("keyword")}
-          />
-          <TextField
-            label="释义"
-            placeholder="请输入释义"
-            sx={{ width: 160 }}
-            {...form.register("gloss")}
-          />
-          {selectOptions.map(({ name, label, options }) => (
-            <Controller
-              key={name}
-              name={name}
-              control={form.control}
-              render={({ field }) => (
-                <TextField
-                  select
-                  label={label}
-                  value={field.value ?? ""}
-                  onChange={(event) =>
-                    field.onChange(event.target.value || undefined)
-                  }
-                  disabled={name === "pos" && partOfSpeechCatalog.isError}
-                  sx={{ width: 150 }}
-                >
-                  <MenuItem value="">全部</MenuItem>
-                  {options.map((option) => (
-                    <MenuItem key={option.value} value={option.value}>
-                      {option.label}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              )}
-            />
-          ))}
-          <Controller
-            name="range"
-            control={form.control}
-            render={({ field }) => (
-              <DateRangeField
-                value={field.value ?? null}
-                onChange={field.onChange}
-              />
-            )}
-          />
-          <Button type="submit" variant="contained">
-            搜索
-          </Button>
-          <Button
-            onClick={() => {
-              reset({});
-              applyFilters({});
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "repeat(2, minmax(0, 1fr))",
+                md: "repeat(3, minmax(0, 1fr))",
+                lg: "repeat(6, minmax(0, 1fr))"
+              },
+              gap: 1
             }}
           >
-            重置
-          </Button>
+            <TextField
+              label="关键字"
+              placeholder="请输入词汇/创建人"
+              fullWidth
+              {...form.register("keyword")}
+            />
+            <TextField
+              label="释义"
+              placeholder="请输入释义"
+              fullWidth
+              {...form.register("gloss")}
+            />
+            {selectOptions.map(({ name, label, options }) => (
+              <Controller
+                key={name}
+                name={name}
+                control={form.control}
+                render={({ field }) => (
+                  <TextField
+                    select
+                    label={label}
+                    value={field.value ?? ""}
+                    onChange={(event) =>
+                      field.onChange(event.target.value || undefined)
+                    }
+                    disabled={name === "pos" && partOfSpeechCatalog.isError}
+                    fullWidth
+                  >
+                    <MenuItem value="">全部</MenuItem>
+                    {options.map((option) => (
+                      <MenuItem key={option.value} value={option.value}>
+                        {option.label}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                )}
+              />
+            ))}
+          </Box>
+          <Stack
+            direction="row"
+            useFlexGap
+            flexWrap="wrap"
+            spacing={1}
+            alignItems="center"
+            sx={{
+              "& > .dictionary-filter-dates": { display: "contents" },
+              "& .MuiPickersTextField-root": {
+                width: { xs: "100%", sm: 220 },
+                minWidth: 0
+              },
+              "& .MuiButton-root": { height: 40 }
+            }}
+          >
+            <Controller
+              name="range"
+              control={form.control}
+              render={({ field }) => (
+                <DateRangeField
+                  className="dictionary-filter-dates"
+                  size="small"
+                  value={field.value ?? null}
+                  onChange={field.onChange}
+                />
+              )}
+            />
+            <Stack direction="row" spacing={1}>
+              <Button type="submit" variant="contained">
+                搜索
+              </Button>
+              <Button
+                onClick={() => {
+                  reset({});
+                  applyFilters({});
+                }}
+              >
+                重置
+              </Button>
+            </Stack>
+          </Stack>
         </Stack>
       </Paper>
       <Paper variant="outlined" sx={{ p: 2 }}>
