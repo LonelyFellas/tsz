@@ -189,13 +189,16 @@ try {
   await page.waitForSelector("#result");
   assert.equal(await page.textContent("#result"), "版本 A");
   assert.deepEqual(failures, []);
-  const tlsGet = (url) => {
+  const tlsGet = (url, version = "--http2") => {
     const raw = execFileSync(
       "curl",
       [
         "--noproxy",
         "*",
         "-ksS",
+        version,
+        "-w",
+        "\n%{http_code} %{http_version}",
         "--resolve",
         `admin-test.tianshengzhi.com:${tlsPort}:127.0.0.1`,
         "-D",
@@ -205,20 +208,35 @@ try {
       { encoding: "utf8" }
     );
     const boundary = raw.indexOf("\r\n\r\n");
-    return { headers: raw.slice(0, boundary), body: raw.slice(boundary + 4) };
+    const metadata = raw.lastIndexOf("\n");
+    const [status, protocol] = raw.slice(metadata + 1).split(" ");
+    return {
+      status: Number(status),
+      protocol,
+      headers: raw.slice(0, boundary),
+      body: raw.slice(boundary + 4, metadata)
+    };
   };
   const response = tlsGet("/version.json");
-  assert.match(response.headers, /200 OK/);
+  assert.equal(response.status, 200);
+  assert.equal(response.protocol, "2");
   assert.equal(JSON.parse(response.body).release_id, "B");
   assert.match(response.headers, /no-store/);
   for (const name of await readdir(path.join(admin, "assets"))) {
     const asset = tlsGet(`/assets/${name}`);
-    assert.match(asset.headers, /200 OK/);
+    assert.equal(asset.status, 200);
+    assert.equal(asset.protocol, "2");
     assert.match(asset.headers, /immutable/);
   }
   const missing = tlsGet("/assets/missing.js");
-  assert.match(missing.headers, /404 Not Found/);
+  assert.equal(missing.status, 404);
+  assert.equal(missing.protocol, "2");
   assert.ok(!missing.headers.includes("immutable"));
+  const fallback = tlsGet("/version.json", "--http1.1");
+  assert.equal(fallback.status, 200);
+  assert.equal(fallback.protocol, "1.1");
+  assert.equal(JSON.parse(fallback.body).release_id, "B");
+  assert.match(fallback.headers, /no-store/);
   // First-entry JS failure must still show a usable native UI.
   const failedPage = await context.newPage();
   await failedPage.route("**/assets/*.js", (route) => route.abort());
