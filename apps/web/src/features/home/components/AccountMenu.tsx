@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
-import { formatCoins } from "@tsz/shared";
+import { formatCoins } from "@tsz/shared/format";
 import {
   useCallback,
   useEffect,
@@ -20,7 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator
-} from "@tsz/ui/components";
+} from "@tsz/ui/components/dropdown-menu";
 import { useUserStore } from "@/stores/user";
 import { displayNameOf } from "@/lib/user";
 import { api } from "@/lib/request";
