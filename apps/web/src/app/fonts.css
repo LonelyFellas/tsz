@@ -1,0 +1,43 @@
+/* 后置同名字体子集：常用拉丁/IPA 先下载，其余字符继续匹配共享完整字体。
+   来自共享 Andika（OFL），保留原有字形特性；由 scripts/subset-web-fonts.py 生成。 */
+@font-face {
+  font-family: "TSZ Words";
+  src: url("../../../../packages/shared/src/fonts/TSZCommonWords-Regular.woff2")
+    format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-feature-settings:
+    "cv01", "cv04", "cv06", "cv09", "cv31", "cv39", "cv52", "ss05";
+  unicode-range: U+0000-036F;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TSZ Words";
+  src: url("../../../../packages/shared/src/fonts/TSZCommonWords-Bold.woff2")
+    format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-feature-settings:
+    "cv01", "cv04", "cv06", "cv09", "cv31", "cv39", "cv52", "ss05";
+  unicode-range: U+0000-00FF;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TSZ Phonetics";
+  src: url("../../../../packages/shared/src/fonts/TSZCommonWords-Regular.woff2")
+    format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-feature-settings:
+    "cv01",
+    "cv04",
+    "cv06",
+    "cv09",
+    "liga" 0,
+    "ss05";
+  /* 重音符继续由共享 Source Sans 规则提供，避免字体优先级变化。 */
+  unicode-range: U+0000-02C7, U+02C9-02CB, U+02CD-036F;
+  font-display: swap;
+}

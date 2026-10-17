@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 export function useSessionRecovery(
   restore: () => Promise<void>,
-  getState: () => { connectionError: boolean }
+  getState: () => { connectionError: boolean; hydrated: boolean }
 ) {
   const [retrying, setRetrying] = useState(false);
   const retry = useCallback(async () => {
@@ -17,7 +17,8 @@ export function useSessionRecovery(
   }, [restore]);
 
   useEffect(() => {
-    void retry();
+    const state = getState();
+    if (!state.hydrated || state.connectionError) void retry();
     const online = () => {
       if (getState().connectionError) void retry();
     };

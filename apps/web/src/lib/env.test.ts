@@ -41,6 +41,12 @@ describe("env", () => {
     const { env } = await import("./env");
     expect(env.NEXT_PUBLIC_API_BASE_URL).toBe("/api/v1");
   });
+
+  it("显式空 API 地址仍拒绝启动", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "");
+    vi.resetModules();
+    await expect(import("./env")).rejects.toThrow("NEXT_PUBLIC_API_BASE_URL");
+  });
 });
 
 // 站点地址只在服务端的生产构建里校验:忘了注入真实域名会让 canonical/sitemap/OG
