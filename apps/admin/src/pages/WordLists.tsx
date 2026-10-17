@@ -1,3 +1,4 @@
+import { ListFilterBar } from "@/components/ListFilterBar";
 import { useState } from "react";
 import Delete from "@mui/icons-material/Delete";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -118,13 +119,8 @@ function Management({ adminId }: { adminId: string }) {
         <Typography>词表管理</Typography>
         <Typography>智能词表</Typography>
       </Breadcrumbs>
-      <Paper variant="outlined" sx={{ p: 2 }}>
-        <Stack
-          component="form"
-          direction="row"
-          useFlexGap
-          flexWrap="wrap"
-          spacing={1}
+      <Paper variant="outlined" sx={{ p: 1.5 }}>
+        <ListFilterBar
           onSubmit={handleSubmit((values) =>
             setQuery({
               page: 1,
@@ -144,7 +140,6 @@ function Management({ adminId }: { adminId: string }) {
           <TextField
             label="搜索词表"
             placeholder="词表名称 / 创建人"
-            sx={{ width: 200 }}
             slotProps={{ htmlInput: { maxLength: 100 } }}
             {...register("q")}
           />
@@ -155,7 +150,6 @@ function Management({ adminId }: { adminId: string }) {
               <TextField
                 select
                 label="公开状态"
-                sx={{ width: 140 }}
                 value={field.value === undefined ? "" : String(field.value)}
                 onChange={(event) =>
                   field.onChange(
@@ -178,7 +172,6 @@ function Management({ adminId }: { adminId: string }) {
               <TextField
                 select
                 label="审核状态"
-                sx={{ width: 160 }}
                 {...field}
                 value={field.value ?? ""}
               >
@@ -198,7 +191,6 @@ function Management({ adminId }: { adminId: string }) {
               <TextField
                 select
                 label="是否推荐"
-                sx={{ width: 140 }}
                 value={field.value === undefined ? "" : String(field.value)}
                 onChange={(event) =>
                   field.onChange(
@@ -219,6 +211,8 @@ function Management({ adminId }: { adminId: string }) {
             control={control}
             render={({ field }) => (
               <DateRangeField
+                size="small"
+                className="list-filter-dates"
                 value={field.value ?? null}
                 onChange={(value) =>
                   field.onChange(
@@ -239,7 +233,7 @@ function Management({ adminId }: { adminId: string }) {
           >
             重置
           </Button>
-        </Stack>
+        </ListFilterBar>
       </Paper>
       <Paper variant="outlined" sx={{ p: 2 }}>
         {error && (

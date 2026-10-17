@@ -1,3 +1,4 @@
+import { ListFilterBar } from "@/components/ListFilterBar";
 import { usePermission } from "@/lib/auth";
 import {
   Alert,
@@ -159,15 +160,10 @@ export function FormTypeSettings() {
             : "服务尚未提供词形配置，请更新后重试"}
         </Alert>
       )}
-      <Paper variant="outlined" sx={{ p: 2 }}>
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          useFlexGap
-          flexWrap="wrap"
-          spacing={1}
-        >
+      <Paper variant="outlined" sx={{ p: 1.5 }}>
+        <ListFilterBar justifyContent="space-between">
           <Autocomplete
+            size="small"
             options={parentOptions}
             value={
               parentOptions.find(
@@ -185,7 +181,6 @@ export function FormTypeSettings() {
                 page: 1
               })
             }
-            sx={{ width: 220 }}
             renderInput={(params) => (
               <TextField
                 {...params}
@@ -204,7 +199,7 @@ export function FormTypeSettings() {
           >
             新增词形变化
           </Button>
-        </Stack>
+        </ListFilterBar>
       </Paper>
       <Paper variant="outlined" sx={{ p: 2 }}>
         {list.isError && (

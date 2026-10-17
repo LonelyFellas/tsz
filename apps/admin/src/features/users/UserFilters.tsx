@@ -1,6 +1,7 @@
+import { ListFilterBar } from "@/components/ListFilterBar";
 import Refresh from "@mui/icons-material/Refresh";
 import Search from "@mui/icons-material/Search";
-import { Button, Paper, Stack, TextField } from "@mui/material";
+import { Button, Paper, TextField } from "@mui/material";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { Controller, useForm } from "react-hook-form";
 import type { UserFilterValues } from "./listQuery";
@@ -22,21 +23,13 @@ export function UserFilters({
     defaultValues: { q: "", registeredDate: null }
   });
   return (
-    <Paper variant="outlined" sx={{ p: 2 }}>
-      <Stack
-        component="form"
-        direction="row"
-        useFlexGap
-        flexWrap="wrap"
-        spacing={1}
-        alignItems="start"
-        onSubmit={handleSubmit(onSearch)}
-      >
+    <Paper variant="outlined" sx={{ p: 1.5 }}>
+      <ListFilterBar onSubmit={handleSubmit(onSearch)}>
         <TextField
+          fullWidth
           label="关键词"
           placeholder="手机号 / 邮箱 / 用户昵称"
           {...register("q")}
-          sx={{ width: 240 }}
         />
         <Controller
           name="registeredDate"
@@ -53,11 +46,11 @@ export function UserFilters({
               slotProps={{
                 field: { clearable: true },
                 textField: {
+                  size: "small",
                   onBlur: field.onBlur,
                   inputRef: field.ref,
                   error: !!errors.registeredDate,
-                  helperText: errors.registeredDate?.message,
-                  sx: { width: 190 }
+                  helperText: errors.registeredDate?.message
                 }
               }}
             />
@@ -75,7 +68,7 @@ export function UserFilters({
         >
           重置
         </Button>
-      </Stack>
+      </ListFilterBar>
     </Paper>
   );
 }

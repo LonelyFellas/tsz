@@ -1,3 +1,4 @@
+import { ListFilterBar } from "@/components/ListFilterBar";
 import Add from "@mui/icons-material/Add";
 import {
   Alert,
@@ -234,32 +235,23 @@ export function AdminManagement() {
         <Typography>用户管理</Typography>
         <Typography>管理员管理</Typography>
       </Breadcrumbs>
-      <Paper variant="outlined" sx={{ p: 2 }}>
-        <Stack
-          component="form"
-          direction="row"
-          useFlexGap
-          flexWrap="wrap"
-          spacing={1}
-          onSubmit={form.handleSubmit(applyFilters)}
-        >
+      <Paper variant="outlined" sx={{ p: 1.5 }}>
+        <ListFilterBar onSubmit={form.handleSubmit(applyFilters)}>
           <TextField
             label="手机号"
             placeholder="手机号包含"
             {...form.register("phone")}
-            sx={{ width: 160 }}
           />
           <TextField
             label="昵称"
             placeholder="昵称包含"
             {...form.register("display_name")}
-            sx={{ width: 160 }}
           />
           <Controller
             name="role"
             control={form.control}
             render={({ field }) => (
-              <TextField select label="权限等级" {...field} sx={{ width: 150 }}>
+              <TextField select label="权限等级" {...field}>
                 <MenuItem value="">全部</MenuItem>
                 {ADMIN_LEVEL_OPTIONS.map((option) => (
                   <MenuItem key={option.value} value={option.value}>
@@ -280,7 +272,7 @@ export function AdminManagement() {
           >
             重置
           </Button>
-        </Stack>
+        </ListFilterBar>
       </Paper>
       <Paper variant="outlined" sx={{ p: 2 }}>
         <PermissionButton
