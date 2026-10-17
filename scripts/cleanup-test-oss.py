@@ -82,11 +82,12 @@ def check_permissions(bucket, prefix):
     key = prefix + ".permission-probe-" + uuid.uuid4().hex
     # Explicitly address a nonexistent null version: no object or delete marker is created.
     try:
-        bucket.head_object(key, params={"versionId": "null"})
+        response = bucket.get_object(key, byte_range=(0, 0), params={"versionId": "null"})
     except Exception as error:
         if getattr(error, "status", None) != 404:
             raise
     else:
+        response.close()
         raise SafetyError("权限探测 key 意外存在，未执行删除")
     result = bucket.delete_object(key, params={"versionId": "null"})
     if result.status != 204 or inventory(bucket, prefix):

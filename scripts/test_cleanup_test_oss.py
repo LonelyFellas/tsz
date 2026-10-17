@@ -52,6 +52,10 @@ class Bucket:
     def head_object(self, key, params):
         raise ProviderError(404)
 
+    def get_object(self, key, byte_range, params):
+        assert byte_range == (0, 0) and params == {"versionId": "null"}
+        raise ProviderError(404)
+
 
 class CleanupTest(unittest.TestCase):
     def setUp(self):
@@ -157,7 +161,7 @@ class CleanupTest(unittest.TestCase):
         self.assertEqual(cleanup.cleanup(bucket, RUN, self.receipt, probe=True)["status"], "failed")
         self.assertEqual(bucket.calls, [])
         bucket = Bucket()
-        bucket.head_object = lambda *args, **kwargs: (_ for _ in ()).throw(ProviderError())
+        bucket.get_object = lambda *args, **kwargs: (_ for _ in ()).throw(ProviderError())
         self.assertEqual(cleanup.cleanup(bucket, RUN, self.receipt, probe=True)["status"], "failed")
         self.assertEqual(bucket.calls, [])
 
@@ -166,6 +170,23 @@ class CleanupTest(unittest.TestCase):
         bucket = Bucket(self.owned)
         with self.assertRaises(OSError):
             cleanup.cleanup(bucket, RUN, self.receipt, apply=True)
+        self.assertEqual(bucket.calls, [])
+
+    def test_version_read_denial_blocks_probe_even_when_head_is_allowed(self):
+        bucket = Bucket()
+        bucket.get_object = lambda *args, **kwargs: (_ for _ in ()).throw(ProviderError())
+        result = cleanup.cleanup(bucket, RUN, self.receipt, probe=True)
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["errors"][0]["http_status"], 403)
+        self.assertEqual(bucket.calls, [])
+
+    def test_unexpected_probe_object_is_closed_without_deleting_it(self):
+        bucket = Bucket()
+        closed = []
+        bucket.get_object = lambda *args, **kwargs: SimpleNamespace(close=lambda: closed.append(True))
+        result = cleanup.cleanup(bucket, RUN, self.receipt, probe=True)
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(closed, [True])
         self.assertEqual(bucket.calls, [])
 
 
