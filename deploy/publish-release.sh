@@ -19,6 +19,27 @@ mkdir -p /opt/tsz-deploy-manifests
 "$node_bin" releases.mjs bootstrap /opt/tsz-releases/admin /opt/tsz-admin/dist admin
 "$node_bin" releases.mjs bootstrap /opt/tsz-releases/web /opt/tsz-web web
 "$node_bin" provenance.mjs verify-candidate --manifest candidate.json --artifact-root artifact
+if [[ "$component" = web ]]; then
+  # 页面可启动不代表 Sharp 可用；Next 缩图失败会静默回传原图。
+  (
+    cd artifact/apps/web
+    "$node_bin" <<'NODE'
+const assert = require('node:assert/strict');
+const sharp = require('next/dist/server/image-optimizer').getSharp();
+sharp({ create: { width: 2, height: 2, channels: 3, background: '#ff0000' } })
+  .resize(1, 1)
+  .webp()
+  .toBuffer({ resolveWithObject: true })
+  .then(({ info }) => {
+    assert.equal(info.width, 1);
+    assert.equal(info.height, 1);
+    assert.equal(info.format, 'webp');
+    console.log('standalone image resize: 2x2 -> 1x1 WebP');
+  })
+  .catch((error) => { console.error(error); process.exitCode = 1; });
+NODE
+  )
+fi
 mkdir -p "$root/releases" backup
 [[ ! -e "$release" ]]
 old="$(readlink "$root/current")"

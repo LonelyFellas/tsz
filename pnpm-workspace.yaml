@@ -2,5 +2,16 @@ packages:
   - "apps/*"
   - "packages/*"
   - "e2e"
+# 本地构建的 standalone 同时需要 tshb-test 的 Linux x64 原生依赖。
+supportedArchitectures:
+  os:
+    - current
+    - linux
+  cpu:
+    - current
+    - x64
+  libc:
+    - current
+    - glibc
 patchedDependencies:
   "@rc-component/util@1.12.0": patches/@rc-component__util@1.12.0.patch
