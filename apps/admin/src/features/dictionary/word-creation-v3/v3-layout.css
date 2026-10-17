@@ -689,9 +689,20 @@
   list-style: none;
 }
 
+.v3-product-progress-group[data-progress-key="senses"]
+  .v3-product-progress-details {
+  padding-inline-start: 16px;
+}
+
 .v3-product-progress-items {
   margin-block: 0 4px;
-  padding-inline: 12px 0;
+  padding-inline: 24px 0;
+  list-style: decimal;
+  font-variant-numeric: tabular-nums;
+}
+
+.v3-product-progress-items > li {
+  min-width: 0;
 }
 
 .v3-product-progress-details > li {
