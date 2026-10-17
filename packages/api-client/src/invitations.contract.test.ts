@@ -112,3 +112,20 @@ it("missing backend capability is an error, not zero rewards or an empty history
   await expect(api.invitations.overview()).rejects.toThrow();
   await expect(api.invitations.records()).rejects.toThrow();
 });
+
+it("accepts pending qualification with zero issued coins and rejects fabricated issuance", () => {
+  const pending = {
+    ...item,
+    reward_status: "pending_qualification",
+    reward_amount: "0"
+  };
+  expect(
+    decodeInvitationRecords({ ...records, items: [pending] }).items[0]
+  ).toEqual(pending);
+  expect(() =>
+    decodeInvitationRecords({
+      ...records,
+      items: [{ ...pending, reward_amount: "10" }]
+    })
+  ).toThrow();
+});
