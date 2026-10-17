@@ -206,3 +206,66 @@ it("shows the server disabled state without inventing an award", async () => {
   expect(screen.queryByText(/已到账/)).not.toBeInTheDocument();
   expect(invalidated).not.toHaveBeenCalled();
 });
+
+it("the first interaction after activation bypasses the previous day's retry cooldown", async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2030-01-01T00:00:00Z"));
+  vi.mocked(api.loginReward.claim)
+    .mockResolvedValueOnce({
+      ...awarded,
+      server_time: "2026-10-17T19:59:59Z",
+      status: "reward_disabled",
+      awarded_amount: "0",
+      operation_id: null
+    })
+    .mockResolvedValue({
+      ...awarded,
+      business_day: "2026-10-18",
+      server_time: "2026-10-17T20:00:01Z",
+      next_day_starts_at: "2026-10-18T20:00:00Z",
+      operation_id: "operation-new-day"
+    });
+  open();
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(10);
+  });
+  expect(api.loginReward.claim).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(2000);
+  });
+  expect(api.loginReward.claim).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    fireEvent.pointerDown(window);
+    await vi.advanceTimersByTimeAsync(10);
+  });
+  expect(api.loginReward.claim).toHaveBeenCalledTimes(2);
+  expect(screen.getByText(/2026-10-18 登录奖励已到账/)).toBeInTheDocument();
+});
+
+it("a failed new-day attempt still throttles repeated interactions on that day", async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2030-01-01T00:00:00Z"));
+  vi.mocked(api.loginReward.claim)
+    .mockResolvedValueOnce({
+      ...awarded,
+      server_time: "2026-10-17T19:59:59Z",
+      status: "reward_disabled",
+      awarded_amount: "0",
+      operation_id: null
+    })
+    .mockRejectedValue(new HttpError(403, "unavailable"));
+  open();
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(2010);
+  });
+  await act(async () => {
+    fireEvent.pointerDown(window);
+    await vi.advanceTimersByTimeAsync(10);
+  });
+  expect(api.loginReward.claim).toHaveBeenCalledTimes(2);
+  await act(async () => {
+    fireEvent.keyDown(window);
+    await vi.advanceTimersByTimeAsync(10);
+  });
+  expect(api.loginReward.claim).toHaveBeenCalledTimes(2);
+});

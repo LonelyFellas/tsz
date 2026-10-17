@@ -52,23 +52,25 @@ export function DailyLoginReward() {
       const state = client.getQueryState<LoginRewardDay>(["login-reward", id]);
       if (state?.fetchStatus === "fetching") return;
       const data = state?.data;
-      if (
-        data?.status === "awarded" &&
-        Date.now() <
-          state!.dataUpdatedAt +
-            Date.parse(data.next_day_starts_at) -
-            Date.parse(data.server_time)
-      )
-        return;
+      const nextDay = data
+        ? state!.dataUpdatedAt +
+          Date.parse(data.next_day_starts_at) -
+          Date.parse(data.server_time)
+        : Infinity;
+      const now = Date.now();
+      if (data?.status === "awarded" && now < nextDay) return;
+      // A previous-day disabled/error attempt must not suppress the first visit of a new day.
+      const crossedDay = now >= nextDay && lastAttempt < nextDay;
       const returning =
         !event || event.type === "focus" || event.type === "visibilitychange";
       if (
         !returning &&
+        !crossedDay &&
         (data?.status !== "awarded" || state?.status === "error") &&
-        Date.now() - lastAttempt < 60_000
+        now - lastAttempt < 60_000
       )
         return;
-      lastAttempt = Date.now();
+      lastAttempt = now;
       void refetch({ cancelRefetch: false });
     };
     visit();
