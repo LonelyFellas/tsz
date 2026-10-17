@@ -65,6 +65,7 @@ export interface V3VoiceTextFieldProps<
   onCancel?: () => void;
   doneLoading?: boolean;
   doneDisabled?: boolean;
+  /** 隐藏内部操作时，改动直接交给宿主草稿，由宿主统一保存或取消。 */
   showDone?: boolean;
   onEditingChange?: (editing: boolean) => void;
   onDraftPendingChange?: (pending: boolean) => void;
@@ -175,11 +176,15 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     const next = captureSession();
     setDraftState(next);
   }, [incomingKey]);
+  const editorState = showDone
+    ? draftState
+    : { nodeId, value, textLinks, voiceProfile, audioAssets };
   const draftPending = JSON.stringify(draftState) !== incomingKey;
   useEffect(() => {
+    if (!showDone) return;
     onDraftPendingChange?.(draftPending);
     return () => onDraftPendingChange?.(false);
-  }, [draftPending, onDraftPendingChange]);
+  }, [draftPending, onDraftPendingChange, showDone]);
   const callbacks = useRef({
     onChange,
     onAssociationsChange,
@@ -492,7 +497,12 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           完成
         </Button>
       </Space>
-    ) : null;
+    ) : (
+      <EditorPendingState
+        pending={!canComplete}
+        onChange={onDraftPendingChange}
+      />
+    );
   const editor = (
     <ConfigProvider
       componentDisabled={
@@ -514,7 +524,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             mode={mode}
             textFormattingEnabled={env.SENTENCE_FORMATTING}
             locale={voiceLocale(dialect)}
-            textLinks={draftState.textLinks}
+            textLinks={editorState.textLinks}
             restoreTextLinksOnCorrection={restoreTextLinksOnCorrection}
             renderAssociationPicker={renderAssociationPicker}
             contextLabel={ariaLabel}
@@ -526,7 +536,11 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             language="en"
             placeholder={placeholder}
             onChange={(next: RichTextV2, nextLinks) => {
-              if (!readOnly)
+              if (readOnly) return;
+              if (!showDone) {
+                if (contentReadOnly) onAssociationsChange?.(nextLinks ?? []);
+                else onChange(next, nextLinks);
+              } else
                 setDraftState((current) => ({
                   ...current,
                   value: contentReadOnly ? current.value : next,
@@ -540,7 +554,9 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             }
             previewIsMock={voicePreviewIsMock}
             onVoiceProfileChange={(next) => {
-              if (!readOnly && !contentReadOnly)
+              if (readOnly || contentReadOnly) return;
+              if (!showDone) onVoiceProfileChange?.(next);
+              else
                 setDraftState((current) => ({
                   ...current,
                   voiceProfile: next
@@ -553,14 +569,16 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
                 ? adminAudioUploadAdapter
                 : undefined
             }
-            audioAssets={draftState.audioAssets ?? undefined}
+            audioAssets={editorState.audioAssets ?? undefined}
             onAudioAssetsChange={(next) => {
-              if (!readOnly && !contentReadOnly)
+              if (readOnly || contentReadOnly) return;
+              if (!showDone) onAudioAssetsChange?.(next);
+              else
                 setDraftState((current) => ({ ...current, audioAssets: next }));
             }}
             readOnly={readOnly}
-            value={draftState.value}
-            voiceProfile={draftState.voiceProfile}
+            value={editorState.value}
+            voiceProfile={editorState.voiceProfile}
           />
         </Suspense>
       </div>
@@ -585,6 +603,21 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       )}
     </>
   );
+}
+
+// renderActions 在子编辑器渲染时调用，提交限制通过 effect 通知宿主。
+function EditorPendingState({
+  pending,
+  onChange
+}: {
+  pending: boolean;
+  onChange?: (pending: boolean) => void;
+}) {
+  useEffect(() => {
+    onChange?.(pending);
+    return () => onChange?.(false);
+  }, [pending, onChange]);
+  return null;
 }
 
 /**
