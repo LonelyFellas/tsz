@@ -410,7 +410,7 @@ function Editor({
     if (!searchTerm) return true;
     const stored = row.entryId ? cache.get(row.entryId) : undefined;
     return [
-      row.text ?? stored?.entry?.label ?? "",
+      row.text ?? stored?.entry?.label ?? stored?.entry_label ?? "",
       authorNoteFor(row),
       row.note ?? stored?.private_note ?? "",
       ...(row.candidate?.glosses ?? glosses(stored?.entry))

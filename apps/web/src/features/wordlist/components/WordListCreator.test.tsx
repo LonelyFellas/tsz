@@ -565,7 +565,7 @@ it("published author annotations require withdrawal while existing private notes
   );
 });
 
-it("shows an unavailable entry's label when editing without treating it as readable", async () => {
+it("shows and searches an unavailable entry's label without treating it as readable", async () => {
   const meta = {
     id: "list",
     owner_user_id: "one",
@@ -587,7 +587,7 @@ it("shows an unavailable entry's label when editing without treating it as reada
         entry_id: candidate.entry_id,
         position: 0,
         entry: null,
-        entry_label: "apple",
+        entry_label: "worker",
         unavailable_reason: "archived",
         private_note: "原备注",
         note_revision: 7
@@ -598,8 +598,12 @@ it("shows an unavailable entry's label when editing without treating it as reada
   });
   renderWithProviders(<WordListCreator id="list" />);
   await waitFor(() =>
-    expect(screen.getByPlaceholderText("输入单词或短语")).toHaveValue("apple")
+    expect(screen.getByPlaceholderText("输入单词或短语")).toHaveValue("worker")
   );
+  fireEvent.change(screen.getByLabelText("表内搜索"), {
+    target: { value: " WORKER " }
+  });
+  expect(screen.getByPlaceholderText("输入单词或短语")).toHaveValue("worker");
   expect(screen.getByLabelText("私密备注 1")).toHaveValue("原备注");
   expect(
     screen.getByText("内容不可用（已移入垃圾桶），请删除或替换此项。")
