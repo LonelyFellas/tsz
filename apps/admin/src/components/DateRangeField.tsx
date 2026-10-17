@@ -57,6 +57,11 @@ export function DateRangeField({
           value={draft[index]}
           onChange={(next) => change(index, next)}
           disabled={disabled}
+          desktopModeMediaQuery={
+            withTime && size === "small"
+              ? "@media (min-width: 600px) and (pointer: fine)"
+              : undefined
+          }
           format={withTime ? "YYYY-MM-DD HH:mm:ss" : "YYYY-MM-DD"}
           slotProps={{
             field: { clearable: true },

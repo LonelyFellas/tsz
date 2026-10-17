@@ -1,3 +1,4 @@
+import { ListFilterBar } from "@/components/ListFilterBar";
 import { useIsSuperAdmin, usePermission } from "@/lib/auth";
 import { FormTypeSettings } from "./FormTypeSettings";
 import {
@@ -198,20 +199,9 @@ export function PartOfSpeechSettings() {
         <FormTypeSettings />
       ) : activeTab === "basic" ? (
         <>
-          <Paper variant="outlined" sx={{ p: 2 }}>
-            <Stack
-              direction="row"
-              justifyContent="space-between"
-              useFlexGap
-              flexWrap="wrap"
-              spacing={1}
-            >
-              <Stack
-                component="form"
-                direction="row"
-                useFlexGap
-                flexWrap="wrap"
-                spacing={1}
+          <Paper variant="outlined" sx={{ p: 1.5 }}>
+            <ListFilterBar justifyContent="space-between">
+              <ListFilterBar
                 onSubmit={handleSubmit(({ q: nextQ }) => {
                   setQ(nextQ.trim());
                   setPage(1);
@@ -220,7 +210,6 @@ export function PartOfSpeechSettings() {
                 <TextField
                   label="关键词"
                   placeholder="中文 / 英文 / 编码 / 缩写"
-                  sx={{ width: 260 }}
                   {...register("q")}
                 />
                 <Button type="submit" variant="contained">
@@ -235,7 +224,7 @@ export function PartOfSpeechSettings() {
                 >
                   重置
                 </Button>
-              </Stack>
+              </ListFilterBar>
               <Button
                 variant="contained"
                 disabled={!canEdit || !catalogReady}
@@ -246,7 +235,7 @@ export function PartOfSpeechSettings() {
               >
                 新增基本词性
               </Button>
-            </Stack>
+            </ListFilterBar>
           </Paper>
           <Paper variant="outlined" sx={{ p: 2 }}>
             {list.isError && (
@@ -375,15 +364,10 @@ export function PartOfSpeechSettings() {
               <Typography>{catalog.error.message}</Typography>
             </Alert>
           )}
-          <Paper variant="outlined" sx={{ p: 2 }}>
-            <Stack
-              direction="row"
-              justifyContent="space-between"
-              useFlexGap
-              flexWrap="wrap"
-              spacing={1}
-            >
+          <Paper variant="outlined" sx={{ p: 1.5 }}>
+            <ListFilterBar justifyContent="space-between">
               <Autocomplete
+                size="small"
                 options={parentOptions}
                 value={
                   parentOptions.find(
@@ -395,7 +379,6 @@ export function PartOfSpeechSettings() {
                 loading={catalog.isPending}
                 disabled={catalog.isError || !parts.length}
                 onChange={(_, part) => setSelectedPartId(part?.id ?? "")}
-                sx={{ width: 220 }}
                 renderInput={(params) => (
                   <TextField
                     {...params}
@@ -414,7 +397,7 @@ export function PartOfSpeechSettings() {
               >
                 新增细分词性
               </PermissionButton>
-            </Stack>
+            </ListFilterBar>
           </Paper>
           <SubPartOfSpeechPanel
             ref={subPanelRef}

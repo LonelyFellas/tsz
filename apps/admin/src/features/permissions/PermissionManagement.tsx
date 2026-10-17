@@ -1,3 +1,4 @@
+import { ListFilterBar } from "@/components/ListFilterBar";
 import Add from "@mui/icons-material/Add";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -67,10 +68,7 @@ function SearchField({
 }) {
   const [value, setValue] = useState("");
   return (
-    <Stack
-      component="form"
-      direction="row"
-      spacing={1}
+    <ListFilterBar
       onSubmit={(event) => {
         event.preventDefault();
         onSearch(value);
@@ -81,11 +79,12 @@ function SearchField({
         placeholder={placeholder}
         value={value}
         onChange={(event) => setValue(event.target.value)}
+        sx={{ flex: "1 1 160px" }}
       />
       <Button type="submit" aria-label={`搜索${placeholder}`}>
         搜索
       </Button>
-    </Stack>
+    </ListFilterBar>
   );
 }
 function GrantedAdmins({
@@ -305,7 +304,7 @@ function PermissionAudits({ onClose }: { onClose: () => void }) {
   });
   return (
     <AdminDrawer width={960} title="权限与标签变更记录" onClose={onClose}>
-      <Stack direction="row" useFlexGap flexWrap="wrap" spacing={1}>
+      <ListFilterBar>
         <SearchField
           placeholder="管理员 ID"
           onSearch={(value) => {
@@ -321,13 +320,15 @@ function PermissionAudits({ onClose }: { onClose: () => void }) {
           }}
         />
         <DateRangeField
+          size="small"
+          className="list-filter-dates"
           value={dates}
           onChange={(value) => {
             setDates(value);
             setPage(1);
           }}
         />
-      </Stack>
+      </ListFilterBar>
       {query.isError && <Alert severity="error">{query.error.message}</Alert>}
       <AdminTable
         rows={query.data?.items ?? []}
@@ -523,14 +524,13 @@ export function PermissionManagement() {
         <Typography>用户管理</Typography>
         <Typography>权限管理</Typography>
       </Breadcrumbs>
-      <Paper variant="outlined" sx={{ p: 2 }}>
-        <Stack direction="row" useFlexGap flexWrap="wrap" spacing={1}>
+      <Paper variant="outlined" sx={{ p: 1.5 }}>
+        <ListFilterBar>
           <TextField
             label="关键词"
             placeholder="权限名称 / 说明"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            sx={{ width: 240 }}
           />
           <TextField
             select
@@ -547,7 +547,6 @@ export function PermissionManagement() {
             }}
             value={module ?? ""}
             onChange={(event) => setModule(event.target.value || undefined)}
-            sx={{ width: 160 }}
           >
             <MenuItem value="">全部</MenuItem>
             {[
@@ -561,13 +560,22 @@ export function PermissionManagement() {
             ))}
           </TextField>
           <Autocomplete
+            fullWidth
+            size="small"
             multiple
+            limitTags={1}
+            sx={{
+              "& .MuiAutocomplete-inputRoot": { flexWrap: "nowrap" },
+              "& .MuiAutocomplete-tag": { minWidth: 0 },
+              "& .MuiAutocomplete-inputRoot .MuiAutocomplete-input": {
+                minWidth: 30
+              }
+            }}
             options={tags}
             value={tags.filter((tag) => tagFilter.includes(tag.id))}
             getOptionLabel={(tag) => tag.name}
             isOptionEqualToValue={(a, b) => a.id === b.id}
             onChange={(_, values) => setTagFilter(values.map((tag) => tag.id))}
-            sx={{ width: 220 }}
             renderInput={(params) => (
               <TextField {...params} label="权限标签" placeholder="全部" />
             )}
@@ -581,7 +589,7 @@ export function PermissionManagement() {
           >
             重置
           </Button>
-        </Stack>
+        </ListFilterBar>
       </Paper>
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Stack

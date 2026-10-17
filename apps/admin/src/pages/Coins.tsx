@@ -1,3 +1,4 @@
+import { ListFilterBar } from "@/components/ListFilterBar";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
@@ -222,13 +223,8 @@ function Management({ profile }: { profile: AdminProfile }) {
     selected.account_status === "active";
   const searchPanel = (
     <Stack spacing={2}>
-      <Paper variant="outlined" sx={{ p: 2 }}>
-        <Stack
-          component="form"
-          direction="row"
-          useFlexGap
-          flexWrap="wrap"
-          spacing={1}
+      <Paper variant="outlined" sx={{ p: 1.5 }}>
+        <ListFilterBar
           onSubmit={searchForm.handleSubmit((value) => {
             setSelected(undefined);
             setSearch({ ...value, search: value.search.trim(), page: 1 });
@@ -238,7 +234,7 @@ function Management({ profile }: { profile: AdminProfile }) {
             name="owner_type"
             control={searchForm.control}
             render={({ field }) => (
-              <TextField {...field} select label="身份域" sx={{ width: 160 }}>
+              <TextField {...field} select label="身份域">
                 <MenuItem value="user">C 端用户</MenuItem>
                 <MenuItem value="admin">管理员</MenuItem>
               </TextField>
@@ -247,7 +243,6 @@ function Management({ profile }: { profile: AdminProfile }) {
           <TextField
             label="账户查找"
             placeholder="姓名 / UUID / 完整手机或邮箱"
-            sx={{ width: 300 }}
             error={!!searchForm.formState.errors.search}
             helperText={searchForm.formState.errors.search?.message}
             slotProps={{ htmlInput: { maxLength: 200 } }}
@@ -259,7 +254,7 @@ function Management({ profile }: { profile: AdminProfile }) {
           <Button type="submit" variant="contained">
             查找
           </Button>
-        </Stack>
+        </ListFilterBar>
       </Paper>
       {search && (
         <Paper variant="outlined" sx={{ p: 2 }}>
@@ -415,13 +410,8 @@ function Management({ profile }: { profile: AdminProfile }) {
   );
   const operationsPanel = (
     <Stack spacing={2}>
-      <Paper variant="outlined" sx={{ p: 2 }}>
-        <Stack
-          component="form"
-          direction="row"
-          useFlexGap
-          flexWrap="wrap"
-          spacing={1}
+      <Paper variant="outlined" sx={{ p: 1.5 }}>
+        <ListFilterBar
           onSubmit={operationForm.handleSubmit(({ time, ...values }) =>
             setFilters({
               ...values,
@@ -440,7 +430,6 @@ function Management({ profile }: { profile: AdminProfile }) {
               <TextField
                 select
                 label="目标身份"
-                sx={{ width: 140 }}
                 value={field.value ?? ""}
                 onChange={(event) =>
                   field.onChange(event.target.value || undefined)
@@ -467,7 +456,6 @@ function Management({ profile }: { profile: AdminProfile }) {
               <TextField
                 select
                 label="类型"
-                sx={{ width: 160 }}
                 value={field.value ?? ""}
                 onChange={(event) =>
                   field.onChange(event.target.value || undefined)
@@ -489,6 +477,8 @@ function Management({ profile }: { profile: AdminProfile }) {
             control={operationForm.control}
             render={({ field }) => (
               <DateRangeField
+                size="small"
+                className="list-filter-dates list-filter-dates-with-time"
                 withTime
                 value={field.value ?? null}
                 onChange={field.onChange}
@@ -498,7 +488,7 @@ function Management({ profile }: { profile: AdminProfile }) {
           <Button type="submit" variant="contained">
             筛选
           </Button>
-        </Stack>
+        </ListFilterBar>
       </Paper>
       <Paper variant="outlined" sx={{ p: 2 }}>
         {operations.isError ? (

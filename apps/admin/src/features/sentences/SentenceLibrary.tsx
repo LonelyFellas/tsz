@@ -1,3 +1,4 @@
+import { ListFilterBar } from "@/components/ListFilterBar";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -440,13 +441,8 @@ export function SentenceLibrary({
         </Typography>
       )}
       {!entryId && (
-        <Paper variant="outlined" sx={{ p: 2 }}>
-          <Stack
-            component="form"
-            direction="row"
-            useFlexGap
-            flexWrap="wrap"
-            spacing={1}
+        <Paper variant="outlined" sx={{ p: 1.5 }}>
+          <ListFilterBar
             onSubmit={filterForm.handleSubmit(({ keyword, level, dates }) =>
               setFilters({
                 ...filters,
@@ -461,19 +457,13 @@ export function SentenceLibrary({
             <TextField
               label="例句关键词"
               placeholder="输入 ID / 例句 / 创建人"
-              sx={{ width: 250 }}
               {...filterForm.register("keyword")}
             />
             <Controller
               name="level"
               control={filterForm.control}
               render={({ field }) => (
-                <TextField
-                  {...field}
-                  select
-                  label="筛选例句等级"
-                  sx={{ width: 160 }}
-                >
+                <TextField {...field} select label="筛选例句等级">
                   <MenuItem value="">全部</MenuItem>
                   {["A1", "A2", "B1", "B2", "C1", "C2"].map((value) => (
                     <MenuItem key={value} value={value}>
@@ -487,7 +477,12 @@ export function SentenceLibrary({
               name="dates"
               control={filterForm.control}
               render={({ field }) => (
-                <DateRangeField value={field.value} onChange={field.onChange} />
+                <DateRangeField
+                  size="small"
+                  className="list-filter-dates"
+                  value={field.value}
+                  onChange={field.onChange}
+                />
               )}
             />
             <Button type="submit" variant="contained">
@@ -501,7 +496,7 @@ export function SentenceLibrary({
             >
               重置
             </Button>
-          </Stack>
+          </ListFilterBar>
         </Paper>
       )}
       {entryId ? (
