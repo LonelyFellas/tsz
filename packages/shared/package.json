@@ -7,6 +7,7 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./format": "./src/format.ts",
     "./auth": "./src/auth/index.ts",
     "./recovery": "./src/recovery/index.ts",
     "./fonts.css": "./src/fonts.css"
