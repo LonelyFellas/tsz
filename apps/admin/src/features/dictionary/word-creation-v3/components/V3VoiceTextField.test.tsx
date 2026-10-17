@@ -338,6 +338,29 @@ describe("V3VoiceTextField 语种筛选", () => {
   });
 });
 
+it("宿主统一保存时音色配置直接回传且不显示内部完成按钮", async () => {
+  state.flags.VOICE_PREVIEW = true;
+  const onVoiceProfileChange = vi.fn();
+  render(
+    <V3VoiceTextField
+      mode="association"
+      presentation="editor"
+      showDone={false}
+      ariaLabel="例句正文"
+      field="value"
+      nodeId="sentence-voice"
+      value={VALUE}
+      onChange={vi.fn()}
+      onVoiceProfileChange={onVoiceProfileChange}
+    />
+  );
+  fireEvent.click(await screen.findByLabelText("启用 Sonia"));
+  expect(onVoiceProfileChange).toHaveBeenCalledWith({
+    voices: [{ voice_id: "sonia", enabled: true, rate_percent: 0 }]
+  });
+  expect(screen.queryByLabelText("完成例句正文编辑")).toBeNull();
+});
+
 describe("V3VoiceTextField 上传音频", () => {
   it("未授予上传权限时宿主传入禁用状态", async () => {
     state.canUpload = false;
@@ -373,51 +396,66 @@ describe("V3VoiceTextField 上传音频", () => {
     expect(screen.getByRole("button", { name: "选择音频文件" })).toBeDisabled();
     expect(state.upload).not.toHaveBeenCalled();
   });
-  it("开关开着时注入适配器：上传成功后把资产原样（wire 形状）抛到 audio_assets", async () => {
-    state.upload.mockImplementation(async ({ file, locale, gender }) => ({
-      id: "asset-1",
-      locale,
-      gender,
-      content_type: file.type,
-      size_bytes: file.size,
-      duration_ms: null,
-      original_name: file.name,
-      created_at: "2026-09-06T00:00:00Z"
-    }));
-    const onAudioAssetsChange = vi.fn();
-    render(
-      <V3VoiceTextField
-        ariaLabel="语法结构 1 通用内容"
-        field="content"
-        nodeId="variant-1"
-        onChange={vi.fn()}
-        onAudioAssetsChange={onAudioAssetsChange}
-        value={VALUE}
-      />
-    );
-    await openAudioPanel();
-    fireEvent.change(screen.getByLabelText("上传音频"), {
-      target: {
-        files: [new File([new Uint8Array(3)], "a.mp3", { type: "audio/mpeg" })]
-      }
-    });
-    await screen.findByLabelText("试听 a.mp3");
-    expect(onAudioAssetsChange).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByLabelText("完成语法结构 1 通用内容编辑"));
-    await waitFor(() => expect(onAudioAssetsChange).toHaveBeenCalledTimes(1));
-    expect(onAudioAssetsChange).toHaveBeenCalledWith([
-      {
+  it.each([true, false])(
+    "内部完成按钮=%s 时上传资产按对应提交方式回传，上传中阻止完成",
+    async (showDone) => {
+      state.upload.mockImplementation(async ({ file, locale, gender }) => ({
         id: "asset-1",
-        locale: "en-GB",
-        gender: "female",
-        content_type: "audio/mpeg",
-        size_bytes: 3,
+        locale,
+        gender,
+        content_type: file.type,
+        size_bytes: file.size,
         duration_ms: null,
-        original_name: "a.mp3",
+        original_name: file.name,
         created_at: "2026-09-06T00:00:00Z"
+      }));
+      const onAudioAssetsChange = vi.fn();
+      const onDraftPendingChange = vi.fn();
+      render(
+        <V3VoiceTextField
+          ariaLabel="语法结构 1 通用内容"
+          showDone={showDone}
+          presentation={showDone ? "field" : "editor"}
+          onDraftPendingChange={onDraftPendingChange}
+          field="content"
+          nodeId="variant-1"
+          onChange={vi.fn()}
+          onAudioAssetsChange={onAudioAssetsChange}
+          value={VALUE}
+        />
+      );
+      if (showDone) await openAudioPanel();
+      else fireEvent.click(await screen.findByLabelText("音频"));
+      fireEvent.change(screen.getByLabelText("上传音频"), {
+        target: {
+          files: [
+            new File([new Uint8Array(3)], "a.mp3", { type: "audio/mpeg" })
+          ]
+        }
+      });
+      await screen.findByLabelText("试听 a.mp3");
+      if (showDone) {
+        expect(onAudioAssetsChange).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByLabelText("完成语法结构 1 通用内容编辑"));
+      } else {
+        expect(onDraftPendingChange).toHaveBeenCalledWith(true);
+        expect(onDraftPendingChange).toHaveBeenLastCalledWith(false);
       }
-    ]);
-  });
+      await waitFor(() => expect(onAudioAssetsChange).toHaveBeenCalledTimes(1));
+      expect(onAudioAssetsChange).toHaveBeenCalledWith([
+        {
+          id: "asset-1",
+          locale: "en-GB",
+          gender: "female",
+          content_type: "audio/mpeg",
+          size_bytes: 3,
+          duration_ms: null,
+          original_name: "a.mp3",
+          created_at: "2026-09-06T00:00:00Z"
+        }
+      ]);
+    }
+  );
 
   it("已有的 audio_assets 原样列出来；开关关着时面板置灰但列表仍在", async () => {
     state.flags.VOICE_AUDIO_UPLOAD = false;

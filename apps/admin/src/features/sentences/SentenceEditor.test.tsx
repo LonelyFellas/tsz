@@ -120,22 +120,34 @@ beforeEach(() => {
   });
 });
 describe("当前词条关联与离开保护", () => {
-  it("正文修改须先完成编辑才能保存例句，取消正文修改不影响原表单", async () => {
+  it("只显示一组取消和完成，正文与译文修改一次保存", async () => {
     const current = example();
     show(
       <SentenceEditor sentence={current} onClose={vi.fn()} onSaved={vi.fn()} />
     );
     const input = await screen.findByLabelText("例句正文");
     fireEvent.change(input, { target: { value: "We write stories." } });
-    expect(screen.getByLabelText("完成例句编辑")).toBeDisabled();
-    expect(api.sentences.update).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByLabelText("取消例句正文编辑"));
-    expect(screen.getByLabelText("例句正文")).toHaveValue("We make stories.");
+    expect(screen.queryByLabelText("完成例句正文编辑")).toBeNull();
+    expect(screen.queryByLabelText("取消例句正文编辑")).toBeNull();
+    expect(
+      screen.getAllByText(/^取\s*消$/, { selector: "button span" })
+    ).toHaveLength(1);
+    expect(
+      screen.getAllByText(/^完\s*成$/, { selector: "button span" })
+    ).toHaveLength(1);
+    const footer = screen
+      .getByLabelText("完成例句编辑")
+      .closest(".ant-modal-footer");
+    expect(footer).not.toBeNull();
+    expect(footer).toContainElement(screen.getByLabelText("取消例句编辑"));
     expect(screen.getByLabelText("完成例句编辑")).toBeEnabled();
-    fireEvent.change(screen.getByLabelText("例句正文"), {
-      target: { value: "We write stories." }
-    });
-    fireEvent.click(screen.getByLabelText("完成例句正文编辑"));
+    fireEvent.change(
+      screen.getAllByPlaceholderText("请输入对应的中文译文")[0]!,
+      {
+        target: { value: "我们写故事。" }
+      }
+    );
+    expect(api.sentences.update).not.toHaveBeenCalled();
     vi.mocked(api.sentences.update).mockImplementation(
       async (_id, payload) => ({ ...current, content: payload.content })
     );
@@ -144,6 +156,40 @@ describe("当前词条关联与离开保护", () => {
     expect(
       vi.mocked(api.sentences.update).mock.calls[0]![1].content.sentence.en_text
     ).toMatchObject({ common: { value: { text: "We write stories." } } });
+    expect(
+      vi.mocked(api.sentences.update).mock.calls[0]![1].content.sentence
+        .zh_translations[0]!.content.text
+    ).toBe("我们写故事。");
+  });
+  it("底部取消确认后关闭，正文和译文修改均不写入接口", async () => {
+    const current = example();
+    const onClose = vi.fn();
+    show(
+      <SentenceEditor sentence={current} onClose={onClose} onSaved={vi.fn()} />
+    );
+    fireEvent.change(await screen.findByLabelText("例句正文"), {
+      target: { value: "Unsaved sentence." }
+    });
+    fireEvent.change(
+      screen.getAllByPlaceholderText("请输入对应的中文译文")[0]!,
+      {
+        target: { value: "不保存的译文" }
+      }
+    );
+    fireEvent.click(screen.getByLabelText("取消例句编辑"));
+    const dialog = (
+      await screen.findByText("放弃本次未完成的例句编辑？", {
+        selector: ".ant-modal-confirm-title"
+      })
+    ).closest('[role="dialog"]')! as HTMLElement;
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole("button", { name: /OK|确.*定/ }));
+    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+    expect(api.sentences.update).not.toHaveBeenCalled();
+    expect(api.sentences.create).not.toHaveBeenCalled();
+    expect(current.content.sentence.en_text).toMatchObject({
+      common: { value: { text: "We make stories." } }
+    });
   });
   it("冲突后保留输入，比较最新草稿，显式确认后用最新 revision 重提", async () => {
     const current = example();
@@ -423,7 +469,6 @@ describe("当前词条关联与离开保护", () => {
     );
     fireEvent.click(await screen.findByText("编造（故事、借口等）"));
     fireEvent.click(screen.getByRole("button", { name: "确认关联" }));
-    fireEvent.click(screen.getByLabelText("完成例句正文编辑"));
     const done = screen.getByRole("button", { name: "完成例句编辑" });
     await waitFor(() => expect(done).toBeEnabled());
     fireEvent.click(done);
