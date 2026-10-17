@@ -3,7 +3,7 @@ import {
   InvalidAdminProfileResponseError,
   ADMIN_PERMISSION_UPGRADE_MESSAGE
 } from "@tsz/api-client";
-import { isCode, isPhone } from "@tsz/shared";
+import { isCode, isPhone, readTestResourceRun } from "@tsz/shared";
 import { translateAuthError } from "@tsz/shared/auth";
 import { Alert, Button, Form, Input } from "antd";
 import { useEffect, useRef, useState } from "react";
@@ -69,6 +69,8 @@ export function AdminLoginForm() {
 
   // 已登录的管理员访问登录页：直接进后台。
   useEffect(() => {
+    // 登录和强制改密都可能在首次业务请求前跳转，先保留显式测试批次。
+    readTestResourceRun();
     if (profile) {
       navigate(safeRedirect(searchParams.get("redirect")), { replace: true });
     }

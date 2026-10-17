@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useUserStore } from "@/stores/user";
 import { needsPhoneBinding, phoneBindingPath } from "@tsz/shared/auth";
 import { postAuthPath } from "../shared";
+import { readTestResourceRun } from "@tsz/shared";
 
 function AuthRedirect({ onboarded }: { onboarded: boolean }) {
   const router = useRouter();
@@ -15,6 +16,7 @@ function AuthRedirect({ onboarded }: { onboarded: boolean }) {
     : postAuthPath(onboarded, searchParams.get("redirect"), user?.roles);
 
   useEffect(() => {
+    readTestResourceRun();
     router.replace(target);
   }, [target, router]);
 
