@@ -6,7 +6,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App } from "antd";
+import { AdminTestProviders as App } from "@/test-utils/AdminTestProviders";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryRouter, Link, RouterProvider } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -130,14 +130,14 @@ describe("当前词条关联与离开保护", () => {
     expect(screen.queryByLabelText("完成例句正文编辑")).toBeNull();
     expect(screen.queryByLabelText("取消例句正文编辑")).toBeNull();
     expect(
-      screen.getAllByText(/^取\s*消$/, { selector: "button span" })
+      screen.getAllByText(/^取\s*消$/, { selector: "button" })
     ).toHaveLength(1);
     expect(
-      screen.getAllByText(/^完\s*成$/, { selector: "button span" })
+      screen.getAllByText(/^完\s*成$/, { selector: "button" })
     ).toHaveLength(1);
     const footer = screen
       .getByLabelText("完成例句编辑")
-      .closest(".ant-modal-footer");
+      .closest("[data-editor-dialog-footer]");
     expect(footer).not.toBeNull();
     expect(footer).toContainElement(screen.getByLabelText("取消例句编辑"));
     expect(screen.getByLabelText("完成例句编辑")).toBeEnabled();
@@ -179,11 +179,11 @@ describe("当前词条关联与离开保护", () => {
     fireEvent.click(screen.getByLabelText("取消例句编辑"));
     const dialog = (
       await screen.findByText("放弃本次未完成的例句编辑？", {
-        selector: ".ant-modal-confirm-title"
+        selector: "h2"
       })
     ).closest('[role="dialog"]')! as HTMLElement;
     expect(onClose).not.toHaveBeenCalled();
-    fireEvent.click(within(dialog).getByRole("button", { name: /OK|确.*定/ }));
+    fireEvent.click(within(dialog).getByRole("button", { name: /确.*认/ }));
     await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
     expect(api.sentences.update).not.toHaveBeenCalled();
     expect(api.sentences.create).not.toHaveBeenCalled();
@@ -213,7 +213,7 @@ describe("当前词条关联与离开保护", () => {
     );
     fireEvent.click(screen.getByLabelText("完成例句编辑"));
     fireEvent.click(
-      await screen.findByText("刷新并比较", { selector: "button span" })
+      await screen.findByText("刷新并比较", { selector: "button" })
     );
     const comparison = await screen.findByLabelText("草稿差异");
     expect(comparison).toHaveTextContent("Remote sentence.");
@@ -221,9 +221,7 @@ describe("当前词条关联与离开保护", () => {
     expect(api.sentences.get).toHaveBeenCalledWith(current.id, "draft");
     fireEvent.click(screen.getByLabelText("完成例句编辑"));
     expect(api.sentences.update).toHaveBeenCalledTimes(1);
-    fireEvent.click(
-      screen.getByText("保留本地修改", { selector: "button span" })
-    );
+    fireEvent.click(screen.getByText("保留本地修改", { selector: "button" }));
     fireEvent.click(screen.getByLabelText("完成例句编辑"));
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
     expect(vi.mocked(api.sentences.update).mock.calls[1]![1]).toMatchObject({
@@ -245,19 +243,19 @@ describe("当前词条关联与离开保护", () => {
     );
     fireEvent.click(screen.getByLabelText("完成例句编辑"));
     fireEvent.click(
-      await screen.findByText("刷新并比较", { selector: "button span" })
+      await screen.findByText("刷新并比较", { selector: "button" })
     );
     expect(await screen.findByText("暂时无法读取")).toBeInTheDocument();
     expect(
-      screen.queryByText("保留本地修改", { selector: "button span" })
+      screen.queryByText("保留本地修改", { selector: "button" })
     ).toBeNull();
     fireEvent.click(screen.getByLabelText("完成例句编辑"));
     expect(api.sentences.update).toHaveBeenCalledTimes(1);
     fireEvent.click(
-      await screen.findByText("刷新并比较", { selector: "button span" })
+      await screen.findByText("刷新并比较", { selector: "button" })
     );
     fireEvent.click(
-      await screen.findByText("保留本地修改", { selector: "button span" })
+      await screen.findByText("保留本地修改", { selector: "button" })
     );
     fireEvent.click(screen.getByLabelText("完成例句编辑"));
     await waitFor(() => expect(api.sentences.update).toHaveBeenCalledTimes(2));
@@ -285,18 +283,18 @@ describe("当前词条关联与离开保护", () => {
     );
     fireEvent.click(screen.getByLabelText("完成例句编辑"));
     fireEvent.click(
-      await screen.findByText("刷新并比较", { selector: "button span" })
+      await screen.findByText("刷新并比较", { selector: "button" })
     );
     fireEvent.click(
-      await screen.findByText("放弃本地修改", { selector: "button span" })
+      await screen.findByText("放弃本地修改", { selector: "button" })
     );
     expect(screen.getByLabelText("例句正文")).toHaveValue("We make stories.");
     const dialog = (
       await screen.findByText("放弃本地修改？", {
-        selector: ".ant-modal-confirm-title"
+        selector: "h2"
       })
     ).closest('[role="dialog"]')! as HTMLElement;
-    fireEvent.click(within(dialog).getByRole("button", { name: /OK|确.*定/ }));
+    fireEvent.click(within(dialog).getByRole("button", { name: /确.*认/ }));
     await waitFor(() =>
       expect(screen.getByLabelText("例句正文")).toHaveValue("Remote sentence.")
     );
@@ -386,7 +384,7 @@ describe("当前词条关联与离开保护", () => {
       await screen.findByText(new RegExp(`请关联当前词义：${spelling}`));
       const shortcut = screen
         .queryByText(/确认关联 make/, {
-          selector: "button span"
+          selector: "button"
         })
         ?.closest("button");
       if (spelling === "make") expect(shortcut).toBeUndefined();
@@ -461,7 +459,7 @@ describe("当前词条关联与离开保护", () => {
     await screen.findByText("旧关联尚未选择具体词义，请补全或清除。");
     fireEvent.click(
       await screen.findByText("make", {
-        selector: ".v3-component-usage-entry strong"
+        selector: ".v3-component-usage-entry .tsz-words"
       })
     );
     fireEvent.click(
@@ -493,7 +491,7 @@ describe("当前词条关联与离开保护", () => {
     );
     fireEvent.click(
       await screen.findByText("make", {
-        selector: ".v3-component-usage-entry strong"
+        selector: ".v3-component-usage-entry .tsz-words"
       })
     );
     expect(screen.getByRole("button", { name: "确认关联" })).toBeDisabled();
@@ -539,7 +537,7 @@ describe("当前词条关联与离开保护", () => {
     );
     fireEvent.click(
       await screen.findByText("for", {
-        selector: ".v3-component-usage-entry strong"
+        selector: ".v3-component-usage-entry .tsz-words"
       })
     );
     expect(searchTargets).toHaveBeenCalledWith(
@@ -548,12 +546,17 @@ describe("当前词条关联与离开保护", () => {
     );
     fireEvent.click(await screen.findByText(/原形 for/, {}, { timeout: 5000 }));
     const sense = await screen.findByText("编造（故事、借口等）");
-    expect(sense.closest("li")).toHaveClass("ant-cascader-menu-item-disabled");
+    expect(sense.closest("[data-candidate-option]")).toHaveAttribute(
+      "aria-disabled",
+      "true"
+    );
     expect(sense.querySelector(".v3-component-usage-radio")).toHaveClass(
       "is-checked"
     );
     fireEvent.click(sense);
-    fireEvent.keyDown(sense.closest("li")!, { key: "Enter" });
+    fireEvent.keyDown(sense.closest("[data-candidate-option]")!, {
+      key: "Enter"
+    });
     expect(select).not.toHaveBeenCalled();
     expect(screen.queryByText("确认关联")).toBeNull();
     fireEvent.click(screen.getByText("清除关联"));
@@ -577,7 +580,7 @@ describe("当前词条关联与离开保护", () => {
     );
     fireEvent.click(
       await screen.findByText("color", {
-        selector: ".v3-component-usage-entry strong"
+        selector: ".v3-component-usage-entry .tsz-words"
       })
     );
     fireEvent.click(
@@ -663,7 +666,10 @@ it("仅关联账号打开本人例句，正文、等级和译文不可改，关�
     <SentenceEditor sentence={sentence} onClose={vi.fn()} onSaved={vi.fn()} />
   );
   // 工具已有明确 aria-label，避免覆盖率模式下反复计算整棵弹窗的可访问名称。
-  expect(screen.getByLabelText("例句等级")).toBeDisabled();
+  expect(screen.getByLabelText("例句等级")).toHaveAttribute(
+    "aria-disabled",
+    "true"
+  );
   expect(await screen.findByLabelText("关联单词")).toBeEnabled();
   expect(screen.queryByLabelText("编辑文本")).toBeNull();
   expect(screen.queryByLabelText("音频")).toBeNull();

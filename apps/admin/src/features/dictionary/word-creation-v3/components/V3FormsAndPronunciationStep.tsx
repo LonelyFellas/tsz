@@ -1,17 +1,17 @@
-import { boundFormGroupIds, setFormGroupBindings } from "../meaningsModel";
-import { MinusCircleOutlined } from "@ant-design/icons";
+import { IconButton as MuiIconButton } from "@mui/material";
 import {
-  Alert,
-  App,
-  Badge,
-  Button,
-  Empty,
-  Flex,
-  Space,
-  Tabs,
-  Tooltip,
-  Typography
-} from "antd";
+  Alert as MuiAlert,
+  AlertTitle as MuiAlertTitle,
+  Stack as MuiStack,
+  Tooltip as MuiTooltip,
+  Typography as MuiTypography
+} from "@mui/material";
+import { boundFormGroupIds, setFormGroupBindings } from "../meaningsModel";
+import MinusCircleOutlined from "@mui/icons-material/RemoveCircleOutline";
+import { Box, Tab, Tabs } from "@mui/material";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { LazyTabPanel } from "@/components/LazyTabPanel";
+import { IncompleteCount } from "./IncompleteCount";
 import type {
   Dialect,
   DraftFormsStepContentV3,
@@ -96,12 +96,12 @@ function V3VoiceNotice({ value }: { value: DraftFormsStepContentV3 }) {
   );
   const notice = usePronunciationVoiceNotice(dialects);
   return notice ? (
-    <Alert
-      description="音标与实际发音仍可正常填写和保存；试听语音需要平台先配置对应方言的发音人。"
-      showIcon
-      title={notice}
-      type="warning"
-    />
+    <MuiAlert severity={"warning"}>
+      <MuiAlertTitle>{notice}</MuiAlertTitle>
+      {
+        "音标与实际发音仍可正常填写和保存；试听语音需要平台先配置对应方言的发音人。"
+      }
+    </MuiAlert>
   ) : null;
 }
 
@@ -121,7 +121,11 @@ export function V3FormsAndPronunciationStep({
   onMeaningsChange,
   onGoToMeanings
 }: V3FormsAndPronunciationStepProps) {
-  const { modal } = App.useApp();
+  const [localPos, setLocalPos] = useState<string>();
+  const [deletingPos, setDeletingPos] = useState<{
+    id: string;
+    label: string;
+  }>();
   const [bindingGroup, setBindingGroup] = useState<{
     posId: string;
     groupId: string;
@@ -276,21 +280,25 @@ export function V3FormsAndPronunciationStep({
             disabled: true,
             children: (
               <div className="word-forms-tabs-empty">
-                <Empty
+                <MuiTypography
+                  component="div"
                   className="word-forms-tabs-empty-content"
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description={
-                    <Space orientation="vertical" size={4}>
-                      <Typography.Text strong>暂无词性</Typography.Text>
-                      <Typography.Text type="secondary">
+                  color="text.secondary"
+                >
+                  {
+                    <MuiStack direction="column" spacing={0.5}>
+                      <MuiTypography component="span" fontWeight={600}>
+                        暂无词性
+                      </MuiTypography>
+                      <MuiTypography component="span" color="text.secondary">
                         草稿可暂时不添加词性
-                      </Typography.Text>
-                      <Typography.Text type="secondary">
+                      </MuiTypography>
+                      <MuiTypography component="span" color="text.secondary">
                         请从右上角添加词性。
-                      </Typography.Text>
-                    </Space>
+                      </MuiTypography>
+                    </MuiStack>
                   }
-                />
+                </MuiTypography>
               </div>
             )
           }
@@ -325,40 +333,33 @@ export function V3FormsAndPronunciationStep({
                 />
                 <span className="word-pos-tab-label">
                   <strong>{label}</strong>
-                  <Badge
+                  <IncompleteCount
                     count={countV3PosFormIncomplete(pos)}
-                    size="small"
                     title="该词性未填项"
                   />
                   <V3ReferenceBadge label={label} nodeIds={posNodeIds(pos)} />
                 </span>
                 {value.pos.length > 1 ? (
-                  <Tooltip
+                  <MuiTooltip
+                    describeChild
                     title={
                       posReferences > 0
                         ? referenceBlockedHint(posReferences)
                         : undefined
                     }
                   >
-                    <Button
+                    <MuiIconButton
                       aria-label={`删除${label}`}
-                      danger
-                      icon={<MinusCircleOutlined />}
                       onClick={(event) => {
                         event.stopPropagation();
-                        modal.confirm({
-                          title: `删除词性“${label}”？`,
-                          content:
-                            "保存时会同时预览该词性下游词义、例句和关系的影响。",
-                          okText: "删除",
-                          okButtonProps: { danger: true },
-                          onOk: () => deletePos(pos.pos_id)
-                        });
+                        setDeletingPos({ id: pos.pos_id, label });
                       }}
                       size="small"
-                      type="text"
-                    />
-                  </Tooltip>
+                      color={"error"}
+                    >
+                      <MinusCircleOutlined fontSize="inherit" />
+                    </MuiIconButton>
+                  </MuiTooltip>
                 ) : null}
               </span>
             ),
@@ -392,43 +393,109 @@ export function V3FormsAndPronunciationStep({
           };
         });
 
+  const requestedPos = activePosId ?? localPos;
+  const selectedPos = tabItems.some((item) => item.key === requestedPos)
+    ? requestedPos
+    : tabItems[0]?.key;
   return (
     <PronunciationPreviewProvider>
-      <Flex className="v3-forms-step" vertical gap="middle">
+      <MuiStack className="v3-forms-step" direction="column" spacing={2}>
         <div className="word-step-heading">
           <span className="word-step-number">STEP 02</span>
-          <Typography.Title level={2} style={{ margin: 0 }}>
+          <MuiTypography style={{ margin: 0 }} component="h2" variant="h4">
             词形与发音
-          </Typography.Title>
-          <Typography.Paragraph className="word-step-description">
+          </MuiTypography>
+          <MuiTypography
+            className="word-step-description"
+            component="p"
+            paragraph
+          >
             先添加基本词性，再录入各种词形。录入词形时，不要遗漏 1)
             英式或美式、2)
             规则变化或不规则变化。字典音标用于展示与主动转换，选择 Azure IPA 或
             UPS 输入进行合成。录入实际发音时需严格按照
             “天生之®通用英语音标字母表” 进行操作。
-          </Typography.Paragraph>
+          </MuiTypography>
         </div>
         <V3VoiceNotice value={value} />
         {issues.length > 0 && (
-          <Alert
-            description="已按最近一次校验结果标出对应字段；修改后重新完成本步或重新检查发布条件以更新状态。"
-            showIcon
-            title="词形与发音尚未完成"
-            type="warning"
-          />
+          <MuiAlert severity={"warning"}>
+            <MuiAlertTitle>{"词形与发音尚未完成"}</MuiAlertTitle>
+            {
+              "已按最近一次校验结果标出对应字段；修改后重新完成本步或重新检查发布条件以更新状态。"
+            }
+          </MuiAlert>
         )}
         {catalog.isError && (
-          <Alert showIcon title="词性目录不可用，已停止新增结构" type="error" />
+          <MuiAlert severity={"error"}>
+            {"词性目录不可用，已停止新增结构"}
+          </MuiAlert>
         )}
-        <Tabs
-          activeKey={value.pos.length === 0 ? "empty" : activePosId}
+        <Box
           className="word-pos-tabs word-forms-tabs"
           key={value.pos.map((pos) => pos.pos_id).join(":")}
-          onChange={onActivePosChange}
-          items={tabItems}
-          tabBarExtraContent={addPosSelect}
-        />
-      </Flex>
+        >
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              minWidth: 0,
+              flexWrap: "wrap"
+            }}
+          >
+            <Tabs
+              value={value.pos.length === 0 ? "empty" : (selectedPos ?? false)}
+              onChange={(_, key: string) => {
+                setLocalPos(key);
+                onActivePosChange?.(key);
+              }}
+              variant="scrollable"
+              scrollButtons="auto"
+              sx={{ flex: 1, minWidth: 0 }}
+              aria-label="基本词性"
+            >
+              {tabItems.map((item) => (
+                <Tab
+                  component="div"
+                  key={item.key}
+                  value={item.key}
+                  label={item.label}
+                  disabled={"disabled" in item ? item.disabled : false}
+                  id={`forms-tab-${item.key}`}
+                  aria-controls={`forms-panel-${item.key}`}
+                />
+              ))}
+            </Tabs>
+            {addPosSelect}
+          </Box>
+          {tabItems.map((item) => (
+            <LazyTabPanel
+              key={item.key}
+              id={`forms-panel-${item.key}`}
+              labelledBy={`forms-tab-${item.key}`}
+              active={
+                item.key === (value.pos.length === 0 ? "empty" : selectedPos)
+              }
+            >
+              {item.children}
+            </LazyTabPanel>
+          ))}
+        </Box>
+        <ConfirmDialog
+          open={!!deletingPos}
+          title={`删除词性“${deletingPos?.label ?? ""}”？`}
+          confirmText="删除"
+          danger
+          onClose={() => setDeletingPos(undefined)}
+          onConfirm={() => {
+            if (deletingPos) deletePos(deletingPos.id);
+            setDeletingPos(undefined);
+          }}
+        >
+          保存时会同时预览该词性下游词义、例句和关系的影响。
+        </ConfirmDialog>
+      </MuiStack>
     </PronunciationPreviewProvider>
   );
 }

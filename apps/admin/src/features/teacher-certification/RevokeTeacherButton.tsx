@@ -1,6 +1,17 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Alert, App, Button, Form, Input, Modal } from "antd";
+import {
+  Alert,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  TextField,
+  Typography
+} from "@mui/material";
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { useFeedback } from "@/components/FeedbackProvider";
 import { api, usePermission } from "@/lib/auth";
 
 export function RevokeTeacherButton({
@@ -12,9 +23,14 @@ export function RevokeTeacherButton({
 }) {
   const allowed = usePermission("teacherapply.revoke");
   const client = useQueryClient();
-  const { message } = App.useApp();
+  const notify = useFeedback();
   const [open, setOpen] = useState(false);
-  const [form] = Form.useForm<{ reason: string }>();
+  const {
+    register,
+    reset,
+    handleSubmit,
+    formState: { errors }
+  } = useForm<{ reason: string }>({ defaultValues: { reason: "" } });
   const mutation = useMutation({
     mutationFn: ({ reason }: { reason: string }) =>
       api.teacherCertification.revoke(userId, reason.trim()),
@@ -25,7 +41,7 @@ export function RevokeTeacherButton({
         client.invalidateQueries({ queryKey: ["teacher-application"] })
       ]);
       setOpen(false);
-      void message.success("教师资格已撤销，学生身份与原有数据保留");
+      notify("教师资格已撤销，学生身份与原有数据保留", "success");
       onSuccess?.();
     }
   });
@@ -33,56 +49,70 @@ export function RevokeTeacherButton({
   return (
     <>
       <Button
-        danger
+        color="error"
         onClick={() => {
-          form.resetFields();
+          reset();
           mutation.reset();
           setOpen(true);
         }}
       >
         撤销教师资格
       </Button>
-      <Modal
-        title="撤销教师资格"
+      <Dialog
         open={open}
-        confirmLoading={mutation.isPending}
-        okText="确认撤销"
-        cancelText="取 消"
-        onOk={() => form.submit()}
-        onCancel={() => {
+        onClose={() => {
           if (!mutation.isPending) setOpen(false);
         }}
-        destroyOnHidden
+        fullWidth
+        maxWidth="sm"
+        aria-labelledby="revoke-teacher-title"
       >
-        <p>
-          撤销后不能再使用教师功能，学生身份与原有数据保留，可重新申请认证。
-        </p>
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={(value) => mutation.mutate(value)}
-          preserve={false}
-        >
-          <Form.Item
-            name="reason"
-            label="撤销原因"
-            rules={[
-              { required: true, whitespace: true, message: "请填写撤销原因" },
-              { max: 2000 }
-            ]}
+        <DialogTitle id="revoke-teacher-title">撤销教师资格</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ mb: 2 }}>
+            撤销后不能再使用教师功能，学生身份与原有数据保留，可重新申请认证。
+          </Typography>
+          <form
+            id="revoke-teacher-form"
+            onSubmit={handleSubmit((value) => {
+              if (!mutation.isPending && allowed) mutation.mutate(value);
+            })}
           >
-            <Input.TextArea
+            <TextField
+              label="撤销原因"
+              multiline
               rows={4}
-              maxLength={2000}
-              showCount
+              fullWidth
               disabled={mutation.isPending}
+              error={!!errors.reason}
+              helperText={errors.reason?.message}
+              {...register("reason", {
+                validate: (value) => !!value.trim() || "请填写撤销原因",
+                maxLength: { value: 2000, message: "最长 2000 字符" }
+              })}
             />
-          </Form.Item>
-        </Form>
-        {mutation.error && (
-          <Alert type="error" showIcon title={mutation.error.message} />
-        )}
-      </Modal>
+          </form>
+          {mutation.error && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {mutation.error.message}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button disabled={mutation.isPending} onClick={() => setOpen(false)}>
+            取消
+          </Button>
+          <Button
+            type="submit"
+            form="revoke-teacher-form"
+            color="error"
+            variant="contained"
+            loading={mutation.isPending}
+          >
+            确认撤销
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }

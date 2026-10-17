@@ -1,14 +1,16 @@
 import { useFormTypeLabel } from "./part-of-speech/FormTypeLabels";
+import ExpandMore from "@mui/icons-material/ExpandMore";
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Alert,
   Button,
-  Card,
-  Collapse,
-  List,
-  Space,
-  Tag,
+  Chip,
+  Paper,
+  Stack,
   Typography
-} from "antd";
+} from "@mui/material";
 import {
   aggregateLifecycleSurfaceMatchCards,
   canAcknowledgeSurfaceSnapshot,
@@ -52,99 +54,106 @@ export function LifecycleSurfaceConfirmation({
     archived: "垃圾桶"
   } as const;
   return (
-    <Card
-      size="small"
-      title={
-        disabled
+    <Paper variant="outlined" sx={{ p: 2 }}>
+      <Typography variant="h6" sx={{ mb: 2 }}>
+        {disabled
           ? "学习端暂不支持多个同名公开词条"
-          : `${actionLabel}前需要确认同名公开范围`
-      }
-    >
-      <Alert
-        showIcon
-        type={disabled ? "error" : "warning"}
-        title={`已加载 ${state.items.length}/${state.total} 条匹配来源`}
-        description={
-          disabled
+          : `${actionLabel}前需要确认同名公开范围`}
+      </Typography>
+      <Alert severity={disabled ? "error" : "warning"}>
+        已加载 {state.items.length}/{state.total} 条匹配来源
+        <Typography>
+          {disabled
             ? `当前不能继续${actionLabel}。已保留当前选择和词条状态，请稍后重试。`
-            : `请核对全部匹配词条；确认后将按当前结果继续${actionLabel}。`
-        }
-      />
+            : `请核对全部匹配词条；确认后将按当前结果继续${actionLabel}。`}
+        </Typography>
+      </Alert>
       {groups.map((group) => (
         <section key={group.key} aria-label={group.title}>
-          <Typography.Text strong>{group.title}</Typography.Text>
-          <List
-            size="small"
-            dataSource={group.cards}
-            renderItem={(card) => (
-              <List.Item>
-                <Space wrap>
-                  <Typography.Text className="tsz-words" strong>
+          <Typography fontWeight={600} sx={{ my: 1 }}>
+            {group.title}
+          </Typography>
+          <Stack
+            component="ul"
+            sx={{ listStyle: "none", p: 0, m: 0 }}
+            spacing={1}
+          >
+            {group.cards.map((card) => (
+              <li key={card.entry_id}>
+                <Stack
+                  direction="row"
+                  useFlexGap
+                  flexWrap="wrap"
+                  spacing={1}
+                  alignItems="center"
+                >
+                  <Typography className="tsz-words" fontWeight={600}>
                     {card.label}
-                  </Typography.Text>
-                  <Tag>{card.kind === "word" ? "单词" : "短语"}</Tag>
-                  <Tag>{statusLabel[card.status]}</Tag>
-                  <Typography.Text type="secondary">
+                  </Typography>
+                  <Chip label={card.kind === "word" ? "单词" : "短语"} />
+                  <Chip label={statusLabel[card.status]} />
+                  <Typography color="text.secondary">
                     {card.match_count} 个来源
-                  </Typography.Text>
-                </Space>
-                <Collapse
-                  size="small"
-                  items={[
-                    {
-                      key: "details",
-                      label: "查看候选详情",
-                      children: (
-                        <Space orientation="vertical" size="small">
-                          {card.source_labels.map((source) => (
-                            <Typography.Text
-                              className="tsz-words"
-                              key={source}
-                              type="secondary"
-                            >
-                              {source}
-                            </Typography.Text>
+                  </Typography>
+                </Stack>
+                <Accordion
+                  disableGutters
+                  elevation={0}
+                  slotProps={{ transition: { unmountOnExit: true } }}
+                >
+                  <AccordionSummary expandIcon={<ExpandMore />}>
+                    查看候选详情
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    <Stack spacing={1}>
+                      {card.source_labels.map((source) => (
+                        <Typography
+                          className="tsz-words"
+                          key={source}
+                          color="text.secondary"
+                        >
+                          {source}
+                        </Typography>
+                      ))}
+                      {!!card.pos_labels.length && (
+                        <Stack
+                          direction="row"
+                          useFlexGap
+                          flexWrap="wrap"
+                          spacing={1}
+                        >
+                          {card.pos_labels.map((label) => (
+                            <Chip key={label} label={label} />
                           ))}
-                          {card.pos_labels.length > 0 ? (
-                            <Space wrap>
-                              {card.pos_labels.map((label) => (
-                                <Tag key={label}>{label}</Tag>
-                              ))}
-                            </Space>
-                          ) : null}
-                          {card.gloss_previews.map((gloss) => (
-                            <Typography.Text key={gloss}>
-                              释义：{gloss}
-                            </Typography.Text>
-                          ))}
-                        </Space>
-                      )
-                    }
-                  ]}
-                />
-              </List.Item>
-            )}
-          />
+                        </Stack>
+                      )}
+                      {card.gloss_previews.map((gloss) => (
+                        <Typography key={gloss}>释义：{gloss}</Typography>
+                      ))}
+                    </Stack>
+                  </AccordionDetails>
+                </Accordion>
+              </li>
+            ))}
+          </Stack>
         </section>
       ))}
-      <Space>
-        {state.phase === "error" ? (
+      <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+        {state.phase === "error" && (
           <Button onClick={state.retry}>重新加载确认快照</Button>
-        ) : null}
-        {state.phase === "expired" ? (
+        )}
+        {state.phase === "expired" && (
           <Button onClick={onRestart}>{`重新检查${actionLabel}条件`}</Button>
-        ) : null}
+        )}
         {!disabled && (
           <Button
-            type="primary"
+            variant="contained"
             loading={confirming}
             disabled={!canAcknowledgeSurfaceSnapshot(state)}
             onClick={onConfirm}
-          >
-            {`确认并${actionLabel}`}
-          </Button>
+          >{`确认并${actionLabel}`}</Button>
         )}
-      </Space>
-    </Card>
+      </Stack>
+    </Paper>
   );
 }

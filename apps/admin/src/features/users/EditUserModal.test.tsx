@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { FeedbackProvider } from "@/components/FeedbackProvider";
+import { AdminThemeProvider } from "@/mui-theme";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpError } from "@tsz/api-client";
 import type { AdminUserView } from "@tsz/types";
@@ -42,9 +43,11 @@ function renderModal(onClose = vi.fn(), target: AdminUserView | null = user) {
   });
   render(
     <QueryClientProvider client={client}>
-      <AntApp>
-        <EditUserModal user={target} onClose={onClose} />
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <EditUserModal user={target} onClose={onClose} />
+        </FeedbackProvider>
+      </AdminThemeProvider>
     </QueryClientProvider>
   );
   return onClose;

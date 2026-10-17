@@ -1,9 +1,11 @@
+import { FeedbackProvider } from "@/components/FeedbackProvider";
+import { AdminThemeProvider } from "@/mui-theme";
 import { changeVoiceText } from "./V3VoiceTextField.test-helper";
 import { env } from "@/lib/env";
-import { ConfigProvider } from "antd";
+
 import {
   fireEvent,
-  render,
+  render as rtlRender,
   screen,
   waitFor,
   within
@@ -101,6 +103,18 @@ vi.mock("@tsz/voice-editor/editor", () => ({
     </div>
   )
 }));
+const render = (
+  ui: Parameters<typeof rtlRender>[0],
+  options?: Parameters<typeof rtlRender>[1]
+) =>
+  rtlRender(ui, {
+    wrapper: ({ children }) => (
+      <AdminThemeProvider>
+        <FeedbackProvider>{children}</FeedbackProvider>
+      </AdminThemeProvider>
+    ),
+    ...options
+  });
 function Harness({
   configured = false,
   phrase = false,
@@ -252,7 +266,9 @@ describe("独立发音输入", () => {
   });
   it("实际发音与音素输入的右端依次排列转换和编辑按钮", () => {
     render(<Harness />);
-    const actualGroup = field("实际发音").closest(".ant-space-compact");
+    const actualGroup = field("实际发音").closest(
+      ".v3-voice-text-field-compact"
+    );
     expect(actualGroup).toContainElement(
       screen.getByLabelText("从字典音标填入实际发音")
     );
@@ -270,7 +286,9 @@ describe("独立发音输入", () => {
         Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
     for (const alphabet of ["IPA", "UPS"]) {
-      const group = field(`Azure ${alphabet}`).closest(".ant-space-compact");
+      const group = field(`Azure ${alphabet}`).closest(
+        ".word-synthesis-control"
+      );
       expect(group).toContainElement(
         screen.getByLabelText(`第 1 条发音转换为美式 Azure ${alphabet}`)
       );
@@ -360,7 +378,9 @@ describe("独立发音输入", () => {
     fireEvent.click(screen.getByText("应用转换结果"));
     expect(field("Azure UPS")).toHaveValue("K EH T");
     expect(field("Azure IPA")).toHaveValue("kɛt");
-    expect(screen.getByRole("radio", { name: "Azure IPA" })).toBeChecked();
+    expect(
+      await screen.findByRole("radio", { name: "Azure IPA" })
+    ).toBeChecked();
     fireEvent.keyDown(field("Azure UPS"), { key: "z", ctrlKey: true });
     expect(field("Azure UPS")).toHaveValue("H U M");
     change("Azure IPA", "");
@@ -430,9 +450,9 @@ describe("独立发音输入", () => {
   });
   it("发音设置通过弹层显示，Escape 关闭并返回触发按钮", async () => {
     const { container } = render(
-      <ConfigProvider theme={{ token: { motion: false } }}>
+      <>
         <Harness />
-      </ConfigProvider>
+      </>
     );
     const trigger = screen.getByLabelText("第 1 条发音发音设置与真人录音");
     expect(trigger).toHaveAttribute("aria-expanded", "false");
@@ -629,9 +649,7 @@ it("读法按指定顺序展示，逐字正音使用独立 wire 值", () => {
   render(<Harness />);
   fireEvent.mouseDown(screen.getByLabelText("第 1 条发音的读法"));
   expect(
-    Array.from(
-      document.querySelectorAll(".ant-select-item-option-content")
-    ).map((item) => item.textContent)
+    Array.from(screen.getAllByRole("option")).map((item) => item.textContent)
   ).toEqual(["语流连读", "逐字正音", "强读", "弱读"]);
   fireEvent.click(screen.getByText("逐字正音"));
   const wire = JSON.parse(screen.getByTestId("wire").textContent!);

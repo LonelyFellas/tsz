@@ -72,10 +72,10 @@ function candidate(
 
 /** 第 N 列（词条 → 词形 → 词义）的可见文本，按渲染顺序。 */
 function columnTexts(column: number): string[] {
-  const menu = document.querySelectorAll(".ant-cascader-menu")[column];
-  return Array.from(menu?.querySelectorAll("li") ?? []).map((item) =>
-    (item.textContent ?? "").trim()
-  );
+  const menu = document.querySelectorAll("[data-candidate-column]")[column];
+  return Array.from(
+    menu?.querySelectorAll("[data-candidate-option]") ?? []
+  ).map((item) => (item.textContent ?? "").trim());
 }
 
 const candidates = [

@@ -1,59 +1,48 @@
-// 用户目录按独立权限展示资料；敏感资源在详情中按需读取。
 import {
   Alert,
-  App,
   Avatar,
-  Badge,
-  Breadcrumb,
+  Breadcrumbs,
   Button,
-  Card,
-  Flex,
-  Segmented,
-  Space,
-  Table,
-  Tag
-} from "antd";
-import type { TableColumnsType } from "antd";
-import { UserOutlined } from "@ant-design/icons";
+  Chip,
+  Paper,
+  Stack,
+  ToggleButton,
+  ToggleButtonGroup,
+  Tooltip,
+  Typography
+} from "@mui/material";
+import Person from "@mui/icons-material/Person";
 import dayjs from "dayjs";
 import { useState } from "react";
-import type { AdminUserView, Role } from "@tsz/types";
+import type { AdminUserView } from "@tsz/types";
+import { AdminTable } from "@/components/AdminTable";
+import type { AdminColumn } from "@/components/AdminTable";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { useFeedback } from "@/components/FeedbackProvider";
 import { CopyableText } from "@/components/CopyableText";
-import { GatedButton } from "@/components/GatedButton";
 import { useAuthStore, usePermission } from "@/lib/auth";
 import { useSetUserStatus, useUserList } from "./api";
 import { EditUserModal } from "./EditUserModal";
-import {
-  ROLE_LABEL,
-  ROLE_TAG_COLOR,
-  levelColor,
-  userActionError
-} from "./labels";
+import { ROLE_LABEL, userActionError } from "./labels";
 import type { UserFilterValues, UserRoleTab } from "./listQuery";
 import { UserDetailDrawer } from "./UserDetailDrawer";
 import { UserFilters } from "./UserFilters";
 
-const ROLE_TABS = [
-  { label: "全部", value: "all" as const },
-  { label: "老师", value: "teacher" as const },
-  { label: "学生", value: "student" as const }
-];
-
 export function UserManagement() {
-  const { message, modal } = App.useApp();
+  const notify = useFeedback();
   const canReadBasic = usePermission("users.read_basic");
   const canEdit = usePermission("users.edit");
   const canSetStatus = usePermission("users.set_status");
   const canReadSensitive = usePermission("users.read_sensitive");
   const connectionError = useAuthStore((state) => state.connectionError);
-
   const [filters, setFilters] = useState<UserFilterValues>({});
   const [role, setRole] = useState<UserRoleTab>("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [detailUser, setDetailUser] = useState<AdminUserView | null>(null);
   const [editingUser, setEditingUser] = useState<AdminUserView | null>(null);
-
+  const [statusTarget, setStatusTarget] = useState<AdminUserView | null>(null);
+  const [statusError, setStatusError] = useState<string>();
   const listQuery = useUserList({
     filters,
     role: canReadBasic ? role : "all",
@@ -61,203 +50,179 @@ export function UserManagement() {
     pageSize
   });
   const setStatus = useSetUserStatus();
-
   const rows = listQuery.data?.items ?? [];
   const total = listQuery.data?.page.total ?? 0;
-
   const applyFilters = (values: UserFilterValues) => {
     setFilters(values);
     setPage(1);
   };
-
-  const changeRole = (next: UserRoleTab) => {
-    setRole(next);
-    setPage(1);
+  const verb = statusTarget?.status === "active" ? "禁用" : "启用";
+  const confirmStatus = async () => {
+    if (!canSetStatus || !statusTarget?.status || setStatus.isPending) return;
+    const next = statusTarget.status === "active" ? "disabled" : "active";
+    setStatusError(undefined);
+    try {
+      await setStatus.mutateAsync({ id: statusTarget.id, status: next });
+    } catch (err) {
+      setStatusError(userActionError(err, "操作失败"));
+      return;
+    }
+    notify(next === "disabled" ? "已禁用" : "已启用", "success");
+    setStatusTarget(null);
   };
-
-  // 独立功能模块（天生币/等级/方言）本次仅占位，接口就绪后各自立项接入。
-  // TODO(backend): 见 backend-todos.md #6。
-  const notReady = (label: string) =>
-    message.info(`${label}功能待接入，接口开发中`);
-
-  const confirmToggleStatus = (record: AdminUserView) => {
-    if (!canSetStatus || !record.status) return;
-    const next = record.status === "active" ? "disabled" : "active";
-    const verb = next === "disabled" ? "禁用" : "启用";
-    modal.confirm({
-      title: `${verb}用户「${record.display_name}」`,
-      content:
-        next === "disabled"
-          ? "禁用后该用户无法登录或继续访问受保护功能，原有角色和绑定信息会保留。确认禁用？"
-          : "启用后该用户可以重新登录，原有角色和绑定信息保持不变。确认启用？",
-      okText: verb,
-      okButtonProps: { danger: next === "disabled" },
-      cancelText: "取消",
-      onOk: () =>
-        setStatus
-          .mutateAsync({ id: record.id, status: next })
-          .then(() =>
-            message.success(next === "disabled" ? "已禁用" : "已启用")
-          )
-          .catch((err: unknown) =>
-            message.error(userActionError(err, "操作失败"))
-          )
-    });
-  };
-
-  const columns: TableColumnsType<AdminUserView> = [
+  const columns: AdminColumn<AdminUserView>[] = [
     {
-      title: "用户ID",
-      dataIndex: "id",
+      id: "id",
+      label: "用户ID",
       width: 140,
-      fixed: "left",
-      // UUID 太长：单行截断 + 悬浮看全 + 一键复制完整 ID。
-      render: (id: string) => <CopyableText value={id} ellipsis={96} />
+      sticky: "left",
+      render: (row) => <CopyableText value={row.id} ellipsis={96} />
     },
     {
-      title: "头像",
-      dataIndex: "avatar_url",
+      id: "avatar_url",
+      label: "头像",
       width: 64,
-      render: (src: string) => (
-        <Avatar src={src || undefined} icon={<UserOutlined />} />
+      render: (row) => (
+        <Avatar src={row.avatar_url || undefined}>
+          <Person />
+        </Avatar>
       )
     },
     {
-      title: "用户昵称",
-      dataIndex: "display_name",
+      id: "display_name",
+      label: "用户昵称",
       width: 130,
-      render: (name: string, record) => (
-        <Button
-          type="link"
-          style={{ padding: 0 }}
-          onClick={() => setDetailUser(record)}
-        >
-          {name}
-        </Button>
+      render: (row) => (
+        <Button onClick={() => setDetailUser(row)}>{row.display_name}</Button>
       )
     },
     {
-      title: "分类",
-      dataIndex: "roles",
+      id: "roles",
+      label: "分类",
       width: 110,
-      render: (roles: Role[]) => (
-        <Space size={[4, 4]} wrap>
-          {(roles ?? []).map((r) => (
-            <Tag key={r} color={ROLE_TAG_COLOR[r]} style={{ margin: 0 }}>
-              {ROLE_LABEL[r]}
-            </Tag>
+      render: (row) => (
+        <Stack direction="row" spacing={0.5}>
+          {(row.roles ?? []).map((value) => (
+            <Chip
+              key={value}
+              label={ROLE_LABEL[value]}
+              color={value === "teacher" ? "primary" : "default"}
+            />
           ))}
-        </Space>
+        </Stack>
       )
     },
     {
-      title: "教师认证",
-      dataIndex: "teacher_verified",
+      id: "teacher_verified",
+      label: "教师认证",
       width: 110,
-      render: (verified: boolean) => (
-        <Tag color={verified ? "success" : "default"}>
-          {verified ? "已认证" : "未认证"}
-        </Tag>
-      )
-    },
-    {
-      title: "等级",
-      dataIndex: "level",
-      width: 100,
-      render: (lv?: string) =>
-        lv ? <Tag color={levelColor(lv)}>{lv}等级</Tag> : "-"
-    },
-    {
-      title: "绑定电话",
-      dataIndex: "phone",
-      width: 150,
-      render: (p?: string) =>
-        canReadSensitive ? <CopyableText value={p} /> : "未授权"
-    },
-    {
-      title: "绑定邮箱",
-      dataIndex: "email",
-      width: 200,
-      render: (e?: string) =>
-        canReadSensitive ? <CopyableText value={e} ellipsis={150} /> : "未授权"
-    },
-    {
-      title: "注册时间",
-      dataIndex: "created_at",
-      width: 160,
-      render: (t: string) => dayjs(t).format("YYYY-MM-DD HH:mm")
-    },
-    {
-      title: "更新时间",
-      dataIndex: "updated_at",
-      width: 160,
-      render: (t?: string) => (t ? dayjs(t).format("YYYY-MM-DD HH:mm") : "-")
-    },
-    {
-      title: "状态",
-      dataIndex: "status",
-      width: 90,
-      render: (s: AdminUserView["status"]) => (
-        <Badge
-          status={s === "active" ? "success" : "default"}
-          text={s === "active" ? "正常" : "已禁用"}
+      render: (row) => (
+        <Chip
+          label={row.teacher_verified ? "已认证" : "未认证"}
+          color={row.teacher_verified ? "success" : "default"}
         />
       )
     },
     {
-      title: "操作",
-      key: "action",
+      id: "level",
+      label: "等级",
+      width: 100,
+      render: (row) => (row.level ? <Chip label={`${row.level}等级`} /> : "-")
+    },
+    {
+      id: "phone",
+      label: "绑定电话",
+      width: 150,
+      render: (row) =>
+        canReadSensitive ? <CopyableText value={row.phone} /> : "未授权"
+    },
+    {
+      id: "email",
+      label: "绑定邮箱",
+      width: 200,
+      render: (row) =>
+        canReadSensitive ? (
+          <CopyableText value={row.email} ellipsis={150} />
+        ) : (
+          "未授权"
+        )
+    },
+    {
+      id: "created_at",
+      label: "注册时间",
+      width: 160,
+      render: (row) => dayjs(row.created_at).format("YYYY-MM-DD HH:mm")
+    },
+    {
+      id: "updated_at",
+      label: "更新时间",
+      width: 160,
+      render: (row) =>
+        row.updated_at ? dayjs(row.updated_at).format("YYYY-MM-DD HH:mm") : "-"
+    },
+    {
+      id: "status",
+      label: "状态",
+      width: 90,
+      render: (row) => (
+        <Chip
+          label={row.status === "active" ? "正常" : "已禁用"}
+          color={row.status === "active" ? "success" : "default"}
+          variant="outlined"
+        />
+      )
+    },
+    {
+      id: "action",
+      label: "操作",
       width: 320,
-      fixed: "right",
-      render: (_: unknown, record) => (
-        <Space size={4} wrap>
-          <Button
-            type="link"
-            size="small"
-            onClick={() => setDetailUser(record)}
+      sticky: "right",
+      render: (row) => (
+        <Stack direction="row" useFlexGap flexWrap="wrap" spacing={0.5}>
+          <Button onClick={() => setDetailUser(row)}>查看详情</Button>
+          {["等级管理", "方言管理"].map((label) => (
+            <Button
+              key={label}
+              onClick={() => notify(`${label}功能待接入，接口开发中`)}
+            >
+              {label}
+            </Button>
+          ))}
+          <Tooltip describeChild title={!canEdit ? "需用户编辑权限" : ""}>
+            <span>
+              <Button disabled={!canEdit} onClick={() => setEditingUser(row)}>
+                编辑
+              </Button>
+            </span>
+          </Tooltip>
+          <Tooltip
+            describeChild
+            title={!canSetStatus ? "需用户状态变更权限" : ""}
           >
-            查看详情
-          </Button>
-          <Button type="link" size="small" onClick={() => notReady("等级管理")}>
-            等级管理
-          </Button>
-          <Button type="link" size="small" onClick={() => notReady("方言管理")}>
-            方言管理
-          </Button>
-          <GatedButton
-            type="link"
-            size="small"
-            reason="需用户编辑权限"
-            disabled={!canEdit}
-            onClick={() => setEditingUser(record)}
-          >
-            编辑
-          </GatedButton>
-          <GatedButton
-            type="link"
-            size="small"
-            // 禁用是破坏性动作，置红警示；启用是恢复性动作，保持常规蓝。
-            danger={record.status === "active"}
-            reason="需用户状态变更权限"
-            disabled={!canSetStatus || !record.status}
-            loading={
-              setStatus.isPending && setStatus.variables?.id === record.id
-            }
-            onClick={() => confirmToggleStatus(record)}
-          >
-            {canReadBasic && record.status === "disabled" ? "启用" : "禁用"}
-          </GatedButton>
-          {/* 删除用户后端本轮 out of scope，暂无接口：占位置灰，待后端接口就绪再启用。 */}
-          <GatedButton
-            type="link"
-            size="small"
-            danger
-            disabled
-            reason="删除功能暂未开放"
-          >
-            删除
-          </GatedButton>
-        </Space>
+            <span>
+              <Button
+                color={row.status === "active" ? "error" : "primary"}
+                disabled={!canSetStatus || !row.status}
+                loading={
+                  setStatus.isPending && setStatus.variables?.id === row.id
+                }
+                onClick={() => {
+                  setStatusError(undefined);
+                  setStatusTarget(row);
+                }}
+              >
+                {canReadBasic && row.status === "disabled" ? "启用" : "禁用"}
+              </Button>
+            </span>
+          </Tooltip>
+          <Tooltip describeChild title="删除功能暂未开放">
+            <span>
+              <Button color="error" disabled>
+                删除
+              </Button>
+            </span>
+          </Tooltip>
+        </Stack>
       )
     }
   ];
@@ -270,70 +235,82 @@ export function UserManagement() {
     "status",
     "updated_at"
   ]);
-  const visibleColumns = columns.filter(
-    (column) =>
-      canReadBasic ||
-      !("dataIndex" in column && basicColumns.has(String(column.dataIndex)))
-  );
-
   return (
-    <Flex vertical gap={16}>
-      <Breadcrumb items={[{ title: "用户管理" }, { title: "用户管理" }]} />
-
+    <Stack spacing={2}>
+      <Breadcrumbs>
+        <Typography>用户管理</Typography>
+        <Typography>用户管理</Typography>
+      </Breadcrumbs>
       <UserFilters onSearch={applyFilters} onReset={() => applyFilters({})} />
-
-      <Card size="small">
+      <Paper variant="outlined" sx={{ p: 2 }}>
         {canReadBasic && (
-          <Segmented<UserRoleTab>
-            options={ROLE_TABS}
+          <ToggleButtonGroup
+            exclusive
             value={role}
-            onChange={changeRole}
-            style={{ marginBottom: 12 }}
-          />
+            onChange={(_, next: UserRoleTab | null) => {
+              if (next) {
+                setRole(next);
+                setPage(1);
+              }
+            }}
+            size="small"
+            aria-label="用户分类"
+          >
+            <ToggleButton value="all">全部</ToggleButton>
+            <ToggleButton value="teacher">老师</ToggleButton>
+            <ToggleButton value="student">学生</ToggleButton>
+          </ToggleButtonGroup>
         )}
-
         {listQuery.isError && !connectionError && (
           <Alert
-            type="error"
-            showIcon
-            style={{ marginBottom: 12 }}
-            title="用户列表加载失败"
-            description={listQuery.error.message}
+            severity="error"
+            sx={{ my: 1 }}
             action={
-              <Button size="small" onClick={() => void listQuery.refetch()}>
-                重试
-              </Button>
+              <Button onClick={() => void listQuery.refetch()}>重试</Button>
             }
-          />
+          >
+            用户列表加载失败<Typography>{listQuery.error.message}</Typography>
+          </Alert>
         )}
-
-        <Table<AdminUserView>
-          rowKey="id"
-          size="middle"
-          columns={visibleColumns}
-          dataSource={rows}
-          loading={listQuery.isPending}
-          scroll={{ x: 1700 }}
+        <AdminTable
+          columns={columns.filter(
+            (column) => canReadBasic || !basicColumns.has(column.id)
+          )}
+          rows={rows}
+          rowId={(row) => row.id}
+          loading={listQuery.isFetching}
+          minWidth={1700}
           pagination={{
-            current: page,
+            page,
             pageSize,
             total,
-            showSizeChanger: true,
-            showTotal: (t) => `共 ${t} 条`,
-            pageSizeOptions: [10, 20, 50],
-            onChange: (nextPage, nextSize) => {
-              setPage(nextSize !== pageSize ? 1 : nextPage);
-              setPageSize(nextSize);
+            pageSizes: [10, 20, 50],
+            onChange: (next, size) => {
+              setPage(next);
+              setPageSize(size);
             }
           }}
         />
-      </Card>
-
+      </Paper>
       <UserDetailDrawer
         user={rows.find((row) => row.id === detailUser?.id) ?? null}
         onClose={() => setDetailUser(null)}
       />
       <EditUserModal user={editingUser} onClose={() => setEditingUser(null)} />
-    </Flex>
+      <ConfirmDialog
+        open={!!statusTarget}
+        title={`${verb}用户「${statusTarget?.display_name ?? ""}」`}
+        confirmText={verb}
+        danger={statusTarget?.status === "active"}
+        pending={setStatus.isPending}
+        error={statusError}
+        onClose={() => setStatusTarget(null)}
+        onConfirm={() => void confirmStatus()}
+      >
+        {statusTarget?.status === "active"
+          ? "禁用后该用户无法登录或继续访问受保护功能，原有角色和绑定信息会保留。确认禁用？"
+          : "启用后该用户可以重新登录，原有角色和绑定信息保持不变。确认启用？"}
+      </ConfirmDialog>
+    </Stack>
   );
 }

@@ -1,4 +1,4 @@
-import { Table } from "antd";
+import { AdminTable } from "@/components/AdminTable";
 import { formatCoins } from "@tsz/shared";
 import type { CoinEntryPage } from "@tsz/types";
 export const coinSourceLabels: Record<string, string> = {
@@ -20,39 +20,38 @@ export function EntriesTable({
   onPage: (page: number) => void;
 }) {
   return (
-    <Table
-      rowKey="id"
+    <AdminTable
+      rows={data?.items ?? []}
+      rowId={(row) => row.id}
       loading={loading}
-      dataSource={data?.items}
-      scroll={{ x: 620 }}
+      minWidth={620}
       pagination={{
-        current: data?.pagination.page ?? 1,
+        page: data?.pagination.page ?? 1,
         pageSize: 20,
         total: data?.pagination.total ?? 0,
-        showSizeChanger: false,
         onChange: onPage
       }}
       columns={[
         {
-          title: "时间",
-          dataIndex: "created_at",
-          render: (v: string) => new Date(v).toLocaleString("zh-CN")
+          id: "time",
+          label: "时间",
+          render: (row) => new Date(row.created_at).toLocaleString("zh-CN")
         },
         {
-          title: "来源",
-          dataIndex: "source_type",
-          render: (v: string) => coinSourceLabels[v] ?? "天生币收支"
+          id: "source",
+          label: "来源",
+          render: (row) => coinSourceLabels[row.source_type] ?? "天生币收支"
         },
         {
-          title: "变动",
-          dataIndex: "delta",
-          render: (v: string) =>
-            `${v.startsWith("-") ? "" : "+"}${formatCoins(v)}`
+          id: "delta",
+          label: "变动",
+          render: (row) =>
+            `${row.delta.startsWith("-") ? "" : "+"}${formatCoins(row.delta)}`
         },
         {
-          title: "记账后余额",
-          dataIndex: "balance_after",
-          render: (v: string) => formatCoins(v)
+          id: "balance",
+          label: "记账后余额",
+          render: (row) => formatCoins(row.balance_after)
         }
       ]}
     />

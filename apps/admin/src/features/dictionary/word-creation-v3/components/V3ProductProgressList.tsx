@@ -1,5 +1,6 @@
-import { CheckOutlined } from "@ant-design/icons";
-import { Flex, Typography } from "antd";
+import { Stack as MuiStack, Typography as MuiTypography } from "@mui/material";
+import CheckOutlined from "@mui/icons-material/Check";
+
 import { useId, useState, type ReactNode } from "react";
 import type { V3ProductProgressDetail } from "../readiness";
 
@@ -30,10 +31,10 @@ export function V3ProductProgressList({
   const detailsId = useId();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   return (
-    <Flex
+    <MuiStack
       className="word-creation-progress-list v3-product-progress-list"
-      gap={2}
-      vertical
+      direction="column"
+      spacing={0.25}
     >
       {rows.map((row) => (
         <section
@@ -60,7 +61,7 @@ export function V3ProductProgressList({
           >
             {row.completed ? (
               <CheckOutlined
-                aria-label={`${row.label}已完成`}
+                titleAccess={`${row.label}已完成`}
                 className="word-progress-done"
               />
             ) : (
@@ -72,11 +73,11 @@ export function V3ProductProgressList({
             {/* 计数与折叠指示同占一个网格项：进度行是三列 grid，多一项会被挤到次行 */}
             <span className="v3-product-progress-trailing">
               {!(row.completed && row.value === "完成") && (
-                <Typography.Text type="secondary">
+                <MuiTypography component="span" color="text.secondary">
                   {typeof row.value === "number"
                     ? `${row.value} 项`
                     : row.value}
-                </Typography.Text>
+                </MuiTypography>
               )}
               <span
                 aria-hidden="true"
@@ -145,6 +146,6 @@ export function V3ProductProgressList({
           )}
         </section>
       ))}
-    </Flex>
+    </MuiStack>
   );
 }

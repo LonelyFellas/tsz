@@ -1,6 +1,16 @@
+import { IconButton as MuiIconButton } from "@mui/material";
+import { Alert as MuiAlert, Typography as MuiTypography } from "@mui/material";
 import { useState } from "react";
-import { Alert, Button, Modal, Typography } from "antd";
-import { SwapOutlined, UndoOutlined } from "@ant-design/icons";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button
+} from "@mui/material";
+import SwapOutlined from "@mui/icons-material/SwapHoriz";
+import UndoOutlined from "@mui/icons-material/Undo";
 import type { Dialect, WordPronunciationV3 } from "@tsz/types";
 import { convertDictionaryToUnified } from "@tsz/shared";
 export function V3ActualPronunciationCopy({
@@ -58,9 +68,7 @@ export function V3ActualPronunciationCopy({
   };
   return (
     <>
-      <Button
-        type="default"
-        icon={<SwapOutlined />}
+      <MuiIconButton
         aria-label="从字典音标填入实际发音"
         title="按天生之统一音标规则转换，使用当前口音与读法"
         disabled={!pronunciation.dict_phonetic.trim()}
@@ -88,13 +96,13 @@ export function V3ActualPronunciationCopy({
             });
           else apply(result.value);
         }}
-      />
+      >
+        <SwapOutlined fontSize="inherit" />
+      </MuiIconButton>
       {history &&
         history.applied === pronunciation.actual_pron &&
         !hasAnnotations && (
-          <Button
-            type="default"
-            icon={<UndoOutlined />}
+          <MuiIconButton
             aria-label="撤销实际发音填入"
             onClick={() => {
               onChange({
@@ -107,15 +115,17 @@ export function V3ActualPronunciationCopy({
               });
               setHistory(undefined);
             }}
-          />
+          >
+            <UndoOutlined fontSize="inherit" />
+          </MuiIconButton>
         )}
-      <Modal
+      <ConfirmDialog
         title="替换实际发音？"
         open={Boolean(pending)}
-        okText="应用"
+        confirmText="应用"
         cancelText="取消"
-        onCancel={() => setPending(undefined)}
-        onOk={() => {
+        onClose={() => setPending(undefined)}
+        onConfirm={() => {
           if (pending?.source === source && pending.previous === previous)
             apply(pending.value);
           else {
@@ -124,22 +134,31 @@ export function V3ActualPronunciationCopy({
           }
         }}
       >
-        <Typography.Paragraph>
+        <MuiTypography component="p" paragraph>
           将按天生之统一音标规则填入以下结果，并清除原实际发音上的标注；应用后可以撤销。
-        </Typography.Paragraph>
-        <Typography.Text>{pending?.value}</Typography.Text>
+        </MuiTypography>
+        <MuiTypography component="span">{pending?.value}</MuiTypography>
         {pending?.notices.map((notice) => (
-          <Alert key={notice} type="warning" title={notice} />
+          <MuiAlert key={notice} severity={"warning"}>
+            {notice}
+          </MuiAlert>
         ))}
-      </Modal>
-      <Modal
-        title="音标转换提示"
+      </ConfirmDialog>
+      <Dialog
         open={Boolean(diagnostic)}
-        footer={null}
-        onCancel={() => setDiagnostic(undefined)}
+        onClose={() => setDiagnostic(undefined)}
+        aria-labelledby="pronunciation-conversion-diagnostic"
       >
-        <Typography.Paragraph>{diagnostic}</Typography.Paragraph>
-      </Modal>
+        <DialogTitle id="pronunciation-conversion-diagnostic">
+          音标转换提示
+        </DialogTitle>
+        <DialogContent>
+          <MuiTypography component="p">{diagnostic}</MuiTypography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDiagnostic(undefined)}>关闭</Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }

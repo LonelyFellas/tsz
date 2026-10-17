@@ -1,7 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { App, ConfigProvider } from "antd";
-import zhCN from "antd/locale/zh_CN";
+import { AdminTestProviders as App } from "@/test-utils/AdminTestProviders";
+import { AdminThemeProvider } from "@/mui-theme";
+import { FeedbackProvider } from "@/components/FeedbackProvider";
+
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SharedSentence } from "@tsz/types";
@@ -78,11 +80,15 @@ function show(entryId?: string) {
       }
     >
       <MemoryRouter>
-        <ConfigProvider locale={zhCN} theme={{ token: { motion: false } }}>
+        <>
           <App>
-            <SentenceLibrary entryId={entryId} />
+            <AdminThemeProvider>
+              <FeedbackProvider>
+                <SentenceLibrary entryId={entryId} />
+              </FeedbackProvider>
+            </AdminThemeProvider>
           </App>
-        </ConfigProvider>
+        </>
       </MemoryRouter>
     </QueryClientProvider>
   );
@@ -229,10 +235,9 @@ describe("独立多维例句库", () => {
     ).toBeGreaterThanOrEqual(2);
     fireEvent.click(screen.getByText(/查\s*看/).closest("button")!);
     await screen.findByText("查看例句");
-    expect(document.querySelector(".ant-modal .tsz-ve-readonly")).toHaveClass(
-      "tsz-entry-en",
-      "has-liaison"
-    );
+    expect(
+      document.querySelector("[role=dialog] .tsz-ve-readonly")
+    ).toHaveClass("tsz-entry-en", "has-liaison");
   });
   it("词条的例句列表不再提供创编入口，添加由 voice-editor 承接", async () => {
     vi.mocked(api.sentences.list).mockResolvedValue({ items: [], total: 0 });

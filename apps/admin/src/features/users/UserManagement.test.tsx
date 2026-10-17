@@ -6,7 +6,8 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { FeedbackProvider } from "@/components/FeedbackProvider";
+import { AdminThemeProvider } from "@/mui-theme";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpError } from "@tsz/api-client";
@@ -37,7 +38,7 @@ vi.mock("@/lib/auth", () => ({
 import { api } from "@/lib/auth";
 import { UserManagement } from "./UserManagement";
 
-// 集成用例含 antd 表格/抽屉 + message 门户，覆盖率插桩下于全量并行
+// 集成用例含 MUI 表格/抽屉与反馈门户，覆盖率插桩下于全量并行
 // 运行时偏慢，放宽超时抗资源竞争（与 AdminManagement.test 同理）。
 vi.setConfig({ testTimeout: 15000 });
 
@@ -150,10 +151,11 @@ beforeEach(() => {
   });
 });
 
-/** 点确认弹窗里的主按钮（.ant-modal-confirm-btns 内，按可见文案定位）。 */
+/** 按确认弹窗内的可见操作定位。 */
 function clickConfirmOk(label: RegExp) {
-  const btns = document.querySelector(".ant-modal-confirm-btns")!;
-  fireEvent.click(within(btns as HTMLElement).getByText(label));
+  fireEvent.click(
+    within(screen.getByRole("dialog")).getByRole("button", { name: label })
+  );
 }
 
 function renderPage(staleTime = 0) {
@@ -164,9 +166,11 @@ function renderPage(staleTime = 0) {
   const view = () => (
     <MemoryRouter>
       <QueryClientProvider client={client}>
-        <AntApp>
-          <UserManagement />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <UserManagement />
+          </FeedbackProvider>
+        </AdminThemeProvider>
       </QueryClientProvider>
     </MemoryRouter>
   );
@@ -216,12 +220,10 @@ describe("UserManagement", () => {
     expect(await screen.findByText("用户 ID")).toBeInTheDocument();
     expect(screen.getAllByText("正常")).toHaveLength(2);
     expect(screen.getAllByText("已认证")).toHaveLength(2);
-    fireEvent.click(screen.getByLabelText("Close"));
+    fireEvent.click(screen.getByLabelText("关闭详情"));
     clickRowButton(/^禁\s?用$/);
     expect(
-      await screen.findByText("禁用用户「record」", {
-        selector: ".ant-modal-confirm-title"
-      })
+      await screen.findByRole("heading", { name: "禁用用户「record」" })
     ).toBeInTheDocument();
     clickConfirmOk(/^禁\s?用$/);
     await waitFor(() =>
@@ -247,14 +249,14 @@ describe("UserManagement", () => {
     expect(screen.queryByText("record@qq.com")).toBeNull();
     expect(screen.queryByText("B2等级")).toBeNull();
     expect(screen.queryByText("教师认证")).toBeNull();
-    expect(screen.queryByRole("radio", { name: "老师" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "老师" })).toBeNull();
     expect(api.users.setStatus).not.toHaveBeenCalled();
   });
   it("渲染搜索行、角色 tab 与用户行；等级/余额缺省列显示「-」", async () => {
     renderPage();
     expect(await screen.findByText("record")).toBeInTheDocument();
     for (const tab of ["全部", "老师", "学生"]) {
-      expect(screen.getByRole("radio", { name: tab })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: tab })).toBeInTheDocument();
     }
     // 等级 / 天生币余额 后端未填充 → 整列占位「-」。
     expect(screen.getAllByText("-").length).toBeGreaterThan(0);
@@ -275,7 +277,7 @@ describe("UserManagement", () => {
   it("切换到「老师」tab 只留老师行", async () => {
     renderPage();
     await screen.findByText("record");
-    fireEvent.click(screen.getByRole("radio", { name: "老师" }));
+    fireEvent.click(screen.getByRole("button", { name: "老师" }));
     await waitFor(() => {
       expect(screen.getByText("workout")).toBeInTheDocument();
       expect(screen.queryByText("record")).toBeNull();
@@ -320,15 +322,15 @@ describe("UserManagement", () => {
     renderPage();
     fireEvent.click(await screen.findByText("record"));
     expect(await screen.findByText("用户 ID")).toBeInTheDocument();
-    // antd Drawer 关闭按钮 aria-label="Close"；点击触发 onClose → 抽屉隐藏。
-    fireEvent.click(screen.getByLabelText("Close"));
+    // 关闭后详情资料不再可见。
+    fireEvent.click(screen.getByLabelText("关闭详情"));
     await waitFor(() => expect(screen.queryByText("用户 ID")).toBeNull());
   });
 
   it("切 tab / 搜索 下发正确的 role / q wire 参数", async () => {
     renderPage();
     await screen.findByText("record");
-    fireEvent.click(screen.getByRole("radio", { name: "老师" }));
+    fireEvent.click(screen.getByRole("button", { name: "老师" }));
     await waitFor(() =>
       expect(mockList).toHaveBeenCalledWith(
         expect.objectContaining({ role: "teacher" })
@@ -447,7 +449,7 @@ describe("UserManagement", () => {
   it("翻到第 2 页展示剩余用户", async () => {
     renderPage();
     await screen.findByText("record"); // 第 1 页
-    fireEvent.click(screen.getByTitle("2"));
+    fireEvent.click(screen.getByRole("button", { name: "下一页" }));
     await waitFor(() => expect(screen.getByText("melody")).toBeInTheDocument());
   });
 

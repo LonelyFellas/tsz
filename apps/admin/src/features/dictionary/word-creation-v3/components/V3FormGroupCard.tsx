@@ -1,26 +1,33 @@
+import { IconButton as MuiIconButton } from "@mui/material";
+import {
+  Box as MuiBox,
+  Paper as MuiPaper,
+  Menu as MuiMenu,
+  MenuItem as MuiMenuItem,
+  Divider as MuiDivider,
+  Dialog as MuiDialog,
+  DialogTitle as MuiDialogTitle,
+  DialogContent as MuiDialogContent,
+  DialogActions as MuiDialogActions
+} from "@mui/material";
+import { AnchoredPanel } from "@/components/AnchoredPanel";
+import {
+  Alert as MuiAlert,
+  Button as MuiButton,
+  Stack as MuiStack,
+  Typography as MuiTypography
+} from "@mui/material";
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
-import {
-  CaretDownFilled,
-  CaretUpFilled,
-  DeleteOutlined,
-  DownCircleOutlined,
-  DownOutlined,
-  EllipsisOutlined,
-  MinusCircleOutlined,
-  PlusCircleOutlined,
-  UpCircleOutlined,
-  UpOutlined
-} from "@ant-design/icons";
-import {
-  Alert,
-  Button,
-  Card,
-  Dropdown,
-  Empty,
-  Flex,
-  Popconfirm,
-  Popover
-} from "antd";
+import CaretDownFilled from "@mui/icons-material/ArrowDropDown";
+import CaretUpFilled from "@mui/icons-material/ArrowDropUp";
+
+import DownCircleOutlined from "@mui/icons-material/ArrowCircleDownOutlined";
+
+import EllipsisOutlined from "@mui/icons-material/MoreHoriz";
+import MinusCircleOutlined from "@mui/icons-material/RemoveCircleOutline";
+import PlusCircleOutlined from "@mui/icons-material/AddCircleOutline";
+import UpCircleOutlined from "@mui/icons-material/ArrowCircleUpOutlined";
+
 import type {
   DraftFormsStepContentV3,
   PartOfSpeechCatalogItem,
@@ -99,6 +106,8 @@ export function V3FormGroupCard({
 }: V3FormGroupCardProps) {
   // 模板仅在新建或显式新增词性时初始化；展示以草稿成员为准。
   const formTypeLabel = useFormTypeLabel();
+  const [scopeAnchor, setScopeAnchor] = useState<HTMLElement | null>(null);
+  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [blockedFormId, setBlockedFormId] = useState<string>();
   const [collapsed, setCollapsed] = useState(false);
   const orderedIds = group.members.map((member) => member.id);
@@ -214,10 +223,9 @@ export function V3FormGroupCard({
       ),
       actions: (
         <div className="v3-membership-actions">
-          <Button
+          <MuiIconButton
             aria-label={`上移变化组 ${groupIndex + 1} 的词形 ${index + 1}`}
             disabled={index === 0}
-            icon={<UpCircleOutlined />}
             onClick={() => {
               const nextOrder = [...orderedIds];
               [nextOrder[index - 1], nextOrder[index]] = [
@@ -227,12 +235,12 @@ export function V3FormGroupCard({
               onChange(reorderMemberships(content, group.id, nextOrder));
             }}
             size="small"
-            type="text"
-          />
-          <Button
+          >
+            {<UpCircleOutlined fontSize="inherit" />}
+          </MuiIconButton>
+          <MuiIconButton
             aria-label={`下移变化组 ${groupIndex + 1} 的词形 ${index + 1}`}
             disabled={index === group.members.length - 1}
-            icon={<DownCircleOutlined />}
             onClick={() => {
               const nextOrder = [...orderedIds];
               [nextOrder[index], nextOrder[index + 1]] = [
@@ -242,11 +250,11 @@ export function V3FormGroupCard({
               onChange(reorderMemberships(content, group.id, nextOrder));
             }}
             size="small"
-            type="text"
-          />
-          <Button
+          >
+            {<DownCircleOutlined fontSize="inherit" />}
+          </MuiIconButton>
+          <MuiIconButton
             aria-label={`在${formPositionLabel} 下方添加同类型词形`}
-            icon={<PlusCircleOutlined />}
             onClick={() => {
               const result = addConcreteFormAfterMembership(
                 content,
@@ -258,39 +266,20 @@ export function V3FormGroupCard({
               if (result.ok) onChange(result.value);
             }}
             size="small"
-            type="text"
-          />
+          >
+            {<PlusCircleOutlined fontSize="inherit" />}
+          </MuiIconButton>
           {/* 一个词形只属于一个组，「从本组移除」就是删除词形，统一走删除确认。 */}
           <V3DisabledReason reason={deleteReason}>
-            <Popconfirm
-              cancelButtonProps={{ "aria-label": "取消删除词形并保留" }}
-              cancelText="取消"
-              description={`词形的拼写与发音会一并删除。${referenceHint ?? ""}`}
+            <MuiIconButton
+              onClick={() => setBlockedFormId(form.id)}
+              aria-label={`删除变化组 ${groupIndex + 1} 的词形 ${index + 1}`}
               disabled={deleteLocked}
-              okButtonProps={{
-                "aria-label": "删除词形及相关发音",
-                danger: true
-              }}
-              okText="删除词形"
-              onConfirm={() => {
-                const result = deleteConcreteForm(content, pos.pos_id, form.id);
-                if (result.ok) onChange(result.value);
-              }}
-              onOpenChange={(open) =>
-                setBlockedFormId(open ? form.id : undefined)
-              }
-              open={blockedFormId === form.id}
-              title="确认删除此词形？"
+              size="small"
+              color={"error"}
             >
-              <Button
-                aria-label={`删除变化组 ${groupIndex + 1} 的词形 ${index + 1}`}
-                danger
-                disabled={deleteLocked}
-                icon={<MinusCircleOutlined />}
-                size="small"
-                type="text"
-              />
-            </Popconfirm>
+              {<MinusCircleOutlined fontSize="inherit" />}
+            </MuiIconButton>
           </V3DisabledReason>
         </div>
       )
@@ -318,200 +307,271 @@ export function V3FormGroupCard({
   const hasBoundSenses = group.scope === "dedicated" && boundSenseCount > 0;
 
   return (
-    <Card
-      className="v3-form-group-card word-form-card word-form-group-card"
-      data-group-id={group.id}
-      data-v3-node-id={group.id}
-      size="small"
-      title={
-        <span className="v3-form-group-heading">{`第 ${groupIndex + 1} 组 词形变化`}</span>
-      }
-      extra={
-        <Flex
-          align="center"
-          gap="small"
-          wrap
-          className="v3-form-group-scope"
-          data-v3-field="scope"
-          data-v3-node-id={group.id}
-          tabIndex={-1}
+    <>
+      <MuiPaper
+        variant="outlined"
+        className="v3-form-group-card word-form-card word-form-group-card"
+        data-group-id={group.id}
+        data-v3-node-id={group.id}
+      >
+        <MuiStack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          useFlexGap
+          flexWrap="wrap"
+          spacing={1}
+          className="v3-form-group-header"
         >
-          {onEditSenses ? (
-            <Popover
-              trigger="click"
-              placement="bottomRight"
-              open={editingSenses}
-              onOpenChange={(open) =>
-                open ? onEditSenses() : onCloseSenses?.()
-              }
-              destroyOnHidden
-              fresh
-              content={editingSenses ? senseScope : <span />}
-            >
-              <Button
-                type={hasBoundSenses ? "primary" : "default"}
-                ghost={!hasBoundSenses}
-                size="small"
-                aria-label={`第 ${groupIndex + 1} 组专用词义`}
-                aria-expanded={editingSenses}
-              >
-                {hasBoundSenses
-                  ? `专用词义 · ${boundSenseCount}`
-                  : "设置专用词形"}
-              </Button>
-            </Popover>
-          ) : null}
-          <Button
-            type="text"
-            size="small"
-            className="v3-form-group-menu word-form-card-toggle-state"
-            aria-label={`${collapsed ? "展开" : "收起"}第 ${groupIndex + 1} 组词形变化`}
-            aria-controls={bodyId}
-            aria-expanded={!collapsed}
-            onClick={() => setCollapsed((value) => !value)}
+          <MuiTypography component="h3" variant="body1" fontWeight={600}>
+            <span className="v3-form-group-heading">{`第 ${groupIndex + 1} 组 词形变化`}</span>
+          </MuiTypography>
+          <MuiStack
+            className="v3-form-group-scope"
+            data-v3-field="scope"
+            data-v3-node-id={group.id}
+            tabIndex={-1}
+            direction="row"
+            spacing={1}
+            alignItems={"center"}
+            useFlexGap
+            flexWrap="wrap"
           >
-            {collapsed ? "展开" : "收起"}
-            {collapsed ? <CaretDownFilled /> : <CaretUpFilled />}
-          </Button>
-          {onDelete ? (
-            <Dropdown
-              menu={{
-                items: [
-                  {
-                    key: "move-up",
-                    icon: <UpOutlined />,
-                    label: "上移本组",
-                    disabled: groupIndex === 0 || !onMove
-                  },
-                  {
-                    key: "move-down",
-                    icon: <DownOutlined />,
-                    label: "下移本组",
-                    disabled: groupIndex === groupCount - 1 || !onMove
-                  },
-                  { type: "divider" },
-                  {
-                    key: "delete",
-                    icon: <DeleteOutlined />,
-                    label:
-                      deleteBlockedByReferences > 0
-                        ? "删除草稿词形组（发布前需处理受影响的关联）"
-                        : deleteDisabled
-                          ? "至少保留一个词形"
-                          : "删除本组",
-                    danger: true,
-                    disabled: deleteDisabled || !onDelete
+            {onEditSenses ? (
+              <>
+                <MuiButton
+                  ref={setScopeAnchor}
+                  color={hasBoundSenses ? "primary" : "inherit"}
+                  onClick={() =>
+                    editingSenses ? onCloseSenses?.() : onEditSenses?.()
                   }
-                ],
-                onClick: ({ key }) => {
-                  if (key === "move-up") onMove?.(-1);
-                  if (key === "move-down") onMove?.(1);
-                  if (key === "delete") onDelete?.();
-                }
-              }}
-              placement="bottomRight"
-              trigger={["click"]}
-            >
-              <Button
-                aria-label={`管理第 ${groupIndex + 1} 组词形变化`}
-                className="v3-form-group-menu"
-                icon={<EllipsisOutlined />}
-                type="text"
-              />
-            </Dropdown>
-          ) : null}
-        </Flex>
-      }
-    >
-      {!collapsed ? (
-        <Flex id={bodyId} vertical>
-          <div className="word-form-rules">{dialectControl}</div>
-          {group.members.length === 0 ? (
-            <Empty
-              description="草稿可暂时保留空变化组"
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-            >
-              <Button
-                icon={<PlusCircleOutlined />}
-                onClick={() => {
-                  const result = addConcreteForm(
-                    content,
-                    pos.pos_id,
-                    group.id,
-                    "base",
-                    idFactory
-                  );
-                  if (result.ok) onChange(result.value);
-                }}
-              >
-                添加原形
-              </Button>
-            </Empty>
-          ) : null}
-          {separatedRows ? (
-            <V3DialectSeparatedFormMatrix
-              content={content}
-              dialectRules={group.dialect_rules}
-              idFactory={idFactory}
-              issues={issues}
-              onChange={onChange}
-              rows={separatedRows}
-            />
-          ) : (
-            group.members.map((member, index) => {
-              const form = pos.forms.find((item) => item.id === member.form_id);
-              if (!form) {
-                return (
-                  <Alert
-                    key={member.id}
-                    title="该变化组关联的词形已不存在，请刷新页面后重试。"
-                    type="error"
-                  />
-                );
-              }
-              const row = formRow(member, index, form);
-              const previousMember = group.members[index - 1];
-              const previousForm = previousMember
-                ? pos.forms.find((item) => item.id === previousMember.form_id)
-                : undefined;
-              return (
-                <div
-                  className="v3-membership-row"
-                  data-form-id={form.id}
-                  data-v3-field="form_id"
-                  data-v3-node-id={member.id}
-                  key={member.id}
-                  tabIndex={-1}
+                  size="small"
+                  aria-label={`第 ${groupIndex + 1} 组专用词义`}
+                  aria-expanded={editingSenses}
+                  variant={hasBoundSenses ? "contained" : "outlined"}
                 >
-                  <V3ConcreteFormRow
-                    actions={row.actions}
-                    content={content}
-                    dialectRules={group.dialect_rules}
-                    form={form}
-                    formLabel={row.formLabel}
-                    formTypeAriaLabel={row.formTypeAriaLabel}
-                    formTypeDisabled={row.formTypeDisabled}
-                    formTypeDisabledReason={row.formTypeDisabledReason}
-                    formTypeChangeHint={row.formTypeChangeHint}
-                    formTypeOptions={row.formTypeOptions}
-                    idFactory={idFactory}
-                    issues={issues}
-                    lastRow={index === group.members.length - 1}
-                    membershipCount={row.membershipCount}
-                    onChange={onChange}
-                    referenceBadge={row.referenceBadge}
-                    showMatrixHeader={
-                      index === 0 ||
-                      previousForm?.regional_variants.mode !==
-                        form.regional_variants.mode
-                    }
-                  />
-                </div>
+                  {hasBoundSenses
+                    ? `专用词义 · ${boundSenseCount}`
+                    : "设置专用词形"}
+                </MuiButton>
+                <AnchoredPanel
+                  open={editingSenses}
+                  anchor={scopeAnchor}
+                  label="适配专用词义"
+                  onClose={() => onCloseSenses?.()}
+                >
+                  {senseScope}
+                </AnchoredPanel>
+              </>
+            ) : null}
+            <MuiButton
+              size="small"
+              className="v3-form-group-menu word-form-card-toggle-state"
+              aria-label={`${collapsed ? "展开" : "收起"}第 ${groupIndex + 1} 组词形变化`}
+              aria-controls={bodyId}
+              aria-expanded={!collapsed}
+              onClick={() => setCollapsed((value) => !value)}
+              variant={"text"}
+            >
+              {collapsed ? "展开" : "收起"}
+              {collapsed ? (
+                <CaretDownFilled fontSize="inherit" />
+              ) : (
+                <CaretUpFilled fontSize="inherit" />
+              )}
+            </MuiButton>
+            {onDelete ? (
+              <>
+                <MuiIconButton
+                  onClick={(event) => setMenuAnchor(event.currentTarget)}
+                  aria-haspopup="menu"
+                  aria-expanded={!!menuAnchor}
+                  aria-label={`管理第 ${groupIndex + 1} 组词形变化`}
+                  className="v3-form-group-menu"
+                >
+                  {<EllipsisOutlined fontSize="inherit" />}
+                </MuiIconButton>
+                <MuiMenu
+                  anchorEl={menuAnchor}
+                  open={!!menuAnchor}
+                  onClose={() => setMenuAnchor(null)}
+                >
+                  <MuiMenuItem
+                    disabled={groupIndex === 0 || !onMove}
+                    onClick={() => {
+                      onMove?.(-1);
+                      setMenuAnchor(null);
+                    }}
+                  >
+                    上移本组
+                  </MuiMenuItem>
+                  <MuiMenuItem
+                    disabled={groupIndex === groupCount - 1 || !onMove}
+                    onClick={() => {
+                      onMove?.(1);
+                      setMenuAnchor(null);
+                    }}
+                  >
+                    下移本组
+                  </MuiMenuItem>
+                  <MuiDivider />
+                  <MuiMenuItem
+                    disabled={deleteDisabled || !onDelete}
+                    sx={{ color: "error.main" }}
+                    onClick={() => {
+                      onDelete?.();
+                      setMenuAnchor(null);
+                    }}
+                  >
+                    {deleteBlockedByReferences > 0
+                      ? "删除草稿词形组（发布前需处理受影响的关联）"
+                      : deleteDisabled
+                        ? "至少保留一个词形"
+                        : "删除本组"}
+                  </MuiMenuItem>
+                </MuiMenu>
+              </>
+            ) : null}
+          </MuiStack>
+        </MuiStack>
+        <MuiBox className="v3-form-group-body">
+          {!collapsed ? (
+            <MuiStack
+              id={bodyId}
+              className="v3-form-group-contents"
+              direction="column"
+            >
+              <div className="word-form-rules">{dialectControl}</div>
+              {group.members.length === 0 ? (
+                <MuiTypography color="text.secondary">
+                  {"草稿可暂时保留空变化组"}
+                  <MuiButton
+                    onClick={() => {
+                      const result = addConcreteForm(
+                        content,
+                        pos.pos_id,
+                        group.id,
+                        "base",
+                        idFactory
+                      );
+                      if (result.ok) onChange(result.value);
+                    }}
+                    startIcon={<PlusCircleOutlined fontSize="inherit" />}
+                  >
+                    添加原形
+                  </MuiButton>
+                </MuiTypography>
+              ) : null}
+              {separatedRows ? (
+                <V3DialectSeparatedFormMatrix
+                  content={content}
+                  dialectRules={group.dialect_rules}
+                  idFactory={idFactory}
+                  issues={issues}
+                  onChange={onChange}
+                  rows={separatedRows}
+                />
+              ) : (
+                group.members.map((member, index) => {
+                  const form = pos.forms.find(
+                    (item) => item.id === member.form_id
+                  );
+                  if (!form) {
+                    return (
+                      <MuiAlert key={member.id} severity={"error"}>
+                        {"该变化组关联的词形已不存在，请刷新页面后重试。"}
+                      </MuiAlert>
+                    );
+                  }
+                  const row = formRow(member, index, form);
+                  const previousMember = group.members[index - 1];
+                  const previousForm = previousMember
+                    ? pos.forms.find(
+                        (item) => item.id === previousMember.form_id
+                      )
+                    : undefined;
+                  return (
+                    <div
+                      className="v3-membership-row"
+                      data-form-id={form.id}
+                      data-v3-field="form_id"
+                      data-v3-node-id={member.id}
+                      key={member.id}
+                      tabIndex={-1}
+                    >
+                      <V3ConcreteFormRow
+                        actions={row.actions}
+                        content={content}
+                        dialectRules={group.dialect_rules}
+                        form={form}
+                        formLabel={row.formLabel}
+                        formTypeAriaLabel={row.formTypeAriaLabel}
+                        formTypeDisabled={row.formTypeDisabled}
+                        formTypeDisabledReason={row.formTypeDisabledReason}
+                        formTypeChangeHint={row.formTypeChangeHint}
+                        formTypeOptions={row.formTypeOptions}
+                        idFactory={idFactory}
+                        issues={issues}
+                        lastRow={index === group.members.length - 1}
+                        membershipCount={row.membershipCount}
+                        onChange={onChange}
+                        referenceBadge={row.referenceBadge}
+                        showMatrixHeader={
+                          index === 0 ||
+                          previousForm?.regional_variants.mode !==
+                            form.regional_variants.mode
+                        }
+                      />
+                    </div>
+                  );
+                })
+              )}
+            </MuiStack>
+          ) : null}
+        </MuiBox>
+      </MuiPaper>
+      <MuiDialog
+        data-form-delete-confirm-open={!!blockedFormId && !!blockedForm}
+        open={!!blockedFormId && !!blockedForm}
+        onClose={() => setBlockedFormId(undefined)}
+        aria-labelledby={bodyId + "-delete-title"}
+      >
+        <MuiDialogTitle id={bodyId + "-delete-title"}>
+          确认删除此词形？
+        </MuiDialogTitle>
+        <MuiDialogContent>词形的拼写与发音会一并删除。</MuiDialogContent>
+        <MuiDialogActions>
+          <MuiButton
+            aria-label="取消删除词形并保留"
+            onClick={() => setBlockedFormId(undefined)}
+          >
+            取消
+          </MuiButton>
+          <MuiButton
+            aria-label="删除词形及相关发音"
+            variant="contained"
+            color="error"
+            onClick={() => {
+              if (
+                !blockedForm ||
+                referenceStatusHint !== undefined ||
+                lockedBaseFormIds.has(blockedForm.id) ||
+                formReferenceCount(referenceGuard.index, blockedForm) > 0
+              )
+                return;
+              const result = deleteConcreteForm(
+                content,
+                pos.pos_id,
+                blockedForm.id
               );
-            })
-          )}
-        </Flex>
-      ) : null}
-    </Card>
+              if (result.ok) onChange(result.value);
+              setBlockedFormId(undefined);
+            }}
+          >
+            删除词形
+          </MuiButton>
+        </MuiDialogActions>
+      </MuiDialog>
+    </>
   );
 }

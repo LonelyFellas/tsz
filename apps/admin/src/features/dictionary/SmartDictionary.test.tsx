@@ -5,7 +5,8 @@ import {
   screen,
   waitFor
 } from "@testing-library/react";
-import { App as AntApp, ConfigProvider } from "antd";
+import { FeedbackProvider } from "@/components/FeedbackProvider";
+import { AdminThemeProvider } from "@/mui-theme";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -244,11 +245,13 @@ describe("SmartDictionary", () => {
       isError: false
     });
     render(
-      <AntApp>
-        <MemoryRouter initialEntries={["/words?keyword=center"]}>
-          <SmartDictionary />
-        </MemoryRouter>
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <MemoryRouter initialEntries={["/words?keyword=center"]}>
+            <SmartDictionary />
+          </MemoryRouter>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
     const annotation = screen.getByText("00123456789012345678");
     expect(annotation.tagName).toBe("SUP");
@@ -273,11 +276,13 @@ describe("SmartDictionary", () => {
     });
     apiMocks.useWordList.mockImplementation(list);
     const view = () => (
-      <AntApp>
-        <MemoryRouter>
-          <SmartDictionary />
-        </MemoryRouter>
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <MemoryRouter>
+            <SmartDictionary />
+          </MemoryRouter>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
     const rendered = render(view());
     expect(screen.queryByText("007")).not.toBeInTheDocument();
@@ -305,11 +310,13 @@ describe("SmartDictionary", () => {
       isError: false
     });
     render(
-      <AntApp>
-        <MemoryRouter>
-          <SmartDictionary />
-        </MemoryRouter>
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <MemoryRouter>
+            <SmartDictionary />
+          </MemoryRouter>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
     expect(screen.getByLabelText("编辑标注「center」")).toBeVisible();
   });
@@ -333,11 +340,13 @@ describe("SmartDictionary", () => {
       isError: false
     });
     render(
-      <AntApp>
-        <MemoryRouter>
-          <SmartDictionary />
-        </MemoryRouter>
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <MemoryRouter>
+            <SmartDictionary />
+          </MemoryRouter>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
     // 角标是「这张列表里还有没有同词面的另一行」，与归属无关，一律显示；
     // 能不能改才看归属。
@@ -358,11 +367,13 @@ describe("SmartDictionary", () => {
       isError: false
     });
     render(
-      <AntApp>
-        <MemoryRouter>
-          <SmartDictionary />
-        </MemoryRouter>
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <MemoryRouter>
+            <SmartDictionary />
+          </MemoryRouter>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
     expect(screen.getByLabelText("查看「center」")).toBeVisible();
     expect(screen.queryByLabelText("继续创建「center」")).toBeNull();
@@ -379,11 +390,13 @@ describe("SmartDictionary", () => {
       isError: false
     });
     render(
-      <AntApp>
-        <MemoryRouter>
-          <SmartDictionary />
-        </MemoryRouter>
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <MemoryRouter>
+            <SmartDictionary />
+          </MemoryRouter>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
     expect(screen.getByLabelText("继续创建「center」")).toBeVisible();
     expect(screen.getByLabelText("移入垃圾桶「center」")).toBeEnabled();
@@ -407,11 +420,13 @@ describe("SmartDictionary", () => {
       isError: false
     });
     render(
-      <AntApp>
-        <MemoryRouter>
-          <SmartDictionary />
-        </MemoryRouter>
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <MemoryRouter>
+            <SmartDictionary />
+          </MemoryRouter>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
     expect(screen.getByLabelText("移入垃圾桶「center」")).toBeDisabled();
   });
@@ -437,11 +452,13 @@ describe("SmartDictionary", () => {
       isError: false
     });
     render(
-      <AntApp>
-        <MemoryRouter>
-          <SmartDictionary />
-        </MemoryRouter>
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <MemoryRouter>
+            <SmartDictionary />
+          </MemoryRouter>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
     const button = screen.getByLabelText("移入垃圾桶「center」");
     expect(button).toBeEnabled();
@@ -469,11 +486,13 @@ describe("SmartDictionary", () => {
       isError: false
     });
     render(
-      <AntApp>
-        <MemoryRouter>
-          <SmartDictionary />
-        </MemoryRouter>
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <MemoryRouter>
+            <SmartDictionary />
+          </MemoryRouter>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
     expect(screen.getByLabelText("编辑标注「center」")).toBeVisible();
   });
@@ -495,11 +514,13 @@ describe("SmartDictionary", () => {
       isError: false
     });
     render(
-      <AntApp>
-        <MemoryRouter>
-          <SmartDictionary />
-        </MemoryRouter>
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <MemoryRouter>
+            <SmartDictionary />
+          </MemoryRouter>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
     expect(screen.getByText("007").tagName).toBe("SUP");
     expect(
@@ -532,13 +553,15 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
-          <SmartDictionary
-            reportUnknownPresentationStrategy={
-              reportUnknownPresentationStrategy
-            }
-          />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary
+              reportUnknownPresentationStrategy={
+                reportUnknownPresentationStrategy
+              }
+            />
+          </FeedbackProvider>
+        </AdminThemeProvider>
         <LocationProbe />
       </MemoryRouter>
     );
@@ -593,11 +616,13 @@ describe("SmartDictionary", () => {
       isError: false
     });
     render(
-      <AntApp>
-        <MemoryRouter>
-          <SmartDictionary />
-        </MemoryRouter>
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <MemoryRouter>
+            <SmartDictionary />
+          </MemoryRouter>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
 
     const cells = screen.getByText("hot").closest("tr")!.querySelectorAll("td");
@@ -638,16 +663,18 @@ describe("SmartDictionary", () => {
       isError: false
     });
     render(
-      <AntApp>
-        <MemoryRouter>
-          <SmartDictionary />
-        </MemoryRouter>
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <MemoryRouter>
+            <SmartDictionary />
+          </MemoryRouter>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     );
 
     // 先悬停未知编码：它若也挂了浮层，会与下面等到的那个一起出现。
     fireEvent.mouseEnter(screen.getByText("unknown-pos"));
-    fireEvent.mouseEnter(screen.getByText("adv").closest(".ant-tag")!);
+    fireEvent.mouseEnter(screen.getByText("adv").closest("[data-word-pos]")!);
     expect(await screen.findByRole("tooltip")).toHaveTextContent(/^副词$/);
     expect(document.querySelectorAll('[role="tooltip"]')).toHaveLength(1);
   });
@@ -663,9 +690,11 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
       </MemoryRouter>
     );
 
@@ -709,20 +738,22 @@ describe("SmartDictionary", () => {
 
     const { container } = render(
       <MemoryRouter>
-        <AntApp>
-          <SmartDictionary
-            reportUnknownPresentationStrategy={
-              reportUnknownPresentationStrategy
-            }
-          />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary
+              reportUnknownPresentationStrategy={
+                reportUnknownPresentationStrategy
+              }
+            />
+          </FeedbackProvider>
+        </AdminThemeProvider>
         <LocationProbe />
       </MemoryRouter>
     );
 
-    expect(
-      container.querySelectorAll(".ant-table-tbody > tr.ant-table-row")
-    ).toHaveLength(3);
+    expect(container.querySelectorAll("tbody > tr[data-row-id]")).toHaveLength(
+      3
+    );
     expect(screen.getByText("累计智能词汇:").parentElement).toHaveTextContent(
       "累计智能词汇:3"
     );
@@ -800,9 +831,11 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
         <LocationProbe />
       </MemoryRouter>
     );
@@ -834,12 +867,12 @@ describe("SmartDictionary", () => {
       )
     ).toBe(false);
     const trashAction = actionNamed("移入垃圾桶「workspace」");
-    expect(trashAction.querySelector(".anticon-delete")).not.toBeNull();
+    expect(trashAction.querySelector("svg")).not.toBeNull();
     fireEvent.click(trashAction);
     fireEvent.click(
       (await screen.findAllByText("移入垃圾桶", { exact: true }))
         .map((item) => item.closest("button"))
-        .find((item) => item?.closest(".ant-modal"))!
+        .find((item) => item?.closest("[role=dialog]"))!
     );
     await waitFor(() =>
       expect(mutateAsync).toHaveBeenCalledWith(
@@ -856,9 +889,11 @@ describe("SmartDictionary", () => {
     matchViewport(390);
     render(
       <MemoryRouter>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
       </MemoryRouter>
     );
 
@@ -893,28 +928,36 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
       </MemoryRouter>
     );
 
     const creator = screen.getByText("非常非常长的创建人名称");
     expect(creator).toHaveAttribute("tabindex", "0");
-    expect(creator.closest("td")).toHaveClass("ant-table-cell-ellipsis");
+    expect(creator).toHaveStyle({
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    });
     // 引用列在无引用时也渲染 "-"，这里只针对创建人列那一个占位断言。
     const creatorPlaceholder = screen
       .getAllByText("-")
-      .find((node) => !node.classList.contains("ant-typography"))!;
+      .find((node) => node.hasAttribute("data-word-creator"))!;
     expect(creatorPlaceholder).not.toHaveAttribute("tabindex");
   });
 
   it("从重复检测入口进入时自动定位归档词条", () => {
     render(
       <MemoryRouter initialEntries={["/words?keyword=center&status=archived"]}>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
       </MemoryRouter>
     );
 
@@ -935,9 +978,11 @@ describe("SmartDictionary", () => {
           "/words?keyword=center&status=published&page=3&page_size=50"
         ]}
       >
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
         <LocationProbe />
       </MemoryRouter>
     );
@@ -968,23 +1013,25 @@ describe("SmartDictionary", () => {
       isPending: false,
       refetch: vi.fn()
     }));
-    const { container } = render(
+    render(
       <MemoryRouter initialEntries={["/words?keyword=center"]}>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
         <LocationProbe />
       </MemoryRouter>
     );
 
-    fireEvent.click(container.querySelector(".ant-pagination-item-2")!);
+    fireEvent.click(screen.getByRole("button", { name: "下一页" }));
     await waitFor(() =>
       expect(screen.getByTestId("location")).toHaveTextContent(
         "/words?keyword=center&page=2"
       )
     );
 
-    fireEvent.mouseDown(screen.getByRole("combobox", { name: "Page Size" }));
+    fireEvent.mouseDown(screen.getByRole("combobox", { name: /每页行数/ }));
     const sizeOptions = await screen.findAllByRole("option");
     fireEvent.click(
       sizeOptions.find((option) => option.textContent?.includes("50"))!
@@ -1004,9 +1051,11 @@ describe("SmartDictionary", () => {
   it("用户连续修改筛选后，后退逐步恢复上一筛选状态", async () => {
     render(
       <MemoryRouter initialEntries={["/words"]}>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
         <LocationProbe />
         <HistoryProbe />
       </MemoryRouter>
@@ -1051,9 +1100,11 @@ describe("SmartDictionary", () => {
   it("深链筛选重置后同步清空表单、查询与 URL", async () => {
     render(
       <MemoryRouter initialEntries={["/words?keyword=center&status=archived"]}>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
         <LocationProbe />
       </MemoryRouter>
     );
@@ -1074,9 +1125,11 @@ describe("SmartDictionary", () => {
   it("翻页时保留完整批量选择，但不提供批量发布入口", async () => {
     const { container } = render(
       <MemoryRouter>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
       </MemoryRouter>
     );
 
@@ -1089,9 +1142,9 @@ describe("SmartDictionary", () => {
     fireEvent.click(firstRowCheckbox!);
     const batchButton = screen.getByText("移入垃圾桶(1)").closest("button");
     expect(batchButton).not.toBeNull();
-    expect(batchButton!.querySelector(".anticon-delete")).not.toBeNull();
+    expect(batchButton!.querySelector("svg")).not.toBeNull();
 
-    fireEvent.click(container.querySelector(".ant-pagination-item-2")!);
+    fireEvent.click(screen.getByRole("button", { name: "下一页" }));
 
     await waitFor(() => {
       expect(screen.getByText("second")).toBeInTheDocument();
@@ -1118,9 +1171,11 @@ describe("SmartDictionary", () => {
       );
     render(
       <MemoryRouter>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
       </MemoryRouter>
     );
     fireEvent.click(screen.getByLabelText("移入垃圾桶「first」"));
@@ -1128,7 +1183,7 @@ describe("SmartDictionary", () => {
     const confirm = screen
       .getAllByText("移入垃圾桶", { exact: true })
       .map((item) => item.closest("button"))
-      .find((item) => item?.closest(".ant-modal"))!;
+      .find((item) => item?.closest("[role=dialog]"))!;
     expect(confirm).toBeDisabled();
     fireEvent.click(confirm);
     expect(mutateAsync).not.toHaveBeenCalled();
@@ -1165,11 +1220,13 @@ describe("SmartDictionary", () => {
     apiMocks.useArchiveWord.mockReturnValue({ ...idleMutation(), mutateAsync });
     render(
       <MemoryRouter>
-        <ConfigProvider theme={{ token: { motion: false } }}>
-          <AntApp>
-            <SmartDictionary />
-          </AntApp>
-        </ConfigProvider>
+        <AdminThemeProvider>
+          <AdminThemeProvider>
+            <FeedbackProvider>
+              <SmartDictionary />
+            </FeedbackProvider>
+          </AdminThemeProvider>
+        </AdminThemeProvider>
       </MemoryRouter>
     );
     fireEvent.click(screen.getByLabelText("移入垃圾桶「first」"));
@@ -1197,9 +1254,11 @@ describe("SmartDictionary", () => {
     apiMocks.useArchiveWord.mockReturnValue({ ...idleMutation(), mutateAsync });
     render(
       <MemoryRouter>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
       </MemoryRouter>
     );
     fireEvent.click(screen.getByLabelText("移入垃圾桶「first」"));
@@ -1220,9 +1279,11 @@ describe("SmartDictionary", () => {
     apiMocks.useArchiveWord.mockReturnValue({ ...idleMutation(), mutateAsync });
     render(
       <MemoryRouter>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
       </MemoryRouter>
     );
     fireEvent.click(screen.getByLabelText("移入垃圾桶「first」"));
@@ -1257,9 +1318,11 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
       </MemoryRouter>
     );
 
@@ -1269,7 +1332,7 @@ describe("SmartDictionary", () => {
     const confirm = screen
       .getAllByText("移入垃圾桶", { exact: true })
       .map((item) => item.closest("button"))
-      .find((item) => item?.closest(".ant-modal"))!;
+      .find((item) => item?.closest("[role=dialog]"))!;
     fireEvent.click(confirm);
     fireEvent.click(confirm);
 
@@ -1303,9 +1366,11 @@ describe("SmartDictionary", () => {
     });
     const { container } = render(
       <MemoryRouter>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
       </MemoryRouter>
     );
     fireEvent.click(
@@ -1315,7 +1380,7 @@ describe("SmartDictionary", () => {
     fireEvent.click(screen.getByText("移入垃圾桶(1)"));
     const confirm = (await screen.findAllByText("移入垃圾桶", { exact: true }))
       .map((item) => item.closest("button"))
-      .find((item) => item?.closest(".ant-modal"))!;
+      .find((item) => item?.closest("[role=dialog]"))!;
     expect(confirm).toBeDisabled();
     fireEvent.click(confirm);
     expect(mutateAsync).not.toHaveBeenCalled();
@@ -1332,7 +1397,7 @@ describe("SmartDictionary", () => {
       await screen.findAllByText("移入垃圾桶", { exact: true })
     )
       .map((item) => item.closest("button"))
-      .filter((item) => item?.closest(".ant-modal"))
+      .filter((item) => item?.closest("[role=dialog]"))
       .at(-1)!;
     await waitFor(() => expect(retryConfirm).toBeEnabled());
     fireEvent.click(retryConfirm);
@@ -1369,9 +1434,11 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
       </MemoryRouter>
     );
 
@@ -1379,12 +1446,12 @@ describe("SmartDictionary", () => {
       screen
         .queryAllByText("移入垃圾桶", { exact: true })
         .map((item) => item.closest("button"))
-        .some((item) => item?.classList.contains("ant-btn-link"))
+        .some((item) => item?.closest("tr"))
     ).toBe(false);
     const rowRestore = screen
-      .getAllByText("恢 复", { exact: true })
+      .getAllByText("恢复", { exact: true })
       .map((item) => item.closest("button"))
-      .find((item) => item?.classList.contains("ant-btn-link"))!;
+      .find((item) => item?.closest("tr"))!;
     expect(rowRestore.getAttribute("aria-label")).toBe("恢复「first」");
     expect(
       rowRestore
@@ -1396,9 +1463,9 @@ describe("SmartDictionary", () => {
     await screen.findAllByText("恢复「first」？");
     fireEvent.click(
       screen
-        .getAllByText("恢 复", { exact: true })
+        .getAllByText("恢复", { exact: true })
         .map((item) => item.closest("button"))
-        .find((item) => item?.closest(".ant-modal"))!
+        .find((item) => item?.closest("[role=dialog]"))!
     );
 
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
@@ -1446,9 +1513,11 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
       </MemoryRouter>
     );
 
@@ -1494,9 +1563,11 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
       </MemoryRouter>
     );
 
@@ -1504,7 +1575,7 @@ describe("SmartDictionary", () => {
       screen
         .getAllByText("永久删除", { exact: true })
         .map((item) => item.closest("button"))
-        .find((item) => item?.classList.contains("ant-btn-link"))
+        .find((item) => item?.closest("tr"))
     ).toBeDisabled();
   });
 
@@ -1521,9 +1592,11 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
-          <SmartDictionary mode="trash" />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary mode="trash" />
+          </FeedbackProvider>
+        </AdminThemeProvider>
       </MemoryRouter>
     );
 
@@ -1534,9 +1607,9 @@ describe("SmartDictionary", () => {
     expect(screen.queryByText("移入垃圾桶")).toBeNull();
     expect(
       screen
-        .getAllByText("恢 复", { exact: true })
+        .getAllByText("恢复", { exact: true })
         .map((item) => item.closest("button"))
-        .find((item) => !item?.classList.contains("ant-btn-link"))
+        .find((item) => !item?.closest("tr"))
     ).toBeTruthy();
     // 即使 URL 上没带 status，也必须只查归档。
     expect(apiMocks.useWordList).toHaveBeenCalledWith(
@@ -1554,9 +1627,11 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter initialEntries={["/words/trash?status=draft"]}>
-        <AntApp>
-          <SmartDictionary mode="trash" />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary mode="trash" />
+          </FeedbackProvider>
+        </AdminThemeProvider>
       </MemoryRouter>
     );
 
@@ -1578,14 +1653,16 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
       </MemoryRouter>
     );
 
     expect(screen.getByText("智能词库")).toBeInTheDocument();
-    expect(screen.getByText("状态")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "状态" })).toBeInTheDocument();
     expect(screen.getByText("创建词汇")).toBeInTheDocument();
   });
 
@@ -1607,16 +1684,18 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
       </MemoryRouter>
     );
 
     const rowDelete = screen
       .getAllByText("永久删除", { exact: true })
       .map((item) => item.closest("button"))
-      .find((item) => item?.classList.contains("ant-btn-link"))!;
+      .find((item) => item?.closest("tr"))!;
     expect(rowDelete.getAttribute("aria-label")).toBe("永久删除「first」");
     expect(rowDelete).toBeEnabled();
     fireEvent.click(rowDelete);
@@ -1626,7 +1705,7 @@ describe("SmartDictionary", () => {
       screen
         .getAllByText("永久删除", { exact: true })
         .map((item) => item.closest("button"))
-        .find((item) => item?.closest(".ant-modal"))!
+        .find((item) => item?.closest("[role=dialog]"))!
     );
 
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
@@ -1650,9 +1729,11 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
       </MemoryRouter>
     );
 
@@ -1678,16 +1759,18 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
       </MemoryRouter>
     );
 
     const rowDelete = screen
       .getAllByText("永久删除", { exact: true })
       .map((item) => item.closest("button"))
-      .find((item) => item?.classList.contains("ant-btn-link"))!;
+      .find((item) => item?.closest("tr"))!;
     expect(rowDelete).toBeDisabled();
     fireEvent.click(rowDelete);
     await waitFor(() => expect(mutateAsync).not.toHaveBeenCalled());
@@ -1707,9 +1790,11 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
       </MemoryRouter>
     );
 
@@ -1717,7 +1802,7 @@ describe("SmartDictionary", () => {
       screen
         .getAllByText("永久删除", { exact: true })
         .map((item) => item.closest("button"))
-        .find((item) => item?.classList.contains("ant-btn-link"))
+        .find((item) => item?.closest("tr"))
     ).toBeEnabled();
   });
 
@@ -1742,9 +1827,11 @@ describe("SmartDictionary", () => {
     });
     const { container } = render(
       <MemoryRouter>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
       </MemoryRouter>
     );
 
@@ -1756,7 +1843,7 @@ describe("SmartDictionary", () => {
       screen
         .getAllByText("永久删除", { exact: true })
         .map((item) => item.closest("button"))
-        .find((item) => item?.closest(".ant-modal"))!
+        .find((item) => item?.closest("[role=dialog]"))!
     );
 
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
@@ -1795,9 +1882,11 @@ describe("SmartDictionary", () => {
     });
     const { container } = render(
       <MemoryRouter>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
       </MemoryRouter>
     );
 
@@ -1831,9 +1920,11 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
       </MemoryRouter>
     );
 
@@ -1841,14 +1932,14 @@ describe("SmartDictionary", () => {
       screen
         .getAllByText("永久删除", { exact: true })
         .map((item) => item.closest("button"))
-        .find((item) => item?.classList.contains("ant-btn-link"))!
+        .find((item) => item?.closest("tr"))!
     );
     await screen.findAllByText("永久删除「first」？");
     fireEvent.click(
       screen
         .getAllByText("永久删除", { exact: true })
         .map((item) => item.closest("button"))
-        .find((item) => item?.closest(".ant-modal"))!
+        .find((item) => item?.closest("[role=dialog]"))!
     );
 
     await screen.findByText("只能永久删除自己创建的词条");
@@ -1875,23 +1966,25 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
       </MemoryRouter>
     );
 
     const rowRestore = screen
-      .getAllByText("恢 复", { exact: true })
+      .getAllByText("恢复", { exact: true })
       .map((item) => item.closest("button"))
-      .find((item) => item?.classList.contains("ant-btn-link"))!;
+      .find((item) => item?.closest("tr"))!;
     fireEvent.click(rowRestore);
     await screen.findAllByText("恢复「first」？");
     fireEvent.click(
       screen
-        .getAllByText("恢 复", { exact: true })
+        .getAllByText("恢复", { exact: true })
         .map((item) => item.closest("button"))
-        .find((item) => item?.closest(".ant-modal"))!
+        .find((item) => item?.closest("[role=dialog]"))!
     );
 
     expect(
@@ -1928,22 +2021,24 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
       </MemoryRouter>
     );
 
     const restoreOnce = async () => {
       const rowRestore = screen
-        .getAllByText("恢 复", { exact: true })
+        .getAllByText("恢复", { exact: true })
         .map((item) => item.closest("button"))
-        .find((item) => item?.classList.contains("ant-btn-link"))!;
+        .find((item) => item?.closest("tr"))!;
       fireEvent.click(rowRestore);
       fireEvent.click(
-        (await screen.findAllByText("恢 复", { exact: true }))
+        (await screen.findAllByText("恢复", { exact: true }))
           .map((item) => item.closest("button"))
-          .find((item) => item?.closest(".ant-modal"))!
+          .find((item) => item?.closest("[role=dialog]"))!
       );
     };
     await restoreOnce();
@@ -1991,9 +2086,11 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
       </MemoryRouter>
     );
     const firstCheckbox = screen
@@ -2005,14 +2102,14 @@ describe("SmartDictionary", () => {
       .closest("tr")!
       .querySelector("input[type='checkbox']")!;
     fireEvent.click(firstCheckbox);
-    await screen.findByText("恢 复(1)");
+    await screen.findByText("恢复(1)");
     fireEvent.click(secondCheckbox);
 
-    fireEvent.click(await screen.findByText("恢 复(2)"));
+    fireEvent.click(await screen.findByText("恢复(2)"));
     fireEvent.click(
-      (await screen.findAllByText("恢 复", { exact: true }))
+      (await screen.findAllByText("恢复", { exact: true }))
         .map((item) => item.closest("button"))
-        .find((item) => item?.closest(".ant-modal"))!
+        .find((item) => item?.closest("[role=dialog]"))!
     );
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
     expect(mutateAsync.mock.calls[0]![0].input).toEqual({
@@ -2049,24 +2146,26 @@ describe("SmartDictionary", () => {
     });
     const { container } = render(
       <MemoryRouter>
-        <AntApp>
-          <SmartDictionary />
-        </AntApp>
+        <AdminThemeProvider>
+          <FeedbackProvider>
+            <SmartDictionary />
+          </FeedbackProvider>
+        </AdminThemeProvider>
       </MemoryRouter>
     );
     const checkbox = container.querySelector("tbody input[type='checkbox']")!;
     fireEvent.click(checkbox);
-    fireEvent.click(screen.getByText("恢 复(1)"));
+    fireEvent.click(screen.getByText("恢复(1)"));
     fireEvent.click(
-      (await screen.findAllByText("恢 复", { exact: true }))
+      (await screen.findAllByText("恢复", { exact: true }))
         .map((item) => item.closest("button"))
-        .find((item) => item?.closest(".ant-modal"))!
+        .find((item) => item?.closest("[role=dialog]"))!
     );
     await waitFor(() => expect(dataSourceMocks.get).toHaveBeenCalledTimes(1));
 
     fireEvent.click(checkbox);
     await act(async () => resolveGet({ word: first }));
-    await waitFor(() => expect(screen.queryByText("恢 复(1)")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("恢复(1)")).toBeNull());
     expect(mutateAsync).not.toHaveBeenCalled();
     expect(screen.queryByText("恢复前需要确认同名公开范围")).toBeNull();
   });

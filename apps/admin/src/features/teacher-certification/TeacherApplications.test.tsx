@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { App } from "antd";
+import { AdminThemeProvider } from "@/mui-theme";
+import { FeedbackProvider } from "@/components/FeedbackProvider";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { TeacherApplicationsPage } from "./TeacherApplications";
@@ -44,9 +45,11 @@ const show = () =>
         })
       }
     >
-      <App>
-        <TeacherApplicationsPage />
-      </App>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <TeacherApplicationsPage />
+        </FeedbackProvider>
+      </AdminThemeProvider>
     </QueryClientProvider>
   );
 
@@ -91,7 +94,7 @@ it("审核授权不包含认证原件读取或资格撤销，原件组件不挂�
   await screen.findByText("李老师");
   fireEvent.click(screen.getByText("查看材料"));
   await screen.findByText("未开通资格证书或身份证查看权限");
-  expect(screen.getByRole("button", { name: "通 过" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "通过" })).toBeEnabled();
   expect(api.teacherCertification.file).not.toHaveBeenCalled();
   expect(screen.queryByText("撤销教师资格")).toBeNull();
 });
@@ -101,7 +104,7 @@ it("lets a super admin read an application and requires a rejection reason", asy
   await screen.findByText("李老师");
   fireEvent.click(screen.getByText("查看材料"));
   await screen.findByText("申请任教");
-  fireEvent.click(screen.getByRole("button", { name: "驳 回" }));
+  fireEvent.click(screen.getByRole("button", { name: "驳回" }));
   fireEvent.click(screen.getByRole("button", { name: "确认驳回" }));
   expect(await screen.findByText("请填写驳回原因")).toBeInTheDocument();
   expect(api.teacherCertification.review).not.toHaveBeenCalled();
@@ -158,9 +161,11 @@ it.each([
   );
   view.rerender(
     <QueryClientProvider client={new QueryClient()}>
-      <App>
-        <TeacherApplicationsPage />
-      </App>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <TeacherApplicationsPage />
+        </FeedbackProvider>
+      </AdminThemeProvider>
     </QueryClientProvider>
   );
   expect(

@@ -137,7 +137,7 @@ test("基本词性表按原型列展示，弹窗只有展示字段、不暴露�
   const row = page.getByRole("row").filter({ hasText: "小品词" });
   await expect(row.getByText("无关联", { exact: true })).toBeVisible();
   await expect(row.getByText("0 项", { exact: true })).toBeVisible();
-  await row.getByRole("button", { name: "修 改" }).click();
+  await row.getByRole("button", { name: "修改" }).click();
 
   const editDialog = page.getByRole("dialog");
   await expect(editDialog.getByLabel("正式中文")).toHaveValue("小品词");
@@ -146,7 +146,7 @@ test("基本词性表按原型列展示，弹窗只有展示字段、不暴露�
   await expect(editDialog.getByLabel("稳定编码")).toHaveCount(0);
   await expect(editDialog.getByLabel("排序值")).toHaveCount(0);
 
-  await editDialog.getByRole("button", { name: "取 消" }).click();
+  await editDialog.getByRole("button", { name: "取消" }).click();
   await page.getByRole("button", { name: "新增基本词性" }).click();
 
   const createDialog = page.getByRole("dialog");

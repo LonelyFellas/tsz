@@ -1,4 +1,4 @@
-import { Spin, Typography } from "antd";
+import { CircularProgress, Typography } from "@mui/material";
 import {
   createBrowserRouter,
   redirect,
@@ -11,12 +11,12 @@ import { ADMIN_PAGE_ROUTES } from "@/lib/adminPageRoutes";
 
 // 首屏兜底：路由全部走 route.lazy，首个匹配的 chunk 就绪前 react-router 需要
 // HydrateFallback（缺省会告警）。渲染在 RootProviders 之外（无 ConfigProvider，
-// antd token 走默认值），视觉与门禁加载态一致，启动时不闪变。
+// MUI token 走默认值），视觉与门禁加载态一致，启动时不闪变。
 function BootFallback() {
   return (
     <FullscreenCenter>
-      <Spin size="small" />
-      <Typography.Text type="secondary">加载中...</Typography.Text>
+      <CircularProgress size={24} />
+      <Typography color="text.secondary">加载中...</Typography>
     </FullscreenCenter>
   );
 }

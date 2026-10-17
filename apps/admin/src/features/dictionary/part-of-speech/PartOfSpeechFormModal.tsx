@@ -1,5 +1,12 @@
 import { usePermission } from "@/lib/auth";
-import { Form, Modal } from "antd";
+import {
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle
+} from "@mui/material";
+import { FormProvider, useForm } from "react-hook-form";
 import type {
   AdminWordKind,
   CreatePartOfSpeechInput,
@@ -74,71 +81,93 @@ export function PartOfSpeechFormModal({
   onError
 }: Props) {
   const canEdit = usePermission("lexicon_settings.edit_basic");
-  const [form] = Form.useForm<PartFormValues>();
-  const create = useCreatePartOfSpeech();
-  const update = useUpdatePartOfSpeech();
+  const form = useForm<PartFormValues>();
+  const { reset, handleSubmit } = form;
+  const create = useCreatePartOfSpeech(),
+    update = useUpdatePartOfSpeech();
   const pending = create.isPending || update.isPending;
-  // 预填值放 ref 而不是 effect 依赖：目录随时可能重拉，跟着重跑那个 effect 会连带
-  // resetFields 清空正在填的表单。
   const defaultSortOrderRef = useRef(defaultSortOrder);
   defaultSortOrderRef.current = defaultSortOrder;
-
   useEffect(() => {
     if (!open) return;
-    if (value) {
-      form.setFieldsValue({
-        name_zh: value.name_zh,
-        name_en: value.name_en,
-        abbreviation: value.abbreviation,
-        short_name_zh: value.short_name_zh,
-        full_name_en: value.full_name_en,
-        sort_order: value.sort_order
-      });
-    } else {
-      form.resetFields();
-      form.setFieldValue("sort_order", defaultSortOrderRef.current);
-    }
-  }, [form, open, value]);
-
+    reset(
+      value
+        ? {
+            name_zh: value.name_zh,
+            name_en: value.name_en,
+            abbreviation: value.abbreviation,
+            short_name_zh: value.short_name_zh,
+            full_name_en: value.full_name_en,
+            sort_order: value.sort_order
+          }
+        : {
+            name_zh: "",
+            name_en: "",
+            abbreviation: "",
+            short_name_zh: "",
+            full_name_en: "",
+            sort_order: defaultSortOrderRef.current
+          }
+    );
+  }, [open, value, reset]);
   const submit = async (values: PartFormValues) => {
-    if (!canEdit) return;
+    if (!canEdit || pending) return;
     try {
-      let saved: PartOfSpeechConfig;
-      if (value) {
-        saved = await update.mutateAsync({
-          id: value.id,
-          input: { base_revision: value.revision, ...values }
-        });
-      } else {
-        saved = await create.mutateAsync({
-          ...values,
-          kind,
-          code: derivePartOfSpeechCode(values.full_name_en, kind)
-        });
-      }
+      const saved = value
+        ? await update.mutateAsync({
+            id: value.id,
+            input: { base_revision: value.revision, ...values }
+          })
+        : await create.mutateAsync({
+            ...values,
+            kind,
+            code: derivePartOfSpeechCode(values.full_name_en, kind)
+          });
       onSaved(saved);
       onClose();
     } catch (error) {
       onError(error);
     }
   };
-
   return (
-    <Modal
+    <Dialog
       open={open}
-      width={720}
-      title={`${value ? "修改" : "新增"}${kind === "phrase" ? "短语" : "单词"}基本词性`}
-      okText={value ? "保 存" : "新 建"}
-      cancelText="取 消"
-      okButtonProps={{ disabled: !canEdit }}
-      confirmLoading={pending}
-      onOk={() => form.submit()}
-      onCancel={onClose}
-      destroyOnHidden
+      fullWidth
+      maxWidth="md"
+      aria-labelledby="part-form-title"
+      onClose={() => {
+        if (!pending) onClose();
+      }}
     >
-      <Form form={form} layout="vertical" onFinish={submit}>
-        <PartOfSpeechSharedFields placeholders={PLACEHOLDERS} />
-      </Form>
-    </Modal>
+      <DialogTitle id="part-form-title">{`${value ? "修改" : "新增"}${kind === "phrase" ? "短语" : "单词"}基本词性`}</DialogTitle>
+      <DialogContent>
+        <FormProvider {...form}>
+          <form
+            id="part-form"
+            onSubmit={handleSubmit(submit)}
+            style={{ marginTop: 8 }}
+          >
+            <PartOfSpeechSharedFields
+              placeholders={PLACEHOLDERS}
+              disabled={pending}
+            />
+          </form>
+        </FormProvider>
+      </DialogContent>
+      <DialogActions>
+        <Button disabled={pending} onClick={onClose}>
+          取消
+        </Button>
+        <Button
+          type="submit"
+          form="part-form"
+          variant="contained"
+          disabled={!canEdit}
+          loading={pending}
+        >
+          {value ? "保存" : "新建"}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }

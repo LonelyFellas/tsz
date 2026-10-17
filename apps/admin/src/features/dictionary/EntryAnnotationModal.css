@@ -46,7 +46,8 @@
   line-height: 20px;
 }
 
-.entry-annotation-meta .ant-typography {
+.entry-annotation-meta .entry-annotation-creator,
+.entry-annotation-meta .entry-annotation-updated {
   font-size: inherit;
   line-height: inherit;
 }

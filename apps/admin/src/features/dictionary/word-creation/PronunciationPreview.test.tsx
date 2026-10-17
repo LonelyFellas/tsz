@@ -26,15 +26,9 @@ const message = vi.hoisted(() => ({
   error: vi.fn()
 }));
 
-vi.mock("antd", async (importOriginal) => {
-  const antd = await importOriginal<typeof import("antd")>();
-  return {
-    ...antd,
-    App: {
-      useApp: () => ({ message })
-    }
-  };
-});
+vi.mock("@/components/FeedbackProvider", () => ({
+  useFeedback: () => (text: string) => message.error(text)
+}));
 
 vi.mock("@/lib/env", () => ({
   env: {

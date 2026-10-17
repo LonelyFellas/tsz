@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { AdminTestProviders as AntApp } from "@/test-utils/AdminTestProviders";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PartOfSpeechSettingsPage } from "./PartOfSpeechSettings";

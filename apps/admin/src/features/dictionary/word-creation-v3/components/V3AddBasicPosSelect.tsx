@@ -1,5 +1,6 @@
-import { PlusOutlined } from "@ant-design/icons";
-import { Select } from "antd";
+import { useContentEditPermissions } from "../../contentEditPermissions";
+import Add from "@mui/icons-material/Add";
+import { MenuItem, TextField } from "@mui/material";
 import type {
   DraftFormsStepContentV3,
   PartOfSpeechCatalogItem,
@@ -25,6 +26,7 @@ export function V3AddBasicPosSelect({
   isPending = false,
   onAdd
 }: V3AddBasicPosSelectProps) {
+  const { edit: canEditContent } = useContentEditPermissions();
   const usedPosCodes = new Set(forms.pos.map((pos) => pos.pos));
   // 挂错一侧后端会以 part_of_speech_kind_mismatch 拒绝，不放进候选。
   const availableItems = (catalog?.items ?? []).filter(
@@ -33,25 +35,26 @@ export function V3AddBasicPosSelect({
   );
 
   return (
-    <Select
-      aria-label="添加基本词性"
+    <TextField
+      select
+      label="添加基本词性"
       className="word-add-basic-pos-select"
-      disabled={isError || isPending}
-      loading={isPending}
-      onChange={(code) => {
+      disabled={!canEditContent || isError || isPending}
+      value=""
+      sx={{ width: 190 }}
+      slotProps={{ select: { IconComponent: Add } }}
+      onChange={(event) => {
         const item = availableItems.find(
-          (candidate) => candidate.code === code
+          (candidate) => candidate.code === event.target.value
         );
         if (item) onAdd(item);
       }}
-      options={availableItems.map((item) => ({
-        value: item.code,
-        label: item.name_zh
-      }))}
-      placeholder="添加基本词性"
-      style={{ width: 190 }}
-      suffixIcon={<PlusOutlined />}
-      value={undefined}
-    />
+    >
+      {availableItems.map((item) => (
+        <MenuItem key={item.code} value={item.code}>
+          {item.name_zh}
+        </MenuItem>
+      ))}
+    </TextField>
   );
 }

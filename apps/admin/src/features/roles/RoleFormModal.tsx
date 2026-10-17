@@ -2,19 +2,24 @@
 // 按目录=侧栏顺序渲染，对角色已有集合打勾）。权限集提交即「全量替换」：把当前勾中的完整数组
 // 塞 permissions（编辑时也照发，等价于按现状替换）。校验对齐 §3/§4：名称 1–50、无 < >/控制字符。
 import {
-  App,
   Alert,
+  Box,
   Button,
   Checkbox,
-  Col,
-  Form,
-  Input,
-  Modal,
-  Row,
-  Spin,
-  Tag
-} from "antd";
+  Chip,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControlLabel,
+  Stack,
+  TextField,
+  Typography
+} from "@mui/material";
 import { useEffect } from "react";
+import { Controller, useForm } from "react-hook-form";
+import { useFeedback } from "@/components/FeedbackProvider";
 import type { AdminRole, CreateRoleRequest, PermissionKey } from "@tsz/types";
 import { HttpError } from "@tsz/api-client";
 import {
@@ -46,8 +51,17 @@ interface Props {
 }
 
 export function RoleFormModal({ open, role, onClose }: Props) {
-  const { message } = App.useApp();
-  const [form] = Form.useForm<FormValues>();
+  const notify = useFeedback();
+  const {
+    register,
+    control,
+    reset,
+    handleSubmit,
+    setError,
+    formState: { errors, isSubmitting }
+  } = useForm<FormValues>({
+    defaultValues: { name: "", description: "", permissions: [] }
+  });
   const catalog = usePermissionCatalog();
   const createRole = useCreateRole();
   const updateRole = useUpdateRole();
@@ -60,16 +74,16 @@ export function RoleFormModal({ open, role, onClose }: Props) {
   // 后者依赖开场动画的 transitionend，在 jsdom（无动画）里不触发，会导致编辑态回填落空。
   useEffect(() => {
     if (open) {
-      form.setFieldsValue({
+      reset({
         name: role?.name ?? "",
         description: role?.description ?? "",
         permissions: role?.permissions ?? []
       });
     }
-  }, [open, role, form]);
+  }, [open, role, reset]);
 
-  const submit = async () => {
-    const values = await form.validateFields();
+  const submit = handleSubmit(async (values) => {
+    if (createRole.isPending || updateRole.isPending) return;
     const input: CreateRoleRequest = {
       name: values.name.trim(),
       description: values.description?.trim() ?? "",
@@ -79,128 +93,165 @@ export function RoleFormModal({ open, role, onClose }: Props) {
     try {
       if (role) await updateRole.mutateAsync({ id: role.id, input });
       else await createRole.mutateAsync(input);
-      message.success(isEdit ? "已保存" : "角色已创建");
+      notify(isEdit ? "已保存" : "角色已创建", "success");
       onClose();
     } catch (err) {
       // 409 = 大小写不敏感重名：高亮名称输入框（§3/§4）。
       if (err instanceof HttpError && err.status === 409) {
-        form.setFields([{ name: "name", errors: ["角色名已存在"] }]);
+        setError("name", { message: "角色名已存在" });
         return;
       }
       // 唯一可据 code 精确处理的 400：勾了目录外 key → 提示并重拉目录（§3）。
       if (isUnknownPermissionKeyError(err)) {
-        message.error("有权限项已失效，请刷新权限目录后重试");
+        notify("有权限项已失效，请刷新权限目录后重试", "error");
         void catalog.refetch();
         return;
       }
       // 其余 400（名称非法等）：一律展示后端 error 原文并停留重填，不匹配英文文案（§3）。
       if (err instanceof HttpError && err.status === 400) {
-        message.error(err.message || "参数不合法");
+        notify(err.message || "参数不合法", "error");
         return;
       }
       // 403（系统角色/非超管）/ 404（并发删）/ 网络等：提示并关闭；404 时刷新列表。
-      message.error(roleMutationError(err, "保存失败"));
+      notify(roleMutationError(err, "保存失败"), "error");
       if (err instanceof HttpError && err.status === 404) invalidate();
       onClose();
     }
-  };
+  });
 
+  const pending = isSubmitting || createRole.isPending || updateRole.isPending;
   return (
-    <Modal
+    <Dialog
       open={open}
-      title={isEdit ? `编辑角色：${role.name}` : "新建角色"}
-      okText={isEdit ? "保存" : "创建"}
-      cancelText="取消"
-      width={560}
-      confirmLoading={createRole.isPending || updateRole.isPending}
-      onOk={() => void submit().catch(() => undefined)}
-      onCancel={onClose}
-      destroyOnHidden
+      fullWidth
+      maxWidth="sm"
+      aria-labelledby="role-form-title"
+      onClose={() => {
+        if (!pending) onClose();
+      }}
     >
-      <Form form={form} layout="vertical" style={{ marginTop: 12 }}>
-        <Form.Item
-          name="name"
-          label="角色名"
-          rules={[
-            {
-              required: true,
-              transform: (v: string) => v?.trim(),
-              message: "请输入角色名"
-            },
-            {
-              validator: (_, v: string) => {
-                const err = v ? validateRoleName(v) : null;
-                return err ? Promise.reject(new Error(err)) : Promise.resolve();
-              }
-            }
-          ]}
+      <DialogTitle id="role-form-title">
+        {isEdit ? `编辑角色：${role.name}` : "新建角色"}
+      </DialogTitle>
+      <DialogContent>
+        <Stack
+          component="form"
+          id="role-form"
+          spacing={2}
+          sx={{ mt: 1 }}
+          onSubmit={submit}
         >
-          <Input
+          <TextField
+            label="角色名"
             placeholder="如：词库管理员"
-            allowClear
-            maxLength={ROLE_NAME_MAX}
+            disabled={pending}
+            error={!!errors.name}
+            helperText={errors.name?.message}
+            slotProps={{ htmlInput: { maxLength: ROLE_NAME_MAX } }}
+            {...register("name", {
+              validate: (value) =>
+                !value.trim() ? "请输入角色名" : validateRoleName(value) || true
+            })}
           />
-        </Form.Item>
-        <Form.Item
-          name="description"
-          label="描述（可选）"
-          rules={[
-            { max: ROLE_DESC_MAX, message: `最长 ${ROLE_DESC_MAX} 字符` }
-          ]}
-        >
-          <Input.TextArea
+          <TextField
+            label="描述（可选）"
             placeholder="这个角色能做什么"
-            allowClear
-            autoSize={{ minRows: 2, maxRows: 4 }}
-            maxLength={ROLE_DESC_MAX}
-            showCount
+            multiline
+            minRows={2}
+            maxRows={4}
+            disabled={pending}
+            error={!!errors.description}
+            helperText={errors.description?.message}
+            slotProps={{ htmlInput: { maxLength: ROLE_DESC_MAX } }}
+            {...register("description", {
+              maxLength: {
+                value: ROLE_DESC_MAX,
+                message: `最长 ${ROLE_DESC_MAX} 字符`
+              }
+            })}
           />
-        </Form.Item>
-        <Form.Item
-          name="permissions"
-          label="菜单权限"
-          extra="勾选该角色可访问的后台菜单；不勾任何项 = 仅可见首页。「未上线」项可先勾选，对应菜单落地前仍为置灰。"
-        >
+          <Typography>菜单权限</Typography>
+          <Typography variant="caption" color="text.secondary">
+            勾选该角色可访问的后台菜单；不勾任何项 =
+            仅可见首页。「未上线」项可先勾选，对应菜单落地前仍为置灰。
+          </Typography>
           {catalog.isPending ? (
-            <div style={{ padding: "16px 0", textAlign: "center" }}>
-              <Spin size="small" />
-            </div>
+            <CircularProgress size={24} />
           ) : catalog.isError ? (
             <Alert
-              type="error"
-              showIcon
-              title="权限目录加载失败"
-              description={catalog.error.message}
+              severity="error"
               action={
-                <Button size="small" onClick={() => void catalog.refetch()}>
-                  重试
-                </Button>
+                <Button onClick={() => void catalog.refetch()}>重试</Button>
               }
-            />
+            >
+              权限目录加载失败<Typography>{catalog.error.message}</Typography>
+            </Alert>
           ) : (
-            <Checkbox.Group style={{ width: "100%" }}>
-              <Row gutter={[8, 8]} style={{ width: "100%" }}>
-                {items.map((item) => (
-                  <Col span={12} key={item.key}>
-                    <Checkbox value={item.key}>
-                      {item.label}
-                      {!isPermissionLanded(item.key) && (
-                        <Tag
-                          color="orange"
-                          variant="filled"
-                          style={{ marginInlineStart: 6 }}
-                        >
-                          未上线
-                        </Tag>
-                      )}
-                    </Checkbox>
-                  </Col>
-                ))}
-              </Row>
-            </Checkbox.Group>
+            <Controller
+              name="permissions"
+              control={control}
+              render={({ field }) => (
+                <Box
+                  role="group"
+                  aria-label="菜单权限"
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(2,minmax(0,1fr))",
+                    gap: 1
+                  }}
+                >
+                  {items.map((item) => (
+                    <FormControlLabel
+                      key={item.key}
+                      control={
+                        <Checkbox
+                          disabled={pending}
+                          checked={field.value?.includes(item.key) ?? false}
+                          onChange={(_, checked) =>
+                            field.onChange(
+                              checked
+                                ? [...(field.value ?? []), item.key]
+                                : (field.value ?? []).filter(
+                                    (key) => key !== item.key
+                                  )
+                            )
+                          }
+                        />
+                      }
+                      label={
+                        <>
+                          {item.label}
+                          {!isPermissionLanded(item.key) && (
+                            <Chip
+                              label="未上线"
+                              color="warning"
+                              size="small"
+                              sx={{ ml: 0.75 }}
+                            />
+                          )}
+                        </>
+                      }
+                    />
+                  ))}
+                </Box>
+              )}
+            />
           )}
-        </Form.Item>
-      </Form>
-    </Modal>
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button disabled={pending} onClick={onClose}>
+          取消
+        </Button>
+        <Button
+          type="submit"
+          form="role-form"
+          variant="contained"
+          loading={pending}
+        >
+          {isEdit ? "保存" : "创建"}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }

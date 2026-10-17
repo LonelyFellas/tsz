@@ -1,5 +1,8 @@
-import { HolderOutlined } from "@ant-design/icons";
-import { Button } from "antd";
+import { useContentEditPermissions } from "../../contentEditPermissions";
+import { IconButton as MuiIconButton } from "@mui/material";
+
+import HolderOutlined from "@mui/icons-material/DragIndicator";
+
 import type { SortableRowsController } from "../sortableRows";
 
 /**
@@ -21,14 +24,13 @@ export function SortableDragHandle({
   index: number;
   dragImageSelector: string;
 }) {
+  const { edit: canEditContent } = useContentEditPermissions();
   return (
-    <Button
+    <MuiIconButton
       aria-label={label}
       className="word-sort-drag-handle"
-      disabled={!sorting.canReorder}
+      disabled={!canEditContent || !sorting.canReorder}
       draggable={sorting.canReorder}
-      htmlType="button"
-      icon={<HolderOutlined />}
       onDragEnd={sorting.handleDragEnd}
       onDragStart={(event) => {
         sorting.handleDragStart(event, index);
@@ -42,7 +44,9 @@ export function SortableDragHandle({
       title={
         sorting.canReorder ? "拖动排序，也可使用上下方向键" : singleItemTitle
       }
-      type="text"
-    />
+      type={"button"}
+    >
+      {<HolderOutlined data-drag-indicator />}
+    </MuiIconButton>
   );
 }

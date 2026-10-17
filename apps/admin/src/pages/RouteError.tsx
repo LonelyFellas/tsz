@@ -1,9 +1,7 @@
 import { useEffect } from "react";
 import { isResourceError } from "@tsz/shared/recovery";
-import { Button, ConfigProvider, Result, Space, Typography } from "antd";
-import zhCN from "antd/locale/zh_CN";
+import { Button, Stack, Typography } from "@mui/material";
 import { useRouteError } from "react-router-dom";
-import { antdTheme } from "@/antd-theme";
 import { FullscreenCenter } from "@/layouts/FullscreenCenter";
 
 // 路由级错误兜底：任一已匹配路由在渲染/loader 中抛出未捕获错误时，react-router
@@ -15,9 +13,7 @@ export function RouteErrorPage() {
   useEffect(() => {
     if (resourceError) window.dispatchEvent(new Event("tsz:resource-error"));
   }, [resourceError]);
-  // 兜底页自己要能在「入口 chunk 加载失败」时渲染，所以挂在 RootProviders 之外；
-  // 随之而来的是这里没有 ConfigProvider，需要就地补一个品牌主题，
-  // 否则整页会退回 antd 默认蓝，与后台其余部分明显不同色。
+  // 根入口的 MUI 主题覆盖路由错误边界。
   const message = resourceError
     ? "页面资源加载失败，请检查网络或刷新重试。编辑备份可在原页面恢复。"
     : "页面暂时无法显示，请刷新后重试。";
@@ -26,41 +22,28 @@ export function RouteErrorPage() {
     error instanceof Error && error.message ? error.message.slice(0, 200) : "";
 
   return (
-    <ConfigProvider locale={zhCN} theme={antdTheme}>
-      <FullscreenCenter>
-        <Result
-          status="error"
-          title={resourceError ? "页面资源加载失败" : "页面出错了"}
-          subTitle={
-            <>
-              {message}
-              {detail && (
-                <Typography.Paragraph
-                  type="secondary"
-                  style={{
-                    margin: "12px 0 0",
-                    fontSize: 12,
-                    wordBreak: "break-word"
-                  }}
-                >
-                  错误信息：{detail}
-                </Typography.Paragraph>
-              )}
-            </>
-          }
-          extra={
-            <Space wrap size={12}>
-              <Button type="primary" onClick={() => window.location.reload()}>
-                刷新重试
-              </Button>
-              {/* 整页跳转：出错后 router 状态可能已不可靠，走新的入口更稳。 */}
-              <Button onClick={() => window.location.assign("/")}>
-                返回首页
-              </Button>
-            </Space>
-          }
-        />
-      </FullscreenCenter>
-    </ConfigProvider>
+    <FullscreenCenter>
+      <Stack spacing={2} sx={{ maxWidth: 640, p: 3 }}>
+        <Typography variant="h4">
+          {resourceError ? "页面资源加载失败" : "页面出错了"}
+        </Typography>
+        <Typography>{message}</Typography>
+        {detail && (
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ overflowWrap: "anywhere" }}
+          >
+            错误信息：{detail}
+          </Typography>
+        )}
+        <Stack direction="row" spacing={1}>
+          <Button variant="contained" onClick={() => window.location.reload()}>
+            刷新重试
+          </Button>
+          <Button onClick={() => window.location.assign("/")}>返回首页</Button>
+        </Stack>
+      </Stack>
+    </FullscreenCenter>
   );
 }

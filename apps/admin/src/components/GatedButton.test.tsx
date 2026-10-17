@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { GatedButton } from "./GatedButton";
 
@@ -30,12 +30,13 @@ describe("GatedButton", () => {
 
   it("透传 loading 等 Button 属性", () => {
     const { container } = render(
-      <GatedButton loading type="primary">
+      <GatedButton loading variant="contained">
         保存
       </GatedButton>
     );
-    expect(container.querySelector("button.ant-btn-loading")).not.toBeNull();
-    expect(container.querySelector("button.ant-btn-primary")).not.toBeNull();
+    const button = container.querySelector("button")!;
+    expect(button).toBeDisabled();
+    expect(within(button).getByRole("progressbar")).toBeInTheDocument();
   });
 
   it("reason 缺省时不报错（disabled 无提示文案）", () => {

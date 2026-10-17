@@ -1,4 +1,5 @@
-import { Button, Result } from "antd";
+import { Button } from "@mui/material";
+import { PageStatus } from "@/components/PageStatus";
 import { Link } from "react-router-dom";
 import { FullscreenCenter } from "@/layouts/FullscreenCenter";
 
@@ -6,13 +7,12 @@ import { FullscreenCenter } from "@/layouts/FullscreenCenter";
 export function NotFoundPage() {
   return (
     <FullscreenCenter>
-      <Result
-        status="404"
+      <PageStatus
         title="页面不存在"
-        subTitle="你访问的地址有误或该页面已被移除。"
-        extra={
+        description="你访问的地址有误或该页面已被移除。"
+        action={
           <Link to="/">
-            <Button type="primary">返回首页</Button>
+            <Button variant="contained">返回首页</Button>
           </Link>
         }
       />

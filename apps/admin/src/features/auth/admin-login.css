@@ -124,99 +124,18 @@
    编辑——为一次性的观众让每天的用户穿过两栏词典，账算不过来。 */
 .admin-login__body {
   flex: 1;
-  padding: 28px 80px 24px;
+  padding: 48px 80px 80px;
   display: flex;
   justify-content: center;
   align-items: center;
 }
 .admin-login__col {
   width: 100%;
-  max-width: 432px;
+  max-width: 400px;
   min-width: 0;
 }
 .admin-login__col-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--rule-2);
-  margin-bottom: 12px;
-}
-.admin-login__col-head .admin-login__zh {
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.16em;
-}
-.admin-login__col-head .admin-login__en {
-  font-size: 12px;
-  letter-spacing: 0.14em;
-  color: var(--ink-3);
-}
-
-/* 表单 */
-.admin-login__field {
-  margin-bottom: 17px;
-}
-.admin-login__label {
-  margin-bottom: 8px;
-}
-.admin-login__label .admin-login__t {
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-}
-.admin-login__ctl {
-  display: flex;
-  gap: 10px;
-}
-/* 输入框边框走 antd 的边框色，与全站其它表单一致（设计稿原用品牌蓝灰 #BFC0CA）。
-   ⚠️ 实测：antd 的 #d9d9d9 对白纸只有 1.41:1，比 #BFC0CA 的 1.81:1 还低，
-   两者都达不到 WCAG 1.4.11 对非文字控件的 3:1；底色 #EAF9FF 对白纸也只有 1.08:1，
-   补不足这个缺口。换色的理由是与全站一致，不是解决了对比度——这一条仍未解决。
-   admin 不把无障碍列为阻塞项，真要修得动色板，需要单独拍板。 */
-.admin-login__ctl .ant-input,
-.admin-login__ctl .ant-input-affix-wrapper {
-  height: 54px;
-  background: var(--wash);
-  font-size: 16px;
-  letter-spacing: 0.02em;
-}
-.admin-login__ctl .ant-input-affix-wrapper .ant-input {
-  height: auto;
-  background: transparent;
-}
-.admin-login__ctl .ant-input:focus,
-.admin-login__ctl .ant-input-affix-wrapper-focused {
-  background: #fff;
-}
-.admin-login__ctl .ant-btn {
-  height: 54px;
-  flex: none;
-  white-space: nowrap;
-}
-
-.admin-login__submit.ant-btn {
-  width: 100%;
-  height: 58px;
-  font-size: 17px;
-  font-weight: 500;
-  letter-spacing: 0.4em;
-  text-indent: 0.4em;
-  margin-top: 4px;
-}
-/* 禁用态是这一页打开时的默认态（表单为空），所以它不能是视觉上最重的死块。
-   antd 默认给禁用按钮铺灰底，在这张白纸样张上会变成整页最沉的一块。
-   改成纸底 + 细边 + 读得清的字：按钮仍明显不可点，但不抢视觉重量。 */
-.admin-login__submit.ant-btn:disabled:not(.admin-login__submit--busy),
-.admin-login__submit.ant-btn:disabled:not(.admin-login__submit--busy):hover,
-.admin-login__ctl .ant-btn:disabled,
-.admin-login__ctl .ant-btn:disabled:hover {
-  background: #fff;
-  border-color: #b4b7c4;
-  color: var(--ink-2); /* 6.5:1，远高于 WCAG 对禁用控件的豁免要求 */
-}
-.admin-login__submit.ant-btn:disabled:not(.admin-login__submit--busy) {
-  border-width: 2px;
+  margin-bottom: 28px;
 }
 
 /* ══ 版权脚 ══════════════════════════════════════════════════════ */
@@ -273,12 +192,6 @@
     font-size: 25px;
     border-radius: 8.25px;
   }
-  .admin-login__ctl {
-    flex-direction: column;
-  }
-  .admin-login__ctl .ant-btn {
-    width: 100%;
-  }
 }
 
 /* 矮视口（1280×800 这类常见笔记本）：实测溢出 71px，版权脚要滚动才看得到。
@@ -292,9 +205,6 @@
   .admin-login__body {
     padding-top: 18px;
     padding-bottom: 16px;
-  }
-  .admin-login__field {
-    margin-bottom: 13px;
   }
 }
 

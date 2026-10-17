@@ -4,7 +4,7 @@ import {
   screen,
   waitFor
 } from "@testing-library/react";
-import { ConfigProvider } from "antd";
+
 import { useState, type ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { GrammarFormLinkV3, RichTextV2, TextLinkV3 } from "@tsz/types";
@@ -12,9 +12,7 @@ import type { AssociationPickerProps } from "../../types";
 import { VoiceEditor } from "./VoiceEditor";
 
 function render(ui: ReactElement) {
-  return renderUI(
-    <ConfigProvider theme={{ token: { motion: false } }}>{ui}</ConfigProvider>
-  );
+  return renderUI(<>{ui}</>);
 }
 
 const target: TextLinkV3 = {
@@ -482,7 +480,8 @@ it.each(["word", "phrase"] as const)(
     });
     fireEvent.click(screen.getByText("提交新关联"));
     expect(observe).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByText("清除原关联"));
+    fireEvent.mouseDown(screen.getByLabelText("关联 give（1）"), { button: 0 });
+    fireEvent.click(await screen.findByText("清除原关联"));
     await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([other]));
     fireEvent.click(screen.getByRole("button", { name: "关联单词" }));
     fireEvent.mouseDown(screen.getByLabelText("关联 give（1）"), { button: 0 });
@@ -538,7 +537,7 @@ it("例句的关联恢复跟随撤销重做，主动清除后不再自动恢复"
   expect(observe).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "确认修改" }));
   await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([]));
-  fireEvent.click(screen.getByRole("button", { name: "上一步" }));
+  fireEvent.click(await screen.findByRole("button", { name: "上一步" }));
   await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([original]));
   fireEvent.click(screen.getByRole("button", { name: "下一步" }));
   await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([]));
@@ -615,7 +614,7 @@ it.each([
     expect(screen.getByText(/部分关联暂时失效/)).toBeVisible();
     fireEvent.change(input, { target: { value: `${changed}!` } });
     expect(screen.getByText(/部分关联暂时失效/)).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "上一步" }));
+    fireEvent.click(await screen.findByRole("button", { name: "上一步" }));
     await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([original]));
     expect(screen.queryByText(/部分关联暂时失效/)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "下一步" }));

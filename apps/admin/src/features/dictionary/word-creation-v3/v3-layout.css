@@ -12,7 +12,7 @@
   gap: 16px;
 }
 
-.v3-word-creation__header .ant-typography {
+.v3-word-creation__header .MuiTypography-root {
   margin: 0;
 }
 
@@ -52,7 +52,8 @@
   text-align: left;
 }
 
-.v3-word-creation :where(.ant-card, .ant-flex, .ant-space, .ant-form-item) {
+.v3-word-creation
+  :where(.MuiCard-root, .MuiStack-root, .MuiStack-root, .MuiFormControl-root) {
   min-width: 0;
 }
 
@@ -77,16 +78,16 @@
 }
 
 /* 字段标签和表头统一轻微内缩，落在输入框圆角起点略偏左的位置。 */
-.v3-meanings-v2 .word-sense-field > .ant-typography:first-child,
-.v3-meanings-v2 .word-sense-context-toggle > .ant-typography:first-child,
+.v3-meanings-v2 .word-sense-field > .MuiTypography-root:first-child,
+.v3-meanings-v2 .word-sense-context-toggle > .MuiTypography-root:first-child,
 .v3-meanings-v2 .word-sense-group-heads > span:not(:empty),
 .v3-meanings-v2 .word-list-header > span:not(:empty),
 .v3-meanings-v2 .word-relation-column-heads > span:not(:empty) {
   display: block;
   box-sizing: border-box;
   padding-inline-start: 6px;
-  color: var(--ant-color-text-secondary, #6f7785);
-  font-family: var(--ant-font-family, inherit);
+  color: var(--admin-color-text-secondary, #6f7785);
+  font-family: var(--admin-font-family, inherit);
   font-size: 12px;
   font-weight: 400;
   line-height: 20px;
@@ -117,14 +118,16 @@
   align-self: center;
 }
 
-.v3-meanings-v2 .word-list-actions .ant-btn {
+.v3-meanings-v2 .word-list-actions :is(.MuiButton-root, .MuiIconButton-root) {
   width: 28px;
   min-width: 28px;
   padding-inline: 0;
   color: #6f7785;
 }
 
-.v3-meanings-v2 .word-sense-meta-grid :where(.ant-input, .ant-select) {
+.v3-meanings-v2
+  .word-sense-meta-grid
+  :where(.MuiInputBase-input, [data-admin-select]) {
   width: 100%;
   margin-top: 6px;
 }
@@ -257,7 +260,7 @@
   margin-bottom: 10px;
   border: 1px solid #e8ecf2;
   border-radius: 10px;
-  background: var(--ant-color-bg-container, #fff);
+  background: var(--admin-color-bg-container, #fff);
 }
 
 .v3-meanings-v2 .word-sentence-row > .word-number-cell {
@@ -266,7 +269,7 @@
   padding-top: 0;
 }
 
-.v3-meanings-v2 .word-sentence-row > .ant-select {
+.v3-meanings-v2 .word-sentence-row > [data-admin-select] {
   grid-area: level;
 }
 
@@ -292,8 +295,8 @@
   }
 }
 
-.v3-meanings-v2 .word-definition-row > .ant-space,
-.v3-meanings-v2 .word-sentence-row > .ant-space {
+.v3-meanings-v2 .word-definition-row > .MuiStack-root,
+.v3-meanings-v2 .word-sentence-row > .MuiStack-root {
   min-width: 0;
 }
 
@@ -301,8 +304,8 @@
   margin-top: 6px;
 }
 
-.v3-meanings-v2 .word-relation-card .ant-select,
-.v3-meanings-v2 .word-relation-card .ant-input {
+.v3-meanings-v2 .word-relation-card [data-admin-select],
+.v3-meanings-v2 .word-relation-card .MuiInputBase-input {
   width: 100%;
 }
 
@@ -327,7 +330,7 @@
 .v3-meanings-v2 .word-definition-meta {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--word-row-padding) var(--word-row-gap);
 }
 
@@ -342,10 +345,11 @@
   gap: 6px;
 }
 
-/* 每个选择器两侧统一 2px padding；宽度包含文字、padding 和透明边框，不再额外补空白。 */
+/* 无箭头的属性选择器按文字宽度排列，保持首行紧凑且不裁字。 */
 .v3-meanings-v2 .word-definition-options > .word-definition-text-select {
   flex: none;
-  padding-inline: 2px;
+  height: 32px;
+  padding-inline: 0;
 }
 
 /* Select 聚焦且下拉关闭时会插入读屏用的 span；宽度顺序只计算选择器本身。 */
@@ -411,9 +415,9 @@
 
 /* 校验提示包装层没有自己的布局，里面的控件会退回 antd 默认宽度
    （语法结构下拉只有 140px，而列宽 260px），显式撑满列。 */
-.v3-meanings-v2 .word-field-with-help > .ant-select,
-.v3-meanings-v2 .word-field-with-help > .ant-input,
-.v3-meanings-v2 .word-field-with-help > .ant-input-affix-wrapper {
+.v3-meanings-v2 .word-field-with-help > [data-admin-select],
+.v3-meanings-v2 .word-field-with-help > .MuiInputBase-input,
+.v3-meanings-v2 .word-field-with-help > .MuiOutlinedInput-root {
   width: 100%;
 }
 
@@ -468,9 +472,9 @@
   overflow-wrap: normal;
 }
 
-.word-grammar-select.ant-select {
+.word-grammar-select[data-admin-select] {
   height: auto;
-  min-height: var(--ant-control-height, 32px);
+  min-height: var(--admin-control-height, 32px);
 }
 
 /* 弧线按 DOM 坐标测量，此浮层禁用缩放，避免首次测量落在动画中间帧。 */
@@ -521,7 +525,7 @@
 
 .v3-product-progress-list .word-progress-index {
   color: #667085;
-  background: var(--ant-color-fill-secondary, #f0f1f3);
+  background: var(--admin-color-fill-secondary, #f0f1f3);
   font-variant-numeric: tabular-nums;
 }
 
@@ -529,7 +533,7 @@
   .word-creation-progress-row[aria-current="step"]
   :is(.word-progress-done, .word-progress-index) {
   color: #fff;
-  background: var(--ant-color-primary, #2053ff);
+  background: var(--admin-color-primary, #2053ff);
 }
 
 .v3-product-progress-list .word-progress-label {
@@ -549,7 +553,7 @@
 .v3-product-progress-list
   .word-creation-progress-row
   .v3-product-progress-trailing
-  > .ant-typography {
+  > .MuiTypography-root {
   min-width: 0;
   padding: 0;
   color: #8b9099;
@@ -586,24 +590,24 @@
 :is(.word-creation-shell, .word-creation-progress-drawer)
   .v3-product-progress-list
   .word-creation-progress-row:hover {
-  background: var(--ant-color-fill-quaternary, #fafafa);
+  background: var(--admin-color-fill-quaternary, #fafafa);
 }
 
 .v3-product-progress-list .word-creation-progress-row:focus-visible {
-  outline: 2px solid var(--ant-color-primary, #2053ff);
+  outline: 2px solid var(--admin-color-primary, #2053ff);
   outline-offset: 2px;
 }
 
 :is(.word-creation-shell, .word-creation-progress-drawer)
   .v3-product-progress-list
   .word-creation-progress-row[aria-current="step"] {
-  background: var(--ant-color-primary-bg, #edf4ff);
+  background: var(--admin-color-primary-bg, #edf4ff);
 }
 
 .v3-product-progress-list
   .word-creation-progress-row[aria-current="step"]
   .word-progress-label {
-  color: var(--ant-color-primary, #2053ff);
+  color: var(--admin-color-primary, #2053ff);
   font-weight: 600;
 }
 
@@ -613,8 +617,8 @@
   flex: none;
   width: 10px;
   height: 10px;
-  color: var(--ant-color-text-description, #8b9099);
-  transition: transform var(--ant-motion-duration-slow, 0.3s);
+  color: var(--admin-color-text-description, #8b9099);
+  transition: transform var(--admin-motion-duration-slow, 0.3s);
 }
 
 .v3-product-progress-chevron::before,
@@ -625,10 +629,10 @@
   width: 6px;
   height: 1.5px;
   background: currentColor;
-  border-radius: var(--ant-border-radius, 6px);
+  border-radius: var(--admin-border-radius, 6px);
   content: "";
-  transition: transform var(--ant-motion-duration-slow, 0.3s)
-    var(--ant-motion-ease-in-out, cubic-bezier(0.645, 0.045, 0.355, 1));
+  transition: transform var(--admin-motion-duration-slow, 0.3s)
+    var(--admin-motion-ease-in-out, cubic-bezier(0.645, 0.045, 0.355, 1));
 }
 
 .v3-product-progress-chevron::before {
@@ -767,7 +771,7 @@
     position: static;
   }
 
-  .v3-word-creation__sidebar .ant-steps {
+  .v3-word-creation__sidebar .MuiStepper-root {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
@@ -782,7 +786,7 @@
     flex-direction: column;
   }
 
-  .v3-word-creation__sidebar .ant-steps {
+  .v3-word-creation__sidebar .MuiStepper-root {
     grid-template-columns: 1fr 1fr;
   }
 
@@ -794,7 +798,7 @@
 }
 
 @media (max-width: 479px) {
-  .v3-word-creation__sidebar .ant-steps {
+  .v3-word-creation__sidebar .MuiStepper-root {
     grid-template-columns: 1fr;
   }
 
@@ -803,7 +807,12 @@
     padding: 12px;
   }
 
-  .v3-word-creation :where(.ant-btn, .ant-select, .ant-input-number) {
+  .v3-word-creation
+    :where(
+      :is(.MuiButton-root, .MuiIconButton-root),
+      [data-admin-select],
+      [data-percentage-field]
+    ) {
     max-width: 100%;
   }
 }
@@ -811,4 +820,17 @@
 /* 问题定位与深链滚到节点时让出 64px 的吸顶导航栏，再留一点空隙。 */
 [data-v3-node-id] {
   scroll-margin-top: 80px;
+}
+
+.word-definition-text-select .MuiSelect-select.MuiSelect-select {
+  padding: 0;
+  font-size: 14px;
+  line-height: 32px;
+  min-height: 0;
+}
+
+.word-grammar-select .MuiSelect-select {
+  min-height: 0;
+  display: flex;
+  align-items: center;
 }

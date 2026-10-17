@@ -9,7 +9,7 @@
   margin-inline: auto;
   color: var(--wordlist-ink);
 }
-.wordlist-editor > .ant-breadcrumb {
+.wordlist-editor > .MuiBreadcrumbs-root {
   font-size: 12px;
 }
 .wordlist-editor__header {
@@ -21,7 +21,7 @@
   justify-content: space-between;
   gap: 16px;
   padding-block: 12px;
-  background: var(--ant-color-bg-layout, #f5f5f5);
+  background: var(--admin-color-bg-layout, #f5f5f5);
 }
 .wordlist-editor__heading {
   flex: 1;
@@ -30,7 +30,7 @@
   gap: 12px;
   min-width: 0;
 }
-.wordlist-editor__heading .ant-typography {
+.wordlist-editor__heading .MuiTypography-root {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -38,7 +38,7 @@
   font-size: 24px;
   color: var(--wordlist-ink);
 }
-.wordlist-editor__heading .ant-tag {
+.wordlist-editor__heading .MuiChip-root {
   margin: 0;
 }
 .wordlist-editor__panel {
@@ -52,7 +52,7 @@
   gap: 10px;
   padding: 24px;
 }
-.wordlist-editor__basics > .ant-input-affix-wrapper {
+.wordlist-editor__basics > .MuiOutlinedInput-root {
   max-width: 640px;
 }
 .wordlist-editor__label {
@@ -60,7 +60,7 @@
   font-weight: 500;
 }
 .wordlist-editor__required {
-  color: var(--ant-color-error, #ff4d4f);
+  color: var(--admin-color-error, #ff4d4f);
 }
 .wordlist-editor__toolbar {
   position: sticky;
@@ -80,7 +80,7 @@
   align-items: baseline;
   gap: 10px;
 }
-.wordlist-editor__section-title .ant-typography {
+.wordlist-editor__section-title .MuiTypography-root {
   margin: 0;
   color: var(--wordlist-ink);
 }
@@ -112,7 +112,7 @@
   border-bottom: 1px solid #eceff3;
 }
 .wordlist-editor__row--invalid {
-  background: var(--ant-color-error-bg, #fff2f0);
+  background: var(--admin-color-error-bg, #fff2f0);
 }
 .wordlist-editor__leading {
   display: flex;
@@ -161,7 +161,7 @@
   min-height: 32px;
   gap: 2px;
 }
-.wordlist-editor__actions .ant-btn {
+.wordlist-editor__actions :is(.MuiButton-root, .MuiIconButton-root) {
   width: 28px;
   min-width: 28px;
 }
@@ -179,13 +179,13 @@
   font-size: 12px;
   color: var(--wordlist-muted);
 }
-.wordlist-editor__note > .ant-input-textarea {
+.wordlist-editor__note > textarea {
   min-width: 0;
 }
 .wordlist-editor__note textarea {
   font-size: 13px;
 }
-.wordlist-editor__note .ant-input-data-count {
+.wordlist-editor__note .admin-input-count {
   font-size: 11px;
   color: #a5abb5;
 }
@@ -215,7 +215,7 @@
 }
 .wordlist-editor__suggestions > button:hover,
 .wordlist-editor__suggestions > button:focus-visible {
-  background: var(--ant-color-primary-bg, #edf4ff);
+  background: var(--admin-color-primary-bg, #edf4ff);
 }
 .wordlist-editor__suggestions > button:disabled {
   cursor: not-allowed;
@@ -247,7 +247,7 @@
   .wordlist-editor__heading {
     gap: 6px;
   }
-  .wordlist-editor__heading .ant-typography {
+  .wordlist-editor__heading .MuiTypography-root {
     font-size: 20px;
   }
   .wordlist-editor__basics,

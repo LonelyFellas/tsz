@@ -1,3 +1,4 @@
+import { AdminThemeProvider } from "@/mui-theme";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   fireEvent,
@@ -6,7 +7,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { FeedbackProvider } from "@/components/FeedbackProvider";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpError } from "@tsz/api-client";
 import type { Admin } from "@tsz/types";
@@ -79,9 +80,11 @@ function renderPage() {
   });
   return render(
     <QueryClientProvider client={client}>
-      <AntApp>
-        <AdminManagement />
-      </AntApp>
+      <AdminThemeProvider>
+        <FeedbackProvider>
+          <AdminManagement />
+        </FeedbackProvider>
+      </AdminThemeProvider>
     </QueryClientProvider>
   );
 }
@@ -91,9 +94,9 @@ function clickButton(label: string | RegExp, idx = 0) {
   fireEvent.click(screen.getAllByText(label)[idx]!);
 }
 
-/** 点确认弹窗里的主按钮（.ant-modal-confirm-btns 内，按可见文案定位）。 */
+/** 点确认弹窗里的主按钮（[role="dialog"] 内，按可见文案定位）。 */
 function clickConfirmOk(label: RegExp) {
-  const btns = document.querySelector(".ant-modal-confirm-btns")!;
+  const btns = document.querySelector("[role=dialog]")!;
   fireEvent.click(within(btns as HTMLElement).getByText(label));
 }
 
@@ -270,9 +273,9 @@ describe("AdminManagement", () => {
       items: [plainAdmin, superAdmin],
       pagination: { page: 1, page_size: 10, total: 25, total_pages: 3 }
     });
-    const { container } = renderPage();
+    renderPage();
     await screen.findByText("审核员小王");
-    fireEvent.click(container.querySelector(".ant-pagination-item-2")!);
+    fireEvent.click(screen.getByRole("button", { name: "下一页" }));
     await waitFor(() =>
       expect(mockList).toHaveBeenCalledWith(
         expect.objectContaining({ page: 2, page_size: 10 })

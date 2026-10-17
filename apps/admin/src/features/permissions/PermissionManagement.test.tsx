@@ -6,7 +6,8 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App, ConfigProvider } from "antd";
+import { FeedbackProvider } from "@/components/FeedbackProvider";
+import { AdminThemeProvider } from "@/mui-theme";
 import { HttpError } from "@tsz/api-client";
 import type { UnifiedPermissionCatalog } from "@tsz/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -105,11 +106,11 @@ function mount() {
         new QueryClient({ defaultOptions: { queries: { retry: false } } })
       }
     >
-      <ConfigProvider theme={{ token: { motion: false } }}>
-        <App>
+      <AdminThemeProvider>
+        <FeedbackProvider>
           <PermissionManagement />
-        </App>
-      </ConfigProvider>
+        </FeedbackProvider>
+      </AdminThemeProvider>
     </QueryClientProvider>
   );
 }
@@ -119,18 +120,15 @@ function chooseRow(label: string) {
   return row;
 }
 async function selectTag(label: string, name: string) {
-  fireEvent.mouseDown(screen.getByLabelText(label));
-  await waitFor(() =>
-    expect(
-      document.querySelector(`.ant-select-item-option[title="${name}"]`)
-    ).not.toBeNull()
-  );
-  fireEvent.click(
-    document.querySelector(`.ant-select-item-option[title="${name}"]`)!
-  );
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: label }));
+  fireEvent.click(await screen.findByRole("option", { name }));
+  fireEvent.keyDown(screen.getByRole("combobox", { name: label }), {
+    key: "Escape"
+  });
 }
+
 function chooseTagRow(name: string) {
-  const drawer = within(document.querySelector(".ant-drawer")!);
+  const drawer = within(document.querySelector("[data-admin-drawer]")!);
   const row = drawer.getByText(name).closest("tr")!;
   fireEvent.click(row.querySelector('input[type="checkbox"]')!);
   return row;
@@ -149,7 +147,7 @@ describe("权限目录、标签和授权人员", () => {
     );
     expect(managerButtons).toHaveLength(1);
     fireEvent.click(managerButtons[0]!);
-    const drawer = within(document.querySelector(".ant-drawer")!);
+    const drawer = within(document.querySelector("[data-admin-drawer]")!);
     expect(drawer.getByText("标签管理")).toBeInTheDocument();
     expect(
       drawer
@@ -180,12 +178,12 @@ describe("权限目录、标签和授权人员", () => {
   it("权限列表按标签保存的颜色显示", async () => {
     mount();
     const row = (await screen.findByText("编辑本人词条")).closest("tr")!;
-    expect(within(row).getByText("内容编辑").closest(".ant-tag")).toHaveClass(
-      "ant-tag-blue"
-    );
-    expect(within(row).getByText("高频操作").closest(".ant-tag")).toHaveClass(
-      "ant-tag-purple"
-    );
+    expect(
+      within(row).getByText("内容编辑").closest("[data-permission-tag]")
+    ).toHaveStyle({ backgroundColor: "#e6f0ff" });
+    expect(
+      within(row).getByText("高频操作").closest("[data-permission-tag]")
+    ).toHaveStyle({ backgroundColor: "#f0e2ff" });
   });
 
   it("新建标签可选择自定义颜色", async () => {
@@ -218,11 +216,11 @@ describe("权限目录、标签和授权人员", () => {
     await screen.findByText("编辑本人词条");
     fireEvent.click(
       document.querySelector(
-        'tr[data-row-key="words.access"] input[type="checkbox"]'
+        'tr[data-row-id="words.access"] input[type="checkbox"]'
       )!
     );
     fireEvent.click(screen.getByText("标签管理"));
-    const row = within(document.querySelector(".ant-drawer")!)
+    const row = within(document.querySelector("[data-admin-drawer]")!)
       .getByText("内容编辑")
       .closest("tr")!;
     expect(within(row).getByRole("checkbox")).not.toBeChecked();
@@ -230,6 +228,11 @@ describe("权限目录、标签和授权人员", () => {
     expect(screen.getByText("确认添加至标签")).toBeInTheDocument();
     expect(api.permissionSystem.changeTags).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: /取\s*消/ }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: /确认添加至标签|确认从标签移除/ })
+      ).not.toBeInTheDocument()
+    );
     expect(within(row).getByRole("checkbox")).not.toBeChecked();
     expect(api.permissionSystem.changeTags).not.toHaveBeenCalled();
   });
@@ -260,7 +263,7 @@ describe("权限目录、标签和授权人员", () => {
     for (const permission of catalog.permissions) {
       expect(screen.queryByText(permission.key)).toBeNull();
       const row = document.querySelector(
-        `tr[data-row-key="${permission.key}"]`
+        `tr[data-row-id="${permission.key}"]`
       )!;
       expect(row.querySelectorAll("td")[1]).toHaveTextContent(permission.label);
     }
@@ -284,6 +287,11 @@ describe("权限目录、标签和授权人员", () => {
     expect(api.permissionSystem.changeTags).not.toHaveBeenCalled();
     expect(screen.getByText("确认从标签移除")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /取\s*消/ }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: /确认添加至标签|确认从标签移除/ })
+      ).not.toBeInTheDocument()
+    );
     expect(api.permissionSystem.changeTags).not.toHaveBeenCalled();
     fireEvent.click(
       within(row).getByRole("button", { name: "从内容编辑移除编辑本人词条" })
@@ -333,7 +341,7 @@ describe("权限目录、标签和授权人员", () => {
       target: { value: "内容" }
     });
     expect(within(dialog).queryByText("高频操作")).toBeNull();
-    fireEvent.click(dialog.querySelector(".ant-drawer-close")!);
+    fireEvent.click(dialog.querySelector('[aria-label="关闭"]')!);
     expect(api.permissionSystem.changeTags).not.toHaveBeenCalled();
     expect(api.permissionSystem.commit).not.toHaveBeenCalled();
   });
@@ -365,7 +373,7 @@ describe("权限目录、标签和授权人员", () => {
     await waitFor(() =>
       expect(
         within(
-          within(document.querySelector(".ant-drawer")!)
+          within(document.querySelector("[data-admin-drawer]")!)
             .getByText("内容编辑")
             .closest("tr")!
         ).getByRole("checkbox")
@@ -398,7 +406,7 @@ describe("权限目录、标签和授权人员", () => {
     fireEvent.click(within(drawer).getByText("新建标签"));
     const tagName = screen.getByLabelText("标签名称");
     await waitFor(() => expect(tagName).toBeVisible());
-    const modal = within(tagName.closest(".ant-modal")!);
+    const modal = within(tagName.closest("[role=dialog]")!);
     fireEvent.change(tagName, { target: { value: "审核" } });
     const green = modal.getByLabelText("绿色");
     expect(green.closest("label")).toBeVisible();
@@ -428,7 +436,7 @@ describe("权限目录、标签和授权人员", () => {
     fireEvent.click(within(row).getByText("删除"));
     const confirm = (
       await screen.findByText("删除标签？管理员已分配的权限不受影响。")
-    ).closest(".ant-popconfirm")!;
+    ).closest("[role=dialog]")!;
     fireEvent.click(
       within(confirm as HTMLElement).getByRole("button", { name: /删\s*除/ })
     );
@@ -478,7 +486,7 @@ describe("权限目录、标签和授权人员", () => {
     await waitFor(() =>
       expect(
         within(
-          within(document.querySelector(".ant-drawer")!)
+          within(document.querySelector("[data-admin-drawer]")!)
             .getByText("审核标签")
             .closest("tr")!
         ).getByRole("checkbox")
@@ -529,7 +537,7 @@ describe("权限目录、标签和授权人员", () => {
     mount();
     await screen.findByText("编辑本人词条");
     fireEvent.click(screen.getByText("标签管理"));
-    const drawer = document.querySelector(".ant-drawer")!;
+    const drawer = document.querySelector("[data-admin-drawer]")!;
     fireEvent.click(
       within(
         within(drawer as HTMLElement)
@@ -568,7 +576,7 @@ describe("权限目录、标签和授权人员", () => {
     await screen.findByText("编辑本人词条");
     fireEvent.click(
       document.querySelector(
-        'tr[data-row-key="words.access"] input[type="checkbox"]'
+        'tr[data-row-id="words.access"] input[type="checkbox"]'
       )!
     );
     fireEvent.click(screen.getByText("标签管理"));
@@ -576,7 +584,9 @@ describe("权限目录、标签和授权人员", () => {
     confirmTagChange("添加");
     await screen.findByText("标签已被删除，请重新选择");
     expect(
-      within(document.querySelector(".ant-drawer")!).queryByText("内容编辑")
+      within(document.querySelector("[data-admin-drawer]")!).queryByText(
+        "内容编辑"
+      )
     ).toBeNull();
     expect(api.permissionSystem.catalog).toHaveBeenCalledTimes(2);
     chooseTagRow("高频操作");
@@ -606,17 +616,19 @@ describe("权限目录、标签和授权人员", () => {
     fireEvent.change(screen.getByPlaceholderText("权限名称 / 说明"), {
       target: { value: "不存在的权限" }
     });
-    expect(document.querySelector('tr[data-row-key="words.edit"]')).toBeNull();
+    expect(document.querySelector('tr[data-row-id="words.edit"]')).toBeNull();
     expect(screen.getByText("已选 1 项")).toBeInTheDocument();
     fireEvent.click(screen.getByText("重置"));
     expect(screen.getByPlaceholderText("权限名称 / 说明")).toHaveValue("");
-    expect(screen.getByLabelText("所属板块")).toHaveValue("");
-    expect(screen.getByLabelText("权限标签")).toHaveValue("");
     expect(
-      document.querySelector('tr[data-row-key="users.access"]')
+      screen.getByRole("combobox", { name: "所属板块" })
+    ).toHaveTextContent("全部");
+    expect(screen.getByRole("combobox", { name: "权限标签" })).toHaveValue("");
+    expect(
+      document.querySelector('tr[data-row-id="users.access"]')
     ).toBeInTheDocument();
     expect(
-      document.querySelector('tr[data-row-key="words.access"]')
+      document.querySelector('tr[data-row-id="words.access"]')
     ).toBeInTheDocument();
     expect(
       screen
@@ -661,8 +673,8 @@ describe("权限目录、标签和授权人员", () => {
     chooseRow("编辑本人词条");
     fireEvent.click(screen.getByText("批量授权"));
     await screen.findByText("管理员甲");
-    const drawer = document.querySelector(".ant-drawer")!;
-    const footer = drawer.querySelector(".ant-drawer-footer")!;
+    const drawer = document.querySelector("[data-admin-drawer]")!;
+    const footer = drawer.querySelector("[data-admin-drawer-footer]")!;
     expect(
       within(footer as HTMLElement).getByText(
         "已选 0 人（单次最多选择 100 人）"
@@ -673,29 +685,34 @@ describe("权限目录、标签和授权人员", () => {
         .getByText("下一步：确认权限变更")
         .closest("button")
     ).toBeDisabled();
-    expect(screen.getByText("已启用")).toHaveClass("ant-tag-green");
+    expect(screen.getByText("已启用")).toBeVisible();
     expect(screen.getByText("199****0001")).toBeInTheDocument();
     expect(screen.queryByText("19900000001")).toBeNull();
     expect(screen.queryByText("active")).toBeNull();
     chooseRow("管理员甲");
     const scroller = drawer.querySelector<HTMLDivElement>(
-      '.ant-drawer-body div[style*="overflow: auto"]'
+      "[data-batch-admin-list]"
     )!;
-    expect(
-      drawer.querySelector(".ant-drawer-body .ant-typography")
-    ).toHaveStyle({ maxHeight: "20%", overflowY: "auto" });
+    expect(within(drawer as HTMLElement).getByText(/^所选权限：/)).toHaveStyle({
+      maxHeight: "20%",
+      overflowY: "auto"
+    });
     scroller.scrollTop = 100;
-    fireEvent.click(drawer.querySelector(".ant-pagination-item-2")!);
+    fireEvent.click(
+      within(drawer as HTMLElement).getByRole("button", { name: "下一页" })
+    );
     await screen.findByText("管理员乙");
     expect(scroller.scrollTop).toBe(0);
-    expect(screen.getByText("已禁用")).toHaveClass("ant-tag-default");
+    expect(screen.getByText("已禁用")).toBeVisible();
     expect(screen.queryByText("disabled")).toBeNull();
     chooseRow("管理员乙");
     expect(
       screen.getByText("已选 2 人（单次最多选择 100 人）")
     ).toBeInTheDocument();
     scroller.scrollTop = 200;
-    fireEvent.click(drawer.querySelector(".ant-pagination-item-1")!);
+    fireEvent.click(
+      within(drawer as HTMLElement).getByRole("button", { name: "上一页" })
+    );
     const first = await screen.findByText("管理员甲");
     expect(scroller.scrollTop).toBe(0);
     expect(
@@ -774,9 +791,9 @@ describe("权限目录、标签和授权人员", () => {
       target: { value: "词条目录" }
     });
     expect(
-      document.querySelector('tr[data-row-key="words.access"]')
+      document.querySelector('tr[data-row-id="words.access"]')
     ).toBeInTheDocument();
-    expect(document.querySelector('tr[data-row-key="words.edit"]')).toBeNull();
+    expect(document.querySelector('tr[data-row-id="words.edit"]')).toBeNull();
     expect(api.permissionSystem.commit).not.toHaveBeenCalled();
   });
   it("搜索与多对多权限标签；标签分类不调用grant/commit", async () => {
@@ -785,12 +802,10 @@ describe("权限目录、标签和授权人员", () => {
     expect(screen.getAllByText("高频操作")).toHaveLength(2);
     await selectTag("权限标签", "内容编辑");
     expect(screen.getByText("编辑本人词条")).toBeInTheDocument();
-    const row = document.querySelector('tr[data-row-key="words.edit"]')!;
+    const row = document.querySelector('tr[data-row-id="words.edit"]')!;
     expect(within(row as HTMLElement).getByText("内容编辑")).toBeVisible();
     expect(within(row as HTMLElement).getByText("高频操作")).toBeVisible();
-    expect(
-      document.querySelector('tr[data-row-key="words.access"]')
-    ).toBeNull();
+    expect(document.querySelector('tr[data-row-id="words.access"]')).toBeNull();
     expect(screen.queryByText("查看用户")).toBeNull();
     expect(api.permissionSystem.preview).not.toHaveBeenCalled();
     expect(api.permissionSystem.commit).not.toHaveBeenCalled();
@@ -799,18 +814,19 @@ describe("权限目录、标签和授权人员", () => {
     mount();
     await screen.findByText("编辑本人词条");
     await selectTag("权限标签", "高频操作");
-    const row = document.querySelector('tr[data-row-key="words.edit"]')!;
+    const row = document.querySelector('tr[data-row-id="words.edit"]')!;
     expect(within(row as HTMLElement).getByText("高频操作")).toBeVisible();
     expect(within(row as HTMLElement).getByText("内容编辑")).toBeVisible();
     expect(
-      row.querySelectorAll("td")[6]?.querySelector(".ant-tag")?.textContent
+      row.querySelectorAll("td")[6]?.querySelector("[data-permission-tag]")
+        ?.textContent
     ).toContain("高频操作");
   });
   it("两个标签在单元格中同一行展示", async () => {
     mount();
     const row = (await screen.findByText("编辑本人词条")).closest("tr")!;
     const tagCell = row.querySelectorAll("td")[6]!;
-    const visibleTags = tagCell.querySelectorAll(".ant-tag");
+    const visibleTags = tagCell.querySelectorAll("[data-permission-tag]");
     expect(visibleTags).toHaveLength(2);
     expect(visibleTags[0]).toHaveTextContent("内容编辑");
     expect(visibleTags[1]).toHaveTextContent("高频操作");
@@ -852,10 +868,10 @@ describe("权限目录、标签和授权人员", () => {
     chooseRow("编辑本人词条");
     chooseRow("查看用户");
     fireEvent.click(screen.getByText("标签管理"));
-    const row = within(document.querySelector(".ant-drawer")!)
+    const row = within(document.querySelector("[data-admin-drawer]")!)
       .getByText("内容编辑")
       .closest("tr")!;
-    expect(row.querySelector(".ant-checkbox-indeterminate")).not.toBeNull();
+    expect(within(row).getByRole("checkbox")).toBePartiallyChecked();
     expect(within(row).getByText("1/2")).toBeInTheDocument();
     chooseTagRow("内容编辑");
     confirmTagChange("添加");
@@ -894,7 +910,10 @@ describe("权限目录、标签和授权人员", () => {
       screen.queryByText("超级管理员无需单独分配权限，因此不在名单中。")
     ).toBeNull();
     fireEvent.click(
-      document.querySelector(".ant-drawer .ant-pagination-item-2")!
+      within(document.querySelector("[data-admin-drawer]")!).getByRole(
+        "button",
+        { name: "下一页" }
+      )
     );
     await waitFor(() =>
       expect(api.permissionSystem.grantedAdmins).toHaveBeenCalledWith(

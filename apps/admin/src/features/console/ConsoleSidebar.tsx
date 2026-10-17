@@ -1,34 +1,48 @@
+import FactCheck from "@mui/icons-material/FactCheck";
+import MenuBook from "@mui/icons-material/MenuBook";
+import Paid from "@mui/icons-material/Paid";
+import Home from "@mui/icons-material/Home";
+import Assignment from "@mui/icons-material/Assignment";
+import LibraryBooks from "@mui/icons-material/LibraryBooks";
+import EventNote from "@mui/icons-material/EventNote";
+import Settings from "@mui/icons-material/Settings";
+import Groups from "@mui/icons-material/Groups";
+import Person from "@mui/icons-material/Person";
+import ExpandLess from "@mui/icons-material/ExpandLess";
+import ExpandMore from "@mui/icons-material/ExpandMore";
 import {
-  AuditOutlined,
-  BookOutlined,
-  DollarOutlined,
-  HomeOutlined,
-  ProfileOutlined,
-  ReadOutlined,
-  ScheduleOutlined,
-  SettingOutlined,
-  TeamOutlined,
-  UserOutlined
-} from "@ant-design/icons";
-import { Menu } from "antd";
-import type { MenuProps } from "antd";
+  Box,
+  Collapse,
+  List,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Menu,
+  MenuItem,
+  Tooltip
+} from "@mui/material";
 import type { AdminProfile, MenuPermission } from "@tsz/types";
 import type { ReactNode } from "react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { hasAdminPermission, hasAnyAdminPermission } from "@tsz/shared/auth";
 import { useAuthStore } from "@/lib/auth";
 import { ADMIN_PAGE_ROUTES } from "@/lib/adminPageRoutes";
 
 /**
- * 后台侧栏导航（antd Menu）。**由后端驱动**：每个叶子挂一个菜单权限 key（RBAC，
+ * 后台侧栏导航（MUI List）。**由后端驱动**：每个叶子挂一个菜单权限 key（RBAC，
  * docs/admin-rbac-design.md），仅当当前管理员持有该 key（super_admin 隐式持有全部）时才渲染
  * ——菜单可见性=后端下发的 profile.permissions。这与「路由是否已落地」正交：已落地叶子挂真实
  * path（key 即路由），点击跳转；未落地的以 `todo:` 前缀标记并渲染为禁用态，避免死链。「首页」
  * 无权限恒显示；「管理员管理」不走 key，仍按 level==super_admin 判定（D9）。当前高亮由
  * useLocation().pathname 推导。
  */
-type MenuItem = Required<MenuProps>["items"][number];
+interface NavItem {
+  key: string;
+  label: string;
+  icon?: ReactNode;
+  children?: { key: string; label: string; disabled?: boolean }[];
+}
 
 /** 一个菜单叶子：perm 为其权限 key；superOnly 的叶子改按 super_admin 判定（不走 key）。 */
 interface Leaf {
@@ -72,7 +86,7 @@ function pageLeaf(
 const GROUPS: Group[] = [
   {
     key: "grp-user",
-    icon: <UserOutlined />,
+    icon: <Person />,
     label: "用户管理",
     leaves: [
       pageLeaf(ADMIN_PAGE_ROUTES.users, "用户管理"),
@@ -82,7 +96,7 @@ const GROUPS: Group[] = [
   },
   {
     key: "grp-class",
-    icon: <TeamOutlined />,
+    icon: <Groups />,
     label: "班级管理",
     leaves: [
       {
@@ -95,7 +109,7 @@ const GROUPS: Group[] = [
   },
   {
     key: "grp-dict",
-    icon: <BookOutlined />,
+    icon: <MenuBook />,
     label: "词库管理",
     leaves: [
       pageLeaf(ADMIN_PAGE_ROUTES.words, "智能词库"),
@@ -111,7 +125,7 @@ const GROUPS: Group[] = [
   },
   {
     key: "grp-wordlist",
-    icon: <ReadOutlined />,
+    icon: <LibraryBooks />,
     label: "词表管理",
     leaves: [
       pageLeaf(ADMIN_PAGE_ROUTES.wordlists, "智能词表"),
@@ -125,7 +139,7 @@ const GROUPS: Group[] = [
   },
   {
     key: "grp-task",
-    icon: <ScheduleOutlined />,
+    icon: <EventNote />,
     label: "任务管理",
     leaves: [
       {
@@ -138,7 +152,7 @@ const GROUPS: Group[] = [
   },
   {
     key: "grp-review",
-    icon: <AuditOutlined />,
+    icon: <FactCheck />,
     label: "审核管理",
     leaves: [
       pageLeaf(ADMIN_PAGE_ROUTES.reviews, "词表审核"),
@@ -153,13 +167,13 @@ const GROUPS: Group[] = [
   },
   {
     key: "grp-settings",
-    icon: <SettingOutlined />,
+    icon: <Settings />,
     label: "系统设置",
     leaves: [pageLeaf(ADMIN_PAGE_ROUTES.partsOfSpeech, "词性配置")]
   },
   {
     key: "grp-coin",
-    icon: <DollarOutlined />,
+    icon: <Paid />,
     label: "天生币管理",
     leaves: [pageLeaf(ADMIN_PAGE_ROUTES.coins, "天生币管理")]
   }
@@ -170,7 +184,7 @@ const GROUPS: Group[] = [
  * 当 super_admin 或 permissions 含其 key 时可见（super 隐式全权，即便 permissions 为空也放行）。
  * 分组过滤掉不可见叶子后若为空则整组不渲染。
  */
-function buildNav(profile: AdminProfile | null): MenuItem[] {
+function buildNav(profile: AdminProfile | null): NavItem[] {
   const visible = (l: Leaf): boolean =>
     l.superOnly
       ? profile?.role === "super_admin"
@@ -178,9 +192,7 @@ function buildNav(profile: AdminProfile | null): MenuItem[] {
         ? hasAnyAdminPermission(profile, l.anyPermission)
         : l.perm !== undefined && hasAdminPermission(profile, l.perm);
 
-  const items: MenuItem[] = [
-    { key: "/", icon: <HomeOutlined />, label: "首页" }
-  ];
+  const items: NavItem[] = [{ key: "/", icon: <Home />, label: "首页" }];
   for (const g of GROUPS) {
     const children = g.leaves
       .filter(visible)
@@ -205,44 +217,133 @@ export function ConsoleSidebar({
   const profile = useAuthStore((s) => s.profile);
   const nav = useMemo(() => buildNav(profile), [profile]);
 
-  const onClick: MenuProps["onClick"] = ({ key }) => {
-    // 占位项以 todo: 前缀标记（且已 disabled，正常点不到），保险起见再拦一次。
-    if (typeof key === "string" && key.startsWith("/")) {
+  const [expanded, setExpanded] = useState<string[]>([]);
+  const [popup, setPopup] = useState<{ key: string; anchor: HTMLElement }>();
+  const visit = (key: string) => {
+    if (key.startsWith("/")) {
       navigate(key);
+      setPopup(undefined);
       onNavigate?.();
     }
   };
-
+  const current = (key: string) =>
+    key === "/"
+      ? pathname === "/"
+      : pathname === key || pathname.startsWith(`${key}/`);
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <div
-        style={{
+    <Box
+      component="nav"
+      aria-label="后台导航"
+      sx={{ display: "flex", flexDirection: "column", height: "100%" }}
+    >
+      <Box
+        sx={{
           display: "flex",
           alignItems: "center",
           justifyContent: collapsed ? "center" : "flex-start",
-          gap: 8,
-          padding: collapsed ? "18px 0" : "18px 24px",
+          gap: 1,
+          p: collapsed ? "18px 0" : "18px 24px",
           fontSize: 18,
           fontWeight: 700,
-          color: "#2053FF",
-          overflow: "hidden",
+          color: "primary.main",
           whiteSpace: "nowrap"
         }}
       >
-        <ProfileOutlined style={{ fontSize: 22 }} />
-        {/* 收起时仅留图标，隐藏站名，避免文字被裁切成半个字 */}
+        <Assignment />
         {!collapsed && <span>天生会背</span>}
-      </div>
+      </Box>
+      <List sx={{ flex: 1 }}>
+        {nav.map((item) => (
+          <Box key={item.key}>
+            <Tooltip
+              describeChild
+              title={collapsed ? item.label : ""}
+              placement="right"
+            >
+              <ListItemButton
+                selected={!item.children && current(item.key)}
+                aria-label={item.label}
+                aria-expanded={
+                  item.children
+                    ? collapsed
+                      ? popup?.key === item.key
+                      : expanded.includes(item.key)
+                    : undefined
+                }
+                onClick={(event) => {
+                  if (!item.children) {
+                    visit(item.key);
+                    return;
+                  }
+                  if (collapsed)
+                    setPopup({ key: item.key, anchor: event.currentTarget });
+                  else
+                    setExpanded((values) =>
+                      values.includes(item.key)
+                        ? values.filter((value) => value !== item.key)
+                        : [...values, item.key]
+                    );
+                }}
+                sx={{ mx: 1, borderRadius: 1, justifyContent: "center" }}
+              >
+                <ListItemIcon
+                  sx={{ minWidth: collapsed ? 24 : 36, color: "inherit" }}
+                >
+                  {item.icon}
+                </ListItemIcon>
+                {!collapsed && (
+                  <>
+                    <ListItemText primary={item.label} />
+                    {item.children &&
+                      (expanded.includes(item.key) ? (
+                        <ExpandLess />
+                      ) : (
+                        <ExpandMore />
+                      ))}
+                  </>
+                )}
+              </ListItemButton>
+            </Tooltip>
+            {!collapsed && item.children && (
+              <Collapse in={expanded.includes(item.key)} unmountOnExit>
+                <List disablePadding>
+                  {item.children.map((leaf) => (
+                    <ListItemButton
+                      key={leaf.key}
+                      disabled={leaf.disabled}
+                      selected={current(leaf.key)}
+                      onClick={() => visit(leaf.key)}
+                      sx={{ pl: 6, mx: 1, borderRadius: 1 }}
+                    >
+                      <ListItemText primary={leaf.label} />
+                    </ListItemButton>
+                  ))}
+                </List>
+              </Collapse>
+            )}
+          </Box>
+        ))}
+      </List>
       <Menu
-        mode="inline"
-        inlineCollapsed={collapsed}
-        selectedKeys={[pathname]}
-        // 分类分组默认收起（不设 defaultOpenKeys）：初始只见顶层分类，按需点开。
-        // 收起态下 antd 改用悬浮弹层展示子菜单，不受此影响。
-        onClick={onClick}
-        items={nav}
-        style={{ borderInlineEnd: 0, flex: 1 }}
-      />
-    </div>
+        anchorEl={popup?.anchor}
+        open={!!popup && collapsed}
+        onClose={() => setPopup(undefined)}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "left" }}
+      >
+        {nav
+          .find((item) => item.key === popup?.key)
+          ?.children?.map((leaf) => (
+            <MenuItem
+              key={leaf.key}
+              disabled={leaf.disabled}
+              selected={current(leaf.key)}
+              onClick={() => visit(leaf.key)}
+            >
+              {leaf.label}
+            </MenuItem>
+          ))}
+      </Menu>
+    </Box>
   );
 }

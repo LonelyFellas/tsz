@@ -1,3 +1,4 @@
+import { Stack as MuiStack } from "@mui/material";
 import { toRichTextV2 } from "@tsz/voice-editor/core";
 import { PronunciationPreviewControls } from "../../word-creation/PronunciationPreview";
 import type {
@@ -7,7 +8,7 @@ import type {
   DraftFormsStepContentV3,
   DraftMeaningsStepContentWritableV3
 } from "@tsz/types";
-import { Flex } from "antd";
+
 import type { ReactNode } from "react";
 import { editableEnglishText } from "../meaningsModel";
 import { dialectLabel } from "../presentation";
@@ -57,7 +58,7 @@ export function V3LinkedEnglishTextField({
     onChange(next);
   };
   return (
-    <Flex vertical gap={6} style={{ width: "100%" }}>
+    <MuiStack style={{ width: "100%" }} direction="column" spacing={0.75}>
       {editableEnglishText(value).map((row) => {
         const variant = variantAt(value, row.dialect);
         return (
@@ -116,6 +117,6 @@ export function V3LinkedEnglishTextField({
           />
         );
       })}
-    </Flex>
+    </MuiStack>
   );
 }

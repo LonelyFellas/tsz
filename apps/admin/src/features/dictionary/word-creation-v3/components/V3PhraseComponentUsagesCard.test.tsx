@@ -215,9 +215,7 @@ async function expandFirstEntry(
   formRowText: string | RegExp
 ): Promise<HTMLElement> {
   return waitFor(() => {
-    const entryRow = baseElement.querySelector(
-      ".ant-cascader-menu-item-content"
-    );
+    const entryRow = baseElement.querySelector("[data-candidate-option]");
     expect(entryRow).not.toBeNull();
     fireEvent.click(entryRow!);
     return screen.getByText(formRowText);
@@ -523,8 +521,9 @@ describe("V3PhraseComponentUsagesCard", () => {
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
     // 没有词义的候选留一条禁用行说明原因，而不是当作没搜到。
     const row = await screen.findByText("give（暂无词义）");
-    expect(row.closest(".ant-cascader-menu-item")?.className).toContain(
-      "ant-cascader-menu-item-disabled"
+    expect(row.closest("[data-candidate-option]")).toHaveAttribute(
+      "aria-disabled",
+      "true"
     );
     expect(screen.queryByText("没有匹配的词条")).not.toBeInTheDocument();
     fireEvent.click(row);
@@ -592,14 +591,14 @@ describe("V3PhraseComponentUsagesCard", () => {
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
     await waitFor(() =>
       expect(
-        baseElement.querySelector(".ant-cascader-menu-item-content")
+        baseElement.querySelector("[data-candidate-option]")
       ).not.toBeNull()
     );
     const formRow = await expandFirstEntry(baseElement, /原形 give/);
-    fireEvent.click(formRow.closest(".ant-cascader-menu-item-content")!);
+    fireEvent.click(formRow.closest("[data-candidate-option]")!);
     // 改选另一条词义：单选下应替换掉原关联，而非并存
     const otherSense = await screen.findByText("举办；提供");
-    fireEvent.click(otherSense.closest(".ant-cascader-menu-item-content")!);
+    fireEvent.click(otherSense.closest("[data-candidate-option]")!);
     await waitFor(() => expect(onUsagesChange).toHaveBeenCalled());
     const written = onUsagesChange.mock.calls.at(
       -1
@@ -707,13 +706,13 @@ describe("V3PhraseComponentUsagesCard", () => {
     // 逐层下钻到词义叶子：父级（词条/词形）不可选，只有词义叶子能选
     await waitFor(() =>
       expect(
-        baseElement.querySelector(".ant-cascader-menu-item-content")
+        baseElement.querySelector("[data-candidate-option]")
       ).not.toBeNull()
     );
     const formRow = await expandFirstEntry(baseElement, /原形 give/);
-    fireEvent.click(formRow.closest(".ant-cascader-menu-item-content")!);
+    fireEvent.click(formRow.closest("[data-candidate-option]")!);
     const senseRow = await screen.findByText("给；交给");
-    fireEvent.click(senseRow.closest(".ant-cascader-menu-item-content")!);
+    fireEvent.click(senseRow.closest("[data-candidate-option]")!);
     await waitFor(() => expect(onUsagesChange).toHaveBeenCalled());
     const written = onUsagesChange.mock.calls.at(
       -1
@@ -848,12 +847,12 @@ describe("V3PhraseComponentUsagesCard", () => {
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
     await waitFor(() =>
       expect(
-        baseElement.querySelector(".ant-cascader-menu-item-content")
+        baseElement.querySelector("[data-candidate-option]")
       ).not.toBeNull()
     );
     // 第一列只展示词面：kind 标签对选择没有帮助，短语候选与单词同构
     expect(
-      baseElement.querySelector(".ant-cascader-menu-item-content")!.textContent
+      baseElement.querySelector("[data-candidate-option]")!.textContent
     ).toBe("give");
     expect(
       await expandFirstEntry(baseElement, /原形 give/)
@@ -861,7 +860,9 @@ describe("V3PhraseComponentUsagesCard", () => {
     // 命中行只靠颜色区分：类名在，文案不在。
     const pastRow = await screen.findByText(/过去式 gave/);
     expect(pastRow).toHaveClass("v3-component-usage-matched-form");
-    expect(pastRow.closest("li")!.textContent).not.toContain("命中");
+    expect(
+      pastRow.closest("[data-candidate-option]")!.textContent
+    ).not.toContain("命中");
     expect(screen.getByText(/原形 give/)).not.toHaveClass(
       "v3-component-usage-matched-form"
     );
@@ -886,7 +887,7 @@ describe("V3PhraseComponentUsagesCard", () => {
       );
       await waitFor(() =>
         expect(
-          baseElement.querySelector(".ant-cascader-menu-item-content")
+          baseElement.querySelector("[data-candidate-option]")
         ).not.toBeNull()
       );
       expect(
@@ -925,7 +926,7 @@ describe("V3PhraseComponentUsagesCard", () => {
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
     await waitFor(() =>
       expect(
-        baseElement.querySelector(".ant-cascader-menu-item-content")
+        baseElement.querySelector("[data-candidate-option]")
       ).not.toBeNull()
     );
     // 偏好是英式，但美式那条已有关联，必须一并列出才能解除；
@@ -967,7 +968,7 @@ describe("V3PhraseComponentUsagesCard", () => {
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
     await waitFor(() =>
       expect(
-        baseElement.querySelector(".ant-cascader-menu-item-content")
+        baseElement.querySelector("[data-candidate-option]")
       ).not.toBeNull()
     );
     expect(
@@ -996,9 +997,7 @@ describe("V3PhraseComponentUsagesCard", () => {
     await waitFor(() =>
       expect(screen.getByText("没有匹配的词条")).toBeInTheDocument()
     );
-    expect(
-      baseElement.querySelector(".ant-cascader-menu-item-content")
-    ).toBeNull();
+    expect(baseElement.querySelector("[data-candidate-option]")).toBeNull();
   });
 
   it("孤儿关联在候选为空时仍可用「清除关联」解除", async () => {
@@ -1034,12 +1033,12 @@ describe("V3PhraseComponentUsagesCard", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
     const formRow = await expandFirstEntry(baseElement, /原形 give/);
-    fireEvent.click(formRow.closest(".ant-cascader-menu-item-content")!);
+    fireEvent.click(formRow.closest("[data-candidate-option]")!);
     // 单选模式下 radio 圆点是唯一的可视选中指示（antd 单选叶子只有背景高亮）
     const senseRow = await screen.findByText("给；交给");
     expect(
       senseRow
-        .closest(".ant-cascader-menu-item")!
+        .closest("[data-candidate-option]")!
         .querySelector(".v3-component-usage-radio")
     ).toHaveClass("is-checked");
   });

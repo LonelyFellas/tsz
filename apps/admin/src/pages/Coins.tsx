@@ -1,22 +1,24 @@
-import { ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
-  App,
-  Breadcrumb,
+  Box,
+  Breadcrumbs,
   Button,
-  Card,
-  DatePicker,
-  Descriptions,
-  Flex,
-  Form,
-  Input,
-  Modal,
-  Select,
-  Table,
+  MenuItem,
+  Paper,
+  Stack,
+  Tab,
   Tabs,
+  TextField,
   Typography
-} from "antd";
+} from "@mui/material";
+import { Controller, useForm } from "react-hook-form";
+import { AdminTable } from "@/components/AdminTable";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { DetailList } from "@/components/DetailList";
+import { DateRangeField } from "@/components/DateRangeField";
+import type { DateRangeValue } from "@/components/DateRangeField";
+import { useFeedback } from "@/components/FeedbackProvider";
 import { HttpError } from "@tsz/api-client";
 import { formatCoins } from "@tsz/shared";
 import { hasAdminPermission } from "@tsz/shared/auth";
@@ -71,7 +73,7 @@ export function CoinsPage() {
       profile={profile}
     />
   ) : (
-    <Alert type="warning" title="没有天生币管理查询权限" />
+    <Alert severity="warning">没有天生币管理查询权限</Alert>
   );
 }
 type CreditFields = Pick<
@@ -79,10 +81,24 @@ type CreditFields = Pick<
   "amount" | "category" | "event_id" | "reason" | "evidence_ref"
 >;
 function Management({ profile }: { profile: AdminProfile }) {
-  const { message } = App.useApp();
+  const notify = useFeedback();
+  const [tab, setTab] = useState("accounts");
   const qc = useQueryClient();
-  const [searchForm] = Form.useForm<CoinAccountsQuery>();
-  const [creditForm] = Form.useForm<CreditFields>();
+  const searchForm = useForm<CoinAccountsQuery>({
+    defaultValues: { owner_type: "user", search: "" }
+  });
+  const creditForm = useForm<CreditFields>({
+    defaultValues: {
+      category: "purchase",
+      amount: "",
+      event_id: "",
+      reason: "",
+      evidence_ref: ""
+    }
+  });
+  const operationForm = useForm<
+    CoinOperationsQuery & { time?: DateRangeValue }
+  >();
   const [search, setSearch] = useState<CoinAccountsQuery>();
   const [selected, setSelected] = useState<CoinAccount>();
   const [entryPage, setEntryPage] = useState(1);
@@ -134,7 +150,7 @@ function Management({ profile }: { profile: AdminProfile }) {
     setEntryPage(1);
     setSnapshot(undefined);
     setError(undefined);
-    creditForm.resetFields();
+    creditForm.reset();
   }
   function keyFor(ref: typeof creditIntent, value: object) {
     const fingerprint = JSON.stringify(value);
@@ -160,16 +176,16 @@ function Management({ profile }: { profile: AdminProfile }) {
     await qc.invalidateQueries({ queryKey: ["my-coins"] });
   }
   async function sendCredit() {
-    if (!confirmation) return;
+    if (!confirmation || busy) return;
     setBusy(true);
     setError(undefined);
     try {
       await api.coinManagement.credit(confirmation);
       creditIntent.current = undefined;
       setConfirmation(undefined);
-      creditForm.resetFields();
+      creditForm.reset();
       await refresh();
-      void message.success("人工入账已完成");
+      notify("人工入账已完成", "success");
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -177,7 +193,7 @@ function Management({ profile }: { profile: AdminProfile }) {
     }
   }
   async function sendReversal() {
-    if (!reversing || !reason.trim()) return;
+    if (!reversing || !reason.trim() || busy) return;
     setBusy(true);
     setError(undefined);
     const intent = { operation_id: reversing.id, reason: reason.trim() };
@@ -191,7 +207,7 @@ function Management({ profile }: { profile: AdminProfile }) {
       setReversing(undefined);
       setReason("");
       await refresh();
-      void message.success("原单已全额冲正");
+      notify("原单已全额冲正", "success");
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -205,325 +221,355 @@ function Management({ profile }: { profile: AdminProfile }) {
     selected.status === "open" &&
     selected.account_status === "active";
   const searchPanel = (
-    <Flex vertical gap={16}>
-      <Card size="small" styles={{ body: { paddingBottom: 8 } }}>
-        <Form
-          form={searchForm}
-          layout="inline"
-          style={{
-            rowGap: 12,
-            columnGap: 8,
-            display: "flex",
-            flexWrap: "wrap"
-          }}
-          initialValues={{ owner_type: "user" }}
-          onFinish={(v) => {
+    <Stack spacing={2}>
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Stack
+          component="form"
+          direction="row"
+          useFlexGap
+          flexWrap="wrap"
+          spacing={1}
+          onSubmit={searchForm.handleSubmit((value) => {
             setSelected(undefined);
-            setSearch({ ...v, search: v.search.trim(), page: 1 });
-          }}
+            setSearch({ ...value, search: value.search.trim(), page: 1 });
+          })}
         >
-          <Form.Item name="owner_type" label="身份域">
-            <Select
-              style={{ width: 140 }}
-              options={[
-                { value: "user", label: "C 端用户" },
-                { value: "admin", label: "管理员" }
+          <Controller
+            name="owner_type"
+            control={searchForm.control}
+            render={({ field }) => (
+              <TextField {...field} select label="身份域" sx={{ width: 160 }}>
+                <MenuItem value="user">C 端用户</MenuItem>
+                <MenuItem value="admin">管理员</MenuItem>
+              </TextField>
+            )}
+          />
+          <TextField
+            label="账户查找"
+            placeholder="姓名 / UUID / 完整手机或邮箱"
+            sx={{ width: 300 }}
+            error={!!searchForm.formState.errors.search}
+            helperText={searchForm.formState.errors.search?.message}
+            slotProps={{ htmlInput: { maxLength: 200 } }}
+            {...searchForm.register("search", {
+              validate: (value) =>
+                !!value?.trim() || "请输入姓名、UUID、完整手机或邮箱"
+            })}
+          />
+          <Button type="submit" variant="contained">
+            查找
+          </Button>
+        </Stack>
+      </Paper>
+      {search && (
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          {accounts.isError ? (
+            <Alert severity="error">账户查询失败，请重试</Alert>
+          ) : (
+            <AdminTable
+              rows={accounts.data?.items ?? []}
+              rowId={(row) => row.owner_id}
+              loading={accounts.isFetching}
+              minWidth={700}
+              pagination={{
+                page: search.page ?? 1,
+                pageSize: 20,
+                total: accounts.data?.pagination.total ?? 0,
+                onChange: (page) => setSearch({ ...search, page })
+              }}
+              columns={[
+                {
+                  id: "name",
+                  label: "姓名",
+                  render: (row) => row.display_name
+                },
+                { id: "id", label: "账户 UUID", render: (row) => row.owner_id },
+                {
+                  id: "balance",
+                  label: "余额",
+                  render: (row) => formatCoins(row.balance)
+                },
+                {
+                  id: "status",
+                  label: "状态",
+                  render: (row) => `${row.account_status} / ${row.status}`
+                },
+                {
+                  id: "actions",
+                  label: "操作",
+                  render: (row) => (
+                    <Button onClick={() => choose(row)}>查看账户</Button>
+                  )
+                }
               ]}
             />
-          </Form.Item>
-          <Form.Item
-            name="search"
-            label="账户查找"
-            rules={[
-              {
-                required: true,
-                whitespace: true,
-                message: "请输入姓名、UUID、完整手机或邮箱"
-              }
-            ]}
-          >
-            <Input
-              placeholder="姓名 / UUID / 完整手机或邮箱"
-              style={{ width: 300 }}
-              maxLength={200}
-            />
-          </Form.Item>
-          <Form.Item>
-            <Button htmlType="submit" type="primary" icon={<SearchOutlined />}>
-              查找
-            </Button>
-          </Form.Item>
-        </Form>
-      </Card>
-      {search && (
-        <Card size="small">
-          {accounts.isError ? (
-            <Alert type="error" title="账户查询失败，请重试" />
-          ) : (
-            search && (
-              <Table
-                rowKey="owner_id"
-                loading={accounts.isFetching}
-                dataSource={accounts.data?.items}
-                scroll={{ x: 700 }}
-                pagination={{
-                  current: search.page ?? 1,
-                  pageSize: 20,
-                  total: accounts.data?.pagination.total ?? 0,
-                  showSizeChanger: false,
-                  onChange: (page) => setSearch({ ...search, page })
-                }}
-                columns={[
-                  { title: "姓名", dataIndex: "display_name" },
-                  { title: "账户 UUID", dataIndex: "owner_id" },
-                  {
-                    title: "余额",
-                    dataIndex: "balance",
-                    render: (v: string) => formatCoins(v)
-                  },
-                  {
-                    title: "状态",
-                    render: (_, r: CoinAccount) =>
-                      `${r.account_status} / ${r.status}`
-                  },
-                  {
-                    title: "操作",
-                    render: (_, r: CoinAccount) => (
-                      <Button
-                        type="link"
-                        size="small"
-                        onClick={() => choose(r)}
-                      >
-                        查看账户
-                      </Button>
-                    )
-                  }
-                ]}
-              />
-            )
           )}
-        </Card>
+        </Paper>
       )}
       {selected && (
         <>
-          <Card title="已选账户">
-            <Descriptions
-              column={1}
+          <Paper variant="outlined" sx={{ p: 2 }}>
+            <Typography variant="h6" sx={{ mb: 2 }}>
+              已选账户
+            </Typography>
+            <DetailList
               items={[
-                { key: "name", label: "姓名", children: selected.display_name },
+                { label: "姓名", value: selected.display_name },
                 {
-                  key: "realm",
                   label: "身份域",
-                  children:
-                    selected.owner_type === "user" ? "C 端用户" : "管理员"
+                  value: selected.owner_type === "user" ? "C 端用户" : "管理员"
                 },
-                { key: "id", label: "账户 UUID", children: selected.owner_id }
+                { label: "账户 UUID", value: selected.owner_id }
               ]}
             />
             {!creditAllowed ? (
-              <Alert type="info" title="当前账户或权限不允许人工入账" />
+              <Alert severity="info">当前账户或权限不允许人工入账</Alert>
             ) : (
-              <Form
-                form={creditForm}
-                layout="vertical"
-                initialValues={{ category: "purchase" }}
-                onFinish={confirm}
-                style={{ maxWidth: 600 }}
+              <Stack
+                component="form"
+                spacing={2}
+                sx={{ maxWidth: 600, mt: 2 }}
+                onSubmit={creditForm.handleSubmit(confirm)}
               >
-                <Form.Item
+                <Controller
                   name="category"
-                  label="入账类别"
-                  rules={[{ required: true }]}
-                >
-                  <Select
-                    options={[
-                      { value: "purchase", label: "购买入账" },
-                      { value: "reward", label: "人工奖励" }
-                    ]}
-                  />
-                </Form.Item>
-                <Form.Item
-                  name="amount"
+                  control={creditForm.control}
+                  rules={{ required: true }}
+                  render={({ field }) => (
+                    <TextField {...field} select label="入账类别">
+                      <MenuItem value="purchase">购买入账</MenuItem>
+                      <MenuItem value="reward">人工奖励</MenuItem>
+                    </TextField>
+                  )}
+                />
+                <TextField
                   label="天生币数量"
-                  rules={[
-                    { required: true, message: "请输入正整数" },
-                    {
-                      validator: (_, v: unknown) =>
-                        typeof v === "string" &&
-                        /^[1-9][0-9]{0,18}$/.test(v) &&
-                        BigInt(v) <= 9223372036854775807n
-                          ? Promise.resolve()
-                          : Promise.reject(
-                              new Error("请输入 BIGINT 范围内的正整数")
-                            )
-                    }
-                  ]}
-                >
-                  <Input inputMode="numeric" maxLength={19} />
-                </Form.Item>
-                <Form.Item
-                  name="event_id"
+                  error={!!creditForm.formState.errors.amount}
+                  helperText={creditForm.formState.errors.amount?.message}
+                  slotProps={{
+                    htmlInput: { inputMode: "numeric", maxLength: 19 }
+                  }}
+                  {...creditForm.register("amount", {
+                    required: "请输入正整数",
+                    validate: (value) =>
+                      (typeof value === "string" &&
+                        /^[1-9][0-9]{0,18}$/.test(value) &&
+                        BigInt(value) <= 9223372036854775807n) ||
+                      "请输入 BIGINT 范围内的正整数"
+                  })}
+                />
+                <TextField
                   label="稳定核验单号 / 奖励事件号"
-                  rules={[{ required: true, whitespace: true }]}
-                  normalize={(v: string) => v.trim()}
-                >
-                  <Input maxLength={200} />
-                </Form.Item>
-                <Form.Item
-                  name="reason"
+                  error={!!creditForm.formState.errors.event_id}
+                  helperText={creditForm.formState.errors.event_id?.message}
+                  slotProps={{ htmlInput: { maxLength: 200 } }}
+                  {...creditForm.register("event_id", {
+                    setValueAs: (value: string) => value.trim(),
+                    validate: (value) =>
+                      !!value?.trim() || "请输入核验单号 / 奖励事件号"
+                  })}
+                />
+                <TextField
                   label="入账原因（仅管理端可见）"
-                  rules={[{ required: true, whitespace: true }]}
-                  normalize={(v: string) => v.trim()}
-                >
-                  <Input.TextArea maxLength={1000} />
-                </Form.Item>
-                <Form.Item
-                  name="evidence_ref"
+                  multiline
+                  minRows={2}
+                  error={!!creditForm.formState.errors.reason}
+                  helperText={creditForm.formState.errors.reason?.message}
+                  slotProps={{ htmlInput: { maxLength: 1000 } }}
+                  {...creditForm.register("reason", {
+                    setValueAs: (value: string) => value.trim(),
+                    validate: (value) => !!value?.trim() || "请输入入账原因"
+                  })}
+                />
+                <TextField
                   label="凭据文本引用（仅管理端可见）"
-                >
-                  <Input maxLength={500} />
-                </Form.Item>
-                <Button type="primary" htmlType="submit">
+                  slotProps={{ htmlInput: { maxLength: 500 } }}
+                  {...creditForm.register("evidence_ref")}
+                />
+                <Button type="submit" variant="contained">
                   核对并入账
                 </Button>
-              </Form>
+              </Stack>
             )}
-          </Card>
-          <Card title="账户流水">
+          </Paper>
+          <Paper variant="outlined" sx={{ p: 2 }}>
+            <Typography variant="h6" sx={{ mb: 2 }}>
+              账户流水
+            </Typography>
             {entries.isError ? (
-              <Alert type="error" title="流水查询失败" />
+              <Alert severity="error">流水查询失败</Alert>
             ) : (
               <EntriesTable
                 data={entries.data}
                 loading={entries.isFetching}
-                onPage={(p) => {
+                onPage={(page) => {
                   setSnapshot(entries.data?.snapshot);
-                  setEntryPage(p);
+                  setEntryPage(page);
                 }}
               />
             )}
-          </Card>
+          </Paper>
         </>
       )}
-    </Flex>
+    </Stack>
   );
   const operationsPanel = (
-    <Flex vertical gap={16}>
-      <Card size="small" styles={{ body: { paddingBottom: 8 } }}>
-        <Form
-          layout="inline"
-          style={{
-            rowGap: 12,
-            columnGap: 8,
-            display: "flex",
-            flexWrap: "wrap"
-          }}
-          onFinish={(v) =>
+    <Stack spacing={2}>
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Stack
+          component="form"
+          direction="row"
+          useFlexGap
+          flexWrap="wrap"
+          spacing={1}
+          onSubmit={operationForm.handleSubmit(({ time, ...values }) =>
             setFilters({
-              ...v,
+              ...values,
               page: 1,
-              created_from: v.time?.[0]?.toISOString(),
-              created_to: v.time?.[1]?.toISOString(),
-              time: undefined
-            } as CoinOperationsQuery)
-          }
+              owner_id: values.owner_id || undefined,
+              actor_id: values.actor_id || undefined,
+              created_from: time?.[0]?.toISOString(),
+              created_to: time?.[1]?.toISOString()
+            })
+          )}
         >
-          <Form.Item name="owner_type" label="目标身份">
-            <Select
-              allowClear
-              style={{ width: 120 }}
-              options={[
-                { value: "user", label: "用户" },
-                { value: "admin", label: "管理员" }
-              ]}
-            />
-          </Form.Item>
-          <Form.Item name="owner_id" label="目标 UUID">
-            <Input />
-          </Form.Item>
-          <Form.Item name="actor_id" label="操作员 UUID">
-            <Input />
-          </Form.Item>
-          <Form.Item name="source_type" label="类型">
-            <Select
-              allowClear
-              style={{ width: 140 }}
-              options={[
-                "manual_purchase",
-                "manual_reward",
-                "manual_reversal"
-              ].map((value) => ({ value, label: coinSourceLabels[value] }))}
-            />
-          </Form.Item>
-          <Form.Item name="time" label="时间">
-            <DatePicker.RangePicker showTime />
-          </Form.Item>
-          <Form.Item>
-            <Button htmlType="submit" type="primary" icon={<SearchOutlined />}>
-              筛选
-            </Button>
-          </Form.Item>
-        </Form>
-      </Card>
-      <Card size="small">
+          <Controller
+            name="owner_type"
+            control={operationForm.control}
+            render={({ field }) => (
+              <TextField
+                select
+                label="目标身份"
+                sx={{ width: 140 }}
+                value={field.value ?? ""}
+                onChange={(event) =>
+                  field.onChange(event.target.value || undefined)
+                }
+              >
+                <MenuItem value="">全部</MenuItem>
+                <MenuItem value="user">用户</MenuItem>
+                <MenuItem value="admin">管理员</MenuItem>
+              </TextField>
+            )}
+          />
+          <TextField
+            label="目标 UUID"
+            {...operationForm.register("owner_id")}
+          />
+          <TextField
+            label="操作员 UUID"
+            {...operationForm.register("actor_id")}
+          />
+          <Controller
+            name="source_type"
+            control={operationForm.control}
+            render={({ field }) => (
+              <TextField
+                select
+                label="类型"
+                sx={{ width: 160 }}
+                value={field.value ?? ""}
+                onChange={(event) =>
+                  field.onChange(event.target.value || undefined)
+                }
+              >
+                <MenuItem value="">全部</MenuItem>
+                {["manual_purchase", "manual_reward", "manual_reversal"].map(
+                  (value) => (
+                    <MenuItem key={value} value={value}>
+                      {coinSourceLabels[value]}
+                    </MenuItem>
+                  )
+                )}
+              </TextField>
+            )}
+          />
+          <Controller
+            name="time"
+            control={operationForm.control}
+            render={({ field }) => (
+              <DateRangeField
+                withTime
+                value={field.value ?? null}
+                onChange={field.onChange}
+              />
+            )}
+          />
+          <Button type="submit" variant="contained">
+            筛选
+          </Button>
+        </Stack>
+      </Paper>
+      <Paper variant="outlined" sx={{ p: 2 }}>
         {operations.isError ? (
-          <Alert type="error" title="操作记录加载失败，请刷新重试" />
+          <Alert severity="error">操作记录加载失败，请刷新重试</Alert>
         ) : (
-          <Table
-            rowKey="id"
+          <AdminTable
+            rows={operations.data?.items ?? []}
+            rowId={(row) => row.id}
             loading={operations.isFetching}
-            dataSource={operations.data?.items}
-            scroll={{ x: 1200 }}
+            minWidth={1200}
             pagination={{
-              current: filters.page ?? 1,
+              page: filters.page ?? 1,
               pageSize: 20,
               total: operations.data?.pagination.total ?? 0,
-              showSizeChanger: false,
               onChange: (page) => setFilters({ ...filters, page })
             }}
             columns={[
               {
-                title: "时间",
-                dataIndex: "created_at",
-                render: (v: string) => new Date(v).toLocaleString("zh-CN")
+                id: "time",
+                label: "时间",
+                render: (row) =>
+                  new Date(row.created_at).toLocaleString("zh-CN")
               },
               {
-                title: "目标",
-                render: (_, r: ManualCoinOperation) => (
+                id: "target",
+                label: "目标",
+                render: (row) => (
                   <>
-                    {r.owner_type}
+                    {row.owner_type}
                     <br />
-                    {r.owner_id}
+                    {row.owner_id}
                   </>
                 )
               },
               {
-                title: "类别",
-                dataIndex: "source_type",
-                render: (v: string) => coinSourceLabels[v] ?? v
+                id: "source",
+                label: "类别",
+                render: (row) =>
+                  coinSourceLabels[row.source_type] ?? row.source_type
               },
               {
-                title: "数量",
-                dataIndex: "delta",
-                render: (v: string) => formatCoins(v)
+                id: "amount",
+                label: "数量",
+                render: (row) => formatCoins(row.delta)
               },
-              { title: "核验 / 事件号", dataIndex: "event_id" },
-              { title: "操作员", dataIndex: "actor_id" },
-              { title: "原因", dataIndex: "reason" },
-              { title: "凭据", dataIndex: "evidence_ref" },
               {
-                title: "纠错",
-                render: (_, r: ManualCoinOperation) =>
-                  r.reversed_by_operation_id ? (
+                id: "event",
+                label: "核验 / 事件号",
+                render: (row) => row.event_id
+              },
+              { id: "actor", label: "操作员", render: (row) => row.actor_id },
+              { id: "reason", label: "原因", render: (row) => row.reason },
+              {
+                id: "evidence",
+                label: "凭据",
+                render: (row) => row.evidence_ref
+              },
+              {
+                id: "reverse",
+                label: "纠错",
+                render: (row) =>
+                  row.reversed_by_operation_id ? (
                     "已全额冲正"
-                  ) : r.reverses_operation_id ? (
-                    `冲正原单 ${r.reverses_operation_id}`
+                  ) : row.reverses_operation_id ? (
+                    `冲正原单 ${row.reverses_operation_id}`
                   ) : hasAdminPermission(profile, "coins.reverse") &&
-                    canTarget(profile, r) ? (
+                    canTarget(profile, row) ? (
                     <Button
-                      danger
+                      color="error"
                       onClick={() => {
-                        setReversing(r);
+                        setReversing(row);
                         setReason("");
                         setError(undefined);
                       }}
@@ -537,124 +583,97 @@ function Management({ profile }: { profile: AdminProfile }) {
             ]}
           />
         )}
-      </Card>
-    </Flex>
+      </Paper>
+    </Stack>
   );
   return (
-    <Flex vertical gap={16}>
-      <Breadcrumb items={[{ title: "天生币管理" }]} />
-      <Tabs
-        tabBarExtraContent={
-          <Button icon={<ReloadOutlined />} onClick={() => void refresh()}>
-            刷新记录
-          </Button>
-        }
-        items={[
-          { key: "accounts", label: "账户与人工入账", children: searchPanel },
-          {
-            key: "operations",
-            label: "操作记录与冲正",
-            children: operationsPanel
-          }
-        ]}
-      />
-      <Modal
-        title="确认人工入账"
+    <Stack spacing={2}>
+      <Breadcrumbs>
+        <Typography>天生币管理</Typography>
+      </Breadcrumbs>
+      <Stack direction="row" alignItems="center" justifyContent="space-between">
+        <Tabs
+          value={tab}
+          onChange={(_, value: string) => setTab(value)}
+          aria-label="天生币管理"
+        >
+          <Tab value="accounts" label="账户与人工入账" />
+          <Tab value="operations" label="操作记录与冲正" />
+        </Tabs>
+        <Button onClick={() => void refresh()}>刷新记录</Button>
+      </Stack>
+      <Box hidden={tab !== "accounts"}>{searchPanel}</Box>
+      <Box hidden={tab !== "operations"}>{operationsPanel}</Box>
+      <ConfirmDialog
         open={!!confirmation}
-        confirmLoading={busy}
-        okText="确认入账"
+        title="确认人工入账"
+        confirmText="确认入账"
         cancelText="返回修改"
-        onOk={() => void sendCredit()}
-        onCancel={() => {
-          if (!busy) setConfirmation(undefined);
-        }}
-        maskClosable={false}
-        closable={!busy}
-        cancelButtonProps={{ disabled: busy }}
+        pending={busy}
+        error={error}
+        closeOnBackdrop={false}
+        onClose={() => setConfirmation(undefined)}
+        onConfirm={() => void sendCredit()}
       >
-        <Alert
-          type="info"
-          title="人工记账不代表线上付款。冲正仅用于原人工入账的全额纠错，不支持退款或债务。"
-          style={{ marginBottom: 16 }}
-        />
+        <Alert severity="info" sx={{ mb: 2 }}>
+          人工记账不代表线上付款。冲正仅用于原人工入账的全额纠错，不支持退款或债务。
+        </Alert>
         {confirmation && (
-          <Descriptions
-            column={1}
+          <DetailList
             items={[
-              { key: "name", label: "姓名", children: selected?.display_name },
+              { label: "姓名", value: selected?.display_name },
               {
-                key: "realm",
                 label: "身份域",
-                children:
+                value:
                   confirmation.owner_type === "user" ? "C 端用户" : "管理员"
               },
-              {
-                key: "id",
-                label: "账户 UUID",
-                children: confirmation.owner_id
-              },
-              {
-                key: "amount",
-                label: "入账数量",
-                children: formatCoins(confirmation.amount)
-              },
-              {
-                key: "event",
-                label: "核验 / 事件号",
-                children: confirmation.event_id
-              },
-              { key: "reason", label: "原因", children: confirmation.reason }
+              { label: "账户 UUID", value: confirmation.owner_id },
+              { label: "入账数量", value: formatCoins(confirmation.amount) },
+              { label: "核验 / 事件号", value: confirmation.event_id },
+              { label: "原因", value: confirmation.reason }
             ]}
           />
         )}
-        {error && <Alert type="error" title={error} />}
-      </Modal>
-      <Modal
-        title="确认原单全额冲正"
+      </ConfirmDialog>
+      <ConfirmDialog
         open={!!reversing}
-        confirmLoading={busy}
-        okText="确认全额冲正"
-        okButtonProps={{ danger: true, disabled: !reason.trim() }}
-        cancelText="取消"
-        onOk={() => void sendReversal()}
-        onCancel={() => {
-          if (!busy) setReversing(undefined);
-        }}
-        maskClosable={false}
-        closable={!busy}
-        cancelButtonProps={{ disabled: busy }}
+        title="确认原单全额冲正"
+        confirmText="确认全额冲正"
+        danger
+        confirmDisabled={!reason.trim()}
+        pending={busy}
+        error={error}
+        closeOnBackdrop={false}
+        onClose={() => setReversing(undefined)}
+        onConfirm={() => void sendReversal()}
       >
         {reversing && (
-          <Descriptions
-            column={1}
+          <DetailList
             items={[
-              { key: "original", label: "原操作", children: reversing.id },
+              { label: "原操作", value: reversing.id },
               {
-                key: "owner",
                 label: "目标",
-                children: `${reversing.owner_type} / ${reversing.owner_id}`
+                value: `${reversing.owner_type} / ${reversing.owner_id}`
               },
-              {
-                key: "amount",
-                label: "扣回原入账",
-                children: formatCoins(reversing.delta)
-              }
+              { label: "扣回原入账", value: formatCoins(reversing.delta) }
             ]}
           />
         )}
-        <Typography.Paragraph>
+        <Typography sx={{ my: 2 }}>
           原单最多冲正一次，余额不足或钱包暂停时会被拒绝。旧流水会保留。
-        </Typography.Paragraph>
-        <Input.TextArea
-          aria-label="冲正原因"
+        </Typography>
+        <TextField
+          label="冲正原因"
           placeholder="必填：纠错原因"
+          multiline
+          minRows={3}
+          fullWidth
           value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          maxLength={1000}
+          onChange={(event) => setReason(event.target.value)}
+          slotProps={{ htmlInput: { maxLength: 1000 } }}
           disabled={busy}
         />
-        {error && <Alert type="error" title={error} />}
-      </Modal>
-    </Flex>
+      </ConfirmDialog>
+    </Stack>
   );
 }

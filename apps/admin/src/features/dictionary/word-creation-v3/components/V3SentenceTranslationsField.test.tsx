@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { ConfigProvider } from "antd";
+import { AdminThemeProvider } from "@/mui-theme";
 import { useState } from "react";
 import { expect, it, vi } from "vitest";
 import type { WordSentenceWritableV3 } from "@tsz/types";
@@ -40,7 +40,7 @@ it("每档可添加多条，改档、编辑、删除以 ID 隔离", async () => 
   function Host() {
     const [sentence, setSentence] = useState(initial);
     return (
-      <ConfigProvider theme={{ token: { motion: false } }}>
+      <AdminThemeProvider>
         <V3SentenceTranslationsField
           sentence={sentence}
           index={0}
@@ -49,7 +49,7 @@ it("每档可添加多条，改档、编辑、删除以 ID 隔离", async () => 
             setSentence((current) => ({ ...current, zh_translations: rows }));
           }}
         />
-      </ConfigProvider>
+      </AdminThemeProvider>
     );
   }
   render(<Host />);
@@ -132,13 +132,13 @@ it("保存期间关闭增删、改档及正文编辑", () => {
 it("历史译文缺 language 时按汉语展示，下拉当前只有汉语一项", async () => {
   // initial.zh_translations 那条没有 language：后端 2026-09-12 上线前发布的快照就是这个形状。
   render(
-    <ConfigProvider theme={{ token: { motion: false } }}>
+    <AdminThemeProvider>
       <V3SentenceTranslationsField
         sentence={initial}
         index={0}
         onChange={vi.fn()}
       />
-    </ConfigProvider>
+    </AdminThemeProvider>
   );
   const picker = screen.getByRole("button", { name: "例句 1 译文语言" });
   expect(picker).toHaveTextContent("汉语译文");
@@ -153,7 +153,7 @@ it("新增的译文行带上当前所选语言", async () => {
   function Host() {
     const [sentence, setSentence] = useState(initial);
     return (
-      <ConfigProvider theme={{ token: { motion: false } }}>
+      <AdminThemeProvider>
         <V3SentenceTranslationsField
           sentence={sentence}
           index={0}
@@ -162,7 +162,7 @@ it("新增的译文行带上当前所选语言", async () => {
             setSentence((current) => ({ ...current, zh_translations: rows }));
           }}
         />
-      </ConfigProvider>
+      </AdminThemeProvider>
     );
   }
   render(<Host />);

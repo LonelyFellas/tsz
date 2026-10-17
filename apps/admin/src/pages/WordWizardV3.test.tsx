@@ -13,7 +13,7 @@ import {
   waitFor,
   act
 } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { AdminTestProviders as AntApp } from "@/test-utils/AdminTestProviders";
 import type {
   AdminWordPublicationV3,
   AdminWordV3,
@@ -788,7 +788,7 @@ describe("WordWizardV3Page", () => {
     );
     await waitFor(() =>
       expect(screen.getByText("保存草稿").closest("button")).not.toHaveClass(
-        "ant-btn-loading"
+        "MuiButton-loading"
       )
     );
     fireEvent.click(screen.getByText("确认影响并保存草稿").closest("button")!);
@@ -1178,7 +1178,7 @@ describe("WordWizardV3Page", () => {
 
     const formsStep = screen
       .getAllByText("词形与发音")
-      .find((item) => item.closest('[role="button"]'));
+      .find((item) => item.closest("button"));
     if (!formsStep) throw new Error("forms step navigation not found");
     fireEvent.click(formsStep);
 
@@ -1310,9 +1310,9 @@ describe("WordWizardV3Page", () => {
       )
     );
     const previewStep = (await screen.findByText("预览并生效")).closest(
-      ".ant-steps-item"
+      "[data-wizard-step]"
     )!;
-    expect(previewStep).toHaveClass("ant-steps-item-disabled");
+    expect(previewStep).toHaveAttribute("aria-disabled", "true");
     fireEvent.click(previewStep);
     expect(router.state.location.pathname).toBe(
       `/words/${WORD_ID}/v3/wizard/meanings`
@@ -1937,8 +1937,8 @@ describe("WordWizardV3Page", () => {
           null
       ).toBeNull();
       expect(
-        screen.getAllByText("词形与发音")[0]?.closest(".ant-steps-item")
-      ).toHaveClass("ant-steps-item-disabled");
+        screen.getAllByText("词形与发音")[0]?.closest("[data-wizard-step]")
+      ).toHaveAttribute("aria-disabled", "true");
       expect(endpoints.validateV3).not.toHaveBeenCalled();
       expect(endpoints.previewFormsImpactV3).not.toHaveBeenCalled();
       expect(endpoints.publishV3).not.toHaveBeenCalled();
@@ -2130,9 +2130,9 @@ describe("WordWizardV3Page", () => {
     expect(
       screen
         .getAllByText("词形与发音")
-        .find((element) => element.closest(".ant-steps-item"))
-        ?.closest(".ant-steps-item")
-    ).not.toHaveClass("ant-steps-item-disabled");
+        .find((element) => element.closest("[data-wizard-step]"))
+        ?.closest("[data-wizard-step]")
+    ).not.toHaveAttribute("aria-disabled", "true");
   });
 
   it("keeps a typed meanings slot ready for T5C without adding a request flow", async () => {

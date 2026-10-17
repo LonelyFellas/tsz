@@ -1,4 +1,6 @@
-import { Table, Typography } from "antd";
+import { Typography } from "@mui/material";
+import { useState } from "react";
+import { AdminTable } from "@/components/AdminTable";
 
 type Difference = { path: string; local: unknown; remote: unknown };
 
@@ -37,48 +39,61 @@ export function DraftComparison({
   remote: unknown;
 }) {
   const rows = differences(local, remote);
+  const [page, setPage] = useState(1);
+  const currentPage = Math.min(page, Math.max(1, Math.ceil(rows.length / 20)));
   return (
     <section aria-label="草稿差异">
-      <Typography.Paragraph>
+      <Typography sx={{ mb: 2 }}>
         本地输入与服务端最新草稿的差异；未自动合并。请核对后调整输入，再保存。
-      </Typography.Paragraph>
+      </Typography>
       {rows.length ? (
-        <Table<Difference>
-          size="small"
-          rowKey="path"
-          dataSource={rows}
+        <AdminTable
+          rows={rows.slice((currentPage - 1) * 20, currentPage * 20)}
+          rowId={(row) => row.path}
+          minWidth={640}
           pagination={
-            rows.length > 20 ? { pageSize: 20, showSizeChanger: false } : false
+            rows.length > 20
+              ? {
+                  page: currentPage,
+                  pageSize: 20,
+                  total: rows.length,
+                  onChange: setPage
+                }
+              : undefined
           }
-          scroll={{ x: 640 }}
           columns={[
-            { title: "字段路径", dataIndex: "path", width: 220 },
             {
-              title: "本地输入",
-              dataIndex: "local",
-              render: (value: unknown) => (
+              id: "path",
+              label: "字段路径",
+              width: 220,
+              render: (row) => row.path
+            },
+            {
+              id: "local",
+              label: "本地输入",
+              render: (row) => (
                 <span
                   style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}
                 >
-                  {valueText(value)}
+                  {valueText(row.local)}
                 </span>
               )
             },
             {
-              title: "服务端最新内容",
-              dataIndex: "remote",
-              render: (value: unknown) => (
+              id: "remote",
+              label: "服务端最新内容",
+              render: (row) => (
                 <span
                   style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}
                 >
-                  {valueText(value)}
+                  {valueText(row.remote)}
                 </span>
               )
             }
           ]}
         />
       ) : (
-        <Typography.Text>本地输入与服务端内容相同。</Typography.Text>
+        <Typography>本地输入与服务端内容相同。</Typography>
       )}
     </section>
   );

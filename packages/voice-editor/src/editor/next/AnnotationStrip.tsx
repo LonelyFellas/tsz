@@ -3,7 +3,8 @@ import type {
   KeyboardEvent as ReactKeyboardEvent,
   ReactNode
 } from "react";
-import { Popover, Tooltip } from "antd";
+import { Tooltip } from "@mui/material";
+import { SelectionPanel } from "./SelectionPanel";
 import { associationWords } from "../../core/text-links";
 import {
   Fragment,
@@ -493,7 +494,7 @@ export function AnnotationStrip({
                * 词只是字母的容器：语法结构与连读都落在字母上，前者按码点区间上色
                * （可以只标一个词里的几个字母），后者把字母当锚点。
                */}
-              <Popover
+              <SelectionPanel
                 content={associationContent}
                 open={
                   brush.kind === "association" &&
@@ -502,8 +503,8 @@ export function AnnotationStrip({
                   associationAnchor < token.end &&
                   Boolean(associationContent)
                 }
-                trigger={[]}
-                placement="bottomLeft"
+
+                placement="bottom-start"
               >
                 <span
                   className={`tsz-ve-token is-letters${linkedRanges?.some((range) => covers(range, token.start, token.end)) ? " is-linked" : ""}${selectedLinkRanges?.some((range) => covers(range, token.start, token.end)) ? " is-link-selected" : ""}`}
@@ -629,7 +630,7 @@ export function AnnotationStrip({
                     );
                   })}
                 </span>
-              </Popover>
+              </SelectionPanel>
 
               {hasNext && (
                 <span
@@ -654,17 +655,17 @@ export function AnnotationStrip({
                   {/* 标签直接占据词缝宽度；原始空白仍保留，保存与复制不包含标签文字。 */}
                   {pause !== undefined && (
                     <span className="tsz-ve-gap-pause" aria-hidden>
-                      <Popover
+                      <SelectionPanel
                         open={pausePopover?.gap === position}
                         content={
                           pausePopover?.gap === position
                             ? pausePopover.content
                             : undefined
                         }
-                        placement="bottomLeft"
-                        trigger={[]}
+                        placement="bottom-start"
                       >
                         <Tooltip
+                          describeChild
                           title={
                             pausePopover?.gap === position
                               ? null
@@ -695,7 +696,7 @@ export function AnnotationStrip({
                             {pauseMarkerLabel(pause)}
                           </button>
                         </Tooltip>
-                      </Popover>
+                      </SelectionPanel>
                     </span>
                   )}
                   {renderWhitespace(

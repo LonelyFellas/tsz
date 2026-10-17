@@ -1,7 +1,21 @@
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import { useQuery } from "@tanstack/react-query";
-import { Alert, Button, Card, Empty, Image, Space, Spin, Table } from "antd";
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  Paper,
+  Stack,
+  Typography
+} from "@mui/material";
+import Close from "@mui/icons-material/Close";
+import { AdminTable } from "@/components/AdminTable";
 import type { CertificationFile } from "@tsz/types";
 import { api, usePermission } from "@/lib/auth";
 
@@ -14,6 +28,7 @@ function IdentityImage({
 }) {
   const [image, setImage] = useState<{ url?: string; failed?: boolean }>();
   const [attempt, setAttempt] = useState(0);
+  const [preview, setPreview] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
     let url: string | undefined;
@@ -38,11 +53,41 @@ function IdentityImage({
       {label}
       <div>
         {image?.url ? (
-          <Image src={image.url} alt={label} width={180} />
+          <>
+            <Button
+              onClick={() => setPreview(true)}
+              aria-label={`预览${label}`}
+            >
+              <img src={image.url} alt={label} width={180} />
+            </Button>
+            <Dialog
+              open={preview}
+              onClose={() => setPreview(false)}
+              maxWidth="lg"
+            >
+              <DialogTitle>
+                {label}
+                <IconButton
+                  aria-label="关闭预览"
+                  onClick={() => setPreview(false)}
+                >
+                  <Close />
+                </IconButton>
+              </DialogTitle>
+              <DialogContent>
+                <Box
+                  component="img"
+                  src={image.url}
+                  alt={label}
+                  sx={{ maxWidth: "100%" }}
+                />
+              </DialogContent>
+            </Dialog>
+          </>
         ) : image?.failed ? (
           <Button onClick={() => setAttempt(attempt + 1)}>重新读取</Button>
         ) : (
-          <Spin />
+          <CircularProgress size={24} />
         )}
       </div>
     </div>
@@ -59,12 +104,17 @@ function Wallet({ userId }: { userId: string }) {
   if (query.isError)
     return (
       <Alert
-        type="error"
-        title="余额加载失败"
+        severity="error"
         action={<Button onClick={() => void query.refetch()}>重试</Button>}
-      />
+      >
+        余额加载失败
+      </Alert>
     );
-  return query.isPending ? <Spin /> : <span>{query.data.balance} 天生币</span>;
+  return query.isPending ? (
+    <CircularProgress size={24} />
+  ) : (
+    <span>{query.data.balance} 天生币</span>
+  );
 }
 
 function Entries({ userId }: { userId: string }) {
@@ -78,31 +128,40 @@ function Entries({ userId }: { userId: string }) {
   if (query.isError)
     return (
       <Alert
-        type="error"
-        title="账单加载失败"
+        severity="error"
         action={<Button onClick={() => void query.refetch()}>重试</Button>}
-      />
+      >
+        账单加载失败
+      </Alert>
     );
   return (
-    <Table
-      rowKey="id"
-      size="small"
-      loading={query.isPending}
-      dataSource={query.data?.items ?? []}
+    <AdminTable
+      rowId={(row) => row.id}
+      loading={query.isFetching}
+      rows={query.data?.items ?? []}
       columns={[
         {
-          title: "时间",
-          dataIndex: "created_at",
-          render: (value: string) => dayjs(value).format("YYYY-MM-DD HH:mm")
+          id: "created_at",
+          label: "时间",
+          render: (row) => dayjs(row.created_at).format("YYYY-MM-DD HH:mm")
         },
-        { title: "收支", dataIndex: "delta" },
-        ...(canBalance ? [{ title: "余额", dataIndex: "balance_after" }] : [])
+        { id: "delta", label: "收支", render: (row) => row.delta },
+        ...(canBalance
+          ? [
+              {
+                id: "balance_after",
+                label: "余额",
+                render: (
+                  row: NonNullable<typeof query.data>["items"][number]
+                ) => row.balance_after
+              }
+            ]
+          : [])
       ]}
       pagination={{
-        current: page,
+        page,
         pageSize: 10,
         total: query.data?.pagination.total ?? 0,
-        showSizeChanger: false,
         onChange: (next) => {
           setSnapshot(query.data?.snapshot);
           setPage(next);
@@ -122,20 +181,21 @@ function IdentityDocuments({ userId }: { userId: string }) {
   if (query.isError)
     return (
       <Alert
-        type="error"
-        title="身份证件加载失败"
+        severity="error"
         action={<Button onClick={() => void query.refetch()}>重试</Button>}
-      />
+      >
+        身份证件加载失败
+      </Alert>
     );
-  if (query.isPending) return <Spin />;
+  if (query.isPending) return <CircularProgress size={24} />;
   return query.data.length ? (
-    <Space wrap>
+    <Stack direction="row" useFlexGap flexWrap="wrap" spacing={1}>
       {query.data.map((file) => (
         <IdentityImage key={file.id} userId={userId} file={file} />
       ))}
-    </Space>
+    </Stack>
   ) : (
-    <Empty description="暂无已提交的身份证件" />
+    <Typography color="text.secondary">暂无已提交的身份证件</Typography>
   );
 }
 
@@ -165,11 +225,14 @@ export function UserResources({ userId }: { userId: string }) {
     }
   ];
   return (
-    <Space orientation="vertical" style={{ width: "100%", marginTop: 16 }}>
+    <Stack spacing={2} sx={{ width: "100%", mt: 2 }}>
       {resources
         .filter((r) => r.allowed)
         .map((r) => (
-          <Card key={r.key} size="small" title={r.title}>
+          <Paper variant="outlined" key={r.key} sx={{ p: 2 }}>
+            <Typography variant="subtitle1" sx={{ mb: 1 }}>
+              {r.title}
+            </Typography>
             {opened.includes(r.key) ? (
               r.content
             ) : (
@@ -177,8 +240,8 @@ export function UserResources({ userId }: { userId: string }) {
                 查看{r.title}
               </Button>
             )}
-          </Card>
+          </Paper>
         ))}
-    </Space>
+    </Stack>
   );
 }

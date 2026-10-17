@@ -102,7 +102,10 @@ it.each([false, true])(
     );
     const label = await screen.findByText("词义未填写");
     expect(label.querySelector(".is-checked")).not.toBeNull();
-    expect(label.closest("li")).toHaveClass("ant-cascader-menu-item-disabled");
+    expect(label.closest("[data-candidate-option]")).toHaveAttribute(
+      "aria-disabled",
+      "true"
+    );
     fireEvent.click(label);
     expect(onReplace).not.toHaveBeenCalled();
     expect(document.querySelectorAll(".v3-component-usage-sense")).toHaveLength(
@@ -121,7 +124,10 @@ it("全部词义为空时禁用词形，不产生可选空白叶子", async () =
   await renderUnselected(onReplace);
   fireEvent.click(screen.getByText("some"));
   const form = await screen.findByText("原形 some（暂无可关联词义）");
-  expect(form.closest("li")).toHaveClass("ant-cascader-menu-item-disabled");
+  expect(form.closest("[data-candidate-option]")).toHaveAttribute(
+    "aria-disabled",
+    "true"
+  );
   fireEvent.click(form);
   expect(onReplace).not.toHaveBeenCalled();
   expect(document.querySelectorAll(".v3-component-usage-sense")).toHaveLength(

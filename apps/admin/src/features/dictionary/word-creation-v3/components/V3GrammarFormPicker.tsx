@@ -1,13 +1,13 @@
 import {
-  Alert,
-  Button,
-  Cascader,
-  Empty,
-  Flex,
-  Spin,
-  Tooltip,
-  Typography
-} from "antd";
+  Alert as MuiAlert,
+  Button as MuiButton,
+  CircularProgress as MuiCircularProgress,
+  Stack as MuiStack,
+  Tooltip as MuiTooltip,
+  Typography as MuiTypography
+} from "@mui/material";
+import { CandidatePanel, type CandidateOption } from "./CandidatePanel";
+
 import { useEffect, useMemo, useState } from "react";
 import type {
   Dialect,
@@ -29,6 +29,13 @@ type CandidateForm = Pick<
   SentenceTargetCandidateFormV3,
   "form_id" | "variant_id" | "form_type" | "spelling" | "dialect"
 >;
+
+interface GrammarCandidateOption extends CandidateOption<GrammarCandidateOption> {
+  label: string;
+  children?: GrammarCandidateOption[];
+  displayDialect?: Dialect;
+  link?: GrammarFormLinkV3;
+}
 
 function sameTarget(left?: GrammarFormLinkV3, right?: GrammarFormLinkV3) {
   return (
@@ -221,7 +228,7 @@ export function V3GrammarFormPicker({
         ])
     ).values()
   ];
-  const options = unique.map((candidate) => ({
+  const options: GrammarCandidateOption[] = unique.map((candidate) => ({
     value: `${candidate.entry_id}:${candidate.publication_id ?? "draft"}:${candidate.pos_id}`,
     label: `${candidate.headword} · ${posLabel(candidate.pos)}${candidate.publication_id ? "" : "（草稿）"}`,
     children: formChoices(
@@ -315,7 +322,7 @@ export function V3GrammarFormPicker({
       (option) =>
         option.value ===
           `${selected.target_word_id}:draft:${selected.target_pos_id}` &&
-        option.children.some(
+        option.children?.some(
           (form) => form.value === selected.target_variant_id
         )
     ) &&
@@ -343,34 +350,40 @@ export function V3GrammarFormPicker({
             option.value ===
             `${selected.target_word_id}:${selected.target_publication_id ?? "draft"}:${selected.target_pos_id}`
         )
-        ?.children.find((form) => form.value === selected.target_variant_id)
+        ?.children?.find((form) => form.value === selected.target_variant_id)
     : undefined;
   return (
-    <Flex vertical gap="small" style={{ maxWidth: "min(760px, 85vw)" }}>
-      <Typography.Text strong className="tsz-words">
+    <MuiStack
+      style={{ maxWidth: "min(760px, 85vw)" }}
+      direction="column"
+      spacing={1}
+    >
+      <MuiTypography className="tsz-words" component="span" fontWeight={600}>
         {literal}
-      </Typography.Text>
+      </MuiTypography>
       {selected && (
-        <Typography.Text>
+        <MuiTypography component="span">
           {draftPending ? "待确认" : "已关联"} ·{" "}
           {dialectLabel(
             selectedOption?.displayDialect ?? selected.target_dialect
           )}
           {selected.target_publication_id ? "" : "（草稿）"}
-        </Typography.Text>
+        </MuiTypography>
       )}
       {initialSelected && !selected && (
-        <Typography.Text type="secondary">确认后清除原关联</Typography.Text>
+        <MuiTypography component="span" color="text.secondary">
+          确认后清除原关联
+        </MuiTypography>
       )}
-      <Tooltip title="使用词形的首条发音">
-        <Typography.Text type="secondary">
+      <MuiTooltip describeChild title="使用词形的首条发音">
+        <MuiTypography component="span" color="text.secondary">
           {selected ? "点击词形可替换" : "选择词形关联"}
-        </Typography.Text>
-      </Tooltip>
+        </MuiTypography>
+      </MuiTooltip>
       {options.length > 0 && (
-        <Cascader.Panel
+        <CandidatePanel<GrammarCandidateOption>
           options={options}
-          optionRender={(option) => (
+          renderLabel={(option) => (
             <span className="tsz-words" style={{ fontWeight: 700 }}>
               {option.label}
             </span>
@@ -383,9 +396,9 @@ export function V3GrammarFormPicker({
                 ]
               : undefined
           }
-          onChange={(_value, selectedOptions) => {
+          onChange={(selectedOptions) => {
             const option = selectedOptions[selectedOptions.length - 1];
-            if (option && "link" in option) {
+            if (option?.link) {
               const next = option.link as GrammarFormLinkV3;
               if (sameTarget(selected, next)) return;
               setSelected(
@@ -395,49 +408,46 @@ export function V3GrammarFormPicker({
           }}
         />
       )}
-      {pending && <Spin size="small" />}
+      {pending && <MuiCircularProgress size={24} />}
       {!pending && !error && options.length === 0 && (
-        <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="没有匹配的词形"
-        />
+        <MuiTypography color="text.secondary">{"没有匹配的词形"}</MuiTypography>
       )}
       {selected && (
-        <Button size="small" onClick={() => setSelected(undefined)}>
+        <MuiButton size="small" onClick={() => setSelected(undefined)}>
           清除关联
-        </Button>
+        </MuiButton>
       )}
       {error && (
-        <Alert
-          type="warning"
-          showIcon
-          title={error}
+        <MuiAlert
           action={
-            <Button
+            <MuiButton
               size="small"
               onClick={() => setRevision((value) => value + 1)}
             >
               重试
-            </Button>
+            </MuiButton>
           }
-        />
+          severity={"warning"}
+        >
+          {error}
+        </MuiAlert>
       )}
       {nextCursor && (
-        <Button
+        <MuiButton
           size="small"
           loading={pending}
           onClick={() => setCursor(nextCursor)}
         >
           加载更多
-        </Button>
+        </MuiButton>
       )}
       {truncated && !nextCursor && (
-        <Typography.Text type="secondary">
+        <MuiTypography component="span" color="text.secondary">
           候选未完整返回，请缩小查询范围后重试。
-        </Typography.Text>
+        </MuiTypography>
       )}
-      <Flex justify="flex-end" gap="small">
-        <Button
+      <MuiStack direction="row" spacing={1} justifyContent={"flex-end"}>
+        <MuiButton
           size="small"
           aria-label="取消词形关联"
           onClick={() => {
@@ -446,9 +456,8 @@ export function V3GrammarFormPicker({
           }}
         >
           取 消
-        </Button>
-        <Button
-          type="primary"
+        </MuiButton>
+        <MuiButton
           size="small"
           aria-label="确认词形关联"
           disabled={!selected && !initialSelected}
@@ -456,10 +465,11 @@ export function V3GrammarFormPicker({
             if (draftPending) onSelect(selected);
             onCancel?.();
           }}
+          variant="contained"
         >
           确 认
-        </Button>
-      </Flex>
-    </Flex>
+        </MuiButton>
+      </MuiStack>
+    </MuiStack>
   );
 }

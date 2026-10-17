@@ -36,7 +36,7 @@ import {
   Segmented,
   panelClass
 } from "@/features/shell/Page";
-import "@tsz/voice-editor/styles.css";
+import "@tsz/voice-editor/reader.css";
 const SORT_LABELS: Record<WordlistSort, string> = {
   author: "作者顺序",
   label_asc: "词面 A–Z",

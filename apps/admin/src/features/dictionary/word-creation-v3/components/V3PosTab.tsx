@@ -1,5 +1,17 @@
-import { PlusOutlined } from "@ant-design/icons";
-import { Alert, Button, Empty, Flex, Radio, Space, Typography } from "antd";
+import {
+  Radio as MuiRadio,
+  RadioGroup as MuiRadioGroup,
+  FormControlLabel as MuiFormControlLabel
+} from "@mui/material";
+import {
+  Alert as MuiAlert,
+  AlertTitle as MuiAlertTitle,
+  Button as MuiButton,
+  Stack as MuiStack,
+  Typography as MuiTypography
+} from "@mui/material";
+import PlusOutlined from "@mui/icons-material/Add";
+
 import type {
   DialectRulesV3,
   DraftFormsStepContentV3,
@@ -172,17 +184,21 @@ export function V3PosTab({
             data-v3-node-id={group.id}
             tabIndex={-1}
           >
-            <Typography.Text strong>英美拼写是否有区别？</Typography.Text>
-            <Flex align="center" gap={12}>
+            <MuiTypography component="span" fontWeight={600}>
+              英美拼写是否有区别？
+            </MuiTypography>
+            <MuiStack direction="row" spacing={1.5} alignItems={"center"}>
               <V3ReferenceBadge
                 label="本组词形变体"
                 nodeIds={commonVariantIds}
               />
-              <Radio.Group
+              <MuiRadioGroup
                 onChange={(event) =>
                   applyDialectRules(
                     group.id,
-                    event.target.value === "distinguish"
+                    (event.target.value as NonNullable<
+                      "unified" | "distinguish"
+                    >) === "distinguish"
                       ? {
                           spelling_mode: "distinguish",
                           phonetic_mode: "distinguish"
@@ -194,15 +210,38 @@ export function V3PosTab({
                   )
                 }
                 value={rules.spelling_mode}
+                row
               >
-                <Radio aria-label="英美拼写有区别" value="distinguish">
-                  是
-                </Radio>
-                <Radio aria-label="英美拼写无区别" value="unified">
-                  否
-                </Radio>
-              </Radio.Group>
-            </Flex>
+                <MuiFormControlLabel
+                  sx={{ m: 0 }}
+                  control={
+                    <MuiRadio
+                      value="distinguish"
+                      slotProps={{
+                        input: {
+                          "aria-label": "英美拼写有区别"
+                        }
+                      }}
+                    />
+                  }
+                  label={<>是</>}
+                />
+                <MuiFormControlLabel
+                  sx={{ m: 0 }}
+                  control={
+                    <MuiRadio
+                      value="unified"
+                      slotProps={{
+                        input: {
+                          "aria-label": "英美拼写无区别"
+                        }
+                      }}
+                    />
+                  }
+                  label={<>否</>}
+                />
+              </MuiRadioGroup>
+            </MuiStack>
           </div>
           <div
             className="word-form-rule-row v3-pos-dialect-rule"
@@ -210,24 +249,40 @@ export function V3PosTab({
             data-v3-node-id={group.id}
             tabIndex={-1}
           >
-            <Typography.Text strong>英美音标是否有区别？</Typography.Text>
-            <Flex align="center" gap={12}>
+            <MuiTypography component="span" fontWeight={600}>
+              英美音标是否有区别？
+            </MuiTypography>
+            <MuiStack direction="row" spacing={1.5} alignItems={"center"}>
               <V3ReferenceBadge
                 label="本组词形变体"
                 nodeIds={memberVariantIds}
               />
-              <Radio.Group
+              <MuiRadioGroup
                 onChange={(event) =>
                   applyDialectRules(group.id, {
                     spelling_mode: rules.spelling_mode,
-                    phonetic_mode: event.target.value
+                    phonetic_mode: event.target.value as NonNullable<
+                      "unified" | "distinguish"
+                    >
                   })
                 }
                 value={rules.phonetic_mode}
+                row
               >
-                <Radio aria-label="英美音标有区别" value="distinguish">
-                  是
-                </Radio>
+                <MuiFormControlLabel
+                  sx={{ m: 0 }}
+                  control={
+                    <MuiRadio
+                      value="distinguish"
+                      slotProps={{
+                        input: {
+                          "aria-label": "英美音标有区别"
+                        }
+                      }}
+                    />
+                  }
+                  label={<>是</>}
+                />
                 <V3DisabledReason
                   reason={
                     rules.spelling_mode === "distinguish"
@@ -235,35 +290,42 @@ export function V3PosTab({
                       : undefined
                   }
                 >
-                  <Radio
-                    aria-label="英美音标无区别"
-                    disabled={rules.spelling_mode === "distinguish"}
-                    value="unified"
-                  >
-                    否
-                  </Radio>
+                  <MuiFormControlLabel
+                    sx={{ m: 0 }}
+                    control={
+                      <MuiRadio
+                        disabled={rules.spelling_mode === "distinguish"}
+                        value="unified"
+                        slotProps={{
+                          input: {
+                            "aria-label": "英美音标无区别"
+                          }
+                        }}
+                      />
+                    }
+                    label={<>否</>}
+                  />
                 </V3DisabledReason>
-              </Radio.Group>
-            </Flex>
+              </MuiRadioGroup>
+            </MuiStack>
           </div>
         </div>
         {!consistent ? (
-          <Alert
-            description="请选择统一目标；系统会按唯一词形逐条要求显式映射，不会静默复制或丢弃发音。"
-            showIcon
-            title="本组的英美结构待统一"
-            type="warning"
-          />
+          <MuiAlert severity={"warning"}>
+            <MuiAlertTitle>{"本组的英美结构待统一"}</MuiAlertTitle>
+            {
+              "请选择统一目标；系统会按唯一词形逐条要求显式映射，不会静默复制或丢弃发音。"
+            }
+          </MuiAlert>
         ) : null}
         {dialectChangeError?.groupId === group.id ? (
-          <Alert
-            closable
+          <MuiAlert
             onClose={() => setDialectChangeError(undefined)}
-            showIcon
-            title="暂不能合并英美配置"
-            description={dialectChangeError.message}
-            type="warning"
-          />
+            severity={"warning"}
+          >
+            <MuiAlertTitle>{"暂不能合并英美配置"}</MuiAlertTitle>
+            {dialectChangeError.message}
+          </MuiAlert>
         ) : null}
       </>
     );
@@ -341,57 +403,55 @@ export function V3PosTab({
   };
 
   return (
-    <Flex
+    <MuiStack
       className="v3-pos-tab word-pos-editor"
       data-pos-id={pos.pos_id}
       data-v3-node-id={pos.pos_id}
-      vertical
-      gap="middle"
+      direction="column"
+      spacing={2}
     >
       {pendingGroupDeletion ? (
-        <Alert
+        <MuiAlert
           // 确认条渲染在组列表上方：从下面的卡片菜单点删除时它落在视口外，
           // 看起来就像点了没反应。挂载时把它带进视野。
           ref={(node) => {
-            node?.nativeElement.scrollIntoView?.({ block: "center" });
+            node?.scrollIntoView?.({ block: "center" });
           }}
           action={
-            <Space>
-              <Button onClick={() => setPendingGroupDeletion(undefined)}>
+            <MuiStack direction="row" spacing={1} alignItems="center">
+              <MuiButton onClick={() => setPendingGroupDeletion(undefined)}>
                 取 消
-              </Button>
-              <Button danger onClick={confirmGroupDeletion}>
+              </MuiButton>
+              <MuiButton onClick={confirmGroupDeletion} color={"error"}>
                 删除变化组并同时删除 {pendingGroupDeletion.formIds.length}{" "}
                 个不再被其他变化组使用的词形
-              </Button>
-            </Space>
+              </MuiButton>
+            </MuiStack>
           }
-          description={
+          severity={"warning"}
+        >
+          <MuiAlertTitle>
+            {pendingGroupDeletion.changed
+              ? "删除影响已变化，请重新确认"
+              : "删除变化组需要额外确认"}
+          </MuiAlertTitle>
+          {
             <ul>
               {pendingGroupDeletion.formIds.map((formId, index) => (
                 <li key={formId}>受影响词形 {index + 1}</li>
               ))}
             </ul>
           }
-          showIcon
-          title={
-            pendingGroupDeletion.changed
-              ? "删除影响已变化，请重新确认"
-              : "删除变化组需要额外确认"
-          }
-          type="warning"
-        />
+        </MuiAlert>
       ) : null}
       {visibleGroups.length === 0 ? (
         !posCatalog || allowedDerivedTypes.length > 0 ? (
-          <Empty description="草稿可暂时不添加变化组" />
+          <MuiTypography color="text.secondary">
+            {"草稿可暂时不添加变化组"}
+          </MuiTypography>
         ) : null
       ) : (
-        <Space
-          className="v3-form-group-list"
-          orientation="vertical"
-          size="middle"
-        >
+        <MuiStack className="v3-form-group-list" direction="column" spacing={2}>
           {visibleGroups.map((group, index) => (
             <V3FormGroupCard
               boundSenseCount={formGroupBindingCounts?.get(group.id) ?? 0}
@@ -425,21 +485,21 @@ export function V3PosTab({
               posCatalog={posCatalog}
             />
           ))}
-        </Space>
+        </MuiStack>
       )}
       {!posCatalog || allowedDerivedTypes.length > 0 ? (
-        <Button
+        <MuiButton
           aria-label={`新增${posLabel}变化组`}
-          block
           className="word-form-add-group"
-          icon={<PlusOutlined />}
           onClick={addGroup}
           size="large"
-          type="dashed"
+          variant="outlined"
+          startIcon={<PlusOutlined fontSize="inherit" />}
+          fullWidth
         >
           增加一组词性变化
-        </Button>
+        </MuiButton>
       ) : null}
-    </Flex>
+    </MuiStack>
   );
 }
