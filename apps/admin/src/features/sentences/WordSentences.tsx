@@ -23,6 +23,7 @@ import { V3EnglishTextPreview } from "../dictionary/word-creation-v3/components/
 import { SentenceEditor } from "./SentenceEditor";
 import { V3RowIndex } from "../dictionary/word-creation-v3/components/V3RowIndex";
 import "./WordSentences.css";
+import { EmptyStateHint } from "@/components/EmptyStateHint";
 
 const PAGE_SIZE = 5;
 const TRANSLATION_BANDS = [
@@ -103,6 +104,7 @@ export function WordSentences({
     enabled: !!savedSense && canRead
   });
   const rows = query.data?.items ?? [];
+  const empty = !rows.length && !query.isFetching && !query.isError && !editor;
   const selectedIndex =
     typeof editor === "object"
       ? rows.findIndex((item) => item.id === editor.id)
@@ -211,9 +213,17 @@ export function WordSentences({
             }}
           />
         )}
-        <MuiStack direction="column" spacing={1}>
+        <MuiStack
+          direction="column"
+          spacing={1}
+          className={empty ? "admin-empty-state" : undefined}
+        >
           {savedSense && (
-            <MuiTypography component="span" color="text.secondary">
+            <MuiTypography
+              className={empty ? "admin-empty-state-note" : undefined}
+              component="span"
+              color="text.secondary"
+            >
               保存只更新例句草稿；例句发布后才更新展示。局部移除随词条发布生效。
             </MuiTypography>
           )}
@@ -228,9 +238,7 @@ export function WordSentences({
             </MuiAlert>
           )}
           {!rows.length && !query.isFetching && (
-            <MuiTypography color="text.secondary">
-              {"暂无关联例句"}
-            </MuiTypography>
+            <EmptyStateHint>暂无关联例句</EmptyStateHint>
           )}
           {rows.map((item, index) => (
             <MuiStack

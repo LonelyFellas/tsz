@@ -845,7 +845,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       />
     );
 
-    fireEvent.mouseDown(screen.getByLabelText("添加基本词性"));
+    fireEvent.mouseDown(screen.getAllByLabelText("添加基本词性")[0]!);
     const choices = [
       ...document.querySelectorAll<HTMLElement>(
         '[role="listbox"] [role="option"]'
@@ -878,7 +878,7 @@ describe("V3MeaningsAndExamplesStep", () => {
         partOfSpeechCatalog={{ catalog_version: 1, items: [] }}
       />
     );
-    expect(screen.getByLabelText("添加基本词性")).toHaveAttribute(
+    expect(screen.getAllByLabelText("添加基本词性")[0]!).toHaveAttribute(
       "aria-disabled",
       "true"
     );
@@ -891,7 +891,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       />
     );
     expect(screen.getByText("词性目录不可用，已停止新增结构")).toBeVisible();
-    expect(screen.getByLabelText("添加基本词性")).toHaveAttribute(
+    expect(screen.getAllByLabelText("添加基本词性")[0]!).toHaveAttribute(
       "aria-disabled",
       "true"
     );
@@ -2368,12 +2368,16 @@ describe("V3MeaningsAndExamplesStep", () => {
       expect(
         metricInput.closest("[data-percentage-field][data-severity=warning]")
       ).not.toBeNull();
-      const disabledSound = targetInput
-        .closest("[data-admin-input]")
-        ?.querySelector("[data-relation-sound]");
-      expect(disabledSound).toHaveAttribute("aria-disabled", "true");
-      expect(disabledSound).toHaveClass("word-relation-sound-disabled");
-      expect(disabledSound).not.toHaveAttribute("tabindex");
+      expect(
+        targetInput
+          .closest("[data-admin-input]")
+          ?.querySelector("[data-relation-search]")
+      ).toBeInTheDocument();
+      expect(
+        targetInput
+          .closest("[data-admin-input]")
+          ?.querySelector("[data-relation-sound]")
+      ).toBeNull();
       expect(targetInput.closest("[data-severity=warning]")).not.toBeNull();
       expect(screen.getByLabelText(`待关联的${label}`)).toBeInTheDocument();
       fireEvent.change(targetInput, { target: { value: "苹果" } });
@@ -2739,6 +2743,33 @@ describe("V3MeaningsAndExamplesStep", () => {
       expect(value().pos[0]!.senses[0]!.relations).toHaveLength(4);
     }
   );
+
+  it("关联词搜索提示留在搜索列内，不挤占匹配词义的网格位置", () => {
+    relatedSearch.mockImplementation((...args) => {
+      const result = defaultRelatedSearchImplementation(...args);
+      result.exact.data.pages[0]!.results = [];
+      result.contains.data.pages[0]!.results = [];
+      return result;
+    });
+    const initial = structuredClone(meaningsFixture);
+    initial.pos[0]!.senses[0]!.relations = [];
+    render(<Harness initial={initial} />);
+    fireEvent.click(screen.getByRole("button", { name: "添加派生词" }));
+    const input = screen.getByLabelText("派生词目标词条");
+    const row = input.closest(".word-relation-row")!;
+    expect(screen.queryByText("输入词汇搜索")).toBeNull();
+    expect(input.closest(".word-relation-search")).toBeInTheDocument();
+    expect(screen.getByLabelText("派生词目标词义")).toHaveTextContent(
+      "先选择派生词"
+    );
+    expect(screen.getByLabelText("派生词目标词义")).toHaveAttribute(
+      "aria-disabled",
+      "true"
+    );
+    expect(row.querySelector(":scope > .word-relation-sense")).toContainElement(
+      screen.getByLabelText("派生词目标词义")
+    );
+  });
 
   it("派生词的多条词义纵向逐条排，可拖动排序也可单条删除", () => {
     relatedSearch.mockImplementation((...args) => {

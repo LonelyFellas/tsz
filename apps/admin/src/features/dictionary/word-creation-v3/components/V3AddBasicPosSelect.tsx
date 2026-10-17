@@ -1,6 +1,7 @@
 import { useContentEditPermissions } from "../../contentEditPermissions";
 import Add from "@mui/icons-material/Add";
-import { MenuItem, TextField } from "@mui/material";
+import AddCircleOutline from "@mui/icons-material/AddCircleOutline";
+import { Input, MenuItem, Select } from "@mui/material";
 import type {
   DraftFormsStepContentV3,
   PartOfSpeechCatalogItem,
@@ -16,6 +17,7 @@ export interface V3AddBasicPosSelectProps {
   isError?: boolean;
   isPending?: boolean;
   onAdd: (item: PartOfSpeechCatalogItem) => void;
+  compact?: boolean;
 }
 
 export function V3AddBasicPosSelect({
@@ -24,7 +26,8 @@ export function V3AddBasicPosSelect({
   forms,
   isError = false,
   isPending = false,
-  onAdd
+  onAdd,
+  compact = false
 }: V3AddBasicPosSelectProps) {
   const { edit: canEditContent } = useContentEditPermissions();
   const usedPosCodes = new Set(forms.pos.map((pos) => pos.pos));
@@ -35,14 +38,24 @@ export function V3AddBasicPosSelect({
   );
 
   return (
-    <TextField
-      select
-      label="添加基本词性"
+    <Select
+      input={<Input disableUnderline />}
+      inputProps={{ "aria-label": "添加基本词性" }}
+      displayEmpty
+      renderValue={() => (
+        <span className="word-add-basic-pos-label">
+          {compact ? (
+            <AddCircleOutline fontSize="small" />
+          ) : (
+            <Add fontSize="small" />
+          )}
+          {!compact && "添加词性"}
+        </span>
+      )}
+      IconComponent={() => null}
       className="word-add-basic-pos-select"
       disabled={!canEditContent || isError || isPending}
       value=""
-      sx={{ width: 190 }}
-      slotProps={{ select: { IconComponent: Add } }}
       onChange={(event) => {
         const item = availableItems.find(
           (candidate) => candidate.code === event.target.value
@@ -55,6 +68,6 @@ export function V3AddBasicPosSelect({
           {item.name_zh}
         </MenuItem>
       ))}
-    </TextField>
+    </Select>
   );
 }

@@ -45,13 +45,14 @@ import {
 import { toRichTextV2 } from "@tsz/voice-editor/core";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import { PronunciationPreviewProvider } from "../word-creation/PronunciationPreview";
-import CaretDownFilled from "@mui/icons-material/ArrowDropDown";
-import CaretUpFilled from "@mui/icons-material/ArrowDropUp";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import CopyOutlined from "@mui/icons-material/ContentCopy";
 import DeleteOutlined from "@mui/icons-material/DeleteOutline";
 import InfoCircleOutlined from "@mui/icons-material/InfoOutlined";
 import MinusCircleOutlined from "@mui/icons-material/RemoveCircleOutline";
 import PlusOutlined from "@mui/icons-material/Add";
+import SearchOutlined from "@mui/icons-material/SearchOutlined";
 import SoundOutlined from "@mui/icons-material/VolumeUpOutlined";
 
 import type {
@@ -110,6 +111,7 @@ import { V3RowIndex } from "./components/V3RowIndex";
 import { V3EditorTitle } from "./components/V3EditorTitle";
 import { reorderPos } from "./operations";
 import "./posTabs.css";
+import { EmptyStateHint } from "@/components/EmptyStateHint";
 import { v3IssueMessage } from "./presentationErrors";
 import { countV3PosMeaningIncomplete } from "./posCompletion";
 import { V3GrammarVoiceTextField } from "./components/V3GrammarVoiceTextField";
@@ -215,7 +217,7 @@ export function SenseSectionTitle({
     <div
       aria-expanded={!collapsed}
       aria-label={`切换${label}`}
-      className="word-sense-section-title is-interactive"
+      className={`word-sense-section-title is-interactive${count === 0 ? " is-empty" : ""}`}
       onClick={onToggle}
       onKeyDown={(event) => {
         if (event.target !== event.currentTarget) return;
@@ -234,6 +236,7 @@ export function SenseSectionTitle({
         <MuiChip label={<>{`${count} ${unit}`}</>} />
         <MuiButton
           aria-label={`${collapsed ? "展开" : "收起"}${label}`}
+          aria-expanded={!collapsed}
           className="word-sense-section-collapse"
           onClick={(event) => {
             event.stopPropagation();
@@ -241,14 +244,14 @@ export function SenseSectionTitle({
           }}
           size="small"
           variant={"text"}
-          startIcon={
+          endIcon={
             collapsed ? (
-              <CaretDownFilled
+              <ExpandMoreIcon
                 data-collapse-indicator="collapsed"
                 fontSize="inherit"
               />
             ) : (
-              <CaretUpFilled
+              <ExpandLessIcon
                 data-collapse-indicator="expanded"
                 fontSize="inherit"
               />
@@ -263,10 +266,12 @@ export function SenseSectionTitle({
 }
 export function SenseSectionBody({
   collapsed,
-  children
+  children,
+  empty = false
 }: {
   collapsed: boolean;
   children: ReactNode;
+  empty?: boolean;
 }) {
   return (
     <div
@@ -274,7 +279,11 @@ export function SenseSectionBody({
       className={`word-sense-section-body${collapsed ? " is-collapsed" : ""}`}
       inert={collapsed}
     >
-      <div className="word-sense-section-body-inner">{children}</div>
+      <div
+        className={`word-sense-section-body-inner${empty ? " admin-empty-state" : ""}`}
+      >
+        {children}
+      </div>
     </div>
   );
 }
@@ -389,12 +398,12 @@ function SenseEditorShell({
                 <span className="word-form-card-toggle-state">
                   <span>{expanded ? "收起" : "展开"}</span>
                   {expanded ? (
-                    <CaretUpFilled
+                    <ExpandLessIcon
                       data-collapse-indicator="expanded"
                       fontSize="inherit"
                     />
                   ) : (
-                    <CaretDownFilled
+                    <ExpandMoreIcon
                       data-collapse-indicator="collapsed"
                       fontSize="inherit"
                     />
@@ -553,7 +562,10 @@ function GrammarStructuresCard({
   });
   return (
     <>
-      <MuiCard className="word-grammar-card" variant="outlined">
+      <MuiCard
+        className={`word-grammar-card${pos.grammar_structures.length === 0 ? " is-empty" : ""}`}
+        variant="outlined"
+      >
         <MuiCardHeader
           className="admin-card-header"
           title={"语法结构"}
@@ -562,11 +574,11 @@ function GrammarStructuresCard({
           }}
           sx={{ p: 2, borderBottom: 1, borderColor: "divider" }}
         />
-        <MuiCardContent className="admin-card-body">
+        <MuiCardContent
+          className={`admin-card-body${pos.grammar_structures.length === 0 ? " admin-empty-state" : ""}`}
+        >
           {pos.grammar_structures.length === 0 ? (
-            <MuiTypography component="span" color="text.secondary">
-              暂无语法结构
-            </MuiTypography>
+            <EmptyStateHint>暂无语法结构</EmptyStateHint>
           ) : (
             <MuiStack direction="column" spacing={0}>
               {pos.grammar_structures.map((structure, structureIndex) => (
@@ -1465,7 +1477,7 @@ function RelationsGrid({
           .map((group) => ({ relation: group[0]!, group }));
         return (
           <MuiCard
-            className={`word-relation-card word-relation-card-animated${collapsed[relationType] ? " is-collapsed" : ""}`}
+            className={`word-relation-card word-relation-card-animated${collapsed[relationType] ? " is-collapsed" : ""}${relations.length === 0 ? " is-empty" : ""}`}
             data-relation-type={relationType}
             onClick={(event) => {
               const header = event.currentTarget.querySelector(
@@ -1497,14 +1509,14 @@ function RelationsGrid({
                   }}
                   size="small"
                   variant={"text"}
-                  startIcon={
+                  endIcon={
                     collapsed[relationType] ? (
-                      <CaretDownFilled
+                      <ExpandMoreIcon
                         data-collapse-indicator="collapsed"
                         fontSize="inherit"
                       />
                     ) : (
-                      <CaretUpFilled
+                      <ExpandLessIcon
                         data-collapse-indicator="expanded"
                         fontSize="inherit"
                       />
@@ -1526,9 +1538,14 @@ function RelationsGrid({
             />
             <MuiCardContent className="admin-card-body">
               <SenseSectionBody collapsed={Boolean(collapsed[relationType])}>
-                <div style={{ padding: 10 }}>
+                <div
+                  className={
+                    relations.length === 0 ? "admin-empty-state" : undefined
+                  }
+                  style={relations.length > 0 ? { padding: 10 } : undefined}
+                >
                   {relations.length === 0 ? (
-                    <MuiTypography color="text.secondary">{`暂无${relationLabel(relationType)}`}</MuiTypography>
+                    <EmptyStateHint>{`暂无${relationLabel(relationType)}`}</EmptyStateHint>
                   ) : (
                     <RelationSortScope
                       items={relations}
@@ -1581,6 +1598,7 @@ function RelationsGrid({
                                   )
                                 }
                                 data-v3-node-id={relation.id}
+                                data-relation-metric={meta.metric}
                                 key={
                                   relationRowKeys.current.get(relation.id) ??
                                   relation.id
@@ -1632,7 +1650,7 @@ function RelationsGrid({
                                   }
                                   value={Number(relation.score)}
                                 />
-                                <>
+                                <div className="word-relation-search">
                                   <MuiAutocomplete
                                     disabled={!canEditContent}
                                     freeSolo
@@ -1953,6 +1971,7 @@ function RelationsGrid({
                                     }}
                                     renderInput={(params) => (
                                       <MuiOutlinedInput
+                                        fullWidth
                                         data-admin-input
                                         data-severity={
                                           relationInputIssue(relation)
@@ -1990,17 +2009,10 @@ function RelationsGrid({
                                                 fontSize="inherit"
                                               />
                                             ) : (
-                                              <MuiTooltip
-                                                describeChild
-                                                title="待关联词暂不支持语音"
-                                              >
-                                                <SoundOutlined
-                                                  data-relation-sound
-                                                  fontSize="inherit"
-                                                  aria-disabled="true"
-                                                  className="word-relation-sound-disabled"
-                                                />
-                                              </MuiTooltip>
+                                              <SearchOutlined
+                                                data-relation-search
+                                                fontSize="small"
+                                              />
                                             )}
                                           </MuiInputAdornment>
                                         }
@@ -2050,7 +2062,8 @@ function RelationsGrid({
                                     )}
                                   />
                                   {searching?.relationId === relation.id &&
-                                    !searchWords.length && (
+                                    !searchWords.length &&
+                                    Boolean(searching.query.trim()) && (
                                       <MuiTypography
                                         component="span"
                                         role="status"
@@ -2059,12 +2072,10 @@ function RelationsGrid({
                                           ? "搜索中…"
                                           : searchFailed
                                             ? "搜索失败，请重试"
-                                            : searching?.query
-                                              ? "未找到匹配词条"
-                                              : "输入词汇搜索"}
+                                            : "未找到匹配词条"}
                                       </MuiTypography>
                                     )}
-                                </>
+                                </div>
                                 {isUnlinkedText(relation) ||
                                 (!relation.target_word_id &&
                                   group.length > 1) ? (
@@ -2442,71 +2453,75 @@ function RelationsGrid({
                                           })(false)
                                         }
                                         renderValue={(selected) =>
-                                          relationType === "derivative"
-                                            ? `已选 ${(selected as string[]).length} 条词义`
-                                            : (Array.from(
-                                                new Map(
-                                                  [
-                                                    ...group
-                                                      .filter(
-                                                        (item) =>
-                                                          item.target_sense_id
-                                                      )
-                                                      .map((item) => ({
-                                                        sense_id:
-                                                          item.target_sense_id!,
-                                                        status:
-                                                          relationDisplaySnapshots?.[
-                                                            item.id
-                                                          ]?.target_status,
-                                                        gloss:
-                                                          relationDisplaySnapshots?.[
-                                                            item.id
-                                                          ]?.gloss ??
-                                                          "已匹配词义"
-                                                      })),
-                                                    ...(Object.values(
-                                                      knownWords
-                                                    ).find(
-                                                      (word) =>
-                                                        word.word_id ===
-                                                        relation.target_word_id
-                                                    )?.senses ?? []),
-                                                    ...(senseSearch?.wordId ===
-                                                    relation.target_word_id
-                                                      ? activeSenses
-                                                      : [])
-                                                  ].map((item) => [
-                                                    item.sense_id,
-                                                    {
-                                                      label: (
-                                                        <span>
-                                                          {item.gloss ||
-                                                            "（无释义）"}
-                                                          {"status" in item &&
-                                                            item.status ===
-                                                              "draft" && (
-                                                              <MuiChip
-                                                                color={
-                                                                  "warning"
-                                                                }
-                                                                label={
-                                                                  <>
-                                                                    未发布词义
-                                                                  </>
-                                                                }
-                                                              />
-                                                            )}
-                                                        </span>
-                                                      ),
-                                                      value: item.sense_id
-                                                    }
-                                                  ])
-                                                ).values()
-                                              ).find(
-                                                (option) =>
-                                                  option.value === selected
-                                              )?.label ?? "请选择词义")
+                                          !relation.target_word_id
+                                            ? `先选择${relationLabel(relationType)}`
+                                            : relationType === "derivative"
+                                              ? (selected as string[]).length
+                                                ? `已选 ${(selected as string[]).length} 条词义`
+                                                : "请选择词义"
+                                              : (Array.from(
+                                                  new Map(
+                                                    [
+                                                      ...group
+                                                        .filter(
+                                                          (item) =>
+                                                            item.target_sense_id
+                                                        )
+                                                        .map((item) => ({
+                                                          sense_id:
+                                                            item.target_sense_id!,
+                                                          status:
+                                                            relationDisplaySnapshots?.[
+                                                              item.id
+                                                            ]?.target_status,
+                                                          gloss:
+                                                            relationDisplaySnapshots?.[
+                                                              item.id
+                                                            ]?.gloss ??
+                                                            "已匹配词义"
+                                                        })),
+                                                      ...(Object.values(
+                                                        knownWords
+                                                      ).find(
+                                                        (word) =>
+                                                          word.word_id ===
+                                                          relation.target_word_id
+                                                      )?.senses ?? []),
+                                                      ...(senseSearch?.wordId ===
+                                                      relation.target_word_id
+                                                        ? activeSenses
+                                                        : [])
+                                                    ].map((item) => [
+                                                      item.sense_id,
+                                                      {
+                                                        label: (
+                                                          <span>
+                                                            {item.gloss ||
+                                                              "（无释义）"}
+                                                            {"status" in item &&
+                                                              item.status ===
+                                                                "draft" && (
+                                                                <MuiChip
+                                                                  color={
+                                                                    "warning"
+                                                                  }
+                                                                  label={
+                                                                    <>
+                                                                      未发布词义
+                                                                    </>
+                                                                  }
+                                                                />
+                                                              )}
+                                                          </span>
+                                                        ),
+                                                        value: item.sense_id
+                                                      }
+                                                    ])
+                                                  ).values()
+                                                ).find(
+                                                  (option) =>
+                                                    option.value === selected
+                                                )?.label ?? "请选择词义")
                                         }
                                       >
                                         <MuiMenuItem value="" disabled>
@@ -2943,6 +2958,7 @@ function V3MeaningsAndExamplesStepContent({
   const addBasicPosSelect =
     forms && addBasicPos ? (
       <V3AddBasicPosSelect
+        compact={visiblePosIds.length > 0}
         catalog={partOfSpeechCatalog}
         entryKind={entryKind}
         forms={forms}
@@ -3015,11 +3031,9 @@ function V3MeaningsAndExamplesStepContent({
 
         {visiblePosIds.length === 0 ? (
           <MuiStack direction="column" spacing={1}>
-            <MuiStack direction="row" justifyContent={"flex-end"}>
-              {addBasicPosSelect}
-            </MuiStack>
+            <MuiStack direction="row">{addBasicPosSelect}</MuiStack>
             <MuiTypography color="text.secondary">
-              {"当前还没有词性，请从右上角添加词性。"}
+              {"当前还没有词性，请从上方“添加词性”入口添加。"}
             </MuiTypography>
           </MuiStack>
         ) : (
@@ -3068,41 +3082,49 @@ function V3MeaningsAndExamplesStepContent({
                         />
                       ) : null}
                     </span>
-                    {forms &&
-                    forms.pos.length > 1 &&
-                    forms.pos.some((formPos) => formPos.pos_id === posId) &&
-                    onFormsChange ? (
-                      <MuiTooltip
-                        describeChild
-                        title={
-                          posReferenceCount(posId) > 0
-                            ? referenceBlockedHint(posReferenceCount(posId))
-                            : undefined
-                        }
-                      >
-                        <span style={{ display: "inline-flex" }}>
-                          <MuiIconButton
-                            disabled={!canEditContent}
-                            aria-label={`删除${visiblePosLabel(posId, displayPosIndex)}`}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setConfirmation({
-                                title: `删除词性“${visiblePosLabel(posId, displayPosIndex)}”？`,
-                                content:
-                                  "会移除该词性下的词形、词义、例句和关联词；保存草稿时会继续预览下游影响。",
-                                confirmText: "删除",
-                                danger: true,
-                                run: () => deleteBasicPos(posId)
-                              });
-                            }}
-                            size="small"
-                            color={"error"}
-                          >
-                            <MinusCircleOutlined fontSize="inherit" />
-                          </MuiIconButton>
-                        </span>
-                      </MuiTooltip>
-                    ) : null}
+                    <span
+                      className="word-pos-tab-actions"
+                      onClick={(event) => event.stopPropagation()}
+                      onMouseDown={(event) => event.stopPropagation()}
+                      onKeyDown={(event) => event.stopPropagation()}
+                    >
+                      {addBasicPosSelect}
+                      {forms &&
+                      forms.pos.length > 1 &&
+                      forms.pos.some((formPos) => formPos.pos_id === posId) &&
+                      onFormsChange ? (
+                        <MuiTooltip
+                          describeChild
+                          title={
+                            posReferenceCount(posId) > 0
+                              ? referenceBlockedHint(posReferenceCount(posId))
+                              : undefined
+                          }
+                        >
+                          <span style={{ display: "inline-flex" }}>
+                            <MuiIconButton
+                              disabled={!canEditContent}
+                              aria-label={`删除${visiblePosLabel(posId, displayPosIndex)}`}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setConfirmation({
+                                  title: `删除词性“${visiblePosLabel(posId, displayPosIndex)}”？`,
+                                  content:
+                                    "会移除该词性下的词形、词义、例句和关联词；保存草稿时会继续预览下游影响。",
+                                  confirmText: "删除",
+                                  danger: true,
+                                  run: () => deleteBasicPos(posId)
+                                });
+                              }}
+                              size="small"
+                              color={"error"}
+                            >
+                              <MinusCircleOutlined fontSize="inherit" />
+                            </MuiIconButton>
+                          </span>
+                        </MuiTooltip>
+                      ) : null}
+                    </span>
                   </span>
                 ),
                 children: pos ? (
@@ -3644,8 +3666,14 @@ function V3MeaningsAndExamplesStepContent({
                                       />
                                       <SenseSectionBody
                                         collapsed={definitionsCollapsed}
+                                        empty={sense.definitions.length === 0}
                                       >
                                         <>
+                                          {sense.definitions.length === 0 && (
+                                            <EmptyStateHint>
+                                              暂无释义
+                                            </EmptyStateHint>
+                                          )}
                                           {sense.definitions.length > 0 ? (
                                             <div className="word-list-header word-definition-list-header">
                                               <span aria-hidden="true" />
@@ -4155,40 +4183,52 @@ function V3MeaningsAndExamplesStepContent({
                                                         renderValue={(
                                                           selected
                                                         ) =>
-                                                          (({ value, label }) =>
-                                                            renderGrammarStructureLabel(
-                                                              pos.grammar_structures,
-                                                              String(value),
+                                                          !selected ? (
+                                                            <MuiTypography
+                                                              component="span"
+                                                              className="word-grammar-select-placeholder"
+                                                            >
+                                                              请选择语法结构
+                                                            </MuiTypography>
+                                                          ) : (
+                                                            (({
+                                                              value,
                                                               label
-                                                            ))({
-                                                            value: selected,
-                                                            label:
-                                                              [
-                                                                ...(definition.grammar_structure_id &&
-                                                                !pos.grammar_structures.some(
-                                                                  (item) =>
-                                                                    item.id ===
+                                                            }) =>
+                                                              renderGrammarStructureLabel(
+                                                                pos.grammar_structures,
+                                                                String(value),
+                                                                label
+                                                              ))({
+                                                              value: selected,
+                                                              label:
+                                                                [
+                                                                  ...(definition.grammar_structure_id &&
+                                                                  !pos.grammar_structures.some(
+                                                                    (item) =>
+                                                                      item.id ===
+                                                                      definition.grammar_structure_id
+                                                                  )
+                                                                    ? [
+                                                                        {
+                                                                          label:
+                                                                            "未找到的语法结构",
+                                                                          value:
+                                                                            definition.grammar_structure_id
+                                                                        }
+                                                                      ]
+                                                                    : []),
+                                                                  ...grammarStructureOptions(
+                                                                    pos.grammar_structures,
                                                                     definition.grammar_structure_id
-                                                                )
-                                                                  ? [
-                                                                      {
-                                                                        label:
-                                                                          "未找到的语法结构",
-                                                                        value:
-                                                                          definition.grammar_structure_id
-                                                                      }
-                                                                    ]
-                                                                  : []),
-                                                                ...grammarStructureOptions(
-                                                                  pos.grammar_structures,
-                                                                  definition.grammar_structure_id
-                                                                )
-                                                              ].find(
-                                                                (option) =>
-                                                                  option.value ===
-                                                                  selected
-                                                              )?.label ?? ""
-                                                          })
+                                                                  )
+                                                                ].find(
+                                                                  (option) =>
+                                                                    option.value ===
+                                                                    selected
+                                                                )?.label ?? ""
+                                                            })
+                                                          )
                                                         }
                                                         MenuProps={{
                                                           slotProps: {
@@ -4590,12 +4630,9 @@ function V3MeaningsAndExamplesStepContent({
             });
             return (
               <MuiBox className="word-pos-tabs">
-                <MuiStack
-                  direction="row"
-                  alignItems="center"
-                  justifyContent="space-between"
-                >
+                <MuiStack className="word-pos-tab-bar" direction="row">
                   <MuiTabs
+                    sx={{ flex: "0 1 auto", minWidth: 0 }}
                     value={resolvedActivePosId}
                     variant="scrollable"
                     onChange={(_, next: string) => {
@@ -4614,7 +4651,6 @@ function V3MeaningsAndExamplesStepContent({
                       />
                     ))}
                   </MuiTabs>
-                  {addBasicPosSelect}
                 </MuiStack>
                 {tabItems.map((tabItem) => (
                   <LazyTabPanel

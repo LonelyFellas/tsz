@@ -242,3 +242,33 @@ it("词表查看权限可进入审核菜单及直链，审核操作权限不替�
     false
   );
 });
+
+it.each([
+  ["/words/trash", "垃圾桶"],
+  ["/words", "智能词库"],
+  ["/words/entry-id/v3/wizard/forms", "智能词库"]
+])("%s 只选中所属的菜单项 %s", (path, selected) => {
+  renderAt(path);
+  fireEvent.click(screen.getByText("词库管理"));
+  const library = screen.getByRole("button", { name: "智能词库" });
+  const trash = screen.getByRole("button", { name: "垃圾桶" });
+  expect(library.classList.contains("Mui-selected")).toBe(
+    selected === "智能词库"
+  );
+  expect(trash.classList.contains("Mui-selected")).toBe(selected === "垃圾桶");
+});
+
+it("收起侧栏的浮层菜单中，垃圾桶也不会同时选中智能词库", () => {
+  render(
+    <MemoryRouter initialEntries={["/words/trash"]}>
+      <ConsoleSidebar collapsed />
+    </MemoryRouter>
+  );
+  fireEvent.click(screen.getByRole("button", { name: "词库管理" }));
+  expect(screen.getByRole("menuitem", { name: "垃圾桶" })).toHaveClass(
+    "Mui-selected"
+  );
+  expect(screen.getByRole("menuitem", { name: "智能词库" })).not.toHaveClass(
+    "Mui-selected"
+  );
+});

@@ -1,0 +1,52 @@
+.admin-empty-state.admin-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  min-width: 0;
+}
+
+.admin-empty-state-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-sizing: border-box;
+  min-height: 48px;
+  padding: 8px 12px;
+  color: #667085;
+}
+
+.admin-empty-state-hint > .MuiSvgIcon-root {
+  flex-shrink: 0;
+  color: #a4aebb;
+  font-size: 22px;
+}
+
+.admin-empty-state-hint > .MuiTypography-root {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.admin-empty-state .MuiButton-root {
+  min-height: 32px;
+  white-space: nowrap;
+}
+
+.admin-empty-state .word-section-add-button.MuiButton-root {
+  width: 100%;
+  margin: 0;
+  border-style: dashed;
+}
+
+.admin-empty-state > .MuiButton-root,
+.admin-empty-state > span:has(> .MuiButton-root) {
+  width: 100%;
+  margin: 0;
+}
+
+.admin-empty-state > .admin-empty-state-note {
+  order: 1;
+  font-size: 12px;
+  line-height: 1.6;
+}

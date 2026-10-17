@@ -1,4 +1,5 @@
 import { Stack as MuiStack, Typography as MuiTypography } from "@mui/material";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import CheckOutlined from "@mui/icons-material/Check";
 
 import { useId, useState, type ReactNode } from "react";
@@ -79,7 +80,7 @@ export function V3ProductProgressList({
                     : row.value}
                 </MuiTypography>
               )}
-              <span
+              <ExpandMoreIcon
                 aria-hidden="true"
                 className="v3-product-progress-chevron"
               />

@@ -486,34 +486,45 @@ function DetectionPresentationCard({
               {displayEntries.map((entry) => (
                 <div className="word-smart-match-summary-entry" key={entry.key}>
                   <div className="word-smart-match-summary-row">
-                    <MuiStack
-                      direction="row"
-                      spacing={1}
-                      alignItems="center"
-                      useFlexGap
-                      flexWrap="wrap"
-                    >
-                      <MuiTypography
-                        className="tsz-words"
-                        component="span"
-                        fontWeight={600}
+                    <div className="word-smart-match-summary-info">
+                      <MuiStack
+                        direction="row"
+                        spacing={1}
+                        alignItems="center"
+                        useFlexGap
+                        flexWrap="wrap"
                       >
-                        {entry.label}
-                      </MuiTypography>
-                      <MuiChip
-                        color={
-                          entry.status === "published"
-                            ? "success"
-                            : entry.status === "draft"
-                              ? "primary"
-                              : "default"
-                        }
-                        label={<>{STATUS_LABEL[entry.status]}</>}
-                      />
-                      {entry.posLabels.map((label) => (
-                        <MuiChip key={label} label={<>{label}</>} />
-                      ))}
-                    </MuiStack>
+                        <MuiTypography
+                          className="tsz-words"
+                          component="span"
+                          fontWeight={600}
+                        >
+                          {entry.label}
+                        </MuiTypography>
+                        <MuiChip
+                          color={
+                            entry.status === "published"
+                              ? "success"
+                              : entry.status === "draft"
+                                ? "primary"
+                                : "default"
+                          }
+                          label={<>{STATUS_LABEL[entry.status]}</>}
+                        />
+                      </MuiStack>
+                      {entry.posLabels.length > 0 && (
+                        <MuiStack
+                          direction="row"
+                          spacing={0.75}
+                          useFlexGap
+                          flexWrap="wrap"
+                        >
+                          {entry.posLabels.map((label) => (
+                            <MuiChip key={label} label={label} />
+                          ))}
+                        </MuiStack>
+                      )}
+                    </div>
                     {entry.status === "draft" ? (
                       <MuiButton
                         href={
@@ -1383,45 +1394,38 @@ export function UnifiedCreateEntryStep({
               <MuiTypography component="span" sx={{ mb: 1 }}>
                 {"录入词条"}
               </MuiTypography>
-              <MuiOutlinedInput
-                data-admin-input
-                autoComplete="off"
-                className="tsz-words"
-                autoFocus
-                disabled={
-                  busy !== undefined ||
-                  (pending !== undefined && !existingDraftId) ||
-                  createAttempt !== undefined
-                }
-                placeholder="例如 center 或 give up"
-                value={value}
-                onChange={(event) => changeValue(event.target.value)}
-                size="medium"
-                inputProps={{ "aria-label": "录入词条" }}
-                endAdornment={
-                  <MuiButton
-                    type="submit"
-                    loading={busy === "checking"}
-                    disabled={
-                      busy !== undefined ||
-                      (pending !== undefined && !existingDraftId) ||
-                      createAttempt !== undefined
-                    }
-                    variant="contained"
-                  >
-                    {
-                      <MuiStack
-                        direction="row"
-                        spacing={0.75}
-                        alignItems="center"
-                      >
-                        <SearchOutlined fontSize="inherit" />
-                        词典检测
-                      </MuiStack>
-                    }
-                  </MuiButton>
-                }
-              />
+              <div className="word-entry-search">
+                <MuiOutlinedInput
+                  data-admin-input
+                  autoComplete="off"
+                  className="tsz-words"
+                  autoFocus
+                  disabled={
+                    busy !== undefined ||
+                    (pending !== undefined && !existingDraftId) ||
+                    createAttempt !== undefined
+                  }
+                  placeholder="例如 center 或 give up"
+                  value={value}
+                  onChange={(event) => changeValue(event.target.value)}
+                  size="small"
+                  inputProps={{ "aria-label": "录入词条" }}
+                />
+                <MuiButton
+                  type="submit"
+                  loading={busy === "checking"}
+                  disabled={
+                    busy !== undefined ||
+                    (pending !== undefined && !existingDraftId) ||
+                    createAttempt !== undefined
+                  }
+                  variant="contained"
+                  disableElevation
+                  startIcon={<SearchOutlined />}
+                >
+                  词典检测
+                </MuiButton>
+              </div>
               <MuiFormHelperText>{fieldError}</MuiFormHelperText>
             </MuiFormControl>
             <MuiTypography

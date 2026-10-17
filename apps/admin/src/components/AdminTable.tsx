@@ -10,7 +10,7 @@ import {
   TablePagination,
   TableRow
 } from "@mui/material";
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 export interface AdminColumn<Row> {
   id: string;
@@ -66,12 +66,37 @@ export function AdminTable<Row>({
   };
   pagination?: AdminPaginationProps;
 }) {
+  const selectionHeader = useRef<HTMLTableCellElement>(null);
+  const [selectionWidth, setSelectionWidth] = useState(48);
+  const hasSelection = !!selection;
+  useLayoutEffect(() => {
+    const cell = selectionHeader.current;
+    if (!cell) return;
+    // 自动表格布局可能分配额外宽度，固定列偏移必须跟随实际渲染结果。
+    const measure = () => setSelectionWidth(cell.getBoundingClientRect().width);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(cell);
+    return () => observer.disconnect();
+  }, [hasSelection]);
   const selectableIds = rows
     .filter((row) => !selection?.disabled?.(row))
     .map(rowId);
   const selectedCount = selectableIds.filter((id) =>
     selection?.ids.includes(id)
   ).length;
+  const selectionCellSx = {
+    position: "sticky",
+    left: 0,
+    bgcolor: "background.paper",
+    zIndex: 2,
+    boxSizing: "border-box",
+    textAlign: "center",
+    width: 48,
+    minWidth: 48,
+    maxWidth: 48,
+    "&.MuiTableCell-paddingCheckbox": { width: 48, p: 0 }
+  } as const;
   const stickyStyle = (index: number) => {
     const column = columns[index]!;
     if (!column.sticky) return {};
@@ -80,7 +105,7 @@ export function AdminTable<Row>({
         ? columns.slice(0, index)
         : columns.slice(index + 1);
     const offset =
-      (column.sticky === "left" && selection ? 48 : 0) +
+      (column.sticky === "left" && selection ? selectionWidth : 0) +
       adjacent
         .filter((item) => item.sticky === column.sticky)
         .reduce((sum, item) => sum + (item.width ?? 0), 0);
@@ -101,14 +126,8 @@ export function AdminTable<Row>({
               {selection && (
                 <TableCell
                   padding="checkbox"
-                  sx={{
-                    position: "sticky",
-                    left: 0,
-                    bgcolor: "background.paper",
-                    zIndex: 2,
-                    width: 48,
-                    minWidth: 48
-                  }}
+                  sx={selectionCellSx}
+                  ref={selectionHeader}
                 >
                   <Checkbox
                     slotProps={{
@@ -160,16 +179,7 @@ export function AdminTable<Row>({
             {rows.map((row) => (
               <TableRow key={rowId(row)} data-row-id={rowId(row)}>
                 {selection && (
-                  <TableCell
-                    padding="checkbox"
-                    sx={{
-                      position: "sticky",
-                      left: 0,
-                      bgcolor: "background.paper",
-                      zIndex: 2,
-                      width: 48
-                    }}
-                  >
+                  <TableCell padding="checkbox" sx={selectionCellSx}>
                     <Checkbox
                       slotProps={{
                         input: {

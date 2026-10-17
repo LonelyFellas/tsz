@@ -1266,7 +1266,7 @@ it("弧线层压在紧凑组员之上、点击穿透，并按输入框视口裁�
   expect(overlayRule).toMatch(/overflow:\s*hidden;/u);
   expect(overlayRule).toMatch(/color:\s*transparent;/u);
   expect(fieldCss).toMatch(
-    /\.v3-voice-text-field-input\s*\{[^}]*margin-inline-end:\s*-1px;/su
+    /\.v3-voice-text-field-input\s*\{[^}]*margin-inline-end:\s*0;/su
   );
 });
 

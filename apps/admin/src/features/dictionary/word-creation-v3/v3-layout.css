@@ -612,49 +612,15 @@
 }
 
 .v3-product-progress-chevron {
-  position: relative;
-  display: inline-block;
   flex: none;
-  width: 10px;
-  height: 10px;
-  color: var(--admin-color-text-description, #8b9099);
+  width: 20px;
+  height: 20px;
+  color: #606b7a;
   transition: transform var(--admin-motion-duration-slow, 0.3s);
 }
 
-.v3-product-progress-chevron::before,
-.v3-product-progress-chevron::after {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  width: 6px;
-  height: 1.5px;
-  background: currentColor;
-  border-radius: var(--admin-border-radius, 6px);
-  content: "";
-  transition: transform var(--admin-motion-duration-slow, 0.3s)
-    var(--admin-motion-ease-in-out, cubic-bezier(0.645, 0.045, 0.355, 1));
-}
-
-.v3-product-progress-chevron::before {
-  transform: rotate(-45deg) translateX(2.5px);
-}
-
-.v3-product-progress-chevron::after {
-  transform: rotate(45deg) translateX(-2.5px);
-}
-
 .word-creation-progress-row[aria-expanded="true"] .v3-product-progress-chevron {
-  transform: translateY(-2px);
-}
-
-.word-creation-progress-row[aria-expanded="true"]
-  .v3-product-progress-chevron::before {
-  transform: rotate(45deg) translateX(2.5px);
-}
-
-.word-creation-progress-row[aria-expanded="true"]
-  .v3-product-progress-chevron::after {
-  transform: rotate(-45deg) translateX(-2.5px);
+  transform: rotate(180deg);
 }
 
 .word-creation-summary:has(.v3-product-progress-list)
