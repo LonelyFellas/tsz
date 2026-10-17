@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useUserStore } from "@/stores/user";
 import { AccountAvatar } from "./AccountAvatar";
 import type { AccountMenuPopoverProps } from "./AccountMenuPopover";
@@ -37,11 +37,26 @@ export function AccountMenu() {
     [user?.id]
   );
 
-  function cancel() {
+  const cancel = useCallback(() => {
     request.current++;
     clearTimeout(timer.current);
     setLoadingUser(null);
-  }
+  }, []);
+  useEffect(() => {
+    if (!user || loadingUser !== user.id) return;
+    const outside = (event: PointerEvent) => {
+      if (!trigger.current?.contains(event.target as Node)) cancel();
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") cancel();
+    };
+    document.addEventListener("pointerdown", outside, true);
+    document.addEventListener("keydown", escape, true);
+    return () => {
+      document.removeEventListener("pointerdown", outside, true);
+      document.removeEventListener("keydown", escape, true);
+    };
+  }, [loadingUser, user, cancel]);
   function preload() {
     void loadMenu().catch(() => {
       // 真正展开失败时交由全局资源恢复提示处理，预载不打断当前操作。

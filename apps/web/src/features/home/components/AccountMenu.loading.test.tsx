@@ -179,3 +179,29 @@ it("触摸按下直接打开，加载期间有反馈且不冒充键盘操作", a
   expect(screen.getByRole("menu")).toHaveAttribute("data-hover", "false");
   expect(screen.getByRole("menu")).toHaveAttribute("data-keyboard", "false");
 });
+
+for (const action of ["outside", "escape"] as const) {
+  it(`首次指针打开尚未聚焦，${action} 仍取消迟到菜单且不抢输入焦点`, async () => {
+    await mount();
+    render(<input aria-label="其他输入" />);
+    const input = screen.getByRole("textbox", { name: "其他输入" });
+    const trigger = screen.getByRole("button", { name: "账户菜单" });
+    fireEvent(
+      trigger,
+      new MouseEvent("pointerdown", {
+        bubbles: true,
+        cancelable: true,
+        button: 0
+      })
+    );
+    expect(trigger).not.toHaveFocus();
+    expect(trigger).toHaveAttribute("aria-busy", "true");
+    if (action === "outside") fireEvent.pointerDown(input);
+    else fireEvent.keyDown(document, { key: "Escape" });
+    act(() => input.focus());
+    await finishLoad();
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(trigger).toHaveAttribute("aria-busy", "false");
+    expect(input).toHaveFocus();
+  });
+}
