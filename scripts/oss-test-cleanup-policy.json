@@ -1,0 +1,26 @@
+{
+  "Version": "1",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "oss:PutObject",
+        "oss:GetObject",
+        "oss:DeleteObject",
+        "oss:GetObjectVersion",
+        "oss:DeleteObjectVersion"
+      ],
+      "Resource": ["acs:oss:*:*:tshb-test-assets/temporary-tests/*"]
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["oss:ListObjects", "oss:ListObjectVersions"],
+      "Resource": ["acs:oss:*:*:tshb-test-assets"],
+      "Condition": {
+        "StringLike": {
+          "oss:Prefix": ["temporary-tests/", "temporary-tests/*"]
+        }
+      }
+    }
+  ]
+}
