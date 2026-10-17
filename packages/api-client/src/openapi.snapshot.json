@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/.codex/worktrees/daily-login-reward/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-17T06:57:28.702Z",
+  "_generatedAt": "2026-10-17T07:09:24.752Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -2397,7 +2397,7 @@
     },
     "LoginRewardStatus": {
       "type": "string",
-      "enum": ["awarded", "wallet_unavailable"]
+      "enum": ["awarded", "wallet_unavailable", "reward_disabled"]
     },
     "UserNotification": {
       "type": "object",

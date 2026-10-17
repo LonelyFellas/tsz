@@ -73,3 +73,17 @@ it("old backend 404 and failed settlement remain errors", async () => {
     await expect(api.loginReward.claim()).rejects.toMatchObject({ status });
   }
 });
+
+it("accepts an explicitly disabled server policy without an operation", () => {
+  expect(
+    decodeLoginRewardDay({
+      ...day,
+      status: "reward_disabled",
+      awarded_amount: "0",
+      operation_id: null
+    }).status
+  ).toBe("reward_disabled");
+  expect(() =>
+    decodeLoginRewardDay({ ...day, status: "reward_disabled" })
+  ).toThrow();
+});

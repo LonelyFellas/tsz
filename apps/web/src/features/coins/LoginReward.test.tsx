@@ -3,7 +3,14 @@ import {
   QueryClientProvider,
   focusManager
 } from "@tanstack/react-query";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor
+} from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { HttpError } from "@tsz/api-client";
 import type { LoginRewardDay } from "@tsz/types";
@@ -65,8 +72,13 @@ it("restored sessions auto-award once and refresh only the same user's wallet", 
   expect(invalidated).toHaveBeenCalledWith({
     queryKey: ["coins", "user", "a"]
   });
-  await act(() => client.refetchQueries({ queryKey: ["login-reward", "a"] }));
-  expect(invalidated).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    await client.fetchQuery({
+      queryKey: ["login-reward", "a"],
+      queryFn: () => api.loginReward.claim()
+    });
+  });
+  expect(invalidated).toHaveBeenCalledTimes(2);
 });
 
 it("does not request before session restoration or phone binding", async () => {
@@ -119,7 +131,7 @@ it("switching accounts cancels the old request and ignores its late receipt", as
   expect(invalidated).not.toHaveBeenCalled();
 });
 
-it("a continuously visible session settles the next server business day without re-login", async () => {
+it("an idle page never awards across days; the first interaction settles the current day", async () => {
   vi.useFakeTimers();
   // Deliberately skew the client clock; schedule from server_time, not local midnight.
   vi.setSystemTime(new Date("2030-01-01T00:00:00Z"));
@@ -139,11 +151,16 @@ it("a continuously visible session settles the next server business day without 
   });
   expect(api.loginReward.claim).toHaveBeenCalledTimes(1);
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(1200);
+    await vi.advanceTimersByTimeAsync(2 * 86400000);
+  });
+  expect(api.loginReward.claim).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    fireEvent.pointerDown(window);
+    await vi.advanceTimersByTimeAsync(10);
   });
   expect(api.loginReward.claim).toHaveBeenCalledTimes(2);
   expect(screen.getByText(/2026-10-18 登录奖励已到账/)).toBeInTheDocument();
-  expect(invalidated).toHaveBeenCalledTimes(2);
+  expect(invalidated).toHaveBeenCalledTimes(4);
 });
 
 it("rechecks a paused wallet on return without requiring logout", async () => {
@@ -157,9 +174,35 @@ it("rechecks a paused wallet on return without requiring logout", async () => {
     .mockResolvedValue(awarded);
   const { invalidated } = open();
   await screen.findByText(/钱包暂停或关闭/);
-  act(() => focusManager.setFocused(false));
-  act(() => focusManager.setFocused(true));
+  act(() => fireEvent(window, new Event("focus")));
   await screen.findByText(/登录奖励已到账 1/);
   expect(api.loginReward.claim).toHaveBeenCalledTimes(2);
-  expect(invalidated).toHaveBeenCalledTimes(1);
+  expect(invalidated).toHaveBeenCalledTimes(2);
+});
+
+it("does not claim while initially hidden and claims when the user returns", async () => {
+  const visibility = vi
+    .spyOn(document, "visibilityState", "get")
+    .mockReturnValue("hidden");
+  vi.mocked(api.loginReward.claim).mockResolvedValue(awarded);
+  open();
+  expect(api.loginReward.claim).not.toHaveBeenCalled();
+  visibility.mockReturnValue("visible");
+  act(() => fireEvent(document, new Event("visibilitychange")));
+  await screen.findByText(/登录奖励已到账 1/);
+  expect(api.loginReward.claim).toHaveBeenCalledTimes(1);
+  visibility.mockRestore();
+});
+
+it("shows the server disabled state without inventing an award", async () => {
+  vi.mocked(api.loginReward.claim).mockResolvedValue({
+    ...awarded,
+    status: "reward_disabled",
+    awarded_amount: "0",
+    operation_id: null
+  });
+  const { invalidated } = open();
+  await screen.findByText("每日登录奖励暂未开启。");
+  expect(screen.queryByText(/已到账/)).not.toBeInTheDocument();
+  expect(invalidated).not.toHaveBeenCalled();
 });

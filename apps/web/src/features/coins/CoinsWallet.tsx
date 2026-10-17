@@ -45,7 +45,15 @@ function Wallet({ id }: { id: string }) {
   function refresh() {
     setPage(1);
     setSnapshot(undefined);
-    void client.invalidateQueries({ queryKey: ["login-reward", id] });
+    void client
+      .fetchQuery({
+        queryKey: ["login-reward", id],
+        queryFn: ({ signal }) => api.loginReward.claim({ signal }),
+        staleTime: 0
+      })
+      .catch(() => {
+        /* Query keeps the error for the reward summary. */
+      });
     void client.invalidateQueries({ queryKey: ["coins", "user", id] });
     void client.invalidateQueries({ queryKey: ["learning-rewards", id] });
   }

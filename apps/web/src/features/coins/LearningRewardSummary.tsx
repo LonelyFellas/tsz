@@ -103,7 +103,7 @@ export function LearningRewardSummary({
               role="status"
               className="rounded-2xl bg-muted px-4 py-3 text-sm text-foreground-muted"
             >
-              达标时钱包暂停或关闭，该日未发奖励；恢复后不补发。
+              达标时钱包暂停或关闭，尚未发奖励；恢复后当天再完成一次每日任务可重新结算，过去日期不补发。
             </p>
           ) : (
             <div className="space-y-2">

@@ -2,55 +2,89 @@
 
 import { useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { LoginRewardDay } from "@tsz/types";
 import { HttpError } from "@tsz/api-client";
 import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
 
 function useLoginReward() {
   const user = useUserStore((s) => s.user);
-  const hydrated = useUserStore((s) => s.hydrated);
-  const connectionError = useUserStore((s) => s.connectionError);
-  const refreshUnconfirmed = useUserStore((s) => s.refreshUnconfirmed);
   return useQuery({
     queryKey: ["login-reward", user?.id],
-    enabled:
-      hydrated && !!user?.phone && !connectionError && !refreshUnconfirmed,
+    // Settlement is a write: only the visit/activity bridge or an explicit retry may trigger it.
+    enabled: false,
     queryFn: ({ signal }) => api.loginReward.claim({ signal }),
-    staleTime: (query) =>
-      query.state.data?.status === "awarded"
-        ? Math.min(
-            60_000,
-            Date.parse(query.state.data.next_day_starts_at) -
-              Date.parse(query.state.data.server_time)
-          )
-        : 0,
     retry: (count, error) =>
       count < 2 &&
       (!(error instanceof HttpError) ||
         error.status >= 500 ||
-        error.status === 409),
-    refetchInterval: (query) => {
-      const d = query.state.data;
-      if (!d || query.state.status === "error") return false;
-      // Use server time + elapsed client duration, not the client's timezone/clock offset.
-      return Math.max(
-        1000,
-        query.state.dataUpdatedAt +
-          Date.parse(d.next_day_starts_at) -
-          Date.parse(d.server_time) -
-          Date.now() +
-          100
-      );
-    },
-    refetchIntervalInBackground: false
+        error.status === 409)
   });
 }
 
 /** Business side effect after session restoration; never changes auth or blocks login. */
 export function DailyLoginReward() {
   const id = useUserStore((s) => s.user?.id);
+  const eligible = useUserStore(
+    (s) =>
+      s.hydrated &&
+      !!s.user?.phone &&
+      !s.connectionError &&
+      !s.refreshUnconfirmed
+  );
   const q = useLoginReward();
   const client = useQueryClient();
+  const refetch = q.refetch;
+  useEffect(() => {
+    if (!id || !eligible) return;
+    let lastAttempt = -Infinity;
+    const visit = (event?: Event) => {
+      const session = useUserStore.getState();
+      if (
+        document.visibilityState !== "visible" ||
+        session.user?.id !== id ||
+        !session.hydrated ||
+        !session.user?.phone ||
+        session.connectionError ||
+        session.refreshUnconfirmed
+      )
+        return;
+      const state = client.getQueryState<LoginRewardDay>(["login-reward", id]);
+      if (state?.fetchStatus === "fetching") return;
+      const data = state?.data;
+      if (
+        data?.status === "awarded" &&
+        Date.now() <
+          state!.dataUpdatedAt +
+            Date.parse(data.next_day_starts_at) -
+            Date.parse(data.server_time)
+      )
+        return;
+      const returning =
+        !event || event.type === "focus" || event.type === "visibilitychange";
+      if (
+        !returning &&
+        (data?.status !== "awarded" || state?.status === "error") &&
+        Date.now() - lastAttempt < 60_000
+      )
+        return;
+      lastAttempt = Date.now();
+      void refetch({ cancelRefetch: false });
+    };
+    visit();
+    window.addEventListener("focus", visit);
+    window.addEventListener("pointerdown", visit);
+    window.addEventListener("keydown", visit);
+    window.addEventListener("wheel", visit, { passive: true });
+    document.addEventListener("visibilitychange", visit);
+    return () => {
+      window.removeEventListener("focus", visit);
+      window.removeEventListener("pointerdown", visit);
+      window.removeEventListener("keydown", visit);
+      window.removeEventListener("wheel", visit);
+      document.removeEventListener("visibilitychange", visit);
+    };
+  }, [id, eligible, client, refetch]);
   const seen = useRef<string | null>(null);
   const operation = !q.isError ? q.data?.operation_id : null;
   useEffect(() => {
@@ -63,6 +97,7 @@ export function DailyLoginReward() {
       return;
     seen.current = operation;
     void client.invalidateQueries({ queryKey: ["coins", "user", id] });
+    void client.invalidateQueries({ queryKey: ["learning-rewards", id] });
   }, [id, operation, client]);
   return null;
 }
@@ -103,6 +138,8 @@ export function LoginRewardSummary({ onAward }: { onAward?: () => void }) {
         </p>
       ) : !q.data ? (
         <p className="text-sm text-foreground-muted">正在确认今日登录奖励…</p>
+      ) : q.data.status === "reward_disabled" ? (
+        <p className="text-sm text-foreground-muted">每日登录奖励暂未开启。</p>
       ) : q.data.status === "awarded" ? (
         <p role="status" className="text-sm font-medium text-success">
           {q.data.business_day} 登录奖励已到账 1 天生币。
@@ -114,7 +151,7 @@ export function LoginRewardSummary({ onAward }: { onAward?: () => void }) {
       )}
       <p className="text-xs leading-5 text-foreground-muted">
         北京时间 04:00 换日，每个账号每天最多 1
-        币；保持登录也可获得，无需退出重登。
+        币；当天打开、返回页面或操作时自动结算，无需退出重登。
       </p>
     </section>
   );
