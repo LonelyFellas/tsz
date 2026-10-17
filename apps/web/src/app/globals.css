@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@tsz/shared/fonts.css";
+@import "./fonts.css";
 
 @source '../../../../packages/ui/src/**/*.{ts,tsx}';
 /* 尚未适配 C 端的旧组件仍保持排除，逐个放行已接入主题变量的组件。 */
