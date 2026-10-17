@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useLayoutEffect } from "react";
 import { getQueryClient } from "@/lib/query-client";
 import { syncThemeToDom } from "@/lib/theme";
+import { DailyLoginReward } from "@/features/coins/LoginReward";
 import { useSessionRestore } from "@/features/auth/hooks/useSessionRestore";
 import { useUserStore } from "@/stores/user";
 import { PhoneBindingGuard } from "@/features/auth/components/PhoneBindingGuard";
@@ -90,6 +91,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
           queryClient.removeQueries({ queryKey: ["wordlists", "user"] });
           void queryClient.cancelQueries({ queryKey: ["coins"] });
           queryClient.removeQueries({ queryKey: ["coins"] });
+          void queryClient.cancelQueries({ queryKey: ["login-reward"] });
+          queryClient.removeQueries({ queryKey: ["login-reward"] });
         }
       }),
     [queryClient]
@@ -99,6 +102,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <ThemeSync />
       <SessionRestorer />
+      <DailyLoginReward />
       <NotificationTabBadge />
       <PhoneBindingGuard>
         <TeacherIdentityProvider>{children}</TeacherIdentityProvider>

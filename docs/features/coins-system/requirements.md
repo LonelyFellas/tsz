@@ -1,5 +1,7 @@
 # 天生币系统需求与分批范围
 
+2026-10-17 更新：用户已确认每日登录 1 币、每日学习达标 5 币（10 个去重单元）。登录奖励补齐与当前实施状态见 [每日奖励](daily-login-reward.md)；下文保留各批历史记录。
+
 当前 COIN-12 评估入口：[奖励需求（待确认）](learning-rewards-requirements.md)、[奖励技术设计](learning-rewards-design.md)。LT 已合并部署，见 [发布事实](learning-task-foundation-design.md#11-lt-发布记录2026-10-07)；本文保留原分批设计，不把历史未就绪状态作为当前缺口。
 
 当前维护位置：本任务前端 worktree 的 `docs/features/coins-system/`。更新日期：2026-10-07。COIN-01～11（不含 COIN-12）及 WL-01～03 已合并部署；原评估与各批历史实现证据保留，当前发布状态见 [词表验收](wordlists-tips-acceptance.md)。
