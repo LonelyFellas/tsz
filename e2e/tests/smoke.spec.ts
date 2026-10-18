@@ -137,8 +137,9 @@ test("登录后选词并保存私密词表", async ({ page }) => {
   await page.getByLabel("词表名称").fill("E2E 冒烟词表");
   await page.getByPlaceholder("输入单词或短语").fill("app");
   await page.getByRole("button", { name: /apple\s*苹果/ }).click();
+  await page.getByRole("button", { name: "添加注释" }).click();
   await page.getByLabel("注 1").fill("给词表读者的说明");
-  await page.getByRole("button", { name: "保存私密词表" }).click();
+  await page.getByRole("button", { name: "保存" }).click();
   await expect(page).toHaveURL(
     `/account/wordlists?space=owned&wordlist=${listId}`
   );

@@ -4,13 +4,35 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  ArrowLeft,
   BookOpen,
+  CheckCircle2,
+  LoaderCircle,
+  ChevronRight,
+  FolderInput,
+  FilePenLine,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Search,
+  X,
   Folder,
   FolderPlus,
   GripVertical,
   Trash2
 } from "lucide-react";
-import { Button, Input } from "@tsz/ui/components";
+import {
+  Button,
+  Input,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator
+} from "@tsz/ui/components";
+import { cn } from "@tsz/ui/lib/cn";
+import { STATE_LABEL } from "../reading";
 import type {
   LibraryAction,
   LibraryImpact,
@@ -25,8 +47,7 @@ import {
   PageNotice,
   Pager,
   buttonClass,
-  primaryButtonClass,
-  panelClass
+  Segmented
 } from "@/features/shell/Page";
 import { wordListKeys } from "../hooks/useWordLists";
 import { LIBRARY_DRAG_TYPE, libraryDragIds } from "../library-drag";
@@ -62,13 +83,38 @@ function Library({ userId }: { userId: string }) {
   const [sidebarWidth, setSidebarWidth] = useState(260);
   const resizeOrigin = useRef({ x: 0, width: 260 });
   const [query, setQuery] = useState(params.get("q") ?? "");
+  const [searchTerm, setSearchTerm] = useState(query.trim());
+  const [composing, setComposing] = useState(false);
+  useEffect(() => {
+    if (composing) return;
+    const timer = setTimeout(() => setSearchTerm(query.trim()), 250);
+    return () => clearTimeout(timer);
+  }, [query, composing]);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<string[]>([]);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const searchInput = useRef<HTMLInputElement>(null);
   const [modal, setModal] = useState<Modal | null>(null);
+  const dialogOpener = useRef<HTMLElement | null>(null);
+  function rememberOpener(target: EventTarget | null) {
+    if (modal || !(target instanceof Element)) return;
+    const control = target.closest<HTMLElement>("button,a");
+    if (control && !control.closest('[role="menu"]'))
+      dialogOpener.current = control;
+  }
   const [name, setName] = useState("");
+  const nameInput = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (
+      error &&
+      !busy &&
+      (modal?.kind === "create" || modal?.kind === "rename")
+    )
+      nameInput.current?.focus();
+  }, [error, busy, modal]);
   const working = useRef(false);
   const mounted = useRef(true);
   useEffect(() => {
@@ -85,17 +131,28 @@ function Library({ userId }: { userId: string }) {
       space,
       parent,
       trash,
-      query,
+      searchTerm,
       page
     ],
     queryFn: ({ signal }) =>
       api.wordList.library.list(
         space,
-        { parent_id: parent, wordlist_id: locateId, trash, q: query, page },
+        {
+          parent_id: parent,
+          wordlist_id: locateId,
+          trash,
+          q: searchTerm,
+          page
+        },
         { signal }
       ),
-    refetchOnMount: "always"
+    refetchOnMount: "always",
+    meta: { libraryLocation: location },
+    placeholderData: (previous, previousQuery) =>
+      previousQuery?.meta?.libraryLocation === location ? previous : undefined
   });
+  const searchPending =
+    composing || query.trim() !== searchTerm || result.isPlaceholderData;
   const current = useRef(location);
   useEffect(() => {
     if (current.current === location) return;
@@ -103,6 +160,8 @@ function Library({ userId }: { userId: string }) {
     setSelected([]);
     setModal(null);
     setQuery("");
+    setSearchTerm("");
+    setComposing(false);
     setPage(1);
     setError("");
     setNotice("");
@@ -112,6 +171,8 @@ function Library({ userId }: { userId: string }) {
     setSelected([]);
     setModal(null);
     setQuery("");
+    setSearchTerm("");
+    setComposing(false);
     setPage(1);
     setNotice("");
     const p = new URLSearchParams({ space: targetSpace });
@@ -142,11 +203,9 @@ function Library({ userId }: { userId: string }) {
       await client.invalidateQueries({ queryKey: wordListKeys.all });
     } catch (e) {
       if (!alive()) return;
-      setError(
-        e instanceof Error
-          ? `操作未完成：${e.message}。请刷新后重试。`
-          : "操作未完成，请刷新后重试。"
-      );
+      const detail =
+        e instanceof Error ? e.message.trim().replace(/[。.!！]+$/u, "") : "";
+      setError(detail ? `操作未完成：${detail}。` : "操作未完成，请稍后重试。");
       await result.refetch();
     } finally {
       working.current = false;
@@ -203,6 +262,20 @@ function Library({ userId }: { userId: string }) {
     if (!trash && ids.length) move(ids, target);
   }
   const items = result.data?.items ?? [];
+  const allSelected =
+    items.length > 0 && items.every((item) => selected.includes(item.id));
+  const partlySelected =
+    !allSelected && items.some((item) => selected.includes(item.id));
+  const spaceLabel = space === "owned" ? "创建" : "收藏";
+  const folderName = result.data?.ancestors.at(-1)?.name;
+  function clearSearch() {
+    setQuery("");
+    setSearchTerm("");
+    setComposing(false);
+    setPage(1);
+    setSelected([]);
+    searchInput.current?.focus();
+  }
   const activeItem = locateId
     ? items.find((item) => item.wordlist_id === locateId)
     : undefined;
@@ -244,53 +317,45 @@ function Library({ userId }: { userId: string }) {
   }
   return (
     <div
-      style={{ marginLeft: "calc(0px - min(50vw - 1rem, 800px))" }}
-      className="relative left-1/2 w-[calc(100vw-2rem)] max-w-[1600px] py-6 sm:py-8"
+      style={{ marginLeft: "calc(0px - min(50vw - 1.5rem, 780px))" }}
+      onPointerDownCapture={(event) => rememberOpener(event.target)}
+      onFocusCapture={(event) => rememberOpener(event.target)}
+      className="relative left-1/2 w-[calc(100vw-3rem)] max-w-[1560px] py-6 sm:py-8"
     >
-      <PageHeader
-        eyebrow="我的学习"
-        title="我的词表"
-        description="在左侧整理目录，在右侧阅读和编辑词表。"
-        actions={
-          <Link href="/wordlists" className={buttonClass}>
-            浏览公开词表
-          </Link>
-        }
-      />
+      {!locateId && mode !== "new" && (
+        <PageHeader
+          eyebrow="我的学习"
+          title="我的词表"
+          actions={
+            <Link href="/wordlists" className={buttonClass}>
+              浏览公开词表
+            </Link>
+          }
+        />
+      )}
       <div
         style={{ "--explorer-width": `${sidebarWidth}px` } as CSSProperties}
-        className="grid min-h-[70dvh] overflow-hidden rounded-3xl border border-border/70 bg-surface/80 shadow-glass lg:grid-cols-[var(--explorer-width)_minmax(0,1fr)]"
+        className="grid min-h-[70dvh] overflow-clip rounded-3xl border border-border/70 bg-surface/80 shadow-glass lg:grid-cols-[var(--explorer-width)_minmax(0,1fr)]"
       >
         <ResponsiveExplorer overlayActive={!!modal}>
           {({ closeDrawer }) => (
             <>
               <div className="flex h-11 items-center px-4">
                 <h2 className="text-[11px] font-medium tracking-[0.12em] text-foreground-muted">
-                  资源管理器
+                  词表目录
                 </h2>
               </div>
-              <div
-                data-leaves-page
-                role="group"
-                aria-label="我的词表分类"
-                className="flex border-b border-border/70 px-2"
-              >
-                {(
-                  [
-                    ["owned", "我创建的"],
-                    ["favorites", "我收藏的"]
-                  ] as const
-                ).map(([value, label]) => (
-                  <button
-                    key={value}
-                    disabled={busy}
-                    aria-pressed={space === value}
-                    onClick={() => go(undefined, false, value)}
-                    className={`min-h-9 flex-1 border-b-2 px-2 text-xs transition-colors ${space === value ? "border-primary text-foreground" : "border-transparent text-foreground-muted hover:text-foreground"}`}
-                  >
-                    {label}
-                  </button>
-                ))}
+              <div data-leaves-page className="px-3 pb-4">
+                <Segmented
+                  label="我的词表分类"
+                  value={space}
+                  options={[
+                    { value: "owned", label: "创建" },
+                    { value: "favorites", label: "收藏" }
+                  ]}
+                  disabled={busy}
+                  onChange={(value) => go(undefined, false, value)}
+                />
               </div>
               <div
                 data-explorer-scroll
@@ -311,6 +376,7 @@ function Library({ userId }: { userId: string }) {
                   disabled={busy}
                   onFolder={(id) => {
                     go(id);
+                    closeDrawer();
                   }}
                   onWordlist={(item) => {
                     openWordlist(item);
@@ -341,15 +407,34 @@ function Library({ userId }: { userId: string }) {
                   }
                 />
               </div>
-              <button
-                data-leaves-page
-                disabled={busy}
-                onClick={() => go(undefined, !trash)}
-                className={`flex h-10 w-full items-center gap-2 border-t border-border/70 px-4 text-left text-xs hover:bg-foreground/5 ${trash ? "text-primary" : "text-foreground-muted"}`}
-              >
-                <Trash2 className="size-3.5" aria-hidden />
-                {trash ? "返回文件夹" : "回收站"}
-              </button>
+              <div className="shrink-0 border-t border-border/60 p-2">
+                <button
+                  type="button"
+                  data-leaves-page
+                  disabled={busy}
+                  onClick={() => {
+                    go(undefined, !trash);
+                    closeDrawer();
+                  }}
+                  aria-pressed={trash}
+                  className="flex min-h-11 w-full items-center gap-2.5 rounded-xl px-3 text-left text-[13px] text-foreground-muted transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40 aria-pressed:bg-primary-muted aria-pressed:text-primary lg:min-h-10"
+                >
+                  {trash ? (
+                    <ArrowLeft
+                      className="size-4 shrink-0"
+                      strokeWidth={1.7}
+                      aria-hidden
+                    />
+                  ) : (
+                    <Trash2
+                      className="size-4 shrink-0"
+                      strokeWidth={1.7}
+                      aria-hidden
+                    />
+                  )}
+                  {trash ? "返回词表" : "回收站"}
+                </button>
+              </div>
               <div
                 role="separator"
                 aria-label="调整目录宽度"
@@ -402,12 +487,32 @@ function Library({ userId }: { userId: string }) {
             </>
           )}
         </ResponsiveExplorer>
-        <section aria-label="内容区域" className="min-w-0 p-4 sm:p-6 lg:p-8">
-          {error && <PageNotice tone="error">{error}</PageNotice>}
+        <section
+          aria-label="内容区域"
+          className="min-w-0 p-4 sm:p-6 lg:p-8"
+          aria-busy={busy || result.isFetching}
+        >
+          {error && !modal && <PageNotice tone="error">{error}</PageNotice>}
           {notice && (
-            <p role="status" className="mb-4 text-sm text-success">
-              {notice}
-            </p>
+            <div
+              role="status"
+              className="mb-4 flex items-center gap-3 rounded-2xl border border-border/60 bg-muted/70 py-2 pl-4 pr-1 text-sm"
+            >
+              <CheckCircle2
+                className="size-5 shrink-0 text-success"
+                aria-hidden
+              />
+              <span className="min-w-0 flex-1">{notice}</span>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                aria-label="关闭操作提示"
+                onClick={() => setNotice("")}
+              >
+                <X className="size-4" aria-hidden />
+              </Button>
+            </div>
           )}
 
           {locateId || mode === "new" ? (
@@ -422,7 +527,9 @@ function Library({ userId }: { userId: string }) {
                     {mode === "new" ? "新建词表" : (activeItem?.name ?? "词表")}
                   </span>
                   {mode === "edit" && (
-                    <span className="text-xs text-foreground-muted">编辑</span>
+                    <span className="shrink-0 whitespace-nowrap text-xs text-foreground-muted">
+                      编辑
+                    </span>
                   )}
                 </span>
                 <Button
@@ -486,166 +593,296 @@ function Library({ userId }: { userId: string }) {
             </>
           ) : (
             <>
-              <nav
-                aria-label="当前文件夹路径"
-                className="mb-5 flex flex-wrap items-center gap-2 text-sm"
-              >
-                <button
-                  disabled={busy}
-                  className="text-primary"
-                  onClick={() => go()}
-                  onDragOver={(e) => {
-                    if (!trash) e.preventDefault();
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    onDrop(e.dataTransfer, null);
-                  }}
+              {(parent || trash) && (
+                <nav
+                  aria-label="当前文件夹路径"
+                  className="-ml-2 mb-3 flex flex-wrap items-center gap-1 text-sm"
                 >
-                  {space === "owned" ? "我创建的" : "我收藏的"}
-                  {trash ? " / 回收站" : ""}
-                </button>
-                {result.data?.ancestors.map((p) => (
                   <button
                     disabled={busy}
-                    className="text-primary"
-                    key={p.id}
-                    onClick={() => go(p.id)}
+                    className="min-h-10 rounded-lg px-2 text-foreground-muted transition-colors hover:bg-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
+                    aria-current={!parent ? "page" : undefined}
+                    onClick={() => go()}
                     onDragOver={(e) => {
                       if (!trash) e.preventDefault();
                     }}
                     onDrop={(e) => {
                       e.preventDefault();
-                      onDrop(e.dataTransfer, p.id);
+                      onDrop(e.dataTransfer, null);
                     }}
                   >
-                    / {p.name}
+                    {space === "owned" ? "创建" : "收藏"}
+                    {trash ? " / 回收站" : ""}
                   </button>
-                ))}
-              </nav>
-              <div className="mb-5 flex flex-wrap gap-3">
+                  {result.data?.ancestors.map((p) => (
+                    <span
+                      key={p.id}
+                      className="flex min-w-0 items-center gap-1"
+                    >
+                      <ChevronRight
+                        className="size-3.5 shrink-0 text-foreground-subtle"
+                        aria-hidden
+                      />
+                      <button
+                        disabled={busy}
+                        aria-current={p.id === parent ? "page" : undefined}
+                        className="min-h-10 min-w-0 break-words rounded-lg px-2 text-left text-foreground-muted transition-colors hover:bg-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-primary aria-[current=page]:text-foreground"
+                        onClick={() => go(p.id)}
+                        onDragOver={(e) => {
+                          if (!trash) e.preventDefault();
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          onDrop(e.dataTransfer, p.id);
+                        }}
+                      >
+                        {p.name}
+                      </button>
+                    </span>
+                  ))}
+                </nav>
+              )}
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="break-words text-xl font-semibold tracking-tight">
+                    {query
+                      ? "搜索结果"
+                      : trash
+                        ? "回收站"
+                        : (folderName ?? spaceLabel)}
+                  </h2>
+                  {(query || trash || space === "favorites") && (
+                    <p className="mt-1 text-xs leading-5 text-foreground-muted">
+                      {query
+                        ? `在${trash ? "回收站" : `「${spaceLabel}」全部目录`}中搜索`
+                        : trash
+                          ? "移入回收站的项目可以恢复；彻底删除后无法找回。"
+                          : space === "favorites"
+                            ? "收藏的内容随原作者更新，备注名仅自己可见。"
+                            : null}
+                    </p>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {!trash && (
+                    <>
+                      <Button
+                        disabled={busy || !result.data}
+                        variant="outline"
+                        className="px-3 sm:px-5"
+                        onClick={() => {
+                          setName("");
+                          setError("");
+                          setModal({
+                            expectedVersion: result.data!.version,
+                            kind: "create"
+                          });
+                        }}
+                      >
+                        <FolderPlus className="size-4" aria-hidden />
+                        新建文件夹
+                      </Button>
+                      {space === "owned" && (
+                        <Button asChild className="px-3 sm:px-5">
+                          <Link
+                            href={workspaceHref(undefined, "new")}
+                            aria-disabled={busy}
+                            onClick={(event) => {
+                              if (busy) event.preventDefault();
+                            }}
+                          >
+                            <Plus className="size-4" aria-hidden />
+                            创建词表
+                          </Link>
+                        </Button>
+                      )}
+                    </>
+                  )}
+                  {trash && (
+                    <Button
+                      variant="outline"
+                      disabled={
+                        busy ||
+                        !result.data ||
+                        (!query && !result.data.pagination.total)
+                      }
+                      onClick={() => void confirm("purge", [], true)}
+                    >
+                      清空回收站
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <div className="relative mb-4 w-full sm:max-w-sm">
+                <Search
+                  className="pointer-events-none absolute left-4 top-4 size-4 text-foreground-subtle"
+                  aria-hidden
+                />
                 <Input
+                  ref={searchInput}
+                  type="search"
+                  maxLength={100}
                   aria-label="搜索词表和文件夹"
-                  placeholder={
-                    trash ? "搜索回收站" : "搜索此系统的词表和文件夹"
-                  }
+                  placeholder={trash ? "搜索回收站" : "搜索词表和文件夹"}
                   value={query}
-                  onChange={(e) => {
-                    setQuery(e.target.value);
+                  disabled={busy}
+                  onChange={(event) => {
+                    setQuery(event.target.value);
                     setPage(1);
                     setSelected([]);
                   }}
-                  className="min-w-48 flex-1"
+                  onCompositionStart={() => setComposing(true)}
+                  onCompositionEnd={(event) => {
+                    setQuery(event.currentTarget.value);
+                    setComposing(false);
+                  }}
+                  onKeyDown={(event) => {
+                    if (
+                      event.key === "Escape" &&
+                      !event.nativeEvent.isComposing &&
+                      query
+                    ) {
+                      event.preventDefault();
+                      clearSearch();
+                    }
+                  }}
+                  className="w-full pl-11 pr-12 [&::-webkit-search-cancel-button]:appearance-none"
                 />
-                {!trash && (
-                  <>
-                    <Button
-                      disabled={busy || !result.data}
-                      variant="outline"
-                      onClick={() => {
-                        setName("");
-                        setModal({
-                          expectedVersion: result.data!.version,
-                          kind: "create"
-                        });
-                      }}
-                    >
-                      <FolderPlus className="size-4" aria-hidden />
-                      新建文件夹
-                    </Button>
-                    {space === "owned" && (
-                      <Link
-                        className={primaryButtonClass}
-                        href={workspaceHref(undefined, "new")}
-                      >
-                        创建词表
-                      </Link>
-                    )}
-                  </>
-                )}
-                {trash && (
+                {query && (
                   <Button
-                    variant="outline"
-                    disabled={busy || !result.data}
-                    onClick={() => void confirm("purge", [], true)}
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={busy}
+                    aria-label="清除搜索"
+                    onClick={clearSearch}
+                    className="absolute right-0.5 top-0.5"
                   >
-                    清空回收站
+                    <X className="size-4" aria-hidden />
                   </Button>
                 )}
               </div>
-              <div className="mb-4 flex flex-wrap items-center gap-3">
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    aria-label="选择当前页全部项目"
-                    disabled={busy || !items.length}
-                    checked={
-                      items.length > 0 &&
-                      items.every((i) => selected.includes(i.id))
-                    }
-                    onChange={(e) =>
-                      setSelected(
-                        e.target.checked ? items.map((i) => i.id) : []
-                      )
-                    }
-                  />
-                  全选本页
-                </label>
-                {selected.length > 0 && (
-                  <>
-                    <span className="text-sm text-foreground-muted">
-                      已选 {selected.length} 项
+              {items.length > 0 && (
+                <div
+                  className={cn(
+                    "mb-2 flex min-h-14 flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-transparent px-2 py-1",
+                    selected.length > 0 &&
+                      "sticky top-20 z-20 border-primary/20 bg-surface/95 shadow-glass backdrop-blur-xl"
+                  )}
+                >
+                  <label className="flex min-h-11 cursor-pointer items-center gap-2 px-2 text-sm">
+                    <input
+                      type="checkbox"
+                      aria-label="选择当前页全部项目"
+                      disabled={busy || searchPending || !items.length}
+                      className="size-4 accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                      ref={(element) => {
+                        if (element) element.indeterminate = partlySelected;
+                      }}
+                      checked={allSelected}
+                      onChange={(e) =>
+                        setSelected(
+                          e.target.checked ? items.map((i) => i.id) : []
+                        )
+                      }
+                    />
+                    全选本页
+                  </label>
+                  {selected.length > 0 && (
+                    <>
+                      <span className="text-sm text-foreground-muted">
+                        已选 {selected.length} 项
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={busy}
+                        onClick={() => setSelected([])}
+                      >
+                        取消选择
+                      </Button>
+                      {trash ? (
+                        <>
+                          <Button
+                            disabled={busy}
+                            variant="outline"
+                            onClick={() =>
+                              setModal({
+                                expectedVersion: result.data!.version,
+                                kind: "restore",
+                                ids: selected
+                              })
+                            }
+                          >
+                            恢复
+                          </Button>
+                          <Button
+                            disabled={busy}
+                            variant="outline"
+                            onClick={() => void confirm("purge", selected)}
+                          >
+                            彻底删除
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            disabled={busy}
+                            variant="outline"
+                            onClick={() =>
+                              setModal({
+                                expectedVersion: result.data!.version,
+                                kind: "move",
+                                ids: selected
+                              })
+                            }
+                          >
+                            移动到…
+                          </Button>
+                          <Button
+                            disabled={busy}
+                            variant="outline"
+                            onClick={() => void confirm("trash", selected)}
+                          >
+                            删除
+                          </Button>
+                        </>
+                      )}
+                    </>
+                  )}
+                  {!selected.length && result.data && (
+                    <span
+                      aria-live="polite"
+                      className="ml-auto flex items-center gap-2 pr-2 text-xs tabular-nums text-foreground-muted"
+                    >
+                      {searchPending || result.isFetching ? (
+                        <>
+                          <LoaderCircle
+                            className="size-3.5 animate-spin motion-reduce:animate-none"
+                            aria-hidden
+                          />
+                          正在更新…
+                        </>
+                      ) : (
+                        <>
+                          {query ? "找到" : "共"} {result.data.pagination.total}{" "}
+                          项
+                        </>
+                      )}
                     </span>
-                    {trash ? (
-                      <>
-                        <Button
-                          disabled={busy}
-                          variant="outline"
-                          onClick={() =>
-                            setModal({
-                              expectedVersion: result.data!.version,
-                              kind: "restore",
-                              ids: selected
-                            })
-                          }
-                        >
-                          恢复
-                        </Button>
-                        <Button
-                          disabled={busy}
-                          variant="outline"
-                          onClick={() => void confirm("purge", selected)}
-                        >
-                          彻底删除
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <Button
-                          disabled={busy}
-                          variant="outline"
-                          onClick={() =>
-                            setModal({
-                              expectedVersion: result.data!.version,
-                              kind: "move",
-                              ids: selected
-                            })
-                          }
-                        >
-                          移动到…
-                        </Button>
-                        <Button
-                          disabled={busy}
-                          variant="outline"
-                          onClick={() => void confirm("trash", selected)}
-                        >
-                          删除
-                        </Button>
-                      </>
-                    )}
-                  </>
+                  )}
+                </div>
+              )}
+              {!items.length &&
+                !result.isPending &&
+                (searchPending || result.isFetching) && (
+                  <p
+                    role="status"
+                    className="my-4 text-sm text-foreground-muted"
+                  >
+                    正在更新…
+                  </p>
                 )}
-              </div>
               {result.isError ? (
                 <PageNotice tone="error">
                   目录读取失败。
@@ -659,19 +896,51 @@ function Library({ userId }: { userId: string }) {
               ) : result.isPending ? (
                 <PageNotice>正在加载目录…</PageNotice>
               ) : !items.length ? (
-                <PageNotice>
-                  {query
-                    ? "没有找到匹配项目"
-                    : trash
-                      ? "回收站为空"
-                      : "此文件夹为空"}
-                </PageNotice>
+                <div className="flex min-h-64 flex-col items-center justify-center px-6 py-12 text-center">
+                  <span className="mb-3 text-foreground-subtle">
+                    {query ? (
+                      <Search className="size-6" aria-hidden />
+                    ) : trash ? (
+                      <Trash2 className="size-6" aria-hidden />
+                    ) : (
+                      <BookOpen className="size-6" aria-hidden />
+                    )}
+                  </span>
+                  <h3 className="text-sm font-medium text-foreground-muted">
+                    {query
+                      ? "未找到匹配项目"
+                      : trash
+                        ? "回收站为空"
+                        : parent
+                          ? "此文件夹为空"
+                          : space === "favorites"
+                            ? "暂无收藏"
+                            : "暂无词表"}
+                  </h3>
+                  {query ? (
+                    <Button
+                      className="mt-5"
+                      variant="outline"
+                      onClick={clearSearch}
+                    >
+                      清空搜索
+                    </Button>
+                  ) : null}
+                </div>
               ) : (
-                <ul className="space-y-3" aria-label="目录项目">
+                <ul
+                  className={cn(
+                    "divide-y divide-border/60 transition-opacity",
+                    searchPending && "opacity-50"
+                  )}
+                  inert={busy || searchPending}
+                  aria-label="目录项目"
+                  aria-busy={searchPending || result.isFetching}
+                >
                   {items.map((item) => (
                     <li
                       key={item.id}
-                      draggable={!trash && !busy}
+                      draggable={!trash && !busy && !searchPending}
                       onDragStart={(event) => {
                         event.dataTransfer.setData(
                           LIBRARY_DRAG_TYPE,
@@ -684,56 +953,100 @@ function Library({ userId }: { userId: string }) {
                         );
                       }}
                       onDragOver={(e) => {
-                        if (!trash && !item.wordlist_id) e.preventDefault();
+                        if (
+                          !trash &&
+                          !busy &&
+                          !item.wordlist_id &&
+                          Array.from(e.dataTransfer.types).includes(
+                            LIBRARY_DRAG_TYPE
+                          )
+                        ) {
+                          e.preventDefault();
+                          setDropTarget(item.id);
+                        }
                       }}
+                      onDragLeave={(e) => {
+                        if (
+                          !e.currentTarget.contains(
+                            e.relatedTarget as Node | null
+                          )
+                        )
+                          setDropTarget(null);
+                      }}
+                      onDragEnd={() => setDropTarget(null)}
                       onDrop={(e) => {
-                        if (!item.wordlist_id) {
+                        setDropTarget(null);
+                        if (!item.wordlist_id && !busy) {
                           e.preventDefault();
                           onDrop(e.dataTransfer, item.id);
                         }
                       }}
-                      className={`${panelClass} flex flex-wrap items-center gap-4 !p-4`}
+                      className={cn(
+                        "group flex items-center gap-2 rounded-xl px-1 py-2 transition-colors sm:gap-3 sm:px-3",
+                        selected.includes(item.id)
+                          ? "bg-primary-muted/70"
+                          : "hover:bg-muted/60 focus-within:bg-muted/60",
+                        dropTarget === item.id &&
+                          "bg-primary-muted outline-2 -outline-offset-2 outline-primary"
+                      )}
                     >
                       {!trash && (
                         <span
                           draggable={!busy}
                           aria-label={`拖动 ${item.name}`}
                           title="拖动到左侧文件夹"
-                          className="cursor-grab text-foreground-subtle active:cursor-grabbing"
+                          className="hidden cursor-grab text-foreground-subtle opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 sm:block active:cursor-grabbing"
                         >
                           <GripVertical className="size-4" aria-hidden />
                         </span>
                       )}
-                      <input
-                        type="checkbox"
-                        aria-label={`选择 ${item.name}`}
-                        disabled={busy}
-                        checked={selected.includes(item.id)}
-                        onChange={() => toggle(item.id)}
-                      />
-                      {item.wordlist_id ? (
-                        <BookOpen
-                          className="size-6 shrink-0 text-foreground-muted"
-                          aria-hidden
+                      <label className="flex size-11 shrink-0 cursor-pointer items-center justify-center">
+                        <input
+                          className="size-4 accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                          type="checkbox"
+                          aria-label={`选择 ${item.name}`}
+                          disabled={busy}
+                          checked={selected.includes(item.id)}
+                          onChange={() => toggle(item.id)}
                         />
-                      ) : (
-                        <Folder
-                          className="size-6 shrink-0 text-primary"
-                          aria-hidden
-                        />
-                      )}
+                      </label>
+                      <span
+                        className={cn(
+                          "flex size-6 shrink-0 items-center justify-center sm:size-8",
+                          item.wordlist_id
+                            ? "text-foreground-muted"
+                            : "text-primary"
+                        )}
+                      >
+                        {item.wordlist_id ? (
+                          <BookOpen className="size-5" aria-hidden />
+                        ) : (
+                          <Folder className="size-5" aria-hidden />
+                        )}
+                      </span>
                       <div className="min-w-0 flex-1">
                         {!item.wordlist_id ? (
                           <button
                             disabled={busy}
                             onClick={() => go(item.id)}
-                            className="break-words text-left font-bold hover:text-primary"
+                            className="flex min-h-11 w-full items-center gap-2 break-words rounded-lg text-left text-sm font-medium hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
                           >
-                            {item.name}
+                            <span className="min-w-0 flex-1 break-words">
+                              {item.name}
+                            </span>
+                            <ChevronRight
+                              className="size-4 shrink-0 text-foreground-subtle"
+                              aria-hidden
+                            />
                           </button>
                         ) : !trash && item.wordlist ? (
                           <Link
-                            className="break-words font-bold hover:text-primary"
+                            aria-disabled={busy || searchPending}
+                            onClick={(event) => {
+                              if (busy || searchPending) event.preventDefault();
+                            }}
+                            title={item.name}
+                            className="line-clamp-2 min-h-8 break-words rounded-lg py-1 text-sm font-medium leading-6 hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
                             draggable={false}
                             href={workspaceHref(
                               item.wordlist_id,
@@ -744,20 +1057,24 @@ function Library({ userId }: { userId: string }) {
                             {item.name}
                           </Link>
                         ) : (
-                          <span className="break-words font-bold">
+                          <span className="break-words text-sm font-medium">
                             {item.name}
                           </span>
                         )}
                         {item.wordlist_id && (
-                          <p className="mt-1 text-xs text-foreground-muted">
+                          <p className="mt-1 break-words text-xs leading-5 text-foreground-muted">
                             {item.wordlist
                               ? `${space === "favorites" ? `${item.wordlist.name} · ${item.wordlist.owner_name} · ` : ""}${item.wordlist.item_count} 个词条`
                               : "原词表不可用"}
+                            {space === "owned" && item.wordlist && (
+                              <span> · {STATE_LABEL[item.wordlist.state]}</span>
+                            )}
                           </p>
                         )}
                         {(query || locateId) && (
                           <button
-                            className="mt-1 block text-left text-xs text-primary"
+                            disabled={busy}
+                            className="mt-1 block min-h-8 max-w-full break-words rounded text-left text-xs text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary"
                             onClick={() =>
                               go(
                                 trash
@@ -772,76 +1089,109 @@ function Library({ userId }: { userId: string }) {
                           </button>
                         )}
                       </div>
-                      <div className="flex flex-wrap gap-2">
-                        {trash ? (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              disabled={busy}
-                              onClick={() =>
-                                setModal({
-                                  expectedVersion: result.data!.version,
-                                  kind: "restore",
-                                  ids: [item.id]
-                                })
-                              }
-                            >
-                              恢复
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              disabled={busy}
-                              onClick={() => void confirm("purge", [item.id])}
-                            >
-                              彻底删除
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              disabled={busy}
-                              onClick={() => {
-                                setName(item.name);
-                                setModal({
-                                  expectedVersion: result.data!.version,
-                                  kind: "rename",
-                                  item
-                                });
-                              }}
-                            >
-                              {space === "favorites" && item.wordlist_id
-                                ? "备注名"
-                                : "重命名"}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              disabled={busy}
-                              onClick={() =>
-                                setModal({
-                                  expectedVersion: result.data!.version,
-                                  kind: "move",
-                                  ids: [item.id]
-                                })
-                              }
-                            >
-                              移动
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              disabled={busy}
-                              onClick={() => void confirm("trash", [item.id])}
-                            >
-                              删除
-                            </Button>
-                          </>
-                        )}
-                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            disabled={busy}
+                            className="size-11 shrink-0"
+                            aria-label={`${item.name}的更多操作`}
+                          >
+                            <MoreHorizontal className="size-5" aria-hidden />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                          align="end"
+                          className="min-w-44"
+                          onCloseAutoFocus={(event) => {
+                            const dialog =
+                              document.querySelector<HTMLDialogElement>(
+                                "dialog[open]"
+                              );
+                            if (dialog) {
+                              event.preventDefault();
+                              (
+                                dialog.querySelector<HTMLElement>(
+                                  "input:not(:disabled)"
+                                ) ?? dialog
+                              ).focus();
+                            }
+                          }}
+                        >
+                          {trash ? (
+                            <>
+                              <DropdownMenuItem
+                                onSelect={() => treeAction("restore", item)}
+                              >
+                                <RotateCcw
+                                  className="mr-2 size-4"
+                                  aria-hidden
+                                />
+                                恢复
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-danger data-[highlighted]:bg-danger/10 data-[highlighted]:text-danger"
+                                onSelect={() => treeAction("purge", item)}
+                              >
+                                <Trash2 className="mr-2 size-4" aria-hidden />
+                                彻底删除
+                              </DropdownMenuItem>
+                            </>
+                          ) : (
+                            <>
+                              {space === "owned" &&
+                                item.wordlist_id &&
+                                item.wordlist && (
+                                  <>
+                                    <DropdownMenuItem asChild>
+                                      <Link
+                                        href={workspaceHref(
+                                          item.wordlist_id,
+                                          "edit",
+                                          item.parent_id
+                                        )}
+                                      >
+                                        <FilePenLine
+                                          className="mr-2 size-4"
+                                          aria-hidden
+                                        />
+                                        编辑词表
+                                      </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                  </>
+                                )}
+                              <DropdownMenuItem
+                                onSelect={() => treeAction("rename", item)}
+                              >
+                                <Pencil className="mr-2 size-4" aria-hidden />
+                                {space === "favorites" && item.wordlist_id
+                                  ? "备注名"
+                                  : "重命名"}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onSelect={() => treeAction("move", item)}
+                              >
+                                <FolderInput
+                                  className="mr-2 size-4"
+                                  aria-hidden
+                                />
+                                移动
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-danger data-[highlighted]:bg-danger/10 data-[highlighted]:text-danger"
+                                onSelect={() => treeAction("trash", item)}
+                              >
+                                <Trash2 className="mr-2 size-4" aria-hidden />
+                                移入回收站
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </li>
                   ))}
                 </ul>
@@ -862,6 +1212,7 @@ function Library({ userId }: { userId: string }) {
       </div>
       {modal && (
         <LibraryDialog
+          returnFocusRef={dialogOpener}
           busy={busy}
           title={
             modal.kind === "create"
@@ -879,7 +1230,11 @@ function Library({ userId }: { userId: string }) {
           onClose={() => setModal(null)}
         >
           {error && (
-            <p role="alert" className="mb-4 text-sm text-danger">
+            <p
+              id="library-form-error"
+              role="alert"
+              className="mb-4 rounded-2xl bg-danger/5 px-4 py-3 text-sm text-danger"
+            >
               {error}
             </p>
           )}
@@ -887,7 +1242,12 @@ function Library({ userId }: { userId: string }) {
             <form
               onSubmit={(event) => {
                 event.preventDefault();
-                if (!result.data) return;
+                if (
+                  !result.data ||
+                  !name.trim() ||
+                  (modal.kind === "rename" && name.trim() === modal.item.name)
+                )
+                  return;
                 void run(
                   () =>
                     modal.kind === "create"
@@ -907,27 +1267,66 @@ function Library({ userId }: { userId: string }) {
                 );
               }}
             >
-              <label className="text-sm" htmlFor="library-name">
+              <label
+                className="mb-2 block px-4 text-sm font-medium"
+                htmlFor="library-name"
+              >
                 名称
               </label>
               <Input
                 id="library-name"
-                autoFocus
+                ref={nameInput}
+                disabled={busy}
+                aria-describedby={
+                  error ? "library-form-error" : "library-name-hint"
+                }
                 maxLength={100}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
-              <Button
-                className="mt-4"
-                disabled={busy || !name.trim()}
-                type="submit"
+              <p
+                id="library-name-hint"
+                className="mt-2 px-4 text-xs text-foreground-muted"
               >
-                保存
-              </Button>
+                {modal.kind === "rename" &&
+                space === "favorites" &&
+                modal.item.wordlist_id
+                  ? "备注名仅自己可见，不会修改原词表。"
+                  : "最多 100 个字符。"}
+              </p>
+              <div className="mt-6 flex justify-end gap-2 border-t border-border/60 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => setModal(null)}
+                >
+                  取消
+                </Button>
+                <Button
+                  disabled={
+                    busy ||
+                    !name.trim() ||
+                    (modal.kind === "rename" && name.trim() === modal.item.name)
+                  }
+                  type="submit"
+                >
+                  {busy && (
+                    <LoaderCircle
+                      className="size-4 animate-spin motion-reduce:animate-none"
+                      aria-hidden
+                    />
+                  )}
+                  {busy ? "保存中…" : "保存"}
+                </Button>
+              </div>
             </form>
           )}
           {(modal.kind === "move" || modal.kind === "restore") && (
             <>
+              <p className="mb-3 text-sm text-foreground-muted">
+                已选择 {modal.ids.length} 项，浏览文件夹后确认目标位置。
+              </p>
               {modal.kind === "restore" && (
                 <Button
                   className="mb-4"
@@ -952,6 +1351,11 @@ function Library({ userId }: { userId: string }) {
                 </Button>
               )}
               <LibraryFolderPicker
+                actionLabel={
+                  modal.kind === "move" ? "移动到这里" : "恢复到这里"
+                }
+                pendingLabel={modal.kind === "move" ? "移动中…" : "恢复中…"}
+                onCancel={() => setModal(null)}
                 space={space}
                 busy={busy}
                 exclude={modal.ids}
@@ -986,25 +1390,44 @@ function Library({ userId }: { userId: string }) {
                     ? "公开词表将停止公开，恢复后为私密状态。"
                     : "只移除你的收藏，不影响原作者词表。"}
               </p>
-              <Button
-                disabled={busy}
-                onClick={() =>
-                  void run(
-                    async () => {
-                      await api.wordList.library.operate(space, modal.input);
-                      if (modal.input.empty_trash && alive())
-                        router.push(
-                          `/account/wordlists?space=${space}&trash=true`
-                        );
-                    },
-                    modal.input.action === "trash"
-                      ? "已移入回收站"
-                      : "已彻底删除"
-                  )
-                }
-              >
-                确认{modal.input.action === "trash" ? "删除" : "彻底删除"}
-              </Button>
+              <div className="mt-6 flex flex-wrap justify-end gap-2 border-t border-border/60 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => setModal(null)}
+                >
+                  取消
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={busy}
+                  onClick={() =>
+                    void run(
+                      async () => {
+                        await api.wordList.library.operate(space, modal.input);
+                        if (modal.input.empty_trash && alive())
+                          router.push(
+                            `/account/wordlists?space=${space}&trash=true`
+                          );
+                      },
+                      modal.input.action === "trash"
+                        ? "已移入回收站"
+                        : "已彻底删除"
+                    )
+                  }
+                >
+                  {busy && (
+                    <LoaderCircle
+                      className="size-4 animate-spin motion-reduce:animate-none"
+                      aria-hidden
+                    />
+                  )}
+                  {busy
+                    ? "删除中…"
+                    : `确认${modal.input.action === "trash" ? "删除" : "彻底删除"}`}
+                </Button>
+              </div>
             </>
           )}
         </LibraryDialog>

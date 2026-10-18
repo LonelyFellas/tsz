@@ -1,4 +1,10 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within
+} from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { renderWithProviders } from "@/test/render";
 import { useUserStore } from "@/stores/user";
@@ -29,6 +35,300 @@ const candidate = {
   label: "apple",
   glosses: ["苹果"]
 };
+it("选定候选后焦点保留在词条输入框", async () => {
+  renderWithProviders(<WordListCreator />);
+  const input = screen.getByPlaceholderText("输入单词或短语");
+  fireEvent.change(input, { target: { value: "app" } });
+  const option = await screen.findByRole("button", { name: /apple\s*苹果/ });
+  option.focus();
+  fireEvent.click(option);
+  expect(input).toHaveValue("apple");
+  expect(input).toHaveFocus();
+});
+
+it("删除词条后聚焦相邻词条", async () => {
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+  try {
+    renderWithProviders(<WordListCreator />);
+    fireEvent.click(screen.getByRole("button", { name: "添加词条" }));
+    const remove = screen.getAllByRole("button", { name: "删除" })[0]!;
+    remove.focus();
+    fireEvent.click(remove);
+    expect(screen.getAllByPlaceholderText("输入单词或短语")).toHaveLength(1);
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText("输入单词或短语")).toHaveFocus()
+    );
+  } finally {
+    confirm.mockRestore();
+  }
+});
+
+it("候选支持方向键与 Esc，单一候选可用回车选定", async () => {
+  renderWithProviders(<WordListCreator />);
+  const input = screen.getByPlaceholderText("输入单词或短语");
+  fireEvent.change(input, { target: { value: "app" } });
+  const option = await screen.findByRole("button", { name: /apple\s*苹果/ });
+  input.focus();
+  fireEvent.keyDown(input, { key: "ArrowDown" });
+  expect(option).toHaveFocus();
+  fireEvent.keyDown(option, { key: "Escape" });
+  expect(input).toHaveFocus();
+  expect(
+    screen.queryByRole("button", { name: /apple\s*苹果/ })
+  ).not.toBeInTheDocument();
+  fireEvent.change(input, { target: { value: "appl" } });
+  await screen.findByRole("button", { name: /apple\s*苹果/ });
+  fireEvent.keyDown(input, { key: "Enter" });
+  expect(input).toHaveValue("apple");
+  expect(input).toHaveFocus();
+});
+
+it("注释按需展开，筛选后输入仍保留并正常保存", async () => {
+  vi.mocked(api.wordList.create).mockResolvedValue({ id: "created" } as never);
+  renderWithProviders(<WordListCreator />);
+  expect(screen.queryByLabelText("注 1")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "添加注释" }));
+  await waitFor(() => expect(screen.getByLabelText("注 1")).toHaveFocus());
+  fireEvent.click(screen.getByRole("button", { name: "收起注释 1" }));
+  expect(screen.queryByLabelText("注 1")).not.toBeInTheDocument();
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "添加注释" })).toHaveFocus()
+  );
+  fireEvent.click(screen.getByRole("button", { name: "添加注释" }));
+  fireEvent.change(screen.getByLabelText("注 1"), {
+    target: { value: "保留的注释" }
+  });
+  fireEvent.change(screen.getByLabelText("词表名称"), {
+    target: { value: "词表" }
+  });
+  fireEvent.change(screen.getByPlaceholderText("输入单词或短语"), {
+    target: { value: "app" }
+  });
+  fireEvent.click(await screen.findByRole("button", { name: /apple\s*苹果/ }));
+  fireEvent.change(screen.getByLabelText("表内搜索"), {
+    target: { value: "不存在" }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "清空搜索" }));
+  expect(screen.getByLabelText("注 1")).toHaveValue("保留的注释");
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
+  await waitFor(() =>
+    expect(api.wordList.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        items: [expect.objectContaining({ author_note: "保留的注释" })]
+      })
+    )
+  );
+});
+
+function mockRowRects() {
+  return vi
+    .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+    .mockImplementation(function (this: HTMLElement) {
+      const row = this.closest('[id^="row-"]');
+      const index = row
+        ? Array.from(document.querySelectorAll('[id^="row-"]')).indexOf(row)
+        : 0;
+      return DOMRect.fromRect({
+        x: 0,
+        y: 100 + index * 200,
+        width: 600,
+        height: 180
+      });
+    });
+}
+
+it("键盘拖动可取消，确认排序后注释仍跟随词条", async () => {
+  const measure = mockRowRects();
+  try {
+    renderWithProviders(<WordListCreator />);
+    fireEvent.click(screen.getByRole("button", { name: "添加词条" }));
+    const inputs = screen.getAllByPlaceholderText("输入单词或短语");
+    fireEvent.change(inputs[0]!, { target: { value: "first" } });
+    fireEvent.change(inputs[1]!, { target: { value: "second" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "添加注释" })[0]!);
+    fireEvent.change(screen.getByLabelText("注 1"), {
+      target: { value: "第一条的注" }
+    });
+    const handle = screen.getByRole("button", { name: "拖动排序词条 1" });
+    handle.focus();
+    fireEvent.keyDown(handle, { key: " ", code: "Space" });
+    await waitFor(() => expect(handle).toHaveAttribute("aria-pressed", "true"));
+    fireEvent.keyDown(handle, { key: "Escape", code: "Escape" });
+    await screen.findByText("已取消排序。");
+    expect(screen.getByLabelText("词条 1")).toHaveValue("first");
+    fireEvent.keyDown(handle, { key: " ", code: "Space" });
+    await waitFor(() => expect(handle).toHaveAttribute("aria-pressed", "true"));
+    fireEvent.keyDown(handle, { key: "ArrowDown", code: "ArrowDown" });
+    await screen.findByText("目标位置：第 2 位。");
+    fireEvent.keyDown(handle, { key: " ", code: "Space" });
+    await waitFor(() =>
+      expect(screen.getByLabelText("词条 1")).toHaveValue("second")
+    );
+    expect(screen.getByLabelText("词条 2")).toHaveValue("first");
+    expect(screen.getByLabelText("注 2")).toHaveValue("第一条的注");
+  } finally {
+    measure.mockRestore();
+  }
+});
+
+it("触控轻扫不拦截滚动，长按把手后可以拖动排序", async () => {
+  const measure = mockRowRects();
+  try {
+    renderWithProviders(<WordListCreator />);
+    fireEvent.click(screen.getByRole("button", { name: "添加词条" }));
+    fireEvent.change(screen.getByLabelText("词条 1"), {
+      target: { value: "first" }
+    });
+    fireEvent.change(screen.getByLabelText("词条 2"), {
+      target: { value: "second" }
+    });
+    const handle = screen.getByRole("button", { name: "拖动排序词条 1" });
+    const point = (y: number) => [
+      { identifier: 1, clientX: 20, clientY: y, target: handle }
+    ];
+    fireEvent.touchStart(handle, { touches: point(130) });
+    expect(fireEvent.touchMove(handle, { touches: point(160) })).toBe(true);
+    fireEvent.touchEnd(handle, { touches: [], changedTouches: point(160) });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    });
+    expect(handle).not.toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText("词条 1")).toHaveValue("first");
+    fireEvent.touchStart(handle, { touches: point(130) });
+    await waitFor(() => expect(handle).toHaveAttribute("aria-pressed", "true"));
+    fireEvent.touchMove(handle, { touches: point(330) });
+    await screen.findByText("目标位置：第 2 位。");
+    fireEvent.touchEnd(handle, { touches: [], changedTouches: point(330) });
+    await waitFor(() =>
+      expect(screen.getByLabelText("词条 1")).toHaveValue("second")
+    );
+    expect(screen.getByLabelText("词条 2")).toHaveValue("first");
+  } finally {
+    measure.mockRestore();
+  }
+});
+
+it("请求超时保留草稿并锁定输入，重试沿用相同的创建请求", async () => {
+  vi.mocked(api.wordList.create).mockRejectedValue(
+    new HttpError(408, "timeout")
+  );
+  renderWithProviders(<WordListCreator />);
+  fireEvent.change(screen.getByLabelText("词表名称"), {
+    target: { value: "超时词表" }
+  });
+  fireEvent.change(screen.getByPlaceholderText("输入单词或短语"), {
+    target: { value: "apple" }
+  });
+  fireEvent.click(await screen.findByRole("button", { name: /apple\s*苹果/ }));
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
+  const retry = await screen.findByRole("button", { name: "重试保存" });
+  expect(screen.getByLabelText("词表名称")).toBeDisabled();
+  expect(screen.getByRole("alert")).not.toHaveTextContent("请求键");
+  fireEvent.click(retry);
+  await waitFor(() => expect(api.wordList.create).toHaveBeenCalledTimes(2));
+  expect(vi.mocked(api.wordList.create).mock.calls[1]![0]).toEqual(
+    vi.mocked(api.wordList.create).mock.calls[0]![0]
+  );
+});
+
+it("保存期间锁定返回与页内导航，失败后恢复离开保护", async () => {
+  let reject!: (reason: Error) => void;
+  vi.mocked(api.wordList.create).mockImplementation(
+    () =>
+      new Promise((_, fail) => {
+        reject = fail;
+      })
+  );
+  const cancel = vi.fn();
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+  try {
+    renderWithProviders(
+      <>
+        <WordListCreator onCancel={cancel} />
+        <a href="/account">离开</a>
+      </>
+    );
+    fireEvent.change(screen.getByLabelText("词表名称"), {
+      target: { value: "词表" }
+    });
+    fireEvent.change(screen.getByPlaceholderText("输入单词或短语"), {
+      target: { value: "apple" }
+    });
+    fireEvent.click(
+      await screen.findByRole("button", { name: /apple\s*苹果/ })
+    );
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    expect(screen.getByRole("button", { name: "返回" })).toBeDisabled();
+    expect(fireEvent.click(screen.getByRole("link", { name: "离开" }))).toBe(
+      false
+    );
+    expect(confirm).not.toHaveBeenCalled();
+    expect(cancel).not.toHaveBeenCalled();
+    await act(async () => reject(new HttpError(413, "too large")));
+    expect(screen.getByRole("button", { name: "返回" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "返回" }));
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(cancel).toHaveBeenCalledOnce();
+  } finally {
+    confirm.mockRestore();
+  }
+});
+
+it("名称校验定位输入框，修正后清除错误", async () => {
+  renderWithProviders(<WordListCreator />);
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
+  expect(screen.getByLabelText("词表名称")).toHaveFocus();
+  expect(screen.getByLabelText("词表名称")).toHaveAttribute(
+    "aria-invalid",
+    "true"
+  );
+  fireEvent.change(screen.getByLabelText("词表名称"), {
+    target: { value: "有效名称" }
+  });
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});
+
+it("嵌入编辑器的取消操作保留未保存保护", () => {
+  const cancel = vi.fn();
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+  try {
+    renderWithProviders(<WordListCreator embedded onCancel={cancel} />);
+    expect(
+      screen.queryByRole("button", { name: "返回" })
+    ).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("词表名称"), {
+      target: { value: "未保存的词表" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(cancel).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("词表名称")).toHaveValue("未保存的词表");
+    confirm.mockReturnValue(true);
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+    expect(cancel).toHaveBeenCalledOnce();
+  } finally {
+    confirm.mockRestore();
+  }
+});
+
+it("词条组合输入期间不搜索未确认文本", async () => {
+  renderWithProviders(<WordListCreator />);
+  const input = screen.getByPlaceholderText("输入单词或短语");
+  fireEvent.compositionStart(input);
+  fireEvent.change(input, { target: { value: "ping" } });
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  });
+  expect(api.wordList.suggestions).not.toHaveBeenCalled();
+  fireEvent.change(input, { target: { value: "苹果" } });
+  fireEvent.compositionEnd(input);
+  await waitFor(() =>
+    expect(api.wordList.suggestions).toHaveBeenCalledWith(
+      { q: "苹果" },
+      expect.anything()
+    )
+  );
+});
 it("保存体积超限明确提示拆分，保留内容并允许继续修改", async () => {
   vi.mocked(api.wordList.create).mockRejectedValue(
     new HttpError(413, "request body too large")
@@ -41,7 +341,7 @@ it("保存体积超限明确提示拆分，保留内容并允许继续修改", a
     target: { value: "apple" }
   });
   fireEvent.click(await screen.findByRole("button", { name: /apple\s*苹果/ }));
-  fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("词表内容过大");
   expect(screen.getByLabelText("词表名称")).toHaveValue("大词表");
   expect(screen.getByLabelText("词表名称")).toBeEnabled();
@@ -93,7 +393,7 @@ it("Excel 追加替换初始空行，保存真实词条引用和作者注释；�
   fireEvent.click(screen.getByRole("button", { name: "确认追加到词表" }));
   expect(screen.getAllByPlaceholderText("输入单词或短语")).toHaveLength(1);
   expect(screen.getByLabelText("注 1")).toHaveValue("公开给读者的注");
-  fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
   await waitFor(() => expect(saved).toHaveBeenCalledWith("created"));
   expect(api.wordList.create).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -117,7 +417,7 @@ it("changing a selected spelling clears the entry ID and blocks save", async () 
   fireEvent.change(input, { target: { value: "app" } });
   fireEvent.click(await screen.findByRole("button", { name: /apple\s*苹果/ }));
   fireEvent.change(input, { target: { value: "other" } });
-  fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "每行都需选定平台词条"
   );
@@ -133,10 +433,11 @@ it("unknown create result freezes changes and retries exactly the same request",
     target: { value: "app" }
   });
   fireEvent.click(await screen.findByRole("button", { name: /apple\s*苹果/ }));
+  fireEvent.click(screen.getByRole("button", { name: "添加注释" }));
   fireEvent.change(screen.getByLabelText("注 1"), {
     target: { value: "我的想法" }
   });
-  fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
   await screen.findByRole("button", { name: "重试保存" });
   expect(screen.getByLabelText("词表名称")).toBeDisabled();
   const first = vi.mocked(api.wordList.create).mock.calls[0]![0];
@@ -191,7 +492,7 @@ it("mixed item revisions cannot advance or save the frozen editing snapshot", as
   );
   expect(await screen.findByRole("alert")).toHaveTextContent("词表版本已变化");
   expect(screen.getByLabelText("词表名称")).toHaveValue("旧名称");
-  expect(screen.getByRole("button", { name: "保存私密词表" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
   expect(api.wordList.update).not.toHaveBeenCalled();
 });
 
@@ -250,7 +551,7 @@ it("selecting another entry and returning preserves the original note version", 
   fireEvent.change(screen.getByLabelText("私密备注 1"), {
     target: { value: "更新备注" }
   });
-  fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
   await waitFor(() => expect(api.wordList.update).toHaveBeenCalled());
   expect(vi.mocked(api.wordList.update).mock.calls[0]![1].note_updates).toEqual(
     [
@@ -325,14 +626,14 @@ it("newly readded entries ignore obsolete pages from the prior editing session",
     </QueryClientProvider>
   );
   await waitFor(() =>
-    expect(screen.getByRole("button", { name: "增加一行" })).toBeEnabled()
+    expect(screen.getByRole("button", { name: "添加词条" })).toBeEnabled()
   );
-  fireEvent.click(screen.getByRole("button", { name: "增加一行" }));
+  fireEvent.click(screen.getByRole("button", { name: "添加词条" }));
   fireEvent.change(screen.getAllByPlaceholderText("输入单词或短语")[1]!, {
     target: { value: "apple" }
   });
   fireEvent.click(await screen.findByRole("button", { name: /apple\s*苹果/ }));
-  fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
   await waitFor(() => expect(api.wordList.update).toHaveBeenCalled());
   expect(vi.mocked(api.wordList.update).mock.calls[0]![1].note_updates).toEqual(
     [
@@ -346,6 +647,10 @@ it("newly readded entries ignore obsolete pages from the prior editing session",
 });
 
 it("automatically loads every page, searches notes across pages and preserves hidden rows on save", async () => {
+  let finishLoading!: () => void;
+  const itemsReady = new Promise<void>((resolve) => {
+    finishLoading = resolve;
+  });
   const items = Array.from({ length: 101 }, (_, index) => ({
     entry_id: `entry-${index}`,
     position: index,
@@ -375,27 +680,38 @@ it("automatically loads every page, searches notes across pages and preserves hi
     wordlist,
     entry_ids: items.map((item) => item.entry_id)
   });
-  vi.mocked(api.wordList.myItems).mockImplementation(async (_, query) => ({
-    items: items.slice(
-      ((query?.page ?? 1) - 1) * 100,
-      (query?.page ?? 1) * 100
-    ),
-    revision: 9,
-    pagination: {
-      page: query?.page ?? 1,
-      page_size: 100,
-      total: 101,
-      total_pages: 2
-    }
-  }));
+  vi.mocked(api.wordList.myItems).mockImplementation(async (_, query) => {
+    await itemsReady;
+    return {
+      items: items.slice(
+        ((query?.page ?? 1) - 1) * 100,
+        (query?.page ?? 1) * 100
+      ),
+      revision: 9,
+      pagination: {
+        page: query?.page ?? 1,
+        page_size: 100,
+        total: 101,
+        total_pages: 2
+      }
+    };
+  });
   vi.mocked(api.wordList.update).mockResolvedValue({
     ...wordlist,
     revision: 10
   });
   renderWithProviders(<WordListCreator id="list" />);
-  await waitFor(() => expect(screen.getByLabelText("表内搜索")).toBeEnabled());
+  await screen.findByText("正在读取词条…");
+  // 大表单中复用工具栏节点，行操作只查询目标行。
+  const controls = within(screen.getByRole("region", { name: "词条编辑" }));
+  const filterInput = screen.getByLabelText("表内搜索");
+  expect(screen.queryAllByPlaceholderText("输入单词或短语")).toHaveLength(0);
+  expect(filterInput).toBeDisabled();
+  expect(controls.getByRole("button", { name: "保存" })).toBeDisabled();
+  await act(async () => finishLoading());
+  await waitFor(() => expect(filterInput).toBeEnabled());
   expect(api.wordList.myItems).toHaveBeenCalledTimes(2);
-  fireEvent.change(screen.getByLabelText("表内搜索"), {
+  fireEvent.change(filterInput, {
     target: { value: "最后一页" }
   });
   expect(screen.getByPlaceholderText("输入单词或短语")).toHaveValue("word100");
@@ -405,11 +721,14 @@ it("automatically loads every page, searches notes across pages and preserves hi
   fireEvent.change(screen.getByLabelText("私密备注 101"), {
     target: { value: "最后一页的新备注" }
   });
-  fireEvent.change(screen.getByLabelText("表内搜索"), {
+  fireEvent.change(filterInput, {
     target: { value: "" }
   });
-  fireEvent.click(screen.getAllByRole("button", { name: "下移" })[0]!);
-  fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
+  const firstRow = screen
+    .getAllByPlaceholderText("输入单词或短语")[0]!
+    .closest('[id^="row-"]') as HTMLElement;
+  fireEvent.click(within(firstRow).getByRole("button", { name: "下移" }));
+  fireEvent.click(controls.getByRole("button", { name: "保存" }));
   await waitFor(() => expect(api.wordList.update).toHaveBeenCalled());
   const saved = vi.mocked(api.wordList.update).mock.calls[0]![1];
   expect(saved.content?.entry_ids).toEqual([
@@ -464,11 +783,11 @@ it("failed loading is retryable and never allows a partial save", async () => {
     });
   renderWithProviders(<WordListCreator id="list" />);
   fireEvent.click(await screen.findByRole("button", { name: "重试读取" }));
-  expect(screen.getByRole("button", { name: "保存私密词表" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
   await waitFor(() =>
     expect(screen.getByLabelText("私密备注 1")).toHaveValue("恢复后的备注")
   );
-  expect(screen.getByRole("button", { name: "保存私密词表" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "保存" })).toBeEnabled();
 });
 
 it("unsaved changes block links before router updates even with native navigation support", () => {
@@ -549,7 +868,7 @@ it("published author annotations require withdrawal while existing private notes
   fireEvent.change(screen.getByLabelText("私密备注 1"), {
     target: { value: "个人的新想法" }
   });
-  fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
+  fireEvent.click(screen.getByRole("button", { name: "保存备注" }));
   await waitFor(() =>
     expect(api.wordList.update).toHaveBeenCalledWith("list", {
       expected_revision: 8,
@@ -634,19 +953,23 @@ it("无匹配时创建自定义词，校验释义并保存稳定标识及注", a
   fireEvent.click(
     await screen.findByRole("button", { name: "创建自定义词汇" })
   );
-  fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "释义须为 1–200 字"
+  );
+  await waitFor(() =>
+    expect(screen.getByLabelText("自定义释义 1")).toHaveFocus()
   );
   expect(api.wordList.create).not.toHaveBeenCalled();
   fireEvent.change(screen.getByLabelText("自定义释义 1"), {
     target: { value: "我的自定义释义" }
   });
+  fireEvent.click(screen.getByRole("button", { name: "添加注释" }));
   fireEvent.change(screen.getByLabelText("注 1"), {
     target: { value: "给读者的注" }
   });
   fireEvent.change(input, { target: { value: "renamed phrase" } });
-  fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
   await waitFor(() =>
     expect(api.wordList.create).toHaveBeenCalledWith({
       idempotency_key: expect.any(String),
@@ -676,7 +999,7 @@ it("搜索失败不把输入当作自定义词，也不能保存未选定行", a
   expect(
     screen.queryByRole("button", { name: "创建自定义词汇" })
   ).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
   expect(api.wordList.create).not.toHaveBeenCalled();
 });
 
@@ -734,7 +1057,7 @@ it("重新打开混合词表后改词及重排，私密备注仍按自定义项�
   vi.mocked(api.wordList.update).mockResolvedValue({ ...meta, revision: 5 });
   renderWithProviders(<WordListCreator id="list" />);
   await waitFor(() =>
-    expect(screen.getByRole("button", { name: "保存私密词表" })).toBeEnabled()
+    expect(screen.getByRole("button", { name: "保存" })).toBeEnabled()
   );
   fireEvent.change(screen.getAllByPlaceholderText("输入单词或短语")[1]!, {
     target: { value: "renamed" }
@@ -743,7 +1066,7 @@ it("重新打开混合词表后改词及重排，私密备注仍按自定义项�
     target: { value: "新私密" }
   });
   fireEvent.click(screen.getAllByRole("button", { name: "上移" })[1]!);
-  fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
   await waitFor(() =>
     expect(api.wordList.update).toHaveBeenCalledWith("list", {
       expected_revision: 4,
@@ -804,7 +1127,7 @@ it("将已有高版本私密备注的平台行改为自定义词时使用新项�
   vi.mocked(api.wordList.update).mockResolvedValue({ ...meta, revision: 2 });
   renderWithProviders(<WordListCreator id="list" />);
   await waitFor(() =>
-    expect(screen.getByRole("button", { name: "保存私密词表" })).toBeEnabled()
+    expect(screen.getByRole("button", { name: "保存" })).toBeEnabled()
   );
   const input = screen.getByPlaceholderText("输入单词或短语");
   fireEvent.change(input, { target: { value: "my replacement phrase" } });
@@ -815,7 +1138,7 @@ it("将已有高版本私密备注的平台行改为自定义词时使用新项�
   fireEvent.change(screen.getByLabelText("自定义释义 1"), {
     target: { value: "新的自定义释义" }
   });
-  fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
   await waitFor(() =>
     expect(api.wordList.update).toHaveBeenCalledWith(
       "list",

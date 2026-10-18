@@ -186,6 +186,40 @@ function open(mine = false) {
   const result = render(element());
   return { client, ...result, refresh: () => result.rerender(element()) };
 }
+it("详情搜索等待组合输入结束，读取期间保留旧词条且不续载旧搜索", async () => {
+  open();
+  await screen.findByRole("heading", { name: "apple" });
+  const input = screen.getByLabelText("搜索词条");
+  fireEvent.compositionStart(input);
+  fireEvent.change(input, { target: { value: "ping" } });
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  });
+  expect(api.wordList.items).toHaveBeenCalledTimes(1);
+  let resolve!: (value: ReturnType<typeof pageResult>) => void;
+  vi.mocked(api.wordList.items).mockImplementationOnce(
+    () =>
+      new Promise((done) => {
+        resolve = done;
+      })
+  );
+  fireEvent.change(input, { target: { value: "苹果" } });
+  fireEvent.compositionEnd(input);
+  await waitFor(() => expect(api.wordList.items).toHaveBeenCalledTimes(2));
+  expect(api.wordList.items).toHaveBeenLastCalledWith(
+    "list",
+    { page: 1, q: "苹果" },
+    expect.anything()
+  );
+  expect(screen.getByRole("heading", { name: "apple" })).toBeVisible();
+  expect(screen.getByText("正在搜索…")).toBeVisible();
+  expect(observers.every((observer) => !observer.connected)).toBe(true);
+  await act(async () => resolve(pageResult(2)));
+  expect(await screen.findByRole("heading", { name: "banana" })).toBeVisible();
+  expect(
+    screen.queryByRole("heading", { name: "apple" })
+  ).not.toBeInTheDocument();
+});
 it("collapses unavailable references, keeps notes and positions, and loads later usable entries", async () => {
   vi.mocked(api.wordList.myAvailability).mockResolvedValue({
     revision: 1,
@@ -467,7 +501,7 @@ it("does not append a late page from the previous search and starts new reading 
     target: { value: "app" }
   });
   await screen.findByRole("heading", { name: "apple" });
-  expect(oldSignal?.aborted).toBe(true);
+  await waitFor(() => expect(oldSignal?.aborted).toBe(true));
   await act(async () => resolve(pageResult(2)));
   expect(
     screen.queryByRole("heading", { name: "banana" })
@@ -682,9 +716,7 @@ it("explains unavailable entries before publication and prevents submission", as
     ]
   });
   open(true);
-  await screen.findByText(
-    "暂时不能申请公开：词表中有暂不可用的词条。请查看下方原因，移除或替换后再申请。"
-  );
+  await screen.findByText("有不可用词条，移除或替换后可申请公开。");
   expect(screen.getByText("原因：已移入垃圾桶")).toBeVisible();
   expect(
     screen.getByText(/查看暂不可用的词条/).closest("details")
@@ -770,7 +802,7 @@ it("uses whole-list counts when unavailable entries are on another page or hidde
       : result;
   });
   open(true);
-  await screen.findByText(/暂时不能申请公开/);
+  await screen.findByText(/有不可用词条/);
   expect(screen.getByRole("button", { name: "申请公开" })).toBeDisabled();
   expect(screen.queryByText("原因：已移入垃圾桶")).not.toBeInTheDocument();
   fireEvent.click(
