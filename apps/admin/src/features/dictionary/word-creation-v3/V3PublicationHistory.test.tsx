@@ -475,9 +475,7 @@ describe("V3PublicationHistory", () => {
       await screen.findByText("strict history loaded")
     ).toBeInTheDocument();
     expect(api.listPublications).toHaveBeenCalledTimes(2);
-    fireEvent.click(
-      await screen.findByRole("button", { name: "查看第 2 次发布" })
-    );
+    fireEvent.click(screen.getByRole("button", { name: "查看第 2 次发布" }));
     const detailView = await screen.findByTestId("publication-detail");
     expect(
       within(detailView).getByText("historical-v3-spelling")
@@ -526,9 +524,7 @@ describe("V3PublicationHistory", () => {
 
     expect(await screen.findByText("historical-v2")).toBeInTheDocument();
     expect(screen.getByText("list-only-label")).toBeInTheDocument();
-    fireEvent.click(
-      await screen.findByRole("button", { name: "查看第 1 次发布" })
-    );
+    fireEvent.click(screen.getByRole("button", { name: "查看第 1 次发布" }));
     const detail = await screen.findByTestId("publication-detail");
     expect(within(detail).getByText("immutable-v2-detail")).toBeInTheDocument();
     expect(
@@ -553,9 +549,7 @@ describe("V3PublicationHistory", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "关闭发布详情" }));
-    fireEvent.click(
-      await screen.findByRole("button", { name: "查看第 2 次发布" })
-    );
+    fireEvent.click(screen.getByRole("button", { name: "查看第 2 次发布" }));
     const v3Detail = await screen.findByTestId("publication-detail");
     expect(
       within(v3Detail).getByText("immutable-v3-detail")
@@ -769,9 +763,7 @@ describe("V3PublicationHistory", () => {
     expect(snapshot.getByText("无关系词快照")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "关闭发布详情" }));
-    fireEvent.click(
-      await screen.findByRole("button", { name: "查看第 2 次发布" })
-    );
+    fireEvent.click(screen.getByRole("button", { name: "查看第 2 次发布" }));
     snapshot = within(await screen.findByTestId("publication-snapshot-body"));
     expect(snapshot.getByText("无词形快照")).toBeInTheDocument();
     expect(snapshot.getByText("无释义快照")).toBeInTheDocument();
@@ -840,9 +832,7 @@ describe("V3PublicationHistory", () => {
       ).toBeEnabled();
       fireEvent.click(screen.getByRole("button", { name: "关闭发布详情" }));
     }
-    fireEvent.click(
-      await screen.findByRole("button", { name: "查看第 3 次发布" })
-    );
+    fireEvent.click(screen.getByRole("button", { name: "查看第 3 次发布" }));
     const rollback = await screen.findByRole("button", {
       name: "回退为新版本"
     });
@@ -1060,11 +1050,7 @@ describe("V3PublicationHistory", () => {
       await screen.findByRole("button", { name: "回退为新版本" })
     );
     fireEvent.click(screen.getByRole("button", { name: "确认回退" }));
-    const acknowledgeRollback = await screen.findByRole("button", {
-      name: "确认并回退"
-    });
-    await waitFor(() => expect(acknowledgeRollback).toBeEnabled());
-    fireEvent.click(acknowledgeRollback);
+    fireEvent.click(await screen.findByRole("button", { name: "确认并回退" }));
 
     await screen.findByText("replacement-source");
     for (const detailsButton of await screen.findAllByRole("button", {
@@ -1175,11 +1161,9 @@ describe("V3PublicationHistory", () => {
       expect(api.rollbackPublication.mock.calls[1]![3]).not.toHaveProperty(
         "confirmed_surface_match_token"
       );
-      const confirmRollback = await screen.findByRole("button", {
-        name: "确认并回退"
-      });
-      await waitFor(() => expect(confirmRollback).toBeEnabled());
-      fireEvent.click(confirmRollback);
+      fireEvent.click(
+        await screen.findByRole("button", { name: "确认并回退" })
+      );
       await waitFor(() =>
         expect(api.rollbackPublication).toHaveBeenCalledTimes(3)
       );
@@ -1496,9 +1480,7 @@ describe("V3PublicationHistory", () => {
       />
     );
     await waitFor(() => expect(api.listPublications).toHaveBeenCalledTimes(2));
-    fireEvent.click(
-      await screen.findByRole("button", { name: "查看第 2 次发布" })
-    );
+    fireEvent.click(screen.getByRole("button", { name: "查看第 2 次发布" }));
     const blocked = await screen.findByRole("button", {
       name: "回退为新版本"
     });
@@ -1759,7 +1741,7 @@ describe("V3PublicationHistory", () => {
     expect(screen.queryByRole("button", { name: "确认回退" })).toBeNull();
     expect(api.rollbackPublication).toHaveBeenCalledTimes(1);
     fireEvent.click(
-      await screen.findByRole("button", { name: "重新刷新词条与发布历史" })
+      screen.getByRole("button", { name: "重新刷新词条与发布历史" })
     );
 
     await waitFor(() => expect(api.get).toHaveBeenCalledTimes(2));
@@ -1816,7 +1798,7 @@ describe("V3PublicationHistory", () => {
     expect(api.rollbackPublication).toHaveBeenCalledTimes(1);
 
     fireEvent.click(
-      await screen.findByRole("button", { name: "重新刷新词条与发布历史" })
+      screen.getByRole("button", { name: "重新刷新词条与发布历史" })
     );
     await waitFor(() => expect(api.get).toHaveBeenCalledTimes(2));
     expect(api.rollbackPublication).toHaveBeenCalledTimes(1);
@@ -1952,9 +1934,7 @@ describe("V3PublicationHistory", () => {
     expect(await screen.findByText("centre · center")).toBeInTheDocument();
 
     for (const callCount of [1, 2, 3]) {
-      fireEvent.click(
-        await screen.findByRole("button", { name: "查看第 1 次发布" })
-      );
+      fireEvent.click(screen.getByRole("button", { name: "查看第 1 次发布" }));
       await waitFor(() =>
         expect(api.getPublication).toHaveBeenCalledTimes(callCount)
       );
@@ -2125,9 +2105,7 @@ describe("V3PublicationHistory", () => {
       await screen.findByRole("button", { name: "查看第 1 次发布" })
     );
     fireEvent.click(screen.getByRole("button", { name: "关闭发布详情" }));
-    fireEvent.click(
-      await screen.findByRole("button", { name: "查看第 2 次发布" })
-    );
+    fireEvent.click(screen.getByRole("button", { name: "查看第 2 次发布" }));
     expect(
       await screen.findByText("server V3 presentation")
     ).toBeInTheDocument();
@@ -2231,9 +2209,11 @@ it("历史发布快照展示释义和例句的人工关联", async () => {
   );
   const body = await screen.findByTestId("publication-snapshot-body");
   for (const label of ["初", "中", "高"]) {
-    expect(within(body).getAllByText(label)).toHaveLength(2);
+    expect(
+      within(body).getAllByText(label, { selector: ".ant-tag" })
+    ).toHaveLength(2);
   }
-  expect(within(body).queryByText("低", { exact: true })).toBeNull();
+  expect(within(body).queryByText("低", { selector: ".ant-tag" })).toBeNull();
   expect(within(body).getAllByText("sentence → sentence · 句子")).toHaveLength(
     2
   );

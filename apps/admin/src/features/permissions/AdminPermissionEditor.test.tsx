@@ -6,8 +6,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { FeedbackProvider } from "@/components/FeedbackProvider";
-import { AdminThemeProvider } from "@/mui-theme";
+import { App, ConfigProvider } from "antd";
 import type { PermissionTag } from "@tsz/types";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/auth";
@@ -105,15 +104,15 @@ function mount(
         new QueryClient({ defaultOptions: { queries: { retry: false } } })
       }
     >
-      <AdminThemeProvider>
-        <FeedbackProvider>
+      <ConfigProvider theme={{ token: { motion: false } }}>
+        <App>
           <AdminPermissionEditor
             adminId="a"
             displayName="管理员甲"
             onClose={vi.fn()}
           />
-        </FeedbackProvider>
-      </AdminThemeProvider>
+        </App>
+      </ConfigProvider>
     </QueryClientProvider>
   );
 }
@@ -124,7 +123,7 @@ describe("个人权限设置", () => {
   const detail = () => within(screen.getByRole("region", { name: "权限明细" }));
   const selectedTags = () =>
     within(screen.getByRole("group", { name: "已选权限标签" }));
-  const picker = () => within(screen.getByRole("dialog", { name: "标签池" }));
+  const picker = () => within(document.querySelector(".ant-modal")!);
   const openPicker = () =>
     fireEvent.click(screen.getByRole("button", { name: "标签池" }));
 
@@ -208,16 +207,11 @@ describe("个人权限设置", () => {
     fireEvent.click(picker().getByRole("checkbox", { name: /词条编辑/ }));
     fireEvent.click(picker().getByRole("checkbox", { name: /例句查看/ }));
     fireEvent.click(picker().getByRole("button", { name: "确认选择" }));
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("dialog", { name: "标签池" })
-      ).not.toBeInTheDocument()
-    );
     expect(selectedTags().getByText("词条编辑")).toBeVisible();
     expect(selectedTags().getByText("例句查看")).toBeVisible();
     expect(
-      selectedTags().getByText("词条编辑").closest("[data-permission-tag]")
-    ).toHaveStyle({ backgroundColor: "#e6f0ff" });
+      selectedTags().getByText("词条编辑").closest(".ant-tag")
+    ).toHaveClass("ant-tag-blue");
     expect(screen.getByText("开通 2 项 · 取消 0 项")).toBeInTheDocument();
     expect(
       modules().getByRole("button", { name: /例句管理/ })
@@ -231,11 +225,6 @@ describe("个人权限设置", () => {
     openPicker();
     fireEvent.click(picker().getByRole("checkbox", { name: /词条编辑/ }));
     fireEvent.click(picker().getByRole("button", { name: "确认选择" }));
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("dialog", { name: "标签池" })
-      ).not.toBeInTheDocument()
-    );
     expect(
       selectedTags().getByRole("button", { name: "词条编辑：移除权限" })
     ).toBeVisible();
@@ -254,21 +243,11 @@ describe("个人权限设置", () => {
     fireEvent.click(picker().getByRole("checkbox", { name: /词条编辑/ }));
     fireEvent.click(picker().getByRole("checkbox", { name: /例句查看/ }));
     fireEvent.click(picker().getByRole("button", { name: "确认选择" }));
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("dialog", { name: "标签池" })
-      ).not.toBeInTheDocument()
-    );
     expect(screen.getByText("开通 3 项 · 取消 0 项")).toBeInTheDocument();
 
     openPicker();
     fireEvent.click(picker().getByRole("checkbox", { name: /词条编辑/ }));
     fireEvent.click(picker().getByRole("button", { name: "确认选择" }));
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("dialog", { name: "标签池" })
-      ).not.toBeInTheDocument()
-    );
     expect(selectedTags().queryByText("词条编辑")).toBeNull();
     expect(selectedTags().getByText("例句查看")).toBeVisible();
     expect(screen.getByText("开通 2 项 · 取消 0 项")).toBeInTheDocument();
@@ -288,11 +267,6 @@ describe("个人权限设置", () => {
       picker().getByRole("checkbox", { name: /词条编辑/ })
     ).not.toBeChecked();
     fireEvent.click(picker().getByRole("button", { name: /取\s*消/ }));
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("dialog", { name: "标签池" })
-      ).not.toBeInTheDocument()
-    );
     fireEvent.click(modules().getByRole("button", { name: /例句管理/ }));
     fireEvent.click(detail().getByLabelText(/例句查看/));
     expect(selectedTags().queryByText("例句查看")).toBeNull();
@@ -334,11 +308,6 @@ describe("个人权限设置", () => {
     ).toHaveLength(1);
     fireEvent.click(picker().getByRole("checkbox", { name: /测试标签36/ }));
     fireEvent.click(picker().getByRole("button", { name: "确认选择" }));
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("dialog", { name: "标签池" })
-      ).not.toBeInTheDocument()
-    );
     expect(selectedTags().getByText("测试标签1")).toBeVisible();
     expect(selectedTags().getByText("测试标签36")).toBeVisible();
     expect(selectedTags().queryByText("测试标签2")).toBeNull();

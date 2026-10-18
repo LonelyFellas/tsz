@@ -1,4 +1,4 @@
-import { Paper, Stack, Typography } from "@mui/material";
+import { Card, Typography } from "antd";
 import type { ReactNode } from "react";
 import {
   Area,
@@ -44,23 +44,17 @@ interface ChartCardProps {
 /** 图表卡外壳：标题行 + 定高图表区。标题包 Typography.Title 保住 heading 语义。 */
 function ChartCard({ title, extra, children }: ChartCardProps) {
   return (
-    <Paper
-      variant="outlined"
-      sx={{ height: "100%", p: 2, boxSizing: "border-box" }}
-    >
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        alignItems="center"
-        sx={{ mb: 2 }}
-      >
-        <Typography variant="h6" component="h3">
+    <Card
+      title={
+        <Typography.Title level={5} style={{ margin: 0 }}>
           {title}
-        </Typography>
-        {extra}
-      </Stack>
+        </Typography.Title>
+      }
+      extra={extra}
+      style={{ height: "100%" }}
+    >
       <div style={{ width: "100%", height: CHART_HEIGHT }}>{children}</div>
-    </Paper>
+    </Card>
   );
 }
 

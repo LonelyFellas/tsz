@@ -1,4 +1,4 @@
-import { Box } from "@mui/material";
+import { theme } from "antd";
 import type { ReactNode } from "react";
 
 /**
@@ -14,9 +14,10 @@ export function FullscreenCenter({
   children: ReactNode;
   vertical?: boolean;
 }) {
+  const { token } = theme.useToken();
   return (
-    <Box
-      sx={{
+    <div
+      style={{
         minHeight: "100vh",
         display: "flex",
         flexDirection: vertical ? "column" : "row",
@@ -24,10 +25,10 @@ export function FullscreenCenter({
         justifyContent: "center",
         gap: vertical ? 0 : 8,
         padding: 16,
-        bgcolor: "background.default"
+        background: token.colorBgLayout
       }}
     >
       {children}
-    </Box>
+    </div>
   );
 }

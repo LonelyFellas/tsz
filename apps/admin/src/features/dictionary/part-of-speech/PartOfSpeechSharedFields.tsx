@@ -1,8 +1,11 @@
-import InfoOutlined from "@mui/icons-material/InfoOutlined";
-import { Box, TextField, Tooltip } from "@mui/material";
-import { Controller, useFormContext } from "react-hook-form";
+import { InfoCircleOutlined } from "@ant-design/icons";
+import { Col, Form, Input, InputNumber, Popover, Row } from "antd";
 import type { ReactNode } from "react";
 
+/**
+ * 字段说明收进标签右侧的问号：这些话挂在输入框下面会把弹窗撑高一截，
+ * 又不是每次填都要读。标签文本只保留字段名，按标签定位的测试不受影响。
+ */
 export function LabelWithHint({
   label,
   hint
@@ -13,20 +16,20 @@ export function LabelWithHint({
   return (
     <span>
       {label}
-      <Tooltip describeChild title={hint}>
-        <InfoOutlined
+      <Popover content={hint}>
+        <InfoCircleOutlined
           aria-hidden
-          sx={{
-            ml: 0.5,
-            fontSize: 14,
-            color: "text.secondary",
-            verticalAlign: "middle"
+          style={{
+            marginInlineStart: 4,
+            color: "rgba(0, 0, 0, 0.45)",
+            cursor: "help"
           }}
         />
-      </Tooltip>
+      </Popover>
     </span>
   );
 }
+
 export interface PartOfSpeechSharedPlaceholders {
   name_zh: string;
   short_name_zh: string;
@@ -34,139 +37,117 @@ export interface PartOfSpeechSharedPlaceholders {
   abbreviation: string;
   full_name_en: string;
 }
-export interface PartFieldValues extends PartOfSpeechSharedPlaceholders {
-  sort_order: number;
-}
-const FIELD_LABELS = {
-  name_zh: "正式中文",
-  short_name_zh: "简洁显示",
-  name_en: "正式英文",
-  abbreviation: "英文缩写",
-  full_name_en: "英文全称"
-} as const;
-const FIELD_REQUIRED = {
-  name_zh: "请输入中文名称",
-  short_name_zh: "请输入简洁显示名称",
-  name_en: "请输入英文名称",
-  abbreviation: "请输入英文缩写",
-  full_name_en: "请输入英文全称"
-};
-const FIELD_MAX = {
-  name_zh: 64,
-  short_name_zh: 16,
-  name_en: 64,
-  abbreviation: 16,
-  full_name_en: 200
-};
-const FIELD_LENGTH_LABEL = {
-  name_zh: "中文名称",
-  short_name_zh: "简洁显示",
-  name_en: "英文名称",
-  abbreviation: "英文缩写",
-  full_name_en: "英文全称"
-};
-export function PartOfSpeechSharedFields({
-  placeholders,
-  disabled = false
-}: {
+
+/** 后端 sort_order 是 PostgreSQL INTEGER，超出范围会被 422 挡回。 */
+const SORT_ORDER_MIN = -2147483648;
+const SORT_ORDER_MAX = 2147483647;
+
+interface Props {
   placeholders: PartOfSpeechSharedPlaceholders;
-  disabled?: boolean;
-}) {
-  const {
-    register,
-    control,
-    formState: { errors }
-  } = useFormContext<PartFieldValues>();
+}
+
+/**
+ * 基本词性、细分词性与词形变化共用的表单字段：正式中文 / 简洁显示、正式英文 / 英文缩写、
+ * 英文全称 / 序号。校验规则与后端契约一致（中英文名 64、简洁显示与缩写 16、
+ * 英文全称 200 且须含英文字母、序号是 32 位有符号整数）。
+ */
+export function PartOfSpeechSharedFields({ placeholders }: Props) {
   return (
-    <Box
-      sx={{
-        display: "grid",
-        gridTemplateColumns: { xs: "1fr", sm: "repeat(2,minmax(0,1fr))" },
-        gap: 2
-      }}
-    >
-      {(Object.keys(FIELD_LABELS) as (keyof typeof FIELD_LABELS)[]).map(
-        (name) => (
-          <TextField
-            disabled={disabled}
-            key={name}
-            label={FIELD_LABELS[name]}
-            placeholder={placeholders[name]}
-            error={!!errors[name]}
-            helperText={errors[name]?.message}
-            {...register(name, {
-              validate: (value) =>
-                !value?.trim()
-                  ? FIELD_REQUIRED[name]
-                  : value.length > FIELD_MAX[name]
-                    ? `${FIELD_LENGTH_LABEL[name]}不能超过 ${FIELD_MAX[name]} 个字符`
-                    : name === "full_name_en" && !/[A-Za-z]/.test(value)
-                      ? "英文全称需包含英文字母"
-                      : true
-            })}
-          />
-        )
-      )}
-      <Controller
-        name="sort_order"
-        control={control}
-        rules={{
-          required: "请输入序号",
-          validate: (value) =>
-            (Number.isInteger(value) &&
-              value >= -2147483648 &&
-              value <= 2147483647) ||
-            "序号需为 32 位有符号整数"
-        }}
-        render={({ field, fieldState }) => (
-          <TextField
-            disabled={disabled}
+    <>
+      <Row gutter={16}>
+        <Col span={12}>
+          <Form.Item
+            name="name_zh"
+            label="正式中文"
+            rules={[
+              { required: true, whitespace: true, message: "请输入中文名称" },
+              { max: 64, message: "中文名称不能超过 64 个字符" }
+            ]}
+          >
+            <Input placeholder={placeholders.name_zh} />
+          </Form.Item>
+        </Col>
+        <Col span={12}>
+          <Form.Item
+            name="short_name_zh"
+            label="简洁显示"
+            rules={[
+              {
+                required: true,
+                whitespace: true,
+                message: "请输入简洁显示名称"
+              },
+              { max: 16, message: "简洁显示不能超过 16 个字符" }
+            ]}
+          >
+            <Input placeholder={placeholders.short_name_zh} />
+          </Form.Item>
+        </Col>
+      </Row>
+      <Row gutter={16}>
+        <Col span={12}>
+          <Form.Item
+            name="name_en"
+            label="正式英文"
+            rules={[
+              { required: true, whitespace: true, message: "请输入英文名称" },
+              { max: 64, message: "英文名称不能超过 64 个字符" }
+            ]}
+          >
+            <Input placeholder={placeholders.name_en} />
+          </Form.Item>
+        </Col>
+        <Col span={12}>
+          <Form.Item
+            name="abbreviation"
+            label="英文缩写"
+            rules={[
+              { required: true, whitespace: true, message: "请输入英文缩写" },
+              { max: 16, message: "英文缩写不能超过 16 个字符" }
+            ]}
+          >
+            <Input placeholder={placeholders.abbreviation} />
+          </Form.Item>
+        </Col>
+      </Row>
+      <Row gutter={16}>
+        {/* 与上面两行同样对半分，四个输入框才在一条竖线上。 */}
+        <Col span={12}>
+          <Form.Item
+            name="full_name_en"
+            label="英文全称"
+            rules={[
+              { required: true, whitespace: true, message: "请输入英文全称" },
+              { max: 200, message: "英文全称不能超过 200 个字符" },
+              { pattern: /[A-Za-z]/, message: "英文全称需包含英文字母" }
+            ]}
+          >
+            <Input placeholder={placeholders.full_name_en} />
+          </Form.Item>
+        </Col>
+        <Col span={12}>
+          <Form.Item
+            name="sort_order"
+            // 列表按序号从小到大排，相同序号再按创建时间。留出间隔就能插队。
             label={
               <LabelWithHint
                 label="序号"
                 hint="数字越小越靠前，允许与别的行相同"
               />
             }
-            placeholder="数字越小越靠前，允许与别的行相同"
-            type="number"
-            value={field.value ?? ""}
-            inputRef={field.ref}
-            onBlur={field.onBlur}
-            onChange={(event) =>
-              field.onChange(
-                event.target.value === ""
-                  ? undefined
-                  : Number(event.target.value)
-              )
-            }
-            error={!!fieldState.error}
-            helperText={fieldState.error?.message}
-            slotProps={{
-              htmlInput: { min: -2147483648, max: 2147483647, step: 1 }
-            }}
-          />
-        )}
-      />
-    </Box>
+            rules={[{ required: true, message: "请输入序号" }]}
+          >
+            <InputNumber
+              style={{ width: "100%" }}
+              // 细分词性要选完父级才预填，空着的时候框里就是这句引导。
+              placeholder="数字越小越靠前，允许与别的行相同"
+              precision={0}
+              min={SORT_ORDER_MIN}
+              max={SORT_ORDER_MAX}
+            />
+          </Form.Item>
+        </Col>
+      </Row>
+    </>
   );
-}
-
-/** 回填只取可编辑字段，不把配置 ID、编码和审计字段提交回服务端。 */
-export function partFieldValues(value: PartFieldValues): PartFieldValues {
-  const {
-    name_zh,
-    short_name_zh,
-    name_en,
-    abbreviation,
-    full_name_en,
-    sort_order
-  } = value;
-  return {
-    name_zh,
-    short_name_zh,
-    name_en,
-    abbreviation,
-    full_name_en,
-    sort_order
-  };
 }

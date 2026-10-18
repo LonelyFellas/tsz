@@ -47,7 +47,7 @@ PENDING 白名单为准。本仓库负责前端与部署编排。
 ## 布局
 
 - `apps/web` — C 端，Next App Router + tailwind + `@tsz/ui`。对体验/性能/SEO 有硬要求。
-- `apps/admin` — 平台后台，Vite + React Router + TanStack Query + **MUI Core 7 + React Hook Form**（品牌蓝 #2053FF）。
+- `apps/admin` — 平台后台，Vite + React Router + TanStack Query + **Ant Design 6**（品牌蓝 #2053FF）。
 - `packages/types` — 后端 wire 类型镜像；`packages/shared` — 共享逻辑（含鉴权内核）；
   `packages/api-client` — 请求层；`packages/ui` — web 专用组件库；`packages/config` — 共享配置。
 - `e2e` — Playwright（`@tsz/e2e`）。
@@ -66,7 +66,7 @@ PENDING 白名单为准。本仓库负责前端与部署编排。
 - `@tsz/types` 全部 **snake_case，1:1 镜像后端的 JSON wire 格式**，前端不做命名转换层
   （http 层纯 parse）。组件 props / 本地 state 是例外，用 camelCase。
 - 复用优先级：逻辑 → `@tsz/shared`，类型 → `@tsz/types`，请求 → `@tsz/api-client`；
-  UI 按端分叉：web → `@tsz/ui`，admin → MUI；迁移期保留未迁移页面的 AntD。
+  UI 按端分叉：web → `@tsz/ui`，admin → Ant Design。
 
 ### 鉴权
 
@@ -84,18 +84,14 @@ PENDING 白名单为准。本仓库负责前端与部署编排。
 - `.dark` 主题 class 加在 `<html>` 上会被 React 水合剥掉：须在水合后的 layout effect
   里重新断言；`useTheme` 状态从 localStorage 派生，不读 DOM。
 
-### admin（MUI）
+### admin（Ant Design）
 
-- 新增和迁移 UI 使用 MUI Core、React Hook Form；复杂草稿继续由业务模型持有。
-- 中文 locale、Day.js 与品牌主题集中配置；不引入商业 Pro/Premium。
-- 不再引入 Ant Design；reader 入口不依赖 MUI、Emotion 或后台 Provider。
-
-- **禁止引入 tailwind / `@tsz/ui`**，视觉遵循 MUI 主题；admin 无 SEO 要求。
-- dayjs 需显式安装；日期范围只有完整有效或明确清空时提交。
-- 业务数组以稳定业务 ID 为 key；分页在公共边界统一转换，避免 0/1 基页码混用。
-- Dialog 的 pending、取消和失败保留由业务状态持有；不重建命令式 update/destroy。
-- 字段定位使用业务 data-* 与实际可聚焦控件；隐藏面板采用 hidden / aria-hidden / inert。
-- jsdom 测试需 `matchMedia` / `ResizeObserver` 垫片；大表格测试避免 `getByRole`（慢到超时）。
+- 后台及共享语音编辑器使用 Ant Design 6 与 `@ant-design/icons`；品牌蓝 #2053FF、中文 locale 与 Day.js 集中配置。
+- 普通表单使用 AntD Form；复杂草稿继续由业务模型持有。仅更换 UI 组件，不改变业务行为、接口或持久化格式。
+- reader 入口不依赖 AntD、MUI、Emotion 或后台 Provider；C 端保留现有设计体系。
+- 禁止引入 tailwind / `@tsz/ui`。业务数组以稳定业务 ID 为 key；服务端分页保持 1 基。
+- 日期范围只有完整有效或明确清空时提交。弹窗 pending、取消及失败保留现有业务状态。
+- 隐藏面板采用 hidden / aria-hidden / inert；字段定位聚焦实际控件，测试保留 matchMedia / ResizeObserver 垫片。
 
 ## 质量门
 

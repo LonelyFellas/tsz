@@ -1,16 +1,3 @@
-import {
-  Accordion as MuiAccordion,
-  AccordionSummary as MuiAccordionSummary,
-  Box as MuiBox,
-  AccordionDetails as MuiAccordionDetails
-} from "@mui/material";
-import { Card as MuiCard, CardContent as MuiCardContent } from "@mui/material";
-import {
-  Button as MuiButton,
-  Chip as MuiChip,
-  Stack as MuiStack,
-  Typography as MuiTypography
-} from "@mui/material";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import {
   EMPTY_SYNTHESIS,
@@ -26,15 +13,15 @@ import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { PronunciationPreviewControls } from "../word-creation/PronunciationPreview";
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
-import ReadOutlined from "@mui/icons-material/MenuBookOutlined";
-import SoundOutlined from "@mui/icons-material/VolumeUpOutlined";
-
+import { ReadOutlined, SoundOutlined } from "@ant-design/icons";
+import { Button, Card, Collapse, Empty, Flex, Tag, Typography } from "antd";
 import type { AdminWordV3, Dialect, WordPronunciationV3 } from "@tsz/types";
 import { useEffect, useState, type ReactNode } from "react";
 import { dialectLabel, pronunciationStyleLabel } from "./presentation";
 import { buildV3ReviewModel } from "./reviewModel";
 import { V3MeaningsPreview, reviewSenseTitle } from "./V3MeaningsPreview";
 import "./v3-preview.css";
+
 interface Props {
   word: AdminWordV3;
   actions?: ReactNode;
@@ -44,6 +31,7 @@ interface Props {
   renderSentences?: (senseId: string) => ReactNode;
   onEdit?: (nodeId: string) => void;
 }
+
 function ReviewPronunciationPlayback({
   pronunciation,
   spelling,
@@ -98,6 +86,7 @@ function ReviewPronunciationPlayback({
     />
   );
 }
+
 function FormsReview({
   word,
   playback = false
@@ -108,28 +97,20 @@ function FormsReview({
   const formTypeLabel = useFormTypeLabel();
   const partOfSpeechLabel = usePartOfSpeechLabel();
   if (word.forms.pos.length === 0)
-    return (
-      <MuiTypography color="text.secondary">{"暂无词形与发音"}</MuiTypography>
-    );
+    return <Empty description="暂无词形与发音" />;
   return (
-    <MuiStack direction="column" spacing={2}>
+    <Flex vertical gap="middle">
       {word.forms.pos.map((pos) => (
         <section className="v3-review-pos" key={pos.pos_id}>
-          <MuiStack
-            direction="row"
-            alignItems={"center"}
-            justifyContent={"space-between"}
-          >
-            <MuiTypography style={{ margin: 0 }} component="h4" variant="h6">
+          <Flex align="center" justify="space-between">
+            <Typography.Title level={4} style={{ margin: 0 }}>
               {partOfSpeechLabel(pos.pos)}
-            </MuiTypography>
-            <MuiChip label={<>{pos.form_groups.length} 个变化组</>} />
-          </MuiStack>
+            </Typography.Title>
+            <Tag>{pos.form_groups.length} 个变化组</Tag>
+          </Flex>
           <div className="v3-review-group-list">
             {pos.form_groups.length === 0 && (
-              <MuiTypography component="span" color="text.secondary">
-                暂无变化组
-              </MuiTypography>
+              <Typography.Text type="secondary">暂无变化组</Typography.Text>
             )}
             {pos.form_groups.map((group, index) => (
               <div
@@ -137,7 +118,7 @@ function FormsReview({
                 data-testid={`preview-group-${group.id}`}
                 key={group.id}
               >
-                <MuiChip label={<>变化组 {index + 1}</>} />
+                <Tag>变化组 {index + 1}</Tag>
                 <span className="v3-review-form-chain">
                   {group.members.map((member, i) => {
                     const form = pos.forms.find((f) => f.id === member.form_id);
@@ -296,9 +277,10 @@ function FormsReview({
           </div>
         </section>
       ))}
-    </MuiStack>
+    </Flex>
   );
 }
+
 export function V3ReviewContent({
   word,
   actions,
@@ -351,7 +333,7 @@ export function V3ReviewContent({
       ? "success"
       : model.state.status === "archived"
         ? "warning"
-        : "primary";
+        : "processing";
   const summaryItems = [
     ["基本词性", model.summary.posCount],
     ["原形数", model.summary.baseCount],
@@ -366,47 +348,37 @@ export function V3ReviewContent({
     ],
     ["关系词", model.summary.relationCount]
   ] as const;
+
   return (
     <section className="v3-review" aria-label="预览并生效">
-      <MuiCard className="v3-review-header" variant="outlined">
-        <MuiCardContent className="admin-card-body">
-          <MuiStack
-            direction="row"
-            spacing={3}
-            alignItems={"flex-start"}
-            justifyContent={"space-between"}
-            useFlexGap
-            flexWrap="wrap"
-          >
-            <div>
-              <MuiTypography className="v3-review-kicker" component="span">
-                当前词条
-              </MuiTypography>
-              <MuiTypography className="tsz-words" component="h2" variant="h4">
-                {model.identity.label}
-              </MuiTypography>
-              <MuiStack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                <MuiChip label={<>{model.identity.kindLabel}</>} />
-                <MuiChip label={<>{model.identity.languageLabel}</>} />
-              </MuiStack>
-              {model.state.status === "published" ||
-              model.state.status === "archived" ? (
-                <MuiTypography component="span" color="text.secondary">
-                  当前词条为只读查看
-                </MuiTypography>
-              ) : null}
-            </div>
-            <MuiStack direction="column" spacing={1} alignItems={"flex-end"}>
-              <MuiChip
-                className="v3-review-status"
-                color={statusColor}
-                label={<>{model.state.statusLabel}</>}
-              />
-              {actions}
-            </MuiStack>
-          </MuiStack>
-        </MuiCardContent>
-      </MuiCard>
+      <Card className="v3-review-header">
+        <Flex align="flex-start" justify="space-between" gap="large" wrap>
+          <div>
+            <Typography.Text className="v3-review-kicker">
+              当前词条
+            </Typography.Text>
+            <Typography.Title className="tsz-words" level={2}>
+              {model.identity.label}
+            </Typography.Title>
+            <Flex gap="small" wrap>
+              <Tag>{model.identity.kindLabel}</Tag>
+              <Tag>{model.identity.languageLabel}</Tag>
+            </Flex>
+            {model.state.status === "published" ||
+            model.state.status === "archived" ? (
+              <Typography.Text type="secondary">
+                当前词条为只读查看
+              </Typography.Text>
+            ) : null}
+          </div>
+          <Flex vertical align="flex-end" gap="small">
+            <Tag className="v3-review-status" color={statusColor}>
+              {model.state.statusLabel}
+            </Tag>
+            {actions}
+          </Flex>
+        </Flex>
+      </Card>
 
       <div className="v3-review-summary" aria-label="内容概览">
         <span>内容概览</span>
@@ -457,27 +429,31 @@ export function V3ReviewContent({
             {readiness ?? "当前内容已保存，可查看内容或发布历史。"}
           </div>
           <div className="v3-review-content">
-            <MuiBox>
-              {[
+            <Collapse
+              activeKey={openSections}
+              onChange={(keys) =>
+                setOpenSections(Array.isArray(keys) ? keys : [keys])
+              }
+              items={[
                 {
                   key: "forms",
                   label: (
-                    <MuiStack direction="row" spacing={1} alignItems={"center"}>
-                      <SoundOutlined fontSize="inherit" />
+                    <Flex align="center" gap="small">
+                      <SoundOutlined />
                       词形与发音
-                    </MuiStack>
+                    </Flex>
                   ),
                   children: (
                     <section id="review-forms">
                       {onEdit && (
-                        <MuiButton
+                        <Button
+                          type="link"
                           onClick={() =>
                             onEdit(word.forms.pos[0]?.pos_id ?? word.id)
                           }
-                          variant={"text"}
                         >
                           编辑词形与发音
-                        </MuiButton>
+                        </Button>
                       )}
                       <FormsReview word={word} playback={playback} />
                     </section>
@@ -486,15 +462,15 @@ export function V3ReviewContent({
                 {
                   key: "meanings",
                   label: (
-                    <MuiStack direction="row" spacing={1} alignItems={"center"}>
-                      <ReadOutlined fontSize="inherit" />
+                    <Flex align="center" gap="small">
+                      <ReadOutlined />
                       词义结构
-                    </MuiStack>
+                    </Flex>
                   ),
                   extra: (
-                    <MuiTypography component="span" color="text.secondary">
+                    <Typography.Text type="secondary">
                       释义、例句与关系
-                    </MuiTypography>
+                    </Typography.Text>
                   ),
                   children: (
                     <V3MeaningsPreview
@@ -505,33 +481,8 @@ export function V3ReviewContent({
                     />
                   )
                 }
-              ].map((section) => (
-                <MuiAccordion
-                  data-admin-accordion
-                  key={section.key}
-                  disableGutters
-                  expanded={openSections.includes(section.key)}
-                  onChange={(event, nextExpanded) =>
-                    ((keys) =>
-                      setOpenSections(Array.isArray(keys) ? keys : [keys]))(
-                      nextExpanded ? [section.key] : []
-                    )
-                  }
-                  slotProps={{ transition: { mountOnEnter: true } }}
-                >
-                  <MuiAccordionSummary
-                    component="div"
-                    className="admin-section-header"
-                  >
-                    {section.label}
-                    <MuiBox sx={{ ml: "auto" }}>{section.extra}</MuiBox>
-                  </MuiAccordionSummary>
-                  <MuiAccordionDetails className="admin-section-body">
-                    {section.children}
-                  </MuiAccordionDetails>
-                </MuiAccordion>
-              ))}
-            </MuiBox>
+              ]}
+            />
           </div>
         </div>
       </div>

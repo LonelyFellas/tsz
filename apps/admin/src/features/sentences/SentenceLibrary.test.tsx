@@ -1,9 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { AdminTestProviders as App } from "@/test-utils/AdminTestProviders";
-import { AdminThemeProvider } from "@/mui-theme";
-import { FeedbackProvider } from "@/components/FeedbackProvider";
-
+import { App, ConfigProvider } from "antd";
+import zhCN from "antd/locale/zh_CN";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SharedSentence } from "@tsz/types";
@@ -80,15 +78,11 @@ function show(entryId?: string) {
       }
     >
       <MemoryRouter>
-        <>
+        <ConfigProvider locale={zhCN} theme={{ token: { motion: false } }}>
           <App>
-            <AdminThemeProvider>
-              <FeedbackProvider>
-                <SentenceLibrary entryId={entryId} />
-              </FeedbackProvider>
-            </AdminThemeProvider>
+            <SentenceLibrary entryId={entryId} />
           </App>
-        </>
+        </ConfigProvider>
       </MemoryRouter>
     </QueryClientProvider>
   );
@@ -126,11 +120,13 @@ describe("独立多维例句库", () => {
       expect(screen.getByText(/^编\s*辑$/).closest("button")).toBeVisible();
       expect(screen.getByText(/^发\s*布$/).closest("button")).toBeVisible();
       fireEvent.click(screen.getByLabelText("更多操作"));
-      expect(
-        screen
-          .getByText(withdrawn ? "重新展示原发布" : /^撤\s*回$/)
-          .closest("li")
-      ).toBeVisible();
+      await waitFor(() =>
+        expect(
+          screen
+            .getByText(withdrawn ? "重新展示原发布" : /^撤\s*回$/)
+            .closest("li")
+        ).toBeVisible()
+      );
     }
   );
   it.each([true, false])(
@@ -236,9 +232,10 @@ describe("独立多维例句库", () => {
     ).toBeGreaterThanOrEqual(2);
     fireEvent.click(screen.getByText(/查\s*看/).closest("button")!);
     await screen.findByText("查看例句");
-    expect(
-      document.querySelector("[role=dialog] .tsz-ve-readonly")
-    ).toHaveClass("tsz-entry-en", "has-liaison");
+    expect(document.querySelector(".ant-modal .tsz-ve-readonly")).toHaveClass(
+      "tsz-entry-en",
+      "has-liaison"
+    );
   });
   it("词条的例句列表不再提供创编入口，添加由 voice-editor 承接", async () => {
     vi.mocked(api.sentences.list).mockResolvedValue({ items: [], total: 0 });
@@ -351,15 +348,15 @@ it("批量选择显示数量并可取消，草稿删除仍先确认", async () =
   });
   show();
   await screen.findByText("A wonderful flower.");
-  fireEvent.click(screen.getByLabelText("选择本页"));
+  fireEvent.click(screen.getByRole("checkbox", { name: "选择本页" }));
   expect(screen.getByText("已选 1 条")).toBeVisible();
   expect(screen.getByText("发布所选").closest("button")).toBeEnabled();
   fireEvent.click(screen.getByText("取消选择"));
-  expect(screen.getByLabelText("选择本页")).not.toBeChecked();
+  expect(screen.getByRole("checkbox", { name: "选择本页" })).not.toBeChecked();
   expect(screen.getByText("已选 0 条")).toBeVisible();
   expect(screen.getByText("发布所选").closest("button")).toBeDisabled();
   fireEvent.click(screen.getByLabelText("更多操作"));
   fireEvent.click(screen.getByText(/^删\s*除$/));
-  expect(screen.getByRole("dialog")).toBeVisible();
+  await waitFor(() => expect(screen.getByRole("dialog")).toBeVisible());
   expect(api.sentences.delete).not.toHaveBeenCalled();
 });

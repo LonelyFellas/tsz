@@ -1,5 +1,3 @@
-import type { RenderOptions } from "@testing-library/react";
-import { AdminTestProviders } from "@/test-utils/AdminTestProviders";
 import { changeVoiceText } from "./components/V3VoiceTextField.test-helper";
 import { useAuthStore } from "@/lib/auth";
 import { HttpError } from "@tsz/api-client";
@@ -16,7 +14,7 @@ import type {
 import {
   act,
   fireEvent,
-  render as rtlRender,
+  render,
   screen,
   waitFor
 } from "@testing-library/react";
@@ -24,10 +22,6 @@ import type { ReactNode } from "react";
 import { StrictMode, useState } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
-
-function render(ui: ReactNode, options?: RenderOptions) {
-  return rtlRender(ui, { ...options, wrapper: AdminTestProviders });
-}
 
 vi.mock("../relatedSuggestions", () => ({
   useRelatedSuggestions: () => ({ words: [], isFetching: false }),
@@ -515,7 +509,9 @@ describe("V3WordCreationWizard", () => {
       expect(field("原形英式拼写")).toBeNull();
       expect(field("原形美式拼写")).toBeNull();
       expect(field("原形英美通用拼写")).toHaveValue("hit the sack");
-      expect(field("英美拼写无区别")).toBeChecked();
+      expect(
+        field("英美拼写无区别")!.closest(".ant-radio-wrapper")
+      ).toHaveClass("ant-radio-wrapper-checked");
     }
   }, 15_000);
 
@@ -1344,7 +1340,7 @@ describe("V3WordCreationWizard", () => {
     await act(async () =>
       resolveFirstGet(draftEnvelope(3, "stale reconciliation"))
     );
-    fireEvent.click((await screen.findByText("重试")).closest("button")!);
+    fireEvent.click((await screen.findByText("重 试")).closest("button")!);
 
     await waitFor(() => expect(get).toHaveBeenCalledTimes(2));
     expect(
@@ -1634,7 +1630,10 @@ describe("V3WordCreationWizard", () => {
 
     expect(screen.getByLabelText("语义区间 1 中文")).toBeVisible();
     expect(
-      screen.getByLabelText("释义 1 所属语义区间").textContent?.trim()
+      screen
+        .getByLabelText("释义 1 所属语义区间")
+        .closest(".ant-select")
+        ?.textContent?.trim()
     ).toBe("请选择语义区间");
     expect(screen.getAllByText("语法结构").length).toBeGreaterThan(0);
     expect(screen.getByText("多维释义")).toBeVisible();
@@ -2137,8 +2136,8 @@ describe("V3WordCreationWizard", () => {
     expect(screen.getByTestId("meanings-retry-local")).toHaveTextContent(
       "重试仍保留"
     );
-    const retryButton = screen.getByText("重试").closest("button")!;
-    await waitFor(() => expect(retryButton).toBeEnabled());
+    const retryButton = screen.getByText("重 试").closest("button")!;
+    await waitFor(() => expect(retryButton).not.toHaveClass("ant-btn-loading"));
     fireEvent.click(retryButton);
 
     await waitFor(() => expect(get).toHaveBeenCalledTimes(2));
@@ -2593,7 +2592,7 @@ describe("V3WordCreationWizard", () => {
       expect(screen.getAllByLabelText("原形英美通用拼写")).toHaveLength(1);
       const sharedInput = screen.getByLabelText("原形英美通用拼写");
       expect(sharedInput).toHaveAttribute("aria-invalid", "true");
-      expect(sharedInput).toHaveAttribute("aria-invalid", "true");
+      expect(sharedInput).toHaveClass("ant-input-status-error");
       for (const candidate of issues) {
         expect(
           document.querySelectorAll(
@@ -2822,7 +2821,7 @@ describe("V3WordCreationWizard", () => {
       renderStep: (context) => <MeaningsSlot context={context} />
     });
     const secondTab = container.querySelector<HTMLElement>(
-      `[role="tab"][id="meanings-pos-tab-${secondPosId}"]`
+      `.ant-tabs-tab[data-node-key="${secondPosId}"] .ant-tabs-tab-btn`
     );
     expect(secondTab).not.toBeNull();
     fireEvent.click(secondTab!);
@@ -2844,7 +2843,7 @@ describe("V3WordCreationWizard", () => {
     fireEvent.click(collapseDefinitions!);
     fireEvent.click(secondSenseHeader!);
     const firstTab = container.querySelector<HTMLElement>(
-      `[role="tab"][id="meanings-pos-tab-${UUIDS.pos}"]`
+      `.ant-tabs-tab[data-node-key="${UUIDS.pos}"] .ant-tabs-tab-btn`
     );
     expect(firstTab).not.toBeNull();
     fireEvent.click(firstTab!);
@@ -2857,7 +2856,7 @@ describe("V3WordCreationWizard", () => {
     expect(secondTab).toHaveAttribute("aria-selected", "true");
     expect(
       container.querySelector(
-        '[data-v3-field="sense"][data-v3-node-id="meaning-sense-1"] .admin-section-header'
+        '[data-v3-field="sense"][data-v3-node-id="meaning-sense-1"] .ant-collapse-header'
       )
     ).toHaveAttribute("aria-expanded", "false");
     expect(secondSenseHeader).toHaveAttribute("aria-expanded", "true");
@@ -4225,11 +4224,11 @@ describe("V3WordCreationWizard", () => {
 
     fireEvent.click(
       screen
-        .getByText("检查发布条件", { selector: "button" })
+        .getByText("检查发布条件", { selector: "button span" })
         .closest("button")!
     );
     const stalePublishButton = (
-      await screen.findByText("发布词条", { selector: "button" })
+      await screen.findByText("发布词条", { selector: "button span" })
     ).closest("button")!;
     await waitFor(() => expect(stalePublishButton).toBeEnabled());
     fireEvent.click(stalePublishButton);
@@ -4243,7 +4242,9 @@ describe("V3WordCreationWizard", () => {
     expect(screen.getByTestId("revision-conflict-revision")).toHaveTextContent(
       "9"
     );
-    expect(screen.queryByText("发布词条", { selector: "button" })).toBeNull();
+    expect(
+      screen.queryByText("发布词条", { selector: "button span" })
+    ).toBeNull();
 
     const prepareAfterRevisionRefresh = screen
       .getByText("检查发布条件")
@@ -4251,7 +4252,7 @@ describe("V3WordCreationWizard", () => {
     await waitFor(() => expect(prepareAfterRevisionRefresh).toBeEnabled());
     fireEvent.click(prepareAfterRevisionRefresh);
     const refreshedPublishButton = (
-      await screen.findByText("发布词条", { selector: "button" })
+      await screen.findByText("发布词条", { selector: "button span" })
     ).closest("button")!;
     await waitFor(() => expect(refreshedPublishButton).toBeEnabled());
     fireEvent.click(refreshedPublishButton);
@@ -5091,7 +5092,7 @@ describe("V3WordCreationWizard", () => {
 
     fireEvent.click(screen.getByText("预览失败后重试"));
     expect(await screen.findByText("服务暂时不可用")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("重试").closest("button")!);
+    fireEvent.click(screen.getByText("重 试").closest("button")!);
 
     await waitFor(() =>
       expect(screen.getByTestId("retried-impact")).toHaveTextContent("present")
@@ -5175,8 +5176,8 @@ describe("V3WordCreationWizard", () => {
     fireEvent.click(screen.getByText("保存"));
     fireEvent.click(await screen.findByRole("button", { name: "刷新并比较" }));
     expect(await screen.findByText("服务暂时不可用")).toBeInTheDocument();
-    const retryButton = screen.getByText("重试").closest("button")!;
-    await waitFor(() => expect(retryButton).toBeEnabled());
+    const retryButton = screen.getByText("重 试").closest("button")!;
+    await waitFor(() => expect(retryButton).not.toHaveClass("ant-btn-loading"));
     fireEvent.click(retryButton);
 
     await waitFor(() => expect(get).toHaveBeenCalledTimes(2));

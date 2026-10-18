@@ -1,4 +1,4 @@
-import { CircularProgress, Typography } from "@mui/material";
+import { Spin, Typography } from "antd";
 import { useEffect, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { FullscreenCenter } from "@/layouts/FullscreenCenter";
@@ -37,15 +37,15 @@ export function AdminRouteGuard({ children }: { children: ReactNode }) {
   if (permissionModelIncompatible) {
     return (
       <FullscreenCenter>
-        <Typography color="error">后台服务暂不可用</Typography>
+        <Typography.Text type="danger">后台服务暂不可用</Typography.Text>
       </FullscreenCenter>
     );
   }
   if (!hydrated || needsLogin) {
     return (
       <FullscreenCenter>
-        <CircularProgress size={24} />
-        <Typography color="text.secondary">加载中...</Typography>
+        <Spin size="small" />
+        <Typography.Text type="secondary">加载中...</Typography.Text>
       </FullscreenCenter>
     );
   }

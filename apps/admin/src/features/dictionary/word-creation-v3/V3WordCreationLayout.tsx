@@ -1,10 +1,4 @@
-import {
-  Alert as MuiAlert,
-  AlertTitle as MuiAlertTitle,
-  Button as MuiButton,
-  Stack as MuiStack
-} from "@mui/material";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { Alert, Button, Flex, Popconfirm } from "antd";
 import type {
   AdminWordV3,
   PartOfSpeechCatalogItem,
@@ -13,7 +7,7 @@ import type {
   V3DraftValidationIssue,
   WordCreationStep
 } from "@tsz/types";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { DraftComparison } from "../DraftComparison";
 import { toWritableMeanings } from "./meaningsModel";
@@ -139,26 +133,17 @@ function DiscardLocalChangesButton({
   revision: number;
   onConfirm: () => void;
 }) {
-  const [open, setOpen] = useState(false);
   return (
-    <>
-      <MuiButton color="error" onClick={() => setOpen(true)}>
-        放弃本地修改
-      </MuiButton>
-      <ConfirmDialog
-        open={open}
-        title="放弃本地修改？"
-        confirmText="放弃修改"
-        danger
-        onClose={() => setOpen(false)}
-        onConfirm={() => {
-          setOpen(false);
-          onConfirm();
-        }}
-      >
-        {`未保存的输入会被丢弃，改用第 ${revision} 版内容。`}
-      </ConfirmDialog>
-    </>
+    <Popconfirm
+      cancelText="取消"
+      description={`未保存的输入会被丢弃，改用第 ${revision} 版内容。`}
+      okButtonProps={{ danger: true }}
+      okText="放弃修改"
+      onConfirm={onConfirm}
+      title="放弃本地修改？"
+    >
+      <Button danger>放弃本地修改</Button>
+    </Popconfirm>
   );
 }
 
@@ -279,38 +264,15 @@ function V3WordCreationLayoutContent({
       }}
       readOnly={readOnly}
     >
-      <MuiStack direction="column" spacing={2}>
+      <Flex vertical gap="middle">
         {showRemoteUpdate && remoteUpdate ? (
           <div ref={remoteUpdateAlertRef}>
-            <MuiAlert
-              action={
-                <MuiStack
-                  direction="row"
-                  spacing={1}
-                  useFlexGap
-                  flexWrap="wrap"
-                >
-                  {onKeepLocalChanges ? (
-                    <MuiButton
-                      onClick={onKeepLocalChanges}
-                      variant={"contained"}
-                    >
-                      保留本地修改
-                    </MuiButton>
-                  ) : null}
-                  {onDiscardLocalChanges ? (
-                    <DiscardLocalChangesButton
-                      revision={remoteUpdate.revision}
-                      onConfirm={onDiscardLocalChanges}
-                    />
-                  ) : null}
-                </MuiStack>
-              }
-              severity={"error"}
-            >
-              <MuiAlertTitle>{"版本冲突"}</MuiAlertTitle>
-              {
-                <MuiStack direction="column" spacing={0.5}>
+            <Alert
+              showIcon
+              type="error"
+              title="版本冲突"
+              description={
+                <Flex vertical gap={4}>
                   <span>
                     {`词条已在别处保存为第 ${remoteUpdate.revision} 版；${
                       dirtyStepLabel
@@ -321,95 +283,111 @@ function V3WordCreationLayoutContent({
                   <span>
                     保留本地修改后可继续编辑并保存；放弃本地修改则改用最新内容。做出选择前不会保存。
                   </span>
-                </MuiStack>
+                </Flex>
               }
-            </MuiAlert>
+              action={
+                <Flex gap="small" wrap="wrap">
+                  {onKeepLocalChanges ? (
+                    <Button type="primary" onClick={onKeepLocalChanges}>
+                      保留本地修改
+                    </Button>
+                  ) : null}
+                  {onDiscardLocalChanges ? (
+                    <DiscardLocalChangesButton
+                      revision={remoteUpdate.revision}
+                      onConfirm={onDiscardLocalChanges}
+                    />
+                  ) : null}
+                </Flex>
+              }
+            />
           </div>
         ) : null}
 
         {!readOnly &&
         !showRemoteUpdate &&
         (dirtySteps.forms || dirtySteps.meanings) ? (
-          <MuiAlert severity={"warning"}>
-            <MuiAlertTitle>{"有未保存的草稿"}</MuiAlertTitle>
-            {`切换步骤不会丢失当前输入；请先保存${dirtyStepLabel}草稿，再检查或发布。`}
-          </MuiAlert>
+          <Alert
+            showIcon
+            type="warning"
+            title="有未保存的草稿"
+            description={`切换步骤不会丢失当前输入；请先保存${dirtyStepLabel}草稿，再检查或发布。`}
+          />
         ) : null}
 
         {/* 挂起的新版本已经给出保留/放弃的选择，同一冲突的 409 提示不再并列显示。 */}
         {problem &&
           !(showRemoteUpdate && problem.kind === "revision_conflict") && (
-            <MuiAlert
+            <Alert
+              showIcon
+              type={problem.kind === "validation" ? "warning" : "error"}
+              title={problemTitle(problem)}
+              description={
+                conflict ? (
+                  <Flex vertical gap={4}>
+                    <span>
+                      <strong>
+                        {conflict.step === "forms"
+                          ? "词形与发音冲突"
+                          : "词义与例句冲突"}
+                      </strong>
+                      ：本地输入仍已保留。
+                    </span>
+                    {conflict.serverWord && <span>已获取服务端最新内容。</span>}
+                  </Flex>
+                ) : inboundReferenceProblem ? (
+                  <Flex vertical gap={4}>
+                    <span>
+                      请刷新页面后重试；若仍无法完成，请检查关联内容，调整内容或解除关联后再试。
+                    </span>
+                    <V3ReferenceList
+                      emptyText="暂时无法查看具体关联，请刷新页面后重试。"
+                      references={inboundReferenceProblem.references}
+                    />
+                  </Flex>
+                ) : operationValidationIssues.length > 0 ? (
+                  <Flex vertical gap={4}>
+                    {v3IssueMessages(operationValidationIssues).map(
+                      (message) => (
+                        <span key={message}>{message}</span>
+                      )
+                    )}
+                  </Flex>
+                ) : undefined
+              }
               action={
                 problem.kind === "revision_conflict" &&
                 conflict &&
                 onRefreshConflict ? (
-                  <MuiStack
-                    direction="row"
-                    spacing={1}
-                    useFlexGap
-                    flexWrap="wrap"
-                  >
-                    <MuiButton
+                  <Flex gap="small" wrap="wrap">
+                    <Button
                       loading={refreshingConflict}
                       onClick={onRefreshConflict}
                     >
                       刷新并比较
-                    </MuiButton>
+                    </Button>
                     {conflict.serverWord && onDiscardLocalChanges ? (
                       <DiscardLocalChangesButton
                         revision={conflict.serverWord.revision}
                         onConfirm={onDiscardLocalChanges}
                       />
                     ) : null}
-                  </MuiStack>
+                  </Flex>
                 ) : operationValidationIssues[0] && onIssueNavigate ? (
-                  <MuiButton
+                  <Button
                     onClick={() =>
                       onIssueNavigate(operationValidationIssues[0]!)
                     }
                   >
                     去处理首项
-                  </MuiButton>
+                  </Button>
                 ) : problem.retryable && onRetry ? (
-                  <MuiButton loading={retrying} onClick={onRetry}>
+                  <Button loading={retrying} onClick={onRetry}>
                     重试
-                  </MuiButton>
+                  </Button>
                 ) : undefined
               }
-              severity={problem.kind === "validation" ? "warning" : "error"}
-            >
-              <MuiAlertTitle>{problemTitle(problem)}</MuiAlertTitle>
-              {conflict ? (
-                <MuiStack direction="column" spacing={0.5}>
-                  <span>
-                    <strong>
-                      {conflict.step === "forms"
-                        ? "词形与发音冲突"
-                        : "词义与例句冲突"}
-                    </strong>
-                    ：本地输入仍已保留。
-                  </span>
-                  {conflict.serverWord && <span>已获取服务端最新内容。</span>}
-                </MuiStack>
-              ) : inboundReferenceProblem ? (
-                <MuiStack direction="column" spacing={0.5}>
-                  <span>
-                    请刷新页面后重试；若仍无法完成，请检查关联内容，调整内容或解除关联后再试。
-                  </span>
-                  <V3ReferenceList
-                    emptyText="暂时无法查看具体关联，请刷新页面后重试。"
-                    references={inboundReferenceProblem.references}
-                  />
-                </MuiStack>
-              ) : operationValidationIssues.length > 0 ? (
-                <MuiStack direction="column" spacing={0.5}>
-                  {v3IssueMessages(operationValidationIssues).map((message) => (
-                    <span key={message}>{message}</span>
-                  ))}
-                </MuiStack>
-              ) : undefined}
-            </MuiAlert>
+            />
           )}
 
         {!readOnly && comparisonWord && (
@@ -445,7 +423,7 @@ function V3WordCreationLayoutContent({
           />
         )}
         {children}
-      </MuiStack>
+      </Flex>
     </WordCreationLayout>
   );
 }

@@ -1,13 +1,5 @@
 import { useState } from "react";
-import {
-  FormControlLabel,
-  Paper,
-  Radio,
-  RadioGroup,
-  Stack,
-  Typography
-} from "@mui/material";
-import { useFeedback } from "@/components/FeedbackProvider";
+import { App, Card, Radio, Space, Typography } from "antd";
 import type { AdminDialectPreference } from "@tsz/shared";
 import { useDialectPreference } from "./useDialectPreference";
 
@@ -23,7 +15,7 @@ const OPTION_LABEL: Record<AdminDialectPreference, string> = {
  */
 export function DialectPreference() {
   const { preference, savePreference } = useDialectPreference();
-  const notify = useFeedback();
+  const { message } = App.useApp();
   const [saving, setSaving] = useState(false);
 
   const change = async (value: AdminDialectPreference) => {
@@ -31,13 +23,12 @@ export function DialectPreference() {
     setSaving(true);
     try {
       await savePreference(value);
-      notify(`已保存英语方言偏好：${OPTION_LABEL[value]}`, "success");
+      message.success(`已保存英语方言偏好：${OPTION_LABEL[value]}`);
     } catch (error) {
-      notify(
+      message.error(
         error instanceof Error
           ? `方言偏好未能保存：${error.message}`
-          : "方言偏好未能保存",
-        "error"
+          : "方言偏好未能保存"
       );
     } finally {
       setSaving(false);
@@ -45,36 +36,23 @@ export function DialectPreference() {
   };
 
   return (
-    <Paper variant="outlined" sx={{ maxWidth: 720, p: 2 }}>
-      <Typography variant="h6" sx={{ mb: 1 }}>
-        英语方言偏好
-      </Typography>
-      <Stack spacing={1.5}>
-        <Typography color="text.secondary">
+    <Card size="small" title="英语方言偏好" style={{ maxWidth: 720 }}>
+      <Space orientation="vertical" size={12} style={{ width: "100%" }}>
+        <Typography.Text type="secondary">
           决定你录入与查看英文内容的默认口径，试听发音人也按此选择。
           词条自身的英美拼写由内置词典决定，不受影响。
-        </Typography>
-        <RadioGroup
-          row
+        </Typography.Text>
+        <Radio.Group
           value={preference}
+          disabled={saving}
           onChange={(event) => {
             void change(event.target.value as AdminDialectPreference);
           }}
         >
-          <FormControlLabel
-            value="uk"
-            disabled={saving}
-            control={<Radio />}
-            label={OPTION_LABEL.uk}
-          />
-          <FormControlLabel
-            value="us"
-            disabled={saving}
-            control={<Radio />}
-            label={OPTION_LABEL.us}
-          />
-        </RadioGroup>
-      </Stack>
-    </Paper>
+          <Radio value="uk">{OPTION_LABEL.uk}</Radio>
+          <Radio value="us">{OPTION_LABEL.us}</Radio>
+        </Radio.Group>
+      </Space>
+    </Card>
   );
 }

@@ -196,11 +196,11 @@ async function focusRenderedTarget(target: V3IssueNavigationTarget) {
         continue;
       }
       const toggles = node.querySelectorAll<HTMLElement>(
-        '[role="button"].admin-section-header[aria-expanded="false"], [role="button"].word-sense-section-title[aria-expanded="false"], button[aria-expanded="false"][aria-label^="展开"]'
+        '[role="button"].ant-collapse-header[aria-expanded="false"], [role="button"].word-sense-section-title[aria-expanded="false"], button[aria-expanded="false"][aria-label^="展开"]'
       );
       for (const toggle of toggles) {
         // 手风琴下只能打开目标词义；展开同词性的兄弟卡片会反过来收起目标。
-        const sense = toggle.matches(".admin-section-header")
+        const sense = toggle.matches(".ant-collapse-header")
           ? toggle.closest<HTMLElement>('[data-v3-field="sense"]')
           : undefined;
         if (sense && !targetNodeIds.has(sense.dataset.v3NodeId)) continue;
@@ -235,7 +235,9 @@ async function focusRenderedTarget(target: V3IssueNavigationTarget) {
         nodeMatches &&
         candidate.dataset.v3Field ===
           (target.field === "text_links" ? "value" : target.field) &&
-        !candidate.closest('[hidden], [aria-hidden="true"], [inert]')
+        !candidate.closest(
+          '.ant-tabs-tabpane-hidden, .ant-collapse-content-hidden, [aria-hidden="true"], [inert]'
+        )
       );
     };
     const scopedElement = scope

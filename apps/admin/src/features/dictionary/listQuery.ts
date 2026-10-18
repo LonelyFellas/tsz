@@ -8,7 +8,7 @@ import type {
 } from "@tsz/types";
 import type { Dayjs } from "dayjs";
 
-/** 搜索行表单值(表单收集,camelCase 属前端本地 state)。 */
+/** 搜索行表单值(antd Form 收集,camelCase 属前端本地 state)。 */
 export interface WordFilterValues {
   keyword?: string;
   gloss?: string;

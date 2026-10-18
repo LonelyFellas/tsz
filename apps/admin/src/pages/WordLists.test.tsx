@@ -1,4 +1,5 @@
-import { AdminThemeProvider } from "@/mui-theme";
+import { App as AntApp, ConfigProvider } from "antd";
+import zhCN from "antd/locale/zh_CN";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   fireEvent,
@@ -58,7 +59,9 @@ function mount(page = <WordListsPage />) {
           new QueryClient({ defaultOptions: { queries: { retry: false } } })
         }
       >
-        <AdminThemeProvider>{page}</AdminThemeProvider>
+        <ConfigProvider locale={zhCN} theme={{ token: { motion: false } }}>
+          <AntApp>{page}</AntApp>
+        </ConfigProvider>
       </QueryClientProvider>
     </MemoryRouter>
   );
@@ -204,7 +207,7 @@ it("review approval uses the submitted snapshot revision instead of the current 
   expect(await screen.findByText("提交时冻结的注释")).toBeVisible();
   expect(api.wordlists.currentItems).not.toHaveBeenCalled();
   fireEvent.click(await screen.findByText("通过审核"));
-  fireEvent.click(await screen.findByText(/^确认$/));
+  fireEvent.click(await screen.findByText(/^确\s*认$/));
   await waitFor(() =>
     expect(api.wordlists.decision).toHaveBeenCalledWith("list", "request", {
       expected_revision: 2,
@@ -231,7 +234,7 @@ it("published user lists can be hidden without changing review semantics", async
   mount();
   fireEvent.click(await screen.findByText("设为私密"));
   expect(await screen.findByText(/审核状态保持不变/)).toBeInTheDocument();
-  fireEvent.click(screen.getByText(/^确认$/));
+  fireEvent.click(screen.getByText(/^确\s*认$/));
   await waitFor(() =>
     expect(api.wordlists.visibility).toHaveBeenCalledWith("list", {
       expected_revision: 4,
@@ -252,7 +255,7 @@ it("search commits filters and reset requests page one without stale query", asy
       expect.anything()
     )
   );
-  fireEvent.click(screen.getByRole("button", { name: /重\s*置/ }));
+  fireEvent.click(screen.getByRole("button", { name: /重\s*置$/ }));
   await waitFor(() =>
     expect(screen.getByLabelText("搜索词表")).toHaveValue("")
   );
@@ -276,7 +279,7 @@ it("failed mutation reports unconfirmed state and refetches", async () => {
   expect(
     await within(dialog).findByText(/该词表当前不是公开状态/)
   ).toBeInTheDocument();
-  fireEvent.click(within(dialog).getByText(/^确认$/));
+  fireEvent.click(within(dialog).getByText(/^确\s*认$/));
   expect(await screen.findByText(/操作失败或结果未确认/)).toBeInTheDocument();
   expect(api.wordlists.delete).toHaveBeenCalledWith("list", {
     expected_revision: 4
@@ -332,7 +335,7 @@ it("delete impact failure is visible and does not strand the confirmation", asyn
   expect(
     await within(dialog).findByText(/任务影响读取失败/)
   ).toBeInTheDocument();
-  expect(within(dialog).getByText(/^确认$/)).toBeEnabled();
+  expect(within(dialog).getByText(/^确\s*认$/)).toBeEnabled();
 });
 
 it("review queue defaults to pending and filters on the server", async () => {
@@ -345,7 +348,7 @@ it("review queue defaults to pending and filters on the server", async () => {
   fireEvent.mouseDown(screen.getByRole("combobox", { name: "审核状态" }));
   fireEvent.click(
     await screen.findByText("审核通过", {
-      selector: '[role="option"]'
+      selector: ".ant-select-item-option-content"
     })
   );
   fireEvent.click(screen.getByRole("button", { name: /搜\s*索/ }));
@@ -355,7 +358,7 @@ it("review queue defaults to pending and filters on the server", async () => {
       expect.anything()
     )
   );
-  fireEvent.click(screen.getByRole("button", { name: /重\s*置/ }));
+  fireEvent.click(screen.getByRole("button", { name: /重\s*置$/ }));
   await waitFor(() =>
     expect(api.wordlists.management).toHaveBeenLastCalledWith(
       { page: 1, page_size: 20, review_state: "pending" },
@@ -377,17 +380,17 @@ it("review readers cannot decide applications", async () => {
 it("rejection requires a reason and sends the inspected request revision", async () => {
   mount(<ReviewsPage />);
   fireEvent.click(await screen.findByText(/^查\s*看$/));
-  fireEvent.click(await screen.findByText("驳回"));
+  fireEvent.click(await screen.findByText(/^驳\s*回$/));
   const dialog = (await screen.findByText("驳回词表")).closest<HTMLElement>(
     '[role="dialog"]'
   )!;
-  fireEvent.click(within(dialog).getByText(/^确认$/));
+  fireEvent.click(within(dialog).getByText(/^确\s*认$/));
   await waitFor(() => expect(screen.getByText("请填写驳回原因")).toBeVisible());
   expect(api.wordlists.decision).not.toHaveBeenCalled();
   fireEvent.change(screen.getByLabelText("操作原因"), {
     target: { value: " 内容不完整 " }
   });
-  fireEvent.click(within(dialog).getByText(/^确认$/));
+  fireEvent.click(within(dialog).getByText(/^确\s*认$/));
   await waitFor(() =>
     expect(api.wordlists.decision).toHaveBeenCalledWith("list", "request", {
       expected_revision: 2,
@@ -464,7 +467,7 @@ it("failed review decision preserves the dialog and reports an unconfirmed resul
   const dialog = (
     await screen.findByText("确认通过审核并公开")
   ).closest<HTMLElement>('[role="dialog"]')!;
-  fireEvent.click(within(dialog).getByText(/^确认$/));
+  fireEvent.click(within(dialog).getByText(/^确\s*认$/));
   await waitFor(() =>
     expect(within(dialog).getByText(/旧审核不会覆盖已修改的内容/)).toBeVisible()
   );
@@ -503,14 +506,14 @@ it.each(["approve", "reject"] as const)(
     await screen.findByText("待审词表");
     fireEvent.click(screen.getByText(/^查\s*看$/));
     fireEvent.click(
-      await screen.findByText(decision === "approve" ? "通过审核" : "驳回")
+      await screen.findByText(decision === "approve" ? "通过审核" : /^驳\s*回$/)
     );
     if (decision === "reject") {
       fireEvent.change(screen.getByLabelText("操作原因"), {
         target: { value: "内容不完整" }
       });
     }
-    fireEvent.click(screen.getByText(/^确认$/));
+    fireEvent.click(screen.getByText(/^确\s*认$/));
     await waitFor(() => expect(api.wordlists.decision).toHaveBeenCalled());
     await waitFor(() =>
       expect(api.wordlists.management).toHaveBeenLastCalledWith(
@@ -540,7 +543,7 @@ it("keeps snapshot pagination scoped to the selected application and hides decis
   mount(<ReviewsPage />);
   fireEvent.click(await screen.findByText(/^查\s*看$/));
   await screen.findByText("暂无词项");
-  const drawer = screen.getByRole("dialog", { name: "待审词表" });
+  const drawer = screen.getByRole("dialog");
   fireEvent.click(within(drawer).getByRole("button", { name: "下一页" }));
   await waitFor(() =>
     expect(api.wordlists.items).toHaveBeenLastCalledWith(

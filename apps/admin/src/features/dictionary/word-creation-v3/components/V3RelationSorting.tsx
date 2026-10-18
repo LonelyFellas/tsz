@@ -1,7 +1,5 @@
-import { IconButton as MuiIconButton } from "@mui/material";
-
-import DeleteOutlined from "@mui/icons-material/DeleteOutline";
-
+import { DeleteOutlined } from "@ant-design/icons";
+import { Button } from "antd";
 import type { ReactNode } from "react";
 import { useSortableRows, type SortableRowsController } from "../sortableRows";
 
@@ -33,14 +31,14 @@ export function RelationDeleteButton({
   onDelete: () => void;
 }) {
   return (
-    <MuiIconButton
+    <Button
       aria-label={`删除${label}`}
+      icon={<DeleteOutlined />}
+      danger
       size="small"
+      type="text"
       className="word-relation-delete"
       onClick={onDelete}
-      color={"error"}
-    >
-      <DeleteOutlined fontSize="inherit" />
-    </MuiIconButton>
+    />
   );
 }

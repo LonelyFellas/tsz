@@ -2,7 +2,6 @@ import { useState } from "react";
 import { PronunciationPreviewProvider } from "../dictionary/word-creation/PronunciationPreview";
 import { sentenceWord, sentenceTarget, sentenceCandidate } from "./fixtures";
 import {
-  act,
   fireEvent,
   render,
   screen,
@@ -10,8 +9,8 @@ import {
   within
 } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { AdminTestProviders as App } from "@/test-utils/AdminTestProviders";
-
+import { App, ConfigProvider } from "antd";
+import zhCN from "antd/locale/zh_CN";
 import type { SharedSentence, SharedSentenceContent } from "@tsz/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WordSentences } from "./WordSentences";
@@ -94,11 +93,11 @@ function show(ui: React.ReactNode) {
         new QueryClient({ defaultOptions: { queries: { retry: false } } })
       }
     >
-      <>
+      <ConfigProvider locale={zhCN} theme={{ token: { motion: false } }}>
         <App>
           <PronunciationPreviewProvider>{ui}</PronunciationPreviewProvider>
         </App>
-      </>
+      </ConfigProvider>
     </QueryClientProvider>
   );
 }
@@ -181,8 +180,7 @@ describe("按词条关联反查共享多维例句", () => {
     );
     fireEvent.mouseLeave(hintTarget);
     await waitFor(() => expect(screen.queryByRole("tooltip")).toBeNull());
-    fireEvent.keyDown(document, { key: "Tab" });
-    act(() => hintTarget.focus());
+    fireEvent.focus(hintTarget);
     expect(await screen.findByRole("tooltip")).toHaveTextContent(
       "先保存词义，再添加例句。"
     );
@@ -411,7 +409,9 @@ describe("按词条关联反查共享多维例句", () => {
       const save = screen.getByLabelText("完成例句编辑");
       fireEvent.change(input, { target: { value: typo } });
       expect(input).toHaveValue(text);
-      fireEvent.click(screen.getByText("确认修改", { selector: "button" }));
+      fireEvent.click(
+        screen.getByText("确认修改", { selector: "button span" })
+      );
       expect(save).toBeDisabled();
       fireEvent.change(input, { target: { value: text } });
       await waitFor(() => expect(save).toBeEnabled());
@@ -518,9 +518,7 @@ describe("按词条关联反查共享多维例句", () => {
       name: "关联短语：make up"
     });
     fireEvent.click(
-      await within(phrasePicker).findByText("make up", {
-        selector: ".tsz-words"
-      })
+      await within(phrasePicker).findByText("make up", { selector: "strong" })
     );
     fireEvent.click(await within(phrasePicker).findByText(/原形 make up/));
     fireEvent.click(
@@ -584,7 +582,7 @@ describe("按词条关联反查共享多维例句", () => {
     fireEvent.click(screen.getByRole("button", { name: /移\s*除/ }));
     fireEvent.click(
       within(await screen.findByRole("dialog")).getByRole("button", {
-        name: /确\s*认/
+        name: /确\s*定/
       })
     );
     await screen.findByText("暂无关联例句");

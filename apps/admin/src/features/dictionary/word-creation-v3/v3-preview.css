@@ -9,15 +9,15 @@
   max-width: 1440px;
   margin-inline: auto;
 }
-.v3-review-header.MuiCard-root {
+.v3-review-header.ant-card {
   border: 0;
   background: transparent;
   box-shadow: none;
 }
-.v3-review-header .admin-card-body {
+.v3-review-header .ant-card-body {
   padding: 24px 0;
 }
-.v3-review-header h2.MuiTypography-root {
+.v3-review-header h2.ant-typography {
   font-size: 14pt;
   line-height: 1.15;
   letter-spacing: -1.5px;
@@ -115,32 +115,30 @@
   color: var(--review-muted);
   font-size: 13px;
 }
-.v3-review-content > .MuiAccordion-root {
+.v3-review-content > .ant-collapse {
   background: transparent;
   border: 0;
 }
-.v3-review-content > .MuiAccordion-root > [data-admin-accordion] {
+.v3-review-content > .ant-collapse > .ant-collapse-item {
   border-bottom: 0;
 }
-.v3-review-content
-  > .MuiAccordion-root
-  > [data-admin-accordion]
-  > .admin-section-header {
+.v3-review-content > .ant-collapse > .ant-collapse-item > .ant-collapse-header {
   padding: 24px 0;
   font-size: 17px;
   font-weight: 600;
 }
 .v3-review-content
-  > .MuiAccordion-root
-  > [data-admin-accordion]
-  > .MuiAccordionDetails-root {
+  > .ant-collapse
+  > .ant-collapse-item
+  > .ant-collapse-content {
   border: 0;
   background: transparent;
 }
 .v3-review-content
-  > .MuiAccordion-root
-  > [data-admin-accordion]
-  > .admin-section-body {
+  > .ant-collapse
+  > .ant-collapse-item
+  > .ant-collapse-content
+  > .ant-collapse-content-box {
   padding: 0;
 }
 .v3-review-pos {
@@ -148,7 +146,7 @@
   border-radius: 8px;
   padding: 18px;
 }
-.v3-review-pos h4.MuiTypography-root {
+.v3-review-pos h4.ant-typography {
   font-size: 15px;
 }
 .v3-review-section-label {
@@ -202,7 +200,7 @@
   color: var(--review-muted);
   font-size: 12px;
 }
-.v3-dictionary-pos > .MuiStack-root > .MuiStack-root:first-child {
+.v3-dictionary-pos > .ant-flex > .ant-flex:first-child {
   padding: 16px 0;
   border-bottom: 1px solid var(--review-line);
 }
@@ -232,7 +230,7 @@
   font-size: 15px;
   font-variant-numeric: tabular-nums;
 }
-.v3-dictionary-sense .MuiChip-root {
+.v3-dictionary-sense .ant-tag {
   font-size: 12px;
   border-radius: 4px;
 }
@@ -311,7 +309,7 @@
   border-radius: 8px;
   margin-bottom: 12px;
 }
-.v3-dictionary-example > .MuiChip-root {
+.v3-dictionary-example > .ant-tag {
   margin-bottom: 10px;
 }
 .v3-dictionary-example .tsz-entry-en {
@@ -352,10 +350,10 @@
   flex-wrap: wrap;
   gap: 8px;
 }
-.v3-dictionary-relations > .MuiStack-root > strong {
+.v3-dictionary-relations > .ant-flex > strong {
   display: none;
 }
-.v3-dictionary-relations .MuiTypography-root {
+.v3-dictionary-relations .ant-typography {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -368,13 +366,13 @@
   font-size: 12px;
   margin-right: 8px;
 }
-.v3-review .admin-empty {
+.v3-review .ant-empty {
   margin: 16px 0;
 }
-.v3-review .admin-empty-image {
+.v3-review .ant-empty-image {
   height: 28px;
 }
-.v3-review .admin-empty-description {
+.v3-review .ant-empty-description {
   font-size: 12px;
   color: var(--review-muted);
 }
@@ -428,7 +426,7 @@
     padding: 14px;
     border-radius: 8px;
   }
-  .v3-review-header h2.MuiTypography-root {
+  .v3-review-header h2.ant-typography {
     font-size: 14pt;
   }
   .v3-dictionary-definition {
@@ -500,7 +498,7 @@
   gap: 8px;
   align-items: center;
 }
-.v3-review-pronunciation-cell :is(.MuiButton-root, .MuiIconButton-root) {
+.v3-review-pronunciation-cell .ant-btn {
   width: 28px;
   min-width: 28px;
   flex-basis: 28px;
@@ -511,7 +509,7 @@
   min-width: 120px;
   margin-right: 12px;
 }
-.v3-relation-empty .admin-empty-image {
+.v3-relation-empty .ant-empty-image {
   height: 22px;
 }
 .v3-dictionary-usage small {
@@ -521,34 +519,34 @@
   outline: 2px solid #2053ff;
   outline-offset: 2px;
 }
-.v3-review .MuiChip-root {
+.v3-review .ant-tag {
   max-width: 100%;
   white-space: normal;
   overflow-wrap: anywhere;
 }
 
 /* 操作栏跟随预览滚动；保留原文档占位，最后一段内容仍可完整滚出。 */
-*:has(> .v3-review-publish) {
+.ant-space-item:has(> .v3-review-publish) {
   position: sticky;
   bottom: 12px;
   z-index: 20;
 }
-.v3-review-publish.MuiCard-root {
+.v3-review-publish.ant-card {
   border-color: #dce4f5;
   box-shadow: 0 -4px 24px rgb(32 53 100 / 12%);
   background: rgba(255, 255, 255, 0.98);
   max-height: min(45vh, 420px);
   overflow-y: auto;
 }
-.v3-review-publish.MuiCard-root > .admin-card-header {
+.v3-review-publish.ant-card > .ant-card-head {
   min-height: 38px;
   font-size: 14px;
 }
-.v3-review-publish.MuiCard-root > .admin-card-body {
+.v3-review-publish.ant-card > .ant-card-body {
   padding: 12px 16px;
 }
 @media (max-width: 760px) {
-  *:has(> .v3-review-publish) {
+  .ant-space-item:has(> .v3-review-publish) {
     bottom: max(8px, env(safe-area-inset-bottom));
   }
 }

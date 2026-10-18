@@ -1,28 +1,25 @@
-import Add from "@mui/icons-material/Add";
+import { CloseOutlined, PlusOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import {
   Alert,
-  Box,
   Button,
   Checkbox,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   Divider,
-  FormControlLabel,
-  Stack,
-  TextField,
-  Typography
-} from "@mui/material";
-import { AdminDrawer } from "@/components/AdminDrawer";
+  Drawer,
+  Flex,
+  Input,
+  Modal,
+  Spin,
+  Tag,
+  Typography,
+  theme
+} from "antd";
 import { useState } from "react";
 import type { AdminPermissions, UnifiedPermissionCatalog } from "@tsz/types";
 import { api } from "@/lib/auth";
 import { PermissionChangeDialog } from "./PermissionChangeDialog";
 import { MODULE_LABELS } from "./labels";
-import { PermissionTagChip } from "./PermissionTagChip";
+import { tagTextColor } from "./tagColors";
 
 function PermissionSelection({
   snapshot,
@@ -35,6 +32,7 @@ function PermissionSelection({
   displayName: string;
   onClose: () => void;
 }) {
+  const { token } = theme.useToken();
   const labels = Object.fromEntries(
     catalog.permissions.map((p) => [p.key, p.label])
   );
@@ -84,63 +82,48 @@ function PermissionSelection({
   };
   const grant = selected.filter((key) => !snapshot.permissions.includes(key));
   const revoke = snapshot.permissions.filter((key) => !selected.includes(key));
-  const confirmTags = () => {
-    const firstAdded = availableTags.find(
-      (tag) => pickerTagIds.includes(tag.id) && !selectedTagIds.includes(tag.id)
-    );
-    if (firstAdded) {
-      const focusKey =
-        firstAdded.permissions.find((key) => !selected.includes(key)) ??
-        firstAdded.permissions[0];
-      setActiveModule(
-        catalog.permissions.find((permission) => permission.key === focusKey)
-          ?.module_key ?? activeModule
-      );
-    }
-    applyTagSelection(pickerTagIds);
-    setPickerOpen(false);
-  };
   return (
-    <Stack spacing={2} sx={{ height: "100%", minHeight: 0 }}>
-      <Stack direction="row" justifyContent="space-between">
-        <div>
-          <Typography variant="caption" color="text.secondary">
+    <Flex vertical gap={16} style={{ height: "100%", minHeight: 0 }}>
+      <Flex justify="space-between" align="center" gap={16}>
+        <Flex vertical gap={2}>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             授权对象
-          </Typography>
-          <Typography fontWeight={600}>{displayName}</Typography>
-        </div>
-        <div>
-          <Typography variant="caption" color="text.secondary">
+          </Typography.Text>
+          <Typography.Text strong style={{ fontSize: 16 }}>
+            {displayName}
+          </Typography.Text>
+        </Flex>
+        <Flex vertical align="end" gap={2}>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             已选权限
-          </Typography>
-          <Typography>
+          </Typography.Text>
+          <Typography.Text strong style={{ whiteSpace: "nowrap" }}>
             {selected.length} / {catalog.permissions.length}
-          </Typography>
-        </div>
-      </Stack>
-      <Box
-        sx={{
-          p: 1.5,
-          border: 1,
-          borderColor: "divider",
-          borderRadius: 1,
-          bgcolor: "action.hover"
+          </Typography.Text>
+        </Flex>
+      </Flex>
+      <Flex
+        vertical
+        gap={10}
+        style={{
+          padding: 12,
+          border: `1px solid ${token.colorBorderSecondary}`,
+          borderRadius: token.borderRadiusLG,
+          background: token.colorFillAlter,
+          flexShrink: 0
         }}
       >
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="center"
-        >
-          <Typography fontWeight={600}>权限标签</Typography>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Typography variant="caption">
+        <Flex justify="space-between" align="center">
+          <Typography.Text strong>权限标签</Typography.Text>
+          <Flex align="center" gap={10}>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
               已选 {selectedTags.length} 项
-            </Typography>
+            </Typography.Text>
             <Button
+              size="small"
               aria-label="标签池"
-              startIcon={<Add />}
-              disabled={!availableTags.length}
+              icon={<PlusOutlined />}
+              disabled={availableTags.length === 0}
               onClick={() => {
                 setPickerTagIds(selectedTagIds);
                 setTagSearch("");
@@ -149,127 +132,169 @@ function PermissionSelection({
             >
               标签池
             </Button>
-          </Stack>
-        </Stack>
-        <Stack
-          direction="row"
-          useFlexGap
-          flexWrap="wrap"
-          spacing={0.75}
+          </Flex>
+        </Flex>
+        <Flex
+          wrap
+          gap={6}
           role="group"
           aria-label="已选权限标签"
-          sx={{ maxHeight: 96, overflowY: "auto" }}
+          style={{ maxHeight: 96, overflowY: "auto", alignContent: "start" }}
         >
-          {!selectedTags.length ? (
-            <Typography variant="caption" color="text.secondary">
-              {!availableTags.length ? "暂无可用标签" : "未选择标签"}
-            </Typography>
+          {selectedTags.length === 0 ? (
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              {availableTags.length === 0 ? "暂无可用标签" : "未选择标签"}
+            </Typography.Text>
           ) : (
             selectedTags.map((tag) => (
-              <PermissionTagChip
+              <Tag
                 key={tag.id}
-                tag={tag}
-                onClick={() =>
-                  setActiveModule(
-                    catalog.permissions.find(
-                      (permission) => permission.key === tag.permissions[0]
-                    )?.module_key ?? activeModule
-                  )
-                }
-                onDelete={() =>
-                  applyTagSelection(
-                    selectedTagIds.filter((id) => id !== tag.id)
-                  )
-                }
-              />
-            ))
-          )}
-        </Stack>
-      </Box>
-      <Typography fontWeight={600}>权限项</Typography>
-      <Stack
-        direction="row"
-        sx={{
-          flex: 1,
-          minHeight: 220,
-          border: 1,
-          borderColor: "divider",
-          borderRadius: 1,
-          overflow: "hidden"
-        }}
-      >
-        <Stack
-          spacing={0.5}
-          role="group"
-          aria-label="权限模块"
-          sx={{
-            width: 184,
-            flexShrink: 0,
-            p: 1,
-            overflowY: "auto",
-            bgcolor: "action.hover"
-          }}
-        >
-          {modules.map((module) => {
-            const permissions = catalog.permissions.filter(
-              (permission) => permission.module_key === module
-            );
-            const count = permissions.filter((permission) =>
-              selected.includes(permission.key)
-            ).length;
-            return (
-              <Button
-                key={module}
-                fullWidth
-                variant={activeModule === module ? "contained" : "text"}
-                aria-pressed={activeModule === module}
-                onClick={() => setActiveModule(module)}
-                sx={{
-                  textAlign: "left",
-                  minHeight: 40,
-                  justifyContent: "space-between"
+                color={tag.color === "default" ? undefined : tag.color}
+                style={{
+                  marginInlineEnd: 0,
+                  padding: "1px 5px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 2,
+                  color: tagTextColor(tag.color)
                 }}
               >
-                <span>{MODULE_LABELS[module] ?? module}</span>
-                <span>
-                  {count}/{permissions.length}
-                </span>
-              </Button>
-            );
-          })}
-        </Stack>
-        <Box
-          role="region"
-          aria-label="权限明细"
-          sx={{ flex: 1, minWidth: 0, px: 2, py: 2, overflowY: "auto" }}
+                <button
+                  type="button"
+                  aria-label={`${tag.name}：查看权限`}
+                  onClick={() =>
+                    setActiveModule(
+                      catalog.permissions.find(
+                        (permission) => permission.key === tag.permissions[0]
+                      )?.module_key ?? activeModule
+                    )
+                  }
+                  style={{
+                    padding: "0 2px",
+                    border: 0,
+                    background: "transparent",
+                    color: "inherit",
+                    cursor: "pointer",
+                    fontSize: 12,
+                    lineHeight: "20px"
+                  }}
+                >
+                  {tag.name}
+                </button>
+                <button
+                  type="button"
+                  aria-label={`${tag.name}：移除权限`}
+                  title={`移除${tag.name}权限`}
+                  onClick={() =>
+                    applyTagSelection(
+                      selectedTagIds.filter((id) => id !== tag.id)
+                    )
+                  }
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 18,
+                    height: 18,
+                    padding: 0,
+                    border: 0,
+                    background: "transparent",
+                    color: "inherit",
+                    cursor: "pointer"
+                  }}
+                >
+                  <CloseOutlined style={{ fontSize: 10 }} />
+                </button>
+              </Tag>
+            ))
+          )}
+        </Flex>
+      </Flex>
+      <Flex vertical gap={10} style={{ flex: 1, minHeight: 0 }}>
+        <Typography.Text strong>权限项</Typography.Text>
+        <Flex
+          style={{
+            flex: 1,
+            minHeight: 0,
+            border: `1px solid ${token.colorBorderSecondary}`,
+            borderRadius: token.borderRadiusLG,
+            overflow: "hidden"
+          }}
         >
-          <Stack direction="row" justifyContent="space-between">
-            <Typography fontWeight={600}>
-              {MODULE_LABELS[activeModule] ?? activeModule}
-            </Typography>
-            <Typography color="text.secondary">
-              已选{" "}
-              {
-                activePermissions.filter((permission) =>
-                  selected.includes(permission.key)
-                ).length
-              }{" "}
-              / {activePermissions.length} 项
-            </Typography>
-          </Stack>
-          <Divider sx={{ my: 1.5 }} />
-          {activePermissions.map((permission) => (
-            <FormControlLabel
-              key={permission.key}
-              sx={{
-                width: "100%",
-                alignItems: "flex-start",
-                py: 1,
-                m: 0,
-                borderBottom: 1,
-                borderColor: "divider"
-              }}
-              control={
+          <Flex
+            vertical
+            gap={4}
+            role="group"
+            aria-label="权限模块"
+            style={{
+              width: 184,
+              flexShrink: 0,
+              padding: 8,
+              overflowY: "auto",
+              background: token.colorFillAlter,
+              borderRight: `1px solid ${token.colorBorderSecondary}`
+            }}
+          >
+            {modules.map((module) => {
+              const permissions = catalog.permissions.filter(
+                (permission) => permission.module_key === module
+              );
+              const count = permissions.filter((permission) =>
+                selected.includes(permission.key)
+              ).length;
+              return (
+                <Button
+                  key={module}
+                  block
+                  type={activeModule === module ? "primary" : "text"}
+                  aria-pressed={activeModule === module}
+                  onClick={() => setActiveModule(module)}
+                  style={{ textAlign: "left", height: 40 }}
+                >
+                  <Flex justify="space-between" gap={8}>
+                    <span>{MODULE_LABELS[module] ?? module}</span>
+                    <span>
+                      {count}/{permissions.length}
+                    </span>
+                  </Flex>
+                </Button>
+              );
+            })}
+          </Flex>
+          <Flex
+            vertical
+            role="region"
+            aria-label="权限明细"
+            style={{
+              flex: 1,
+              minWidth: 0,
+              padding: "16px 20px",
+              overflowY: "auto"
+            }}
+          >
+            <Flex justify="space-between" align="center" gap={12}>
+              <Typography.Text strong style={{ fontSize: 15 }}>
+                {MODULE_LABELS[activeModule] ?? activeModule}
+              </Typography.Text>
+              <Typography.Text type="secondary">
+                已选{" "}
+                {
+                  activePermissions.filter((permission) =>
+                    selected.includes(permission.key)
+                  ).length
+                }{" "}
+                / {activePermissions.length} 项
+              </Typography.Text>
+            </Flex>
+            <Divider style={{ margin: "12px 0 4px" }} />
+            {activePermissions.map((permission) => (
+              <Flex
+                key={permission.key}
+                style={{
+                  padding: "12px 0",
+                  borderBottom: `1px solid ${token.colorBorderSecondary}`
+                }}
+              >
                 <Checkbox
                   checked={selected.includes(permission.key)}
                   onChange={(event) => {
@@ -288,128 +313,142 @@ function PermissionSelection({
                         )
                       );
                   }}
-                />
-              }
-              label={
-                <Stack spacing={0.5}>
-                  <Typography>{permission.label}</Typography>
-                  {permission.description !== permission.label && (
-                    <Typography color="text.secondary">
-                      {permission.description}
-                    </Typography>
-                  )}
-                  {permission.requires.length > 0 && (
-                    <Typography variant="caption" color="text.secondary">
-                      前置权限：
-                      {permission.requires
-                        .map((key) => labels[key] ?? key)
-                        .join("、")}
-                    </Typography>
-                  )}
-                </Stack>
-              }
-            />
-          ))}
-        </Box>
-      </Stack>
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        alignItems="center"
-        useFlexGap
-        flexWrap="wrap"
-        spacing={1.5}
-        sx={{ borderTop: 1, borderColor: "divider", pt: 2 }}
+                  style={{ width: "100%", alignItems: "flex-start" }}
+                >
+                  <Flex vertical gap={4}>
+                    <Typography.Text>{permission.label}</Typography.Text>
+                    {permission.description !== permission.label && (
+                      <Typography.Text type="secondary">
+                        {permission.description}
+                      </Typography.Text>
+                    )}
+                    {permission.requires.length > 0 && (
+                      <Typography.Text
+                        type="secondary"
+                        style={{ fontSize: 12 }}
+                      >
+                        前置权限：
+                        {permission.requires
+                          .map((key) => labels[key] ?? key)
+                          .join("、")}
+                      </Typography.Text>
+                    )}
+                  </Flex>
+                </Checkbox>
+              </Flex>
+            ))}
+          </Flex>
+        </Flex>
+      </Flex>
+      <Flex
+        justify="space-between"
+        align="center"
+        gap={12}
+        wrap
+        style={{
+          borderTop: `1px solid ${token.colorBorderSecondary}`,
+          paddingTop: 14
+        }}
       >
-        <div>
-          <Typography fontWeight={600}>待提交变更</Typography>
-          <Typography variant="caption" color="text.secondary">
+        <Flex vertical gap={2}>
+          <Typography.Text strong>待提交变更</Typography.Text>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             {grant.length || revoke.length
               ? `开通 ${grant.length} 项 · 取消 ${revoke.length} 项`
               : "无变更"}
-          </Typography>
-        </div>
+          </Typography.Text>
+        </Flex>
         <Button
-          variant="contained"
+          type="primary"
           disabled={!grant.length && !revoke.length}
           onClick={() => setPreviewing(true)}
         >
           预览变更
         </Button>
-      </Stack>
-      <Dialog
+      </Flex>
+      <Modal
         open={pickerOpen}
-        onClose={() => setPickerOpen(false)}
-        fullWidth
-        maxWidth="sm"
-        aria-labelledby="tag-picker-title"
+        title="标签池"
+        width={560}
+        okText="确认选择"
+        cancelText="取消"
+        okButtonProps={{
+          disabled:
+            pickerTagIds.length === selectedTagIds.length &&
+            pickerTagIds.every((id) => selectedTagIds.includes(id))
+        }}
+        onCancel={() => setPickerOpen(false)}
+        onOk={() => {
+          const firstAdded = availableTags.find(
+            (tag) =>
+              pickerTagIds.includes(tag.id) && !selectedTagIds.includes(tag.id)
+          );
+          if (firstAdded) {
+            const focusKey =
+              firstAdded.permissions.find((key) => !selected.includes(key)) ??
+              firstAdded.permissions[0];
+            setActiveModule(
+              catalog.permissions.find(
+                (permission) => permission.key === focusKey
+              )?.module_key ?? activeModule
+            );
+          }
+          applyTagSelection(pickerTagIds);
+          setPickerOpen(false);
+        }}
       >
-        <DialogTitle id="tag-picker-title">标签池</DialogTitle>
-        <DialogContent>
-          <TextField
-            label="搜索标签"
+        <Flex vertical gap={12}>
+          <Input
+            aria-label="搜索标签"
             placeholder="搜索标签"
-            fullWidth
+            allowClear
             value={tagSearch}
             onChange={(event) => setTagSearch(event.target.value)}
-            sx={{ my: 1 }}
           />
-          <Stack
+          <Flex
+            vertical
+            gap={4}
             role="group"
             aria-label="可用标签"
-            sx={{ maxHeight: 360, overflowY: "auto" }}
+            style={{ maxHeight: 360, overflowY: "auto" }}
           >
             {availableTags
               .filter((tag) => tag.name.includes(tagSearch.trim()))
               .map((tag) => (
-                <FormControlLabel
+                <Checkbox
                   key={tag.id}
-                  control={
-                    <Checkbox
-                      slotProps={{
-                        input: {
-                          "aria-label": `${tag.name}，${tag.permissions.length} 项权限`
-                        }
-                      }}
-                      checked={pickerTagIds.includes(tag.id)}
-                      onChange={(event) =>
-                        setPickerTagIds((current) =>
-                          event.target.checked
-                            ? [...current, tag.id]
-                            : current.filter((id) => id !== tag.id)
-                        )
-                      }
-                    />
+                  aria-label={`${tag.name}，${tag.permissions.length} 项权限`}
+                  checked={pickerTagIds.includes(tag.id)}
+                  onChange={(event) =>
+                    setPickerTagIds((current) =>
+                      event.target.checked
+                        ? [...current, tag.id]
+                        : current.filter((id) => id !== tag.id)
+                    )
                   }
-                  label={
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <PermissionTagChip tag={tag} />
-                      <Typography variant="caption">
-                        {tag.permissions.length} 项权限
-                      </Typography>
-                    </Stack>
-                  }
-                />
+                  style={{ padding: "8px 10px" }}
+                >
+                  <Tag
+                    color={tag.color === "default" ? undefined : tag.color}
+                    style={{
+                      marginInlineEnd: 0,
+                      color: tagTextColor(tag.color)
+                    }}
+                  >
+                    {tag.name}
+                  </Tag>
+                  <Typography.Text type="secondary" style={{ marginLeft: 8 }}>
+                    {tag.permissions.length} 项权限
+                  </Typography.Text>
+                </Checkbox>
               ))}
-            {!availableTags.some((tag) =>
-              tag.name.includes(tagSearch.trim())
-            ) && <Typography color="text.secondary">无匹配标签</Typography>}
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPickerOpen(false)}>取消</Button>
-          <Button
-            variant="contained"
-            disabled={
-              pickerTagIds.length === selectedTagIds.length &&
-              pickerTagIds.every((id) => selectedTagIds.includes(id))
-            }
-            onClick={confirmTags}
-          >
-            确认选择
-          </Button>
-        </DialogActions>
-      </Dialog>
+            {availableTags.filter((tag) => tag.name.includes(tagSearch.trim()))
+              .length === 0 && (
+              <Typography.Text type="secondary">无匹配标签</Typography.Text>
+            )}
+          </Flex>
+        </Flex>
+      </Modal>
       {previewing && (
         <PermissionChangeDialog
           catalogVersion={catalog.catalog_version}
@@ -425,7 +464,7 @@ function PermissionSelection({
           onCommitted={onClose}
         />
       )}
-    </Stack>
+    </Flex>
   );
 }
 
@@ -447,12 +486,19 @@ export function AdminPermissionEditor({
     queryFn: () => api.permissionSystem.forAdmin(adminId)
   });
   return (
-    <AdminDrawer width={720} title="权限配置" onClose={onClose}>
+    <Drawer
+      open
+      size={720}
+      title="权限配置"
+      onClose={onClose}
+      styles={{ body: { overflow: "hidden" } }}
+    >
       {catalog.isPending || snapshot.isPending ? (
-        <CircularProgress size={24} />
+        <Spin />
       ) : catalog.isError || snapshot.isError ? (
         <Alert
-          severity="error"
+          type="error"
+          title="无法读取权限"
           action={
             <Button
               onClick={() => {
@@ -463,9 +509,7 @@ export function AdminPermissionEditor({
               重试
             </Button>
           }
-        >
-          无法读取权限
-        </Alert>
+        />
       ) : (
         <PermissionSelection
           key={`${snapshot.data.permission_version}:${catalog.data.catalog_version}`}
@@ -475,6 +519,6 @@ export function AdminPermissionEditor({
           onClose={onClose}
         />
       )}
-    </AdminDrawer>
+    </Drawer>
   );
 }

@@ -2,7 +2,7 @@
   width: 100%;
 }
 
-.v3-forms-step textarea.tsz-words,
+.v3-forms-step textarea.tsz-words.ant-input,
 .v3-forms-step .v3-grammar-preview-content.tsz-words {
   font-weight: 700;
 }
@@ -11,7 +11,7 @@
   font-weight: 400;
 }
 
-.v3-forms-step > .MuiTabs-root [role="tabpanel"] {
+.v3-forms-step > .ant-tabs .ant-tabs-content-holder {
   min-width: 0;
 }
 
@@ -58,11 +58,11 @@
   box-shadow: none;
 }
 
-.v3-form-group-card > .v3-form-group-header {
+.v3-form-group-card > .ant-card-head {
   min-height: 48px;
 }
 
-.v3-form-group-card > .v3-form-group-header {
+.v3-form-group-card > .ant-card-head {
   padding-inline: 14px;
   color: #fff;
   background: var(--word-ink);
@@ -75,7 +75,7 @@
   gap: 8px;
 }
 
-.v3-form-group-menu {
+.v3-form-group-menu.ant-btn {
   color: #fff;
 }
 
@@ -83,11 +83,11 @@
   background: rgba(255, 255, 255, 0.12);
 }
 
-.v3-form-group-card > .v3-form-group-body {
+.v3-form-group-card > .ant-card-body {
   padding: 0;
 }
 
-.v3-form-group-card > .v3-form-group-body > .v3-form-group-contents {
+.v3-form-group-card > .ant-card-body > .ant-flex {
   gap: 0;
   padding-bottom: 16px;
 }
@@ -258,7 +258,7 @@
 }
 
 /* popup 挂在 body 下，不受矩阵类型列宽度约束。 */
-.v3-form-type-popup [role="option"] {
+.v3-form-type-popup .ant-select-item-option-content {
   white-space: normal;
   overflow-wrap: anywhere;
   text-overflow: clip;
@@ -278,9 +278,7 @@
   padding-top: 4px;
 }
 
-.v3-pronunciation-list
-  > .MuiStack-root
-  > :is(.MuiButton-root, .MuiIconButton-root) {
+.v3-pronunciation-list > .ant-flex > .ant-btn {
   justify-self: start;
 }
 
@@ -343,11 +341,11 @@
 }
 
 @media (max-width: 767px) {
-  .v3-form-group-card > .v3-form-group-header {
+  .v3-form-group-card > .ant-card-head {
     align-items: flex-start;
   }
 
-  .v3-form-group-card > .v3-form-group-header .v3-form-group-scope {
+  .v3-form-group-card > .ant-card-head .ant-card-extra {
     margin-inline-start: 8px;
   }
 
@@ -356,7 +354,7 @@
   }
 }
 
-.v3-group-sense-editor > .MuiStack-root:first-child {
+.v3-group-sense-editor > .ant-flex:first-child {
   margin-bottom: 8px;
 }
 
@@ -366,7 +364,7 @@
   border-top: 1px solid #e5e7eb;
 }
 
-.v3-form-group-card > .v3-form-group-header .v3-form-group-scope {
+.v3-form-group-card > .ant-card-head .ant-card-extra {
   margin-inline-start: 16px;
 }
 
@@ -375,14 +373,14 @@
   overflow-y: auto;
 }
 
-.v3-group-sense-options .MuiFormControlLabel-root {
+.v3-group-sense-options .ant-checkbox-wrapper {
   align-items: flex-start;
   padding: 12px;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
 }
 
-.v3-group-sense-options .MuiFormControlLabel-root:has(input:checked) {
+.v3-group-sense-options .ant-checkbox-wrapper-checked {
   border-color: #91caff;
   background: #f0f7ff;
 }

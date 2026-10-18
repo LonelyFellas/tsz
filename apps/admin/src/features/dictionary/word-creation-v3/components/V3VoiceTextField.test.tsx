@@ -1,5 +1,3 @@
-import { FeedbackProvider } from "@/components/FeedbackProvider";
-import { AdminThemeProvider } from "@/mui-theme";
 import { PronunciationPreviewProvider } from "../../word-creation/PronunciationPreview";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -60,19 +58,7 @@ import { V3LinkedEnglishTextField } from "./V3LinkedEnglishTextField";
 const render = (
   ui: Parameters<typeof rtlRender>[0],
   options?: Parameters<typeof rtlRender>[1]
-) =>
-  rtlRender(ui, {
-    wrapper: ({ children }) => (
-      <AdminThemeProvider>
-        <FeedbackProvider>
-          <PronunciationPreviewProvider>
-            {children}
-          </PronunciationPreviewProvider>
-        </FeedbackProvider>
-      </AdminThemeProvider>
-    ),
-    ...options
-  });
+) => rtlRender(ui, { wrapper: PronunciationPreviewProvider, ...options });
 
 const VALUE: RichTextV3 = { version: 2, text: "hello there", annotations: [] };
 
@@ -1135,7 +1121,7 @@ it("grammar 富文本位于紧凑组背景上方，透明输入框覆盖长预�
     /\.v3-grammar-preview-content\s*\{[^}]*z-index:\s*5;/su
   );
   expect(fieldCss).toMatch(
-    /\.v3-grammar-preview\s*>\s*textarea\s*\{[^}]*height:\s*100%\s*!important;[^}]*max-height:\s*none\s*!important;/su
+    /\.v3-grammar-preview\s*>\s*textarea\.ant-input\s*\{[^}]*height:\s*100%\s*!important;[^}]*max-height:\s*none\s*!important;/su
   );
 });
 
@@ -1187,7 +1173,7 @@ it.each([
 });
 
 it("弧线层内层扣掉输入框滚动条宽度，并随输入框滚动和尺寸变化跟进", () => {
-  const resizeInputs = new Set<() => void>();
+  let resizeInput: (() => void) | undefined;
   vi.stubGlobal(
     "ResizeObserver",
     class {
@@ -1196,11 +1182,11 @@ it("弧线层内层扣掉输入框滚动条宽度，并随输入框滚动和尺�
         this.callback = callback;
       }
       observe(target: Element) {
-        // 真实 resize 会通知所有观察器，不依赖文本框和弧线层的注册顺序。
-        if (target instanceof HTMLTextAreaElement)
-          resizeInputs.add(() =>
-            this.callback([], this as unknown as ResizeObserver)
-          );
+        // 只接住第一个观察输入框的，即弧线层在布局副作用里建的那个；antd 自适应高度的共享观察器
+        // 在被动副作用里才观察输入框，单独跑本用例时由桩创建，不能让它覆盖掉。
+        if (target instanceof HTMLTextAreaElement && !resizeInput)
+          resizeInput = () =>
+            this.callback([], this as unknown as ResizeObserver);
       }
       unobserve() {}
       disconnect() {}
@@ -1248,8 +1234,8 @@ it("弧线层内层扣掉输入框滚动条宽度，并随输入框滚动和尺�
     // 删短内容后滚动条消失、scrollTop 归零，只保证有尺寸变化回调。
     define("offsetWidth", 184 + borders);
     define("scrollTop", 0);
-    expect(resizeInputs.size).toBeGreaterThan(0);
-    resizeInputs.forEach((notify) => notify());
+    expect(resizeInput).toBeDefined();
+    resizeInput!();
     expect(content!.style.marginRight).toBe("0px");
     expect(content!.style.transform).toBe("translateY(0px)");
   } finally {

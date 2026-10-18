@@ -41,7 +41,7 @@
   flex: 1;
   min-width: 0;
 }
-.tsz-ve-editor .tsz-ve-tool-toggle:is(.MuiButton-root, .MuiIconButton-root) {
+.tsz-ve-editor .tsz-ve-tool-toggle.ant-btn {
   flex-shrink: 0;
   height: 30px;
   padding-inline: 8px;
@@ -51,22 +51,13 @@
   color: #68768b;
   box-shadow: none;
 }
-.tsz-ve-editor
-  .tsz-ve-tool-toggle:is(
-    .MuiButton-root,
-    .MuiIconButton-root
-  )[aria-pressed="true"],
-.tsz-ve-editor
-  .tsz-ve-speech-tool:is(
-    .MuiButton-root,
-    .MuiIconButton-root
-  )[aria-expanded="true"] {
+.tsz-ve-editor .tsz-ve-tool-toggle.ant-btn[aria-pressed="true"],
+.tsz-ve-editor .tsz-ve-speech-tool.ant-btn[aria-expanded="true"] {
   border-color: #cfdcff;
   background: #edf2ff;
   color: #2053ff;
 }
-.tsz-ve-editor
-  .tsz-ve-tool-toggle:is(.MuiButton-root, .MuiIconButton-root):disabled {
+.tsz-ve-editor .tsz-ve-tool-toggle.ant-btn:disabled {
   color: #a0a9b7;
   border-color: transparent;
   background: transparent;
@@ -101,7 +92,7 @@
   top: 54px;
   right: 12px;
 }
-.tsz-ve-editor .tsz-ve-clear-mode:is(.MuiButton-root, .MuiIconButton-root) {
+.tsz-ve-editor .tsz-ve-clear-mode.ant-btn {
   width: 64px;
   height: 64px;
   border: 1px solid #d9dfe8;
@@ -129,15 +120,14 @@
 .tsz-ve-canvas[data-target="mark"] .tsz-ve-arc-layer {
   z-index: 2;
 }
-.tsz-ve-top-tools .tsz-ve-icon-button:is(.MuiButton-root, .MuiIconButton-root) {
+.tsz-ve-top-tools .tsz-ve-icon-button.ant-btn {
   width: 28px;
   min-width: 28px;
   height: 30px;
   padding: 0;
   color: #718099;
 }
-.tsz-ve-top-tools
-  .tsz-ve-icon-button:is(.MuiButton-root, .MuiIconButton-root):disabled {
+.tsz-ve-top-tools .tsz-ve-icon-button.ant-btn:disabled {
   color: #bdc6d5;
 }
 .tsz-ve-top-hint {
@@ -189,13 +179,13 @@
 .tsz-ve-editor .tsz-ve-grammar-hint {
   display: none;
 }
-.tsz-ve-editor .tsz-ve-grammar-option:is(.MuiButton-root, .MuiIconButton-root),
-.tsz-ve-selection-liaison :is(.MuiButton-root, .MuiIconButton-root) {
+.tsz-ve-editor .tsz-ve-grammar-option.ant-btn,
+.tsz-ve-selection-liaison .ant-btn {
   height: 30px;
   font-size: 12px;
   padding-inline: 10px;
 }
-.tsz-ve-selection-liaison :is(.MuiButton-root, .MuiIconButton-root) {
+.tsz-ve-selection-liaison .ant-btn {
   border-radius: 6px;
 }
 .tsz-ve-footer {
@@ -241,10 +231,10 @@
   gap: 6px;
   align-items: center;
 }
-.tsz-ve-pause-presets :is(.MuiButton-root, .MuiIconButton-root) {
+.tsz-ve-pause-presets .ant-btn {
   padding-inline: 6px;
 }
-.tsz-ve-pause-custom .MuiInputBase-input {
+.tsz-ve-pause-custom .ant-input {
   width: 88px;
 }
 .tsz-ve-pause-location {

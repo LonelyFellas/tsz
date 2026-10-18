@@ -1,16 +1,14 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  App,
   Alert,
   Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Stack,
+  Flex,
+  Modal,
+  Space,
+  Table,
   Typography
-} from "@mui/material";
-import { AdminTable } from "@/components/AdminTable";
-import { useFeedback } from "@/components/FeedbackProvider";
+} from "antd";
 import { useEffect, useRef, useState } from "react";
 import { HttpError } from "@tsz/api-client";
 import type { PermissionPreviewResponse } from "@tsz/types";
@@ -54,7 +52,7 @@ export function PermissionChangeDialog({
   onClose: () => void;
   onCommitted: () => void;
 }) {
-  const notify = useFeedback();
+  const { message } = App.useApp();
   const client = useQueryClient();
   const [saving, setSaving] = useState(false);
   const busy = useRef(false);
@@ -132,7 +130,7 @@ export function PermissionChangeDialog({
         permissionCommitFromPreview(preview.data)
       );
       await client.invalidateQueries({ queryKey: ["permission-system"] });
-      notify("权限已保存", "success");
+      message.success("权限已保存");
       onCommitted();
     } catch (error) {
       if (
@@ -143,7 +141,7 @@ export function PermissionChangeDialog({
         recoveryStarted.current = true;
         await reread();
       } else {
-        notify(error.message, "error");
+        message.error(error.message);
       }
     } finally {
       busy.current = false;
@@ -159,137 +157,132 @@ export function PermissionChangeDialog({
   ) => {
     const direct = keys.filter((key) => !dependencies.includes(key));
     return (
-      <Stack spacing={0.5}>
+      <Flex vertical gap={4}>
         {(direct.length > 0 || dependencies.length === 0) && (
           <span title={direct.join("、")}>{describePermissions(direct)}</span>
         )}
         {dependencies.length > 0 && (
-          <Typography
-            data-permission-dependency={automaticLabel}
-            component="span"
+          <Typography.Text
             title={dependencies.join("、")}
-            color={
-              automaticLabel === "自动补齐" ? "warning.main" : "error.main"
-            }
+            type={automaticLabel === "自动补齐" ? "warning" : "danger"}
             style={{ fontSize: 12 }}
           >
             {automaticLabel}：<span>{describePermissions(dependencies)}</span>
-          </Typography>
+          </Typography.Text>
         )}
-      </Stack>
+      </Flex>
     );
   };
   const adminColumn = {
-    id: "admin",
-    label: "管理员",
-    render: (row: PermissionPreviewResponse["targets"][number]) => (
-      <Typography component="span" title={row.admin_id}>
+    title: "管理员",
+    render: (_: unknown, row: PermissionPreviewResponse["targets"][number]) => (
+      <Typography.Text title={row.admin_id}>
         {adminNames?.[row.admin_id] ?? row.admin_id}
-      </Typography>
+      </Typography.Text>
     )
   };
+
   return (
-    <Dialog
+    <Modal
       open
-      onClose={close}
-      fullWidth
-      maxWidth="md"
-      aria-labelledby="permission-preview-title"
+      title="权限变更预览"
+      width={720}
+      closable={!saving && recovery !== "reading"}
+      onCancel={close}
+      footer={
+        <Space>
+          <Button disabled={saving || recovery === "reading"} onClick={close}>
+            取消
+          </Button>
+          {conflict ? (
+            <Button disabled={saving || recovery === "reading"} onClick={close}>
+              返回查看
+            </Button>
+          ) : (
+            <Button
+              type="primary"
+              disabled={!preview.data || preview.isFetching || preview.isError}
+              loading={saving}
+              onClick={() => void commit()}
+            >
+              保存变更
+            </Button>
+          )}
+        </Space>
+      }
     >
-      <DialogTitle id="permission-preview-title">权限变更预览</DialogTitle>
-      <DialogContent>
-        {recovery === "reading" && (
-          <Alert severity="info">正在确认当前权限，请勿重复保存。</Alert>
-        )}
-        {recovery === "read" && (
-          <Alert severity="warning">
-            已重新读取当前权限。请核对后返回，重新选择需要的调整。
-          </Alert>
-        )}
-        {recovery === "failed" && (
-          <Alert
-            severity="warning"
-            action={<Button onClick={() => void reread()}>重新查看</Button>}
-          >
-            暂时无法确认是否保存成功，请重新查看后再操作
-          </Alert>
-        )}
-        {preview.isError && !conflict && (
-          <Alert
-            severity="error"
-            action={
-              <Button onClick={() => void preview.refetch()}>重新查看</Button>
-            }
-          >
-            {preview.error.message}
-          </Alert>
-        )}
-        {conflict ? (
-          current && (
-            <AdminTable
-              rowId={(row) => row.admin_id}
-              rows={current.targets}
-              loading={recovery === "reading"}
-              columns={[
-                adminColumn,
-                {
-                  id: "after",
-                  label: "当前权限",
-                  render: (row) => (
-                    <span title={row.after.join("、")}>
-                      {describePermissions(row.after)}
-                    </span>
-                  )
-                }
-              ]}
-            />
-          )
-        ) : (
-          <AdminTable
-            rowId={(row) => row.admin_id}
-            rows={preview.data?.targets ?? []}
-            loading={preview.isFetching}
+      {recovery === "reading" && (
+        <Alert type="info" title="正在确认当前权限，请勿重复保存。" />
+      )}
+      {recovery === "read" && (
+        <Alert
+          type="warning"
+          showIcon
+          title="已重新读取当前权限。请核对后返回，重新选择需要的调整。"
+        />
+      )}
+      {recovery === "failed" && (
+        <Alert
+          type="warning"
+          showIcon
+          title="暂时无法确认是否保存成功，请重新查看后再操作"
+          action={<Button onClick={() => void reread()}>重新查看</Button>}
+        />
+      )}
+      {preview.isError && !conflict && (
+        <Alert
+          type="error"
+          title={preview.error.message}
+          action={
+            <Button onClick={() => void preview.refetch()}>重新查看</Button>
+          }
+        />
+      )}
+      {conflict ? (
+        current && (
+          <Table
+            loading={recovery === "reading"}
+            rowKey="admin_id"
+            pagination={false}
+            dataSource={current?.targets ?? []}
             columns={[
               adminColumn,
               {
-                id: "grant",
-                label: "开通",
-                render: (row) =>
-                  renderChanges(row.grant, row.dependency_grants, "自动补齐")
-              },
-              {
-                id: "revoke",
-                label: "取消",
-                render: (row) =>
-                  renderChanges(
-                    row.revoke,
-                    row.dependency_revocations,
-                    "自动取消"
-                  )
+                title: "当前权限",
+                render: (_, row) => (
+                  <span title={row.after.join("、")}>
+                    {describePermissions(row.after)}
+                  </span>
+                )
               }
             ]}
           />
-        )}
-      </DialogContent>
-      <DialogActions>
-        <Button disabled={saving || recovery === "reading"} onClick={close}>
-          取消
-        </Button>
-        {conflict ? (
-          <Button disabled={saving || recovery === "reading"} onClick={close}>
-            返回查看
-          </Button>
-        ) : (
-          <Button
-            variant="contained"
-            disabled={!preview.data || preview.isFetching || preview.isError}
-            loading={saving}
-            onClick={() => void commit()}
-          >
-            保存变更
-          </Button>
-        )}
-      </DialogActions>
-    </Dialog>
+        )
+      ) : (
+        <Table
+          loading={preview.isFetching}
+          rowKey="admin_id"
+          pagination={false}
+          dataSource={preview.data?.targets ?? []}
+          columns={[
+            adminColumn,
+            {
+              title: "开通",
+              render: (_, row) =>
+                renderChanges(row.grant, row.dependency_grants, "自动补齐")
+            },
+            {
+              title: "取消",
+              render: (_, row) =>
+                renderChanges(
+                  row.revoke,
+                  row.dependency_revocations,
+                  "自动取消"
+                )
+            }
+          ]}
+        />
+      )}
+    </Modal>
   );
 }

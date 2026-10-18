@@ -1,9 +1,4 @@
-import {
-  Button as MuiButton,
-  Stack as MuiStack,
-  Typography as MuiTypography
-} from "@mui/material";
-
+import { Button, Flex, Typography } from "antd";
 import type { AssociationPickerProps } from "@tsz/voice-editor/types";
 import type {
   Dialect,
@@ -31,15 +26,11 @@ export function V3TextAssociationPicker({
   const literal = segments.map((segment) => segment.surface).join(" ");
   if (selected) {
     return (
-      <MuiStack
-        style={{ maxWidth: "min(360px, 85vw)" }}
-        direction="column"
-        spacing={1}
-      >
-        <MuiTypography className="tsz-words" component="span" fontWeight={600}>
+      <Flex vertical gap="small" style={{ maxWidth: "min(360px, 85vw)" }}>
+        <Typography.Text className="tsz-words" strong>
           {literal}
-        </MuiTypography>
-        <MuiTypography className="tsz-entry-en" component="span">
+        </Typography.Text>
+        <Typography.Text className="tsz-entry-en">
           已关联：{selected.target_headword ?? "词条"} ·{" "}
           {selected.target_gloss ?? "词义"}
           {selected.target_word_id === wordId
@@ -47,25 +38,21 @@ export function V3TextAssociationPicker({
             : selected.target_publication_id
               ? null
               : "（草稿）"}
-        </MuiTypography>
-        <MuiTypography component="span" color="text.secondary">
+        </Typography.Text>
+        <Typography.Text type="secondary">
           这些单词已有关联，请先清除原关联再重新选择。
-        </MuiTypography>
-        <MuiButton size="small" onClick={() => onSelect(undefined)}>
+        </Typography.Text>
+        <Button size="small" onClick={() => onSelect(undefined)}>
           清除关联
-        </MuiButton>
-      </MuiStack>
+        </Button>
+      </Flex>
     );
   }
   return (
-    <MuiStack
-      style={{ maxWidth: "min(760px, 85vw)" }}
-      direction="column"
-      spacing={1}
-    >
-      <MuiTypography className="tsz-words" component="span" fontWeight={600}>
+    <Flex vertical gap="small" style={{ maxWidth: "min(760px, 85vw)" }}>
+      <Typography.Text className="tsz-words" strong>
         {literal}
-      </MuiTypography>
+      </Typography.Text>
       <V3TargetCascader
         key={`${kind}:${literal}`}
         literal={literal.trim()}
@@ -103,6 +90,6 @@ export function V3TextAssociationPicker({
           });
         }}
       />
-    </MuiStack>
+    </Flex>
   );
 }

@@ -1,16 +1,6 @@
-import {
-  Pagination as MuiPagination,
-  Skeleton as MuiSkeleton
-} from "@mui/material";
-import {
-  Alert as MuiAlert,
-  Button as MuiButton,
-  Chip as MuiChip,
-  Typography as MuiTypography
-} from "@mui/material";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-
+import { Alert, Button, Empty, Pagination, Skeleton, Tag } from "antd";
 import { api, useAnyPermission } from "@/lib/auth";
 import { V3EnglishTextPreview } from "./components/V3EnglishTextPreview";
 import { sentenceTranslationsV3 } from "./meaningsModel";
@@ -60,8 +50,7 @@ export function V3ReviewSentences({
         page_size: 5
       })
   });
-  if (!canRead)
-    return <MuiAlert severity={"info"}>{"未开通例句查看权限"}</MuiAlert>;
+  if (!canRead) return <Alert type="info" title="未开通例句查看权限" />;
   return (
     <section
       ref={root}
@@ -70,30 +59,24 @@ export function V3ReviewSentences({
     >
       <h4>多维例句 {query.data && <span>{query.data.total} 条</span>}</h4>
       {query.isPending ? (
-        <MuiSkeleton
-          variant="rectangular"
-          height={80}
-          aria-label="正在加载例句"
-        />
+        <Skeleton active paragraph={{ rows: 2 }} />
       ) : query.isError ? (
-        <MuiAlert
-          action={
-            <MuiButton onClick={() => void query.refetch()}>重试</MuiButton>
-          }
-          severity={"error"}
-        >
-          {"例句加载失败"}
-        </MuiAlert>
+        <Alert
+          type="error"
+          title="例句加载失败"
+          action={<Button onClick={() => void query.refetch()}>重试</Button>}
+        />
       ) : (
         <>
           {query.data.items.length === 0 && (
-            <MuiTypography color="text.secondary">
-              {"暂无关联例句"}
-            </MuiTypography>
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description="暂无关联例句"
+            />
           )}
           {query.data.items.map((item) => (
             <article className="v3-dictionary-example" key={item.id}>
-              <MuiChip label={<>{item.content.sentence.level}</>} />
+              <Tag>{item.content.sentence.level}</Tag>
               <V3EnglishTextPreview
                 value={item.content.sentence.en_text}
                 hideCommonDialect
@@ -133,16 +116,11 @@ export function V3ReviewSentences({
                         : undefined;
                     return (
                       <span key={annotation.id}>
-                        <MuiChip
-                          color={
-                            target.state === "pending" ? "warning" : "primary"
-                          }
-                          label={
-                            <>
-                              {target.state === "pending" ? "待关联" : "已关联"}
-                            </>
-                          }
-                        />
+                        <Tag
+                          color={target.state === "pending" ? "orange" : "blue"}
+                        >
+                          {target.state === "pending" ? "待关联" : "已关联"}
+                        </Tag>
                         {annotation.source_segments
                           .map((segment) => segment.surface)
                           .join(" … ")}{" "}
@@ -159,11 +137,13 @@ export function V3ReviewSentences({
             </article>
           ))}
           {query.data.total > 5 && (
-            <MuiPagination
+            <Pagination
               size="small"
-              page={page}
-              count={Math.max(1, Math.ceil((query.data.total ?? 0) / 5))}
-              onChange={(_, next) => setPage(next)}
+              current={page}
+              pageSize={5}
+              total={query.data.total}
+              showSizeChanger={false}
+              onChange={setPage}
             />
           )}
         </>

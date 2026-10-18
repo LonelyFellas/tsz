@@ -6,7 +6,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { FeedbackProvider } from "@/components/FeedbackProvider";
+import { App as AntApp } from "antd";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpError } from "@tsz/api-client";
 import type { AdminRole, PermissionCatalogItem } from "@tsz/types";
@@ -128,21 +128,28 @@ function renderPage() {
   });
   return render(
     <QueryClientProvider client={client}>
-      <FeedbackProvider>
+      <AntApp>
         <RoleManagement />
-      </FeedbackProvider>
+      </AntApp>
     </QueryClientProvider>
   );
 }
 
 /**
  * 打开某个 antd Select（点其根节点），在浮层里点选文案匹配的选项。
- * 按公开 option role 定位，并等待浮层关闭；
+ * 按 `.ant-select-item-option` 定位而非按浮层可见性——v6 里刚关闭的浮层未必立刻加隐藏类，
  * 但各 Select 的选项文案互不相同（管理员名 vs 角色名 vs 收回），据文案定位即可精确命中。
  */
 async function pickOption(selectRoot: Element, text: string) {
   fireEvent.mouseDown(selectRoot);
-  fireEvent.click(await screen.findByRole("option", { name: text }));
+  const opt = await waitFor(() => {
+    const el = [...document.querySelectorAll(".ant-select-item-option")].find(
+      (i) => (i.textContent ?? "").includes(text)
+    );
+    if (!el) throw new Error(`option not ready: ${text}`);
+    return el;
+  });
+  fireEvent.click(opt);
 }
 
 beforeEach(() => {
@@ -393,7 +400,7 @@ describe("RoleManagement — 删角色", () => {
     expect(
       await screen.findByText(/该角色下有 3 名管理员/)
     ).toBeInTheDocument();
-    const confirmBtns = screen.getByRole("dialog");
+    const confirmBtns = document.querySelector(".ant-modal-confirm-btns")!;
     fireEvent.click(within(confirmBtns as HTMLElement).getByText(/^删\s?除$/));
     await waitFor(() => expect(mockRemove).toHaveBeenCalledWith("r-lib"));
     expect(await screen.findByText("已删除")).toBeInTheDocument();
@@ -406,7 +413,7 @@ describe("RoleManagement — 删角色", () => {
     // 第 2 行为「新人」(member_count 0)。
     fireEvent.click(screen.getAllByText("删除")[2]!);
     expect(await screen.findByText("确认删除该角色？")).toBeInTheDocument();
-    const confirmBtns = screen.getByRole("dialog");
+    const confirmBtns = document.querySelector(".ant-modal-confirm-btns")!;
     fireEvent.click(within(confirmBtns as HTMLElement).getByText(/^删\s?除$/));
     await waitFor(() => expect(mockRemove).toHaveBeenCalledWith("r-empty"));
   });
@@ -417,7 +424,7 @@ describe("RoleManagement — 删角色", () => {
     await screen.findByText("全功能管理员");
     fireEvent.click(screen.getAllByText("删除")[1]!);
     await screen.findByText(/该角色下有 3 名管理员/);
-    const confirmBtns = screen.getByRole("dialog");
+    const confirmBtns = document.querySelector(".ant-modal-confirm-btns")!;
     fireEvent.click(within(confirmBtns as HTMLElement).getByText(/^删\s?除$/));
     expect(
       await screen.findByText("角色或管理员不存在，可能已被删除")
@@ -430,14 +437,13 @@ describe("RoleManagement — 派角色", () => {
   // 打开指派弹窗，等管理员下拉渲染出来（占位文案）。
   async function openAssign() {
     fireEvent.click(screen.getByRole("button", { name: /指派角色/ }));
-    await screen.findByPlaceholderText("选择一名普通管理员");
+    await screen.findByText("选择一名普通管理员");
   }
   // 弹窗底部主按钮（指派）。避开工具栏「指派角色」的同名文案。
   function assignOk() {
-    return within(screen.getByRole("dialog", { name: "指派角色" })).getByRole(
-      "button",
-      { name: "指派" }
-    );
+    return document.querySelector(
+      ".ant-modal-footer .ant-btn-primary"
+    ) as HTMLElement;
   }
 
   it("指派：选管理员 + 角色 → setRole(adminId, roleId)", async () => {
@@ -445,7 +451,7 @@ describe("RoleManagement — 派角色", () => {
     renderPage();
     await screen.findByText("全功能管理员");
     await openAssign();
-    const selectors = screen.getAllByRole("combobox");
+    const selectors = document.querySelectorAll(".ant-select");
     await pickOption(selectors[0]!, "审核员小王（13800138000）");
     await pickOption(selectors[1]!, "词库管理员");
     fireEvent.click(assignOk());
@@ -460,7 +466,7 @@ describe("RoleManagement — 派角色", () => {
     renderPage();
     await screen.findByText("全功能管理员");
     await openAssign();
-    const selectors = screen.getAllByRole("combobox");
+    const selectors = document.querySelectorAll(".ant-select");
     await pickOption(selectors[0]!, "审核员小王（13800138000）");
     await pickOption(selectors[1]!, "收回角色（降为仅首页）");
     fireEvent.click(assignOk());
@@ -477,7 +483,7 @@ describe("RoleManagement — 派角色", () => {
     renderPage();
     await screen.findByText("全功能管理员");
     await openAssign();
-    const selectors = screen.getAllByRole("combobox");
+    const selectors = document.querySelectorAll(".ant-select");
     await pickOption(selectors[0]!, "审核员小王（13800138000）");
     await pickOption(selectors[1]!, "词库管理员");
     fireEvent.click(assignOk());

@@ -5,17 +5,7 @@ import {
 } from "@tsz/api-client";
 import { isCode, isPhone, readTestResourceRun } from "@tsz/shared";
 import { translateAuthError } from "@tsz/shared/auth";
-import {
-  Alert,
-  Button,
-  Divider,
-  InputAdornment,
-  Stack,
-  TextField,
-  Typography
-} from "@mui/material";
-import { useForm } from "react-hook-form";
-import { PasswordField } from "@/components/PasswordField";
+import { Alert, Button, Form, Input } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, persistSession, tokens, useAuthStore } from "@/lib/auth";
@@ -45,12 +35,17 @@ function safeRedirect(raw: string | null): string {
   return "/";
 }
 
-// 保留原生表单提交，避免回车与点击重复触发登录。
+// antd Form 在此负责「原生提交」（htmlType=submit + onFinish）：让浏览器把这次交互识别为
+// 一次登录，从而触发密码管理器的「保存密码」提示（纯 onClick + XHR 的 SPA 登录识别率很低）。
+// 回车由表单隐式提交驱动，不再单挂 onPressEnter，避免与 submit 双触发后端请求。
+// 但 Form 不接管字段状态：
+// 1) 交互沿用「未达标只禁用按钮、不飘红」，用不上 rules 校验（onFinish 里由 canSubmit 兜底）；
+// 2) Form.useWatch 在 antd v6 + React 19 的 jsdom 测试环境下不触发重渲染，
+//    受控 useState 是能被测试覆盖的可靠写法。
 export function AdminLoginForm() {
-  const { watch, setValue, handleSubmit } = useForm({
-    defaultValues: { account: "", password: "", code: "" }
-  });
-  const { account, password, code } = watch();
+  const [account, setAccount] = useState("");
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   // 验证码倒计时（发码后 60s 内禁止重发）与在途发码态。
@@ -72,16 +67,14 @@ export function AdminLoginForm() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const redirect = safeRedirect(searchParams.get("redirect"));
-
   // 已登录的管理员访问登录页：直接进后台。
   useEffect(() => {
     // 登录和强制改密都可能在首次业务请求前跳转，先保留显式测试批次。
     readTestResourceRun();
     if (profile) {
-      navigate(redirect, { replace: true });
+      navigate(safeRedirect(searchParams.get("redirect")), { replace: true });
     }
-  }, [profile, navigate, redirect]);
+  }, [profile, navigate, searchParams]);
 
   // 验证码倒计时（与 web 端一致：发码后 60→0 递减）。
   useEffect(() => {
@@ -102,17 +95,17 @@ export function AdminLoginForm() {
 
   // 输入变更即视为新一次尝试意图：清错误 + 解除锁定置灰（仍在锁定窗口内会再拿到 423）。
   function onAccountChange(value: string) {
-    setValue("account", value);
+    setAccount(value);
     if (error) setError("");
     if (locked) setLocked(false);
   }
   function onPasswordChange(value: string) {
-    setValue("password", value);
+    setPassword(value);
     if (error) setError("");
     if (locked) setLocked(false);
   }
   function onCodeChange(value: string) {
-    setValue("code", value);
+    setCode(value);
     if (error) setError("");
     if (locked) setLocked(false);
   }
@@ -122,7 +115,7 @@ export function AdminLoginForm() {
   // 避免「后退」回登录页。
   async function enterConsole() {
     setProfile(await api.profile());
-    navigate(redirect, { replace: true });
+    navigate(safeRedirect(searchParams.get("redirect")), { replace: true });
   }
 
   // 2FA 第一步：发码。后端恒 202（查无此号/冷却也 202），前端只据成功与否起倒计时。
@@ -209,112 +202,101 @@ export function AdminLoginForm() {
       <main className="admin-login__body">
         <section className="admin-login__col admin-login__a4">
           <div className="admin-login__col-head">
-            <Typography
-              component="h2"
-              sx={{ fontSize: 26, lineHeight: 1.4, fontWeight: 600 }}
-            >
-              管理员登录
-            </Typography>
-            <Typography
-              sx={{
-                mt: 0.75,
-                fontSize: 14,
-                lineHeight: 1.7,
-                color: "text.secondary"
-              }}
-            >
-              使用管理员账号进入工作台
-            </Typography>
+            <span className="admin-login__zh">管理员登录</span>
+            <span className="admin-login__en">SIGN IN</span>
           </div>
 
-          {/* 三项凭据同宽对齐；发码操作位于验证码输入的上下文中。 */}
-          <Stack
-            component="form"
-            spacing={2.5}
-            onSubmit={handleSubmit(handleLogin)}
-          >
-            <TextField
-              fullWidth
-              size="medium"
-              label="手机号"
-              placeholder="请输入手机号"
-              autoComplete="username"
-              value={account}
-              onChange={(event) => onAccountChange(event.target.value)}
-              slotProps={{ htmlInput: { inputMode: "tel" } }}
-            />
-            <PasswordField
-              fullWidth
-              size="medium"
-              label="登录密码"
-              placeholder="请输入登录密码"
-              autoComplete="current-password"
-              value={password}
-              onChange={(event) => onPasswordChange(event.target.value)}
-            />
-            <TextField
-              fullWidth
-              size="medium"
-              label="验证码"
-              placeholder="请输入验证码"
-              autoComplete="one-time-code"
-              value={code}
-              onChange={(event) => onCodeChange(event.target.value)}
-              slotProps={{
-                htmlInput: { inputMode: "numeric" },
-                input: {
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <Divider
-                        orientation="vertical"
-                        flexItem
-                        sx={{ height: 24, alignSelf: "center", mr: 1 }}
-                      />
-                      <Button
-                        size="small"
-                        type="button"
-                        onClick={() => void handleSendCode()}
-                        disabled={!canSendCode}
-                        sx={{
-                          minWidth: 100,
-                          px: 1,
-                          whiteSpace: "nowrap",
-                          fontSize: 13,
-                          fontVariantNumeric: "tabular-nums"
-                        }}
-                      >
-                        {countdown > 0
-                          ? `${countdown}s 后重发`
-                          : sending
-                            ? "发送中..."
-                            : "获取验证码"}
-                      </Button>
-                    </InputAdornment>
-                  )
-                }
-              }}
-            />
+          <Form onFinish={() => void handleLogin()}>
+            <div className="admin-login__field">
+              <div className="admin-login__label">
+                <span className="admin-login__t">手机号</span>
+              </div>
+              <div className="admin-login__ctl">
+                <Input
+                  size="large"
+                  placeholder="请输入手机号"
+                  aria-label="手机号"
+                  autoComplete="username"
+                  value={account}
+                  onChange={(e) => onAccountChange(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="admin-login__field">
+              <div className="admin-login__label">
+                <span className="admin-login__t">验证码</span>
+              </div>
+              <div className="admin-login__ctl">
+                <Input
+                  size="large"
+                  placeholder="请输入验证码"
+                  aria-label="验证码"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={code}
+                  onChange={(e) => onCodeChange(e.target.value)}
+                />
+                <Button
+                  size="large"
+                  htmlType="button"
+                  onClick={() => void handleSendCode()}
+                  disabled={!canSendCode}
+                >
+                  {countdown > 0
+                    ? `${countdown}s 后重发`
+                    : sending
+                      ? "发送中..."
+                      : "获取验证码"}
+                </Button>
+              </div>
+            </div>
+
+            <div className="admin-login__field">
+              <div className="admin-login__label">
+                <span className="admin-login__t">登录密码</span>
+              </div>
+              <div className="admin-login__ctl">
+                <Input.Password
+                  size="large"
+                  placeholder="请输入登录密码"
+                  aria-label="登录密码"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => onPasswordChange(e.target.value)}
+                />
+              </div>
+            </div>
 
             {(error || permissionModelIncompatible) && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {permissionModelIncompatible
-                  ? ADMIN_PERMISSION_UPGRADE_MESSAGE
-                  : error}
-              </Alert>
+              <Alert
+                type="error"
+                title={
+                  permissionModelIncompatible
+                    ? ADMIN_PERMISSION_UPGRADE_MESSAGE
+                    : error
+                }
+                showIcon
+                style={{ marginBottom: 16 }}
+              />
             )}
 
             <Button
-              variant="contained"
-              type="submit"
-              fullWidth
-              size="medium"
+              className={
+                loading
+                  ? "admin-login__submit admin-login__submit--busy"
+                  : "admin-login__submit"
+              }
+              type="primary"
+              htmlType="submit"
+              block
+              size="large"
               loading={loading}
-              sx={{ height: 48, fontSize: 15, fontWeight: 600 }}
               disabled={!canSubmit}
             >
-              {loading ? "登录中..." : "登录"}
+              {loading ? "登录中..." : "登 录"}
             </Button>
-          </Stack>
+          </Form>
         </section>
       </main>
 

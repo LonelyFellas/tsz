@@ -1,4 +1,4 @@
-import { Stack, Typography } from "@mui/material";
+import { Result } from "antd";
 import type { ReactNode } from "react";
 import { useLocation } from "react-router-dom";
 import { useAuthStore } from "@/lib/auth";
@@ -13,11 +13,10 @@ export function BusinessPermissionGuard({ children }: { children: ReactNode }) {
   return canVisitAdminRoute(profile, pathname) ? (
     children
   ) : (
-    <Stack spacing={1} sx={{ p: 4 }} role="alert">
-      <Typography variant="h5">没有访问权限</Typography>
-      <Typography>
-        请联系超级管理员开通权限。你仍可查看首页和个人设置。
-      </Typography>
-    </Stack>
+    <Result
+      status="403"
+      title="没有访问权限"
+      subTitle="请联系超级管理员开通权限。你仍可查看首页和个人设置。"
+    />
   );
 }

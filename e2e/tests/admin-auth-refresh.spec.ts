@@ -61,7 +61,7 @@ test("初始恢复 503 后手动登录可进入后台，不永久停在加载态
     .getByLabel("登录密码", { exact: true })
     .fill("Correct!Password731");
   await page.getByLabel("验证码", { exact: true }).fill("000000");
-  await page.getByRole("button", { name: "登录", exact: true }).click();
+  await page.getByRole("button", { name: "登 录", exact: true }).click();
   await expect(page).toHaveURL(/\/settings\/profile$/);
   await expect(page.getByText("加载中...", { exact: true })).toHaveCount(0);
   await expect(page.getByText("正在恢复连接，联网后将自动继续")).toHaveCount(0);

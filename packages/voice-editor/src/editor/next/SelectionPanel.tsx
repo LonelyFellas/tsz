@@ -1,5 +1,5 @@
-import { ClickAwayListener, Paper, Popper } from "@mui/material";
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { Popover } from "antd";
+import { useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
 /** 非模态浮层允许字段获取焦点，保留编辑器持有的业务选区。 */
@@ -18,27 +18,10 @@ export function SelectionPanel({
 }) {
   const anchor = useRef<HTMLSpanElement>(null);
   const [surface, setSurface] = useState<HTMLDivElement | null>(null);
-  const updatePosition = useRef<(() => void) | null>(null);
-  const bindPopper = useCallback(
-    (instance: { update(): Promise<unknown> } | null) => {
-      updatePosition.current = instance
-        ? () => {
-            void instance.update();
-          }
-        : null;
-    },
-    []
-  );
   useLayoutEffect(() => {
     if (!open || !surface) return;
     const popup = surface;
-    const observer =
-      typeof ResizeObserver === "undefined"
-        ? undefined
-        : new ResizeObserver(() => updatePosition.current?.());
-    if (popup) observer?.observe(popup);
     return () => {
-      observer?.disconnect();
       queueMicrotask(() => {
         if (
           document.activeElement !== document.body &&
@@ -56,52 +39,43 @@ export function SelectionPanel({
   }, [open, surface]);
   return (
     <span ref={anchor} style={{ display: "contents" }}>
-      {children}
-      <Popper
-        popperRef={bindPopper}
-        modifiers={[
-          {
-            name: "preventOverflow",
-            options: {
-              padding: 12,
-              altAxis: true,
-              tether: false,
-              boundary: "viewport"
-            }
-          },
-          { name: "flip", options: { padding: 12 } }
-        ]}
+      <Popover
+        fresh
+        styles={{ root: { pointerEvents: "auto" } }}
         open={open}
-        anchorEl={() => anchor.current?.firstElementChild as HTMLElement}
-        placement={placement}
-        container={() =>
+        trigger={onDismiss ? "click" : []}
+        onOpenChange={(next) => {
+          if (!next) onDismiss?.();
+        }}
+        placement={placement === "top-start" ? "topLeft" : "bottomLeft"}
+        getPopupContainer={() =>
           anchor.current?.closest<HTMLElement>('[role="dialog"]') ??
           document.body
         }
-        sx={{ zIndex: 1500 }}
+        classNames={{ root: "tsz-ve-pop-overlay" }}
+        content={
+          open ? (
+            <div
+              ref={setSurface}
+              style={{
+                maxWidth: "min(900px, 95vw)",
+                maxHeight: "80vh",
+                overflow: "auto"
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Escape" && onDismiss) {
+                  event.stopPropagation();
+                  onDismiss();
+                }
+              }}
+            >
+              {content}
+            </div>
+          ) : null
+        }
       >
-        <ClickAwayListener onClickAway={() => onDismiss?.()}>
-          <Paper
-            ref={setSurface}
-            className="tsz-ve-pop-overlay"
-            elevation={8}
-            sx={{
-              p: 1.5,
-              maxWidth: "min(900px, 95vw)",
-              maxHeight: "80vh",
-              overflow: "auto"
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Escape" && onDismiss) {
-                event.stopPropagation();
-                onDismiss();
-              }
-            }}
-          >
-            {content}
-          </Paper>
-        </ClickAwayListener>
-      </Popper>
+        {children}
+      </Popover>
     </span>
   );
 }

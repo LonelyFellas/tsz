@@ -24,26 +24,24 @@
   overflow-x: auto;
 }
 
-.word-creation-stepper .MuiStepper-root {
+.word-creation-stepper .ant-steps {
   min-width: 0;
 }
 
-.word-creation-stepper .MuiStepLabel-label {
+.word-creation-stepper .ant-steps-item-title {
   font-weight: 700;
   font-size: 16px;
 }
 
-.word-creation-stepper .MuiStepLabel-labelContainer {
+.word-creation-stepper .ant-steps-item-content {
   font-size: 11px;
 }
 
-.word-creation-steps .MuiStepLabel-iconContainer {
+.word-creation-steps .ant-steps-item-icon {
   box-shadow: 0 4px 12px rgba(0, 113, 227, 0.1);
 }
 
-.word-creation-steps
-  .MuiStep-root:has([aria-current="step"])
-  .MuiStepLabel-label {
+.word-creation-steps .ant-steps-item-process .ant-steps-item-title {
   color: #111827;
 }
 
@@ -194,7 +192,7 @@
   color: #22a06b;
 }
 
-.word-creation-progress-row > .MuiTypography-root:last-child {
+.word-creation-progress-row > .ant-typography:last-child {
   min-width: 34px;
   margin: 0;
   padding: 1px 7px;
@@ -206,7 +204,6 @@
 
 .word-creation-content {
   container: word-creation-content / inline-size;
-  box-sizing: border-box;
   width: 100%;
   max-width: 1540px;
   min-width: 0;
@@ -224,7 +221,7 @@
   margin-bottom: 22px;
 }
 
-.word-step-heading h2 {
+.word-step-heading .ant-typography-h2 {
   color: #161b26;
   font-size: 30px;
   line-height: 1.25;
@@ -259,8 +256,6 @@
 }
 
 .word-step-actions {
-  box-sizing: border-box;
-  align-items: center;
   position: sticky;
   z-index: 5;
   bottom: 0;
@@ -276,9 +271,9 @@
   backdrop-filter: blur(8px);
 }
 
-.word-step-actions :is(.MuiButton-root, .MuiIconButton-root) {
+.word-step-actions .ant-btn {
   min-width: 96px;
-  min-height: 40px;
+  height: 40px;
 }
 
 .dialect-panel {
@@ -320,43 +315,34 @@
   box-shadow: 0 10px 28px rgba(34, 43, 63, 0.06);
 }
 
-.word-form-card > .admin-card-header,
-.word-sense-card > .admin-card-header {
+.word-form-card > .ant-card-head,
+.word-sense-card > .ant-card-head {
   color: #fff;
   background: var(--word-ink);
 }
 
-.word-form-card > .admin-card-header .MuiCardHeader-action,
-.word-sense-card > .admin-card-header .MuiCardHeader-action {
+.word-form-card > .ant-card-head .ant-card-extra,
+.word-sense-card > .ant-card-head .ant-card-extra {
   color: #fff;
 }
 
-.word-form-card
-  > .admin-card-header
-  .MuiCardHeader-action
-  :is(.MuiButton-root, .MuiIconButton-root) {
+.word-form-card > .ant-card-head .ant-card-extra .ant-btn {
   color: rgba(255, 255, 255, 0.82);
 }
 
-.word-form-card
-  > .admin-card-header
-  .MuiCardHeader-action
-  :is(.MuiButton-root, .MuiIconButton-root):hover {
+.word-form-card > .ant-card-head .ant-card-extra .ant-btn:hover {
   color: #fff;
   background: rgba(255, 255, 255, 0.12);
 }
 
-.word-form-card
-  > .admin-card-header
-  .MuiCardHeader-action
-  :is(.MuiButton-root, .MuiIconButton-root):disabled {
+.word-form-card > .ant-card-head .ant-card-extra .ant-btn:disabled {
   color: rgba(255, 255, 255, 0.38);
 }
 
 .word-form-card
-  > .admin-card-header
-  .MuiCardHeader-action
-  :is(.MuiButton-colorError, .MuiIconButton-colorError):not(:disabled) {
+  > .ant-card-head
+  .ant-card-extra
+  .ant-btn-dangerous:not(:disabled) {
   color: #ffb3b3;
 }
 
@@ -368,65 +354,18 @@
 
 .word-basics-input-card,
 .word-detection-result-card,
-.word-basics-input-card > .admin-card-header,
-.word-detection-result-card > .admin-card-header,
-.word-basics-input-card > .admin-card-body {
+.word-basics-input-card > .ant-card-head,
+.word-detection-result-card > .ant-card-head,
+.word-basics-input-card > .ant-card-body {
   padding: 18px;
 }
 
-.word-basics-input-card .MuiFormControl-root:last-of-type {
+.word-basics-input-card .ant-form-item:last-of-type {
   margin-bottom: 12px;
 }
 
-.word-basics-input-card button[type="submit"] {
+.word-basics-input-card .ant-input-search-button {
   min-width: 128px;
-}
-
-.word-entry-search {
-  --entry-focus-color: var(--admin-color-primary);
-  display: flex;
-  min-width: 0;
-  height: 44px;
-  box-sizing: border-box;
-  overflow: hidden;
-  border: 1px solid rgba(0, 0, 0, 0.23);
-  border-radius: 8px;
-}
-
-.word-entry-search:focus-within {
-  border-color: var(--entry-focus-color);
-  box-shadow: 0 0 0 1px var(--entry-focus-color);
-}
-
-.word-entry-search:has(.Mui-error) {
-  --entry-focus-color: var(--admin-color-error);
-  border-color: var(--entry-focus-color);
-}
-
-.word-entry-search > .MuiOutlinedInput-root {
-  flex: 1;
-  min-width: 0;
-  height: 100%;
-  border-radius: 0;
-}
-
-.word-entry-search .MuiOutlinedInput-notchedOutline {
-  border: 0;
-}
-
-.word-entry-search > .MuiOutlinedInput-root .MuiOutlinedInput-input {
-  box-sizing: border-box;
-  height: 100%;
-  padding: 8px 12px;
-  font-size: 16px;
-}
-
-.word-entry-search > .MuiButton-root {
-  flex-shrink: 0;
-  height: 100%;
-  border-radius: 0;
-  font-size: 14px;
-  white-space: nowrap;
 }
 
 .word-field-help {
@@ -443,7 +382,7 @@
   box-shadow: 0 8px 24px rgba(32, 38, 54, 0.05);
 }
 
-.word-headword-confirmation-card > .admin-card-header {
+.word-headword-confirmation-card > .ant-card-head {
   min-height: 44px;
   padding-inline: 16px;
   background: #fafbfc;
@@ -471,11 +410,11 @@
   gap: 2px;
 }
 
-.word-dialect-detection-row .MuiTypography-root {
+.word-dialect-detection-row .ant-typography-secondary {
   font-size: 12px;
 }
 
-.word-headword-confirmation-card .MuiAlert-root {
+.word-headword-confirmation-card .ant-alert {
   border-radius: 9px;
 }
 
@@ -484,7 +423,7 @@
   border-radius: 10px;
 }
 
-.word-headword-confirmation-card .dialect-panel > .MuiTypography-root {
+.word-headword-confirmation-card .dialect-panel > .ant-typography {
   display: block;
   margin-bottom: 8px;
 }
@@ -520,29 +459,21 @@
 }
 
 .word-smart-match-summary-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 12px;
-}
-
-.word-smart-match-summary-info {
   display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 8px;
-  overflow-wrap: anywhere;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
-.word-smart-match-summary-row .MuiChip-root {
+.word-smart-match-summary-row .ant-tag {
   margin-inline-end: 0;
 }
 
-/* 操作与词头对齐，词性在下方独立排布。 */
-.word-smart-match-summary-row .MuiButton-text {
-  min-height: 24px;
+/* 「查看已有原形」是次要动作，去掉 antd 链接按钮的默认内边距，
+   让它与主词在同一条基线上收边，不额外撑高整行。 */
+.word-smart-match-summary-row .ant-btn-link {
+  height: auto;
   padding: 0;
-  white-space: nowrap;
 }
 
 .word-smart-match-context-meta {
@@ -556,7 +487,7 @@
   color: #98a2b3;
 }
 
-.word-smart-match-context-meta .MuiChip-root {
+.word-smart-match-context-meta .ant-tag {
   margin-inline-end: 0;
 }
 
@@ -572,7 +503,7 @@
   border-radius: 10px;
 }
 
-.word-detection-empty-state > .MuiSvgIcon-root {
+.word-detection-empty-state > .anticon {
   color: #7c8ca3;
   font-size: 16px;
 }
@@ -604,16 +535,16 @@
   margin-top: 14px;
 }
 
-.word-entry-actions :is(.MuiButton-root, .MuiIconButton-root) {
+.word-entry-actions .ant-btn {
   min-width: 112px;
 }
 
-.word-detection-result-card .MuiAlert-root {
+.word-detection-result-card .ant-alert {
   border-radius: 9px;
 }
 
-.word-detection-result-card dl > div > th,
-.word-detection-result-card dl > div > td {
+.word-detection-result-card .ant-descriptions-row > th,
+.word-detection-result-card .ant-descriptions-row > td {
   padding-bottom: 10px;
 }
 
@@ -641,7 +572,7 @@
     .word-detection-result-card,
     .word-headword-confirmation-card
   )
-  > .admin-card-header {
+  > .ant-card-head {
   min-height: 48px;
   padding: 0 var(--word-card-padding);
 }
@@ -652,17 +583,15 @@
     .word-detection-result-card,
     .word-headword-confirmation-card
   )
-  > .admin-card-body {
+  > .ant-card-body {
   padding: var(--word-card-padding);
 }
 
-.word-basics-workflow .word-basics-input-card .MuiFormControl-root {
+.word-basics-workflow .word-basics-input-card .ant-form-item {
   margin-bottom: 20px;
 }
 
-.word-basics-workflow
-  .word-basics-input-card
-  .MuiFormControl-root:last-of-type {
+.word-basics-workflow .word-basics-input-card .ant-form-item:last-of-type {
   margin-bottom: 8px;
 }
 
@@ -691,7 +620,7 @@
   padding: 16px;
 }
 
-.word-basics-workflow .word-headword-confirmation-card .MuiFormControl-root {
+.word-basics-workflow .word-headword-confirmation-card .ant-form-item {
   margin-bottom: 0;
 }
 
@@ -703,8 +632,7 @@
 
 .word-basics-workflow
   .word-detection-result-card
-  dl
-  > div:last-child
+  .ant-descriptions-row:last-child
   > :is(th, td) {
   padding-bottom: 0;
 }
@@ -736,7 +664,7 @@
   padding: 12px 16px;
 }
 
-.word-forms-tabs > .MuiTabs-root {
+.word-forms-tabs > .ant-tabs-nav {
   padding: 0 2px;
 }
 
@@ -745,18 +673,18 @@
   border-radius: 13px;
 }
 
-.word-form-card > .admin-card-header {
+.word-form-card > .ant-card-head {
   min-height: 48px;
   padding-inline: 14px;
   cursor: pointer;
 }
 
 /* 基准原形卡不可折叠(它是完成本步的硬要求,任何时候都得能改)。 */
-.word-form-base-card > .admin-card-header {
+.word-form-base-card > .ant-card-head {
   cursor: default;
 }
 
-.word-form-card > .admin-card-header .admin-card-title {
+.word-form-card > .ant-card-head .ant-card-head-title {
   min-width: 0;
 }
 
@@ -784,14 +712,14 @@
   font-weight: 400;
 }
 
-.word-form-card > .admin-card-body {
+.word-form-card > .ant-card-body {
   padding: 0;
 }
 
 /* 词形组卡的底部留白来自组内的「添加派生词形」行,基准原形卡没有那一行,
    自己补上,否则矩阵/折叠条会直接压在卡片底边上。必须排在上面那条
    padding:0 之后——同特异性,靠顺序取胜。 */
-.word-form-base-card > .admin-card-body {
+.word-form-base-card > .ant-card-body {
   padding-bottom: 16px;
 }
 
@@ -813,8 +741,8 @@
   background: #fff;
 }
 
-.word-shared-form-spelling .MuiChip-root,
-.word-shared-pronunciation .MuiChip-root {
+.word-shared-form-spelling .ant-tag,
+.word-shared-pronunciation .ant-tag {
   margin-inline-end: 0;
 }
 
@@ -876,20 +804,17 @@
   min-width: 0;
 }
 
-.word-pronunciation-actions :is(.MuiButton-root, .MuiIconButton-root) {
+.word-pronunciation-actions .ant-btn {
   width: 27px;
   padding-inline: 0;
 }
 
 .word-pronunciation-actions
-  :is(.MuiButton-root, .MuiIconButton-root):not(:disabled):where(
-    :not(.word-pronunciation-remove)
-  ) {
+  .ant-btn:not(:disabled):where(:not(.word-pronunciation-remove)) {
   color: var(--word-ink);
 }
 
-.word-pronunciation-actions
-  .word-pronunciation-drag-handle:is(.MuiButton-root, .MuiIconButton-root) {
+.word-pronunciation-actions .word-pronunciation-drag-handle.ant-btn {
   color: #7f8998;
   cursor: grab;
   user-select: none;
@@ -900,33 +825,20 @@
 }
 
 .word-pronunciation-actions
-  .word-pronunciation-drag-handle:is(
-    .MuiButton-root,
-    .MuiIconButton-root
-  ):hover:not(:disabled),
+  .word-pronunciation-drag-handle.ant-btn:hover:not(:disabled),
 .word-pronunciation-actions
-  .word-pronunciation-drag-handle:is(
-    .MuiButton-root,
-    .MuiIconButton-root
-  ):focus-visible {
+  .word-pronunciation-drag-handle.ant-btn:focus-visible {
   color: #1677ff;
   background: rgba(22, 119, 255, 0.1);
 }
 
 .word-pronunciation-actions
-  .word-pronunciation-drag-handle:is(
-    .MuiButton-root,
-    .MuiIconButton-root
-  ):active:not(:disabled) {
+  .word-pronunciation-drag-handle.ant-btn:active:not(:disabled) {
   cursor: grabbing;
   transform: scale(1.06);
 }
 
-.word-pronunciation-actions
-  .word-pronunciation-drag-handle:is(
-    .MuiButton-root,
-    .MuiIconButton-root
-  ):disabled {
+.word-pronunciation-actions .word-pronunciation-drag-handle.ant-btn:disabled {
   color: #c4cad4;
   cursor: default;
 }
@@ -1044,7 +956,7 @@
   padding-left: 10px;
 }
 
-.word-pronunciation-phonetic-control .v3-voice-text-field-compact {
+.word-pronunciation-phonetic-control .ant-space-compact {
   width: 100%;
 }
 
@@ -1069,15 +981,9 @@
   --word-playback-color: #d42a91;
 }
 
-.word-pronunciation-play-action:is(.MuiButton-root, .MuiIconButton-root):not(
-    :disabled
-  ),
-.word-pronunciation-play-action:is(.MuiButton-root, .MuiIconButton-root):not(
-    :disabled
-  ):hover,
-.word-pronunciation-play-action:is(.MuiButton-root, .MuiIconButton-root):not(
-    :disabled
-  ):active {
+.word-pronunciation-play-action.ant-btn:not(:disabled),
+.word-pronunciation-play-action.ant-btn:not(:disabled):hover,
+.word-pronunciation-play-action.ant-btn:not(:disabled):active {
   color: var(--word-playback-color);
 }
 
@@ -1196,7 +1102,7 @@
   border-bottom: 1px solid #d9dee7;
 }
 
-.word-form-type-cell .MuiChip-root {
+.word-form-type-cell .ant-tag {
   margin-inline-end: 0;
 }
 
@@ -1278,18 +1184,16 @@
   box-shadow: 0 6px 18px rgba(32, 38, 54, 0.04);
 }
 
-.word-sense-groups-card > .admin-card-header,
-.word-grammar-card > .admin-card-header {
-  box-sizing: border-box;
+.word-sense-groups-card > .ant-card-head,
+.word-grammar-card > .ant-card-head {
   min-height: 48px;
-  padding-block: 8px;
   padding-inline: 14px;
   background: #fafbfc;
   border-bottom-color: #e8ebf0;
 }
 
 /* 上下留白要和行间对齐：行自带 10px padding，卡片再给 14px 会让首末两条比行间多出 3px。 */
-.word-sense-groups-card > .admin-card-body {
+.word-sense-groups-card > .ant-card-body {
   padding: 10px 14px;
 }
 
@@ -1308,7 +1212,7 @@
   border-radius: 9px;
 }
 
-.word-meaning-dialect-panel .MuiChip-root {
+.word-meaning-dialect-panel .ant-tag {
   margin-inline-end: 0;
 }
 
@@ -1368,15 +1272,15 @@
   min-width: 0;
 }
 
-.word-pos-tabs > [role="tabpanel"] {
-  padding-top: 16px;
+.word-pos-tabs > .ant-tabs-nav {
+  margin-bottom: 16px;
 }
 
-.word-pos-tabs > .MuiTabs-root [role="tab"] {
+.word-pos-tabs > .ant-tabs-nav .ant-tabs-tab {
   padding-block: 9px;
 }
 
-.word-pos-tabs > .MuiTabs-root [role="tab"][aria-selected="true"] {
+.word-pos-tabs > .ant-tabs-nav .ant-tabs-tab-active {
   font-weight: 700;
 }
 
@@ -1391,7 +1295,7 @@
   box-shadow: 0 6px 18px rgba(32, 38, 54, 0.04);
 }
 
-.word-grammar-card > .admin-card-body {
+.word-grammar-card > .ant-card-body {
   padding: 10px 14px;
 }
 
@@ -1421,12 +1325,11 @@
   width: var(--word-ops-col, 32px);
 }
 
-.word-sort-actions > button {
+.word-sort-actions > .ant-btn {
   width: 32px;
 }
 
-:is(.word-sort-actions, .word-sort-leading)
-  .word-sort-drag-handle:is(.MuiButton-root, .MuiIconButton-root) {
+:is(.word-sort-actions, .word-sort-leading) .word-sort-drag-handle.ant-btn {
   color: #7f8998;
   cursor: grab;
   user-select: none;
@@ -1437,28 +1340,21 @@
 }
 
 :is(.word-sort-actions, .word-sort-leading)
-  .word-sort-drag-handle:is(.MuiButton-root, .MuiIconButton-root):hover:not(
-    :disabled
-  ),
+  .word-sort-drag-handle.ant-btn:hover:not(:disabled),
 :is(.word-sort-actions, .word-sort-leading)
-  .word-sort-drag-handle:is(
-    .MuiButton-root,
-    .MuiIconButton-root
-  ):focus-visible {
+  .word-sort-drag-handle.ant-btn:focus-visible {
   color: #1677ff;
   background: rgba(22, 119, 255, 0.1);
 }
 
 :is(.word-sort-actions, .word-sort-leading)
-  .word-sort-drag-handle:is(.MuiButton-root, .MuiIconButton-root):active:not(
-    :disabled
-  ) {
+  .word-sort-drag-handle.ant-btn:active:not(:disabled) {
   cursor: grabbing;
   transform: scale(1.06);
 }
 
 :is(.word-sort-actions, .word-sort-leading)
-  .word-sort-drag-handle:is(.MuiButton-root, .MuiIconButton-root):disabled {
+  .word-sort-drag-handle.ant-btn:disabled {
   color: #c4cad4;
   cursor: default;
 }
@@ -1566,7 +1462,7 @@
   --sense-accent: #d22d8d;
 }
 
-.word-sense-editor > [data-admin-accordion] {
+.word-sense-editor > .ant-collapse-item {
   overflow: hidden;
   background: #fff;
   border: 1px solid var(--sense-border) !important;
@@ -1575,30 +1471,22 @@
   box-shadow: 0 8px 22px rgba(32, 38, 54, 0.05);
 }
 
-.word-sense-editor > [data-admin-accordion] .admin-section-header {
+.word-sense-editor > .ant-collapse-item > .ant-collapse-header {
   align-items: center !important;
   min-height: 48px;
   padding: 9px 12px !important;
   background: var(--sense-soft);
 }
 
-.word-sense-editor > [data-admin-accordion] > .admin-section-body {
+.word-sense-editor
+  > .ant-collapse-item
+  > .ant-collapse-content
+  > .ant-collapse-content-box {
   padding: 14px !important;
 }
 
-.word-sense-editor .MuiAccordionSummary-content {
+.word-sense-editor .ant-collapse-header-text {
   min-width: 0;
-  margin-block: 0;
-  align-items: center;
-}
-
-.word-sense-header-actions .MuiIconButton-root {
-  width: 32px;
-  height: 32px;
-}
-
-.word-sense-header-actions > span {
-  align-items: center;
 }
 
 .word-sense-header-label {
@@ -1610,7 +1498,7 @@
   min-width: 0;
 }
 
-.word-sense-editor .MuiAccordionSummary-content .MuiTypography-root {
+.word-sense-editor .ant-collapse-header-text .ant-typography {
   display: inline-block;
   max-width: min(720px, 58vw);
   overflow: hidden;
@@ -1619,13 +1507,12 @@
   vertical-align: middle;
 }
 
-.word-sense-editor-v3 > [data-admin-accordion] .admin-section-header {
-  box-sizing: border-box;
-  padding: 4px 12px !important;
+.word-sense-editor-v3 > .ant-collapse-item > .ant-collapse-header {
+  padding: 8px 12px !important;
   background: color-mix(in srgb, var(--sense-accent) 24%, white);
 }
 
-.word-sense-editor-v3 > [data-admin-accordion] .MuiAccordionDetails-root {
+.word-sense-editor-v3 > .ant-collapse-item > .ant-collapse-panel {
   border-top: 0;
 }
 
@@ -1679,7 +1566,7 @@
   grid-template-columns:
     minmax(86px, 0.55fr) minmax(190px, 1.45fr) minmax(210px, 1.35fr)
     minmax(150px, 0.85fr) minmax(130px, 0.72fr);
-  align-items: start;
+  align-items: end;
   gap: 10px 16px;
   padding: 2px 2px 4px;
 }
@@ -1688,8 +1575,8 @@
   min-width: 0;
 }
 
-.word-sense-field > .MuiTypography-root,
-.word-sense-context-toggle > .MuiTypography-root {
+.word-sense-field > .ant-typography,
+.word-sense-context-toggle > .ant-typography {
   font-size: 12px;
 }
 
@@ -1700,13 +1587,13 @@
 .word-sense-context-control {
   display: flex;
   align-items: center;
-  height: 40px;
+  height: 32px;
   margin-top: 6px;
 }
 
-.word-sense-context-control .MuiSwitch-root {
-  flex-shrink: 0;
-  width: 58px;
+.word-sense-context-control .ant-switch {
+  width: auto;
+  min-width: 44px;
 }
 
 .word-sense-field-frequency {
@@ -1715,11 +1602,11 @@
   gap: 6px;
 }
 
-.word-sense-field-frequency [data-percentage-field] {
+.word-sense-field-frequency .ant-input-number {
   width: 100%;
 }
 
-.word-sense-field-frequency .MuiInputAdornment-positionEnd {
+.word-sense-field-frequency .ant-input-number-suffix {
   color: #7f8794;
 }
 
@@ -1761,7 +1648,7 @@
   outline-offset: -2px;
 }
 
-.word-sense-section-title .MuiChip-root {
+.word-sense-section-title .ant-tag {
   margin-inline-end: 0;
   color: #737b89;
   background: #fff;
@@ -1801,46 +1688,12 @@
   gap: 8px;
 }
 
-.word-sense-section-collapse.MuiButton-root,
-.word-relation-collapse.MuiButton-root,
-.word-form-card-toggle-state {
-  min-height: 32px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  gap: 4px;
-  font-size: 13px;
-  line-height: 24px;
-  white-space: nowrap;
+.word-sense-section-collapse {
+  color: #858c98;
 }
 
-.word-sense-section-collapse.MuiButton-root,
-.word-relation-collapse.MuiButton-root {
-  color: #606b7a;
-}
-
-.word-sense-section-collapse .MuiButton-endIcon,
-.word-relation-collapse .MuiButton-endIcon {
-  margin: 0;
-}
-
-.word-sense-section-collapse .MuiSvgIcon-root,
-.word-relation-collapse .MuiSvgIcon-root,
-.word-form-card-toggle-state .MuiSvgIcon-root {
-  flex: none;
-  font-size: 20px;
-}
-
-.word-sense-section-collapse.MuiButton-root:hover,
-.word-relation-collapse.MuiButton-root:hover {
-  color: var(--admin-color-primary, #2053ff);
-  background: rgba(32, 83, 255, 0.06);
-}
-
-.word-sense-section-collapse:focus-visible,
-.word-relation-collapse:focus-visible,
-.word-form-card-toggle-state:focus-visible {
-  outline: 2px solid currentColor;
-  outline-offset: 2px;
+.word-sense-section-collapse .anticon {
+  font-size: 11px;
 }
 
 .word-list-header {
@@ -1877,24 +1730,22 @@
   padding-block: 9px;
 }
 
-.word-definition-text-select[data-admin-select] {
+.word-definition-text-select.ant-select {
   padding-inline: 0;
 }
 
-.word-definition-text-select .MuiSelect-select {
+.word-definition-text-select .ant-select-content {
   margin-inline-end: 0;
   text-align: center;
 }
 
-.word-definition-text-select[data-admin-select][data-admin-select]:has(
-    [aria-expanded="true"]
-  )
-  .MuiSelect-select.MuiSelect-select {
-  color: var(--admin-color-primary, #2053ff);
+.word-definition-text-select.ant-select.ant-select-open
+  .ant-select-content.ant-select-content-has-value {
+  color: var(--ant-color-primary, #2053ff);
   opacity: 1;
 }
 
-.word-definition-text-options [role="option"] {
+.word-definition-text-options .ant-select-item-option-content {
   text-align: center;
 }
 
@@ -1968,37 +1819,35 @@
 
 .word-forms-tabs-empty {
   display: grid;
-  min-height: 120px;
+  min-height: 210px;
   background: transparent;
   place-items: center;
 }
 
-.word-forms-tabs-empty .admin-empty-description {
+.word-forms-tabs-empty .ant-empty-description {
   color: inherit;
 }
 
-.word-forms-tabs-empty .admin-empty-description strong {
+.word-forms-tabs-empty .ant-empty-description strong {
   color: #262626;
 }
 
-.word-add-basic-pos-select .MuiSelect-select {
+.word-add-basic-pos-select .ant-select-selector {
   background: #f5faff !important;
   border-color: #91caff !important;
 }
 
-.word-add-basic-pos-select .MuiSelect-select,
-.word-add-basic-pos-select .MuiSelect-icon {
+.word-add-basic-pos-select .ant-select-selection-placeholder,
+.word-add-basic-pos-select .ant-select-arrow {
   color: #1677ff !important;
 }
 
-.word-add-basic-pos-select .MuiSelect-select {
+.word-add-basic-pos-select .ant-select-selection-placeholder {
   font-weight: 500;
 }
 
-.word-add-basic-pos-select:not(
-    [data-admin-select]:has([aria-disabled="true"])
-  ):hover
-  .MuiSelect-select {
+.word-add-basic-pos-select:not(.ant-select-disabled):hover
+  .ant-select-selector {
   border-color: #4096ff !important;
 }
 
@@ -2012,24 +1861,23 @@
 
 .word-relations-grid-stacked {
   grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
-  padding-top: 4px;
 }
 
 .word-relations-grid-stacked .word-relation-column-heads,
 .word-relations-grid-stacked .word-relation-row {
-  /* 拖动与序号共需 62px；关联度定宽，搜索与词义保留接近的输入空间。 */
-  grid-template-columns: 64px 112px minmax(0, 1fr) minmax(0, 1.25fr) 32px;
-  gap: 12px;
+  /* 度量列定宽不收缩：InputNumber 悬停时右侧箭头（22px）会把 % 往左推，
+     112px 才能让 100.00 完整显示。 */
+  grid-template-columns:
+    50px 112px minmax(0, 1fr) minmax(0, 2fr)
+    24px;
+  gap: 10px;
 }
 
 .word-relations-grid-stacked .word-relation-column-heads > :last-child {
   display: block;
 }
 
-.word-relations-grid-stacked
-  .word-relation-row
-  > :is(.MuiButton-colorError, .MuiIconButton-colorError) {
+.word-relations-grid-stacked .word-relation-row > .ant-btn-dangerous {
   grid-column: 5;
   grid-row: 1;
   position: static;
@@ -2063,47 +1911,54 @@
     box-shadow 160ms ease;
 }
 
-.word-relation-card > .admin-card-header {
-  box-sizing: border-box;
+.word-relation-card:focus-within {
+  border-color: #3f7cff;
+  box-shadow: 0 9px 22px rgba(32, 83, 255, 0.1);
+}
+
+.word-relation-card > .ant-card-head {
   min-height: 44px;
-  padding: 6px 12px;
+  padding-inline: 12px 8px;
   background: #f5f6f8;
   border-bottom-color: #dfe3e8;
 }
 
-.word-relation-card > .admin-card-header .MuiCardHeader-action {
-  align-self: center;
-  margin: 0;
-}
-
-.word-relation-card > .admin-card-header .admin-card-title {
+.word-relation-card > .ant-card-head .ant-card-head-title {
   font-size: 15px;
   font-weight: 700;
 }
 
-.word-relation-card > .admin-card-body {
+.word-relation-card > .ant-card-body {
   padding: 10px;
 }
 
-.word-relation-card.is-collapsed > .admin-card-body {
+.word-relation-card.is-collapsed > .ant-card-body {
   display: none;
 }
 
 /* 关联词复用词义区块的高度与透明度动画，避免 display:none 截断过渡。 */
-.word-relation-card.word-relation-card-animated > .admin-card-body {
+.word-relation-card.word-relation-card-animated > .ant-card-body {
   display: block;
   padding: 0;
 }
 
+.word-relation-collapse {
+  color: #858c98;
+}
+
+.word-relation-collapse .anticon {
+  font-size: 11px;
+}
+
 .word-relations-grid-stacked .word-relation-row + .word-relation-row {
-  border-top: 1px solid var(--admin-color-border-secondary, #f0f0f0);
+  border-top: 1px solid var(--ant-color-border-secondary, #f0f0f0);
   padding-top: 6px;
 }
 
 .word-relation-index {
   min-width: 16px;
   flex-shrink: 0;
-  color: var(--admin-color-text-tertiary, #8c8c8c);
+  color: var(--ant-color-text-tertiary, #8c8c8c);
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
@@ -2120,12 +1975,12 @@
   padding-inline-start: 16px;
 }
 
-.word-relation-glosses-connected > .MuiStack-root {
+.word-relation-glosses-connected > .ant-flex {
   position: relative;
 }
 
-.word-relation-glosses-connected > .MuiStack-root::before,
-.word-relation-glosses-connected > .MuiStack-root::after {
+.word-relation-glosses-connected > .ant-flex::before,
+.word-relation-glosses-connected > .ant-flex::after {
   content: "";
   position: absolute;
   inset-inline-start: -16px;
@@ -2136,26 +1991,26 @@
   pointer-events: none;
 }
 
-.word-relation-glosses-connected > .MuiStack-root::before {
+.word-relation-glosses-connected > .ant-flex::before {
   top: -3px;
   bottom: -3px;
   border-inline-start-width: 1px;
 }
 
-.word-relation-glosses-connected > .MuiStack-root:first-child::before {
+.word-relation-glosses-connected > .ant-flex:first-child::before {
   top: 50%;
   border-top-width: 1px;
   border-start-start-radius: 6px;
 }
 
-.word-relation-glosses-connected > .MuiStack-root:last-child::before {
+.word-relation-glosses-connected > .ant-flex:last-child::before {
   bottom: 50%;
   border-bottom-width: 1px;
   border-end-start-radius: 6px;
 }
 
 .word-relation-glosses-connected
-  > .MuiStack-root:not(:first-child):not(:last-child)::after {
+  > .ant-flex:not(:first-child):not(:last-child)::after {
   top: 50%;
   border-top-width: 1px;
 }
@@ -2173,7 +2028,7 @@
 }
 
 .word-relation-column-heads {
-  padding-inline: 0;
+  padding-inline: 1px 0;
   color: #333a47;
   font-size: 12px;
   font-weight: 600;
@@ -2191,67 +2046,8 @@
   min-width: 0;
 }
 
-.word-relation-row [data-percentage-field] {
+.word-relation-row .ant-input-number {
   width: 100%;
-}
-
-.word-relations-grid-stacked .word-relation-row {
-  align-items: start;
-}
-
-.word-relations-grid-stacked .word-relation-index {
-  min-height: 40px;
-}
-
-.word-relations-grid-stacked .word-relation-row > .word-relation-delete {
-  width: 32px;
-  height: 32px;
-  margin-top: 4px;
-  justify-self: center;
-}
-
-.word-relation-autocomplete .word-relation-target.MuiOutlinedInput-root {
-  height: 40px;
-  padding: 0 12px;
-  align-items: center;
-}
-
-.word-relation-autocomplete
-  .word-relation-target.MuiOutlinedInput-root.MuiInputBase-sizeSmall
-  .MuiAutocomplete-input {
-  height: 24px;
-  padding: 0;
-  font-size: 16px;
-  line-height: 24px;
-}
-
-.word-relation-target .MuiInputAdornment-positionStart .MuiSvgIcon-root {
-  width: 18px;
-  height: 18px;
-}
-
-.word-relation-target .MuiInputAdornment-positionStart {
-  margin-right: 8px;
-}
-
-.word-relation-target [data-relation-search] {
-  color: #858c98;
-}
-
-.word-relation-sense.Mui-disabled {
-  background: #f5f6f8;
-}
-
-.word-relation-search {
-  min-width: 0;
-}
-
-.word-relation-search > [role="status"] {
-  display: block;
-  margin-top: 4px;
-  color: var(--admin-color-text-secondary);
-  font-size: 12px;
-  line-height: 1.5;
 }
 
 .word-relation-autocomplete,
@@ -2260,17 +2056,12 @@
   min-width: 0;
 }
 
-.word-relation-row .word-relation-target input {
+.word-relation-row .ant-input,
+.word-relation-row .ant-input-number-input {
   font-weight: 600;
 }
 
-.word-relation-target input::placeholder {
-  font-family: var(--tsz-font-text);
-  font-size: 16px;
-  font-weight: 400;
-}
-
-.word-relation-target .MuiInputAdornment-positionStart {
+.word-relation-target .ant-input-prefix {
   color: #2563eb;
 }
 
@@ -2280,8 +2071,8 @@
   min-width: 0;
 }
 
-.word-relation-sense .MuiSelect-select,
-.word-relation-sense .MuiSelect-select {
+.word-relation-sense .ant-select-selection-item,
+.word-relation-sense .ant-select-selection-placeholder {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2299,7 +2090,7 @@
   white-space: nowrap;
 }
 
-.word-relation-row > :is(.MuiButton-colorError, .MuiIconButton-colorError) {
+.word-relation-row > .ant-btn-dangerous {
   position: absolute;
   top: -5px;
   right: -5px;
@@ -2312,16 +2103,13 @@
   transition: opacity 120ms ease;
 }
 
-.word-relation-row:hover
-  > :is(.MuiButton-colorError, .MuiIconButton-colorError),
-.word-relation-row:focus-within
-  > :is(.MuiButton-colorError, .MuiIconButton-colorError) {
+.word-relation-row:hover > .ant-btn-dangerous,
+.word-relation-row:focus-within > .ant-btn-dangerous {
   opacity: 1;
 }
 
-.word-section-add-button.MuiButton-root {
+.word-section-add-button {
   margin-top: 8px;
-  border-style: dashed;
 }
 
 .word-table-row {
@@ -2391,27 +2179,12 @@
     overflow-x: hidden;
   }
 
-  .word-creation-stepper .MuiStepLabel-label {
+  .word-creation-stepper .ant-steps-item-title {
     font-size: 14px;
   }
 
-  .word-creation-stepper .MuiStepLabel-labelContainer {
-    display: block;
-    min-width: 0;
-  }
-
-  .word-creation-steps .MuiStepConnector-root {
+  .word-creation-stepper .ant-steps-item-content {
     display: none;
-  }
-
-  .word-creation-steps .MuiTypography-caption {
-    display: none;
-  }
-
-  .word-creation-steps .MuiStepButton-root {
-    width: 100%;
-    margin: 0;
-    padding: 8px 4px;
   }
 
   .word-creation-shell {
@@ -2486,43 +2259,39 @@
     padding: 12px 8px;
   }
 
-  .word-creation-steps.MuiStepper-horizontal {
+  .word-creation-steps.ant-steps-horizontal {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 4px;
   }
 
-  .word-creation-steps .MuiStep-root {
+  .word-creation-steps .ant-steps-item {
     min-width: 0;
     padding-inline-start: 0;
   }
 
-  .word-creation-steps .MuiStepButton-root {
+  .word-creation-steps .ant-steps-item-wrapper {
     display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 6px;
   }
 
-  .word-creation-steps .MuiStepLabel-iconContainer {
+  .word-creation-steps .ant-steps-item-icon {
     margin: 0;
   }
 
-  .word-creation-steps .MuiStepLabel-root {
+  .word-creation-steps .ant-steps-item-section {
     width: 100%;
     min-width: 0;
     text-align: center;
   }
 
-  .word-creation-steps .MuiStepLabel-root {
-    display: flex;
-    gap: 6px;
+  .word-creation-steps .ant-steps-item-header {
+    display: block;
+    width: 100%;
   }
 
-  .word-creation-steps .MuiTypography-root {
-    font-size: 12px;
-  }
-
-  .word-creation-stepper .word-creation-steps .MuiStepLabel-label {
+  .word-creation-stepper .word-creation-steps .ant-steps-item-title {
     width: 100%;
     padding-inline-end: 0;
     font-size: 12px;
@@ -2530,6 +2299,11 @@
     overflow-wrap: normal;
     word-break: keep-all;
     white-space: nowrap;
+  }
+
+  .word-creation-steps .ant-steps-item-rail,
+  .word-creation-steps .ant-steps-item-content {
+    display: none;
   }
 
   .word-creation-shell .word-creation-summary {
@@ -2555,13 +2329,13 @@
     min-height: 0;
   }
 
-  .word-step-actions :is(.MuiButton-root, .MuiIconButton-root) {
+  .word-step-actions .ant-btn {
     width: 100%;
     min-width: 0;
     padding-inline: 8px;
   }
 
-  .word-step-actions .MuiButton-containedPrimary:last-child:nth-child(odd) {
+  .word-step-actions .ant-btn-primary:last-child:nth-child(odd) {
     grid-column: 1 / -1;
   }
 }
@@ -2630,7 +2404,7 @@
     display: none;
   }
 
-  .word-sense-group-item > :is(.MuiButton-root, .MuiIconButton-root) {
+  .word-sense-group-item > .ant-btn {
     width: 100%;
   }
 }
@@ -2685,7 +2459,10 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .word-sense-editor > [data-admin-accordion] > .admin-section-body {
+  .word-sense-editor
+    > .ant-collapse-item
+    > .ant-collapse-content
+    > .ant-collapse-content-box {
     padding: 10px !important;
   }
 
@@ -2713,14 +2490,14 @@
     min-width: 0;
   }
 
-  .word-definition-row > .MuiStack-root,
-  .word-sentence-row > .MuiStack-root {
+  .word-definition-row > .ant-space,
+  .word-sentence-row > .ant-space {
     width: 100%;
   }
 
-  .word-definition-row > .MuiStack-root:last-child,
+  .word-definition-row > .ant-space:last-child,
   .word-definition-row > .word-list-actions,
-  .word-sentence-row > .MuiStack-root:last-child {
+  .word-sentence-row > .ant-space:last-child {
     flex-direction: row;
     justify-content: flex-end;
   }
@@ -2766,101 +2543,4 @@
 .is-drag-over-after > .word-relation-drop-line {
   display: block;
   bottom: -4px;
-}
-
-/* 空内容保留入口与状态，用更轻的标题和就近操作代替大块占位。 */
-.word-sense-section-title.is-empty {
-  box-sizing: border-box;
-  min-height: 40px;
-  padding-block: 6px;
-}
-
-:is(.word-relation-card, .word-grammar-card).is-empty > .admin-card-header {
-  box-sizing: border-box;
-  min-height: 40px;
-  padding: 6px 12px;
-}
-
-:is(.word-relation-card, .word-grammar-card).is-empty .MuiCardHeader-action {
-  align-self: center;
-  margin: 0;
-}
-
-:is(.word-relation-card, .word-grammar-card).is-empty > .admin-card-body {
-  padding: 8px 12px;
-}
-
-.word-relation-card.is-empty {
-  box-shadow: none;
-}
-
-@container word-creation-content (max-width: 760px) {
-  .word-relations-grid-stacked .word-relation-column-heads {
-    display: none;
-  }
-
-  .word-relations-grid-stacked .word-relation-row {
-    grid-template-columns: 56px minmax(0, 1fr) 32px;
-  }
-
-  .word-relations-grid-stacked .word-relation-row::before {
-    content: attr(data-relation-metric);
-    grid-column: 1;
-    grid-row: 2;
-    align-self: center;
-    color: var(--admin-color-text-secondary);
-    font-size: 12px;
-  }
-
-  .word-relations-grid-stacked .word-relation-index {
-    grid-column: 1 / 3;
-    grid-row: 1;
-  }
-
-  .word-relations-grid-stacked .word-relation-row > [data-percentage-field] {
-    grid-column: 2 / -1;
-    grid-row: 2;
-  }
-
-  .word-relations-grid-stacked .word-relation-row > .word-relation-delete {
-    grid-column: 3;
-    grid-row: 1;
-  }
-
-  .word-relations-grid-stacked .word-relation-search {
-    grid-column: 1 / -1;
-    grid-row: 3;
-  }
-
-  .word-relations-grid-stacked .word-relation-row > .word-relation-sense {
-    grid-column: 1 / -1;
-    grid-row: 4;
-  }
-
-  .word-relations-grid-stacked .word-relation-row > .word-relation-input-error {
-    grid-column: 1 / -1;
-    grid-row: 4;
-  }
-
-  .word-relations-grid-stacked
-    .word-relation-row:has(> .word-relation-input-error)
-    > .word-relation-sense {
-    grid-row: 5;
-  }
-}
-
-.word-relation-card.word-relation-card-animated.is-collapsed
-  > .admin-card-body {
-  padding: 0;
-}
-
-.word-relation-card.is-collapsed > .admin-card-header {
-  border-bottom: 0;
-}
-
-.word-grammar-select .word-grammar-select-placeholder {
-  font-family: var(--tsz-font-text);
-  font-size: 14px;
-  font-weight: 400;
-  color: #9e9e9e;
 }

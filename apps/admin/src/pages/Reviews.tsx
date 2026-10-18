@@ -1,19 +1,20 @@
-import { ListFilterBar } from "@/components/ListFilterBar";
+import { TableEmptyState } from "@/components/TableEmptyState";
 import { useEffect, useState } from "react";
+import { ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import {
   Alert,
-  Breadcrumbs,
+  Breadcrumb,
   Button,
-  MenuItem,
-  Paper,
-  Stack,
-  TextField,
-  Typography
-} from "@mui/material";
-import { Controller, useForm } from "react-hook-form";
-import { AdminTable } from "@/components/AdminTable";
-import { PageStatus } from "@/components/PageStatus";
+  Card,
+  Flex,
+  Form,
+  Input,
+  Result,
+  Select,
+  Space,
+  Table
+} from "antd";
 import type { AdminWordlist, WordlistManagementQuery } from "@tsz/types";
 import { api, useAuthStore, usePermission } from "@/lib/auth";
 import { WordlistDetails } from "@/features/wordlists/WordlistDetails";
@@ -40,14 +41,12 @@ export function ReviewsPage() {
       adminId={profile.id}
     />
   ) : (
-    <PageStatus title="未开通词表查看权限" />
+    <Result status="403" title="未开通词表查看权限" />
   );
 }
 
 function ReviewQueue({ adminId }: { adminId: string }) {
-  const { register, control, reset, handleSubmit } = useForm<Filters>({
-    defaultValues: { q: "", review_state: "pending" }
-  });
+  const [form] = Form.useForm<Filters>();
   const [query, setQuery] = useState(initialQuery);
   const [selected, setSelected] = useState<AdminWordlist | null>(null);
   const result = useQuery({
@@ -62,115 +61,140 @@ function ReviewQueue({ adminId }: { adminId: string }) {
     );
   }, [result.data, result.isFetching, result.isSuccess]);
   return (
-    <Stack spacing={2}>
-      <Breadcrumbs>
-        <Typography>审核管理</Typography>
-        <Typography>词表审核</Typography>
-      </Breadcrumbs>
-      <Paper variant="outlined" sx={{ p: 1.5 }}>
-        <ListFilterBar
-          onSubmit={handleSubmit((values) =>
+    <Flex vertical gap={16}>
+      <Breadcrumb items={[{ title: "审核管理" }, { title: "词表审核" }]} />
+      <Card size="small" styles={{ body: { paddingBottom: 8 } }}>
+        <Form
+          form={form}
+          layout="inline"
+          style={{
+            rowGap: 12,
+            columnGap: 8,
+            display: "flex",
+            flexWrap: "wrap"
+          }}
+          initialValues={{ review_state: "pending" }}
+          onFinish={(values) =>
             setQuery({
               page: 1,
               page_size: query.page_size,
               q: values.q?.trim(),
               review_state: values.review_state
             })
-          )}
+          }
         >
-          <TextField
-            label="搜索词表"
-            placeholder="词表名称 / 创建人"
-            slotProps={{ htmlInput: { maxLength: 100 } }}
-            {...register("q")}
-          />
-          <Controller
-            name="review_state"
-            control={control}
-            render={({ field }) => (
-              <TextField {...field} select label="审核状态">
-                {Object.entries(reviewLabels).map(([value, label]) => (
-                  <MenuItem key={value} value={value}>
-                    {label}
-                  </MenuItem>
-                ))}
-              </TextField>
-            )}
-          />
-          <Button type="submit" variant="contained">
-            搜索
-          </Button>
-          <Button
-            onClick={() => {
-              reset();
-              setQuery(initialQuery);
-            }}
-          >
-            重置
-          </Button>
-        </ListFilterBar>
-      </Paper>
-      <Paper variant="outlined" sx={{ p: 2 }}>
+          <Form.Item name="q" label="关键词">
+            <Input
+              aria-label="搜索词表"
+              maxLength={100}
+              placeholder="词表名称 / 创建人"
+              style={{ width: 180 }}
+              allowClear
+            />
+          </Form.Item>
+          <Form.Item name="review_state" label="审核状态">
+            <Select
+              aria-label="审核状态"
+              style={{ width: 140 }}
+              options={Object.entries(reviewLabels).map(([value, label]) => ({
+                value,
+                label
+              }))}
+            />
+          </Form.Item>
+          <Form.Item>
+            <Space>
+              <Button
+                type="primary"
+                icon={<SearchOutlined />}
+                htmlType="submit"
+              >
+                搜索
+              </Button>
+              <Button
+                icon={<ReloadOutlined />}
+                onClick={() => {
+                  form.resetFields();
+                  setQuery(initialQuery);
+                }}
+              >
+                重置
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Card>
+      <Card size="small">
         {result.isError && (
           <Alert
-            severity="error"
+            type="error"
+            title="审核词表加载失败"
             action={<Button onClick={() => void result.refetch()}>重试</Button>}
-          >
-            审核词表加载失败
-          </Alert>
+          />
         )}
-        <AdminTable
-          emptyMessage="暂无待审核词表"
-          filtered={!!query.q || query.review_state !== "pending"}
-          onResetFilters={() => {
-            reset();
-            setQuery(initialQuery);
+        <Table<AdminWordlist>
+          locale={{
+            emptyText: (
+              <TableEmptyState
+                message="暂无待审核词表"
+                filtered={!!query.q || query.review_state !== "pending"}
+                onResetFilters={() => {
+                  form.resetFields();
+                  setQuery(initialQuery);
+                }}
+              />
+            )
           }}
-          rows={result.data?.items ?? []}
-          rowId={(row) => row.wordlist.id}
+          rowKey={(row) => row.wordlist.id}
           loading={result.isFetching}
-          minWidth={800}
+          dataSource={result.data?.items ?? []}
+          scroll={{ x: 800 }}
           pagination={{
-            page: query.page ?? 1,
-            pageSize: query.page_size ?? 20,
+            itemRender: (_, type, original) =>
+              type === "next" ? (
+                <button type="button" aria-label="下一页">
+                  ›
+                </button>
+              ) : (
+                original
+              ),
+            current: query.page,
+            pageSize: query.page_size,
             total: result.data?.pagination.total ?? 0,
-            pageSizes: [20, 50, 100],
+            showSizeChanger: true,
+            pageSizeOptions: [20, 50, 100],
             onChange: (page, page_size) =>
-              setQuery((q) => ({ ...q, page, page_size }))
+              setQuery((q) => ({
+                ...q,
+                page: page_size !== q.page_size ? 1 : page,
+                page_size
+              }))
           }}
           columns={[
+            { title: "词表名称", render: (_, row) => row.wordlist.name },
+            { title: "创建人", render: (_, row) => row.wordlist.owner_name },
+            { title: "词汇数量", render: (_, row) => row.wordlist.item_count },
             {
-              id: "name",
-              label: "词表名称",
-              render: (row) => row.wordlist.name
+              title: "审核状态",
+              render: (_, row) => reviewLabels[row.review_state]
             },
             {
-              id: "owner",
-              label: "创建人",
-              render: (row) => row.wordlist.owner_name
-            },
-            {
-              id: "count",
-              label: "词汇数量",
-              render: (row) => row.wordlist.item_count
-            },
-            {
-              id: "review",
-              label: "审核状态",
-              render: (row) => reviewLabels[row.review_state]
-            },
-            {
-              id: "action",
-              label: "操作",
+              title: "操作",
+              fixed: "right",
               width: 100,
-              sticky: "right",
-              render: (row) => (
-                <Button onClick={() => setSelected(row)}>查看</Button>
+              render: (_, row) => (
+                <Button
+                  type="link"
+                  size="small"
+                  onClick={() => setSelected(row)}
+                >
+                  查看
+                </Button>
               )
             }
           ]}
         />
-      </Paper>
+      </Card>
       {selected && (
         <WordlistDetails
           key={selected.wordlist.id}
@@ -180,6 +204,6 @@ function ReviewQueue({ adminId }: { adminId: string }) {
           onClose={() => setSelected(null)}
         />
       )}
-    </Stack>
+    </Flex>
   );
 }

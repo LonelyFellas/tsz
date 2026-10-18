@@ -1,6 +1,5 @@
-import { Typography as MuiTypography } from "@mui/material";
 import { useQueryClient } from "@tanstack/react-query";
-
+import { Typography } from "antd";
 import { wordKeys } from "@/features/dictionary/api";
 import { useNavigate, Navigate } from "react-router-dom";
 import { useAuthStore } from "@/lib/auth";
@@ -43,12 +42,9 @@ export function WordCreatePage({
         breadcrumbTitle: "创建词汇",
         completedSteps: [],
         summaryHeadword: (
-          <MuiTypography
-            className="word-summary-pending-detection"
-            component="span"
-          >
+          <Typography.Text className="word-summary-pending-detection">
             待检测
-          </MuiTypography>
+          </Typography.Text>
         ),
         progressBadge: v3ProductProgressBadge(EMPTY_PROGRESS_ROWS),
         progress: (

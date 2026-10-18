@@ -1,5 +1,4 @@
-import { Tooltip as MuiTooltip } from "@mui/material";
-
+import { Tooltip } from "antd";
 import type { ReactNode } from "react";
 import "./V3DisabledReason.css";
 
@@ -20,7 +19,7 @@ export function V3DisabledReason({
 }) {
   if (!reason) return <>{children}</>;
   return (
-    <MuiTooltip describeChild title={reason}>
+    <Tooltip title={reason}>
       <span
         className={
           block
@@ -32,6 +31,6 @@ export function V3DisabledReason({
       >
         {children}
       </span>
-    </MuiTooltip>
+    </Tooltip>
   );
 }

@@ -1,21 +1,15 @@
-import { Pagination as MuiPagination } from "@mui/material";
-import {
-  Autocomplete as MuiAutocomplete,
-  TextField as MuiTextField
-} from "@mui/material";
-import { List as MuiList, ListItem as MuiListItem } from "@mui/material";
-import { OutlinedInput as MuiOutlinedInput } from "@mui/material";
-import { AdminDialog } from "@/components/AdminDialog";
-import { Button as MuiDialogButton } from "@mui/material";
-import {
-  Alert as MuiAlert,
-  AlertTitle as MuiAlertTitle,
-  Button as MuiButton,
-  Stack as MuiStack,
-  Typography as MuiTypography
-} from "@mui/material";
 import { useRef, useState } from "react";
-
+import {
+  Alert,
+  List,
+  Modal,
+  Space,
+  Typography,
+  Select,
+  Input,
+  Pagination,
+  Button
+} from "antd";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { HttpError } from "@tsz/api-client";
 import type {
@@ -36,6 +30,7 @@ import {
   canAcknowledgeSurfaceSnapshot,
   isSurfaceMatchPageAny
 } from "./surfaceSnapshot";
+
 /** rows 是打开确认框时冻结的显式范围；版本冲突不得自动换成新 revision 重试。 */
 export function BatchPublicationModal({
   rows,
@@ -102,6 +97,7 @@ export function BatchPublicationModal({
     surface?.page,
     surface?.page.snapshot_id ?? "batch-none"
   );
+
   const submit = async (request = input) => {
     if (
       busy.current ||
@@ -150,75 +146,64 @@ export function BatchPublicationModal({
       setPending(false);
     }
   };
+
   return (
-    <AdminDialog
+    <Modal
       open
       title={`发布所选 ${rows.length} 个词条、${sentenceRows.length} 条例句`}
       width={720}
-      onClose={onClose}
-      closeDisabled={!!pending}
-      escapeDisabled={!!pending}
-      backdropDismiss={false}
-      actions={
-        <>
-          <MuiDialogButton onClick={onClose} disabled={pending}>
-            {"取消"}
-          </MuiDialogButton>
-          <MuiDialogButton
-            variant="contained"
-            onClick={() => void submit()}
-            loading={pending}
-            aria-label={"发布所选"}
-            disabled={
-              !allowed ||
-              conflict ||
-              Boolean(surface) ||
-              rows.length + sentenceRows.length === 0 ||
-              rows.length + sentenceRows.length > 50
-            }
-          >
-            {"发布所选"}
-          </MuiDialogButton>
-        </>
-      }
+      onCancel={onClose}
+      cancelButtonProps={{ disabled: pending }}
+      closable={!pending}
+      keyboard={!pending}
+      mask={{ closable: false }}
+      cancelText="取消"
+      okText="发布所选"
+      confirmLoading={pending}
+      okButtonProps={{
+        "aria-label": "发布所选",
+        disabled:
+          !allowed ||
+          conflict ||
+          Boolean(surface) ||
+          rows.length + sentenceRows.length === 0 ||
+          rows.length + sentenceRows.length > 50
+      }}
+      onOk={() => void submit()}
     >
-      <MuiStack style={{ width: "100%" }} direction="column" spacing={1}>
-        <MuiAlert severity={"info"}>
-          <MuiAlertTitle>{"全部成功或全部不发布"}</MuiAlertTitle>
-          {
-            "仅发布明确选择的词条和例句，不会自动加入依赖。合计最多 50 项，任何一项失败都不发布。"
-          }
-        </MuiAlert>
-        <MuiList dense>
-          {rows.map((row) => (
-            <MuiListItem
-              key={row.id}
-              divider
-              sx={{ gap: 2, alignItems: "flex-start" }}
-            >
-              {wordListLabel(row)}
-            </MuiListItem>
-          ))}
-        </MuiList>
-        <MuiTypography component="span">
+      <Space orientation="vertical" style={{ width: "100%" }}>
+        <Alert
+          type="info"
+          title="全部成功或全部不发布"
+          description="仅发布明确选择的词条和例句，不会自动加入依赖。合计最多 50 项，任何一项失败都不发布。"
+        />
+        <List
+          size="small"
+          dataSource={rows}
+          renderItem={(row) => <List.Item>{wordListLabel(row)}</List.Item>}
+        />
+        <Typography.Text>
           一起发布的例句草稿（明确选择，不自动收录）
-        </MuiTypography>
-        <MuiOutlinedInput
-          data-admin-input
+        </Typography.Text>
+        <Input
+          aria-label="查找待发布例句"
           placeholder="按 ID 或正文查找例句"
           disabled={started || !canReadSentences}
+          value={keyword}
           onChange={(event) => {
             setKeyword(event.target.value);
             setPage(1);
           }}
-          inputProps={{
-            "aria-label": "查找待发布例句"
-          }}
-          value={keyword ?? ""}
-          size="small"
         />
-        {(() => {
-          const options = Array.from(
+        <Select
+          mode="multiple"
+          aria-label="选择一起发布的例句"
+          style={{ width: "100%" }}
+          disabled={started || !canReadSentences}
+          loading={candidates.isFetching}
+          value={sentenceRows.map((row) => row.id)}
+          optionFilterProp="label"
+          options={Array.from(
             new Map(
               [...sentenceRows, ...(candidates.data?.items ?? [])].map(
                 (row) => [row.id, row]
@@ -234,73 +219,52 @@ export function BatchPublicationModal({
                 0,
                 100
               )} · ${row.id.slice(0, 8)} · 草稿 v${row.revision}${row.withdrawn_at ? "（已下架，发布不会恢复）" : ""}`
-          }));
-          const ids = sentenceRows.map((row) => row.id);
-          return (
-            <MuiAutocomplete
-              multiple
-              options={options}
-              value={options.filter((option) => ids.includes(option.value))}
-              isOptionEqualToValue={(left, right) => left.value === right.value}
-              getOptionLabel={(option) => option.label}
-              getOptionDisabled={(option) => option.disabled}
-              loading={candidates.isFetching}
-              disabled={started || !canReadSentences}
-              onChange={(_, selected) =>
-                ((ids: string[]) => {
-                  const available = new Map(
-                    [...sentenceRows, ...(candidates.data?.items ?? [])].map(
-                      (row) => [row.id, row]
-                    )
-                  );
-                  const selected = ids.map((id) => available.get(id)!);
-                  setSentenceRows(selected);
-                  key.current = crypto.randomUUID();
-                  setInput((current) => ({
-                    ...current,
-                    sentences: selected.map((row) => ({
-                      sentence_id: row.id,
-                      base_revision: row.revision,
-                      base_lifecycle_revision: row.lifecycle_revision
-                    }))
-                  }));
-                })(selected.map((option) => option.value))
-              }
-              renderInput={(params) => (
-                <MuiTextField {...params} label="选择一起发布的例句" />
-              )}
-            />
-          );
-        })()}
+          }))}
+          onChange={(ids: string[]) => {
+            const available = new Map(
+              [...sentenceRows, ...(candidates.data?.items ?? [])].map(
+                (row) => [row.id, row]
+              )
+            );
+            const selected = ids.map((id) => available.get(id)!);
+            setSentenceRows(selected);
+            key.current = crypto.randomUUID();
+            setInput((current) => ({
+              ...current,
+              sentences: selected.map((row) => ({
+                sentence_id: row.id,
+                base_revision: row.revision,
+                base_lifecycle_revision: row.lifecycle_revision
+              }))
+            }));
+          }}
+        />
         {candidates.isError && (
-          <MuiAlert
+          <Alert
+            type="error"
+            title="例句候选加载失败"
             action={
-              <MuiButton onClick={() => void candidates.refetch()}>
-                重试
-              </MuiButton>
+              <Button onClick={() => void candidates.refetch()}>重试</Button>
             }
-            severity={"error"}
-          >
-            {"例句候选加载失败"}
-          </MuiAlert>
+          />
         )}
-        <MuiPagination
+        <Pagination
           size="small"
-          page={page}
-          count={Math.max(1, Math.ceil((candidates.data?.total ?? 0) / 20))}
-          onChange={(_, next) => setPage(next)}
+          current={page}
+          pageSize={20}
+          total={candidates.data?.total}
           disabled={started || !canReadSentences}
+          showSizeChanger={false}
+          onChange={setPage}
         />
         {rows.length + sentenceRows.length > 50 && (
-          <MuiAlert severity={"warning"}>
-            {"词条与例句合计不能超过 50 项"}
-          </MuiAlert>
+          <Alert type="warning" title="词条与例句合计不能超过 50 项" />
         )}
-        {error && <MuiAlert severity={"error"}>{error}</MuiAlert>}
+        {error && <Alert type="error" title={error} />}
         {conflict && (
-          <MuiTypography component="span">
+          <Typography.Text>
             请关闭此窗口，刷新列表并重新选择、确认当前版本。
-          </MuiTypography>
+          </Typography.Text>
         )}
         {surface && (
           <LifecycleSurfaceConfirmation
@@ -331,7 +295,7 @@ export function BatchPublicationModal({
             }}
           />
         )}
-      </MuiStack>
-    </AdminDialog>
+      </Space>
+    </Modal>
   );
 }

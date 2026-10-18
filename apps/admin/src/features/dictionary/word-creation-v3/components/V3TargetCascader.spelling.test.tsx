@@ -68,7 +68,7 @@ async function expandJob() {
   // 候选 DOM 出现时，Panel 的初始展开 effect 可能尚未完成；先刷新再点击，避免初始化覆盖点击。
   await act(async () => {});
   const entry = await screen.findByText("job", {
-    selector: ".v3-component-usage-entry .tsz-words"
+    selector: ".v3-component-usage-entry strong"
   });
   await act(async () => {
     fireEvent.click(entry);
@@ -112,7 +112,7 @@ it.each([false, true])(
     );
     await expandJob();
     const labels = Array.from(
-      document.querySelectorAll("[data-candidate-column] .tsz-words")
+      document.querySelectorAll(".ant-cascader-menu .tsz-words")
     )
       .map((node) => node.textContent)
       .filter((text) => text !== "job");
@@ -250,10 +250,7 @@ it("只读旧关联通过合并路径自动展开和回显，不允许更换", a
   expect(sense.querySelector(".v3-component-usage-radio")).toHaveClass(
     "is-checked"
   );
-  expect(sense.closest("[data-candidate-option]")).toHaveAttribute(
-    "aria-disabled",
-    "true"
-  );
+  expect(sense.closest("li")).toHaveClass("ant-cascader-menu-item-disabled");
   fireEvent.click(sense);
   expect(onReplace).not.toHaveBeenCalled();
 });

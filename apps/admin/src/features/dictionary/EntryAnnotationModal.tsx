@@ -3,16 +3,14 @@ import type { EntryAnnotationGroup } from "@tsz/types";
 import {
   Alert,
   Button,
-  Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Paper,
-  Stack,
-  TextField,
+  Card,
+  Form,
+  Input,
+  Modal,
+  Space,
+  Tag,
   Typography
-} from "@mui/material";
+} from "antd";
 import dayjs from "dayjs";
 import { usePartOfSpeechLabel } from "./part-of-speech/PartOfSpeechLabels";
 import "./EntryAnnotationModal.css";
@@ -109,55 +107,52 @@ export function EntryAnnotationModal({
     return (
       <div key={row.key} className="entry-annotation-row" data-annotation-row>
         <div className="entry-annotation-details">
-          <Stack direction="row" useFlexGap flexWrap="wrap" spacing={1}>
-            <Typography component="span" className="tsz-words" fontWeight={600}>
+          <Space size={8} wrap>
+            <Typography.Text className="tsz-words" strong>
               {row.label}
-            </Typography>
-            {!row.incoming ? <Chip label={`已有词条 ${index + 1}`} /> : null}
+            </Typography.Text>
+            {!row.incoming ? <Tag>{`已有词条 ${index + 1}`}</Tag> : null}
             {row.readOnly && row.readOnlyHint ? (
-              <Chip label={row.readOnlyHint} />
+              <Tag>{row.readOnlyHint}</Tag>
             ) : null}
-          </Stack>
+          </Space>
           {!row.incoming ? (
             <>
               {row.posLabels?.length ? (
-                <Stack direction="row" useFlexGap flexWrap="wrap" spacing={0.5}>
+                <Space size={[4, 4]} wrap>
                   {row.posLabels.map((pos) => (
-                    <Chip
-                      key={pos}
-                      label={/^[a-z_]+$/.test(pos) ? posLabel(pos) : pos}
-                    />
+                    <Tag key={pos}>
+                      {/^[a-z_]+$/.test(pos) ? posLabel(pos) : pos}
+                    </Tag>
                   ))}
-                </Stack>
+                </Space>
               ) : null}
-              <Typography component="span" color="text.secondary">
+              <Typography.Text type="secondary">
                 {row.glossPreviews?.length
                   ? row.glossPreviews.join("；")
                   : row.posLabels?.length
                     ? "暂无释义"
                     : "暂无词性、释义"}
-              </Typography>
+              </Typography.Text>
               {row.referenceCount ? (
-                <Typography component="span" color="text.secondary">
+                <Typography.Text type="secondary">
                   关联引用：{row.referenceCount} 处
-                </Typography>
+                </Typography.Text>
               ) : null}
               {row.createdByName || row.updatedAt || row.href ? (
                 <div className="entry-annotation-meta">
                   {row.createdByName ? (
-                    <Typography
-                      component="span"
-                      color="text.secondary"
+                    <Typography.Text
+                      type="secondary"
                       className="entry-annotation-creator"
                       title={`创建人：${row.createdByName}`}
                     >
                       {row.createdByName}
-                    </Typography>
+                    </Typography.Text>
                   ) : null}
                   {row.updatedAt ? (
-                    <Typography
-                      component="span"
-                      color="text.secondary"
+                    <Typography.Text
+                      type="secondary"
                       className="entry-annotation-updated"
                     >
                       <time
@@ -166,11 +161,11 @@ export function EntryAnnotationModal({
                       >
                         {dayjs(row.updatedAt).format("MM-DD HH:mm")}
                       </time>
-                    </Typography>
+                    </Typography.Text>
                   ) : null}
                   {row.href ? (
                     <Button
-                      variant="text"
+                      type="link"
                       size="small"
                       className="entry-annotation-view"
                       aria-label={`查看词条 ${row.label}`}
@@ -186,107 +181,100 @@ export function EntryAnnotationModal({
             </>
           ) : null}
         </div>
-        <TextField
+        <Form.Item
           label="数字标注"
           required={!row.readOnly && (creating || groups.length > 0)}
-          error={!!showError}
-          helperText={showError ? fieldError : undefined}
-          placeholder={row.readOnly ? "未标注" : "例如 001"}
-          slotProps={{
-            htmlInput: {
-              "aria-label": `${row.incoming ? "新建词条" : row.label}标注`,
-              inputMode: "numeric",
-              className: "entry-annotation-input"
+          layout="vertical"
+          style={{ marginBottom: 0 }}
+          validateStatus={showError ? "error" : undefined}
+          help={showError ? fieldError : undefined}
+        >
+          <Input
+            aria-label={`${row.incoming ? "新建词条" : row.label}标注`}
+            placeholder={row.readOnly ? "未标注" : "例如 001"}
+            inputMode="numeric"
+            className="entry-annotation-input"
+            value={values[row.key] ?? ""}
+            disabled={busy || frozen || row.readOnly}
+            onBlur={() =>
+              setTouched((current) => ({ ...current, [row.key]: true }))
             }
-          }}
-          value={values[row.key] ?? ""}
-          disabled={busy || frozen || row.readOnly}
-          onBlur={() =>
-            setTouched((current) => ({ ...current, [row.key]: true }))
-          }
-          onChange={(event) =>
-            setValues((current) => ({
-              ...current,
-              [row.key]: event.target.value
-            }))
-          }
-        />
+            onChange={(event) =>
+              setValues((current) => ({
+                ...current,
+                [row.key]: event.target.value
+              }))
+            }
+          />
+        </Form.Item>
       </div>
     );
   };
   return (
-    <Dialog
+    <Modal
+      title={creating ? "设置词条标注" : "编辑词条标注"}
+      cancelText="取消"
       open
-      fullWidth
-      maxWidth="md"
-      aria-labelledby="entry-annotation-title"
-      onClose={() => {
-        if (!busy && !frozen) onClose();
+      centered
+      width={760}
+      onCancel={onClose}
+      closable={!busy && !frozen}
+      maskClosable={!busy && !frozen}
+      keyboard={!busy && !frozen}
+      cancelButtonProps={{ disabled: busy || frozen }}
+      onOk={() => {
+        if (Object.keys(errors).length) return;
+        const normalized = Object.fromEntries(
+          Object.entries(values).map(([id, value]) => [id, value.trim()])
+        );
+        onSave(normalized);
       }}
+      okText={creating ? "保存标注并创建" : "保存标注"}
+      confirmLoading={busy}
+      okButtonProps={{
+        disabled: Object.keys(errors).length > 0
+      }}
+      destroyOnHidden
     >
-      <DialogTitle id="entry-annotation-title">
-        {creating ? "设置词条标注" : "编辑词条标注"}
-      </DialogTitle>
-      <DialogContent>
-        {error ? (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        ) : null}
-        <div className="entry-annotation-content">
-          <div className="entry-annotation-intro">
-            <Typography component="span" color="text.secondary">
-              同原形词条需使用不同的数字标注，最多 20 位。
-            </Typography>
-          </div>
-          {existingRows.length > 0 ? (
-            <section aria-label="已有词条">
-              <Typography
-                component="span"
-                fontWeight={600}
-                className="entry-annotation-section-title"
-              >
-                已有词条 · {existingRows.length} 条
-              </Typography>
-              <Paper variant="outlined">{existingRows.map(renderRow)}</Paper>
-            </section>
-          ) : null}
-          {incomingRows.length > 0 ? (
-            <section aria-label="本次新建">
-              <Typography
-                component="span"
-                fontWeight={600}
-                className="entry-annotation-section-title"
-              >
-                本次新建
-              </Typography>
-              <Paper variant="outlined" className="entry-annotation-incoming">
-                {incomingRows.map(renderRow)}
-              </Paper>
-            </section>
-          ) : null}
+      {error ? (
+        <Alert
+          showIcon
+          type="error"
+          title={error}
+          style={{ marginBottom: 16 }}
+        />
+      ) : null}
+      <div className="entry-annotation-content">
+        <div className="entry-annotation-intro">
+          <Typography.Text type="secondary">
+            同原形词条需使用不同的数字标注，最多 20 位。
+          </Typography.Text>
         </div>
-      </DialogContent>
-      <DialogActions>
-        <Button disabled={busy || frozen} onClick={onClose}>
-          取消
-        </Button>
-        <Button
-          variant="contained"
-          disabled={Object.keys(errors).length > 0}
-          loading={busy}
-          onClick={() => {
-            if (busy || Object.keys(errors).length) return;
-            onSave(
-              Object.fromEntries(
-                Object.entries(values).map(([id, value]) => [id, value.trim()])
-              )
-            );
-          }}
-        >
-          {creating ? "保存标注并创建" : "保存标注"}
-        </Button>
-      </DialogActions>
-    </Dialog>
+        {existingRows.length > 0 ? (
+          <section aria-label="已有词条">
+            <Typography.Text strong className="entry-annotation-section-title">
+              已有词条 · {existingRows.length} 条
+            </Typography.Text>
+            <Card size="small" styles={{ body: { padding: 0 } }}>
+              {existingRows.map(renderRow)}
+            </Card>
+          </section>
+        ) : null}
+        {incomingRows.length > 0 ? (
+          <section aria-label="本次新建">
+            <Typography.Text strong className="entry-annotation-section-title">
+              本次新建
+            </Typography.Text>
+            <Card
+              size="small"
+              className="entry-annotation-incoming"
+              styles={{ body: { padding: 0 } }}
+            >
+              {incomingRows.map(renderRow)}
+            </Card>
+          </section>
+        ) : null}
+      </div>
+    </Modal>
   );
 }

@@ -1,18 +1,3 @@
-import { AdminDialog } from "@/components/AdminDialog";
-import {
-  Card as MuiCard,
-  CardHeader as MuiCardHeader,
-  CardContent as MuiCardContent
-} from "@mui/material";
-import {
-  Alert as MuiAlert,
-  AlertTitle as MuiAlertTitle,
-  Button as MuiButton,
-  Chip as MuiChip,
-  CircularProgress as MuiCircularProgress,
-  Stack as MuiStack,
-  Typography as MuiTypography
-} from "@mui/material";
 import { useAuthStore } from "@/lib/auth";
 import { canAdminResourceAction } from "@tsz/shared/auth";
 import { pronunciationSynthesisLabel } from "@tsz/shared";
@@ -29,7 +14,7 @@ import type {
   PronunciationSynthesisV3,
   SurfaceMatchPageV3
 } from "@tsz/types";
-
+import { Alert, Button, Card, Flex, Modal, Spin, Tag, Typography } from "antd";
 import dayjs from "dayjs";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LifecycleSurfaceConfirmation } from "../LifecycleSurfaceConfirmation";
@@ -52,15 +37,19 @@ import {
   relationLabel,
   sentenceLinkRoleLabel
 } from "./presentation";
+
 type PublicationRequests = Pick<
   V3WordRequests,
   "get" | "listPublications" | "getPublication" | "rollbackPublication"
 >;
+
 type RecoveryStatus = 409 | 410;
+
 interface RecoveryState {
   status: RecoveryStatus;
   phase: "refreshing" | "error";
 }
+
 interface Props {
   activationBlockedByUnsavedChanges?: boolean;
   currentWord: AdminWordV3;
@@ -70,10 +59,13 @@ interface Props {
   idempotencyKeyFactory?: () => string;
   fetchSurfacePage?: FetchSurfaceMatchPage<SurfaceMatchPageV3>;
 }
+
 const defaultRequests = createV3WordRequests();
+
 function publicationLabel(publication: AdminWordPublicationAny): string {
   return publication.word.presentation.label;
 }
+
 interface SnapshotFormLine {
   id: string;
   pos: string;
@@ -88,6 +80,7 @@ interface SnapshotFormLine {
     style?: string;
   }>;
 }
+
 interface SnapshotMeaningLine {
   english?: EnglishTextV3;
   id: string;
@@ -95,34 +88,25 @@ interface SnapshotMeaningLine {
   mode: string;
   text: string;
 }
+
 interface SnapshotGrammarLine {
   id: string;
   pos: string;
   dialect: string;
   text: string;
 }
+
 interface SnapshotSentenceLine {
   richEnglish?: EnglishTextV3;
   id: string;
   pos: string;
   level: string;
-  english: Array<{
-    id: string;
-    dialect: string;
-    text: string;
-  }>;
-  chinese: Array<{
-    id: string;
-    label?: string;
-    text: string;
-  }>;
+  english: Array<{ id: string; dialect: string; text: string }>;
+  chinese: Array<{ id: string; label?: string; text: string }>;
   roles: string[];
-  associations: Array<{
-    id: string;
-    target: string;
-    gloss?: string;
-  }>;
+  associations: Array<{ id: string; target: string; gloss?: string }>;
 }
+
 interface SnapshotRelationLine {
   id: string;
   pos: string;
@@ -130,10 +114,12 @@ interface SnapshotRelationLine {
   target: string;
   gloss?: string;
 }
+
 interface SnapshotSenseGroupLine {
   id: string;
   label: string;
 }
+
 function v3EnglishRows(value: EnglishTextV3) {
   if (value.mode === "unified") {
     return [
@@ -157,6 +143,7 @@ function v3EnglishRows(value: EnglishTextV3) {
       : [];
   });
 }
+
 function snapshotBody(publication: AdminWordPublicationAny): {
   forms: SnapshotFormLine[];
   meanings: SnapshotMeaningLine[];
@@ -278,6 +265,7 @@ function snapshotBody(publication: AdminWordPublicationAny): {
     )
   };
 }
+
 function PublicationSnapshotBody({
   publication
 }: {
@@ -287,305 +275,205 @@ function PublicationSnapshotBody({
   const partOfSpeechLabel = usePartOfSpeechLabel();
   const snapshot = snapshotBody(publication);
   return (
-    <MuiCard
+    <Card
       className="v3-publication-modal-content"
+      size="small"
+      title="快照正文"
       data-testid="publication-snapshot-body"
-      variant="outlined"
     >
-      <MuiCardHeader
-        className="admin-card-header"
-        title={"快照正文"}
-        slotProps={{
-          title: { variant: "subtitle1", className: "admin-card-title" }
-        }}
-        sx={{ p: 2, borderBottom: 1, borderColor: "divider" }}
-      />
-      <MuiCardContent className="admin-card-body">
-        <MuiStack direction="column" spacing={2}>
-          <MuiStack direction="column" spacing={1}>
-            <MuiTypography component="span" fontWeight={600}>
-              词形与发音
-            </MuiTypography>
-            {snapshot.forms.length === 0 ? (
-              <MuiTypography component="span" color="text.secondary">
-                无词形快照
-              </MuiTypography>
-            ) : (
-              snapshot.forms.map((form) => (
-                <MuiStack key={form.id} direction="column" spacing={0.25}>
-                  <MuiStack
-                    direction="row"
-                    spacing={1}
-                    alignItems={"center"}
-                    useFlexGap
-                    flexWrap="wrap"
+      <Flex vertical gap="middle">
+        <Flex vertical gap="small">
+          <Typography.Text strong>词形与发音</Typography.Text>
+          {snapshot.forms.length === 0 ? (
+            <Typography.Text type="secondary">无词形快照</Typography.Text>
+          ) : (
+            snapshot.forms.map((form) => (
+              <Flex key={form.id} vertical gap={2}>
+                <Flex align="center" gap="small" wrap>
+                  <Tag>{partOfSpeechLabel(form.pos)}</Tag>
+                  <Tag>{formTypeLabel(form.formType as never)}</Tag>
+                  <Tag>{dialectLabel(form.dialect as never)}</Tag>
+                  <Typography.Text
+                    className="tsz-words"
+                    style={{ fontWeight: 700 }}
                   >
-                    <MuiChip label={<>{partOfSpeechLabel(form.pos)}</>} />
-                    <MuiChip
-                      label={<>{formTypeLabel(form.formType as never)}</>}
-                    />
-                    <MuiChip
-                      label={<>{dialectLabel(form.dialect as never)}</>}
-                    />
-                    <MuiTypography
-                      className="tsz-words"
-                      style={{ fontWeight: 700 }}
-                      component="span"
-                    >
-                      {form.spelling}
-                    </MuiTypography>
-                  </MuiStack>
-                  {form.pronunciations.length === 0 ? (
-                    <MuiTypography component="span" color="text.secondary">
-                      无发音
-                    </MuiTypography>
+                    {form.spelling}
+                  </Typography.Text>
+                </Flex>
+                {form.pronunciations.length === 0 ? (
+                  <Typography.Text type="secondary">无发音</Typography.Text>
+                ) : (
+                  form.pronunciations.map((pronunciation) => (
+                    <Typography.Text key={pronunciation.id} type="secondary">
+                      词典音标{" "}
+                      <span className="tsz-phonetics">
+                        {pronunciation.dictPhonetic}
+                      </span>{" "}
+                      · 实际发音{" "}
+                      <span className="tsz-phonetics tsz-actual-pronunciation">
+                        {pronunciation.actualPron}
+                      </span>
+                      {pronunciation.synthesis
+                        ? ` · ${pronunciationSynthesisLabel(pronunciation.synthesis, form.dialect)}`
+                        : ""}
+                      {pronunciation.style
+                        ? ` · ${pronunciationStyleLabel(pronunciation.style as never)}`
+                        : ""}
+                    </Typography.Text>
+                  ))
+                )}
+              </Flex>
+            ))
+          )}
+        </Flex>
+        <Flex vertical gap="small">
+          <Typography.Text strong>释义</Typography.Text>
+          {snapshot.meanings.length === 0 ? (
+            <Typography.Text type="secondary">无释义快照</Typography.Text>
+          ) : (
+            snapshot.meanings.map((meaning) => (
+              <Flex key={meaning.id} align="center" gap="small" wrap>
+                <Tag>{partOfSpeechLabel(meaning.pos)}</Tag>
+                <Tag>{definitionModeLabel(meaning.mode)}</Tag>
+                {meaning.english ? (
+                  <V3EnglishTextPreview value={meaning.english} />
+                ) : (
+                  <Typography.Text>{meaning.text}</Typography.Text>
+                )}
+              </Flex>
+            ))
+          )}
+        </Flex>
+        {snapshot.senseGroups.length > 0 ? (
+          <Flex vertical gap="small">
+            <Typography.Text strong>释义组</Typography.Text>
+            <Flex gap="small" wrap>
+              {snapshot.senseGroups.map((group, index) => (
+                <Tag key={group.id}>
+                  释义组 {index + 1}：{group.label}
+                </Tag>
+              ))}
+            </Flex>
+          </Flex>
+        ) : null}
+        {snapshot.grammar.length > 0 ? (
+          <Flex vertical gap="small">
+            <Typography.Text strong>语法结构</Typography.Text>
+            {snapshot.grammar.map((grammar) => (
+              <Flex key={grammar.id} gap="small" wrap>
+                <Tag>{partOfSpeechLabel(grammar.pos)}</Tag>
+                <Tag>{dialectLabel(grammar.dialect as never)}</Tag>
+                <Typography.Text className="tsz-words">
+                  {grammar.text}
+                </Typography.Text>
+              </Flex>
+            ))}
+          </Flex>
+        ) : null}
+        <Flex vertical gap="small">
+          <Typography.Text strong>例句</Typography.Text>
+          {snapshot.sentences.length === 0 ? (
+            <Typography.Text type="secondary">无例句快照</Typography.Text>
+          ) : (
+            snapshot.sentences.map((sentence) => (
+              <Card key={sentence.id} size="small">
+                <Flex vertical gap={4}>
+                  <Flex gap="small" wrap>
+                    <Tag>{partOfSpeechLabel(sentence.pos)}</Tag>
+                    {sentence.level ? <Tag>{sentence.level}</Tag> : null}
+                    {sentence.roles.map((role, index) => (
+                      <Tag key={`${sentence.id}-role-${index}`}>{role}</Tag>
+                    ))}
+                  </Flex>
+                  {sentence.richEnglish ? (
+                    <V3EnglishTextPreview value={sentence.richEnglish} />
                   ) : (
-                    form.pronunciations.map((pronunciation) => (
-                      <MuiTypography
-                        key={pronunciation.id}
-                        component="span"
-                        color="text.secondary"
-                      >
-                        词典音标{" "}
-                        <span className="tsz-phonetics">
-                          {pronunciation.dictPhonetic}
-                        </span>{" "}
-                        · 实际发音{" "}
-                        <span className="tsz-phonetics tsz-actual-pronunciation">
-                          {pronunciation.actualPron}
-                        </span>
-                        {pronunciation.synthesis
-                          ? ` · ${pronunciationSynthesisLabel(pronunciation.synthesis, form.dialect)}`
-                          : ""}
-                        {pronunciation.style
-                          ? ` · ${pronunciationStyleLabel(pronunciation.style as never)}`
-                          : ""}
-                      </MuiTypography>
+                    sentence.english.map((row) => (
+                      <Typography.Text className="tsz-entry-en" key={row.id}>
+                        {dialectLabel(row.dialect as never)}：{row.text}
+                      </Typography.Text>
                     ))
                   )}
-                </MuiStack>
-              ))
-            )}
-          </MuiStack>
-          <MuiStack direction="column" spacing={1}>
-            <MuiTypography component="span" fontWeight={600}>
-              释义
-            </MuiTypography>
-            {snapshot.meanings.length === 0 ? (
-              <MuiTypography component="span" color="text.secondary">
-                无释义快照
-              </MuiTypography>
-            ) : (
-              snapshot.meanings.map((meaning) => (
-                <MuiStack
-                  key={meaning.id}
-                  direction="row"
-                  spacing={1}
-                  alignItems={"center"}
-                  useFlexGap
-                  flexWrap="wrap"
-                >
-                  <MuiChip label={<>{partOfSpeechLabel(meaning.pos)}</>} />
-                  <MuiChip label={<>{definitionModeLabel(meaning.mode)}</>} />
-                  {meaning.english ? (
-                    <V3EnglishTextPreview value={meaning.english} />
-                  ) : (
-                    <MuiTypography component="span">
-                      {meaning.text}
-                    </MuiTypography>
-                  )}
-                </MuiStack>
-              ))
-            )}
-          </MuiStack>
-          {snapshot.senseGroups.length > 0 ? (
-            <MuiStack direction="column" spacing={1}>
-              <MuiTypography component="span" fontWeight={600}>
-                释义组
-              </MuiTypography>
-              <MuiStack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                {snapshot.senseGroups.map((group, index) => (
-                  <MuiChip
-                    key={group.id}
-                    label={
-                      <>
-                        释义组 {index + 1}：{group.label}
-                      </>
-                    }
-                  />
-                ))}
-              </MuiStack>
-            </MuiStack>
-          ) : null}
-          {snapshot.grammar.length > 0 ? (
-            <MuiStack direction="column" spacing={1}>
-              <MuiTypography component="span" fontWeight={600}>
-                语法结构
-              </MuiTypography>
-              {snapshot.grammar.map((grammar) => (
-                <MuiStack
-                  key={grammar.id}
-                  direction="row"
-                  spacing={1}
-                  useFlexGap
-                  flexWrap="wrap"
-                >
-                  <MuiChip label={<>{partOfSpeechLabel(grammar.pos)}</>} />
-                  <MuiChip
-                    label={<>{dialectLabel(grammar.dialect as never)}</>}
-                  />
-                  <MuiTypography className="tsz-words" component="span">
-                    {grammar.text}
-                  </MuiTypography>
-                </MuiStack>
-              ))}
-            </MuiStack>
-          ) : null}
-          <MuiStack direction="column" spacing={1}>
-            <MuiTypography component="span" fontWeight={600}>
-              例句
-            </MuiTypography>
-            {snapshot.sentences.length === 0 ? (
-              <MuiTypography component="span" color="text.secondary">
-                无例句快照
-              </MuiTypography>
-            ) : (
-              snapshot.sentences.map((sentence) => (
-                <MuiCard key={sentence.id} variant="outlined">
-                  <MuiCardContent className="admin-card-body">
-                    <MuiStack direction="column" spacing={0.5}>
-                      <MuiStack
-                        direction="row"
-                        spacing={1}
-                        useFlexGap
-                        flexWrap="wrap"
-                      >
-                        <MuiChip
-                          label={<>{partOfSpeechLabel(sentence.pos)}</>}
-                        />
-                        {sentence.level ? (
-                          <MuiChip label={<>{sentence.level}</>} />
-                        ) : null}
-                        {sentence.roles.map((role, index) => (
-                          <MuiChip
-                            key={`${sentence.id}-role-${index}`}
-                            label={<>{role}</>}
-                          />
-                        ))}
-                      </MuiStack>
-                      {sentence.richEnglish ? (
-                        <V3EnglishTextPreview value={sentence.richEnglish} />
+                  {sentence.chinese.map((translation) => (
+                    <Typography.Text key={translation.id}>
+                      {translation.label ? (
+                        <Tag>{translation.label}</Tag>
                       ) : (
-                        sentence.english.map((row) => (
-                          <MuiTypography
-                            className="tsz-entry-en"
-                            key={row.id}
-                            component="span"
-                          >
-                            {dialectLabel(row.dialect as never)}：{row.text}
-                          </MuiTypography>
-                        ))
+                        "中文："
                       )}
-                      {sentence.chinese.map((translation) => (
-                        <MuiTypography key={translation.id} component="span">
-                          {translation.label ? (
-                            <MuiChip label={<>{translation.label}</>} />
-                          ) : (
-                            "中文："
-                          )}
-                          {translation.text}
-                        </MuiTypography>
-                      ))}
-                      {sentence.associations.map((association) => (
-                        <MuiTypography
-                          className="tsz-entry-en"
-                          key={association.id}
-                          component="span"
-                        >
-                          上下文关联：{association.target}
-                          {association.gloss ? ` · ${association.gloss}` : ""}
-                        </MuiTypography>
-                      ))}
-                    </MuiStack>
-                  </MuiCardContent>
-                </MuiCard>
-              ))
-            )}
-          </MuiStack>
-          <MuiStack direction="column" spacing={1}>
-            <MuiTypography component="span" fontWeight={600}>
-              关系词
-            </MuiTypography>
-            {snapshot.relations.length === 0 ? (
-              <MuiTypography component="span" color="text.secondary">
-                无关系词快照
-              </MuiTypography>
-            ) : (
-              snapshot.relations.map((relation) => (
-                <MuiStack
-                  key={relation.id}
-                  direction="row"
-                  spacing={1}
-                  useFlexGap
-                  flexWrap="wrap"
-                >
-                  <MuiChip label={<>{partOfSpeechLabel(relation.pos)}</>} />
-                  <MuiChip label={<>{relationLabel(relation.relation)}</>} />
-                  <MuiTypography className="tsz-entry-en" component="span">
-                    {relation.target}
-                    {relation.gloss ? ` · ${relation.gloss}` : ""}
-                  </MuiTypography>
-                </MuiStack>
-              ))
-            )}
-          </MuiStack>
-        </MuiStack>
-      </MuiCardContent>
-    </MuiCard>
+                      {translation.text}
+                    </Typography.Text>
+                  ))}
+                  {sentence.associations.map((association) => (
+                    <Typography.Text
+                      className="tsz-entry-en"
+                      key={association.id}
+                    >
+                      上下文关联：{association.target}
+                      {association.gloss ? ` · ${association.gloss}` : ""}
+                    </Typography.Text>
+                  ))}
+                </Flex>
+              </Card>
+            ))
+          )}
+        </Flex>
+        <Flex vertical gap="small">
+          <Typography.Text strong>关系词</Typography.Text>
+          {snapshot.relations.length === 0 ? (
+            <Typography.Text type="secondary">无关系词快照</Typography.Text>
+          ) : (
+            snapshot.relations.map((relation) => (
+              <Flex key={relation.id} gap="small" wrap>
+                <Tag>{partOfSpeechLabel(relation.pos)}</Tag>
+                <Tag>{relationLabel(relation.relation)}</Tag>
+                <Typography.Text className="tsz-entry-en">
+                  {relation.target}
+                  {relation.gloss ? ` · ${relation.gloss}` : ""}
+                </Typography.Text>
+              </Flex>
+            ))
+          )}
+        </Flex>
+      </Flex>
+    </Card>
   );
 }
+
 function PublicationMetadata({
   publication
 }: {
   publication: AdminWordPublicationAny;
 }) {
   return (
-    <MuiCard
+    <Card
       className="v3-publication-modal-metadata"
+      size="small"
+      title="发布信息"
       data-testid="publication-metadata"
-      variant="outlined"
     >
-      <MuiCardHeader
-        className="admin-card-header"
-        title={"发布信息"}
-        slotProps={{
-          title: { variant: "subtitle1", className: "admin-card-title" }
-        }}
-        sx={{ p: 2, borderBottom: 1, borderColor: "divider" }}
-      />
-      <MuiCardContent className="admin-card-body">
-        <MuiStack direction="column" spacing={0.25}>
-          <MuiTypography component="span">
-            发布批次：第 {publication.publication_number} 次
-          </MuiTypography>
-          <MuiTypography component="span">
-            发布时间：
-            {dayjs(publication.published_at).format("YYYY-MM-DD HH:mm")}
-          </MuiTypography>
-          <MuiTypography component="span">
-            当前状态：{publication.is_current ? "当前线上版本" : "历史版本"}
-          </MuiTypography>
-        </MuiStack>
-      </MuiCardContent>
-    </MuiCard>
+      <Flex vertical gap={2}>
+        <Typography.Text>
+          发布批次：第 {publication.publication_number} 次
+        </Typography.Text>
+        <Typography.Text>
+          发布时间：{dayjs(publication.published_at).format("YYYY-MM-DD HH:mm")}
+        </Typography.Text>
+        <Typography.Text>
+          当前状态：{publication.is_current ? "当前线上版本" : "历史版本"}
+        </Typography.Text>
+      </Flex>
+    </Card>
   );
 }
+
 function canRollbackV3Publication(currentWord: AdminWordV3): boolean {
   if (currentWord.status !== "published") {
     return false;
   }
   return currentWord.capabilities.publication.mode === "native";
 }
+
 function isCanonicalActivationConflict(error: unknown): error is HttpError {
   return (
     error instanceof HttpError &&
@@ -595,6 +483,7 @@ function isCanonicalActivationConflict(error: unknown): error is HttpError {
       error.code === "entry_archived")
   );
 }
+
 function surfaceActivationErrorMessage(code: string | undefined): string {
   if (
     code === "surface_match_snapshot_expired" ||
@@ -610,6 +499,7 @@ function surfaceActivationErrorMessage(code: string | undefined): string {
   }
   return "回退需要确认同名公开范围，但服务端未返回可确认快照。";
 }
+
 function activationErrorMessage(error: unknown): string {
   if (error instanceof HttpError) {
     switch (error.status) {
@@ -628,9 +518,11 @@ function activationErrorMessage(error: unknown): string {
   }
   return "回退发布版本失败，请稍后重试。";
 }
+
 function newIdempotencyKey(): string {
   return crypto.randomUUID();
 }
+
 export function V3PublicationHistory({
   activationBlockedByUnsavedChanges = false,
   currentWord,
@@ -676,6 +568,7 @@ export function V3PublicationHistory({
     `${currentWord.id}:${selectedPublicationId ?? "none"}:${surfacePage?.schema_version ?? "none"}:${surfacePage?.snapshot_id ?? "none"}:${surfaceResetVersion}`,
     fetchSurfacePage
   );
+
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -688,6 +581,7 @@ export function V3PublicationHistory({
       recoveryLock.current = false;
     };
   }, []);
+
   useEffect(() => {
     const generation = ++listGeneration.current;
     setLoading(true);
@@ -711,6 +605,7 @@ export function V3PublicationHistory({
     requests,
     retryVersion
   ]);
+
   useEffect(() => {
     detailGeneration.current += 1;
     activationGeneration.current += 1;
@@ -727,7 +622,9 @@ export function V3PublicationHistory({
     setSurfaceResetVersion((value) => value + 1);
     setRecovery(undefined);
   }, [currentWord.id, currentWord.lifecycle_revision, currentWord.revision]);
+
   const retry = useCallback(() => setRetryVersion((value) => value + 1), []);
+
   const invalidateDetail = useCallback(() => {
     detailGeneration.current += 1;
     activationGeneration.current += 1;
@@ -743,9 +640,11 @@ export function V3PublicationHistory({
     setSurfacePage(undefined);
     setSurfaceResetVersion((value) => value + 1);
   }, []);
+
   const closeDetail = useCallback(() => {
     invalidateDetail();
   }, [invalidateDetail]);
+
   const refreshAfterConflict = useCallback(
     (status: RecoveryStatus) => {
       invalidateDetail();
@@ -783,6 +682,7 @@ export function V3PublicationHistory({
     },
     [currentWord.id, invalidateDetail, onCanonicalRefreshed, requests]
   );
+
   const openDetail = useCallback(
     (publicationId: string) => {
       const generation = ++detailGeneration.current;
@@ -823,6 +723,7 @@ export function V3PublicationHistory({
     },
     [currentWord.id, requests]
   );
+
   const activate = useCallback(
     (confirmedSurfaceToken?: string) => {
       if (
@@ -914,6 +815,7 @@ export function V3PublicationHistory({
       requests
     ]
   );
+
   const confirmSurfaceActivation = useCallback(() => {
     if (
       activationBlockedByUnsavedChanges ||
@@ -923,6 +825,7 @@ export function V3PublicationHistory({
     }
     void activate(surfaceSnapshot.surface_confirmation_token);
   }, [activate, activationBlockedByUnsavedChanges, surfaceSnapshot]);
+
   const restartSurfaceActivation = useCallback(() => {
     if (activationBlockedByUnsavedChanges || activationLock.current) return;
     activationKey.current = undefined;
@@ -931,166 +834,130 @@ export function V3PublicationHistory({
     setActivationError(undefined);
     void activate();
   }, [activate, activationBlockedByUnsavedChanges]);
+
   const beginActivation = useCallback(() => {
     if (activationBlockedByUnsavedChanges) return;
     setConfirming(true);
   }, [activationBlockedByUnsavedChanges]);
-  if (loading)
-    return <MuiCircularProgress aria-label="加载发布历史" size={32} />;
+
+  if (loading) return <Spin aria-label="加载发布历史" />;
   if (listError) {
     return (
-      <MuiAlert
-        action={<MuiButton onClick={retry}>重 试</MuiButton>}
-        severity={"error"}
-      >
-        {"发布历史加载失败"}
-      </MuiAlert>
+      <Alert
+        showIcon
+        type="error"
+        title="发布历史加载失败"
+        action={<Button onClick={retry}>重 试</Button>}
+      />
     );
   }
+
   return (
     <>
       {recovery ? (
-        <MuiAlert
-          action={
-            recovery.phase === "error" ? (
-              <MuiButton onClick={() => refreshAfterConflict(recovery.status)}>
-                重新刷新词条与发布历史
-              </MuiButton>
-            ) : null
-          }
-          severity={recovery.phase === "error" ? "error" : "warning"}
-        >
-          <MuiAlertTitle>
-            {recovery.phase === "error"
+        <Alert
+          showIcon
+          type={recovery.phase === "error" ? "error" : "warning"}
+          title={
+            recovery.phase === "error"
               ? "刷新最新词条与发布历史失败"
               : recovery.status === 409
                 ? "词条版本已变化，正在刷新最新词条与发布历史"
-                : "确认上下文已失效，正在刷新最新词条与发布历史"}
-          </MuiAlertTitle>
-          {recovery.phase === "error"
-            ? "旧发布详情与确认已失效。刷新成功并重新打开发布详情前，不会再次发送回退请求。"
-            : "旧发布详情与确认已失效，正在获取最新词条和发布历史。"}
-        </MuiAlert>
-      ) : null}
-      <MuiCard className="v3-publication-history" variant="outlined">
-        <MuiCardHeader
-          className="admin-card-header"
-          title={"发布历史"}
-          slotProps={{
-            title: { variant: "subtitle1", className: "admin-card-title" }
-          }}
-          sx={{ p: 2, borderBottom: 1, borderColor: "divider" }}
+                : "确认上下文已失效，正在刷新最新词条与发布历史"
+          }
+          description={
+            recovery.phase === "error"
+              ? "旧发布详情与确认已失效。刷新成功并重新打开发布详情前，不会再次发送回退请求。"
+              : "旧发布详情与确认已失效，正在获取最新词条和发布历史。"
+          }
+          action={
+            recovery.phase === "error" ? (
+              <Button onClick={() => refreshAfterConflict(recovery.status)}>
+                重新刷新词条与发布历史
+              </Button>
+            ) : null
+          }
         />
-        <MuiCardContent className="admin-card-body">
-          {publications.length === 0 ? (
-            <MuiTypography component="span" color="text.secondary">
-              暂无发布记录
-            </MuiTypography>
-          ) : (
-            <MuiStack direction="column" spacing={1}>
-              {publications.map((publication) => (
-                <MuiStack
-                  key={publication.publication_id}
-                  direction="row"
-                  spacing={1}
-                  alignItems={"center"}
-                  justifyContent={"space-between"}
-                  useFlexGap
-                  flexWrap="wrap"
+      ) : null}
+      <Card className="v3-publication-history" title="发布历史">
+        {publications.length === 0 ? (
+          <Typography.Text type="secondary">暂无发布记录</Typography.Text>
+        ) : (
+          <Flex vertical gap="small">
+            {publications.map((publication) => (
+              <Flex
+                key={publication.publication_id}
+                align="center"
+                justify="space-between"
+                gap="small"
+                wrap
+              >
+                <Flex vertical gap={2}>
+                  <Flex align="center" gap="small" wrap>
+                    <Typography.Text className="tsz-words" strong>
+                      {publicationLabel(publication)}
+                    </Typography.Text>
+                    <Typography.Text type="secondary">
+                      第 {publication.publication_number} 次发布
+                    </Typography.Text>
+                    {publication.rollback_of_publication_id ? (
+                      <Tag>历史内容回退</Tag>
+                    ) : null}
+                    {publication.is_current ? (
+                      <Tag color="green">当前</Tag>
+                    ) : null}
+                  </Flex>
+                  <Typography.Text type="secondary">
+                    {dayjs(publication.published_at).format("YYYY-MM-DD HH:mm")}
+                  </Typography.Text>
+                </Flex>
+                <Button
+                  aria-label={`查看第 ${publication.publication_number} 次发布`}
+                  disabled={recovery !== undefined}
+                  onClick={() => openDetail(publication.publication_id)}
                 >
-                  <MuiStack direction="column" spacing={0.25}>
-                    <MuiStack
-                      direction="row"
-                      spacing={1}
-                      alignItems={"center"}
-                      useFlexGap
-                      flexWrap="wrap"
-                    >
-                      <MuiTypography
-                        className="tsz-words"
-                        component="span"
-                        fontWeight={600}
-                      >
-                        {publicationLabel(publication)}
-                      </MuiTypography>
-                      <MuiTypography component="span" color="text.secondary">
-                        第 {publication.publication_number} 次发布
-                      </MuiTypography>
-                      {publication.rollback_of_publication_id ? (
-                        <MuiChip label={<>历史内容回退</>} />
-                      ) : null}
-                      {publication.is_current ? (
-                        <MuiChip color={"success"} label={<>当前</>} />
-                      ) : null}
-                    </MuiStack>
-                    <MuiTypography component="span" color="text.secondary">
-                      {dayjs(publication.published_at).format(
-                        "YYYY-MM-DD HH:mm"
-                      )}
-                    </MuiTypography>
-                  </MuiStack>
-                  <MuiButton
-                    aria-label={`查看第 ${publication.publication_number} 次发布`}
-                    disabled={recovery !== undefined}
-                    onClick={() => openDetail(publication.publication_id)}
-                  >
-                    查看详情
-                  </MuiButton>
-                </MuiStack>
-              ))}
-            </MuiStack>
-          )}
-        </MuiCardContent>
-      </MuiCard>
-      <AdminDialog
+                  查看详情
+                </Button>
+              </Flex>
+            ))}
+          </Flex>
+        )}
+      </Card>
+      <Modal
         className="v3-publication-modal"
+        footer={null}
         open={selectedPublicationId !== undefined}
         title="发布详情"
         width={920}
-        onClose={closeDetail}
-        actions={null}
+        onCancel={closeDetail}
       >
-        <MuiStack
-          data-testid="publication-detail"
-          direction="column"
-          spacing={2}
-        >
-          {detailLoading ? (
-            <MuiCircularProgress aria-label="加载发布详情" size={32} />
-          ) : null}
+        <Flex vertical gap="middle" data-testid="publication-detail">
+          {detailLoading ? <Spin aria-label="加载发布详情" /> : null}
           {detailError ? (
-            <MuiAlert severity={"error"}>{"发布详情加载失败"}</MuiAlert>
+            <Alert showIcon type="error" title="发布详情加载失败" />
           ) : null}
           {detail ? (
             <>
-              <MuiStack
-                direction="row"
-                spacing={1}
-                alignItems={"center"}
-                useFlexGap
-                flexWrap="wrap"
-              >
-                <MuiTypography
+              <Flex align="center" gap="small" wrap>
+                <Typography.Title
                   className="tsz-words"
+                  level={5}
                   style={{ margin: 0 }}
-                  component="h5"
-                  variant="subtitle1"
                 >
                   {publicationLabel(detail)}
-                </MuiTypography>
-                <MuiTypography component="span" color="text.secondary">
+                </Typography.Title>
+                <Typography.Text type="secondary">
                   第 {detail.publication_number} 次发布
-                </MuiTypography>
-              </MuiStack>
-              <MuiAlert severity={"info"}>
-                {"正在查看只读的历史发布快照"}
-              </MuiAlert>
+                </Typography.Text>
+              </Flex>
+              <Alert showIcon type="info" title="正在查看只读的历史发布快照" />
               <PublicationMetadata publication={detail} />
               <PublicationSnapshotBody publication={detail} />
               {!allowedToPublish ? (
-                <MuiAlert severity={"info"}>
-                  {"需要词条回滚权限；普通管理员仅能回滚本人词条"}
-                </MuiAlert>
+                <Alert
+                  type="info"
+                  title={"需要词条回滚权限；普通管理员仅能回滚本人词条"}
+                />
               ) : null}
               {surfacePage ? (
                 <LifecycleSurfaceConfirmation
@@ -1102,24 +969,26 @@ export function V3PublicationHistory({
                 />
               ) : null}
               {activationError ? (
-                <MuiAlert severity={"error"}>{activationError}</MuiAlert>
+                <Alert showIcon type="error" title={activationError} />
               ) : null}
               {canRollbackV3Publication(currentWord) && !surfacePage ? (
                 <>
                   {activationBlockedByUnsavedChanges ? (
-                    <MuiAlert severity={"warning"}>
-                      <MuiAlertTitle>
-                        {"请先保存或放弃未保存的草稿"}
-                      </MuiAlertTitle>
-                      {
-                        "当前有未保存的词形或释义草稿。请先保存或主动放弃草稿，再将历史内容发布为新版本；查看历史详情不受影响。"
-                      }
-                    </MuiAlert>
+                    <Alert
+                      showIcon
+                      type="warning"
+                      title="请先保存或放弃未保存的草稿"
+                      description="当前有未保存的词形或释义草稿。请先保存或主动放弃草稿，再将历史内容发布为新版本；查看历史详情不受影响。"
+                    />
                   ) : null}
                   {confirming ? (
-                    <MuiAlert
+                    <Alert
+                      showIcon
+                      type="warning"
+                      title="确认将历史内容发布为新版本"
+                      description="将历史内容按当前规则重新校验并发布为新版本，保留当前草稿。"
                       action={
-                        <MuiButton
+                        <Button
                           disabled={
                             activationBlockedByUnsavedChanges ||
                             !allowedToPublish
@@ -1128,48 +997,39 @@ export function V3PublicationHistory({
                           onClick={() => void activate()}
                         >
                           确认回退
-                        </MuiButton>
+                        </Button>
                       }
-                      severity={"warning"}
-                    >
-                      <MuiAlertTitle>
-                        {"确认将历史内容发布为新版本"}
-                      </MuiAlertTitle>
-                      {
-                        "将历史内容按当前规则重新校验并发布为新版本，保留当前草稿。"
-                      }
-                    </MuiAlert>
+                    />
                   ) : null}
                 </>
               ) : null}
             </>
           ) : null}
-          <MuiStack
+          <Flex
             className="v3-publication-modal-actions"
-            direction="row"
-            spacing={1}
-            justifyContent={"flex-end"}
+            justify="flex-end"
+            gap="small"
           >
-            <MuiButton aria-label="关闭发布详情" onClick={closeDetail}>
+            <Button aria-label="关闭发布详情" onClick={closeDetail}>
               关 闭
-            </MuiButton>
+            </Button>
             {detail &&
             canRollbackV3Publication(currentWord) &&
             !surfacePage &&
             !confirming ? (
-              <MuiButton
+              <Button
+                type="primary"
                 disabled={
                   activationBlockedByUnsavedChanges || !allowedToPublish
                 }
                 onClick={() => beginActivation()}
-                variant={"contained"}
               >
                 回退为新版本
-              </MuiButton>
+              </Button>
             ) : null}
-          </MuiStack>
-        </MuiStack>
-      </AdminDialog>
+          </Flex>
+        </Flex>
+      </Modal>
     </>
   );
 }

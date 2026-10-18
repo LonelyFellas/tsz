@@ -1,4 +1,5 @@
-import { AdminTable } from "@/components/AdminTable";
+import { TableEmptyState } from "@/components/TableEmptyState";
+import { Table } from "antd";
 import { formatCoins } from "@tsz/shared";
 import type { CoinEntryPage } from "@tsz/types";
 export const coinSourceLabels: Record<string, string> = {
@@ -20,39 +21,40 @@ export function EntriesTable({
   onPage: (page: number) => void;
 }) {
   return (
-    <AdminTable
-      emptyMessage="暂无账户流水"
-      rows={data?.items ?? []}
-      rowId={(row) => row.id}
+    <Table
+      locale={{ emptyText: <TableEmptyState message="暂无账户流水" /> }}
+      rowKey="id"
       loading={loading}
-      minWidth={620}
+      dataSource={data?.items}
+      scroll={{ x: 620 }}
       pagination={{
-        page: data?.pagination.page ?? 1,
+        current: data?.pagination.page ?? 1,
         pageSize: 20,
         total: data?.pagination.total ?? 0,
+        showSizeChanger: false,
         onChange: onPage
       }}
       columns={[
         {
-          id: "time",
-          label: "时间",
-          render: (row) => new Date(row.created_at).toLocaleString("zh-CN")
+          title: "时间",
+          dataIndex: "created_at",
+          render: (v: string) => new Date(v).toLocaleString("zh-CN")
         },
         {
-          id: "source",
-          label: "来源",
-          render: (row) => coinSourceLabels[row.source_type] ?? "天生币收支"
+          title: "来源",
+          dataIndex: "source_type",
+          render: (v: string) => coinSourceLabels[v] ?? "天生币收支"
         },
         {
-          id: "delta",
-          label: "变动",
-          render: (row) =>
-            `${row.delta.startsWith("-") ? "" : "+"}${formatCoins(row.delta)}`
+          title: "变动",
+          dataIndex: "delta",
+          render: (v: string) =>
+            `${v.startsWith("-") ? "" : "+"}${formatCoins(v)}`
         },
         {
-          id: "balance",
-          label: "记账后余额",
-          render: (row) => formatCoins(row.balance_after)
+          title: "记账后余额",
+          dataIndex: "balance_after",
+          render: (v: string) => formatCoins(v)
         }
       ]}
     />

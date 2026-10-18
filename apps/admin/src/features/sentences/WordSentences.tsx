@@ -1,17 +1,19 @@
-import {
-  Alert as MuiAlert,
-  Button as MuiButton,
-  Chip as MuiChip,
-  Stack as MuiStack,
-  Tooltip as MuiTooltip,
-  Typography as MuiTypography
-} from "@mui/material";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import PlusOutlined from "@mui/icons-material/Add";
-import { Pagination as MuiPagination } from "@mui/material";
-import { useFeedback } from "@/components/FeedbackProvider";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { PlusOutlined } from "@ant-design/icons";
+import {
+  Alert,
+  App,
+  Button,
+  Empty,
+  Flex,
+  Pagination,
+  Popover,
+  Space,
+  Tag,
+  Tooltip,
+  Typography
+} from "antd";
 import type { AdminWordV3, SharedSentence } from "@tsz/types";
 import { canAdminResourceAction, hasAdminPermission } from "@tsz/shared/auth";
 import { api, useAuthStore } from "@/lib/auth";
@@ -23,7 +25,6 @@ import { V3EnglishTextPreview } from "../dictionary/word-creation-v3/components/
 import { SentenceEditor } from "./SentenceEditor";
 import { V3RowIndex } from "../dictionary/word-creation-v3/components/V3RowIndex";
 import "./WordSentences.css";
-import { EmptyStateHint } from "@/components/EmptyStateHint";
 
 const PAGE_SIZE = 5;
 const TRANSLATION_BANDS = [
@@ -78,9 +79,7 @@ export function WordSentences({
   const savedSense = sourceWord.meanings.pos
     .flatMap((pos) => pos.senses)
     .find((sense) => sense.id === senseId);
-  const feedback = useFeedback();
-  const [removing, setRemoving] = useState<SharedSentence>();
-  const [removePending, setRemovePending] = useState(false);
+  const { message, modal } = App.useApp();
   const client = useQueryClient();
   const [collapsed, setCollapsed] = useState(false);
   const [page, setPage] = useState(1);
@@ -104,7 +103,6 @@ export function WordSentences({
     enabled: !!savedSense && canRead
   });
   const rows = query.data?.items ?? [];
-  const empty = !rows.length && !query.isFetching && !query.isError && !editor;
   const selectedIndex =
     typeof editor === "object"
       ? rows.findIndex((item) => item.id === editor.id)
@@ -119,9 +117,8 @@ export function WordSentences({
     });
   };
   const failure = (error: unknown) => {
-    void feedback(
-      error instanceof Error ? error.message : "操作失败，请重试",
-      "error"
+    void message.error(
+      error instanceof Error ? error.message : "操作失败，请重试"
     );
   };
   const edit = async (item: SharedSentence) => {
@@ -152,27 +149,39 @@ export function WordSentences({
     // 只按目标例句 id 触发；onOpen / onFocusHandled 每次渲染都是新函数。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusSentenceId]);
-  const remove = async () => {
-    if (!removing || removePending) return;
-    setRemovePending(true);
-    try {
-      await api.sentences.setVisibility(entryId, removing.id, {
-        base_revision: sourceWord.revision,
-        hidden: true,
-        sense_id: senseId
-      });
-      setPage(1);
-      void client.invalidateQueries({ queryKey: ["admin-words"] });
-      refresh();
-      setRemoving(undefined);
-    } catch (error) {
-      failure(error);
-    } finally {
-      setRemovePending(false);
-    }
+  const remove = (item: SharedSentence) => {
+    const confirmation = modal.confirm({
+      title: "从当前词义移除例句？",
+      content:
+        "移除只写入当前词条草稿，发布词条后生效。共享标注和其他词义的展示不变。",
+      onOk: (close) => {
+        confirmation.update({
+          okButtonProps: { loading: true },
+          cancelButtonProps: { disabled: true }
+        });
+        void api.sentences
+          .setVisibility(entryId, item.id, {
+            base_revision: sourceWord.revision,
+            hidden: true,
+            sense_id: senseId
+          })
+          .then(() => {
+            setPage(1);
+            void client.invalidateQueries({ queryKey: ["admin-words"] });
+            refresh();
+            close();
+          })
+          .catch((error: unknown) => {
+            void failure(error);
+            confirmation.update({
+              okButtonProps: { loading: false },
+              cancelButtonProps: { disabled: false }
+            });
+          });
+      }
+    });
   };
-  if (!canRead)
-    return <MuiAlert severity={"info"}>{"未开通例句查看权限"}</MuiAlert>;
+  if (!canRead) return <Alert type="info" title="未开通例句查看权限" />;
   return (
     <section
       className={`word-sense-section${collapsed ? " is-collapsed" : ""}`}
@@ -186,15 +195,6 @@ export function WordSentences({
         collapsed={collapsed}
         onToggle={() => setCollapsed(!collapsed)}
       />
-      <ConfirmDialog
-        open={!!removing}
-        title="从当前词义移除例句？"
-        pending={removePending}
-        onClose={() => setRemoving(undefined)}
-        onConfirm={() => void remove()}
-      >
-        移除只写入当前词条草稿，发布词条后生效。共享标注和其他词义的展示不变。
-      </ConfirmDialog>
       <SenseSectionBody collapsed={collapsed}>
         {editor && (editor === "new" ? canCreate : canEditSentence(editor)) && (
           <SentenceEditor
@@ -213,82 +213,69 @@ export function WordSentences({
             }}
           />
         )}
-        <MuiStack
-          direction="column"
-          spacing={1}
-          className={empty ? "admin-empty-state" : undefined}
-        >
+        <Flex vertical gap="small">
           {savedSense && (
-            <MuiTypography
-              className={empty ? "admin-empty-state-note" : undefined}
-              component="span"
-              color="text.secondary"
-            >
+            <Typography.Text type="secondary">
               保存只更新例句草稿；例句发布后才更新展示。局部移除随词条发布生效。
-            </MuiTypography>
+            </Typography.Text>
           )}
           {query.isError && (
-            <MuiAlert
+            <Alert
+              type="error"
+              title="例句加载失败"
               action={
-                <MuiButton onClick={() => void query.refetch()}>重试</MuiButton>
+                <Button onClick={() => void query.refetch()}>重试</Button>
               }
-              severity={"error"}
-            >
-              {"例句加载失败"}
-            </MuiAlert>
+            />
           )}
           {!rows.length && !query.isFetching && (
-            <EmptyStateHint>暂无关联例句</EmptyStateHint>
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description="暂无关联例句"
+            />
           )}
           {rows.map((item, index) => (
-            <MuiStack
+            <Flex
               key={item.id}
+              vertical
+              gap={12}
               className="shared-sentence-row"
-              direction="column"
-              spacing={1.5}
             >
-              <MuiStack
+              <Flex
+                align="center"
+                justify="space-between"
+                gap="small"
                 className="shared-sentence-header"
-                direction="row"
-                spacing={1}
-                alignItems={"center"}
-                justifyContent={"space-between"}
               >
-                <MuiStack direction="row" spacing={1} alignItems="center">
+                <Space size={8}>
                   <V3RowIndex index={(page - 1) * PAGE_SIZE + index} />
-                  <MuiChip label={<>{item.content.sentence.level}</>} />
-                </MuiStack>
+                  <Tag>{item.content.sentence.level}</Tag>
+                </Space>
                 {!readOnly && (
-                  <MuiStack direction="row" spacing={1} alignItems="center">
-                    <MuiButton
+                  <Space>
+                    <Button
                       disabled={!canEditSentence(item)}
                       size="small"
                       onClick={() => void edit(item)}
                     >
                       编辑
-                    </MuiButton>
-                    <MuiTooltip
-                      describeChild
-                      title="从当前词义移除，随词条发布生效"
+                    </Button>
+                    <Popover
+                      content="从当前词义移除，随词条发布生效"
+                      trigger="hover"
                     >
-                      <span style={{ display: "inline-flex" }}>
-                        <MuiButton
-                          size="small"
-                          disabled={!canEditWord}
-                          onClick={() => setRemoving(item)}
-                        >
-                          移除
-                        </MuiButton>
-                      </span>
-                    </MuiTooltip>
-                  </MuiStack>
+                      <Button
+                        size="small"
+                        disabled={!canEditWord}
+                        onClick={() => remove(item)}
+                      >
+                        移除
+                      </Button>
+                    </Popover>
+                  </Space>
                 )}
-              </MuiStack>
-              <MuiStack
-                style={{ minWidth: 0 }}
-                direction="column"
-                spacing={1.5}
-              >
+              </Flex>
+              <Flex vertical gap={12} style={{ minWidth: 0 }}>
                 <div className="shared-sentence-english">
                   <V3EnglishTextPreview
                     value={item.content.sentence.en_text}
@@ -296,11 +283,7 @@ export function WordSentences({
                     showPlayback
                   />
                 </div>
-                <MuiStack
-                  className="shared-sentence-translations"
-                  direction="column"
-                  spacing={1}
-                >
+                <Flex vertical gap={8} className="shared-sentence-translations">
                   {TRANSLATION_BANDS.flatMap(({ band, label }) =>
                     item.content.sentence.zh_translations
                       .filter(
@@ -309,49 +292,47 @@ export function WordSentences({
                           translation.content.text.trim()
                       )
                       .map((translation) => (
-                        <MuiStack
+                        <Flex
                           key={translation.id}
                           role="group"
                           aria-label={`${label}阶译文`}
+                          align="start"
+                          gap={10}
                           className="shared-sentence-translation"
-                          direction="row"
-                          spacing={1.25}
-                          alignItems={"flex-start"}
                         >
-                          <MuiChip
+                          <Tag
+                            color="blue"
                             style={{ marginInlineEnd: 0, flexShrink: 0 }}
-                            color={"primary"}
-                            label={<>{label}</>}
-                          />
-                          <MuiTypography
+                          >
+                            {label}
+                          </Tag>
+                          <Typography.Text
+                            type="secondary"
                             style={{ whiteSpace: "pre-wrap" }}
-                            component="span"
-                            color="text.secondary"
                           >
                             {translation.content.text}
-                          </MuiTypography>
-                        </MuiStack>
+                          </Typography.Text>
+                        </Flex>
                       ))
                   )}
-                </MuiStack>
-              </MuiStack>
-            </MuiStack>
+                </Flex>
+              </Flex>
+            </Flex>
           ))}
           {(query.data?.total ?? 0) > PAGE_SIZE && (
-            <MuiPagination
+            <Pagination
               size="small"
-              page={page}
-              count={Math.max(
-                1,
-                Math.ceil((query.data?.total ?? 0) / PAGE_SIZE)
-              )}
-              onChange={(_, next) => setPage(next)}
+              current={page}
+              pageSize={PAGE_SIZE}
+              total={query.data?.total}
+              onChange={setPage}
+              showSizeChanger={false}
             />
           )}
           {canCreate && (
-            <MuiTooltip
-              describeChild
+            <Tooltip
               title={!savedSense ? "先保存词义，再添加例句。" : undefined}
+              trigger={["hover", "focus"]}
             >
               <span
                 style={{
@@ -360,21 +341,21 @@ export function WordSentences({
                 }}
                 tabIndex={!savedSense ? 0 : undefined}
               >
-                <MuiButton
+                <Button
+                  block
+                  type="dashed"
                   className="word-section-add-button"
+                  icon={<PlusOutlined aria-hidden />}
                   disabled={!savedSense}
                   style={!savedSense ? { pointerEvents: "none" } : undefined}
                   onClick={() => onOpen("new")}
-                  variant={"outlined"}
-                  startIcon={<PlusOutlined fontSize="inherit" aria-hidden />}
-                  fullWidth
                 >
                   添加例句
-                </MuiButton>
+                </Button>
               </span>
-            </MuiTooltip>
+            </Tooltip>
           )}
-        </MuiStack>
+        </Flex>
       </SenseSectionBody>
     </section>
   );

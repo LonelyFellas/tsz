@@ -1,12 +1,5 @@
-import { IconButton as MuiIconButton } from "@mui/material";
-import {
-  Chip as MuiChip,
-  Stack as MuiStack,
-  Tooltip as MuiTooltip
-} from "@mui/material";
-import SoundOutlined from "@mui/icons-material/VolumeUpOutlined";
-import SyncOutlined from "@mui/icons-material/Sync";
-import { useFeedback } from "@/components/FeedbackProvider";
+import { SoundOutlined, SyncOutlined } from "@ant-design/icons";
+import { App, Button, Space, Tag, Tooltip } from "antd";
 import type { Dialect, RichTextV2, VoiceProfileV3 } from "@tsz/types";
 import type { AdminDialectPreference } from "@tsz/shared";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
@@ -214,7 +207,7 @@ export function PronunciationPreviewControls({
 }) {
   const context = useContext(PreviewContext);
   if (!context) throw new Error("PronunciationPreviewProvider is required");
-  const feedback = useFeedback();
+  const { message } = App.useApp();
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<VoicePreviewResult>();
   const [status, setStatus] = useState("");
@@ -316,7 +309,7 @@ export function PronunciationPreviewControls({
           if (audioRef.current !== audio) return;
           discardResult();
           setStatus("试听音频加载失败，请重新生成");
-          void feedback("试听音频加载失败，请重新生成", "error");
+          void message.error("试听音频加载失败，请重新生成");
         },
         { once: true }
       );
@@ -329,7 +322,7 @@ export function PronunciationPreviewControls({
       );
       return audio;
     },
-    [audioFactory, discardResult, feedback]
+    [audioFactory, discardResult, message]
   );
 
   const generate = async () => {
@@ -398,7 +391,7 @@ export function PronunciationPreviewControls({
       if (!controller.signal.aborted) {
         const nextStatus = errorMessage(error);
         setStatus(nextStatus);
-        void feedback(nextStatus, "error");
+        void message.error(nextStatus);
       }
     } finally {
       if (generationRef.current === generation) {
@@ -421,7 +414,7 @@ export function PronunciationPreviewControls({
     } catch {
       if (audioRef.current === audio) {
         setStatus("播放失败，请检查浏览器音频权限后重试");
-        void feedback("播放失败，请检查浏览器音频权限后重试", "error");
+        void message.error("播放失败，请检查浏览器音频权限后重试");
       }
     }
   };
@@ -445,8 +438,7 @@ export function PronunciationPreviewControls({
   const controls = (
     <>
       {
-        <MuiTooltip
-          describeChild
+        <Tooltip
           title={
             (disabled ? disabledReason : undefined) ||
             status ||
@@ -457,73 +449,56 @@ export function PronunciationPreviewControls({
                 : "请先获取语音")
           }
         >
-          <span style={{ display: "inline-flex" }}>
-            <MuiIconButton
-              className="word-pronunciation-play-action"
-              data-playback-dialect={targetLocale === "en-GB" ? "uk" : "us"}
-              disabled={
-                disabled ||
-                !context.enabled ||
-                busy ||
-                (!result &&
-                  (!playbackOnly || context.voicesLoading || !voice || !text))
-              }
-              aria-label={playLabel}
-              loading={playbackOnly && busy}
-              onClick={() => void (result ? replay() : generate())}
-            >
-              <SoundOutlined fontSize="inherit" />
-            </MuiIconButton>
-          </span>
-        </MuiTooltip>
+          <Button
+            className="word-pronunciation-play-action"
+            data-playback-dialect={targetLocale === "en-GB" ? "uk" : "us"}
+            icon={<SoundOutlined />}
+            disabled={
+              disabled ||
+              !context.enabled ||
+              busy ||
+              (!result &&
+                (!playbackOnly || context.voicesLoading || !voice || !text))
+            }
+            aria-label={playLabel}
+            loading={playbackOnly && busy}
+            onClick={() => void (result ? replay() : generate())}
+          />
+        </Tooltip>
       }
       {children}
       {voicePreviewIsMock && (
-        <MuiTooltip
-          describeChild
-          title="当前走本地 TTS mock，试听音频不是真实合成结果"
-        >
-          <MuiChip
+        <Tooltip title="当前走本地 TTS mock，试听音频不是真实合成结果">
+          <Tag
             className="word-pronunciation-mock-tag"
+            color="warning"
             role="note"
             aria-label="试听走本地 TTS mock，音频不是真实合成结果"
-            color={"warning"}
-            label={<>模拟</>}
-          />
-        </MuiTooltip>
+          >
+            模拟
+          </Tag>
+        </Tooltip>
       )}
       {!playbackOnly && (
-        <MuiTooltip describeChild title={status || unavailableReason}>
-          <span style={{ display: "inline-flex" }}>
-            <MuiIconButton
-              className="word-pronunciation-voice-action word-pronunciation-sync-action"
-              aria-label={generateLabel}
-              loading={busy}
-              disabled={
-                disabled ||
-                !context.enabled ||
-                context.voicesLoading ||
-                !voice ||
-                !text ||
-                busy
-              }
-              onClick={() => void generate()}
-            >
-              <SyncOutlined
-                fontSize="inherit"
-                sx={{ animation: "admin-icon-spin 1s linear infinite" }}
-              />
-            </MuiIconButton>
-          </span>
-        </MuiTooltip>
+        <Tooltip title={status || unavailableReason}>
+          <Button
+            className="word-pronunciation-voice-action word-pronunciation-sync-action"
+            aria-label={generateLabel}
+            icon={<SyncOutlined spin={busy} />}
+            loading={busy}
+            disabled={
+              disabled ||
+              !context.enabled ||
+              context.voicesLoading ||
+              !voice ||
+              !text ||
+              busy
+            }
+            onClick={() => void generate()}
+          />
+        </Tooltip>
       )}
     </>
   );
-  return compact ? (
-    <MuiStack direction="row" spacing={1} alignItems="center">
-      {controls}
-    </MuiStack>
-  ) : (
-    controls
-  );
+  return compact ? <Space.Compact block>{controls}</Space.Compact> : controls;
 }
