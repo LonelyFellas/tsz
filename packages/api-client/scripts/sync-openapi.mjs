@@ -80,6 +80,7 @@ const RUNTIME_SCHEMA_ROOTS = [
   "WordlistTipPage",
   "AdminWordlist",
   "AdminWordlistPage",
+  "WordlistDeleteImpact",
   "Wordlist",
   "WordlistPage",
   "WordlistItems",

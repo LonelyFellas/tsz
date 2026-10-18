@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/qualified-invitation-reward/tsz-rust/docs/openapi.json",
-  "_source_sha256": "3e970c64348fd3b638128c05b92c1e7d354c46c57d585e23c2cb7dab53079bbc",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-deletion-grace/docs/openapi.json",
+  "_source_sha256": "025f09f45a897af9c12ad4cde98d224e0cc0a69d93045210a212df2bf8060ea4",
   "roots": [
     "DictionaryPage",
     "DictionaryEntry",
@@ -26,6 +26,7 @@
     "WordlistTipPage",
     "AdminWordlist",
     "AdminWordlistPage",
+    "WordlistDeleteImpact",
     "Wordlist",
     "WordlistPage",
     "WordlistItems",
@@ -3652,6 +3653,22 @@
           "type": "array",
           "items": { "$ref": "#/$defs/WordlistText" }
         }
+      },
+      "additionalProperties": false
+    },
+    "WordlistDeleteImpact": {
+      "type": "object",
+      "required": [
+        "active_run_count",
+        "active_task_count",
+        "affected_user_count",
+        "blocked_task_count"
+      ],
+      "properties": {
+        "active_run_count": { "type": "integer" },
+        "active_task_count": { "type": "integer" },
+        "affected_user_count": { "type": "integer" },
+        "blocked_task_count": { "type": "integer" }
       },
       "additionalProperties": false
     },

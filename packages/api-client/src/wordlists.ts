@@ -14,6 +14,7 @@ import { checkInteger } from "./coins";
 import type {
   AdminWordlist,
   AdminWordlistPage,
+  WordlistDeleteImpact,
   WordlistManagementQuery,
   Wordlist,
   WordlistPage,
@@ -288,6 +289,15 @@ export function createAdminWordlistEndpoints(http: HttpClient) {
       http
         .post<unknown>(`/wordlists/${id}/recommendation`, data)
         .then((v) => decodeWordlistResponse<AdminWordlist>("AdminWordlist", v)),
+    deleteImpact: (id: string, o?: Options) =>
+      http
+        .get<unknown>(`/wordlists/${id}/delete-impact`, o)
+        .then((v) =>
+          decodeWordlistResponse<WordlistDeleteImpact>(
+            "WordlistDeleteImpact",
+            v
+          )
+        ),
     delete: (id: string, data: { expected_revision: number }) =>
       http.post<void>(`/wordlists/${id}/delete`, data),
     list: (

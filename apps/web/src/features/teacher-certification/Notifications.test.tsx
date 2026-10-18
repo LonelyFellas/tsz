@@ -129,6 +129,32 @@ it("shows wordlist likes and tips with author links and exact amounts", async ()
   ).not.toBeInTheDocument();
 });
 
+it("shows deleted-source notice and links to learning tasks", async () => {
+  vi.mocked(api.teacherCertification.notifications).mockResolvedValue({
+    items: [
+      {
+        ...notification,
+        application_id: null,
+        kind: "wordlist_deleted",
+        reason:
+          "词表「四级词汇」已被删除。已开始的学习轮次可在 2026-10-25 12:00（北京时间）前完成。"
+      }
+    ],
+    total: 1,
+    unread_count: 1
+  });
+  show();
+  expect(await screen.findByText("使用中的词表已删除")).toBeInTheDocument();
+  expect(screen.getByText(/可在 2026-10-25 12:00/)).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "查看学习任务" })).toHaveAttribute(
+    "href",
+    "/student/practice"
+  );
+  expect(
+    screen.queryByRole("link", { name: "查看词表" })
+  ).not.toBeInTheDocument();
+});
+
 it("keeps deleted wordlist notifications readable without a broken wordlist link", async () => {
   vi.mocked(api.teacherCertification.notifications).mockResolvedValue({
     items: [
