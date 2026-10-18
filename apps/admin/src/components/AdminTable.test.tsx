@@ -1,7 +1,58 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { AdminThemeProvider } from "@/mui-theme";
-import { AdminTable } from "./AdminTable";
+import { AdminTable, AdminPagination } from "./AdminTable";
+
+it("空表保留表头并隐藏零数据分页，加载中不显示空结果或重置操作", () => {
+  const props = {
+    columns: [
+      { id: "name", label: "名称", render: (row: { id: string }) => row.id }
+    ],
+    rows: [],
+    rowId: (row: { id: string }) => row.id,
+    emptyMessage: "暂无待审核词表",
+    pagination: { page: 1, pageSize: 20, total: 0, onChange: vi.fn() },
+    onResetFilters: vi.fn()
+  };
+  const view = render(<AdminTable {...props} />);
+  expect(screen.getByText("名称").tagName).toBe("TH");
+  expect(screen.getByRole("status")).toHaveTextContent("暂无待审核词表");
+  expect(screen.queryByText("共 0 条")).not.toBeInTheDocument();
+  expect(screen.queryByText("重置筛选")).not.toBeInTheDocument();
+
+  view.rerender(<AdminTable {...props} filtered loading />);
+  expect(screen.getByRole("status")).toHaveTextContent("正在加载…");
+  expect(screen.queryByText("暂无待审核词表")).not.toBeInTheDocument();
+  expect(screen.queryByText("未找到符合条件的数据")).not.toBeInTheDocument();
+  expect(screen.queryByText("重置筛选")).not.toBeInTheDocument();
+
+  view.rerender(<AdminTable {...props} filtered />);
+  expect(screen.getByRole("status")).toHaveTextContent("未找到符合条件的数据");
+  fireEvent.click(screen.getByText("重置筛选"));
+  expect(props.onResetFilters).toHaveBeenCalledOnce();
+
+  view.rerender(<AdminTable {...props} rows={[{ id: "a" }]} loading />);
+  expect(screen.getByText("a")).toBeInTheDocument();
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
+});
+
+it("独立分页总数为零时隐藏，有数据但当前页为空时仍可翻页", () => {
+  const pagination = { page: 2, pageSize: 10, total: 0, onChange: vi.fn() };
+  const view = render(<AdminPagination {...pagination} />);
+  expect(view.container).toBeEmptyDOMElement();
+  view.rerender(
+    <AdminThemeProvider>
+      <AdminTable
+        rows={[]}
+        rowId={(row: { id: string }) => row.id}
+        columns={[{ id: "name", label: "名称", render: (row) => row.id }]}
+        pagination={{ ...pagination, total: 11 }}
+      />
+    </AdminThemeProvider>
+  );
+  fireEvent.click(screen.getByRole("button", { name: "上一页" }));
+  expect(pagination.onChange).toHaveBeenCalledWith(1, 10);
+});
 
 it("翻页保持 API 的 1 起始页码，调整条数回到第 1 页", () => {
   const change = vi.fn();

@@ -190,6 +190,7 @@ export function WordlistDetails({
             <p>尚未提交公开审核</p>
           ) : !reviewMode ? (
             <AdminTable
+              emptyMessage="暂无审核记录"
               rows={reviews.data.items}
               rowId={(row) => row.id}
               columns={[

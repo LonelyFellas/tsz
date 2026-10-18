@@ -129,7 +129,10 @@ const subItems: SubPartOfSpeechConfig[] = [
   }
 ];
 
-function renderPanel(value: PartOfSpeechConfig | null = parent) {
+function renderPanel(
+  value: PartOfSpeechConfig | null = parent,
+  emptyState: { filtered?: boolean; onResetFilters?: () => void } = {}
+) {
   const onSaved = vi.fn();
   const onError = vi.fn();
   const handle = createRef<SubPartOfSpeechPanelHandle>();
@@ -137,6 +140,7 @@ function renderPanel(value: PartOfSpeechConfig | null = parent) {
     <AdminThemeProvider>
       <FeedbackProvider>
         <SubPartOfSpeechPanel
+          {...emptyState}
           ref={handle}
           parents={value ? [value] : []}
           createParent={value ?? undefined}
@@ -195,6 +199,19 @@ beforeEach(() => {
 });
 
 describe("SubPartOfSpeechPanel", () => {
+  it("空列表区分未配置与筛选无结果，并提供重置入口", () => {
+    api.list.data = { items: [] };
+    const unfiltered = renderPanel();
+    expect(screen.getByText("暂无细分词性")).toBeVisible();
+    expect(screen.queryByText("重置筛选")).not.toBeInTheDocument();
+    unfiltered.unmount();
+    const onResetFilters = vi.fn();
+    renderPanel(parent, { filtered: true, onResetFilters });
+    expect(screen.getByText("未找到符合条件的数据")).toBeVisible();
+    expect(screen.queryByText("暂无细分词性")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("重置筛选"));
+    expect(onResetFilters).toHaveBeenCalledOnce();
+  });
   it("展示当前基本词性的细分项、引用禁删和空 parent 提示", () => {
     const visible = renderPanel();
     const referencedRow = screen.getByText("可数名词").closest("tr")!;

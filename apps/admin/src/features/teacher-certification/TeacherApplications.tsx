@@ -214,6 +214,14 @@ function ApplicationQueue() {
           </Alert>
         )}
         <AdminTable
+          emptyMessage={
+            status === "pending" ? "暂无待审核的教师申请" : "暂无教师申请"
+          }
+          filtered={status !== undefined && status !== "pending"}
+          onResetFilters={() => {
+            setStatus("pending");
+            setPage(1);
+          }}
           rows={list.data?.items ?? []}
           rowId={(row) => row.id}
           loading={list.isFetching}

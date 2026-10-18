@@ -249,6 +249,13 @@ export function PartOfSpeechSettings() {
               </Alert>
             )}
             <AdminTable<PartOfSpeechConfig>
+              emptyMessage="暂无基本词性"
+              filtered={!!q}
+              onResetFilters={() => {
+                reset();
+                setQ("");
+                setPage(1);
+              }}
               rows={list.data?.items ?? []}
               rowId={(item) => item.id}
               loading={list.isFetching}
@@ -403,6 +410,8 @@ export function PartOfSpeechSettings() {
             ref={subPanelRef}
             parents={selectedPart ? [selectedPart] : parts}
             createParent={selectedPart}
+            filtered={!!selectedPart}
+            onResetFilters={() => setSelectedPartId("")}
             loading={catalog.isPending}
             onSaved={(text) => notify(text, "success")}
             onError={showError}

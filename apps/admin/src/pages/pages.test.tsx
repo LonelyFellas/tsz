@@ -9,6 +9,7 @@ import { ReviewsPage } from "./Reviews";
 import { UsersPage } from "./Users";
 import { WordCreatePage } from "./WordCreate";
 import { WordsPage } from "./Words";
+import { api } from "@/lib/auth";
 
 const smokeProfile = vi.hoisted(() => ({
   id: "smoke-admin",
@@ -73,6 +74,39 @@ vi.mock("@/lib/auth", () => ({
 // 平台后台各模块页。烟雾测试保证：页面能正常渲染、关键内容正确，
 // 守住「导入错误 / 渲染时抛错」这类回归；待其余模块功能落地后在此补充业务测试。
 describe("admin 页面烟雾测试", () => {
+  it("审核空队列按已提交条件展示空状态，重置后恢复待审核条件并清空输入", async () => {
+    render(
+      <QueryClientProvider
+        client={
+          new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        }
+      >
+        <ReviewsPage />
+      </QueryClientProvider>
+    );
+    expect(await screen.findByText("暂无待审核词表")).toBeInTheDocument();
+    const search = screen.getByLabelText("搜索词表");
+    fireEvent.change(search, { target: { value: "missing-list" } });
+    expect(screen.getByText("暂无待审核词表")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "搜索" }));
+    expect(await screen.findByText("未找到符合条件的数据")).toBeInTheDocument();
+    expect(api.wordlists.management).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        q: "missing-list",
+        review_state: "pending",
+        page: 1
+      }),
+      expect.anything()
+    );
+    fireEvent.click(screen.getByText("重置筛选"));
+    expect(await screen.findByText("暂无待审核词表")).toBeInTheDocument();
+    expect(search).toHaveValue("");
+    expect(api.wordlists.management).toHaveBeenLastCalledWith(
+      expect.objectContaining({ review_state: "pending", page: 1 }),
+      expect.anything()
+    );
+    expect(screen.queryByText("共 0 条")).not.toBeInTheDocument();
+  });
   it("首页渲染 KPI 指标行与四张图表卡", () => {
     render(<HomePage />);
     expect(

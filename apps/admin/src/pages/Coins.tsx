@@ -262,6 +262,7 @@ function Management({ profile }: { profile: AdminProfile }) {
             <Alert severity="error">账户查询失败，请重试</Alert>
           ) : (
             <AdminTable
+              filtered
               rows={accounts.data?.items ?? []}
               rowId={(row) => row.owner_id}
               loading={accounts.isFetching}
@@ -495,6 +496,21 @@ function Management({ profile }: { profile: AdminProfile }) {
           <Alert severity="error">操作记录加载失败，请刷新重试</Alert>
         ) : (
           <AdminTable
+            emptyMessage="暂无操作记录"
+            filtered={
+              !!(
+                filters.owner_type ||
+                filters.owner_id ||
+                filters.actor_id ||
+                filters.source_type ||
+                filters.created_from ||
+                filters.created_to
+              )
+            }
+            onResetFilters={() => {
+              operationForm.reset();
+              setFilters({});
+            }}
             rows={operations.data?.items ?? []}
             rowId={(row) => row.id}
             loading={operations.isFetching}

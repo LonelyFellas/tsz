@@ -103,6 +103,7 @@ function GrantedAdmins({
     <AdminDrawer width={640} title="管理员名单" onClose={onClose}>
       {query.isError && <Alert severity="error">{query.error.message}</Alert>}
       <AdminTable
+        emptyMessage="暂无已授权管理员"
         rows={query.data?.items ?? []}
         rowId={(row) => row.admin_id}
         loading={query.isFetching}
@@ -142,6 +143,7 @@ function BatchTargets({
 }) {
   const [page, setPage] = useState(1),
     [search, setSearch] = useState("");
+  const [filterResetKey, setFilterResetKey] = useState(0);
   const [selected, setSelected] = useState<string[]>([]);
   const [adminNames, setAdminNames] = useState<Record<string, string>>({});
   const [previewing, setPreviewing] = useState(false);
@@ -206,6 +208,7 @@ function BatchTargets({
             .join("、")}
         </Typography>
         <SearchField
+          key={filterResetKey}
           placeholder="搜索管理员名称"
           onSearch={(value) => {
             setSearch(value);
@@ -219,6 +222,13 @@ function BatchTargets({
           style={{ overflow: "auto", flex: 1, minHeight: 0 }}
         >
           <AdminTable
+            emptyMessage="暂无可选管理员"
+            filtered={!!search.trim()}
+            onResetFilters={() => {
+              setSearch("");
+              setPage(1);
+              setFilterResetKey((key) => key + 1);
+            }}
             rows={query.data?.items ?? []}
             rowId={(row) => row.id}
             loading={query.isFetching}
@@ -284,6 +294,7 @@ function BatchTargets({
   );
 }
 function PermissionAudits({ onClose }: { onClose: () => void }) {
+  const [filterResetKey, setFilterResetKey] = useState(0);
   const [page, setPage] = useState(1),
     [adminId, setAdminId] = useState(""),
     [key, setKey] = useState("");
@@ -304,7 +315,7 @@ function PermissionAudits({ onClose }: { onClose: () => void }) {
   });
   return (
     <AdminDrawer width={960} title="权限与标签变更记录" onClose={onClose}>
-      <ListFilterBar>
+      <ListFilterBar key={filterResetKey}>
         <SearchField
           placeholder="管理员 ID"
           onSearch={(value) => {
@@ -331,6 +342,15 @@ function PermissionAudits({ onClose }: { onClose: () => void }) {
       </ListFilterBar>
       {query.isError && <Alert severity="error">{query.error.message}</Alert>}
       <AdminTable
+        emptyMessage="暂无变更记录"
+        filtered={!!(adminId || key || dates)}
+        onResetFilters={() => {
+          setAdminId("");
+          setKey("");
+          setDates(null);
+          setPage(1);
+          setFilterResetKey((key) => key + 1);
+        }}
         rows={query.data?.items ?? []}
         rowId={(row) => row.id}
         loading={query.isFetching}
@@ -640,6 +660,13 @@ export function PermissionManagement() {
           </Alert>
         )}
         <AdminTable
+          emptyMessage="暂无权限"
+          filtered={!!(search.trim() || module || tagFilter.length)}
+          onResetFilters={() => {
+            setSearch("");
+            setModule(undefined);
+            setTagFilter([]);
+          }}
           rows={rows}
           rowId={(row) => row.key}
           loading={catalog.isFetching}
@@ -826,6 +853,9 @@ export function PermissionManagement() {
               onChange={(event) => setTagSearch(event.target.value)}
             />
             <AdminTable
+              emptyMessage="暂无标签"
+              filtered={!!tagSearch.trim()}
+              onResetFilters={() => setTagSearch("")}
               rows={tags.filter((tag) =>
                 tag.name.toLowerCase().includes(tagSearch.trim().toLowerCase())
               )}
