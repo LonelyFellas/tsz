@@ -46,6 +46,7 @@ const question = {
 };
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.answer.mockReset();
   mocks.plansList.mockRejectedValue(new HttpError(404, "API missing"));
   mocks.plansDetail.mockRejectedValue(new HttpError(404, "API missing"));
   mocks.user = { id: "learner-a", roles: ["student"] };
@@ -245,4 +246,60 @@ it("a background question advance cannot submit the previous question's draft", 
   expect(screen.getByLabelText("英文拼写")).toHaveValue("");
   expect(screen.getByRole("button", { name: "提交答案" })).toBeDisabled();
   expect(mocks.answer).not.toHaveBeenCalled();
+});
+
+it("来源失权后仍可重试未确认的原请求，再继续同页其他合法题", async () => {
+  mocks.answer
+    .mockImplementationOnce(async () => {
+      mocks.questions.mockResolvedValue({
+        items: [
+          { ...question, content_available: false, prompt: null },
+          {
+            ...question,
+            id: "q2",
+            position: 1,
+            prompt: { definition: "香蕉", part_of_speech: "noun" }
+          }
+        ],
+        pagination: { total_pages: 1 }
+      });
+      throw new Error("response lost");
+    })
+    .mockRejectedValueOnce(new HttpError(409, "来源不可用"));
+  renderWithProviders(<LearningPractice id="run" />);
+  fireEvent.change(await screen.findByLabelText("英文拼写"), {
+    target: { value: "apple" }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "提交答案" }));
+  const retry = await screen.findByRole("button", { name: "重试原答案" });
+  expect(retry).toBeEnabled();
+  fireEvent.click(retry);
+  await waitFor(() => expect(mocks.answer).toHaveBeenCalledTimes(2));
+  expect(mocks.answer.mock.calls[1]![1]).toEqual(
+    mocks.answer.mock.calls[0]![1]
+  );
+  await waitFor(() => expect(screen.getByLabelText("英文拼写")).toBeEnabled());
+  expect(screen.getByLabelText("英文拼写")).toHaveValue("");
+});
+it("原题全部失权且没有 next 时仍可核对未确认请求", async () => {
+  mocks.answer
+    .mockImplementationOnce(async () => {
+      mocks.questions.mockResolvedValue({
+        items: [{ ...question, content_available: false, prompt: null }],
+        pagination: { total_pages: 1 }
+      });
+      throw new Error("response lost");
+    })
+    .mockResolvedValueOnce({});
+  renderWithProviders(<LearningPractice id="run" />);
+  fireEvent.change(await screen.findByLabelText("英文拼写"), {
+    target: { value: "apple" }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "提交答案" }));
+  const retry = await screen.findByRole("button", { name: "重试原答案" });
+  fireEvent.click(retry);
+  await waitFor(() => expect(mocks.answer).toHaveBeenCalledTimes(2));
+  expect(mocks.answer.mock.calls[1]![1]).toEqual(
+    mocks.answer.mock.calls[0]![1]
+  );
 });

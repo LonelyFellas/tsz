@@ -610,15 +610,17 @@ function Practice({ userId, id }: { userId: string; id: string }) {
   const uncertain = !!pending && !pendingAccepted && !busy;
   const answer = draft?.questionId === next?.id ? (draft?.value ?? "") : "";
   async function submit() {
-    if (!next) return;
     const submission =
       pending && !pendingAccepted
         ? pending
-        : {
-            idempotency_key: crypto.randomUUID(),
-            question_id: next.id,
-            answer
-          };
+        : next
+          ? {
+              idempotency_key: crypto.randomUUID(),
+              question_id: next.id,
+              answer
+            }
+          : null;
+    if (!submission) return;
     setPending(submission);
     setBusy(true);
     setError("");
@@ -771,13 +773,15 @@ function Practice({ userId, id }: { userId: string; id: string }) {
                     setDraft({ questionId: next.id, value: e.target.value })
                   }
                 />
-                <button
-                  className={`${primaryButtonClass} min-w-40`}
-                  disabled={busy || !answer.trim()}
-                  type="submit"
-                >
-                  {busy ? "提交中…" : uncertain ? "重试原答案" : "提交答案"}
-                </button>
+                {!uncertain && (
+                  <button
+                    className={`${primaryButtonClass} min-w-40`}
+                    disabled={busy || !answer.trim()}
+                    type="submit"
+                  >
+                    {busy ? "提交中…" : "提交答案"}
+                  </button>
+                )}
               </form>
             ) : (
               <p className="py-6 text-center text-base text-foreground-muted">
@@ -839,9 +843,18 @@ function Practice({ userId, id }: { userId: string; id: string }) {
               </button>
             )}
             {uncertain && (
-              <p className={`${hintText} text-center`}>
-                结果未确认，输入已保留；重试将沿用原请求。
-              </p>
+              <div className="space-y-3 text-center">
+                <button
+                  className={primaryButtonClass}
+                  type="button"
+                  onClick={() => void submit()}
+                >
+                  重试原答案
+                </button>
+                <p className={hintText}>
+                  结果未确认，原答案已保留；重试将沿用原请求。
+                </p>
+              </div>
             )}
           </div>
         </div>
