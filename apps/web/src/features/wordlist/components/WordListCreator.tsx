@@ -526,7 +526,9 @@ function Editor({
   });
   const pages = Math.max(1, Math.ceil(matches.length / 50));
   const currentPage = Math.min(page, pages);
-  const visible = matches.slice((currentPage - 1) * 50, currentPage * 50);
+  const visible = loadingItems
+    ? []
+    : matches.slice((currentPage - 1) * 50, currentPage * 50);
   const replaceEmpty =
     rows.length === 1 &&
     !rows[0]!.entryId &&

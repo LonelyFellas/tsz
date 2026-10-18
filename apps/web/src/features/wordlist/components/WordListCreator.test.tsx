@@ -641,6 +641,10 @@ it("newly readded entries ignore obsolete pages from the prior editing session",
 });
 
 it("automatically loads every page, searches notes across pages and preserves hidden rows on save", async () => {
+  let finishLoading!: () => void;
+  const itemsReady = new Promise<void>((resolve) => {
+    finishLoading = resolve;
+  });
   const items = Array.from({ length: 101 }, (_, index) => ({
     entry_id: `entry-${index}`,
     position: index,
@@ -670,24 +674,32 @@ it("automatically loads every page, searches notes across pages and preserves hi
     wordlist,
     entry_ids: items.map((item) => item.entry_id)
   });
-  vi.mocked(api.wordList.myItems).mockImplementation(async (_, query) => ({
-    items: items.slice(
-      ((query?.page ?? 1) - 1) * 100,
-      (query?.page ?? 1) * 100
-    ),
-    revision: 9,
-    pagination: {
-      page: query?.page ?? 1,
-      page_size: 100,
-      total: 101,
-      total_pages: 2
-    }
-  }));
+  vi.mocked(api.wordList.myItems).mockImplementation(async (_, query) => {
+    await itemsReady;
+    return {
+      items: items.slice(
+        ((query?.page ?? 1) - 1) * 100,
+        (query?.page ?? 1) * 100
+      ),
+      revision: 9,
+      pagination: {
+        page: query?.page ?? 1,
+        page_size: 100,
+        total: 101,
+        total_pages: 2
+      }
+    };
+  });
   vi.mocked(api.wordList.update).mockResolvedValue({
     ...wordlist,
     revision: 10
   });
   renderWithProviders(<WordListCreator id="list" />);
+  await screen.findByText("正在读取词条…");
+  expect(screen.queryAllByPlaceholderText("输入单词或短语")).toHaveLength(0);
+  expect(screen.getByLabelText("表内搜索")).toBeDisabled();
+  expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
+  await act(async () => finishLoading());
   await waitFor(() => expect(screen.getByLabelText("表内搜索")).toBeEnabled());
   expect(api.wordList.myItems).toHaveBeenCalledTimes(2);
   fireEvent.change(screen.getByLabelText("表内搜索"), {
