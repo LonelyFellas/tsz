@@ -31,14 +31,17 @@ export function AdminDrawer({
     >
       <Stack
         direction="row"
-        alignItems="center"
+        alignItems="flex-start"
         spacing={1}
         sx={{ p: 2, borderBottom: 1, borderColor: "divider" }}
       >
-        <Typography variant="h6" sx={{ flex: 1 }}>
+        <Typography
+          variant="h6"
+          sx={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}
+        >
           {title}
         </Typography>
-        <IconButton aria-label="关闭" onClick={onClose}>
+        <IconButton aria-label="关闭" onClick={onClose} sx={{ flexShrink: 0 }}>
           <Close />
         </IconButton>
       </Stack>
