@@ -901,6 +901,7 @@ function WordRow({
                 onClick={() =>
                   change({
                     itemId: crypto.randomUUID(),
+                    noteRevision: 1,
                     customWord: { word: text, definition: "" }
                   })
                 }

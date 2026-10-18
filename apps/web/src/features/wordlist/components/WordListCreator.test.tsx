@@ -769,3 +769,78 @@ it("重新打开混合词表后改词及重排，私密备注仍按自定义项�
   );
   expect(api.wordList.suggestions).not.toHaveBeenCalled();
 });
+
+it("将已有高版本私密备注的平台行改为自定义词时使用新项的备注版本", async () => {
+  const meta = {
+    id: "list",
+    owner_user_id: "one",
+    owner_name: "作者",
+    name: "改为自定义",
+    state: "draft" as const,
+    revision: 1,
+    item_count: 1,
+    created_at: "",
+    updated_at: ""
+  };
+  vi.mocked(api.wordList.edit).mockResolvedValue({
+    wordlist: meta,
+    entry_ids: [candidate.entry_id]
+  });
+  vi.mocked(api.wordList.myItems).mockResolvedValue({
+    revision: 1,
+    pagination: { page: 1, page_size: 100, total: 1, total_pages: 1 },
+    items: [
+      {
+        entry_id: candidate.entry_id,
+        entry: { ...candidate, kind: "word", pos: [] },
+        position: 0,
+        author_note: "原注",
+        private_note: "原私密",
+        note_revision: 7
+      }
+    ]
+  });
+  vi.mocked(api.wordList.suggestions).mockResolvedValue({ items: [] });
+  vi.mocked(api.wordList.update).mockResolvedValue({ ...meta, revision: 2 });
+  renderWithProviders(<WordListCreator id="list" />);
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "保存私密词表" })).toBeEnabled()
+  );
+  const input = screen.getByPlaceholderText("输入单词或短语");
+  fireEvent.change(input, { target: { value: "my replacement phrase" } });
+  fireEvent.blur(input);
+  fireEvent.click(
+    await screen.findByRole("button", { name: "创建自定义词汇" })
+  );
+  fireEvent.change(screen.getByLabelText("自定义释义 1"), {
+    target: { value: "新的自定义释义" }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
+  await waitFor(() =>
+    expect(api.wordList.update).toHaveBeenCalledWith(
+      "list",
+      expect.objectContaining({
+        content: {
+          name: "改为自定义",
+          items: [
+            {
+              item_id: expect.any(String),
+              custom_word: {
+                word: "my replacement phrase",
+                definition: "新的自定义释义"
+              },
+              author_note: "原注"
+            }
+          ]
+        },
+        note_updates: [
+          {
+            item_id: expect.any(String),
+            private_note: "原私密",
+            expected_note_revision: 1
+          }
+        ]
+      })
+    )
+  );
+});
