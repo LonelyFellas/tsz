@@ -211,3 +211,47 @@ it("按 100 行分批，失败重试只请求未完成批次且保留已匹配�
   expect(append.mock.calls[0]![0]).toHaveLength(101);
   expect(append.mock.calls[0]![0][0].candidate.entry_id).toBe("word0");
 });
+
+it("未匹配行可明确改为自定义，释义必填，追加保留词面和注释", async () => {
+  vi.mocked(readExcelFile).mockResolvedValue([
+    row(2, "custom phrase"),
+    { ...row(3, "another phrase"), gloss: "" }
+  ]);
+  vi.mocked(api.wordList.matchImport).mockResolvedValue({
+    items: [
+      { status: "unmatched", candidates: [] },
+      { status: "unmatched", candidates: [] }
+    ]
+  });
+  const append = vi.fn();
+  renderWithProviders(
+    <ExcelImport
+      existingIds={new Set()}
+      remaining={10000}
+      onAppend={append}
+      onCancel={vi.fn()}
+    />
+  );
+  await upload();
+  fireEvent.click(screen.getByRole("button", { name: "匹配词汇" }));
+  await screen.findAllByRole("button", { name: "创建自定义词汇" });
+  for (const button of screen.getAllByRole("button", {
+    name: "创建自定义词汇"
+  }))
+    fireEvent.click(button);
+  expect(screen.getByRole("button", { name: "确认追加到词表" })).toBeDisabled();
+  fireEvent.change(screen.getByLabelText("第 3 行释义"), {
+    target: { value: "补充释义" }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "确认追加到词表" }));
+  expect(append).toHaveBeenCalledWith([
+    {
+      customWord: { word: "custom phrase", definition: "原文件释义" },
+      authorNote: "注释 2"
+    },
+    {
+      customWord: { word: "another phrase", definition: "补充释义" },
+      authorNote: "注释 3"
+    }
+  ]);
+});

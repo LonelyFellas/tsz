@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-deletion-grace/docs/openapi.json",
-  "_source_sha256": "025f09f45a897af9c12ad4cde98d224e0cc0a69d93045210a212df2bf8060ea4",
+  "_source": "/Users/darwish/.codex/worktrees/wordlist-custom-vocabulary/tsz-rust/docs/openapi.json",
+  "_source_sha256": "be1cbb420ad44530fea6c0b033ae50910ab3b8a2dc610036d3e6a280065deb8d",
   "roots": [
     "DictionaryPage",
     "DictionaryEntry",
@@ -584,6 +584,15 @@
       "additionalProperties": false
     },
     "CommonDialectV3": { "type": "string", "enum": ["common"] },
+    "CustomWord": {
+      "type": "object",
+      "required": ["word", "definition"],
+      "properties": {
+        "definition": { "type": "string", "maxLength": 200, "minLength": 1 },
+        "word": { "type": "string", "maxLength": 50, "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
     "DeletionStatus": {
       "type": "string",
       "enum": ["pending", "cancelled", "completed"]
@@ -1889,11 +1898,13 @@
       ],
       "properties": {
         "author_note": { "type": "string", "maxLength": 1000 },
+        "custom_word": { "$ref": "#/$defs/CustomWord" },
         "entry": {
           "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/WordlistEntry" }]
         },
-        "entry_id": { "type": "string", "format": "uuid" },
+        "entry_id": { "type": ["string", "null"], "format": "uuid" },
         "entry_label": { "type": "string" },
+        "item_id": { "type": "string", "format": "uuid" },
         "note_revision": { "type": "integer" },
         "position": { "type": "integer" },
         "private_note": { "type": "string" },
@@ -3604,6 +3615,7 @@
       "required": ["revision", "available_count", "unavailable_count"],
       "properties": {
         "available_count": { "type": "integer", "minimum": 0 },
+        "custom_count": { "type": "integer", "minimum": 0 },
         "revision": { "type": "integer" },
         "unavailable_count": { "type": "integer", "minimum": 0 }
       },
@@ -3629,6 +3641,17 @@
           "items": { "$ref": "#/$defs/WordlistCandidate" }
         },
         "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistContentItem": {
+      "type": "object",
+      "required": ["item_id"],
+      "properties": {
+        "author_note": { "type": "string", "maxLength": 1000 },
+        "custom_word": { "$ref": "#/$defs/CustomWord" },
+        "entry_id": { "type": "string", "format": "uuid" },
+        "item_id": { "type": "string", "format": "uuid" }
       },
       "additionalProperties": false
     },
@@ -3679,6 +3702,10 @@
         "entry_ids": {
           "type": "array",
           "items": { "type": "string", "format": "uuid" }
+        },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistContentItem" }
         },
         "wordlist": { "$ref": "#/$defs/Wordlist" }
       },
@@ -3841,10 +3868,12 @@
       "required": ["entry_id", "position", "entry"],
       "properties": {
         "author_note": { "type": "string", "maxLength": 1000 },
+        "custom_word": { "$ref": "#/$defs/CustomWord" },
         "entry": {
           "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/WordlistEntry" }]
         },
-        "entry_id": { "type": "string", "format": "uuid" },
+        "entry_id": { "type": ["string", "null"], "format": "uuid" },
+        "item_id": { "type": "string", "format": "uuid" },
         "position": { "type": "integer" }
       },
       "additionalProperties": false

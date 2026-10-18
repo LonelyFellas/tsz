@@ -28,14 +28,31 @@ export interface WordlistItemsQuery extends WordlistQuery {
   view?: WordlistView;
   sort?: WordlistSort;
 }
+export interface CustomWord {
+  word: string;
+  definition: string;
+}
+export interface WordlistContentItem {
+  item_id: string;
+  entry_id?: string;
+  custom_word?: CustomWord;
+  author_note: string;
+}
 export interface CreateWordlist {
   folder_id?: string;
   idempotency_key: string;
   name: string;
-  items: { entry_id: string; private_note: string; author_note?: string }[];
+  items: {
+    entry_id?: string;
+    item_id?: string;
+    custom_word?: CustomWord;
+    private_note: string;
+    author_note?: string;
+  }[];
 }
 export interface WordlistNoteUpdate {
-  entry_id: string;
+  entry_id?: string;
+  item_id?: string;
   expected_note_revision: number;
   private_note: string;
 }
@@ -43,7 +60,8 @@ export interface UpdateWordlist {
   expected_revision: number;
   content: {
     name: string;
-    entry_ids: string[];
+    entry_ids?: string[];
+    items?: WordlistContentItem[];
     author_notes?: { entry_id: string; author_note: string }[] | null;
   } | null;
   note_updates: WordlistNoteUpdate[];
@@ -51,6 +69,7 @@ export interface UpdateWordlist {
 export interface WordlistEditSnapshot {
   wordlist: Wordlist;
   entry_ids: string[];
+  items?: WordlistContentItem[];
 }
 export interface WordlistText {
   dialect: "common" | "uk" | "us";
@@ -90,7 +109,9 @@ export interface WordlistEntry {
   pos: WordlistPos[];
 }
 export interface WordlistItem {
-  entry_id: string;
+  entry_id: string | null;
+  item_id?: string;
+  custom_word?: CustomWord;
   position: number;
   author_note?: string;
   entry: WordlistEntry | null;
@@ -105,6 +126,7 @@ export interface MyWordlistItem extends WordlistItem {
 }
 export interface WordlistAvailability {
   revision: number;
+  custom_count?: number;
   available_count: number;
   unavailable_count: number;
 }

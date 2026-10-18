@@ -60,6 +60,12 @@ const WORDLIST_ANNOTATION_OPERATIONS = [
   "get /admin/wordlists/{id}/items",
   "get /admin/wordlists/{id}/review-requests/{request_id}/items"
 ];
+const WORDLIST_CUSTOM_OPERATIONS: readonly string[] = [
+  ...WORDLIST_ANNOTATION_OPERATIONS,
+  "get /me/wordlists/{id}/edit",
+  "get /me/wordlists/{id}/availability",
+  "get /wordlists/{id}/availability"
+];
 const SENTENCE_FORMATTING_OPERATIONS: readonly string[] = [
   ...SPELLING_MARKUP_OPERATIONS,
   "get /admin/lexicon/sentences",
@@ -742,7 +748,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "025f09f45a897af9c12ad4cde98d224e0cc0a69d93045210a212df2bf8060ea4"
+      "be1cbb420ad44530fea6c0b033ae50910ab3b8a2dc610036d3e6a280065deb8d"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1069,7 +1075,8 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
             ...IDEMPOTENT_LEXICON_OPERATIONS,
             ...SPELLING_MARKUP_OPERATIONS,
             ...SENTENCE_FORMATTING_OPERATIONS,
-            ...WORDLIST_ANNOTATION_OPERATIONS
+            ...WORDLIST_ANNOTATION_OPERATIONS,
+            ...WORDLIST_CUSTOM_OPERATIONS
           ])
         ].map((operation) => [
           operation,
@@ -1111,6 +1118,16 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
                   },
                   {
                     name: "X-TSZ-Wordlist-Entry-Reasons",
+                    in: "header",
+                    required: false,
+                    schema: { type: ["string", "null"] }
+                  }
+                ]
+              : []),
+            ...(WORDLIST_CUSTOM_OPERATIONS.includes(operation)
+              ? [
+                  {
+                    name: "X-TSZ-Wordlist-Custom-Items",
                     in: "header",
                     required: false,
                     schema: { type: ["string", "null"] }

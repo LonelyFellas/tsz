@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { WordlistCandidate, WordlistImportMatch } from "@tsz/types";
+import type {
+  CustomWord,
+  WordlistCandidate,
+  WordlistImportMatch
+} from "@tsz/types";
 import { Button, Input } from "@tsz/ui/components";
 import { api } from "@/lib/request";
 import { downloadExcelTemplate, readExcelFile } from "../excel-client";
@@ -15,8 +19,13 @@ import {
 type PreviewRow = ExcelRow & {
   match?: WordlistImportMatch;
   selected?: WordlistCandidate;
+  custom?: boolean;
 };
-export type ImportedWord = { candidate: WordlistCandidate; authorNote: string };
+export type ImportedWord = {
+  candidate?: WordlistCandidate;
+  customWord?: CustomWord;
+  authorNote: string;
+};
 
 export function ExcelImport({
   existingIds,
@@ -64,7 +73,10 @@ export function ExcelImport({
       ([field, message]) =>
         `${importFieldLabels[field as ImportField]}：${message}`
     );
-    if (!row.selected)
+    if (row.custom) {
+      if ([...row.word].length > 50) messages.push("自定义词汇不能超过 50 字");
+      if (!row.gloss.trim()) messages.push("自定义释义不能为空");
+    } else if (!row.selected)
       messages.push(row.match ? "尚未选定平台词条" : "尚未匹配词汇");
     else {
       const id = row.selected.entry_id;
@@ -81,7 +93,7 @@ export function ExcelImport({
   const pages = Math.max(1, Math.ceil(filtered.length / 50));
   const currentPage = Math.min(page, pages);
   const visible = filtered.slice((currentPage - 1) * 50, currentPage * 50);
-  const unmatched = rows.filter((row) => !row.match);
+  const unmatched = rows.filter((row) => !row.match && !row.custom);
   const invalid = rows.some(
     (row) => Object.keys(validateExcelRow(row)).length > 0
   );
@@ -150,7 +162,7 @@ export function ExcelImport({
       <p className="text-sm leading-6 text-foreground-muted">
         使用一个工作表，表头为「词汇 / 释义 / 注释」。支持 .xls、.xlsx，最多 10
         MB、10000 行。
-        释义仅供核对，保存后使用平台释义；注释会随词表展示给读者。仅导入已有平台词条。
+        匹配平台词条时释义仅供核对；未匹配的行可选择创建自定义词汇并填写释义。注释会随词表展示给读者。
       </p>
       <fieldset disabled={!!busy} className="flex flex-wrap items-center gap-3">
         <Button
@@ -271,7 +283,8 @@ export function ExcelImport({
                 {(["word", "gloss", "note"] as const).map((field) => (
                   <label key={field} className="block text-sm font-medium">
                     {importFieldLabels[field]}
-                    {field === "gloss" && "（仅供核对）"}
+                    {field === "gloss" &&
+                      (row.custom ? "（自定义释义，必填）" : "（仅供核对）")}
                     {field === "note" ? (
                       <textarea
                         aria-label={`第 ${row.rowNumber} 行注释`}
@@ -293,7 +306,11 @@ export function ExcelImport({
                     )}
                   </label>
                 ))}
-                {row.selected ? (
+                {row.custom ? (
+                  <p className="text-sm text-foreground-muted">
+                    自定义词汇，暂不参与学习出题。
+                  </p>
+                ) : row.selected ? (
                   <p className="text-sm text-success">
                     已选定：{row.selected.label} ·{" "}
                     {row.selected.glosses.join("；") || "暂无释义"}
@@ -307,8 +324,26 @@ export function ExcelImport({
                     )}
                     {row.match?.status === "unmatched" && (
                       <p className="text-sm text-foreground-muted">
-                        没有精确匹配，请修改词汇、查找候选或删除此行。
+                        没有精确匹配，可创建自定义词汇、查找候选或修改词汇。
                       </p>
+                    )}
+                    {row.match?.status === "unmatched" && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setRows((current) =>
+                            current.map((item) =>
+                              item.rowNumber === row.rowNumber
+                                ? { ...item, custom: true, selected: undefined }
+                                : item
+                            )
+                          )
+                        }
+                      >
+                        创建自定义词汇
+                      </Button>
                     )}
                     {row.match?.candidates.map((candidate) => (
                       <Button
@@ -411,7 +446,9 @@ export function ExcelImport({
           onClick={() =>
             onAppend(
               rows.map((row) => ({
-                candidate: row.selected!,
+                ...(row.custom
+                  ? { customWord: { word: row.word, definition: row.gloss } }
+                  : { candidate: row.selected! }),
                 authorNote: row.note
               }))
             )

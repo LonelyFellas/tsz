@@ -610,3 +610,162 @@ it("shows and searches an unavailable entry's label without treating it as reada
   ).toBeVisible();
   expect(api.wordList.suggestions).not.toHaveBeenCalled();
 });
+
+it("无匹配时创建自定义词，校验释义并保存稳定标识及注", async () => {
+  vi.mocked(api.wordList.suggestions).mockResolvedValue({ items: [] });
+  vi.mocked(api.wordList.create).mockResolvedValue({
+    id: "created",
+    owner_user_id: "one",
+    owner_name: "one",
+    name: "自定义",
+    state: "draft",
+    revision: 1,
+    item_count: 1,
+    created_at: "",
+    updated_at: ""
+  });
+  renderWithProviders(<WordListCreator />);
+  fireEvent.change(screen.getByLabelText("词表名称"), {
+    target: { value: "自定义" }
+  });
+  const input = screen.getByPlaceholderText("输入单词或短语");
+  fireEvent.change(input, { target: { value: "my own phrase" } });
+  fireEvent.blur(input);
+  fireEvent.click(
+    await screen.findByRole("button", { name: "创建自定义词汇" })
+  );
+  fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "释义须为 1–200 字"
+  );
+  expect(api.wordList.create).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByLabelText("自定义释义 1"), {
+    target: { value: "我的自定义释义" }
+  });
+  fireEvent.change(screen.getByLabelText("注 1"), {
+    target: { value: "给读者的注" }
+  });
+  fireEvent.change(input, { target: { value: "renamed phrase" } });
+  fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
+  await waitFor(() =>
+    expect(api.wordList.create).toHaveBeenCalledWith({
+      idempotency_key: expect.any(String),
+      name: "自定义",
+      items: [
+        {
+          item_id: expect.any(String),
+          custom_word: { word: "renamed phrase", definition: "我的自定义释义" },
+          private_note: "",
+          author_note: "给读者的注"
+        }
+      ]
+    })
+  );
+});
+
+it("搜索失败不把输入当作自定义词，也不能保存未选定行", async () => {
+  vi.mocked(api.wordList.suggestions).mockRejectedValue(new Error("offline"));
+  renderWithProviders(<WordListCreator />);
+  fireEvent.change(screen.getByLabelText("词表名称"), {
+    target: { value: "失败保护" }
+  });
+  const input = screen.getByPlaceholderText("输入单词或短语");
+  fireEvent.change(input, { target: { value: "unknown phrase" } });
+  fireEvent.blur(input);
+  expect(await screen.findByRole("alert")).toHaveTextContent("搜索失败");
+  expect(
+    screen.queryByRole("button", { name: "创建自定义词汇" })
+  ).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
+  expect(api.wordList.create).not.toHaveBeenCalled();
+});
+
+it("重新打开混合词表后改词及重排，私密备注仍按自定义项标识更新", async () => {
+  const meta = {
+    id: "list",
+    owner_user_id: "one",
+    owner_name: "作者",
+    name: "混合",
+    state: "draft" as const,
+    revision: 4,
+    item_count: 2,
+    created_at: "",
+    updated_at: ""
+  };
+  const custom = {
+    item_id: "custom-id",
+    custom_word: { word: "original", definition: "原释义" },
+    author_note: "自定义注"
+  };
+  vi.mocked(api.wordList.edit).mockResolvedValue({
+    wordlist: meta,
+    entry_ids: [candidate.entry_id],
+    items: [
+      {
+        item_id: candidate.entry_id,
+        entry_id: candidate.entry_id,
+        author_note: ""
+      },
+      custom
+    ]
+  });
+  vi.mocked(api.wordList.myItems).mockResolvedValue({
+    revision: 4,
+    pagination: { page: 1, page_size: 100, total: 2, total_pages: 1 },
+    items: [
+      {
+        item_id: candidate.entry_id,
+        entry_id: candidate.entry_id,
+        position: 0,
+        entry: { ...candidate, kind: "word", pos: [] },
+        private_note: "平台私密",
+        note_revision: 1
+      },
+      {
+        ...custom,
+        entry_id: null,
+        position: 1,
+        entry: null,
+        private_note: "原私密",
+        note_revision: 7
+      }
+    ]
+  });
+  vi.mocked(api.wordList.update).mockResolvedValue({ ...meta, revision: 5 });
+  renderWithProviders(<WordListCreator id="list" />);
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "保存私密词表" })).toBeEnabled()
+  );
+  fireEvent.change(screen.getAllByPlaceholderText("输入单词或短语")[1]!, {
+    target: { value: "renamed" }
+  });
+  fireEvent.change(screen.getByLabelText("私密备注 2"), {
+    target: { value: "新私密" }
+  });
+  fireEvent.click(screen.getAllByRole("button", { name: "上移" })[1]!);
+  fireEvent.click(screen.getByRole("button", { name: "保存私密词表" }));
+  await waitFor(() =>
+    expect(api.wordList.update).toHaveBeenCalledWith("list", {
+      expected_revision: 4,
+      content: {
+        name: "混合",
+        items: [
+          { ...custom, custom_word: { word: "renamed", definition: "原释义" } },
+          {
+            item_id: candidate.entry_id,
+            entry_id: candidate.entry_id,
+            author_note: ""
+          }
+        ]
+      },
+      note_updates: [
+        {
+          item_id: "custom-id",
+          private_note: "新私密",
+          expected_note_revision: 7
+        }
+      ]
+    })
+  );
+  expect(api.wordList.suggestions).not.toHaveBeenCalled();
+});
