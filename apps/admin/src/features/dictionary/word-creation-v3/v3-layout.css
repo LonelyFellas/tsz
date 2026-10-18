@@ -125,9 +125,7 @@
   color: #6f7785;
 }
 
-.v3-meanings-v2
-  .word-sense-meta-grid
-  :where(.MuiInputBase-input, [data-admin-select]) {
+.v3-meanings-v2 .word-sense-meta-grid [data-admin-select] {
   width: 100%;
   margin-top: 6px;
 }
