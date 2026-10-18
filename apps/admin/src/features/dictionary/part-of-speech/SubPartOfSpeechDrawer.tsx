@@ -53,6 +53,8 @@ interface Props {
   createParent?: PanelParent;
   /** 父级目录仍在加载：表格显示加载态，而不是把空列表当成"暂无基本词性"。 */
   loading?: boolean;
+  filtered?: boolean;
+  onResetFilters?: () => void;
   onSaved: (message: string) => void;
   onError: (error: unknown) => void;
   ref?: Ref<SubPartOfSpeechPanelHandle>;
@@ -248,6 +250,8 @@ export function SubPartOfSpeechPanel({
   parents,
   createParent,
   loading = false,
+  filtered = false,
+  onResetFilters,
   onSaved,
   onError,
   ref
@@ -323,6 +327,8 @@ export function SubPartOfSpeechPanel({
           <>
             <AdminTable<SubPartOfSpeechConfig>
               emptyMessage="暂无细分词性"
+              filtered={filtered}
+              onResetFilters={onResetFilters}
               rows={list.items.slice(
                 (currentPage - 1) * pageSize,
                 currentPage * pageSize
@@ -404,9 +410,6 @@ export function SubPartOfSpeechPanel({
                 }
               ]}
             />
-            {!list.isPending && !list.items.length && (
-              <Typography color="text.secondary">暂无细分词性</Typography>
-            )}
           </>
         )}
       </Paper>

@@ -410,6 +410,8 @@ export function PartOfSpeechSettings() {
             ref={subPanelRef}
             parents={selectedPart ? [selectedPart] : parts}
             createParent={selectedPart}
+            filtered={!!selectedPart}
+            onResetFilters={() => setSelectedPartId("")}
             loading={catalog.isPending}
             onSaved={(text) => notify(text, "success")}
             onError={showError}
