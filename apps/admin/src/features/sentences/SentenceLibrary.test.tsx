@@ -125,10 +125,11 @@ describe("独立多维例句库", () => {
       await screen.findByText("A wonderful flower.");
       expect(screen.getByText(/^编\s*辑$/).closest("button")).toBeVisible();
       expect(screen.getByText(/^发\s*布$/).closest("button")).toBeVisible();
+      fireEvent.click(screen.getByLabelText("更多操作"));
       expect(
         screen
           .getByText(withdrawn ? "重新展示原发布" : /^撤\s*回$/)
-          .closest("button")
+          .closest("li")
       ).toBeVisible();
     }
   );
@@ -169,9 +170,8 @@ describe("独立多维例句库", () => {
         }
       ]);
       show();
-      fireEvent.click(
-        (await screen.findByText(/^历\s*史$/)).closest("button")!
-      );
+      fireEvent.click(await screen.findByLabelText("更多操作"));
+      fireEvent.click(screen.getByText(/^历\s*史$/));
       await screen.findByText(/版本 1/);
       if (own) {
         fireEvent.click(screen.getByText("选择恢复").closest("button")!);
@@ -210,6 +210,7 @@ describe("独立多维例句库", () => {
     await screen.findByText("A wonderful flower.");
     expect(screen.getByText(/^编\s*辑$/).closest("button")).toBeVisible();
     expect(screen.queryByText(/^发\s*布$/)).toBeNull();
+    fireEvent.click(screen.getByLabelText("更多操作"));
     expect(screen.queryByText(/^撤\s*回$/)).toBeNull();
   });
   it("列表与查看详情保留连读标注及英文展示字体类", async () => {
@@ -293,7 +294,9 @@ it("已发布例句不提供永久删除，超管编辑读取草稿而不是发�
   vi.mocked(api.sentences.get).mockResolvedValue(item);
   show();
   await screen.findByText("已发布");
+  fireEvent.click(screen.getByLabelText("更多操作"));
   expect(screen.queryByText(/^删\s*除$/)).toBeNull();
+  fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
   fireEvent.click(screen.getByText(/^编\s*辑$/).closest("button")!);
   await screen.findByText("独立例句编辑器");
   expect(api.sentences.get).toHaveBeenLastCalledWith(item.id, "draft");
@@ -315,6 +318,7 @@ it("只有已发布查看权限时列表和详情只请求公开快照，不显�
     expect.objectContaining({ view: "published" })
   );
   expect(screen.queryByText(/^历\s*史$/)).toBeNull();
+  expect(screen.queryByLabelText("更多操作")).toBeNull();
   expect(screen.queryByText(/^编\s*辑$/)).toBeNull();
   fireEvent.click(screen.getByText(/^查\s*看$/).closest("button")!);
   await screen.findByText("查看例句");
@@ -328,7 +332,8 @@ it("已公开例句即使有历史恢复权限也不能恢复", async () => {
   vi.mocked(api.sentences.get).mockResolvedValue(item);
   vi.mocked(api.sentences.publications).mockResolvedValue([]);
   show();
-  fireEvent.click((await screen.findByText(/^历\s*史$/)).closest("button")!);
+  fireEvent.click(await screen.findByLabelText("更多操作"));
+  fireEvent.click(screen.getByText(/^历\s*史$/));
   await waitFor(() =>
     expect(screen.getByText("恢复所选历史到草稿")).toBeVisible()
   );
@@ -336,4 +341,25 @@ it("已公开例句即使有历史恢复权限也不能恢复", async () => {
     screen.getByText("恢复所选历史到草稿").closest("button")
   ).toBeDisabled();
   expect(api.sentences.rollback).not.toHaveBeenCalled();
+});
+
+it("批量选择显示数量并可取消，草稿删除仍先确认", async () => {
+  auth.role = "super_admin";
+  vi.mocked(api.sentences.list).mockResolvedValue({
+    items: [fixture()],
+    total: 1
+  });
+  show();
+  await screen.findByText("A wonderful flower.");
+  fireEvent.click(screen.getByLabelText("选择本页"));
+  expect(screen.getByText("已选 1 条")).toBeVisible();
+  expect(screen.getByText("发布所选").closest("button")).toBeEnabled();
+  fireEvent.click(screen.getByText("取消选择"));
+  expect(screen.getByLabelText("选择本页")).not.toBeChecked();
+  expect(screen.getByText("已选 0 条")).toBeVisible();
+  expect(screen.getByText("发布所选").closest("button")).toBeDisabled();
+  fireEvent.click(screen.getByLabelText("更多操作"));
+  fireEvent.click(screen.getByText(/^删\s*除$/));
+  expect(screen.getByRole("dialog")).toBeVisible();
+  expect(api.sentences.delete).not.toHaveBeenCalled();
 });
