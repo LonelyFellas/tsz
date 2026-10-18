@@ -1,4 +1,10 @@
-import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within
+} from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { renderWithProviders } from "@/test/render";
 import { useUserStore } from "@/stores/user";
@@ -696,13 +702,16 @@ it("automatically loads every page, searches notes across pages and preserves hi
   });
   renderWithProviders(<WordListCreator id="list" />);
   await screen.findByText("正在读取词条…");
+  // 大表单中复用工具栏节点，行操作只查询目标行。
+  const controls = within(screen.getByRole("region", { name: "词条编辑" }));
+  const filterInput = screen.getByLabelText("表内搜索");
   expect(screen.queryAllByPlaceholderText("输入单词或短语")).toHaveLength(0);
-  expect(screen.getByLabelText("表内搜索")).toBeDisabled();
-  expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
+  expect(filterInput).toBeDisabled();
+  expect(controls.getByRole("button", { name: "保存" })).toBeDisabled();
   await act(async () => finishLoading());
-  await waitFor(() => expect(screen.getByLabelText("表内搜索")).toBeEnabled());
+  await waitFor(() => expect(filterInput).toBeEnabled());
   expect(api.wordList.myItems).toHaveBeenCalledTimes(2);
-  fireEvent.change(screen.getByLabelText("表内搜索"), {
+  fireEvent.change(filterInput, {
     target: { value: "最后一页" }
   });
   expect(screen.getByPlaceholderText("输入单词或短语")).toHaveValue("word100");
@@ -712,11 +721,14 @@ it("automatically loads every page, searches notes across pages and preserves hi
   fireEvent.change(screen.getByLabelText("私密备注 101"), {
     target: { value: "最后一页的新备注" }
   });
-  fireEvent.change(screen.getByLabelText("表内搜索"), {
+  fireEvent.change(filterInput, {
     target: { value: "" }
   });
-  fireEvent.click(screen.getAllByRole("button", { name: "下移" })[0]!);
-  fireEvent.click(screen.getByRole("button", { name: "保存" }));
+  const firstRow = screen
+    .getAllByPlaceholderText("输入单词或短语")[0]!
+    .closest('[id^="row-"]') as HTMLElement;
+  fireEvent.click(within(firstRow).getByRole("button", { name: "下移" }));
+  fireEvent.click(controls.getByRole("button", { name: "保存" }));
   await waitFor(() => expect(api.wordList.update).toHaveBeenCalled());
   const saved = vi.mocked(api.wordList.update).mock.calls[0]![1];
   expect(saved.content?.entry_ids).toEqual([
