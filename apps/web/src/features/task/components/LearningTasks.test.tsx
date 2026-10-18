@@ -303,3 +303,62 @@ it("原题全部失权且没有 next 时仍可核对未确认请求", async () =
     mocks.answer.mock.calls[0]![1]
   );
 });
+
+it("定位可答题会采用刚读取的权威结果，替换目标页的未过期失权缓存", async () => {
+  const { QueryClient, QueryClientProvider } =
+    await import("@tanstack/react-query");
+  const { render } = await import("@testing-library/react");
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: 60_000 } }
+  });
+  const second = {
+    ...question,
+    id: "q21",
+    position: 20,
+    prompt: { definition: "新恢复的题目", part_of_speech: "noun" }
+  };
+  client.setQueryData(["learning", "learner-a", "questions", "run", 2], {
+    items: [{ ...second, content_available: false, prompt: null }],
+    pagination: { total_pages: 2 }
+  });
+  mocks.questions.mockImplementation(
+    async (_id: string, q: { page: number }) => ({
+      items: q.page === 2 ? [second] : [{ ...question, answered: true }],
+      pagination: { total_pages: 2 }
+    })
+  );
+  render(
+    <QueryClientProvider client={client}>
+      <LearningPractice id="run" />
+    </QueryClientProvider>
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "定位可答题" }));
+  expect(
+    await screen.findByRole("heading", { name: /新恢复的题目/ })
+  ).toBeInTheDocument();
+  expect(screen.getByLabelText("英文拼写")).toBeEnabled();
+});
+it("历史批次的全局摘要明确标注任务当前轮次", async () => {
+  mocks.plansDetail.mockResolvedValue({
+    task: { id: "task" },
+    current_cycle: {
+      cycle_number: 2,
+      covered_count: 0,
+      total_count: 35,
+      blocked_count: 0
+    }
+  });
+  mocks.run.mockResolvedValue({
+    ...run,
+    task_type: "daily",
+    business_day: "2026-10-17",
+    state: "completed",
+    answered_count: 2
+  });
+  mocks.questions.mockResolvedValue({
+    items: [],
+    pagination: { total_pages: 1 }
+  });
+  renderWithProviders(<LearningPractice id="run" />);
+  expect(await screen.findByText(/任务当前第 2 轮已覆盖/)).toBeInTheDocument();
+});

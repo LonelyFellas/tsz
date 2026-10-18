@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { HttpError } from "@tsz/api-client";
@@ -540,6 +540,7 @@ export function LearningPractice({ id }: { id: string }) {
   );
 }
 function Practice({ userId, id }: { userId: string; id: string }) {
+  const client = useQueryClient();
   const op = useOperation(userId);
   const [page, setPage] = useState(1);
   const [draft, setDraft] = useState<{
@@ -592,6 +593,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
               );
         if (!op.current()) return;
         if (result.items.some((q) => !q.answered && q.content_available)) {
+          client.setQueryData(["learning", userId, "questions", id, p], result);
           setPage(p);
           return;
         }
@@ -706,7 +708,8 @@ function Practice({ userId, id }: { userId: string; id: string }) {
         {r.task_type === "daily" && plan.data?.current_cycle && (
           <div className="rounded-2xl bg-muted/70 p-4 text-sm">
             <p>
-              本轮已覆盖 {plan.data.current_cycle.covered_count}/
+              任务当前第 {plan.data.current_cycle.cycle_number} 轮已覆盖{" "}
+              {plan.data.current_cycle.covered_count}/
               {plan.data.current_cycle.total_count} 题 · 不可用{" "}
               {plan.data.current_cycle.blocked_count} 题
             </p>
