@@ -250,6 +250,19 @@ function Management({ adminId }: { adminId: string }) {
           </Alert>
         )}
         <AdminTable
+          emptyMessage="暂无词表"
+          filtered={
+            !!query.q ||
+            query.public !== undefined ||
+            !!query.review_state ||
+            query.recommended !== undefined ||
+            !!query.created_from ||
+            !!query.created_before
+          }
+          onResetFilters={() => {
+            reset();
+            setQuery({ page: 1, page_size: query.page_size });
+          }}
           rows={result.data?.items ?? []}
           rowId={(row) => row.wordlist.id}
           loading={result.isFetching}

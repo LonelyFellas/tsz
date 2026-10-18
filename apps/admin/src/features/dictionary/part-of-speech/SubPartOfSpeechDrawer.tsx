@@ -322,6 +322,7 @@ export function SubPartOfSpeechPanel({
         ) : (
           <>
             <AdminTable<SubPartOfSpeechConfig>
+              emptyMessage="暂无细分词性"
               rows={list.items.slice(
                 (currentPage - 1) * pageSize,
                 currentPage * pageSize

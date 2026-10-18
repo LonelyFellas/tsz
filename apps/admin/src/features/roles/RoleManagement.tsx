@@ -134,6 +134,7 @@ export function RoleManagement() {
           </Alert>
         )}
         <AdminTable
+          emptyMessage="暂无角色"
           rows={rows}
           rowId={(row) => row.id}
           loading={listQuery.isFetching}

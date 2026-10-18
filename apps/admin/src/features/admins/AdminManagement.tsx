@@ -296,6 +296,18 @@ export function AdminManagement() {
           </Alert>
         )}
         <AdminTable
+          emptyMessage="暂无管理员"
+          filtered={
+            !!(
+              filters.role ||
+              filters.phone?.trim() ||
+              filters.display_name?.trim()
+            )
+          }
+          onResetFilters={() => {
+            form.reset();
+            applyFilters({});
+          }}
           columns={columns}
           rows={rows}
           rowId={(row) => row.id}

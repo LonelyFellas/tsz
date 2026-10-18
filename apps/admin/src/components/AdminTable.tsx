@@ -1,15 +1,20 @@
 import {
   Box,
+  Button,
   Checkbox,
   LinearProgress,
+  Stack,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TablePagination,
-  TableRow
+  TableRow,
+  Typography
 } from "@mui/material";
+import InboxOutlined from "@mui/icons-material/InboxOutlined";
+import SearchOffOutlined from "@mui/icons-material/SearchOffOutlined";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 export interface AdminColumn<Row> {
@@ -27,6 +32,7 @@ export interface AdminPaginationProps {
   onChange: (page: number, pageSize: number) => void;
 }
 export function AdminPagination(pagination: AdminPaginationProps) {
+  if (pagination.total === 0) return null;
   return (
     <TablePagination
       component="div"
@@ -51,13 +57,19 @@ export function AdminTable<Row>({
   loading,
   minWidth,
   pagination,
-  selection
+  selection,
+  emptyMessage = "暂无数据",
+  filtered = false,
+  onResetFilters
 }: {
   columns: AdminColumn<Row>[];
   rows: Row[];
   rowId: (row: Row) => string;
   loading?: boolean;
   minWidth?: number;
+  emptyMessage?: string;
+  filtered?: boolean;
+  onResetFilters?: () => void;
   selection?: {
     ids: string[];
     onChange: (ids: string[]) => void;
@@ -205,19 +217,37 @@ export function AdminTable<Row>({
                 ))}
               </TableRow>
             ))}
-            {!loading && rows.length === 0 && (
-              <TableRow>
-                <TableCell
-                  colSpan={columns.length + (selection ? 1 : 0)}
-                  align="center"
-                >
-                  暂无数据
-                </TableCell>
-              </TableRow>
-            )}
           </TableBody>
         </Table>
       </TableContainer>
+      {rows.length === 0 && (
+        <Stack
+          role="status"
+          alignItems="center"
+          justifyContent="center"
+          spacing={1}
+          sx={{ minHeight: 240, p: 3, boxSizing: "border-box" }}
+        >
+          {!loading &&
+            (filtered ? (
+              <SearchOffOutlined
+                sx={{ fontSize: 40, color: "text.disabled" }}
+              />
+            ) : (
+              <InboxOutlined sx={{ fontSize: 40, color: "text.disabled" }} />
+            ))}
+          <Typography color="text.secondary" align="center">
+            {loading
+              ? "正在加载…"
+              : filtered
+                ? "未找到符合条件的数据"
+                : emptyMessage}
+          </Typography>
+          {!loading && filtered && onResetFilters && (
+            <Button onClick={onResetFilters}>重置筛选</Button>
+          )}
+        </Stack>
+      )}
       {pagination && <AdminPagination {...pagination} />}
     </Box>
   );

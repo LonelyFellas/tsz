@@ -36,6 +36,7 @@ export function UserManagement() {
   const canReadSensitive = usePermission("users.read_sensitive");
   const connectionError = useAuthStore((state) => state.connectionError);
   const [filters, setFilters] = useState<UserFilterValues>({});
+  const [filterResetKey, setFilterResetKey] = useState(0);
   const [role, setRole] = useState<UserRoleTab>("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -241,7 +242,11 @@ export function UserManagement() {
         <Typography>用户管理</Typography>
         <Typography>用户管理</Typography>
       </Breadcrumbs>
-      <UserFilters onSearch={applyFilters} onReset={() => applyFilters({})} />
+      <UserFilters
+        key={filterResetKey}
+        onSearch={applyFilters}
+        onReset={() => applyFilters({})}
+      />
       <Paper variant="outlined" sx={{ p: 2 }}>
         {canReadBasic && (
           <ToggleButtonGroup
@@ -273,6 +278,19 @@ export function UserManagement() {
           </Alert>
         )}
         <AdminTable
+          emptyMessage="暂无用户"
+          filtered={
+            !!(
+              filters.q?.trim() ||
+              filters.registeredDate ||
+              (canReadBasic && role !== "all")
+            )
+          }
+          onResetFilters={() => {
+            applyFilters({});
+            setRole("all");
+            setFilterResetKey((key) => key + 1);
+          }}
           columns={columns.filter(
             (column) => canReadBasic || !basicColumns.has(column.id)
           )}

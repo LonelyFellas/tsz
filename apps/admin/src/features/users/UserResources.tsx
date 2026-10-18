@@ -136,6 +136,7 @@ function Entries({ userId }: { userId: string }) {
     );
   return (
     <AdminTable
+      emptyMessage="暂无账单记录"
       rowId={(row) => row.id}
       loading={query.isFetching}
       rows={query.data?.items ?? []}

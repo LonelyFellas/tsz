@@ -387,6 +387,19 @@ export function SentenceLibrary({
         </Alert>
       )}
       <AdminTable
+        emptyMessage={entryId ? "暂无关联例句" : "暂无例句"}
+        filtered={
+          !!(
+            filters.q ||
+            filters.level ||
+            filters.created_from ||
+            filters.created_to
+          )
+        }
+        onResetFilters={() => {
+          filterForm.reset();
+          setFilters({ page: 1, page_size: filters.page_size });
+        }}
         columns={columns}
         rows={rows}
         rowId={(row) => row.id}

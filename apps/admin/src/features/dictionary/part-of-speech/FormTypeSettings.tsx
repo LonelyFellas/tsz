@@ -211,6 +211,11 @@ export function FormTypeSettings() {
           </Alert>
         )}
         <AdminTable<FormTypeConfig>
+          emptyMessage="暂无词形变化"
+          filtered={!!query.part_of_speech_id}
+          onResetFilters={() =>
+            setQuery({ ...query, page: 1, part_of_speech_id: undefined })
+          }
           rows={list.data?.items ?? []}
           rowId={(item) => item.id}
           loading={catalog.isPending || (ready && list.isFetching)}

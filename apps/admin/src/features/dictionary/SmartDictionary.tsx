@@ -1320,6 +1320,12 @@ export function SmartDictionary({
           />
         )}
         <AdminTable
+          emptyMessage={trashMode ? "垃圾桶暂无词条" : "暂无词条"}
+          filtered={Object.values(filters).some(Boolean)}
+          onResetFilters={() => {
+            reset({});
+            applyFilters({});
+          }}
           rows={rows}
           rowId={(row) => row.id}
           columns={

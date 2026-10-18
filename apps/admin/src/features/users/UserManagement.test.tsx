@@ -252,6 +252,21 @@ describe("UserManagement", () => {
     expect(screen.queryByRole("button", { name: "老师" })).toBeNull();
     expect(api.users.setStatus).not.toHaveBeenCalled();
   });
+  it("筛选无结果后重置空状态，恢复用户列表并清空搜索表单", async () => {
+    renderPage();
+    await screen.findByText("record");
+    const keyword = screen.getByLabelText("关键词");
+    fireEvent.change(keyword, { target: { value: "missing-user" } });
+    fireEvent.click(screen.getByText("搜索"));
+    expect(await screen.findByText("未找到符合条件的数据")).toBeInTheDocument();
+    expect(keyword).toHaveValue("missing-user");
+    fireEvent.change(keyword, { target: { value: "unsent-user" } });
+    fireEvent.click(screen.getByText("重置筛选"));
+    expect(await screen.findByText("record")).toBeInTheDocument();
+    expect(screen.getByLabelText("关键词")).toHaveValue("");
+    expect(mockList).toHaveBeenLastCalledWith({ page: 1, page_size: 10 });
+  });
+
   it("渲染搜索行、角色 tab 与用户行；等级/余额缺省列显示「-」", async () => {
     renderPage();
     expect(await screen.findByText("record")).toBeInTheDocument();

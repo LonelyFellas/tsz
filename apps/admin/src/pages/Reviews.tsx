@@ -120,6 +120,12 @@ function ReviewQueue({ adminId }: { adminId: string }) {
           </Alert>
         )}
         <AdminTable
+          emptyMessage="暂无待审核词表"
+          filtered={!!query.q || query.review_state !== "pending"}
+          onResetFilters={() => {
+            reset();
+            setQuery(initialQuery);
+          }}
           rows={result.data?.items ?? []}
           rowId={(row) => row.wordlist.id}
           loading={result.isFetching}

@@ -21,6 +21,7 @@ export function EntriesTable({
 }) {
   return (
     <AdminTable
+      emptyMessage="暂无账户流水"
       rows={data?.items ?? []}
       rowId={(row) => row.id}
       loading={loading}
