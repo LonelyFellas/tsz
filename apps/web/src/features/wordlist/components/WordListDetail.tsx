@@ -11,6 +11,7 @@ import {
 } from "@tanstack/react-query";
 import { ReadingEntry } from "./ReadingEntry";
 import {
+  Button,
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
@@ -33,8 +34,7 @@ import {
   PageHeader,
   PageNotice,
   PageShell,
-  Segmented,
-  panelClass
+  Segmented
 } from "@/features/shell/Page";
 import "@tsz/voice-editor/reader.css";
 const SORT_LABELS: Record<WordlistSort, string> = {
@@ -86,6 +86,13 @@ function Detail({
   const lastAvailabilityRefresh = useRef(0);
   const [unavailableOpen, setUnavailableOpen] = useState<boolean>();
   const [q, setQ] = useState("");
+  const [query, setQuery] = useState("");
+  const [composing, setComposing] = useState(false);
+  useEffect(() => {
+    if (composing) return;
+    const timer = setTimeout(() => setQ(query.trim()), 250);
+    return () => clearTimeout(timer);
+  }, [query, composing]);
   const [view, setView] = useState<WordlistView>("standard");
   const [sort, setSort] = useState<WordlistSort>("author");
   const [busy, setBusy] = useState(false);
@@ -144,6 +151,11 @@ function Detail({
     getNextPageParam: (lastPage) =>
       lastPage.pagination.page < lastPage.pagination.total_pages
         ? { page: lastPage.pagination.page + 1, revision: lastPage.revision }
+        : undefined,
+    placeholderData: (previous, previousQuery) =>
+      previousQuery?.queryKey.at(-2) === view &&
+      previousQuery.queryKey.at(-1) === sort
+        ? previous
         : undefined
   });
   const profile = useQuery({
@@ -158,6 +170,8 @@ function Detail({
     queryFn: ({ signal }) => api.wordList.reviews(id, { signal })
   });
   const ready = hydrated && (!userId || (identity.ready && profile.isSuccess));
+  const updatingSearch =
+    composing || query.trim() !== q || items.isPlaceholderData;
   const level: CEFRLevel =
     identity.identity === "teacher"
       ? "C2"
@@ -225,6 +239,7 @@ function Detail({
     if (
       !target ||
       !ready ||
+      updatingSearch ||
       allUnavailable ||
       !hasNextPage ||
       isFetching ||
@@ -239,7 +254,15 @@ function Detail({
     );
     observer.observe(target);
     return () => observer.disconnect();
-  }, [ready, allUnavailable, hasNextPage, isFetching, isError, fetchNextPage]);
+  }, [
+    ready,
+    updatingSearch,
+    allUnavailable,
+    hasNextPage,
+    isFetching,
+    isError,
+    fetchNextPage
+  ]);
   async function reloadWordlist() {
     await client.invalidateQueries({
       queryKey: [...keys, "availability", id],
@@ -251,7 +274,7 @@ function Detail({
     ]);
   }
   async function action(kind: "submit" | "withdraw") {
-    if (!meta.data || (kind === "submit" && !canSubmit)) return;
+    if (busy || !meta.data || (kind === "submit" && !canSubmit)) return;
     if (
       kind === "withdraw" &&
       !window.confirm(
@@ -343,36 +366,36 @@ function Detail({
     <PageShell size="lg" embedded={embedded}>
       <PageHeader
         back={embedded ? undefined : back}
-        eyebrow={mine ? "我的词表" : "词库广场"}
+        eyebrow={embedded ? undefined : mine ? "我的词表" : "词库广场"}
         title={list.name}
-        description={`${list.owner_name} · ${STATE_LABEL[list.state]} · ${list.item_count} 个词条`}
+        description={
+          <span className="break-words">{`${list.owner_name} · ${STATE_LABEL[list.state]} · ${list.item_count} 个词条`}</span>
+        }
+        actions={
+          mine && (
+            <Button asChild>
+              <Link href={editHref ?? `/account/wordlists/${id}/edit`}>
+                {list.state === "pending" || list.state === "published"
+                  ? "查看与编辑"
+                  : "编辑词表"}
+              </Link>
+            </Button>
+          )
+        }
       />
-      <section className="glass rounded-3xl p-2">
-        <div className="rounded-[20px] bg-surface/70 p-6 sm:p-8">
-          <p className="break-all text-xs text-foreground-subtle">
-            ID：{list.id}
-          </p>
-          {!!availabilityData?.custom_count && (
-            <p className="mt-4 text-sm text-foreground-muted">含自定义词汇</p>
-          )}
-          <div className="mt-6 flex flex-wrap gap-3 empty:hidden">
+      <section className="border-b border-border/70 pb-5">
+        <div>
+          <h2 className="sr-only">词表概况</h2>
+          <div className="flex flex-wrap gap-2 empty:hidden">
             {mine ? (
               <>
-                <Link
-                  className={buttonClass}
-                  href={editHref ?? `/account/wordlists/${id}/edit`}
-                >
-                  {list.state === "pending" || list.state === "published"
-                    ? "查看创编内容"
-                    : "编辑词表"}
-                </Link>
                 {list.state === "pending" || list.state === "published" ? (
                   <button
                     className={buttonClass}
                     disabled={busy}
                     onClick={() => void action("withdraw")}
                   >
-                    撤回为私密
+                    {busy ? "处理中…" : "撤回为私密"}
                   </button>
                 ) : (
                   <button
@@ -385,7 +408,7 @@ function Detail({
                     }
                     onClick={() => void action("submit")}
                   >
-                    申请公开
+                    {busy ? "提交中…" : "申请公开"}
                   </button>
                 )}
                 {list.state === "published" && (
@@ -402,13 +425,15 @@ function Detail({
               )
             )}
           </div>
-          {mine && list.state !== "published" && (
-            <p className="mt-4 text-sm text-foreground-subtle">
-              {list.state === "pending"
-                ? "公开申请正在审核中，审核通过前仅你可见。"
-                : "申请公开后需经管理员审核，通过后其他用户才能搜索和使用。"}
-            </p>
-          )}
+          {mine &&
+            list.state !== "published" &&
+            (list.state === "pending" || canSubmit) && (
+              <p className="mt-4 text-sm leading-6 text-foreground-muted">
+                {list.state === "pending"
+                  ? "公开申请正在审核中，审核通过前仅你可见。"
+                  : "公开后可被其他用户搜索和使用，需审核。"}
+              </p>
+            )}
           {showPublicationCheck && !canSubmit && (
             <p
               id="publication-availability-message"
@@ -416,7 +441,7 @@ function Detail({
               className="mt-4 text-sm text-foreground-muted"
             >
               {publicationHasUnavailable
-                ? "暂时不能申请公开：词表中有暂不可用的词条。请查看下方原因，移除或替换后再申请。"
+                ? "有不可用词条，移除或替换后可申请公开。"
                 : availability.isError ||
                     (availability.isSuccess && !availabilityData)
                   ? "暂时无法确认词条是否全部可用，请在下方重试后再申请。"
@@ -474,8 +499,8 @@ function Detail({
           )}
         </div>
       </section>
-      <div className="mb-6 mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-        <label className="glass relative flex min-h-11 min-w-40 flex-1 items-center rounded-full pl-11 pr-5 transition-shadow focus-within:ring-4 focus-within:ring-primary/15">
+      <div className="mb-5 mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <label className="relative flex min-h-11 min-w-40 flex-1 items-center border border-border bg-surface sm:max-w-sm rounded-full pl-11 pr-5 transition-shadow focus-within:ring-4 focus-within:ring-primary/15">
           <Search
             className="absolute left-4 size-4 text-foreground-subtle"
             strokeWidth={1.8}
@@ -485,9 +510,14 @@ function Detail({
             aria-label="搜索词条"
             placeholder="搜索词面"
             className="w-full bg-transparent py-2.5 text-sm text-foreground outline-hidden placeholder:text-foreground-subtle"
-            value={q}
+            value={query}
+            onCompositionStart={() => setComposing(true)}
+            onCompositionEnd={(event) => {
+              setComposing(false);
+              setQuery(event.currentTarget.value);
+            }}
             onChange={(e) => {
-              setQ(e.target.value);
+              setQuery(e.target.value);
             }}
           />
         </label>
@@ -529,6 +559,11 @@ function Detail({
           )}
         </div>
       </div>
+      {updatingSearch && (
+        <p role="status" className="mb-5 text-xs text-foreground-muted">
+          正在搜索…
+        </p>
+      )}
       {!ready ? (
         profile.isError || identity.error ? (
           <PageNotice tone="error">
@@ -557,7 +592,7 @@ function Detail({
           {(unavailableItems.length > 0 ||
             (availabilityData?.unavailable_count ?? 0) > 0) && (
             <details
-              className="mb-6 rounded-2xl border border-border/60 bg-muted/70 px-4 py-3 text-sm leading-6"
+              className="mb-6 break-words rounded-2xl border border-border/60 bg-muted/70 px-4 py-3 text-sm leading-6"
               open={unavailableExpanded}
               onToggle={(event) => setUnavailableOpen(event.currentTarget.open)}
             >
@@ -568,7 +603,7 @@ function Detail({
                   : `（已加载 ${unavailableItems.length} 个）`}
               </summary>
               <p className="mt-3 text-foreground-muted">
-                这些词条目前不能阅读或用于出题。引用和备注仍保留，内容恢复可用后会重新显示。
+                引用和备注已保留，词条恢复后可继续阅读。
               </p>
               {mine && (
                 <p className="mt-2">
@@ -632,7 +667,7 @@ function Detail({
                 !isError && (
                   <button
                     className={textButtonClass}
-                    disabled={isFetching}
+                    disabled={isFetching || updatingSearch}
                     onClick={() => void fetchNextPage({ cancelRefetch: false })}
                   >
                     {allUnavailable
@@ -647,7 +682,10 @@ function Detail({
                   {showPublicationCheck && q.trim() && (
                     <button
                       className={textButtonClass}
-                      onClick={() => setQ("")}
+                      onClick={() => {
+                        setQuery("");
+                        setQ("");
+                      }}
                     >
                       清空搜索查看原因
                     </button>
@@ -656,12 +694,12 @@ function Detail({
               )}
             </details>
           )}
-          <div className="space-y-4">
+          <div aria-busy={updatingSearch}>
             {loadedItems.map((item) =>
               item.entry || item.custom_word ? (
                 <section
                   key={item.item_id ?? item.entry_id}
-                  className={panelClass}
+                  className="min-w-0 break-words border-b border-border/60 py-6 last:border-b-0"
                 >
                   <div className="mb-3 text-xs font-medium tabular-nums tracking-wide text-foreground-subtle">
                     {String(item.position + 1).padStart(2, "0")}
@@ -709,7 +747,22 @@ function Detail({
               <PageNotice>当前已加载的词条均不可用。</PageNotice>
             )}
           {loadedItems.length === 0 ? (
-            <PageNotice>没有匹配词条</PageNotice>
+            <PageNotice>
+              {q ? "未找到匹配词条" : "暂无词条"}
+              {q && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="ml-2"
+                  onClick={() => {
+                    setQuery("");
+                    setQ("");
+                  }}
+                >
+                  清空搜索
+                </Button>
+              )}
+            </PageNotice>
           ) : (
             <div
               ref={loadMoreRef}

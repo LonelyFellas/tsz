@@ -127,7 +127,7 @@ it("removes unavailable references and sends search and pagination to favorites"
     favorited: false
   });
   renderWithProviders(<WordListBrowser mine />);
-  fireEvent.click(screen.getByRole("button", { name: "我收藏的" }));
+  fireEvent.click(screen.getByRole("button", { name: "收藏" }));
   expect(await screen.findByText("词表暂不可用")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "取消收藏" }));
   await waitFor(() =>

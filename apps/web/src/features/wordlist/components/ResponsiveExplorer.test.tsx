@@ -87,6 +87,41 @@ it("keeps the mounted tree state across drawer close and desktop resizing, resto
   ).toBeInTheDocument();
   expect(screen.getByLabelText("保留的目录状态")).toHaveValue("展开 雅思");
 });
+
+it("keeps the desktop footer in the available viewport as the page moves and resizes", () => {
+  wide = true;
+  vi.stubGlobal("innerHeight", 900);
+  let top = 200;
+  const bounds = vi
+    .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+    .mockImplementation(() => ({
+      top,
+      bottom: top,
+      left: 0,
+      right: 0,
+      width: 0,
+      height: 0,
+      x: 0,
+      y: top,
+      toJSON: () => ({})
+    }));
+  try {
+    const result = render(view());
+    const panel = screen.getByRole("complementary", { name: "目录区域" });
+    expect(panel.style.getPropertyValue("--explorer-height")).toBe("684px");
+    top = 80;
+    fireEvent.scroll(window);
+    expect(panel.style.getPropertyValue("--explorer-height")).toBe("804px");
+    vi.stubGlobal("innerHeight", 720);
+    fireEvent.resize(window);
+    expect(panel.style.getPropertyValue("--explorer-height")).toBe("624px");
+    top = 160;
+    result.rerender(view());
+    expect(panel.style.getPropertyValue("--explorer-height")).toBe("544px");
+  } finally {
+    bounds.mockRestore();
+  }
+});
 it("delays hover opening, stays open over portaled menus, pins on click and closes on Escape", () => {
   hover = true;
   vi.useFakeTimers();

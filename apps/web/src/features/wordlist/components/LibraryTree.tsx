@@ -8,7 +8,6 @@ import {
   Folder,
   FolderOpen,
   FileText,
-  FilePlus2,
   FolderPlus,
   ListCollapse,
   MoreHorizontal,
@@ -49,7 +48,7 @@ type TreeProps = Props & {
   toggle: (id: string, open?: boolean) => void;
 };
 const iconButton =
-  "inline-flex size-7 shrink-0 items-center justify-center rounded text-foreground-muted hover:bg-foreground/10 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-40";
+  "inline-flex size-10 shrink-0 items-center justify-center rounded-xl lg:size-7 lg:rounded-lg text-foreground-muted hover:bg-foreground/10 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-40";
 export function LibraryTree(props: Props) {
   const [expansion, setExpansion] = useState(() => new Map<string, boolean>());
   const expanded = new Set([
@@ -90,7 +89,7 @@ export function LibraryTree(props: Props) {
   }
   return (
     <nav aria-label="工程目录" className="min-w-0" onKeyDown={navigate}>
-      <div className="flex h-9 items-center border-y border-border/60 bg-muted/60 pl-2 pr-1">
+      <div className="flex min-h-11 items-center border-y border-border/60 bg-muted/60 pl-2 pr-1">
         <button
           data-leaves-page
           data-explorer-item
@@ -108,37 +107,19 @@ export function LibraryTree(props: Props) {
         >
           <ChevronDown className="size-3.5 shrink-0" aria-hidden />
           <span className="truncate">
-            {props.trash
-              ? "回收站"
-              : props.space === "owned"
-                ? "我创建的"
-                : "我收藏的"}
+            {props.trash ? "回收站" : props.space === "owned" ? "创建" : "收藏"}
           </span>
         </button>
         {!props.trash && (
-          <>
-            {props.space === "owned" && (
-              <button
-                data-leaves-page
-                className={iconButton}
-                aria-label="在当前目录新建词表"
-                title="新建词表"
-                disabled={props.disabled}
-                onClick={() => props.onCreateWordlist(props.selectedFolder)}
-              >
-                <FilePlus2 className="size-3.5" aria-hidden />
-              </button>
-            )}
-            <button
-              className={iconButton}
-              aria-label="在当前目录新建文件夹"
-              title="新建文件夹"
-              disabled={props.disabled}
-              onClick={() => props.onCreateFolder(props.selectedFolder)}
-            >
-              <FolderPlus className="size-3.5" aria-hidden />
-            </button>
-          </>
+          <button
+            className={iconButton}
+            aria-label="在当前目录新建文件夹"
+            title="新建文件夹"
+            disabled={props.disabled}
+            onClick={() => props.onCreateFolder(props.selectedFolder)}
+          >
+            <FolderPlus className="size-3.5" aria-hidden />
+          </button>
         )}
         <button
           className={iconButton}
@@ -239,7 +220,7 @@ function TreeItem(props: TreeProps & { item: LibraryItem; depth: number }) {
     <li>
       <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
         <div
-          className={`group relative flex min-h-9 items-center border-l-2 pr-1 md:min-h-7 ${selected ? "border-primary bg-primary/12 text-foreground" : "border-transparent hover:bg-foreground/5"} ${menuOpen ? "bg-foreground/5" : ""}`}
+          className={`group relative flex min-h-11 items-center border-l-2 pr-1 lg:min-h-9 ${selected ? "border-primary bg-primary/12 text-foreground" : "border-transparent hover:bg-foreground/5"} ${menuOpen ? "bg-foreground/5" : ""}`}
           onContextMenu={(event) => {
             event.preventDefault();
             if (!props.disabled) setMenuOpen(true);
@@ -266,7 +247,7 @@ function TreeItem(props: TreeProps & { item: LibraryItem; depth: number }) {
               tabIndex={-1}
               aria-label={`${open ? "收起" : "展开"} ${item.name}`}
               aria-expanded={open}
-              className="flex size-6 shrink-0 items-center justify-center text-foreground-muted"
+              className="flex size-11 shrink-0 items-center justify-center rounded-lg text-foreground-muted focus-visible:outline-2 focus-visible:outline-primary lg:size-7"
               onClick={() => props.toggle(item.id)}
             >
               {open ? (
@@ -276,7 +257,7 @@ function TreeItem(props: TreeProps & { item: LibraryItem; depth: number }) {
               )}
             </button>
           ) : (
-            <span className="w-6 shrink-0" />
+            <span className="w-11 shrink-0 lg:w-7" />
           )}
           <button
             data-leaves-page
@@ -311,14 +292,11 @@ function TreeItem(props: TreeProps & { item: LibraryItem; depth: number }) {
             {folder ? (
               open ? (
                 <FolderOpen
-                  className="size-4 shrink-0 text-amber-600 dark:text-amber-400"
+                  className="size-4 shrink-0 text-primary"
                   aria-hidden
                 />
               ) : (
-                <Folder
-                  className="size-4 shrink-0 text-amber-600 dark:text-amber-400"
-                  aria-hidden
-                />
+                <Folder className="size-4 shrink-0 text-primary" aria-hidden />
               )
             ) : (
               <FileText className="size-4 shrink-0 text-primary" aria-hidden />
@@ -328,7 +306,7 @@ function TreeItem(props: TreeProps & { item: LibraryItem; depth: number }) {
           <DropdownMenuTrigger asChild>
             <button
               data-explorer-menu
-              className={`${iconButton} size-6 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 data-[state=open]:opacity-100`}
+              className={`${iconButton} size-11 lg:size-7 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 data-[state=open]:opacity-100`}
               aria-label={`${item.name}的操作`}
               disabled={props.disabled}
             >
@@ -337,9 +315,20 @@ function TreeItem(props: TreeProps & { item: LibraryItem; depth: number }) {
           </DropdownMenuTrigger>
         </div>
         <DropdownMenuContent
+          onCloseAutoFocus={(event) => {
+            const dialog =
+              document.querySelector<HTMLDialogElement>("dialog[open]");
+            if (dialog) {
+              event.preventDefault();
+              (
+                dialog.querySelector<HTMLElement>("input:not(:disabled)") ??
+                dialog
+              ).focus();
+            }
+          }}
           data-explorer-popup
           align="end"
-          className="min-w-44 rounded-lg"
+          className="min-w-44"
           sideOffset={2}
         >
           {!props.trash && folder && (

@@ -192,9 +192,7 @@ function InteractionControls({
           )}
           {state?.favorited ? (
             <>
-              <p className="mb-4">
-                这份收藏将移入「我收藏的」回收站，可以恢复。
-              </p>
+              <p className="mb-4">这份收藏将移入「收藏」回收站，可以恢复。</p>
               <button
                 disabled={busy}
                 className={buttonClass}

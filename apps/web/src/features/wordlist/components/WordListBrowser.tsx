@@ -59,8 +59,8 @@ export function WordListBrowser({ mine = false }: { mine?: boolean }) {
             label="我的词表分类"
             value={favorites}
             options={[
-              { value: false, label: "我创建的" },
-              { value: true, label: "我收藏的" }
+              { value: false, label: "创建" },
+              { value: true, label: "收藏" }
             ]}
             onChange={(value) => {
               setFavorites(value);
