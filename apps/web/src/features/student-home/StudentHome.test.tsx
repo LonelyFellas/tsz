@@ -1,3 +1,4 @@
+import { HttpError } from "@tsz/api-client";
 import {
   act,
   fireEvent,
@@ -12,10 +13,16 @@ import { renderWithProviders } from "@/test/render";
 import { useUserStore } from "@/stores/user";
 import { StudentHome } from "./StudentHome";
 
-const mocks = vi.hoisted(() => ({ list: vi.fn(), me: vi.fn(), save: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  list: vi.fn(),
+  plansList: vi.fn(),
+  me: vi.fn(),
+  save: vi.fn()
+}));
 vi.mock("@/lib/request", () => ({
   api: {
     learning: { list: mocks.list },
+    learningPlans: { list: mocks.plansList },
     auth: { me: mocks.me, updateLearningSettings: mocks.save }
   }
 }));
@@ -68,6 +75,7 @@ const detail: LearningTaskDetail = {
 };
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.plansList.mockRejectedValue(new HttpError(404, "API missing"));
   useUserStore.setState({ user, hydrated: true, onboarded: true });
   mocks.list.mockResolvedValue({
     items: [detail],
@@ -235,4 +243,49 @@ it("切换账号后关闭旧浮层并读取新账号任务，迟到的保存不�
   expect(await screen.findByRole("radio", { name: "英式英语" })).toBeChecked();
   expect(screen.getByText(/当前难度：B1/)).toBeInTheDocument();
   expect(screen.queryByText("日常英语")).not.toBeInTheDocument();
+});
+
+it("覆盖计划的每日完成不冒充整轮完成，跨日无 run 的整轮完成仍可进入详情", async () => {
+  const plan = {
+    ...detail,
+    mode: "coverage_v1",
+    status: "today_completed",
+    can_start: false,
+    current_cycle: {
+      id: "cycle",
+      state: "active",
+      covered_count: 20,
+      total_count: 35
+    }
+  };
+  mocks.plansList.mockResolvedValue({
+    items: [
+      { ...plan, current_run: { ...detail.current_run, state: "completed" } }
+    ],
+    pagination: { total: 1, total_pages: 1 }
+  });
+  const view = renderWithProviders(<StudentHome />);
+  await screen.findByText("今日已完成");
+  expect(screen.queryByText("本轮已完成")).not.toBeInTheDocument();
+  mocks.plansList.mockResolvedValue({
+    items: [
+      {
+        ...plan,
+        status: "cycle_completed",
+        current_run: null,
+        current_cycle: {
+          ...plan.current_cycle,
+          state: "completed",
+          covered_count: 35
+        }
+      }
+    ],
+    pagination: { total: 1, total_pages: 1 }
+  });
+  view.rerender(<StudentHome key="next-day" />);
+  await screen.findByText("本轮已完成");
+  expect(screen.getByRole("link", { name: "查看任务" })).toHaveAttribute(
+    "href",
+    "/student/tasks/task-a"
+  );
 });

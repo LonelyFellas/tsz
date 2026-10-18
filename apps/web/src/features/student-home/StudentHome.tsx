@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, BookOpen } from "lucide-react";
 import { Button } from "@tsz/ui/components";
-import { api } from "@/lib/request";
+import { planStatusLabels } from "@/features/task/components/PlanCoverage";
+import { listPlans } from "@/features/task/components/plan-api";
 import { useUserStore } from "@/stores/user";
 import { AppTopbar } from "@/features/shell/AppTopbar";
 
@@ -26,22 +27,22 @@ export function StudentHome() {
 
 function HomeWorkspace({ userId }: { userId: string }) {
   const tasks = useQuery({
-    queryKey: ["learning", userId, "home"],
+    queryKey: ["learning-plans", userId, "v1-with-legacy", "home"],
     queryFn: ({ signal }) =>
-      api.learning.list(
-        { page: 1, page_size: 20, state: "active" },
-        { signal }
-      ),
-    refetchOnMount: "always"
+      listPlans({ page: 1, page_size: 20, state: "active" }, { signal }),
+    refetchOnMount: "always",
+    refetchOnWindowFocus: "always"
   });
   // 重新读取失败时缓存仍在，不能让页头与失败提示各说各话。
   const items = tasks.isError ? undefined : tasks.data?.items;
-  const featured =
-    items?.find(({ current_run }) => current_run?.state === "active") ??
-    items?.[0];
+  const featured = items?.find((plan) => plan.can_start) ?? items?.[0];
   const run = featured?.current_run;
-  const continuing = run?.state === "active";
-  const completed = run?.state === "completed";
+  const continuing = featured?.can_start && run?.state === "active";
+  const completed =
+    featured?.mode === "coverage_v1"
+      ? featured.current_cycle?.state === "completed"
+      : run?.state === "completed";
+  const showRun = !!run && (continuing || run.state === "completed");
 
   return (
     <div className="min-h-dvh">
@@ -87,9 +88,11 @@ function HomeWorkspace({ userId }: { userId: string }) {
                   <p className="text-xs font-medium tracking-[0.2em] text-foreground-muted">
                     {continuing
                       ? "继续这一轮"
-                      : completed
-                        ? "本轮已完成"
-                        : "你的学习任务"}
+                      : featured.mode === "coverage_v1"
+                        ? planStatusLabels[featured.status]
+                        : completed
+                          ? "本轮已完成"
+                          : "你的学习任务"}
                   </p>
                   <h2 className="mt-5 max-w-full break-words text-5xl font-bold leading-none tracking-tight sm:text-7xl">
                     {featured.task.name}
@@ -98,22 +101,34 @@ function HomeWorkspace({ userId }: { userId: string }) {
                     className="mt-7 h-1.5 w-14 rounded-full bg-primary"
                     aria-hidden
                   />
-                  {run && (
-                    <div className="mt-8 w-full max-w-xs space-y-3">
-                      <p className="text-sm text-foreground-muted">
-                        本轮已答{" "}
-                        <span className="text-xl font-bold tabular-nums text-foreground">
-                          {run.answered_count}
-                        </span>{" "}
-                        / {run.target_count} 题
-                      </p>
-                      <progress
-                        aria-label="本轮答题进度"
-                        className="h-1.5 w-full overflow-hidden rounded-full [&::-moz-progress-bar]:bg-primary [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary"
-                        value={run.answered_count}
-                        max={run.target_count}
-                      />
+                  {featured.current_cycle ? (
+                    <div className="mt-8 text-sm text-foreground-muted">
+                      本轮已覆盖 {featured.current_cycle.covered_count}/
+                      {featured.current_cycle.total_count} 题
+                      {featured.task.task_type === "daily" && run && (
+                        <p className="mt-2">
+                          今日已答 {run.answered_count}/{run.target_count} 题
+                        </p>
+                      )}
                     </div>
+                  ) : (
+                    run && (
+                      <div className="mt-8 w-full max-w-xs space-y-3">
+                        <p className="text-sm text-foreground-muted">
+                          本轮已答{" "}
+                          <span className="text-xl font-bold tabular-nums text-foreground">
+                            {run.answered_count}
+                          </span>{" "}
+                          / {run.target_count} 题
+                        </p>
+                        <progress
+                          aria-label="本轮答题进度"
+                          className="h-1.5 w-full overflow-hidden rounded-full [&::-moz-progress-bar]:bg-primary [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary"
+                          value={run.answered_count}
+                          max={run.target_count}
+                        />
+                      </div>
+                    )
                   )}
                   <Button
                     asChild
@@ -122,15 +137,15 @@ function HomeWorkspace({ userId }: { userId: string }) {
                   >
                     <Link
                       href={
-                        continuing || completed
-                          ? `/student/practice/${run!.id}`
+                        showRun
+                          ? `/student/practice/${run.id}`
                           : `/student/tasks/${featured.task.id}`
                       }
                     >
                       {continuing
                         ? "继续练习"
-                        : completed
-                          ? "查看结果"
+                        : showRun
+                          ? "查看记录"
                           : "查看任务"}
                       <ArrowRight className="size-4" aria-hidden />
                     </Link>

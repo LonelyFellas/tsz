@@ -1,6 +1,7 @@
 import { createLoginRewardEndpoints } from "./login-reward";
 import { createDictionaryEndpoints } from "./dictionary";
 import { createLearningRewardEndpoints } from "./learning-rewards";
+import { createLearningPlanEndpoints } from "./learning-plans";
 import { createLearningTaskEndpoints } from "./learning-tasks";
 import { createWordlistEndpoints } from "./wordlists";
 import { createAccountDeletionEndpoints } from "./account-deletion";
@@ -221,7 +222,8 @@ export function createEndpoints(http: HttpClient) {
       create: (data: Pick<Comment, "target_type" | "target_id" | "content">) =>
         http.post<Comment>("/comments", data)
     },
-    learning: createLearningTaskEndpoints(http)
+    learning: createLearningTaskEndpoints(http),
+    learningPlans: createLearningPlanEndpoints(http)
   };
 }
 

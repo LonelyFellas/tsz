@@ -52,3 +52,11 @@ export interface LibraryImpact {
   folder_count: number;
   wordlist_count: number;
 }
+export interface LibrarySelectionInput {
+  expected_version: string;
+  node_ids: string[];
+}
+export interface LibrarySelection {
+  version: string;
+  wordlists: Wordlist[];
+}

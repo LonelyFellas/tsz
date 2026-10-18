@@ -1,3 +1,4 @@
+import { HttpError } from "@tsz/api-client";
 import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { renderWithProviders } from "@/test/render";
@@ -7,10 +8,16 @@ const mocks = vi.hoisted(() => ({
   questions: vi.fn(),
   answer: vi.fn(),
   list: vi.fn(),
+  plansList: vi.fn(),
+  plansDetail: vi.fn(),
   user: { id: "learner-a", roles: ["student"] }
 }));
 vi.mock("@/lib/request", () => ({
-  api: { learning: mocks, learningRewards: { day: mocks.day } }
+  api: {
+    learning: mocks,
+    learningPlans: { list: mocks.plansList, detail: mocks.plansDetail },
+    learningRewards: { day: mocks.day }
+  }
 }));
 vi.mock("@/stores/user", () => ({
   useUserStore: Object.assign(
@@ -39,6 +46,9 @@ const question = {
 };
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.answer.mockReset();
+  mocks.plansList.mockRejectedValue(new HttpError(404, "API missing"));
+  mocks.plansDetail.mockRejectedValue(new HttpError(404, "API missing"));
   mocks.user = { id: "learner-a", roles: ["student"] };
   mocks.day.mockResolvedValue({
     status: "reward_disabled",
@@ -107,7 +117,7 @@ it("completion is server-owned and zero correct still displays completed", async
   });
   renderWithProviders(<LearningPractice id="run" />);
   expect(
-    await screen.findByRole("heading", { name: "本轮已完成" })
+    await screen.findByRole("heading", { name: "本批次已完成" })
   ).toBeInTheDocument();
   expect(screen.getByText(/正确率 0%/)).toBeInTheDocument();
   expect(
@@ -236,4 +246,119 @@ it("a background question advance cannot submit the previous question's draft", 
   expect(screen.getByLabelText("英文拼写")).toHaveValue("");
   expect(screen.getByRole("button", { name: "提交答案" })).toBeDisabled();
   expect(mocks.answer).not.toHaveBeenCalled();
+});
+
+it("来源失权后仍可重试未确认的原请求，再继续同页其他合法题", async () => {
+  mocks.answer
+    .mockImplementationOnce(async () => {
+      mocks.questions.mockResolvedValue({
+        items: [
+          { ...question, content_available: false, prompt: null },
+          {
+            ...question,
+            id: "q2",
+            position: 1,
+            prompt: { definition: "香蕉", part_of_speech: "noun" }
+          }
+        ],
+        pagination: { total_pages: 1 }
+      });
+      throw new Error("response lost");
+    })
+    .mockRejectedValueOnce(new HttpError(409, "来源不可用"));
+  renderWithProviders(<LearningPractice id="run" />);
+  fireEvent.change(await screen.findByLabelText("英文拼写"), {
+    target: { value: "apple" }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "提交答案" }));
+  const retry = await screen.findByRole("button", { name: "重试原答案" });
+  expect(retry).toBeEnabled();
+  fireEvent.click(retry);
+  await waitFor(() => expect(mocks.answer).toHaveBeenCalledTimes(2));
+  expect(mocks.answer.mock.calls[1]![1]).toEqual(
+    mocks.answer.mock.calls[0]![1]
+  );
+  await waitFor(() => expect(screen.getByLabelText("英文拼写")).toBeEnabled());
+  expect(screen.getByLabelText("英文拼写")).toHaveValue("");
+});
+it("原题全部失权且没有 next 时仍可核对未确认请求", async () => {
+  mocks.answer
+    .mockImplementationOnce(async () => {
+      mocks.questions.mockResolvedValue({
+        items: [{ ...question, content_available: false, prompt: null }],
+        pagination: { total_pages: 1 }
+      });
+      throw new Error("response lost");
+    })
+    .mockResolvedValueOnce({});
+  renderWithProviders(<LearningPractice id="run" />);
+  fireEvent.change(await screen.findByLabelText("英文拼写"), {
+    target: { value: "apple" }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "提交答案" }));
+  const retry = await screen.findByRole("button", { name: "重试原答案" });
+  fireEvent.click(retry);
+  await waitFor(() => expect(mocks.answer).toHaveBeenCalledTimes(2));
+  expect(mocks.answer.mock.calls[1]![1]).toEqual(
+    mocks.answer.mock.calls[0]![1]
+  );
+});
+
+it("定位可答题会采用刚读取的权威结果，替换目标页的未过期失权缓存", async () => {
+  const { QueryClient, QueryClientProvider } =
+    await import("@tanstack/react-query");
+  const { render } = await import("@testing-library/react");
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: 60_000 } }
+  });
+  const second = {
+    ...question,
+    id: "q21",
+    position: 20,
+    prompt: { definition: "新恢复的题目", part_of_speech: "noun" }
+  };
+  client.setQueryData(["learning", "learner-a", "questions", "run", 2], {
+    items: [{ ...second, content_available: false, prompt: null }],
+    pagination: { total_pages: 2 }
+  });
+  mocks.questions.mockImplementation(
+    async (_id: string, q: { page: number }) => ({
+      items: q.page === 2 ? [second] : [{ ...question, answered: true }],
+      pagination: { total_pages: 2 }
+    })
+  );
+  render(
+    <QueryClientProvider client={client}>
+      <LearningPractice id="run" />
+    </QueryClientProvider>
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "定位可答题" }));
+  expect(
+    await screen.findByRole("heading", { name: /新恢复的题目/ })
+  ).toBeInTheDocument();
+  expect(screen.getByLabelText("英文拼写")).toBeEnabled();
+});
+it("历史批次的全局摘要明确标注任务当前轮次", async () => {
+  mocks.plansDetail.mockResolvedValue({
+    task: { id: "task" },
+    current_cycle: {
+      cycle_number: 2,
+      covered_count: 0,
+      total_count: 35,
+      blocked_count: 0
+    }
+  });
+  mocks.run.mockResolvedValue({
+    ...run,
+    task_type: "daily",
+    business_day: "2026-10-17",
+    state: "completed",
+    answered_count: 2
+  });
+  mocks.questions.mockResolvedValue({
+    items: [],
+    pagination: { total_pages: 1 }
+  });
+  renderWithProviders(<LearningPractice id="run" />);
+  expect(await screen.findByText(/任务当前第 2 轮已覆盖/)).toBeInTheDocument();
 });

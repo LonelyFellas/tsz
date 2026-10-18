@@ -62,6 +62,15 @@ const RUNTIME_SCHEMA_ROOTS = [
   "LearningRewardDay",
   "LoginRewardDay",
   "LearningPreview",
+  "LearningPlanPreview",
+  "LearningPlan",
+  "LearningPlanPage",
+  "LearningCyclePreview",
+  "LearningCycle",
+  "LearningCyclePage",
+  "LearningPlanRunPage",
+  "LibrarySelection",
+
   "LearningTask",
   "LearningTaskDetail",
   "LearningTaskPage",
@@ -585,6 +594,7 @@ for (const [rawPath, item] of Object.entries(spec.paths)) {
     const operationKey = `${method} ${path}`;
     if (
       rawPath.startsWith(ADMIN_LEXICON_PREFIX) ||
+      rawPath.startsWith(`${API_PREFIX}/me/learning-plans`) ||
       rawPath.startsWith(`${API_PREFIX}/me/account-deletion`) ||
       rawPath === `${API_PREFIX}/auth/account` ||
       rawPath.startsWith(`${API_PREFIX}/me/wordlist-library/`) ||
