@@ -45,6 +45,103 @@ const body = {
 };
 
 describe("shared sentence wire contract", () => {
+  it("例句录音在创建、更新、重读和发布快照中保留；兼容缺省字段且不放宽未知字段", async () => {
+    const asset = {
+      id,
+      locale: "en-GB",
+      gender: "female",
+      content_type: "audio/wav",
+      size_bytes: 110520,
+      duration_ms: null,
+      original_name: "sentence.wav",
+      created_at: body.created_at
+    };
+    const variant = {
+      ...body.content.sentence.en_text.common,
+      audio_assets: [asset]
+    };
+    const content = {
+      ...body.content,
+      sentence: {
+        ...body.content.sentence,
+        en_text: { mode: "unified", common: variant }
+      }
+    };
+    const response = { ...body, content };
+    const publication = {
+      id,
+      sentence_id: id,
+      publication_number: 1,
+      source_revision: 1,
+      snapshot: content,
+      published_at: body.created_at,
+      published_by_admin_id: id,
+      created_by_admin_id: body.created_by_admin_id
+    };
+    expect(validateRuntimeSchema("SharedSentence", body)).toEqual({
+      valid: true
+    });
+    expect(validateRuntimeSchema("SentencePublication", publication)).toEqual({
+      valid: true
+    });
+    expect(
+      validateRuntimeSchema("SharedSentence", {
+        ...response,
+        content: {
+          ...content,
+          sentence: {
+            ...content.sentence,
+            en_text: {
+              mode: "unified",
+              common: { ...variant, unexpected_audio_field: true }
+            }
+          }
+        }
+      })
+    ).toMatchObject({ valid: false });
+    const post = vi.fn().mockResolvedValue(response);
+    const put = vi.fn().mockResolvedValue(response);
+    const get = vi.fn().mockResolvedValue(response);
+    const endpoints = createSharedSentenceEndpoints({
+      post,
+      put,
+      get
+    } as unknown as HttpClient);
+    const input = { source_entry_id: id, source_sense_id: id, content };
+    // Runtime checks intentionally receive plain JSON, exactly as returned by the API.
+    await expect(
+      endpoints.create(input as Parameters<typeof endpoints.create>[0])
+    ).resolves.toEqual(response);
+    await expect(
+      endpoints.update(id, { base_revision: 1, content } as Parameters<
+        typeof endpoints.update
+      >[1])
+    ).resolves.toEqual(response);
+    await expect(endpoints.get(id, "draft")).resolves.toEqual(response);
+    expect(post).toHaveBeenCalledWith("/lexicon/sentences", input, {
+      headers: SENTENCE_FORMATTING_HEADERS
+    });
+    expect(put.mock.calls[0]?.[1]).toEqual({ base_revision: 1, content });
+    // The deployed strict reader rejects the new property: frontend must ship first.
+    const definitions = runtimeSchemaBundleJson.$defs as unknown as Record<
+      string,
+      { properties: Record<string, unknown> }
+    >;
+    const current = definitions.RichTextVariantV3!;
+    const old = structuredClone(current);
+    delete old.properties.audio_assets;
+    definitions.RichTextVariantV3 = old;
+    try {
+      expect(validateRuntimeSchema("SharedSentence", response)).toMatchObject({
+        valid: false
+      });
+      expect(validateRuntimeSchema("SharedSentence", body)).toEqual({
+        valid: true
+      });
+    } finally {
+      definitions.RichTextVariantV3 = current;
+    }
+  });
   it.each(["SharedSentence", "SentencePublication"] as const)(
     "%s新字段保持真实owner，旧strict schema拒绝新增字段、新schema必需该字段",
     (root) => {
