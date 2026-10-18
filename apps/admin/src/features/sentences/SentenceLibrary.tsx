@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
+  Box,
   Breadcrumbs,
   Button,
   Chip,
@@ -10,12 +11,15 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
+  Menu,
   MenuItem,
   Paper,
   Stack,
   TextField,
   Typography
 } from "@mui/material";
+import MoreHoriz from "@mui/icons-material/MoreHoriz";
 import { Controller, useForm } from "react-hook-form";
 import { AdminTable } from "@/components/AdminTable";
 import type { AdminColumn } from "@/components/AdminTable";
@@ -113,6 +117,10 @@ export function SentenceLibrary({
   const [detail, setDetail] = useState<SharedSentence>();
   const [batch, setBatch] = useState<SharedSentence[]>();
   const [selected, setSelected] = useState<string[]>([]);
+  const [actionMenu, setActionMenu] = useState<{
+    anchor: HTMLElement;
+    row: SharedSentence;
+  }>();
   const query = useQuery({
     queryKey: ["shared-sentences", entryId, filters, readOnly],
     enabled: canRead,
@@ -190,57 +198,56 @@ export function SentenceLibrary({
   }, [linkedSentenceId]);
   const rows = query.data?.items ?? [];
   const columns: AdminColumn<SharedSentence>[] = [
-    ...(!entryId
-      ? [
-          {
-            id: "id",
-            label: "ID",
-            width: 125,
-            render: (row: SharedSentence) => (
-              <CopyableText value={row.id} ellipsis={80} />
-            )
-          }
-        ]
-      : []),
-    {
-      id: "status",
-      label: "状态",
-      width: 100,
-      render: (row) => (
-        <Chip
-          label={
-            row.withdrawn_at
-              ? "草稿（已撤回）"
-              : row.current_publication_id
-                ? "已发布"
-                : "草稿"
-          }
-        />
-      )
-    },
-    {
-      id: "level",
-      label: "等级",
-      width: 65,
-      render: (row) => row.content.sentence.level
-    },
     {
       id: "content",
       label: "例句",
-      width: 350,
+      width: 320,
       render: (row) => (
-        <V3EnglishTextPreview
-          value={row.content.sentence.en_text}
-          hideCommonDialect
-        />
+        <Stack spacing={1} sx={{ maxWidth: 520, overflowWrap: "anywhere" }}>
+          <Stack direction="row" spacing={0.75} alignItems="center">
+            <Chip
+              label={
+                row.withdrawn_at
+                  ? "草稿（已撤回）"
+                  : row.current_publication_id
+                    ? "已发布"
+                    : "草稿"
+              }
+              color={
+                row.withdrawn_at
+                  ? "warning"
+                  : row.current_publication_id
+                    ? "success"
+                    : "default"
+              }
+              variant="outlined"
+            />
+            <Chip label={row.content.sentence.level} variant="outlined" />
+          </Stack>
+          <V3EnglishTextPreview
+            value={row.content.sentence.en_text}
+            hideCommonDialect
+          />
+          {!entryId && (
+            <Box sx={{ typography: "caption", color: "text.secondary" }}>
+              ID：
+              <CopyableText value={row.id} ellipsis={180} />
+            </Box>
+          )}
+        </Stack>
       )
     },
     {
       id: "entries",
       label: "关联词条",
-      width: 190,
+      width: 180,
       render: (row) => (
-        <Stack>
+        <Stack spacing={0.75} sx={{ maxWidth: 280, overflowWrap: "anywhere" }}>
+          {!row.entries.length && (
+            <Typography variant="body2" color="text.secondary">
+              暂无关联词条
+            </Typography>
+          )}
           {row.entries.slice(0, 2).map((entry) => (
             <span className="tsz-words" key={entry.id}>
               {entryLink(entry)}{" "}
@@ -248,84 +255,104 @@ export function SentenceLibrary({
           ))}
           {row.entries.length > 2 && (
             <Typography
+              variant="caption"
+              color="text.secondary"
               title={row.entries.map((entry) => entry.headword).join("、")}
             >
-              …
+              另有 {row.entries.length - 2} 个词条
             </Typography>
           )}
           {row.content.annotations.some(
             (annotation) => annotation.target.state === "pending"
-          ) && <Chip label="含待关联" color="warning" />}
+          ) && (
+            <Chip
+              label="含待关联"
+              color="warning"
+              variant="outlined"
+              sx={{ alignSelf: "flex-start" }}
+            />
+          )}
         </Stack>
       )
     },
     ...(!entryId
       ? [
           {
-            id: "created",
-            label: "创建时间",
-            width: 170,
-            render: (row: SharedSentence) =>
-              new Date(row.created_at).toLocaleString("zh-CN")
-          },
-          {
-            id: "creator",
-            label: "创建人",
-            width: 100,
-            render: (row: SharedSentence) => row.created_by
-          },
-          {
-            id: "updated",
-            label: "更新时间",
-            width: 170,
-            render: (row: SharedSentence) =>
-              new Date(row.updated_at).toLocaleString("zh-CN")
+            id: "timestamps",
+            label: "维护信息",
+            width: 200,
+            render: (row: SharedSentence) => (
+              <Stack spacing={0.5}>
+                <Box sx={{ maxWidth: 200, overflowWrap: "anywhere" }}>
+                  {row.created_by}
+                </Box>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  component="time"
+                  dateTime={row.created_at}
+                  sx={{ whiteSpace: "nowrap" }}
+                >
+                  创建 {new Date(row.created_at).toLocaleString("zh-CN")}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  component="time"
+                  dateTime={row.updated_at}
+                  sx={{ whiteSpace: "nowrap" }}
+                >
+                  更新 {new Date(row.updated_at).toLocaleString("zh-CN")}
+                </Typography>
+              </Stack>
+            )
           }
         ]
       : []),
     {
       id: "action",
       label: "操作",
-      width: canEdit || canPublish ? 380 : 140,
+      width: canEdit || canPublish ? 208 : 112,
       sticky: "right",
       render: (row) => (
-        <Stack direction="row" useFlexGap flexWrap="wrap" spacing={1}>
+        <Stack
+          direction="row"
+          spacing={0.5}
+          alignItems="center"
+          sx={{ "& .MuiButton-root": { minWidth: 44, px: 1 } }}
+        >
           <Button onClick={() => void open(row.id, false)}>查看</Button>
-          {canReadAll && (
-            <Button onClick={() => void openPublication(row, "history")}>
-              历史
-            </Button>
-          )}
           {!readOnly && (
             <>
               {(canAction(row, "edit") || canAction(row, "associate")) && (
                 <Button onClick={() => void open(row.id, true)}>编辑</Button>
               )}
               {canAction(row, "publish") && (
-                <Button onClick={() => void openPublication(row, "publish")}>
+                <Button
+                  variant="outlined"
+                  onClick={() => void openPublication(row, "publish")}
+                >
                   发布
                 </Button>
               )}
-              {row.current_publication_id &&
-                canAction(row, row.withdrawn_at ? "restore" : "withdraw") && (
-                  <Button
-                    color={row.withdrawn_at ? "primary" : "error"}
-                    onClick={() =>
-                      void openPublication(
-                        row,
-                        row.withdrawn_at ? "restore" : "withdraw"
-                      )
-                    }
-                  >
-                    {row.withdrawn_at ? "重新展示原发布" : "撤回"}
-                  </Button>
-                )}
-              {canDelete && !entryId && !row.current_publication_id && (
-                <Button color="error" onClick={() => setDeleting([row])}>
-                  删除
-                </Button>
-              )}
             </>
+          )}
+          {canReadAll && (
+            <IconButton
+              aria-label="更多操作"
+              aria-haspopup="menu"
+              aria-expanded={actionMenu?.row.id === row.id}
+              aria-controls={
+                actionMenu?.row.id === row.id
+                  ? "sentence-actions-menu"
+                  : undefined
+              }
+              onClick={(event) =>
+                setActionMenu({ anchor: event.currentTarget, row })
+              }
+            >
+              <MoreHoriz fontSize="small" />
+            </IconButton>
           )}
         </Stack>
       )
@@ -335,45 +362,71 @@ export function SentenceLibrary({
     <>
       {!entryId && (
         <Stack
-          direction="row"
+          direction={{ xs: "column", sm: "row" }}
           useFlexGap
           flexWrap="wrap"
-          spacing={1}
-          sx={{ mb: 1.5 }}
+          spacing={1.5}
+          justifyContent="space-between"
+          alignItems={{ xs: "stretch", sm: "center" }}
+          sx={{ mb: 2 }}
         >
-          {canPublish && (
+          <Typography variant="subtitle1" fontWeight={600} component="h2">
+            例句列表
+          </Typography>
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            useFlexGap
+            flexWrap="wrap"
+          >
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              aria-live="polite"
+            >
+              已选 {selected.length} 条
+            </Typography>
+            {canPublish && (
+              <Button
+                variant="outlined"
+                disabled={
+                  !selected.length ||
+                  rows.some(
+                    (row) =>
+                      selected.includes(row.id) && !canAction(row, "publish")
+                  )
+                }
+                onClick={() =>
+                  setBatch(rows.filter((row) => selected.includes(row.id)))
+                }
+              >
+                发布所选
+              </Button>
+            )}
             <Button
+              color="error"
               disabled={
+                !canDelete ||
                 !selected.length ||
                 rows.some(
                   (row) =>
-                    selected.includes(row.id) && !canAction(row, "publish")
+                    selected.includes(row.id) &&
+                    row.current_publication_id != null
                 )
               }
               onClick={() =>
-                setBatch(rows.filter((row) => selected.includes(row.id)))
+                setDeleting(rows.filter((row) => selected.includes(row.id)))
               }
             >
-              发布所选
+              删除所选
             </Button>
-          )}
-          <Button
-            color="error"
-            disabled={
-              !canDelete ||
-              !selected.length ||
-              rows.some(
-                (row) =>
-                  selected.includes(row.id) &&
-                  row.current_publication_id != null
-              )
-            }
-            onClick={() =>
-              setDeleting(rows.filter((row) => selected.includes(row.id)))
-            }
-          >
-            删除所选
-          </Button>
+            {selected.length > 0 && (
+              <Button color="inherit" onClick={() => setSelected([])}>
+                取消选择
+              </Button>
+            )}
+          </Stack>
         </Stack>
       )}
       {query.isError && (
@@ -402,7 +455,7 @@ export function SentenceLibrary({
         rows={rows}
         rowId={(row) => row.id}
         loading={query.isFetching}
-        minWidth={entryId ? 700 : 1350}
+        minWidth={entryId ? 700 : 960}
         selection={
           !entryId && (canEdit || canPublish)
             ? {
@@ -427,6 +480,60 @@ export function SentenceLibrary({
   );
   return (
     <Stack spacing={2}>
+      <Menu
+        id="sentence-actions-menu"
+        anchorEl={actionMenu?.anchor}
+        open={!!actionMenu}
+        onClose={() => setActionMenu(undefined)}
+        slotProps={{ list: { "aria-label": "例句更多操作" } }}
+      >
+        {actionMenu && [
+          <MenuItem
+            key="history"
+            onClick={() => {
+              void openPublication(actionMenu.row, "history");
+              setActionMenu(undefined);
+            }}
+          >
+            历史
+          </MenuItem>,
+          actionMenu.row.current_publication_id &&
+            canAction(
+              actionMenu.row,
+              actionMenu.row.withdrawn_at ? "restore" : "withdraw"
+            ) && (
+              <MenuItem
+                key="lifecycle"
+                sx={{
+                  color: actionMenu.row.withdrawn_at
+                    ? "primary.main"
+                    : "error.main"
+                }}
+                onClick={() => {
+                  void openPublication(
+                    actionMenu.row,
+                    actionMenu.row.withdrawn_at ? "restore" : "withdraw"
+                  );
+                  setActionMenu(undefined);
+                }}
+              >
+                {actionMenu.row.withdrawn_at ? "重新展示原发布" : "撤回"}
+              </MenuItem>
+            ),
+          canDelete && !entryId && !actionMenu.row.current_publication_id && (
+            <MenuItem
+              key="delete"
+              sx={{ color: "error.main" }}
+              onClick={() => {
+                setDeleting([actionMenu.row]);
+                setActionMenu(undefined);
+              }}
+            >
+              删除
+            </MenuItem>
+          )
+        ]}
+      </Menu>
       {editor && (
         <SentenceEditor
           key={`${editor.id}:${editor.revision}`}
@@ -454,7 +561,22 @@ export function SentenceLibrary({
         </Typography>
       )}
       {!entryId && (
-        <Paper variant="outlined" sx={{ p: 1.5 }}>
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 2,
+            "& .list-filter-bar": { alignItems: "center", gap: 1.5 },
+            "& .list-filter-bar > .MuiFormControl-root": {
+              width: { xs: "100%", sm: 220 }
+            },
+            "& .list-filter-bar > .MuiFormControl-root:nth-of-type(2)": {
+              width: { xs: "100%", sm: 120 }
+            },
+            "& .list-filter-bar .MuiPickersTextField-root": {
+              width: { xs: "100%", sm: 180 }
+            }
+          }}
+        >
           <ListFilterBar
             onSubmit={filterForm.handleSubmit(({ keyword, level, dates }) =>
               setFilters({
@@ -515,7 +637,26 @@ export function SentenceLibrary({
       {entryId ? (
         content
       ) : (
-        <Paper variant="outlined" sx={{ p: 2 }}>
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 2,
+            minWidth: 0,
+            "& th, & td": { boxSizing: "border-box" },
+            "& thead th": {
+              bgcolor: "grey.50",
+              color: "text.secondary",
+              whiteSpace: "nowrap",
+              py: 1.5
+            },
+            "& tbody td": { py: 2 },
+            "& .tsz-words a": {
+              color: "primary.main",
+              textDecoration: "none",
+              "&:hover": { textDecoration: "underline" }
+            }
+          }}
+        >
           {content}
         </Paper>
       )}

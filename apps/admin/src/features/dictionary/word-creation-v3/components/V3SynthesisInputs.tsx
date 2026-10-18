@@ -12,14 +12,9 @@ import {
   Typography as MuiTypography
 } from "@mui/material";
 import { V3PhonemeSpeechSettings } from "./V3PhonemeSpeechSettings";
-import { usePermission } from "@/lib/auth";
-import SettingOutlined from "@mui/icons-material/SettingsOutlined";
 import SwapOutlined from "@mui/icons-material/SwapHoriz";
-import CloseOutlined from "@mui/icons-material/Close";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { AnchoredPanel } from "@/components/AnchoredPanel";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import type { VoicePreviewAdapter } from "@tsz/voice-editor/types";
+import { useEffect, useRef, useState } from "react";
 import type {
   Dialect,
   PronunciationSynthesisCandidateV3,
@@ -39,20 +34,9 @@ import {
   synthesisForLocale
 } from "@tsz/shared";
 import { PronunciationPreviewControls } from "../../word-creation/PronunciationPreview";
-import {
-  adminAudioUploadAdapter,
-  adminVoicePreviewAdapter,
-  voicePreviewIsMock
-} from "../../voice-editor/dataSource";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
-import { env } from "@/lib/env";
 import "./V3SynthesisInputs.css";
 import "@/components/InputActionGroup.css";
-const VoiceEditor = lazy(() =>
-  import("@tsz/voice-editor/editor").then((module) => ({
-    default: module.VoiceEditor
-  }))
-);
 type Alphabet = "ipa" | "ups";
 type Side = "uk" | "us";
 const SIDES = ["uk", "us"] as const;
@@ -92,24 +76,10 @@ export function V3SynthesisInputs({
   issues: readonly V3DraftValidationIssue[];
   onChange: (patch: Partial<WordPronunciationV3>) => void;
 }) {
-  const canUploadAudio = usePermission("speech.upload_audio");
   const synthesis = pronunciation.synthesis ?? EMPTY_SYNTHESIS;
   const { preference } = useDialectPreference();
   const locale = pronunciationLocale(dialect, preference);
-  const localeLabel = pronunciationLocaleLabel(locale);
   const requireLocaleConfirmation = dialect === "common";
-  const [expanded, setExpanded] = useState(false);
-  const captureSettings = () =>
-    structuredClone({
-      voice_profile: pronunciation.voice_profile,
-      audio_assets: pronunciation.audio_assets
-    });
-  const [settingsDraft, setSettingsDraft] = useState(captureSettings);
-  const settingsTrigger = useRef<HTMLButtonElement>(null);
-  const closeSettings = () => {
-    setExpanded(false);
-    settingsTrigger.current?.focus();
-  };
   const [diagnostic, setDiagnostic] = useState("");
   const [pending, setPending] = useState<{
     side: Side;
@@ -164,52 +134,6 @@ export function V3SynthesisInputs({
         requireLocaleConfirmation
       ));
   const source = synthesis.use_spelling ? "spelling" : synthesis.alphabet;
-  const settingsVoiceLocales = useRef(new Map<string, "en-GB" | "en-US">());
-  const settingsPreviewAdapter = useMemo<VoicePreviewAdapter>(
-    () => ({
-      async listVoices(input) {
-        const voices = await adminVoicePreviewAdapter.listVoices(input);
-        settingsVoiceLocales.current.clear();
-        for (const voice of voices) {
-          if (voice.locale === "en-GB" || voice.locale === "en-US")
-            settingsVoiceLocales.current.set(voice.id, voice.locale);
-        }
-        return voices;
-      },
-      async synthesize(input, options) {
-        const targetLocale = settingsVoiceLocales.current.get(input.voiceId);
-        if (!targetLocale) throw new Error("请选择英式或美式音色");
-        const selected = synthesisForLocale(synthesis, targetLocale, dialect);
-        const targetContent = pronunciationSynthesisContent(
-          spelling,
-          selected,
-          targetLocale,
-          requireLocaleConfirmation
-        );
-        if (!targetContent)
-          throw new Error(
-            `${pronunciationLocaleLabel(targetLocale)}：${
-              synthesisInputIssue(
-                selected.alphabet,
-                selected[selected.alphabet]
-              ) ??
-              synthesisLocaleIssue(
-                selected,
-                selected.alphabet,
-                targetLocale,
-                requireLocaleConfirmation
-              ) ??
-              "请检查合成输入与逐词边界"
-            }`
-          );
-        return adminVoicePreviewAdapter.synthesize(
-          { ...input, content: targetContent },
-          options
-        );
-      }
-    }),
-    [dialect, requireLocaleConfirmation, spelling, synthesis]
-  );
   const writeCandidate = (
     side: Side,
     candidate: PronunciationSynthesisCandidateV3
@@ -302,142 +226,6 @@ export function V3SynthesisInputs({
       });
     else change(side, alphabet, result.value, result.ups_words);
   };
-  const settingsButton = (
-    <>
-      <MuiButton
-        ref={settingsTrigger}
-        onClick={() => {
-          if (!expanded) setSettingsDraft(captureSettings());
-          setExpanded(!expanded);
-        }}
-        size="small"
-        aria-label={`${label}发音设置与真人录音`}
-        aria-expanded={expanded}
-        aria-haspopup="dialog"
-        aria-controls={
-          expanded ? `speech-settings-${pronunciation.id}` : undefined
-        }
-        variant="text"
-        startIcon={<SettingOutlined fontSize="inherit" />}
-      >
-        {synthesisEditable ? "设置" : "发音设置"}
-      </MuiButton>
-      <AnchoredPanel
-        anchor={settingsTrigger.current}
-        open={expanded}
-        label="发音设置面板"
-        onClose={closeSettings}
-        placement="top-end"
-      >
-        <div
-          className="word-synthesis-settings"
-          id={`speech-settings-${pronunciation.id}`}
-          role="dialog"
-          aria-label={`${label}发音设置`}
-          onKeyDown={(event) => {
-            if (event.key === "Escape" && !event.defaultPrevented) {
-              event.stopPropagation();
-              closeSettings();
-            }
-          }}
-        >
-          <div className="word-synthesis-settings-header">
-            <div>
-              <MuiTypography component="span" fontWeight={600}>
-                发音设置
-              </MuiTypography>
-              <MuiTypography
-                className="word-synthesis-settings-source"
-                component="span"
-                color="text.secondary"
-              >
-                英式、美式音色 · 当前来源：
-                {source === "spelling"
-                  ? "词形拼写"
-                  : `Azure ${source.toUpperCase()}`}
-              </MuiTypography>
-            </div>
-            <MuiIconButton
-              size="small"
-              aria-label="收起设置"
-              title="关闭发音设置"
-              onClick={closeSettings}
-            >
-              <CloseOutlined fontSize="inherit" />
-            </MuiIconButton>
-          </div>
-          <div className="word-synthesis-settings-body">
-            {!content && (
-              <MuiTypography
-                className="word-synthesis-settings-hint"
-                component="span"
-                color="text.secondary"
-              >
-                {localeLabel}：{selectedIssue ?? "请先填写有效正文和合成输入"}
-                。音色可先配置。
-              </MuiTypography>
-            )}
-            <Suspense
-              fallback={
-                <MuiTypography component="span">
-                  正在加载发音设置…
-                </MuiTypography>
-              }
-            >
-              <VoiceEditor
-                mode="synthesis"
-                contextLabel={`${label}发音设置`}
-                language="en"
-                value={
-                  content ?? { version: 2, text: spelling, annotations: [] }
-                }
-                onChange={() => {}}
-                voiceProfile={settingsDraft.voice_profile}
-                onVoiceProfileChange={(voice_profile) =>
-                  setSettingsDraft((current) => ({ ...current, voice_profile }))
-                }
-                audioAssets={settingsDraft.audio_assets}
-                onAudioAssetsChange={(audio_assets) =>
-                  setSettingsDraft((current) => ({ ...current, audio_assets }))
-                }
-                renderActions={(canComplete) => (
-                  <MuiStack direction="row" spacing={1} alignItems="center">
-                    <MuiButton
-                      size="small"
-                      aria-label={`取消${label}设置`}
-                      onClick={closeSettings}
-                    >
-                      取消
-                    </MuiButton>
-                    <MuiButton
-                      size="small"
-                      aria-label={`完成${label}设置`}
-                      disabled={!canComplete}
-                      onClick={() => {
-                        onChange(settingsDraft);
-                        closeSettings();
-                      }}
-                      variant="contained"
-                    >
-                      完成
-                    </MuiButton>
-                  </MuiStack>
-                )}
-                previewAdapter={
-                  env.VOICE_PREVIEW ? settingsPreviewAdapter : undefined
-                }
-                previewIsMock={voicePreviewIsMock}
-                audioUploadAllowed={canUploadAudio}
-                audioUploadAdapter={
-                  env.VOICE_AUDIO_UPLOAD ? adminAudioUploadAdapter : undefined
-                }
-              />
-            </Suspense>
-          </div>
-        </div>
-      </AnchoredPanel>
-    </>
-  );
   return (
     <div className="word-pronunciation-synthesis" data-phoneme-locale={locale}>
       {synthesisEditable ? (
@@ -638,7 +426,6 @@ export function V3SynthesisInputs({
               >
                 语音来源
               </MuiTypography>
-              {settingsButton}
             </div>
             <div className="word-synthesis-source-actions">
               <MuiRadioGroup
@@ -738,7 +525,6 @@ export function V3SynthesisInputs({
               ? "词形拼写"
               : `Azure ${source.toUpperCase()}`}
           </MuiTypography>
-          {settingsButton}
         </MuiStack>
       )}
       <ConfirmDialog

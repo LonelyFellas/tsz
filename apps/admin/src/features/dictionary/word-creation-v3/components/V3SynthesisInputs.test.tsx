@@ -205,59 +205,6 @@ describe("双口音真实试听控件", () => {
       }
     }
   );
-  it("明确英式词形也能补选美式音色，设置试听使用美式候选而不覆盖英式音色", async () => {
-    render(<Harness dialect="uk" profiled />);
-    expect(
-      screen.queryByLabelText("第 1 条发音 美式 Azure IPA 最终读音 播放语音")
-    ).toBeNull();
-    fireEvent.click(screen.getByLabelText("第 1 条发音发音设置与真人录音"));
-    expect(
-      await screen.findByRole("checkbox", { name: "启用 Sonia" })
-    ).toBeChecked();
-    const aria = await screen.findByRole("checkbox", { name: "启用 Aria" });
-    fireEvent.click(aria);
-    fireEvent.click(screen.getByLabelText("试听 Aria"));
-    await waitFor(() =>
-      expect(speech.synthesize).toHaveBeenLastCalledWith(
-        {
-          language: "en",
-          voiceId: "en-us-aria",
-          ratePercent: 0,
-          content: {
-            version: 2,
-            text: "far",
-            annotations: [
-              {
-                type: "phoneme",
-                start: 0,
-                end: 3,
-                alphabet: "ipa",
-                phoneme: "fɑɹ"
-              }
-            ]
-          }
-        },
-        { signal: expect.any(AbortSignal) }
-      )
-    );
-    fireEvent.click(screen.getByLabelText("完成第 1 条发音设置"));
-    expect(
-      screen.queryByLabelText("第 1 条发音 美式 Azure IPA 最终读音 播放语音")
-    ).toBeNull();
-    expect(
-      screen.getByLabelText("第 1 条发音 英式 Azure IPA 最终读音 播放语音")
-    ).toBeEnabled();
-    expect(screen.getByRole("radio", { name: "Azure IPA" })).toBeChecked();
-  });
-  it("设置试听缺少对应口音时不借用另一侧音素", async () => {
-    render(<Harness dialect="common" legacy />);
-    fireEvent.click(screen.getByLabelText("第 1 条发音发音设置与真人录音"));
-    fireEvent.click(await screen.findByLabelText("试听 Aria"));
-    await waitFor(() =>
-      expect(screen.getAllByText(/当前为美式/).length).toBeGreaterThan(0)
-    );
-    expect(speech.synthesize).not.toHaveBeenCalled();
-  });
   it("缺省来源的旧 UPS 短语仍可按整段音素试听", async () => {
     render(<Harness dialect="common" legacyPhrase />);
     const play = screen.getByLabelText(
