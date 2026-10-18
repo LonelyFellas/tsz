@@ -163,7 +163,7 @@ it("management shows one row per review without loading word details or decision
   });
   mount();
   fireEvent.click(await screen.findByText(/^查\s*看$/));
-  expect(await screen.findByText("注：当前词表注释")).toBeVisible();
+  expect(await screen.findByText("当前词表注释")).toBeVisible();
   fireEvent.click(await screen.findByText("审核记录"));
   expect(await screen.findByText("提交名称")).toBeVisible();
   expect(screen.getByText("已驳回")).toBeVisible();
@@ -176,11 +176,11 @@ it("management shows one row per review without loading word details or decision
   expect(screen.getByText("旧申请名称").closest("tr")).toHaveTextContent(
     "审核老师"
   );
-  expect(screen.queryByText("注：提交时冻结的注释")).not.toBeInTheDocument();
+  expect(screen.queryByText("提交时冻结的注释")).not.toBeInTheDocument();
   expect(api.wordlists.items).not.toHaveBeenCalled();
   expect(screen.queryByText(/第\s*\d+\s*版/)).not.toBeInTheDocument();
   expect(screen.queryByRole("radio")).not.toBeInTheDocument();
-  expect(screen.queryByText("注：当前词表注释")).not.toBeInTheDocument();
+  expect(screen.queryByText("当前词表注释")).not.toBeInTheDocument();
 
   expect(screen.queryByText("通过审核")).not.toBeInTheDocument();
   expect(screen.queryByText("驳回")).not.toBeInTheDocument();
@@ -201,7 +201,7 @@ it("review approval uses the submitted snapshot revision instead of the current 
   });
   mount(<ReviewsPage />);
   fireEvent.click(await screen.findByText(/^查\s*看$/));
-  expect(await screen.findByText("注：提交时冻结的注释")).toBeVisible();
+  expect(await screen.findByText("提交时冻结的注释")).toBeVisible();
   expect(api.wordlists.currentItems).not.toHaveBeenCalled();
   fireEvent.click(await screen.findByText("通过审核"));
   fireEvent.click(await screen.findByText(/^确认$/));
@@ -368,7 +368,9 @@ it("review readers cannot decide applications", async () => {
   permissions.allowed = false;
   mount(<ReviewsPage />);
   fireEvent.click(await screen.findByText(/^查\s*看$/));
-  expect(await screen.findByText("申请名称：提交名称")).toBeVisible();
+  expect(
+    await screen.findByRole("radio", { name: /待审核.*提交名称/ })
+  ).toBeChecked();
   expect(screen.queryByText("通过审核")).not.toBeInTheDocument();
   expect(screen.queryByText("驳回")).not.toBeInTheDocument();
 });
@@ -432,14 +434,18 @@ it("completed review records remain readable without decision controls", async (
   expect(await screen.findByText("审核意见：内容不完整")).toBeVisible();
   expect(screen.queryByText("通过审核")).not.toBeInTheDocument();
   expect(screen.queryByText("驳回")).not.toBeInTheDocument();
-  expect(screen.getByRole("radio", { name: "已驳回" })).toBeChecked();
-  const approved = screen.getByRole("radio", { name: "已通过" });
+  expect(screen.getByRole("radio", { name: /已驳回.*提交名称/ })).toBeChecked();
+  const approved = screen.getByRole("radio", {
+    name: /已通过.*第一版提交名称/
+  });
   expect(
-    screen.queryByRole("button", { name: "已通过" })
+    screen.queryByRole("button", { name: /已通过.*第一版提交名称/ })
   ).not.toBeInTheDocument();
   fireEvent.click(approved);
   expect(approved).toBeChecked();
-  expect(await screen.findByText("申请名称：第一版提交名称")).toBeVisible();
+  expect(
+    await screen.findByRole("radio", { name: /已通过.*第一版提交名称/ })
+  ).toBeChecked();
   await waitFor(() =>
     expect(api.wordlists.items).toHaveBeenLastCalledWith(
       "list",
@@ -516,3 +522,132 @@ it.each(["approve", "reject"] as const)(
     expect(screen.queryByText("待审词表")).not.toBeInTheDocument();
   }
 );
+
+it("keeps snapshot pagination scoped to the selected application and hides decisions on current content", async () => {
+  const pending = (await api.wordlists.reviews("list")).items[0]!;
+  vi.mocked(api.wordlists.reviews).mockResolvedValue({
+    withdraw_reason: null,
+    items: [
+      pending,
+      { ...pending, id: "old-request", name: "旧申请", state: "rejected" }
+    ]
+  });
+  vi.mocked(api.wordlists.items).mockResolvedValue({
+    items: [],
+    revision: 2,
+    pagination: { ...pagination, total: 21, total_pages: 2 }
+  });
+  mount(<ReviewsPage />);
+  fireEvent.click(await screen.findByText(/^查\s*看$/));
+  await screen.findByText("暂无词项");
+  const drawer = screen.getByRole("dialog", { name: "待审词表" });
+  fireEvent.click(within(drawer).getByRole("button", { name: "下一页" }));
+  await waitFor(() =>
+    expect(api.wordlists.items).toHaveBeenLastCalledWith(
+      "list",
+      "request",
+      { page: 2, page_size: 20 },
+      expect.anything()
+    )
+  );
+  fireEvent.click(
+    within(drawer).getByRole("radio", { name: /已驳回.*旧申请/ })
+  );
+  await waitFor(() =>
+    expect(api.wordlists.items).toHaveBeenLastCalledWith(
+      "list",
+      "old-request",
+      { page: 1, page_size: 20 },
+      expect.anything()
+    )
+  );
+  expect(within(drawer).queryByText("通过审核")).not.toBeInTheDocument();
+  fireEvent.click(
+    within(drawer).getByRole("radio", { name: /待审核.*提交名称/ })
+  );
+  expect(await within(drawer).findByText("通过审核")).toBeVisible();
+  fireEvent.click(within(drawer).getByRole("tab", { name: "当前内容" }));
+  await waitFor(() => expect(api.wordlists.currentItems).toHaveBeenCalled());
+  expect(within(drawer).queryByText("通过审核")).not.toBeInTheDocument();
+  expect(within(drawer).queryByText("驳回")).not.toBeInTheDocument();
+});
+
+it("reads custom and platform words with their own definitions and author notes", async () => {
+  vi.mocked(api.wordlists.currentItems).mockResolvedValue({
+    revision: 4,
+    pagination: { ...pagination, total: 2 },
+    items: [
+      {
+        item_id: "custom",
+        entry_id: null,
+        position: 0,
+        entry: null,
+        custom_word: {
+          word: "a moment of clarity",
+          definition: "恍然大悟\n思路突然清晰"
+        },
+        author_note: "自定义词的作者注"
+      },
+      {
+        item_id: "platform",
+        entry_id: "entry",
+        position: 1,
+        author_note: "平台词的作者注",
+        entry: {
+          entry_id: "entry",
+          publication_id: "publication",
+          label: "clarity",
+          kind: "word",
+          pos: [
+            {
+              pos_id: "noun",
+              pos: "n.",
+              label: "名词",
+              grammar_structures: [],
+              senses: [
+                {
+                  id: "sense",
+                  sub_pos: "",
+                  level: "",
+                  definitions: [
+                    {
+                      id: "definition",
+                      definition_mode: "unified",
+                      level: "",
+                      grammar_structure_id: null,
+                      texts: [
+                        {
+                          dialect: "common",
+                          content: {
+                            version: 2,
+                            text: "清晰；清楚",
+                            annotations: []
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  });
+  mount();
+  fireEvent.click(await screen.findByText(/^查\s*看$/));
+  const custom = (
+    await screen.findByRole("heading", { name: "a moment of clarity" })
+  ).closest("article")!;
+  expect(within(custom).getByText("自定义词汇")).toBeVisible();
+  expect(within(custom).getByText("恍然大悟 思路突然清晰")).toBeVisible();
+  expect(within(custom).getByText("自定义词的作者注")).toBeVisible();
+  const platform = screen
+    .getByRole("heading", { name: /^clarity$/ })
+    .closest("article")!;
+  expect(within(platform).getByText("平台词汇")).toBeVisible();
+  expect(within(platform).getByText("名词")).toBeVisible();
+  expect(within(platform).getByText("清晰；清楚")).toBeVisible();
+  expect(within(platform).getByText("平台词的作者注")).toBeVisible();
+});

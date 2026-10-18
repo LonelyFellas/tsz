@@ -2,11 +2,13 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
+  Box,
   Button,
   Chip,
   FormControlLabel,
   Radio,
   RadioGroup,
+  Paper,
   Stack,
   Tab,
   Tabs,
@@ -19,16 +21,17 @@ import { AdminTable, AdminPagination } from "@/components/AdminTable";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type { Wordlist, WordlistEntry, AdminWordlistReview } from "@tsz/types";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
+import "@tsz/voice-editor/reader.css";
 import { api, usePermission } from "@/lib/auth";
 
 export function WordlistEntryView({ entry }: { entry: WordlistEntry }) {
   return (
-    <section style={{ padding: "16px 0", borderBottom: "1px solid #eee" }}>
-      <Typography variant="h6" component="h3">
+    <Stack spacing={1.5}>
+      <Typography variant="h6" component="h3" sx={{ overflowWrap: "anywhere" }}>
         {entry.label}
       </Typography>
       {entry.pos.map((pos) => (
-        <div key={pos.pos_id}>
+        <Stack key={pos.pos_id} spacing={0.5}>
           <Typography color="text.secondary">{pos.label ?? pos.pos}</Typography>
           {pos.senses.map((sense) => (
             <div key={sense.id}>
@@ -41,9 +44,9 @@ export function WordlistEntryView({ entry }: { entry: WordlistEntry }) {
               ))}
             </div>
           ))}
-        </div>
+        </Stack>
       ))}
-    </section>
+    </Stack>
   );
 }
 const reviewLabels: Record<string, string> = {
@@ -159,11 +162,99 @@ export function WordlistDetails({
         onClose={() => {
           if (!busy) onClose();
         }}
+        footer={
+          tab === "reviews" &&
+          reviewMode &&
+          !reviews.isError &&
+          current?.state === "pending" &&
+          canReview ? (
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              alignItems={{ sm: "center" }}
+              justifyContent="space-between"
+              spacing={1.5}
+            >
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="body2" noWrap title={current.name}>
+                  {current.name}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  通过后将公开本次提交内容
+                </Typography>
+              </Box>
+              <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
+                <Button
+                  variant="contained"
+                  size="medium"
+                  disabled={busy}
+                  onClick={() => {
+                    setAction("approve");
+                    setError("");
+                  }}
+                >
+                  通过审核
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  size="medium"
+                  disabled={busy}
+                  onClick={() => {
+                    setAction("reject");
+                    setError("");
+                  }}
+                >
+                  驳回
+                </Button>
+              </Stack>
+            </Stack>
+          ) : undefined
+        }
       >
-        <Typography sx={{ mb: 2 }}>
-          创建人：{list.owner_name} · ID：{list.id}
-        </Typography>
+        <Box
+          component="dl"
+          sx={{
+            m: 0,
+            mb: 2.5,
+            p: 2,
+            bgcolor: "background.default",
+            borderRadius: 1,
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "minmax(0, 1fr)",
+              sm: "minmax(0, 1fr) minmax(0, 1.5fr)"
+            },
+            gap: 1.5
+          }}
+        >
+          <Box>
+            <Typography component="dt" variant="caption" color="text.secondary">
+              创建人
+            </Typography>
+            <Typography
+              component="dd"
+              variant="body2"
+              sx={{ m: 0, overflowWrap: "anywhere" }}
+            >
+              {list.owner_name}
+            </Typography>
+          </Box>
+          <Box>
+            <Typography component="dt" variant="caption" color="text.secondary">
+              词表 ID
+            </Typography>
+            <Typography
+              component="dd"
+              variant="body2"
+              color="text.secondary"
+              sx={{ m: 0, overflowWrap: "anywhere", fontFamily: "monospace" }}
+            >
+              {list.id}
+            </Typography>
+          </Box>
+        </Box>
         <Tabs
+          sx={{ mb: 2.5, borderBottom: 1, borderColor: "divider" }}
           value={tab}
           onChange={(_, value: string) => {
             setTab(value);
@@ -185,9 +276,13 @@ export function WordlistDetails({
               审核记录加载失败
             </Alert>
           ) : reviews.isPending ? (
-            <p>读取审核记录…</p>
+            <Typography role="status" color="text.secondary" sx={{ py: 3 }}>
+              读取审核记录…
+            </Typography>
           ) : !current ? (
-            <p>尚未提交公开审核</p>
+            <Typography color="text.secondary" sx={{ py: 3 }}>
+              尚未提交公开审核
+            </Typography>
           ) : !reviewMode ? (
             <AdminTable
               emptyMessage="暂无审核记录"
@@ -233,10 +328,21 @@ export function WordlistDetails({
             />
           ) : (
             <>
+              <Typography variant="subtitle2" component="h2" sx={{ mb: 1 }}>
+                选择审核申请
+              </Typography>
               <RadioGroup
-                row
                 aria-label="审核记录"
                 value={current.id}
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: {
+                    xs: "minmax(0, 1fr)",
+                    sm: "repeat(2, minmax(0, 1fr))"
+                  },
+                  gap: 1,
+                  mb: 2.5
+                }}
                 onChange={(event) => {
                   setRequestId(event.target.value);
                   setPage(1);
@@ -246,96 +352,194 @@ export function WordlistDetails({
                   <FormControlLabel
                     key={row.id}
                     value={row.id}
-                    control={<Radio />}
-                    label={reviewChip(row.state)}
+                    control={<Radio size="small" />}
+                    sx={{
+                      m: 0,
+                      p: 1,
+                      alignItems: "flex-start",
+                      border: 1,
+                      borderColor:
+                        current.id === row.id ? "primary.main" : "divider",
+                      bgcolor:
+                        current.id === row.id
+                          ? "action.selected"
+                          : "background.paper",
+                      borderRadius: 1,
+                      "& .MuiFormControlLabel-label": { minWidth: 0, flex: 1 },
+                      "&:focus-within": {
+                        outline: "2px solid",
+                        outlineColor: "primary.main",
+                        outlineOffset: 2
+                      }
+                    }}
+                    label={
+                      <Stack
+                        spacing={0.75}
+                        sx={{ py: 0.5, pr: 0.5, alignItems: "flex-start" }}
+                      >
+                        {reviewChip(row.state)}
+                        <Typography
+                          variant="body2"
+                          fontWeight={600}
+                          sx={{ overflowWrap: "anywhere" }}
+                        >
+                          {row.name}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          提交于{" "}
+                          {row.created_at
+                            ? new Date(row.created_at).toLocaleString("zh-CN")
+                            : "—"}
+                        </Typography>
+                      </Stack>
+                    }
                   />
                 ))}
               </RadioGroup>
-              <p>申请名称：{current.name}</p>
-              <p>
-                审核人：
-                {current.reviewer_name ||
-                  current.reviewer_id ||
-                  (current.decided_at ? "未提供" : "—")}
-              </p>
-              {current.reason && <p>审核意见：{current.reason}</p>}
-              {reviewMode && current.state === "pending" && canReview && (
-                <Stack direction="row" spacing={1}>
-                  <Button
-                    variant="contained"
-                    onClick={() => {
-                      setAction("approve");
-                      setError("");
-                    }}
-                  >
-                    通过审核
-                  </Button>
-                  <Button
-                    color="error"
-                    onClick={() => {
-                      setAction("reject");
-                      setError("");
-                    }}
-                  >
-                    驳回
-                  </Button>
-                </Stack>
-              )}
-            </>
-          ))}
-        {(tab === "current" || (reviewMode && current)) &&
-          (items.isError ? (
-            <Alert
-              severity="error"
-              action={
-                <Button onClick={() => void items.refetch()}>重试</Button>
-              }
-            >
-              词条加载失败
-            </Alert>
-          ) : items.isPending ? (
-            <p>读取词条…</p>
-          ) : (
-            <>
-              {items.data.items.map((item) => (
-                <div key={item.item_id ?? item.entry_id}>
-                  {item.custom_word ? (
-                    <div>
-                      <Typography fontWeight={600}>
-                        {item.custom_word.word}
-                      </Typography>
-                      <Typography
-                        sx={{
-                          whiteSpace: "pre-wrap",
-                          overflowWrap: "anywhere"
-                        }}
-                      >
-                        {item.custom_word.definition}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        自定义词汇
-                      </Typography>
-                    </div>
-                  ) : item.entry ? (
-                    <WordlistEntryView entry={item.entry} />
-                  ) : (
-                    <p>内容不可用</p>
-                  )}
-                  {item.author_note && (
-                    <Typography sx={{ whiteSpace: "pre-wrap" }}>
-                      注：{item.author_note}
+              <Box sx={{ mb: 2.5, overflowWrap: "anywhere" }}>
+                <Stack spacing={1}>
+                  <Typography variant="body2" color="text.secondary">
+                    审核人：
+                    {current.reviewer_name ||
+                      current.reviewer_id ||
+                      (current.decided_at ? "未提供" : "—")}
+                  </Typography>
+                  {current.decided_at && (
+                    <Typography variant="body2" color="text.secondary">
+                      审核时间：
+                      {new Date(current.decided_at).toLocaleString("zh-CN")}
                     </Typography>
                   )}
-                </div>
-              ))}
-              <AdminPagination
-                page={page}
-                pageSize={20}
-                total={items.data.pagination.total}
-                onChange={setPage}
-              />
+                  {current.reason && (
+                    <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+                      审核意见：{current.reason}
+                    </Typography>
+                  )}
+                </Stack>
+              </Box>
             </>
           ))}
+        {(tab === "current" || (reviewMode && current)) && (
+          <Stack spacing={2}>
+            <Stack
+              direction="row"
+              alignItems="baseline"
+              justifyContent="space-between"
+              spacing={1}
+            >
+              <Typography variant="subtitle1" fontWeight={600} component="h2">
+                {tab === "current" ? "词表内容" : "提交时内容"}
+              </Typography>
+              {items.data && (
+                <Typography variant="body2" color="text.secondary">
+                  {items.data.pagination.total} 个词项
+                </Typography>
+              )}
+            </Stack>
+            {items.isError ? (
+              <Alert
+                severity="error"
+                action={
+                  <Button onClick={() => void items.refetch()}>重试</Button>
+                }
+              >
+                词条加载失败
+              </Alert>
+            ) : items.isPending ? (
+              <Typography role="status" color="text.secondary" sx={{ py: 3 }}>
+                读取词条…
+              </Typography>
+            ) : (
+              <>
+                {items.data.items.length === 0 && (
+                  <Typography color="text.secondary" sx={{ py: 3 }}>
+                    暂无词项
+                  </Typography>
+                )}
+                {items.data.items.map((item, index) => (
+                  <Paper
+                    component="article"
+                    variant="outlined"
+                    key={item.item_id ?? item.entry_id}
+                    sx={{
+                      p: { xs: 2, sm: 2.5 },
+                      overflowWrap: "anywhere",
+                      minWidth: 0
+                    }}
+                  >
+                    <Stack spacing={2}>
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <Typography variant="caption" color="text.secondary">
+                          {(page - 1) * 20 + index + 1}
+                        </Typography>
+                        <Chip
+                          variant="outlined"
+                          label={item.custom_word ? "自定义词汇" : "平台词汇"}
+                        />
+                      </Stack>
+                      {item.custom_word ? (
+                        <Stack spacing={1.5}>
+                          <Typography variant="h6" component="h3">
+                            {item.custom_word.word}
+                          </Typography>
+                          <Box>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ display: "block", mb: 0.5 }}
+                            >
+                              释义
+                            </Typography>
+                            <Typography
+                              sx={{ whiteSpace: "pre-wrap", lineHeight: 1.8 }}
+                            >
+                              {item.custom_word.definition}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      ) : item.entry ? (
+                        <WordlistEntryView entry={item.entry} />
+                      ) : (
+                        <Typography color="text.secondary">
+                          内容不可用
+                        </Typography>
+                      )}
+                      {item.author_note && (
+                        <Box
+                          sx={{
+                            p: 1.5,
+                            bgcolor: "background.default",
+                            borderRadius: 1
+                          }}
+                        >
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ display: "block", mb: 0.5 }}
+                          >
+                            作者注
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            sx={{ whiteSpace: "pre-wrap", lineHeight: 1.8 }}
+                          >
+                            {item.author_note}
+                          </Typography>
+                        </Box>
+                      )}
+                    </Stack>
+                  </Paper>
+                ))}
+                <AdminPagination
+                  page={page}
+                  pageSize={20}
+                  total={items.data.pagination.total}
+                  onChange={setPage}
+                />
+              </>
+            )}
+          </Stack>
+        )}
       </AdminDrawer>
       <ConfirmDialog
         open={!!action}
@@ -343,10 +547,13 @@ export function WordlistDetails({
         pending={busy}
         error={error || undefined}
         confirmText="确认"
+        danger={action === "reject"}
         onClose={() => setAction(null)}
         onConfirm={() => void decide()}
       >
-        <p>{current?.name}</p>
+        <Typography sx={{ mb: 2, overflowWrap: "anywhere" }}>
+          {current?.name}
+        </Typography>
         {action === "reject" && (
           <TextField
             label="操作原因"
