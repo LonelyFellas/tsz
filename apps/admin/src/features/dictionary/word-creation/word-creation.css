@@ -1700,7 +1700,7 @@
 .word-sense-context-control {
   display: flex;
   align-items: center;
-  height: 46px;
+  height: 40px;
   margin-top: 6px;
 }
 

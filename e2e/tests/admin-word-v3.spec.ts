@@ -434,6 +434,23 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       .locator(".word-sense-meta-grid")
       .first()
       .screenshot({ path: test.info().outputPath("unified-field-labels.png") });
+    // 百分比后缀和开关图标都要与输入框内容保持同一水平中线。
+    const frequency = page.locator(".word-sense-field-frequency").first();
+    const frequencyBox = (await frequency.locator("input").boundingBox())!;
+    const suffixBox = (await frequency
+      .locator(".MuiInputAdornment-root")
+      .boundingBox())!;
+    const trackBox = (await page
+      .locator(".word-sense-context-control .MuiSwitch-track")
+      .first()
+      .boundingBox())!;
+    const inputCenter = frequencyBox.y + frequencyBox.height / 2;
+    expect(
+      Math.abs(suffixBox.y + suffixBox.height / 2 - inputCenter)
+    ).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(trackBox.y + trackBox.height / 2 - inputCenter)
+    ).toBeLessThanOrEqual(1);
     await page.setViewportSize({ width: 390, height: 844 });
     const levelTitle = page
       .locator(
