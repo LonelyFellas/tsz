@@ -14,8 +14,7 @@ import {
   Paper,
   Stack,
   TextField,
-  Typography,
-  useMediaQuery
+  Typography
 } from "@mui/material";
 import { Controller, useForm } from "react-hook-form";
 import { AdminTable } from "@/components/AdminTable";
@@ -65,7 +64,6 @@ export function SentenceLibrary({
   entryId?: string;
   readOnly?: boolean;
 }) {
-  const narrow = useMediaQuery("(max-width: 900px)");
   const notify = useFeedback();
   const filterForm = useForm<{
     keyword: string;
@@ -289,7 +287,7 @@ export function SentenceLibrary({
       id: "action",
       label: "操作",
       width: canEdit || canPublish ? 380 : 140,
-      sticky: narrow ? undefined : "right",
+      sticky: "right",
       render: (row) => (
         <Stack direction="row" useFlexGap flexWrap="wrap" spacing={1}>
           <Button onClick={() => void open(row.id, false)}>查看</Button>

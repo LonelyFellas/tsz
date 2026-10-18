@@ -84,3 +84,57 @@ test("超管编辑管理员昵称，失败保留输入，保存后列表更新",
     { display_name: "新昵称" }
   ]);
 });
+
+test("共用表格按容器宽度解除固定列且窄屏分页可见", async ({ page }) => {
+  await mockAdminV3Api(page, { viewerRole: "super_admin" });
+  await page.route("**/api/v1/admin/admins**", (route) =>
+    route.fulfill({
+      json: {
+        items: [
+          {
+            id: "019d2c55-1f9e-7f88-a189-a2b8a07153aa",
+            phone: "13800138000",
+            display_name: "布局验收",
+            role: "admin",
+            status: "active",
+            can_publish_lexicon: false,
+            created_by: null,
+            created_at: "2026-09-25T00:00:00Z",
+            updated_at: "2026-09-25T00:00:00Z"
+          }
+        ],
+        pagination: { page: 1, page_size: 20, total: 101, total_pages: 6 }
+      }
+    })
+  );
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/admins");
+  const first = page.getByRole("columnheader", { name: "手机号", exact: true });
+  const action = page.getByRole("columnheader", { name: "操作", exact: true });
+  await expect(action).toHaveCSS("position", "sticky");
+  // 大视口中的窄容器也必须解除固定列，覆盖抽屉内复用场景。
+  await page.locator("[aria-busy]").evaluateAll((nodes) =>
+    nodes.forEach((node) => {
+      (node as HTMLElement).style.maxWidth = "600px";
+    })
+  );
+  await expect(action).toHaveCSS("position", "static");
+  await expect(first).toHaveCSS("position", "static");
+  await page.setViewportSize({ width: 320, height: 844 });
+  const pagination = page.locator(".MuiTablePagination-root");
+  expect(
+    await pagination.evaluate((node) => node.scrollWidth - node.clientWidth)
+  ).toBeLessThanOrEqual(1);
+  const next = page.getByRole("button", { name: "下一页", exact: true });
+  const box = (await next.boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(320);
+  await page.locator("[aria-busy]").evaluateAll((nodes) =>
+    nodes.forEach((node) => {
+      (node as HTMLElement).style.maxWidth = "";
+    })
+  );
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(first).toHaveCSS("position", "sticky");
+  await expect(action).toHaveCSS("position", "sticky");
+});
