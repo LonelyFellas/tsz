@@ -115,17 +115,6 @@
   min-height: 28px;
 }
 
-.word-synthesis-source-label > .MuiButton-root {
-  min-width: 0;
-  min-height: 28px;
-  padding: 0;
-}
-
-.word-synthesis-source-label .MuiButton-startIcon {
-  margin-left: 0;
-  margin-right: 4px;
-}
-
 .word-synthesis-source-actions {
   min-width: 0;
 }
@@ -139,56 +128,6 @@
 
 .word-synthesis-source-actions .MuiRadio-root {
   padding: 4px 8px 4px 0;
-}
-
-.word-synthesis-settings {
-  container-type: inline-size;
-  width: min(560px, calc(100vw - 48px));
-  display: grid;
-  gap: 12px;
-  min-width: 0;
-}
-.word-synthesis-settings-body {
-  display: grid;
-  gap: 12px;
-  max-height: min(540px, calc(100dvh - 180px));
-  overflow: auto;
-  overscroll-behavior: contain;
-  padding: 0 4px 4px;
-}
-.word-synthesis-settings-source {
-  display: block;
-  margin-top: 3px;
-  font-size: 12px;
-  font-weight: 400;
-}
-
-/* 弹层宽度独立于所在英/美音栏，窄屏内部转为单列。 */
-.word-synthesis-settings .tsz-ve-speech-panel {
-  width: 100%;
-}
-
-.word-synthesis-settings .tsz-ve-editor {
-  display: grid;
-  gap: 16px;
-  min-width: 0;
-}
-
-.word-synthesis-settings .tsz-ve-pop-upload,
-.word-synthesis-settings .tsz-ve-upload-list {
-  min-width: 0;
-  max-width: 100%;
-}
-
-.word-synthesis-settings .tsz-ve-pop-upload {
-  padding-top: 12px;
-  border-top: 1px solid var(--admin-color-border-secondary, #f0f0f0);
-}
-
-@container (max-width: 480px) {
-  .word-synthesis-settings .tsz-ve-voice-columns {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 .MuiFormControlLabel-root:has(.word-synthesis-choice) {
@@ -250,37 +189,6 @@
   .MuiFormControlLabel-root:has(.word-synthesis-choice)
   .MuiRadio-root.Mui-checked:not(.Mui-disabled) {
   color: #d42a91;
-}
-
-.word-synthesis-settings-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--admin-color-border-secondary, #f0f0f0);
-}
-
-.word-synthesis-settings-hint {
-  font-size: 12px;
-}
-
-.word-synthesis-settings
-  .tsz-ve-synthesis[data-locale="en-GB"]
-  .tsz-ve-pop-section[data-locale="en-GB"]
-  > .tsz-ve-pop-section-head,
-.word-synthesis-settings
-  .tsz-ve-synthesis[data-locale="en-US"]
-  .tsz-ve-pop-section[data-locale="en-US"]
-  > .tsz-ve-pop-section-head {
-  display: none;
-}
-
-.word-synthesis-settings .tsz-ve-synthesis-upload-unavailable {
-  padding-top: 12px;
-  border-top: 1px solid var(--admin-color-border-secondary, #f0f0f0);
-  color: var(--admin-color-text-secondary, #8c8c8c);
-  font-size: 12px;
 }
 
 .word-synthesis-control

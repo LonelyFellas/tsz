@@ -7,7 +7,6 @@ import {
   fireEvent,
   render as rtlRender,
   screen,
-  waitFor,
   within
 } from "@testing-library/react";
 import { useState } from "react";
@@ -57,7 +56,6 @@ vi.mock("@tsz/voice-editor/editor", () => ({
     contextLabel,
     onChange,
     onVoiceProfileChange,
-    onAudioAssetsChange,
     renderActions
   }: VoiceEditorProps) => (
     <div>
@@ -80,24 +78,6 @@ vi.mock("@tsz/voice-editor/editor", () => ({
         }
       >
         配置音色
-      </button>
-      <button
-        onClick={() =>
-          onAudioAssetsChange?.([
-            {
-              id: "audio-local",
-              locale: "en-US",
-              gender: "female",
-              content_type: "audio/mpeg",
-              size_bytes: 3,
-              duration_ms: null,
-              original_name: "test.mp3",
-              created_at: "2026-09-09T00:00:00Z"
-            }
-          ])
-        }
-      >
-        保存录音
       </button>
       {renderActions?.(true)}
     </div>
@@ -248,22 +228,6 @@ describe("独立发音输入", () => {
     expect(field("英式 Azure IPA")).toHaveValue("");
     expect(field("美式 Azure IPA")).toHaveValue("fɑɹ");
   });
-  it("发音设置完成前不写回，关闭丢弃音色和录音，完成一次写回两项", async () => {
-    render(<Harness />);
-    const before = JSON.stringify(rows());
-    fireEvent.click(screen.getByLabelText("第 1 条发音发音设置与真人录音"));
-    fireEvent.click(await screen.findByText("配置音色"));
-    fireEvent.click(screen.getByText("保存录音"));
-    expect(JSON.stringify(rows())).toBe(before);
-    fireEvent.click(screen.getByLabelText("收起设置"));
-    expect(JSON.stringify(rows())).toBe(before);
-    fireEvent.click(screen.getByLabelText("第 1 条发音发音设置与真人录音"));
-    fireEvent.click(await screen.findByText("配置音色"));
-    fireEvent.click(screen.getByText("保存录音"));
-    fireEvent.click(screen.getByLabelText("完成第 1 条发音设置"));
-    expect(rows()[0].voice_profile.voices[0].voice_id).toBe("american-voice");
-    expect(rows()[0].audio_assets[0].original_name).toBe("test.mp3");
-  });
   it("实际发音与音素输入的右端依次排列转换和编辑按钮", () => {
     render(<Harness />);
     const actualGroup = field("实际发音").closest(
@@ -312,8 +276,11 @@ describe("独立发音输入", () => {
       ).toBeTruthy();
     }
   });
-  it("默认 IPA；两种音素预览、音色、录音及另一行保持独立", async () => {
+  it("移除旧设置后 IPA、UPS 来源和各自音色设置仍独立", async () => {
     render(<Harness />);
+    expect(
+      screen.queryByRole("button", { name: /发音设置与真人录音/ })
+    ).not.toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("在第 1 条后新增发音"));
     change("Azure IPA", "kæt");
     change("Azure UPS", "K AE T");
@@ -321,48 +288,23 @@ describe("独立发音输入", () => {
       expect(radio).toBeChecked();
     }
     expect(screen.getByText("/ kæt /")).toBeInTheDocument();
-    expect(rows()[0].synthesis).toMatchObject({
-      alphabet: "ipa",
-      use_spelling: false,
-      us: { ipa: "kæt" }
-    });
     fireEvent.click(screen.getAllByRole("radio", { name: "Azure UPS" })[0]!);
-    fireEvent.click(screen.getByLabelText("第 1 条发音发音设置与真人录音"));
-    fireEvent.click(await screen.findByText("配置音色"));
-    fireEvent.click(screen.getByText("保存录音"));
-    const content = JSON.parse(
-      screen.getByTestId("editor-content").textContent!
-    );
-    expect(content).toEqual({
-      version: 2,
-      text: "cat",
-      annotations: [
-        {
-          type: "phoneme",
-          start: 0,
-          end: 3,
-          alphabet: "ups",
-          phoneme: "K AE T"
-        }
-      ]
-    });
-    expect(rows()[0].synthesis).toEqual({
-      alphabet: "ups",
-      ipa: "",
-      ups: "",
-      use_spelling: false,
-      us: { ipa: "kæt", ups: "K AE T", ups_words: null }
-    });
-    fireEvent.click(screen.getByLabelText("完成第 1 条发音设置"));
-    expect(rows()[0].voice_profile.voices[0].voice_id).toBe("american-voice");
-    expect(rows()[0].audio_assets[0].original_name).toBe("test.mp3");
-    expect(rows()[1].synthesis).toBeUndefined();
-    fireEvent.click(screen.getByLabelText("第 1 条发音发音设置与真人录音"));
-    await waitFor(() =>
-      expect(screen.getByTestId("editor-content")).toHaveTextContent(
-        '"alphabet":"ups"'
-      )
-    );
+    for (const alphabet of ["IPA", "UPS"]) {
+      const label = `第 1 条发音 美式 Azure ${alphabet}`;
+      const before = structuredClone(rows()[0].synthesis);
+      fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
+      fireEvent.click(await screen.findByText("配置音色"));
+      expect(rows()[0].synthesis).toEqual(before);
+      fireEvent.click(screen.getByLabelText(`完成${label}设置`));
+      expect(
+        rows()[0].synthesis.us[`${alphabet.toLowerCase()}_speech`].voice_profile
+          .voices[0].voice_id
+      ).toBe("american-voice");
+      expect(rows()[0].synthesis.alphabet).toBe("ups");
+      expect(rows()[0].synthesis.us.ipa).toBe("kæt");
+      expect(rows()[0].synthesis.us.ups).toBe("K AE T");
+      expect(rows()[1].synthesis).toBeUndefined();
+    }
   });
   it("IPA 读取字典，UPS 读取人工修正后的对应 IPA；实际发音不参与转换", async () => {
     render(<Harness />);
@@ -448,34 +390,6 @@ describe("独立发音输入", () => {
     expect(screen.getByRole("radio", { name: "Azure UPS" })).toBeChecked();
     expect(rows()[0].synthesis.use_spelling).toBe(false);
   });
-  it("发音设置通过弹层显示，Escape 关闭并返回触发按钮", async () => {
-    const { container } = render(
-      <>
-        <Harness />
-      </>
-    );
-    const trigger = screen.getByLabelText("第 1 条发音发音设置与真人录音");
-    expect(trigger).toHaveAttribute("aria-expanded", "false");
-    expect(
-      screen.queryByRole("dialog", { name: "第 1 条发音发音设置" })
-    ).not.toBeInTheDocument();
-    fireEvent.click(trigger);
-    const panel = await screen.findByRole("dialog", {
-      name: "第 1 条发音发音设置"
-    });
-    expect(trigger).toHaveAttribute("aria-expanded", "true");
-    expect(
-      container.querySelector(".word-pronunciation-synthesis")
-    ).not.toContainElement(panel);
-    await screen.findByText("配置音色");
-    fireEvent.keyDown(panel, { key: "Escape" });
-    await waitFor(() =>
-      expect(trigger).toHaveAttribute("aria-expanded", "false")
-    );
-    await waitFor(() => expect(panel).not.toBeInTheDocument());
-    expect(trigger).toHaveFocus();
-    expect(trigger).toHaveAttribute("aria-expanded", "false");
-  });
   it("通用栏旧候选确认后只归入对应口音，偏好改变不重标", () => {
     const view = render(<Harness configured />);
     const preview = () =>
@@ -510,7 +424,7 @@ describe("独立发音输入", () => {
     expect(screen.getByText(/来源、口音或目标内容已变化/)).toBeInTheDocument();
   });
 });
-it("关闭入口时旧 UPS 记录原样保存且保留设置", async () => {
+it("关闭音素输入时旧 UPS 记录原样保留且不显示旧设置", () => {
   env.AZURE_PRONUNCIATION_INPUTS = false;
   try {
     render(<Harness configured />);
@@ -518,8 +432,9 @@ it("关闭入口时旧 UPS 记录原样保存且保留设置", async () => {
       screen.queryByLabelText("第 1 条发音的Azure IPA")
     ).not.toBeInTheDocument();
     expect(screen.getByText(/当前来源：Azure UPS/)).toBeInTheDocument();
-    fireEvent.click(screen.getByLabelText("第 1 条发音发音设置与真人录音"));
-    fireEvent.click(await screen.findByText("保存录音"));
+    expect(
+      screen.queryByRole("button", { name: /发音设置与真人录音/ })
+    ).not.toBeInTheDocument();
     expect(rows()[0].synthesis).toEqual({
       alphabet: "ups",
       ipa: "kæt",
