@@ -1,6 +1,4 @@
-import { FeedbackProvider } from "@/components/FeedbackProvider";
-import { AdminThemeProvider } from "@/mui-theme";
-import { AdminTestProviders as App } from "@/test-utils/AdminTestProviders";
+import { App, ConfigProvider } from "antd";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -110,30 +108,26 @@ function Harness({
       : {})
   });
   return (
-    <>
-      <AdminThemeProvider>
-        <FeedbackProvider>
-          <App>
-            <PronunciationPreviewProvider>
-              <V3SynthesisInputs
-                pronunciation={pronunciation}
-                synthesisEditable
-                spelling={legacyPhrase || settingsPhrase ? "far away" : "far"}
-                dialect={dialect}
-                index={0}
-                issues={[]}
-                onChange={(patch) =>
-                  setPronunciation((value) => ({ ...value, ...patch }))
-                }
-              />
-              <output data-testid="pronunciation-wire">
-                {JSON.stringify(pronunciation)}
-              </output>
-            </PronunciationPreviewProvider>
-          </App>
-        </FeedbackProvider>
-      </AdminThemeProvider>
-    </>
+    <ConfigProvider theme={{ token: { motion: false } }}>
+      <App>
+        <PronunciationPreviewProvider>
+          <V3SynthesisInputs
+            pronunciation={pronunciation}
+            synthesisEditable
+            spelling={legacyPhrase || settingsPhrase ? "far away" : "far"}
+            dialect={dialect}
+            index={0}
+            issues={[]}
+            onChange={(patch) =>
+              setPronunciation((value) => ({ ...value, ...patch }))
+            }
+          />
+          <output data-testid="pronunciation-wire">
+            {JSON.stringify(pronunciation)}
+          </output>
+        </PronunciationPreviewProvider>
+      </App>
+    </ConfigProvider>
   );
 }
 

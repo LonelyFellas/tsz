@@ -1,13 +1,11 @@
-import CleaningServices from "@mui/icons-material/CleaningServices";
-import Redo from "@mui/icons-material/Redo";
-import Undo from "@mui/icons-material/Undo";
-import { Button, Tooltip } from "@mui/material";
-import { SelectionPanel } from "./SelectionPanel";
+import { ClearOutlined, RedoOutlined, UndoOutlined } from "@ant-design/icons";
+import { Button, Tooltip } from "antd";
 import { useId, useState, type ReactNode } from "react";
 import { AnnotationStrip, type AnnotationStripProps } from "./AnnotationStrip";
 import type { VoiceEditorProps } from "../../types";
 import type { Brush } from "./roles";
 import type { LiaisonAnchor, LiaisonDraft, MarkState } from "./tokens";
+import { SelectionPanel } from "./SelectionPanel";
 import { ShortcutHint } from "./ShortcutHint";
 
 const FORMAT_SHORTCUTS: Record<string, string> = {
@@ -224,13 +222,7 @@ export function MarkupPanel({
     );
     const shortcut = FORMAT_SHORTCUTS[tool.key];
     const hint = shortcut ? <ShortcutHint shortcut={shortcut} /> : undefined;
-    return hint ? (
-      <Tooltip describeChild title={hint}>
-        <span style={{ display: "inline-flex" }}>{button}</span>
-      </Tooltip>
-    ) : (
-      button
-    );
+    return hint ? <Tooltip title={hint}>{button}</Tooltip> : button;
   };
   const renderTool = (tool: DropdownTool) =>
     tool.content ? (
@@ -265,7 +257,6 @@ export function MarkupPanel({
         )}
         <div className="tsz-ve-toolbar-actions">
           <Tooltip
-            describeChild
             title={
               <>
                 <span>撤销</span>
@@ -275,34 +266,34 @@ export function MarkupPanel({
           >
             <Button
               size="small"
-              variant="text"
+              type="text"
               className="tsz-ve-icon-button"
               aria-label="上一步"
               disabled={readOnly || !canUndo}
               onClick={onUndo}
-              startIcon={<Undo />}
+              icon={<UndoOutlined />}
             />
           </Tooltip>
-          <Tooltip describeChild title="重做">
+          <Tooltip title="重做">
             <Button
               size="small"
-              variant="text"
+              type="text"
               className="tsz-ve-icon-button"
               aria-label="下一步"
               disabled={readOnly || !canRedo}
               onClick={onRedo}
-              startIcon={<Redo />}
+              icon={<RedoOutlined />}
             />
           </Tooltip>
-          <Tooltip describeChild title="清空标注">
+          <Tooltip title="清空标注">
             <Button
               size="small"
-              variant="text"
+              type="text"
               className="tsz-ve-icon-button"
               aria-label="清空标注"
               disabled={readOnly || marked === 0}
               onClick={onClearAll}
-              startIcon={<CleaningServices />}
+              icon={<ClearOutlined />}
             />
           </Tooltip>
         </div>
@@ -316,7 +307,6 @@ export function MarkupPanel({
         {eraseTool && (
           <div className="tsz-ve-erase-action">
             <Tooltip
-              describeChild
               title={
                 composedMode || mode === "spelling"
                   ? "开启后点击已有连读或停顿即可取消，再次点击退出"

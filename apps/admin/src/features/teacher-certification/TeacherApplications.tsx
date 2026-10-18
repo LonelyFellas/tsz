@@ -1,4 +1,5 @@
-import { ListFilterBar } from "@/components/ListFilterBar";
+import { TableEmptyState } from "@/components/TableEmptyState";
+import { ReloadOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   CertificationFile,
@@ -7,27 +8,26 @@ import type {
 } from "@tsz/types";
 import {
   Alert,
-  Breadcrumbs,
+  App,
+  Breadcrumb,
   Button,
-  Chip,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  MenuItem,
-  Paper,
-  Stack,
-  TextField,
+  Card,
+  Descriptions,
+  Drawer,
+  Empty,
+  Flex,
+  Form,
+  Image,
+  Input,
+  Modal,
+  Result,
+  Select,
+  Space,
+  Spin,
+  Table,
+  Tag,
   Typography
-} from "@mui/material";
-import { useForm } from "react-hook-form";
-import { AdminDrawer } from "@/components/AdminDrawer";
-import { AdminTable } from "@/components/AdminTable";
-import { DetailList } from "@/components/DetailList";
-import { ImagePreview } from "@/components/ImagePreview";
-import { PageStatus } from "@/components/PageStatus";
-import { useFeedback } from "@/components/FeedbackProvider";
+} from "antd";
 import { useEffect, useState } from "react";
 import { api, useAuthStore, usePermission } from "@/lib/auth";
 import { RevokeTeacherButton } from "./RevokeTeacherButton";
@@ -53,7 +53,7 @@ export function TeacherApplicationsPage() {
   return allowed ? (
     <ApplicationQueue />
   ) : (
-    <PageStatus title="未开通教师资格申请列表查看权限" />
+    <Result status="403" title="未开通教师资格申请列表查看权限" />
   );
 }
 
@@ -96,21 +96,22 @@ function PrivateMaterial({ file }: { file: CertificationFile }) {
   if (!allowed) return null;
   return (
     <div style={{ width: 160 }}>
-      <Typography color="text.secondary">{kinds[file.kind]}</Typography>
+      <Typography.Text type="secondary">{kinds[file.kind]}</Typography.Text>
       <div style={{ minHeight: 120, marginTop: 8 }}>
         {current?.url ? (
-          <ImagePreview
+          <Image
             src={current.url}
             alt={kinds[file.kind]}
             width={160}
             height={120}
+            style={{ objectFit: "contain" }}
           />
         ) : current?.failed ? (
           <Button onClick={() => setAttempt((value) => value + 1)}>
             重新读取
           </Button>
         ) : (
-          <CircularProgress size={24} />
+          <Spin />
         )}
       </div>
     </div>
@@ -123,7 +124,7 @@ function ApplicationQueue() {
   const canReadIdentity = usePermission("teacherapply.read_identity");
   const adminId = useAuthStore((state) => state.profile?.id);
   const client = useQueryClient();
-  const notify = useFeedback();
+  const { message } = App.useApp();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [status, setStatus] = useState<TeacherApplicationStatus | undefined>(
@@ -134,15 +135,7 @@ function ApplicationQueue() {
     application: TeacherApplication;
     decision: "approve" | "reject";
   }>();
-  const {
-    register,
-    reset,
-    handleSubmit,
-    formState: { errors, isSubmitting }
-  } = useForm<{ reason?: string }>({
-    shouldUnregister: true,
-    defaultValues: { reason: "" }
-  });
+  const [form] = Form.useForm<{ reason?: string }>();
   const list = useQuery({
     queryKey: ["teacher-applications", adminId, page, pageSize, status],
     queryFn: () => api.teacherCertification.list(page, pageSize, status)
@@ -166,245 +159,264 @@ function ApplicationQueue() {
         client.invalidateQueries({ queryKey: ["admin-users"] })
       ]);
       setAction(undefined);
-      notify("审核结果已保存并通知申请人", "success");
+      void message.success("审核结果已保存并通知申请人");
     }
   });
   function review(
     application: TeacherApplication,
     decision: "approve" | "reject"
   ) {
-    reset();
+    form.resetFields();
     mutation.reset();
     setAction({ application, decision });
   }
   const application = detail.data?.application;
   return (
-    <Stack spacing={2}>
-      <Breadcrumbs>
-        <Typography>审核管理</Typography>
-        <Typography>教师申请审核</Typography>
-      </Breadcrumbs>
-      <Paper variant="outlined" sx={{ p: 1.5 }}>
-        <ListFilterBar>
-          <TextField
-            select
-            label="认证状态"
-            value={status ?? ""}
-            onChange={(event) => {
-              setStatus(
-                (event.target.value as TeacherApplicationStatus) || undefined
-              );
-              setPage(1);
-            }}
-          >
-            <MenuItem value="">全部状态</MenuItem>
-            {Object.entries(statuses).map(([value, entry]) => (
-              <MenuItem key={value} value={value}>
-                {entry.label}
-              </MenuItem>
-            ))}
-          </TextField>
-          <Button onClick={() => void list.refetch()}>刷新</Button>
-        </ListFilterBar>
-      </Paper>
-      <Paper variant="outlined" sx={{ p: 2 }}>
-        {list.isError && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {list.error.message}
-          </Alert>
-        )}
-        <AdminTable
-          emptyMessage={
-            status === "pending" ? "暂无待审核的教师申请" : "暂无教师申请"
-          }
-          filtered={status !== undefined && status !== "pending"}
-          onResetFilters={() => {
-            setStatus("pending");
-            setPage(1);
+    <Flex vertical gap={16}>
+      <Breadcrumb items={[{ title: "审核管理" }, { title: "教师申请审核" }]} />
+      <Card size="small" styles={{ body: { paddingBottom: 8 } }}>
+        <Form
+          layout="inline"
+          style={{
+            rowGap: 12,
+            columnGap: 8,
+            display: "flex",
+            flexWrap: "wrap"
           }}
-          rows={list.data?.items ?? []}
-          rowId={(row) => row.id}
+        >
+          <Form.Item label="审核状态">
+            <Select
+              aria-label="认证状态"
+              allowClear
+              placeholder="全部状态"
+              value={status}
+              style={{ width: 140 }}
+              options={Object.entries(statuses).map(([value, label]) => ({
+                value,
+                label: label.label
+              }))}
+              onChange={(value) => {
+                setStatus(value);
+                setPage(1);
+              }}
+            />
+          </Form.Item>
+          <Form.Item>
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={() => void list.refetch()}
+            >
+              刷新
+            </Button>
+          </Form.Item>
+        </Form>
+      </Card>
+      <Card size="small">
+        {list.isError && (
+          <Alert
+            type="error"
+            title={list.error.message}
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+        )}
+        <Table<TeacherApplication>
+          locale={{
+            emptyText: (
+              <TableEmptyState
+                message={
+                  status === "pending" ? "暂无待审核的教师申请" : "暂无教师申请"
+                }
+                filtered={status !== undefined && status !== "pending"}
+                onResetFilters={() => {
+                  setStatus("pending");
+                  setPage(1);
+                }}
+              />
+            )
+          }}
+          rowKey="id"
           loading={list.isFetching}
-          minWidth={760}
+          dataSource={list.data?.items ?? []}
+          scroll={{ x: 760 }}
           pagination={{
-            page,
+            current: page,
             pageSize,
             total: list.data?.total ?? 0,
-            pageSizes: [10, 20, 50, 100],
+            showSizeChanger: true,
+            pageSizeOptions: [10, 20, 50, 100],
             onChange: (next, size) => {
               setPage(next);
               setPageSize(size);
             }
           }}
           columns={[
-            { id: "name", label: "姓名", render: (row) => row.real_name },
-            { id: "contact", label: "联系方式", render: (row) => row.contact },
+            { title: "姓名", dataIndex: "real_name" },
+            { title: "联系方式", dataIndex: "contact" },
             {
-              id: "time",
-              label: "提交时间",
-              render: (row) => new Date(row.submitted_at).toLocaleString()
+              title: "提交时间",
+              dataIndex: "submitted_at",
+              render: (value: string) => new Date(value).toLocaleString()
             },
             {
-              id: "status",
-              label: "状态",
-              render: (row) => (
-                <Chip
-                  label={statuses[row.status].label}
-                  color={
-                    row.status === "approved"
-                      ? "success"
-                      : row.status === "pending"
-                        ? "primary"
-                        : row.status === "rejected"
-                          ? "warning"
-                          : "error"
-                  }
-                />
+              title: "状态",
+              dataIndex: "status",
+              render: (value: TeacherApplicationStatus) => (
+                <Tag color={statuses[value].color}>{statuses[value].label}</Tag>
               )
             },
             {
-              id: "action",
-              label: "操作",
-              render: (row) => (
-                <Button onClick={() => setSelected(row.id)}>查看材料</Button>
+              title: "操作",
+              key: "actions",
+              render: (_, row) => (
+                <Button type="link" onClick={() => setSelected(row.id)}>
+                  查看材料
+                </Button>
               )
             }
           ]}
         />
-      </Paper>
-      {selected && (
-        <AdminDrawer
-          title="认证资料"
-          width={820}
-          onClose={() => setSelected(undefined)}
-        >
-          {detail.isPending ? (
-            <CircularProgress size={24} />
-          ) : detail.isError ? (
-            <Alert
-              severity="error"
-              action={
-                <Button onClick={() => void detail.refetch()}>重试</Button>
-              }
-            >
-              {detail.error.message}
-            </Alert>
-          ) : application ? (
-            <Stack spacing={3}>
-              <DetailList
-                items={[
-                  { label: "姓名", value: application.real_name },
-                  { label: "联系方式", value: application.contact },
-                  { label: "状态", value: statuses[application.status].label },
-                  { label: "认证说明", value: application.statement },
-                  ...(application.review_reason
-                    ? [{ label: "审核原因", value: application.review_reason }]
-                    : []),
-                  ...(application.revoke_reason
-                    ? [{ label: "撤销原因", value: application.revoke_reason }]
-                    : [])
-                ]}
-              />
-              {canReadCertificates || canReadIdentity ? (
-                <Stack direction="row" useFlexGap flexWrap="wrap" spacing={2}>
+      </Card>
+      <Drawer
+        title="认证资料"
+        open={!!selected}
+        onClose={() => setSelected(undefined)}
+        size={820}
+        destroyOnHidden
+      >
+        {detail.isPending ? (
+          <Spin />
+        ) : detail.isError ? (
+          <Alert
+            type="error"
+            title={detail.error.message}
+            action={
+              <Button onClick={() => void detail.refetch()}>重 试</Button>
+            }
+          />
+        ) : application ? (
+          <Space orientation="vertical" size="large" style={{ width: "100%" }}>
+            <Descriptions
+              column={1}
+              bordered
+              items={[
+                { key: "name", label: "姓名", children: application.real_name },
+                {
+                  key: "contact",
+                  label: "联系方式",
+                  children: application.contact
+                },
+                {
+                  key: "status",
+                  label: "状态",
+                  children: statuses[application.status].label
+                },
+                {
+                  key: "statement",
+                  label: "认证说明",
+                  children: (
+                    <div style={{ whiteSpace: "pre-wrap" }}>
+                      {application.statement}
+                    </div>
+                  )
+                },
+                ...(application.review_reason
+                  ? [
+                      {
+                        key: "review",
+                        label: "审核原因",
+                        children: application.review_reason
+                      }
+                    ]
+                  : []),
+                ...(application.revoke_reason
+                  ? [
+                      {
+                        key: "revoke",
+                        label: "撤销原因",
+                        children: application.revoke_reason
+                      }
+                    ]
+                  : [])
+              ]}
+            />
+            {canReadCertificates || canReadIdentity ? (
+              <Image.PreviewGroup>
+                <Flex wrap gap={16}>
                   {detail.data.files.map((file) => (
                     <PrivateMaterial key={file.id} file={file} />
                   ))}
-                </Stack>
-              ) : (
-                <Alert severity="info">未开通资格证书或身份证查看权限</Alert>
-              )}
-              {canReview && application.status === "pending" && (
-                <Stack direction="row" spacing={1}>
-                  <Button
-                    variant="contained"
-                    onClick={() => review(application, "approve")}
-                  >
-                    通过
-                  </Button>
-                  <Button
-                    color="error"
-                    onClick={() => review(application, "reject")}
-                  >
-                    驳回
-                  </Button>
-                </Stack>
-              )}
-              {application.status === "approved" && (
-                <RevokeTeacherButton userId={application.user_id} />
-              )}
-            </Stack>
-          ) : (
-            <Typography color="text.secondary">暂无数据</Typography>
-          )}
-        </AdminDrawer>
-      )}
-      <Dialog
-        open={!!action}
-        fullWidth
-        maxWidth="sm"
-        aria-labelledby="teacher-review-title"
-        onClose={() => {
-          if (!mutation.isPending && !isSubmitting) setAction(undefined);
-        }}
-      >
-        <DialogTitle id="teacher-review-title">
-          {action?.decision === "approve" ? "通过教师认证" : "驳回教师申请"}
-        </DialogTitle>
-        <DialogContent>
-          {action?.decision === "approve" && (
-            <Typography>
-              通过后，该账号将新增教师身份，学生身份保持不变。
-            </Typography>
-          )}
-          <form
-            id="teacher-review-form"
-            onSubmit={handleSubmit((value) => {
-              if (canReview && !mutation.isPending) mutation.mutate(value);
-            })}
-          >
-            {action?.decision === "reject" && (
-              <TextField
-                label="驳回原因"
-                multiline
-                rows={4}
-                fullWidth
-                disabled={mutation.isPending}
-                error={!!errors.reason}
-                helperText={errors.reason?.message}
-                sx={{ mt: 1 }}
-                slotProps={{ htmlInput: { maxLength: 2000 } }}
-                {...register("reason", {
-                  validate: (value) => !!value?.trim() || "请填写驳回原因",
-                  maxLength: { value: 2000, message: "最长 2000 字符" }
-                })}
-              />
+                </Flex>
+              </Image.PreviewGroup>
+            ) : (
+              <Alert type="info" title="未开通资格证书或身份证查看权限" />
             )}
-          </form>
-          {mutation.error && (
-            <Alert severity="error" sx={{ mt: 2 }}>
-              {mutation.error.message}
-            </Alert>
+            {canReview && application.status === "pending" && (
+              <Space>
+                <Button
+                  type="primary"
+                  onClick={() => review(application, "approve")}
+                >
+                  通 过
+                </Button>
+                <Button danger onClick={() => review(application, "reject")}>
+                  驳 回
+                </Button>
+              </Space>
+            )}
+            {application.status === "approved" && (
+              <RevokeTeacherButton userId={application.user_id} />
+            )}
+          </Space>
+        ) : (
+          <Empty />
+        )}
+      </Drawer>
+      <Modal
+        title={action?.decision === "approve" ? "通过教师认证" : "驳回教师申请"}
+        open={!!action}
+        confirmLoading={mutation.isPending}
+        okText={action?.decision === "approve" ? "确认通过" : "确认驳回"}
+        cancelText="取 消"
+        onOk={() => form.submit()}
+        onCancel={() => {
+          if (!mutation.isPending) setAction(undefined);
+        }}
+        destroyOnHidden
+      >
+        {action?.decision === "approve" && (
+          <p>通过后，该账号将新增教师身份，学生身份保持不变。</p>
+        )}
+        <Form
+          form={form}
+          layout="vertical"
+          preserve={false}
+          onFinish={(value) => {
+            if (canReview) mutation.mutate(value);
+          }}
+        >
+          {action?.decision === "reject" && (
+            <Form.Item
+              name="reason"
+              label="驳回原因"
+              rules={[
+                { required: true, whitespace: true, message: "请填写驳回原因" },
+                { max: 2000 }
+              ]}
+            >
+              <Input.TextArea
+                rows={4}
+                maxLength={2000}
+                showCount
+                disabled={mutation.isPending}
+              />
+            </Form.Item>
           )}
-        </DialogContent>
-        <DialogActions>
-          <Button
-            disabled={mutation.isPending || isSubmitting}
-            onClick={() => setAction(undefined)}
-          >
-            取消
-          </Button>
-          <Button
-            type="submit"
-            form="teacher-review-form"
-            variant="contained"
-            color={action?.decision === "reject" ? "error" : "primary"}
-            loading={mutation.isPending || isSubmitting}
-          >
-            {action?.decision === "approve" ? "确认通过" : "确认驳回"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Stack>
+        </Form>
+        {mutation.error && (
+          <Alert type="error" title={mutation.error.message} showIcon />
+        )}
+      </Modal>
+    </Flex>
   );
 }

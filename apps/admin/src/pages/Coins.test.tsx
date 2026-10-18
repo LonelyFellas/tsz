@@ -6,8 +6,7 @@ import {
   screen,
   waitFor
 } from "@testing-library/react";
-import { FeedbackProvider } from "@/components/FeedbackProvider";
-import { AdminThemeProvider } from "@/mui-theme";
+import { App } from "antd";
 import { beforeEach, expect, it, vi } from "vitest";
 import { HttpError } from "@tsz/api-client";
 import { useAuthStore } from "@/lib/auth";
@@ -72,11 +71,9 @@ function open() {
   });
   return render(
     <QueryClientProvider client={client}>
-      <AdminThemeProvider>
-        <FeedbackProvider>
-          <CoinsPage />
-        </FeedbackProvider>
-      </AdminThemeProvider>
+      <App>
+        <CoinsPage />
+      </App>
     </QueryClientProvider>
   );
 }

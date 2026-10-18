@@ -5,7 +5,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { AdminTestProviders as AntApp } from "@/test-utils/AdminTestProviders";
+import { App as AntApp, ConfigProvider } from "antd";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type {
@@ -89,14 +89,14 @@ describe("词形组的专用词义交互", () => {
       );
     }
     render(
-      <>
+      <ConfigProvider theme={{ token: { motion: false } }}>
         <ScopeHarness />
-      </>
+      </ConfigProvider>
     );
     // 按标签与可见文案定位；复选框类型、按钮禁用及可见性仍独立断言。
     expect(screen.queryByText("通用", { exact: true })).not.toBeInTheDocument();
     const headerEntry = await screen.findByLabelText("第 1 组专用词义");
-    expect(headerEntry.closest(".v3-form-group-header")).not.toBeNull();
+    expect(headerEntry.closest(".ant-card-head")).not.toBeNull();
     expect(headerEntry).toHaveTextContent("设置专用词形");
     expect(screen.queryByText("专用", { exact: true })).not.toBeInTheDocument();
     expect(screen.queryByText("限定适用词义")).not.toBeInTheDocument();
@@ -123,11 +123,11 @@ describe("词形组的专用词义交互", () => {
       within(dialog).getByText("确认选择").closest("button")!
     ).toBeDisabled();
     fireEvent.click(within(dialog).getByLabelText(/本词性释义1/));
-    expect(dialog.closest('[role="dialog"]')).not.toHaveAttribute(
-      "aria-modal",
-      "true"
-    );
-    expect(dialog.closest(".v3-form-group-body")).toBeNull();
+    expect(
+      document.querySelector('[role="dialog"], dialog')
+    ).not.toBeInTheDocument();
+    expect(dialog.closest(".ant-popover")).not.toBeNull();
+    expect(dialog.closest(".ant-card-body")).toBeNull();
     expect(screen.getByLabelText("展开第 1 组词形变化")).toBeVisible();
     expect(within(dialog).getByLabelText(/本词性释义1/)).toBeChecked();
     fireEvent.click(

@@ -1,4 +1,5 @@
-import { AdminThemeProvider } from "@/mui-theme";
+import { App as AntApp, ConfigProvider } from "antd";
+import zhCN from "antd/locale/zh_CN";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   fireEvent,
@@ -58,7 +59,9 @@ function mount(page = <WordListsPage />) {
           new QueryClient({ defaultOptions: { queries: { retry: false } } })
         }
       >
-        <AdminThemeProvider>{page}</AdminThemeProvider>
+        <ConfigProvider locale={zhCN} theme={{ token: { motion: false } }}>
+          <AntApp>{page}</AntApp>
+        </ConfigProvider>
       </QueryClientProvider>
     </MemoryRouter>
   );
@@ -204,7 +207,7 @@ it("review approval uses the submitted snapshot revision instead of the current 
   expect(await screen.findByText("提交时冻结的注释")).toBeVisible();
   expect(api.wordlists.currentItems).not.toHaveBeenCalled();
   fireEvent.click(await screen.findByText("通过审核"));
-  fireEvent.click(await screen.findByText(/^确认$/));
+  fireEvent.click(await screen.findByText(/^确\s*认$/));
   await waitFor(() =>
     expect(api.wordlists.decision).toHaveBeenCalledWith("list", "request", {
       expected_revision: 2,
@@ -231,7 +234,7 @@ it("published user lists can be hidden without changing review semantics", async
   mount();
   fireEvent.click(await screen.findByText("设为私密"));
   expect(await screen.findByText(/审核状态保持不变/)).toBeInTheDocument();
-  fireEvent.click(screen.getByText(/^确认$/));
+  fireEvent.click(screen.getByText(/^确\s*认$/));
   await waitFor(() =>
     expect(api.wordlists.visibility).toHaveBeenCalledWith("list", {
       expected_revision: 4,
@@ -252,7 +255,7 @@ it("search commits filters and reset requests page one without stale query", asy
       expect.anything()
     )
   );
-  fireEvent.click(screen.getByRole("button", { name: /重\s*置/ }));
+  fireEvent.click(screen.getByRole("button", { name: /重\s*置$/ }));
   await waitFor(() =>
     expect(screen.getByLabelText("搜索词表")).toHaveValue("")
   );
@@ -276,7 +279,7 @@ it("failed mutation reports unconfirmed state and refetches", async () => {
   expect(
     await within(dialog).findByText(/该词表当前不是公开状态/)
   ).toBeInTheDocument();
-  fireEvent.click(within(dialog).getByText(/^确认$/));
+  fireEvent.click(within(dialog).getByText(/^确\s*认$/));
   expect(await screen.findByText(/操作失败或结果未确认/)).toBeInTheDocument();
   expect(api.wordlists.delete).toHaveBeenCalledWith("list", {
     expected_revision: 4
@@ -332,7 +335,7 @@ it("delete impact failure is visible and does not strand the confirmation", asyn
   expect(
     await within(dialog).findByText(/任务影响读取失败/)
   ).toBeInTheDocument();
-  expect(within(dialog).getByText(/^确认$/)).toBeEnabled();
+  expect(within(dialog).getByText(/^确\s*认$/)).toBeEnabled();
 });
 
 it("review queue defaults to pending and filters on the server", async () => {
@@ -345,7 +348,7 @@ it("review queue defaults to pending and filters on the server", async () => {
   fireEvent.mouseDown(screen.getByRole("combobox", { name: "审核状态" }));
   fireEvent.click(
     await screen.findByText("审核通过", {
-      selector: '[role="option"]'
+      selector: ".ant-select-item-option-content"
     })
   );
   fireEvent.click(screen.getByRole("button", { name: /搜\s*索/ }));
@@ -355,7 +358,7 @@ it("review queue defaults to pending and filters on the server", async () => {
       expect.anything()
     )
   );
-  fireEvent.click(screen.getByRole("button", { name: /重\s*置/ }));
+  fireEvent.click(screen.getByRole("button", { name: /重\s*置$/ }));
   await waitFor(() =>
     expect(api.wordlists.management).toHaveBeenLastCalledWith(
       { page: 1, page_size: 20, review_state: "pending" },
@@ -377,17 +380,17 @@ it("review readers cannot decide applications", async () => {
 it("rejection requires a reason and sends the inspected request revision", async () => {
   mount(<ReviewsPage />);
   fireEvent.click(await screen.findByText(/^查\s*看$/));
-  fireEvent.click(await screen.findByText("驳回"));
+  fireEvent.click(await screen.findByText(/^驳\s*回$/));
   const dialog = (await screen.findByText("驳回词表")).closest<HTMLElement>(
     '[role="dialog"]'
   )!;
-  fireEvent.click(within(dialog).getByText(/^确认$/));
+  fireEvent.click(within(dialog).getByText(/^确\s*认$/));
   await waitFor(() => expect(screen.getByText("请填写驳回原因")).toBeVisible());
   expect(api.wordlists.decision).not.toHaveBeenCalled();
   fireEvent.change(screen.getByLabelText("操作原因"), {
     target: { value: " 内容不完整 " }
   });
-  fireEvent.click(within(dialog).getByText(/^确认$/));
+  fireEvent.click(within(dialog).getByText(/^确\s*认$/));
   await waitFor(() =>
     expect(api.wordlists.decision).toHaveBeenCalledWith("list", "request", {
       expected_revision: 2,
@@ -415,7 +418,7 @@ it("completed review records remain readable without decision controls", async (
         state: "rejected",
         reason: "内容不完整",
         created_at: "",
-        decided_at: ""
+        decided_at: "2026-10-17T08:30:00Z"
       },
       {
         id: "approved-request",
@@ -432,6 +435,11 @@ it("completed review records remain readable without decision controls", async (
   mount(<ReviewsPage />);
   fireEvent.click(await screen.findByText(/^查\s*看$/));
   expect(await screen.findByText("审核意见：内容不完整")).toBeVisible();
+  expect(
+    await screen.findByText(
+      `审核时间：${new Date("2026-10-17T08:30:00Z").toLocaleString("zh-CN")}`
+    )
+  ).toBeVisible();
   expect(screen.queryByText("通过审核")).not.toBeInTheDocument();
   expect(screen.queryByText("驳回")).not.toBeInTheDocument();
   expect(screen.getByRole("radio", { name: /已驳回.*提交名称/ })).toBeChecked();
@@ -464,7 +472,7 @@ it("failed review decision preserves the dialog and reports an unconfirmed resul
   const dialog = (
     await screen.findByText("确认通过审核并公开")
   ).closest<HTMLElement>('[role="dialog"]')!;
-  fireEvent.click(within(dialog).getByText(/^确认$/));
+  fireEvent.click(within(dialog).getByText(/^确\s*认$/));
   await waitFor(() =>
     expect(within(dialog).getByText(/旧审核不会覆盖已修改的内容/)).toBeVisible()
   );
@@ -503,14 +511,14 @@ it.each(["approve", "reject"] as const)(
     await screen.findByText("待审词表");
     fireEvent.click(screen.getByText(/^查\s*看$/));
     fireEvent.click(
-      await screen.findByText(decision === "approve" ? "通过审核" : "驳回")
+      await screen.findByText(decision === "approve" ? "通过审核" : /^驳\s*回$/)
     );
     if (decision === "reject") {
       fireEvent.change(screen.getByLabelText("操作原因"), {
         target: { value: "内容不完整" }
       });
     }
-    fireEvent.click(screen.getByText(/^确认$/));
+    fireEvent.click(screen.getByText(/^确\s*认$/));
     await waitFor(() => expect(api.wordlists.decision).toHaveBeenCalled());
     await waitFor(() =>
       expect(api.wordlists.management).toHaveBeenLastCalledWith(
@@ -540,7 +548,7 @@ it("keeps snapshot pagination scoped to the selected application and hides decis
   mount(<ReviewsPage />);
   fireEvent.click(await screen.findByText(/^查\s*看$/));
   await screen.findByText("暂无词项");
-  const drawer = screen.getByRole("dialog", { name: "待审词表" });
+  const drawer = screen.getByRole("dialog");
   fireEvent.click(within(drawer).getByRole("button", { name: "下一页" }));
   await waitFor(() =>
     expect(api.wordlists.items).toHaveBeenLastCalledWith(
@@ -650,4 +658,28 @@ it("reads custom and platform words with their own definitions and author notes"
   expect(within(platform).getByText("名词")).toBeVisible();
   expect(within(platform).getByText("清晰；清楚")).toBeVisible();
   expect(within(platform).getByText("平台词的作者注")).toBeVisible();
+});
+
+it("驳回提交等待期间锁定原因，失败后保留原输入", async () => {
+  let fail!: (error: Error) => void;
+  vi.mocked(api.wordlists.decision).mockReturnValueOnce(
+    new Promise((_, reject) => {
+      fail = reject;
+    })
+  );
+  mount(<ReviewsPage />);
+  fireEvent.click(await screen.findByText(/^查\s*看$/));
+  fireEvent.click(await screen.findByText(/^驳\s*回$/));
+  const reason = screen.getByLabelText("操作原因");
+  fireEvent.change(reason, { target: { value: "保留的驳回原因" } });
+  const dialog = reason.closest<HTMLElement>('[role="dialog"]')!;
+  fireEvent.click(within(dialog).getByText(/^确\s*认$/));
+  await waitFor(() => expect(api.wordlists.decision).toHaveBeenCalledTimes(1));
+  expect(reason).toBeDisabled();
+  fail(new Error("temporary failure"));
+  await waitFor(() => expect(reason).toBeEnabled());
+  expect(reason).toHaveValue("保留的驳回原因");
+  expect(
+    within(dialog).getByText(/旧审核不会覆盖已修改的内容/)
+  ).toBeInTheDocument();
 });

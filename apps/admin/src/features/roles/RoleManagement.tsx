@@ -1,23 +1,31 @@
+import { TableEmptyState } from "@/components/TableEmptyState";
 // 角色权限管理（super_admin 专属）：角色列表 + 建 / 改 / 删角色 + 派角色。全对接真实接口。
 // 系统角色（is_system「全功能管理员」）在 UI 上置灰不可编辑 / 删除，后端 403 只是兜底。
 import {
+  PlusOutlined,
+  ReloadOutlined,
+  UsergroupAddOutlined
+} from "@ant-design/icons";
+import {
   Alert,
-  Breadcrumbs,
+  App,
+  Breadcrumb,
   Button,
-  Chip,
-  Paper,
-  Stack,
+  Card,
+  Flex,
+  Modal,
+  Space,
+  Table,
+  Tag,
   Tooltip,
   Typography
-} from "@mui/material";
-import { AdminTable } from "@/components/AdminTable";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { PermissionButton } from "@/components/PermissionButton";
-import { useFeedback } from "@/components/FeedbackProvider";
+} from "antd";
+import type { TableColumnsType } from "antd";
 import dayjs from "dayjs";
 import { useMemo, useState } from "react";
 import type { AdminRole, PermissionKey } from "@tsz/types";
 import { HttpError } from "@tsz/api-client";
+import { GatedButton } from "@/components/GatedButton";
 import {
   useDeleteRole,
   useInvalidateRoles,
@@ -29,9 +37,7 @@ import { roleMutationError } from "./labels";
 import { RoleFormModal } from "./RoleFormModal";
 
 export function RoleManagement() {
-  const notify = useFeedback();
-  const [deleting, setDeleting] = useState<AdminRole>();
-  const [deleteError, setDeleteError] = useState<string>();
+  const { message } = App.useApp();
   const listQuery = useRoleList();
   const catalog = usePermissionCatalog();
   const deleteRole = useDeleteRole();
@@ -61,12 +67,14 @@ export function RoleManagement() {
     setFormOpen(true);
   };
 
+  const [deleting, setDeleting] = useState<AdminRole>();
+  const [deleteError, setDeleteError] = useState<string>();
   const confirmDelete = async () => {
     if (!deleting || deleteRole.isPending || deleting.is_system) return;
     setDeleteError(undefined);
     try {
       await deleteRole.mutateAsync(deleting.id);
-      notify("已删除", "success");
+      void message.success("已删除");
       setDeleting(undefined);
     } catch (err) {
       setDeleteError(roleMutationError(err, "删除失败"));
@@ -77,10 +85,10 @@ export function RoleManagement() {
   // 角色权限集 → 标签。系统角色显「全部功能」；空集显「仅首页」；否则按侧栏顺序取前 6 个 + 折叠。
   const renderPermissions = (role: AdminRole) => {
     if (role.is_system) {
-      return <Chip color="primary" label="全部功能" />;
+      return <Tag color="geekblue">全部功能</Tag>;
     }
     if (role.permissions.length === 0) {
-      return <Typography color="text.secondary">仅首页</Typography>;
+      return <Typography.Text type="secondary">仅首页</Typography.Text>;
     }
     const permSet = new Set<PermissionKey>(role.permissions);
     // 目录已加载则按侧栏顺序，否则退回后端返回的字母序。
@@ -91,125 +99,179 @@ export function RoleManagement() {
     const shown = ordered.slice(0, 6);
     const rest = ordered.slice(6);
     return (
-      <Stack direction="row" useFlexGap flexWrap="wrap" spacing={0.5}>
+      <Space size={[4, 4]} wrap>
         {shown.map((k) => (
-          <Chip key={k} label={labelOf.get(k) ?? k} />
+          <Tag key={k}>{labelOf.get(k) ?? k}</Tag>
         ))}
         {rest.length > 0 && (
-          <Tooltip
-            describeChild
-            title={rest.map((k) => labelOf.get(k) ?? k).join("、")}
-          >
-            <Chip label={`+${rest.length}`} />
+          <Tooltip title={rest.map((k) => labelOf.get(k) ?? k).join("、")}>
+            <Tag>+{rest.length}</Tag>
           </Tooltip>
         )}
-      </Stack>
+      </Space>
     );
   };
 
+  const columns: TableColumnsType<AdminRole> = [
+    {
+      title: "角色名",
+      dataIndex: "name",
+      width: 180,
+      fixed: "left",
+      render: (name: string, record) => (
+        <Space size={6}>
+          <span>{name}</span>
+          {record.is_system && <Tag color="gold">系统</Tag>}
+        </Space>
+      )
+    },
+    {
+      title: "描述",
+      dataIndex: "description",
+      width: 220,
+      render: (d: string) => d || "-"
+    },
+    {
+      title: "权限",
+      key: "permissions",
+      width: 300,
+      render: (_: unknown, record) => renderPermissions(record)
+    },
+    {
+      title: "成员数",
+      dataIndex: "member_count",
+      width: 90,
+      align: "center"
+    },
+    {
+      title: "更新时间",
+      dataIndex: "updated_at",
+      width: 160,
+      render: (t: string) => dayjs(t).format("YYYY-MM-DD HH:mm")
+    },
+    {
+      title: "操作",
+      key: "action",
+      width: 150,
+      fixed: "right",
+      render: (_: unknown, record) => {
+        // 系统角色只读：编辑 / 删除均置灰，后端 403 兜底。
+        const reason = "系统角色不可编辑或删除";
+        return (
+          <Space size={4}>
+            <GatedButton
+              type="link"
+              size="small"
+              reason={reason}
+              disabled={record.is_system}
+              onClick={() => openEdit(record)}
+            >
+              编辑
+            </GatedButton>
+            <GatedButton
+              type="link"
+              size="small"
+              danger
+              reason={reason}
+              disabled={record.is_system}
+              loading={
+                deleteRole.isPending && deleteRole.variables === record.id
+              }
+              onClick={() => {
+                setDeleteError(undefined);
+                setDeleting(record);
+              }}
+            >
+              删除
+            </GatedButton>
+          </Space>
+        );
+      }
+    }
+  ];
+
   return (
-    <Stack spacing={2}>
-      <Breadcrumbs>
-        <Typography>用户管理</Typography>
-        <Typography>角色权限管理</Typography>
-      </Breadcrumbs>
-      <Paper variant="outlined" sx={{ p: 2 }}>
-        <Stack direction="row" justifyContent="space-between" sx={{ mb: 1.5 }}>
-          <Stack direction="row" spacing={1}>
-            <Button variant="contained" onClick={openCreate}>
+    <Flex vertical gap={16}>
+      {deleting && (
+        <Modal
+          open
+          title={`删除角色「${deleting.name}」`}
+          okText="删除"
+          cancelText="取消"
+          confirmLoading={deleteRole.isPending}
+          okButtonProps={{ danger: true }}
+          cancelButtonProps={{ disabled: deleteRole.isPending }}
+          closable={!deleteRole.isPending}
+          keyboard={!deleteRole.isPending}
+          mask={{ closable: !deleteRole.isPending }}
+          onCancel={() => {
+            if (!deleteRole.isPending) setDeleting(undefined);
+          }}
+          onOk={() => void confirmDelete()}
+        >
+          <p>
+            {deleting.member_count > 0
+              ? `该角色下有 ${deleting.member_count} 名管理员，删除后他们将被解绑、降级为仅可见首页。确认删除？`
+              : "确认删除该角色？"}
+          </p>
+          {deleteError && <Alert type="error" title={deleteError} />}
+        </Modal>
+      )}
+
+      <Breadcrumb items={[{ title: "用户管理" }, { title: "角色权限管理" }]} />
+
+      <Card size="small">
+        <Flex
+          justify="space-between"
+          align="center"
+          style={{ marginBottom: 12 }}
+        >
+          <Space>
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
               新建角色
             </Button>
-            <Button onClick={() => setAssignOpen(true)}>指派角色</Button>
-          </Stack>
-          <Button onClick={() => void listQuery.refetch()}>刷新</Button>
-        </Stack>
+            <Button
+              icon={<UsergroupAddOutlined />}
+              onClick={() => setAssignOpen(true)}
+            >
+              指派角色
+            </Button>
+          </Space>
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={() => void listQuery.refetch()}
+          >
+            刷新
+          </Button>
+        </Flex>
+
         {listQuery.isError && (
           <Alert
-            severity="error"
+            type="error"
+            showIcon
+            style={{ marginBottom: 12 }}
+            title="角色列表加载失败"
+            description={listQuery.error.message}
             action={
-              <Button onClick={() => void listQuery.refetch()}>重试</Button>
+              <Button size="small" onClick={() => void listQuery.refetch()}>
+                重试
+              </Button>
             }
-          >
-            角色列表加载失败<Typography>{listQuery.error.message}</Typography>
-          </Alert>
+          />
         )}
-        <AdminTable
-          emptyMessage="暂无角色"
-          rows={rows}
-          rowId={(row) => row.id}
-          loading={listQuery.isFetching}
-          minWidth={1000}
-          columns={[
-            {
-              id: "name",
-              label: "角色名",
-              width: 180,
-              sticky: "left",
-              render: (row) => (
-                <Stack direction="row" spacing={0.75} alignItems="center">
-                  <span>{row.name}</span>
-                  {row.is_system && <Chip label="系统" color="warning" />}
-                </Stack>
-              )
-            },
-            {
-              id: "description",
-              label: "描述",
-              width: 220,
-              render: (row) => row.description || "-"
-            },
-            {
-              id: "permissions",
-              label: "权限",
-              width: 300,
-              render: renderPermissions
-            },
-            {
-              id: "count",
-              label: "成员数",
-              width: 90,
-              render: (row) => row.member_count
-            },
-            {
-              id: "time",
-              label: "更新时间",
-              width: 160,
-              render: (row) => dayjs(row.updated_at).format("YYYY-MM-DD HH:mm")
-            },
-            {
-              id: "actions",
-              label: "操作",
-              width: 150,
-              sticky: "right",
-              render: (row) => (
-                <Stack direction="row" spacing={0.5}>
-                  <PermissionButton
-                    disabled={row.is_system}
-                    reason="系统角色不可编辑或删除"
-                    onClick={() => openEdit(row)}
-                  >
-                    编辑
-                  </PermissionButton>
-                  <PermissionButton
-                    color="error"
-                    disabled={row.is_system}
-                    reason="系统角色不可编辑或删除"
-                    loading={
-                      deleteRole.isPending && deleteRole.variables === row.id
-                    }
-                    onClick={() => {
-                      setDeleteError(undefined);
-                      setDeleting(row);
-                    }}
-                  >
-                    删除
-                  </PermissionButton>
-                </Stack>
-              )
-            }
-          ]}
+
+        <Table<AdminRole>
+          locale={{ emptyText: <TableEmptyState message="暂无角色" /> }}
+          rowKey="id"
+          size="middle"
+          columns={columns}
+          dataSource={rows}
+          loading={listQuery.isPending}
+          scroll={{ x: 1000 }}
+          pagination={false}
         />
-      </Paper>
+      </Card>
+
       <RoleFormModal
         open={formOpen}
         role={editingRole}
@@ -220,20 +282,6 @@ export function RoleManagement() {
         roles={rows}
         onClose={() => setAssignOpen(false)}
       />
-      <ConfirmDialog
-        open={!!deleting}
-        title={`删除角色「${deleting?.name ?? ""}」`}
-        confirmText="删除"
-        danger
-        pending={deleteRole.isPending}
-        error={deleteError}
-        onClose={() => setDeleting(undefined)}
-        onConfirm={() => void confirmDelete()}
-      >
-        {deleting?.member_count
-          ? `该角色下有 ${deleting.member_count} 名管理员，删除后他们将被解绑、降级为仅可见首页。确认删除？`
-          : "确认删除该角色？"}
-      </ConfirmDialog>
-    </Stack>
+    </Flex>
   );
 }

@@ -6,7 +6,7 @@
  * `.word-sort-actions` 下，标签页没有那层容器，所以这里按同一组视觉参数复刻，
  * 而不是去动那个被多处共用的选择器。
  */
-.word-pos-tabs [role="tab"][aria-selected="true"] {
+.word-pos-tabs > .ant-tabs-nav .ant-tabs-tab-active {
   background: #eef2fe;
 }
 
@@ -26,7 +26,11 @@
   align-items: center;
 }
 
-.word-pos-tab-handle .word-sort-drag-handle {
+.word-pos-tab-label > .ant-badge:empty {
+  display: none;
+}
+
+.word-pos-tab-handle .word-sort-drag-handle.ant-btn {
   width: 24px;
   min-width: 24px;
   color: #7f8998;
@@ -38,18 +42,18 @@
     transform 140ms ease;
 }
 
-.word-pos-tab-handle .word-sort-drag-handle:hover:not(:disabled),
-.word-pos-tab-handle .word-sort-drag-handle:focus-visible {
+.word-pos-tab-handle .word-sort-drag-handle.ant-btn:hover:not(:disabled),
+.word-pos-tab-handle .word-sort-drag-handle.ant-btn:focus-visible {
   color: #1677ff;
   background: rgba(22, 119, 255, 0.1);
 }
 
-.word-pos-tab-handle .word-sort-drag-handle:active:not(:disabled) {
+.word-pos-tab-handle .word-sort-drag-handle.ant-btn:active:not(:disabled) {
   cursor: grabbing;
   transform: scale(1.06);
 }
 
-.word-pos-tab-handle .word-sort-drag-handle:disabled {
+.word-pos-tab-handle .word-sort-drag-handle.ant-btn:disabled {
   color: #c4cad4;
   cursor: default;
 }
@@ -64,62 +68,13 @@
   outline-offset: -2px;
 }
 
-.word-pos-tab-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.word-add-basic-pos-select {
-  flex-shrink: 0;
-  color: var(--admin-color-primary, #2053ff);
-  border-radius: 8px;
-}
-
-.word-add-basic-pos-select .MuiSelect-select {
-  display: flex;
-  align-items: center;
-  min-height: 48px;
-  box-sizing: border-box;
-  padding: 0 12px;
-}
-
-.word-add-basic-pos-select:hover:not(.Mui-disabled),
-.word-add-basic-pos-select .MuiSelect-select:focus {
-  background: rgba(32, 83, 255, 0.06);
-  border-radius: 8px;
-}
-
-.word-add-basic-pos-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-}
-
-.word-pos-tabs [role="tab"] {
-  padding-block: 6px;
-}
-
 .word-pos-tab-actions {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
 }
-
-.word-pos-tab-actions .word-add-basic-pos-select,
-.word-pos-tab-actions .MuiIconButton-root {
+.word-pos-tab-actions .word-add-basic-pos-select {
   width: 24px;
   height: 24px;
-  padding: 0;
-}
-
-.word-pos-tab-actions .word-add-basic-pos-select .MuiSelect-select {
-  width: 24px;
-  height: 24px;
-  min-height: 24px;
-  padding: 0;
-  justify-content: center;
 }

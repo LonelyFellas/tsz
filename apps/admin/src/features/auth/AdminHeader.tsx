@@ -1,110 +1,178 @@
-import KeyboardArrowDown from "@mui/icons-material/KeyboardArrowDown";
 import {
-  Button,
-  Divider,
-  Menu,
-  MenuItem,
-  Stack,
-  Typography
-} from "@mui/material";
+  DisconnectOutlined,
+  DownOutlined,
+  LockOutlined,
+  LogoutOutlined,
+  SettingOutlined
+} from "@ant-design/icons";
+import { App, Button, Divider, Popover, Space, Typography } from "antd";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ADMIN_LEVEL_LABEL } from "@/features/admins/labels";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useAuthStore } from "@/lib/auth";
 import { AdminAvatar } from "./adminAvatar";
 import { useAdminLogout, useAdminLogoutAll } from "./useAdminLogout";
 
+/**
+ * 后台顶栏内容：把身份与账户操作收进头像 Popover——顶栏只留一个头像，
+ * 点开展开「已登录为 X」+ 修改密码 + 退出登录，供 ConsoleLayout 的 Layout.Header 承载。
+ * 身份来自 store.profile —— 登录与会话恢复（useAdminSessionRestore）已写入，
+ * 守卫保证进到这里时 profile 必有值，无需再单独探一次 /admin/profile。
+ */
 export function AdminHeader() {
+  const { modal } = App.useApp();
   const profile = useAuthStore((s) => s.profile);
   const logout = useAdminLogout();
   const logoutAll = useAdminLogoutAll();
   const navigate = useNavigate();
-  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
-  const [confirmation, setConfirmation] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string>();
+  const [open, setOpen] = useState(false);
+
   const name = profile?.display_name ?? "管理员";
+  // 未映射的 role（后端将来新增等级、前端未跟上）回退「管理员」，不留空白角色行。
   const roleLabel = (profile && ADMIN_LEVEL_LABEL[profile.role]) || "管理员";
-  const go = (path: string) => {
-    setAnchor(null);
-    navigate(path);
+
+  // 选一项后先收起 Popover，再执行动作（改密/个人设置走 SPA 导航，登出走整页跳转）。
+  const goProfileSettings = () => {
+    setOpen(false);
+    navigate("/settings/profile");
   };
-  return (
-    <Stack
-      direction="row"
-      justifyContent="flex-end"
-      alignItems="center"
-      sx={{ height: "100%" }}
-    >
-      <Button
-        aria-label="账户菜单"
-        aria-haspopup="menu"
-        aria-expanded={!!anchor}
-        onClick={(event) => setAnchor(event.currentTarget)}
-        endIcon={<KeyboardArrowDown />}
-      >
-        <AdminAvatar level={profile?.role} size="small" />
-      </Button>
-      <Menu
-        anchorEl={anchor}
-        open={!!anchor}
-        onClose={() => setAnchor(null)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-        transformOrigin={{ vertical: "top", horizontal: "right" }}
-      >
-        <Stack direction="row" spacing={1} sx={{ px: 2, py: 1, width: 220 }}>
-          <AdminAvatar level={profile?.role} />
-          <div>
-            <Typography fontWeight={600}>{name}</Typography>
-            <Typography variant="caption" color="text.secondary">
-              {roleLabel}
-            </Typography>
-          </div>
-        </Stack>
-        <Divider />
-        <MenuItem onClick={() => go("/settings/profile")}>个人设置</MenuItem>
-        <MenuItem onClick={() => go("/account/coins")}>我的天生币</MenuItem>
-        <MenuItem onClick={() => go("/change-password")}>修改密码</MenuItem>
-        <MenuItem
-          sx={{ color: "error.main" }}
-          onClick={() => {
-            setAnchor(null);
-            void logout();
-          }}
-        >
-          退出登录
-        </MenuItem>
-        <MenuItem
-          sx={{ color: "error.main" }}
-          onClick={() => {
-            setAnchor(null);
-            setError(undefined);
-            setConfirmation(true);
-          }}
-        >
-          退出所有设备
-        </MenuItem>
-      </Menu>
-      <ConfirmDialog
-        open={confirmation}
-        title="退出所有设备"
-        confirmText="全部退出"
-        danger
-        pending={pending}
-        error={error}
-        onClose={() => setConfirmation(false)}
-        onConfirm={() => {
-          if (pending) return;
-          setPending(true);
-          setError(undefined);
-          void logoutAll()
-            .catch(() => setError("未能确认所有设备已退出，请重试。"))
-            .finally(() => setPending(false));
+  const goChangePassword = () => {
+    setOpen(false);
+    navigate("/change-password");
+  };
+  const doLogout = () => {
+    setOpen(false);
+    void logout();
+  };
+  // 「退出所有设备」会把当前这台一起踢下线，误点代价高：二次确认。
+  const doLogoutAll = () => {
+    setOpen(false);
+    const confirmation = modal.confirm({
+      title: "退出所有设备",
+      content:
+        "将吊销你在全部设备上的登录会话，包括当前这台——确认后需要重新登录。确认退出？",
+      okText: "全部退出",
+      okButtonProps: { danger: true },
+      cancelText: "取消",
+      // 使用 close 回调自行收尾，避免 antd 再次抛出拒绝的 Promise。
+      onOk: (close: () => void) => {
+        confirmation.update({ okButtonProps: { danger: true, loading: true } });
+        void logoutAll().then(close, () => {
+          confirmation.update({
+            content: (
+              <Typography.Text type="danger" role="alert">
+                未能确认所有设备已退出，请重试。
+              </Typography.Text>
+            ),
+            okButtonProps: { danger: true, loading: false }
+          });
+        });
+      }
+    });
+  };
+
+  const menu = (
+    <div style={{ width: 220 }}>
+      <Space align="center" style={{ padding: "4px 4px 12px" }}>
+        <AdminAvatar level={profile?.role} />
+        <div style={{ minWidth: 0 }}>
+          <Typography.Text strong ellipsis style={{ display: "block" }}>
+            {name}
+          </Typography.Text>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            {roleLabel}
+          </Typography.Text>
+        </div>
+      </Space>
+      <Divider style={{ margin: 0 }} />
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 4,
+          paddingTop: 8
         }}
       >
-        将吊销你在全部设备上的登录会话，包括当前这台——确认后需要重新登录。确认退出？
-      </ConfirmDialog>
-    </Stack>
+        <Button
+          type="text"
+          block
+          icon={<SettingOutlined />}
+          style={{ justifyContent: "flex-start" }}
+          onClick={goProfileSettings}
+        >
+          个人设置
+        </Button>
+        <Button
+          type="text"
+          block
+          style={{ justifyContent: "flex-start" }}
+          onClick={() => {
+            setOpen(false);
+            navigate("/account/coins");
+          }}
+        >
+          我的天生币
+        </Button>
+        <Button
+          type="text"
+          block
+          icon={<LockOutlined />}
+          style={{ justifyContent: "flex-start" }}
+          onClick={goChangePassword}
+        >
+          修改密码
+        </Button>
+        <Button
+          type="text"
+          block
+          danger
+          icon={<LogoutOutlined />}
+          style={{ justifyContent: "flex-start" }}
+          onClick={doLogout}
+        >
+          退出登录
+        </Button>
+        <Button
+          type="text"
+          block
+          danger
+          icon={<DisconnectOutlined />}
+          style={{ justifyContent: "flex-start" }}
+          onClick={doLogoutAll}
+        >
+          退出所有设备
+        </Button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "flex-end",
+        height: "100%"
+      }}
+    >
+      <Popover
+        trigger="click"
+        placement="bottomRight"
+        open={open}
+        onOpenChange={setOpen}
+        content={menu}
+      >
+        <Button
+          type="text"
+          aria-label="账户菜单"
+          style={{ height: "auto", padding: "4px 8px" }}
+        >
+          <Space size={8}>
+            <AdminAvatar level={profile?.role} size="small" />
+            <DownOutlined style={{ fontSize: 12, color: "#8c8c8c" }} />
+          </Space>
+        </Button>
+      </Popover>
+    </div>
   );
 }

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { FeedbackProvider } from "@/components/FeedbackProvider";
+import { App } from "antd";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, usePermission } from "@/lib/auth";
 
@@ -60,12 +60,12 @@ describe("UserDetailDrawer", () => {
     const onClose = vi.fn();
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <FeedbackProvider>
+        <App>
           <UserDetailDrawer
             user={{ ...base, teacher_verified: true }}
             onClose={onClose}
           />
-        </FeedbackProvider>
+        </App>
       </QueryClientProvider>
     );
     fireEvent.click(screen.getByText("撤销教师资格"));

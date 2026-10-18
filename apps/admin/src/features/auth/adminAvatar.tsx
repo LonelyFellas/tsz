@@ -1,6 +1,6 @@
-import WorkspacePremium from "@mui/icons-material/WorkspacePremium";
-import Person from "@mui/icons-material/Person";
-import { Avatar } from "@mui/material";
+import { CrownOutlined, UserOutlined } from "@ant-design/icons";
+import type { AvatarProps } from "antd";
+import { Avatar } from "antd";
 import type { AdminLevel } from "@tsz/types";
 import type { ReactNode } from "react";
 
@@ -12,8 +12,8 @@ interface AdminAvatarStyle {
 }
 
 const AVATAR_BY_LEVEL: Record<AdminLevel, AdminAvatarStyle> = {
-  super_admin: { icon: <WorkspacePremium />, background: "#faad14" },
-  admin: { icon: <Person />, background: "#2053FF" }
+  super_admin: { icon: <CrownOutlined />, background: "#faad14" },
+  admin: { icon: <UserOutlined />, background: "#2053FF" }
 };
 
 /**
@@ -27,35 +27,13 @@ export function adminAvatarStyle(level?: AdminLevel): AdminAvatarStyle {
 
 interface AdminAvatarProps {
   level?: AdminLevel;
-  size?: "small" | "default" | "large" | number;
+  size?: AvatarProps["size"];
 }
 
 /** 按权限等级渲染默认头像（前端静态，无后端字段）。 */
 export function AdminAvatar({ level, size }: AdminAvatarProps) {
   const { icon, background } = adminAvatarStyle(level);
   return (
-    <Avatar
-      sx={{
-        bgcolor: background,
-        width:
-          typeof size === "number"
-            ? size
-            : size === "small"
-              ? 24
-              : size === "large"
-                ? 40
-                : 32,
-        height:
-          typeof size === "number"
-            ? size
-            : size === "small"
-              ? 24
-              : size === "large"
-                ? 40
-                : 32
-      }}
-    >
-      {icon}
-    </Avatar>
+    <Avatar size={size} icon={icon} style={{ backgroundColor: background }} />
   );
 }

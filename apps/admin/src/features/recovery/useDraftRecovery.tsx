@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Alert, AlertTitle, Button, Stack } from "@mui/material";
+import { Alert, Button, Space } from "antd";
 import {
   readSnapshot,
   snapshotKey,
@@ -107,9 +107,23 @@ export function useDraftRecovery<T>({
     notice:
       saved || error ? (
         <Alert
-          severity="warning"
+          type="warning"
+          showIcon
+          title={
+            error ||
+            (sameRevision
+              ? "发现尚未保存的编辑备份"
+              : "发现编辑备份，但服务器内容已更新")
+          }
+          description={
+            error
+              ? "导出包含当前可序列化内容，未上传文件需单独保留。"
+              : sameRevision
+                ? "恢复后请核对内容，再手动保存。"
+                : "为避免覆盖他人修改，请导出备份并对照当前内容处理。"
+          }
           action={
-            <Stack direction="row" useFlexGap flexWrap="wrap" spacing={1}>
+            <Space wrap>
               {saved && sameRevision && (
                 <Button
                   disabled={busy || !restoreAllowed}
@@ -125,21 +139,9 @@ export function useDraftRecovery<T>({
               <Button disabled={busy} onClick={discard}>
                 丢弃备份
               </Button>
-            </Stack>
+            </Space>
           }
-        >
-          <AlertTitle>
-            {error ||
-              (sameRevision
-                ? "发现尚未保存的编辑备份"
-                : "发现编辑备份，但服务器内容已更新")}
-          </AlertTitle>
-          {error
-            ? "导出包含当前可序列化内容，未上传文件需单独保留。"
-            : sameRevision
-              ? "恢复后请核对内容，再手动保存。"
-              : "为避免覆盖他人修改，请导出备份并对照当前内容处理。"}
-        </Alert>
+        />
       ) : null
   };
 }

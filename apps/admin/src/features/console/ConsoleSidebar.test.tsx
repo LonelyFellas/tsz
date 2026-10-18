@@ -57,7 +57,7 @@ beforeEach(() => {
 afterEach(() => setLevel(null));
 
 // 侧栏依赖 react-router 的 useLocation/useNavigate，用 MemoryRouter 提供路由上下文，
-// initialEntries 控制当前路径。侧栏使用 MUI List，断言其菜单项与禁用态。
+// initialEntries 控制当前路径。侧栏已改为 antd Menu，断言其菜单项与禁用态。
 function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -174,7 +174,7 @@ describe("ConsoleSidebar", () => {
     // 展开「词库管理」分组后，智能词库（已挂真实路由）可点。
     fireEvent.click(screen.getByText("词库管理"));
     expect(
-      screen.getByRole("button", { name: "智能词库" })
+      screen.getByRole("menuitem", { name: "智能词库" })
     ).toBeInTheDocument();
   });
 
@@ -186,7 +186,7 @@ describe("ConsoleSidebar", () => {
       </MemoryRouter>
     );
     fireEvent.click(screen.getByText("词库管理"));
-    fireEvent.click(screen.getByRole("button", { name: "智能词库" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "智能词库" }));
     expect(mockNavigate).toHaveBeenCalledWith("/words");
     expect(onNavigate).toHaveBeenCalledTimes(1);
   });
@@ -195,7 +195,7 @@ describe("ConsoleSidebar", () => {
     // onNavigate 缺省：进入跳转分支后 onNavigate?.() 应短路不抛错。
     renderAt("/");
     fireEvent.click(screen.getByText("词库管理"));
-    fireEvent.click(screen.getByRole("button", { name: "垃圾桶" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "垃圾桶" }));
     expect(mockNavigate).toHaveBeenCalledWith("/words/trash");
   });
 
@@ -250,25 +250,27 @@ it.each([
 ])("%s 只选中所属的菜单项 %s", (path, selected) => {
   renderAt(path);
   fireEvent.click(screen.getByText("词库管理"));
-  const library = screen.getByRole("button", { name: "智能词库" });
-  const trash = screen.getByRole("button", { name: "垃圾桶" });
-  expect(library.classList.contains("Mui-selected")).toBe(
+  const library = screen.getByRole("menuitem", { name: "智能词库" });
+  const trash = screen.getByRole("menuitem", { name: "垃圾桶" });
+  expect(library.classList.contains("ant-menu-item-selected")).toBe(
     selected === "智能词库"
   );
-  expect(trash.classList.contains("Mui-selected")).toBe(selected === "垃圾桶");
+  expect(trash.classList.contains("ant-menu-item-selected")).toBe(
+    selected === "垃圾桶"
+  );
 });
 
-it("收起侧栏的浮层菜单中，垃圾桶也不会同时选中智能词库", () => {
+it("收起侧栏的浮层菜单中，垃圾桶也不会同时选中智能词库", async () => {
   render(
     <MemoryRouter initialEntries={["/words/trash"]}>
       <ConsoleSidebar collapsed />
     </MemoryRouter>
   );
-  fireEvent.click(screen.getByRole("button", { name: "词库管理" }));
-  expect(screen.getByRole("menuitem", { name: "垃圾桶" })).toHaveClass(
-    "Mui-selected"
+  fireEvent.mouseOver(screen.getByText("词库管理"));
+  expect(await screen.findByRole("menuitem", { name: "垃圾桶" })).toHaveClass(
+    "ant-menu-item-selected"
   );
   expect(screen.getByRole("menuitem", { name: "智能词库" })).not.toHaveClass(
-    "Mui-selected"
+    "ant-menu-item-selected"
   );
 });

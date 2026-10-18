@@ -3,7 +3,7 @@ import type {
   KeyboardEvent as ReactKeyboardEvent,
   ReactNode
 } from "react";
-import { Tooltip } from "@mui/material";
+import { Tooltip } from "antd";
 import { SelectionPanel } from "./SelectionPanel";
 import { associationWords } from "../../core/text-links";
 import {
@@ -503,7 +503,6 @@ export function AnnotationStrip({
                   associationAnchor < token.end &&
                   Boolean(associationContent)
                 }
-
                 placement="bottom-start"
               >
                 <span
@@ -665,7 +664,6 @@ export function AnnotationStrip({
                         placement="bottom-start"
                       >
                         <Tooltip
-                          describeChild
                           title={
                             pausePopover?.gap === position
                               ? null

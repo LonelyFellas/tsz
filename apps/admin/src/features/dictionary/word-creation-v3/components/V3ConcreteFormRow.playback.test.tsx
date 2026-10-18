@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { AdminTestProviders as App } from "@/test-utils/AdminTestProviders";
+import { App } from "antd";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { DialectRulesV3, WordConcreteFormV3 } from "@tsz/types";
 import { PronunciationPreviewProvider } from "../../word-creation/PronunciationPreview";

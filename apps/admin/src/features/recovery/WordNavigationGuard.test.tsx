@@ -1,4 +1,4 @@
-import { AdminThemeProvider } from "@/mui-theme";
+import { ConfigProvider } from "antd";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import {
   createMemoryRouter,
@@ -32,9 +32,9 @@ it("keeps unsaved word edits on external navigation while allowing its own step 
     { initialEntries: ["/words/a/v3/wizard/forms"] }
   );
   render(
-    <AdminThemeProvider>
+    <ConfigProvider theme={{ token: { motion: false } }}>
       <RouterProvider router={router} />
-    </AdminThemeProvider>
+    </ConfigProvider>
   );
   fireEvent.click(screen.getByText("词义步骤"));
   expect(await screen.findByText("词义")).toBeVisible();
@@ -70,14 +70,16 @@ it("does not leave until the embedded sentence guard permits it", async () => {
     { initialEntries: ["/words/a/v3/wizard/forms"] }
   );
   render(
-    <AdminThemeProvider>
+    <ConfigProvider theme={{ token: { motion: false } }}>
       <RouterProvider router={router} />
-    </AdminThemeProvider>
+    </ConfigProvider>
   );
   fireEvent.click(screen.getByText("离开词条"));
   fireEvent.click(await screen.findByText("离开页面"));
   await waitFor(() =>
-    expect(screen.getByText("离开页面").closest("button")).toBeEnabled()
+    expect(screen.getByText("离开页面").closest("button")).not.toHaveClass(
+      "ant-btn-loading"
+    )
   );
   expect(router.state.location.pathname).toBe("/words/a/v3/wizard/forms");
   allowed = true;

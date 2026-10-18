@@ -1,7 +1,7 @@
 .v3-english-preview-playback {
   display: flex;
   flex: 0 0 44px;
-  border-right: 1px solid var(--admin-color-border, #d9d9d9);
+  border-right: 1px solid var(--ant-color-border, #d9d9d9);
 }
 
 .v3-english-preview-playback .word-pronunciation-play-action {
@@ -11,10 +11,9 @@
   height: auto;
   min-height: 44px;
   border: 0;
-  border-radius: var(--admin-border-radius, 6px) 0 0
-    var(--admin-border-radius, 6px);
+  border-radius: var(--ant-border-radius, 6px) 0 0 var(--ant-border-radius, 6px);
   box-shadow: none;
-  background: var(--admin-color-fill-quaternary, rgba(0, 0, 0, 0.02));
+  background: var(--ant-color-fill-quaternary, rgba(0, 0, 0, 0.02));
 }
 
 .v3-english-preview-text {
@@ -24,39 +23,25 @@
 }
 
 /* 焦点落在图标上，避免整块前置区域出现输入框式蓝色轮廓。 */
+.v3-english-preview-playback .word-pronunciation-play-action.ant-btn:focus,
 .v3-english-preview-playback
-  .word-pronunciation-play-action:is(
-    .MuiButton-root,
-    .MuiIconButton-root
-  ):focus,
-.v3-english-preview-playback
-  .word-pronunciation-play-action:is(
-    .MuiButton-root,
-    .MuiIconButton-root
-  ):focus-visible {
+  .word-pronunciation-play-action.ant-btn:focus-visible {
   outline: none;
   box-shadow: none;
 }
 
 .v3-english-preview-playback
-  .word-pronunciation-play-action:is(.MuiButton-root, .MuiIconButton-root):not(
-    :disabled
-  ):hover,
+  .word-pronunciation-play-action.ant-btn:not(:disabled):hover,
 .v3-english-preview-playback
-  .word-pronunciation-play-action:is(.MuiButton-root, .MuiIconButton-root):not(
-    :disabled
-  ):active {
+  .word-pronunciation-play-action.ant-btn:not(:disabled):active {
   color: var(--word-playback-color);
-  background: var(--admin-color-fill-quaternary, rgba(0, 0, 0, 0.02));
+  background: var(--ant-color-fill-quaternary, rgba(0, 0, 0, 0.02));
 }
 
 .v3-english-preview-playback
-  .word-pronunciation-play-action:is(
-    .MuiButton-root,
-    .MuiIconButton-root
-  ):focus-visible
-  .MuiSvgIcon-root {
+  .word-pronunciation-play-action.ant-btn:focus-visible
+  .anticon {
   border-radius: 3px;
-  outline: 2px solid var(--admin-color-primary, #2053ff);
+  outline: 2px solid var(--ant-color-primary, #2053ff);
   outline-offset: 4px;
 }

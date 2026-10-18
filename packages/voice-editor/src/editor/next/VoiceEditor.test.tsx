@@ -1,6 +1,4 @@
-import readerStyles from "../../reader.css?raw";
-import editorStyles from "../../editor.css?raw";
-const stylesSource = `${readerStyles}\n${editorStyles}`;
+import stylesSource from "../../styles.css?raw";
 import interactionSource from "./interaction.css?raw";
 import { VoicePanel } from "./ToolPanels";
 import {
@@ -1695,11 +1693,11 @@ describe("VoiceEditor 发音区", () => {
     render(<VoiceEditor {...props({ previewAdapter: adapter(synthesize) })} />);
     openVoices();
     const play = await screen.findByLabelText("试听 Sonia · 英式女声");
-    expect(play.querySelector("[data-preview-speaker]")).not.toBeNull();
+    expect(play.querySelector('[aria-label="sound"]')).not.toBeNull();
     fireEvent.click(play);
     expect(play).toHaveAttribute("aria-busy", "true");
-    expect(within(play).getAllByRole("progressbar")).toHaveLength(1);
-    expect(play.querySelector("[data-preview-speaker]")).toBeNull();
+    expect(play.querySelectorAll('[aria-label="loading"]')).toHaveLength(1);
+    expect(play.querySelector('[aria-label="sound"]')).toBeNull();
   });
 
   it("未配置时默认不勾选，试听不改变C端音色选择", async () => {
@@ -2127,15 +2125,14 @@ describe("VoiceEditor 发音区", () => {
     );
     openTool("音频");
     fireEvent.click(screen.getByLabelText("移除 old.mp3"));
-    fireEvent.click(await screen.findByRole("button", { name: "取消" }));
-    expect(
-      await screen.findByRole("button", { name: "试听 old.mp3" })
-    ).toBeInTheDocument();
+    // antd 在两字按钮之间插了空格，可及名是「取 消」/「移 除」
+    fireEvent.click(await screen.findByRole("button", { name: "取 消" }));
+    expect(screen.getByLabelText("试听 old.mp3")).toBeInTheDocument();
     expect(onAudioAssetsChange).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByLabelText("移除 old.mp3"));
-    // 确认框与行按钮使用不同的可访问名称。
-    fireEvent.click(await screen.findByRole("button", { name: "移除" }));
+    // 行按钮的可及名是「移除 old.mp3」，只有确认框的按钮叫「移 除」
+    fireEvent.click(await screen.findByRole("button", { name: "移 除" }));
     expect(screen.queryByLabelText("试听 old.mp3")).toBeNull();
     expect(onAudioAssetsChange).toHaveBeenLastCalledWith([]);
   });
@@ -2253,7 +2250,7 @@ describe("VoiceEditor 发音区", () => {
     await waitFor(() =>
       expect(screen.getByRole("alert")).toHaveTextContent("音频暂时无法试听")
     );
-    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    expect(document.querySelector(".ant-alert-error")).toBeNull();
     expect(screen.getByLabelText("试听 other.mp3")).toHaveAttribute(
       "data-playing",
       "false"

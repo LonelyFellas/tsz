@@ -1,4 +1,3 @@
-import { AdminThemeProvider } from "@/mui-theme";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   fireEvent,
@@ -7,7 +6,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { FeedbackProvider } from "@/components/FeedbackProvider";
+import { App as AntApp } from "antd";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpError } from "@tsz/api-client";
 import type { Admin } from "@tsz/types";
@@ -80,11 +79,9 @@ function renderPage() {
   });
   return render(
     <QueryClientProvider client={client}>
-      <AdminThemeProvider>
-        <FeedbackProvider>
-          <AdminManagement />
-        </FeedbackProvider>
-      </AdminThemeProvider>
+      <AntApp>
+        <AdminManagement />
+      </AntApp>
     </QueryClientProvider>
   );
 }
@@ -94,9 +91,11 @@ function clickButton(label: string | RegExp, idx = 0) {
   fireEvent.click(screen.getAllByText(label)[idx]!);
 }
 
-/** 点确认弹窗里的主按钮（[role="dialog"] 内，按可见文案定位）。 */
+/** 点确认弹窗里的主按钮（.ant-modal-confirm-btns 内，按可见文案定位）。 */
 function clickConfirmOk(label: RegExp) {
-  const btns = document.querySelector("[role=dialog]")!;
+  const btns = document.querySelector(
+    ".ant-modal-confirm-btns, .ant-modal-footer"
+  )!;
   fireEvent.click(within(btns as HTMLElement).getByText(label));
 }
 
@@ -273,9 +272,9 @@ describe("AdminManagement", () => {
       items: [plainAdmin, superAdmin],
       pagination: { page: 1, page_size: 10, total: 25, total_pages: 3 }
     });
-    renderPage();
+    const { container } = renderPage();
     await screen.findByText("审核员小王");
-    fireEvent.click(screen.getByRole("button", { name: "下一页" }));
+    fireEvent.click(container.querySelector(".ant-pagination-item-2")!);
     await waitFor(() =>
       expect(mockList).toHaveBeenCalledWith(
         expect.objectContaining({ page: 2, page_size: 10 })
@@ -372,4 +371,66 @@ describe("AdminManagement — 行操作", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText("临时密码已生成")).toBeNull();
   });
+});
+
+it.each(["status", "reset"] as const)(
+  "%s 失败后确认弹窗保留目标并可重试",
+  async (kind) => {
+    const request = kind === "status" ? mockSetStatus : mockResetPassword;
+    request.mockRejectedValueOnce(new HttpError(500, "temporary failure"));
+    if (kind === "status")
+      mockSetStatus.mockResolvedValueOnce({
+        ...plainAdmin,
+        status: "disabled"
+      });
+    else
+      mockResetPassword.mockResolvedValueOnce({
+        temporary_password: "TempPassword123"
+      });
+    renderPage();
+    await screen.findByText("审核员小王");
+    clickButton(kind === "status" ? /^禁\s?用$/ : /重置密码/);
+    const title =
+      kind === "status"
+        ? "禁用管理员「审核员小王」"
+        : "重置「审核员小王」的密码";
+    const dialog = (await screen.findByText(title)).closest<HTMLElement>(
+      '[role="dialog"]'
+    )!;
+    clickConfirmOk(kind === "status" ? /^禁\s?用$/ : /^重\s?置$/);
+    expect(await within(dialog).findByRole("alert")).toBeInTheDocument();
+    expect(dialog).not.toHaveClass("ant-zoom-leave");
+    clickConfirmOk(kind === "status" ? /^禁\s?用$/ : /^重\s?置$/);
+    await waitFor(() => expect(request).toHaveBeenCalledTimes(2));
+    if (kind === "reset")
+      expect(await screen.findByText("TempPassword123")).toBeInTheDocument();
+    else await waitFor(() => expect(dialog).not.toBeInTheDocument());
+  }
+);
+
+it("重置请求等待期间阻止取消和重复提交", async () => {
+  let finish!: (value: { temporary_password: string }) => void;
+  mockResetPassword.mockReturnValueOnce(
+    new Promise((resolve) => {
+      finish = resolve;
+    })
+  );
+  renderPage();
+  await screen.findByText("审核员小王");
+  clickButton(/^重置密码$/, 0);
+  const dialog = (
+    await screen.findByText("重置「审核员小王」的密码")
+  ).closest<HTMLElement>('[role="dialog"]')!;
+  clickConfirmOk(/^重\s?置$/);
+  await waitFor(() => expect(mockResetPassword).toHaveBeenCalledTimes(1));
+  const cancel = within(dialog).getByRole("button", { name: /取\s*消/ });
+  expect(cancel).toBeDisabled();
+  fireEvent.click(cancel);
+  fireEvent.keyDown(dialog, { key: "Escape", keyCode: 27 });
+  expect(dialog).toBeInTheDocument();
+  expect(buttonOf(/新建管理员/)).toBeDisabled();
+  clickConfirmOk(/^重\s?置$/);
+  expect(mockResetPassword).toHaveBeenCalledTimes(1);
+  finish({ temporary_password: "Tmp9xKq2wZ4d" });
+  expect(await screen.findByText("Tmp9xKq2wZ4d")).toBeInTheDocument();
 });

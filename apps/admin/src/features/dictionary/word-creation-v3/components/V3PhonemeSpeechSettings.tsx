@@ -1,12 +1,5 @@
-import { IconButton as MuiIconButton } from "@mui/material";
-import {
-  Alert as MuiAlert,
-  Button as MuiButton,
-  Stack as MuiStack,
-  Typography as MuiTypography
-} from "@mui/material";
-import EditOutlined from "@mui/icons-material/EditOutlined";
-
+import { EditOutlined } from "@ant-design/icons";
+import { Alert, Button, Space, Typography } from "antd";
 import {
   lazy,
   Suspense,
@@ -36,7 +29,7 @@ import {
 } from "../../voice-editor/dataSource";
 import { useContentEditPermissions } from "../../contentEditPermissions";
 import { VoiceEditorModal } from "./VoiceEditorModal";
-import "@tsz/voice-editor/reader.css";
+import "@tsz/voice-editor/styles.css";
 
 const VoiceEditor = lazy(() =>
   import("@tsz/voice-editor/editor").then((module) => ({
@@ -190,7 +183,8 @@ export function V3PhonemeSpeechSettings({
   );
   return (
     <>
-      <MuiIconButton
+      <Button
+        icon={<EditOutlined />}
         aria-label={`打开${label} TTS 设置器`}
         data-v3-node-id={nodeId}
         data-v3-field={field}
@@ -200,20 +194,16 @@ export function V3PhonemeSpeechSettings({
           setSource(sourceKey);
           setOpen(true);
         }}
-      >
-        <EditOutlined fontSize="inherit" />
-      </MuiIconButton>
+      />
       {open && (
         <VoiceEditorModal
           title={`${label} · 音标、停顿与音色`}
           open
           footer={null}
-          onClose={() => setOpen(false)}
+          onCancel={() => setOpen(false)}
         >
           <Suspense
-            fallback={
-              <MuiTypography component="span">正在加载 TTS 设置…</MuiTypography>
-            }
+            fallback={<Typography.Text>正在加载 TTS 设置…</Typography.Text>}
           >
             <VoiceEditor
               readOnly={!canEdit || source !== sourceKey}
@@ -256,14 +246,15 @@ export function V3PhonemeSpeechSettings({
               }
               previewIsMock={voicePreviewIsMock}
               renderActions={(canComplete) => (
-                <MuiStack direction="row" spacing={1} alignItems="center">
-                  <MuiButton
+                <Space>
+                  <Button
                     aria-label={`取消${label}设置`}
                     onClick={() => setOpen(false)}
                   >
                     取消
-                  </MuiButton>
-                  <MuiButton
+                  </Button>
+                  <Button
+                    type="primary"
                     aria-label={`完成${label}设置`}
                     disabled={
                       !canEdit ||
@@ -275,16 +266,13 @@ export function V3PhonemeSpeechSettings({
                       onChange(resolveCandidate(draft.content));
                       setOpen(false);
                     }}
-                    variant="contained"
                   >
                     完成
-                  </MuiButton>
-                </MuiStack>
+                  </Button>
+                </Space>
               )}
             />
-            {inputIssue && (
-              <MuiAlert severity={"warning"}>{inputIssue}</MuiAlert>
-            )}
+            {inputIssue && <Alert type="warning" title={inputIssue} showIcon />}
           </Suspense>
         </VoiceEditorModal>
       )}

@@ -1,8 +1,3 @@
-import {
-  Alert as MuiAlert,
-  Stack as MuiStack,
-  Typography as MuiTypography
-} from "@mui/material";
 // 释义卡内的「成分用词」区块（多维释义与多维例句之间，仅短语渲染，可选内容）。
 // 交互（2026-09-02 定稿三层级联；2026-09-04 前端临时收成单选）：点击短语中的单词 →
 // Popover 级联（词条 → 词形 → 词义）**单选（radio）**，点词义即关联、经「清除关联」解除；
@@ -10,7 +5,7 @@ import {
 // 候选按词形**等值**匹配检索（含从未发布的草稿，带「草稿」标记），词形层按管理员方言偏好只给一侧。
 // 数据按释义归属：读写 sense.component_usages（数组，每单词 0/1 条），随词义步保存；
 // 短语拼写只用于切词展示（unified 取 common、distinguish 取 uk，英美拼写不同时以英式为准）。
-import { AnchoredPanel } from "@/components/AnchoredPanel";
+import { Alert, Empty, Flex, Popover } from "antd";
 import type {
   DraftFormsStepContentV3,
   PhraseComponentUsageV3
@@ -135,7 +130,6 @@ export function V3PhraseComponentUsagesCard({
     () => sentenceTokens(spelling ?? "").map((token) => token.text),
     [spelling]
   );
-  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const [openIndex, setOpenIndex] = useState<number | undefined>(undefined);
   // 每次打开都换一次 nonce，强制重新取候选——否则同事新发布的词条一直看不到。
   const [openNonce, setOpenNonce] = useState(0);
@@ -163,25 +157,23 @@ export function V3PhraseComponentUsagesCard({
   };
 
   if (spelling === undefined || tokens.length === 0) {
-    return (
-      <MuiTypography color="text.secondary">
-        {"请先在词形步填写短语拼写"}
-      </MuiTypography>
-    );
+    return <Empty description="请先在词形步填写短语拼写" />;
   }
   return (
-    <MuiStack direction="column" spacing={1}>
+    <Flex vertical gap="small">
       {senseComponentUsagesEnabled ? null : (
-        <MuiAlert severity={"info"}>
-          {"当前后端尚不支持释义级成分用词，暂只读；升级后端后即可编辑。"}
-        </MuiAlert>
+        <Alert
+          showIcon
+          title="当前后端尚不支持释义级成分用词，暂只读；升级后端后即可编辑。"
+          type="info"
+        />
       )}
       {senseComponentUsagesEnabled && !discoveryEnabled ? (
-        <MuiAlert severity={"info"}>
-          {
-            "当前后端未开启词义查询能力，成分用词暂不可编辑；已有关联仍会随词义一起保存。"
-          }
-        </MuiAlert>
+        <Alert
+          showIcon
+          title="当前后端未开启词义查询能力，成分用词暂不可编辑；已有关联仍会随词义一起保存。"
+          type="info"
+        />
       ) : null}
       <div
         aria-label="短语单词选择区"
@@ -198,7 +190,27 @@ export function V3PhraseComponentUsagesCard({
           const targets = selectionsByLiteral.get(token) ?? [];
           const hasLinks = targets.length > 0;
           return (
-            <span key={`${index}:${token}`}>
+            <Popover
+              content={
+                <V3TargetCascader
+                  key={`${index}:${openNonce}`}
+                  literal={token}
+                  onReplace={(replaced) => replaceLiteral(token, replaced)}
+                  selfEntryId={wordId}
+                  targets={targets}
+                />
+              }
+              destroyOnHidden
+              key={`${index}:${token}`}
+              onOpenChange={(open) => {
+                if (!editable) return;
+                if (open) setOpenNonce((current) => current + 1);
+                setOpenIndex(open ? index : undefined);
+              }}
+              open={editable && openIndex === index}
+              placement="bottomLeft"
+              trigger="click"
+            >
               <button
                 aria-label={`关联第 ${index + 1} 个词 ${token}`}
                 aria-pressed={hasLinks}
@@ -211,35 +223,14 @@ export function V3PhraseComponentUsagesCard({
                     ? { background: "#389e0d", borderColor: "#389e0d" }
                     : undefined
                 }
-                onClick={(event) => {
-                  setAnchor(event.currentTarget);
-                  setOpenNonce((current) => current + 1);
-                  setOpenIndex(openIndex === index ? undefined : index);
-                }}
-                aria-expanded={editable && openIndex === index}
                 type="button"
               >
                 {token}
               </button>
-              <AnchoredPanel
-                anchor={anchor}
-                open={editable && openIndex === index}
-                label={`关联 ${token}`}
-                placement="bottom-start"
-                onClose={() => setOpenIndex(undefined)}
-              >
-                <V3TargetCascader
-                  key={`${index}:${openNonce}`}
-                  literal={token}
-                  onReplace={(replaced) => replaceLiteral(token, replaced)}
-                  selfEntryId={wordId}
-                  targets={targets}
-                />
-              </AnchoredPanel>
-            </span>
+            </Popover>
           );
         })}
       </div>
-    </MuiStack>
+    </Flex>
   );
 }

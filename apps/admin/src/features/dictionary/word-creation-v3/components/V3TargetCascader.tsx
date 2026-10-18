@@ -1,15 +1,15 @@
-import {
-  Alert as MuiAlert,
-  Button as MuiButton,
-  Chip as MuiChip,
-  CircularProgress as MuiCircularProgress,
-  Stack as MuiStack,
-  Typography as MuiTypography
-} from "@mui/material";
-import { CandidatePanel } from "./CandidatePanel";
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
 import { usePartOfSpeechLabel } from "../../part-of-speech/PartOfSpeechLabels";
-
+import {
+  Alert,
+  Button,
+  Cascader,
+  Empty,
+  Flex,
+  Spin,
+  Tag,
+  Typography
+} from "antd";
 import type {
   AdminWordV3,
   DraftMeaningsStepContentWritableV3,
@@ -120,7 +120,7 @@ function cascaderOptionsFromGroups(
 ): CascaderOptionNode[] {
   return groups.map((group) => {
     const draftTag = group.draft ? (
-      <MuiChip className="v3-component-usage-draft" label={<>草稿</>} />
+      <Tag className="v3-component-usage-draft">草稿</Tag>
     ) : null;
     // 没有词义就没有可关联的叶子：留一条禁用行说明原因（草稿常见——词义步还没保存），
     // 免得用户以为词条不存在。
@@ -131,13 +131,9 @@ function cascaderOptionsFromGroups(
         isLeaf: true,
         label: (
           <span className="v3-component-usage-entry">
-            <MuiTypography
-              className="tsz-words"
-              component="span"
-              color="text.secondary"
-            >
+            <Typography.Text className="tsz-words" type="secondary">
               {group.headword}（暂无词义）
-            </MuiTypography>
+            </Typography.Text>
             {draftTag}
           </span>
         )
@@ -150,13 +146,9 @@ function cascaderOptionsFromGroups(
       value: group.entryId,
       label: (
         <span className="v3-component-usage-entry">
-          <MuiTypography
-            className="tsz-words"
-            component="span"
-            fontWeight={600}
-          >
+          <Typography.Text className="tsz-words" strong>
             {group.headword}
-          </MuiTypography>
+          </Typography.Text>
           {draftTag}
         </span>
       ),
@@ -175,7 +167,6 @@ function cascaderOptionsFromGroups(
           disabled: senses.length === 0,
           isLeaf: senses.length === 0,
           label: (
-            // 命中行只靠颜色区分，不再占一个「命中」标签的宽度。
             // 命中行只靠颜色区分，不再占一个「命中」标签的宽度。
             <span
               className={
@@ -215,10 +206,7 @@ function cascaderOptionsFromGroups(
                   />
                   {sense.gloss.trim() || "词义未填写"}
                   {target && !target.target_publication_id && (
-                    <MuiChip
-                      className="v3-component-usage-draft"
-                      label={<>未发布目标</>}
-                    />
+                    <Tag className="v3-component-usage-draft">未发布目标</Tag>
                   )}
                 </span>
               )
@@ -912,18 +900,11 @@ export function V3TargetCascader({
         label:
           components.length === 0 ? (
             <span className="v3-component-usage-entry">
-              <MuiTypography
-                className="tsz-words"
-                component="span"
-                color="text.secondary"
-              >
+              <Typography.Text className="tsz-words" type="secondary">
                 {groups[index]!.headword}（未配置成分用词）
-              </MuiTypography>
+              </Typography.Text>
               {groups[index]!.draft ? (
-                <MuiChip
-                  className="v3-component-usage-draft"
-                  label={<>草稿</>}
-                />
+                <Tag className="v3-component-usage-draft">草稿</Tag>
               ) : null}
             </span>
           ) : (
@@ -1028,32 +1009,29 @@ export function V3TargetCascader({
   // 无候选/查询失败时也要出现——否则指向已下架目标的孤儿关联再也删不掉。
   const clearControl =
     selected && !readOnly ? (
-      <MuiStack direction="row" justifyContent={"flex-end"}>
-        <MuiButton
+      <Flex justify="flex-end">
+        <Button
           onClick={() => onReplace([])}
           size="small"
           style={{ paddingInline: 0, height: "auto" }}
-          variant="text"
+          type="link"
         >
           清除关联
-        </MuiButton>
-      </MuiStack>
+        </Button>
+      </Flex>
     ) : null;
 
   if (state.pending) {
     return (
-      <MuiStack
+      <Flex
+        align="center"
+        justify="center"
+        gap="small"
         style={{ width: 360, padding: 16 }}
-        direction="row"
-        spacing={1}
-        alignItems={"center"}
-        justifyContent={"center"}
       >
-        <MuiCircularProgress size={32} />
-        <MuiTypography component="span" color="text.secondary">
-          正在按关键字查询词库
-        </MuiTypography>
-      </MuiStack>
+        <Spin />
+        <Typography.Text type="secondary">正在按关键字查询词库</Typography.Text>
+      </Flex>
     );
   }
   const reloadCandidates = () => {
@@ -1067,19 +1045,19 @@ export function V3TargetCascader({
   const pagination = (
     <>
       {state.error ? (
-        <MuiAlert severity={"warning"}>{state.error}</MuiAlert>
+        <Alert showIcon title={state.error} type="warning" />
       ) : null}
       {state.stale || (state.error && !state.nextCursor) ? (
-        <MuiButton
+        <Button
           key="reload"
           aria-label="重新加载"
           size="small"
           onClick={reloadCandidates}
         >
           重新加载
-        </MuiButton>
+        </Button>
       ) : state.nextCursor ? (
-        <MuiButton
+        <Button
           key="more"
           aria-label={state.error ? "重试加载更多" : "加载更多"}
           size="small"
@@ -1087,55 +1065,60 @@ export function V3TargetCascader({
           onClick={state.loadMore}
         >
           {state.error ? "重试加载更多" : "加载更多"}
-        </MuiButton>
+        </Button>
       ) : state.truncated ? (
-        <MuiAlert severity={"info"}>
-          {"候选未完整返回，当前服务暂不支持继续加载。"}
-        </MuiAlert>
+        <Alert
+          showIcon
+          type="info"
+          title="候选未完整返回，当前服务暂不支持继续加载。"
+        />
       ) : null}
     </>
   );
   if (options.length === 0) {
     return (
-      <MuiStack direction="column" spacing={1}>
+      <Flex vertical gap="small">
         {clearControl}
         {!state.error && (
-          <MuiTypography color="text.secondary">
-            {state.nextCursor || state.truncated
-              ? "已加载的候选中没有可关联的词条"
-              : "没有匹配的词条"}
-          </MuiTypography>
+          <Empty
+            description={
+              state.nextCursor || state.truncated
+                ? "已加载的候选中没有可关联的词条"
+                : "没有匹配的词条"
+            }
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+          />
         )}
         {pagination}
-      </MuiStack>
+      </Flex>
     );
   }
   return (
-    <MuiStack direction="column" spacing={1}>
+    <Flex vertical gap="small">
       {clearControl}
       {failedComponent && (
-        <MuiAlert
+        <Alert
+          showIcon
+          type="warning"
+          title="成分词形词义加载失败，已有关联未受影响。"
           action={
-            <MuiButton
+            <Button
               size="small"
               onClick={() => void loadComponent(failedComponent)}
             >
               重试
-            </MuiButton>
+            </Button>
           }
-          severity={"warning"}
-        >
-          {"成分词形词义加载失败，已有关联未受影响。"}
-        </MuiAlert>
+        />
       )}
-      <CandidatePanel<CascaderOptionNode>
+      <Cascader.Panel<CascaderOptionNode>
         className="v3-component-usage-cascader"
-        onExpand={(path) => {
+        loadData={(path) => {
           const component = path.at(-1)?.component;
           if (component && !componentResults[component.key])
             void loadComponent(component);
         }}
-        onChange={(selectedOptions) => {
+        onChange={(_next, selectedOptions) => {
           if (readOnly) return;
           const leaf = selectedOptions.at(-1);
           const selection =
@@ -1150,6 +1133,6 @@ export function V3TargetCascader({
         value={value}
       />
       {pagination}
-    </MuiStack>
+    </Flex>
   );
 }

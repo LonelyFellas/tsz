@@ -75,6 +75,7 @@ describe("KpiCard", () => {
         item={{ key: "rate", label: "学习进度", value: 34, suffix: "%" }}
       />
     );
-    expect(screen.getByText("34 %")).toBeInTheDocument();
+    expect(screen.getByText("34")).toBeInTheDocument();
+    expect(screen.getByText("%")).toBeInTheDocument();
   });
 });

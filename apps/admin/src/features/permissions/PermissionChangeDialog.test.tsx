@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { FeedbackProvider } from "@/components/FeedbackProvider";
+import { App } from "antd";
 import { HttpError } from "@tsz/api-client";
 import type { PermissionPreviewResponse } from "@tsz/types";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -46,7 +46,7 @@ function mount(extra: { expectedVersions?: Record<string, number> } = {}) {
   const close = vi.fn();
   render(
     <QueryClientProvider client={client}>
-      <FeedbackProvider>
+      <App>
         <PermissionChangeDialog
           catalogVersion="v1"
           adminIds={["a"]}
@@ -56,7 +56,7 @@ function mount(extra: { expectedVersions?: Record<string, number> } = {}) {
           onClose={close}
           {...extra}
         />
-      </FeedbackProvider>
+      </App>
     </QueryClientProvider>
   );
   return { client, committed, close };
@@ -80,7 +80,7 @@ describe("单人/批量权限精确预览提交", () => {
     expect(
       screen
         .getByText("words.access、words.edit")
-        .closest('[data-permission-dependency="自动补齐"]')
+        .closest(".ant-typography-warning")
     ).toHaveTextContent("自动补齐：words.access、words.edit");
     expect(screen.queryByText("同时开通")).toBeNull();
   });
@@ -174,11 +174,11 @@ describe("单人/批量权限精确预览提交", () => {
     const { client, committed } = mount();
     const reload = vi.spyOn(client, "invalidateQueries");
     const automaticRevoke = await screen.findByText("words.edit_others", {
-      selector: '[data-permission-dependency="自动取消"] span'
+      selector: ".ant-typography-danger span"
     });
-    expect(
-      automaticRevoke.closest('[data-permission-dependency="自动取消"]')
-    ).toHaveTextContent("自动取消：words.edit_others");
+    expect(automaticRevoke.closest(".ant-typography-danger")).toHaveTextContent(
+      "自动取消：words.edit_others"
+    );
     fireEvent.click(screen.getByText("保存变更"));
     await screen.findByText(
       "已重新读取当前权限。请核对后返回，重新选择需要的调整。"

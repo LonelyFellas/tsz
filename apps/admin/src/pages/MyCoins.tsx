@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, Button, Paper, Stack, Typography } from "@mui/material";
+import { Alert, Button, Card, Space, Typography } from "antd";
 import { formatCoins } from "@tsz/shared";
 import { useState } from "react";
 import { api, useAuthStore } from "@/lib/auth";
@@ -23,10 +23,8 @@ function Wallet({ id }: { id: string }) {
       api.coins.entries({ page, page_size: 20, snapshot }, { signal })
   });
   return (
-    <Stack spacing={3} sx={{ width: "100%" }}>
-      <Typography variant="h4" component="h1">
-        我的天生币
-      </Typography>
+    <Space orientation="vertical" size="large" style={{ width: "100%" }}>
+      <Typography.Title level={2}>我的天生币</Typography.Title>
       <Button
         onClick={() => {
           setPage(1);
@@ -38,31 +36,25 @@ function Wallet({ id }: { id: string }) {
       >
         刷新
       </Button>
-      <Paper variant="outlined" sx={{ p: 2 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>
-          管理员本人钱包
-        </Typography>
+      <Card title="管理员本人钱包">
         {wallet.isError ? (
-          <Alert severity="error">余额加载失败，当前余额未知</Alert>
+          <Alert type="error" title="余额加载失败，当前余额未知" />
         ) : wallet.isPending || wallet.isFetching ? (
           "正在读取余额…"
         ) : (
           <>
-            <Typography variant="h5">
+            <Typography.Title level={3}>
               {formatCoins(wallet.data.balance)}
-            </Typography>
+            </Typography.Title>
             {wallet.data.status !== "open" && (
-              <Alert severity="warning">钱包已暂停或关闭</Alert>
+              <Alert type="warning" title="钱包已暂停或关闭" />
             )}
           </>
         )}
-      </Paper>
-      <Paper variant="outlined" sx={{ p: 2 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>
-          收支记录
-        </Typography>
+      </Card>
+      <Card title="收支记录">
         {entries.isError ? (
-          <Alert severity="error">流水加载失败，请重试</Alert>
+          <Alert type="error" title="流水加载失败，请重试" />
         ) : (
           <EntriesTable
             data={entries.data}
@@ -73,7 +65,7 @@ function Wallet({ id }: { id: string }) {
             }}
           />
         )}
-      </Paper>
-    </Stack>
+      </Card>
+    </Space>
   );
 }

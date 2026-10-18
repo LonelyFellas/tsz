@@ -1,43 +1,3 @@
-:where(textarea.word-pronunciation-phonetic-input) {
-  box-sizing: border-box;
-  width: 100%;
-  min-width: 0;
-  padding: 4px 11px;
-  border: 1px solid #c4c4c4;
-  border-radius: 8px;
-  font: inherit;
-  background: #fff;
-  resize: none;
-}
-/* 单独的字典音标框与带操作按钮的发音输入组统一为 40px 单行高度。 */
-.word-pronunciation-phonetic-control
-  > textarea.word-pronunciation-phonetic-input {
-  display: block;
-  line-height: 22px;
-  padding-block: 8px;
-}
-
-textarea.word-pronunciation-phonetic-input:focus {
-  outline: 2px solid #2053ff;
-  outline-offset: -2px;
-}
-textarea.word-pronunciation-phonetic-input[aria-invalid="true"] {
-  border-color: #d32f2f;
-}
-textarea.word-pronunciation-phonetic-input:disabled {
-  color: rgba(0, 0, 0, 0.38);
-  background: #fafafa;
-}
-.v3-voice-text-field-compact {
-  display: flex;
-  align-items: stretch;
-  min-width: 0;
-  width: 100%;
-}
-.v3-voice-text-field-compact > .v3-voice-text-field-input {
-  border-radius: 0;
-}
-
 .v3-voice-text-editor {
   position: relative;
   width: 100%;
@@ -80,7 +40,7 @@ textarea.word-pronunciation-phonetic-input:disabled {
   background: transparent;
 }
 
-.v3-voice-text-editor-done > button {
+.v3-voice-text-editor-done .ant-btn {
   min-width: 68px;
   height: 30px;
   border-radius: 7px;
@@ -129,31 +89,31 @@ textarea.word-pronunciation-phonetic-input:disabled {
 }
 
 /* 收起态与周围输入框同字号；编辑器的大字只留在编辑态，标注字重仍由只读渲染器控制。 */
-textarea.v3-voice-text-large-preview {
-  font-size: 14px;
+textarea.v3-voice-text-large-preview.ant-input {
+  font-size: var(--ant-font-size, 14px);
   font-weight: 400;
-  line-height: 1.5714285714;
+  line-height: var(--ant-line-height, 1.5714285714);
   padding: 4px 11px;
 }
 
-textarea.word-pronunciation-phonetic-input.tsz-words,
-textarea.word-pronunciation-phonetic-input.tsz-actual-pronunciation {
+textarea.word-pronunciation-phonetic-input.tsz-words.ant-input,
+textarea.word-pronunciation-phonetic-input.tsz-actual-pronunciation.ant-input {
   font-size: 14pt;
 }
 
 /* 语法结构收起态保持紧凑，聚焦输入与富文本预览使用同样的行高和内边距。 */
-textarea.v3-grammar-input {
+textarea.v3-grammar-input.ant-input {
   line-height: 1.5;
   padding: 4px 12px;
 }
 
 /* antd 默认 transition: all 会让 autoSize 测到连读留白的动画中间值；仅保留颜色和焦点过渡。 */
-textarea.word-pronunciation-phonetic-input {
+textarea.word-pronunciation-phonetic-input.ant-input {
   transition-property: color, background-color, border-color, box-shadow;
 }
 
 /* grammar 用真实富文本排版撑高；透明输入框保留边框、点击和可访问焦点。 */
-.v3-grammar-preview > textarea {
+.v3-grammar-preview > textarea.ant-input {
   position: absolute;
   inset: 0;
   height: 100% !important;
@@ -182,7 +142,7 @@ textarea.word-pronunciation-phonetic-input {
 
 /* 释义收起态沿用正文输入框的字号和内边距，富文本负责撑高。 */
 .v3-association-preview-content {
-  font-size: 14px;
-  line-height: 1.5714285714;
+  font-size: var(--ant-font-size, 14px);
+  line-height: var(--ant-line-height, 1.5714285714);
   padding: 4px 11px;
 }

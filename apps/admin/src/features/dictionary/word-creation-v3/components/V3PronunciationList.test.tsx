@@ -1,5 +1,5 @@
-import { FeedbackProvider } from "@/components/FeedbackProvider";
-import { AdminThemeProvider } from "@/mui-theme";
+import { App as AntApp, ConfigProvider } from "antd";
+
 import { changeVoiceText } from "./V3VoiceTextField.test-helper";
 import { env } from "@/lib/env";
 
@@ -89,9 +89,9 @@ const render = (
 ) =>
   rtlRender(ui, {
     wrapper: ({ children }) => (
-      <AdminThemeProvider>
-        <FeedbackProvider>{children}</FeedbackProvider>
-      </AdminThemeProvider>
+      <ConfigProvider theme={{ token: { motion: false } }}>
+        <AntApp>{children}</AntApp>
+      </ConfigProvider>
     ),
     ...options
   });
@@ -564,7 +564,9 @@ it("读法按指定顺序展示，逐字正音使用独立 wire 值", () => {
   render(<Harness />);
   fireEvent.mouseDown(screen.getByLabelText("第 1 条发音的读法"));
   expect(
-    Array.from(screen.getAllByRole("option")).map((item) => item.textContent)
+    Array.from(
+      document.querySelectorAll(".ant-select-item-option-content")
+    ).map((item) => item.textContent)
   ).toEqual(["语流连读", "逐字正音", "强读", "弱读"]);
   fireEvent.click(screen.getByText("逐字正音"));
   const wire = JSON.parse(screen.getByTestId("wire").textContent!);

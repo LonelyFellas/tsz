@@ -4,7 +4,7 @@ import {
   screen,
   waitFor
 } from "@testing-library/react";
-
+import { ConfigProvider } from "antd";
 import { useState, type ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { GrammarFormLinkV3, RichTextV2, TextLinkV3 } from "@tsz/types";
@@ -12,7 +12,9 @@ import type { AssociationPickerProps } from "../../types";
 import { VoiceEditor } from "./VoiceEditor";
 
 function render(ui: ReactElement) {
-  return renderUI(<>{ui}</>);
+  return renderUI(
+    <ConfigProvider theme={{ token: { motion: false } }}>{ui}</ConfigProvider>
+  );
 }
 
 const target: TextLinkV3 = {
@@ -537,7 +539,7 @@ it("例句的关联恢复跟随撤销重做，主动清除后不再自动恢复"
   expect(observe).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "确认修改" }));
   await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([]));
-  fireEvent.click(await screen.findByRole("button", { name: "上一步" }));
+  fireEvent.click(screen.getByRole("button", { name: "上一步" }));
   await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([original]));
   fireEvent.click(screen.getByRole("button", { name: "下一步" }));
   await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([]));
@@ -614,7 +616,7 @@ it.each([
     expect(screen.getByText(/部分关联暂时失效/)).toBeVisible();
     fireEvent.change(input, { target: { value: `${changed}!` } });
     expect(screen.getByText(/部分关联暂时失效/)).toBeVisible();
-    fireEvent.click(await screen.findByRole("button", { name: "上一步" }));
+    fireEvent.click(screen.getByRole("button", { name: "上一步" }));
     await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([original]));
     expect(screen.queryByText(/部分关联暂时失效/)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "下一步" }));

@@ -1,118 +1,81 @@
-import {
-  Alert,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  TextField
-} from "@mui/material";
-import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+// 编辑用户：对接 PATCH /admin/users/{id}（super_admin）。本轮后端只开放昵称一个可编辑字段
+// （1–50 字符、trim 后非空）；联系方式走用户自己的绑定流程，不在此改。
+import { App, Form, Input, Modal } from "antd";
+import { useEffect } from "react";
 import type { AdminUserView } from "@tsz/types";
 import { DISPLAY_NAME_MAX, hasDisplayNameForbiddenChars } from "@tsz/shared";
-import { useFeedback } from "@/components/FeedbackProvider";
 import { usePermission } from "@/lib/auth";
 import { useUpdateUser } from "./api";
 import { userActionError } from "./labels";
 
-export function EditUserModal({
-  user,
-  onClose
-}: {
+interface Props {
   user: AdminUserView | null;
   onClose: () => void;
-}) {
+}
+
+export function EditUserModal({ user, onClose }: Props) {
   const allowed = usePermission("users.edit");
-  const notify = useFeedback();
-  const {
-    register,
-    reset,
-    handleSubmit,
-    formState: { errors, isSubmitting }
-  } = useForm<{ display_name: string }>({
-    defaultValues: { display_name: "" }
-  });
-  const [error, setError] = useState<string>();
+  const { message } = App.useApp();
+  const [form] = Form.useForm<{ display_name: string }>();
   const updateUser = useUpdateUser();
-  // 同一用户的后台刷新不覆盖正在编辑的输入。
-  const userId = user?.id;
-  const [initialUser, setInitialUser] = useState(user);
-  if (initialUser?.id !== userId) setInitialUser(user);
+
   useEffect(() => {
-    reset({ display_name: initialUser?.display_name ?? "" });
-    setError(undefined);
-  }, [initialUser, reset]);
-  const submit = handleSubmit(async ({ display_name }) => {
-    if (!user || !allowed || updateUser.isPending) return;
-    setError(undefined);
+    if (user) form.setFieldsValue({ display_name: user.display_name });
+  }, [user, form]);
+
+  const submit = async () => {
+    if (!user || !allowed) return;
+    // validateFields 失败向上抛给 onOk 的 .catch（antd 就地飘红，不弹 toast）；
+    // 只把「保存请求」的失败单独兜住给出明确提示，避免像 no-op 一样静默。
+    const { display_name } = await form.validateFields();
     try {
       await updateUser.mutateAsync({
         id: user.id,
         display_name: display_name.trim()
       });
     } catch (err) {
-      setError(userActionError(err, "保存失败"));
+      message.error(userActionError(err, "保存失败"));
       return;
     }
-    notify("已保存", "success");
+    message.success("已保存");
     onClose();
-  });
-  const pending = isSubmitting || updateUser.isPending;
+  };
+
   return (
-    <Dialog
+    <Modal
       open={!!user}
-      onClose={() => {
-        if (!pending) onClose();
-      }}
-      fullWidth
-      maxWidth="sm"
-      aria-labelledby="edit-user-title"
+      title="编辑用户"
+      okText="保存"
+      cancelText="取消"
+      okButtonProps={{ disabled: !allowed }}
+      confirmLoading={updateUser.isPending}
+      onOk={() => void submit().catch(() => undefined)}
+      onCancel={onClose}
+      destroyOnHidden
     >
-      <DialogTitle id="edit-user-title">编辑用户</DialogTitle>
-      <DialogContent>
-        <form id="edit-user-form" onSubmit={submit}>
-          <TextField
-            fullWidth
-            autoFocus
-            label="用户昵称"
-            placeholder="请输入用户昵称"
-            sx={{ mt: 1 }}
-            disabled={pending}
-            error={!!errors.display_name}
-            helperText={errors.display_name?.message}
-            {...register("display_name", {
-              validate: (value) =>
-                !value.trim()
-                  ? "请输入用户昵称"
-                  : value.length > DISPLAY_NAME_MAX
-                    ? `最长 ${DISPLAY_NAME_MAX} 字符`
-                    : hasDisplayNameForbiddenChars(value)
-                      ? "昵称不能包含 < > 或控制字符"
-                      : true
-            })}
-          />
-          {error && (
-            <Alert severity="error" sx={{ mt: 2 }}>
-              {error}
-            </Alert>
-          )}
-        </form>
-      </DialogContent>
-      <DialogActions>
-        <Button disabled={pending} onClick={onClose}>
-          取消
-        </Button>
-        <Button
-          form="edit-user-form"
-          type="submit"
-          variant="contained"
-          disabled={!allowed}
-          loading={pending}
+      <Form form={form} layout="vertical" style={{ marginTop: 12 }}>
+        <Form.Item
+          name="display_name"
+          label="用户昵称"
+          rules={[
+            {
+              required: true,
+              transform: (v: string) => v?.trim(),
+              message: "请输入用户昵称"
+            },
+            { max: DISPLAY_NAME_MAX, message: `最长 ${DISPLAY_NAME_MAX} 字符` },
+            // 与后端同款规则本地预检，挡掉大部分 400 invalid_display_name 的往返。
+            {
+              validator: (_, v: string) =>
+                hasDisplayNameForbiddenChars(v ?? "")
+                  ? Promise.reject(new Error("昵称不能包含 < > 或控制字符"))
+                  : Promise.resolve()
+            }
+          ]}
         >
-          保存
-        </Button>
-      </DialogActions>
-    </Dialog>
+          <Input placeholder="请输入用户昵称" allowClear />
+        </Form.Item>
+      </Form>
+    </Modal>
   );
 }

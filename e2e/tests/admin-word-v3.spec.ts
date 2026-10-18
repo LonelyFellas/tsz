@@ -19,24 +19,24 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/meanings`);
     await expect(
-      page.locator(".word-grammar-card > .admin-card-header").first()
+      page.locator(".word-grammar-card > .ant-card-head").first()
     ).toBeVisible();
     expect(
       (await page
-        .locator(".word-grammar-card > .admin-card-header")
+        .locator(".word-grammar-card > .ant-card-head")
         .first()
         .boundingBox())!.height
     ).toBe(48);
     for (const button of await page
-      .locator(".word-step-actions .MuiButton-root")
+      .locator(".word-step-actions .ant-btn")
       .all()) {
       expect((await button.boundingBox())!.height).toBe(40);
     }
     await page.setViewportSize({ width: 390, height: 844 });
-    const steps = page.locator("[data-wizard-step]");
+    const steps = page.locator(".word-creation-steps .ant-steps-item");
     await expect(steps).toHaveCount(4);
     for (const step of await steps.all()) {
-      await expect(step.locator(".MuiStepLabel-labelContainer")).toBeVisible();
+      await expect(step.locator(".ant-steps-item-section")).toBeVisible();
       expect(
         await step.evaluate((node) => node.scrollWidth - node.clientWidth)
       ).toBeLessThanOrEqual(1);
@@ -133,7 +133,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       "font-weight",
       "700"
     );
-    const spellings = page.locator(".dialect-panel .tsz-words input");
+    const spellings = page.locator(".dialect-panel input.tsz-words");
     await expect(spellings.first()).toBeVisible();
     for (const spelling of await spellings.all())
       await expect(spelling).toHaveCSS("font-weight", "700");
@@ -243,11 +243,9 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
         .evaluate((node) => getComputedStyle(node).backgroundColor);
       for (const name of ["词形拼写", "Azure UPS", "Azure IPA"]) {
         await usSource.getByRole("radio", { name, exact: true }).check();
-        const checked = usSource.locator(
-          ".MuiFormControlLabel-root:has(input:checked)"
-        );
-        await expect(checked.locator(".MuiRadio-root")).toHaveCSS(
-          "color",
+        const checked = usSource.locator(".ant-radio-wrapper-checked");
+        await expect(checked.locator(".ant-radio")).toHaveCSS(
+          "background-color",
           usColor
         );
         await expect(checked.locator(".word-synthesis-choice-tag")).toHaveCSS(
@@ -255,13 +253,13 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
           usColor
         );
         await checked.hover();
-        await expect(checked.locator(".MuiRadio-root")).toHaveCSS(
-          "color",
+        await expect(checked.locator(".ant-radio")).toHaveCSS(
+          "background-color",
           usColor
         );
       }
-      await expect(source.locator(".MuiRadio-root.Mui-checked")).toHaveCSS(
-        "color",
+      await expect(source.locator(".ant-radio-checked")).toHaveCSS(
+        "background-color",
         "rgb(32, 83, 255)"
       );
       await test.info().attach("美式语音来源", {
@@ -286,13 +284,13 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       const separatedUs = page
         .locator(".v3-dialect-panel-us .word-pronunciation-synthesis")
         .first();
-      await expect(separatedUs.locator(".MuiRadio-root.Mui-checked")).toHaveCSS(
-        "color",
+      await expect(separatedUs.locator(".ant-radio-checked")).toHaveCSS(
+        "background-color",
         usColor
       );
       await expect(
         separatedUs.locator(
-          ".MuiFormControlLabel-root:has(input:checked) .word-synthesis-choice-tag"
+          ".ant-radio-wrapper-checked .word-synthesis-choice-tag"
         )
       ).toHaveCSS("background-color", usColor);
     }
@@ -387,8 +385,8 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     const labels = page
       .locator(
         [
-          ".word-sense-field > .MuiTypography-root:first-child",
-          ".word-sense-context-toggle > .MuiTypography-root:first-child",
+          ".word-sense-field > .ant-typography:first-child",
+          ".word-sense-context-toggle > .ant-typography:first-child",
           ".word-sense-group-heads > span:not(:empty)",
           ".word-definition-list-header > span:not(:empty)",
           ".word-relation-column-heads > span:not(:empty)"
@@ -408,14 +406,14 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       await expect(label).toHaveCSS("padding-inline-start", labelInset);
     }
     const group = page.locator(".word-sense-field-group").first();
-    const title = group.locator(".MuiTypography-root").first();
+    const title = group.locator(".ant-typography").first();
     const titleTextX = await title.evaluate((node) => {
       const range = document.createRange();
       range.selectNodeContents(node);
       return range.getBoundingClientRect().x;
     });
     expect(
-      titleTextX - (await group.locator("[data-admin-select]").boundingBox())!.x
+      titleTextX - (await group.locator(".ant-select").boundingBox())!.x
     ).toBe(parseFloat(labelInset));
     const tableTitle = page
       .locator(".word-definition-list-header")
@@ -438,10 +436,10 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     const frequency = page.locator(".word-sense-field-frequency").first();
     const frequencyBox = (await frequency.locator("input").boundingBox())!;
     const suffixBox = (await frequency
-      .locator(".MuiInputAdornment-root")
+      .locator(".ant-input-number-suffix")
       .boundingBox())!;
     const trackBox = (await page
-      .locator(".word-sense-context-control .MuiSwitch-track")
+      .locator(".word-sense-context-control .ant-switch")
       .first()
       .boundingBox())!;
     const inputCenter = frequencyBox.y + frequencyBox.height / 2;
@@ -454,7 +452,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await page.setViewportSize({ width: 390, height: 844 });
     const levelTitle = page
       .locator(
-        ".word-sense-meta-grid > .word-sense-field:first-child > .MuiTypography-root"
+        ".word-sense-meta-grid > .word-sense-field:first-child > .ant-typography"
       )
       .first();
     expect(
@@ -502,13 +500,13 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       "8px"
     );
     await expect(
-      sense.locator(":scope > [data-admin-accordion] .MuiAccordionDetails-root")
+      sense.locator(":scope > .ant-collapse-item > .ant-collapse-panel")
     ).toHaveCSS("border-top-width", "0px");
     await expect(sense.locator(".word-sense-header-content")).toHaveCSS(
       "column-gap",
       "8px"
     );
-    await expect(sense.locator(":scope > [data-admin-accordion]")).toHaveCSS(
+    await expect(sense.locator(":scope > .ant-collapse-item")).toHaveCSS(
       "border-left-width",
       "4px"
     );
@@ -525,10 +523,10 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       const count = await rows.count();
       await expect(
         card
-          .locator(".MuiCardHeader-root")
+          .locator(".ant-card-head")
           .getByRole("button", { name: `添加${name}` })
       ).toHaveCount(0);
-      await expect(add).toHaveClass(/MuiButton-fullWidth/);
+      await expect(add).toHaveClass(/ant-btn-block/);
       await expect(add).toHaveCSS("border-top-style", "dashed");
       const buttonBox = (await add.boundingBox())!;
       const rowBox = (await rows.last().boundingBox())!;
@@ -607,7 +605,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       exact: true
     });
     const originalHeader = page.locator(
-      `.word-sense-sortable[data-v3-node-id="${originalId}"] > .word-sense-editor [data-admin-accordion] .admin-section-header`
+      `.word-sense-sortable[data-v3-node-id="${originalId}"] > .ant-collapse > .ant-collapse-item > .ant-collapse-header`
     );
     await drag.click();
     await expect(originalHeader).toHaveAttribute("aria-expanded", "true");
@@ -630,7 +628,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     const target = page.getByLabel("派生词目标词条", { exact: true });
     await target.fill("的发生地放水淀粉");
     await target.press("Escape");
-    await expect(page.locator('[role="listbox"]:visible')).toHaveCount(0);
+    await expect(page.locator(".ant-select-dropdown:visible")).toHaveCount(0);
     const row = page.locator(".word-relation-row").filter({ has: target });
     const error = row.getByRole("alert");
     await expect(error).toContainText("仅支持英文词条");
@@ -675,8 +673,6 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await page.mouse.move(0, 0);
     await expect(page.getByRole("tooltip")).toBeHidden();
     await add.locator("..").focus();
-    await page.keyboard.press("Shift+Tab");
-    await page.keyboard.press("Tab");
     await expect(page.getByRole("tooltip")).toHaveText(hint);
   });
 
@@ -709,7 +705,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       // Select 含透明的原生焦点 input；scrollWidth 也会计入它，不能替代可见标签的裁切检查。
       await expect
         .poll(() =>
-          select.locator(".MuiSelect-select").evaluate((node) => {
+          select.locator(".ant-select-content").evaluate((node) => {
             const text = [...node.childNodes].find(
               (child) =>
                 child.nodeType === Node.TEXT_NODE && child.textContent?.trim()
@@ -734,7 +730,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
         expect(current.y).toBe(previous.y);
       }
       await select.click();
-      const combo = select.locator('[role="combobox"]');
+      const combo = select.getByRole("combobox");
       await expect(combo).toHaveAttribute("aria-expanded", "true");
       const controls = await combo.getAttribute("aria-controls");
       const dropdown = page.locator(".word-definition-text-options").filter({
@@ -867,7 +863,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       dropdown.locator(".word-grammar-reference-text").first()
     ).toHaveCSS("padding-top", "0px");
     const markedOption = dropdown
-      .locator('[role="option"]')
+      .locator(".ant-select-item-option")
       .filter({ has: page.locator(".has-liaison") });
     await expect(markedOption.locator(".tsz-ve-arc-layer path")).toBeVisible();
     await markedOption.locator(".word-grammar-reference-label").click();
@@ -1045,7 +1041,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     const liaisonDialog = page
       .getByRole("dialog")
       .filter({ has: page.locator(".tsz-ve-editor") });
-    const editorTitle = liaisonDialog.locator(".MuiDialogTitle-root");
+    const editorTitle = liaisonDialog.locator(".ant-modal-title");
     await expect(editorTitle).toContainText("多维释义");
     await expect(editorTitle).toContainText("整句释义 · 英美通用");
     const titleIndex = editorTitle.locator(".word-grammar-index");
@@ -1182,14 +1178,12 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(
       sentenceDialog.locator(".v3-editor-title .word-grammar-index")
     ).toHaveText("1");
-    await sentenceDialog
-      .getByRole("button", { name: "取消例句编辑", exact: true })
-      .click();
+    await sentenceDialog.getByRole("button", { name: "取消例句编辑" }).click();
     const discard = page.getByRole("dialog", {
       name: "放弃本次未完成的例句编辑？"
     });
     await expect(discard).toBeVisible();
-    await discard.getByRole("button", { name: "确认", exact: true }).click();
+    await discard.getByRole("button", { name: /^确\s*定$/ }).click();
     await expect(sentenceDialog).toBeHidden();
     await page.getByRole("button", { name: "添加例句", exact: true }).click();
     await expect(sentenceDialog.locator(".v3-editor-title")).toContainText(
@@ -1198,11 +1192,9 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(
       sentenceDialog.locator(".v3-editor-title .word-grammar-index")
     ).toHaveCount(0);
-    await sentenceDialog
-      .getByRole("button", { name: "取消例句编辑", exact: true })
-      .click();
+    await sentenceDialog.getByRole("button", { name: "取消例句编辑" }).click();
     await expect(discard).toBeVisible();
-    await discard.getByRole("button", { name: "确认", exact: true }).click();
+    await discard.getByRole("button", { name: /^确\s*定$/ }).click();
     await expect(sentenceDialog).toBeHidden();
   });
 
@@ -1312,13 +1304,13 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
         name: "关联单词：orbit",
         exact: true
       });
-      const popup = page.locator(".MuiPopper-root").filter({ has: picker });
+      const popup = page.locator(".ant-popover").filter({ has: picker });
       await picker
-        .locator("[data-candidate-column]")
+        .locator(".ant-cascader-menu")
         .first()
         .getByText("orbit", { exact: true })
         .click();
-      const formMenu = picker.locator("[data-candidate-column]").nth(1);
+      const formMenu = picker.locator(".ant-cascader-menu").nth(1);
       await expect(
         formMenu.getByText("复数 orbit", { exact: true }).first()
       ).toHaveCSS("font-weight", "700");
@@ -1351,7 +1343,22 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       await expect
         .poll(() => formMenu.evaluate((el) => el.scrollTop))
         .toBeGreaterThan(0);
-      const scrollTop = await formMenu.evaluate((el) => el.scrollTop);
+      // wheel() 不等待浏览器平滑滚动结束；先等连续三帧稳定，再记录加载更多前的位置。
+      const scrollTop = await formMenu.evaluate(
+        (el) =>
+          new Promise<number>((resolve) => {
+            let previous = el.scrollTop;
+            let stableFrames = 0;
+            const measure = () => {
+              const current = el.scrollTop;
+              stableFrames = current === previous ? stableFrames + 1 : 0;
+              previous = current;
+              if (stableFrames >= 3) resolve(current);
+              else requestAnimationFrame(measure);
+            };
+            requestAnimationFrame(measure);
+          })
+      );
       await more.click();
       await expect(
         picker.getByRole("button", { name: /加载更多/ })
@@ -1505,14 +1512,14 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       };
       await openPicker();
       await page
-        .locator("[data-candidate-column]")
+        .locator(".ant-cascader-menu")
         .first()
         .getByText(literal, { exact: true })
         .click();
       await page.getByText(`原形 ${literal}`, { exact: true }).click();
       await expect(page.getByText(/待关联/)).toHaveCount(0);
       await page
-        .locator("[data-candidate-column]")
+        .locator(".ant-cascader-menu")
         .nth(2)
         .getByText("关联目标释义")
         .click();
@@ -1616,7 +1623,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       )
       .toBeCloseTo(18.6667, 3);
     await page
-      .locator("[data-candidate-option] > div:first-child")
+      .locator(".ant-cascader-menu-item-content")
       .filter({ hasText: /^job ·/ })
       .click();
     await expect(page.getByText(/原形 job/)).toBeVisible();
@@ -1808,7 +1815,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await page.evaluate(() => document.fonts.ready);
     // 放慢真实的弹窗动画，检查中间帧；只检查动画结束会漏掉先错位再纠正的闪烁。
     await page.addStyleTag({
-      content: ".MuiDialog-container { transition-duration: 1s !important; }"
+      content: ".ant-modal { animation-duration: 1s !important; }"
     });
     const opener = page
       .getByRole("button", { name: /^打开.*语法结构.*编辑器$/ })
@@ -1821,7 +1828,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       const strip = dialog.locator(".tsz-ve-strip");
       await expect(strip.locator(".tsz-ve-arc")).toHaveCount(1);
       const frames = await strip.evaluate(async (node) => {
-        const samples: { opacity: number; error: number; d: string }[] = [];
+        const samples: { scale: number; error: number; d: string }[] = [];
         const start = performance.now();
         while (performance.now() - start < 1200) {
           await new Promise(requestAnimationFrame);
@@ -1846,17 +1853,14 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
             return Math.abs(points[index === 0 ? 0 : 6]! - local.x);
           });
           samples.push({
-            opacity: Number(
-              getComputedStyle(node.closest(".MuiDialog-container")!).opacity
-            ),
+            scale: matrix.a,
             error: Math.max(...errors),
             d: path.getAttribute("d")!
           });
         }
         return samples;
       });
-      expect(frames.some((frame) => frame.opacity < 0.95)).toBe(true);
-      expect(frames.at(-1)!.opacity).toBe(1);
+      expect(frames.some((frame) => frame.scale < 0.95)).toBe(true);
       expect(Math.max(...frames.map((frame) => frame.error))).toBeLessThan(0.1);
       const finalPoints = frames
         .at(-1)!
@@ -1900,7 +1904,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       dialog.locator(".v3-editor-title .word-grammar-index")
     ).toHaveText("1");
     await dialog
-      .locator(".MuiDialogTitle-root")
+      .locator(".ant-modal-title")
       .screenshot({ path: test.info().outputPath("grammar-editor-title.png") });
     const input = dialog.locator(".tsz-ve-canvas-input");
     await expect(input).toHaveCount(1);
@@ -1908,7 +1912,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect
       .poll(() =>
         dialog
-          .locator(".MuiDialogContent-root")
+          .locator(".ant-modal-body")
           .evaluate((body) => body.scrollWidth - body.clientWidth)
       )
       .toBe(0);
@@ -1958,7 +1962,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await confirmation.getByRole("button", { name: "保留原文" }).click();
     await expect(confirmation).toBeHidden();
     await expect(input).toHaveValue("a job");
-    const handle = dialog.locator(".MuiDialogTitle-root");
+    const handle = dialog.locator(".ant-modal-title");
     const box = (await handle.boundingBox())!;
     await page.mouse.move(box.x + 100, box.y + box.height / 2);
     await page.mouse.down();
@@ -2020,19 +2024,13 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     const isMac = await page.evaluate(() => /Mac/i.test(navigator.platform));
     const shortcutPrefix = isMac ? "⌘" : "Ctrl";
     const otherPrefix = isMac ? "Ctrl" : "⌘";
-    await dialog
-      .getByRole("button", { name: "加粗", exact: true })
-      .locator("..")
-      .hover();
+    await dialog.getByRole("button", { name: "加粗", exact: true }).hover();
     await expect(
       page.getByRole("tooltip").filter({ hasText: `${shortcutPrefix} + B` })
     ).not.toContainText(`${otherPrefix} + B`);
     for (const modifier of ["Control", "Meta"]) {
       await input.press("ControlOrMeta+A");
-      await dialog
-        .getByRole("button", { name: "加粗", exact: true })
-        .locator("..")
-        .hover();
+      await dialog.getByRole("button", { name: "加粗", exact: true }).hover();
       const shortcutTooltip = page
         .getByRole("tooltip")
         .filter({ hasText: `${shortcutPrefix} + B` });
@@ -2346,13 +2344,13 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     const dialog = page.getByRole("dialog", { name: "确定删除该词义吗？" });
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText("运行轨道");
-    await expect(page.getByRole("dialog")).toHaveCount(1);
-    await expect(page.locator(".MuiBackdrop-root")).toBeVisible();
+    await expect(page.locator(".ant-popconfirm")).toHaveCount(0);
+    await expect(page.locator(".ant-modal-mask")).toBeVisible();
     await expect.poll(async () => (await dialog.boundingBox())?.y).toBe(48);
     await page.screenshot({ path: test.info().outputPath("sense-delete.png") });
     await page.mouse.click(8, 8);
     await expect(dialog).toBeVisible();
-    await dialog.getByRole("button", { name: "取消" }).click();
+    await dialog.getByRole("button", { name: "取 消" }).click();
     await expect(dialog).toBeHidden();
     await expect(deleteButton).toBeVisible();
     await deleteButton.click();
@@ -2382,9 +2380,9 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     );
     await expect(page.getByText("草稿可暂时不添加词性")).toBeVisible();
 
-    await page.getByLabel("添加基本词性").click();
+    await page.getByLabel("添加基本词性").first().click();
     await page
-      .locator('[role="listbox"]:visible')
+      .locator(".ant-select-dropdown:visible")
       .getByText("名词", { exact: true })
       .click();
     await expect(page.getByRole("tab", { name: "名词" })).toHaveAttribute(
@@ -2469,15 +2467,24 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       .getByRole("textbox", { name: "第 1 条发音的实际发音", exact: true })
       .fill("orbit-us");
 
-    await page.getByLabel("添加基本词性").click();
+    await page.getByLabel("添加基本词性").first().click();
     await page
-      .locator('[role="listbox"]:visible')
+      .locator(".ant-select-dropdown:visible")
       .getByText("动词", { exact: true })
       .click();
     await expect(page.getByRole("tab", { name: "动词" })).toHaveAttribute(
       "aria-selected",
       "true"
     );
+    const nounTab = page
+      .getByRole("tab")
+      .filter({ has: page.getByLabel("拖动名词") });
+    await nounTab.getByLabel("添加基本词性").click();
+    await expect(page.locator(".ant-select-dropdown:visible")).toHaveCount(1);
+    await expect(
+      page.getByRole("tab").filter({ has: page.getByLabel("拖动动词") })
+    ).toHaveAttribute("aria-selected", "true");
+    await nounTab.getByLabel("添加基本词性").press("Escape");
     const verbPanel = page.getByRole("tabpanel", { name: /动词/ });
     const ukVerb = verbPanel
       .locator(".v3-dialect-panel-uk .v3-dialect-form-cell")
@@ -2635,11 +2642,11 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     ).toHaveValue("orbit-center");
 
     // 未完成词义时，顶部入口及直达链接都不能跳过完成校验。
-    const previewStep = page.locator(".MuiStep-root").filter({
+    const previewStep = page.locator(".ant-steps-item").filter({
       has: page.getByText("预览并生效", { exact: true })
     });
-    await expect(previewStep.getByRole("button")).toBeDisabled();
-    await previewStep.getByRole("button").click({ force: true });
+    await expect(previewStep).toHaveClass(/ant-steps-item-disabled/);
+    await page.getByText("预览并生效", { exact: true }).click();
     await expect(page).toHaveURL(
       new RegExp(`/words/${ADMIN_V3_NEW_WORD_ID}/v3/wizard/forms$`)
     );
@@ -2672,9 +2679,9 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       new RegExp(`/words/${ADMIN_V3_NEW_WORD_ID}/v3/wizard/forms$`)
     );
 
-    await page.getByLabel("添加基本词性").click();
+    await page.getByLabel("添加基本词性").first().click();
     await page
-      .locator('[role="listbox"]:visible')
+      .locator(".ant-select-dropdown:visible")
       .getByText("名词", { exact: true })
       .click();
     const nounGroups = page.locator("[data-pos-id] .v3-form-group-card");
@@ -2787,7 +2794,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       .getByRole("button", { name: "查看 1 处关联" })
       .first()
       .click();
-    const popover = page.getByRole("dialog", { name: /关联/ });
+    const popover = page.locator(".ant-popover:visible");
     await expect(
       popover.getByText("The satellite entered orbit.")
     ).toBeVisible();
@@ -2928,11 +2935,11 @@ test("任务74：释义文字居中、打开变蓝、关闭恢复且弹层不越
   );
   const row = page.locator(".word-definition-row").first();
   const select = row.locator(".word-definition-text-select").first();
-  const input = select.locator('[role="combobox"]');
-  const content = select.locator(".MuiSelect-select");
+  const input = select.getByRole("combobox");
+  const content = select.locator(".ant-select-content");
   const popup = page.locator(".word-definition-text-options:visible");
   await expect(row.locator(".word-definition-text-select")).toHaveCount(3);
-  await expect(select.locator(".MuiSelect-icon")).toHaveCount(0);
+  await expect(select.locator(".ant-select-suffix")).toHaveCount(0);
   await expect(page.locator(".word-definition-list-header").first()).toHaveText(
     "释义语句语法结构"
   );
@@ -3030,7 +3037,7 @@ test("语法引用：保留富文本和基线，按连读状态预留弧线空�
   await expect(select.locator(".tsz-ve-arc")).toHaveCount(1);
   await expect(select.locator("strong")).toHaveText(["center", "wal", "l"]);
   await input.click();
-  const dropdown = page.locator('[role="listbox"]:visible');
+  const dropdown = page.locator(".ant-select-dropdown:visible");
   await expect(dropdown.locator(".word-grammar-reference-label")).toHaveCount(
     3
   );
@@ -3116,7 +3123,7 @@ test("语法引用：保留富文本和基线，按连读状态预留弧线空�
       expect(geometry.arcBottom).toBeLessThanOrEqual(geometry.clipBottom);
       expect(geometry.height).toBe(heights[0]);
     }
-    const arrow = await select.locator(".MuiSelect-icon").boundingBox();
+    const arrow = await select.locator(".ant-select-suffix").boundingBox();
     const box = (await select.boundingBox())!;
     expect(
       Math.abs(arrow!.y + arrow!.height / 2 - box.y - box.height / 2)

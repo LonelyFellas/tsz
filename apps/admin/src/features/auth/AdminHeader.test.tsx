@@ -7,7 +7,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { Fragment } from "react";
+import { App as AntApp } from "antd";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockNavigate = vi.fn();
@@ -51,9 +51,9 @@ const PROFILE: AdminProfile = {
 // 「退出所有设备」用 modal.confirm，须挂在 AntApp 的 context 下才有 modal 实例。
 function renderHeader() {
   return render(
-    <Fragment>
+    <AntApp>
       <AdminHeader />
-    </Fragment>
+    </AntApp>
   );
 }
 
@@ -61,7 +61,7 @@ function renderHeader() {
 async function openAccountMenu() {
   fireEvent.click(screen.getByRole("button", { name: "账户菜单" }));
   // 等 Popover 内容挂载。
-  await screen.findByRole("menuitem", { name: /退出登录/ });
+  await screen.findByRole("button", { name: /退出登录/ });
 }
 
 // 登出走整页跳转 window.location.replace("/login")，jsdom 里桩掉以便断言。
@@ -128,7 +128,7 @@ describe("AdminHeader", () => {
     useAuthStore.setState({ profile: PROFILE, role: PROFILE.role });
     renderHeader();
     await openAccountMenu();
-    fireEvent.click(screen.getByRole("menuitem", { name: /个人设置/ }));
+    fireEvent.click(screen.getByRole("button", { name: /个人设置/ }));
     expect(mockNavigate).toHaveBeenCalledWith("/settings/profile");
   });
 
@@ -136,7 +136,7 @@ describe("AdminHeader", () => {
     useAuthStore.setState({ profile: PROFILE, role: PROFILE.role });
     renderHeader();
     await openAccountMenu();
-    fireEvent.click(screen.getByRole("menuitem", { name: /修改密码/ }));
+    fireEvent.click(screen.getByRole("button", { name: /修改密码/ }));
     expect(mockNavigate).toHaveBeenCalledWith("/change-password");
   });
 
@@ -145,7 +145,7 @@ describe("AdminHeader", () => {
     renderHeader();
     await openAccountMenu();
 
-    fireEvent.click(screen.getByRole("menuitem", { name: /退出登录/ }));
+    fireEvent.click(screen.getByRole("button", { name: /退出登录/ }));
 
     // 整页跳裸 /login（不带 redirect）：保证再次登录从首页进，且避开门禁抢注 redirect 的竞态。
     await waitFor(() =>
@@ -162,7 +162,7 @@ describe("AdminHeader", () => {
     renderHeader();
     await openAccountMenu();
 
-    fireEvent.click(screen.getByRole("menuitem", { name: /退出登录/ }));
+    fireEvent.click(screen.getByRole("button", { name: /退出登录/ }));
 
     await waitFor(() =>
       expect(window.location.replace).toHaveBeenCalledWith("/login")
@@ -177,13 +177,13 @@ describe("AdminHeader — 退出所有设备", () => {
     useAuthStore.setState({ profile: PROFILE, role: PROFILE.role });
     renderHeader();
     await openAccountMenu();
-    fireEvent.click(screen.getByRole("menuitem", { name: /退出所有设备/ }));
+    fireEvent.click(screen.getByRole("button", { name: /退出所有设备/ }));
     // 文案要说清当前这台也会被踢下线。
     await screen.findByText(/包括当前这台/);
   }
 
   function clickConfirmOk() {
-    const btns = screen.getByRole("dialog");
+    const btns = document.querySelector(".ant-modal-confirm-btns")!;
     fireEvent.click(within(btns as HTMLElement).getByText(/全部退出/));
   }
 
@@ -218,7 +218,7 @@ describe("AdminHeader — 退出所有设备", () => {
 
   it("取消确认：不发请求也不登出", async () => {
     await openLogoutAllConfirm();
-    const btns = screen.getByRole("dialog");
+    const btns = document.querySelector(".ant-modal-confirm-btns")!;
     fireEvent.click(within(btns as HTMLElement).getByText(/取\s?消/));
 
     // 取消是同步的；给一个 tick 让潜在的异步动作有机会发生后再断言什么都没做。
@@ -239,13 +239,13 @@ describe("AdminHeader — 退出所有设备", () => {
     expect(window.location.replace).not.toHaveBeenCalled();
     expect(useAuthStore.getState().profile).toEqual(PROFILE);
 
-    const dialog = failure.closest('[role="dialog"]')!;
+    const dialog = failure.closest(".ant-modal-confirm")!;
     const retry = within(dialog as HTMLElement).getByRole("button", {
       name: /全部退出/
     });
     await waitFor(() => {
       expect(retry).toBeEnabled();
-      expect(retry).not.toBeDisabled();
+      expect(retry).not.toHaveClass("ant-btn-loading");
     });
     fireEvent.click(retry);
     await waitFor(() =>

@@ -1,13 +1,6 @@
-import { OutlinedInput as MuiOutlinedInput } from "@mui/material";
-import {
-  Alert as MuiAlert,
-  Button as MuiButton,
-  Stack as MuiStack,
-  Typography as MuiTypography
-} from "@mui/material";
 import { useState } from "react";
 import { linkedSentenceAnnotation } from "./associationModel";
-import { RadioGroup, Radio, FormControlLabel } from "@mui/material";
+import { Alert, Button, Flex, Input, Radio, Typography } from "antd";
 import type { AssociationPickerProps } from "@tsz/voice-editor/types";
 import type {
   AdminWordV3,
@@ -48,26 +41,18 @@ export function SharedSentenceAssociationPicker({
   if (selected && selected.target.state !== "entry_only") {
     const target = selected.target;
     return (
-      <MuiStack
-        style={{ maxWidth: "min(760px, 85vw)" }}
-        direction="column"
-        spacing={1}
-      >
-        <MuiTypography
-          className="tsz-entry-en"
-          component="span"
-          fontWeight={600}
-        >
+      <Flex vertical gap="small" style={{ maxWidth: "min(760px, 85vw)" }}>
+        <Typography.Text className="tsz-entry-en" strong>
           {literal}
-        </MuiTypography>
-        <MuiTypography className="tsz-entry-en" component="span">
+        </Typography.Text>
+        <Typography.Text className="tsz-entry-en">
           {target.state === "linked"
             ? `已关联：${labels[`${target.target_entry_id}:${target.target_sense_id}`] ?? "具体词义"}`
             : `待关联：${target.headword}${target.gloss ? ` · ${target.gloss}` : ""}`}
-        </MuiTypography>
-        <MuiTypography component="span" color="text.secondary">
+        </Typography.Text>
+        <Typography.Text type="secondary">
           可查看关联列表，清除后可以重新选择词形和词义。
-        </MuiTypography>
+        </Typography.Text>
         <V3TargetCascader
           literal={literal}
           targetKind={kind}
@@ -92,44 +77,34 @@ export function SharedSentenceAssociationPicker({
           onReplace={() => {}}
           readOnly
         />
-        <MuiButton size="small" onClick={() => onSelect(undefined)}>
+        <Button size="small" onClick={() => onSelect(undefined)}>
           清除关联
-        </MuiButton>
-      </MuiStack>
+        </Button>
+      </Flex>
     );
   }
   return (
-    <MuiStack
+    <Flex
       role="group"
       aria-label={`${kind === "word" ? "关联单词" : "关联短语"}：${literal}`}
+      vertical
+      gap="small"
       style={{ maxWidth: "min(760px, 85vw)" }}
-      direction="column"
-      spacing={1}
     >
-      <MuiTypography className="tsz-entry-en" component="span" fontWeight={600}>
+      <Typography.Text className="tsz-entry-en" strong>
         {segments.map((segment) => segment.surface).join(" … ")}
-      </MuiTypography>
+      </Typography.Text>
       {selected?.target.state === "entry_only" && (
-        <MuiAlert severity={"warning"}>
-          {"旧关联尚未选择具体词义，请补全或清除。"}
-        </MuiAlert>
+        <Alert type="warning" title="旧关联尚未选择具体词义，请补全或清除。" />
       )}
-      <RadioGroup
-        row
+      <Radio.Group
         value={mode}
-        onChange={(_, value) => setMode(value as "linked" | "pending")}
-      >
-        <FormControlLabel
-          value="linked"
-          control={<Radio />}
-          label="关联已有词义"
-        />
-        <FormControlLabel
-          value="pending"
-          control={<Radio />}
-          label="词条未创建，记为待关联"
-        />
-      </RadioGroup>
+        onChange={(event) => setMode(event.target.value)}
+        options={[
+          { value: "linked", label: "关联已有词义" },
+          { value: "pending", label: "词条未创建，记为待关联" }
+        ]}
+      />
       {mode === "linked" ? (
         <V3TargetCascader
           literal={literal}
@@ -145,36 +120,29 @@ export function SharedSentenceAssociationPicker({
         />
       ) : (
         <>
-          <MuiOutlinedInput
-            data-admin-input
+          <Input
+            aria-label="待关联词面"
             className="tsz-entry-en"
+            value={literal}
             readOnly
             title="由选中的正文片段确定"
-            inputProps={{
-              "aria-label": "待关联词面"
-            }}
-            value={literal ?? ""}
-            size="small"
           />
-          <MuiOutlinedInput
-            data-admin-input
+          <Input
+            aria-label="待关联释义"
             placeholder="释义或上下文（可选）"
+            value={gloss}
+            maxLength={2000}
             onChange={(event) => setGloss(event.target.value)}
-            inputProps={{
-              "aria-label": "待关联释义",
-              maxLength: 2000
-            }}
-            value={gloss ?? ""}
-            size="small"
           />
         </>
       )}
-      <MuiStack direction="row" spacing={1} justifyContent={"end"}>
-        <MuiButton size="small" onClick={() => onSelect(undefined)}>
+      <Flex justify="end" gap="small">
+        <Button size="small" onClick={() => onSelect(undefined)}>
           {selected ? "清除关联" : "取消选择"}
-        </MuiButton>
-        <MuiButton
+        </Button>
+        <Button
           size="small"
+          type="primary"
           disabled={mode === "linked" ? !choice : !literal.trim()}
           onClick={() => {
             if (mode === "linked" && choice)
@@ -203,11 +171,10 @@ export function SharedSentenceAssociationPicker({
                   }
             );
           }}
-          variant={"contained"}
         >
           确认关联
-        </MuiButton>
-      </MuiStack>
-    </MuiStack>
+        </Button>
+      </Flex>
+    </Flex>
   );
 }

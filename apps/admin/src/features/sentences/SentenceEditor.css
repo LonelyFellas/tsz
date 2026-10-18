@@ -24,12 +24,7 @@
   margin-inline-start: auto;
 }
 
-.sentence-editor
-  .tsz-ve-toolbar
-  :is(.MuiButton-root, .MuiIconButton-root):is(
-    .MuiButton-root,
-    .MuiIconButton-root
-  ) {
+.sentence-editor .tsz-ve-toolbar .ant-btn.ant-btn {
   height: 28px;
   border-radius: 6px;
 }
@@ -54,5 +49,5 @@
 .sentence-editor .tsz-ve-canvas-input::placeholder {
   font-size: 14px;
   font-weight: 400;
-  color: var(--admin-color-text-placeholder, #bfbfbf);
+  color: var(--ant-color-text-placeholder, #bfbfbf);
 }

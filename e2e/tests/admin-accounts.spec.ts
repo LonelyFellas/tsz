@@ -113,7 +113,7 @@ test("共用表格按容器宽度解除固定列且窄屏分页可见", async ({
   const action = page.getByRole("columnheader", { name: "操作", exact: true });
   await expect(action).toHaveCSS("position", "sticky");
   // 大视口中的窄容器也必须解除固定列，覆盖抽屉内复用场景。
-  await page.locator("[aria-busy]").evaluateAll((nodes) =>
+  await page.locator(".ant-table-wrapper").evaluateAll((nodes) =>
     nodes.forEach((node) => {
       (node as HTMLElement).style.maxWidth = "600px";
     })
@@ -121,15 +121,15 @@ test("共用表格按容器宽度解除固定列且窄屏分页可见", async ({
   await expect(action).toHaveCSS("position", "static");
   await expect(first).toHaveCSS("position", "static");
   await page.setViewportSize({ width: 320, height: 844 });
-  const pagination = page.locator(".MuiTablePagination-root");
+  const pagination = page.locator(".ant-table-pagination");
   expect(
     await pagination.evaluate((node) => node.scrollWidth - node.clientWidth)
   ).toBeLessThanOrEqual(1);
-  const next = page.getByRole("button", { name: "下一页", exact: true });
+  const next = page.locator(".ant-pagination-next button");
   const box = (await next.boundingBox())!;
   expect(box.x).toBeGreaterThanOrEqual(0);
   expect(box.x + box.width).toBeLessThanOrEqual(320);
-  await page.locator("[aria-busy]").evaluateAll((nodes) =>
+  await page.locator(".ant-table-wrapper").evaluateAll((nodes) =>
     nodes.forEach((node) => {
       (node as HTMLElement).style.maxWidth = "";
     })

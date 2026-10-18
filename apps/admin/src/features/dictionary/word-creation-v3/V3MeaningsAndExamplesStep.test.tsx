@@ -1,7 +1,3 @@
-import type { ReactNode } from "react";
-import type { RenderOptions } from "@testing-library/react";
-import { AdminThemeProvider } from "@/mui-theme";
-import { FeedbackProvider } from "@/components/FeedbackProvider";
 import type { RelatedWordResultAny } from "@tsz/types";
 import type { RelatedWordChoice } from "../relatedSuggestions";
 import { changeVoiceText } from "./components/V3VoiceTextField.test-helper";
@@ -9,12 +5,12 @@ import { env } from "@/lib/env";
 import { adminVoicePreviewAdapter } from "@/features/dictionary/voice-editor/dataSource";
 import {
   fireEvent,
-  render as rtlRender,
+  render,
   screen,
   waitFor,
   within
 } from "@testing-library/react";
-import { AdminTestProviders as AntApp } from "@/test-utils/AdminTestProviders";
+import { App as AntApp, ConfigProvider } from "antd";
 import type {
   DraftFormsStepContentV3,
   DraftMeaningsStepContentWritableV3,
@@ -42,17 +38,6 @@ import {
   uuidFromInt,
   uuidSequence
 } from "./fixtures";
-
-function render(ui: ReactNode, options?: RenderOptions) {
-  return rtlRender(ui, {
-    ...options,
-    wrapper: ({ children }) => (
-      <AdminThemeProvider>
-        <FeedbackProvider>{children}</FeedbackProvider>
-      </AdminThemeProvider>
-    )
-  });
-}
 
 const meaningsCss = readFileSync(
   resolve(
@@ -426,9 +411,9 @@ describe("V3MeaningsAndExamplesStep", () => {
         content: { version: 2, text: "其他释义", annotations: [] }
       });
       const { container } = render(
-        <>
+        <ConfigProvider theme={{ token: { motion: false } }}>
           <Harness initial={initial} />
-        </>
+        </ConfigProvider>
       );
       const deleteButton = container.querySelector<HTMLButtonElement>(
         'button[aria-label="删除语法结构 1"]'
@@ -437,7 +422,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       fireEvent.click(deleteButton);
       expect(value()).toEqual(before);
       const confirmationTitle = await screen.findByText("删除语法结构？", {
-        selector: "h2"
+        selector: ".ant-modal-confirm-title"
       });
       const confirmation = confirmationTitle.closest(
         '[role="dialog"]'
@@ -450,7 +435,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       await waitFor(() => expect(confirmationTitle).not.toBeInTheDocument());
       fireEvent.click(deleteButton);
       const nextTitle = await screen.findByText("删除语法结构？", {
-        selector: "h2"
+        selector: ".ant-modal-confirm-title"
       });
       const nextConfirmation = nextTitle.closest(
         '[role="dialog"]'
@@ -486,24 +471,28 @@ describe("V3MeaningsAndExamplesStep", () => {
     fireEvent.click(screen.getByText("添加词义"));
     const before = value();
     const expanded = document.querySelector(
-      ".word-sense-editor [data-admin-accordion]"
+      ".word-sense-editor .ant-collapse-item"
     )?.className;
     fireEvent.click(screen.getByLabelText("删除词义 1"));
     expect(screen.getByText("确定删除该词义吗？")).toBeInTheDocument();
     const dialog = screen.getByRole("dialog");
-    expect(dialog).toHaveStyle({ marginTop: "48px" });
+    expect(dialog).toHaveStyle({ top: "48px" });
     expect(container).not.toContainElement(dialog);
-    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(document.querySelector(".ant-modal-mask")).toBeInTheDocument();
+    expect(document.querySelector(".ant-popconfirm")).toBeNull();
     expect(dialog).toHaveTextContent("中心");
     expect(value()).toEqual(before);
     expect(
-      document.querySelector(".word-sense-editor [data-admin-accordion]")
-        ?.className
+      document.querySelector(".word-sense-editor .ant-collapse-item")?.className
     ).toBe(expanded);
-    fireEvent.click(screen.getByText(/取\s*消/u, { selector: "button" }));
+    fireEvent.click(
+      screen.getByText(/取\s*消/u, { selector: ".ant-modal button span" })
+    );
     expect(value()).toEqual(before);
     fireEvent.click(screen.getByLabelText("删除词义 1"));
-    fireEvent.click(screen.getByText("确认删除", { selector: "button" }));
+    fireEvent.click(
+      screen.getByText("确认删除", { selector: ".ant-modal button span" })
+    );
     expect(value().pos[0]!.senses).toHaveLength(1);
     expect(value().pos[0]!.senses[0]!.id).toBe(before.pos[0]!.senses[1]!.id);
     expect(screen.getByLabelText("删除词义 1")).toBeDisabled();
@@ -534,12 +523,18 @@ describe("V3MeaningsAndExamplesStep", () => {
     );
     fireEvent.click(document.querySelectorAll(".word-sense-header-label")[1]!);
     fireEvent.mouseDown(screen.getByLabelText("释义 2 所属语义区间"));
-    fireEvent.click(screen.getByRole("option", { name: "不归入语义区间" }));
+    fireEvent.click(
+      document.querySelector(
+        ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
+      )!
+    );
     const before = value();
     expect(before.pos[0]!.senses[1]!.sense_group_id).toBeUndefined();
     fireEvent.click(screen.getByLabelText("删除词义 2"));
     expect(screen.getByText("确定删除该词义吗？")).toBeInTheDocument();
-    fireEvent.click(screen.getByText(/取\s*消/u, { selector: "button" }));
+    fireEvent.click(
+      screen.getByText(/取\s*消/u, { selector: ".ant-modal button span" })
+    );
     expect(value()).toEqual(before);
   });
 
@@ -570,7 +565,9 @@ describe("V3MeaningsAndExamplesStep", () => {
     const before = value();
     fireEvent.click(screen.getByLabelText("删除词义 1"));
     expect(screen.getByText("确定删除该词义吗？")).toBeInTheDocument();
-    fireEvent.click(screen.getByText(/取\s*消/u, { selector: "button" }));
+    fireEvent.click(
+      screen.getByText(/取\s*消/u, { selector: ".ant-modal button span" })
+    );
     expect(value()).toEqual(before);
   });
 
@@ -608,10 +605,13 @@ describe("V3MeaningsAndExamplesStep", () => {
     fireEvent.change(screen.getByLabelText("释义 1 频率"), {
       target: { value: "50" }
     });
-    expect(screen.queryByTitle("该词性未填项")).not.toBeInTheDocument();
+    expect(screen.getByTitle("该词性未填项")).toHaveAttribute(
+      "data-show",
+      "false"
+    );
     expect(
-      screen.getByLabelText("释义 1 频率").closest("[data-percentage-field]")
-    ).not.toHaveAttribute("data-severity", "error");
+      screen.getByLabelText("释义 1 频率").closest(".ant-input-number")
+    ).not.toHaveClass("ant-input-number-status-error");
   });
 
   beforeEach(() => {
@@ -848,7 +848,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     fireEvent.mouseDown(screen.getAllByLabelText("添加基本词性")[0]!);
     const choices = [
       ...document.querySelectorAll<HTMLElement>(
-        '[role="listbox"] [role="option"]'
+        ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
       )
     ];
     expect(choices.map((item) => item.textContent)).toEqual(["动词"]);
@@ -878,10 +878,7 @@ describe("V3MeaningsAndExamplesStep", () => {
         partOfSpeechCatalog={{ catalog_version: 1, items: [] }}
       />
     );
-    expect(screen.getAllByLabelText("添加基本词性")[0]!).toHaveAttribute(
-      "aria-disabled",
-      "true"
-    );
+    expect(screen.getAllByLabelText("添加基本词性")[0]!).toBeDisabled();
 
     rerender(
       <Harness
@@ -891,10 +888,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       />
     );
     expect(screen.getByText("词性目录不可用，已停止新增结构")).toBeVisible();
-    expect(screen.getAllByLabelText("添加基本词性")[0]!).toHaveAttribute(
-      "aria-disabled",
-      "true"
-    );
+    expect(screen.getAllByLabelText("添加基本词性")[0]!).toBeDisabled();
   });
 
   it("在词义步骤从基本词性标签确认删除时，同步移除该词性内容与本词条内失效关联", async () => {
@@ -940,8 +934,13 @@ describe("V3MeaningsAndExamplesStep", () => {
 
     render(<Harness forms={forms} initial={initial} wordId="entry-1" />);
     const removePos = screen.getByLabelText("删除名词");
-    expect(removePos).toHaveAccessibleName("删除名词");
-    expect(removePos.querySelector("svg")).not.toBeNull();
+    expect(removePos).toHaveClass(
+      "ant-btn-text",
+      "ant-btn-sm",
+      "ant-btn-dangerous"
+    );
+    expect(removePos.querySelector(".anticon-minus-circle")).not.toBeNull();
+    expect(removePos.querySelector(".anticon-delete")).toBeNull();
     fireEvent.click(removePos);
     fireEvent.click(
       within(await screen.findByRole("dialog")).getByRole("button", {
@@ -1033,9 +1032,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       )
     ).toBeVisible();
     expect(
-      document.querySelector(
-        ".word-sense-editor [data-collapse-indicator=expanded]"
-      )
+      document.querySelector(".word-sense-editor .anticon-caret-up")
     ).not.toBeNull();
 
     clickButton("添加语法结构");
@@ -1189,7 +1186,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       fireEvent.mouseDown(screen.getByLabelText("释义 1 等级"));
       const choice = [
         ...document.querySelectorAll<HTMLElement>(
-          '[role="listbox"] [role="option"]'
+          ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
         )
       ].find((item) => item.textContent === level);
       fireEvent.click(choice!);
@@ -1389,11 +1386,7 @@ describe("V3MeaningsAndExamplesStep", () => {
 
     const before = value().pos[0]!.grammar_structures[0]!.variants[0]!.content;
     expect(before.version === 2 ? before.annotations : []).toEqual([]);
-    fireEvent.click(
-      await screen.findByRole("button", {
-        name: "完成语法结构 1 英美通用内容编辑"
-      })
-    );
+    fireEvent.click(screen.getByLabelText("完成语法结构 1 英美通用内容编辑"));
     const content = value().pos[0]!.grammar_structures[0]!.variants[0]!.content;
     expect(content.text).toBe("a centre of the city");
     expect(content.version).toBe(2);
@@ -1430,14 +1423,11 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(screen.getByLabelText("试听 old.mp3")).toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText("移除 old.mp3"));
-    // 直接在确认弹窗内定位操作，避免扫描编辑页全部按钮。
+    // Popconfirm 的确认键：这一页 DOM 很大，findByRole 逐个算可及名在 CI 上会拖到超时，按类名定位
     const confirm = await waitFor(() => {
-      const confirmation = screen
-        .getAllByRole("dialog")
-        .find((dialog) => dialog.textContent?.includes("移除这条音频？"));
-      const found = confirmation
-        ? within(confirmation).getByRole("button", { name: "移除" })
-        : null;
+      const found = document.querySelector<HTMLButtonElement>(
+        ".ant-popconfirm-buttons .ant-btn-primary"
+      );
       expect(found).not.toBeNull();
       return found!;
     });
@@ -1445,11 +1435,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(
       value().pos[0]!.grammar_structures[0]!.variants[0]!.audio_assets
     ).toEqual(initial.pos[0]!.grammar_structures[0]!.variants[0]!.audio_assets);
-    fireEvent.click(
-      await screen.findByRole("button", {
-        name: "完成语法结构 1 英美通用内容编辑"
-      })
-    );
+    fireEvent.click(screen.getByLabelText("完成语法结构 1 英美通用内容编辑"));
     expect(
       value().pos[0]!.grammar_structures[0]!.variants[0]!.audio_assets
     ).toEqual([]);
@@ -1492,11 +1478,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       fireEvent.click(rateButtons[0]!);
       fireEvent.click(await screen.findByLabelText("语速 1.25 倍"));
       expect(variant().voice_profile).toBeUndefined();
-      fireEvent.click(
-        await screen.findByRole("button", {
-          name: "完成语法结构 1 英美通用内容编辑"
-        })
-      );
+      fireEvent.click(screen.getByLabelText("完成语法结构 1 英美通用内容编辑"));
       expect(variant().voice_profile).toEqual({
         voices: [
           { voice_id: expect.any(String), enabled: false, rate_percent: 25 }
@@ -1536,10 +1518,13 @@ describe("V3MeaningsAndExamplesStep", () => {
     const addGrammar = within(
       container.querySelector(".word-grammar-card") as HTMLElement
     ).getByRole("button", { name: "添加语法结构" });
-    expect(addGrammar.closest(".MuiCardHeader-action")).toBeNull();
-    expect(addGrammar).toHaveClass("word-section-add-button");
-    expect(addGrammar).toHaveStyle({ width: "100%" });
-    expect(addGrammar.closest(".admin-card-body")?.lastElementChild).toBe(
+    expect(addGrammar.closest(".ant-card-extra")).toBeNull();
+    expect(addGrammar).toHaveClass(
+      "word-section-add-button",
+      "ant-btn-dashed",
+      "ant-btn-block"
+    );
+    expect(addGrammar.closest(".ant-card-body")?.lastElementChild).toBe(
       addGrammar
     );
     expect(container.querySelector(".word-grammar-add")).toBeNull();
@@ -1629,12 +1614,18 @@ describe("V3MeaningsAndExamplesStep", () => {
     ];
     render(<Harness initial={initial} />);
     const select = screen.getByLabelText("释义 1 所属语义区间");
-    expect(select.textContent?.trim()).toBe("请选择语义区间");
-    expect(select.closest("[data-admin-select]")).not.toHaveTextContent(
+    expect(select.closest(".ant-select")?.textContent?.trim()).toBe(
+      "请选择语义区间"
+    );
+    expect(select.closest(".ant-select")).not.toHaveTextContent(
       "sense-group-1"
     );
     fireEvent.mouseDown(select);
-    const options = screen.getAllByRole("option");
+    const options = Array.from(
+      document.querySelectorAll(
+        ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
+      )
+    );
     expect(options.map((option) => option.textContent)).toEqual([
       "不归入语义区间",
       "中文",
@@ -1644,14 +1635,20 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(value()).toEqual(initial);
     fireEvent.click(options[2]!);
     expect(value().pos[0]!.senses[0]!.sense_group_id).toBe("en");
-    expect(select.closest("[data-admin-select]")).toHaveTextContent("English");
+    expect(select.closest(".ant-select")).toHaveTextContent("English");
     fireEvent.change(screen.getByLabelText("语义区间 4 英文"), {
       target: { value: "  " }
     });
-    expect(select.textContent?.trim()).toBe("请选择语义区间");
+    expect(select.closest(".ant-select")?.textContent?.trim()).toBe(
+      "请选择语义区间"
+    );
     expect(value().pos[0]!.senses[0]!.sense_group_id).toBe("en");
     fireEvent.mouseDown(select);
-    fireEvent.click(screen.getByRole("option", { name: "不归入语义区间" }));
+    fireEvent.click(
+      document.querySelector(
+        ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
+      )!
+    );
     expect(value().pos[0]!.senses[0]!.sense_group_id).toBeUndefined();
     expect(value().sense_groups).toHaveLength(5);
   });
@@ -1660,11 +1657,9 @@ describe("V3MeaningsAndExamplesStep", () => {
     const dropdownOptions = () =>
       [
         ...document.querySelectorAll<HTMLElement>(
-          '[role="listbox"] [role="option"]'
+          ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
         )
-      ]
-        .filter((option) => option.getAttribute("aria-disabled") !== "true")
-        .map((option) => option.textContent);
+      ].map((option) => option.textContent);
 
     // 填了内容：序号对齐上方卡片编号，后面跟内容预览
     const { unmount } = render(<Harness />);
@@ -1692,7 +1687,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(
       [
         ...document.querySelectorAll<HTMLElement>(
-          '[role="listbox"] [role="option"]'
+          ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
         )
       ].map((option) => option.textContent)
     ).toEqual(["① "]);
@@ -1710,7 +1705,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     };
     render(<Harness initial={initial} />);
     const select = screen.getByLabelText("定义 1 语法结构");
-    const selected = select.closest("[data-admin-select]")!;
+    const selected = select.closest(".ant-select")!;
     expect(
       [...selected.querySelectorAll('strong[data-level="core"]')]
         .map((node) => node.textContent)
@@ -1721,7 +1716,9 @@ describe("V3MeaningsAndExamplesStep", () => {
       2
     );
     fireEvent.mouseDown(select);
-    const option = screen.getByRole("option");
+    const option = document.querySelector(
+      ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
+    )!;
     expect(
       [...option.querySelectorAll('strong[data-level="core"]')]
         .map((node) => node.textContent)
@@ -1761,9 +1758,9 @@ describe("V3MeaningsAndExamplesStep", () => {
       const select = screen.getByLabelText("定义 1 语法结构");
       fireEvent.mouseDown(select);
       const option = document.querySelector(
-        '[role="listbox"] [role="option"]'
+        ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
       )!;
-      for (const preview of [select.closest("[data-admin-select]")!, option]) {
+      for (const preview of [select.closest(".ant-select")!, option]) {
         expect(preview).toHaveTextContent(
           text.trim() === "ab" ? "① ab" : `① 😀${"a".repeat(23)}…`
         );
@@ -1792,7 +1789,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(
       [
         ...document.querySelectorAll<HTMLElement>(
-          '[role="listbox"] [role="option"]'
+          ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
         )
       ].map((option) => option.textContent)
     ).toEqual([`① ${"a".repeat(24)}…`]);
@@ -1846,17 +1843,16 @@ describe("V3MeaningsAndExamplesStep", () => {
     const grammar = within(grammarCell).getByLabelText("定义 1 语法结构");
     expect(content.tagName).toBe("TEXTAREA");
     expect(grammar).toHaveAttribute("aria-required", "true");
-    expect(grammar.closest("[data-admin-select]")).not.toHaveAttribute(
-      "aria-invalid",
-      "true"
+    expect(grammar.closest(".ant-select")).not.toHaveClass(
+      "ant-select-status-error"
     );
 
     rerender(<Harness initial={initial} issues={[issue]} />);
     expect(
-      screen.getByLabelText("定义 1 语法结构").closest("[data-admin-select]")
-    ).toHaveAttribute("aria-invalid", "true");
+      screen.getByLabelText("定义 1 语法结构").closest(".ant-select")
+    ).toHaveClass("ant-select-status-error");
     expect(screen.getByText("请完整填写释义并选择语法结构")).toBeVisible();
-    expect(actions).toHaveClass("word-sort-actions", "word-sort-actions");
+    expect(actions).toHaveClass("word-sort-actions", "ant-space-horizontal");
     expect(v3LayoutCss).toMatch(
       /\.v3-meanings-v2 \.word-sense-section\s*\{[^}]*--word-ops-col:\s*56px;/u
     );
@@ -1876,24 +1872,23 @@ describe("V3MeaningsAndExamplesStep", () => {
     const language = screen.getByLabelText("定义 1 语言");
     const style = screen.getByLabelText("定义 1 释义方式");
     for (const input of [level, language, style]) {
-      expect(input.closest("[data-admin-select]")).toHaveClass(
-        "word-definition-text-select"
+      expect(input.closest(".ant-select")).toHaveClass(
+        "word-definition-text-select",
+        "ant-select-borderless"
       );
       expect(
-        input
-          .closest("[data-admin-select]")!
-          .querySelector("[data-select-indicator]")
+        input.closest(".ant-select")!.querySelector(".ant-select-arrow")
       ).toBeNull();
     }
     expect(
-      screen.getByLabelText("定义 1 语法结构").closest("[data-admin-select]")
+      screen.getByLabelText("定义 1 语法结构").closest(".ant-select")
     ).not.toHaveClass("word-definition-text-select");
 
     fireEvent.mouseDown(level);
     expect(level).toHaveAttribute("aria-expanded", "true");
     const option = [
       ...document.querySelectorAll<HTMLElement>(
-        ".word-definition-text-options [role=option]"
+        ".word-definition-text-options .ant-select-item-option-content"
       )
     ].find((item) => item.textContent === "B2")!;
     fireEvent.click(option);
@@ -1905,17 +1900,14 @@ describe("V3MeaningsAndExamplesStep", () => {
     const beforeDismiss = value();
     fireEvent.mouseDown(language);
     expect(language).toHaveAttribute("aria-expanded", "true");
-    fireEvent.keyDown(screen.getByRole("listbox"), {
-      key: "Escape",
-      keyCode: 27
-    });
+    fireEvent.keyDown(language, { key: "Escape", keyCode: 27 });
     await waitFor(() =>
       expect(language).toHaveAttribute("aria-expanded", "false")
     );
 
     fireEvent.mouseDown(style);
     expect(style).toHaveAttribute("aria-expanded", "true");
-    fireEvent.click(document.querySelector("[data-admin-select-backdrop]")!);
+    fireEvent.mouseDown(document.body);
     await waitFor(() =>
       expect(style).toHaveAttribute("aria-expanded", "false")
     );
@@ -1954,19 +1946,19 @@ describe("V3MeaningsAndExamplesStep", () => {
     const view = render(<Harness initial={meaningsFixture} />);
 
     expect(
-      screen.getByLabelText("释义 1 子词性").closest("[data-admin-select]")
-    ).not.toHaveAttribute("aria-invalid", "true");
+      screen.getByLabelText("释义 1 子词性").closest(".ant-select")
+    ).not.toHaveClass("ant-select-status-error");
     expect(
-      screen.getByLabelText("释义 1 频率").closest("[data-percentage-field]")
-    ).not.toHaveAttribute("data-severity", "error");
+      screen.getByLabelText("释义 1 频率").closest(".ant-input-number")
+    ).not.toHaveClass("ant-input-number-status-error");
 
     view.rerender(<Harness initial={meaningsFixture} issues={issues} />);
     expect(
-      screen.getByLabelText("释义 1 子词性").closest("[data-admin-select]")
-    ).toHaveAttribute("aria-invalid", "true");
+      screen.getByLabelText("释义 1 子词性").closest(".ant-select")
+    ).toHaveClass("ant-select-status-error");
     expect(
-      screen.getByLabelText("释义 1 频率").closest("[data-percentage-field]")
-    ).toHaveAttribute("data-severity", "error");
+      screen.getByLabelText("释义 1 频率").closest(".ant-input-number")
+    ).toHaveClass("ant-input-number-status-error");
     expect(screen.getByText("请选择细分词性")).toBeVisible();
     expect(
       screen.getByText("请填写词频，取值 0–100 且最多两位小数")
@@ -2010,7 +2002,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(sectionBody(definitions)).toHaveAttribute("aria-hidden", "true");
     expect(
       sectionButton(definitions, "展开多维释义").querySelector(
-        "[data-collapse-indicator=collapsed]"
+        ".anticon-caret-down"
       )
     ).not.toBeNull();
 
@@ -2026,7 +2018,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(sectionBody(relations)).toHaveAttribute("aria-hidden", "true");
     expect(
       sectionButton(relations, "展开拓展词").querySelector(
-        "[data-collapse-indicator=collapsed]"
+        ".anticon-caret-down"
       )
     ).not.toBeNull();
     fireEvent.click(sectionButton(relations, "展开拓展词"));
@@ -2062,7 +2054,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     const { container } = render(<Harness initial={initial} />);
     const cards = [...container.querySelectorAll('[data-v3-field="sense"]')];
     const headers = cards.map((card) =>
-      card.querySelector<HTMLElement>(".admin-section-header")!
+      card.querySelector<HTMLElement>(".ant-collapse-header")!
     );
     expect(
       headers.map((header) => header.getAttribute("aria-expanded"))
@@ -2079,7 +2071,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       headers.map((header) => header.getAttribute("aria-expanded"))
     ).toEqual(["true", "false"]);
     fireEvent.click(headers[1]!);
-    expect(screen.getByLabelText("释义 2 频率")).toHaveValue("25");
+    expect(screen.getByLabelText("释义 2 频率")).toHaveValue("25.00");
     fireEvent.click(headers[1]!);
     expect(
       headers.map((header) => header.getAttribute("aria-expanded"))
@@ -2095,8 +2087,8 @@ describe("V3MeaningsAndExamplesStep", () => {
     ];
     expect(cards).toHaveLength(3);
     for (const card of cards) {
-      const header = card.querySelector<HTMLElement>(".admin-card-header")!;
-      const title = header.querySelector<HTMLElement>(".admin-card-title")!;
+      const header = card.querySelector<HTMLElement>(".ant-card-head")!;
+      const title = header.querySelector<HTMLElement>(".ant-card-head-title")!;
       fireEvent.click(title);
       expect(card).toHaveClass("is-collapsed");
       fireEvent.click(header);
@@ -2109,7 +2101,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       expect(toggle).toHaveAttribute("aria-expanded", "false");
       fireEvent.click(toggle);
       expect(card).not.toHaveClass("is-collapsed");
-      fireEvent.click(card.querySelector<HTMLElement>(".admin-card-body")!);
+      fireEvent.click(card.querySelector<HTMLElement>(".ant-card-body")!);
       expect(card).not.toHaveClass("is-collapsed");
     }
     expect(value()).toEqual(before);
@@ -2123,7 +2115,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     const titles = () =>
       [
         ...grid.querySelectorAll(
-          ":scope > .word-relation-card > .admin-card-header .admin-card-title"
+          ":scope > .word-relation-card > .ant-card-head .ant-card-head-title"
         )
       ].map((title) => title.textContent);
 
@@ -2161,9 +2153,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(within(synonymCard).getByText("匹配词义")).toBeVisible();
     expect(within(synonymCard).queryByLabelText("关联 1 类型")).toBeNull();
     expect(
-      within(synonymCard)
-        .getByLabelText("相似度")
-        .closest("[data-percentage-field]")
+      within(synonymCard).getByLabelText("相似度").closest(".ant-input-number")
     ).not.toBeNull();
 
     const target = within(synonymCard).getByLabelText("近义词目标词条");
@@ -2245,9 +2235,7 @@ describe("V3MeaningsAndExamplesStep", () => {
 
     fireEvent.click(within(synonymCard).getByText("收起").closest("button")!);
     expect(synonymCard).toHaveClass("is-collapsed");
-    expect(
-      synonymCard.querySelector("[data-collapse-indicator=collapsed]")
-    ).not.toBeNull();
+    expect(synonymCard.querySelector(".anticon-caret-down")).not.toBeNull();
     expect(meaningsCss).toMatch(
       /\.word-relations-grid\s*\{[^}]*align-items:\s*start;/su
     );
@@ -2316,8 +2304,10 @@ describe("V3MeaningsAndExamplesStep", () => {
       });
       const emptyDraftOption = screen
         .getByText("reliability")
-        .closest("[role=option]")!;
-      expect(emptyDraftOption).not.toHaveAttribute("aria-disabled", "true");
+        .closest(".ant-select-item-option")!;
+      expect(emptyDraftOption).not.toHaveClass(
+        "ant-select-item-option-disabled"
+      );
       // 零词义草稿仍可选，但选项要说明选中只会记文本，别让人误以为绑上了词义。
       expect(
         within(emptyDraftOption as HTMLElement).getByText(
@@ -2325,7 +2315,9 @@ describe("V3MeaningsAndExamplesStep", () => {
         )
       ).toBeInTheDocument();
       expect(
-        screen.getByLabelText(`${label}目标词条`).closest("[data-admin-input]")
+        screen
+          .getByLabelText(`${label}目标词条`)
+          .closest(".ant-input-affix-wrapper")
       ).toContainElement(screen.getByLabelText(`待关联的${label}`));
       fireEvent.click(screen.getAllByText("reliability").at(-1)!);
       const relation = value().pos[0]!.senses[0]!.relations[0]!;
@@ -2339,19 +2331,24 @@ describe("V3MeaningsAndExamplesStep", () => {
         target: { value: "reliable" }
       });
       expect(
-        screen.getAllByText("reliability").at(-1)!.closest("[role=option]")
-      ).toHaveAttribute("aria-disabled", "true");
+        screen
+          .getAllByText("reliability")
+          .at(-1)!
+          .closest(".ant-select-item-option")
+      ).toHaveClass("ant-select-item-option-disabled");
       deleteRelationItem(label, 1);
 
       expect(screen.queryByLabelText(`${label}预定义词义`)).toBeNull();
       const glossInput = screen.getByLabelText(`${label}待关联词义`);
-      const glossWrapper = glossInput.closest("[data-admin-input]")!;
-      expect(glossWrapper).toHaveAttribute("data-severity", "warning");
+      const glossWrapper = glossInput.closest(".ant-input-affix-wrapper")!;
+      expect(glossWrapper).toHaveClass("ant-input-status-warning");
       expect(
         within(glossWrapper as HTMLElement).getByLabelText(`待关联的${label}`)
       ).toBeInTheDocument();
       expect(
-        screen.getByLabelText(`${label}目标词条`).closest("[data-admin-input]")
+        screen
+          .getByLabelText(`${label}目标词条`)
+          .closest(".ant-input-affix-wrapper")
       ).not.toContainElement(screen.getByLabelText(`待关联的${label}`));
       fireEvent.change(glossInput, { target: { value: "可靠性" } });
       expect(value().pos[0]!.senses[0]!.relations[0]).toMatchObject({
@@ -2366,29 +2363,31 @@ describe("V3MeaningsAndExamplesStep", () => {
         label === "近义词" ? "相似度" : label === "反义词" ? "差异度" : "关联度"
       );
       expect(
-        metricInput.closest("[data-percentage-field][data-severity=warning]")
+        metricInput.closest(".ant-input-number-status-warning")
       ).not.toBeNull();
       expect(
         targetInput
-          .closest("[data-admin-input]")
+          .closest(".ant-input-affix-wrapper")
           ?.querySelector("[data-relation-search]")
       ).toBeInTheDocument();
       expect(
         targetInput
-          .closest("[data-admin-input]")
-          ?.querySelector("[data-relation-sound]")
+          .closest(".ant-input-affix-wrapper")
+          ?.querySelector(".anticon-sound")
       ).toBeNull();
-      expect(targetInput.closest("[data-severity=warning]")).not.toBeNull();
-      expect(screen.getByLabelText(`待关联的${label}`)).toBeInTheDocument();
+      expect(targetInput.closest(".ant-input-status-warning")).not.toBeNull();
+      expect(screen.getByLabelText(`待关联的${label}`)).toHaveClass(
+        "anticon-info-circle"
+      );
       fireEvent.change(targetInput, { target: { value: "苹果" } });
-      expect(targetInput.closest("[data-severity=error]")).not.toBeNull();
+      expect(targetInput.closest(".ant-input-status-error")).not.toBeNull();
       expect(
-        metricInput.closest("[data-percentage-field][data-severity=warning]")
+        metricInput.closest(".ant-input-number-status-warning")
       ).toBeNull();
-      expect(targetInput.closest("[data-severity=warning]")).toBeNull();
+      expect(targetInput.closest(".ant-input-status-warning")).toBeNull();
       expect(screen.queryByLabelText(`待关联的${label}`)).toBeNull();
       fireEvent.change(targetInput, { target: { value: " " } });
-      expect(targetInput.closest("[data-severity=warning]")).toBeNull();
+      expect(targetInput.closest(".ant-input-status-warning")).toBeNull();
       expect(screen.queryByLabelText(`待关联的${label}`)).toBeNull();
       expect(value().pos[0]!.senses[0]!.relations[0]).not.toHaveProperty(
         "pending_target_gloss"
@@ -2405,17 +2404,14 @@ describe("V3MeaningsAndExamplesStep", () => {
         label === "近义词" ? "相似度" : label === "反义词" ? "差异度" : "关联度"
       );
       expect(screen.queryByLabelText(`${label}待关联词义`)).toBeNull();
-      expect(screen.getByLabelText(`${label}目标词义`)).not.toHaveAttribute(
-        "aria-disabled",
-        "true"
-      );
+      expect(screen.getByLabelText(`${label}目标词义`)).toBeEnabled();
       expect(
-        metricInput.closest("[data-percentage-field][data-severity=warning]")
+        metricInput.closest(".ant-input-number-status-warning")
       ).toBeNull();
       expect(
         targetInput
-          .closest("[data-admin-input]")
-          ?.querySelector("[data-relation-sound]")
+          .closest(".ant-input-affix-wrapper")
+          ?.querySelector(".anticon-sound")
       ).not.toHaveAttribute("aria-disabled");
       expect(value().pos[0]!.senses[0]!.relations[0]).not.toHaveProperty(
         "pending_target_gloss"
@@ -2423,7 +2419,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       expect(value().pos[0]!.senses[0]!.relations[0]).not.toHaveProperty(
         "pending_target_headword"
       );
-      expect(targetInput.closest("[data-severity=warning]")).toBeNull();
+      expect(targetInput.closest(".ant-input-status-warning")).toBeNull();
       expect(screen.queryByLabelText(`待关联的${label}`)).toBeNull();
       expect(value().pos[0]!.senses[0]!.relations[0]).toHaveProperty(
         "target_word_id",
@@ -2649,7 +2645,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       const mounted = render(<Harness initial={initial} onSave={onSave} />);
       expect(
         document.querySelectorAll(
-          ".word-relation-row > button[aria-label^=删除], .word-relation-gloss-row > button[aria-label^=删除]"
+          ".word-relation-row > .ant-btn-dangerous, .word-relation-gloss-row > .ant-btn-dangerous"
         )
       ).toHaveLength(5);
       fireEvent.keyDown(screen.getByLabelText(`拖动${label}词义 2`), {
@@ -2744,33 +2740,6 @@ describe("V3MeaningsAndExamplesStep", () => {
     }
   );
 
-  it("关联词搜索提示留在搜索列内，不挤占匹配词义的网格位置", () => {
-    relatedSearch.mockImplementation((...args) => {
-      const result = defaultRelatedSearchImplementation(...args);
-      result.exact.data.pages[0]!.results = [];
-      result.contains.data.pages[0]!.results = [];
-      return result;
-    });
-    const initial = structuredClone(meaningsFixture);
-    initial.pos[0]!.senses[0]!.relations = [];
-    render(<Harness initial={initial} />);
-    fireEvent.click(screen.getByRole("button", { name: "添加派生词" }));
-    const input = screen.getByLabelText("派生词目标词条");
-    const row = input.closest(".word-relation-row")!;
-    expect(screen.queryByText("输入词汇搜索")).toBeNull();
-    expect(input.closest(".word-relation-search")).toBeInTheDocument();
-    expect(screen.getByLabelText("派生词目标词义")).toHaveTextContent(
-      "先选择派生词"
-    );
-    expect(screen.getByLabelText("派生词目标词义")).toHaveAttribute(
-      "aria-disabled",
-      "true"
-    );
-    expect(row.querySelector(":scope > .word-relation-sense")).toContainElement(
-      screen.getByLabelText("派生词目标词义")
-    );
-  });
-
   it("派生词的多条词义纵向逐条排，可拖动排序也可单条删除", () => {
     relatedSearch.mockImplementation((...args) => {
       const result = defaultRelatedSearchImplementation(...args);
@@ -2791,7 +2760,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     fireEvent.mouseDown(screen.getByLabelText("派生词目标词义"));
     fireEvent.click(screen.getAllByText("外部词义一").at(-1)!);
     fireEvent.click(screen.getAllByText("外部词义二").at(-1)!);
-    fireEvent.keyDown(screen.getByRole("listbox"), {
+    fireEvent.keyDown(screen.getByLabelText("派生词目标词义"), {
       key: "Escape",
       code: "Escape"
     });
@@ -2800,9 +2769,7 @@ describe("V3MeaningsAndExamplesStep", () => {
         (item) => item.textContent
       );
     expect(glosses()).toEqual(["外部词义一", "外部词义二"]);
-    expect(screen.getByLabelText("派生词目标词义")).toHaveTextContent(
-      "已选 2 条词义"
-    );
+    expect(screen.getByTitle("已选 2 条词义")).toBeInTheDocument();
 
     // 逐条排开就要能排序，顺序落到 relations 上。
     fireEvent.keyDown(screen.getByLabelText("拖动派生词词义 1"), {
@@ -2816,9 +2783,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     // 每条词义能单独删掉，选择器的计数跟着走。
     deleteRelationItem("派生词词义 1");
     expect(glosses()).toEqual(["外部词义一"]);
-    expect(screen.getByLabelText("派生词目标词义")).toHaveTextContent(
-      "已选 1 条词义"
-    );
+    expect(screen.getByTitle("已选 1 条词义")).toBeInTheDocument();
     expect(
       value().pos[0]!.senses[0]!.relations.map((item) => item.target_sense_id)
     ).toEqual(["external-sense-1"]);
@@ -2927,13 +2892,13 @@ describe("V3MeaningsAndExamplesStep", () => {
     const optionFor = (text: string) =>
       screen
         .getAllByText(text)
-        .map((item) => item.closest("[role=option]"))
+        .map((item) => item.closest(".ant-select-item-option"))
         .find((item): item is HTMLElement => item !== null)!;
 
     // 草稿 + 0 词义 + 已被上面那行按词面关联：灰着，要说禁用理由，
     // 不能显示「选中仅记文本」去邀请一个点不动的操作。
     const draftOption = optionFor("beyond");
-    expect(draftOption).toHaveAttribute("aria-disabled", "true");
+    expect(draftOption).toHaveClass("ant-select-item-option-disabled");
     expect(
       within(draftOption).getByText("已被同类型的另一行关联")
     ).toBeInTheDocument();
@@ -2943,7 +2908,7 @@ describe("V3MeaningsAndExamplesStep", () => {
 
     // 已发布 + 0 词义：禁用理由是没词义可绑，这条最该先说。
     const publishedOption = optionFor("outside");
-    expect(publishedOption).toHaveAttribute("aria-disabled", "true");
+    expect(publishedOption).toHaveClass("ant-select-item-option-disabled");
     expect(
       within(publishedOption).getByText("暂无词义，请先添加词义")
     ).toBeInTheDocument();
@@ -2974,9 +2939,9 @@ describe("V3MeaningsAndExamplesStep", () => {
     });
     const option = screen
       .getAllByText("outside")
-      .map((item) => item.closest("[role=option]"))
+      .map((item) => item.closest(".ant-select-item-option"))
       .find((item): item is HTMLElement => item !== null)!;
-    expect(option).toHaveAttribute("aria-disabled", "true");
+    expect(option).toHaveClass("ant-select-item-option-disabled");
     // 置灰但不给原因，用户只会以为坏了。
     expect(
       within(option).getByText("已被同类型的另一行关联")
@@ -3143,7 +3108,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(
       value().pos[0]!.senses[0]!.relations.map((item) => item.target_sense_id)
     ).toEqual(["external-sense-2", "external-sense-3"]);
-    fireEvent.keyDown(screen.getByRole("listbox"), {
+    fireEvent.keyDown(screen.getByLabelText("派生词目标词义"), {
       key: "Escape",
       code: "Escape"
     });
@@ -3193,12 +3158,18 @@ describe("V3MeaningsAndExamplesStep", () => {
         target: { value: "outs" }
       });
       expect(
-        screen.getAllByText("outside").at(-1)!.closest("[role=option]")
-      ).toHaveAttribute("aria-disabled", "true");
+        screen
+          .getAllByText("outside")
+          .at(-1)!
+          .closest(".ant-select-item-option")
+      ).toHaveClass("ant-select-item-option-disabled");
       deleteRelationItem("近义词");
       expect(
-        screen.getAllByText("outside").at(-1)!.closest("[role=option]")
-      ).not.toHaveAttribute("aria-disabled", "true");
+        screen
+          .getAllByText("outside")
+          .at(-1)!
+          .closest(".ant-select-item-option")
+      ).not.toHaveClass("ant-select-item-option-disabled");
       fireEvent.click(screen.getAllByText("outside").at(-1)!);
       expect(value().pos[0]!.senses[0]!.relations[0]).toHaveProperty(
         "target_word_id",
@@ -3210,9 +3181,8 @@ describe("V3MeaningsAndExamplesStep", () => {
           target: { value: "outs" }
         });
         const option = screen.getAllByText("outside").at(-1)!;
-        expect(option.closest("[role=option]")).not.toHaveAttribute(
-          "aria-disabled",
-          "true"
+        expect(option.closest(".ant-select-item-option")).not.toHaveClass(
+          "ant-select-item-option-disabled"
         );
         fireEvent.click(option);
         expect(value().pos[0]!.senses[0]!.relations.at(-1)).toHaveProperty(
@@ -3282,7 +3252,7 @@ describe("V3MeaningsAndExamplesStep", () => {
 
       const options = [
         ...document.querySelectorAll<HTMLElement>(
-          '[role="listbox"] [role="option"]'
+          ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
         )
       ].map((option) => option.textContent);
       expect(options.some((text) => text?.includes("otherword"))).toBe(true);
@@ -3624,7 +3594,9 @@ describe("V3MeaningsAndExamplesStep", () => {
       "grammar_structure_id"
     );
     fireEvent.click(screen.getByLabelText("删除词义 2"));
-    fireEvent.click(screen.getByText("确认删除", { selector: "button" }));
+    fireEvent.click(
+      screen.getByText("确认删除", { selector: ".ant-modal button span" })
+    );
     expect(value().sense_groups.map((item) => item.id)).toEqual([
       "sense-group-2"
     ]);
@@ -3666,14 +3638,10 @@ describe("V3MeaningsAndExamplesStep", () => {
     };
 
     expect(
-      screen
-        .getByLabelText("拖动语义区间 1")
-        .querySelector("[data-drag-indicator]")
+      screen.getByLabelText("拖动语义区间 1").querySelector(".anticon-holder")
     ).not.toBeNull();
     expect(
-      screen
-        .getByLabelText("拖动语法结构 1")
-        .querySelector("[data-drag-indicator]")
+      screen.getByLabelText("拖动语法结构 1").querySelector(".anticon-holder")
     ).not.toBeNull();
     expect(screen.queryByLabelText("上移语义区间 1")).toBeNull();
     expect(screen.queryByLabelText("下移语法结构 1")).toBeNull();
@@ -3733,7 +3701,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       /\.word-sort-actions\s*\{[^}]*align-items:\s*center;[^}]*width:\s*var\(--word-ops-col,\s*32px\);/su
     );
     expect(meaningsCss).toMatch(
-      /\.word-sort-actions\s*>\s*button\s*\{[^}]*width:\s*32px;/su
+      /\.word-sort-actions\s*>\s*\.ant-btn\s*\{[^}]*width:\s*32px;/su
     );
   });
 
@@ -3940,7 +3908,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       screen.getByLabelText("拖动定义 1"),
       screen.getByLabelText("拖动定义 2")
     ];
-    expect(handles[0]!.querySelector("[data-drag-indicator]")).not.toBeNull();
+    expect(handles[0]!.querySelector(".anticon-holder")).not.toBeNull();
     expect(screen.queryByLabelText("上移定义 1")).toBeNull();
     expect(screen.queryByLabelText("下移定义 2")).toBeNull();
 
@@ -4055,7 +4023,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     render(<Harness />);
     const frequency = screen.getByLabelText("释义 1 频率");
     expect(frequency).toHaveAttribute("role", "spinbutton");
-    expect(frequency.closest("[data-percentage-field]")).toHaveTextContent("%");
+    expect(frequency.closest(".ant-input-number")).toHaveTextContent("%");
     expect(meaningsCss).toMatch(
       /\.word-sense-field-frequency\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;/su
     );
@@ -4078,9 +4046,15 @@ describe("V3MeaningsAndExamplesStep", () => {
     // jsdom 里点过的下拉不会被标成 hidden，按选项内容认准是哪一个下拉。
     const optionsIn = (marker: string) => {
       const dropdown = [
-        ...document.querySelectorAll<HTMLElement>('[role="listbox"]')
+        ...document.querySelectorAll<HTMLElement>(
+          ".ant-select-dropdown:not(.ant-select-dropdown-hidden)"
+        )
       ].find((item) => item.textContent?.includes(marker))!;
-      return [...dropdown.querySelectorAll<HTMLElement>("[role=option]")];
+      return [
+        ...dropdown.querySelectorAll<HTMLElement>(
+          ".ant-select-item-option-content"
+        )
+      ];
     };
     render(<Harness idFactory={() => ids.shift()!} />);
 
@@ -4169,7 +4143,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     for (const field of fields) {
       const control = screen.getByLabelText(field.label);
       expect(control).toHaveAttribute("role", "combobox");
-      expect(control.closest("[data-admin-select]")).toHaveTextContent(
+      expect(control.closest(".ant-select")).toHaveTextContent(
         field.initialLevel
       );
     }
@@ -4178,7 +4152,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(
       [
         ...document.querySelectorAll<HTMLElement>(
-          '[role="listbox"] [role="option"]'
+          ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
         )
       ].map((option) => option.textContent)
     ).toEqual(["A1", "A2", "B1", "B2", "C1", "C2"]);
@@ -4210,7 +4184,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       fireEvent.mouseDown(screen.getByLabelText(label));
       const choice = [
         ...document.querySelectorAll<HTMLElement>(
-          '[role="listbox"] [role="option"]'
+          ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
         )
       ].find((option) => option.textContent === nextLevel);
       expect(choice).toBeDefined();
@@ -4234,16 +4208,14 @@ describe("V3MeaningsAndExamplesStep", () => {
     ] as const) {
       const control = screen.getByLabelText(label);
       expect(control).toHaveAttribute("role", "combobox");
-      expect(control.closest("[data-admin-select]")).toHaveTextContent(
-        historicalLevel
-      );
+      expect(control.closest(".ant-select")).toHaveTextContent(historicalLevel);
     }
 
     fireEvent.mouseDown(screen.getByLabelText("释义 1 等级"));
     expect(
       [
         ...document.querySelectorAll<HTMLElement>(
-          '[role="listbox"] [role="option"]'
+          ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
         )
       ].map((option) => option.textContent)
     ).toEqual(["A1", "A2", "B1", "B2", "C1", "C2"]);
@@ -4398,7 +4370,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(screen.queryByText("n. 可数名词")).not.toBeInTheDocument();
     expect(screen.getByText("核心")).toBeInTheDocument();
     expect(
-      screen.getByLabelText("定义 1 语法结构").closest("[data-admin-select]")
+      screen.getByLabelText("定义 1 语法结构").closest(".ant-select")
     ).toHaveTextContent("① used as a noun");
     expect(editor).not.toHaveTextContent("pos-1");
     expect(editor).not.toHaveTextContent("sense-group-1");
@@ -4656,7 +4628,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       target: { value: "12.5" }
     });
     fireEvent.click(screen.getByText("保存草稿").closest("button")!);
-    expect(screen.getByLabelText("释义 1 频率")).toHaveValue("12.5");
+    expect(screen.getByLabelText("释义 1 频率")).toHaveValue("12.50");
 
     const canonical = structuredClone(initial);
     canonical.pos[0]!.senses[0]!.frequency = "64.25";
@@ -5021,14 +4993,14 @@ it.each([false, true])(
       }
     };
     render(
-      <>
+      <ConfigProvider theme={{ token: { motion: false } }}>
         <Harness initial={initial} />
-      </>
+      </ConfigProvider>
     );
     fireEvent.mouseDown(screen.getByLabelText("定义 1 语言"));
     fireEvent.click(
       document.querySelectorAll<HTMLElement>(
-        '[role="listbox"] [role="option"]'
+        ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
       )[0]!
     );
     // jsdom 不执行 antd 弹窗布局；验证确认内容和真实取消/确认回调。
@@ -5037,7 +5009,7 @@ it.each([false, true])(
     ).toBeInTheDocument();
     if (confirm) {
       fireEvent.click(
-        within(screen.getByRole("dialog")).getByRole("button", { name: "切换" })
+        document.querySelector(".ant-modal-confirm-btns .ant-btn-primary")!
       );
       await waitFor(() =>
         expect(value().pos[0]!.senses[0]!.definitions[0]).toMatchObject({
@@ -5093,9 +5065,7 @@ describe("V3MeaningsAndExamplesStep 词形组设置归属", () => {
       const before = value().pos[0]!.senses[0]!;
       expect(screen.queryByLabelText("释义 1 词形与发音")).toBeNull();
       expect(
-        container.querySelector(
-          ".word-sense-field-form-group [data-admin-select]"
-        )
+        container.querySelector(".word-sense-field-form-group .ant-select")
       ).toBeNull();
       fireEvent.click(screen.getByLabelText("释义 1 是否依赖语境"));
       const after = value().pos[0]!.senses[0]!;

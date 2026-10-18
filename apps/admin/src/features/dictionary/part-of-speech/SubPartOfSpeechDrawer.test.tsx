@@ -6,8 +6,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { FeedbackProvider } from "@/components/FeedbackProvider";
-import { AdminThemeProvider } from "@/mui-theme";
+import { App as AntApp } from "antd";
 import type { PartOfSpeechConfig, SubPartOfSpeechConfig } from "@tsz/types";
 import { createRef } from "react";
 import type { ReactNode } from "react";
@@ -17,8 +16,8 @@ import { useAuthStore } from "@/lib/auth";
 import { SubPartOfSpeechPanel } from "./SubPartOfSpeechDrawer";
 import type { SubPartOfSpeechPanelHandle } from "./SubPartOfSpeechDrawer";
 
-vi.mock("@mui/material", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@mui/material")>();
+vi.mock("antd", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("antd")>();
   return {
     ...actual,
     Tooltip: ({
@@ -28,9 +27,7 @@ vi.mock("@mui/material", async (importOriginal) => {
       title?: ReactNode;
       children: ReactNode;
     }) => (
-      <span
-        data-tooltip={typeof title === "string" && title ? title : undefined}
-      >
+      <span data-tooltip={typeof title === "string" ? title : undefined}>
         {children}
       </span>
     )
@@ -129,26 +126,20 @@ const subItems: SubPartOfSpeechConfig[] = [
   }
 ];
 
-function renderPanel(
-  value: PartOfSpeechConfig | null = parent,
-  emptyState: { filtered?: boolean; onResetFilters?: () => void } = {}
-) {
+function renderPanel(value: PartOfSpeechConfig | null = parent) {
   const onSaved = vi.fn();
   const onError = vi.fn();
   const handle = createRef<SubPartOfSpeechPanelHandle>();
   const view = render(
-    <AdminThemeProvider>
-      <FeedbackProvider>
-        <SubPartOfSpeechPanel
-          {...emptyState}
-          ref={handle}
-          parents={value ? [value] : []}
-          createParent={value ?? undefined}
-          onSaved={onSaved}
-          onError={onError}
-        />
-      </FeedbackProvider>
-    </AdminThemeProvider>
+    <AntApp>
+      <SubPartOfSpeechPanel
+        ref={handle}
+        parents={value ? [value] : []}
+        createParent={value ?? undefined}
+        onSaved={onSaved}
+        onError={onError}
+      />
+    </AntApp>
   );
   // 「新增细分词性」按钮已挪到设置页的选择器行，面板只暴露 openCreate 句柄。
   const openCreate = () => act(() => handle.current!.openCreate());
@@ -172,7 +163,7 @@ function fillSubForm(values: { nameZh: string; nameEn: string }) {
 async function findDeleteConfirm(name = "集合名词") {
   const titles = await screen.findAllByText(`删除细分词性“${name}”？`);
   const dialog = titles
-    .map((title) => title.closest<HTMLElement>("[role=dialog]"))
+    .map((title) => title.closest<HTMLElement>(".ant-modal-confirm"))
     .find((candidate): candidate is HTMLElement => candidate !== null);
   if (!dialog) throw new Error("delete confirmation not found");
   return dialog;
@@ -199,36 +190,24 @@ beforeEach(() => {
 });
 
 describe("SubPartOfSpeechPanel", () => {
-  it("空列表区分未配置与筛选无结果，并提供重置入口", () => {
-    api.list.data = { items: [] };
-    const unfiltered = renderPanel();
-    expect(screen.getByText("暂无细分词性")).toBeVisible();
-    expect(screen.queryByText("重置筛选")).not.toBeInTheDocument();
-    unfiltered.unmount();
-    const onResetFilters = vi.fn();
-    renderPanel(parent, { filtered: true, onResetFilters });
-    expect(screen.getByText("未找到符合条件的数据")).toBeVisible();
-    expect(screen.queryByText("暂无细分词性")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText("重置筛选"));
-    expect(onResetFilters).toHaveBeenCalledOnce();
-  });
   it("展示当前基本词性的细分项、引用禁删和空 parent 提示", () => {
     const visible = renderPanel();
     const referencedRow = screen.getByText("可数名词").closest("tr")!;
     const referencedDelete = within(referencedRow)
-      .getByText("删除")
+      .getByText("删 除")
       .closest("button")!;
     expect(referencedDelete).toBeDisabled();
-    expect(referencedDelete.closest("[data-tooltip]")).toHaveAttribute(
+    expect(referencedDelete.parentElement).toHaveAttribute(
       "data-tooltip",
       "已关联 4 个词义，可以修改，但不能删除"
     );
     const unreferencedRow = screen.getByText("集合名词").closest("tr")!;
     expect(
-      within(unreferencedRow).getByText("删除").closest("button")
+      within(unreferencedRow).getByText("删 除").closest("button")
     ).toBeEnabled();
     expect(
-      within(unreferencedRow).getByText("删除").closest("button")?.parentElement
+      within(unreferencedRow).getByText("删 除").closest("button")
+        ?.parentElement
     ).not.toHaveAttribute("data-tooltip");
     visible.unmount();
     renderPanel(null);
@@ -245,7 +224,7 @@ describe("SubPartOfSpeechPanel", () => {
       nameZh: "物质名词",
       nameEn: "Mass noun"
     });
-    fireEvent.click(screen.getByText("新建"));
+    fireEvent.click(screen.getByText("新 建"));
 
     await waitFor(() =>
       expect(api.create).toHaveBeenCalledWith({
@@ -273,7 +252,7 @@ describe("SubPartOfSpeechPanel", () => {
       const callbacks = renderPanel();
       callbacks.openCreate();
       fillSubForm({ nameZh: "物质名词", nameEn: "Mass noun" });
-      fireEvent.click(screen.getByText("新建"));
+      fireEvent.click(screen.getByText("新 建"));
       await waitFor(() =>
         expect(api.create).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -292,14 +271,14 @@ describe("SubPartOfSpeechPanel", () => {
   it("修改未引用细分词性不提交编码，仍可修改名称和序号", async () => {
     renderPanel();
     const row = screen.getByText("集合名词").closest("tr")!;
-    fireEvent.click(within(row).getByText("修改"));
+    fireEvent.click(within(row).getByText("修 改"));
     expect(screen.queryByLabelText("编码")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("序号")).toHaveValue(20);
+    expect(screen.getByLabelText("序号")).toHaveValue("20");
     fillSubForm({
       nameZh: "集合类名词",
       nameEn: "Collective noun"
     });
-    fireEvent.click(screen.getByText("保存"));
+    fireEvent.click(screen.getByText("保 存"));
 
     await waitFor(() =>
       expect(api.update).toHaveBeenCalledWith({
@@ -321,7 +300,7 @@ describe("SubPartOfSpeechPanel", () => {
   it("已被词义引用的细分词性不展示编码且仍可编辑序号", () => {
     renderPanel();
     const row = screen.getByText("可数名词").closest("tr")!;
-    fireEvent.click(within(row).getByText("修改"));
+    fireEvent.click(within(row).getByText("修 改"));
     expect(screen.queryByLabelText("编码")).not.toBeInTheDocument();
     // 序号不受引用限制，照样能改。
     expect(screen.getByLabelText("序号")).toBeEnabled();
@@ -330,10 +309,10 @@ describe("SubPartOfSpeechPanel", () => {
   it("已引用细分词性修改序号时不提交编码", async () => {
     renderPanel();
     const row = screen.getByText("可数名词").closest("tr")!;
-    fireEvent.click(within(row).getByText("修改"));
+    fireEvent.click(within(row).getByText("修 改"));
     fireEvent.change(screen.getByLabelText("序号"), { target: { value: "5" } });
     fillSubForm({ nameZh: "可数名词", nameEn: "Countable noun" });
-    fireEvent.click(screen.getByText("保存"));
+    fireEvent.click(screen.getByText("保 存"));
 
     await waitFor(() =>
       expect(api.update).toHaveBeenCalledWith(
@@ -349,12 +328,12 @@ describe("SubPartOfSpeechPanel", () => {
   it("正式英文在同一基本词性下允许重复", async () => {
     renderPanel();
     const row = screen.getByText("集合名词").closest("tr")!;
-    fireEvent.click(within(row).getByText("修改"));
+    fireEvent.click(within(row).getByText("修 改"));
     fillSubForm({
       nameZh: "不可数抽象名词",
       nameEn: "Countable noun"
     });
-    fireEvent.click(screen.getByText("保存"));
+    fireEvent.click(screen.getByText("保 存"));
 
     await waitFor(() =>
       expect(api.update).toHaveBeenCalledWith(
@@ -368,9 +347,9 @@ describe("SubPartOfSpeechPanel", () => {
   it("未引用细分词性二次确认后删除", async () => {
     const callbacks = renderPanel();
     const row = screen.getByText("集合名词").closest("tr")!;
-    fireEvent.click(within(row).getByText("删除"));
+    fireEvent.click(within(row).getByText("删 除"));
     const dialog = await findDeleteConfirm();
-    fireEvent.click(within(dialog).getByText("删除"));
+    fireEvent.click(within(dialog).getByText("删 除"));
     await waitFor(() =>
       expect(api.remove).toHaveBeenCalledWith({
         partId: "pos-noun",
@@ -386,9 +365,9 @@ describe("SubPartOfSpeechPanel", () => {
     api.remove.mockRejectedValueOnce(failure);
     const callbacks = renderPanel();
     const row = screen.getByText("集合名词").closest("tr")!;
-    fireEvent.click(within(row).getByText("删除"));
+    fireEvent.click(within(row).getByText("删 除"));
     const dialog = await findDeleteConfirm();
-    fireEvent.click(within(dialog).getByText("删除"));
+    fireEvent.click(within(dialog).getByText("删 除"));
     await waitFor(() =>
       expect(callbacks.onError).toHaveBeenCalledWith(failure)
     );
@@ -400,7 +379,7 @@ describe("SubPartOfSpeechPanel", () => {
     api.list.data = undefined;
     renderPanel();
     expect(screen.getByText("细分词性加载失败")).toBeVisible();
-    fireEvent.click(screen.getByText("重试"));
+    fireEvent.click(screen.getByText("重 试"));
     expect(api.refetch).toHaveBeenCalledTimes(1);
   });
 
@@ -410,7 +389,7 @@ describe("SubPartOfSpeechPanel", () => {
     const callbacks = renderPanel();
     callbacks.openCreate();
     fillSubForm({ nameZh: "物质名词", nameEn: "Mass noun" });
-    fireEvent.click(screen.getByText("新建"));
+    fireEvent.click(screen.getByText("新 建"));
     await waitFor(() =>
       expect(callbacks.onError).toHaveBeenCalledWith(failure)
     );
@@ -462,16 +441,14 @@ describe("SubPartOfSpeechPanel 「全部」视图", () => {
     const onError = vi.fn();
     const handle = createRef<SubPartOfSpeechPanelHandle>();
     render(
-      <AdminThemeProvider>
-        <FeedbackProvider>
-          <SubPartOfSpeechPanel
-            ref={handle}
-            parents={[parent, verbParent]}
-            onSaved={onSaved}
-            onError={onError}
-          />
-        </FeedbackProvider>
-      </AdminThemeProvider>
+      <AntApp>
+        <SubPartOfSpeechPanel
+          ref={handle}
+          parents={[parent, verbParent]}
+          onSaved={onSaved}
+          onError={onError}
+        />
+      </AntApp>
     );
     return { onSaved, onError, handle };
   }
@@ -489,9 +466,9 @@ describe("SubPartOfSpeechPanel 「全部」视图", () => {
     ]);
 
     const verbRow = screen.getByText("及物动词").closest("tr")!;
-    fireEvent.click(within(verbRow).getByText("删除"));
+    fireEvent.click(within(verbRow).getByText("删 除"));
     const dialog = await findDeleteConfirm("及物动词");
-    fireEvent.click(within(dialog).getByText("删除"));
+    fireEvent.click(within(dialog).getByText("删 除"));
     await waitFor(() =>
       expect(api.remove).toHaveBeenCalledWith({
         partId: "pos-verb",
@@ -513,7 +490,9 @@ describe("SubPartOfSpeechPanel 「全部」视图", () => {
     fireEvent.mouseDown(parentSelect);
     // 表格里也有"动词"文案，按 antd 下拉选项的 title 定位可见选项再点击。
     const verbOption = await waitFor(() => {
-      const option = screen.queryByRole("option", { name: "动词" });
+      const option = document.querySelector<HTMLElement>(
+        '.ant-select-item-option[title="动词"]'
+      );
       if (!option) throw new Error("动词 选项尚未渲染");
       return option;
     });
@@ -522,19 +501,25 @@ describe("SubPartOfSpeechPanel 「全部」视图", () => {
     fireEvent.change(screen.getByLabelText("序号"), { target: { value: "7" } });
     fireEvent.mouseDown(parentSelect);
     const nounOption = await waitFor(() => {
-      const option = screen.queryByRole("option", { name: "名词" });
+      const option = document.querySelector<HTMLElement>(
+        '.ant-select-item-option[title="名词"]'
+      );
       if (!option) throw new Error("名词 选项尚未渲染");
       return option;
     });
     fireEvent.click(nounOption);
-    expect(screen.getByLabelText("序号")).toHaveValue(7);
+    expect(screen.getByLabelText("序号")).toHaveValue("7");
     fireEvent.mouseDown(parentSelect);
-    fireEvent.click(screen.queryByRole("option", { name: "动词" })!);
+    fireEvent.click(
+      document.querySelector<HTMLElement>(
+        '.ant-select-item-option[title="动词"]'
+      )!
+    );
     fillSubForm({
       nameZh: "使役动词",
       nameEn: "Causative verb"
     });
-    fireEvent.click(screen.getByText("新建"));
+    fireEvent.click(screen.getByText("新 建"));
     await waitFor(() =>
       expect(api.create).toHaveBeenCalledWith({
         partId: "pos-verb",
@@ -547,9 +532,9 @@ describe("SubPartOfSpeechPanel 「全部」视图", () => {
     );
 
     const verbRow = screen.getByText("及物动词").closest("tr")!;
-    fireEvent.click(within(verbRow).getByText("修改"));
+    fireEvent.click(within(verbRow).getByText("修 改"));
     fillSubForm({ nameZh: "及物动词", nameEn: "Transitive verb" });
-    fireEvent.click(screen.getByText("保存"));
+    fireEvent.click(screen.getByText("保 存"));
     await waitFor(() =>
       expect(api.update).toHaveBeenCalledWith(
         expect.objectContaining({ partId: "pos-verb", subId: "sub-transitive" })
@@ -563,7 +548,9 @@ describe("SubPartFormModal 表单默认值", () => {
     const callbacks = renderPanel();
     callbacks.openCreate();
 
-    await waitFor(() => expect(screen.getByLabelText("序号")).toHaveValue(30));
+    await waitFor(() =>
+      expect(screen.getByLabelText("序号")).toHaveValue("30")
+    );
     expect(screen.queryByLabelText("编码")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("序号"), {
       target: { value: "15" }
@@ -576,7 +563,7 @@ describe("SubPartFormModal 表单默认值", () => {
     });
     await expectDisplayNamesNotDerived();
     fillSubForm({ nameZh: "物质名词", nameEn: "Mass noun" });
-    fireEvent.click(screen.getByText("新建"));
+    fireEvent.click(screen.getByText("新 建"));
     await waitFor(() =>
       expect(api.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -605,7 +592,7 @@ describe("SubPartOfSpeechPanel 分页", () => {
     expect(screen.getAllByRole("row")).toHaveLength(11);
     expect(screen.queryByText("批量名词10")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "下一页" }));
+    fireEvent.click(screen.getByTitle("2"));
     expect(screen.getByText("批量名词10")).toBeVisible();
     const row = screen.getByText("批量名词10").closest("tr")!;
     expect(within(row).getByText("110")).toBeInTheDocument();
@@ -622,8 +609,8 @@ it.each(["lexicon_settings.edit_sub", "lexicon_settings.delete"])(
     });
     renderPanel();
     const row = screen.getByText("集合名词").closest("tr")!;
-    const edit = within(row).getByText("修改").closest("button");
-    const remove = within(row).getByText("删除").closest("button");
+    const edit = within(row).getByText("修 改").closest("button");
+    const remove = within(row).getByText("删 除").closest("button");
     if (key === "lexicon_settings.delete") {
       expect(edit).toBeDisabled();
       expect(remove).toBeEnabled();

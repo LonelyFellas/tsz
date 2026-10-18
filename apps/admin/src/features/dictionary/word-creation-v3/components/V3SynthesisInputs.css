@@ -24,20 +24,32 @@
   display: flex;
   align-items: center;
   align-self: start;
-  min-height: 40px;
+  min-height: 32px;
+}
+
+.word-actual-pronunciation-control .v3-voice-text-field-compact > .ant-btn,
+.word-synthesis-control > .ant-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  flex-shrink: 0;
 }
 
 .word-actual-pronunciation-control {
   min-width: 0;
 }
+.word-actual-pronunciation-control .v3-voice-text-field-compact > .ant-btn {
+  height: auto;
+}
 .word-actual-pronunciation-control textarea {
   font-weight: 400;
 }
-.word-actual-pronunciation-control textarea.v3-voice-text-large-preview {
+.word-actual-pronunciation-control
+  textarea.v3-voice-text-large-preview.ant-input {
   font-size: 14pt;
   font-weight: 400;
-  padding: 3px 11px;
-  line-height: 1.5714285714;
+  padding: 4px 11px;
+  line-height: var(--ant-line-height, 1.5714285714);
 }
 
 .word-synthesis-input {
@@ -52,15 +64,26 @@
   min-width: 0;
 }
 
-.word-synthesis-control > textarea {
+.word-synthesis-control > .ant-input {
   flex: 1;
   min-width: 0;
-  line-height: 22px;
-  padding-block: 7px;
 }
 
-.word-synthesis-control > :is(.MuiButton-root, .MuiIconButton-root),
-.word-synthesis-input > :is(.MuiButton-root, .MuiIconButton-root) {
+.word-actual-pronunciation-control
+  .v3-voice-text-field-compact
+  textarea.ant-input {
+  border-start-start-radius: var(--ant-border-radius, 6px);
+  border-end-start-radius: var(--ant-border-radius, 6px);
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+
+.word-synthesis-control > textarea.ant-input {
+  border-radius: 0;
+}
+
+.word-synthesis-control > .ant-btn,
+.word-synthesis-input > .ant-btn {
   flex-shrink: 0;
 }
 
@@ -98,6 +121,9 @@
   align-items: stretch;
   width: 100%;
 }
+.word-synthesis-candidate .word-synthesis-control > .ant-btn {
+  height: auto;
+}
 @container (max-width: 600px) {
   .word-synthesis-candidates {
     grid-template-columns: minmax(0, 1fr);
@@ -105,56 +131,99 @@
 }
 
 .word-synthesis-source-label {
-  align-self: start;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
 }
 
 .word-synthesis-source-label .word-pronunciation-label {
-  min-height: 28px;
+  min-height: 0;
 }
 
 .word-synthesis-source-actions {
   min-width: 0;
 }
 
-.word-synthesis-source-actions > .MuiRadioGroup-root {
+.word-synthesis-source-actions > .ant-radio-group {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 2px;
+  gap: 4px;
 }
 
-.word-synthesis-source-actions .MuiRadio-root {
-  padding: 4px 8px 4px 0;
+.word-synthesis-settings {
+  container-type: inline-size;
+  width: min(560px, calc(100vw - 48px));
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.word-synthesis-settings-body {
+  display: grid;
+  gap: 12px;
+  max-height: min(540px, calc(100dvh - 180px));
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 0 4px 4px;
+}
+.word-synthesis-settings-source {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  font-weight: 400;
 }
 
-.MuiFormControlLabel-root:has(.word-synthesis-choice) {
+/* 弹层宽度独立于所在英/美音栏，窄屏内部转为单列。 */
+.word-synthesis-settings .tsz-ve-speech-panel {
+  width: 100%;
+}
+
+.word-synthesis-settings .tsz-ve-editor {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.word-synthesis-settings .tsz-ve-pop-upload,
+.word-synthesis-settings .tsz-ve-upload-list {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.word-synthesis-settings .tsz-ve-pop-upload {
+  padding-top: 12px;
+  border-top: 1px solid var(--ant-color-border-secondary, #f0f0f0);
+}
+
+@container (max-width: 480px) {
+  .word-synthesis-settings .tsz-ve-voice-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.word-synthesis-choice.ant-radio-wrapper {
   width: 100%;
   min-width: 0;
   margin-inline-end: 0;
   font-weight: 400;
 }
 
-.MuiFormControlLabel-root:has(.word-synthesis-choice) > span:last-child {
+.word-synthesis-choice.ant-radio-wrapper > span:last-child {
   flex: 1;
   min-width: 0;
 }
 
 .word-synthesis-choice-content {
-  display: grid;
-  grid-template-columns: 100px minmax(0, 1fr);
-  align-items: center;
+  display: flex;
+  align-items: baseline;
   gap: 8px;
   min-width: 0;
 }
 
 .word-synthesis-choice-tag {
-  justify-self: start;
-  white-space: nowrap;
+  flex-shrink: 0;
   padding-inline: 4px;
-  border: 1px solid var(--admin-color-border, #d9d9d9);
+  border: 1px solid var(--ant-color-border, #d9d9d9);
   border-radius: 4px;
   line-height: 20px;
 }
@@ -171,75 +240,58 @@
   font-weight: 700;
 }
 
-.MuiFormControlLabel-root:has(.word-synthesis-choice):has(input:checked)
-  .word-synthesis-choice-tag {
-  color: var(--admin-color-text-light-solid, #fff);
-  background: var(--admin-color-primary, #2053ff);
-  border-color: var(--admin-color-primary, #2053ff);
+.word-synthesis-choice.ant-radio-wrapper-checked .word-synthesis-choice-tag {
+  color: var(--ant-color-text-light-solid, #fff);
+  background: var(--ant-color-primary, #2053ff);
+  border-color: var(--ant-color-primary, #2053ff);
 }
 
 :is(.word-shared-pronunciation-us, .v3-dialect-panel-us)
-  .MuiFormControlLabel-root:has(.word-synthesis-choice):has(input:checked)
-  .word-synthesis-choice-tag {
+  .word-synthesis-choice.ant-radio-wrapper-checked
+  .word-synthesis-choice-tag,
+:is(.word-shared-pronunciation-us, .v3-dialect-panel-us)
+  .word-synthesis-choice.ant-radio-wrapper
+  .ant-radio-checked:not(.ant-radio-disabled) {
   background-color: #d42a91;
   border-color: #d42a91;
 }
 
-:is(.word-shared-pronunciation-us, .v3-dialect-panel-us)
-  .MuiFormControlLabel-root:has(.word-synthesis-choice)
-  .MuiRadio-root.Mui-checked:not(.Mui-disabled) {
-  color: #d42a91;
+.word-synthesis-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--ant-color-border-secondary, #f0f0f0);
+}
+
+.word-synthesis-settings-hint {
+  font-size: 12px;
+}
+
+.word-synthesis-settings
+  .tsz-ve-synthesis[data-locale="en-GB"]
+  .tsz-ve-pop-section[data-locale="en-GB"]
+  > .tsz-ve-pop-section-head,
+.word-synthesis-settings
+  .tsz-ve-synthesis[data-locale="en-US"]
+  .tsz-ve-pop-section[data-locale="en-US"]
+  > .tsz-ve-pop-section-head {
+  display: none;
+}
+
+.word-synthesis-settings .tsz-ve-synthesis-upload-unavailable {
+  padding-top: 12px;
+  border-top: 1px solid var(--ant-color-border-secondary, #f0f0f0);
+  color: var(--ant-color-text-secondary, #8c8c8c);
+  font-size: 12px;
 }
 
 .word-synthesis-control
   > .word-pronunciation-play-action[data-playback-dialect="uk"] {
-  color: var(--admin-color-primary, #2053ff);
+  color: var(--ant-color-primary, #2053ff);
 }
 .word-synthesis-control
   > .word-pronunciation-play-action[data-playback-dialect="us"] {
-  color: var(--admin-magenta-6, #c41d7f);
-}
-
-/* 发音字段的标签并入外框上沿，保留输入后仍可见的字段名称。 */
-.word-pronunciation-fields .word-pronunciation-inline-label {
-  position: relative;
-  grid-template-columns: minmax(0, 1fr);
-  margin-top: 8px;
-}
-
-.word-pronunciation-inline-label > .word-field-help,
-.word-pronunciation-inline-label > .word-synthesis-locale-warning {
-  grid-column: 1;
-}
-
-.word-synthesis-candidate {
-  position: relative;
-}
-
-.word-pronunciation-fields .word-pronunciation-floating-label {
-  position: absolute;
-  z-index: 2;
-  top: -8px;
-  left: 10px;
-  min-height: 0;
-  padding: 0 4px;
-  background: #fff;
-  color: var(--admin-color-text-secondary);
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 16px;
-  pointer-events: none;
-}
-
-.word-pronunciation-inline-label:focus-within
-  > .word-pronunciation-floating-label,
-.word-synthesis-candidate:focus-within > .word-pronunciation-floating-label {
-  color: var(--admin-color-primary);
-}
-
-.word-pronunciation-inline-label:has([aria-invalid="true"], .Mui-error)
-  > .word-pronunciation-floating-label,
-.word-synthesis-candidate:has([aria-invalid="true"])
-  > .word-pronunciation-floating-label {
-  color: var(--admin-color-error);
+  color: var(--ant-magenta-6, #c41d7f);
 }

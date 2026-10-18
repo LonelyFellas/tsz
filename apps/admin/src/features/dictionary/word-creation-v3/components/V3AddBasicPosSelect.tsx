@@ -1,7 +1,5 @@
-import { useContentEditPermissions } from "../../contentEditPermissions";
-import Add from "@mui/icons-material/Add";
-import AddCircleOutline from "@mui/icons-material/AddCircleOutline";
-import { Input, MenuItem, Select } from "@mui/material";
+import { PlusOutlined } from "@ant-design/icons";
+import { Select } from "antd";
 import type {
   DraftFormsStepContentV3,
   PartOfSpeechCatalogItem,
@@ -10,6 +8,7 @@ import type {
 } from "@tsz/types";
 
 export interface V3AddBasicPosSelectProps {
+  compact?: boolean;
   catalog?: PartOfSpeechCatalogResponse;
   /** 词条自身是单词还是短语；给定时候选只列同一侧的词性。 */
   entryKind?: WordEntryKindV3;
@@ -17,19 +16,17 @@ export interface V3AddBasicPosSelectProps {
   isError?: boolean;
   isPending?: boolean;
   onAdd: (item: PartOfSpeechCatalogItem) => void;
-  compact?: boolean;
 }
 
 export function V3AddBasicPosSelect({
+  compact = false,
   catalog,
   entryKind,
   forms,
   isError = false,
   isPending = false,
-  onAdd,
-  compact = false
+  onAdd
 }: V3AddBasicPosSelectProps) {
-  const { edit: canEditContent } = useContentEditPermissions();
   const usedPosCodes = new Set(forms.pos.map((pos) => pos.pos));
   // 挂错一侧后端会以 part_of_speech_kind_mismatch 拒绝，不放进候选。
   const availableItems = (catalog?.items ?? []).filter(
@@ -39,35 +36,43 @@ export function V3AddBasicPosSelect({
 
   return (
     <Select
-      input={<Input disableUnderline />}
-      inputProps={{ "aria-label": "添加基本词性" }}
-      displayEmpty
-      renderValue={() => (
-        <span className="word-add-basic-pos-label">
-          {compact ? (
-            <AddCircleOutline fontSize="small" />
-          ) : (
-            <Add fontSize="small" />
-          )}
-          {!compact && "添加词性"}
-        </span>
-      )}
-      IconComponent={() => null}
+      aria-label="添加基本词性"
       className="word-add-basic-pos-select"
-      disabled={!canEditContent || isError || isPending}
-      value=""
-      onChange={(event) => {
+      disabled={isError || isPending}
+      loading={isPending}
+      onChange={(code) => {
         const item = availableItems.find(
-          (candidate) => candidate.code === event.target.value
+          (candidate) => candidate.code === code
         );
         if (item) onAdd(item);
       }}
-    >
-      {availableItems.map((item) => (
-        <MenuItem key={item.code} value={item.code}>
-          {item.name_zh}
-        </MenuItem>
-      ))}
-    </Select>
+      options={availableItems.map((item) => ({
+        value: item.code,
+        label: item.name_zh
+      }))}
+      placeholder="添加基本词性"
+      style={{ width: compact ? 24 : 190 }}
+      popupMatchSelectWidth={190}
+      styles={
+        compact
+          ? {
+              root: { padding: 0 },
+              content: { marginInlineEnd: 0, width: "100%", height: "100%" },
+              input: { width: "100%", height: "100%" },
+              placeholder: { display: "none" },
+              suffix: {
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                pointerEvents: "none"
+              }
+            }
+          : undefined
+      }
+      suffixIcon={<PlusOutlined />}
+      value={undefined}
+    />
   );
 }

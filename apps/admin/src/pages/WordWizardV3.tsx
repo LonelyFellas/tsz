@@ -1,12 +1,4 @@
 import {
-  Alert as MuiAlert,
-  AlertTitle as MuiAlertTitle,
-  Button as MuiButton,
-  CircularProgress as MuiCircularProgress,
-  Stack as MuiStack,
-  Typography as MuiTypography
-} from "@mui/material";
-import {
   ContentEditPermissions,
   useContentEditPermissions,
   onlyTextAssociationsChanged
@@ -16,8 +8,16 @@ import { V3ReviewSentences } from "@/features/dictionary/word-creation-v3/V3Revi
 import { WordSentences } from "@/features/sentences/WordSentences";
 import { wordKeys } from "@/features/dictionary/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useFeedback } from "@/components/FeedbackProvider";
-import { PageStatus } from "@/components/PageStatus";
+import {
+  Alert,
+  App,
+  Button,
+  ConfigProvider,
+  Flex,
+  Result,
+  Spin,
+  Typography
+} from "antd";
 import type {
   AdminWordDraftV3Envelope,
   AdminWordV3,
@@ -146,18 +146,20 @@ function V3ReferenceNotices() {
   return (
     <>
       {index.status === "unavailable" ? (
-        <MuiAlert severity={"info"}>
-          <MuiAlertTitle>{"暂时无法查看关联信息"}</MuiAlertTitle>
-          {
-            "请刷新页面后重试。你可以继续编辑和保存草稿，发布时系统会再次检查关联内容是否正确。"
-          }
-        </MuiAlert>
+        <Alert
+          showIcon
+          type="info"
+          title="暂时无法查看关联信息"
+          description="请刷新页面后重试。你可以继续编辑和保存草稿，发布时系统会再次检查关联内容是否正确。"
+        />
       ) : null}
       {index.stale.length > 0 ? (
-        <MuiAlert severity={"error"}>
-          <MuiAlertTitle>{`存在 ${index.stale.length} 处关联失效，处理后才能发布`}</MuiAlertTitle>
-          {
-            <MuiStack direction="column" spacing={0.5}>
+        <Alert
+          showIcon
+          type="error"
+          title={`存在 ${index.stale.length} 处关联失效，处理后才能发布`}
+          description={
+            <Flex vertical gap={4}>
               <span>
                 以下内容关联的词形或词义已发生变化，请打开对应内容，重新选择或解除关联。你可以继续保存草稿，已发布的内容不受影响；处理完这些关联后才能发布。
               </span>
@@ -165,9 +167,9 @@ function V3ReferenceNotices() {
                 references={index.stale}
                 staleLabel="草稿内不成立"
               />
-            </MuiStack>
+            </Flex>
           }
-        </MuiAlert>
+        />
       ) : null}
     </>
   );
@@ -181,17 +183,19 @@ function V3BlockedReferencesAlert({
 }) {
   if (references.length === 0) return null;
   return (
-    <MuiAlert severity={"error"}>
-      <MuiAlertTitle>{`本次词形修改会影响 ${references.length} 处关联，处理后才能发布`}</MuiAlertTitle>
-      {
-        <MuiStack direction="column" spacing={0.5}>
+    <Alert
+      showIcon
+      type="error"
+      title={`本次词形修改会影响 ${references.length} 处关联，处理后才能发布`}
+      description={
+        <Flex vertical gap={4}>
           <span>
             可以先保存草稿，再打开以下关联内容，重新选择或解除关联；处理完成后才能发布。
           </span>
           <V3ReferenceList references={references} staleLabel="将失效" />
-        </MuiStack>
+        </Flex>
       }
-    </MuiAlert>
+    />
   );
 }
 
@@ -291,22 +295,22 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
 
   const resetConfirmation = () => setPendingIntent(undefined);
   return (
-    <MuiStack direction="column" spacing={2}>
+    <Flex vertical gap="middle">
       <V3ReferenceNotices />
       {conflictNoticeReferences.length > 0 ? (
-        <MuiAlert severity={"error"}>
-          <MuiAlertTitle>
-            {"修改后的拼写与关联内容不一致，处理后才能发布"}
-          </MuiAlertTitle>
-          {
-            <MuiStack direction="column" spacing={0.5}>
+        <Alert
+          showIcon
+          type="error"
+          title="修改后的拼写与关联内容不一致，处理后才能发布"
+          description={
+            <Flex vertical gap={4}>
               <span>
                 可以先保存草稿，再打开以下关联内容，调整文字或重新选择关联词形。处理完成后才能发布，已发布的内容不受草稿修改影响。
               </span>
               <V3ReferenceList references={conflictNoticeReferences} />
-            </MuiStack>
+            </Flex>
           }
-        </MuiAlert>
+        />
       ) : null}
       <V3BlockedReferencesAlert references={blockedReferences} />
       <V3FormsAndPronunciationStep
@@ -345,15 +349,35 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
         value={context.draftForms}
       />
       {pendingIntent && context.impact && requiresConfirmation ? (
-        <MuiAlert
+        <Alert
+          showIcon
+          type="warning"
+          title="保存前请确认影响"
+          description={
+            <Flex vertical gap={4}>
+              <span>
+                {impactPage
+                  ? `正在核对同形匹配：已加载 ${snapshot.items.length}/${snapshot.total}`
+                  : `本次修改会影响 ${context.impact.affected.length} 项关联内容。`}
+              </span>
+              {summarizeFormsImpact(context.impact.affected).map((group) => (
+                <Typography.Text key={group.reason} type="secondary">
+                  {group.reasonLabel}：
+                  {group.parts
+                    .map((part) => `${part.label} ${part.count}`)
+                    .join("、")}
+                </Typography.Text>
+              ))}
+            </Flex>
+          }
           action={
-            <MuiStack direction="row" spacing={1}>
+            <Flex gap="small">
               {impactPage &&
               (snapshot.phase === "error" || snapshot.phase === "expired") ? (
-                <MuiButton onClick={snapshot.retry}>重新加载影响</MuiButton>
+                <Button onClick={snapshot.retry}>重新加载影响</Button>
               ) : null}
-              <MuiButton onClick={resetConfirmation}>取消</MuiButton>
-              <MuiButton
+              <Button onClick={resetConfirmation}>取消</Button>
+              <Button
                 disabled={Boolean(impactPage) && !terminalPage}
                 loading={snapshot.phase === "loading"}
                 onClick={() => void confirmAndSave()}
@@ -361,43 +385,19 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
                 {pendingIntent === "complete"
                   ? "确认影响并完成词形"
                   : "确认影响并保存草稿"}
-              </MuiButton>
-            </MuiStack>
+              </Button>
+            </Flex>
           }
-          severity={"warning"}
-        >
-          <MuiAlertTitle>{"保存前请确认影响"}</MuiAlertTitle>
-          {
-            <MuiStack direction="column" spacing={0.5}>
-              <span>
-                {impactPage
-                  ? `正在核对同形匹配：已加载 ${snapshot.items.length}/${snapshot.total}`
-                  : `本次修改会影响 ${context.impact.affected.length} 项关联内容。`}
-              </span>
-              {summarizeFormsImpact(context.impact.affected).map((group) => (
-                <MuiTypography
-                  key={group.reason}
-                  component="span"
-                  color="text.secondary"
-                >
-                  {group.reasonLabel}：
-                  {group.parts
-                    .map((part) => `${part.label} ${part.count}`)
-                    .join("、")}
-                </MuiTypography>
-              ))}
-            </MuiStack>
-          }
-        </MuiAlert>
+        />
       ) : null}
       <div className="word-step-actions">
-        <MuiButton
+        <Button
           disabled={Boolean(pendingIntent)}
           onClick={() => context.setActiveStep("basics")}
         >
           上一步
-        </MuiButton>
-        <MuiButton
+        </Button>
+        <Button
           disabled={
             Boolean(pendingIntent) ||
             (!context.hasUnsavedChanges && !bindingsDirty) ||
@@ -407,19 +407,19 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
           onClick={() => void prepareSave("save")}
         >
           保存草稿
-        </MuiButton>
-        <MuiButton
+        </Button>
+        <Button
+          type="primary"
           disabled={Boolean(pendingIntent)}
           onClick={() => {
             resetConfirmation();
             context.setActiveStep("meanings");
           }}
-          variant={"contained"}
         >
           进入词义与例句
-        </MuiButton>
+        </Button>
       </div>
-    </MuiStack>
+    </Flex>
   );
 }
 
@@ -452,7 +452,7 @@ function V3MeaningsSlot({
   onFocusSentenceHandled?: () => void;
 }) {
   const permissions = useContentEditPermissions();
-  const feedback = useFeedback();
+  const { message } = App.useApp();
   const [sentenceEditor, setSentenceEditor] = useState<{
     senseId: string;
     value: SharedSentence | "new";
@@ -522,79 +522,70 @@ function V3MeaningsSlot({
   };
 
   return (
-    <MuiStack direction="column" spacing={2}>
+    <Flex vertical gap="middle">
       {!permissions.edit && (
-        <MuiAlert severity={"info"}>
-          {"仅可编辑单词与短语关联，文本、音频及其他内容只读"}
-        </MuiAlert>
+        <Alert
+          type="info"
+          title="仅可编辑单词与短语关联，文本、音频及其他内容只读"
+        />
       )}
       <V3ReferenceNotices />
       <V3BlockedReferencesAlert references={blockedReferences} />
       {surfaceBlocked ? (
-        <MuiAlert
+        <Alert
+          showIcon
+          type="warning"
+          title="词形变更需要在上一步确认"
+          description="本次词形改动触发了同形匹配核对，请回到「词形与发音」保存一次并确认，再回来保存词义。"
           action={
-            <MuiStack direction="row" spacing={1}>
-              <MuiButton onClick={() => setSurfaceBlocked(false)}>
-                知道了
-              </MuiButton>
-              <MuiButton
+            <Flex gap="small">
+              <Button onClick={() => setSurfaceBlocked(false)}>知道了</Button>
+              <Button
                 onClick={() => {
                   setSurfaceBlocked(false);
                   context.setActiveStep("forms");
                 }}
               >
                 去词形与发音
-              </MuiButton>
-            </MuiStack>
+              </Button>
+            </Flex>
           }
-          severity={"warning"}
-        >
-          <MuiAlertTitle>{"词形变更需要在上一步确认"}</MuiAlertTitle>
-          {
-            "本次词形改动触发了同形匹配核对，请回到「词形与发音」保存一次并确认，再回来保存词义。"
-          }
-        </MuiAlert>
+        />
       ) : null}
       {pendingIntent && context.impact ? (
-        <MuiAlert
-          action={
-            <MuiStack direction="row" spacing={1}>
-              <MuiButton onClick={() => setPendingIntent(undefined)}>
-                取 消
-              </MuiButton>
-              <MuiButton onClick={() => void confirmAndSave()}>
-                {pendingIntent === "complete"
-                  ? "确认影响并完成"
-                  : "确认影响并保存草稿"}
-              </MuiButton>
-            </MuiStack>
-          }
-          severity={"warning"}
-        >
-          <MuiAlertTitle>{"保存前请确认词形影响"}</MuiAlertTitle>
-          {
-            <MuiStack direction="column" spacing={0.5}>
+        <Alert
+          showIcon
+          type="warning"
+          title="保存前请确认词形影响"
+          description={
+            <Flex vertical gap={4}>
               <span>{`本次词形修改会影响 ${context.impact.affected.length} 项关联内容。`}</span>
               {summarizeFormsImpact(context.impact.affected).map((group) => (
-                <MuiTypography
-                  key={group.reason}
-                  component="span"
-                  color="text.secondary"
-                >
+                <Typography.Text key={group.reason} type="secondary">
                   {group.reasonLabel}：
                   {group.parts
                     .map((part) => `${part.label} ${part.count}`)
                     .join("、")}
-                </MuiTypography>
+                </Typography.Text>
               ))}
-            </MuiStack>
+            </Flex>
           }
-        </MuiAlert>
+          action={
+            <Flex gap="small">
+              <Button onClick={() => setPendingIntent(undefined)}>取 消</Button>
+              <Button onClick={() => void confirmAndSave()}>
+                {pendingIntent === "complete"
+                  ? "确认影响并完成"
+                  : "确认影响并保存草稿"}
+              </Button>
+            </Flex>
+          }
+        />
       ) : null}
-      <>
+      <ConfigProvider componentDisabled={!permissions.edit}>
         <V3MeaningsAndExamplesStep
           renderSentenceSection={(senseId) => (
-            <>
+            <ConfigProvider componentDisabled={false}>
               <WordSentences
                 key={senseId}
                 sourceWord={context.word}
@@ -620,7 +611,7 @@ function V3MeaningsSlot({
                 }
                 onFocusHandled={onFocusSentenceHandled}
               />
-            </>
+            </ConfigProvider>
           )}
           textLinksEnabled={context.word.capabilities.text_links === true}
           activePosId={context.activePosId}
@@ -642,7 +633,7 @@ function V3MeaningsSlot({
               !permissions.edit &&
               !onlyTextAssociationsChanged(context.draftMeanings, next)
             ) {
-              void feedback("当前仅有单词与短语关联权限", "warning");
+              void message.warning("当前仅有单词与短语关联权限");
               return;
             }
             if (
@@ -690,8 +681,8 @@ function V3MeaningsSlot({
           value={context.draftMeanings}
           wordId={context.word.id}
         />
-      </>
-    </MuiStack>
+      </ConfigProvider>
+    </Flex>
   );
 }
 
@@ -753,9 +744,9 @@ function V3ReadOnlyPreview({
     <V3LiveReview
       actions={
         onEdit ? (
-          <MuiButton onClick={onEdit} variant={"contained"}>
+          <Button type="primary" onClick={onEdit}>
             继续编辑
-          </MuiButton>
+          </Button>
         ) : undefined
       }
       word={word}
@@ -766,12 +757,12 @@ function V3ReadOnlyPreview({
 function V3PreviewSlot({ context }: { context: V3WizardSlotContext }) {
   if (context.hasUnsavedChanges) {
     return (
-      <MuiAlert severity={"warning"}>
-        <MuiAlertTitle>{"请先保存未保存的草稿"}</MuiAlertTitle>
-        {
-          "当前预览只显示最近一次已保存内容。请先返回对应步骤保存草稿，再重新检查发布条件。"
-        }
-      </MuiAlert>
+      <Alert
+        showIcon
+        type="warning"
+        title="请先保存未保存的草稿"
+        description="当前预览只显示最近一次已保存内容。请先返回对应步骤保存草稿，再重新检查发布条件。"
+      />
     );
   }
   const controller = {
@@ -887,7 +878,7 @@ function V3WizardSlots({
 
   if (context.readOnly) {
     return (
-      <MuiStack direction="column" spacing={2}>
+      <Flex vertical gap="middle">
         {canCheckEntry(profile) && !canModifyEntry(profile, context.word) ? (
           <V3PreviewAndPublishStep
             word={context.word}
@@ -919,7 +910,7 @@ function V3WizardSlots({
           onCanonicalRefreshed={onActivated}
           requests={requests}
         />
-      </MuiStack>
+      </Flex>
     );
   }
 
@@ -930,12 +921,12 @@ function V3WizardSlots({
       return canWriteEntry(profile, context.word) ? (
         <V3FormsSlot context={context} />
       ) : (
-        <MuiStack direction="column" spacing={2}>
-          <MuiAlert severity={"info"}>{"当前仅有单词与短语关联权限"}</MuiAlert>
-          <MuiButton onClick={() => context.setActiveStep("meanings")}>
+        <Flex vertical gap="middle">
+          <Alert type="info" title="当前仅有单词与短语关联权限" />
+          <Button onClick={() => context.setActiveStep("meanings")}>
             进入词义与例句关联
-          </MuiButton>
-        </MuiStack>
+          </Button>
+        </Flex>
       );
     case "meanings":
       return (
@@ -949,7 +940,7 @@ function V3WizardSlots({
       );
     case "preview":
       return (
-        <MuiStack direction="column" spacing={2}>
+        <Flex vertical gap="middle">
           <V3PreviewSlot context={context} />
           <V3PublicationHistory
             activationBlockedByUnsavedChanges={context.hasUnsavedChanges}
@@ -958,7 +949,7 @@ function V3WizardSlots({
             onCanonicalRefreshed={onActivated}
             requests={requests}
           />
-        </MuiStack>
+        </Flex>
       );
   }
 }
@@ -1060,30 +1051,23 @@ export function WordWizardV3Page({
 
   if (detail.isPending) {
     return (
-      <MuiStack
-        style={{ minHeight: 420 }}
-        direction="row"
-        alignItems={"center"}
-        justifyContent={"center"}
-      >
-        <MuiCircularProgress aria-label="正在加载词条" size={40} />
-      </MuiStack>
+      <Flex justify="center" align="center" style={{ minHeight: 420 }}>
+        <Spin size="large" description="正在加载词条" />
+      </Flex>
     );
   }
   if (detail.isError || !detail.data) {
     const presentation = presentV3DetailError(detail.error);
     return (
-      <PageStatus
+      <Result
+        status="error"
         title={presentation.title}
-        description={presentation.description}
-        action={
+        subTitle={presentation.description}
+        extra={
           presentation.retryable ? (
-            <MuiButton
-              onClick={() => void detail.refetch()}
-              variant={"contained"}
-            >
+            <Button type="primary" onClick={() => void detail.refetch()}>
               重试
-            </MuiButton>
+            </Button>
           ) : undefined
         }
       />
@@ -1112,16 +1096,16 @@ export function WordWizardV3Page({
   }
 
   return (
-    <MuiStack direction="column" spacing={2}>
+    <Flex vertical gap="middle">
       <CreationSourceNotice source={creationSourceFromState(location.state)} />
       {searchParams.get("focus_node") &&
         !locateV3Node(word, searchParams.get("focus_node")!) && (
-          <MuiAlert severity={"warning"}>
-            <MuiAlertTitle>{"未找到关联来源内容"}</MuiAlertTitle>
-            {
-              "来源内容可能已被删除或修改，但关联不一定已解除。请检查来源词条的草稿和已发布内容，重新选择或解除关联后，返回本词条刷新页面。"
-            }
-          </MuiAlert>
+          <Alert
+            showIcon
+            type="warning"
+            title="未找到关联来源内容"
+            description="来源内容可能已被删除或修改，但关联不一定已解除。请检查来源词条的草稿和已发布内容，重新选择或解除关联后，返回本词条刷新页面。"
+          />
         )}
       <ContentEditPermissions
         value={{
@@ -1159,6 +1143,6 @@ export function WordWizardV3Page({
           />
         </V3ReferenceGuardProvider>
       </ContentEditPermissions>
-    </MuiStack>
+    </Flex>
   );
 }

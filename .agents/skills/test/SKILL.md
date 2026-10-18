@@ -33,7 +33,7 @@ Bug 回归先证明旧实现失败，再证明修复后通过。纯文案、静�
 ## 3. 实现有价值的测试
 
 - 沿用邻近测试的 providers、fixture 与 mock 位置；web 的 Next 路由和 admin 的 React Router 不混用。
-- admin 使用 MUI Theme/反馈 provider，并保留 matchMedia/ResizeObserver 垫片；断言公开 role/label 或业务 data 属性，大表格限定查询范围。
+- admin 使用 AntD ConfigProvider/App，并保留 matchMedia/ResizeObserver 垫片；断言公开 role/label 或业务 data 属性，大表格限定查询范围。
 - 断言用户可观察结果、请求契约或公开行为；异步等待最终状态，不断言私有实现，不弱化输入来变绿。
 - API 变化读取本仓 [contract-sync](../contract-sync/SKILL.md)，核实两仓 checkout 后按原生流程同步并验证契约；只读核对请求不执行生成。
 - `PENDING` 只记录后端确实尚未提供的端点及原因，不能掩盖已实现端点的不一致。

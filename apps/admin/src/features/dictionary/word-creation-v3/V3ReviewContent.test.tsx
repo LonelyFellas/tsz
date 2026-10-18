@@ -1,6 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
-
-import { Button } from "@mui/material";
+import { Button } from "antd";
 import type { AdminWordV3 } from "@tsz/types";
 import { describe, expect, it, vi } from "vitest";
 import { formsFixture } from "./fixtures";

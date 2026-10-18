@@ -1,24 +1,21 @@
+import { TableEmptyState } from "@/components/TableEmptyState";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
-  Box,
   Button,
-  Chip,
-  FormControlLabel,
+  Card,
+  Drawer,
+  Input,
+  Modal,
+  Pagination,
   Radio,
-  RadioGroup,
-  Paper,
-  Stack,
-  Tab,
+  Space,
+  Table,
   Tabs,
-  TextField,
+  Tag,
   Typography
-} from "@mui/material";
-import { useForm } from "react-hook-form";
-import { AdminDrawer } from "@/components/AdminDrawer";
-import { AdminTable, AdminPagination } from "@/components/AdminTable";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
+} from "antd";
 import type { Wordlist, WordlistEntry, AdminWordlistReview } from "@tsz/types";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import "@tsz/voice-editor/reader.css";
@@ -26,13 +23,13 @@ import { api, usePermission } from "@/lib/auth";
 
 export function WordlistEntryView({ entry }: { entry: WordlistEntry }) {
   return (
-    <Stack spacing={1.5}>
-      <Typography variant="h6" component="h3" sx={{ overflowWrap: "anywhere" }}>
-        {entry.label}
-      </Typography>
+    <section style={{ padding: "16px 0", borderBottom: "1px solid #eee" }}>
+      <Typography.Title level={5}>{entry.label}</Typography.Title>
       {entry.pos.map((pos) => (
-        <Stack key={pos.pos_id} spacing={0.5}>
-          <Typography color="text.secondary">{pos.label ?? pos.pos}</Typography>
+        <div key={pos.pos_id}>
+          <Typography.Text type="secondary">
+            {pos.label ?? pos.pos}
+          </Typography.Text>
           {pos.senses.map((sense) => (
             <div key={sense.id}>
               {sense.definitions.map((def) => (
@@ -44,9 +41,9 @@ export function WordlistEntryView({ entry }: { entry: WordlistEntry }) {
               ))}
             </div>
           ))}
-        </Stack>
+        </div>
       ))}
-    </Stack>
+    </section>
   );
 }
 const reviewLabels: Record<string, string> = {
@@ -55,22 +52,12 @@ const reviewLabels: Record<string, string> = {
   rejected: "已驳回",
   cancelled: "已取消"
 };
-function reviewChip(state: string) {
-  return (
-    <Chip
-      label={reviewLabels[state] ?? state}
-      color={
-        state === "approved"
-          ? "success"
-          : state === "rejected"
-            ? "error"
-            : state === "pending"
-              ? "primary"
-              : "default"
-      }
-    />
-  );
-}
+const reviewColors: Record<string, string> = {
+  pending: "processing",
+  approved: "success",
+  rejected: "error",
+  cancelled: "default"
+};
 export function WordlistDetails({
   list,
   adminId,
@@ -88,10 +75,7 @@ export function WordlistDetails({
   const [page, setPage] = useState(1);
   const [requestId, setRequestId] = useState<string>();
   const [action, setAction] = useState<"approve" | "reject" | null>(null);
-  const { register, watch } = useForm<{ reason: string }>({
-    defaultValues: { reason: "" }
-  });
-  const reason = watch("reason");
+  const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const key = ["admin-wordlists", adminId, list.id];
@@ -156,416 +140,253 @@ export function WordlistDetails({
   }
   return (
     <>
-      <AdminDrawer
+      <Drawer
+        aria-label={list.name}
         title={list.name}
-        width={736}
+        open
+        size={736}
+        footer={
+          <>
+            {tab === "reviews" &&
+              reviewMode &&
+              !reviews.isError &&
+              current?.state === "pending" &&
+              canReview && (
+                <Space>
+                  <Button
+                    type="primary"
+                    onClick={() => {
+                      setAction("approve");
+                      setError("");
+                    }}
+                  >
+                    通过审核
+                  </Button>
+                  <Button
+                    danger
+                    onClick={() => {
+                      setAction("reject");
+                      setError("");
+                    }}
+                  >
+                    驳回
+                  </Button>
+                </Space>
+              )}
+          </>
+        }
         onClose={() => {
           if (!busy) onClose();
         }}
-        footer={
-          tab === "reviews" &&
-          reviewMode &&
-          !reviews.isError &&
-          current?.state === "pending" &&
-          canReview ? (
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              alignItems={{ sm: "center" }}
-              justifyContent="space-between"
-              spacing={1.5}
-            >
-              <Box sx={{ minWidth: 0 }}>
-                <Typography variant="body2" noWrap title={current.name}>
-                  {current.name}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  通过后将公开本次提交内容
-                </Typography>
-              </Box>
-              <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
-                <Button
-                  variant="contained"
-                  size="medium"
-                  disabled={busy}
-                  onClick={() => {
-                    setAction("approve");
-                    setError("");
-                  }}
-                >
-                  通过审核
-                </Button>
-                <Button
-                  variant="outlined"
-                  color="error"
-                  size="medium"
-                  disabled={busy}
-                  onClick={() => {
-                    setAction("reject");
-                    setError("");
-                  }}
-                >
-                  驳回
-                </Button>
-              </Stack>
-            </Stack>
-          ) : undefined
-        }
       >
-        <Box
-          component="dl"
-          sx={{
-            m: 0,
-            mb: 2.5,
-            p: 2,
-            bgcolor: "background.default",
-            borderRadius: 1,
-            display: "grid",
-            gridTemplateColumns: {
-              xs: "minmax(0, 1fr)",
-              sm: "minmax(0, 1fr) minmax(0, 1.5fr)"
-            },
-            gap: 1.5
-          }}
-        >
-          <Box>
-            <Typography component="dt" variant="caption" color="text.secondary">
-              创建人
-            </Typography>
-            <Typography
-              component="dd"
-              variant="body2"
-              sx={{ m: 0, overflowWrap: "anywhere" }}
-            >
-              {list.owner_name}
-            </Typography>
-          </Box>
-          <Box>
-            <Typography component="dt" variant="caption" color="text.secondary">
-              词表 ID
-            </Typography>
-            <Typography
-              component="dd"
-              variant="body2"
-              color="text.secondary"
-              sx={{ m: 0, overflowWrap: "anywhere", fontFamily: "monospace" }}
-            >
-              {list.id}
-            </Typography>
-          </Box>
-        </Box>
+        <Typography.Paragraph>
+          创建人：{list.owner_name} · ID：{list.id}
+        </Typography.Paragraph>
         <Tabs
-          sx={{ mb: 2.5, borderBottom: 1, borderColor: "divider" }}
-          value={tab}
-          onChange={(_, value: string) => {
-            setTab(value);
+          activeKey={tab}
+          onChange={(v) => {
+            setTab(v);
             setPage(1);
           }}
-          aria-label="词表内容"
-        >
-          <Tab value="current" label="当前内容" />
-          <Tab value="reviews" label="审核记录" />
-        </Tabs>
-        {tab === "reviews" &&
-          (reviews.isError ? (
-            <Alert
-              severity="error"
-              action={
-                <Button onClick={() => void reviews.refetch()}>重试</Button>
-              }
-            >
-              审核记录加载失败
-            </Alert>
-          ) : reviews.isPending ? (
-            <Typography role="status" color="text.secondary" sx={{ py: 3 }}>
-              读取审核记录…
-            </Typography>
-          ) : !current ? (
-            <Typography color="text.secondary" sx={{ py: 3 }}>
-              尚未提交公开审核
-            </Typography>
-          ) : !reviewMode ? (
-            <AdminTable
-              emptyMessage="暂无审核记录"
-              rows={reviews.data.items}
-              rowId={(row) => row.id}
-              columns={[
-                {
-                  id: "state",
-                  label: "审核状态",
-                  render: (row) => reviewChip(row.state)
-                },
-                { id: "name", label: "申请名称", render: (row) => row.name },
-                {
-                  id: "created",
-                  label: "提交时间",
-                  render: (row) =>
-                    row.created_at
-                      ? new Date(row.created_at).toLocaleString("zh-CN")
-                      : "—"
-                },
-                {
-                  id: "reviewer",
-                  label: "审核人",
-                  render: (row) =>
-                    row.reviewer_name ||
-                    row.reviewer_id ||
-                    (row.decided_at ? "未提供" : "—")
-                },
-                {
-                  id: "decided",
-                  label: "审核时间",
-                  render: (row) =>
-                    row.decided_at
-                      ? new Date(row.decided_at).toLocaleString("zh-CN")
-                      : "—"
-                },
-                {
-                  id: "reason",
-                  label: "审核意见",
-                  render: (row) => row.reason || "—"
-                }
-              ]}
-            />
-          ) : (
-            <>
-              <Typography variant="subtitle2" component="h2" sx={{ mb: 1 }}>
-                选择审核申请
-              </Typography>
-              <RadioGroup
-                aria-label="审核记录"
-                value={current.id}
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: {
-                    xs: "minmax(0, 1fr)",
-                    sm: "repeat(2, minmax(0, 1fr))"
-                  },
-                  gap: 1,
-                  mb: 2.5
-                }}
-                onChange={(event) => {
-                  setRequestId(event.target.value);
-                  setPage(1);
-                }}
-              >
-                {reviews.data.items.map((row) => (
-                  <FormControlLabel
-                    key={row.id}
-                    value={row.id}
-                    control={<Radio size="small" />}
-                    sx={{
-                      m: 0,
-                      p: 1,
-                      alignItems: "flex-start",
-                      border: 1,
-                      borderColor:
-                        current.id === row.id ? "primary.main" : "divider",
-                      bgcolor:
-                        current.id === row.id
-                          ? "action.selected"
-                          : "background.paper",
-                      borderRadius: 1,
-                      "& .MuiFormControlLabel-label": { minWidth: 0, flex: 1 },
-                      "&:focus-within": {
-                        outline: "2px solid",
-                        outlineColor: "primary.main",
-                        outlineOffset: 2
-                      }
-                    }}
-                    label={
-                      <Stack
-                        spacing={0.75}
-                        sx={{ py: 0.5, pr: 0.5, alignItems: "flex-start" }}
-                      >
-                        {reviewChip(row.state)}
-                        <Typography
-                          variant="body2"
-                          fontWeight={600}
-                          sx={{ overflowWrap: "anywhere" }}
-                        >
-                          {row.name}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          提交于{" "}
-                          {row.created_at
-                            ? new Date(row.created_at).toLocaleString("zh-CN")
-                            : "—"}
-                        </Typography>
-                      </Stack>
-                    }
-                  />
-                ))}
-              </RadioGroup>
-              <Box sx={{ mb: 2.5, overflowWrap: "anywhere" }}>
-                <Stack spacing={1}>
-                  <Typography variant="body2" color="text.secondary">
-                    审核人：
-                    {current.reviewer_name ||
-                      current.reviewer_id ||
-                      (current.decided_at ? "未提供" : "—")}
-                  </Typography>
-                  {current.decided_at && (
-                    <Typography variant="body2" color="text.secondary">
-                      审核时间：
-                      {new Date(current.decided_at).toLocaleString("zh-CN")}
-                    </Typography>
-                  )}
-                  {current.reason && (
-                    <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
-                      审核意见：{current.reason}
-                    </Typography>
-                  )}
-                </Stack>
-              </Box>
-            </>
-          ))}
-        {(tab === "current" || (reviewMode && current)) && (
-          <Stack spacing={2}>
-            <Stack
-              direction="row"
-              alignItems="baseline"
-              justifyContent="space-between"
-              spacing={1}
-            >
-              <Typography variant="subtitle1" fontWeight={600} component="h2">
-                {tab === "current" ? "词表内容" : "提交时内容"}
-              </Typography>
-              {items.data && (
-                <Typography variant="body2" color="text.secondary">
-                  {items.data.pagination.total} 个词项
-                </Typography>
-              )}
-            </Stack>
-            {items.isError ? (
+          items={[
+            { key: "current", label: "当前内容" },
+            { key: "reviews", label: "审核记录" }
+          ]}
+        />
+        {tab === "reviews" && (
+          <>
+            {reviews.isError ? (
               <Alert
-                severity="error"
+                type="error"
+                title="审核记录加载失败"
                 action={
-                  <Button onClick={() => void items.refetch()}>重试</Button>
+                  <Button onClick={() => void reviews.refetch()}>重试</Button>
                 }
-              >
-                词条加载失败
-              </Alert>
-            ) : items.isPending ? (
-              <Typography role="status" color="text.secondary" sx={{ py: 3 }}>
-                读取词条…
-              </Typography>
+              />
+            ) : reviews.isPending ? (
+              <p>读取审核记录…</p>
+            ) : !current ? (
+              <p>尚未提交公开审核</p>
+            ) : !reviewMode ? (
+              <Table<AdminWordlistReview>
+                locale={{
+                  emptyText: <TableEmptyState message="暂无审核记录" />
+                }}
+                rowKey="id"
+                size="small"
+                pagination={false}
+                dataSource={reviews.data.items}
+                columns={[
+                  {
+                    title: "审核状态",
+                    render: (_, r) => (
+                      <Tag color={reviewColors[r.state]}>
+                        {reviewLabels[r.state] ?? r.state}
+                      </Tag>
+                    )
+                  },
+                  { title: "申请名称", dataIndex: "name" },
+                  {
+                    title: "提交时间",
+                    dataIndex: "created_at",
+                    render: (value: string) =>
+                      value ? new Date(value).toLocaleString("zh-CN") : "—"
+                  },
+                  {
+                    title: "审核人",
+                    render: (_, r) =>
+                      r.reviewer_name ||
+                      r.reviewer_id ||
+                      (r.decided_at ? "未提供" : "—")
+                  },
+                  {
+                    title: "审核时间",
+                    dataIndex: "decided_at",
+                    render: (value: string | null) =>
+                      value ? new Date(value).toLocaleString("zh-CN") : "—"
+                  },
+                  {
+                    title: "审核意见",
+                    dataIndex: "reason",
+                    render: (value: string | null) => value || "—"
+                  }
+                ]}
+              />
             ) : (
               <>
-                {items.data.items.length === 0 && (
-                  <Typography color="text.secondary" sx={{ py: 3 }}>
-                    暂无词项
-                  </Typography>
+                <Radio.Group
+                  aria-label="审核记录"
+                  value={current.id}
+                  onChange={(e) => {
+                    setRequestId(e.target.value);
+                    setPage(1);
+                  }}
+                >
+                  <Space wrap>
+                    {reviews.data.items.map((r) => (
+                      <Radio key={r.id} value={r.id}>
+                        <Tag color={reviewColors[r.state]}>
+                          {reviewLabels[r.state] ?? r.state}
+                        </Tag>
+                        {r.name}
+                      </Radio>
+                    ))}
+                  </Space>
+                </Radio.Group>
+                <p>申请名称：{current.name}</p>
+                <p>
+                  审核人：
+                  {current.reviewer_name ||
+                    current.reviewer_id ||
+                    (current.decided_at ? "未提供" : "—")}
+                </p>
+                {current.decided_at && (
+                  <p>
+                    审核时间：
+                    {new Date(current.decided_at).toLocaleString("zh-CN")}
+                  </p>
                 )}
-                {items.data.items.map((item, index) => (
-                  <Paper
-                    component="article"
-                    variant="outlined"
-                    key={item.item_id ?? item.entry_id}
-                    sx={{
-                      p: { xs: 2, sm: 2.5 },
-                      overflowWrap: "anywhere",
-                      minWidth: 0
-                    }}
-                  >
-                    <Stack spacing={2}>
-                      <Stack direction="row" alignItems="center" spacing={1}>
-                        <Typography variant="caption" color="text.secondary">
-                          {(page - 1) * 20 + index + 1}
-                        </Typography>
-                        <Chip
-                          variant="outlined"
-                          label={item.custom_word ? "自定义词汇" : "平台词汇"}
-                        />
-                      </Stack>
-                      {item.custom_word ? (
-                        <Stack spacing={1.5}>
-                          <Typography variant="h6" component="h3">
-                            {item.custom_word.word}
-                          </Typography>
-                          <Box>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              sx={{ display: "block", mb: 0.5 }}
-                            >
-                              释义
-                            </Typography>
-                            <Typography
-                              sx={{ whiteSpace: "pre-wrap", lineHeight: 1.8 }}
-                            >
-                              {item.custom_word.definition}
-                            </Typography>
-                          </Box>
-                        </Stack>
-                      ) : item.entry ? (
-                        <WordlistEntryView entry={item.entry} />
-                      ) : (
-                        <Typography color="text.secondary">
-                          内容不可用
-                        </Typography>
-                      )}
-                      {item.author_note && (
-                        <Box
-                          sx={{
-                            p: 1.5,
-                            bgcolor: "background.default",
-                            borderRadius: 1
-                          }}
-                        >
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{ display: "block", mb: 0.5 }}
-                          >
-                            作者注
-                          </Typography>
-                          <Typography
-                            variant="body2"
-                            sx={{ whiteSpace: "pre-wrap", lineHeight: 1.8 }}
-                          >
-                            {item.author_note}
-                          </Typography>
-                        </Box>
-                      )}
-                    </Stack>
-                  </Paper>
-                ))}
-                <AdminPagination
-                  page={page}
-                  pageSize={20}
-                  total={items.data.pagination.total}
-                  onChange={setPage}
-                />
+                {current.reason && <p>审核意见：{current.reason}</p>}
               </>
             )}
-          </Stack>
+          </>
         )}
-      </AdminDrawer>
-      <ConfirmDialog
-        open={!!action}
+        {(tab === "current" || (reviewMode && current)) &&
+          (items.isError ? (
+            <Alert
+              type="error"
+              title="词条加载失败"
+              action={
+                <Button onClick={() => void items.refetch()}>重试</Button>
+              }
+            />
+          ) : items.isPending ? (
+            <p>读取词条…</p>
+          ) : (
+            <>
+              {items.data.items.length === 0 && <p>暂无词项</p>}
+              {items.data.items.map((item, index) => (
+                <article
+                  key={item.item_id ?? item.entry_id}
+                  style={{ marginBottom: 16, overflowWrap: "anywhere" }}
+                >
+                  <Card size="small">
+                    <Space style={{ marginBottom: 12 }}>
+                      <Typography.Text type="secondary">
+                        {(page - 1) * 20 + index + 1}
+                      </Typography.Text>
+                      <Tag>{item.custom_word ? "自定义词汇" : "平台词汇"}</Tag>
+                    </Space>
+                    {item.custom_word ? (
+                      <>
+                        <Typography.Title level={5}>
+                          {item.custom_word.word}
+                        </Typography.Title>
+                        <Typography.Paragraph
+                          style={{ whiteSpace: "pre-wrap" }}
+                        >
+                          {item.custom_word.definition}
+                        </Typography.Paragraph>
+                      </>
+                    ) : item.entry ? (
+                      <WordlistEntryView entry={item.entry} />
+                    ) : (
+                      <p>内容不可用</p>
+                    )}
+                    {item.author_note && (
+                      <Typography.Paragraph style={{ whiteSpace: "pre-wrap" }}>
+                        {item.author_note}
+                      </Typography.Paragraph>
+                    )}
+                  </Card>
+                </article>
+              ))}
+              <Pagination
+                current={page}
+                pageSize={20}
+                total={items.data.pagination.total}
+                showSizeChanger={false}
+                onChange={setPage}
+                itemRender={(_, type, original) =>
+                  type === "next" ? (
+                    <button type="button" aria-label="下一页">
+                      ›
+                    </button>
+                  ) : (
+                    original
+                  )
+                }
+              />
+            </>
+          ))}
+      </Drawer>
+      <Modal
         title={action === "approve" ? "确认通过审核并公开" : "驳回词表"}
-        pending={busy}
-        error={error || undefined}
-        confirmText="确认"
-        danger={action === "reject"}
-        onClose={() => setAction(null)}
-        onConfirm={() => void decide()}
+        open={!!action}
+        confirmLoading={busy}
+        cancelButtonProps={{ disabled: busy }}
+        closable={!busy}
+        keyboard={!busy}
+        mask={{ closable: !busy }}
+        okText="确认"
+        okButtonProps={{ danger: action === "reject" }}
+        onCancel={() => {
+          if (!busy) setAction(null);
+        }}
+        onOk={() => void decide()}
       >
-        <Typography sx={{ mb: 2, overflowWrap: "anywhere" }}>
-          {current?.name}
-        </Typography>
+        <p>{current?.name}</p>
         {action === "reject" && (
-          <TextField
-            label="操作原因"
-            multiline
-            minRows={3}
-            fullWidth
+          <Input.TextArea
+            aria-label="操作原因"
             disabled={busy}
-            slotProps={{ htmlInput: { maxLength: 1000 } }}
-            {...register("reason")}
+            maxLength={1000}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
           />
         )}
-      </ConfirmDialog>
+        {error && <Alert type="error" title={error} />}
+      </Modal>
     </>
   );
 }
