@@ -77,12 +77,13 @@ it("reads whole-list availability through separate authorized routes and rejects
   const signal = new AbortController().signal;
   expect(await api.availability(id, { signal })).toEqual(counts);
   expect(http.get).toHaveBeenLastCalledWith(`/wordlists/${id}/availability`, {
-    signal
+    signal,
+    headers: WORDLIST_READING_HEADERS
   });
   await api.myAvailability(id, { signal });
   expect(http.get).toHaveBeenLastCalledWith(
     `/me/wordlists/${id}/availability`,
-    { signal }
+    { signal, headers: WORDLIST_READING_HEADERS }
   );
   expect(() =>
     decodeWordlistResponse("WordlistAvailability", {
@@ -562,4 +563,49 @@ it("keeps batched public stats separate from private state and decodes unavailab
   expect(() =>
     decodeWordlistResponse("Wordlist", { ...meta, like_count: 1 })
   ).toThrow();
+});
+
+it("自定义项保持独立标识及释义，公共契约拒绝私密备注和超长自定义字段", async () => {
+  const item = {
+    item_id: id,
+    entry_id: null,
+    custom_word: { word: "my phrase", definition: "自定义释义" },
+    position: 0,
+    entry: null,
+    author_note: "读者可见"
+  };
+  const data = { items: [item], revision: 1, pagination };
+  expect(decodeWordlistResponse("WordlistItems", data)).toEqual(data);
+  expect(() =>
+    decodeWordlistResponse("WordlistItems", {
+      ...data,
+      items: [{ ...item, private_note: "secret" }]
+    })
+  ).toThrow();
+  expect(() =>
+    decodeWordlistResponse("WordlistItems", {
+      ...data,
+      items: [
+        { ...item, custom_word: { word: "x".repeat(51), definition: "d" } }
+      ]
+    })
+  ).toThrow();
+  expect(() =>
+    decodeWordlistResponse("WordlistItems", {
+      ...data,
+      items: [{ ...item, custom_word: { word: "x", definition: "" } }]
+    })
+  ).toThrow();
+  const edit = {
+    wordlist: meta,
+    entry_ids: [],
+    items: [{ item_id: id, custom_word: item.custom_word, author_note: "注" }]
+  };
+  const http = {
+    get: vi.fn().mockResolvedValue(edit)
+  } as unknown as HttpClient;
+  expect(await createWordlistEndpoints(http).edit(id)).toEqual(edit);
+  expect(http.get).toHaveBeenCalledWith(`/me/wordlists/${id}/edit`, {
+    headers: WORDLIST_READING_HEADERS
+  });
 });

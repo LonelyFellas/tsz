@@ -298,8 +298,25 @@ export function WordlistDetails({
           ) : (
             <>
               {items.data.items.map((item) => (
-                <div key={item.entry_id}>
-                  {item.entry ? (
+                <div key={item.item_id ?? item.entry_id}>
+                  {item.custom_word ? (
+                    <div>
+                      <Typography fontWeight={600}>
+                        {item.custom_word.word}
+                      </Typography>
+                      <Typography
+                        sx={{
+                          whiteSpace: "pre-wrap",
+                          overflowWrap: "anywhere"
+                        }}
+                      >
+                        {item.custom_word.definition}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        自定义词汇
+                      </Typography>
+                    </div>
+                  ) : item.entry ? (
                     <WordlistEntryView entry={item.entry} />
                   ) : (
                     <p>内容不可用</p>

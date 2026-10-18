@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-deletion-grace/docs/openapi.json",
-  "_generatedAt": "2026-10-18T04:52:27.171Z",
+  "_source": "/Users/darwish/.codex/worktrees/wordlist-custom-vocabulary/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-10-18T07:11:25.856Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -748,6 +748,12 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Wordlist-Custom-Items",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "get /admin/wordlists/{id}/review-requests/{request_id}/items": [
@@ -759,6 +765,12 @@
       },
       {
         "name": "X-TSZ-Wordlist-Annotations",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Wordlist-Custom-Items",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -802,6 +814,22 @@
         "schema": { "type": ["string", "null"] }
       }
     ],
+    "get /me/wordlists/{id}/availability": [
+      {
+        "name": "X-TSZ-Wordlist-Custom-Items",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "get /me/wordlists/{id}/edit": [
+      {
+        "name": "X-TSZ-Wordlist-Custom-Items",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
     "get /me/wordlists/{id}/items": [
       {
         "name": "X-TSZ-Sentence-Formatting",
@@ -811,6 +839,12 @@
       },
       {
         "name": "X-TSZ-Wordlist-Annotations",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Wordlist-Custom-Items",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -828,6 +862,14 @@
         "schema": { "type": ["string", "null"] }
       }
     ],
+    "get /wordlists/{id}/availability": [
+      {
+        "name": "X-TSZ-Wordlist-Custom-Items",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
     "get /wordlists/{id}/items": [
       {
         "name": "X-TSZ-Sentence-Formatting",
@@ -837,6 +879,12 @@
       },
       {
         "name": "X-TSZ-Wordlist-Annotations",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Wordlist-Custom-Items",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -4505,6 +4553,7 @@
           "format": "int64",
           "minimum": 0
         },
+        "custom_count": { "type": "integer", "format": "int64", "minimum": 0 },
         "revision": { "type": "integer", "format": "int64" },
         "unavailable_count": {
           "type": "integer",

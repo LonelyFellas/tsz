@@ -61,7 +61,8 @@ function query(q: WordlistQuery) {
 }
 export const WORDLIST_READING_HEADERS = {
   ...SENTENCE_FORMATTING_HEADERS,
-  "X-TSZ-Wordlist-Annotations": "v1"
+  "X-TSZ-Wordlist-Annotations": "v1",
+  "X-TSZ-Wordlist-Custom-Items": "v1"
 } as const;
 type Options = { signal?: AbortSignal };
 export function createWordlistEndpoints(http: HttpClient) {
@@ -150,7 +151,10 @@ export function createWordlistEndpoints(http: HttpClient) {
         .then((v) => decodeWordlistResponse<Wordlist>("Wordlist", v)),
     availability: (id: string, o?: Options) =>
       http
-        .get<unknown>(`/wordlists/${id}/availability`, o)
+        .get<unknown>(`/wordlists/${id}/availability`, {
+          ...o,
+          headers: WORDLIST_READING_HEADERS
+        })
         .then((v) =>
           decodeWordlistResponse<WordlistAvailability>(
             "WordlistAvailability",
@@ -195,7 +199,10 @@ export function createWordlistEndpoints(http: HttpClient) {
         .then((v) => decodeWordlistResponse<Wordlist>("Wordlist", v)),
     myAvailability: (id: string, o?: Options) =>
       http
-        .get<unknown>(`/me/wordlists/${id}/availability`, o)
+        .get<unknown>(`/me/wordlists/${id}/availability`, {
+          ...o,
+          headers: WORDLIST_READING_HEADERS
+        })
         .then((v) =>
           decodeWordlistResponse<WordlistAvailability>(
             "WordlistAvailability",
@@ -217,7 +224,10 @@ export function createWordlistEndpoints(http: HttpClient) {
         ),
     edit: (id: string, o?: Options) =>
       http
-        .get<unknown>(`/me/wordlists/${id}/edit`, o)
+        .get<unknown>(`/me/wordlists/${id}/edit`, {
+          ...o,
+          headers: WORDLIST_READING_HEADERS
+        })
         .then((v) =>
           decodeWordlistResponse<WordlistEditSnapshot>(
             "WordlistEditSnapshot",

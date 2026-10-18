@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { HttpError } from "@tsz/api-client";
 import type {
   CreateWordlist,
+  CustomWord,
   MyWordlistItem,
   WordlistCandidate,
   WordlistEditSnapshot,
@@ -23,6 +24,8 @@ import { ExcelImport } from "./ExcelImport";
 type Row = {
   id: string;
   entryId: string | null;
+  itemId?: string;
+  customWord?: CustomWord;
   text?: string;
   candidate?: WordlistCandidate;
   note?: string;
@@ -31,6 +34,8 @@ type Row = {
   noteVersions?: Record<string, number | undefined>;
   noteDirty?: boolean;
 };
+const rowKey = (row: Row) => row.entryId ?? row.itemId!;
+const itemKey = (item: MyWordlistItem) => item.item_id ?? item.entry_id!;
 const emptyRow = (): Row => ({
   id: crypto.randomUUID(),
   entryId: null,
@@ -126,15 +131,23 @@ function Editor({
   initial?: WordlistEditSnapshot;
 }) {
   const [initial] = useState(snapshot);
-  const [originalIds] = useState(() => new Set(initial?.entry_ids));
+  const [originalIds] = useState(
+    () =>
+      new Set(initial?.items?.map((item) => item.item_id) ?? initial?.entry_ids)
+  );
   const router = useRouter();
   const client = useQueryClient();
   const [name, setName] = useState(initial?.wordlist.name ?? "");
   const [rows, setRows] = useState<Row[]>(() =>
     initial
-      ? initial.entry_ids.map((entryId) => ({
+      ? (
+          initial.items ??
+          initial.entry_ids.map((entry_id) => ({ item_id: entry_id, entry_id }))
+        ).map((item) => ({
           id: crypto.randomUUID(),
-          entryId
+          entryId: item.entry_id ?? null,
+          itemId: item.item_id,
+          customWord: "custom_word" in item ? item.custom_word : undefined
         }))
       : [emptyRow()]
   );
@@ -157,7 +170,8 @@ function Editor({
     queryKey: [...wordListKeys.mine(userId), "edit-items", id, session],
     queryFn: async ({ signal }) => {
       const items: MyWordlistItem[] = [];
-      const ids = initial!.entry_ids;
+      const ids =
+        initial!.items?.map((item) => item.item_id) ?? initial!.entry_ids;
       for (
         let batch = 1;
         batch <= Math.max(1, Math.ceil(ids.length / 100));
@@ -173,7 +187,7 @@ function Editor({
           data.pagination.total !== ids.length ||
           data.items.length !== Math.min(100, ids.length - items.length) ||
           data.items.some(
-            (item, offset) => item.entry_id !== ids[items.length + offset]
+            (item, offset) => itemKey(item) !== ids[items.length + offset]
           )
         ) {
           throw new Error("词表版本已变化，请重新打开后编辑。");
@@ -190,13 +204,9 @@ function Editor({
   });
   const loadingItems = !!id && !loaded.data;
   // Only this editing session's complete, revision-checked response supplies notes.
-  const cache = new Map(loaded.data?.map((item) => [item.entry_id, item]));
+  const cache = new Map(loaded.data?.map((item) => [itemKey(item), item]));
   function authorNoteFor(row: Row) {
-    return (
-      row.authorNote ??
-      (row.entryId ? cache.get(row.entryId)?.author_note : undefined) ??
-      ""
-    );
+    return row.authorNote ?? cache.get(rowKey(row))?.author_note ?? "";
   }
   function noteRevisionFor(entryId: string) {
     return originalIds.has(entryId) ? cache.get(entryId)?.note_revision : 1;
@@ -294,15 +304,27 @@ function Editor({
       setError("名称须为 1–100 字");
       return;
     }
-    const unmatched = rows.find((r) => !r.entryId);
+    const unmatched = rows.find((r) => !r.entryId && !r.customWord);
     if (unmatched) {
-      invalidRow("每行都需选定平台词条，请选择候选或删除未匹配行", unmatched);
+      invalidRow("每行都需选定平台词条或填写自定义词汇", unmatched);
       return;
     }
-    const seenIds = new Set<string | null>();
+    const invalidCustom = rows.find(
+      (row) =>
+        row.customWord &&
+        (!row.customWord.word.trim() ||
+          [...row.customWord.word].length > 50 ||
+          !row.customWord.definition.trim() ||
+          [...row.customWord.definition].length > 200)
+    );
+    if (invalidCustom) {
+      invalidRow("自定义词汇须为 1–50 字，释义须为 1–200 字", invalidCustom);
+      return;
+    }
+    const seenIds = new Set<string>();
     const duplicate = rows.find((row) => {
-      if (seenIds.has(row.entryId)) return true;
-      seenIds.add(row.entryId);
+      if (seenIds.has(rowKey(row))) return true;
+      seenIds.add(rowKey(row));
       return false;
     });
     if (duplicate) {
@@ -321,8 +343,8 @@ function Editor({
       rows.some(
         (r) =>
           r.noteDirty &&
-          r.entryId &&
-          (r.noteRevision ?? noteRevisionFor(r.entryId)) === undefined
+          rowKey(r) &&
+          (r.noteRevision ?? noteRevisionFor(rowKey(r))) === undefined
       )
     ) {
       setError("词义和备注尚未读取完成，请稍后重试");
@@ -335,12 +357,16 @@ function Editor({
       if (id && initial) {
         const same =
           name === initial.wordlist.name &&
-          JSON.stringify(rows.map((r) => r.entryId)) ===
-            JSON.stringify(initial.entry_ids) &&
+          JSON.stringify(rows.map(rowKey)) ===
+            JSON.stringify(
+              initial.items?.map((item) => item.item_id) ?? initial.entry_ids
+            ) &&
           rows.every(
             (row) =>
               authorNoteFor(row) ===
-              (cache.get(row.entryId!)?.author_note ?? "")
+                (cache.get(rowKey(row))?.author_note ?? "") &&
+              JSON.stringify(row.customWord) ===
+                JSON.stringify(cache.get(rowKey(row))?.custom_word)
           );
         result = await api.wordList.update(id, {
           expected_revision: initial.wordlist.revision,
@@ -348,28 +374,41 @@ function Editor({
             ? null
             : {
                 name,
-                entry_ids: rows.map((r) => r.entryId!),
-                ...(rows.some((row) => authorNoteFor(row)) ||
-                loaded.data?.some((item) => item.author_note)
+                ...(rows.some((row) => row.customWord) ||
+                initial.items?.some((item) => item.custom_word)
                   ? {
-                      author_notes: rows.map((row) => ({
-                        entry_id: row.entryId!,
+                      items: rows.map((row) => ({
+                        item_id: rowKey(row),
+                        ...(row.entryId
+                          ? { entry_id: row.entryId }
+                          : { custom_word: row.customWord! }),
                         author_note: authorNoteFor(row)
                       }))
                     }
-                  : {})
+                  : {
+                      entry_ids: rows.map((r) => r.entryId!),
+                      ...(rows.some((row) => authorNoteFor(row)) ||
+                      loaded.data?.some((item) => item.author_note)
+                        ? {
+                            author_notes: rows.map((row) => ({
+                              entry_id: row.entryId!,
+                              author_note: authorNoteFor(row)
+                            }))
+                          }
+                        : {})
+                    })
               },
           note_updates: rows
             .filter(
               (r) =>
                 r.note !== undefined &&
-                (r.noteDirty || !originalIds.has(r.entryId!))
+                (r.noteDirty || !originalIds.has(rowKey(r)))
             )
             .map((r) => ({
-              entry_id: r.entryId!,
+              ...(r.entryId ? { entry_id: r.entryId } : { item_id: rowKey(r) }),
               private_note: r.note!,
               expected_note_revision:
-                r.noteRevision ?? noteRevisionFor(r.entryId!)!
+                r.noteRevision ?? noteRevisionFor(rowKey(r))!
             }))
         });
       } else {
@@ -378,7 +417,9 @@ function Editor({
           ...(folderId ? { folder_id: folderId } : {}),
           name,
           items: rows.map((r) => ({
-            entry_id: r.entryId!,
+            ...(r.entryId
+              ? { entry_id: r.entryId }
+              : { item_id: rowKey(r), custom_word: r.customWord! }),
             private_note: r.note ?? "",
             ...(authorNoteFor(r) ? { author_note: authorNoteFor(r) } : {})
           }))
@@ -408,9 +449,14 @@ function Editor({
   const searchTerm = filter.trim().toLowerCase();
   const matches = rows.filter((row) => {
     if (!searchTerm) return true;
-    const stored = row.entryId ? cache.get(row.entryId) : undefined;
+    const stored = cache.get(rowKey(row));
     return [
-      row.text ?? stored?.entry?.label ?? stored?.entry_label ?? "",
+      row.customWord?.word ??
+        row.text ??
+        stored?.entry?.label ??
+        stored?.entry_label ??
+        "",
+      row.customWord?.definition ?? "",
       authorNoteFor(row),
       row.note ?? stored?.private_note ?? "",
       ...(row.candidate?.glosses ?? glosses(stored?.entry))
@@ -425,6 +471,7 @@ function Editor({
   const replaceEmpty =
     rows.length === 1 &&
     !rows[0]!.entryId &&
+    !rows[0]!.customWord &&
     !rows[0]!.text &&
     !rows[0]!.note &&
     !rows[0]!.authorNote;
@@ -440,10 +487,12 @@ function Editor({
           onAppend={(words) => {
             setRows((current) => [
               ...(replaceEmpty ? [] : current),
-              ...words.map(({ candidate, authorNote }) => ({
+              ...words.map(({ candidate, customWord, authorNote }) => ({
                 id: crypto.randomUUID(),
-                entryId: candidate.entry_id,
-                text: candidate.label,
+                entryId: candidate?.entry_id ?? null,
+                itemId: customWord ? crypto.randomUUID() : undefined,
+                text: candidate?.label ?? customWord?.word,
+                customWord,
                 candidate,
                 note: "",
                 authorNote
@@ -485,7 +534,7 @@ function Editor({
         {id ? "编辑词表" : "创建词表"}
       </h1>
       <p className="mt-3 max-w-xl text-sm leading-6 text-foreground-muted">
-        从平台已发布词库逐行选词。“注”是给读者的补充说明，随词表展示。
+        可选取平台词条，找不到时填写自定义词汇和释义。“注”随词表展示。
         {locked && "修改名称、选词或“注”前请先撤回；已有私密备注仍可单独修改。"}
       </p>
       <header className="glass sticky top-20 z-20 mt-8 flex flex-col gap-4 rounded-3xl p-4 sm:flex-row sm:items-end sm:p-5">
@@ -601,7 +650,7 @@ function Editor({
           >
             <WordRow
               row={row}
-              stored={row.entryId ? cache.get(row.entryId) : undefined}
+              stored={cache.get(rowKey(row))}
               noteRevisionFor={noteRevisionFor}
               locked={!!locked}
               index={rows.indexOf(row) + 1}
@@ -722,7 +771,9 @@ function WordRow({
   change: (patch: Partial<Row>) => void;
 }) {
   const userId = useUserStore((s) => s.user?.id);
+  const [blurred, setBlurred] = useState(false);
   const text =
+    row.customWord?.word ??
     row.text ??
     stored?.entry?.label ??
     stored?.entry_label ??
@@ -735,14 +786,17 @@ function WordRow({
   const search = useQuery({
     queryKey: [...wordListKeys.mine(userId), "suggestions", searchText],
     enabled:
-      !row.entryId && searchText.trim().length > 0 && searchText === text,
+      !row.entryId &&
+      !row.customWord &&
+      searchText.trim().length > 0 &&
+      searchText === text,
     queryFn: ({ signal }) =>
       api.wordList.suggestions({ q: searchText }, { signal })
   });
   const note = row.note ?? stored?.private_note ?? "";
   const unloaded =
-    row.entryId &&
-    (row.noteRevision ?? noteRevisionFor(row.entryId)) === undefined;
+    rowKey(row) &&
+    (row.noteRevision ?? noteRevisionFor(rowKey(row))) === undefined;
   return (
     <section className="rounded-[20px] bg-surface/70 p-5">
       <label className="block text-sm font-medium">
@@ -760,7 +814,16 @@ function WordRow({
           value={text}
           disabled={locked}
           placeholder="输入单词或短语"
-          onChange={(e) =>
+          maxLength={row.customWord ? 50 : undefined}
+          onBlur={() => setBlurred(true)}
+          onChange={(e) => {
+            setBlurred(false);
+            if (row.customWord) {
+              change({
+                customWord: { ...row.customWord, word: e.target.value }
+              });
+              return;
+            }
             change({
               text: e.target.value,
               entryId: null,
@@ -775,19 +838,26 @@ function WordRow({
                 : row.noteVersions,
               note: row.note ?? stored?.private_note ?? "",
               authorNote: row.authorNote ?? stored?.author_note ?? ""
-            })
-          }
+            });
+          }}
         />
       </label>
-      {!row.entryId && searchText === text && search.isFetching && (
-        <p className="mt-2 text-sm text-foreground-muted">正在搜索…</p>
-      )}
-      {!row.entryId && searchText === text && search.isError && (
-        <p role="alert" className="mt-2 text-sm text-danger">
-          搜索失败，请重试输入。
-        </p>
-      )}
       {!row.entryId &&
+        !row.customWord &&
+        searchText === text &&
+        search.isFetching && (
+          <p className="mt-2 text-sm text-foreground-muted">正在搜索…</p>
+        )}
+      {!row.entryId &&
+        !row.customWord &&
+        searchText === text &&
+        search.isError && (
+          <p role="alert" className="mt-2 text-sm text-danger">
+            搜索失败，请重试输入。
+          </p>
+        )}
+      {!row.entryId &&
+        !row.customWord &&
         searchText === text &&
         search.data?.items.map((candidate) => (
           <Button
@@ -800,6 +870,8 @@ function WordRow({
                 entryId: candidate.entry_id,
                 text: candidate.label,
                 candidate,
+                customWord: undefined,
+                itemId: undefined,
                 noteRevision:
                   row.noteVersions?.[candidate.entry_id] ??
                   noteRevisionFor(candidate.entry_id)
@@ -813,19 +885,64 @@ function WordRow({
           </Button>
         ))}
       {!row.entryId &&
+        !row.customWord &&
         searchText === text &&
         search.isSuccess &&
         search.data.items.length === 0 && (
           <p className="mt-2 text-sm text-foreground-muted">
-            没有匹配词条，请修改输入或删除此行。
+            没有匹配词条。
+            {blurred && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="ml-2"
+                disabled={locked}
+                onClick={() =>
+                  change({
+                    itemId: crypto.randomUUID(),
+                    noteRevision: 1,
+                    customWord: { word: text, definition: "" }
+                  })
+                }
+              >
+                创建自定义词汇
+              </Button>
+            )}
           </p>
         )}
+      {row.customWord && (
+        <div className="mt-4">
+          <label className="block text-sm font-medium">
+            自定义释义（必填）
+            <textarea
+              className={cn(field, "mt-2")}
+              aria-label={`自定义释义 ${index}`}
+              maxLength={200}
+              disabled={locked}
+              value={row.customWord.definition}
+              placeholder="填写词汇的释义"
+              onChange={(event) =>
+                change({
+                  customWord: {
+                    ...row.customWord!,
+                    definition: event.target.value
+                  }
+                })
+              }
+            />
+          </label>
+          <p className="mt-2 text-xs text-foreground-muted">
+            自定义词汇可阅读，暂不参与学习出题。
+          </p>
+        </div>
+      )}
       {(row.candidate || stored?.entry) && (
         <p className="mt-3 rounded-2xl bg-muted/70 px-4 py-2.5 text-sm leading-6 text-foreground-muted">
           {(row.candidate?.glosses ?? glosses(stored?.entry)).join("；")}
         </p>
       )}
-      {stored && !stored.entry && (
+      {stored && !stored.entry && !stored.custom_word && (
         <p className="mt-3 text-sm text-danger">
           内容不可用
           {stored.unavailable_reason
@@ -867,7 +984,7 @@ function WordRow({
               change({
                 note: e.target.value,
                 noteDirty: true,
-                noteRevision: row.noteRevision ?? noteRevisionFor(row.entryId!)
+                noteRevision: row.noteRevision ?? noteRevisionFor(rowKey(row))
               })
             }
           />

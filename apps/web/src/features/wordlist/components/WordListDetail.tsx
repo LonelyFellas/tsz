@@ -164,7 +164,9 @@ function Detail({
       : (profile.data?.learning_settings?.cefr_level ?? "C2");
   const variant = profile.data?.learning_settings?.english_variant ?? null;
   const loadedItems = items.data?.pages.flatMap((page) => page.items) ?? [];
-  const unavailableItems = loadedItems.filter((item) => !item.entry);
+  const unavailableItems = loadedItems.filter(
+    (item) => !item.entry && !item.custom_word
+  );
   const availabilityVersionChanged =
     !!availability.data && availability.data.revision !== meta.data?.revision;
   const availabilityCountsChanged =
@@ -350,6 +352,9 @@ function Detail({
           <p className="break-all text-xs text-foreground-subtle">
             ID：{list.id}
           </p>
+          {!!availabilityData?.custom_count && (
+            <p className="mt-4 text-sm text-foreground-muted">含自定义词汇</p>
+          )}
           <div className="mt-6 flex flex-wrap gap-3 empty:hidden">
             {mine ? (
               <>
@@ -441,6 +446,8 @@ function Detail({
           {availabilityData ? (
             <p className="mt-4 text-sm text-foreground-muted">
               整张词表：{availabilityData.available_count} 个可用词条
+              {!!availabilityData.custom_count &&
+                `，其中 ${availabilityData.custom_count} 个自定义词汇暂不参与学习出题`}
               {availabilityData.unavailable_count > 0 &&
                 `，${availabilityData.unavailable_count} 个暂不可用，不参与出题`}
             </p>
@@ -579,7 +586,7 @@ function Detail({
                 <ul className="mt-3 space-y-2">
                   {unavailableItems.map((item) => (
                     <li
-                      key={item.entry_id}
+                      key={item.item_id ?? item.entry_id}
                       className="border-t border-border/60 pt-2"
                     >
                       {mine &&
@@ -651,17 +658,36 @@ function Detail({
           )}
           <div className="space-y-4">
             {loadedItems.map((item) =>
-              item.entry ? (
-                <section key={item.entry_id} className={panelClass}>
+              item.entry || item.custom_word ? (
+                <section
+                  key={item.item_id ?? item.entry_id}
+                  className={panelClass}
+                >
                   <div className="mb-3 text-xs font-medium tabular-nums tracking-wide text-foreground-subtle">
                     {String(item.position + 1).padStart(2, "0")}
                   </div>
-                  <ReadingEntry
-                    full={view === "full"}
-                    entry={item.entry}
-                    level={level}
-                    variant={variant}
-                  />
+                  {item.custom_word ? (
+                    <div>
+                      <h2 className="tsz-words break-words text-xl font-semibold">
+                        {item.custom_word.word}
+                      </h2>
+                      <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6">
+                        {item.custom_word.definition}
+                      </p>
+                      <p className="mt-2 text-xs text-foreground-muted">
+                        自定义词汇
+                      </p>
+                    </div>
+                  ) : (
+                    item.entry && (
+                      <ReadingEntry
+                        full={view === "full"}
+                        entry={item.entry}
+                        level={level}
+                        variant={variant}
+                      />
+                    )
+                  )}
                   {item.author_note && (
                     <p className="mt-5 whitespace-pre-wrap rounded-2xl bg-muted/70 px-4 py-3 text-sm leading-6">
                       注：{item.author_note}
@@ -679,7 +705,7 @@ function Detail({
             )}
           </div>
           {loadedItems.length > 0 &&
-            loadedItems.every((item) => !item.entry) && (
+            loadedItems.every((item) => !item.entry && !item.custom_word) && (
               <PageNotice>当前已加载的词条均不可用。</PageNotice>
             )}
           {loadedItems.length === 0 ? (

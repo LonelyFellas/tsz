@@ -810,3 +810,38 @@ it("blocks publication when availability belongs to a different wordlist revisio
   await screen.findByRole("button", { name: "重新加载词表" });
   expect(screen.getByRole("button", { name: "申请公开" })).toBeDisabled();
 });
+
+it("自定义词在阅读页展示原释义，不误判为不可用并提示不参与出题", async () => {
+  vi.mocked(api.wordList.availability).mockResolvedValue({
+    revision: 1,
+    available_count: 1,
+    unavailable_count: 0,
+    custom_count: 1
+  });
+  vi.mocked(api.wordList.items).mockResolvedValue({
+    revision: 1,
+    pagination: { page: 1, page_size: 50, total: 1, total_pages: 1 },
+    items: [
+      {
+        item_id: "custom",
+        entry_id: null,
+        custom_word: { word: "custom phrase", definition: "独立的自定义释义" },
+        entry: null,
+        position: 0,
+        author_note: "自定义词的注"
+      }
+    ]
+  });
+  open();
+  expect(await screen.findByText("独立的自定义释义")).toBeInTheDocument();
+  expect(
+    screen.getByRole("heading", { name: "custom phrase" })
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText(/其中 1 个自定义词汇暂不参与学习出题/)
+  ).toBeInTheDocument();
+  expect(screen.getByText("注：自定义词的注")).toBeInTheDocument();
+  expect(
+    screen.queryByText("当前已加载的词条均不可用。")
+  ).not.toBeInTheDocument();
+});

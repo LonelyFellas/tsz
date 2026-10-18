@@ -1,0 +1,21 @@
+{
+  "run_id": "custom-vocabulary-20261018-3eb5",
+  "task_services_stopped": [13488, 18488, 55488, 56488],
+  "independent_port_recheck": "all closed",
+  "exclusive_postgres_cluster": "removed including all databases, accounts, sessions, wordlists, entries, review snapshots and test harness databases",
+  "exclusive_redis": "stopped; ephemeral data removed",
+  "local_fixture_workbooks_credentials_logs_and_binary": "removed",
+  "temporary_fixture_source_and_build_artifact": "removed",
+  "oss_objects_created": 0,
+  "browser_account": "logged out through UI",
+  "browser_tab": "closed",
+  "browser_emulation": "restored",
+  "browser_origin_storage": {
+    "origin": "http://custom-vocabulary.localhost:13488",
+    "status": "not verified cleared",
+    "reason": "built-in browser has no supported site-data deletion interface; raw CDP Storage/DOMStorage deletion unsupported"
+  },
+  "shared_business_resources": "untouched",
+  "complete": false,
+  "remaining": "test browser origin cache and non-login preferences cannot be confirmed cleared"
+}
