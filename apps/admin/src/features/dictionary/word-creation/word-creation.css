@@ -259,6 +259,8 @@
 }
 
 .word-step-actions {
+  box-sizing: border-box;
+  align-items: center;
   position: sticky;
   z-index: 5;
   bottom: 0;
@@ -276,6 +278,7 @@
 
 .word-step-actions :is(.MuiButton-root, .MuiIconButton-root) {
   min-width: 96px;
+  min-height: 40px;
 }
 
 .dialect-panel {
@@ -1277,7 +1280,9 @@
 
 .word-sense-groups-card > .admin-card-header,
 .word-grammar-card > .admin-card-header {
-  min-height: 42px;
+  box-sizing: border-box;
+  min-height: 48px;
+  padding-block: 8px;
   padding-inline: 14px;
   background: #fafbfc;
   border-bottom-color: #e8ebf0;
@@ -2391,7 +2396,22 @@
   }
 
   .word-creation-stepper .MuiStepLabel-labelContainer {
+    display: block;
+    min-width: 0;
+  }
+
+  .word-creation-steps .MuiStepConnector-root {
     display: none;
+  }
+
+  .word-creation-steps .MuiTypography-caption {
+    display: none;
+  }
+
+  .word-creation-steps .MuiStepButton-root {
+    width: 100%;
+    margin: 0;
+    padding: 8px 4px;
   }
 
   .word-creation-shell {
@@ -2468,7 +2488,8 @@
 
   .word-creation-steps.MuiStepper-horizontal {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
   }
 
   .word-creation-steps .MuiStep-root {
@@ -2478,7 +2499,6 @@
 
   .word-creation-steps .MuiStepButton-root {
     display: flex;
-    flex-direction: column;
     align-items: center;
     gap: 6px;
   }
@@ -2494,8 +2514,12 @@
   }
 
   .word-creation-steps .MuiStepLabel-root {
-    display: block;
-    width: 100%;
+    display: flex;
+    gap: 6px;
+  }
+
+  .word-creation-steps .MuiTypography-root {
+    font-size: 12px;
   }
 
   .word-creation-stepper .word-creation-steps .MuiStepLabel-label {
@@ -2506,11 +2530,6 @@
     overflow-wrap: normal;
     word-break: keep-all;
     white-space: nowrap;
-  }
-
-  .word-creation-steps .MuiStepConnector-line,
-  .word-creation-steps .MuiStepLabel-labelContainer {
-    display: none;
   }
 
   .word-creation-shell .word-creation-summary {
