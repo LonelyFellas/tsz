@@ -34,20 +34,44 @@ export interface AdminPaginationProps {
 export function AdminPagination(pagination: AdminPaginationProps) {
   if (pagination.total === 0) return null;
   return (
-    <TablePagination
-      component="div"
-      count={pagination.total}
-      page={pagination.page - 1}
-      rowsPerPage={pagination.pageSize}
-      rowsPerPageOptions={pagination.pageSizes ?? []}
-      onPageChange={(_, page) =>
-        pagination.onChange(page + 1, pagination.pageSize)
-      }
-      onRowsPerPageChange={(event) =>
-        pagination.onChange(1, Number(event.target.value))
-      }
-      labelDisplayedRows={({ count }) => `共 ${count} 条`}
-    />
+    <Box
+      sx={{
+        minWidth: 0,
+        containerType: "inline-size",
+        containerName: "admin-pagination"
+      }}
+    >
+      <TablePagination
+        component="div"
+        sx={{
+          "@container admin-pagination (max-width: 600px)": {
+            "& .MuiTablePagination-toolbar": {
+              flexWrap: "wrap",
+              justifyContent: "flex-end",
+              gap: 1,
+              px: 1,
+              py: 1
+            },
+            "& .MuiTablePagination-spacer": { display: "none" },
+            "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows":
+              { my: 0 },
+            "& .MuiTablePagination-input": { mr: 1 },
+            "& .MuiTablePagination-actions": { ml: 0 }
+          }
+        }}
+        count={pagination.total}
+        page={pagination.page - 1}
+        rowsPerPage={pagination.pageSize}
+        rowsPerPageOptions={pagination.pageSizes ?? []}
+        onPageChange={(_, page) =>
+          pagination.onChange(page + 1, pagination.pageSize)
+        }
+        onRowsPerPageChange={(event) =>
+          pagination.onChange(1, Number(event.target.value))
+        }
+        labelDisplayedRows={({ count }) => `共 ${count} 条`}
+      />
+    </Box>
   );
 }
 export function AdminTable<Row>({
@@ -125,11 +149,24 @@ export function AdminTable<Row>({
       position: "sticky" as const,
       [column.sticky]: offset,
       zIndex: 1,
-      bgcolor: "background.paper"
+      bgcolor: "background.paper",
+      "@container admin-table (max-width: 900px)": {
+        position: "static",
+        left: "auto",
+        right: "auto",
+        zIndex: "auto"
+      }
     };
   };
   return (
-    <Box aria-busy={loading}>
+    <Box
+      aria-busy={loading}
+      sx={{
+        minWidth: 0,
+        containerType: "inline-size",
+        containerName: "admin-table"
+      }}
+    >
       <Box sx={{ height: 4 }}>{loading && <LinearProgress />}</Box>
       <TableContainer>
         <Table sx={{ minWidth }}>
