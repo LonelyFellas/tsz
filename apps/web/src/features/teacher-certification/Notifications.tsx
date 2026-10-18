@@ -20,7 +20,8 @@ const titles = {
   teacher_rejected: "教师申请已驳回",
   teacher_revoked: "教师资格已撤销",
   wordlist_liked: "词表收到点赞",
-  wordlist_tipped: "词表收到投币"
+  wordlist_tipped: "词表收到投币",
+  wordlist_deleted: "使用中的词表已删除"
 };
 
 export function Notifications() {
@@ -135,6 +136,11 @@ export function Notifications() {
                         className={buttonClass}
                       >
                         查看收币记录
+                      </Link>
+                    )}
+                    {item.kind === "wordlist_deleted" && (
+                      <Link href="/student/tasks" className={buttonClass}>
+                        查看学习任务
                       </Link>
                     )}
                     {item.application_id && (

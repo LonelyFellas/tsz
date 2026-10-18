@@ -27,6 +27,7 @@ vi.mock("@/lib/auth", () => ({
       decision: vi.fn(),
       visibility: vi.fn(),
       recommend: vi.fn(),
+      deleteImpact: vi.fn(),
       delete: vi.fn()
     }
   }
@@ -70,6 +71,12 @@ beforeEach(() => {
     items: [row],
     pagination
   });
+  vi.mocked(api.wordlists.deleteImpact).mockResolvedValue({
+    active_run_count: 2,
+    active_task_count: 1,
+    affected_user_count: 1,
+    blocked_task_count: 1
+  });
   vi.mocked(api.wordlists.currentItems).mockResolvedValue({
     items: [],
     revision: 4,
@@ -97,6 +104,12 @@ beforeEach(() => {
   });
 });
 it("management shows one row per review without loading word details or decision controls", async () => {
+  vi.mocked(api.wordlists.deleteImpact).mockResolvedValue({
+    active_run_count: 2,
+    active_task_count: 1,
+    affected_user_count: 1,
+    blocked_task_count: 1
+  });
   vi.mocked(api.wordlists.currentItems).mockResolvedValue({
     items: [
       {
@@ -260,6 +273,7 @@ it("failed mutation reports unconfirmed state and refetches", async () => {
   mount();
   fireEvent.click(await screen.findByLabelText("删除待审词表"));
   const dialog = await screen.findByRole("dialog");
+  expect(await within(dialog).findByText(/2 个进行中轮次/)).toBeInTheDocument();
   fireEvent.click(within(dialog).getByText(/^确认$/));
   expect(await screen.findByText(/操作失败或结果未确认/)).toBeInTheDocument();
   expect(api.wordlists.delete).toHaveBeenCalledWith("list", {
@@ -268,6 +282,28 @@ it("failed mutation reports unconfirmed state and refetches", async () => {
   expect(vi.mocked(api.wordlists.management).mock.calls.length).toBeGreaterThan(
     1
   );
+});
+
+it("delete preview explains in-flight and blocked task impact", async () => {
+  mount();
+  fireEvent.click(await screen.findByLabelText("删除待审词表"));
+  const dialog = await screen.findByRole("dialog");
+  expect(await within(dialog).findByText(/2 个进行中轮次/)).toBeInTheDocument();
+  expect(
+    within(dialog).getByText(/1 个引用该词表但没有可继续轮次的任务/)
+  ).toBeInTheDocument();
+  expect(api.wordlists.deleteImpact).toHaveBeenCalledWith("list");
+});
+
+it("delete impact failure is visible and does not strand the confirmation", async () => {
+  vi.mocked(api.wordlists.deleteImpact).mockRejectedValue(new Error("offline"));
+  mount();
+  fireEvent.click(await screen.findByLabelText("删除待审词表"));
+  const dialog = await screen.findByRole("dialog");
+  expect(
+    await within(dialog).findByText(/任务影响读取失败/)
+  ).toBeInTheDocument();
+  expect(within(dialog).getByText(/^确认$/)).toBeEnabled();
 });
 
 it("review queue defaults to pending and filters on the server", async () => {

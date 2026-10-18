@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/qualified-invitation-reward/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-17T20:54:10.257Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-deletion-grace/docs/openapi.json",
+  "_generatedAt": "2026-10-18T04:52:27.171Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -106,6 +106,7 @@
     "/admin/wordlists/management": ["get"],
     "/admin/wordlists/{id}": ["get"],
     "/admin/wordlists/{id}/delete": ["post"],
+    "/admin/wordlists/{id}/delete-impact": ["get"],
     "/admin/wordlists/{id}/items": ["get"],
     "/admin/wordlists/{id}/recommendation": ["post"],
     "/admin/wordlists/{id}/review-requests": ["get"],

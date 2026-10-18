@@ -1,5 +1,5 @@
 import { ListFilterBar } from "@/components/ListFilterBar";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Delete from "@mui/icons-material/Delete";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -23,7 +23,11 @@ import { CopyableText } from "@/components/CopyableText";
 import { DateRangeField } from "@/components/DateRangeField";
 import { PageStatus } from "@/components/PageStatus";
 import type { Dayjs } from "dayjs";
-import type { AdminWordlist, WordlistManagementQuery } from "@tsz/types";
+import type {
+  AdminWordlist,
+  WordlistDeleteImpact,
+  WordlistManagementQuery
+} from "@tsz/types";
 import { api, useAuthStore, usePermission } from "@/lib/auth";
 import { WordlistDetails } from "@/features/wordlists/WordlistDetails";
 const reviewLabels: Record<string, string> = {
@@ -70,11 +74,36 @@ function Management({ adminId }: { adminId: string }) {
   } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [deleteImpact, setDeleteImpact] = useState<WordlistDeleteImpact | null>(
+    null
+  );
+  const [deleteImpactError, setDeleteImpactError] = useState("");
+  const [deleteImpactLoading, setDeleteImpactLoading] = useState(false);
+  const deleteImpactRequest = useRef(0);
   const key = ["admin-wordlists", adminId];
   const result = useQuery({
     queryKey: [...key, "management", query],
     queryFn: ({ signal }) => api.wordlists.management(query, { signal })
   });
+  async function openDelete(row: AdminWordlist) {
+    const request = ++deleteImpactRequest.current;
+    setAction({ kind: "delete", row });
+    setDeleteImpact(null);
+    setDeleteImpactError("");
+    setDeleteImpactLoading(true);
+    try {
+      const impact = await api.wordlists.deleteImpact(row.wordlist.id);
+      if (deleteImpactRequest.current === request) setDeleteImpact(impact);
+    } catch {
+      if (deleteImpactRequest.current === request)
+        setDeleteImpactError(
+          "任务影响读取失败；仍可删除，但请先确认当前使用情况。"
+        );
+    } finally {
+      if (deleteImpactRequest.current === request)
+        setDeleteImpactLoading(false);
+    }
+  }
   async function mutate(
     row: AdminWordlist,
     kind: "visibility" | "delete" | "recommend",
@@ -97,7 +126,11 @@ function Management({ adminId }: { adminId: string }) {
           expected_revision: revision,
           recommended: !!checked
         });
+      deleteImpactRequest.current += 1;
       setAction(null);
+      setDeleteImpact(null);
+      setDeleteImpactError("");
+      setDeleteImpactLoading(false);
       await client.invalidateQueries({ queryKey: key });
       if (
         kind === "delete" &&
@@ -414,7 +447,7 @@ function Management({ adminId }: { adminId: string }) {
                         color="error"
                         aria-label={`删除${row.wordlist.name}`}
                         disabled={!canDelete || !!busy}
-                        onClick={() => setAction({ kind: "delete", row })}
+                        onClick={() => void openDelete(row)}
                       >
                         <Delete fontSize="small" />
                       </IconButton>
@@ -444,20 +477,49 @@ function Management({ adminId }: { adminId: string }) {
               : "设为公开"
         }
         danger={action?.kind === "delete"}
-        pending={!!busy}
-        onClose={() => setAction(null)}
+        pending={!!busy || deleteImpactLoading}
+        onClose={() => {
+          if (busy) return;
+          deleteImpactRequest.current += 1;
+          setAction(null);
+          setDeleteImpact(null);
+          setDeleteImpactError("");
+          setDeleteImpactLoading(false);
+        }}
         onConfirm={() => {
           if (action) void mutate(action.row, action.kind);
         }}
       >
         <p>{action?.row.wordlist.name}</p>
-        <p>
-          {action?.kind === "delete"
-            ? "删除后该词表将不可访问，系统推荐也会取消。历史投币记录保留。"
-            : action?.row.wordlist.state === "published"
+        {action?.kind === "delete" ? (
+          <>
+            <p>删除后该词表将不可访问，系统推荐也会取消。历史投币记录保留。</p>
+            {deleteImpactLoading ? (
+              <p>正在读取学习任务影响…</p>
+            ) : deleteImpactError ? (
+              <p>{deleteImpactError}</p>
+            ) : deleteImpact ? (
+              <>
+                <p>
+                  已有 {deleteImpact.active_run_count} 个进行中轮次（涉及{" "}
+                  {deleteImpact.affected_user_count}{" "}
+                  位用户）可在删除后继续完成；日任务仍受当天窗口限制，长期任务在宽限期内完成。
+                  完成后对应任务自动结束，不能再开新一轮。
+                </p>
+                <p>
+                  {deleteImpact.blocked_task_count}{" "}
+                  个引用该词表但没有可继续轮次的任务将无法再开始。
+                </p>
+              </>
+            ) : null}
+          </>
+        ) : (
+          <p>
+            {action?.row.wordlist.state === "published"
               ? "设为私密后其他用户将无法访问，系统推荐会取消。审核状态保持不变。"
               : "公开后其他用户可以搜索和使用此词表。审核状态保持不变。"}
-        </p>
+          </p>
+        )}
       </ConfirmDialog>
     </Stack>
   );
