@@ -212,6 +212,16 @@ export interface AdminWordlistPage {
   items: AdminWordlist[];
   pagination: WordlistPage["pagination"];
 }
+export interface WordlistDeleteImpact {
+  /** 删除前已开始、仍可在宽限期内完成的轮次。 */
+  active_run_count: number;
+  /** 拥有上述轮次的任务数。 */
+  active_task_count: number;
+  /** 拥有上述轮次的用户数。 */
+  affected_user_count: number;
+  /** 引用了该词表、但没有可继续轮次的任务数。 */
+  blocked_task_count: number;
+}
 export interface WordlistManagementQuery extends WordlistQuery {
   review_state?: AdminWordlist["review_state"];
   public?: boolean;
