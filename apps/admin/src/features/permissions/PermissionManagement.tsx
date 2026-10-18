@@ -16,7 +16,6 @@ import {
   Input,
   Modal,
   Pagination,
-  Popconfirm,
   Radio,
   Select,
   Space,
@@ -390,6 +389,7 @@ export function PermissionManagement() {
     keys: string[];
     checked: boolean;
   }>();
+  const [deletingTag, setDeletingTag] = useState<PermissionTag>();
   const [editingTag, setEditingTag] = useState<PermissionTag | "new">();
   const [tagName, setTagName] = useState("");
   const [tagColor, setTagColor] = useState("default");
@@ -929,22 +929,15 @@ export function PermissionManagement() {
                     >
                       编辑
                     </Button>
-                    <Popconfirm
-                      title="删除标签？管理员已分配的权限不受影响。"
-                      okText="删除"
-                      cancelText="取消"
-                      onConfirm={() =>
-                        mutateTags(
-                          () =>
-                            api.permissionSystem.deleteTag(tag.id, tag.version),
-                          "标签已删除，管理员权限未改变"
-                        )
-                      }
+                    <Button
+                      type="link"
+                      size="small"
+                      danger
+                      disabled={busy}
+                      onClick={() => setDeletingTag(tag)}
                     >
-                      <Button type="link" size="small" danger disabled={busy}>
-                        删除
-                      </Button>
-                    </Popconfirm>
+                      删除
+                    </Button>
                   </Space>
                 )
               }
@@ -989,15 +982,53 @@ export function PermissionManagement() {
           </Typography.Text>
         )}
       </Modal>
+      {deletingTag && (
+        <Modal
+          open
+          title="删除标签？管理员已分配的权限不受影响。"
+          okText="删除"
+          cancelText="取消"
+          confirmLoading={busy}
+          okButtonProps={{ danger: true }}
+          cancelButtonProps={{ disabled: busy }}
+          closable={!busy}
+          keyboard={!busy}
+          mask={{ closable: !busy }}
+          onCancel={() => {
+            if (!busy) setDeletingTag(undefined);
+          }}
+          onOk={() => {
+            if (busy) return;
+            void mutateTags(
+              () =>
+                api.permissionSystem.deleteTag(
+                  deletingTag.id,
+                  deletingTag.version
+                ),
+              "标签已删除，管理员权限未改变"
+            ).then((ok) => {
+              if (ok) setDeletingTag(undefined);
+            });
+          }}
+        >
+          确认删除“{deletingTag.name}”标签？
+        </Modal>
+      )}
       <Modal
         open={editingTag !== undefined}
         title={editingTag === "new" ? "新建标签" : "编辑标签"}
         okText="保存"
         cancelText="取消"
         confirmLoading={busy}
-        onCancel={() => setEditingTag(undefined)}
+        cancelButtonProps={{ disabled: busy }}
+        closable={!busy}
+        mask={{ closable: !busy }}
+        keyboard={!busy}
+        onCancel={() => {
+          if (!busy) setEditingTag(undefined);
+        }}
         onOk={() => {
-          if (!editingTag || !tagName.trim()) return;
+          if (busy || !editingTag || !tagName.trim()) return;
           void mutateTags(
             () =>
               editingTag === "new"
@@ -1017,6 +1048,7 @@ export function PermissionManagement() {
         <Flex vertical gap={16}>
           <Input
             aria-label="标签名称"
+            disabled={busy}
             placeholder="标签名称"
             value={tagName}
             onChange={(e) => setTagName(e.target.value)}
@@ -1026,6 +1058,7 @@ export function PermissionManagement() {
             <Typography.Text>标签颜色</Typography.Text>
             <Radio.Group
               aria-label="标签颜色"
+              disabled={busy}
               value={tagColor.startsWith("#") ? "custom" : tagColor}
               onChange={(event) =>
                 setTagColor(
@@ -1058,6 +1091,7 @@ export function PermissionManagement() {
                   </Radio>
                   <ColorPicker
                     aria-label="自定义颜色"
+                    disabled={busy}
                     value={customColor}
                     format="hex"
                     disabledFormat

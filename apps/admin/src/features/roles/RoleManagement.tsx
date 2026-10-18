@@ -13,6 +13,7 @@ import {
   Button,
   Card,
   Flex,
+  Modal,
   Space,
   Table,
   Tag,
@@ -36,7 +37,7 @@ import { roleMutationError } from "./labels";
 import { RoleFormModal } from "./RoleFormModal";
 
 export function RoleManagement() {
-  const { message, modal } = App.useApp();
+  const { message } = App.useApp();
   const listQuery = useRoleList();
   const catalog = usePermissionCatalog();
   const deleteRole = useDeleteRole();
@@ -66,26 +67,19 @@ export function RoleManagement() {
     setFormOpen(true);
   };
 
-  const confirmDelete = (role: AdminRole) => {
-    modal.confirm({
-      title: `删除角色「${role.name}」`,
-      content:
-        role.member_count > 0
-          ? `该角色下有 ${role.member_count} 名管理员，删除后他们将被解绑、降级为仅可见首页。确认删除？`
-          : "确认删除该角色？",
-      okText: "删除",
-      okButtonProps: { danger: true },
-      cancelText: "取消",
-      onOk: () =>
-        deleteRole
-          .mutateAsync(role.id)
-          .then(() => message.success("已删除"))
-          .catch((err: unknown) => {
-            message.error(roleMutationError(err, "删除失败"));
-            // 404 = 已被并发删，列表刷新去掉残影。
-            if (err instanceof HttpError && err.status === 404) invalidate();
-          })
-    });
+  const [deleting, setDeleting] = useState<AdminRole>();
+  const [deleteError, setDeleteError] = useState<string>();
+  const confirmDelete = async () => {
+    if (!deleting || deleteRole.isPending || deleting.is_system) return;
+    setDeleteError(undefined);
+    try {
+      await deleteRole.mutateAsync(deleting.id);
+      void message.success("已删除");
+      setDeleting(undefined);
+    } catch (err) {
+      setDeleteError(roleMutationError(err, "删除失败"));
+      if (err instanceof HttpError && err.status === 404) invalidate();
+    }
   };
 
   // 角色权限集 → 标签。系统角色显「全部功能」；空集显「仅首页」；否则按侧栏顺序取前 6 个 + 折叠。
@@ -183,7 +177,10 @@ export function RoleManagement() {
               loading={
                 deleteRole.isPending && deleteRole.variables === record.id
               }
-              onClick={() => confirmDelete(record)}
+              onClick={() => {
+                setDeleteError(undefined);
+                setDeleting(record);
+              }}
             >
               删除
             </GatedButton>
@@ -195,6 +192,32 @@ export function RoleManagement() {
 
   return (
     <Flex vertical gap={16}>
+      {deleting && (
+        <Modal
+          open
+          title={`删除角色「${deleting.name}」`}
+          okText="删除"
+          cancelText="取消"
+          confirmLoading={deleteRole.isPending}
+          okButtonProps={{ danger: true }}
+          cancelButtonProps={{ disabled: deleteRole.isPending }}
+          closable={!deleteRole.isPending}
+          keyboard={!deleteRole.isPending}
+          mask={{ closable: !deleteRole.isPending }}
+          onCancel={() => {
+            if (!deleteRole.isPending) setDeleting(undefined);
+          }}
+          onOk={() => void confirmDelete()}
+        >
+          <p>
+            {deleting.member_count > 0
+              ? `该角色下有 ${deleting.member_count} 名管理员，删除后他们将被解绑、降级为仅可见首页。确认删除？`
+              : "确认删除该角色？"}
+          </p>
+          {deleteError && <Alert type="error" title={deleteError} />}
+        </Modal>
+      )}
+
       <Breadcrumb items={[{ title: "用户管理" }, { title: "角色权限管理" }]} />
 
       <Card size="small">

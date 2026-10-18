@@ -428,7 +428,7 @@ describe("权限目录、标签和授权人员", () => {
     fireEvent.click(within(row).getByText("删除"));
     const confirm = (
       await screen.findByText("删除标签？管理员已分配的权限不受影响。")
-    ).closest(".ant-popconfirm")!;
+    ).closest('[role="dialog"]')!;
     fireEvent.click(
       within(confirm as HTMLElement).getByRole("button", { name: /删\s*除/ })
     );
@@ -927,4 +927,65 @@ describe("权限目录、标签和授权人员", () => {
     );
     expect(api.permissionSystem.commit).not.toHaveBeenCalled();
   });
+});
+
+it("标签保存等待期间禁止修改颜色名称和取消", async () => {
+  let finish!: (value: (typeof catalog.tags)[number]) => void;
+  const create = vi
+    .spyOn(api.permissionSystem, "createTag")
+    .mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+    );
+  mount();
+  await screen.findByText("编辑本人词条");
+  fireEvent.click(screen.getByText("标签管理"));
+  fireEvent.click(screen.getByText("新建标签"));
+  const field = screen.getByLabelText("标签名称");
+  fireEvent.change(field, { target: { value: "慢保存标签" } });
+  const dialog = field.closest<HTMLElement>('[role="dialog"]')!;
+  fireEvent.click(within(dialog).getByRole("button", { name: /保\s*存/ }));
+  await waitFor(() =>
+    expect(create).toHaveBeenCalledWith("慢保存标签", "default")
+  );
+  expect(field).toBeDisabled();
+  for (const radio of within(dialog).getAllByRole("radio"))
+    expect(radio).toBeDisabled();
+  expect(within(dialog).getByLabelText("自定义颜色")).toHaveClass(
+    "ant-color-picker-trigger-disabled"
+  );
+  const cancel = within(dialog).getByRole("button", { name: /取\s*消/ });
+  expect(cancel).toBeDisabled();
+  fireEvent.click(cancel);
+  expect(dialog).not.toHaveClass("ant-zoom-leave");
+  finish({ ...catalog.tags[0]!, name: "慢保存标签" });
+  await waitFor(() => expect(field).not.toBeVisible());
+});
+it("标签删除失败保留确认目标，再次确认可以重试", async () => {
+  const remove = vi
+    .spyOn(api.permissionSystem, "deleteTag")
+    .mockRejectedValueOnce(new Error("temporary failure"))
+    .mockResolvedValueOnce(undefined);
+  mount();
+  await screen.findByText("编辑本人词条");
+  fireEvent.click(screen.getByText("标签管理"));
+  const row = within(document.querySelector(".ant-drawer")!)
+    .getByText("内容编辑")
+    .closest("tr")!;
+  fireEvent.click(within(row).getByText("删除"));
+  const dialog = (
+    await screen.findByText("删除标签？管理员已分配的权限不受影响。")
+  ).closest<HTMLElement>('[role="dialog"]')!;
+  fireEvent.click(within(dialog).getByRole("button", { name: /删\s*除/ }));
+  await screen.findByText("temporary failure");
+  expect(
+    within(dialog).getByText("确认删除“内容编辑”标签？")
+  ).toBeInTheDocument();
+  const confirm = within(dialog).getByRole("button", { name: /删\s*除/ });
+  await waitFor(() => expect(confirm).toBeEnabled());
+  fireEvent.click(confirm);
+  await waitFor(() => expect(remove).toHaveBeenCalledTimes(2));
+  expect(remove).toHaveBeenLastCalledWith("t1", 3);
+  await waitFor(() => expect(dialog).not.toBeInTheDocument());
 });

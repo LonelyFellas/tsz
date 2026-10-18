@@ -152,7 +152,9 @@ beforeEach(() => {
 
 /** 点确认弹窗里的主按钮（.ant-modal-confirm-btns 内，按可见文案定位）。 */
 function clickConfirmOk(label: RegExp) {
-  const btns = document.querySelector(".ant-modal-confirm-btns")!;
+  const btns = document.querySelector(
+    ".ant-modal-confirm-btns, .ant-modal-footer"
+  )!;
   fireEvent.click(within(btns as HTMLElement).getByText(label));
 }
 
@@ -220,7 +222,7 @@ describe("UserManagement", () => {
     clickRowButton(/^禁\s?用$/);
     expect(
       await screen.findByText("禁用用户「record」", {
-        selector: ".ant-modal-confirm-title"
+        selector: ".ant-modal-title"
       })
     ).toBeInTheDocument();
     clickConfirmOk(/^禁\s?用$/);
@@ -483,4 +485,21 @@ describe("UserManagement", () => {
     expect(screen.queryByText("用户列表加载失败")).not.toBeInTheDocument();
     expect(screen.queryByText(/重\s?试/)).not.toBeInTheDocument();
   });
+});
+
+it("用户状态失败后确认弹窗保留目标并可重试", async () => {
+  mockSetStatus.mockRejectedValueOnce(new HttpError(500, "temporary failure"));
+  renderPage();
+  await screen.findByText("record");
+  clickRowButton(/^禁\s?用$/);
+  const dialog = (
+    await screen.findByText(/禁用后该用户无法登录或继续访问受保护功能/)
+  ).closest<HTMLElement>('[role="dialog"]')!;
+  clickConfirmOk(/^禁\s?用$/);
+  expect(await within(dialog).findByRole("alert")).toBeInTheDocument();
+  expect(dialog).not.toHaveClass("ant-zoom-leave");
+  clickConfirmOk(/^禁\s?用$/);
+  await waitFor(() => expect(mockSetStatus).toHaveBeenCalledTimes(2));
+  expect(mockSetStatus).toHaveBeenLastCalledWith("1", "disabled");
+  await waitFor(() => expect(dialog).not.toBeInTheDocument());
 });

@@ -9,6 +9,7 @@ import {
   Button,
   Card,
   Flex,
+  Modal,
   Segmented,
   Space,
   Table,
@@ -41,7 +42,7 @@ const ROLE_TABS = [
 ];
 
 export function UserManagement() {
-  const { message, modal } = App.useApp();
+  const { message } = App.useApp();
   const canReadBasic = usePermission("users.read_basic");
   const canEdit = usePermission("users.edit");
   const canSetStatus = usePermission("users.set_status");
@@ -82,31 +83,27 @@ export function UserManagement() {
   const notReady = (label: string) =>
     message.info(`${label}功能待接入，接口开发中`);
 
+  const [statusTarget, setStatusTarget] = useState<AdminUserView | null>(null);
+  const [statusError, setStatusError] = useState<string>();
+  const verb = statusTarget?.status === "active" ? "禁用" : "启用";
+  const confirmStatus = async () => {
+    if (!canSetStatus || !statusTarget?.status || setStatus.isPending) return;
+    const next = statusTarget.status === "active" ? "disabled" : "active";
+    setStatusError(undefined);
+    try {
+      await setStatus.mutateAsync({ id: statusTarget.id, status: next });
+    } catch (err) {
+      setStatusError(userActionError(err, "操作失败"));
+      return;
+    }
+    void message.success(next === "disabled" ? "已禁用" : "已启用");
+    setStatusTarget(null);
+  };
   const confirmToggleStatus = (record: AdminUserView) => {
     if (!canSetStatus || !record.status) return;
-    const next = record.status === "active" ? "disabled" : "active";
-    const verb = next === "disabled" ? "禁用" : "启用";
-    modal.confirm({
-      title: `${verb}用户「${record.display_name}」`,
-      content:
-        next === "disabled"
-          ? "禁用后该用户无法登录或继续访问受保护功能，原有角色和绑定信息会保留。确认禁用？"
-          : "启用后该用户可以重新登录，原有角色和绑定信息保持不变。确认启用？",
-      okText: verb,
-      okButtonProps: { danger: next === "disabled" },
-      cancelText: "取消",
-      onOk: () =>
-        setStatus
-          .mutateAsync({ id: record.id, status: next })
-          .then(() =>
-            message.success(next === "disabled" ? "已禁用" : "已启用")
-          )
-          .catch((err: unknown) =>
-            message.error(userActionError(err, "操作失败"))
-          )
-    });
+    setStatusError(undefined);
+    setStatusTarget(record);
   };
-
   const columns: TableColumnsType<AdminUserView> = [
     {
       title: "用户ID",
@@ -280,6 +277,32 @@ export function UserManagement() {
 
   return (
     <Flex vertical gap={16}>
+      {statusTarget && (
+        <Modal
+          open
+          title={`${verb}用户「${statusTarget.display_name}」`}
+          okText={verb}
+          cancelText="取消"
+          confirmLoading={setStatus.isPending}
+          okButtonProps={{ danger: statusTarget.status === "active" }}
+          cancelButtonProps={{ disabled: setStatus.isPending }}
+          closable={!setStatus.isPending}
+          keyboard={!setStatus.isPending}
+          mask={{ closable: !setStatus.isPending }}
+          onCancel={() => {
+            if (!setStatus.isPending) setStatusTarget(null);
+          }}
+          onOk={() => void confirmStatus()}
+        >
+          <p>
+            {statusTarget.status === "active"
+              ? "禁用后该用户无法登录或继续访问受保护功能，原有角色和绑定信息会保留。确认禁用？"
+              : "启用后该用户可以重新登录，原有角色和绑定信息保持不变。确认启用？"}
+          </p>
+          {statusError && <Alert type="error" title={statusError} />}
+        </Modal>
+      )}
+
       <Breadcrumb items={[{ title: "用户管理" }, { title: "用户管理" }]} />
 
       <UserFilters

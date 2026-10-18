@@ -418,7 +418,7 @@ it("completed review records remain readable without decision controls", async (
         state: "rejected",
         reason: "内容不完整",
         created_at: "",
-        decided_at: ""
+        decided_at: "2026-10-17T08:30:00Z"
       },
       {
         id: "approved-request",
@@ -435,6 +435,11 @@ it("completed review records remain readable without decision controls", async (
   mount(<ReviewsPage />);
   fireEvent.click(await screen.findByText(/^查\s*看$/));
   expect(await screen.findByText("审核意见：内容不完整")).toBeVisible();
+  expect(
+    await screen.findByText(
+      `审核时间：${new Date("2026-10-17T08:30:00Z").toLocaleString("zh-CN")}`
+    )
+  ).toBeVisible();
   expect(screen.queryByText("通过审核")).not.toBeInTheDocument();
   expect(screen.queryByText("驳回")).not.toBeInTheDocument();
   expect(screen.getByRole("radio", { name: /已驳回.*提交名称/ })).toBeChecked();
@@ -653,4 +658,28 @@ it("reads custom and platform words with their own definitions and author notes"
   expect(within(platform).getByText("名词")).toBeVisible();
   expect(within(platform).getByText("清晰；清楚")).toBeVisible();
   expect(within(platform).getByText("平台词的作者注")).toBeVisible();
+});
+
+it("驳回提交等待期间锁定原因，失败后保留原输入", async () => {
+  let fail!: (error: Error) => void;
+  vi.mocked(api.wordlists.decision).mockReturnValueOnce(
+    new Promise((_, reject) => {
+      fail = reject;
+    })
+  );
+  mount(<ReviewsPage />);
+  fireEvent.click(await screen.findByText(/^查\s*看$/));
+  fireEvent.click(await screen.findByText(/^驳\s*回$/));
+  const reason = screen.getByLabelText("操作原因");
+  fireEvent.change(reason, { target: { value: "保留的驳回原因" } });
+  const dialog = reason.closest<HTMLElement>('[role="dialog"]')!;
+  fireEvent.click(within(dialog).getByText(/^确\s*认$/));
+  await waitFor(() => expect(api.wordlists.decision).toHaveBeenCalledTimes(1));
+  expect(reason).toBeDisabled();
+  fail(new Error("temporary failure"));
+  await waitFor(() => expect(reason).toBeEnabled());
+  expect(reason).toHaveValue("保留的驳回原因");
+  expect(
+    within(dialog).getByText(/旧审核不会覆盖已修改的内容/)
+  ).toBeInTheDocument();
 });

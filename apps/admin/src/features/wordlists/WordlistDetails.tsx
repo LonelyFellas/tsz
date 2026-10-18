@@ -280,6 +280,12 @@ export function WordlistDetails({
                     current.reviewer_id ||
                     (current.decided_at ? "未提供" : "—")}
                 </p>
+                {current.decided_at && (
+                  <p>
+                    审核时间：
+                    {new Date(current.decided_at).toLocaleString("zh-CN")}
+                  </p>
+                )}
                 {current.reason && <p>审核意见：{current.reason}</p>}
               </>
             )}
@@ -358,6 +364,10 @@ export function WordlistDetails({
         title={action === "approve" ? "确认通过审核并公开" : "驳回词表"}
         open={!!action}
         confirmLoading={busy}
+        cancelButtonProps={{ disabled: busy }}
+        closable={!busy}
+        keyboard={!busy}
+        mask={{ closable: !busy }}
         okText="确认"
         okButtonProps={{ danger: action === "reject" }}
         onCancel={() => {
@@ -369,6 +379,7 @@ export function WordlistDetails({
         {action === "reject" && (
           <Input.TextArea
             aria-label="操作原因"
+            disabled={busy}
             maxLength={1000}
             value={reason}
             onChange={(e) => setReason(e.target.value)}

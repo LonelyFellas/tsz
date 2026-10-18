@@ -400,7 +400,9 @@ describe("RoleManagement — 删角色", () => {
     expect(
       await screen.findByText(/该角色下有 3 名管理员/)
     ).toBeInTheDocument();
-    const confirmBtns = document.querySelector(".ant-modal-confirm-btns")!;
+    const confirmBtns = document.querySelector(
+      ".ant-modal-confirm-btns, .ant-modal-footer"
+    )!;
     fireEvent.click(within(confirmBtns as HTMLElement).getByText(/^删\s?除$/));
     await waitFor(() => expect(mockRemove).toHaveBeenCalledWith("r-lib"));
     expect(await screen.findByText("已删除")).toBeInTheDocument();
@@ -413,7 +415,9 @@ describe("RoleManagement — 删角色", () => {
     // 第 2 行为「新人」(member_count 0)。
     fireEvent.click(screen.getAllByText("删除")[2]!);
     expect(await screen.findByText("确认删除该角色？")).toBeInTheDocument();
-    const confirmBtns = document.querySelector(".ant-modal-confirm-btns")!;
+    const confirmBtns = document.querySelector(
+      ".ant-modal-confirm-btns, .ant-modal-footer"
+    )!;
     fireEvent.click(within(confirmBtns as HTMLElement).getByText(/^删\s?除$/));
     await waitFor(() => expect(mockRemove).toHaveBeenCalledWith("r-empty"));
   });
@@ -424,7 +428,9 @@ describe("RoleManagement — 删角色", () => {
     await screen.findByText("全功能管理员");
     fireEvent.click(screen.getAllByText("删除")[1]!);
     await screen.findByText(/该角色下有 3 名管理员/);
-    const confirmBtns = document.querySelector(".ant-modal-confirm-btns")!;
+    const confirmBtns = document.querySelector(
+      ".ant-modal-confirm-btns, .ant-modal-footer"
+    )!;
     fireEvent.click(within(confirmBtns as HTMLElement).getByText(/^删\s?除$/));
     expect(
       await screen.findByText("角色或管理员不存在，可能已被删除")
@@ -491,4 +497,23 @@ describe("RoleManagement — 派角色", () => {
       await screen.findByText("无权限执行此操作（系统角色或超管不可操作）")
     ).toBeInTheDocument();
   });
+});
+
+it("角色删除失败后确认弹窗保留目标并可重试", async () => {
+  mockRemove
+    .mockRejectedValueOnce(new HttpError(500, "temporary failure"))
+    .mockResolvedValueOnce(undefined);
+  renderPage();
+  await screen.findByText("全功能管理员");
+  fireEvent.click(screen.getAllByText("删除")[1]!);
+  const dialog = (
+    await screen.findByText(/该角色下有 3 名管理员/)
+  ).closest<HTMLElement>('[role="dialog"]')!;
+  fireEvent.click(within(dialog).getByText(/^删\s?除$/));
+  expect(await within(dialog).findByRole("alert")).toBeInTheDocument();
+  expect(dialog).not.toHaveClass("ant-zoom-leave");
+  fireEvent.click(within(dialog).getByText(/^删\s?除$/));
+  await waitFor(() => expect(mockRemove).toHaveBeenCalledTimes(2));
+  expect(mockRemove).toHaveBeenLastCalledWith("r-lib");
+  await waitFor(() => expect(dialog).not.toBeInTheDocument());
 });
