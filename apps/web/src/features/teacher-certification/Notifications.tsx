@@ -139,7 +139,7 @@ export function Notifications() {
                       </Link>
                     )}
                     {item.kind === "wordlist_deleted" && (
-                      <Link href="/student/tasks" className={buttonClass}>
+                      <Link href="/student/practice" className={buttonClass}>
                         查看学习任务
                       </Link>
                     )}

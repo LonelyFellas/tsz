@@ -148,7 +148,7 @@ it("shows deleted-source notice and links to learning tasks", async () => {
   expect(screen.getByText(/可在 2026-10-25 12:00/)).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "查看学习任务" })).toHaveAttribute(
     "href",
-    "/student/tasks"
+    "/student/practice"
   );
   expect(
     screen.queryByRole("link", { name: "查看词表" })

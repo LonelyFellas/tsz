@@ -126,7 +126,7 @@
 
 ## 回退限制
 
-- 新迁移 `20261018070000` 的 down 会删除删除事件表与 `wordlist_deleted` 通知；回退后宽限立即失去依据，在途轮次会按旧逻辑失效。
+- 新迁移 `20261018070000` 的 down 在已投递 `wordlist_deleted` 通知时拒绝执行，需先归档通知；成功回退会删除删除事件表，宽限立即失去依据，在途轮次按旧逻辑失效。
 - 后端迁移与代码必须配套发布。旧后端配新 schema 不会写删除事件；新后端配旧 schema 会在删除时失败，不能作为可用组合。
 - 前端可先行：旧后端没有 `delete-impact` 时后台显示读取失败但仍可删除；新通知 kind 对旧前端只是未知字符串，不会破坏严格 schema。
 
@@ -140,7 +140,7 @@
 
 后端（隔离 PostgreSQL `127.0.0.1:55441`、Redis `127.0.0.1:6399`）：
 
-- `cargo test --test learning_tasks_handler`：14 项通过。新增覆盖：
+- `cargo test --test learning_tasks_handler`：15 项通过。新增覆盖：
   - 管理员删除后，在途轮次继续、完成时自动归档、新轮次/新任务被拒；
   - 删除前已完成的轮次不获得宽限；
   - 删除后恢复词表，宽限仍在；宽限到期后失效；
@@ -149,16 +149,17 @@
   - 删除与答题并发时，未提交删除不会让等待中的轮次误判失效；
   - 先撤回再删除不会复活已失效轮次；
   - 宽限期间恢复并治理下架会立即终止宽限；
-  - 非公开词表的删除影响不承诺宽限。
+  - 非公开词表的删除影响不承诺宽限；
+  - 撤回后重新发布再删除，不会复活旧公开世代的轮次。
 - `cargo test --test learning_runs_handler --test wordlists_handler --test wordlists_review --test wordlists_schema`：全部通过。
 - `cargo test --lib`：371 项通过；部署迁移 undo 覆盖新迁移版本。
 - `cargo fmt --all -- --check`、`cargo clippy --locked --all-features --all-targets -- -D warnings` 通过。
-- 迁移 up/down 在隔离库验证。
+- `wordlists_schema`：3 项通过；迁移 up/down 在隔离库验证，已投递通知时 down 拒绝执行。
 
 前端：
 
 - `pnpm --filter @tsz/api-client test`：559 项通过。
-- `pnpm --filter @tsz/web test`：675 项通过；`pnpm --filter @tsz/admin test`：1971 项通过、2 项既有跳过。
+- `pnpm --filter @tsz/web test`：675 项通过；`pnpm --filter @tsz/admin test`：1973 项通过、2 项既有跳过。
 - `pnpm typecheck`、`pnpm lint` 通过（lint 仅 3 项既有警告）。
 - `pnpm --filter @tsz/web build`、`pnpm --filter @tsz/admin build` 通过。
 - OpenAPI 从后端任务 checkout 导出，`@tsz/api-client sync:openapi` 已同步 snapshot 与 runtime schema，contract hash 已更新。

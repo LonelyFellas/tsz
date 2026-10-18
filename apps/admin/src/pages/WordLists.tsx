@@ -477,7 +477,8 @@ function Management({ adminId }: { adminId: string }) {
               : "设为公开"
         }
         danger={action?.kind === "delete"}
-        pending={!!busy || deleteImpactLoading}
+        pending={!!busy}
+        confirmDisabled={deleteImpactLoading}
         onClose={() => {
           if (busy) return;
           deleteImpactRequest.current += 1;
@@ -495,22 +496,31 @@ function Management({ adminId }: { adminId: string }) {
           <>
             <p>删除后该词表将不可访问，系统推荐也会取消。历史投币记录保留。</p>
             {deleteImpactLoading ? (
-              <p>正在读取学习任务影响…</p>
+              <p aria-live="polite">正在读取学习任务影响…</p>
             ) : deleteImpactError ? (
-              <p>{deleteImpactError}</p>
+              <p role="alert">{deleteImpactError}</p>
             ) : deleteImpact ? (
-              <>
-                <p>
-                  已有 {deleteImpact.active_run_count} 个进行中轮次（涉及{" "}
-                  {deleteImpact.affected_user_count}{" "}
-                  位用户）可在删除后继续完成；日任务仍受当天窗口限制，长期任务在宽限期内完成。
-                  完成后对应任务自动结束，不能再开新一轮。
-                </p>
-                <p>
+              action.row.wordlist.state === "published" ? (
+                <div aria-live="polite">
+                  <p>
+                    已有 {deleteImpact.active_run_count} 个进行中轮次（涉及{" "}
+                    {deleteImpact.active_task_count} 个任务、
+                    {deleteImpact.affected_user_count}{" "}
+                    位用户）可在删除后继续完成；日任务仍受当天窗口限制，长期任务在宽限期内完成。
+                    完成后对应任务自动结束，不能再开新一轮。
+                  </p>
+                  <p>
+                    {deleteImpact.blocked_task_count}{" "}
+                    个引用该词表但没有可继续轮次的任务将无法再开始。
+                  </p>
+                </div>
+              ) : (
+                <p aria-live="polite">
+                  该词表当前不是公开状态，删除不会保留在途轮次；
                   {deleteImpact.blocked_task_count}{" "}
-                  个引用该词表但没有可继续轮次的任务将无法再开始。
+                  个引用该词表的活动任务将无法再开始。
                 </p>
-              </>
+              )
             ) : null}
           </>
         ) : (

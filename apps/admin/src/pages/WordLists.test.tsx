@@ -273,7 +273,9 @@ it("failed mutation reports unconfirmed state and refetches", async () => {
   mount();
   fireEvent.click(await screen.findByLabelText("删除待审词表"));
   const dialog = await screen.findByRole("dialog");
-  expect(await within(dialog).findByText(/2 个进行中轮次/)).toBeInTheDocument();
+  expect(
+    await within(dialog).findByText(/该词表当前不是公开状态/)
+  ).toBeInTheDocument();
   fireEvent.click(within(dialog).getByText(/^确认$/));
   expect(await screen.findByText(/操作失败或结果未确认/)).toBeInTheDocument();
   expect(api.wordlists.delete).toHaveBeenCalledWith("list", {
@@ -285,6 +287,10 @@ it("failed mutation reports unconfirmed state and refetches", async () => {
 });
 
 it("delete preview explains in-flight and blocked task impact", async () => {
+  vi.mocked(api.wordlists.management).mockResolvedValue({
+    items: [{ ...row, wordlist: { ...row.wordlist, state: "published" } }],
+    pagination
+  });
   mount();
   fireEvent.click(await screen.findByLabelText("删除待审词表"));
   const dialog = await screen.findByRole("dialog");
@@ -293,6 +299,29 @@ it("delete preview explains in-flight and blocked task impact", async () => {
     within(dialog).getByText(/1 个引用该词表但没有可继续轮次的任务/)
   ).toBeInTheDocument();
   expect(api.wordlists.deleteImpact).toHaveBeenCalledWith("list");
+});
+
+it("non-public delete does not promise grace", async () => {
+  mount();
+  fireEvent.click(await screen.findByLabelText("删除待审词表"));
+  const dialog = await screen.findByRole("dialog");
+  expect(
+    await within(dialog).findByText(/该词表当前不是公开状态/)
+  ).toBeInTheDocument();
+  expect(
+    within(dialog).queryByText(/可在删除后继续完成/)
+  ).not.toBeInTheDocument();
+});
+
+it("impact loading can be cancelled", async () => {
+  vi.mocked(api.wordlists.deleteImpact).mockReturnValue(new Promise(() => {}));
+  mount();
+  fireEvent.click(await screen.findByLabelText("删除待审词表"));
+  const dialog = await screen.findByRole("dialog");
+  fireEvent.click(within(dialog).getByRole("button", { name: /取\s*消/ }));
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+  );
 });
 
 it("delete impact failure is visible and does not strand the confirmation", async () => {
