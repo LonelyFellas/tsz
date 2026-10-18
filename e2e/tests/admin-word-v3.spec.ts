@@ -12,6 +12,53 @@ import {
 } from "./support/mockAdminV3Api";
 
 test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () => {
+  test("窄屏步骤标题可读、例句操作列不遮挡且编辑栏高度一致", async ({
+    page
+  }) => {
+    await mockAdminV3Api(page);
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/meanings`);
+    await expect(
+      page.locator(".word-grammar-card > .admin-card-header").first()
+    ).toBeVisible();
+    expect(
+      (await page
+        .locator(".word-grammar-card > .admin-card-header")
+        .first()
+        .boundingBox())!.height
+    ).toBe(48);
+    for (const button of await page
+      .locator(".word-step-actions .MuiButton-root")
+      .all()) {
+      expect((await button.boundingBox())!.height).toBe(40);
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    const steps = page.locator("[data-wizard-step]");
+    await expect(steps).toHaveCount(4);
+    for (const step of await steps.all()) {
+      await expect(step.locator(".MuiStepLabel-labelContainer")).toBeVisible();
+      expect(
+        await step.evaluate((node) => node.scrollWidth - node.clientWidth)
+      ).toBeLessThanOrEqual(1);
+    }
+    const boxes = await steps.evaluateAll((nodes) =>
+      nodes.map((node) => {
+        const r = node.getBoundingClientRect();
+        return { x: r.x, y: r.y };
+      })
+    );
+    expect(boxes[0]!.y).toBe(boxes[1]!.y);
+    expect(boxes[2]!.y).toBeGreaterThan(boxes[0]!.y);
+    await page.goto("/sentences");
+    const action = page.getByRole("columnheader", {
+      name: "操作",
+      exact: true
+    });
+    await expect(action).toHaveCSS("position", "static");
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await expect(action).toHaveCSS("position", "sticky");
+  });
+
   for (const { width, zoom } of [
     { width: 1366, zoom: 1 },
     { width: 1280, zoom: 0.8 },
