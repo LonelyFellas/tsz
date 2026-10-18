@@ -308,6 +308,27 @@ it("management wire supports platform authors and keeps private notes out of pub
     `/wordlists/${id}/recommendation`,
     { expected_revision: 8, recommended: true }
   );
+  vi.mocked(http.get).mockResolvedValueOnce({
+    active_run_count: 2,
+    active_task_count: 1,
+    affected_user_count: 1,
+    blocked_task_count: 3
+  });
+  expect(await admin.deleteImpact(id)).toEqual({
+    active_run_count: 2,
+    active_task_count: 1,
+    affected_user_count: 1,
+    blocked_task_count: 3
+  });
+  expect(http.get).toHaveBeenLastCalledWith(
+    `/wordlists/${id}/delete-impact`,
+    undefined
+  );
+  expect(() =>
+    decodeWordlistResponse("WordlistDeleteImpact", {
+      active_run_count: 2
+    })
+  ).toThrow();
   await admin.delete(id, { expected_revision: 9 });
   expect(http.post).toHaveBeenLastCalledWith(`/wordlists/${id}/delete`, {
     expected_revision: 9

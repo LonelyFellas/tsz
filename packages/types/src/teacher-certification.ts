@@ -53,7 +53,8 @@ export interface UserNotification {
     | "teacher_rejected"
     | "teacher_revoked"
     | "wordlist_liked"
-    | "wordlist_tipped";
+    | "wordlist_tipped"
+    | "wordlist_deleted";
   wordlist_id?: string | null;
   wordlist_name?: string | null;
   actor_name?: string | null;
