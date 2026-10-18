@@ -5,6 +5,8 @@ import type {
   LibraryFolderInput,
   LibraryRename,
   LibraryOperation,
+  LibrarySelectionInput,
+  LibrarySelection,
   LibraryImpact
 } from "@tsz/types";
 import type { HttpClient } from "./http";
@@ -36,6 +38,14 @@ export function createWordlistLibraryEndpoints(http: HttpClient) {
         )
         .then((value) => decode<LibraryPage>("LibraryPage", value));
     },
+    selection: (
+      space: LibrarySpace,
+      data: LibrarySelectionInput,
+      options?: { signal?: AbortSignal }
+    ) =>
+      http
+        .post<unknown>(`${base(space)}/selection`, data, options)
+        .then((v) => decode<LibrarySelection>("LibrarySelection", v)),
     createFolder: (space: LibrarySpace, data: LibraryFolderInput) =>
       http.post<void>(`${base(space)}/folders`, data),
     rename: (space: LibrarySpace, id: string, data: LibraryRename) =>

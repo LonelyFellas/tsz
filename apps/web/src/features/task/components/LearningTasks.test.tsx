@@ -1,3 +1,4 @@
+import { HttpError } from "@tsz/api-client";
 import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { renderWithProviders } from "@/test/render";
@@ -7,10 +8,16 @@ const mocks = vi.hoisted(() => ({
   questions: vi.fn(),
   answer: vi.fn(),
   list: vi.fn(),
+  plansList: vi.fn(),
+  plansDetail: vi.fn(),
   user: { id: "learner-a", roles: ["student"] }
 }));
 vi.mock("@/lib/request", () => ({
-  api: { learning: mocks, learningRewards: { day: mocks.day } }
+  api: {
+    learning: mocks,
+    learningPlans: { list: mocks.plansList, detail: mocks.plansDetail },
+    learningRewards: { day: mocks.day }
+  }
 }));
 vi.mock("@/stores/user", () => ({
   useUserStore: Object.assign(
@@ -39,6 +46,8 @@ const question = {
 };
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.plansList.mockRejectedValue(new HttpError(404, "API missing"));
+  mocks.plansDetail.mockRejectedValue(new HttpError(404, "API missing"));
   mocks.user = { id: "learner-a", roles: ["student"] };
   mocks.day.mockResolvedValue({
     status: "reward_disabled",
@@ -107,7 +116,7 @@ it("completion is server-owned and zero correct still displays completed", async
   });
   renderWithProviders(<LearningPractice id="run" />);
   expect(
-    await screen.findByRole("heading", { name: "本轮已完成" })
+    await screen.findByRole("heading", { name: "本批次已完成" })
   ).toBeInTheDocument();
   expect(screen.getByText(/正确率 0%/)).toBeInTheDocument();
   expect(

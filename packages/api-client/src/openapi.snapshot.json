@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/wordlist-custom-vocabulary/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-18T07:11:25.856Z",
+  "_source": "/Users/darwish/.codex/worktrees/task-spelling-creation/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-10-18T12:38:34.626Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -145,6 +145,13 @@
     "/me/invitations": ["get"],
     "/me/invitations/code": ["post"],
     "/me/invitations/records": ["get"],
+    "/me/learning-plans": ["get", "post"],
+    "/me/learning-plans/preview": ["post"],
+    "/me/learning-plans/{id}": ["get", "patch"],
+    "/me/learning-plans/{id}/archive": ["post"],
+    "/me/learning-plans/{id}/cycles": ["get", "post"],
+    "/me/learning-plans/{id}/cycles/preview": ["post"],
+    "/me/learning-plans/{id}/runs": ["get", "post"],
     "/me/learning-runs/{id}": ["get"],
     "/me/learning-runs/{id}/answers": ["post"],
     "/me/learning-runs/{id}/questions": ["get"],
@@ -168,6 +175,7 @@
     "/me/wordlist-library/{space}/nodes/{id}": ["put"],
     "/me/wordlist-library/{space}/operations": ["post"],
     "/me/wordlist-library/{space}/preview": ["post"],
+    "/me/wordlist-library/{space}/selection": ["post"],
     "/me/wordlist-tips": ["get"],
     "/me/wordlist-tips/{event_id}": ["get"],
     "/me/wordlists": ["get", "post"],
@@ -2362,6 +2370,138 @@
         "503": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
+    "get /me/learning-plans": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/LearningPlanPage" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /me/learning-plans": {
+      "request": { "$ref": "#/components/schemas/CreateLearningPlan" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/LearningPlan" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /me/learning-plans/preview": {
+      "request": { "$ref": "#/components/schemas/PreviewLearningPlan" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/LearningPlanPreview" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /me/learning-plans/{id}": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/LearningPlan" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "patch /me/learning-plans/{id}": {
+      "request": { "$ref": "#/components/schemas/RenameLearningTask" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/LearningPlan" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /me/learning-plans/{id}/archive": {
+      "request": { "$ref": "#/components/schemas/ArchiveLearningTask" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/LearningPlan" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /me/learning-plans/{id}/cycles": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/LearningCyclePage" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /me/learning-plans/{id}/cycles": {
+      "request": { "$ref": "#/components/schemas/CreateLearningCycle" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/LearningCycle" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /me/learning-plans/{id}/cycles/preview": {
+      "request": { "$ref": "#/components/schemas/PreviewLearningCycle" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/LearningCyclePreview" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /me/learning-plans/{id}/runs": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/LearningPlanRunPage" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /me/learning-plans/{id}/runs": {
+      "request": { "$ref": "#/components/schemas/StartLearningRun" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/LearningRun" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "put /me/learning-settings": {
       "request": { "$ref": "#/components/schemas/LearningSettings" },
       "responses": {
@@ -2419,6 +2559,18 @@
         "400": { "$ref": "#/components/schemas/ProblemDetails" },
         "404": { "$ref": "#/components/schemas/ProblemDetails" },
         "409": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /me/wordlist-library/{space}/selection": {
+      "request": { "$ref": "#/components/schemas/LibrarySelectionInput" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/LibrarySelection" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     }
   },
@@ -4977,6 +5129,14 @@
       }
     },
     "AccountDeletionChannel": { "type": "string", "enum": ["phone", "email"] },
+    "ArchiveLearningTask": {
+      "type": "object",
+      "required": ["expected_revision"],
+      "properties": {
+        "expected_revision": { "type": "integer", "format": "int64" }
+      },
+      "additionalProperties": false
+    },
     "AudioAsset": {
       "type": "object",
       "description": "一条已登记的音频资产。既是 confirm 的响应体，也内嵌在 `GrammarVariantV3.audio_assets` 里。\n除 `id` 外的字段都是服务端权威元数据：保存词义时按 id 重新灌入，客户端回传的值不作数。",
@@ -5184,6 +5344,57 @@
         "sort_order": { "type": "integer", "format": "int32" }
       }
     },
+    "CreateLearningCycle": {
+      "type": "object",
+      "required": [
+        "operation",
+        "after_cycle_id",
+        "expected_revision",
+        "preview_fingerprint",
+        "idempotency_key"
+      ],
+      "properties": {
+        "after_cycle_id": { "type": "string", "format": "uuid" },
+        "expected_revision": { "type": "integer", "format": "int64" },
+        "idempotency_key": { "type": "string", "format": "uuid" },
+        "operation": { "$ref": "#/components/schemas/CycleOperation" },
+        "preview_fingerprint": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "CreateLearningPlan": {
+      "type": "object",
+      "required": [
+        "idempotency_key",
+        "name",
+        "task_type",
+        "wordlist_ids",
+        "daily_question_count",
+        "schedule",
+        "preview_fingerprint"
+      ],
+      "properties": {
+        "daily_question_count": {
+          "type": ["integer", "null"],
+          "format": "int32"
+        },
+        "idempotency_key": { "type": "string", "format": "uuid" },
+        "name": { "type": "string" },
+        "preview_fingerprint": { "type": "string" },
+        "schedule": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/components/schemas/LearningSchedule" }
+          ]
+        },
+        "task_type": { "$ref": "#/components/schemas/LearningTaskType" },
+        "wordlist_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" }
+        }
+      },
+      "additionalProperties": false
+    },
     "CreateSharedSentence": {
       "type": "object",
       "required": ["source_entry_id", "source_sense_id", "content"],
@@ -5198,6 +5409,7 @@
       },
       "additionalProperties": false
     },
+    "CycleOperation": { "type": "string", "enum": ["next", "restart_blocked"] },
     "DetectLexiconSurfaceV3Input": {
       "type": "object",
       "required": ["schema_version", "language", "kind", "surface"],
@@ -5381,6 +5593,16 @@
       },
       "additionalProperties": false
     },
+    "LearningSchedule": {
+      "type": "object",
+      "required": ["start_date", "end_date"],
+      "properties": {
+        "end_date": { "type": "string", "format": "date" },
+        "start_date": { "type": "string", "format": "date" }
+      },
+      "additionalProperties": false
+    },
+    "LearningTaskType": { "type": "string", "enum": ["daily", "longterm"] },
     "LibraryAction": {
       "type": "string",
       "enum": ["move", "trash", "restore", "purge"]
@@ -5424,6 +5646,18 @@
       "properties": {
         "expected_version": { "type": "string" },
         "name": { "type": "string", "maxLength": 100, "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "LibrarySelectionInput": {
+      "type": "object",
+      "required": ["expected_version", "node_ids"],
+      "properties": {
+        "expected_version": { "type": "string" },
+        "node_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" }
+        }
       },
       "additionalProperties": false
     },
@@ -5521,6 +5755,43 @@
         }
       ],
       "discriminator": { "propertyName": "state" }
+    },
+    "PreviewLearningCycle": {
+      "type": "object",
+      "required": ["operation", "after_cycle_id", "expected_revision"],
+      "properties": {
+        "after_cycle_id": { "type": "string", "format": "uuid" },
+        "expected_revision": { "type": "integer", "format": "int64" },
+        "operation": { "$ref": "#/components/schemas/CycleOperation" }
+      },
+      "additionalProperties": false
+    },
+    "PreviewLearningPlan": {
+      "type": "object",
+      "required": [
+        "task_type",
+        "wordlist_ids",
+        "daily_question_count",
+        "schedule"
+      ],
+      "properties": {
+        "daily_question_count": {
+          "type": ["integer", "null"],
+          "format": "int32"
+        },
+        "schedule": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/components/schemas/LearningSchedule" }
+          ]
+        },
+        "task_type": { "$ref": "#/components/schemas/LearningTaskType" },
+        "wordlist_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" }
+        }
+      },
+      "additionalProperties": false
     },
     "PronunciationStyle": {
       "type": "string",
@@ -5622,6 +5893,15 @@
         },
         "phone": { "type": ["string", "null"], "example": "13800138000" }
       }
+    },
+    "RenameLearningTask": {
+      "type": "object",
+      "required": ["expected_revision", "name"],
+      "properties": {
+        "expected_revision": { "type": "integer", "format": "int64" },
+        "name": { "type": "string" }
+      },
+      "additionalProperties": false
     },
     "RichTextAnnotationV3": {
       "oneOf": [
@@ -5978,6 +6258,16 @@
       "properties": {
         "content": { "$ref": "#/components/schemas/RichTextV2V3" },
         "voice_profile": { "$ref": "#/components/schemas/VoiceProfileV3" }
+      },
+      "additionalProperties": false
+    },
+    "StartLearningRun": {
+      "type": "object",
+      "required": ["idempotency_key", "expected_revision", "after_run_id"],
+      "properties": {
+        "after_run_id": { "type": ["string", "null"], "format": "uuid" },
+        "expected_revision": { "type": "integer", "format": "int64" },
+        "idempotency_key": { "type": "string", "format": "uuid" }
       },
       "additionalProperties": false
     },

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/wordlist-custom-vocabulary/tsz-rust/docs/openapi.json",
-  "_source_sha256": "be1cbb420ad44530fea6c0b033ae50910ab3b8a2dc610036d3e6a280065deb8d",
+  "_source": "/Users/darwish/.codex/worktrees/task-spelling-creation/tsz-rust/docs/openapi.json",
+  "_source_sha256": "a01a783198925c08b54bf05331933e7a17e61eef68c79cbd642079447f00585c",
   "roots": [
     "DictionaryPage",
     "DictionaryEntry",
@@ -9,6 +9,14 @@
     "LearningRewardDay",
     "LoginRewardDay",
     "LearningPreview",
+    "LearningPlanPreview",
+    "LearningPlan",
+    "LearningPlanPage",
+    "LearningCyclePreview",
+    "LearningCycle",
+    "LearningCyclePage",
+    "LearningPlanRunPage",
+    "LibrarySelection",
     "LearningTask",
     "LearningTaskDetail",
     "LearningTaskPage",
@@ -1462,6 +1470,70 @@
       },
       "additionalProperties": false
     },
+    "LearningCycle": {
+      "type": "object",
+      "required": [
+        "id",
+        "cycle_number",
+        "state",
+        "total_count",
+        "covered_count",
+        "remaining_count",
+        "available_remaining_count",
+        "blocked_count",
+        "earliest_day",
+        "created_at",
+        "completed_at"
+      ],
+      "properties": {
+        "available_remaining_count": { "type": "integer" },
+        "blocked_count": { "type": "integer" },
+        "completed_at": { "type": ["string", "null"], "format": "date-time" },
+        "covered_count": { "type": "integer" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "cycle_number": { "type": "integer" },
+        "earliest_day": { "type": "string", "format": "date" },
+        "id": { "type": "string", "format": "uuid" },
+        "remaining_count": { "type": "integer" },
+        "state": { "$ref": "#/$defs/LearningCycleState" },
+        "total_count": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "LearningCyclePage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LearningCycle" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "LearningCyclePreview": {
+      "type": "object",
+      "required": [
+        "preview",
+        "earliest_day",
+        "previous_covered_count",
+        "previous_total_count",
+        "previous_blocked_count"
+      ],
+      "properties": {
+        "earliest_day": { "type": "string", "format": "date" },
+        "preview": { "$ref": "#/$defs/LearningPlanPreview" },
+        "previous_blocked_count": { "type": "integer" },
+        "previous_covered_count": { "type": "integer" },
+        "previous_total_count": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "LearningCycleState": {
+      "type": "string",
+      "enum": ["active", "completed", "cancelled"]
+    },
     "LearningExclusions": {
       "type": "object",
       "required": [
@@ -1479,6 +1551,166 @@
         "unavailable_entries": { "type": "integer" }
       },
       "additionalProperties": false
+    },
+    "LearningPlan": {
+      "type": "object",
+      "required": [
+        "task",
+        "mode",
+        "schedule",
+        "sources",
+        "current_cycle",
+        "current_run",
+        "today_available_count",
+        "estimated_learning_days",
+        "estimate_from_day",
+        "schedule_at_risk",
+        "status",
+        "can_start",
+        "can_start_next_cycle",
+        "can_restart_blocked_cycle",
+        "reasons",
+        "server_time",
+        "business_day",
+        "next_day_at",
+        "timezone"
+      ],
+      "properties": {
+        "business_day": { "type": "string", "format": "date" },
+        "can_restart_blocked_cycle": { "type": "boolean" },
+        "can_start": { "type": "boolean" },
+        "can_start_next_cycle": { "type": "boolean" },
+        "current_cycle": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/LearningCycle" }]
+        },
+        "current_run": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/LearningRun" }]
+        },
+        "estimate_from_day": { "type": ["string", "null"], "format": "date" },
+        "estimated_learning_days": { "type": ["integer", "null"] },
+        "mode": { "$ref": "#/$defs/LearningPlanMode" },
+        "next_day_at": { "type": "string", "format": "date-time" },
+        "reasons": { "type": "array", "items": { "type": "string" } },
+        "schedule": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/LearningSchedule" }]
+        },
+        "schedule_at_risk": { "type": "boolean" },
+        "server_time": { "type": "string", "format": "date-time" },
+        "sources": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LearningPlanSource" }
+        },
+        "status": { "$ref": "#/$defs/LearningPlanStatus" },
+        "task": { "$ref": "#/$defs/LearningTask" },
+        "timezone": { "type": "string" },
+        "today_available_count": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "LearningPlanMode": {
+      "type": "string",
+      "enum": ["legacy_v1", "coverage_v1"]
+    },
+    "LearningPlanPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LearningPlan" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "LearningPlanPreview": {
+      "type": "object",
+      "required": [
+        "entry_count",
+        "eligible_count",
+        "custom_word_count",
+        "exclusions",
+        "settings",
+        "estimated_learning_days",
+        "available_learning_days",
+        "can_create",
+        "reasons",
+        "preview_fingerprint",
+        "server_time",
+        "business_day",
+        "timezone"
+      ],
+      "properties": {
+        "available_learning_days": { "type": ["integer", "null"] },
+        "business_day": { "type": "string", "format": "date" },
+        "can_create": { "type": "boolean" },
+        "custom_word_count": { "type": "integer" },
+        "eligible_count": { "type": "integer" },
+        "entry_count": { "type": "integer" },
+        "estimated_learning_days": { "type": ["integer", "null"] },
+        "exclusions": { "$ref": "#/$defs/LearningExclusions" },
+        "preview_fingerprint": { "type": "string" },
+        "reasons": { "type": "array", "items": { "type": "string" } },
+        "server_time": { "type": "string", "format": "date-time" },
+        "settings": { "$ref": "#/$defs/LearningContext" },
+        "timezone": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "LearningPlanRun": {
+      "type": "object",
+      "required": ["run", "cycle_id"],
+      "properties": {
+        "cycle_id": { "type": ["string", "null"], "format": "uuid" },
+        "run": { "$ref": "#/$defs/LearningRun" }
+      },
+      "additionalProperties": false
+    },
+    "LearningPlanRunPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LearningPlanRun" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "LearningPlanSource": {
+      "type": "object",
+      "required": [
+        "id",
+        "available",
+        "name",
+        "personal_note",
+        "author_name",
+        "state",
+        "item_count"
+      ],
+      "properties": {
+        "author_name": { "type": ["string", "null"] },
+        "available": { "type": "boolean" },
+        "id": { "type": "string", "format": "uuid" },
+        "item_count": { "type": ["integer", "null"] },
+        "name": { "type": ["string", "null"] },
+        "personal_note": { "type": ["string", "null"] },
+        "state": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "LearningPlanStatus": {
+      "type": "string",
+      "enum": [
+        "archived",
+        "schedule_ended",
+        "cycle_completed",
+        "not_started",
+        "today_completed",
+        "source_blocked",
+        "ready"
+      ]
     },
     "LearningPreview": {
       "type": "object",
@@ -1648,6 +1880,15 @@
       "type": "string",
       "enum": ["active", "completed", "expired", "invalidated", "cancelled"]
     },
+    "LearningSchedule": {
+      "type": "object",
+      "required": ["start_date", "end_date"],
+      "properties": {
+        "end_date": { "type": "string", "format": "date" },
+        "start_date": { "type": "string", "format": "date" }
+      },
+      "additionalProperties": false
+    },
     "LearningTask": {
       "type": "object",
       "required": [
@@ -1773,6 +2014,18 @@
         },
         "pagination": { "$ref": "#/$defs/PaginationMeta" },
         "version": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "LibrarySelection": {
+      "type": "object",
+      "required": ["version", "wordlists"],
+      "properties": {
+        "version": { "type": "string" },
+        "wordlists": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Wordlist" }
+        }
       },
       "additionalProperties": false
     },

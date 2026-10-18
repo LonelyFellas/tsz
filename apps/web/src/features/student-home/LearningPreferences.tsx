@@ -31,6 +31,9 @@ export function LearningPreferences({ userId }: { userId: string }) {
       );
       setDraft(null);
       void client.invalidateQueries({ queryKey: wordListKeys.mine(userId) });
+      void client.invalidateQueries({
+        queryKey: ["learning-plans", userId, "v1", "preview"]
+      });
     }
   });
   const settings = profile.data?.learning_settings;

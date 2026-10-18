@@ -5,14 +5,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { HttpError } from "@tsz/api-client";
 import type {
-  CreateLearningTask,
-  LearningPreview,
   LearningRunState,
   StartLearningRun,
   SubmitLearningAnswer
 } from "@tsz/types";
 import { api } from "@/lib/request";
 import { cn } from "@tsz/ui/lib/cn";
+import { LearningProgressBar as ProgressBar } from "./LearningProgressBar";
+import { LearningPlanCreator } from "./LearningPlanCreator";
+import { PlanCoverage, planStatusLabels } from "./PlanCoverage";
+import { listPlans, detailPlan, historyPlans } from "./plan-api";
 import { LearningRewardSummary } from "@/features/coins/LearningRewardSummary";
 import { useUserStore } from "@/stores/user";
 import { buttonClass, primaryButtonClass } from "@/features/wordlist/reading";
@@ -27,7 +29,6 @@ import {
 } from "@/features/shell/Page";
 const field =
   "mt-2 block min-h-11 w-full rounded-2xl border border-border bg-surface px-4 text-sm text-foreground transition-shadow placeholder:text-foreground-subtle focus-visible:border-primary/50 focus-visible:outline-hidden focus-visible:ring-4 focus-visible:ring-primary/15 disabled:opacity-50";
-const labelText = "block text-sm font-medium text-foreground";
 const box = `${panelClass} space-y-6`;
 const sectionTitle = "text-lg font-bold tracking-tight text-foreground";
 const alertText = "text-sm text-danger";
@@ -46,32 +47,6 @@ function Stat({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-function ProgressBar({
-  value,
-  max,
-  label = "本轮进度"
-}: {
-  value: number;
-  max: number;
-  label?: string;
-}) {
-  const percent = max ? Math.min(100, Math.round((value / max) * 100)) : 0;
-  return (
-    <div
-      className="h-1.5 overflow-hidden rounded-full bg-muted"
-      role="progressbar"
-      aria-label={label}
-      aria-valuemin={0}
-      aria-valuemax={max}
-      aria-valuenow={value}
-    >
-      <div
-        className="h-full rounded-full bg-primary transition-[width] duration-500"
-        style={{ width: `${percent}%` }}
-      />
-    </div>
-  );
-}
 export const runLabels: Record<LearningRunState, string> = {
   active: "进行中",
   completed: "已完成",
@@ -116,13 +91,18 @@ function TaskList({ userId }: { userId: string }) {
   const [page, setPage] = useState(1);
   const [archived, setArchived] = useState(false);
   const q = useQuery({
-    queryKey: ["learning", userId, "tasks", page, archived],
+    queryKey: [
+      "learning-plans",
+      userId,
+      "v1-with-legacy",
+      "tasks",
+      page,
+      archived
+    ],
     refetchOnMount: "always",
+    refetchOnWindowFocus: "always",
     queryFn: ({ signal }) =>
-      api.learning.list(
-        { page, state: archived ? "archived" : "active" },
-        { signal }
-      )
+      listPlans({ page, state: archived ? "archived" : "active" }, { signal })
   });
   return (
     <PageShell>
@@ -168,52 +148,77 @@ function TaskList({ userId }: { userId: string }) {
               <PageNotice>暂无任务，先选择词表创建一个吧。</PageNotice>
             )}
             <ul className="space-y-4">
-              {q.data.items.map(({ task, current_run: r }) => (
-                <li key={task.id}>
-                  <Link
-                    className={`${listCardClass} group`}
-                    href={`/student/tasks/${task.id}`}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium tracking-[0.2em] text-foreground-muted">
-                          {task.task_type === "daily" ? "每日任务" : "长期任务"}
-                          {" · "}
-                          {task.wordlist_ids.length} 个词表
-                        </p>
-                        <h2 className="mt-2 truncate text-xl font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
-                          {task.name}
-                        </h2>
+              {q.data.items.map((plan) => {
+                const { task, current_run: r, current_cycle: c } = plan;
+                return (
+                  <li key={task.id}>
+                    <Link
+                      className={`${listCardClass} group`}
+                      href={`/student/tasks/${task.id}`}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium tracking-[0.2em] text-foreground-muted">
+                            {task.task_type === "daily"
+                              ? "每日任务"
+                              : "长期任务"}
+                            {" · "}
+                            {task.wordlist_ids.length} 个词表
+                          </p>
+                          <h2 className="mt-2 truncate text-xl font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+                            {task.name}
+                          </h2>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs text-foreground-muted">
+                          {plan.mode === "coverage_v1"
+                            ? planStatusLabels[plan.status]
+                            : r
+                              ? runLabels[r.state]
+                              : task.task_type === "daily"
+                                ? "今日未开始"
+                                : "尚未开始"}
+                        </span>
                       </div>
-                      <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs text-foreground-muted">
-                        {r
-                          ? runLabels[r.state]
-                          : task.task_type === "daily"
-                            ? "今日未开始"
-                            : "尚未开始"}
-                      </span>
-                    </div>
-                    {r ? (
-                      <div className="mt-5 space-y-2">
-                        <ProgressBar
-                          value={r.answered_count}
-                          max={r.target_count}
-                          label={`${task.name} 本轮进度`}
-                        />
-                        <p className="text-sm tabular-nums text-foreground-muted">
-                          {r.answered_count}/{r.target_count} 题
-                        </p>
-                      </div>
-                    ) : (
-                      task.task_type === "daily" && (
-                        <p className="mt-5 text-sm text-foreground-muted">
-                          每日 {task.daily_question_count} 题
-                        </p>
-                      )
-                    )}
-                  </Link>
-                </li>
-              ))}
+                      {c ? (
+                        <div className="mt-5 space-y-2">
+                          <ProgressBar
+                            value={c.covered_count}
+                            max={c.total_count}
+                            label={`${task.name} 本轮覆盖进度`}
+                          />
+                          <p className="text-sm text-foreground-muted">
+                            本轮已覆盖 {c.covered_count}/{c.total_count} 题
+                            {c.blocked_count > 0 &&
+                              ` · 不可用 ${c.blocked_count} 题`}
+                          </p>
+                          {task.task_type === "daily" && r && (
+                            <p className="text-sm text-foreground-muted">
+                              今日已答 {r.answered_count}/{r.target_count} 题
+                            </p>
+                          )}
+                        </div>
+                      ) : r ? (
+                        <div className="mt-5 space-y-2">
+                          <ProgressBar
+                            value={r.answered_count}
+                            max={r.target_count}
+                            label={`${task.name} 本轮进度`}
+                          />
+                          <p className="text-sm tabular-nums text-foreground-muted">
+                            {r.answered_count}/{r.target_count} 题
+                          </p>
+                        </div>
+                      ) : (
+                        task.task_type === "daily" && (
+                          <p className="mt-5 text-sm text-foreground-muted">
+                            每日 {task.daily_question_count} 题
+                          </p>
+                        )
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
             <Pager
               page={page}
@@ -227,292 +232,8 @@ function TaskList({ userId }: { userId: string }) {
   );
 }
 export function LearningTaskCreator() {
-  return <Student>{(id) => <Creator key={id} userId={id} />}</Student>;
-}
-function Creator({ userId }: { userId: string }) {
-  const router = useRouter();
-  const op = useOperation(userId);
-  const [name, setName] = useState("");
-  const [kind, setKind] = useState<"daily" | "longterm">("daily");
-  const [count, setCount] = useState(10);
-  const [ends, setEnds] = useState("");
-  const [ids, setIds] = useState<string[]>([]);
-  const [mine, setMine] = useState(true);
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const [preview, setPreview] = useState<LearningPreview | null>(null);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [uncertain, setUncertain] = useState(false);
-  const intent = useRef<CreateLearningTask | null>(null);
-  const lists = useQuery({
-    queryKey: ["learning", userId, "sources", mine, page, search],
-    queryFn: ({ signal }) =>
-      mine
-        ? api.wordList.mine({ page, q: search }, { signal })
-        : api.wordList.list({ page, q: search }, { signal })
-  });
-  function change() {
-    setPreview(null);
-    setError("");
-  }
-  function payload() {
-    return {
-      task_type: kind,
-      wordlist_ids: ids,
-      daily_question_count: kind === "daily" ? count : null,
-      ends_at:
-        kind === "daily" && ends
-          ? new Date(`${ends}:00+08:00`).toISOString()
-          : null
-    };
-  }
-  async function check() {
-    setBusy(true);
-    setError("");
-    try {
-      const p = await api.learning.preview(payload(), op.options());
-      if (op.current()) setPreview(p);
-    } catch (e) {
-      if (op.current()) setError(learningError(e));
-    } finally {
-      if (op.current()) setBusy(false);
-    }
-  }
-  async function save() {
-    setBusy(true);
-    setError("");
-    try {
-      intent.current ??= {
-        ...payload(),
-        name,
-        idempotency_key: crypto.randomUUID()
-      };
-      const task = await api.learning.create(intent.current, op.options());
-      if (op.current()) router.push(`/student/tasks/${task.id}`);
-    } catch (e) {
-      if (op.current()) {
-        setError(learningError(e));
-        if (e instanceof HttpError && e.status < 500 && e.status !== 408) {
-          intent.current = null;
-          setUncertain(false);
-        } else setUncertain(true);
-      }
-    } finally {
-      if (op.current()) setBusy(false);
-    }
-  }
   return (
-    <PageShell>
-      <PageHeader
-        back={{ href: "/student/practice", label: "我的任务" }}
-        eyebrow="新建任务"
-        title="创建学习任务"
-        description="选好词表和节奏，系统按你的学习偏好出题。"
-      />
-      <form
-        className={box}
-        onSubmit={(e) => {
-          e.preventDefault();
-          void save();
-        }}
-      >
-        <fieldset className="space-y-6" disabled={busy || uncertain}>
-          <label className={labelText}>
-            任务名称
-            <input
-              required
-              maxLength={100}
-              className={field}
-              placeholder="例如：七年级上册单词"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </label>
-          <div className="space-y-2">
-            <p className={labelText}>任务类型</p>
-            <Segmented
-              label="任务类型"
-              value={kind}
-              options={[
-                { value: "daily", label: "每日任务" },
-                { value: "longterm", label: "长期任务" }
-              ]}
-              onChange={(value) => {
-                setKind(value);
-                change();
-              }}
-            />
-          </div>
-          {kind === "daily" ? (
-            <div className="grid gap-5 sm:grid-cols-2">
-              <label className={labelText}>
-                每日题量
-                <input
-                  className={field}
-                  type="number"
-                  min={1}
-                  max={200}
-                  required
-                  value={count}
-                  onChange={(e) => {
-                    setCount(Number(e.target.value));
-                    change();
-                  }}
-                />
-              </label>
-              <label className={labelText}>
-                整个任务结束时间
-                <span className="ml-1 font-normal text-foreground-muted">
-                  （北京时间，可不填）
-                </span>
-                <input
-                  className={field}
-                  type="datetime-local"
-                  value={ends}
-                  onChange={(e) => {
-                    setEnds(e.target.value);
-                    change();
-                  }}
-                />
-              </label>
-            </div>
-          ) : (
-            <p className={hintText}>
-              每轮覆盖开始时全部可出题内容，完成后可主动再开一轮。
-            </p>
-          )}
-          <div className="space-y-4 border-t border-border/60 pt-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className={sectionTitle}>
-                选择词表
-                <span className="ml-2 text-sm font-normal tabular-nums text-foreground-muted">
-                  {ids.length}/5
-                </span>
-              </h2>
-              <Segmented
-                label="词表来源"
-                value={mine}
-                options={[
-                  { value: true, label: "我的词表" },
-                  { value: false, label: "公开词表" }
-                ]}
-                onChange={(value) => {
-                  setMine(value);
-                  setPage(1);
-                }}
-              />
-            </div>
-            <input
-              className={field}
-              placeholder="搜索词表"
-              aria-label="搜索词表"
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
-            />
-            {lists.isError ? (
-              <p role="alert" className={alertText}>
-                词表读取失败
-              </p>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {lists.data?.items.map((w) => (
-                  <label
-                    className="flex cursor-pointer items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-3.5 transition-colors hover:border-primary/40 has-checked:border-primary has-checked:bg-primary-muted has-disabled:cursor-not-allowed has-disabled:opacity-50 has-focus-visible:ring-4 has-focus-visible:ring-primary/15"
-                    key={w.id}
-                  >
-                    <input
-                      type="checkbox"
-                      className="size-4 shrink-0 accent-primary"
-                      checked={ids.includes(w.id)}
-                      disabled={!ids.includes(w.id) && ids.length >= 5}
-                      onChange={(e) => {
-                        setIds(
-                          e.target.checked
-                            ? [...ids, w.id]
-                            : ids.filter((id) => id !== w.id)
-                        );
-                        change();
-                      }}
-                    />
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-medium text-foreground">
-                        {w.name}
-                      </span>
-                      <span className="text-xs text-foreground-muted">
-                        {w.item_count} 个词条
-                      </span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            )}
-            {lists.data && (
-              <Pager
-                page={page}
-                total={lists.data.pagination.total_pages}
-                onChange={setPage}
-              />
-            )}
-          </div>
-          <button
-            type="button"
-            disabled={!ids.length}
-            className={buttonClass}
-            onClick={() => void check()}
-          >
-            预览可出题数量
-          </button>
-        </fieldset>
-        {preview && (
-          <div className="space-y-4 rounded-3xl bg-muted/70 p-5">
-            <dl className="grid grid-cols-3 gap-3">
-              <Stat label="词条" value={preview.entry_count} />
-              <Stat label="可出题" value={preview.eligible_count} />
-              <Stat
-                label="难度 / 口音"
-                value={
-                  <span className="text-base">
-                    {preview.settings.cefr_level} /{" "}
-                    {preview.settings.english_variant}
-                  </span>
-                }
-              />
-            </dl>
-            <p className="text-xs leading-5 text-foreground-muted">
-              排除：来源不可用 {preview.exclusions.unavailable_entries}
-              ，依赖上下文 {preview.exclusions.context_dependent}
-              ，无适配中文定义 {preview.exclusions.no_chinese_definition}
-              ，无关联原形 {preview.exclusions.no_base_form}，题面含答案{" "}
-              {preview.exclusions.answer_in_prompt}。
-            </p>
-            {!preview.can_start && (
-              <p role="alert" className={alertText}>
-                题目不足或任务已过期，请调整词表或题量。
-              </p>
-            )}
-          </div>
-        )}
-        {error && (
-          <p role="alert" className={alertText}>
-            {error}
-          </p>
-        )}
-        {uncertain && (
-          <p className={hintText}>创建结果尚未确认，请使用原请求重试。</p>
-        )}
-        <button
-          className={`${primaryButtonClass} w-full sm:w-auto sm:min-w-40`}
-          disabled={busy || !name.trim() || (!uncertain && !preview?.can_start)}
-          type="submit"
-        >
-          {busy ? "处理中…" : uncertain ? "重试原创建请求" : "创建任务"}
-        </button>
-      </form>
-    </PageShell>
+    <Student>{(id) => <LearningPlanCreator key={id} userId={id} />}</Student>
   );
 }
 export function LearningTaskPage({ id }: { id: string }) {
@@ -533,14 +254,16 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
   const [error, setError] = useState("");
   const intent = useRef<StartLearningRun | null>(null);
   const q = useQuery({
-    queryKey: ["learning", userId, "task", id],
+    queryKey: ["learning-plans", userId, "v1-with-legacy", "task", id],
     refetchOnMount: "always",
-    queryFn: ({ signal }) => api.learning.detail(id, { signal })
+    refetchOnWindowFocus: "always",
+    queryFn: ({ signal }) => detailPlan(id, { signal })
   });
   const history = useQuery({
-    queryKey: ["learning", userId, "history", id, page],
+    queryKey: ["learning-plans", userId, "v1-with-legacy", "history", id, page],
     refetchOnMount: "always",
-    queryFn: ({ signal }) => api.learning.history(id, { page }, { signal })
+    refetchOnWindowFocus: "always",
+    queryFn: ({ signal }) => historyPlans(id, { page }, { signal })
   });
   async function start(after: string | null) {
     if (!q.data) return;
@@ -552,7 +275,9 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
         expected_revision: q.data.task.revision,
         after_run_id: after
       };
-      const r = await api.learning.start(id, intent.current, op.options());
+      const r = await (
+        q.data.mode === "coverage_v1" ? api.learningPlans : api.learning
+      ).start(id, intent.current, op.options());
       if (op.current()) router.push(`/student/practice/${r.id}`);
     } catch (e) {
       if (op.current()) {
@@ -571,13 +296,17 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
     setError("");
     try {
       if (archive)
-        await api.learning.archive(
+        await (
+          q.data.mode === "coverage_v1" ? api.learningPlans : api.learning
+        ).archive(
           id,
           { expected_revision: q.data.task.revision },
           op.options()
         );
       else
-        await api.learning.rename(
+        await (
+          q.data.mode === "coverage_v1" ? api.learningPlans : api.learning
+        ).rename(
           id,
           { expected_revision: q.data.task.revision, name },
           op.options()
@@ -637,48 +366,66 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
       />
       <div className="space-y-6">
         <div className={box}>
-          <div className="flex items-center justify-between gap-3">
-            <h2 className={sectionTitle}>本轮进度</h2>
-            <span className="rounded-full bg-muted px-2.5 py-1 text-xs text-foreground-muted">
-              {r ? runLabels[r.state] : "尚未开始"}
-            </span>
-          </div>
-          {r ? (
+          <PlanCoverage
+            plan={q.data}
+            userId={userId}
+            refresh={() => q.refetch()}
+          />
+          {q.data.mode === "legacy_v1" && (
             <>
-              <dl className="grid grid-cols-3 gap-3">
-                <Stat label="已答" value={r.answered_count} />
-                <Stat label="目标" value={r.target_count} />
-                <Stat label="答对" value={r.correct_count} />
-              </dl>
-              <ProgressBar value={r.answered_count} max={r.target_count} />
+              <div className="flex items-center justify-between gap-3">
+                <h2 className={sectionTitle}>本轮进度</h2>
+                <span className="rounded-full bg-muted px-2.5 py-1 text-xs text-foreground-muted">
+                  {r ? runLabels[r.state] : "尚未开始"}
+                </span>
+              </div>
+              {r ? (
+                <>
+                  <dl className="grid grid-cols-3 gap-3">
+                    <Stat label="已答" value={r.answered_count} />
+                    <Stat label="目标" value={r.target_count} />
+                    <Stat label="答对" value={r.correct_count} />
+                  </dl>
+                  <ProgressBar value={r.answered_count} max={r.target_count} />
+                </>
+              ) : (
+                <p className={hintText}>开始后，进度和正确率会显示在这里。</p>
+              )}
+              {r?.state === "invalidated" && (
+                <p className={hintText}>
+                  本轮词条或词表来源发生变化，无法继续。已提交的作答记录仍保留；请检查来源后重新开始一轮。恢复词条不会自动恢复旧轮次。
+                </p>
+              )}
             </>
-          ) : (
-            <p className={hintText}>开始后，进度和正确率会显示在这里。</p>
-          )}
-          {r?.state === "invalidated" && (
-            <p className={hintText}>
-              本轮词条或词表来源发生变化，无法继续。已提交的作答记录仍保留；请检查来源后重新开始一轮。恢复词条不会自动恢复旧轮次。
-            </p>
           )}
           <div className="flex flex-wrap gap-3">
             {r && (
               <Link
                 className={
-                  r.state === "active" ? primaryButtonClass : buttonClass
+                  r.state === "active" && q.data.can_start
+                    ? primaryButtonClass
+                    : buttonClass
                 }
                 href={`/student/practice/${r.id}`}
               >
-                {r.state === "active" ? "继续练习" : "查看结果"}
+                {r.state === "active" && q.data.can_start
+                  ? "继续练习"
+                  : "查看记录"}
               </Link>
             )}
             {task.state === "active" &&
-              (!r ||
-                (["completed", "expired", "invalidated", "cancelled"].includes(
-                  r.state
-                ) &&
-                  !(
-                    task.task_type === "daily" && r.state === "completed"
-                  ))) && (
+              (q.data.mode === "coverage_v1"
+                ? q.data.can_start && !r
+                : !r ||
+                  ([
+                    "completed",
+                    "expired",
+                    "invalidated",
+                    "cancelled"
+                  ].includes(r.state) &&
+                    !(
+                      task.task_type === "daily" && r.state === "completed"
+                    ))) && (
                 <button
                   className={r ? buttonClass : primaryButtonClass}
                   disabled={busy}
@@ -708,7 +455,7 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                   <input
                     className={cn(field, "mt-0 flex-1")}
-                    maxLength={100}
+                    maxLength={q.data.mode === "coverage_v1" ? undefined : 100}
                     aria-label="新任务名称"
                     placeholder="新任务名称"
                     value={name}
@@ -748,7 +495,7 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
             <p className={hintText}>还没有学习记录。</p>
           ) : (
             <ul className="divide-y divide-border/60">
-              {history.data?.items.map((h) => (
+              {history.data?.items.map(({ run: h, cycle_id }) => (
                 <li key={h.id}>
                   <Link
                     className="-mx-3 flex items-center justify-between gap-4 rounded-2xl px-3 py-3.5 transition-colors hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-primary"
@@ -761,6 +508,7 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
                       </span>
                       <span className="text-xs text-foreground-muted">
                         {runLabels[h.state]}
+                        {cycle_id && " · 覆盖计划批次"}
                       </span>
                     </span>
                     <span className="shrink-0 text-sm tabular-nums text-foreground-muted">
@@ -799,20 +547,62 @@ function Practice({ userId, id }: { userId: string; id: string }) {
     value: string;
   } | null>(null);
   const [error, setError] = useState("");
+  const [locating, setLocating] = useState(false);
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<SubmitLearningAnswer | null>(null);
   const run = useQuery({
     queryKey: ["learning", userId, "run", id],
     refetchOnMount: "always",
-    queryFn: ({ signal }) => api.learning.run(id, { signal }),
-    refetchOnWindowFocus: true
+    refetchOnWindowFocus: "always",
+    queryFn: ({ signal }) => api.learning.run(id, { signal })
   });
   const qs = useQuery({
     queryKey: ["learning", userId, "questions", id, page],
     refetchOnMount: "always",
+    refetchOnWindowFocus: "always",
     queryFn: ({ signal }) =>
       api.learning.questions(id, { page, page_size: 20 }, { signal })
   });
+  const plan = useQuery({
+    queryKey: [
+      "learning-plans",
+      userId,
+      "v1-with-legacy",
+      "practice",
+      run.data?.task_id,
+      run.data?.answered_count
+    ],
+    enabled: !!run.data?.task_id,
+    queryFn: ({ signal }) => detailPlan(run.data!.task_id, { signal }),
+    retry: false
+  });
+  async function locate() {
+    if (!qs.data) return;
+    setLocating(true);
+    setError("");
+    try {
+      for (let p = 1; p <= qs.data.pagination.total_pages; p++) {
+        const result =
+          p === page
+            ? qs.data
+            : await api.learning.questions(
+                id,
+                { page: p, page_size: 20 },
+                op.options()
+              );
+        if (!op.current()) return;
+        if (result.items.some((q) => !q.answered && q.content_available)) {
+          setPage(p);
+          return;
+        }
+      }
+      setError("当前批次没有合法待答内容；已保留进度，请检查来源。");
+    } catch (e) {
+      if (op.current()) setError(learningError(e));
+    } finally {
+      if (op.current()) setLocating(false);
+    }
+  }
   const next = qs.data?.items.find((q) => !q.answered && q.content_available);
   const pendingAccepted =
     !!pending &&
@@ -894,7 +684,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
           label: r.state === "invalidated" ? "返回任务重新开始" : "任务与历史"
         }}
         eyebrow={`${runLabels[r.state]} · ${r.settings.cefr_level} / ${r.settings.english_variant}`}
-        title={r.state === "completed" ? "本轮已完成" : "中文释义拼写"}
+        title={r.state === "completed" ? "本批次已完成" : "中文释义拼写"}
         description={
           <>
             完成以有效作答数量为准。
@@ -911,6 +701,20 @@ function Practice({ userId, id }: { userId: string; id: string }) {
         }
       />
       <div className="space-y-6">
+        {r.task_type === "daily" && plan.data?.current_cycle && (
+          <div className="rounded-2xl bg-muted/70 p-4 text-sm">
+            <p>
+              本轮已覆盖 {plan.data.current_cycle.covered_count}/
+              {plan.data.current_cycle.total_count} 题 · 不可用{" "}
+              {plan.data.current_cycle.blocked_count} 题
+            </p>
+            {r.task_type === "daily" && (
+              <p>
+                今日批次与本轮覆盖分开统计；部分有效作答会保留覆盖，奖励仅统计完成批次。
+              </p>
+            )}
+          </div>
+        )}
         <div className="glass rounded-3xl p-2">
           <div className="space-y-8 rounded-[20px] bg-surface/70 px-6 py-8 sm:px-10 sm:py-10">
             <div className="space-y-3">
@@ -978,7 +782,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
             ) : (
               <p className="py-6 text-center text-base text-foreground-muted">
                 {r.state === "active"
-                  ? "本页已答完，请进入下一页继续。"
+                  ? "本页没有合法待答题；可定位其他页面的待答题，或检查来源。"
                   : r.state === "invalidated"
                     ? "本轮词条或词表来源发生变化，无法继续。已提交的作答记录仍保留；返回任务页可检查来源后重新开始。恢复词条不会自动恢复旧轮次。"
                     : r.state !== "completed"
@@ -986,10 +790,53 @@ function Practice({ userId, id }: { userId: string; id: string }) {
                       : "已保存本轮完成记录。"}
               </p>
             )}
+            {r.state === "active" && !next && (
+              <div className="flex flex-wrap justify-center gap-3">
+                <button
+                  type="button"
+                  className={buttonClass}
+                  disabled={busy || uncertain || locating}
+                  onClick={() => void locate()}
+                >
+                  {locating ? "正在定位…" : "定位可答题"}
+                </button>
+                <button
+                  type="button"
+                  className={buttonClass}
+                  disabled={busy || uncertain}
+                  onClick={() =>
+                    void Promise.all([
+                      run.refetch(),
+                      qs.refetch(),
+                      plan.refetch()
+                    ])
+                  }
+                >
+                  检查来源
+                </button>
+              </div>
+            )}
             {error && !pendingAccepted && (
               <p role="alert" className={`${alertText} text-center`}>
                 {error}
               </p>
+            )}
+            {error.includes("刷新") && (
+              <button
+                className={buttonClass}
+                type="button"
+                onClick={() => {
+                  if (
+                    !draft?.value ||
+                    window.confirm(
+                      "刷新会丢弃未提交拼写，请先复制保存。确认刷新？"
+                    )
+                  )
+                    window.location.reload();
+                }}
+              >
+                刷新页面
+              </button>
             )}
             {uncertain && (
               <p className={`${hintText} text-center`}>
