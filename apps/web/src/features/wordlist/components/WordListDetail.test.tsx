@@ -96,10 +96,12 @@ const user = (id: string) => ({
 const observers: TestObserver[] = [];
 class TestObserver {
   connected = false;
+  target: Element | null = null;
   constructor(readonly callback: IntersectionObserverCallback) {
     observers.push(this);
   }
-  observe() {
+  observe(target: Element) {
+    this.target = target;
     this.connected = true;
   }
   disconnect() {
@@ -107,7 +109,9 @@ class TestObserver {
   }
 }
 function reachBottom() {
-  const observer = observers.filter((observer) => observer.connected).pop();
+  const observer = observers
+    .filter((observer) => observer.connected && observer.target?.isConnected)
+    .pop();
   expect(observer).toBeDefined();
   act(() =>
     observer!.callback(
@@ -144,7 +148,7 @@ const myPageResult = (page: number) => {
   };
 };
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
   observers.length = 0;
   vi.stubGlobal("IntersectionObserver", TestObserver);
   identity.identity = "student";
@@ -174,9 +178,9 @@ beforeEach(() => {
   vi.mocked(api.auth.me).mockResolvedValue(profile(settings));
 });
 afterEach(() => vi.unstubAllGlobals());
-function open(mine = false) {
+function open(mine = false, staleTime = 0) {
   const client = new QueryClient({
-    defaultOptions: { queries: { retry: false } }
+    defaultOptions: { queries: { retry: false, staleTime } }
   });
   const element = () => (
     <QueryClientProvider client={client}>
@@ -285,6 +289,27 @@ it("reloads metadata, entries and counts after an availability revision mismatch
   expect(api.wordList.myItems).toHaveBeenCalledTimes(2);
   expect(api.wordList.myAvailability).toHaveBeenCalledTimes(2);
   expect(api.wordList.availability).not.toHaveBeenCalled();
+});
+
+it("元数据版本未变时，重新加载仍刷新同版本的词条与可用数量", async () => {
+  vi.mocked(api.wordList.myDetail).mockResolvedValue({
+    ...list,
+    state: "draft"
+  });
+  vi.mocked(api.wordList.myAvailability).mockResolvedValueOnce({
+    revision: 2,
+    available_count: 51,
+    unavailable_count: 0
+  });
+  open(true, 60_000);
+  fireEvent.click(await screen.findByRole("button", { name: "重新加载词表" }));
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "申请公开" })).toBeEnabled()
+  );
+  expect(screen.getByText("整张词表：51 个可用词条")).toBeVisible();
+  expect(api.wordList.myDetail).toHaveBeenCalledTimes(2);
+  expect(api.wordList.myItems).toHaveBeenCalledTimes(2);
+  expect(api.wordList.myAvailability).toHaveBeenCalledTimes(2);
 });
 
 it("does not automatically page an entirely unavailable list and loads hidden references on demand", async () => {
@@ -437,6 +462,206 @@ it("search resets pagination and unsupported full mode can return to the standar
   await screen.findByText(/完整内容暂不可用，可切回标准模式/);
   fireEvent.click(screen.getByRole("button", { name: "标准模式" }));
   await screen.findByText("A1-UK");
+});
+
+it("词表信息重试恢复后，新鲜缓存仍能触底加载下一页", async () => {
+  const { client } = open(false, 60_000);
+  await screen.findByRole("heading", { name: "apple" });
+  const oldTarget =
+    screen.getByText("继续向下滚动，自动加载更多词条").parentElement;
+  await waitFor(() =>
+    expect(
+      observers.some(
+        (observer) => observer.connected && observer.target === oldTarget
+      )
+    ).toBe(true)
+  );
+  vi.mocked(api.wordList.get).mockRejectedValueOnce(new Error("offline"));
+  await act(async () => {
+    await client.refetchQueries({
+      queryKey: ["wordlists", "public", "detail", "list"],
+      exact: true
+    });
+  });
+  await screen.findByText("词表不存在、不可访问或暂时无法加载。");
+  expect(oldTarget).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "重试" }));
+  await screen.findByRole("heading", { name: "apple" });
+  expect(api.wordList.items).toHaveBeenCalledTimes(1);
+  const newTarget =
+    screen.getByText("继续向下滚动，自动加载更多词条").parentElement;
+  expect(newTarget).not.toBe(oldTarget);
+  await waitFor(() =>
+    expect(
+      observers.some(
+        (observer) =>
+          observer.connected &&
+          observer.target === newTarget &&
+          observer.target?.isConnected
+      )
+    ).toBe(true)
+  );
+  reachBottom();
+  await screen.findByRole("heading", { name: "banana" });
+  expect(screen.getByRole("heading", { name: "apple" })).toBeVisible();
+  expect(
+    vi.mocked(api.wordList.items).mock.calls.map((call) => call[1]?.page)
+  ).toEqual([1, 2]);
+});
+
+it("空结果后台刷新失败时显示错误，并可重试恢复词条", async () => {
+  vi.mocked(api.wordList.items).mockResolvedValueOnce({
+    ...pageResult(1),
+    items: [],
+    pagination: { page: 1, page_size: 50, total: 0, total_pages: 0 }
+  });
+  const { client } = open();
+  await screen.findByText("暂无词条");
+  vi.mocked(api.wordList.items).mockRejectedValueOnce(new Error("offline"));
+  await act(async () => {
+    await client.refetchQueries({
+      queryKey: [
+        "wordlists",
+        "public",
+        "items",
+        "infinite",
+        "list",
+        1,
+        "",
+        "standard",
+        "author"
+      ],
+      exact: true
+    });
+  });
+  expect(await screen.findByRole("alert")).toHaveTextContent("条目加载失败");
+  expect(screen.queryByText("暂无词条")).not.toBeInTheDocument();
+  let finish!: (value: ReturnType<typeof pageResult>) => void;
+  let retrySignal: AbortSignal | undefined;
+  vi.mocked(api.wordList.items).mockImplementationOnce(
+    (_id, _query, options) => {
+      retrySignal = options?.signal;
+      return new Promise((resolve) => {
+        finish = resolve;
+      });
+    }
+  );
+  const retry = screen.getByRole("button", { name: "重试" });
+  fireEvent.click(retry);
+  await waitFor(() => expect(retry).toBeDisabled());
+  fireEvent.click(retry);
+  expect(api.wordList.items).toHaveBeenCalledTimes(3);
+  expect(retrySignal?.aborted).toBe(false);
+  await act(async () => finish(pageResult(1)));
+  await screen.findByRole("heading", { name: "apple" });
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  expect(
+    vi.mocked(api.wordList.items).mock.calls.map((call) => call[1]?.page)
+  ).toEqual([1, 1, 1]);
+});
+
+it("元数据恢复到新版本时清除旧分页，并从第一页重新读取", async () => {
+  const { client } = open(false, 60_000);
+  await screen.findByRole("heading", { name: "apple" });
+  reachBottom();
+  await screen.findByRole("heading", { name: "banana" });
+  await screen.findByText("已加载全部 2 个词条");
+  vi.mocked(api.wordList.get).mockRejectedValueOnce(new Error("offline"));
+  await act(async () => {
+    await client.refetchQueries({
+      queryKey: ["wordlists", "public", "detail", "list"],
+      exact: true
+    });
+  });
+  await screen.findByText("词表不存在、不可访问或暂时无法加载。");
+  vi.mocked(api.wordList.get).mockResolvedValue({
+    ...list,
+    name: "新版词表",
+    revision: 2,
+    item_count: 1
+  });
+  vi.mocked(api.wordList.availability).mockResolvedValue({
+    revision: 2,
+    available_count: 1,
+    unavailable_count: 0
+  });
+  let finish!: (value: ReturnType<typeof pageResult>) => void;
+  vi.mocked(api.wordList.items).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  fireEvent.click(screen.getByRole("button", { name: "重试" }));
+  await screen.findByRole("heading", { name: "新版词表" });
+  await waitFor(() => expect(api.wordList.items).toHaveBeenCalledTimes(3));
+  expect(
+    screen.queryByRole("heading", { name: "apple" })
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("heading", { name: "banana" })
+  ).not.toBeInTheDocument();
+  expect(screen.getByText("正在读取条目…")).toBeVisible();
+  const next = pageResult(1, 2);
+  next.items[0]!.entry.label = "pear";
+  next.pagination = { page: 1, page_size: 50, total: 1, total_pages: 1 };
+  await act(async () => finish(next));
+  await screen.findByRole("heading", { name: "pear" });
+  expect(
+    screen.queryByRole("heading", { name: "apple" })
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("heading", { name: "banana" })
+  ).not.toBeInTheDocument();
+  expect(screen.getByText("已加载全部 1 个词条")).toBeVisible();
+  expect(
+    vi.mocked(api.wordList.items).mock.calls.map((call) => call[1]?.page)
+  ).toEqual([1, 2, 1]);
+});
+
+it("可用性缓存刷新失败保留数量并提供重试，成功后恢复申请公开", async () => {
+  vi.mocked(api.wordList.myDetail).mockResolvedValue({
+    ...list,
+    state: "draft"
+  });
+  const { client } = open(true, 60_000);
+  const apply = await screen.findByRole("button", { name: "申请公开" });
+  await waitFor(() => expect(apply).toBeEnabled());
+  vi.mocked(api.wordList.myAvailability).mockRejectedValueOnce(
+    new Error("offline")
+  );
+  await act(async () => {
+    await client.refetchQueries({
+      queryKey: ["wordlists", "user", "owner", "availability", "list", 1],
+      exact: true
+    });
+  });
+  await waitFor(() => expect(apply).toBeDisabled());
+  expect(screen.getByText("整张词表：51 个可用词条")).toBeVisible();
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "可用数量暂时无法读取"
+  );
+  let finish!: (value: {
+    revision: number;
+    available_count: number;
+    unavailable_count: number;
+  }) => void;
+  vi.mocked(api.wordList.myAvailability).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  const retry = screen.getByRole("button", { name: "重试" });
+  fireEvent.click(retry);
+  await waitFor(() => expect(retry).toBeDisabled());
+  fireEvent.click(retry);
+  expect(api.wordList.myAvailability).toHaveBeenCalledTimes(3);
+  await act(async () =>
+    finish({ revision: 1, available_count: 51, unavailable_count: 0 })
+  );
+  await waitFor(() => expect(apply).toBeEnabled());
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
 
 it("appends on reaching the bottom, coalesces repeated intersections and stops at the last page", async () => {

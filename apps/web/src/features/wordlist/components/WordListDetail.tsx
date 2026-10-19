@@ -118,7 +118,16 @@ function Detail({
         : api.wordList.availability(id, { signal })
   });
   const items = useInfiniteQuery({
-    queryKey: [...keys, "items", "infinite", id, q, view, sort],
+    queryKey: [
+      ...keys,
+      "items",
+      "infinite",
+      id,
+      meta.data?.revision,
+      q,
+      view,
+      sort
+    ],
     enabled: meta.isSuccess,
     refetchOnMount: "always",
     initialPageParam: { page: 1, revision: null as number | null },
@@ -154,6 +163,7 @@ function Detail({
         : undefined,
     placeholderData: (previous, previousQuery) =>
       previousQuery?.queryKey.at(-2) === view &&
+      previousQuery.queryKey.at(-4) === meta.data?.revision &&
       previousQuery.queryKey.at(-1) === sort
         ? previous
         : undefined
@@ -255,6 +265,7 @@ function Detail({
     observer.observe(target);
     return () => observer.disconnect();
   }, [
+    meta.isSuccess,
     ready,
     updatingSearch,
     allUnavailable,
@@ -264,14 +275,14 @@ function Detail({
     fetchNextPage
   ]);
   async function reloadWordlist() {
-    await client.invalidateQueries({
-      queryKey: [...keys, "availability", id],
-      refetchType: "none"
-    });
-    await Promise.all([
-      meta.refetch(),
-      client.resetQueries({ queryKey: [...keys, "items", "infinite", id] })
-    ]);
+    const revision = meta.data?.revision;
+    const result = await meta.refetch();
+    if (result.isSuccess && result.data.revision === revision) {
+      await Promise.all([
+        refetchAvailability(),
+        client.resetQueries({ queryKey: [...keys, "items", "infinite", id] })
+      ]);
+    }
   }
   async function action(kind: "submit" | "withdraw") {
     if (busy || !meta.data || (kind === "submit" && !canSubmit)) return;
@@ -468,7 +479,7 @@ function Detail({
               审核记录加载失败。
             </p>
           )}
-          {availabilityData ? (
+          {availabilityData && (
             <p className="mt-4 text-sm text-foreground-muted">
               整张词表：{availabilityData.available_count} 个可用词条
               {!!availabilityData.custom_count &&
@@ -476,14 +487,16 @@ function Detail({
               {availabilityData.unavailable_count > 0 &&
                 `，${availabilityData.unavailable_count} 个暂不可用，不参与出题`}
             </p>
-          ) : availability.isError ||
-            (availability.isSuccess && !availabilityData) ? (
+          )}
+          {(availability.isError ||
+            (availability.isSuccess && !availabilityData)) && (
             <p role="alert" className="mt-4 text-sm text-foreground-muted">
               {availabilityVersionChanged
                 ? "词表内容已变化，请重新加载词表。"
                 : "可用数量暂时无法读取，已加载的词条仍可阅读。"}{" "}
               <button
                 className={textButtonClass}
+                disabled={availabilityFetching}
                 onClick={() =>
                   void (availabilityVersionChanged
                     ? reloadWordlist()
@@ -493,7 +506,7 @@ function Detail({
                 {availabilityVersionChanged ? "重新加载词表" : "重试"}
               </button>
             </p>
-          ) : null}
+          )}
           {!mine && list.state === "published" && (
             <DetailInteractions list={list} />
           )}
@@ -572,16 +585,17 @@ function Detail({
         ) : (
           <PageNotice>正在读取阅读设置…</PageNotice>
         )
-      ) : items.isError && !items.data ? (
+      ) : items.isError && loadedItems.length === 0 ? (
         <PageNotice tone="error">
           {view === "full"
             ? "完整内容暂不可用，可切回标准模式，或"
             : "条目加载失败，"}
           <button
             className={textButtonClass}
+            disabled={items.isFetching}
             onClick={() => void items.refetch()}
           >
-            重试
+            {items.isFetching ? "重试中…" : "重试"}
           </button>
           。
         </PageNotice>
