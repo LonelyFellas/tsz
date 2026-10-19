@@ -74,7 +74,7 @@ test("W03: coverage merge downloads, picks latest attempts, validates and merges
   assert.ok(block);
   assert.match(block, /needs: unit-coverage/);
   assert.match(block, /always\(\).*![ ]*cancelled\(\)/);
-  assert.match(block, /actions\/download-artifact@v7/);
+  assert.match(block, /actions\/download-artifact@v8/);
   assert.match(block, /pattern: vitest-blob-\*/);
   // 合并下载会把同一模块多个 attempt 的产物解压进同一目录互相覆盖。
   assert.doesNotMatch(block, /merge-multiple/);
