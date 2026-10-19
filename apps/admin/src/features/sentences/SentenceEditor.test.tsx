@@ -120,6 +120,51 @@ beforeEach(() => {
   });
 });
 describe("当前词条关联与离开保护", () => {
+  it("保存失败后保留例句录音，重试时提交同一音频资产", async () => {
+    const current = example();
+    const asset = {
+      id: "11111111-1111-4111-8111-111111111112",
+      locale: "en-GB" as const,
+      gender: "female" as const,
+      content_type: "audio/wav",
+      size_bytes: 110520,
+      duration_ms: null,
+      original_name: "sentence.wav",
+      created_at: current.created_at
+    };
+    if (current.content.sentence.en_text.mode === "unified")
+      current.content.sentence.en_text.common.audio_assets = [asset];
+    vi.mocked(api.sentences.update)
+      .mockRejectedValueOnce(new HttpError(422, "invalid request body"))
+      .mockImplementation(async (_id, input) => ({
+        ...current,
+        content: input.content,
+        revision: 4
+      }));
+    const onSaved = vi.fn();
+    show(
+      <SentenceEditor sentence={current} onClose={vi.fn()} onSaved={onSaved} />
+    );
+    fireEvent.change(await screen.findByLabelText("例句正文"), {
+      target: { value: "We make new stories." }
+    });
+    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    expect(await screen.findByText("invalid request body")).toBeInTheDocument();
+    expect(screen.getByLabelText("例句正文")).toHaveValue(
+      "We make new stories."
+    );
+    expect(onSaved).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
+    expect(api.sentences.update).toHaveBeenCalledTimes(2);
+    for (const [, input] of vi.mocked(api.sentences.update).mock.calls)
+      expect(input.content.sentence.en_text).toMatchObject({
+        common: {
+          audio_assets: [asset],
+          value: { text: "We make new stories." }
+        }
+      });
+  });
   it("只显示一组取消和完成，正文与译文修改一次保存", async () => {
     const current = example();
     show(
