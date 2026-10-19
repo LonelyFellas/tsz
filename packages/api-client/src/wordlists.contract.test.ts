@@ -253,6 +253,73 @@ it("resolves the optional reading query enums from the generated contract", () =
   }
 });
 
+it.each([true, false])(
+  "management opts into custom-word presence %s",
+  async (value) => {
+    const response = {
+      items: [
+        {
+          wordlist: meta,
+          review_state: "none",
+          recommended: false,
+          tip_amount: "0",
+          has_custom_words: value,
+          like_count: 0,
+          favorite_count: 2
+        }
+      ],
+      pagination
+    };
+    const http = {
+      get: vi.fn().mockResolvedValue(response)
+    } as unknown as HttpClient;
+    const signal = new AbortController().signal;
+    expect(
+      await createAdminWordlistEndpoints(http).management(
+        { include_stats: true },
+        { signal }
+      )
+    ).toEqual(response);
+    expect(http.get).toHaveBeenCalledWith(
+      "/wordlists/management?include_stats=true",
+      { signal }
+    );
+    const params =
+      snapshot.operationQueryParameters["get /admin/wordlists/management"];
+    const param = params.find((p) => p.name === "include_stats");
+    expect(param?.required).toBe(false);
+    expect(param?.schema).toEqual({ type: "boolean" });
+  }
+);
+
+it("management accepts omitted custom-word presence but rejects null, wrong types and unknown fields", () => {
+  const detail = {
+    wordlist: meta,
+    review_state: "none",
+    recommended: false,
+    tip_amount: "0"
+  };
+  expect(() => decodeWordlistResponse("AdminWordlist", detail)).not.toThrow();
+  for (const value of [null, "false", 0]) {
+    expect(() =>
+      decodeWordlistResponse("AdminWordlist", {
+        ...detail,
+        has_custom_words: value
+      })
+    ).toThrow();
+  }
+  for (const field of ["like_count", "favorite_count"]) {
+    for (const value of [null, -1, "0"]) {
+      expect(() =>
+        decodeWordlistResponse("AdminWordlist", { ...detail, [field]: value })
+      ).toThrow();
+    }
+  }
+  expect(() =>
+    decodeWordlistResponse("AdminWordlist", { ...detail, custom_word_count: 1 })
+  ).toThrow();
+});
+
 it("management wire supports platform authors and keeps private notes out of public DTOs", async () => {
   const detail = {
     wordlist: { ...meta, owner_user_id: null },

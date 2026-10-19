@@ -41,6 +41,7 @@ const QUERY_CONTRACT_OPERATIONS = new Set([
   "get /me/wordlists",
   "get /me/wordlists/{id}/items",
   "get /admin/wordlists",
+  "get /admin/wordlists/management",
   "get /admin/wordlists/{id}/review-requests",
   "get /admin/wordlists/{id}/review-requests/{request_id}/items",
   "get /me/invitations/records",

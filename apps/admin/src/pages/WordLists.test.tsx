@@ -11,6 +11,7 @@ import {
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
 import type { AdminWordlist } from "@tsz/types";
+import { browserQueryDefaults } from "@tsz/shared";
 import { WordListsPage } from "./WordLists";
 import { ReviewsPage } from "./Reviews";
 const permissions = vi.hoisted(() => ({ allowed: true, access: true }));
@@ -51,11 +52,12 @@ const row: AdminWordlist = {
   recommended: false,
   tip_amount: "5"
 };
-function mount(page = <WordListsPage />) {
+function mount(page = <WordListsPage />, client?: QueryClient) {
   return render(
     <MemoryRouter>
       <QueryClientProvider
         client={
+          client ??
           new QueryClient({ defaultOptions: { queries: { retry: false } } })
         }
       >
@@ -105,6 +107,96 @@ beforeEach(() => {
       }
     ]
   });
+});
+it.each([
+  [true, "是"],
+  [false, "否"],
+  [undefined, "—"]
+] as const)(
+  "management renders custom-word presence %s as %s",
+  async (value, label) => {
+    vi.mocked(api.wordlists.management).mockResolvedValue({
+      items: [{ ...row, has_custom_words: value }],
+      pagination
+    });
+    mount();
+    const cells = (await screen.findByText(row.wordlist.name))
+      .closest("tr")!
+      .querySelectorAll("td");
+    expect(cells[3]).toHaveTextContent(label);
+    expect(api.wordlists.management).toHaveBeenCalledWith(
+      expect.objectContaining({ include_stats: true }),
+      expect.objectContaining({ signal: expect.anything() })
+    );
+    expect(api.wordlists.currentItems).not.toHaveBeenCalled();
+    expect(api.wordlists.items).not.toHaveBeenCalled();
+    expect(api.wordlists.reviews).not.toHaveBeenCalled();
+  }
+);
+it.each([
+  [0, 0, "0", "0"],
+  [12, 7, "12", "7"],
+  [undefined, undefined, "—", "—"]
+] as const)(
+  "management renders interaction counts %s/%s without an undefined question count",
+  async (likes, favorites, likeLabel, favoriteLabel) => {
+    vi.mocked(api.wordlists.management).mockResolvedValue({
+      items: [{ ...row, like_count: likes, favorite_count: favorites }],
+      pagination
+    });
+    mount();
+    const cells = (await screen.findByText(row.wordlist.name))
+      .closest("tr")!
+      .querySelectorAll("td");
+    expect(screen.queryAllByText("题量")).toHaveLength(0);
+    expect(cells[4]).toHaveTextContent(likeLabel);
+    expect(cells[5]).toHaveTextContent(favoriteLabel);
+    expect(api.wordlists.currentItems).not.toHaveBeenCalled();
+    expect(api.wordlists.items).not.toHaveBeenCalled();
+  }
+);
+it("management statistics do not reuse a fresh review-page cache", async () => {
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: { ...browserQueryDefaults.queries, retry: false }
+    }
+  });
+  const enriched = {
+    ...row,
+    has_custom_words: true,
+    like_count: 2,
+    favorite_count: 1
+  };
+  vi.mocked(api.wordlists.management).mockImplementation(async (query) => ({
+    items: [query?.include_stats ? enriched : row],
+    pagination
+  }));
+  const reviews = mount(<ReviewsPage />, client);
+  await screen.findByText(row.wordlist.name);
+  expect(api.wordlists.management).toHaveBeenCalledTimes(1);
+  reviews.unmount();
+  const management = mount(<WordListsPage />, client);
+  await screen.findByText(row.wordlist.name);
+  fireEvent.mouseDown(screen.getByLabelText("审核状态"));
+  fireEvent.click(await screen.findByTitle("待审核"));
+  fireEvent.click(screen.getByRole("button", { name: /搜\s*索/ }));
+  await waitFor(() =>
+    expect(api.wordlists.management).toHaveBeenCalledWith(
+      expect.objectContaining({ review_state: "pending", include_stats: true }),
+      expect.anything()
+    )
+  );
+  const cells = (await screen.findByText(row.wordlist.name))
+    .closest("tr")!
+    .querySelectorAll("td");
+  expect(cells[3]).toHaveTextContent("是");
+  expect(cells[4]).toHaveTextContent("2");
+  expect(cells[5]).toHaveTextContent("1");
+  expect(api.wordlists.management).toHaveBeenCalledTimes(3);
+  management.unmount();
+  mount(<ReviewsPage />, client);
+  await screen.findByText(row.wordlist.name);
+  expect(api.wordlists.management).toHaveBeenCalledTimes(3);
 });
 it("management shows one row per review without loading word details or decision controls", async () => {
   vi.mocked(api.wordlists.deleteImpact).mockResolvedValue({
@@ -260,7 +352,7 @@ it("search commits filters and reset requests page one without stale query", asy
     expect(screen.getByLabelText("搜索词表")).toHaveValue("")
   );
   expect(api.wordlists.management).toHaveBeenLastCalledWith(
-    { page: 1, page_size: 20 },
+    { page: 1, page_size: 20, include_stats: true },
     expect.anything()
   );
 });

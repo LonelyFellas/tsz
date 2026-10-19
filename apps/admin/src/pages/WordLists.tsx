@@ -82,9 +82,11 @@ function Management({ adminId }: { adminId: string }) {
   const [deleteImpactLoading, setDeleteImpactLoading] = useState(false);
   const deleteImpactRequest = useRef(0);
   const key = ["admin-wordlists", adminId];
+  const managementQuery = { ...query, include_stats: true };
   const result = useQuery({
-    queryKey: [...key, "management", query],
-    queryFn: ({ signal }) => api.wordlists.management(query, { signal })
+    queryKey: [...key, "management", managementQuery],
+    queryFn: ({ signal }) =>
+      api.wordlists.management(managementQuery, { signal })
   });
   async function openDelete(row: AdminWordlist) {
     const request = ++deleteImpactRequest.current;
@@ -330,14 +332,26 @@ function Management({ adminId }: { adminId: string }) {
               width: 90,
               render: (_, r) => r.wordlist.item_count
             },
-            { title: "题量", width: 70, render: () => "—" },
             {
               title: <span style={{ whiteSpace: "nowrap" }}>含自定义词</span>,
               width: 120,
-              render: () => "否"
+              render: (_, r) =>
+                r.has_custom_words === undefined
+                  ? "—"
+                  : r.has_custom_words
+                    ? "是"
+                    : "否"
             },
-            { title: "点赞量", width: 80, render: () => "—" },
-            { title: "收藏量", width: 80, render: () => "—" },
+            {
+              title: "点赞量",
+              width: 80,
+              render: (_, r) => r.like_count ?? "—"
+            },
+            {
+              title: "收藏量",
+              width: 80,
+              render: (_, r) => r.favorite_count ?? "—"
+            },
             { title: "投币枚数", width: 100, dataIndex: "tip_amount" },
             {
               title: "公开状态",
