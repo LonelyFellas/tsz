@@ -6,7 +6,8 @@ import {
   waitFor
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AuthResponse, MeResponse } from "@tsz/api-client";
+import type { AuthResponse } from "@tsz/api-client";
+import type { MeResponse } from "@tsz/types";
 import { GuestGuard } from "./GuestGuard";
 import { LoginForm } from "./LoginForm";
 import { RegisterForm } from "./RegisterForm";
@@ -150,7 +151,9 @@ describe("认证表单与访客守卫的导航装配", () => {
       vi.mocked(api.auth.me).mockResolvedValue(me(false));
       submit(mode);
       await waitFor(() =>
-        expect(navigation.replace).toHaveBeenCalledWith("/onboarding")
+        expect(navigation.replace).toHaveBeenCalledWith(
+          "/onboarding?redirect=%2Fstudent%2Fpractice"
+        )
       );
       expect(navigation.replace).toHaveBeenCalledTimes(1);
       expect(navigation.push).not.toHaveBeenCalled();
@@ -201,3 +204,44 @@ describe("认证表单与访客守卫的导航装配", () => {
     expect(navigation.push).not.toHaveBeenCalled();
   });
 });
+
+it("登录和注册之间保留最终邀请码，清空后不恢复旧链接归因", () => {
+  navigation.params = new URLSearchParams({ invite: "0123456789ABCDEF" });
+  const view = render(<LoginForm />);
+  fireEvent.click(screen.getByRole("button", { name: /注册/ }));
+  expect(navigation.push).toHaveBeenLastCalledWith(
+    "/register?invite=0123456789ABCDEF"
+  );
+  view.unmount();
+  render(<RegisterForm initialInviteCode="0123456789ABCDEF" />);
+  fireEvent.change(screen.getByLabelText("邀请码（选填）"), {
+    target: { value: "FEDCBA9876543210" }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "已有账号,去登录" }));
+  expect(navigation.push).toHaveBeenLastCalledWith(
+    "/login?invite=FEDCBA9876543210"
+  );
+  fireEvent.change(screen.getByLabelText("邀请码（选填）"), {
+    target: { value: "" }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "已有账号,去登录" }));
+  expect(navigation.push).toHaveBeenLastCalledWith("/login");
+});
+
+it.each(["password", "register"] as const)(
+  "%s 完成后纯邮箱账号必须先绑定手机号",
+  async (mode) => {
+    const response = me(false);
+    response.user = {
+      ...response.user,
+      phone: undefined,
+      email: "only@example.com"
+    };
+    vi.mocked(api.auth.me).mockResolvedValue(response);
+    submit(mode);
+    await waitFor(() =>
+      expect(navigation.replace).toHaveBeenCalledWith("/bind-phone")
+    );
+    expect(navigation.replace).toHaveBeenCalledTimes(1);
+  }
+);

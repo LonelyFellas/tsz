@@ -1,11 +1,11 @@
 // 后台「用户管理」里看到的 C 端用户（web 学员/教师）—— 1:1 镜像 openapi `AdminUser`。
-// 与 web 的 User 同源，但后台视图里联系方式（手机/邮箱）与状态始终可见（不脱敏）。
+// 基本资料与联系方式由后端按独立权限裁剪。
 import type { Role } from "./user";
 import type { AdminPaginationMeta } from "./admin";
 
 /**
- * GET /admin/users 列表项。required: id, display_name, avatar_url, roles, teacher_verified, status,
- * created_at, updated_at；phone / email 可选（邮箱账号无手机，反之亦然）。
+ * GET /admin/users 列表项。名单必含 id、display_name、created_at。
+ * 基本资料需 users.read_basic；phone / email 需 users.read_sensitive，未授权或未绑定时省略。
  */
 export interface AdminUser {
   id: string;
@@ -15,15 +15,15 @@ export interface AdminUser {
   email?: string;
   display_name: string;
   /** 头像绝对地址；未设置为 ""。 */
-  avatar_url: string;
+  avatar_url?: string;
   /** 师生合一：一个账号可同时持有 student / teacher。 */
-  roles: Role[];
-  teacher_verified: boolean;
-  status: "active" | "disabled";
+  roles?: Role[];
+  teacher_verified?: boolean;
+  status?: "active" | "disabled";
   /** ISO8601 注册时间。 */
   created_at: string;
   /** ISO8601 更新时间。 */
-  updated_at: string;
+  updated_at?: string;
 }
 
 /** GET /admin/users 查询参数（按持有角色 / 关键字 / 注册时间过滤 + 分页）。 */
@@ -62,6 +62,16 @@ export interface AdminUserListResponse {
 export interface AdminUserView extends AdminUser {
   /** 语言等级（A1/A2…；教师取其作为学生时的等级，口径待产品确认）。后端暂未返回。 */
   level?: string;
-  /** 当前天生币余额；不属于本轮后端 wire 契约，列表暂显示「-」。 */
-  coin_balance?: number;
+}
+
+/** 用户账单独立于余额授权；未授权余额时不返回逐笔余额。 */
+export interface AdminUserCoinEntryPage extends Omit<
+  import("./coins").CoinEntryPage,
+  "items"
+> {
+  items: Array<
+    Omit<import("./coins").CoinEntry, "balance_after"> & {
+      balance_after?: string;
+    }
+  >;
 }

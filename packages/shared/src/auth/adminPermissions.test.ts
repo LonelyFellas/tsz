@@ -40,7 +40,7 @@ describe("统一授权事实", () => {
         { ...actor, permissions: ["words.access", "words.edit_others"] },
         "words.edit_others"
       )
-    ).toBe(false);
+    ).toBe(true);
     expect(
       hasAdminPermission(
         {
@@ -65,7 +65,7 @@ describe("统一授权事实", () => {
       ]
     };
     expect(hasAdminPermission(incomplete, "sentences.edit")).toBe(false);
-    expect(hasAdminPermission(incomplete, "sentences.edit_others")).toBe(false);
+    expect(hasAdminPermission(incomplete, "sentences.edit_others")).toBe(true);
     expect(
       canAdminResourceAction(incomplete, "sentences", "edit", actor.id)
     ).toBe(false);
@@ -105,12 +105,7 @@ describe("统一授权事实", () => {
       ]
     };
     expect(canAdminResourceAction(editor, "sentences", "edit", "b")).toBe(true);
-    for (const action of [
-      "publish",
-      "withdraw",
-      "restore",
-      "rollback"
-    ] as const) {
+    for (const action of ["publish", "withdraw", "rollback"] as const) {
       expect(canAdminResourceAction(editor, "sentences", action, "a")).toBe(
         false
       );
@@ -169,3 +164,149 @@ describe("统一授权事实", () => {
     ).toBe(true);
   });
 });
+
+it("wordlist review and withdraw require the access permission", () => {
+  const actor = {
+    id: "reviewer",
+    role: "admin",
+    permissions: ["wordlists.review", "wordlists.withdraw"]
+  };
+  expect(hasAdminPermission(actor, "wordlists.review")).toBe(false);
+  expect(
+    hasAdminPermission(
+      { ...actor, permissions: [...actor.permissions, "wordlists.access"] },
+      "wordlists.review"
+    )
+  ).toBe(true);
+  expect(
+    hasAdminPermission(
+      { ...actor, permissions: ["wordlists.access"] },
+      "wordlists.withdraw"
+    )
+  ).toBe(false);
+});
+
+it.each(["words", "sentences"] as const)(
+  "%s：关联和正文独立，共用他人范围开关",
+  (module) => {
+    const associate = {
+      ...actor,
+      permissions: ["words.access", "sentences.access", `${module}.associate`]
+    };
+    expect(canAdminResourceAction(associate, module, "associate", "a")).toBe(
+      true
+    );
+    expect(canAdminResourceAction(associate, module, "edit", "a")).toBe(false);
+    expect(canAdminResourceAction(associate, module, "associate", "b")).toBe(
+      false
+    );
+    const others = {
+      ...associate,
+      permissions: [...associate.permissions, `${module}.edit_others`]
+    };
+    expect(canAdminResourceAction(others, module, "associate", "b")).toBe(true);
+    expect(canAdminResourceAction(others, module, "edit", "b")).toBe(false);
+    expect(
+      canAdminResourceAction(
+        {
+          ...others,
+          permissions: others.permissions.filter(
+            (key) => !key.endsWith(".associate")
+          )
+        },
+        module,
+        "associate",
+        "b"
+      )
+    ).toBe(false);
+  }
+);
+
+it.each(["visibility", "recommend", "delete"])(
+  "wordlist %s requires its explicit grant and access, while super admins can use it",
+  (action) => {
+    const key = `wordlists.${action}`;
+    const admin = { id: "admin", role: "admin" };
+    expect(hasAdminPermission({ ...admin, role: "super_admin" }, key)).toBe(
+      true
+    );
+    expect(
+      hasAdminPermission({ ...admin, permissions: ["wordlists.access"] }, key)
+    ).toBe(false);
+    expect(hasAdminPermission({ ...admin, permissions: [key] }, key)).toBe(
+      false
+    );
+    expect(
+      hasAdminPermission(
+        { ...admin, permissions: [key, "wordlists.access"] },
+        key
+      )
+    ).toBe(true);
+  }
+);
+
+it("教师材料和三类配置分别授权，废弃权限无效", () => {
+  const split = [
+    "teacherapply.read_certificates",
+    "teacherapply.read_identity",
+    "lexicon_settings.edit_basic",
+    "lexicon_settings.edit_sub",
+    "lexicon_settings.edit_forms",
+    "lexicon_settings.delete"
+  ];
+  for (const granted of split) {
+    const actor = {
+      id: "admin",
+      role: "admin",
+      permissions: ["teacherapply.access", "lexicon_settings.access", granted]
+    };
+    for (const key of split)
+      expect(hasAdminPermission(actor, key)).toBe(key === granted);
+    expect(
+      hasAdminPermission({ ...actor, permissions: [granted] }, granted)
+    ).toBe(false);
+  }
+  for (const role of ["admin", "super_admin"]) {
+    const actor = {
+      id: "admin",
+      role,
+      permissions: [
+        "teacherapply.access",
+        "lexicon_settings.access",
+        "teacherapply.read_sensitive",
+        "lexicon_settings.edit"
+      ]
+    };
+    expect(hasAdminPermission(actor, "teacherapply.read_sensitive")).toBe(
+      false
+    );
+    expect(hasAdminPermission(actor, "lexicon_settings.edit")).toBe(false);
+  }
+});
+
+it("公开只读权限不授予草稿或操作，废弃恢复权限不会继续授权", () => {
+  const reader = { ...actor, permissions: ["sentences.read_published"] };
+  expect(hasAdminPermission(reader, "sentences.read_published")).toBe(true);
+  expect(hasAdminPermission(reader, "sentences.access")).toBe(false);
+  expect(canAdminResourceAction(reader, "sentences", "publish", "a")).toBe(
+    false
+  );
+  expect(
+    hasAdminPermission({ ...actor, role: "super_admin" }, "sentences.restore")
+  ).toBe(false);
+});
+
+it.each(["create", "edit"])(
+  "removed wordlist %s permission stays invalid even with legacy grants",
+  (action) => {
+    const key = `wordlists.${action}`;
+    for (const role of ["admin", "super_admin"]) {
+      expect(
+        hasAdminPermission(
+          { id: "admin", role, permissions: [key, "wordlists.access"] },
+          key
+        )
+      ).toBe(false);
+    }
+  }
+);

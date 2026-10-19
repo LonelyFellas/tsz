@@ -146,3 +146,14 @@ describe("菜单之外的直链门禁", () => {
     expect(screen.getByText("没有访问权限")).toBeInTheDocument();
   });
 });
+
+it("removed wordlist authoring routes stay inaccessible to super administrators", () => {
+  const superAdmin = {
+    ...profile,
+    role: "super_admin" as const,
+    permissions: ["*"]
+  };
+  expect(canVisitAdminRoute(superAdmin, "/wordlists/new")).toBe(false);
+  expect(canVisitAdminRoute(superAdmin, "/wordlists/list/edit")).toBe(false);
+  expect(canVisitAdminRoute(superAdmin, "/wordlists")).toBe(true);
+});

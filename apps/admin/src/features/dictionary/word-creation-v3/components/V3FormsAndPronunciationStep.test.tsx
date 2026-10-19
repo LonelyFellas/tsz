@@ -274,7 +274,11 @@ function formById(content: DraftFormsStepContentV3, formId: string) {
 }
 
 function chooseOption(label: string, option: string) {
-  fireEvent.mouseDown(screen.getByLabelText(label));
+  fireEvent.mouseDown(
+    label === "添加基本词性"
+      ? screen.getAllByLabelText(label)[0]!
+      : screen.getByLabelText(label)
+  );
   const choice = [
     ...document.querySelectorAll<HTMLElement>(
       ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
@@ -585,7 +589,7 @@ describe("V3FormsAndPronunciationStep", () => {
     });
     render(<Harness initial={initial} />);
     await waitFor(() =>
-      expect(screen.getByLabelText("添加基本词性")).not.toBeDisabled()
+      expect(screen.getAllByLabelText("添加基本词性")[0]!).not.toBeDisabled()
     );
     expect(screen.queryByLabelText("复数英美通用拼写")).toBeNull();
     expect(canonicalValue()).toEqual(initial);
@@ -668,7 +672,7 @@ describe("V3FormsAndPronunciationStep", () => {
       view.unmount();
       render(<Harness initial={JSON.parse(JSON.stringify(persisted))} />);
       await waitFor(() =>
-        expect(screen.getByLabelText("添加基本词性")).not.toBeDisabled()
+        expect(screen.getAllByLabelText("添加基本词性")[0]!).not.toBeDisabled()
       );
       expect(screen.queryByLabelText("复数英美通用拼写")).toBeNull();
       expect(canonicalValue()).toEqual(persisted);
@@ -706,8 +710,8 @@ describe("V3FormsAndPronunciationStep", () => {
       container.querySelector(".word-form-matrix, .v3-dialect-separated-matrix")
     ).not.toBeNull();
     expect(screen.getByText("词形类型")).toBeVisible();
-    expect(screen.getByText("英式英语 · BrE")).toBeVisible();
-    expect(screen.getByText("美式英语 · AmE")).toBeVisible();
+    expect(screen.getByText("英式英语")).toBeVisible();
+    expect(screen.getByText("美式英语")).toBeVisible();
     expect(await screen.findByText("名词")).toBeVisible();
   });
 
@@ -860,8 +864,8 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(container.querySelector(".v3-dialect-separated-matrix")).toBeNull();
     expect(screen.queryByLabelText("原形英式拼写")).toBeNull();
     expect(screen.queryByLabelText("原形美式拼写")).toBeNull();
-    expect(screen.getByText("英式英语 · BrE")).toBeVisible();
-    expect(screen.getByText("美式英语 · AmE")).toBeVisible();
+    expect(screen.getByText("英式英语")).toBeVisible();
+    expect(screen.getByText("美式英语")).toBeVisible();
     expect(
       container.querySelectorAll(".word-pronunciation-editor")
     ).toHaveLength(2);
@@ -1060,6 +1064,9 @@ describe("V3FormsAndPronunciationStep", () => {
       .closest(".ant-select");
     expect(addBasicPosSelect).toHaveClass("word-add-basic-pos-select");
     expect(addBasicPosSelect).toHaveTextContent("添加基本词性");
+    expect(
+      addBasicPosSelect?.querySelector('[data-icon="plus-circle"]')
+    ).not.toBeNull();
     expect(screen.queryByLabelText("新增词性")).not.toBeInTheDocument();
 
     const groupCard = await waitFor(() => {
@@ -1190,10 +1197,15 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(
       groupCard.querySelectorAll(".word-form-type-cell .v3-membership-actions")
     ).toHaveLength(3);
-    expect(groupCard).toHaveTextContent("发音方式");
+    expect(groupCard).toHaveTextContent("读法");
     expect(groupCard).toHaveTextContent("字典音标");
     expect(groupCard).toHaveTextContent("实际发音");
-    expect(within(groupCard).getAllByLabelText(/播放语音/)).toHaveLength(3);
+    expect(within(groupCard).getAllByLabelText(/拼写 播放语音/)).toHaveLength(
+      3
+    );
+    expect(
+      within(groupCard).getAllByLabelText(/最终读音 播放语音/)
+    ).toHaveLength(3);
     expect(within(groupCard).queryAllByLabelText(/获取语音/)).toHaveLength(0);
     expect(
       within(groupCard).getAllByLabelText("第 1 条发音的字典音标", {
@@ -1338,12 +1350,8 @@ describe("V3FormsAndPronunciationStep", () => {
       screen.getByLabelText("英美音标有区别").closest(".ant-radio-wrapper")
     ).toHaveClass("ant-radio-wrapper-checked");
     expect(screen.getByLabelText("英美音标无区别")).toBeDisabled();
-    expect(
-      screen.getAllByText("英式英语 · BrE", { exact: true })[0]
-    ).toBeVisible();
-    expect(
-      screen.getAllByText("美式英语 · AmE", { exact: true })[0]
-    ).toBeVisible();
+    expect(screen.getAllByText("英式英语", { exact: true })[0]).toBeVisible();
+    expect(screen.getAllByText("美式英语", { exact: true })[0]).toBeVisible();
     const converted = canonicalValue().pos[0]!.forms;
     expect(converted.map((form) => form.id)).toEqual([base.id, comparative.id]);
     expect(
@@ -2276,7 +2284,7 @@ describe("V3FormsAndPronunciationStep", () => {
       "aria-invalid",
       "false"
     );
-    expect(screen.getByLabelText("第 1 条发音的发音方式")).toHaveValue("");
+    expect(screen.getByLabelText("第 1 条发音的读法")).toHaveValue("");
     expect(screen.queryByLabelText("新增发音")).toBeNull();
     expect(screen.getAllByLabelText(/在第 \d+ 条后新增发音/)).toHaveLength(2);
 
@@ -2286,7 +2294,7 @@ describe("V3FormsAndPronunciationStep", () => {
     await changeVoiceText(screen.getByLabelText("第 2 条发音的实际发音"), {
       target: { value: "edited-actual" }
     });
-    fireEvent.mouseDown(screen.getByLabelText("第 2 条发音的发音方式"));
+    fireEvent.mouseDown(screen.getByLabelText("第 2 条发音的读法"));
     fireEvent.click(screen.getAllByText("弱读").at(-1)!);
     fireEvent.click(screen.getByLabelText("在第 2 条后新增发音"));
     fireEvent.click(screen.getByLabelText("删除第 2 条发音"));
@@ -2313,7 +2321,7 @@ describe("V3FormsAndPronunciationStep", () => {
     ).toBe(false);
   });
 
-  it("把发布检查的发音方式与字典音标问题映射为各自短帮助文案", () => {
+  it("把发布检查的读法与字典音标问题映射为各自短帮助文案", () => {
     const pronunciation = pronunciationFixture({
       id: uuidFromInt(905),
       dict_phonetic: "",
@@ -2372,9 +2380,9 @@ describe("V3FormsAndPronunciationStep", () => {
     );
 
     expect(
-      screen.getByLabelText("第 1 条发音的发音方式").closest(".ant-select")
+      screen.getByLabelText("第 1 条发音的读法").closest(".ant-select")
     ).toHaveClass("ant-select-status-error");
-    expect(screen.getByText("请选择发音方式")).toBeVisible();
+    expect(screen.getByText("请选择读法")).toBeVisible();
     expect(screen.getByLabelText("第 1 条发音的字典音标")).toHaveClass(
       "ant-input-status-error"
     );
@@ -2617,7 +2625,7 @@ describe("V3FormsAndPronunciationStep", () => {
     render(<Harness initial={{ pos: [] }} idFactory={uuidSequence(...ids)} />);
 
     await waitFor(() =>
-      expect(screen.getByLabelText("添加基本词性")).not.toBeDisabled()
+      expect(screen.getAllByLabelText("添加基本词性")[0]!).not.toBeDisabled()
     );
     chooseOption("添加基本词性", "名词");
     const addedNoun = canonicalValue().pos[0]!;
@@ -3235,7 +3243,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(
       await screen.findByText("词性目录不可用，已停止新增结构")
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("添加基本词性")).toBeDisabled();
+    expect(screen.getAllByLabelText("添加基本词性")[0]!).toBeDisabled();
     unmount();
   }, 15_000);
 
@@ -3282,6 +3290,30 @@ describe("V3FormsAndPronunciationStep", () => {
     });
   });
 
+  it("每个词性 tab 内提供新增入口，打开未激活 tab 的入口不会切换词性", async () => {
+    render(<Harness initial={multiPosFixture()} />);
+    const additions = screen.getAllByLabelText("添加基本词性");
+    expect(additions).toHaveLength(2);
+    await waitFor(() => expect(additions[1]).not.toBeDisabled());
+    const noun = screen.getByLabelText("拖动名词").closest('[role="tab"]')!;
+    const verb = screen.getByLabelText("拖动动词").closest('[role="tab"]')!;
+    expect(noun).toContainElement(additions[0]!);
+    expect(verb).toContainElement(additions[1]!);
+    fireEvent.mouseDown(additions[1]!);
+    fireEvent.click(additions[1]!);
+    expect(additions[1]).toHaveAttribute("aria-expanded", "true");
+    // jsdom 无布局；浮层的实际可见性由 E01a 浏览器回归验证。
+    expect(
+      document.querySelector(
+        ".ant-select-dropdown:not(.ant-select-dropdown-hidden)"
+      )
+    ).toBeInTheDocument();
+    expect(noun).toHaveAttribute("aria-selected", "true");
+    expect(verb).toHaveAttribute("aria-selected", "false");
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
+    expect(noun).toHaveAttribute("aria-selected", "true");
+  });
+
   it("删除受控活动 POS 后选择相邻项，删除最后一项时不发出非法 active key", async () => {
     const initial = multiPosFixture();
     const activeChanges = vi.fn();
@@ -3309,7 +3341,7 @@ describe("V3FormsAndPronunciationStep", () => {
 
     render(<ControlledHarness />);
     await waitFor(() =>
-      expect(screen.getByLabelText("添加基本词性")).not.toBeDisabled()
+      expect(screen.getAllByLabelText("添加基本词性")[0]!).not.toBeDisabled()
     );
 
     fireEvent.click(screen.getByLabelText("删除名词"));
@@ -3415,18 +3447,27 @@ it.each([false, true])(
     catalogState.data.items[0]!.allowed_form_types = items.map(
       (item) => item.code
     );
+    // 标签场景不需要发音条目，避免英美分栏重复挂载无关的语音控件。
     const initial = formsFixture({
       forms: [
-        separated ? ukUsFormFixture() : commonFormFixture(),
+        separated
+          ? ukUsFormFixture({
+              uk: { pronunciations: [] },
+              us: { pronunciations: [] }
+            })
+          : commonFormFixture({ pronunciations: [] }),
         ...items.map((item, index) =>
           separated
             ? ukUsFormFixture({
                 id: uuidFromInt(960 + index),
-                form_type: item.code
+                form_type: item.code,
+                uk: { pronunciations: [] },
+                us: { pronunciations: [] }
               })
             : commonFormFixture({
                 id: uuidFromInt(960 + index),
-                form_type: item.code
+                form_type: item.code,
+                pronunciations: []
               })
         )
       ]

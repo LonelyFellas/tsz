@@ -65,7 +65,7 @@ export function SentenceEditor({
   onSaved: (sentence: SharedSentence) => void;
 }) {
   const profile = useAuthStore((state) => state.profile);
-  const allowed = sentence
+  const canEdit = sentence
     ? canAdminResourceAction(
         profile,
         "sentences",
@@ -73,6 +73,15 @@ export function SentenceEditor({
         sentence.created_by_admin_id
       )
     : hasAdminPermission(profile, "sentences.create");
+  const canAssociate = sentence
+    ? canAdminResourceAction(
+        profile,
+        "sentences",
+        "associate",
+        sentence.created_by_admin_id
+      )
+    : hasAdminPermission(profile, "sentences.create");
+  const allowed = canEdit || canAssociate;
   const { modal } = App.useApp();
   const sourceEntryId = sourceWord?.id;
   const currentTargets =
@@ -153,7 +162,7 @@ export function SentenceEditor({
   const finish = async (afterSave?: () => void) => {
     if (conflict || saving || !allowed) return false;
     if (pendingEditor) {
-      setError("请先完成或取消正文编辑，再保存例句。");
+      setError("请先处理正文中的未完成操作，再保存例句。");
       return false;
     }
     if (pendingAnnotation) {
@@ -169,19 +178,21 @@ export function SentenceEditor({
     try {
       const next = structuredClone(content);
       // Empty starter rows are editing affordances, not published translations.
-      next.sentence.zh_translations = next.sentence.zh_translations.filter(
-        (t) => t.content.text.trim()
-      );
-      if (!next.sentence.zh_translations.length) {
-        setError("请至少填写一条译文");
-        return;
+      if (canEdit) {
+        next.sentence.zh_translations = next.sentence.zh_translations.filter(
+          (t) => t.content.text.trim()
+        );
+        if (!next.sentence.zh_translations.length) {
+          setError("请至少填写一条译文");
+          return;
+        }
+        const alias =
+          next.sentence.zh_translations.find(
+            (t) => t.id === next.sentence.zh_text_id
+          ) ?? next.sentence.zh_translations[0]!;
+        next.sentence.zh_text_id = alias.id;
+        next.sentence.zh_text = alias.content;
       }
-      const alias =
-        next.sentence.zh_translations.find(
-          (t) => t.id === next.sentence.zh_text_id
-        ) ?? next.sentence.zh_translations[0]!;
-      next.sentence.zh_text_id = alias.id;
-      next.sentence.zh_text = alias.content;
       let saved: SharedSentence;
       if (sentence)
         saved = await api.sentences.update(sentence.id, {
@@ -383,6 +394,13 @@ export function SentenceEditor({
     <PronunciationPreviewProvider>
       <VoiceEditorModal
         open
+        centered
+        styles={{
+          body: {
+            maxHeight: "min(70vh, calc(100dvh - 160px))",
+            overflowY: "auto"
+          }
+        }}
         title={
           <V3EditorTitle
             index={rowIndex}
@@ -390,7 +408,22 @@ export function SentenceEditor({
             details={`${sentence ? "" : "新建 · "}${content.sentence.level} · ${dialectLabel(row.dialect)}`}
           />
         }
-        footer={null}
+        footer={
+          <Flex justify="end" gap="small">
+            <Button aria-label="取消例句编辑" disabled={saving} onClick={close}>
+              取消
+            </Button>
+            <Button
+              aria-label="完成例句编辑"
+              type="primary"
+              loading={saving}
+              disabled={!canSave}
+              onClick={() => void finish()}
+            >
+              完成
+            </Button>
+          </Flex>
+        }
         onCancel={close}
         closable={!saving}
         keyboard={!saving}
@@ -417,7 +450,7 @@ export function SentenceEditor({
                 aria-label="例句等级"
                 value={content.sentence.level}
                 options={LEVELS}
-                disabled={saving}
+                disabled={saving || !canEdit}
                 onChange={(level) =>
                   setContent((current) => ({
                     ...current,
@@ -503,7 +536,12 @@ export function SentenceEditor({
                 <Button
                   key={segments[0]!.start}
                   size="small"
-                  disabled={saving || pendingEditor || pendingAnnotation}
+                  disabled={
+                    !canAssociate ||
+                    saving ||
+                    pendingEditor ||
+                    pendingAnnotation
+                  }
                   onClick={() => {
                     setTargetLabels((labels) => ({
                       ...labels,
@@ -546,6 +584,7 @@ export function SentenceEditor({
               key={row.variant_id}
               mode="association"
               presentation="editor"
+              showDone={false}
               restoreTextLinksOnCorrection
               audioUploadEnabled
               value={variant.value}
@@ -558,8 +597,13 @@ export function SentenceEditor({
               placeholder="请输入英文例句"
               dialect={row.dialect}
               readOnly={saving}
+              contentReadOnly={!canEdit}
+              associationsReadOnly={!canAssociate}
               onAssociationPendingChange={setPendingAnnotation}
               onDraftPendingChange={setPendingEditor}
+              onAssociationsChange={(annotations) =>
+                changeVariant({}, annotations)
+              }
               onChange={(value, annotations) =>
                 changeVariant({ value }, annotations)
               }
@@ -586,7 +630,10 @@ export function SentenceEditor({
                   }
                   sourceForms={sourceWord?.forms}
                   onTargetLabel={(id, label) =>
-                    setTargetLabels((current) => ({ ...current, [id]: label }))
+                    setTargetLabels((current) => ({
+                      ...current,
+                      [id]: label
+                    }))
                   }
                 />
               )}
@@ -595,7 +642,7 @@ export function SentenceEditor({
           <V3SentenceTranslationsField
             sentence={content.sentence}
             index={0}
-            disabled={saving}
+            disabled={saving || !canEdit}
             onChange={(zh_translations) =>
               setContent((current) => ({
                 ...current,
@@ -603,20 +650,6 @@ export function SentenceEditor({
               }))
             }
           />
-          <Flex justify="end" gap="small">
-            <Button disabled={saving} onClick={close}>
-              取消
-            </Button>
-            <Button
-              aria-label="完成例句编辑"
-              type="primary"
-              loading={saving}
-              disabled={!canSave}
-              onClick={() => void finish()}
-            >
-              完成
-            </Button>
-          </Flex>
         </Flex>
       </VoiceEditorModal>
     </PronunciationPreviewProvider>

@@ -10,14 +10,22 @@ export const metadata: Metadata = {
 export default async function RegisterPage({
   searchParams
 }: {
-  searchParams: Promise<{ method?: string; redirect?: string }>;
+  searchParams: Promise<{
+    method?: string;
+    redirect?: string;
+    invite?: string | string[];
+  }>;
 }) {
   const params = await searchParams;
+  const invite = Array.isArray(params.invite)
+    ? params.invite[0]
+    : params.invite;
   const method = params.method === "email" ? "email" : "phone";
   return (
     <RegisterForm
-      key={method}
+      key={`${method}:${invite ?? ""}`}
       initialMethod={method}
+      initialInviteCode={invite}
       redirect={params.redirect}
     />
   );

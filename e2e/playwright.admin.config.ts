@@ -6,6 +6,7 @@ const adminBaseUrl = `http://127.0.0.1:${adminPort}`;
 export default defineConfig({
   testDir: "./tests",
   testMatch: [
+    "admin-coins.spec.ts",
     "admin-accounts.spec.ts",
     "admin-word-creation.spec.ts",
     "admin-word-v3.spec.ts",
@@ -28,7 +29,7 @@ export default defineConfig({
   // 独立启动 admin；API 由每个 spec 在 page.goto 前全量拦截，不依赖真实后端。
   // mock data-source 保持关闭，让浏览器路径同时验证真实 HTTP client 边界。
   webServer: {
-    command: `VITE_RELATED_SEARCH_V2=true pnpm --filter @tsz/admin build && pnpm --filter @tsz/admin preview --host 127.0.0.1 --port ${adminPort}`,
+    command: `VITE_RELATED_SEARCH_V2=true VITE_AZURE_PRONUNCIATION_INPUTS=true pnpm --filter @tsz/admin build && pnpm --filter @tsz/admin preview --host 127.0.0.1 --port ${adminPort}`,
     url: adminBaseUrl,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000

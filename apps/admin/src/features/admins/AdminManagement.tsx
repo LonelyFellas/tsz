@@ -1,3 +1,4 @@
+import { TableEmptyState } from "@/components/TableEmptyState";
 // 管理员管理（super_admin 专属）：列表、筛选、验证码建号，以及行操作（启禁用 / 重置密码）。
 // 全对接真实接口；超管账号不可被互操作（后端 403），整行操作按钮前端先置灰。
 import {
@@ -48,7 +49,7 @@ interface FilterValues {
 }
 
 export function AdminManagement() {
-  const { message, modal } = App.useApp();
+  const { message } = App.useApp();
   const [form] = Form.useForm<FilterValues>();
   const [editForm] = Form.useForm<{ display_name: string }>();
   const [editingAdmin, setEditingAdmin] = useState<Admin | null>(null);
@@ -89,52 +90,49 @@ export function AdminManagement() {
     setPage(1);
   };
 
-  const confirmToggleStatus = (record: Admin) => {
-    const next = record.status === "active" ? "disabled" : "active";
-    const verb = next === "disabled" ? "禁用" : "启用";
-    modal.confirm({
-      title: `${verb}管理员「${record.display_name}」`,
-      content:
-        next === "disabled"
-          ? "禁用后该管理员无法再登录后台，已有登录态也不能继续访问后台数据。确认禁用？"
-          : "启用后该管理员可以重新登录后台。确认启用？",
-      okText: verb,
-      okButtonProps: { danger: next === "disabled" },
-      cancelText: "取消",
-      onOk: () =>
-        setStatus
-          .mutateAsync({ id: record.id, status: next })
-          .then(() =>
-            message.success(next === "disabled" ? "已禁用" : "已启用")
-          )
-          .catch((err: unknown) =>
-            message.error(adminActionError(err, "status", "操作失败"))
-          )
-    });
+  const [confirmation, setConfirmation] = useState<{
+    kind: "status" | "reset";
+    record: Admin;
+  }>();
+  const [actionError, setActionError] = useState<string>();
+  const actionPending = setStatus.isPending || resetPassword.isPending;
+  const statusVerb = confirmation?.record.status === "active" ? "禁用" : "启用";
+  const confirmAction = async () => {
+    if (
+      !confirmation ||
+      actionPending ||
+      confirmation.record.role === "super_admin"
+    )
+      return;
+    const { kind, record } = confirmation;
+    setActionError(undefined);
+    try {
+      if (kind === "status") {
+        const status = record.status === "active" ? "disabled" : "active";
+        await setStatus.mutateAsync({ id: record.id, status });
+        void message.success(status === "disabled" ? "已禁用" : "已启用");
+      } else {
+        if (secretBusy) return;
+        const result = await resetPassword.mutateAsync(record.id);
+        setResetResult({
+          password: result.temporary_password,
+          name: record.display_name
+        });
+      }
+      setConfirmation(undefined);
+    } catch (err) {
+      setActionError(
+        adminActionError(err, kind, kind === "status" ? "操作失败" : "重置失败")
+      );
+    }
   };
-
-  // 重置会先吊销目标全部会话、再产出仅显示一次的临时密码，误点代价高，二次确认。
+  const confirmToggleStatus = (record: Admin) => {
+    setActionError(undefined);
+    setConfirmation({ kind: "status", record });
+  };
   const confirmResetPassword = (record: Admin) => {
-    modal.confirm({
-      title: `重置「${record.display_name}」的密码`,
-      content:
-        "重置会立即吊销该管理员的全部登录会话，并生成一个只显示一次的临时密码，对方下次登录须改密。确认重置？",
-      okText: "重置",
-      okButtonProps: { danger: true },
-      cancelText: "取消",
-      onOk: () =>
-        resetPassword
-          .mutateAsync(record.id)
-          .then((res) =>
-            setResetResult({
-              password: res.temporary_password,
-              name: record.display_name
-            })
-          )
-          .catch((err: unknown) =>
-            message.error(adminActionError(err, "reset", "重置失败"))
-          )
-    });
+    setActionError(undefined);
+    setConfirmation({ kind: "reset", record });
   };
 
   const columns: TableColumnsType<Admin> = [
@@ -148,7 +146,11 @@ export function AdminManagement() {
         record.role === "super_admin" ? (
           <Tag>全部权限</Tag>
         ) : (
-          <Button type="link" onClick={() => setPermissionAdmin(record)}>
+          <Button
+            type="link"
+            style={{ paddingInline: 0 }}
+            onClick={() => setPermissionAdmin(record)}
+          >
             设置权限
           </Button>
         )
@@ -245,6 +247,42 @@ export function AdminManagement() {
 
   return (
     <Flex vertical gap={16}>
+      {confirmation && (
+        <Modal
+          open
+          title={
+            confirmation.kind === "reset"
+              ? `重置「${confirmation.record.display_name}」的密码`
+              : `${statusVerb}管理员「${confirmation.record.display_name}」`
+          }
+          okText={confirmation.kind === "reset" ? "重置" : statusVerb}
+          cancelText="取消"
+          confirmLoading={actionPending}
+          cancelButtonProps={{ disabled: actionPending }}
+          okButtonProps={{
+            danger:
+              confirmation.kind === "reset" ||
+              confirmation.record.status === "active"
+          }}
+          closable={!actionPending}
+          keyboard={!actionPending}
+          mask={{ closable: !actionPending }}
+          onCancel={() => {
+            if (!actionPending) setConfirmation(undefined);
+          }}
+          onOk={() => void confirmAction()}
+        >
+          <p>
+            {confirmation.kind === "reset"
+              ? "重置会立即吊销该管理员的全部登录会话，并生成一个只显示一次的临时密码，对方下次登录须改密。确认重置？"
+              : confirmation.record.status === "active"
+                ? "禁用后该管理员无法再登录后台，已有登录态也不能继续访问后台数据。确认禁用？"
+                : "启用后该管理员可以重新登录后台。确认启用？"}
+          </p>
+          {actionError && <Alert type="error" title={actionError} />}
+        </Modal>
+      )}
+
       <Breadcrumb items={[{ title: "用户管理" }, { title: "管理员管理" }]} />
 
       <Card size="small" styles={{ body: { paddingBottom: 8 } }}>
@@ -329,6 +367,24 @@ export function AdminManagement() {
         )}
 
         <Table<Admin>
+          locale={{
+            emptyText: (
+              <TableEmptyState
+                message="暂无管理员"
+                filtered={
+                  !!(
+                    filters.role ||
+                    filters.phone?.trim() ||
+                    filters.display_name?.trim()
+                  )
+                }
+                onResetFilters={() => {
+                  form.resetFields();
+                  applyFilters({});
+                }}
+              />
+            )
+          }}
           rowKey="id"
           size="middle"
           columns={columns}

@@ -1,8 +1,5 @@
-// 用户管理（C 端用户，师生合一）：角色 tab + 搜索行 + 表格 + 详情 + 行操作。
-// 列表 / 编辑昵称 / 启禁用 均已对接真实接口；后两者后端限 super_admin，非超管整行置灰
-//（403 仍会在这里落成中文提示，前端门禁不是唯一防线）。删除后端无接口，恒置灰。
-// 等级/天生币余额两列后端不返回（恒显示「-」）。
-// 天生币/等级/方言管理是独立模块，本次仅占位（点击提示「功能待接入」）。
+import { TableEmptyState } from "@/components/TableEmptyState";
+// 用户目录按独立权限展示资料；敏感资源在详情中按需读取。
 import {
   Alert,
   App,
@@ -12,6 +9,7 @@ import {
   Button,
   Card,
   Flex,
+  Modal,
   Segmented,
   Space,
   Table,
@@ -24,7 +22,7 @@ import { useState } from "react";
 import type { AdminUserView, Role } from "@tsz/types";
 import { CopyableText } from "@/components/CopyableText";
 import { GatedButton } from "@/components/GatedButton";
-import { usePermission } from "@/lib/auth";
+import { useAuthStore, usePermission } from "@/lib/auth";
 import { useSetUserStatus, useUserList } from "./api";
 import { EditUserModal } from "./EditUserModal";
 import {
@@ -44,12 +42,14 @@ const ROLE_TABS = [
 ];
 
 export function UserManagement() {
-  const { message, modal } = App.useApp();
-  // 编辑 / 启禁用后端限 super_admin：普通 admin 整行置灰，不让点了才吃 403。
+  const { message } = App.useApp();
+  const canReadBasic = usePermission("users.read_basic");
   const canEdit = usePermission("users.edit");
   const canSetStatus = usePermission("users.set_status");
   const canReadSensitive = usePermission("users.read_sensitive");
+  const connectionError = useAuthStore((state) => state.connectionError);
 
+  const [filterResetKey, setFilterResetKey] = useState(0);
   const [filters, setFilters] = useState<UserFilterValues>({});
   const [role, setRole] = useState<UserRoleTab>("all");
   const [page, setPage] = useState(1);
@@ -57,7 +57,12 @@ export function UserManagement() {
   const [detailUser, setDetailUser] = useState<AdminUserView | null>(null);
   const [editingUser, setEditingUser] = useState<AdminUserView | null>(null);
 
-  const listQuery = useUserList({ filters, role, page, pageSize });
+  const listQuery = useUserList({
+    filters,
+    role: canReadBasic ? role : "all",
+    page,
+    pageSize
+  });
   const setStatus = useSetUserStatus();
 
   const rows = listQuery.data?.items ?? [];
@@ -78,30 +83,27 @@ export function UserManagement() {
   const notReady = (label: string) =>
     message.info(`${label}功能待接入，接口开发中`);
 
-  const confirmToggleStatus = (record: AdminUserView) => {
-    const next = record.status === "active" ? "disabled" : "active";
-    const verb = next === "disabled" ? "禁用" : "启用";
-    modal.confirm({
-      title: `${verb}用户「${record.display_name}」`,
-      content:
-        next === "disabled"
-          ? "禁用后该用户无法登录或继续访问受保护功能，原有角色和绑定信息会保留。确认禁用？"
-          : "启用后该用户可以重新登录，原有角色和绑定信息保持不变。确认启用？",
-      okText: verb,
-      okButtonProps: { danger: next === "disabled" },
-      cancelText: "取消",
-      onOk: () =>
-        setStatus
-          .mutateAsync({ id: record.id, status: next })
-          .then(() =>
-            message.success(next === "disabled" ? "已禁用" : "已启用")
-          )
-          .catch((err: unknown) =>
-            message.error(userActionError(err, "操作失败"))
-          )
-    });
+  const [statusTarget, setStatusTarget] = useState<AdminUserView | null>(null);
+  const [statusError, setStatusError] = useState<string>();
+  const verb = statusTarget?.status === "active" ? "禁用" : "启用";
+  const confirmStatus = async () => {
+    if (!canSetStatus || !statusTarget?.status || setStatus.isPending) return;
+    const next = statusTarget.status === "active" ? "disabled" : "active";
+    setStatusError(undefined);
+    try {
+      await setStatus.mutateAsync({ id: statusTarget.id, status: next });
+    } catch (err) {
+      setStatusError(userActionError(err, "操作失败"));
+      return;
+    }
+    void message.success(next === "disabled" ? "已禁用" : "已启用");
+    setStatusTarget(null);
   };
-
+  const confirmToggleStatus = (record: AdminUserView) => {
+    if (!canSetStatus || !record.status) return;
+    setStatusError(undefined);
+    setStatusTarget(record);
+  };
   const columns: TableColumnsType<AdminUserView> = [
     {
       title: "用户ID",
@@ -139,7 +141,7 @@ export function UserManagement() {
       width: 110,
       render: (roles: Role[]) => (
         <Space size={[4, 4]} wrap>
-          {roles.map((r) => (
+          {(roles ?? []).map((r) => (
             <Tag key={r} color={ROLE_TAG_COLOR[r]} style={{ margin: 0 }}>
               {ROLE_LABEL[r]}
             </Tag>
@@ -163,13 +165,6 @@ export function UserManagement() {
       width: 100,
       render: (lv?: string) =>
         lv ? <Tag color={levelColor(lv)}>{lv}等级</Tag> : "-"
-    },
-    {
-      title: "天生币余额",
-      dataIndex: "coin_balance",
-      width: 110,
-      // 余额可选：缺失显示「-」，与其它可空列一致；0 是有效余额，故用 ?? 而非 ||。
-      render: (v?: number) => v ?? "-"
     },
     {
       title: "绑定电话",
@@ -218,9 +213,9 @@ export function UserManagement() {
           <Button
             type="link"
             size="small"
-            onClick={() => notReady("天生币管理")}
+            onClick={() => setDetailUser(record)}
           >
-            天生币管理
+            查看详情
           </Button>
           <Button type="link" size="small" onClick={() => notReady("等级管理")}>
             等级管理
@@ -243,13 +238,13 @@ export function UserManagement() {
             // 禁用是破坏性动作，置红警示；启用是恢复性动作，保持常规蓝。
             danger={record.status === "active"}
             reason="需用户状态变更权限"
-            disabled={!canSetStatus}
+            disabled={!canSetStatus || !record.status}
             loading={
               setStatus.isPending && setStatus.variables?.id === record.id
             }
             onClick={() => confirmToggleStatus(record)}
           >
-            {record.status === "active" ? "禁用" : "启用"}
+            {canReadBasic && record.status === "disabled" ? "启用" : "禁用"}
           </GatedButton>
           {/* 删除用户后端本轮 out of scope，暂无接口：占位置灰，待后端接口就绪再启用。 */}
           <GatedButton
@@ -265,22 +260,68 @@ export function UserManagement() {
       )
     }
   ];
+  const basicColumns = new Set([
+    "id",
+    "avatar_url",
+    "roles",
+    "teacher_verified",
+    "level",
+    "status",
+    "updated_at"
+  ]);
+  const visibleColumns = columns.filter(
+    (column) =>
+      canReadBasic ||
+      !("dataIndex" in column && basicColumns.has(String(column.dataIndex)))
+  );
 
   return (
     <Flex vertical gap={16}>
+      {statusTarget && (
+        <Modal
+          open
+          title={`${verb}用户「${statusTarget.display_name}」`}
+          okText={verb}
+          cancelText="取消"
+          confirmLoading={setStatus.isPending}
+          okButtonProps={{ danger: statusTarget.status === "active" }}
+          cancelButtonProps={{ disabled: setStatus.isPending }}
+          closable={!setStatus.isPending}
+          keyboard={!setStatus.isPending}
+          mask={{ closable: !setStatus.isPending }}
+          onCancel={() => {
+            if (!setStatus.isPending) setStatusTarget(null);
+          }}
+          onOk={() => void confirmStatus()}
+        >
+          <p>
+            {statusTarget.status === "active"
+              ? "禁用后该用户无法登录或继续访问受保护功能，原有角色和绑定信息会保留。确认禁用？"
+              : "启用后该用户可以重新登录，原有角色和绑定信息保持不变。确认启用？"}
+          </p>
+          {statusError && <Alert type="error" title={statusError} />}
+        </Modal>
+      )}
+
       <Breadcrumb items={[{ title: "用户管理" }, { title: "用户管理" }]} />
 
-      <UserFilters onSearch={applyFilters} onReset={() => applyFilters({})} />
+      <UserFilters
+        key={filterResetKey}
+        onSearch={applyFilters}
+        onReset={() => applyFilters({})}
+      />
 
       <Card size="small">
-        <Segmented<UserRoleTab>
-          options={ROLE_TABS}
-          value={role}
-          onChange={changeRole}
-          style={{ marginBottom: 12 }}
-        />
+        {canReadBasic && (
+          <Segmented<UserRoleTab>
+            options={ROLE_TABS}
+            value={role}
+            onChange={changeRole}
+            style={{ marginBottom: 12 }}
+          />
+        )}
 
-        {listQuery.isError && (
+        {listQuery.isError && !connectionError && (
           <Alert
             type="error"
             showIcon
@@ -296,9 +337,28 @@ export function UserManagement() {
         )}
 
         <Table<AdminUserView>
+          locale={{
+            emptyText: (
+              <TableEmptyState
+                message="暂无用户"
+                filtered={
+                  !!(
+                    filters.q?.trim() ||
+                    filters.registeredDate ||
+                    (canReadBasic && role !== "all")
+                  )
+                }
+                onResetFilters={() => {
+                  applyFilters({});
+                  setRole("all");
+                  setFilterResetKey((key) => key + 1);
+                }}
+              />
+            )
+          }}
           rowKey="id"
           size="middle"
-          columns={columns}
+          columns={visibleColumns}
           dataSource={rows}
           loading={listQuery.isPending}
           scroll={{ x: 1700 }}
@@ -317,7 +377,10 @@ export function UserManagement() {
         />
       </Card>
 
-      <UserDetailDrawer user={detailUser} onClose={() => setDetailUser(null)} />
+      <UserDetailDrawer
+        user={rows.find((row) => row.id === detailUser?.id) ?? null}
+        onClose={() => setDetailUser(null)}
+      />
       <EditUserModal user={editingUser} onClose={() => setEditingUser(null)} />
     </Flex>
   );

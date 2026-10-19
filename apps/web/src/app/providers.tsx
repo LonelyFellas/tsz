@@ -5,8 +5,11 @@ import dynamic from "next/dynamic";
 import { useEffect, useLayoutEffect } from "react";
 import { getQueryClient } from "@/lib/query-client";
 import { syncThemeToDom } from "@/lib/theme";
+import { DailyLoginReward } from "@/features/coins/LoginReward";
 import { useSessionRestore } from "@/features/auth/hooks/useSessionRestore";
 import { useUserStore } from "@/stores/user";
+import { PhoneBindingGuard } from "@/features/auth/components/PhoneBindingGuard";
+import { NotificationTabBadge } from "@/features/teacher-certification/NotificationTabBadge";
 import { TeacherIdentityProvider } from "@/features/teacher-certification/TeacherIdentityProvider";
 
 // 服务端无 layout effect;客户端用 layoutEffect 在 paint 前补主题 class。
@@ -32,27 +35,35 @@ const ReactQueryDevtools = dynamic(
 
 function SessionRestorer() {
   const { retry, retrying } = useSessionRestore();
+  const refreshUnconfirmed = useUserStore((s) => s.refreshUnconfirmed);
   const connectionError = useUserStore((s) => s.connectionError);
   const hydrated = useUserStore((s) => s.hydrated);
   useEffect(() => {
     window.dispatchEvent(new Event("tsz:app-ready"));
   }, []);
-  if (!connectionError) return null;
+  if (!connectionError && !refreshUnconfirmed) return null;
+  // 顶栏为 64px 高的 sticky z-50，提示需落在其下方并压过它，否则文字被遮住。
   return (
     <div
       role="alert"
-      className="fixed inset-x-4 top-4 z-50 mx-auto max-w-lg rounded-3xl border border-gray-200 bg-white p-4 text-center text-gray-900 shadow-lg dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+      className="animate-in fixed inset-x-4 top-20 z-[60] mx-auto max-w-md rounded-3xl border border-border/60 bg-surface/90 px-6 py-5 text-center text-foreground shadow-float backdrop-blur-xl"
     >
-      <p>
-        {hydrated ? "连接暂时中断，当前内容已保留" : "暂时无法恢复会话，请重试"}
+      <p className="text-sm leading-6">
+        {refreshUnconfirmed
+          ? "会话刷新结果尚未确认，请重新登录；当前操作请先查看结果"
+          : hydrated
+            ? "连接暂时中断，联网后将自动恢复；当前内容已保留"
+            : "正在恢复连接，联网后将自动继续"}
       </p>
       <button
         type="button"
         disabled={retrying}
-        onClick={() => void retry()}
-        className="mt-3 rounded-full bg-[#0071e3] px-5 py-2 text-white disabled:opacity-50"
+        onClick={() =>
+          refreshUnconfirmed ? (window.location.href = "/login") : void retry()
+        }
+        className="mt-4 inline-flex min-h-10 items-center rounded-full bg-primary px-5 text-sm font-medium tracking-wide text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
       >
-        {retrying ? "重试中…" : "重试连接"}
+        {refreshUnconfirmed ? "重新登录" : retrying ? "重试中…" : "重试连接"}
       </button>
     </div>
   );
@@ -61,12 +72,41 @@ function SessionRestorer() {
 export function Providers({ children }: { children: React.ReactNode }) {
   // getQueryClient 在浏览器端返回单例,不放进 useState 也安全。
   const queryClient = getQueryClient();
+  useEffect(() => {
+    const recovered = () => {
+      if (useUserStore.getState().user)
+        void queryClient.refetchQueries({
+          type: "active",
+          predicate: (query) => query.state.status === "error"
+        });
+    };
+    window.addEventListener("tsz:session-recovered", recovered);
+    return () => window.removeEventListener("tsz:session-recovered", recovered);
+  }, [queryClient]);
+  useEffect(
+    () =>
+      useUserStore.subscribe((state, previous) => {
+        if (state.user?.id !== previous.user?.id) {
+          void queryClient.cancelQueries({ queryKey: ["wordlists", "user"] });
+          queryClient.removeQueries({ queryKey: ["wordlists", "user"] });
+          void queryClient.cancelQueries({ queryKey: ["coins"] });
+          queryClient.removeQueries({ queryKey: ["coins"] });
+          void queryClient.cancelQueries({ queryKey: ["login-reward"] });
+          queryClient.removeQueries({ queryKey: ["login-reward"] });
+        }
+      }),
+    [queryClient]
+  );
 
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeSync />
       <SessionRestorer />
-      <TeacherIdentityProvider>{children}</TeacherIdentityProvider>
+      <DailyLoginReward />
+      <NotificationTabBadge />
+      <PhoneBindingGuard>
+        <TeacherIdentityProvider>{children}</TeacherIdentityProvider>
+      </PhoneBindingGuard>
       {process.env.NODE_ENV === "development" && (
         <ReactQueryDevtools initialIsOpen={false} />
       )}

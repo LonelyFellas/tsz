@@ -1,12 +1,79 @@
-.word-pronunciation-fields:has(> .word-pronunciation-synthesis)
-  .word-pronunciation-row {
-  column-gap: 24px;
+.word-pronunciation-floating-fields {
+  gap: 20px;
+  padding-block-start: 8px;
+}
+
+.word-pronunciation-floating-fields > .word-pronunciation-row {
+  position: relative;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.word-pronunciation-floating-fields
+  > .word-pronunciation-row
+  > .word-field-help {
+  grid-column: 1;
+}
+
+.word-pronunciation-floating-fields
+  > .word-pronunciation-row
+  > .word-pronunciation-label,
+.word-synthesis-candidate > .word-pronunciation-label {
+  position: absolute;
+  z-index: 5;
+  inset-inline-start: 12px;
+  top: -8px;
+  padding-inline: 4px;
+  color: var(--ant-color-text-secondary, #8c8c8c);
+  background: var(--ant-color-bg-container, #fff);
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 16px;
+  cursor: text;
+}
+
+.word-pronunciation-floating-fields
+  > .word-pronunciation-row:focus-within
+  > .word-pronunciation-label,
+.word-synthesis-candidate:focus-within > .word-pronunciation-label {
+  color: var(--ant-color-primary, #2053ff);
 }
 
 .word-pronunciation-synthesis {
   display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.word-synthesis-optional {
+  display: grid;
   gap: 12px;
   min-width: 0;
+}
+
+.word-synthesis-source-label.word-synthesis-source-heading {
+  flex-direction: row;
+  align-items: center;
+}
+
+.word-synthesis-ups-toggle {
+  margin-inline-start: auto;
+  padding-inline: 4px;
+  border: 0;
+  font-size: 12px;
+  color: var(--ant-color-text-secondary, #8c8c8c);
+}
+
+.word-synthesis-ups-toggle .ant-btn-icon {
+  color: var(--ant-color-text-quaternary, rgba(0, 0, 0, 0.25));
+  font-size: var(--ant-font-size-icon, 12px);
+}
+
+.word-synthesis-ups-toggle[aria-expanded="true"] {
+  color: var(--ant-color-primary, #2053ff);
+}
+
+.word-synthesis-ups-fields {
+  padding-block: 12px;
 }
 
 .word-synthesis-source {
@@ -16,12 +83,12 @@
 }
 
 .word-pronunciation-synthesis .word-pronunciation-row {
-  grid-template-columns: 64px minmax(0, 1fr);
-  gap: 6px 12px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
 }
 
 .word-actual-pronunciation-control .v3-voice-text-field-compact > .ant-btn,
-.word-synthesis-control > .ant-btn:first-child {
+.word-synthesis-control > .ant-btn {
   width: 32px;
   height: 32px;
   padding: 0;
@@ -30,6 +97,9 @@
 
 .word-actual-pronunciation-control {
   min-width: 0;
+}
+.word-actual-pronunciation-control .v3-voice-text-field-compact > .ant-btn {
+  height: auto;
 }
 .word-actual-pronunciation-control textarea {
   font-weight: 400;
@@ -61,7 +131,13 @@
 
 .word-actual-pronunciation-control
   .v3-voice-text-field-compact
-  textarea.ant-input,
+  textarea.ant-input {
+  border-start-start-radius: var(--ant-border-radius, 6px);
+  border-end-start-radius: var(--ant-border-radius, 6px);
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+
 .word-synthesis-control > textarea.ant-input {
   border-radius: 0;
 }
@@ -72,7 +148,7 @@
 }
 
 .word-synthesis-locale-warning {
-  grid-column: 2;
+  grid-column: 1;
   font-size: 12px;
   line-height: 1.6;
 }
@@ -94,22 +170,20 @@
   gap: 12px;
   min-width: 0;
 }
+.word-synthesis-candidates:has(> .word-synthesis-candidate:only-child) {
+  grid-template-columns: minmax(0, 1fr);
+}
 .word-synthesis-candidate {
+  position: relative;
   min-width: 0;
 }
 .word-synthesis-candidate .word-synthesis-control {
   display: flex;
+  align-items: stretch;
   width: 100%;
 }
-.word-synthesis-control > .word-synthesis-accent:first-child {
-  width: auto;
-  padding-inline: 8px;
-}
-.word-synthesis-accent-uk {
-  color: var(--ant-color-primary, #2053ff);
-}
-.word-synthesis-accent-us {
-  color: var(--ant-magenta-6, #c41d7f);
+.word-synthesis-candidate .word-synthesis-control > .ant-btn {
+  height: auto;
 }
 @container (max-width: 600px) {
   .word-synthesis-candidates {
@@ -117,21 +191,25 @@
   }
 }
 
-.word-synthesis-source-actions {
+.word-synthesis-source-label {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 16px;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.word-synthesis-source-label .word-pronunciation-label {
+  min-height: 0;
+}
+
+.word-synthesis-source-actions {
   min-width: 0;
 }
+
 .word-synthesis-source-actions > .ant-radio-group {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px 0;
-}
-.word-synthesis-source-actions > .ant-btn {
-  flex-shrink: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
 }
 
 .word-synthesis-settings {
@@ -185,7 +263,58 @@
 }
 
 .word-synthesis-choice.ant-radio-wrapper {
+  width: 100%;
+  min-width: 0;
   margin-inline-end: 0;
+  font-weight: 400;
+}
+
+.word-synthesis-choice.ant-radio-wrapper > span:last-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.word-synthesis-choice-content {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.word-synthesis-choice-tag {
+  flex-shrink: 0;
+  padding-inline: 4px;
+  border: 1px solid var(--ant-color-border, #d9d9d9);
+  border-radius: 4px;
+  line-height: 20px;
+}
+
+.word-synthesis-choice-preview {
+  min-width: 0;
+  font-weight: 400;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.word-synthesis-choice-preview.tsz-words {
+  font-weight: 700;
+}
+
+.word-synthesis-choice.ant-radio-wrapper-checked .word-synthesis-choice-tag {
+  color: var(--ant-color-text-light-solid, #fff);
+  background: var(--ant-color-primary, #2053ff);
+  border-color: var(--ant-color-primary, #2053ff);
+}
+
+:is(.word-shared-pronunciation-us, .v3-dialect-panel-us)
+  .word-synthesis-choice.ant-radio-wrapper-checked
+  .word-synthesis-choice-tag,
+:is(.word-shared-pronunciation-us, .v3-dialect-panel-us)
+  .word-synthesis-choice.ant-radio-wrapper
+  .ant-radio-checked:not(.ant-radio-disabled) {
+  background-color: #d42a91;
+  border-color: #d42a91;
 }
 
 .word-synthesis-settings-header {
@@ -217,4 +346,13 @@
   border-top: 1px solid var(--ant-color-border-secondary, #f0f0f0);
   color: var(--ant-color-text-secondary, #8c8c8c);
   font-size: 12px;
+}
+
+.word-synthesis-control
+  > .word-pronunciation-play-action[data-playback-dialect="uk"] {
+  color: var(--ant-color-primary, #2053ff);
+}
+.word-synthesis-control
+  > .word-pronunciation-play-action[data-playback-dialect="us"] {
+  color: var(--ant-magenta-6, #c41d7f);
 }

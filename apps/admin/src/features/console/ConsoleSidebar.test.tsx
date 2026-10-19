@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { MenuPermission } from "@tsz/types";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -22,7 +22,7 @@ const FULL_PERMISSIONS: MenuPermission[] = [
   "wordlists.access",
   "customwordlist.access",
   "tasks.access",
-  "reviews.access",
+  "wordlists.review",
   "teacherapply.access",
   "comments.access",
   "coins.access"
@@ -207,4 +207,70 @@ describe("ConsoleSidebar", () => {
     );
     expect(screen.queryByText("天生会背")).toBeNull();
   });
+});
+
+it("公开例句只读管理员可见例句菜单及直链，不能进入词库", async () => {
+  setLevel("admin", ["sentences.read_published"]);
+  renderAt("/sentences");
+  fireEvent.click(screen.getByText("词库管理"));
+  await waitFor(() => expect(screen.getByText("多维例句")).toBeVisible());
+  expect(screen.queryByText("智能词库")).toBeNull();
+  const { canVisitAdminRoute } = await import("@/lib/adminPageRoutes");
+  const profile = useAuthStore.getState().profile;
+  expect(canVisitAdminRoute(profile, "/sentences")).toBe(true);
+  expect(canVisitAdminRoute(profile, "/words")).toBe(false);
+  expect(
+    canVisitAdminRoute({ ...profile!, permissions: [] }, "/sentences")
+  ).toBe(false);
+});
+
+it("词表查看权限可进入审核菜单及直链，审核操作权限不替代查看权限", async () => {
+  const { canVisitAdminRoute } = await import("@/lib/adminPageRoutes");
+  setLevel("admin", ["wordlists.access"]);
+  const view = renderAt("/");
+  fireEvent.click(screen.getByText("审核管理"));
+  fireEvent.click(screen.getByText("词表审核"));
+  expect(mockNavigate).toHaveBeenCalledWith("/reviews");
+  expect(canVisitAdminRoute(useAuthStore.getState().profile, "/reviews")).toBe(
+    true
+  );
+  view.unmount();
+  setLevel("admin", ["wordlists.review"]);
+  renderAt("/");
+  expect(screen.queryByText("审核管理")).toBeNull();
+  expect(canVisitAdminRoute(useAuthStore.getState().profile, "/reviews")).toBe(
+    false
+  );
+});
+
+it.each([
+  ["/words/trash", "垃圾桶"],
+  ["/words", "智能词库"],
+  ["/words/entry-id/v3/wizard/forms", "智能词库"]
+])("%s 只选中所属的菜单项 %s", (path, selected) => {
+  renderAt(path);
+  fireEvent.click(screen.getByText("词库管理"));
+  const library = screen.getByRole("menuitem", { name: "智能词库" });
+  const trash = screen.getByRole("menuitem", { name: "垃圾桶" });
+  expect(library.classList.contains("ant-menu-item-selected")).toBe(
+    selected === "智能词库"
+  );
+  expect(trash.classList.contains("ant-menu-item-selected")).toBe(
+    selected === "垃圾桶"
+  );
+});
+
+it("收起侧栏的浮层菜单中，垃圾桶也不会同时选中智能词库", async () => {
+  render(
+    <MemoryRouter initialEntries={["/words/trash"]}>
+      <ConsoleSidebar collapsed />
+    </MemoryRouter>
+  );
+  fireEvent.mouseOver(screen.getByText("词库管理"));
+  expect(await screen.findByRole("menuitem", { name: "垃圾桶" })).toHaveClass(
+    "ant-menu-item-selected"
+  );
+  expect(screen.getByRole("menuitem", { name: "智能词库" })).not.toHaveClass(
+    "ant-menu-item-selected"
+  );
 });

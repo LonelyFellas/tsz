@@ -29,14 +29,92 @@ const runtimeOnly = process.env.SYNC_OPENAPI_RUNTIME_ONLY === "1";
 
 const API_PREFIX = "/api/v1";
 const ADMIN_LEXICON_PREFIX = `${API_PREFIX}/admin/lexicon`;
-const HTTP_METHODS = ["get", "post", "put", "patch", "delete"];
+const HTTP_METHODS = ["get", "head", "post", "put", "patch", "delete"];
 const QUERY_CONTRACT_OPERATIONS = new Set([
+  "get /me/wordlist-tips",
+  "get /wordlists",
+  "get /wordlists/catalog",
+  "get /wordlists/suggestions",
+  "get /admin/lexicon/entries/related-suggestions",
+  "get /admin/lexicon/entries/{id}/relation-senses",
+  "get /wordlists/{id}/items",
+  "get /me/wordlists",
+  "get /me/wordlists/{id}/items",
+  "get /admin/wordlists",
+  "get /admin/wordlists/management",
+  "get /admin/wordlists/{id}/review-requests",
+  "get /admin/wordlists/{id}/review-requests/{request_id}/items",
+  "get /me/invitations/records",
+  "get /admin/coins/accounts",
+  "get /admin/coins/accounts/{owner_type}/{owner_id}/entries",
+  "get /admin/coins/operations",
+  "get /me/coins/entries",
+  "get /me/coins/learning-rewards",
+  "get /admin/me/coins/entries",
   "get /admin/lexicon/entries/related-search",
   "get /admin/settings/form-types",
   "delete /admin/settings/form-types/{id}"
 ]);
 
 const RUNTIME_SCHEMA_ROOTS = [
+  "DictionaryPage",
+  "DictionaryEntry",
+  "AudioAssetUrlResponse",
+  "LearningRewardDay",
+  "LoginRewardDay",
+  "LearningPreview",
+  "LearningPlanPreview",
+  "LearningPlan",
+  "LearningPlanPage",
+  "LearningCyclePreview",
+  "LearningCycle",
+  "LearningCyclePage",
+  "LearningPlanRunPage",
+  "LibrarySelection",
+
+  "LearningTask",
+  "LearningTaskDetail",
+  "LearningTaskPage",
+  "LearningRun",
+  "LearningRunPage",
+  "LearningQuestionPage",
+  "LearningAnswerReceipt",
+
+  "WordlistInteractionStatsBatch",
+  "WordlistInteractionState",
+  "WordlistInteractionStates",
+  "WordlistFavoritePage",
+  "LibraryPage",
+  "LibraryImpact",
+  "WordlistTip",
+  "WordlistTipPage",
+  "AdminWordlist",
+  "AdminWordlistPage",
+  "WordlistDeleteImpact",
+  "Wordlist",
+  "WordlistPage",
+  "WordlistItems",
+  "WordlistAvailability",
+  "EntryArchiveImpact",
+  "MyWordlistItems",
+  "WordlistCatalog",
+  "WordlistSuggestions",
+  "WordlistImportMatches",
+  "WordlistEditSnapshot",
+  "WordlistReview",
+  "WordlistReviews",
+  "AdminWordlistReviews",
+  "InvitationCode",
+  "InvitationOverview",
+  "InvitationRecordPage",
+  "AccountDeletionRequest",
+  "AccountDeletionState",
+  "CoinAccountPage",
+  "ManualCoinOperation",
+  "ManualCoinOperationPage",
+  "CoinWallet",
+  "CoinEntryPage",
+  "UserCoinEntryPage",
   "SharedSentence",
   "SentencePublication",
   "SentenceWithdrawalImpact",
@@ -55,6 +133,8 @@ const RUNTIME_SCHEMA_ROOTS = [
   "InboundReferencesV3",
   "SurfaceMatchPageV3",
   "RelatedSearchResponse",
+  "RelatedEntrySuggestions",
+  "RelatedEntrySenses",
   "DetectLexiconSurfaceResponseV3",
   "SearchComponentTargetsV3Response",
   "AdminWordPublicationListResponse",
@@ -90,7 +170,7 @@ const IGNORED_ANNOTATION_KEYWORDS = new Set([
   "readOnly"
 ]);
 const IGNORED_ANNOTATION_FORMATS = new Set(["int32", "int64"]);
-const SUPPORTED_VALIDATION_FORMATS = new Set(["date-time", "uuid"]);
+const SUPPORTED_VALIDATION_FORMATS = new Set(["date", "date-time", "uuid"]);
 
 const sourceText = readFileSync(source, "utf8");
 const spec = load(sourceText);
@@ -98,8 +178,39 @@ if (!spec?.paths) {
   throw new Error(`spec 无 paths 字段: ${source}`);
 }
 const contractSchemaNames = [
+  "LoginRewardRequest",
+  "LoginRewardDay",
+  "LoginRewardStatus",
+  "UserNotification",
+  "NotificationList",
+  "WordlistView",
+  "WordlistSort",
+  "ManualCreditCategory",
+  "ManualCreditRequest",
+  "ManualReversalRequest",
+  "CoinAccount",
+  "AccountDeletionRequest",
+  "AccountDeletionState",
+  "CreateAccountDeletionRequest",
+  "DeletionStatus",
+  "PaginationMeta",
+  "CoinAccountPage",
+  "ManualCoinOperation",
+  "ManualCoinOperationPage",
+  "CoinWallet",
+  "CoinEntry",
+  "CoinEntryPage",
+  "UserCoinEntryPage",
+  "OwnerType",
+  "WalletStatus",
+  "OperationKind",
   "UserProfile",
   "UserRole",
+  "MeResponse",
+  "LearningSettings",
+  "LearningSettingsResponse",
+  "CefrLevel",
+  "EnglishVariant",
   "UpdateProfileResponse",
   "PasswordStatus",
   "FormTypeConfig",
@@ -146,6 +257,8 @@ const contractSchemaNames = [
   "RelatedSearchLegacyResponse",
   "RelatedSearchV2Response",
   "RelatedSearchResponse",
+  "RelatedEntrySuggestions",
+  "RelatedEntrySenses",
   "FormsImpactItemV3",
   "FormsImpactNodeTypeV3",
   "FormsImpactResponseV3",
@@ -161,6 +274,9 @@ const contractSchemaNames = [
   "AdminWordDraftV3Envelope",
   "AdminWordListItemV3",
   "EntryLifecycleInput",
+  "EntryArchiveImpactInput",
+  "EntryArchiveImpact",
+  "WordlistAvailability",
   "EntryLifecycleTarget",
   "EntryLifecycleBatchInput",
   "EntryLifecycleBatchResponse",
@@ -479,10 +595,18 @@ for (const [rawPath, item] of Object.entries(spec.paths)) {
     const operationKey = `${method} ${path}`;
     if (
       rawPath.startsWith(ADMIN_LEXICON_PREFIX) ||
+      rawPath.startsWith(`${API_PREFIX}/me/learning-plans`) ||
+      rawPath.startsWith(`${API_PREFIX}/me/account-deletion`) ||
+      rawPath === `${API_PREFIX}/auth/account` ||
+      rawPath.startsWith(`${API_PREFIX}/me/wordlist-library/`) ||
+      rawPath.startsWith(`${API_PREFIX}/me/coins/`) ||
+      rawPath.startsWith(`${API_PREFIX}/admin/me/coins/`) ||
+      rawPath.startsWith(`${API_PREFIX}/admin/coins/`) ||
       rawPath.startsWith(`${API_PREFIX}/auth/password/`) ||
       rawPath === `${API_PREFIX}/auth/register` ||
       rawPath === `${API_PREFIX}/admin/auth/change-password` ||
       rawPath === `${API_PREFIX}/me` ||
+      rawPath === `${API_PREFIX}/me/learning-settings` ||
       rawPath.startsWith(`${API_PREFIX}/me/avatar`) ||
       rawPath.startsWith(`${API_PREFIX}/me/contact/`) ||
       rawPath.startsWith(`${API_PREFIX}/admin/settings/form-types`) ||

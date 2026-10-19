@@ -162,7 +162,7 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
-        className="absolute inset-0 z-10 flex touch-none cursor-grab select-none flex-col items-center justify-center gap-4 rounded-3xl bg-surface shadow-lg active:cursor-grabbing"
+        className="absolute inset-0 z-10 flex touch-none cursor-grab select-none flex-col items-center justify-center gap-4 rounded-3xl border border-border/60 bg-surface shadow-float active:cursor-grabbing"
       >
         <span
           ref={knowRef}

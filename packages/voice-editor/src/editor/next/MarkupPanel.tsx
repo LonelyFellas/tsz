@@ -1,9 +1,18 @@
 import { ClearOutlined, RedoOutlined, UndoOutlined } from "@ant-design/icons";
-import { Button, Popover, Tooltip } from "antd";
-import type { ReactNode } from "react";
+import { Button, Tooltip } from "antd";
+import { useId, useState, type ReactNode } from "react";
 import { AnnotationStrip, type AnnotationStripProps } from "./AnnotationStrip";
+import type { VoiceEditorProps } from "../../types";
 import type { Brush } from "./roles";
 import type { LiaisonAnchor, LiaisonDraft, MarkState } from "./tokens";
+import { SelectionPanel } from "./SelectionPanel";
+import { ShortcutHint } from "./ShortcutHint";
+
+const FORMAT_SHORTCUTS: Record<string, string> = {
+  bold: "B",
+  italic: "I",
+  underline: "U"
+};
 
 export interface DropdownTool {
   key: string;
@@ -32,11 +41,15 @@ export interface MarkupPanelProps extends Pick<
   | "onInspectPause"
   | "selectedPauseGap"
 > {
+  mode: VoiceEditorProps["mode"];
+
+  selectionText?: string;
   text: string;
   marks: MarkState;
   brush: Brush;
   draft: LiaisonDraft;
   readOnly?: boolean;
+  contentReadOnly?: boolean;
   onRoleRange: (start: number, end: number, mode: "click" | "drag") => void;
   roleAnchorStart?: number;
   onGapClick: (gapIndex: number) => void;
@@ -46,7 +59,7 @@ export interface MarkupPanelProps extends Pick<
   inputLabel: string;
   inputDataAttributes?: Record<string, string>;
   inputPlaceholder?: string;
-  onTextChange: (value: string) => void;
+  onTextChange: AnnotationStripProps["onTextChange"];
   canUndo: boolean;
   canRedo: boolean;
   onUndo: () => void;
@@ -58,6 +71,9 @@ export interface MarkupPanelProps extends Pick<
 }
 
 export function MarkupPanel({
+  mode,
+
+  selectionText,
   associationContent,
   associationAnchor,
   selectedLinkRanges,
@@ -68,6 +84,7 @@ export function MarkupPanel({
   brush,
   draft,
   readOnly,
+  contentReadOnly,
   textReadOnly,
   onRoleRange,
   onTextSelection,
@@ -92,46 +109,161 @@ export function MarkupPanel({
   actions,
   onOpenToolChange
 }: MarkupPanelProps) {
+  const grammarMode = mode === "grammar";
+  const associationMode = mode === "association";
+  const composedMode = grammarMode || associationMode;
+  const selectionMode =
+    grammarMode ||
+    associationMode ||
+    mode === "spelling" ||
+    mode === "actual-pron";
+  const selectionToolsLabel = grammarMode
+    ? "“语法结构”和“连读符号”"
+    : associationMode
+      ? "“文本格式”和“连读符号”"
+      : mode === "spelling"
+        ? "“斜体”和“连读符号”"
+        : "“连读符号”";
+  const [voicesExpanded, setVoicesExpanded] = useState(true);
+  const voicesPanelId = useId();
+  const headerTools = selectionMode
+    ? tools.filter(
+        (tool) =>
+          tool.key === "text" ||
+          tool.key === "bold" ||
+          tool.key === "italic" ||
+          tool.key === "underline" ||
+          tool.key.startsWith("association-")
+      )
+    : [];
+  const formatOrder = [
+    "text",
+    "bold",
+    "italic",
+    "underline",
+    "association-word",
+    "association-phrase"
+  ];
+  headerTools.sort(
+    (left, right) =>
+      formatOrder.indexOf(left.key) - formatOrder.indexOf(right.key)
+  );
   const topTools = tools.filter(
     (tool) => tool.key === "roles" || tool.key === "liaison"
   );
   const bottomTools = tools.filter(
     (tool) => tool.key === "pause" || tool.key === "voices"
   );
+  const uploadTool = composedMode
+    ? tools.find((tool) => tool.key === "uploads")
+    : undefined;
   const secondaryTools = tools.filter(
-    (tool) => !topTools.includes(tool) && !bottomTools.includes(tool)
+    (tool) =>
+      tool.key !== "erase" &&
+      tool !== uploadTool &&
+      !headerTools.includes(tool) &&
+      !topTools.includes(tool) &&
+      !bottomTools.includes(tool)
   );
+  const eraseTool = tools.find((tool) => tool.key === "erase");
   const marked =
     marks.roles.length +
     marks.liaisons.length +
+    marks.passthrough.filter(
+      (annotation) =>
+        annotation.type === "italic" ||
+        annotation.type === "bold" ||
+        annotation.type === "underline"
+    ).length +
     Object.keys(marks.pauses).length;
-  const trigger = (tool: DropdownTool, inline: boolean) => (
-    <Button
-      size="small"
-      className={`tsz-ve-tool-toggle ${tool.icon ? "tsz-ve-icon-tool" : ""} ${tool.className ?? ""}`}
-      aria-label={tool.ariaLabel ?? tool.label}
-      aria-pressed={tool.active ?? openTool === tool.key}
-      aria-expanded={tool.content ? inline || openTool === tool.key : undefined}
-      disabled={readOnly || tool.disabled}
-      onMouseDown={inline ? (event) => event.preventDefault() : undefined}
-      onClick={() =>
-        onOpenToolChange(
-          openTool === tool.key && !inline ? undefined : tool.key
-        )
-      }
-    >
-      {tool.icon}
-      <span className="tsz-ve-tool-label">{tool.label}</span>
-      {tool.summary !== undefined && (
-        <span className="tsz-ve-tool-summary">{tool.summary}</span>
-      )}
-    </Button>
-  );
+  const trigger = (tool: DropdownTool, inline: boolean) => {
+    const isVoices = inline && tool.key === "voices";
+    const button = (
+      <Button
+        size="small"
+        className={`tsz-ve-tool-toggle ${tool.icon ? "tsz-ve-icon-tool" : ""} ${tool.className ?? ""}`}
+        aria-label={tool.ariaLabel ?? tool.label}
+        aria-pressed={
+          isVoices ? undefined : (tool.active ?? openTool === tool.key)
+        }
+        aria-expanded={
+          isVoices
+            ? voicesExpanded
+            : tool.content
+              ? inline || openTool === tool.key
+              : undefined
+        }
+        aria-controls={isVoices ? voicesPanelId : undefined}
+        disabled={readOnly || tool.disabled}
+        onMouseDown={
+          inline ||
+          tool.key === "italic" ||
+          tool.key === "bold" ||
+          tool.key === "underline"
+            ? (event) => event.preventDefault()
+            : undefined
+        }
+        onClick={() => {
+          if (isVoices) {
+            setVoicesExpanded((expanded) => !expanded);
+            return;
+          }
+          onOpenToolChange(
+            openTool === tool.key && !inline ? undefined : tool.key
+          );
+        }}
+      >
+        {tool.icon}
+        <span className="tsz-ve-tool-label">{tool.label}</span>
+        {tool.summary !== undefined && (
+          <span className="tsz-ve-tool-summary">{tool.summary}</span>
+        )}
+      </Button>
+    );
+    const shortcut = FORMAT_SHORTCUTS[tool.key];
+    const hint = shortcut ? <ShortcutHint shortcut={shortcut} /> : undefined;
+    return hint ? <Tooltip title={hint}>{button}</Tooltip> : button;
+  };
+  const renderTool = (tool: DropdownTool) =>
+    tool.content ? (
+      <SelectionPanel
+        key={tool.key}
+        open={openTool === tool.key}
+        onDismiss={
+          tool.stayOpen ? undefined : () => onOpenToolChange(undefined)
+        }
+        placement={
+          tool.placement === "bottomLeft" ? "bottom-start" : "top-start"
+        }
+        content={tool.content}
+      >
+        {trigger(tool, false)}
+      </SelectionPanel>
+    ) : (
+      <span key={tool.key}>{trigger(tool, false)}</span>
+    );
   return (
     <div className="tsz-ve-markup">
-      <div className="tsz-ve-top-tools" role="toolbar" aria-label="标注工具栏">
+      <div
+        className={`tsz-ve-top-tools${selectionMode ? " is-selection" : ""}`}
+
+        role="toolbar"
+        aria-label="标注工具栏"
+      >
+        {headerTools.length > 0 && (
+          <div className="tsz-ve-primary-tools">
+            {headerTools.map(renderTool)}
+          </div>
+        )}
         <div className="tsz-ve-toolbar-actions">
-          <Tooltip title="撤销">
+          <Tooltip
+            title={
+              <>
+                <span>撤销</span>
+                <ShortcutHint shortcut="Z" />
+              </>
+            }
+          >
             <Button
               size="small"
               type="text"
@@ -172,9 +304,44 @@ export function MarkupPanel({
             <div className="tsz-ve-tool-content">{tool.content}</div>
           </div>
         ))}
-        {topTools.length === 0 && (
+        {eraseTool && (
+          <div className="tsz-ve-erase-action">
+            <Tooltip
+              title={
+                composedMode || mode === "spelling"
+                  ? "开启后点击已有连读或停顿即可取消，再次点击退出"
+                  : "开启后点击已有连读即可取消，再次点击退出"
+              }
+            >
+              {trigger(eraseTool, false)}
+            </Tooltip>
+          </div>
+        )}
+        {selectionMode && (
+          <div className="tsz-ve-selection-status" role="status">
+            {contentReadOnly ? (
+              "正文只读，请选择单词或短语编辑关联。"
+            ) : brush.kind === "erase" ? (
+              composedMode || mode === "spelling" ? (
+                "清除模式：点击已有连读或停顿即可取消。"
+              ) : (
+                "清除模式：点击已有连读即可取消。"
+              )
+            ) : selectionText ? (
+              <>
+                已选中 <strong>{selectionText}</strong>
+                ，可配置{selectionToolsLabel}。
+              </>
+            ) : (
+              `选中文字，可配置${selectionToolsLabel}。`
+            )}
+          </div>
+        )}
+        {topTools.length === 0 && !contentReadOnly && (
           <div className="tsz-ve-top-hint">
-            直接编辑正文；光标停在词间可插入停顿
+            {mode === "phoneme-settings"
+              ? "选择词形拼写的词缝设置停顿；音素正文在外部输入框编辑"
+              : "直接编辑正文；光标停在词间可插入停顿"}
           </div>
         )}
       </div>
@@ -206,6 +373,9 @@ export function MarkupPanel({
           onLetterClick={onLetterClick}
           onLiaisonClick={onLiaisonClick}
         />
+        {selectionMode && actions && (
+          <div className="tsz-ve-editor-actions">{actions}</div>
+        )}
       </div>
       {bottomTools.length > 0 && (
         <div className="tsz-ve-bottom-tools">
@@ -217,40 +387,28 @@ export function MarkupPanel({
             >
               {trigger(tool, true)}
               <span className="tsz-ve-toolbar-divider" aria-hidden />
-              <div className="tsz-ve-tool-content">{tool.content}</div>
+              {tool.key === "voices" && uploadTool && renderTool(uploadTool)}
+              <div
+                className="tsz-ve-tool-content"
+                id={tool.key === "voices" ? voicesPanelId : undefined}
+                hidden={tool.key === "voices" && !voicesExpanded}
+              >
+                {tool.content}
+              </div>
             </div>
           ))}
         </div>
       )}
-      {(secondaryTools.length > 0 || actions) && (
+      {(secondaryTools.length > 0 || (!selectionMode && actions)) && (
         <div className="tsz-ve-footer">
           {secondaryTools.length > 0 && (
             <div className="tsz-ve-secondary-tools">
-              {secondaryTools.map((tool) =>
-                tool.content ? (
-                  <Popover
-                    key={tool.key}
-                    open={openTool === tool.key}
-                    onOpenChange={
-                      tool.stayOpen
-                        ? undefined
-                        : (next) =>
-                            onOpenToolChange(next ? tool.key : undefined)
-                    }
-                    trigger={tool.stayOpen ? [] : "click"}
-                    placement={tool.placement ?? "topLeft"}
-                    overlayClassName="tsz-ve-pop-overlay"
-                    content={tool.content}
-                  >
-                    {trigger(tool, false)}
-                  </Popover>
-                ) : (
-                  <span key={tool.key}>{trigger(tool, false)}</span>
-                )
-              )}
+              {secondaryTools.map(renderTool)}
             </div>
           )}
-          {actions && <div className="tsz-ve-editor-actions">{actions}</div>}
+          {!selectionMode && actions && (
+            <div className="tsz-ve-editor-actions">{actions}</div>
+          )}
         </div>
       )}
     </div>

@@ -93,7 +93,7 @@ export function V3GrammarVoiceTextField({
       textLinks={textLinks}
       previewAdapter={previewAdapter}
       renderAssociationPicker={(pickerProps) => (
-        <V3GrammarFormPicker {...pickerProps} />
+        <V3GrammarFormPicker {...pickerProps} wordId={wordId} forms={forms} />
       )}
       leadingAction={
         <PronunciationPreviewControls

@@ -417,6 +417,43 @@ describe("HttpError", () => {
 });
 
 describe("createHttpClient", () => {
+  it("测试批次只附加到业务请求，401 重试保留原批次", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ message: "expired" }, { ok: false, status: 401 })
+    );
+    fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true }));
+    let run = "fixture-20261017";
+    let token = "old";
+    const http = createHttpClient({
+      baseUrl: "/api/v1/admin",
+      getToken: () => token,
+      getTestResourceRun: () => run,
+      onRefresh: async () => {
+        run = "another-20261017";
+        token = "new";
+        return token;
+      }
+    });
+    await http.post("/speech/previews", {});
+    expect(requestHeaders(0).get("X-TSZ-Test-Run")).toBe("fixture-20261017");
+    expect(requestHeaders(1).get("X-TSZ-Test-Run")).toBe("fixture-20261017");
+    expect(requestHeaders(1).get("Authorization")).toBe("Bearer new");
+    fetchMock.mockResolvedValueOnce(jsonResponse({}));
+    await http.post("/login", {}, { skipAuth: true });
+    expect(requestHeaders(2).has("X-TSZ-Test-Run")).toBe(false);
+  });
+  it("GET forwards spelling markup negotiation with the existing authorization", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({}));
+    const http = createHttpClient({
+      baseUrl: "/api/v1/admin",
+      getToken: () => "abc"
+    });
+    await http.get("/lexicon/entries/word", {
+      headers: { "X-TSZ-Spelling-Markup": "v1" }
+    });
+    expect(requestHeaders().get("X-TSZ-Spelling-Markup")).toBe("v1");
+    expect(requestHeaders().get("Authorization")).toBe("Bearer abc");
+  });
   it("get:拼接 baseUrl + path,带默认 Content-Type,返回响应体", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ id: "1" }));
     const http = createHttpClient({ baseUrl: "https://api.test" });
@@ -479,7 +516,7 @@ describe("createHttpClient", () => {
     expect(init.body).toBe(JSON.stringify({ name: "a" }));
   });
 
-  it("get/post:把 AbortSignal 原样传给 fetch", async () => {
+  it("get/post:合并调用方取消信号", async () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse(null))
       .mockResolvedValueOnce(jsonResponse(null));
@@ -489,8 +526,8 @@ describe("createHttpClient", () => {
     await http.get("/items", { signal: controller.signal });
     await http.post("/items", { name: "a" }, { signal: controller.signal });
 
-    expect(fetchMock.mock.calls[0]![1].signal).toBe(controller.signal);
-    expect(fetchMock.mock.calls[1]![1].signal).toBe(controller.signal);
+    expect(fetchMock.mock.calls[0]![1].signal.aborted).toBe(false);
+    expect(fetchMock.mock.calls[1]![1].signal.aborted).toBe(false);
   });
 
   it("put:method=PUT 且 body 为 JSON 字符串", async () => {
@@ -502,7 +539,7 @@ describe("createHttpClient", () => {
     expect(init.body).toBe(JSON.stringify({ name: "b" }));
   });
 
-  it("put:把自定义 header 与 AbortSignal 原样传给 fetch", async () => {
+  it("put:保留自定义 header 并合并取消信号", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(null));
     const http = createHttpClient({ baseUrl: "" });
     const controller = new AbortController();
@@ -517,7 +554,7 @@ describe("createHttpClient", () => {
     );
 
     const init = fetchMock.mock.calls[0]![1];
-    expect(init.signal).toBe(controller.signal);
+    expect(init.signal.aborted).toBe(false);
     expect(new Headers(init.headers).get("Idempotency-Key")).toBe("key-1");
   });
 

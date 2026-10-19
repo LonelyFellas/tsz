@@ -1,3 +1,12 @@
+import { createRelatedSuggestionEndpoints } from "./related-suggestions";
+import { SENTENCE_FORMATTING_HEADERS } from "./sentence-formatting";
+import { createAdminWordlistEndpoints } from "./wordlists";
+import { createAdminCoinEndpoints } from "./admin-coins";
+import {
+  createCoinEndpoints,
+  decodeCoinWallet,
+  decodeUserCoinEntryPage
+} from "./coins";
 import {
   createPermissionEndpoints,
   decodeAdminProfile
@@ -15,6 +24,8 @@ import type {
   AdminListResponse,
   AdminRole,
   AdminUser,
+  CoinEntriesQuery,
+  CertificationFile,
   AdminUserListQuery,
   AdminUserListResponse,
   AdminUserUpdateInput,
@@ -36,6 +47,7 @@ import type {
   DeleteDraftInput,
   EntryDeleteBatchInput,
   DetectLexiconSurfaceV3Input,
+  EntryArchiveImpactInput,
   EntryLifecycleBatchInput,
   EntryLifecycleInput,
   PreviewFormsImpactInputV3,
@@ -84,6 +96,7 @@ import {
   decodeDraftValidationResponseV3,
   decodeEntryLifecycleBatchAnyResponse,
   decodeFormsImpactResponseV3,
+  decodeEntryArchiveImpact,
   decodeInboundReferencesV3,
   decodeSearchComponentTargetsV3Response,
   InvalidAdminWordResponseError,
@@ -92,6 +105,13 @@ import {
   decodeEntryDeleteBatchResponse
 } from "./admin-word-schema";
 import type { HttpClient } from "./http";
+
+const SPELLING_MARKUP_HEADERS = {
+  ...SENTENCE_FORMATTING_HEADERS,
+  "X-TSZ-Spelling-Markup": "v1",
+  "X-TSZ-Spelling-Speech": "v1",
+  "X-TSZ-Phoneme-Speech": "v1"
+};
 
 // admin 账号体系的 wire 类型已收敛到 @tsz/types（wire 类型唯一家）。此处 re-export，
 // 保持既有 `import { AdminProfile, ... } from "@tsz/api-client"` 的消费方不破。
@@ -215,6 +235,9 @@ function requireLifecycleBatchIdentity<
  */
 export function createAdminEndpoints(http: HttpClient) {
   return {
+    coins: createCoinEndpoints(http),
+    wordlists: createAdminWordlistEndpoints(http),
+    coinManagement: createAdminCoinEndpoints(http),
     permissionSystem: createPermissionEndpoints(http),
     teacherCertification: createAdminTeacherCertificationEndpoints(http),
     sentences: createSharedSentenceEndpoints(http),
@@ -300,6 +323,7 @@ export function createAdminEndpoints(http: HttpClient) {
      * 树内节点 id 由前端生成（UUID v4）且跨保存稳定，updated_at 兼作乐观锁 token。
      */
     words: {
+      ...createRelatedSuggestionEndpoints(http),
       /** GET /admin/lexicon/entries — 列表页：搜索行筛选 + 分页。 */
       list: (query: AdminWordListQuery = {}) =>
         http
@@ -332,13 +356,18 @@ export function createAdminEndpoints(http: HttpClient) {
       createV3: (idempotencyKey: string, input: CreateAdminWordV3Input) =>
         http
           .post<unknown>("/lexicon/entries", input, {
-            headers: { "Idempotency-Key": idempotencyKey }
+            headers: {
+              ...SPELLING_MARKUP_HEADERS,
+              "Idempotency-Key": idempotencyKey
+            }
           })
           .then(decodeAdminWordV3Envelope),
       /** GET /admin/lexicon/entries/{id} — 草稿详情。 */
       get: (wordId: string) =>
         http
-          .get<unknown>(`/lexicon/entries/${wordId}`)
+          .get<unknown>(`/lexicon/entries/${wordId}`, {
+            headers: SPELLING_MARKUP_HEADERS
+          })
           .then(decodeAdminWordDraftAnyEnvelope)
           .then((response) =>
             requireWordPathIdentity(response, wordId, "get.word.id")
@@ -357,11 +386,15 @@ export function createAdminEndpoints(http: HttpClient) {
           .then(decodeFormsImpactResponseV3),
       saveFormsStepV3: (wordId: string, input: SaveFormsStepInputV3) =>
         http
-          .put<unknown>(`/lexicon/entries/${wordId}/steps/forms`, input)
+          .put<unknown>(`/lexicon/entries/${wordId}/steps/forms`, input, {
+            headers: SPELLING_MARKUP_HEADERS
+          })
           .then(decodeAdminWordV3Envelope),
       saveMeaningsStepV3: (wordId: string, input: SaveMeaningsStepInputV3) =>
         http
-          .put<unknown>(`/lexicon/entries/${wordId}/steps/meanings`, input)
+          .put<unknown>(`/lexicon/entries/${wordId}/steps/meanings`, input, {
+            headers: SPELLING_MARKUP_HEADERS
+          })
           .then(decodeAdminWordV3Envelope),
       /** 按关键字检索可做短语成分目标的已发布词条。 */
       searchComponentTargetsV3: (
@@ -386,13 +419,16 @@ export function createAdminEndpoints(http: HttpClient) {
       /** 历史 publication 双版本只读列表。 */
       listPublications: (wordId: string) =>
         http
-          .get<unknown>(`/lexicon/entries/${wordId}/publications`)
+          .get<unknown>(`/lexicon/entries/${wordId}/publications`, {
+            headers: SPELLING_MARKUP_HEADERS
+          })
           .then(decodeAdminWordPublicationListResponse),
       /** 历史 publication 双版本只读详情。 */
       getPublication: (wordId: string, publicationId: string) =>
         http
           .get<unknown>(
-            `/lexicon/entries/${wordId}/publications/${publicationId}`
+            `/lexicon/entries/${wordId}/publications/${publicationId}`,
+            { headers: SPELLING_MARKUP_HEADERS }
           )
           .then(decodeAdminWordPublicationEnvelope),
       publishBatchV3: (
@@ -401,7 +437,10 @@ export function createAdminEndpoints(http: HttpClient) {
       ) =>
         http
           .post<unknown>("/lexicon/entries/publications/batch", input, {
-            headers: { "Idempotency-Key": idempotencyKey }
+            headers: {
+              ...SPELLING_MARKUP_HEADERS,
+              "Idempotency-Key": idempotencyKey
+            }
           })
           .then((response) =>
             decodeBatchPublicationResponseV3(
@@ -417,7 +456,10 @@ export function createAdminEndpoints(http: HttpClient) {
       ) =>
         http
           .post<unknown>(`/lexicon/entries/${wordId}/publications`, input, {
-            headers: { "Idempotency-Key": idempotencyKey }
+            headers: {
+              ...SPELLING_MARKUP_HEADERS,
+              "Idempotency-Key": idempotencyKey
+            }
           })
           .then(decodeAdminWordV3Envelope),
       rollbackPublicationV3: (
@@ -430,9 +472,18 @@ export function createAdminEndpoints(http: HttpClient) {
           .post<unknown>(
             `/lexicon/entries/${wordId}/publications/${publicationId}/rollback`,
             input,
-            { headers: { "Idempotency-Key": idempotencyKey } }
+            {
+              headers: {
+                ...SPELLING_MARKUP_HEADERS,
+                "Idempotency-Key": idempotencyKey
+              }
+            }
           )
           .then(decodeAdminWordV3Envelope),
+      archiveImpact: (input: EntryArchiveImpactInput) =>
+        http
+          .post<unknown>("/lexicon/entries/archive-impact", input)
+          .then(decodeEntryArchiveImpact),
       archive: (
         wordId: string,
         idempotencyKey: string,
@@ -440,7 +491,10 @@ export function createAdminEndpoints(http: HttpClient) {
       ) =>
         http
           .post<unknown>(`/lexicon/entries/${wordId}/archive`, input, {
-            headers: { "Idempotency-Key": idempotencyKey }
+            headers: {
+              ...SPELLING_MARKUP_HEADERS,
+              "Idempotency-Key": idempotencyKey
+            }
           })
           .then(decodeAdminWordAnyEnvelope)
           .then((response) =>
@@ -453,7 +507,10 @@ export function createAdminEndpoints(http: HttpClient) {
       ) =>
         http
           .post<unknown>(`/lexicon/entries/${wordId}/restore`, input, {
-            headers: { "Idempotency-Key": idempotencyKey }
+            headers: {
+              ...SPELLING_MARKUP_HEADERS,
+              "Idempotency-Key": idempotencyKey
+            }
           })
           .then(decodeAdminWordAnyEnvelope)
           .then((response) =>
@@ -462,7 +519,10 @@ export function createAdminEndpoints(http: HttpClient) {
       archiveBatch: (idempotencyKey: string, input: EntryLifecycleBatchInput) =>
         http
           .post<unknown>("/lexicon/entries/archive-batch", input, {
-            headers: { "Idempotency-Key": idempotencyKey }
+            headers: {
+              ...SPELLING_MARKUP_HEADERS,
+              "Idempotency-Key": idempotencyKey
+            }
           })
           .then(decodeEntryLifecycleBatchAnyResponse)
           .then((response) =>
@@ -471,7 +531,10 @@ export function createAdminEndpoints(http: HttpClient) {
       restoreBatch: (idempotencyKey: string, input: EntryLifecycleBatchInput) =>
         http
           .post<unknown>("/lexicon/entries/restore-batch", input, {
-            headers: { "Idempotency-Key": idempotencyKey }
+            headers: {
+              ...SPELLING_MARKUP_HEADERS,
+              "Idempotency-Key": idempotencyKey
+            }
           })
           .then(decodeEntryLifecycleBatchAnyResponse)
           .then((response) =>
@@ -586,24 +649,47 @@ export function createAdminEndpoints(http: HttpClient) {
      * 四条的 200 都返回同一个 AdminUser 形状；phone / email 缺值时**省略键**（不返回 null 或 ""）。
      */
     users: {
-      /** GET /admin/users — 列表页：role/关键字/注册时间筛选 + 分页。联系方式不脱敏。 */
+      wallet: (id: string) =>
+        http
+          .get<unknown>(`/users/${encodeURIComponent(id)}/coin-wallet`)
+          .then(decodeCoinWallet),
+      entries: (id: string, query: CoinEntriesQuery = {}) =>
+        http
+          .get<unknown>(
+            `/users/${encodeURIComponent(id)}/coin-entries${qs({ ...query })}`
+          )
+          .then(decodeUserCoinEntryPage),
+      identityDocuments: (id: string) =>
+        http.get<CertificationFile[]>(
+          `/users/${encodeURIComponent(id)}/identity-documents`
+        ),
+      identityFile: (
+        id: string,
+        fileId: string,
+        opts?: { signal?: AbortSignal }
+      ) =>
+        http.getBlob(
+          `/users/${encodeURIComponent(id)}/identity-documents/${encodeURIComponent(fileId)}`,
+          opts
+        ),
+      /** GET /admin/users — 列表页：role/关键字/注册时间筛选 + 分页。联系方式另需 users.read_sensitive。 */
       list: (query: AdminUserListQuery = {}) =>
         http.get<AdminUserListResponse>(`/users${qs({ ...query })}`),
       /**
        * GET /admin/users/{id} — 用户详情（单个 AdminUser，与列表条目同形状）。
-       * 全体 admin 可读（与列表同一道闸，不需超管）。404 = 用户不存在。
+       * 需 users.access；基本资料和联系方式分别按授权省略。404 = 用户不存在。
        */
       get: (id: string) => http.get<AdminUser>(`/users/${id}`),
       /**
-       * PATCH /admin/users/{id}/status — 启用/禁用；返回更新后的 AdminUser。**需超管**。
-       * 禁用在用户下次登录/刷新时生效（一个 access-token TTL 内），不强制吊销活跃会话。
-       * 403 = 非超管；404 = 用户不存在；422 = status 不在枚举内或缺字段。
+       * PATCH /admin/users/{id}/status — 启用/禁用；返回按授权裁剪的 AdminUser。需 users.set_status。
+       * 禁用后登录、刷新及受保护请求均会拒绝。
+       * 403 = 无权限；404 = 用户不存在；422 = status 不在枚举内或缺字段。
        */
-      setStatus: (id: string, status: AdminUser["status"]) =>
+      setStatus: (id: string, status: NonNullable<AdminUser["status"]>) =>
         http.patch<AdminUser>(`/users/${id}/status`, { status }),
       /**
        * PATCH /admin/users/{id} — 编辑昵称（请求体仅 display_name）；返回更新后的 AdminUser。
-       * **需超管**。400 invalid_display_name（错误体带 field）；404 = 用户不存在；
+       * 需 users.edit。400 invalid_display_name（错误体带 field）；404 = 用户不存在；
        * 422 = 请求体缺 display_name。
        */
       update: (id: string, input: AdminUserUpdateInput) =>

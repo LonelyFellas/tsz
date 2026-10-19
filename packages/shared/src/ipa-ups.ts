@@ -1,6 +1,9 @@
-/** en-US UPS rules. Sources (reviewed 2026-09-20):
+/** English UPS rules. Sources (reviewed 2026-10-11):
  * https://learn.microsoft.com/en-us/previous-versions/office/developer/speech-technologies/hh378403(v=office.14)
  * https://learn.microsoft.com/azure/ai-services/speech-service/customize-pronunciation
+ * The UPS reference linked by Azure SSML includes en-GB ER (ɜ), lng (ː)
+ * and '+' for compound vowels. Voice fidelity still needs audition.
+ * https://learn.microsoft.com/azure/ai-services/speech-service/speech-synthesis-markup-pronunciation
  * S1/S2 precede a stressed syllable; '.' is a syllable boundary.
  * Diphthong/r mappings are English lexical phone adaptations, not narrow-IPA equivalence.
  * Unsupported conventions fail instead of dropping stress/length or guessing accent.
@@ -55,14 +58,29 @@ const phones: Readonly<Record<string, string>> = {
   ɹ: "R",
   ɻ: "R"
 };
-const keys = Object.keys(phones).sort((a, b) => b.length - a.length);
-const vowel = /^[ɑæʌɔəɛɪioɒʊuae]/u;
+const britishPhones: Readonly<Record<string, string>> = {
+  ɑː: "AA lng",
+  ɔː: "AO lng",
+  ɜː: "ER lng",
+  iː: "I lng",
+  uː: "U lng",
+  əʊ: "AX + UH",
+  ɪə: "IH + AX",
+  ɛə: "EH + AX",
+  ʊə: "UH + AX"
+};
+const rhoticPhones = { ɚ: "AX R", ɝ: "ER R" };
+const vowel = /^[ɑæʌɔəɛɪioɒʊuaeɜɚɝ]/u;
 export function ipaWordToUps(input: string, locale: string = "en-US") {
   const fail = (message: string) => ({ ok: false as const, message });
-  if (locale !== "en-US")
-    return fail(
-      "UPS 自动转换目前仅验证 en-US；其他口音请保留 IPA 或手工填写已确认的 UPS。"
-    );
+  if (locale !== "en-US" && locale !== "en-GB")
+    return fail("UPS 自动转换仅支持 en-US 和 en-GB。");
+  const mapping: Readonly<Record<string, string>> = {
+    ...phones,
+    ...rhoticPhones,
+    ...(locale === "en-GB" ? britishPhones : {})
+  };
+  const keys = Object.keys(mapping).sort((a, b) => b.length - a.length);
   if (Array.from(input).length > 200)
     return fail("单词实际音标最多 200 个字符。");
   const source = input.replaceAll("ɡ", "g");
@@ -95,14 +113,14 @@ export function ipaWordToUps(input: string, locale: string = "en-US") {
       i++;
       continue;
     }
-    if (source.startsWith("əʊ", i))
+    if (locale === "en-US" && source.startsWith("əʊ", i))
       return fail("英式 əʊ 暂无已确认的 UPS 转换；不自动改成美式 oʊ。");
     const key = keys.find((key) => source.startsWith(key, i));
     if (!key)
       return fail(
         `第 ${Array.from(source.slice(0, i)).length + 1} 个字符「${char}」尚无确认规则（长音、卷舌元音等不会静默删除或拆开）。`
       );
-    out.push(phones[key]!);
+    out.push(mapping[key]!);
     hasPhone = true;
     if (vowel.test(key)) {
       hasVowel = true;

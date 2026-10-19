@@ -11,7 +11,7 @@ import {
 import { v3IssueMessage } from "./presentationErrors";
 
 const STEP_LABEL: Record<PersistedWordStep, string> = {
-  basics: "创建新词条",
+  basics: "创建词汇",
   forms: "词形与发音",
   meanings: "词义与例句"
 };

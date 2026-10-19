@@ -29,11 +29,16 @@ async function securityApi(
         })
       });
     }
-    if (path === "/auth/me") {
+    if (path === "/me") {
       return route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(user)
+        body: JSON.stringify({
+          user,
+          active_role: user.active_role,
+          learning_settings: { cefr_level: "A1", english_variant: "BrE" },
+          onboarded: true
+        })
       });
     }
     if (path.startsWith("/me/contact/") || path === "/auth/password/change") {
@@ -110,7 +115,7 @@ for (const width of [375, 1280]) {
       await trigger.focus();
       await page.keyboard.press("ArrowDown");
       await expect(
-        page.getByRole("menuitem", { name: "进入学生工作台" })
+        page.getByRole("menuitem", { name: "天生币：0" })
       ).toBeFocused();
       await page.keyboard.press(shift ? "Shift+Tab" : "Tab");
       await expect(page.getByRole("menu")).toHaveCount(0);
@@ -129,16 +134,16 @@ for (const width of [375, 1280]) {
     await page.goto("/account/profile");
     const title = page.getByRole("heading", { name: "编辑资料", level: 1 });
     await expect(title).toBeVisible();
-    await expect(page.getByText("修改头像和昵称。")).toBeVisible();
+    await expect(page.getByText("修改头像、昵称和英美偏好。")).toBeVisible();
     await expect(
-      page.getByRole("link", { name: "← 返回个人中心" })
+      page.getByRole("link", { name: "返回个人中心" })
     ).toHaveAttribute("href", "/account");
     await expect(
       page.getByRole("button", { name: "保存", exact: true })
     ).toBeDisabled();
     const editLayout = await title.evaluate((element) => {
       const style = getComputedStyle(element);
-      const back = element.parentElement!.querySelector("a")!;
+      const back = element.closest("header")!.querySelector("a")!;
       return {
         fontSize: style.fontSize,
         fontWeight: style.fontWeight,
@@ -160,7 +165,7 @@ for (const width of [375, 1280]) {
     await expect(
       page.getByRole("link", { name: "账号与密码设置" })
     ).toHaveCount(0);
-    await page.getByRole("link", { name: "← 返回个人中心" }).click();
+    await page.getByRole("link", { name: "返回个人中心" }).click();
     await page.getByRole("link", { name: "账号安全", exact: true }).click();
     const reference = page.getByRole("heading", { name: "账号安全", level: 1 });
     await expect(reference).toBeVisible();
@@ -185,6 +190,10 @@ test.describe("昵称修复浏览器复核", () => {
     let release!: () => void;
     const pending = new Promise<void>((done) => (release = done));
     await page.route("**/api/v1/me", async (route) => {
+      if (route.request().method() !== "PATCH") {
+        await route.fallback();
+        return;
+      }
       const name = route.request().postDataJSON().display_name as string;
       await pending;
       await route.fulfill({
@@ -211,6 +220,10 @@ test.describe("昵称修复浏览器复核", () => {
   test("emoji昵称保存后的资料头像不是孤立代理项", async ({ page }) => {
     await mockApi(page, { authenticated: true });
     await page.route("**/api/v1/me", async (route) => {
+      if (route.request().method() !== "PATCH") {
+        await route.fallback();
+        return;
+      }
       const name = route.request().postDataJSON().display_name as string;
       await route.fulfill({
         status: 200,
@@ -262,7 +275,7 @@ test.describe("账号安全", () => {
       await pending;
       await route.fallback();
     });
-    await page.route("**/api/v1/auth/me", async (route) => {
+    await page.route("**/api/v1/me", async (route) => {
       meRequests += 1;
       expect(route.request().headers().authorization).toBe(
         "Bearer test-access-token"
@@ -290,9 +303,9 @@ test.describe("账号安全", () => {
     await page.goto("/account");
     await page.getByRole("link", { name: /账号安全/ }).click();
     await expect(page).toHaveURL(/\/account\/security$/);
-    await expect(
-      page.getByRole("button", { name: "解绑手机号" })
-    ).toBeDisabled();
+    await expect(page.getByRole("button", { name: "解绑手机号" })).toHaveCount(
+      0
+    );
     await page.getByRole("button", { name: "绑定邮箱", exact: true }).click();
     await page.getByLabel("新邮箱", { exact: true }).fill(" New@EXAMPLE.com ");
     await page
@@ -326,11 +339,13 @@ test.describe("账号安全", () => {
     ]);
   });
 
-  test("双渠道可用邮箱验证解绑手机，窄屏无横向溢出", async ({ page }) => {
+  test("双渠道可用邮箱验证解绑邮箱，手机号只允许换绑，窄屏无横向溢出", async ({
+    page
+  }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     const requests = await securityApi(page);
     await page.goto("/account/security");
-    await page.getByRole("button", { name: "解绑手机号", exact: true }).click();
+    await page.getByRole("button", { name: "解绑邮箱", exact: true }).click();
     await page.getByRole("combobox", { name: "当前账号的验证方式" }).click();
     await page.getByRole("option", { name: /邮箱：/ }).click();
     await expect(
@@ -345,21 +360,21 @@ test.describe("账号安全", () => {
     await expect(page.getByLabel("邮箱验证码")).toBeEnabled();
     await page.getByLabel("邮箱验证码").fill("123456");
     await expect(page.getByLabel("新手机号验证码")).toHaveCount(0);
-    await page.getByRole("button", { name: "确认解绑手机号" }).click();
+    await page.getByRole("button", { name: "确认解绑邮箱" }).click();
     await expect(page).toHaveURL(/\/login\?security=success$/);
     expect(requests).toEqual([
       {
         path: "/me/contact/verification-code",
         body: {
           operation: "unbind",
-          contact: TEST_USER.phone,
+          contact: TEST_USER.email,
           verification_channel: "email"
         }
       },
       {
         path: "/me/contact/unbind",
         body: {
-          channel: "phone",
+          channel: "email",
           verification_channel: "email",
           verification_code: "123456"
         }

@@ -5,6 +5,12 @@ import Link from "next/link";
 import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
 import { PrivateImage } from "./PrivateImage";
+import { cn } from "@tsz/ui/lib/cn";
+import {
+  PageNotice,
+  buttonClass,
+  textButtonClass
+} from "@/features/shell/Page";
 
 const statuses = {
   pending: "待审核",
@@ -26,70 +32,69 @@ export function ApplicationDetail({ id }: { id: string }) {
     queryFn: () => api.teacherCertification.detail(id),
     enabled: !!userId
   });
-  if (query.isPending) return <p>正在读取申请…</p>;
+  if (query.isPending) return <PageNotice>正在读取申请…</PageNotice>;
   if (query.isError)
     return (
-      <div role="alert">
+      <PageNotice tone="error">
         <p>{query.error.message}</p>
         <button
           type="button"
-          className="mt-3 text-primary"
+          className={cn(textButtonClass, "mt-3")}
           onClick={() => void query.refetch()}
         >
           重试
         </button>
-      </div>
+      </PageNotice>
     );
   const { application, files } = query.data;
+  const fields: [string, string | null][] = [
+    ["真实姓名", application.real_name],
+    ["联系方式", application.contact],
+    ["认证说明", application.statement],
+    ["审核原因", application.review_reason],
+    ["撤销原因", application.revoke_reason]
+  ];
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="font-medium">{statuses[application.status]}</p>
-        <time
-          dateTime={application.submitted_at}
-          className="text-sm text-foreground-muted"
-        >
-          {new Date(application.submitted_at).toLocaleString()}
-        </time>
-      </div>
-      <dl className="space-y-4">
-        <div>
-          <dt className="text-sm text-foreground-muted">真实姓名</dt>
-          <dd>{application.real_name}</dd>
-        </div>
-        <div>
-          <dt className="text-sm text-foreground-muted">联系方式</dt>
-          <dd>{application.contact}</dd>
-        </div>
-        <div>
-          <dt className="text-sm text-foreground-muted">认证说明</dt>
-          <dd className="whitespace-pre-wrap break-words">
-            {application.statement}
-          </dd>
-        </div>
-        {application.review_reason && (
-          <div>
-            <dt className="text-sm text-foreground-muted">审核原因</dt>
-            <dd className="whitespace-pre-wrap break-words">
-              {application.review_reason}
-            </dd>
+      <div className="glass rounded-3xl p-2">
+        <div className="rounded-[20px] bg-surface/70 p-6 sm:p-8">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="rounded-full bg-primary-muted px-3 py-1 text-sm font-medium text-primary">
+              {statuses[application.status]}
+            </p>
+            <time
+              dateTime={application.submitted_at}
+              className="text-sm text-foreground-muted"
+            >
+              {new Date(application.submitted_at).toLocaleString()}
+            </time>
           </div>
-        )}
-        {application.revoke_reason && (
-          <div>
-            <dt className="text-sm text-foreground-muted">撤销原因</dt>
-            <dd className="whitespace-pre-wrap break-words">
-              {application.revoke_reason}
-            </dd>
-          </div>
-        )}
-      </dl>
-      <div className="grid gap-4 sm:grid-cols-2">
-        {files.map((file) => (
-          <PrivateImage key={file.id} id={file.id} label={kinds[file.kind]} />
-        ))}
+          <dl className="mt-6 divide-y divide-border/60">
+            {fields.map(
+              ([label, value]) =>
+                value && (
+                  <div
+                    key={label}
+                    className="grid gap-1 py-4 first:pt-0 last:pb-0 sm:grid-cols-[96px_1fr] sm:gap-4"
+                  >
+                    <dt className="text-sm text-foreground-muted">{label}</dt>
+                    <dd className="whitespace-pre-wrap break-words text-sm leading-6">
+                      {value}
+                    </dd>
+                  </div>
+                )
+            )}
+          </dl>
+        </div>
       </div>
-      <Link href="/apply-teacher" className="inline-block text-sm text-primary">
+      {files.length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {files.map((file) => (
+            <PrivateImage key={file.id} id={file.id} label={kinds[file.kind]} />
+          ))}
+        </div>
+      )}
+      <Link href="/apply-teacher" className={buttonClass}>
         查看当前认证状态
       </Link>
     </div>

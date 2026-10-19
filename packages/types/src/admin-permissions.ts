@@ -11,6 +11,7 @@ export interface PermissionDefinition {
 export interface PermissionTag {
   id: string;
   name: string;
+  color: string;
   version: number;
   permissions: string[];
 }

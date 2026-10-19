@@ -55,7 +55,7 @@ test("初始恢复 503 后手动登录可进入后台，不永久停在加载态
     return route.fulfill({ json: {} });
   });
   await page.goto("/login?redirect=/settings/profile");
-  await expect(page.getByText("暂时无法恢复会话，请重试")).toBeVisible();
+  await expect(page.getByText("正在恢复连接，联网后将自动继续")).toBeVisible();
   await page.getByLabel("手机号", { exact: true }).fill("13800138000");
   await page
     .getByLabel("登录密码", { exact: true })
@@ -64,7 +64,7 @@ test("初始恢复 503 后手动登录可进入后台，不永久停在加载态
   await page.getByRole("button", { name: "登 录", exact: true }).click();
   await expect(page).toHaveURL(/\/settings\/profile$/);
   await expect(page.getByText("加载中...", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("暂时无法恢复会话，请重试")).toHaveCount(0);
+  await expect(page.getByText("正在恢复连接，联网后将自动继续")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "个人设置" })).toBeVisible();
 });
 
@@ -155,18 +155,26 @@ for (const forced of [false, true]) {
   }
 }
 
-test("主动刷新 503 不丢表单，联网恢复后继续会话", async ({ page }) => {
+test("主动刷新 503 自动恢复会话并保留未提交表单", async ({ page }) => {
   await page.clock.install();
   let refreshes = 0;
   let available = false;
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
+  const keys: (string | undefined)[] = [];
   await page.route("**/api/v1/admin/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path.endsWith("/auth/refresh")) {
+      if (route.request().method() === "HEAD")
+        return route.fulfill({
+          status: 204,
+          headers: { "x-refresh-recovery": "v1" }
+        });
       refreshes++;
+      keys.push(route.request().headers()["x-refresh-request-id"]);
       if (refreshes > 1 && !available) return route.fulfill({ status: 503 });
-      return route.fulfill({ json: { access_token: "token", expires_in: 60 } });
+      return route.fulfill({
+        headers: { "x-refresh-recovery": "v1" },
+        json: { access_token: "token", expires_in: 60 }
+      });
     }
     if (path.endsWith("/profile")) return route.fulfill({ json: profile });
     return route.fulfill({ json: {} });
@@ -175,42 +183,113 @@ test("主动刷新 503 不丢表单，联网恢复后继续会话", async ({ pag
   await expect(page.getByLabel("当前密码", { exact: true })).toBeVisible();
   await page.getByLabel("当前密码", { exact: true }).fill("Unsubmitted!731");
   await page.clock.fastForward(30_000);
-  await expect(page.getByText("连接暂时中断，当前内容已保留")).toBeVisible();
+  const message = "连接暂时中断，联网后将自动恢复；当前内容已保留";
+  await expect(page.getByText(message)).toBeVisible();
   await expect(page.getByLabel("当前密码", { exact: true })).toHaveValue(
     "Unsubmitted!731"
   );
-  await page.screenshot({
-    path: test.info().outputPath("refresh-offline.png")
-  });
-  await expect(page).toHaveURL(/\/change-password$/);
   available = true;
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
-  await expect(page.getByText("连接暂时中断，当前内容已保留")).toHaveCount(0);
+  await expect(page.getByText(message)).toHaveCount(0);
   await expect.poll(() => refreshes).toBe(3);
+  expect(keys[2]).toBe(keys[1]);
+  await expect(page).toHaveURL(/\/change-password$/);
   await expect(page.getByLabel("当前密码", { exact: true })).toHaveValue(
     "Unsubmitted!731"
   );
-  expect(errors).toEqual([]);
+  await expect(page.getByRole("button", { name: "重新登录" })).toHaveCount(0);
 });
 
-test("恢复 503 保留原 URL 且不放行后台，重试后恢复", async ({ page }) => {
-  let available = false;
+for (const failure of ["429", "503", "offline"] as const) {
+  test(`恢复 ${failure} 保留原 URL 且不放行后台`, async ({ page }) => {
+    let available = false;
+    let refreshes = 0;
+    await page.route("**/api/v1/admin/**", async (route) => {
+      const path = new URL(route.request().url()).pathname;
+      if (path.endsWith("/auth/refresh")) {
+        if (route.request().method() === "HEAD")
+          return route.fulfill({
+            status: 204,
+            headers: { "x-refresh-recovery": "v1" }
+          });
+        refreshes++;
+        if (available)
+          return route.fulfill({
+            json: { access_token: "token", expires_in: 900 }
+          });
+        return failure === "offline"
+          ? route.abort("internetdisconnected")
+          : route.fulfill({ status: Number(failure) });
+      }
+      if (path.endsWith("/auth/login"))
+        return route.fulfill({
+          json: {
+            access_token: "login",
+            expires_in: 900,
+            must_change_password: false
+          }
+        });
+      if (path.endsWith("/profile")) return route.fulfill({ json: profile });
+      return route.fulfill({ json: {} });
+    });
+    await page.goto("/settings/profile");
+    const message = "正在恢复连接，联网后将自动继续";
+    await expect(page.getByText(message)).toBeVisible();
+    await expect(page).toHaveURL(/\/settings\/profile$/);
+    await expect(page.getByRole("heading", { name: "个人设置" })).toHaveCount(
+      0
+    );
+    expect(refreshes).toBe(1);
+    available = true;
+    await page.evaluate(() => window.dispatchEvent(new Event("online")));
+    await expect(page.getByText(message)).toHaveCount(0);
+    await expect(page.getByText("加载中...", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "个人设置" })).toBeVisible();
+    expect(refreshes).toBe(2);
+    await expect(page).toHaveURL(/\/settings\/profile$/);
+  });
+}
+
+test("旧标签页未知标记刷新后直接恢复，无需重新登录", async ({ page }) => {
+  const attempts: string[] = [];
   await page.route("**/api/v1/admin/**", async (route) => {
-    const path = new URL(route.request().url()).pathname;
-    if (path.endsWith("/auth/refresh"))
-      return available
-        ? route.fulfill({ json: { access_token: "token", expires_in: 900 } })
-        : route.fulfill({ status: 503 });
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path.endsWith("/auth/refresh")) {
+      attempts.push(request.method());
+      if (request.method() === "HEAD")
+        return route.fulfill({
+          status: 204,
+          headers: {
+            "x-refresh-recovery": "v1",
+            "x-refresh-current-only": "v1"
+          }
+        });
+      if (attempts.length > 1)
+        expect(request.headers()["x-refresh-current-only"]).toBe("v1");
+      return route.fulfill({
+        headers: { "x-refresh-recovery": "v1" },
+        json: { access_token: "restored", expires_in: 900 }
+      });
+    }
     if (path.endsWith("/profile")) return route.fulfill({ json: profile });
     return route.fulfill({ json: {} });
   });
   await page.goto("/settings/profile");
-  await expect(page.getByText("暂时无法恢复会话，请重试")).toBeVisible();
-  await expect(page).toHaveURL(/\/settings\/profile$/);
-  await expect(page.getByRole("button", { name: "重试连接" })).toBeEnabled();
-  available = true;
-  await page.getByRole("button", { name: "重试连接" }).click();
-  await expect(page.getByText("暂时无法恢复会话，请重试")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "个人设置" })).toBeVisible();
+  await page.evaluate(() =>
+    sessionStorage.setItem("tsz:refresh-unconfirmed:/api/v1/admin", "1")
+  );
+  attempts.length = 0;
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "个人设置" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "重新登录" })).toHaveCount(0);
   await expect(page.getByText("加载中...", { exact: true })).toHaveCount(0);
   await expect(page).toHaveURL(/\/settings\/profile$/);
+  expect(attempts).toEqual(["HEAD", "POST"]);
+  expect(
+    await page.evaluate(() =>
+      sessionStorage.getItem("tsz:refresh-unconfirmed:/api/v1/admin")
+    )
+  ).toBeNull();
 });

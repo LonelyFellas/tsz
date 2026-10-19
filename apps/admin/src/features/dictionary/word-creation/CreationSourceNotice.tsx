@@ -41,7 +41,7 @@ export function CreationSourceNotice({ source }: { source?: CreationSource }) {
       showIcon
       type="warning"
       title="词性建议尚未写入，请手动补充"
-      description="当前草稿没有词性或词形，请从右上角添加词性；系统未复制重复词条的既有内容。"
+      description="当前草稿没有词性或词形，请使用“添加词性”入口；系统未复制重复词条的既有内容。"
     />
   ) : (
     <Alert

@@ -17,7 +17,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/stores/user", () => ({
   useUserStore: (select: (s: unknown) => unknown) =>
     select({
-      user: { id: "student-1", active_role: "student" },
+      user: { id: "student-1", phone: "13800138000", active_role: "student" },
       hydrated: true
     })
 }));

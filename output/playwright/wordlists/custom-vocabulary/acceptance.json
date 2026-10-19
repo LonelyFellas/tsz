@@ -1,0 +1,32 @@
+{
+  "run_id": "custom-vocabulary-20261018-3eb5",
+  "frontend_base": "79c7930e",
+  "backend_base": "0d22770",
+  "frontend_mode": "production build + next start",
+  "backend_binary_sha256": "a700ff565e65584b5153b8ba274fa0b6128dc677324cf675b141ca3427d1822d",
+  "database": "127.0.0.1:55488/custom_vocabulary",
+  "redis": "127.0.0.1:56488/0",
+  "business_api_mock": false,
+  "browser": "Codex built-in browser",
+  "verified": [
+    "mixed manual create and reload",
+    "edit rename definition reorder and reload",
+    "Excel unmatched to custom append and persist",
+    "standard and full reading",
+    "manual publication pending with immutable custom snapshot",
+    "390px light/dark no horizontal overflow",
+    "console no errors or warnings"
+  ],
+  "frontend_tests": {
+    "files": 281,
+    "passed": 3988,
+    "skipped_existing": 2
+  },
+  "backend_tests": {
+    "lib_passed": 371,
+    "integration_passed": 62
+  },
+  "admin_browser_review": "not run; API snapshot/privacy covered by backend integration tests",
+  "spec_sha256": "76f9040cecfaaed11062d1e4a660728a760bf61647f744de73191fa1f57c9f9e",
+  "final_build_readback": "same persisted three items, author notes and pending review state"
+}

@@ -1,33 +1,54 @@
 /** 前端只匹配已实现的稳定业务 key，未知 key（包括通配符）永不授权。 */
 export const ADMIN_PERMISSION_DEPENDENCIES = {
+  "wordlists.access": [],
+  "wordlists.visibility": ["wordlists.access"],
+  "wordlists.recommend": ["wordlists.access"],
+  "wordlists.delete": ["wordlists.access"],
+
+  "wordlists.review": ["wordlists.access"],
+  "wordlists.withdraw": ["wordlists.access"],
+  "coins.access": [],
+  "coins.credit": ["coins.access"],
+  "coins.reverse": ["coins.access"],
   "words.access": [],
   "words.create": ["words.access"],
   "words.detect": ["words.access"],
   "words.validate": ["words.access"],
   "words.edit": ["words.access"],
-  "words.edit_others": ["words.edit"],
+  "words.associate": ["words.access"],
+  "words.edit_others": ["words.access"],
   "words.publish": ["words.access"],
   "words.archive": ["words.access"],
   "words.restore": ["words.access"],
   "words.rollback": ["words.access"],
   "sentences.access": [],
+  "sentences.read_published": [],
   "sentences.create": ["sentences.access"],
   "sentences.edit": ["sentences.access", "words.access"],
-  "sentences.edit_others": ["sentences.edit"],
+  "sentences.associate": ["sentences.access", "words.access"],
+  "sentences.edit_others": ["sentences.access"],
   "sentences.publish": ["sentences.access"],
   "sentences.withdraw": ["sentences.access"],
-  "sentences.restore": ["sentences.access"],
   "sentences.rollback": ["sentences.access"],
   "users.access": [],
+  "users.read_basic": ["users.access"],
+  "users.read_coin_balance": ["users.access"],
+  "users.read_coin_entries": ["users.access"],
+  "users.read_identity": ["users.access"],
   "users.edit": ["users.access"],
-  "users.set_status": ["users.access"],
+  "users.set_status": ["users.read_basic"],
   "users.read_sensitive": ["users.access"],
   "teacherapply.access": [],
   "teacherapply.review": ["teacherapply.access"],
   "teacherapply.revoke": ["teacherapply.access"],
-  "teacherapply.read_sensitive": ["teacherapply.access"],
+  "teacherapply.read_certificates": ["teacherapply.access"],
+  "teacherapply.read_identity": ["teacherapply.access"],
   "lexicon_settings.access": [],
-  "lexicon_settings.edit": ["lexicon_settings.access"],
+  "lexicon_settings.edit_basic": ["lexicon_settings.access"],
+  "lexicon_settings.edit_sub": ["lexicon_settings.access"],
+  "lexicon_settings.edit_forms": ["lexicon_settings.access"],
+  "lexicon_settings.delete": ["lexicon_settings.access"],
+  "speech.upload_audio": [],
   "speech.generate": ["words.access"]
 } as const;
 
@@ -60,7 +81,14 @@ export function hasAnyAdminPermission(
 export function canAdminResourceAction(
   actor: AdminPermissionActor | null | undefined,
   module: "words" | "sentences",
-  action: "edit" | "publish" | "archive" | "withdraw" | "restore" | "rollback",
+  action:
+    | "edit"
+    | "associate"
+    | "publish"
+    | "archive"
+    | "withdraw"
+    | "restore"
+    | "rollback",
   createdBy: string | undefined
 ): boolean {
   return (
@@ -69,7 +97,7 @@ export function canAdminResourceAction(
       actor &&
       (actor.role === "super_admin" ||
         (Boolean(createdBy) && createdBy === actor.id) ||
-        (action === "edit" &&
+        ((action === "edit" || action === "associate") &&
           hasAdminPermission(actor, `${module}.edit_others`)))
     )
   );

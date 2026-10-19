@@ -1,6 +1,7 @@
 import { env } from "../../../lib/env";
+import { spellingSpeechEqual } from "./spellingSpeech";
 import { toFormsWire } from "./model";
-import type { WordConcreteFormV3 } from "@tsz/types";
+import type { RichTextV2V3, WordConcreteFormV3 } from "@tsz/types";
 import { describe, expect, it, vi } from "vitest";
 import {
   addConcreteForm,
@@ -27,7 +28,8 @@ import {
   updateFormGroupScope,
   updateGroupDialectRules,
   updatePronunciation,
-  updateVariantSpelling
+  updateVariantSpelling,
+  updateSpellingVoiceProfile
 } from "./operations";
 import {
   UUIDS,
@@ -2218,4 +2220,360 @@ it("兼容发布保留新 API 已有规则值，拆分和合并也不丢失 fals
   } finally {
     env.FORM_SPELLING_REGULARITY = enabled;
   }
+});
+
+it("拼写完整标注保存、改字重定位和清空均保留节点，wire 不丢字段", () => {
+  const original = formsFixture();
+  const rich: RichTextV2V3 = {
+    version: 2,
+    text: "boiled potatoes",
+    annotations: [
+      { type: "liaison", start: 3, end: 9, start_len: 3, end_len: 2 },
+      { type: "italic", start: 7, end: 15 }
+    ]
+  };
+  const edited = updateVariantSpelling(original, UUIDS.common_variant, rich);
+  expect(
+    commonVariant(toFormsWire(edited).pos[0]!.forms[0]!).spelling_rich
+  ).toEqual(rich);
+  expect(commonVariant(edited.pos[0]!.forms[0]!).id).toBe(UUIDS.common_variant);
+  const shifted = updateVariantSpelling(
+    edited,
+    UUIDS.common_variant,
+    "fresh boiled potatoes"
+  );
+  expect(
+    commonVariant(shifted.pos[0]!.forms[0]!).spelling_rich?.annotations
+  ).toEqual([
+    { type: "liaison", start: 9, end: 15, start_len: 3, end_len: 2 },
+    { type: "italic", start: 13, end: 21 }
+  ]);
+  const cleared = updateVariantSpelling(edited, UUIDS.common_variant, {
+    ...rich,
+    annotations: []
+  });
+  expect(
+    commonVariant(toFormsWire(cleared).pos[0]!.forms[0]!).spelling_rich
+  ).toEqual({ ...rich, annotations: [] });
+  expect(
+    commonVariant(original.pos[0]!.forms[0]!).spelling_rich
+  ).toBeUndefined();
+});
+
+it("方言显式拆合携带拼写标注，统一拼写同步两侧，规则合并不覆盖矛盾标注", () => {
+  const rich: RichTextV2V3 = {
+    version: 2,
+    text: "boiled potatoes",
+    annotations: [{ type: "italic", start: 7, end: 15 }]
+  };
+  const form = commonFormFixture({ spelling: rich.text });
+  form.regional_variants.common.spelling_rich = rich;
+  const mapping = {
+    spelling: rich.text,
+    spelling_rich: rich,
+    origin: "manual" as const,
+    pronunciations: []
+  };
+  const split = convertCommonToUkUs(form, {
+    confirmed: true,
+    uk: mapping,
+    us: mapping
+  });
+  if (!split.ok || split.value.regional_variants.mode !== "uk_us")
+    throw new Error("expected split");
+  expect(split.value.regional_variants.uk.spelling_rich).toEqual(rich);
+  expect(split.value.regional_variants.us.spelling_rich).toEqual(rich);
+  const merged = convertUkUsToCommon(split.value, {
+    confirmed: true,
+    common: mapping
+  });
+  if (!merged.ok) throw new Error("expected merge");
+  expect(commonVariant(merged.value).spelling_rich).toEqual(rich);
+  const next: RichTextV2V3 = {
+    ...rich,
+    annotations: [{ type: "liaison", start: 5, end: 8 }]
+  };
+  const unified = unifyUkUsSpelling(split.value, next);
+  if (!unified.ok || unified.value.regional_variants.mode !== "uk_us")
+    throw new Error("expected unified");
+  expect(unified.value.regional_variants.uk.spelling_rich).toEqual(next);
+  expect(unified.value.regional_variants.us.spelling_rich).toEqual(next);
+  split.value.regional_variants.us.spelling_rich = { ...rich, annotations: [] };
+  const content = formsFixture({ forms: [split.value] });
+  expect(
+    normalizeGroupDialectRules(
+      content,
+      UUIDS.pos,
+      content.pos[0]!.form_groups[0]!.id,
+      { spelling_mode: "unified", phonetic_mode: "distinguish" }
+    )
+  ).toEqual({ ok: false, reason: "spelling_marks_merge_required" });
+});
+
+it("逐字拼写输入保留尾空格，第二个词可以继续录入", () => {
+  const content = updateVariantSpelling(
+    formsFixture(),
+    UUIDS.common_variant,
+    "boiled "
+  );
+  expect(commonVariant(content.pos[0]!.forms[0]!).spelling).toBe("boiled ");
+  const next = updateVariantSpelling(
+    content,
+    UUIDS.common_variant,
+    "boiled potatoes"
+  );
+  expect(commonVariant(next.pos[0]!.forms[0]!).spelling).toBe(
+    "boiled potatoes"
+  );
+});
+
+it("英美相同连读的省略与显式默认端宽不阻止统一拼写", () => {
+  const loaded: RichTextV2V3 = {
+    version: 2,
+    text: "boiled potatoes",
+    annotations: [{ type: "liaison", start: 5, end: 8 }]
+  };
+  const edited: RichTextV2V3 = {
+    ...loaded,
+    annotations: [
+      { type: "liaison", start: 5, end: 8, start_len: 1, end_len: 1 }
+    ]
+  };
+  const form = ukUsFormFixture({
+    uk: { spelling: loaded.text, spelling_rich: loaded },
+    us: { spelling: edited.text, spelling_rich: edited }
+  });
+  const content = formsFixture({ forms: [form] });
+  const result = normalizeGroupDialectRules(
+    content,
+    UUIDS.pos,
+    content.pos[0]!.form_groups[0]!.id,
+    { spelling_mode: "unified", phonetic_mode: "distinguish" }
+  );
+  expect(result.ok).toBe(true);
+  if (!result.ok) throw new Error(result.reason);
+  const merged = result.value.pos[0]!.forms[0]!.regional_variants;
+  if (merged.mode !== "uk_us") throw new Error("expected uk_us");
+  expect(merged.uk.spelling_rich).toEqual(edited);
+  expect(merged.us.spelling_rich).toEqual(edited);
+  expect(unifyUkUsSpelling(form, loaded.text).ok).toBe(true);
+  expect(form.regional_variants.uk.spelling_rich).toEqual(loaded);
+});
+
+it("方言显式拆合保留逐字正音", () => {
+  const form = commonFormFixture();
+  const mapping = {
+    spelling: "cat",
+    origin: "manual" as const,
+    pronunciations: [
+      { dict_phonetic: "kæt", actual_pron: "kæt", style: "citation" as const }
+    ]
+  };
+  const split = convertCommonToUkUs(form, {
+    confirmed: true,
+    uk: mapping,
+    us: mapping
+  });
+  if (!split.ok || split.value.regional_variants.mode !== "uk_us")
+    throw new Error("expected split");
+  expect(split.value.regional_variants.uk.pronunciations[0]?.style).toBe(
+    "citation"
+  );
+  expect(split.value.regional_variants.us.pronunciations[0]?.style).toBe(
+    "citation"
+  );
+  const merged = convertUkUsToCommon(split.value, {
+    confirmed: true,
+    common: mapping
+  });
+  if (!merged.ok) throw new Error("expected merge");
+  expect(commonVariant(merged.value).pronunciations[0]?.style).toBe("citation");
+});
+
+it("拼写停顿和音色独立保存、改字迁移、清除并保留各读法配置", () => {
+  const original = formsFixture();
+  const pronunciation = commonVariant(
+    original.pos[0]!.forms[0]!
+  ).pronunciations;
+  const rich: RichTextV2V3 = {
+    version: 2,
+    text: "hello there",
+    annotations: [
+      { type: "italic", start: 0, end: 5 },
+      { type: "pause", at: 5, duration_ms: 500 }
+    ]
+  };
+  const edited = updateSpellingVoiceProfile(
+    updateVariantSpelling(original, UUIDS.common_variant, rich),
+    [UUIDS.common_variant],
+    { voices: [{ voice_id: "sonia", enabled: true, rate_percent: 10 }] }
+  );
+  const variant = commonVariant(toFormsWire(edited).pos[0]!.forms[0]!);
+  expect(variant.spelling_rich?.annotations).toEqual([
+    { type: "italic", start: 0, end: 5 }
+  ]);
+  expect(variant.spelling_speech).toEqual({
+    content: {
+      ...rich,
+      annotations: [{ type: "pause", at: 5, duration_ms: 500 }]
+    },
+    voice_profile: {
+      voices: [{ voice_id: "sonia", enabled: true, rate_percent: 10 }]
+    }
+  });
+  expect(variant.pronunciations).toEqual(pronunciation);
+  const shifted = updateVariantSpelling(
+    edited,
+    UUIDS.common_variant,
+    "oh hello there"
+  );
+  expect(
+    commonVariant(shifted.pos[0]!.forms[0]!).spelling_speech?.content
+  ).toMatchObject({
+    text: "oh hello there",
+    annotations: [{ type: "pause", at: 8, duration_ms: 500 }]
+  });
+  const cleared = updateVariantSpelling(shifted, UUIDS.common_variant, {
+    version: 2,
+    text: "oh hello there",
+    annotations: []
+  });
+  expect(
+    commonVariant(cleared.pos[0]!.forms[0]!).spelling_speech
+  ).toMatchObject({
+    content: { annotations: [] },
+    voice_profile: variant.spelling_speech!.voice_profile
+  });
+  expect(
+    commonVariant(original.pos[0]!.forms[0]!).spelling_speech
+  ).toBeUndefined();
+});
+
+it("方言拆合携带独立拼写试听，统一编辑同步两侧且不静默覆盖不同配置", () => {
+  let content = updateVariantSpelling(formsFixture(), UUIDS.common_variant, {
+    version: 2,
+    text: "hello there",
+    annotations: [{ type: "pause", at: 5, duration_ms: 1000 }]
+  });
+  content = updateSpellingVoiceProfile(content, [UUIDS.common_variant], {
+    voices: [{ voice_id: "sonia", enabled: true, rate_percent: 0 }]
+  });
+  const split = normalizeGroupDialectRules(content, UUIDS.pos, UUIDS.group, {
+    spelling_mode: "distinguish",
+    phonetic_mode: "distinguish"
+  });
+  if (!split.ok) throw new Error("expected split");
+  const form = split.value.pos[0]!.forms[0]!;
+  if (form.regional_variants.mode !== "uk_us")
+    throw new Error("expected regions");
+  expect(form.regional_variants.uk.spelling_speech).toEqual(
+    commonVariant(content.pos[0]!.forms[0]!).spelling_speech
+  );
+  expect(form.regional_variants.us.spelling_speech).toEqual(
+    form.regional_variants.uk.spelling_speech
+  );
+  const ids = [form.regional_variants.uk.id, form.regional_variants.us.id];
+  const unified = updateSpellingVoiceProfile(split.value, ids, { voices: [] });
+  const merged = normalizeGroupDialectRules(unified, UUIDS.pos, UUIDS.group, {
+    spelling_mode: "unified",
+    phonetic_mode: "unified"
+  });
+  if (!merged.ok) throw new Error("expected merge");
+  expect(
+    commonVariant(merged.value.pos[0]!.forms[0]!).spelling_speech
+  ).toMatchObject({
+    content: { annotations: [{ type: "pause", at: 5, duration_ms: 1000 }] },
+    voice_profile: { voices: [] }
+  });
+  const differing = updateSpellingVoiceProfile(unified, [ids[0]!], {
+    voices: [{ voice_id: "sonia", enabled: true, rate_percent: 0 }]
+  });
+  expect(
+    normalizeGroupDialectRules(differing, UUIDS.pos, UUIDS.group, {
+      spelling_mode: "unified",
+      phonetic_mode: "distinguish"
+    })
+  ).toEqual({ ok: false, reason: "spelling_marks_merge_required" });
+});
+
+it("拼写试听比较兼容缺省空配置、音色顺序与字段顺序，保留实际差异", () => {
+  const empty = {
+    content: { version: 2 as const, text: "hello there", annotations: [] },
+    voice_profile: { voices: [] }
+  };
+  expect(spellingSpeechEqual(undefined, empty)).toBe(true);
+  const sonia = { voice_id: "sonia", enabled: true, rate_percent: 0 };
+  const guy = { voice_id: "guy", enabled: false, rate_percent: 10 };
+  const left = { ...empty, voice_profile: { voices: [sonia, guy] } };
+  const right = {
+    ...empty,
+    voice_profile: {
+      voices: [guy, { rate_percent: 0, enabled: true, voice_id: "sonia" }]
+    }
+  };
+  expect(spellingSpeechEqual(left, right)).toBe(true);
+  expect(
+    spellingSpeechEqual(left, { ...empty, voice_profile: { voices: [sonia] } })
+  ).toBe(false);
+});
+
+it("改拼写同步迁移四份音素设置的停顿，保留各自音色与音素", () => {
+  const original = formsFixture();
+  const variant = commonVariant(original.pos[0]!.forms[0]!);
+  variant.spelling = "hello there";
+  const speech = (duration_ms: number) => ({
+    content: {
+      version: 2 as const,
+      text: "hello there",
+      annotations: [{ type: "pause" as const, at: 5, duration_ms }]
+    },
+    voice_profile: {
+      voices: [
+        { voice_id: `voice-${duration_ms}`, enabled: true, rate_percent: 0 }
+      ]
+    }
+  });
+  variant.pronunciations[0]!.synthesis = {
+    alphabet: "ipa",
+    ipa: "",
+    ups: "",
+    uk: {
+      ipa: "hello",
+      ups: "H",
+      ipa_speech: speech(500),
+      ups_speech: speech(1000)
+    },
+    us: {
+      ipa: "there",
+      ups: "DH",
+      ipa_speech: speech(2000),
+      ups_speech: speech(3000)
+    }
+  };
+  const updated = updateVariantSpelling(
+    original,
+    UUIDS.common_variant,
+    "oh hello there"
+  );
+  const saved = commonVariant(toFormsWire(updated).pos[0]!.forms[0]!)
+    .pronunciations[0]!.synthesis!;
+  for (const [side, alphabet, duration_ms] of [
+    ["uk", "ipa", 500],
+    ["uk", "ups", 1000],
+    ["us", "ipa", 2000],
+    ["us", "ups", 3000]
+  ] as const) {
+    expect(saved[side]![`${alphabet}_speech`]).toEqual({
+      ...speech(duration_ms),
+      content: {
+        version: 2,
+        text: "oh hello there",
+        annotations: [{ type: "pause", at: 8, duration_ms }]
+      }
+    });
+    expect(saved[side]![alphabet]).toBe(
+      variant.pronunciations[0]!.synthesis![side]![alphabet]
+    );
+  }
+  expect(variant.spelling).toBe("hello there");
 });

@@ -180,3 +180,28 @@ describe("V3ReviewContent", () => {
     consoleError.mockRestore();
   });
 });
+
+it("发布预览回显词形拼写斜体和多字符连读", () => {
+  const current = word();
+  const form = current.forms.pos[0]!.forms[0]!;
+  if (form.regional_variants.mode !== "common")
+    throw new Error("expected common");
+  const variant = form.regional_variants.common;
+  variant.spelling_rich = {
+    version: 2,
+    text: variant.spelling,
+    annotations: [
+      { type: "italic", start: 0, end: 2 },
+      { type: "liaison", start: 1, end: 5, start_len: 2, end_len: 2 }
+    ]
+  };
+  const { container } = render(<V3ReviewContent word={current} />);
+  expect(container.querySelector("strong.tsz-words i")).not.toBeNull();
+  const anchors = container.querySelectorAll(
+    "strong.tsz-words .tsz-ve-liaison-anchor"
+  );
+  expect(anchors.length).toBeGreaterThanOrEqual(2);
+  expect(container.querySelector("strong.tsz-words")).toHaveTextContent(
+    variant.spelling
+  );
+});

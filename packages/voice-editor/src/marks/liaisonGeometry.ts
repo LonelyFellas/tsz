@@ -148,7 +148,7 @@ export interface AnchorBox {
 /**
  * 锚点盒 → 弧线端点。
  *
- * 落点取中心附近的实际字母；起笔高度取该字母的**墨迹顶端**：字盒顶端是字体上伸
+ * 水平落点取锚点中心；起笔高度取中心附近字母的**墨迹顶端**：字盒顶端是字体上伸
  * 高度，比 x 高度字母（w、o、u）的墨迹高出半个字号，弧线会整体飘在字上方。
  * 按墨迹起笔，弧线两端才贴着字，与参考件一致。
  */
@@ -182,7 +182,32 @@ export function buildLiaisonArcs(
 ): LiaisonLayout {
   // 没有任何连读就别碰布局：返回同一个空对象，调用方据此跳过重渲染。
   if (!links.some(Boolean)) return EMPTY_LIAISON_LAYOUT;
-  const base = container.getBoundingClientRect();
+  const screenBase = container.getBoundingClientRect();
+  // DOM 的矩形含祖先弹窗的缩放；SVG path 与字体度量使用局部 CSS 像素。
+  // 先逆变换，避免动画途中把缩放重复应用到弧线，结束时再跳回正确位置。
+  const inverse = container
+    .querySelector<SVGSVGElement>(".tsz-ve-arc-layer")
+    ?.getScreenCTM?.()
+    ?.inverse();
+  const localPoint = (x: number, y: number) =>
+    inverse
+      ? {
+          x: inverse.a * x + inverse.c * y + inverse.e,
+          y: inverse.b * x + inverse.d * y + inverse.f
+        }
+      : { x: x - screenBase.left, y: y - screenBase.top };
+  const localBox = (box: DOMRect) => {
+    const topLeft = localPoint(box.left, box.top);
+    const bottomRight = localPoint(box.right, box.bottom);
+    return {
+      left: topLeft.x,
+      top: topLeft.y,
+      right: bottomRight.x,
+      bottom: bottomRight.y,
+      width: bottomRight.x - topLeft.x
+    };
+  };
+  const base = localBox(screenBase);
   const style = getComputedStyle(container);
   const fontSize = Number.parseFloat(style.fontSize);
   // 没有排版信息（jsdom）时什么都画不出来，也别把 NaN 写进 path。
@@ -192,13 +217,13 @@ export function buildLiaisonArcs(
   const pauseZones = Array.from(
     container.querySelectorAll(".tsz-ve-pause-chip")
   ).map((chip) => {
-    const box = chip.getBoundingClientRect();
-    const gap = chip.closest(".tsz-ve-gap")?.getBoundingClientRect();
+    const box = localBox(chip.getBoundingClientRect());
+    const gap = chip.closest(".tsz-ve-gap");
     return {
-      left: box.left - base.left,
-      right: box.right - base.left,
-      bottom: box.bottom - base.top,
-      rowTop: (gap?.top ?? box.top) - base.top
+      left: box.left,
+      right: box.right,
+      bottom: box.bottom,
+      rowTop: gap ? localBox(gap.getBoundingClientRect()).top : box.top
     };
   });
   const clearance =
@@ -225,24 +250,27 @@ export function buildLiaisonArcs(
   const geometryOf = (anchor: LiaisonAnchorElements) => {
     const glyphs = anchor.glyphs.map((glyph) => ({
       ...glyph,
-      box: glyph.source.getBoundingClientRect()
+      box: localBox(glyph.source.getBoundingClientRect())
     }));
     const first = glyphs[0];
     const last = glyphs[glyphs.length - 1];
     if (!first || !last) return undefined;
     const middleX = (first.box.left + last.box.right) / 2;
-    // 贴着实际字母，而非选区中点的空隙或整段文字里最高的字母。
+    // 高度沿用中心附近字母的墨迹；水平位置保留整个锚点的宽度。
     const distance = (glyph: typeof first) =>
       Math.abs((glyph.box.left + glyph.box.right) / 2 - middleX);
     const chosen = glyphs.reduce(
       (best, glyph) => (distance(glyph) < distance(best) ? glyph : best),
       first
     );
+    const singleLine =
+      Math.abs(first.box.top - last.box.top) <
+      fontSize * SAME_LINE_TOLERANCE_EM;
     const box: AnchorBox = {
-      left: chosen.box.left - base.left,
-      right: chosen.box.right - base.left,
-      top: chosen.box.top - base.top,
-      bottom: chosen.box.bottom - base.top
+      left: singleLine ? first.box.left : chosen.box.left,
+      right: singleLine ? last.box.right : chosen.box.right,
+      top: chosen.box.top,
+      bottom: chosen.box.bottom
     };
     return {
       ...anchorTip(box, fontSize, measure(chosen.text, chosen.element)),

@@ -1,5 +1,5 @@
 import { useAuthStore } from "@/lib/auth";
-import { HttpError } from "@tsz/api-client";
+import { HttpError, RequestTimeoutError } from "@tsz/api-client";
 import type {
   AdminWordV3,
   DraftFormsStepContentV3,
@@ -251,8 +251,16 @@ describe("V3PreviewAndPublishStep", () => {
       />
     );
 
-    expect(screen.getByText("learn")).toBeInTheDocument();
-    expect(screen.getByText("learnt")).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId(`preview-form-${UUIDS.form}`)).getByText(
+        "learn"
+      )
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId(`preview-form-${UUIDS.form_2}`)).getByText(
+        "learnt"
+      )
+    ).toBeInTheDocument();
     expect(screen.getAllByText("原形")).toHaveLength(2);
     expect(screen.queryByText(/主词|主形|主原形/)).not.toBeInTheDocument();
   });
@@ -346,7 +354,7 @@ describe("V3PreviewAndPublishStep", () => {
     );
     expect(
       screen.getByTestId(`preview-pronunciation-${UUIDS.pronunciation}`)
-    ).toHaveTextContent(/sen\-tre.*常规.*centre/);
+    ).toHaveTextContent(/sen\-tre.*语流连读.*centre/);
     expect(
       screen.getByTestId(`preview-pronunciation-${UUIDS.pronunciation_2}`)
     ).toHaveTextContent(/sen\-tr.*强读.*centr/);
@@ -355,7 +363,7 @@ describe("V3PreviewAndPublishStep", () => {
     ).toHaveTextContent(/sen\-ter.*弱读.*center/);
     expect(
       screen.getByTestId(`preview-pronunciation-${uuidFromInt(904)}`)
-    ).toHaveTextContent(/sen\-tre\-uk.*常规.*centre\-uk/);
+    ).toHaveTextContent(/sen\-tre\-uk.*语流连读.*centre\-uk/);
   });
 
   it("keeps an empty group list and an empty pronunciation list explicit", () => {
@@ -403,9 +411,7 @@ describe("V3PreviewAndPublishStep", () => {
     expect(screen.getByText("暂无发音")).toBeInTheDocument();
     expect(
       screen.getByTestId(`preview-pronunciation-${uuidFromInt(905)}`)
-    ).toHaveTextContent(
-      /pending-phonetic.*未选择发音方式.*pending-pronunciation/
-    );
+    ).toHaveTextContent(/pending-phonetic.*未选择读法.*pending-pronunciation/);
   });
 
   it("缺失成员与空音标使用产品回退", () => {
@@ -438,7 +444,7 @@ describe("V3PreviewAndPublishStep", () => {
     ).toHaveTextContent("1. 未知词形");
     expect(
       screen.getByTestId(`preview-pronunciation-${uuidFromInt(906)}`)
-    ).toHaveTextContent("常规");
+    ).toHaveTextContent("语流连读");
   });
 
   it("受控校验问题统一按稳定 code 展示中文并隐藏内部代码", () => {
@@ -536,7 +542,7 @@ describe("V3PreviewAndPublishStep", () => {
       "动词11 项待完成"
     );
     expect(
-      within(summary).getAllByText("请完整填写发音方式、字典音标和实际发音", {
+      within(summary).getAllByText("请完整填写读法、字典音标和实际发音", {
         exact: true
       })
     ).toHaveLength(1);
@@ -852,7 +858,7 @@ describe("V3PreviewAndPublishStep", () => {
           input: PublishAdminWordV3Input
         ) => Promise<{ word: AdminWordV3 }>
       >()
-      .mockRejectedValueOnce(new TypeError("offline"))
+      .mockRejectedValueOnce(new RequestTimeoutError("POST"))
       .mockResolvedValueOnce({ word: { ...current, revision: 8 } });
 
     render(
@@ -868,12 +874,13 @@ describe("V3PreviewAndPublishStep", () => {
     });
     fireEvent.click(publishButton);
     expect(
-      await screen.findByText("网络异常，发布失败，可原样重试。")
+      await screen.findByText("网络异常，发布结果尚未确认，可原样重试确认。")
     ).toBeInTheDocument();
     fireEvent.click(publishButton);
     await waitFor(() => expect(publish).toHaveBeenCalledTimes(2));
 
     expect(publish.mock.calls[1]?.[1]).toBe(publish.mock.calls[0]?.[1]);
+    expect(publish.mock.calls[1]?.[2]).toEqual(publish.mock.calls[0]?.[2]);
   });
 
   it("starts a new standalone publish key after a known successful response", async () => {
@@ -958,7 +965,7 @@ describe("V3PreviewAndPublishStep", () => {
       confirmed_surface_match_token: "publish-token"
     });
     expect(
-      await screen.findByText("网络异常，发布失败，可原样重试。")
+      await screen.findByText("网络异常，发布结果尚未确认，可原样重试确认。")
     ).toBeInTheDocument();
     expect(screen.getByText("learn / learnt")).toBeInTheDocument();
   });
@@ -997,8 +1004,9 @@ describe("V3PreviewAndPublishStep", () => {
         onPublished={vi.fn()}
       />
     );
-    expect(screen.getByText("colour")).toBeInTheDocument();
-    expect(screen.getByText("color")).toBeInTheDocument();
+    const form = within(screen.getByTestId(`preview-form-${UUIDS.form}`));
+    expect(form.getByText("colour")).toBeInTheDocument();
+    expect(form.getByText("color")).toBeInTheDocument();
   });
 
   it("renders authoritative V3 validation issues and does not preview impact", async () => {
@@ -1099,7 +1107,10 @@ describe("V3PreviewAndPublishStep", () => {
   it.each([
     [new HttpError(401, "expired"), "登录已失效，请重新登录。"],
     [new HttpError(403, "forbidden"), "当前账号没有发布权限。"],
-    [new HttpError(503, "off"), "发布服务暂不可用，请稍后重试。"]
+    [
+      new HttpError(503, "off"),
+      "发布结果尚未确认，请刷新查看结果或原样重试确认。"
+    ]
   ])(
     "maps preparation errors without dropping the preview",
     async (failure, message) => {

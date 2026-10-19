@@ -242,6 +242,7 @@ export function V3FormsAndPronunciationStep({
 
   const addPosSelect = (
     <V3AddBasicPosSelect
+      compact={value.pos.length > 0}
       catalog={catalog.data}
       entryKind={entryKind}
       forms={value}
@@ -286,7 +287,7 @@ export function V3FormsAndPronunciationStep({
                         草稿可暂时不添加词性
                       </Typography.Text>
                       <Typography.Text type="secondary">
-                        请从右上角添加词性。
+                        请从上方“添加词性”入口添加。
                       </Typography.Text>
                     </Space>
                   }
@@ -316,14 +317,14 @@ export function V3FormsAndPronunciationStep({
                 }
                 onDrop={(event) => posSorting.handleDrop(event, posIndex)}
               >
-                <Space size={6}>
-                  <SortableDragHandle
-                    dragImageSelector=".word-pos-tab-handle"
-                    index={posIndex}
-                    label={`拖动${label}`}
-                    singleItemTitle="至少需要两个基本词性"
-                    sorting={posSorting}
-                  />
+                <SortableDragHandle
+                  dragImageSelector=".word-pos-tab-handle"
+                  index={posIndex}
+                  label={`拖动${label}`}
+                  singleItemTitle="至少需要两个基本词性"
+                  sorting={posSorting}
+                />
+                <span className="word-pos-tab-label">
                   <strong>{label}</strong>
                   <Badge
                     count={countV3PosFormIncomplete(pos)}
@@ -331,6 +332,14 @@ export function V3FormsAndPronunciationStep({
                     title="该词性未填项"
                   />
                   <V3ReferenceBadge label={label} nodeIds={posNodeIds(pos)} />
+                </span>
+                <span
+                  className="word-pos-tab-actions"
+                  onClick={(event) => event.stopPropagation()}
+                  onMouseDown={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => event.stopPropagation()}
+                >
+                  {addPosSelect}
                   {value.pos.length > 1 ? (
                     <Tooltip
                       title={
@@ -359,7 +368,7 @@ export function V3FormsAndPronunciationStep({
                       />
                     </Tooltip>
                   ) : null}
-                </Space>
+                </span>
               </span>
             ),
             children: (
@@ -426,7 +435,7 @@ export function V3FormsAndPronunciationStep({
           key={value.pos.map((pos) => pos.pos_id).join(":")}
           onChange={onActivePosChange}
           items={tabItems}
-          tabBarExtraContent={addPosSelect}
+          tabBarExtraContent={value.pos.length === 0 ? addPosSelect : undefined}
         />
       </Flex>
     </PronunciationPreviewProvider>

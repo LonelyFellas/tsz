@@ -1,0 +1,354 @@
+import { createWordlistLibraryEndpoints } from "./wordlist-library";
+import { SENTENCE_FORMATTING_HEADERS } from "./sentence-formatting";
+import type {
+  WordlistInteractionStatsBatch,
+  WordlistInteractionState,
+  WordlistInteractionStates,
+  WordlistFavoritePage,
+  SetWordlistInteraction,
+  CreateWordlistTip,
+  WordlistTip,
+  WordlistTipPage
+} from "@tsz/types";
+import { checkInteger } from "./coins";
+import type {
+  AdminWordlist,
+  AdminWordlistPage,
+  WordlistDeleteImpact,
+  WordlistManagementQuery,
+  Wordlist,
+  WordlistPage,
+  WordlistQuery,
+  WordlistItemsQuery,
+  CreateWordlist,
+  UpdateWordlist,
+  WordlistEditSnapshot,
+  WordlistAvailability,
+  WordlistItems,
+  MyWordlistItems,
+  WordlistCatalog,
+  WordlistSuggestionQuery,
+  WordlistSuggestions,
+  WordlistImportMatchRequest,
+  WordlistImportMatches,
+  SubmitWordlist,
+  WordlistReview,
+  WordlistReviews,
+  AdminWordlistReviews,
+  WordlistDecision
+} from "@tsz/types";
+import type { HttpClient } from "./http";
+import {
+  validateRuntimeSchema,
+  type RuntimeSchemaRoot
+} from "./runtime-schema";
+export function decodeWordlistResponse<T>(
+  name: RuntimeSchemaRoot,
+  value: unknown
+): T {
+  const result = validateRuntimeSchema(name, value);
+  if (!result.valid)
+    throw new Error(
+      `词表响应不符合接口契约：${result.path} (${result.reason})`
+    );
+  return value as T;
+}
+function query(q: WordlistQuery) {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(q))
+    if (v !== undefined) p.set(k, String(v));
+  return p.size ? `?${p}` : "";
+}
+export const WORDLIST_READING_HEADERS = {
+  ...SENTENCE_FORMATTING_HEADERS,
+  "X-TSZ-Wordlist-Annotations": "v1",
+  "X-TSZ-Wordlist-Custom-Items": "v1"
+} as const;
+type Options = { signal?: AbortSignal };
+export function createWordlistEndpoints(http: HttpClient) {
+  return {
+    library: createWordlistLibraryEndpoints(http),
+    interactionStats: (ids: string[], o?: Options) =>
+      http
+        .get<unknown>(
+          `/wordlists/interactions?ids=${encodeURIComponent(ids.join(","))}`,
+          o
+        )
+        .then((v) =>
+          decodeWordlistResponse<WordlistInteractionStatsBatch>(
+            "WordlistInteractionStatsBatch",
+            v
+          )
+        ),
+    interactionStates: (ids: string[], o?: Options) =>
+      http
+        .get<unknown>(
+          `/me/wordlist-interactions?ids=${encodeURIComponent(ids.join(","))}`,
+          o
+        )
+        .then((v) =>
+          decodeWordlistResponse<WordlistInteractionStates>(
+            "WordlistInteractionStates",
+            v
+          )
+        ),
+    setInteraction: (id: string, data: SetWordlistInteraction, o?: Options) =>
+      http
+        .put<unknown>(`/me/wordlists/${id}/interactions`, data, o)
+        .then((v) =>
+          decodeWordlistResponse<WordlistInteractionState>(
+            "WordlistInteractionState",
+            v
+          )
+        ),
+    favorites: (q: WordlistQuery = {}, o?: Options) =>
+      http
+        .get<unknown>(`/me/wordlist-favorites${query(q)}`, o)
+        .then((v) =>
+          decodeWordlistResponse<WordlistFavoritePage>(
+            "WordlistFavoritePage",
+            v
+          )
+        ),
+    recommended: (q: WordlistQuery = {}, o?: Options) =>
+      http
+        .get<unknown>(`/wordlists/recommended${query(q)}`, o)
+        .then((v) => decodeWordlistResponse<WordlistPage>("WordlistPage", v)),
+    publish: (id: string, data: SubmitWordlist) =>
+      http
+        .post<unknown>(`/me/wordlists/${id}/publish`, data)
+        .then((v) =>
+          decodeWordlistResponse<WordlistReview>("WordlistReview", v)
+        ),
+    tipReceipt: (eventId: string, o?: Options) =>
+      http.get<unknown>(`/me/wordlist-tips/${eventId}`, o).then((v) => {
+        const result = decodeWordlistResponse<WordlistTip>("WordlistTip", v);
+        checkInteger(result.amount);
+        return result;
+      }),
+    tip: (id: string, data: CreateWordlistTip, options?: Options) =>
+      http.post<unknown>(`/wordlists/${id}/tips`, data, options).then((v) => {
+        const result = decodeWordlistResponse<WordlistTip>("WordlistTip", v);
+        checkInteger(result.amount);
+        return result;
+      }),
+    tips: (q: WordlistQuery = {}, o?: Options) =>
+      http.get<unknown>(`/me/wordlist-tips${query(q)}`, o).then((v) => {
+        const result = decodeWordlistResponse<WordlistTipPage>(
+          "WordlistTipPage",
+          v
+        );
+        for (const item of result.items) checkInteger(item.amount);
+        return result;
+      }),
+    list: (q: WordlistQuery = {}, o?: Options) =>
+      http
+        .get<unknown>(`/wordlists${query(q)}`, o)
+        .then((v) => decodeWordlistResponse<WordlistPage>("WordlistPage", v)),
+    get: (id: string, o?: Options) =>
+      http
+        .get<unknown>(`/wordlists/${id}`, o)
+        .then((v) => decodeWordlistResponse<Wordlist>("Wordlist", v)),
+    availability: (id: string, o?: Options) =>
+      http
+        .get<unknown>(`/wordlists/${id}/availability`, {
+          ...o,
+          headers: WORDLIST_READING_HEADERS
+        })
+        .then((v) =>
+          decodeWordlistResponse<WordlistAvailability>(
+            "WordlistAvailability",
+            v
+          )
+        ),
+    items: (id: string, q: WordlistItemsQuery = {}, o?: Options) =>
+      http
+        .get<unknown>(`/wordlists/${id}/items${query(q)}`, {
+          ...o,
+          headers: WORDLIST_READING_HEADERS
+        })
+        .then((v) => decodeWordlistResponse<WordlistItems>("WordlistItems", v)),
+    suggestions: (q: WordlistSuggestionQuery, o?: Options) =>
+      http
+        .get<unknown>(`/wordlists/suggestions${query(q)}`, o)
+        .then((v) =>
+          decodeWordlistResponse<WordlistSuggestions>("WordlistSuggestions", v)
+        ),
+    matchImport: (data: WordlistImportMatchRequest, o?: Options) =>
+      http
+        .post<unknown>("/wordlists/import-matches", data, o)
+        .then((v) =>
+          decodeWordlistResponse<WordlistImportMatches>(
+            "WordlistImportMatches",
+            v
+          )
+        ),
+    catalog: (q: WordlistQuery = {}, o?: Options) =>
+      http
+        .get<unknown>(`/wordlists/catalog${query(q)}`, o)
+        .then((v) =>
+          decodeWordlistResponse<WordlistCatalog>("WordlistCatalog", v)
+        ),
+    mine: (q: WordlistQuery = {}, o?: Options) =>
+      http
+        .get<unknown>(`/me/wordlists${query(q)}`, o)
+        .then((v) => decodeWordlistResponse<WordlistPage>("WordlistPage", v)),
+    myDetail: (id: string, o?: Options) =>
+      http
+        .get<unknown>(`/me/wordlists/${id}`, o)
+        .then((v) => decodeWordlistResponse<Wordlist>("Wordlist", v)),
+    myAvailability: (id: string, o?: Options) =>
+      http
+        .get<unknown>(`/me/wordlists/${id}/availability`, {
+          ...o,
+          headers: WORDLIST_READING_HEADERS
+        })
+        .then((v) =>
+          decodeWordlistResponse<WordlistAvailability>(
+            "WordlistAvailability",
+            v
+          )
+        ),
+    myItems: (id: string, q: WordlistItemsQuery = {}, o?: Options) =>
+      http
+        .get<unknown>(`/me/wordlists/${id}/items${query(q)}`, {
+          ...o,
+          headers: {
+            ...WORDLIST_READING_HEADERS,
+            "X-TSZ-Wordlist-Entry-Labels": "v1",
+            "X-TSZ-Wordlist-Entry-Reasons": "v1"
+          }
+        })
+        .then((v) =>
+          decodeWordlistResponse<MyWordlistItems>("MyWordlistItems", v)
+        ),
+    edit: (id: string, o?: Options) =>
+      http
+        .get<unknown>(`/me/wordlists/${id}/edit`, {
+          ...o,
+          headers: WORDLIST_READING_HEADERS
+        })
+        .then((v) =>
+          decodeWordlistResponse<WordlistEditSnapshot>(
+            "WordlistEditSnapshot",
+            v
+          )
+        ),
+    create: (data: CreateWordlist) =>
+      http
+        .post<unknown>("/me/wordlists", data)
+        .then((v) => decodeWordlistResponse<Wordlist>("Wordlist", v)),
+    update: (id: string, data: UpdateWordlist) =>
+      http
+        .put<unknown>(`/me/wordlists/${id}`, data)
+        .then((v) => decodeWordlistResponse<Wordlist>("Wordlist", v)),
+    submit: (id: string, data: SubmitWordlist) =>
+      http
+        .post<unknown>(`/me/wordlists/${id}/review-requests`, data)
+        .then((v) =>
+          decodeWordlistResponse<WordlistReview>("WordlistReview", v)
+        ),
+    withdraw: (id: string, data: { expected_revision: number }) =>
+      http
+        .post<unknown>(`/me/wordlists/${id}/withdraw`, data)
+        .then((v) => decodeWordlistResponse<Wordlist>("Wordlist", v)),
+    reviews: (id: string, o?: Options) =>
+      http
+        .get<unknown>(`/me/wordlists/${id}/review-requests`, o)
+        .then((v) =>
+          decodeWordlistResponse<WordlistReviews>("WordlistReviews", v)
+        )
+  };
+}
+export function createAdminWordlistEndpoints(http: HttpClient) {
+  return {
+    management: (q: WordlistManagementQuery = {}, o?: Options) =>
+      http
+        .get<unknown>(`/wordlists/management${query(q)}`, o)
+        .then((v) =>
+          decodeWordlistResponse<AdminWordlistPage>("AdminWordlistPage", v)
+        ),
+    get: (id: string, o?: Options) =>
+      http
+        .get<unknown>(`/wordlists/${id}`, o)
+        .then((v) => decodeWordlistResponse<AdminWordlist>("AdminWordlist", v)),
+    currentItems: (id: string, q: WordlistItemsQuery = {}, o?: Options) =>
+      http
+        .get<unknown>(`/wordlists/${id}/items${query(q)}`, {
+          ...o,
+          headers: WORDLIST_READING_HEADERS
+        })
+        .then((v) => decodeWordlistResponse<WordlistItems>("WordlistItems", v)),
+    catalog: (q: WordlistQuery = {}, o?: Options) =>
+      http
+        .get<unknown>(`/wordlists/catalog${query(q)}`, o)
+        .then((v) =>
+          decodeWordlistResponse<WordlistCatalog>("WordlistCatalog", v)
+        ),
+    visibility: (
+      id: string,
+      data: { expected_revision: number; public: boolean }
+    ) =>
+      http
+        .post<unknown>(`/wordlists/${id}/visibility`, data)
+        .then((v) => decodeWordlistResponse<AdminWordlist>("AdminWordlist", v)),
+    recommend: (
+      id: string,
+      data: { expected_revision: number; recommended: boolean }
+    ) =>
+      http
+        .post<unknown>(`/wordlists/${id}/recommendation`, data)
+        .then((v) => decodeWordlistResponse<AdminWordlist>("AdminWordlist", v)),
+    deleteImpact: (id: string, o?: Options) =>
+      http
+        .get<unknown>(`/wordlists/${id}/delete-impact`, o)
+        .then((v) =>
+          decodeWordlistResponse<WordlistDeleteImpact>(
+            "WordlistDeleteImpact",
+            v
+          )
+        ),
+    delete: (id: string, data: { expected_revision: number }) =>
+      http.post<void>(`/wordlists/${id}/delete`, data),
+    list: (
+      q: WordlistQuery & { state?: Wordlist["state"] } = {},
+      o?: Options
+    ) =>
+      http
+        .get<unknown>(`/wordlists${query(q)}`, o)
+        .then((v) => decodeWordlistResponse<WordlistPage>("WordlistPage", v)),
+    reviews: (id: string, o?: Options) =>
+      http
+        .get<unknown>(
+          `/wordlists/${id}/review-requests?include_reviewer=true`,
+          o
+        )
+        .then((v) =>
+          decodeWordlistResponse<AdminWordlistReviews>(
+            "AdminWordlistReviews",
+            v
+          )
+        ),
+    items: (id: string, request: string, q: WordlistQuery = {}, o?: Options) =>
+      http
+        .get<unknown>(
+          `/wordlists/${id}/review-requests/${request}/items${query(q)}`,
+          { ...o, headers: WORDLIST_READING_HEADERS }
+        )
+        .then((v) => decodeWordlistResponse<WordlistItems>("WordlistItems", v)),
+    decision: (id: string, request: string, data: WordlistDecision) =>
+      http
+        .post<unknown>(
+          `/wordlists/${id}/review-requests/${request}/decision`,
+          data
+        )
+        .then((v) => decodeWordlistResponse<Wordlist>("Wordlist", v)),
+    withdraw: (
+      id: string,
+      data: { expected_revision: number; reason: string }
+    ) =>
+      http
+        .post<unknown>(`/wordlists/${id}/withdraw`, data)
+        .then((v) => decodeWordlistResponse<Wordlist>("Wordlist", v))
+  };
+}

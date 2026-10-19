@@ -451,6 +451,7 @@ export function PronunciationPreviewControls({
         >
           <Button
             className="word-pronunciation-play-action"
+            data-playback-dialect={targetLocale === "en-GB" ? "uk" : "us"}
             icon={<SoundOutlined />}
             disabled={
               disabled ||

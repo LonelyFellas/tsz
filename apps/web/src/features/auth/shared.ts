@@ -2,6 +2,7 @@ import { HttpError, type AuthResponse } from "@tsz/api-client";
 import { passwordErrorMessage } from "@tsz/shared/auth";
 import { PASSWORD_MIN_LENGTH } from "@tsz/shared";
 import { safeRedirectPath } from "@tsz/shared/auth";
+import type { Role } from "@tsz/types";
 import { api, persistSession as persistRuntimeSession } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
 
@@ -15,7 +16,7 @@ export const AUTH_PASSWORD_HINT = `密码至少 ${PASSWORD_MIN_LENGTH} 位`;
 
 // 登录 / 注册表单共用的输入框样式。
 export const AUTH_INPUT_CLASS =
-  "w-full rounded-full border border-border bg-surface px-4 py-3 text-sm text-foreground outline-hidden placeholder:text-foreground-subtle focus:border-primary focus:ring-1 focus:ring-primary";
+  "min-h-12 w-full rounded-full border border-border bg-surface px-5 py-3 text-sm text-foreground outline-hidden transition-shadow placeholder:text-foreground-subtle focus:border-primary/50 focus:ring-4 focus:ring-primary/15 aria-invalid:border-danger";
 
 /** 登录 / 注册成功后，将 access token 存入内存并启动主动刷新定时器。 */
 export function persistSession(
@@ -51,6 +52,8 @@ export function securityErrorMessage(error: unknown): string {
     invalid_password: "密码须为 15–128 个字符，区分大小写，支持符号和空格",
     account_disabled: "账号已停用，请联系平台客服",
     forbidden: "不能移除最后一种登录方式",
+    phone_binding_required: "请先验证并绑定手机号",
+    phone_unbind_forbidden: "手机号不能解绑，请使用换绑手机号",
     revision_conflict: "账号信息已变化，请刷新页面后重试"
   };
   return messages[error.code ?? ""] ?? "操作失败，请稍后重试";
@@ -58,13 +61,32 @@ export function securityErrorMessage(error: unknown): string {
 
 export function postAuthPath(
   onboarded: boolean,
-  redirect: string | null
+  redirect: string | null,
+  roles: readonly Role[] = []
 ): string {
-  if (!onboarded) return ONBOARDING_PATH;
   const target = safeRedirectPath(redirect);
   const pathname = decodeURIComponent(target.split(/[?#]/)[0]!);
-  // 登录/注册/找回密码共享访客守卫，回跳到这些页面会形成导航循环。
-  return /^\/(login|register|forgot-password)(\/|$)/i.test(pathname)
+  const teacherReturn =
+    roles.includes("teacher") && /^\/teacher(\/|$)/.test(pathname);
+  if (
+    !onboarded &&
+    !teacherReturn &&
+    pathname !== "/account/coins" &&
+    pathname !== "/account/invitations" &&
+    pathname !== "/student/coins" &&
+    pathname !== "/wordlists/new" &&
+    pathname !== "/account/wordlist-tips" &&
+    !/^\/wordlists\/[^/]+$/.test(pathname) &&
+    !/^\/account\/wordlists(\/|$)/.test(pathname)
+  ) {
+    return target === "/"
+      ? ONBOARDING_PATH
+      : `${ONBOARDING_PATH}?redirect=${encodeURIComponent(target)}`;
+  }
+  // 完成后的回跳不能再次落入认证或引导流程。
+  return /^\/(login|register|forgot-password|onboarding|bind-phone)(\/|$)/i.test(
+    pathname
+  )
     ? "/"
     : target;
 }

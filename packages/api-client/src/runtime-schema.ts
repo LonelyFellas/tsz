@@ -1,6 +1,64 @@
 import runtimeSchemaBundleJson from "./admin-word-v3.runtime-schema.json";
 
 export const RUNTIME_SCHEMA_ROOTS = [
+  "DictionaryPage",
+  "DictionaryEntry",
+  "AudioAssetUrlResponse",
+  "LearningRewardDay",
+  "LoginRewardDay",
+  "LearningPreview",
+  "LearningPlanPreview",
+  "LearningPlan",
+  "LearningPlanPage",
+  "LearningCyclePreview",
+  "LearningCycle",
+  "LearningCyclePage",
+  "LearningPlanRunPage",
+  "LibrarySelection",
+
+  "LearningTask",
+  "LearningTaskDetail",
+  "LearningTaskPage",
+  "LearningRun",
+  "LearningRunPage",
+  "LearningQuestionPage",
+  "LearningAnswerReceipt",
+
+  "AccountDeletionRequest",
+  "AccountDeletionState",
+  "CoinAccountPage",
+  "ManualCoinOperation",
+  "ManualCoinOperationPage",
+  "CoinWallet",
+  "CoinEntryPage",
+  "UserCoinEntryPage",
+  "WordlistInteractionStatsBatch",
+  "WordlistInteractionState",
+  "WordlistInteractionStates",
+  "WordlistFavoritePage",
+  "LibraryPage",
+  "LibraryImpact",
+  "WordlistTip",
+  "WordlistTipPage",
+  "AdminWordlist",
+  "AdminWordlistPage",
+  "WordlistDeleteImpact",
+  "Wordlist",
+  "WordlistPage",
+  "WordlistItems",
+  "WordlistAvailability",
+  "EntryArchiveImpact",
+  "MyWordlistItems",
+  "WordlistCatalog",
+  "WordlistSuggestions",
+  "WordlistImportMatches",
+  "WordlistEditSnapshot",
+  "WordlistReview",
+  "WordlistReviews",
+  "AdminWordlistReviews",
+  "InvitationCode",
+  "InvitationOverview",
+  "InvitationRecordPage",
   "SharedSentence",
   "SentencePublication",
   "SentenceWithdrawalImpact",
@@ -19,6 +77,8 @@ export const RUNTIME_SCHEMA_ROOTS = [
   "InboundReferencesV3",
   "SurfaceMatchPageV3",
   "RelatedSearchResponse",
+  "RelatedEntrySuggestions",
+  "RelatedEntrySenses",
   "DetectLexiconSurfaceResponseV3",
   "SearchComponentTargetsV3Response",
   "AdminWordPublicationListResponse",
@@ -69,7 +129,7 @@ type RuntimeSchema = {
   oneOf?: RuntimeSchema[];
   anyOf?: RuntimeSchema[];
   allOf?: RuntimeSchema[];
-  format?: "date-time" | "uuid";
+  format?: "date" | "date-time" | "uuid";
   minimum?: number;
   maximum?: number;
   pattern?: string;
@@ -274,7 +334,10 @@ function validateSchema(
       schema.format !== undefined &&
       !(
         (schema.format === "uuid" && isUuid(value)) ||
-        (schema.format === "date-time" && isRfc3339(value))
+        (schema.format === "date-time" && isRfc3339(value)) ||
+        (schema.format === "date" &&
+          /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+          isRfc3339(`${value}T00:00:00Z`))
       )
     ) {
       return failure(path, "invalid_format", value);

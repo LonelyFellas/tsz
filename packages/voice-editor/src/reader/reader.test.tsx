@@ -36,7 +36,7 @@ describe("RichText reader", () => {
       <RichTextReadOnly value={V2} className="custom-reader" />
     );
 
-    expect(screen.getByText("⏸ 300ms")).toHaveAttribute(
+    expect(screen.getByText("0.3 s")).toHaveAttribute(
       "data-duration-ms",
       "300"
     );

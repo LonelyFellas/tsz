@@ -1,5 +1,6 @@
 "use client";
 
+import { cn } from "@tsz/ui/lib/cn";
 import { useTheme } from "./useTheme";
 
 // 明/暗切换按钮。Apple 风圆形细描边,点击在两套主题间翻转。
@@ -15,7 +16,10 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
       onClick={toggle}
       aria-label={isDark ? "切换到浅色模式" : "切换到深色模式"}
       title={isDark ? "浅色模式" : "深色模式"}
-      className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-border text-foreground-muted transition hover:bg-muted hover:text-foreground ${className}`}
+      className={cn(
+        "inline-flex h-8 w-8 items-center justify-center rounded-full border border-border text-foreground-muted transition hover:bg-muted hover:text-foreground",
+        className
+      )}
     >
       {isDark ? (
         // 太阳（点击回到浅色）

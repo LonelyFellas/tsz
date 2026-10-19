@@ -8,9 +8,16 @@ import { cn } from "../../lib/cn";
 const DropdownMenu = DropdownMenuPrimitive.Root;
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
 
+type DropdownMenuContentProps = ComponentPropsWithoutRef<
+  typeof DropdownMenuPrimitive.Content
+> & {
+  // Radix Menu 运行时支持此事件，但 DropdownMenu 类型未公开；用于悬停展开时保留页面焦点。
+  onOpenAutoFocus?: (event: Event) => void;
+};
+
 const DropdownMenuContent = forwardRef<
   ComponentRef<typeof DropdownMenuPrimitive.Content>,
-  ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
+  DropdownMenuContentProps
 >(({ className, sideOffset = 8, collisionPadding = 12, ...props }, ref) => (
   <DropdownMenuPrimitive.Portal>
     <DropdownMenuPrimitive.Content
@@ -18,7 +25,7 @@ const DropdownMenuContent = forwardRef<
       sideOffset={sideOffset}
       collisionPadding={collisionPadding}
       className={cn(
-        "z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-32 overflow-y-auto rounded-2xl border border-border bg-surface p-1 text-foreground shadow-xl shadow-black/5 outline-hidden",
+        "z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-32 overflow-y-auto rounded-2xl border border-border/70 bg-surface p-1 text-foreground shadow-float outline-hidden",
         className
       )}
       {...props}

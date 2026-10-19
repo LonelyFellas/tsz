@@ -5,13 +5,15 @@ import { renderWithProviders } from "@/test/render";
 import { recordResult } from "../lib/quota";
 import { QuotaExhaustedError, type BlockItem } from "../lib/types";
 import { PlacementFlow } from "./PlacementFlow";
+import { useUserStore } from "@/stores/user";
 
 // 经装配点注入假 client,脚本化 start/submit 的每种响应,驱动流程编排的全部分支。
 // 手势/动画路径(SwipeCard 内部)不在此测(见 vitest.config.ts 的排除说明),
 // 作答一律走按钮/键盘备选输入——reduced-motion 垫片使作答同步完成,无动画等待。
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: mockPush })
+  useRouter: () => ({ push: mockPush }),
+  useSearchParams: () => mockParams
 }));
 
 vi.mock("../lib/client", () => ({
@@ -21,6 +23,7 @@ vi.mock("../lib/client", () => ({
 import { assessmentClient } from "../lib/client";
 
 const mockPush = vi.fn();
+let mockParams = new URLSearchParams();
 const mockStart = vi.mocked(assessmentClient.start);
 const mockSubmit = vi.mocked(assessmentClient.submit);
 
@@ -40,6 +43,8 @@ beforeAll(() => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockParams = new URLSearchParams();
+  useUserStore.setState({ onboarded: false });
   window.localStorage.clear();
 });
 
@@ -68,6 +73,47 @@ async function answerFive(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("PlacementFlow — 欢迎屏与开测", () => {
+  it("跳过测评仍保留引导后的回跳目标，包括 query 和 hash", async () => {
+    mockParams.set("redirect", "/student/practice?unit=2#words");
+    renderWithProviders(<PlacementFlow />);
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole("button", { name: "跳过，手动选择等级" })
+    );
+    expect(mockPush).toHaveBeenCalledWith(
+      "/onboarding?redirect=%2Fstudent%2Fpractice%3Funit%3D2%23words"
+    );
+  });
+
+  it("应用测评结果同时携带预选等级与原回跳目标", async () => {
+    mockParams.set("redirect", "/student/practice");
+    seedQuota(3, "B2");
+    renderWithProviders(<PlacementFlow />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "查看结果" }));
+    await user.click(
+      screen.getByRole("button", { name: "应用该等级，继续设置" })
+    );
+    expect(mockPush).toHaveBeenCalledWith(
+      "/onboarding?level=B2&redirect=%2Fstudent%2Fpractice"
+    );
+  });
+
+  it("已配置账号查看测评只作参考，不再进入等级设置", async () => {
+    useUserStore.setState({ onboarded: true });
+    seedQuota(3, "C2");
+    renderWithProviders(<PlacementFlow />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "查看结果" }));
+    expect(
+      screen.queryByRole("button", { name: "应用该等级，继续设置" })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText("测评结果仅供参考，不会修改已保存的学习难度。")
+    ).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "返回学习" }));
+    expect(mockPush).toHaveBeenCalledWith("/student/practice");
+  });
   it("新用户看到卖点文案,点开始测试直接进入答题", async () => {
     mockStart.mockResolvedValueOnce({ session_id: "s1", block: block(1) });
     renderWithProviders(<PlacementFlow />);

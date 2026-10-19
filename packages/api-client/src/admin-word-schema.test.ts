@@ -347,6 +347,66 @@ describe("decodeEntryDeleteBatchResponse", () => {
 });
 
 describe("admin word V3/Any runtime decoder", () => {
+  it("四种读法均能完整读回，未知读法仍拒绝", () => {
+    const word = validAdminWordV3();
+    const pronunciation =
+      word.forms.pos[0]!.forms[0]!.regional_variants.common!.pronunciations[0]!;
+    for (const style of ["normal", "citation", "strong", "weak"]) {
+      pronunciation.style = style;
+      expect(decodeAdminWordV3Envelope({ word })).toEqual({ word });
+    }
+    pronunciation.style = "unknown";
+    expect(() => decodeAdminWordV3Envelope({ word })).toThrow(
+      InvalidAdminWordResponseError
+    );
+  });
+  it("词条语法斜体完整读回，缺范围或额外字段仍拒绝", () => {
+    const annotation: Record<string, unknown> = {
+      type: "italic",
+      start: 2,
+      end: 5
+    };
+    const response = {
+      word: {
+        ...validAdminWordV3(),
+        meanings: {
+          sense_groups: [],
+          pos: [
+            {
+              pos_id: IDS.pos,
+              senses: [],
+              grammar_structures: [
+                {
+                  id: IDS.group1,
+                  variants: [
+                    {
+                      id: IDS.uk,
+                      dialect: "common",
+                      content: {
+                        version: 2,
+                        text: "a job",
+                        annotations: [annotation]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    };
+    expect(decodeAdminWordV3Envelope(response)).toEqual(response);
+    delete annotation.end;
+    expect(() => decodeAdminWordV3Envelope(response)).toThrow(
+      InvalidAdminWordResponseError
+    );
+    annotation.end = 5;
+    annotation.affects_speech = true;
+    expect(() => decodeAdminWordV3Envelope(response)).toThrow(
+      InvalidAdminWordResponseError
+    );
+  });
   it("解码草稿正文引用并保留完整目标与来源定位", () => {
     const response = {
       entry_id: IDS.entry,
@@ -530,7 +590,7 @@ describe("admin word V3/Any runtime decoder", () => {
     }
   });
 
-  it("同时接受旧 source_range 和新 source_segments，并为旧消费者补 range alias", () => {
+  it("只接受正式 source_segments，保留响应引用且不补旧字段", () => {
     const legacyWord = validAdminWordV3() as unknown as Record<string, unknown>;
     const pos = buildRuntimeFixture(
       runtimeFixtureBundle.$defs.WordPosMeaningsV3!
@@ -558,7 +618,9 @@ describe("admin word V3/Any runtime decoder", () => {
     pos.senses = [sense];
     legacyWord.meanings = { sense_groups: [], pos: [pos] };
     const legacyEnvelope = { word: legacyWord };
-    expect(decodeAdminWordV3Envelope(legacyEnvelope)).toBe(legacyEnvelope);
+    expect(() => decodeAdminWordV3Envelope(legacyEnvelope)).toThrow(
+      InvalidAdminWordResponseError
+    );
 
     const currentWord = validAdminWordV3() as unknown as Record<
       string,
@@ -587,18 +649,10 @@ describe("admin word V3/Any runtime decoder", () => {
     ];
     currentWord.meanings = { sense_groups: [], pos: [currentPos] };
     const currentEnvelope = { word: currentWord };
+    const originalEnvelope = structuredClone(currentEnvelope);
+    Object.freeze((currentSentence.associations as object[])[0]!);
     expect(decodeAdminWordV3Envelope(currentEnvelope)).toBe(currentEnvelope);
-    expect(
-      (
-        (currentPos.senses as Array<Record<string, unknown>>)[0]!
-          .sentences as Array<Record<string, unknown>>
-      )[0]!.associations as unknown
-    ).toEqual([
-      expect.objectContaining({
-        source_range: { start: 0, end: 6, surface: "center" },
-        source_segments: [{ start: 0, end: 6, surface: "center" }]
-      })
-    ]);
+    expect(currentEnvelope).toEqual(originalEnvelope);
     expect(decodeAdminWordV3Envelope(currentEnvelope)).toBe(currentEnvelope);
   });
 
@@ -660,7 +714,7 @@ describe("admin word V3/Any runtime decoder", () => {
     ["invalid segments", { source_segments: "center" }],
     ["invalid state", { state: "unknown" }],
     ["invalid components", { target_component_usages: "center" }]
-  ] as const)("旧 V3 兼容不会覆盖 %s", (_name, extraFields) => {
+  ] as const)("正式 V3 关联拒绝 %s", (_name, extraFields) => {
     const word = validAdminWordV3() as unknown as Record<string, unknown>;
     const pos = buildRuntimeFixture(
       runtimeFixtureBundle.$defs.WordPosMeaningsV3!
@@ -674,8 +728,11 @@ describe("admin word V3/Any runtime decoder", () => {
     sentence.associations = [
       {
         id: IDS.member1,
+        association_schema_version: 3,
         source_dialect: "common",
-        source_range: { start: 0, end: 6, surface: "center" },
+        source_segments: [{ start: 0, end: 6, surface: "center" }],
+        state: "linked",
+        target_component_usages: [],
         target_word_id: IDS.entry,
         target_sense_id: IDS.member2,
         origin: "manual",
@@ -694,7 +751,10 @@ describe("admin word V3/Any runtime decoder", () => {
     );
   });
 
-  it("新旧位置同时存在但不一致时 fail closed", () => {
+  it.each([
+    ["与新位置一致", { start: 0, end: 6, surface: "center" }],
+    ["与新位置不一致", { start: 1, end: 6, surface: "enter" }]
+  ])("拒绝 source_range，即使%s", (_name, sourceRange) => {
     const word = validAdminWordV3() as unknown as Record<string, unknown>;
     const pos = buildRuntimeFixture(
       runtimeFixtureBundle.$defs.WordPosMeaningsV3!
@@ -710,7 +770,7 @@ describe("admin word V3/Any runtime decoder", () => {
         id: IDS.member1,
         association_schema_version: 3,
         source_dialect: "common",
-        source_range: { start: 1, end: 6, surface: "enter" },
+        source_range: sourceRange,
         source_segments: [{ start: 0, end: 6, surface: "center" }],
         state: "linked",
         target_word_id: IDS.entry,
@@ -1126,4 +1186,30 @@ it("混合批次响应分别核对词条和例句身份，不接受漏项或重�
       [id, "another-sentence"]
     )
   ).toThrow();
+});
+
+it("旧纯文本词形与新 V2 拼写标注均能读取，严格拒绝 null/V1 和未知字段", () => {
+  const word = validAdminWordV3();
+  expect(decodeAdminWordV3Envelope({ word })).toEqual({ word });
+  const variant = word.forms.pos[0]!.forms[0]!.regional_variants.common!;
+  const rich = {
+    version: 2,
+    text: variant.spelling,
+    annotations: [
+      { type: "italic", start: 0, end: 2 },
+      { type: "liaison", start: 1, end: 4, start_len: 2 }
+    ]
+  };
+  Object.assign(variant, { spelling_rich: rich });
+  expect(decodeAdminWordV3Envelope({ word })).toEqual({ word });
+  for (const invalid of [
+    null,
+    { version: 1, text: variant.spelling, spans: [], liaisons: [] },
+    { ...rich, unexpected: true }
+  ]) {
+    Object.assign(variant, { spelling_rich: invalid });
+    expect(() => decodeAdminWordV3Envelope({ word })).toThrow(
+      InvalidAdminWordResponseError
+    );
+  }
 });

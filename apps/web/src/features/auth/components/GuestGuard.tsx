@@ -3,14 +3,20 @@
 import { Suspense, useEffect, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUserStore } from "@/stores/user";
+import { needsPhoneBinding, phoneBindingPath } from "@tsz/shared/auth";
 import { postAuthPath } from "../shared";
+import { readTestResourceRun } from "@tsz/shared";
 
 function AuthRedirect({ onboarded }: { onboarded: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const target = postAuthPath(onboarded, searchParams.get("redirect"));
+  const user = useUserStore((s) => s.user);
+  const target = needsPhoneBinding(user)
+    ? phoneBindingPath(searchParams.get("redirect"))
+    : postAuthPath(onboarded, searchParams.get("redirect"), user?.roles);
 
   useEffect(() => {
+    readTestResourceRun();
     router.replace(target);
   }, [target, router]);
 

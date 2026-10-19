@@ -1,10 +1,93 @@
 import { describe, expect, it } from "vitest";
 import {
   convertDictionaryPhonetic,
+  convertDictionaryToAzureIpa,
+  convertAzureIpaToUps,
+  synthesisForLocale,
   grammarSynthesisContent,
   pronunciationSynthesisContent,
+  pronunciationSynthesisLabel,
+  editSynthesisUpsWords,
+  synthesisPhonemeWordRanges,
   synthesisInputIssue
 } from "./pronunciation-synthesis";
+
+describe("手动选源", () => {
+  it.each(["ipa", "ups", "spelling"] as const)(
+    "已有 IPA 和 UPS 时仍使用明确选择的 %s",
+    (source) => {
+      const synthesis = {
+        alphabet: source === "ups" ? ("ups" as const) : ("ipa" as const),
+        use_spelling: source === "spelling",
+        ipa: "",
+        ups: "",
+        uk: { ipa: "fɑː", ups: "F AA" },
+        us: { ipa: "fɑɹ", ups: "F AA R" }
+      };
+      const selected = synthesisForLocale(synthesis, "en-US");
+      expect(selected.alphabet).toBe(synthesis.alphabet);
+      expect(selected.use_spelling).toBe(synthesis.use_spelling);
+      expect(
+        pronunciationSynthesisContent("far", selected)?.annotations
+      ).toEqual(
+        source === "spelling"
+          ? []
+          : [
+              {
+                type: "phoneme",
+                start: 0,
+                end: 3,
+                alphabet: source,
+                phoneme: source === "ipa" ? "fɑɹ" : "F AA R"
+              }
+            ]
+      );
+      expect(pronunciationSynthesisLabel(synthesis, "common")).toContain(
+        source === "spelling" ? "词形拼写" : `Azure ${source.toUpperCase()}`
+      );
+    }
+  );
+
+  it("选中 UPS 后留空不静默切换成 IPA，也不借用另一侧 UPS", () => {
+    const synthesis = {
+      alphabet: "ups" as const,
+      use_spelling: false,
+      ipa: "",
+      ups: "",
+      uk: { ipa: "fɑː", ups: "F AA" },
+      us: { ipa: "fɑɹ", ups: "" }
+    };
+    expect(
+      pronunciationSynthesisContent("far", synthesis, "en-US")
+    ).toBeUndefined();
+    expect(
+      pronunciationSynthesisContent("far", synthesis, "en-GB")?.annotations
+    ).toEqual([
+      { type: "phoneme", start: 0, end: 3, alphabet: "ups", phoneme: "F AA" }
+    ]);
+  });
+});
+
+it("区分词形的合成摘要只显示自身方言", () => {
+  const uk = {
+    alphabet: "ipa" as const,
+    ipa: "",
+    ups: "",
+    uk: { ipa: "sɛn.tə", ups: "" }
+  };
+  const us = {
+    alphabet: "ipa" as const,
+    ipa: "",
+    ups: "",
+    us: { ipa: "sɛn.tɚ", ups: "" }
+  };
+  expect(pronunciationSynthesisLabel(uk, "uk")).toBe(
+    "Azure IPA · 英式：sɛn.tə"
+  );
+  expect(pronunciationSynthesisLabel(us, "us")).toBe(
+    "Azure IPA · 美式：sɛn.tɚ"
+  );
+});
 
 describe("语法结构整段合成", () => {
   const first = {
@@ -76,6 +159,25 @@ describe("语法结构整段合成", () => {
         { type: "phoneme", start: 4, end: 7, alphabet: "ipa", phoneme: "dʒɒb" }
       ]
     });
+  });
+  it("词形发音注入保留斜体和加粗，正文与音素不因视觉标注改变", () => {
+    const visual = [
+      { type: "italic" as const, start: 5, end: 7 },
+      { type: "emphasis" as const, start: 4, end: 7, level: "core" as const }
+    ];
+    const plain = grammarSynthesisContent(content, [binding], "en-GB");
+    const styled = grammarSynthesisContent(
+      { ...content, annotations: visual },
+      [binding],
+      "en-GB"
+    );
+    expect(styled.text).toBe(plain.text);
+    expect(
+      styled.annotations.filter((item) => item.type === "phoneme")
+    ).toEqual(plain.annotations);
+    expect(
+      styled.annotations.filter((item) => item.type !== "phoneme")
+    ).toEqual(visual);
   });
   it("首条未配置或口音不匹配时明确报错，不跳到第二条或默认发音", () => {
     expect(() =>
@@ -317,5 +419,179 @@ describe("独立合成输入", () => {
     expect(synthesisInputIssue("ups", "A".repeat(1601))).toContain("1600");
     expect(synthesisInputIssue("ups", "kæt")).toContain("ASCII");
     expect(synthesisInputIssue("ipa", "k\nt")).toContain("控制字符");
+  });
+});
+
+describe("IPA/UPS 来源与独立停顿", () => {
+  it("将音标词界映射到正文词界，UPS 音素间空格不视为正文词界", () => {
+    const candidate = {
+      ipa: "fɑː ə.ˈweɪ",
+      ups: "F AA lng AX . S1 W EY",
+      ups_words: [
+        { text: "far", phoneme: "F AA lng" },
+        { text: "away", phoneme: "AX . S1 W EY" }
+      ]
+    };
+    expect(synthesisPhonemeWordRanges("far away", candidate, "ipa")).toEqual([
+      { textEnd: 3, start: 0, end: 3 },
+      { textEnd: 8, start: 4, end: 10 }
+    ]);
+    expect(synthesisPhonemeWordRanges("far away", candidate, "ups")).toEqual([
+      { textEnd: 3, start: 0, end: 8 },
+      { textEnd: 8, start: 9, end: 21 }
+    ]);
+    expect(
+      synthesisPhonemeWordRanges(
+        "far away",
+        { ...candidate, ups_words: null },
+        "ups"
+      )
+    ).toBeUndefined();
+    expect(
+      synthesisPhonemeWordRanges("job", { ipa: "dʒɒb", ups: "JH Q B" }, "ups")
+    ).toEqual([{ textEnd: 3, start: 0, end: 6 }]);
+  });
+  it("只在单个词的 UPS 音素内编辑时保留显式词界，不猜测跨词修改的归属", () => {
+    const candidate = {
+      ipa: "",
+      ups: "F AA lng AX W EY",
+      ups_words: [
+        { text: "far", phoneme: "F AA lng" },
+        { text: "away", phoneme: "AX W EY" }
+      ]
+    };
+    expect(
+      editSynthesisUpsWords("far away", candidate, "F AA R lng AX W EY")
+    ).toEqual([
+      { text: "far", phoneme: "F AA R lng" },
+      { text: "away", phoneme: "AX W EY" }
+    ]);
+    expect(
+      editSynthesisUpsWords("far away", candidate, "F AA lng AX W I")
+    ).toEqual([
+      { text: "far", phoneme: "F AA lng" },
+      { text: "away", phoneme: "AX W I" }
+    ]);
+    expect(editSynthesisUpsWords("far away", candidate, candidate.ups)).toBe(
+      candidate.ups_words
+    );
+    expect(editSynthesisUpsWords("far away", candidate, "JH Q B")).toBeNull();
+    expect(
+      editSynthesisUpsWords("far away", candidate, "F AA lngAX W EY")
+    ).toBeNull();
+  });
+  it.each(["en-GB", "en-US"] as const)(
+    "%s 从 different 字典音标生成规范 IPA，严格 UPS 拒绝原始 r",
+    (locale) => {
+      expect(
+        convertDictionaryToAzureIpa("ˈdɪfrənt", "different", locale)
+      ).toMatchObject({
+        ok: true,
+        value: "ˈdɪfɹənt"
+      });
+      expect(
+        convertAzureIpaToUps("ˈdɪfrənt", "different", locale)
+      ).toMatchObject({
+        ok: false,
+        message: expect.stringContaining("第 5 个字符「r」")
+      });
+      expect(
+        convertAzureIpaToUps("ˈdɪfɹənt", "different", locale)
+      ).toMatchObject({
+        ok: true,
+        value: "S1 D IH F R AX N T"
+      });
+    }
+  );
+  it("字典括号不进入 IPA，UPS 直接保留人工 IPA 的音素", () => {
+    expect(
+      convertDictionaryToAzureIpa("/k(æ)t/", "cat", "en-US")
+    ).toMatchObject({ ok: true, value: "kæt" });
+    expect(convertAzureIpaToUps("kɛt", "cat", "en-US")).toEqual({
+      ok: true,
+      value: "K EH T",
+      ups_words: [{ text: "cat", phoneme: "K EH T" }]
+    });
+    expect(convertAzureIpaToUps("", "cat", "en-US")).toMatchObject({
+      ok: false
+    });
+    expect(convertAzureIpaToUps("kæt dɔg", "cat", "en-US")).toMatchObject({
+      ok: false
+    });
+  });
+  it("每种口音与格式仅应用自己的停顿；UPS 依据逐词元数据而非音素空格", () => {
+    const speech = (duration_ms: number) => ({
+      content: {
+        version: 2 as const,
+        text: "far away",
+        annotations: [{ type: "pause" as const, at: 3, duration_ms }]
+      },
+      voice_profile: { voices: [] }
+    });
+    const synthesis = {
+      alphabet: "ipa" as const,
+      use_spelling: false,
+      ipa: "",
+      ups: "",
+      uk: {
+        ipa: "fɑː əˈweɪ",
+        ups: "F AA lng AX W EY",
+        ups_words: [
+          { text: "far", phoneme: "F AA lng" },
+          { text: "away", phoneme: "AX W EY" }
+        ],
+        ipa_speech: speech(500),
+        ups_speech: speech(1000)
+      },
+      us: {
+        ipa: "fɑɹ əˈweɪ",
+        ups: "F AA R AX W EY",
+        ups_words: [
+          { text: "far", phoneme: "F AA R" },
+          { text: "away", phoneme: "AX W EY" }
+        ],
+        ipa_speech: speech(1500),
+        ups_speech: speech(2000)
+      }
+    };
+    for (const [locale, ipaPause, upsPause] of [
+      ["en-GB", 500, 1000],
+      ["en-US", 1500, 2000]
+    ] as const) {
+      for (const [alphabet, duration_ms] of [
+        ["ipa", ipaPause],
+        ["ups", upsPause]
+      ] as const) {
+        const selected = synthesisForLocale({ ...synthesis, alphabet }, locale);
+        const content = pronunciationSynthesisContent(
+          "far away",
+          selected,
+          locale
+        )!;
+        expect(content.annotations).toContainEqual({
+          type: "pause",
+          at: 3,
+          duration_ms
+        });
+        expect(
+          content.annotations.filter((mark) => mark.type === "phoneme")
+        ).toHaveLength(2);
+      }
+    }
+    expect(
+      pronunciationSynthesisContent(
+        "far away",
+        { ...synthesis, use_spelling: true },
+        "en-GB"
+      )?.annotations
+    ).toEqual([]);
+    const legacy = {
+      ...synthesis,
+      alphabet: "ups" as const,
+      uk: { ...synthesis.uk, ups_words: undefined }
+    };
+    expect(
+      pronunciationSynthesisContent("far away", legacy, "en-GB")
+    ).toBeUndefined();
   });
 });

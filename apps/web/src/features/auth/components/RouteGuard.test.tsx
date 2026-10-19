@@ -64,7 +64,9 @@ describe("RouteGuard", () => {
       </RouteGuard>
     );
     await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith("/onboarding");
+      expect(mockReplace).toHaveBeenCalledWith(
+        "/onboarding?redirect=%2Fwordlists"
+      );
     });
   });
 
@@ -89,4 +91,74 @@ describe("RouteGuard", () => {
     expect(screen.getByText("受保护内容")).toBeInTheDocument();
     expect(mockReplace).not.toHaveBeenCalled();
   });
+});
+
+it("未绑手机的旧会话不能访问业务，注销仍可访问", async () => {
+  setState({
+    user: { ...USER, phone: undefined, email: "only@example.com" },
+    hydrated: true,
+    onboarded: true
+  });
+  const { rerender } = render(
+    <RouteGuard>
+      <p>受保护内容</p>
+    </RouteGuard>
+  );
+  await waitFor(() =>
+    expect(mockReplace).toHaveBeenCalledWith(
+      "/bind-phone?redirect=%2Fwordlists"
+    )
+  );
+  expect(screen.queryByText("受保护内容")).not.toBeInTheDocument();
+  mockPathname = "/account/delete";
+  mockReplace.mockClear();
+  rerender(
+    <RouteGuard>
+      <p>注销账号</p>
+    </RouteGuard>
+  );
+  expect(screen.getByText("注销账号")).toBeVisible();
+  expect(mockReplace).not.toHaveBeenCalled();
+});
+
+it("工作区登录保留目录和编辑模式查询参数", async () => {
+  mockPathname = "/account/wordlists";
+  window.history.replaceState(
+    null,
+    "",
+    "/account/wordlists?space=owned&folder=target&mode=new"
+  );
+  setState({ hydrated: true, user: null });
+  render(
+    <RouteGuard preserveSearch>
+      <p>工作区</p>
+    </RouteGuard>
+  );
+  await waitFor(() =>
+    expect(mockReplace).toHaveBeenCalledWith(
+      "/login?redirect=%2Faccount%2Fwordlists%3Fspace%3Downed%26folder%3Dtarget%26mode%3Dnew"
+    )
+  );
+  window.history.replaceState(null, "", "/");
+});
+
+it("工作区绑定手机后仍可回到原词表编辑模式", async () => {
+  mockPathname = "/account/wordlists";
+  window.history.replaceState(
+    null,
+    "",
+    "/account/wordlists?space=owned&wordlist=target&mode=edit"
+  );
+  setState({ hydrated: true, user: { ...USER, phone: undefined } });
+  render(
+    <RouteGuard preserveSearch>
+      <p>工作区</p>
+    </RouteGuard>
+  );
+  await waitFor(() =>
+    expect(mockReplace).toHaveBeenCalledWith(
+      "/bind-phone?redirect=%2Faccount%2Fwordlists%3Fspace%3Downed%26wordlist%3Dtarget%26mode%3Dedit"
+    )
+  );
+  window.history.replaceState(null, "", "/");
 });

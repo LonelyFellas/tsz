@@ -1,9 +1,13 @@
 import { matchRoutes } from "react-router-dom";
 import type { AdminProfile } from "@tsz/types";
-import { hasAdminPermission } from "@tsz/shared/auth";
+import { hasAdminPermission, hasAnyAdminPermission } from "@tsz/shared/auth";
 
 /** Router、直链守卫与已落地菜单共用路径及页面权限。匹配采用 Router 默认语义。 */
 export const ADMIN_PAGE_ROUTES = {
+  wordlists: { path: "wordlists", handle: { permission: "wordlists.access" } },
+  reviews: { path: "reviews", handle: { permission: "wordlists.access" } },
+  coins: { path: "coins", handle: { permission: "coins.access" } },
+  myCoins: { path: "account/coins", handle: {} },
   words: { path: "words", handle: { permission: "words.access" } },
   wordsTrash: { path: "words/trash", handle: { permission: "words.access" } },
   wordsNewV3: { path: "words/new/v3", handle: { permission: "words.create" } },
@@ -12,7 +16,10 @@ export const ADMIN_PAGE_ROUTES = {
     path: "words/:wordId/v3/wizard/:step",
     handle: { permission: "words.access" }
   },
-  sentences: { path: "sentences", handle: { permission: "sentences.access" } },
+  sentences: {
+    path: "sentences",
+    handle: { anyPermission: ["sentences.access", "sentences.read_published"] }
+  },
   users: { path: "users", handle: { permission: "users.access" } },
   teacherApplications: {
     path: "teacher-applications",
@@ -38,7 +45,14 @@ export function canVisitAdminRoute(
   );
   if (!matches) return false;
   const handle = matches.at(-1)?.route.handle as
-    { permission?: string; superOnly?: boolean } | undefined;
+    | {
+        permission?: string;
+        anyPermission?: readonly string[];
+        superOnly?: boolean;
+      }
+    | undefined;
   if (handle?.superOnly) return profile.role === "super_admin";
+  if (handle?.anyPermission)
+    return hasAnyAdminPermission(profile, handle.anyPermission);
   return !handle?.permission || hasAdminPermission(profile, handle.permission);
 }

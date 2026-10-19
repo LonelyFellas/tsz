@@ -1,4 +1,5 @@
-import { usePermission } from "@/lib/auth";
+import { TableEmptyState } from "@/components/TableEmptyState";
+import { useIsSuperAdmin, usePermission } from "@/lib/auth";
 import { FormTypeSettings } from "./FormTypeSettings";
 import {
   PlusOutlined,
@@ -101,7 +102,9 @@ export function errorMessage(error: unknown): string {
 }
 
 export function PartOfSpeechSettings() {
-  const canEdit = usePermission("lexicon_settings.edit");
+  const canEdit = usePermission("lexicon_settings.edit_basic");
+  const canEditSub = usePermission("lexicon_settings.edit_sub");
+  const canDelete = useIsSuperAdmin();
   const { message, modal } = App.useApp();
   const [form] = Form.useForm<{ q?: string }>();
   const [q, setQ] = useState("");
@@ -244,7 +247,7 @@ export function PartOfSpeechSettings() {
               size="small"
               danger
               disabled={
-                !canEdit ||
+                !canDelete ||
                 item.usage_count > 0 ||
                 item.sub_part_count > 0 ||
                 // 候选清单就是该词性名下的非原形词形，长度即数量。
@@ -263,15 +266,6 @@ export function PartOfSpeechSettings() {
   return (
     <Flex vertical gap={16}>
       <Breadcrumb items={[{ title: "系统设置" }, { title: "词性配置" }]} />
-      <div>
-        <Typography.Title level={3} style={{ margin: 0 }}>
-          词性配置
-        </Typography.Title>
-        <Typography.Text type="secondary" style={{ display: "block" }}>
-          统一维护智能词库使用的基本词性、细分词性与词形变化；业务页面显示「简洁显示」的名称。
-        </Typography.Text>
-      </div>
-
       {/* Tab 自带的上内边距与下外边距会让它和上下块的间距比页面统一的 16px 大，这里归零。 */}
       <ConfigProvider
         theme={{
@@ -377,6 +371,19 @@ export function PartOfSpeechSettings() {
               />
             )}
             <Table<PartOfSpeechConfig>
+              locale={{
+                emptyText: (
+                  <TableEmptyState
+                    message="暂无基本词性"
+                    filtered={!!q}
+                    onResetFilters={() => {
+                      form.resetFields();
+                      setQ("");
+                      setPage(1);
+                    }}
+                  />
+                )
+              }}
               rowKey="id"
               size="middle"
               columns={columns}
@@ -446,7 +453,9 @@ export function PartOfSpeechSettings() {
                 <Button
                   type="primary"
                   icon={<PlusOutlined />}
-                  disabled={!canEdit || catalog.isError || parts.length === 0}
+                  disabled={
+                    !canEditSub || catalog.isError || parts.length === 0
+                  }
                   onClick={() => subPanelRef.current?.openCreate()}
                 >
                   新增细分词性
@@ -458,6 +467,8 @@ export function PartOfSpeechSettings() {
             ref={subPanelRef}
             parents={selectedPart ? [selectedPart] : parts}
             createParent={selectedPart}
+            filtered={!!selectedPart}
+            onResetFilters={() => setSelectedPartId("")}
             loading={catalog.isPending}
             onSaved={(text) => message.success(text)}
             onError={showError}

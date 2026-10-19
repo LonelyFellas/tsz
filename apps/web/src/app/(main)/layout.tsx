@@ -1,6 +1,6 @@
-import { MainNav } from "@/features/auth/components/MainNav";
+import { AppTopbar } from "@/features/shell/AppTopbar";
 
-// 登录后主布局：角色感知导航。
+// 主区使用学习区同款顶栏：左侧品牌菜单、右侧设置与账户入口。
 // 注意：主区本身不强制登录——词表浏览对游客开放；
 // 受保护区域（student/teacher）各自的 layout 用 RouteGuard 单独把关。
 export default function MainLayout({
@@ -9,9 +9,9 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="mx-auto max-w-5xl px-4">
-      <MainNav />
-      <main className="py-6">{children}</main>
-    </div>
+    <>
+      <AppTopbar />
+      <main className="mx-auto max-w-5xl">{children}</main>
+    </>
   );
 }

@@ -1,3 +1,4 @@
+import { SENTENCE_FORMATTING_HEADERS } from "./sentence-formatting";
 import { describe, expect, it, vi } from "vitest";
 import { createSharedSentenceEndpoints } from "./shared-sentences";
 import type { HttpClient } from "./http";
@@ -44,6 +45,103 @@ const body = {
 };
 
 describe("shared sentence wire contract", () => {
+  it("例句录音在创建、更新、重读和发布快照中保留；兼容缺省字段且不放宽未知字段", async () => {
+    const asset = {
+      id,
+      locale: "en-GB",
+      gender: "female",
+      content_type: "audio/wav",
+      size_bytes: 110520,
+      duration_ms: null,
+      original_name: "sentence.wav",
+      created_at: body.created_at
+    };
+    const variant = {
+      ...body.content.sentence.en_text.common,
+      audio_assets: [asset]
+    };
+    const content = {
+      ...body.content,
+      sentence: {
+        ...body.content.sentence,
+        en_text: { mode: "unified", common: variant }
+      }
+    };
+    const response = { ...body, content };
+    const publication = {
+      id,
+      sentence_id: id,
+      publication_number: 1,
+      source_revision: 1,
+      snapshot: content,
+      published_at: body.created_at,
+      published_by_admin_id: id,
+      created_by_admin_id: body.created_by_admin_id
+    };
+    expect(validateRuntimeSchema("SharedSentence", body)).toEqual({
+      valid: true
+    });
+    expect(validateRuntimeSchema("SentencePublication", publication)).toEqual({
+      valid: true
+    });
+    expect(
+      validateRuntimeSchema("SharedSentence", {
+        ...response,
+        content: {
+          ...content,
+          sentence: {
+            ...content.sentence,
+            en_text: {
+              mode: "unified",
+              common: { ...variant, unexpected_audio_field: true }
+            }
+          }
+        }
+      })
+    ).toMatchObject({ valid: false });
+    const post = vi.fn().mockResolvedValue(response);
+    const put = vi.fn().mockResolvedValue(response);
+    const get = vi.fn().mockResolvedValue(response);
+    const endpoints = createSharedSentenceEndpoints({
+      post,
+      put,
+      get
+    } as unknown as HttpClient);
+    const input = { source_entry_id: id, source_sense_id: id, content };
+    // Runtime checks intentionally receive plain JSON, exactly as returned by the API.
+    await expect(
+      endpoints.create(input as Parameters<typeof endpoints.create>[0])
+    ).resolves.toEqual(response);
+    await expect(
+      endpoints.update(id, { base_revision: 1, content } as Parameters<
+        typeof endpoints.update
+      >[1])
+    ).resolves.toEqual(response);
+    await expect(endpoints.get(id, "draft")).resolves.toEqual(response);
+    expect(post).toHaveBeenCalledWith("/lexicon/sentences", input, {
+      headers: SENTENCE_FORMATTING_HEADERS
+    });
+    expect(put.mock.calls[0]?.[1]).toEqual({ base_revision: 1, content });
+    // The deployed strict reader rejects the new property: frontend must ship first.
+    const definitions = runtimeSchemaBundleJson.$defs as unknown as Record<
+      string,
+      { properties: Record<string, unknown> }
+    >;
+    const current = definitions.RichTextVariantV3!;
+    const old = structuredClone(current);
+    delete old.properties.audio_assets;
+    definitions.RichTextVariantV3 = old;
+    try {
+      expect(validateRuntimeSchema("SharedSentence", response)).toMatchObject({
+        valid: false
+      });
+      expect(validateRuntimeSchema("SharedSentence", body)).toEqual({
+        valid: true
+      });
+    } finally {
+      definitions.RichTextVariantV3 = current;
+    }
+  });
   it.each(["SharedSentence", "SentencePublication"] as const)(
     "%s新字段保持真实owner，旧strict schema拒绝新增字段、新schema必需该字段",
     (root) => {
@@ -109,7 +207,8 @@ describe("shared sentence wire contract", () => {
       total: 1
     });
     expect(get).toHaveBeenCalledWith(
-      `/lexicon/sentences?q=give+up&entry_id=${id}&sense_id=${id}`
+      `/lexicon/sentences?q=give+up&entry_id=${id}&sense_id=${id}`,
+      { headers: SENTENCE_FORMATTING_HEADERS }
     );
     await expect(api.get(id)).rejects.toThrow("revision");
     await expect(api.get(id)).rejects.toThrow("unexpected_property");
@@ -164,7 +263,8 @@ describe("shared sentence wire contract", () => {
     });
     expect(put).toHaveBeenCalledWith(
       `/lexicon/sentences/${id}`,
-      expect.objectContaining({ context_entry_id: id, base_revision: 1 })
+      expect.objectContaining({ context_entry_id: id, base_revision: 1 }),
+      { headers: SENTENCE_FORMATTING_HEADERS }
     );
     await expect(
       api.targets({ q: "flower", context_entry_id: id, page: 2 })
@@ -182,7 +282,12 @@ it("发布、回退、下架、恢复分别走独立路径并携带双版本与�
   const post = vi.fn().mockResolvedValue(body);
   const api = createSharedSentenceEndpoints({ post } as unknown as HttpClient);
   const input = { base_revision: 1, base_lifecycle_revision: 2 };
-  const headers = { headers: { "Idempotency-Key": "command-key" } };
+  const headers = {
+    headers: {
+      ...SENTENCE_FORMATTING_HEADERS,
+      "Idempotency-Key": "command-key"
+    }
+  };
   await api.publish(id, "command-key", input);
   await api.rollback(id, id, "command-key", input);
   await api.withdraw(id, "command-key", {
@@ -223,10 +328,13 @@ it("编辑显式读取草稿，历史支持游标并拒绝畸形响应", async (
     .mockResolvedValueOnce([{ ...publication, snapshot: null }]);
   const api = createSharedSentenceEndpoints({ get } as unknown as HttpClient);
   await api.get(id, "draft");
-  expect(get).toHaveBeenLastCalledWith(`/lexicon/sentences/${id}?view=draft`);
+  expect(get).toHaveBeenLastCalledWith(`/lexicon/sentences/${id}?view=draft`, {
+    headers: SENTENCE_FORMATTING_HEADERS
+  });
   await expect(api.publications(id, 5)).resolves.toEqual([publication]);
   expect(get).toHaveBeenLastCalledWith(
-    `/lexicon/sentences/${id}/publications?before_number=5`
+    `/lexicon/sentences/${id}/publications?before_number=5`,
+    { headers: SENTENCE_FORMATTING_HEADERS }
   );
   await expect(api.publication(id, id)).resolves.toEqual(publication);
   await expect(api.publications(id)).rejects.toThrow("数组");
@@ -253,4 +361,36 @@ it("下架影响预览保持目标身份并拒绝缺失指纹", async () => {
     `/lexicon/sentences/${id}/withdrawal-impact`
   );
   await expect(api.withdrawalImpact(id)).rejects.toThrow("fingerprint");
+});
+
+it("creation and historical detail negotiate the same response capability", async () => {
+  const post = vi.fn().mockResolvedValue(body);
+  const get = vi.fn().mockResolvedValue({
+    id,
+    sentence_id: id,
+    publication_number: 1,
+    source_revision: 1,
+    snapshot: body.content,
+    published_at: body.created_at,
+    published_by_admin_id: id,
+    created_by_admin_id: id
+  });
+  const api = createSharedSentenceEndpoints({
+    post,
+    get
+  } as unknown as HttpClient);
+  const input = {
+    source_entry_id: id,
+    source_sense_id: id,
+    content: body.content
+  };
+  await api.create(input as never);
+  expect(post).toHaveBeenCalledWith("/lexicon/sentences", input, {
+    headers: SENTENCE_FORMATTING_HEADERS
+  });
+  await api.publication(id, id);
+  expect(get).toHaveBeenCalledWith(
+    `/lexicon/sentences/${id}/publications/${id}`,
+    { headers: SENTENCE_FORMATTING_HEADERS }
+  );
 });

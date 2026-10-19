@@ -1,4 +1,4 @@
-import { PlusOutlined } from "@ant-design/icons";
+import { PlusCircleOutlined, PlusOutlined } from "@ant-design/icons";
 import { Select } from "antd";
 import type {
   DraftFormsStepContentV3,
@@ -8,6 +8,7 @@ import type {
 } from "@tsz/types";
 
 export interface V3AddBasicPosSelectProps {
+  compact?: boolean;
   catalog?: PartOfSpeechCatalogResponse;
   /** 词条自身是单词还是短语；给定时候选只列同一侧的词性。 */
   entryKind?: WordEntryKindV3;
@@ -18,6 +19,7 @@ export interface V3AddBasicPosSelectProps {
 }
 
 export function V3AddBasicPosSelect({
+  compact = false,
   catalog,
   entryKind,
   forms,
@@ -49,8 +51,31 @@ export function V3AddBasicPosSelect({
         label: item.name_zh
       }))}
       placeholder="添加基本词性"
-      style={{ width: 190 }}
-      suffixIcon={<PlusOutlined />}
+      style={{ width: compact ? 24 : 190 }}
+      popupMatchSelectWidth={190}
+      styles={
+        compact
+          ? {
+              root: { padding: 0 },
+              content: { marginInlineEnd: 0, width: "100%", height: "100%" },
+              input: { width: "100%", height: "100%" },
+              placeholder: { display: "none" },
+              suffix: {
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 14,
+                color:
+                  isError || isPending ? undefined : "var(--ant-color-primary)",
+                pointerEvents: "none"
+              }
+            }
+          : undefined
+      }
+      variant={compact ? "borderless" : undefined}
+      suffixIcon={compact ? <PlusCircleOutlined /> : <PlusOutlined />}
       value={undefined}
     />
   );

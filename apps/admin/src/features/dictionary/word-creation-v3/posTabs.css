@@ -6,10 +6,28 @@
  * `.word-sort-actions` 下，标签页没有那层容器，所以这里按同一组视觉参数复刻，
  * 而不是去动那个被多处共用的选择器。
  */
+.word-pos-tabs > .ant-tabs-nav .ant-tabs-tab-active {
+  background: #eef2fe;
+}
+
 .word-pos-tab-handle {
-  display: inline-flex;
+  display: inline-grid;
+  grid-template-columns: 24px max-content 24px;
+  column-gap: 6px;
+  justify-content: center;
+  min-width: 120px;
   align-items: center;
   border-radius: 6px;
+}
+
+.word-pos-tab-label {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.word-pos-tab-label > .ant-badge:empty {
+  display: none;
 }
 
 .word-pos-tab-handle .word-sort-drag-handle.ant-btn {
@@ -48,4 +66,15 @@
   outline: 2px solid rgba(22, 119, 255, 0.55);
   /* Tabs 导航会裁切外溢内容，将提示框内收，首尾页签也能完整显示。 */
   outline-offset: -2px;
+}
+
+.word-pos-tab-actions {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.word-pos-tab-actions .word-add-basic-pos-select {
+  width: 24px;
+  height: 24px;
 }

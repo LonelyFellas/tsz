@@ -18,6 +18,10 @@ export interface AssociationPickerProps<
   /** 已有关联可查看、清除或补全目标；更新时保留原标注 ID 与片段。 */
   selected?: TLink;
   onSelect: (link?: TLink) => void;
+  /** 取消候选选择并关闭浮层，不修改原关联。 */
+  onCancel?: () => void;
+  /** 候选选择器内有待确认的变更时，阻止直接完成外层编辑。 */
+  onPendingChange?: (pending: boolean) => void;
 }
 
 export interface VoiceOption {
@@ -175,18 +179,25 @@ export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
     | "dict-phonetic"
     | "actual-pron"
     | "spelling"
-    | "synthesis";
+    | "synthesis"
+    | "phoneme-settings";
   /**
    * 这段正文所属的语种。宿主按英美分栏时传进来，音色清单和录音归属都只留这一侧；
    * 不分英美（通用栏）的字段不传，此时不做筛选。
    */
   locale?: AudioAssetLocale;
+  /** 释义/例句新增格式写入口；关闭时仍读取已有格式。 */
+  textFormattingEnabled?: boolean;
   textLinks?: TLink[];
   /** 改字失效的关联在改回原文时恢复；显式清除不自动恢复。 */
   restoreTextLinksOnCorrection?: boolean;
   renderAssociationPicker?: (props: AssociationPickerProps<TLink>) => ReactNode;
   onAssociationPendingChange?: (pending: boolean) => void;
-  renderActions?: (canComplete: boolean) => ReactNode;
+  /** prepareComplete normalizes spelling through the editor history; false asks the user to review. */
+  renderActions?: (
+    canComplete: boolean,
+    prepareComplete?: () => boolean
+  ) => ReactNode;
   value: RichText;
   language?: string;
   /** 无障碍名，同时用于区分同一页面上的多个编辑器。 */
@@ -200,6 +211,9 @@ export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
   readOnly?: boolean;
   /** 正文由宿主输入框编辑；隐藏文本工具并禁止改字，仍允许标注和发音配置。 */
   textReadOnly?: boolean;
+  /** Allow association changes while keeping text, formatting and audio unchanged. */
+  contentReadOnly?: boolean;
+  associationsReadOnly?: boolean;
   /**
    * 透传到正文输入框上的 data-* 属性。宿主（admin）用它做错误定位：拿
    * `[data-v3-node-id][data-v3-field]` 找到元素后要 `focus()` 并校验
@@ -219,6 +233,8 @@ export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
    * 两套语义并存会让人分不清哪些音频真的保存了。
    */
   audioUploadAdapter?: AudioUploadAdapter;
+  /** 仅限制新增上传；已有音频仍可试听。 */
+  audioUploadAllowed?: boolean;
   /** 挂在这段文本上的音频资产；与 voiceProfile 一样是受控通道，改动实时抛出。 */
   audioAssets?: AudioAsset[];
   onAudioAssetsChange?: (next: AudioAsset[]) => void;

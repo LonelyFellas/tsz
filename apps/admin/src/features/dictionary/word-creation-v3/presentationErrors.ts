@@ -1,5 +1,6 @@
 import {
   HttpError,
+  RequestTimeoutError,
   InvalidAdminWordResponseError,
   UnsupportedAdminWordSchemaVersionError
 } from "@tsz/api-client";
@@ -23,8 +24,9 @@ const ISSUE_MESSAGES = {
   form_group_required: "每个词性都需要至少一个词形变化组",
   empty_form_group: "词形变化组不能为空",
   base_form_required_in_group: "第 1 组词形变化需要至少一个原形",
+  spelling_rich_text_invalid: "拼写正文与标注不一致或标注范围无效，请重新编辑",
   variant_spelling_required: "请填写词形拼写",
-  pronunciation_required: "请完整填写发音方式、字典音标和实际发音",
+  pronunciation_required: "请完整填写读法、字典音标和实际发音",
   duplicate_pronunciation: "同一词形下不能添加重复发音",
   content_limit_exceeded: "词条内容数量超过上限，请精简后重试",
   sense_group_required: "请至少添加一个语义区间",
@@ -194,7 +196,7 @@ export function presentV3DetailError(
     }
     return { title, description: "词条暂时无法打开", retryable: false };
   }
-  if (error instanceof TypeError) {
+  if (error instanceof TypeError || error instanceof RequestTimeoutError) {
     return {
       title,
       description: "网络异常，请检查连接后重试",

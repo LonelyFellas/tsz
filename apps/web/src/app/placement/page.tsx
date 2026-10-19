@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { RouteGuard } from "@/features/auth/components/RouteGuard";
 import { PlacementFlow } from "@/features/placement";
 
@@ -9,7 +10,9 @@ import { PlacementFlow } from "@/features/placement";
 export default function PlacementPage() {
   return (
     <RouteGuard>
-      <PlacementFlow />
+      <Suspense fallback={null}>
+        <PlacementFlow />
+      </Suspense>
     </RouteGuard>
   );
 }

@@ -1502,7 +1502,7 @@ describe("V3PublicationHistory", () => {
     [403, "当前账号没有回退发布版本的权限。"],
     [422, "回退请求校验未通过。"],
     [500, "回退发布版本失败，请稍后重试。"],
-    [503, "发布服务暂不可用，请稍后重试。"]
+    [503, "发布结果尚未确认，请刷新查看结果或原样重试确认。"]
   ])(
     "classifies activate HTTP %s and preserves immutable detail",
     async (status, message) => {

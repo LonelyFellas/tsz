@@ -5,12 +5,15 @@ import type {
   ProblemDetails,
   ProblemMeta
 } from "@tsz/types";
+import { createRequestDeadline } from "./deadline";
 import { validateRuntimeSchema } from "./runtime-schema";
 
 export interface HttpClientOptions {
   baseUrl: string;
   /** 每次请求动态获取 access token。 */
   getToken?: () => string | undefined | Promise<string | undefined>;
+  /** 仅测试批次使用；后端仍须验证账号白名单。不会附加到 OSS 直传请求。 */
+  getTestResourceRun?: () => string | undefined;
   getSessionGeneration?: () => number;
   /**
    * access token 过期(401)时调用。实现应：
@@ -157,25 +160,36 @@ async function parseError(res: Response): Promise<ParsedError> {
 export function createHttpClient({
   baseUrl,
   getToken,
+  getTestResourceRun,
   getSessionGeneration,
   onRefresh,
   onSessionExpired,
   onForbidden
 }: HttpClientOptions) {
-  async function request<T>(
+  async function performRequest<T>(
     path: string,
     init: RequestInit = {},
     retrying = false,
     skipAuth = false,
     retryOnUnauthorized:
       boolean | ((code: string | undefined) => boolean) = true,
-    responseType: "json" | "blob" = "json"
+    responseType: "json" | "blob" = "json",
+    deadline?: ReturnType<typeof createRequestDeadline>
   ): Promise<T> {
+    if (!retrying && !skipAuth && getTestResourceRun) {
+      const run = getTestResourceRun();
+      if (run !== undefined) {
+        const scopedHeaders = new Headers(init.headers);
+        scopedHeaders.set("X-TSZ-Test-Run", run);
+        init = { ...init, headers: scopedHeaders };
+      }
+    }
     const generation = getSessionGeneration?.();
     const isCurrent = () => generation === getSessionGeneration?.();
     // 公开端点(登录/注册等)不带 access token，避免遗留的旧 token 污染请求。
     const token = skipAuth ? undefined : await getToken?.();
     if (!skipAuth && !isCurrent()) throw new Error("session changed");
+    init.signal?.throwIfAborted();
     const headers = new Headers(init.headers);
     if (!headers.has("Content-Type")) {
       headers.set("Content-Type", "application/json");
@@ -190,7 +204,9 @@ export function createHttpClient({
     });
 
     if (!skipAuth && !isCurrent()) throw new Error("session changed");
+    init.signal?.throwIfAborted();
     const parsedError = res.ok ? undefined : await parseError(res);
+    init.signal?.throwIfAborted();
     if (!skipAuth && !isCurrent()) throw new Error("session changed");
     if (
       res.status === 401 &&
@@ -204,7 +220,7 @@ export function createHttpClient({
       try {
         const currentToken = await getToken?.();
         if (!isCurrent()) throw new Error("session changed");
-        if (currentToken === token) await onRefresh();
+        if (currentToken === token) await deadline!.wait(onRefresh);
       } catch (error) {
         if (isCurrent() && error instanceof HttpError && error.status === 401) {
           onSessionExpired?.();
@@ -212,13 +228,14 @@ export function createHttpClient({
         throw error;
       }
       if (!isCurrent()) throw new Error("session changed");
-      return request<T>(
+      return performRequest<T>(
         path,
         init,
         true,
         skipAuth,
         retryOnUnauthorized,
-        responseType
+        responseType,
+        deadline
       );
     }
 
@@ -251,6 +268,43 @@ export function createHttpClient({
     return (text ? JSON.parse(text) : undefined) as T;
   }
 
+  async function request<T>(
+    path: string,
+    init: RequestInit = {},
+    retrying = false,
+    skipAuth = false,
+    retryOnUnauthorized:
+      boolean | ((code: string | undefined) => boolean) = true,
+    responseType: "json" | "blob" = "json"
+  ): Promise<T> {
+    const method = init.method ?? "GET";
+    const longOperation =
+      init.body instanceof Blob ||
+      /\/(speech|audio|avatar|teacher-certification|teacher-applications)/.test(
+        path
+      );
+    const deadline = createRequestDeadline(
+      longOperation ? 90_000 : 30_000,
+      method,
+      init.signal
+    );
+    try {
+      return await deadline.wait(() =>
+        performRequest<T>(
+          path,
+          { ...init, signal: deadline.signal },
+          retrying,
+          skipAuth,
+          retryOnUnauthorized,
+          responseType,
+          deadline
+        )
+      );
+    } finally {
+      deadline.dispose();
+    }
+  }
+
   return {
     getBlob: (path: string, opts?: { signal?: AbortSignal }) =>
       request<Blob>(
@@ -268,8 +322,14 @@ export function createHttpClient({
         headers: { "Content-Type": body.type || "application/octet-stream" },
         signal: opts?.signal
       }),
-    get: <T>(path: string, opts?: { signal?: AbortSignal }) =>
-      request<T>(path, opts?.signal ? { signal: opts.signal } : {}),
+    get: <T>(
+      path: string,
+      opts?: { signal?: AbortSignal; headers?: HeadersInit }
+    ) =>
+      request<T>(path, {
+        ...(opts?.signal ? { signal: opts.signal } : {}),
+        ...(opts?.headers ? { headers: opts.headers } : {})
+      }),
     post: <T>(
       path: string,
       data?: unknown,
@@ -303,8 +363,12 @@ export function createHttpClient({
         ...(opts?.headers ? { headers: opts.headers } : {}),
         ...(opts?.signal ? { signal: opts.signal } : {})
       }),
-    patch: <T>(path: string, data?: unknown) =>
-      request<T>(path, { method: "PATCH", body: JSON.stringify(data) }),
+    patch: <T>(path: string, data?: unknown, opts?: { signal?: AbortSignal }) =>
+      request<T>(path, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+        ...(opts?.signal ? { signal: opts.signal } : {})
+      }),
     del: <T>(
       path: string,
       data?: unknown,
@@ -325,3 +389,5 @@ export function createHttpClient({
 }
 
 export type HttpClient = ReturnType<typeof createHttpClient>;
+
+export { RequestTimeoutError } from "./deadline";

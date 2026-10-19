@@ -223,3 +223,37 @@ describe("身份和授权缓存边界", () => {
     client.clear();
   });
 });
+
+it("coins 权限撤回或超管降级清理管理缓存，保留本人钱包", () => {
+  const store = createAdminAuthStore();
+  const client = new QueryClient();
+  store.getState().setProfile({
+    ...profile,
+    role: "super_admin",
+    permissions: ["coins.access"]
+  });
+  const detach = bindAdminAuthorizationCache(store, client);
+  client.setQueryData(["admin-coins", "admin", profile.id], { private: true });
+  client.setQueryData(["my-coins", "admin", profile.id], { balance: "7" });
+  store.getState().setProfile({
+    ...profile,
+    role: "admin",
+    permission_version: 2,
+    permissions: ["coins.access"]
+  });
+  expect(
+    client.getQueryData(["admin-coins", "admin", profile.id])
+  ).toBeUndefined();
+  expect(client.getQueryData(["my-coins", "admin", profile.id])).toEqual({
+    balance: "7"
+  });
+  client.setQueryData(["admin-coins", "admin", profile.id], { private: true });
+  store
+    .getState()
+    .setProfile({ ...profile, permission_version: 3, permissions: [] });
+  expect(
+    client.getQueryData(["admin-coins", "admin", profile.id])
+  ).toBeUndefined();
+  detach();
+  client.clear();
+});

@@ -114,6 +114,12 @@ export function V3PosTab({
     if (result.ok) {
       setDialectChangeError(undefined);
       onChange(result.value);
+    } else if (result.reason === "spelling_marks_merge_required") {
+      setDialectChangeError({
+        groupId,
+        message:
+          "英式与美式拼写标注或试听配置不同，请先统一需要保留的配置，再合并拼写。"
+      });
     } else if (result.reason === "regularity_merge_required") {
       setDialectChangeError({
         groupId,

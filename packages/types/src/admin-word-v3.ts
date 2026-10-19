@@ -52,10 +52,16 @@ export interface UpsWordV3 {
   phoneme: string;
 }
 export type PhonemeLocaleV3 = "en-GB" | "en-US";
+export interface SynthesisSpeechV3 {
+  content: RichTextV2V3;
+  voice_profile: VoiceProfileV3;
+}
 export interface PronunciationSynthesisCandidateV3 {
   ipa: string;
   ups: string;
   ups_words?: UpsWordV3[] | null;
+  ipa_speech?: SynthesisSpeechV3;
+  ups_speech?: SynthesisSpeechV3;
 }
 export interface PronunciationSynthesisV3 {
   alphabet: "ipa" | "ups";
@@ -107,10 +113,19 @@ export type PhraseComponentUsageV3 =
       target_gloss: string;
     };
 
+/** 拼写独立试听；content 与 spelling 同文且仅含 pause。 */
+export interface SpellingSpeechV3 {
+  content: RichTextV2V3;
+  voice_profile: VoiceProfileV3;
+}
+
 interface WordFormVariantBaseV3<TDialect extends Dialect> {
   id: string;
   dialect: TDialect;
   spelling: string;
+  /** 拼写展示标注；正文与 spelling 一致，仅含斜体和连读。 */
+  spelling_rich?: RichTextV2V3;
+  spelling_speech?: SpellingSpeechV3;
   /** 是否规则变化；旧数据缺省时沿用所属组的历史值。 */
   is_regular?: boolean;
   origin: TextOriginV3;
@@ -167,6 +182,21 @@ export interface RichTextSpanV3 {
 
 export type RichTextAnnotationV3 =
   | {
+      type: "italic";
+      start: number;
+      end: number;
+    }
+  | {
+      type: "bold";
+      start: number;
+      end: number;
+    }
+  | {
+      type: "underline";
+      start: number;
+      end: number;
+    }
+  | {
       type: "emphasis";
       start: number;
       end: number;
@@ -219,12 +249,9 @@ export interface RichTextVariantV3 {
   id: string;
   value: RichTextV3;
   origin: TextOriginV3;
-  /**
-   * 缺省 / null 表示未配置。例句英文与释义内容目前还没接语音编辑器，
-   * 这里先留着，等它们接入时用。
-   */
+  /** 缺省表示未配置语音。 */
   voice_profile?: VoiceProfileV3 | null;
-  /** 与 GrammarVariantV3 同形预留；例句 / 释义接入语音编辑器前 admin 不写入。 */
+  /** 已上传的录音；保存后元数据以服务端资产登记为准，空数组表示移除。 */
   audio_assets?: AudioAssetV3[];
   /** 人工正文关联。省略保留存量，显式空数组清除。 */
   text_links?: TextLinkV3[];
@@ -795,6 +822,7 @@ export const V3_VALIDATION_ISSUE_CODES = [
   "empty_form_group",
   "base_form_required_in_group",
   "variant_spelling_required",
+  "spelling_rich_text_invalid",
   "pronunciation_required",
   "duplicate_pronunciation",
   "content_limit_exceeded",

@@ -942,8 +942,13 @@ describe("实时摘要明细", () => {
       meanings
     });
     expect(rows[3]!.details.map((item) => item.label)).toEqual([
-      "1. 位置",
-      "2. 待填写语义区间"
+      "位置",
+      "待填写语义区间"
+    ]);
+    expect(rows[3]!.details.map((item) => item.pending)).toEqual([false, true]);
+    expect(rows[5]!.details[0]!.items?.map((item) => item.pending)).toEqual([
+      false,
+      true
     ]);
     expect(rows[4]!.count).toBe(3);
     expect(rows[4]!.details.map((item) => [item.label, item.count])).toEqual([
@@ -951,8 +956,8 @@ describe("实时摘要明细", () => {
       ["动词", 1]
     ]);
     expect(rows[5]!.details[0]!.items?.map((item) => item.label)).toEqual([
-      "1. 真实释义",
-      "2. 待填写释义"
+      "真实释义",
+      "待填写释义"
     ]);
     expect(rows[6]!.count).toBe(3);
     expect(rows[6]!.details.map((item) => [item.label, item.count])).toEqual([
@@ -979,10 +984,10 @@ describe("实时摘要明细", () => {
       dirtySteps: { forms: false, meanings: true }
     });
     expect(updated[3]!.details.map((item) => item.label)).toEqual([
-      "1. 待填写语义区间",
-      "2. 位置"
+      "待填写语义区间",
+      "位置"
     ]);
-    expect(updated[5]!.details[0]!.items?.[0]!.label).toBe("1. 修改后的释义");
+    expect(updated[5]!.details[0]!.items?.[0]!.label).toBe("修改后的释义");
     expect(updated.slice(3).every((row) => !row.completed)).toBe(true);
     expect(updated[3]!.statusDescription).toBe("编辑中，完成状态待确认");
     expect(updated[1]!.completed).toBe(true);

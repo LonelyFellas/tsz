@@ -6,7 +6,6 @@ import {
   useState
 } from "react";
 import type { RefObject } from "react";
-import { fitPauseHitAreas } from "./pauseHitAreas";
 import {
   EMPTY_LIAISON_LAYOUT,
   buildLiaisonArcs,
@@ -33,7 +32,6 @@ export function useLiaisonArcs(
   const measure = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
-    fitPauseHitAreas(container);
     const next = buildLiaisonArcs(
       container,
       collectRef.current(),
@@ -57,6 +55,22 @@ export function useLiaisonArcs(
     const observer = new ResizeObserver(measure);
     observer.observe(container);
     return () => observer.disconnect();
+  }, [containerRef, measure]);
+
+  // 弹窗缩放改变了 getBoundingClientRect，却不会触发 ResizeObserver。
+  // 编辑器若在动画途中加载，结束时必须丢弃缩放中的坐标。
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const onAnimationEnd = (event: AnimationEvent) => {
+      if (event.target instanceof Element && event.target.contains(container)) {
+        measure();
+      }
+    };
+    const document = container.ownerDocument;
+    document.addEventListener("animationend", onAnimationEnd, true);
+    return () =>
+      document.removeEventListener("animationend", onAnimationEnd, true);
   }, [containerRef, measure]);
 
   // 网页字体晚于首帧到位（font-display: swap）时字形宽高都会变，容器宽度却未必变，

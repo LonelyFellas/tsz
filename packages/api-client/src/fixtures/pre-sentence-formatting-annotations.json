@@ -1,0 +1,229 @@
+{
+  "source_commit": "7b0f0e53009044e21eccb90851602cddfe3d7982",
+  "source_sha256": "340fee8e1dc15012de4ea09c7fa53a9439d462af7ddb7e3025f7dd5ec89d3933",
+  "$defs": {
+    "RichTextAnnotationV3": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["start", "end", "level", "type"],
+          "properties": {
+            "end": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "level": {
+              "$ref": "#/$defs/RichTextEmphasisLevel"
+            },
+            "start": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "type": {
+              "type": "string",
+              "enum": ["emphasis"]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "alphabet", "phoneme", "type"],
+          "properties": {
+            "alphabet": {
+              "$ref": "#/$defs/RichTextPhonemeAlphabet"
+            },
+            "end": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "phoneme": {
+              "type": "string",
+              "maxLength": 1600
+            },
+            "start": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "type": {
+              "type": "string",
+              "enum": ["phoneme"]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "type"],
+          "properties": {
+            "end": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "end_len": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "start": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "start_len": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "type": {
+              "type": "string",
+              "enum": ["liaison"]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "color", "type"],
+          "properties": {
+            "color": {
+              "$ref": "#/$defs/RichTextHighlightColor"
+            },
+            "end": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "start": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "type": {
+              "type": "string",
+              "enum": ["highlight"]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["at", "duration_ms", "type"],
+          "properties": {
+            "at": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "duration_ms": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "type": {
+              "type": "string",
+              "enum": ["pause"]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "type"],
+          "properties": {
+            "end": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "start": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "type": {
+              "type": "string",
+              "enum": ["italic"]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "V3ValidationIssueCode": {
+      "type": "string",
+      "enum": [
+        "invalid_regional_variant_shape",
+        "dialect_rules_invalid",
+        "invalid_form_type_for_part_of_speech",
+        "part_of_speech_kind_mismatch",
+        "forbidden_v3_field",
+        "duplicate_node_id",
+        "duplicate_pos_code",
+        "pos_required",
+        "form_group_membership_invalid",
+        "orphan_form",
+        "form_group_required",
+        "empty_form_group",
+        "base_form_required_in_group",
+        "variant_spelling_required",
+        "pronunciation_required",
+        "duplicate_pronunciation",
+        "content_limit_exceeded",
+        "sense_group_required",
+        "sense_group_name_required",
+        "sense_group_name_too_long",
+        "pos_not_found",
+        "duplicate_pos_meanings",
+        "grammar_required",
+        "grammar_variants_invalid",
+        "grammar_form_link_invalid",
+        "sense_required",
+        "level_invalid",
+        "sub_pos_required",
+        "invalid_sub_part_of_speech",
+        "frequency_invalid",
+        "sense_group_not_found",
+        "definition_required",
+        "definition_level_invalid",
+        "definition_invalid",
+        "native_definition_required",
+        "sentence_level_invalid",
+        "sentence_incomplete",
+        "sentence_translation_required",
+        "sentence_translation_invalid",
+        "duplicate_sentence_translation_band",
+        "sentence_link_role_invalid",
+        "duplicate_sentence_link",
+        "relation_score_invalid",
+        "relation_type_invalid",
+        "relation_self_target",
+        "relation_target_archived",
+        "relation_target_has_no_sense",
+        "relation_target_unavailable",
+        "relation_target_stale",
+        "sentence_context_target_unavailable",
+        "relation_pending_headword_invalid",
+        "relation_target_shape_invalid",
+        "relation_pending_gloss_without_headword",
+        "relation_pending_gloss_invalid",
+        "relation_pending_gloss_conflict",
+        "relation_pending_gloss_target_exists",
+        "relation_prebound_target_not_found",
+        "relation_prebound_target_archived",
+        "relation_prebound_target_has_no_sense",
+        "relation_target_sense_deleted",
+        "node_id_reused",
+        "node_binding_unknown",
+        "node_binding_changed",
+        "meanings_storage_unsafe",
+        "pos_meanings_required",
+        "sense_has_inbound_publication_refs",
+        "phrase_component_not_allowed",
+        "phrase_component_limit_exceeded",
+        "phrase_component_literal_invalid",
+        "phrase_component_self_target",
+        "phrase_component_target_unavailable",
+        "phrase_component_target_nested",
+        "phrase_component_target_stale",
+        "phonetic_rich_text_invalid",
+        "voice_profile_invalid",
+        "audio_asset_invalid",
+        "sense_form_group_invalid",
+        "dedicated_form_group_unused",
+        "sense_form_group_required"
+      ]
+    }
+  }
+}

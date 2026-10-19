@@ -1,5 +1,5 @@
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
-import { HttpError } from "@tsz/api-client/http";
+import { HttpError, RequestTimeoutError } from "@tsz/api-client/http";
 import type {
   AdminWordV3Envelope,
   EntryAnnotationConflict,
@@ -145,11 +145,11 @@ function errorMessage(error: unknown): string {
     if (error.status === 403)
       return isAnnotationOwnershipError(error.code)
         ? annotationForbiddenMessage(error.code)
-        : "当前账号没有创建词条的权限。";
+        : "当前账号没有创建词汇的权限。";
     if (error.status === 503) return "词条服务暂时不可用，请稍后重试。";
     if (error.status === 410) return "检查结果已过期，请重新提交。";
   }
-  if (error instanceof TypeError) {
+  if (error instanceof TypeError || error instanceof RequestTimeoutError) {
     return "网络异常，创建结果未知。请原样重试。";
   }
   return error instanceof ProductError
@@ -158,7 +158,7 @@ function errorMessage(error: unknown): string {
 }
 
 function createErrorMessage(error: unknown): string {
-  if (error instanceof TypeError) {
+  if (error instanceof TypeError || error instanceof RequestTimeoutError) {
     return "网络异常，创建结果未知。请原样重试。";
   }
   if (!(error instanceof HttpError)) {
@@ -452,13 +452,21 @@ function DetectionPresentationCard({
                 {expanded === entry.key ? (
                   <div className="word-smart-match-context-meta">
                     {entry.baseSpellings.map((spelling) => (
-                      <div className="tsz-words" key={spelling}>
+                      <div
+                        className="tsz-words"
+                        key={spelling}
+                        style={{ fontWeight: 700 }}
+                      >
                         原形：{spelling}
                       </div>
                     ))}
                     {entry.baseSpellings.length === 0
                       ? entry.otherMatches.map((match) => (
-                          <div className="tsz-words" key={match}>
+                          <div
+                            className="tsz-words"
+                            key={match}
+                            style={{ fontWeight: 700 }}
+                          >
                             命中：{match}
                           </div>
                         ))
@@ -1153,10 +1161,10 @@ export function UnifiedCreateEntryStep({
       <div className="word-step-heading">
         <span className="word-step-number">STEP 01</span>
         <Typography.Title level={2} style={{ margin: 0 }}>
-          创建新词条
+          创建词汇
         </Typography.Title>
         <Typography.Paragraph className="word-step-description">
-          输入单词或短语，检测后确认主词。
+          利用内置词典检测单词或短语，确认主词后创建词汇。
         </Typography.Paragraph>
       </div>
 

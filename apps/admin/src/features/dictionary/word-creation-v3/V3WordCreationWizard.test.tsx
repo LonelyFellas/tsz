@@ -23,11 +23,9 @@ import { StrictMode, useState } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
-vi.mock("../api", () => ({
-  useRelatedSearch: () => ({
-    exact: { data: undefined, isFetching: false },
-    contains: { data: undefined, isFetching: false }
-  })
+vi.mock("../relatedSuggestions", () => ({
+  useRelatedSuggestions: () => ({ words: [], isFetching: false }),
+  useRelatedWordSenses: () => ({ data: undefined, isFetching: false })
 }));
 
 import type { V3WordRequests } from "./api";
@@ -296,6 +294,7 @@ function renderWizard(
     initialWord?: AdminWordV3;
     initialStep?: Parameters<typeof V3WordCreationWizard>[0]["initialStep"];
     readOnly?: boolean;
+    contentEditing?: boolean;
     allowPublishedEditing?: boolean;
     idempotencyKeyFactory?: () => string;
     renderStep?: (context: V3WizardSlotContext) => ReactNode;
@@ -317,6 +316,7 @@ function renderWizard(
         requests={source}
         initialStep={options.initialStep}
         readOnly={options.readOnly}
+        contentEditing={options.contentEditing}
         allowPublishedEditing={options.allowPublishedEditing}
         idempotencyKeyFactory={options.idempotencyKeyFactory}
         navigationAdapter={options.navigationAdapter}
@@ -373,6 +373,92 @@ function impactSurfacePage(nextCursor: string | null): SurfaceMatchPageV3 {
 }
 
 describe("V3WordCreationWizard", () => {
+  it("选择有效语法结构后立即清除对应警示，保留其他错误并在撤销选择后恢复", async () => {
+    const initialWord = word();
+    const grammarIssue: V3DraftValidationIssue = {
+      schema_version: 3,
+      step: "meanings",
+      node_id: "definition-canonical",
+      field: "grammar_structure_id",
+      code: "definition_invalid",
+      message: "请选择语法结构",
+      node_location: {
+        node_role: "meanings.definition",
+        pos_id: UUIDS.pos,
+        ancestor_node_ids: [UUIDS.pos, "sense-canonical"]
+      }
+    };
+    const contentIssue = {
+      ...grammarIssue,
+      field: "content",
+      message: "释义内容无效"
+    };
+    const source = requests({
+      saveMeanings: vi
+        .fn()
+        .mockRejectedValue(
+          new HttpError(422, "invalid", [], "validation_failed", [
+            grammarIssue,
+            contentIssue
+          ])
+        )
+    });
+    renderWizard(source, {
+      initialWord,
+      renderStep: (context) => (
+        <>
+          <output data-testid="grammar-issues">
+            {context.issues.map((issue) => issue.message).join(",")}
+          </output>
+          <select
+            aria-label="语法结构"
+            value={
+              context.draftMeanings.pos[0]!.senses[0]!.definitions[0]!
+                .grammar_structure_id ?? ""
+            }
+            onChange={(event) => {
+              const next = structuredClone(context.draftMeanings);
+              const definition = next.pos[0]!.senses[0]!.definitions[0]!;
+              if (event.target.value) {
+                definition.grammar_structure_id = event.target.value;
+              } else {
+                delete definition.grammar_structure_id;
+              }
+              context.setDraftMeanings(next);
+            }}
+          >
+            <option value="">未选择</option>
+            <option value="missing-grammar">失效结构</option>
+            <option value="grammar-canonical">有效结构</option>
+          </select>
+          <button
+            onClick={() =>
+              void context.actions.saveMeanings(
+                context.draftMeanings,
+                "complete"
+              )
+            }
+          >
+            完成词义
+          </button>
+        </>
+      )
+    });
+
+    fireEvent.click(screen.getByText("完成词义"));
+    const issues = screen.getByTestId("grammar-issues");
+    await waitFor(() => expect(issues).toHaveTextContent("请选择语法结构"));
+    const select = screen.getByLabelText("语法结构");
+    fireEvent.change(select, { target: { value: "missing-grammar" } });
+    expect(issues).toHaveTextContent("请选择语法结构");
+    fireEvent.change(select, { target: { value: "grammar-canonical" } });
+    expect(issues).not.toHaveTextContent("请选择语法结构");
+    expect(issues).toHaveTextContent("释义内容无效");
+    expect(source.saveMeanings).toHaveBeenCalledTimes(1);
+    fireEvent.change(select, { target: { value: "" } });
+    expect(issues).toHaveTextContent("请选择语法结构");
+  });
+
   // 这条渲染整个真实向导。实际发音改成编辑器字段后每条发音多一个组件，
   // CI 机器上会压着 5s 默认上限跑，给个明确上限而不是靠运气。
   it("短语拼写开关在真实向导中可以往返并保留成分配置", async () => {
@@ -2279,12 +2365,15 @@ describe("V3WordCreationWizard", () => {
       expect(element).not.toBeNull();
       return element!;
     });
-    await waitFor(() =>
-      expect(screen.getByRole("tab", { name: /动词/ })).toHaveAttribute(
-        "aria-selected",
-        "true"
-      )
-    );
+    await waitFor(() => {
+      // 已知词性 ID，直接锁定目标 tab，避免大表单的全局可访问名称计算。
+      const tab = container
+        .querySelector(`[data-pos-id="${UUIDS.pos_2}"]`)
+        ?.closest('[role="tab"]');
+      expect(tab).toBeVisible();
+      expect(tab).toHaveTextContent("动词");
+      expect(tab).toHaveAttribute("aria-selected", "true");
+    });
     await waitFor(() => expect(target).toHaveFocus());
   });
 
@@ -6564,4 +6653,69 @@ beforeEach(() => {
       preferences: { dialect: "uk" }
     }
   });
+});
+
+it("仅关联保存不自动拆分已有通用语法变体或重建节点", async () => {
+  const initial = word();
+  initial.forms.pos[0]!.form_groups[0]!.dialect_rules.spelling_mode =
+    "distinguish";
+  const variant = initial.meanings.pos[0]!.grammar_structures[0]!.variants[0]!;
+  variant.form_links = [
+    {
+      id: "link",
+      source_segments: [{ start: 0, end: 7, surface: "grammar" }],
+      target_word_id: initial.id,
+      target_pos_id: initial.forms.pos[0]!.pos_id,
+      target_form_id: "form",
+      target_variant_id: "variant",
+      target_dialect: "common"
+    }
+  ];
+  const saved = structuredClone(initial);
+  saved.revision = 2;
+  saved.meanings.pos[0]!.grammar_structures[0]!.variants[0]!.form_links = [];
+  const saveMeanings = vi.fn<V3WordRequests["saveMeanings"]>(async () => ({
+    word: saved
+  }));
+  renderWizard(requests({ saveMeanings }), {
+    initialWord: initial,
+    contentEditing: false,
+    renderStep: (context) => (
+      <>
+        <output data-testid="association-draft">
+          {JSON.stringify(context.draftMeanings)}
+        </output>
+        <button
+          onClick={() => {
+            const next = structuredClone(context.draftMeanings);
+            next.pos[0]!.grammar_structures[0]!.variants[0]!.form_links = [];
+            context.setDraftMeanings(next);
+          }}
+        >
+          清除词形关联
+        </button>
+        <button
+          onClick={() =>
+            void context.actions.saveMeanings(context.draftMeanings, "save")
+          }
+        >
+          保存关联
+        </button>
+      </>
+    )
+  });
+  expect(
+    JSON.parse(screen.getByTestId("association-draft").textContent!)
+  ).toEqual(toWritableMeanings(initial.meanings));
+  fireEvent.click(screen.getByText("清除词形关联"));
+  fireEvent.click(screen.getByText("保存关联"));
+  await waitFor(() => expect(saveMeanings).toHaveBeenCalledTimes(1));
+  expect(saveMeanings.mock.calls[0]?.[1].content).toEqual(
+    toWritableMeanings(saved.meanings)
+  );
+  await waitFor(() =>
+    expect(
+      JSON.parse(screen.getByTestId("association-draft").textContent!)
+    ).toEqual(toWritableMeanings(saved.meanings))
+  );
 });

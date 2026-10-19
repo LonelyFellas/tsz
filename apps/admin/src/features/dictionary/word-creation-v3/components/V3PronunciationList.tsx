@@ -16,7 +16,7 @@ import type {
   WordUkFormVariantV3,
   WordUsFormVariantV3
 } from "@tsz/types";
-import { useEffect, useState, type DragEvent } from "react";
+import { useEffect, useId, useState, type DragEvent } from "react";
 import { issuesForPronunciation } from "../model";
 import {
   reorderPronunciations,
@@ -33,7 +33,7 @@ function pronunciationFieldMessage(
   field: "style" | "dict_phonetic" | "actual_pron"
 ) {
   if (issue.code !== "pronunciation_required") return v3IssueMessage(issue);
-  if (field === "style") return "请选择发音方式";
+  if (field === "style") return "请选择读法";
   if (field === "dict_phonetic") return "请填写字典音标";
   return "请填写实际发音";
 }
@@ -76,6 +76,7 @@ export function V3PronunciationList({
   onChange
 }: V3PronunciationListProps) {
   const [form] = Form.useForm();
+  const inputPrefix = useId();
   const [draggingIndex, setDraggingIndex] = useState<number>();
   const [dragOverIndex, setDragOverIndex] = useState<number>();
   useEffect(() => {
@@ -276,14 +277,18 @@ export function V3PronunciationList({
                         type="text"
                       />
                     </div>
-                    <div className="word-pronunciation-fields">
-                      <label className="word-pronunciation-row">
-                        <Typography.Text className="word-pronunciation-label">
-                          发音方式
-                        </Typography.Text>
+                    <div className="word-pronunciation-fields word-pronunciation-floating-fields">
+                      <div className="word-pronunciation-row">
+                        <label
+                          className="word-pronunciation-label"
+                          htmlFor={`${inputPrefix}-${pronunciation.id}-style`}
+                        >
+                          读法
+                        </label>
                         <Form.Item noStyle>
                           <Select
-                            aria-label={`第 ${index + 1} 条发音的发音方式`}
+                            id={`${inputPrefix}-${pronunciation.id}-style`}
+                            aria-label={`第 ${index + 1} 条发音的读法`}
                             className="word-pronunciation-style-select"
                             data-v3-field="style"
                             data-v3-node-id={pronunciation.id}
@@ -298,6 +303,10 @@ export function V3PronunciationList({
                               {
                                 value: "normal",
                                 label: pronunciationStyleLabel("normal")
+                              },
+                              {
+                                value: "citation",
+                                label: pronunciationStyleLabel("citation")
                               },
                               {
                                 value: "strong",
@@ -321,14 +330,18 @@ export function V3PronunciationList({
                             {pronunciationFieldMessage(styleIssue, "style")}
                           </Typography.Text>
                         ) : null}
-                      </label>
+                      </div>
                       <div className="word-pronunciation-row">
-                        <Typography.Text className="word-pronunciation-label">
+                        <label
+                          className="word-pronunciation-label"
+                          htmlFor={`${inputPrefix}-${pronunciation.id}-dict`}
+                        >
                           字典音标
-                        </Typography.Text>
+                        </label>
                         <div className="word-pronunciation-phonetic-control">
                           <Form.Item noStyle>
                             <V3VoiceTextField
+                              id={`${inputPrefix}-${pronunciation.id}-dict`}
                               mode="dict-phonetic"
                               editingEnabled={false}
                               dialect={variant.dialect}
@@ -375,16 +388,22 @@ export function V3PronunciationList({
                         </div>
                       </div>
                       <div className="word-pronunciation-row">
-                        <Typography.Text className="word-pronunciation-label">
+                        <label
+                          className="word-pronunciation-label"
+                          htmlFor={`${inputPrefix}-${pronunciation.id}-actual`}
+                        >
                           实际发音
-                        </Typography.Text>
+                        </label>
                         <div className="word-actual-pronunciation-control">
                           <Form.Item noStyle>
                             <V3VoiceTextField
+                              id={`${inputPrefix}-${pronunciation.id}-actual`}
                               mode="actual-pron"
-                              leadingAction={
+                              trailingAction={
                                 <V3ActualPronunciationCopy
                                   pronunciation={pronunciation}
+                                  spelling={variant.spelling}
+                                  dialect={variant.dialect}
                                   onChange={(patch) =>
                                     onChange(
                                       updatePronunciation(

@@ -63,7 +63,7 @@ describe("正文关联编辑器", () => {
     render(<Host />);
     expect(screen.queryByRole("button", { name: /^语法结构/ })).toBeNull();
     expect(observe).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "关联单词" }));
+    fireEvent.click(screen.getByLabelText("关联单词"));
     fireEvent.mouseDown(screen.getByLabelText("关联 mother（1）"), {
       button: 0
     });
@@ -73,14 +73,14 @@ describe("正文关联编辑器", () => {
         { start: 0, end: 6, surface: "mother" }
       ])
     );
-    fireEvent.click(screen.getByRole("button", { name: "编辑文本" }));
+    fireEvent.click(screen.getByLabelText("编辑文本"));
     fireEvent.change(screen.getByLabelText("释义正文"), {
       target: { value: "dear mother helps mother" }
     });
     await waitFor(() =>
       expect(observe.mock.lastCall?.[1]?.[0]?.source_segments[0].start).toBe(5)
     );
-    fireEvent.click(screen.getByRole("button", { name: "上一步" }));
+    fireEvent.click(screen.getByLabelText("上一步"));
     await waitFor(() =>
       expect(observe.mock.lastCall?.[0]?.text).toBe("mother helps mother")
     );
@@ -88,12 +88,60 @@ describe("正文关联编辑器", () => {
       target: { value: "father helps mother" }
     });
     expect(observe.mock.lastCall?.[1]).toHaveLength(1);
-    fireEvent.click(screen.getByRole("button", { name: "确认修改" }));
+    fireEvent.click(screen.getByText("确认修改"));
     await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([]));
     expect(screen.getByText(/被修改词段的关联已移除/)).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "上一步" }));
+    fireEvent.click(screen.getByLabelText("上一步"));
     await waitFor(() => expect(observe.mock.lastCall?.[1]).toHaveLength(1));
   });
+});
+
+it("已关联词形的待确认选择阻止外层完成，取消只关闭候选并保留关联", async () => {
+  const observe = vi.fn();
+  const original = {
+    ...target,
+    source_segments: [{ start: 0, end: 3, surface: "job" }]
+  };
+  function Host() {
+    const [pending, setPending] = useState(false);
+    return (
+      <>
+        <button disabled={pending}>完成标注</button>
+        <VoiceEditor
+          mode="grammar"
+          value={{ version: 2, text: "job", annotations: [] }}
+          textLinks={[original]}
+          onChange={observe}
+          onAssociationPendingChange={setPending}
+          renderAssociationPicker={({ onCancel, onPendingChange }) => (
+            <>
+              <button onClick={() => onPendingChange?.(true)}>
+                暂选新词形
+              </button>
+              <button onClick={onCancel}>取消候选</button>
+            </>
+          )}
+        />
+      </>
+    );
+  }
+  render(<Host />);
+  fireEvent.click(screen.getByLabelText("关联单词"));
+  fireEvent.mouseDown(screen.getByLabelText("关联 job（1）"), { button: 0 });
+  fireEvent.click(
+    await screen.findByText("暂选新词形", { selector: "button" })
+  );
+  expect(screen.getByText("完成标注", { selector: "button" })).toBeDisabled();
+  fireEvent.click(screen.getByText("取消候选", { selector: "button" }));
+  expect(
+    screen.queryByRole("button", { name: "暂选新词形" })
+  ).not.toBeInTheDocument();
+  expect(screen.getByText("完成标注", { selector: "button" })).toBeEnabled();
+  expect(observe).not.toHaveBeenCalled();
+  fireEvent.mouseDown(screen.getByLabelText("关联 job（1）"), { button: 0 });
+  await waitFor(() =>
+    expect(screen.getByText("暂选新词形", { selector: "button" })).toBeVisible()
+  );
 });
 
 it("语法结构保留标注工具，以完整单词关联词形并支持撤销", async () => {
@@ -118,8 +166,11 @@ it("语法结构保留标注工具，以完整单词关联词形并支持撤销"
     />
   );
   expect(screen.getByRole("button", { name: /^语法结构/ })).toBeVisible();
+  expect(document.querySelector(".tsz-ve-primary-tools")).toContainElement(
+    screen.getByRole("button", { name: "关联单词" })
+  );
   expect(screen.queryByRole("button", { name: "关联短语" })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "关联词形" }));
+  fireEvent.click(screen.getByRole("button", { name: "关联单词" }));
   fireEvent.mouseDown(screen.getByLabelText("关联 job（2）"), { button: 0 });
   fireEvent.click(await screen.findByText("选择词形"));
   await waitFor(() =>
@@ -197,7 +248,7 @@ it("清除语法词形关联后候选保持打开，可直接改选并撤销恢�
     );
   }
   render(<Host />);
-  fireEvent.click(screen.getByRole("button", { name: "关联词形" }));
+  fireEvent.click(screen.getByRole("button", { name: "关联单词" }));
   fireEvent.mouseDown(screen.getByLabelText("关联 job（2）"), { button: 0 });
   fireEvent.click(await screen.findByText("清除词形关联"));
   await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([other]));
@@ -246,7 +297,6 @@ it.each(["grammar", "association"] as const)(
     fireEvent.change(input, { target: { value: "不可写入" } });
     expect(observe).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "停顿" }));
-    fireEvent.click(screen.getByRole("button", { name: "连续添加" }));
     fireEvent.click(screen.getByLabelText("停顿 0.5 秒"));
     fireEvent.mouseDown(screen.getByLabelText("第 1 处词缝"), { button: 0 });
     await waitFor(() =>
@@ -432,7 +482,8 @@ it.each(["word", "phrase"] as const)(
     });
     fireEvent.click(screen.getByText("提交新关联"));
     expect(observe).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByText("清除原关联"));
+    fireEvent.mouseDown(screen.getByLabelText("关联 give（1）"), { button: 0 });
+    fireEvent.click(await screen.findByText("清除原关联"));
     await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([other]));
     fireEvent.click(screen.getByRole("button", { name: "关联单词" }));
     fireEvent.mouseDown(screen.getByLabelText("关联 give（1）"), { button: 0 });
@@ -576,3 +627,70 @@ it.each([
     expect(screen.queryByText(/部分关联暂时失效/)).toBeNull();
   }
 );
+
+it("仅关联模式可改关联，正文和音频工具不可用", async () => {
+  const observe = vi.fn();
+  const value = { version: 2 as const, text: "hello world", annotations: [] };
+  render(
+    <VoiceEditor<TextLinkV3>
+      mode="association"
+      value={value}
+      textLinks={[]}
+      contentReadOnly
+      contextLabel="仅关联正文"
+      renderAssociationPicker={({ segments, onSelect }) => (
+        <button
+          onClick={() => onSelect({ ...target, source_segments: segments })}
+        >
+          选择目标
+        </button>
+      )}
+      onChange={observe}
+    />
+  );
+  expect(screen.queryByRole("button", { name: "编辑文本" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "音频" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "加粗" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "关联单词" }));
+  fireEvent.mouseDown(screen.getByLabelText("关联 hello（1）"), { button: 0 });
+  fireEvent.click(await screen.findByText("选择目标"));
+  await waitFor(() => expect(observe.mock.lastCall?.[1]).toHaveLength(1));
+  expect(observe.mock.lastCall?.[0]).toEqual(value);
+});
+it("仅正文模式禁用关联操作", () => {
+  render(
+    <VoiceEditor<TextLinkV3>
+      mode="association"
+      value={{ version: 2, text: "hello world", annotations: [] }}
+      textLinks={[]}
+      associationsReadOnly
+      onChange={vi.fn()}
+    />
+  );
+  expect(screen.getByRole("button", { name: "关联单词" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "关联短语" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "编辑文本" })).toBeEnabled();
+});
+
+it("仅关联模式可结束未完成的选择并继续保存", async () => {
+  render(
+    <VoiceEditor<TextLinkV3>
+      mode="grammar"
+      value={{ version: 2, text: "hello", annotations: [] }}
+      textLinks={[]}
+      contentReadOnly
+      onChange={vi.fn()}
+      renderAssociationPicker={() => <span>无可用目标</span>}
+      renderActions={(ready) => <button disabled={!ready}>保存关联</button>}
+    />
+  );
+  fireEvent.click(screen.getByRole("button", { name: "关联单词" }));
+  fireEvent.mouseDown(screen.getByLabelText("关联 hello（1）"), { button: 0 });
+  expect(screen.getByRole("button", { name: "保存关联" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "结束关联" }));
+  expect(screen.getByRole("button", { name: "保存关联" })).toBeEnabled();
+  await waitFor(() => {
+    const picker = screen.queryByText("无可用目标");
+    if (picker) expect(picker).not.toBeVisible();
+  });
+});

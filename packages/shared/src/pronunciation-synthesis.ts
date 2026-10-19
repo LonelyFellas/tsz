@@ -1,5 +1,7 @@
 import type {
   PronunciationSynthesisV3,
+  PronunciationSynthesisCandidateV3,
+  SynthesisSpeechV3,
   RichTextV2,
   PhonemeLocaleV3,
   SentenceSourceRangeV3,
@@ -8,12 +10,17 @@ import type {
 } from "@tsz/types";
 
 import { ipaWordToUps } from "./ipa-ups";
+import {
+  stripPhoneticDelimiters,
+  convertDictionaryToUnified,
+  unifiedWordToAzureIpa
+} from "./unified-phonetic";
 export const SYNTHESIS_LIMITS = { ipa: 200, ups: 1600 } as const;
 export const EMPTY_SYNTHESIS: PronunciationSynthesisV3 = {
   alphabet: "ipa",
   ipa: "",
   ups: "",
-  use_spelling: true
+  use_spelling: false
 };
 
 /** Candidates may be unfinished in a draft; only the selected side is required to synthesize. */
@@ -42,11 +49,14 @@ export function pronunciationLocale(
 export function pronunciationLocaleLabel(locale: PhonemeLocaleV3): string {
   return locale === "en-GB" ? "英式" : "美式";
 }
+type SelectedSynthesis = PronunciationSynthesisV3 &
+  Pick<PronunciationSynthesisCandidateV3, "ipa_speech" | "ups_speech">;
+
 export function synthesisForLocale(
-  synthesis: PronunciationSynthesisV3,
+  synthesis: SelectedSynthesis,
   locale: PhonemeLocaleV3,
   legacyDialect: Dialect = "common"
-): PronunciationSynthesisV3 {
+): SelectedSynthesis {
   const candidate = synthesis[locale === "en-GB" ? "uk" : "us"];
   if (candidate)
     return {
@@ -70,7 +80,10 @@ export function synthesisForLocale(
     ups: !dual || upsLocale === locale ? synthesis.ups : "",
     ipa_locale: ipaLocale,
     ups_locale: upsLocale,
-    ups_words: !dual || upsLocale === locale ? synthesis.ups_words : undefined
+    ups_words: !dual || upsLocale === locale ? synthesis.ups_words : undefined,
+    ipa_speech:
+      !dual || ipaLocale === locale ? synthesis.ipa_speech : undefined,
+    ups_speech: !dual || upsLocale === locale ? synthesis.ups_speech : undefined
   };
 }
 
@@ -88,6 +101,8 @@ export function pronunciationSynthesisLabel(
   const us = synthesisForLocale(synthesis, "en-US", dialect)[
     synthesis.alphabet
   ];
+  if (dialect === "uk") return `${name} · 英式：${uk || "未填写"}`;
+  if (dialect === "us") return `${name} · 美式：${us || "未填写"}`;
   return `${name} · 英式：${uk || "未填写"} · 美式：${us || "未填写"}`;
 }
 
@@ -106,7 +121,7 @@ export function synthesisLocaleIssue(
 }
 
 /** Spelling is the readable body, never the phoneme string. Offsets count Unicode code points. */
-export function pronunciationSynthesisContent(
+function basePronunciationSynthesisContent(
   spelling: string,
   synthesis?: PronunciationSynthesisV3,
   targetLocale?: PhonemeLocaleV3,
@@ -177,6 +192,195 @@ export function pronunciationSynthesisContent(
         phoneme: synthesis[synthesis.alphabet]!.trim()
       }
     ]
+  };
+}
+
+/** Pair visible phoneme ranges with spelling word ends for the settings editor. */
+export function synthesisPhonemeWordRanges(
+  spelling: string,
+  candidate: PronunciationSynthesisCandidateV3,
+  alphabet: "ipa" | "ups"
+): { textEnd: number; start: number; end: number }[] | undefined {
+  const words = [...spelling.matchAll(/\S+/gu)];
+  const value = candidate[alphabet];
+  const phones =
+    alphabet === "ipa"
+      ? [...value.matchAll(/\S+/gu)].map((match) => match[0])
+      : words.length === 1
+        ? [value.trim()]
+        : candidate.ups_words?.map((word, index) =>
+            word.text === words[index]?.[0] ? word.phoneme : ""
+          );
+  if (
+    !phones ||
+    phones.length !== words.length ||
+    phones.some((phone) => !phone) ||
+    (alphabet === "ups" && phones.join(" ") !== value.trim())
+  )
+    return undefined;
+  let offset = 0;
+  return phones.map((phone, index) => {
+    const start = value.indexOf(phone, offset);
+    offset = start + phone.length;
+    const word = words[index]!;
+    return {
+      textEnd: Array.from(spelling.slice(0, word.index + word[0].length))
+        .length,
+      start: Array.from(value.slice(0, start)).length,
+      end: Array.from(value.slice(0, offset)).length
+    };
+  });
+}
+
+/** Keep explicit UPS word ownership only when an edit stays inside one word's phones. */
+export function editSynthesisUpsWords(
+  spelling: string,
+  candidate: PronunciationSynthesisCandidateV3,
+  value: string
+): PronunciationSynthesisCandidateV3["ups_words"] {
+  if (value === candidate.ups) return candidate.ups_words;
+  const ranges = synthesisPhonemeWordRanges(spelling, candidate, "ups");
+  if (!ranges) return null;
+  const before = Array.from(candidate.ups);
+  const after = Array.from(value);
+  let start = 0;
+  while (start < before.length && before[start] === after[start]) start++;
+  let end = before.length;
+  let nextEnd = after.length;
+  while (
+    end > start &&
+    nextEnd > start &&
+    before[end - 1] === after[nextEnd - 1]
+  ) {
+    end--;
+    nextEnd--;
+  }
+  const changed = ranges.findIndex(
+    (range) => start >= range.start && end <= range.end
+  );
+  if (changed < 0) return null;
+  const words = [...spelling.matchAll(/\S+/gu)].map((match, index) => ({
+    text: match[0],
+    phoneme: before.slice(ranges[index]!.start, ranges[index]!.end).join("")
+  }));
+  const range = ranges[changed]!;
+  words[changed]!.phoneme = [
+    ...before.slice(range.start, start),
+    ...after.slice(start, nextEnd),
+    ...before.slice(end, range.end)
+  ]
+    .join("")
+    .trim();
+  return words.every((word) => word.phoneme) &&
+    words.map((word) => word.phoneme).join(" ") === value.trim()
+    ? words
+    : null;
+}
+
+/** Settings are anchored to spelling word boundaries, never to spaces between UPS phones. */
+export function pronunciationSynthesisSpeech(
+  synthesis: SelectedSynthesis | undefined,
+  locale?: PhonemeLocaleV3,
+  alphabet?: "ipa" | "ups"
+): SynthesisSpeechV3 | undefined {
+  if (!synthesis) return undefined;
+  const selected = locale ? synthesisForLocale(synthesis, locale) : synthesis;
+  if (selected.use_spelling) return undefined;
+  return selected[`${alphabet ?? selected.alphabet}_speech`];
+}
+
+export function pronunciationSynthesisContent(
+  spelling: string,
+  synthesis?: SelectedSynthesis,
+  targetLocale?: PhonemeLocaleV3,
+  requireLocaleConfirmation = false
+): RichTextV2 | undefined {
+  const content = basePronunciationSynthesisContent(
+    spelling,
+    synthesis,
+    targetLocale,
+    requireLocaleConfirmation
+  );
+  const speech = pronunciationSynthesisSpeech(synthesis, targetLocale);
+  if (!content || !speech) return content;
+  if (speech.content.annotations.some((mark) => mark.type !== "pause"))
+    return undefined;
+  const pauses = speech.content.annotations;
+  if (!pauses.length) return content;
+  if (speech.content.text !== spelling) return undefined;
+  const selected =
+    targetLocale && synthesis
+      ? synthesisForLocale(synthesis, targetLocale)
+      : synthesis;
+  const words = [...spelling.matchAll(/\S+/gu)];
+  if (words.length > 1 && content.annotations.length === 1) {
+    if (selected?.alphabet !== "ipa") return undefined;
+    const phones = selected.ipa.trim().split(/\s+/u);
+    if (phones.length !== words.length) return undefined;
+    content.annotations = words.map((match, index) => {
+      const start = Array.from(spelling.slice(0, match.index)).length;
+      return {
+        type: "phoneme",
+        start,
+        end: start + Array.from(match[0]).length,
+        alphabet: "ipa",
+        phoneme: phones[index]!
+      };
+    });
+  }
+  return { ...content, annotations: [...content.annotations, ...pauses] };
+}
+
+/** IPA is derived from dictionary notation; actual pronunciation is display-only. */
+export function convertDictionaryToAzureIpa(
+  input: string,
+  spelling: string,
+  locale: PhonemeLocaleV3,
+  style?: WordPronunciationV3["style"]
+) {
+  const dictionary = input.replace(/[()[\]{}]/gu, "");
+  const unified = convertDictionaryToUnified(
+    dictionary,
+    spelling,
+    locale === "en-GB" ? "uk" : "us",
+    style
+  );
+  if (!unified.ok) return unified;
+  return convertActualPronunciation(unified.value, spelling, "ipa", locale);
+}
+
+/** Consume the current, possibly manually corrected IPA without reapplying dictionary rules. */
+export function convertAzureIpaToUps(
+  input: string,
+  spelling: string,
+  locale: PhonemeLocaleV3
+) {
+  const source = stripPhoneticDelimiters(input);
+  const words = spelling.trim().split(/\s+/u).filter(Boolean);
+  const phones = source.split(/\s+/u).filter(Boolean);
+  if (!source)
+    return { ok: false as const, message: "请先填写对应口音的 Azure IPA" };
+  if (!words.length || words.length > 30 || words.length !== phones.length)
+    return {
+      ok: false as const,
+      message: "Azure IPA 与正文词数不一致，请用空格明确逐词音标"
+    };
+  const values: string[] = [];
+  for (const phone of phones) {
+    const result = ipaWordToUps(phone, locale);
+    if (!result.ok) return result;
+    values.push(result.value);
+  }
+  const value = values.join(" ");
+  const issue = synthesisInputIssue("ups", value);
+  if (issue) return { ok: false as const, message: issue };
+  return {
+    ok: true as const,
+    value,
+    ups_words: values.map((phoneme, index) => ({
+      text: words[index]!,
+      phoneme
+    }))
   };
 }
 
@@ -251,7 +455,7 @@ export function convertActualPronunciation(
 ) {
   if (/\p{Cc}/u.test(input))
     return { ok: false as const, message: "实际发音不能包含控制字符" };
-  const source = input.trim().replace(/^\/(.*)\/$/u, "$1");
+  const source = stripPhoneticDelimiters(input);
   const textWords = spelling.trim().split(/\s+/u).filter(Boolean);
   const phones = source.split(/\s+/u).filter(Boolean);
   if (!source) return { ok: false as const, message: "请先填写实际发音" };
@@ -267,10 +471,19 @@ export function convertActualPronunciation(
     };
   const values: string[] = [];
   for (const [index, phone] of phones.entries()) {
+    const adapted = unifiedWordToAzureIpa(
+      stripPhoneticDelimiters(phone),
+      locale
+    );
+    if (!adapted.ok)
+      return {
+        ok: false as const,
+        message: `第 ${index + 1} 个词：${adapted.message}`
+      };
     const result =
       alphabet === "ups"
-        ? ipaWordToUps(phone, locale)
-        : convertDictionaryPhonetic(phone, "ipa");
+        ? ipaWordToUps(adapted.value, locale)
+        : convertDictionaryPhonetic(adapted.value, "ipa");
     if (!result.ok)
       return {
         ok: false as const,

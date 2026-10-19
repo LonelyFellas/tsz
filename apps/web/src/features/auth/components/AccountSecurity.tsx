@@ -21,10 +21,18 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, clearSession } from "@/lib/request";
 import { AUTH_INPUT_CLASS, securityErrorMessage } from "../shared";
 import { PasswordVisibilityIcon } from "./PasswordVisibilityIcon";
+import { cn } from "@tsz/ui/lib/cn";
+import {
+  PageHeader,
+  PageNotice,
+  PageShell,
+  buttonClass,
+  primaryButtonClass,
+  textButtonClass
+} from "@/features/shell/Page";
 
 const LABELS = { phone: "手机号", email: "邮箱" };
-const BUTTON =
-  "min-h-12 rounded-full bg-primary px-5 text-sm font-medium text-white transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40";
+const BUTTON = primaryButtonClass;
 const CODE_BUTTON =
   "min-h-12 shrink-0 rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50";
 type ContactAction = { channel: ContactChannel; operation: "bind" | "unbind" };
@@ -75,31 +83,23 @@ export function AccountSecurity() {
         : "账号安全";
 
   return (
-    <div className="animate-in mx-auto max-w-2xl px-6 py-10 sm:py-14">
-      {action ? (
-        <p className="text-sm text-foreground-muted">账号安全 / {title}</p>
-      ) : (
-        <Link
-          href="/account"
-          className="rounded-sm text-sm text-foreground-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-        >
-          ← 返回个人中心
-        </Link>
-      )}
-      <h1 className="mt-7 text-3xl font-semibold tracking-tight text-foreground">
-        {title}
-      </h1>
-      <p className="mt-3 text-sm leading-6 text-foreground-muted">
-        {action
-          ? "完成后，所有设备需重新登录。"
-          : "管理登录方式与密码。修改后，所有设备需重新登录。"}
-      </p>
+    <PageShell size="sm">
+      <PageHeader
+        back={action ? undefined : { href: "/account", label: "返回个人中心" }}
+        eyebrow={action ? `账号安全 / ${title}` : "个人中心"}
+        title={title}
+        description={
+          action
+            ? "完成后，所有设备需重新登录。"
+            : "管理登录方式与密码。修改后，所有设备需重新登录。"
+        }
+      />
       {loadError ? (
-        <div className="mt-8" role="alert">
+        <PageNotice tone="error">
           资料加载失败。
           <button
             type="button"
-            className="text-primary"
+            className={textButtonClass}
             onClick={() => {
               setLoadError(false);
               setAttempt((v) => v + 1);
@@ -107,115 +107,122 @@ export function AccountSecurity() {
           >
             重新加载
           </button>
-        </div>
+        </PageNotice>
       ) : !user ? (
-        <p className="mt-8" role="status">
-          加载中…
-        </p>
+        <div role="status">
+          <PageNotice>加载中…</PageNotice>
+        </div>
       ) : (
-        <div className="mt-8 rounded-3xl border border-border bg-surface p-5 shadow-sm sm:p-8">
-          {action === "password" ? (
-            <ChangePasswordForm onCancel={() => setAction(null)} />
-          ) : action ? (
-            <ContactForm
-              user={user}
-              action={action}
-              onCancel={() => setAction(null)}
-            />
-          ) : (
-            <div className="divide-y divide-border">
-              {(["phone", "email"] as const).map((channel) => (
-                <section
-                  key={channel}
-                  className="flex flex-col gap-4 py-6 first:pt-0 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="min-w-0">
-                    <h2 className="text-sm font-semibold text-foreground">
-                      {LABELS[channel]}
-                    </h2>
-                    <p className="mt-1 break-all text-sm text-foreground-muted">
-                      {user[channel] || "尚未绑定"}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 flex-wrap items-center gap-5">
-                    <button
-                      type="button"
-                      className="rounded-sm text-sm font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                      aria-label={`${user[channel] ? "换绑" : "绑定"}${LABELS[channel]}`}
-                      onClick={() => setAction({ channel, operation: "bind" })}
-                    >
-                      {user[channel] ? "换绑" : `绑定${LABELS[channel]}`}
-                    </button>
-                    {user[channel] && (
+        <div className="glass rounded-3xl p-2">
+          <div className="rounded-[20px] bg-surface/70 p-6 sm:p-8">
+            {action === "password" ? (
+              <ChangePasswordForm onCancel={() => setAction(null)} />
+            ) : action ? (
+              <ContactForm
+                user={user}
+                action={action}
+                onCancel={() => setAction(null)}
+              />
+            ) : (
+              <div className="divide-y divide-border/60">
+                {(["phone", "email"] as const).map((channel) => (
+                  <section
+                    key={channel}
+                    className="flex flex-col gap-4 py-6 first:pt-0 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <h2 className="text-sm font-medium text-foreground">
+                        {LABELS[channel]}
+                      </h2>
+                      <p className="mt-1 break-all text-sm text-foreground-muted">
+                        {user[channel] || "尚未绑定"}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap items-center gap-2">
                       <button
                         type="button"
-                        disabled={!user.phone || !user.email}
-                        className="rounded-sm text-sm text-danger hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger disabled:cursor-not-allowed disabled:opacity-40 disabled:no-underline"
-                        aria-label={`解绑${LABELS[channel]}`}
+                        className={buttonClass}
+                        aria-label={`${user[channel] ? "换绑" : "绑定"}${LABELS[channel]}`}
                         onClick={() =>
-                          setAction({ channel, operation: "unbind" })
+                          setAction({ channel, operation: "bind" })
                         }
                       >
-                        解绑
+                        {user[channel] ? "换绑" : `绑定${LABELS[channel]}`}
                       </button>
-                    )}
+                      {channel === "email" && user[channel] && (
+                        <button
+                          type="button"
+                          disabled={!user.phone || !user.email}
+                          className={cn(
+                            buttonClass,
+                            "text-danger hover:bg-danger/5"
+                          )}
+                          aria-label={`解绑${LABELS[channel]}`}
+                          onClick={() =>
+                            setAction({ channel, operation: "unbind" })
+                          }
+                        >
+                          解绑
+                        </button>
+                      )}
+                    </div>
+                  </section>
+                ))}
+                <section className="flex items-center justify-between gap-4 pb-0 pt-6">
+                  <div>
+                    <h2 className="text-sm font-medium text-foreground">
+                      登录密码
+                    </h2>
+                    <p className="mt-1 text-sm text-foreground-muted">
+                      用于账号密码登录
+                    </p>
                   </div>
+                  <button
+                    type="button"
+                    className={cn(buttonClass, "shrink-0")}
+                    onClick={() => setAction("password")}
+                  >
+                    修改密码
+                  </button>
                 </section>
-              ))}
-              <section className="flex items-center justify-between gap-4 py-6">
-                <div>
-                  <h2 className="text-sm font-semibold text-foreground">
-                    登录密码
-                  </h2>
-                  <p className="mt-1 text-sm text-foreground-muted">
-                    用于账号密码登录
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="shrink-0 rounded-sm text-sm font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                  onClick={() => setAction("password")}
-                >
-                  修改密码
-                </button>
-              </section>
-              {(!user.phone || !user.email) && (
-                <p className="pt-5 text-xs leading-5 text-foreground-muted">
-                  至少保留一种登录方式。绑定另一种联系方式后，才能解绑当前联系方式。
-                </p>
-              )}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </div>
       )}
       {!action && (
-        <section className="mt-8 flex flex-col gap-4 rounded-3xl border border-border p-6 sm:flex-row sm:items-center sm:justify-between">
+        <section className="mt-6 flex flex-col gap-4 rounded-3xl border border-border/60 bg-muted/50 p-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-foreground">注销账号</h2>
+            <h2 className="text-sm font-medium text-foreground">注销账号</h2>
             <p className="mt-1 text-sm text-foreground-muted">
-              永久注销账号，继续前请仔细阅读注销说明。
+              提交申请后 72 小时生效，期间可撤销。
             </p>
           </div>
           <Link
             href="/account/delete"
-            className="shrink-0 rounded-sm text-sm text-danger hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger"
+            className={cn(
+              buttonClass,
+              "shrink-0 self-start text-danger hover:bg-danger/5 sm:self-auto"
+            )}
           >
-            了解注销流程
+            申请注销
           </Link>
         </section>
       )}
-    </div>
+    </PageShell>
   );
 }
 
-function ContactForm({
+export function ContactForm({
   user,
   action,
-  onCancel
+  onCancel,
+  onSuccess = finishSecurityChange
 }: {
   user: User;
   action: ContactAction;
-  onCancel: () => void;
+  onCancel?: () => void;
+  onSuccess?: () => void;
 }) {
   const [contact, setContact] = useState("");
   const [verificationChannel, setVerificationChannel] =
@@ -226,6 +233,13 @@ function ContactForm({
   const [newCountdown, setNewCountdown] = useState(0);
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const [error, setError] = useState("");
   const unbind = action.operation === "unbind";
   const target = unbind
@@ -270,18 +284,21 @@ function ContactForm({
           contact: target,
           verification_channel: verificationChannel
         });
+        if (!mounted.current) return;
         setVerificationCode("");
         setOldCountdown(60);
       } else {
         await api.auth.requestContactBindCode(target);
+        if (!mounted.current) return;
         setCode("");
         setNewCountdown(60);
       }
     } catch (e) {
+      if (!mounted.current) return;
       setError(handleSecurityError(e));
     } finally {
       pending.current = false;
-      setBusy(false);
+      if (mounted.current) setBusy(false);
     }
   }
 
@@ -303,8 +320,9 @@ function ContactForm({
         });
       else
         await api.auth.bindContact({ contact: target, code, ...verification });
-      finishSecurityChange();
+      if (mounted.current) onSuccess();
     } catch (e) {
+      if (!mounted.current) return;
       setError(handleSecurityError(e));
       setVerificationCode("");
       setCode("");
@@ -315,14 +333,16 @@ function ContactForm({
 
   return (
     <form noValidate onSubmit={submit} className="space-y-5">
-      <button
-        type="button"
-        onClick={onCancel}
-        disabled={busy}
-        className="rounded-sm text-sm text-foreground-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        ← 返回账号安全
-      </button>
+      {onCancel && (
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={busy}
+          className="rounded-sm text-sm text-foreground-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          ← 返回账号安全
+        </button>
+      )}
       <p className="text-sm leading-6 text-foreground-muted">
         {unbind
           ? "先验证已绑定的联系方式。解绑后，该联系方式将不能用于登录或找回密码。"
@@ -369,7 +389,7 @@ function ContactForm({
                 当前账号的验证方式
               </p>
               <p
-                className={`${AUTH_INPUT_CLASS} flex min-h-12 items-center break-all`}
+                className={cn(AUTH_INPUT_CLASS, "flex items-center break-all")}
               >
                 {LABELS[verificationChannel]}：{user[verificationChannel]}
               </p>
@@ -416,7 +436,7 @@ function ContactForm({
           <div className="flex gap-2">
             <input
               id="security-old-code"
-              className={`${AUTH_INPUT_CLASS} min-w-0 flex-1`}
+              className={cn(AUTH_INPUT_CLASS, "min-w-0 flex-1")}
               inputMode="numeric"
               autoComplete="one-time-code"
               placeholder="请输入 6 位验证码"
@@ -450,7 +470,7 @@ function ContactForm({
             <div className="flex gap-2">
               <input
                 id="security-new-code"
-                className={`${AUTH_INPUT_CLASS} min-w-0 flex-1`}
+                className={cn(AUTH_INPUT_CLASS, "min-w-0 flex-1")}
                 inputMode="numeric"
                 maxLength={6}
                 placeholder="请输入 6 位验证码"
@@ -482,16 +502,18 @@ function ContactForm({
           </p>
         )}
         <div className="flex gap-3 border-t border-border pt-5">
-          <button
-            type="button"
-            className="min-h-12 rounded-full border border-border px-5 text-sm text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            onClick={onCancel}
-          >
-            取消
-          </button>
+          {onCancel && (
+            <button
+              type="button"
+              className={cn(buttonClass, "min-h-12 px-5")}
+              onClick={onCancel}
+            >
+              取消
+            </button>
+          )}
           <button
             type="submit"
-            className={`${BUTTON} flex-1`}
+            className={cn(BUTTON, "flex-1")}
             disabled={!targetValid || !codesValid}
           >
             确认{title}
@@ -534,7 +556,7 @@ function SecurityPasswordField({
       <div className="relative">
         <input
           id={id}
-          className={`${AUTH_INPUT_CLASS} pr-14`}
+          className={cn(AUTH_INPUT_CLASS, "pr-14")}
           type={visible ? "text" : "password"}
           autoComplete={autoComplete}
           placeholder={placeholder}
@@ -620,7 +642,12 @@ function ChangePasswordForm({ onCancel }: { onCancel: () => void }) {
             disabled={busy}
           />
           <p
-            className={`mt-3 ml-4 text-xs ${newPassword && !isRegisterPassword(newPassword) ? "text-danger" : "text-foreground-muted"}`}
+            className={cn(
+              "mt-3 ml-4 text-xs",
+              newPassword && !isRegisterPassword(newPassword)
+                ? "text-danger"
+                : "text-foreground-muted"
+            )}
           >
             {newPassword
               ? (passwordLengthError(newPassword) ?? PASSWORD_HINT)
@@ -654,14 +681,14 @@ function ChangePasswordForm({ onCancel }: { onCancel: () => void }) {
         <div className="flex gap-3 border-t border-border pt-5">
           <button
             type="button"
-            className="min-h-12 rounded-full border border-border px-5 text-sm text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            className={cn(buttonClass, "min-h-12 px-5")}
             onClick={onCancel}
           >
             取消
           </button>
           <button
             type="submit"
-            className={`${BUTTON} flex-1`}
+            className={cn(BUTTON, "flex-1")}
             disabled={!valid}
           >
             {busy ? "修改中…" : "确认修改密码"}

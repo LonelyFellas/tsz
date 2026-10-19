@@ -1,3 +1,4 @@
+import { onlyTextAssociationsChanged } from "../contentEditPermissions";
 import { UNSAFE_DataRouterContext } from "react-router-dom";
 import { WordNavigationGuard } from "@/features/recovery/WordNavigationGuard";
 import { useDraftRecovery } from "@/features/recovery/useDraftRecovery";
@@ -74,6 +75,12 @@ export interface V3WizardActions {
       "base_revision" | "impact_content"
     >
   ): Promise<void>;
+  saveDraft(
+    confirmationContext?: Omit<
+      V3ConfirmationContext,
+      "base_revision" | "impact_content"
+    >
+  ): Promise<void>;
   previewFormsImpact(): Promise<FormsImpactResponseV3 | undefined>;
   previewFormsSaveImpact(): Promise<FormsImpactResponseV3 | undefined>;
   saveMeanings(
@@ -138,6 +145,7 @@ export interface V3WordCreationWizardProps {
   initialStep?: WordCreationStep;
   readOnly?: boolean;
   allowPublishedEditing?: boolean;
+  contentEditing?: boolean;
   renderStep: (context: V3WizardSlotContext) => ReactNode;
   navigationAdapter?: ExternalNavigationAdapter;
   idempotencyKeyFactory?: () => string;
@@ -151,15 +159,13 @@ function defaultIdempotencyKey() {
 
 function initializedMeanings(
   word: AdminWordV3,
-  forms: DraftFormsStepContentV3 = word.forms
+  forms: DraftFormsStepContentV3 = word.forms,
+  contentEditing = true
 ) {
   const canonical = toWritableMeanings(word.meanings);
-  const draft = ensureV3MeaningsForForms(
-    word.id,
-    forms,
-    canonical,
-    newWordNodeId
-  );
+  const draft = contentEditing
+    ? ensureV3MeaningsForForms(word.id, forms, canonical, newWordNodeId)
+    : canonical;
   return { draft };
 }
 
@@ -245,8 +251,13 @@ async function focusRenderedTarget(target: V3IssueNavigationTarget) {
     const element = scopedElement ?? uniqueGlobalFallback;
     if (element) {
       scrollV3TargetIntoView(element);
-      element.focus();
-      if (document.activeElement === element) return;
+      const control = element.matches("input, textarea, button, [tabindex]")
+        ? element
+        : (element.querySelector<HTMLElement>(
+            '[role="combobox"], input:not([type="hidden"]):not([aria-hidden="true"]), textarea, button:not([disabled]), [tabindex]'
+          ) ?? element);
+      control.focus();
+      if (document.activeElement === control) return;
     }
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
   }
@@ -262,6 +273,7 @@ function V3WordCreationSession({
   requests,
   initialStep = "forms",
   readOnly = false,
+  contentEditing = true,
   allowPublishedEditing = false,
   renderStep,
   navigationAdapter,
@@ -295,7 +307,11 @@ function V3WordCreationSession({
     ReturnType<typeof initializedMeanings> | undefined
   >(undefined);
   if (!initialMeaningsRef.current) {
-    initialMeaningsRef.current = initializedMeanings(initialWord);
+    initialMeaningsRef.current = initializedMeanings(
+      initialWord,
+      undefined,
+      contentEditing
+    );
   }
   const cleanMeaningsRef = useRef(initialMeaningsRef.current.draft);
   const dirtyRef = useRef({
@@ -482,6 +498,7 @@ function V3WordCreationSession({
 
   const setDraftForms = useCallback(
     (content: DraftFormsStepContentV3) => {
+      if (!contentEditing) return;
       supersede();
       setDraftFormsState(content);
       const nextMeanings = ensureV3MeaningsForForms(
@@ -515,11 +532,23 @@ function V3WordCreationSession({
       setConflict(undefined);
       clearPreviewState();
     },
-    [clearPreviewState, draftMeanings, supersede, updateDirty, word.id]
+    [
+      contentEditing,
+      clearPreviewState,
+      draftMeanings,
+      supersede,
+      updateDirty,
+      word.id
+    ]
   );
 
   const setDraftMeanings = useCallback(
     (content: DraftMeaningsStepContentWritableV3) => {
+      if (
+        !contentEditing &&
+        !onlyTextAssociationsChanged(draftMeaningsRef.current, content)
+      )
+        return;
       supersede();
       setDraftMeaningsState(content);
       updateDirty(
@@ -531,7 +560,7 @@ function V3WordCreationSession({
       setConflict(undefined);
       clearPreviewState();
     },
-    [clearPreviewState, supersede, updateDirty]
+    [contentEditing, clearPreviewState, supersede, updateDirty]
   );
 
   // 刚从创建页进来的草稿：词典给几条词形就只有几条、语义区间也只有零星几个。这里
@@ -546,7 +575,12 @@ function V3WordCreationSession({
   // 「刚创建」的判据跟着草稿本身走：revision 还是 1、两个步骤都没保存过。只看
   // location.state 不行——F5 后 history 会把它原样恢复，一刷新就把删掉的行铺回来。
   useEffect(() => {
-    if (!prefillNewDraft || sessionReadOnly || newDraftPrefilledRef.current) {
+    if (
+      !contentEditing ||
+      !prefillNewDraft ||
+      sessionReadOnly ||
+      newDraftPrefilledRef.current
+    ) {
       return;
     }
     if (
@@ -573,6 +607,7 @@ function V3WordCreationSession({
     if (filledForms !== draftForms) setDraftForms(filledForms);
     if (filledMeanings !== draftMeanings) setDraftMeanings(filledMeanings);
   }, [
+    contentEditing,
     draftForms,
     draftMeanings,
     partOfSpeechCatalog,
@@ -677,7 +712,11 @@ function V3WordCreationSession({
         updateDirty("forms", false);
       }
       if (!keepDirtyDrafts || !dirtyRef.current.meanings) {
-        const nextMeanings = initializedMeanings(latest);
+        const nextMeanings = initializedMeanings(
+          latest,
+          undefined,
+          contentEditing
+        );
         cleanMeaningsRef.current = nextMeanings.draft;
         setDraftMeaningsState(nextMeanings.draft);
         updateDirty("meanings", false);
@@ -691,7 +730,7 @@ function V3WordCreationSession({
       setConflict(undefined);
       clearPreviewState();
     },
-    [clearPreviewState, setRemoteUpdate, supersede, updateDirty]
+    [contentEditing, clearPreviewState, setRemoteUpdate, supersede, updateDirty]
   );
 
   // 以服务端版本为保存基线，同时保留本地输入：「刷新并比较」「保留本地修改」与识别出的
@@ -703,12 +742,14 @@ function V3WordCreationSession({
       localMeanings: DraftMeaningsStepContentWritableV3
     ) => {
       // 对方可能增删了词性：本地词义先按要保留的词形对齐。
-      const alignedMeanings = ensureV3MeaningsForForms(
-        latest.id,
-        localForms,
-        localMeanings,
-        newWordNodeId
-      );
+      const alignedMeanings = contentEditing
+        ? ensureV3MeaningsForForms(
+            latest.id,
+            localForms,
+            localMeanings,
+            newWordNodeId
+          )
+        : localMeanings;
       flowRef.current.dispose();
       flowRef.current = createV3SaveFlow(latest);
       scopeRef.current += 1;
@@ -718,15 +759,17 @@ function V3WordCreationSession({
         "forms",
         JSON.stringify(localForms) !== JSON.stringify(latest.forms)
       );
-      cleanMeaningsRef.current = dirtyRef.current.meanings
-        ? ensureV3MeaningsForForms(
-            latest.id,
-            localForms,
-            cleanMeaningsRef.current,
-            newWordNodeId,
-            alignedMeanings
-          )
-        : alignedMeanings;
+      cleanMeaningsRef.current = !contentEditing
+        ? toWritableMeanings(latest.meanings)
+        : dirtyRef.current.meanings
+          ? ensureV3MeaningsForForms(
+              latest.id,
+              localForms,
+              cleanMeaningsRef.current,
+              newWordNodeId,
+              alignedMeanings
+            )
+          : alignedMeanings;
       setDraftMeaningsState(alignedMeanings);
       updateDirty(
         "meanings",
@@ -745,7 +788,7 @@ function V3WordCreationSession({
         setRemoteUpdate(undefined);
       }
     },
-    [setRemoteUpdate, updateDirty]
+    [contentEditing, setRemoteUpdate, updateDirty]
   );
 
   // 录入者知情后（或新版本就是自己写出的）继续用本地输入：基线换成该版本，之后的保存是有意覆盖。
@@ -758,13 +801,13 @@ function V3WordCreationSession({
         : latest.forms;
       const localMeanings = dirtyRef.current.meanings
         ? draftMeaningsRef.current
-        : initializedMeanings(latest, localForms).draft;
+        : initializedMeanings(latest, localForms, contentEditing).draft;
       rebaseKeepingLocalDrafts(latest, localForms, localMeanings);
       setProblem(undefined);
       setConflict(undefined);
       clearPreviewState();
     },
-    [clearPreviewState, rebaseKeepingLocalDrafts, supersede]
+    [contentEditing, clearPreviewState, rebaseKeepingLocalDrafts, supersede]
   );
 
   // 服务端送来比当前基线更新的内容版本（刷新或对账）。保存在途就等保存结束再判定；本地没有
@@ -841,7 +884,7 @@ function V3WordCreationSession({
         replacement === "meanings" ||
         !dirtyRef.current.meanings;
       const nextMeanings = syncMeanings
-        ? initializedMeanings(canonical)
+        ? initializedMeanings(canonical, undefined, contentEditing)
         : undefined;
       setWord(canonical);
       if (syncForms) {
@@ -870,7 +913,13 @@ function V3WordCreationSession({
       clearPreviewState();
       onWordChange?.(canonical);
     },
-    [clearDirty, clearPreviewState, onWordChange, setRemoteUpdate]
+    [
+      contentEditing,
+      clearDirty,
+      clearPreviewState,
+      onWordChange,
+      setRemoteUpdate
+    ]
   );
 
   const replaceStepIssues = useCallback(
@@ -969,7 +1018,11 @@ function V3WordCreationSession({
         );
       }
       if (!dirtyRef.current.meanings) {
-        const nextMeanings = initializedMeanings(latest.word);
+        const nextMeanings = initializedMeanings(
+          latest.word,
+          undefined,
+          contentEditing
+        );
         cleanMeaningsRef.current = nextMeanings.draft;
         setDraftMeaningsState(nextMeanings.draft);
         updateDirty("meanings", false);
@@ -997,6 +1050,7 @@ function V3WordCreationSession({
       }
     }
   }, [
+    contentEditing,
     clearPreviewState,
     handleError,
     markPending,
@@ -1470,7 +1524,11 @@ function V3WordCreationSession({
         );
       }
       if (!dirtyRef.current.meanings) {
-        const nextMeanings = initializedMeanings(latest.word);
+        const nextMeanings = initializedMeanings(
+          latest.word,
+          undefined,
+          contentEditing
+        );
         cleanMeaningsRef.current = nextMeanings.draft;
         setDraftMeaningsState(nextMeanings.draft);
         updateDirty("meanings", false);
@@ -1489,6 +1547,7 @@ function V3WordCreationSession({
       done();
     }
   }, [
+    contentEditing,
     clearPreviewState,
     handleError,
     markPending,
@@ -1612,7 +1671,11 @@ function V3WordCreationSession({
           : dirtyRef.current.meanings
             ? draftMeanings
             : (() => {
-                const next = initializedMeanings(latest.word, localForms);
+                const next = initializedMeanings(
+                  latest.word,
+                  localForms,
+                  contentEditing
+                );
                 return next.draft;
               })();
       rebaseKeepingLocalDrafts(latest.word, localForms, localMeanings);
@@ -1627,6 +1690,7 @@ function V3WordCreationSession({
       done();
     }
   }, [
+    contentEditing,
     clearPreviewState,
     conflict,
     draftForms,
@@ -1660,6 +1724,28 @@ function V3WordCreationSession({
     () => ({
       saveForms: async (intent, confirmationContext) => {
         await saveFormsContent(draftForms, intent, confirmationContext);
+      },
+      saveDraft: async (confirmationContext) => {
+        const flow = flowRef.current;
+        const scope = scopeRef.current;
+        const bindingsDirty =
+          flow.canonical().capabilities.atomic_form_sense_bindings === true &&
+          formGroupBindingPatches(
+            draftMeaningsRef.current,
+            flow.canonical().meanings
+          ).length > 0;
+        if (dirtyRef.current.forms || bindingsDirty) {
+          const saved = await saveFormsContent(
+            draftFormsRef.current,
+            "save",
+            confirmationContext
+          );
+          if (!saved || scope !== scopeRef.current || flowRef.current !== flow)
+            return;
+        }
+        if (dirtyRef.current.meanings) {
+          await saveMeanings(draftMeaningsRef.current, "save");
+        }
       },
       previewFormsImpact: () => previewFormsImpact("publish"),
       previewFormsSaveImpact: () => previewFormsImpact("save"),
@@ -1703,6 +1789,30 @@ function V3WordCreationSession({
       ).reachable,
     [activeStep, allowPublishedEditing, sessionReadOnly, word]
   );
+  // 服务端的缺选提示属于上次校验快照；按本地选择投影，撤销选择时仍能恢复提示。
+  const currentPublicationIssues = useMemo(
+    () =>
+      publicationIssues.filter((issue) => {
+        if (
+          issue.step !== "meanings" ||
+          issue.code !== "definition_invalid" ||
+          issue.field !== "grammar_structure_id"
+        )
+          return true;
+        return !draftMeanings.pos.some((pos) =>
+          pos.senses.some((sense) =>
+            sense.definitions.some(
+              (definition) =>
+                definition.id === issue.node_id &&
+                pos.grammar_structures.some(
+                  (grammar) => grammar.id === definition.grammar_structure_id
+                )
+            )
+          )
+        );
+      }),
+    [draftMeanings, publicationIssues]
+  );
   const context: V3WizardSlotContext = {
     registerSentenceLeaveGuard,
     requestSentenceLeave,
@@ -1722,7 +1832,7 @@ function V3WordCreationSession({
     setActiveStep,
     ...(activePosId ? { activePosId } : {}),
     setActivePosId,
-    issues: publicationIssues,
+    issues: currentPublicationIssues,
     ...(validation ? { validation } : {}),
     ...(impact ? { impact } : {}),
     impactConfirmed,

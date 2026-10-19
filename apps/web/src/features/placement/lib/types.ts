@@ -1,4 +1,4 @@
-import type { CEFRLevel } from "@tsz/api-client";
+import type { CEFRLevel } from "@tsz/types";
 
 // 定级测试 API 契约(wire 形状 snake_case,对齐产品方案 docs/placement-product-plan.md §8.2)。
 // 目前后端未实现,由 mock.ts 兑现同一契约;后端(tsz-rust)落地后这些类型

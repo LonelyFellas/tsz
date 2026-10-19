@@ -52,7 +52,7 @@ describe("WordCreationLayout", () => {
     const view = renderLayout({
       currentStep: "basics",
       presentation: presentation({
-        breadcrumbTitle: "创建词条",
+        breadcrumbTitle: "创建词汇",
         showEntrySummary: true,
         summaryHeadword: (
           <Typography.Text className="word-summary-pending-detection">
@@ -63,7 +63,11 @@ describe("WordCreationLayout", () => {
       })
     });
 
-    expect(screen.getByText("创建词条")).toBeInTheDocument();
+    expect(
+      within(
+        view.container.querySelector<HTMLElement>(".word-creation-breadcrumb")!
+      ).getByText("创建词汇")
+    ).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "词条摘要" })).toBe(
       view.container.querySelector(".word-creation-summary")
     );
@@ -89,7 +93,7 @@ describe("WordCreationLayout", () => {
       onStepChange,
       presentation: presentation({
         wordExists: false,
-        breadcrumbTitle: "创建词条",
+        breadcrumbTitle: "创建词汇",
         completedSteps: []
       })
     });
@@ -129,7 +133,7 @@ describe("WordCreationLayout", () => {
     const statusOf = (title: string) =>
       screen.getByText(title).closest(".ant-steps-item")!.className;
 
-    expect(statusOf("创建新词条")).toContain("ant-steps-item-finish");
+    expect(statusOf("创建词汇")).toContain("ant-steps-item-finish");
     expect(statusOf("词形与发音")).toContain("ant-steps-item-wait");
     expect(statusOf("词义与例句")).toContain("ant-steps-item-wait");
     expect(statusOf("预览并生效")).toContain("ant-steps-item-process");

@@ -1,3 +1,4 @@
+import { TableEmptyState } from "@/components/TableEmptyState";
 import { usePermission } from "@/lib/auth";
 import { PlusOutlined } from "@ant-design/icons";
 import {
@@ -42,7 +43,8 @@ function deriveFormTypeCode(parentCode: string, fullNameEn: string): string {
 }
 
 export function FormTypeSettings() {
-  const canEdit = usePermission("lexicon_settings.edit");
+  const canEdit = usePermission("lexicon_settings.edit_forms");
+  const canDelete = usePermission("lexicon_settings.delete");
   const { message, modal } = App.useApp();
   const client = useQueryClient();
   const catalog = usePartOfSpeechCatalog();
@@ -197,7 +199,7 @@ export function FormTypeSettings() {
               size="small"
               danger
               disabled={
-                !canEdit || item.code === "base" || item.usage_count > 0
+                !canDelete || item.code === "base" || item.usage_count > 0
               }
               onClick={() => remove(item)}
             >
@@ -276,6 +278,17 @@ export function FormTypeSettings() {
           />
         )}
         <Table<FormTypeConfig>
+          locale={{
+            emptyText: (
+              <TableEmptyState
+                message="暂无词形变化"
+                filtered={!!query.part_of_speech_id}
+                onResetFilters={() =>
+                  setQuery({ ...query, page: 1, part_of_speech_id: undefined })
+                }
+              />
+            )
+          }}
           rowKey="id"
           size="middle"
           columns={columns}

@@ -10,6 +10,7 @@ import {
   type LiaisonLinkElements
 } from "../marks";
 import { segmentRichText, type RichTextRenderSegment } from "./segments";
+import { pauseMarkerLabel, pauseMarkerWidth } from "../marks/pausePresentation";
 
 export interface RichTextReadOnlyProps {
   value: RichText;
@@ -41,6 +42,15 @@ function liaisonAnchorEnd(
 function renderMarkedText(segment: TextSegment, key: string): ReactNode {
   const { text, annotations } = segment;
   let node: ReactNode = text;
+  if (annotations.some((item) => item.type === "italic")) {
+    node = <i className="tsz-ve-italic">{node}</i>;
+  }
+  if (annotations.some((item) => item.type === "bold")) {
+    node = <strong className="tsz-ve-bold">{node}</strong>;
+  }
+  if (annotations.some((item) => item.type === "underline")) {
+    node = <span className="tsz-ve-underline">{node}</span>;
+  }
   const phoneme = annotations.find((item) => item.type === "phoneme");
   const emphasis = annotations.find((item) => item.type === "emphasis");
   const liaisons = annotations.filter(
@@ -177,9 +187,10 @@ export function RichTextReadOnly({
           <span
             className="tsz-ve-pause"
             data-duration-ms={segment.durationMs}
+            style={{ minWidth: pauseMarkerWidth(segment.durationMs) }}
             key={`pause-${segment.at}`}
           >
-            ⏸ {segment.durationMs}ms
+            {pauseMarkerLabel(segment.durationMs)}
           </span>
         ) : (
           renderMarkedText(

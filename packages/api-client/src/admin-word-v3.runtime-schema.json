@@ -1,8 +1,64 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/pronunciation-dual-accent-20261004/docs/openapi.json",
-  "_source_sha256": "156d5a03a8baf392f1c00aa298d0cc347199b32f141d19524567a3c1fc0461e7",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-custom-word-flag/docs/openapi.json",
+  "_source_sha256": "3de0e2d9e4f0b0babe30effacb7cb44f5bce552e63bb6aa34fad468b9bfdf826",
   "roots": [
+    "DictionaryPage",
+    "DictionaryEntry",
+    "AudioAssetUrlResponse",
+    "LearningRewardDay",
+    "LoginRewardDay",
+    "LearningPreview",
+    "LearningPlanPreview",
+    "LearningPlan",
+    "LearningPlanPage",
+    "LearningCyclePreview",
+    "LearningCycle",
+    "LearningCyclePage",
+    "LearningPlanRunPage",
+    "LibrarySelection",
+    "LearningTask",
+    "LearningTaskDetail",
+    "LearningTaskPage",
+    "LearningRun",
+    "LearningRunPage",
+    "LearningQuestionPage",
+    "LearningAnswerReceipt",
+    "WordlistInteractionStatsBatch",
+    "WordlistInteractionState",
+    "WordlistInteractionStates",
+    "WordlistFavoritePage",
+    "LibraryPage",
+    "LibraryImpact",
+    "WordlistTip",
+    "WordlistTipPage",
+    "AdminWordlist",
+    "AdminWordlistPage",
+    "WordlistDeleteImpact",
+    "Wordlist",
+    "WordlistPage",
+    "WordlistItems",
+    "WordlistAvailability",
+    "EntryArchiveImpact",
+    "MyWordlistItems",
+    "WordlistCatalog",
+    "WordlistSuggestions",
+    "WordlistImportMatches",
+    "WordlistEditSnapshot",
+    "WordlistReview",
+    "WordlistReviews",
+    "AdminWordlistReviews",
+    "InvitationCode",
+    "InvitationOverview",
+    "InvitationRecordPage",
+    "AccountDeletionRequest",
+    "AccountDeletionState",
+    "CoinAccountPage",
+    "ManualCoinOperation",
+    "ManualCoinOperationPage",
+    "CoinWallet",
+    "CoinEntryPage",
+    "UserCoinEntryPage",
     "SharedSentence",
     "SentencePublication",
     "SentenceWithdrawalImpact",
@@ -21,6 +77,8 @@
     "InboundReferencesV3",
     "SurfaceMatchPageV3",
     "RelatedSearchResponse",
+    "RelatedEntrySuggestions",
+    "RelatedEntrySenses",
     "DetectLexiconSurfaceResponseV3",
     "SearchComponentTargetsV3Response",
     "AdminWordPublicationListResponse",
@@ -30,6 +88,63 @@
     "ProblemDetails"
   ],
   "$defs": {
+    "AccountDeletionRequest": {
+      "type": "object",
+      "required": [
+        "id",
+        "status",
+        "requested_at",
+        "effective_at",
+        "cancelled_at",
+        "completed_at",
+        "confirmed_balance",
+        "waive_balance",
+        "consent_version",
+        "consent_text"
+      ],
+      "properties": {
+        "cancelled_at": { "type": ["string", "null"], "format": "date-time" },
+        "completed_at": { "type": ["string", "null"], "format": "date-time" },
+        "confirmed_balance": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$"
+        },
+        "consent_text": { "type": "string" },
+        "consent_version": { "type": "string" },
+        "effective_at": { "type": "string", "format": "date-time" },
+        "id": { "type": "string", "format": "uuid" },
+        "requested_at": { "type": "string", "format": "date-time" },
+        "status": { "$ref": "#/$defs/DeletionStatus" },
+        "waive_balance": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "AccountDeletionState": {
+      "type": "object",
+      "required": [
+        "request",
+        "coin_balance",
+        "consent_version",
+        "consent_text",
+        "server_time"
+      ],
+      "properties": {
+        "coin_balance": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$"
+        },
+        "consent_text": { "type": "string" },
+        "consent_version": { "type": "string" },
+        "request": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/AccountDeletionRequest" }
+          ]
+        },
+        "server_time": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
     "AdminWordDraftV3Envelope": {
       "type": "object",
       "required": ["word", "retired_stable_nodes"],
@@ -39,6 +154,20 @@
           "items": { "$ref": "#/$defs/RetiredStableNodeV3" }
         },
         "word": { "$ref": "#/$defs/AdminWordV3" }
+      },
+      "additionalProperties": false
+    },
+    "AdminWordlist": {
+      "type": "object",
+      "required": ["wordlist", "review_state", "recommended", "tip_amount"],
+      "properties": {
+        "favorite_count": { "type": "integer", "minimum": 0 },
+        "has_custom_words": { "type": "boolean" },
+        "like_count": { "type": "integer", "minimum": 0 },
+        "recommended": { "type": "boolean" },
+        "review_state": { "type": "string" },
+        "tip_amount": { "type": "string" },
+        "wordlist": { "$ref": "#/$defs/Wordlist" }
       },
       "additionalProperties": false
     },
@@ -93,6 +222,18 @@
       },
       "additionalProperties": false
     },
+    "AdminWordlistPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AdminWordlist" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
     "AdminWordListPage": {
       "type": "object",
       "required": ["page", "page_size", "total"],
@@ -112,6 +253,44 @@
           "type": "array",
           "items": { "$ref": "#/$defs/AdminWordListItemV3" }
         }
+      },
+      "additionalProperties": false
+    },
+    "AdminWordlistReview": {
+      "type": "object",
+      "required": [
+        "id",
+        "wordlist_id",
+        "submitted_revision",
+        "name",
+        "state",
+        "reason",
+        "created_at",
+        "decided_at"
+      ],
+      "properties": {
+        "created_at": { "type": "string", "format": "date-time" },
+        "decided_at": { "type": ["string", "null"], "format": "date-time" },
+        "id": { "type": "string", "format": "uuid" },
+        "name": { "type": "string" },
+        "reason": { "type": ["string", "null"] },
+        "reviewer_id": { "type": ["string", "null"], "format": "uuid" },
+        "reviewer_name": { "type": ["string", "null"] },
+        "state": { "type": "string" },
+        "submitted_revision": { "type": "integer" },
+        "wordlist_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "AdminWordlistReviews": {
+      "type": "object",
+      "required": ["withdraw_reason", "items"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AdminWordlistReview" }
+        },
+        "withdraw_reason": { "type": ["string", "null"] }
       },
       "additionalProperties": false
     },
@@ -267,6 +446,15 @@
     },
     "AudioAssetGender": { "type": "string", "enum": ["female", "male"] },
     "AudioAssetLocale": { "type": "string", "enum": ["en-GB", "en-US"] },
+    "AudioAssetUrlResponse": {
+      "type": "object",
+      "required": ["url", "expires_at", "url_expires_in_seconds"],
+      "properties": {
+        "expires_at": { "type": "string", "format": "date-time" },
+        "url": { "type": "string" },
+        "url_expires_in_seconds": { "type": "integer", "minimum": 0 }
+      }
+    },
     "BatchPublicationResponseV3": {
       "type": "object",
       "required": ["words", "sentences"],
@@ -328,7 +516,98 @@
         }
       ]
     },
+    "CoinAccount": {
+      "type": "object",
+      "required": [
+        "owner_type",
+        "owner_id",
+        "display_name",
+        "account_status",
+        "balance",
+        "status"
+      ],
+      "properties": {
+        "account_status": { "type": "string" },
+        "balance": { "type": "string", "pattern": "^(0|[1-9][0-9]{0,18})$" },
+        "display_name": { "type": "string" },
+        "owner_id": { "type": "string", "format": "uuid" },
+        "owner_type": { "$ref": "#/$defs/OwnerType" },
+        "status": { "$ref": "#/$defs/WalletStatus" }
+      },
+      "additionalProperties": false
+    },
+    "CoinAccountPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/CoinAccount" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "CoinEntry": {
+      "type": "object",
+      "required": [
+        "id",
+        "operation_id",
+        "kind",
+        "source_type",
+        "delta",
+        "balance_after",
+        "created_at"
+      ],
+      "properties": {
+        "balance_after": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$"
+        },
+        "created_at": { "type": "string", "format": "date-time" },
+        "delta": { "type": "string", "pattern": "^-?[1-9][0-9]{0,18}$" },
+        "id": { "type": "string", "pattern": "^[1-9][0-9]{0,18}$" },
+        "kind": { "$ref": "#/$defs/OperationKind" },
+        "operation_id": { "type": "string", "format": "uuid" },
+        "source_type": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "CoinEntryPage": {
+      "type": "object",
+      "required": ["items", "pagination", "snapshot"],
+      "properties": {
+        "items": { "type": "array", "items": { "$ref": "#/$defs/CoinEntry" } },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" },
+        "snapshot": { "type": "string", "pattern": "^(0|[1-9][0-9]{0,18})$" }
+      },
+      "additionalProperties": false
+    },
+    "CoinWallet": {
+      "type": "object",
+      "required": ["owner_type", "owner_id", "balance", "status"],
+      "properties": {
+        "balance": { "type": "string", "pattern": "^(0|[1-9][0-9]{0,18})$" },
+        "owner_id": { "type": "string", "format": "uuid" },
+        "owner_type": { "$ref": "#/$defs/OwnerType" },
+        "status": { "$ref": "#/$defs/WalletStatus" }
+      },
+      "additionalProperties": false
+    },
     "CommonDialectV3": { "type": "string", "enum": ["common"] },
+    "CustomWord": {
+      "type": "object",
+      "required": ["word", "definition"],
+      "properties": {
+        "definition": { "type": "string", "maxLength": 200, "minLength": 1 },
+        "word": { "type": "string", "maxLength": 50, "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "DeletionStatus": {
+      "type": "string",
+      "enum": ["pending", "cancelled", "completed"]
+    },
     "DetectionSurfaceRequestEchoV3": {
       "type": "object",
       "required": ["language", "kind", "surface"],
@@ -404,6 +683,16 @@
         }
       ]
     },
+    "DictionaryAudio": {
+      "type": "object",
+      "required": ["target_id", "asset_id", "locale"],
+      "properties": {
+        "asset_id": { "type": "string", "format": "uuid" },
+        "locale": { "type": "string" },
+        "target_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
     "DictionaryCoverageStateV2": {
       "type": "string",
       "enum": ["complete", "partial", "missing"]
@@ -423,6 +712,48 @@
         "frequency": { "$ref": "#/$defs/DictionaryCoverageStateV2" },
         "meanings": { "$ref": "#/$defs/DictionaryCoverageStateV2" },
         "pronunciations": { "$ref": "#/$defs/DictionaryCoverageStateV2" }
+      },
+      "additionalProperties": false
+    },
+    "DictionaryEntry": {
+      "type": "object",
+      "required": ["content", "audio", "examples"],
+      "properties": {
+        "audio": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/DictionaryAudio" }
+        },
+        "content": { "$ref": "#/$defs/WordlistEntry" },
+        "examples": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/DictionaryExample" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "DictionaryExample": {
+      "type": "object",
+      "required": ["id", "sense_id", "texts", "translation"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "sense_id": { "type": "string", "format": "uuid" },
+        "texts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistText" }
+        },
+        "translation": { "$ref": "#/$defs/RichTextV3" }
+      },
+      "additionalProperties": false
+    },
+    "DictionaryPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/DictionaryEntry" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
       },
       "additionalProperties": false
     },
@@ -567,6 +898,15 @@
       },
       "additionalProperties": false
     },
+    "EntryArchiveImpact": {
+      "type": "object",
+      "required": ["wordlist_count", "active_run_count"],
+      "properties": {
+        "active_run_count": { "type": "integer", "minimum": 0 },
+        "wordlist_count": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
     "EntryKind": { "type": "string", "enum": ["word", "phrase"] },
     "EntryLifecycleBatchResponse": {
       "type": "object",
@@ -656,6 +996,14 @@
         "password_unchanged",
         "invalid_display_name",
         "invalid_otp_code",
+        "invalid_invitation_code",
+        "learning_task_conflict",
+        "learning_run_unavailable",
+        "learning_settings_required",
+        "learning_insufficient_questions",
+        "learning_already_answered",
+        "word_list_conflict",
+        "word_list_entry_unavailable",
         "invalid_credentials",
         "invalid_token",
         "invalid_refresh_token",
@@ -665,8 +1013,23 @@
         "account_locked",
         "must_change_password",
         "forbidden",
+        "phone_binding_required",
+        "phone_unbind_forbidden",
         "otp_rate_limited",
         "otp_unavailable",
+        "coin_invalid_amount",
+        "coin_account_unavailable",
+        "coin_wallet_unavailable",
+        "coin_insufficient_balance",
+        "coin_idempotency_conflict",
+        "coin_source_conflict",
+        "coin_reversal_invalid",
+        "account_deletion_upgrade_required",
+        "account_deletion_consent_required",
+        "account_deletion_consent_outdated",
+        "account_deletion_balance_changed",
+        "account_deletion_pending",
+        "account_deletion_expired",
         "account_deletion_channel_unavailable",
         "invalid_account_deletion_code",
         "password_hash_unavailable",
@@ -678,6 +1041,7 @@
         "sub_part_of_speech_conflict",
         "annotation_conflict",
         "revision_conflict",
+        "cefr_level_locked",
         "reference_conflict",
         "relation_prebinding_fanout_exceeded",
         "stable_node_id_changed",
@@ -996,6 +1360,754 @@
       },
       "additionalProperties": false
     },
+    "InvitationCode": {
+      "type": "object",
+      "required": ["invite_code"],
+      "properties": {
+        "invite_code": { "type": "string", "pattern": "^[A-F0-9]{16}$" }
+      },
+      "additionalProperties": false
+    },
+    "InvitationOverview": {
+      "type": "object",
+      "required": ["invite_code", "reward_amount", "can_receive_reward"],
+      "properties": {
+        "can_receive_reward": { "type": "boolean" },
+        "invite_code": {
+          "type": ["string", "null"],
+          "pattern": "^[A-F0-9]{16}$"
+        },
+        "reward_amount": {
+          "type": ["string", "null"],
+          "pattern": "^[1-9][0-9]{0,18}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "InvitationRecord": {
+      "type": "object",
+      "required": [
+        "invitee_user_id",
+        "invitee_name",
+        "reward_status",
+        "reward_amount",
+        "created_at"
+      ],
+      "properties": {
+        "created_at": { "type": "string", "format": "date-time" },
+        "invitee_name": { "type": ["string", "null"] },
+        "invitee_user_id": { "type": "string", "format": "uuid" },
+        "reward_amount": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$"
+        },
+        "reward_status": { "$ref": "#/$defs/InvitationRewardStatus" }
+      },
+      "additionalProperties": false
+    },
+    "InvitationRecordPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/InvitationRecord" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "InvitationRewardStatus": {
+      "type": "string",
+      "enum": [
+        "pending_qualification",
+        "awarded",
+        "reward_disabled",
+        "inviter_unavailable"
+      ]
+    },
+    "LearningAnswerFeedback": {
+      "type": "object",
+      "required": [
+        "answer_id",
+        "submitted_answer",
+        "is_correct",
+        "accepted_at",
+        "accepted_answers"
+      ],
+      "properties": {
+        "accepted_answers": { "type": "array", "items": { "type": "string" } },
+        "accepted_at": { "type": "string", "format": "date-time" },
+        "answer_id": { "type": "string", "format": "uuid" },
+        "is_correct": { "type": "boolean" },
+        "submitted_answer": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "LearningAnswerReceipt": {
+      "type": "object",
+      "required": [
+        "answer_id",
+        "question_id",
+        "is_correct",
+        "accepted_at",
+        "run",
+        "question"
+      ],
+      "properties": {
+        "accepted_at": { "type": "string", "format": "date-time" },
+        "answer_id": { "type": "string", "format": "uuid" },
+        "is_correct": { "type": "boolean" },
+        "question": { "$ref": "#/$defs/LearningQuestion" },
+        "question_id": { "type": "string", "format": "uuid" },
+        "run": { "$ref": "#/$defs/LearningRun" }
+      },
+      "additionalProperties": false
+    },
+    "LearningContext": {
+      "type": "object",
+      "required": ["cefr_level", "english_variant"],
+      "properties": {
+        "cefr_level": { "type": "string" },
+        "english_variant": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "LearningCycle": {
+      "type": "object",
+      "required": [
+        "id",
+        "cycle_number",
+        "state",
+        "total_count",
+        "covered_count",
+        "remaining_count",
+        "available_remaining_count",
+        "blocked_count",
+        "earliest_day",
+        "created_at",
+        "completed_at"
+      ],
+      "properties": {
+        "available_remaining_count": { "type": "integer" },
+        "blocked_count": { "type": "integer" },
+        "completed_at": { "type": ["string", "null"], "format": "date-time" },
+        "covered_count": { "type": "integer" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "cycle_number": { "type": "integer" },
+        "earliest_day": { "type": "string", "format": "date" },
+        "id": { "type": "string", "format": "uuid" },
+        "remaining_count": { "type": "integer" },
+        "state": { "$ref": "#/$defs/LearningCycleState" },
+        "total_count": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "LearningCyclePage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LearningCycle" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "LearningCyclePreview": {
+      "type": "object",
+      "required": [
+        "preview",
+        "earliest_day",
+        "previous_covered_count",
+        "previous_total_count",
+        "previous_blocked_count"
+      ],
+      "properties": {
+        "earliest_day": { "type": "string", "format": "date" },
+        "preview": { "$ref": "#/$defs/LearningPlanPreview" },
+        "previous_blocked_count": { "type": "integer" },
+        "previous_covered_count": { "type": "integer" },
+        "previous_total_count": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "LearningCycleState": {
+      "type": "string",
+      "enum": ["active", "completed", "cancelled"]
+    },
+    "LearningExclusions": {
+      "type": "object",
+      "required": [
+        "unavailable_entries",
+        "context_dependent",
+        "no_chinese_definition",
+        "no_base_form",
+        "answer_in_prompt"
+      ],
+      "properties": {
+        "answer_in_prompt": { "type": "integer" },
+        "context_dependent": { "type": "integer" },
+        "no_base_form": { "type": "integer" },
+        "no_chinese_definition": { "type": "integer" },
+        "unavailable_entries": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "LearningPlan": {
+      "type": "object",
+      "required": [
+        "task",
+        "mode",
+        "schedule",
+        "sources",
+        "current_cycle",
+        "current_run",
+        "today_available_count",
+        "estimated_learning_days",
+        "estimate_from_day",
+        "schedule_at_risk",
+        "status",
+        "can_start",
+        "can_start_next_cycle",
+        "can_restart_blocked_cycle",
+        "reasons",
+        "server_time",
+        "business_day",
+        "next_day_at",
+        "timezone"
+      ],
+      "properties": {
+        "business_day": { "type": "string", "format": "date" },
+        "can_restart_blocked_cycle": { "type": "boolean" },
+        "can_start": { "type": "boolean" },
+        "can_start_next_cycle": { "type": "boolean" },
+        "current_cycle": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/LearningCycle" }]
+        },
+        "current_run": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/LearningRun" }]
+        },
+        "estimate_from_day": { "type": ["string", "null"], "format": "date" },
+        "estimated_learning_days": { "type": ["integer", "null"] },
+        "mode": { "$ref": "#/$defs/LearningPlanMode" },
+        "next_day_at": { "type": "string", "format": "date-time" },
+        "reasons": { "type": "array", "items": { "type": "string" } },
+        "schedule": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/LearningSchedule" }]
+        },
+        "schedule_at_risk": { "type": "boolean" },
+        "server_time": { "type": "string", "format": "date-time" },
+        "sources": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LearningPlanSource" }
+        },
+        "status": { "$ref": "#/$defs/LearningPlanStatus" },
+        "task": { "$ref": "#/$defs/LearningTask" },
+        "timezone": { "type": "string" },
+        "today_available_count": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "LearningPlanMode": {
+      "type": "string",
+      "enum": ["legacy_v1", "coverage_v1"]
+    },
+    "LearningPlanPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LearningPlan" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "LearningPlanPreview": {
+      "type": "object",
+      "required": [
+        "entry_count",
+        "eligible_count",
+        "custom_word_count",
+        "exclusions",
+        "settings",
+        "estimated_learning_days",
+        "available_learning_days",
+        "can_create",
+        "reasons",
+        "preview_fingerprint",
+        "server_time",
+        "business_day",
+        "timezone"
+      ],
+      "properties": {
+        "available_learning_days": { "type": ["integer", "null"] },
+        "business_day": { "type": "string", "format": "date" },
+        "can_create": { "type": "boolean" },
+        "custom_word_count": { "type": "integer" },
+        "eligible_count": { "type": "integer" },
+        "entry_count": { "type": "integer" },
+        "estimated_learning_days": { "type": ["integer", "null"] },
+        "exclusions": { "$ref": "#/$defs/LearningExclusions" },
+        "preview_fingerprint": { "type": "string" },
+        "reasons": { "type": "array", "items": { "type": "string" } },
+        "server_time": { "type": "string", "format": "date-time" },
+        "settings": { "$ref": "#/$defs/LearningContext" },
+        "timezone": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "LearningPlanRun": {
+      "type": "object",
+      "required": ["run", "cycle_id"],
+      "properties": {
+        "cycle_id": { "type": ["string", "null"], "format": "uuid" },
+        "run": { "$ref": "#/$defs/LearningRun" }
+      },
+      "additionalProperties": false
+    },
+    "LearningPlanRunPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LearningPlanRun" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "LearningPlanSource": {
+      "type": "object",
+      "required": [
+        "id",
+        "available",
+        "name",
+        "personal_note",
+        "author_name",
+        "state",
+        "item_count"
+      ],
+      "properties": {
+        "author_name": { "type": ["string", "null"] },
+        "available": { "type": "boolean" },
+        "id": { "type": "string", "format": "uuid" },
+        "item_count": { "type": ["integer", "null"] },
+        "name": { "type": ["string", "null"] },
+        "personal_note": { "type": ["string", "null"] },
+        "state": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "LearningPlanStatus": {
+      "type": "string",
+      "enum": [
+        "archived",
+        "schedule_ended",
+        "cycle_completed",
+        "not_started",
+        "today_completed",
+        "source_blocked",
+        "ready"
+      ]
+    },
+    "LearningPreview": {
+      "type": "object",
+      "required": [
+        "eligible_count",
+        "entry_count",
+        "exclusions",
+        "settings",
+        "can_start"
+      ],
+      "properties": {
+        "can_start": { "type": "boolean" },
+        "eligible_count": { "type": "integer" },
+        "entry_count": { "type": "integer" },
+        "exclusions": { "$ref": "#/$defs/LearningExclusions" },
+        "settings": { "$ref": "#/$defs/LearningContext" }
+      },
+      "additionalProperties": false
+    },
+    "LearningPrompt": {
+      "type": "object",
+      "required": ["definition", "part_of_speech"],
+      "properties": {
+        "definition": { "type": "string" },
+        "part_of_speech": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "LearningQuestion": {
+      "type": "object",
+      "required": [
+        "id",
+        "position",
+        "answered",
+        "content_available",
+        "prompt",
+        "feedback"
+      ],
+      "properties": {
+        "answered": { "type": "boolean" },
+        "content_available": { "type": "boolean" },
+        "feedback": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/LearningAnswerFeedback" }
+          ]
+        },
+        "id": { "type": "string", "format": "uuid" },
+        "position": { "type": "integer" },
+        "prompt": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/LearningPrompt" }]
+        }
+      },
+      "additionalProperties": false
+    },
+    "LearningQuestionPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LearningQuestion" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "LearningRewardDay": {
+      "type": "object",
+      "required": [
+        "business_day",
+        "server_time",
+        "rule_version",
+        "minimum_units",
+        "daily_amount",
+        "qualifying_units",
+        "status",
+        "awarded_amount",
+        "operation_id",
+        "settled_at"
+      ],
+      "properties": {
+        "awarded_amount": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$"
+        },
+        "business_day": { "type": "string", "format": "date" },
+        "daily_amount": {
+          "type": ["string", "null"],
+          "pattern": "^[1-9][0-9]{0,18}$"
+        },
+        "minimum_units": { "type": ["integer", "null"] },
+        "operation_id": { "type": ["string", "null"], "format": "uuid" },
+        "qualifying_units": { "type": "integer", "maximum": 200, "minimum": 0 },
+        "rule_version": { "type": ["string", "null"] },
+        "server_time": { "type": "string", "format": "date-time" },
+        "settled_at": { "type": ["string", "null"], "format": "date-time" },
+        "status": { "$ref": "#/$defs/LearningRewardStatus" }
+      },
+      "additionalProperties": false
+    },
+    "LearningRewardStatus": {
+      "type": "string",
+      "enum": [
+        "in_progress",
+        "threshold_not_met",
+        "awarded",
+        "reward_disabled",
+        "wallet_unavailable"
+      ]
+    },
+    "LearningRun": {
+      "type": "object",
+      "required": [
+        "id",
+        "task_id",
+        "task_type",
+        "state",
+        "question_type",
+        "task_revision",
+        "business_day",
+        "expires_at",
+        "started_at",
+        "server_time",
+        "settings",
+        "target_count",
+        "answered_count",
+        "correct_count",
+        "generation_version",
+        "grading_version",
+        "completion_id"
+      ],
+      "properties": {
+        "answered_count": { "type": "integer" },
+        "business_day": { "type": ["string", "null"], "format": "date" },
+        "completion_id": { "type": ["string", "null"], "format": "uuid" },
+        "correct_count": { "type": "integer" },
+        "expires_at": { "type": ["string", "null"], "format": "date-time" },
+        "generation_version": { "type": "string" },
+        "grading_version": { "type": "string" },
+        "id": { "type": "string", "format": "uuid" },
+        "question_type": { "type": "string" },
+        "server_time": { "type": "string", "format": "date-time" },
+        "settings": { "$ref": "#/$defs/LearningContext" },
+        "started_at": { "type": "string", "format": "date-time" },
+        "state": { "$ref": "#/$defs/LearningRunState" },
+        "target_count": { "type": "integer" },
+        "task_id": { "type": "string", "format": "uuid" },
+        "task_revision": { "type": "integer" },
+        "task_type": { "$ref": "#/$defs/LearningTaskType" }
+      },
+      "additionalProperties": false
+    },
+    "LearningRunPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LearningRun" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "LearningRunState": {
+      "type": "string",
+      "enum": ["active", "completed", "expired", "invalidated", "cancelled"]
+    },
+    "LearningSchedule": {
+      "type": "object",
+      "required": ["start_date", "end_date"],
+      "properties": {
+        "end_date": { "type": "string", "format": "date" },
+        "start_date": { "type": "string", "format": "date" }
+      },
+      "additionalProperties": false
+    },
+    "LearningTask": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "task_type",
+        "wordlist_ids",
+        "daily_question_count",
+        "ends_at",
+        "state",
+        "revision",
+        "created_at"
+      ],
+      "properties": {
+        "created_at": { "type": "string", "format": "date-time" },
+        "daily_question_count": { "type": ["integer", "null"] },
+        "ends_at": { "type": ["string", "null"], "format": "date-time" },
+        "id": { "type": "string", "format": "uuid" },
+        "name": { "type": "string" },
+        "revision": { "type": "integer" },
+        "state": { "$ref": "#/$defs/LearningTaskState" },
+        "task_type": { "$ref": "#/$defs/LearningTaskType" },
+        "wordlist_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "LearningTaskDetail": {
+      "type": "object",
+      "required": [
+        "task",
+        "server_time",
+        "business_day",
+        "timezone",
+        "current_run"
+      ],
+      "properties": {
+        "business_day": { "type": "string", "format": "date" },
+        "current_run": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/LearningRun" }]
+        },
+        "server_time": { "type": "string", "format": "date-time" },
+        "task": { "$ref": "#/$defs/LearningTask" },
+        "timezone": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "LearningTaskPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LearningTaskDetail" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "LearningTaskState": { "type": "string", "enum": ["active", "archived"] },
+    "LearningTaskType": { "type": "string", "enum": ["daily", "longterm"] },
+    "LibraryCrumb": {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "name": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "LibraryImpact": {
+      "type": "object",
+      "required": ["version", "folder_count", "wordlist_count"],
+      "properties": {
+        "folder_count": { "type": "integer" },
+        "version": { "type": "string" },
+        "wordlist_count": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "LibraryItem": {
+      "type": "object",
+      "required": [
+        "id",
+        "parent_id",
+        "wordlist_id",
+        "name",
+        "revision",
+        "trashed_at",
+        "path",
+        "wordlist"
+      ],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "name": { "type": "string" },
+        "parent_id": { "type": ["string", "null"], "format": "uuid" },
+        "path": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LibraryCrumb" }
+        },
+        "revision": { "type": "integer" },
+        "trashed_at": { "type": ["string", "null"], "format": "date-time" },
+        "wordlist": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/Wordlist" }]
+        },
+        "wordlist_id": { "type": ["string", "null"], "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "LibraryPage": {
+      "type": "object",
+      "required": ["version", "ancestors", "items", "pagination"],
+      "properties": {
+        "ancestors": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LibraryCrumb" }
+        },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LibraryItem" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" },
+        "version": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "LibrarySelection": {
+      "type": "object",
+      "required": ["version", "wordlists"],
+      "properties": {
+        "version": { "type": "string" },
+        "wordlists": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Wordlist" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "LoginRewardDay": {
+      "type": "object",
+      "required": [
+        "business_day",
+        "server_time",
+        "next_day_starts_at",
+        "status",
+        "awarded_amount",
+        "operation_id"
+      ],
+      "properties": {
+        "awarded_amount": { "type": "string", "pattern": "^[01]$" },
+        "business_day": { "type": "string", "format": "date" },
+        "next_day_starts_at": { "type": "string", "format": "date-time" },
+        "operation_id": { "type": ["string", "null"], "format": "uuid" },
+        "server_time": { "type": "string", "format": "date-time" },
+        "status": { "$ref": "#/$defs/LoginRewardStatus" }
+      },
+      "additionalProperties": false
+    },
+    "LoginRewardStatus": {
+      "type": "string",
+      "enum": ["awarded", "wallet_unavailable", "reward_disabled"]
+    },
+    "ManualCoinOperation": {
+      "type": "object",
+      "required": [
+        "id",
+        "owner_type",
+        "owner_id",
+        "actor_id",
+        "source_type",
+        "event_id",
+        "delta",
+        "balance_after",
+        "reason",
+        "created_at"
+      ],
+      "properties": {
+        "actor_id": { "type": "string", "format": "uuid" },
+        "balance_after": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$"
+        },
+        "created_at": { "type": "string", "format": "date-time" },
+        "delta": { "type": "string", "pattern": "^-?[1-9][0-9]{0,18}$" },
+        "event_id": { "type": "string" },
+        "evidence_ref": { "type": ["string", "null"] },
+        "id": { "type": "string", "format": "uuid" },
+        "owner_id": { "type": "string", "format": "uuid" },
+        "owner_type": { "$ref": "#/$defs/OwnerType" },
+        "reason": { "type": "string" },
+        "reversed_by_operation_id": {
+          "type": ["string", "null"],
+          "format": "uuid"
+        },
+        "reverses_operation_id": {
+          "type": ["string", "null"],
+          "format": "uuid"
+        },
+        "source_type": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "ManualCoinOperationPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ManualCoinOperation" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
     "MatchedEntryContextV3": {
       "type": "object",
       "required": [
@@ -1030,6 +2142,59 @@
         "updated_at": { "type": "string", "format": "date-time" }
       },
       "additionalProperties": false
+    },
+    "MyWordlistItem": {
+      "type": "object",
+      "required": [
+        "entry_id",
+        "position",
+        "entry",
+        "private_note",
+        "note_revision"
+      ],
+      "properties": {
+        "author_note": { "type": "string", "maxLength": 1000 },
+        "custom_word": { "$ref": "#/$defs/CustomWord" },
+        "entry": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/WordlistEntry" }]
+        },
+        "entry_id": { "type": ["string", "null"], "format": "uuid" },
+        "entry_label": { "type": "string" },
+        "item_id": { "type": "string", "format": "uuid" },
+        "note_revision": { "type": "integer" },
+        "position": { "type": "integer" },
+        "private_note": { "type": "string" },
+        "unavailable_reason": { "$ref": "#/$defs/WordlistUnavailableReason" }
+      },
+      "additionalProperties": false
+    },
+    "MyWordlistItems": {
+      "type": "object",
+      "required": ["items", "revision", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/MyWordlistItem" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" },
+        "revision": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "OperationKind": {
+      "type": "string",
+      "enum": ["credit", "debit", "transfer", "account_closure_forfeit"]
+    },
+    "OwnerType": { "type": "string", "enum": ["user", "admin"] },
+    "PaginationMeta": {
+      "type": "object",
+      "required": ["page", "page_size", "total", "total_pages"],
+      "properties": {
+        "page": { "type": "integer", "minimum": 0 },
+        "page_size": { "type": "integer", "minimum": 0 },
+        "total": { "type": "integer" },
+        "total_pages": { "type": "integer" }
+      }
     },
     "PersistedWordStep": {
       "type": "string",
@@ -1163,14 +2328,16 @@
     },
     "PronunciationStyle": {
       "type": "string",
-      "enum": ["normal", "strong", "weak"]
+      "enum": ["normal", "citation", "strong", "weak"]
     },
     "PronunciationSynthesisCandidateV3": {
       "type": "object",
       "required": ["ipa", "ups"],
       "properties": {
         "ipa": { "type": "string", "maxLength": 200 },
+        "ipa_speech": { "$ref": "#/$defs/SynthesisSpeechV3" },
         "ups": { "type": "string", "maxLength": 1600 },
+        "ups_speech": { "$ref": "#/$defs/SynthesisSpeechV3" },
         "ups_words": {
           "type": ["array", "null"],
           "items": { "$ref": "#/$defs/UpsWordV3" },
@@ -1254,6 +2421,49 @@
         "senses": {
           "type": "array",
           "items": { "$ref": "#/$defs/SentenceTargetSenseV3" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "RelatedEntrySenses": {
+      "type": "object",
+      "required": ["entry_id", "publication_id", "senses"],
+      "properties": {
+        "entry_id": { "type": "string", "format": "uuid" },
+        "publication_id": { "type": "string", "format": "uuid" },
+        "senses": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/RelatedWordSenseV3" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "RelatedEntrySuggestion": {
+      "type": "object",
+      "required": [
+        "entry_id",
+        "publication_id",
+        "label",
+        "glosses",
+        "sense_count"
+      ],
+      "properties": {
+        "entry_id": { "type": "string", "format": "uuid" },
+        "glosses": { "type": "array", "items": { "type": "string" } },
+        "label": { "type": "string" },
+        "publication_id": { "type": "string", "format": "uuid" },
+        "sense_count": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "RelatedEntrySuggestions": {
+      "type": "object",
+      "required": ["items"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/RelatedEntrySuggestion" },
+          "maxItems": 3
         }
       },
       "additionalProperties": false
@@ -1463,6 +2673,36 @@
             "type": { "type": "string", "enum": ["pause"] }
           },
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "type"],
+          "properties": {
+            "end": { "type": "integer", "minimum": 0 },
+            "start": { "type": "integer", "minimum": 0 },
+            "type": { "type": "string", "enum": ["italic"] }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "type"],
+          "properties": {
+            "end": { "type": "integer", "minimum": 0 },
+            "start": { "type": "integer", "minimum": 0 },
+            "type": { "type": "string", "enum": ["bold"] }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "type"],
+          "properties": {
+            "end": { "type": "integer", "minimum": 0 },
+            "start": { "type": "integer", "minimum": 0 },
+            "type": { "type": "string", "enum": ["underline"] }
+          },
+          "additionalProperties": false
         }
       ]
     },
@@ -1529,6 +2769,11 @@
       "type": "object",
       "required": ["id", "value", "origin"],
       "properties": {
+        "audio_assets": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AudioAsset" },
+          "maxItems": 8
+        },
         "id": { "type": "string", "format": "uuid" },
         "origin": { "$ref": "#/$defs/TextOrigin" },
         "text_links": {
@@ -1908,6 +3153,15 @@
       "additionalProperties": false
     },
     "SourceDialect": { "type": "string", "enum": ["uk", "us"] },
+    "SpellingSpeechV3": {
+      "type": "object",
+      "required": ["content", "voice_profile"],
+      "properties": {
+        "content": { "$ref": "#/$defs/RichTextV2V3" },
+        "voice_profile": { "$ref": "#/$defs/VoiceProfileV3" }
+      },
+      "additionalProperties": false
+    },
     "SuggestedCommonFormVariantV3": {
       "type": "object",
       "required": ["dialect", "spelling", "pronunciations"],
@@ -2167,6 +3421,15 @@
         "allow_multiple_active_exact_headword_publications"
       ]
     },
+    "SynthesisSpeechV3": {
+      "type": "object",
+      "required": ["content", "voice_profile"],
+      "properties": {
+        "content": { "$ref": "#/$defs/RichTextV2V3" },
+        "voice_profile": { "$ref": "#/$defs/VoiceProfileV3" }
+      },
+      "additionalProperties": false
+    },
     "TextLinkV3": {
       "type": "object",
       "required": [
@@ -2228,6 +3491,43 @@
       "additionalProperties": false
     },
     "UsDialectV3": { "type": "string", "enum": ["us"] },
+    "UserCoinEntry": {
+      "type": "object",
+      "required": [
+        "id",
+        "operation_id",
+        "kind",
+        "source_type",
+        "delta",
+        "created_at"
+      ],
+      "properties": {
+        "balance_after": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$"
+        },
+        "created_at": { "type": "string", "format": "date-time" },
+        "delta": { "type": "string", "pattern": "^-?[1-9][0-9]{0,18}$" },
+        "id": { "type": "string", "pattern": "^[1-9][0-9]{0,18}$" },
+        "kind": { "$ref": "#/$defs/OperationKind" },
+        "operation_id": { "type": "string", "format": "uuid" },
+        "source_type": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "UserCoinEntryPage": {
+      "type": "object",
+      "required": ["items", "pagination", "snapshot"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/UserCoinEntry" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" },
+        "snapshot": { "type": "string", "pattern": "^(0|[1-9][0-9]{0,18})$" }
+      },
+      "additionalProperties": false
+    },
     "V3DraftNodeLocation": {
       "type": "object",
       "required": ["node_role", "ancestor_node_ids"],
@@ -2316,6 +3616,7 @@
         "empty_form_group",
         "base_form_required_in_group",
         "variant_spelling_required",
+        "spelling_rich_text_invalid",
         "pronunciation_required",
         "duplicate_pronunciation",
         "content_limit_exceeded",
@@ -2405,6 +3706,10 @@
       },
       "additionalProperties": false
     },
+    "WalletStatus": {
+      "type": "string",
+      "enum": ["open", "deletion_pending", "closed"]
+    },
     "WordCommonFormVariantV3": {
       "type": "object",
       "required": ["id", "dialect", "spelling", "origin", "pronunciations"],
@@ -2423,7 +3728,9 @@
           "items": { "$ref": "#/$defs/WordPronunciationV3" },
           "maxItems": 2000
         },
-        "spelling": { "type": "string", "maxLength": 200 }
+        "spelling": { "type": "string", "maxLength": 200 },
+        "spelling_rich": { "$ref": "#/$defs/RichTextV2V3" },
+        "spelling_speech": { "$ref": "#/$defs/SpellingSpeechV3" }
       },
       "additionalProperties": false
     },
@@ -2537,6 +3844,496 @@
         "scope": { "$ref": "#/$defs/FormGroupScopeV3" }
       },
       "additionalProperties": false
+    },
+    "Wordlist": {
+      "type": "object",
+      "required": [
+        "id",
+        "owner_user_id",
+        "owner_name",
+        "name",
+        "state",
+        "revision",
+        "item_count",
+        "created_at",
+        "updated_at"
+      ],
+      "properties": {
+        "created_at": { "type": "string", "format": "date-time" },
+        "id": { "type": "string", "format": "uuid" },
+        "item_count": { "type": "integer" },
+        "name": { "type": "string" },
+        "owner_name": { "type": "string" },
+        "owner_user_id": { "type": ["string", "null"], "format": "uuid" },
+        "revision": { "type": "integer" },
+        "state": { "$ref": "#/$defs/WordlistState" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistAvailability": {
+      "type": "object",
+      "required": ["revision", "available_count", "unavailable_count"],
+      "properties": {
+        "available_count": { "type": "integer", "minimum": 0 },
+        "custom_count": { "type": "integer", "minimum": 0 },
+        "revision": { "type": "integer" },
+        "unavailable_count": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "WordlistCandidate": {
+      "type": "object",
+      "required": ["entry_id", "publication_id", "label", "glosses"],
+      "properties": {
+        "entry_id": { "type": "string", "format": "uuid" },
+        "glosses": { "type": "array", "items": { "type": "string" } },
+        "label": { "type": "string" },
+        "publication_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistCatalog": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistCandidate" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistContentItem": {
+      "type": "object",
+      "required": ["item_id"],
+      "properties": {
+        "author_note": { "type": "string", "maxLength": 1000 },
+        "custom_word": { "$ref": "#/$defs/CustomWord" },
+        "entry_id": { "type": "string", "format": "uuid" },
+        "item_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistDefinition": {
+      "type": "object",
+      "required": [
+        "id",
+        "definition_mode",
+        "level",
+        "grammar_structure_id",
+        "texts"
+      ],
+      "properties": {
+        "definition_mode": { "type": "string" },
+        "grammar_structure_id": {
+          "type": ["string", "null"],
+          "format": "uuid"
+        },
+        "id": { "type": "string", "format": "uuid" },
+        "level": { "type": "string" },
+        "texts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistText" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "WordlistDeleteImpact": {
+      "type": "object",
+      "required": [
+        "active_run_count",
+        "active_task_count",
+        "affected_user_count",
+        "blocked_task_count"
+      ],
+      "properties": {
+        "active_run_count": { "type": "integer" },
+        "active_task_count": { "type": "integer" },
+        "affected_user_count": { "type": "integer" },
+        "blocked_task_count": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistEditSnapshot": {
+      "type": "object",
+      "required": ["wordlist", "entry_ids"],
+      "properties": {
+        "entry_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" }
+        },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistContentItem" }
+        },
+        "wordlist": { "$ref": "#/$defs/Wordlist" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistEntry": {
+      "type": "object",
+      "required": ["entry_id", "publication_id", "label", "kind", "pos"],
+      "properties": {
+        "entry_id": { "type": "string", "format": "uuid" },
+        "kind": { "$ref": "#/$defs/WordEntryKindV3" },
+        "label": { "type": "string" },
+        "pos": { "type": "array", "items": { "$ref": "#/$defs/WordlistPos" } },
+        "publication_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistFavorite": {
+      "type": "object",
+      "required": ["wordlist_id", "wordlist"],
+      "properties": {
+        "wordlist": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/Wordlist" }]
+        },
+        "wordlist_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistFavoritePage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistFavorite" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistForm": {
+      "type": "object",
+      "required": ["id", "form_type", "label", "sense_ids", "variants"],
+      "properties": {
+        "form_type": { "type": "string" },
+        "id": { "type": "string", "format": "uuid" },
+        "label": { "type": "string" },
+        "sense_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" }
+        },
+        "variants": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistFormVariant" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "WordlistFormVariant": {
+      "type": "object",
+      "required": ["id", "dialect", "spelling", "pronunciations"],
+      "properties": {
+        "dialect": { "$ref": "#/$defs/Dialect" },
+        "id": { "type": "string", "format": "uuid" },
+        "pronunciations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistPronunciation" }
+        },
+        "spelling": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistGrammar": {
+      "type": "object",
+      "required": ["id", "variants"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "variants": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistText" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "WordlistImportMatch": {
+      "type": "object",
+      "required": ["status", "candidates"],
+      "properties": {
+        "candidates": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistCandidate" },
+          "maxItems": 3
+        },
+        "status": { "$ref": "#/$defs/WordlistImportMatchStatus" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistImportMatches": {
+      "type": "object",
+      "required": ["items"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistImportMatch" },
+          "maxItems": 100,
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "WordlistImportMatchStatus": {
+      "type": "string",
+      "enum": ["matched", "ambiguous", "unmatched"]
+    },
+    "WordlistInteractionState": {
+      "type": "object",
+      "required": ["wordlist_id", "liked", "favorited"],
+      "properties": {
+        "favorited": { "type": "boolean" },
+        "liked": { "type": "boolean" },
+        "wordlist_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistInteractionStates": {
+      "type": "object",
+      "required": ["items"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistInteractionState" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "WordlistInteractionStats": {
+      "type": "object",
+      "required": ["wordlist_id", "like_count", "favorite_count", "tip_amount"],
+      "properties": {
+        "favorite_count": { "type": "integer", "minimum": 0 },
+        "like_count": { "type": "integer", "minimum": 0 },
+        "tip_amount": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+        "wordlist_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistInteractionStatsBatch": {
+      "type": "object",
+      "required": ["items"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistInteractionStats" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "WordlistItem": {
+      "type": "object",
+      "required": ["entry_id", "position", "entry"],
+      "properties": {
+        "author_note": { "type": "string", "maxLength": 1000 },
+        "custom_word": { "$ref": "#/$defs/CustomWord" },
+        "entry": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/WordlistEntry" }]
+        },
+        "entry_id": { "type": ["string", "null"], "format": "uuid" },
+        "item_id": { "type": "string", "format": "uuid" },
+        "position": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistItems": {
+      "type": "object",
+      "required": ["items", "revision", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistItem" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" },
+        "revision": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": { "type": "array", "items": { "$ref": "#/$defs/Wordlist" } },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistPos": {
+      "type": "object",
+      "required": ["pos_id", "pos", "senses", "grammar_structures"],
+      "properties": {
+        "forms": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistForm" }
+        },
+        "grammar_structures": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistGrammar" }
+        },
+        "label": { "type": "string" },
+        "pos": { "type": "string" },
+        "pos_id": { "type": "string", "format": "uuid" },
+        "senses": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistSense" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "WordlistPronunciation": {
+      "type": "object",
+      "required": ["id", "dict_phonetic"],
+      "properties": {
+        "dict_phonetic": { "type": "string" },
+        "dict_phonetic_rich": { "$ref": "#/$defs/RichTextV3" },
+        "id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistReview": {
+      "type": "object",
+      "required": [
+        "id",
+        "wordlist_id",
+        "submitted_revision",
+        "name",
+        "state",
+        "reason",
+        "created_at",
+        "decided_at"
+      ],
+      "properties": {
+        "created_at": { "type": "string", "format": "date-time" },
+        "decided_at": { "type": ["string", "null"], "format": "date-time" },
+        "id": { "type": "string", "format": "uuid" },
+        "name": { "type": "string" },
+        "reason": { "type": ["string", "null"] },
+        "state": { "type": "string" },
+        "submitted_revision": { "type": "integer" },
+        "wordlist_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistReviews": {
+      "type": "object",
+      "required": ["withdraw_reason", "items"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistReview" }
+        },
+        "withdraw_reason": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "WordlistSense": {
+      "type": "object",
+      "required": ["id", "sub_pos", "level", "definitions"],
+      "properties": {
+        "definitions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistDefinition" }
+        },
+        "id": { "type": "string", "format": "uuid" },
+        "level": { "type": "string" },
+        "sub_pos": { "type": "string" },
+        "sub_pos_label": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistState": {
+      "type": "string",
+      "enum": ["draft", "pending", "published", "rejected", "withdrawn"]
+    },
+    "WordlistSuggestions": {
+      "type": "object",
+      "required": ["items"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistCandidate" },
+          "maxItems": 3
+        }
+      },
+      "additionalProperties": false
+    },
+    "WordlistText": {
+      "type": "object",
+      "required": ["dialect", "content"],
+      "properties": {
+        "content": { "$ref": "#/$defs/RichTextV3" },
+        "dialect": { "$ref": "#/$defs/Dialect" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistTip": {
+      "type": "object",
+      "required": [
+        "event_id",
+        "wordlist_id",
+        "payer_user_id",
+        "author_user_id",
+        "amount",
+        "operation_id",
+        "created_at"
+      ],
+      "properties": {
+        "amount": { "type": "string", "pattern": "^[1-9][0-9]{0,18}$" },
+        "author_user_id": { "type": "string", "format": "uuid" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "event_id": { "type": "string", "format": "uuid" },
+        "operation_id": { "type": "string", "format": "uuid" },
+        "payer_user_id": { "type": "string", "format": "uuid" },
+        "wordlist_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistTipPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistTipRecord" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistTipRecord": {
+      "type": "object",
+      "required": [
+        "event_id",
+        "wordlist_id",
+        "payer_user_id",
+        "author_user_id",
+        "amount",
+        "operation_id",
+        "created_at",
+        "wordlist_name",
+        "wordlist_accessible",
+        "counterparty_name"
+      ],
+      "properties": {
+        "amount": { "type": "string", "pattern": "^[1-9][0-9]{0,18}$" },
+        "author_user_id": { "type": "string", "format": "uuid" },
+        "counterparty_name": { "type": ["string", "null"] },
+        "created_at": { "type": "string", "format": "date-time" },
+        "event_id": { "type": "string", "format": "uuid" },
+        "operation_id": { "type": "string", "format": "uuid" },
+        "payer_user_id": { "type": "string", "format": "uuid" },
+        "wordlist_accessible": { "type": "boolean" },
+        "wordlist_id": { "type": "string", "format": "uuid" },
+        "wordlist_name": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "WordlistUnavailableReason": {
+      "type": "string",
+      "enum": ["archived", "unpublished", "unsupported_schema"]
     },
     "WordPosFormsV3": {
       "type": "object",
@@ -2894,7 +4691,9 @@
           "items": { "$ref": "#/$defs/WordPronunciationV3" },
           "maxItems": 2000
         },
-        "spelling": { "type": "string", "maxLength": 200 }
+        "spelling": { "type": "string", "maxLength": 200 },
+        "spelling_rich": { "$ref": "#/$defs/RichTextV2V3" },
+        "spelling_speech": { "$ref": "#/$defs/SpellingSpeechV3" }
       },
       "additionalProperties": false
     },
@@ -2916,7 +4715,9 @@
           "items": { "$ref": "#/$defs/WordPronunciationV3" },
           "maxItems": 2000
         },
-        "spelling": { "type": "string", "maxLength": 200 }
+        "spelling": { "type": "string", "maxLength": 200 },
+        "spelling_rich": { "$ref": "#/$defs/RichTextV2V3" },
+        "spelling_speech": { "$ref": "#/$defs/SpellingSpeechV3" }
       },
       "additionalProperties": false
     }

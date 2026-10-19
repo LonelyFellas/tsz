@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { PageHeader, PageShell } from "@/features/shell/Page";
 import { RouteGuard } from "@/features/auth";
 import { ApplicationDetail } from "@/features/teacher-certification/ApplicationDetail";
 
@@ -16,18 +16,14 @@ export default async function TeacherApplicationPage({
   const { id } = await params;
   return (
     <RouteGuard>
-      <div className="mx-auto max-w-3xl">
-        <Link
-          href="/account/notifications"
-          className="text-sm text-foreground-muted"
-        >
-          返回站内通知
-        </Link>
-        <h1 className="mb-8 mt-5 text-3xl font-semibold tracking-tight">
-          教师认证申请详情
-        </h1>
+      <PageShell>
+        <PageHeader
+          back={{ href: "/account/notifications", label: "返回站内通知" }}
+          eyebrow="教师认证"
+          title="教师认证申请详情"
+        />
         <ApplicationDetail id={id} />
-      </div>
+      </PageShell>
     </RouteGuard>
   );
 }

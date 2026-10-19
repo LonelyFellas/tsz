@@ -38,6 +38,52 @@ const IDEMPOTENT_LEXICON_OPERATIONS = [
   "post /admin/lexicon/entries/publications/batch"
 ] as const;
 
+const SPELLING_MARKUP_OPERATIONS: readonly string[] = [
+  "get /admin/lexicon/entries/{id}",
+  "get /admin/lexicon/entries/{id}/publications",
+  "get /admin/lexicon/entries/{id}/publications/{publication_id}",
+  "post /admin/lexicon/entries",
+  "put /admin/lexicon/entries/{id}/steps/forms",
+  "put /admin/lexicon/entries/{id}/steps/meanings",
+  "post /admin/lexicon/entries/{id}/publications",
+  "post /admin/lexicon/entries/{id}/publications/{publication_id}/rollback",
+  "post /admin/lexicon/entries/publications/batch",
+  "post /admin/lexicon/entries/{id}/archive",
+  "post /admin/lexicon/entries/{id}/restore",
+  "post /admin/lexicon/entries/archive-batch",
+  "post /admin/lexicon/entries/restore-batch"
+];
+
+const WORDLIST_ANNOTATION_OPERATIONS = [
+  "get /wordlists/{id}/items",
+  "get /me/wordlists/{id}/items",
+  "get /admin/wordlists/{id}/items",
+  "get /admin/wordlists/{id}/review-requests/{request_id}/items"
+];
+const WORDLIST_CUSTOM_OPERATIONS: readonly string[] = [
+  ...WORDLIST_ANNOTATION_OPERATIONS,
+  "get /me/wordlists/{id}/edit",
+  "get /me/wordlists/{id}/availability",
+  "get /wordlists/{id}/availability"
+];
+const SENTENCE_FORMATTING_OPERATIONS: readonly string[] = [
+  ...SPELLING_MARKUP_OPERATIONS,
+  "get /admin/lexicon/sentences",
+  "get /admin/lexicon/sentences/{id}",
+  "post /admin/lexicon/sentences",
+  "put /admin/lexicon/sentences/{id}",
+  "get /admin/lexicon/sentences/{id}/publications",
+  "get /admin/lexicon/sentences/{id}/publications/{publication_id}",
+  "post /admin/lexicon/sentences/{id}/publications",
+  "post /admin/lexicon/sentences/{id}/publications/{publication_id}/rollback",
+  "post /admin/lexicon/sentences/{id}/withdraw",
+  "post /admin/lexicon/sentences/{id}/restore",
+  "get /wordlists/{id}/items",
+  "get /me/wordlists/{id}/items",
+  "get /admin/wordlists/{id}/items",
+  "get /admin/wordlists/{id}/review-requests/{request_id}/items"
+];
+
 // 已知「后端尚未提供 / 待对接」的端点白名单。每条都必须真不在 spec 里——
 // 等后端实现后,本测试会反过来要求你把它从这里删掉(见下方「台账保鲜」断言),
 // 删掉后它就自动纳入正式校验。新增端点若既不在 spec 也不在此处,测试会红。
@@ -47,17 +93,9 @@ const PENDING = new Set<string>([
   // ---- 后端已切换为 tsz-rust(重写进行中),spec 只含 auth 核心 7 条路由。 ----
   // 以下按 tsz-rust 落地节奏逐步从白名单移除(T 系列见 tsz-rust/docs/frontend-integration.md §6)。
 
-  // 学习设置(tsz-rust 未实现)。
-  "put /me/learning-settings",
-  // 词库 / 词表 / 评论 / 任务:目前全是前端 mock(useWordLists 等),后端未实现。
+  // 尚未提供的旧词库列表与评论接口。
   "get /words",
-  "get /wordlists",
-  "get /wordlists/_",
-  "post /wordlists",
-  "post /wordlists/_/publish",
   "post /comments",
-  "get /tasks",
-  "post /tasks",
   // 角色治理尚未实现，页面保持未挂路由；统一权限目录已经实现，不在白名单中。
   "patch /admin/admins/_/role",
   "get /admin/roles",
@@ -95,16 +133,18 @@ function collectCalls(
   };
 
   // 遍历端点树,用哨兵参数调用每个函数,触发其内部的 http.* 记录。
-  const walk = (node: unknown) => {
+  const walk = (node: unknown, name = "") => {
     if (typeof node === "function") {
       (node as (...a: unknown[]) => unknown)(
-        SENTINEL,
+        name === "interactionStats" || name === "interactionStates"
+          ? [SENTINEL]
+          : SENTINEL,
         SENTINEL,
         SENTINEL,
         SENTINEL
       );
     } else if (node && typeof node === "object") {
-      Object.values(node).forEach(walk);
+      Object.entries(node).forEach(([key, value]) => walk(value, key));
     }
   };
   walk(factory(http as never));
@@ -161,6 +201,40 @@ function collectComponentSchemaRefs(value: unknown): Set<string> {
 
   return refs;
 }
+
+describe("个人学习配置契约", () => {
+  it("真实读取为必填可空配置，保存严格成对字段并公开锁定错误", () => {
+    expect(specPaths["/me"]).toContain("get");
+    expect(specPaths["/me/learning-settings"]).toContain("put");
+    expect(snapshot.schemas.MeResponse.required.slice().sort()).toEqual(
+      ["user", "active_role", "learning_settings", "onboarded"].sort()
+    );
+    expect(snapshot.schemas.MeResponse.properties.learning_settings).toEqual({
+      oneOf: [
+        { type: "null" },
+        { $ref: "#/components/schemas/LearningSettings" }
+      ]
+    });
+    expect(snapshot.schemas.LearningSettings.additionalProperties).toBe(false);
+    expect(snapshot.schemas.LearningSettings.required.slice().sort()).toEqual([
+      "cefr_level",
+      "english_variant"
+    ]);
+    expect(snapshot.schemas.CefrLevel.enum).toEqual([
+      "A1",
+      "A2",
+      "B1",
+      "B2",
+      "C1",
+      "C2"
+    ]);
+    expect(snapshot.schemas.EnglishVariant.enum).toEqual(["BrE", "AmE"]);
+    expect(snapshot.schemas.ErrorCode.enum).toContain("cefr_level_locked");
+    expect(
+      snapshot.operationSchemas["put /me/learning-settings"].responses
+    ).toHaveProperty("409");
+  });
+});
 
 describe("昵称保存契约", () => {
   it("PATCH /me 仅允许 display_name，成功响应为安全的完整 user", () => {
@@ -674,7 +748,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "156d5a03a8baf392f1c00aa298d0cc347199b32f141d19524567a3c1fc0461e7"
+      "3de0e2d9e4f0b0babe30effacb7cb44f5bce552e63bb6aa34fad468b9bfdf826"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -703,6 +777,22 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     expect(defs.AdminWordV3.properties.schema_version.enum).toEqual([3]);
     expect(defs.WordEntryKindV3.enum).toEqual(["word", "phrase"]);
     expect(defs.WordPosFormsV3.required).not.toContain("dialect_rules");
+    for (const schema of [
+      "WordCommonFormVariantV3",
+      "WordUkFormVariantV3",
+      "WordUsFormVariantV3"
+    ] as const) {
+      expect(defs[schema].required).not.toContain("spelling_speech");
+      expect(defs[schema].properties.spelling_speech).toMatchObject({
+        $ref: "#/$defs/SpellingSpeechV3"
+      });
+    }
+    expect(defs.SpellingSpeechV3.required).toEqual([
+      "content",
+      "voice_profile"
+    ]);
+    expect(defs.SpellingSpeechV3.additionalProperties).toBe(false);
+
     expect(defs.WordFormGroupV3.required).toEqual([
       "id",
       "is_regular",
@@ -927,7 +1017,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     );
   });
 
-  it("词库命令端点的 Idempotency-Key 必须是必填 UUID header", () => {
+  it("请求幂等、会话恢复与格式能力头保持独立契约", () => {
     const expectedHeader = {
       name: "Idempotency-Key",
       in: "header",
@@ -935,14 +1025,139 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       schema: { type: "string", format: "uuid" }
     };
 
-    expect(snapshot.operationHeaders).toEqual(
-      Object.fromEntries(
-        IDEMPOTENT_LEXICON_OPERATIONS.map((operation) => [
+    const refreshHeader = {
+      name: "X-Refresh-Request-Id",
+      in: "header",
+      required: false,
+      schema: { type: ["string", "null"], format: "uuid" }
+    };
+    const currentOnlyHeader = {
+      name: "X-Refresh-Current-Only",
+      in: "header",
+      required: false,
+      schema: { type: ["string", "null"] }
+    };
+    expect(specPaths["/auth/refresh"]?.slice().sort()).toEqual([
+      "head",
+      "post"
+    ]);
+    expect(specPaths["/admin/auth/refresh"]?.slice().sort()).toEqual([
+      "head",
+      "post"
+    ]);
+    expect(snapshot.operationHeaders).toEqual({
+      "post /auth/refresh": [currentOnlyHeader, refreshHeader],
+      "post /admin/auth/refresh": [currentOnlyHeader, refreshHeader],
+      ...Object.fromEntries(
+        [
+          "post /admin/speech/previews",
+          "post /admin/lexicon/audio-assets/upload-url",
+          "post /admin/lexicon/audio-assets",
+          "get /admin/lexicon/audio-assets/{id}/url",
+          "post /me/avatar/upload-url",
+          "post /me/avatar",
+          "post /me/teacher-certification/files"
+        ].map((operation) => [
           operation,
-          [expectedHeader]
+          [
+            {
+              name: "X-TSZ-Test-Run",
+              in: "header",
+              required: false,
+              schema: { type: ["string", "null"] }
+            }
+          ]
+        ])
+      ),
+      ...Object.fromEntries(
+        [
+          ...new Set([
+            ...IDEMPOTENT_LEXICON_OPERATIONS,
+            ...SPELLING_MARKUP_OPERATIONS,
+            ...SENTENCE_FORMATTING_OPERATIONS,
+            ...WORDLIST_ANNOTATION_OPERATIONS,
+            ...WORDLIST_CUSTOM_OPERATIONS
+          ])
+        ].map((operation) => [
+          operation,
+          [
+            ...(IDEMPOTENT_LEXICON_OPERATIONS.includes(
+              operation as (typeof IDEMPOTENT_LEXICON_OPERATIONS)[number]
+            )
+              ? [expectedHeader]
+              : []),
+            ...(SPELLING_MARKUP_OPERATIONS.includes(operation)
+              ? [
+                  {
+                    name: "X-TSZ-Phoneme-Speech",
+                    in: "header",
+                    required: false,
+                    schema: { type: ["string", "null"] }
+                  },
+                  {
+                    name: "X-TSZ-Spelling-Markup",
+                    in: "header",
+                    required: false,
+                    schema: { type: ["string", "null"] }
+                  },
+                  {
+                    name: "X-TSZ-Spelling-Speech",
+                    in: "header",
+                    required: false,
+                    schema: { type: ["string", "null"] }
+                  }
+                ]
+              : []),
+            ...(operation === "get /me/wordlists/{id}/items"
+              ? [
+                  {
+                    name: "X-TSZ-Wordlist-Entry-Labels",
+                    in: "header",
+                    required: false,
+                    schema: { type: ["string", "null"] }
+                  },
+                  {
+                    name: "X-TSZ-Wordlist-Entry-Reasons",
+                    in: "header",
+                    required: false,
+                    schema: { type: ["string", "null"] }
+                  }
+                ]
+              : []),
+            ...(WORDLIST_CUSTOM_OPERATIONS.includes(operation)
+              ? [
+                  {
+                    name: "X-TSZ-Wordlist-Custom-Items",
+                    in: "header",
+                    required: false,
+                    schema: { type: ["string", "null"] }
+                  }
+                ]
+              : []),
+            ...(WORDLIST_ANNOTATION_OPERATIONS.includes(operation)
+              ? [
+                  {
+                    name: "X-TSZ-Wordlist-Annotations",
+                    in: "header",
+                    required: false,
+                    schema: { type: ["string", "null"] }
+                  }
+                ]
+              : []),
+            ...(SENTENCE_FORMATTING_OPERATIONS.includes(operation)
+              ? [
+                  {
+                    name: "X-TSZ-Sentence-Formatting",
+                    in: "header",
+                    required: false,
+                    schema: { type: ["string", "null"] }
+                  }
+                ]
+              : [])
+          ].sort((a, b) => a.name.localeCompare(b.name))
         ])
       )
-    );
+    });
   });
 
   it("词条发布与生命周期字段的 required/可选性和后端一致", () => {
@@ -1353,4 +1568,47 @@ describe("统一新密码契约", () => {
       expect.arrayContaining(["password_too_weak", "password_compromised"])
     );
   });
+});
+
+it("手机号必绑错误与业务 403 保持契约，补绑和资料读取端点仍可用", () => {
+  expect(snapshot.schemas.ErrorCode.enum).toEqual(
+    expect.arrayContaining(["phone_binding_required", "phone_unbind_forbidden"])
+  );
+  for (const operation of [
+    "patch /me",
+    "put /me/learning-settings",
+    "post /me/avatar",
+    "post /me/avatar/upload-url",
+    "post /me/contact/unbind"
+  ]) {
+    expect(
+      snapshot.operationSchemas[
+        operation as keyof typeof snapshot.operationSchemas
+      ].responses
+    ).toHaveProperty("403");
+  }
+  expect(snapshot.operationSchemas["get /me"].responses).toHaveProperty("200");
+  expect(
+    snapshot.operationSchemas["post /me/contact/bind"].responses
+  ).toHaveProperty("204");
+});
+
+it("拼写展示字段可选且不接受 null，三种地区变体复用 V2 契约", () => {
+  for (const name of [
+    "WordCommonFormVariantV3",
+    "WordUkFormVariantV3",
+    "WordUsFormVariantV3"
+  ] as const) {
+    const schema = snapshot.schemas[name];
+    expect(schema.required).not.toContain("spelling_rich");
+    expect(schema.properties.spelling_rich).toEqual(
+      expect.objectContaining({ $ref: "#/components/schemas/RichTextV2V3" })
+    );
+    expect(runtimeSchemaBundle.$defs[name].properties.spelling_rich).toEqual({
+      $ref: "#/$defs/RichTextV2V3"
+    });
+  }
+  expect(snapshot.schemas.V3ValidationIssueCode.enum).toContain(
+    "spelling_rich_text_invalid"
+  );
 });

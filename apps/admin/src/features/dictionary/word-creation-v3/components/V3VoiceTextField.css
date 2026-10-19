@@ -61,8 +61,40 @@
   display: flex;
   flex: 1 1 auto;
   min-width: 0;
-  /* 紧凑组靠 -1px 让相邻两框共用一条边；外层成了组员，后面总跟着编辑器按钮，得由它来叠。 */
-  margin-inline-end: -1px;
+  margin-inline-end: 0;
+}
+
+/* 输入框有预览包装层，紧凑组的接缝由这一层统一承接。 */
+.v3-voice-text-field-compact > .v3-voice-text-field-input:not(:last-child),
+.v3-voice-text-field-compact
+  > textarea.ant-input-compact-item:not(.ant-input-compact-last-item) {
+  margin-inline-end: calc(-1 * var(--ant-line-width, 1px));
+}
+
+.v3-voice-text-field-compact > .v3-voice-text-field-input > textarea.ant-input {
+  margin-inline-end: 0;
+}
+
+.v3-voice-text-field-compact
+  textarea.ant-input-compact-item:not(.ant-input-compact-first-item) {
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+}
+
+.v3-voice-text-field-compact
+  textarea.ant-input-compact-item:not(.ant-input-compact-last-item) {
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+
+.v3-voice-text-field-compact > .v3-voice-text-field-input:focus-within,
+.v3-voice-text-field-compact > textarea.ant-input:focus {
+  z-index: 3;
+}
+
+.v3-voice-text-field-compact > .v3-voice-text-field-input:hover,
+.v3-voice-text-field-compact > textarea.ant-input:hover {
+  z-index: 4;
 }
 
 .v3-voice-text-liaison-overlay {
@@ -82,6 +114,11 @@
   display: block;
   max-width: none;
   padding-top: 0;
+}
+
+/* 定位文字保持透明，连读弧使用输入框字色。 */
+.v3-voice-text-liaison-overlay .tsz-ve-arc-layer {
+  color: var(--v3-voice-text-liaison-color);
 }
 
 /* 收起态与周围输入框同字号；编辑器的大字只留在编辑态，标注字重仍由只读渲染器控制。 */
@@ -134,4 +171,11 @@ textarea.word-pronunciation-phonetic-input.ant-input {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   pointer-events: none;
+}
+
+/* 释义收起态沿用正文输入框的字号和内边距，富文本负责撑高。 */
+.v3-association-preview-content {
+  font-size: var(--ant-font-size, 14px);
+  line-height: var(--ant-line-height, 1.5714285714);
+  padding: 4px 11px;
 }

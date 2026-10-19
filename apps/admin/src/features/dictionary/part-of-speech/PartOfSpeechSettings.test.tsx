@@ -150,12 +150,16 @@ vi.mock("./SubPartOfSpeechDrawer", async () => {
   const SubPartOfSpeechPanel = ({
     parents,
     createParent,
+    filtered,
+    onResetFilters,
     onSaved,
     onError,
     ref
   }: {
     parents: Pick<PartOfSpeechConfig, "id" | "name_zh">[];
     createParent?: Pick<PartOfSpeechConfig, "id" | "name_zh">;
+    filtered?: boolean;
+    onResetFilters?: () => void;
     onSaved: (text: string) => void;
     onError: (error: unknown) => void;
     ref?: Ref<{ openCreate: () => void }>;
@@ -165,6 +169,7 @@ vi.mock("./SubPartOfSpeechDrawer", async () => {
       <div data-testid="sub-panel">
         细分-{parents.map((item) => item.id).join(",")}
         /新建父级-{createParent?.id ?? "无"}
+        {filtered && <button onClick={onResetFilters}>重置细分词性筛选</button>}
         <button onClick={() => onSaved("细分词性已保存")}>
           模拟保存细分词性
         </button>
@@ -316,7 +321,7 @@ beforeEach(() => {
 });
 
 describe("PartOfSpeechSettings", () => {
-  it("配置查看权不开放写操作；编辑授权才可新增、修改、删除", () => {
+  it("配置查看权不开放新增、修改或删除", () => {
     useAuthStore.getState().setProfile({
       ...useAuthStore.getState().profile!,
       role: "admin",
@@ -393,6 +398,17 @@ describe("PartOfSpeechSettings", () => {
     fireEvent.click(await screen.findByText("动词", { exact: true }));
     expect(screen.getByTestId("sub-panel")).toHaveTextContent(
       "细分-pos-verb/新建父级-pos-verb"
+    );
+    fireEvent.click(screen.getByText("重置细分词性筛选"));
+    expect(
+      screen
+        .getByLabelText("所属基本词性")
+        .closest(".ant-select")
+        ?.querySelector(".ant-select-content")
+    ).toHaveTextContent("全部");
+    expect(screen.getByLabelText("所属基本词性")).toHaveValue("");
+    expect(screen.getByTestId("sub-panel")).toHaveTextContent(
+      "细分-pos-noun,pos-particle,pos-verb/新建父级-无"
     );
   });
 
@@ -781,4 +797,30 @@ describe("PartOfSpeechSettings", () => {
       "暂无基本词性"
     );
   });
+});
+
+it("基本词性编辑不开放细分词性新增，普通管理员即使持有删除权也不能删基本词性", () => {
+  useAuthStore.getState().setProfile({
+    ...useAuthStore.getState().profile!,
+    role: "admin",
+    permissions: [
+      "lexicon_settings.access",
+      "lexicon_settings.edit_basic",
+      "lexicon_settings.delete"
+    ]
+  });
+  renderSettings();
+  expect(screen.getByText("新增基本词性").closest("button")).toBeEnabled();
+  for (const button of screen.getAllByText("修 改", {
+    selector: "button span"
+  }))
+    expect(button.closest("button")).toBeEnabled();
+  for (const button of screen.getAllByText("删 除", {
+    selector: "button span"
+  }))
+    expect(button.closest("button")).toBeDisabled();
+  fireEvent.click(
+    screen.getByText("细分词性", { selector: ".ant-segmented-item-label" })
+  );
+  expect(screen.getByText("新增细分词性").closest("button")).toBeDisabled();
 });

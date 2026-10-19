@@ -10,6 +10,12 @@ const user = {
   avatar_url: "",
   active_role: "student"
 };
+const me = {
+  user,
+  active_role: "student",
+  learning_settings: { cefr_level: "A1", english_variant: "BrE" },
+  onboarded: true
+};
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status });
 
@@ -25,11 +31,29 @@ afterEach(() => {
 });
 
 describe("useSessionRestore + runtime + HTTP", () => {
-  it.each([503, "offline"])(
-    "refresh %s 不判未登录，手动重试可恢复",
+  it("恢复会话保留服务端未配置状态，不跳过引导", async () => {
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(json({ access_token: "new", expires_in: 900 }))
+      .mockResolvedValueOnce(
+        json({ ...me, learning_settings: null, onboarded: false })
+      );
+    renderHook(() => useSessionRestore());
+    await waitFor(() =>
+      expect(authRuntime.store.getState().hydrated).toBe(true)
+    );
+    expect(authRuntime.store.getState()).toMatchObject({
+      user,
+      onboarded: false
+    });
+    expect(fetch.mock.calls[1]?.[0]).toBe("/api/v1/me");
+  });
+  it.each([429, "offline", 503])(
+    "refresh %s 不判未登录，未知结果要求重新登录",
     async (failure) => {
       const fetch = vi.spyOn(globalThis, "fetch");
-      if (failure === 503) fetch.mockResolvedValueOnce(json({}, 503));
+      if (typeof failure === "number")
+        fetch.mockResolvedValueOnce(json({}, failure));
       else fetch.mockRejectedValueOnce(new TypeError("Failed to fetch"));
       const { result, rerender } = renderHook(() => useSessionRestore());
       await waitFor(() =>
@@ -41,16 +65,24 @@ describe("useSessionRestore + runtime + HTTP", () => {
       });
       rerender();
       expect(fetch).toHaveBeenCalledTimes(1);
-      fetch
-        .mockResolvedValueOnce(json({ access_token: "new", expires_in: 900 }))
-        .mockResolvedValueOnce(json(user));
+      if (failure !== 429) {
+        await act(() => result.current.retry());
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(authRuntime.store.getState().refreshUnconfirmed).toBe(true);
+        authRuntime.tokens.setAccessToken("new-login");
+      }
+      if (failure === 429)
+        fetch.mockResolvedValueOnce(
+          json({ access_token: "new", expires_in: 900 })
+        );
+      fetch.mockResolvedValueOnce(json(me));
       await act(() => result.current.retry());
       expect(authRuntime.store.getState()).toMatchObject({
         user,
         hydrated: true,
         connectionError: false
       });
-      expect(fetch).toHaveBeenCalledTimes(3);
+      expect(fetch).toHaveBeenCalledTimes(failure !== 429 ? 2 : 3);
     }
   );
 
@@ -77,7 +109,7 @@ describe("useSessionRestore + runtime + HTTP", () => {
       const fetch = vi
         .spyOn(globalThis, "fetch")
         .mockResolvedValueOnce(json({ access_token: "first", expires_in: 900 }))
-        .mockResolvedValueOnce(json(user));
+        .mockResolvedValueOnce(json(me));
       renderHook(() => useSessionRestore());
       await waitFor(() =>
         expect(authRuntime.store.getState().hydrated).toBe(true)
@@ -117,7 +149,7 @@ describe("useSessionRestore + runtime + HTTP", () => {
       hydrated: false,
       user: null
     });
-    fetch.mockResolvedValueOnce(json(user));
+    fetch.mockResolvedValueOnce(json(me));
     act(() => window.dispatchEvent(new Event("online")));
     await waitFor(() =>
       expect(authRuntime.store.getState().hydrated).toBe(true)

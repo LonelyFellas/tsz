@@ -12,6 +12,713 @@ import {
 } from "./support/mockAdminV3Api";
 
 test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () => {
+  test("手动选择 IPA、UPS 或拼写，词性添加显示圆圈加号", async ({ page }) => {
+    const api = await mockAdminV3Api(page, { formsFailureOnce: false });
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    const formsUrl = `/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`;
+    const previewUrl = `/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/preview`;
+    await page.goto(formsUrl);
+    const add = page.getByLabel("添加基本词性").first();
+    const select = page.locator(".word-add-basic-pos-select").first();
+    await expect(select.locator('[data-icon="plus-circle"]')).toBeVisible();
+    await expect(select).toHaveClass(/ant-select-borderless/);
+    expect(
+      await page
+        .locator(".word-pos-tab-actions")
+        .first()
+        .locator("svg")
+        .evaluateAll((icons) =>
+          icons.map((icon) => {
+            const { width, height } = icon.getBoundingClientRect();
+            return { width, height };
+          })
+        )
+    ).toEqual([
+      { width: 14, height: 14 },
+      { width: 14, height: 14 }
+    ]);
+    await add.click();
+    await expect(page.locator(".ant-select-dropdown:visible")).toHaveCount(1);
+    await add.press("Escape");
+    await expect(page.locator(".ant-select-dropdown:visible")).toHaveCount(0);
+    await add.blur();
+    await page.locator(".word-pos-tabs > .ant-tabs-nav").screenshot({
+      path: test.info().outputPath("circle-add.png")
+    });
+    const source = page.locator(".word-pronunciation-synthesis").first();
+    await expect(
+      source.getByRole("radio", { name: "Azure UPS", exact: true })
+    ).toHaveCount(0);
+    const ukUps = source.getByLabel("第 1 条发音的英式 Azure UPS", {
+      exact: true
+    });
+    const usUps = source.getByLabel("第 1 条发音的美式 Azure UPS", {
+      exact: true
+    });
+    await source
+      .getByLabel("第 1 条发音的英式 Azure IPA", { exact: true })
+      .fill("ˈɔːbɪt");
+    await source
+      .getByLabel("第 1 条发音的美式 Azure IPA", { exact: true })
+      .fill("ˈɔɹbɪt");
+    await expect(usUps).toHaveCount(0);
+    await source.getByRole("button", { name: "展开第 1 条发音的 UPS" }).click();
+    const save = async () => {
+      const button = page.getByRole("button", { name: /保存草稿$/ });
+      const saved = page.waitForResponse(
+        (response) =>
+          response.request().method() === "PUT" &&
+          response
+            .url()
+            .endsWith(
+              `${ADMIN_V3_ENTRIES_PATH}/${ADMIN_V3_MIXED_WORD_ID}/steps/forms`
+            )
+      );
+      const before = api.count(
+        "PUT",
+        `${ADMIN_V3_ENTRIES_PATH}/${ADMIN_V3_MIXED_WORD_ID}/steps/forms`
+      );
+      await button.click();
+      expect((await saved).ok()).toBe(true);
+      await expect
+        .poll(() =>
+          api.count(
+            "PUT",
+            `${ADMIN_V3_ENTRIES_PATH}/${ADMIN_V3_MIXED_WORD_ID}/steps/forms`
+          )
+        )
+        .toBe(before + 1);
+      await expect(button).not.toHaveClass(/ant-btn-loading/);
+      await expect(button).toBeDisabled();
+    };
+    await source.getByRole("radio", { name: "词形拼写", exact: true }).check();
+    await ukUps.fill("AO B IH T");
+    await usUps.fill("AO R B IH T");
+    await expect(
+      source.getByRole("radio", { name: "词形拼写", exact: true })
+    ).toBeChecked();
+    await source.getByRole("radio", { name: "Azure UPS", exact: true }).check();
+    await source.getByRole("button", { name: "收起第 1 条发音的 UPS" }).click();
+    await expect(
+      source.getByRole("radio", { name: "Azure UPS", exact: true })
+    ).toHaveCount(0);
+    await expect(usUps).toBeHidden();
+    await save();
+    await source.screenshot({
+      path: test.info().outputPath("optional-ups.png")
+    });
+    await page.goto(previewUrl);
+    await expect(
+      page.getByText("Azure UPS · 英式：AO B IH T · 美式：AO R B IH T", {
+        exact: true
+      })
+    ).toBeVisible();
+    await page.goto(formsUrl);
+    await expect(usUps).toHaveCount(0);
+    await expect(
+      source.getByRole("radio", { name: "Azure UPS", exact: true })
+    ).toHaveCount(0);
+    await source.getByRole("button", { name: "展开第 1 条发音的 UPS" }).click();
+    await expect(usUps).toHaveValue("AO R B IH T");
+    await expect(ukUps).toHaveValue("AO B IH T");
+    await expect(
+      source.getByRole("radio", { name: "Azure UPS", exact: true })
+    ).toBeChecked();
+    await source.getByRole("radio", { name: "Azure IPA", exact: true }).check();
+    await expect(
+      source.getByText("请填写 Azure UPS", { exact: true })
+    ).toHaveCount(0);
+    await save();
+    await page.goto(previewUrl);
+    await expect(
+      page.getByText("Azure IPA · 英式：ˈɔːbɪt · 美式：ˈɔɹbɪt", { exact: true })
+    ).toBeVisible();
+    await page.goto(formsUrl);
+    await expect(
+      source.getByRole("radio", { name: "Azure IPA", exact: true })
+    ).toBeChecked();
+    await expect(
+      source.getByRole("radio", { name: "Azure UPS", exact: true })
+    ).toHaveCount(0);
+    await source.getByRole("radio", { name: "词形拼写", exact: true }).check();
+    await save();
+    await page.goto(previewUrl);
+    await expect(
+      page.getByText("词形拼写（语音来源）", { exact: true }).first()
+    ).toBeVisible();
+    await page.goto(formsUrl);
+    await expect(
+      source.getByRole("radio", { name: "词形拼写", exact: true })
+    ).toBeChecked();
+    await source.getByRole("button", { name: "展开第 1 条发音的 UPS" }).click();
+    await expect(ukUps).toHaveValue("AO B IH T");
+    await expect(usUps).toHaveValue("AO R B IH T");
+  });
+
+  for (const alphabet of ["ipa", "ups"] as const) {
+    test(`扁平 ${alphabet.toUpperCase()} 提交错误标记输入并可定位，UPS 收起保留面板`, async ({
+      page
+    }) => {
+      const api = await mockAdminV3Api(page, { formsFailureOnce: false });
+      const pos = api.getWord().forms.pos[0]!;
+      const group = pos.form_groups[0]!;
+      const form = pos.forms.find(
+        (item) => item.id === group.members[0]!.form_id
+      )!;
+      if (form.regional_variants.mode !== "common")
+        throw new Error("Expected common pronunciation fixture");
+      const variant = form.regional_variants.common;
+      const pronunciation = variant.pronunciations[0]!;
+      const formsPath = `${ADMIN_V3_ENTRIES_PATH}/${ADMIN_V3_MIXED_WORD_ID}/steps/forms`;
+      await page.route(`**${formsPath}`, async (route) => {
+        if (
+          route.request().method() !== "PUT" ||
+          route.request().postDataJSON().intent !== "complete"
+        )
+          return route.fallback();
+        await route.fulfill({
+          status: 422,
+          contentType: "application/problem+json",
+          body: JSON.stringify({
+            type: "urn:tsz:problem:validation_failed",
+            title: "Validation failed",
+            status: 422,
+            detail: "Mock selected phonemes are missing",
+            code: "validation_failed",
+            field_issues: [
+              {
+                schema_version: 3,
+                step: "forms",
+                node_id: pronunciation.id,
+                field: `synthesis.${alphabet}`,
+                code: "pronunciation_required",
+                message: "请填写合成音素",
+                node_location: {
+                  node_role: "forms.pronunciation:common",
+                  ancestor_node_ids: [
+                    pos.pos_id,
+                    group.id,
+                    form.id,
+                    variant.id
+                  ],
+                  pos_id: pos.pos_id,
+                  form_group_id: group.id,
+                  form_id: form.id,
+                  variant_id: variant.id,
+                  dialect: "common",
+                  pronunciation_id: pronunciation.id
+                }
+              }
+            ]
+          })
+        });
+      });
+      await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+      const source = page.locator(".word-pronunciation-synthesis").first();
+      await source
+        .getByRole("radio", { name: "词形拼写", exact: true })
+        .check();
+      if (alphabet === "ups")
+        await source
+          .getByRole("button", { name: "展开第 1 条发音的 UPS" })
+          .click();
+      await source
+        .getByRole("radio", {
+          name: `Azure ${alphabet.toUpperCase()}`,
+          exact: true
+        })
+        .check();
+      await expect(source.locator('textarea[aria-invalid="true"]')).toHaveCount(
+        0
+      );
+      await page
+        .getByRole("button", { name: "进入词义与例句", exact: true })
+        .click();
+      const rejected = page.waitForResponse(
+        (response) =>
+          response.request().method() === "PUT" &&
+          response.url().endsWith(formsPath) &&
+          response.status() === 422
+      );
+      await page
+        .getByRole("button", { name: "完成并进入预览", exact: true })
+        .click();
+      const response = await rejected;
+      const submitted = response.request().postDataJSON();
+      expect(submitted.intent).toBe("complete");
+      const selected = submitted.content.pos[0].forms.find(
+        (item: { id: string }) => item.id === form.id
+      ).regional_variants.common.pronunciations[0].synthesis;
+      expect(selected).toMatchObject({ alphabet, use_spelling: false });
+      expect(selected.uk).toBeUndefined();
+      expect(selected.us).toBeUndefined();
+      await page.getByRole("button", { name: /词形与发音$/ }).click();
+      const input = source.locator(
+        `textarea[data-v3-field="synthesis.${alphabet}"]`
+      );
+      await expect(input).toHaveCount(1);
+      await expect(input).toHaveAttribute("aria-invalid", "true");
+      await expect(
+        source.getByText(`请填写 Azure ${alphabet.toUpperCase()}`, {
+          exact: true
+        })
+      ).toBeVisible();
+      await page
+        .getByRole("button", { name: "去处理首项", exact: true })
+        .click();
+      await expect(input).toBeFocused();
+      if (alphabet === "ups") {
+        const panel = source.locator(".word-synthesis-ups-fields");
+        await source
+          .getByRole("button", { name: "收起第 1 条发音的 UPS" })
+          .click();
+        await expect(input).toHaveCount(1);
+        await expect(input).toBeHidden();
+        await expect(panel).toHaveAttribute("aria-hidden", "true");
+        await expect(panel).toHaveAttribute("inert", "");
+        await expect(
+          source.getByRole("radio", { name: "Azure UPS", exact: true })
+        ).toHaveCount(0);
+        await page
+          .getByRole("button", { name: "去处理首项", exact: true })
+          .click();
+        await expect(input).toBeVisible();
+        await expect(input).toBeFocused();
+      }
+    });
+  }
+
+  test("词形拼写与实际发音的输入和按钮保持连续边框", async ({ page }) => {
+    await mockAdminV3Api(page, { formsFailureOnce: false });
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+    await page.evaluate(() => document.fonts.ready);
+    const groups = [
+      page
+        .locator(".word-shared-form-spelling .v3-voice-text-field-compact")
+        .first(),
+      page
+        .locator(
+          ".word-actual-pronunciation-control .v3-voice-text-field-compact"
+        )
+        .first()
+    ];
+    for (const width of [1280, 760]) {
+      await page.setViewportSize({ width, height: 1000 });
+      for (const [index, group] of groups.entries()) {
+        await expect(group).toBeVisible();
+        const controls = await group.evaluate((node) =>
+          [...node.children].map((child) => {
+            const control = child.matches("button, textarea")
+              ? child
+              : child.querySelector("textarea")!;
+            const rect = control.getBoundingClientRect();
+            const style = getComputedStyle(control);
+            return {
+              x: rect.x,
+              right: rect.right,
+              y: rect.y,
+              height: rect.height,
+              left: [style.borderTopLeftRadius, style.borderBottomLeftRadius],
+              end: [style.borderTopRightRadius, style.borderBottomRightRadius]
+            };
+          })
+        );
+        expect(controls.length).toBeGreaterThanOrEqual(2);
+        for (let i = 0; i < controls.length; i++) {
+          const control = controls[i]!;
+          expect(Math.abs(control.y - controls[0]!.y)).toBeLessThanOrEqual(1);
+          expect(
+            Math.abs(control.height - controls[0]!.height)
+          ).toBeLessThanOrEqual(1);
+          if (i > 0) {
+            expect(control.left).toEqual(["0px", "0px"]);
+            expect(control.x - controls[i - 1]!.right).toBeCloseTo(-1, 1);
+          } else
+            expect(
+              control.left.every((radius) => Number.parseFloat(radius) > 0)
+            ).toBe(true);
+          if (i < controls.length - 1)
+            expect(control.end).toEqual(["0px", "0px"]);
+          else
+            expect(
+              control.end.every((radius) => Number.parseFloat(radius) > 0)
+            ).toBe(true);
+        }
+        const input = group.locator("textarea");
+        await input.focus();
+        await expect(input).toBeFocused();
+        await expect(input).toHaveCSS("border-color", "rgb(32, 83, 255)");
+        await group.screenshot({
+          path: test.info().outputPath(`compact-field-${index}-${width}.png`)
+        });
+      }
+    }
+  });
+
+  test("UPS 折叠箭头与读法下拉保持一致", async ({ page }) => {
+    await mockAdminV3Api(page, { formsFailureOnce: false });
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+    const fields = page.locator(".word-pronunciation-floating-fields").first();
+    const nativeArrow = fields.locator(".ant-select .anticon-down").first();
+    const toggle = fields.locator(".word-synthesis-ups-toggle");
+    const arrow = toggle.locator(".anticon-down");
+    const nativeStyle = await nativeArrow.evaluate((node) => ({
+      color: getComputedStyle(node).color,
+      fontSize: getComputedStyle(node).fontSize,
+      path: node.querySelector("path")!.getAttribute("d")!
+    }));
+    for (const [step, expanded] of [false, true, false].entries()) {
+      await expect(toggle).toHaveAttribute("aria-expanded", String(expanded));
+      await expect(arrow).toHaveCSS("color", nativeStyle.color);
+      await expect(arrow).toHaveCSS("font-size", nativeStyle.fontSize);
+      await expect(arrow.locator("path")).toHaveAttribute(
+        "d",
+        nativeStyle.path
+      );
+      await expect(arrow.locator("svg")).toHaveCSS(
+        "transform",
+        expanded ? "matrix(-1, 0, 0, -1, 0, 0)" : "none"
+      );
+      if (step < 2) await toggle.click();
+    }
+  });
+
+  test("浮动标签在聚焦和悬停时始终完整显示", async ({ page }) => {
+    await mockAdminV3Api(page, { formsFailureOnce: false });
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+    const fields = page.locator(".word-pronunciation-floating-fields").first();
+    await fields.getByRole("button", { name: "展开第 1 条发音的 UPS" }).click();
+    const labels = fields.locator("label[for]");
+    await expect(labels).toHaveCount(7);
+    expect(
+      await labels.evaluateAll((nodes) =>
+        nodes.map((node) => {
+          const style = getComputedStyle(node);
+          return [
+            style.borderTopLeftRadius,
+            style.borderTopRightRadius,
+            style.borderBottomLeftRadius,
+            style.borderBottomRightRadius
+          ];
+        })
+      )
+    ).toEqual(Array.from({ length: 7 }, () => ["4px", "4px", "4px", "4px"]));
+    for (const width of [1280, 760]) {
+      await page.setViewportSize({ width, height: 1000 });
+      for (const label of await labels.all()) {
+        const id = await label.getAttribute("for");
+        const input = page.locator(`[id="${id}"]`);
+        const control = label
+          .locator("..")
+          .locator(".ant-select, input, textarea")
+          .first();
+        await control.evaluate((node) =>
+          node.scrollIntoView({ block: "center" })
+        );
+        for (const state of ["focus", "hover"]) {
+          if (state === "focus") await input.focus();
+          else await input.evaluate((node) => (node as HTMLElement).blur());
+          await control.hover();
+          if ((await label.textContent())?.trim() === "实际发音") {
+            const row = (await label.locator("..").boundingBox())!;
+            const title = (await label.boundingBox())!;
+            await page.screenshot({
+              path: test
+                .info()
+                .outputPath(`actual-label-${state}-${width}.png`),
+              clip: {
+                x: row.x - 4,
+                y: title.y - 4,
+                width: row.width + 8,
+                height: row.y + row.height - title.y + 8
+              }
+            });
+          }
+          const exposed = await label.evaluate((node) => {
+            const rect = node.getBoundingClientRect();
+            return [0.1, 0.5, 0.9].flatMap((x) =>
+              [0.25, 0.75].map((y) => {
+                const top = document.elementFromPoint(
+                  rect.left + rect.width * x,
+                  rect.top + rect.height * y
+                );
+                return top === node || node.contains(top);
+              })
+            );
+          });
+          expect(
+            exposed,
+            `${await label.textContent()} ${state} ${width}`
+          ).toEqual([true, true, true, true, true, true]);
+        }
+      }
+    }
+  });
+
+  test("发音标签嵌入输入框上边框，宽窄屏点击标签均可聚焦", async ({ page }) => {
+    await mockAdminV3Api(page, { formsFailureOnce: false });
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+    const fields = page.locator(".word-pronunciation-floating-fields").first();
+    const labels = fields.locator("label[for]");
+    await expect(labels).toHaveCount(5);
+    await fields.getByRole("button", { name: "展开第 1 条发音的 UPS" }).click();
+    await expect(
+      page.getByText("UPS 已填写时优先使用，留空时使用所选来源。", {
+        exact: true
+      })
+    ).toHaveCount(0);
+    await expect(
+      page.getByText("请填写 Azure IPA", { exact: true })
+    ).toHaveCount(0);
+    for (const width of [1280, 760, 390]) {
+      await page.setViewportSize({ width, height: 1100 });
+      await expect(labels).toHaveCount(7);
+      await expect
+        .poll(() =>
+          labels.evaluateAll((items) =>
+            Math.max(
+              ...items.map((label) => {
+                const input = document.getElementById(
+                  (label as HTMLLabelElement).htmlFor
+                )!;
+                const control =
+                  input.closest(".ant-select, .word-synthesis-control") ??
+                  input;
+                const box = label.getBoundingClientRect();
+                return Math.abs(
+                  (box.top + box.bottom) / 2 -
+                    control.getBoundingClientRect().top
+                );
+              })
+            )
+          )
+        )
+        .toBeLessThanOrEqual(1);
+      await fields
+        .locator("label")
+        .filter({ hasText: /^字典音标$/ })
+        .click();
+      await expect(
+        fields.getByLabel("第 1 条发音的字典音标", { exact: true })
+      ).toBeFocused();
+      await fields
+        .locator("label")
+        .filter({ hasText: /^美式 Azure IPA$/ })
+        .click();
+      await expect(
+        fields.getByLabel("第 1 条发音的美式 Azure IPA", { exact: true })
+      ).toBeFocused();
+      await expect(
+        fields.getByRole("button", { name: "收起第 1 条发音的 UPS" })
+      ).toHaveText("UPS");
+      if (width === 1280) {
+        const dict = (await fields
+          .getByLabel("第 1 条发音的字典音标", { exact: true })
+          .boundingBox())!;
+        const actual = (await fields
+          .getByLabel("第 1 条发音的实际发音", { exact: true })
+          .boundingBox())!;
+        expect(actual.y).toBeGreaterThanOrEqual(dict.y + dict.height);
+        expect(Math.abs(actual.x - dict.x)).toBeLessThanOrEqual(1);
+      }
+      const source = fields.locator(".word-synthesis-source-label");
+      const choices = fields.locator(".word-synthesis-source-actions");
+      const toggle = fields.getByRole("button", {
+        name: "收起第 1 条发音的 UPS"
+      });
+      const headingBox = (await source.boundingBox())!;
+      const toggleBox = (await toggle.boundingBox())!;
+      expect(
+        Math.abs(
+          headingBox.y +
+            headingBox.height / 2 -
+            toggleBox.y -
+            toggleBox.height / 2
+        )
+      ).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs(
+          headingBox.x + headingBox.width - toggleBox.x - toggleBox.width
+        )
+      ).toBeLessThanOrEqual(1);
+      await expect(toggle).toHaveCSS("border-top-style", "none");
+      expect(
+        (await fields
+          .getByLabel("第 1 条发音的美式 Azure UPS", { exact: true })
+          .boundingBox())!.y
+      ).toBeGreaterThan(headingBox.y + headingBox.height);
+      expect(
+        (await source.boundingBox())!.y + (await source.boundingBox())!.height
+      ).toBeLessThanOrEqual((await choices.boundingBox())!.y);
+      await fields.screenshot({
+        path: test.info().outputPath(`floating-labels-${width}.png`)
+      });
+    }
+  });
+
+  test("窄屏步骤标题可读、例句操作列不遮挡且编辑栏高度一致", async ({
+    page
+  }) => {
+    await mockAdminV3Api(page);
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/meanings`);
+    await expect(
+      page.locator(".word-grammar-card > .ant-card-head").first()
+    ).toBeVisible();
+    expect(
+      (await page
+        .locator(".word-grammar-card > .ant-card-head")
+        .first()
+        .boundingBox())!.height
+    ).toBe(48);
+    for (const button of await page
+      .locator(".word-step-actions .ant-btn")
+      .all()) {
+      expect((await button.boundingBox())!.height).toBe(40);
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    const steps = page.locator(".word-creation-steps .ant-steps-item");
+    await expect(steps).toHaveCount(4);
+    for (const step of await steps.all()) {
+      await expect(step.locator(".ant-steps-item-section")).toBeVisible();
+      expect(
+        await step.evaluate((node) => node.scrollWidth - node.clientWidth)
+      ).toBeLessThanOrEqual(1);
+    }
+    const boxes = await steps.evaluateAll((nodes) =>
+      nodes.map((node) => {
+        const r = node.getBoundingClientRect();
+        return { x: r.x, y: r.y };
+      })
+    );
+    expect(boxes[0]!.y).toBe(boxes[1]!.y);
+    expect(boxes[2]!.y).toBeGreaterThan(boxes[0]!.y);
+    await page.goto("/sentences");
+    const action = page.getByRole("columnheader", {
+      name: "操作",
+      exact: true
+    });
+    await expect(action).toHaveCSS("position", "static");
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await expect(action).toHaveCSS("position", "sticky");
+  });
+
+  for (const { width, zoom } of [
+    { width: 1366, zoom: 1 },
+    { width: 1280, zoom: 0.8 },
+    { width: 1280, zoom: 1.25 },
+    { width: 1024, zoom: 1.5 },
+    { width: 390, zoom: 1 }
+  ]) {
+    test(`任务139：${width}px / ${zoom * 100}% 首次点击中文后标签保持同行`, async ({
+      page
+    }) => {
+      await mockAdminV3Api(page);
+      await page.setViewportSize({ width, height: 1000 });
+      // CSS zoom 验证缩放布局；不同视口宽度同时覆盖浏览器缩放后的可用空间。
+      await page.addInitScript((zoom) => {
+        document.addEventListener("DOMContentLoaded", () => {
+          document.documentElement.style.zoom = String(zoom);
+        });
+      }, zoom);
+      await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/meanings`);
+      const row = page.locator(".word-definition-row").first();
+      const language = row.getByLabel("定义 1 语言", { exact: true });
+      await expect(language).toBeVisible();
+      await language.scrollIntoViewIfNeeded();
+      const measure = () =>
+        row.evaluate((node) => {
+          const meta = node.querySelector(".word-definition-meta")!;
+          const number = meta
+            .querySelector(".word-number-cell")!
+            .getBoundingClientRect();
+          return [...meta.querySelectorAll(".word-definition-text-select")].map(
+            (el) => {
+              const rect = el.getBoundingClientRect();
+              return {
+                width: rect.width,
+                height: rect.height,
+                offsetY: rect.y - number.y
+              };
+            }
+          );
+        });
+      const before = await measure();
+      expect(before).toHaveLength(3);
+      for (const control of before)
+        expect(Math.abs(control.offsetY)).toBeLessThan(1);
+      // 必须先点中文；关闭下拉后焦点仍在该控件上，布局也应与初始状态相同。
+      for (const name of ["语言", "等级", "释义方式"]) {
+        const input = row.getByLabel(`定义 1 ${name}`, { exact: true });
+        await input.click();
+        await expect(input).toHaveAttribute("aria-expanded", "true");
+        await expect.poll(measure).toEqual(before);
+        await input.press("Escape");
+        await expect(input).toHaveAttribute("aria-expanded", "false");
+        await expect(
+          page.locator(".word-definition-text-options:visible")
+        ).toHaveCount(0);
+        await expect.poll(measure).toEqual(before);
+        if (name === "语言") {
+          await row.screenshot({
+            path: test.info().outputPath("definition-language-focused.png")
+          });
+        }
+      }
+    });
+  }
+
+  test("词形拼写在基础确认、摘要、预览和历史快照中统一为 700", async ({
+    page
+  }) => {
+    await mockAdminV3Api(page);
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/basics`);
+    await expect(page.locator(".v3-summary-headword")).toHaveCSS(
+      "font-weight",
+      "700"
+    );
+    const spellings = page.locator(".dialect-panel input.tsz-words");
+    await expect(spellings.first()).toBeVisible();
+    for (const spelling of await spellings.all())
+      await expect(spelling).toHaveCSS("font-weight", "700");
+    // 仅向本用例拦截的 Mock API 生成发布快照。
+    const status = await page.evaluate(async (id) => {
+      const response = await fetch(
+        `/api/v1/admin/lexicon/entries/${id}/publications`,
+        { method: "POST" }
+      );
+      return response.status;
+    }, ADMIN_V3_MIXED_WORD_ID);
+    expect(status).toBe(200);
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/preview`);
+    const chain = page.locator(".v3-review-form-chain .tsz-words");
+    await expect(chain.first()).toBeVisible();
+    for (const spelling of await chain.all())
+      await expect(spelling).toHaveCSS("font-weight", "700");
+    await page.getByRole("button", { name: "查看第 2 次发布" }).click();
+    const snapshot = page.getByTestId("publication-snapshot-body");
+    await expect(
+      snapshot.getByText("orbit", { exact: true }).first()
+    ).toHaveCSS("font-weight", "700");
+  });
+
+  test("词形拼写收起态的可见文字与输入框都使用 Bold", async ({ page }) => {
+    await mockAdminV3Api(page);
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+    const spelling = page.locator("textarea.tsz-words").first();
+    const preview = page
+      .locator(".v3-forms-step .v3-grammar-preview-content.tsz-words")
+      .first();
+    const text = preview.locator(".tsz-ve-readonly > span").first();
+    await expect(preview).toHaveText(await spelling.inputValue());
+    await expect(text).toHaveCSS("font-weight", "700");
+    await expect(spelling).toHaveCSS("font-weight", "700");
+    await spelling.focus();
+    await expect(text).toHaveCSS("font-weight", "700");
+    await spelling.blur();
+    await expect(text).toHaveCSS("font-weight", "700");
+  });
+
   test("英文词语、音标与默认正文实际加载各自字体，补字不回退到系统字体", async ({
     page
   }) => {
@@ -27,6 +734,137 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(phonetic).toHaveCSS("font-family", /TSZ Phonetics/);
     await expect(actual).toHaveCSS("font-size", "18.6667px");
     await expect(actual).toHaveCSS("font-family", /TSZ Phonetics/);
+    const source = page.locator(".word-pronunciation-synthesis").first();
+    if (await source.locator(".word-synthesis-source-actions").isVisible()) {
+      await source
+        .getByRole("button", { name: "展开第 1 条发音的 UPS" })
+        .click();
+      const sourcePreviews = source.locator(".word-synthesis-choice-preview");
+      await expect(sourcePreviews).toHaveCount(3);
+      await source
+        .getByLabel("第 1 条发音的英式 Azure IPA", { exact: true })
+        .fill("ˈɔːbɪt");
+      await source
+        .getByLabel("第 1 条发音的英式 Azure UPS", { exact: true })
+        .fill("AO B IH T");
+      await expect(sourcePreviews.nth(0)).toHaveText(
+        await spelling.inputValue()
+      );
+      await expect(sourcePreviews.nth(1)).toHaveText("/ ˈɔːbɪt /");
+      await expect(sourcePreviews.nth(2)).toHaveText("AO B IH T");
+      await expect(
+        source.getByRole("radio", { name: "Azure UPS", exact: true })
+      ).toBeVisible();
+      const spellingFont = await spelling.evaluate(
+        (node) => getComputedStyle(node).fontFamily
+      );
+      const synthesisFont = await source
+        .locator("textarea")
+        .first()
+        .evaluate((node) => getComputedStyle(node).fontFamily);
+      for (const name of ["词形拼写", "Azure IPA", "Azure UPS"]) {
+        await source.getByRole("radio", { name, exact: true }).check();
+        for (let index = 0; index < 3; index++) {
+          await expect(sourcePreviews.nth(index)).toHaveCSS(
+            "font-family",
+            index === 0 ? spellingFont : synthesisFont
+          );
+          await expect(sourcePreviews.nth(index)).toHaveCSS(
+            "font-weight",
+            index === 0 ? "700" : "400"
+          );
+        }
+      }
+      await page
+        .locator("[data-pos-id] .v3-form-group-card")
+        .first()
+        .getByLabel("英美音标有区别")
+        .check();
+      const usSource = page
+        .locator(".word-shared-pronunciation-us .word-pronunciation-synthesis")
+        .first();
+      await usSource.getByLabel("第 1 条发音的美式 Azure IPA").fill("ˈɔrbɪt");
+      await usSource
+        .getByRole("button", { name: "展开第 1 条发音的 UPS" })
+        .click();
+      await usSource
+        .getByLabel("第 1 条发音的美式 Azure UPS")
+        .fill("AO R B IH T");
+      const usColor = await page
+        .locator(".word-form-matrix-shared-header-us")
+        .first()
+        .evaluate((node) => getComputedStyle(node).backgroundColor);
+      for (const name of ["词形拼写", "Azure IPA", "Azure UPS"]) {
+        await usSource.getByRole("radio", { name, exact: true }).check();
+        const checked = usSource.locator(".ant-radio-wrapper-checked");
+        await expect(checked.locator(".ant-radio")).toHaveCSS(
+          "background-color",
+          usColor
+        );
+        await expect(checked.locator(".word-synthesis-choice-tag")).toHaveCSS(
+          "background-color",
+          usColor
+        );
+        await checked.hover();
+        await expect(checked.locator(".ant-radio")).toHaveCSS(
+          "background-color",
+          usColor
+        );
+      }
+      await expect(
+        source.getByRole("radio", { name: "Azure UPS", exact: true })
+      ).toHaveCount(0);
+      await source
+        .getByRole("button", { name: "展开第 1 条发音的 UPS" })
+        .click();
+      await expect(
+        source.getByRole("radio", { name: "Azure UPS", exact: true })
+      ).toBeChecked();
+      await expect(source.locator(".ant-radio-checked")).toHaveCSS(
+        "background-color",
+        "rgb(32, 83, 255)"
+      );
+      await test.info().attach("美式语音来源", {
+        body: await usSource
+          .locator(".word-pronunciation-row")
+          .last()
+          .screenshot({ animations: "disabled" }),
+        contentType: "image/png"
+      });
+      await test.info().attach("语音来源样式", {
+        body: await source
+          .locator(".word-pronunciation-row")
+          .last()
+          .screenshot({ animations: "disabled" }),
+        contentType: "image/png"
+      });
+      await page
+        .locator("[data-pos-id] .v3-form-group-card")
+        .first()
+        .getByLabel("英美拼写有区别")
+        .check();
+      const separatedUs = page
+        .locator(".v3-dialect-panel-us .word-pronunciation-synthesis")
+        .first();
+      await expect(
+        separatedUs.getByRole("radio", { name: "Azure UPS", exact: true })
+      ).toHaveCount(0);
+      await separatedUs
+        .getByRole("button", { name: "展开第 1 条发音的 UPS" })
+        .click();
+      await expect(
+        separatedUs.getByRole("radio", { name: "Azure UPS", exact: true })
+      ).toBeChecked();
+      await expect(separatedUs.locator(".ant-radio-checked")).toHaveCSS(
+        "background-color",
+        usColor
+      );
+      await expect(
+        separatedUs.locator(
+          ".ant-radio-wrapper-checked .word-synthesis-choice-tag"
+        )
+      ).toHaveCSS("background-color", usColor);
+    }
     await page.evaluate(async () => {
       await Promise.all(
         ["normal", "italic"].flatMap((style) =>
@@ -54,7 +892,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       expect.arrayContaining([
         expect.objectContaining({
           family: "TSZ Words",
-          features: expect.stringContaining('"cv31"')
+          features: '"cv01", "cv04", "cv06", "cv09", "cv39", "cv52", "ss05"'
         }),
         expect.objectContaining({
           family: "TSZ Phonetics",
@@ -68,7 +906,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
               variation,
               features:
                 style === "normal"
-                  ? '"ss04", "ss07", "ss08"'
+                  ? '"ss04", "ss06", "ss07", "ss08"'
                   : '"ss02", "ss04", "ss06", "ss07", "ss08"'
             })
           )
@@ -165,6 +1003,23 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       .locator(".word-sense-meta-grid")
       .first()
       .screenshot({ path: test.info().outputPath("unified-field-labels.png") });
+    // 百分比后缀和开关图标都要与输入框内容保持同一水平中线。
+    const frequency = page.locator(".word-sense-field-frequency").first();
+    const frequencyBox = (await frequency.locator("input").boundingBox())!;
+    const suffixBox = (await frequency
+      .locator(".ant-input-number-suffix")
+      .boundingBox())!;
+    const trackBox = (await page
+      .locator(".word-sense-context-control .ant-switch")
+      .first()
+      .boundingBox())!;
+    const inputCenter = frequencyBox.y + frequencyBox.height / 2;
+    expect(
+      Math.abs(suffixBox.y + suffixBox.height / 2 - inputCenter)
+    ).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(trackBox.y + trackBox.height / 2 - inputCenter)
+    ).toBeLessThanOrEqual(1);
     await page.setViewportSize({ width: 390, height: 844 });
     const levelTitle = page
       .locator(
@@ -348,6 +1203,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     const row = page.locator(".word-relation-row").filter({ has: target });
     const error = row.getByRole("alert");
     await expect(error).toContainText("仅支持英文词条");
+    await expect(row.getByRole("status")).toHaveCount(0);
     const control = row.locator(".word-relation-autocomplete");
     const box = (await control.boundingBox())!;
     const errorBox = (await error.boundingBox())!;
@@ -787,7 +1643,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       .locator(".tsz-ve-canvas-input")
       .press("ControlOrMeta+A");
     await liaisonDialog
-      .getByRole("button", { name: "确认添加", exact: true })
+      .getByRole("button", { name: "一次性添加", exact: true })
       .click();
     await liaisonDialog.getByRole("button", { name: /^完成.*编辑$/ }).click();
     const englishPreview = english.locator("..");
@@ -839,9 +1695,19 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       path: test.info().outputPath("collapsed-added-liaison.png"),
       fullPage: true
     });
-    // 文字没变时撤销标记，也要恢复紧凑高度；不靠重挂输入框丢掉焦点来触发测量。
+    // 弹窗以完成为提交边界；重开取消连读后，原输入框应恢复紧凑高度而不重挂。
+    await page
+      .getByRole("button", { name: /^打开.*定义 2.*编辑器$/ })
+      .first()
+      .click();
+    await liaisonDialog
+      .locator(".tsz-ve-canvas-input")
+      .press("ControlOrMeta+A");
+    await liaisonDialog
+      .getByRole("button", { name: "取消连读", exact: true })
+      .click();
+    await liaisonDialog.getByRole("button", { name: /^完成.*编辑$/ }).click();
     await english.focus();
-    await english.press("ControlOrMeta+z");
     await expect(englishPreview.locator(".tsz-ve-arc-layer path")).toHaveCount(
       0
     );
@@ -883,7 +1749,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(
       sentenceDialog.locator(".v3-editor-title .word-grammar-index")
     ).toHaveText("1");
-    await sentenceDialog.getByRole("button", { name: /^取\s*消$/ }).click();
+    await sentenceDialog.getByRole("button", { name: "取消例句编辑" }).click();
     const discard = page.getByRole("dialog", {
       name: "放弃本次未完成的例句编辑？"
     });
@@ -897,7 +1763,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(
       sentenceDialog.locator(".v3-editor-title .word-grammar-index")
     ).toHaveCount(0);
-    await sentenceDialog.getByRole("button", { name: /^取\s*消$/ }).click();
+    await sentenceDialog.getByRole("button", { name: "取消例句编辑" }).click();
     await expect(discard).toBeVisible();
     await discard.getByRole("button", { name: /^确\s*定$/ }).click();
     await expect(sentenceDialog).toBeHidden();
@@ -1016,6 +1882,9 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
         .getByText("orbit", { exact: true })
         .click();
       const formMenu = picker.locator(".ant-cascader-menu").nth(1);
+      await expect(
+        formMenu.getByText("复数 orbit", { exact: true }).first()
+      ).toHaveCSS("font-weight", "700");
       await formMenu.getByText("复数 orbit", { exact: true }).first().click();
       await picker.getByText("分页布局验收释义").click();
       const more = picker.getByRole("button", {
@@ -1045,7 +1914,22 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       await expect
         .poll(() => formMenu.evaluate((el) => el.scrollTop))
         .toBeGreaterThan(0);
-      const scrollTop = await formMenu.evaluate((el) => el.scrollTop);
+      // wheel() 不等待浏览器平滑滚动结束；先等连续三帧稳定，再记录加载更多前的位置。
+      const scrollTop = await formMenu.evaluate(
+        (el) =>
+          new Promise<number>((resolve) => {
+            let previous = el.scrollTop;
+            let stableFrames = 0;
+            const measure = () => {
+              const current = el.scrollTop;
+              stableFrames = current === previous ? stableFrames + 1 : 0;
+              previous = current;
+              if (stableFrames >= 3) resolve(current);
+              else requestAnimationFrame(measure);
+            };
+            requestAnimationFrame(measure);
+          })
+      );
       await more.click();
       await expect(
         picker.getByRole("button", { name: /加载更多/ })
@@ -1244,6 +2128,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     const form = pos.forms[0]!;
     const regional = form.regional_variants;
     const variant = regional.mode === "common" ? regional.common : regional.uk;
+    const targetEntryId = "01990000-0000-7000-8000-000000000999";
     await page.route(
       "**/lexicon/entries/component-targets/search",
       async (route) => {
@@ -1254,7 +2139,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
             truncated: false,
             matches: [
               {
-                entry_id: word.id,
+                entry_id: targetEntryId,
                 pos_id: pos.pos_id,
                 base_form_id: form.id,
                 publication_id: variant.id,
@@ -1294,16 +2179,20 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       .getByRole("dialog")
       .filter({ has: page.locator(".tsz-ve-editor") });
     await dialog.locator(".tsz-ve-canvas-input").fill("a job");
-    await dialog.getByRole("button", { name: "关联词形", exact: true }).click();
+    await dialog.getByRole("button", { name: "关联单词", exact: true }).click();
     await dialog.getByLabel("关联 job（2）").click();
     await expect(page.getByText(/^job ·/).last()).toHaveCSS(
       "font-family",
       /TSZ Words/
     );
-    await expect(page.getByText(/^job ·/).last()).toHaveCSS(
-      "font-size",
-      "18.6667px"
-    );
+    await expect
+      .poll(() =>
+        page
+          .getByText(/^job ·/)
+          .last()
+          .evaluate((node) => parseFloat(getComputedStyle(node).fontSize))
+      )
+      .toBeCloseTo(18.6667, 3);
     await page
       .locator(".ant-cascader-menu-item-content")
       .filter({ hasText: /^job ·/ })
@@ -1313,6 +2202,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       "font-family",
       /TSZ Words/
     );
+    await expect(page.getByText(/原形 job/)).toHaveCSS("font-weight", "700");
     await page.screenshot({
       path: "/tmp/grammar-form-picker.png",
       fullPage: false,
@@ -1320,9 +2210,15 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     });
     await page.getByText(/原形 job/).click();
     await expect(page.getByText("选择词义", { exact: true })).toHaveCount(0);
+    await expect(
+      dialog.getByRole("button", { name: /^完成.*编辑$/ })
+    ).toBeDisabled();
+    await page
+      .getByRole("button", { name: "确认词形关联", exact: true })
+      .click();
     await dialog.getByRole("button", { name: /^完成.*编辑$/ }).click();
     await opener.click();
-    await dialog.getByRole("button", { name: "关联词形", exact: true }).click();
+    await dialog.getByRole("button", { name: "关联单词", exact: true }).click();
     await dialog.getByLabel("关联 job（2）").click();
     await expect(page.getByText(/已关联 ·/)).toBeVisible();
     await expect(
@@ -1334,12 +2230,264 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       animations: "disabled"
     });
     await page.getByRole("button", { name: "清除关联", exact: true }).click();
-    await page.getByRole("button", { name: /^清\s*除$/ }).click();
+    await page
+      .getByRole("button", { name: "确认词形关联", exact: true })
+      .click();
     await dialog.getByRole("button", { name: /^取消.*编辑$/ }).click();
     await opener.click();
-    await dialog.getByRole("button", { name: "关联词形", exact: true }).click();
+    await dialog.getByRole("button", { name: "关联单词", exact: true }).click();
     await dialog.getByLabel("关联 job（2）").click();
     await expect(page.getByText(/已关联 ·/)).toBeVisible();
+  });
+
+  test("富文本按实际字宽排版，混合格式后的点击和输入不偏移", async ({
+    page
+  }) => {
+    test.skip(
+      process.env.VITE_VOICE_EDITOR !== "true" ||
+        process.env.VITE_SENTENCE_FORMATTING !== "true",
+      "需要启用语音编辑器和释义例句格式"
+    );
+    const api = await mockAdminV3Api(page);
+    const word = api.getWord();
+    const text =
+      "If you have a job, you work for a person or organization and receive a regular salary for doing this.";
+    word.meanings.pos[0]!.grammar_structures[0]!.variants[0]!.content = {
+      version: 2,
+      text,
+      annotations: []
+    };
+    word.meanings.pos[0]!.senses[0]!.definitions.push({
+      id: "01990000-0000-7000-8000-000000000950",
+      level: "B1",
+      grammar_structure_id: word.meanings.pos[0]!.grammar_structures[0]!.id,
+      definition_mode: "en_sentence",
+      content: {
+        mode: "unified",
+        common: {
+          id: "01990000-0000-7000-8000-000000000951",
+          origin: "manual",
+          value: { version: 2, text, annotations: [] }
+        }
+      }
+    });
+    await page.route(`**/lexicon/entries/${word.id}`, (route) =>
+      route.fulfill({ json: { word, retired_stable_nodes: [] } })
+    );
+    await page.goto(`/words/${word.id}/v3/wizard/meanings`);
+    for (const name of [/^打开.*定义 2.*编辑器$/, /^打开.*语法结构.*编辑器$/]) {
+      await page.getByRole("button", { name }).first().click();
+      const dialog = page
+        .getByRole("dialog")
+        .filter({ has: page.locator(".tsz-ve-editor") });
+      const input = dialog.locator(".tsz-ve-canvas-input");
+      await page.evaluate(() => document.fonts.ready);
+      const extraGlyphWidth = () =>
+        dialog.locator(".tsz-ve-letter").evaluateAll((letters) =>
+          Math.max(
+            ...letters.map((letter) => {
+              const range = document.createRange();
+              range.selectNodeContents(
+                letter.querySelector(".tsz-ve-letter-text")!
+              );
+              return Math.abs(
+                letter.getBoundingClientRect().width -
+                  range.getBoundingClientRect().width
+              );
+            })
+          )
+        );
+      await expect.poll(extraGlyphWidth).toBeLessThan(0.1);
+      // 只格式化句首，后方文字必须按自己的字宽紧随其后。
+      await input.press("ControlOrMeta+Home");
+      await input.press("Shift+ArrowRight");
+      await input.press("Shift+ArrowRight");
+      if (
+        await dialog.getByRole("button", { name: "加粗", exact: true }).count()
+      )
+        await input.press("ControlOrMeta+b");
+      else
+        await dialog
+          .getByRole("button", { name: "标记为固定核心词", exact: true })
+          .click();
+      await input.press("ControlOrMeta+i");
+      await expect.poll(extraGlyphWidth).toBeLessThan(0.1);
+      for (const point of [15, text.length - 2]) {
+        const letter = dialog.locator(
+          `[data-codepoint="${point}"] .tsz-ve-letter-text`
+        );
+        const box = (await letter.boundingBox())!;
+        // aria-disabled 只禁用字母的标注操作；正文仍通过真实鼠标坐标选字。
+        await page.mouse.click(
+          box.x + box.width * 0.85,
+          box.y + box.height / 2
+        );
+        await expect
+          .poll(() => input.evaluate((node) => node.selectionStart))
+          .toBe(point + 1);
+        await input.press("x");
+        await expect(input).toHaveValue(
+          `${text.slice(0, point + 1)}x${text.slice(point + 1)}`
+        );
+        await input.press("ControlOrMeta+z");
+        await expect(input).toHaveValue(text);
+      }
+      const dragStart = (await dialog
+        .locator('[data-codepoint="3"] .tsz-ve-letter-text')
+        .boundingBox())!;
+      const stripBox = (await dialog.locator(".tsz-ve-strip").boundingBox())!;
+      await page.mouse.move(
+        dragStart.x + 1,
+        dragStart.y + dragStart.height / 2
+      );
+      await page.mouse.down();
+      await page.mouse.move(
+        stripBox.x + stripBox.width + 8,
+        stripBox.y + stripBox.height + 8,
+        { steps: 5 }
+      );
+      await page.mouse.up();
+      await expect(input).toBeFocused();
+      await expect
+        .poll(() => input.evaluate((node) => node.selectionStart))
+        .toBe(3);
+      await expect
+        .poll(() => input.evaluate((node) => node.selectionEnd))
+        .toBe(text.length);
+      await page.keyboard.type("X");
+      await expect(input).toHaveValue(`${text.slice(0, 3)}X`);
+      await input.press("ControlOrMeta+z");
+      await expect(input).toHaveValue(text);
+      await dialog.screenshot({
+        path: test
+          .info()
+          .outputPath(
+            `${name.source.includes("定义") ? "definition" : "grammar"}-natural-spacing.png`
+          ),
+        animations: "disabled"
+      });
+      await dialog.getByRole("button", { name: /^取消.*编辑$/ }).click();
+    }
+  });
+
+  test("连读在编辑器首次打开和重开动画中始终贴合文字", async ({ page }) => {
+    test.skip(process.env.VITE_VOICE_EDITOR !== "true", "需要启用语音编辑器");
+    const api = await mockAdminV3Api(page);
+    const word = api.getWord();
+    word.meanings.pos[0]!.grammar_structures[0]!.variants[0]!.content = {
+      version: 2,
+      text: "pick it up",
+      annotations: [{ type: "liaison", start: 3, end: 6 }]
+    };
+    await page.route(`**/lexicon/entries/${word.id}`, (route) =>
+      route.fulfill({ json: { word, retired_stable_nodes: [] } })
+    );
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/meanings`);
+    await page.evaluate(() => document.fonts.ready);
+    // 首次懒加载可能错过中间帧；保留真实进场动画，待连读层就绪后从起点重放。
+    await page.addStyleTag({
+      content: ".ant-modal { animation-duration: 1s !important; }"
+    });
+    const opener = page
+      .getByRole("button", { name: /^打开.*语法结构.*编辑器$/ })
+      .first();
+    const dialog = page
+      .getByRole("dialog")
+      .filter({ has: page.locator(".tsz-ve-editor") });
+    for (let opening = 0; opening < 2; opening += 1) {
+      const captured = await page.evaluateHandle(() => {
+        const state = {
+          animation: null as Animation | null,
+          dispose: () =>
+            document.removeEventListener("animationstart", capture, true)
+        };
+        function capture(event: AnimationEvent) {
+          if (
+            !(event.target instanceof HTMLElement) ||
+            !event.target.matches(".ant-modal") ||
+            !event.animationName.endsWith("antZoomIn")
+          )
+            return;
+          state.animation =
+            event.target
+              .getAnimations()
+              .find(
+                (animation) =>
+                  animation instanceof CSSAnimation &&
+                  animation.animationName === event.animationName
+              ) ?? null;
+        }
+        document.addEventListener("animationstart", capture, true);
+        return state;
+      });
+      await opener.click();
+      const strip = dialog.locator(".tsz-ve-strip");
+      await expect(strip.locator(".tsz-ve-arc")).toHaveCount(1);
+      await expect
+        .poll(() => captured.evaluate((state) => state.animation !== null))
+        .toBe(true);
+      const frames = await strip
+        .evaluate(async (node, captured) => {
+          const animation = captured.animation;
+          if (!animation) throw new Error("Missing modal opening animation");
+          animation.currentTime = 0;
+          animation.play();
+          const samples: { scale: number; error: number; d: string }[] = [];
+          const start = performance.now();
+          while (performance.now() - start < 1200) {
+            await new Promise(requestAnimationFrame);
+            const svg = node.querySelector<SVGSVGElement>(".tsz-ve-arc-layer")!;
+            const matrix = svg.getScreenCTM()!;
+            const path = node.querySelector<SVGPathElement>(".tsz-ve-arc")!;
+            const points = path
+              .getAttribute("d")!
+              .match(/-?\d+(?:\.\d+)?/g)!
+              .map(Number);
+            const errors = [3, 5].map((point, index) => {
+              const letter = node.querySelector(
+                `[data-codepoint="${point}"] .tsz-ve-letter-text`
+              )!;
+              const range = document.createRange();
+              range.selectNodeContents(letter);
+              const rect = range.getBoundingClientRect();
+              const local = new DOMPoint(
+                (rect.left + rect.right) / 2,
+                rect.top
+              ).matrixTransform(matrix.inverse());
+              return Math.abs(points[index === 0 ? 0 : 6]! - local.x);
+            });
+            samples.push({
+              scale: matrix.a,
+              error: Math.max(...errors),
+              d: path.getAttribute("d")!
+            });
+          }
+          return samples;
+        }, captured)
+        .finally(async () => {
+          await captured.evaluate((state) => state.dispose());
+          await captured.dispose();
+        });
+      expect(frames.some((frame) => frame.scale < 0.95)).toBe(true);
+      expect(frames.at(-1)!.scale).toBeCloseTo(1, 2);
+      expect(Math.max(...frames.map((frame) => frame.error))).toBeLessThan(0.1);
+      const finalPoints = frames
+        .at(-1)!
+        .d.match(/-?\d+(?:\.\d+)?/g)!
+        .map(Number);
+      for (const frame of frames) {
+        const points = frame.d.match(/-?\d+(?:\.\d+)?/g)!.map(Number);
+        expect(
+          Math.max(
+            ...points.map((point, index) =>
+              Math.abs(point - finalPoints[index]!)
+            )
+          )
+        ).toBeLessThan(0.1);
+      }
+      await dialog.getByRole("button", { name: /^完成.*编辑$/ }).click();
+      await expect(dialog).toBeHidden();
+    }
   });
 
   test("统一富文本弹窗：保持布局、拖动、选区连读、改字确认和取消恢复", async ({
@@ -1377,33 +2525,28 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
           .evaluate((body) => body.scrollWidth - body.clientWidth)
       )
       .toBe(0);
-    await expect(dialog.locator(".tsz-ve-inline-tools")).toHaveAttribute(
-      "data-combined",
-      "true"
-    );
+    const actions = dialog.getByRole("toolbar", { name: "标注工具栏" });
+    await expect(actions).toHaveCount(1);
     const original = await input.inputValue();
     await input.fill("a job");
     await input.press("ControlOrMeta+A");
-    const actions = dialog.locator(".tsz-ve-inline-tools");
-    await expect(actions).toHaveCount(1);
-    await expect(actions).toHaveAttribute("data-combined", "true");
     const grammarActions = actions.getByRole("group", { name: "语法标注类别" });
     const liaisonActions = actions.locator(".tsz-ve-selection-liaison");
+    await expect(grammarActions).toBeVisible();
+    await expect(liaisonActions).toBeVisible();
+    // 当前工具栏按语法、连读分行排列，两行操作区左侧对齐。
     await expect
       .poll(async () => {
         const grammarBox = (await grammarActions.boundingBox())!;
         const liaisonBox = (await liaisonActions.boundingBox())!;
-        return Math.abs(
-          grammarBox.y +
-            grammarBox.height / 2 -
-            liaisonBox.y -
-            liaisonBox.height / 2
-        );
+        return Math.abs(grammarBox.x - liaisonBox.x);
       })
       .toBeLessThan(2);
     const grammarBox = (await grammarActions.boundingBox())!;
     const liaisonBox = (await liaisonActions.boundingBox())!;
-    expect(liaisonBox.x - grammarBox.x - grammarBox.width).toBeLessThan(35);
+    expect(liaisonBox.y).toBeGreaterThanOrEqual(
+      grammarBox.y + grammarBox.height
+    );
     const canvasBox = (await dialog.locator(".tsz-ve-canvas").boundingBox())!;
     const footerBox = (await dialog
       .locator(".v3-voice-text-editor-done")
@@ -1411,13 +2554,15 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     expect(footerBox.y).toBeGreaterThanOrEqual(
       canvasBox.y + canvasBox.height - 1
     );
-    await dialog.getByRole("button", { name: "确认添加", exact: true }).click();
+    await dialog
+      .getByRole("button", { name: "一次性添加", exact: true })
+      .click();
     await expect(
       dialog.locator(".tsz-ve-arc-layer path").first()
     ).toBeVisible();
-    await expect(actions).toHaveAttribute("data-combined", "true");
+    await expect(actions).toBeVisible();
     await input.press("Escape");
-    await expect(actions).toHaveAttribute("data-combined", "true");
+    await expect(actions).toBeVisible();
     await input.fill("new text");
     const confirmation = page.getByRole("dialog", {
       name: "修改文字会移除已有标注"
@@ -1437,6 +2582,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect
       .poll(async () => Math.round((await handle.boundingBox())!.x - box.x))
       .toBe(60);
+    await input.press("ControlOrMeta+A");
     await dialog.locator(".tsz-ve-role-button").click();
     await page.screenshot({
       path: test.info().outputPath("unified-rich-editor.png")
@@ -1446,6 +2592,315 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(opener).toBeVisible();
     await opener.click();
     await expect(dialog.locator(".tsz-ve-canvas-input")).toHaveValue(original);
+  });
+
+  test("编辑器快捷键：选区格式、一次性连读、撤销与完成重开", async ({
+    page
+  }) => {
+    test.skip(
+      process.env.VITE_VOICE_EDITOR !== "true" ||
+        process.env.VITE_SENTENCE_FORMATTING !== "true",
+      "需要启用语音编辑器和释义例句格式"
+    );
+    const api = await mockAdminV3Api(page);
+    const word = api.getWord();
+    word.meanings.pos[0]!.senses[0]!.definitions.push({
+      id: "01990000-0000-7000-8000-000000000950",
+      level: "B1",
+      grammar_structure_id: word.meanings.pos[0]!.grammar_structures[0]!.id,
+      definition_mode: "en_sentence",
+      content: {
+        mode: "unified",
+        common: {
+          id: "01990000-0000-7000-8000-000000000951",
+          origin: "manual",
+          value: { version: 2, text: "a job", annotations: [] }
+        }
+      }
+    });
+    await page.route(`**/lexicon/entries/${word.id}`, (route) =>
+      route.fulfill({ json: { word, retired_stable_nodes: [] } })
+    );
+    await page.goto(`/words/${word.id}/v3/wizard/meanings`);
+    const opener = page
+      .getByRole("button", { name: /^打开.*定义 2.*编辑器$/ })
+      .first();
+    await opener.click();
+    const dialog = page
+      .getByRole("dialog")
+      .filter({ has: page.locator(".tsz-ve-editor") });
+    const input = dialog.locator(".tsz-ve-canvas-input");
+    const isMac = await page.evaluate(() => /Mac/i.test(navigator.platform));
+    const shortcutPrefix = isMac ? "⌘" : "Ctrl";
+    const otherPrefix = isMac ? "Ctrl" : "⌘";
+    await dialog.getByRole("button", { name: "加粗", exact: true }).hover();
+    await expect(
+      page.getByRole("tooltip").filter({ hasText: `${shortcutPrefix} + B` })
+    ).not.toContainText(`${otherPrefix} + B`);
+    for (const modifier of ["Control", "Meta"]) {
+      await input.press("ControlOrMeta+A");
+      await dialog.getByRole("button", { name: "加粗", exact: true }).hover();
+      const shortcutTooltip = page
+        .getByRole("tooltip")
+        .filter({ hasText: `${shortcutPrefix} + B` });
+      await expect(shortcutTooltip).not.toContainText(`${otherPrefix} + B`);
+      await expect(shortcutTooltip).not.toContainText("Mac");
+      await expect(shortcutTooltip).not.toContainText("Win");
+      await expect(shortcutTooltip.locator(".tsz-ve-shortcut-hint")).toHaveCSS(
+        "text-align",
+        "left"
+      );
+      await page.screenshot({
+        animations: "disabled",
+        path: test.info().outputPath(`shortcut-tooltip-${modifier}.png`)
+      });
+      for (const key of ["b", "i", "u"])
+        await input.press(`${modifier}+${key}`);
+      await expect(
+        dialog.locator(".is-bold.is-italic.is-underline")
+      ).toHaveCount(4);
+      await input.press(`${modifier}+l`);
+      await expect(
+        dialog.locator(".tsz-ve-arc-layer path").first()
+      ).toBeVisible();
+      await expect(input).toBeFocused();
+      await input.press(`${modifier}+l`);
+      await expect(dialog.locator(".tsz-ve-arc")).toHaveCount(0);
+      await expect(dialog.getByText("这两处已经连过了")).toHaveCount(0);
+      await expect(
+        dialog.locator(".is-bold.is-italic.is-underline")
+      ).toHaveCount(4);
+      await input.press(`${modifier}+z`);
+      await expect(dialog.locator(".tsz-ve-arc")).toHaveCount(1);
+      await input.press(`${modifier}+z`);
+      await expect(dialog.locator(".tsz-ve-arc-layer path")).toHaveCount(0);
+      await expect(
+        dialog.locator(".is-bold.is-italic.is-underline")
+      ).toHaveCount(4);
+      for (let step = 0; step < 3; step++) await input.press(`${modifier}+z`);
+      await expect(
+        dialog.locator(".is-bold, .is-italic, .is-underline")
+      ).toHaveCount(0);
+      await expect(input).toHaveValue("a job");
+    }
+    await input.press("ControlOrMeta+A");
+    await dialog
+      .getByRole("button", { name: "一次性添加", exact: true })
+      .click();
+    await expect(dialog.locator(".tsz-ve-arc")).toHaveCount(1);
+    await dialog.getByRole("button", { name: "取消连读", exact: true }).click();
+    await expect(dialog.locator(".tsz-ve-arc")).toHaveCount(0);
+    await expect(input).toBeFocused();
+    const boldButton = dialog.getByRole("button", {
+      name: "加粗",
+      exact: true
+    });
+    await expect(boldButton).toBeEnabled();
+    await boldButton.focus();
+    await boldButton.press("ControlOrMeta+b");
+    await dialog.getByRole("button", { name: "斜体", exact: true }).click();
+    await input.press("ControlOrMeta+z");
+    await expect(dialog.locator(".is-italic")).toHaveCount(0);
+    await expect(dialog.locator(".is-bold")).toHaveCount(4);
+    await input.press("ControlOrMeta+l");
+    await dialog.getByRole("button", { name: /^完成.*编辑$/ }).click();
+    await expect(dialog).toBeHidden();
+    await opener.click();
+    await expect(dialog.locator(".is-bold")).toHaveCount(4);
+    await expect(
+      dialog.locator(".tsz-ve-arc-layer path").first()
+    ).toBeVisible();
+    await dialog.locator(".tsz-ve-strip").click({ trial: true });
+    await page.screenshot({
+      animations: "disabled",
+      path: test.info().outputPath("editor-keyboard-shortcuts.png")
+    });
+  });
+
+  test("拼写与实际发音快捷键：键盘局部选区、正文撤销和取消恢复", async ({
+    page
+  }) => {
+    test.skip(process.env.VITE_VOICE_EDITOR !== "true", "需要启用语音编辑器");
+    await mockAdminV3Api(page);
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+    for (const name of [/^打开.*拼写编辑器$/, /^打开.*实际发音编辑器$/]) {
+      const opener = page.getByRole("button", { name }).first();
+      await opener.click();
+      const dialog = page
+        .getByRole("dialog")
+        .filter({ has: page.locator(".tsz-ve-editor") });
+      const input = dialog.locator(".tsz-ve-canvas-input");
+      const original = await input.inputValue();
+      if (
+        (await dialog.locator(".tsz-ve-editor").getAttribute("data-mode")) ===
+        "spelling"
+      ) {
+        await expect(input).toHaveCSS("font-weight", "700");
+        const letters = dialog.locator(".tsz-ve-letter-text");
+        for (const letter of await letters.all())
+          await expect(letter).toHaveCSS("font-weight", "700");
+        await page.evaluate(() => document.fonts.ready);
+        const box = await letters.nth(1).boundingBox();
+        expect(box).not.toBeNull();
+        await page.mouse.click(
+          box!.x + box!.width - 0.5,
+          box!.y + box!.height / 2
+        );
+        await expect
+          .poll(() =>
+            input.evaluate((node: HTMLTextAreaElement) => node.selectionStart)
+          )
+          .toBe(2);
+      } else {
+        await expect(input).toHaveCSS("font-weight", "400");
+      }
+      await input.press("ControlOrMeta+A");
+      await input.press("ArrowLeft");
+      await input.press("Shift+ArrowRight");
+      await input.press("Shift+ArrowRight");
+      await input.press("ControlOrMeta+l");
+      await expect(dialog.locator(".tsz-ve-arc")).toHaveCount(1);
+      await input.press("ControlOrMeta+z");
+      await expect(dialog.locator(".tsz-ve-arc")).toHaveCount(0);
+      if (
+        (await dialog.locator(".tsz-ve-editor").getAttribute("data-mode")) ===
+        "spelling"
+      ) {
+        await input.press("ControlOrMeta+i");
+        await expect(dialog.locator(".is-italic")).toHaveCount(2);
+        await input.press("ControlOrMeta+z");
+        await expect(dialog.locator(".is-italic")).toHaveCount(0);
+      }
+      await input.press("ControlOrMeta+A");
+      await input.press("ArrowRight");
+      await input.press("x");
+      await expect(input).toHaveValue(`${original}x`);
+      await input.press("ControlOrMeta+z");
+      await expect(input).toHaveValue(original);
+      await input.press("ControlOrMeta+A");
+      await input.press("ControlOrMeta+l");
+      await expect(dialog.locator(".tsz-ve-arc")).toHaveCount(1);
+      await dialog.getByRole("button", { name: /^取消.*编辑$/ }).click();
+      await expect(dialog).toBeHidden();
+      await opener.click();
+      await expect(dialog.locator(".tsz-ve-canvas-input")).toHaveValue(
+        original
+      );
+      await expect(dialog.locator(".tsz-ve-arc")).toHaveCount(0);
+      await dialog.getByRole("button", { name: /^取消.*编辑$/ }).click();
+    }
+  });
+
+  test("含停顿正文不显示剪贴板提示，停顿仍可编辑", async ({ page }) => {
+    test.skip(process.env.VITE_VOICE_EDITOR !== "true", "需要启用语音编辑器");
+    const api = await mockAdminV3Api(page);
+    const word = api.getWord();
+    word.meanings.pos[0]!.grammar_structures[0]!.variants[0]!.content = {
+      version: 2,
+      text: "a job",
+      annotations: [{ type: "pause", at: 1, duration_ms: 200 }]
+    };
+    await page.route(`**/lexicon/entries/${word.id}`, (route) =>
+      route.fulfill({ json: { word, retired_stable_nodes: [] } })
+    );
+    await page.goto(`/words/${word.id}/v3/wizard/meanings`);
+    await page
+      .getByRole("button", { name: /^打开.*语法结构.*编辑器$/ })
+      .first()
+      .click();
+    const dialog = page
+      .getByRole("dialog")
+      .filter({ has: page.locator(".tsz-ve-editor") });
+    await expect(dialog.locator(".tsz-ve-canvas-input")).toHaveCSS(
+      "pointer-events",
+      "none"
+    );
+    await dialog.locator(".tsz-ve-letter").first().hover();
+    const clipboardTooltip = page
+      .getByRole("tooltip")
+      .filter({ hasText: /(?:⌘|Ctrl) \+ [CVX]/ });
+    await expect(clipboardTooltip).toHaveCount(0);
+    const pause = dialog.locator(".tsz-ve-pause-chip");
+    await expect(pause).toHaveAttribute("aria-label", "编辑第 1 处停顿 0.2 秒");
+    await pause.hover();
+    await expect(clipboardTooltip).toHaveCount(0);
+    await pause.click();
+    await page
+      .getByRole("button", { name: "停顿 0.5 秒", exact: true })
+      .last()
+      .click();
+    await expect(pause).toHaveAttribute("aria-label", "编辑第 1 处停顿 0.5 秒");
+    await dialog.getByRole("button", { name: "编辑文本", exact: true }).click();
+    await page.mouse.move(0, 0);
+    await expect(clipboardTooltip).toHaveCount(0);
+    await dialog.locator(".tsz-ve-letter").first().hover();
+    await expect(clipboardTooltip).toHaveCount(0);
+  });
+
+  test("编辑器剪贴板：原生复制、剪切、粘贴及独立撤销", async ({ page }) => {
+    test.skip(process.env.VITE_VOICE_EDITOR !== "true", "需要启用语音编辑器");
+    await mockAdminV3Api(page);
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+    await page
+      .getByRole("button", { name: /^打开.*拼写编辑器$/ })
+      .first()
+      .click();
+    const dialog = page
+      .getByRole("dialog")
+      .filter({ has: page.locator(".tsz-ve-editor") });
+    const input = dialog.locator(".tsz-ve-canvas-input");
+    const original = await input.inputValue();
+    await dialog.locator(".tsz-ve-canvas").hover();
+    const clipboardTooltip = page
+      .getByRole("tooltip")
+      .filter({ hasText: /(?:⌘|Ctrl) \+ [CVX]/ });
+    await expect(clipboardTooltip).toHaveCount(0);
+    await input.press("ControlOrMeta+A");
+    await input.press("ControlOrMeta+C");
+    await input.press("ArrowRight");
+    await input.press("ControlOrMeta+V");
+    await expect(input).toHaveValue(`${original}${original}`);
+    await input.press("ControlOrMeta+Z");
+    await expect(input).toHaveValue(original);
+    await input.press("ControlOrMeta+A");
+    await input.press("ControlOrMeta+X");
+    await expect(input).toHaveValue("");
+    await input.press("ControlOrMeta+V");
+    await expect(input).toHaveValue(original);
+    await input.press("ControlOrMeta+Z");
+    await expect(input).toHaveValue("");
+    await input.press("ControlOrMeta+Z");
+    await expect(input).toHaveValue(original);
+    await input.press("ControlOrMeta+A");
+    await input.press("ControlOrMeta+I");
+    await input.press("ControlOrMeta+L");
+    await expect(dialog.locator(".tsz-ve-arc")).toHaveCount(1);
+    await input.press("ControlOrMeta+C");
+    await input.press("ArrowRight");
+    await input.press("ControlOrMeta+V");
+    await expect(input).toHaveValue(`${original}${original}`);
+    await input.press("ControlOrMeta+Z");
+    await expect(input).toHaveValue(original);
+    await input.press("ControlOrMeta+A");
+    await input.press("ControlOrMeta+X");
+    const confirmation = page.getByRole("dialog", {
+      name: "修改文字会移除已有标注"
+    });
+    await expect(confirmation).toBeVisible();
+    await confirmation
+      .getByRole("button", { name: "保留原文", exact: true })
+      .click();
+    await expect(input).toHaveValue(original);
+    await expect(dialog.locator(".tsz-ve-arc")).toHaveCount(1);
+    await input.press("ControlOrMeta+A");
+    await input.press("ControlOrMeta+X");
+    await confirmation
+      .getByRole("button", { name: "确认修改", exact: true })
+      .click();
+    await expect(input).toHaveValue("");
+    await input.press("ControlOrMeta+Z");
+    await expect(input).toHaveValue(original);
+    await expect(dialog.locator(".tsz-ve-arc")).toHaveCount(1);
   });
 
   test("统一富文本入口：拼写和实际发音可打开编辑并取消", async ({ page }) => {
@@ -1523,7 +2978,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     const api = await mockAdminV3Api(page);
     await page.goto("/words");
 
-    await page.getByRole("button", { name: "创建词条" }).click();
+    await page.getByRole("button", { name: "创建词汇" }).click();
     await expect(page).toHaveURL(/\/words\/new$/);
     await page.getByPlaceholder("例如 center 或 give up").fill("orbit");
     await page.getByRole("button", { name: "词典检测" }).click();
@@ -1534,7 +2989,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     );
     await expect(page.getByText("草稿可暂时不添加词性")).toBeVisible();
 
-    await page.getByLabel("添加基本词性").click();
+    await page.getByLabel("添加基本词性").first().click();
     await page
       .locator(".ant-select-dropdown:visible")
       .getByText("名词", { exact: true })
@@ -1621,7 +3076,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       .getByRole("textbox", { name: "第 1 条发音的实际发音", exact: true })
       .fill("orbit-us");
 
-    await page.getByLabel("添加基本词性").click();
+    await page.getByLabel("添加基本词性").first().click();
     await page
       .locator(".ant-select-dropdown:visible")
       .getByText("动词", { exact: true })
@@ -1630,6 +3085,15 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       "aria-selected",
       "true"
     );
+    const nounTab = page
+      .getByRole("tab")
+      .filter({ has: page.getByLabel("拖动名词") });
+    await nounTab.getByLabel("添加基本词性").click();
+    await expect(page.locator(".ant-select-dropdown:visible")).toHaveCount(1);
+    await expect(
+      page.getByRole("tab").filter({ has: page.getByLabel("拖动动词") })
+    ).toHaveAttribute("aria-selected", "true");
+    await nounTab.getByLabel("添加基本词性").press("Escape");
     const verbPanel = page.getByRole("tabpanel", { name: /动词/ });
     const ukVerb = verbPanel
       .locator(".v3-dialect-panel-uk .v3-dialect-form-cell")
@@ -1683,7 +3147,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       page
         .getByRole("alert")
         .filter({ hasText: "仍有内容需要完成" })
-        .getByText("请完整填写发音方式、字典音标和实际发音")
+        .getByText("请完整填写读法、字典音标和实际发音")
     ).toBeVisible();
 
     await page.getByRole("button", { name: "保存草稿" }).click();
@@ -1816,7 +3280,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
   }) => {
     const api = await mockAdminV3Api(page, { formsFailureOnce: false });
     await page.goto("/words");
-    await page.getByRole("button", { name: "创建词条" }).click();
+    await page.getByRole("button", { name: "创建词汇" }).click();
     await page.getByPlaceholder("例如 center 或 give up").fill("orbit");
     await page.getByRole("button", { name: "词典检测" }).click();
     await page.getByRole("button", { name: "创建并进入词形与发音" }).click();
@@ -1824,7 +3288,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       new RegExp(`/words/${ADMIN_V3_NEW_WORD_ID}/v3/wizard/forms$`)
     );
 
-    await page.getByLabel("添加基本词性").click();
+    await page.getByLabel("添加基本词性").first().click();
     await page
       .locator(".ant-select-dropdown:visible")
       .getByText("名词", { exact: true })

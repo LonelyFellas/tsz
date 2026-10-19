@@ -182,7 +182,9 @@
   cursor: pointer;
 }
 
-.word-creation-progress-row:not(:disabled):hover > span {
+.word-creation-progress-list:not(.v3-product-progress-list)
+  .word-creation-progress-row:not(:disabled):hover
+  > span {
   color: #1677ff;
 }
 
@@ -271,6 +273,7 @@
 
 .word-step-actions .ant-btn {
   min-width: 96px;
+  height: 40px;
 }
 
 .dialect-panel {
@@ -970,6 +973,20 @@
   font-size: 15px;
 }
 
+.word-pronunciation-play-action[data-playback-dialect="uk"] {
+  --word-playback-color: #2f5bff;
+}
+
+.word-pronunciation-play-action[data-playback-dialect="us"] {
+  --word-playback-color: #d42a91;
+}
+
+.word-pronunciation-play-action.ant-btn:not(:disabled),
+.word-pronunciation-play-action.ant-btn:not(:disabled):hover,
+.word-pronunciation-play-action.ant-btn:not(:disabled):active {
+  color: var(--word-playback-color);
+}
+
 .word-pronunciation-voice-action {
   width: 34px;
   flex: 0 0 34px;
@@ -1169,7 +1186,7 @@
 
 .word-sense-groups-card > .ant-card-head,
 .word-grammar-card > .ant-card-head {
-  min-height: 42px;
+  min-height: 48px;
   padding-inline: 14px;
   background: #fafbfc;
   border-bottom-color: #e8ebf0;
@@ -2244,7 +2261,7 @@
 
   .word-creation-steps.ant-steps-horizontal {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .word-creation-steps .ant-steps-item {

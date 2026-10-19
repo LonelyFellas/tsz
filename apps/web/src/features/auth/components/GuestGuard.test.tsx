@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { User } from "@tsz/types";
 import { GuestGuard } from "./GuestGuard";
 import { useUserStore } from "@/stores/user";
@@ -98,4 +98,49 @@ describe("GuestGuard", () => {
       expect(mockReplace).toHaveBeenCalledWith("/onboarding");
     });
   });
+});
+
+it.each([true, false])(
+  "纯邮箱账号（onboarded=%s）优先补绑，保留回跳目标",
+  async (onboarded) => {
+    searchParams.set("redirect", "/student/practice?unit=2");
+    useUserStore.setState({
+      user: { ...USER, phone: undefined, email: "only@example.com" },
+      hydrated: true,
+      onboarded
+    });
+    render(
+      <GuestGuard>
+        <p>登录表单</p>
+      </GuestGuard>
+    );
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith(
+        "/bind-phone?redirect=%2Fstudent%2Fpractice%3Funit%3D2"
+      )
+    );
+    expect(screen.queryByText("登录表单")).not.toBeInTheDocument();
+  }
+);
+
+const initialGuestTestUrl = window.location.href;
+afterEach(() => {
+  window.history.replaceState({}, "", initialGuestTestUrl);
+  window.sessionStorage.removeItem("tsz:test-resource-run");
+});
+
+it("已有用户态跳离登录页前保留新的测试批次", async () => {
+  window.history.replaceState({}, "", "/login?tsz_test_run=fixture-20261017");
+  useUserStore.setState({ hydrated: true, user: USER, onboarded: true });
+  const atNavigation: (string | null)[] = [];
+  mockReplace.mockImplementation(() =>
+    atNavigation.push(window.sessionStorage.getItem("tsz:test-resource-run"))
+  );
+  render(
+    <GuestGuard>
+      <p>登录表单</p>
+    </GuestGuard>
+  );
+  await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/"));
+  expect(atNavigation).toEqual(["fixture-20261017"]);
 });

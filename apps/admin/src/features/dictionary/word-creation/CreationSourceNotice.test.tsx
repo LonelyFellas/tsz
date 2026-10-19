@@ -31,7 +31,7 @@ describe("CreationSourceNotice", () => {
     expect(screen.getByText("词性建议尚未写入，请手动补充")).toBeVisible();
     expect(
       screen.getByText(
-        "当前草稿没有词性或词形，请从右上角添加词性；系统未复制重复词条的既有内容。"
+        "当前草稿没有词性或词形，请使用“添加词性”入口；系统未复制重复词条的既有内容。"
       )
     ).toBeVisible();
     expect(screen.queryByText(/matched|not_found|V3/)).toBeNull();

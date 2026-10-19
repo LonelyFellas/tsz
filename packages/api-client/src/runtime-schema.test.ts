@@ -17,6 +17,7 @@ type RuntimeSchema = {
   anyOf?: RuntimeSchema[];
   allOf?: RuntimeSchema[];
   format?: string;
+  pattern?: string;
   minimum?: number;
   maximum?: number;
   minLength?: number;
@@ -34,6 +35,64 @@ const runtimeSchemaBundle =
   runtimeSchemaBundleJson as unknown as RuntimeSchemaBundle;
 
 const ROOTS = [
+  "DictionaryPage",
+  "DictionaryEntry",
+  "AudioAssetUrlResponse",
+  "LearningRewardDay",
+  "LoginRewardDay",
+  "LearningPreview",
+  "LearningPlanPreview",
+  "LearningPlan",
+  "LearningPlanPage",
+  "LearningCyclePreview",
+  "LearningCycle",
+  "LearningCyclePage",
+  "LearningPlanRunPage",
+  "LibrarySelection",
+
+  "LearningTask",
+  "LearningTaskDetail",
+  "LearningTaskPage",
+  "LearningRun",
+  "LearningRunPage",
+  "LearningQuestionPage",
+  "LearningAnswerReceipt",
+
+  "WordlistInteractionStatsBatch",
+  "WordlistInteractionState",
+  "WordlistInteractionStates",
+  "WordlistFavoritePage",
+  "LibraryPage",
+  "LibraryImpact",
+  "WordlistTip",
+  "WordlistTipPage",
+  "AdminWordlist",
+  "AdminWordlistPage",
+  "WordlistDeleteImpact",
+  "Wordlist",
+  "WordlistPage",
+  "WordlistItems",
+  "WordlistAvailability",
+  "EntryArchiveImpact",
+  "MyWordlistItems",
+  "WordlistCatalog",
+  "WordlistSuggestions",
+  "WordlistImportMatches",
+  "WordlistEditSnapshot",
+  "WordlistReview",
+  "WordlistReviews",
+  "AdminWordlistReviews",
+  "InvitationCode",
+  "InvitationOverview",
+  "InvitationRecordPage",
+  "AccountDeletionRequest",
+  "AccountDeletionState",
+  "CoinAccountPage",
+  "ManualCoinOperation",
+  "ManualCoinOperationPage",
+  "CoinWallet",
+  "CoinEntryPage",
+  "UserCoinEntryPage",
   "SharedSentence",
   "SentencePublication",
   "SentenceWithdrawalImpact",
@@ -52,6 +111,8 @@ const ROOTS = [
   "InboundReferencesV3",
   "SurfaceMatchPageV3",
   "RelatedSearchResponse",
+  "RelatedEntrySuggestions",
+  "RelatedEntrySenses",
   "DetectLexiconSurfaceResponseV3",
   "SearchComponentTargetsV3Response",
   "AdminWordPublicationListResponse",
@@ -129,8 +190,11 @@ function buildValidValue(
         buildValidValue(schema.items!, activeRefs)
       );
     case "string":
+      if (schema.pattern === "^[A-F0-9]{16}$") return "0123456789ABCDEF";
+      if (schema.pattern && new RegExp(schema.pattern).test("1")) return "1";
       if (schema.format === "uuid") return UUID_V4;
       if (schema.format === "date-time") return RFC3339;
+      if (schema.format === "date") return "2026-10-07";
       return "x".repeat(Math.max(schema.minLength ?? 0, 1));
     case "integer":
     case "number":
@@ -207,6 +271,32 @@ describe("OpenAPI generated runtime schema", () => {
 });
 
 describe("runtime schema fail-closed diagnostics", () => {
+  it("新格式可在真实响应形状中组合，未知格式与额外属性继续被拒绝", () => {
+    const word = validFixture("AdminWordV3") as {
+      meanings: { sense_groups: unknown[] };
+    };
+    const group = buildValidValue(
+      runtimeSchemaBundle.$defs.SenseGroupV3!
+    ) as Record<string, unknown>;
+    const rich = {
+      version: 2,
+      text: "a job",
+      annotations: [
+        { type: "bold", start: 2, end: 5 },
+        { type: "italic", start: 2, end: 5 },
+        { type: "underline", start: 2, end: 5 }
+      ]
+    };
+    group.name_en_rich = rich;
+    word.meanings.sense_groups = [group];
+    expect(validateRuntimeSchema("AdminWordV3", word)).toEqual({ valid: true });
+    rich.annotations[0]!.type = "unknown-format";
+    expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(false);
+    rich.annotations[0]!.type = "bold";
+    Object.assign(rich.annotations[0]!, { color: "blue" });
+    expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(false);
+  });
+
   it.each(["common", "uk", "us"] as const)(
     "拼写规则标记接受 %s 的布尔值、兼容缺省并拒绝 null",
     (dialect) => {
@@ -261,6 +351,119 @@ describe("runtime schema fail-closed diagnostics", () => {
       expect(validateRuntimeSchema("AdminWordV3", word)).toMatchObject({
         valid: false
       });
+    }
+  );
+
+  it("IPA/UPS 四份配置可选且不可为 null，保留严格字段校验", () => {
+    const word = validFixture("AdminWordV3") as { forms: { pos: unknown[] } };
+    const pronunciation = buildValidValue(
+      runtimeSchemaBundle.$defs.WordPronunciationV3!
+    ) as Record<string, unknown>;
+    const variant = buildValidValue(
+      runtimeSchemaBundle.$defs.WordCommonFormVariantV3!
+    ) as Record<string, unknown>;
+    variant.pronunciations = [pronunciation];
+    const form = buildValidValue(
+      runtimeSchemaBundle.$defs.WordConcreteFormV3!
+    ) as Record<string, unknown>;
+    form.regional_variants = { mode: "common", common: variant };
+    const pos = buildValidValue(
+      runtimeSchemaBundle.$defs.WordPosFormsV3!
+    ) as Record<string, unknown>;
+    pos.forms = [form];
+    word.forms.pos = [pos];
+    const speech = {
+      content: { version: 2, text: "cat", annotations: [] },
+      voice_profile: { voices: [] }
+    };
+    const synthesis = {
+      alphabet: "ipa",
+      ipa: "",
+      ups: "",
+      uk: { ipa: "kæt", ups: "K AE T", ipa_speech: speech, ups_speech: speech },
+      us: { ipa: "kæt", ups: "K AE T", ipa_speech: speech, ups_speech: speech }
+    };
+    pronunciation.synthesis = synthesis;
+    expect(validateRuntimeSchema("AdminWordV3", word)).toEqual({ valid: true });
+    for (const candidate of [synthesis.uk, synthesis.us]) {
+      for (const key of ["ipa_speech", "ups_speech"] as const) {
+        for (const invalid of [
+          null,
+          { ...speech, unknown: true },
+          { ...speech, content: { ...speech.content, version: 1 } }
+        ]) {
+          Object.assign(candidate, { [key]: invalid });
+          expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(false);
+          candidate[key] = speech;
+        }
+      }
+    }
+  });
+
+  it.each(["common", "uk", "us"] as const)(
+    "%s 拼写试听配置可选但不可为 null，严格保留正文与音色",
+    (dialect) => {
+      const word = validFixture("AdminWordV3") as { forms: { pos: unknown[] } };
+      const pos = buildValidValue(
+        runtimeSchemaBundle.$defs.WordPosFormsV3!
+      ) as { forms: unknown[] };
+      const form = buildValidValue(
+        runtimeSchemaBundle.$defs.WordConcreteFormV3!
+      ) as Record<string, unknown>;
+      const schemas = {
+        common: "WordCommonFormVariantV3",
+        uk: "WordUkFormVariantV3",
+        us: "WordUsFormVariantV3"
+      };
+      const variant = buildValidValue(
+        runtimeSchemaBundle.$defs[schemas[dialect]]!
+      ) as Record<string, unknown>;
+      const regions = {
+        mode: dialect === "common" ? "common" : "uk_us",
+        [dialect]: variant
+      };
+      if (dialect !== "common")
+        Object.assign(regions, {
+          [dialect === "uk" ? "us" : "uk"]: buildValidValue(
+            runtimeSchemaBundle.$defs[schemas[dialect === "uk" ? "us" : "uk"]]!
+          )
+        });
+      form.regional_variants = regions;
+      pos.forms = [form];
+      word.forms.pos = [pos];
+      expect(validateRuntimeSchema("AdminWordV3", word)).toEqual({
+        valid: true
+      });
+      const speech = {
+        content: {
+          version: 2,
+          text: "hello there",
+          annotations: [{ type: "pause", at: 5, duration_ms: 500 }]
+        },
+        voice_profile: {
+          voices: [{ voice_id: "sonia", enabled: true, rate_percent: 0 }]
+        }
+      };
+      variant.spelling_speech = speech;
+      expect(validateRuntimeSchema("AdminWordV3", word)).toEqual({
+        valid: true
+      });
+      for (const invalid of [
+        null,
+        { ...speech, unexpected: true },
+        { ...speech, content: { ...speech.content, version: 1 } },
+        {
+          ...speech,
+          voice_profile: {
+            voices: [{ voice_id: "sonia", enabled: true, rate_percent: 101 }]
+          }
+        }
+      ]) {
+        variant.spelling_speech = invalid;
+        expect(validateRuntimeSchema("AdminWordV3", word)).toMatchObject({
+          valid: false
+        });
+      }
     }
   );
 

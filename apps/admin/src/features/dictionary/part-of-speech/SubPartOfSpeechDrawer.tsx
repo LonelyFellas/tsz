@@ -1,3 +1,4 @@
+import { TableEmptyState } from "@/components/TableEmptyState";
 import { usePermission } from "@/lib/auth";
 import {
   Alert,
@@ -49,6 +50,8 @@ interface Props {
   createParent?: PanelParent;
   /** 父级目录仍在加载：表格显示加载态，而不是把空列表当成"暂无基本词性"。 */
   loading?: boolean;
+  filtered?: boolean;
+  onResetFilters?: () => void;
   onSaved: (message: string) => void;
   onError: (error: unknown) => void;
   ref?: Ref<SubPartOfSpeechPanelHandle>;
@@ -88,7 +91,7 @@ function SubPartFormModal({
   onSaved: (message: string) => void;
   onError: (error: unknown) => void;
 }) {
-  const canEdit = usePermission("lexicon_settings.edit");
+  const canEdit = usePermission("lexicon_settings.edit_sub");
   const [form] = Form.useForm<SubPartFormValues>();
   const create = useCreateSubPartOfSpeech();
   const update = useUpdateSubPartOfSpeech();
@@ -207,11 +210,14 @@ export function SubPartOfSpeechPanel({
   parents,
   createParent,
   loading = false,
+  filtered = false,
+  onResetFilters,
   onSaved,
   onError,
   ref
 }: Props) {
-  const canEdit = usePermission("lexicon_settings.edit");
+  const canEdit = usePermission("lexicon_settings.edit_sub");
+  const canDelete = usePermission("lexicon_settings.delete");
   const { modal } = App.useApp();
   const [editing, setEditing] = useState<SubPartOfSpeechConfig>();
   const [formOpen, setFormOpen] = useState(false);
@@ -331,7 +337,7 @@ export function SubPartOfSpeechPanel({
             <Button
               size="small"
               danger
-              disabled={!canEdit || item.usage_count > 0}
+              disabled={!canDelete || item.usage_count > 0}
               onClick={() => removeItem(item)}
             >
               删 除
@@ -368,12 +374,21 @@ export function SubPartOfSpeechPanel({
           />
         ) : (
           <Table<SubPartOfSpeechConfig>
+            locale={{
+              emptyText: (
+                <TableEmptyState
+                  message="暂无细分词性"
+                  filtered={filtered}
+                  onResetFilters={onResetFilters}
+                />
+              )
+            }}
             rowKey="id"
             size="middle"
             columns={columns}
             dataSource={list.items}
             loading={loading || list.isPending}
-            locale={{ emptyText: <Empty description="暂无细分词性" /> }}
+
             pagination={{
               current: currentPage,
               pageSize,

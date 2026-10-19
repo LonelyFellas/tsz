@@ -2,14 +2,26 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import { formatCoins } from "@tsz/shared";
 import { useState } from "react";
 import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
+import { cn } from "@tsz/ui/lib/cn";
+import {
+  PageNotice,
+  Pager,
+  buttonClass,
+  panelClass,
+  textButtonClass
+} from "@/features/shell/Page";
 
 const titles = {
   teacher_approved: "教师认证已通过",
   teacher_rejected: "教师申请已驳回",
-  teacher_revoked: "教师资格已撤销"
+  teacher_revoked: "教师资格已撤销",
+  wordlist_liked: "词表收到点赞",
+  wordlist_tipped: "词表收到投币",
+  wordlist_deleted: "使用中的词表已删除"
 };
 
 export function Notifications() {
@@ -29,18 +41,18 @@ export function Notifications() {
   return (
     <section aria-label="站内通知" className="space-y-6">
       {query.isPending ? (
-        <p>正在读取通知…</p>
+        <PageNotice>正在读取通知…</PageNotice>
       ) : query.isError ? (
-        <div role="alert">
+        <PageNotice tone="error">
           <p>{query.error.message}</p>
           <button
             type="button"
             onClick={() => void query.refetch()}
-            className="mt-3 text-primary"
+            className={cn(textButtonClass, "mt-3")}
           >
             重试
           </button>
-        </div>
+        </PageNotice>
       ) : (
         <>
           <p className="text-sm text-foreground-muted">
@@ -49,16 +61,31 @@ export function Notifications() {
               : "暂无未读通知"}
           </p>
           {query.data.items.length === 0 ? (
-            <p className="py-10 text-center text-foreground-muted">
-              暂无站内通知，认证结果会显示在这里。
-            </p>
+            <PageNotice>
+              暂无站内通知，词表互动和认证结果会显示在这里。
+            </PageNotice>
           ) : (
-            <ul className="divide-y divide-border">
+            <ul className="space-y-3">
               {query.data.items.map((item) => (
-                <li key={item.id} className="py-6 first:pt-0">
+                <li key={item.id} className={panelClass}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h2 className="font-semibold">{titles[item.kind]}</h2>
-                    <span className="text-sm text-foreground-muted">
+                    <h2 className="flex items-center gap-2 text-lg font-bold tracking-tight">
+                      {!item.read_at && (
+                        <span
+                          aria-hidden
+                          className="size-2 rounded-full bg-primary"
+                        />
+                      )}
+                      {titles[item.kind]}
+                    </h2>
+                    <span
+                      className={cn(
+                        "rounded-full px-2.5 py-1 text-xs",
+                        item.read_at
+                          ? "bg-muted text-foreground-muted"
+                          : "bg-primary-muted text-primary"
+                      )}
+                    >
                       {item.read_at ? "已读" : "未读"}
                     </span>
                   </div>
@@ -69,20 +96,57 @@ export function Notifications() {
                     {new Date(item.created_at).toLocaleString()}
                   </time>
                   {item.kind === "teacher_approved" && (
-                    <p className="mt-3">
+                    <p className="mt-3 text-sm leading-6">
                       你已获得教师身份，可在账号菜单中切换工作台，原有学生身份保持不变。
                     </p>
                   )}
+                  {(item.kind === "wordlist_liked" ||
+                    item.kind === "wordlist_tipped") && (
+                    <p className="mt-3 text-sm leading-6">
+                      {item.actor_name ?? "账号已注销"}
+                      {item.kind === "wordlist_liked"
+                        ? "赞了你的词表"
+                        : "向你的词表"}
+                      {item.wordlist_name
+                        ? `「${item.wordlist_name}」`
+                        : "（已删除）"}
+                      {item.kind === "wordlist_tipped" && item.amount
+                        ? `投了 ${formatCoins(item.amount)}`
+                        : ""}
+                      。
+                    </p>
+                  )}
                   {item.reason && (
-                    <p className="mt-3 whitespace-pre-wrap break-words">
+                    <p className="mt-3 whitespace-pre-wrap break-words rounded-2xl bg-muted/70 px-4 py-3 text-sm leading-6">
                       {item.reason}
                     </p>
                   )}
-                  <div className="mt-4 flex flex-wrap gap-5 text-sm">
+                  <div className="mt-4 flex flex-wrap gap-2 empty:hidden">
+                    {item.wordlist_id && item.wordlist_name && (
+                      <Link
+                        href={`/account/wordlists/${encodeURIComponent(item.wordlist_id)}`}
+                        className={buttonClass}
+                      >
+                        查看词表
+                      </Link>
+                    )}
+                    {item.kind === "wordlist_tipped" && (
+                      <Link
+                        href="/account/wordlist-tips"
+                        className={buttonClass}
+                      >
+                        查看收币记录
+                      </Link>
+                    )}
+                    {item.kind === "wordlist_deleted" && (
+                      <Link href="/student/practice" className={buttonClass}>
+                        查看学习任务
+                      </Link>
+                    )}
                     {item.application_id && (
                       <Link
                         href={`/account/teacher-applications/${encodeURIComponent(item.application_id)}`}
-                        className="text-primary"
+                        className={buttonClass}
                       >
                         查看对应申请
                       </Link>
@@ -92,7 +156,7 @@ export function Notifications() {
                         type="button"
                         disabled={read.isPending}
                         onClick={() => read.mutate(item.id)}
-                        className="text-primary disabled:opacity-50"
+                        className={buttonClass}
                       >
                         标为已读
                       </button>
@@ -102,34 +166,15 @@ export function Notifications() {
               ))}
             </ul>
           )}
-          {query.data.total > 20 && (
-            <nav
-              aria-label="通知分页"
-              className="flex items-center justify-between"
-            >
-              <button
-                type="button"
-                disabled={page === 1}
-                onClick={() => setPage((value) => value - 1)}
-                className="disabled:opacity-40"
-              >
-                上一页
-              </button>
-              <span>第 {page} 页</span>
-              <button
-                type="button"
-                disabled={page * 20 >= query.data.total}
-                onClick={() => setPage((value) => value + 1)}
-                className="disabled:opacity-40"
-              >
-                下一页
-              </button>
-            </nav>
-          )}
+          <Pager
+            page={page}
+            total={Math.ceil(query.data.total / 20)}
+            onChange={setPage}
+          />
         </>
       )}
       {read.error && (
-        <p role="alert" className="text-red-600">
+        <p role="alert" className="text-sm text-danger">
           {read.error.message}
         </p>
       )}

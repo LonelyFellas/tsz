@@ -14,29 +14,6 @@ export interface Word {
   created_at: string;
 }
 
-/** 词表可见性:私密 / 公开(公开需过审)。 */
-export type WordListVisibility = "private" | "public";
-
-export interface WordList {
-  id: string;
-  name: string;
-  owner_id: string;
-  /** 来源:平台智能词库选词 + 自定义词汇 */
-  word_ids: string[];
-  custom_words: WordListCustomWord[];
-  visibility: WordListVisibility;
-  /** 公开词表的审核状态 */
-  review_status?: ReviewStatus;
-  reject_reason?: string;
-  created_at: string;
-}
-
-/** 用户自定义词汇(对应「是否有自定义词汇」分支,需敏感词审核)。 */
-export interface WordListCustomWord {
-  text: string;
-  definition?: string;
-}
-
 /** 对单词/词表的评论(需敏感词审核)。 */
 export interface Comment {
   id: string;

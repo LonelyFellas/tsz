@@ -159,6 +159,40 @@ describe("V3WordCreationLayout", () => {
     expect(onIssueNavigate).toHaveBeenCalledWith(currentIssue);
   });
 
+  it("旧格式客户端的安全拒写显示刷新提示，不强制刷新或丢弃本地修改", () => {
+    const onRefreshConflict = vi.fn();
+    const onDiscardLocalChanges = vi.fn();
+    renderLayout({
+      activeStep: "meanings",
+      dirtySteps: { forms: false, meanings: true },
+      problem: {
+        kind: "validation",
+        status: 422,
+        code: "validation_failed",
+        operation: "save_meanings",
+        retryable: false,
+        issues: [
+          {
+            ...issue(),
+            step: "meanings",
+            field: "sentence_formatting",
+            code: "meanings_storage_unsafe",
+            node_id: "word-1",
+            node_location: { node_role: "entry", ancestor_node_ids: [] }
+          }
+        ]
+      },
+      onRefreshConflict,
+      onDiscardLocalChanges
+    });
+    expect(
+      screen.getByText("词义内容暂时无法安全保存，请刷新后重试")
+    ).toBeVisible();
+    expect(screen.getByText("step body")).toBeVisible();
+    expect(onRefreshConflict).not.toHaveBeenCalled();
+    expect(onDiscardLocalChanges).not.toHaveBeenCalled();
+  });
+
   it("关联冲突 409 展示操作建议与关联列表，不直接显示后端技术文案", () => {
     renderLayout({
       problem: {
@@ -279,12 +313,12 @@ describe("V3WordCreationLayout", () => {
     ]);
     expect(rows.map((row) => row.textContent)).toEqual([
       "语言识别",
-      "基本词性1",
-      "词形变化2",
-      "4语义区间1",
-      "5语法结构1",
-      "6多维词义1",
-      "7多维例句1"
+      "基本词性1 项",
+      "词形变化2 项",
+      "4语义区间1 项",
+      "5语法结构1 项",
+      "6多维词义1 项",
+      "7多维例句1 项"
     ]);
     expect(
       rows.slice(0, 3).every((row) => row.dataset.readinessState === "complete")
@@ -314,7 +348,7 @@ describe("V3WordCreationLayout", () => {
     ]) {
       expect(progressText).not.toContain(forbidden);
     }
-    expect(rows[2]).toHaveTextContent("词形变化2");
+    expect(rows[2]).toHaveTextContent("词形变化2 项");
   });
 
   it("完成情况默认收起，点击行展开该行明细、再点收起", () => {

@@ -1,3 +1,5 @@
+import type { RelatedWordResultAny } from "@tsz/types";
+import type { RelatedWordChoice } from "../relatedSuggestions";
 import { changeVoiceText } from "./components/V3VoiceTextField.test-helper";
 import { env } from "@/lib/env";
 import { adminVoicePreviewAdapter } from "@/features/dictionary/voice-editor/dataSource";
@@ -129,7 +131,68 @@ const relatedSearch = vi.hoisted(() =>
   )
 );
 
-vi.mock("../api", () => ({ useRelatedSearch: relatedSearch }));
+// Reuse the existing relation fixtures while mocking the new lightweight hook.
+// HTTP shape, lazy reads and cancellation are tested with the real hooks separately.
+function relationFixtureWords(
+  result: ReturnType<typeof relatedSearch>
+): RelatedWordChoice[] {
+  return [
+    ...(result.exact.data?.pages ?? []),
+    ...(result.contains.data?.pages ?? [])
+  ]
+    .flatMap<RelatedWordResultAny>((page) => page.results)
+    .map((raw) => {
+      const item = raw as RelatedWordResultAny;
+      const status =
+        item.schema_version === 3 ? (item.status ?? "published") : "published";
+      const headword =
+        item.schema_version === 3 ? item.presentation.label : item.headword;
+      return {
+        word_id: item.schema_version === 3 ? item.entry_id : item.word_id,
+        headword,
+        matchedHeadword:
+          item.schema_version === 3
+            ? (item.presentation.matched_surfaces[0] ?? headword)
+            : headword,
+        status,
+        senses: item.senses.map((sense) => ({ ...sense, status }))
+      };
+    });
+}
+const senseRead = vi.hoisted(() => vi.fn());
+vi.mock("../relatedSuggestions", () => ({
+  useRelatedSuggestions: (q: string, open: boolean) => {
+    const result = relatedSearch(q, q.includes(" ") ? "phrase" : "word", open);
+    return {
+      words: relationFixtureWords(result),
+      isFetching: result.exact.isFetching || result.contains.isFetching,
+      isError: result.exact.isError || result.contains.isError,
+      refetch: () =>
+        Promise.all([
+          ...(result.exact.isError ? [result.exact.refetch()] : []),
+          ...(result.contains.isError ? [result.contains.refetch()] : [])
+        ])
+    };
+  },
+  useRelatedWordSenses: (id?: string) => {
+    senseRead(id);
+    const words = relationFixtureWords(
+      relatedSearch.getMockImplementation()!("", undefined, false)
+    );
+    return {
+      data: id
+        ? {
+            entry_id: id,
+            publication_id: "publication",
+            senses: words.find((word) => word.word_id === id)?.senses ?? []
+          }
+        : undefined,
+      isFetching: false,
+      isError: false,
+      refetch: vi.fn()
+    };
+  }
+}));
 const defaultRelatedSearchImplementation =
   relatedSearch.getMockImplementation()!;
 
@@ -782,7 +845,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       />
     );
 
-    fireEvent.mouseDown(screen.getByLabelText("添加基本词性"));
+    fireEvent.mouseDown(screen.getAllByLabelText("添加基本词性")[0]!);
     const choices = [
       ...document.querySelectorAll<HTMLElement>(
         ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
@@ -815,7 +878,7 @@ describe("V3MeaningsAndExamplesStep", () => {
         partOfSpeechCatalog={{ catalog_version: 1, items: [] }}
       />
     );
-    expect(screen.getByLabelText("添加基本词性")).toBeDisabled();
+    expect(screen.getAllByLabelText("添加基本词性")[0]!).toBeDisabled();
 
     rerender(
       <Harness
@@ -825,7 +888,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       />
     );
     expect(screen.getByText("词性目录不可用，已停止新增结构")).toBeVisible();
-    expect(screen.getByLabelText("添加基本词性")).toBeDisabled();
+    expect(screen.getAllByLabelText("添加基本词性")[0]!).toBeDisabled();
   });
 
   it("在词义步骤从基本词性标签确认删除时，同步移除该词性内容与本词条内失效关联", async () => {
@@ -1310,21 +1373,16 @@ describe("V3MeaningsAndExamplesStep", () => {
       value().pos[0]!.grammar_structures[0]!.variants[0]!.content.text
     ).toBe("a centre of the city");
 
-    // 连续标注仍在编辑器本地草稿内，完成之前不影响外层。
+    // 选区标注保留在编辑器本地草稿内，完成之前不影响外层。
     const activeEditor = input.closest(".tsz-ve-editor") as HTMLElement;
-    fireEvent.click(activeEditor.querySelector(".tsz-ve-role-button")!);
+    input.focus();
+    (input as HTMLTextAreaElement).setSelectionRange(2, 8);
+    fireEvent.mouseUp(input);
+    fireEvent.select(input);
     // 只查询当前编辑器，避免全页大量字段的可及名计算拖慢并发测试。
-    fireEvent.click(
-      within(activeEditor).getByText("连续标注", { exact: true })
-    );
-    fireEvent.click(within(activeEditor).getByLabelText("用固定核心词画笔"));
-    const word = [
-      ...input.closest(".tsz-ve-editor")!.querySelectorAll(".tsz-ve-token")
-    ].find((node) => node.textContent === "centre")!;
-    const letters = [...word.querySelectorAll(".tsz-ve-letter")];
-    fireEvent.mouseDown(letters[0]!);
-    fireEvent.mouseEnter(letters[letters.length - 1]!, { buttons: 1 });
-    fireEvent.mouseUp(letters[letters.length - 1]!);
+    const core = within(activeEditor).getByLabelText("标记为固定核心词");
+    expect(core).toBeEnabled();
+    fireEvent.click(core);
 
     const before = value().pos[0]!.grammar_structures[0]!.variants[0]!.content;
     expect(before.version === 2 ? before.annotations : []).toEqual([]);
@@ -2307,12 +2365,16 @@ describe("V3MeaningsAndExamplesStep", () => {
       expect(
         metricInput.closest(".ant-input-number-status-warning")
       ).not.toBeNull();
-      const disabledSound = targetInput
-        .closest(".ant-input-affix-wrapper")
-        ?.querySelector(".anticon-sound");
-      expect(disabledSound).toHaveAttribute("aria-disabled", "true");
-      expect(disabledSound).toHaveClass("word-relation-sound-disabled");
-      expect(disabledSound).not.toHaveAttribute("tabindex");
+      expect(
+        targetInput
+          .closest(".ant-input-affix-wrapper")
+          ?.querySelector("[data-relation-search]")
+      ).toBeInTheDocument();
+      expect(
+        targetInput
+          .closest(".ant-input-affix-wrapper")
+          ?.querySelector(".anticon-sound")
+      ).toBeNull();
       expect(targetInput.closest(".ant-input-status-warning")).not.toBeNull();
       expect(screen.getByLabelText(`待关联的${label}`)).toHaveClass(
         "anticon-info-circle"
@@ -3297,47 +3359,19 @@ describe("V3MeaningsAndExamplesStep", () => {
     );
   });
 
-  it("关联词搜索有后页时提供加载入口，未完成 exact 前不宣称无匹配", () => {
-    const fetchExactNextPage = vi.fn().mockResolvedValue(undefined);
-    relatedSearch.mockImplementation((query, kind, open) =>
-      query === "laterexact"
-        ? ({
-            exact: {
-              data: {
-                pages: [{ results: [], total: 1, next_cursor: "exact-next" }]
-              },
-              isFetching: false,
-              isError: false,
-              hasNextPage: true,
-              fetchNextPage: fetchExactNextPage,
-              refetch: vi.fn()
-            },
-            contains: {
-              data: {
-                pages: [{ results: [], total: 0, next_cursor: null }]
-              },
-              isFetching: false,
-              isError: false,
-              hasNextPage: false,
-              fetchNextPage: vi.fn(),
-              refetch: vi.fn()
-            }
-          } as never)
-        : defaultRelatedSearchImplementation(query, kind, open)
-    );
+  it("关联词联想不再提供分页加载入口", () => {
     const initial = structuredClone(meaningsFixture);
     initial.pos[0]!.senses[0]!.relations = [];
     render(<Harness initial={initial} />);
     fireEvent.click(screen.getByText("添加近义词").closest("button")!);
     fireEvent.change(screen.getByLabelText("近义词目标词条"), {
-      target: { value: "laterexact" }
+      target: { value: "out" }
     });
-
-    expect(screen.queryByText("未找到匹配词条")).toBeNull();
-    const loadMore = screen.getByLabelText("加载更多关联词结果");
-    expect(loadMore).toBeVisible();
-    fireEvent.click(loadMore);
-    expect(fetchExactNextPage).toHaveBeenCalledTimes(1);
+    expect(screen.queryByLabelText("加载更多关联词结果")).toBeNull();
+    fireEvent.click(screen.getAllByText("outside").at(-1)!);
+    expect(value().pos[0]!.senses[0]!.relations[0]?.target_word_id).toBe(
+      "external-word-1"
+    );
   });
 
   it("关联词搜索失败显示错误和重试，不伪装成未找到", () => {
@@ -3379,49 +3413,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(retryExact).toHaveBeenCalledTimes(1);
   });
 
-  it("exact 已完成但 contains 有后页时从 contains 加载更多", () => {
-    const fetchExactNextPage = vi.fn().mockResolvedValue(undefined);
-    const fetchContainsNextPage = vi.fn().mockResolvedValue(undefined);
-    relatedSearch.mockImplementation((query, kind, open) =>
-      query === "containsmore"
-        ? ({
-            exact: {
-              data: { pages: [{ results: [], total: 0, next_cursor: null }] },
-              isFetching: false,
-              isError: false,
-              hasNextPage: false,
-              fetchNextPage: fetchExactNextPage,
-              refetch: vi.fn()
-            },
-            contains: {
-              data: {
-                pages: [{ results: [], total: 1, next_cursor: "contains-next" }]
-              },
-              isFetching: false,
-              isError: false,
-              hasNextPage: true,
-              fetchNextPage: fetchContainsNextPage,
-              refetch: vi.fn()
-            }
-          } as never)
-        : defaultRelatedSearchImplementation(query, kind, open)
-    );
-    const initial = structuredClone(meaningsFixture);
-    initial.pos[0]!.senses[0]!.relations = [];
-    render(<Harness initial={initial} />);
-    fireEvent.click(screen.getByText("添加近义词").closest("button")!);
-    fireEvent.change(screen.getByLabelText("近义词目标词条"), {
-      target: { value: "containsmore" }
-    });
-
-    const loadMore = screen.getByLabelText("加载更多关联词结果");
-    expect(fireEvent.mouseDown(loadMore)).toBe(false);
-    fireEvent.click(loadMore);
-    expect(fetchExactNextPage).not.toHaveBeenCalled();
-    expect(fetchContainsNextPage).toHaveBeenCalledTimes(1);
-  });
-
-  it("仅 contains 搜索失败时只重试 contains", () => {
+  it("候选查询失败时重试失败请求", () => {
     const retryExact = vi.fn().mockResolvedValue(undefined);
     const retryContains = vi.fn().mockResolvedValue(undefined);
     relatedSearch.mockImplementation((query, kind, open) =>

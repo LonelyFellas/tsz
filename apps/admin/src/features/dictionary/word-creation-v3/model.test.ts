@@ -33,6 +33,15 @@ function commonVariant(form: WordConcreteFormV3) {
 }
 
 describe("V3 forms model", () => {
+  it("逐字正音通过草稿结构校验并无损序列化", () => {
+    const form = commonFormFixture({
+      pronunciations: [pronunciationFixture({ style: "citation" })]
+    });
+    const content = formsFixture({ forms: [form] });
+    expect(validateFormsContent(content, "complete")).toEqual([]);
+    expect(toFormsWire(content)).toEqual(content);
+  });
+
   it("U01/U02 common 与完整 uk_us 无损保留 form/variant/pronunciation 身份", () => {
     const common = commonFormFixture();
     const regional = ukUsFormFixture();
@@ -730,6 +739,33 @@ it("synthesis 保真，草稿可缺选中侧，完成定位缺失，旧记录不
   expect(toFormsWire(content)).toEqual(content);
 });
 
+it("区分英美词形时完成只要求各词形自身的 Azure 候选", () => {
+  const form = ukUsFormFixture();
+  form.regional_variants.uk.pronunciations[0]!.synthesis = {
+    alphabet: "ipa",
+    ipa: "",
+    ups: "",
+    use_spelling: false,
+    uk: { ipa: "sɛn.tə", ups: "S EH N T AH" }
+  };
+  form.regional_variants.us.pronunciations[0]!.synthesis = {
+    alphabet: "ipa",
+    ipa: "",
+    ups: "",
+    use_spelling: false,
+    us: { ipa: "sɛn.tɚ", ups: "S EH N T ER" }
+  };
+  const content = formsFixture({ forms: [form] });
+  expect(validateFormsContent(content, "complete")).toEqual([]);
+  form.regional_variants.us.pronunciations[0]!.synthesis!.us!.ipa = "";
+  expect(validateFormsContent(content, "complete")).toContainEqual(
+    expect.objectContaining({
+      field: "synthesis.us.ipa",
+      node_id: form.regional_variants.us.pronunciations[0]!.id
+    })
+  );
+});
+
 it("拼写规则标记通过显式 wire 投影且统一拼写不得保存矛盾值", () => {
   const form = ukUsFormFixture();
   form.regional_variants.uk.is_regular = false;
@@ -748,4 +784,106 @@ it("拼写规则标记通过显式 wire 投影且统一拼写不得保存矛盾�
   expect(codes(content)).toContain("invalid_regional_variant_shape");
   form.regional_variants.us.is_regular = false;
   expect(validateFormsContent(content, "save")).toEqual([]);
+});
+
+it("拼写标注 wire 保留并校验正文、范围及展示类型，未知字段仍被拒", () => {
+  const form = commonFormFixture();
+  const variant = form.regional_variants.common;
+  variant.spelling_rich = {
+    version: 2,
+    text: variant.spelling,
+    annotations: [{ type: "italic", start: 0, end: 2 }]
+  };
+  const content = formsFixture({ forms: [form] });
+  expect(validateFormsContent(content, "save")).toEqual([]);
+  expect(
+    commonVariant(toFormsWire(content).pos[0]!.forms[0]!).spelling_rich
+  ).toEqual(variant.spelling_rich);
+  for (const rich of [
+    { ...variant.spelling_rich, text: "wrong" },
+    {
+      ...variant.spelling_rich,
+      annotations: [{ type: "italic", start: 0, end: 99 }]
+    },
+    {
+      ...variant.spelling_rich,
+      annotations: [{ type: "pause", at: 0, duration_ms: 500 }]
+    },
+    { ...variant.spelling_rich, annotations: [null] }
+  ]) {
+    const input = structuredClone(content);
+    const target = commonVariant(input.pos[0]!.forms[0]!);
+    Object.assign(target, { spelling_rich: rich });
+    expect(validateFormsContent(input, "save")).toContainEqual(
+      expect.objectContaining({
+        code: "spelling_rich_text_invalid",
+        field: "spelling_rich",
+        node_id: variant.id
+      })
+    );
+  }
+  const input = structuredClone(content);
+  Object.assign(commonVariant(input.pos[0]!.forms[0]!), {
+    spelling_rich: null
+  });
+  expect(codes(input)).toContain("invalid_regional_variant_shape");
+  Object.assign(commonVariant(input.pos[0]!.forms[0]!), {
+    spelling_rich: variant.spelling_rich,
+    unexpected: true
+  });
+  expect(codes(input)).toContain("invalid_regional_variant_shape");
+});
+
+it("独立拼写试听通过草稿与 wire 校验，拒绝错文、展示标注及非法音色", () => {
+  const content = formsFixture();
+  const variant = commonVariant(content.pos[0]!.forms[0]!);
+  variant.spelling = "hello there";
+  variant.spelling_speech = {
+    content: {
+      version: 2,
+      text: variant.spelling,
+      annotations: [{ type: "pause", at: 5, duration_ms: 500 }]
+    },
+    voice_profile: {
+      voices: [{ voice_id: "sonia", enabled: true, rate_percent: 0 }]
+    }
+  };
+  expect(validateFormsContent(content, "save")).toEqual([]);
+  expect(
+    commonVariant(toFormsWire(content).pos[0]!.forms[0]!).spelling_speech
+  ).toEqual(variant.spelling_speech);
+  for (const speech of [
+    {
+      ...variant.spelling_speech,
+      content: { ...variant.spelling_speech.content, text: "wrong" }
+    },
+    {
+      ...variant.spelling_speech,
+      content: {
+        ...variant.spelling_speech.content,
+        annotations: [{ type: "italic", start: 0, end: 2 }]
+      }
+    },
+    {
+      ...variant.spelling_speech,
+      voice_profile: {
+        voices: [{ voice_id: "sonia", enabled: true, rate_percent: 101 }]
+      }
+    }
+  ]) {
+    const invalid = structuredClone(content);
+    Object.assign(commonVariant(invalid.pos[0]!.forms[0]!), {
+      spelling_speech: speech
+    });
+    expect(validateFormsContent(invalid, "save")).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ field: "spelling_speech" })
+      ])
+    );
+  }
+  const invalid = structuredClone(content);
+  Object.assign(commonVariant(invalid.pos[0]!.forms[0]!), {
+    spelling_speech: null
+  });
+  expect(validateFormsContent(invalid, "save")).not.toEqual([]);
 });

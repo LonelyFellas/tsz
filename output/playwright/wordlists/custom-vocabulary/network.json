@@ -1,0 +1,34 @@
+[
+  {
+    "path": "/api/v1/me/wordlists/01a14dc9-796e-7ed2-b297-287097368d5e/publish",
+    "status": 200
+  },
+  {
+    "path": "/api/v1/me",
+    "status": 200
+  },
+  {
+    "path": "/api/v1/me/wordlists/01a14dc9-796e-7ed2-b297-287097368d5e",
+    "status": 200
+  },
+  {
+    "path": "/api/v1/me/wordlist-library/owned",
+    "status": 200
+  },
+  {
+    "path": "/api/v1/me/wordlists/01a14dc9-796e-7ed2-b297-287097368d5e/items",
+    "status": 200
+  },
+  {
+    "path": "/api/v1/me/wordlists/01a14dc9-796e-7ed2-b297-287097368d5e/review-requests",
+    "status": 200
+  },
+  {
+    "path": "/api/v1/me/wordlist-library/owned",
+    "status": 200
+  },
+  {
+    "path": "/api/v1/me/wordlists/01a14dc9-796e-7ed2-b297-287097368d5e/availability",
+    "status": 200
+  }
+]

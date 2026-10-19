@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { RouteGuard } from "@/features/auth";
+import { PageHeader, PageShell } from "@/features/shell/Page";
 import { Notifications } from "@/features/teacher-certification/Notifications";
 
 export const metadata: Metadata = {
@@ -10,10 +11,14 @@ export const metadata: Metadata = {
 export default function NotificationsPage() {
   return (
     <RouteGuard>
-      <div className="mx-auto max-w-3xl">
-        <h1 className="mb-8 text-3xl font-semibold tracking-tight">站内通知</h1>
+      <PageShell>
+        <PageHeader
+          back={{ href: "/account", label: "返回个人中心" }}
+          eyebrow="个人中心"
+          title="站内通知"
+        />
         <Notifications />
-      </div>
+      </PageShell>
     </RouteGuard>
   );
 }

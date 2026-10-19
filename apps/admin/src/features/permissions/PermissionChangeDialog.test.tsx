@@ -70,6 +70,21 @@ function allowReread() {
 }
 
 describe("单人/批量权限精确预览提交", () => {
+  it("只列实际开通和取消的权限，依赖调整在对应列标注", async () => {
+    vi.spyOn(api.permissionSystem, "preview").mockResolvedValue(preview);
+    mount();
+    await screen.findByText("words.edit_others");
+    expect(
+      screen.getAllByRole("columnheader").map((header) => header.textContent)
+    ).toEqual(["管理员", "开通", "取消"]);
+    expect(
+      screen
+        .getByText("words.access、words.edit")
+        .closest(".ant-typography-warning")
+    ).toHaveTextContent("自动补齐：words.access、words.edit");
+    expect(screen.queryByText("同时开通")).toBeNull();
+  });
+
   it("显式展示依赖，点击确认前不保存；commit逐人使用服务端展开的差异与版本", async () => {
     const read = vi
       .spyOn(api.permissionSystem, "preview")
@@ -87,7 +102,7 @@ describe("单人/批量权限精确预览提交", () => {
       revoke: []
     });
     expect(save).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByText("保存修改"));
+    fireEvent.click(screen.getByText("保存变更"));
     await waitFor(() => expect(committed).toHaveBeenCalledOnce());
     expect(save).toHaveBeenCalledWith({
       catalog_version: "v1",
@@ -128,7 +143,7 @@ describe("单人/批量权限精确预览提交", () => {
     });
     const { committed } = mount();
     await screen.findByText("words.access、words.edit");
-    fireEvent.click(screen.getByText("保存修改"));
+    fireEvent.click(screen.getByText("保存变更"));
     await waitFor(() => expect(committed).toHaveBeenCalledOnce());
     expect(useAuthStore.getState().profile).toBe(own);
     expect(useAuthStore.getState().role).toBe("super_admin");
@@ -158,10 +173,13 @@ describe("单人/批量权限精确预览提交", () => {
       );
     const { client, committed } = mount();
     const reload = vi.spyOn(client, "invalidateQueries");
-    await screen.findByText("words.edit_others", {
-      selector: ".ant-typography-danger"
+    const automaticRevoke = await screen.findByText("words.edit_others", {
+      selector: ".ant-typography-danger span"
     });
-    fireEvent.click(screen.getByText("保存修改"));
+    expect(automaticRevoke.closest(".ant-typography-danger")).toHaveTextContent(
+      "自动取消：words.edit_others"
+    );
+    fireEvent.click(screen.getByText("保存变更"));
     await screen.findByText(
       "已重新读取当前权限。请核对后返回，重新选择需要的调整。"
     );
@@ -172,7 +190,7 @@ describe("单人/批量权限精确预览提交", () => {
       revoke: []
     });
     expect(screen.getByText("当前权限")).toBeInTheDocument();
-    expect(screen.queryByText("保存修改")).toBeNull();
+    expect(screen.queryByText("保存变更")).toBeNull();
     expect(save).toHaveBeenCalledOnce();
     expect(committed).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText("返回查看"));
@@ -196,7 +214,7 @@ describe("单人/批量权限精确预览提交", () => {
         .mockRejectedValue(failure);
       const { committed } = mount({ expectedVersions: { a: 3 } });
       await screen.findByText("words.access、words.edit");
-      fireEvent.click(screen.getByText("保存修改"));
+      fireEvent.click(screen.getByText("保存变更"));
       await screen.findByText("当前权限");
       expect(read).toHaveBeenLastCalledWith({
         catalog_version: "v2",
@@ -204,7 +222,7 @@ describe("单人/批量权限精确预览提交", () => {
         grant: [],
         revoke: []
       });
-      expect(screen.queryByText("保存修改")).toBeNull();
+      expect(screen.queryByText("保存变更")).toBeNull();
       expect(screen.queryByText("权限已保存")).toBeNull();
       expect(save).toHaveBeenCalledOnce();
       expect(committed).not.toHaveBeenCalled();
@@ -221,9 +239,9 @@ describe("单人/批量权限精确预览提交", () => {
       .mockRejectedValue(new TypeError("response lost"));
     mount();
     await screen.findByText("words.access、words.edit");
-    fireEvent.click(screen.getByText("保存修改"));
+    fireEvent.click(screen.getByText("保存变更"));
     await screen.findByText("暂时无法确认是否保存成功，请重新查看后再操作");
-    expect(screen.queryByText("保存修改")).toBeNull();
+    expect(screen.queryByText("保存变更")).toBeNull();
     expect(screen.queryByText("当前权限")).toBeNull();
     fireEvent.click(screen.getByText("重新查看"));
     await waitFor(() =>
@@ -241,7 +259,7 @@ describe("单人/批量权限精确预览提交", () => {
       .mockResolvedValue({ request_id: "r", targets: [] });
     mount();
     await screen.findByText("目录暂不可用");
-    expect(screen.getByText("保存修改").closest("button")).toBeDisabled();
+    expect(screen.getByText("保存变更").closest("button")).toBeDisabled();
     expect(save).not.toHaveBeenCalled();
   });
 });

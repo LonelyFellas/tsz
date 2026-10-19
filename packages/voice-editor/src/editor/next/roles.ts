@@ -19,16 +19,18 @@ export const LEGACY_GRAMMAR_LEVEL = "strong";
 /**
  * 当前画笔。选中一支笔后直接点靶子落笔，免去「先拖选、再去远处点按钮」的往返。
  *
- * 三种笔各有各的靶子，互不干扰：
+ * 标注工具各有各的靶子，互不干扰：
  * - role   → 点字母 / 拖过一段字母，标语法结构分类（粒度到字母）
  * - liaison→ 点字母，连出一条连读弧（两端可跨任意距离）
  * - pause  → 点词缝，插入停顿
+ * - erase  → 点已有连读或停顿，逐个取消
  */
 export type Brush =
   | { kind: "association"; targetKind: "word" | "phrase" }
   | { kind: "none" }
   | { kind: "role"; level: string }
   | { kind: "liaison" }
+  | { kind: "erase" }
   | { kind: "pause"; durationMs: number };
 
 /** 连读的哪一端；两端各自可含多个连续字母。 */
@@ -41,7 +43,10 @@ export type LiaisonEnd = "start" | "end";
 export const DEFAULT_BRUSH: Brush = { kind: "none" };
 
 /** 当前画笔作用在哪种靶子上；none 表示这一刻鼠标归文本编辑。 */
-export function brushTarget(brush: Brush): "letter" | "gap" | "word" | "none" {
+export function brushTarget(
+  brush: Brush
+): "letter" | "gap" | "word" | "mark" | "none" {
+  if (brush.kind === "erase") return "mark";
   if (brush.kind === "association") return "word";
   if (brush.kind === "role") return "letter";
   if (brush.kind === "liaison") return "letter";

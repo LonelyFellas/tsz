@@ -3,7 +3,7 @@ import { api, tokens, useAuthStore } from "@/lib/auth";
 
 /**
  * 本地登出收尾：清 token、清 profile、整页跳回登录页。两条登出路径（当前会话 / 全部会话）
- * 共用同一份收尾，后端调用成败都要执行。
+ * 共用同一份收尾；全部退出须先确认后端成功，普通退出则尽力通知后端。
  *
  * 整页跳转到干净的 /login（而非客户端 navigate）：撤销整棵 React 树，彻底避开门禁守卫
  * 在 setProfile(null) 后抢注 ?redirect=<当前页> 的竞态——否则再次登录（尤其切换账号）
@@ -44,19 +44,14 @@ export function useAdminLogout() {
 
 /**
  * 后台「退出所有设备」：吊销该 admin 的全部会话（含当前这台），再走同一套本地收尾。
- * 逃生组端点，带 Bearer、不过 must_change_password 守卫。后端失败同样不阻断本地登出——
- * 本机至少要下线，别把人卡在一个已经点了「全部退出」的界面里。
+ * 逃生组端点，带 Bearer、不过 must_change_password 守卫。失败交给界面提示并允许重试，
+ * 避免仅本地登出被误认为全部设备已退出。
  */
 export function useAdminLogoutAll() {
   const finishLocalLogout = useFinishLocalLogout();
 
   return async function logoutAll() {
-    try {
-      await api.auth.logoutAll();
-    } catch {
-      // 同 logout()：吞掉错误，保证始终 resolve 并完成本地登出。
-    } finally {
-      finishLocalLogout();
-    }
+    await api.auth.logoutAll();
+    finishLocalLogout();
   };
 }

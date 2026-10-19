@@ -29,6 +29,21 @@ export type RichTextEmphasisLevel = "strong" | "function" | "core" | "grammar";
 
 export type RichTextAnnotation =
   | {
+      type: "italic";
+      start: number;
+      end: number;
+    }
+  | {
+      type: "bold";
+      start: number;
+      end: number;
+    }
+  | {
+      type: "underline";
+      start: number;
+      end: number;
+    }
+  | {
       type: "emphasis";
       start: number;
       end: number;

@@ -32,13 +32,14 @@ export function V3ProductProgressList({
   return (
     <Flex
       className="word-creation-progress-list v3-product-progress-list"
-      gap={4}
+      gap={2}
       vertical
     >
       {rows.map((row) => (
         <section
           aria-label={`${row.label}摘要`}
           className="v3-product-progress-group"
+          data-progress-key={row.key}
           key={row.key}
         >
           <button
@@ -71,7 +72,11 @@ export function V3ProductProgressList({
             {/* 计数与折叠指示同占一个网格项：进度行是三列 grid，多一项会被挤到次行 */}
             <span className="v3-product-progress-trailing">
               {!(row.completed && row.value === "完成") && (
-                <Typography.Text type="secondary">{row.value}</Typography.Text>
+                <Typography.Text type="secondary">
+                  {typeof row.value === "number"
+                    ? `${row.value} 项`
+                    : row.value}
+                </Typography.Text>
               )}
               <span
                 aria-hidden="true"
@@ -93,9 +98,14 @@ export function V3ProductProgressList({
                     {row.details.length === 0 ? (
                       <li className="v3-product-progress-empty">暂未添加</li>
                     ) : (
-                      row.details.map((detail) => (
-                        <li key={detail.key}>
+                      row.details.map((detail, index) => (
+                        <li key={detail.key} data-pending={detail.pending}>
                           <div className="v3-product-progress-detail">
+                            {row.key === "sense_groups" && (
+                              <span className="v3-product-progress-ordinal">
+                                {index + 1}.
+                              </span>
+                            )}
                             {detail.dialect && (
                               <span
                                 className={`dialect-dot dialect-dot-${detail.dialect}`}
@@ -108,21 +118,22 @@ export function V3ProductProgressList({
                               {detail.label}
                             </span>
                             {detail.count !== undefined && (
-                              <span>{detail.count}</span>
+                              <span>{detail.count} 项</span>
                             )}
                           </div>
                           {detail.items && detail.items.length > 0 && (
-                            <ul className="v3-product-progress-items">
+                            <ol className="v3-product-progress-items">
                               {detail.items.map((item) => (
-                                <li
-                                  key={item.key}
-                                  className="v3-product-progress-text"
-                                  title={item.label}
-                                >
-                                  {item.label}
+                                <li key={item.key} data-pending={item.pending}>
+                                  <span
+                                    className="v3-product-progress-text"
+                                    title={item.label}
+                                  >
+                                    {item.label}
+                                  </span>
                                 </li>
                               ))}
-                            </ul>
+                            </ol>
                           )}
                         </li>
                       ))

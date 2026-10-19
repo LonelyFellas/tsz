@@ -647,6 +647,15 @@ export interface EntryLifecycleTarget {
   base_lifecycle_revision: number;
 }
 
+export interface EntryArchiveImpactInput {
+  entries: EntryLifecycleTarget[];
+}
+
+export interface EntryArchiveImpact {
+  wordlist_count: number;
+  active_run_count: number;
+}
+
 export interface EntryLifecycleBatchInput {
   entries: EntryLifecycleTarget[];
   confirmed_surface_match_token?: string;
@@ -689,13 +698,10 @@ export interface EntryDeleteBatchResponse {
   affected: number;
 }
 
-/** @deprecated 新代码统一使用通用 ProblemMeta。 */
-export type AdminWordApiErrorMeta = ProblemMeta;
-
 export interface AdminWordApiError {
   error: string;
   code: string;
   details?: string[];
   field_issues?: DraftValidationIssue[];
-  meta?: AdminWordApiErrorMeta;
+  meta?: ProblemMeta;
 }

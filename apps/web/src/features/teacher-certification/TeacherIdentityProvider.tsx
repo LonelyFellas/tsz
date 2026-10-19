@@ -13,6 +13,8 @@ import {
 } from "react";
 import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
+import { cn } from "@tsz/ui/lib/cn";
+import { PageNotice, PageShell, textButtonClass } from "@/features/shell/Page";
 import {
   readWorkspaceIdentity,
   resolveWorkspaceIdentity,
@@ -47,6 +49,7 @@ function subscribePreference(callback: () => void) {
 export function TeacherIdentityProvider({ children }: { children: ReactNode }) {
   const userId = useUserStore((s) => s.user?.id);
   const hydrated = useUserStore((s) => s.hydrated);
+  const phone = useUserStore((s) => s.user?.phone);
   const pathname = usePathname();
   const router = useRouter();
   const client = useQueryClient();
@@ -63,7 +66,7 @@ export function TeacherIdentityProvider({ children }: { children: ReactNode }) {
   const query = useQuery({
     queryKey: ["teacher-certification", userId],
     queryFn: ({ signal }) => api.teacherCertification.mine({ signal }),
-    enabled: hydrated && !!userId,
+    enabled: hydrated && !!userId && !!phone,
     retry: false,
     staleTime: 0,
     refetchOnWindowFocus: "always"
@@ -88,7 +91,7 @@ export function TeacherIdentityProvider({ children }: { children: ReactNode }) {
       if (event.key !== `tsz:workspace:${userId}` && event.key !== null) return;
       const next = readWorkspaceIdentity(userId!);
       if (next === "student" && pathname.startsWith("/teacher/"))
-        router.replace("/student/practice");
+        router.replace("/student/home");
       if (next === "teacher" && verified && pathname.startsWith("/student/"))
         router.replace("/teacher/classes");
     }
@@ -100,7 +103,7 @@ export function TeacherIdentityProvider({ children }: { children: ReactNode }) {
     if (!userId || !ready) return;
     if (!verified) {
       writeWorkspaceIdentity(userId, "student");
-      if (pathname.startsWith("/teacher/")) router.replace("/student/practice");
+      if (pathname.startsWith("/teacher/")) router.replace("/student/home");
       return;
     }
     const mode = pathname.startsWith("/teacher/")
@@ -131,7 +134,7 @@ export function TeacherIdentityProvider({ children }: { children: ReactNode }) {
     }
     if (!writeWorkspaceIdentity(userId, next))
       throw new Error("无法保存工作台偏好，请检查浏览器存储设置后重试");
-    router.push(next === "teacher" ? "/teacher/classes" : "/student/practice");
+    router.push(next === "teacher" ? "/teacher/classes" : "/student/home");
   }
 
   return (
@@ -153,21 +156,29 @@ export function TeacherAccessGuard({ children }: { children: ReactNode }) {
   const userId = useUserStore((s) => s.user?.id);
   if (identity.error)
     return (
-      <div role="alert">
-        <p>无法核验教师资格，请重试。</p>
-        <button
-          className="mt-3 text-primary"
-          onClick={() =>
-            void client.invalidateQueries({
-              queryKey: ["teacher-certification", userId]
-            })
-          }
-        >
-          重新核验
-        </button>
-      </div>
+      <PageShell>
+        <PageNotice tone="error">
+          <p>无法核验教师资格，请重试。</p>
+          <button
+            className={cn(textButtonClass, "mt-3")}
+            onClick={() =>
+              void client.invalidateQueries({
+                queryKey: ["teacher-certification", userId]
+              })
+            }
+          >
+            重新核验
+          </button>
+        </PageNotice>
+      </PageShell>
     );
   if (!identity.ready || !identity.verified)
-    return <p role="status">正在核验教师资格…</p>;
+    return (
+      <PageShell>
+        <div role="status">
+          <PageNotice>正在核验教师资格…</PageNotice>
+        </div>
+      </PageShell>
+    );
   return <>{children}</>;
 }

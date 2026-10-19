@@ -2,6 +2,7 @@ import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import {
   EMPTY_SYNTHESIS,
   pronunciationSynthesisContent,
+  pronunciationSynthesisSpeech,
   synthesisInputIssue,
   synthesisLocaleIssue,
   pronunciationLocale,
@@ -78,7 +79,10 @@ function ReviewPronunciationPlayback({
             (!spelling.trim() ? "请先填写词形拼写" : undefined))
       }
       content={content ?? { version: 2, text: "", annotations: [] }}
-      voiceProfile={pronunciation.voice_profile}
+      voiceProfile={
+        pronunciationSynthesisSpeech(synthesis)?.voice_profile ??
+        pronunciation.voice_profile
+      }
     />
   );
 }
@@ -130,7 +134,17 @@ function FormsReview({
                         {i > 0 && <small> → </small>}
                         {i + 1}.{" "}
                         {form ? formTypeLabel(form.form_type) : "未知词形"}
-                        {variant ? ` · ${variant.spelling}` : ""}
+                        {variant ? (
+                          <>
+                            {" · "}
+                            <span
+                              className="tsz-words"
+                              style={{ fontWeight: 700 }}
+                            >
+                              {variant.spelling}
+                            </span>
+                          </>
+                        ) : null}
                       </span>
                     );
                   })}
@@ -175,7 +189,16 @@ function FormsReview({
                             {index === 0 && (
                               <>
                                 <strong className="tsz-words">
-                                  {variant.spelling || "待填写拼写"}
+                                  <RichTextReadOnly
+                                    value={
+                                      variant.spelling_rich ?? {
+                                        version: 2,
+                                        text: variant.spelling,
+                                        annotations: []
+                                      }
+                                    }
+                                    emptyText="待填写拼写"
+                                  />
                                 </strong>
                                 <small>{dialectLabel(variant.dialect)}</small>
                               </>
@@ -215,7 +238,7 @@ function FormsReview({
                                     ? pronunciationStyleLabel(
                                         pronunciation.style
                                       )
-                                    : "未选择发音方式"}
+                                    : "未选择读法"}
                                 </small>
                                 {pronunciation.synthesis && (
                                   <small>

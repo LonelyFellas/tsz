@@ -20,12 +20,18 @@ export type MenuPermission =
   | "words.access"
   | "customdict.access"
   | "sentences.access"
+  | "sentences.read_published"
   | "wordlists.access"
   | "customwordlist.access"
   | "tasks.access"
   | "reviews.access"
   | "teacherapply.access"
   | "comments.access"
+  | "wordlists.visibility"
+  | "wordlists.recommend"
+  | "wordlists.delete"
+  | "wordlists.review"
+  | "wordlists.withdraw"
   | "coins.access"
   | "lexicon_settings.access";
 

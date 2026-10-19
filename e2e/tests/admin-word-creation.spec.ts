@@ -22,7 +22,7 @@ test.describe("统一 V3 创建流程", () => {
     const api = await mockAdminV3Api(page, { viewerRole: "admin" });
     await page.goto("/words");
     await expect(page.getByText("累计智能词汇:")).toBeVisible();
-    await expect(page.getByRole("button", { name: "创建词条" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "创建词汇" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /^编辑/ })).toHaveCount(0);
     await page.goto("/words/new");
     await expect(page).toHaveURL(/\/words\/new$/);
@@ -39,15 +39,13 @@ test.describe("统一 V3 创建流程", () => {
     await mockAdminV3Api(page);
 
     await page.goto("/words");
-    await expect(page.getByRole("button", { name: "创建词条" })).toHaveCount(1);
+    await expect(page.getByRole("button", { name: "创建词汇" })).toHaveCount(1);
     await expect(page.getByRole("button", { name: "创建单词" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "创建短语" })).toHaveCount(0);
 
-    await page.getByRole("button", { name: "创建词条" }).click();
+    await page.getByRole("button", { name: "创建词汇" }).click();
     await expect(page).toHaveURL(/\/words\/new$/);
-    await expect(
-      page.getByRole("heading", { name: "创建新词条" })
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "创建词汇" })).toBeVisible();
     await expect(page.getByPlaceholder("例如 center 或 give up")).toBeVisible();
     await expect(page.getByRole("button", { name: "词典检测" })).toBeVisible();
   });
@@ -69,6 +67,10 @@ test.describe("统一 V3 创建流程", () => {
     await expect(duplicateButtons).toHaveCount(2);
     await duplicateButtons.first().click();
     await expect(page.getByText("原形：colour", { exact: true })).toBeVisible();
+    await expect(page.getByText("原形：colour", { exact: true })).toHaveCSS(
+      "font-weight",
+      "700"
+    );
     await expect(
       page.getByText("垃圾桶", { exact: true }).first()
     ).toBeVisible();

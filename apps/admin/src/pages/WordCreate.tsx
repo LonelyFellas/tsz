@@ -39,7 +39,7 @@ export function WordCreatePage({
       currentStep="basics"
       presentation={{
         wordExists: false,
-        breadcrumbTitle: "创建词条",
+        breadcrumbTitle: "创建词汇",
         completedSteps: [],
         summaryHeadword: (
           <Typography.Text className="word-summary-pending-detection">

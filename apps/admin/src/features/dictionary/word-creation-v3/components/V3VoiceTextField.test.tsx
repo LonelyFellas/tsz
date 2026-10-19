@@ -7,23 +7,34 @@ import {
   screen,
   waitFor
 } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EnglishTextV3, RichTextV3, TextLinkV3 } from "@tsz/types";
 import { useState } from "react";
 import type { AudioUploadAdapter } from "@tsz/voice-editor/types";
 
 const state = vi.hoisted(() => ({
-  flags: { VOICE_EDITOR: true, VOICE_PREVIEW: false, VOICE_AUDIO_UPLOAD: true },
+  canUpload: true,
+  flags: {
+    VOICE_EDITOR: true,
+    VOICE_PREVIEW: false,
+    VOICE_AUDIO_UPLOAD: true,
+    SENTENCE_FORMATTING: true
+  },
   listVoices: vi.fn(),
+  synthesize: vi.fn(),
   upload: vi.fn(),
   resolveUrl: vi.fn()
 }));
 
+vi.mock("@/lib/auth", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/auth")>()),
+  usePermission: () => state.canUpload
+}));
 vi.mock("@/lib/env", () => ({ env: state.flags }));
 vi.mock("@/features/dictionary/voice-editor/dataSource", () => ({
   adminVoicePreviewAdapter: {
     listVoices: state.listVoices,
-    synthesize: vi.fn()
+    synthesize: state.synthesize
   },
   voicePreviewIsMock: false,
   adminAudioUploadAdapter: {
@@ -34,6 +45,13 @@ vi.mock("@/features/dictionary/voice-editor/dataSource", () => ({
   } satisfies AudioUploadAdapter
 }));
 
+import { formsFixture, UUIDS } from "../fixtures";
+import { spellingEditorValue } from "../spellingSpeech";
+import {
+  updateVariantSpelling,
+  updateSpellingVoiceProfile
+} from "../operations";
+import { toFormsWire } from "../model";
 import { V3VoiceTextField } from "./V3VoiceTextField";
 import { V3LinkedEnglishTextField } from "./V3LinkedEnglishTextField";
 
@@ -66,7 +84,10 @@ async function openAudioPanel() {
 }
 
 beforeEach(() => {
+  state.synthesize.mockReset();
+  state.canUpload = true;
   state.flags.VOICE_EDITOR = true;
+  state.flags.SENTENCE_FORMATTING = true;
   state.flags.VOICE_PREVIEW = false;
   state.listVoices.mockResolvedValue([
     {
@@ -85,12 +106,12 @@ beforeEach(() => {
   state.resolveUrl.mockReset();
 });
 
-it("词形拼写使用可直接编辑的普通输入框，不显示语音编辑器入口", () => {
+it("未录入词形拼写可直接输入，并提供编辑器入口", () => {
   const onChange = vi.fn();
   render(
     <V3VoiceTextField
       mode="spelling"
-      value={{ version: 2, text: "translate", annotations: [] }}
+      value={{ version: 2, text: "", annotations: [] }}
       onChange={onChange}
       ariaLabel="英式拼写"
       nodeId="spelling-uk"
@@ -101,8 +122,8 @@ it("词形拼写使用可直接编辑的普通输入框，不显示语音编辑�
   expect(input).not.toHaveAttribute("readonly");
   expect(input).not.toHaveClass("v3-voice-text-large-preview");
   expect(
-    screen.queryByRole("button", { name: "打开英式拼写编辑器" })
-  ).not.toBeInTheDocument();
+    screen.getByRole("button", { name: "打开英式拼写编辑器" })
+  ).toBeInTheDocument();
   fireEvent.change(input, { target: { value: "translated" } });
   expect(onChange).toHaveBeenCalledWith(
     { version: 2, text: "translated", annotations: [] },
@@ -113,6 +134,9 @@ it("词形拼写使用可直接编辑的普通输入框，不显示语音编辑�
 });
 
 describe("V3VoiceTextField 取消和收起态", () => {
+  // rc-util 的 test-id 会让嵌套弹窗清除外层的 Esc 栈；使用开发环境的真实唯一 ID。
+  beforeEach(() => vi.stubEnv("NODE_ENV", "development"));
+  afterEach(() => vi.unstubAllEnvs());
   function Host() {
     const [value, setValue] = useState<RichTextV3>({
       version: 2,
@@ -189,6 +213,79 @@ describe("V3VoiceTextField 取消和收起态", () => {
         .duration_ms
     ).toBe(2000);
   });
+
+  it.each(["正文", "停顿", "音色"])(
+    "%s 改动未完成时 Esc 不关闭弹窗或丢失改动",
+    async (kind) => {
+      state.flags.VOICE_PREVIEW = true;
+      render(<Host />);
+      fireEvent.click(screen.getByLabelText("打开测试语法编辑器"));
+      await screen.findByRole(
+        "toolbar",
+        { name: "标注工具栏" },
+        { timeout: 10000 }
+      );
+      if (kind === "正文") {
+        fireEvent.change(screen.getByLabelText("测试语法"), {
+          target: { value: "hello there again" }
+        });
+      } else if (kind === "停顿") {
+        fireEvent.click(screen.getByLabelText("编辑第 1 处停顿 0.5 秒"));
+        fireEvent.click(screen.getByRole("button", { name: "移除停顿" }));
+      } else {
+        fireEvent.click(await screen.findByLabelText("启用 Sonia"));
+      }
+      const escape = () =>
+        fireEvent.keyDown(screen.getByRole("dialog"), {
+          key: "Escape",
+          keyCode: 27
+        });
+      escape();
+      expect(screen.getByRole("toolbar")).toBeInTheDocument();
+      escape();
+      expect(screen.getByRole("toolbar")).toBeInTheDocument();
+      if (kind === "正文")
+        expect(screen.getByLabelText("测试语法")).toHaveValue(
+          "hello there again"
+        );
+      else if (kind === "停顿")
+        expect(screen.queryByLabelText("编辑第 1 处停顿 0.5 秒")).toBeNull();
+      else expect(screen.getByLabelText("启用 Sonia")).toBeChecked();
+      fireEvent.click(screen.getByLabelText("完成测试语法编辑"));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      const saved = JSON.parse(screen.getByTestId("cancel-value").textContent!);
+      if (kind === "正文") expect(saved.text).toBe("hello there again");
+      else if (kind === "停顿") expect(saved.annotations).toEqual([]);
+    }
+  );
+
+  it("没有改动或撤销回原内容后 Esc 仍可关闭弹窗", async () => {
+    render(<Host />);
+    const open = async () => {
+      fireEvent.click(screen.getByLabelText("打开测试语法编辑器"));
+      await screen.findByRole(
+        "toolbar",
+        { name: "标注工具栏" },
+        { timeout: 10000 }
+      );
+    };
+    const escape = () =>
+      fireEvent.keyDown(screen.getByRole("dialog"), {
+        key: "Escape",
+        keyCode: 27
+      });
+    await open();
+    escape();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await open();
+    fireEvent.change(screen.getByLabelText("测试语法"), {
+      target: { value: "hello there again" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "上一步" }));
+    expect(screen.getByLabelText("测试语法")).toHaveValue("hello there");
+    escape();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
 });
 
 describe("V3VoiceTextField 语种筛选", () => {
@@ -199,7 +296,9 @@ describe("V3VoiceTextField 语种筛选", () => {
       { name: "标注工具栏" },
       { timeout: 10_000 }
     );
-    fireEvent.click(screen.getByRole("button", { name: /发音/ }));
+    const voices = screen.getByRole("button", { name: /发音/ });
+    if (voices.getAttribute("aria-expanded") !== "true")
+      fireEvent.click(voices);
   }
 
   // uk 必须落 en-GB、us 必须落 en-US：映射写反了不会报错，只会静默上线。
@@ -239,7 +338,48 @@ describe("V3VoiceTextField 语种筛选", () => {
   });
 });
 
+it("宿主统一保存时音色配置直接回传且不显示内部完成按钮", async () => {
+  state.flags.VOICE_PREVIEW = true;
+  const onVoiceProfileChange = vi.fn();
+  render(
+    <V3VoiceTextField
+      mode="association"
+      presentation="editor"
+      showDone={false}
+      ariaLabel="例句正文"
+      field="value"
+      nodeId="sentence-voice"
+      value={VALUE}
+      onChange={vi.fn()}
+      onVoiceProfileChange={onVoiceProfileChange}
+    />
+  );
+  fireEvent.click(await screen.findByLabelText("启用 Sonia"));
+  expect(onVoiceProfileChange).toHaveBeenCalledWith({
+    voices: [{ voice_id: "sonia", enabled: true, rate_percent: 0 }]
+  });
+  expect(screen.queryByLabelText("完成例句正文编辑")).toBeNull();
+});
+
 describe("V3VoiceTextField 上传音频", () => {
+  it("未授予上传权限时宿主传入禁用状态", async () => {
+    state.canUpload = false;
+    render(
+      <V3VoiceTextField
+        ariaLabel="测试正文"
+        nodeId="task102"
+        field="text"
+        mode="grammar"
+        value={VALUE}
+        onChange={vi.fn()}
+      />
+    );
+    await openAudioPanel();
+    expect(screen.getByLabelText("上传音频")).toBeDisabled();
+    expect(screen.getByText("没有上传音频的权限")).toBeInTheDocument();
+    expect(state.upload).not.toHaveBeenCalled();
+  });
+
   it("后端仅支持语法结构音频时，正文关联模式不开放上传", async () => {
     render(
       <V3VoiceTextField
@@ -256,51 +396,66 @@ describe("V3VoiceTextField 上传音频", () => {
     expect(screen.getByRole("button", { name: "选择音频文件" })).toBeDisabled();
     expect(state.upload).not.toHaveBeenCalled();
   });
-  it("开关开着时注入适配器：上传成功后把资产原样（wire 形状）抛到 audio_assets", async () => {
-    state.upload.mockImplementation(async ({ file, locale, gender }) => ({
-      id: "asset-1",
-      locale,
-      gender,
-      content_type: file.type,
-      size_bytes: file.size,
-      duration_ms: null,
-      original_name: file.name,
-      created_at: "2026-09-06T00:00:00Z"
-    }));
-    const onAudioAssetsChange = vi.fn();
-    render(
-      <V3VoiceTextField
-        ariaLabel="语法结构 1 通用内容"
-        field="content"
-        nodeId="variant-1"
-        onChange={vi.fn()}
-        onAudioAssetsChange={onAudioAssetsChange}
-        value={VALUE}
-      />
-    );
-    await openAudioPanel();
-    fireEvent.change(screen.getByLabelText("上传音频"), {
-      target: {
-        files: [new File([new Uint8Array(3)], "a.mp3", { type: "audio/mpeg" })]
-      }
-    });
-    await screen.findByLabelText("试听 a.mp3");
-    expect(onAudioAssetsChange).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByLabelText("完成语法结构 1 通用内容编辑"));
-    await waitFor(() => expect(onAudioAssetsChange).toHaveBeenCalledTimes(1));
-    expect(onAudioAssetsChange).toHaveBeenCalledWith([
-      {
+  it.each([true, false])(
+    "内部完成按钮=%s 时上传资产按对应提交方式回传，上传中阻止完成",
+    async (showDone) => {
+      state.upload.mockImplementation(async ({ file, locale, gender }) => ({
         id: "asset-1",
-        locale: "en-GB",
-        gender: "female",
-        content_type: "audio/mpeg",
-        size_bytes: 3,
+        locale,
+        gender,
+        content_type: file.type,
+        size_bytes: file.size,
         duration_ms: null,
-        original_name: "a.mp3",
+        original_name: file.name,
         created_at: "2026-09-06T00:00:00Z"
+      }));
+      const onAudioAssetsChange = vi.fn();
+      const onDraftPendingChange = vi.fn();
+      render(
+        <V3VoiceTextField
+          ariaLabel="语法结构 1 通用内容"
+          showDone={showDone}
+          presentation={showDone ? "field" : "editor"}
+          onDraftPendingChange={onDraftPendingChange}
+          field="content"
+          nodeId="variant-1"
+          onChange={vi.fn()}
+          onAudioAssetsChange={onAudioAssetsChange}
+          value={VALUE}
+        />
+      );
+      if (showDone) await openAudioPanel();
+      else fireEvent.click(await screen.findByLabelText("音频"));
+      fireEvent.change(screen.getByLabelText("上传音频"), {
+        target: {
+          files: [
+            new File([new Uint8Array(3)], "a.mp3", { type: "audio/mpeg" })
+          ]
+        }
+      });
+      await screen.findByLabelText("试听 a.mp3");
+      if (showDone) {
+        expect(onAudioAssetsChange).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByLabelText("完成语法结构 1 通用内容编辑"));
+      } else {
+        expect(onDraftPendingChange).toHaveBeenCalledWith(true);
+        expect(onDraftPendingChange).toHaveBeenLastCalledWith(false);
       }
-    ]);
-  });
+      await waitFor(() => expect(onAudioAssetsChange).toHaveBeenCalledTimes(1));
+      expect(onAudioAssetsChange).toHaveBeenCalledWith([
+        {
+          id: "asset-1",
+          locale: "en-GB",
+          gender: "female",
+          content_type: "audio/mpeg",
+          size_bytes: 3,
+          duration_ms: null,
+          original_name: "a.mp3",
+          created_at: "2026-09-06T00:00:00Z"
+        }
+      ]);
+    }
+  );
 
   it("已有的 audio_assets 原样列出来；开关关着时面板置灰但列表仍在", async () => {
     state.flags.VOICE_AUDIO_UPLOAD = false;
@@ -695,6 +850,74 @@ const LIAISON_TEXT: RichTextV3 = {
   annotations: [{ type: "liaison", start: 3, end: 6 }]
 };
 
+it.each([
+  ["association", false],
+  ["association", true],
+  ["grammar", true]
+] as const)(
+  "打开 %s 弹窗仍保留页面原有标注，取消或完成不改写正文 formatting=%s",
+  async (mode, formatting) => {
+    const label = mode === "grammar" ? "语法结构" : "释义语句";
+    const onChange = vi.fn();
+    const { container } = render(
+      <V3VoiceTextField
+        mode={mode}
+        ariaLabel={label}
+        nodeId="definition-preview"
+        field="content"
+        value={{
+          ...LIAISON_TEXT,
+          version: 2,
+          annotations: [
+            ...LIAISON_TEXT.annotations,
+            ...(mode === "grammar"
+              ? [
+                  {
+                    type: "emphasis" as const,
+                    start: 0,
+                    end: 4,
+                    level: "core" as const
+                  }
+                ]
+              : formatting
+                ? [{ type: "bold" as const, start: 0, end: 4 }]
+                : [])
+          ]
+        }}
+        onChange={onChange}
+      />
+    );
+    const assertAnnotations = () => {
+      expect(container.querySelectorAll(".tsz-ve-liaison-anchor")).toHaveLength(
+        2
+      );
+      if (formatting)
+        expect(
+          Array.from(container.querySelectorAll("strong"))
+            .map((node) => node.textContent)
+            .join("")
+        ).toBe("pick");
+      if (mode === "grammar")
+        expect(
+          container.querySelector('strong[data-level="core"]')
+        ).not.toBeNull();
+    };
+    assertAnnotations();
+    for (const action of ["取消", "完成"]) {
+      fireEvent.click(screen.getByLabelText(`打开${label}编辑器`));
+      await screen.findByRole(
+        "toolbar",
+        { name: "标注工具栏" },
+        { timeout: 10000 }
+      );
+      assertAnnotations();
+      fireEvent.click(screen.getByLabelText(`${action}${label}编辑`));
+      assertAnnotations();
+    }
+    expect(onChange).not.toHaveBeenCalled();
+  }
+);
+
 // 编辑器里怎么连，收起后就怎么显示：实际发音、语法结构、英文正文（释义）三类字段都叠。
 it.each([
   [undefined, "默认语音字段"],
@@ -754,7 +977,69 @@ it.each([
   }
 );
 
-it("grammar 未聚焦展示颜色粗体和连读，聚焦改字、撤销后失焦恢复且不重挂输入框", () => {
+it.each([
+  { editor: true, readOnly: false },
+  { editor: true, readOnly: true },
+  { editor: false, readOnly: true }
+])(
+  "grammar 只读预览聚焦保留颜色、粗体、斜体、下划线和连读 editor=$editor readOnly=$readOnly",
+  ({ editor, readOnly }) => {
+    state.flags.VOICE_EDITOR = editor;
+    const onChange = vi.fn();
+    const { container } = render(
+      <V3VoiceTextField
+        mode="grammar"
+        ariaLabel="聚焦语法"
+        nodeId="focus-grammar"
+        field="content"
+        readOnly={readOnly}
+        value={{
+          ...LIAISON_TEXT,
+          version: 2,
+          annotations: [
+            ...LIAISON_TEXT.annotations,
+            { type: "emphasis", start: 0, end: 4, level: "core" },
+            { type: "italic", start: 0, end: 4 },
+            { type: "underline", start: 0, end: 4 }
+          ]
+        }}
+        onChange={onChange}
+      />
+    );
+    const input = screen.getByLabelText("聚焦语法");
+    const preview = container.querySelector(".v3-grammar-preview-content");
+    const anchors = Array.from(
+      container.querySelectorAll(".tsz-ve-liaison-anchor")
+    );
+    expect(input).toHaveAttribute("readonly");
+    expect(preview).not.toBeNull();
+    expect(anchors).toHaveLength(2);
+    fireEvent.focus(input);
+    expect(container.querySelector(".v3-grammar-preview-content")).toBe(
+      preview
+    );
+    expect(
+      Array.from(container.querySelectorAll('strong[data-level="core"]'))
+        .map((node) => node.textContent)
+        .join("")
+    ).toBe("pick");
+    expect(container.querySelector(".tsz-ve-italic")).not.toBeNull();
+    expect(container.querySelector(".tsz-ve-underline")).not.toBeNull();
+    expect(
+      Array.from(container.querySelectorAll(".tsz-ve-liaison-anchor"))
+    ).toEqual(anchors);
+    fireEvent.change(input, { target: { value: "changed" } });
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.blur(input);
+    expect(container.querySelector(".v3-grammar-preview-content")).toBe(
+      preview
+    );
+    expect(screen.getByLabelText("聚焦语法")).toBe(input);
+  }
+);
+
+it("grammar 降级输入可聚焦改字、撤销，失焦恢复格式且不重挂输入框", () => {
+  state.flags.VOICE_EDITOR = false;
   const initial: RichTextV3 = {
     ...LIAISON_TEXT,
     version: 2,
@@ -919,6 +1204,9 @@ it("弧线层内层扣掉输入框滚动条宽度，并随输入框滚动和尺�
       />
     );
     const input = screen.getByLabelText("英文例句");
+    const overlay = container.querySelector<HTMLElement>(
+      ".v3-voice-text-liaison-overlay"
+    );
     const content = container.querySelector<HTMLElement>(
       ".v3-voice-text-liaison-content"
     );
@@ -926,6 +1214,9 @@ it("弧线层内层扣掉输入框滚动条宽度，并随输入框滚动和尺�
     // 宽度不能写死成取整的 clientWidth：内层自动撑满，只用右外边距扣滚动条。
     expect(content!.style.width).toBe("");
     const style = getComputedStyle(input);
+    expect(
+      overlay!.style.getPropertyValue("--v3-voice-text-liaison-color")
+    ).toBe(style.color);
     const borders =
       (Number.parseFloat(style.borderLeftWidth) || 0) +
       (Number.parseFloat(style.borderRightWidth) || 0);
@@ -961,6 +1252,371 @@ it("弧线层压在紧凑组员之上、点击穿透，并按输入框视口裁�
   expect(overlayRule).toMatch(/overflow:\s*hidden;/u);
   expect(overlayRule).toMatch(/color:\s*transparent;/u);
   expect(fieldCss).toMatch(
-    /\.v3-voice-text-field-input\s*\{[^}]*margin-inline-end:\s*-1px;/su
+    /\.v3-voice-text-field-input\s*\{[^}]*margin-inline-end:\s*0;/su
   );
+});
+
+it("拼写编辑取消不改原值，完成保留斜体并在收起态回显", async () => {
+  const changed = vi.fn();
+  function Host() {
+    const [value, setValue] = useState<RichTextV3>({
+      version: 2,
+      text: "boiled potatoes",
+      annotations: []
+    });
+    return (
+      <V3VoiceTextField
+        mode="spelling"
+        value={value}
+        ariaLabel="拼写"
+        nodeId="spelling"
+        field="spelling"
+        onChange={(next) => {
+          setValue(next);
+          changed(next);
+        }}
+      />
+    );
+  }
+  const { container } = render(<Host />);
+  fireEvent.click(screen.getByRole("button", { name: "打开拼写编辑器" }));
+  const input = await screen.findByLabelText<HTMLTextAreaElement>("拼写");
+  input.focus();
+  input.setSelectionRange(7, 15);
+  fireEvent.mouseUp(input);
+  fireEvent.select(input);
+  fireEvent.click(screen.getByRole("button", { name: "斜体" }));
+  fireEvent.click(screen.getByLabelText("取消拼写编辑"));
+  expect(changed).not.toHaveBeenCalled();
+  expect(screen.getByLabelText("拼写")).toHaveValue("boiled potatoes");
+  fireEvent.click(screen.getByRole("button", { name: "打开拼写编辑器" }));
+  const again = await screen.findByLabelText<HTMLTextAreaElement>("拼写");
+  again.focus();
+  again.setSelectionRange(7, 15);
+  fireEvent.mouseUp(again);
+  fireEvent.select(again);
+  fireEvent.click(screen.getByRole("button", { name: "斜体" }));
+  fireEvent.click(screen.getByLabelText("完成拼写编辑"));
+  await waitFor(() =>
+    expect(changed).toHaveBeenCalledWith({
+      version: 2,
+      text: "boiled potatoes",
+      annotations: [{ type: "italic", start: 7, end: 15 }]
+    })
+  );
+  expect(
+    container.querySelector(".v3-grammar-preview-content i")
+  ).toHaveTextContent("potatoes");
+});
+
+it("关闭编辑器时拼写标注仍只读回显，降级改字保留未受影响的标注", () => {
+  state.flags.VOICE_EDITOR = false;
+  const rich: RichTextV3 = {
+    version: 2,
+    text: "boiled potatoes",
+    annotations: [
+      { type: "italic", start: 7, end: 15 },
+      { type: "liaison", start: 5, end: 8 }
+    ]
+  };
+  const changed = vi.fn();
+  const { container } = render(
+    <V3VoiceTextField
+      mode="spelling"
+      value={rich}
+      ariaLabel="拼写"
+      nodeId="spelling"
+      field="spelling"
+      onChange={changed}
+    />
+  );
+  expect(
+    Array.from(container.querySelectorAll(".v3-grammar-preview-content i"))
+      .map((node) => node.textContent)
+      .join("")
+  ).toBe("potatoes");
+  expect(container.querySelector(".tsz-ve-liaison-anchor")).not.toBeNull();
+  expect(screen.queryByRole("button", { name: "打开拼写编辑器" })).toBeNull();
+  const input = screen.getByLabelText("拼写");
+  fireEvent.focus(input);
+  fireEvent.change(input, { target: { value: "boiled potatoes today" } });
+  expect(changed).toHaveBeenCalledWith(
+    {
+      version: 2,
+      text: "boiled potatoes today",
+      annotations: [
+        { type: "liaison", start: 5, end: 8, start_len: 1, end_len: 1 },
+        { type: "italic", start: 7, end: 15 }
+      ]
+    },
+    undefined
+  );
+});
+
+it("释义完成后显示三种格式，重开取消保持保存内容和另一方言", async () => {
+  const initial: Extract<EnglishTextV3, { mode: "distinguish" }> = {
+    mode: "distinguish",
+    source_dialect: "uk",
+    uk: {
+      state: "ready",
+      variant: {
+        id: "uk",
+        origin: "manual",
+        value: { version: 2, text: "a job", annotations: [] }
+      }
+    },
+    us: {
+      state: "ready",
+      variant: {
+        id: "us",
+        origin: "manual",
+        value: {
+          version: 2,
+          text: "a job",
+          annotations: [{ type: "italic", start: 2, end: 5 }]
+        }
+      }
+    }
+  };
+  function Host() {
+    const [value, setValue] = useState<EnglishTextV3>(initial);
+    return (
+      <>
+        <V3LinkedEnglishTextField
+          value={value}
+          label="释义"
+          suffix="正文"
+          linksEnabled={false}
+          onChange={setValue}
+        />
+        <output data-testid="sentence-format">{JSON.stringify(value)}</output>
+      </>
+    );
+  }
+  const view = render(<Host />);
+  fireEvent.click(screen.getByLabelText("打开释义 英式正文编辑器"));
+  await screen.findByRole(
+    "toolbar",
+    { name: "标注工具栏" },
+    { timeout: 10000 }
+  );
+  const input = screen.getByLabelText("释义 英式正文") as HTMLTextAreaElement;
+  input.focus();
+  input.setSelectionRange(2, 5);
+  fireEvent.mouseUp(input);
+  fireEvent.select(input);
+  for (const name of ["加粗", "斜体", "下划线"])
+    fireEvent.click(screen.getByRole("button", { name }));
+  expect(
+    JSON.parse(screen.getByTestId("sentence-format").textContent!)
+  ).toEqual(initial);
+  fireEvent.click(screen.getByLabelText("完成释义 英式正文编辑"));
+  const saved = JSON.parse(screen.getByTestId("sentence-format").textContent!);
+  expect(saved.uk.variant.value.annotations).toEqual([
+    { type: "italic", start: 2, end: 5 },
+    { type: "bold", start: 2, end: 5 },
+    { type: "underline", start: 2, end: 5 }
+  ]);
+  expect(saved.us).toEqual(initial.us);
+  expect(
+    view.container.querySelector(".v3-association-preview-content .tsz-ve-bold")
+  ).toHaveTextContent("job");
+  expect(
+    view.container.querySelector(
+      ".v3-association-preview-content .tsz-ve-underline"
+    )
+  ).toHaveTextContent("job");
+  fireEvent.click(screen.getByLabelText("打开释义 英式正文编辑器"));
+  await screen.findByRole(
+    "toolbar",
+    { name: "标注工具栏" },
+    { timeout: 10000 }
+  );
+  fireEvent.click(screen.getByRole("button", { name: "清空标注" }));
+  fireEvent.click(screen.getByLabelText("取消释义 英式正文编辑"));
+  expect(
+    JSON.parse(screen.getByTestId("sentence-format").textContent!)
+  ).toEqual(saved);
+  expect(
+    view.container.querySelector(".v3-association-preview-content .tsz-ve-bold")
+  ).toHaveTextContent("job");
+});
+
+it.each([
+  { editor: false, editing: true, leading: true },
+  { editor: true, editing: false, leading: false }
+])(
+  "读取端 editor=$editor editing=$editing 关闭写入仍显示格式，聚焦降级输入仍可见",
+  ({ editor, editing, leading }) => {
+    state.flags.VOICE_EDITOR = editor;
+    state.flags.SENTENCE_FORMATTING = false;
+    const value: RichTextV3 = {
+      version: 2,
+      text: "jobs",
+      annotations: [
+        { type: "bold", start: 0, end: 4 },
+        { type: "underline", start: 0, end: 4 }
+      ]
+    };
+    const { container } = render(
+      <V3VoiceTextField
+        mode="association"
+        ariaLabel="格式读取"
+        nodeId="format-reader"
+        field="value"
+        value={value}
+        editingEnabled={editing}
+        leadingAction={leading ? <button>播放</button> : undefined}
+        onChange={vi.fn()}
+      />
+    );
+    const input = screen.getByLabelText("格式读取");
+    expect(container.querySelector(".tsz-ve-bold")).toHaveTextContent("jobs");
+    expect(container.querySelector(".tsz-ve-underline")).toHaveTextContent(
+      "jobs"
+    );
+    expect(screen.queryByLabelText("打开格式读取编辑器")).toBeNull();
+    fireEvent.focus(input);
+    expect(container.querySelector(".v3-grammar-preview-content")).toBeNull();
+    expect(input).not.toHaveAttribute("readonly");
+    fireEvent.blur(input);
+    expect(container.querySelector(".tsz-ve-bold")).toHaveTextContent("jobs");
+    expect(screen.getByLabelText("格式读取")).toBe(input);
+  }
+);
+
+it("仅关联保存通过独立回调保留原正文 wire 格式", async () => {
+  const onChange = vi.fn();
+  const onAssociationsChange = vi.fn();
+  render(
+    <V3VoiceTextField<TextLinkV3>
+      mode="association"
+      value={{ version: 1, text: "hello there", spans: [], liaisons: [] }}
+      textLinks={[]}
+      contentReadOnly
+      ariaLabel="仅关联"
+      nodeId="v"
+      field="value"
+      onChange={onChange}
+      onAssociationsChange={onAssociationsChange}
+      renderAssociationPicker={({ segments, onSelect }) => (
+        <button
+          onClick={() =>
+            onSelect({
+              id: "l",
+              source_segments: segments,
+              target_word_id: "w",
+              target_pos_id: "p",
+              target_base_form_id: "b",
+              target_form_id: "f",
+              target_variant_id: "v",
+              target_sense_id: "s"
+            })
+          }
+        >
+          关联此词
+        </button>
+      )}
+    />
+  );
+  fireEvent.click(screen.getByRole("button", { name: "打开仅关联编辑器" }));
+  fireEvent.click(await screen.findByRole("button", { name: "关联单词" }));
+  fireEvent.mouseDown(screen.getByLabelText("关联 hello（1）"), { button: 0 });
+  fireEvent.click(await screen.findByText("关联此词"));
+  fireEvent.click(screen.getByRole("button", { name: "完成仅关联编辑" }));
+  expect(onChange).not.toHaveBeenCalled();
+  expect(onAssociationsChange).toHaveBeenCalledWith([
+    expect.objectContaining({ target_word_id: "w" })
+  ]);
+});
+
+it("拼写停顿与音色同时编辑：取消恢复，完成同时写回且不改变读法配置", async () => {
+  state.flags.VOICE_PREVIEW = true;
+  state.synthesize.mockImplementation(() => new Promise(() => {}));
+  const initial = updateVariantSpelling(formsFixture(), UUIDS.common_variant, {
+    version: 2,
+    text: "hello there",
+    annotations: [
+      { type: "italic", start: 0, end: 5 },
+      { type: "pause", at: 5, duration_ms: 500 }
+    ]
+  });
+  const variantOf = (content: typeof initial) => {
+    const regions = content.pos[0]!.forms[0]!.regional_variants;
+    if (regions.mode !== "common") throw new Error("expected common");
+    return regions.common;
+  };
+  function Host() {
+    const [content, setContent] = useState(initial);
+    const variant = variantOf(content);
+    return (
+      <>
+        <V3VoiceTextField
+          mode="spelling"
+          ariaLabel="测试拼写"
+          field="spelling"
+          nodeId={variant.id}
+          audioUploadEnabled={false}
+          value={spellingEditorValue(variant)}
+          voiceProfile={variant.spelling_speech?.voice_profile}
+          onChange={(next) =>
+            setContent(updateVariantSpelling(content, variant.id, next))
+          }
+          onVoiceProfileChange={(profile) =>
+            setContent(
+              updateSpellingVoiceProfile(content, [variant.id], profile)
+            )
+          }
+        />
+        <output data-testid="spelling-wire">
+          {JSON.stringify(toFormsWire(content))}
+        </output>
+      </>
+    );
+  }
+  render(<Host />);
+  const saved = () =>
+    variantOf(JSON.parse(screen.getByTestId("spelling-wire").textContent!));
+  const edit = async () => {
+    fireEvent.click(screen.getByLabelText("打开测试拼写编辑器"));
+    fireEvent.click(await screen.findByLabelText("编辑第 1 处停顿 0.5 秒"));
+    fireEvent.click(screen.getByLabelText("停顿 1 秒"));
+    fireEvent.click(await screen.findByLabelText("启用 Sonia"));
+  };
+  await edit();
+  fireEvent.click(screen.getByLabelText("试听 Sonia"));
+  await waitFor(() => expect(state.synthesize).toHaveBeenCalled());
+  expect(state.synthesize.mock.lastCall?.[0]).toMatchObject({
+    voiceId: "sonia",
+    content: {
+      text: "hello there",
+      annotations: expect.arrayContaining([
+        { type: "pause", at: 5, duration_ms: 1000 }
+      ])
+    }
+  });
+  expect(saved()).toEqual(variantOf(initial));
+  fireEvent.click(screen.getByLabelText("取消测试拼写编辑"));
+  expect(saved()).toEqual(variantOf(initial));
+  await edit();
+  fireEvent.click(screen.getByLabelText("完成测试拼写编辑"));
+  expect(saved().spelling_speech).toEqual({
+    content: {
+      version: 2,
+      text: "hello there",
+      annotations: [{ type: "pause", at: 5, duration_ms: 1000 }]
+    },
+    voice_profile: {
+      voices: [{ voice_id: "sonia", enabled: true, rate_percent: 0 }]
+    }
+  });
+  expect(saved().spelling_rich?.annotations).toEqual([
+    { type: "italic", start: 0, end: 5 }
+  ]);
+  expect(saved().pronunciations).toEqual(variantOf(initial).pronunciations);
+  fireEvent.click(screen.getByLabelText("打开测试拼写编辑器"));
+  expect(
+    await screen.findByLabelText("编辑第 1 处停顿 1 秒")
+  ).toBeInTheDocument();
+  expect(await screen.findByLabelText("启用 Sonia")).toBeChecked();
 });

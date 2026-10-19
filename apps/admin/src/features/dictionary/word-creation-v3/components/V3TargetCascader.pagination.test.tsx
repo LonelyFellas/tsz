@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor
+} from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { HttpError } from "@tsz/api-client/http";
 import type {
@@ -173,13 +179,18 @@ it.each([true, false])(
       sense_id: "new-sense",
       gloss: "新增未发布词义"
     });
-    search.mockResolvedValue(
-      response(draftFirst ? [draft, published] : [published, draft])
-    );
+    const firstPage = pending<SearchComponentTargetsV3Response>();
+    search.mockReturnValue(firstPage.promise);
     const onReplace = vi.fn();
     render(
       <V3TargetCascader literal="give" targets={[]} onReplace={onReplace} />
     );
+    // 先完成候选加载与级联初始化，避免首帧的 effect 清空刚展开的路径。
+    await act(async () => {
+      firstPage.resolve(
+        response(draftFirst ? [draft, published] : [published, draft])
+      );
+    });
     fireEvent.click(await screen.findByText("give 0"));
     fireEvent.click(await screen.findByText("原形 give"));
     expect(screen.getAllByText("未发布目标")).toHaveLength(1);

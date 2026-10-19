@@ -26,6 +26,7 @@ export function adminAuthorizationIdentity(
 }
 
 const MODULE_QUERY_ROOTS: Record<string, readonly string[]> = {
+  coins: ["admin-coins"],
   words: ["admin-words", "inbound-references"],
   sentences: [
     "shared-sentences",
@@ -67,6 +68,7 @@ export function bindAdminAuthorizationCache(
     }
     if (before?.role === "super_admin" && after?.role !== "super_admin") {
       for (const root of [
+        "admin-coins",
         "admin-admins",
         "admin-roles",
         "permission-system",

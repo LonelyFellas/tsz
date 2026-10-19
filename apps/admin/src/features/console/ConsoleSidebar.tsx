@@ -16,7 +16,7 @@ import type { AdminProfile, MenuPermission } from "@tsz/types";
 import type { ReactNode } from "react";
 import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { hasAdminPermission } from "@tsz/shared/auth";
+import { hasAdminPermission, hasAnyAdminPermission } from "@tsz/shared/auth";
 import { useAuthStore } from "@/lib/auth";
 import { ADMIN_PAGE_ROUTES } from "@/lib/adminPageRoutes";
 
@@ -35,6 +35,7 @@ interface Leaf {
   key: string;
   label: string;
   perm?: MenuPermission;
+  anyPermission?: readonly string[];
   superOnly?: boolean;
   disabled?: boolean;
 }
@@ -51,7 +52,11 @@ interface Group {
 function pageLeaf(
   route: {
     path: string;
-    handle: { permission?: MenuPermission; superOnly?: boolean };
+    handle: {
+      permission?: MenuPermission;
+      anyPermission?: readonly string[];
+      superOnly?: boolean;
+    };
   },
   label: string
 ): Leaf {
@@ -59,6 +64,7 @@ function pageLeaf(
     key: `/${route.path}`,
     label,
     perm: route.handle.permission,
+    anyPermission: route.handle.anyPermission,
     superOnly: route.handle.superOnly
   };
 }
@@ -108,13 +114,7 @@ const GROUPS: Group[] = [
     icon: <ReadOutlined />,
     label: "词表管理",
     leaves: [
-      // 页面是只有标题的空壳，后端也没有 wordlists 端点，先按未落地处理。
-      {
-        key: "todo:wordlists",
-        label: "智能词表",
-        perm: "wordlists.access",
-        disabled: true
-      },
+      pageLeaf(ADMIN_PAGE_ROUTES.wordlists, "智能词表"),
       {
         key: "todo:custom-wordlist",
         label: "自定义词表",
@@ -141,13 +141,7 @@ const GROUPS: Group[] = [
     icon: <AuditOutlined />,
     label: "审核管理",
     leaves: [
-      // 同上：审核中心页面是空壳，后端无对应端点。
-      {
-        key: "todo:reviews",
-        label: "词表审核",
-        perm: "reviews.access",
-        disabled: true
-      },
+      pageLeaf(ADMIN_PAGE_ROUTES.reviews, "词表审核"),
       pageLeaf(ADMIN_PAGE_ROUTES.teacherApplications, "教师申请审核"),
       {
         key: "todo:comments",
@@ -167,14 +161,7 @@ const GROUPS: Group[] = [
     key: "grp-coin",
     icon: <DollarOutlined />,
     label: "天生币管理",
-    leaves: [
-      {
-        key: "todo:coins",
-        label: "天生币管理",
-        perm: "coins.access",
-        disabled: true
-      }
-    ]
+    leaves: [pageLeaf(ADMIN_PAGE_ROUTES.coins, "天生币管理")]
   }
 ];
 
@@ -187,7 +174,9 @@ function buildNav(profile: AdminProfile | null): MenuItem[] {
   const visible = (l: Leaf): boolean =>
     l.superOnly
       ? profile?.role === "super_admin"
-      : l.perm !== undefined && hasAdminPermission(profile, l.perm);
+      : l.anyPermission
+        ? hasAnyAdminPermission(profile, l.anyPermission)
+        : l.perm !== undefined && hasAdminPermission(profile, l.perm);
 
   const items: MenuItem[] = [
     { key: "/", icon: <HomeOutlined />, label: "首页" }
@@ -224,6 +213,21 @@ export function ConsoleSidebar({
     }
   };
 
+  const selectedKey = nav
+    .flatMap((item) =>
+      item && "children" in item ? (item.children ?? []) : [item]
+    )
+    .map((item) => item?.key)
+    .filter(
+      (key): key is string =>
+        typeof key === "string" &&
+        (pathname === key || (key !== "/" && pathname.startsWith(`${key}/`)))
+    )
+    .reduce(
+      (selected, key) => (key.length > selected.length ? key : selected),
+      ""
+    );
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <div
@@ -247,7 +251,7 @@ export function ConsoleSidebar({
       <Menu
         mode="inline"
         inlineCollapsed={collapsed}
-        selectedKeys={[pathname]}
+        selectedKeys={[selectedKey]}
         // 分类分组默认收起（不设 defaultOpenKeys）：初始只见顶层分类，按需点开。
         // 收起态下 antd 改用悬浮弹层展示子菜单，不受此影响。
         onClick={onClick}

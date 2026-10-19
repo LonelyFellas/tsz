@@ -348,21 +348,22 @@
   padding-inline: 2px;
 }
 
+/* Select 聚焦且下拉关闭时会插入读屏用的 span；宽度顺序只计算选择器本身。 */
 .v3-meanings-v2
   .word-definition-options
-  > .word-definition-text-select:nth-child(1) {
+  > .word-definition-text-select:nth-child(1 of .word-definition-text-select) {
   width: 24px;
 }
 
 .v3-meanings-v2
   .word-definition-options
-  > .word-definition-text-select:nth-child(2) {
+  > .word-definition-text-select:nth-child(2 of .word-definition-text-select) {
   width: 34px;
 }
 
 .v3-meanings-v2
   .word-definition-options
-  > .word-definition-text-select:nth-child(3) {
+  > .word-definition-text-select:nth-child(3 of .word-definition-text-select) {
   width: 62px;
 }
 
@@ -497,7 +498,7 @@
   min-width: 0;
   color: #273043;
   font-size: 14pt;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
@@ -514,8 +515,8 @@
 }
 
 .v3-product-progress-list .word-progress-done {
-  color: var(--ant-color-primary, #2053ff);
-  background: var(--ant-color-primary-bg, #edf4ff);
+  color: #576574;
+  background: #f0f2f4;
 }
 
 .v3-product-progress-list .word-progress-index {
@@ -561,7 +562,7 @@
   .v3-product-progress-list {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 4px;
+  gap: 2px;
 }
 
 .v3-product-progress-group {
@@ -573,7 +574,7 @@
   .word-creation-progress-row {
   grid-template-columns: 22px minmax(0, 1fr) auto;
   gap: 10px;
-  min-height: 42px;
+  min-height: 40px;
   padding: 8px;
   font-size: 13px;
   background: transparent;
@@ -679,8 +680,8 @@
 .v3-product-progress-details,
 .v3-product-progress-items {
   display: grid;
-  gap: 4px;
-  margin: 4px 0 8px;
+  gap: 2px;
+  margin: 0 0 4px;
   padding: 0 8px 0 40px;
   color: #667085;
   font-size: 12px;
@@ -689,8 +690,34 @@
 }
 
 .v3-product-progress-items {
-  margin-block: 0 4px;
-  padding-inline: 12px 0;
+  margin-block: 0;
+  padding-inline: 0;
+  counter-reset: progress-item;
+  font-variant-numeric: tabular-nums;
+}
+
+.v3-product-progress-items > li {
+  position: relative;
+  min-width: 0;
+  counter-increment: progress-item;
+}
+
+.v3-product-progress-items > li::before,
+.v3-product-progress-ordinal {
+  position: absolute;
+  inset-inline-start: -32px;
+  width: 28px;
+  color: #667085;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.v3-product-progress-items > li::before {
+  content: counter(progress-item) ".";
+}
+
+.v3-product-progress-details [data-pending="true"] .v3-product-progress-text {
+  color: #946000;
 }
 
 .v3-product-progress-details > li {
@@ -698,11 +725,12 @@
 }
 
 .v3-product-progress-detail {
+  position: relative;
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 8px;
   min-width: 0;
-  min-height: 28px;
+  min-height: 22px;
 }
 
 .v3-product-progress-detail > .v3-product-progress-text {
@@ -716,9 +744,8 @@
 .v3-product-progress-text {
   display: block;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 @media (prefers-reduced-motion: reduce) {

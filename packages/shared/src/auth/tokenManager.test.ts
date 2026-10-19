@@ -1,6 +1,62 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTokenManager } from "./tokenManager";
 
+it.each(["/api/v1", "/api/v1/admin"])(
+  "%s 旧标签页保留未知标记时，刷新后用当前 Cookie 安全恢复",
+  async (baseUrl) => {
+    vi.useFakeTimers();
+    const marker = `tsz:refresh-unconfirmed:${baseUrl}`;
+    const values = new Map([[marker, "1"]]);
+    vi.stubGlobal("sessionStorage", {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key)
+    });
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(null, {
+          status: 204,
+          headers: {
+            "x-refresh-recovery": "v1",
+            "x-refresh-current-only": "v1"
+          }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ access_token: "restored", expires_in: 900 }),
+          {
+            headers: { "x-refresh-recovery": "v1" }
+          }
+        )
+      );
+    const manager = createTokenManager({ baseUrl });
+    await expect(manager.refreshTokens()).resolves.toBe("restored");
+    expect(fetch.mock.calls.map(([, init]) => init?.method)).toEqual([
+      "HEAD",
+      "POST"
+    ]);
+    expect(
+      new Headers(fetch.mock.calls[1]?.[1]?.headers).get(
+        "x-refresh-current-only"
+      )
+    ).toBe("v1");
+    expect(
+      new Headers(fetch.mock.calls[1]?.[1]?.headers).get("x-refresh-request-id")
+    ).toMatch(/^[\da-f-]{36}$/);
+    expect(values.has(marker)).toBe(false);
+    expect(manager.getToken()).toBe("restored");
+    manager.setAccessToken(null);
+  }
+);
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
+
 function jsonResponse(body: unknown, ok = true): Response {
   return {
     ok,
@@ -210,4 +266,237 @@ describe("createTokenManager", () => {
     expect(() => tm.redirectToLogin()).not.toThrow();
     expect(tm.getToken()).toBeUndefined();
   });
+});
+
+it("refresh body timeout releases waiters and blocks Cookie replay until new login", async () => {
+  vi.useFakeTimers();
+  let deliver!: (value: unknown) => void;
+  const body = new Promise((resolve) => {
+    deliver = resolve;
+  });
+  const fetch = vi
+    .spyOn(globalThis, "fetch")
+    .mockResolvedValue({ ok: true, json: () => body } as Response);
+  const manager = createTokenManager({ baseUrl: "/api" });
+  manager.setAccessToken("old");
+  const first = manager.refreshTokens();
+  expect(manager.refreshTokens()).toBe(first);
+  const rejected = expect(first).rejects.toThrow("请重新登录");
+  await vi.advanceTimersByTimeAsync(10_000);
+  await rejected;
+  await expect(manager.refreshTokens()).rejects.toThrow("请重新登录");
+  expect(fetch).toHaveBeenCalledTimes(1);
+  deliver({ access_token: "late", expires_in: 900 });
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(manager.getToken()).toBe("old");
+  expect(fetch).toHaveBeenCalledTimes(1);
+  manager.setAccessToken("new-login");
+  fetch.mockResolvedValueOnce(
+    new Response(
+      JSON.stringify({ access_token: "new-session", expires_in: 900 })
+    )
+  );
+  await expect(manager.refreshTokens()).resolves.toBe("new-session");
+  manager.setAccessToken(null);
+  expect(vi.getTimerCount()).toBe(0);
+  vi.useRealTimers();
+});
+
+it("unknown Cookie rotation survives runtime recreation but explicit login clears it", async () => {
+  vi.restoreAllMocks();
+  const values = new Map<string, string>();
+  vi.stubGlobal("sessionStorage", {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key)
+  });
+  const fetch = vi
+    .spyOn(globalThis, "fetch")
+    .mockRejectedValueOnce(new TypeError("offline"));
+  const first = createTokenManager({ baseUrl: "/api/reliability" });
+  await expect(first.refreshTokens()).rejects.toThrow("offline");
+  first.setAccessToken(null);
+  expect(first.getToken()).toBeUndefined();
+  await expect(first.refreshTokens()).rejects.toThrow("请重新登录");
+  const restored = createTokenManager({ baseUrl: "/api/reliability" });
+  await expect(restored.refreshTokens()).rejects.toThrow("请重新登录");
+  expect(fetch).toHaveBeenCalledTimes(1);
+  restored.setAccessToken("explicit-login");
+  expect(values.size).toBe(0);
+  vi.unstubAllGlobals();
+});
+
+it.each([500, 502, 503, 504])(
+  "refresh %s cannot prove rotation failed and must not replay",
+  async (status) => {
+    vi.restoreAllMocks();
+    vi.useFakeTimers();
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(
+        async (_url, init) =>
+          new Response(null, { status: init?.method === "HEAD" ? 405 : status })
+      );
+    const manager = createTokenManager({ baseUrl: "/unknown-rotation" });
+    manager.setAccessToken("valid-access-token");
+    await expect(manager.refreshTokens()).rejects.toThrow("会话刷新失败");
+    await vi.advanceTimersByTimeAsync(600_000);
+    await expect(manager.refreshTokens()).rejects.toThrow("请重新登录");
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(
+      fetch.mock.calls.filter(([, init]) => init?.method === "POST")
+    ).toHaveLength(1);
+    expect(manager.getToken()).toBe("valid-access-token");
+    manager.setAccessToken(null);
+    vi.useRealTimers();
+  }
+);
+
+it("响应丢失后页面重载仍使用原刷新键，探明能力后续接", async () => {
+  vi.useFakeTimers();
+  const values = new Map<string, string>();
+  vi.stubGlobal("sessionStorage", {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key)
+  });
+  const fetch = vi
+    .spyOn(globalThis, "fetch")
+    .mockRejectedValueOnce(new TypeError("response lost"))
+    .mockResolvedValueOnce(
+      new Response(null, {
+        status: 204,
+        headers: { "x-refresh-recovery": "v1" }
+      })
+    )
+    .mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ access_token: "recovered", expires_in: 900 }),
+        { headers: { "x-refresh-recovery": "v1" } }
+      )
+    );
+  const first = createTokenManager({ baseUrl: "/reload-recovery" });
+  await expect(first.refreshTokens()).rejects.toThrow("response lost");
+  vi.clearAllTimers(); // 旧页面已卸载。
+  const reloaded = createTokenManager({ baseUrl: "/reload-recovery" });
+  await expect(reloaded.refreshTokens()).resolves.toBe("recovered");
+  const key = new Headers(fetch.mock.calls[0]?.[1]?.headers).get(
+    "x-refresh-request-id"
+  );
+  expect(key).toMatch(/^[a-f0-9-]{36}$/);
+  expect(
+    new Headers(fetch.mock.calls[2]?.[1]?.headers).get("x-refresh-request-id")
+  ).toBe(key);
+  expect(fetch.mock.calls[1]?.[1]?.method).toBe("HEAD");
+  expect(values.size).toBe(0);
+  reloaded.setAccessToken(null);
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+it("曾支持恢复的后端回退后，必须重新探测而不能重放旧 Cookie", async () => {
+  vi.useFakeTimers();
+  const fetch = vi
+    .spyOn(globalThis, "fetch")
+    .mockResolvedValueOnce(
+      new Response(JSON.stringify({ access_token: "valid", expires_in: 900 }), {
+        headers: { "x-refresh-recovery": "v1" }
+      })
+    )
+    .mockRejectedValueOnce(new TypeError("response lost after rollback"))
+    .mockResolvedValueOnce(new Response(null, { status: 405 }));
+  const manager = createTokenManager({ baseUrl: "/rollback-recovery" });
+  await expect(manager.refreshTokens()).resolves.toBe("valid");
+  await expect(manager.refreshTokens()).rejects.toThrow("response lost");
+  await vi.advanceTimersByTimeAsync(600_000);
+  expect(fetch.mock.calls.map(([, init]) => init?.method)).toEqual([
+    "POST",
+    "POST",
+    "HEAD"
+  ]);
+  await expect(manager.refreshTokens()).rejects.toThrow("请重新登录");
+  expect(fetch).toHaveBeenCalledTimes(3);
+  expect(manager.getToken()).toBe("valid");
+  manager.setAccessToken(null);
+});
+
+it("旧标签页恢复未获后端安全能力时不发 POST，后端升级后可继续", async () => {
+  vi.useFakeTimers();
+  const marker = "tsz:refresh-unconfirmed:/legacy";
+  const values = new Map([[marker, "1"]]);
+  vi.stubGlobal("sessionStorage", {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key)
+  });
+  const fetch = vi
+    .spyOn(globalThis, "fetch")
+    .mockResolvedValueOnce(
+      new Response(null, {
+        status: 204,
+        headers: { "x-refresh-recovery": "v1" }
+      })
+    )
+    .mockResolvedValueOnce(
+      new Response(null, {
+        status: 204,
+        headers: { "x-refresh-recovery": "v1", "x-refresh-current-only": "v1" }
+      })
+    )
+    .mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ access_token: "restored", expires_in: 900 }),
+        { headers: { "x-refresh-recovery": "v1" } }
+      )
+    );
+  const manager = createTokenManager({ baseUrl: "/legacy" });
+  await expect(manager.refreshTokens()).rejects.toThrow("请重新登录");
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(values.get(marker)).toBe("1");
+  await expect(manager.refreshTokens()).resolves.toBe("restored");
+  expect(fetch.mock.calls.map(([, init]) => init?.method)).toEqual([
+    "HEAD",
+    "HEAD",
+    "POST"
+  ]);
+  manager.setAccessToken(null);
+});
+
+it("旧标签页恢复响应丢失后自动用同键续接，不永久卡在加载中", async () => {
+  vi.useFakeTimers();
+  const marker = "tsz:refresh-unconfirmed:/legacy";
+  const values = new Map([[marker, "1"]]);
+  vi.stubGlobal("sessionStorage", {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key)
+  });
+  const capability = () =>
+    new Response(null, {
+      status: 204,
+      headers: { "x-refresh-recovery": "v1", "x-refresh-current-only": "v1" }
+    });
+  const fetch = vi
+    .spyOn(globalThis, "fetch")
+    .mockResolvedValueOnce(capability())
+    .mockRejectedValueOnce(new TypeError("response lost"))
+    .mockResolvedValueOnce(capability())
+    .mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ access_token: "restored", expires_in: 900 }),
+        { headers: { "x-refresh-recovery": "v1" } }
+      )
+    );
+  const manager = createTokenManager({ baseUrl: "/legacy" });
+  await expect(manager.refreshTokens()).rejects.toThrow("response lost");
+  await vi.advanceTimersByTimeAsync(5_000);
+  expect(manager.getToken()).toBe("restored");
+  expect(
+    new Headers(fetch.mock.calls[3]?.[1]?.headers).get("x-refresh-request-id")
+  ).toBe(
+    new Headers(fetch.mock.calls[1]?.[1]?.headers).get("x-refresh-request-id")
+  );
+  expect(values.has(marker)).toBe(false);
+  manager.setAccessToken(null);
 });

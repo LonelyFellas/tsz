@@ -1,3 +1,4 @@
+import { RefreshUnconfirmedError } from "./tokenManager";
 // 把 admin 端点、token 管理器、后台 store 装配成一份 admin 鉴权 runtime。
 // 与 web 的 createAuthRuntime 互不引用：端点、refresh cookie path、store 形状都不同。
 // 复用底层 createHttpClient / createTokenManager（无状态机制，按 baseUrl 参数化），
@@ -29,6 +30,7 @@ export interface AdminAuthRuntime {
 export interface AdminAuthRuntimeOptions {
   /** 必须指向后台前缀（如 /api/v1/admin），refresh 与各端点据此拼接。 */
   baseUrl: string;
+  getTestResourceRun?: () => string | undefined;
   /** refresh 失败后跳转的登录页路径。默认 /login。 */
   loginPath?: string;
   /** 待改密（403 code:must_change_password）时整页跳转的改密页路径。默认 /change-password。 */
@@ -53,6 +55,7 @@ export function redirectToChangePassword(
 
 export function createAdminAuthRuntime({
   baseUrl,
+  getTestResourceRun,
   loginPath,
   changePasswordPath = "/change-password"
 }: AdminAuthRuntimeOptions): AdminAuthRuntime {
@@ -61,8 +64,13 @@ export function createAdminAuthRuntime({
     baseUrl,
     loginPath,
     onRefreshError: (error) => {
+      store.setState({
+        refreshUnconfirmed: error instanceof RefreshUnconfirmedError
+      });
       if (error !== null || store.getState().hydrated) {
-        store.setState({ connectionError: error !== null });
+        store.setState({
+          connectionError: error !== null
+        });
       }
     }
   });
@@ -71,6 +79,7 @@ export function createAdminAuthRuntime({
   let profileDirty = false;
   const http = createHttpClient({
     baseUrl,
+    getTestResourceRun,
     getToken: tokens.getToken,
     getSessionGeneration: tokens.getSessionGeneration,
     onRefresh: tokens.refreshTokens,

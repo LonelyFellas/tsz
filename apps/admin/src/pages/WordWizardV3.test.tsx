@@ -47,6 +47,14 @@ const authMocks = vi.hoisted(() => ({
   } as { id: string; role: string; permissions?: string[] } | null
 }));
 
+// 页面测试验证词形编辑与保存编排；Azure 合成面板由 V3SynthesisInputs 测试覆盖。
+vi.mock(
+  "@/features/dictionary/word-creation-v3/components/V3SynthesisInputs",
+  () => ({
+    V3SynthesisInputs: () => null
+  })
+);
+
 // 只覆盖 useAuthStore：@/lib/auth 的其余导出被 api/dataSource 真实依赖，整体替换会让模块加载失败。
 vi.mock("@/lib/auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/auth")>()),
@@ -256,7 +264,31 @@ describe("WordWizardV3Page", () => {
   });
 
   it.each(["forms", "meanings"])(
-    "%s 保存按钮随未保存修改变化，失败可重试，成功后禁用",
+    "%s 保存按钮在修改后启用，还原原值后禁用",
+    async (step) => {
+      const current = word();
+      const endpoints = source({ word: current, retired_stable_nodes: [] });
+      renderPage(
+        `/words/${WORD_ID}/v3/wizard/${step}`,
+        createV3WordRequests(endpoints)
+      );
+      const input = await screen.findByLabelText(
+        step === "forms" ? "原形英美通用拼写" : "语义区间 1 中文"
+      );
+      const save = screen.getByText("保存草稿").closest("button")!;
+      const original = (input as HTMLInputElement).value;
+      expect(save).toBeDisabled();
+      await changeVoiceText(input, { target: { value: "edited" } });
+      expect(save).toBeEnabled();
+      await changeVoiceText(input, { target: { value: original } });
+      expect(save).toBeDisabled();
+      expect(endpoints.saveFormsStepV3).not.toHaveBeenCalled();
+      expect(endpoints.saveMeaningsStepV3).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(["forms", "meanings"])(
+    "%s 保存失败可重试，成功后禁用并保留输入",
     async (step) => {
       const current = word();
       const endpoints = source({ word: current, retired_stable_nodes: [] });
@@ -285,13 +317,9 @@ describe("WordWizardV3Page", () => {
         step === "forms" ? "原形英美通用拼写" : "语义区间 1 中文"
       );
       const save = screen.getByText("保存草稿").closest("button")!;
-      const original = (input as HTMLInputElement).value;
       expect(save).toBeDisabled();
       await changeVoiceText(input, { target: { value: "edited" } });
       expect(save).toBeEnabled();
-      await changeVoiceText(input, { target: { value: original } });
-      expect(save).toBeDisabled();
-      await changeVoiceText(input, { target: { value: "edited" } });
       fireEvent.click(save);
       const request =
         step === "forms"
@@ -413,7 +441,7 @@ describe("WordWizardV3Page", () => {
 
     expect(await screen.findByText("STEP 01")).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { level: 2, name: "创建新词条" })
+      screen.getByRole("heading", { level: 2, name: "创建词汇" })
     ).toBeInTheDocument();
     expect(screen.getByText("所属语言｜英美区分")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /返回智能词库/ })).toBeVisible();
@@ -1405,15 +1433,19 @@ describe("WordWizardV3Page", () => {
     expect(endpoints.rollbackPublicationV3).not.toHaveBeenCalled();
   });
 
-  it("retains an unsaved meanings draft when saving forms advances canonical revision", async () => {
+  it("仅词义有未保存修改时，在词形步骤也能保存并清除提示", async () => {
     const current = word({
       completed_steps: ["basics", "forms", "meanings"],
       max_reachable_step: "preview"
     });
     const endpoints = source({ word: current, retired_stable_nodes: [] });
-    vi.mocked(endpoints.saveFormsStepV3).mockImplementationOnce(
+    vi.mocked(endpoints.saveMeaningsStepV3).mockImplementationOnce(
       async (_wordId, input) => ({
-        word: { ...current, revision: 2, forms: input.content }
+        word: {
+          ...current,
+          revision: 2,
+          meanings: canonicalMeaningsFromWritable(input.content)
+        }
       })
     );
     renderPage(
@@ -1421,27 +1453,122 @@ describe("WordWizardV3Page", () => {
       createV3WordRequests(endpoints)
     );
 
-    fireEvent.click(
-      (await screen.findByText("添加语义区间")).closest("button")!
-    );
     fireEvent.change(await screen.findByLabelText("语义区间 1 中文"), {
-      target: { value: "词形保存后仍保留" }
+      target: { value: "从词形步骤保存的词义" }
     });
     fireEvent.click(screen.getByText("词形与发音"));
-    await changeVoiceText(await screen.findByLabelText(`原形英美通用拼写`), {
-      target: { value: "centre-forms-saved" }
-    });
-    fireEvent.click(screen.getByText("保存草稿").closest("button")!);
+    await screen.findByLabelText("原形英美通用拼写");
+    expect(screen.getByText("有未保存的草稿")).toBeVisible();
+    const save = screen.getByText("保存草稿").closest("button")!;
+    expect(save).toBeEnabled();
+    fireEvent.click(save);
 
     await waitFor(() =>
-      expect(endpoints.saveFormsStepV3).toHaveBeenCalledTimes(1)
+      expect(screen.queryByText("有未保存的草稿")).toBeNull()
+    );
+    expect(save).toBeDisabled();
+    expect(endpoints.saveFormsStepV3).not.toHaveBeenCalled();
+    expect(endpoints.previewFormsImpactV3).not.toHaveBeenCalled();
+    expect(endpoints.saveMeaningsStepV3).toHaveBeenCalledWith(
+      WORD_ID,
+      expect.objectContaining({
+        base_revision: 1,
+        intent: "save",
+        content: expect.objectContaining({
+          sense_groups: [
+            expect.objectContaining({ name_zh: "从词形步骤保存的词义" })
+          ]
+        })
+      })
     );
     fireEvent.click(screen.getByText("词义与例句"));
     expect(await screen.findByLabelText("语义区间 1 中文")).toHaveValue(
-      "词形保存后仍保留"
+      "从词形步骤保存的词义"
     );
-    expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
   });
+
+  it.each([undefined, "forms", "meanings"] as const)(
+    "词形与词义都有修改时保存全部草稿，失败后可重试（%s）",
+    async (failedStep) => {
+      const current = word({
+        completed_steps: ["basics", "forms", "meanings"],
+        max_reachable_step: "preview"
+      });
+      const endpoints = source({ word: current, retired_stable_nodes: [] });
+      if (failedStep === "forms") {
+        vi.mocked(endpoints.saveFormsStepV3).mockRejectedValueOnce(
+          new HttpError(500, "temporary failure", [], "internal_error")
+        );
+      }
+      if (failedStep === "meanings") {
+        vi.mocked(endpoints.saveMeaningsStepV3).mockRejectedValueOnce(
+          new HttpError(500, "temporary failure", [], "internal_error")
+        );
+      }
+      vi.mocked(endpoints.saveFormsStepV3).mockImplementationOnce(
+        async (_wordId, input) => ({
+          word: { ...current, revision: 2, forms: input.content }
+        })
+      );
+      vi.mocked(endpoints.saveMeaningsStepV3).mockImplementationOnce(
+        async (_wordId, input) => ({
+          word: {
+            ...current,
+            revision: 3,
+            forms: vi.mocked(endpoints.saveFormsStepV3).mock.calls[0]![1]
+              .content,
+            meanings: canonicalMeaningsFromWritable(input.content)
+          }
+        })
+      );
+      renderPage(
+        `/words/${WORD_ID}/v3/wizard/meanings`,
+        createV3WordRequests(endpoints)
+      );
+
+      fireEvent.click(
+        (await screen.findByText("添加语义区间")).closest("button")!
+      );
+      fireEvent.change(await screen.findByLabelText("语义区间 1 中文"), {
+        target: { value: "词形保存后仍保留" }
+      });
+      fireEvent.click(screen.getByText("词形与发音"));
+      await changeVoiceText(await screen.findByLabelText(`原形英美通用拼写`), {
+        target: { value: "centre-forms-saved" }
+      });
+      const save = screen.getByText("保存草稿").closest("button")!;
+      fireEvent.click(save);
+      if (failedStep) {
+        await screen.findByText("服务暂时不可用");
+        await waitFor(() => expect(save).toBeEnabled());
+        expect(screen.getByText("有未保存的草稿")).toBeVisible();
+        if (failedStep === "forms") {
+          expect(endpoints.saveMeaningsStepV3).not.toHaveBeenCalled();
+        }
+        fireEvent.click(save);
+      }
+
+      await waitFor(() =>
+        expect(screen.queryByText("有未保存的草稿")).toBeNull()
+      );
+      expect(endpoints.saveFormsStepV3).toHaveBeenCalledTimes(
+        failedStep === "forms" ? 2 : 1
+      );
+      expect(endpoints.saveMeaningsStepV3).toHaveBeenCalledTimes(
+        failedStep === "meanings" ? 2 : 1
+      );
+      expect(endpoints.saveMeaningsStepV3).toHaveBeenCalledWith(
+        WORD_ID,
+        expect.objectContaining({ base_revision: 2, intent: "save" })
+      );
+      expect(screen.getByText("保存草稿").closest("button")).toBeDisabled();
+      fireEvent.click(screen.getByText("词义与例句"));
+      expect(await screen.findByLabelText("语义区间 1 中文")).toHaveValue(
+        "词形保存后仍保留"
+      );
+      expect(screen.queryByText("有未保存的草稿")).toBeNull();
+    }
+  );
 
   it("saves an unsaved forms draft before meanings and keeps the accepted form", async () => {
     const current = word({
@@ -1949,7 +2076,7 @@ describe("WordWizardV3Page", () => {
     );
     expect(
       screen.getByTestId(`preview-pronunciation-${UUIDS.pronunciation}`)
-    ).toHaveTextContent(/sen\-tre.*常规.*centre/);
+    ).toHaveTextContent(/sen\-tre.*语流连读.*centre/);
     expect(
       screen.getByTestId(`preview-pronunciation-${UUIDS.pronunciation_2}`)
     ).toHaveTextContent(/sen\-tr.*强读.*centr/);
@@ -1958,7 +2085,7 @@ describe("WordWizardV3Page", () => {
     ).toHaveTextContent(/sen\-ter.*弱读.*center/);
     expect(
       screen.getByTestId(`preview-pronunciation-${uuidFromInt(904)}`)
-    ).toHaveTextContent(/sen\-tre\-uk.*常规.*centre\-uk/);
+    ).toHaveTextContent(/sen\-tre\-uk.*语流连读.*centre\-uk/);
   });
 
   it("keeps empty read-only groups and pronunciations visible", async () => {
@@ -2214,7 +2341,7 @@ describe("WordWizardV3Page", () => {
       node_id: UUIDS.pronunciation,
       field: "dict_phonetic",
       code: "pronunciation_required",
-      message: "请完整填写发音方式、字典音标和实际发音",
+      message: "请完整填写读法、字典音标和实际发音",
       node_location: {
         node_role: "forms.pronunciation",
         ancestor_node_ids: [
