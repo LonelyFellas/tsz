@@ -30,7 +30,7 @@ import type { PermissionTag, UnifiedPermissionCatalog } from "@tsz/types";
 import { CopyableText } from "@/components/CopyableText";
 import { api } from "@/lib/auth";
 import { PermissionChangeDialog } from "./PermissionChangeDialog";
-import { MODULE_LABELS } from "./labels";
+import { MODULE_LABELS, permissionModules } from "./labels";
 import { tagTextColor } from "./tagColors";
 const KIND_LABELS: Record<string, string> = {
   page: "页面",
@@ -492,7 +492,7 @@ export function PermissionManagement() {
     ) ?? [];
   const rows = (catalog.data?.permissions ?? []).filter(
     (permission) =>
-      (!module || module === permission.module_key) &&
+      (!module || permissionModules(permission).includes(module)) &&
       (!search ||
         `${permission.key} ${permission.label} ${permission.description}`
           .toLowerCase()
@@ -541,7 +541,7 @@ export function PermissionManagement() {
               style={{ width: 160 }}
               options={[
                 ...new Set(
-                  catalog.data?.permissions.map((p) => p.module_key) ?? []
+                  catalog.data?.permissions.flatMap(permissionModules) ?? []
                 )
               ].map((value) => ({
                 value,
@@ -663,7 +663,11 @@ export function PermissionManagement() {
               width: 140,
               render: (_, p) => (
                 <>
-                  <div>{MODULE_LABELS[p.module_key] ?? p.module_key}</div>
+                  <div>
+                    {permissionModules(p)
+                      .map((key) => MODULE_LABELS[key] ?? key)
+                      .join(" / ")}
+                  </div>
                   <Typography.Text type="secondary">
                     {KIND_LABELS[p.kind] ?? p.kind}
                   </Typography.Text>

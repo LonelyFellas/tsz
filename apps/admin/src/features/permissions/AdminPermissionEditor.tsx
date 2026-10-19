@@ -18,7 +18,7 @@ import { useState } from "react";
 import type { AdminPermissions, UnifiedPermissionCatalog } from "@tsz/types";
 import { api } from "@/lib/auth";
 import { PermissionChangeDialog } from "./PermissionChangeDialog";
-import { MODULE_LABELS } from "./labels";
+import { MODULE_LABELS, permissionModules } from "./labels";
 import { tagTextColor } from "./tagColors";
 
 function PermissionSelection({
@@ -36,7 +36,7 @@ function PermissionSelection({
   const labels = Object.fromEntries(
     catalog.permissions.map((p) => [p.key, p.label])
   );
-  const modules = [...new Set(catalog.permissions.map((p) => p.module_key))];
+  const modules = [...new Set(catalog.permissions.flatMap(permissionModules))];
   const [selected, setSelected] = useState<string[]>(snapshot.permissions);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -46,7 +46,7 @@ function PermissionSelection({
     modules.find((module) =>
       catalog.permissions.some(
         (permission) =>
-          permission.module_key === module &&
+          permissionModules(permission).includes(module) &&
           snapshot.permissions.includes(permission.key)
       )
     ) ??
@@ -54,8 +54,8 @@ function PermissionSelection({
       ""
   );
   const [previewing, setPreviewing] = useState(false);
-  const activePermissions = catalog.permissions.filter(
-    (permission) => permission.module_key === activeModule
+  const activePermissions = catalog.permissions.filter((permission) =>
+    permissionModules(permission).includes(activeModule)
   );
   const availableTags = catalog.tags.filter(
     (tag) => tag.permissions.length > 0
@@ -236,8 +236,8 @@ function PermissionSelection({
             }}
           >
             {modules.map((module) => {
-              const permissions = catalog.permissions.filter(
-                (permission) => permission.module_key === module
+              const permissions = catalog.permissions.filter((permission) =>
+                permissionModules(permission).includes(module)
               );
               const count = permissions.filter((permission) =>
                 selected.includes(permission.key)

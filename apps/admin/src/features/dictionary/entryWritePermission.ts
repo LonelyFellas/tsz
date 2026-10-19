@@ -26,7 +26,7 @@ export function canCheckEntry(
   return hasAnyAdminPermission(actor, [
     "words.edit",
     "words.publish",
-    "words.validate"
+    "words.create"
   ]);
 }
 export function canWriteEntry(

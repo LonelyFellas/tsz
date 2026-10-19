@@ -401,7 +401,7 @@ export function SmartDictionary({
         setSelectedKeys([]);
         setSelectedRecords({});
         setPendingRestore(undefined);
-        message.success(`已恢复 ${affected} 个词条`);
+        message.success(`已将 ${affected} 个词条恢复为草稿`);
       } else if (
         outcome.error.code ===
         "multiple_active_exact_headword_publications_not_enabled"
@@ -600,7 +600,7 @@ export function SmartDictionary({
                 {impact.active_run_count} 轮尚未结束的练习。
               </p>
               <p>
-                发布记录会保留。恢复词条后，词表可以重新展示；已失效的练习需要重新开始。
+                发布记录会保留。恢复后词条为草稿，不会自动公开；重新发布后词表才可展示，已失效的练习需要重新开始。
               </p>
               <p>
                 如果只是修正内容，请取消并编辑词条。引用数量可能随新操作变化，其他关联仍须先解除。
@@ -667,7 +667,7 @@ export function SmartDictionary({
     const confirmation = {
       title: `${restoring ? "恢复" : "移入垃圾桶"}「${label}」？`,
       content:
-        "恢复后词条重新进入正常列表，词表可以重新展示；已失效的练习不会自动恢复。",
+        "恢复后词条为草稿，不会自动公开。重新发布后词表才可展示；已失效的练习不会自动恢复。",
       okText: restoring ? "恢 复" : "移入垃圾桶",
       okButtonProps: { danger: !restoring },
       cancelText: "取消",
@@ -687,7 +687,9 @@ export function SmartDictionary({
             setSelectedKeys((previous) =>
               previous.filter((key) => key !== record.id)
             );
-            message.success(restoring ? "词条已恢复" : "词条已移入垃圾桶");
+            message.success(
+              restoring ? "词条已恢复为草稿" : "词条已移入垃圾桶"
+            );
           } catch (error) {
             message.error(
               describeLifecycleFailure(
@@ -749,7 +751,7 @@ export function SmartDictionary({
         ? `恢复选中的 ${selectedKeys.length} 个词条？`
         : `将选中的 ${selectedKeys.length} 个词条移入垃圾桶？`,
       content:
-        "该批次将原子恢复：任意一条冲突时全部保持原状。已失效的练习不会自动恢复。",
+        "该批次将原子恢复为草稿，不会自动公开；任意一条冲突时全部保持原状。已失效的练习不会自动恢复。",
       okText: restoring ? "恢 复" : "移入垃圾桶",
       okButtonProps: { danger: !restoring },
       cancelText: "取消",
@@ -771,7 +773,7 @@ export function SmartDictionary({
             setSelectedKeys([]);
             message.success(
               restoring
-                ? `已恢复 ${response.affected} 个词条`
+                ? `已将 ${response.affected} 个词条恢复为草稿`
                 : `已将 ${response.affected} 个词条移入垃圾桶`
             );
           } catch (error) {

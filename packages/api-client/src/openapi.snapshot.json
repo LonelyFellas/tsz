@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-custom-word-flag/docs/openapi.json",
-  "_generatedAt": "2026-10-19T06:15:15.126Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/zentao-132-permissions/docs/openapi.json",
+  "_generatedAt": "2026-10-19T08:43:22.942Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -44,6 +44,9 @@
     "/admin/lexicon/entries/{id}/inbound-references": ["get"],
     "/admin/lexicon/entries/{id}/publications": ["get", "post"],
     "/admin/lexicon/entries/{id}/publications/{publication_id}": ["get"],
+    "/admin/lexicon/entries/{id}/publications/{publication_id}/restore-draft": [
+      "post"
+    ],
     "/admin/lexicon/entries/{id}/publications/{publication_id}/rollback": [
       "post"
     ],
@@ -491,6 +494,38 @@
       }
     ],
     "get /admin/lexicon/entries/{id}/publications/{publication_id}": [
+      {
+        "name": "X-TSZ-Phoneme-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Spelling-Markup",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Spelling-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "post /admin/lexicon/entries/{id}/publications/{publication_id}/restore-draft": [
+      {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
       {
         "name": "X-TSZ-Phoneme-Speech",
         "in": "header",
@@ -1782,7 +1817,7 @@
       }
     },
     "post /admin/lexicon/entries/restore-batch": {
-      "request": { "$ref": "#/components/schemas/EntryLifecycleBatchInput" },
+      "request": { "$ref": "#/components/schemas/EntryRestoreBatchInput" },
       "responses": {
         "200": { "$ref": "#/components/schemas/EntryLifecycleBatchResponse" },
         "400": { "$ref": "#/components/schemas/ProblemDetails" },
@@ -1913,6 +1948,22 @@
         "503": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
+    "post /admin/lexicon/entries/{id}/publications/{publication_id}/restore-draft": {
+      "request": {
+        "$ref": "#/components/schemas/RestoreDraftFromPublicationV3Input"
+      },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/AdminWordV3Envelope" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "410": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "post /admin/lexicon/entries/{id}/publications/{publication_id}/rollback": {
       "request": { "$ref": "#/components/schemas/RollbackPublicationV3Input" },
       "responses": {
@@ -1940,7 +1991,7 @@
       }
     },
     "post /admin/lexicon/entries/{id}/restore": {
-      "request": { "$ref": "#/components/schemas/EntryLifecycleInput" },
+      "request": { "$ref": "#/components/schemas/EntryRestoreInput" },
       "responses": {
         "200": { "$ref": "#/components/schemas/AdminWordV3Envelope" },
         "400": { "$ref": "#/components/schemas/ProblemDetails" },
@@ -5582,6 +5633,35 @@
       "additionalProperties": false
     },
     "EntryKind": { "type": "string", "enum": ["word", "phrase"] },
+    "EntryRestoreBatchInput": {
+      "type": "object",
+      "required": ["restore_as", "entries"],
+      "properties": {
+        "confirmed_surface_match_token": { "type": "string" },
+        "entries": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/EntryLifecycleTarget" }
+        },
+        "restore_as": { "$ref": "#/components/schemas/EntryRestoreState" }
+      },
+      "additionalProperties": false
+    },
+    "EntryRestoreInput": {
+      "type": "object",
+      "required": ["restore_as", "base_revision", "base_lifecycle_revision"],
+      "properties": {
+        "base_lifecycle_revision": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
+        },
+        "base_revision": { "type": "integer", "format": "int64", "minimum": 1 },
+        "confirmed_surface_match_token": { "type": "string" },
+        "restore_as": { "$ref": "#/components/schemas/EntryRestoreState" }
+      },
+      "additionalProperties": false
+    },
+    "EntryRestoreState": { "type": "string", "enum": ["draft"] },
     "FormGroupScopeV3": { "type": "string", "enum": ["general", "dedicated"] },
     "GrammarFormLinkV3": {
       "type": "object",
@@ -5956,6 +6036,25 @@
       "properties": {
         "expected_revision": { "type": "integer", "format": "int64" },
         "name": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "RestoreDraftFromPublicationV3Input": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "base_revision",
+        "base_lifecycle_revision"
+      ],
+      "properties": {
+        "base_lifecycle_revision": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
+        },
+        "base_revision": { "type": "integer", "format": "int64", "minimum": 1 },
+        "confirmed_surface_match_token": { "type": "string" },
+        "schema_version": { "type": "integer", "enum": [3] }
       },
       "additionalProperties": false
     },

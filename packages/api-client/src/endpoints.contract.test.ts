@@ -33,6 +33,7 @@ const IDEMPOTENT_LEXICON_OPERATIONS = [
   "post /admin/lexicon/entries/restore-batch",
   "post /admin/lexicon/entries/{id}/archive",
   "post /admin/lexicon/entries/{id}/publications",
+  "post /admin/lexicon/entries/{id}/publications/{publication_id}/restore-draft",
   "post /admin/lexicon/entries/{id}/publications/{publication_id}/rollback",
   "post /admin/lexicon/entries/{id}/restore",
   "post /admin/lexicon/entries/publications/batch"
@@ -46,6 +47,7 @@ const SPELLING_MARKUP_OPERATIONS: readonly string[] = [
   "put /admin/lexicon/entries/{id}/steps/forms",
   "put /admin/lexicon/entries/{id}/steps/meanings",
   "post /admin/lexicon/entries/{id}/publications",
+  "post /admin/lexicon/entries/{id}/publications/{publication_id}/restore-draft",
   "post /admin/lexicon/entries/{id}/publications/{publication_id}/rollback",
   "post /admin/lexicon/entries/publications/batch",
   "post /admin/lexicon/entries/{id}/archive",
@@ -522,6 +524,12 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
         "AdminWordPublicationEnvelope"
       ],
       [
+        "post /admin/lexicon/entries/{id}/publications/{publication_id}/restore-draft",
+        "RestoreDraftFromPublicationV3Input",
+        "200",
+        "AdminWordV3Envelope"
+      ],
+      [
         "post /admin/lexicon/entries/{id}/publications/{publication_id}/rollback",
         "RollbackPublicationV3Input",
         "201",
@@ -547,7 +555,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       ],
       [
         "post /admin/lexicon/entries/restore-batch",
-        "EntryLifecycleBatchInput",
+        "EntryRestoreBatchInput",
         "200",
         "EntryLifecycleBatchResponse"
       ],
@@ -565,7 +573,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       ],
       [
         "post /admin/lexicon/entries/{id}/restore",
-        "EntryLifecycleInput",
+        "EntryRestoreInput",
         "200",
         "AdminWordV3Envelope"
       ]
@@ -655,6 +663,8 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
         "500",
         "503"
       ],
+      "post /admin/lexicon/entries/{id}/publications/{publication_id}/restore-draft":
+        ["400", "401", "403", "404", "409", "410", "422", "503"],
       "post /admin/lexicon/entries/{id}/publications/{publication_id}/rollback":
         ["400", "401", "403", "404", "409", "410", "422", "503"],
       "get /admin/lexicon/surface-match-snapshots/{snapshot_id}": [
@@ -748,7 +758,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "3de0e2d9e4f0b0babe30effacb7cb44f5bce552e63bb6aa34fad468b9bfdf826"
+      "2540306f1f5cf81992088e29a342bcca1bf307c4c4779b9260ace6d015943495"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");

@@ -29,7 +29,7 @@ function renderPanel(
   state: SurfaceSnapshotState<SurfaceMatchPageV3>,
   onConfirm = vi.fn(),
   onRestart = vi.fn(),
-  action: "restore" | "rollback" = "restore"
+  action: "restore" | "restoreDraft" = "restore"
 ) {
   render(
     <App>
@@ -108,7 +108,7 @@ describe("LifecycleSurfaceConfirmation", () => {
     expect(screen.getByText("名词")).toBeInTheDocument();
     expect(screen.getByText("释义：颜色")).toBeInTheDocument();
     expect(screen.queryByText("12345678")).toBeNull();
-    expect(screen.getByText("恢复前需要确认同名公开范围")).toBeVisible();
+    expect(screen.getByText("恢复前需要确认同名词条")).toBeVisible();
     expect(screen.getByText(/确认后将按当前结果继续恢复/)).toBeInTheDocument();
     expect(screen.getByText("确认并恢复")).toBeEnabled();
   });
@@ -183,13 +183,13 @@ describe("LifecycleSurfaceConfirmation", () => {
     expect(screen.queryByText("重新加载确认快照")).toBeNull();
   });
 
-  it("activate 模式使用激活语义且保持确认回调", () => {
+  it("历史恢复使用草稿语义且保持确认回调", () => {
     const onConfirm = vi.fn();
     renderPanel(
       {
         generation: 1,
         phase: "ready",
-        items: [item("rollback")],
+        items: [item("restoreDraft")],
         matched_entry_contexts: [],
         total: 1,
         confirmation_reasons: ["visibility_activation"],
@@ -197,17 +197,19 @@ describe("LifecycleSurfaceConfirmation", () => {
       },
       onConfirm,
       vi.fn(),
-      "rollback"
+      "restoreDraft"
     );
 
-    expect(screen.getByText("回退前需要确认同名公开范围")).toBeVisible();
-    expect(screen.getByText(/确认后将按当前结果继续回退/)).toBeInTheDocument();
-    expect(screen.queryByText(/恢复/)).toBeNull();
-    fireEvent.click(screen.getByText("确认并回退"));
+    expect(screen.getByText("恢复草稿前需要确认同名词条")).toBeVisible();
+    expect(
+      screen.getByText(/确认后将按当前结果继续恢复草稿/)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/回退/)).toBeNull();
+    fireEvent.click(screen.getByText("确认并恢复草稿"));
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
-  it("activate 模式的过期快照要求重新检查回退条件", () => {
+  it("历史恢复快照过期后重新检查恢复草稿条件", () => {
     const onRestart = vi.fn();
     renderPanel(
       {
@@ -220,15 +222,15 @@ describe("LifecycleSurfaceConfirmation", () => {
       },
       vi.fn(),
       onRestart,
-      "rollback"
+      "restoreDraft"
     );
 
-    fireEvent.click(screen.getByText("重新检查回退条件"));
+    fireEvent.click(screen.getByText("重新检查恢复草稿条件"));
     expect(onRestart).toHaveBeenCalledTimes(1);
-    expect(screen.queryByText(/恢复/)).toBeNull();
+    expect(screen.queryByText(/回退/)).toBeNull();
   });
 
-  it("activate 模式的 disabled gate 不泄漏恢复语义", () => {
+  it("历史恢复受限时保留草稿语义且不提供确认入口", () => {
     renderPanel(
       {
         generation: 1,
@@ -242,11 +244,11 @@ describe("LifecycleSurfaceConfirmation", () => {
       },
       vi.fn(),
       vi.fn(),
-      "rollback"
+      "restoreDraft"
     );
 
-    expect(screen.getByText(/当前不能继续回退/)).toBeInTheDocument();
-    expect(screen.queryByText(/恢复/)).toBeNull();
-    expect(screen.queryByText("确认并回退")).toBeNull();
+    expect(screen.getByText(/当前不能继续恢复草稿/)).toBeInTheDocument();
+    expect(screen.queryByText(/回退/)).toBeNull();
+    expect(screen.queryByText("确认并恢复草稿")).toBeNull();
   });
 });

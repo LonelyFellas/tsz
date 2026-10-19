@@ -155,7 +155,7 @@ function source(getAnyValue: unknown) {
     publishV3: vi.fn(),
     listPublications: vi.fn(async () => ({ publications: [] })),
     getPublication: vi.fn(),
-    rollbackPublicationV3: vi.fn()
+    restoreDraftFromPublicationV3: vi.fn()
   } as unknown as V3WordsApi;
 }
 
@@ -1323,7 +1323,7 @@ describe("WordWizardV3Page", () => {
 
   it("preserves an unsaved forms draft across steps and gates canonical preview actions", async () => {
     const current = word({
-      status: "published",
+      status: "draft",
       completed_steps: ["basics", "forms", "meanings"],
       max_reachable_step: "preview",
       capabilities: {
@@ -1371,14 +1371,14 @@ describe("WordWizardV3Page", () => {
       await screen.findByText("请先保存或放弃未保存的草稿")
     ).toBeInTheDocument();
     expect(
-      screen.getByText("回退为新版本", { exact: true }).closest("button")!
+      screen.getByText("恢复到草稿", { exact: true }).closest("button")!
     ).toBeDisabled();
-    expect(endpoints.rollbackPublicationV3).not.toHaveBeenCalled();
+    expect(endpoints.restoreDraftFromPublicationV3).not.toHaveBeenCalled();
   });
 
   it("preserves an unsaved meanings draft across steps and gates canonical preview actions", async () => {
     const current = word({
-      status: "published",
+      status: "draft",
       completed_steps: ["basics", "forms", "meanings"],
       max_reachable_step: "preview",
       capabilities: {
@@ -1428,9 +1428,9 @@ describe("WordWizardV3Page", () => {
       await screen.findByText("请先保存或放弃未保存的草稿")
     ).toBeInTheDocument();
     expect(
-      screen.getByText("回退为新版本", { exact: true }).closest("button")!
+      screen.getByText("恢复到草稿", { exact: true }).closest("button")!
     ).toBeDisabled();
-    expect(endpoints.rollbackPublicationV3).not.toHaveBeenCalled();
+    expect(endpoints.restoreDraftFromPublicationV3).not.toHaveBeenCalled();
   });
 
   it("仅词义有未保存修改时，在词形步骤也能保存并清除提示", async () => {
@@ -1713,9 +1713,206 @@ describe("WordWizardV3Page", () => {
     );
   });
 
-  it("activates from history and replaces the page canonical/read-only state", async () => {
+  it("审查回归：未完成草稿不必先补齐发布条件即可恢复历史", async () => {
+    const current = word();
+    const historical = publication(current);
+    const canonical = word({ revision: 2 });
+    const endpoints = source({ word: current, retired_stable_nodes: [] });
+    vi.mocked(endpoints.listPublications).mockResolvedValue({
+      publications: [historical]
+    });
+    vi.mocked(endpoints.getPublication).mockResolvedValue({
+      publication: historical
+    });
+    vi.mocked(endpoints.restoreDraftFromPublicationV3).mockResolvedValue({
+      word: canonical
+    });
+    vi.mocked(endpoints.get)
+      .mockResolvedValueOnce({ word: current, retired_stable_nodes: [] })
+      .mockResolvedValue({ word: canonical, retired_stable_nodes: [] });
+    renderPage(
+      `/words/${WORD_ID}/v3/wizard/forms`,
+      createV3WordRequests(endpoints)
+    );
+    await screen.findByLabelText("原形英美通用拼写");
+    fireEvent.click(await screen.findByLabelText("查看第 1 次发布"));
+    fireEvent.click(await screen.findByRole("button", { name: "恢复到草稿" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
+    await waitFor(() => expect(endpoints.get).toHaveBeenCalledTimes(2));
+    expect(await screen.findByLabelText("原形英美通用拼写")).toBeEnabled();
+    expect(endpoints.validateV3).not.toHaveBeenCalled();
+    expect(endpoints.publishV3).not.toHaveBeenCalled();
+  });
+
+  it.each(["forms", "meanings"])(
+    "审查回归：%s 脏草稿在撤销编辑权限后仍禁止历史恢复",
+    async (step) => {
+      const previous = authMocks.profile;
+      try {
+        const current = word({
+          completed_steps: ["basics", "forms", "meanings"],
+          max_reachable_step: "preview"
+        });
+        const historical = publication(current);
+        const endpoints = source({ word: current, retired_stable_nodes: [] });
+        vi.mocked(endpoints.listPublications).mockResolvedValue({
+          publications: [historical]
+        });
+        vi.mocked(endpoints.getPublication).mockResolvedValue({
+          publication: historical
+        });
+        const client = new QueryClient({
+          defaultOptions: { queries: { retry: false } }
+        });
+        const router = renderPage(
+          `/words/${WORD_ID}/v3/wizard/${step}`,
+          createV3WordRequests(endpoints),
+          undefined,
+          undefined,
+          client
+        );
+        const input = await screen.findByLabelText(
+          step === "forms" ? "原形英美通用拼写" : "语义区间 1 中文"
+        );
+        await changeVoiceText(input, {
+          target: { value: "unsaved-before-revoke" }
+        });
+        let finishRefresh!: (value: {
+          word: AdminWordV3;
+          retired_stable_nodes: [];
+        }) => void;
+        vi.mocked(endpoints.get).mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              finishRefresh = resolve;
+            })
+        );
+        authMocks.profile = {
+          id: current.created_by,
+          role: "admin",
+          permissions: ["words.access", "words.rollback"]
+        };
+        await act(() => {
+          client.removeQueries({ queryKey: ["admin-words"] });
+          return router.navigate(`/words/${WORD_ID}/v3/wizard/${step}`, {
+            replace: true
+          });
+        });
+        await waitFor(() => expect(endpoints.get).toHaveBeenCalledTimes(2));
+        await act(async () =>
+          finishRefresh({ word: current, retired_stable_nodes: [] })
+        );
+        fireEvent.click(await screen.findByLabelText("查看第 1 次发布"));
+        await waitFor(() =>
+          expect(
+            screen.getByText("请先保存或放弃未保存的草稿")
+          ).toBeInTheDocument()
+        );
+        expect(
+          screen.getByRole("button", { name: "恢复到草稿" })
+        ).toBeDisabled();
+        expect(endpoints.restoreDraftFromPublicationV3).not.toHaveBeenCalled();
+      } finally {
+        authMocks.profile = previous;
+      }
+    }
+  );
+
+  it("审查回归：恢复 common 历史后用完整退役账本重用 split 槽位", async () => {
     const current = word({
-      status: "published",
+      forms: formsFixture({ forms: [ukUsFormFixture({ id: UUIDS.form })] }),
+      completed_steps: ["basics", "forms", "meanings"],
+      max_reachable_step: "preview"
+    });
+    const restored = word({ revision: 2 });
+    const historical = publication(restored);
+    const retired = [
+      {
+        id: UUIDS.uk_variant,
+        node_role: "uk_variant" as const,
+        parent_node_id: UUIDS.form,
+        retired_at: current.updated_at
+      },
+      {
+        id: UUIDS.us_variant,
+        node_role: "us_variant" as const,
+        parent_node_id: UUIDS.form,
+        retired_at: current.updated_at
+      }
+    ];
+    const endpoints = source({ word: current, retired_stable_nodes: [] });
+    vi.mocked(endpoints.get)
+      .mockResolvedValueOnce({ word: current, retired_stable_nodes: [] })
+      .mockResolvedValue({ word: restored, retired_stable_nodes: retired });
+    vi.mocked(endpoints.listPublications).mockResolvedValue({
+      publications: [historical]
+    });
+    vi.mocked(endpoints.getPublication).mockResolvedValue({
+      publication: historical
+    });
+    vi.mocked(endpoints.restoreDraftFromPublicationV3).mockResolvedValue({
+      word: restored
+    });
+    vi.mocked(endpoints.previewFormsImpactV3).mockResolvedValue({
+      schema_version: 3,
+      base_revision: 2,
+      requires_confirmation: false,
+      affected: []
+    });
+    vi.mocked(endpoints.saveFormsStepV3).mockImplementation(
+      async (_id, input) => ({
+        word: { ...restored, revision: 3, forms: input.content }
+      })
+    );
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } }
+    });
+    const router = renderPage(
+      `/words/${WORD_ID}/v3/wizard/preview`,
+      createV3WordRequests(endpoints),
+      undefined,
+      undefined,
+      client
+    );
+    fireEvent.click(await screen.findByLabelText("查看第 1 次发布"));
+    fireEvent.click(await screen.findByRole("button", { name: "恢复到草稿" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
+    await waitFor(() =>
+      expect(
+        client.getQueryData<{ word: AdminWordV3 }>([
+          "admin-words",
+          "detail-v3",
+          WORD_ID
+        ])?.word.revision
+      ).toBe(2)
+    );
+    await waitFor(() =>
+      expect(router.state.location.pathname).toContain("/wizard/meanings")
+    );
+    fireEvent.click(
+      (await screen.findAllByText("词形与发音")).find((element) =>
+        element.closest(".ant-steps-item")
+      )!
+    );
+    await screen.findByLabelText("原形英美通用拼写");
+    fireEvent.click(screen.getByLabelText("英美拼写有区别"));
+    fireEvent.click(screen.getByText("保存草稿").closest("button")!);
+    await waitFor(() => expect(endpoints.saveFormsStepV3).toHaveBeenCalled());
+    const saved = vi.mocked(endpoints.saveFormsStepV3).mock.calls[0]![1].content
+      .pos[0]!.forms[0]!.regional_variants;
+    expect(saved).toMatchObject({
+      mode: "uk_us",
+      uk: { id: UUIDS.uk_variant },
+      us: { id: UUIDS.us_variant }
+    });
+    await waitFor(() =>
+      expect(screen.getByText("保存草稿").closest("button")).toBeDisabled()
+    );
+  });
+
+  it("restores history into the page canonical draft and keeps it editable", async () => {
+    const current = word({
+      status: "draft",
       completed_steps: ["basics", "forms", "meanings"],
       max_reachable_step: "preview",
       capabilities: {
@@ -1725,9 +1922,12 @@ describe("WordWizardV3Page", () => {
     });
     const historical = publication(current);
     const activated = word({
-      status: "published",
+      forms: formsFixture({
+        forms: [commonFormFixture({ spelling: "restored-canonical" })]
+      }),
+      status: "draft",
       revision: 2,
-      lifecycle_revision: 2,
+      lifecycle_revision: 1,
       has_unpublished_changes: false,
       completed_steps: ["basics", "forms", "meanings"],
       max_reachable_step: "preview",
@@ -1742,13 +1942,16 @@ describe("WordWizardV3Page", () => {
       }
     });
     const endpoints = source({ word: current, retired_stable_nodes: [] });
+    vi.mocked(endpoints.get)
+      .mockResolvedValueOnce({ word: current, retired_stable_nodes: [] })
+      .mockResolvedValue({ word: activated, retired_stable_nodes: [] });
     vi.mocked(endpoints.listPublications).mockResolvedValue({
       publications: [historical]
     });
     vi.mocked(endpoints.getPublication).mockResolvedValue({
       publication: historical
     });
-    vi.mocked(endpoints.rollbackPublicationV3).mockResolvedValue({
+    vi.mocked(endpoints.restoreDraftFromPublicationV3).mockResolvedValue({
       word: activated
     });
 
@@ -1759,16 +1962,16 @@ describe("WordWizardV3Page", () => {
 
     fireEvent.click(await screen.findByLabelText("查看第 1 次发布"));
     fireEvent.click(
-      (await screen.findByText("回退为新版本", { exact: true })).closest(
+      (await screen.findByText("恢复到草稿", { exact: true })).closest(
         "button"
       )!
     );
     fireEvent.click(
-      screen.getByText("确认回退", { exact: true }).closest("button")!
+      screen.getByText("确认恢复", { exact: true }).closest("button")!
     );
 
     await waitFor(() =>
-      expect(endpoints.rollbackPublicationV3).toHaveBeenCalledWith(
+      expect(endpoints.restoreDraftFromPublicationV3).toHaveBeenCalledWith(
         WORD_ID,
         "publication-v3-history",
         expect.any(String),
@@ -1779,15 +1982,26 @@ describe("WordWizardV3Page", () => {
         }
       )
     );
-    expect(await screen.findByText("当前词条为只读查看")).toBeInTheDocument();
+    expect(screen.queryByText("当前词条为只读查看")).toBeNull();
+    expect(
+      await screen.findByRole("button", { name: "检查发布条件" })
+    ).toBeEnabled();
     expect(screen.getAllByText("activated canonical").length).toBeGreaterThan(
       0
+    );
+    fireEvent.click(
+      screen
+        .getAllByText("词形与发音")
+        .find((element) => element.closest(".ant-steps-item"))!
+    );
+    expect(await screen.findByLabelText("原形英美通用拼写")).toHaveValue(
+      "restored-canonical"
     );
   });
 
   it("refreshes after an activation conflict, clears preview confirmation state, and uses the latest base revisions", async () => {
     const current = word({
-      status: "published",
+      status: "draft",
       completed_steps: ["basics", "forms", "meanings"],
       max_reachable_step: "preview",
       capabilities: {
@@ -1797,7 +2011,7 @@ describe("WordWizardV3Page", () => {
     });
     const expired = publication(current);
     const freshWord = word({
-      status: "published",
+      status: "draft",
       revision: 5,
       lifecycle_revision: 4,
       completed_steps: ["basics", "forms", "meanings"],
@@ -1813,9 +2027,9 @@ describe("WordWizardV3Page", () => {
       source_revision: 5
     });
     const activated = word({
-      status: "published",
+      status: "draft",
       revision: 6,
-      lifecycle_revision: 5,
+      lifecycle_revision: 4,
       has_unpublished_changes: false,
       completed_steps: ["basics", "forms", "meanings"],
       max_reachable_step: "preview",
@@ -1827,7 +2041,8 @@ describe("WordWizardV3Page", () => {
     const endpoints = source({ word: current, retired_stable_nodes: [] });
     vi.mocked(endpoints.get)
       .mockResolvedValueOnce({ word: current, retired_stable_nodes: [] })
-      .mockResolvedValue({ word: freshWord, retired_stable_nodes: [] });
+      .mockResolvedValueOnce({ word: freshWord, retired_stable_nodes: [] })
+      .mockResolvedValue({ word: activated, retired_stable_nodes: [] });
     vi.mocked(endpoints.listPublications)
       .mockResolvedValueOnce({ publications: [expired] })
       .mockResolvedValue({ publications: [fresh] });
@@ -1836,7 +2051,7 @@ describe("WordWizardV3Page", () => {
         publication: publicationId === "publication-v3-fresh" ? fresh : expired
       })
     );
-    vi.mocked(endpoints.rollbackPublicationV3)
+    vi.mocked(endpoints.restoreDraftFromPublicationV3)
       .mockRejectedValueOnce(
         new HttpError(409, "stale revision", [], "revision_conflict")
       )
@@ -1857,12 +2072,12 @@ describe("WordWizardV3Page", () => {
     ).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("查看第 1 次发布"));
     fireEvent.click(
-      (await screen.findByText("回退为新版本", { exact: true })).closest(
+      (await screen.findByText("恢复到草稿", { exact: true })).closest(
         "button"
       )!
     );
     fireEvent.click(
-      screen.getByText("确认回退", { exact: true }).closest("button")!
+      screen.getByText("确认恢复", { exact: true }).closest("button")!
     );
 
     await waitFor(() => expect(endpoints.get).toHaveBeenCalledTimes(2));
@@ -1875,26 +2090,26 @@ describe("WordWizardV3Page", () => {
       screen.queryByText("发布词条", { exact: true })?.closest("button") ?? null
     ).toBeNull();
     expect(
-      screen.queryByText("确认回退", { exact: true })?.closest("button") ?? null
+      screen.queryByText("确认恢复", { exact: true })?.closest("button") ?? null
     ).toBeNull();
 
     fireEvent.click(
       await screen.findByRole("button", { name: "查看第 2 次发布" })
     );
     fireEvent.click(
-      (await screen.findByText("回退为新版本", { exact: true })).closest(
+      (await screen.findByText("恢复到草稿", { exact: true })).closest(
         "button"
       )!
     );
     fireEvent.click(
-      screen.getByText("确认回退", { exact: true }).closest("button")!
+      screen.getByText("确认恢复", { exact: true }).closest("button")!
     );
 
     await waitFor(() =>
-      expect(endpoints.rollbackPublicationV3).toHaveBeenCalledTimes(2)
+      expect(endpoints.restoreDraftFromPublicationV3).toHaveBeenCalledTimes(2)
     );
-    const activationCalls = vi.mocked(endpoints.rollbackPublicationV3).mock
-      .calls;
+    const activationCalls = vi.mocked(endpoints.restoreDraftFromPublicationV3)
+      .mock.calls;
     expect(activationCalls[1]![3]).toEqual({
       schema_version: 3,
       base_revision: 5,
@@ -2152,7 +2367,7 @@ describe("WordWizardV3Page", () => {
 
   it("wires the real T5C editor to the wizard's single save flow", async () => {
     const current = word({
-      status: "published",
+      status: "draft",
       meanings: { sense_groups: [], pos: [] },
       completed_steps: ["basics", "forms", "meanings"],
       max_reachable_step: "preview",
@@ -2261,7 +2476,7 @@ describe("WordWizardV3Page", () => {
     ).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("查看第 1 次发布"));
     expect(
-      (await screen.findByText("回退为新版本", { exact: true })).closest(
+      (await screen.findByText("恢复到草稿", { exact: true })).closest(
         "button"
       )!
     ).toBeEnabled();

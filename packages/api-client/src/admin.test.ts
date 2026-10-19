@@ -435,6 +435,21 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         })
     },
     {
+      name: "restoreDraftFromPublicationV3",
+      httpMethod: "post",
+      invoke: (api: ReturnType<typeof createAdminEndpoints>) =>
+        api.words.restoreDraftFromPublicationV3(
+          "w-1",
+          "pub-1",
+          "restore-draft-key",
+          {
+            schema_version: 3,
+            base_revision: 1,
+            base_lifecycle_revision: 1
+          }
+        )
+    },
+    {
       name: "archive",
       httpMethod: "post",
       invoke: (api: ReturnType<typeof createAdminEndpoints>) =>
@@ -500,15 +515,19 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       base_lifecycle_revision: 2
     };
     api.words[method]("w-2", `${method}-key`, input);
-    expect(http.post).toHaveBeenCalledWith(path, input, {
-      headers: {
-        "X-TSZ-Spelling-Markup": "v1",
-        "X-TSZ-Spelling-Speech": "v1",
-        "X-TSZ-Phoneme-Speech": "v1",
-        "X-TSZ-Sentence-Formatting": "v1",
-        "Idempotency-Key": `${method}-key`
+    expect(http.post).toHaveBeenCalledWith(
+      path,
+      method === "restore" ? { ...input, restore_as: "draft" } : input,
+      {
+        headers: {
+          "X-TSZ-Spelling-Markup": "v1",
+          "X-TSZ-Spelling-Speech": "v1",
+          "X-TSZ-Phoneme-Speech": "v1",
+          "X-TSZ-Sentence-Formatting": "v1",
+          "Idempotency-Key": `${method}-key`
+        }
       }
-    });
+    );
   });
 
   it.each([
@@ -520,15 +539,19 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       entries: [{ id: "w-2", base_revision: 5, base_lifecycle_revision: 2 }]
     };
     api.words[method](`${method}-key`, input);
-    expect(http.post).toHaveBeenCalledWith(path, input, {
-      headers: {
-        "X-TSZ-Spelling-Markup": "v1",
-        "X-TSZ-Spelling-Speech": "v1",
-        "X-TSZ-Phoneme-Speech": "v1",
-        "X-TSZ-Sentence-Formatting": "v1",
-        "Idempotency-Key": `${method}-key`
+    expect(http.post).toHaveBeenCalledWith(
+      path,
+      method === "restoreBatch" ? { ...input, restore_as: "draft" } : input,
+      {
+        headers: {
+          "X-TSZ-Spelling-Markup": "v1",
+          "X-TSZ-Spelling-Speech": "v1",
+          "X-TSZ-Phoneme-Speech": "v1",
+          "X-TSZ-Sentence-Formatting": "v1",
+          "Idempotency-Key": `${method}-key`
+        }
       }
-    });
+    );
   });
 
   it.each(["archiveBatch", "restoreBatch"] as const)(
@@ -954,7 +977,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     );
     expect(http.post).toHaveBeenCalledWith(
       "/lexicon/entries/w-3/restore",
-      lifecycle,
+      { ...lifecycle, restore_as: "draft" },
       {
         headers: {
           "X-TSZ-Spelling-Markup": "v1",
@@ -980,7 +1003,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     );
     expect(http.post).toHaveBeenCalledWith(
       "/lexicon/entries/restore-batch",
-      batch,
+      { ...batch, restore_as: "draft" },
       {
         headers: {
           "X-TSZ-Spelling-Markup": "v1",
@@ -1538,5 +1561,31 @@ it("成分查询原样透传目标 entry_id、cursor 与取消信号", async () 
     "/lexicon/entries/component-targets/search",
     input,
     { signal }
+  );
+});
+
+it("恢复历史只使用独立草稿接口，失败不降级为线上回滚", async () => {
+  http.post.mockRejectedValueOnce(new Error("not found"));
+  const api = createAdminEndpoints(http);
+  const input = {
+    schema_version: 3 as const,
+    base_revision: 2,
+    base_lifecycle_revision: 3
+  };
+  await expect(
+    api.words.restoreDraftFromPublicationV3(
+      "word-1",
+      "pub-1",
+      "restore-key",
+      input
+    )
+  ).rejects.toThrow("not found");
+  expect(http.post).toHaveBeenCalledTimes(1);
+  expect(http.post).toHaveBeenCalledWith(
+    "/lexicon/entries/word-1/publications/pub-1/restore-draft",
+    input,
+    expect.objectContaining({
+      headers: expect.objectContaining({ "Idempotency-Key": "restore-key" })
+    })
   );
 });

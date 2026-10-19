@@ -29,10 +29,10 @@ describe("统一词条权限与归属", () => {
     expect(canCreateEntry(actor(["words.edit"]))).toBe(false);
     expect(canWriteEntry(null, own)).toBe(false);
   });
-  it("校验匹配edit/publish/validate任一能力，不借create或access自动放行", () => {
-    for (const key of ["words.edit", "words.publish", "words.validate"])
+  it("创建合并校验能力，编辑和发布仍可独立校验", () => {
+    for (const key of ["words.create", "words.edit", "words.publish"])
       expect(canCheckEntry(actor([key]))).toBe(true);
-    expect(canCheckEntry(actor(["words.create"]))).toBe(false);
+    expect(canCheckEntry(actor(["words.validate"]))).toBe(false);
     expect(canCheckEntry(actor([]))).toBe(false);
     expect(canCheckEntry(superAdmin)).toBe(true);
   });
