@@ -53,7 +53,7 @@ type SelectedSynthesis = PronunciationSynthesisV3 &
   Pick<PronunciationSynthesisCandidateV3, "ipa_speech" | "ups_speech">;
 
 export function synthesisForLocale(
-  synthesis: PronunciationSynthesisV3,
+  synthesis: SelectedSynthesis,
   locale: PhonemeLocaleV3,
   legacyDialect: Dialect = "common"
 ): SelectedSynthesis {
@@ -80,7 +80,10 @@ export function synthesisForLocale(
     ups: !dual || upsLocale === locale ? synthesis.ups : "",
     ipa_locale: ipaLocale,
     ups_locale: upsLocale,
-    ups_words: !dual || upsLocale === locale ? synthesis.ups_words : undefined
+    ups_words: !dual || upsLocale === locale ? synthesis.ups_words : undefined,
+    ipa_speech:
+      !dual || ipaLocale === locale ? synthesis.ipa_speech : undefined,
+    ups_speech: !dual || upsLocale === locale ? synthesis.ups_speech : undefined
   };
 }
 
@@ -278,13 +281,12 @@ export function editSynthesisUpsWords(
 export function pronunciationSynthesisSpeech(
   synthesis: SelectedSynthesis | undefined,
   locale?: PhonemeLocaleV3,
-  alphabet = synthesis?.alphabet
+  alphabet?: "ipa" | "ups"
 ): SynthesisSpeechV3 | undefined {
-  if (!synthesis || synthesis.use_spelling || !alphabet) return undefined;
-  const candidate = locale
-    ? synthesis[locale === "en-GB" ? "uk" : "us"]
-    : undefined;
-  return (candidate ?? synthesis)[`${alphabet}_speech`];
+  if (!synthesis) return undefined;
+  const selected = locale ? synthesisForLocale(synthesis, locale) : synthesis;
+  if (selected.use_spelling) return undefined;
+  return selected[`${alphabet ?? selected.alphabet}_speech`];
 }
 
 export function pronunciationSynthesisContent(
