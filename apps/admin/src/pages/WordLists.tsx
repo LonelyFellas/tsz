@@ -82,10 +82,11 @@ function Management({ adminId }: { adminId: string }) {
   const [deleteImpactLoading, setDeleteImpactLoading] = useState(false);
   const deleteImpactRequest = useRef(0);
   const key = ["admin-wordlists", adminId];
+  const managementQuery = { ...query, include_stats: true };
   const result = useQuery({
-    queryKey: [...key, "management", query],
+    queryKey: [...key, "management", managementQuery],
     queryFn: ({ signal }) =>
-      api.wordlists.management({ ...query, include_stats: true }, { signal })
+      api.wordlists.management(managementQuery, { signal })
   });
   async function openDelete(row: AdminWordlist) {
     const request = ++deleteImpactRequest.current;
