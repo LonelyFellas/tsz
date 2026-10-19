@@ -3447,18 +3447,27 @@ it.each([false, true])(
     catalogState.data.items[0]!.allowed_form_types = items.map(
       (item) => item.code
     );
+    // 标签场景不需要发音条目，避免英美分栏重复挂载无关的语音控件。
     const initial = formsFixture({
       forms: [
-        separated ? ukUsFormFixture() : commonFormFixture(),
+        separated
+          ? ukUsFormFixture({
+              uk: { pronunciations: [] },
+              us: { pronunciations: [] }
+            })
+          : commonFormFixture({ pronunciations: [] }),
         ...items.map((item, index) =>
           separated
             ? ukUsFormFixture({
                 id: uuidFromInt(960 + index),
-                form_type: item.code
+                form_type: item.code,
+                uk: { pronunciations: [] },
+                us: { pronunciations: [] }
               })
             : commonFormFixture({
                 id: uuidFromInt(960 + index),
-                form_type: item.code
+                form_type: item.code,
+                pronunciations: []
               })
         )
       ]
