@@ -12,6 +12,62 @@ import {
   synthesisInputIssue
 } from "./pronunciation-synthesis";
 
+describe("手动选源", () => {
+  it.each(["ipa", "ups", "spelling"] as const)(
+    "已有 IPA 和 UPS 时仍使用明确选择的 %s",
+    (source) => {
+      const synthesis = {
+        alphabet: source === "ups" ? ("ups" as const) : ("ipa" as const),
+        use_spelling: source === "spelling",
+        ipa: "",
+        ups: "",
+        uk: { ipa: "fɑː", ups: "F AA" },
+        us: { ipa: "fɑɹ", ups: "F AA R" }
+      };
+      const selected = synthesisForLocale(synthesis, "en-US");
+      expect(selected.alphabet).toBe(synthesis.alphabet);
+      expect(selected.use_spelling).toBe(synthesis.use_spelling);
+      expect(
+        pronunciationSynthesisContent("far", selected)?.annotations
+      ).toEqual(
+        source === "spelling"
+          ? []
+          : [
+              {
+                type: "phoneme",
+                start: 0,
+                end: 3,
+                alphabet: source,
+                phoneme: source === "ipa" ? "fɑɹ" : "F AA R"
+              }
+            ]
+      );
+      expect(pronunciationSynthesisLabel(synthesis, "common")).toContain(
+        source === "spelling" ? "词形拼写" : `Azure ${source.toUpperCase()}`
+      );
+    }
+  );
+
+  it("选中 UPS 后留空不静默切换成 IPA，也不借用另一侧 UPS", () => {
+    const synthesis = {
+      alphabet: "ups" as const,
+      use_spelling: false,
+      ipa: "",
+      ups: "",
+      uk: { ipa: "fɑː", ups: "F AA" },
+      us: { ipa: "fɑɹ", ups: "" }
+    };
+    expect(
+      pronunciationSynthesisContent("far", synthesis, "en-US")
+    ).toBeUndefined();
+    expect(
+      pronunciationSynthesisContent("far", synthesis, "en-GB")?.annotations
+    ).toEqual([
+      { type: "phoneme", start: 0, end: 3, alphabet: "ups", phoneme: "F AA" }
+    ]);
+  });
+});
+
 it("区分词形的合成摘要只显示自身方言", () => {
   const uk = {
     alphabet: "ipa" as const,

@@ -1064,6 +1064,9 @@ describe("V3FormsAndPronunciationStep", () => {
       .closest(".ant-select");
     expect(addBasicPosSelect).toHaveClass("word-add-basic-pos-select");
     expect(addBasicPosSelect).toHaveTextContent("添加基本词性");
+    expect(
+      addBasicPosSelect?.querySelector('[data-icon="plus-circle"]')
+    ).not.toBeNull();
     expect(screen.queryByLabelText("新增词性")).not.toBeInTheDocument();
 
     const groupCard = await waitFor(() => {

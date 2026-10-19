@@ -83,11 +83,11 @@ vi.mock("@tsz/voice-editor/editor", () => ({
     </div>
   )
 }));
-const render = (
+const renderWithUps = (
   ui: Parameters<typeof rtlRender>[0],
   options?: Parameters<typeof rtlRender>[1]
-) =>
-  rtlRender(ui, {
+) => {
+  const view = rtlRender(ui, {
     wrapper: ({ children }) => (
       <ConfigProvider theme={{ token: { motion: false } }}>
         <AntApp>{children}</AntApp>
@@ -95,6 +95,12 @@ const render = (
     ),
     ...options
   });
+  for (const toggle of screen.queryAllByRole("button", {
+    name: /^展开第 \d+ 条发音的 UPS$/
+  }))
+    fireEvent.click(toggle);
+  return view;
+};
 function Harness({
   configured = false,
   phrase = false,
@@ -173,7 +179,7 @@ const rows = () =>
     .regional_variants.common.pronunciations;
 describe("独立发音输入", () => {
   it("区分词形时英式和美式各只编辑自身的 IPA、UPS", () => {
-    render(<RegionalHarness />);
+    renderWithUps(<RegionalHarness />);
     const uk = screen.getByRole("region", { name: "uk" });
     const us = screen.getByRole("region", { name: "us" });
     for (const alphabet of ["IPA", "UPS"]) {
@@ -205,7 +211,7 @@ describe("独立发音输入", () => {
     expect(variants.us.pronunciations[0].synthesis.uk).toBeUndefined();
   });
   it("通用音标也同时保留四个英美候选，切换偏好不覆盖内容", () => {
-    const view = render(<Harness />);
+    const view = renderWithUps(<Harness />);
     for (const side of ["英式", "美式"]) {
       for (const alphabet of ["IPA", "UPS"]) {
         expect(field(`${side} Azure ${alphabet}`)).toHaveValue("");
@@ -229,7 +235,7 @@ describe("独立发音输入", () => {
     expect(field("美式 Azure IPA")).toHaveValue("fɑɹ");
   });
   it("实际发音与音素输入的右端依次排列转换和编辑按钮", () => {
-    render(<Harness />);
+    renderWithUps(<Harness />);
     const actualGroup = field("实际发音").closest(
       ".v3-voice-text-field-compact"
     );
@@ -277,7 +283,7 @@ describe("独立发音输入", () => {
     }
   });
   it("移除旧设置后 IPA、UPS 来源和各自音色设置仍独立", async () => {
-    render(<Harness />);
+    renderWithUps(<Harness />);
     expect(
       screen.queryByRole("button", { name: /发音设置与真人录音/ })
     ).not.toBeInTheDocument();
@@ -288,7 +294,9 @@ describe("独立发音输入", () => {
       expect(radio).toBeChecked();
     }
     expect(screen.getByText("/ kæt /")).toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole("radio", { name: "Azure UPS" })[0]!);
+    expect(
+      screen.getByRole("radio", { name: "Azure UPS" })
+    ).toBeInTheDocument();
     for (const alphabet of ["IPA", "UPS"]) {
       const label = `第 1 条发音 美式 Azure ${alphabet}`;
       const before = structuredClone(rows()[0].synthesis);
@@ -300,14 +308,14 @@ describe("独立发音输入", () => {
         rows()[0].synthesis.us[`${alphabet.toLowerCase()}_speech`].voice_profile
           .voices[0].voice_id
       ).toBe("american-voice");
-      expect(rows()[0].synthesis.alphabet).toBe("ups");
+      expect(rows()[0].synthesis.alphabet).toBe("ipa");
       expect(rows()[0].synthesis.us.ipa).toBe("kæt");
       expect(rows()[0].synthesis.us.ups).toBe("K AE T");
       expect(rows()[1].synthesis).toBeUndefined();
     }
   });
   it("IPA 读取字典，UPS 读取人工修正后的对应 IPA；实际发音不参与转换", async () => {
-    render(<Harness />);
+    renderWithUps(<Harness />);
     await change("字典音标", "dɔg");
     await change("实际发音", "kæt");
     change("Azure UPS", "H U M");
@@ -338,7 +346,7 @@ describe("独立发音输入", () => {
     expect(field("Azure UPS")).toHaveValue("H U M");
   });
   it("两行试听各自使用对应候选，不受语音来源切换影响", () => {
-    render(<Harness />);
+    renderWithUps(<Harness />);
     change("Azure IPA", "kæt");
     change("Azure UPS", "K AE T");
     for (const selection of ["词形拼写", "Azure IPA", "Azure UPS"]) {
@@ -359,7 +367,7 @@ describe("独立发音输入", () => {
     }
   });
   it("短语连续显示，词界保存；手改后禁止复用，撤销恢复", () => {
-    render(<Harness phrase />);
+    renderWithUps(<Harness phrase />);
     change("Azure IPA", "hə.ˈloʊ kæt");
     convert("UPS");
     expect(field("Azure UPS")).toHaveValue("H AX . S1 L O K AE T");
@@ -380,18 +388,18 @@ describe("独立发音输入", () => {
     expect(preview).toBeEnabled();
     expect(rows()[0].synthesis.us.ups_words).toHaveLength(2);
   });
-  it("撤销 UPS 内容不会撤销后来主动选择的语音来源", () => {
-    render(<Harness />);
+  it("撤销 UPS 内容不会撤销后来选择的回退来源", () => {
+    renderWithUps(<Harness />);
     change("Azure UPS", "OLD");
     change("Azure UPS", "NEW");
-    fireEvent.click(screen.getByRole("radio", { name: "Azure UPS" }));
+    fireEvent.click(screen.getByRole("radio", { name: "词形拼写" }));
     fireEvent.keyDown(field("Azure UPS"), { key: "z", ctrlKey: true });
     expect(field("Azure UPS")).toHaveValue("OLD");
-    expect(screen.getByRole("radio", { name: "Azure UPS" })).toBeChecked();
-    expect(rows()[0].synthesis.use_spelling).toBe(false);
+    expect(screen.getByRole("radio", { name: "词形拼写" })).toBeChecked();
+    expect(rows()[0].synthesis.use_spelling).toBe(true);
   });
   it("通用栏旧候选确认后只归入对应口音，偏好改变不重标", () => {
-    const view = render(<Harness configured />);
+    const view = renderWithUps(<Harness configured />);
     const preview = () =>
       screen.getByLabelText("第 1 条发音 美式 Azure UPS 最终读音");
     expect(preview()).toBeDisabled();
@@ -414,7 +422,7 @@ describe("独立发音输入", () => {
     expect(field("英式 Azure UPS")).toHaveValue("K EH T");
   });
   it("来源改变后取消过期的覆盖确认", async () => {
-    render(<Harness />);
+    renderWithUps(<Harness />);
     change("Azure UPS", "OLD");
     change("Azure IPA", "kæt");
     convert("UPS");
@@ -427,7 +435,7 @@ describe("独立发音输入", () => {
 it("关闭音素输入时旧 UPS 记录原样保留且不显示旧设置", () => {
   env.AZURE_PRONUNCIATION_INPUTS = false;
   try {
-    render(<Harness configured />);
+    renderWithUps(<Harness configured />);
     expect(
       screen.queryByLabelText("第 1 条发音的Azure IPA")
     ).not.toBeInTheDocument();
@@ -445,7 +453,7 @@ it("关闭音素输入时旧 UPS 记录原样保留且不显示旧设置", () =>
   }
 });
 it("实际发音填入需确认并保留可撤销快照", async () => {
-  render(<Harness />);
+  renderWithUps(<Harness />);
   await change("实际发音", "dɔg");
   fireEvent.click(screen.getByLabelText("从字典音标填入实际发音"));
   fireEvent.click(screen.getByText(/^应\s*用$/));
@@ -454,7 +462,7 @@ it("实际发音填入需确认并保留可撤销快照", async () => {
   expect(field("实际发音")).toHaveValue("dɔg");
 });
 it("字典独立生成实际发音和英美 IPA，UPS 从各自 IPA 转换", () => {
-  render(<Harness word="school" phonetic="/skuːl/" />);
+  renderWithUps(<Harness word="school" phonetic="/skuːl/" />);
   fireEvent.click(screen.getByLabelText("从字典音标填入实际发音"));
   expect(screen.getByText("sguːl")).toBeInTheDocument();
   fireEvent.click(screen.getByText(/^应\s*用$/));
@@ -480,7 +488,7 @@ it("字典独立生成实际发音和英美 IPA，UPS 从各自 IPA 转换", () 
 it.each(["英式", "美式"])(
   "%s UPS 转换先确认字典 r 的规范化，再同步更新 IPA 和 UPS",
   (side) => {
-    render(
+    renderWithUps(
       <Harness
         word="different"
         initialSynthesis={{
@@ -517,7 +525,7 @@ it.each(["英式", "美式"])(
   }
 );
 it("取消或 IPA 来源改变时不应用 r 规范化与 UPS 转换", () => {
-  render(<Harness word="different" />);
+  renderWithUps(<Harness word="different" />);
   change("Azure IPA", "ˈdɪfrənt");
   change("Azure UPS", "H U M");
   convert("UPS");
@@ -533,7 +541,7 @@ it("取消或 IPA 来源改变时不应用 r 规范化与 UPS 转换", () => {
   expect(screen.getByText(/来源、口音或目标内容已变化/)).toBeInTheDocument();
 });
 it("r 规范化后仍有不支持音素时保持严格拒绝，不改写 IPA 或 UPS", () => {
-  render(<Harness />);
+  renderWithUps(<Harness />);
   change("Azure IPA", "frɑː");
   change("Azure UPS", "H U M");
   convert("UPS");
@@ -545,12 +553,12 @@ it("r 规范化后仍有不支持音素时保持严格拒绝，不改写 IPA 或
   expect(field("Azure UPS")).toHaveValue("H U M");
 });
 it("字典转换失败保留目标，确认期间编辑目标会阻止覆盖", async () => {
-  const view = render(<Harness phonetic="kæt😀" />);
+  const view = renderWithUps(<Harness phonetic="kæt😀" />);
   fireEvent.click(screen.getByLabelText("从字典音标填入实际发音"));
   expect(screen.getByText(/第 1 个词包含未支持的音标/)).toBeInTheDocument();
   expect(field("实际发音")).toHaveValue("kæt");
   view.unmount();
-  render(<Harness word="school" phonetic="skuːl" />);
+  renderWithUps(<Harness word="school" phonetic="skuːl" />);
   fireEvent.click(screen.getByLabelText("从字典音标填入实际发音"));
   await change("实际发音", "dɒg");
   fireEvent.click(screen.getByText(/^应\s*用$/));
@@ -561,7 +569,7 @@ it("字典转换失败保留目标，确认期间编辑目标会阻止覆盖", a
 });
 
 it("读法按指定顺序展示，逐字正音使用独立 wire 值", () => {
-  render(<Harness />);
+  renderWithUps(<Harness />);
   fireEvent.mouseDown(screen.getByLabelText("第 1 条发音的读法"));
   expect(
     Array.from(

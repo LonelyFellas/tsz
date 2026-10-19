@@ -64,6 +64,39 @@
   margin-inline-end: 0;
 }
 
+/* 输入框有预览包装层，紧凑组的接缝由这一层统一承接。 */
+.v3-voice-text-field-compact > .v3-voice-text-field-input:not(:last-child),
+.v3-voice-text-field-compact
+  > textarea.ant-input-compact-item:not(.ant-input-compact-last-item) {
+  margin-inline-end: calc(-1 * var(--ant-line-width, 1px));
+}
+
+.v3-voice-text-field-compact > .v3-voice-text-field-input > textarea.ant-input {
+  margin-inline-end: 0;
+}
+
+.v3-voice-text-field-compact
+  textarea.ant-input-compact-item:not(.ant-input-compact-first-item) {
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+}
+
+.v3-voice-text-field-compact
+  textarea.ant-input-compact-item:not(.ant-input-compact-last-item) {
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+
+.v3-voice-text-field-compact > .v3-voice-text-field-input:focus-within,
+.v3-voice-text-field-compact > textarea.ant-input:focus {
+  z-index: 3;
+}
+
+.v3-voice-text-field-compact > .v3-voice-text-field-input:hover,
+.v3-voice-text-field-compact > textarea.ant-input:hover {
+  z-index: 4;
+}
+
 .v3-voice-text-liaison-overlay {
   position: absolute;
   inset: 0;

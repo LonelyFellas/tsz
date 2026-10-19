@@ -85,6 +85,7 @@ export interface V3VoiceTextFieldProps<
   renderAssociationPicker?: VoiceEditorProps<TLink>["renderAssociationPicker"];
   previewAdapter?: VoiceEditorProps<TLink>["previewAdapter"];
   value: RichTextV3;
+  id?: string;
   ariaLabel: string;
   editorTitle?: ReactNode;
   nodeId: string;
@@ -127,6 +128,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   renderAssociationPicker,
   previewAdapter,
   value,
+  id,
   ariaLabel,
   editorTitle,
   nodeId,
@@ -324,6 +326,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     value.text !== "";
   const fallback = (
     <Input.TextArea
+      id={expanded ? undefined : id}
       key={largePreview ? "large" : "standard"}
       onFocus={() => setFocused(true)}
       onBlur={() => {

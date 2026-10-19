@@ -12,6 +12,550 @@ import {
 } from "./support/mockAdminV3Api";
 
 test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () => {
+  test("手动选择 IPA、UPS 或拼写，词性添加显示圆圈加号", async ({ page }) => {
+    const api = await mockAdminV3Api(page, { formsFailureOnce: false });
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    const formsUrl = `/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`;
+    const previewUrl = `/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/preview`;
+    await page.goto(formsUrl);
+    const add = page.getByLabel("添加基本词性").first();
+    const select = page.locator(".word-add-basic-pos-select").first();
+    await expect(select.locator('[data-icon="plus-circle"]')).toBeVisible();
+    await expect(select).toHaveClass(/ant-select-borderless/);
+    expect(
+      await page
+        .locator(".word-pos-tab-actions")
+        .first()
+        .locator("svg")
+        .evaluateAll((icons) =>
+          icons.map((icon) => {
+            const { width, height } = icon.getBoundingClientRect();
+            return { width, height };
+          })
+        )
+    ).toEqual([
+      { width: 14, height: 14 },
+      { width: 14, height: 14 }
+    ]);
+    await add.click();
+    await expect(page.locator(".ant-select-dropdown:visible")).toHaveCount(1);
+    await add.press("Escape");
+    await expect(page.locator(".ant-select-dropdown:visible")).toHaveCount(0);
+    await add.blur();
+    await page.locator(".word-pos-tabs > .ant-tabs-nav").screenshot({
+      path: test.info().outputPath("circle-add.png")
+    });
+    const source = page.locator(".word-pronunciation-synthesis").first();
+    await expect(
+      source.getByRole("radio", { name: "Azure UPS", exact: true })
+    ).toHaveCount(0);
+    const ukUps = source.getByLabel("第 1 条发音的英式 Azure UPS", {
+      exact: true
+    });
+    const usUps = source.getByLabel("第 1 条发音的美式 Azure UPS", {
+      exact: true
+    });
+    await source
+      .getByLabel("第 1 条发音的英式 Azure IPA", { exact: true })
+      .fill("ˈɔːbɪt");
+    await source
+      .getByLabel("第 1 条发音的美式 Azure IPA", { exact: true })
+      .fill("ˈɔɹbɪt");
+    await expect(usUps).toHaveCount(0);
+    await source.getByRole("button", { name: "展开第 1 条发音的 UPS" }).click();
+    const save = async () => {
+      const button = page.getByRole("button", { name: /保存草稿$/ });
+      const saved = page.waitForResponse(
+        (response) =>
+          response.request().method() === "PUT" &&
+          response
+            .url()
+            .endsWith(
+              `${ADMIN_V3_ENTRIES_PATH}/${ADMIN_V3_MIXED_WORD_ID}/steps/forms`
+            )
+      );
+      const before = api.count(
+        "PUT",
+        `${ADMIN_V3_ENTRIES_PATH}/${ADMIN_V3_MIXED_WORD_ID}/steps/forms`
+      );
+      await button.click();
+      expect((await saved).ok()).toBe(true);
+      await expect
+        .poll(() =>
+          api.count(
+            "PUT",
+            `${ADMIN_V3_ENTRIES_PATH}/${ADMIN_V3_MIXED_WORD_ID}/steps/forms`
+          )
+        )
+        .toBe(before + 1);
+      await expect(button).not.toHaveClass(/ant-btn-loading/);
+      await expect(button).toBeDisabled();
+    };
+    await source.getByRole("radio", { name: "词形拼写", exact: true }).check();
+    await ukUps.fill("AO B IH T");
+    await usUps.fill("AO R B IH T");
+    await expect(
+      source.getByRole("radio", { name: "词形拼写", exact: true })
+    ).toBeChecked();
+    await source.getByRole("radio", { name: "Azure UPS", exact: true }).check();
+    await source.getByRole("button", { name: "收起第 1 条发音的 UPS" }).click();
+    await expect(
+      source.getByRole("radio", { name: "Azure UPS", exact: true })
+    ).toHaveCount(0);
+    await expect(usUps).toBeHidden();
+    await save();
+    await source.screenshot({
+      path: test.info().outputPath("optional-ups.png")
+    });
+    await page.goto(previewUrl);
+    await expect(
+      page.getByText("Azure UPS · 英式：AO B IH T · 美式：AO R B IH T", {
+        exact: true
+      })
+    ).toBeVisible();
+    await page.goto(formsUrl);
+    await expect(usUps).toHaveCount(0);
+    await expect(
+      source.getByRole("radio", { name: "Azure UPS", exact: true })
+    ).toHaveCount(0);
+    await source.getByRole("button", { name: "展开第 1 条发音的 UPS" }).click();
+    await expect(usUps).toHaveValue("AO R B IH T");
+    await expect(ukUps).toHaveValue("AO B IH T");
+    await expect(
+      source.getByRole("radio", { name: "Azure UPS", exact: true })
+    ).toBeChecked();
+    await source.getByRole("radio", { name: "Azure IPA", exact: true }).check();
+    await expect(
+      source.getByText("请填写 Azure UPS", { exact: true })
+    ).toHaveCount(0);
+    await save();
+    await page.goto(previewUrl);
+    await expect(
+      page.getByText("Azure IPA · 英式：ˈɔːbɪt · 美式：ˈɔɹbɪt", { exact: true })
+    ).toBeVisible();
+    await page.goto(formsUrl);
+    await expect(
+      source.getByRole("radio", { name: "Azure IPA", exact: true })
+    ).toBeChecked();
+    await expect(
+      source.getByRole("radio", { name: "Azure UPS", exact: true })
+    ).toHaveCount(0);
+    await source.getByRole("radio", { name: "词形拼写", exact: true }).check();
+    await save();
+    await page.goto(previewUrl);
+    await expect(
+      page.getByText("词形拼写（语音来源）", { exact: true }).first()
+    ).toBeVisible();
+    await page.goto(formsUrl);
+    await expect(
+      source.getByRole("radio", { name: "词形拼写", exact: true })
+    ).toBeChecked();
+    await source.getByRole("button", { name: "展开第 1 条发音的 UPS" }).click();
+    await expect(ukUps).toHaveValue("AO B IH T");
+    await expect(usUps).toHaveValue("AO R B IH T");
+  });
+
+  for (const alphabet of ["ipa", "ups"] as const) {
+    test(`扁平 ${alphabet.toUpperCase()} 提交错误标记输入并可定位，UPS 收起保留面板`, async ({
+      page
+    }) => {
+      const api = await mockAdminV3Api(page, { formsFailureOnce: false });
+      const pos = api.getWord().forms.pos[0]!;
+      const group = pos.form_groups[0]!;
+      const form = pos.forms.find(
+        (item) => item.id === group.members[0]!.form_id
+      )!;
+      if (form.regional_variants.mode !== "common")
+        throw new Error("Expected common pronunciation fixture");
+      const variant = form.regional_variants.common;
+      const pronunciation = variant.pronunciations[0]!;
+      const formsPath = `${ADMIN_V3_ENTRIES_PATH}/${ADMIN_V3_MIXED_WORD_ID}/steps/forms`;
+      await page.route(`**${formsPath}`, async (route) => {
+        if (
+          route.request().method() !== "PUT" ||
+          route.request().postDataJSON().intent !== "complete"
+        )
+          return route.fallback();
+        await route.fulfill({
+          status: 422,
+          contentType: "application/problem+json",
+          body: JSON.stringify({
+            type: "urn:tsz:problem:validation_failed",
+            title: "Validation failed",
+            status: 422,
+            detail: "Mock selected phonemes are missing",
+            code: "validation_failed",
+            field_issues: [
+              {
+                schema_version: 3,
+                step: "forms",
+                node_id: pronunciation.id,
+                field: `synthesis.${alphabet}`,
+                code: "pronunciation_required",
+                message: "请填写合成音素",
+                node_location: {
+                  node_role: "forms.pronunciation:common",
+                  ancestor_node_ids: [
+                    pos.pos_id,
+                    group.id,
+                    form.id,
+                    variant.id
+                  ],
+                  pos_id: pos.pos_id,
+                  form_group_id: group.id,
+                  form_id: form.id,
+                  variant_id: variant.id,
+                  dialect: "common",
+                  pronunciation_id: pronunciation.id
+                }
+              }
+            ]
+          })
+        });
+      });
+      await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+      const source = page.locator(".word-pronunciation-synthesis").first();
+      await source
+        .getByRole("radio", { name: "词形拼写", exact: true })
+        .check();
+      if (alphabet === "ups")
+        await source
+          .getByRole("button", { name: "展开第 1 条发音的 UPS" })
+          .click();
+      await source
+        .getByRole("radio", {
+          name: `Azure ${alphabet.toUpperCase()}`,
+          exact: true
+        })
+        .check();
+      await expect(source.locator('textarea[aria-invalid="true"]')).toHaveCount(
+        0
+      );
+      await page
+        .getByRole("button", { name: "进入词义与例句", exact: true })
+        .click();
+      const rejected = page.waitForResponse(
+        (response) =>
+          response.request().method() === "PUT" &&
+          response.url().endsWith(formsPath) &&
+          response.status() === 422
+      );
+      await page
+        .getByRole("button", { name: "完成并进入预览", exact: true })
+        .click();
+      const response = await rejected;
+      const submitted = response.request().postDataJSON();
+      expect(submitted.intent).toBe("complete");
+      const selected = submitted.content.pos[0].forms.find(
+        (item: { id: string }) => item.id === form.id
+      ).regional_variants.common.pronunciations[0].synthesis;
+      expect(selected).toMatchObject({ alphabet, use_spelling: false });
+      expect(selected.uk).toBeUndefined();
+      expect(selected.us).toBeUndefined();
+      await page.getByRole("button", { name: /词形与发音$/ }).click();
+      const input = source.locator(
+        `textarea[data-v3-field="synthesis.${alphabet}"]`
+      );
+      await expect(input).toHaveCount(1);
+      await expect(input).toHaveAttribute("aria-invalid", "true");
+      await expect(
+        source.getByText(`请填写 Azure ${alphabet.toUpperCase()}`, {
+          exact: true
+        })
+      ).toBeVisible();
+      await page
+        .getByRole("button", { name: "去处理首项", exact: true })
+        .click();
+      await expect(input).toBeFocused();
+      if (alphabet === "ups") {
+        const panel = source.locator(".word-synthesis-ups-fields");
+        await source
+          .getByRole("button", { name: "收起第 1 条发音的 UPS" })
+          .click();
+        await expect(input).toHaveCount(1);
+        await expect(input).toBeHidden();
+        await expect(panel).toHaveAttribute("aria-hidden", "true");
+        await expect(panel).toHaveAttribute("inert", "");
+        await expect(
+          source.getByRole("radio", { name: "Azure UPS", exact: true })
+        ).toHaveCount(0);
+        await page
+          .getByRole("button", { name: "去处理首项", exact: true })
+          .click();
+        await expect(input).toBeVisible();
+        await expect(input).toBeFocused();
+      }
+    });
+  }
+
+  test("词形拼写与实际发音的输入和按钮保持连续边框", async ({ page }) => {
+    await mockAdminV3Api(page, { formsFailureOnce: false });
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+    await page.evaluate(() => document.fonts.ready);
+    const groups = [
+      page
+        .locator(".word-shared-form-spelling .v3-voice-text-field-compact")
+        .first(),
+      page
+        .locator(
+          ".word-actual-pronunciation-control .v3-voice-text-field-compact"
+        )
+        .first()
+    ];
+    for (const width of [1280, 760]) {
+      await page.setViewportSize({ width, height: 1000 });
+      for (const [index, group] of groups.entries()) {
+        await expect(group).toBeVisible();
+        const controls = await group.evaluate((node) =>
+          [...node.children].map((child) => {
+            const control = child.matches("button, textarea")
+              ? child
+              : child.querySelector("textarea")!;
+            const rect = control.getBoundingClientRect();
+            const style = getComputedStyle(control);
+            return {
+              x: rect.x,
+              right: rect.right,
+              y: rect.y,
+              height: rect.height,
+              left: [style.borderTopLeftRadius, style.borderBottomLeftRadius],
+              end: [style.borderTopRightRadius, style.borderBottomRightRadius]
+            };
+          })
+        );
+        expect(controls.length).toBeGreaterThanOrEqual(2);
+        for (let i = 0; i < controls.length; i++) {
+          const control = controls[i]!;
+          expect(Math.abs(control.y - controls[0]!.y)).toBeLessThanOrEqual(1);
+          expect(
+            Math.abs(control.height - controls[0]!.height)
+          ).toBeLessThanOrEqual(1);
+          if (i > 0) {
+            expect(control.left).toEqual(["0px", "0px"]);
+            expect(control.x - controls[i - 1]!.right).toBeCloseTo(-1, 1);
+          } else
+            expect(
+              control.left.every((radius) => Number.parseFloat(radius) > 0)
+            ).toBe(true);
+          if (i < controls.length - 1)
+            expect(control.end).toEqual(["0px", "0px"]);
+          else
+            expect(
+              control.end.every((radius) => Number.parseFloat(radius) > 0)
+            ).toBe(true);
+        }
+        const input = group.locator("textarea");
+        await input.focus();
+        await expect(input).toBeFocused();
+        await expect(input).toHaveCSS("border-color", "rgb(32, 83, 255)");
+        await group.screenshot({
+          path: test.info().outputPath(`compact-field-${index}-${width}.png`)
+        });
+      }
+    }
+  });
+
+  test("UPS 折叠箭头与读法下拉保持一致", async ({ page }) => {
+    await mockAdminV3Api(page, { formsFailureOnce: false });
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+    const fields = page.locator(".word-pronunciation-floating-fields").first();
+    const nativeArrow = fields.locator(".ant-select .anticon-down").first();
+    const toggle = fields.locator(".word-synthesis-ups-toggle");
+    const arrow = toggle.locator(".anticon-down");
+    const nativeStyle = await nativeArrow.evaluate((node) => ({
+      color: getComputedStyle(node).color,
+      fontSize: getComputedStyle(node).fontSize,
+      path: node.querySelector("path")!.getAttribute("d")!
+    }));
+    for (const [step, expanded] of [false, true, false].entries()) {
+      await expect(toggle).toHaveAttribute("aria-expanded", String(expanded));
+      await expect(arrow).toHaveCSS("color", nativeStyle.color);
+      await expect(arrow).toHaveCSS("font-size", nativeStyle.fontSize);
+      await expect(arrow.locator("path")).toHaveAttribute(
+        "d",
+        nativeStyle.path
+      );
+      await expect(arrow.locator("svg")).toHaveCSS(
+        "transform",
+        expanded ? "matrix(-1, 0, 0, -1, 0, 0)" : "none"
+      );
+      if (step < 2) await toggle.click();
+    }
+  });
+
+  test("浮动标签在聚焦和悬停时始终完整显示", async ({ page }) => {
+    await mockAdminV3Api(page, { formsFailureOnce: false });
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+    const fields = page.locator(".word-pronunciation-floating-fields").first();
+    await fields.getByRole("button", { name: "展开第 1 条发音的 UPS" }).click();
+    const labels = fields.locator("label[for]");
+    await expect(labels).toHaveCount(7);
+    expect(
+      await labels.evaluateAll((nodes) =>
+        nodes.map((node) => {
+          const style = getComputedStyle(node);
+          return [
+            style.borderTopLeftRadius,
+            style.borderTopRightRadius,
+            style.borderBottomLeftRadius,
+            style.borderBottomRightRadius
+          ];
+        })
+      )
+    ).toEqual(Array.from({ length: 7 }, () => ["4px", "4px", "4px", "4px"]));
+    for (const width of [1280, 760]) {
+      await page.setViewportSize({ width, height: 1000 });
+      for (const label of await labels.all()) {
+        const id = await label.getAttribute("for");
+        const input = page.locator(`[id="${id}"]`);
+        const control = label
+          .locator("..")
+          .locator(".ant-select, input, textarea")
+          .first();
+        await control.evaluate((node) =>
+          node.scrollIntoView({ block: "center" })
+        );
+        for (const state of ["focus", "hover"]) {
+          if (state === "focus") await input.focus();
+          else await input.evaluate((node) => (node as HTMLElement).blur());
+          await control.hover();
+          if ((await label.textContent())?.trim() === "实际发音") {
+            const row = (await label.locator("..").boundingBox())!;
+            const title = (await label.boundingBox())!;
+            await page.screenshot({
+              path: test
+                .info()
+                .outputPath(`actual-label-${state}-${width}.png`),
+              clip: {
+                x: row.x - 4,
+                y: title.y - 4,
+                width: row.width + 8,
+                height: row.y + row.height - title.y + 8
+              }
+            });
+          }
+          const exposed = await label.evaluate((node) => {
+            const rect = node.getBoundingClientRect();
+            return [0.1, 0.5, 0.9].flatMap((x) =>
+              [0.25, 0.75].map((y) => {
+                const top = document.elementFromPoint(
+                  rect.left + rect.width * x,
+                  rect.top + rect.height * y
+                );
+                return top === node || node.contains(top);
+              })
+            );
+          });
+          expect(
+            exposed,
+            `${await label.textContent()} ${state} ${width}`
+          ).toEqual([true, true, true, true, true, true]);
+        }
+      }
+    }
+  });
+
+  test("发音标签嵌入输入框上边框，宽窄屏点击标签均可聚焦", async ({ page }) => {
+    await mockAdminV3Api(page, { formsFailureOnce: false });
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+    const fields = page.locator(".word-pronunciation-floating-fields").first();
+    const labels = fields.locator("label[for]");
+    await expect(labels).toHaveCount(5);
+    await fields.getByRole("button", { name: "展开第 1 条发音的 UPS" }).click();
+    await expect(
+      page.getByText("UPS 已填写时优先使用，留空时使用所选来源。", {
+        exact: true
+      })
+    ).toHaveCount(0);
+    await expect(
+      page.getByText("请填写 Azure IPA", { exact: true })
+    ).toHaveCount(0);
+    for (const width of [1280, 760, 390]) {
+      await page.setViewportSize({ width, height: 1100 });
+      await expect(labels).toHaveCount(7);
+      await expect
+        .poll(() =>
+          labels.evaluateAll((items) =>
+            Math.max(
+              ...items.map((label) => {
+                const input = document.getElementById(
+                  (label as HTMLLabelElement).htmlFor
+                )!;
+                const control =
+                  input.closest(".ant-select, .word-synthesis-control") ??
+                  input;
+                const box = label.getBoundingClientRect();
+                return Math.abs(
+                  (box.top + box.bottom) / 2 -
+                    control.getBoundingClientRect().top
+                );
+              })
+            )
+          )
+        )
+        .toBeLessThanOrEqual(1);
+      await fields
+        .locator("label")
+        .filter({ hasText: /^字典音标$/ })
+        .click();
+      await expect(
+        fields.getByLabel("第 1 条发音的字典音标", { exact: true })
+      ).toBeFocused();
+      await fields
+        .locator("label")
+        .filter({ hasText: /^美式 Azure IPA$/ })
+        .click();
+      await expect(
+        fields.getByLabel("第 1 条发音的美式 Azure IPA", { exact: true })
+      ).toBeFocused();
+      await expect(
+        fields.getByRole("button", { name: "收起第 1 条发音的 UPS" })
+      ).toHaveText("UPS");
+      if (width === 1280) {
+        const dict = (await fields
+          .getByLabel("第 1 条发音的字典音标", { exact: true })
+          .boundingBox())!;
+        const actual = (await fields
+          .getByLabel("第 1 条发音的实际发音", { exact: true })
+          .boundingBox())!;
+        expect(actual.y).toBeGreaterThanOrEqual(dict.y + dict.height);
+        expect(Math.abs(actual.x - dict.x)).toBeLessThanOrEqual(1);
+      }
+      const source = fields.locator(".word-synthesis-source-label");
+      const choices = fields.locator(".word-synthesis-source-actions");
+      const toggle = fields.getByRole("button", {
+        name: "收起第 1 条发音的 UPS"
+      });
+      const headingBox = (await source.boundingBox())!;
+      const toggleBox = (await toggle.boundingBox())!;
+      expect(
+        Math.abs(
+          headingBox.y +
+            headingBox.height / 2 -
+            toggleBox.y -
+            toggleBox.height / 2
+        )
+      ).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs(
+          headingBox.x + headingBox.width - toggleBox.x - toggleBox.width
+        )
+      ).toBeLessThanOrEqual(1);
+      await expect(toggle).toHaveCSS("border-top-style", "none");
+      expect(
+        (await fields
+          .getByLabel("第 1 条发音的美式 Azure UPS", { exact: true })
+          .boundingBox())!.y
+      ).toBeGreaterThan(headingBox.y + headingBox.height);
+      expect(
+        (await source.boundingBox())!.y + (await source.boundingBox())!.height
+      ).toBeLessThanOrEqual((await choices.boundingBox())!.y);
+      await fields.screenshot({
+        path: test.info().outputPath(`floating-labels-${width}.png`)
+      });
+    }
+  });
+
   test("窄屏步骤标题可读、例句操作列不遮挡且编辑栏高度一致", async ({
     page
   }) => {
@@ -192,6 +736,9 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(actual).toHaveCSS("font-family", /TSZ Phonetics/);
     const source = page.locator(".word-pronunciation-synthesis").first();
     if (await source.locator(".word-synthesis-source-actions").isVisible()) {
+      await source
+        .getByRole("button", { name: "展开第 1 条发音的 UPS" })
+        .click();
       const sourcePreviews = source.locator(".word-synthesis-choice-preview");
       await expect(sourcePreviews).toHaveCount(3);
       await source
@@ -205,6 +752,9 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       );
       await expect(sourcePreviews.nth(1)).toHaveText("/ ˈɔːbɪt /");
       await expect(sourcePreviews.nth(2)).toHaveText("AO B IH T");
+      await expect(
+        source.getByRole("radio", { name: "Azure UPS", exact: true })
+      ).toBeVisible();
       const spellingFont = await spelling.evaluate(
         (node) => getComputedStyle(node).fontFamily
       );
@@ -235,13 +785,16 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
         .first();
       await usSource.getByLabel("第 1 条发音的美式 Azure IPA").fill("ˈɔrbɪt");
       await usSource
+        .getByRole("button", { name: "展开第 1 条发音的 UPS" })
+        .click();
+      await usSource
         .getByLabel("第 1 条发音的美式 Azure UPS")
         .fill("AO R B IH T");
       const usColor = await page
         .locator(".word-form-matrix-shared-header-us")
         .first()
         .evaluate((node) => getComputedStyle(node).backgroundColor);
-      for (const name of ["词形拼写", "Azure UPS", "Azure IPA"]) {
+      for (const name of ["词形拼写", "Azure IPA", "Azure UPS"]) {
         await usSource.getByRole("radio", { name, exact: true }).check();
         const checked = usSource.locator(".ant-radio-wrapper-checked");
         await expect(checked.locator(".ant-radio")).toHaveCSS(
@@ -258,6 +811,15 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
           usColor
         );
       }
+      await expect(
+        source.getByRole("radio", { name: "Azure UPS", exact: true })
+      ).toHaveCount(0);
+      await source
+        .getByRole("button", { name: "展开第 1 条发音的 UPS" })
+        .click();
+      await expect(
+        source.getByRole("radio", { name: "Azure UPS", exact: true })
+      ).toBeChecked();
       await expect(source.locator(".ant-radio-checked")).toHaveCSS(
         "background-color",
         "rgb(32, 83, 255)"
@@ -284,6 +846,15 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       const separatedUs = page
         .locator(".v3-dialect-panel-us .word-pronunciation-synthesis")
         .first();
+      await expect(
+        separatedUs.getByRole("radio", { name: "Azure UPS", exact: true })
+      ).toHaveCount(0);
+      await separatedUs
+        .getByRole("button", { name: "展开第 1 条发音的 UPS" })
+        .click();
+      await expect(
+        separatedUs.getByRole("radio", { name: "Azure UPS", exact: true })
+      ).toBeChecked();
       await expect(separatedUs.locator(".ant-radio-checked")).toHaveCSS(
         "background-color",
         usColor
@@ -1813,7 +2384,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     );
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/meanings`);
     await page.evaluate(() => document.fonts.ready);
-    // 放慢真实的弹窗动画，检查中间帧；只检查动画结束会漏掉先错位再纠正的闪烁。
+    // 首次懒加载可能错过中间帧；保留真实进场动画，待连读层就绪后从起点重放。
     await page.addStyleTag({
       content: ".ant-modal { animation-duration: 1s !important; }"
     });
@@ -1824,43 +2395,81 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       .getByRole("dialog")
       .filter({ has: page.locator(".tsz-ve-editor") });
     for (let opening = 0; opening < 2; opening += 1) {
+      const captured = await page.evaluateHandle(() => {
+        const state = {
+          animation: null as Animation | null,
+          dispose: () =>
+            document.removeEventListener("animationstart", capture, true)
+        };
+        function capture(event: AnimationEvent) {
+          if (
+            !(event.target instanceof HTMLElement) ||
+            !event.target.matches(".ant-modal") ||
+            !event.animationName.endsWith("antZoomIn")
+          )
+            return;
+          state.animation =
+            event.target
+              .getAnimations()
+              .find(
+                (animation) =>
+                  animation instanceof CSSAnimation &&
+                  animation.animationName === event.animationName
+              ) ?? null;
+        }
+        document.addEventListener("animationstart", capture, true);
+        return state;
+      });
       await opener.click();
       const strip = dialog.locator(".tsz-ve-strip");
       await expect(strip.locator(".tsz-ve-arc")).toHaveCount(1);
-      const frames = await strip.evaluate(async (node) => {
-        const samples: { scale: number; error: number; d: string }[] = [];
-        const start = performance.now();
-        while (performance.now() - start < 1200) {
-          await new Promise(requestAnimationFrame);
-          const svg = node.querySelector<SVGSVGElement>(".tsz-ve-arc-layer")!;
-          const matrix = svg.getScreenCTM()!;
-          const path = node.querySelector<SVGPathElement>(".tsz-ve-arc")!;
-          const points = path
-            .getAttribute("d")!
-            .match(/-?\d+(?:\.\d+)?/g)!
-            .map(Number);
-          const errors = [3, 5].map((point, index) => {
-            const letter = node.querySelector(
-              `[data-codepoint="${point}"] .tsz-ve-letter-text`
-            )!;
-            const range = document.createRange();
-            range.selectNodeContents(letter);
-            const rect = range.getBoundingClientRect();
-            const local = new DOMPoint(
-              (rect.left + rect.right) / 2,
-              rect.top
-            ).matrixTransform(matrix.inverse());
-            return Math.abs(points[index === 0 ? 0 : 6]! - local.x);
-          });
-          samples.push({
-            scale: matrix.a,
-            error: Math.max(...errors),
-            d: path.getAttribute("d")!
-          });
-        }
-        return samples;
-      });
+      await expect
+        .poll(() => captured.evaluate((state) => state.animation !== null))
+        .toBe(true);
+      const frames = await strip
+        .evaluate(async (node, captured) => {
+          const animation = captured.animation;
+          if (!animation) throw new Error("Missing modal opening animation");
+          animation.currentTime = 0;
+          animation.play();
+          const samples: { scale: number; error: number; d: string }[] = [];
+          const start = performance.now();
+          while (performance.now() - start < 1200) {
+            await new Promise(requestAnimationFrame);
+            const svg = node.querySelector<SVGSVGElement>(".tsz-ve-arc-layer")!;
+            const matrix = svg.getScreenCTM()!;
+            const path = node.querySelector<SVGPathElement>(".tsz-ve-arc")!;
+            const points = path
+              .getAttribute("d")!
+              .match(/-?\d+(?:\.\d+)?/g)!
+              .map(Number);
+            const errors = [3, 5].map((point, index) => {
+              const letter = node.querySelector(
+                `[data-codepoint="${point}"] .tsz-ve-letter-text`
+              )!;
+              const range = document.createRange();
+              range.selectNodeContents(letter);
+              const rect = range.getBoundingClientRect();
+              const local = new DOMPoint(
+                (rect.left + rect.right) / 2,
+                rect.top
+              ).matrixTransform(matrix.inverse());
+              return Math.abs(points[index === 0 ? 0 : 6]! - local.x);
+            });
+            samples.push({
+              scale: matrix.a,
+              error: Math.max(...errors),
+              d: path.getAttribute("d")!
+            });
+          }
+          return samples;
+        }, captured)
+        .finally(async () => {
+          await captured.evaluate((state) => state.dispose());
+          await captured.dispose();
+        });
       expect(frames.some((frame) => frame.scale < 0.95)).toBe(true);
+      expect(frames.at(-1)!.scale).toBeCloseTo(1, 2);
       expect(Math.max(...frames.map((frame) => frame.error))).toBeLessThan(0.1);
       const finalPoints = frames
         .at(-1)!

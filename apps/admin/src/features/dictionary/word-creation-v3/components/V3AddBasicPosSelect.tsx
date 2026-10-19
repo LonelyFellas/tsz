@@ -1,4 +1,4 @@
-import { PlusOutlined } from "@ant-design/icons";
+import { PlusCircleOutlined, PlusOutlined } from "@ant-design/icons";
 import { Select } from "antd";
 import type {
   DraftFormsStepContentV3,
@@ -66,12 +66,16 @@ export function V3AddBasicPosSelect({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                fontSize: 14,
+                color:
+                  isError || isPending ? undefined : "var(--ant-color-primary)",
                 pointerEvents: "none"
               }
             }
           : undefined
       }
-      suffixIcon={<PlusOutlined />}
+      variant={compact ? "borderless" : undefined}
+      suffixIcon={compact ? <PlusCircleOutlined /> : <PlusOutlined />}
       value={undefined}
     />
   );
