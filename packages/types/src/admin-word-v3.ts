@@ -249,12 +249,9 @@ export interface RichTextVariantV3 {
   id: string;
   value: RichTextV3;
   origin: TextOriginV3;
-  /**
-   * 缺省 / null 表示未配置。例句英文与释义内容目前还没接语音编辑器，
-   * 这里先留着，等它们接入时用。
-   */
+  /** 缺省表示未配置语音。 */
   voice_profile?: VoiceProfileV3 | null;
-  /** 与 GrammarVariantV3 同形预留；例句 / 释义接入语音编辑器前 admin 不写入。 */
+  /** 已上传的录音；保存后元数据以服务端资产登记为准，空数组表示移除。 */
   audio_assets?: AudioAssetV3[];
   /** 人工正文关联。省略保留存量，显式空数组清除。 */
   text_links?: TextLinkV3[];
