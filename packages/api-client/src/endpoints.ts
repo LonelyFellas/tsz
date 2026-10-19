@@ -10,7 +10,6 @@ import { createCoinEndpoints } from "./coins";
 // 按业务域组织的接口定义(纯函数,接受 HttpClient)。
 // features/*/api.ts 负责把这些绑定到具体的 client 实例。
 import type {
-  AccountDeletionChannel,
   AccountDeletionCodeRequest,
   BindContactRequest,
   ChangePasswordRequest,
@@ -45,13 +44,6 @@ export interface RefreshResponse {
   expires_in: number;
   refresh_token_expires_at: number;
 }
-
-/**
- * 注销账号的验证渠道：验证码始终发往账号本人「在档」的手机或邮箱（二选一），
- * 而非请求里的值——以此证明账号归属。仅绑定其中一项的账号只能用对应渠道。
- */
-/** @deprecated 请从 @tsz/types 使用 AccountDeletionChannel。 */
-export type DeletionChannel = AccountDeletionChannel;
 
 /** 头像上传的 MIME 白名单（与后端一致；被签进预签名 URL，PUT 时必须完全一致）。 */
 export const AVATAR_CONTENT_TYPES = [
