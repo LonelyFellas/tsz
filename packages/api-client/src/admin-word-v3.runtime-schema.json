@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/sentence-audio-contract/tsz-rust/docs/openapi.json",
-  "_source_sha256": "82b10935960e43da34325bab25ad8b860fd5af1232f470bfd743ec0ea520fe36",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-custom-word-flag/docs/openapi.json",
+  "_source_sha256": "3de0e2d9e4f0b0babe30effacb7cb44f5bce552e63bb6aa34fad468b9bfdf826",
   "roots": [
     "DictionaryPage",
     "DictionaryEntry",
@@ -161,6 +161,9 @@
       "type": "object",
       "required": ["wordlist", "review_state", "recommended", "tip_amount"],
       "properties": {
+        "favorite_count": { "type": "integer", "minimum": 0 },
+        "has_custom_words": { "type": "boolean" },
+        "like_count": { "type": "integer", "minimum": 0 },
         "recommended": { "type": "boolean" },
         "review_state": { "type": "string" },
         "tip_amount": { "type": "string" },

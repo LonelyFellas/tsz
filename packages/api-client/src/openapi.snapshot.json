@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/sentence-audio-contract/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-18T15:43:00.820Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-custom-word-flag/docs/openapi.json",
+  "_generatedAt": "2026-10-19T06:15:15.126Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -1184,6 +1184,62 @@
         "in": "query",
         "required": false,
         "schema": { "$ref": "#/components/schemas/WordlistState" }
+      }
+    ],
+    "get /admin/wordlists/management": [
+      {
+        "name": "created_before",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "format": "date-time" }
+      },
+      {
+        "name": "created_from",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "format": "date-time" }
+      },
+      {
+        "name": "include_stats",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "boolean" }
+      },
+      {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "format": "int32", "minimum": 0 }
+      },
+      {
+        "name": "page_size",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "format": "int32", "minimum": 0 }
+      },
+      {
+        "name": "public",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "boolean" }
+      },
+      {
+        "name": "q",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "recommended",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "boolean" }
+      },
+      {
+        "name": "review_state",
+        "in": "query",
+        "required": false,
+        "schema": { "$ref": "#/components/schemas/WordlistReviewState" }
       }
     ],
     "get /admin/wordlists/{id}/review-requests": [

@@ -229,6 +229,9 @@ export interface AdminWordlist {
   review_state: "none" | "pending" | "approved" | "rejected";
   recommended: boolean;
   tip_amount: string;
+  has_custom_words?: boolean;
+  like_count?: number;
+  favorite_count?: number;
 }
 export interface AdminWordlistPage {
   items: AdminWordlist[];
@@ -245,6 +248,7 @@ export interface WordlistDeleteImpact {
   blocked_task_count: number;
 }
 export interface WordlistManagementQuery extends WordlistQuery {
+  include_stats?: boolean;
   review_state?: AdminWordlist["review_state"];
   public?: boolean;
   recommended?: boolean;

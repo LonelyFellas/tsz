@@ -106,6 +106,53 @@ beforeEach(() => {
     ]
   });
 });
+it.each([
+  [true, "是"],
+  [false, "否"],
+  [undefined, "—"]
+] as const)(
+  "management renders custom-word presence %s as %s",
+  async (value, label) => {
+    vi.mocked(api.wordlists.management).mockResolvedValue({
+      items: [{ ...row, has_custom_words: value }],
+      pagination
+    });
+    mount();
+    const cells = (await screen.findByText(row.wordlist.name))
+      .closest("tr")!
+      .querySelectorAll("td");
+    expect(cells[3]).toHaveTextContent(label);
+    expect(api.wordlists.management).toHaveBeenCalledWith(
+      expect.objectContaining({ include_stats: true }),
+      expect.objectContaining({ signal: expect.anything() })
+    );
+    expect(api.wordlists.currentItems).not.toHaveBeenCalled();
+    expect(api.wordlists.items).not.toHaveBeenCalled();
+    expect(api.wordlists.reviews).not.toHaveBeenCalled();
+  }
+);
+it.each([
+  [0, 0, "0", "0"],
+  [12, 7, "12", "7"],
+  [undefined, undefined, "—", "—"]
+] as const)(
+  "management renders interaction counts %s/%s without an undefined question count",
+  async (likes, favorites, likeLabel, favoriteLabel) => {
+    vi.mocked(api.wordlists.management).mockResolvedValue({
+      items: [{ ...row, like_count: likes, favorite_count: favorites }],
+      pagination
+    });
+    mount();
+    const cells = (await screen.findByText(row.wordlist.name))
+      .closest("tr")!
+      .querySelectorAll("td");
+    expect(screen.queryAllByText("题量")).toHaveLength(0);
+    expect(cells[4]).toHaveTextContent(likeLabel);
+    expect(cells[5]).toHaveTextContent(favoriteLabel);
+    expect(api.wordlists.currentItems).not.toHaveBeenCalled();
+    expect(api.wordlists.items).not.toHaveBeenCalled();
+  }
+);
 it("management shows one row per review without loading word details or decision controls", async () => {
   vi.mocked(api.wordlists.deleteImpact).mockResolvedValue({
     active_run_count: 2,
@@ -260,7 +307,7 @@ it("search commits filters and reset requests page one without stale query", asy
     expect(screen.getByLabelText("搜索词表")).toHaveValue("")
   );
   expect(api.wordlists.management).toHaveBeenLastCalledWith(
-    { page: 1, page_size: 20 },
+    { page: 1, page_size: 20, include_stats: true },
     expect.anything()
   );
 });
