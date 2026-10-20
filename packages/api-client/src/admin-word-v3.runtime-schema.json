@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dictionary-search-layout/docs/openapi.json",
-  "_source_sha256": "5e60fd77cb63ec5a4cb369e332035c399d1f6e5c454aa4aec2511c7397d586ec",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/user-registration-region/docs/openapi.json",
+  "_source_sha256": "9c5805cd8d69f875967c7219470c374460d78547cf614cf42b48933fe9d9cb3d",
   "roots": [
     "DictionaryPage",
     "DictionaryEntry",

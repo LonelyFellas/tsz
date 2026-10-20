@@ -23,6 +23,9 @@ vi.mock("@/lib/auth", () => ({
   api: {
     users: {
       list: vi.fn(),
+      registrationRegion: vi
+        .fn()
+        .mockResolvedValue({ city: null, status: "not_recorded" }),
       get: vi.fn(),
       setStatus: vi.fn(),
       update: vi.fn()

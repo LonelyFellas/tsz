@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dictionary-search-layout/docs/openapi.json",
-  "_generatedAt": "2026-10-20T05:02:00.258Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/user-registration-region/docs/openapi.json",
+  "_generatedAt": "2026-10-20T07:32:37.226Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -103,6 +103,7 @@
     "/admin/users/{id}/coin-wallet": ["get"],
     "/admin/users/{id}/identity-documents": ["get"],
     "/admin/users/{id}/identity-documents/{file_id}": ["get"],
+    "/admin/users/{id}/registration-region": ["get"],
     "/admin/users/{id}/status": ["patch"],
     "/admin/users/{id}/teacher-certification": ["delete"],
     "/admin/wordlists": ["get"],
@@ -2358,6 +2359,14 @@
         "500": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
+    "get /admin/users/{id}/registration-region": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/UserRegistrationRegion" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "delete /auth/account": {
       "request": {
         "$ref": "#/components/schemas/ConfirmAccountDeletionRequest"
@@ -3143,6 +3152,19 @@
         "snapshot": { "type": "string", "pattern": "^(0|[1-9][0-9]{0,18})$" }
       },
       "additionalProperties": false
+    },
+    "UserRegistrationRegion": {
+      "type": "object",
+      "required": ["city", "status"],
+      "properties": {
+        "city": { "type": ["string", "null"] },
+        "status": { "$ref": "#/components/schemas/RegistrationRegionStatus" }
+      },
+      "additionalProperties": false
+    },
+    "RegistrationRegionStatus": {
+      "type": "string",
+      "enum": ["resolved", "not_recorded", "unknown"]
     },
     "OwnerType": { "type": "string", "enum": ["user", "admin"] },
     "WalletStatus": {

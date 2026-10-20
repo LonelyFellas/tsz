@@ -3,7 +3,7 @@ import { Avatar, Badge, Descriptions, Drawer, Space, Tag } from "antd";
 import { UserOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import type { AdminUserView } from "@tsz/types";
-import { UserResources } from "./UserResources";
+import { UserRegistrationRegion, UserResources } from "./UserResources";
 import { CopyableText } from "@/components/CopyableText";
 import { usePermission } from "@/lib/auth";
 import { RevokeTeacherButton } from "@/features/teacher-certification/RevokeTeacherButton";
@@ -22,6 +22,9 @@ export function UserDetailDrawer({ user, onClose }: Props) {
   const canReadBasic = usePermission("users.read_basic");
   const canRevoke = usePermission("teacherapply.revoke");
   const canReadSensitive = usePermission("users.read_sensitive");
+  const canReadRegistrationRegion = usePermission(
+    "users.read_registration_region"
+  );
   const items = user
     ? [
         ...(canReadBasic
@@ -97,6 +100,17 @@ export function UserDetailDrawer({ user, onClose }: Props) {
             ]
           : []),
         { key: "created", label: "注册时间", children: fmt(user.created_at) },
+        ...(canReadRegistrationRegion
+          ? [
+              {
+                key: "registration-region",
+                label: "注册地区",
+                children: (
+                  <UserRegistrationRegion key={user.id} userId={user.id} />
+                )
+              }
+            ]
+          : []),
         ...(canReadBasic
           ? [
               {

@@ -203,6 +203,8 @@ const contractSchemaNames = [
   "CoinEntry",
   "CoinEntryPage",
   "UserCoinEntryPage",
+  "UserRegistrationRegion",
+  "RegistrationRegionStatus",
   "OwnerType",
   "WalletStatus",
   "OperationKind",
@@ -612,7 +614,8 @@ for (const [rawPath, item] of Object.entries(spec.paths)) {
       rawPath.startsWith(`${API_PREFIX}/me/avatar`) ||
       rawPath.startsWith(`${API_PREFIX}/me/contact/`) ||
       rawPath.startsWith(`${API_PREFIX}/admin/settings/form-types`) ||
-      rawPath === `${API_PREFIX}/admin/settings/parts-of-speech/catalog`
+      rawPath === `${API_PREFIX}/admin/settings/parts-of-speech/catalog` ||
+      rawPath === `${API_PREFIX}/admin/users/{id}/registration-region`
     ) {
       const requestSchema =
         operation?.requestBody?.content?.["application/json"]?.schema ?? null;

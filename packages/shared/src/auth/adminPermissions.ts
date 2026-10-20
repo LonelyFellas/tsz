@@ -36,6 +36,7 @@ export const ADMIN_PERMISSION_DEPENDENCIES = {
   "users.edit": ["users.access"],
   "users.set_status": ["users.read_basic"],
   "users.read_sensitive": ["users.access"],
+  "users.read_registration_region": ["users.access"],
   "teacherapply.access": [],
   "teacherapply.review": ["teacherapply.access"],
   "teacherapply.revoke": ["teacherapply.access"],

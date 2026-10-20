@@ -26,6 +26,11 @@ export interface AdminUser {
   updated_at?: string;
 }
 
+/** GET /admin/users/{id}/registration-region；仅独立地区权限可读取。 */
+export type UserRegistrationRegion =
+  | { city: string; status: "resolved" }
+  | { city: null; status: "not_recorded" | "unknown" };
+
 /** GET /admin/users 查询参数（按持有角色 / 关键字 / 注册时间过滤 + 分页）。 */
 export interface AdminUserListQuery {
   /** 按持有角色过滤；不传 = 全部。 */
