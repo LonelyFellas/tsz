@@ -161,7 +161,7 @@ describe("统一授权事实", () => {
         { ...reader, permissions: [...reader.permissions, "words.validate"] },
         ["words.edit", "words.publish", "words.validate"]
       )
-    ).toBe(true);
+    ).toBe(false);
   });
 });
 
@@ -310,3 +310,50 @@ it.each(["create", "edit"])(
     }
   }
 );
+
+it("词条历史恢复可扩展至他人，但不放开发布、删除或垃圾桶恢复", () => {
+  const restorer = {
+    ...actor,
+    permissions: ["words.access", "words.rollback", "words.edit_others"]
+  };
+  expect(canAdminResourceAction(restorer, "words", "rollback", "b")).toBe(true);
+  for (const action of ["publish", "archive", "restore"] as const) {
+    expect(
+      canAdminResourceAction(
+        {
+          ...restorer,
+          permissions: [...restorer.permissions, `words.${action}`]
+        },
+        "words",
+        action,
+        "b"
+      )
+    ).toBe(false);
+  }
+  expect(
+    canAdminResourceAction(
+      { ...restorer, permissions: ["words.access", "words.edit_others"] },
+      "words",
+      "rollback",
+      "b"
+    )
+  ).toBe(false);
+});
+
+it("退休权限不授权，预留全局配音不授予其他语音或编辑能力", () => {
+  for (const key of ["words.detect", "words.validate"]) {
+    expect(hasAdminPermission({ ...actor, role: "super_admin" }, key)).toBe(
+      false
+    );
+  }
+  const reserved = { ...actor, permissions: ["speech.global_dubbing"] };
+  expect(hasAdminPermission(reserved, "speech.global_dubbing")).toBe(true);
+  for (const key of [
+    "speech.generate",
+    "speech.upload_audio",
+    "words.create",
+    "words.edit"
+  ]) {
+    expect(hasAdminPermission(reserved, key)).toBe(false);
+  }
+});

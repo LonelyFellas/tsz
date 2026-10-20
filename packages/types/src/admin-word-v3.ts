@@ -804,6 +804,13 @@ export interface RollbackPublicationV3Input {
   confirmed_surface_match_token?: string;
 }
 
+export interface RestoreDraftFromPublicationV3Input {
+  schema_version: 3;
+  base_revision: number;
+  base_lifecycle_revision: number;
+  confirmed_surface_match_token?: string;
+}
+
 export type ActivatePublicationAnyInput =
   ActivatePublicationInput | RollbackPublicationV3Input;
 

@@ -27,7 +27,7 @@ export function LifecycleSurfaceConfirmation({
   onConfirm: () => void;
   onRestart: () => void;
   confirming: boolean;
-  action?: "restore" | "rollback" | "publish";
+  action?: "restore" | "restoreDraft" | "publish";
 }) {
   const formTypeLabel = useFormTypeLabel();
   const cards = aggregateLifecycleSurfaceMatchCards(state, formTypeLabel);
@@ -43,9 +43,12 @@ export function LifecycleSurfaceConfirmation({
     }))
     .filter((group) => group.cards.length > 0);
   const disabled = state.phase === "disabled";
-  const isActivation = action === "rollback";
   const actionLabel =
-    action === "publish" ? "发布" : isActivation ? "回退" : "恢复";
+    action === "publish"
+      ? "发布"
+      : action === "restoreDraft"
+        ? "恢复草稿"
+        : "恢复";
   const statusLabel = {
     draft: "草稿",
     published: "已发布",
@@ -57,7 +60,7 @@ export function LifecycleSurfaceConfirmation({
       title={
         disabled
           ? "学习端暂不支持多个同名公开词条"
-          : `${actionLabel}前需要确认同名公开范围`
+          : `${actionLabel}前需要确认同名${action === "restoreDraft" || action === "restore" ? "词条" : "公开范围"}`
       }
     >
       <Alert

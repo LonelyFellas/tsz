@@ -140,6 +140,43 @@ function confirmTagChange(action: "添加" | "移除") {
 }
 
 describe("权限目录、标签和授权人员", () => {
+  it("上传音频可从两类筛选且保留同一行选择", async () => {
+    vi.mocked(api.permissionSystem.catalog).mockResolvedValue({
+      ...catalog,
+      permissions: [
+        ...catalog.permissions,
+        {
+          key: "speech.upload_audio",
+          module_key: "words",
+          label: "语音合成 上传音频",
+          description: "上传音频",
+          kind: "action",
+          requires: [],
+          risk_level: "medium"
+        }
+      ]
+    });
+    mount();
+    await screen.findByText("语音合成 上传音频");
+    chooseRow("语音合成 上传音频");
+    await selectTag("所属板块", "语音合成管理");
+    expect(
+      document.querySelectorAll('tr[data-row-key="speech.upload_audio"]')
+    ).toHaveLength(1);
+    expect(document.querySelector('tr[data-row-key="words.edit"]')).toBeNull();
+    expect(
+      document.querySelector('tr[data-row-key="speech.upload_audio"] input')
+    ).toBeChecked();
+    await selectTag("所属板块", "词库管理");
+    expect(
+      document.querySelectorAll('tr[data-row-key="speech.upload_audio"]')
+    ).toHaveLength(1);
+    expect(
+      document.querySelector('tr[data-row-key="speech.upload_audio"] input')
+    ).toBeChecked();
+    expect(screen.getByText("已选 1 项")).toBeInTheDocument();
+  });
+
   it("单一标签管理入口在同一抽屉提供批量设置与标签目录", async () => {
     mount();
     await screen.findByText("编辑本人词条");

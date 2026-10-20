@@ -12,8 +12,6 @@ export const ADMIN_PERMISSION_DEPENDENCIES = {
   "coins.reverse": ["coins.access"],
   "words.access": [],
   "words.create": ["words.access"],
-  "words.detect": ["words.access"],
-  "words.validate": ["words.access"],
   "words.edit": ["words.access"],
   "words.associate": ["words.access"],
   "words.edit_others": ["words.access"],
@@ -49,6 +47,7 @@ export const ADMIN_PERMISSION_DEPENDENCIES = {
   "lexicon_settings.edit_forms": ["lexicon_settings.access"],
   "lexicon_settings.delete": ["lexicon_settings.access"],
   "speech.upload_audio": [],
+  "speech.global_dubbing": [],
   "speech.generate": ["words.access"]
 } as const;
 
@@ -97,7 +96,9 @@ export function canAdminResourceAction(
       actor &&
       (actor.role === "super_admin" ||
         (Boolean(createdBy) && createdBy === actor.id) ||
-        ((action === "edit" || action === "associate") &&
+        ((action === "edit" ||
+          action === "associate" ||
+          (module === "words" && action === "rollback")) &&
           hasAdminPermission(actor, `${module}.edit_others`)))
     )
   );

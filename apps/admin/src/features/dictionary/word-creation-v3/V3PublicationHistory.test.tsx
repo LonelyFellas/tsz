@@ -1,6 +1,7 @@
 import { useAuthStore } from "@/lib/auth";
 import { HttpError, InvalidAdminWordResponseError } from "@tsz/api-client";
 import type {
+  AdminWordDraftV3Envelope,
   AdminWordPublicationV3,
   AdminWordV3,
   SurfaceMatchPageV3
@@ -24,7 +25,7 @@ function v3Word(overrides: Partial<AdminWordV3> = {}): AdminWordV3 {
     id: "word-mixed",
     language: "en",
     kind: "word",
-    status: "published",
+    status: "draft",
     revision: 9,
     lifecycle_revision: 3,
     annotation: null,
@@ -46,8 +47,6 @@ function v3Word(overrides: Partial<AdminWordV3> = {}): AdminWordV3 {
     created_by: "admin-1",
     created_at: "2026-08-25T00:00:00Z",
     updated_at: "2026-08-25T00:00:00Z",
-    published_revision: 9,
-    published_at: "2026-08-25T00:30:00Z",
     ...overrides
   };
 }
@@ -66,6 +65,8 @@ function v2Publication(
     published_at: "2026-08-24T00:00:00Z",
     is_current: false,
     word: v3Word({
+      status: "published",
+      published_revision: 3,
       presentation: {
         label: "historical-v2",
         matched_surfaces: [],
@@ -89,7 +90,7 @@ function v3Publication(
     published_by_admin_id: "admin-1",
     published_at: "2026-08-25T00:30:00Z",
     is_current: false,
-    word: v3Word(),
+    word: v3Word({ status: "published", published_revision: 9 }),
     ...overrides
   };
 }
@@ -346,10 +347,14 @@ function complexV3Publication(): AdminWordPublicationV3 {
 
 function requests() {
   return {
-    get: vi.fn(),
+    get: vi.fn().mockResolvedValue({
+      word: v3Word({ revision: 10 }),
+      retired_stable_nodes: []
+    }),
+    surfacePage: vi.fn(),
     listPublications: vi.fn(),
     getPublication: vi.fn(),
-    rollbackPublication: vi.fn()
+    restoreDraftFromPublication: vi.fn()
   };
 }
 
@@ -413,6 +418,258 @@ function activationSurfacePage(
 }
 
 describe("V3PublicationHistory", () => {
+  it("审查回归：恢复写入待决时禁止关闭详情且保留成功回填", async () => {
+    const api = requests();
+    const historical = v3Publication();
+    const pending = deferred<{ word: AdminWordV3 }>();
+    const canonical: AdminWordDraftV3Envelope = {
+      word: v3Word({ revision: 10 }),
+      retired_stable_nodes: []
+    };
+    api.listPublications.mockResolvedValue({ publications: [historical] });
+    api.getPublication.mockResolvedValue({ publication: historical });
+    api.restoreDraftFromPublication.mockReturnValue(pending.promise);
+    api.get.mockResolvedValue(canonical);
+    const onRestored = vi.fn();
+    render(
+      <V3PublicationHistory
+        currentWord={v3Word()}
+        requests={api}
+        idempotencyKeyFactory={() => "pending-key"}
+        onRestored={onRestored}
+      />
+    );
+    fireEvent.click(await screen.findByLabelText("查看第 2 次发布"));
+    fireEvent.click(await screen.findByRole("button", { name: "恢复到草稿" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
+    expect(screen.getByLabelText("关闭发布详情")).toBeDisabled();
+    expect(document.querySelector(".ant-modal-close")).toBeNull();
+    fireEvent.click(screen.getByLabelText("关闭发布详情"));
+    fireEvent.keyDown(screen.getByRole("dialog"), {
+      key: "Escape",
+      keyCode: 27
+    });
+    fireEvent.click(document.querySelector(".ant-modal-wrap")!);
+    await waitFor(() =>
+      expect(screen.getByTestId("publication-detail")).toBeInTheDocument()
+    );
+    await act(async () => pending.resolve({ word: canonical.word }));
+    await waitFor(() => expect(onRestored).toHaveBeenCalledWith(canonical));
+    expect(api.restoreDraftFromPublication).toHaveBeenCalledTimes(1);
+  });
+
+  it("审查回归：纯 HTTP 缺少 randomUUID 仍可生成合法幂等键", async () => {
+    vi.stubGlobal("crypto", {
+      getRandomValues: (bytes: Uint8Array) => bytes.fill(255)
+    });
+    try {
+      const api = requests();
+      const historical = v3Publication();
+      api.listPublications.mockResolvedValue({ publications: [historical] });
+      api.getPublication.mockResolvedValue({ publication: historical });
+      api.restoreDraftFromPublication.mockResolvedValue({
+        word: v3Word({ revision: 10 })
+      });
+      api.get.mockResolvedValue({
+        word: v3Word({ revision: 10 }),
+        retired_stable_nodes: []
+      });
+      const onRestored = vi.fn();
+      render(
+        <V3PublicationHistory
+          currentWord={v3Word()}
+          requests={api}
+          onRestored={onRestored}
+        />
+      );
+      fireEvent.click(await screen.findByLabelText("查看第 2 次发布"));
+      fireEvent.click(
+        await screen.findByRole("button", { name: "恢复到草稿" })
+      );
+      fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
+      await waitFor(() =>
+        expect(api.restoreDraftFromPublication).toHaveBeenCalledTimes(1)
+      );
+      expect(api.restoreDraftFromPublication.mock.calls[0]![2]).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      );
+      await waitFor(() => expect(onRestored).toHaveBeenCalledTimes(1));
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("审查回归：同名确认分页使用注入的请求实例", async () => {
+    const api = { ...requests(), surfacePage: vi.fn() };
+    const historical = v3Publication();
+    api.listPublications.mockResolvedValue({ publications: [historical] });
+    api.getPublication.mockResolvedValue({ publication: historical });
+    api.restoreDraftFromPublication.mockRejectedValue(
+      new HttpError(
+        409,
+        "confirm",
+        [],
+        "surface_match_acknowledgement_required",
+        [],
+        {
+          surface_match_page: activationSurfacePage(
+            "same-source",
+            "first",
+            "next",
+            undefined,
+            2
+          )
+        }
+      )
+    );
+    api.surfacePage.mockResolvedValue(
+      activationSurfacePage("same-source", "last", null, "terminal", 2)
+    );
+    render(
+      <V3PublicationHistory
+        currentWord={v3Word()}
+        requests={api}
+        idempotencyKeyFactory={() => "surface-key"}
+        onRestored={vi.fn()}
+      />
+    );
+    fireEvent.click(await screen.findByLabelText("查看第 2 次发布"));
+    fireEvent.click(await screen.findByRole("button", { name: "恢复到草稿" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
+    await waitFor(() =>
+      expect(api.surfacePage).toHaveBeenCalledWith(
+        "same-source",
+        "next",
+        expect.any(AbortSignal)
+      )
+    );
+    expect(
+      await screen.findByRole("button", { name: "确认并恢复草稿" })
+    ).toBeEnabled();
+  });
+
+  it("审查回归：恢复校验展示音频问题及具体位置", async () => {
+    const api = requests();
+    const historical = v3Publication();
+    api.listPublications.mockResolvedValue({ publications: [historical] });
+    api.getPublication.mockResolvedValue({ publication: historical });
+    api.restoreDraftFromPublication.mockRejectedValue(
+      new HttpError(422, "invalid", [], "validation_failed", [
+        {
+          schema_version: 3,
+          step: "forms",
+          node_id: "bad-audio",
+          field: "audio_asset_id",
+          code: "audio_asset_invalid",
+          message: "invalid audio",
+          node_location: { node_role: "pronunciation", ancestor_node_ids: [] }
+        }
+      ])
+    );
+    render(
+      <V3PublicationHistory
+        currentWord={v3Word()}
+        requests={api}
+        idempotencyKeyFactory={() => "validation-key"}
+        onRestored={vi.fn()}
+      />
+    );
+    fireEvent.click(await screen.findByLabelText("查看第 2 次发布"));
+    fireEvent.click(await screen.findByRole("button", { name: "恢复到草稿" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
+    await waitFor(() =>
+      expect(
+        screen.getByText(/音频不可用、格式错误或你没有使用权限/)
+      ).toBeInTheDocument()
+    );
+    expect(screen.getByText(/bad-audio/)).toBeInTheDocument();
+  });
+
+  it("审查回归：恢复引用冲突展示来源与处理入口", async () => {
+    const api = requests();
+    const historical = v3Publication();
+    api.listPublications.mockResolvedValue({ publications: [historical] });
+    api.getPublication.mockResolvedValue({ publication: historical });
+    api.restoreDraftFromPublication.mockRejectedValue(
+      new HttpError(409, "references", [], "inbound_reference_conflict", [], {
+        inbound_references: [
+          {
+            id: "ref-1",
+            kind: "draft_relation",
+            target: { sense_id: "sense-1" },
+            stale: true,
+            source: {
+              entry_id: "source-entry",
+              entry_headword: "dependent-word",
+              entry_status: "draft"
+            }
+          }
+        ]
+      })
+    );
+    render(
+      <V3PublicationHistory
+        currentWord={v3Word()}
+        requests={api}
+        idempotencyKeyFactory={() => "references-key"}
+        onRestored={vi.fn()}
+      />
+    );
+    fireEvent.click(await screen.findByLabelText("查看第 2 次发布"));
+    fireEvent.click(await screen.findByRole("button", { name: "恢复到草稿" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
+    await waitFor(() =>
+      expect(screen.getByText("dependent-word")).toBeInTheDocument()
+    );
+    expect(screen.getByRole("link", { name: "打开来源词条" })).toHaveAttribute(
+      "href",
+      expect.stringContaining("source-entry")
+    );
+  });
+
+  it("审查回归：写入已成功但完整读取失败时保留幂等键重试", async () => {
+    const api = requests();
+    const historical = v3Publication();
+    const canonical = {
+      word: v3Word({ revision: 10 }),
+      retired_stable_nodes: []
+    };
+    api.listPublications.mockResolvedValue({ publications: [historical] });
+    api.getPublication.mockResolvedValue({ publication: historical });
+    api.restoreDraftFromPublication.mockResolvedValue({ word: canonical.word });
+    api.get
+      .mockRejectedValueOnce(new TypeError("offline"))
+      .mockResolvedValue(canonical);
+    const keyFactory = vi.fn(() => "read-retry-key");
+    const onRestored = vi.fn();
+    render(
+      <V3PublicationHistory
+        currentWord={v3Word()}
+        requests={api}
+        idempotencyKeyFactory={keyFactory}
+        onRestored={onRestored}
+      />
+    );
+    fireEvent.click(await screen.findByLabelText("查看第 2 次发布"));
+    fireEvent.click(await screen.findByRole("button", { name: "恢复到草稿" }));
+    fireEvent.click(await screen.findByRole("button", { name: "确认恢复" }));
+    await waitFor(() =>
+      expect(screen.getByText(/网络异常，恢复状态未知/)).toBeInTheDocument()
+    );
+    expect(onRestored).not.toHaveBeenCalled();
+    const retry = screen
+      .getByText("确认恢复", { exact: true })
+      .closest("button")!;
+    await waitFor(() => expect(retry).not.toHaveClass("ant-btn-loading"));
+    fireEvent.click(retry);
+    await waitFor(() => expect(onRestored).toHaveBeenCalledWith(canonical));
+    expect(api.restoreDraftFromPublication).toHaveBeenCalledTimes(2);
+    expect(keyFactory).toHaveBeenCalledTimes(1);
+    expect(
+      api.restoreDraftFromPublication.mock.calls.map((call) => call[2])
+    ).toEqual(["read-retry-key", "read-retry-key"]);
+  });
+
   it("历史摘要按旧字段归属展示英式回退和新增美式候选", async () => {
     const api = requests();
     const detail = v3PublicationWithSnapshotBody();
@@ -432,7 +689,7 @@ describe("V3PublicationHistory", () => {
     render(
       <V3PublicationHistory
         currentWord={v3Word()}
-        onActivated={vi.fn()}
+        onRestored={vi.fn()}
         requests={api}
       />
     );
@@ -465,7 +722,7 @@ describe("V3PublicationHistory", () => {
       <StrictMode>
         <V3PublicationHistory
           currentWord={v3Word()}
-          onActivated={vi.fn()}
+          onRestored={vi.fn()}
           requests={api}
         />
       </StrictMode>
@@ -517,7 +774,7 @@ describe("V3PublicationHistory", () => {
       <V3PublicationHistory
         currentWord={v3Word()}
         idempotencyKeyFactory={() => "activate-key"}
-        onActivated={vi.fn()}
+        onRestored={vi.fn()}
         requests={api}
       />
     );
@@ -541,7 +798,7 @@ describe("V3PublicationHistory", () => {
     expect(within(detail).queryByText("centre")).toBeNull();
     expect(within(detail).queryByText("server V3 presentation")).toBeNull();
     expect(
-      within(detail).getByRole("button", { name: "回退为新版本" })
+      within(detail).getByRole("button", { name: "恢复到草稿" })
     ).toBeEnabled();
     expect(api.getPublication).toHaveBeenCalledWith(
       "word-mixed",
@@ -592,7 +849,7 @@ describe("V3PublicationHistory", () => {
     render(
       <V3PublicationHistory
         currentWord={v3Word()}
-        onActivated={vi.fn()}
+        onRestored={vi.fn()}
         requests={api}
       />
     );
@@ -683,7 +940,7 @@ describe("V3PublicationHistory", () => {
     render(
       <V3PublicationHistory
         currentWord={v3Word()}
-        onActivated={vi.fn()}
+        onRestored={vi.fn()}
         requests={api}
       />
     );
@@ -747,7 +1004,7 @@ describe("V3PublicationHistory", () => {
     render(
       <V3PublicationHistory
         currentWord={v3Word()}
-        onActivated={vi.fn()}
+        onRestored={vi.fn()}
         requests={api}
       />
     );
@@ -773,7 +1030,7 @@ describe("V3PublicationHistory", () => {
 
   it("当前与历史发布均通过新版本回退命令重新发布", async () => {
     const api = requests();
-    api.rollbackPublication.mockResolvedValue({
+    api.restoreDraftFromPublication.mockResolvedValue({
       word: v3Word({ lifecycle_revision: 4 })
     });
     const legacy = v2Publication();
@@ -816,7 +1073,7 @@ describe("V3PublicationHistory", () => {
             pronunciation_normalization_version: "nfkc_trim_lower_v1"
           }
         })}
-        onActivated={vi.fn()}
+        onRestored={vi.fn()}
         requests={api}
       />
     );
@@ -828,19 +1085,19 @@ describe("V3PublicationHistory", () => {
         })
       );
       expect(
-        await screen.findByRole("button", { name: "回退为新版本" })
+        await screen.findByRole("button", { name: "恢复到草稿" })
       ).toBeEnabled();
       fireEvent.click(screen.getByRole("button", { name: "关闭发布详情" }));
     }
     fireEvent.click(screen.getByRole("button", { name: "查看第 3 次发布" }));
     const rollback = await screen.findByRole("button", {
-      name: "回退为新版本"
+      name: "恢复到草稿"
     });
     expect(rollback).toBeEnabled();
     fireEvent.click(rollback);
-    fireEvent.click(screen.getByRole("button", { name: "确认回退" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
     await waitFor(() =>
-      expect(api.rollbackPublication).toHaveBeenCalledWith(
+      expect(api.restoreDraftFromPublication).toHaveBeenCalledWith(
         "word-mixed",
         "pub-v3-current",
         expect.any(String),
@@ -853,44 +1110,47 @@ describe("V3PublicationHistory", () => {
     );
   });
 
-  it("keeps non-current V2 and V3 history read-only when the current entry is archived", async () => {
-    const api = requests();
-    const legacy = v2Publication();
-    const historicalV3 = v3Publication();
-    const keyFactory = vi.fn(() => "must-not-be-created");
-    api.listPublications.mockResolvedValue({
-      publications: [legacy, historicalV3]
-    });
-    api.getPublication.mockImplementation(
-      async (_wordId: string, publicationId: string) => ({
-        publication: publicationId === "pub-earlier" ? legacy : historicalV3
-      })
-    );
-
-    render(
-      <V3PublicationHistory
-        currentWord={v3Word({ status: "archived" })}
-        idempotencyKeyFactory={keyFactory}
-        onActivated={vi.fn()}
-        requests={api}
-      />
-    );
-
-    for (const publicationNumber of [1, 2]) {
-      fireEvent.click(
-        await screen.findByRole("button", {
-          name: `查看第 ${publicationNumber} 次发布`
+  it.each(["archived", "published"] as const)(
+    "非草稿 %s 只能查看历史，不能执行恢复",
+    async (status) => {
+      const api = requests();
+      const legacy = v2Publication();
+      const historicalV3 = v3Publication();
+      const keyFactory = vi.fn(() => "must-not-be-created");
+      api.listPublications.mockResolvedValue({
+        publications: [legacy, historicalV3]
+      });
+      api.getPublication.mockImplementation(
+        async (_wordId: string, publicationId: string) => ({
+          publication: publicationId === "pub-earlier" ? legacy : historicalV3
         })
       );
-      expect(
-        await screen.findByTestId("publication-snapshot-body")
-      ).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "回退为新版本" })).toBeNull();
-      fireEvent.click(screen.getByRole("button", { name: "关闭发布详情" }));
+
+      render(
+        <V3PublicationHistory
+          currentWord={v3Word({ status })}
+          idempotencyKeyFactory={keyFactory}
+          onRestored={vi.fn()}
+          requests={api}
+        />
+      );
+
+      for (const publicationNumber of [1, 2]) {
+        fireEvent.click(
+          await screen.findByRole("button", {
+            name: `查看第 ${publicationNumber} 次发布`
+          })
+        );
+        expect(
+          await screen.findByTestId("publication-snapshot-body")
+        ).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "恢复到草稿" })).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: "关闭发布详情" }));
+      }
+      expect(keyFactory).not.toHaveBeenCalled();
+      expect(api.restoreDraftFromPublication).not.toHaveBeenCalled();
     }
-    expect(keyFactory).not.toHaveBeenCalled();
-    expect(api.rollbackPublication).not.toHaveBeenCalled();
-  });
+  );
 
   it("activates a V2 publication after loading a complete surface snapshot with a rotated key", async () => {
     const api = requests();
@@ -915,7 +1175,7 @@ describe("V3PublicationHistory", () => {
       .mockReturnValueOnce("confirmed-activation-key");
     api.listPublications.mockResolvedValue({ publications: [legacy] });
     api.getPublication.mockResolvedValue({ publication: legacy });
-    api.rollbackPublication
+    api.restoreDraftFromPublication
       .mockRejectedValueOnce(
         new HttpError(
           409,
@@ -927,7 +1187,8 @@ describe("V3PublicationHistory", () => {
         )
       )
       .mockResolvedValueOnce({ word: activated });
-    const onActivated = vi.fn();
+    api.get.mockResolvedValue({ word: activated, retired_stable_nodes: [] });
+    const onRestored = vi.fn();
 
     render(
       <StrictMode>
@@ -935,7 +1196,7 @@ describe("V3PublicationHistory", () => {
           currentWord={v3Word({ revision: 12, lifecycle_revision: 7 })}
           fetchSurfacePage={fetchSurfacePage}
           idempotencyKeyFactory={keyFactory}
-          onActivated={onActivated}
+          onRestored={onRestored}
           requests={api}
         />
       </StrictMode>
@@ -943,10 +1204,8 @@ describe("V3PublicationHistory", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "查看第 1 次发布" })
     );
-    fireEvent.click(
-      await screen.findByRole("button", { name: "回退为新版本" })
-    );
-    fireEvent.click(screen.getByRole("button", { name: "确认回退" }));
+    fireEvent.click(await screen.findByRole("button", { name: "恢复到草稿" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
 
     await screen.findByText("terminal-source");
     for (const detailsButton of await screen.findAllByRole("button", {
@@ -965,10 +1224,15 @@ describe("V3PublicationHistory", () => {
       "cursor-2",
       expect.any(AbortSignal)
     );
-    fireEvent.click(screen.getByRole("button", { name: "确认并回退" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认并恢复草稿" }));
 
-    await waitFor(() => expect(onActivated).toHaveBeenCalledWith(activated));
-    expect(api.rollbackPublication).toHaveBeenNthCalledWith(
+    await waitFor(() =>
+      expect(onRestored).toHaveBeenCalledWith({
+        word: activated,
+        retired_stable_nodes: []
+      })
+    );
+    expect(api.restoreDraftFromPublication).toHaveBeenNthCalledWith(
       1,
       "word-mixed",
       "pub-earlier",
@@ -979,7 +1243,7 @@ describe("V3PublicationHistory", () => {
         base_lifecycle_revision: 7
       }
     );
-    expect(api.rollbackPublication).toHaveBeenNthCalledWith(
+    expect(api.restoreDraftFromPublication).toHaveBeenNthCalledWith(
       2,
       "word-mixed",
       "pub-earlier",
@@ -1012,7 +1276,7 @@ describe("V3PublicationHistory", () => {
     const keyFactory = vi.fn(() => keys.shift()!);
     api.listPublications.mockResolvedValue({ publications: [historical] });
     api.getPublication.mockResolvedValue({ publication: historical });
-    api.rollbackPublication
+    api.restoreDraftFromPublication
       .mockRejectedValueOnce(
         new HttpError(
           409,
@@ -1039,18 +1303,18 @@ describe("V3PublicationHistory", () => {
       <V3PublicationHistory
         currentWord={v3Word()}
         idempotencyKeyFactory={keyFactory}
-        onActivated={vi.fn()}
+        onRestored={vi.fn()}
         requests={api}
       />
     );
     fireEvent.click(
       await screen.findByRole("button", { name: "查看第 2 次发布" })
     );
+    fireEvent.click(await screen.findByRole("button", { name: "恢复到草稿" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
     fireEvent.click(
-      await screen.findByRole("button", { name: "回退为新版本" })
+      await screen.findByRole("button", { name: "确认并恢复草稿" })
     );
-    fireEvent.click(screen.getByRole("button", { name: "确认回退" }));
-    fireEvent.click(await screen.findByRole("button", { name: "确认并回退" }));
 
     await screen.findByText("replacement-source");
     for (const detailsButton of await screen.findAllByRole("button", {
@@ -1064,16 +1328,14 @@ describe("V3PublicationHistory", () => {
     expect(
       screen.queryByText("词形 · old-source · 原形 · 英美通用")
     ).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /确认并回退/ }));
+    fireEvent.click(screen.getByRole("button", { name: /确认并恢复草稿/ }));
     await waitFor(() =>
-      expect(api.rollbackPublication).toHaveBeenCalledTimes(3)
+      expect(api.restoreDraftFromPublication).toHaveBeenCalledTimes(3)
     );
-    expect(api.rollbackPublication.mock.calls.map((call) => call[2])).toEqual([
-      "initial-key",
-      "old-confirm-key",
-      "replacement-key"
-    ]);
-    expect(api.rollbackPublication.mock.calls[2]![3]).toMatchObject({
+    expect(
+      api.restoreDraftFromPublication.mock.calls.map((call) => call[2])
+    ).toEqual(["initial-key", "old-confirm-key", "replacement-key"]);
+    expect(api.restoreDraftFromPublication.mock.calls[2]![3]).toMatchObject({
       confirmed_surface_match_token: "replacement-token"
     });
   });
@@ -1111,7 +1373,7 @@ describe("V3PublicationHistory", () => {
       const keyFactory = vi.fn(() => keys.shift()!);
       api.listPublications.mockResolvedValue({ publications: [historical] });
       api.getPublication.mockResolvedValue({ publication: historical });
-      api.rollbackPublication
+      api.restoreDraftFromPublication
         .mockRejectedValueOnce(
           new HttpError(
             409,
@@ -1139,7 +1401,7 @@ describe("V3PublicationHistory", () => {
           currentWord={v3Word()}
           fetchSurfacePage={fetchSurfacePage}
           idempotencyKeyFactory={keyFactory}
-          onActivated={vi.fn()}
+          onRestored={vi.fn()}
           requests={api}
         />
       );
@@ -1147,30 +1409,32 @@ describe("V3PublicationHistory", () => {
         await screen.findByRole("button", { name: "查看第 2 次发布" })
       );
       fireEvent.click(
-        await screen.findByRole("button", { name: "回退为新版本" })
+        await screen.findByRole("button", { name: "恢复到草稿" })
       );
-      fireEvent.click(screen.getByRole("button", { name: "确认回退" }));
+      fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
 
       fireEvent.click(
-        await screen.findByRole("button", { name: "重新检查回退条件" })
+        await screen.findByRole("button", { name: "重新检查恢复草稿条件" })
       );
       await waitFor(() =>
-        expect(api.rollbackPublication).toHaveBeenCalledTimes(2)
+        expect(api.restoreDraftFromPublication).toHaveBeenCalledTimes(2)
       );
-      expect(api.rollbackPublication.mock.calls[1]![2]).toBe("restart-key");
-      expect(api.rollbackPublication.mock.calls[1]![3]).not.toHaveProperty(
-        "confirmed_surface_match_token"
+      expect(api.restoreDraftFromPublication.mock.calls[1]![2]).toBe(
+        "restart-key"
       );
+      expect(
+        api.restoreDraftFromPublication.mock.calls[1]![3]
+      ).not.toHaveProperty("confirmed_surface_match_token");
       fireEvent.click(
-        await screen.findByRole("button", { name: "确认并回退" })
+        await screen.findByRole("button", { name: "确认并恢复草稿" })
       );
       await waitFor(() =>
-        expect(api.rollbackPublication).toHaveBeenCalledTimes(3)
+        expect(api.restoreDraftFromPublication).toHaveBeenCalledTimes(3)
       );
-      expect(api.rollbackPublication.mock.calls[2]![2]).toBe(
+      expect(api.restoreDraftFromPublication.mock.calls[2]![2]).toBe(
         "fresh-confirm-key"
       );
-      expect(api.rollbackPublication.mock.calls[2]![3]).toMatchObject({
+      expect(api.restoreDraftFromPublication.mock.calls[2]![3]).toMatchObject({
         confirmed_surface_match_token: "fresh-terminal-token"
       });
     }
@@ -1194,7 +1458,7 @@ describe("V3PublicationHistory", () => {
     );
     api.listPublications.mockResolvedValue({ publications: [historical] });
     api.getPublication.mockResolvedValue({ publication: historical });
-    api.rollbackPublication.mockRejectedValueOnce(
+    api.restoreDraftFromPublication.mockRejectedValueOnce(
       new HttpError(
         409,
         "confirmation required",
@@ -1210,17 +1474,15 @@ describe("V3PublicationHistory", () => {
         currentWord={v3Word()}
         fetchSurfacePage={fetchSurfacePage}
         idempotencyKeyFactory={() => "activation-key"}
-        onActivated={vi.fn()}
+        onRestored={vi.fn()}
         requests={api}
       />
     );
     fireEvent.click(
       await screen.findByRole("button", { name: "查看第 2 次发布" })
     );
-    fireEvent.click(
-      await screen.findByRole("button", { name: "回退为新版本" })
-    );
-    fireEvent.click(screen.getByRole("button", { name: "确认回退" }));
+    fireEvent.click(await screen.findByRole("button", { name: "恢复到草稿" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
     await waitFor(() => expect(fetchSurfacePage).toHaveBeenCalledTimes(1));
     expect(pageSignal?.aborted).toBe(false);
 
@@ -1239,14 +1501,14 @@ describe("V3PublicationHistory", () => {
     );
 
     expect(screen.queryByText(/late-after-close/)).toBeNull();
-    expect(api.rollbackPublication).toHaveBeenCalledTimes(1);
+    expect(api.restoreDraftFromPublication).toHaveBeenCalledTimes(1);
   });
 
   it.each([
     [
       410,
       "surface_match_snapshot_expired",
-      "同名公开范围确认已失效，请重新检查回退条件。"
+      "同名词条确认已失效，请重新检查恢复条件。"
     ],
     [
       409,
@@ -1256,7 +1518,7 @@ describe("V3PublicationHistory", () => {
     [
       409,
       "surface_match_acknowledgement_required",
-      "回退需要确认同名公开范围，但服务端未返回可确认快照。"
+      "恢复需要确认同名词条，但服务端未返回可确认快照。"
     ]
   ])(
     "keeps V2 detail visible when surface response %s/%s has no usable snapshot",
@@ -1265,7 +1527,7 @@ describe("V3PublicationHistory", () => {
       const historical = v2Publication();
       api.listPublications.mockResolvedValue({ publications: [historical] });
       api.getPublication.mockResolvedValue({ publication: historical });
-      api.rollbackPublication.mockRejectedValueOnce(
+      api.restoreDraftFromPublication.mockRejectedValueOnce(
         new HttpError(status as number, "surface gate", [], code as string)
       );
 
@@ -1273,7 +1535,7 @@ describe("V3PublicationHistory", () => {
         <V3PublicationHistory
           currentWord={v3Word()}
           idempotencyKeyFactory={() => "activation-key"}
-          onActivated={vi.fn()}
+          onRestored={vi.fn()}
           requests={api}
         />
       );
@@ -1281,9 +1543,9 @@ describe("V3PublicationHistory", () => {
         await screen.findByRole("button", { name: "查看第 1 次发布" })
       );
       fireEvent.click(
-        await screen.findByRole("button", { name: "回退为新版本" })
+        await screen.findByRole("button", { name: "恢复到草稿" })
       );
-      fireEvent.click(screen.getByRole("button", { name: "确认回退" }));
+      fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
 
       expect(await screen.findByText(message as string)).toBeInTheDocument();
       expect(
@@ -1291,9 +1553,7 @@ describe("V3PublicationHistory", () => {
           name: "historical-v2"
         })
       ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: "回退为新版本" })
-      ).toBeEnabled();
+      expect(screen.getByRole("button", { name: "恢复到草稿" })).toBeEnabled();
     }
   );
 
@@ -1308,7 +1568,7 @@ describe("V3PublicationHistory", () => {
     );
     api.listPublications.mockResolvedValue({ publications: [historical] });
     api.getPublication.mockResolvedValue({ publication: historical });
-    api.rollbackPublication.mockRejectedValueOnce(
+    api.restoreDraftFromPublication.mockRejectedValueOnce(
       new HttpError(
         409,
         "confirmation required",
@@ -1322,17 +1582,15 @@ describe("V3PublicationHistory", () => {
       <V3PublicationHistory
         currentWord={v3Word()}
         idempotencyKeyFactory={() => "activation-key"}
-        onActivated={vi.fn()}
+        onRestored={vi.fn()}
         requests={api}
       />
     );
     fireEvent.click(
       await screen.findByRole("button", { name: "查看第 2 次发布" })
     );
-    fireEvent.click(
-      await screen.findByRole("button", { name: "回退为新版本" })
-    );
-    fireEvent.click(screen.getByRole("button", { name: "确认回退" }));
+    fireEvent.click(await screen.findByRole("button", { name: "恢复到草稿" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
     fireEvent.click(
       await screen.findByRole("button", { name: "查看候选详情" })
     );
@@ -1342,16 +1600,16 @@ describe("V3PublicationHistory", () => {
 
     view.rerender(
       <V3PublicationHistory
-        activationBlockedByUnsavedChanges
+        restoreBlockedByUnsavedChanges
         currentWord={v3Word()}
         idempotencyKeyFactory={() => "activation-key"}
-        onActivated={vi.fn()}
+        onRestored={vi.fn()}
         requests={api}
       />
     );
-    fireEvent.click(screen.getByRole("button", { name: "确认并回退" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认并恢复草稿" }));
 
-    expect(api.rollbackPublication).toHaveBeenCalledTimes(1);
+    expect(api.restoreDraftFromPublication).toHaveBeenCalledTimes(1);
   });
 
   it("requires confirmation, single-flights activate, then refreshes canonical/history", async () => {
@@ -1361,13 +1619,14 @@ describe("V3PublicationHistory", () => {
     const pending = deferred<{ word: AdminWordV3 }>();
     api.listPublications.mockResolvedValue({ publications: [historical] });
     api.getPublication.mockResolvedValue({ publication: historical });
-    api.rollbackPublication.mockReturnValue(pending.promise);
-    const onActivated = vi.fn();
+    api.restoreDraftFromPublication.mockReturnValue(pending.promise);
+    api.get.mockResolvedValue({ word: activated, retired_stable_nodes: [] });
+    const onRestored = vi.fn();
     render(
       <V3PublicationHistory
         currentWord={v3Word()}
         idempotencyKeyFactory={() => "activate-key"}
-        onActivated={onActivated}
+        onRestored={onRestored}
         requests={api}
       />
     );
@@ -1375,15 +1634,13 @@ describe("V3PublicationHistory", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "查看第 2 次发布" })
     );
-    fireEvent.click(
-      await screen.findByRole("button", { name: "回退为新版本" })
-    );
-    expect(api.rollbackPublication).not.toHaveBeenCalled();
-    const confirm = screen.getByRole("button", { name: "确认回退" });
+    fireEvent.click(await screen.findByRole("button", { name: "恢复到草稿" }));
+    expect(api.restoreDraftFromPublication).not.toHaveBeenCalled();
+    const confirm = screen.getByRole("button", { name: "确认恢复" });
     fireEvent.click(confirm);
     fireEvent.click(confirm);
-    expect(api.rollbackPublication).toHaveBeenCalledTimes(1);
-    expect(api.rollbackPublication).toHaveBeenCalledWith(
+    expect(api.restoreDraftFromPublication).toHaveBeenCalledTimes(1);
+    expect(api.restoreDraftFromPublication).toHaveBeenCalledWith(
       "word-mixed",
       "pub-v3",
       "activate-key",
@@ -1395,7 +1652,12 @@ describe("V3PublicationHistory", () => {
     );
 
     await act(async () => pending.resolve({ word: activated }));
-    await waitFor(() => expect(onActivated).toHaveBeenCalledWith(activated));
+    await waitFor(() =>
+      expect(onRestored).toHaveBeenCalledWith({
+        word: activated,
+        retired_stable_nodes: []
+      })
+    );
     await waitFor(() => expect(api.listPublications).toHaveBeenCalledTimes(2));
   });
 
@@ -1405,15 +1667,15 @@ describe("V3PublicationHistory", () => {
     const idempotencyKeyFactory = vi.fn(() => "activate-key");
     api.listPublications.mockResolvedValue({ publications: [historical] });
     api.getPublication.mockResolvedValue({ publication: historical });
-    api.rollbackPublication.mockResolvedValue({
+    api.restoreDraftFromPublication.mockResolvedValue({
       word: v3Word({ revision: 10, lifecycle_revision: 4 })
     });
     const view = render(
       <V3PublicationHistory
-        activationBlockedByUnsavedChanges
+        restoreBlockedByUnsavedChanges
         currentWord={v3Word()}
         idempotencyKeyFactory={idempotencyKeyFactory}
-        onActivated={vi.fn()}
+        onRestored={vi.fn()}
         requests={api}
       />
     );
@@ -1425,30 +1687,30 @@ describe("V3PublicationHistory", () => {
       await screen.findByText("正在查看只读的历史发布快照")
     ).toBeInTheDocument();
     expect(screen.getByText("请先保存或放弃未保存的草稿")).toBeInTheDocument();
-    const blocked = screen.getByRole("button", { name: "回退为新版本" });
+    const blocked = screen.getByRole("button", { name: "恢复到草稿" });
     expect(blocked).toBeDisabled();
 
     blocked.removeAttribute("disabled");
     fireEvent.click(blocked);
     const bypassedConfirmation = screen.queryByRole("button", {
-      name: "确认回退"
+      name: "确认恢复"
     });
     if (bypassedConfirmation) {
       bypassedConfirmation.removeAttribute("disabled");
       fireEvent.click(bypassedConfirmation);
     }
     expect(idempotencyKeyFactory).not.toHaveBeenCalled();
-    expect(api.rollbackPublication).not.toHaveBeenCalled();
+    expect(api.restoreDraftFromPublication).not.toHaveBeenCalled();
 
     view.rerender(
       <V3PublicationHistory
         currentWord={v3Word()}
         idempotencyKeyFactory={idempotencyKeyFactory}
-        onActivated={vi.fn()}
+        onRestored={vi.fn()}
         requests={api}
       />
     );
-    expect(screen.getByRole("button", { name: "回退为新版本" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "恢复到草稿" })).toBeEnabled();
   });
 
   it("does not let a blocked activation generation trigger across canonical remounts", async () => {
@@ -1459,10 +1721,10 @@ describe("V3PublicationHistory", () => {
     api.getPublication.mockResolvedValue({ publication: historical });
     const view = render(
       <V3PublicationHistory
-        activationBlockedByUnsavedChanges
+        restoreBlockedByUnsavedChanges
         currentWord={v3Word()}
         idempotencyKeyFactory={idempotencyKeyFactory}
-        onActivated={vi.fn()}
+        onRestored={vi.fn()}
         requests={api}
       />
     );
@@ -1472,22 +1734,22 @@ describe("V3PublicationHistory", () => {
     );
     view.rerender(
       <V3PublicationHistory
-        activationBlockedByUnsavedChanges
+        restoreBlockedByUnsavedChanges
         currentWord={v3Word({ revision: 10 })}
         idempotencyKeyFactory={idempotencyKeyFactory}
-        onActivated={vi.fn()}
+        onRestored={vi.fn()}
         requests={api}
       />
     );
     await waitFor(() => expect(api.listPublications).toHaveBeenCalledTimes(2));
     fireEvent.click(screen.getByRole("button", { name: "查看第 2 次发布" }));
     const blocked = await screen.findByRole("button", {
-      name: "回退为新版本"
+      name: "恢复到草稿"
     });
     blocked.removeAttribute("disabled");
     fireEvent.click(blocked);
     const bypassedConfirmation = screen.queryByRole("button", {
-      name: "确认回退"
+      name: "确认恢复"
     });
     if (bypassedConfirmation) {
       bypassedConfirmation.removeAttribute("disabled");
@@ -1495,14 +1757,14 @@ describe("V3PublicationHistory", () => {
     }
 
     expect(idempotencyKeyFactory).not.toHaveBeenCalled();
-    expect(api.rollbackPublication).not.toHaveBeenCalled();
+    expect(api.restoreDraftFromPublication).not.toHaveBeenCalled();
   });
 
   it.each([
-    [403, "当前账号没有回退发布版本的权限。"],
-    [422, "回退请求校验未通过。"],
-    [500, "回退发布版本失败，请稍后重试。"],
-    [503, "发布结果尚未确认，请刷新查看结果或原样重试确认。"]
+    [403, "当前账号没有恢复历史草稿的权限。"],
+    [422, "恢复请求校验未通过。"],
+    [500, "恢复历史草稿失败，请稍后重试。"],
+    [503, "恢复结果尚未确认，请刷新查看结果或原样重试确认。"]
   ])(
     "classifies activate HTTP %s and preserves immutable detail",
     async (status, message) => {
@@ -1510,14 +1772,14 @@ describe("V3PublicationHistory", () => {
       const historical = v2Publication();
       api.listPublications.mockResolvedValue({ publications: [historical] });
       api.getPublication.mockResolvedValue({ publication: historical });
-      api.rollbackPublication.mockRejectedValue(
+      api.restoreDraftFromPublication.mockRejectedValue(
         new HttpError(status as number, "sensitive backend detail")
       );
       render(
         <V3PublicationHistory
           currentWord={v3Word()}
           idempotencyKeyFactory={() => "activate-key"}
-          onActivated={vi.fn()}
+          onRestored={vi.fn()}
           requests={api}
         />
       );
@@ -1526,9 +1788,9 @@ describe("V3PublicationHistory", () => {
         await screen.findByRole("button", { name: "查看第 1 次发布" })
       );
       fireEvent.click(
-        await screen.findByRole("button", { name: "回退为新版本" })
+        await screen.findByRole("button", { name: "恢复到草稿" })
       );
-      fireEvent.click(screen.getByRole("button", { name: "确认回退" }));
+      fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
 
       expect(await screen.findByText(message as string)).toBeInTheDocument();
       expect(
@@ -1559,25 +1821,27 @@ describe("V3PublicationHistory", () => {
       api.listPublications
         .mockResolvedValueOnce({ publications: [expired] })
         .mockResolvedValue({ publications: [fresh] });
-      api.get.mockResolvedValue({ word: freshWord, retired_stable_nodes: [] });
+      api.get
+        .mockResolvedValueOnce({ word: freshWord, retired_stable_nodes: [] })
+        .mockResolvedValue({ word: activated, retired_stable_nodes: [] });
       api.getPublication.mockImplementation(
         async (_wordId: string, publicationId: string) => ({
           publication: publicationId === "pub-fresh" ? fresh : expired
         })
       );
-      api.rollbackPublication
+      api.restoreDraftFromPublication
         .mockRejectedValueOnce(new HttpError(409, "expired", [], code))
         .mockResolvedValueOnce({ word: activated });
-      const onActivated = vi.fn();
+      const onRestored = vi.fn();
       const view: {
         rerender?: ReturnType<typeof render>["rerender"];
       } = {};
-      const onCanonicalRefreshed = vi.fn((word: AdminWordV3) => {
+      const onCanonicalRefreshed = vi.fn((draft: AdminWordDraftV3Envelope) => {
         view.rerender?.(
           <V3PublicationHistory
-            currentWord={word}
+            currentWord={draft.word}
             idempotencyKeyFactory={keyFactory}
-            onActivated={onActivated}
+            onRestored={onRestored}
             onCanonicalRefreshed={onCanonicalRefreshed}
             requests={api}
           />
@@ -1587,7 +1851,7 @@ describe("V3PublicationHistory", () => {
         <V3PublicationHistory
           currentWord={v3Word()}
           idempotencyKeyFactory={keyFactory}
-          onActivated={onActivated}
+          onRestored={onRestored}
           onCanonicalRefreshed={onCanonicalRefreshed}
           requests={api}
         />
@@ -1597,30 +1861,33 @@ describe("V3PublicationHistory", () => {
         await screen.findByRole("button", { name: "查看第 2 次发布" })
       );
       fireEvent.click(
-        await screen.findByRole("button", { name: "回退为新版本" })
+        await screen.findByRole("button", { name: "恢复到草稿" })
       );
-      const expiredConfirm = screen.getByRole("button", { name: "确认回退" });
+      const expiredConfirm = screen.getByRole("button", { name: "确认恢复" });
       fireEvent.click(expiredConfirm);
 
       await waitFor(() => expect(api.get).toHaveBeenCalledWith("word-mixed"));
       await waitFor(() =>
-        expect(onCanonicalRefreshed).toHaveBeenCalledWith(freshWord)
+        expect(onCanonicalRefreshed).toHaveBeenCalledWith({
+          word: freshWord,
+          retired_stable_nodes: []
+        })
       );
-      expect(screen.queryByRole("button", { name: "确认回退" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "确认恢复" })).toBeNull();
       fireEvent.click(expiredConfirm);
-      expect(api.rollbackPublication).toHaveBeenCalledTimes(1);
+      expect(api.restoreDraftFromPublication).toHaveBeenCalledTimes(1);
       expect(keyFactory).toHaveBeenCalledTimes(1);
 
       fireEvent.click(
         await screen.findByRole("button", { name: "查看第 3 次发布" })
       );
       fireEvent.click(
-        await screen.findByRole("button", { name: "回退为新版本" })
+        await screen.findByRole("button", { name: "恢复到草稿" })
       );
-      fireEvent.click(screen.getByRole("button", { name: "确认回退" }));
+      fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
 
       await waitFor(() =>
-        expect(api.rollbackPublication).toHaveBeenLastCalledWith(
+        expect(api.restoreDraftFromPublication).toHaveBeenLastCalledWith(
           "word-mixed",
           "pub-fresh",
           "fresh-activation-key",
@@ -1631,7 +1898,10 @@ describe("V3PublicationHistory", () => {
           }
         )
       );
-      expect(onActivated).toHaveBeenCalledWith(activated);
+      expect(onRestored).toHaveBeenCalledWith({
+        word: activated,
+        retired_stable_nodes: []
+      });
       expect(keyFactory).toHaveBeenCalledTimes(2);
       expect(api.listPublications.mock.calls.length).toBeGreaterThanOrEqual(2);
     }
@@ -1648,7 +1918,7 @@ describe("V3PublicationHistory", () => {
     api.listPublications.mockResolvedValue({ publications: [historical] });
     api.get.mockResolvedValue({ word: archived, retired_stable_nodes: [] });
     api.getPublication.mockResolvedValue({ publication: historical });
-    api.rollbackPublication.mockRejectedValue(
+    api.restoreDraftFromPublication.mockRejectedValue(
       new HttpError(409, "entry archived", [], "entry_archived")
     );
     const onCanonicalRefreshed = vi.fn();
@@ -1660,7 +1930,7 @@ describe("V3PublicationHistory", () => {
         <V3PublicationHistory
           currentWord={word}
           idempotencyKeyFactory={() => "archived-activation-key"}
-          onActivated={vi.fn()}
+          onRestored={vi.fn()}
           onCanonicalRefreshed={onCanonicalRefreshed}
           requests={api}
         />
@@ -1670,7 +1940,7 @@ describe("V3PublicationHistory", () => {
       <V3PublicationHistory
         currentWord={v3Word()}
         idempotencyKeyFactory={() => "archived-activation-key"}
-        onActivated={vi.fn()}
+        onRestored={vi.fn()}
         onCanonicalRefreshed={onCanonicalRefreshed}
         requests={api}
       />
@@ -1679,21 +1949,22 @@ describe("V3PublicationHistory", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "查看第 2 次发布" })
     );
-    fireEvent.click(
-      await screen.findByRole("button", { name: "回退为新版本" })
-    );
-    const staleConfirm = screen.getByRole("button", { name: "确认回退" });
+    fireEvent.click(await screen.findByRole("button", { name: "恢复到草稿" }));
+    const staleConfirm = screen.getByRole("button", { name: "确认恢复" });
     fireEvent.click(staleConfirm);
 
     await waitFor(() => expect(api.get).toHaveBeenCalledWith("word-mixed"));
     await waitFor(() =>
-      expect(onCanonicalRefreshed).toHaveBeenCalledWith(archived)
+      expect(onCanonicalRefreshed).toHaveBeenCalledWith({
+        word: archived,
+        retired_stable_nodes: []
+      })
     );
     expect(api.listPublications.mock.calls.length).toBeGreaterThanOrEqual(2);
-    expect(screen.queryByRole("button", { name: "确认回退" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "回退为新版本" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "确认恢复" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "恢复到草稿" })).toBeNull();
     fireEvent.click(staleConfirm);
-    expect(api.rollbackPublication).toHaveBeenCalledTimes(1);
+    expect(api.restoreDraftFromPublication).toHaveBeenCalledTimes(1);
   });
 
   it("keeps activation unavailable while a failed conflict refresh is retried", async () => {
@@ -1713,7 +1984,7 @@ describe("V3PublicationHistory", () => {
       .mockRejectedValueOnce(new TypeError("offline"))
       .mockResolvedValueOnce({ word: freshWord, retired_stable_nodes: [] });
     api.getPublication.mockResolvedValue({ publication: expired });
-    api.rollbackPublication.mockRejectedValueOnce(
+    api.restoreDraftFromPublication.mockRejectedValueOnce(
       new HttpError(409, "stale", [], "revision_conflict")
     );
     const onCanonicalRefreshed = vi.fn();
@@ -1721,7 +1992,7 @@ describe("V3PublicationHistory", () => {
       <V3PublicationHistory
         currentWord={v3Word()}
         idempotencyKeyFactory={() => "expired-key"}
-        onActivated={vi.fn()}
+        onRestored={vi.fn()}
         onCanonicalRefreshed={onCanonicalRefreshed}
         requests={api}
       />
@@ -1730,26 +2001,27 @@ describe("V3PublicationHistory", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "查看第 2 次发布" })
     );
-    fireEvent.click(
-      await screen.findByRole("button", { name: "回退为新版本" })
-    );
-    fireEvent.click(screen.getByRole("button", { name: "确认回退" }));
+    fireEvent.click(await screen.findByRole("button", { name: "恢复到草稿" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
 
     expect(
       await screen.findByText("刷新最新词条与发布历史失败")
     ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "确认回退" })).toBeNull();
-    expect(api.rollbackPublication).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: "确认恢复" })).toBeNull();
+    expect(api.restoreDraftFromPublication).toHaveBeenCalledTimes(1);
     fireEvent.click(
       screen.getByRole("button", { name: "重新刷新词条与发布历史" })
     );
 
     await waitFor(() => expect(api.get).toHaveBeenCalledTimes(2));
     await waitFor(() =>
-      expect(onCanonicalRefreshed).toHaveBeenCalledWith(freshWord)
+      expect(onCanonicalRefreshed).toHaveBeenCalledWith({
+        word: freshWord,
+        retired_stable_nodes: []
+      })
     );
     expect(api.listPublications).toHaveBeenCalledTimes(3);
-    expect(api.rollbackPublication).toHaveBeenCalledTimes(1);
+    expect(api.restoreDraftFromPublication).toHaveBeenCalledTimes(1);
     expect(
       await screen.findByRole("button", { name: "查看第 4 次发布" })
     ).toBeInTheDocument();
@@ -1760,7 +2032,7 @@ describe("V3PublicationHistory", () => {
     const expired = v3Publication();
     api.listPublications.mockResolvedValue({ publications: [expired] });
     api.getPublication.mockResolvedValue({ publication: expired });
-    api.rollbackPublication.mockRejectedValueOnce(
+    api.restoreDraftFromPublication.mockRejectedValueOnce(
       new HttpError(409, "stale", [], "revision_conflict")
     );
     api.get.mockRejectedValue(
@@ -1771,12 +2043,12 @@ describe("V3PublicationHistory", () => {
       )
     );
     const onCanonicalRefreshed = vi.fn();
-    const onActivated = vi.fn();
+    const onRestored = vi.fn();
     render(
       <V3PublicationHistory
         currentWord={v3Word()}
         idempotencyKeyFactory={() => "expired-key"}
-        onActivated={onActivated}
+        onRestored={onRestored}
         onCanonicalRefreshed={onCanonicalRefreshed}
         requests={api}
       />
@@ -1785,23 +2057,21 @@ describe("V3PublicationHistory", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "查看第 2 次发布" })
     );
-    fireEvent.click(
-      await screen.findByRole("button", { name: "回退为新版本" })
-    );
-    fireEvent.click(screen.getByRole("button", { name: "确认回退" }));
+    fireEvent.click(await screen.findByRole("button", { name: "恢复到草稿" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
 
     expect(
       await screen.findByText("刷新最新词条与发布历史失败")
     ).toBeInTheDocument();
     expect(onCanonicalRefreshed).not.toHaveBeenCalled();
-    expect(onActivated).not.toHaveBeenCalled();
-    expect(api.rollbackPublication).toHaveBeenCalledTimes(1);
+    expect(onRestored).not.toHaveBeenCalled();
+    expect(api.restoreDraftFromPublication).toHaveBeenCalledTimes(1);
 
     fireEvent.click(
       screen.getByRole("button", { name: "重新刷新词条与发布历史" })
     );
     await waitFor(() => expect(api.get).toHaveBeenCalledTimes(2));
-    expect(api.rollbackPublication).toHaveBeenCalledTimes(1);
+    expect(api.restoreDraftFromPublication).toHaveBeenCalledTimes(1);
   });
 
   it("does not update canonical/history after an activation identity guard rejects the response", async () => {
@@ -1809,19 +2079,19 @@ describe("V3PublicationHistory", () => {
     const historical = v3Publication();
     api.listPublications.mockResolvedValue({ publications: [historical] });
     api.getPublication.mockResolvedValue({ publication: historical });
-    api.rollbackPublication.mockRejectedValue(
+    api.restoreDraftFromPublication.mockRejectedValue(
       new InvalidAdminWordResponseError(
-        "activate_publication.word.id",
+        "restore_draft.word.id",
         "enum_mismatch",
         "string"
       )
     );
-    const onActivated = vi.fn();
+    const onRestored = vi.fn();
     render(
       <V3PublicationHistory
         currentWord={v3Word()}
         idempotencyKeyFactory={() => "activation-key"}
-        onActivated={onActivated}
+        onRestored={onRestored}
         requests={api}
       />
     );
@@ -1829,15 +2099,13 @@ describe("V3PublicationHistory", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "查看第 2 次发布" })
     );
-    fireEvent.click(
-      await screen.findByRole("button", { name: "回退为新版本" })
-    );
-    fireEvent.click(screen.getByRole("button", { name: "确认回退" }));
+    fireEvent.click(await screen.findByRole("button", { name: "恢复到草稿" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
 
     expect(
-      await screen.findByText("回退发布版本失败，请稍后重试。")
+      await screen.findByText("恢复历史草稿失败，请稍后重试。")
     ).toBeInTheDocument();
-    expect(onActivated).not.toHaveBeenCalled();
+    expect(onRestored).not.toHaveBeenCalled();
     expect(api.listPublications).toHaveBeenCalledTimes(1);
     expect(
       within(screen.getByTestId("publication-detail")).getByText(
@@ -1859,7 +2127,7 @@ describe("V3PublicationHistory", () => {
       .mockReturnValueOnce(history.promise);
     api.get.mockReturnValue(canonical.promise);
     api.getPublication.mockResolvedValue({ publication: historical });
-    api.rollbackPublication.mockRejectedValue(
+    api.restoreDraftFromPublication.mockRejectedValue(
       new HttpError(409, "expired", [], "revision_conflict")
     );
     const onCanonicalRefreshed = vi.fn();
@@ -1867,7 +2135,7 @@ describe("V3PublicationHistory", () => {
       <V3PublicationHistory
         currentWord={v3Word()}
         idempotencyKeyFactory={() => "expired-key"}
-        onActivated={vi.fn()}
+        onRestored={vi.fn()}
         onCanonicalRefreshed={onCanonicalRefreshed}
         requests={api}
       />
@@ -1876,10 +2144,8 @@ describe("V3PublicationHistory", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "查看第 2 次发布" })
     );
-    fireEvent.click(
-      await screen.findByRole("button", { name: "回退为新版本" })
-    );
-    fireEvent.click(screen.getByRole("button", { name: "确认回退" }));
+    fireEvent.click(await screen.findByRole("button", { name: "恢复到草稿" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
     await waitFor(() => expect(api.get).toHaveBeenCalledTimes(1));
     unmount();
     await act(async () => {
@@ -1926,7 +2192,7 @@ describe("V3PublicationHistory", () => {
       <V3PublicationHistory
         currentWord={v3Word()}
         idempotencyKeyFactory={() => "activate-key"}
-        onActivated={vi.fn()}
+        onRestored={vi.fn()}
         requests={api}
       />
     );
@@ -1948,9 +2214,9 @@ describe("V3PublicationHistory", () => {
   it.each([
     [
       new TypeError("offline"),
-      "网络异常，回退状态未知，请刷新发布历史后再重试。"
+      "网络异常，恢复状态未知，请刷新发布历史后再重试。"
     ],
-    [new Error("decoder failed"), "回退发布版本失败，请稍后重试。"]
+    [new Error("decoder failed"), "恢复历史草稿失败，请稍后重试。"]
   ])(
     "classifies non-HTTP activation failures and retries the same operation key",
     async (error, message) => {
@@ -1959,12 +2225,12 @@ describe("V3PublicationHistory", () => {
       const keyFactory = vi.fn(() => "stable-activation-key");
       api.listPublications.mockResolvedValue({ publications: [historical] });
       api.getPublication.mockResolvedValue({ publication: historical });
-      api.rollbackPublication.mockRejectedValue(error);
+      api.restoreDraftFromPublication.mockRejectedValue(error);
       render(
         <V3PublicationHistory
           currentWord={v3Word()}
           idempotencyKeyFactory={keyFactory}
-          onActivated={vi.fn()}
+          onRestored={vi.fn()}
           requests={api}
         />
       );
@@ -1973,18 +2239,18 @@ describe("V3PublicationHistory", () => {
         await screen.findByRole("button", { name: "查看第 2 次发布" })
       );
       fireEvent.click(
-        await screen.findByRole("button", { name: "回退为新版本" })
+        await screen.findByRole("button", { name: "恢复到草稿" })
       );
-      const confirm = screen.getByRole("button", { name: "确认回退" });
+      const confirm = screen.getByRole("button", { name: "确认恢复" });
       fireEvent.click(confirm);
       expect(await screen.findByText(message)).toBeInTheDocument();
       fireEvent.click(confirm);
       await waitFor(() =>
-        expect(api.rollbackPublication).toHaveBeenCalledTimes(2)
+        expect(api.restoreDraftFromPublication).toHaveBeenCalledTimes(2)
       );
 
       expect(keyFactory).toHaveBeenCalledTimes(1);
-      expect(api.rollbackPublication.mock.calls[1]![2]).toBe(
+      expect(api.restoreDraftFromPublication.mock.calls[1]![2]).toBe(
         "stable-activation-key"
       );
       expect(
@@ -1995,8 +2261,8 @@ describe("V3PublicationHistory", () => {
     }
   );
 
-  it("当前词条未处于已发布态时，历史快照只读且无回退入口", async () => {
-    for (const status of ["draft", "archived"] as const) {
+  it("当前词条不是草稿时，历史快照只读且无恢复入口", async () => {
+    for (const status of ["published", "archived"] as const) {
       const api = requests();
       const historical = v3Publication({ word: v3Word({}) });
       api.listPublications.mockResolvedValue({ publications: [historical] });
@@ -2005,7 +2271,7 @@ describe("V3PublicationHistory", () => {
         <V3PublicationHistory
           currentWord={v3Word({ status })}
           idempotencyKeyFactory={() => "activate-key"}
-          onActivated={vi.fn()}
+          onRestored={vi.fn()}
           requests={api}
         />
       );
@@ -2016,8 +2282,8 @@ describe("V3PublicationHistory", () => {
       expect(
         await screen.findByText("正在查看只读的历史发布快照")
       ).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "回退为新版本" })).toBeNull();
-      expect(api.rollbackPublication).not.toHaveBeenCalled();
+      expect(screen.queryByRole("button", { name: "恢复到草稿" })).toBeNull();
+      expect(api.restoreDraftFromPublication).not.toHaveBeenCalled();
       view.unmount();
     }
   });
@@ -2037,12 +2303,12 @@ describe("V3PublicationHistory", () => {
     api.listPublications
       .mockReturnValueOnce(stale.promise)
       .mockResolvedValueOnce({ publications: [fresh] });
-    const onActivated = vi.fn();
+    const onRestored = vi.fn();
     const view = render(
       <V3PublicationHistory
         currentWord={v3Word()}
         idempotencyKeyFactory={() => "activate-key"}
-        onActivated={onActivated}
+        onRestored={onRestored}
         requests={api}
       />
     );
@@ -2051,7 +2317,7 @@ describe("V3PublicationHistory", () => {
       <V3PublicationHistory
         currentWord={v3Word({ revision: 10 })}
         idempotencyKeyFactory={() => "activate-key"}
-        onActivated={onActivated}
+        onRestored={onRestored}
         requests={api}
       />
     );
@@ -2090,13 +2356,13 @@ describe("V3PublicationHistory", () => {
     api.getPublication
       .mockReturnValueOnce(first.promise)
       .mockResolvedValueOnce({ publication: historicalV3 });
-    api.rollbackPublication.mockReturnValue(activate.promise);
-    const onActivated = vi.fn();
+    api.restoreDraftFromPublication.mockReturnValue(activate.promise);
+    const onRestored = vi.fn();
     const { unmount } = render(
       <V3PublicationHistory
         currentWord={v3Word()}
         idempotencyKeyFactory={() => "activate-key"}
-        onActivated={onActivated}
+        onRestored={onRestored}
         requests={api}
       />
     );
@@ -2124,11 +2390,11 @@ describe("V3PublicationHistory", () => {
     );
     expect(screen.queryByText("stale-v2-detail")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "回退为新版本" }));
-    fireEvent.click(screen.getByRole("button", { name: "确认回退" }));
+    fireEvent.click(screen.getByRole("button", { name: "恢复到草稿" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
     unmount();
     await act(async () => activate.resolve({ word: v3Word({ revision: 10 }) }));
-    expect(onActivated).not.toHaveBeenCalled();
+    expect(onRestored).not.toHaveBeenCalled();
     expect(api.listPublications).toHaveBeenCalledTimes(1);
   });
 
@@ -2141,7 +2407,7 @@ describe("V3PublicationHistory", () => {
       <V3PublicationHistory
         currentWord={v3Word()}
         idempotencyKeyFactory={() => "activate-key"}
-        onActivated={vi.fn()}
+        onRestored={vi.fn()}
         requests={api}
       />
     );
@@ -2198,7 +2464,7 @@ it("历史发布快照展示释义和例句的人工关联", async () => {
   render(
     <V3PublicationHistory
       currentWord={v3Word()}
-      onActivated={vi.fn()}
+      onRestored={vi.fn()}
       requests={api}
     />
   );

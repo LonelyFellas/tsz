@@ -904,12 +904,6 @@ function V3WizardSlots({
             }
           />
         )}
-        <V3PublicationHistory
-          currentWord={context.word}
-          onActivated={onActivated}
-          onCanonicalRefreshed={onActivated}
-          requests={requests}
-        />
       </Flex>
     );
   }
@@ -939,18 +933,7 @@ function V3WizardSlots({
         )
       );
     case "preview":
-      return (
-        <Flex vertical gap="middle">
-          <V3PreviewSlot context={context} />
-          <V3PublicationHistory
-            activationBlockedByUnsavedChanges={context.hasUnsavedChanges}
-            currentWord={context.word}
-            onActivated={onActivated}
-            onCanonicalRefreshed={onActivated}
-            requests={requests}
-          />
-        </Flex>
-      );
+      return <V3PreviewSlot context={context} />;
   }
 }
 
@@ -1002,9 +985,20 @@ export function WordWizardV3Page({
     },
     [replaceCanonical]
   );
+  const replaceRestoredCanonical = useCallback(
+    (draft: AdminWordDraftV3Envelope) => {
+      queryClient.setQueryData(queryKey, draft);
+      void queryClient.invalidateQueries({ queryKey: wordKeys.lists() });
+      void queryClient.invalidateQueries({ queryKey: wordKeys.stats() });
+      setActivationGeneration((generation) => generation + 1);
+    },
+    [queryClient, queryKey]
+  );
   const detail = useQuery({
     queryKey,
     queryFn: () => requests.get(wordId),
+    placeholderData: (previous) =>
+      previous?.word.id === wordId ? previous : undefined,
     enabled: wordId !== "",
     staleTime: 0,
     gcTime: 0,
@@ -1086,17 +1080,14 @@ export function WordWizardV3Page({
   );
   const forcePreview = stepAccess.readOnly;
   const legalStep = stepAccess.effective;
-  if (step !== legalStep) {
-    return (
-      <Navigate
-        replace
-        to={`/words/${word.id}/v3/wizard/${legalStep}${location.search}`}
-      />
-    );
-  }
-
   return (
     <Flex vertical gap="middle">
+      {step !== legalStep ? (
+        <Navigate
+          replace
+          to={`/words/${word.id}/v3/wizard/${legalStep}${location.search}`}
+        />
+      ) : null}
       <CreationSourceNotice source={creationSourceFromState(location.state)} />
       {searchParams.get("focus_node") &&
         !locateV3Node(word, searchParams.get("focus_node")!) && (
@@ -1132,13 +1123,22 @@ export function WordWizardV3Page({
             requests={requests}
             onWordChange={replaceCanonical}
             renderStep={(context) => (
-              <V3WizardSlots
-                context={context}
-                onActivated={replaceActivatedCanonical}
-                renderMeaningsStep={renderMeaningsStep}
-                requests={requests}
-                wordId={word.id}
-              />
+              <Flex vertical gap="middle">
+                <V3WizardSlots
+                  context={context}
+                  onActivated={replaceActivatedCanonical}
+                  renderMeaningsStep={renderMeaningsStep}
+                  requests={requests}
+                  wordId={word.id}
+                />
+                <V3PublicationHistory
+                  restoreBlockedByUnsavedChanges={context.hasUnsavedChanges}
+                  currentWord={context.word}
+                  onRestored={replaceRestoredCanonical}
+                  onCanonicalRefreshed={replaceRestoredCanonical}
+                  requests={requests}
+                />
+              </Flex>
             )}
           />
         </V3ReferenceGuardProvider>

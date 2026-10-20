@@ -676,7 +676,7 @@ describe("V3PreviewAndPublishStep", () => {
     }
   });
 
-  it.each(["words.edit", "words.validate"])(
+  it.each(["words.edit", "words.create"])(
     "只有%s也可以校验，但校验结果不能开放发布或确认发布",
     async (permission) => {
       useAuthStore.getState().setProfile({

@@ -63,6 +63,15 @@ function mount(
         requires: ["words.access"]
       },
       {
+        key: "speech.upload_audio",
+        label: "语音合成 上传音频",
+        description: "上传音频给文本配音",
+        module_key: "words",
+        kind: "action",
+        risk_level: "medium",
+        requires: []
+      },
+      {
         key: "sentences.access",
         label: "例句查看",
         description: "查看后台共享例句",
@@ -145,6 +154,28 @@ describe("个人权限设置", () => {
     expect(screen.queryByText("words.access")).toBeNull();
     expect(detail().getByText("前置权限：查看词条")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "预览变更" })).toBeDisabled();
+  });
+
+  it("上传音频在两个分类勾选同步且仅提交一个授权", async () => {
+    mount([]);
+    await screen.findByRole("group", { name: "权限模块" });
+    fireEvent.click(detail().getByLabelText(/语音合成 上传音频/));
+    fireEvent.click(modules().getByRole("button", { name: /语音合成管理/ }));
+    expect(detail().getByLabelText(/语音合成 上传音频/)).toBeChecked();
+    expect(screen.getByText("1 / 4")).toBeInTheDocument();
+    fireEvent.click(detail().getByLabelText(/语音合成 上传音频/));
+    fireEvent.click(modules().getByRole("button", { name: /词库管理/ }));
+    expect(detail().getByLabelText(/语音合成 上传音频/)).not.toBeChecked();
+    fireEvent.click(detail().getByLabelText(/语音合成 上传音频/));
+    fireEvent.click(screen.getByRole("button", { name: "预览变更" }));
+    await waitFor(() =>
+      expect(api.permissionSystem.preview).toHaveBeenCalledWith({
+        catalog_version: "v1",
+        targets: [{ admin_id: "a", expected_version: 3 }],
+        grant: ["speech.upload_audio"],
+        revoke: []
+      })
+    );
   });
 
   it("回填已有权限，显示授权对象与权限说明", async () => {

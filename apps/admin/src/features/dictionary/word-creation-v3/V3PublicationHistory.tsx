@@ -5,6 +5,7 @@ import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
 import { HttpError, RequestTimeoutError } from "@tsz/api-client";
 import type {
+  AdminWordDraftV3Envelope,
   AdminWordPublicationAny,
   AdminWordPublicationEnvelope,
   AdminWordPublicationListResponse,
@@ -28,6 +29,10 @@ import {
   useSurfaceSnapshot
 } from "../useSurfaceSnapshot";
 import { createV3WordRequests, type V3WordRequests } from "./api";
+import { newWordNodeId } from "../word-model/primitives";
+import { classifyV3Problem, type V3Problem } from "./problem";
+import { v3IssueMessage } from "./presentationErrors";
+import { V3ReferenceList } from "./components/V3ReferenceList";
 import { sentenceTranslationsV3 } from "./meaningsModel";
 import { V3EnglishTextPreview } from "./components/V3EnglishTextPreview";
 import {
@@ -40,7 +45,11 @@ import {
 
 type PublicationRequests = Pick<
   V3WordRequests,
-  "get" | "listPublications" | "getPublication" | "rollbackPublication"
+  | "get"
+  | "listPublications"
+  | "getPublication"
+  | "restoreDraftFromPublication"
+  | "surfacePage"
 >;
 
 type RecoveryStatus = 409 | 410;
@@ -51,11 +60,11 @@ interface RecoveryState {
 }
 
 interface Props {
-  activationBlockedByUnsavedChanges?: boolean;
+  restoreBlockedByUnsavedChanges?: boolean;
   currentWord: AdminWordV3;
   requests?: PublicationRequests;
-  onActivated: (word: AdminWordV3) => void;
-  onCanonicalRefreshed?: (word: AdminWordV3) => void;
+  onRestored: (draft: AdminWordDraftV3Envelope) => void;
+  onCanonicalRefreshed?: (draft: AdminWordDraftV3Envelope) => void;
   idempotencyKeyFactory?: () => string;
   fetchSurfacePage?: FetchSurfaceMatchPage<SurfaceMatchPageV3>;
 }
@@ -467,8 +476,8 @@ function PublicationMetadata({
   );
 }
 
-function canRollbackV3Publication(currentWord: AdminWordV3): boolean {
-  if (currentWord.status !== "published") {
+function canRestoreV3Draft(currentWord: AdminWordV3): boolean {
+  if (currentWord.status !== "draft") {
     return false;
   }
   return currentWord.capabilities.publication.mode === "native";
@@ -489,7 +498,7 @@ function surfaceActivationErrorMessage(code: string | undefined): string {
     code === "surface_match_snapshot_expired" ||
     code === "surface_policy_changed"
   ) {
-    return "同名公开范围确认已失效，请重新检查回退条件。";
+    return "同名词条确认已失效，请重新检查恢复条件。";
   }
   if (
     code === "exact_headword_creation_temporarily_disabled" ||
@@ -497,40 +506,39 @@ function surfaceActivationErrorMessage(code: string | undefined): string {
   ) {
     return "学习端暂不支持多个同名公开词条。";
   }
-  return "回退需要确认同名公开范围，但服务端未返回可确认快照。";
+  return "恢复需要确认同名词条，但服务端未返回可确认快照。";
 }
 
 function activationErrorMessage(error: unknown): string {
   if (error instanceof HttpError) {
     switch (error.status) {
       case 403:
-        return "当前账号没有回退发布版本的权限。";
+        return "当前账号没有恢复历史草稿的权限。";
+      case 404:
+      case 405:
+        return "当前服务不支持历史草稿恢复，或该历史记录已不存在。请刷新页面后重试。";
       case 422:
-        return "回退请求校验未通过。";
+        return "恢复请求校验未通过。";
       case 503:
-        return "发布结果尚未确认，请刷新查看结果或原样重试确认。";
+        return "恢复结果尚未确认，请刷新查看结果或原样重试确认。";
       default:
-        return "回退发布版本失败，请稍后重试。";
+        return "恢复历史草稿失败，请稍后重试。";
     }
   }
   if (error instanceof TypeError || error instanceof RequestTimeoutError) {
-    return "网络异常，回退状态未知，请刷新发布历史后再重试。";
+    return "网络异常，恢复状态未知，请刷新发布历史后再重试。";
   }
-  return "回退发布版本失败，请稍后重试。";
-}
-
-function newIdempotencyKey(): string {
-  return crypto.randomUUID();
+  return "恢复历史草稿失败，请稍后重试。";
 }
 
 export function V3PublicationHistory({
-  activationBlockedByUnsavedChanges = false,
+  restoreBlockedByUnsavedChanges = false,
   currentWord,
   requests = defaultRequests,
-  onActivated,
-  onCanonicalRefreshed = onActivated,
-  idempotencyKeyFactory = newIdempotencyKey,
-  fetchSurfacePage
+  onRestored,
+  onCanonicalRefreshed = onRestored,
+  idempotencyKeyFactory = newWordNodeId,
+  fetchSurfacePage = requests.surfacePage
 }: Props) {
   const [publications, setPublications] = useState<AdminWordPublicationAny[]>(
     []
@@ -545,13 +553,14 @@ export function V3PublicationHistory({
   const [confirming, setConfirming] = useState(false);
   const [activating, setActivating] = useState(false);
   const profile = useAuthStore((state) => state.profile);
-  const allowedToPublish = canAdminResourceAction(
+  const allowedToRestore = canAdminResourceAction(
     profile,
     "words",
     "rollback",
     currentWord.created_by
   );
   const [activationError, setActivationError] = useState<string>();
+  const [activationProblem, setActivationProblem] = useState<V3Problem>();
   const [surfacePage, setSurfacePage] = useState<SurfaceMatchPageV3>();
   const [surfaceResetVersion, setSurfaceResetVersion] = useState(0);
   const [recovery, setRecovery] = useState<RecoveryState>();
@@ -618,6 +627,7 @@ export function V3PublicationHistory({
     setConfirming(false);
     setActivating(false);
     setActivationError(undefined);
+    setActivationProblem(undefined);
     setSurfacePage(undefined);
     setSurfaceResetVersion((value) => value + 1);
     setRecovery(undefined);
@@ -637,11 +647,13 @@ export function V3PublicationHistory({
     setConfirming(false);
     setActivating(false);
     setActivationError(undefined);
+    setActivationProblem(undefined);
     setSurfacePage(undefined);
     setSurfaceResetVersion((value) => value + 1);
   }, []);
 
   const closeDetail = useCallback(() => {
+    if (activationLock.current) return;
     invalidateDetail();
   }, [invalidateDetail]);
 
@@ -665,7 +677,7 @@ export function V3PublicationHistory({
             setLoading(false);
             setListError(false);
             setRecovery(undefined);
-            onCanonicalRefreshed(canonical.word);
+            onCanonicalRefreshed(canonical);
           },
           () => {
             if (!mounted.current || recoveryGeneration.current !== generation) {
@@ -685,6 +697,7 @@ export function V3PublicationHistory({
 
   const openDetail = useCallback(
     (publicationId: string) => {
+      if (activationLock.current) return;
       const generation = ++detailGeneration.current;
       activationGeneration.current += 1;
       activationLock.current = false;
@@ -695,6 +708,7 @@ export function V3PublicationHistory({
       setDetailError(false);
       setConfirming(false);
       setActivationError(undefined);
+      setActivationProblem(undefined);
       setSurfacePage(undefined);
       setSurfaceResetVersion((value) => value + 1);
       void requests.getPublication(currentWord.id, publicationId).then(
@@ -727,77 +741,80 @@ export function V3PublicationHistory({
   const activate = useCallback(
     (confirmedSurfaceToken?: string) => {
       if (
-        !allowedToPublish ||
-        activationBlockedByUnsavedChanges ||
+        !allowedToRestore ||
+        restoreBlockedByUnsavedChanges ||
         activationLock.current ||
         !detail ||
-        !canRollbackV3Publication(currentWord)
+        !canRestoreV3Draft(currentWord)
       ) {
         return;
       }
+      const key = (activationKey.current ??= idempotencyKeyFactory());
       activationLock.current = true;
       const generation = ++activationGeneration.current;
-      const key = (activationKey.current ??= idempotencyKeyFactory());
       setActivating(true);
       setActivationError(undefined);
+      setActivationProblem(undefined);
       void requests
-        .rollbackPublication(currentWord.id, detail.publication_id, key, {
-          schema_version: 3,
-          base_revision: currentWord.revision,
-          base_lifecycle_revision: currentWord.lifecycle_revision,
-          ...(confirmedSurfaceToken
-            ? { confirmed_surface_match_token: confirmedSurfaceToken }
-            : {})
-        })
-        .then(
-          (response) => {
-            if (
-              !mounted.current ||
-              activationGeneration.current !== generation
-            ) {
-              return;
-            }
-            activationKey.current = undefined;
-            setSurfacePage(undefined);
-            setSurfaceResetVersion((value) => value + 1);
-            setActivating(false);
-            setConfirming(false);
-            onActivated(response.word);
-            setRetryVersion((value) => value + 1);
-          },
-          (error: unknown) => {
-            if (
-              !mounted.current ||
-              activationGeneration.current !== generation
-            ) {
-              return;
-            }
-            if (isCanonicalActivationConflict(error)) {
-              refreshAfterConflict(409);
-              return;
-            }
-            if (
-              error instanceof HttpError &&
-              requiresNewIdempotencyKey(error.status, error.code)
-            ) {
-              activationKey.current = undefined;
-              setActivating(false);
-              setConfirming(false);
-              setActivationError(undefined);
-              const candidatePage = error.meta?.surface_match_page;
-              if (isSurfaceMatchPageAny(candidatePage)) {
-                setSurfacePage(candidatePage);
-                setSurfaceResetVersion((value) => value + 1);
-              } else {
-                setSurfacePage(undefined);
-                setActivationError(surfaceActivationErrorMessage(error.code));
-              }
-              return;
-            }
-            setActivating(false);
-            setActivationError(activationErrorMessage(error));
+        .restoreDraftFromPublication(
+          currentWord.id,
+          detail.publication_id,
+          key,
+          {
+            schema_version: 3,
+            base_revision: currentWord.revision,
+            base_lifecycle_revision: currentWord.lifecycle_revision,
+            ...(confirmedSurfaceToken
+              ? { confirmed_surface_match_token: confirmedSurfaceToken }
+              : {})
           }
         )
+        .then(async () => {
+          if (!mounted.current || activationGeneration.current !== generation) {
+            return;
+          }
+          const canonical = await requests.get(currentWord.id);
+          if (!mounted.current || activationGeneration.current !== generation)
+            return;
+          activationKey.current = undefined;
+          setSurfacePage(undefined);
+          setSurfaceResetVersion((value) => value + 1);
+          setActivating(false);
+          setConfirming(false);
+          onRestored(canonical);
+          setRetryVersion((value) => value + 1);
+        })
+        .catch((error: unknown) => {
+          if (!mounted.current || activationGeneration.current !== generation) {
+            return;
+          }
+          if (isCanonicalActivationConflict(error)) {
+            refreshAfterConflict(409);
+            return;
+          }
+          if (
+            error instanceof HttpError &&
+            requiresNewIdempotencyKey(error.status, error.code)
+          ) {
+            activationKey.current = undefined;
+            setActivating(false);
+            setConfirming(false);
+            setActivationError(undefined);
+            setActivationProblem(undefined);
+            const candidatePage = error.meta?.surface_match_page;
+            if (isSurfaceMatchPageAny(candidatePage)) {
+              setSurfacePage(candidatePage);
+              setSurfaceResetVersion((value) => value + 1);
+            } else {
+              setSurfacePage(undefined);
+              setActivationError(surfaceActivationErrorMessage(error.code));
+            }
+            return;
+          }
+          setActivating(false);
+          setActivationError(activationErrorMessage(error));
+          setActivationProblem(classifyV3Problem(error, "activate"));
+        })
         .finally(() => {
           if (activationGeneration.current === generation) {
             activationLock.current = false;
@@ -805,12 +822,12 @@ export function V3PublicationHistory({
         });
     },
     [
-      allowedToPublish,
-      activationBlockedByUnsavedChanges,
+      allowedToRestore,
+      restoreBlockedByUnsavedChanges,
       currentWord,
       detail,
       idempotencyKeyFactory,
-      onActivated,
+      onRestored,
       refreshAfterConflict,
       requests
     ]
@@ -818,27 +835,28 @@ export function V3PublicationHistory({
 
   const confirmSurfaceActivation = useCallback(() => {
     if (
-      activationBlockedByUnsavedChanges ||
+      restoreBlockedByUnsavedChanges ||
       !canAcknowledgeSurfaceSnapshot(surfaceSnapshot)
     ) {
       return;
     }
     void activate(surfaceSnapshot.surface_confirmation_token);
-  }, [activate, activationBlockedByUnsavedChanges, surfaceSnapshot]);
+  }, [activate, restoreBlockedByUnsavedChanges, surfaceSnapshot]);
 
   const restartSurfaceActivation = useCallback(() => {
-    if (activationBlockedByUnsavedChanges || activationLock.current) return;
+    if (restoreBlockedByUnsavedChanges || activationLock.current) return;
     activationKey.current = undefined;
     setSurfacePage(undefined);
     setSurfaceResetVersion((value) => value + 1);
     setActivationError(undefined);
+    setActivationProblem(undefined);
     void activate();
-  }, [activate, activationBlockedByUnsavedChanges]);
+  }, [activate, restoreBlockedByUnsavedChanges]);
 
   const beginActivation = useCallback(() => {
-    if (activationBlockedByUnsavedChanges) return;
+    if (restoreBlockedByUnsavedChanges) return;
     setConfirming(true);
-  }, [activationBlockedByUnsavedChanges]);
+  }, [restoreBlockedByUnsavedChanges]);
 
   if (loading) return <Spin aria-label="加载发布历史" />;
   if (listError) {
@@ -867,7 +885,7 @@ export function V3PublicationHistory({
           }
           description={
             recovery.phase === "error"
-              ? "旧发布详情与确认已失效。刷新成功并重新打开发布详情前，不会再次发送回退请求。"
+              ? "旧发布详情与确认已失效。刷新成功并重新打开发布详情前，不会再次发送恢复请求。"
               : "旧发布详情与确认已失效，正在获取最新词条和发布历史。"
           }
           action={
@@ -913,7 +931,7 @@ export function V3PublicationHistory({
                 </Flex>
                 <Button
                   aria-label={`查看第 ${publication.publication_number} 次发布`}
-                  disabled={recovery !== undefined}
+                  disabled={recovery !== undefined || activating}
                   onClick={() => openDetail(publication.publication_id)}
                 >
                   查看详情
@@ -926,6 +944,9 @@ export function V3PublicationHistory({
       <Modal
         className="v3-publication-modal"
         footer={null}
+        closable={!activating}
+        mask={{ closable: !activating }}
+        keyboard={!activating}
         open={selectedPublicationId !== undefined}
         title="发布详情"
         width={920}
@@ -953,15 +974,23 @@ export function V3PublicationHistory({
               <Alert showIcon type="info" title="正在查看只读的历史发布快照" />
               <PublicationMetadata publication={detail} />
               <PublicationSnapshotBody publication={detail} />
-              {!allowedToPublish ? (
+              {currentWord.status !== "draft" ? (
                 <Alert
                   type="info"
-                  title={"需要词条回滚权限；普通管理员仅能回滚本人词条"}
+                  title="只有草稿词条可以恢复历史版本，当前线上内容不会自动撤回。"
+                />
+              ) : null}
+              {!allowedToRestore ? (
+                <Alert
+                  type="info"
+                  title={
+                    "需要恢复词条至历史版本权限；恢复他人草稿还需获准编辑他人词条"
+                  }
                 />
               ) : null}
               {surfacePage ? (
                 <LifecycleSurfaceConfirmation
-                  action="rollback"
+                  action="restoreDraft"
                   state={surfaceSnapshot}
                   confirming={activating}
                   onConfirm={confirmSurfaceActivation}
@@ -969,34 +998,62 @@ export function V3PublicationHistory({
                 />
               ) : null}
               {activationError ? (
-                <Alert showIcon type="error" title={activationError} />
+                <Alert
+                  showIcon
+                  type="error"
+                  title={activationError}
+                  description={
+                    activationProblem?.kind === "validation" ? (
+                      <ul>
+                        {activationProblem.issues.map((issue) => (
+                          <li
+                            key={`${issue.node_id}:${issue.field}:${issue.code}`}
+                          >
+                            {v3IssueMessage(issue)}
+                            <Typography.Text type="secondary">
+                              {` · ${{ basics: "创建词汇", forms: "词形与发音", meanings: "词义与例句" }[issue.step]} · ${issue.field} · ${issue.node_id}`}
+                            </Typography.Text>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : activationProblem?.kind === "inbound_reference" ? (
+                      <Flex vertical gap="small">
+                        <Typography.Text>
+                          历史内容会影响以下关联，请先处理关联或选择其他版本。
+                        </Typography.Text>
+                        <V3ReferenceList
+                          references={activationProblem.references}
+                        />
+                      </Flex>
+                    ) : undefined
+                  }
+                />
               ) : null}
-              {canRollbackV3Publication(currentWord) && !surfacePage ? (
+              {canRestoreV3Draft(currentWord) && !surfacePage ? (
                 <>
-                  {activationBlockedByUnsavedChanges ? (
+                  {restoreBlockedByUnsavedChanges ? (
                     <Alert
                       showIcon
                       type="warning"
                       title="请先保存或放弃未保存的草稿"
-                      description="当前有未保存的词形或释义草稿。请先保存或主动放弃草稿，再将历史内容发布为新版本；查看历史详情不受影响。"
+                      description="当前有未保存的词形或释义草稿。请先保存或主动放弃草稿，再将历史内容恢复到草稿；查看历史详情不受影响。"
                     />
                   ) : null}
                   {confirming ? (
                     <Alert
                       showIcon
                       type="warning"
-                      title="确认将历史内容发布为新版本"
-                      description="将历史内容按当前规则重新校验并发布为新版本，保留当前草稿。"
+                      title="确认恢复历史内容到草稿"
+                      description="将历史内容恢复到草稿，覆盖当前已保存的词形和释义；不会发布或改变线上版本。"
                       action={
                         <Button
                           disabled={
-                            activationBlockedByUnsavedChanges ||
-                            !allowedToPublish
+                            restoreBlockedByUnsavedChanges || !allowedToRestore
                           }
                           loading={activating}
                           onClick={() => void activate()}
                         >
-                          确认回退
+                          确认恢复
                         </Button>
                       }
                     />
@@ -1010,21 +1067,23 @@ export function V3PublicationHistory({
             justify="flex-end"
             gap="small"
           >
-            <Button aria-label="关闭发布详情" onClick={closeDetail}>
+            <Button
+              aria-label="关闭发布详情"
+              disabled={activating}
+              onClick={closeDetail}
+            >
               关 闭
             </Button>
             {detail &&
-            canRollbackV3Publication(currentWord) &&
+            canRestoreV3Draft(currentWord) &&
             !surfacePage &&
             !confirming ? (
               <Button
                 type="primary"
-                disabled={
-                  activationBlockedByUnsavedChanges || !allowedToPublish
-                }
+                disabled={restoreBlockedByUnsavedChanges || !allowedToRestore}
                 onClick={() => beginActivation()}
               >
-                回退为新版本
+                恢复到草稿
               </Button>
             ) : null}
           </Flex>

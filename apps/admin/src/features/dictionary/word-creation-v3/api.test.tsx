@@ -26,7 +26,7 @@ function endpointDoubles(): V3WordsApi {
     publishV3: vi.fn(),
     listPublications: vi.fn(),
     getPublication: vi.fn(),
-    rollbackPublicationV3: vi.fn()
+    restoreDraftFromPublicationV3: vi.fn()
   } as unknown as V3WordsApi;
 }
 
@@ -153,7 +153,9 @@ describe("createV3WordRequests", () => {
     vi.mocked(endpoints.getPublication).mockResolvedValue({
       publication: v3Publication()
     });
-    vi.mocked(endpoints.rollbackPublicationV3).mockResolvedValue(canonical);
+    vi.mocked(endpoints.restoreDraftFromPublicationV3).mockResolvedValue(
+      canonical
+    );
     const detectInput = {
       schema_version: 3,
       language: "en",
@@ -212,7 +214,7 @@ describe("createV3WordRequests", () => {
       WORD_ID,
       "019d2c55-1f9e-7f88-a189-a2b8a07153fe"
     );
-    await requests.rollbackPublication(
+    await requests.restoreDraftFromPublication(
       WORD_ID,
       "019d2c55-1f9e-7f88-a189-a2b8a07153fe",
       "activate-key",
@@ -253,7 +255,7 @@ describe("createV3WordRequests", () => {
       WORD_ID,
       "019d2c55-1f9e-7f88-a189-a2b8a07153fe"
     );
-    expect(endpoints.rollbackPublicationV3).toHaveBeenCalledWith(
+    expect(endpoints.restoreDraftFromPublicationV3).toHaveBeenCalledWith(
       WORD_ID,
       "019d2c55-1f9e-7f88-a189-a2b8a07153fe",
       "activate-key",
@@ -419,7 +421,9 @@ describe("createV3WordRequests", () => {
     vi.mocked(endpoints.saveFormsStepV3).mockResolvedValue(mismatched);
     vi.mocked(endpoints.saveMeaningsStepV3).mockResolvedValue(mismatched);
     vi.mocked(endpoints.publishV3).mockResolvedValue(mismatched);
-    vi.mocked(endpoints.rollbackPublicationV3).mockResolvedValue(mismatched);
+    vi.mocked(endpoints.restoreDraftFromPublicationV3).mockResolvedValue(
+      mismatched
+    );
 
     await expect(requests.get(WORD_ID)).rejects.toMatchObject({
       name: "InvalidAdminWordResponseError",
@@ -447,7 +451,7 @@ describe("createV3WordRequests", () => {
       response_path: "publish.word.id"
     });
     await expect(
-      requests.rollbackPublication(
+      requests.restoreDraftFromPublication(
         WORD_ID,
         "019d2c55-1f9e-7f88-a189-a2b8a07153fe",
         "activation-key",
@@ -459,7 +463,7 @@ describe("createV3WordRequests", () => {
       )
     ).rejects.toMatchObject({
       name: "InvalidAdminWordResponseError",
-      response_path: "activate_publication.word.id"
+      response_path: "restore_draft.word.id"
     });
   });
 

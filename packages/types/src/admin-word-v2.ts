@@ -641,6 +641,14 @@ export interface EntryLifecycleInput {
   confirmed_surface_match_token?: string;
 }
 
+export interface EntryRestoreInput extends EntryLifecycleInput {
+  restore_as: "draft";
+}
+
+export interface EntryRestoreBatchInput extends EntryLifecycleBatchInput {
+  restore_as: "draft";
+}
+
 export interface EntryLifecycleTarget {
   id: string;
   base_revision: number;

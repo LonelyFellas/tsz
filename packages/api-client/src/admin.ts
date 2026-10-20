@@ -20,6 +20,9 @@ import type {
   UpdateAdminInput,
   UpdateEntryAnnotationInput,
   RollbackPublicationV3Input,
+  RestoreDraftFromPublicationV3Input,
+  EntryRestoreInput,
+  EntryRestoreBatchInput,
   AdminListQuery,
   AdminListResponse,
   AdminRole,
@@ -480,6 +483,24 @@ export function createAdminEndpoints(http: HttpClient) {
             }
           )
           .then(decodeAdminWordV3Envelope),
+      restoreDraftFromPublicationV3: (
+        wordId: string,
+        publicationId: string,
+        idempotencyKey: string,
+        input: RestoreDraftFromPublicationV3Input
+      ) =>
+        http
+          .post<unknown>(
+            `/lexicon/entries/${wordId}/publications/${publicationId}/restore-draft`,
+            input,
+            {
+              headers: {
+                ...SPELLING_MARKUP_HEADERS,
+                "Idempotency-Key": idempotencyKey
+              }
+            }
+          )
+          .then(decodeAdminWordV3Envelope),
       archiveImpact: (input: EntryArchiveImpactInput) =>
         http
           .post<unknown>("/lexicon/entries/archive-impact", input)
@@ -503,15 +524,19 @@ export function createAdminEndpoints(http: HttpClient) {
       restore: (
         wordId: string,
         idempotencyKey: string,
-        input: EntryLifecycleInput
+        input: Omit<EntryRestoreInput, "restore_as">
       ) =>
         http
-          .post<unknown>(`/lexicon/entries/${wordId}/restore`, input, {
-            headers: {
-              ...SPELLING_MARKUP_HEADERS,
-              "Idempotency-Key": idempotencyKey
+          .post<unknown>(
+            `/lexicon/entries/${wordId}/restore`,
+            { ...input, restore_as: "draft" },
+            {
+              headers: {
+                ...SPELLING_MARKUP_HEADERS,
+                "Idempotency-Key": idempotencyKey
+              }
             }
-          })
+          )
           .then(decodeAdminWordAnyEnvelope)
           .then((response) =>
             requireWordPathIdentity(response, wordId, "restore.word.id")
@@ -528,14 +553,21 @@ export function createAdminEndpoints(http: HttpClient) {
           .then((response) =>
             requireLifecycleBatchIdentity(response, input, "archive_batch")
           ),
-      restoreBatch: (idempotencyKey: string, input: EntryLifecycleBatchInput) =>
+      restoreBatch: (
+        idempotencyKey: string,
+        input: Omit<EntryRestoreBatchInput, "restore_as">
+      ) =>
         http
-          .post<unknown>("/lexicon/entries/restore-batch", input, {
-            headers: {
-              ...SPELLING_MARKUP_HEADERS,
-              "Idempotency-Key": idempotencyKey
+          .post<unknown>(
+            "/lexicon/entries/restore-batch",
+            { ...input, restore_as: "draft" },
+            {
+              headers: {
+                ...SPELLING_MARKUP_HEADERS,
+                "Idempotency-Key": idempotencyKey
+              }
             }
-          })
+          )
           .then(decodeEntryLifecycleBatchAnyResponse)
           .then((response) =>
             requireLifecycleBatchIdentity(response, input, "restore_batch")
