@@ -19,7 +19,7 @@ import type { TableColumnsType } from "antd";
 import { UserOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { useState } from "react";
-import type { AdminUserView, Role } from "@tsz/types";
+import type { AdminUser, Role } from "@tsz/types";
 import { CopyableText } from "@/components/CopyableText";
 import { GatedButton } from "@/components/GatedButton";
 import { useAuthStore, usePermission } from "@/lib/auth";
@@ -54,8 +54,8 @@ export function UserManagement() {
   const [role, setRole] = useState<UserRoleTab>("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [detailUser, setDetailUser] = useState<AdminUserView | null>(null);
-  const [editingUser, setEditingUser] = useState<AdminUserView | null>(null);
+  const [detailUser, setDetailUser] = useState<AdminUser | null>(null);
+  const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
 
   const listQuery = useUserList({
     filters,
@@ -78,12 +78,7 @@ export function UserManagement() {
     setPage(1);
   };
 
-  // 独立功能模块（天生币/等级/方言）本次仅占位，接口就绪后各自立项接入。
-  // TODO(backend): 见 backend-todos.md #6。
-  const notReady = (label: string) =>
-    message.info(`${label}功能待接入，接口开发中`);
-
-  const [statusTarget, setStatusTarget] = useState<AdminUserView | null>(null);
+  const [statusTarget, setStatusTarget] = useState<AdminUser | null>(null);
   const [statusError, setStatusError] = useState<string>();
   const verb = statusTarget?.status === "active" ? "禁用" : "启用";
   const confirmStatus = async () => {
@@ -99,12 +94,12 @@ export function UserManagement() {
     void message.success(next === "disabled" ? "已禁用" : "已启用");
     setStatusTarget(null);
   };
-  const confirmToggleStatus = (record: AdminUserView) => {
+  const confirmToggleStatus = (record: AdminUser) => {
     if (!canSetStatus || !record.status) return;
     setStatusError(undefined);
     setStatusTarget(record);
   };
-  const columns: TableColumnsType<AdminUserView> = [
+  const columns: TableColumnsType<AdminUser> = [
     {
       title: "用户ID",
       dataIndex: "id",
@@ -160,11 +155,17 @@ export function UserManagement() {
       )
     },
     {
-      title: "等级",
-      dataIndex: "level",
+      title: "学生等级",
+      dataIndex: "learning_settings",
       width: 100,
-      render: (lv?: string) =>
-        lv ? <Tag color={levelColor(lv)}>{lv}等级</Tag> : "-"
+      render: (settings: AdminUser["learning_settings"]) =>
+        settings ? (
+          <Tag color={levelColor(settings.cefr_level)}>
+            {settings.cefr_level}
+          </Tag>
+        ) : (
+          "未设置"
+        )
     },
     {
       title: "绑定电话",
@@ -196,7 +197,7 @@ export function UserManagement() {
       title: "状态",
       dataIndex: "status",
       width: 90,
-      render: (s: AdminUserView["status"]) => (
+      render: (s: AdminUser["status"]) => (
         <Badge
           status={s === "active" ? "success" : "default"}
           text={s === "active" ? "正常" : "已禁用"}
@@ -206,7 +207,7 @@ export function UserManagement() {
     {
       title: "操作",
       key: "action",
-      width: 320,
+      width: 240,
       fixed: "right",
       render: (_: unknown, record) => (
         <Space size={4} wrap>
@@ -216,12 +217,6 @@ export function UserManagement() {
             onClick={() => setDetailUser(record)}
           >
             查看详情
-          </Button>
-          <Button type="link" size="small" onClick={() => notReady("等级管理")}>
-            等级管理
-          </Button>
-          <Button type="link" size="small" onClick={() => notReady("方言管理")}>
-            方言管理
           </Button>
           <GatedButton
             type="link"
@@ -265,7 +260,7 @@ export function UserManagement() {
     "avatar_url",
     "roles",
     "teacher_verified",
-    "level",
+    "learning_settings",
     "status",
     "updated_at"
   ]);
@@ -336,7 +331,7 @@ export function UserManagement() {
           />
         )}
 
-        <Table<AdminUserView>
+        <Table<AdminUser>
           locale={{
             emptyText: (
               <TableEmptyState

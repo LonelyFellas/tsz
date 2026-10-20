@@ -32,12 +32,12 @@ beforeEach(() => {
 });
 import type {
   AdminProfile,
-  AdminUserView,
+  AdminUser,
   UserRegistrationRegion
 } from "@tsz/types";
 import { UserDetailDrawer } from "./UserDetailDrawer";
 
-const base: AdminUserView = {
+const base: AdminUser = {
   id: "u1",
   display_name: "Full",
   avatar_url: "",
@@ -52,7 +52,7 @@ function mountRegistrationRegion() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } }
   });
-  const view = (user: AdminUserView | null = base) => (
+  const view = (user: AdminUser | null = base) => (
     <QueryClientProvider client={client}>
       <UserDetailDrawer user={user} onClose={vi.fn()} />
     </QueryClientProvider>
@@ -61,17 +61,26 @@ function mountRegistrationRegion() {
 }
 
 describe("UserDetailDrawer", () => {
-  it("没有敏感资料权限时，即使旧缓存含完整联系方式也不展示或复制", () => {
+  it("没有资料权限时，即使旧缓存含完整联系方式和学习配置也不展示", () => {
     vi.mocked(usePermission).mockReturnValue(false);
     render(
       <UserDetailDrawer
-        user={{ ...base, phone: "13800138000", email: "private@example.test" }}
+        user={{
+          ...base,
+          phone: "13800138000",
+          email: "private@example.test",
+          learning_settings: { cefr_level: "C1", english_variant: "AmE" }
+        }}
         onClose={vi.fn()}
       />
     );
     expect(screen.queryByText("13800138000")).toBeNull();
     expect(screen.queryByText("private@example.test")).toBeNull();
     expect(screen.getAllByText("未授权")).toHaveLength(2);
+    expect(screen.queryByText("学生等级")).toBeNull();
+    expect(screen.queryByText("英美式偏好")).toBeNull();
+    expect(screen.queryByText("C1")).toBeNull();
+    expect(screen.queryByText("美式")).toBeNull();
   });
   it("普通管理员只能查看认证状态", () => {
     render(
@@ -117,22 +126,27 @@ describe("UserDetailDrawer", () => {
       screen.getByText("教师资格已撤销，学生身份与原有数据保留")
     ).toBeInTheDocument();
   });
-  it("完整用户：联系方式/等级/禁用态全部展示", () => {
-    const user: AdminUserView = {
+  it.each([
+    ["BrE", "英式"],
+    ["AmE", "美式"]
+  ] as const)("完整用户：展示学生等级与 %s 偏好", (variant, label) => {
+    const user: AdminUser = {
       ...base,
       phone: "13800000009",
       email: "full@qq.com",
       roles: ["student", "teacher"],
       status: "disabled",
-      level: "B2"
+      learning_settings: { cefr_level: "B2", english_variant: variant }
     };
     render(<UserDetailDrawer user={user} onClose={vi.fn()} />);
     expect(screen.getByText("13800000009")).toBeInTheDocument();
     expect(screen.getByText("full@qq.com")).toBeInTheDocument();
-    // 等级 Tag：level 存在时渲染「B2等级」而非占位。
-    expect(screen.getByText("B2等级")).toBeInTheDocument();
+    expect(screen.getByText("学生等级")).toBeInTheDocument();
+    expect(screen.getByText("B2")).toBeInTheDocument();
+    expect(screen.getByText("英美式偏好")).toBeInTheDocument();
+    expect(screen.getByText(label)).toBeInTheDocument();
     expect(screen.getByText("已禁用")).toBeInTheDocument();
-    // 师生合一：两个角色 tag 都在。
+    // 师生合一：教师仍展示自己作为学生时的等级。
     expect(screen.getByText("学生")).toBeInTheDocument();
     expect(screen.getByText("老师")).toBeInTheDocument();
   });
@@ -146,12 +160,20 @@ describe("UserDetailDrawer", () => {
     ).toBeInTheDocument();
   });
 
-  it("最小用户：缺失字段显示占位「-」，状态正常", () => {
-    render(<UserDetailDrawer user={base} onClose={vi.fn()} />);
-    // phone / email / level / coin 四处缺省 → 至少 4 个占位「-」。
-    expect(screen.getAllByText("-").length).toBeGreaterThanOrEqual(3);
-    expect(screen.getByText("正常")).toBeInTheDocument();
-  });
+  it.each([null, undefined])(
+    "学习配置为 %s 时显示未设置，不推断等级或默认英美式偏好",
+    (settings) => {
+      render(
+        <UserDetailDrawer
+          user={{ ...base, learning_settings: settings }}
+          onClose={vi.fn()}
+        />
+      );
+      expect(screen.getAllByText("未设置")).toHaveLength(2);
+      expect(screen.getAllByText("-")).toHaveLength(2);
+      expect(screen.getByText("正常")).toBeInTheDocument();
+    }
+  );
 
   it("空时间戳走 fmt 占位分支", () => {
     render(
@@ -161,7 +183,7 @@ describe("UserDetailDrawer", () => {
       />
     );
     // 注册时间 + 更新时间两处也变占位，占位总数进一步增加。
-    expect(screen.getAllByText("-").length).toBeGreaterThanOrEqual(5);
+    expect(screen.getAllByText("-")).toHaveLength(4);
   });
 
   it("没有地区独立权限时整行隐藏，不请求注册地区", () => {

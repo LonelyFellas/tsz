@@ -203,6 +203,7 @@ const contractSchemaNames = [
   "CoinEntry",
   "CoinEntryPage",
   "UserCoinEntryPage",
+  "AdminAccountUserResponse",
   "UserRegistrationRegion",
   "RegistrationRegionStatus",
   "OwnerType",

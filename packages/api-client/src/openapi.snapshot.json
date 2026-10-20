@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/user-registration-region/docs/openapi.json",
-  "_generatedAt": "2026-10-20T07:32:37.226Z",
+  "_source": "/Users/darwish/orca/workspaces/tsz-rust/user-detail-learning-settings/docs/openapi.json",
+  "_generatedAt": "2026-10-20T14:17:36.814Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -3152,6 +3152,54 @@
         "snapshot": { "type": "string", "pattern": "^(0|[1-9][0-9]{0,18})$" }
       },
       "additionalProperties": false
+    },
+    "AdminAccountUserResponse": {
+      "type": "object",
+      "required": ["id", "display_name", "created_at"],
+      "properties": {
+        "avatar_url": {
+          "type": "string",
+          "description": "仅对 users.read_basic 可见。"
+        },
+        "created_at": { "type": "string", "format": "date-time" },
+        "display_name": { "type": "string" },
+        "email": {
+          "type": "string",
+          "description": "完整邮箱仅对 users.read_sensitive 可见；无权限或未绑定时省略。"
+        },
+        "id": { "type": "string", "format": "uuid" },
+        "learning_settings": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "#/components/schemas/LearningSettings",
+              "description": "仅对 users.read_basic 可见；尚未配置学习设置时为 null，无权限时省略。"
+            }
+          ]
+        },
+        "phone": {
+          "type": "string",
+          "description": "完整手机号仅对 users.read_sensitive 可见；无权限或未绑定时省略。"
+        },
+        "roles": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/UserRole" },
+          "description": "仅对 users.read_basic 可见。"
+        },
+        "status": {
+          "$ref": "#/components/schemas/UserStatus",
+          "description": "仅对 users.read_basic 可见。"
+        },
+        "teacher_verified": {
+          "type": "boolean",
+          "description": "仅对 users.read_basic 可见。"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "仅对 users.read_basic 可见。"
+        }
+      }
     },
     "UserRegistrationRegion": {
       "type": "object",

@@ -86,6 +86,80 @@ test("超管编辑管理员昵称，失败保留输入，保存后列表更新",
   ]);
 });
 
+test("用户列表收起等级和方言管理，详情展示学生等级及英美式偏好", async ({
+  page
+}) => {
+  await mockAdminV3Api(page, { viewerRole: "super_admin" });
+  const response: AdminUserListResponse = {
+    items: [
+      {
+        id: "019d2c55-1f9e-7f88-a189-000000000001",
+        display_name: "英式偏好教师",
+        roles: ["student", "teacher"],
+        status: "active",
+        learning_settings: { cefr_level: "B2", english_variant: "BrE" },
+        created_at: "2026-10-20T00:00:00Z"
+      },
+      {
+        id: "019d2c55-1f9e-7f88-a189-000000000002",
+        display_name: "美式偏好学生",
+        roles: ["student"],
+        status: "active",
+        learning_settings: { cefr_level: "C1", english_variant: "AmE" },
+        created_at: "2026-10-20T00:00:00Z"
+      },
+      {
+        id: "019d2c55-1f9e-7f88-a189-000000000003",
+        display_name: "未设置学习配置",
+        status: "active",
+        learning_settings: null,
+        created_at: "2026-10-20T00:00:00Z"
+      }
+    ],
+    page: { page: 1, page_size: 10, total: 3, total_pages: 1 }
+  };
+  await page.route("**/api/v1/admin/users?**", (route) =>
+    route.fulfill({ json: response })
+  );
+  await page.route("**/api/v1/admin/users/*/registration-region", (route) =>
+    route.fulfill({ json: { city: null, status: "not_recorded" } })
+  );
+  await page.goto("/users");
+  await expect(
+    page.getByRole("button", { name: "英式偏好教师", exact: true })
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "等级管理" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "方言管理" })).toHaveCount(0);
+
+  for (const [user, level, variant] of [
+    [response.items[0]!, "B2", "英式"],
+    [response.items[1]!, "C1", "美式"],
+    [response.items[2]!, "未设置", "未设置"]
+  ] as const) {
+    const row = page.getByRole("row").filter({
+      has: page.getByRole("button", { name: user.display_name, exact: true })
+    });
+    await row.getByRole("button", { name: "查看详情", exact: true }).click();
+    const drawer = page.getByRole("dialog", {
+      name: new RegExp(`${user.display_name}$`)
+    });
+    await expect(drawer).toBeVisible();
+    const descriptions = drawer.locator(".ant-descriptions-row");
+    await expect(
+      descriptions
+        .filter({ hasText: "学生等级" })
+        .getByText(level, { exact: true })
+    ).toBeVisible();
+    await expect(
+      descriptions
+        .filter({ hasText: "英美式偏好" })
+        .getByText(variant, { exact: true })
+    ).toBeVisible();
+    await drawer.getByRole("button", { name: "关闭", exact: true }).click();
+    await expect(drawer).not.toBeVisible();
+  }
+});
+
 test("固定列表格滚动到顶栏后，顶栏仍可点击且账户弹层正常覆盖", async ({
   page
 }) => {
@@ -105,7 +179,7 @@ test("固定列表格滚动到顶栏后，顶栏仍可点击且账户弹层正�
   await page.route("**/api/v1/admin/users?**", (route) =>
     route.fulfill({ json: response })
   );
-  await page.setViewportSize({ width: 1440, height: 720 });
+  await page.setViewportSize({ width: 1440, height: 600 });
   await page.goto("/users");
 
   const row = page.getByRole("row").filter({

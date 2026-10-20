@@ -2,14 +2,14 @@
 // （1–50 字符、trim 后非空）；联系方式走用户自己的绑定流程，不在此改。
 import { App, Form, Input, Modal } from "antd";
 import { useEffect } from "react";
-import type { AdminUserView } from "@tsz/types";
+import type { AdminUser } from "@tsz/types";
 import { DISPLAY_NAME_MAX, hasDisplayNameForbiddenChars } from "@tsz/shared";
 import { usePermission } from "@/lib/auth";
 import { useUpdateUser } from "./api";
 import { userActionError } from "./labels";
 
 interface Props {
-  user: AdminUserView | null;
+  user: AdminUser | null;
   onClose: () => void;
 }
 

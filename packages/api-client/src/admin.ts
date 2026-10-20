@@ -136,7 +136,6 @@ export type {
   AdminUserListQuery,
   AdminUserListResponse,
   AdminUserUpdateInput,
-  AdminUserView,
   CreateAdminInput,
   CreateAdminResponse,
   CreateRoleRequest,

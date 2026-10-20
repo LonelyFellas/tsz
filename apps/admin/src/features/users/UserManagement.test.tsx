@@ -10,7 +10,7 @@ import { App as AntApp } from "antd";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpError } from "@tsz/api-client";
-import type { AdminUserListQuery, AdminUserView } from "@tsz/types";
+import type { AdminUserListQuery, AdminUser } from "@tsz/types";
 
 // 编辑 / 启禁用按后台身份置灰：逐例可切超管与普通 admin 两种身份。
 const auth = vi.hoisted(() => ({
@@ -80,9 +80,9 @@ const SPEC: Spec[] = [
   { id: "13", name: "pioneer", role: "student" }
 ];
 
-// 契约外字段（level/coin_balance）后端不返回，本地态里恒为缺省 → 列表显示「-」。
-function seed(): AdminUserView[] {
-  const rows: AdminUserView[] = SPEC.map((s) => ({
+// 学习配置跟随用户基本资料；未完成设置的账号返回 null。
+function seed(): AdminUser[] {
+  const rows: AdminUser[] = SPEC.map((s) => ({
     id: s.id,
     phone: s.phone,
     email: s.email,
@@ -90,19 +90,18 @@ function seed(): AdminUserView[] {
     avatar_url: "",
     roles: [s.role],
     teacher_verified: false,
+    learning_settings: null,
     status: s.status ?? "active",
     created_at: "2026-06-01T08:00:00Z",
     updated_at: "2026-06-02T08:00:00Z"
   }));
-  // 首行（record，第 1 页可见）刻意带 level、且更新时间为空：覆盖表格「等级」列的
-  // 有值分支与「更新时间」列的占位分支——真实后端虽不下发 level，列渲染仍须两分支都对。
-  rows[0]!.level = "B2";
+  rows[0]!.learning_settings = { cefr_level: "B2", english_variant: "AmE" };
   rows[0]!.updated_at = "";
   return rows;
 }
 
 // 每例复位的列表数据源。
-let users: AdminUserView[];
+let users: AdminUser[];
 
 /** 模拟后端 GET /admin/users：role/q 过滤 + 分页，形状同 AdminUserListResponse。 */
 function fakeList(query: AdminUserListQuery = {}) {
@@ -250,7 +249,8 @@ describe("UserManagement", () => {
     ).toBeDisabled();
     expect(screen.queryByText("13800000001")).toBeNull();
     expect(screen.queryByText("record@qq.com")).toBeNull();
-    expect(screen.queryByText("B2等级")).toBeNull();
+    expect(screen.queryByText("学生等级")).toBeNull();
+    expect(screen.queryByText("B2")).toBeNull();
     expect(screen.queryByText("教师认证")).toBeNull();
     expect(screen.queryByRole("radio", { name: "老师" })).toBeNull();
     expect(api.users.setStatus).not.toHaveBeenCalled();
@@ -270,16 +270,15 @@ describe("UserManagement", () => {
     expect(mockList).toHaveBeenLastCalledWith({ page: 1, page_size: 10 });
   });
 
-  it("渲染搜索行、角色 tab 与用户行；等级/余额缺省列显示「-」", async () => {
+  it("渲染搜索行、角色 tab 与用户行；学生等级使用真实学习配置", async () => {
     renderPage();
     expect(await screen.findByText("record")).toBeInTheDocument();
     for (const tab of ["全部", "老师", "学生"]) {
       expect(screen.getByRole("radio", { name: tab })).toBeInTheDocument();
     }
-    // 等级 / 天生币余额 后端未填充 → 整列占位「-」。
-    expect(screen.getAllByText("-").length).toBeGreaterThan(0);
-    // 首行带 level：「等级」列的有值分支渲染成 Tag「B2等级」。
-    expect(screen.getByText("B2等级")).toBeInTheDocument();
+    expect(screen.getAllByText("学生等级")[0]).toBeInTheDocument();
+    expect(screen.getByText("B2")).toBeInTheDocument();
+    expect(screen.getAllByText("未设置")).toHaveLength(9);
   });
 
   it("列表展示真实教师认证状态，不从教师角色推断", async () => {
@@ -329,7 +328,7 @@ describe("UserManagement", () => {
 
   it("点昵称打开只读详情抽屉，缺失字段显示占位", async () => {
     renderPage();
-    // attitude 无绑定手机：抽屉里「绑定电话」及 等级/余额 均为占位「-」。
+    // attitude 无绑定手机，学习配置也未设置。
     fireEvent.click(await screen.findByText("attitude"));
     // 「用户 ID」（带空格）是抽屉 Descriptions 独有标签，据此确证抽屉打开。
     expect(await screen.findByText("用户 ID")).toBeInTheDocument();
@@ -451,17 +450,19 @@ describe("UserManagement", () => {
     expect(screen.getAllByText(/删\s?除/)[0]!.closest("button")).toBeDisabled();
   });
 
-  it("等级/方言管理点击提示功能待接入", async () => {
+  it("列表移除等级/方言管理入口，查看详情展示学生等级与英美式偏好", async () => {
     renderPage();
     await screen.findByText("record");
-    clickRowButton(/^等级管理$/);
-    expect(
-      await screen.findByText("等级管理功能待接入，接口开发中")
-    ).toBeInTheDocument();
-    clickRowButton(/^方言管理$/);
-    expect(
-      await screen.findByText("方言管理功能待接入，接口开发中")
-    ).toBeInTheDocument();
+    expect(screen.queryByText("等级管理")).toBeNull();
+    expect(screen.queryByText("方言管理")).toBeNull();
+    clickRowButton(/^查看详情$/);
+    const drawer = (await screen.findByText("用户 ID")).closest<HTMLElement>(
+      ".ant-drawer-body"
+    )!;
+    expect(within(drawer).getByText("学生等级")).toBeInTheDocument();
+    expect(within(drawer).getByText("B2")).toBeInTheDocument();
+    expect(within(drawer).getByText("英美式偏好")).toBeInTheDocument();
+    expect(within(drawer).getByText("美式")).toBeInTheDocument();
   });
 
   it("翻到第 2 页展示剩余用户", async () => {
