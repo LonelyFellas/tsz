@@ -11,6 +11,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
   act
 } from "@testing-library/react";
 import { App as AntApp } from "antd";
@@ -1736,9 +1737,19 @@ describe("WordWizardV3Page", () => {
     );
     await screen.findByLabelText("原形英美通用拼写");
     fireEvent.click(await screen.findByLabelText("查看第 1 次发布"));
-    fireEvent.click(await screen.findByRole("button", { name: "恢复到草稿" }));
-    fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
+    const detail = within(await screen.findByTestId("publication-detail"));
+    fireEvent.click(
+      (await detail.findByText("恢复到草稿", { exact: true })).closest(
+        "button"
+      )!
+    );
+    fireEvent.click(
+      detail.getByText("确认恢复", { exact: true }).closest("button")!
+    );
     await waitFor(() => expect(endpoints.get).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(screen.queryByTestId("publication-detail")).not.toBeInTheDocument()
+    );
     expect(await screen.findByLabelText("原形英美通用拼写")).toBeEnabled();
     expect(endpoints.validateV3).not.toHaveBeenCalled();
     expect(endpoints.publishV3).not.toHaveBeenCalled();
@@ -1867,16 +1878,23 @@ describe("WordWizardV3Page", () => {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false } }
     });
-    const router = renderPage(
-      `/words/${WORD_ID}/v3/wizard/preview`,
+    renderPage(
+      `/words/${WORD_ID}/v3/wizard/forms`,
       createV3WordRequests(endpoints),
       undefined,
       undefined,
       client
     );
     fireEvent.click(await screen.findByLabelText("查看第 1 次发布"));
-    fireEvent.click(await screen.findByRole("button", { name: "恢复到草稿" }));
-    fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
+    const detail = within(await screen.findByTestId("publication-detail"));
+    fireEvent.click(
+      (await detail.findByText("恢复到草稿", { exact: true })).closest(
+        "button"
+      )!
+    );
+    fireEvent.click(
+      detail.getByText("确认恢复", { exact: true }).closest("button")!
+    );
     await waitFor(() =>
       expect(
         client.getQueryData<{ word: AdminWordV3 }>([
@@ -1887,12 +1905,7 @@ describe("WordWizardV3Page", () => {
       ).toBe(2)
     );
     await waitFor(() =>
-      expect(router.state.location.pathname).toContain("/wizard/meanings")
-    );
-    fireEvent.click(
-      (await screen.findAllByText("词形与发音")).find((element) =>
-        element.closest(".ant-steps-item")
-      )!
+      expect(screen.queryByTestId("publication-detail")).not.toBeInTheDocument()
     );
     await screen.findByLabelText("原形英美通用拼写");
     fireEvent.click(screen.getByLabelText("英美拼写有区别"));
