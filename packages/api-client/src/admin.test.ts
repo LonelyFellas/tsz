@@ -323,6 +323,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       page: 2,
       page_size: 50,
       q: "take off",
+      headword: "alpha",
+      created_by: "creator-id",
       gloss: "",
       kind: "phrase",
       level: "B1",
@@ -335,6 +337,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     expect(sp.get("page")).toBe("2");
     expect(sp.get("page_size")).toBe("50");
     expect(sp.get("q")).toBe("take off");
+    expect(sp.get("headword")).toBe("alpha");
+    expect(sp.get("created_by")).toBe("creator-id");
     expect(sp.get("kind")).toBe("phrase");
     expect(sp.get("level")).toBe("B1");
     expect(sp.get("status")).toBe("draft");
@@ -359,6 +363,11 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       response_path: "words[1].schema_version",
       received_schema_version: 4
     });
+  });
+
+  it("creators → 词库权限范围内的创建人选项", () => {
+    createAdminEndpoints(http).words.creators();
+    expect(http.get).toHaveBeenCalledWith("/lexicon/entries/creators");
   });
 
   it("stats → GET /lexicon/entries/stats", () => {

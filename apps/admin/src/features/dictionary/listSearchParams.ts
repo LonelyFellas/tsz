@@ -11,6 +11,8 @@ import type { WordFilterValues } from "./listQuery";
 const KINDS = new Set<AdminWordKind>(["word", "phrase"]);
 const STATUSES = new Set<AdminWordStatus>(["draft", "published", "archived"]);
 const LEVELS = new Set<CefrLevel>(CEFR_LEVELS);
+const ADMIN_ID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 const POS_CODE = /^[a-z][a-z0-9_]{0,31}$/u;
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 20;
@@ -39,6 +41,8 @@ export function parseWordFilterSearchParams(
   params: URLSearchParams
 ): WordFilterValues {
   const keyword = trimmed(params.get("keyword"));
+  const headword = trimmed(params.get("headword"));
+  const createdBy = params.get("created_by");
   const gloss = trimmed(params.get("gloss"));
   const kind = params.get("kind");
   const pos = params.get("pos");
@@ -48,6 +52,8 @@ export function parseWordFilterSearchParams(
   const createdTo = dateParam(params.get("created_to"));
   return {
     ...(keyword ? { keyword } : {}),
+    ...(headword ? { headword } : {}),
+    ...(createdBy && ADMIN_ID.test(createdBy) ? { createdBy } : {}),
     ...(gloss ? { gloss } : {}),
     ...(kind && KINDS.has(kind as AdminWordKind)
       ? { kind: kind as AdminWordKind }
@@ -72,6 +78,9 @@ export function serializeWordFilterSearchParams(
   const keyword = values.keyword?.trim();
   const gloss = values.gloss?.trim();
   if (keyword) params.set("keyword", keyword);
+  const headword = values.headword?.trim();
+  if (headword) params.set("headword", headword);
+  if (values.createdBy) params.set("created_by", values.createdBy);
   if (gloss) params.set("gloss", gloss);
   if (values.kind) params.set("kind", values.kind);
   if (values.pos) params.set("pos", values.pos);

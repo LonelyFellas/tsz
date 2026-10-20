@@ -21,6 +21,12 @@ export type WordSubPos = "" | SubPartOfSpeechCode;
 export type WordRelationType = "synonym" | "antonym" | "derivative";
 export type PronunciationStyle = "normal" | "citation" | "strong" | "weak";
 
+/** 词条创建人筛选选项。 */
+export interface AdminWordCreator {
+  id: string;
+  display_name: string;
+}
+
 /** GET /admin/lexicon/entries 查询参数。 */
 export interface AdminWordListQuery {
   page?: number;
@@ -28,6 +34,10 @@ export interface AdminWordListQuery {
   page_size?: number;
   /** 词汇或创建人姓名,子串匹配 */
   q?: string;
+  /** 仅词条词面，子串匹配；与旧 q 及其余条件取交集 */
+  headword?: string;
+  /** 创建人管理员 ID，精确匹配 */
+  created_by?: string;
   /** 释义文本,子串匹配 */
   gloss?: string;
   kind?: AdminWordKind;

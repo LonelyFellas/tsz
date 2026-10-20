@@ -40,6 +40,7 @@ import type {
   CreateAudioUploadInput,
   CreateAudioUploadResponse,
   AdminWordListQuery,
+  AdminWordCreator,
   AdminWordStats,
   AdminStatus,
   CreateAdminInput,
@@ -332,6 +333,8 @@ export function createAdminEndpoints(http: HttpClient) {
         http
           .get<unknown>(`/lexicon/entries${qs({ ...query })}`)
           .then(decodeAdminWordAnyListResponse),
+      /** 创建人选项仅要求词库访问权限，不依赖管理员管理权限。 */
+      creators: () => http.get<AdminWordCreator[]>("/lexicon/entries/creators"),
       /** GET /admin/lexicon/entries/stats — 头部计数（累计 / 今日 / 本月）。 */
       stats: () => http.get<AdminWordStats>("/lexicon/entries/stats"),
       /** V3 surface detection；C1 后端 capability 未开放时会稳定返回 503。 */

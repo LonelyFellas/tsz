@@ -22,6 +22,7 @@ export * from "./surface-match";
 export * from "./entry-annotation";
 export type {
   AdminWordKind,
+  AdminWordCreator,
   AdminWordListItem,
   CefrLevel,
   AdminWordListPage,

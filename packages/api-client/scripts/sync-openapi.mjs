@@ -52,6 +52,7 @@ const QUERY_CONTRACT_OPERATIONS = new Set([
   "get /me/coins/learning-rewards",
   "get /admin/me/coins/entries",
   "get /admin/lexicon/entries/related-search",
+  "get /admin/lexicon/entries",
   "get /admin/settings/form-types",
   "delete /admin/settings/form-types/{id}"
 ]);
@@ -178,6 +179,7 @@ if (!spec?.paths) {
   throw new Error(`spec 无 paths 字段: ${source}`);
 }
 const contractSchemaNames = [
+  "AdminWordCreator",
   "LoginRewardRequest",
   "LoginRewardDay",
   "LoginRewardStatus",

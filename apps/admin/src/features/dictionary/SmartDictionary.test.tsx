@@ -22,7 +22,8 @@ const apiMocks = vi.hoisted(() => ({
   useRestoreWord: vi.fn(),
   useRestoreWordsBatch: vi.fn(),
   useWordList: vi.fn(),
-  useWordStats: vi.fn()
+  useWordStats: vi.fn(),
+  useWordCreators: vi.fn()
 }));
 
 const catalogMocks = vi.hoisted(() => ({
@@ -210,6 +211,14 @@ beforeEach(() => {
   ]) {
     hook.mockReturnValue(idleMutation());
   }
+  apiMocks.useWordCreators.mockReturnValue({
+    data: [
+      { id: "01991111-2222-7333-8444-555566667777", display_name: "甲管理员" }
+    ],
+    isPending: false,
+    isError: false,
+    refetch: vi.fn()
+  });
   apiMocks.useWordStats.mockReturnValue({
     data: { total: 21, today: 1, month: 2 }
   });
@@ -232,6 +241,67 @@ afterEach(() => {
 });
 
 describe("SmartDictionary", () => {
+  it("主搜索常驻，更多筛选按顺序展开且收起后保留创建人条件", async () => {
+    render(
+      <AntApp>
+        <MemoryRouter>
+          <SmartDictionary />
+          <LocationProbe />
+        </MemoryRouter>
+      </AntApp>
+    );
+    const headword = screen.getByLabelText("词条");
+    expect(headword).toBeVisible();
+    expect(screen.getByLabelText("词义")).toBeVisible();
+    const toggle = screen.getByRole("button", { name: /更多筛选/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(toggle);
+    const panel = document.getElementById(
+      toggle.getAttribute("aria-controls")!
+    )!;
+    expect(
+      Array.from(panel.querySelectorAll("label")).map(
+        (label) => label.textContent
+      )
+    ).toEqual([
+      "词条类型",
+      "基本词性",
+      "词义难度",
+      "词条状态",
+      "创建人",
+      "创建时间"
+    ]);
+    fireEvent.change(headword, { target: { value: "alpha" } });
+    fireEvent.mouseDown(
+      screen.getByLabelText("创建人").closest(".ant-select")!
+    );
+    fireEvent.click(await screen.findByText("甲管理员"));
+    fireEvent.click(screen.getByRole("button", { name: /收起筛选/ }));
+    expect(panel).not.toBeVisible();
+    fireEvent.submit(headword.closest("form")!);
+    await waitFor(() =>
+      expect(apiMocks.useWordList).toHaveBeenLastCalledWith({
+        page: 1,
+        page_size: 20,
+        headword: "alpha",
+        created_by: "01991111-2222-7333-8444-555566667777"
+      })
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("location").textContent).toContain(
+        "created_by=01991111-2222-7333-8444-555566667777"
+      )
+    );
+    fireEvent.click(screen.getByRole("button", { name: /重置/ }));
+    await waitFor(() =>
+      expect(apiMocks.useWordList).toHaveBeenLastCalledWith({
+        page: 1,
+        page_size: 20
+      })
+    );
+    expect(screen.getByLabelText("词条")).toHaveValue("");
+  });
+
   it("真实查询行以词名上标保留完整数字和前导0，并提供编辑入口", async () => {
     const annotated = {
       ...v3Word("entry", "center"),
@@ -924,7 +994,7 @@ describe("SmartDictionary", () => {
       q: "center",
       status: "archived"
     });
-    expect(screen.getByLabelText("关键字")).toHaveValue("center");
+    expect(screen.getByLabelText("词条")).toHaveValue("center");
     expect(screen.getByText("垃圾桶")).toBeInTheDocument();
   });
 
@@ -1012,38 +1082,38 @@ describe("SmartDictionary", () => {
       </MemoryRouter>
     );
 
-    let keyword = screen.getByLabelText("关键字");
+    let keyword = screen.getByLabelText("词条");
     fireEvent.change(keyword, { target: { value: "center" } });
     fireEvent.submit(keyword.closest("form")!);
     await waitFor(() =>
       expect(screen.getByTestId("location")).toHaveTextContent(
-        "/words?keyword=center"
+        "/words?headword=center"
       )
     );
     await waitFor(() =>
-      expect(screen.getByLabelText("关键字")).toHaveValue("center")
+      expect(screen.getByLabelText("词条")).toHaveValue("center")
     );
-    keyword = screen.getByLabelText("关键字");
+    keyword = screen.getByLabelText("词条");
 
     fireEvent.change(keyword, { target: { value: "harbour" } });
     expect(keyword).toHaveValue("harbour");
     fireEvent.submit(keyword.closest("form")!);
     await waitFor(() =>
       expect(screen.getByTestId("location")).toHaveTextContent(
-        "/words?keyword=harbour"
+        "/words?headword=harbour"
       )
     );
 
     fireEvent.click(screen.getByTestId("history-back"));
     await waitFor(() => {
       expect(screen.getByTestId("location")).toHaveTextContent(
-        "/words?keyword=center"
+        "/words?headword=center"
       );
-      expect(screen.getByLabelText("关键字")).toHaveValue("center");
+      expect(screen.getByLabelText("词条")).toHaveValue("center");
       expect(apiMocks.useWordList).toHaveBeenLastCalledWith({
         page: 1,
         page_size: 20,
-        q: "center"
+        headword: "center"
       });
     });
   });
@@ -1065,7 +1135,7 @@ describe("SmartDictionary", () => {
         page: 1,
         page_size: 20
       });
-      expect(screen.getByLabelText("关键字")).toHaveValue("");
+      expect(screen.getByLabelText("词条")).toHaveValue("");
       expect(screen.queryByText("垃圾桶")).toBeNull();
       expect(screen.getByTestId("location")).toHaveTextContent("/words");
     });
@@ -1528,7 +1598,7 @@ describe("SmartDictionary", () => {
     );
 
     expect(screen.getByText("垃圾桶")).toBeInTheDocument();
-    expect(screen.queryByText("状态")).toBeNull();
+    expect(screen.queryByLabelText("词条状态")).toBeNull();
     expect(screen.queryByText("创建词汇")).toBeNull();
     // 垃圾桶里全是归档词条，批量动作恒为恢复，不该出现「移入垃圾桶」。
     expect(screen.queryByText("移入垃圾桶")).toBeNull();
@@ -1585,7 +1655,7 @@ describe("SmartDictionary", () => {
     );
 
     expect(screen.getByText("智能词库")).toBeInTheDocument();
-    expect(screen.getByText("状态")).toBeInTheDocument();
+    expect(screen.getByLabelText("词条状态")).toBeInTheDocument();
     expect(screen.getByText("创建词汇")).toBeInTheDocument();
   });
 

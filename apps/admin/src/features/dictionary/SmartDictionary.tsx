@@ -1,10 +1,11 @@
 import { TableEmptyState } from "@/components/TableEmptyState";
 import {
   DeleteOutlined,
+  DownOutlined,
   PlusOutlined,
-  ReloadOutlined,
   RollbackOutlined,
-  SearchOutlined
+  SearchOutlined,
+  UpOutlined
 } from "@ant-design/icons";
 import {
   Alert,
@@ -12,6 +13,7 @@ import {
   Breadcrumb,
   Button,
   Card,
+  ConfigProvider,
   DatePicker,
   Flex,
   Form,
@@ -22,11 +24,12 @@ import {
   Table,
   Tag,
   Tooltip,
-  Typography
+  Typography,
+  theme
 } from "antd";
 import type { TableColumnsType } from "antd";
 import dayjs from "dayjs";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "@/lib/auth";
 import { HttpError, InvalidAdminWordResponseError } from "@tsz/api-client";
@@ -49,6 +52,7 @@ import {
   useRestoreWord,
   useRestoreWordsBatch,
   useWordList,
+  useWordCreators,
   useWordStats
 } from "./api";
 import {
@@ -102,6 +106,8 @@ import {
   isEntryOwnershipError
 } from "./entryWritePermission";
 import { newWordNodeId } from "./word-model/primitives";
+
+import "./smart-dictionary.css";
 
 import { EditEntryAnnotation } from "./EditEntryAnnotation";
 import { canEditRowAnnotation } from "./annotationPermission";
@@ -216,6 +222,31 @@ export function SmartDictionary({
     [serializedSearchParams]
   );
   const { filters, page, pageSize } = listSearch;
+  const hasAdvancedFilters = Boolean(
+    filters.kind ||
+    filters.pos ||
+    filters.level ||
+    (!trashMode && filters.status) ||
+    filters.createdBy ||
+    filters.range?.some(Boolean)
+  );
+  const [advancedExpanded, setAdvancedExpanded] = useState(hasAdvancedFilters);
+  const advancedPanelId = useId();
+  const { token } = theme.useToken();
+  const creators = useWordCreators(advancedExpanded);
+  const creatorOptions = (creators.data ?? []).map((creator) => ({
+    value: creator.id,
+    label: (creators.data ?? []).some(
+      (other) =>
+        other.id !== creator.id && other.display_name === creator.display_name
+    )
+      ? `${creator.display_name}（${creator.id.slice(-8)}）`
+      : creator.display_name
+  }));
+
+  useEffect(() => {
+    if (hasAdvancedFilters) setAdvancedExpanded(true);
+  }, [hasAdvancedFilters, serializedSearchParams]);
 
   // 服务端分页 + 筛选:三者共同构成列表查询,任何变化都触发重取。
   const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([]);
@@ -233,7 +264,10 @@ export function SmartDictionary({
 
   useEffect(() => {
     form.resetFields();
-    form.setFieldsValue(filters);
+    form.setFieldsValue({
+      ...filters,
+      headword: filters.headword ?? filters.keyword
+    });
   }, [filters, form]);
 
   // 垃圾桶页固定只看归档，不受 URL 上残留的 status 影响。
@@ -1172,94 +1206,138 @@ export function SmartDictionary({
         ]}
       />
 
-      <Card size="small" styles={{ body: { paddingBottom: 8 } }}>
-        <Form
-          form={form}
-          initialValues={filters}
-          layout="inline"
-          onFinish={applyFilters}
-          style={{
-            rowGap: 12,
-            columnGap: 8,
-            display: "flex",
-            flexWrap: "wrap"
-          }}
-        >
-          <Form.Item name="keyword" label="关键字">
-            <Input
-              placeholder="请输入词汇/创建人"
-              allowClear
-              style={{ width: 180 }}
-            />
-          </Form.Item>
-          <Form.Item name="gloss" label="释义">
-            <Input placeholder="请输入释义" allowClear style={{ width: 160 }} />
-          </Form.Item>
-          <Form.Item name="kind" label="类型">
-            <Select
-              placeholder="请选择词汇类型"
-              options={kindOptions}
-              allowClear
-              style={{ width: 150 }}
-            />
-          </Form.Item>
-          <Form.Item name="pos" label="基本词性">
-            <Select
-              placeholder="请选择基本词性"
-              options={partOfSpeechOptions}
-              loading={partOfSpeechCatalog.isPending}
-              disabled={partOfSpeechCatalog.isError}
-              allowClear
-              style={{ width: 140 }}
-            />
-          </Form.Item>
-          <Form.Item name="level" label="难度">
-            <Select
-              placeholder="请选择难度"
-              options={CEFR_OPTIONS}
-              allowClear
-              style={{ width: 120 }}
-            />
-          </Form.Item>
-          {!trashMode && (
-            <Form.Item name="status" label="状态">
-              <Select
-                placeholder="请选择状态"
-                options={STATUS_OPTIONS}
-                allowClear
-                style={{ width: 120 }}
-              />
-            </Form.Item>
-          )}
-          <Form.Item name="range" label="创建时间">
-            <RangePicker />
-          </Form.Item>
-          <Form.Item>
-            <Space>
-              <Button
-                type="primary"
-                icon={<SearchOutlined />}
-                htmlType="submit"
+      <ConfigProvider
+        theme={{
+          token: { colorTextPlaceholder: token.colorTextSecondary },
+          components: {
+            Form: { labelColor: token.colorTextSecondary }
+          }
+        }}
+      >
+        <Card size="small" styles={{ body: { padding: 16 } }}>
+          <Form
+            form={form}
+            initialValues={{
+              ...filters,
+              headword: filters.headword ?? filters.keyword
+            }}
+            layout="horizontal"
+            labelCol={{ flex: "72px" }}
+            wrapperCol={{ flex: 1 }}
+            labelAlign="left"
+            colon={false}
+            onFinish={applyFilters}
+            className="word-search-form"
+          >
+            <div className="word-search-main">
+              <Form.Item
+                name="headword"
+                label="词条"
+                labelCol={{ flex: "36px" }}
               >
-                搜索
-              </Button>
-              <Button
-                icon={<ReloadOutlined />}
-                onClick={() => {
-                  form.resetFields();
-                  form.setFieldsValue({
-                    keyword: undefined,
-                    status: undefined
-                  });
-                  applyFilters({});
-                }}
+                <Input placeholder="请输入词条名称" allowClear />
+              </Form.Item>
+              <Form.Item name="gloss" label="词义" labelCol={{ flex: "36px" }}>
+                <Input placeholder="请输入词义" allowClear />
+              </Form.Item>
+              <div className="word-search-actions">
+                <Button
+                  type="primary"
+                  icon={<SearchOutlined />}
+                  htmlType="submit"
+                >
+                  搜索
+                </Button>
+                <Button
+                  type="text"
+                  onClick={() => {
+                    form.resetFields();
+                    applyFilters({});
+                  }}
+                >
+                  重置
+                </Button>
+                <Button
+                  type="link"
+                  className="word-search-toggle"
+                  icon={advancedExpanded ? <UpOutlined /> : <DownOutlined />}
+                  iconPlacement="end"
+                  aria-expanded={advancedExpanded}
+                  aria-controls={advancedPanelId}
+                  onClick={() => setAdvancedExpanded((value) => !value)}
+                >
+                  {advancedExpanded ? "收起筛选" : "更多筛选"}
+                </Button>
+              </div>
+            </div>
+            <div
+              id={advancedPanelId}
+              className="word-search-advanced"
+              hidden={!advancedExpanded}
+              aria-hidden={!advancedExpanded}
+              inert={!advancedExpanded}
+              style={{
+                borderTop: `1px solid ${token.colorSplit}`
+              }}
+            >
+              <Form.Item name="kind" label="词条类型">
+                <Select placeholder="全部" options={kindOptions} allowClear />
+              </Form.Item>
+              <Form.Item name="pos" label="基本词性">
+                <Select
+                  placeholder="全部"
+                  options={partOfSpeechOptions}
+                  loading={partOfSpeechCatalog.isPending}
+                  disabled={partOfSpeechCatalog.isError}
+                  allowClear
+                />
+              </Form.Item>
+              <Form.Item name="level" label="词义难度">
+                <Select placeholder="全部" options={CEFR_OPTIONS} allowClear />
+              </Form.Item>
+              {!trashMode && (
+                <Form.Item name="status" label="词条状态">
+                  <Select
+                    placeholder="全部"
+                    options={STATUS_OPTIONS}
+                    allowClear
+                  />
+                </Form.Item>
+              )}
+              <Form.Item
+                name="createdBy"
+                label="创建人"
+                help={
+                  creators.isError ? (
+                    <span>
+                      创建人加载失败
+                      <Button
+                        type="link"
+                        size="small"
+                        onClick={() => void creators.refetch()}
+                      >
+                        重新加载创建人
+                      </Button>
+                    </span>
+                  ) : undefined
+                }
               >
-                重置
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Card>
+                <Select
+                  placeholder="不限"
+                  options={creatorOptions}
+                  allowClear
+                  showSearch={{ optionFilterProp: "label" }}
+                  loading={creators.isPending}
+                  disabled={creators.isError}
+                />
+              </Form.Item>
+              <Form.Item name="range" label="创建时间">
+                <RangePicker style={{ width: "100%" }} />
+              </Form.Item>
+            </div>
+          </Form>
+        </Card>
+      </ConfigProvider>
 
       <Card size="small">
         {restoreSurface.page && pendingRestore && (
