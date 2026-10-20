@@ -132,7 +132,8 @@ export function useDeleteWordDraft() {
       qc.removeQueries({ queryKey: wordKeys.detail(wordId), exact: true });
       return Promise.all([
         qc.invalidateQueries({ queryKey: wordKeys.lists() }),
-        qc.invalidateQueries({ queryKey: wordKeys.stats() })
+        qc.invalidateQueries({ queryKey: wordKeys.stats() }),
+        qc.invalidateQueries({ queryKey: wordKeys.creators() })
       ]);
     }
   });
@@ -156,7 +157,8 @@ export function useDeleteWordBatch() {
       }
       return Promise.all([
         qc.invalidateQueries({ queryKey: wordKeys.lists() }),
-        qc.invalidateQueries({ queryKey: wordKeys.stats() })
+        qc.invalidateQueries({ queryKey: wordKeys.stats() }),
+        qc.invalidateQueries({ queryKey: wordKeys.creators() })
       ]);
     }
   });
