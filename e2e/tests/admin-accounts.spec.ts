@@ -182,17 +182,40 @@ test("固定列表格滚动到顶栏后，顶栏仍可点击且账户弹层正�
     exact: true
   });
   await expect(dialog).toBeVisible();
+  const mask = page.locator(".ant-modal-mask");
+  await expect(mask).toBeVisible();
+  await expect(mask).toHaveCSS("opacity", "1");
+  await expect(mask).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
   const accountBox = (await accountMenu.boundingBox())!;
-  // 弹窗遮罩必须同时盖住 sticky 顶栏；仅弹窗内容可见不能证明层级关系正确。
+  const headerPoint = { x: accountBox.x + accountBox.width / 2, y: headerY };
+  // 透明 wrap 拦截点击；独立检查实际 mask 的层叠，避免把 wrap 命中当作遮罩绘制证据。
   await expect
     .poll(() =>
-      dialog.evaluate(
-        (node, point) => {
-          const hit = document.elementFromPoint(point.x, point.y);
-          return node.parentElement?.contains(hit) ?? false;
-        },
-        { x: accountBox.x + accountBox.width / 2, y: headerY }
-      )
+      mask.evaluate((node, point) => {
+        const wrap =
+          node.parentElement?.querySelector<HTMLElement>(".ant-modal-wrap");
+        if (!wrap) return false;
+        const maskPointerEvents = node.style.pointerEvents;
+        const wrapPointerEvents = wrap.style.pointerEvents;
+        try {
+          // 只切换命中检测，不改布局或 z-index；检测完立即恢复实际交互状态。
+          node.style.pointerEvents = "auto";
+          wrap.style.pointerEvents = "none";
+          return document.elementFromPoint(point.x, point.y) === node;
+        } finally {
+          node.style.pointerEvents = maskPointerEvents;
+          wrap.style.pointerEvents = wrapPointerEvents;
+        }
+      }, headerPoint)
+    )
+    .toBe(true);
+  // 同时确认实际交互状态下，弹窗容器阻止点击顶栏。
+  await expect
+    .poll(() =>
+      dialog.evaluate((node, point) => {
+        const hit = document.elementFromPoint(point.x, point.y);
+        return node.parentElement?.contains(hit) ?? false;
+      }, headerPoint)
     )
     .toBe(true);
   await dialog.getByRole("button", { name: /^取\s*消$/ }).click();
