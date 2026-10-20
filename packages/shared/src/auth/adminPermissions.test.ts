@@ -135,6 +135,37 @@ describe("统一授权事实", () => {
       ).toBe(true);
     }
   });
+  it("注册地区仅依赖用户入口，与基本资料和联系方式独立授权", () => {
+    const key = "users.read_registration_region";
+    const regionReader = {
+      ...actor,
+      permissions: ["users.access", key]
+    };
+    expect(hasAdminPermission(regionReader, key)).toBe(true);
+    expect(hasAdminPermission(regionReader, "users.read_basic")).toBe(false);
+    expect(hasAdminPermission(regionReader, "users.read_sensitive")).toBe(
+      false
+    );
+    expect(hasAdminPermission({ ...actor, permissions: [key] }, key)).toBe(
+      false
+    );
+    expect(hasAdminPermission({ ...actor, role: "super_admin" }, key)).toBe(
+      true
+    );
+    expect(
+      hasAdminPermission(
+        {
+          ...actor,
+          permissions: [
+            "users.access",
+            "users.read_basic",
+            "users.read_sensitive"
+          ]
+        },
+        key
+      )
+    ).toBe(false);
+  });
   it("敏感资料、语音消耗和配置写入都须单独授权", () => {
     const reader = {
       ...actor,
