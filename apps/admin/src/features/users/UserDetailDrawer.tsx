@@ -2,7 +2,7 @@
 import { Avatar, Badge, Descriptions, Drawer, Space, Tag } from "antd";
 import { UserOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
-import type { AdminUserView } from "@tsz/types";
+import type { AdminUser } from "@tsz/types";
 import { UserRegistrationRegion, UserResources } from "./UserResources";
 import { CopyableText } from "@/components/CopyableText";
 import { usePermission } from "@/lib/auth";
@@ -10,7 +10,7 @@ import { RevokeTeacherButton } from "@/features/teacher-certification/RevokeTeac
 import { ROLE_LABEL, ROLE_TAG_COLOR, levelColor } from "./labels";
 
 interface Props {
-  user: AdminUserView | null;
+  user: AdminUser | null;
   onClose: () => void;
 }
 
@@ -58,12 +58,23 @@ export function UserDetailDrawer({ user, onClose }: Props) {
               },
               {
                 key: "level",
-                label: "等级",
-                children: user.level ? (
-                  <Tag color={levelColor(user.level)}>{user.level}等级</Tag>
+                label: "学生等级",
+                children: user.learning_settings ? (
+                  <Tag color={levelColor(user.learning_settings.cefr_level)}>
+                    {user.learning_settings.cefr_level}
+                  </Tag>
                 ) : (
-                  "-"
+                  "未设置"
                 )
+              },
+              {
+                key: "english-variant",
+                label: "英美式偏好",
+                children: user.learning_settings
+                  ? user.learning_settings.english_variant === "BrE"
+                    ? "英式"
+                    : "美式"
+                  : "未设置"
               }
             ]
           : []),

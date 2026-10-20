@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { App as AntApp } from "antd";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpError } from "@tsz/api-client";
-import type { AdminUserView } from "@tsz/types";
+import type { AdminUser } from "@tsz/types";
 
 vi.mock("@/lib/auth", () => ({
   usePermission: () => true,
@@ -17,7 +17,7 @@ vi.setConfig({ testTimeout: 15000 });
 
 const mockUpdate = vi.mocked(api.users.update);
 
-const user: AdminUserView = {
+const user: AdminUser = {
   id: "u7",
   display_name: "Frank",
   avatar_url: "",
@@ -36,7 +36,7 @@ beforeEach(() => {
   }));
 });
 
-function renderModal(onClose = vi.fn(), target: AdminUserView | null = user) {
+function renderModal(onClose = vi.fn(), target: AdminUser | null = user) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } }
   });
