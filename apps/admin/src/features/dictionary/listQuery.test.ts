@@ -12,6 +12,17 @@ describe("toListQuery — 搜索行 → 列表查询参数", () => {
     expect(q).toEqual({ page: 2, page_size: 50, q: "take" });
   });
 
+  it("词条与创建人独立传参，不借用混合关键词搜索", () => {
+    expect(
+      toListQuery({ headword: "  alpha  ", createdBy: "creator-id" }, 1, 20)
+    ).toEqual({
+      page: 1,
+      page_size: 20,
+      headword: "alpha",
+      created_by: "creator-id"
+    });
+  });
+
   it("枚举筛选原样透传", () => {
     const q = toListQuery(
       { kind: "phrase", pos: "verb", level: "B1", status: "draft" },

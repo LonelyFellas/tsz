@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/zentao-132-permissions/docs/openapi.json",
-  "_source_sha256": "2540306f1f5cf81992088e29a342bcca1bf307c4c4779b9260ace6d015943495",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dictionary-search-layout/docs/openapi.json",
+  "_source_sha256": "5e60fd77cb63ec5a4cb369e332035c399d1f6e5c454aa4aec2511c7397d586ec",
   "roots": [
     "DictionaryPage",
     "DictionaryEntry",

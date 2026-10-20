@@ -754,11 +754,26 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     }
   });
 
+  it("词条筛选契约包含独立词面、创建人和最小创建人选项", () => {
+    const parameters =
+      snapshot.operationQueryParameters["get /admin/lexicon/entries"];
+    expect(parameters.map((parameter) => parameter.name)).toEqual(
+      expect.arrayContaining(["q", "headword", "created_by"])
+    );
+    const creator = parameters.find(
+      (parameter) => parameter.name === "created_by"
+    )!;
+    expect(creator.schema).toMatchObject({ type: "string", format: "uuid" });
+    expect(
+      Object.keys(snapshot.schemas.AdminWordCreator.properties).sort()
+    ).toEqual(["display_name", "id"]);
+  });
+
   it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "2540306f1f5cf81992088e29a342bcca1bf307c4c4779b9260ace6d015943495"
+      "5e60fd77cb63ec5a4cb369e332035c399d1f6e5c454aa4aec2511c7397d586ec"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");

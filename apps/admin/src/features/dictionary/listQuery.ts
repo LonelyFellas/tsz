@@ -10,7 +10,10 @@ import type { Dayjs } from "dayjs";
 
 /** 搜索行表单值(antd Form 收集,camelCase 属前端本地 state)。 */
 export interface WordFilterValues {
+  /** 兼容旧 URL 的词面/创建人混合搜索。 */
   keyword?: string;
+  headword?: string;
+  createdBy?: string;
   gloss?: string;
   kind?: AdminWordKind;
   pos?: WordPosTag;
@@ -28,10 +31,23 @@ export function toListQuery(
   page: number,
   pageSize: number
 ): AdminWordListQuery {
-  const { keyword, gloss, kind, pos, level, status, range } = filters;
+  const {
+    keyword,
+    headword,
+    createdBy,
+    gloss,
+    kind,
+    pos,
+    level,
+    status,
+    range
+  } = filters;
   const query: AdminWordListQuery = { page, page_size: pageSize };
   const q = keyword?.trim();
   if (q) query.q = q;
+  const word = headword?.trim();
+  if (word) query.headword = word;
+  if (createdBy) query.created_by = createdBy;
   const g = gloss?.trim();
   if (g) query.gloss = g;
   if (kind) query.kind = kind;

@@ -21,6 +21,7 @@ export const wordKeys = {
   lists: () => [...wordKeys.all, "list"] as const,
   list: (query: AdminWordListQuery) => [...wordKeys.lists(), query] as const,
   stats: () => [...wordKeys.all, "stats"] as const,
+  creators: () => [...wordKeys.all, "creators"] as const,
   detail: (id: string) => [...wordKeys.all, "detail", id] as const,
   relatedSearch: (
     q: string,
@@ -35,6 +36,14 @@ export function useWordList(query: AdminWordListQuery) {
     queryFn: () => adminWordsDataSource.list(query),
     // 翻页/改筛选时保留上一页数据渲染,避免表格闪空。
     placeholderData: keepPreviousData
+  });
+}
+
+export function useWordCreators(enabled: boolean) {
+  return useQuery({
+    queryKey: wordKeys.creators(),
+    queryFn: () => adminWordsDataSource.creators(),
+    enabled
   });
 }
 
@@ -123,7 +132,8 @@ export function useDeleteWordDraft() {
       qc.removeQueries({ queryKey: wordKeys.detail(wordId), exact: true });
       return Promise.all([
         qc.invalidateQueries({ queryKey: wordKeys.lists() }),
-        qc.invalidateQueries({ queryKey: wordKeys.stats() })
+        qc.invalidateQueries({ queryKey: wordKeys.stats() }),
+        qc.invalidateQueries({ queryKey: wordKeys.creators() })
       ]);
     }
   });
@@ -147,7 +157,8 @@ export function useDeleteWordBatch() {
       }
       return Promise.all([
         qc.invalidateQueries({ queryKey: wordKeys.lists() }),
-        qc.invalidateQueries({ queryKey: wordKeys.stats() })
+        qc.invalidateQueries({ queryKey: wordKeys.stats() }),
+        qc.invalidateQueries({ queryKey: wordKeys.creators() })
       ]);
     }
   });

@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const dataSource = vi.hoisted(() => ({
   archive: vi.fn(),
   archiveBatch: vi.fn(),
+  creators: vi.fn(),
   deleteBatch: vi.fn(),
   deleteDraft: vi.fn(),
   get: vi.fn(),
@@ -28,6 +29,7 @@ import {
   useRelatedSearch,
   useRestoreWord,
   useRestoreWordsBatch,
+  useWordCreators,
   useWordDetail,
   useWordList,
   wordKeys
@@ -517,7 +519,59 @@ describe("dictionary React Query hooks", () => {
     );
   });
 
-  it("删除草稿后移除 active detail，仅失效列表与统计且不重取 404", async () => {
+  it.each(["single", "batch"] as const)(
+    "%s 删除最后一条词条后刷新创建人选项",
+    async (mode) => {
+      dataSource.creators
+        .mockResolvedValueOnce([{ id: "creator-1", display_name: "创建人" }])
+        .mockResolvedValue([]);
+      dataSource.deleteDraft.mockResolvedValue(undefined);
+      dataSource.deleteBatch.mockResolvedValue(undefined);
+      const { wrapper } = queryWrapper();
+      const hook = renderHook(
+        () => ({
+          creators: useWordCreators(true),
+          deletion: useDeleteWordDraft(),
+          deleteBatch: useDeleteWordBatch()
+        }),
+        { wrapper }
+      );
+      await waitFor(() =>
+        expect(hook.result.current.creators.data).toEqual([
+          { id: "creator-1", display_name: "创建人" }
+        ])
+      );
+
+      await act(async () => {
+        if (mode === "single") {
+          await hook.result.current.deletion.mutateAsync({
+            wordId: "last-entry",
+            baseRevision: 1,
+            baseLifecycleRevision: 1
+          });
+        } else {
+          await hook.result.current.deleteBatch.mutateAsync({
+            idempotencyKey: "delete-last-entry",
+            input: {
+              entries: [
+                {
+                  id: "last-entry",
+                  base_revision: 1,
+                  base_lifecycle_revision: 1
+                }
+              ]
+            }
+          });
+        }
+      });
+
+      await waitFor(() =>
+        expect(hook.result.current.creators.data).toEqual([])
+      );
+    }
+  );
+
+  it("删除草稿后移除 active detail，失效集合派生数据且不重取 404", async () => {
     const detail = detailFixture();
     const { word } = detail;
     dataSource.get
@@ -562,9 +616,10 @@ describe("dictionary React Query hooks", () => {
       queryKey: wordKeys.detail(word.id),
       exact: true
     });
-    expect(invalidate).toHaveBeenCalledTimes(2);
+    expect(invalidate).toHaveBeenCalledTimes(3);
     expect(invalidate).toHaveBeenCalledWith({ queryKey: wordKeys.lists() });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: wordKeys.stats() });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: wordKeys.creators() });
     expect(dataSource.get).toHaveBeenCalledTimes(1);
     expect(client.getQueryData(wordKeys.detail(word.id))).toBeUndefined();
   });

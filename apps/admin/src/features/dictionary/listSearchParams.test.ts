@@ -8,6 +8,22 @@ import {
 } from "./listSearchParams";
 
 describe("word list search params", () => {
+  it("独立词条和创建人条件可在 URL 中往返", () => {
+    const id = "01991111-2222-7333-8444-555566667777";
+    const params = serializeWordFilterSearchParams({
+      headword: " alpha ",
+      createdBy: id
+    });
+    expect(params.toString()).toBe(`headword=alpha&created_by=${id}`);
+    expect(parseWordFilterSearchParams(params)).toEqual({
+      headword: "alpha",
+      createdBy: id
+    });
+    expect(
+      parseWordFilterSearchParams(new URLSearchParams("created_by=invalid"))
+    ).toEqual({});
+  });
+
   it("round-trips every product filter with day-granularity dates", () => {
     const params = serializeWordFilterSearchParams({
       keyword: "  creator  ",
