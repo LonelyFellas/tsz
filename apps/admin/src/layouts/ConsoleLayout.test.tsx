@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  CONSOLE_HEADER_Z_INDEX,
   ConsoleLayout,
   isWordCreationWorkspacePath,
   modeOf
@@ -116,5 +117,17 @@ describe("ConsoleLayout", () => {
   it("普通页面在相同宽度仍按原规则完整展开", () => {
     renderLayout("/words", 1200);
     expect(screen.getByTestId("sidebar")).toHaveTextContent("full");
+  });
+
+  it("顶栏层级高于表格固定列，滚动时表体不会盖住顶栏", () => {
+    // antd v6 表格固定单元格为 `zIndexTableFixed + 固定列偏移`（实测 10~12）：
+    // 顶栏与它同值时，DOM 靠后的表体会反盖住顶栏，因此必须更严格地高于该范围。
+    const { container } = renderLayout("/users", 1440);
+    const header = container.querySelector("header.ant-layout-header");
+    expect(header).not.toBeNull();
+    expect(CONSOLE_HEADER_Z_INDEX).toBeGreaterThan(12);
+    expect(Number(getComputedStyle(header!).zIndex)).toBe(
+      CONSOLE_HEADER_Z_INDEX
+    );
   });
 });

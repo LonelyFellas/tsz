@@ -20,6 +20,11 @@ const LG_BREAKPOINT = 992;
 const MD_BREAKPOINT = 768;
 const WORD_CREATION_FULL_BREAKPOINT = 1200 + 220 + 24 * 2;
 
+// 顶栏层级必须高于表格内固定列的层叠：antd v6 的 Table 固定单元格是
+// `calc(var(--z-offset-reverse) + zIndexTableFixed)`（默认 2 + 固定列偏移，实测 10~12），
+// 与顶栏同值时后渲染的表体会反盖住顶栏。弹层（Drawer/Modal）仍在 1000+。
+export const CONSOLE_HEADER_Z_INDEX = 100;
+
 type LayoutMode = "full" | "rail" | "drawer";
 
 export function isWordCreationWorkspacePath(pathname: string): boolean {
@@ -146,10 +151,7 @@ export function ConsoleLayout() {
               borderBottom: "1px solid #f0f0f0",
               position: "sticky",
               top: 0,
-              // 必须高于表格内固定列的层叠：antd v6 的 Table 固定单元格是
-              // zIndexTableFixed(2) + 固定列偏移，实际到 10~12；与 10 持平会让
-              // 表格滚到顶栏下方时反盖住顶栏。弹层（Drawer/Modal）仍在 1000+。
-              zIndex: 100
+              zIndex: CONSOLE_HEADER_Z_INDEX
             }}
           >
             <Tooltip title={toggleLabel} placement="right">
