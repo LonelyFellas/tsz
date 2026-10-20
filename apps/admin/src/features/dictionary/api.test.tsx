@@ -3,7 +3,6 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import type { AdminWordDraftV3Envelope, AdminWordListItemV3 } from "@tsz/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { wordFixture } from "./word-creation/wordCreation.test.helper";
 
 const dataSource = vi.hoisted(() => ({
   archive: vi.fn(),
@@ -96,6 +95,26 @@ function listItemFixture(): AdminWordListItemV3 {
   };
 }
 
+function detailFixture(): AdminWordDraftV3Envelope {
+  return {
+    word: {
+      ...listItemFixture(),
+      language: "en" as const,
+      capabilities: {
+        publication: {
+          mode: "native" as const
+        },
+        pronunciation_normalization_version: "nfkc_trim_lower_v1" as const
+      },
+      forms: { pos: [] },
+      meanings: { sense_groups: [], pos: [] },
+      completed_steps: [] as const,
+      created_by: "admin-1"
+    },
+    retired_stable_nodes: []
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -164,23 +183,7 @@ describe("dictionary React Query hooks", () => {
       words: [listItem],
       page: { page: 1, page_size: 20, total: 1 }
     };
-    const detail: AdminWordDraftV3Envelope = {
-      word: {
-        ...listItem,
-        language: "en" as const,
-        capabilities: {
-          publication: {
-            mode: "native" as const
-          },
-          pronunciation_normalization_version: "nfkc_trim_lower_v1" as const
-        },
-        forms: { pos: [] },
-        meanings: { sense_groups: [], pos: [] },
-        completed_steps: [] as const,
-        created_by: "admin-1"
-      },
-      retired_stable_nodes: []
-    };
+    const detail = detailFixture();
     dataSource.list.mockResolvedValue(list);
     dataSource.get.mockResolvedValue(detail);
     const { wrapper } = queryWrapper();
@@ -515,9 +518,10 @@ describe("dictionary React Query hooks", () => {
   });
 
   it("删除草稿后移除 active detail，仅失效列表与统计且不重取 404", async () => {
-    const word = wordFixture();
+    const detail = detailFixture();
+    const { word } = detail;
     dataSource.get
-      .mockResolvedValueOnce({ word })
+      .mockResolvedValueOnce(detail)
       .mockRejectedValue(new Error("word not found"));
     dataSource.deleteDraft.mockResolvedValue(undefined);
     const client = new QueryClient({
