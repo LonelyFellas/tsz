@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import type { AdminUserListResponse } from "@tsz/types";
 import { mockAdminV3Api } from "./support/mockAdminV3Api";
 
 test("超管编辑管理员昵称，失败保留输入，保存后列表更新", async ({ page }) => {
@@ -83,6 +84,122 @@ test("超管编辑管理员昵称，失败保留输入，保存后列表更新",
     { display_name: "新昵称" },
     { display_name: "新昵称" }
   ]);
+});
+
+test("固定列表格滚动到顶栏后，顶栏仍可点击且账户弹层正常覆盖", async ({
+  page
+}) => {
+  await mockAdminV3Api(page, { viewerRole: "super_admin" });
+  const users = Array.from({ length: 10 }, (_, index) => ({
+    id: `019d2c55-1f9e-7f88-a189-${String(index + 1).padStart(12, "0")}`,
+    display_name: `顶栏回归用户${index + 1}`,
+    roles: ["student" as const],
+    teacher_verified: false,
+    status: "active" as const,
+    created_at: "2026-10-20T00:00:00Z"
+  }));
+  const response: AdminUserListResponse = {
+    items: users,
+    page: { page: 1, page_size: 10, total: users.length, total_pages: 1 }
+  };
+  await page.route("**/api/v1/admin/users?**", (route) =>
+    route.fulfill({ json: response })
+  );
+  await page.setViewportSize({ width: 1440, height: 720 });
+  await page.goto("/users");
+
+  const row = page.getByRole("row").filter({
+    has: page.getByRole("button", { name: users[0].display_name, exact: true })
+  });
+  const fixedCell = row.getByRole("cell").first();
+  await expect(fixedCell).toHaveCSS("position", "sticky");
+  await expect(row.getByRole("cell").last()).toHaveCSS("position", "sticky");
+  // 加载退场时的 opacity 动画会临时隔离表格层叠，须等它结束再验证固定列遮挡。
+  await expect(page.locator(".ant-spin-container")).toHaveCSS("opacity", "1");
+  const toggle = page.getByRole("button", { name: "收起侧栏", exact: true });
+  const accountMenu = page.getByRole("button", {
+    name: "账户菜单",
+    exact: true
+  });
+  const toggleBox = (await toggle.boundingBox())!;
+  const headerY = toggleBox.y + toggleBox.height / 2;
+
+  // 把真实固定单元格移到顶栏按钮背后，避免只检查 z-index 数字却未覆盖遮挡现场。
+  await fixedCell.evaluate((cell, y) => {
+    const rect = cell.getBoundingClientRect();
+    window.scrollTo(0, window.scrollY + rect.top + rect.height / 2 - y);
+  }, headerY);
+  await expect
+    .poll(() => page.evaluate(() => window.scrollY))
+    .toBeGreaterThan(0);
+  await expect
+    .poll(async () => {
+      const rect = (await fixedCell.boundingBox())!;
+      return rect.y <= headerY && rect.y + rect.height >= headerY;
+    })
+    .toBe(true);
+  for (const cell of [fixedCell, row.getByRole("cell").last()]) {
+    await expect
+      .poll(
+        () =>
+          cell.evaluate((node, y) => {
+            const rect = node.getBoundingClientRect();
+            const hit = document.elementFromPoint(
+              rect.left + rect.width / 2,
+              y
+            );
+            return document.querySelector("header")?.contains(hit) ?? false;
+          }, headerY),
+        { message: "滚动后的固定列不应盖住顶栏" }
+      )
+      .toBe(true);
+  }
+  for (const button of [toggle, accountMenu]) {
+    await expect
+      .poll(() =>
+        button.evaluate((node) => {
+          const rect = node.getBoundingClientRect();
+          const hit = document.elementFromPoint(
+            rect.left + rect.width / 2,
+            rect.top + rect.height / 2
+          );
+          return node.contains(hit);
+        })
+      )
+      .toBe(true);
+  }
+  await toggle.click();
+  await expect(
+    page.getByRole("button", { name: "展开侧栏", exact: true })
+  ).toBeVisible();
+
+  await accountMenu.click();
+  const logoutAll = page.getByRole("button", { name: /退出所有设备$/ });
+  await expect(logoutAll).toBeVisible();
+  await logoutAll.click();
+  const dialog = page.getByRole("dialog", {
+    name: "退出所有设备",
+    exact: true
+  });
+  await expect(dialog).toBeVisible();
+  const accountBox = (await accountMenu.boundingBox())!;
+  // 弹窗遮罩必须同时盖住 sticky 顶栏；仅弹窗内容可见不能证明层级关系正确。
+  await expect
+    .poll(() =>
+      dialog.evaluate(
+        (node, point) => {
+          const hit = document.elementFromPoint(point.x, point.y);
+          return node.parentElement?.contains(hit) ?? false;
+        },
+        { x: accountBox.x + accountBox.width / 2, y: headerY }
+      )
+    )
+    .toBe(true);
+  await dialog.getByRole("button", { name: /^取\s*消$/ }).click();
+  await expect(dialog).not.toBeVisible();
+  await accountMenu.click();
+  await page.getByRole("button", { name: /个人设置$/ }).click();
+  await expect(page).toHaveURL(/\/settings\/profile$/);
 });
 
 test("共用表格按容器宽度解除固定列且窄屏分页可见", async ({ page }) => {
