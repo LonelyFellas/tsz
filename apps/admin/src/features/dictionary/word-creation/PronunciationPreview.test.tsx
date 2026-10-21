@@ -597,7 +597,13 @@ it("最终读音使用编辑后的标注、选定音色和语速，并直接播�
       playbackOnly
       voiceProfile={{
         voices: [
-          { voice_id: "american-voice", enabled: true, rate_percent: -25 }
+          {
+            voice_id: "american-voice",
+            enabled: true,
+            rate_percent: -25,
+            pitch_semitones: 2,
+            style: "cheerful"
+          }
         ]
       }}
     />
@@ -608,7 +614,14 @@ it("最终读音使用编辑后的标注、选定音色和语速，并直接播�
   fireEvent.click(button);
   await waitFor(() =>
     expect(preview.synthesize).toHaveBeenCalledWith(
-      { language: "en", content, voiceId: "american-voice", ratePercent: -25 },
+      {
+        language: "en",
+        content,
+        voiceId: "american-voice",
+        ratePercent: -25,
+        pitchSemitones: 2,
+        style: "cheerful"
+      },
       expect.anything()
     )
   );

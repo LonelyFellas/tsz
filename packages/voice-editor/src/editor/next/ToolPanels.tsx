@@ -2,7 +2,9 @@ import { CheckOutlined, SoundOutlined } from "@ant-design/icons";
 import {
   Button,
   Input,
+  InputNumber,
   Popconfirm,
+  Select,
   Space,
   Progress,
   Radio,
@@ -111,6 +113,10 @@ export interface VoicePanelProps {
   enabledVoiceIds: string[];
   voiceSettings?: readonly VoiceSetting[];
   onRateChange?: (voiceId: string, ratePercent: number) => void;
+  onParametersChange?: (
+    voiceId: string,
+    patch: Partial<Omit<VoiceSetting, "voice_id">>
+  ) => void;
   onToggleVoice: (voiceId: string) => void;
   pendingVoiceId?: string;
   playingVoiceId?: string;
@@ -129,6 +135,7 @@ export function VoicePanel({
   enabledVoiceIds,
   voiceSettings,
   onRateChange,
+  onParametersChange,
   onToggleVoice,
   pendingVoiceId,
   playingVoiceId,
@@ -204,6 +211,57 @@ export function VoicePanel({
                               }
                             />
                           )}
+                          {onParametersChange && (
+                            <details>
+                              <summary>更多参数</summary>
+                              <Space direction="vertical">
+                                <Select
+                                  aria-label={`${voice.label} 风格`}
+                                  value={
+                                    voiceSettings?.find(
+                                      (setting) => setting.voice_id === voice.id
+                                    )?.style ?? ""
+                                  }
+                                  style={{ minWidth: 120 }}
+                                  disabled={readOnly}
+                                  options={[
+                                    { value: "", label: "自然" },
+                                    ...voice.styles.map((style) => ({
+                                      value: style,
+                                      label: style
+                                    }))
+                                  ]}
+                                  onChange={(style: string) =>
+                                    onParametersChange(voice.id, {
+                                      style: style || undefined
+                                    })
+                                  }
+                                />
+                                <label>
+                                  音调（半音）
+                                  <InputNumber
+                                    aria-label={`${voice.label} 音调`}
+                                    value={
+                                      voiceSettings?.find(
+                                        (setting) =>
+                                          setting.voice_id === voice.id
+                                      )?.pitch_semitones ?? 0
+                                    }
+                                    min={voice.pitchRange?.min ?? -12}
+                                    max={voice.pitchRange?.max ?? 12}
+                                    disabled={readOnly || !voice.supportsPitch}
+                                    precision={0}
+                                    onChange={(pitch) => {
+                                      if (pitch !== null)
+                                        onParametersChange(voice.id, {
+                                          pitch_semitones: pitch
+                                        });
+                                    }}
+                                  />
+                                </label>
+                              </Space>
+                            </details>
+                          )}
                           <Button
                             size="small"
                             type="text"
@@ -242,12 +300,40 @@ export function VoicePanel({
     });
   return (
     <div className="tsz-ve-pop tsz-ve-pop-voices" aria-label="音色清单">
+      {voices.find((voice) => voice.personalSettingsError)
+        ?.personalSettingsError && (
+        <div className="tsz-ve-pop-status" role="status">
+          {
+            voices.find((voice) => voice.personalSettingsError)
+              ?.personalSettingsError
+          }
+        </div>
+      )}
       {voicesLoading ? (
         <div className="tsz-ve-pop-loading">
           <Spin size="small" aria-label="正在加载音色" />
         </div>
       ) : (
         <>
+          {voiceSettings
+            ?.filter(
+              (setting) =>
+                setting.enabled &&
+                !voices.some((voice) => voice.id === setting.voice_id)
+            )
+            .map((setting) => (
+              <div key={setting.voice_id} className="tsz-ve-pop-status">
+                {setting.voice_id}（音色已失效，口音未知）
+                <Button
+                  size="small"
+                  disabled={readOnly}
+                  aria-label={`取消启用失效音色 ${setting.voice_id}`}
+                  onClick={() => onToggleVoice(setting.voice_id)}
+                >
+                  取消启用
+                </Button>
+              </div>
+            ))}
           {renderGroups(common)}
           {uncommon.length > 0 && (
             <details className="tsz-ve-more-voices" open={moreOpen}>

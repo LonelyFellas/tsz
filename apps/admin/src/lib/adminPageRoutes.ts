@@ -20,6 +20,16 @@ export const ADMIN_PAGE_ROUTES = {
     path: "sentences",
     handle: { anyPermission: ["sentences.access", "sentences.read_published"] }
   },
+  voices: {
+    path: "voices",
+    handle: {
+      anyPermission: [
+        "words.access",
+        "sentences.access",
+        "speech.global_dubbing"
+      ]
+    }
+  },
   users: { path: "users", handle: { permission: "users.access" } },
   teacherApplications: {
     path: "teacher-applications",

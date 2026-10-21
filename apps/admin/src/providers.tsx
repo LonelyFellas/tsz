@@ -1,7 +1,7 @@
 import { RecoverySession } from "@/features/recovery/RecoverySession";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { ADMIN_PERMISSION_UPGRADE_MESSAGE } from "@tsz/api-client";
-import { browserQueryDefaults } from "@tsz/shared";
 import { Alert, Button, App as AntApp, ConfigProvider } from "antd";
 import { antdTheme } from "@/antd-theme";
 import { authRuntime, useAuthStore } from "@/lib/auth";
@@ -16,8 +16,6 @@ import { useAdminSessionRestore } from "@/features/auth/hooks/useAdminSessionRes
 
 // 单例 QueryClient：全局唯一，避免每次渲染重建缓存。默认项（staleTime 等）取自
 // @tsz/shared 的 browserQueryDefaults，与 web 共用同一份，避免两处漂移。
-const queryClient = new QueryClient({ defaultOptions: browserQueryDefaults });
-
 bindAdminAuthorizationCache(useAuthStore, queryClient);
 
 // 根布局 element：QueryClientProvider + antd ConfigProvider + 会话恢复，包住所有路由。

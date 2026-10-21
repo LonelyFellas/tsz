@@ -5,6 +5,8 @@ const state = vi.hoisted(() => ({
   profile: { id: "a", role: "super_admin", permissions: [] as string[] },
   voices: vi.fn(),
   preview: vi.fn(),
+  groups: vi.fn(),
+  library: vi.fn(),
   audioUrl: vi.fn(),
   audioCreateUpload: vi.fn(),
   audioConfirm: vi.fn()
@@ -14,7 +16,12 @@ vi.mock("@/lib/env", () => ({ env: state.env }));
 vi.mock("@/lib/auth", () => ({
   useAuthStore: { getState: () => ({ profile: state.profile }) },
   api: {
-    speech: { voices: state.voices, preview: state.preview },
+    speech: {
+      voices: state.voices,
+      preview: state.preview,
+      groups: state.groups,
+      library: state.library
+    },
     audioAssets: {
       createUpload: state.audioCreateUpload,
       confirm: state.audioConfirm,
@@ -55,6 +62,8 @@ beforeEach(() => {
   state.env.ADMIN_TTS_MOCK = false;
   state.voices.mockReset();
   state.preview.mockReset();
+  state.groups.mockReset().mockResolvedValue({ groups: [], revision: 0 });
+  state.library.mockReset().mockResolvedValue({ items: [] });
   state.audioUrl.mockReset().mockResolvedValue({
     url: "https://example.test/asset.mp3",
     expires_at: "2026-09-06T00:05:00Z",
@@ -71,6 +80,115 @@ afterEach(() => {
 });
 
 describe("admin voice preview data source", () => {
+  it.each([new Error("offline"), { status: 500 }])(
+    "个人参数失败不清空成功的目录，已有文本仍能试听：%s",
+    async (failure) => {
+      state.library.mockRejectedValue(failure);
+      const { adminVoicePreviewAdapter } = await import("./dataSource");
+      const voices = await adminVoicePreviewAdapter.listVoices({
+        language: "en"
+      });
+      expect(voices).toHaveLength(1);
+      expect(voices[0]).toMatchObject({
+        id: "real-voice",
+        personalSettingsError: expect.stringContaining("个人参数加载失败")
+      });
+      expect(voices[0]?.defaultSettings).toBeUndefined();
+      await adminVoicePreviewAdapter.synthesize({
+        language: "en",
+        content: CONTENT,
+        voiceId: "real-voice",
+        ratePercent: 0,
+        pitchSemitones: 0
+      });
+      expect(state.preview).toHaveBeenCalled();
+    }
+  );
+  it("分组和个人参数按账号共享缓存，换账号重新查询", async () => {
+    state.library.mockResolvedValue({
+      items: [
+        {
+          voice_alias: "real-voice",
+          parameters: { rate_percent: 0, pitch_semitones: 0, style: null }
+        }
+      ]
+    });
+    const { loadAdminVoiceRecommendations, adminVoicePreviewAdapter } =
+      await import("./dataSource");
+    await loadAdminVoiceRecommendations({ area: "word" });
+    await loadAdminVoiceRecommendations({ area: "meaning" });
+    expect(state.groups).toHaveBeenCalledTimes(1);
+    expect(
+      await adminVoicePreviewAdapter.listVoices({ language: "en" })
+    ).toEqual([
+      expect.objectContaining({
+        defaultSettings: { rate_percent: 0, pitch_semitones: 0 }
+      })
+    ]);
+    await adminVoicePreviewAdapter.listVoices({ language: "en" });
+    expect(state.library).toHaveBeenCalledTimes(1);
+    state.profile = { ...state.profile, id: "another" };
+    await loadAdminVoiceRecommendations({ area: "word" });
+    await adminVoicePreviewAdapter.listVoices({ language: "en" });
+    expect(state.groups).toHaveBeenCalledTimes(2);
+    expect(state.library).toHaveBeenCalledTimes(2);
+  });
+
+  it("推荐按板块和口音加载，并复制完整声音参数", async () => {
+    state.groups.mockResolvedValue({
+      revision: 1,
+      groups: [
+        {
+          id: "g",
+          name: "释义",
+          areas: ["meaning"],
+          uk: [
+            {
+              id: "uk-rec",
+              name: "慢读",
+              voice_alias: "sonia",
+              parameters: {
+                rate_percent: -25,
+                pitch_semitones: 2,
+                style: "cheerful"
+              }
+            }
+          ],
+          us: [
+            {
+              id: "us-rec",
+              name: "美式",
+              voice_alias: "guy",
+              parameters: { rate_percent: 0, pitch_semitones: 0, style: null }
+            }
+          ]
+        }
+      ]
+    });
+    const { loadAdminVoiceRecommendations } = await import("./dataSource");
+    const result = await loadAdminVoiceRecommendations({
+      area: "meaning",
+      locale: "en-GB"
+    });
+    expect(result).toEqual([
+      {
+        id: "uk-rec",
+        name: "慢读",
+        locale: "en-GB",
+        groupName: "释义",
+        setting: {
+          voice_id: "sonia",
+          enabled: true,
+          rate_percent: -25,
+          pitch_semitones: 2,
+          style: "cheerful"
+        }
+      }
+    ]);
+    expect(await loadAdminVoiceRecommendations({ area: "grammar" })).toEqual(
+      []
+    );
+  });
   it("delegates both methods to the real API when mock is disabled", async () => {
     vi.stubEnv("PROD", false);
     const { adminVoicePreviewAdapter, voicePreviewIsMock } =

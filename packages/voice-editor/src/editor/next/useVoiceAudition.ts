@@ -18,12 +18,19 @@ function settingsForVoice(
   settings: readonly VoiceSetting[],
   voice: VoiceOption
 ): VoiceSettings {
-  const rate =
-    settings.find((item) => item.voice_id === voice.id)?.rate_percent ?? 0;
+  const setting = settings.find((item) => item.voice_id === voice.id);
+  const rate = setting?.rate_percent ?? 0;
   const ratePercent = voice.rateRange
     ? Math.min(Math.max(rate, voice.rateRange.min), voice.rateRange.max)
     : rate;
-  return { voiceId: voice.id, ratePercent };
+  return {
+    voiceId: voice.id,
+    ratePercent,
+    ...(setting?.pitch_semitones !== undefined
+      ? { pitchSemitones: setting.pitch_semitones }
+      : {}),
+    ...(setting?.style ? { style: setting.style } : {})
+  };
 }
 
 export interface VoiceAuditionInput {

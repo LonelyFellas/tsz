@@ -17,6 +17,61 @@ export interface AdminSpeechVoice {
   capabilities: AdminSpeechVoiceCapabilities;
 }
 
+export interface AdminDubbingRecommendation {
+  id: string;
+  name: string;
+  voice_alias: string;
+  parameters: AdminVoiceParameters;
+}
+
+export interface AdminDubbingGroup {
+  id: string;
+  name: string;
+  areas: string[];
+  uk: AdminDubbingRecommendation[];
+  us: AdminDubbingRecommendation[];
+}
+
+export interface AdminDubbingGroupsResponse {
+  groups: AdminDubbingGroup[];
+  revision: number;
+}
+
+export interface SaveAdminDubbingGroupsInput {
+  groups: AdminDubbingGroup[];
+  base_revision: number;
+}
+
+export interface AdminVoiceParameters {
+  rate_percent: number;
+  pitch_semitones: number;
+  style: string | null;
+}
+
+export interface AdminVoiceLibraryItem {
+  voice_alias: string;
+  description_zh: string | null;
+  description_revision: number;
+  parameters: AdminVoiceParameters | null;
+  notes: string;
+  personal_revision: number;
+}
+
+export interface AdminVoiceLibraryResponse {
+  items: AdminVoiceLibraryItem[];
+}
+
+export interface SaveAdminVoiceSettingsInput {
+  parameters: AdminVoiceParameters | null;
+  notes: string;
+  base_revision: number;
+}
+
+export interface SaveAdminVoiceDescriptionInput {
+  description_zh: string;
+  base_revision: number;
+}
+
 export interface AdminSpeechVoiceListResponse {
   items: AdminSpeechVoice[];
 }

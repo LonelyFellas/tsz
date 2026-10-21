@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type { MenuPermission } from "@tsz/types";
+import type { AdminProfile, MenuPermission } from "@tsz/types";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuthStore } from "@/lib/auth";
@@ -30,7 +30,7 @@ const FULL_PERMISSIONS: MenuPermission[] = [
 
 function setLevel(
   level: "admin" | "super_admin" | null,
-  permissions: MenuPermission[] = FULL_PERMISSIONS
+  permissions: AdminProfile["permissions"] = FULL_PERMISSIONS
 ) {
   useAuthStore.getState().setProfile(
     level
@@ -105,7 +105,7 @@ describe("ConsoleSidebar", () => {
     expect(screen.queryByText("管理员管理")).toBeNull();
   });
 
-  it("按后端权限过滤菜单：只有 words.access 时仅词库管理组可见", () => {
+  it("按后端权限过滤菜单：只有 words.access 时词库与音色库可见", () => {
     setLevel("admin", ["words.access"]);
     renderAt("/");
     expect(screen.getByText("词库管理")).toBeInTheDocument();
@@ -113,6 +113,36 @@ describe("ConsoleSidebar", () => {
     expect(screen.queryByText("用户管理")).toBeNull();
     expect(screen.queryByText("审核管理")).toBeNull();
     expect(screen.queryByText("天生币管理")).toBeNull();
+  });
+
+  it.each([
+    ["words.access"],
+    ["sentences.access"],
+    ["speech.global_dubbing"]
+  ] as [string][])(
+    "音色库是可直接点击的一级菜单，目录权限为 %s",
+    async (permission) => {
+      setLevel("admin", [permission]);
+      renderAt("/voices");
+      const entry = screen.getByRole("menuitem", { name: /音色库/ });
+      expect(entry).toHaveClass("ant-menu-item-selected");
+      fireEvent.click(entry);
+      expect(mockNavigate).toHaveBeenCalledWith("/voices");
+      const { canVisitAdminRoute } = await import("@/lib/adminPageRoutes");
+      expect(
+        canVisitAdminRoute(useAuthStore.getState().profile, "/voices")
+      ).toBe(true);
+    }
+  );
+
+  it("没有目录权限时不展示音色库，直链也不放行", async () => {
+    setLevel("admin", ["speech.generate"]);
+    renderAt("/");
+    expect(screen.queryByText("音色库")).toBeNull();
+    const { canVisitAdminRoute } = await import("@/lib/adminPageRoutes");
+    expect(canVisitAdminRoute(useAuthStore.getState().profile, "/voices")).toBe(
+      false
+    );
   });
 
   it("super_admin 即便 permissions 为空也可见全部委派菜单", () => {

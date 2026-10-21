@@ -358,37 +358,39 @@ export function SentenceEditor({
     patch: Partial<RichTextVariantV3>,
     annotations?: SharedSentenceAnnotation[]
   ) => {
-    const next = structuredClone(content);
-    const target = next.sentence.en_text;
-    if (target.mode === "unified") Object.assign(target.common, patch);
-    else {
-      const targetSlot = target[row.dialect === "us" ? "us" : "uk"];
-      if (targetSlot.state === "ready")
-        Object.assign(targetSlot.variant, patch);
-    }
-    if (annotations)
-      next.annotations = [
-        ...next.annotations.filter(
-          (item) => item.source_dialect !== row.dialect
-        ),
-        ...annotations
-      ];
-    const nextRows = editableEnglishText(next.sentence.en_text);
-    next.annotations = next.annotations.filter((annotation) => {
-      const source = nextRows.find(
-        (item) => item.dialect === annotation.source_dialect
-      );
-      return (
-        source &&
-        annotation.source_segments.every(
-          (segment) =>
-            Array.from(source.text)
-              .slice(segment.start, segment.end)
-              .join("") === segment.surface
-        )
-      );
+    setContent((current) => {
+      const next = structuredClone(current);
+      const target = next.sentence.en_text;
+      if (target.mode === "unified") Object.assign(target.common, patch);
+      else {
+        const targetSlot = target[row.dialect === "us" ? "us" : "uk"];
+        if (targetSlot.state === "ready")
+          Object.assign(targetSlot.variant, patch);
+      }
+      if (annotations)
+        next.annotations = [
+          ...next.annotations.filter(
+            (item) => item.source_dialect !== row.dialect
+          ),
+          ...annotations
+        ];
+      const nextRows = editableEnglishText(next.sentence.en_text);
+      next.annotations = next.annotations.filter((annotation) => {
+        const source = nextRows.find(
+          (item) => item.dialect === annotation.source_dialect
+        );
+        return (
+          source &&
+          annotation.source_segments.every(
+            (segment) =>
+              Array.from(source.text)
+                .slice(segment.start, segment.end)
+                .join("") === segment.surface
+          )
+        );
+      });
+      return next;
     });
-    setContent(next);
   };
   return (
     <PronunciationPreviewProvider>

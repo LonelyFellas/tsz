@@ -10,17 +10,39 @@ import type {
 import { PronunciationPreviewProvider } from "../../word-creation/PronunciationPreview";
 import { V3SynthesisInputs } from "./V3SynthesisInputs";
 
-const speech = vi.hoisted(() => ({ synthesize: vi.fn() }));
+const speech = vi.hoisted(() => ({
+  synthesize: vi.fn(),
+  recommendations: vi.fn()
+}));
 vi.mock("@/lib/auth", () => ({ usePermission: () => true }));
 vi.mock("@/lib/env", () => ({ env: { VOICE_PREVIEW: true } }));
 vi.mock("@/features/settings/useDialectPreference", () => ({
   useDialectPreference: () => ({ preference: "us" })
 }));
 vi.mock("../../voice-editor/dataSource", () => ({
+  loadAdminVoiceRecommendations: speech.recommendations,
   adminVoicePreviewAdapter: {
     listVoices: async () => [
-      { id: "en-gb-sonia", locale: "en-GB", gender: "female", label: "Sonia" },
-      { id: "en-us-aria", locale: "en-US", gender: "female", label: "Aria" }
+      {
+        id: "en-gb-sonia",
+        locale: "en-GB",
+        gender: "female",
+        label: "Sonia",
+        styles: [],
+        supportsRate: true,
+        supportsPitch: true,
+        isDefault: true
+      },
+      {
+        id: "en-us-aria",
+        locale: "en-US",
+        gender: "female",
+        label: "Aria",
+        styles: [],
+        supportsRate: true,
+        supportsPitch: true,
+        isDefault: false
+      }
     ],
     synthesize: speech.synthesize
   },
@@ -29,6 +51,7 @@ vi.mock("../../voice-editor/dataSource", () => ({
 }));
 
 beforeEach(() => {
+  speech.recommendations.mockReset().mockResolvedValue([]);
   speech.synthesize.mockReset().mockResolvedValue({
     audioUrl: "/test-audio.mp3",
     expiresAt: new Date(Date.now() + 60000).toISOString(),
@@ -716,6 +739,25 @@ it("UPS 音素间空格不能被保存为英文词间停顿", async () => {
   fireEvent.mouseDown(screen.getByRole("dialog").querySelector(".tsz-ve-gap")!);
   expect(screen.getByText(/停顿只能设置在词间音标边界/)).toBeInTheDocument();
   expect(screen.getByLabelText(`完成${label}设置`)).toBeDisabled();
+});
+
+it("未配置的音素设置器采用首位推荐，完成时保存参数", async () => {
+  speech.recommendations.mockResolvedValue([
+    {
+      id: "r",
+      name: "慢读",
+      groupName: "发音",
+      locale: "en-GB",
+      setting: { voice_id: "en-gb-sonia", enabled: true, rate_percent: -25 }
+    }
+  ]);
+  render(<Harness dialect="uk" />);
+  const label = "第 1 条发音 英式 Azure IPA";
+  fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
+  await waitFor(() =>
+    expect(screen.getByLabelText("启用 Sonia")).toBeChecked()
+  );
+  expect(screen.getByLabelText("设置 Sonia 的语速")).toHaveTextContent("0.75");
 });
 
 it("四个 TTS 设置器提供音标编辑、停顿和音色，完成各自保存；取消不影响字段试听", async () => {

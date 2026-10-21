@@ -22,6 +22,7 @@ const state = vi.hoisted(() => ({
   },
   listVoices: vi.fn(),
   synthesize: vi.fn(),
+  recommendations: vi.fn(),
   upload: vi.fn(),
   resolveUrl: vi.fn()
 }));
@@ -32,6 +33,7 @@ vi.mock("@/lib/auth", async (importOriginal) => ({
 }));
 vi.mock("@/lib/env", () => ({ env: state.flags }));
 vi.mock("@/features/dictionary/voice-editor/dataSource", () => ({
+  loadAdminVoiceRecommendations: state.recommendations,
   adminVoicePreviewAdapter: {
     listVoices: state.listVoices,
     synthesize: state.synthesize
@@ -85,6 +87,7 @@ async function openAudioPanel() {
 
 beforeEach(() => {
   state.synthesize.mockReset();
+  state.recommendations.mockReset().mockResolvedValue([]);
   state.canUpload = true;
   state.flags.VOICE_EDITOR = true;
   state.flags.SENTENCE_FORMATTING = true;
@@ -105,6 +108,50 @@ beforeEach(() => {
   state.upload.mockReset();
   state.resolveUrl.mockReset();
 });
+
+it("先在折叠字段输入再打开编辑器，仍保留首次未配置状态", async () => {
+  state.flags.VOICE_PREVIEW = true;
+  state.recommendations.mockResolvedValue([
+    {
+      id: "r",
+      name: "慢读",
+      groupName: "词形",
+      locale: "en-GB",
+      setting: { voice_id: "sonia", enabled: true, rate_percent: -25 }
+    }
+  ]);
+  const onProfile = vi.fn();
+  function Host() {
+    const [value, setValue] = useState<RichTextV3>({
+      version: 2,
+      text: "",
+      annotations: []
+    });
+    return (
+      <V3VoiceTextField
+        mode="spelling"
+        value={value}
+        nodeId="new-word"
+        field="spelling"
+        ariaLabel="新拼写"
+        onChange={setValue}
+        onVoiceProfileChange={onProfile}
+      />
+    );
+  }
+  render(<Host />);
+  fireEvent.change(screen.getByLabelText("新拼写"), {
+    target: { value: "hello" }
+  });
+  fireEvent.click(screen.getByLabelText("打开新拼写编辑器"));
+  await waitFor(() =>
+    expect(screen.getByLabelText("启用 Sonia")).toBeChecked()
+  );
+  fireEvent.click(screen.getByLabelText("完成新拼写编辑"));
+  expect(onProfile).toHaveBeenCalledWith({
+    voices: [{ voice_id: "sonia", enabled: true, rate_percent: -25 }]
+  });
+}, 15000);
 
 it("未录入词形拼写可直接输入，并提供编辑器入口", () => {
   const onChange = vi.fn();

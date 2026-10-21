@@ -2473,6 +2473,23 @@ it("方言拆合携带独立拼写试听，统一编辑同步两侧且不静默�
     form.regional_variants.uk.spelling_speech
   );
   const ids = [form.regional_variants.uk.id, form.regional_variants.us.id];
+  for (const patch of [{ style: "cheerful" }, { pitch_semitones: 2 }]) {
+    const differentParameters = updateSpellingVoiceProfile(
+      split.value,
+      [ids[0]!],
+      {
+        voices: [
+          { voice_id: "sonia", enabled: true, rate_percent: 0, ...patch }
+        ]
+      }
+    );
+    expect(
+      normalizeGroupDialectRules(differentParameters, UUIDS.pos, UUIDS.group, {
+        spelling_mode: "unified",
+        phonetic_mode: "unified"
+      })
+    ).toEqual({ ok: false, reason: "spelling_marks_merge_required" });
+  }
   const unified = updateSpellingVoiceProfile(split.value, ids, { voices: [] });
   const merged = normalizeGroupDialectRules(unified, UUIDS.pos, UUIDS.group, {
     spelling_mode: "unified",
@@ -2512,6 +2529,24 @@ it("拼写试听比较兼容缺省空配置、音色顺序与字段顺序，保�
     }
   };
   expect(spellingSpeechEqual(left, right)).toBe(true);
+  expect(
+    spellingSpeechEqual(left, {
+      ...empty,
+      voice_profile: { voices: [{ ...sonia, style: "cheerful" }, guy] }
+    })
+  ).toBe(false);
+  expect(
+    spellingSpeechEqual(left, {
+      ...empty,
+      voice_profile: { voices: [{ ...sonia, pitch_semitones: 2 }, guy] }
+    })
+  ).toBe(false);
+  expect(
+    spellingSpeechEqual(left, {
+      ...empty,
+      voice_profile: { voices: [{ ...sonia, pitch_semitones: 0 }, guy] }
+    })
+  ).toBe(true);
   expect(
     spellingSpeechEqual(left, { ...empty, voice_profile: { voices: [sonia] } })
   ).toBe(false);

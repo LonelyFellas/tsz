@@ -34,6 +34,11 @@ export interface VoiceOption {
   supportsRate: boolean;
   supportsPitch: boolean;
   isDefault: boolean;
+  personalSettingsError?: string;
+  defaultSettings?: Pick<
+    VoiceSetting,
+    "rate_percent" | "pitch_semitones" | "style"
+  >;
   rateRange?: { min: number; max: number };
   pitchRange?: { min: number; max: number };
 }
@@ -77,6 +82,14 @@ export class VoicePreviewError extends Error {
     this.name = "VoicePreviewError";
   }
 }
+
+export type VoiceRecommendationArea =
+  "word" | "azure" | "grammar" | "meaning" | "example";
+export type LoadVoiceRecommendations = (input: {
+  area: VoiceRecommendationArea;
+  locale?: AudioAssetLocale;
+  signal?: AbortSignal;
+}) => Promise<VoiceRecommendation[]>;
 
 export interface VoicePreviewAdapter {
   listVoices(input: {
@@ -165,6 +178,16 @@ export interface VoiceSetting {
   voice_id: string;
   enabled: boolean;
   rate_percent: number;
+  pitch_semitones?: number;
+  style?: string;
+}
+
+export interface VoiceRecommendation {
+  id: string;
+  name: string;
+  locale: AudioAssetLocale;
+  groupName: string;
+  setting: VoiceSetting;
 }
 
 export interface VoiceProfile {
@@ -203,6 +226,10 @@ export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
   /** 无障碍名，同时用于区分同一页面上的多个编辑器。 */
   contextLabel?: string;
   previewAdapter?: VoicePreviewAdapter;
+  loadRecommendations?: LoadVoiceRecommendations;
+  recommendationArea?: VoiceRecommendationArea;
+  /** 宿主在首次创建时判断，避免折叠输入后打开编辑器丢失未配置状态。 */
+  autoRecommend?: boolean;
   /**
    * previewAdapter 是否是「假」适配器(不发请求、返回假音频)。宿主自己判断并告知，
    * 本包不读任何环境变量，保持对宿主环境无感。为 true 时编辑器内会标出「模拟」。

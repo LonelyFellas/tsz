@@ -7,6 +7,7 @@ import {
   ReadOutlined,
   ScheduleOutlined,
   SettingOutlined,
+  SoundOutlined,
   TeamOutlined,
   UserOutlined
 } from "@ant-design/icons";
@@ -187,6 +188,16 @@ function buildNav(profile: AdminProfile | null): MenuItem[] {
       .map((l) => ({ key: l.key, label: l.label, disabled: l.disabled }));
     if (children.length > 0) {
       items.push({ key: g.key, icon: g.icon, label: g.label, children });
+    }
+    if (
+      g.key === "grp-dict" &&
+      visible(pageLeaf(ADMIN_PAGE_ROUTES.voices, "音色库"))
+    ) {
+      items.push({
+        key: `/${ADMIN_PAGE_ROUTES.voices.path}`,
+        icon: <SoundOutlined />,
+        label: "音色库"
+      });
     }
   }
   return items;

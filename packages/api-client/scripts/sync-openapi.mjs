@@ -179,6 +179,9 @@ if (!spec?.paths) {
   throw new Error(`spec 无 paths 字段: ${source}`);
 }
 const contractSchemaNames = [
+  "VoiceLibraryItem",
+  "VoiceLibraryResponse",
+  "DubbingGroupsResponse",
   "AdminWordCreator",
   "LoginRewardRequest",
   "LoginRewardDay",
@@ -600,6 +603,7 @@ for (const [rawPath, item] of Object.entries(spec.paths)) {
     const operationKey = `${method} ${path}`;
     if (
       rawPath.startsWith(ADMIN_LEXICON_PREFIX) ||
+      rawPath.startsWith(`${API_PREFIX}/admin/speech/`) ||
       rawPath.startsWith(`${API_PREFIX}/me/learning-plans`) ||
       rawPath.startsWith(`${API_PREFIX}/me/account-deletion`) ||
       rawPath === `${API_PREFIX}/auth/account` ||

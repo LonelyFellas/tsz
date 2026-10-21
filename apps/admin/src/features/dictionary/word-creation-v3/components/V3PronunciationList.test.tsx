@@ -27,6 +27,7 @@ vi.mock("@/features/settings/useDialectPreference", () => ({
   useDialectPreference: () => ({ preference: accent.value })
 }));
 vi.mock("@/features/dictionary/voice-editor/dataSource", () => ({
+  loadAdminVoiceRecommendations: vi.fn().mockResolvedValue([]),
   adminVoicePreviewAdapter: {},
   adminAudioUploadAdapter: {},
   voicePreviewIsMock: false
