@@ -85,7 +85,10 @@ function PronunciationCell({
                       ariaLabelPrefix={`读法 ${index + 1}${dialect === "uk" ? "英式" : "美式"}`}
                       playbackOnly
                     />
-                    <span className="v3-overview-phonetic tsz-phonetics">
+                    <span
+                      className="v3-overview-phonetic tsz-phonetics"
+                      title={actualPron.text}
+                    >
                       {addSlashes ? "/" : null}
                       <RichTextReadOnly value={actualPron} emptyText="未填写" />
                       {addSlashes ? "/" : null}

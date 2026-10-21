@@ -47,6 +47,11 @@ test("词形总览按设计横排发音、音色与语速，窄屏只滚动表�
       }
     }
   }
+  const firstRegions = word.forms.contents[0]!.regional_variants;
+  if (firstRegions.mode !== "common")
+    throw new Error("Expected common variant");
+  firstRegions.common.pronunciations[1]!.actual_pron =
+    "ˌsuːpəkælɪfrædʒɪlɪstɪkˌekspiːælɪˈdəʊʃəs";
   const response = { word, retired_stable_nodes: [] };
   expect(validateRuntimeSchema("AdminWordDraftV3Envelope", response)).toEqual({
     valid: true
@@ -159,6 +164,19 @@ test("词形总览按设计横排发音、音色与语速，窄屏只滚动表�
   expect(
     await content.evaluate((node) => node.scrollWidth > node.clientWidth)
   ).toBe(true);
+  for (const reading of await overview
+    .locator(".v3-overview-pronunciation")
+    .all()) {
+    expect(
+      await reading.evaluate((node) => {
+        const phonetic = node.querySelector(".v3-overview-phonetic")!;
+        return (
+          phonetic.getBoundingClientRect().right <=
+          node.closest("td")!.getBoundingClientRect().right
+        );
+      })
+    ).toBe(true);
+  }
   await content.evaluate((node) => {
     node.scrollLeft = node.scrollWidth;
   });

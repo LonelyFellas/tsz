@@ -28,13 +28,26 @@
 .v3-overview-reading {
   display: flex;
   align-items: center;
+  min-width: 0;
   min-height: 32px;
 }
 .v3-overview-pronunciation {
   display: flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
+  width: 100%;
   white-space: nowrap;
+}
+.v3-overview-phonetic {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.v3-overview-phonetic .tsz-ve-readonly {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .v3-overview-phonetic,
 .v3-overview-phonetic .tsz-ve-readonly {
