@@ -35,6 +35,12 @@ import type {
   UserRegistrationRegion,
   AdminSpeechPreviewResponse,
   AdminSpeechVoiceListResponse,
+  AdminVoiceLibraryResponse,
+  AdminVoiceLibraryItem,
+  SaveAdminVoiceSettingsInput,
+  SaveAdminVoiceDescriptionInput,
+  AdminDubbingGroupsResponse,
+  SaveAdminDubbingGroupsInput,
   AudioAssetUrlResponse,
   ConfirmAudioAssetInput,
   ConfirmAudioAssetResponse,
@@ -297,7 +303,23 @@ export function createAdminEndpoints(http: HttpClient) {
       preview: (input: CreateAdminSpeechPreviewInput, signal?: AbortSignal) =>
         http.post<AdminSpeechPreviewResponse>("/speech/previews", input, {
           signal
-        })
+        }),
+      groups: (signal?: AbortSignal) =>
+        http.get<AdminDubbingGroupsResponse>("/speech/groups", { signal }),
+      saveGroups: (input: SaveAdminDubbingGroupsInput) =>
+        http.put<AdminDubbingGroupsResponse>("/speech/groups", input),
+      library: (signal?: AbortSignal) =>
+        http.get<AdminVoiceLibraryResponse>("/speech/library", { signal }),
+      saveSettings: (alias: string, input: SaveAdminVoiceSettingsInput) =>
+        http.put<AdminVoiceLibraryItem>(
+          `/speech/library/${encodeURIComponent(alias)}/personal`,
+          input
+        ),
+      saveDescription: (alias: string, input: SaveAdminVoiceDescriptionInput) =>
+        http.put<AdminVoiceLibraryItem>(
+          `/speech/library/${encodeURIComponent(alias)}/description`,
+          input
+        )
     },
     /**
      * 音频资产（真人录音）：OSS 预签名直传三步——申请许可 → 前端直传 → confirm 落库。

@@ -391,6 +391,8 @@ export interface VoiceSettingV3 {
   voice_id: string;
   enabled: boolean;
   rate_percent: number;
+  pitch_semitones?: number;
+  style?: string;
 }
 
 /** 未出现的音色默认不勾选、原速；voice_id 使用目录 alias。 */

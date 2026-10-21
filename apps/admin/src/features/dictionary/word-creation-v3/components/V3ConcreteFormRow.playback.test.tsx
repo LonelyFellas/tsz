@@ -19,6 +19,7 @@ vi.mock("@/lib/env", () => ({
   env: { VOICE_PREVIEW: true, VOICE_EDITOR: false }
 }));
 vi.mock("../../voice-editor/dataSource", () => ({
+  loadAdminVoiceRecommendations: vi.fn().mockResolvedValue([]),
   adminVoicePreviewAdapter: {
     listVoices: async () => [
       { id: "british-voice", locale: "en-GB" },

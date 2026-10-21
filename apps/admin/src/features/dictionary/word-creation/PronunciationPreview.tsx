@@ -315,12 +315,16 @@ export function PronunciationPreviewControls({
     () => content ?? { version: 2, text: spelling ?? "", annotations: [] },
     [content, spelling]
   );
+  const selectedSetting = voiceProfile?.voices.find(
+    (setting) => setting.voice_id === voice?.id
+  );
   const contentKey = JSON.stringify([
     previewContent,
     targetLocale,
     voice?.id,
-    voiceProfile?.voices.find((setting) => setting.voice_id === voice?.id)
-      ?.rate_percent ?? 0
+    selectedSetting?.rate_percent ?? 0,
+    selectedSetting?.pitch_semitones ?? 0,
+    selectedSetting?.style ?? ""
   ]);
   const text = previewContent.text.trim();
   const playLabel = ariaLabelPrefix
@@ -435,10 +439,11 @@ export function PronunciationPreviewControls({
           language: "en",
           content: previewContent,
           voiceId: voice.id,
-          ratePercent:
-            voiceProfile?.voices.find(
-              (setting) => setting.voice_id === voice.id
-            )?.rate_percent ?? 0
+          ratePercent: selectedSetting?.rate_percent ?? 0,
+          ...(selectedSetting?.pitch_semitones !== undefined
+            ? { pitchSemitones: selectedSetting.pitch_semitones }
+            : {}),
+          ...(selectedSetting?.style ? { style: selectedSetting.style } : {})
         },
         { signal: controller.signal }
       );

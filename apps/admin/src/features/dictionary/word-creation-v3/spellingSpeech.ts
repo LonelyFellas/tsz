@@ -28,7 +28,9 @@ export function spellingSpeechEqual(
         .map((voice) => ({
           voice_id: voice.voice_id,
           enabled: voice.enabled,
-          rate_percent: voice.rate_percent
+          rate_percent: voice.rate_percent,
+          pitch_semitones: voice.pitch_semitones ?? 0,
+          style: voice.style ?? ""
         }))
         .sort((a, b) => a.voice_id.localeCompare(b.voice_id))
     );

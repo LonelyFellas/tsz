@@ -25,6 +25,7 @@ import {
 import { env } from "@/lib/env";
 import {
   adminVoicePreviewAdapter,
+  loadAdminVoiceRecommendations,
   voicePreviewIsMock
 } from "../../voice-editor/dataSource";
 import { useContentEditPermissions } from "../../contentEditPermissions";
@@ -86,14 +87,13 @@ export function V3PhonemeSpeechSettings({
             : [];
         })
       },
-      voice_profile: speech?.voice_profile ??
-        fallbackVoiceProfile ?? { voices: [] },
+      voice_profile: speech?.voice_profile ?? fallbackVoiceProfile,
       ups_words: candidate.ups_words
     });
   };
   const [draft, setDraft] = useState<{
     content: RichTextV2;
-    voice_profile: VoiceProfileV3;
+    voice_profile: VoiceProfileV3 | undefined;
     ups_words: PronunciationSynthesisCandidateV3["ups_words"];
   }>(capture);
   const [source, setSource] = useState("");
@@ -131,7 +131,7 @@ export function V3PhonemeSpeechSettings({
             : [];
         })
       },
-      voice_profile: draft.voice_profile
+      voice_profile: draft.voice_profile ?? { voices: [] }
     }
   });
   const sourceKey = JSON.stringify([
@@ -208,6 +208,12 @@ export function V3PhonemeSpeechSettings({
             <VoiceEditor
               readOnly={!canEdit || source !== sourceKey}
               mode="phoneme-settings"
+              autoRecommend={
+                candidate[`${alphabet}_speech`]?.voice_profile == null &&
+                fallbackVoiceProfile == null
+              }
+              loadRecommendations={loadAdminVoiceRecommendations}
+              recommendationArea="azure"
               locale={locale}
               language="en"
               contextLabel={`${label}音标编辑`}

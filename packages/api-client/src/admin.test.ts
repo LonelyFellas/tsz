@@ -209,6 +209,27 @@ describe("createAdminEndpoints", () => {
 });
 
 describe("createAdminEndpoints — speech 试听", () => {
+  it("个人音色设置使用当前账号、版本号和编码后的 alias", () => {
+    const api = createAdminEndpoints(http);
+    const input = {
+      parameters: { rate_percent: -25, pitch_semitones: 0, style: null },
+      notes: "慢读",
+      base_revision: 2
+    };
+    api.speech.saveSettings("voice/alias", input);
+    expect(http.put).toHaveBeenCalledWith(
+      "/speech/library/voice%2Falias/personal",
+      input
+    );
+    api.speech.saveDescription("voice", {
+      description_zh: "中文介绍",
+      base_revision: 1
+    });
+    expect(http.put).toHaveBeenCalledWith("/speech/library/voice/description", {
+      description_zh: "中文介绍",
+      base_revision: 1
+    });
+  });
   it("voices → GET /speech/voices 带 AbortSignal", () => {
     const api = createAdminEndpoints(http);
     const controller = new AbortController();

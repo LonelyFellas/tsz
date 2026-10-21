@@ -1,10 +1,14 @@
 import type {
   AudioUploadAdapter,
-  VoicePreviewAdapter
+  VoicePreviewAdapter,
+  VoiceRecommendation,
+  LoadVoiceRecommendations
 } from "@tsz/voice-editor/types";
 import { hasAdminPermission, hasAnyAdminPermission } from "@tsz/shared/auth";
 import { api, useAuthStore } from "@/lib/auth";
 import { env } from "@/lib/env";
+import { queryClient } from "@/lib/queryClient";
+import { HttpError } from "@tsz/api-client";
 import { createAdminVoicePreviewAdapter } from "./adapter";
 import { createAdminAudioUploadAdapter } from "./audioUploadAdapter";
 
@@ -32,9 +36,76 @@ async function resolveAdapter(): Promise<VoicePreviewAdapter> {
   return mockAdapterPromise;
 }
 
+export const loadAdminVoiceRecommendations: LoadVoiceRecommendations = async ({
+  area,
+  locale,
+  signal
+}) => {
+  if (voicePreviewIsMock) return [];
+  signal?.throwIfAborted();
+  const actor = useAuthStore.getState().profile?.id;
+  const response = await queryClient.fetchQuery({
+    queryKey: ["admin-dubbing-groups", actor],
+    queryFn: ({ signal }) => api.speech.groups(signal),
+    staleTime: 60_000
+  });
+  signal?.throwIfAborted();
+  if (useAuthStore.getState().profile?.id !== actor) return [];
+  const group = response.groups.find((item) => item.areas.includes(area));
+  if (!group) return [];
+  return (["en-GB", "en-US"] as const)
+    .filter((value) => !locale || locale === value)
+    .flatMap((value) =>
+      group[value === "en-GB" ? "uk" : "us"].map(
+        (item): VoiceRecommendation => ({
+          id: item.id,
+          name: item.name,
+          locale: value,
+          groupName: group.name,
+          setting: {
+            voice_id: item.voice_alias,
+            enabled: true,
+            rate_percent: item.parameters.rate_percent,
+            pitch_semitones: item.parameters.pitch_semitones,
+            ...(item.parameters.style ? { style: item.parameters.style } : {})
+          }
+        })
+      )
+    );
+};
+
 export const adminVoicePreviewAdapter: VoicePreviewAdapter = {
   async listVoices(input) {
-    return (await resolveAdapter()).listVoices(input);
+    const voices = await (await resolveAdapter()).listVoices(input);
+    if (voicePreviewIsMock) return voices;
+    const actor = useAuthStore.getState().profile?.id;
+    const personal = await queryClient
+      .fetchQuery({
+        queryKey: ["admin-speech-library", actor],
+        queryFn: ({ signal }) => api.speech.library(signal),
+        staleTime: 60_000
+      })
+      .catch((error) => {
+        if (error instanceof HttpError && error.status === 404) return null;
+        throw error;
+      });
+    input.signal?.throwIfAborted();
+    if (useAuthStore.getState().profile?.id !== actor) return [];
+    return voices.map((voice) => {
+      const saved = personal?.items.find(
+        (item) => item.voice_alias === voice.id
+      )?.parameters;
+      return saved
+        ? {
+            ...voice,
+            defaultSettings: {
+              rate_percent: saved.rate_percent,
+              pitch_semitones: saved.pitch_semitones,
+              ...(saved.style ? { style: saved.style } : {})
+            }
+          }
+        : voice;
+    });
   },
   async synthesize(input, options) {
     if (!hasAdminPermission(useAuthStore.getState().profile, "speech.generate"))

@@ -66,6 +66,7 @@ export function V3LinkedEnglishTextField({
             value={variant.value}
             placeholder={placeholder}
             mode="association"
+            recommendationArea="meaning"
             dialect={row.dialect}
             leadingAction={
               <PronunciationPreviewControls

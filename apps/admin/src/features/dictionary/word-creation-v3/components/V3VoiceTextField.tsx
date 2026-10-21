@@ -38,6 +38,7 @@ import {
 import {
   adminAudioUploadAdapter,
   adminVoicePreviewAdapter,
+  loadAdminVoiceRecommendations,
   voicePreviewIsMock
 } from "@/features/dictionary/voice-editor/dataSource";
 import { env } from "@/lib/env";
@@ -72,6 +73,7 @@ export interface V3VoiceTextFieldProps<
   onDraftPendingChange?: (pending: boolean) => void;
   onAssociationPendingChange?: (pending: boolean) => void;
   mode?: VoiceEditorProps<TLink>["mode"];
+  recommendationArea?: VoiceEditorProps<TLink>["recommendationArea"];
   editingEnabled?: boolean;
   /** 独立正文编辑直接展示可输入文字的编辑器；其他字段仍使用输入框入口。 */
   presentation?: "field" | "editor";
@@ -120,6 +122,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   onDraftPendingChange,
   onAssociationPendingChange,
   mode,
+  recommendationArea,
   editingEnabled = true,
   presentation = "field",
   dialect,
@@ -160,6 +163,15 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   const [editing, setEditing] = useState(false);
   const [focused, setFocused] = useState(false);
   const [recorded, setRecorded] = useState(value.text.length > 0);
+  const initialVoiceState = useRef({
+    nodeId,
+    unconfigured: !value.text.trim() && voiceProfile == null
+  });
+  if (initialVoiceState.current.nodeId !== nodeId)
+    initialVoiceState.current = {
+      nodeId,
+      unconfigured: !value.text.trim() && voiceProfile == null
+    };
   useEffect(() => {
     if (!editing && !focused && !value.text) setRecorded(false);
   }, [editing, focused, value.text]);
@@ -533,6 +545,22 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             contentReadOnly={contentReadOnly}
             associationsReadOnly={associationsReadOnly}
             mode={mode}
+            autoRecommend={initialVoiceState.current.unconfigured}
+            loadRecommendations={loadAdminVoiceRecommendations}
+            recommendationArea={
+              recommendationArea ??
+              (mode === "spelling"
+                ? "word"
+                : mode === "grammar"
+                  ? "grammar"
+                  : mode === "association"
+                    ? "example"
+                    : mode === "synthesis"
+                      ? "azure"
+                      : mode === "actual-pron" || mode === "dict-phonetic"
+                        ? undefined
+                        : "meaning")
+            }
             textFormattingEnabled={env.SENTENCE_FORMATTING}
             locale={voiceLocale(dialect)}
             textLinks={editorState.textLinks}

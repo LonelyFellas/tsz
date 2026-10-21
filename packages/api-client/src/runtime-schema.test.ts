@@ -624,6 +624,40 @@ describe("wire format and collection boundaries", () => {
     });
   });
 
+  it("音色风格与音调可省略，提供时严格校验且不接受 null", () => {
+    const word = validFixture("AdminWordV3") as {
+      meanings: { sense_groups: unknown[] };
+    };
+    const setting: Record<string, unknown> = {
+      voice_id: "sonia",
+      enabled: true,
+      rate_percent: -25
+    };
+    word.meanings.sense_groups = [
+      {
+        id: UUID_V4,
+        name_en: "test",
+        name_zh: "测试",
+        voice_profile: { voices: [setting] }
+      }
+    ];
+    expect(validateRuntimeSchema("AdminWordV3", word)).toEqual({ valid: true });
+    setting.pitch_semitones = 2;
+    setting.style = "cheerful";
+    expect(validateRuntimeSchema("AdminWordV3", word)).toEqual({ valid: true });
+    for (const [field, value] of [
+      ["pitch_semitones", null],
+      ["pitch_semitones", 13],
+      ["style", null],
+      ["style", "x".repeat(65)]
+    ]) {
+      const before = setting[field as string];
+      setting[field as string] = value;
+      expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(false);
+      setting[field as string] = before;
+    }
+  });
+
   it("音色配置接受完整目录并保留 2000 项存储边界", () => {
     const word = validFixture("AdminWordV3") as {
       meanings: { pos: unknown[] };

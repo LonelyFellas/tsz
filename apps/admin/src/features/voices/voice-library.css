@@ -1,0 +1,46 @@
+.voice-library {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.voice-library-filters {
+  display: grid;
+  grid-template-columns:
+    minmax(200px, 2fr) repeat(3, minmax(120px, 1fr))
+    auto auto;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.voice-library-id {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.dubbing-recommendation {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--ant-color-border-secondary);
+}
+
+.voice-library-player audio {
+  width: 100%;
+}
+
+@media (max-width: 1200px) {
+  .voice-library-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .voice-library-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

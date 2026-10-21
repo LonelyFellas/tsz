@@ -16,11 +16,33 @@ import { SharedSentenceAssociationPicker } from "./SharedSentenceAssociationPick
 import { newSentence } from "./model";
 import { HttpError } from "@tsz/api-client";
 import { api } from "@/lib/auth";
+const speech = vi.hoisted(() => ({ preview: false, recommendations: vi.fn() }));
 vi.mock("@/lib/env", () => ({
-  env: { VOICE_EDITOR: true, VOICE_PREVIEW: false, VOICE_AUDIO_UPLOAD: false }
+  env: {
+    VOICE_EDITOR: true,
+    get VOICE_PREVIEW() {
+      return speech.preview;
+    },
+    VOICE_AUDIO_UPLOAD: false
+  }
 }));
 vi.mock("../dictionary/voice-editor/dataSource", () => ({
-  adminVoicePreviewAdapter: undefined,
+  loadAdminVoiceRecommendations: speech.recommendations,
+  adminVoicePreviewAdapter: {
+    listVoices: async () => [
+      {
+        id: "sonia",
+        label: "Sonia",
+        locale: "en-GB",
+        gender: "female",
+        styles: [],
+        supportsRate: true,
+        supportsPitch: true,
+        isDefault: true
+      }
+    ],
+    synthesize: vi.fn()
+  },
   adminAudioUploadAdapter: undefined,
   voicePreviewIsMock: false
 }));
@@ -110,6 +132,8 @@ beforeEach(() => {
     permissions: []
   };
   vi.resetAllMocks();
+  speech.preview = false;
+  speech.recommendations.mockResolvedValue([]);
   searchTargets.mockResolvedValue({
     matches: [sentenceCandidate("source", "make")],
     truncated: false
@@ -120,6 +144,50 @@ beforeEach(() => {
   });
 });
 describe("当前词条关联与离开保护", () => {
+  it("新例句输入与自动配音同批更新时正文和推荐均保存", async () => {
+    speech.preview = true;
+    speech.recommendations.mockResolvedValue([
+      {
+        id: "r",
+        name: "慢读",
+        groupName: "例句",
+        locale: "en-GB",
+        setting: { voice_id: "sonia", enabled: true, rate_percent: -25 }
+      }
+    ]);
+    const current = example();
+    if (current.content.sentence.en_text.mode === "unified")
+      current.content.sentence.en_text.common.value.text = "";
+    vi.mocked(api.sentences.update).mockImplementation(async (_id, input) => ({
+      ...current,
+      content: input.content,
+      revision: 4
+    }));
+    show(
+      <SentenceEditor sentence={current} onClose={vi.fn()} onSaved={vi.fn()} />
+    );
+    await screen.findByRole("combobox", { name: "分组推荐" });
+    fireEvent.change(screen.getByLabelText("例句正文"), {
+      target: { value: "A new sentence." }
+    });
+    await waitFor(() =>
+      expect(screen.getByLabelText("启用 Sonia")).toBeChecked()
+    );
+    expect(screen.getByLabelText("例句正文")).toHaveValue("A new sentence.");
+    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    await waitFor(() => expect(api.sentences.update).toHaveBeenCalled());
+    expect(
+      vi.mocked(api.sentences.update).mock.calls[0]![1].content.sentence.en_text
+    ).toMatchObject({
+      common: {
+        value: { text: "A new sentence." },
+        voice_profile: {
+          voices: [{ voice_id: "sonia", enabled: true, rate_percent: -25 }]
+        }
+      }
+    });
+  }, 15000);
+
   it("保存失败后保留例句录音，重试时提交同一音频资产", async () => {
     const current = example();
     const asset = {

@@ -27,16 +27,25 @@ export function adminAuthorizationIdentity(
 
 const MODULE_QUERY_ROOTS: Record<string, readonly string[]> = {
   coins: ["admin-coins"],
-  words: ["admin-words", "inbound-references"],
+  words: [
+    "admin-words",
+    "inbound-references",
+    "admin-speech-voices",
+    "admin-speech-library",
+    "admin-dubbing-groups"
+  ],
   sentences: [
     "shared-sentences",
     "sentence-publications",
-    "sentence-withdrawal-impact"
+    "sentence-withdrawal-impact",
+    "admin-speech-voices",
+    "admin-speech-library",
+    "admin-dubbing-groups"
   ],
   users: ["admin-users"],
   teacherapply: ["teacher-applications", "teacher-application"],
   lexicon_settings: ["part-of-speech-config"],
-  speech: ["admin-words"]
+  speech: ["admin-words", "admin-speech-library", "admin-dubbing-groups"]
 };
 
 /** 账号切换全清；失权仅清受影响模块，增权不清除当前编辑页及其查询。 */
