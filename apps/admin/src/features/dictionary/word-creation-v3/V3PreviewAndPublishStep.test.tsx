@@ -48,7 +48,7 @@ function word(
   publication: AdminWordV3["capabilities"]["publication"] = {
     mode: "native" as const
   }
-): AdminWordV3 {
+): import("@tsz/shared").ExpandedAdminWordV3 {
   return {
     schema_version: 3,
     id: "word-v3",

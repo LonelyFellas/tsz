@@ -1622,7 +1622,7 @@ describe("V3FormsAndPronunciationStep", () => {
 
     const confirm = openDeleteConfirm();
     expect(confirm).toHaveTextContent("确认删除此词形？");
-    expect(confirm).toHaveTextContent("词形的拼写与发音会一并删除。");
+    expect(confirm).toHaveTextContent("这是最后一个标签，词形内容会一并删除。");
     expect(confirm).not.toHaveTextContent(/孤立词形|membership|使用位置/);
     const deleteButton = screen.getByLabelText("删除词形及相关发音");
     expect(deleteButton).toHaveTextContent("删除词形");

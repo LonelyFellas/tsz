@@ -19,7 +19,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { formsFixture, ukUsFormFixture } from "./fixtures";
 import { V3PublicationHistory } from "./V3PublicationHistory";
 
-function v3Word(overrides: Partial<AdminWordV3> = {}): AdminWordV3 {
+function v3Word(
+  overrides: Partial<import("@tsz/shared").ExpandedAdminWordV3> = {}
+): import("@tsz/shared").ExpandedAdminWordV3 {
   return {
     schema_version: 3,
     id: "word-mixed",
@@ -79,8 +81,14 @@ function v2Publication(
 }
 
 function v3Publication(
-  overrides: Partial<AdminWordPublicationV3> = {}
-): AdminWordPublicationV3 {
+  overrides: Partial<
+    Omit<AdminWordPublicationV3, "word"> & {
+      word: import("@tsz/shared").ExpandedAdminWordV3;
+    }
+  > = {}
+): Omit<AdminWordPublicationV3, "word"> & {
+  word: import("@tsz/shared").ExpandedAdminWordV3;
+} {
   return {
     schema_version: 3,
     publication_id: "pub-v3",
@@ -154,7 +162,7 @@ function v2PublicationWithSnapshotBody(): AdminWordPublicationV3 {
   return v2Publication({ word });
 }
 
-function v3PublicationWithSnapshotBody(): AdminWordPublicationV3 {
+function v3PublicationWithSnapshotBody(): ReturnType<typeof v3Publication> {
   const word = v3Word({
     presentation: {
       label: "immutable-v3-detail",

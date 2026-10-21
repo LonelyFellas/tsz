@@ -1,5 +1,6 @@
 import type {
   Dialect,
+  FormsStepRepresentationV3,
   PersistedWordStep,
   V3DraftValidationIssue
 } from "@tsz/types";
@@ -8,6 +9,8 @@ export interface V3IssueNavigationTarget {
   step: PersistedWordStep;
   node_id: string;
   field: string;
+  content_id?: string;
+  content_slot_id?: string;
   ancestor_node_ids?: string[];
   pos_id?: string;
   form_group_id?: string;
@@ -37,7 +40,8 @@ export function v3IssueNavigationTarget(
   const node_id =
     issue.step === "meanings"
       ? issue.node_id
-      : (location.pronunciation_id ??
+      : (location.content_slot_id ??
+        location.pronunciation_id ??
         location.variant_id ??
         location.form_id ??
         location.membership_id ??
@@ -49,6 +53,10 @@ export function v3IssueNavigationTarget(
     node_id,
     field: issue.field === "spelling_rich" ? "spelling" : issue.field,
     ancestor_node_ids: [...location.ancestor_node_ids],
+    ...(location.content_id ? { content_id: location.content_id } : {}),
+    ...(location.content_slot_id
+      ? { content_slot_id: location.content_slot_id }
+      : {}),
     ...(location.pos_id ? { pos_id: location.pos_id } : {}),
     ...(location.form_group_id
       ? { form_group_id: location.form_group_id }
@@ -63,6 +71,44 @@ export function v3IssueNavigationTarget(
       ? { pronunciation_id: location.pronunciation_id }
       : {})
   };
+}
+
+export function resolveV3ContentIssueTarget(
+  target: V3IssueNavigationTarget,
+  forms: FormsStepRepresentationV3
+): V3IssueNavigationTarget {
+  if (
+    target.step !== "forms" ||
+    !target.content_id ||
+    !("forms_format" in forms)
+  )
+    return target;
+  const positions = forms.pos.filter(
+    (pos) => !target.pos_id || pos.pos_id === target.pos_id
+  );
+  for (const pos of positions) {
+    const binding = pos.forms.find(
+      (form) =>
+        form.content_id === target.content_id &&
+        (!target.form_id || form.id === target.form_id)
+    );
+    if (!binding) continue;
+    const group = pos.form_groups.find(
+      (group) =>
+        (!target.form_group_id || group.id === target.form_group_id) &&
+        group.members.some((member) => member.form_id === binding.id)
+    );
+    return {
+      ...target,
+      pos_id: pos.pos_id,
+      form_id: binding.id,
+      form_group_id: group?.id,
+      membership_id: group?.members.find(
+        (member) => member.form_id === binding.id
+      )?.id
+    };
+  }
+  return target;
 }
 
 /** Applies stateful containers outside-in, then delegates the exact DOM focus. */

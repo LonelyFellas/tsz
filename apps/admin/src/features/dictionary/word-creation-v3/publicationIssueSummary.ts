@@ -4,11 +4,16 @@ import type {
   V3DraftValidationIssue,
   V3ValidationIssueCode
 } from "@tsz/types";
+import { expandFormContents } from "@tsz/shared";
 import {
   formTypeLabel as fallbackFormTypeLabel,
   partOfSpeechLabel as fallbackPartOfSpeechLabel
 } from "./presentation";
 import { v3IssueMessage } from "./presentationErrors";
+import {
+  resolveV3ContentIssueTarget,
+  v3IssueNavigationTarget
+} from "./issueNavigation";
 
 const STEP_LABEL: Record<PersistedWordStep, string> = {
   basics: "创建词汇",
@@ -48,7 +53,9 @@ function formPosOwnsIssue(
   posId: string,
   nodeIds: ReadonlySet<string>
 ) {
-  const pos = word.forms.pos.find((candidate) => candidate.pos_id === posId);
+  const pos = expandFormContents(word.forms).pos.find(
+    (candidate) => candidate.pos_id === posId
+  );
   if (!pos) return false;
   if (nodeIds.has(pos.pos_id)) return true;
   if (
@@ -151,9 +158,13 @@ function positionForIssue(
   posLabel = fallbackPartOfSpeechLabel
 ): Omit<V3PublicationIssuePosition, "by_step" | "issues"> {
   const nodeIds = issueNodeIds(issue);
-  const pos = word.forms.pos.find(
+  const target = resolveV3ContentIssueTarget(
+    v3IssueNavigationTarget(issue),
+    word.forms
+  );
+  const pos = expandFormContents(word.forms).pos.find(
     (candidate) =>
-      candidate.pos_id === issue.node_location.pos_id ||
+      candidate.pos_id === target.pos_id ||
       formPosOwnsIssue(word, candidate.pos_id, nodeIds) ||
       meaningPosOwnsIssue(word, candidate.pos_id, nodeIds)
   );

@@ -56,6 +56,11 @@ const SPELLING_MARKUP_OPERATIONS: readonly string[] = [
   "post /admin/lexicon/entries/restore-batch"
 ];
 
+const FORM_CONTENTS_OPERATIONS = [
+  ...SPELLING_MARKUP_OPERATIONS,
+  "post /admin/lexicon/entries/{id}/steps/forms/impact"
+];
+
 const WORDLIST_ANNOTATION_OPERATIONS = [
   "get /wordlists/{id}/items",
   "get /me/wordlists/{id}/items",
@@ -773,7 +778,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "5e60fd77cb63ec5a4cb369e332035c399d1f6e5c454aa4aec2511c7397d586ec"
+      "066c1db9d4b103b33a7345a400e0f8f9347336af5d9adf522183640c874211fe"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1099,6 +1104,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
           ...new Set([
             ...IDEMPOTENT_LEXICON_OPERATIONS,
             ...SPELLING_MARKUP_OPERATIONS,
+            ...FORM_CONTENTS_OPERATIONS,
             ...SENTENCE_FORMATTING_OPERATIONS,
             ...WORDLIST_ANNOTATION_OPERATIONS,
             ...WORDLIST_CUSTOM_OPERATIONS
@@ -1110,6 +1116,16 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
               operation as (typeof IDEMPOTENT_LEXICON_OPERATIONS)[number]
             )
               ? [expectedHeader]
+              : []),
+            ...(FORM_CONTENTS_OPERATIONS.includes(operation)
+              ? [
+                  {
+                    name: "X-TSZ-Form-Contents",
+                    in: "header",
+                    required: false,
+                    schema: { type: ["string", "null"] }
+                  }
+                ]
               : []),
             ...(SPELLING_MARKUP_OPERATIONS.includes(operation)
               ? [

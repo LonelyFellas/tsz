@@ -1,3 +1,4 @@
+import { expandFormContents } from "@tsz/shared";
 import type {
   AdminWordV3,
   AdminWordStatus,
@@ -77,8 +78,8 @@ export function resolveDetectedBaseForm(
   candidate: DetectedBaseForm
 ): WordHeadwordsV2 | undefined {
   if (word.id !== candidate.entryId) return undefined;
-  const form = word.forms.pos
-    .flatMap((pos) => pos.forms)
+  const form = expandFormContents(word.forms)
+    .pos.flatMap((pos) => pos.forms)
     .find(
       (concreteForm) =>
         concreteForm.id === candidate.formId &&

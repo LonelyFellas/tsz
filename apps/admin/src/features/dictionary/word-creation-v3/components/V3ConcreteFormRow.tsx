@@ -60,6 +60,27 @@ function conflictLiterals(
   ];
 }
 
+function spellingReferences(
+  index: Parameters<typeof spellingConflictReferences>[0],
+  form: WordConcreteFormV3,
+  referenceForms: readonly WordConcreteFormV3[] | undefined,
+  dialects: readonly ("common" | "uk" | "us")[],
+  spelling: string
+) {
+  return (referenceForms ?? [form]).flatMap((binding) => {
+    const regions = binding.regional_variants;
+    const ids =
+      regions.mode === "common"
+        ? [regions.common.id]
+        : dialects.flatMap((side) =>
+            side === "common"
+              ? [regions.uk.id, regions.us.id]
+              : [regions[side].id]
+          );
+    return spellingConflictReferences(index, binding, ids, spelling);
+  });
+}
+
 function replaceForm(
   content: DraftFormsStepContentV3,
   replacement: WordConcreteFormV3
@@ -91,6 +112,8 @@ export interface V3ConcreteFormRowProps {
   idFactory: V3IdFactory;
   onChange: (next: DraftFormsStepContentV3) => void;
   showMatrixHeader?: boolean;
+  showRegularity?: boolean;
+  referenceForms?: readonly WordConcreteFormV3[];
   lastRow?: boolean;
   actions?: ReactNode;
   /** 类型下拉上方的引用徽标，占的是与右侧「词形拼写」标签对齐的那一行。 */
@@ -214,7 +237,8 @@ function SpellingRegularity({
   dialectRules,
   variant,
   label,
-  onChange
+  onChange,
+  visible = true
 }: {
   content: DraftFormsStepContentV3;
   form: WordConcreteFormV3;
@@ -222,9 +246,10 @@ function SpellingRegularity({
   variant: WordCommonFormVariantV3 | WordUkFormVariantV3 | WordUsFormVariantV3;
   label: string;
   onChange: (next: DraftFormsStepContentV3) => void;
+  visible?: boolean;
 }) {
   const name = useId();
-  if (!env.FORM_SPELLING_REGULARITY) return null;
+  if (!visible || !env.FORM_SPELLING_REGULARITY) return null;
   return (
     <Flex align="center" gap="small" className="v3-spelling-regularity">
       <Typography.Text>是否规则变化？</Typography.Text>
@@ -262,6 +287,8 @@ interface V3DialectFormCellProps {
   dialect: "uk" | "us";
   lastRow?: boolean;
   narrowGridRow?: number;
+  showRegularity?: boolean;
+  referenceForms?: readonly WordConcreteFormV3[];
 }
 
 function V3DialectFormCell({
@@ -274,16 +301,19 @@ function V3DialectFormCell({
   onChange,
   dialect,
   lastRow,
-  narrowGridRow
+  narrowGridRow,
+  showRegularity = true,
+  referenceForms
 }: V3DialectFormCellProps) {
   const referenceGuard = useV3ReferenceGuard();
   if (form.regional_variants.mode !== "uk_us") return null;
   const variant = form.regional_variants[dialect];
   const conflictLiteralList = conflictLiterals(
-    spellingConflictReferences(
+    spellingReferences(
       referenceGuard.index,
       form,
-      [variant.id],
+      referenceForms,
+      [dialect],
       variant.spelling
     )
   );
@@ -309,6 +339,7 @@ function V3DialectFormCell({
         <Flex align="center" justify="space-between" gap="small" wrap>
           <Typography.Text strong>{dialectLabel(dialect)}拼写</Typography.Text>
           <SpellingRegularity
+            visible={showRegularity}
             content={content}
             form={form}
             dialectRules={dialectRules}
@@ -388,6 +419,8 @@ export function V3ConcreteFormRow({
   idFactory,
   onChange,
   showMatrixHeader = true,
+  showRegularity = true,
+  referenceForms,
   lastRow = true,
   actions,
   referenceBadge
@@ -413,10 +446,11 @@ export function V3ConcreteFormRow({
     : [];
   const unifiedConflictLiterals = unifiedSpellingVariants
     ? conflictLiterals(
-        spellingConflictReferences(
+        spellingReferences(
           referenceGuard.index,
           form,
-          unifiedSpellingVariantIds,
+          referenceForms,
+          ["uk", "us"],
           unifiedSpellingVariants.uk.spelling
         )
       )
@@ -433,10 +467,11 @@ export function V3ConcreteFormRow({
     );
   const commonConflictLiterals = commonVariant
     ? conflictLiterals(
-        spellingConflictReferences(
+        spellingReferences(
           referenceGuard.index,
           form,
-          [commonVariant.id],
+          referenceForms,
+          ["common"],
           commonVariant.spelling
         )
       )
@@ -507,6 +542,7 @@ export function V3ConcreteFormRow({
               <Flex align="center" justify="space-between" gap="small" wrap>
                 <Typography.Text strong>词形拼写</Typography.Text>
                 <SpellingRegularity
+                  visible={showRegularity}
                   content={content}
                   form={form}
                   dialectRules={dialectRules}
@@ -583,6 +619,7 @@ export function V3ConcreteFormRow({
               <Flex align="center" justify="space-between" gap="small" wrap>
                 <Typography.Text strong>词形拼写</Typography.Text>
                 <SpellingRegularity
+                  visible={showRegularity}
                   content={content}
                   form={form}
                   dialectRules={dialectRules}
@@ -664,6 +701,8 @@ export function V3ConcreteFormRow({
               idFactory={idFactory}
               issues={issues}
               key={variant.id}
+              showRegularity={showRegularity}
+              referenceForms={referenceForms}
               lastRow={lastRow}
               onChange={onChange}
             />

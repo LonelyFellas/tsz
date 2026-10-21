@@ -42,6 +42,8 @@ function formMatchesDialectRules(
 }
 
 export interface V3PosTabProps {
+  sharedCounts?: ReadonlyMap<string, number>;
+  onEditContent?: (formId: string) => void;
   content: DraftFormsStepContentV3;
   pos: WordPosFormsV3;
   issues: readonly V3DraftValidationIssue[];
@@ -58,6 +60,8 @@ export interface V3PosTabProps {
 }
 
 export function V3PosTab({
+  sharedCounts,
+  onEditContent,
   content,
   pos,
   issues,
@@ -402,7 +406,9 @@ export function V3PosTab({
                 group
               )}
               deleteDisabled={deletingGroupRemovesLastForm(group.id)}
-              dialectControl={dialectControl(group)}
+              sharedCounts={sharedCounts}
+              onEditContent={onEditContent}
+              dialectControl={onEditContent ? undefined : dialectControl(group)}
               group={group}
               groupCount={visibleGroups.length}
               groupIndex={index}

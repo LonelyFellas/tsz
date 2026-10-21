@@ -1,3 +1,5 @@
+import { expandFormContents, isSharedForms } from "@tsz/shared";
+import { applyFormsStructure } from "@/features/dictionary/word-creation-v3/sharedFormsModel";
 import { changeVoiceText } from "@/features/dictionary/word-creation-v3/components/V3VoiceTextField.test-helper";
 import { wordKeys } from "@/features/dictionary/api";
 import {
@@ -14,11 +16,12 @@ import {
   within,
   act
 } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { App as AntApp, ConfigProvider } from "antd";
 import type {
   AdminWordPublicationV3,
   AdminWordV3,
   DraftMeaningsStepContentWritableV3,
+  SharedFormsStepContentV3,
   SurfaceMatchPageV3,
   V3DraftValidationIssue
 } from "@tsz/types";
@@ -91,8 +94,17 @@ function canonicalMeaningsFromWritable(
   };
 }
 
-function word(overrides: Partial<AdminWordV3> = {}): AdminWordV3 {
-  const forms = overrides.forms ?? formsFixture();
+function word(
+  overrides: Partial<AdminWordV3> = {}
+): AdminWordV3 & { forms: SharedFormsStepContentV3 } {
+  const source = overrides.forms ?? formsFixture();
+  const forms = isSharedForms(source)
+    ? source
+    : applyFormsStructure(
+        { forms_format: "shared_v1", contents: [], pos: [] },
+        source
+      );
+  if (!isSharedForms(forms)) throw new Error("expected shared fixture");
   return {
     schema_version: 3,
     id: WORD_ID,
@@ -109,20 +121,20 @@ function word(overrides: Partial<AdminWordV3> = {}): AdminWordV3 {
       matched_surfaces: ["centre"],
       strategy_version: "v3"
     },
-    capabilities: {
-      publication: {
-        mode: "native" as const
-      },
-      pronunciation_normalization_version: "nfkc_trim_lower_v1"
-    },
-    forms,
     meanings: overrides.meanings ?? cleanMeanings(forms.pos[0]?.pos_id),
     completed_steps: ["basics"],
     max_reachable_step: "forms",
     created_by: "019d2c55-1f9e-7f88-a189-a2b8a07153fc",
     created_at: "2026-08-25T00:00:00Z",
     updated_at: "2026-08-25T00:00:00Z",
-    ...overrides
+    ...overrides,
+    forms,
+    capabilities: {
+      shared_form_contents: true,
+      publication: { mode: "native" },
+      pronunciation_normalization_version: "nfkc_trim_lower_v1",
+      ...overrides.capabilities
+    }
   };
 }
 
@@ -228,15 +240,63 @@ function renderPage(
   );
   render(
     <QueryClientProvider client={client}>
-      <AntApp>
-        <RouterProvider router={router} />
-      </AntApp>
+      <ConfigProvider theme={{ token: { motion: false } }}>
+        <AntApp>
+          <RouterProvider router={router} />
+        </AntApp>
+      </ConfigProvider>
     </QueryClientProvider>
   );
   return router;
 }
 
+async function contentEditButton(formId = UUIDS.form) {
+  return waitFor(() => {
+    const button = document.querySelector<HTMLButtonElement>(
+      `[data-v3-open-content="${formId}"]`
+    );
+    expect(button).not.toBeNull();
+    return button!;
+  });
+}
+
+async function openContentEditor(formId = UUIDS.form) {
+  fireEvent.click(await contentEditButton(formId));
+  return screen.findByLabelText("词形英美通用拼写");
+}
+
+function confirmContentEditor() {
+  fireEvent.click(screen.getByText("确认，应用到草稿").closest("button")!);
+}
+
+async function editContentSpelling(value: string) {
+  await changeVoiceText(await openContentEditor(), { target: { value } });
+  confirmContentEditor();
+}
+
 describe("WordWizardV3Page", () => {
+  it.each([true, undefined])(
+    "展开响应不能因能力位为 %s 而进入编辑",
+    async (capability) => {
+      const current: AdminWordV3 = { ...word(), forms: formsFixture() };
+      if (capability === undefined) {
+        delete current.capabilities.shared_form_contents;
+      } else {
+        current.capabilities.shared_form_contents = capability;
+      }
+      const endpoints = source({ word: current, retired_stable_nodes: [] });
+      renderPage(
+        `/words/${WORD_ID}/v3/wizard/forms`,
+        createV3WordRequests(endpoints)
+      );
+      expect(await screen.findByText("词形编辑暂不可用")).toBeVisible();
+      expect(screen.queryByText("保存草稿")).not.toBeInTheDocument();
+      expect(document.querySelector("[data-v3-open-content]")).toBeNull();
+      expect(endpoints.previewFormsImpactV3).not.toHaveBeenCalled();
+      expect(endpoints.saveFormsStepV3).not.toHaveBeenCalled();
+    }
+  );
+
   it("来源节点已移除时明确提示，并在步骤重定向后保留定位参数", async () => {
     const endpoints = source({ word: word(), retired_stable_nodes: [] });
     const router = renderPage(
@@ -260,8 +320,82 @@ describe("WordWizardV3Page", () => {
       `/words/${WORD_ID}/v3/wizard/forms?focus_node=${current.forms.pos[0]!.pos_id}`,
       createV3WordRequests(endpoints)
     );
-    await screen.findByLabelText("原形英美通用拼写");
+    await contentEditButton();
     expect(screen.queryByText("未找到关联来源内容")).not.toBeInTheDocument();
+  });
+
+  it("共享正文确认后才进入页面草稿，影响与保存期间禁止再次编辑", async () => {
+    const initial = word();
+    const current: AdminWordV3 = {
+      ...initial,
+      forms: initial.forms
+    };
+    const endpoints = source({ word: current, retired_stable_nodes: [] });
+    let finishImpact!: (
+      value: Awaited<ReturnType<V3WordsApi["previewFormsImpactV3"]>>
+    ) => void;
+    let finishSave!: (
+      value: Awaited<ReturnType<V3WordsApi["saveFormsStepV3"]>>
+    ) => void;
+    vi.mocked(endpoints.previewFormsImpactV3).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishImpact = resolve;
+        })
+    );
+    vi.mocked(endpoints.saveFormsStepV3).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishSave = resolve;
+        })
+    );
+    renderPage(
+      `/words/${WORD_ID}/v3/wizard/forms`,
+      createV3WordRequests(endpoints)
+    );
+    // 限定业务入口，避免对整张 AntD 表格计算可访问名。
+    const edit = await waitFor(() => {
+      const button = document.querySelector<HTMLButtonElement>(
+        `[data-v3-open-content="${initial.forms.pos[0]!.forms[0]!.id}"]`
+      );
+      expect(button).not.toBeNull();
+      return button!;
+    });
+    fireEvent.click(edit);
+    const input = await screen.findByLabelText("词形英美通用拼写");
+    await changeVoiceText(input, { target: { value: "shared edited" } });
+    expect(endpoints.previewFormsImpactV3).not.toHaveBeenCalled();
+    expect(endpoints.saveFormsStepV3).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("确认，应用到草稿").closest("button")!);
+    const save = screen.getByText("保存草稿").closest("button")!;
+    fireEvent.click(save);
+    await waitFor(() =>
+      expect(endpoints.previewFormsImpactV3).toHaveBeenCalledOnce()
+    );
+    expect(edit).toBeDisabled();
+    expect(screen.getByText("进入词义与例句").closest("button")).toBeDisabled();
+    await act(async () =>
+      finishImpact({
+        schema_version: 3,
+        base_revision: 1,
+        requires_confirmation: false,
+        affected: []
+      })
+    );
+    await waitFor(() =>
+      expect(endpoints.saveFormsStepV3).toHaveBeenCalledOnce()
+    );
+    expect(edit).toBeDisabled();
+    const payload = vi.mocked(endpoints.saveFormsStepV3).mock.calls[0]![1]
+      .content;
+    expect(JSON.stringify(payload)).toContain("shared edited");
+    expect(payload).toHaveProperty("forms_format", "shared_v1");
+    await act(async () =>
+      finishSave({ word: { ...current, revision: 2, forms: payload } })
+    );
+    await waitFor(() => expect(edit).toBeEnabled());
+    expect(save).toBeDisabled();
+    expect(screen.getAllByText("shared edited").length).toBeGreaterThan(0);
   });
 
   it.each(["forms", "meanings"])(
@@ -273,15 +407,20 @@ describe("WordWizardV3Page", () => {
         `/words/${WORD_ID}/v3/wizard/${step}`,
         createV3WordRequests(endpoints)
       );
-      const input = await screen.findByLabelText(
-        step === "forms" ? "原形英美通用拼写" : "语义区间 1 中文"
-      );
+      const input =
+        step === "forms"
+          ? await openContentEditor()
+          : await screen.findByLabelText("语义区间 1 中文");
       const save = screen.getByText("保存草稿").closest("button")!;
       const original = (input as HTMLInputElement).value;
       expect(save).toBeDisabled();
       await changeVoiceText(input, { target: { value: "edited" } });
+      if (step === "forms") confirmContentEditor();
       expect(save).toBeEnabled();
-      await changeVoiceText(input, { target: { value: original } });
+      const restoredInput =
+        step === "forms" ? await openContentEditor() : input;
+      await changeVoiceText(restoredInput, { target: { value: original } });
+      if (step === "forms") confirmContentEditor();
       expect(save).toBeDisabled();
       expect(endpoints.saveFormsStepV3).not.toHaveBeenCalled();
       expect(endpoints.saveMeaningsStepV3).not.toHaveBeenCalled();
@@ -314,12 +453,14 @@ describe("WordWizardV3Page", () => {
         `/words/${WORD_ID}/v3/wizard/${step}`,
         createV3WordRequests(endpoints)
       );
-      const input = await screen.findByLabelText(
-        step === "forms" ? "原形英美通用拼写" : "语义区间 1 中文"
-      );
+      const input =
+        step === "forms"
+          ? await openContentEditor()
+          : await screen.findByLabelText("语义区间 1 中文");
       const save = screen.getByText("保存草稿").closest("button")!;
       expect(save).toBeDisabled();
       await changeVoiceText(input, { target: { value: "edited" } });
+      if (step === "forms") confirmContentEditor();
       expect(save).toBeEnabled();
       fireEvent.click(save);
       const request =
@@ -331,7 +472,9 @@ describe("WordWizardV3Page", () => {
       fireEvent.click(save);
       await waitFor(() => expect(request).toHaveBeenCalledTimes(2));
       await waitFor(() => expect(save).toBeDisabled());
-      expect(input).toHaveValue("edited");
+      expect(step === "forms" ? await openContentEditor() : input).toHaveValue(
+        "edited"
+      );
     }
   );
 
@@ -754,13 +897,11 @@ describe("WordWizardV3Page", () => {
     );
 
     const editedForms = structuredClone(current.forms);
-    const firstVariant = editedForms.pos[0]!.forms[0]!.regional_variants;
+    const firstVariant = editedForms.contents[0]!.regional_variants;
     if (firstVariant.mode !== "common")
       throw new Error("expected common fixture");
     firstVariant.common.spelling = "centre-edited";
-    await changeVoiceText(await screen.findByLabelText("原形英美通用拼写"), {
-      target: { value: "centre-edited" }
-    });
+    await editContentSpelling("centre-edited");
     fireEvent.click(await screen.findByText("保存草稿"));
 
     await waitFor(() =>
@@ -828,13 +969,11 @@ describe("WordWizardV3Page", () => {
     );
 
     const editedForms = structuredClone(current.forms);
-    const firstVariant = editedForms.pos[0]!.forms[0]!.regional_variants;
+    const firstVariant = editedForms.contents[0]!.regional_variants;
     if (firstVariant.mode !== "common")
       throw new Error("expected common fixture");
     firstVariant.common.spelling = "centre-edited";
-    await changeVoiceText(await screen.findByLabelText("原形英美通用拼写"), {
-      target: { value: "centre-edited" }
-    });
+    await editContentSpelling("centre-edited");
     fireEvent.click(await screen.findByText("保存草稿"));
 
     await waitFor(() =>
@@ -866,9 +1005,9 @@ describe("WordWizardV3Page", () => {
     const pos = current.forms.pos[0]!;
     const base = pos.forms[0]!;
     const variantId =
-      base.regional_variants.mode === "common"
-        ? base.regional_variants.common.id
-        : base.regional_variants.uk.id;
+      base.regional_bindings.mode === "common"
+        ? base.regional_bindings.common.id
+        : base.regional_bindings.uk.id;
     const reference = {
       id: "shared_sentence:annotation-1",
       kind: "shared_sentence" as const,
@@ -924,10 +1063,14 @@ describe("WordWizardV3Page", () => {
       0
     );
     // TASK#58：被引用不再锁英美结构开关（引用按语义坐标重解析）。
-    expect(screen.getByLabelText("英美拼写有区别")).not.toBeDisabled();
-    await changeVoiceText(await screen.findByLabelText("原形英美通用拼写"), {
-      target: { value: "center" }
-    });
+    const spelling = await openContentEditor();
+    expect(
+      document.querySelector(
+        '.v3-content-modal .ant-radio-group input[value="distinguish"]'
+      )
+    ).not.toBeDisabled();
+    await changeVoiceText(spelling, { target: { value: "center" } });
+    confirmContentEditor();
     expect(screen.getByText("保存草稿").closest("button")).toBeEnabled();
     expect(
       screen.getByText("修改后的拼写与关联内容不一致，处理后才能发布")
@@ -945,9 +1088,8 @@ describe("WordWizardV3Page", () => {
       base_revision: 1,
       intent: "save",
       content: {
-        pos: [
-          { forms: [{ regional_variants: { common: { spelling: "center" } } }] }
-        ]
+        forms_format: "shared_v1",
+        contents: [{ regional_variants: { common: { spelling: "center" } } }]
       }
     });
   });
@@ -991,9 +1133,9 @@ describe("WordWizardV3Page", () => {
     const pos = current.forms.pos[0]!;
     const base = pos.forms[0]!;
     const variantId =
-      base.regional_variants.mode === "common"
-        ? base.regional_variants.common.id
-        : base.regional_variants.uk.id;
+      base.regional_bindings.mode === "common"
+        ? base.regional_bindings.common.id
+        : base.regional_bindings.uk.id;
     const endpoints = source({ word: current, retired_stable_nodes: [] });
     vi.mocked(endpoints.inboundReferencesV3).mockResolvedValue({
       entry_id: WORD_ID,
@@ -1035,6 +1177,7 @@ describe("WordWizardV3Page", () => {
     expect(
       await screen.findByText("存在 1 处关联失效，处理后才能发布")
     ).toBeInTheDocument();
+    await openContentEditor();
     // 输入框旁的即时标红照常；顶部只是不再多出一条列同一引用的红条。
     expect(
       screen.getByText(/与关联内容中的文字“center”不一致/)
@@ -1049,9 +1192,10 @@ describe("WordWizardV3Page", () => {
       screen.getByText("保存草稿").closest(".v3-disabled-reason")
     ).toBeNull();
     // 有改动、拼写仍与失效片段对不上：旧冲突不挡，保存照样可点。
-    await changeVoiceText(screen.getByLabelText("原形英美通用拼写"), {
+    await changeVoiceText(screen.getByLabelText("词形英美通用拼写"), {
       target: { value: "centres" }
     });
+    confirmContentEditor();
     expect(screen.getByText("保存草稿").closest("button")).not.toBeDisabled();
   });
 
@@ -1069,9 +1213,7 @@ describe("WordWizardV3Page", () => {
       createV3WordRequests(endpoints)
     );
     expect(await screen.findByText("暂时无法查看关联信息")).toBeInTheDocument();
-    await changeVoiceText(await screen.findByLabelText("原形英美通用拼写"), {
-      target: { value: "centre-edited" }
-    });
+    await editContentSpelling("centre-edited");
     fireEvent.click(screen.getByText("保存草稿"));
     await waitFor(() =>
       expect(endpoints.saveFormsStepV3).toHaveBeenCalledTimes(1)
@@ -1171,9 +1313,7 @@ describe("WordWizardV3Page", () => {
       createV3WordRequests(endpoints)
     );
 
-    await changeVoiceText(await screen.findByLabelText("原形英美通用拼写"), {
-      target: { value: "center-unsaved" }
-    });
+    await editContentSpelling("center-unsaved");
     fireEvent.click(screen.getByText("进入词义与例句"));
     expect(await screen.findByLabelText("语义区间 1 中文")).toHaveValue("");
 
@@ -1183,9 +1323,7 @@ describe("WordWizardV3Page", () => {
     if (!formsStep) throw new Error("forms step navigation not found");
     fireEvent.click(formsStep);
 
-    expect(await screen.findByLabelText("原形英美通用拼写")).toHaveValue(
-      "center-unsaved"
-    );
+    expect(await openContentEditor()).toHaveValue("center-unsaved");
     expect(endpoints.previewFormsImpactV3).not.toHaveBeenCalled();
     expect(endpoints.saveFormsStepV3).not.toHaveBeenCalled();
   }, 10_000);
@@ -1223,19 +1361,15 @@ describe("WordWizardV3Page", () => {
     );
 
     const editedForms = structuredClone(current.forms);
-    const firstVariant = editedForms.pos[0]!.forms[0]!.regional_variants;
+    const firstVariant = editedForms.contents[0]!.regional_variants;
     if (firstVariant.mode !== "common")
       throw new Error("expected common fixture");
     firstVariant.common.spelling = "centre-edited";
-    await changeVoiceText(await screen.findByLabelText("原形英美通用拼写"), {
-      target: { value: "centre-edited" }
-    });
+    await editContentSpelling("centre-edited");
     fireEvent.click(await screen.findByText("保存草稿"));
     expect(await screen.findByText("确认影响并保存草稿")).toBeInTheDocument();
 
-    await changeVoiceText(screen.getByLabelText(`原形英美通用拼写`), {
-      target: { value: "center-updated" }
-    });
+    await editContentSpelling("center-updated");
     await waitFor(() =>
       expect(screen.queryByText("确认影响并保存草稿")).toBeNull()
     );
@@ -1245,10 +1379,10 @@ describe("WordWizardV3Page", () => {
       expect(endpoints.saveFormsStepV3).toHaveBeenCalledTimes(1)
     );
     const request = vi.mocked(endpoints.saveFormsStepV3).mock.calls[0]![1];
+    const variants = expandFormContents(request.content).pos[0]!.forms[0]!
+      .regional_variants;
     expect(
-      request.content.pos[0]!.forms[0]!.regional_variants.mode === "common"
-        ? request.content.pos[0]!.forms[0]!.regional_variants.common.spelling
-        : undefined
+      variants.mode === "common" ? variants.common.spelling : undefined
     ).toBe("center-updated");
     expect(request).not.toHaveProperty("confirmed_impact_token");
     expect(request).not.toHaveProperty("confirmed_surface_match_token");
@@ -1345,17 +1479,14 @@ describe("WordWizardV3Page", () => {
       createV3WordRequests(endpoints)
     );
 
-    await changeVoiceText(await screen.findByLabelText(`原形英美通用拼写`), {
-      target: { value: "centre-local-draft" }
-    });
+    await editContentSpelling("centre-local-draft");
     fireEvent.click(screen.getByText("词义与例句"));
     expect(
       await screen.findByText("添加语义区间", { exact: true })
     ).toBeInTheDocument();
     fireEvent.click(screen.getByText("词形与发音"));
-    expect(await screen.findByLabelText(`原形英美通用拼写`)).toHaveValue(
-      "centre-local-draft"
-    );
+    expect(await openContentEditor()).toHaveValue("centre-local-draft");
+    confirmContentEditor();
 
     fireEvent.click(screen.getByText("预览并生效"));
 
@@ -1406,9 +1537,7 @@ describe("WordWizardV3Page", () => {
     const groupName = await screen.findByLabelText("语义区间 1 中文");
     fireEvent.change(groupName, { target: { value: "本地释义组" } });
     fireEvent.click(screen.getByText("词形与发音"));
-    expect(
-      await screen.findByLabelText(`原形英美通用拼写`)
-    ).toBeInTheDocument();
+    expect(await contentEditButton()).toBeInTheDocument();
     fireEvent.click(screen.getByText("词义与例句"));
     expect(await screen.findByLabelText("语义区间 1 中文")).toHaveValue(
       "本地释义组"
@@ -1458,7 +1587,7 @@ describe("WordWizardV3Page", () => {
       target: { value: "从词形步骤保存的词义" }
     });
     fireEvent.click(screen.getByText("词形与发音"));
-    await screen.findByLabelText("原形英美通用拼写");
+    await contentEditButton();
     expect(screen.getByText("有未保存的草稿")).toBeVisible();
     const save = screen.getByText("保存草稿").closest("button")!;
     expect(save).toBeEnabled();
@@ -1534,9 +1663,7 @@ describe("WordWizardV3Page", () => {
         target: { value: "词形保存后仍保留" }
       });
       fireEvent.click(screen.getByText("词形与发音"));
-      await changeVoiceText(await screen.findByLabelText(`原形英美通用拼写`), {
-        target: { value: "centre-forms-saved" }
-      });
+      await editContentSpelling("centre-forms-saved");
       const save = screen.getByText("保存草稿").closest("button")!;
       fireEvent.click(save);
       if (failedStep) {
@@ -1598,9 +1725,7 @@ describe("WordWizardV3Page", () => {
       createV3WordRequests(endpoints)
     );
 
-    await changeVoiceText(await screen.findByLabelText(`原形英美通用拼写`), {
-      target: { value: "centre-unsaved-forms" }
-    });
+    await editContentSpelling("centre-unsaved-forms");
     fireEvent.click(screen.getByText("词义与例句"));
     fireEvent.click(
       (await screen.findByText("添加语义区间")).closest("button")!
@@ -1621,9 +1746,7 @@ describe("WordWizardV3Page", () => {
       vi.mocked(endpoints.saveMeaningsStepV3).mock.calls[0]![1].base_revision
     ).toBe(2);
     fireEvent.click(screen.getByText("词形与发音"));
-    expect(await screen.findByLabelText(`原形英美通用拼写`)).toHaveValue(
-      "centre-unsaved-forms"
-    );
+    expect(await openContentEditor()).toHaveValue("centre-unsaved-forms");
     expect(screen.queryByText("有未保存的草稿")).toBeNull();
   });
 
@@ -1735,7 +1858,7 @@ describe("WordWizardV3Page", () => {
       `/words/${WORD_ID}/v3/wizard/forms`,
       createV3WordRequests(endpoints)
     );
-    await screen.findByLabelText("原形英美通用拼写");
+    await contentEditButton();
     fireEvent.click(await screen.findByLabelText("查看第 1 次发布"));
     const detail = within(await screen.findByTestId("publication-detail"));
     fireEvent.click(
@@ -1750,7 +1873,7 @@ describe("WordWizardV3Page", () => {
     await waitFor(() =>
       expect(screen.queryByTestId("publication-detail")).not.toBeInTheDocument()
     );
-    expect(await screen.findByLabelText("原形英美通用拼写")).toBeEnabled();
+    expect(await contentEditButton()).toBeEnabled();
     expect(endpoints.validateV3).not.toHaveBeenCalled();
     expect(endpoints.publishV3).not.toHaveBeenCalled();
   });
@@ -1782,12 +1905,14 @@ describe("WordWizardV3Page", () => {
           undefined,
           client
         );
-        const input = await screen.findByLabelText(
-          step === "forms" ? "原形英美通用拼写" : "语义区间 1 中文"
-        );
+        const input =
+          step === "forms"
+            ? await openContentEditor()
+            : await screen.findByLabelText("语义区间 1 中文");
         await changeVoiceText(input, {
           target: { value: "unsaved-before-revoke" }
         });
+        if (step === "forms") confirmContentEditor();
         let finishRefresh!: (value: {
           word: AdminWordV3;
           retired_stable_nodes: [];
@@ -1907,12 +2032,18 @@ describe("WordWizardV3Page", () => {
     await waitFor(() =>
       expect(screen.queryByTestId("publication-detail")).not.toBeInTheDocument()
     );
-    await screen.findByLabelText("原形英美通用拼写");
-    fireEvent.click(screen.getByLabelText("英美拼写有区别"));
+    await contentEditButton();
+    await openContentEditor();
+    const spellingRules = document.querySelector(
+      ".v3-content-modal .ant-radio-group"
+    )!;
+    fireEvent.click(spellingRules.querySelector('input[value="distinguish"]')!);
+    confirmContentEditor();
     fireEvent.click(screen.getByText("保存草稿").closest("button")!);
     await waitFor(() => expect(endpoints.saveFormsStepV3).toHaveBeenCalled());
-    const saved = vi.mocked(endpoints.saveFormsStepV3).mock.calls[0]![1].content
-      .pos[0]!.forms[0]!.regional_variants;
+    const saved = expandFormContents(
+      vi.mocked(endpoints.saveFormsStepV3).mock.calls[0]![1].content
+    ).pos[0]!.forms[0]!.regional_variants;
     expect(saved).toMatchObject({
       mode: "uk_us",
       uk: { id: UUIDS.uk_variant },
@@ -2007,9 +2138,7 @@ describe("WordWizardV3Page", () => {
         .getAllByText("词形与发音")
         .find((element) => element.closest(".ant-steps-item"))!
     );
-    expect(await screen.findByLabelText("原形英美通用拼写")).toHaveValue(
-      "restored-canonical"
-    );
+    expect(await openContentEditor()).toHaveValue("restored-canonical");
   });
 
   it("refreshes after an activation conflict, clears preview confirmation state, and uses the latest base revisions", async () => {
@@ -2598,10 +2727,13 @@ describe("WordWizardV3Page", () => {
     );
     expect(await screen.findByText("仍有内容需要完成")).toBeVisible();
     fireEvent.click(screen.getByText("词形与发音"));
+    await openContentEditor();
 
     const input = await screen.findByLabelText("第 1 条发音的字典音标");
     expect(input).toHaveAttribute("aria-invalid", "true");
-    expect(screen.getByText("请填写字典音标")).toBeVisible();
+    await waitFor(() =>
+      expect(screen.getByText("请填写字典音标")).toBeVisible()
+    );
   });
 
   it("retains a dirty meanings draft and save gate after a failed save", async () => {

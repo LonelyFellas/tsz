@@ -1,6 +1,6 @@
 import { useAuthStore } from "@/lib/auth";
 import { canAdminResourceAction } from "@tsz/shared/auth";
-import { pronunciationSynthesisLabel } from "@tsz/shared";
+import { expandFormContents, pronunciationSynthesisLabel } from "@tsz/shared";
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
 import { HttpError, RequestTimeoutError } from "@tsz/api-client";
@@ -61,6 +61,7 @@ interface RecoveryState {
 
 interface Props {
   restoreBlockedByUnsavedChanges?: boolean;
+  restoreBlockedReason?: string;
   currentWord: AdminWordV3;
   requests?: PublicationRequests;
   onRestored: (draft: AdminWordDraftV3Envelope) => void;
@@ -165,7 +166,7 @@ function snapshotBody(publication: AdminWordPublicationAny): {
     publication.word.forms.pos.map((pos) => [pos.pos_id, pos.pos])
   );
   return {
-    forms: publication.word.forms.pos.flatMap((pos) =>
+    forms: expandFormContents(publication.word.forms).pos.flatMap((pos) =>
       pos.forms.flatMap((form) => {
         const variants =
           form.regional_variants.mode === "common"
@@ -533,6 +534,7 @@ function activationErrorMessage(error: unknown): string {
 
 export function V3PublicationHistory({
   restoreBlockedByUnsavedChanges = false,
+  restoreBlockedReason,
   currentWord,
   requests = defaultRequests,
   onRestored,
@@ -1035,8 +1037,14 @@ export function V3PublicationHistory({
                     <Alert
                       showIcon
                       type="warning"
-                      title="请先保存或放弃未保存的草稿"
-                      description="当前有未保存的词形或释义草稿。请先保存或主动放弃草稿，再将历史内容恢复到草稿；查看历史详情不受影响。"
+                      title={
+                        restoreBlockedReason ?? "请先保存或放弃未保存的草稿"
+                      }
+                      description={
+                        restoreBlockedReason
+                          ? "服务更新并刷新页面后，才能恢复历史内容；查看历史详情不受影响。"
+                          : "当前有未保存的词形或释义草稿。请先保存或主动放弃草稿，再将历史内容恢复到草稿；查看历史详情不受影响。"
+                      }
                     />
                   ) : null}
                   {confirming ? (

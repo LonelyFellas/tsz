@@ -19,7 +19,7 @@ import type {
 } from "@tsz/types";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AdminDialectPreference } from "@tsz/shared";
+import { expandFormContents, type AdminDialectPreference } from "@tsz/shared";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { createV3WordRequests } from "../api";
 import { dialectLabel } from "../presentation";
@@ -622,9 +622,11 @@ export function V3TargetCascader({
       state.candidates.flatMap((candidate) => {
         if (candidate.entry_id !== currentDraft?.id) return [candidate];
         if (candidate.publication_id) return [];
-        const pos = currentDraft.forms?.pos.find(
-          (item) => item.pos_id === candidate.pos_id
-        );
+        const pos = (
+          currentDraft.forms
+            ? expandFormContents(currentDraft.forms)
+            : undefined
+        )?.pos.find((item) => item.pos_id === candidate.pos_id);
         const senses = currentDraft.meanings?.pos.find(
           (item) => item.pos_id === candidate.pos_id
         )?.senses;

@@ -61,7 +61,7 @@ import {
   type UnifiedCreateRequests
 } from "./UnifiedCreateEntryStep";
 
-function v3Word(): AdminWordV3 {
+function v3Word(): import("@tsz/shared").ExpandedAdminWordV3 {
   return {
     schema_version: 3,
     id: "word-v3",
@@ -92,7 +92,9 @@ function v3Word(): AdminWordV3 {
   };
 }
 
-function v3PhraseWord(surface = "give up"): AdminWordV3 {
+function v3PhraseWord(
+  surface = "give up"
+): import("@tsz/shared").ExpandedAdminWordV3 {
   return {
     ...v3Word(),
     id: "phrase-v3",
@@ -105,7 +107,7 @@ function v3PhraseWord(surface = "give up"): AdminWordV3 {
   };
 }
 
-function v3PrefilledWord(): AdminWordV3 {
+function v3PrefilledWord(): import("@tsz/shared").ExpandedAdminWordV3 {
   const word = v3Word();
   word.forms.pos = [
     {
@@ -253,7 +255,7 @@ function v3BaseFormPage(): SurfaceMatchPageV3 {
   };
 }
 
-function existingV3Word(): AdminWordV3 {
+function existingV3Word(): import("@tsz/shared").ExpandedAdminWordV3 {
   const word = v3Word();
   word.id = "existing-v3";
   word.status = "published";

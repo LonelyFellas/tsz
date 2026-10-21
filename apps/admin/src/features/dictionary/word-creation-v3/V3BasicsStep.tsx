@@ -1,3 +1,4 @@
+import { expandFormContents } from "@tsz/shared";
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
 import {
@@ -56,7 +57,7 @@ function visibleEntryLabel(word: AdminWordV3): string {
     (surface) => !isUnnamedPlaceholder(surface)
   );
   if (matchedSurface) return matchedSurface;
-  for (const pos of word.forms.pos) {
+  for (const pos of expandFormContents(word.forms).pos) {
     for (const form of pos.forms) {
       const variant =
         form.regional_variants.mode === "common"
@@ -223,7 +224,7 @@ function SuggestedForm({
 
 function DictionarySuggestions({ word }: { word: AdminWordV3 }) {
   const partOfSpeechLabel = usePartOfSpeechLabel();
-  if (word.forms.pos.length === 0) {
+  if (expandFormContents(word.forms).pos.length === 0) {
     return (
       <Card
         className="word-headword-confirmation-card"
@@ -255,7 +256,7 @@ function DictionarySuggestions({ word }: { word: AdminWordV3 }) {
         <SafetyCertificateOutlined />
       </div>
       <Space orientation="vertical" size="middle" style={{ width: "100%" }}>
-        {word.forms.pos.map((pos) => (
+        {expandFormContents(word.forms).pos.map((pos) => (
           <Card
             key={pos.pos_id}
             size="small"
@@ -279,7 +280,7 @@ function V3BasicsContent({
   onContinue: () => void;
 }) {
   const partOfSpeechLabel = usePartOfSpeechLabel();
-  const suggestedPos = word.forms.pos.map((pos) => ({
+  const suggestedPos = expandFormContents(word.forms).pos.map((pos) => ({
     key: pos.pos_id,
     label: partOfSpeechLabel(pos.pos)
   }));
@@ -337,8 +338,16 @@ function V3BasicsContent({
           size="small"
           title="词典检测结果"
           extra={
-            <Tag color={word.forms.pos.length > 0 ? "green" : "default"}>
-              {word.forms.pos.length > 0 ? "已匹配" : "未匹配"}
+            <Tag
+              color={
+                expandFormContents(word.forms).pos.length > 0
+                  ? "green"
+                  : "default"
+              }
+            >
+              {expandFormContents(word.forms).pos.length > 0
+                ? "已匹配"
+                : "未匹配"}
             </Tag>
           }
         >
@@ -364,7 +373,7 @@ function V3BasicsContent({
               )}
             </Descriptions.Item>
           </Descriptions>
-          {word.forms.pos.length === 0 ? (
+          {expandFormContents(word.forms).pos.length === 0 ? (
             <div className="word-detection-empty-state">
               <InfoCircleOutlined />
               <div>
@@ -404,7 +413,7 @@ export function V3BasicsStep({
     wordId: word.id,
     language: word.language,
     completedSteps: word.completed_steps,
-    forms: draftForms ?? word.forms,
+    forms: draftForms ?? expandFormContents(word.forms),
     meanings: draftMeanings ?? word.meanings,
     dirtySteps,
     partOfSpeechCatalog

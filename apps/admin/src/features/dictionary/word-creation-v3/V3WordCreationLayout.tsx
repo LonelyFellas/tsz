@@ -2,11 +2,12 @@ import { Alert, Button, Flex, Popconfirm } from "antd";
 import type {
   AdminWordV3,
   PartOfSpeechCatalogItem,
-  DraftFormsStepContentV3,
+  FormsStepRepresentationV3,
   DraftMeaningsStepContentWritableV3,
   V3DraftValidationIssue,
   WordCreationStep
 } from "@tsz/types";
+import { expandFormContents } from "@tsz/shared";
 import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { DraftComparison } from "../DraftComparison";
@@ -48,7 +49,7 @@ interface Props {
   reachableSteps?: ReadonlySet<WordCreationStep>;
   readOnly?: boolean;
   dirtySteps?: Readonly<{ forms: boolean; meanings: boolean }>;
-  draftForms?: DraftFormsStepContentV3;
+  draftForms?: FormsStepRepresentationV3;
   draftMeanings?: DraftMeaningsStepContentWritableV3;
   problem?: V3Problem;
   conflict?: V3ConflictComparison;
@@ -106,7 +107,7 @@ type V3BaseFormSummary =
 function firstBaseFormSummary(
   word: AdminWordV3
 ): V3BaseFormSummary | undefined {
-  for (const pos of word.forms.pos) {
+  for (const pos of expandFormContents(word.forms).pos) {
     const base = pos.forms.find((form) => form.form_type === "base");
     if (!base) continue;
     if (base.regional_variants.mode === "common") {
@@ -205,7 +206,7 @@ function V3WordCreationLayoutContent({
     partOfSpeechCatalog,
     dirtySteps,
     completedSteps: word.completed_steps,
-    forms: draftForms ?? word.forms,
+    forms: expandFormContents(draftForms ?? word.forms),
     meanings: draftMeanings ?? word.meanings
   });
   if (sharedSentenceCount !== undefined) {

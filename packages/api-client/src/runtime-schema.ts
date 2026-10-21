@@ -287,12 +287,28 @@ function validateSchema(
   }
 
   if (schema.oneOf !== undefined) {
-    const matchCount = schema.oneOf.reduce(
-      (count, branch) =>
-        validateSchema(branch, value, path) === undefined ? count + 1 : count,
-      0
+    const failures = schema.oneOf.map((branch) =>
+      validateSchema(branch, value, path)
     );
-    if (matchCount === 0) return failure(path, "no_union_match", value);
+    const matchCount = failures.filter((result) => result === undefined).length;
+    if (matchCount === 0) {
+      // The forms protocol has an explicit representation marker. Keep the
+      // selected representation's field diagnostic without accepting bad data.
+      if (
+        isRecord(value) &&
+        schema === runtimeSchemaBundle.$defs.FormsStepRepresentationV3
+      ) {
+        const ref =
+          "forms_format" in value
+            ? "SharedFormsStepContentV3"
+            : "ExpandedFormsStepContentV3";
+        const index = schema.oneOf.findIndex(
+          (branch) => branch.$ref === `#/$defs/${ref}`
+        );
+        if (index >= 0) return failures[index]!;
+      }
+      return failure(path, "no_union_match", value);
+    }
     if (matchCount > 1) return failure(path, "ambiguous_union_match", value);
   }
 

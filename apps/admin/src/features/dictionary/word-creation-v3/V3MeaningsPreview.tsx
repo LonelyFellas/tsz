@@ -1,3 +1,4 @@
+import { expandFormContents } from "@tsz/shared";
 import { boundFormGroupIds } from "./meaningsModel";
 import type {
   AdminWordV3,
@@ -74,10 +75,12 @@ export function V3MeaningsPreview({
   const partOfSpeechLabel = usePartOfSpeechLabel();
   const subPartOfSpeechLabel = useSubPartOfSpeechLabel();
   const posCodeById = new Map(
-    word.forms.pos.map((pos) => [pos.pos_id, pos.pos] as const)
+    expandFormContents(word.forms).pos.map(
+      (pos) => [pos.pos_id, pos.pos] as const
+    )
   );
   const formsPosById = new Map(
-    word.forms.pos.map((pos) => [pos.pos_id, pos] as const)
+    expandFormContents(word.forms).pos.map((pos) => [pos.pos_id, pos] as const)
   );
   const senseGroupById = new Map(
     word.meanings.sense_groups.map((group, index) => [

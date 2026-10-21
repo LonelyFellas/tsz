@@ -1,11 +1,13 @@
 import type {
-  AdminWordV3,
   Dialect,
   PublishedSentenceTargetCandidateV3,
   SentenceTarget
 } from "@tsz/types";
 
-export function sentenceWord(id = "entry", spelling = "make up"): AdminWordV3 {
+export function sentenceWord(
+  id = "entry",
+  spelling = "make up"
+): import("@tsz/shared").ExpandedAdminWordV3 {
   return {
     schema_version: 3,
     id,

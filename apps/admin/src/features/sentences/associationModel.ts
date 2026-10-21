@@ -1,3 +1,4 @@
+import { expandFormContents } from "@tsz/shared";
 import type {
   AdminWordV3,
   Dialect,
@@ -125,7 +126,9 @@ export function savedSenseTargets(word: AdminWordV3, senseId: string) {
     row.senses.some((sense) => sense.id === senseId)
   );
   const sense = pos?.senses.find((item) => item.id === senseId);
-  const forms = word.forms.pos.find((row) => row.pos_id === pos?.pos_id);
+  const forms = expandFormContents(word.forms).pos.find(
+    (row) => row.pos_id === pos?.pos_id
+  );
   if (!sense || !forms) return [];
   const definition = sense.definitions.find(
     (item) =>

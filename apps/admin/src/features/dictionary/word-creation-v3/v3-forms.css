@@ -2,6 +2,39 @@
   width: 100%;
 }
 
+.v3-form-overview {
+  min-width: 0;
+  max-width: 100%;
+}
+.v3-overview-reading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.v3-content-editor {
+  overflow-x: auto;
+}
+.v3-content-editor .word-form-type-cell,
+.v3-content-editor .word-form-matrix-type-header,
+.v3-content-editor .v3-spelling-regularity {
+  display: none;
+}
+.v3-content-editor .word-form-matrix {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.v3-content-editor .word-form-matrix-unified {
+  grid-template-columns: minmax(0, 1fr);
+}
+.v3-content-modal {
+  padding-block: 12px;
+}
+@media (max-width: 720px) {
+  .v3-content-editor .word-form-matrix {
+    display: flex;
+    flex-direction: column;
+  }
+}
+
 .v3-forms-step textarea.tsz-words.ant-input,
 .v3-forms-step .v3-grammar-preview-content.tsz-words {
   font-weight: 700;

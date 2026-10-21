@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dictionary-search-layout/docs/openapi.json",
-  "_source_sha256": "5e60fd77cb63ec5a4cb369e332035c399d1f6e5c454aa4aec2511c7397d586ec",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/task-146-form-content-design/docs/openapi.json",
+  "_source_sha256": "066c1db9d4b103b33a7345a400e0f8f9347336af5d9adf522183640c874211fe",
   "roots": [
     "DictionaryPage",
     "DictionaryEntry",
@@ -149,6 +149,10 @@
       "type": "object",
       "required": ["word", "retired_stable_nodes"],
       "properties": {
+        "retired_content_slots": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/RetiredContentSlotV3" }
+        },
         "retired_stable_nodes": {
           "type": "array",
           "items": { "$ref": "#/$defs/RetiredStableNodeV3" }
@@ -380,7 +384,7 @@
         "created_at": { "type": "string", "format": "date-time" },
         "created_by": { "type": "string", "format": "uuid" },
         "detection_basis_dialect": { "$ref": "#/$defs/SourceDialect" },
-        "forms": { "$ref": "#/$defs/DraftFormsStepContentV3" },
+        "forms": { "$ref": "#/$defs/FormsStepRepresentationV3" },
         "has_unpublished_changes": { "type": "boolean" },
         "id": { "type": "string", "format": "uuid" },
         "kind": { "$ref": "#/$defs/WordEntryKindV3" },
@@ -411,6 +415,7 @@
         "publication": { "$ref": "#/$defs/V3PublicationCapability" },
         "sense_component_usages": { "type": "boolean" },
         "sentence_associations": { "type": "boolean" },
+        "shared_form_contents": { "type": "boolean" },
         "text_links": { "type": "boolean" }
       },
       "additionalProperties": false
@@ -787,18 +792,6 @@
       },
       "additionalProperties": false
     },
-    "DraftFormsStepContentV3": {
-      "type": "object",
-      "required": ["pos"],
-      "properties": {
-        "pos": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/WordPosFormsV3" },
-          "maxItems": 2000
-        }
-      },
-      "additionalProperties": false
-    },
     "DraftMeaningsStepContentV3": {
       "type": "object",
       "required": ["sense_groups", "pos"],
@@ -1074,6 +1067,7 @@
         "sentence_not_found",
         "sentence_associations_unresolved",
         "sentence_association_client_upgrade_required",
+        "form_contents_client_upgrade_required",
         "pending_sentence_association_not_found",
         "pending_sentence_association_claimed",
         "publication_not_found",
@@ -1107,7 +1101,142 @@
         "internal_error"
       ]
     },
+    "ExpandedFormsStepContentV3": {
+      "type": "object",
+      "required": ["pos"],
+      "properties": {
+        "pos": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordPosFormsV3" },
+          "maxItems": 2000
+        }
+      },
+      "additionalProperties": false
+    },
+    "FormContentBindingV3": {
+      "type": "object",
+      "required": ["id", "form_type", "content_id", "regional_bindings"],
+      "properties": {
+        "content_id": { "type": "string", "format": "uuid" },
+        "form_type": {
+          "type": "string",
+          "maxLength": 32,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]{0,31}$"
+        },
+        "id": { "type": "string", "format": "uuid" },
+        "regional_bindings": { "$ref": "#/$defs/FormRegionalBindingsV3" }
+      },
+      "additionalProperties": false
+    },
+    "FormContentRegionalVariantsV3": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["common", "mode"],
+          "properties": {
+            "common": { "$ref": "#/$defs/FormContentVariantV3" },
+            "mode": { "type": "string", "enum": ["common"] }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["uk", "us", "mode"],
+          "properties": {
+            "mode": { "type": "string", "enum": ["uk_us"] },
+            "uk": { "$ref": "#/$defs/FormContentVariantV3" },
+            "us": { "$ref": "#/$defs/FormContentVariantV3" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "FormContentV3": {
+      "type": "object",
+      "required": ["id", "dialect_rules", "regional_variants"],
+      "properties": {
+        "dialect_rules": { "$ref": "#/$defs/DialectRulesV3" },
+        "id": { "type": "string", "format": "uuid" },
+        "pronunciation_slots": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/FormPronunciationSlotsV3" },
+          "maxItems": 2000
+        },
+        "regional_variants": { "$ref": "#/$defs/FormContentRegionalVariantsV3" }
+      },
+      "additionalProperties": false
+    },
+    "FormContentVariantV3": {
+      "type": "object",
+      "required": ["id", "spelling", "origin", "pronunciations"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "origin": { "$ref": "#/$defs/TextOrigin" },
+        "pronunciations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordPronunciationV3" },
+          "maxItems": 2000
+        },
+        "spelling": { "type": "string", "maxLength": 200 },
+        "spelling_rich": { "$ref": "#/$defs/RichTextV2V3" },
+        "spelling_speech": { "$ref": "#/$defs/SpellingSpeechV3" }
+      },
+      "additionalProperties": false
+    },
     "FormGroupScopeV3": { "type": "string", "enum": ["general", "dedicated"] },
+    "FormPronunciationBindingV3": {
+      "type": "object",
+      "required": ["id", "content_slot_id"],
+      "properties": {
+        "content_slot_id": { "type": "string", "format": "uuid" },
+        "id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "FormPronunciationSlotsV3": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "common": { "$ref": "#/$defs/FormPronunciationSlotV3" },
+        "id": { "type": "string", "format": "uuid" },
+        "uk": { "$ref": "#/$defs/FormPronunciationSlotV3" },
+        "us": { "$ref": "#/$defs/FormPronunciationSlotV3" }
+      },
+      "additionalProperties": false
+    },
+    "FormPronunciationSlotV3": {
+      "type": "object",
+      "required": ["id", "variant_slot_id"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "variant_slot_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "FormRegionalBindingsV3": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["common", "mode"],
+          "properties": {
+            "common": { "$ref": "#/$defs/FormVariantBindingV3" },
+            "mode": { "type": "string", "enum": ["common"] }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["uk", "us", "mode"],
+          "properties": {
+            "mode": { "type": "string", "enum": ["uk_us"] },
+            "uk": { "$ref": "#/$defs/FormVariantBindingV3" },
+            "us": { "$ref": "#/$defs/FormVariantBindingV3" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
     "FormsImpactItemV3": {
       "type": "object",
       "required": ["node_id", "node_type", "reason"],
@@ -1164,6 +1293,12 @@
       },
       "additionalProperties": false
     },
+    "FormsStepRepresentationV3": {
+      "oneOf": [
+        { "$ref": "#/$defs/SharedFormsStepContentV3" },
+        { "$ref": "#/$defs/ExpandedFormsStepContentV3" }
+      ]
+    },
     "FormSurfaceMatchV3": {
       "type": "object",
       "required": [
@@ -1202,6 +1337,26 @@
         "spelling": { "type": "string" },
         "status": { "$ref": "#/$defs/AdminWordStatus" },
         "variant_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "FormVariantBindingV3": {
+      "type": "object",
+      "required": ["id", "content_slot_id", "is_regular", "pronunciations"],
+      "properties": {
+        "component_usages": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/PhraseComponentUsageV3" },
+          "maxItems": 100
+        },
+        "content_slot_id": { "type": "string", "format": "uuid" },
+        "id": { "type": "string", "format": "uuid" },
+        "is_regular": { "type": "boolean" },
+        "pronunciations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/FormPronunciationBindingV3" },
+          "maxItems": 2000
+        }
       },
       "additionalProperties": false
     },
@@ -2605,10 +2760,27 @@
       "type": "string",
       "enum": ["synonym", "antonym", "derivative"]
     },
+    "RetiredContentSlotV3": {
+      "type": "object",
+      "required": ["id", "content_id", "role", "retired_at"],
+      "properties": {
+        "content_id": { "type": "string", "format": "uuid" },
+        "id": { "type": "string", "format": "uuid" },
+        "parent_slot_id": { "type": "string", "format": "uuid" },
+        "retired_at": { "type": "string", "format": "date-time" },
+        "role": {
+          "type": "string",
+          "pattern": "^(content|common|uk|us|pronunciation)$"
+        }
+      },
+      "additionalProperties": false
+    },
     "RetiredStableNodeV3": {
       "type": "object",
       "required": ["id", "node_role", "retired_at"],
       "properties": {
+        "content_id": { "type": "string", "format": "uuid" },
+        "content_slot_id": { "type": "string", "format": "uuid" },
         "id": { "type": "string", "format": "uuid" },
         "node_role": { "$ref": "#/$defs/V3RetiredNodeRole" },
         "parent_node_id": { "type": "string", "format": "uuid" },
@@ -3060,6 +3232,59 @@
           "type": "array",
           "items": { "$ref": "#/$defs/SentenceImpactTarget" }
         }
+      },
+      "additionalProperties": false
+    },
+    "SharedFormGroupV3": {
+      "type": "object",
+      "required": ["id", "is_regular", "scope", "members"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "is_regular": { "type": "boolean" },
+        "members": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordFormGroupMemberV3" },
+          "maxItems": 2000
+        },
+        "scope": { "$ref": "#/$defs/FormGroupScopeV3" }
+      },
+      "additionalProperties": false
+    },
+    "SharedFormsFormatV3": { "type": "string", "enum": ["shared_v1"] },
+    "SharedFormsStepContentV3": {
+      "type": "object",
+      "required": ["forms_format", "contents", "pos"],
+      "properties": {
+        "contents": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/FormContentV3" },
+          "maxItems": 2000
+        },
+        "forms_format": { "$ref": "#/$defs/SharedFormsFormatV3" },
+        "pos": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SharedPosFormsV3" },
+          "maxItems": 2000
+        }
+      },
+      "additionalProperties": false
+    },
+    "SharedPosFormsV3": {
+      "type": "object",
+      "required": ["pos_id", "pos", "forms", "form_groups"],
+      "properties": {
+        "form_groups": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SharedFormGroupV3" },
+          "maxItems": 2000
+        },
+        "forms": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/FormContentBindingV3" },
+          "maxItems": 2000
+        },
+        "pos": { "type": "string" },
+        "pos_id": { "type": "string", "format": "uuid" }
       },
       "additionalProperties": false
     },
@@ -3536,6 +3761,8 @@
           "type": "array",
           "items": { "type": "string", "format": "uuid" }
         },
+        "content_id": { "type": "string", "format": "uuid" },
+        "content_slot_id": { "type": "string", "format": "uuid" },
         "dialect": { "$ref": "#/$defs/Dialect" },
         "form_group_id": { "type": "string", "format": "uuid" },
         "form_id": { "type": "string", "format": "uuid" },
@@ -3603,6 +3830,7 @@
       "type": "string",
       "enum": [
         "invalid_regional_variant_shape",
+        "form_content_mapping_invalid",
         "dialect_rules_invalid",
         "invalid_form_type_for_part_of_speech",
         "part_of_speech_kind_mismatch",

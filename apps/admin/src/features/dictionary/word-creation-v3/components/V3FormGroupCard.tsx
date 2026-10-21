@@ -36,6 +36,7 @@ import {
   addConcreteFormAfterMembership,
   deleteConcreteForm,
   reorderMemberships,
+  updateConcreteFormType,
   type V3IdFactory
 } from "../operations";
 import {
@@ -48,9 +49,13 @@ import { V3ReferenceBadge } from "./V3ReferenceBadge";
 import { formNodeIds, formReferenceCount } from "../referenceGuard";
 import { useV3ReferenceGuard } from "../referenceGuardContext";
 
+import { V3FormContentOverview } from "./V3FormContentOverview";
+
 const BASE_REQUIRED_HINT = "第 1 组词形变化至少保留一个原形";
 
 export interface V3FormGroupCardProps {
+  sharedCounts?: ReadonlyMap<string, number>;
+  onEditContent?: (formId: string) => void;
   content: DraftFormsStepContentV3;
   group: WordFormGroupV3;
   groupCount?: number;
@@ -76,6 +81,8 @@ export interface V3FormGroupCardProps {
 }
 
 export function V3FormGroupCard({
+  sharedCounts,
+  onEditContent,
   content,
   group,
   groupCount = 1,
@@ -265,7 +272,7 @@ export function V3FormGroupCard({
             <Popconfirm
               cancelButtonProps={{ "aria-label": "取消删除词形并保留" }}
               cancelText="取消"
-              description={`词形的拼写与发音会一并删除。${referenceHint ?? ""}`}
+              description={`${(sharedCounts?.get(form.id) ?? 1) > 1 ? "只移除这个标签，其他标签继续使用同一份拼写与发音。" : "这是最后一个标签，词形内容会一并删除。"}${referenceHint ?? ""}`}
               disabled={deleteLocked}
               okButtonProps={{
                 "aria-label": "删除词形及相关发音",
@@ -448,7 +455,23 @@ export function V3FormGroupCard({
               </Button>
             </Empty>
           ) : null}
-          {separatedRows ? (
+          {onEditContent && sharedCounts ? (
+            <V3FormContentOverview
+              group={group}
+              issues={issues}
+              sharedCounts={sharedCounts}
+              onEdit={onEditContent}
+              onFormTypeChange={(id, type) =>
+                onChange(updateConcreteFormType(content, id, type))
+              }
+              rows={group.members.flatMap((member, index) => {
+                const form = pos.forms.find(
+                  (item) => item.id === member.form_id
+                );
+                return form ? [formRow(member, index, form)] : [];
+              })}
+            />
+          ) : separatedRows ? (
             <V3DialectSeparatedFormMatrix
               content={content}
               dialectRules={group.dialect_rules}
