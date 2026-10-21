@@ -60,6 +60,7 @@ import "../posTabs.css";
 import { sortableRowClass, useSortableRows } from "../sortableRows";
 import { SortableDragHandle } from "./SortableDragHandle";
 import { V3FormContentModal } from "./V3FormContentModal";
+import type { createPronunciationReferenceIds } from "../sharedFormsModel";
 
 /** 只接受本编辑器发出的词性拖动，避免把外部拖入的内容当成排序。 */
 const POS_DRAG_TYPE = "application/x-tsz-v3-pos";
@@ -79,6 +80,9 @@ export interface V3FormsAndPronunciationStepProps {
   issues?: readonly V3DraftValidationIssue[];
   idFactory?: V3IdFactory;
   stableVariantIds?: V3StableVariantIdFactory;
+  pronunciationReferenceIds?: ReturnType<
+    typeof createPronunciationReferenceIds
+  >;
   /** 变化组 id → 词义步里绑定它的词义数；组卡片据此提示专用组的影响面。 */
   formGroupBindingCounts?: ReadonlyMap<string, number>;
   meanings?: DraftMeaningsStepContentWritableV3;
@@ -128,6 +132,7 @@ export function V3FormsAndPronunciationStep({
   issues = [],
   idFactory = newWordNodeId,
   stableVariantIds,
+  pronunciationReferenceIds,
   formGroupBindingCounts,
   meanings,
   savedSenseIds,
@@ -459,6 +464,7 @@ export function V3FormsAndPronunciationStep({
             catalog={catalog.data?.items ?? []}
             issues={issues}
             stableVariantIds={stableVariantIds}
+            pronunciationReferenceIds={pronunciationReferenceIds}
             retiredContentSlots={retiredContentSlots}
             retiredStableNodes={retiredStableNodes}
             registerLeaveGuard={registerLeaveGuard}

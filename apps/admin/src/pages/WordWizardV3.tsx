@@ -371,6 +371,7 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
               context.setDraftForms(content);
             }}
             stableVariantIds={context.stableVariantIds}
+            pronunciationReferenceIds={context.pronunciationReferenceIds}
             value={context.draftForms}
           />
         </div>

@@ -45,6 +45,7 @@ export function V3FormContentModal({
   catalog,
   issues,
   stableVariantIds,
+  pronunciationReferenceIds,
   retiredContentSlots,
   retiredStableNodes = [],
   registerLeaveGuard,
@@ -56,6 +57,9 @@ export function V3FormContentModal({
   catalog: readonly PartOfSpeechCatalogItem[];
   issues: readonly V3DraftValidationIssue[];
   stableVariantIds: V3StableVariantIdFactory;
+  pronunciationReferenceIds?: ReturnType<
+    typeof createPronunciationReferenceIds
+  >;
   retiredContentSlots: readonly RetiredContentSlotV3[];
   retiredStableNodes?: readonly RetiredStableNodeV3[];
   registerLeaveGuard?: (guard?: () => Promise<boolean>) => void;
@@ -63,8 +67,10 @@ export function V3FormContentModal({
   onConfirm: (forms: SharedFormsStepContentV3) => void;
 }) {
   const original = useRef(forms);
-  const [pronunciationIds] = useState(() =>
-    createPronunciationReferenceIds(forms, retiredStableNodes)
+  const [pronunciationIds] = useState(
+    () =>
+      pronunciationReferenceIds ??
+      createPronunciationReferenceIds(forms, retiredStableNodes)
   );
   const content = sharedContentForForm(original.current, formId)!;
   const [editor, setEditor] = useState(() => contentEditorForms(content));

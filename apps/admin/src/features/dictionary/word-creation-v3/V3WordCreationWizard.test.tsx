@@ -1,5 +1,8 @@
 import { expandFormContents } from "@tsz/shared";
 import { applyFormsStructure } from "./sharedFormsModel";
+import { ConfigProvider } from "antd";
+import { V3FormContentModal } from "./components/V3FormContentModal";
+import { PronunciationPreviewProvider } from "../word-creation/PronunciationPreview";
 import { changeVoiceText } from "./components/V3VoiceTextField.test-helper";
 import { useAuthStore } from "@/lib/auth";
 import { HttpError } from "@tsz/api-client";
@@ -6406,6 +6409,64 @@ describe("V3WordCreationWizard", () => {
     expect(get).toHaveBeenCalledTimes(2);
     expect(saveForms).toHaveBeenCalledTimes(1);
   });
+});
+
+it("未保存页面时跨两次内容弹窗地区往返保留完整引用身份", async () => {
+  const initialWord = word();
+  const shared = applyFormsStructure(
+    { forms_format: "shared_v1", contents: [], pos: [] },
+    initialWord.forms
+  );
+  if (!("forms_format" in shared)) throw new Error("fixture");
+  initialWord.forms = shared;
+  const source = requests();
+  let latest: V3WizardSlotContext;
+  function ContentHost({ context }: { context: V3WizardSlotContext }) {
+    const [open, setOpen] = useState(false);
+    latest = context;
+    if (!("forms_format" in context.formContents)) throw new Error("fixture");
+    return (
+      <ConfigProvider theme={{ token: { motion: false } }}>
+        <PronunciationPreviewProvider>
+          <button onClick={() => setOpen(true)}>打开内容弹窗</button>
+          {open && (
+            <V3FormContentModal
+              forms={context.formContents}
+              formId={shared.pos[0]!.forms[0]!.id}
+              catalog={[]}
+              issues={[]}
+              stableVariantIds={context.stableVariantIds}
+              pronunciationReferenceIds={context.pronunciationReferenceIds}
+              retiredContentSlots={[]}
+              onCancel={() => setOpen(false)}
+              onConfirm={(next) => {
+                context.setFormContents(next);
+                setOpen(false);
+              }}
+            />
+          )}
+        </PronunciationPreviewProvider>
+      </ConfigProvider>
+    );
+  }
+  renderWizard(source, {
+    initialWord,
+    renderStep: (context) => <ContentHost context={context} />
+  });
+  fireEvent.click(screen.getByText("打开内容弹窗"));
+  fireEvent.click(screen.getAllByRole("radio", { name: "是" })[1]!);
+  fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+  );
+  fireEvent.click(screen.getByText("打开内容弹窗"));
+  fireEvent.click(screen.getAllByRole("radio", { name: "否" })[1]!);
+  fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+  );
+  expect(latest!.formContents.pos).toEqual(shared.pos);
+  expect(source.saveForms).not.toHaveBeenCalled();
 });
 
 it.each([

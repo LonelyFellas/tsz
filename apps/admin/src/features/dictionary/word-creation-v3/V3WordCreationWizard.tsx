@@ -18,7 +18,10 @@ import type {
   WordCreationStep
 } from "@tsz/types";
 import { expandFormContents } from "@tsz/shared";
-import { applyFormsStructure } from "./sharedFormsModel";
+import {
+  applyFormsStructure,
+  createPronunciationReferenceIds
+} from "./sharedFormsModel";
 import type { ReactNode } from "react";
 import {
   useCallback,
@@ -122,6 +125,7 @@ export interface V3WizardSlotContext {
   draftForms: DraftFormsStepContentV3;
   setDraftForms: (content: DraftFormsStepContentV3) => void;
   stableVariantIds: V3StableVariantIdFactory;
+  pronunciationReferenceIds: ReturnType<typeof createPronunciationReferenceIds>;
   retiredStableNodes: readonly RetiredStableNodeV3[];
   draftMeanings: DraftMeaningsStepContentWritableV3;
   setDraftMeanings: (content: DraftMeaningsStepContentWritableV3) => void;
@@ -344,6 +348,11 @@ function V3WordCreationSession({
   });
   const [word, setWord] = useState(initialWord);
   const [draftForms, setDraftFormsState] = useState(initialWord.forms);
+  const [pronunciationReferenceIds] = useState(() =>
+    createPronunciationReferenceIds(initialWord.forms, retiredStableNodes)
+  );
+  pronunciationReferenceIds.seed(initialWord.forms, retiredStableNodes);
+  pronunciationReferenceIds.seed(draftForms);
   const [draftMeanings, setDraftMeaningsState] = useState(
     initialMeaningsRef.current.draft
   );
@@ -1942,6 +1951,7 @@ function V3WordCreationSession({
     draftForms: expandFormContents(draftForms),
     setDraftForms,
     stableVariantIds: stableVariantIdsRef.current,
+    pronunciationReferenceIds,
     retiredStableNodes,
     draftMeanings,
     setDraftMeanings,

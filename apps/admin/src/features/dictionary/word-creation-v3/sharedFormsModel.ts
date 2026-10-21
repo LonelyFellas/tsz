@@ -410,33 +410,42 @@ export function createSharedContentDialectNormalizer(
 }
 
 export function createPronunciationReferenceIds(
-  forms: SharedFormsStepContentV3,
+  forms: FormsStepRepresentationV3,
   retiredNodes: readonly RetiredStableNodeV3[] = []
 ) {
   const ids = new Map<string, string>();
-  for (const node of retiredNodes) {
-    if (
-      node.node_role === "pronunciation" &&
-      node.parent_node_id &&
-      node.content_slot_id
-    )
-      ids.set(`${node.parent_node_id}:${node.content_slot_id}`, node.id);
-  }
-  for (const pos of forms.pos)
-    for (const form of pos.forms) {
-      const refs = form.regional_bindings;
-      for (const variant of refs.mode === "common"
-        ? [refs.common]
-        : [refs.uk, refs.us])
-        for (const row of variant.pronunciations)
-          ids.set(`${variant.id}:${row.content_slot_id}`, row.id);
+  const seed = (
+    current: FormsStepRepresentationV3,
+    retired: readonly RetiredStableNodeV3[] = []
+  ) => {
+    for (const node of retired) {
+      if (
+        node.node_role === "pronunciation" &&
+        node.parent_node_id &&
+        node.content_slot_id
+      )
+        ids.set(`${node.parent_node_id}:${node.content_slot_id}`, node.id);
     }
-  return (variantId: string, slotId: string) => {
+    if (!isSharedForms(current)) return;
+    for (const pos of current.pos)
+      for (const form of pos.forms) {
+        const refs = form.regional_bindings;
+        for (const variant of refs.mode === "common"
+          ? [refs.common]
+          : [refs.uk, refs.us])
+          for (const row of variant.pronunciations)
+            ids.set(`${variant.id}:${row.content_slot_id}`, row.id);
+      }
+  };
+  seed(forms, retiredNodes);
+  const factory = (variantId: string, slotId: string) => {
     const key = `${variantId}:${slotId}`;
     const id = ids.get(key) ?? newWordNodeId();
     ids.set(key, id);
     return id;
   };
+  factory.seed = seed;
+  return factory;
 }
 
 export function replaceSharedContent(
