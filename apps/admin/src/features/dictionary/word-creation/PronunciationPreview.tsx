@@ -224,11 +224,15 @@ export function PronunciationPreviewVoiceSummary({
     return <span>{voice ? `${(1 + rate / 100).toFixed(2)}×` : "—"}</span>;
   return (
     <Space orientation="vertical" size={0}>
-      <span>
+      <span
+        title={
+          voice ? `${isDefault ? "默认 · " : ""}${voice.label}` : undefined
+        }
+      >
         {context.voicesLoading
           ? "正在读取音色"
           : voice
-            ? `${isDefault ? "默认 · " : ""}${voice.label}`
+            ? voice.label.replace(` · ${voice.locale}`, "")
             : context.voicesError || "当前口音没有可用音色"}
       </span>
       {enabled.length > 1 && (
