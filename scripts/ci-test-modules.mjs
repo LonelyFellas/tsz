@@ -214,7 +214,8 @@ export function normalizeInventory(entries, repositoryRoot = process.cwd()) {
 export function buildModuleVitestArgs(
   moduleName,
   outputDirectory,
-  repositoryRoot = process.cwd()
+  repositoryRoot = process.cwd(),
+  { coverage = true } = {}
 ) {
   const module = moduleByName(moduleName);
   const blobPath = resolve(
@@ -223,12 +224,12 @@ export function buildModuleVitestArgs(
     ".vitest-reports",
     module.blobFile
   );
+  const runnerArgs = buildCoverageVitestArgs(
+    module.projects.includes("admin") ? ["--maxWorkers=1"] : []
+  );
   return [
-    // antd 大表单在覆盖率 runner 中并行会争抢 CPU，连续触发不同用例的 5 秒超时。
-    // 后台分片串行执行文件，保留全部用例、原有超时和覆盖率收集策略。
-    ...buildCoverageVitestArgs(
-      module.projects.includes("admin") ? ["--maxWorkers=1"] : []
-    ),
+    // antd 大表单并行会争抢 CPU；两种模式保持相同分片、用例、超时与 worker 数。
+    ...runnerArgs.filter((argument) => coverage || argument !== "--coverage"),
     "--config=vitest.ci-shard.config.ts",
     "--reporter=blob",
     "--reporter=./scripts/ci-test-inventory-reporter.mjs",
@@ -392,7 +393,7 @@ export async function collectModuleArtifacts(
   }
 }
 
-async function runModule(moduleName, outputDirectory) {
+async function runModule(moduleName, outputDirectory, mode) {
   const module = moduleByName(moduleName);
   const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
   const vitestCli = resolve(repositoryRoot, "node_modules/vitest/vitest.mjs");
@@ -406,7 +407,9 @@ async function runModule(moduleName, outputDirectory) {
     process.execPath,
     [
       vitestCli,
-      ...buildModuleVitestArgs(module.name, outputDirectory, repositoryRoot)
+      ...buildModuleVitestArgs(module.name, outputDirectory, repositoryRoot, {
+        coverage: mode === "coverage"
+      })
     ],
     {
       cwd: repositoryRoot,
@@ -427,8 +430,15 @@ async function runModule(moduleName, outputDirectory) {
 async function main(rawArgs) {
   const args = rawArgs[0] === "--" ? rawArgs.slice(1) : rawArgs;
   const [command, ...commandArgs] = args;
-  if (command === "run" && commandArgs.length === 2) {
-    process.exitCode = await runModule(commandArgs[0], commandArgs[1]);
+  if (
+    command === "run" &&
+    (commandArgs.length === 2 || commandArgs.length === 3)
+  ) {
+    const [moduleName, outputDirectory, mode = "coverage"] = commandArgs;
+    if (mode !== "test" && mode !== "coverage") {
+      throw new Error(`unknown CI test mode: ${mode}`);
+    }
+    process.exitCode = await runModule(moduleName, outputDirectory, mode);
     return;
   }
   if (command === "validate-inventories" && commandArgs.length === 3) {
@@ -444,7 +454,7 @@ async function main(rawArgs) {
     return;
   }
   throw new Error(
-    "usage: ci-test-modules.mjs run <module> <output-dir> | validate-inventories <full-inventory.json> <inventory-dir> <report-dir> | collect-artifacts <download-dir> <output-dir>"
+    "usage: ci-test-modules.mjs run <module> <output-dir> [test|coverage] | validate-inventories <full-inventory.json> <inventory-dir> <report-dir> | collect-artifacts <download-dir> <output-dir>"
   );
 }
 

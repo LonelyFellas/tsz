@@ -137,6 +137,23 @@ test("M05: module arguments bound admin concurrency and retain path selection", 
   );
 });
 
+test("PR mode keeps the same tests, workers and reporters without coverage", () => {
+  for (const module of ciTestModules) {
+    const coverageArgs = buildModuleVitestArgs(
+      module.name,
+      "artifacts",
+      "/repo"
+    );
+    const testArgs = buildModuleVitestArgs(module.name, "artifacts", "/repo", {
+      coverage: false
+    });
+    assert.deepEqual(
+      testArgs,
+      coverageArgs.filter((argument) => argument !== "--coverage")
+    );
+  }
+});
+
 test("M06: full and shard configs share collection policy", () => {
   assert.deepEqual(vitestProjects, [
     "packages/shared",

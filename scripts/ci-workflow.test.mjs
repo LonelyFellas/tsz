@@ -59,6 +59,11 @@ test("W02: coverage matrix has five fixed modules and fail-fast disabled", async
     assert.match(block, new RegExp(`module: ${module}(?:\\n|$)`));
   }
   assert.match(block, /pnpm ci:test-module/);
+  assert.ok(
+    block.includes(
+      "${{ github.event_name == 'pull_request' && 'test' || 'coverage' }}"
+    )
+  );
   assert.match(block, /actions\/upload-artifact@v7/);
   // 重跑后各 attempt 的同名产物并存，名字不带 attempt 就分不出新旧。
   assert.match(
@@ -83,6 +88,10 @@ test("W03: coverage merge downloads, picks latest attempts, validates and merges
   assert.ok(collectIndex < block.indexOf("pnpm ci:validate-test-inventories"));
   assert.match(block, /pnpm ci:validate-test-inventories/);
   assert.match(block, /--merge-reports=.*--coverage/);
+  assert.match(
+    block,
+    /- name: Merge coverage report\n        if: github\.event_name != 'pull_request'/
+  );
 });
 
 test("W04: verify is a fail-closed stable summary", async () => {
@@ -248,13 +257,10 @@ test("W11: cache outcomes never skip quality, coverage or E2E gates", async () =
   const { jobs } = await workflowFixture();
   const requiredSteps = [
     ["quality", ["Lint", "Typecheck", "Format check", "Build"]],
-    ["unit-coverage", ["Run coverage module"]],
+    ["unit-coverage", ["Run test module"]],
     [
       "coverage-merge",
-      [
-        "Verify every test file ran exactly once",
-        "Merge coverage and enforce thresholds"
-      ]
+      ["Verify every test file ran exactly once", "Merge coverage report"]
     ],
     ["e2e-web", ["Web E2E"]],
     ["e2e-admin", ["Admin E2E"]]
