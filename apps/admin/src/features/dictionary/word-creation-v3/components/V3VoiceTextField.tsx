@@ -16,6 +16,7 @@ import type {
 } from "@tsz/voice-editor/types";
 import {
   editRichText,
+  isVoiceRecommendationAvailable,
   normalizeSpellingRich,
   remapTextLinks,
   toRichTextV2
@@ -23,7 +24,7 @@ import {
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import { EditOutlined } from "@ant-design/icons";
 import { flushSync } from "react-dom";
-import { Button, Input, Space, message } from "antd";
+import { Alert, Button, Input, Space, message } from "antd";
 import {
   type ReactNode,
   Suspense,
@@ -172,6 +173,87 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       nodeId,
       unconfigured: !value.text.trim() && voiceProfile == null
     };
+  const area =
+    recommendationArea ??
+    (mode === "spelling"
+      ? "word"
+      : mode === "grammar"
+        ? "grammar"
+        : mode === "association"
+          ? "example"
+          : mode === "synthesis"
+            ? "azure"
+            : mode === "actual-pron" || mode === "dict-phonetic"
+              ? undefined
+              : "meaning");
+  const locale = voiceLocale(dialect);
+  const prepareDefault =
+    env.VOICE_EDITOR &&
+    editingEnabled &&
+    presentation === "field" &&
+    !editing &&
+    !readOnly &&
+    !contentReadOnly &&
+    initialVoiceState.current.unconfigured &&
+    voiceProfile == null &&
+    !!onVoiceProfileChange &&
+    !!area;
+  const defaultKey = JSON.stringify([nodeId, area, locale]);
+  const [defaultVoice, setDefaultVoice] = useState<{
+    key: string;
+    profile?: VoiceProfileV3;
+    error?: string;
+  }>();
+  const defaultLoading = prepareDefault && defaultVoice?.key !== defaultKey;
+  useEffect(() => {
+    if (!prepareDefault || !area) return;
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const items = await loadAdminVoiceRecommendations({
+          area,
+          locale,
+          signal: controller.signal
+        });
+        const first = (["en-GB", "en-US"] as const)
+          .filter((accent) => !locale || accent === locale)
+          .map((accent) => items.find((item) => item.locale === accent))
+          .filter((item) => item !== undefined);
+        const voices = first.length
+          ? await (previewAdapter ?? adminVoicePreviewAdapter).listVoices({
+              language: "en",
+              signal: controller.signal
+            })
+          : [];
+        if (controller.signal.aborted) return;
+        const usable = first.filter((item) =>
+          isVoiceRecommendationAvailable(item, voices, locale)
+        );
+        setDefaultVoice({
+          key: defaultKey,
+          profile: usable.length
+            ? {
+                voices: usable.map((item) => ({
+                  ...item.setting,
+                  enabled: true
+                }))
+              }
+            : undefined,
+          error:
+            usable.length < first.length
+              ? "部分首位推荐已失效，请打开编辑器选择其他音色。"
+              : undefined
+        });
+      } catch {
+        if (!controller.signal.aborted)
+          setDefaultVoice({
+            key: defaultKey,
+            error: "默认配音加载失败，可继续输入并打开编辑器选择音色。"
+          });
+      }
+    })();
+    return () => controller.abort();
+  }, [prepareDefault, area, locale, defaultKey, previewAdapter]);
   useEffect(() => {
     if (!editing && !focused && !value.text) setRecorded(false);
   }, [editing, focused, value.text]);
@@ -303,7 +385,16 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       { value, links: textLinks }
     ];
     history.current.future = [];
-    publish(next, links);
+    const profile =
+      prepareDefault && defaultVoice?.key === defaultKey && next.text.trim()
+        ? defaultVoice.profile
+        : undefined;
+    if (profile) {
+      initialVoiceState.current.unconfigured = false;
+      // 正文先回灌父草稿，再用刷新后的回调写音色，避免两次更新互相覆盖。
+      flushSync(() => publish(next, links));
+      callbacks.current.onVoiceProfileChange?.(structuredClone(profile));
+    } else publish(next, links);
   };
   const restore = (redo: boolean) => {
     if (readOnly) return;
@@ -388,6 +479,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         if (
           readOnly ||
           contentReadOnly ||
+          defaultLoading ||
           (env.VOICE_EDITOR && editingEnabled && (recorded || expanded))
         )
           return;
@@ -409,9 +501,11 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           void feedback.info("已移除受改字影响的关联或标注，可撤销恢复");
       }}
       placeholder={placeholder}
+      aria-busy={defaultLoading || undefined}
       readOnly={
         readOnly ||
         contentReadOnly ||
+        defaultLoading ||
         (env.VOICE_EDITOR && editingEnabled && (recorded || expanded))
       }
       value={value.text}
@@ -547,20 +641,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             mode={mode}
             autoRecommend={initialVoiceState.current.unconfigured}
             loadRecommendations={loadAdminVoiceRecommendations}
-            recommendationArea={
-              recommendationArea ??
-              (mode === "spelling"
-                ? "word"
-                : mode === "grammar"
-                  ? "grammar"
-                  : mode === "association"
-                    ? "example"
-                    : mode === "synthesis"
-                      ? "azure"
-                      : mode === "actual-pron" || mode === "dict-phonetic"
-                        ? undefined
-                        : "meaning")
-            }
+            recommendationArea={area}
             textFormattingEnabled={env.SENTENCE_FORMATTING}
             locale={voiceLocale(dialect)}
             textLinks={editorState.textLinks}
@@ -628,6 +709,10 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   return (
     <>
       {fieldView}
+      {defaultLoading && <span role="status">正在加载默认配音…</span>}
+      {!editing && defaultVoice?.key === defaultKey && defaultVoice.error && (
+        <Alert type="warning" showIcon title={defaultVoice.error} />
+      )}
       {editing && (
         <VoiceEditorModal
           title={editorTitle ?? `编辑${ariaLabel}`}
