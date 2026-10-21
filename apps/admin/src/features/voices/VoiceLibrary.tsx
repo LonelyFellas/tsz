@@ -133,7 +133,11 @@ function VoiceSettingsNavigationGuard({
 }
 
 export function VoiceLibrary() {
-  const canView = useAnyPermission(["words.access", "sentences.access"]);
+  const canView = useAnyPermission([
+    "words.access",
+    "sentences.access",
+    "speech.global_dubbing"
+  ]);
   const canViewWords = usePermission("words.access");
   const canGenerateSpeech = usePermission("speech.generate");
   const canGenerate = canViewWords && canGenerateSpeech;

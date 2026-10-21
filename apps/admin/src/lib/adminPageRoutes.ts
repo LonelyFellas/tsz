@@ -22,7 +22,13 @@ export const ADMIN_PAGE_ROUTES = {
   },
   voices: {
     path: "voices",
-    handle: { anyPermission: ["words.access", "sentences.access"] }
+    handle: {
+      anyPermission: [
+        "words.access",
+        "sentences.access",
+        "speech.global_dubbing"
+      ]
+    }
   },
   users: { path: "users", handle: { permission: "users.access" } },
   teacherApplications: {

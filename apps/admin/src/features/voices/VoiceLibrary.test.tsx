@@ -260,6 +260,14 @@ describe("音色库", () => {
     expect(screen.getByLabelText("试听 Guy")).toBeVisible();
   }, 10_000);
 
+  it("全局配音管理员可维护音色，但不自动获得试听权限", async () => {
+    setPermissions(["speech.global_dubbing"]);
+    mount();
+    expect(await screen.findByLabelText("试听 Sonia")).toBeDisabled();
+    fireEvent.click(screen.getByLabelText("调整 Sonia 参数"));
+    expect(await screen.findByText("保存共享介绍")).toBeVisible();
+  });
+
   it("目录访问和生成权限分别判断，无权限时不请求目录", async () => {
     setPermissions(["sentences.access"]);
     const view = mount();

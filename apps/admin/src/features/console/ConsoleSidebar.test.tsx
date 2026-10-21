@@ -115,7 +115,11 @@ describe("ConsoleSidebar", () => {
     expect(screen.queryByText("天生币管理")).toBeNull();
   });
 
-  it.each([["words.access"], ["sentences.access"]] as MenuPermission[][])(
+  it.each([
+    ["words.access"],
+    ["sentences.access"],
+    ["speech.global_dubbing"]
+  ] as [string][])(
     "音色库是可直接点击的一级菜单，目录权限为 %s",
     async (permission) => {
       setLevel("admin", [permission]);

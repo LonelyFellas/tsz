@@ -151,7 +151,7 @@
 
 最新后端基线已包含拼写／IPA／UPS 独立配置（`spelling_speech`、`ipa_speech`、`ups_speech`）；上一轮旧主线的缺口已补齐，不重复实现。本批为 `voice_profile.voices` 新增可选 `pitch_semitones`（-12 至 12）与 `style`（最多 64 字符），缺省保持旧 JSON 形状，显式 null 拒绝；参数随文本保存和发布快照保留。关联任务 worktree 不在本任务修改范围内。
 
-现有目录权限为 `words.access` 或 `sentences.access`；试听权限为 `words.access` 且 `speech.generate`。第一批保留服务端权限规则，只读例句管理员可以浏览，但没有所需权限时不能试听。独立权限调整放入后续批次。
+目录与音色库访问允许 `words.access`、`sentences.access` 或 `speech.global_dubbing` 任一权限；共享介绍／分组写入要求 `speech.global_dubbing`，与权限目录的独立授权一致。试听仍需 `words.access` 且 `speech.generate`，维护权限不自动允许生成。
 
 ## 9. 分批施工与验收
 
@@ -213,6 +213,10 @@
 | 反复请求完整分组         | 提取已有 QueryClient 单例，编辑器和音色库共用账号隔离的 60 秒缓存；保存更新及撤权清理仍复用原机制 |
 
 先新增失败用例，已确认五条旧实现失败。修复后 309 个定向测试通过（音色抽屉 10 个，其余正文／默认值／参数／缓存／权限 299 个），586 个 API 客户端契约与请求测试通过，4 条音色库浏览器流程及 2 条既有 gated 编辑器浏览器流程实际通过，类型、后台构建、ESLint 和格式检查通过。确认弹窗在 jsdom 中关闭动画，保留保护行为断言，真实可见性由浏览器验证。浏览器使用受控 API，不把这轮测试称为 Azure 实测。后端接口、迁移本轮未改，沿用先前有效验证。
+
+### 精确提交交付审查
+
+后端 pre-push 独立审查补充修复：CI 固定 target 清单收录 `speech_library`；写入事务持账号行锁并比对 token 的 `security_version`，拒绝全端退出后的旧会话；仅持全局配音权限也能读取维护对象；多音色保存与目录同步共用 advisory lock；个人笔记、共享介绍、分组／推荐名称拒绝 NUL 并返回 400。前端入口同步全局配音访问权限，不额外授予试听。
 
 ### 下一批的具体入口
 
