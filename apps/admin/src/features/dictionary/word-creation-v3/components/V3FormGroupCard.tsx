@@ -3,12 +3,10 @@ import {
   CaretDownFilled,
   CaretUpFilled,
   DeleteOutlined,
-  DownCircleOutlined,
   DownOutlined,
   EllipsisOutlined,
   MinusCircleOutlined,
   PlusCircleOutlined,
-  UpCircleOutlined,
   UpOutlined
 } from "@ant-design/icons";
 import {
@@ -23,6 +21,7 @@ import {
 } from "antd";
 import type {
   DraftFormsStepContentV3,
+  FormTypeCatalogItem,
   PartOfSpeechCatalogItem,
   V3DraftValidationIssue,
   WordFormTypeV3,
@@ -33,9 +32,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import {
   addConcreteForm,
-  addConcreteFormAfterMembership,
   deleteConcreteForm,
-  reorderMemberships,
   updateConcreteFormType,
   type V3IdFactory
 } from "../operations";
@@ -71,6 +68,7 @@ export interface V3FormGroupCardProps {
   deleteBlockedByReferences?: number;
   onMove?: (offset: -1 | 1) => void;
   posCatalog?: PartOfSpeechCatalogItem;
+  formTypes?: readonly FormTypeCatalogItem[];
   dialectControl?: ReactNode;
   senseScope?: ReactNode;
   onEditSenses?: () => void;
@@ -97,6 +95,7 @@ export function V3FormGroupCard({
   deleteBlockedByReferences = 0,
   onMove,
   posCatalog,
+  formTypes,
   dialectControl,
   senseScope,
   onEditSenses,
@@ -108,10 +107,37 @@ export function V3FormGroupCard({
   const formTypeLabel = useFormTypeLabel();
   const [blockedFormId, setBlockedFormId] = useState<string>();
   const [collapsed, setCollapsed] = useState(false);
-  const orderedIds = group.members.map((member) => member.id);
+  const configuredTypes = formTypes?.length
+    ? [...formTypes]
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map((item) => item.code)
+    : ["base", ...(posCatalog?.allowed_form_types ?? [])];
+  const typeOrder = new Map(
+    configuredTypes.map((type, index) => [type, index])
+  );
+  const compareTypes = (a: string, b: string) =>
+    (typeOrder.get(a) ?? Number.MAX_SAFE_INTEGER) -
+    (typeOrder.get(b) ?? Number.MAX_SAFE_INTEGER);
   const formTypeOptions = posCatalog
-    ? (["base", ...(posCatalog.allowed_form_types ?? [])] as WordFormTypeV3[])
+    ? [
+        ...new Set<WordFormTypeV3>([
+          "base",
+          ...(posCatalog.allowed_form_types ?? [])
+        ])
+      ].sort(compareTypes)
     : [];
+  const formTypesById = new Map(
+    pos.forms.map((form) => [form.id, form.form_type])
+  );
+  const orderedMembers =
+    posCatalog || formTypes?.length
+      ? [...group.members].sort((a, b) =>
+          compareTypes(
+            formTypesById.get(a.form_id) ?? "",
+            formTypesById.get(b.form_id) ?? ""
+          )
+        )
+      : group.members;
   const baseMembersOf = (candidate: WordFormGroupV3) =>
     candidate.members.filter(
       (member) =>
@@ -158,13 +184,13 @@ export function V3FormGroupCard({
     index: number,
     form: WordPosFormsV3["forms"][number]
   ): V3DialectSeparatedFormRow => {
-    const sameTypeMembers = group.members.filter((candidate) => {
+    const sameTypeMembers = orderedMembers.filter((candidate) => {
       const candidateForm = pos.forms.find(
         (item) => item.id === candidate.form_id
       );
       return candidateForm?.form_type === form.form_type;
     });
-    const sameTypeIndex = group.members
+    const sameTypeIndex = orderedMembers
       .slice(0, index + 1)
       .filter((candidate) => {
         const candidateForm = pos.forms.find(
@@ -191,7 +217,6 @@ export function V3FormGroupCard({
     const lastRequiredForm = pos.forms.length === 1 && formMembershipCount <= 1;
     const formLabel =
       sameTypeMembers.length > 1 ? `${baseLabel} ${sameTypeIndex}` : baseLabel;
-    const formPositionLabel = `${baseLabel} ${sameTypeIndex}`;
     const deleteLocked =
       referenceStatusHint !== undefined ||
       formReferences > 0 ||
@@ -221,52 +246,6 @@ export function V3FormGroupCard({
       ),
       actions: (
         <div className="v3-membership-actions">
-          <Button
-            aria-label={`上移变化组 ${groupIndex + 1} 的词形 ${index + 1}`}
-            disabled={index === 0}
-            icon={<UpCircleOutlined />}
-            onClick={() => {
-              const nextOrder = [...orderedIds];
-              [nextOrder[index - 1], nextOrder[index]] = [
-                nextOrder[index]!,
-                nextOrder[index - 1]!
-              ];
-              onChange(reorderMemberships(content, group.id, nextOrder));
-            }}
-            size="small"
-            type="text"
-          />
-          <Button
-            aria-label={`下移变化组 ${groupIndex + 1} 的词形 ${index + 1}`}
-            disabled={index === group.members.length - 1}
-            icon={<DownCircleOutlined />}
-            onClick={() => {
-              const nextOrder = [...orderedIds];
-              [nextOrder[index], nextOrder[index + 1]] = [
-                nextOrder[index + 1]!,
-                nextOrder[index]!
-              ];
-              onChange(reorderMemberships(content, group.id, nextOrder));
-            }}
-            size="small"
-            type="text"
-          />
-          <Button
-            aria-label={`在${formPositionLabel} 下方添加同类型词形`}
-            icon={<PlusCircleOutlined />}
-            onClick={() => {
-              const result = addConcreteFormAfterMembership(
-                content,
-                pos.pos_id,
-                group.id,
-                member.id,
-                idFactory
-              );
-              if (result.ok) onChange(result.value);
-            }}
-            size="small"
-            type="text"
-          />
           {/* 一个词形只属于一个组，「从本组移除」就是删除词形，统一走删除确认。 */}
           <V3DisabledReason reason={deleteReason}>
             <Popconfirm
@@ -312,7 +291,7 @@ export function V3FormGroupCard({
       return form?.regional_variants.mode === "uk_us";
     });
   const separatedRows = useSeparatedMatrix
-    ? group.members.map((member, index) =>
+    ? orderedMembers.map((member, index) =>
         formRow(
           member,
           index,
@@ -343,6 +322,40 @@ export function V3FormGroupCard({
           data-v3-node-id={group.id}
           tabIndex={-1}
         >
+          <Dropdown
+            disabled={formTypeOptions.length === 0}
+            menu={{
+              items: formTypeOptions.map((type) => ({
+                key: type,
+                label: formTypeLabel(type)
+              })),
+              onClick: ({ key }) => {
+                const result = addConcreteForm(
+                  content,
+                  pos.pos_id,
+                  group.id,
+                  key,
+                  idFactory
+                );
+                if (result.ok) {
+                  onChange(result.value);
+                  setCollapsed(false);
+                }
+              }
+            }}
+            placement="bottomRight"
+            trigger={["click"]}
+          >
+            <Button
+              aria-label={`为第 ${groupIndex + 1} 组增加词形`}
+              disabled={formTypeOptions.length === 0}
+              ghost
+              icon={<PlusCircleOutlined />}
+              size="small"
+            >
+              增加词形
+            </Button>
+          </Dropdown>
           {onEditSenses ? (
             <Popover
               trigger="click"
@@ -437,23 +450,7 @@ export function V3FormGroupCard({
             <Empty
               description="草稿可暂时保留空变化组"
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-            >
-              <Button
-                icon={<PlusCircleOutlined />}
-                onClick={() => {
-                  const result = addConcreteForm(
-                    content,
-                    pos.pos_id,
-                    group.id,
-                    "base",
-                    idFactory
-                  );
-                  if (result.ok) onChange(result.value);
-                }}
-              >
-                添加原形
-              </Button>
-            </Empty>
+            />
           ) : null}
           {onEditContent && sharedCounts ? (
             <V3FormContentOverview
@@ -464,7 +461,7 @@ export function V3FormGroupCard({
               onFormTypeChange={(id, type) =>
                 onChange(updateConcreteFormType(content, id, type))
               }
-              rows={group.members.flatMap((member, index) => {
+              rows={orderedMembers.flatMap((member, index) => {
                 const form = pos.forms.find(
                   (item) => item.id === member.form_id
                 );
@@ -481,7 +478,7 @@ export function V3FormGroupCard({
               rows={separatedRows}
             />
           ) : (
-            group.members.map((member, index) => {
+            orderedMembers.map((member, index) => {
               const form = pos.forms.find((item) => item.id === member.form_id);
               if (!form) {
                 return (
@@ -493,7 +490,7 @@ export function V3FormGroupCard({
                 );
               }
               const row = formRow(member, index, form);
-              const previousMember = group.members[index - 1];
+              const previousMember = orderedMembers[index - 1];
               const previousForm = previousMember
                 ? pos.forms.find((item) => item.id === previousMember.form_id)
                 : undefined;
