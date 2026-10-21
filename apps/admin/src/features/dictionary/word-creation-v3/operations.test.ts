@@ -5,7 +5,6 @@ import type { RichTextV2V3, WordConcreteFormV3 } from "@tsz/types";
 import { describe, expect, it, vi } from "vitest";
 import {
   addConcreteForm,
-  addConcreteFormAfterMembership,
   addFormGroup,
   addPartOfSpeech,
   convertCommonToUkUs,
@@ -20,7 +19,6 @@ import {
   updateFormRegularity,
   reorderFormGroups,
   reorderForms,
-  reorderMemberships,
   reorderPos,
   reorderPronunciations,
   unifyUkUsSpelling,
@@ -779,15 +777,8 @@ describe("V3 forms operations", () => {
       second.id,
       first.id
     ]);
-    const reorderedMembers = reorderMemberships(reorderedForms, UUIDS.group, [
-      UUIDS.membership_2,
-      UUIDS.membership
-    ]);
-    expect(
-      reorderedMembers.pos[0]!.form_groups[0]!.members.map((item) => item.id)
-    ).toEqual([UUIDS.membership_2, UUIDS.membership]);
     const reorderedPronunciations = reorderPronunciations(
-      reorderedMembers,
+      reorderedForms,
       second.regional_variants.common.id,
       [UUIDS.pronunciation_3, UUIDS.pronunciation_2]
     );
@@ -1498,7 +1489,7 @@ describe("V3 forms operations", () => {
       mode: "uk_us"
     }
   ])(
-    "#174-$name 在当前 membership 下方创建同类型 form 并继承规则/默认发音",
+    "#174-$name 新增指定类型词形并继承规则/默认发音",
     ({ rules, source, generated, mode }) => {
       const tail = commonFormFixture({
         id: uuidFromInt(3051),
@@ -1523,29 +1514,29 @@ describe("V3 forms operations", () => {
         ]
       });
 
-      const added = addConcreteFormAfterMembership(
+      const added = addConcreteForm(
         original,
         original.pos[0]!.pos_id,
         groupId,
-        sourceMembershipId,
+        source.form_type,
         uuidSequence(...generated)
       );
 
       expect(added.ok).toBe(true);
       if (!added.ok) return;
       const nextPos = added.value.pos[0]!;
-      const newForm = nextPos.forms[1]!;
+      const newForm = nextPos.forms[2]!;
       expect(nextPos.forms.map((form) => form.id)).toEqual([
         source.id,
-        generated[0],
-        tail.id
+        tail.id,
+        generated[0]
       ]);
       expect(newForm.form_type).toBe(source.form_type);
       expect(newForm.regional_variants.mode).toBe(mode);
       expect(nextPos.form_groups[0]!.members).toEqual([
         { id: sourceMembershipId, form_id: source.id },
-        { id: generated[mode === "common" ? 2 : 3], form_id: generated[0] },
-        { id: tailMembershipId, form_id: tail.id }
+        { id: tailMembershipId, form_id: tail.id },
+        { id: generated[mode === "common" ? 2 : 3], form_id: generated[0] }
       ]);
       const variants =
         newForm.regional_variants.mode === "common"
@@ -1570,7 +1561,7 @@ describe("V3 forms operations", () => {
     }
   );
 
-  it("#176 行内加号只在触发组创建新 form 与 membership", () => {
+  it("#176 只在指定组创建新 form 与 membership", () => {
     const source = commonFormFixture({
       id: uuidFromInt(3101),
       variant_id: uuidFromInt(3102),
@@ -1602,11 +1593,11 @@ describe("V3 forms operations", () => {
     });
     const generated = [3131, 3132, 3133, 3134].map(uuidFromInt);
 
-    const added = addConcreteFormAfterMembership(
+    const added = addConcreteForm(
       original,
       original.pos[0]!.pos_id,
       secondGroupId,
-      secondMembershipId,
+      source.form_type,
       uuidSequence(...generated)
     );
 

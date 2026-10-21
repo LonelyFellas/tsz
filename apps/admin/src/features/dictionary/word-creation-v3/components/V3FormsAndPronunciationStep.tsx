@@ -443,6 +443,7 @@ export function V3FormsAndPronunciationStep({
                 onChange={onChange}
                 pos={pos}
                 stableVariantIds={stableVariantIds}
+                formTypes={catalog.data?.form_types}
                 posCatalog={catalog.data?.items.find(
                   (item) => item.code === pos.pos
                 )}

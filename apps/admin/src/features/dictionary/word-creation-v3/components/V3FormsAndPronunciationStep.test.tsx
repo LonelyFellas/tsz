@@ -301,6 +301,15 @@ async function chooseGroupAction(groupIndex: number, action: string) {
   fireEvent.click(choices.at(-1)!);
 }
 
+async function addFormType(groupIndex: number, label: string) {
+  const button = await screen.findByRole("button", {
+    name: `为第 ${groupIndex} 组增加词形`
+  });
+  await waitFor(() => expect(button).toBeEnabled());
+  fireEvent.click(button);
+  fireEvent.click(await screen.findByRole("menuitem", { name: label }));
+}
+
 function guardFor(
   index: V3ReferenceGuard["index"],
   openReference = vi.fn()
@@ -612,7 +621,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(canonicalValue().pos[0]!.forms).toHaveLength(1);
   });
 
-  it("实际模板空行支持移动和在下方添加同类型词形", async () => {
+  it("模板空行通过组顶部新增同类型词形，行内只保留删除", async () => {
     const initial = formsFixture({
       forms: [
         commonFormFixture({ spelling: "cat" }),
@@ -625,20 +634,9 @@ describe("V3FormsAndPronunciationStep", () => {
     });
     render(<Harness initial={initial} />);
     await screen.findByLabelText("复数英美通用拼写");
-    fireEvent.click(screen.getByLabelText("上移变化组 1 的词形 2"));
-    expect(
-      screen.getByLabelText("变化组 1 词形 1 类型").closest(".ant-select")
-    ).toHaveTextContent("复数");
-    expect(
-      canonicalValue().pos[0]!.form_groups[0]!.members.map(
-        (member) => member.form_id
-      )
-    ).toEqual([...initial.pos[0]!.forms].reverse().map((form) => form.id));
-    fireEvent.click(screen.getByLabelText("下移变化组 1 的词形 1"));
-    expect(
-      screen.getByLabelText("变化组 1 词形 2 类型").closest(".ant-select")
-    ).toHaveTextContent("复数");
-    fireEvent.click(screen.getByLabelText("在复数 1 下方添加同类型词形"));
+    expect(screen.queryByLabelText(/[上下]移变化组 \d+ 的词形/)).toBeNull();
+    expect(screen.queryByLabelText(/下方添加同类型词形/)).toBeNull();
+    await addFormType(1, "复数");
     expect(screen.getByLabelText("复数 1英美通用拼写")).toHaveValue("");
     expect(screen.getByLabelText("复数 2英美通用拼写")).toHaveValue("");
     expect(screen.getByTestId("progress-count")).toHaveTextContent("3");
@@ -942,62 +940,93 @@ describe("V3FormsAndPronunciationStep", () => {
     );
   });
 
-  it("类型单元加号在当前行下方新增同类型 form，并移除底部类型选择入口", async () => {
+  it("组顶部增加词形可在收起时使用，新增后展开并按类型归位", async () => {
     const base = commonFormFixture({
       id: uuidFromInt(2161),
       variant_id: uuidFromInt(2162),
-      spelling: "harbor"
+      spelling: "harbor",
+      pronunciations: []
+    });
+    const plural = commonFormFixture({
+      id: uuidFromInt(2163),
+      form_type: "plural",
+      spelling: "harbors",
+      pronunciations: []
     });
     const generated = [2171, 2172, 2173, 2174].map(uuidFromInt);
-    const content = formsFixture({ forms: [base] });
-    render(
-      <Harness initial={content} idFactory={uuidSequence(...generated)} />
-    );
+    const idFactory = uuidSequence(...generated);
+    const content = formsFixture({ forms: [base, plural] });
+    function GroupHarness() {
+      const [value, setValue] = useState(content);
+      const pos = value.pos[0]!;
+      return (
+        <AntApp>
+          <PronunciationPreviewProvider>
+            <V3FormGroupCard
+              content={value}
+              group={pos.form_groups[0]!}
+              groupIndex={0}
+              idFactory={idFactory}
+              issues={[]}
+              membershipCounts={new Map(pos.forms.map((form) => [form.id, 1]))}
+              onChange={setValue}
+              onEditContent={() => undefined}
+              pos={pos}
+              posCatalog={partOfSpeechCatalogFixture.items.find(
+                (item) => item.code === pos.pos
+              )}
+              formTypes={partOfSpeechCatalogFixture.form_types}
+              sharedCounts={new Map(pos.forms.map((form) => [form.id, 1]))}
+            />
+          </PronunciationPreviewProvider>
+          <output data-testid="canonical-value">{JSON.stringify(value)}</output>
+        </AntApp>
+      );
+    }
+    const { container } = render(<GroupHarness />);
 
-    const addButton =
-      await screen.findByLabelText("在原形 1 下方添加同类型词形");
-    expect(addButton.tagName).toBe("BUTTON");
-    expect(
-      [...addButton.parentElement!.querySelectorAll("button")].map((button) =>
-        button.getAttribute("aria-label")
-      )
-    ).toEqual([
-      "上移变化组 1 的词形 1",
-      "下移变化组 1 的词形 1",
-      "在原形 1 下方添加同类型词形",
-      "删除变化组 1 的词形 1"
-    ]);
+    const addButton = await screen.findByRole("button", {
+      name: "为第 1 组增加词形"
+    });
+    expect(addButton).toHaveTextContent("增加词形");
+    expect(addButton.closest(".ant-card-head")).not.toBeNull();
     expect(screen.queryByLabelText("变化组 1 新增词形类型")).toBeNull();
-    expect(screen.queryByLabelText("变化组 1 新增词形")).toBeNull();
     expect(screen.getByLabelText("删除变化组 1 的词形 1")).toBeDisabled();
+    fireEvent.click(screen.getByLabelText("收起第 1 组词形变化"));
 
-    fireEvent.click(addButton);
+    await addFormType(1, "原形");
 
-    await waitFor(() =>
-      expect(screen.getByLabelText("变化组 1 词形 2 类型")).toBeInTheDocument()
+    expect(screen.getByLabelText("收起第 1 组词形变化")).toHaveAttribute(
+      "aria-expanded",
+      "true"
     );
     const next = canonicalValue();
     expect(next.pos[0]!.forms.map((form) => form.id)).toEqual([
       base.id,
+      plural.id,
       generated[0]
     ]);
     expect(next.pos[0]!.forms.map((form) => form.form_type)).toEqual([
       "base",
+      "plural",
       "base"
     ]);
-    expect(
-      next.pos[0]!.form_groups[0]!.members.map((member) => member.form_id)
-    ).toEqual([base.id, generated[0]]);
-    expect(next.pos[0]!.form_groups[0]!.members[0]).toEqual(
-      content.pos[0]!.form_groups[0]!.members[0]
+    expect(next.pos[0]!.form_groups[0]!.members.slice(0, 2)).toEqual(
+      content.pos[0]!.form_groups[0]!.members
     );
-    expect(screen.getByLabelText("删除变化组 1 的词形 1")).not.toBeDisabled();
-    expect(screen.getByLabelText("删除变化组 1 的词形 2")).not.toBeDisabled();
     expect(
-      screen
-        .getAllByLabelText(/下方添加同类型词形/)
-        .map((button) => button.getAttribute("aria-label"))
-    ).toEqual(["在原形 1 下方添加同类型词形", "在原形 2 下方添加同类型词形"]);
+      [
+        ...container.querySelectorAll(".ant-table-tbody > tr[data-row-key]")
+      ].map((row) =>
+        row
+          .querySelector('[data-v3-field="form_type"]')
+          ?.getAttribute("data-v3-node-id")
+      )
+    ).toEqual([base.id, generated[0], plural.id]);
+    expect(next.pos[0]!.forms.slice(0, 2)).toEqual(content.pos[0]!.forms);
+    expect(screen.getByLabelText("删除变化组 1 的词形 1")).toBeEnabled();
+    expect(screen.getByLabelText("删除变化组 1 的词形 2")).toBeEnabled();
+    expect(screen.queryByLabelText(/下方添加同类型词形/)).toBeNull();
   });
 
   it("方言独立矩阵 CSS 固定宽屏留白/圆角并在窄屏按 V2 双行堆叠", () => {
@@ -1105,7 +1134,8 @@ describe("V3FormsAndPronunciationStep", () => {
       "true"
     );
     expect(screen.queryByText("添加词形")).toBeNull();
-    expect(screen.getAllByLabelText(/下方添加同类型词形/)).toHaveLength(3);
+    expect(screen.getByLabelText("为第 1 组增加词形")).toBeVisible();
+    expect(screen.queryByLabelText(/下方添加同类型词形/)).toBeNull();
     expect(container.textContent).not.toMatch(/派生词形|派生词性/);
     expect(container.querySelector(".v3-form-group-tools")).toBeNull();
     expect(
@@ -1471,26 +1501,33 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(screen.getByLabelText("删除变化组 2 的词形 1")).not.toBeDisabled();
   });
 
-  it("I02 使用 form UUID key，membership 重排时输入节点与焦点保持", async () => {
+  it("I02 修改类型后按配置归位，保留 form UUID、输入节点与焦点", async () => {
     const content = multiPosFixture();
     const formId = content.pos[0]!.forms[0]!.id;
     const groupId = content.pos[0]!.form_groups[0]!.id;
     const { container } = render(<Harness initial={content} />);
     const target = screen.getByLabelText("原形 1英美通用拼写");
-    target.focus();
     const row = target.closest(`[data-form-id="${formId}"]`);
 
-    await waitFor(() =>
-      expect(screen.getByLabelText("下移变化组 1 的词形 1")).toBeInTheDocument()
-    );
-    fireEvent.click(screen.getByLabelText("下移变化组 1 的词形 1"));
+    const typeSelect = screen.getByLabelText("变化组 1 词形 1 类型");
+    await waitFor(() => expect(typeSelect).toBeEnabled());
+    typeSelect.focus();
+    chooseOption("变化组 1 词形 1 类型", "复数");
 
-    expect(document.activeElement).toBe(target);
+    expect(document.activeElement).toBe(typeSelect);
+    expect(screen.getByLabelText("变化组 1 词形 2 类型")).toBe(typeSelect);
+    expect(screen.getByLabelText("复数英美通用拼写")).toBe(target);
     expect(target.closest(`[data-form-id="${formId}"]`)).toBe(row);
     const rows = container.querySelectorAll(
       `[data-group-id="${groupId}"] .v3-membership-row[data-form-id]`
     );
-    expect(rows[1]).toHaveAttribute("data-form-id", formId);
+    expect([...rows].map((item) => item.getAttribute("data-form-id"))).toEqual([
+      content.pos[0]!.forms[1]!.id,
+      formId
+    ]);
+    expect(canonicalValue().pos[0]!.form_groups).toEqual(
+      content.pos[0]!.form_groups
+    );
   });
 
   it.each(["拼写", "音标"])(
@@ -1849,8 +1886,8 @@ describe("V3FormsAndPronunciationStep", () => {
   });
 
   it.each(["unified", "distinguish"] as const)(
-    "合法空组显式添加原形，保留组 ID、范围和 %s 规则且不补模板",
-    (mode) => {
+    "合法空组通过顶部增加原形，保留组 ID、范围和 %s 规则且不补模板",
+    async (mode) => {
       const content = formsFixture();
       const emptyGroup: WordFormGroupV3 = {
         ...generalGroup(uuidFromInt(970), []),
@@ -1878,7 +1915,8 @@ describe("V3FormsAndPronunciationStep", () => {
         />
       );
       expect(onChange).not.toHaveBeenCalled();
-      fireEvent.click(screen.getByRole("button", { name: /添加原形/ }));
+      expect(screen.queryByRole("button", { name: "添加原形" })).toBeNull();
+      await addFormType(2, "原形");
       expect(onChange).toHaveBeenCalledTimes(1);
       const next: DraftFormsStepContentV3 = onChange.mock.calls[0]![0];
       const pos = next.pos[0]!;
@@ -2051,50 +2089,113 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(document.body.textContent).not.toMatch(/基本词性|派生词形|派生词性/);
   });
 
-  it("覆盖 group 首尾禁用、向上重排与缺省 membership count", () => {
-    const forms = [
-      commonFormFixture({ id: uuidFromInt(601) }),
-      commonFormFixture({ id: uuidFromInt(602) }),
-      commonFormFixture({ id: uuidFromInt(603) })
+  it("按目录 sort_order 展示，保持同类型及未知类型顺序且首次加载不写回", async () => {
+    const catalog = structuredClone(partOfSpeechCatalogFixture);
+    const verb = catalog.items.find((item) => item.code === "verb")!;
+    verb.allowed_form_types = [
+      "present_participle",
+      "third_person_singular",
+      "past_participle",
+      "past_tense"
     ];
-    const formGroup: WordFormGroupV3 = {
-      id: uuidFromInt(610),
-      is_regular: false,
-      scope: "general",
-      dialect_rules: { spelling_mode: "unified", phonetic_mode: "unified" },
-      members: forms.map((form, index) => ({
-        id: uuidFromInt(620 + index),
-        form_id: form.id
-      }))
-    };
-    const content = formsFixture({ forms, groups: [formGroup] });
+    const order = [
+      "past_tense",
+      "base",
+      "present_participle",
+      "third_person_singular",
+      "past_participle"
+    ];
+    for (const item of catalog.form_types ?? []) {
+      item.sort_order = order.indexOf(item.code) * 10;
+    }
+    catalog.form_types?.reverse();
+    catalogState.data = catalog;
+    const forms = [
+      "present_participle",
+      "historical_one",
+      "past_tense",
+      "base",
+      "present_participle",
+      "historical_two"
+    ].map((form_type, index) =>
+      commonFormFixture({
+        id: uuidFromInt(601 + index),
+        variant_id: uuidFromInt(611 + index),
+        form_type,
+        spelling: `form-${index}`,
+        pronunciations: []
+      })
+    );
+    const content = formsFixture({ forms, pos: "verb" });
+    const original = structuredClone(content);
     const onChange = vi.fn();
-    render(
+    const { container } = render(
+      <AntApp>
+        <V3FormsAndPronunciationStep value={content} onChange={onChange} />
+      </AntApp>
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText("为第 1 组增加词形")).toBeEnabled()
+    );
+    expect(
+      [...container.querySelectorAll(".v3-membership-row[data-form-id]")].map(
+        (row) => row.getAttribute("data-form-id")
+      )
+    ).toEqual([2, 3, 0, 4, 1, 5].map((index) => forms[index]!.id));
+    fireEvent.click(screen.getByLabelText("为第 1 组增加词形"));
+    expect(
+      screen.getAllByRole("menuitem").map((item) => item.textContent)
+    ).toEqual(["过去式", "原形", "现在分词", "第三人称单数", "过去分词"]);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(content).toEqual(original);
+  });
+
+  it("缺词形目录时按 allowed_form_types 排序，词性目录也缺失时保留原顺序并禁新增", () => {
+    const forms = [
+      commonFormFixture({
+        id: uuidFromInt(601),
+        form_type: "plural",
+        pronunciations: []
+      }),
+      commonFormFixture({ id: uuidFromInt(602), pronunciations: [] })
+    ];
+    const content = formsFixture({ forms });
+    const onChange = vi.fn();
+    const card = (withCatalog: boolean) => (
       <AntApp>
         <PronunciationPreviewProvider>
           <V3FormGroupCard
             content={content}
-            group={formGroup}
+            group={content.pos[0]!.form_groups[0]!}
             groupIndex={0}
             idFactory={() => uuidFromInt(699)}
             issues={[]}
             membershipCounts={new Map()}
             onChange={onChange}
             pos={content.pos[0]!}
+            posCatalog={
+              withCatalog
+                ? partOfSpeechCatalogFixture.items.find(
+                    (item) => item.code === "noun"
+                  )
+                : undefined
+            }
           />
         </PronunciationPreviewProvider>
       </AntApp>
     );
-
-    expect(screen.getByLabelText("上移变化组 1 的词形 1")).toBeDisabled();
-    expect(screen.getByLabelText("下移变化组 1 的词形 3")).toBeDisabled();
+    const { container, rerender } = render(card(true));
+    const rowIds = () =>
+      [...container.querySelectorAll(".v3-membership-row[data-form-id]")].map(
+        (row) => row.getAttribute("data-form-id")
+      );
+    expect(rowIds()).toEqual([forms[1]!.id, forms[0]!.id]);
+    expect(screen.getByLabelText("为第 1 组增加词形")).toBeEnabled();
+    rerender(card(false));
+    expect(rowIds()).toEqual(forms.map((form) => form.id));
+    expect(screen.getByLabelText("为第 1 组增加词形")).toBeDisabled();
     expect(screen.queryByText(/共享于/)).toBeNull();
-
-    fireEvent.click(screen.getByLabelText("上移变化组 1 的词形 3"));
-    const next = onChange.mock.calls[0]![0] as DraftFormsStepContentV3;
-    expect(
-      next.pos[0]!.form_groups[0]!.members.map((item) => item.form_id)
-    ).toEqual([forms[0]!.id, forms[2]!.id, forms[1]!.id]);
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it("覆盖 membership stale、词形缺失与取消删除", () => {
@@ -2667,8 +2768,8 @@ describe("V3FormsAndPronunciationStep", () => {
     const firstGroupId = ids[1]!;
     const firstFormId = ids[2]!;
     const firstMembershipId = ids[4]!;
-    fireEvent.click(screen.getByLabelText("在原形 1 下方添加同类型词形"));
-    // ⊕ 复制出的第二个原形排在原形后面，模板行的 ID 由同一个工厂顺次发，
+    await addFormType(1, "原形");
+    // 顶部新增的原形显示在已有原形后面，模板行的 ID 由同一个工厂顺次发，
     // 这里只认结构：两个原形同组、第二个是新节点。
     const copied = canonicalValue().pos[0]!;
     expect(
@@ -2687,9 +2788,8 @@ describe("V3FormsAndPronunciationStep", () => {
     const secondGroupId = noun.form_groups[1]!.id;
     expect(noun.forms).toHaveLength(templateFormTypes("noun").length + 1);
     expect(noun.form_groups[0]!.members.map((item) => item.form_id)).toEqual([
-      firstFormId,
-      secondFormId,
-      ...noun.form_groups[0]!.members.slice(2).map((member) => member.form_id)
+      ...addedNoun.form_groups[0]!.members.map((member) => member.form_id),
+      secondFormId
     ]);
     expect(noun.form_groups[1]!.members).toEqual([]);
     expect(noun.form_groups[0]!.members[0]!.id).toBe(firstMembershipId);
@@ -2780,7 +2880,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(locked).toBeDisabled();
     await expectDisabledReason(locked, "第 1 组词形变化至少保留一个原形");
 
-    fireEvent.click(screen.getByLabelText("在原形 1 下方添加同类型词形"));
+    await addFormType(1, "原形");
 
     await waitFor(() =>
       expect(screen.getByLabelText("变化组 1 词形 2 类型")).not.toBeDisabled()
@@ -2844,12 +2944,12 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(openDeleteConfirm()).not.toBeNull();
     fireEvent.click(pluralOption!);
     await waitFor(() =>
-      expect(screen.getByLabelText("变化组 1 词形 2 类型")).toBeDisabled()
+      expect(screen.getByLabelText("变化组 1 词形 1 类型")).toBeDisabled()
     );
 
-    // 确认框随之收起，删除按钮锁住并给出原因
+    // 剩下的原形按配置排到第 1 行，确认框随之收起且删除锁住。
     expect(openDeleteConfirm()).toBeNull();
-    const deleteButton = screen.getByLabelText("删除变化组 1 的词形 2");
+    const deleteButton = screen.getByLabelText("删除变化组 1 的词形 1");
     expect(deleteButton).toBeDisabled();
     await expectDisabledReason(deleteButton, "第 1 组词形变化至少保留一个原形");
     expect(
@@ -3085,10 +3185,7 @@ describe("V3FormsAndPronunciationStep", () => {
       />
     );
 
-    fireEvent.click(
-      await screen.findByLabelText("在原形 1 下方添加同类型词形")
-    );
-    chooseOption("变化组 1 词形 2 类型", "比较级");
+    await addFormType(1, "比较级");
     expect(
       canonicalValue().pos[0]!.forms.map((form) => form.form_type)
     ).toEqual(["base", "comparative"]);
@@ -3136,10 +3233,7 @@ describe("V3FormsAndPronunciationStep", () => {
         />
       );
 
-      fireEvent.click(
-        await screen.findByLabelText("在原形 1 下方添加同类型词形")
-      );
-      chooseOption("变化组 1 词形 2 类型", "复数");
+      await addFormType(1, "复数");
 
       await waitFor(() =>
         expect(screen.getByLabelText(expectedLabel)).toBeVisible()
@@ -3220,13 +3314,7 @@ describe("V3FormsAndPronunciationStep", () => {
     });
 
     await chooseGroupAction(1, "删除本组");
-    fireEvent.click(
-      within(
-        firstRender.container.querySelector(
-          `[data-group-id="${firstGroup.id}"]`
-        ) as HTMLElement
-      ).getByLabelText("在原形 1 下方添加同类型词形")
-    );
+    await addFormType(1, "原形");
     expect(canonicalValue().pos[0]!.forms).toHaveLength(3);
     fireEvent.click(
       screen.getByRole("button", {

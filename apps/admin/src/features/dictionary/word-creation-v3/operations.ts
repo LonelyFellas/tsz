@@ -1212,49 +1212,6 @@ export function addConcreteForm(
   return { ok: true, value: next };
 }
 
-export function addConcreteFormAfterMembership(
-  content: DraftFormsStepContentV3,
-  posId: string,
-  groupId: string,
-  sourceMembershipId: string,
-  idFactory: V3IdFactory = defaultIdFactory
-): OperationResult<DraftFormsStepContentV3> {
-  const pos = content.pos.find((item) => item.pos_id === posId);
-  if (!pos) return { ok: false, reason: "pos_not_found" };
-  const group = pos.form_groups.find((item) => item.id === groupId);
-  if (!group) return { ok: false, reason: "group_not_found" };
-  const sourceMembershipIndex = group.members.findIndex(
-    (member) => member.id === sourceMembershipId
-  );
-  if (sourceMembershipIndex < 0) {
-    return { ok: false, reason: "membership_not_found" };
-  }
-  const sourceFormId = group.members[sourceMembershipIndex]!.form_id;
-  const sourceFormIndex = pos.forms.findIndex(
-    (form) => form.id === sourceFormId
-  );
-  if (sourceFormIndex < 0) return { ok: false, reason: "form_not_found" };
-
-  const added = addConcreteForm(
-    content,
-    posId,
-    groupId,
-    pos.forms[sourceFormIndex]!.form_type,
-    idFactory
-  );
-  if (!added.ok) return added;
-
-  const targetPos = added.value.pos.find((item) => item.pos_id === posId)!;
-  const targetGroup = targetPos.form_groups.find(
-    (item) => item.id === groupId
-  )!;
-  const newForm = targetPos.forms.pop()!;
-  const newMembership = targetGroup.members.pop()!;
-  targetPos.forms.splice(sourceFormIndex + 1, 0, newForm);
-  targetGroup.members.splice(sourceMembershipIndex + 1, 0, newMembership);
-  return added;
-}
-
 export function deleteConcreteForm(
   content: DraftFormsStepContentV3,
   posId: string,
@@ -1348,20 +1305,6 @@ export function reorderFormGroups(
   const pos = next.pos.find((item) => item.pos_id === posId);
   if (!pos) throw new Error(`pos not found: ${posId}`);
   pos.form_groups = reorderByIds(pos.form_groups, orderedIds, "form group");
-  return next;
-}
-
-export function reorderMemberships(
-  content: DraftFormsStepContentV3,
-  groupId: string,
-  orderedIds: readonly string[]
-): DraftFormsStepContentV3 {
-  const next = clone(content);
-  const group = next.pos
-    .flatMap((pos) => pos.form_groups)
-    .find((item) => item.id === groupId);
-  if (!group) throw new Error(`group not found: ${groupId}`);
-  group.members = reorderByIds(group.members, orderedIds, "membership");
   return next;
 }
 

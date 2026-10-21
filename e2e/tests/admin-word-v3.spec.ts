@@ -1,6 +1,10 @@
 import { expect, test, type Page, type Locator } from "@playwright/test";
 import { expandFormContents } from "@tsz/shared";
-import type { RichTextV2, SharedSentence } from "@tsz/types";
+import type {
+  PartOfSpeechCatalogResponse,
+  RichTextV2,
+  SharedSentence
+} from "@tsz/types";
 import { validateRuntimeSchema } from "@tsz/api-client";
 import {
   ADMIN_V3_DETECTIONS_PATH,
@@ -28,6 +32,13 @@ async function openFormContent(
     );
   });
   return dialog;
+}
+
+async function addFormType(page: Page, groupIndex: number, label: string) {
+  await page
+    .getByRole("button", { name: `为第 ${groupIndex} 组增加词形` })
+    .click();
+  await page.getByRole("menuitem", { name: label, exact: true }).click();
 }
 
 async function applyFormContent(page: Page) {
@@ -3057,6 +3068,112 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(deleteButton).toBeDisabled();
   });
 
+  test("组顶部增加词形按配置排序，同类型归位且保存刷新后保留", async ({
+    page
+  }) => {
+    const api = await mockAdminV3Api(page, { formsFailureOnce: false });
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.goto("/words");
+    const catalog: PartOfSpeechCatalogResponse = await page.evaluate(async () =>
+      (await fetch("/api/v1/admin/settings/parts-of-speech/catalog")).json()
+    );
+    const orderedTypes = [
+      "past_tense",
+      "base",
+      "past_participle",
+      "present_participle",
+      "third_person_singular"
+    ];
+    for (const item of catalog.form_types ?? []) {
+      item.sort_order = orderedTypes.indexOf(item.code) * 10;
+    }
+    catalog.form_types?.reverse();
+    catalog.items.find((item) => item.code === "verb")!.allowed_form_types = [
+      "third_person_singular",
+      "past_tense",
+      "present_participle",
+      "past_participle"
+    ];
+    await page.route("**/settings/parts-of-speech/catalog", (route) =>
+      route.fulfill({ json: catalog })
+    );
+    await page.goto("/words/new");
+    await page.getByPlaceholder("例如 center 或 give up").fill("orbit");
+    await page.getByRole("button", { name: "词典检测" }).click();
+    await page.getByRole("button", { name: "创建并进入词形与发音" }).click();
+    await page.getByLabel("添加基本词性").first().click();
+    await page
+      .locator(".ant-select-dropdown:visible")
+      .getByText("动词", { exact: true })
+      .click();
+
+    const group = page.locator(".v3-form-group-card").first();
+    const rows = group.locator(
+      ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
+    );
+    const labels = rows.locator(".ant-select-content");
+    await expect(labels).toHaveText([
+      "过去式",
+      "原形",
+      "过去分词",
+      "现在分词",
+      "第三人称单数"
+    ]);
+    const originalKeys = await rows.evaluateAll((items) =>
+      items.map((item) => item.getAttribute("data-row-key"))
+    );
+    const add = group.getByRole("button", { name: "为第 1 组增加词形" });
+    await expect(add).toHaveText("增加词形");
+    await expect(
+      group
+        .locator(".ant-card-head")
+        .getByRole("button", { name: "为第 1 组增加词形" })
+    ).toBeVisible();
+    expect((await add.boundingBox())!.y).toBeLessThan(
+      (await rows.first().boundingBox())!.y
+    );
+    await expect(
+      group.getByRole("button", {
+        name: /[上下]移变化组 \d+ 的词形|下方添加同类型词形/
+      })
+    ).toHaveCount(0);
+    await group.getByLabel("收起第 1 组词形变化").click();
+    await addFormType(page, 1, "过去式");
+    await expect(group.getByLabel("收起第 1 组词形变化")).toHaveAttribute(
+      "aria-expanded",
+      "true"
+    );
+    const expectedLabels = [
+      "过去式",
+      "过去式",
+      "原形",
+      "过去分词",
+      "现在分词",
+      "第三人称单数"
+    ];
+    await expect(labels).toHaveText(expectedLabels);
+    const savedKeys = await rows.evaluateAll((items) =>
+      items.map((item) => item.getAttribute("data-row-key"))
+    );
+    expect([savedKeys[0], ...savedKeys.slice(2)]).toEqual(originalKeys);
+    expect(originalKeys).not.toContain(savedKeys[1]);
+    await expect(page.locator(".ant-dropdown-menu:visible")).toHaveCount(0);
+    await group.screenshot({
+      path: test.info().outputPath("form-config-order.png")
+    });
+
+    await page.getByRole("button", { name: "保存草稿" }).click();
+    await expect.poll(() => api.getWord().revision).toBe(2);
+    await page.reload();
+    await expect(labels).toHaveText(expectedLabels);
+    expect(
+      await rows.evaluateAll((items) =>
+        items.map((item) => item.getAttribute("data-row-key"))
+      )
+    ).toEqual(savedKeys);
+    await expect(page.getByRole("button", { name: "保存草稿" })).toBeDisabled();
+  });
+
   test("E01a Mock：统一入口新建复杂单词、保存刷新、422 定位及发布阻断", async ({
     page
   }) => {
@@ -3097,14 +3214,14 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await applyFormContent(page);
 
     // 加词性时按词性配置铺出新建模板：原形加名词名下的复数，共 2 行。
-    // 组内只剩一个原形时类型锁死；⊕ 复制出第二个原形后放开，删回去又锁上。
+    // 组内只剩一个原形时类型锁死；顶部新增第二个原形后放开，删回去又锁上。
     await expect(
       firstGroup.locator(
         ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
       )
     ).toHaveCount(2);
     await expect(firstGroup.getByLabel("变化组 1 词形 1 类型")).toBeDisabled();
-    await firstGroup.getByLabel("在原形 1 下方添加同类型词形").click();
+    await addFormType(page, 1, "原形");
     await expect(
       firstGroup.locator(
         ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
@@ -3166,7 +3283,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(secondGroup.getByText("草稿可暂时保留空变化组")).toBeVisible();
 
     // 第 2 组手动加原形，再在内容弹窗区分英美拼写。
-    await secondGroup.getByRole("button", { name: "添加原形" }).click();
+    await addFormType(page, 2, "原形");
     await expect(
       secondGroup.locator(
         ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
@@ -3464,7 +3581,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
 
     await page.getByRole("button", { name: "新增名词变化组" }).click();
     const secondGroup = nounGroups.nth(1);
-    await secondGroup.getByRole("button", { name: "添加原形" }).click();
+    await addFormType(page, 2, "原形");
     const secondContent = await openFormContent(page, secondGroup);
     await setContentRule(secondContent, "spelling", true);
     await setContentRule(secondContent, "spelling", false);

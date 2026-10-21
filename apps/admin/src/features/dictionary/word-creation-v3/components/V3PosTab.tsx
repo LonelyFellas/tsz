@@ -3,6 +3,7 @@ import { Alert, Button, Empty, Flex, Radio, Space, Typography } from "antd";
 import type {
   DialectRulesV3,
   DraftFormsStepContentV3,
+  FormTypeCatalogItem,
   PartOfSpeechCatalogItem,
   V3DraftValidationIssue,
   WordFormGroupV3,
@@ -50,6 +51,7 @@ export interface V3PosTabProps {
   idFactory: V3IdFactory;
   onChange: (next: DraftFormsStepContentV3) => void;
   posCatalog?: PartOfSpeechCatalogItem;
+  formTypes?: readonly FormTypeCatalogItem[];
   stableVariantIds?: V3StableVariantIdFactory;
   /** 变化组 id → 词义步里绑定它的词义数。 */
   formGroupBindingCounts?: ReadonlyMap<string, number>;
@@ -68,6 +70,7 @@ export function V3PosTab({
   idFactory,
   onChange,
   posCatalog,
+  formTypes,
   stableVariantIds,
   formGroupBindingCounts,
   renderGroupSenses,
@@ -429,6 +432,7 @@ export function V3PosTab({
               editingSenses={editingGroupId === group.id}
               pos={pos}
               posCatalog={posCatalog}
+              formTypes={formTypes}
             />
           ))}
         </Space>
