@@ -1023,7 +1023,7 @@ describe("V3FormsAndPronunciationStep", () => {
     );
   });
 
-  it("以实际产品图为基准恢复词性 Tab 与同组词形矩阵层级", async () => {
+  function mixedMatrixFixture() {
     const base = commonFormFixture({
       id: uuidFromInt(701),
       variant_id: uuidFromInt(711),
@@ -1051,6 +1051,11 @@ describe("V3FormsAndPronunciationStep", () => {
       ],
       pos: "noun"
     });
+    return { content, base, secondBase, plural };
+  }
+
+  it("以实际产品图为基准恢复词性 Tab 与同组词形矩阵层级", async () => {
+    const { content, base, secondBase, plural } = mixedMatrixFixture();
     const { container } = render(<Harness initial={content} />);
 
     expect(await screen.findByText("名词")).toBeVisible();
@@ -1108,7 +1113,12 @@ describe("V3FormsAndPronunciationStep", () => {
         `[data-group-id="${content.pos[0]!.form_groups[0]!.id}"] [data-form-id="${plural.id}"]`
       )
     ).not.toBeNull();
+  });
 
+  it("混合词形矩阵收起后重新展开仍保留三行与全部草稿", async () => {
+    const { content } = mixedMatrixFixture();
+    const { container } = render(<Harness initial={content} />);
+    await screen.findByText("名词");
     fireEvent.click(screen.getByLabelText("收起第 1 组词形变化"));
     expect(screen.getByLabelText("展开第 1 组词形变化")).toHaveAttribute(
       "aria-expanded",
@@ -1116,7 +1126,15 @@ describe("V3FormsAndPronunciationStep", () => {
     );
     expect(screen.queryByText("词形是否规则变化？")).toBeNull();
     fireEvent.click(screen.getByLabelText("展开第 1 组词形变化"));
-    const regularRadios = groupCard.querySelectorAll<HTMLInputElement>(
+    expect(container.querySelectorAll(".v3-concrete-form-row")).toHaveLength(3);
+    expect(canonicalValue()).toEqual(content);
+  });
+
+  it("混合矩阵切换原形规则变化只更新当前词形并保持组与另一原形", async () => {
+    const { content, base, secondBase } = mixedMatrixFixture();
+    const { container } = render(<Harness initial={content} />);
+    await screen.findByText("名词");
+    const regularRadios = container.querySelectorAll<HTMLInputElement>(
       '.v3-spelling-regularity input[type="radio"]'
     );
     fireEvent.click(regularRadios[1]!);

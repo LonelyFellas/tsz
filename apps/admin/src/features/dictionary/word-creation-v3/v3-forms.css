@@ -35,12 +35,12 @@
   }
 }
 
-.v3-forms-step textarea.tsz-words.ant-input,
-.v3-forms-step .v3-grammar-preview-content.tsz-words {
+:is(.v3-forms-step, .v3-content-modal) textarea.tsz-words.ant-input,
+:is(.v3-forms-step, .v3-content-modal) .v3-grammar-preview-content.tsz-words {
   font-weight: 700;
 }
 
-.v3-forms-step .word-pronunciation-label {
+:is(.v3-forms-step, .v3-content-modal) .word-pronunciation-label {
   font-weight: 400;
 }
 

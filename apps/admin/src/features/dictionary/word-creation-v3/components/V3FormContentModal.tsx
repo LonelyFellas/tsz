@@ -99,8 +99,9 @@ export function V3FormContentModal({
       }))
   );
   const current = contentFromEditor(editor);
+  const initialEditor = useRef(JSON.stringify(current));
   const dirty =
-    JSON.stringify(current) !== JSON.stringify(content) ||
+    JSON.stringify(current) !== initialEditor.current ||
     JSON.stringify(labels) !== JSON.stringify(original.current);
   const state = useRef({ dirty, editor, labels });
   state.current = { dirty, editor, labels };

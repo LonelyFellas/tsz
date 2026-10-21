@@ -43,7 +43,7 @@ vi.mock("./V3ConcreteFormRow", () => ({
   }
 }));
 
-function setup({ multipleGroups = false } = {}) {
+function setup({ multipleGroups = false, serverFieldOrder = false } = {}) {
   const expanded = formsFixture({
     forms: [
       commonFormFixture(),
@@ -54,6 +54,12 @@ function setup({ multipleGroups = false } = {}) {
     { forms_format: "shared_v1", contents: [], pos: [] },
     expanded
   ) as SharedFormsStepContentV3;
+  if (serverFieldOrder) {
+    const content = forms.contents[1]!;
+    if (content.regional_variants.mode !== "common") throw new Error("fixture");
+    const { id, ...variant } = content.regional_variants.common;
+    content.regional_variants.common = { ...variant, id };
+  }
   if (multipleGroups) {
     forms.pos[0]!.form_groups.push({
       id: uuidFromInt(902),
@@ -109,6 +115,16 @@ describe("词形内容弹窗的草稿边界", () => {
     fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
     expect(onConfirm).toHaveBeenCalledTimes(1);
     expect(JSON.stringify(onConfirm.mock.calls[0]![0])).toContain("changed");
+  });
+
+  it("服务端 JSON 字段顺序不同时，未编辑可直接取消", () => {
+    const { onConfirm, onCancel } = setup({ serverFieldOrder: true });
+    fireEvent.click(screen.getByRole("button", { name: /取\s*消/ }));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("button", { name: "放弃修改" })
+    ).not.toBeInTheDocument();
   });
 
   it("取消后选择放弃，不泄漏内容或标签修改", async () => {
