@@ -341,18 +341,18 @@ describe("SmartDictionary", () => {
         creator.closest(".ant-select")!.querySelector(".ant-select-clear")!
       );
       fireEvent.submit(screen.getByLabelText("词条").closest("form")!);
-      await waitFor(() =>
+      await waitFor(() => {
         expect(apiMocks.useWordList).toHaveBeenLastCalledWith({
           page: 1,
           page_size: 20,
           headword: "alpha",
           gloss: "测试",
           status: "published"
-        })
-      );
-      expect(screen.getByTestId("location").textContent).not.toContain(
-        "created_by="
-      );
+        });
+        expect(screen.getByTestId("location").textContent).not.toContain(
+          "created_by="
+        );
+      });
       expect(screen.getByLabelText("词条")).toHaveValue("alpha");
       expect(screen.getByLabelText("词义")).toHaveValue("测试");
     }
