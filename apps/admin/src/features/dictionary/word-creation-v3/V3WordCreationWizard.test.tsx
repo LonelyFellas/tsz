@@ -6412,10 +6412,10 @@ describe("V3WordCreationWizard", () => {
 });
 
 it("未保存页面时跨两次内容弹窗地区往返保留完整引用身份", async () => {
-  const initialWord = word();
+  const initialWord: AdminWordV3 = word();
   const shared = applyFormsStructure(
     { forms_format: "shared_v1", contents: [], pos: [] },
-    initialWord.forms
+    word().forms
   );
   if (!("forms_format" in shared)) throw new Error("fixture");
   initialWord.forms = shared;
