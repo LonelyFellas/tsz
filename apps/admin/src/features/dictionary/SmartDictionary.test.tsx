@@ -292,6 +292,8 @@ describe("SmartDictionary", () => {
         "created_by=01991111-2222-7333-8444-555566667777"
       )
     );
+    expect(panel).not.toBeVisible();
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(screen.getByRole("button", { name: /重置/ }));
     await waitFor(() =>
       expect(apiMocks.useWordList).toHaveBeenLastCalledWith({
@@ -301,6 +303,60 @@ describe("SmartDictionary", () => {
     );
     expect(screen.getByLabelText("词条")).toHaveValue("");
   });
+
+  it.each([false, true])(
+    "创建人加载失败时仍可单独清除已有条件，保留其他筛选（有缓存：%s）",
+    async (hasCachedCreators) => {
+      const refetch = vi.fn();
+      apiMocks.useWordCreators.mockReturnValue({
+        data: hasCachedCreators
+          ? [
+              {
+                id: "01991111-2222-7333-8444-555566667777",
+                display_name: "甲管理员"
+              }
+            ]
+          : undefined,
+        isPending: false,
+        isError: true,
+        refetch
+      });
+      render(
+        <AntApp>
+          <MemoryRouter
+            initialEntries={[
+              "/words?headword=alpha&gloss=测试&status=published&created_by=01991111-2222-7333-8444-555566667777"
+            ]}
+          >
+            <SmartDictionary />
+            <LocationProbe />
+          </MemoryRouter>
+        </AntApp>
+      );
+      const creator = screen.getByLabelText("创建人");
+      expect(creator).not.toBeDisabled();
+      fireEvent.click(screen.getByRole("button", { name: "重新加载创建人" }));
+      expect(refetch).toHaveBeenCalledOnce();
+      fireEvent.click(
+        creator.closest(".ant-select")!.querySelector(".ant-select-clear")!
+      );
+      fireEvent.submit(screen.getByLabelText("词条").closest("form")!);
+      await waitFor(() =>
+        expect(apiMocks.useWordList).toHaveBeenLastCalledWith({
+          page: 1,
+          page_size: 20,
+          headword: "alpha",
+          gloss: "测试",
+          status: "published"
+        })
+      );
+      expect(screen.getByTestId("location").textContent).not.toContain(
+        "created_by="
+      );
+      expect(screen.getByLabelText("词条")).toHaveValue("alpha");
+      expect(screen.getByLabelText("词义")).toHaveValue("测试");
+    }
+  );
 
   it("真实查询行以词名上标保留完整数字和前导0，并提供编辑入口", async () => {
     const annotated = {
@@ -1023,7 +1079,7 @@ describe("SmartDictionary", () => {
     );
   });
 
-  it("用户分页与修改每页数量会写入 URL", async () => {
+  it("用户分页与修改每页数量会写入 URL，并保留高级筛选的收起状态", async () => {
     apiMocks.useWordList.mockImplementation((query: AdminWordListQuery) => ({
       data: {
         words: [word("word-1", "first")],
@@ -1039,20 +1095,25 @@ describe("SmartDictionary", () => {
       refetch: vi.fn()
     }));
     const { container } = render(
-      <MemoryRouter initialEntries={["/words?keyword=center"]}>
+      <MemoryRouter initialEntries={["/words?keyword=center&status=published"]}>
         <AntApp>
           <SmartDictionary />
         </AntApp>
         <LocationProbe />
       </MemoryRouter>
     );
+    const toggle = screen.getByRole("button", { name: /收起筛选/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
 
     fireEvent.click(container.querySelector(".ant-pagination-item-2")!);
     await waitFor(() =>
       expect(screen.getByTestId("location")).toHaveTextContent(
-        "/words?keyword=center&page=2"
+        "/words?keyword=center&status=published&page=2"
       )
     );
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
 
     fireEvent.mouseDown(screen.getByRole("combobox", { name: "Page Size" }));
     const sizeOptions = await screen.findAllByRole("option");
@@ -1061,14 +1122,16 @@ describe("SmartDictionary", () => {
     );
     await waitFor(() => {
       expect(screen.getByTestId("location")).toHaveTextContent(
-        "/words?keyword=center&page_size=50"
+        "/words?keyword=center&status=published&page_size=50"
       );
       expect(apiMocks.useWordList).toHaveBeenLastCalledWith({
         page: 1,
         page_size: 50,
-        q: "center"
+        q: "center",
+        status: "published"
       });
     });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
   });
 
   it("用户连续修改筛选后，后退逐步恢复上一筛选状态", async () => {

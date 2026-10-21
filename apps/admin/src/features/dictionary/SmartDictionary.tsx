@@ -244,10 +244,6 @@ export function SmartDictionary({
       : creator.display_name
   }));
 
-  useEffect(() => {
-    if (hasAdvancedFilters) setAdvancedExpanded(true);
-  }, [hasAdvancedFilters, serializedSearchParams]);
-
   // 服务端分页 + 筛选:三者共同构成列表查询,任何变化都触发重取。
   const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([]);
   const [selectedRecords, setSelectedRecords] = useState<
@@ -1328,7 +1324,6 @@ export function SmartDictionary({
                   allowClear
                   showSearch={{ optionFilterProp: "label" }}
                   loading={creators.isPending}
-                  disabled={creators.isError}
                 />
               </Form.Item>
               <Form.Item name="range" label="创建时间">
