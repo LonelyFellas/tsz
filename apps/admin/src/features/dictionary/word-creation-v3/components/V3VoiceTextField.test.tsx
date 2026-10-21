@@ -8,7 +8,12 @@ import {
   waitFor
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { EnglishTextV3, RichTextV3, TextLinkV3 } from "@tsz/types";
+import type {
+  EnglishTextV3,
+  RichTextV3,
+  TextLinkV3,
+  VoiceProfileV3
+} from "@tsz/types";
 import { useState } from "react";
 import type { AudioUploadAdapter } from "@tsz/voice-editor/types";
 
@@ -109,7 +114,7 @@ beforeEach(() => {
   state.resolveUrl.mockReset();
 });
 
-it("先在折叠字段输入再打开编辑器，仍保留首次未配置状态", async () => {
+it("先在折叠字段输入再打开编辑器，保留已应用的首次推荐", async () => {
   state.flags.VOICE_PREVIEW = true;
   state.recommendations.mockResolvedValue([
     {
@@ -127,6 +132,7 @@ it("先在折叠字段输入再打开编辑器，仍保留首次未配置状态"
       text: "",
       annotations: []
     });
+    const [profile, setProfile] = useState<VoiceProfileV3>();
     return (
       <V3VoiceTextField
         mode="spelling"
@@ -135,11 +141,18 @@ it("先在折叠字段输入再打开编辑器，仍保留首次未配置状态"
         field="spelling"
         ariaLabel="新拼写"
         onChange={setValue}
-        onVoiceProfileChange={onProfile}
+        voiceProfile={profile}
+        onVoiceProfileChange={(next) => {
+          setProfile(next);
+          onProfile(next);
+        }}
       />
     );
   }
   render(<Host />);
+  await waitFor(() =>
+    expect(screen.getByLabelText("新拼写")).not.toHaveAttribute("readonly")
+  );
   fireEvent.change(screen.getByLabelText("新拼写"), {
     target: { value: "hello" }
   });
@@ -152,6 +165,214 @@ it("先在折叠字段输入再打开编辑器，仍保留首次未配置状态"
     voices: [{ voice_id: "sonia", enabled: true, rate_percent: -25 }]
   });
 }, 15000);
+
+it("折叠拼写输入直接保存后，正文和默认推荐一起读回", async () => {
+  state.flags.VOICE_PREVIEW = true;
+  state.recommendations.mockResolvedValue([
+    {
+      id: "first",
+      name: "慢读",
+      groupName: "词形",
+      locale: "en-GB",
+      setting: { voice_id: "sonia", enabled: true, rate_percent: -25 }
+    }
+  ]);
+  const initial = updateVariantSpelling(formsFixture(), UUIDS.common_variant, {
+    version: 2,
+    text: "",
+    annotations: []
+  });
+  const variantOf = (content: typeof initial) => {
+    const regions = content.pos[0]!.forms[0]!.regional_variants;
+    if (regions.mode !== "common") throw new Error("expected common");
+    return regions.common;
+  };
+  delete variantOf(initial).spelling_speech;
+  const saved = vi.fn();
+  function Host() {
+    const [content, setContent] = useState(initial);
+    const variant = variantOf(content);
+    return (
+      <>
+        <V3VoiceTextField
+          mode="spelling"
+          ariaLabel="直接录入拼写"
+          field="spelling"
+          nodeId={variant.id}
+          value={spellingEditorValue(variant)}
+          voiceProfile={variant.spelling_speech?.voice_profile}
+          onChange={(next) =>
+            setContent(updateVariantSpelling(content, variant.id, next))
+          }
+          onVoiceProfileChange={(profile) =>
+            setContent(
+              updateSpellingVoiceProfile(content, [variant.id], profile)
+            )
+          }
+        />
+        <button onClick={() => saved(structuredClone(toFormsWire(content)))}>
+          保存词形
+        </button>
+      </>
+    );
+  }
+  const view = render(<Host />);
+  const input = screen.getByLabelText("直接录入拼写");
+  await waitFor(() => expect(input).not.toHaveAttribute("readonly"));
+  fireEvent.change(input, { target: { value: "hello" } });
+  fireEvent.click(screen.getByText("保存词形"));
+  const wire = saved.mock.lastCall![0] as typeof initial;
+  expect(variantOf(wire).spelling).toBe("hello");
+  expect(variantOf(wire).spelling_speech?.voice_profile).toEqual({
+    voices: [{ voice_id: "sonia", enabled: true, rate_percent: -25 }]
+  });
+  expect(screen.queryByRole("dialog")).toBeNull();
+  view.unmount();
+  const profileChanged = vi.fn();
+  const variant = variantOf(wire);
+  render(
+    <V3VoiceTextField
+      mode="spelling"
+      ariaLabel="已保存拼写"
+      field="spelling"
+      nodeId={variant.id}
+      value={spellingEditorValue(variant)}
+      voiceProfile={variant.spelling_speech?.voice_profile}
+      onChange={vi.fn()}
+      onVoiceProfileChange={profileChanged}
+    />
+  );
+  expect(screen.getByLabelText("已保存拼写")).toHaveValue("hello");
+  expect(profileChanged).not.toHaveBeenCalled();
+});
+
+it("默认推荐加载期间不能提交正文，失败后保留手动录入入口", async () => {
+  let reject!: (error: Error) => void;
+  state.recommendations.mockImplementation(
+    () =>
+      new Promise((_, fail) => {
+        reject = fail;
+      })
+  );
+  const onChange = vi.fn();
+  render(
+    <V3VoiceTextField
+      mode="spelling"
+      ariaLabel="等待推荐"
+      field="spelling"
+      nodeId="pending"
+      value={{ version: 2, text: "", annotations: [] }}
+      onChange={onChange}
+      onVoiceProfileChange={vi.fn()}
+    />
+  );
+  const input = screen.getByLabelText("等待推荐");
+  expect(input).toHaveAttribute("readonly");
+  expect(screen.getByRole("status")).toHaveTextContent("正在加载默认配音");
+  fireEvent.change(input, { target: { value: "hello" } });
+  expect(onChange).not.toHaveBeenCalled();
+  reject(new Error("offline"));
+  await screen.findByText("默认配音加载失败，可继续输入并打开编辑器选择音色。");
+  expect(input).not.toHaveAttribute("readonly");
+  fireEvent.change(input, { target: { value: "hello" } });
+  expect(onChange).toHaveBeenCalledWith(
+    { version: 2, text: "hello", annotations: [] },
+    undefined
+  );
+});
+
+it.each([
+  { text: "已有正文", profile: undefined },
+  { text: "", profile: { voices: [] } }
+])("旧文本或显式空配置不自动采用推荐：$text", ({ text, profile }) => {
+  const changed = vi.fn();
+  render(
+    <V3VoiceTextField
+      mode="spelling"
+      ariaLabel="保留配置"
+      field="spelling"
+      nodeId="existing"
+      value={{ version: 2, text, annotations: [] }}
+      voiceProfile={profile}
+      onChange={vi.fn()}
+      onVoiceProfileChange={changed}
+    />
+  );
+  expect(state.recommendations).not.toHaveBeenCalled();
+  expect(changed).not.toHaveBeenCalled();
+});
+
+it("折叠释义只复制有效口音的首位推荐，不回填失效推荐", async () => {
+  state.recommendations.mockResolvedValue([
+    {
+      id: "uk",
+      name: "英式",
+      groupName: "释义",
+      locale: "en-GB",
+      setting: { voice_id: "sonia", enabled: true, rate_percent: -25 }
+    },
+    {
+      id: "us",
+      name: "已下线",
+      groupName: "释义",
+      locale: "en-US",
+      setting: { voice_id: "missing", enabled: true, rate_percent: 0 }
+    }
+  ]);
+  const changed = vi.fn();
+  render(
+    <V3VoiceTextField
+      mode="association"
+      recommendationArea="meaning"
+      ariaLabel="新释义"
+      field="meaning"
+      nodeId="meaning"
+      value={{ version: 2, text: "", annotations: [] }}
+      onChange={vi.fn()}
+      onVoiceProfileChange={changed}
+    />
+  );
+  await screen.findByText("部分首位推荐已失效，请打开编辑器选择其他音色。");
+  fireEvent.change(screen.getByLabelText("新释义"), {
+    target: { value: "hello" }
+  });
+  expect(state.recommendations).toHaveBeenCalledWith(
+    expect.objectContaining({ area: "meaning" })
+  );
+  expect(changed).toHaveBeenCalledWith({
+    voices: [{ voice_id: "sonia", enabled: true, rate_percent: -25 }]
+  });
+});
+
+it("切换节点后忽略上一节点迟到的默认推荐", async () => {
+  let resolve!: (items: unknown[]) => void;
+  let signal!: AbortSignal;
+  state.recommendations.mockImplementationOnce((input) => {
+    signal = input.signal;
+    return new Promise((done) => {
+      resolve = done;
+    });
+  });
+  const changed = vi.fn();
+  const field = (nodeId: string, text: string) => (
+    <V3VoiceTextField
+      mode="spelling"
+      ariaLabel="当前拼写"
+      field="spelling"
+      nodeId={nodeId}
+      value={{ version: 2, text, annotations: [] }}
+      onChange={vi.fn()}
+      onVoiceProfileChange={changed}
+    />
+  );
+  const view = render(field("new", ""));
+  view.rerender(field("saved", "existing"));
+  expect(signal.aborted).toBe(true);
+  resolve([]);
+  await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+  expect(changed).not.toHaveBeenCalled();
+  expect(screen.getByLabelText("当前拼写")).toHaveValue("existing");
+});
 
 it("未录入词形拼写可直接输入，并提供编辑器入口", () => {
   const onChange = vi.fn();

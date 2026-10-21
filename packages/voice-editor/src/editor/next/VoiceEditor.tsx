@@ -16,6 +16,7 @@ import { AUDIO_ASSETS_PER_VARIANT_MAX } from "@tsz/types";
 import {
   MAX_PAUSE_MS,
   MIN_PAUSE_MS,
+  isVoiceRecommendationAvailable,
   normalizeRichTextV2,
   normalizeSpellingRich,
   toRichTextV2,
@@ -543,25 +544,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   });
 
   const recommendationAvailable = useCallback(
-    (item: VoiceRecommendation): boolean => {
-      const voice = voices.find(
-        (value) =>
-          value.id === item.setting.voice_id && value.locale === item.locale
-      );
-      if (!voice || (locale && item.locale !== locale)) return false;
-      const {
-        rate_percent: rate,
-        pitch_semitones: pitch = 0,
-        style
-      } = item.setting;
-      return (
-        (!style || voice.styles.includes(style)) &&
-        (!voice.rateRange ||
-          (rate >= voice.rateRange.min && rate <= voice.rateRange.max)) &&
-        (!voice.pitchRange ||
-          (pitch >= voice.pitchRange.min && pitch <= voice.pitchRange.max))
-      );
-    },
+    (item: VoiceRecommendation): boolean =>
+      isVoiceRecommendationAvailable(item, voices, locale),
     [voices, locale]
   );
 
