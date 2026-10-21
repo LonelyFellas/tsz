@@ -11,6 +11,7 @@ export default defineConfig({
     "admin-accounts.spec.ts",
     "admin-word-creation.spec.ts",
     "admin-word-v3.spec.ts",
+    "admin-form-overview.spec.ts",
     "admin-part-of-speech.spec.ts",
     "admin-voice-library.spec.ts",
     "admin-auth-refresh.spec.ts"
