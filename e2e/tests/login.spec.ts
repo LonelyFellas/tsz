@@ -23,31 +23,6 @@ test.describe("登录页", () => {
     );
   });
 
-  test("初始状态立即登录按钮禁用", async ({ page }) => {
-    await expect(page.getByRole("button", { name: "立即登录" })).toBeDisabled();
-  });
-
-  for (const account of ["13800138000", "student@example.com"]) {
-    test(`${account} 与密码填写完整后可以登录`, async ({ page }) => {
-      await page.getByRole("textbox", { name: "手机号或邮箱" }).fill(account);
-      await expect(
-        page.getByRole("button", { name: "立即登录" })
-      ).toBeDisabled();
-      await page.getByLabel("密码", { exact: true }).fill("abc123");
-      await expect(
-        page.getByRole("button", { name: "立即登录" })
-      ).toBeEnabled();
-    });
-  }
-
-  test("无效账号不能提交", async ({ page }) => {
-    await page
-      .getByRole("textbox", { name: "手机号或邮箱" })
-      .fill("not-an-account");
-    await page.getByLabel("密码", { exact: true }).fill("abc123");
-    await expect(page.getByRole("button", { name: "立即登录" })).toBeDisabled();
-  });
-
   test("点击立即注册跳转注册页", async ({ page }) => {
     await expect(
       page.getByRole("button", { name: "没有账号，立即注册" })

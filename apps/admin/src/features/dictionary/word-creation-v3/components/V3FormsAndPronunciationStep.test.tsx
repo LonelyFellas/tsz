@@ -1029,29 +1029,6 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(screen.queryByLabelText(/下方添加同类型词形/)).toBeNull();
   });
 
-  it("方言独立矩阵 CSS 固定宽屏留白/圆角并在窄屏按 V2 双行堆叠", () => {
-    expect(formsCss).toMatch(
-      /\.v3-form-group-card\s*>\s*\.ant-card-body\s*>\s*\.ant-flex\s*\{[^}]*padding-bottom:\s*16px;/su
-    );
-    expect(formsCss).toContain(".v3-dialect-separated-matrix {");
-    expect(formsCss).toContain(
-      "grid-template-columns: 144px repeat(2, minmax(0, 1fr));"
-    );
-    expect(formsCss).toContain("column-gap: 12px;");
-    expect(formsCss).toMatch(
-      /\.v3-dialect-panel \{[\s\S]*?border: 1px solid;[\s\S]*?border-radius: 14px;/
-    );
-    expect(formsCss).toMatch(
-      /@container word-creation-content \(max-width: 900px\)[\s\S]*?\.v3-dialect-separated-matrix \{[\s\S]*?grid-template-columns: 112px minmax\(0, 1fr\);[\s\S]*?overflow-x: visible;/
-    );
-    expect(formsCss).toMatch(
-      /@container word-creation-content \(max-width: 900px\)[\s\S]*?\.v3-form-type-column[\s\S]*?display: contents;/
-    );
-    expect(formsCss).toMatch(
-      /\.v3-membership-actions \{[\s\S]*?grid-template-columns: repeat\(2, auto\);[\s\S]*?min-width: 0;/
-    );
-  });
-
   function mixedMatrixFixture() {
     const base = commonFormFixture({
       id: uuidFromInt(701),

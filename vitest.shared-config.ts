@@ -72,6 +72,6 @@ export const fullCoverageConfig: CoverageV8Options = {
 
 export const shardCoverageConfig: CoverageV8Options = {
   ...coverageCollectionConfig,
-  // 分片只收集数据；完整阈值和最终 reporter 在 merge 阶段统一执行。
+  // 覆盖率模式下分片只收集数据，最终 reporter 在 merge 阶段统一执行。
   reporter: []
 };
