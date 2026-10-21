@@ -193,7 +193,7 @@ describe("音色库", () => {
         new HttpError(409, "conflict", [], "revision_conflict")
       );
     mount();
-    const open = await screen.findByRole("button", { name: "调整 Sonia 参数" });
+    const open = await screen.findByLabelText("调整 Sonia 参数");
     await waitFor(() => expect(open).toBeEnabled());
     fireEvent.click(open);
     const dialog = await screen.findByRole("dialog");
@@ -284,8 +284,8 @@ describe("音色库", () => {
 
   it("空白及超长文本不能生成，修改文本清除旧音频", async () => {
     mount();
-    const button = await screen.findByRole("button", { name: "试听 Sonia" });
-    const text = screen.getByRole("textbox", { name: "共用试听文本" });
+    const button = await screen.findByLabelText("试听 Sonia");
+    const text = screen.getByLabelText("共用试听文本");
     fireEvent.change(text, { target: { value: "   " } });
     expect(button).toBeDisabled();
     fireEvent.change(text, { target: { value: "a".repeat(501) } });
@@ -316,9 +316,9 @@ describe("音色库", () => {
       .mockImplementationOnce(() => first.promise)
       .mockImplementationOnce(() => second.promise);
     mount();
-    fireEvent.click(await screen.findByRole("button", { name: "试听 Sonia" }));
+    fireEvent.click(await screen.findByLabelText("试听 Sonia"));
     const signal = vi.mocked(api.speech.preview).mock.calls[0]![1]!;
-    fireEvent.click(screen.getByRole("button", { name: "试听 Guy" }));
+    fireEvent.click(screen.getByLabelText("试听 Guy"));
     expect(signal.aborted).toBe(true);
     await act(async () => second.resolve(result("guy")));
     expect(await screen.findByLabelText("Guy 试听播放器")).toHaveAttribute(
@@ -335,20 +335,15 @@ describe("音色库", () => {
 
   it("调参按服务能力校验，原样提交百分比和半音，关闭后不留旧播放器", async () => {
     mount();
-    fireEvent.click(
-      await screen.findByRole("button", { name: "调整 Sonia 参数" })
-    );
+    fireEvent.click(await screen.findByLabelText("调整 Sonia 参数"));
     const drawer = await screen.findByRole("dialog");
-    fireEvent.change(
-      within(drawer).getByRole("spinbutton", { name: "合成语速" }),
-      { target: { value: "-25" } }
-    );
-    fireEvent.change(within(drawer).getByRole("spinbutton", { name: "音调" }), {
+    fireEvent.change(within(drawer).getByLabelText("合成语速"), {
+      target: { value: "-25" }
+    });
+    fireEvent.change(within(drawer).getByLabelText("音调"), {
       target: { value: "2" }
     });
-    fireEvent.click(
-      within(drawer).getByRole("button", { name: "试听当前参数" })
-    );
+    fireEvent.click(within(drawer).getByLabelText("试听当前参数"));
     await waitFor(() =>
       expect(api.speech.preview).toHaveBeenCalledWith(
         expect.objectContaining({ rate_percent: -25, pitch_semitones: 2 }),
@@ -358,13 +353,10 @@ describe("音色库", () => {
     expect(
       await within(drawer).findByLabelText("Sonia 试听播放器")
     ).toBeVisible();
-    fireEvent.change(
-      within(drawer).getByRole("spinbutton", { name: "合成语速" }),
-      { target: { value: "" } }
-    );
-    fireEvent.click(
-      within(drawer).getByRole("button", { name: "试听当前参数" })
-    );
+    fireEvent.change(within(drawer).getByLabelText("合成语速"), {
+      target: { value: "" }
+    });
+    fireEvent.click(within(drawer).getByLabelText("试听当前参数"));
     await within(drawer).findByText("请输入 -50 至 50 的整数");
     expect(api.speech.preview).toHaveBeenCalledTimes(1);
     expect(screen.queryByLabelText("Sonia 试听播放器")).toBeNull();
@@ -375,7 +367,7 @@ describe("音色库", () => {
     mount();
     expect(await screen.findByText("音色列表加载失败，请重试。")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: /重\s*试/ }));
-    fireEvent.click(await screen.findByRole("button", { name: "试听 Sonia" }));
+    fireEvent.click(await screen.findByLabelText("试听 Sonia"));
     fireEvent.error(await screen.findByLabelText("Sonia 试听播放器"));
     expect(
       screen.getByText("音频加载失败或链接已过期，请重新生成试听。")
@@ -386,12 +378,12 @@ describe("音色库", () => {
     const pending = deferred<AdminSpeechPreviewResponse>();
     vi.mocked(api.speech.preview).mockImplementationOnce(() => pending.promise);
     mount();
-    fireEvent.click(await screen.findByRole("button", { name: "试听 Sonia" }));
+    fireEvent.click(await screen.findByLabelText("试听 Sonia"));
     const signal = vi.mocked(api.speech.preview).mock.calls[0]![1]!;
     act(() => setPermissions(["words.access"]));
     expect(signal.aborted).toBe(true);
     await act(async () => pending.resolve(result("old")));
     expect(screen.queryByLabelText("Sonia 试听播放器")).toBeNull();
-    expect(screen.getByRole("button", { name: "试听 Sonia" })).toBeDisabled();
+    expect(screen.getByLabelText("试听 Sonia")).toBeDisabled();
   });
 });

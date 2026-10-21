@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
 import * as prettier from "prettier";
 
@@ -113,6 +113,29 @@ test("W05: web and admin E2E run independently and converge", async () => {
   assert.match(summary, /WEB_E2E_RESULT/);
   assert.match(summary, /ADMIN_E2E_RESULT/);
   assert.match(summary, /!= "success"/);
+});
+
+test("web excludes every admin E2E file and admin includes each exactly once", async () => {
+  const [web, admin, files] = await Promise.all([
+    readFile(new URL("../e2e/playwright.config.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL("../e2e/playwright.admin.config.ts", import.meta.url),
+      "utf8"
+    ),
+    readdir(new URL("../e2e/tests/", import.meta.url))
+  ]);
+  const entries = (source, key) => {
+    const block = source.match(new RegExp(`${key}:\\s*\\[([\\s\\S]*?)\\]`));
+    assert.ok(block, `${key} must be explicit`);
+    return [...block[1].matchAll(/"([^"]+\.spec\.ts)"/g)].map(
+      (match) => match[1]
+    );
+  };
+  const expected = files
+    .filter((file) => /^admin-.*\.spec\.ts$/.test(file))
+    .sort();
+  assert.deepEqual(entries(admin, "testMatch").sort(), expected);
+  assert.deepEqual(entries(web, "testIgnore").sort(), expected);
 });
 
 test("W06: commitlint remains pull-request only", async () => {
