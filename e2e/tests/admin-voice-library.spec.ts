@@ -1,8 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
-import type { AdminDubbingGroupsResponse } from "@tsz/types";
+import type {
+  AdminDubbingGroupsResponse,
+  SharedFormsStepContentV3
+} from "@tsz/types";
 import {
   mockAdminV3Api,
-  ADMIN_V3_MIXED_WORD_ID
+  ADMIN_V3_MIXED_WORD_ID,
+  ADMIN_V3_ENTRIES_PATH
 } from "./support/mockAdminV3Api";
 
 const voices = [
@@ -380,6 +384,108 @@ test("词形编辑器选用推荐并保留完整参数", async ({ page }) => {
     path: test.info().outputPath("text-recommendation.png"),
     fullPage: true
   });
+});
+
+test("折叠拼写直接保存并刷新，默认推荐随正文保留", async ({ page }) => {
+  const api = await mockAdminV3Api(page, { formsFailureOnce: false });
+  const word = api.getWord();
+  const forms = word.forms as SharedFormsStepContentV3;
+  const regions = forms.contents[0]!.regional_variants;
+  const initial = regions.mode === "common" ? regions.common : regions.uk;
+  initial.spelling = "";
+  delete initial.spelling_rich;
+  delete initial.spelling_speech;
+  const entryPath = `${ADMIN_V3_ENTRIES_PATH}/${word.id}`;
+  await page.route(`**/api/v1/admin${entryPath}`, async (route) => {
+    if (route.request().method() !== "GET") return route.fallback();
+    await route.fulfill({
+      json: {
+        word: api.count("PUT", `${entryPath}/steps/forms`)
+          ? api.getWord()
+          : word,
+        retired_stable_nodes: []
+      }
+    });
+  });
+  await page.route("**/api/v1/admin/speech/voices", (route) =>
+    route.fulfill({ json: { items: voices } })
+  );
+  await page.route("**/api/v1/admin/speech/library", (route) =>
+    route.fulfill({ json: { items: [] } })
+  );
+  await page.route("**/api/v1/admin/speech/groups", (route) =>
+    route.fulfill({
+      json: {
+        revision: 1,
+        groups: [
+          {
+            id: "group",
+            name: "词形推荐",
+            areas: ["word"],
+            uk: [
+              {
+                id: "first",
+                name: "慢读",
+                voice_alias: voices[0]!.alias,
+                parameters: {
+                  rate_percent: -25,
+                  pitch_semitones: 2,
+                  style: "cheerful"
+                }
+              }
+            ],
+            us: []
+          }
+        ]
+      }
+    })
+  );
+  await page.goto(`/words/${word.id}/v3/wizard/forms`);
+  await page.locator("[data-v3-open-content]").first().click();
+  const content = page.getByRole("dialog", { name: /^词形 .* 内容设置$/ });
+  const input = content.locator(".word-shared-form-spelling textarea").first();
+  await expect(input).toBeEditable();
+  await input.fill("hello");
+  await expect(page.getByRole("dialog")).toHaveCount(1);
+  await content
+    .getByRole("button", { name: "确认，应用到草稿", exact: true })
+    .click();
+  const saved = page.waitForResponse(
+    (response) =>
+      response.request().method() === "PUT" &&
+      response.url().endsWith(`${entryPath}/steps/forms`)
+  );
+  await page.getByRole("button", { name: /保存草稿$/ }).click();
+  expect((await saved).ok()).toBe(true);
+  const stored = (api.getWord().forms as SharedFormsStepContentV3).contents[0]!
+    .regional_variants;
+  const variant = stored.mode === "common" ? stored.common : stored.uk;
+  expect(variant.spelling).toBe("hello");
+  expect(variant.spelling_speech?.voice_profile).toEqual({
+    voices: [
+      {
+        voice_id: voices[0]!.alias,
+        enabled: true,
+        rate_percent: -25,
+        pitch_semitones: 2,
+        style: "cheerful"
+      }
+    ]
+  });
+  await page.reload();
+  await page.locator("[data-v3-open-content]").first().click();
+  await expect(input).toHaveValue("hello");
+  await content
+    .locator(".word-shared-form-spelling")
+    .first()
+    .getByRole("button", { name: /^打开.*编辑器$/ })
+    .click();
+  await expect(
+    page.getByRole("checkbox", { name: /启用 Sonia/ })
+  ).toBeChecked();
+  await expect(
+    page.getByRole("button", { name: /设置 Sonia.*的语速/ })
+  ).toContainText("0.75");
 });
 
 test("窄屏可浏览，只有例句权限时禁止生成；固定参数不可编辑", async ({
