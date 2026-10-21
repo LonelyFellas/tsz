@@ -32,6 +32,7 @@ import type {
   AdminUserListQuery,
   AdminUserListResponse,
   AdminUserUpdateInput,
+  UserRegistrationRegion,
   AdminSpeechPreviewResponse,
   AdminSpeechVoiceListResponse,
   AudioAssetUrlResponse,
@@ -136,7 +137,6 @@ export type {
   AdminUserListQuery,
   AdminUserListResponse,
   AdminUserUpdateInput,
-  AdminUserView,
   CreateAdminInput,
   CreateAdminResponse,
   CreateRoleRequest,
@@ -691,6 +691,12 @@ export function createAdminEndpoints(http: HttpClient) {
      * 四条的 200 都返回同一个 AdminUser 形状；phone / email 缺值时**省略键**（不返回 null 或 ""）。
      */
     users: {
+      /** 独立读取注册城市；需 users.read_registration_region。 */
+      registrationRegion: (id: string, opts?: { signal?: AbortSignal }) =>
+        http.get<UserRegistrationRegion>(
+          `/users/${encodeURIComponent(id)}/registration-region`,
+          opts
+        ),
       wallet: (id: string) =>
         http
           .get<unknown>(`/users/${encodeURIComponent(id)}/coin-wallet`)

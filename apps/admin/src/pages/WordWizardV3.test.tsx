@@ -26,7 +26,7 @@ import type {
   V3DraftValidationIssue
 } from "@tsz/types";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 import {
   createV3WordRequests,
   type V3WordsApi,
@@ -1955,6 +1955,17 @@ describe("WordWizardV3Page", () => {
   );
 
   it("审查回归：恢复 common 历史后用完整退役账本重用 split 槽位", async () => {
+    // jsdom 不做布局；只跳过 textarea 自动测高，保留真实控件、恢复与保存链路。
+    const getComputedStyle = window.getComputedStyle.bind(window);
+    const textareaStyle = getComputedStyle(document.createElement("textarea"));
+    const styleSpy = vi
+      .spyOn(window, "getComputedStyle")
+      .mockImplementation((element, pseudoElement) =>
+        element instanceof HTMLTextAreaElement
+          ? textareaStyle
+          : getComputedStyle(element, pseudoElement)
+      );
+    onTestFinished(() => styleSpy.mockRestore());
     const current = word({
       forms: formsFixture({ forms: [ukUsFormFixture({ id: UUIDS.form })] }),
       completed_steps: ["basics", "forms", "meanings"],

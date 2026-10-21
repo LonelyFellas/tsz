@@ -27,7 +27,9 @@
 
 后端 `docs/openapi.json` 已由 Rust 1.98.0 原生 exporter 导出，并通过显式 `OPENAPI_SOURCE=<本任务后端>/docs/openapi.json` 同步前端；没有手改生成 JSON。后端原始文件 SHA-256 与前端 runtime bundle 的 `_source_sha256` 相同：
 
-`066c1db9d4b103b33a7345a400e0f8f9347336af5d9adf522183640c874211fe`
+`67f013e088a3bc724cef67b007120d8da7ea13491fdd0090bdfe246ccf117fd6`
+
+PR 准备时两仓均合入新主线：前端 `20e802344381e40885a3befb1ff625cf5bca2865`，后端 `fcefa876b32f53a86a5229a9b406c13f4efe9954`。上列契约 hash 已从合并后的后端重新原生导出并同步，包含主线用户资料接口增量；实施阶段的真实页面验收仍对应原实施版本。
 
 现网版本、现网数据规模及迁移耗时未核实。本地候选不能作为已部署版本证据。
 

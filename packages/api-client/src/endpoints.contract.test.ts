@@ -209,6 +209,46 @@ function collectComponentSchemaRefs(value: unknown): Set<string> {
   return refs;
 }
 
+describe("用户注册地区独立资源契约", () => {
+  it("独立 GET 返回必填可空城市与三种状态，不暴露 IP", () => {
+    expect(specPaths["/admin/users/{id}/registration-region"]).toEqual(["get"]);
+    const operation =
+      snapshot.operationSchemas["get /admin/users/{id}/registration-region"];
+    expect(operation.request).toBeNull();
+    expect(operation.responses["200"]).toEqual({
+      $ref: "#/components/schemas/UserRegistrationRegion"
+    });
+    expect(operation.responses).toHaveProperty("403");
+    expect(operation.responses).toHaveProperty("404");
+    const schema = snapshot.schemas.UserRegistrationRegion;
+    expect(schema.additionalProperties).toBe(false);
+    expect([...schema.required].sort()).toEqual(["city", "status"]);
+    expect(Object.keys(schema.properties).sort()).toEqual(["city", "status"]);
+    expect(schema.properties.city.type).toEqual(["string", "null"]);
+    expect(schema.properties.status).toEqual({
+      $ref: "#/components/schemas/RegistrationRegionStatus"
+    });
+    expect(snapshot.schemas.RegistrationRegionStatus.enum).toEqual([
+      "resolved",
+      "not_recorded",
+      "unknown"
+    ]);
+  });
+});
+
+describe("后台用户学习配置契约", () => {
+  it("用户资料复用学生学习配置，允许未配置或按基本资料权限省略", () => {
+    const schema = snapshot.schemas.AdminAccountUserResponse;
+    expect(schema.required).not.toContain("learning_settings");
+    expect(schema.properties.learning_settings.oneOf).toEqual([
+      { type: "null" },
+      expect.objectContaining({ $ref: "#/components/schemas/LearningSettings" })
+    ]);
+    expect(schema.properties).not.toHaveProperty("level");
+    expect(schema.properties).not.toHaveProperty("dialect");
+  });
+});
+
 describe("个人学习配置契约", () => {
   it("真实读取为必填可空配置，保存严格成对字段并公开锁定错误", () => {
     expect(specPaths["/me"]).toContain("get");
@@ -778,7 +818,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "066c1db9d4b103b33a7345a400e0f8f9347336af5d9adf522183640c874211fe"
+      "67f013e088a3bc724cef67b007120d8da7ea13491fdd0090bdfe246ccf117fd6"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");

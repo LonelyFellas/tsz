@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/task-146-form-content-design/docs/openapi.json",
-  "_generatedAt": "2026-10-21T02:02:17.094Z",
+  "_generatedAt": "2026-10-21T03:10:27.278Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -103,6 +103,7 @@
     "/admin/users/{id}/coin-wallet": ["get"],
     "/admin/users/{id}/identity-documents": ["get"],
     "/admin/users/{id}/identity-documents/{file_id}": ["get"],
+    "/admin/users/{id}/registration-region": ["get"],
     "/admin/users/{id}/status": ["patch"],
     "/admin/users/{id}/teacher-certification": ["delete"],
     "/admin/wordlists": ["get"],
@@ -2450,6 +2451,14 @@
         "500": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
+    "get /admin/users/{id}/registration-region": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/UserRegistrationRegion" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "delete /auth/account": {
       "request": {
         "$ref": "#/components/schemas/ConfirmAccountDeletionRequest"
@@ -3235,6 +3244,67 @@
         "snapshot": { "type": "string", "pattern": "^(0|[1-9][0-9]{0,18})$" }
       },
       "additionalProperties": false
+    },
+    "AdminAccountUserResponse": {
+      "type": "object",
+      "required": ["id", "display_name", "created_at"],
+      "properties": {
+        "avatar_url": {
+          "type": "string",
+          "description": "仅对 users.read_basic 可见。"
+        },
+        "created_at": { "type": "string", "format": "date-time" },
+        "display_name": { "type": "string" },
+        "email": {
+          "type": "string",
+          "description": "完整邮箱仅对 users.read_sensitive 可见；无权限或未绑定时省略。"
+        },
+        "id": { "type": "string", "format": "uuid" },
+        "learning_settings": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "#/components/schemas/LearningSettings",
+              "description": "仅对 users.read_basic 可见；尚未配置学习设置时为 null，无权限时省略。"
+            }
+          ]
+        },
+        "phone": {
+          "type": "string",
+          "description": "完整手机号仅对 users.read_sensitive 可见；无权限或未绑定时省略。"
+        },
+        "roles": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/UserRole" },
+          "description": "仅对 users.read_basic 可见。"
+        },
+        "status": {
+          "$ref": "#/components/schemas/UserStatus",
+          "description": "仅对 users.read_basic 可见。"
+        },
+        "teacher_verified": {
+          "type": "boolean",
+          "description": "仅对 users.read_basic 可见。"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "仅对 users.read_basic 可见。"
+        }
+      }
+    },
+    "UserRegistrationRegion": {
+      "type": "object",
+      "required": ["city", "status"],
+      "properties": {
+        "city": { "type": ["string", "null"] },
+        "status": { "$ref": "#/components/schemas/RegistrationRegionStatus" }
+      },
+      "additionalProperties": false
+    },
+    "RegistrationRegionStatus": {
+      "type": "string",
+      "enum": ["resolved", "not_recorded", "unknown"]
     },
     "OwnerType": { "type": "string", "enum": ["user", "admin"] },
     "WalletStatus": {

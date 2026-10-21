@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/task-146-form-content-design/docs/openapi.json",
-  "_source_sha256": "066c1db9d4b103b33a7345a400e0f8f9347336af5d9adf522183640c874211fe",
+  "_source_sha256": "67f013e088a3bc724cef67b007120d8da7ea13491fdd0090bdfe246ccf117fd6",
   "roots": [
     "DictionaryPage",
     "DictionaryEntry",

@@ -1388,6 +1388,20 @@ describe("createAdminEndpoints — 系统设置词性配置", () => {
 });
 
 describe("createAdminEndpoints — 用户管理 users", () => {
+  it("registrationRegion 读取独立资源、转义用户 ID 并透传取消信号", async () => {
+    const api = createAdminEndpoints(http);
+    const controller = new AbortController();
+    const region = { city: "北京", status: "resolved" };
+    http.get.mockResolvedValueOnce(region);
+    await expect(
+      api.users.registrationRegion("u/1", {
+        signal: controller.signal
+      })
+    ).resolves.toEqual(region);
+    expect(http.get).toHaveBeenCalledWith("/users/u%2F1/registration-region", {
+      signal: controller.signal
+    });
+  });
   it("list 无参 → GET /users(不带 ?)", () => {
     const api = createAdminEndpoints(http);
     api.users.list();

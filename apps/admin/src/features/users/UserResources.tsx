@@ -4,7 +4,35 @@ import dayjs from "dayjs";
 import { useQuery } from "@tanstack/react-query";
 import { Alert, Button, Card, Empty, Image, Space, Spin, Table } from "antd";
 import type { CertificationFile } from "@tsz/types";
+import { HttpError } from "@tsz/api-client";
 import { api, usePermission } from "@/lib/auth";
+
+export function UserRegistrationRegion({ userId }: { userId: string }) {
+  const query = useQuery({
+    queryKey: ["admin-users", "registration-region", userId],
+    staleTime: 0,
+    gcTime: 0,
+    retry: false,
+    queryFn: ({ signal }) => api.users.registrationRegion(userId, { signal })
+  });
+  if (query.isError)
+    return query.error instanceof HttpError && query.error.status === 403 ? (
+      <span>无权限</span>
+    ) : (
+      <Space size={8}>
+        <span>加载失败</span>
+        <Button size="small" onClick={() => void query.refetch()}>
+          重试
+        </Button>
+      </Space>
+    );
+  if (query.isPending) return <Spin size="small" />;
+  return query.data.status === "resolved"
+    ? query.data.city
+    : query.data.status === "not_recorded"
+      ? "未记录"
+      : "未知";
+}
 
 function IdentityImage({
   userId,

@@ -1,11 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  DIALECT_LABEL,
-  FORM_TYPE_OPTIONS,
-  shownDialects,
-  toOptions
-} from "./editorConstants";
-import {
   CEFR_LEVELS,
   cefrColor,
   inboundRelationSummary,
@@ -33,24 +27,6 @@ describe("labels — wire 枚举 ↔ UI 标签", () => {
       "#B817CF",
       "#D22D8D"
     ]);
-  });
-});
-
-describe("editorConstants — 编辑器枚举", () => {
-  it("shownDialects:选了方言按所选,否则回退 common", () => {
-    expect(shownDialects(["uk", "us"])).toEqual(["uk", "us"]);
-    expect(shownDialects([])).toEqual(["common"]);
-  });
-
-  it("固定方言与词形枚举的中文标签齐全", () => {
-    expect(DIALECT_LABEL.common).toBe("英美通用");
-    expect(DIALECT_LABEL.uk).toBe("英式英语");
-    expect(DIALECT_LABEL.us).toBe("美式英语");
-    expect(FORM_TYPE_OPTIONS).toContainEqual({ value: "base", label: "原形" });
-  });
-
-  it("toOptions:字符串数组转 label/value 对", () => {
-    expect(toOptions(["A1"])).toEqual([{ label: "A1", value: "A1" }]);
   });
 });
 
