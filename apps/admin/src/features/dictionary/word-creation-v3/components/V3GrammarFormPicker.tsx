@@ -9,6 +9,7 @@ import {
   Typography
 } from "antd";
 import { useEffect, useMemo, useState } from "react";
+import { expandFormContents } from "@tsz/shared";
 import type {
   Dialect,
   DraftFormsStepContentV3,
@@ -91,7 +92,7 @@ export function V3GrammarFormPicker({
     void requests
       .get(link.target_word_id)
       .then(({ word }) => {
-        const pos = word.forms.pos.find(
+        const pos = expandFormContents(word.forms).pos.find(
           (pos) => pos.pos_id === link.target_pos_id
         );
         const form = pos?.forms.find((form) => form.id === link.target_form_id);

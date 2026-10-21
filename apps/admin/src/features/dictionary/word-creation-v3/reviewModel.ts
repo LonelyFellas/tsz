@@ -1,4 +1,5 @@
-import type { AdminWordV3 } from "@tsz/types";
+import type { AdminWordV3, WordConcreteFormV3 } from "@tsz/types";
+import { expandFormContents } from "@tsz/shared";
 
 export type V3ReviewStatus =
   "draft" | "published" | "published_dirty" | "archived";
@@ -30,9 +31,7 @@ export interface V3ReviewModel {
  * 好让「同一个词的多套变化范式」共用的原形只数一次。两侧都空的原形还没有
  * 身份，跟着后端 presentation 投影的口径一并跳过。
  */
-function baseSpellingKey(
-  form: AdminWordV3["forms"]["pos"][number]["forms"][number]
-): string | undefined {
+function baseSpellingKey(form: WordConcreteFormV3): string | undefined {
   const spellings =
     form.regional_variants.mode === "common"
       ? [
@@ -50,7 +49,7 @@ function baseSpellingKey(
 }
 
 export function buildV3ReviewModel(word: AdminWordV3): V3ReviewModel {
-  const forms = word.forms.pos.flatMap((pos) => pos.forms);
+  const forms = expandFormContents(word.forms).pos.flatMap((pos) => pos.forms);
   const pronunciations = forms.flatMap((form) =>
     form.regional_variants.mode === "common"
       ? form.regional_variants.common.pronunciations

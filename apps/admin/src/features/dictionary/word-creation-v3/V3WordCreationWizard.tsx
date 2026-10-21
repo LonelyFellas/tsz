@@ -6,6 +6,8 @@ import type {
   AdminWordV3,
   PartOfSpeechCatalogResponse,
   DraftFormsStepContentV3,
+  FormsStepRepresentationV3,
+  RetiredContentSlotV3,
   DraftMeaningsStepContentWritableV3,
   DraftValidationResponseV3,
   FormsImpactResponseV3,
@@ -15,6 +17,11 @@ import type {
   V3DraftValidationIssue,
   WordCreationStep
 } from "@tsz/types";
+import { expandFormContents } from "@tsz/shared";
+import {
+  applyFormsStructure,
+  createPronunciationReferenceIds
+} from "./sharedFormsModel";
 import type { ReactNode } from "react";
 import {
   useCallback,
@@ -32,7 +39,8 @@ import {
 } from "./operations";
 import type { V3WordRequests } from "./api";
 import {
-  navigateToV3Issue,
+  v3IssueNavigationTarget,
+  resolveV3ContentIssueTarget,
   navigateToV3Target,
   type V3IssueNavigationAdapter,
   type V3IssueNavigationTarget,
@@ -107,6 +115,9 @@ export interface V3WizardSlotContext {
   requestSentenceLeave?: () => Promise<boolean>;
   registerSentenceLeaveGuard?: (guard?: () => Promise<boolean>) => void;
   word: AdminWordV3;
+  formContents: FormsStepRepresentationV3;
+  setFormContents: (content: FormsStepRepresentationV3) => void;
+  retiredContentSlots: readonly RetiredContentSlotV3[];
   partOfSpeechCatalog?: PartOfSpeechCatalogResponse;
   partOfSpeechCatalogError: boolean;
   partOfSpeechCatalogPending: boolean;
@@ -114,6 +125,8 @@ export interface V3WizardSlotContext {
   draftForms: DraftFormsStepContentV3;
   setDraftForms: (content: DraftFormsStepContentV3) => void;
   stableVariantIds: V3StableVariantIdFactory;
+  pronunciationReferenceIds: ReturnType<typeof createPronunciationReferenceIds>;
+  retiredStableNodes: readonly RetiredStableNodeV3[];
   draftMeanings: DraftMeaningsStepContentWritableV3;
   setDraftMeanings: (content: DraftMeaningsStepContentWritableV3) => void;
   dirtySteps: Readonly<{ forms: boolean; meanings: boolean }>;
@@ -123,6 +136,7 @@ export interface V3WizardSlotContext {
   activePosId?: string;
   setActivePosId: (posId: string) => void;
   issues: readonly V3DraftValidationIssue[];
+  editorIssues: readonly V3DraftValidationIssue[];
   validation?: DraftValidationResponseV3;
   impact?: FormsImpactResponseV3;
   impactConfirmed: boolean;
@@ -151,6 +165,7 @@ export interface V3WordCreationWizardProps {
   idempotencyKeyFactory?: () => string;
   onWordChange?: (word: AdminWordV3) => void;
   retiredStableNodes?: readonly RetiredStableNodeV3[];
+  retiredContentSlots?: readonly RetiredContentSlotV3[];
 }
 
 function defaultIdempotencyKey() {
@@ -159,12 +174,17 @@ function defaultIdempotencyKey() {
 
 function initializedMeanings(
   word: AdminWordV3,
-  forms: DraftFormsStepContentV3 = word.forms,
+  forms: FormsStepRepresentationV3 = word.forms,
   contentEditing = true
 ) {
   const canonical = toWritableMeanings(word.meanings);
   const draft = contentEditing
-    ? ensureV3MeaningsForForms(word.id, forms, canonical, newWordNodeId)
+    ? ensureV3MeaningsForForms(
+        word.id,
+        expandFormContents(forms),
+        canonical,
+        newWordNodeId
+      )
     : canonical;
   return { draft };
 }
@@ -175,8 +195,12 @@ interface PublishAttempt {
   confirmedSurfaceToken?: string;
 }
 
-async function focusRenderedTarget(target: V3IssueNavigationTarget) {
+async function focusRenderedTarget(
+  target: V3IssueNavigationTarget,
+  signal: AbortSignal
+) {
   for (let attempt = 0; attempt < 10; attempt += 1) {
+    if (signal.aborted) return;
     const nodes = [
       ...document.querySelectorAll<HTMLElement>("[data-v3-node-id]")
     ];
@@ -279,18 +303,22 @@ function V3WordCreationSession({
   navigationAdapter,
   idempotencyKeyFactory = defaultIdempotencyKey,
   onWordChange,
-  retiredStableNodes = []
+  retiredStableNodes = [],
+  retiredContentSlots = []
 }: V3WordCreationWizardProps) {
   const stableVariantIdsRef = useRef<V3StableVariantIdFactory | undefined>(
     undefined
   );
   if (!stableVariantIdsRef.current) {
     stableVariantIdsRef.current = createStableVariantIdFactory(
-      initialWord.forms,
+      expandFormContents(initialWord.forms),
       retiredStableNodes
     );
   } else {
-    stableVariantIdsRef.current.seed(initialWord.forms, retiredStableNodes);
+    stableVariantIdsRef.current.seed(
+      expandFormContents(initialWord.forms),
+      retiredStableNodes
+    );
   }
   const flowRef = useRef<V3SaveFlow>(createV3SaveFlow(initialWord));
   const flowRestoreRef = useRef<AdminWordV3 | undefined>(undefined);
@@ -320,6 +348,11 @@ function V3WordCreationSession({
   });
   const [word, setWord] = useState(initialWord);
   const [draftForms, setDraftFormsState] = useState(initialWord.forms);
+  const [pronunciationReferenceIds] = useState(() =>
+    createPronunciationReferenceIds(initialWord.forms, retiredStableNodes)
+  );
+  pronunciationReferenceIds.seed(initialWord.forms, retiredStableNodes);
+  pronunciationReferenceIds.seed(draftForms);
   const [draftMeanings, setDraftMeaningsState] = useState(
     initialMeaningsRef.current.draft
   );
@@ -404,9 +437,73 @@ function V3WordCreationSession({
   }, []);
 
   useEffect(() => {
-    if (!pendingFocusTarget) return;
-    void focusRenderedTarget(pendingFocusTarget);
-  }, [pendingFocusTarget]);
+    if (
+      !pendingFocusTarget ||
+      pendingFocusTarget.step !== activeStep ||
+      (pendingFocusTarget.pos_id && pendingFocusTarget.pos_id !== activePosId)
+    )
+      return;
+    const controller = new AbortController();
+    const forms = draftFormsRef.current;
+    const binding =
+      "forms_format" in forms
+        ? forms.pos
+            .flatMap((pos) => pos.forms)
+            .find((form) => form.id === pendingFocusTarget.form_id)
+        : undefined;
+    if (
+      pendingFocusTarget.step === "forms" &&
+      binding &&
+      !["form_id", "form_type", "scope"].includes(pendingFocusTarget.field)
+    ) {
+      const refs = binding.regional_bindings;
+      const variants =
+        refs.mode === "common" ? [refs.common] : [refs.uk, refs.us];
+      const variant = variants.find(
+        (row) =>
+          row.id === pendingFocusTarget.variant_id ||
+          row.id === pendingFocusTarget.node_id ||
+          row.pronunciations.some(
+            (pronunciation) =>
+              pronunciation.id === pendingFocusTarget.pronunciation_id ||
+              pronunciation.id === pendingFocusTarget.node_id
+          )
+      );
+      const pronunciation = variant?.pronunciations.find(
+        (row) =>
+          row.id === pendingFocusTarget.pronunciation_id ||
+          row.id === pendingFocusTarget.node_id
+      );
+      void (async () => {
+        await focusRenderedTarget(
+          { ...pendingFocusTarget, node_id: binding.id, field: "form_id" },
+          controller.signal
+        );
+        if (controller.signal.aborted) return;
+        const button = [
+          ...document.querySelectorAll<HTMLElement>("[data-v3-open-content]")
+        ].find((row) => row.dataset.v3OpenContent === binding.id);
+        if (!button) return;
+        button.click();
+        await focusRenderedTarget(
+          {
+            ...pendingFocusTarget,
+            node_id:
+              pendingFocusTarget.content_slot_id ??
+              pronunciation?.content_slot_id ??
+              variant?.content_slot_id ??
+              binding.content_id,
+            form_id: binding.content_id,
+            form_group_id: undefined,
+            membership_id: undefined,
+            ancestor_node_ids: []
+          },
+          controller.signal
+        );
+      })();
+    } else void focusRenderedTarget(pendingFocusTarget, controller.signal);
+    return () => controller.abort();
+  }, [pendingFocusTarget, activeStep, activePosId]);
 
   const markPending = useCallback((command: string) => {
     const token = Symbol(command);
@@ -496,20 +593,20 @@ function V3WordCreationSession({
 
   const newDraftPrefilledRef = useRef(false);
 
-  const setDraftForms = useCallback(
-    (content: DraftFormsStepContentV3) => {
+  const setFormContents = useCallback(
+    (content: FormsStepRepresentationV3) => {
       if (!contentEditing) return;
       supersede();
       setDraftFormsState(content);
       const nextMeanings = ensureV3MeaningsForForms(
         word.id,
-        content,
+        expandFormContents(content),
         draftMeanings,
         newWordNodeId
       );
       const nextCleanMeanings = ensureV3MeaningsForForms(
         word.id,
-        content,
+        expandFormContents(content),
         cleanMeaningsRef.current,
         newWordNodeId,
         nextMeanings
@@ -540,6 +637,12 @@ function V3WordCreationSession({
       updateDirty,
       word.id
     ]
+  );
+
+  const setDraftForms = useCallback(
+    (content: DraftFormsStepContentV3) =>
+      setFormContents(applyFormsStructure(draftFormsRef.current, content)),
+    [setFormContents]
   );
 
   const setDraftMeanings = useCallback(
@@ -593,9 +696,14 @@ function V3WordCreationSession({
     const items = partOfSpeechCatalog?.items;
     if (!items?.length) return;
     newDraftPrefilledRef.current = true;
-    const filledForms = fillFormTypeTemplate(draftForms, items, newWordNodeId);
+    const projectedForms = expandFormContents(draftForms);
+    const filledForms = fillFormTypeTemplate(
+      projectedForms,
+      items,
+      newWordNodeId
+    );
     const baseMeanings =
-      filledForms === draftForms
+      filledForms === projectedForms
         ? draftMeanings
         : ensureV3MeaningsForForms(
             word.id,
@@ -604,7 +712,7 @@ function V3WordCreationSession({
             newWordNodeId
           );
     const filledMeanings = fillDefaultSenseGroups(baseMeanings, newWordNodeId);
-    if (filledForms !== draftForms) setDraftForms(filledForms);
+    if (filledForms !== projectedForms) setDraftForms(filledForms);
     if (filledMeanings !== draftMeanings) setDraftMeanings(filledMeanings);
   }, [
     contentEditing,
@@ -632,65 +740,81 @@ function V3WordCreationSession({
         setActiveStepState(effective);
       };
       if (sentenceLeaveGuard.current)
-        void sentenceLeaveGuard.current().then((accepted) => {
+        void requestSentenceLeave().then((accepted) => {
           if (accepted) leave();
         });
       else leave();
     },
-    [activeStep, allowPublishedEditing, sessionReadOnly, supersede]
+    [
+      activeStep,
+      allowPublishedEditing,
+      requestSentenceLeave,
+      sessionReadOnly,
+      supersede
+    ]
   );
 
   const setActivePosId = useCallback(
     (posId: string) => {
       if (posId === activePosId) return;
-      supersede();
-      setActivePosIdState(posId);
+      const leave = () => {
+        supersede();
+        setActivePosIdState(posId);
+      };
+      if (sentenceLeaveGuard.current)
+        void requestSentenceLeave().then((accepted) => {
+          if (accepted) leave();
+        });
+      else leave();
     },
-    [activePosId, supersede]
+    [activePosId, requestSentenceLeave, supersede]
   );
 
   const navigateTarget = useCallback(
     async (target: V3IssueNavigationTarget) => {
-      await navigateToV3Target(target, {
-        activateStep: (next) => setActiveStep(next.step),
-        activatePos: (next) => {
-          if (next.pos_id) setActivePosId(next.pos_id);
-        },
-        expandGroup: navigationAdapter?.expandGroup,
-        revealForm: navigationAdapter?.revealForm,
-        revealVariant: navigationAdapter?.revealVariant,
-        revealPronunciation: navigationAdapter?.revealPronunciation,
-        focusField: (next) => {
-          if (navigationAdapter?.focusField) {
-            return navigationAdapter.focusField(next);
+      if (!(await requestSentenceLeave())) return;
+      await navigateToV3Target(
+        resolveV3ContentIssueTarget(target, draftFormsRef.current),
+        {
+          activateStep: (next) => {
+            if (sessionReadOnly) return;
+            const effective = resolveV3StepAccess(
+              flowRef.current.canonical(),
+              next.step,
+              allowPublishedEditing
+            ).effective;
+            supersede();
+            setActiveStepState(effective);
+          },
+          activatePos: (next) => {
+            if (next.pos_id) setActivePosIdState(next.pos_id);
+          },
+          expandGroup: navigationAdapter?.expandGroup,
+          revealForm: navigationAdapter?.revealForm,
+          revealVariant: navigationAdapter?.revealVariant,
+          revealPronunciation: navigationAdapter?.revealPronunciation,
+          focusField: (next) => {
+            if (navigationAdapter?.focusField) {
+              return navigationAdapter.focusField(next);
+            }
+            setPendingFocusTarget(next);
           }
-          setPendingFocusTarget(next);
         }
-      });
+      );
     },
-    [navigationAdapter, setActivePosId, setActiveStep]
+    [
+      navigationAdapter,
+      requestSentenceLeave,
+      sessionReadOnly,
+      allowPublishedEditing,
+      supersede
+    ]
   );
 
   const navigateIssue = useCallback(
-    async (issue: V3DraftValidationIssue) => {
-      await navigateToV3Issue(issue, {
-        activateStep: (target) => setActiveStep(target.step),
-        activatePos: (target) => {
-          if (target.pos_id) setActivePosId(target.pos_id);
-        },
-        expandGroup: navigationAdapter?.expandGroup,
-        revealForm: navigationAdapter?.revealForm,
-        revealVariant: navigationAdapter?.revealVariant,
-        revealPronunciation: navigationAdapter?.revealPronunciation,
-        focusField: (target) => {
-          if (navigationAdapter?.focusField) {
-            return navigationAdapter.focusField(target);
-          }
-          setPendingFocusTarget(target);
-        }
-      });
-    },
-    [navigationAdapter, setActivePosId, setActiveStep]
+    (issue: V3DraftValidationIssue) =>
+      navigateTarget(v3IssueNavigationTarget(issue)),
+    [navigateTarget]
   );
 
   // 用一份更新的服务端版本整体替换会话。keepDirtyDrafts 时只同步没有未保存输入的步骤，
@@ -738,14 +862,14 @@ function V3WordCreationSession({
   const rebaseKeepingLocalDrafts = useCallback(
     (
       latest: AdminWordV3,
-      localForms: DraftFormsStepContentV3,
+      localForms: FormsStepRepresentationV3,
       localMeanings: DraftMeaningsStepContentWritableV3
     ) => {
       // 对方可能增删了词性：本地词义先按要保留的词形对齐。
       const alignedMeanings = contentEditing
         ? ensureV3MeaningsForForms(
             latest.id,
-            localForms,
+            expandFormContents(localForms),
             localMeanings,
             newWordNodeId
           )
@@ -764,7 +888,7 @@ function V3WordCreationSession({
         : dirtyRef.current.meanings
           ? ensureV3MeaningsForForms(
               latest.id,
-              localForms,
+              expandFormContents(localForms),
               cleanMeaningsRef.current,
               newWordNodeId,
               alignedMeanings
@@ -1079,7 +1203,7 @@ function V3WordCreationSession({
 
   const saveFormsContent = useCallback(
     async (
-      content: DraftFormsStepContentV3,
+      content: FormsStepRepresentationV3,
       intent: StepSaveIntent,
       confirmationContext?: Omit<
         V3ConfirmationContext,
@@ -1817,13 +1941,18 @@ function V3WordCreationSession({
     registerSentenceLeaveGuard,
     requestSentenceLeave,
     word,
+    formContents: draftForms,
+    setFormContents,
+    retiredContentSlots,
     partOfSpeechCatalog,
     partOfSpeechCatalogError,
     partOfSpeechCatalogPending,
     readOnly: sessionReadOnly,
-    draftForms,
+    draftForms: expandFormContents(draftForms),
     setDraftForms,
     stableVariantIds: stableVariantIdsRef.current,
+    pronunciationReferenceIds,
+    retiredStableNodes,
     draftMeanings,
     setDraftMeanings,
     dirtySteps,
@@ -1833,6 +1962,17 @@ function V3WordCreationSession({
     ...(activePosId ? { activePosId } : {}),
     setActivePosId,
     issues: currentPublicationIssues,
+    editorIssues:
+      problem?.kind === "validation"
+        ? [
+            ...new Map(
+              [...currentPublicationIssues, ...problem.issues].map((issue) => [
+                JSON.stringify(issue),
+                issue
+              ])
+            ).values()
+          ]
+        : currentPublicationIssues,
     ...(validation ? { validation } : {}),
     ...(impact ? { impact } : {}),
     impactConfirmed,
@@ -1856,7 +1996,7 @@ function V3WordCreationSession({
     busy: pending.size > 0,
     restoreAllowed: !sessionReadOnly,
     restore: (value) => {
-      setDraftForms(value.forms);
+      setFormContents(value.forms);
       setDraftMeanings(value.meanings);
     }
   });

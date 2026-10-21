@@ -2,7 +2,7 @@ import { boundFormGroupIds } from "./meaningsModel";
 import type {
   AdminWordV3,
   AdminWordV3Envelope,
-  DraftFormsStepContentV3,
+  FormsStepRepresentationV3,
   DraftMeaningsStepContentWritableV3,
   FormsImpactResponseV3,
   SenseFormGroupBindingV3,
@@ -20,7 +20,7 @@ export interface V3ConfirmationContext {
   snapshot_id?: string;
   policy_name?: SurfacePolicyNameV2;
   policy_epoch?: number;
-  impact_content?: DraftFormsStepContentV3;
+  impact_content?: FormsStepRepresentationV3;
   sense_bindings?: SenseFormGroupBindingV3[];
 }
 
@@ -79,11 +79,11 @@ export interface V3SaveFlow {
   ): Promise<V3CanonicalCommandResult>;
   bindSurfaceConfirmation(
     page: SurfaceMatchPageV3,
-    content: DraftFormsStepContentV3
+    content: FormsStepRepresentationV3
   ): boolean;
   bindImpactConfirmation(
     impact: FormsImpactResponseV3,
-    content: DraftFormsStepContentV3,
+    content: FormsStepRepresentationV3,
     senseBindings?: SenseFormGroupBindingV3[]
   ): boolean;
   bindImpactSurfaceConfirmation(page: SurfaceMatchPageV3): boolean;
@@ -133,7 +133,7 @@ export function v3MeaningsContentFingerprint(
 
 /** Stable local fingerprint of the exact forms body used for impact preview. */
 function formsContentFingerprint(
-  content: DraftFormsStepContentV3,
+  content: FormsStepRepresentationV3,
   bindings: SenseFormGroupBindingV3[] = []
 ): string {
   return v3ContentFingerprint(
@@ -147,7 +147,7 @@ function formsContentFingerprint(
 }
 
 export function formsContentDigest(
-  content: DraftFormsStepContentV3,
+  content: FormsStepRepresentationV3,
   bindings: SenseFormGroupBindingV3[] = []
 ): string {
   const serialized = formsContentFingerprint(content, bindings);
@@ -183,7 +183,7 @@ export function createV3SaveFlow(initialWord: AdminWordV3): V3SaveFlow {
   };
 
   const exactContentBinding = (
-    content: DraftFormsStepContentV3,
+    content: FormsStepRepresentationV3,
     bindings: SenseFormGroupBindingV3[] = []
   ) => ({
     base_revision: canonicalWord.revision,

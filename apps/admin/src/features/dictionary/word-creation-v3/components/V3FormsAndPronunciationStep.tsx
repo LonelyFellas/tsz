@@ -22,7 +22,10 @@ import type {
   WordPosFormsV3,
   WordFormGroupV3,
   V3DraftValidationIssue,
-  WordEntryKindV3
+  WordEntryKindV3,
+  SharedFormsStepContentV3,
+  RetiredContentSlotV3,
+  RetiredStableNodeV3
 } from "@tsz/types";
 import { useEffect, useState } from "react";
 import { partOfSpeechDataSource } from "../../dataSource";
@@ -56,11 +59,18 @@ import "../v3-forms.css";
 import "../posTabs.css";
 import { sortableRowClass, useSortableRows } from "../sortableRows";
 import { SortableDragHandle } from "./SortableDragHandle";
+import { V3FormContentModal } from "./V3FormContentModal";
+import type { createPronunciationReferenceIds } from "../sharedFormsModel";
 
 /** 只接受本编辑器发出的词性拖动，避免把外部拖入的内容当成排序。 */
 const POS_DRAG_TYPE = "application/x-tsz-v3-pos";
 
 export interface V3FormsAndPronunciationStepProps {
+  sharedForms?: SharedFormsStepContentV3;
+  onSharedFormsChange?: (next: SharedFormsStepContentV3) => void;
+  retiredContentSlots?: readonly RetiredContentSlotV3[];
+  retiredStableNodes?: readonly RetiredStableNodeV3[];
+  registerLeaveGuard?: (guard?: () => Promise<boolean>) => void;
   value: DraftFormsStepContentV3;
   onChange: (next: DraftFormsStepContentV3) => void;
   /** 词条是单词还是短语；决定「添加基本词性」只列哪一侧。 */
@@ -70,6 +80,9 @@ export interface V3FormsAndPronunciationStepProps {
   issues?: readonly V3DraftValidationIssue[];
   idFactory?: V3IdFactory;
   stableVariantIds?: V3StableVariantIdFactory;
+  pronunciationReferenceIds?: ReturnType<
+    typeof createPronunciationReferenceIds
+  >;
   /** 变化组 id → 词义步里绑定它的词义数；组卡片据此提示专用组的影响面。 */
   formGroupBindingCounts?: ReadonlyMap<string, number>;
   meanings?: DraftMeaningsStepContentWritableV3;
@@ -106,6 +119,11 @@ function V3VoiceNotice({ value }: { value: DraftFormsStepContentV3 }) {
 }
 
 export function V3FormsAndPronunciationStep({
+  sharedForms,
+  onSharedFormsChange,
+  retiredContentSlots = [],
+  retiredStableNodes = [],
+  registerLeaveGuard,
   value,
   onChange,
   entryKind,
@@ -114,6 +132,7 @@ export function V3FormsAndPronunciationStep({
   issues = [],
   idFactory = newWordNodeId,
   stableVariantIds,
+  pronunciationReferenceIds,
   formGroupBindingCounts,
   meanings,
   savedSenseIds,
@@ -122,6 +141,35 @@ export function V3FormsAndPronunciationStep({
   onGoToMeanings
 }: V3FormsAndPronunciationStepProps) {
   const { modal } = App.useApp();
+  const [editingFormId, setEditingFormId] = useState<string>();
+  const sharedCounts = new Map<string, number>();
+  if (sharedForms) {
+    const counts = new Map<string, number>();
+    for (const pos of sharedForms.pos)
+      for (const form of pos.forms)
+        counts.set(form.content_id, (counts.get(form.content_id) ?? 0) + 1);
+    for (const pos of sharedForms.pos)
+      for (const form of pos.forms)
+        sharedCounts.set(form.id, counts.get(form.content_id)!);
+  }
+  const formIssues = sharedForms
+    ? issues.flatMap((issue) => {
+        const location = issue.node_location;
+        if (!location.content_id || location.form_id) return [issue];
+        return sharedForms.pos.flatMap((pos) =>
+          pos.forms
+            .filter((form) => form.content_id === location.content_id)
+            .map((form) => ({
+              ...issue,
+              node_location: {
+                ...location,
+                pos_id: pos.pos_id,
+                form_id: form.id
+              }
+            }))
+        );
+      })
+    : issues;
   const [bindingGroup, setBindingGroup] = useState<{
     posId: string;
     groupId: string;
@@ -373,6 +421,8 @@ export function V3FormsAndPronunciationStep({
             ),
             children: (
               <V3PosTab
+                sharedCounts={sharedForms ? sharedCounts : undefined}
+                onEditContent={sharedForms ? setEditingFormId : undefined}
                 content={value}
                 formGroupBindingCounts={bindingCounts}
                 renderGroupSenses={(group) => renderGroupSenses(pos, group)}
@@ -389,7 +439,7 @@ export function V3FormsAndPronunciationStep({
                     : undefined
                 }
                 idFactory={idFactory}
-                issues={issues}
+                issues={formIssues}
                 onChange={onChange}
                 pos={pos}
                 stableVariantIds={stableVariantIds}
@@ -403,6 +453,28 @@ export function V3FormsAndPronunciationStep({
 
   return (
     <PronunciationPreviewProvider>
+      {editingFormId &&
+        sharedForms &&
+        onSharedFormsChange &&
+        stableVariantIds && (
+          <V3FormContentModal
+            key={editingFormId}
+            forms={sharedForms}
+            formId={editingFormId}
+            catalog={catalog.data?.items ?? []}
+            issues={issues}
+            stableVariantIds={stableVariantIds}
+            pronunciationReferenceIds={pronunciationReferenceIds}
+            retiredContentSlots={retiredContentSlots}
+            retiredStableNodes={retiredStableNodes}
+            registerLeaveGuard={registerLeaveGuard}
+            onCancel={() => setEditingFormId(undefined)}
+            onConfirm={(next) => {
+              onSharedFormsChange(next);
+              setEditingFormId(undefined);
+            }}
+          />
+        )}
       <Flex className="v3-forms-step" vertical gap="middle">
         <div className="word-step-heading">
           <span className="word-step-number">STEP 02</span>

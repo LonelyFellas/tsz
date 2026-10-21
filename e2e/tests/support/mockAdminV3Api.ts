@@ -7,12 +7,17 @@ import type {
   AdminWordV3,
   DetectLexiconSurfaceResponseV3,
   DraftFormsStepContentV3,
+  FormsStepRepresentationV3,
+  SharedFormsStepContentV3,
   DraftMeaningsStepContentV3,
   InboundReferencesV3,
   PartOfSpeechCatalogResponse,
   SharedSentence,
   SurfaceMatchPageV3,
-  V3DraftValidationIssue
+  V3DraftValidationIssue,
+  WordCommonFormVariantV3,
+  WordUkFormVariantV3,
+  WordUsFormVariantV3
 } from "@tsz/types";
 
 export const ADMIN_V3_ENTRIES_PATH = "/lexicon/entries";
@@ -274,6 +279,79 @@ const FORMS: DraftFormsStepContentV3 = {
   ]
 };
 
+function sharedFormsFixture(
+  forms: DraftFormsStepContentV3
+): SharedFormsStepContentV3 {
+  let nextId = 6000;
+  const contents: SharedFormsStepContentV3["contents"] = [];
+  return {
+    forms_format: "shared_v1",
+    contents,
+    pos: forms.pos.map((pos) => ({
+      ...pos,
+      form_groups: pos.form_groups.map(
+        ({ dialect_rules: _, ...group }) => group
+      ),
+      forms: pos.forms.map((form) => {
+        const group = pos.form_groups.find((row) =>
+          row.members.some((member) => member.form_id === form.id)
+        )!;
+        const contentId = nodeId(nextId++);
+        const project = (
+          variant:
+            WordCommonFormVariantV3 | WordUkFormVariantV3 | WordUsFormVariantV3
+        ) => {
+          const {
+            id,
+            dialect: _,
+            is_regular,
+            component_usages,
+            ...value
+          } = variant;
+          const slotId = nodeId(nextId++);
+          const pronunciations = value.pronunciations.map((row) => ({
+            ...row,
+            id: nodeId(nextId++)
+          }));
+          return {
+            content: { ...value, id: slotId, pronunciations },
+            binding: {
+              id,
+              content_slot_id: slotId,
+              is_regular: is_regular ?? group.is_regular,
+              component_usages: component_usages ?? [],
+              pronunciations: value.pronunciations.map((row, index) => ({
+                id: row.id,
+                content_slot_id: pronunciations[index]!.id
+              }))
+            }
+          };
+        };
+        const regions = form.regional_variants;
+        const common =
+          regions.mode === "common" ? project(regions.common) : undefined;
+        const uk = regions.mode === "uk_us" ? project(regions.uk) : undefined;
+        const us = regions.mode === "uk_us" ? project(regions.us) : undefined;
+        contents.push({
+          id: contentId,
+          dialect_rules: group.dialect_rules,
+          regional_variants: common
+            ? { mode: "common", common: common.content }
+            : { mode: "uk_us", uk: uk!.content, us: us!.content }
+        });
+        return {
+          id: form.id,
+          form_type: form.form_type,
+          content_id: contentId,
+          regional_bindings: common
+            ? { mode: "common" as const, common: common.binding }
+            : { mode: "uk_us" as const, uk: uk!.binding, us: us!.binding }
+        };
+      })
+    }))
+  };
+}
+
 const MEANINGS: DraftMeaningsStepContentV3 = {
   sense_groups: [
     { id: nodeId(71), name_zh: "轨道运动", name_en: "Orbital motion" },
@@ -373,9 +451,10 @@ function v3Word(
     },
     capabilities: {
       publication: capability,
-      pronunciation_normalization_version: "nfkc_trim_lower_v1"
+      pronunciation_normalization_version: "nfkc_trim_lower_v1",
+      shared_form_contents: true
     },
-    forms: structuredClone(FORMS),
+    forms: sharedFormsFixture(structuredClone(FORMS)),
     meanings: structuredClone(MEANINGS),
     completed_steps: ["basics", "forms", "meanings"],
     max_reachable_step: "preview",
@@ -593,10 +672,10 @@ function validationProblem(route: Route, word: AdminWordV3) {
   const group = pos?.form_groups[0];
   const membership = group?.members[0];
   const form = pos?.forms.find((item) => item.id === membership?.form_id);
-  const variant =
-    form?.regional_variants.mode === "common"
-      ? form.regional_variants.common
-      : form?.regional_variants.uk;
+  const regions =
+    form && "regional_bindings" in form ? form.regional_bindings : undefined;
+  const dialect = regions?.mode === "common" ? "common" : "uk";
+  const variant = regions?.mode === "common" ? regions.common : regions?.uk;
   const pronunciation = variant?.pronunciations[0];
   if (!pos || !group || !membership || !form || !variant || !pronunciation) {
     throw new Error("Mock E01a must build a second-POS pronunciation via UI");
@@ -609,7 +688,7 @@ function validationProblem(route: Route, word: AdminWordV3) {
     code: "pronunciation_required",
     message: "Mock：第二词性的实际发音需要确认",
     node_location: {
-      node_role: `forms.pronunciation:${variant.dialect}`,
+      node_role: `forms.pronunciation:${dialect}`,
       ancestor_node_ids: [
         pos.pos_id,
         group.id,
@@ -623,8 +702,10 @@ function validationProblem(route: Route, word: AdminWordV3) {
       form_id: form.id,
       form_type: form.form_type,
       variant_id: variant.id,
-      dialect: variant.dialect,
-      pronunciation_id: pronunciation.id
+      dialect,
+      pronunciation_id: pronunciation.id,
+      content_id: "content_id" in form ? form.content_id : undefined,
+      content_slot_id: pronunciation.content_slot_id
     }
   };
   return route.fulfill({
@@ -744,10 +825,10 @@ function surfaceCandidateWord(
     matched_surfaces: [spelling],
     strategy_version: "mock-surface-v3"
   };
-  for (const pos of candidate.forms.pos) {
-    for (const form of pos.forms) {
-      if (form.regional_variants.mode === "common") {
-        form.regional_variants.common.spelling = spelling;
+  if ("forms_format" in candidate.forms) {
+    for (const content of candidate.forms.contents) {
+      if (content.regional_variants.mode === "common") {
+        content.regional_variants.common.spelling = spelling;
       }
     }
   }
@@ -992,7 +1073,7 @@ export async function mockAdminV3Api(
           mode: "native" as const
         }),
         kind: input?.kind ?? surfaceKind,
-        forms: { pos: [] },
+        forms: { forms_format: "shared_v1", contents: [], pos: [] },
         meanings: { sense_groups: [], pos: [] },
         completed_steps: ["basics"],
         max_reachable_step: "forms"
@@ -1055,7 +1136,7 @@ export async function mockAdminV3Api(
       const input = requestBody as
         | {
             intent?: "save" | "complete";
-            content?: DraftFormsStepContentV3;
+            content?: FormsStepRepresentationV3;
           }
         | undefined;
       if (formsFailurePending) {
@@ -1069,12 +1150,13 @@ export async function mockAdminV3Api(
         word.forms = clone(input.content);
         for (const pos of word.forms.pos) {
           for (const form of pos.forms) {
-            if (form.regional_variants.mode === "common") {
-              form.regional_variants.common.component_usages ??= [];
-            } else {
-              form.regional_variants.uk.component_usages ??= [];
-              form.regional_variants.us.component_usages ??= [];
-            }
+            if (!("regional_bindings" in form))
+              throw new Error("Mock editor must submit shared forms");
+            const bindings = form.regional_bindings;
+            for (const variant of bindings.mode === "common"
+              ? [bindings.common]
+              : [bindings.uk, bindings.us])
+              variant.component_usages ??= [];
           }
         }
       }

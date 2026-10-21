@@ -1,9 +1,11 @@
 import type { AdminWordV3, V3DraftValidationIssue } from "@tsz/types";
+import { applyFormsStructure } from "./sharedFormsModel";
+import type { ExpandedAdminWordV3 } from "@tsz/shared";
 import { describe, expect, it } from "vitest";
 import { formsFixture, uuidFromInt } from "./fixtures";
 import { buildV3PublicationIssueSummary } from "./publicationIssueSummary";
 
-function word(): AdminWordV3 {
+function word(): ExpandedAdminWordV3 {
   const noun = formsFixture({
     pos: "noun",
     pos_id: uuidFromInt(1001)
@@ -83,6 +85,33 @@ function issue(
 }
 
 describe("buildV3PublicationIssueSummary", () => {
+  it("共享内容槽位问题归属到实际绑定词性，保留原问题数量", () => {
+    const expanded = word();
+    const current: AdminWordV3 = expanded;
+    const shared = applyFormsStructure(
+      { forms_format: "shared_v1", contents: [], pos: [] },
+      expanded.forms
+    );
+    if (!("forms_format" in shared)) throw new Error("fixture");
+    current.forms = shared;
+    const binding = shared.pos[1]!.forms[0]!;
+    const contentIssue = issue(1500, {
+      node_id: binding.content_id,
+      node_location: {
+        node_role: "forms.content",
+        ancestor_node_ids: [],
+        content_id: binding.content_id
+      }
+    });
+    const summary = buildV3PublicationIssueSummary(current, [contentIssue]);
+    expect(summary.total).toBe(1);
+    expect(summary.positions).toHaveLength(1);
+    expect(summary.positions[0]!.pos_id).toBe(shared.pos[1]!.pos_id);
+    expect(summary.positions[0]!.issues[0]!.node_location.content_id).toBe(
+      binding.content_id
+    );
+  });
+
   it("词性标签一路透传，定位列表与问题分布用同一份文案", () => {
     const current = word();
     const posLabel = (code: string) => (code === "noun" ? "名" : `其他${code}`);
@@ -201,24 +230,27 @@ describe("buildV3PublicationIssueSummary", () => {
   it.each([
     [
       "group",
-      (current: AdminWordV3) => current.forms.pos[0]!.form_groups[0]!.id
+      (current: ExpandedAdminWordV3) => current.forms.pos[0]!.form_groups[0]!.id
     ],
     [
       "membership",
-      (current: AdminWordV3) =>
+      (current: ExpandedAdminWordV3) =>
         current.forms.pos[0]!.form_groups[0]!.members[0]!.id
     ],
-    ["form", (current: AdminWordV3) => current.forms.pos[0]!.forms[0]!.id],
+    [
+      "form",
+      (current: ExpandedAdminWordV3) => current.forms.pos[0]!.forms[0]!.id
+    ],
     [
       "variant",
-      (current: AdminWordV3) => {
+      (current: ExpandedAdminWordV3) => {
         const variants = current.forms.pos[0]!.forms[0]!.regional_variants;
         return variants.mode === "common" ? variants.common.id : variants.uk.id;
       }
     ],
     [
       "pronunciation",
-      (current: AdminWordV3) => {
+      (current: ExpandedAdminWordV3) => {
         const variants = current.forms.pos[0]!.forms[0]!.regional_variants;
         return variants.mode === "common"
           ? variants.common.pronunciations[0]!.id

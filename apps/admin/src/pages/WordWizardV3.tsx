@@ -29,6 +29,7 @@ import type {
   SurfaceMatchPageV3,
   WordCreationStep
 } from "@tsz/types";
+import { isSharedForms } from "@tsz/shared";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -266,7 +267,7 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
   };
 
   const confirmAndSave = async () => {
-    if (!pendingIntent) return;
+    if (!pendingIntent || preparingRef.current || busy) return;
     let confirmed = false;
     let confirmationContext:
       | {
@@ -288,9 +289,15 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
     }
     if (!confirmed) return;
     const intent = pendingIntent;
+    preparingRef.current = true;
     setPendingIntent(undefined);
-    if (intent === "save") await context.actions.saveDraft(confirmationContext);
-    else await context.actions.saveForms(intent, confirmationContext);
+    try {
+      if (intent === "save")
+        await context.actions.saveDraft(confirmationContext);
+      else await context.actions.saveForms(intent, confirmationContext);
+    } finally {
+      preparingRef.current = false;
+    }
   };
 
   const resetConfirmation = () => setPendingIntent(undefined);
@@ -313,41 +320,62 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
         />
       ) : null}
       <V3BlockedReferencesAlert references={blockedReferences} />
-      <V3FormsAndPronunciationStep
-        activePosId={context.activePosId}
-        entryKind={context.word.kind}
-        formGroupBindingCounts={countFormGroupBindings(context.draftMeanings)}
-        bindingEditingAvailable={
-          context.word.capabilities.multi_group_sense_bindings === true
-        }
-        meanings={context.draftMeanings}
-        savedSenseIds={
-          new Set(
-            context.word.meanings.pos.flatMap((pos) =>
-              pos.senses.map((sense) => sense.id)
-            )
-          )
-        }
-        onMeaningsChange={(meanings) => {
-          resetConfirmation();
-          context.setDraftMeanings(meanings);
-        }}
-        onGoToMeanings={(posId) => {
-          context.setActivePosId(posId);
-          context.setActiveStep("meanings");
-        }}
-        issues={context.issues.filter((issue) => issue.step === "forms")}
-        onActivePosChange={(posId) => {
-          resetConfirmation();
-          context.setActivePosId(posId);
-        }}
-        onChange={(content) => {
-          resetConfirmation();
-          context.setDraftForms(content);
-        }}
-        stableVariantIds={context.stableVariantIds}
-        value={context.draftForms}
-      />
+      <ConfigProvider componentDisabled={busy}>
+        <div inert={busy}>
+          <V3FormsAndPronunciationStep
+            sharedForms={
+              isSharedForms(context.formContents)
+                ? context.formContents
+                : undefined
+            }
+            onSharedFormsChange={(content) => {
+              resetConfirmation();
+              context.setFormContents(content);
+            }}
+            retiredContentSlots={context.retiredContentSlots}
+            retiredStableNodes={context.retiredStableNodes}
+            registerLeaveGuard={context.registerSentenceLeaveGuard}
+            activePosId={context.activePosId}
+            entryKind={context.word.kind}
+            formGroupBindingCounts={countFormGroupBindings(
+              context.draftMeanings
+            )}
+            bindingEditingAvailable={
+              context.word.capabilities.multi_group_sense_bindings === true
+            }
+            meanings={context.draftMeanings}
+            savedSenseIds={
+              new Set(
+                context.word.meanings.pos.flatMap((pos) =>
+                  pos.senses.map((sense) => sense.id)
+                )
+              )
+            }
+            onMeaningsChange={(meanings) => {
+              resetConfirmation();
+              context.setDraftMeanings(meanings);
+            }}
+            onGoToMeanings={(posId) => {
+              context.setActivePosId(posId);
+              context.setActiveStep("meanings");
+            }}
+            issues={context.editorIssues.filter(
+              (issue) => issue.step === "forms"
+            )}
+            onActivePosChange={(posId) => {
+              resetConfirmation();
+              context.setActivePosId(posId);
+            }}
+            onChange={(content) => {
+              resetConfirmation();
+              context.setDraftForms(content);
+            }}
+            stableVariantIds={context.stableVariantIds}
+            pronunciationReferenceIds={context.pronunciationReferenceIds}
+            value={context.draftForms}
+          />
+        </div>
+      </ConfigProvider>
       {pendingIntent && context.impact && requiresConfirmation ? (
         <Alert
           showIcon
@@ -392,7 +420,7 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
       ) : null}
       <div className="word-step-actions">
         <Button
-          disabled={Boolean(pendingIntent)}
+          disabled={Boolean(pendingIntent) || busy}
           onClick={() => context.setActiveStep("basics")}
         >
           上一步
@@ -410,7 +438,7 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
         </Button>
         <Button
           type="primary"
-          disabled={Boolean(pendingIntent)}
+          disabled={Boolean(pendingIntent) || busy}
           onClick={() => {
             resetConfirmation();
             context.setActiveStep("meanings");
@@ -620,7 +648,9 @@ function V3MeaningsSlot({
           }
           entryKind={context.word.kind}
           forms={context.draftForms}
-          issues={context.issues.filter((issue) => issue.step === "meanings")}
+          issues={context.editorIssues.filter(
+            (issue) => issue.step === "meanings"
+          )}
           onActivePosChange={(posId) => {
             // 切词性同样会作废影响令牌，条子留着的话点确认是无反馈的空操作。
             setPendingIntent(undefined);
@@ -973,10 +1003,27 @@ export function WordWizardV3Page({
       queryClient.setQueryData<AdminWordDraftV3Envelope>(queryKey, (current) =>
         current ? { ...current, word } : current
       );
+      void requests
+        .get(word.id)
+        .then((draft) => {
+          queryClient.setQueryData<AdminWordDraftV3Envelope>(
+            queryKey,
+            (current) =>
+              current?.word.id === draft.word.id &&
+              current.word.revision === draft.word.revision
+                ? {
+                    ...current,
+                    retired_stable_nodes: draft.retired_stable_nodes,
+                    retired_content_slots: draft.retired_content_slots
+                  }
+                : current
+          );
+        })
+        .catch(() => {});
       void queryClient.invalidateQueries({ queryKey: wordKeys.lists() });
       void queryClient.invalidateQueries({ queryKey: wordKeys.stats() });
     },
-    [queryClient, queryKey]
+    [queryClient, queryKey, requests]
   );
   const replaceActivatedCanonical = useCallback(
     (word: AdminWordV3) => {
@@ -1078,7 +1125,10 @@ export function WordWizardV3Page({
     editingPublished,
     canModifyEntry(writeActor, word)
   );
-  const forcePreview = stepAccess.readOnly;
+  const sharedFormsReady =
+    word.capabilities.shared_form_contents === true &&
+    isSharedForms(word.forms);
+  const forcePreview = stepAccess.readOnly || !sharedFormsReady;
   const legalStep = stepAccess.effective;
   return (
     <Flex vertical gap="middle">
@@ -1088,6 +1138,14 @@ export function WordWizardV3Page({
           to={`/words/${word.id}/v3/wizard/${legalStep}${location.search}`}
         />
       ) : null}
+      {!sharedFormsReady && (
+        <Alert
+          type="warning"
+          showIcon
+          title="词形编辑暂不可用"
+          description="当前服务尚未提供共享词形内容，请在服务更新后刷新页面。现有内容仍可查看。"
+        />
+      )}
       <CreationSourceNotice source={creationSourceFromState(location.state)} />
       {searchParams.get("focus_node") &&
         !locateV3Node(word, searchParams.get("focus_node")!) && (
@@ -1100,8 +1158,8 @@ export function WordWizardV3Page({
         )}
       <ContentEditPermissions
         value={{
-          edit: canWriteEntry(writeActor, word),
-          associate: canAssociateEntry(writeActor, word)
+          edit: sharedFormsReady && canWriteEntry(writeActor, word),
+          associate: sharedFormsReady && canAssociateEntry(writeActor, word)
         }}
       >
         <V3ReferenceGuardProvider value={referenceGuard}>
@@ -1118,6 +1176,7 @@ export function WordWizardV3Page({
             partOfSpeechCatalogError={partOfSpeechCatalog.isError}
             partOfSpeechCatalogPending={partOfSpeechCatalog.isPending}
             retiredStableNodes={detail.data.retired_stable_nodes}
+            retiredContentSlots={detail.data.retired_content_slots}
             readOnly={forcePreview}
             contentEditing={canWriteEntry(writeActor, word)}
             requests={requests}
@@ -1132,7 +1191,14 @@ export function WordWizardV3Page({
                   wordId={word.id}
                 />
                 <V3PublicationHistory
-                  restoreBlockedByUnsavedChanges={context.hasUnsavedChanges}
+                  restoreBlockedByUnsavedChanges={
+                    context.hasUnsavedChanges || !sharedFormsReady
+                  }
+                  restoreBlockedReason={
+                    !sharedFormsReady
+                      ? "当前服务尚未支持共享词形，暂不能恢复历史内容"
+                      : undefined
+                  }
                   currentWord={context.word}
                   onRestored={replaceRestoredCanonical}
                   onCanonicalRefreshed={replaceRestoredCanonical}

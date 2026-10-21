@@ -1,11 +1,11 @@
-import type { AdminWordV3, SurfaceMatchPageV3 } from "@tsz/types";
+import type { SurfaceMatchPageV3 } from "@tsz/types";
 import { describe, expect, it } from "vitest";
 import {
   extractDetectedBaseForms,
   resolveDetectedBaseForm
 } from "./baseFormDetection";
 
-function v3Word(): AdminWordV3 {
+function v3Word(): import("@tsz/shared").ExpandedAdminWordV3 {
   return {
     schema_version: 3,
     id: "entry-v3",

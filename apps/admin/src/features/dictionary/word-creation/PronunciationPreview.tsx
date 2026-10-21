@@ -176,6 +176,92 @@ export function usePronunciationVoiceNotice(
   return `${labels}暂无可用发音人，对应的「获取语音」已禁用`;
 }
 
+export function resolvePronunciationPreviewVoice(
+  voices: VoiceOption[],
+  dialect: Dialect,
+  preference: AdminDialectPreference,
+  profile?: VoiceProfileV3
+) {
+  const locale = localeForDialect(dialect, preference)?.toLowerCase();
+  const settings = profile?.voices.filter((setting) => setting.enabled) ?? [];
+  const voice = settings.length
+    ? settings
+        .map((setting) => voices.find((row) => row.id === setting.voice_id))
+        .find((row) => row?.locale.toLowerCase() === locale)
+    : voiceForDialect(voices, dialect, preference);
+  return {
+    voice,
+    rate:
+      profile?.voices.find((row) => row.voice_id === voice?.id)?.rate_percent ??
+      0,
+    isDefault: settings.length === 0
+  };
+}
+
+export function PronunciationPreviewVoiceSummary({
+  dialect,
+  voiceProfile,
+  pronunciationId,
+  content,
+  column = "voice"
+}: {
+  dialect: Dialect;
+  voiceProfile?: VoiceProfileV3;
+  pronunciationId?: string;
+  content?: RichTextV2;
+  column?: "voice" | "rate";
+}) {
+  const context = useContext(PreviewContext);
+  if (!context) throw new Error("PronunciationPreviewProvider is required");
+  const { voice, rate, isDefault } = resolvePronunciationPreviewVoice(
+    context.voices,
+    dialect,
+    context.dialectPreference,
+    voiceProfile
+  );
+  const enabled = voiceProfile?.voices.filter((row) => row.enabled) ?? [];
+  if (column === "rate")
+    return <span>{voice ? `${(1 + rate / 100).toFixed(2)}×` : "—"}</span>;
+  return (
+    <Space orientation="vertical" size={0}>
+      <span>
+        {context.voicesLoading
+          ? "正在读取音色"
+          : voice
+            ? `${isDefault ? "默认 · " : ""}${voice.label}`
+            : context.voicesError || "当前口音没有可用音色"}
+      </span>
+      {enabled.length > 1 && (
+        <details>
+          <summary>全部 {enabled.length} 个音色</summary>
+          {enabled.map((setting) => (
+            <div key={setting.voice_id}>
+              {context.voices.find((row) => row.id === setting.voice_id)
+                ?.label ?? `${setting.voice_id}（不可用）`}{" "}
+              · {(1 + setting.rate_percent / 100).toFixed(2)}×
+              {pronunciationId && (
+                <PronunciationPreviewControls
+                  pronunciationId={pronunciationId}
+                  dialect={dialect}
+                  content={content}
+                  voiceProfile={{ voices: [setting] }}
+                  disabled={!content}
+                  disabledReason="请先填写当前口音的合成输入"
+                  ariaLabelPrefix={
+                    context.voices.find((row) => row.id === setting.voice_id)
+                      ?.label ?? setting.voice_id
+                  }
+                  compact
+                />
+              )}
+            </div>
+          ))}
+        </details>
+      )}
+    </Space>
+  );
+}
+
 export function PronunciationPreviewControls({
   pronunciationId,
   previewAdapter,
@@ -219,15 +305,12 @@ export function PronunciationPreviewControls({
   const targetLocale = localeForDialect(dialect, context.dialectPreference);
   const enabledSettings =
     voiceProfile?.voices.filter((setting) => setting.enabled) ?? [];
-  const voice = enabledSettings.length
-    ? enabledSettings
-        .map((setting) =>
-          context.voices.find((voice) => voice.id === setting.voice_id)
-        )
-        .find(
-          (voice) => voice?.locale.toLowerCase() === targetLocale?.toLowerCase()
-        )
-    : voiceForDialect(context.voices, dialect, context.dialectPreference);
+  const { voice } = resolvePronunciationPreviewVoice(
+    context.voices,
+    dialect,
+    context.dialectPreference,
+    voiceProfile
+  );
   const previewContent = useMemo<RichTextV2>(
     () => content ?? { version: 2, text: spelling ?? "", annotations: [] },
     [content, spelling]

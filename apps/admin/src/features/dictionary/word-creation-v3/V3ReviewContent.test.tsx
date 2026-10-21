@@ -1,6 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
 import { Button } from "antd";
-import type { AdminWordV3 } from "@tsz/types";
 import { describe, expect, it, vi } from "vitest";
 import { formsFixture } from "./fixtures";
 import { V3ReviewContent } from "./V3ReviewContent";
@@ -20,7 +19,7 @@ vi.mock("../word-creation/PronunciationPreview", () => ({
   }
 }));
 
-function word(): AdminWordV3 {
+function word(): import("@tsz/shared").ExpandedAdminWordV3 {
   const forms = formsFixture();
   return {
     schema_version: 3,

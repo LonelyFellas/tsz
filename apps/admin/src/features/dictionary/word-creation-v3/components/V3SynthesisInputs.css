@@ -307,10 +307,18 @@
   border-color: var(--ant-color-primary, #2053ff);
 }
 
-:is(.word-shared-pronunciation-us, .v3-dialect-panel-us)
+:is(
+    .word-shared-pronunciation-us,
+    .v3-dialect-panel-us,
+    .word-form-matrix-dialect-cell-us
+  )
   .word-synthesis-choice.ant-radio-wrapper-checked
   .word-synthesis-choice-tag,
-:is(.word-shared-pronunciation-us, .v3-dialect-panel-us)
+:is(
+    .word-shared-pronunciation-us,
+    .v3-dialect-panel-us,
+    .word-form-matrix-dialect-cell-us
+  )
   .word-synthesis-choice.ant-radio-wrapper
   .ant-radio-checked:not(.ant-radio-disabled) {
   background-color: #d42a91;

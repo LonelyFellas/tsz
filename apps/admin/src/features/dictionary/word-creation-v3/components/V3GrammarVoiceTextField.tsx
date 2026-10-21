@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { expandFormContents } from "@tsz/shared";
 import type { DraftFormsStepContentV3, GrammarFormLinkV3 } from "@tsz/types";
 import { toRichTextV2 } from "@tsz/voice-editor/core";
 import {
@@ -40,7 +41,9 @@ export function V3GrammarVoiceTextField({
                   )
                     return forms;
                   if (!link.target_publication_id)
-                    return (await requests.get(link.target_word_id)).word.forms;
+                    return expandFormContents(
+                      (await requests.get(link.target_word_id)).word.forms
+                    );
                   const target = (
                     await requests.getPublication(
                       link.target_word_id,
@@ -49,7 +52,7 @@ export function V3GrammarVoiceTextField({
                   ).publication.word;
                   if (target.schema_version !== 3)
                     throw new Error("关联词形的数据版本不支持，请重新关联");
-                  return target.forms;
+                  return expandFormContents(target.forms);
                 })()
               );
             }

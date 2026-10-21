@@ -335,7 +335,7 @@ describe("runtime schema fail-closed diagnostics", () => {
                     )
             };
       pos.forms = [form];
-      word.forms.pos = [pos];
+      word.forms = { pos: [pos] };
       expect(validateRuntimeSchema("AdminWordV3", word)).toEqual({
         valid: true
       });
@@ -371,7 +371,7 @@ describe("runtime schema fail-closed diagnostics", () => {
       runtimeSchemaBundle.$defs.WordPosFormsV3!
     ) as Record<string, unknown>;
     pos.forms = [form];
-    word.forms.pos = [pos];
+    word.forms = { pos: [pos] };
     const speech = {
       content: { version: 2, text: "cat", annotations: [] },
       voice_profile: { voices: [] }
@@ -430,7 +430,7 @@ describe("runtime schema fail-closed diagnostics", () => {
         });
       form.regional_variants = regions;
       pos.forms = [form];
-      word.forms.pos = [pos];
+      word.forms = { pos: [pos] };
       expect(validateRuntimeSchema("AdminWordV3", word)).toEqual({
         valid: true
       });

@@ -115,7 +115,8 @@ const SPELLING_MARKUP_HEADERS = {
   ...SENTENCE_FORMATTING_HEADERS,
   "X-TSZ-Spelling-Markup": "v1",
   "X-TSZ-Spelling-Speech": "v1",
-  "X-TSZ-Phoneme-Speech": "v1"
+  "X-TSZ-Phoneme-Speech": "v1",
+  "X-TSZ-Form-Contents": "v1"
 };
 
 // admin 账号体系的 wire 类型已收敛到 @tsz/types（wire 类型唯一家）。此处 re-export，
@@ -388,7 +389,13 @@ export function createAdminEndpoints(http: HttpClient) {
         input: PreviewFormsImpactInputV3
       ) =>
         http
-          .post<unknown>(`/lexicon/entries/${wordId}/steps/forms/impact`, input)
+          .post<unknown>(
+            `/lexicon/entries/${wordId}/steps/forms/impact`,
+            input,
+            {
+              headers: SPELLING_MARKUP_HEADERS
+            }
+          )
           .then(decodeFormsImpactResponseV3),
       saveFormsStepV3: (wordId: string, input: SaveFormsStepInputV3) =>
         http

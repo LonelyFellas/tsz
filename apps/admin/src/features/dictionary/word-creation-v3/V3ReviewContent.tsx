@@ -1,5 +1,6 @@
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import {
+  expandFormContents,
   EMPTY_SYNTHESIS,
   pronunciationSynthesisContent,
   pronunciationSynthesisSpeech,
@@ -100,7 +101,7 @@ function FormsReview({
     return <Empty description="暂无词形与发音" />;
   return (
     <Flex vertical gap="middle">
-      {word.forms.pos.map((pos) => (
+      {expandFormContents(word.forms).pos.map((pos) => (
         <section className="v3-review-pos" key={pos.pos_id}>
           <Flex align="center" justify="space-between">
             <Typography.Title level={4} style={{ margin: 0 }}>

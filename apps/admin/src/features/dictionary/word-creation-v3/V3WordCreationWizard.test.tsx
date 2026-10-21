@@ -1,3 +1,8 @@
+import { expandFormContents } from "@tsz/shared";
+import { applyFormsStructure } from "./sharedFormsModel";
+import { ConfigProvider } from "antd";
+import { V3FormContentModal } from "./components/V3FormContentModal";
+import { PronunciationPreviewProvider } from "../word-creation/PronunciationPreview";
 import { changeVoiceText } from "./components/V3VoiceTextField.test-helper";
 import { useAuthStore } from "@/lib/auth";
 import { HttpError } from "@tsz/api-client";
@@ -127,7 +132,10 @@ function canonicalMeanings(posId: string): AdminWordV3["meanings"] {
   };
 }
 
-function word(revision = 1, spelling = "centre"): AdminWordV3 {
+function word(
+  revision = 1,
+  spelling = "centre"
+): import("@tsz/shared").ExpandedAdminWordV3 {
   const forms = formsFixture();
   const variants = forms.pos[0]!.forms[0]!.regional_variants;
   if (variants.mode === "common") variants.common.spelling = spelling;
@@ -908,8 +916,8 @@ describe("V3WordCreationWizard", () => {
     await waitFor(() => expect(source.saveForms).toHaveBeenCalledTimes(1));
     const [, savedInput] = vi.mocked(source.saveForms).mock.calls[0]!;
     expect(savedInput.base_revision).toBe(2);
-    const savedVariants =
-      savedInput.content.pos[0]!.forms[0]!.regional_variants;
+    const savedVariants = expandFormContents(savedInput.content).pos[0]!
+      .forms[0]!.regional_variants;
     expect(
       savedVariants.mode === "common" ? savedVariants.common.spelling : ""
     ).toBe("local edit");
@@ -3163,6 +3171,83 @@ describe("V3WordCreationWizard", () => {
     expect(screen.getByTestId("forms-error-issues")).toBeEmptyDOMElement();
   });
 
+  it("内容弹窗拒绝离开时，中止跨步骤与词性的问题导航", async () => {
+    const initialWord = word();
+    initialWord.completed_steps = ["basics", "forms"];
+    initialWord.max_reachable_step = "meanings";
+    const guard = vi.fn(async () => false);
+    const focusField = vi.fn();
+    renderWizard(requests(), {
+      initialWord,
+      initialStep: "meanings",
+      navigationAdapter: { focusField },
+      renderStep: (context) => (
+        <>
+          <output data-testid="navigation-step">{context.activeStep}</output>
+          <button onClick={() => context.registerSentenceLeaveGuard?.(guard)}>
+            注册内容离开保护
+          </button>
+          <button
+            onClick={() =>
+              void context.actions.navigateTarget({
+                step: "forms",
+                pos_id: UUIDS.pos,
+                node_id: UUIDS.pos,
+                field: "spelling"
+              })
+            }
+          >
+            跳转内容问题
+          </button>
+        </>
+      )
+    });
+    fireEvent.click(screen.getByText("注册内容离开保护"));
+    fireEvent.click(screen.getByText("跳转内容问题"));
+    await waitFor(() => expect(guard).toHaveBeenCalledOnce());
+    expect(focusField).not.toHaveBeenCalled();
+    expect(screen.getByTestId("navigation-step")).toHaveTextContent("meanings");
+  });
+
+  it("切换步骤和词性共用待决离开确认，拒绝后保持原位置", async () => {
+    const initialWord = word();
+    initialWord.completed_steps = ["basics", "forms"];
+    initialWord.max_reachable_step = "meanings";
+    let answer!: (accepted: boolean) => void;
+    const confirmation = new Promise<boolean>((resolve) => {
+      answer = resolve;
+    });
+    const guard = vi.fn(() => confirmation);
+    renderWizard(requests(), {
+      initialWord,
+      initialStep: "meanings",
+      renderStep: (context) => (
+        <>
+          <output data-testid="pending-leave-position">
+            {context.activeStep}:{context.activePosId}
+          </output>
+          <button onClick={() => context.registerSentenceLeaveGuard?.(guard)}>
+            注册待决离开保护
+          </button>
+          <button onClick={() => context.setActiveStep("forms")}>
+            切换待决步骤
+          </button>
+          <button onClick={() => context.setActivePosId(UUIDS.pos_2)}>
+            切换待决词性
+          </button>
+        </>
+      )
+    });
+    fireEvent.click(screen.getByText("注册待决离开保护"));
+    fireEvent.click(screen.getByText("切换待决步骤"));
+    fireEvent.click(screen.getByText("切换待决词性"));
+    expect(guard).toHaveBeenCalledOnce();
+    await act(async () => answer(false));
+    expect(screen.getByTestId("pending-leave-position")).toHaveTextContent(
+      `meanings:${UUIDS.pos}`
+    );
+  });
+
   it("未完成例句阻止离开时，不提前保存词形或词义", async () => {
     const initialWord = word();
     initialWord.completed_steps = ["basics", "forms"];
@@ -5301,7 +5386,9 @@ describe("V3WordCreationWizard", () => {
           <button
             type="button"
             onClick={() => {
-              context.setDraftForms(structuredClone(context.word.forms));
+              context.setDraftForms(
+                structuredClone(expandFormContents(context.word.forms))
+              );
               context.setDraftMeanings(
                 toWritableMeanings(context.word.meanings)
               );
@@ -6323,6 +6410,179 @@ describe("V3WordCreationWizard", () => {
     expect(saveForms).toHaveBeenCalledTimes(1);
   });
 });
+
+it("未保存页面时跨两次内容弹窗地区往返保留完整引用身份", async () => {
+  const initialWord: AdminWordV3 = word();
+  const shared = applyFormsStructure(
+    { forms_format: "shared_v1", contents: [], pos: [] },
+    word().forms
+  );
+  if (!("forms_format" in shared)) throw new Error("fixture");
+  initialWord.forms = shared;
+  const source = requests();
+  let latest: V3WizardSlotContext;
+  function ContentHost({ context }: { context: V3WizardSlotContext }) {
+    const [open, setOpen] = useState(false);
+    latest = context;
+    if (!("forms_format" in context.formContents)) throw new Error("fixture");
+    return (
+      <ConfigProvider theme={{ token: { motion: false } }}>
+        <PronunciationPreviewProvider>
+          <button onClick={() => setOpen(true)}>打开内容弹窗</button>
+          {open && (
+            <V3FormContentModal
+              forms={context.formContents}
+              formId={shared.pos[0]!.forms[0]!.id}
+              catalog={[]}
+              issues={[]}
+              stableVariantIds={context.stableVariantIds}
+              pronunciationReferenceIds={context.pronunciationReferenceIds}
+              retiredContentSlots={[]}
+              onCancel={() => setOpen(false)}
+              onConfirm={(next) => {
+                context.setFormContents(next);
+                setOpen(false);
+              }}
+            />
+          )}
+        </PronunciationPreviewProvider>
+      </ConfigProvider>
+    );
+  }
+  renderWizard(source, {
+    initialWord,
+    renderStep: (context) => <ContentHost context={context} />
+  });
+  fireEvent.click(screen.getByText("打开内容弹窗"));
+  fireEvent.click(screen.getAllByRole("radio", { name: "是" })[1]!);
+  fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+  );
+  fireEvent.click(screen.getByText("打开内容弹窗"));
+  fireEvent.click(screen.getAllByRole("radio", { name: "否" })[1]!);
+  fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+  );
+  expect(latest!.formContents.pos).toEqual(shared.pos);
+  expect(source.saveForms).not.toHaveBeenCalled();
+});
+
+it.each([
+  ["spelling", "词形英美通用拼写"],
+  ["dict_phonetic", "第 1 条发音的字典音标"]
+] as const)(
+  "仅带共享内容槽位的问题打开内容弹窗并定位实际控件：%s",
+  async (field, label) => {
+    const initialWord: AdminWordV3 = word();
+    const shared = applyFormsStructure(
+      { forms_format: "shared_v1", contents: [], pos: [] },
+      word().forms
+    );
+    if (!("forms_format" in shared)) throw new Error("fixture");
+    initialWord.forms = shared;
+    const content = shared.contents[0]!;
+    if (content.regional_variants.mode !== "common") throw new Error("fixture");
+    const slotId =
+      field === "spelling"
+        ? content.regional_variants.common.id
+        : content.regional_variants.common.pronunciations[0]!.id;
+    const issue: V3DraftValidationIssue = {
+      ...validationIssue(),
+      node_id: slotId,
+      field,
+      code:
+        field === "spelling"
+          ? "variant_spelling_required"
+          : "pronunciation_required",
+      node_location: {
+        node_role: "forms.content",
+        ancestor_node_ids: [],
+        content_id: content.id,
+        content_slot_id: slotId
+      }
+    };
+    renderWizard(requests(), {
+      initialWord,
+      renderStep: (context) => (
+        <>
+          <V3FormsAndPronunciationStep
+            sharedForms={shared}
+            onSharedFormsChange={context.setFormContents}
+            stableVariantIds={context.stableVariantIds}
+            value={expandFormContents(context.draftForms)}
+            activePosId={context.activePosId}
+            onActivePosChange={context.setActivePosId}
+            onChange={context.setDraftForms}
+            issues={[issue]}
+          />
+          <button onClick={() => void context.actions.navigateIssue(issue)}>
+            定位共享内容槽位
+          </button>
+        </>
+      )
+    });
+    expect(screen.getByText("有待填写项")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("定位共享内容槽位"));
+    const input = await screen.findByLabelText(label);
+    await waitFor(() => expect(input).toHaveFocus());
+    expect(input).toHaveAttribute("aria-invalid", "true");
+  }
+);
+
+it.each(["supersede", "unmount"] as const)(
+  "共享内容定位在 %s 后不再打开过期弹窗",
+  async (end) => {
+    const initialWord: AdminWordV3 = word();
+    const shared = applyFormsStructure(
+      { forms_format: "shared_v1", contents: [], pos: [] },
+      word().forms
+    );
+    if (!("forms_format" in shared)) throw new Error("fixture");
+    initialWord.forms = shared;
+    const binding = shared.pos[0]!.forms[0]!;
+    const open = vi.fn();
+    let actions: V3WizardSlotContext["actions"];
+    const issue: V3DraftValidationIssue = {
+      ...validationIssue(),
+      node_id: binding.content_id,
+      field: "spelling",
+      node_location: {
+        node_role: "forms.content",
+        ancestor_node_ids: [],
+        content_id: binding.content_id
+      }
+    };
+    const view = renderWizard(requests(), {
+      initialWord,
+      renderStep: (context) => {
+        actions = context.actions;
+        return (
+          <button data-v3-open-content={binding.id} onClick={open}>
+            打开内容
+          </button>
+        );
+      }
+    });
+    await act(async () => {
+      await actions!.navigateIssue(issue);
+    });
+    if (end === "unmount") view.unmount();
+    else
+      await act(async () => {
+        await actions!.navigateIssue({
+          ...issue,
+          step: "meanings",
+          node_location: { node_role: "meanings.sense", ancestor_node_ids: [] }
+        });
+      });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    });
+    expect(open).not.toHaveBeenCalled();
+  }
+);
 
 it("正文关联校验失败定位到所属英文正文输入框", async () => {
   const initialWord = word();

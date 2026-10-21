@@ -9,6 +9,7 @@ import type { V3DraftValidationIssue, V3ValidationIssueCode } from "@tsz/types";
 const UNKNOWN_ISSUE_MESSAGE = "该内容暂时无法完成，请刷新后重试";
 
 const ISSUE_MESSAGES = {
+  form_content_mapping_invalid: "词形内容与标签的关联无效，请检查对应标签",
   invalid_regional_variant_shape: "词形的英美结构与当前规则不一致",
   dialect_rules_invalid: "英美拼写与音标规则组合无效",
   invalid_form_type_for_part_of_speech: "当前词性不支持该词形类型",

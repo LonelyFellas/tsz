@@ -174,6 +174,88 @@ export interface DraftFormsStepContentV3 {
   pos: WordPosFormsV3[];
 }
 
+export interface FormContentVariantV3 {
+  id: string;
+  spelling: string;
+  spelling_rich?: RichTextV2V3;
+  spelling_speech?: SpellingSpeechV3;
+  origin: TextOriginV3;
+  pronunciations: WordPronunciationV3[];
+}
+
+export type FormContentRegionalVariantsV3 =
+  | { mode: "common"; common: FormContentVariantV3 }
+  | { mode: "uk_us"; uk: FormContentVariantV3; us: FormContentVariantV3 };
+
+export interface FormPronunciationSlotV3 {
+  id: string;
+  variant_slot_id: string;
+}
+
+export interface FormPronunciationSlotsV3 {
+  id: string;
+  common?: FormPronunciationSlotV3;
+  uk?: FormPronunciationSlotV3;
+  us?: FormPronunciationSlotV3;
+}
+
+export interface FormContentV3 {
+  id: string;
+  dialect_rules: DialectRulesV3;
+  regional_variants: FormContentRegionalVariantsV3;
+  pronunciation_slots?: FormPronunciationSlotsV3[];
+}
+
+export interface FormPronunciationBindingV3 {
+  id: string;
+  content_slot_id: string;
+}
+
+export interface FormVariantBindingV3 {
+  id: string;
+  content_slot_id: string;
+  is_regular: boolean;
+  pronunciations: FormPronunciationBindingV3[];
+  component_usages?: PhraseComponentUsageV3[];
+}
+
+export type FormRegionalBindingsV3 =
+  | { mode: "common"; common: FormVariantBindingV3 }
+  | { mode: "uk_us"; uk: FormVariantBindingV3; us: FormVariantBindingV3 };
+
+export interface FormContentBindingV3 {
+  id: string;
+  form_type: WordFormTypeV3;
+  content_id: string;
+  regional_bindings: FormRegionalBindingsV3;
+}
+
+export type SharedFormGroupV3 = Omit<WordFormGroupV3, "dialect_rules">;
+
+export interface SharedPosFormsV3 {
+  pos_id: string;
+  pos: string;
+  forms: FormContentBindingV3[];
+  form_groups: SharedFormGroupV3[];
+}
+
+export interface SharedFormsStepContentV3 {
+  forms_format: "shared_v1";
+  contents: FormContentV3[];
+  pos: SharedPosFormsV3[];
+}
+
+export type FormsStepRepresentationV3 =
+  SharedFormsStepContentV3 | DraftFormsStepContentV3;
+
+export interface RetiredContentSlotV3 {
+  id: string;
+  content_id: string;
+  parent_slot_id?: string;
+  role: "content" | "common" | "uk" | "us" | "pronunciation";
+  retired_at: string;
+}
+
 export interface RichTextSpanV3 {
   start: number;
   end: number;
@@ -664,6 +746,7 @@ export interface AdminWordV3Capabilities {
   draft_relation_prebinding?: boolean;
   /** 释义级成分用词（B1 起恒 true）；缺失表示后端尚不支持，前端不得发送 sense.component_usages。 */
   sense_component_usages?: boolean;
+  shared_form_contents?: boolean;
 }
 
 export interface AdminWordV3 {
@@ -682,7 +765,7 @@ export interface AdminWordV3 {
   presentation: EntryPresentationV3;
   capabilities: AdminWordV3Capabilities;
   detection_basis_dialect?: SourceDialect;
-  forms: DraftFormsStepContentV3;
+  forms: FormsStepRepresentationV3;
   meanings: DraftMeaningsStepContentV3;
   /** 已通过完整性校验并由服务端标记完成；不表达页面访问权限。 */
   completed_steps: PersistedWordStep[];
@@ -716,12 +799,15 @@ export interface RetiredStableNodeV3 {
   id: string;
   node_role: V3RetiredNodeRole;
   parent_node_id?: string;
+  content_id?: string;
+  content_slot_id?: string;
   retired_at: string;
 }
 
 export interface AdminWordDraftV3Envelope {
   word: AdminWordV3;
   retired_stable_nodes: RetiredStableNodeV3[];
+  retired_content_slots?: RetiredContentSlotV3[];
 }
 
 export interface CreateAdminWordV3Input {
@@ -753,7 +839,7 @@ export interface SaveFormsStepInputV3 {
   base_revision: number;
   intent: StepSaveIntent;
   sense_bindings?: SenseFormGroupBindingV3[];
-  content: DraftFormsStepContentV3;
+  content: FormsStepRepresentationV3;
   confirmed_impact_token?: string;
   confirmed_surface_match_token?: string;
 }
@@ -774,7 +860,7 @@ export interface PreviewFormsImpactInputV3 {
   schema_version: 3;
   base_revision: number;
   sense_bindings?: SenseFormGroupBindingV3[];
-  content: DraftFormsStepContentV3;
+  content: FormsStepRepresentationV3;
 }
 
 export type PreviewFormsImpactInputAny =
@@ -816,6 +902,7 @@ export type ActivatePublicationAnyInput =
 
 export const V3_VALIDATION_ISSUE_CODES = [
   "invalid_regional_variant_shape",
+  "form_content_mapping_invalid",
   "dialect_rules_invalid",
   "invalid_form_type_for_part_of_speech",
   "part_of_speech_kind_mismatch",
@@ -900,6 +987,8 @@ export const V3_VALIDATION_ISSUE_CODES = [
 export type V3ValidationIssueCode = (typeof V3_VALIDATION_ISSUE_CODES)[number];
 
 export interface V3DraftNodeLocation {
+  content_id?: string;
+  content_slot_id?: string;
   node_role: string;
   ancestor_node_ids: string[];
   pos_id?: string;

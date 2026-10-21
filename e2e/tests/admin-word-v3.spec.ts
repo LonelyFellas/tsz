@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page, type Locator } from "@playwright/test";
+import { expandFormContents } from "@tsz/shared";
 import type { RichTextV2, SharedSentence } from "@tsz/types";
 import { validateRuntimeSchema } from "@tsz/api-client";
 import {
@@ -10,6 +11,43 @@ import {
   mockAdminV3Api,
   sharedSentenceFixture
 } from "./support/mockAdminV3Api";
+
+async function openFormContent(
+  page: Page,
+  scope: Page | Locator = page,
+  index = 0
+) {
+  await scope.locator("[data-v3-open-content]").nth(index).click();
+  const dialog = page.getByRole("dialog", { name: /^词形 .* 内容设置$/ });
+  await expect(dialog).toBeVisible();
+  await dialog.evaluate(async (node) => {
+    await Promise.all(
+      node
+        .getAnimations({ subtree: true })
+        .map((animation) => animation.finished)
+    );
+  });
+  return dialog;
+}
+
+async function applyFormContent(page: Page) {
+  const dialog = page.getByRole("dialog", { name: /^词形 .* 内容设置$/ });
+  await dialog
+    .getByRole("button", { name: "确认，应用到草稿", exact: true })
+    .click();
+  await expect(dialog).toBeHidden();
+}
+
+async function setContentRule(
+  dialog: Locator,
+  rule: "spelling" | "phonetic",
+  distinguish: boolean
+) {
+  const group = dialog.getByRole("radiogroup").nth(rule === "spelling" ? 0 : 1);
+  await group
+    .getByRole("radio", { name: distinguish ? "是" : "否", exact: true })
+    .check();
+}
 
 test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () => {
   test("手动选择 IPA、UPS 或拼写，词性添加显示圆圈加号", async ({ page }) => {
@@ -45,6 +83,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await page.locator(".word-pos-tabs > .ant-tabs-nav").screenshot({
       path: test.info().outputPath("circle-add.png")
     });
+    await openFormContent(page);
     const source = page.locator(".word-pronunciation-synthesis").first();
     await expect(
       source.getByRole("radio", { name: "Azure UPS", exact: true })
@@ -64,6 +103,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(usUps).toHaveCount(0);
     await source.getByRole("button", { name: "展开第 1 条发音的 UPS" }).click();
     const save = async () => {
+      await applyFormContent(page);
       const button = page.getByRole("button", { name: /保存草稿$/ });
       const saved = page.waitForResponse(
         (response) =>
@@ -103,10 +143,10 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       source.getByRole("radio", { name: "Azure UPS", exact: true })
     ).toHaveCount(0);
     await expect(usUps).toBeHidden();
-    await save();
     await source.screenshot({
       path: test.info().outputPath("optional-ups.png")
     });
+    await save();
     await page.goto(previewUrl);
     await expect(
       page.getByText("Azure UPS · 英式：AO B IH T · 美式：AO R B IH T", {
@@ -114,6 +154,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       })
     ).toBeVisible();
     await page.goto(formsUrl);
+    await openFormContent(page);
     await expect(usUps).toHaveCount(0);
     await expect(
       source.getByRole("radio", { name: "Azure UPS", exact: true })
@@ -134,6 +175,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       page.getByText("Azure IPA · 英式：ˈɔːbɪt · 美式：ˈɔɹbɪt", { exact: true })
     ).toBeVisible();
     await page.goto(formsUrl);
+    await openFormContent(page);
     await expect(
       source.getByRole("radio", { name: "Azure IPA", exact: true })
     ).toBeChecked();
@@ -147,6 +189,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       page.getByText("词形拼写（语音来源）", { exact: true }).first()
     ).toBeVisible();
     await page.goto(formsUrl);
+    await openFormContent(page);
     await expect(
       source.getByRole("radio", { name: "词形拼写", exact: true })
     ).toBeChecked();
@@ -160,7 +203,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       page
     }) => {
       const api = await mockAdminV3Api(page, { formsFailureOnce: false });
-      const pos = api.getWord().forms.pos[0]!;
+      const pos = expandFormContents(api.getWord().forms).pos[0]!;
       const group = pos.form_groups[0]!;
       const form = pos.forms.find(
         (item) => item.id === group.members[0]!.form_id
@@ -169,6 +212,13 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
         throw new Error("Expected common pronunciation fixture");
       const variant = form.regional_variants.common;
       const pronunciation = variant.pronunciations[0]!;
+      const shared = api.getWord().forms;
+      if (!("forms_format" in shared)) throw new Error("Expected shared forms");
+      const binding = shared.pos[0]!.forms.find((item) => item.id === form.id)!;
+      if (binding.regional_bindings.mode !== "common")
+        throw new Error("Expected common binding");
+      const pronunciationSlot =
+        binding.regional_bindings.common.pronunciations[0]!.content_slot_id;
       const formsPath = `${ADMIN_V3_ENTRIES_PATH}/${ADMIN_V3_MIXED_WORD_ID}/steps/forms`;
       await page.route(`**${formsPath}`, async (route) => {
         if (
@@ -206,7 +256,9 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
                   form_id: form.id,
                   variant_id: variant.id,
                   dialect: "common",
-                  pronunciation_id: pronunciation.id
+                  pronunciation_id: pronunciation.id,
+                  content_id: binding.content_id,
+                  content_slot_id: pronunciationSlot
                 }
               }
             ]
@@ -214,6 +266,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
         });
       });
       await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+      await openFormContent(page);
       const source = page.locator(".word-pronunciation-synthesis").first();
       await source
         .getByRole("radio", { name: "词形拼写", exact: true })
@@ -231,6 +284,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       await expect(source.locator('textarea[aria-invalid="true"]')).toHaveCount(
         0
       );
+      await applyFormContent(page);
       await page
         .getByRole("button", { name: "进入词义与例句", exact: true })
         .click();
@@ -246,13 +300,21 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       const response = await rejected;
       const submitted = response.request().postDataJSON();
       expect(submitted.intent).toBe("complete");
-      const selected = submitted.content.pos[0].forms.find(
-        (item: { id: string }) => item.id === form.id
-      ).regional_variants.common.pronunciations[0].synthesis;
+      const selectedForm = expandFormContents(
+        submitted.content
+      ).pos[0]!.forms.find((item) => item.id === form.id)!;
+      if (selectedForm.regional_variants.mode !== "common")
+        throw new Error("Expected common content");
+      const selected =
+        selectedForm.regional_variants.common.pronunciations[0]!.synthesis;
       expect(selected).toMatchObject({ alphabet, use_spelling: false });
+      if (!selected) throw new Error("Expected submitted synthesis");
       expect(selected.uk).toBeUndefined();
       expect(selected.us).toBeUndefined();
       await page.getByRole("button", { name: /词形与发音$/ }).click();
+      await page
+        .getByRole("button", { name: "去处理首项", exact: true })
+        .click();
       const input = source.locator(
         `textarea[data-v3-field="synthesis.${alphabet}"]`
       );
@@ -263,9 +325,6 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
           exact: true
         })
       ).toBeVisible();
-      await page
-        .getByRole("button", { name: "去处理首项", exact: true })
-        .click();
       await expect(input).toBeFocused();
       if (alphabet === "ups") {
         const panel = source.locator(".word-synthesis-ups-fields");
@@ -279,6 +338,11 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
         await expect(
           source.getByRole("radio", { name: "Azure UPS", exact: true })
         ).toHaveCount(0);
+        const dialog = page.getByRole("dialog", {
+          name: /^词形 .* 内容设置$/
+        });
+        await dialog.getByRole("button", { name: /取\s*消/ }).click();
+        await expect(dialog).toBeHidden();
         await page
           .getByRole("button", { name: "去处理首项", exact: true })
           .click();
@@ -291,6 +355,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
   test("词形拼写与实际发音的输入和按钮保持连续边框", async ({ page }) => {
     await mockAdminV3Api(page, { formsFailureOnce: false });
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+    await openFormContent(page);
     await page.evaluate(() => document.fonts.ready);
     const groups = [
       page
@@ -306,44 +371,46 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       await page.setViewportSize({ width, height: 1000 });
       for (const [index, group] of groups.entries()) {
         await expect(group).toBeVisible();
-        const controls = await group.evaluate((node) =>
-          [...node.children].map((child) => {
-            const control = child.matches("button, textarea")
-              ? child
-              : child.querySelector("textarea")!;
-            const rect = control.getBoundingClientRect();
-            const style = getComputedStyle(control);
-            return {
-              x: rect.x,
-              right: rect.right,
-              y: rect.y,
-              height: rect.height,
-              left: [style.borderTopLeftRadius, style.borderBottomLeftRadius],
-              end: [style.borderTopRightRadius, style.borderBottomRightRadius]
-            };
-          })
-        );
-        expect(controls.length).toBeGreaterThanOrEqual(2);
-        for (let i = 0; i < controls.length; i++) {
-          const control = controls[i]!;
-          expect(Math.abs(control.y - controls[0]!.y)).toBeLessThanOrEqual(1);
-          expect(
-            Math.abs(control.height - controls[0]!.height)
-          ).toBeLessThanOrEqual(1);
-          if (i > 0) {
-            expect(control.left).toEqual(["0px", "0px"]);
-            expect(control.x - controls[i - 1]!.right).toBeCloseTo(-1, 1);
-          } else
+        await expect(async () => {
+          const controls = await group.evaluate((node) =>
+            [...node.children].map((child) => {
+              const control = child.matches("button, textarea")
+                ? child
+                : child.querySelector("textarea")!;
+              const rect = control.getBoundingClientRect();
+              const style = getComputedStyle(control);
+              return {
+                x: rect.x,
+                right: rect.right,
+                y: rect.y,
+                height: rect.height,
+                left: [style.borderTopLeftRadius, style.borderBottomLeftRadius],
+                end: [style.borderTopRightRadius, style.borderBottomRightRadius]
+              };
+            })
+          );
+          expect(controls.length).toBeGreaterThanOrEqual(2);
+          for (let i = 0; i < controls.length; i++) {
+            const control = controls[i]!;
+            expect(Math.abs(control.y - controls[0]!.y)).toBeLessThanOrEqual(1);
             expect(
-              control.left.every((radius) => Number.parseFloat(radius) > 0)
-            ).toBe(true);
-          if (i < controls.length - 1)
-            expect(control.end).toEqual(["0px", "0px"]);
-          else
-            expect(
-              control.end.every((radius) => Number.parseFloat(radius) > 0)
-            ).toBe(true);
-        }
+              Math.abs(control.height - controls[0]!.height)
+            ).toBeLessThanOrEqual(1);
+            if (i > 0) {
+              expect(control.left).toEqual(["0px", "0px"]);
+              expect(control.x - controls[i - 1]!.right).toBeCloseTo(-1, 1);
+            } else
+              expect(
+                control.left.every((radius) => Number.parseFloat(radius) > 0)
+              ).toBe(true);
+            if (i < controls.length - 1)
+              expect(control.end).toEqual(["0px", "0px"]);
+            else
+              expect(
+                control.end.every((radius) => Number.parseFloat(radius) > 0)
+              ).toBe(true);
+          }
+        }).toPass({ timeout: 5000 });
         const input = group.locator("textarea");
         await input.focus();
         await expect(input).toBeFocused();
@@ -358,6 +425,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
   test("UPS 折叠箭头与读法下拉保持一致", async ({ page }) => {
     await mockAdminV3Api(page, { formsFailureOnce: false });
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+    await openFormContent(page);
     const fields = page.locator(".word-pronunciation-floating-fields").first();
     const nativeArrow = fields.locator(".ant-select .anticon-down").first();
     const toggle = fields.locator(".word-synthesis-ups-toggle");
@@ -386,6 +454,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
   test("浮动标签在聚焦和悬停时始终完整显示", async ({ page }) => {
     await mockAdminV3Api(page, { formsFailureOnce: false });
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+    await openFormContent(page);
     const fields = page.locator(".word-pronunciation-floating-fields").first();
     await fields.getByRole("button", { name: "展开第 1 条发音的 UPS" }).click();
     const labels = fields.locator("label[for]");
@@ -458,6 +527,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
   test("发音标签嵌入输入框上边框，宽窄屏点击标签均可聚焦", async ({ page }) => {
     await mockAdminV3Api(page, { formsFailureOnce: false });
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+    await openFormContent(page);
     const fields = page.locator(".word-pronunciation-floating-fields").first();
     const labels = fields.locator("label[for]");
     await expect(labels).toHaveCount(5);
@@ -526,8 +596,13 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       const toggle = fields.getByRole("button", {
         name: "收起第 1 条发音的 UPS"
       });
-      const headingBox = (await source.boundingBox())!;
-      const toggleBox = (await toggle.boundingBox())!;
+      const { headingBox, toggleBox } = await source.evaluate((heading) => ({
+        headingBox: heading.getBoundingClientRect().toJSON(),
+        toggleBox: heading
+          .querySelector(".word-synthesis-ups-toggle")!
+          .getBoundingClientRect()
+          .toJSON()
+      }));
       expect(
         Math.abs(
           headingBox.y +
@@ -705,9 +780,10 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
   test("词形拼写收起态的可见文字与输入框都使用 Bold", async ({ page }) => {
     await mockAdminV3Api(page);
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+    await openFormContent(page);
     const spelling = page.locator("textarea.tsz-words").first();
     const preview = page
-      .locator(".v3-forms-step .v3-grammar-preview-content.tsz-words")
+      .locator(".ant-modal .v3-grammar-preview-content.tsz-words")
       .first();
     const text = preview.locator(".tsz-ve-readonly > span").first();
     await expect(preview).toHaveText(await spelling.inputValue());
@@ -724,6 +800,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
   }) => {
     await mockAdminV3Api(page);
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+    const contentDialog = await openFormContent(page);
     const spelling = page.locator("textarea.tsz-words").first();
     const phonetic = page
       .locator("textarea.tsz-phonetics:not(.tsz-actual-pronunciation)")
@@ -775,11 +852,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
           );
         }
       }
-      await page
-        .locator("[data-pos-id] .v3-form-group-card")
-        .first()
-        .getByLabel("英美音标有区别")
-        .check();
+      await setContentRule(contentDialog, "phonetic", true);
       const usSource = page
         .locator(".word-shared-pronunciation-us .word-pronunciation-synthesis")
         .first();
@@ -838,13 +911,11 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
           .screenshot({ animations: "disabled" }),
         contentType: "image/png"
       });
-      await page
-        .locator("[data-pos-id] .v3-form-group-card")
-        .first()
-        .getByLabel("英美拼写有区别")
-        .check();
+      await setContentRule(contentDialog, "spelling", true);
       const separatedUs = page
-        .locator(".v3-dialect-panel-us .word-pronunciation-synthesis")
+        .locator(
+          ".word-form-matrix-dialect-cell-us .word-pronunciation-synthesis"
+        )
         .first();
       await expect(
         separatedUs.getByRole("radio", { name: "Azure UPS", exact: true })
@@ -913,6 +984,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
         )
       ])
     );
+    await applyFormContent(page);
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/preview`);
     await expect(page.locator(".v3-review")).toBeVisible();
     await page.evaluate(() => document.fonts.ready);
@@ -1969,12 +2041,21 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       const literal = kind === "word" ? "orbit" : "give up";
       const pos = word.forms.pos[0]!;
       const form = pos.forms[0]!;
-      const regional = form.regional_variants;
+      const expandedForm = expandFormContents(word.forms).pos[0]!.forms[0]!;
+      const regional = expandedForm.regional_variants;
       const variant =
         regional.mode === "common" ? regional.common : regional.uk;
       const sense = word.meanings.pos[0]!.senses[0]!;
       word.capabilities.text_links = true;
-      variant.spelling = literal;
+      if (!("forms_format" in word.forms))
+        throw new Error("Expected shared forms");
+      const contentId = word.forms.pos[0]!.forms[0]!.content_id;
+      const sharedContent = word.forms.contents.find(
+        (content) => content.id === contentId
+      )!;
+      if (sharedContent.regional_variants.mode !== "common")
+        throw new Error("Expected common content");
+      sharedContent.regional_variants.common.spelling = literal;
       sense.definitions[0]!.content = {
         version: 2,
         text: "关联目标释义",
@@ -2126,7 +2207,8 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     const word = api.getWord();
     const pos = word.forms.pos[0]!;
     const form = pos.forms[0]!;
-    const regional = form.regional_variants;
+    const expandedForm = expandFormContents(word.forms).pos[0]!.forms[0]!;
+    const regional = expandedForm.regional_variants;
     const variant = regional.mode === "common" ? regional.common : regional.uk;
     const targetEntryId = "01990000-0000-7000-8000-000000000999";
     await page.route(
@@ -2723,6 +2805,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     test.skip(process.env.VITE_VOICE_EDITOR !== "true", "需要启用语音编辑器");
     await mockAdminV3Api(page);
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+    await openFormContent(page);
     for (const name of [/^打开.*拼写编辑器$/, /^打开.*实际发音编辑器$/]) {
       const opener = page.getByRole("button", { name }).first();
       await opener.click();
@@ -2841,6 +2924,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     test.skip(process.env.VITE_VOICE_EDITOR !== "true", "需要启用语音编辑器");
     await mockAdminV3Api(page);
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+    await openFormContent(page);
     await page
       .getByRole("button", { name: /^打开.*拼写编辑器$/ })
       .first()
@@ -2910,6 +2994,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     );
     await mockAdminV3Api(page);
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+    await openFormContent(page);
     for (const name of [/^打开.*拼写编辑器$/, /^打开.*实际发音编辑器$/]) {
       const opener = page.getByRole("button", { name }).first();
       await opener.click();
@@ -3001,29 +3086,45 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
 
     const nounGroups = page.locator("[data-pos-id] .v3-form-group-card");
     const firstGroup = nounGroups.nth(0);
+    const pluralDialog = await openFormContent(page, firstGroup, 1);
     await expect(
-      firstGroup.getByRole("textbox", { name: "复数英美通用拼写", exact: true })
+      pluralDialog.getByRole("textbox", {
+        name: "词形英美通用拼写",
+        exact: true
+      })
     ).toHaveValue("");
-    // 拼写统一 / 英美区分都会出 BrE 表头，只有共用结构没有。
-    await expect(firstGroup.getByText("英式英语 · BrE")).toHaveCount(0);
+    await expect(pluralDialog.getByText("英式英语 · BrE")).toHaveCount(0);
+    await applyFormContent(page);
 
     // 加词性时按词性配置铺出新建模板：原形加名词名下的复数，共 2 行。
     // 组内只剩一个原形时类型锁死；⊕ 复制出第二个原形后放开，删回去又锁上。
-    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(2);
+    await expect(
+      firstGroup.locator(
+        ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
+      )
+    ).toHaveCount(2);
     await expect(firstGroup.getByLabel("变化组 1 词形 1 类型")).toBeDisabled();
     await firstGroup.getByLabel("在原形 1 下方添加同类型词形").click();
-    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(3);
+    await expect(
+      firstGroup.locator(
+        ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
+      )
+    ).toHaveCount(3);
     await expect(firstGroup.getByLabel("变化组 1 词形 1 类型")).toBeEnabled();
     await expect(firstGroup.getByLabel("变化组 1 词形 2 类型")).toBeEnabled();
     await firstGroup.getByLabel("删除变化组 1 的词形 2").click();
     // 确认框挂在 body 上，不在组卡片里
     await page.getByLabel("删除词形及相关发音").click();
-    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(2);
+    await expect(
+      firstGroup.locator(
+        ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
+      )
+    ).toHaveCount(2);
     await expect(firstGroup.getByLabel("变化组 1 词形 1 类型")).toBeDisabled();
 
-    const firstForm = firstGroup.locator(".v3-concrete-form-row").nth(0);
+    const firstForm = await openFormContent(page, firstGroup);
     await firstForm
-      .getByRole("textbox", { name: "原形英美通用拼写", exact: true })
+      .getByRole("textbox", { name: "词形英美通用拼写", exact: true })
       .fill("orbit-common");
     await firstForm.getByRole("button", { name: /新增发音/ }).click();
     await firstForm
@@ -3042,39 +3143,58 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       .getByRole("textbox", { name: /^第 \d+ 条发音的实际发音$/ })
       .nth(1)
       .fill("orbit-us");
+    await setContentRule(firstForm, "spelling", true);
+    await applyFormContent(page);
 
+    // 每份内容各自选择规则；空复数也切换后，刷新仍保留空模板。
+    const pluralContent = await openFormContent(page, firstGroup, 1);
+    await setContentRule(pluralContent, "spelling", true);
+    await applyFormContent(page);
     await page.getByRole("button", { name: "新增名词变化组" }).click();
     const secondGroup = nounGroups.nth(1);
-    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(2);
+    await expect(
+      firstGroup.locator(
+        ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
+      )
+    ).toHaveCount(2);
     // 手动加的组是空组：不再自动带原形，也不按词性自动补复数占位行。
-    await expect(secondGroup.locator(".v3-membership-row")).toHaveCount(0);
+    await expect(
+      secondGroup.locator(
+        ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
+      )
+    ).toHaveCount(0);
     await expect(secondGroup.getByText("草稿可暂时保留空变化组")).toBeVisible();
 
-    // 英美规则按组生效，两组各自切换；第 2 组手动加原形后再填拼写。
-    await firstGroup.getByLabel("英美拼写有区别").click();
-    await secondGroup.getByLabel("英美拼写有区别").click();
+    // 第 2 组手动加原形，再在内容弹窗区分英美拼写。
     await secondGroup.getByRole("button", { name: "添加原形" }).click();
-    await expect(secondGroup.locator(".v3-membership-row")).toHaveCount(1);
-    const ukSecondForm = secondGroup
-      .locator(".v3-dialect-panel-uk .v3-dialect-form-cell")
-      .filter({ has: page.getByLabel("原形英式拼写", { exact: true }) });
-    const usSecondForm = secondGroup
-      .locator(".v3-dialect-panel-us .v3-dialect-form-cell")
-      .filter({ has: page.getByLabel("原形美式拼写", { exact: true }) });
+    await expect(
+      secondGroup.locator(
+        ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
+      )
+    ).toHaveCount(1);
+    const secondContent = await openFormContent(page, secondGroup);
+    await setContentRule(secondContent, "spelling", true);
+    const ukSecondForm = secondContent.locator(
+      ".word-form-matrix-dialect-cell-uk"
+    );
+    const usSecondForm = secondContent.locator(
+      ".word-form-matrix-dialect-cell-us"
+    );
     await ukSecondForm
-      .getByRole("textbox", { name: "原形英式拼写", exact: true })
+      .getByRole("textbox", { name: "词形英式拼写", exact: true })
       .fill("orbit-centre");
     await ukSecondForm.getByLabel("第 1 条发音的字典音标").fill("ˈɔːbɪt");
     await ukSecondForm
       .getByRole("textbox", { name: "第 1 条发音的实际发音", exact: true })
       .fill("orbit-uk");
     await usSecondForm
-      .getByRole("textbox", { name: "原形美式拼写", exact: true })
+      .getByRole("textbox", { name: "词形美式拼写", exact: true })
       .fill("orbit-center");
     await usSecondForm.getByLabel("第 1 条发音的字典音标").fill("ˈɔrbɪt");
     await usSecondForm
       .getByRole("textbox", { name: "第 1 条发音的实际发音", exact: true })
       .fill("orbit-us");
+    await applyFormContent(page);
 
     await page.getByLabel("添加基本词性").first().click();
     await page
@@ -3095,18 +3215,16 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     ).toHaveAttribute("aria-selected", "true");
     await nounTab.getByLabel("添加基本词性").press("Escape");
     const verbPanel = page.getByRole("tabpanel", { name: /动词/ });
-    const ukVerb = verbPanel
-      .locator(".v3-dialect-panel-uk .v3-dialect-form-cell")
-      .filter({ has: page.getByLabel("原形英式拼写", { exact: true }) });
-    const usVerb = verbPanel
-      .locator(".v3-dialect-panel-us .v3-dialect-form-cell")
-      .filter({ has: page.getByLabel("原形美式拼写", { exact: true }) });
+    const verbContent = await openFormContent(page, verbPanel);
+    await setContentRule(verbContent, "spelling", true);
+    const ukVerb = verbContent.locator(".word-form-matrix-dialect-cell-uk");
+    const usVerb = verbContent.locator(".word-form-matrix-dialect-cell-us");
     for (const [form, dialect, spelling, phonetic] of [
       [ukVerb, "英式", "orbit-verb-uk", "ˈɔːbɪt"],
       [usVerb, "美式", "orbit-verb-us", "ˈɔrbɪt"]
     ] as const) {
       const input = form.getByRole("textbox", {
-        name: `原形${dialect}拼写`,
+        name: `词形${dialect}拼写`,
         exact: true
       });
       if (await input.isEditable()) {
@@ -3114,7 +3232,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       } else {
         await form
           .getByRole("button", {
-            name: `打开原形${dialect}拼写编辑器`,
+            name: `打开词形${dialect}拼写编辑器`,
             exact: true
           })
           .click();
@@ -3130,6 +3248,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
         .getByRole("textbox", { name: "第 1 条发音的实际发音", exact: true })
         .fill(spelling);
     }
+    await applyFormContent(page);
 
     await page.getByRole("button", { name: "保存草稿" }).click();
     await expect(page.getByRole("tab", { name: "动词" })).toHaveAttribute(
@@ -3138,9 +3257,8 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     );
     await page.getByRole("button", { name: "去处理首项" }).click();
     const issueTarget = page
-      .getByRole("tabpanel", { name: /动词/ })
-      .locator(".v3-dialect-panel-uk .v3-dialect-form-cell")
-      .filter({ has: page.getByLabel("原形英式拼写", { exact: true }) })
+      .getByRole("dialog", { name: /^词形 .* 内容设置$/ })
+      .locator(".word-form-matrix-dialect-cell-uk")
       .getByRole("textbox", { name: "第 1 条发音的实际发音", exact: true });
     await expect(issueTarget).toBeFocused();
     await expect(
@@ -3149,6 +3267,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
         .filter({ hasText: "仍有内容需要完成" })
         .getByText("请完整填写读法、字典音标和实际发音")
     ).toBeVisible();
+    await applyFormContent(page);
 
     await page.getByRole("button", { name: "保存草稿" }).click();
     await expect.poll(() => api.getWord().revision).toBe(2);
@@ -3163,56 +3282,70 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     expect(savedForms.pos[0]?.form_groups).toHaveLength(2);
     expect(savedForms.pos[0]?.form_groups[0]?.members).toHaveLength(2);
     expect(savedForms.pos[0]?.form_groups[1]?.members).toHaveLength(1);
+    if (!("forms_format" in savedForms))
+      throw new Error("Expected shared forms");
     expect(
-      savedForms.pos[0]?.form_groups.map((group) => group.dialect_rules)
-    ).toEqual([
-      { spelling_mode: "distinguish", phonetic_mode: "distinguish" },
-      { spelling_mode: "distinguish", phonetic_mode: "distinguish" }
-    ]);
+      savedForms.pos[0]?.forms.map(
+        (form) =>
+          savedForms.contents.find((content) => content.id === form.content_id)
+            ?.dialect_rules
+      )
+    ).toEqual(
+      Array.from({ length: 3 }, () => ({
+        spelling_mode: "distinguish",
+        phonetic_mode: "distinguish"
+      }))
+    );
+    const expanded = expandFormContents(savedForms);
     expect(
-      savedForms.pos[0]?.forms.every(
+      expanded.pos[0]?.forms.every(
         (item) => item.regional_variants.mode === "uk_us"
       )
     ).toBe(true);
-    const errorPronunciation = savedForms.pos[1]?.forms[0];
-    if (errorPronunciation?.regional_variants.mode !== "uk_us") {
-      throw new Error("Mock E01a expected a regional verb form");
-    }
+    expect(expanded.pos[1]?.forms[0]?.regional_variants.mode).toBe("uk_us");
     await page.reload();
     await expect(page.getByRole("tab", { name: "名词" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "动词" })).toBeVisible();
     await page.getByRole("tab", { name: "名词" }).click();
-    await expect
-      .poll(() =>
-        page
-          .getByRole("textbox", { name: /拼写$/ })
-          .evaluateAll(
-            (fields) =>
-              fields.filter(
-                (field) =>
-                  (field as HTMLTextAreaElement).value === "orbit-common"
-              ).length
-          )
-      )
-      .toBe(2);
-    await expect(page.getByLabel("原形英式拼写", { exact: true })).toHaveCount(
-      2
-    );
-    await expect(page.getByLabel("原形美式拼写", { exact: true })).toHaveCount(
-      2
-    );
+    const restoredFirst = await openFormContent(page, firstGroup);
+    await expect(
+      restoredFirst.getByRole("textbox", { name: "词形英式拼写", exact: true })
+    ).toHaveValue("orbit-common");
+    await expect(
+      restoredFirst.getByRole("textbox", { name: "词形美式拼写", exact: true })
+    ).toHaveValue("orbit-common");
+    await expect(
+      restoredFirst
+        .locator(".word-form-matrix-dialect-cell-uk")
+        .getByLabel(/第 \d+ 条发音的字典音标/)
+    ).toHaveCount(2);
+    await applyFormContent(page);
 
     await expect(nounGroups).toHaveCount(2);
-    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(2);
-    await expect(secondGroup.locator(".v3-membership-row")).toHaveCount(1);
+    await expect(
+      firstGroup.locator(
+        ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
+      )
+    ).toHaveCount(2);
+    await expect(
+      secondGroup.locator(
+        ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
+      )
+    ).toHaveCount(1);
 
     // 删除首次添加词性时生成的真实复数；保存、刷新后不能再自动补回。
+    const restoredPlural = await openFormContent(page, firstGroup, 1);
     await expect(
-      firstGroup.getByRole("textbox", { name: "复数英式拼写", exact: true })
+      restoredPlural.getByRole("textbox", { name: "词形英式拼写", exact: true })
     ).toHaveValue("");
+    await applyFormContent(page);
     await firstGroup.getByLabel("删除变化组 1 的词形 2").click();
     await page.getByLabel("删除词形及相关发音").click();
-    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(1);
+    await expect(
+      firstGroup.locator(
+        ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
+      )
+    ).toHaveCount(1);
     await page.getByRole("button", { name: "保存草稿" }).click();
     await expect.poll(() => api.getWord().revision).toBe(3);
     const savedNoun = savedForms.pos[0]!;
@@ -3234,21 +3367,49 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await page.reload();
     await page.getByRole("tab", { name: "名词" }).click();
     await expect(nounGroups).toHaveCount(2);
-    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(1);
-    await expect(secondGroup.locator(".v3-membership-row")).toHaveCount(1);
-    await expect(page.getByRole("textbox", { name: /^复数/ })).toHaveCount(0);
     await expect(
-      firstGroup.getByRole("textbox", { name: "原形英式拼写", exact: true })
+      firstGroup.locator(
+        ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
+      )
+    ).toHaveCount(1);
+    await expect(
+      secondGroup.locator(
+        ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
+      )
+    ).toHaveCount(1);
+    expect(
+      expandFormContents(api.getWord().forms).pos[0]!.forms.some(
+        (form) => form.form_type === "plural"
+      )
+    ).toBe(false);
+    const firstAfterDelete = await openFormContent(page, firstGroup);
+    await expect(
+      firstAfterDelete.getByRole("textbox", {
+        name: "词形英式拼写",
+        exact: true
+      })
     ).toHaveValue("orbit-common");
     await expect(
-      firstGroup.getByRole("textbox", { name: "原形美式拼写", exact: true })
+      firstAfterDelete.getByRole("textbox", {
+        name: "词形美式拼写",
+        exact: true
+      })
     ).toHaveValue("orbit-common");
+    await applyFormContent(page);
+    const secondAfterDelete = await openFormContent(page, secondGroup);
     await expect(
-      secondGroup.getByRole("textbox", { name: "原形英式拼写", exact: true })
+      secondAfterDelete.getByRole("textbox", {
+        name: "词形英式拼写",
+        exact: true
+      })
     ).toHaveValue("orbit-centre");
     await expect(
-      secondGroup.getByRole("textbox", { name: "原形美式拼写", exact: true })
+      secondAfterDelete.getByRole("textbox", {
+        name: "词形美式拼写",
+        exact: true
+      })
     ).toHaveValue("orbit-center");
+    await applyFormContent(page);
 
     // 未完成词义时，顶部入口及直达链接都不能跳过完成校验。
     const previewStep = page.locator(".ant-steps-item").filter({
@@ -3275,7 +3436,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     ).toBe(3);
   });
 
-  test("E03 Mock：同一词性第 2 组独立设为英美通用，保存后两组规则各自落库", async ({
+  test("E03 Mock：同一词性不同内容独立设定英美规则，保存刷新后各自保留", async ({
     page
   }) => {
     const api = await mockAdminV3Api(page, { formsFailureOnce: false });
@@ -3295,42 +3456,90 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       .click();
     const nounGroups = page.locator("[data-pos-id] .v3-form-group-card");
     const firstGroup = nounGroups.nth(0);
-    await firstGroup.getByLabel("英美拼写有区别").click();
+    for (let index = 0; index < 2; index++) {
+      const content = await openFormContent(page, firstGroup, index);
+      await setContentRule(content, "spelling", true);
+      await applyFormContent(page);
+    }
 
     await page.getByRole("button", { name: "新增名词变化组" }).click();
     const secondGroup = nounGroups.nth(1);
-    // 新组沿用上一组的英美规则；这里只把第 2 组改成英美共用，第 1 组保持区分。
-    await expect(secondGroup.getByLabel("英美拼写有区别")).toBeChecked();
-    await secondGroup.getByLabel("英美拼写无区别").click();
-    await secondGroup.getByLabel("英美音标无区别").click();
-    await expect(secondGroup.getByLabel("英美音标无区别")).toBeChecked();
-    await expect(firstGroup.getByLabel("英美拼写有区别")).toBeChecked();
-    await expect(page.getByText("暂不能合并英美配置")).toHaveCount(0);
-
-    // 第 2 组默认为空组，手动加一个原形验证词形跟随本组英美规则。
     await secondGroup.getByRole("button", { name: "添加原形" }).click();
-    await expect(secondGroup.locator(".v3-membership-row")).toHaveCount(1);
+    const secondContent = await openFormContent(page, secondGroup);
+    await setContentRule(secondContent, "spelling", true);
+    await setContentRule(secondContent, "spelling", false);
+    await setContentRule(secondContent, "phonetic", false);
+    await expect(
+      secondContent
+        .getByRole("radiogroup")
+        .nth(1)
+        .getByRole("radio", { name: "否", exact: true })
+    ).toBeChecked();
+    await expect(
+      secondContent.getByText(
+        "英美内容或配置不同，请先统一要保留的拼写、发音及设置，再合并。"
+      )
+    ).toHaveCount(0);
+    await applyFormContent(page);
+    await expect(
+      secondGroup.locator(
+        ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
+      )
+    ).toHaveCount(1);
 
     await page.getByRole("button", { name: "保存草稿" }).click();
     await expect.poll(() => api.getWord().revision).toBe(2);
-    const savedPos = api.getWord().forms.pos[0]!;
+    const saved = api.getWord().forms;
+    if (!("forms_format" in saved)) throw new Error("Expected shared forms");
+    const savedPos = saved.pos[0]!;
     const [first, second] = savedPos.form_groups;
-    expect(first?.dialect_rules).toEqual({
-      spelling_mode: "distinguish",
-      phonetic_mode: "distinguish"
-    });
-    expect(second?.dialect_rules).toEqual({
-      spelling_mode: "unified",
-      phonetic_mode: "unified"
-    });
-    const modeOf = (formId: string) =>
-      savedPos.forms.find((form) => form.id === formId)?.regional_variants.mode;
+    const contentOf = (formId: string) =>
+      saved.contents.find(
+        (content) =>
+          content.id ===
+          savedPos.forms.find((form) => form.id === formId)?.content_id
+      )!;
     expect(
-      first?.members.map((member) => modeOf(member.form_id))
-    ).not.toContain("common");
-    expect(second?.members.map((member) => modeOf(member.form_id))).toEqual([
-      "common"
+      first?.members.map((member) => contentOf(member.form_id).dialect_rules)
+    ).toEqual([
+      { spelling_mode: "distinguish", phonetic_mode: "distinguish" },
+      { spelling_mode: "distinguish", phonetic_mode: "distinguish" }
     ]);
+    expect(
+      second?.members.map((member) => contentOf(member.form_id).dialect_rules)
+    ).toEqual([{ spelling_mode: "unified", phonetic_mode: "unified" }]);
+    expect(
+      first?.members.map(
+        (member) => contentOf(member.form_id).regional_variants.mode
+      )
+    ).toEqual(["uk_us", "uk_us"]);
+    expect(
+      second?.members.map(
+        (member) => contentOf(member.form_id).regional_variants.mode
+      )
+    ).toEqual(["common"]);
+    await page.reload();
+    const restoredFirst = await openFormContent(page, firstGroup);
+    await expect(
+      restoredFirst
+        .getByRole("radiogroup")
+        .nth(0)
+        .getByRole("radio", { name: "是", exact: true })
+    ).toBeChecked();
+    await applyFormContent(page);
+    const restoredSecond = await openFormContent(page, secondGroup);
+    await expect(
+      restoredSecond
+        .getByRole("radiogroup")
+        .nth(0)
+        .getByRole("radio", { name: "否", exact: true })
+    ).toBeChecked();
+    await expect(
+      restoredSecond
+        .getByRole("radiogroup")
+        .nth(1)
+        .getByRole("radio", { name: "否", exact: true })
+    ).toBeChecked();
   });
 
   test("E02 Mock：列表行展示 V3 投影并能进向导", async ({ page }) => {
@@ -3359,14 +3568,28 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
 
     const firstGroup = page.locator("[data-pos-id] .v3-form-group-card").nth(0);
-    // 引用不锁英美规则编辑，但阻止删除词形。
-    await expect(firstGroup.getByLabel("英美拼写有区别")).toBeEnabled();
-    await expect(firstGroup.getByLabel("英美音标有区别")).toBeEnabled();
+    // 引用不锁内容规则编辑，但阻止删除词形与移除引用标签。
+    const referencedContent = await openFormContent(page, firstGroup);
     await expect(
-      firstGroup.getByLabel(
-        /存在 \d+ 处关联，修改词形类型后，请检查关联内容是否正确/
-      )
-    ).toBeVisible();
+      referencedContent
+        .getByRole("radiogroup")
+        .nth(0)
+        .getByRole("radio", { name: "是", exact: true })
+    ).toBeEnabled();
+    await expect(
+      referencedContent
+        .getByRole("radiogroup")
+        .nth(1)
+        .getByRole("radio", { name: "是", exact: true })
+    ).toBeEnabled();
+    await expect(
+      referencedContent.getByRole("button", {
+        name: "移除名词原形标签",
+        exact: true
+      })
+    ).toBeDisabled();
+    await referencedContent.getByRole("button", { name: /^取\s*消$/ }).click();
+    await expect(referencedContent).toBeHidden();
     const deleteForm = firstGroup.getByRole("button", {
       name: "删除变化组 1 的词形 1"
     });
@@ -3391,13 +3614,21 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await confirmation.getByRole("button", { name: /取\s*消/ }).click();
     await expect(confirmation).toBeHidden();
     await expect(deletePos).toBeEnabled();
-    // 没被引用的第 2 组照常可切英美规则。
+    // 没被引用的第 2 组照常可编辑内容规则。
+    const unreferencedContent = await openFormContent(
+      page,
+      page.locator("[data-pos-id] .v3-form-group-card").nth(1)
+    );
     await expect(
-      page
-        .locator("[data-pos-id] .v3-form-group-card")
-        .nth(1)
-        .getByLabel("英美拼写有区别")
+      unreferencedContent
+        .getByRole("radiogroup")
+        .nth(0)
+        .getByRole("radio", { name: "是", exact: true })
     ).toBeEnabled();
+    await unreferencedContent
+      .getByRole("button", { name: /^取\s*消$/ })
+      .click();
+    await expect(unreferencedContent).toBeHidden();
 
     await firstGroup
       .getByRole("button", { name: "查看 1 处关联" })

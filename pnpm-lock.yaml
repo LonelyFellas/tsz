@@ -243,6 +243,9 @@ importers:
       '@tsz/api-client':
         specifier: workspace:*
         version: link:../packages/api-client
+      '@tsz/shared':
+        specifier: workspace:*
+        version: link:../packages/shared
       '@tsz/types':
         specifier: workspace:*
         version: link:../packages/types

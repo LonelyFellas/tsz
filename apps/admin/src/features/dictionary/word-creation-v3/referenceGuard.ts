@@ -7,6 +7,7 @@ import type {
   WordFormGroupV3,
   WordPosFormsV3
 } from "@tsz/types";
+import { expandFormContents } from "@tsz/shared";
 import { normalizeSentenceSurface } from "@/features/sentences/associationModel";
 import type { V3IssueNavigationTarget } from "./issueNavigation";
 
@@ -398,7 +399,7 @@ export function locateV3Node(
   word: Pick<AdminWordV3, "forms" | "meanings">,
   nodeId: string
 ): V3IssueNavigationTarget | undefined {
-  for (const pos of word.forms.pos) {
+  for (const pos of expandFormContents(word.forms).pos) {
     if (pos.pos_id === nodeId) {
       return {
         step: "forms",
