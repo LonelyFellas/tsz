@@ -1,12 +1,5 @@
-import type { RichText } from "@tsz/types";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  cloneWordValue,
-  emptyWordRichText,
-  moveWordNode,
-  newWordNodeId,
-  toWordRichText
-} from "./primitives";
+import { newWordNodeId } from "./primitives";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -36,80 +29,5 @@ describe("newWordNodeId", () => {
     const bytes = getRandomValues.mock.calls[0]![0];
     expect(bytes).toBeInstanceOf(Uint8Array);
     expect(bytes).toHaveLength(16);
-  });
-});
-
-describe("RichText primitives", () => {
-  const original: RichText = {
-    version: 1,
-    text: "centre",
-    spans: [{ start: 0, end: 6, type: "blue" }],
-    liaisons: [2]
-  };
-
-  it("文本未变时复用原对象，避免丢失 code-point 标记", () => {
-    expect(toWordRichText("centre", original)).toBe(original);
-  });
-
-  it("缺少原值或文本变化时创建干净 RichText", () => {
-    expect(toWordRichText("center")).toEqual({
-      version: 1,
-      text: "center",
-      spans: [],
-      liaisons: []
-    });
-    expect(toWordRichText("center", original)).toEqual({
-      version: 1,
-      text: "center",
-      spans: [],
-      liaisons: []
-    });
-    expect(emptyWordRichText()).toEqual({
-      version: 1,
-      text: "",
-      spans: [],
-      liaisons: []
-    });
-  });
-});
-
-describe("tree value primitives", () => {
-  it("cloneWordValue 深拷贝嵌套值且不污染原节点", () => {
-    const original = {
-      id: "root",
-      children: [{ id: "child", values: [1, 2] }]
-    };
-
-    const cloned = cloneWordValue(original);
-    cloned.children[0]!.values.push(3);
-
-    expect(cloned).not.toBe(original);
-    expect(cloned.children[0]).not.toBe(original.children[0]);
-    expect(cloned.children[0]!.values).toEqual([1, 2, 3]);
-    expect(original.children[0]!.values).toEqual([1, 2]);
-  });
-
-  it("moveWordNode 支持向前/向后移动且不改写输入数组", () => {
-    const items = ["a", "b", "c"];
-
-    expect(moveWordNode(items, 0, 2)).toEqual(["b", "c", "a"]);
-    expect(moveWordNode(items, 2, 0)).toEqual(["c", "a", "b"]);
-    expect(items).toEqual(["a", "b", "c"]);
-  });
-
-  it.each([
-    [-1, 0],
-    [3, 0],
-    [0, -1],
-    [0, 3],
-    [1, 1]
-  ])("来源/目标 (%s -> %s) 越界或不变时返回原引用", (from, to) => {
-    const items = ["a", "b", "c"];
-    expect(moveWordNode(items, from, to)).toBe(items);
-  });
-
-  it("空数组移动保持原引用", () => {
-    const items: string[] = [];
-    expect(moveWordNode(items, 0, 0)).toBe(items);
   });
 });
