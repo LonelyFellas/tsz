@@ -79,15 +79,21 @@ export const adminVoicePreviewAdapter: VoicePreviewAdapter = {
     const voices = await (await resolveAdapter()).listVoices(input);
     if (voicePreviewIsMock) return voices;
     const actor = useAuthStore.getState().profile?.id;
+    let personalSettingsError: string | undefined;
     const personal = await queryClient
       .fetchQuery({
         queryKey: ["admin-speech-library", actor],
         queryFn: ({ signal }) => api.speech.library(signal),
-        staleTime: 60_000
+        staleTime: 60_000,
+        retry: false
       })
       .catch((error) => {
-        if (error instanceof HttpError && error.status === 404) return null;
-        throw error;
+        if (error instanceof HttpError && [401, 403].includes(error.status))
+          throw error;
+        input.signal?.throwIfAborted();
+        personalSettingsError =
+          "个人参数加载失败；已有文本仍使用已保存参数，新选音色暂用默认值。";
+        return null;
       });
     input.signal?.throwIfAborted();
     if (useAuthStore.getState().profile?.id !== actor) return [];
@@ -104,7 +110,9 @@ export const adminVoicePreviewAdapter: VoicePreviewAdapter = {
               ...(saved.style ? { style: saved.style } : {})
             }
           }
-        : voice;
+        : personalSettingsError
+          ? { ...voice, personalSettingsError }
+          : voice;
     });
   },
   async synthesize(input, options) {

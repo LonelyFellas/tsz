@@ -34,6 +34,7 @@ export interface VoiceOption {
   supportsRate: boolean;
   supportsPitch: boolean;
   isDefault: boolean;
+  personalSettingsError?: string;
   defaultSettings?: Pick<
     VoiceSetting,
     "rate_percent" | "pitch_semitones" | "style"

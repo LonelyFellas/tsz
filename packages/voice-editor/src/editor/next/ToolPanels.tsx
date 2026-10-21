@@ -300,6 +300,15 @@ export function VoicePanel({
     });
   return (
     <div className="tsz-ve-pop tsz-ve-pop-voices" aria-label="音色清单">
+      {voices.find((voice) => voice.personalSettingsError)
+        ?.personalSettingsError && (
+        <div className="tsz-ve-pop-status" role="status">
+          {
+            voices.find((voice) => voice.personalSettingsError)
+              ?.personalSettingsError
+          }
+        </div>
+      )}
       {voicesLoading ? (
         <div className="tsz-ve-pop-loading">
           <Spin size="small" aria-label="正在加载音色" />

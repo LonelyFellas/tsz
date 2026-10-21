@@ -80,6 +80,30 @@ afterEach(() => {
 });
 
 describe("admin voice preview data source", () => {
+  it.each([new Error("offline"), { status: 500 }])(
+    "个人参数失败不清空成功的目录，已有文本仍能试听：%s",
+    async (failure) => {
+      state.library.mockRejectedValue(failure);
+      const { adminVoicePreviewAdapter } = await import("./dataSource");
+      const voices = await adminVoicePreviewAdapter.listVoices({
+        language: "en"
+      });
+      expect(voices).toHaveLength(1);
+      expect(voices[0]).toMatchObject({
+        id: "real-voice",
+        personalSettingsError: expect.stringContaining("个人参数加载失败")
+      });
+      expect(voices[0]?.defaultSettings).toBeUndefined();
+      await adminVoicePreviewAdapter.synthesize({
+        language: "en",
+        content: CONTENT,
+        voiceId: "real-voice",
+        ratePercent: 0,
+        pitchSemitones: 0
+      });
+      expect(state.preview).toHaveBeenCalled();
+    }
+  );
   it("分组和个人参数按账号共享缓存，换账号重新查询", async () => {
     state.library.mockResolvedValue({
       items: [
