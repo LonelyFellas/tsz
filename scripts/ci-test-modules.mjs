@@ -231,6 +231,7 @@ export function buildModuleVitestArgs(
     // antd 大表单并行会争抢 CPU；两种模式保持相同分片、用例、超时与 worker 数。
     ...runnerArgs.filter((argument) => coverage || argument !== "--coverage"),
     "--config=vitest.ci-shard.config.ts",
+    "--reporter=default",
     "--reporter=blob",
     "--reporter=./scripts/ci-test-inventory-reporter.mjs",
     `--outputFile.blob=${blobPath}`,
