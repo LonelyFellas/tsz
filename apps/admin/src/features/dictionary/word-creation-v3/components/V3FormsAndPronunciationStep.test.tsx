@@ -944,18 +944,46 @@ describe("V3FormsAndPronunciationStep", () => {
     const base = commonFormFixture({
       id: uuidFromInt(2161),
       variant_id: uuidFromInt(2162),
-      spelling: "harbor"
+      spelling: "harbor",
+      pronunciations: []
     });
     const plural = commonFormFixture({
       id: uuidFromInt(2163),
       form_type: "plural",
-      spelling: "harbors"
+      spelling: "harbors",
+      pronunciations: []
     });
     const generated = [2171, 2172, 2173, 2174].map(uuidFromInt);
+    const idFactory = uuidSequence(...generated);
     const content = formsFixture({ forms: [base, plural] });
-    const { container } = render(
-      <Harness initial={content} idFactory={uuidSequence(...generated)} />
-    );
+    function GroupHarness() {
+      const [value, setValue] = useState(content);
+      const pos = value.pos[0]!;
+      return (
+        <AntApp>
+          <PronunciationPreviewProvider>
+            <V3FormGroupCard
+              content={value}
+              group={pos.form_groups[0]!}
+              groupIndex={0}
+              idFactory={idFactory}
+              issues={[]}
+              membershipCounts={new Map(pos.forms.map((form) => [form.id, 1]))}
+              onChange={setValue}
+              onEditContent={() => undefined}
+              pos={pos}
+              posCatalog={partOfSpeechCatalogFixture.items.find(
+                (item) => item.code === pos.pos
+              )}
+              formTypes={partOfSpeechCatalogFixture.form_types}
+              sharedCounts={new Map(pos.forms.map((form) => [form.id, 1]))}
+            />
+          </PronunciationPreviewProvider>
+          <output data-testid="canonical-value">{JSON.stringify(value)}</output>
+        </AntApp>
+      );
+    }
+    const { container } = render(<GroupHarness />);
 
     const addButton = await screen.findByRole("button", {
       name: "为第 1 组增加词形"
@@ -987,10 +1015,15 @@ describe("V3FormsAndPronunciationStep", () => {
       content.pos[0]!.form_groups[0]!.members
     );
     expect(
-      [...container.querySelectorAll(".v3-membership-row[data-form-id]")].map(
-        (row) => row.getAttribute("data-form-id")
+      [
+        ...container.querySelectorAll(".ant-table-tbody > tr[data-row-key]")
+      ].map((row) =>
+        row
+          .querySelector('[data-v3-field="form_type"]')
+          ?.getAttribute("data-v3-node-id")
       )
     ).toEqual([base.id, generated[0], plural.id]);
+    expect(next.pos[0]!.forms.slice(0, 2)).toEqual(content.pos[0]!.forms);
     expect(screen.getByLabelText("删除变化组 1 的词形 1")).toBeEnabled();
     expect(screen.getByLabelText("删除变化组 1 的词形 2")).toBeEnabled();
     expect(screen.queryByLabelText(/下方添加同类型词形/)).toBeNull();
