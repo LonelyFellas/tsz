@@ -291,6 +291,12 @@ function DetectionPresentationCard({
   const baseEntryIds = new Set(
     baseCandidates.map((candidate) => candidate.entryId)
   );
+  const annotations = new Map(
+    snapshot.matched_entry_contexts.map((context) => [
+      context.entry_id,
+      context.annotation?.trim()
+    ])
+  );
   const displayEntries = [
     ...baseCandidates.map((candidate) => ({
       key: candidate.key,
@@ -407,9 +413,29 @@ function DetectionPresentationCard({
               <div className="word-smart-match-summary-entry" key={entry.key}>
                 <div className="word-smart-match-summary-row">
                   <Space size={8} wrap>
-                    <Typography.Text className="tsz-words" strong>
-                      {entry.label}
-                    </Typography.Text>
+                    <span>
+                      <Typography.Text className="tsz-words" strong>
+                        {entry.label}
+                      </Typography.Text>
+                      {annotations.get(entry.entryId) ? (
+                        <sup
+                          title={`词条标注：${annotations.get(entry.entryId)}`}
+                          style={{
+                            display: "inline-block",
+                            position: "relative",
+                            top: "-0.4em",
+                            marginInlineStart: 2,
+                            color: "rgba(0, 0, 0, 0.65)",
+                            fontSize: 11,
+                            fontWeight: 600,
+                            lineHeight: 1,
+                            verticalAlign: "baseline"
+                          }}
+                        >
+                          {annotations.get(entry.entryId)}
+                        </sup>
+                      ) : null}
+                    </span>
                     <Tag
                       color={
                         entry.status === "published"
