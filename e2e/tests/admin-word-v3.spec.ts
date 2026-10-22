@@ -791,10 +791,10 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
   test("词形拼写收起态的可见文字与输入框都使用 Bold", async ({ page }) => {
     await mockAdminV3Api(page);
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
-    await openFormContent(page);
-    const spelling = page.locator("textarea.tsz-words").first();
-    const preview = page
-      .locator(".ant-modal .v3-grammar-preview-content.tsz-words")
+    const contentDrawer = await openFormContent(page);
+    const spelling = contentDrawer.locator("textarea.tsz-words").first();
+    const preview = contentDrawer
+      .locator(".v3-grammar-preview-content.tsz-words")
       .first();
     const text = preview.locator(".tsz-ve-readonly > span").first();
     await expect(preview).toHaveText(await spelling.inputValue());
@@ -3111,7 +3111,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     const rows = group.locator(
       ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
     );
-    const labels = rows.locator(".ant-select-content");
+    const labels = rows.locator(".v3-overview-form-type");
     await expect(labels).toHaveText([
       "过去式",
       "原形",
@@ -3214,21 +3214,21 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await applyFormContent(page);
 
     // 加词性时按词性配置铺出新建模板：原形加名词名下的复数，共 2 行。
-    // 组内只剩一个原形时类型锁死；顶部新增第二个原形后放开，删回去又锁上。
+    // 词形名称直接展示；唯一原形不可删除，新增第二个原形后可删除，删回去又锁上。
     await expect(
       firstGroup.locator(
         ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
       )
     ).toHaveCount(2);
-    await expect(firstGroup.getByLabel("变化组 1 词形 1 类型")).toBeDisabled();
+    await expect(firstGroup.getByLabel("删除变化组 1 的词形 1")).toBeDisabled();
     await addFormType(page, 1, "原形");
     await expect(
       firstGroup.locator(
         ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
       )
     ).toHaveCount(3);
-    await expect(firstGroup.getByLabel("变化组 1 词形 1 类型")).toBeEnabled();
-    await expect(firstGroup.getByLabel("变化组 1 词形 2 类型")).toBeEnabled();
+    await expect(firstGroup.getByLabel("删除变化组 1 的词形 1")).toBeEnabled();
+    await expect(firstGroup.getByLabel("删除变化组 1 的词形 2")).toBeEnabled();
     await firstGroup.getByLabel("删除变化组 1 的词形 2").click();
     // 确认框挂在 body 上，不在组卡片里
     await page.getByLabel("删除词形及相关发音").click();
@@ -3237,7 +3237,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
         ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
       )
     ).toHaveCount(2);
-    await expect(firstGroup.getByLabel("变化组 1 词形 1 类型")).toBeDisabled();
+    await expect(firstGroup.getByLabel("删除变化组 1 的词形 1")).toBeDisabled();
 
     const firstForm = await openFormContent(page, firstGroup);
     await firstForm

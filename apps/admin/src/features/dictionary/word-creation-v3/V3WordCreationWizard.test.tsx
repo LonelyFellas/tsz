@@ -1,5 +1,6 @@
 import { expandFormContents } from "@tsz/shared";
 import { applyFormsStructure } from "./sharedFormsModel";
+import { V3FormContentOverview } from "./components/V3FormContentOverview";
 import { ConfigProvider } from "antd";
 import { V3FormContentModal } from "./components/V3FormContentModal";
 import { PronunciationPreviewProvider } from "../word-creation/PronunciationPreview";
@@ -6433,7 +6434,6 @@ it("未保存页面时跨两次内容弹窗地区往返保留完整引用身份"
             <V3FormContentModal
               forms={context.formContents}
               formId={shared.pos[0]!.forms[0]!.id}
-              catalog={[]}
               issues={[]}
               stableVariantIds={context.stableVariantIds}
               pronunciationReferenceIds={context.pronunciationReferenceIds}
@@ -6467,6 +6467,81 @@ it("未保存页面时跨两次内容弹窗地区往返保留完整引用身份"
   );
   expect(latest!.formContents.pos).toEqual(shared.pos);
   expect(source.saveForms).not.toHaveBeenCalled();
+});
+
+it("词形类型问题可聚焦纯文字锚点", async () => {
+  const initialWord: AdminWordV3 = word();
+  const shared = applyFormsStructure(
+    { forms_format: "shared_v1", contents: [], pos: [] },
+    formsFixture({
+      forms: [
+        commonFormFixture(),
+        commonFormFixture({ id: UUIDS.form_2, form_type: "custom_disabled" })
+      ]
+    })
+  );
+  if (!("forms_format" in shared)) throw new Error("fixture");
+  initialWord.forms = shared;
+  const pos = shared.pos[0]!;
+  const binding = pos.forms[1]!;
+  const member = pos.form_groups[0]!.members.find(
+    (row) => row.form_id === binding.id
+  )!;
+  const issue: V3DraftValidationIssue = {
+    ...validationIssue(),
+    node_id: binding.id,
+    field: "form_type",
+    code: "invalid_form_type_for_part_of_speech",
+    node_location: {
+      node_role: "form",
+      ancestor_node_ids: [pos.pos_id, pos.form_groups[0]!.id],
+      pos_id: pos.pos_id,
+      form_group_id: pos.form_groups[0]!.id,
+      form_id: binding.id,
+      membership_id: member.id
+    }
+  };
+  renderWizard(requests(), {
+    initialWord,
+    renderStep: (context) => {
+      return (
+        <>
+          <PronunciationPreviewProvider>
+            <V3FormContentOverview
+              rows={[
+                {
+                  membershipId: member.id,
+                  form: expandFormContents(shared).pos[0]!.forms[1]!,
+                  formLabel: "custom_disabled",
+                  formTypeAriaLabel: "词形类型",
+                  formTypeDisabled: false,
+                  formTypeOptions: ["base", "plural"],
+                  membershipCount: 1
+                }
+              ]}
+              group={expandFormContents(shared).pos[0]!.form_groups[0]!}
+              sharedCounts={new Map([[binding.id, 1]])}
+              onEdit={() => undefined}
+              onFormTypeChange={() => undefined}
+              issues={[issue]}
+            />
+          </PronunciationPreviewProvider>
+          <button onClick={() => void context.actions.navigateIssue(issue)}>
+            定位词形类型问题
+          </button>
+        </>
+      );
+    }
+  });
+  fireEvent.click(screen.getByText("定位词形类型问题"));
+  const target = document.querySelector(
+    `[data-v3-node-id="${binding.id}"][data-v3-field="form_type"]`
+  )!;
+  await waitFor(() => expect(target).toHaveFocus());
+  expect(target).toHaveTextContent("custom_disabled");
+  expect(
+    screen.getByRole("button", { name: "调整custom_disabled词形类型" })
+  ).toBeEnabled();
 });
 
 it.each([

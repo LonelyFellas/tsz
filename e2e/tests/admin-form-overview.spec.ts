@@ -102,6 +102,8 @@ test("词形总览按设计横排发音、音色与语速，窄屏只滚动表�
   await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
   const overview = page.locator(".v3-form-overview").first();
   await expect(overview).toBeVisible();
+  await expect(overview.getByRole("combobox")).toHaveCount(0);
+  await expect(overview.locator(".v3-overview-form-type")).toHaveText("原形");
   await expect(overview.getByText("Libby", { exact: true })).toHaveCount(2);
   await expect(overview.getByText("Andrew", { exact: true })).toHaveCount(2);
   await expect(overview.getByText("0.70×", { exact: true })).toHaveCount(2);
@@ -157,7 +159,28 @@ test("词形总览按设计横排发音、音色与语速，窄屏只滚动表�
   await overview.locator("[data-v3-open-content]").first().click();
   const dialog = page.getByRole("dialog", { name: /^词形 .* 内容设置$/ });
   await expect(dialog).toBeVisible();
+  await expect(dialog).toHaveClass(/ant-drawer-section/);
+  await dialog.screenshot({
+    path: test.info().outputPath("content-drawer.png")
+  });
+  await dialog
+    .getByRole("radiogroup", { name: "英美音标是否有区别", exact: true })
+    .getByRole("radio", { name: "是", exact: true })
+    .check();
+  const ukPronunciation = dialog.locator(".word-shared-pronunciation-uk");
+  const usPronunciation = dialog.locator(".word-shared-pronunciation-us");
+  await expect(ukPronunciation).toBeVisible();
+  await expect(usPronunciation).toBeVisible();
+  await expect(dialog.locator(".word-shared-form-spelling")).toHaveCount(1);
+  const ukBox = (await ukPronunciation.boundingBox())!;
+  const usBox = (await usPronunciation.boundingBox())!;
+  expect(Math.abs(ukBox.y - usBox.y)).toBeLessThan(1);
+  expect(usBox.x).toBeGreaterThanOrEqual(ukBox.x + ukBox.width);
+  await dialog.screenshot({
+    path: test.info().outputPath("content-drawer-dialects.png")
+  });
   await dialog.getByRole("button", { name: /^取\s*消$/ }).click();
+  await page.getByRole("button", { name: "放弃修改", exact: true }).click();
   await expect(dialog).toBeHidden();
   await page.setViewportSize({ width: 390, height: 844 });
   const content = overview.locator(".ant-table-content");
@@ -185,5 +208,141 @@ test("词形总览按设计横排发音、音色与语速，窄屏只滚动表�
     path: test.info().outputPath("overview-narrow.png")
   });
   expect(await content.evaluate((node) => node.scrollLeft)).toBeGreaterThan(0);
+  await overview.locator("[data-v3-open-content]").first().click();
+  await expect(dialog).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: "确认，应用到草稿" })
+  ).toBeInViewport();
+  expect(
+    await dialog.evaluate((node) => node.getBoundingClientRect().width)
+  ).toBeLessThanOrEqual(391);
+  await dialog.screenshot({
+    path: test.info().outputPath("content-drawer-narrow.png")
+  });
+  await dialog.getByRole("button", { name: /^取\s*消$/ }).click();
+  await expect(dialog).toBeHidden();
+  await page.setViewportSize({ width: 1920, height: 1100 });
+  await overview.locator("[data-v3-open-content]").first().click();
+  await dialog
+    .getByRole("radiogroup", { name: "是否规则变化", exact: true })
+    .getByRole("radio", { name: "否", exact: true })
+    .check();
+  await dialog.getByRole("button", { name: "新增标签", exact: true }).click();
+  const picker = page.getByRole("dialog", {
+    name: /这种拼写形式 指派词形标签$/
+  });
+  await expect(picker).toBeVisible();
+  await expect(picker.getByRole("combobox")).toHaveCount(0);
+  await expect(
+    picker.getByRole("region", { name: "名词词形标签" })
+  ).toBeVisible();
+  await expect(
+    picker.getByRole("region", { name: "动词词形标签" })
+  ).toBeVisible();
+  await expect(
+    picker.getByRole("checkbox", { name: "名词第 1 组原形", exact: true })
+  ).toBeChecked();
+  await expect(
+    picker.getByRole("checkbox", { name: "名词第 1 组原形", exact: true })
+  ).toBeDisabled();
+  await expect(picker.getByRole("checkbox")).toHaveCount(4);
+  await expect(
+    picker.getByRole("checkbox", { name: "名词第 1 组复数", exact: true })
+  ).toHaveCount(0);
+  await expect(
+    picker.getByRole("checkbox", { name: "动词第三人称单数", exact: true })
+  ).toHaveCount(0);
+  await picker
+    .getByRole("checkbox", { name: "名词第 2 组复数", exact: true })
+    .check();
+  await picker.getByRole("checkbox", { name: "动词原形", exact: true }).check();
+  await picker.screenshot({
+    path: test.info().outputPath("label-assignment.png")
+  });
+  await picker.getByRole("button", { name: /^完\s*成$/ }).click();
+  await expect(picker).toBeHidden();
+  await expect(dialog.locator(".v3-content-label")).toHaveCount(3);
+  await expect(
+    dialog
+      .getByRole("radiogroup", { name: "是否规则变化", exact: true })
+      .getByRole("radio", { name: "否", exact: true })
+  ).toBeChecked();
+  await dialog
+    .getByRole("button", { name: "确认，应用到草稿", exact: true })
+    .click();
+  await expect(dialog).toBeHidden();
+  await page.getByRole("button", { name: "保存草稿", exact: true }).click();
+  await expect.poll(() => api.getWord().revision).toBe(2);
+  await page.unroute(
+    `**/api/v1/admin/lexicon/entries/${ADMIN_V3_MIXED_WORD_ID}`
+  );
+  await page.reload();
+  await overview.locator("[data-v3-open-content]").first().click();
+  await expect(dialog.locator(".v3-content-label")).toHaveCount(3);
+  await expect(
+    dialog
+      .getByRole("radiogroup", { name: "是否规则变化", exact: true })
+      .getByRole("radio", { name: "否", exact: true })
+  ).toBeChecked();
+  await dialog
+    .getByRole("button", { name: "分别设置规则变化", exact: true })
+    .click();
+  const nounRegularity = dialog.getByRole("radiogroup", {
+    name: "名词第 1 组原形英美通用是否规则变化",
+    exact: true
+  });
+  const verbRegularity = dialog.getByRole("radiogroup", {
+    name: "动词第 1 组原形英美通用是否规则变化",
+    exact: true
+  });
+  await verbRegularity.getByRole("radio", { name: "是", exact: true }).check();
+  await expect(
+    nounRegularity.getByRole("radio", { name: "否", exact: true })
+  ).toBeChecked();
+  await expect(
+    dialog
+      .getByRole("radiogroup", { name: "是否规则变化", exact: true })
+      .getByRole("radio", { name: "是", exact: true })
+  ).not.toBeChecked();
+  await expect(
+    dialog
+      .getByRole("radiogroup", { name: "是否规则变化", exact: true })
+      .getByRole("radio", { name: "否", exact: true })
+  ).not.toBeChecked();
+  await dialog.screenshot({
+    path: test.info().outputPath("regularity-details.png")
+  });
+  await dialog
+    .getByRole("button", { name: "确认，应用到草稿", exact: true })
+    .click();
+  await expect(dialog).toBeHidden();
+  await page.getByRole("button", { name: "保存草稿", exact: true }).click();
+  await expect.poll(() => api.getWord().revision).toBe(3);
+  await page.reload();
+  await overview.locator("[data-v3-open-content]").first().click();
+  await dialog
+    .getByRole("button", { name: "分别设置规则变化", exact: true })
+    .click();
+  await expect(
+    nounRegularity.getByRole("radio", { name: "否", exact: true })
+  ).toBeChecked();
+  await expect(
+    verbRegularity.getByRole("radio", { name: "是", exact: true })
+  ).toBeChecked();
+  await dialog.getByRole("button", { name: "新增标签", exact: true }).click();
+  await expect(
+    picker.getByRole("checkbox", { name: "名词第 2 组复数", exact: true })
+  ).toBeChecked();
+  await expect(
+    picker.getByRole("checkbox", { name: "动词原形", exact: true })
+  ).toBeChecked();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await picker.screenshot({
+    path: test.info().outputPath("label-assignment-narrow.png")
+  });
+  await picker.getByRole("button", { name: /^取\s*消$/ }).click();
+  await expect(picker).toBeHidden();
+  await dialog.getByRole("button", { name: /^取\s*消$/ }).click();
+  await expect(dialog).toBeHidden();
   expect(errors).toEqual([]);
 });
