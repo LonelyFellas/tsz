@@ -9,7 +9,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { App as AntApp, ConfigProvider } from "antd";
 import type {
   DraftFormsStepContentV3,
   Dialect,
@@ -991,12 +991,22 @@ describe("V3FormsAndPronunciationStep", () => {
         </AntApp>
       );
     }
-    const { container } = render(<GroupHarness />);
-    expect(container.querySelector(".v3-form-overview .ant-select")).toBeNull();
-    fireEvent.click(
-      screen.getByRole("button", { name: "调整disabled_type词形类型" })
+    const { container } = render(
+      <ConfigProvider theme={{ token: { motion: false } }}>
+        <GroupHarness />
+      </ConfigProvider>
     );
-    fireEvent.click(await screen.findByRole("menuitem", { name: "复数" }));
+    expect(container.querySelector(".v3-form-overview .ant-select")).toBeNull();
+    const targetRow = container.querySelector<HTMLElement>(
+      `tr[data-row-key="${initial.pos[0]!.form_groups[0]!.members[1]!.id}"]`
+    )!;
+    fireEvent.click(
+      within(targetRow).getByRole("button", {
+        name: "调整disabled_type词形类型"
+      })
+    );
+    const menu = await screen.findByRole("menu");
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "复数" }));
     expect(formById(canonicalValue(), historical.id)).toEqual({
       ...historical,
       form_type: "plural"
