@@ -27,6 +27,7 @@ export function WordNavigationGuard({
     <Modal
       open
       title="词条还有未保存的修改"
+      zIndex={2000}
       closable={!leaving}
       onCancel={() => {
         if (!leaving) blocker.reset();

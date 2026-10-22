@@ -67,6 +67,8 @@ const POS_DRAG_TYPE = "application/x-tsz-v3-pos";
 
 export interface V3FormsAndPronunciationStepProps {
   sharedForms?: SharedFormsStepContentV3;
+  contentReassignmentAvailable?: boolean;
+  savedContentIds?: ReadonlySet<string>;
   onSharedFormsChange?: (next: SharedFormsStepContentV3) => void;
   retiredContentSlots?: readonly RetiredContentSlotV3[];
   retiredStableNodes?: readonly RetiredStableNodeV3[];
@@ -120,6 +122,8 @@ function V3VoiceNotice({ value }: { value: DraftFormsStepContentV3 }) {
 
 export function V3FormsAndPronunciationStep({
   sharedForms,
+  contentReassignmentAvailable = false,
+  savedContentIds,
   onSharedFormsChange,
   retiredContentSlots = [],
   retiredStableNodes = [],
@@ -461,6 +465,8 @@ export function V3FormsAndPronunciationStep({
           <V3FormContentModal
             key={editingFormId}
             forms={sharedForms}
+            contentReassignmentAvailable={contentReassignmentAvailable}
+            savedContentIds={savedContentIds}
             formId={editingFormId}
             issues={issues}
             stableVariantIds={stableVariantIds}

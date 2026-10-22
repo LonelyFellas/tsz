@@ -1808,6 +1808,37 @@ describe("WordWizardV3Page", () => {
     ).toBeNull();
   });
 
+  it("发布历史只在核对与发布步骤显示，返回录入步骤后卸载", async () => {
+    const current = word({
+      completed_steps: ["basics", "forms", "meanings"],
+      max_reachable_step: "preview"
+    });
+    const endpoints = source({ word: current, retired_stable_nodes: [] });
+    renderPage(
+      `/words/${WORD_ID}/v3/wizard/basics`,
+      createV3WordRequests(endpoints)
+    );
+    await screen.findByRole("button", { name: "进入词形与发音" });
+    expect(document.querySelector(".v3-publication-history")).toBeNull();
+    for (const step of ["词形与发音", "词义与例句"]) {
+      fireEvent.click(
+        within(document.querySelector(".word-creation-steps")!).getByText(step)
+      );
+      expect(document.querySelector(".v3-publication-history")).toBeNull();
+      expect(endpoints.listPublications).not.toHaveBeenCalled();
+    }
+    fireEvent.click(screen.getByText("预览并生效"));
+    expect(await screen.findByText("暂无发布记录")).toBeInTheDocument();
+    expect(endpoints.listPublications).toHaveBeenCalledTimes(1);
+    fireEvent.click(
+      within(document.querySelector(".word-creation-steps")!).getByText(
+        "词形与发音"
+      )
+    );
+    await contentEditButton();
+    expect(document.querySelector(".v3-publication-history")).toBeNull();
+  });
+
   it("makes immutable publication history and detail reachable from the real preview route", async () => {
     const current = word({
       completed_steps: ["basics", "forms", "meanings"],
@@ -1853,7 +1884,7 @@ describe("WordWizardV3Page", () => {
     );
   });
 
-  it("审查回归：未完成草稿不必先补齐发布条件即可恢复历史", async () => {
+  it("未完成草稿从独立历史入口恢复，无需先补齐发布条件", async () => {
     const current = word();
     const historical = publication(current);
     const canonical = word({ revision: 2 });
@@ -1864,18 +1895,29 @@ describe("WordWizardV3Page", () => {
     vi.mocked(endpoints.getPublication).mockResolvedValue({
       publication: historical
     });
-    vi.mocked(endpoints.restoreDraftFromPublicationV3).mockResolvedValue({
-      word: canonical
-    });
+    let finishRestore!: (value: { word: AdminWordV3 }) => void;
+    vi.mocked(endpoints.restoreDraftFromPublicationV3).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishRestore = resolve;
+        })
+    );
     vi.mocked(endpoints.get)
       .mockResolvedValueOnce({ word: current, retired_stable_nodes: [] })
       .mockResolvedValue({ word: canonical, retired_stable_nodes: [] });
-    renderPage(
+    const router = renderPage(
       `/words/${WORD_ID}/v3/wizard/forms`,
       createV3WordRequests(endpoints)
     );
     await contentEditButton();
-    fireEvent.click(await screen.findByLabelText("查看第 1 次发布"));
+    expect(endpoints.listPublications).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "发布历史" }));
+    expect(router.state.location.pathname).toContain("/wizard/forms");
+    const historyButton = await screen.findByLabelText("查看第 1 次发布");
+    const historyDialog = historyButton.closest(
+      '[role="dialog"]'
+    ) as HTMLElement;
+    fireEvent.click(historyButton);
     const detail = within(await screen.findByTestId("publication-detail"));
     fireEvent.click(
       (await detail.findByText("恢复到草稿", { exact: true })).closest(
@@ -1885,9 +1927,19 @@ describe("WordWizardV3Page", () => {
     fireEvent.click(
       detail.getByText("确认恢复", { exact: true }).closest("button")!
     );
+    await waitFor(() =>
+      expect(endpoints.restoreDraftFromPublicationV3).toHaveBeenCalledOnce()
+    );
+    expect(historyDialog.querySelector(".ant-modal-close")).toBeNull();
+    await act(async () => finishRestore({ word: canonical }));
     await waitFor(() => expect(endpoints.get).toHaveBeenCalledTimes(2));
     await waitFor(() =>
       expect(screen.queryByTestId("publication-detail")).not.toBeInTheDocument()
+    );
+    fireEvent.click(
+      within(document.querySelector(".word-creation-steps")!).getByText(
+        "词形与发音"
+      )
     );
     expect(await contentEditButton()).toBeEnabled();
     expect(endpoints.validateV3).not.toHaveBeenCalled();
@@ -2031,7 +2083,7 @@ describe("WordWizardV3Page", () => {
       defaultOptions: { queries: { retry: false } }
     });
     renderPage(
-      `/words/${WORD_ID}/v3/wizard/forms`,
+      `/words/${WORD_ID}/v3/wizard/preview`,
       createV3WordRequests(endpoints),
       undefined,
       undefined,
@@ -2059,7 +2111,10 @@ describe("WordWizardV3Page", () => {
     await waitFor(() =>
       expect(screen.queryByTestId("publication-detail")).not.toBeInTheDocument()
     );
-    await contentEditButton();
+    await waitFor(() =>
+      expect(screen.getByText("词形与发音")).toBeInTheDocument()
+    );
+    fireEvent.click(screen.getByText("词形与发音"));
     await openContentEditor();
     const spellingRules = document.querySelector(
       ".v3-content-modal .ant-radio-group"

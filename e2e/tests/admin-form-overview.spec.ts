@@ -5,6 +5,287 @@ import {
   mockAdminV3Api
 } from "./support/mockAdminV3Api";
 
+test("发布历史仅在核对与发布页显示，录入步骤底部没有历史卡片", async ({
+  page
+}) => {
+  await mockAdminV3Api(page, { formsFailureOnce: false });
+  for (const step of ["basics", "forms", "meanings"]) {
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/${step}`);
+    await expect(
+      page.locator(
+        step === "basics" ? ".word-entry-actions" : ".word-step-actions"
+      )
+    ).toBeVisible();
+    await expect(page.locator(".v3-publication-history")).toHaveCount(0);
+  }
+  await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/preview`);
+  await expect(page.locator(".v3-publication-history")).toBeVisible();
+  await expect(page.getByText("暂无发布记录", { exact: true })).toBeVisible();
+  await page
+    .locator(".ant-steps-item")
+    .filter({ hasText: "词形与发音" })
+    .click();
+  await expect(page.locator(".v3-forms-step")).toBeVisible();
+  await expect(page.locator(".v3-publication-history")).toHaveCount(0);
+  await page.locator(".word-step-actions").scrollIntoViewIfNeeded();
+  await page.screenshot({ path: test.info().outputPath("forms-footer.png") });
+});
+
+test("词形和词义操作栏滚动时吸底，到页尾与容器底边对齐且不遮挡正文", async ({
+  page
+}) => {
+  await mockAdminV3Api(page, { formsFailureOnce: false });
+  for (const viewport of [
+    { width: 1920, height: 1600 },
+    { width: 1280, height: 900 },
+    { width: 390, height: 844 }
+  ]) {
+    await page.setViewportSize(viewport);
+    for (const step of ["forms", "meanings"]) {
+      await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/${step}`);
+      const actions = page.locator(".word-step-actions");
+      await expect(actions).toBeVisible();
+      for (const fraction of [0, 0.5, 1]) {
+        await page.evaluate((fraction) => {
+          window.scrollTo(
+            0,
+            (document.documentElement.scrollHeight - innerHeight) * fraction
+          );
+        }, fraction);
+        await expect
+          .poll(async () => {
+            const box = (await actions.boundingBox())!;
+            const shell = (await page
+              .locator(".word-creation-shell")
+              .boundingBox())!;
+            const bottom = Math.min(
+              viewport.height,
+              shell.y + shell.height - 1
+            );
+            return Math.abs(box.y + box.height - bottom);
+          })
+          .toBeLessThanOrEqual(1);
+      }
+      const shell = (await page.locator(".word-creation-shell").boundingBox())!;
+      const summary = (await page
+        .locator(".word-creation-summary")
+        .boundingBox())!;
+      const main = (await page
+        .locator(".word-creation-content")
+        .boundingBox())!;
+      const box = (await actions.boundingBox())!;
+      const expectedLeft =
+        summary.x + summary.width <= main.x + 1
+          ? summary.x + summary.width
+          : shell.x + 1;
+      expect(Math.abs(box.x - expectedLeft)).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs(box.x + box.width - (shell.x + shell.width - 1))
+      ).toBeLessThanOrEqual(1);
+      const lastContent = page
+        .locator(step === "forms" ? ".v3-forms-step" : ".word-pos-tabs")
+        .last();
+      const lastBox = (await lastContent.boundingBox())!;
+      expect(lastBox.y + lastBox.height).toBeLessThanOrEqual(box.y);
+      await page.screenshot({
+        path: test.info().outputPath(`${step}-footer-${viewport.width}.png`)
+      });
+    }
+  }
+});
+
+test("未完成草稿可独立打开历史，录入页不常驻历史卡片", async ({ page }) => {
+  const api = await mockAdminV3Api(page, { formsFailureOnce: false });
+  const word = api.getWord();
+  word.completed_steps = ["basics"];
+  word.max_reachable_step = "forms";
+  await page.route(
+    `**/api/v1/admin/lexicon/entries/${ADMIN_V3_MIXED_WORD_ID}`,
+    (route) => route.fulfill({ json: { word, retired_stable_nodes: [] } })
+  );
+  await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+  await expect(page.locator(".v3-form-overview").first()).toBeVisible();
+  await expect(page.locator(".v3-publication-history")).toHaveCount(0);
+  await page.getByRole("button", { name: "发布历史", exact: true }).click();
+  const history = page.getByRole("dialog", { name: "发布历史", exact: true });
+  await expect(history.getByText("暂无发布记录")).toBeVisible();
+  await expect(page).toHaveURL(/\/wizard\/forms$/);
+  await expect
+    .poll(async () => (await history.boundingBox())!.width)
+    .toBeGreaterThan(850);
+  await history.screenshot({
+    path: test.info().outputPath("unfinished-draft-history.png"),
+    animations: "disabled"
+  });
+  await history.getByRole("button", { name: /close|关闭/i }).click();
+  await expect(page.locator(".v3-publication-history")).toHaveCount(0);
+});
+
+test("浏览器后退保护未确认指派，继续编辑后可确认并保存替换", async ({
+  page
+}) => {
+  const api = await mockAdminV3Api(page, { formsFailureOnce: false });
+  const original = api.getWord().forms;
+  await page.goto("/words");
+  await page
+    .locator("tbody tr", { hasText: "orbit-v3" })
+    .getByRole("button", { name: /继续创建/ })
+    .click();
+  await page
+    .locator(".ant-steps-item")
+    .filter({ hasText: "词形与发音" })
+    .click();
+  await page.locator("[data-v3-open-content]").first().click();
+  const drawer = page.getByRole("dialog", { name: /^词形 .* 内容设置$/ });
+  await drawer.getByRole("button", { name: "新增标签", exact: true }).click();
+  const picker = page.getByRole("dialog", {
+    name: /这种拼写形式 指派词形标签$/
+  });
+  await picker.getByRole("checkbox", { name: "动词原形", exact: true }).check();
+  await page.goBack();
+  const navigation = page.getByRole("dialog", {
+    name: "词条还有未保存的修改",
+    exact: true
+  });
+  await navigation
+    .getByRole("button", { name: "离开页面", exact: true })
+    .click();
+  const prompt = page.getByRole("dialog", {
+    name: "词形内容尚未应用",
+    exact: true
+  });
+  await expect(prompt.getByText(/动词第 1 组原形/)).toBeVisible();
+  await prompt.screenshot({
+    path: test.info().outputPath("assignment-leave.png")
+  });
+  await prompt.getByRole("button", { name: "继续编辑", exact: true }).click();
+  await navigation
+    .getByRole("button", { name: "继续编辑", exact: true })
+    .click();
+  await expect(
+    picker.getByRole("checkbox", { name: "动词原形", exact: true })
+  ).toBeChecked();
+  expect(api.getWord().forms).toEqual(original);
+  await picker.getByRole("button", { name: "确认替换", exact: true }).click();
+  await drawer
+    .getByRole("button", { name: "确认，应用到草稿", exact: true })
+    .click();
+  await page.getByRole("button", { name: "保存草稿", exact: true }).click();
+  await expect.poll(() => api.getWord().revision).toBe(2);
+  const forms = api.getWord().forms;
+  expect(forms.pos.map((pos) => pos.forms.map((form) => form.id))).toEqual(
+    original.pos.map((pos) => pos.forms.map((form) => form.id))
+  );
+  if (!("forms_format" in forms)) throw new Error("Expected shared forms");
+  expect(forms.pos[1]!.forms[0]!.content_id).toBe(
+    forms.pos[0]!.forms[0]!.content_id
+  );
+});
+
+test("旧后端缺少替换能力时保持内容可编辑并禁用指派替换", async ({ page }) => {
+  const api = await mockAdminV3Api(page, { formsFailureOnce: false });
+  const word = api.getWord();
+  delete word.capabilities.form_content_reassignment;
+  await page.route(
+    `**/api/v1/admin/lexicon/entries/${ADMIN_V3_MIXED_WORD_ID}`,
+    (route) => route.fulfill({ json: { word, retired_stable_nodes: [] } })
+  );
+  await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+  await page.locator("[data-v3-open-content]").first().click();
+  const dialog = page.getByRole("dialog", { name: /^词形 .* 内容设置$/ });
+  await expect(dialog.locator(".word-shared-form-spelling")).toBeVisible();
+  await dialog.getByRole("button", { name: "新增标签", exact: true }).click();
+  const picker = page.getByRole("dialog", {
+    name: /这种拼写形式 指派词形标签$/
+  });
+  await expect(
+    picker.getByRole("checkbox", { name: "动词原形", exact: true })
+  ).toBeDisabled();
+  await expect(picker.getByRole("alert")).toContainText(
+    "当前服务暂不支持替换词形内容"
+  );
+  await picker.screenshot({
+    path: test.info().outputPath("old-backend-assignment.png")
+  });
+});
+
+test("多个原形自动编号，指派只替换选中行且保存刷新后不新增", async ({
+  page
+}) => {
+  const api = await mockAdminV3Api(page, { formsFailureOnce: false });
+  const word = api.getWord();
+  if (!("forms_format" in word.forms)) throw new Error("Expected shared forms");
+  const pos = word.forms.pos[0]!;
+  const group = pos.form_groups[1]!;
+  const targets = group.members.map((member) =>
+    pos.forms.find((form) => form.id === member.form_id)!
+  );
+  targets[1]!.form_type = "base";
+  const originalIds = word.forms.pos.map((item) =>
+    item.forms.map((form) => form.id)
+  );
+  await page.route(
+    `**/api/v1/admin/lexicon/entries/${ADMIN_V3_MIXED_WORD_ID}`,
+    (route) => route.fulfill({ json: { word, retired_stable_nodes: [] } })
+  );
+  await page.setViewportSize({ width: 1920, height: 1100 });
+  await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+  const overview = page.locator(".v3-form-overview");
+  await expect(
+    overview.nth(1).locator(".v3-overview-form-type sup")
+  ).toHaveText(["1", "2"]);
+  await overview.first().locator("[data-v3-open-content]").first().click();
+  const dialog = page.getByRole("dialog", { name: /^词形 .* 内容设置$/ });
+  await dialog.getByRole("button", { name: "新增标签", exact: true }).click();
+  const picker = page.getByRole("dialog", {
+    name: /这种拼写形式 指派词形标签$/
+  });
+  const selected = picker.getByRole("checkbox", {
+    name: "名词第 2 组原形 2（orbits）",
+    exact: true
+  });
+  await selected.check();
+  await expect(
+    picker.getByRole("checkbox", {
+      name: "名词第 2 组原形 1（orbital centre）",
+      exact: true
+    })
+  ).not.toBeChecked();
+  await selected.uncheck();
+  await expect(picker.getByRole("alert")).toHaveCount(0);
+  await selected.check();
+  await picker.screenshot({
+    path: test.info().outputPath("numbered-form-replacement.png")
+  });
+  await picker.getByRole("button", { name: "确认替换", exact: true }).click();
+  await dialog
+    .getByRole("button", { name: "确认，应用到草稿", exact: true })
+    .click();
+  await page.getByRole("button", { name: "保存草稿", exact: true }).click();
+  await expect.poll(() => api.getWord().revision).toBe(2);
+  const saved = api.getWord().forms;
+  expect(saved.pos.map((item) => item.forms.map((form) => form.id))).toEqual(
+    originalIds
+  );
+  expect(
+    saved.pos[0]!.forms.find((form) => form.id === targets[0]!.id)
+  ).toEqual(targets[0]);
+  expect(
+    saved.pos[0]!.forms.find((form) => form.id === targets[1]!.id)
+  ).toMatchObject({ content_id: pos.forms[0]!.content_id });
+  await page.unroute(
+    `**/api/v1/admin/lexicon/entries/${ADMIN_V3_MIXED_WORD_ID}`
+  );
+  await page.reload();
+  await expect(
+    overview.nth(1).locator(".v3-overview-form-type sup")
+  ).toHaveText(["1", "2"]);
+  await expect(overview.nth(1).locator(".v3-overview-spelling")).toHaveText([
+    "orbital centre",
+    "orbit"
+  ]);
+});
+
 test("词形总览按设计横排发音、音色与语速，窄屏只滚动表格", async ({ page }) => {
   const api = await mockAdminV3Api(page, { formsFailureOnce: false });
   const word = api.getWord();
@@ -259,20 +540,28 @@ test("词形总览按设计横排发音、音色与语速，窄屏只滚动表�
   await picker.screenshot({
     path: test.info().outputPath("label-assignment.png")
   });
-  await picker.getByRole("button", { name: /^完\s*成$/ }).click();
+  await expect(picker.getByRole("alert")).toContainText(
+    "以下词形的拼写与发音将被替换"
+  );
+  await picker.getByRole("button", { name: "确认替换", exact: true }).click();
   await expect(picker).toBeHidden();
   await expect(dialog.locator(".v3-content-label")).toHaveCount(3);
-  await expect(
-    dialog
-      .getByRole("radiogroup", { name: "是否规则变化", exact: true })
-      .getByRole("radio", { name: "否", exact: true })
-  ).toBeChecked();
+  await dialog
+    .getByRole("radiogroup", { name: "是否规则变化", exact: true })
+    .getByRole("radio", { name: "否", exact: true })
+    .check();
   await dialog
     .getByRole("button", { name: "确认，应用到草稿", exact: true })
     .click();
   await expect(dialog).toBeHidden();
   await page.getByRole("button", { name: "保存草稿", exact: true }).click();
   await expect.poll(() => api.getWord().revision).toBe(2);
+  expect(
+    api.getWord().forms.pos.map((pos) => pos.forms.map((form) => form.id))
+  ).toEqual(word.forms.pos.map((pos) => pos.forms.map((form) => form.id)));
+  expect(api.getWord().forms.pos.map((pos) => pos.form_groups)).toEqual(
+    word.forms.pos.map((pos) => pos.form_groups)
+  );
   await page.unroute(
     `**/api/v1/admin/lexicon/entries/${ADMIN_V3_MIXED_WORD_ID}`
   );
@@ -283,51 +572,6 @@ test("词形总览按设计横排发音、音色与语速，窄屏只滚动表�
     dialog
       .getByRole("radiogroup", { name: "是否规则变化", exact: true })
       .getByRole("radio", { name: "否", exact: true })
-  ).toBeChecked();
-  await dialog
-    .getByRole("button", { name: "分别设置规则变化", exact: true })
-    .click();
-  const nounRegularity = dialog.getByRole("radiogroup", {
-    name: "名词第 1 组原形英美通用是否规则变化",
-    exact: true
-  });
-  const verbRegularity = dialog.getByRole("radiogroup", {
-    name: "动词第 1 组原形英美通用是否规则变化",
-    exact: true
-  });
-  await verbRegularity.getByRole("radio", { name: "是", exact: true }).check();
-  await expect(
-    nounRegularity.getByRole("radio", { name: "否", exact: true })
-  ).toBeChecked();
-  await expect(
-    dialog
-      .getByRole("radiogroup", { name: "是否规则变化", exact: true })
-      .getByRole("radio", { name: "是", exact: true })
-  ).not.toBeChecked();
-  await expect(
-    dialog
-      .getByRole("radiogroup", { name: "是否规则变化", exact: true })
-      .getByRole("radio", { name: "否", exact: true })
-  ).not.toBeChecked();
-  await dialog.screenshot({
-    path: test.info().outputPath("regularity-details.png")
-  });
-  await dialog
-    .getByRole("button", { name: "确认，应用到草稿", exact: true })
-    .click();
-  await expect(dialog).toBeHidden();
-  await page.getByRole("button", { name: "保存草稿", exact: true }).click();
-  await expect.poll(() => api.getWord().revision).toBe(3);
-  await page.reload();
-  await overview.locator("[data-v3-open-content]").first().click();
-  await dialog
-    .getByRole("button", { name: "分别设置规则变化", exact: true })
-    .click();
-  await expect(
-    nounRegularity.getByRole("radio", { name: "否", exact: true })
-  ).toBeChecked();
-  await expect(
-    verbRegularity.getByRole("radio", { name: "是", exact: true })
   ).toBeChecked();
   await dialog.getByRole("button", { name: "新增标签", exact: true }).click();
   await expect(

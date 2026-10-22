@@ -14,6 +14,7 @@ import {
   Button,
   ConfigProvider,
   Flex,
+  Modal,
   Result,
   Spin,
   Typography
@@ -58,6 +59,7 @@ import {
 } from "@/features/dictionary/word-creation-v3/meaningsModel";
 import { V3PreviewAndPublishStep } from "@/features/dictionary/word-creation-v3/V3PreviewAndPublishStep";
 import { V3PublicationHistory } from "@/features/dictionary/word-creation-v3/V3PublicationHistory";
+import { V3StepActions } from "@/features/dictionary/word-creation-v3/components/V3StepActions";
 import { V3ReviewContent } from "@/features/dictionary/word-creation-v3/V3ReviewContent";
 import {
   presentV3DetailError,
@@ -332,6 +334,16 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
               resetConfirmation();
               context.setFormContents(content);
             }}
+            contentReassignmentAvailable={
+              context.word.capabilities.form_content_reassignment === true
+            }
+            savedContentIds={
+              new Set(
+                isSharedForms(context.word.forms)
+                  ? context.word.forms.contents.map((row) => row.id)
+                  : []
+              )
+            }
             retiredContentSlots={context.retiredContentSlots}
             retiredStableNodes={context.retiredStableNodes}
             registerLeaveGuard={context.registerSentenceLeaveGuard}
@@ -418,8 +430,9 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
           }
         />
       ) : null}
-      <div className="word-step-actions">
+      <V3StepActions>
         <Button
+          type="text"
           disabled={Boolean(pendingIntent) || busy}
           onClick={() => context.setActiveStep("basics")}
         >
@@ -446,7 +459,7 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
         >
           进入词义与例句
         </Button>
-      </div>
+      </V3StepActions>
     </Flex>
   );
 }
@@ -989,6 +1002,8 @@ export function WordWizardV3Page({
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const [activationGeneration, setActivationGeneration] = useState(0);
+  const [historyEntryId, setHistoryEntryId] = useState<string>();
+  const [historyBusy, setHistoryBusy] = useState(false);
   const queryClient = useQueryClient();
   const requests = useMemo(
     () => suppliedRequests ?? createV3WordRequests(),
@@ -1034,6 +1049,7 @@ export function WordWizardV3Page({
   );
   const replaceRestoredCanonical = useCallback(
     (draft: AdminWordDraftV3Envelope) => {
+      setHistoryEntryId(undefined);
       queryClient.setQueryData(queryKey, draft);
       void queryClient.invalidateQueries({ queryKey: wordKeys.lists() });
       void queryClient.invalidateQueries({ queryKey: wordKeys.stats() });
@@ -1183,6 +1199,13 @@ export function WordWizardV3Page({
             onWordChange={replaceCanonical}
             renderStep={(context) => (
               <Flex vertical gap="middle">
+                {context.activeStep !== "preview" && !context.readOnly && (
+                  <Flex justify="flex-end">
+                    <Button onClick={() => setHistoryEntryId(word.id)}>
+                      发布历史
+                    </Button>
+                  </Flex>
+                )}
                 <V3WizardSlots
                   context={context}
                   onActivated={replaceActivatedCanonical}
@@ -1190,20 +1213,59 @@ export function WordWizardV3Page({
                   requests={requests}
                   wordId={word.id}
                 />
-                <V3PublicationHistory
-                  restoreBlockedByUnsavedChanges={
-                    context.hasUnsavedChanges || !sharedFormsReady
+                <Modal
+                  open={
+                    historyEntryId === word.id &&
+                    context.activeStep !== "preview" &&
+                    !context.readOnly
                   }
-                  restoreBlockedReason={
-                    !sharedFormsReady
-                      ? "当前服务尚未支持共享词形，暂不能恢复历史内容"
-                      : undefined
-                  }
-                  currentWord={context.word}
-                  onRestored={replaceRestoredCanonical}
-                  onCanonicalRefreshed={replaceRestoredCanonical}
-                  requests={requests}
-                />
+                  title="发布历史"
+                  width={880}
+                  footer={null}
+                  destroyOnHidden
+                  closable={!historyBusy}
+                  keyboard={!historyBusy}
+                  mask={{ closable: !historyBusy }}
+                  onCancel={() => {
+                    if (!historyBusy) setHistoryEntryId(undefined);
+                  }}
+                >
+                  {historyEntryId === word.id &&
+                    context.activeStep !== "preview" &&
+                    !context.readOnly && (
+                      <V3PublicationHistory
+                        onBusyChange={setHistoryBusy}
+                        restoreBlockedByUnsavedChanges={
+                          context.hasUnsavedChanges || !sharedFormsReady
+                        }
+                        restoreBlockedReason={
+                          !sharedFormsReady
+                            ? "当前服务尚未支持共享词形，暂不能恢复历史内容"
+                            : undefined
+                        }
+                        currentWord={context.word}
+                        onRestored={replaceRestoredCanonical}
+                        onCanonicalRefreshed={replaceRestoredCanonical}
+                        requests={requests}
+                      />
+                    )}
+                </Modal>
+                {(context.activeStep === "preview" || context.readOnly) && (
+                  <V3PublicationHistory
+                    restoreBlockedByUnsavedChanges={
+                      context.hasUnsavedChanges || !sharedFormsReady
+                    }
+                    restoreBlockedReason={
+                      !sharedFormsReady
+                        ? "当前服务尚未支持共享词形，暂不能恢复历史内容"
+                        : undefined
+                    }
+                    currentWord={context.word}
+                    onRestored={replaceRestoredCanonical}
+                    onCanonicalRefreshed={replaceRestoredCanonical}
+                    requests={requests}
+                  />
+                )}
               </Flex>
             )}
           />

@@ -116,6 +116,12 @@ test("W05: web and admin E2E run independently and converge", async () => {
   const { jobs } = await workflowFixture();
   assert.match(jobs.get("e2e-web"), /test:e2e:web/);
   assert.match(jobs.get("e2e-admin"), /test:e2e:admin/);
+  const admin = jobs.get("e2e-admin");
+  assert.match(admin, /apt-get install[^\n]*fonts-noto-cjk/);
+  assert.ok(
+    admin.indexOf("Install Chinese fonts") < admin.indexOf("- name: Admin E2E")
+  );
+  assert.match(admin, /fc-match[^\n]*lang=zh-cn[^\n]*Noto Sans CJK/);
   const summary = jobs.get("e2e");
   assert.match(summary, /needs: \[e2e-web, e2e-admin\]/);
   assert.match(summary, /if: \$\{\{ always\(\) \}\}/);

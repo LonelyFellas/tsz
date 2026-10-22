@@ -62,6 +62,7 @@ interface RecoveryState {
 interface Props {
   restoreBlockedByUnsavedChanges?: boolean;
   restoreBlockedReason?: string;
+  onBusyChange?: (busy: boolean) => void;
   currentWord: AdminWordV3;
   requests?: PublicationRequests;
   onRestored: (draft: AdminWordDraftV3Envelope) => void;
@@ -535,6 +536,7 @@ function activationErrorMessage(error: unknown): string {
 export function V3PublicationHistory({
   restoreBlockedByUnsavedChanges = false,
   restoreBlockedReason,
+  onBusyChange,
   currentWord,
   requests = defaultRequests,
   onRestored,
@@ -554,6 +556,10 @@ export function V3PublicationHistory({
   const [detailError, setDetailError] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [activating, setActivating] = useState(false);
+  useEffect(() => {
+    onBusyChange?.(activating);
+    return () => onBusyChange?.(false);
+  }, [activating, onBusyChange]);
   const profile = useAuthStore((state) => state.profile);
   const allowedToRestore = canAdminResourceAction(
     profile,

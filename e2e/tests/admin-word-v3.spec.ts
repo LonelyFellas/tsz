@@ -3144,8 +3144,8 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       "true"
     );
     const expectedLabels = [
-      "过去式",
-      "过去式",
+      "过去式1",
+      "过去式2",
       "原形",
       "过去分词",
       "现在分词",

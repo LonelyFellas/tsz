@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -14,7 +15,7 @@ import type {
 } from "@tsz/types";
 import { V3FormContentModal } from "./V3FormContentModal";
 import {
-  addSharedLabel,
+  assignSharedFormContent,
   applyFormsStructure,
   expandFormContents
 } from "../sharedFormsModel";
@@ -58,7 +59,9 @@ function setup({
   multiplePos = false,
   baseOnly = false,
   initialForms,
-  editFormId
+  editFormId,
+  contentReassignmentAvailable = true,
+  savedContentIds
 }: {
   multipleGroups?: boolean;
   serverFieldOrder?: boolean;
@@ -66,6 +69,8 @@ function setup({
   baseOnly?: boolean;
   initialForms?: SharedFormsStepContentV3;
   editFormId?: string;
+  contentReassignmentAvailable?: boolean;
+  savedContentIds?: ReadonlySet<string>;
 } = {}) {
   const expanded = formsFixture({
     forms: [
@@ -113,6 +118,10 @@ function setup({
   }
   const onConfirm = vi.fn();
   const onCancel = vi.fn();
+  let leaveGuard: (() => Promise<boolean>) | undefined;
+  const registerLeaveGuard = (guard?: () => Promise<boolean>) => {
+    leaveGuard = guard;
+  };
   function Host() {
     const [open, setOpen] = useState(true);
     return (
@@ -121,6 +130,8 @@ function setup({
           {open && (
             <V3FormContentModal
               forms={forms}
+              contentReassignmentAvailable={contentReassignmentAvailable}
+              savedContentIds={savedContentIds}
               formId={editFormId ?? forms.pos[0]!.forms[baseOnly ? 0 : 1]!.id}
               issues={[]}
               stableVariantIds={createStableVariantIdFactory(
@@ -128,6 +139,7 @@ function setup({
                 []
               )}
               retiredContentSlots={[]}
+              registerLeaveGuard={registerLeaveGuard}
               onConfirm={(next) => {
                 onConfirm(next);
                 setOpen(false);
@@ -143,23 +155,27 @@ function setup({
     );
   }
   render(<Host />);
-  return { forms, onConfirm, onCancel };
+  return { forms, onConfirm, onCancel, leave: () => leaveGuard!() };
 }
 
 describe("词形内容弹窗的草稿边界", () => {
-  it("按标签及英美侧修改规则变化不会覆盖其他绑定", () => {
-    const expanded = formsFixture({ forms: [ukUsFormFixture()] });
+  it("统一修改规则变化只应用到当前内容的全部标签和英美侧", () => {
+    const expanded = formsFixture({
+      forms: [
+        ukUsFormFixture(),
+        commonFormFixture({ id: uuidFromInt(901) }),
+        commonFormFixture({ id: uuidFromInt(902), form_type: "plural" })
+      ]
+    });
     let initial = applyFormsStructure(
       { forms_format: "shared_v1", contents: [], pos: [] },
       expanded
     ) as SharedFormsStepContentV3;
     const ids = createStableVariantIdFactory(expanded, []);
-    initial = addSharedLabel(
+    initial = assignSharedFormContent(
       initial,
       initial.contents[0]!.id,
-      initial.pos[0]!.pos_id,
-      initial.pos[0]!.form_groups[0]!.id,
-      "plural",
+      initial.pos[0]!.forms[2]!.id,
       ids
     );
     const regions = initial.pos[0]!.forms[0]!.regional_bindings;
@@ -170,36 +186,70 @@ describe("词形内容弹窗的草稿边界", () => {
       initialForms: initial,
       editFormId: initial.pos[0]!.forms[0]!.id
     });
-    fireEvent.click(screen.getByRole("button", { name: "分别设置规则变化" }));
-    const uk = screen.getByRole("radiogroup", {
-      name: "名词第 1 组原形英式是否规则变化"
+    const regularity = screen.getByRole("radiogroup", {
+      name: "是否规则变化"
     });
-    expect(within(uk).getByRole("radio", { name: "否" })).toBeChecked();
-    fireEvent.click(
-      within(
-        screen.getByRole("radiogroup", {
-          name: "名词第 1 组复数美式是否规则变化"
-        })
-      ).getByRole("radio", { name: "否" })
-    );
-    expect(forms).toEqual(initial);
     expect(
-      within(screen.getByRole("radiogroup", { name: "是否规则变化" }))
+      within(regularity)
         .getAllByRole("radio")
         .every((input) => !(input as HTMLInputElement).checked)
     ).toBe(true);
+    fireEvent.click(within(regularity).getByRole("radio", { name: "否" }));
+    expect(forms).toEqual(initial);
     fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
     const next = onConfirm.mock.calls[0]![0] as SharedFormsStepContentV3;
-    expect(next.pos[0]!.forms[0]!.regional_bindings).toEqual(
-      initial.pos[0]!.forms[0]!.regional_bindings
-    );
-    expect(next.pos[0]!.forms[1]!.regional_bindings).toMatchObject({
-      uk: { is_regular: true },
-      us: { is_regular: false }
-    });
+    for (const binding of next.pos[0]!.forms.filter(
+      (row) => row.content_id === initial.contents[0]!.id
+    )) {
+      expect(binding.regional_bindings).toMatchObject({
+        uk: { is_regular: false },
+        us: { is_regular: false }
+      });
+    }
+    expect(next.pos[0]!.forms[1]).toEqual(initial.pos[0]!.forms[1]);
   });
 
-  it("先设为不规则再新增标签会继承当前设置", async () => {
+  it("指派动词原形替换已有内容，保留词形数量、身份和组内顺序", async () => {
+    const { forms, onConfirm } = setup({ baseOnly: true, multiplePos: true });
+    const before = structuredClone(forms);
+    fireEvent.change(screen.getByRole("textbox", { name: "内容拼写" }), {
+      target: { value: "graph" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "新增标签" }));
+    const picker = screen
+      .getByText(/这种拼写形式 指派词形标签$/)
+      .closest('[role="dialog"]') as HTMLElement;
+    fireEvent.click(within(picker).getByRole("checkbox", { name: "动词原形" }));
+    expect(within(picker).getByRole("alert")).toHaveTextContent(
+      "以下词形的拼写与发音将被替换"
+    );
+    expect(forms).toEqual(before);
+    fireEvent.click(within(picker).getByRole("button", { name: "确认替换" }));
+    await waitFor(() => expect(picker).not.toBeInTheDocument());
+    expect(onConfirm).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
+    const next = onConfirm.mock.calls[0]![0] as SharedFormsStepContentV3;
+    expect(next.pos[1]!.forms).toHaveLength(1);
+    expect(next.pos[1]!.forms[0]).toMatchObject({
+      id: before.pos[1]!.forms[0]!.id,
+      form_type: "base",
+      content_id: before.pos[0]!.forms[0]!.content_id
+    });
+    expect(next.pos.map((pos) => pos.form_groups)).toEqual(
+      before.pos.map((pos) => pos.form_groups)
+    );
+    const expanded = expandFormContents(next);
+    for (const pos of expanded.pos) {
+      const regions = pos.forms[0]!.regional_variants;
+      expect(regions).toMatchObject({
+        mode: "common",
+        common: { spelling: "graph" }
+      });
+    }
+    expect(next.contents).toHaveLength(1);
+  });
+
+  it("替换内容保留目标词形自己的规则变化设置", async () => {
     const { forms, onConfirm } = setup();
     fireEvent.click(
       within(
@@ -211,26 +261,23 @@ describe("词形内容弹窗的草稿边界", () => {
       .getByText(/这种拼写形式 指派词形标签$/)
       .closest('[role="dialog"]') as HTMLElement;
     fireEvent.click(within(picker).getByRole("checkbox", { name: "名词原形" }));
-    fireEvent.click(within(picker).getByRole("button", { name: /完\s*成/ }));
+    fireEvent.click(within(picker).getByRole("button", { name: "确认替换" }));
     await waitFor(() => expect(picker).not.toBeInTheDocument());
-    expect(
-      within(
-        screen.getByRole("radiogroup", { name: "是否规则变化" })
-      ).getByRole("radio", { name: "否" })
-    ).toBeChecked();
     fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
     const next = onConfirm.mock.calls[0]![0] as SharedFormsStepContentV3;
-    const contentId = forms.pos[0]!.forms[1]!.content_id;
-    for (const binding of next.pos[0]!.forms.filter(
-      (row) => row.content_id === contentId
-    )) {
-      expect(binding.regional_bindings).toMatchObject({
-        common: { is_regular: false }
-      });
-    }
+    expect(next.pos[0]!.forms).toHaveLength(2);
+    expect(next.pos[0]!.forms[0]!.content_id).toBe(
+      forms.pos[0]!.forms[1]!.content_id
+    );
+    expect(next.pos[0]!.forms[0]!.regional_bindings).toMatchObject({
+      common: { is_regular: true }
+    });
+    expect(next.pos[0]!.forms[1]!.regional_bindings).toMatchObject({
+      common: { is_regular: false }
+    });
   });
 
-  it("首个原形取消勾选再恢复不改变词形和组成员顺序", async () => {
+  it("指派中不能取消既有原形并隐式删除词形", async () => {
     const expanded = formsFixture({
       forms: [
         commonFormFixture({ spelling: "A" }),
@@ -249,13 +296,197 @@ describe("词形内容弹窗的草稿边界", () => {
     const picker = screen
       .getByText(/这种拼写形式 指派词形标签$/)
       .closest('[role="dialog"]') as HTMLElement;
-    const checkbox = within(picker).getByRole("checkbox", { name: "名词原形" });
+    const checkbox = within(picker).getByRole("checkbox", {
+      name: "名词原形 1（A）"
+    });
+    expect(checkbox).toBeDisabled();
     fireEvent.click(checkbox);
     fireEvent.click(checkbox);
     fireEvent.click(within(picker).getByRole("button", { name: /完\s*成/ }));
     await waitFor(() => expect(picker).not.toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
     expect(onConfirm.mock.calls[0]![0]).toEqual(initial);
+  });
+
+  it("多个原形按序号分别选择，取消新勾选会还原被替换内容", async () => {
+    const expanded = formsFixture({
+      forms: [
+        commonFormFixture({ spelling: "graph", form_type: "plural" }),
+        commonFormFixture({ id: uuidFromInt(901), spelling: "job" }),
+        commonFormFixture({ id: uuidFromInt(902), spelling: "jab" })
+      ]
+    });
+    const initial = applyFormsStructure(
+      { forms_format: "shared_v1", contents: [], pos: [] },
+      expanded
+    ) as SharedFormsStepContentV3;
+    const { onConfirm } = setup({
+      initialForms: initial,
+      editFormId: initial.pos[0]!.forms[0]!.id
+    });
+    fireEvent.click(screen.getByRole("button", { name: "新增标签" }));
+    const picker = screen
+      .getByText(/这种拼写形式 指派词形标签$/)
+      .closest('[role="dialog"]') as HTMLElement;
+    const first = within(picker).getByRole("checkbox", {
+      name: "名词原形 1（job）"
+    });
+    const second = within(picker).getByRole("checkbox", {
+      name: "名词原形 2（jab）"
+    });
+    fireEvent.click(second);
+    expect(first).not.toBeChecked();
+    expect(first).toBeDisabled();
+    fireEvent.click(second);
+    expect(first).toBeEnabled();
+    expect(within(picker).queryByRole("alert")).toBeNull();
+    fireEvent.click(first);
+    fireEvent.click(within(picker).getByRole("button", { name: "确认替换" }));
+    await waitFor(() => expect(picker).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
+    const next = onConfirm.mock.calls[0]![0] as SharedFormsStepContentV3;
+    expect(next.pos[0]!.forms).toHaveLength(3);
+    expect(next.pos[0]!.forms[1]!.content_id).toBe(initial.contents[0]!.id);
+    expect(next.pos[0]!.forms[2]).toEqual(initial.pos[0]!.forms[2]);
+    expect(
+      next.contents.find((row) => row.id === initial.contents[2]!.id)
+    ).toEqual(initial.contents[2]);
+    expect(next.pos[0]!.form_groups).toEqual(initial.pos[0]!.form_groups);
+  });
+
+  it("取消刚选中的替换恢复全部内容，确认替换后放弃抽屉也不改页面草稿", async () => {
+    const { forms, onConfirm, onCancel } = setup({
+      baseOnly: true,
+      multiplePos: true
+    });
+    const before = structuredClone(forms);
+    fireEvent.click(screen.getByRole("button", { name: "新增标签" }));
+    let picker = screen
+      .getByText(/这种拼写形式 指派词形标签$/)
+      .closest('[role="dialog"]') as HTMLElement;
+    const target = within(picker).getByRole("checkbox", { name: "动词原形" });
+    fireEvent.click(target);
+    fireEvent.click(target);
+    fireEvent.click(within(picker).getByRole("button", { name: /完\s*成/ }));
+    await waitFor(() => expect(picker).not.toBeInTheDocument());
+    expect(screen.queryByText("动词原形")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "新增标签" }));
+    picker = screen
+      .getByText(/这种拼写形式 指派词形标签$/)
+      .closest('[role="dialog"]') as HTMLElement;
+    fireEvent.click(within(picker).getByRole("checkbox", { name: "动词原形" }));
+    fireEvent.click(within(picker).getByRole("button", { name: "确认替换" }));
+    await waitFor(() => expect(picker).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /^取\s*消$/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "放弃修改" }));
+    expect(onCancel).toHaveBeenCalledOnce();
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(forms).toEqual(before);
+  });
+
+  it("未保存的新内容先保存再指派，不发送后端尚未登记的内容", () => {
+    setup({ baseOnly: true, multiplePos: true, savedContentIds: new Set() });
+    fireEvent.click(screen.getByRole("button", { name: "新增标签" }));
+    const picker = screen
+      .getByText(/这种拼写形式 指派词形标签$/)
+      .closest('[role="dialog"]') as HTMLElement;
+    expect(within(picker).getByRole("alert")).toHaveTextContent(
+      "请先确认当前内容并保存草稿"
+    );
+    expect(
+      within(picker).getByRole("checkbox", { name: "动词原形" })
+    ).toBeDisabled();
+  });
+
+  it.each([false, true])(
+    "未确认指派触发离开保护并应用全部选择，正文已修改=%s",
+    async (editContent) => {
+      const { forms, onConfirm, onCancel, leave } = setup({
+        baseOnly: true,
+        multiplePos: true
+      });
+      if (editContent)
+        fireEvent.change(screen.getByRole("textbox", { name: "内容拼写" }), {
+          target: { value: "changed" }
+        });
+      fireEvent.click(screen.getByRole("button", { name: "新增标签" }));
+      const picker = screen
+        .getByText(/这种拼写形式 指派词形标签$/)
+        .closest('[role="dialog"]') as HTMLElement;
+      fireEvent.click(
+        within(picker).getByRole("checkbox", { name: "动词原形" })
+      );
+      let pending!: Promise<boolean>;
+      act(() => {
+        pending = leave();
+      });
+      expect(onCancel).not.toHaveBeenCalled();
+      const prompt = screen
+        .getByText("词形内容尚未应用")
+        .closest('[role="dialog"]') as HTMLElement;
+      await waitFor(() =>
+        expect(within(prompt).getByText(/动词/)).toBeVisible()
+      );
+      fireEvent.click(
+        within(prompt).getByRole("button", { name: "应用并离开" })
+      );
+      await expect(pending).resolves.toBe(true);
+      const next = onConfirm.mock.calls[0]![0] as SharedFormsStepContentV3;
+      expect(next.pos[1]!.forms).toHaveLength(1);
+      expect(next.pos[1]!.forms[0]!.content_id).toBe(
+        forms.pos[0]!.forms[0]!.content_id
+      );
+      if (editContent) expect(JSON.stringify(next)).toContain("changed");
+    }
+  );
+
+  it("待确认选择离开时继续编辑保留选择，放弃后不改变草稿", async () => {
+    const { forms, onConfirm, onCancel, leave } = setup({
+      baseOnly: true,
+      multiplePos: true
+    });
+    const before = structuredClone(forms);
+    fireEvent.click(screen.getByRole("button", { name: "新增标签" }));
+    const picker = screen
+      .getByText(/这种拼写形式 指派词形标签$/)
+      .closest('[role="dialog"]') as HTMLElement;
+    fireEvent.click(within(picker).getByRole("checkbox", { name: "动词原形" }));
+    let pending!: Promise<boolean>;
+    act(() => {
+      pending = leave();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "继续编辑" }));
+    await expect(pending).resolves.toBe(false);
+    expect(
+      within(picker).getByRole("checkbox", { name: "动词原形" })
+    ).toBeChecked();
+    act(() => {
+      pending = leave();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "放弃修改" }));
+    await expect(pending).resolves.toBe(true);
+    expect(onCancel).toHaveBeenCalledOnce();
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(forms).toEqual(before);
+  });
+
+  it("旧服务不允许替换已有词形，既有标签仍可查看", () => {
+    const { onConfirm } = setup({
+      baseOnly: true,
+      multiplePos: true,
+      contentReassignmentAvailable: false
+    });
+    fireEvent.click(screen.getByRole("button", { name: "新增标签" }));
+    const picker = screen
+      .getByText(/这种拼写形式 指派词形标签$/)
+      .closest('[role="dialog"]') as HTMLElement;
+    expect(
+      within(picker).getByRole("checkbox", { name: "动词原形" })
+    ).toBeDisabled();
+    expect(
+      within(picker).getByRole("checkbox", { name: "名词原形" })
+    ).toBeChecked();
+    expect(onConfirm).not.toHaveBeenCalled();
   });
 
   it("标签候选只展示外层已添加的词形，不补齐目录类型或空组", () => {
@@ -345,7 +576,7 @@ describe("词形内容弹窗的草稿边界", () => {
     );
     fireEvent.click(within(picker).getByRole("checkbox", { name: "动词原形" }));
     expect(onConfirm).not.toHaveBeenCalled();
-    fireEvent.click(within(picker).getByRole("button", { name: /完\s*成/ }));
+    fireEvent.click(within(picker).getByRole("button", { name: "确认替换" }));
     await waitFor(() => expect(picker).not.toBeInTheDocument());
     expect(onConfirm).not.toHaveBeenCalled();
     expect(forms.pos[0]!.form_groups[1]!.members).toHaveLength(0);
@@ -359,12 +590,10 @@ describe("词形内容弹窗的草稿边界", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
     const next = onConfirm.mock.calls[0]![0] as SharedFormsStepContentV3;
-    const added = next.pos[0]!.forms.find(
-      (binding) =>
-        binding.id !== forms.pos[0]!.forms[0]!.id &&
-        binding.form_type === "base" &&
-        binding.content_id === forms.pos[0]!.forms[1]!.content_id
-    )!;
+    const added = next.pos[0]!.forms[0]!;
+    expect(next.pos.map((pos) => pos.forms.map((row) => row.id))).toEqual(
+      forms.pos.map((pos) => pos.forms.map((row) => row.id))
+    );
     expect(next.pos[0]!.form_groups[1]!.members).toHaveLength(0);
     expect(added.form_type).toBe("base");
     expect(added.content_id).toBe(forms.pos[0]!.forms[1]!.content_id);
@@ -381,8 +610,8 @@ describe("词形内容弹窗的草稿边界", () => {
         common: { is_regular: false }
       });
     }
-    expect(next.pos[0]!.forms[0]!.regional_bindings).toEqual(
-      forms.pos[0]!.forms[0]!.regional_bindings
+    expect(next.pos.map((pos) => pos.form_groups)).toEqual(
+      forms.pos.map((pos) => pos.form_groups)
     );
   });
 

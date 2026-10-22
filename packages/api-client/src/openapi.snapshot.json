@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/repo-health-cleanup-20261020/docs/openapi.json",
-  "_generatedAt": "2026-10-22T02:12:20.420Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/form-content-reassignment/docs/openapi.json",
+  "_generatedAt": "2026-10-22T11:43:07.696Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -255,6 +255,12 @@
         "schema": { "type": "string", "format": "uuid" }
       },
       {
+        "name": "X-TSZ-Form-Content-Reassignment",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Form-Contents",
         "in": "header",
         "required": false,
@@ -291,6 +297,12 @@
         "in": "header",
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
+      },
+      {
+        "name": "X-TSZ-Form-Content-Reassignment",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       },
       {
         "name": "X-TSZ-Form-Contents",
@@ -339,6 +351,12 @@
         "schema": { "type": "string", "format": "uuid" }
       },
       {
+        "name": "X-TSZ-Form-Content-Reassignment",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Form-Contents",
         "in": "header",
         "required": false,
@@ -377,6 +395,12 @@
         "schema": { "type": "string", "format": "uuid" }
       },
       {
+        "name": "X-TSZ-Form-Content-Reassignment",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Form-Contents",
         "in": "header",
         "required": false,
@@ -408,6 +432,12 @@
       }
     ],
     "get /admin/lexicon/entries/{id}": [
+      {
+        "name": "X-TSZ-Form-Content-Reassignment",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
       {
         "name": "X-TSZ-Form-Contents",
         "in": "header",
@@ -447,6 +477,12 @@
         "schema": { "type": "string", "format": "uuid" }
       },
       {
+        "name": "X-TSZ-Form-Content-Reassignment",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Form-Contents",
         "in": "header",
         "required": false,
@@ -478,6 +514,12 @@
       }
     ],
     "get /admin/lexicon/entries/{id}/publications": [
+      {
+        "name": "X-TSZ-Form-Content-Reassignment",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
       {
         "name": "X-TSZ-Form-Contents",
         "in": "header",
@@ -517,6 +559,12 @@
         "schema": { "type": "string", "format": "uuid" }
       },
       {
+        "name": "X-TSZ-Form-Content-Reassignment",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Form-Contents",
         "in": "header",
         "required": false,
@@ -548,6 +596,12 @@
       }
     ],
     "get /admin/lexicon/entries/{id}/publications/{publication_id}": [
+      {
+        "name": "X-TSZ-Form-Content-Reassignment",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
       {
         "name": "X-TSZ-Form-Contents",
         "in": "header",
@@ -585,6 +639,12 @@
         "in": "header",
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
+      },
+      {
+        "name": "X-TSZ-Form-Content-Reassignment",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       },
       {
         "name": "X-TSZ-Form-Contents",
@@ -625,6 +685,12 @@
         "schema": { "type": "string", "format": "uuid" }
       },
       {
+        "name": "X-TSZ-Form-Content-Reassignment",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Form-Contents",
         "in": "header",
         "required": false,
@@ -663,6 +729,12 @@
         "schema": { "type": "string", "format": "uuid" }
       },
       {
+        "name": "X-TSZ-Form-Content-Reassignment",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Form-Contents",
         "in": "header",
         "required": false,
@@ -694,6 +766,12 @@
       }
     ],
     "put /admin/lexicon/entries/{id}/steps/forms": [
+      {
+        "name": "X-TSZ-Form-Content-Reassignment",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
       {
         "name": "X-TSZ-Form-Contents",
         "in": "header",
@@ -727,6 +805,12 @@
     ],
     "post /admin/lexicon/entries/{id}/steps/forms/impact": [
       {
+        "name": "X-TSZ-Form-Content-Reassignment",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Form-Contents",
         "in": "header",
         "required": false,
@@ -734,6 +818,12 @@
       }
     ],
     "put /admin/lexicon/entries/{id}/steps/meanings": [
+      {
+        "name": "X-TSZ-Form-Content-Reassignment",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
       {
         "name": "X-TSZ-Form-Contents",
         "in": "header",

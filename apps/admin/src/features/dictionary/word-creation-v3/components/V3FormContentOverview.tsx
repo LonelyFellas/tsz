@@ -137,46 +137,55 @@ export function V3FormContentOverview({
             key: "label",
             width: 150,
             fixed: "left",
-            render: (_, row) => (
-              <div data-v3-node-id={row.membershipId} data-group-id={group.id}>
-                <Typography.Text
-                  className="v3-overview-form-type"
-                  strong
-                  data-v3-node-id={row.form.id}
-                  data-v3-field="form_type"
-                  tabIndex={-1}
+            render: (_, row) => {
+              const peers = rows.filter(
+                (item) => item.form.form_type === row.form.form_type
+              );
+              return (
+                <div
+                  data-v3-node-id={row.membershipId}
+                  data-group-id={group.id}
                 >
-                  {label(row.form.form_type)}
-                </Typography.Text>
-                {issues.some(
-                  (issue) =>
-                    issue.field === "form_type" &&
-                    (issue.node_location.form_id === row.form.id ||
-                      issue.node_id === row.form.id)
-                ) && (
-                  <Dropdown
-                    trigger={["click"]}
-                    menu={{
-                      items: row.formTypeOptions.map((type) => ({
-                        key: type,
-                        label: label(type)
-                      })),
-                      onClick: ({ key }) => onFormTypeChange(row.form.id, key)
-                    }}
+                  <Typography.Text
+                    className="v3-overview-form-type"
+                    strong
+                    data-v3-node-id={row.form.id}
+                    data-v3-field="form_type"
+                    tabIndex={-1}
                   >
-                    <Button
-                      type="link"
-                      size="small"
-                      disabled={row.formTypeDisabled}
-                      aria-label={`调整${label(row.form.form_type)}词形类型`}
+                    {label(row.form.form_type)}
+                    {peers.length > 1 && <sup>{peers.indexOf(row) + 1}</sup>}
+                  </Typography.Text>
+                  {issues.some(
+                    (issue) =>
+                      issue.field === "form_type" &&
+                      (issue.node_location.form_id === row.form.id ||
+                        issue.node_id === row.form.id)
+                  ) && (
+                    <Dropdown
+                      trigger={["click"]}
+                      menu={{
+                        items: row.formTypeOptions.map((type) => ({
+                          key: type,
+                          label: label(type)
+                        })),
+                        onClick: ({ key }) => onFormTypeChange(row.form.id, key)
+                      }}
                     >
-                      调整词形类型
-                    </Button>
-                  </Dropdown>
-                )}
-                {row.referenceBadge}
-              </div>
-            )
+                      <Button
+                        type="link"
+                        size="small"
+                        disabled={row.formTypeDisabled}
+                        aria-label={`调整${label(row.form.form_type)}词形类型`}
+                      >
+                        调整词形类型
+                      </Button>
+                    </Dropdown>
+                  )}
+                  {row.referenceBadge}
+                </div>
+              );
+            }
           },
           {
             title: "词形变化",
