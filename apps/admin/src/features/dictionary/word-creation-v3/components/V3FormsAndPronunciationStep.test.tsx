@@ -942,6 +942,59 @@ describe("V3FormsAndPronunciationStep", () => {
     );
   });
 
+  it("总览同组多个原形按行序自动编号，删到一条后去掉编号", () => {
+    const forms = formsFixture({
+      forms: [
+        commonFormFixture({ spelling: "job", pronunciations: [] }),
+        commonFormFixture({
+          id: uuidFromInt(2180),
+          spelling: "jab",
+          pronunciations: []
+        })
+      ]
+    });
+    const pos = forms.pos[0]!;
+    const rows = pos.forms.map((form, index) => ({
+      membershipId: pos.form_groups[0]!.members[index]!.id,
+      form,
+      formLabel: "原形",
+      formTypeAriaLabel: "词形类型",
+      formTypeDisabled: false,
+      formTypeOptions: ["base"],
+      membershipCount: 1
+    }));
+    const view = (visible: typeof rows) => (
+      <AntApp>
+        <PronunciationPreviewProvider>
+          <V3FormContentOverview
+            rows={visible}
+            group={pos.form_groups[0]!}
+            sharedCounts={new Map()}
+            onEdit={() => undefined}
+            onFormTypeChange={() => undefined}
+            issues={[]}
+          />
+        </PronunciationPreviewProvider>
+      </AntApp>
+    );
+    const { container, rerender } = render(view(rows));
+    expect(
+      [...container.querySelectorAll(".v3-overview-form-type")].map(
+        (node) => node.textContent
+      )
+    ).toEqual(["原形1", "原形2"]);
+    expect(
+      [...container.querySelectorAll(".v3-overview-form-type sup")].map(
+        (node) => node.textContent
+      )
+    ).toEqual(["1", "2"]);
+    rerender(view([rows[1]!]));
+    expect(container.querySelector(".v3-overview-form-type")?.textContent).toBe(
+      "原形"
+    );
+    expect(container.querySelector(".v3-overview-form-type sup")).toBeNull();
+  });
+
   it("总览词形名称保持文字，校验出错时可以调整类型并保留内容", async () => {
     const base = commonFormFixture({ pronunciations: [] });
     const historical = commonFormFixture({

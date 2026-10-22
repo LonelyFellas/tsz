@@ -26,7 +26,7 @@ import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { newWordNodeId } from "../../word-model/primitives";
 import {
-  addSharedLabel,
+  assignSharedFormContent,
   contentEditorForms,
   contentFromEditor,
   createPronunciationReferenceIds,
@@ -44,6 +44,8 @@ import { expandFormContents } from "@tsz/shared";
 
 export function V3FormContentModal({
   forms,
+  contentReassignmentAvailable = false,
+  savedContentIds,
   formId,
   issues,
   stableVariantIds,
@@ -55,6 +57,8 @@ export function V3FormContentModal({
   onConfirm
 }: {
   forms: SharedFormsStepContentV3;
+  contentReassignmentAvailable?: boolean;
+  savedContentIds?: ReadonlySet<string>;
   formId: string;
   issues: readonly V3DraftValidationIssue[];
   stableVariantIds: V3StableVariantIdFactory;
@@ -74,13 +78,17 @@ export function V3FormContentModal({
       createPronunciationReferenceIds(forms, retiredStableNodes)
   );
   const content = sharedContentForForm(original.current, formId)!;
+  const reassignmentBlockedReason = !contentReassignmentAvailable
+    ? "当前服务暂不支持替换词形内容，请更新后重试"
+    : savedContentIds && !savedContentIds.has(content.id)
+      ? "请先确认当前内容并保存草稿，再指派其他词形"
+      : undefined;
   const [editor, setEditor] = useState(() => contentEditorForms(content));
   const [labels, setLabels] = useState(() => structuredClone(forms));
   const [error, setError] = useState("");
   const [choosing, setChoosing] = useState(false);
   const [assignmentError, setAssignmentError] = useState("");
   const [assignment, setAssignment] = useState<SharedFormsStepContentV3>();
-  const [separateRegularity, setSeparateRegularity] = useState(false);
   const { preference } = useDialectPreference();
   const { modal } = App.useApp();
   const label = useFormTypeLabel();
@@ -98,16 +106,117 @@ export function V3FormContentModal({
         )!
       }))
   );
+  const assignmentGroups = useMemo(() => {
+    if (!choosing) return [];
+    const contents = new Map(labels.contents.map((row) => [row.id, row]));
+    return labels.pos.map((pos) => {
+      const forms = new Map(pos.forms.map((row) => [row.id, row]));
+      return {
+        pos,
+        groups: pos.form_groups.flatMap((group, groupIndex) => {
+          const members = group.members.flatMap((member) => {
+            const binding = forms.get(member.form_id);
+            return binding ? [binding] : [];
+          });
+          if (!members.length) return [];
+          const totals = new Map<string, number>();
+          const seen = new Map<string, number>();
+          for (const binding of members)
+            totals.set(
+              binding.form_type,
+              (totals.get(binding.form_type) ?? 0) + 1
+            );
+          const candidates = members.map((binding) => {
+            const ordinal = (seen.get(binding.form_type) ?? 0) + 1;
+            seen.set(binding.form_type, ordinal);
+            const number =
+              totals.get(binding.form_type)! > 1 ? ordinal : undefined;
+            const regions = contents.get(binding.content_id)!.regional_variants;
+            const spelling =
+              [
+                ...new Set(
+                  regions.mode === "common"
+                    ? [regions.common.spelling]
+                    : [regions.uk.spelling, regions.us.spelling]
+                )
+              ]
+                .filter(Boolean)
+                .join(" / ") || "未填写";
+            return { binding, number, spelling, pos, group, groupIndex };
+          });
+          return [{ group, groupIndex, candidates }];
+        })
+      };
+    });
+  }, [choosing, labels]);
+  const assignmentCandidates = useMemo(
+    () =>
+      new Map(
+        assignmentGroups.flatMap(({ groups }) =>
+          groups.flatMap(({ candidates }) =>
+            candidates.map((row) => [row.binding.id, row] as const)
+          )
+        )
+      ),
+    [assignmentGroups]
+  );
+  const assignedForms = useMemo(
+    () =>
+      new Map(
+        choosing && assignment
+          ? assignment.pos.flatMap((pos) =>
+              pos.forms.map((row) => [row.id, row] as const)
+            )
+          : []
+      ),
+    [choosing, assignment]
+  );
+  const replacements = useMemo(
+    () =>
+      [...assignedForms.values()].flatMap((binding) => {
+        const previous = assignmentCandidates.get(binding.id);
+        if (
+          !previous ||
+          previous.binding.content_id === content.id ||
+          binding.content_id !== content.id
+        )
+          return [];
+        return [
+          {
+            id: binding.id,
+            text: `${partOfSpeechLabel(previous.pos.pos)}第 ${previous.groupIndex + 1} 组${label(binding.form_type)}${previous.number ? ` ${previous.number}` : ""}：${previous.spelling}`
+          }
+        ];
+      }),
+    [assignedForms, assignmentCandidates, content.id, label]
+  );
+  const assignmentDirty = replacements.length > 0;
+  const closeAssignment = () => {
+    setChoosing(false);
+    setAssignment(undefined);
+    setAssignmentError("");
+  };
   const current = contentFromEditor(editor);
   const initialEditor = useRef(JSON.stringify(current));
   const dirty =
     JSON.stringify(current) !== initialEditor.current ||
-    JSON.stringify(labels) !== JSON.stringify(original.current);
-  const state = useRef({ dirty, editor, labels });
-  state.current = { dirty, editor, labels };
+    JSON.stringify(labels) !== JSON.stringify(original.current) ||
+    assignmentDirty;
+  const state = useRef({
+    dirty,
+    editor,
+    labels,
+    assignment: choosing ? assignment : undefined
+  });
+  state.current = {
+    dirty,
+    editor,
+    labels,
+    assignment: choosing ? assignment : undefined
+  };
   const confirmed = () => {
     try {
-      const local = state.current.labels;
+      const local = state.current.assignment ?? state.current.labels;
       const next = local.contents.some((row) => row.id === content.id)
         ? replaceSharedContent(
             local,
@@ -187,17 +296,6 @@ export function V3FormContentModal({
       ),
     [labels]
   );
-  const expandedAssignment = useMemo(
-    () =>
-      assignment
-        ? new Map(
-            expandFormContents(assignment).pos.flatMap((pos) =>
-              pos.forms.map((form) => [form.id, form] as const)
-            )
-          )
-        : expandedLabels,
-    [assignment, expandedLabels]
-  );
   const referenceForms = rows.map(({ binding }) =>
     expandedLabels.get(binding.id)!
   );
@@ -258,113 +356,34 @@ export function V3FormContentModal({
       onOk: remove
     });
   };
-  const toggleAssignment = (
-    posId: string,
-    groupId: string,
-    formType: string,
-    checked: boolean
-  ) => {
+  const toggleAssignment = (targetId: string, checked: boolean) => {
     if (!assignment) return;
+    const originalBinding = assignmentCandidates.get(targetId)!.binding;
+    if (originalBinding.content_id === content.id) return;
     try {
-      let next = structuredClone(assignment);
-      const pos = next.pos.find((row) => row.pos_id === posId)!;
-      const group = pos.form_groups.find((row) => row.id === groupId)!;
-      const bindings = pos.forms.filter(
-        (binding) =>
-          binding.content_id === content.id &&
-          binding.form_type === formType &&
-          group.members.some((member) => member.form_id === binding.id)
-      );
+      let next: SharedFormsStepContentV3;
       if (checked) {
-        const previousPos = labels.pos.find((row) => row.pos_id === posId)!;
-        const previousGroup = previousPos.form_groups.find(
-          (row) => row.id === groupId
-        )!;
-        const previous = previousPos.forms.filter(
-          (binding) =>
-            binding.content_id === content.id &&
-            binding.form_type === formType &&
-            previousGroup.members.some(
-              (member) => member.form_id === binding.id
-            )
+        if (reassignmentBlockedReason)
+          throw new Error(reassignmentBlockedReason);
+        next = assignSharedFormContent(
+          assignment,
+          content.id,
+          targetId,
+          stableVariantIds,
+          pronunciationIds
         );
-        if (previous.length > 0) {
-          for (const binding of previous) {
-            const originalIndex = previousPos.forms.indexOf(binding);
-            const following = new Set(
-              previousPos.forms.slice(originalIndex + 1).map((row) => row.id)
-            );
-            const insertAt = pos.forms.findIndex((row) =>
-              following.has(row.id)
-            );
-            pos.forms.splice(
-              insertAt < 0 ? pos.forms.length : insertAt,
-              0,
-              structuredClone(binding)
-            );
-          }
-          for (const member of previousGroup.members.filter((member) =>
-            previous.some((binding) => binding.id === member.form_id)
-          )) {
-            const originalIndex = previousGroup.members.indexOf(member);
-            const following = new Set(
-              previousGroup.members
-                .slice(originalIndex + 1)
-                .map((row) => row.id)
-            );
-            const insertAt = group.members.findIndex((row) =>
-              following.has(row.id)
-            );
-            group.members.splice(
-              insertAt < 0 ? group.members.length : insertAt,
-              0,
-              structuredClone(member)
-            );
-          }
-        } else {
-          next = addSharedLabel(
-            next,
-            content.id,
-            posId,
-            groupId,
-            formType,
-            stableVariantIds
-          );
-          const added = next.pos
-            .find((row) => row.pos_id === posId)!
-            .forms.at(-1)!;
-          const source = (rows.find(({ binding }) => binding.id === formId) ??
-            rows[0])!.binding.regional_bindings;
-          const regions = added.regional_bindings;
-          if (regions.mode === "common") {
-            regions.common.is_regular =
-              regularity ??
-              (source.mode === "common"
-                ? source.common.is_regular
-                : source.uk.is_regular);
-          } else {
-            regions.uk.is_regular =
-              regularity ??
-              (source.mode === "common"
-                ? source.common.is_regular
-                : source.uk.is_regular);
-            regions.us.is_regular =
-              regularity ??
-              (source.mode === "common"
-                ? source.common.is_regular
-                : source.us.is_regular);
-          }
-        }
       } else {
-        for (const binding of bindings) {
-          const reason = removalReason(binding.id, next, expandedAssignment);
-          if (reason) throw new Error(reason);
-          pos.forms = pos.forms.filter((row) => row.id !== binding.id);
-          group.members = group.members.filter(
-            (member) => member.form_id !== binding.id
-          );
-        }
+        next = structuredClone(assignment);
+        const pos = next.pos.find((row) =>
+          row.forms.some((form) => form.id === targetId)
+        )!;
+        pos.forms[pos.forms.findIndex((row) => row.id === targetId)] =
+          structuredClone(originalBinding);
       }
+      const used = new Set(
+        next.pos.flatMap((row) => row.forms.map((form) => form.content_id))
+      );
+      next.contents = labels.contents.filter((row) => used.has(row.id));
       setAssignment(next);
       setAssignmentError("");
     } catch (cause) {
@@ -463,10 +482,7 @@ export function V3FormContentModal({
       mask={{ closable: false }}
       destroyOnHidden
       footer={
-        <Flex justify="space-between" align="center" gap="small" wrap>
-          <Typography.Text type="secondary">
-            确认后应用到页面，保存草稿后同步到服务器
-          </Typography.Text>
+        <Flex justify="flex-end" align="center" gap="small" wrap>
           <Space>
             <Button onClick={() => void askLeaveRef.current!()}>取消</Button>
             <Button type="primary" onClick={confirmed}>
@@ -535,78 +551,8 @@ export function V3FormContentModal({
                   <Radio value>是</Radio>
                   <Radio value={false}>否</Radio>
                 </Radio.Group>
-                <Button
-                  type="link"
-                  size="small"
-                  aria-label="分别设置规则变化"
-                  aria-expanded={separateRegularity}
-                  onClick={() => setSeparateRegularity((value) => !value)}
-                >
-                  分别设置
-                </Button>
               </Space>
             </div>
-            {separateRegularity && (
-              <div className="v3-content-regularity-details">
-                {rows.map(({ pos, binding, group }) => (
-                  <div key={binding.id} className="v3-content-regularity-item">
-                    <Typography.Text>
-                      {partOfSpeechLabel(pos.pos)} · 第{" "}
-                      {pos.form_groups.indexOf(group) + 1} 组 ·{" "}
-                      {label(binding.form_type)}
-                    </Typography.Text>
-                    <Space wrap>
-                      {(binding.regional_bindings.mode === "common"
-                        ? [
-                            [
-                              "common",
-                              binding.regional_bindings.common
-                            ] as const
-                          ]
-                        : [
-                            ["uk", binding.regional_bindings.uk] as const,
-                            ["us", binding.regional_bindings.us] as const
-                          ]
-                      ).map(([side, variant]) => {
-                        const sideLabel =
-                          side === "common"
-                            ? "英美通用"
-                            : side === "uk"
-                              ? "英式"
-                              : "美式";
-                        return (
-                          <Space key={side}>
-                            <Typography.Text type="secondary">
-                              {sideLabel}
-                            </Typography.Text>
-                            <Radio.Group
-                              aria-label={`${partOfSpeechLabel(pos.pos)}第 ${pos.form_groups.indexOf(group) + 1} 组${label(binding.form_type)}${sideLabel}是否规则变化`}
-                              value={variant.is_regular}
-                              onChange={(event) => {
-                                const next = structuredClone(labels);
-                                const target = next.pos
-                                  .find((row) => row.pos_id === pos.pos_id)!
-                                  .forms.find(
-                                    (row) => row.id === binding.id
-                                  )!.regional_bindings;
-                                if (target.mode === "common")
-                                  target.common.is_regular = event.target.value;
-                                else if (side !== "common")
-                                  target[side].is_regular = event.target.value;
-                                setLabels(next);
-                              }}
-                            >
-                              <Radio value>是</Radio>
-                              <Radio value={false}>否</Radio>
-                            </Radio.Group>
-                          </Space>
-                        );
-                      })}
-                    </Space>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         )}
         <div className="v3-content-labels">
@@ -615,26 +561,38 @@ export function V3FormContentModal({
             <Typography.Text type="secondary">可多选</Typography.Text>
           </Space>
           <Space wrap className="v3-content-label-list">
-            {rows.map(({ pos, binding, group }) => (
-              <Tag
-                key={binding.id}
-                className="v3-content-label"
-                title={`第 ${pos.form_groups.indexOf(group) + 1} 组`}
-              >
-                {partOfSpeechLabel(pos.pos)}
-                {label(binding.form_type)}
-                <Tooltip title={removalReason(binding.id)}>
-                  <Button
-                    size="small"
-                    type="text"
-                    icon={<CloseOutlined />}
-                    disabled={Boolean(removalReason(binding.id))}
-                    onClick={() => removeLabel(binding.id)}
-                    aria-label={`移除${partOfSpeechLabel(pos.pos)}${label(binding.form_type)}标签`}
-                  />
-                </Tooltip>
-              </Tag>
-            ))}
+            {rows.map(({ pos, binding, group }) => {
+              const sameType = group.members.flatMap((member) =>
+                pos.forms.filter(
+                  (row) =>
+                    row.id === member.form_id &&
+                    row.form_type === binding.form_type
+                )
+              );
+              const number =
+                sameType.length > 1 ? sameType.indexOf(binding) + 1 : undefined;
+              return (
+                <Tag
+                  key={binding.id}
+                  className="v3-content-label"
+                  title={`第 ${pos.form_groups.indexOf(group) + 1} 组`}
+                >
+                  {partOfSpeechLabel(pos.pos)}
+                  {label(binding.form_type)}
+                  {number && <sup>{number}</sup>}
+                  <Tooltip title={removalReason(binding.id)}>
+                    <Button
+                      size="small"
+                      type="text"
+                      icon={<CloseOutlined />}
+                      disabled={Boolean(removalReason(binding.id))}
+                      onClick={() => removeLabel(binding.id)}
+                      aria-label={`移除${partOfSpeechLabel(pos.pos)}${label(binding.form_type)}${number ? ` ${number}` : ""}标签`}
+                    />
+                  </Tooltip>
+                </Tag>
+              );
+            })}
             <Button
               type="dashed"
               aria-label="新增标签"
@@ -642,7 +600,7 @@ export function V3FormContentModal({
               disabled={rows.length === 0}
               onClick={() => {
                 setAssignmentError("");
-                setAssignment(structuredClone(labels));
+                setAssignment(labels);
                 setChoosing(true);
               }}
             >
@@ -681,6 +639,7 @@ export function V3FormContentModal({
       <Modal
         open={leavePrompt}
         title="词形内容尚未应用"
+        zIndex={2100}
         onCancel={() => finishLeave(false)}
         destroyOnHidden
         footer={
@@ -707,16 +666,30 @@ export function V3FormContentModal({
         }
       >
         确认后应用到页面草稿；放弃会丢弃本次抽屉修改。
+        {assignmentDirty && (
+          <Alert
+            type="warning"
+            title="以下词形的拼写与发音将被替换"
+            description={
+              <Flex vertical>
+                {replacements.map((row) => (
+                  <span key={row.id}>{row.text}</span>
+                ))}
+              </Flex>
+            }
+          />
+        )}
+        {error && <Alert type="error" title={error} />}
       </Modal>
       <Modal
-        open={choosing}
+        open={choosing && !leavePrompt}
         title={`为 ${previewSpelling || "未填写"} 这种拼写形式 指派词形标签`}
         className="v3-label-assignment-modal"
         width={640}
-        okText="完成"
+        okText={replacements.length > 0 ? "确认替换" : "完成"}
         cancelText="取消"
         destroyOnHidden
-        onCancel={() => setChoosing(false)}
+        onCancel={closeAssignment}
         onOk={() => {
           if (!assignment) return;
           if (
@@ -730,24 +703,38 @@ export function V3FormContentModal({
             return;
           }
           setLabels(assignment);
-          setChoosing(false);
+          closeAssignment();
           setError("");
         }}
       >
         <Typography.Paragraph type="secondary">
-          选择这种拼写形式可以充当的词形。多个标签将复用同一份拼写与发音。
+          选择要共用当前拼写与发音的已有词形，词形数量不变。同组有多个同类型词形时，请按序号和拼写选择。
         </Typography.Paragraph>
+        {reassignmentBlockedReason && (
+          <Alert type="info" title={reassignmentBlockedReason} />
+        )}
+        {replacements.length > 0 && (
+          <Alert
+            type="warning"
+            showIcon
+            title="以下词形的拼写与发音将被替换"
+            description={
+              <Flex vertical gap={4}>
+                {replacements.map((row) => (
+                  <span key={row.id}>{row.text}</span>
+                ))}
+                <span>
+                  确认后共用当前内容，后续修改将同步。已有关联会在保存草稿时检查。
+                </span>
+              </Flex>
+            }
+          />
+        )}
         {assignmentError && (
           <Alert type="error" showIcon title={assignmentError} />
         )}
         <div className="v3-label-assignment-columns">
-          {assignment?.pos.map((pos) => {
-            const existingPos = labels.pos.find(
-              (row) => row.pos_id === pos.pos_id
-            )!;
-            const groups = existingPos.form_groups.filter(
-              (group) => group.members.length > 0
-            );
+          {assignmentGroups.map(({ pos, groups }) => {
             if (groups.length === 0) return null;
             return (
               <section
@@ -758,21 +745,16 @@ export function V3FormContentModal({
                 <Typography.Title level={5}>
                   {partOfSpeechLabel(pos.pos)}
                 </Typography.Title>
-                {groups.map((group) => {
-                  const groupIndex = existingPos.form_groups.indexOf(group);
-                  const selectedGroup = pos.form_groups.find(
-                    (row) => row.id === group.id
-                  )!;
-                  const types = [
-                    ...new Set(
-                      group.members.flatMap((member) => {
-                        const binding = existingPos.forms.find(
-                          (binding) => binding.id === member.form_id
-                        );
-                        return binding ? [binding.form_type] : [];
-                      })
-                    )
-                  ];
+                {groups.map(({ group, groupIndex, candidates }) => {
+                  const selectedTypes = new Set(
+                    candidates
+                      .filter(
+                        ({ binding }) =>
+                          assignedForms.get(binding.id)?.content_id ===
+                          content.id
+                      )
+                      .map(({ binding }) => binding.form_type)
+                  );
                   return (
                     <div className="v3-label-assignment-group" key={group.id}>
                       {pos.form_groups.length > 1 && (
@@ -781,47 +763,47 @@ export function V3FormContentModal({
                           {group.scope === "dedicated" ? "（专用）" : ""}
                         </Typography.Text>
                       )}
-                      {types.map((type) => {
-                        const bindings = pos.forms.filter(
-                          (binding) =>
-                            binding.content_id === content.id &&
-                            binding.form_type === type &&
-                            selectedGroup.members.some(
-                              (member) => member.form_id === binding.id
-                            )
-                        );
-                        const blockedReason = bindings
-                          .map((binding) =>
-                            removalReason(
-                              binding.id,
-                              assignment,
-                              expandedAssignment
-                            )
-                          )
-                          .find(Boolean);
-                        const checkboxLabel = `${partOfSpeechLabel(pos.pos)}${pos.form_groups.length > 1 ? `第 ${groupIndex + 1} 组` : ""}${label(type)}`;
-                        return (
-                          <Tooltip key={type} title={blockedReason}>
-                            <span className="v3-label-assignment-option">
-                              <Checkbox
-                                aria-label={checkboxLabel}
-                                checked={bindings.length > 0}
-                                disabled={Boolean(blockedReason)}
-                                onChange={(event) =>
-                                  toggleAssignment(
-                                    pos.pos_id,
-                                    group.id,
-                                    type,
-                                    event.target.checked
-                                  )
-                                }
-                              >
-                                {label(type)}
-                              </Checkbox>
-                            </span>
-                          </Tooltip>
-                        );
-                      })}
+                      {candidates.map(
+                        ({ binding: candidate, number, spelling }) => {
+                          const selected =
+                            assignedForms.get(candidate.id)?.content_id ===
+                            content.id;
+                          const typeLabel = `${label(candidate.form_type)}${number ? ` ${number}（${spelling}）` : ""}`;
+                          const duplicate =
+                            !selected && selectedTypes.has(candidate.form_type);
+                          const blockedReason =
+                            candidate.content_id === content.id
+                              ? "已共用当前内容；移除请使用外层标签的移除按钮"
+                              : duplicate
+                                ? "同组已有同类型词形共用这份内容，不能重复指派"
+                                : reassignmentBlockedReason;
+                          const checkboxLabel = `${partOfSpeechLabel(pos.pos)}${pos.form_groups.length > 1 ? `第 ${groupIndex + 1} 组` : ""}${typeLabel}`;
+                          return (
+                            <Tooltip key={candidate.id} title={blockedReason}>
+                              <span className="v3-label-assignment-option">
+                                <Checkbox
+                                  aria-label={checkboxLabel}
+                                  checked={selected}
+                                  disabled={Boolean(blockedReason)}
+                                  onChange={(event) =>
+                                    toggleAssignment(
+                                      candidate.id,
+                                      event.target.checked
+                                    )
+                                  }
+                                >
+                                  {label(candidate.form_type)}
+                                  {number && (
+                                    <>
+                                      <sup>{number}</sup>（{spelling}）
+                                    </>
+                                  )}
+                                </Checkbox>
+                              </span>
+                            </Tooltip>
+                          );
+                        }
+                      )}
                     </div>
                   );
                 })}

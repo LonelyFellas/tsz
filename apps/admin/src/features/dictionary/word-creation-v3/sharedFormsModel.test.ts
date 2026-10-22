@@ -9,7 +9,7 @@ import {
   uuidFromInt
 } from "./fixtures";
 import {
-  addSharedLabel,
+  assignSharedFormContent,
   applyFormsStructure,
   contentEditorForms,
   contentFromEditor,
@@ -34,24 +34,127 @@ function stableIds(forms: SharedFormsStepContentV3) {
 }
 
 describe("共享词形内容", () => {
-  it("跨词性标签共用正文，编辑保留各绑定身份和规则性", () => {
-    const initial = sharedFormsFixture();
-    const secondPos = uuidFromInt(501);
-    const groupId = uuidFromInt(502);
-    initial.pos.push({
-      pos_id: secondPos,
-      pos: "verb",
-      forms: [],
-      form_groups: [
-        { id: groupId, scope: "general", is_regular: true, members: [] }
+  it("改绑只替换指定词形的内容，保留变体身份、规则性和其他共享者", () => {
+    const expanded = formsFixture({
+      forms: [
+        commonFormFixture(),
+        commonFormFixture({
+          id: uuidFromInt(901),
+          spelling: "other",
+          form_type: "past"
+        }),
+        commonFormFixture({
+          id: uuidFromInt(902),
+          spelling: "others",
+          form_type: "plural"
+        })
       ]
     });
-    const forms = addSharedLabel(
+    let initial = applyFormsStructure(
+      { forms_format: "shared_v1", contents: [], pos: [] },
+      expanded
+    ) as SharedFormsStepContentV3;
+    initial = assignSharedFormContent(
+      initial,
+      initial.contents[1]!.id,
+      initial.pos[0]!.forms[2]!.id,
+      stableIds(initial)
+    );
+    const before = structuredClone(initial);
+    const target = initial.pos[0]!.forms[1]!;
+    const old = target.regional_bindings;
+    if (old.mode !== "common") throw new Error("fixture");
+    old.common.is_regular = false;
+    const ids = createPronunciationReferenceIds(initial);
+    const variants = stableIds(initial);
+    const next = assignSharedFormContent(
       initial,
       initial.contents[0]!.id,
-      secondPos,
-      groupId,
-      "base",
+      target.id,
+      variants,
+      ids
+    );
+    expect(initial.pos[0]!.forms.map((row) => row.id)).toEqual(
+      next.pos[0]!.forms.map((row) => row.id)
+    );
+    expect(next.pos[0]!.form_groups).toEqual(initial.pos[0]!.form_groups);
+    expect(next.contents).toHaveLength(2);
+    expect(next.pos[0]!.forms[2]).toEqual(initial.pos[0]!.forms[2]);
+    const updated = next.pos[0]!.forms[1]!.regional_bindings;
+    expect(updated).toMatchObject({
+      common: {
+        id: old.common.id,
+        is_regular: false,
+        content_slot_id:
+          initial.contents[0]!.regional_variants.mode === "common"
+            ? initial.contents[0]!.regional_variants.common.id
+            : ""
+      }
+    });
+    if (updated.mode !== "common") throw new Error("fixture");
+    expect(updated.common.pronunciations[0]!.id).not.toBe(
+      old.common.pronunciations[0]!.id
+    );
+    expect(updated.common.pronunciations[0]!.id).not.toBe(
+      (next.pos[0]!.forms[0]!.regional_bindings as typeof old).common
+        .pronunciations[0]!.id
+    );
+    const restored = assignSharedFormContent(
+      next,
+      target.content_id,
+      target.id,
+      variants,
+      ids
+    );
+    expect(restored).toEqual(initial);
+    expect(initial.contents).toEqual(before.contents);
+  });
+
+  it("改绑至英美分开的正文保持词形数量并完整建立两侧读法", () => {
+    const expanded = formsFixture({
+      forms: [ukUsFormFixture(), commonFormFixture({ form_type: "plural" })]
+    });
+    const initial = applyFormsStructure(
+      { forms_format: "shared_v1", contents: [], pos: [] },
+      expanded
+    ) as SharedFormsStepContentV3;
+    const next = assignSharedFormContent(
+      initial,
+      initial.contents[0]!.id,
+      initial.pos[0]!.forms[1]!.id,
+      stableIds(initial)
+    );
+    expect(next.pos[0]!.forms).toHaveLength(2);
+    expect(next.contents).toHaveLength(1);
+    const projected =
+      expandFormContents(next).pos[0]!.forms[1]!.regional_variants;
+    expect(projected).toMatchObject({
+      mode: "uk_us",
+      uk: { spelling: "centre" },
+      us: { spelling: "center" }
+    });
+    if (projected.mode !== "uk_us") throw new Error("fixture");
+    expect(projected.uk.pronunciations).toHaveLength(1);
+    expect(projected.us.pronunciations).toHaveLength(1);
+    expect(next.pos[0]!.form_groups).toEqual(initial.pos[0]!.form_groups);
+  });
+  it("跨词性标签共用正文，编辑保留各绑定身份和规则性", () => {
+    const expanded = formsFixture();
+    expanded.pos.push(
+      ...formsFixture({
+        pos_id: uuidFromInt(501),
+        pos: "verb",
+        forms: [commonFormFixture({ id: uuidFromInt(502) })]
+      }).pos
+    );
+    const initial = applyFormsStructure(
+      { forms_format: "shared_v1", contents: [], pos: [] },
+      expanded
+    ) as SharedFormsStepContentV3;
+    const forms = assignSharedFormContent(
+      initial,
+      initial.contents[0]!.id,
+      initial.pos[1]!.forms[0]!.id,
       stableIds(initial)
     );
     const binding = forms.pos[1]!.forms[0]!;
@@ -103,26 +206,21 @@ describe("共享词形内容", () => {
     );
   });
 
-  it("同组同内容同类型拒绝重复，新增标签不重复使用引用节点 ID", () => {
-    const forms = sharedFormsFixture();
-    const pos = forms.pos[0]!;
-    const group = pos.form_groups[0]!;
-    expect(() =>
-      addSharedLabel(
-        forms,
-        forms.contents[0]!.id,
-        pos.pos_id,
-        group.id,
-        "base",
-        stableIds(forms)
-      )
-    ).toThrow("已在");
-    const next = addSharedLabel(
+  it("既有词形共用内容后保持各自引用节点 ID", () => {
+    const expanded = formsFixture({
+      forms: [
+        commonFormFixture(),
+        commonFormFixture({ id: uuidFromInt(610), form_type: "plural" })
+      ]
+    });
+    const forms = applyFormsStructure(
+      { forms_format: "shared_v1", contents: [], pos: [] },
+      expanded
+    ) as SharedFormsStepContentV3;
+    const next = assignSharedFormContent(
       forms,
       forms.contents[0]!.id,
-      pos.pos_id,
-      group.id,
-      "plural",
+      forms.pos[0]!.forms[1]!.id,
       stableIds(forms)
     );
     const variants = next.pos[0]!.forms.map((form) => form.regional_bindings);

@@ -749,6 +749,7 @@ export interface AdminWordV3Capabilities {
   /** 释义级成分用词（B1 起恒 true）；缺失表示后端尚不支持，前端不得发送 sense.component_usages。 */
   sense_component_usages?: boolean;
   shared_form_contents?: boolean;
+  form_content_reassignment?: boolean;
 }
 
 export interface AdminWordV3 {

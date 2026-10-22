@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/repo-health-cleanup-20261020/docs/openapi.json",
-  "_source_sha256": "a5c2305c777249ee5317c950d4eb561d2440a463aa16b35136a90b5dcb6c56eb",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/form-content-reassignment/docs/openapi.json",
+  "_source_sha256": "5f7848cebc2c85a516727e93015fd0fcd8bf172a8d81c4a37f2da1edb97e01d4",
   "roots": [
     "DictionaryPage",
     "DictionaryEntry",
@@ -408,6 +408,7 @@
       "properties": {
         "atomic_form_sense_bindings": { "type": "boolean" },
         "draft_relation_prebinding": { "type": "boolean" },
+        "form_content_reassignment": { "type": "boolean" },
         "multi_group_sense_bindings": { "type": "boolean" },
         "pronunciation_normalization_version": {
           "$ref": "#/$defs/PronunciationNormalizationVersionV3"

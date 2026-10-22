@@ -656,6 +656,18 @@ describe("admin word V3/Any runtime decoder", () => {
     expect(decodeAdminWordV3Envelope(currentEnvelope)).toBe(currentEnvelope);
   });
 
+  it.each([undefined, false, true])(
+    "词形内容替换能力 %s 兼容新旧服务响应",
+    (available) => {
+      const word = validAdminWordV3() as unknown as Record<string, unknown>;
+      const capabilities = word.capabilities as Record<string, unknown>;
+      if (available !== undefined)
+        capabilities.form_content_reassignment = available;
+      const envelope = { word };
+      expect(decodeAdminWordV3Envelope(envelope)).toBe(envelope);
+    }
+  );
+
   it("接受新能力、分层译文、成分用词与待关联响应", () => {
     const word = validAdminWordV3() as unknown as Record<string, unknown>;
     const capabilities = word.capabilities as Record<string, unknown>;

@@ -452,7 +452,8 @@ function v3Word(
     capabilities: {
       publication: capability,
       pronunciation_normalization_version: "nfkc_trim_lower_v1",
-      shared_form_contents: true
+      shared_form_contents: true,
+      form_content_reassignment: true
     },
     forms: sharedFormsFixture(structuredClone(FORMS)),
     meanings: structuredClone(MEANINGS),

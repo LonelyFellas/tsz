@@ -454,7 +454,20 @@ export function replaceSharedContent(
   stableIds: V3StableVariantIdFactory,
   pronunciationIds = createPronunciationReferenceIds(forms)
 ): SharedFormsStepContentV3 {
-  const next = structuredClone(forms);
+  return replaceSharedContentInPlace(
+    structuredClone(forms),
+    content,
+    stableIds,
+    pronunciationIds
+  );
+}
+
+function replaceSharedContentInPlace(
+  next: SharedFormsStepContentV3,
+  content: FormContentV3,
+  stableIds: V3StableVariantIdFactory,
+  pronunciationIds: ReturnType<typeof createPronunciationReferenceIds>
+): SharedFormsStepContentV3 {
   const index = next.contents.findIndex((row) => row.id === content.id);
   if (index < 0) throw new Error("Shared content no longer exists");
   for (const pos of next.pos)
@@ -528,64 +541,49 @@ export function replaceSharedContent(
   return next;
 }
 
-export function addSharedLabel(
+export function assignSharedFormContent(
   forms: SharedFormsStepContentV3,
   contentId: string,
-  posId: string,
-  groupId: string,
-  formType: string,
-  stableIds: V3StableVariantIdFactory
+  formId: string,
+  stableIds: V3StableVariantIdFactory,
+  pronunciationIds = createPronunciationReferenceIds(forms)
 ): SharedFormsStepContentV3 {
   const next = structuredClone(forms);
-  const pos = next.pos.find((row) => row.pos_id === posId);
-  const group = pos?.form_groups.find((row) => row.id === groupId);
+  const binding = next.pos
+    .flatMap((pos) => pos.forms)
+    .find((row) => row.id === formId);
   const content = next.contents.find((row) => row.id === contentId);
-  if (!pos || !group || !content) throw new Error("请选择词性和变化组");
+  if (!binding || !content)
+    throw new Error("词形或内容已不存在，请重新打开后再试");
+  const pos = next.pos.find((row) => row.forms.includes(binding))!;
+  const group = pos.form_groups.find((row) =>
+    row.members.some((member) => member.form_id === formId)
+  )!;
   if (
     group.members.some((member) =>
       pos.forms.some(
-        (form) =>
-          form.id === member.form_id &&
-          form.content_id === contentId &&
-          form.form_type === formType
+        (row) =>
+          row.id === member.form_id &&
+          row.id !== formId &&
+          row.form_type === binding.form_type &&
+          row.content_id === contentId
       )
     )
-  )
-    throw new Error("该内容已在这个变化组使用此标签");
-  const id = newWordNodeId();
-  pos.forms.push({
-    id,
-    content_id: contentId,
-    form_type: formType,
-    regional_bindings:
-      content.regional_variants.mode === "common"
-        ? {
-            mode: "common",
-            common: {
-              id: stableIds(id, "common_variant"),
-              content_slot_id: content.regional_variants.common.id,
-              is_regular: true,
-              pronunciations: []
-            }
-          }
-        : {
-            mode: "uk_us",
-            uk: {
-              id: stableIds(id, "uk_variant"),
-              content_slot_id: content.regional_variants.uk.id,
-              is_regular: true,
-              pronunciations: []
-            },
-            us: {
-              id: stableIds(id, "us_variant"),
-              content_slot_id: content.regional_variants.us.id,
-              is_regular: true,
-              pronunciations: []
-            }
-          }
-  });
-  group.members.push({ id: newWordNodeId(), form_id: id });
-  return replaceSharedContent(next, content, stableIds);
+  ) {
+    throw new Error("同组已有同类型词形共用这份内容，不能重复指派");
+  }
+  binding.content_id = contentId;
+  const updated = replaceSharedContentInPlace(
+    next,
+    content,
+    stableIds,
+    pronunciationIds
+  );
+  const used = new Set(
+    updated.pos.flatMap((pos) => pos.forms.map((row) => row.content_id))
+  );
+  updated.contents = updated.contents.filter((row) => used.has(row.id));
+  return updated;
 }
 
 export function sharedContentForForm(

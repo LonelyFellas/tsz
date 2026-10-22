@@ -93,6 +93,7 @@ import {
 } from "./sortableRows";
 import { SortableDragHandle } from "./components/SortableDragHandle";
 import { V3RowIndex } from "./components/V3RowIndex";
+import { V3StepActions } from "./components/V3StepActions";
 import { V3EditorTitle } from "./components/V3EditorTitle";
 import { reorderPos } from "./operations";
 import "./posTabs.css";
@@ -3795,9 +3796,9 @@ function V3MeaningsAndExamplesStepContent({
       )}
 
       {onSave && (
-        <div className="word-step-actions">
+        <V3StepActions>
           {onPrevious ? (
-            <Button disabled={saving} onClick={onPrevious}>
+            <Button type="text" disabled={saving} onClick={onPrevious}>
               上一步
             </Button>
           ) : null}
@@ -3815,7 +3816,7 @@ function V3MeaningsAndExamplesStepContent({
           >
             完成并进入预览
           </Button>
-        </div>
+        </V3StepActions>
       )}
     </Flex>
   );
