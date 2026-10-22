@@ -1,7 +1,7 @@
 import type { V3DraftValidationIssue } from "@tsz/types";
 import { describe, expect, it, vi } from "vitest";
 import {
-  navigateToV3Issue,
+  navigateToV3Target,
   v3IssueNavigationTarget,
   scrollV3TargetIntoView
 } from "./issueNavigation";
@@ -104,7 +104,7 @@ describe("V3 issue navigation", () => {
       })
     };
 
-    await navigateToV3Issue(deepIssue, adapter);
+    await navigateToV3Target(v3IssueNavigationTarget(deepIssue), adapter);
 
     expect(calls).toEqual([
       "step",

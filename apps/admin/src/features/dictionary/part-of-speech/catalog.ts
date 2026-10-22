@@ -82,28 +82,6 @@ export function availablePartOfSpeechOptions(
     .map((item) => ({ value: item.code, label: item.name_zh }));
 }
 
-export function subPartOfSpeechOptions(
-  lookup: PartOfSpeechLookup,
-  posCode: PartOfSpeechCode
-) {
-  return (lookup.subPartsByPosCode.get(posCode) ?? []).map((item) => ({
-    value: item.code,
-    label: item.name_zh
-  }));
-}
-
-/**
- * 基本词性下只配置了一个细分项时返回它的编码。目录未加载或加载失败时
- * `subPartsByPosCode` 为空，返回 undefined，避免把「拿不到目录」误判成「只有一项」。
- */
-export function soleSubPartOfSpeechCode(
-  lookup: PartOfSpeechLookup,
-  posCode: PartOfSpeechCode
-): SubPartOfSpeechCode | undefined {
-  const subParts = lookup.subPartsByPosCode.get(posCode) ?? [];
-  return subParts.length === 1 ? subParts[0]!.code : undefined;
-}
-
 /**
  * 新建时排序值自动追加在末尾：现有最大排序值 + 10；空列表从 10 开始。
  * 基本词性按整个目录算，细分词性按所属基本词性下的列表算。

@@ -204,34 +204,6 @@ export function groupDeleteReferenceCount(
   );
 }
 
-export interface V3DialectRuleLocks {
-  /** 指向英美通用变体的引用数（仅作计数展示，不再阻断开关）。 */
-  split: number;
-  /** 指向英式 / 美式变体的引用数（仅作计数展示，不再阻断开关）。 */
-  merge: number;
-}
-
-/**
- * 统计本组词形变体被引用的情况。**自 TASK#58 起不再用于阻断英美结构切换**：引用已改为按
- * 「词形 + 方言侧」语义坐标重解析，common ↔ uk_us 切换后引用自动跟随，不必先解除引用。
- * 保留此函数供徽标 / 提示展示引用计数。改坏拼写仍由拼写一致性校验兜底，结构合并冲突仍硬拦。
- */
-export function dialectRuleLocks(
-  index: V3ReferenceIndex,
-  pos: WordPosFormsV3,
-  group: WordFormGroupV3
-): V3DialectRuleLocks {
-  const forms = groupForms(pos, group);
-  const variantIds = (mode: "common" | "uk_us") =>
-    forms
-      .filter((form) => form.regional_variants.mode === mode)
-      .flatMap(variantIdsOf);
-  return {
-    split: nodesBlockingReferenceCount(index, variantIds("common")),
-    merge: nodesBlockingReferenceCount(index, variantIds("uk_us"))
-  };
-}
-
 export function senseReferenceCount(
   index: V3ReferenceIndex,
   senseId: string
@@ -328,12 +300,6 @@ export function spellingConflicts(
     }
   }
   return conflicts;
-}
-
-export function staleReferences(
-  index: V3ReferenceIndex
-): readonly InboundReferenceV3[] {
-  return index.stale;
 }
 
 export type V3ReferenceLink =

@@ -111,14 +111,6 @@ export function resolveV3ContentIssueTarget(
   return target;
 }
 
-/** Applies stateful containers outside-in, then delegates the exact DOM focus. */
-export async function navigateToV3Issue(
-  issue: V3DraftValidationIssue,
-  adapter: V3IssueNavigationAdapter
-): Promise<V3IssueNavigationTarget> {
-  return navigateToV3Target(v3IssueNavigationTarget(issue), adapter);
-}
-
 /** 同一套定位，但目标不来自校验问题（引用跳转、深链定位）。 */
 export async function navigateToV3Target(
   target: V3IssueNavigationTarget,

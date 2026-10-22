@@ -2,14 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   CEFR_LEVELS,
   cefrColor,
-  inboundRelationSummary,
   KIND_OPTIONS,
   relationTypeLabel,
   matchCategoryLabel,
   MATCH_CATEGORY_LABEL,
   STATUS_LABEL
 } from "./labels";
-import type { RelationReferenceSummaryV2 } from "@tsz/types";
 
 describe("labels — wire 枚举 ↔ UI 标签", () => {
   it("kind/status 对照与 CEFR 全集", () => {
@@ -48,89 +46,6 @@ describe("matchCategoryLabel — 命中原因", () => {
     expect(matchCategoryLabel("brand_new_category" as never)).toBe(
       "brand_new_category"
     );
-  });
-});
-
-describe("inboundRelationSummary — 被哪些词条引用", () => {
-  const summary = (
-    overrides: Partial<RelationReferenceSummaryV2> = {}
-  ): RelationReferenceSummaryV2 => ({
-    total: 0,
-    by_type: { synonym: 0, antonym: 0, derivative: 0 },
-    previews: [],
-    truncated: false,
-    ...overrides
-  });
-  const preview = (
-    headword: string,
-    relation: "synonym" | "antonym" | "derivative"
-  ) => ({
-    source_word_id: `word-${headword}`,
-    source_headword: headword,
-    relation
-  });
-
-  it("没有引用时不出这一项", () => {
-    expect(inboundRelationSummary(summary())).toBeUndefined();
-    expect(inboundRelationSummary(undefined)).toBeUndefined();
-  });
-
-  it("total 与样本不同步时按多条处理，不写具体类型", () => {
-    // total 说 1 但给了两条样本：宁可只报数量，也不要挑一条当成全部
-    expect(
-      inboundRelationSummary(
-        summary({
-          total: 1,
-          by_type: { synonym: 1, antonym: 0, derivative: 0 },
-          previews: [preview("clear", "synonym"), preview("high", "antonym")]
-        })
-      )
-    ).toBe("clear 等 1 个词条");
-  });
-
-  it("恰好一条时写出具体来源与类型", () => {
-    expect(
-      inboundRelationSummary(
-        summary({
-          total: 1,
-          by_type: { synonym: 1, antonym: 0, derivative: 0 },
-          previews: [preview("clear", "synonym")]
-        })
-      )
-    ).toBe("clear 的同义词");
-    expect(
-      inboundRelationSummary(
-        summary({
-          total: 1,
-          by_type: { synonym: 0, antonym: 1, derivative: 0 },
-          previews: [preview("high", "antonym")]
-        })
-      )
-    ).toBe("high 的反义词");
-  });
-
-  it("多条时只报数量不报类型——previews 被后端截到 5 条，写类型会以偏概全", () => {
-    expect(
-      inboundRelationSummary(
-        summary({
-          total: 9,
-          by_type: { synonym: 3, antonym: 3, derivative: 3 },
-          previews: [preview("high", "antonym"), preview("record", "synonym")],
-          truncated: true
-        })
-      )
-    ).toBe("high 等 9 个词条");
-  });
-
-  it("有计数但样本为空时仍报得出数量", () => {
-    expect(
-      inboundRelationSummary(
-        summary({
-          total: 4,
-          by_type: { synonym: 4, antonym: 0, derivative: 0 }
-        })
-      )
-    ).toBe("4 个词条");
   });
 });
 
