@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/voice-library/docs/openapi.json",
-  "_source_sha256": "7305c08e9825af1f22bfd4d997a55538a2c08c5be1a736a74bf41d58132ba357",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/repo-health-cleanup-20261020/docs/openapi.json",
+  "_source_sha256": "a5c2305c777249ee5317c950d4eb561d2440a463aa16b35136a90b5dcb6c56eb",
   "roots": [
     "DictionaryPage",
     "DictionaryEntry",
@@ -137,8 +137,8 @@
         "consent_version": { "type": "string" },
         "request": {
           "oneOf": [
-            { "type": "null" },
-            { "$ref": "#/$defs/AccountDeletionRequest" }
+            { "$ref": "#/$defs/AccountDeletionRequest" },
+            { "type": "null" }
           ]
         },
         "server_time": { "type": "string", "format": "date-time" }
@@ -1739,10 +1739,10 @@
         "can_start": { "type": "boolean" },
         "can_start_next_cycle": { "type": "boolean" },
         "current_cycle": {
-          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/LearningCycle" }]
+          "oneOf": [{ "$ref": "#/$defs/LearningCycle" }, { "type": "null" }]
         },
         "current_run": {
-          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/LearningRun" }]
+          "oneOf": [{ "$ref": "#/$defs/LearningRun" }, { "type": "null" }]
         },
         "estimate_from_day": { "type": ["string", "null"], "format": "date" },
         "estimated_learning_days": { "type": ["integer", "null"] },
@@ -1750,7 +1750,7 @@
         "next_day_at": { "type": "string", "format": "date-time" },
         "reasons": { "type": "array", "items": { "type": "string" } },
         "schedule": {
-          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/LearningSchedule" }]
+          "oneOf": [{ "$ref": "#/$defs/LearningSchedule" }, { "type": "null" }]
         },
         "schedule_at_risk": { "type": "boolean" },
         "server_time": { "type": "string", "format": "date-time" },
@@ -1912,14 +1912,14 @@
         "content_available": { "type": "boolean" },
         "feedback": {
           "oneOf": [
-            { "type": "null" },
-            { "$ref": "#/$defs/LearningAnswerFeedback" }
+            { "$ref": "#/$defs/LearningAnswerFeedback" },
+            { "type": "null" }
           ]
         },
         "id": { "type": "string", "format": "uuid" },
         "position": { "type": "integer" },
         "prompt": {
-          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/LearningPrompt" }]
+          "oneOf": [{ "$ref": "#/$defs/LearningPrompt" }, { "type": "null" }]
         }
       },
       "additionalProperties": false
@@ -2088,7 +2088,7 @@
       "properties": {
         "business_day": { "type": "string", "format": "date" },
         "current_run": {
-          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/LearningRun" }]
+          "oneOf": [{ "$ref": "#/$defs/LearningRun" }, { "type": "null" }]
         },
         "server_time": { "type": "string", "format": "date-time" },
         "task": { "$ref": "#/$defs/LearningTask" },
@@ -2152,7 +2152,7 @@
         "revision": { "type": "integer" },
         "trashed_at": { "type": ["string", "null"], "format": "date-time" },
         "wordlist": {
-          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/Wordlist" }]
+          "oneOf": [{ "$ref": "#/$defs/Wordlist" }, { "type": "null" }]
         },
         "wordlist_id": { "type": ["string", "null"], "format": "uuid" }
       },
@@ -2311,7 +2311,7 @@
         "author_note": { "type": "string", "maxLength": 1000 },
         "custom_word": { "$ref": "#/$defs/CustomWord" },
         "entry": {
-          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/WordlistEntry" }]
+          "oneOf": [{ "$ref": "#/$defs/WordlistEntry" }, { "type": "null" }]
         },
         "entry_id": { "type": ["string", "null"], "format": "uuid" },
         "entry_label": { "type": "string" },
@@ -2508,12 +2508,12 @@
         "alphabet": { "$ref": "#/$defs/RichTextPhonemeAlphabet" },
         "ipa": { "type": "string", "maxLength": 200 },
         "ipa_locale": {
-          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/PhonemeLocaleV3" }]
+          "oneOf": [{ "$ref": "#/$defs/PhonemeLocaleV3" }, { "type": "null" }]
         },
         "uk": { "$ref": "#/$defs/PronunciationSynthesisCandidateV3" },
         "ups": { "type": "string", "maxLength": 1600 },
         "ups_locale": {
-          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/PhonemeLocaleV3" }]
+          "oneOf": [{ "$ref": "#/$defs/PhonemeLocaleV3" }, { "type": "null" }]
         },
         "ups_words": {
           "type": ["array", "null"],
@@ -4219,7 +4219,7 @@
       "required": ["wordlist_id", "wordlist"],
       "properties": {
         "wordlist": {
-          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/Wordlist" }]
+          "oneOf": [{ "$ref": "#/$defs/Wordlist" }, { "type": "null" }]
         },
         "wordlist_id": { "type": "string", "format": "uuid" }
       },
@@ -4361,7 +4361,7 @@
         "author_note": { "type": "string", "maxLength": 1000 },
         "custom_word": { "$ref": "#/$defs/CustomWord" },
         "entry": {
-          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/WordlistEntry" }]
+          "oneOf": [{ "$ref": "#/$defs/WordlistEntry" }, { "type": "null" }]
         },
         "entry_id": { "type": ["string", "null"], "format": "uuid" },
         "item_id": { "type": "string", "format": "uuid" },

@@ -240,10 +240,15 @@ describe("后台用户学习配置契约", () => {
   it("用户资料复用学生学习配置，允许未配置或按基本资料权限省略", () => {
     const schema = snapshot.schemas.AdminAccountUserResponse;
     expect(schema.required).not.toContain("learning_settings");
-    expect(schema.properties.learning_settings.oneOf).toEqual([
-      { type: "null" },
-      expect.objectContaining({ $ref: "#/components/schemas/LearningSettings" })
-    ]);
+    expect(schema.properties.learning_settings.oneOf).toHaveLength(2);
+    expect(schema.properties.learning_settings.oneOf).toEqual(
+      expect.arrayContaining([
+        { type: "null" },
+        expect.objectContaining({
+          $ref: "#/components/schemas/LearningSettings"
+        })
+      ])
+    );
     expect(schema.properties).not.toHaveProperty("level");
     expect(schema.properties).not.toHaveProperty("dialect");
   });
@@ -256,11 +261,14 @@ describe("个人学习配置契约", () => {
     expect(snapshot.schemas.MeResponse.required.slice().sort()).toEqual(
       ["user", "active_role", "learning_settings", "onboarded"].sort()
     );
+    expect(
+      snapshot.schemas.MeResponse.properties.learning_settings.oneOf
+    ).toHaveLength(2);
     expect(snapshot.schemas.MeResponse.properties.learning_settings).toEqual({
-      oneOf: [
+      oneOf: expect.arrayContaining([
         { type: "null" },
         { $ref: "#/components/schemas/LearningSettings" }
-      ]
+      ])
     });
     expect(snapshot.schemas.LearningSettings.additionalProperties).toBe(false);
     expect(snapshot.schemas.LearningSettings.required.slice().sort()).toEqual([
@@ -818,7 +826,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "7305c08e9825af1f22bfd4d997a55538a2c08c5be1a736a74bf41d58132ba357"
+      "a5c2305c777249ee5317c950d4eb561d2440a463aa16b35136a90b5dcb6c56eb"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
