@@ -462,7 +462,6 @@ export function V3FormsAndPronunciationStep({
             key={editingFormId}
             forms={sharedForms}
             formId={editingFormId}
-            catalog={catalog.data?.items ?? []}
             issues={issues}
             stableVariantIds={stableVariantIds}
             pronunciationReferenceIds={pronunciationReferenceIds}

@@ -940,6 +940,70 @@ describe("V3FormsAndPronunciationStep", () => {
     );
   });
 
+  it("总览词形名称保持文字，校验出错时可以调整类型并保留内容", async () => {
+    const base = commonFormFixture({ pronunciations: [] });
+    const historical = commonFormFixture({
+      id: uuidFromInt(2181),
+      form_type: "disabled_type",
+      pronunciations: []
+    });
+    const initial = formsFixture({ forms: [base, historical] });
+    function GroupHarness() {
+      const [value, setValue] = useState(initial);
+      const pos = value.pos[0]!;
+      return (
+        <AntApp>
+          <PronunciationPreviewProvider>
+            <V3FormGroupCard
+              content={value}
+              group={pos.form_groups[0]!}
+              groupIndex={0}
+              idFactory={() => uuidFromInt(2191)}
+              issues={[
+                {
+                  schema_version: 3,
+                  step: "forms",
+                  node_id: historical.id,
+                  field: "form_type",
+                  code: "invalid_form_type_for_part_of_speech",
+                  message: "请选择可用词形类型",
+                  node_location: {
+                    node_role: "form",
+                    ancestor_node_ids: [],
+                    form_id: historical.id
+                  }
+                }
+              ]}
+              membershipCounts={new Map(pos.forms.map((form) => [form.id, 1]))}
+              onChange={setValue}
+              onEditContent={() => undefined}
+              pos={pos}
+              posCatalog={partOfSpeechCatalogFixture.items.find(
+                (item) => item.code === pos.pos
+              )}
+              formTypes={partOfSpeechCatalogFixture.form_types}
+              sharedCounts={new Map(pos.forms.map((form) => [form.id, 1]))}
+            />
+            <output data-testid="canonical-value">
+              {JSON.stringify(value)}
+            </output>
+          </PronunciationPreviewProvider>
+        </AntApp>
+      );
+    }
+    const { container } = render(<GroupHarness />);
+    expect(container.querySelector(".v3-form-overview .ant-select")).toBeNull();
+    fireEvent.click(
+      screen.getByRole("button", { name: "调整disabled_type词形类型" })
+    );
+    fireEvent.click(await screen.findByRole("menuitem", { name: "复数" }));
+    expect(formById(canonicalValue(), historical.id)).toEqual({
+      ...historical,
+      form_type: "plural"
+    });
+    expect(formById(canonicalValue(), base.id)).toEqual(base);
+  });
+
   it("组顶部增加词形可在收起时使用，新增后展开并按类型归位", async () => {
     const base = commonFormFixture({
       id: uuidFromInt(2161),

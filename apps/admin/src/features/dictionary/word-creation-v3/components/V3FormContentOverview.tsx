@@ -1,5 +1,5 @@
 import { EditOutlined } from "@ant-design/icons";
-import { Button, Select, Space, Table, Tooltip, Typography } from "antd";
+import { Button, Dropdown, Space, Table, Tooltip, Typography } from "antd";
 import type {
   WordConcreteFormV3,
   WordFormGroupV3,
@@ -139,26 +139,42 @@ export function V3FormContentOverview({
             fixed: "left",
             render: (_, row) => (
               <div data-v3-node-id={row.membershipId} data-group-id={group.id}>
-                <Tooltip
-                  title={row.formTypeDisabledReason ?? row.formTypeChangeHint}
+                <Typography.Text
+                  className="v3-overview-form-type"
+                  strong
+                  data-v3-node-id={row.form.id}
+                  data-v3-field="form_type"
+                  tabIndex={-1}
                 >
-                  <div data-v3-node-id={row.form.id} data-v3-field="form_type">
-                    <Select
-                      className="v3-overview-form-type"
-                      variant="borderless"
-                      aria-label={row.formTypeAriaLabel}
-                      value={row.form.form_type}
-                      disabled={row.formTypeDisabled}
-                      options={row.formTypeOptions.map((type) => ({
-                        value: type,
+                  {label(row.form.form_type)}
+                </Typography.Text>
+                {issues.some(
+                  (issue) =>
+                    issue.field === "form_type" &&
+                    (issue.node_location.form_id === row.form.id ||
+                      issue.node_id === row.form.id)
+                ) && (
+                  <Dropdown
+                    trigger={["click"]}
+                    menu={{
+                      items: row.formTypeOptions.map((type) => ({
+                        key: type,
                         label: label(type)
-                      }))}
-                      onChange={(type) => onFormTypeChange(row.form.id, type)}
-                    />
-                  </div>
-                </Tooltip>
+                      })),
+                      onClick: ({ key }) => onFormTypeChange(row.form.id, key)
+                    }}
+                  >
+                    <Button
+                      type="link"
+                      size="small"
+                      disabled={row.formTypeDisabled}
+                      aria-label={`调整${label(row.form.form_type)}词形类型`}
+                    >
+                      调整词形类型
+                    </Button>
+                  </Dropdown>
+                )}
                 {row.referenceBadge}
-                {row.actions}
               </div>
             )
           },
@@ -260,18 +276,21 @@ export function V3FormContentOverview({
             fixed: "right",
             render: (_, row) => (
               <Space orientation="vertical">
-                <Tooltip title="编辑词形内容">
-                  <Button
-                    type="text"
-                    className="v3-overview-edit"
-                    aria-label={`编辑${label(row.form.form_type)}内容`}
-                    icon={<EditOutlined />}
-                    data-v3-node-id={row.form.id}
-                    data-v3-field="form_id"
-                    data-v3-open-content={row.form.id}
-                    onClick={() => onEdit(row.form.id)}
-                  />
-                </Tooltip>
+                <div className="v3-overview-actions">
+                  <Tooltip title="编辑词形内容">
+                    <Button
+                      type="text"
+                      className="v3-overview-edit"
+                      aria-label={`编辑${label(row.form.form_type)}内容`}
+                      icon={<EditOutlined />}
+                      data-v3-node-id={row.form.id}
+                      data-v3-field="form_id"
+                      data-v3-open-content={row.form.id}
+                      onClick={() => onEdit(row.form.id)}
+                    />
+                  </Tooltip>
+                  {row.actions}
+                </div>
                 {(sharedCounts.get(row.form.id) ?? 0) > 1 && (
                   <Typography.Text type="secondary">
                     共用于 {sharedCounts.get(row.form.id)} 个标签

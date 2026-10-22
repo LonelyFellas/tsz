@@ -112,6 +112,7 @@ export interface V3ConcreteFormRowProps {
   idFactory: V3IdFactory;
   onChange: (next: DraftFormsStepContentV3) => void;
   showMatrixHeader?: boolean;
+  presentation?: "matrix" | "content";
   showRegularity?: boolean;
   referenceForms?: readonly WordConcreteFormV3[];
   lastRow?: boolean;
@@ -419,6 +420,7 @@ export function V3ConcreteFormRow({
   idFactory,
   onChange,
   showMatrixHeader = true,
+  presentation = "matrix",
   showRegularity = true,
   referenceForms,
   lastRow = true,
@@ -478,7 +480,7 @@ export function V3ConcreteFormRow({
     : [];
   return (
     <div
-      className={`v3-concrete-form-row${showMatrixHeader ? "" : " v3-concrete-form-row-continuation"}`}
+      className={`v3-concrete-form-row${showMatrixHeader ? "" : " v3-concrete-form-row-continuation"}${presentation === "content" ? " v3-content-form-row" : ""}`}
       data-form-id={form.id}
       data-v3-node-id={form.id}
     >
@@ -491,8 +493,19 @@ export function V3ConcreteFormRow({
       >
         {showMatrixHeader ? (
           <>
-            <div className="word-form-matrix-type-header">词形类型</div>
-            {commonVariant ? (
+            {presentation === "matrix" ? (
+              <div className="word-form-matrix-type-header">词形类型</div>
+            ) : null}
+            {presentation === "content" ? (
+              <div className="word-form-matrix-shared-header">
+                <span className="word-form-matrix-shared-header-uk">
+                  BrE 英式
+                </span>
+                <span className="word-form-matrix-shared-header-us">
+                  AmE 美式
+                </span>
+              </div>
+            ) : commonVariant ? (
               <div className="word-form-matrix-shared-header">
                 <span className="word-form-matrix-shared-header-common">
                   英美通用
@@ -519,20 +532,22 @@ export function V3ConcreteFormRow({
             )}
           </>
         ) : null}
-        <V3ConcreteFormTypeCell
-          actions={actions}
-          content={content}
-          form={form}
-          formTypeAriaLabel={formTypeAriaLabel}
-          formTypeDisabled={formTypeDisabled}
-          formTypeDisabledReason={formTypeDisabledReason}
-          formTypeChangeHint={formTypeChangeHint}
-          formTypeOptions={formTypeOptions}
-          lastRow={lastRow}
-          membershipCount={membershipCount}
-          onChange={onChange}
-          referenceBadge={referenceBadge}
-        />
+        {presentation === "matrix" ? (
+          <V3ConcreteFormTypeCell
+            actions={actions}
+            content={content}
+            form={form}
+            formTypeAriaLabel={formTypeAriaLabel}
+            formTypeDisabled={formTypeDisabled}
+            formTypeDisabledReason={formTypeDisabledReason}
+            formTypeChangeHint={formTypeChangeHint}
+            formTypeOptions={formTypeOptions}
+            lastRow={lastRow}
+            membershipCount={membershipCount}
+            onChange={onChange}
+            referenceBadge={referenceBadge}
+          />
+        ) : null}
         {commonVariant ? (
           <div
             className={`word-form-matrix-shared-cell${lastRow ? " word-form-matrix-last-row" : ""}`}
