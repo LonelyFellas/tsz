@@ -6475,8 +6475,12 @@ it("词形类型问题可聚焦纯文字锚点", async () => {
     { forms_format: "shared_v1", contents: [], pos: [] },
     formsFixture({
       forms: [
-        commonFormFixture(),
-        commonFormFixture({ id: UUIDS.form_2, form_type: "custom_disabled" })
+        commonFormFixture({ pronunciations: [] }),
+        commonFormFixture({
+          id: UUIDS.form_2,
+          form_type: "custom_disabled",
+          pronunciations: []
+        })
       ]
     })
   );
@@ -6501,6 +6505,7 @@ it("词形类型问题可聚焦纯文字锚点", async () => {
       membership_id: member.id
     }
   };
+  const expanded = expandFormContents(shared).pos[0]!;
   renderWizard(requests(), {
     initialWord,
     renderStep: (context) => {
@@ -6511,7 +6516,7 @@ it("词形类型问题可聚焦纯文字锚点", async () => {
               rows={[
                 {
                   membershipId: member.id,
-                  form: expandFormContents(shared).pos[0]!.forms[1]!,
+                  form: expanded.forms[1]!,
                   formLabel: "custom_disabled",
                   formTypeAriaLabel: "词形类型",
                   formTypeDisabled: false,
@@ -6519,7 +6524,7 @@ it("词形类型问题可聚焦纯文字锚点", async () => {
                   membershipCount: 1
                 }
               ]}
-              group={expandFormContents(shared).pos[0]!.form_groups[0]!}
+              group={expanded.form_groups[0]!}
               sharedCounts={new Map([[binding.id, 1]])}
               onEdit={() => undefined}
               onFormTypeChange={() => undefined}
