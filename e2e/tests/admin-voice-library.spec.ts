@@ -151,23 +151,32 @@ test("从一级菜单查找音色、调参并播放，改字后清除旧音频",
   const requests = await mockApi(page);
   await page.goto("/voices");
   await expect(
-    page.getByRole("heading", { name: "音色库", exact: true })
+    page.getByRole("navigation").getByText("音色库", { exact: true })
   ).toBeVisible();
   await page.getByRole("menuitem", { name: /音色库/ }).click();
   await expect(page).toHaveURL(/\/voices$/);
+  await expect(
+    page.getByRole("button", { name: "试听 Guy", exact: true })
+  ).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("voice-library-overview.png"),
+    fullPage: true,
+    animations: "disabled"
+  });
   await page.getByRole("searchbox", { name: "搜索音色" }).fill("Sonia");
   await expect(
     page.getByRole("button", { name: "试听 Guy", exact: true })
   ).toHaveCount(0);
   await page.screenshot({
     path: testInfo.outputPath("voice-library-desktop.png"),
-    fullPage: true
+    fullPage: true,
+    animations: "disabled"
   });
   await page.getByRole("button", { name: "调整 Sonia 参数" }).click();
   const drawer = page.getByRole("dialog");
   await drawer
     .getByRole("spinbutton", { name: "合成语速", exact: true })
-    .fill("-25");
+    .fill("0.75");
   await drawer.getByRole("spinbutton", { name: "音调", exact: true }).fill("2");
   await drawer
     .getByRole("button", { name: "试听当前参数", exact: true })
@@ -184,6 +193,18 @@ test("从一级菜单查找音色、调参并播放，改字后清除旧音频",
     pitch_semitones: 2,
     content: { version: 2, annotations: [] }
   });
+  await audio.evaluate(async (node: HTMLAudioElement) => {
+    node.loop = true;
+    await node.play();
+  });
+  await drawer
+    .getByRole("textbox", { name: "我的听感" })
+    .fill("声音清晰，适合慢读");
+  await expect(audio).toBeVisible();
+  await expect
+    .poll(() => audio.evaluate((node: HTMLAudioElement) => node.paused))
+    .toBe(false);
+  expect(requests).toHaveLength(1);
   await page.screenshot({
     path: testInfo.outputPath("voice-library-parameters.png"),
     fullPage: true
@@ -193,6 +214,11 @@ test("从一级菜单查找音色、调参并播放，改字后清除旧音频",
   await expect(audio).toHaveCount(0);
   await page.getByRole("button", { name: "试听 Sonia", exact: true }).click();
   await expect(page.getByLabel("Sonia 试听播放器")).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("voice-library-playing.png"),
+    fullPage: true,
+    animations: "disabled"
+  });
   await page
     .getByRole("textbox", { name: "共用试听文本" })
     .fill("A different sentence.");
@@ -215,6 +241,30 @@ test("分组草稿受保护，保存后重新打开保持英美推荐", async ({
     })
   );
   await page.getByRole("button", { name: "创建三个初始分组" }).click();
+  const uk = page.getByRole("region", { name: "词形与发音 英式推荐" });
+  const us = page.getByRole("region", { name: "词形与发音 美式推荐" });
+  const ukBox = await uk.boundingBox();
+  const usBox = await us.boundingBox();
+  expect(ukBox).not.toBeNull();
+  expect(usBox).not.toBeNull();
+  expect(Math.abs(ukBox!.y - usBox!.y)).toBeLessThan(2);
+  expect(usBox!.x).toBeGreaterThan(ukBox!.x);
+  await page
+    .getByRole("region", { name: "例句 美式推荐" })
+    .scrollIntoViewIfNeeded();
+  await expect(
+    page.getByRole("button", { name: "保存分组配音" })
+  ).toBeInViewport();
+  await page.screenshot({
+    path: test.info().outputPath("voice-groups-sticky.png"),
+    animations: "disabled"
+  });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: test.info().outputPath("voice-groups-desktop.png"),
+    fullPage: true,
+    animations: "disabled"
+  });
   await page
     .getByRole("textbox", { name: "分组名称", exact: true })
     .first()
@@ -227,7 +277,7 @@ test("分组草稿受保护，保存后重新打开保持英美推荐", async ({
   await page
     .getByRole("spinbutton", { name: "推荐语速", exact: true })
     .first()
-    .fill("-20");
+    .fill("0.80");
   await expect(page.getByLabel("Sonia 试听播放器")).toHaveCount(0);
   await page.getByRole("tab", { name: "全部音色" }).click();
   await expect(page.getByRole("dialog")).toContainText("分组还有未保存的修改");
@@ -246,6 +296,7 @@ test("分组草稿受保护，保存后重新打开保持英美推荐", async ({
   const body = response.request().postDataJSON();
   expect(body.groups).toHaveLength(3);
   expect(body.groups[0].uk[0].voice_alias).toBe(voices[0]!.alias);
+  expect(body.groups[0].uk[0].parameters.rate_percent).toBe(-20);
   expect(body.groups[0].us[0].voice_alias).toBe(voices[1]!.alias);
   await page.reload();
   await page.getByRole("tab", { name: "分组配音" }).click();
@@ -255,13 +306,17 @@ test("分组草稿受保护，保存后重新打开保持英美推荐", async ({
     "true"
   );
   await page.getByRole("tab", { name: "全部音色" }).click();
-  await expect(page.getByRole("region", { name: "女声音色" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "男声音色" })).toBeVisible();
+  await expect(
+    page.getByRole("table").getByLabel("试听 Sonia", { exact: true })
+  ).toBeVisible();
+  await expect(
+    page.getByRole("table").getByLabel("试听 Guy", { exact: true })
+  ).toBeVisible();
   await page.getByRole("button", { name: "调整 Sonia 参数" }).click();
   const drawer = page.getByRole("dialog");
   await drawer
     .getByRole("spinbutton", { name: "合成语速", exact: true })
-    .fill("-25");
+    .fill("0.75");
   await drawer.getByRole("spinbutton", { name: "音调", exact: true }).fill("2");
   await page.evaluate(() =>
     Object.defineProperty(window.crypto, "randomUUID", {
@@ -270,18 +325,25 @@ test("分组草稿受保护，保存后重新打开保持英美推荐", async ({
     })
   );
   await drawer.getByRole("button", { name: "加入分组推荐" }).click();
-  await drawer.getByRole("combobox", { name: "推荐分组", exact: true }).click();
+  const recommendation = page.getByRole("dialog", {
+    name: "将 Sonia 加入分组推荐"
+  });
+  await recommendation
+    .getByRole("combobox", { name: "推荐分组", exact: true })
+    .click();
   await page
     .locator(".ant-select-dropdown:visible .ant-select-item-option-content")
     .getByText("发音推荐", { exact: true })
     .click();
-  await drawer.getByRole("textbox", { name: "推荐版本名称" }).fill("清晰慢读");
+  await recommendation
+    .getByRole("textbox", { name: "推荐版本名称" })
+    .fill("清晰慢读");
   const added = page.waitForResponse(
     (value) =>
       value.url().endsWith("/speech/groups") &&
       value.request().method() === "PUT"
   );
-  await drawer.getByRole("button", { name: "确认加入推荐" }).click();
+  await recommendation.getByRole("button", { name: "确认加入推荐" }).click();
   const next = await added;
   expect(next.request().postDataJSON().groups[0].uk[1]).toMatchObject({
     name: "清晰慢读",
@@ -289,8 +351,105 @@ test("分组草稿受保护，保存后重新打开保持英美推荐", async ({
     parameters: { rate_percent: -25, pitch_semitones: 2, style: null }
   });
   await expect(
-    drawer.getByText("已加入分组推荐。后续修改个人参数不会改变这份推荐。")
+    recommendation.getByText(
+      "已加入分组推荐。后续修改个人参数不会改变这份推荐。"
+    )
   ).toBeVisible();
+});
+
+test("空态直接新增一个分组，保存后重新打开仍保留自定义设置", async ({
+  page
+}) => {
+  await mockApi(page, [
+    "words.access",
+    "speech.generate",
+    "speech.global_dubbing"
+  ]);
+  await page.goto("/voices");
+  await page.getByRole("tab", { name: "分组配音" }).click();
+  await page.getByRole("button", { name: /新增分组$/ }).click();
+  const names = page.getByRole("textbox", { name: "分组名称", exact: true });
+  await expect(names).toHaveCount(1);
+  await names.fill("朗读练习");
+  await page.getByRole("combobox", { name: "朗读练习 使用板块" }).click();
+  await page
+    .locator(".ant-select-dropdown:visible .ant-select-item-option-content")
+    .getByText("多维例句", { exact: true })
+    .click();
+  await page
+    .getByRole("combobox", { name: "朗读练习 使用板块" })
+    .press("Escape");
+  await page
+    .getByRole("spinbutton", { name: "推荐语速", exact: true })
+    .first()
+    .fill("0.85");
+  const saving = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/speech/groups") &&
+      response.request().method() === "PUT"
+  );
+  await page.getByRole("button", { name: "保存分组配音" }).click();
+  const response = await saving;
+  expect(response.ok()).toBe(true);
+  expect(response.request().postDataJSON().groups).toEqual([
+    expect.objectContaining({
+      name: "朗读练习",
+      areas: ["example"],
+      uk: [
+        expect.objectContaining({
+          parameters: { rate_percent: -15, pitch_semitones: 0, style: null }
+        })
+      ]
+    })
+  ]);
+  await page.reload();
+  await page.getByRole("tab", { name: "分组配音" }).click();
+  await expect(page.getByText("朗读练习", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "编辑分组" }).click();
+  await expect(names).toHaveCount(1);
+  await expect(
+    page.getByRole("spinbutton", { name: "推荐语速", exact: true }).first()
+  ).toHaveValue("0.85");
+});
+
+test("窄屏分组使用单栏，滚动后仍可保存或取消", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockApi(page, [
+    "words.access",
+    "speech.generate",
+    "speech.global_dubbing"
+  ]);
+  await page.goto("/voices");
+  await page.getByRole("tab", { name: "分组配音" }).click();
+  await page.getByRole("button", { name: "创建三个初始分组" }).click();
+  const uk = await page
+    .getByRole("region", { name: "词形与发音 英式推荐" })
+    .boundingBox();
+  const us = await page
+    .getByRole("region", { name: "词形与发音 美式推荐" })
+    .boundingBox();
+  expect(uk).not.toBeNull();
+  expect(us).not.toBeNull();
+  expect(Math.abs(uk!.x - us!.x)).toBeLessThan(2);
+  expect(us!.y).toBeGreaterThan(uk!.y + uk!.height);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth
+    )
+  ).toBe(true);
+  await page
+    .getByRole("region", { name: "例句 美式推荐" })
+    .scrollIntoViewIfNeeded();
+  await expect(
+    page.getByRole("button", { name: "保存分组配音" })
+  ).toBeInViewport();
+  await page.screenshot({
+    path: test.info().outputPath("voice-groups-mobile.png"),
+    animations: "disabled"
+  });
+  await page.getByRole("button", { name: "取消编辑" }).click();
+  await page.getByRole("button", { name: "放弃并重新载入" }).click();
+  await expect(page.getByText("尚未设置分组推荐")).toBeVisible();
 });
 
 test("词形编辑器选用推荐并保留完整参数", async ({ page }) => {
@@ -495,7 +654,7 @@ test("窄屏可浏览，只有例句权限时禁止生成；固定参数不可�
   const requests = await mockApi(page, ["sentences.access"]);
   await page.goto("/voices");
   await expect(
-    page.getByRole("heading", { name: "音色库", exact: true })
+    page.getByRole("navigation").getByText("音色库", { exact: true })
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "试听 Sonia", exact: true })
@@ -509,7 +668,8 @@ test("窄屏可浏览，只有例句权限时禁止生成；固定参数不可�
     .toBe(true);
   await page.screenshot({
     path: testInfo.outputPath("voice-library-mobile.png"),
-    fullPage: true
+    fullPage: true,
+    animations: "disabled"
   });
   await page.getByRole("button", { name: "调整 Guy 参数" }).click();
   await expect(

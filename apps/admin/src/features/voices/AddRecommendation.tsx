@@ -77,6 +77,10 @@ export function AddRecommendation({
             : item
         )
       });
+      await client.cancelQueries({
+        queryKey: ["admin-dubbing-groups", accountId],
+        exact: true
+      });
       if (useAuthStore.getState().profile?.id !== accountId) return;
       client.setQueryData<AdminDubbingGroupsResponse>(
         ["admin-dubbing-groups", accountId],
