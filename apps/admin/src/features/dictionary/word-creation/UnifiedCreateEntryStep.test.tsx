@@ -823,32 +823,43 @@ describe("UnifiedCreateEntryStep", () => {
     await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(1));
   });
 
-  it("命中草稿原形时提供四字继续创建入口并路由到对应 schema", async () => {
-    const supplied = requests();
-    const page = v3BaseFormPage();
-    for (const item of page.items) {
-      if (item.match_kind === "form_variant_v3") {
-        item.match.status = "draft";
-        item.match.content_scope = "draft";
+  it.each(["base", "plural"] as const)(
+    "命中草稿词形 %s 时展示词头标注，并保留继续创建入口",
+    async (formType) => {
+      const supplied = requests();
+      const page = v3BaseFormPage();
+      page.matched_entry_contexts[0]!.annotation = "4";
+      for (const item of page.items) {
+        if (item.match_kind === "form_variant_v3") {
+          item.match.status = "draft";
+          item.match.content_scope = "draft";
+          item.match.form_type = formType;
+        }
       }
+      vi.mocked(supplied.detectV3).mockResolvedValue({
+        ...matchedV3Detection(),
+        requires_acknowledgement: true,
+        surface_match_page: page
+      });
+      const draft = existingV3Word();
+      draft.status = "draft";
+      vi.mocked(supplied.getWord).mockResolvedValue({ word: draft });
+      renderStep(supplied);
+
+      fireEvent.change(input(), { target: { value: "center" } });
+      fireEvent.click(screen.getByText("词典检测"));
+
+      const link = await screen.findByRole("link", { name: "继续创建" });
+      expect(link).toHaveAttribute(
+        "href",
+        "/words/existing-v3/v3/wizard/forms"
+      );
+      expect(link).toHaveTextContent("继续创建");
+      const annotation = screen.getByTitle("词条标注：4");
+      expect(annotation.tagName).toBe("SUP");
+      expect(annotation.parentElement).toHaveTextContent("centre / center4");
     }
-    vi.mocked(supplied.detectV3).mockResolvedValue({
-      ...matchedV3Detection(),
-      requires_acknowledgement: true,
-      surface_match_page: page
-    });
-    const draft = existingV3Word();
-    draft.status = "draft";
-    vi.mocked(supplied.getWord).mockResolvedValue({ word: draft });
-    renderStep(supplied);
-
-    fireEvent.change(input(), { target: { value: "center" } });
-    fireEvent.click(screen.getByText("词典检测"));
-
-    const link = await screen.findByRole("link", { name: "继续创建" });
-    expect(link).toHaveAttribute("href", "/words/existing-v3/v3/wizard/forms");
-    expect(link).toHaveTextContent("继续创建");
-  });
+  );
 
   it("首个数据库原形详情加载失败时阻断创建，重试成功后才允许继续", async () => {
     const supplied = requests();
