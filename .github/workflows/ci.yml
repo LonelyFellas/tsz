@@ -477,6 +477,12 @@ jobs:
           done
           echo "::warning::playwright install-deps 三次均失败,继续执行 e2e(runner 镜像通常已含所需库)"
 
+      - name: Install Chinese fonts for layout checks
+        run: |
+          sudo apt-get update -o Acquire::Retries=3
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          fc-match -f '%{family}\n' ':lang=zh-cn' | grep -q 'Noto Sans CJK'
+
       - name: Admin E2E
         env:
           VITE_VOICE_EDITOR: "true"
