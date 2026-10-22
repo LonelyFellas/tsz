@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/voice-library/docs/openapi.json",
-  "_generatedAt": "2026-10-21T06:51:10.922Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/repo-health-cleanup-20261020/docs/openapi.json",
+  "_generatedAt": "2026-10-22T02:12:20.420Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -2975,8 +2975,8 @@
         "notes": { "type": "string" },
         "parameters": {
           "oneOf": [
-            { "type": "null" },
-            { "$ref": "#/components/schemas/VoiceParameters" }
+            { "$ref": "#/components/schemas/VoiceParameters" },
+            { "type": "null" }
           ]
         },
         "personal_revision": { "type": "integer", "format": "int64" },
@@ -3183,8 +3183,8 @@
         "consent_version": { "type": "string" },
         "request": {
           "oneOf": [
-            { "type": "null" },
-            { "$ref": "#/components/schemas/AccountDeletionRequest" }
+            { "$ref": "#/components/schemas/AccountDeletionRequest" },
+            { "type": "null" }
           ]
         },
         "server_time": { "type": "string", "format": "date-time" }
@@ -3385,11 +3385,11 @@
         "id": { "type": "string", "format": "uuid" },
         "learning_settings": {
           "oneOf": [
-            { "type": "null" },
             {
               "$ref": "#/components/schemas/LearningSettings",
               "description": "仅对 users.read_basic 可见；尚未配置学习设置时为 null，无权限时省略。"
-            }
+            },
+            { "type": "null" }
           ]
         },
         "phone": {
@@ -3473,8 +3473,8 @@
         "active_role": { "$ref": "#/components/schemas/UserRole" },
         "learning_settings": {
           "oneOf": [
-            { "type": "null" },
-            { "$ref": "#/components/schemas/LearningSettings" }
+            { "$ref": "#/components/schemas/LearningSettings" },
+            { "type": "null" }
           ]
         },
         "onboarded": { "type": "boolean" },
@@ -3552,8 +3552,8 @@
         "updated_at": { "type": "string", "format": "date-time" },
         "updated_by": {
           "oneOf": [
-            { "type": "null" },
-            { "$ref": "#/components/schemas/Actor" }
+            { "$ref": "#/components/schemas/Actor" },
+            { "type": "null" }
           ]
         },
         "usage_count": { "type": "integer", "format": "int64" }
@@ -4726,7 +4726,10 @@
           "type": "array",
           "items": { "$ref": "#/components/schemas/RelatedWordMatchV3" }
         },
-        "presentation": { "$ref": "#/components/schemas/EntryPresentationV3" },
+        "presentation": {
+          "$ref": "#/components/schemas/EntryPresentationV3",
+          "readOnly": true
+        },
         "schema_version": { "type": "integer", "enum": [3] },
         "senses": {
           "type": "array",
@@ -5149,7 +5152,10 @@
           "$ref": "#/components/schemas/WordCreationStep"
         },
         "pos_list": { "type": "array", "items": { "type": "string" } },
-        "presentation": { "$ref": "#/components/schemas/EntryPresentationV3" },
+        "presentation": {
+          "$ref": "#/components/schemas/EntryPresentationV3",
+          "readOnly": true
+        },
         "published_revision": { "type": "integer", "format": "int64" },
         "reference_summary": {
           "$ref": "#/components/schemas/EntryReferenceSummary",
@@ -5889,8 +5895,8 @@
         "preview_fingerprint": { "type": "string" },
         "schedule": {
           "oneOf": [
-            { "type": "null" },
-            { "$ref": "#/components/schemas/LearningSchedule" }
+            { "$ref": "#/components/schemas/LearningSchedule" },
+            { "type": "null" }
           ]
         },
         "task_type": { "$ref": "#/components/schemas/LearningTaskType" },
@@ -6508,8 +6514,8 @@
         },
         "schedule": {
           "oneOf": [
-            { "type": "null" },
-            { "$ref": "#/components/schemas/LearningSchedule" }
+            { "$ref": "#/components/schemas/LearningSchedule" },
+            { "type": "null" }
           ]
         },
         "task_type": { "$ref": "#/components/schemas/LearningTaskType" },
@@ -6549,11 +6555,11 @@
         "ipa": { "type": "string", "maxLength": 200 },
         "ipa_locale": {
           "oneOf": [
-            { "type": "null" },
             {
               "$ref": "#/components/schemas/PhonemeLocaleV3",
               "description": "Each candidate retains its own accent; changing preferences cannot relabel old phonemes."
-            }
+            },
+            { "type": "null" }
           ]
         },
         "uk": {
@@ -6562,8 +6568,8 @@
         "ups": { "type": "string", "maxLength": 1600 },
         "ups_locale": {
           "oneOf": [
-            { "type": "null" },
-            { "$ref": "#/components/schemas/PhonemeLocaleV3" }
+            { "$ref": "#/components/schemas/PhonemeLocaleV3" },
+            { "type": "null" }
           ]
         },
         "ups_words": {
@@ -6982,8 +6988,8 @@
         "notes": { "type": "string" },
         "parameters": {
           "oneOf": [
-            { "type": "null" },
-            { "$ref": "#/components/schemas/VoiceParameters" }
+            { "$ref": "#/components/schemas/VoiceParameters" },
+            { "type": "null" }
           ]
         }
       },
