@@ -791,10 +791,10 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
   test("词形拼写收起态的可见文字与输入框都使用 Bold", async ({ page }) => {
     await mockAdminV3Api(page);
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
-    await openFormContent(page);
-    const spelling = page.locator("textarea.tsz-words").first();
-    const preview = page
-      .locator(".ant-modal .v3-grammar-preview-content.tsz-words")
+    const contentDrawer = await openFormContent(page);
+    const spelling = contentDrawer.locator("textarea.tsz-words").first();
+    const preview = contentDrawer
+      .locator(".v3-grammar-preview-content.tsz-words")
       .first();
     const text = preview.locator(".tsz-ve-readonly > span").first();
     await expect(preview).toHaveText(await spelling.inputValue());
