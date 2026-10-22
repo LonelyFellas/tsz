@@ -51,7 +51,8 @@ export function RouteGuard({
     needsOnboarding,
     pathname,
     router,
-    preserveSearch
+    preserveSearch,
+    user
   ]);
 
   // 恢复中或即将跳转：不渲染受保护内容。

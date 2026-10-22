@@ -49,7 +49,7 @@ it("撤销的头像不读取或续存旧缩略图，源站 404 正常返回", as
     expect(await cache.get("new-avatar")).toBeNull();
     expect(await readdir(cacheDir)).toEqual([key]);
 
-    const responses = new ResponseCache(false);
+    const responses = new ResponseCache({ minimalMode: false, route: "image" });
     await expect(
       responses.get(
         key,

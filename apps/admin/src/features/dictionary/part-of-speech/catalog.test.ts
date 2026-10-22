@@ -3,9 +3,7 @@ import { partOfSpeechCatalogFixture } from "../word-creation/partOfSpeech.test.h
 import {
   availablePartOfSpeechOptions,
   createPartOfSpeechLookup,
-  soleSubPartOfSpeechCode,
-  subPartOfSpeechLabel,
-  subPartOfSpeechOptions
+  subPartOfSpeechLabel
 } from "./catalog";
 
 describe("part-of-speech catalog", () => {
@@ -40,43 +38,6 @@ describe("part-of-speech catalog", () => {
       { value: "pronoun", label: "代词" },
       { value: "adjective", label: "形容词" }
     ]);
-    expect(subPartOfSpeechOptions(lookup, "noun")[0]).toEqual({
-      value: "N-COUNT",
-      label: "可数名词"
-    });
-    expect(subPartOfSpeechOptions(lookup, "unknown-pos")).toEqual([]);
-    expect(soleSubPartOfSpeechCode(lookup, "adjective")).toBe("ADJ");
-    expect(soleSubPartOfSpeechCode(lookup, "noun")).toBeUndefined();
-    expect(soleSubPartOfSpeechCode(lookup, "unknown-pos")).toBeUndefined();
     expect(createPartOfSpeechLookup(undefined).items).toEqual([]);
-  });
-});
-
-describe("part-of-speech catalog 细分词性选项", () => {
-  it("任意基本词性配了细分词性就提供选项，不看是不是内置词性", () => {
-    const catalog = structuredClone(partOfSpeechCatalogFixture);
-    const noun = catalog.items.find((item) => item.code === "noun")!;
-    const lookup = createPartOfSpeechLookup(catalog);
-
-    expect(noun.sub_parts.length).toBeGreaterThan(0);
-    expect(subPartOfSpeechOptions(lookup, "noun").length).toBe(
-      noun.sub_parts.length
-    );
-    expect(subPartOfSpeechOptions(lookup, "verb")[0]).toEqual({
-      value: "V-T",
-      label: "及物动词"
-    });
-    expect(soleSubPartOfSpeechCode(lookup, "adverb")).toBe("ADV");
-  });
-
-  it("词性名下没有细分词性时返回空，不把「拿不到目录」当成有选项", () => {
-    const catalog = structuredClone(partOfSpeechCatalogFixture);
-    const adjective = catalog.items.find((item) => item.code === "adjective")!;
-    adjective.sub_parts = [];
-    const lookup = createPartOfSpeechLookup(catalog);
-
-    expect(subPartOfSpeechOptions(lookup, "adjective")).toEqual([]);
-    expect(soleSubPartOfSpeechCode(lookup, "adjective")).toBeUndefined();
-    expect(subPartOfSpeechOptions(lookup, "unknown-code")).toEqual([]);
   });
 });

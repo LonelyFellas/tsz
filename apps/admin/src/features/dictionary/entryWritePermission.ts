@@ -47,8 +47,6 @@ export function canModifyEntry(
 ): boolean {
   return canWriteEntry(actor, entry) || canAssociateEntry(actor, entry);
 }
-export const ENTRY_WRITE_BLOCKED_HINT =
-  "需要相应业务权限，普通管理员仅能操作本人内容；编辑他人内容需额外授权";
 export function entryWriteForbiddenMessage(code: string | undefined): string {
   return isEntryOwnershipError(code)
     ? "没有编辑该归属词条的权限。"
