@@ -6545,7 +6545,9 @@ it("词形类型问题可聚焦纯文字锚点", async () => {
   await waitFor(() => expect(target).toHaveFocus());
   expect(target).toHaveTextContent("custom_disabled");
   expect(
-    screen.getByRole("button", { name: "调整custom_disabled词形类型" })
+    target.parentElement!.querySelector(
+      '[aria-label="调整custom_disabled词形类型"]'
+    )
   ).toBeEnabled();
 });
 
