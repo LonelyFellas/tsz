@@ -40,6 +40,8 @@ import {
 } from "../../word-creation/PronunciationPreview";
 import { V3ConcreteFormRow } from "./V3ConcreteFormRow";
 import { V3FormGroupCard } from "./V3FormGroupCard";
+import { V3FormContentOverview } from "./V3FormContentOverview";
+import { updateConcreteFormType } from "../operations";
 import { V3FormsAndPronunciationStep } from "./V3FormsAndPronunciationStep";
 import { V3PosTab } from "./V3PosTab";
 import { V3PronunciationList } from "./V3PronunciationList";
@@ -954,11 +956,17 @@ describe("V3FormsAndPronunciationStep", () => {
       return (
         <AntApp>
           <PronunciationPreviewProvider>
-            <V3FormGroupCard
-              content={value}
+            <V3FormContentOverview
+              rows={pos.forms.map((form, index) => ({
+                membershipId: pos.form_groups[0]!.members[index]!.id,
+                form,
+                formLabel: form.form_type,
+                formTypeAriaLabel: "词形类型",
+                formTypeDisabled: false,
+                formTypeOptions: ["base", "plural"],
+                membershipCount: 1
+              }))}
               group={pos.form_groups[0]!}
-              groupIndex={0}
-              idFactory={() => uuidFromInt(2191)}
               issues={[
                 {
                   schema_version: 3,
@@ -974,14 +982,10 @@ describe("V3FormsAndPronunciationStep", () => {
                   }
                 }
               ]}
-              membershipCounts={new Map(pos.forms.map((form) => [form.id, 1]))}
-              onChange={setValue}
-              onEditContent={() => undefined}
-              pos={pos}
-              posCatalog={partOfSpeechCatalogFixture.items.find(
-                (item) => item.code === pos.pos
-              )}
-              formTypes={partOfSpeechCatalogFixture.form_types}
+              onEdit={() => undefined}
+              onFormTypeChange={(id, type) =>
+                setValue(updateConcreteFormType(value, id, type))
+              }
               sharedCounts={new Map(pos.forms.map((form) => [form.id, 1]))}
             />
             <output data-testid="canonical-value">
@@ -1005,8 +1009,16 @@ describe("V3FormsAndPronunciationStep", () => {
         name: "调整disabled_type词形类型"
       })
     );
-    const menu = await screen.findByRole("menu");
-    fireEvent.click(within(menu).getByRole("menuitem", { name: "复数" }));
+    const menu = await waitFor(() => {
+      const element = document.querySelector<HTMLElement>(
+        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]'
+      );
+      expect(element).not.toBeNull();
+      return element!;
+    });
+    fireEvent.click(
+      within(menu).getByRole("menuitem", { name: "复数", hidden: true })
+    );
     expect(formById(canonicalValue(), historical.id)).toEqual({
       ...historical,
       form_type: "plural"
