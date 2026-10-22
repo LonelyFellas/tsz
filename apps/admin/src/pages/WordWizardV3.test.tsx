@@ -543,10 +543,7 @@ describe("WordWizardV3Page", () => {
     }
   });
 
-  // TODO(左栏完成情况): 本用例断言「点左栏进度行会跳到对应步骤」,而该行为已被刻意移除——
-  // V3ProductProgressList 改成了点行只展开/收起明细,注释里明写「这里不做跳转,
-  // 纯粹是一份可查看的清单」。新的导航入口定下来之后,把 it.skip 改回 it 并改用那个入口。
-  it.skip("未保存摘要实时更新并在返回第一步时保留，期间不调用保存或校验", async () => {
+  it("未保存摘要实时更新并在返回第一步时保留，期间不调用保存或校验", async () => {
     const current = word();
     const api = source({ word: current, retired_stable_nodes: [] });
     const router = renderPage(
@@ -557,18 +554,29 @@ describe("WordWizardV3Page", () => {
     fireEvent.change(field, { target: { value: "即时语义区间" } });
     // 左栏明细现在默认收起，点开才列出条目。
     fireEvent.click(screen.getByRole("button", { name: "展开语义区间" }));
-    expect(screen.getByText("1. 即时语义区间")).toBeVisible();
     const group = screen.getByRole("region", { name: "语义区间摘要" });
+    expect(within(group).getByText("即时语义区间")).toBeVisible();
     expect(group.querySelector("button")).toHaveAttribute(
       "data-readiness-state",
       "incomplete"
     );
-    fireEvent.click(screen.getByText("语言识别"));
+    fireEvent.click(
+      within(
+        document.querySelector<HTMLElement>(".word-creation-stepper")!
+      ).getByText("创建词汇")
+    );
     await waitFor(() =>
       expect(router.state.location.pathname).toContain("/basics")
     );
-    expect(screen.getByText("1. 即时语义区间")).toBeVisible();
-    expect(screen.queryByText("当前词条")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "展开语义区间" }));
+    expect(
+      within(screen.getByRole("region", { name: "语义区间摘要" })).getByText(
+        "即时语义区间"
+      )
+    ).toBeVisible();
+    expect(screen.getByRole("region", { name: "词条摘要" })).toHaveTextContent(
+      "centre"
+    );
     expect(api.saveMeaningsStepV3).not.toHaveBeenCalled();
     expect(api.saveFormsStepV3).not.toHaveBeenCalled();
     expect(api.validateV3).not.toHaveBeenCalled();
@@ -703,10 +711,7 @@ describe("WordWizardV3Page", () => {
     expect(screen.getByLabelText("录入词条")).toHaveValue("");
   });
 
-  // TODO(左栏完成情况): 本用例断言「点左栏进度行会跳到对应步骤」,而该行为已被刻意移除——
-  // V3ProductProgressList 改成了点行只展开/收起明细,注释里明写「这里不做跳转,
-  // 纯粹是一份可查看的清单」。新的导航入口定下来之后,把 it.skip 改回 it 并改用那个入口。
-  it.skip("reports meaning progress and lets readiness navigate past the resume hint", async () => {
+  it("展示词义进度，展开明细不跳转，顶部步骤导航可进入词义页", async () => {
     const current = word({
       presentation: {
         label: "未命名词条 · 01a03e0c",
@@ -796,6 +801,17 @@ describe("WordWizardV3Page", () => {
       screen.getByRole("button", { name: "展开多维词义" })
     ).toHaveTextContent("1");
     fireEvent.click(screen.getByRole("button", { name: "展开多维例句" }));
+    expect(router.state.location.pathname).toBe(
+      `/words/${WORD_ID}/v3/wizard/basics`
+    );
+    expect(
+      screen.getByRole("button", { name: "收起多维例句" })
+    ).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(
+      within(
+        document.querySelector<HTMLElement>(".word-creation-stepper")!
+      ).getByText("词义与例句")
+    );
     await waitFor(() =>
       expect(router.state.location.pathname).toBe(
         `/words/${WORD_ID}/v3/wizard/meanings`

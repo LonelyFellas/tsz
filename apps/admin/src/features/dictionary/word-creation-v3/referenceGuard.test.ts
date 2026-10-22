@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import { commonFormFixture, formsFixture, ukUsFormFixture } from "./fixtures";
 import {
   buildReferenceIndex,
-  dialectRuleLocks,
   formReferenceCount,
   groupDeleteReferenceCount,
   locateV3Node,
@@ -95,10 +94,6 @@ describe("referenceGuard 判定", () => {
     expect(posReferenceCount(onlyStale, pos, ["sense-1"])).toBe(0);
     expect(senseReferenceCount(onlyStale, "sense-1")).toBe(0);
     expect(groupDeleteReferenceCount(onlyStale, pos, group)).toBe(0);
-    expect(dialectRuleLocks(onlyStale, pos, group)).toEqual({
-      split: 0,
-      merge: 0
-    });
 
     const fresh = sharedSentenceReference(target, {
       sentence_id: "sentence-2"
@@ -118,30 +113,12 @@ describe("referenceGuard 判定", () => {
     expect(formReferenceCount(truncated, base)).toBe(1);
   });
 
-  it("英美规则：通用变体被引用锁拆分，英美变体被引用锁合并，计数按引用去重", () => {
-    const commonIndex = buildReferenceIndex(
-      inboundReferences([
-        sharedSentenceReference(target),
-        phraseComponentReference(target)
-      ])
-    );
-    expect(dialectRuleLocks(commonIndex, pos, group)).toEqual({
-      split: 2,
-      merge: 0
-    });
-
+  it("英美变体被引用时仍保护词形", () => {
     const ukForm = ukUsFormFixture({
       id: "form-ukus",
       uk: { id: "variant-uk" },
       us: { id: "variant-us" }
     });
-    const ukPos = {
-      ...pos,
-      forms: [ukForm],
-      form_groups: [
-        { ...group, members: [{ id: "membership-uk", form_id: "form-ukus" }] }
-      ]
-    };
     const ukIndex = buildReferenceIndex(
       inboundReferences([
         phraseComponentReference({
@@ -152,10 +129,6 @@ describe("referenceGuard 判定", () => {
         })
       ])
     );
-    expect(dialectRuleLocks(ukIndex, ukPos, ukPos.form_groups[0]!)).toEqual({
-      split: 0,
-      merge: 1
-    });
     expect(formReferenceCount(ukIndex, ukForm)).toBe(1);
   });
 
