@@ -37,7 +37,7 @@ export interface VoiceOption {
   personalSettingsError?: string;
   defaultSettings?: Pick<
     VoiceSetting,
-    "rate_percent" | "pitch_semitones" | "style"
+    "rate_percent" | "pitch_semitones" | "volume_percent" | "style"
   >;
   rateRange?: { min: number; max: number };
   pitchRange?: { min: number; max: number };
@@ -48,6 +48,7 @@ export interface VoiceSettings {
   style?: string;
   ratePercent?: number;
   pitchSemitones?: number;
+  volumePercent?: number;
 }
 
 export interface VoicePreviewRequest extends VoiceSettings {
@@ -179,6 +180,7 @@ export interface VoiceSetting {
   enabled: boolean;
   rate_percent: number;
   pitch_semitones?: number;
+  volume_percent?: number;
   style?: string;
 }
 

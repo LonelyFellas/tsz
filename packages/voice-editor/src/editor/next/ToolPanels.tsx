@@ -187,111 +187,124 @@ export function VoicePanel({
                 <div className="tsz-ve-voice-column-title">{label}</div>
                 {group
                   .filter((voice) => voice.gender === gender)
-                  .map((voice) => (
-                    <PopRow
-                      key={voice.id}
-                      selected={enabledVoiceIds.includes(voice.id)}
-                      label={voiceShortName(voice)}
-                      ariaLabel={`启用 ${voice.label}`}
-                      disabled={readOnly}
-                      onToggle={() => onToggleVoice(voice.id)}
-                      trailing={
-                        <Space size={2}>
-                          {onRateChange && (
-                            <VoiceRateControl
-                              voice={voice}
-                              ratePercent={
-                                voiceSettings?.find(
-                                  (setting) => setting.voice_id === voice.id
-                                )?.rate_percent ?? 0
-                              }
-                              readOnly={readOnly}
-                              onChange={(ratePercent) =>
-                                onRateChange(voice.id, ratePercent)
-                              }
-                            />
-                          )}
-                          {onParametersChange && (
-                            <details>
-                              <summary>更多参数</summary>
-                              <Space direction="vertical">
-                                <Select
-                                  aria-label={`${voice.label} 风格`}
-                                  value={
-                                    voiceSettings?.find(
-                                      (setting) => setting.voice_id === voice.id
-                                    )?.style ?? ""
-                                  }
-                                  style={{ minWidth: 120 }}
-                                  disabled={readOnly}
-                                  options={[
-                                    { value: "", label: "自然" },
-                                    ...voice.styles.map((style) => ({
-                                      value: style,
-                                      label: style
-                                    }))
-                                  ]}
-                                  onChange={(style: string) =>
-                                    onParametersChange(voice.id, {
-                                      style: style || undefined
-                                    })
-                                  }
-                                />
-                                <label>
-                                  音调（半音）
-                                  <InputNumber
-                                    aria-label={`${voice.label} 音调`}
-                                    value={
-                                      voiceSettings?.find(
-                                        (setting) =>
-                                          setting.voice_id === voice.id
-                                      )?.pitch_semitones ?? 0
+                  .map((voice) => {
+                    const setting =
+                      voiceSettings?.find(
+                        (item) => item.voice_id === voice.id
+                      ) ?? voice.defaultSettings;
+                    return (
+                      <PopRow
+                        key={voice.id}
+                        selected={enabledVoiceIds.includes(voice.id)}
+                        label={voiceShortName(voice)}
+                        ariaLabel={`启用 ${voice.label}`}
+                        disabled={readOnly}
+                        onToggle={() => onToggleVoice(voice.id)}
+                        trailing={
+                          <Space size={2}>
+                            {onRateChange && (
+                              <VoiceRateControl
+                                voice={voice}
+                                ratePercent={setting?.rate_percent ?? 0}
+                                readOnly={readOnly}
+                                onChange={(ratePercent) =>
+                                  onRateChange(voice.id, ratePercent)
+                                }
+                              />
+                            )}
+                            {onParametersChange && (
+                              <details>
+                                <summary>更多参数</summary>
+                                <Space direction="vertical">
+                                  <label>
+                                    音量
+                                    <InputNumber
+                                      aria-label={`${voice.label} 音量`}
+                                      value={setting?.volume_percent ?? 100}
+                                      min={0}
+                                      max={100}
+                                      precision={0}
+                                      suffix="%"
+                                      disabled={readOnly}
+                                      onChange={(volume) => {
+                                        if (volume !== null)
+                                          onParametersChange(voice.id, {
+                                            volume_percent: volume
+                                          });
+                                      }}
+                                    />
+                                  </label>
+                                  <Select
+                                    aria-label={`${voice.label} 风格`}
+                                    value={setting?.style ?? ""}
+                                    style={{ minWidth: 120 }}
+                                    disabled={readOnly}
+                                    options={[
+                                      { value: "", label: "自然" },
+                                      ...voice.styles.map((style) => ({
+                                        value: style,
+                                        label: style
+                                      }))
+                                    ]}
+                                    onChange={(style: string) =>
+                                      onParametersChange(voice.id, {
+                                        style: style || undefined
+                                      })
                                     }
-                                    min={voice.pitchRange?.min ?? -12}
-                                    max={voice.pitchRange?.max ?? 12}
-                                    disabled={readOnly || !voice.supportsPitch}
-                                    precision={0}
-                                    onChange={(pitch) => {
-                                      if (pitch !== null)
-                                        onParametersChange(voice.id, {
-                                          pitch_semitones: pitch
-                                        });
-                                    }}
                                   />
-                                </label>
-                              </Space>
-                            </details>
-                          )}
-                          <Button
-                            size="small"
-                            type="text"
-                            className="tsz-ve-audition-button"
-                            aria-label={`试听 ${voice.label}`}
-                            loading={pendingVoiceId === voice.id}
-                            icon={<SoundOutlined />}
-                            aria-busy={pendingVoiceId === voice.id}
-                            disabled={
-                              !canAudition ||
-                              Boolean(
+                                  <label>
+                                    音调（半音）
+                                    <InputNumber
+                                      aria-label={`${voice.label} 音调`}
+                                      value={setting?.pitch_semitones ?? 0}
+                                      min={voice.pitchRange?.min ?? -12}
+                                      max={voice.pitchRange?.max ?? 12}
+                                      disabled={
+                                        readOnly || !voice.supportsPitch
+                                      }
+                                      precision={0}
+                                      onChange={(pitch) => {
+                                        if (pitch !== null)
+                                          onParametersChange(voice.id, {
+                                            pitch_semitones: pitch
+                                          });
+                                      }}
+                                    />
+                                  </label>
+                                </Space>
+                              </details>
+                            )}
+                            <Button
+                              size="small"
+                              type="text"
+                              className="tsz-ve-audition-button"
+                              aria-label={`试听 ${voice.label}`}
+                              loading={pendingVoiceId === voice.id}
+                              icon={<SoundOutlined />}
+                              aria-busy={pendingVoiceId === voice.id}
+                              disabled={
+                                !canAudition ||
+                                Boolean(
+                                  auditionLocale &&
+                                  voice.locale.toLowerCase() !==
+                                    auditionLocale.toLowerCase()
+                                )
+                              }
+                              title={
                                 auditionLocale &&
                                 voice.locale.toLowerCase() !==
                                   auditionLocale.toLowerCase()
-                              )
-                            }
-                            title={
-                              auditionLocale &&
-                              voice.locale.toLowerCase() !==
-                                auditionLocale.toLowerCase()
-                                ? `当前音素为 ${auditionLocale}，不能使用另一口音试听；可取消该历史音色`
-                                : undefined
-                            }
-                            data-playing={playingVoiceId === voice.id}
-                            onClick={() => onAudition(voice)}
-                          />
-                        </Space>
-                      }
-                    />
-                  ))}
+                                  ? `当前音素为 ${auditionLocale}，不能使用另一口音试听；可取消该历史音色`
+                                  : undefined
+                              }
+                              data-playing={playingVoiceId === voice.id}
+                              onClick={() => onAudition(voice)}
+                            />
+                          </Space>
+                        }
+                      />
+                    );
+                  })}
               </div>
             ))}
           </div>

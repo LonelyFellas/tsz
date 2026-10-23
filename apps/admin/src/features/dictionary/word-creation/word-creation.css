@@ -4,6 +4,7 @@
   --word-line: #e2e5eb;
   --word-uk: #2457ff;
   --word-us: #d6258b;
+  --word-common: #566e62;
   container: word-creation-page / inline-size;
   min-width: 0;
   color: var(--word-ink);
@@ -122,21 +123,28 @@
 }
 
 .dialect-dot {
+  display: inline-block;
+  box-sizing: border-box;
+  flex: none;
   width: 8px;
   height: 8px;
-  border-radius: 999px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
 }
 
 .dialect-dot-uk {
-  background: var(--word-uk);
+  color: var(--word-uk);
+  background: currentColor;
 }
 
 .dialect-dot-us {
-  background: var(--word-us);
+  color: var(--word-us);
+  background: currentColor;
 }
 
 .dialect-dot-common {
-  background: #566e62;
+  color: var(--word-common);
+  background: transparent;
 }
 
 .word-summary-language,
@@ -1005,6 +1013,88 @@
   align-self: center;
   margin-inline: 6px;
   cursor: help;
+}
+
+.word-pronunciation-voice-popover .ant-popover-container {
+  padding: 12px 14px 6px;
+  border: 1px solid #e9ecf1;
+  border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(32, 38, 54, 0.12);
+}
+.word-pronunciation-voice-popover .ant-popover-title {
+  margin-bottom: 4px;
+}
+.word-pronunciation-voice-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #606875;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 20px;
+}
+.word-pronunciation-voice-count {
+  color: #9299a4;
+  font-variant-numeric: tabular-nums;
+}
+.word-pronunciation-voice-list {
+  width: 268px;
+  max-width: calc(100vw - 60px);
+  max-height: 300px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.word-pronunciation-voice-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 48px auto;
+  align-items: center;
+  gap: 12px;
+  padding-block: 10px;
+}
+.word-pronunciation-voice-row + .word-pronunciation-voice-row {
+  border-top: 1px solid #f0f1f4;
+}
+.word-pronunciation-voice-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+.word-pronunciation-voice-name {
+  overflow: hidden;
+  color: #202636;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.word-pronunciation-voice-locale {
+  color: #9299a4;
+  font-size: 11px;
+  line-height: 16px;
+}
+.word-pronunciation-voice-rate {
+  color: #717986;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.word-pronunciation-voice-controls .ant-space-compact {
+  width: auto;
+}
+.word-pronunciation-voice-controls .ant-btn {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  flex-basis: 28px;
+  padding: 0;
+  border-color: #e4e7ec;
+  font-size: 14px;
+  box-shadow: none;
 }
 
 .word-form-matrix {

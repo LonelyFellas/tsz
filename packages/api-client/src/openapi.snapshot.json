@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dictionary-last-updater/docs/openapi.json",
-  "_generatedAt": "2026-10-23T13:54:21.290Z",
+  "_generatedAt": "2026-10-23T14:29:46.688Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
