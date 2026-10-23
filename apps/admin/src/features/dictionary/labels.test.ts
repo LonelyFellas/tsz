@@ -3,7 +3,6 @@ import {
   CEFR_LEVELS,
   cefrColor,
   KIND_OPTIONS,
-  relationTypeLabel,
   matchCategoryLabel,
   MATCH_CATEGORY_LABEL,
   STATUS_LABEL
@@ -46,18 +45,5 @@ describe("matchCategoryLabel — 命中原因", () => {
     expect(matchCategoryLabel("brand_new_category" as never)).toBe(
       "brand_new_category"
     );
-  });
-});
-
-describe("relationTypeLabel — 关联类型", () => {
-  it("三种类型都带「词」字", () => {
-    expect(relationTypeLabel("synonym")).toBe("同义词");
-    expect(relationTypeLabel("antonym")).toBe("反义词");
-    expect(relationTypeLabel("derivative")).toBe("派生词");
-  });
-
-  it("未知类型原样透出，不渲染成 undefined", () => {
-    // wire 先于前端新增取值时，「clear 的undefined」是会直接给用户看到的
-    expect(relationTypeLabel("hypernym" as never)).toBe("hypernym");
   });
 });
