@@ -29,6 +29,9 @@ function settingsForVoice(
     ...(setting?.pitch_semitones !== undefined
       ? { pitchSemitones: setting.pitch_semitones }
       : {}),
+    ...(setting?.volume_percent !== undefined
+      ? { volumePercent: setting.volume_percent }
+      : {}),
     ...(setting?.style ? { style: setting.style } : {})
   };
 }

@@ -22,7 +22,8 @@ export function canonicalVoiceHash(
       voice_id: settings.voiceId ?? "",
       style: settings.style ?? "",
       rate_percent: settings.ratePercent ?? 0,
-      pitch_semitones: settings.pitchSemitones ?? 0
+      pitch_semitones: settings.pitchSemitones ?? 0,
+      volume_percent: settings.volumePercent ?? 100
     })
   );
 }

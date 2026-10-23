@@ -68,7 +68,8 @@ describe("admin voice preview adapter", () => {
           voiceId: "ava",
           style: "cheerful",
           ratePercent: 5,
-          pitchSemitones: 0
+          pitchSemitones: 0,
+          volumePercent: 65
         },
         { signal: controller.signal }
       )
@@ -84,7 +85,8 @@ describe("admin voice preview adapter", () => {
         voice_alias: "ava",
         style: "cheerful",
         rate_percent: 5,
-        pitch_semitones: 0
+        pitch_semitones: 0,
+        volume_percent: 65
       },
       controller.signal
     );

@@ -644,11 +644,16 @@ describe("wire format and collection boundaries", () => {
     ];
     expect(validateRuntimeSchema("AdminWordV3", word)).toEqual({ valid: true });
     setting.pitch_semitones = 2;
+    setting.volume_percent = 65;
     setting.style = "cheerful";
     expect(validateRuntimeSchema("AdminWordV3", word)).toEqual({ valid: true });
     for (const [field, value] of [
       ["pitch_semitones", null],
       ["pitch_semitones", 13],
+      ["volume_percent", null],
+      ["volume_percent", -1],
+      ["volume_percent", 101],
+      ["volume_percent", 65.5],
       ["style", null],
       ["style", "x".repeat(65)]
     ]) {

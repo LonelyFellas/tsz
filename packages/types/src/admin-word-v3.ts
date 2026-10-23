@@ -392,6 +392,7 @@ export interface VoiceSettingV3 {
   enabled: boolean;
   rate_percent: number;
   pitch_semitones?: number;
+  volume_percent?: number;
   style?: string;
 }
 

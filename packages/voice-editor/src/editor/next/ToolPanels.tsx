@@ -215,6 +215,29 @@ export function VoicePanel({
                             <details>
                               <summary>更多参数</summary>
                               <Space direction="vertical">
+                                <label>
+                                  音量
+                                  <InputNumber
+                                    aria-label={`${voice.label} 音量`}
+                                    value={
+                                      voiceSettings?.find(
+                                        (setting) =>
+                                          setting.voice_id === voice.id
+                                      )?.volume_percent ?? 100
+                                    }
+                                    min={0}
+                                    max={100}
+                                    precision={0}
+                                    suffix="%"
+                                    disabled={readOnly}
+                                    onChange={(volume) => {
+                                      if (volume !== null)
+                                        onParametersChange(voice.id, {
+                                          volume_percent: volume
+                                        });
+                                    }}
+                                  />
+                                </label>
                                 <Select
                                   aria-label={`${voice.label} 风格`}
                                   value={

@@ -196,7 +196,17 @@ export function createAdminVoicePreviewAdapter(
           !Number.isInteger(pitchSemitones) ||
           pitchSemitones < capabilities.min_pitch_semitones ||
           pitchSemitones > capabilities.max_pitch_semitones;
-        if (unsupportedStyle || unsupportedRate || unsupportedPitch) {
+        const volumePercent = input.volumePercent ?? 100;
+        const unsupportedVolume =
+          !Number.isInteger(volumePercent) ||
+          volumePercent < 0 ||
+          volumePercent > 100;
+        if (
+          unsupportedStyle ||
+          unsupportedRate ||
+          unsupportedPitch ||
+          unsupportedVolume
+        ) {
           throw new VoicePreviewError(
             "option_not_supported",
             "所选发音参数不受支持，请调整后重试"
@@ -207,7 +217,8 @@ export function createAdminVoicePreviewAdapter(
           voice_alias: input.voiceId,
           ...(input.style ? { style: input.style } : {}),
           rate_percent: ratePercent,
-          pitch_semitones: pitchSemitones
+          pitch_semitones: pitchSemitones,
+          ...(volumePercent === 100 ? {} : { volume_percent: volumePercent })
         };
         for (
           let attempt = 1;

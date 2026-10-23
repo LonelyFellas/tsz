@@ -602,6 +602,7 @@ it("最终读音使用编辑后的标注、选定音色和语速，并直接播�
             enabled: true,
             rate_percent: -25,
             pitch_semitones: 2,
+            volume_percent: 65,
             style: "cheerful"
           }
         ]
@@ -620,6 +621,7 @@ it("最终读音使用编辑后的标注、选定音色和语速，并直接播�
         voiceId: "american-voice",
         ratePercent: -25,
         pitchSemitones: 2,
+        volumePercent: 65,
         style: "cheerful"
       },
       expect.anything()
