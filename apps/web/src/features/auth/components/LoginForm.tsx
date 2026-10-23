@@ -174,6 +174,11 @@ export function LoginForm() {
             : securityErrorMessage(e)
         );
         setCode("");
+      } else if (
+        e instanceof HttpError &&
+        (e.code === "login_rate_limited" || e.code === "login_unavailable")
+      ) {
+        setError(securityErrorMessage(e));
       } else {
         const msg = e instanceof Error ? e.message : "";
         setError(translateAuthError(msg, LOGIN_ERRORS, "登录失败，请稍后重试"));
