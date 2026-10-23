@@ -1051,7 +1051,10 @@ export function SmartDictionary({
       render: (name?: string) => {
         const label = name?.trim() || "-";
         return (
-          <Tooltip title={name?.trim() || undefined}>
+          <Tooltip
+            title={name?.trim() || undefined}
+            trigger={["hover", "focus"]}
+          >
             <span tabIndex={name?.trim() ? 0 : undefined}>{label}</span>
           </Tooltip>
         );

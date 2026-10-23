@@ -1037,7 +1037,7 @@ describe("SmartDictionary", () => {
     expect(creatorPlaceholder.querySelector("[tabindex]")).toBeNull();
   });
 
-  it("最后更新人独立于创建人，旧接口缺少姓名时不冒用创建人", () => {
+  it("最后更新人独立于创建人，旧接口缺少姓名时不冒用创建人", async () => {
     matchViewport(1440);
     apiMocks.useWordList.mockReturnValue({
       data: {
@@ -1074,6 +1074,8 @@ describe("SmartDictionary", () => {
     expect(updatedRow).toHaveTextContent("张老师");
     expect(legacyRow.children[updaterIndex]).toHaveTextContent(/^-$/);
     expect(legacyRow).toHaveTextContent("王老师");
+    fireEvent.focus(screen.getByText("李老师"));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("李老师");
   });
 
   it("从重复检测入口进入时自动定位归档词条", () => {
