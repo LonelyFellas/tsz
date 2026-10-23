@@ -17,9 +17,13 @@ export function isVoiceRecommendationAvailable(
   const {
     rate_percent: rate,
     pitch_semitones: pitch = 0,
+    volume_percent: volume = 100,
     style
   } = item.setting;
   return (
+    Number.isInteger(volume) &&
+    volume >= 0 &&
+    volume <= 100 &&
     (!style || voice.styles.includes(style)) &&
     (!voice.rateRange ||
       (rate >= voice.rateRange.min && rate <= voice.rateRange.max)) &&

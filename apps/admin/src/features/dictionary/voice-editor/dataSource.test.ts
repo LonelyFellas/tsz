@@ -150,6 +150,7 @@ describe("admin voice preview data source", () => {
               parameters: {
                 rate_percent: -25,
                 pitch_semitones: 2,
+                volume_percent: 65,
                 style: "cheerful"
               }
             }
@@ -181,6 +182,7 @@ describe("admin voice preview data source", () => {
           enabled: true,
           rate_percent: -25,
           pitch_semitones: 2,
+          volume_percent: 65,
           style: "cheerful"
         }
       }

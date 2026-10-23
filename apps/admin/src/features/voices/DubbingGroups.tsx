@@ -83,7 +83,19 @@ function recommendationError(
   }
   if (!item.name.trim()) return `${location}：请填写推荐名称。`;
   const caps = voice.capabilities;
-  const { rate_percent, pitch_semitones, style } = item.parameters;
+  const {
+    rate_percent,
+    pitch_semitones,
+    volume_percent = 100,
+    style
+  } = item.parameters;
+  if (
+    !Number.isInteger(volume_percent) ||
+    volume_percent < 0 ||
+    volume_percent > 100
+  ) {
+    return `${location}：音量需为 0 到 100 之间的整数，请调整音量。`;
+  }
   if (
     !Number.isInteger(rate_percent) ||
     rate_percent < caps.min_rate_percent ||
@@ -723,6 +735,37 @@ export function DubbingGroups({
                             caps && (
                               <div className="dubbing-recommendation-parameters">
                                 <Form.Item
+                                  label="音量"
+                                  htmlFor={`${item.id}-volume`}
+                                >
+                                  <InputNumber
+                                    id={`${item.id}-volume`}
+                                    aria-label="推荐音量"
+                                    min={0}
+                                    max={100}
+                                    precision={0}
+                                    suffix="%"
+                                    value={
+                                      item.parameters.volume_percent ?? 100
+                                    }
+                                    style={{ width: "100%" }}
+                                    onChange={(volume) =>
+                                      updateItem(
+                                        group.id,
+                                        locale,
+                                        item.id,
+                                        (entry) => ({
+                                          ...entry,
+                                          parameters: {
+                                            ...entry.parameters,
+                                            volume_percent: volume ?? Number.NaN
+                                          }
+                                        })
+                                      )
+                                    }
+                                  />
+                                </Form.Item>
+                                <Form.Item
                                   label="语速（倍速）"
                                   htmlFor={`${item.id}-rate`}
                                 >
@@ -823,7 +866,8 @@ export function DubbingGroups({
                             )
                           ) : (
                             <Typography.Text type="secondary">
-                              语速{" "}
+                              音量 {item.parameters.volume_percent ?? 100}
+                              %，语速{" "}
                               {(
                                 (item.parameters.rate_percent + 100) /
                                 100

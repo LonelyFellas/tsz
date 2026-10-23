@@ -67,6 +67,9 @@ export const loadAdminVoiceRecommendations: LoadVoiceRecommendations = async ({
             enabled: true,
             rate_percent: item.parameters.rate_percent,
             pitch_semitones: item.parameters.pitch_semitones,
+            ...(item.parameters.volume_percent !== undefined
+              ? { volume_percent: item.parameters.volume_percent }
+              : {}),
             ...(item.parameters.style ? { style: item.parameters.style } : {})
           }
         })
@@ -107,6 +110,9 @@ export const adminVoicePreviewAdapter: VoicePreviewAdapter = {
             defaultSettings: {
               rate_percent: saved.rate_percent,
               pitch_semitones: saved.pitch_semitones,
+              ...(saved.volume_percent !== undefined
+                ? { volume_percent: saved.volume_percent }
+                : {}),
               ...(saved.style ? { style: saved.style } : {})
             }
           }

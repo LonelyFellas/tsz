@@ -3,13 +3,16 @@
 }
 
 .v3-form-overview {
+  width: 100%;
   min-width: 0;
-  max-width: 100%;
+  max-width: 920px;
+  padding-bottom: 12px;
+  isolation: isolate;
 }
-.v3-form-overview .ant-table-thead > tr > th {
-  padding: 8px;
+.v3-form-overview .ant-table.ant-table-small .ant-table-thead > tr > th {
+  padding: 10px 12px;
   color: #8d929b;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 400;
   white-space: nowrap;
   background: #fff;
@@ -17,29 +20,31 @@
 .v3-form-overview .ant-table-thead > tr > th::before {
   display: none;
 }
-.v3-form-overview .ant-table-tbody > tr > td {
-  padding: 8px;
+.v3-form-overview .ant-table.ant-table-small .ant-table-tbody > tr > td {
+  padding: 2px 12px;
   vertical-align: top;
   border-bottom: 0;
 }
-.v3-form-overview .ant-table-thead > tr > th.ant-table-cell:first-child,
-.v3-form-overview .ant-table-tbody > tr > td.ant-table-cell:first-child {
-  padding-inline-start: 16px;
+.v3-form-overview
+  .ant-table.ant-table-small
+  .ant-table-tbody
+  > tr.v3-overview-form-start
+  > td {
+  padding-top: 16px;
 }
-.v3-form-overview .ant-table-thead > tr > th.ant-table-cell:last-child,
-.v3-form-overview .ant-table-tbody > tr > td.ant-table-cell:last-child {
-  padding-inline-end: 16px;
+.v3-form-overview .ant-table.ant-table-small tr > .v3-overview-action-cell {
+  padding-inline: 16px 8px;
 }
-.v3-overview-spellings .ant-space-item > div {
+.v3-overview-spellings {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  column-gap: 4px;
+  align-items: baseline;
+  gap: 8px;
   min-height: 28px;
+  padding-top: 3px;
 }
-.v3-overview-readings {
-  display: grid;
-  gap: 4px;
+.dialect-dot.v3-overview-dialect-dot {
+  width: 6px;
+  height: 6px;
 }
 .v3-overview-reading {
   display: flex;
@@ -49,26 +54,25 @@
 }
 .v3-overview-pronunciation {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 4px;
   min-width: 0;
   width: 100%;
-  white-space: nowrap;
 }
 .v3-overview-phonetic {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   min-width: 0;
+  padding-top: 3px;
 }
 .v3-overview-phonetic .tsz-ve-readonly {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .v3-overview-phonetic,
 .v3-overview-phonetic .tsz-ve-readonly {
   font-size: 14px;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .v3-overview-pronunciation .word-pronunciation-play-action.ant-btn {
   width: 24px;
@@ -105,8 +109,11 @@
   color: var(--word-ink);
 }
 .v3-form-overview .v3-overview-spelling {
+  min-width: 0;
   font-size: 14px;
   font-weight: 600;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .v3-overview-type-fix.ant-btn {
   max-width: 100%;
@@ -117,15 +124,12 @@
 .v3-overview-edit.ant-btn {
   color: #b4b4b4;
 }
-.v3-overview-action-list {
-  display: flex;
-  align-items: flex-end;
-  width: 100%;
+.v3-overview-notes {
+  font-size: 12px;
 }
 .v3-overview-actions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 4px;
   min-height: 28px;
 }
