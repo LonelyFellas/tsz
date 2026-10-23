@@ -688,7 +688,7 @@ it.each([false, true])(
           entry_id: null,
           entry: null,
           position: 0,
-          custom_word: { word: "phrase", definition: "释义" }
+          custom_word: { word: " phrase ", definition: "释义" }
         }
       ]
     };

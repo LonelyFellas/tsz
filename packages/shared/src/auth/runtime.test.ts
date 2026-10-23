@@ -31,9 +31,12 @@ describe("createAuthRuntime", () => {
       setItem: (key: string, value: string) => items.set(key, value),
       removeItem: (key: string) => items.delete(key)
     });
+    const pendingKey = "tsz:wordlist-save:u1:new:root";
+    items.set(pendingKey, "pending-command");
     const first = createAuthRuntime({ baseUrl: "/api/v1" });
     first.persistSession({ access_token: "first", expires_in: 900 });
     first.clearSession();
+    expect(items.get(pendingKey)).toBe("pending-command");
     const fetch = vi.spyOn(globalThis, "fetch");
     const loggedOut = createAuthRuntime({ baseUrl: "/api/v1" });
     await loggedOut.restoreSession();
@@ -69,6 +72,7 @@ describe("createAuthRuntime", () => {
     await restored.restoreSession();
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(restored.store.getState().user?.id).toBe("u1");
+    expect(items.get(pendingKey)).toBe("pending-command");
   });
 
   it("Web Storage 抛错不阻断内存登出或显式登录", async () => {

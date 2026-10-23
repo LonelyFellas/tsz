@@ -351,6 +351,7 @@ it("保存体积超限明确提示拆分，保留内容并允许继续修改", a
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
+  sessionStorage.clear();
   vi.mocked(api.wordList.myCustomAudio).mockRejectedValue(
     new HttpError(404, "not found")
   );

@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { HttpError } from "@tsz/api-client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -48,6 +48,7 @@ const job = (status: WordlistCustomAudio["status"]): WordlistCustomAudio => ({
 });
 beforeEach(() => {
   vi.resetAllMocks();
+  sessionStorage.clear();
   localStorage.clear();
   useUserStore.setState({
     user: {
@@ -274,7 +275,7 @@ it.each(["create", "update"] as const)(
     expect(screen.getByLabelText("词表名称")).toBeDisabled();
     const args = vi.mocked(api.wordList[kind]).mock.calls[0]!;
     const key = pendingSaveKey("one", kind === "update" ? "list" : undefined);
-    expect(localStorage.getItem(key)).toContain("expected_cost");
+    expect(sessionStorage.getItem(key)).toContain("expected_cost");
     first.unmount();
     vi.mocked(api.wordList[kind]).mockResolvedValue(meta);
     // Recovery must not depend on a fresh editor snapshot or revision-matched items.
@@ -292,9 +293,130 @@ it.each(["create", "update"] as const)(
     fireEvent.click(retry);
     await waitFor(() => expect(api.wordList[kind]).toHaveBeenCalledTimes(2));
     expect(vi.mocked(api.wordList[kind]).mock.calls[1]).toEqual(args);
-    await waitFor(() => expect(localStorage.getItem(key)).toBeNull());
+    await waitFor(() => expect(sessionStorage.getItem(key)).toBeNull());
   }
 );
+it.each([401, 403, 404, 409])(
+  "未知结果后重试 %s 仍冻结原键，重新登录后可继续确认",
+  async (status) => {
+    vi.mocked(api.wordList.create)
+      .mockRejectedValueOnce(new HttpError(408, "timeout"))
+      .mockRejectedValueOnce(new HttpError(status, "rejected"));
+    renderWithProviders(<WordListCreator />);
+    await newCustom();
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    fireEvent.click(await screen.findByRole("button", { name: "重试保存" }));
+    await waitFor(() => expect(api.wordList.create).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "重试保存" })).toBeEnabled()
+    );
+    expect(screen.getByLabelText("词表名称")).toBeDisabled();
+    const original = vi.mocked(api.wordList.create).mock.calls[0]![0];
+    const key = pendingSaveKey("one");
+    expect(sessionStorage.getItem(key)).toContain(original.idempotency_key);
+    const user = useUserStore.getState().user!;
+    act(() => useUserStore.setState({ user: null }));
+    expect(screen.queryByLabelText("词表名称")).not.toBeInTheDocument();
+    expect(sessionStorage.getItem(key)).toContain(original.idempotency_key);
+    act(() => useUserStore.setState({ user: { ...user, id: "other" } }));
+    expect(screen.getByLabelText("词表名称")).toHaveValue("");
+    expect(
+      screen.queryByRole("button", { name: "重试保存" })
+    ).not.toBeInTheDocument();
+    act(() => useUserStore.setState({ user }));
+    expect(screen.getByLabelText("自定义释义 1")).toHaveValue("我的释义");
+    expect(screen.getByLabelText("词表名称")).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "重试保存" }));
+    await waitFor(() => expect(sessionStorage.getItem(key)).toBeNull());
+    expect(
+      vi.mocked(api.wordList.create).mock.calls.map(([body]) => body)
+    ).toEqual([original, original, original]);
+  }
+);
+
+it("完成旧请求不会删除同目标的另一条待确认请求", async () => {
+  let finish!: (result: Wordlist) => void;
+  vi.mocked(api.wordList.create).mockReturnValueOnce(
+    new Promise((resolve) => {
+      finish = resolve;
+    })
+  );
+  renderWithProviders(<WordListCreator />);
+  await newCustom();
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
+  await waitFor(() => expect(api.wordList.create).toHaveBeenCalledOnce());
+  const key = pendingSaveKey("one");
+  const other = JSON.stringify({
+    request: {
+      kind: "create",
+      body: { idempotency_key: "another-request", name: "另一份", items: [] }
+    },
+    form: { name: "另一份", rows: [] }
+  });
+  sessionStorage.setItem(key, other);
+  localStorage.setItem(key, other);
+  await act(async () => finish(meta));
+  expect(sessionStorage.getItem(key)).toBe(other);
+  expect(localStorage.getItem(key)).toBe(other);
+});
+
+it.each([
+  [" hello ", "hello", true],
+  [" \thello\n ", "\thello\n", true],
+  ["\thello\n", "hello", false]
+])("音频比较遵循 SQL btrim：%j 对 %j", async (word, audioWord, matches) => {
+  vi.mocked(api.wordList.edit).mockResolvedValue({
+    wordlist: meta,
+    entry_ids: [],
+    items: [
+      {
+        ...custom,
+        custom_word: { ...custom.custom_word, word: word as string }
+      }
+    ]
+  });
+  vi.mocked(api.wordList.myItems).mockResolvedValue({
+    revision: 2,
+    pagination: { page: 1, page_size: 100, total: 1, total_pages: 1 },
+    items: [
+      {
+        ...custom,
+        custom_word: { ...custom.custom_word, word: word as string },
+        entry_id: null,
+        entry: null,
+        position: 0,
+        private_note: "",
+        note_revision: 1
+      }
+    ]
+  });
+  vi.mocked(api.wordList.myCustomAudio).mockResolvedValue({
+    items: [{ ...job("ready"), word: audioWord as string }]
+  });
+  renderWithProviders(<WordListCreator id="list" />);
+  await screen.findByLabelText("自定义释义 1");
+  await waitFor(() => expect(api.wordList.myCustomAudio).toHaveBeenCalled());
+  if (matches) {
+    await screen.findByText("语音已生成");
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("自定义释义 1"), {
+      target: { value: "新释义" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(api.wordList.update).toHaveBeenCalled());
+    expect(vi.mocked(api.wordList.update).mock.calls[0]![1]).toMatchObject({
+      content: { items: [{ custom_word: { word, definition: "新释义" } }] }
+    });
+    expect(
+      vi.mocked(api.wordList.update).mock.calls[0]![1].audio_generation
+    ).toBeUndefined();
+  } else {
+    expect(
+      await screen.findByRole("checkbox", { name: "生成语音 1" })
+    ).toBeEnabled();
+  }
+});
+
 it("旧端点不可用保留文本编辑且普通编辑省略幂等字段", async () => {
   vi.mocked(api.wordList.myCustomAudio).mockRejectedValue(
     new HttpError(404, "missing")

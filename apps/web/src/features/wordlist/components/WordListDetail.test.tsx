@@ -1080,7 +1080,7 @@ it.each([false, true])(
     const custom = {
       item_id: "custom",
       entry_id: null,
-      custom_word: { word: "custom phrase", definition: "释义" },
+      custom_word: { word: " custom phrase ", definition: "释义" },
       entry: null,
       position: 0,
       private_note: "",
@@ -1133,7 +1133,10 @@ it.each([false, true])(
       screen
         .getAllByRole("button", { name: /播放 custom phrase/ })
         .map((button) => button.getAttribute("aria-label"))
-    ).toEqual(["播放 custom phrase 美式语音", "播放 custom phrase 英式语音"]);
+    ).toEqual([
+      "播放  custom phrase  美式语音",
+      "播放  custom phrase  英式语音"
+    ]);
     expect(
       mine ? api.wordList.myCustomAudio : api.wordList.customAudio
     ).toHaveBeenCalledWith(

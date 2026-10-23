@@ -25,7 +25,6 @@ import { HttpError } from "@tsz/api-client";
 import type {
   UpdateWordlist,
   WordlistCustomAudio,
-  CustomWord,
   MyWordlistItem,
   WordlistCandidate,
   WordlistEditSnapshot,
@@ -39,9 +38,11 @@ import {
   pendingSaveKey,
   readPendingSave,
   writePendingSave,
-  type WordlistSave
+  removePendingSave,
+  type WordlistSave,
+  type WordlistSaveRow as Row
 } from "../pending-save";
-import { formatCoins } from "@tsz/shared";
+import { formatCoins, wordlistAudioWord } from "@tsz/shared";
 import { Button, Input, FormField } from "@tsz/ui/components";
 import { cn } from "@tsz/ui/lib/cn";
 import { ArrowLeft, Plus, Pencil } from "lucide-react";
@@ -50,21 +51,6 @@ import { ExcelImport } from "./ExcelImport";
 import { SortableWordRow } from "./SortableWordRow";
 import { createWordRowPreview, WordRowDragPreview } from "./WordRowDragPreview";
 const verticalOnly: Modifier = ({ transform }) => ({ ...transform, x: 0 });
-type Row = {
-  id: string;
-  entryId: string | null;
-  itemId?: string;
-  customWord?: CustomWord;
-  text?: string;
-  candidate?: WordlistCandidate;
-  note?: string;
-  authorNote?: string;
-  noteRevision?: number;
-  noteVersions?: Record<string, number | undefined>;
-  noteDirty?: boolean;
-  generateAudio?: boolean;
-};
-type SavedForm = { name: string; rows: Row[]; initial?: WordlistEditSnapshot };
 type RowField = "word" | "definition" | "author-note" | "private-note";
 const rowKey = (row: Row) => row.entryId ?? row.itemId!;
 const itemKey = (item: MyWordlistItem) => item.item_id ?? item.entry_id!;
@@ -113,7 +99,7 @@ export function WordListCreator({
   try {
     hasPending =
       typeof window !== "undefined" &&
-      !!localStorage.getItem(pendingSaveKey(userId, id, folderId));
+      !!sessionStorage.getItem(pendingSaveKey(userId, id, folderId));
   } catch {
     /* The editor reports storage failures before dispatch. */
   }
@@ -173,7 +159,7 @@ function Editor({
   const storageKey = pendingSaveKey(userId, id, folderId);
   const [recovery] = useState(() => {
     try {
-      return { saved: readPendingSave<SavedForm>(storageKey), error: "" };
+      return { saved: readPendingSave(storageKey), error: "" };
     } catch {
       return {
         saved: null,
@@ -299,7 +285,8 @@ function Editor({
     return !(
       job &&
       (job.status === "refunding" ||
-        (job.word === row.customWord.word && job.status !== "refunded"))
+        (job.word === wordlistAudioWord(row.customWord.word) &&
+          job.status !== "refunded"))
     );
   });
   const audioCost = BigInt(selectedAudio.length) * 2n;
@@ -611,7 +598,7 @@ function Editor({
         request.kind === "create"
           ? await api.wordList.create(request.body)
           : await api.wordList.update(request.id, request.body);
-      localStorage.removeItem(storageKey);
+      removePendingSave(storageKey, request);
       pending.current = null;
       setUncertain(false);
       allowLeave.current = true;
@@ -631,11 +618,13 @@ function Editor({
           "speech_storage_unavailable",
           "speech_voice_not_found"
         ].includes(e.code ?? "");
+      // A later rejection cannot establish whether an earlier attempt committed.
       const unknown =
-        !audioUnavailable &&
-        (!(e instanceof HttpError) || e.status >= 500 || e.status === 408);
+        uncertain ||
+        (!audioUnavailable &&
+          (!(e instanceof HttpError) || e.status >= 500 || e.status === 408));
       if (!unknown) {
-        localStorage.removeItem(storageKey);
+        removePendingSave(storageKey, request);
         pending.current = null;
       }
       setUncertain(unknown);
@@ -655,10 +644,10 @@ function Editor({
         if (id) void audio.refetch();
       }
       setError(
-        audioUnavailable
-          ? "语音服务暂不可用，本次未保存、未扣款。输入已保留，可稍后重试，或主动取消生成语音后保存文本。"
-          : unknown
-            ? "保存结果未确认，请重试保存。确认前无法修改本次内容，刷新后仍可继续确认。"
+        unknown
+          ? "保存结果未确认，请重试保存。确认前无法修改本次内容，刷新后仍可继续确认。"
+          : audioUnavailable
+            ? "语音服务暂不可用，本次未保存、未扣款。输入已保留，可稍后重试，或主动取消生成语音后保存文本。"
             : e instanceof HttpError && messages[e.code ?? ""]
               ? messages[e.code!]!
               : e instanceof HttpError && e.status === 413
@@ -1385,7 +1374,7 @@ function WordRow({
             自定义词汇可阅读，暂不参与学习出题。
           </p>
           {audio &&
-            (audio.word === row.customWord.word ||
+            (audio.word === wordlistAudioWord(row.customWord.word) ||
               audio.status === "refunding") && (
               <p className="mt-2 text-sm text-foreground-muted">
                 {audioStatusLabels[audio.status]}
@@ -1395,7 +1384,7 @@ function WordRow({
             !(
               audio &&
               (audio.status === "refunding" ||
-                (audio.word === row.customWord.word &&
+                (audio.word === wordlistAudioWord(row.customWord.word) &&
                   audio.status !== "refunded"))
             ) && (
               <label className="mt-3 flex min-h-11 items-center gap-2 text-sm">

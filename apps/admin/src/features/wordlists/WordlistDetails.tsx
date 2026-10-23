@@ -21,6 +21,7 @@ import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import "@tsz/voice-editor/reader.css";
 import { api, usePermission } from "@/lib/auth";
 import { CustomAudio } from "./CustomAudio";
+import { wordlistAudioWord } from "@tsz/shared";
 
 export function WordlistEntryView({ entry }: { entry: WordlistEntry }) {
   return (
@@ -364,7 +365,7 @@ export function WordlistDetails({
                           {item.custom_word.definition}
                         </Typography.Paragraph>
                         {audioByItem.get(item.item_id!)?.word ===
-                          item.custom_word.word && (
+                          wordlistAudioWord(item.custom_word.word) && (
                           <CustomAudio
                             key={`${tab}:${current?.id}:${audioByItem.get(item.item_id!)!.job_id}`}
                             listId={list.id}

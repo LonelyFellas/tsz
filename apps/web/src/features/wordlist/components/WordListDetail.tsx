@@ -4,6 +4,7 @@ import { DetailInteractions } from "./WordlistInteractions";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { HttpError } from "@tsz/api-client";
+import { wordlistAudioWord } from "@tsz/shared";
 import {
   useInfiniteQuery,
   useQuery,
@@ -756,7 +757,7 @@ function Detail({
                         {item.custom_word.word}
                       </h2>
                       {audioByItem.get(item.item_id!)?.word ===
-                        item.custom_word.word &&
+                        wordlistAudioWord(item.custom_word.word) &&
                         (audioByItem.get(item.item_id!)?.status === "ready" ? (
                           <div className="flex flex-wrap items-center gap-3">
                             {locales.map((locale) => (
