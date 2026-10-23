@@ -134,6 +134,71 @@ describe("createTokenManager", () => {
     }
   );
 
+  it.each([false, true])(
+    "旧退出收尾不能覆盖其他标签页的新登录（已通知=%s）",
+    (notified) => {
+      vi.useFakeTimers();
+      const values = new Map<string, string>();
+      vi.stubGlobal("localStorage", {
+        getItem: (key: string) => values.get(key) ?? null,
+        setItem: (key: string, value: string) => values.set(key, value),
+        removeItem: (key: string) => values.delete(key)
+      });
+      const oldTab = createTokenManager({ baseUrl: "/api/v1/admin" });
+      oldTab.setAccessToken("admin-a");
+      const newTab = createTokenManager({ baseUrl: "/api/v1/admin" });
+      newTab.setAccessToken("admin-b");
+      const newStamp = values.get("tsz:auth-session:/api/v1/admin");
+      if (notified) expect(oldTab.getToken()).toBeUndefined();
+
+      oldTab.clearSession();
+
+      expect(values.get("tsz:auth-session:/api/v1/admin")).toBe(newStamp);
+      expect(newTab.getToken()).toBe("admin-b");
+      expect(oldTab.canRestoreSession()).toBe(false);
+    }
+  );
+
+  it("被回收的旧标签页重建后，不恢复另一标签页的新账号", async () => {
+    vi.useFakeTimers();
+    const shared = new Map<string, string>();
+    const tabA = new Map<string, string>();
+    const tabB = new Map<string, string>();
+    const storage = (items: Map<string, string>) => ({
+      getItem: (key: string) => items.get(key) ?? null,
+      setItem: (key: string, value: string) => items.set(key, value),
+      removeItem: (key: string) => items.delete(key)
+    });
+    vi.stubGlobal("localStorage", storage(shared));
+    vi.stubGlobal("sessionStorage", storage(tabA));
+    createTokenManager({ baseUrl: "/api/v1" }).setAccessToken("account-a");
+    vi.stubGlobal("sessionStorage", storage(tabB));
+    createTokenManager({ baseUrl: "/api/v1" }).setAccessToken("account-b");
+    vi.stubGlobal("sessionStorage", storage(tabA));
+    const reloaded = createTokenManager({ baseUrl: "/api/v1" });
+    const fetch = vi.spyOn(globalThis, "fetch");
+
+    expect(reloaded.canRestoreSession()).toBe(false);
+    await expect(reloaded.refreshTokens()).rejects.toThrow("session changed");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("缺少 randomUUID 时，通知仍不阻断显式登录和本地退出", () => {
+    const values = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key)
+    });
+    vi.stubGlobal("crypto", { randomUUID: undefined });
+    const tm = createTokenManager({ baseUrl: "/api/v1/admin" });
+    expect(() => tm.setAccessToken("login")).not.toThrow();
+    expect(tm.getToken()).toBe("login");
+    expect(() => tm.clearSession()).not.toThrow();
+    expect(tm.getToken()).toBeUndefined();
+    expect(tm.canRestoreSession()).toBe(false);
+  });
+
   it("跨页退出后的新页面也禁止旧 Cookie 恢复，显式登录才解除", async () => {
     vi.useFakeTimers();
     const values = new Map<string, string>();
@@ -409,7 +474,8 @@ it("unknown Cookie rotation survives runtime recreation but explicit login clear
   await expect(restored.refreshTokens()).rejects.toThrow("请重新登录");
   expect(fetch).toHaveBeenCalledTimes(1);
   restored.setAccessToken("explicit-login");
-  expect(values.size).toBe(0);
+  expect(values.has("tsz:refresh-unconfirmed:/api/reliability")).toBe(false);
+  expect(values.has("tsz:refresh-request:/api/reliability")).toBe(false);
   vi.unstubAllGlobals();
 });
 
@@ -475,7 +541,8 @@ it("响应丢失后页面重载仍使用原刷新键，探明能力后续接", a
     new Headers(fetch.mock.calls[2]?.[1]?.headers).get("x-refresh-request-id")
   ).toBe(key);
   expect(fetch.mock.calls[1]?.[1]?.method).toBe("HEAD");
-  expect(values.size).toBe(0);
+  expect(values.has("tsz:refresh-request:/reload-recovery")).toBe(false);
+  expect(values.has("tsz:refresh-unconfirmed:/reload-recovery")).toBe(false);
   reloaded.setAccessToken(null);
   vi.useRealTimers();
   vi.unstubAllGlobals();

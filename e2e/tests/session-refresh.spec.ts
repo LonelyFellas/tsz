@@ -54,6 +54,25 @@ test("另一标签页切换账号后旧页面退出，刷新也不恢复另一�
   await second.close();
 });
 
+test("旧页面错过账号切换通知，重建后仍保持退出", async ({ page, context }) => {
+  await mockApi(context, { authenticated: true });
+  await page.goto("/login");
+  await expect(page.getByRole("button", { name: "账户菜单" })).toBeVisible();
+  await page.goto("about:blank"); // 卸载旧文档，保留这个 tab 的 sessionStorage。
+  const second = await context.newPage();
+  await second.goto("/student/practice");
+  await second.getByRole("button", { name: "账户菜单" }).click();
+  await second.getByRole("menuitem", { name: "退出登录" }).click();
+  await second.getByLabel("手机号或邮箱").fill("bob@example.com");
+  await second.getByLabel("密码", { exact: true }).fill("RawCase!234");
+  await second.getByRole("button", { name: "立即登录" }).click();
+  await expect(second.getByRole("button", { name: "账户菜单" })).toBeVisible();
+  await page.goto("/student/practice");
+  await expect(page.getByRole("button", { name: "立即登录" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "账户菜单" })).toHaveCount(0);
+  await second.close();
+});
+
 test("首页恢复会话后再预取导航页面", async ({ page }) => {
   await mockApi(page, { authenticated: true });
   const profileGate = Promise.withResolvers<void>();

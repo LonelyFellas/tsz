@@ -69,6 +69,7 @@ export function createTokenManager({
   let legacyUnconfirmed = false;
   const logoutKey = `tsz.auth.logged-out:${baseUrl}`;
   const sessionKey = `tsz:auth-session:${baseUrl}`;
+  const tabSessionKey = `tsz:auth-tab:${baseUrl}`;
   let locallyLoggedOut = false;
   let sessionStamp: string | null = null;
   try {
@@ -79,7 +80,15 @@ export function createTokenManager({
       typeof localStorage !== "undefined"
         ? localStorage.getItem(sessionKey)
         : null;
-    locallyLoggedOut ||= sessionStamp?.startsWith("logout:") ?? false;
+    const tabStamp =
+      typeof sessionStorage !== "undefined"
+        ? sessionStorage.getItem(tabSessionKey)
+        : null;
+    locallyLoggedOut ||=
+      (sessionStamp?.startsWith("logout:") ?? false) ||
+      (tabStamp !== null && tabStamp !== (sessionStamp ?? ""));
+    markLoggedOut(locallyLoggedOut);
+    rememberSessionStamp();
   } catch {
     /* 存储不可用时仍保留内存状态与刷新主体检查。 */
   }
@@ -145,12 +154,23 @@ export function createTokenManager({
     }
   }
 
+  function rememberSessionStamp() {
+    try {
+      if (typeof sessionStorage !== "undefined")
+        sessionStorage.setItem(tabSessionKey, sessionStamp ?? "");
+    } catch {
+      /* 页面重建标记不可用时保留内存与主体检查。 */
+    }
+  }
+
   function publishSession(kind: "login" | "logout") {
-    const stamp = `${kind}:${crypto.randomUUID()}`;
+    // 这是失效通知标记，不是凭据；非安全上下文也须完成本地登录和退出。
+    const stamp = `${kind}:${Date.now()}:${Math.random()}`;
     try {
       if (typeof localStorage !== "undefined") {
         localStorage.setItem(sessionKey, stamp);
         sessionStamp = stamp;
+        rememberSessionStamp();
       }
     } catch {
       /* 不保存凭据；跨页通知不可用时由刷新主体检查兜底。 */
@@ -174,14 +194,21 @@ export function createTokenManager({
     }
     if (stamp === sessionStamp) return;
     sessionStamp = stamp;
+    rememberSessionStamp();
     invalidateSession();
     throw new SessionChangedError();
   }
 
   function clearSession() {
+    try {
+      checkSharedSession();
+    } catch {
+      return;
+    }
+    const wasLoggedOut = locallyLoggedOut;
     markLoggedOut(true);
     setAccessToken(null);
-    publishSession("logout");
+    if (!wasLoggedOut) publishSession("logout");
   }
 
   function setAccessToken(token: string | null) {
