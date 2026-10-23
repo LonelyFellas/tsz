@@ -190,4 +190,20 @@ if install_nginx_configs "$build" 2>/dev/null; then
 fi
 [[ "$(nginx_calls)" = $'nginx -t\nsystemctl reload nginx' ]] || fail "N07 should test, then try to reload"
 
+# N08 安全响应头静态断言（issue #499）：nginx 继承规则下，location 内出现任何 add_header
+# 会覆盖 server 级全部安全头，所以每个 HTTPS server 块及其自带 add_header 的 location 都要
+# 整组重复——web 块 3 处（server + version.json + /_next/static/），admin 块 4 处（server +
+# version.json + /assets/ + /），共 7。数的是"组"的出现次数，防止改配置时悄悄漏配或回退。
+domains_conf="$repo_root/deploy/nginx/tshb-test-domains.conf"
+for header in \
+  'add_header X-Content-Type-Options "nosniff" always;' \
+  'add_header X-Frame-Options "DENY" always;' \
+  'add_header Referrer-Policy "strict-origin-when-cross-origin" always;' \
+  'add_header Content-Security-Policy-Report-Only' \
+  'add_header Strict-Transport-Security "max-age=31536000" always;' \
+  'add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;'; do
+  count="$(grep -cF "$header" "$domains_conf" || true)"
+  [[ "$count" = 7 ]] || fail "N08 safety header group must appear exactly 7 times (web 3 + admin 4): '$header' found $count"
+done
+
 printf 'deploy-nginx tests: PASS\n'
