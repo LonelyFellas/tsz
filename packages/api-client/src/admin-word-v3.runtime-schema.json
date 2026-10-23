@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/voice-volume/docs/openapi.json",
-  "_source_sha256": "4bcdd4f87897729968e3bdcaadfd0fb8fff73e28fdc26100053d9342d51f5cf1",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dictionary-last-updater/docs/openapi.json",
+  "_source_sha256": "c81963fbfc3ac9af335a2336eb7979b1e017d000e93ce3250b2ca471940489f8",
   "roots": [
     "DictionaryPage",
     "DictionaryEntry",
@@ -223,7 +223,8 @@
         "revision": { "type": "integer" },
         "schema_version": { "type": "integer", "enum": [3] },
         "status": { "$ref": "#/$defs/AdminWordStatus" },
-        "updated_at": { "type": "string", "format": "date-time" }
+        "updated_at": { "type": "string", "format": "date-time" },
+        "updated_by_name": { "type": "string" }
       },
       "additionalProperties": false
     },
