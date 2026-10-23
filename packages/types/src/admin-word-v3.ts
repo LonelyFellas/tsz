@@ -1262,6 +1262,8 @@ export interface AdminWordListItemV3 {
   reference_summary: EntryReferenceSummary;
   created_at: string;
   updated_at: string;
+  /** 与 updated_at 对应的最后更新人；旧后端可能尚未返回。 */
+  updated_by_name?: string;
 }
 
 export type AdminWordListItemAny = AdminWordListItemV3;

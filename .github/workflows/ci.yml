@@ -375,10 +375,11 @@ jobs:
       # 因此:单次 4 分钟封顶 + 最多三次重试;三次都失败也不阻断,继续执行 e2e——
       # runner 镜像通常已含所需库,真缺库时让 e2e 以真实报错失败,比留下一个
       # 「超时取消」更好排查。
+      # timeout 与 apt 同为 root，超时后才能终止整组安装进程，避免遗留 apt 占锁。
       - name: Install Playwright system deps
         run: |
           for i in 1 2 3; do
-            if timeout 240 pnpm --filter @tsz/e2e exec playwright install-deps chromium; then
+            if sudo timeout --kill-after=15s 240 env "PATH=$PATH" pnpm --filter @tsz/e2e exec playwright install-deps chromium; then
               exit 0
             fi
             echo "::warning::playwright install-deps 第 $i 次失败或超时,15 秒后重试"
@@ -475,7 +476,7 @@ jobs:
       - name: Install Playwright system deps
         run: |
           for i in 1 2 3; do
-            if timeout 240 pnpm --filter @tsz/e2e exec playwright install-deps chromium; then
+            if sudo timeout --kill-after=15s 240 env "PATH=$PATH" pnpm --filter @tsz/e2e exec playwright install-deps chromium; then
               exit 0
             fi
             echo "::warning::playwright install-deps 第 $i 次失败或超时,15 秒后重试"
@@ -486,7 +487,7 @@ jobs:
       - name: Install Chinese fonts for layout checks
         run: |
           sudo apt-get update -o Acquire::Retries=3
-          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          sudo apt-get install -o DPkg::Lock::Timeout=120 -y --no-install-recommends fonts-noto-cjk
           fc-match -f '%{family}\n' ':lang=zh-cn' | grep -q 'Noto Sans CJK'
 
       - name: Admin E2E

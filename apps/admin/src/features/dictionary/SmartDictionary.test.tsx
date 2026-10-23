@@ -1028,11 +1028,54 @@ describe("SmartDictionary", () => {
     const creator = screen.getByText("非常非常长的创建人名称");
     expect(creator).toHaveAttribute("tabindex", "0");
     expect(creator.closest("td")).toHaveClass("ant-table-cell-ellipsis");
-    // 引用列在无引用时也渲染 "-"，这里只针对创建人列那一个占位断言。
-    const creatorPlaceholder = screen
-      .getAllByText("-")
-      .find((node) => !node.classList.contains("ant-typography"))!;
-    expect(creatorPlaceholder).not.toHaveAttribute("tabindex");
+    const creatorIndex = screen
+      .getAllByRole("columnheader")
+      .findIndex((header) => header.textContent === "创建人");
+    const emptyRow = screen.getByText("empty-creator").closest("tr")!;
+    const creatorPlaceholder = emptyRow.children[creatorIndex]!;
+    expect(creatorPlaceholder).toHaveTextContent(/^-$/);
+    expect(creatorPlaceholder.querySelector("[tabindex]")).toBeNull();
+  });
+
+  it("最后更新人独立于创建人，旧接口缺少姓名时不冒用创建人", async () => {
+    matchViewport(1440);
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [
+          {
+            ...word("collaborative", "collaborative"),
+            created_by_name: "张老师",
+            updated_by_name: "李老师"
+          },
+          { ...word("legacy", "legacy"), created_by_name: "王老师" }
+        ],
+        page: { page: 1, page_size: 20, total: 2 }
+      },
+      error: null,
+      isError: false,
+      isPending: false,
+      refetch: vi.fn()
+    });
+    render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+      </MemoryRouter>
+    );
+
+    const headers = screen.getAllByRole("columnheader");
+    const updaterIndex = headers.findIndex(
+      (header) => header.textContent === "最后更新人"
+    );
+    const updatedRow = screen.getByText("collaborative").closest("tr")!;
+    const legacyRow = screen.getByText("legacy").closest("tr")!;
+    expect(updatedRow.children[updaterIndex]).toHaveTextContent("李老师");
+    expect(updatedRow).toHaveTextContent("张老师");
+    expect(legacyRow.children[updaterIndex]).toHaveTextContent(/^-$/);
+    expect(legacyRow).toHaveTextContent("王老师");
+    fireEvent.focus(screen.getByText("李老师"));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("李老师");
   });
 
   it("从重复检测入口进入时自动定位归档词条", () => {

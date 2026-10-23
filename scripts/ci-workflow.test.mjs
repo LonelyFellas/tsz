@@ -238,6 +238,24 @@ test("W09: Playwright cache is architecture-safe and never skips browser fallbac
   assert.doesNotMatch(jobs.get("e2e-admin"), /actions\/cache\/save@v6/);
 });
 
+test("Playwright dependency timeouts can terminate privileged installers", async () => {
+  const { jobs } = await workflowFixture();
+  for (const name of ["e2e-web", "e2e-admin"]) {
+    const block = jobs.get(name);
+    assert.match(
+      block,
+      /sudo timeout --kill-after=15s 240 env "PATH=\$PATH" pnpm --filter @tsz\/e2e exec playwright install-deps chromium/
+    );
+    assert.doesNotMatch(block, /if timeout 240 pnpm/);
+  }
+  const admin = jobs.get("e2e-admin");
+  assert.match(
+    admin,
+    /apt-get install[^\n]*-o DPkg::Lock::Timeout=120[^\n]*fonts-noto-cjk/
+  );
+  assert.match(admin, /fc-match[^\n]*lang=zh-cn[^\n]*Noto Sans CJK/);
+});
+
 test("W10: only trusted successful main pushes can write caches", async () => {
   const { source } = await workflowFixture();
   const saveIndexes = [
