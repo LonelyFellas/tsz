@@ -9,6 +9,7 @@ vi.mock("@/lib/auth", async () => {
     authRuntime,
     useAuthStore: authRuntime.store,
     tokens: authRuntime.tokens,
+    clearSession: authRuntime.clearSession,
     api: authRuntime.api
   };
 });
