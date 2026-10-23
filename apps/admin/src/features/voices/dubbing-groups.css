@@ -1,0 +1,123 @@
+.dubbing-groups-toolbar {
+  padding: 12px 0;
+}
+
+.dubbing-groups-toolbar.is-editing {
+  position: sticky;
+  top: 64px;
+  z-index: 10;
+  padding: 12px;
+  border: 1px solid var(--voice-border);
+  border-radius: var(--voice-radius);
+  background: var(--voice-surface);
+}
+
+.dubbing-groups .ant-form-item {
+  margin-bottom: 0;
+}
+
+.dubbing-groups .ant-form-item-label {
+  padding-bottom: 4px;
+}
+
+.dubbing-groups .ant-form-item-label > label {
+  color: var(--voice-muted);
+  font-size: 12px;
+}
+
+.dubbing-group-header {
+  display: grid;
+  grid-template-columns: minmax(160px, 240px) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--voice-border);
+}
+
+.dubbing-group-header > *,
+.dubbing-group-locale,
+.dubbing-recommendation-fields > *,
+.dubbing-recommendation-parameters > * {
+  min-width: 0;
+}
+
+.dubbing-group-locales {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: 20px;
+  margin-top: 16px;
+}
+
+.dubbing-group-locale {
+  container: dubbing-locale / inline-size;
+}
+
+.dubbing-group-locale > .ant-typography {
+  margin: 0 0 12px;
+}
+
+.dubbing-groups .dubbing-recommendation {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--voice-radius);
+  background: var(--voice-fill);
+  overflow-wrap: anywhere;
+}
+
+.dubbing-recommendation-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.dubbing-recommendation-parameters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 12px;
+}
+
+@container dubbing-locale (max-width: 350px) {
+  .dubbing-recommendation-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dubbing-recommendation-parameters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dubbing-recommendation-parameters > :last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 600px) {
+  .dubbing-group-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .dubbing-group-areas {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .dubbing-group-delete {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .dubbing-groups-toolbar.is-editing {
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .dubbing-groups-toolbar.is-editing > .ant-space {
+    width: 100%;
+  }
+
+  .dubbing-groups-toolbar.is-editing .ant-btn {
+    padding-inline: 8px;
+    font-size: 12px;
+  }
+}

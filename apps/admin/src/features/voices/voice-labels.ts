@@ -1,0 +1,20 @@
+export const styleNames: Record<string, string> = {
+  cheerful: "愉快",
+  sad: "悲伤",
+  angry: "生气",
+  excited: "兴奋",
+  friendly: "友好",
+  hopeful: "充满希望",
+  calm: "平静",
+  chat: "日常交流",
+  whispering: "耳语",
+  shouting: "高声",
+  terrified: "惊恐",
+  unfriendly: "冷淡",
+  empathetic: "共情",
+  newscast: "新闻播报",
+  "newscast-casual": "轻松播报",
+  "newscast-formal": "正式播报",
+  customerservice: "客户服务",
+  "narration-professional": "专业叙述"
+};
