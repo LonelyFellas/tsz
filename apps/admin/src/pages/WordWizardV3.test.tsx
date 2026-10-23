@@ -1820,11 +1820,17 @@ describe("WordWizardV3Page", () => {
     );
     await screen.findByRole("button", { name: "进入词形与发音" });
     expect(document.querySelector(".v3-publication-history")).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "发布历史" })
+    ).not.toBeInTheDocument();
     for (const step of ["词形与发音", "词义与例句"]) {
       fireEvent.click(
         within(document.querySelector(".word-creation-steps")!).getByText(step)
       );
       expect(document.querySelector(".v3-publication-history")).toBeNull();
+      expect(
+        screen.queryByRole("button", { name: "发布历史" })
+      ).not.toBeInTheDocument();
       expect(endpoints.listPublications).not.toHaveBeenCalled();
     }
     fireEvent.click(screen.getByText("预览并生效"));
@@ -1884,10 +1890,13 @@ describe("WordWizardV3Page", () => {
     );
   });
 
-  it("未完成草稿从独立历史入口恢复，无需先补齐发布条件", async () => {
-    const current = word();
+  it("从预览并生效页恢复历史后可继续编辑草稿", async () => {
+    const current = word({
+      completed_steps: ["basics", "forms", "meanings"],
+      max_reachable_step: "preview"
+    });
     const historical = publication(current);
-    const canonical = word({ revision: 2 });
+    const canonical = { ...current, revision: 2 };
     const endpoints = source({ word: current, retired_stable_nodes: [] });
     vi.mocked(endpoints.listPublications).mockResolvedValue({
       publications: [historical]
@@ -1906,18 +1915,11 @@ describe("WordWizardV3Page", () => {
       .mockResolvedValueOnce({ word: current, retired_stable_nodes: [] })
       .mockResolvedValue({ word: canonical, retired_stable_nodes: [] });
     const router = renderPage(
-      `/words/${WORD_ID}/v3/wizard/forms`,
+      `/words/${WORD_ID}/v3/wizard/preview`,
       createV3WordRequests(endpoints)
     );
-    await contentEditButton();
-    expect(endpoints.listPublications).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "发布历史" }));
-    expect(router.state.location.pathname).toContain("/wizard/forms");
-    const historyButton = await screen.findByLabelText("查看第 1 次发布");
-    const historyDialog = historyButton.closest(
-      '[role="dialog"]'
-    ) as HTMLElement;
-    fireEvent.click(historyButton);
+    expect(router.state.location.pathname).toContain("/wizard/preview");
+    fireEvent.click(await screen.findByLabelText("查看第 1 次发布"));
     const detail = within(await screen.findByTestId("publication-detail"));
     fireEvent.click(
       (await detail.findByText("恢复到草稿", { exact: true })).closest(
@@ -1930,7 +1932,6 @@ describe("WordWizardV3Page", () => {
     await waitFor(() =>
       expect(endpoints.restoreDraftFromPublicationV3).toHaveBeenCalledOnce()
     );
-    expect(historyDialog.querySelector(".ant-modal-close")).toBeNull();
     await act(async () => finishRestore({ word: canonical }));
     await waitFor(() => expect(endpoints.get).toHaveBeenCalledTimes(2));
     await waitFor(() =>
