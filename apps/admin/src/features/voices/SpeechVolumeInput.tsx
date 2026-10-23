@@ -1,7 +1,11 @@
 import { MutedOutlined, SoundOutlined } from "@ant-design/icons";
 import { Flex, InputNumber, Slider } from "antd";
+import type { AriaAttributes } from "react";
 
-interface SpeechVolumeInputProps {
+interface SpeechVolumeInputProps extends Pick<
+  AriaAttributes,
+  "aria-invalid" | "aria-describedby" | "aria-required"
+> {
   value?: number | null;
   onChange?: (value: number | null) => void;
   disabled?: boolean;
@@ -12,10 +16,18 @@ export function SpeechVolumeInput({
   value,
   onChange,
   disabled,
-  id
+  id,
+  ...aria
 }: SpeechVolumeInputProps) {
   return (
-    <Flex className="voice-library-volume-control" align="center" gap={12}>
+    <Flex
+      className="voice-library-volume-control"
+      align="center"
+      gap={12}
+      role="group"
+      aria-label="音量"
+      aria-describedby={aria["aria-describedby"]}
+    >
       <span className="voice-library-volume-icon" aria-hidden="true">
         {value === 0 ? <MutedOutlined /> : <SoundOutlined />}
       </span>
@@ -31,6 +43,7 @@ export function SpeechVolumeInput({
         style={{ flex: 1 }}
       />
       <InputNumber
+        {...aria}
         id={id}
         aria-label="合成音量"
         min={0}

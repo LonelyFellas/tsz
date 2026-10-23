@@ -111,6 +111,21 @@ afterEach(() => {
 });
 
 describe("音色库", () => {
+  it("清空音量后输入框与控件组关联表单错误", async () => {
+    mount();
+    fireEvent.click(await screen.findByLabelText("调整 Sonia 参数"));
+    const input = screen.getByRole("spinbutton", { name: "合成音量" });
+    expect(input).toHaveAttribute("aria-required", "true");
+    fireEvent.change(input, { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存个人参数与听感" }));
+    await screen.findByText("请输入 0 至 100 的整数");
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(input).toHaveAccessibleDescription("请输入 0 至 100 的整数");
+    expect(
+      screen.getByRole("group", { name: "音量" })
+    ).toHaveAccessibleDescription("请输入 0 至 100 的整数");
+    expect(api.speech.saveSettings).not.toHaveBeenCalled();
+  });
   it("音量同步滑块、保存重开并参与试听，恢复默认清除旧音频", async () => {
     vi.mocked(api.speech.saveSettings).mockImplementation(
       async (alias, input) => ({
