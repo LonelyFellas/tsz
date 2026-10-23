@@ -238,33 +238,59 @@ export function PronunciationPreviewVoiceSummary({
   return (
     <Popover
       trigger="click"
-      title={`全部 ${enabled.length} 个音色`}
+      classNames={{ root: "word-pronunciation-voice-popover" }}
+      title={
+        <div className="word-pronunciation-voice-heading">
+          <span>已启用音色</span>
+          <span className="word-pronunciation-voice-count">
+            {enabled.length}
+          </span>
+        </div>
+      }
       destroyOnHidden
       content={
-        <Space orientation="vertical">
-          {enabled.map((setting) => (
-            <div key={setting.voice_id}>
-              {context.voices.find((row) => row.id === setting.voice_id)
-                ?.label ?? `${setting.voice_id}（不可用）`}{" "}
-              · {(1 + setting.rate_percent / 100).toFixed(2)}×
-              {pronunciationId && (
-                <PronunciationPreviewControls
-                  pronunciationId={pronunciationId}
-                  dialect={dialect}
-                  content={content}
-                  voiceProfile={{ voices: [setting] }}
-                  disabled={!content}
-                  disabledReason="请先填写当前口音的合成输入"
-                  ariaLabelPrefix={
-                    context.voices.find((row) => row.id === setting.voice_id)
-                      ?.label ?? setting.voice_id
-                  }
-                  compact
-                />
-              )}
-            </div>
-          ))}
-        </Space>
+        <ul className="word-pronunciation-voice-list" aria-label="已启用音色">
+          {enabled.map((setting) => {
+            const option = context.voices.find(
+              (row) => row.id === setting.voice_id
+            );
+            const name = option
+              ? option.label.replace(` · ${option.locale}`, "")
+              : setting.voice_id;
+            return (
+              <li
+                className="word-pronunciation-voice-row"
+                key={setting.voice_id}
+              >
+                <div className="word-pronunciation-voice-info">
+                  <span className="word-pronunciation-voice-name" title={name}>
+                    {name}
+                  </span>
+                  <span className="word-pronunciation-voice-locale">
+                    {option?.locale ?? "不可用"}
+                  </span>
+                </div>
+                <span className="word-pronunciation-voice-rate">
+                  {(1 + setting.rate_percent / 100).toFixed(2)}×
+                </span>
+                {pronunciationId && (
+                  <div className="word-pronunciation-voice-controls">
+                    <PronunciationPreviewControls
+                      pronunciationId={pronunciationId}
+                      dialect={dialect}
+                      content={content}
+                      voiceProfile={{ voices: [setting] }}
+                      disabled={!content}
+                      disabledReason="请先填写当前口音的合成输入"
+                      ariaLabelPrefix={option?.label ?? setting.voice_id}
+                      compact
+                    />
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
       }
     >
       <Button

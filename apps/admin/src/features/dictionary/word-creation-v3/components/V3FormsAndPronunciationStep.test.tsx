@@ -995,6 +995,87 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(container.querySelector(".v3-overview-form-type sup")).toBeNull();
   });
 
+  it("总览只合并同文拼写展示，保留不等长发音、空侧和独立编辑目标", () => {
+    const form = ukUsFormFixture({
+      uk: {
+        spelling: "travel",
+        pronunciations: [
+          pronunciationFixture({
+            id: uuidFromInt(2191),
+            actual_pron: "uk-one"
+          }),
+          pronunciationFixture({ id: uuidFromInt(2192), actual_pron: "uk-two" })
+        ]
+      },
+      us: {
+        spelling: "travel",
+        spelling_rich: {
+          version: 2,
+          text: "travel",
+          annotations: [{ type: "italic", start: 0, end: 6 }]
+        },
+        pronunciations: [
+          pronunciationFixture({ id: uuidFromInt(2193), actual_pron: "us-one" })
+        ]
+      }
+    });
+    const original = structuredClone(form);
+    const forms = formsFixture({ forms: [form] });
+    const pos = forms.pos[0]!;
+    const onEdit = vi.fn();
+    const view = () => (
+      <AntApp>
+        <PronunciationPreviewProvider>
+          <V3FormContentOverview
+            rows={[
+              {
+                membershipId: pos.form_groups[0]!.members[0]!.id,
+                form,
+                formLabel: "原形",
+                formTypeAriaLabel: "词形类型",
+                formTypeDisabled: false,
+                formTypeOptions: ["base"],
+                membershipCount: 1
+              }
+            ]}
+            group={pos.form_groups[0]!}
+            sharedCounts={new Map()}
+            onEdit={onEdit}
+            onFormTypeChange={() => undefined}
+            issues={[]}
+          />
+        </PronunciationPreviewProvider>
+      </AntApp>
+    );
+    const { container, rerender } = render(view());
+    expect(screen.getAllByText("travel", { exact: true })).toHaveLength(1);
+    const readingRows = container.querySelectorAll("tr[data-overview-dialect]");
+    expect([...readingRows].map((row) => row.textContent)).toEqual([
+      expect.stringContaining("uk-one"),
+      expect.stringContaining("uk-two"),
+      expect.stringContaining("us-one")
+    ]);
+    expect(
+      screen.getByRole("img", { name: "英美通用拼写" }).closest("td")
+    ).toHaveAttribute("rowspan", "3");
+    fireEvent.click(screen.getByRole("button", { name: "编辑原形内容" }));
+    expect(onEdit).toHaveBeenCalledWith(form.id);
+    expect(form).toEqual(original);
+
+    form.regional_variants.us.spelling = "traveled";
+    delete form.regional_variants.us.spelling_rich;
+    form.regional_variants.us.pronunciations = [];
+    rerender(view());
+    expect(
+      screen.getByRole("img", { name: "英式拼写" }).closest("td")
+    ).toHaveAttribute("rowspan", "2");
+    expect(screen.getByRole("img", { name: "美式拼写" })).toBeInTheDocument();
+    expect(screen.getByText("美式未填写")).toBeInTheDocument();
+    expect(
+      container.querySelectorAll("tr[data-overview-dialect]")
+    ).toHaveLength(3);
+  });
+
   it("总览词形名称保持文字，校验出错时可以调整类型并保留内容", async () => {
     const base = commonFormFixture({ pronunciations: [] });
     const historical = commonFormFixture({
@@ -1055,7 +1136,7 @@ describe("V3FormsAndPronunciationStep", () => {
     );
     expect(container.querySelector(".v3-form-overview .ant-select")).toBeNull();
     const targetRow = container.querySelector<HTMLElement>(
-      `tr[data-row-key="${initial.pos[0]!.form_groups[0]!.members[1]!.id}"]`
+      `tr[data-overview-form-id="${historical.id}"]`
     )!;
     fireEvent.click(
       within(targetRow).getByRole("button", {
@@ -1155,7 +1236,9 @@ describe("V3FormsAndPronunciationStep", () => {
     );
     expect(
       [
-        ...container.querySelectorAll(".ant-table-tbody > tr[data-row-key]")
+        ...container.querySelectorAll(
+          ".ant-table-tbody > tr.v3-overview-form-start"
+        )
       ].map((row) =>
         row
           .querySelector('[data-v3-field="form_type"]')

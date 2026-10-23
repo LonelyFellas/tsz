@@ -70,6 +70,23 @@ test("词形和词义操作栏滚动时吸底，到页尾与容器底边对齐�
             return Math.abs(box.y + box.height - bottom);
           })
           .toBeLessThanOrEqual(1);
+        if (step === "forms") {
+          await expect
+            .poll(() =>
+              actions.evaluate((node) => {
+                const box = node.getBoundingClientRect();
+                return [0.05, 0.15, 0.35, 0.65, 0.95].every((position) =>
+                  node.contains(
+                    document.elementFromPoint(
+                      box.left + box.width * position,
+                      box.top + box.height / 2
+                    )
+                  )
+                );
+              })
+            )
+            .toBe(true);
+        }
       }
       const shell = (await page.locator(".word-creation-shell").boundingBox())!;
       const summary = (await page
@@ -358,10 +375,72 @@ test("多个原形自动编号，指派只替换选中行且保存刷新后不�
   ]);
 });
 
-test("词形总览按设计横排发音、音色与语速，窄屏只滚动表格", async ({ page }) => {
+test("词形总览按英美发音逐行对应音色与语速，窄屏只滚动表格", async ({
+  page
+}) => {
   const api = await mockAdminV3Api(page, { formsFailureOnce: false });
   const word = api.getWord();
   if (!("forms_format" in word.forms)) throw new Error("Expected shared forms");
+  const splitForm = word.forms.pos[0]!.forms[1]!;
+  const splitContent = word.forms.contents.find(
+    (content) => content.id === splitForm.content_id
+  )!;
+  const splitRegions = splitContent.regional_variants;
+  const splitBindings = splitForm.regional_bindings;
+  if (splitRegions.mode !== "common" || splitBindings.mode !== "common")
+    throw new Error("Expected common variant and binding");
+  const ukVariant = splitRegions.common;
+  ukVariant.pronunciations.push({
+    ...structuredClone(ukVariant.pronunciations[0]!),
+    id: "01990000-0000-7000-8000-000000009001",
+    actual_pron: "ˈɔːbɪtəl ˈsentə",
+    style: "weak"
+  });
+  const usVariant = {
+    ...structuredClone(ukVariant),
+    id: "01990000-0000-7000-8000-000000009002",
+    spelling: "orbital center",
+    pronunciations: [
+      {
+        ...structuredClone(ukVariant.pronunciations[0]!),
+        id: "01990000-0000-7000-8000-000000009003",
+        actual_pron: "ˈɔrbɪtl ˈsentər"
+      }
+    ]
+  };
+  splitContent.dialect_rules = {
+    spelling_mode: "distinguish",
+    phonetic_mode: "distinguish"
+  };
+  splitContent.regional_variants = {
+    mode: "uk_us",
+    uk: ukVariant,
+    us: usVariant
+  };
+  splitForm.regional_bindings = {
+    mode: "uk_us",
+    uk: {
+      ...splitBindings.common,
+      pronunciations: [
+        ...splitBindings.common.pronunciations,
+        {
+          id: "01990000-0000-7000-8000-000000009004",
+          content_slot_id: ukVariant.pronunciations[1]!.id
+        }
+      ]
+    },
+    us: {
+      ...splitBindings.common,
+      id: "01990000-0000-7000-8000-000000009005",
+      content_slot_id: usVariant.id,
+      pronunciations: [
+        {
+          id: "01990000-0000-7000-8000-000000009006",
+          content_slot_id: usVariant.pronunciations[0]!.id
+        }
+      ]
+    }
+  };
   for (const content of word.forms.contents) {
     const regions = content.regional_variants;
     const variants =
@@ -468,23 +547,91 @@ test("词形总览按设计横排发音、音色与语速，窄屏只滚动表�
   await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
   const overview = page.locator(".v3-form-overview").first();
   await expect(overview).toBeVisible();
+  const formRows = overview.locator("tbody tr[data-overview-form-id]");
+  await expect(formRows).toHaveCount(4);
+  expect(
+    await formRows.evaluateAll((rows) =>
+      rows.map((row) => row.getAttribute("data-overview-dialect"))
+    )
+  ).toEqual(["uk", "uk", "us", "us"]);
+  await expect(overview.locator(".v3-overview-form-start")).toHaveCount(1);
+  await expect(overview.locator(".v3-overview-spelling")).toHaveText(["orbit"]);
+  await expect(
+    overview.locator('.v3-overview-dialect-dot[data-spelling-dialect="common"]')
+  ).toHaveCount(1);
+  for (const selector of [
+    ".v3-overview-form-type",
+    ".v3-overview-spellings",
+    ".v3-overview-actions"
+  ]) {
+    expect(
+      await overview
+        .locator(selector)
+        .evaluate((node) => node.closest("td")!.rowSpan)
+    ).toBe(4);
+  }
+  const splitRows = page.locator(`tr[data-overview-form-id="${splitForm.id}"]`);
+  await expect(splitRows).toHaveCount(3);
+  expect(
+    await splitRows.evaluateAll((rows) =>
+      rows.map((row) => row.getAttribute("data-overview-dialect"))
+    )
+  ).toEqual(["uk", "uk", "us"]);
+  await expect(
+    splitRows.locator(".v3-overview-phonetic .tsz-ve-readonly")
+  ).toHaveText([
+    ...ukVariant.pronunciations.map(
+      (pronunciation) => pronunciation.actual_pron
+    ),
+    ...usVariant.pronunciations.map(
+      (pronunciation) => pronunciation.actual_pron
+    )
+  ]);
+  await expect(splitRows.locator(".v3-overview-spelling")).toHaveText([
+    "orbital centre",
+    "orbital center"
+  ]);
+  expect(
+    await splitRows.locator(".v3-overview-dialect-dot").evaluateAll((dots) =>
+      dots.map((dot) => ({
+        dialect: dot.getAttribute("data-spelling-dialect"),
+        rowSpan: dot.closest("td")!.rowSpan
+      }))
+    )
+  ).toEqual([
+    { dialect: "uk", rowSpan: 2 },
+    { dialect: "us", rowSpan: 1 }
+  ]);
   const assertReadingsAligned = async () => {
-    const readings = await overview
-      .locator(".v3-overview-readings")
-      .evaluateAll((columns) =>
-        columns.map((column) =>
-          [...column.children].map((row) => {
-            const box = row.getBoundingClientRect();
-            return box.top + box.height / 2;
-          })
+    const readings = await page
+      .locator(".v3-form-overview tbody tr[data-overview-dialect]")
+      .evaluateAll((rows) =>
+        rows.map((row) =>
+          [...row.querySelectorAll<HTMLElement>(".v3-overview-reading")].map(
+            (reading) => {
+              const box = reading.getBoundingClientRect();
+              const cell = reading.closest("td")!.getBoundingClientRect();
+              return {
+                top: box.top,
+                fits:
+                  box.left >= cell.left - 1 &&
+                  box.right <= cell.right + 1 &&
+                  box.top >= cell.top - 1 &&
+                  box.bottom <= cell.bottom + 1 &&
+                  reading.scrollWidth <= reading.clientWidth + 1 &&
+                  reading.scrollHeight <= reading.clientHeight + 1
+              };
+            }
+          )
         )
       );
-    for (const centers of readings) {
-      for (const [index, center] of centers.entries()) {
-        expect(Math.abs(center - readings[0]![index]!)).toBeLessThan(1);
+    for (const cells of readings) {
+      expect(cells).toHaveLength(3);
+      for (const cell of cells) {
+        expect(Math.abs(cell.top - cells[0]!.top)).toBeLessThan(1);
+        expect(cell.fits).toBe(true);
       }
     }
-    return readings;
   };
   for (const width of [1920, 1440, 1280, 1024]) {
     await page.setViewportSize({ width, height: 1100 });
@@ -500,40 +647,53 @@ test("词形总览按设计横排发音、音色与语速，窄屏只滚动表�
         }))
       )
       .toEqual({ fits: true, pageFits: true });
-    const readings = await assertReadingsAligned();
+    await assertReadingsAligned();
     const voiceDetails = overview.getByRole("button", {
       name: "查看英式全部 2 个音色"
     });
     await voiceDetails.click();
-    await expect(page.getByText("Sonia · en-GB · 1.20×")).toBeVisible();
+    const voicePopover = page.locator(".word-pronunciation-voice-popover");
+    const sonia = voicePopover
+      .getByRole("listitem")
+      .filter({ hasText: "Sonia" });
+    await expect(sonia).toBeVisible();
+    await expect(sonia).toContainText("en-GB");
+    await expect(sonia).toContainText("1.20×");
+    await expect(
+      sonia.getByRole("button", { name: "Sonia · en-GB 获取语音" })
+    ).toBeEnabled();
+    expect(
+      await sonia.evaluate((row) => {
+        const info = row
+          .querySelector(".word-pronunciation-voice-info")!
+          .getBoundingClientRect();
+        const rate = row
+          .querySelector(".word-pronunciation-voice-rate")!
+          .getBoundingClientRect();
+        const controls = row
+          .querySelector(".word-pronunciation-voice-controls")!
+          .getBoundingClientRect();
+        return (
+          info.right <= rate.left &&
+          rate.right <= controls.left &&
+          Math.abs(
+            rate.top + rate.height / 2 - controls.top - controls.height / 2
+          ) < 1
+        );
+      })
+    ).toBe(true);
+    if (width === 1440) {
+      await voicePopover.screenshot({
+        path: test.info().outputPath("voice-popover.png"),
+        animations: "disabled"
+      });
+    }
     await assertReadingsAligned();
     await voiceDetails.click();
-    await expect(page.getByText("Sonia · en-GB · 1.20×")).toBeHidden();
+    await expect(
+      page.getByRole("listitem").filter({ hasText: "Sonia" })
+    ).toBeHidden();
     await assertReadingsAligned();
-    const edgeSpacing = await overview.evaluate((node) => {
-      const table = node.querySelector("table")!.getBoundingClientRect();
-      const label = node
-        .querySelector(".v3-overview-form-type")!
-        .getBoundingClientRect();
-      const actions = node
-        .querySelector(".v3-overview-actions")!
-        .getBoundingClientRect();
-      return {
-        left: label.left - table.left,
-        right: table.right - actions.right
-      };
-    });
-    expect(Math.abs(edgeSpacing.left - edgeSpacing.right)).toBeLessThan(1);
-    for (const selector of [
-      ".v3-overview-form-type",
-      ".v3-overview-spellings .ant-space-item > div",
-      ".v3-overview-actions"
-    ]) {
-      const box = (await overview.locator(selector).first().boundingBox())!;
-      expect(Math.abs(box.y + box.height / 2 - readings[0]![0]!)).toBeLessThan(
-        1
-      );
-    }
   }
   await page.setViewportSize({ width: 1920, height: 1100 });
   await expect(overview.getByRole("combobox")).toHaveCount(0);
@@ -550,16 +710,21 @@ test("词形总览按设计横排发音、音色与语速，窄屏只滚动表�
   ).toBeEnabled();
   await overview.screenshot({ path: test.info().outputPath("overview.png") });
   await expect(overview.getByRole("columnheader")).toHaveText([
+    "",
     "词形名称",
-    "词形变化",
-    "英式发音",
+    "词形拼写",
+    "实际发音",
     "音色",
-    "语速",
-    "美式发音",
-    "音色",
-    "语速",
-    ""
+    "语速"
   ]);
+  const actionButtons = formRows
+    .first()
+    .locator("td")
+    .first()
+    .getByRole("button");
+  await expect(actionButtons).toHaveCount(2);
+  await expect(actionButtons.nth(0)).toHaveAccessibleName(/删除/);
+  await expect(actionButtons.nth(1)).toHaveAttribute("data-v3-open-content");
   await expect(overview.getByRole("button", { name: /获取语音/ })).toHaveCount(
     0
   );
@@ -573,23 +738,12 @@ test("词形总览按设计横排发音、音色与语速，窄屏只滚动表�
         .getBoundingClientRect();
       return {
         left: button.right <= text.left,
-        centerDelta: Math.abs(
-          button.y + button.height / 2 - text.y - text.height / 2
-        )
+        fits: text.right <= node.closest("td")!.getBoundingClientRect().right
       };
     });
-    expect(geometry.left).toBe(true);
-    expect(geometry.centerDelta).toBeLessThan(2);
+    expect(geometry).toEqual({ left: true, fits: true });
   }
   await expect(overview.locator(".v3-overview-pronunciation")).toHaveCount(4);
-  for (const [dialect, color] of [
-    ["uk", "rgb(47, 91, 255)"],
-    ["us", "rgb(212, 42, 145)"]
-  ]) {
-    await expect(
-      overview.locator(`[data-playback-dialect="${dialect}"]`).first()
-    ).toHaveCSS("color", color!);
-  }
   await overview.locator("[data-v3-open-content]").first().click();
   const dialog = page.getByRole("dialog", { name: /^词形 .* 内容设置$/ });
   await expect(dialog).toBeVisible();
@@ -622,10 +776,34 @@ test("词形总览按设计横排发音、音色与语速，窄屏只滚动表�
     name: "查看英式全部 2 个音色"
   });
   await voiceDetails.click();
-  await expect(page.getByText("Sonia · en-GB · 1.20×")).toBeVisible();
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "Sonia" })
+  ).toBeVisible();
+  const narrowPopover = page.locator(".word-pronunciation-voice-popover");
+  await expect
+    .poll(() =>
+      narrowPopover.evaluate((node) => {
+        const box = node.getBoundingClientRect();
+        return (
+          box.left >= 0 &&
+          box.right <= window.innerWidth &&
+          box.top >= 0 &&
+          box.bottom <= window.innerHeight &&
+          getComputedStyle(node).opacity === "1" &&
+          document.documentElement.scrollWidth <= window.innerWidth
+        );
+      })
+    )
+    .toBe(true);
+  await narrowPopover.screenshot({
+    path: test.info().outputPath("voice-popover-narrow.png"),
+    animations: "disabled"
+  });
   await assertReadingsAligned();
   await voiceDetails.click();
-  await expect(page.getByText("Sonia · en-GB · 1.20×")).toBeHidden();
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "Sonia" })
+  ).toBeHidden();
   await assertReadingsAligned();
   const content = overview.locator(".ant-table-content");
   expect(
@@ -637,13 +815,27 @@ test("词形总览按设计横排发音、音色与语速，窄屏只滚动表�
     expect(
       await reading.evaluate((node) => {
         const phonetic = node.querySelector(".v3-overview-phonetic")!;
+        const range = document.createRange();
+        range.selectNodeContents(phonetic);
+        const text = range.getBoundingClientRect();
+        const cell = node.closest("td")!.getBoundingClientRect();
         return (
-          phonetic.getBoundingClientRect().right <=
-          node.closest("td")!.getBoundingClientRect().right
+          text.left >= cell.left &&
+          text.right <= cell.right &&
+          text.top >= cell.top &&
+          text.bottom <= cell.bottom
         );
       })
     ).toBe(true);
   }
+  const shortReading = (await formRows.nth(0).boundingBox())!;
+  const longReading = (await formRows.nth(1).boundingBox())!;
+  expect(longReading.height).toBeGreaterThan(shortReading.height);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth
+    )
+  ).toBe(true);
   await content.evaluate((node) => {
     node.scrollLeft = node.scrollWidth;
   });
