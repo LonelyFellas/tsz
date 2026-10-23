@@ -60,11 +60,13 @@
   width: 100%;
 }
 .v3-overview-phonetic {
+  display: flex;
+  align-items: baseline;
   min-width: 0;
   padding-top: 3px;
 }
 .v3-overview-phonetic .tsz-ve-readonly {
-  display: inline;
+  min-width: 0;
 }
 .v3-overview-phonetic,
 .v3-overview-phonetic .tsz-ve-readonly {

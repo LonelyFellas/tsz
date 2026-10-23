@@ -489,8 +489,20 @@ test("词形总览按英美发音逐行对应音色与语速，窄屏只滚动�
       rate_percent: 20
     }
   );
-  firstRegions.common.pronunciations[1]!.actual_pron =
-    "ˌsuːpəkælɪfrædʒɪlɪstɪkˌekspiːælɪˈdəʊʃəs";
+  const longPronunciation = firstRegions.common.pronunciations[1]!;
+  const prefix = "ˌsuːpəkælɪfrædʒɪlɪstɪkˌekspiːælɪˈdəʊʃəs ";
+  longPronunciation.actual_pron = `${prefix}pick it up`;
+  longPronunciation.actual_pron_rich = {
+    version: 2,
+    text: longPronunciation.actual_pron,
+    annotations: [
+      {
+        type: "liaison",
+        start: Array.from(prefix).length + 3,
+        end: Array.from(prefix).length + 6
+      }
+    ]
+  };
   const response = { word, retired_stable_nodes: [] };
   expect(validateRuntimeSchema("AdminWordDraftV3Envelope", response)).toEqual({
     valid: true
@@ -633,6 +645,31 @@ test("词形总览按英美发音逐行对应音色与语速，窄屏只滚动�
       }
     }
   };
+  const assertLiaisonAligned = async () => {
+    const reader = overview
+      .locator(".v3-overview-phonetic .has-liaison")
+      .first();
+    await expect(reader.locator(".tsz-ve-arc-layer path")).toBeVisible();
+    await expect
+      .poll(() =>
+        reader.evaluate((node) => {
+          const svg = node.querySelector<SVGSVGElement>(".tsz-ve-arc-layer")!;
+          const path = svg.querySelector<SVGPathElement>("path")!;
+          const anchor = node.querySelector('[data-end="start"]')!;
+          const range = document.createRange();
+          range.selectNodeContents(anchor);
+          const text = range.getBoundingClientRect();
+          const start = path
+            .getPointAtLength(0)
+            .matrixTransform(svg.getScreenCTM()!);
+          return (
+            Math.abs(start.x - (text.left + text.right) / 2) < 2 &&
+            Math.abs(start.y - text.top) < 8
+          );
+        })
+      )
+      .toBe(true);
+  };
   for (const width of [1920, 1440, 1280, 1024]) {
     await page.setViewportSize({ width, height: 1100 });
     await overview.screenshot({
@@ -647,6 +684,7 @@ test("词形总览按英美发音逐行对应音色与语速，窄屏只滚动�
         }))
       )
       .toEqual({ fits: true, pageFits: true });
+    await assertLiaisonAligned();
     await assertReadingsAligned();
     const voiceDetails = overview.getByRole("button", {
       name: "查看英式全部 2 个音色"
@@ -771,6 +809,7 @@ test("词形总览按英美发音逐行对应音色与语速，窄屏只滚动�
   await page.getByRole("button", { name: "放弃修改", exact: true }).click();
   await expect(dialog).toBeHidden();
   await page.setViewportSize({ width: 390, height: 844 });
+  await assertLiaisonAligned();
   await assertReadingsAligned();
   const voiceDetails = overview.getByRole("button", {
     name: "查看英式全部 2 个音色"
