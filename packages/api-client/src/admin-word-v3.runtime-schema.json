@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-custom-audio/docs/openapi.json",
-  "_source_sha256": "f8ef1da00239e86b93c9018cc879b2007f68432051499ff621cb8d09a1a72410",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dictionary-last-updater/docs/openapi.json",
+  "_source_sha256": "c81963fbfc3ac9af335a2336eb7979b1e017d000e93ce3250b2ca471940489f8",
   "roots": [
     "DictionaryPage",
     "DictionaryEntry",
@@ -223,7 +223,8 @@
         "revision": { "type": "integer" },
         "schema_version": { "type": "integer", "enum": [3] },
         "status": { "$ref": "#/$defs/AdminWordStatus" },
-        "updated_at": { "type": "string", "format": "date-time" }
+        "updated_at": { "type": "string", "format": "date-time" },
+        "updated_by_name": { "type": "string" }
       },
       "additionalProperties": false
     },
@@ -3962,7 +3963,8 @@
         "pitch_semitones": { "type": "integer", "maximum": 12, "minimum": -12 },
         "rate_percent": { "type": "integer", "maximum": 100, "minimum": -50 },
         "style": { "type": "string", "maxLength": 64 },
-        "voice_id": { "type": "string" }
+        "voice_id": { "type": "string" },
+        "volume_percent": { "type": "integer", "maximum": 100, "minimum": 0 }
       },
       "additionalProperties": false
     },

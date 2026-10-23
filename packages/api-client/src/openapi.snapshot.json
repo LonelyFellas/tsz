@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-custom-audio/docs/openapi.json",
-  "_generatedAt": "2026-10-23T09:54:03.668Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dictionary-last-updater/docs/openapi.json",
+  "_generatedAt": "2026-10-23T13:54:21.290Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -5268,7 +5268,11 @@
         "revision": { "type": "integer", "format": "int64" },
         "schema_version": { "type": "integer", "enum": [3] },
         "status": { "$ref": "#/components/schemas/AdminWordStatus" },
-        "updated_at": { "type": "string", "format": "date-time" }
+        "updated_at": { "type": "string", "format": "date-time" },
+        "updated_by_name": {
+          "type": "string",
+          "description": "与 updated_at 对应的最后更新人；契约允许旧后端响应缺少此字段。"
+        }
       },
       "additionalProperties": false
     },
@@ -5720,7 +5724,14 @@
         "pitch_semitones": { "type": "integer", "format": "int32" },
         "rate_percent": { "type": "integer", "format": "int32" },
         "style": { "type": ["string", "null"] },
-        "voice_alias": { "type": "string" }
+        "voice_alias": { "type": "string" },
+        "volume_percent": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Absolute synthesis volume; omitted values retain the original volume (100).",
+          "maximum": 100,
+          "minimum": 0
+        }
       },
       "additionalProperties": false
     },
@@ -7495,7 +7506,13 @@
       "properties": {
         "pitch_semitones": { "type": "integer", "format": "int32" },
         "rate_percent": { "type": "integer", "format": "int32" },
-        "style": { "type": ["string", "null"] }
+        "style": { "type": ["string", "null"] },
+        "volume_percent": {
+          "type": "integer",
+          "format": "int32",
+          "maximum": 100,
+          "minimum": 0
+        }
       },
       "additionalProperties": false
     },
@@ -7531,7 +7548,13 @@
           "minimum": -50
         },
         "style": { "type": "string", "maxLength": 64 },
-        "voice_id": { "type": "string" }
+        "voice_id": { "type": "string" },
+        "volume_percent": {
+          "type": "integer",
+          "format": "int32",
+          "maximum": 100,
+          "minimum": 0
+        }
       },
       "additionalProperties": false
     },

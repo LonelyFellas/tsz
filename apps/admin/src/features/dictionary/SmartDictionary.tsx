@@ -1043,6 +1043,21 @@ export function SmartDictionary({
       render: (t: string) => dayjs(t).format("YYYY-MM-DD HH:mm")
     },
     {
+      title: "最后更新人",
+      dataIndex: "updated_by_name",
+      width: 140,
+      ellipsis: { showTitle: false },
+      responsive: ["sm"],
+      render: (name?: string) => {
+        const label = name?.trim() || "-";
+        return (
+          <Tooltip title={name?.trim() || undefined}>
+            <span tabIndex={name?.trim() ? 0 : undefined}>{label}</span>
+          </Tooltip>
+        );
+      }
+    },
+    {
       title: "操作",
       key: "action",
       // 归档视图的右组是「恢 复 + 永久删除」两个文字按钮，实测比常规页宽一倍多；
