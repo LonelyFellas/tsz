@@ -142,6 +142,12 @@ jobs:
           node scripts/ci-metrics.mjs run test-deploy-provenance --
           pnpm test:deploy-provenance
 
+      - name: Validate frontend retention systemd units
+        run: >-
+          systemd-analyze verify
+          deploy/systemd/tsz-frontend-retention.service
+          deploy/systemd/tsz-frontend-retention.timer
+
       - name: Test release transaction with Nginx
         run: bash deploy/test-runtime/test.sh
 
