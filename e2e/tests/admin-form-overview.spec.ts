@@ -5,9 +5,7 @@ import {
   mockAdminV3Api
 } from "./support/mockAdminV3Api";
 
-test("发布历史仅在核对与发布页显示，录入步骤底部没有历史卡片", async ({
-  page
-}) => {
+test("发布历史仅在预览并生效页显示，录入步骤没有历史入口", async ({ page }) => {
   await mockAdminV3Api(page, { formsFailureOnce: false });
   for (const step of ["basics", "forms", "meanings"]) {
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/${step}`);
@@ -17,6 +15,13 @@ test("发布历史仅在核对与发布页显示，录入步骤底部没有历�
       )
     ).toBeVisible();
     await expect(page.locator(".v3-publication-history")).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "发布历史", exact: true })
+    ).toHaveCount(0);
+    await page.screenshot({
+      path: test.info().outputPath(`${step}-without-history.png`),
+      animations: "disabled"
+    });
   }
   await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/preview`);
   await expect(page.locator(".v3-publication-history")).toBeVisible();
@@ -94,7 +99,7 @@ test("词形和词义操作栏滚动时吸底，到页尾与容器底边对齐�
   }
 });
 
-test("未完成草稿可独立打开历史，录入页不常驻历史卡片", async ({ page }) => {
+test("未完成草稿的录入页不显示发布历史入口或弹窗", async ({ page }) => {
   const api = await mockAdminV3Api(page, { formsFailureOnce: false });
   const word = api.getWord();
   word.completed_steps = ["basics"];
@@ -106,19 +111,86 @@ test("未完成草稿可独立打开历史，录入页不常驻历史卡片", as
   await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
   await expect(page.locator(".v3-form-overview").first()).toBeVisible();
   await expect(page.locator(".v3-publication-history")).toHaveCount(0);
-  await page.getByRole("button", { name: "发布历史", exact: true }).click();
-  const history = page.getByRole("dialog", { name: "发布历史", exact: true });
-  await expect(history.getByText("暂无发布记录")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "发布历史", exact: true })
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("dialog", { name: "发布历史", exact: true })
+  ).toHaveCount(0);
   await expect(page).toHaveURL(/\/wizard\/forms$/);
-  await expect
-    .poll(async () => (await history.boundingBox())!.width)
-    .toBeGreaterThan(850);
-  await history.screenshot({
-    path: test.info().outputPath("unfinished-draft-history.png"),
-    animations: "disabled"
+});
+
+test("类型校验修复入口在中等宽度和窄屏完整可见并可修改词形", async ({
+  page
+}) => {
+  const api = await mockAdminV3Api(page, { formsFailureOnce: false });
+  const word = api.getWord();
+  const pos = word.forms.pos[0]!;
+  const form = pos.forms.find((item) => item.form_type === "plural")!;
+  await page.route(
+    `**/api/v1/admin/lexicon/entries/${word.id}/validate`,
+    (route) =>
+      route.fulfill({
+        json: {
+          schema_version: 3,
+          validated_revision: word.revision,
+          valid: false,
+          issues: [
+            {
+              schema_version: 3,
+              step: "forms",
+              node_id: form.id,
+              field: "form_type",
+              code: "invalid_form_type_for_part_of_speech",
+              message: "请选择可用词形类型",
+              node_location: {
+                node_role: "form",
+                ancestor_node_ids: [pos.pos_id],
+                pos_id: pos.pos_id,
+                form_id: form.id
+              }
+            }
+          ]
+        }
+      })
+  );
+  await page.goto(`/words/${word.id}/v3/wizard/preview`);
+  await page.getByRole("button", { name: "检查发布条件", exact: true }).click();
+  await expect(
+    page.getByRole("region", { name: "发布待完成摘要" })
+  ).toBeVisible();
+  await page
+    .locator(".ant-steps-item")
+    .filter({ hasText: "词形与发音" })
+    .click();
+  const fix = page.getByRole("button", { name: "调整复数词形类型" });
+  for (const width of [1024, 390]) {
+    await page.setViewportSize({ width, height: 1100 });
+    await fix.scrollIntoViewIfNeeded();
+    await expect(fix).toBeEnabled();
+    expect(
+      await fix.evaluate((button) => {
+        const box = button.getBoundingClientRect();
+        const cell = button.closest("td")!.getBoundingClientRect();
+        return (
+          box.left >= cell.left &&
+          box.right <= cell.right &&
+          box.top >= cell.top &&
+          box.bottom <= cell.bottom &&
+          button.scrollWidth <= button.clientWidth
+        );
+      })
+    ).toBe(true);
+  }
+  await fix.click();
+  await page.getByRole("menuitem", { name: "原形", exact: true }).click();
+  const row = page.locator(".ant-table-row").filter({
+    has: page.locator(`[data-v3-open-content="${form.id}"]`)
   });
-  await history.getByRole("button", { name: /close|关闭/i }).click();
-  await expect(page.locator(".v3-publication-history")).toHaveCount(0);
+  await expect(row.locator(".v3-overview-form-type")).toContainText("原形");
+  await expect(
+    page.getByRole("button", { name: "保存草稿", exact: true })
+  ).toBeEnabled();
 });
 
 test("浏览器后退保护未确认指派，继续编辑后可确认并保存替换", async ({
@@ -331,6 +403,13 @@ test("词形总览按设计横排发音、音色与语速，窄屏只滚动表�
   const firstRegions = word.forms.contents[0]!.regional_variants;
   if (firstRegions.mode !== "common")
     throw new Error("Expected common variant");
+  firstRegions.common.pronunciations[0]!.synthesis!.uk!.ipa_speech!.voice_profile!.voices.push(
+    {
+      voice_id: "sonia",
+      enabled: true,
+      rate_percent: 20
+    }
+  );
   firstRegions.common.pronunciations[1]!.actual_pron =
     "ˌsuːpəkælɪfrædʒɪlɪstɪkˌekspiːælɪˈdəʊʃəs";
   const response = { word, retired_stable_nodes: [] };
@@ -356,6 +435,12 @@ test("词形总览按设计横排发音、音色与语速，窄屏只滚动表�
             display_name: "Andrew",
             locale: "en-US",
             gender: "male"
+          },
+          {
+            alias: "sonia",
+            display_name: "Sonia",
+            locale: "en-GB",
+            gender: "female"
           }
         ].map((voice) => ({
           ...voice,
@@ -383,6 +468,74 @@ test("词形总览按设计横排发音、音色与语速，窄屏只滚动表�
   await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
   const overview = page.locator(".v3-form-overview").first();
   await expect(overview).toBeVisible();
+  const assertReadingsAligned = async () => {
+    const readings = await overview
+      .locator(".v3-overview-readings")
+      .evaluateAll((columns) =>
+        columns.map((column) =>
+          [...column.children].map((row) => {
+            const box = row.getBoundingClientRect();
+            return box.top + box.height / 2;
+          })
+        )
+      );
+    for (const centers of readings) {
+      for (const [index, center] of centers.entries()) {
+        expect(Math.abs(center - readings[0]![index]!)).toBeLessThan(1);
+      }
+    }
+    return readings;
+  };
+  for (const width of [1920, 1440, 1280, 1024]) {
+    await page.setViewportSize({ width, height: 1100 });
+    await overview.screenshot({
+      path: test.info().outputPath(`overview-${width}.png`),
+      animations: "disabled"
+    });
+    await expect
+      .poll(() =>
+        overview.locator(".ant-table-content").evaluate((node) => ({
+          fits: node.scrollWidth <= node.clientWidth,
+          pageFits: document.documentElement.scrollWidth <= window.innerWidth
+        }))
+      )
+      .toEqual({ fits: true, pageFits: true });
+    const readings = await assertReadingsAligned();
+    const voiceDetails = overview.getByRole("button", {
+      name: "查看英式全部 2 个音色"
+    });
+    await voiceDetails.click();
+    await expect(page.getByText("Sonia · en-GB · 1.20×")).toBeVisible();
+    await assertReadingsAligned();
+    await voiceDetails.click();
+    await expect(page.getByText("Sonia · en-GB · 1.20×")).toBeHidden();
+    await assertReadingsAligned();
+    const edgeSpacing = await overview.evaluate((node) => {
+      const table = node.querySelector("table")!.getBoundingClientRect();
+      const label = node
+        .querySelector(".v3-overview-form-type")!
+        .getBoundingClientRect();
+      const actions = node
+        .querySelector(".v3-overview-actions")!
+        .getBoundingClientRect();
+      return {
+        left: label.left - table.left,
+        right: table.right - actions.right
+      };
+    });
+    expect(Math.abs(edgeSpacing.left - edgeSpacing.right)).toBeLessThan(1);
+    for (const selector of [
+      ".v3-overview-form-type",
+      ".v3-overview-spellings .ant-space-item > div",
+      ".v3-overview-actions"
+    ]) {
+      const box = (await overview.locator(selector).first().boundingBox())!;
+      expect(Math.abs(box.y + box.height / 2 - readings[0]![0]!)).toBeLessThan(
+        1
+      );
+    }
+  }
+  await page.setViewportSize({ width: 1920, height: 1100 });
   await expect(overview.getByRole("combobox")).toHaveCount(0);
   await expect(overview.locator(".v3-overview-form-type")).toHaveText("原形");
   await expect(overview.getByText("Libby", { exact: true })).toHaveCount(2);
@@ -464,6 +617,16 @@ test("词形总览按设计横排发音、音色与语速，窄屏只滚动表�
   await page.getByRole("button", { name: "放弃修改", exact: true }).click();
   await expect(dialog).toBeHidden();
   await page.setViewportSize({ width: 390, height: 844 });
+  await assertReadingsAligned();
+  const voiceDetails = overview.getByRole("button", {
+    name: "查看英式全部 2 个音色"
+  });
+  await voiceDetails.click();
+  await expect(page.getByText("Sonia · en-GB · 1.20×")).toBeVisible();
+  await assertReadingsAligned();
+  await voiceDetails.click();
+  await expect(page.getByText("Sonia · en-GB · 1.20×")).toBeHidden();
+  await assertReadingsAligned();
   const content = overview.locator(".ant-table-content");
   expect(
     await content.evaluate((node) => node.scrollWidth > node.clientWidth)

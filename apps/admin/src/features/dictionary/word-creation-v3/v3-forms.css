@@ -7,6 +7,7 @@
   max-width: 100%;
 }
 .v3-form-overview .ant-table-thead > tr > th {
+  padding: 8px;
   color: #8d929b;
   font-size: 12px;
   font-weight: 400;
@@ -17,19 +18,34 @@
   display: none;
 }
 .v3-form-overview .ant-table-tbody > tr > td {
-  padding-block: 12px;
+  padding: 8px;
   vertical-align: top;
   border-bottom: 0;
 }
+.v3-form-overview .ant-table-thead > tr > th.ant-table-cell:first-child,
+.v3-form-overview .ant-table-tbody > tr > td.ant-table-cell:first-child {
+  padding-inline-start: 16px;
+}
+.v3-form-overview .ant-table-thead > tr > th.ant-table-cell:last-child,
+.v3-form-overview .ant-table-tbody > tr > td.ant-table-cell:last-child {
+  padding-inline-end: 16px;
+}
+.v3-overview-spellings .ant-space-item > div {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: 4px;
+  min-height: 28px;
+}
 .v3-overview-readings {
   display: grid;
-  gap: 8px;
+  gap: 4px;
 }
 .v3-overview-reading {
   display: flex;
   align-items: center;
   min-width: 0;
-  min-height: 32px;
+  min-height: 28px;
 }
 .v3-overview-pronunciation {
   display: flex;
@@ -51,11 +67,12 @@
 }
 .v3-overview-phonetic,
 .v3-overview-phonetic .tsz-ve-readonly {
-  font-size: 16px;
+  font-size: 14px;
   white-space: nowrap;
 }
 .v3-overview-pronunciation .word-pronunciation-play-action.ant-btn {
   width: 24px;
+  height: 28px;
   flex-basis: 24px;
   border: 0;
   background: transparent;
@@ -63,25 +80,54 @@
 }
 .v3-overview-settings {
   color: #8d929b;
-  font-size: 12px;
+  font-size: 14px;
+}
+.v3-overview-settings .word-pronunciation-voice-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.v3-overview-settings .word-pronunciation-voice-summary {
+  min-width: 0;
+  max-width: 100%;
+  padding-inline: 0;
+  color: inherit;
+  font-size: inherit;
+}
+.v3-overview-settings .word-pronunciation-voice-summary .anticon {
+  flex-shrink: 0;
 }
 .v3-overview-form-type {
   display: flex;
   align-items: center;
-  min-height: 32px;
+  min-height: 28px;
   color: var(--word-ink);
 }
 .v3-form-overview .v3-overview-spelling {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 600;
+}
+.v3-overview-type-fix.ant-btn {
+  max-width: 100%;
+  height: auto;
+  padding-inline: 0;
+  white-space: normal;
 }
 .v3-overview-edit.ant-btn {
   color: #b4b4b4;
 }
+.v3-overview-action-list {
+  display: flex;
+  align-items: flex-end;
+  width: 100%;
+}
 .v3-overview-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 4px;
+  min-height: 28px;
 }
 .v3-overview-actions .v3-membership-actions {
   display: flex;
@@ -94,8 +140,8 @@
   --word-us: #d42a91;
 }
 .v3-content-drawer .ant-drawer-header {
-  min-height: 72px;
-  padding: 20px 24px;
+  min-height: 56px;
+  padding: 12px 24px;
   color: #fff;
   background: #696d76;
 }
@@ -104,37 +150,46 @@
   color: inherit;
 }
 .v3-content-drawer .ant-drawer-title {
-  font-size: 20px;
+  font-size: 18px;
 }
 .v3-content-drawer .ant-drawer-body {
   padding: 0;
 }
 .v3-content-rules {
-  padding-inline: 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 8px 24px;
+  padding: 12px 24px;
+  border-bottom: 1px solid #e2e5eb;
 }
 .v3-content-rule-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
-  min-height: 68px;
-  box-sizing: border-box;
-  padding-block: 16px;
-  border-bottom: 1px solid #e2e5eb;
+  gap: 4px 12px;
+  min-width: 0;
+  min-height: 32px;
 }
 .v3-content-rule-row > .ant-typography,
 .v3-content-labels > .ant-space {
-  font-size: 16px;
+  font-size: 14px;
 }
 .v3-content-rule-row .ant-radio-wrapper:last-child {
   margin-inline-end: 0;
 }
 .v3-content-labels {
   display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 24px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 12px 24px;
+}
+.v3-content-labels > .ant-space:first-child {
+  flex-shrink: 0;
+}
+.v3-content-label-list {
+  min-width: 0;
 }
 .v3-content-label-list .v3-content-label {
   display: inline-flex;
@@ -202,12 +257,12 @@
 }
 .v3-content-form-row .word-form-matrix-shared-header {
   grid-column: 1 / -1;
-  min-height: 58px;
+  min-height: 40px;
   border-radius: 0;
-  font-size: 18px;
+  font-size: 16px;
 }
 .v3-content-form-row .word-form-matrix-shared-header > span {
-  padding-inline: 24px;
+  padding: 8px 16px;
 }
 .v3-content-form-row .word-form-matrix-shared-cell {
   grid-column: 1 / -1;
@@ -216,7 +271,7 @@
   border-radius: 0;
 }
 .v3-content-form-row .word-form-matrix-shared-cell .word-shared-form-spelling {
-  padding: 20px 24px;
+  padding: 12px 16px;
 }
 .v3-content-form-row .word-shared-pronunciation-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -230,17 +285,28 @@
 }
 .v3-content-form-row .word-form-matrix-dialect-cell,
 .v3-content-form-row .word-form-matrix-shared-cell .word-shared-pronunciation {
-  padding: 20px;
+  padding: 12px;
 }
 .v3-content-form-row .word-form-matrix-dialect-cell-us {
   border-inline-start: 0;
 }
+.v3-content-form-row .word-pronunciation-editor {
+  margin-top: 8px;
+}
+.v3-content-form-row .word-pronunciation-floating-fields,
+.v3-content-form-row .word-pronunciation-synthesis {
+  gap: 16px;
+}
+.v3-content-form-row .word-synthesis-source {
+  gap: 8px;
+}
 @media (max-width: 720px) {
-  .v3-content-rules {
+  .v3-content-drawer .ant-drawer-header {
     padding-inline: 16px;
   }
+  .v3-content-rules,
   .v3-content-labels {
-    padding: 20px 16px;
+    padding-inline: 16px;
   }
   .v3-content-editor {
     margin: 0 16px 16px;

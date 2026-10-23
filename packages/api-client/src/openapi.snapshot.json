@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/form-content-reassignment/docs/openapi.json",
-  "_generatedAt": "2026-10-22T11:43:07.696Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/issue-279-login-throttle/docs/openapi.json",
+  "_generatedAt": "2026-10-23T05:38:47.426Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -3744,6 +3744,8 @@
         "phone_unbind_forbidden",
         "otp_rate_limited",
         "otp_unavailable",
+        "login_rate_limited",
+        "login_unavailable",
         "coin_invalid_amount",
         "coin_account_unavailable",
         "coin_wallet_unavailable",
