@@ -1,11 +1,12 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/form-content-reassignment/docs/openapi.json",
-  "_source_sha256": "5f7848cebc2c85a516727e93015fd0fcd8bf172a8d81c4a37f2da1edb97e01d4",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-custom-audio/docs/openapi.json",
+  "_source_sha256": "510b9941ff85488c01fb20c6471e2300091bb24409c7cddb6f92fc7314e53823",
   "roots": [
     "DictionaryPage",
     "DictionaryEntry",
     "AudioAssetUrlResponse",
+    "AudioStatuses",
     "LearningRewardDay",
     "LoginRewardDay",
     "LearningPreview",
@@ -460,6 +461,30 @@
         "url": { "type": "string" },
         "url_expires_in_seconds": { "type": "integer", "minimum": 0 }
       }
+    },
+    "AudioState": {
+      "type": "string",
+      "enum": ["queued", "processing", "ready", "refunding", "refunded"]
+    },
+    "AudioStatus": {
+      "type": "object",
+      "required": ["item_id", "job_id", "word", "status", "locales"],
+      "properties": {
+        "item_id": { "type": "string", "format": "uuid" },
+        "job_id": { "type": "string", "format": "uuid" },
+        "locales": { "type": "array", "items": { "type": "string" } },
+        "status": { "$ref": "#/$defs/AudioState" },
+        "word": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "AudioStatuses": {
+      "type": "object",
+      "required": ["items"],
+      "properties": {
+        "items": { "type": "array", "items": { "$ref": "#/$defs/AudioStatus" } }
+      },
+      "additionalProperties": false
     },
     "BatchPublicationResponseV3": {
       "type": "object",
@@ -997,6 +1022,8 @@
         "learning_insufficient_questions",
         "learning_already_answered",
         "word_list_conflict",
+        "word_list_audio_cost_changed",
+        "account_deletion_unsettled_audio",
         "word_list_entry_unavailable",
         "invalid_credentials",
         "invalid_token",

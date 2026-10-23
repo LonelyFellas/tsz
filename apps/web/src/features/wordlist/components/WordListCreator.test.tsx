@@ -18,8 +18,10 @@ vi.mock("@/lib/request", () => ({
       create: vi.fn(),
       edit: vi.fn(),
       myItems: vi.fn(),
-      update: vi.fn()
-    }
+      update: vi.fn(),
+      myCustomAudio: vi.fn()
+    },
+    coins: { wallet: vi.fn() }
   }
 }));
 vi.mock("../excel-client", () => ({
@@ -348,6 +350,16 @@ it("保存体积超限明确提示拆分，保留内容并允许继续修改", a
 });
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.clear();
+  vi.mocked(api.wordList.myCustomAudio).mockRejectedValue(
+    new HttpError(404, "not found")
+  );
+  vi.mocked(api.coins.wallet).mockResolvedValue({
+    owner_type: "user",
+    owner_id: "one",
+    balance: "100",
+    status: "open"
+  });
   useUserStore.setState({
     user: {
       id: "one",

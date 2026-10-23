@@ -1,0 +1,51 @@
+{
+  "date": "2026-10-23",
+  "frontend_base": "164691d7",
+  "backend_base": "c9c2fe4",
+  "source": "base commits plus uncommitted task changes",
+  "openapi_sha256": "510b9941ff85488c01fb20c6471e2300091bb24409c7cddb6f92fc7314e53823",
+  "runtime_schema_hash_matches": true,
+  "backend_tests": {
+    "lib_passed": 396,
+    "related_integration_passed": 74,
+    "additional_lifecycle_passed": 5,
+    "audio_replay_regression_passed": 8
+  },
+  "frontend_checks": {
+    "api_client_passed": 594,
+    "targeted_component_tests": "passed",
+    "types_api_web_admin_typecheck": "passed",
+    "changed_file_eslint": "passed",
+    "web_production_build": "passed",
+    "admin_production_build": "passed"
+  },
+  "browser": {
+    "backend": "isolated task API on 127.0.0.1:18579; PostgreSQL 55579/custom_audio_browser; Redis 56579/1",
+    "frontend": "production build + next start on localhost:13579",
+    "api_mock": false,
+    "speech_and_object_storage": "not configured; shared cloud storage actions blocked pending explicit approval",
+    "verified": [
+      "audio generation unchecked by default",
+      "one selected custom item costs 2 coins for both accents",
+      "zero balance shows insufficient funds and preserves inputs",
+      "speech unavailable returns 503 and preserves word/definition/selection",
+      "independent SQL confirms no wordlist, no job, balance unchanged after rejection",
+      "explicitly unchecking audio allows text save",
+      "refresh and reopen retain custom word and definition",
+      "desktop light and mobile dark at 375px without horizontal overflow",
+      "corrected duplicate balance unit"
+    ],
+    "not_verified": ["old release binaries against new schema"],
+    "subsequent_real_cloud_acceptance": "passed after explicit authorization; see real-audio-acceptance.json; both locales played to completion and prefix cleaned",
+    "console_notes": [
+      "local version.json returns 404",
+      "automated navigation beforeunload prompt blocked without native gesture"
+    ],
+    "backend_error_logs": "none"
+  },
+  "cloud_test_prefix": "tshb-test-assets/temporary-tests/20261023-wordlist-audio-luwlgu/",
+  "cloud_write_count": 2,
+  "cloud_versions_permanently_deleted": 2,
+  "cloud_readonly_plan_object_count": 0,
+  "delivery": "not committed, pushed, merged or deployed"
+}

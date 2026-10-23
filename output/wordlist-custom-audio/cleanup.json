@@ -1,0 +1,21 @@
+{
+  "date": "2026-10-23",
+  "local_api_and_web": "stopped",
+  "isolated_postgres_and_redis": "stopped",
+  "ports_13579_18579_55579_56579": "independently checked; no listeners",
+  "isolated_database": "dropped; pg_database independently reports zero matching databases",
+  "isolated_data_directory": "removed and absence verified",
+  "temporary_startup_files": "removed",
+  "container_launch_config": "only this task's entries removed; original entries preserved",
+  "browser_logout": "POST /api/v1/auth/logout returned 204",
+  "pending_save_records": 0,
+  "browser_test_run": "removed from session storage",
+  "browser_cache": "not asserted cleared; test account and sessions removed with isolated database",
+  "cloud_prefix": "tshb-test-assets/temporary-tests/20261023-wordlist-audio-luwlgu/",
+  "cloud_objects_created": 2,
+  "cloud_versions_permanently_deleted": 2,
+  "cloud_remaining_after_cleanup": 0,
+  "cloud_independent_inventory": 0,
+  "cloud_apply": "clean; see oss-cleanup.json and oss-empty-recheck.json",
+  "preserved": "source worktrees, dependencies, production builds, sanitized acceptance records and screenshots"
+}

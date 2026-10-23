@@ -10,6 +10,8 @@ import {
   useQueryClient
 } from "@tanstack/react-query";
 import { ReadingEntry } from "./ReadingEntry";
+import { AudioButton } from "@/features/audio/AudioButton";
+import { audioStatusLabels, useCustomAudio } from "../hooks/useCustomAudio";
 import {
   Button,
   DropdownMenu,
@@ -188,6 +190,23 @@ function Detail({
       : (profile.data?.learning_settings?.cefr_level ?? "C2");
   const variant = profile.data?.learning_settings?.english_variant ?? null;
   const loadedItems = items.data?.pages.flatMap((page) => page.items) ?? [];
+  const customIds = loadedItems.flatMap((item) =>
+    item.custom_word && item.item_id ? [item.item_id] : []
+  );
+  const audio = useCustomAudio(
+    id,
+    customIds,
+    mine,
+    userId,
+    customIds.length > 0 && !updatingSearch
+  );
+  const audioByItem = new Map(
+    audio.data?.items.map((item) => [item.item_id, item])
+  );
+  const locales =
+    variant === "AmE"
+      ? (["en-US", "en-GB"] as const)
+      : (["en-GB", "en-US"] as const);
   const unavailableItems = loadedItems.filter(
     (item) => !item.entry && !item.custom_word
   );
@@ -708,6 +727,19 @@ function Detail({
               )}
             </details>
           )}
+          {audio.isError && customIds.length > 0 && (
+            <p role="status" className="mb-4 text-sm text-foreground-muted">
+              语音暂不可用，词表内容仍可阅读。
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => void audio.refetch()}
+              >
+                重试读取语音
+              </Button>
+            </p>
+          )}
           <div aria-busy={updatingSearch}>
             {loadedItems.map((item) =>
               item.entry || item.custom_word ? (
@@ -723,6 +755,46 @@ function Detail({
                       <h2 className="tsz-words break-words text-xl font-semibold">
                         {item.custom_word.word}
                       </h2>
+                      {audioByItem.get(item.item_id!)?.word ===
+                        item.custom_word.word &&
+                        (audioByItem.get(item.item_id!)?.status === "ready" ? (
+                          <div className="flex flex-wrap items-center gap-3">
+                            {locales.map((locale) => (
+                              <span
+                                key={locale}
+                                className="inline-flex items-center text-xs text-foreground-muted"
+                              >
+                                {locale === "en-GB" ? "英式" : "美式"}
+                                <AudioButton
+                                  label={`播放 ${item.custom_word!.word} ${locale === "en-GB" ? "英式" : "美式"}语音`}
+                                  sign={(signal) =>
+                                    mine
+                                      ? api.wordList.myCustomAudioUrl(
+                                          id,
+                                          item.item_id!,
+                                          locale,
+                                          { signal }
+                                        )
+                                      : api.wordList.customAudioUrl(
+                                          id,
+                                          item.item_id!,
+                                          locale,
+                                          { signal }
+                                        )
+                                  }
+                                />
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="mt-2 text-xs text-foreground-muted">
+                            {
+                              audioStatusLabels[
+                                audioByItem.get(item.item_id!)!.status
+                              ]
+                            }
+                          </p>
+                        ))}
                       <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6">
                         {item.custom_word.definition}
                       </p>

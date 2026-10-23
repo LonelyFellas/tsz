@@ -1,0 +1,11 @@
+{
+  "bucket": "tshb-test-assets",
+  "run_id": "20261023-wordlist-audio-luwlgu",
+  "prefix": "temporary-tests/20261023-wordlist-audio-luwlgu/",
+  "started_at": "2026-10-23T07:05:37.518830+00:00",
+  "status": "planned",
+  "planned": [],
+  "deleted": [],
+  "errors": [],
+  "finished_at": "2026-10-23T07:05:37.668561+00:00"
+}
