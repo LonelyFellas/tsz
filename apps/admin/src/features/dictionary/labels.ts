@@ -4,7 +4,6 @@ import type {
   AdminWordKind,
   AdminWordStatus,
   CefrLevel,
-  RelationReferenceSummaryV2,
   SurfaceMatchCategoryV2
 } from "@tsz/types";
 
@@ -46,20 +45,6 @@ export const MATCH_CATEGORY_LABEL: Record<SurfaceMatchCategoryV2, string> = {
  */
 export function matchCategoryLabel(category: SurfaceMatchCategoryV2): string {
   return MATCH_CATEGORY_LABEL[category] ?? category;
-}
-
-type RelationType = RelationReferenceSummaryV2["previews"][number]["relation"];
-
-/** 关联类型。词面统一带「词」字：「同义词」而非「同义」。 */
-export const RELATION_TYPE_LABEL: Record<RelationType, string> = {
-  synonym: "同义词",
-  antonym: "反义词",
-  derivative: "派生词"
-};
-
-/** 同 `matchCategoryLabel`：wire 先于前端新增取值时原样透出，别渲染出 undefined。 */
-export function relationTypeLabel(relation: RelationType): string {
-  return RELATION_TYPE_LABEL[relation] ?? relation;
 }
 
 export const CEFR_LEVELS: readonly CefrLevel[] = [

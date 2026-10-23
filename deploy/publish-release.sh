@@ -25,7 +25,7 @@ if [[ "$component" = web ]]; then
     cd artifact/apps/web
     "$node_bin" <<'NODE'
 const assert = require('node:assert/strict');
-const sharp = require('next/dist/server/image-optimizer').getSharp();
+const sharp = require('next/dist/server/image-optimizer/transform').getSharp();
 sharp({ create: { width: 2, height: 2, channels: 3, background: '#ff0000' } })
   .resize(1, 1)
   .webp()
