@@ -21,6 +21,7 @@ export interface AdminAuthRuntime {
   tokens: TokenManager;
   restoreSession: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  clearSession: () => void;
   /** 登录成功后：access token 存内存并启动主动刷新定时器。 */
   persistSession: (
     auth: Pick<AdminAuthResponse, "access_token" | "expires_in">
@@ -60,9 +61,14 @@ export function createAdminAuthRuntime({
   changePasswordPath = "/change-password"
 }: AdminAuthRuntimeOptions): AdminAuthRuntime {
   const store = createAdminAuthStore();
+  const clearProfile = () => {
+    store.getState().setProfile(null);
+    store.setState({ hydrated: true, connectionError: false });
+  };
   const tokens = createTokenManager({
     baseUrl,
     loginPath,
+    onSessionChanged: clearProfile,
     onRefreshError: (error) => {
       store.setState({
         refreshUnconfirmed: error instanceof RefreshUnconfirmedError
@@ -188,6 +194,10 @@ export function createAdminAuthRuntime({
     tokens,
     restoreSession: refreshProfile,
     refreshProfile,
+    clearSession: () => {
+      tokens.clearSession();
+      clearProfile();
+    },
     persistSession: (auth) => {
       store.getState().setProfile(null);
       loadingProfile = undefined;

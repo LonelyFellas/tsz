@@ -14,6 +14,10 @@ export function createSessionRestore<T>(
     if (pending?.generation === generation) return pending.promise;
     const promise = (async () => {
       try {
+        if (!tokens.canRestoreSession()) {
+          absent();
+          return;
+        }
         if (!tokens.getToken()) await tokens.refreshTokens();
         if (generation !== tokens.getSessionGeneration()) return;
         const session = await load();

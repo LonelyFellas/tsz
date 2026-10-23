@@ -1,5 +1,5 @@
 import { clearOtherSnapshots } from "@tsz/shared/recovery";
-import { api, tokens, useAuthStore } from "@/lib/auth";
+import { api, clearSession } from "@/lib/auth";
 
 /**
  * 本地登出收尾：清 token、清 profile、整页跳回登录页。两条登出路径（当前会话 / 全部会话）
@@ -10,26 +10,19 @@ import { api, tokens, useAuthStore } from "@/lib/auth";
  * 会被那个残留的 redirect 送回上一账号的页面，而非从首页进。与「终止操作整页跳转」约定一致；
  * replace 不把登出前的受保护页留在历史，避免「后退」闪回外壳。
  */
-function useFinishLocalLogout() {
-  const setProfile = useAuthStore((s) => s.setProfile);
-
-  return function finishLocalLogout() {
-    // 仅明确登出清全部草稿；会话恢复/续期失败保留备份供重新登录后恢复。
-    try {
-      clearOtherSnapshots(null, sessionStorage);
-    } catch {
-      // 存储不可用不能阻断本地退出登录。
-    }
-    tokens.setAccessToken(null);
-    setProfile(null);
-    window.location.replace("/login");
-  };
+function finishLocalLogout() {
+  // 仅明确登出清全部草稿；会话恢复/续期失败保留备份供重新登录后恢复。
+  try {
+    clearOtherSnapshots(null, sessionStorage);
+  } catch {
+    // 存储不可用不能阻断本地退出登录。
+  }
+  clearSession();
+  window.location.replace("/login");
 }
 
 /** 后台登出：吊销当前会话 refresh token，清本地态，整页跳回登录页。 */
 export function useAdminLogout() {
-  const finishLocalLogout = useFinishLocalLogout();
-
   return async function logout() {
     try {
       // 通知后端吊销 refresh token（admin cookie 自动携带）。幂等。
@@ -48,8 +41,6 @@ export function useAdminLogout() {
  * 避免仅本地登出被误认为全部设备已退出。
  */
 export function useAdminLogoutAll() {
-  const finishLocalLogout = useFinishLocalLogout();
-
   return async function logoutAll() {
     await api.auth.logoutAll();
     finishLocalLogout();

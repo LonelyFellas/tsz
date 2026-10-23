@@ -17,7 +17,7 @@ export const authRuntime = createAdminAuthRuntime({
   getTestResourceRun: readTestResourceRun
 });
 
-export const { api, tokens, persistSession } = authRuntime;
+export const { api, tokens, persistSession, clearSession } = authRuntime;
 
 /** 后台用户态 store（含 profile / role，门禁据 profile 是否存在判定）。 */
 export const useAuthStore = authRuntime.store;
