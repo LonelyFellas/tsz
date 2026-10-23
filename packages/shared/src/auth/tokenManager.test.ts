@@ -86,6 +86,93 @@ describe("createTokenManager", () => {
     expect(tm.getToken()).toBeUndefined();
   });
 
+  it.each(["storage", "request"])(
+    "跨页登录通过 %s 检查清除旧身份，但不影响另一 realm",
+    (delivery) => {
+      vi.useFakeTimers();
+      const values = new Map<string, string>();
+      vi.stubGlobal("localStorage", {
+        getItem: (key: string) => values.get(key) ?? null,
+        setItem: (key: string, value: string) => values.set(key, value),
+        removeItem: (key: string) => values.delete(key)
+      });
+      const location = { href: "" };
+      const win = Object.assign(new EventTarget(), { location });
+      vi.stubGlobal("window", win);
+      vi.stubGlobal("document", new EventTarget());
+      const changed = vi.fn();
+      const oldTab = createTokenManager({
+        baseUrl: "/api/v1",
+        onSessionChanged: changed
+      });
+      oldTab.setAccessToken("account-a");
+      oldTab.scheduleRefresh(900);
+      const admin = createTokenManager({ baseUrl: "/api/v1/admin" });
+      admin.setAccessToken("admin-a");
+      const newTab = createTokenManager({ baseUrl: "/api/v1" });
+      newTab.setAccessToken("account-b");
+      const generation = oldTab.getSessionGeneration();
+
+      if (delivery === "storage") {
+        win.dispatchEvent(
+          Object.assign(new Event("storage"), {
+            key: "tsz:auth-session:/api/v1"
+          })
+        );
+      } else {
+        expect(oldTab.getToken()).toBeUndefined();
+      }
+
+      expect(oldTab.getToken()).toBeUndefined();
+      expect(oldTab.getSessionGeneration()).toBeGreaterThan(generation);
+      expect(oldTab.canRestoreSession()).toBe(false);
+      expect(changed).toHaveBeenCalledTimes(1);
+      expect(newTab.getToken()).toBe("account-b");
+      expect(admin.getToken()).toBe("admin-a");
+      expect(location.href).toBe("/login");
+      expect(vi.getTimerCount()).toBe(0);
+    }
+  );
+
+  it("跨页退出后的新页面也禁止旧 Cookie 恢复，显式登录才解除", async () => {
+    vi.useFakeTimers();
+    const values = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key)
+    });
+    const first = createTokenManager({ baseUrl: "/api/v1/admin" });
+    first.setAccessToken("admin-a");
+    first.clearSession();
+    const reloaded = createTokenManager({ baseUrl: "/api/v1/admin" });
+    const fetch = vi.spyOn(globalThis, "fetch");
+    await expect(reloaded.refreshTokens()).rejects.toThrow("session changed");
+    expect(fetch).not.toHaveBeenCalled();
+    expect(reloaded.canRestoreSession()).toBe(false);
+    reloaded.setAccessToken("explicit-login");
+    expect(reloaded.canRestoreSession()).toBe(true);
+  });
+
+  it("浏览器存储可读但写入被拒绝时，不会把本次登录误判为跨页切换", () => {
+    vi.stubGlobal("localStorage", {
+      getItem: () => null,
+      setItem: () => {
+        throw new DOMException("quota", "QuotaExceededError");
+      },
+      removeItem: () => undefined
+    });
+    const changed = vi.fn();
+    const tm = createTokenManager({
+      baseUrl: "/api/v1",
+      onSessionChanged: changed
+    });
+    tm.setAccessToken("login");
+    expect(tm.getToken()).toBe("login");
+    expect(tm.canRestoreSession()).toBe(true);
+    expect(changed).not.toHaveBeenCalled();
+  });
+
   it("refreshTokens 成功后写入新 token 并返回", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")

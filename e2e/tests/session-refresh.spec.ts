@@ -1,5 +1,58 @@
 import { expect, test } from "@playwright/test";
-import { mockApi } from "./support/mockApi";
+import { mockApi, TEST_USER } from "./support/mockApi";
+
+test("另一标签页切换账号后旧页面退出，刷新也不恢复另一账号", async ({
+  page,
+  context
+}) => {
+  await mockApi(context, { authenticated: true });
+  const other = {
+    ...TEST_USER,
+    id: "00000000-0000-4000-8000-000000000002",
+    display_name: "Bob"
+  };
+  let current = TEST_USER as typeof other;
+  const jwt = () =>
+    `header.${Buffer.from(JSON.stringify({ sub: current.id, aud: "web" })).toString("base64")}.signature`;
+  await context.route("**/api/v1/auth/refresh", (route) =>
+    route.fulfill({ json: { access_token: jwt(), expires_in: 900 } })
+  );
+  await context.route("**/api/v1/auth/login", (route) => {
+    current = other;
+    return route.fulfill({
+      json: { user: current, access_token: jwt(), expires_in: 900 }
+    });
+  });
+  await context.route("**/api/v1/me", (route) =>
+    route.fulfill({
+      json: {
+        user: current,
+        active_role: "student",
+        onboarded: true,
+        learning_settings: { cefr_level: "A1", english_variant: "BrE" }
+      }
+    })
+  );
+  await page.goto("/student/practice");
+  await expect(page.getByRole("button", { name: "账户菜单" })).toBeVisible();
+  const second = await context.newPage();
+  await second.goto("/student/practice");
+  await second.getByRole("button", { name: "账户菜单" }).click();
+  await second.getByRole("menuitem", { name: "退出登录" }).click();
+  await expect(second).toHaveURL(/\/login(?:\?|$)/);
+  await second.getByLabel("手机号或邮箱").fill("bob@example.com");
+  await second.getByLabel("密码", { exact: true }).fill("RawCase!234");
+  await second.getByRole("button", { name: "立即登录" }).click();
+  await expect(second.getByRole("button", { name: "账户菜单" })).toBeVisible();
+  await expect(page).toHaveURL(/\/login(?:\?|$)/);
+  await expect(page.getByRole("button", { name: "账户菜单" })).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole("button", { name: "立即登录" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "账户菜单" })).toHaveCount(0);
+  await second.getByRole("button", { name: "账户菜单" }).click();
+  await expect(second.getByText("Bob", { exact: true })).toBeVisible();
+  await second.close();
+});
 
 test("首页恢复会话后再预取导航页面", async ({ page }) => {
   await mockApi(page, { authenticated: true });

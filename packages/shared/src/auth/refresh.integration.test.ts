@@ -66,6 +66,99 @@ describe.each(["web", "admin"] as const)("%s HTTP + auth runtime", (realm) => {
     rt.tokens.setAccessToken(null);
   });
 
+  it("共享 Cookie 切换账号后，拒绝以新身份重放旧页面的写请求", async () => {
+    const { rt, location } = setup();
+    const jwt = (sub: string) =>
+      `header.${btoa(JSON.stringify({ sub, aud: realm }))}.signature`;
+    rt.persistSession({ access_token: jwt("account-a"), expires_in: 900 });
+    const state = rt.store.getState();
+    if ("setProfile" in state)
+      state.setProfile({
+        id: "account-a",
+        phone: "",
+        display_name: "账号 A",
+        role: "admin",
+        permission_version: 1,
+        catalog_version: "v1",
+        permissions: [],
+        preferences: { dialect: "uk" }
+      });
+    else
+      state.setSession(
+        {
+          id: "account-a",
+          display_name: "账号 A",
+          avatar_url: "",
+          roles: ["student"],
+          active_role: "student"
+        },
+        true
+      );
+    const generation = rt.tokens.getSessionGeneration();
+    let writes = 0;
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async (url) => {
+        if (String(url).endsWith("/auth/refresh"))
+          return response(200, {
+            access_token: jwt("account-b"),
+            expires_in: 900
+          });
+        writes++;
+        return writes === 1 ? response(401) : response(200, {});
+      });
+    const write = () =>
+      "profile" in rt.api
+        ? rt.api.updateProfilePreferences({ dialect: "us" })
+        : rt.api.auth.updateProfile("新昵称");
+
+    await expect(write()).rejects.toThrow("session changed");
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(rt.tokens.getToken()).toBeUndefined();
+    expect(rt.tokens.getSessionGeneration()).toBeGreaterThan(generation);
+    expect(location.href).toBe("/login");
+    expect(rt.store.getState()).toMatchObject(
+      realm === "admin" ? { profile: null } : { user: null }
+    );
+  });
+
+  it("同账号正常续期仍可重放原请求", async () => {
+    const { rt, request, location } = setup();
+    const jwt = (exp: number) =>
+      `header.${btoa(JSON.stringify({ sub: "account-a", aud: realm, exp }))}.signature`;
+    rt.persistSession({ access_token: jwt(1), expires_in: 900 });
+    const generation = rt.tokens.getSessionGeneration();
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(response(401))
+      .mockResolvedValueOnce(
+        response(200, { access_token: jwt(2), expires_in: 900 })
+      )
+      .mockResolvedValueOnce(
+        response(
+          200,
+          realm === "admin"
+            ? {
+                id: "account-a",
+                role: "admin",
+                permission_version: 1,
+                catalog_version: "v1",
+                permissions: []
+              }
+            : {}
+        )
+      );
+
+    await request();
+
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(rt.tokens.getToken()).toBe(jwt(2));
+    expect(rt.tokens.getSessionGeneration()).toBe(generation);
+    expect(location.href).toBe("");
+    rt.tokens.setAccessToken(null);
+  });
+
   it("同页并发业务 401 只产生一次 refresh", async () => {
     const { rt, request } = setup();
     let release!: (res: Response) => void;
