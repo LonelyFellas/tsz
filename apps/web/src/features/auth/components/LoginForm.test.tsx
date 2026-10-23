@@ -64,6 +64,32 @@ async function fillLogin(account = "13800138000", password = "abc123") {
 }
 
 describe("LoginForm — 密码与手机验证码登录", () => {
+  it.each([
+    [429, "login_rate_limited", "登录尝试过于频繁"],
+    [503, "login_unavailable", "登录服务暂不可用"]
+  ] as const)(
+    "密码登录 %s 按错误码提示并保留重试能力",
+    async (status, code, message) => {
+      mockLogin.mockRejectedValueOnce(
+        new HttpError(status, "changed backend detail", [], code)
+      );
+      renderWithProviders(<LoginForm />);
+      const user = await fillLogin();
+      await user.click(screen.getByRole("button", { name: "立即登录" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent(message);
+      expect(screen.getByLabelText("手机号或邮箱")).toHaveValue("13800138000");
+      expect(screen.getByRole("button", { name: "立即登录" })).toBeEnabled();
+      expect(mockMe).not.toHaveBeenCalled();
+      expect(useUserStore.getState().user).toBeNull();
+
+      mockLogin.mockResolvedValueOnce(AUTH_OK);
+      await user.click(screen.getByRole("button", { name: "立即登录" }));
+      await waitFor(() =>
+        expect(useUserStore.getState().user).toEqual(ME_USER)
+      );
+    }
+  );
+
   it("默认密码登录并提供手机验证码切换", () => {
     renderWithProviders(<LoginForm />);
     expect(
