@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily tsz frontend retention cleanup
+
+[Timer]
+OnCalendar=*-*-* 04:17:00
+RandomizedDelaySec=5min
+Persistent=true
+Unit=tsz-frontend-retention.service
+
+[Install]
+WantedBy=timers.target
