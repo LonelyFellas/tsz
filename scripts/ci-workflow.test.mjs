@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
-import { readFile, readdir } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import * as prettier from "prettier";
 
@@ -244,7 +247,7 @@ test("Playwright dependency timeouts can terminate privileged installers", async
     const block = jobs.get(name);
     assert.match(
       block,
-      /sudo timeout --kill-after=15s 240 env "PATH=\$PATH" pnpm --filter @tsz\/e2e exec playwright install-deps chromium/
+      /sudo timeout --kill-after=15s 180 env "PATH=\$PATH" pnpm --filter @tsz\/e2e exec playwright install-deps chromium/
     );
     assert.doesNotMatch(block, /if timeout 240 pnpm/);
   }
@@ -254,6 +257,92 @@ test("Playwright dependency timeouts can terminate privileged installers", async
     /apt-get install[^\n]*-o DPkg::Lock::Timeout=120[^\n]*fonts-noto-cjk/
   );
   assert.match(admin, /fc-match[^\n]*lang=zh-cn[^\n]*Noto Sans CJK/);
+});
+
+test("APT downloads leave time for E2E and required fonts still fail closed", async () => {
+  const { jobs } = await workflowFixture();
+  for (const name of ["e2e-web", "e2e-admin"]) {
+    const block = jobs.get(name);
+    const setup = block.slice(
+      block.indexOf("- name: Configure APT downloads"),
+      block.indexOf("- name: Install Playwright system deps")
+    );
+    assert.match(setup, /https:\/\/archive\.ubuntu\.com\/ubuntu\//);
+    assert.match(setup, /Acquire::http::Timeout "30"/);
+    assert.match(setup, /Acquire::https::Timeout "30"/);
+    assert.match(setup, /Acquire::Retries "2"/);
+    const deps = block.slice(
+      block.indexOf("- name: Install Playwright system deps")
+    );
+    assert.match(deps, /for i in 1 2; do/);
+    assert.doesNotMatch(deps, /for i in 1 2 3; do/);
+  }
+  const admin = jobs.get("e2e-admin");
+  const fonts = admin.slice(
+    admin.indexOf("- name: Install Chinese fonts"),
+    admin.indexOf("- name: Admin E2E")
+  );
+  assert.match(fonts, /sudo timeout --kill-after=15s 120 sh -c/);
+  assert.match(fonts, /for i in 1 2; do/);
+  assert.match(fonts, /fc-match[^\n]*lang=zh-cn[^\n]*Noto Sans CJK/);
+  assert.match(fonts, /exit 1/);
+  assert.doesNotMatch(fonts, /continue-on-error/);
+  assert.match(admin, /timeout-minutes: 20/);
+});
+
+test("font installation retries are bounded and missing fonts fail the step", async (t) => {
+  const { jobs } = await workflowFixture();
+  const admin = jobs.get("e2e-admin");
+  const step = admin.slice(
+    admin.indexOf("- name: Install Chinese fonts"),
+    admin.indexOf("- name: Admin E2E")
+  );
+  const script = step
+    .slice(step.indexOf("run: |") + "run: |".length)
+    .split("\n")
+    .map((line) => line.replace(/^ {10}/, ""))
+    .join("\n");
+  const dir = await mkdtemp(join(tmpdir(), "ci-font-test-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  await writeFile(
+    join(dir, "sudo"),
+    `#!/bin/sh
+count=$(wc -l < "$CALLS_FILE")
+printf 'attempt\\n' >> "$CALLS_FILE"
+[ "$count" -ge "$FAIL_COUNT" ]
+`,
+    { mode: 0o755 }
+  );
+  await writeFile(join(dir, "sleep"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+  await writeFile(
+    join(dir, "fc-match"),
+    '#!/bin/sh\nprintf "%s\\n" "$FONT_FAMILY"\n',
+    { mode: 0o755 }
+  );
+  for (const [failCount, font, expectedStatus, attempts] of [
+    [1, "Noto Sans CJK SC", 0, 2],
+    [2, "Noto Sans CJK SC", 1, 2],
+    [0, "DejaVu Sans", 1, 1]
+  ]) {
+    const calls = join(dir, "calls");
+    await writeFile(calls, "");
+    const result = spawnSync("bash", ["-e", "-o", "pipefail", "-c", script], {
+      encoding: "utf8",
+      timeout: 5000,
+      env: {
+        ...process.env,
+        PATH: `${dir}:${process.env.PATH}`,
+        CALLS_FILE: calls,
+        FAIL_COUNT: String(failCount),
+        FONT_FAMILY: font
+      }
+    });
+    assert.equal(result.status, expectedStatus, result.stderr);
+    assert.equal(
+      (await readFile(calls, "utf8")).trim().split("\n").length,
+      attempts
+    );
+  }
 });
 
 test("W10: only trusted successful main pushes can write caches", async () => {

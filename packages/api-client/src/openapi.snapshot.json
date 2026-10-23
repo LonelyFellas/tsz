@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dictionary-last-updater/docs/openapi.json",
-  "_generatedAt": "2026-10-23T14:29:46.688Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/coins-management-clarity/docs/openapi.json",
+  "_generatedAt": "2026-10-23T15:40:24.471Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -1198,6 +1198,12 @@
         "schema": { "type": "string", "format": "uuid" }
       },
       {
+        "name": "actor_search",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
         "name": "created_from",
         "in": "query",
         "required": false,
@@ -1210,10 +1216,22 @@
         "schema": { "type": "string", "format": "date-time" }
       },
       {
+        "name": "include_names",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "boolean" }
+      },
+      {
         "name": "owner_id",
         "in": "query",
         "required": false,
         "schema": { "type": "string", "format": "uuid" }
+      },
+      {
+        "name": "owner_search",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
       },
       {
         "name": "owner_type",
@@ -3362,6 +3380,10 @@
         "created_at"
       ],
       "properties": {
+        "actor_display_name": {
+          "type": ["string", "null"],
+          "description": "Current operator name, included only when requested and available."
+        },
         "actor_id": { "type": "string", "format": "uuid" },
         "balance_after": {
           "type": "string",
@@ -3372,6 +3394,10 @@
         "event_id": { "type": "string" },
         "evidence_ref": { "type": ["string", "null"] },
         "id": { "type": "string", "format": "uuid" },
+        "owner_display_name": {
+          "type": ["string", "null"],
+          "description": "Current account name, included only when requested and available."
+        },
         "owner_id": { "type": "string", "format": "uuid" },
         "owner_type": { "$ref": "#/components/schemas/OwnerType" },
         "reason": { "type": "string" },

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dictionary-last-updater/docs/openapi.json",
-  "_source_sha256": "c81963fbfc3ac9af335a2336eb7979b1e017d000e93ce3250b2ca471940489f8",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/coins-management-clarity/docs/openapi.json",
+  "_source_sha256": "ef95269aba974feac1666c14c90620428f653f8d48dd0376e1058d4760e56e70",
   "roots": [
     "DictionaryPage",
     "DictionaryEntry",
@@ -2257,6 +2257,7 @@
         "created_at"
       ],
       "properties": {
+        "actor_display_name": { "type": ["string", "null"] },
         "actor_id": { "type": "string", "format": "uuid" },
         "balance_after": {
           "type": "string",
@@ -2267,6 +2268,7 @@
         "event_id": { "type": "string" },
         "evidence_ref": { "type": ["string", "null"] },
         "id": { "type": "string", "format": "uuid" },
+        "owner_display_name": { "type": ["string", "null"] },
         "owner_id": { "type": "string", "format": "uuid" },
         "owner_type": { "$ref": "#/$defs/OwnerType" },
         "reason": { "type": "string" },
