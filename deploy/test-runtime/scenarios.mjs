@@ -5,11 +5,12 @@ import {
   readFile,
   readlink,
   access,
-  rm
+  rm,
+  utimes
 } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
-import { createCandidateManifest } from "../provenance.mjs";
+import { createCandidateManifest, digestDirectory } from "../provenance.mjs";
 const file = (p) => readFile(p, "utf8");
 async function stage(component, id, withImageRuntime = true) {
   const dir = `/opt/stage-${id}`;
@@ -177,6 +178,29 @@ const zentao = spawnSync(
 );
 assert.equal(zentao.status, 0, zentao.stderr);
 assert.equal(zentao.stdout, "zentao");
+// 旧 manifest 包含构建种子；正常请求新增路由缓存后，下一次发布仍能验证原摘要。
+const acceptedWeb = JSON.parse(
+  await file("/opt/tsz-deploy-manifests/web.json")
+);
+const webRoot = await readlink("/opt/tsz-releases/web/current");
+const oldDigest = await digestDirectory(webRoot, {
+  excludedPaths: ["apps/web/.next/cache"]
+});
+acceptedWeb.artifact.excluded_paths = ["apps/web/.next/cache"];
+acceptedWeb.artifact.sha256 = oldDigest.sha256;
+acceptedWeb.artifact.file_count = oldDigest.fileCount;
+await writeFile(
+  "/opt/tsz-deploy-manifests/web.json",
+  JSON.stringify(acceptedWeb)
+);
+const runtimeCache = `${webRoot}/apps/web/.next/server/route-cache/APP_PAGE/request`;
+await mkdir(runtimeCache, { recursive: true });
+await writeFile(`${runtimeCache}/login.html`, "runtime page");
+await utimes(
+  `${runtimeCache}/login.html`,
+  new Date(),
+  new Date(Date.parse(acceptedWeb.accepted_at) + 1000)
+);
 const webAccepted = await file("/opt/tsz-deploy-manifests/web.json");
 const systemCallsBeforeImages = await file("/tmp/systemctl-calls");
 const upstreamBeforeImages = await file("/etc/nginx/tsz-web-upstream.inc");

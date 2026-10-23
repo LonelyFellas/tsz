@@ -18,6 +18,7 @@ import {
   createCandidateManifest,
   digestDirectory,
   validateManifest,
+  verifyCandidateManifest,
   verifyManifest
 } from "./provenance.mjs";
 
@@ -211,6 +212,104 @@ test("N08: fixed web runtime cache is excluded from the release digest", async (
 
   assert.deepEqual(await digestDirectory(root, options), initial);
   assert.notDeepEqual(await digestDirectory(root), initial);
+});
+
+test("web route cache can grow without changing the accepted release digest", async (t) => {
+  const root = await fixture();
+  const outputDir = await mkdtemp(path.join(tmpdir(), "tsz-route-cache-"));
+  t.after(async () => {
+    const { rm } = await import("node:fs/promises");
+    await rm(root, { recursive: true });
+    await rm(outputDir, { recursive: true });
+  });
+  const cache = path.join(root, "apps/web/.next/server/route-cache/APP_PAGE");
+  await mkdir(cache, { recursive: true });
+  await writeFile(path.join(cache, "seed.html"), "built seed");
+  const candidatePath = path.join(outputDir, "candidate.json");
+  const finalPath = path.join(outputDir, "web.json");
+  const candidate = await createCandidateManifest(
+    candidateInput(root, candidatePath)
+  );
+  await writeFile(path.join(cache, "runtime.html"), "runtime page");
+  await acceptManifest({
+    manifestPath: candidatePath,
+    artifactRoot: root,
+    outputPath: finalPath
+  });
+  const verified = await verifyManifest({
+    manifestPath: finalPath,
+    artifactRoot: root
+  });
+  assert.deepEqual(verified.artifact, candidate.artifact);
+  await writeFile(path.join(root, "a.txt"), "modified code");
+  await assert.rejects(
+    () => verifyManifest({ manifestPath: finalPath, artifactRoot: root }),
+    /digest/i
+  );
+});
+
+test("legacy web manifests ignore only route-cache files added after acceptance", async (t) => {
+  const root = await fixture();
+  const outputDir = await mkdtemp(
+    path.join(tmpdir(), "tsz-legacy-route-cache-")
+  );
+  t.after(async () => {
+    const { rm } = await import("node:fs/promises");
+    await rm(root, { recursive: true });
+    await rm(outputDir, { recursive: true });
+  });
+  const cache = path.join(root, "apps/web/.next/server/route-cache/APP_PAGE");
+  await mkdir(cache, { recursive: true });
+  const seed = path.join(cache, "seed.html");
+  await writeFile(seed, "built seed");
+  const digest = await digestDirectory(root, {
+    excludedPaths: ["apps/web/.next/cache"]
+  });
+  const manifestPath = path.join(outputDir, "web.json");
+  const candidate = await createCandidateManifest(
+    candidateInput(root, manifestPath)
+  );
+  const acceptedAt = "2026-10-22T07:28:15.650Z";
+  const legacy = {
+    ...candidate,
+    artifact: {
+      ...candidate.artifact,
+      sha256: digest.sha256,
+      file_count: digest.fileCount,
+      excluded_paths: ["apps/web/.next/cache"]
+    },
+    accepted_at: acceptedAt
+  };
+  await writeFile(manifestPath, JSON.stringify(legacy));
+  await utimes(seed, new Date(0), new Date(0));
+  const runtime = path.join(cache, "runtime.html");
+  await writeFile(runtime, "runtime page");
+  await utimes(
+    runtime,
+    new Date(acceptedAt),
+    new Date(Date.parse(acceptedAt) + 1000)
+  );
+  const bytes = await readFile(manifestPath);
+  await verifyManifest({ manifestPath, artifactRoot: root });
+  assert.deepEqual(await readFile(manifestPath), bytes);
+  const pending = { ...legacy, accepted_at: null };
+  await writeFile(manifestPath, JSON.stringify(pending));
+  await assert.rejects(
+    () => verifyCandidateManifest({ manifestPath, artifactRoot: root }),
+    /digest/i
+  );
+  await writeFile(manifestPath, JSON.stringify(legacy));
+  await writeFile(seed, "modified seed");
+  await assert.rejects(
+    () => verifyManifest({ manifestPath, artifactRoot: root }),
+    /digest/i
+  );
+  const { rm } = await import("node:fs/promises");
+  await rm(runtime);
+  await assert.rejects(
+    () => verifyManifest({ manifestPath, artifactRoot: root }),
+    /digest/i
+  );
 });
 
 test("N06: candidate acceptance creates a strict verifiable manifest", async (t) => {
