@@ -549,12 +549,15 @@ describe("failed admin logout after an uncertain Cookie rotation", () => {
     const refreshing = runtime.tokens.refreshTokens();
     const cancelled = expect(refreshing).rejects.toThrow("session changed");
     await expect(runtime.api.auth.logout()).rejects.toThrow("offline");
-    runtime.tokens.setAccessToken(null);
-    runtime.store.getState().setProfile(null);
+    runtime.clearSession();
     await cancelled;
     expect(values.get(`tsz:refresh-unconfirmed:${baseUrl}`)).toBe("cancelled");
     const loginPage = createAdminAuthRuntime({ baseUrl });
-    await expect(loginPage.restoreSession()).rejects.toThrow("请重新登录");
+    await expect(loginPage.restoreSession()).resolves.toBeUndefined();
+    expect(loginPage.store.getState()).toMatchObject({
+      profile: null,
+      hydrated: true
+    });
     expect(fetch).toHaveBeenCalledTimes(2);
     deliver(response(200, { access_token: "late-rotation", expires_in: 900 }));
     await vi.advanceTimersByTimeAsync(0);
@@ -583,13 +586,16 @@ describe("failed admin logout after an uncertain Cookie rotation", () => {
     await expect(runtime.tokens.refreshTokens()).rejects.toThrow("offline");
     await expect(runtime.api.auth.logout()).rejects.toThrow("offline");
     // The normal logout hook performs this local cleanup even if revocation failed.
-    runtime.tokens.setAccessToken(null);
-    runtime.store.getState().setProfile(null);
+    runtime.clearSession();
     expect(runtime.tokens.getToken()).toBeUndefined();
     const loginPage = createAdminAuthRuntime({ baseUrl });
-    await expect(loginPage.restoreSession()).rejects.toThrow("请重新登录");
+    await expect(loginPage.restoreSession()).resolves.toBeUndefined();
+    expect(loginPage.store.getState()).toMatchObject({
+      profile: null,
+      hydrated: true
+    });
     expect(fetch).toHaveBeenCalledTimes(2);
-    expect(loginPage.store.getState().refreshUnconfirmed).toBe(true);
+    expect(loginPage.tokens.canRestoreSession()).toBe(false);
     expect(values.get(`tsz:refresh-unconfirmed:${baseUrl}`)).toBe("cancelled");
     loginPage.persistSession({
       access_token: "explicit-login",
