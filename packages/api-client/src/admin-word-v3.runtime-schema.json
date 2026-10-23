@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-custom-audio/docs/openapi.json",
-  "_source_sha256": "f8ef1da00239e86b93c9018cc879b2007f68432051499ff621cb8d09a1a72410",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/voice-volume/docs/openapi.json",
+  "_source_sha256": "4bcdd4f87897729968e3bdcaadfd0fb8fff73e28fdc26100053d9342d51f5cf1",
   "roots": [
     "DictionaryPage",
     "DictionaryEntry",
@@ -3962,7 +3962,8 @@
         "pitch_semitones": { "type": "integer", "maximum": 12, "minimum": -12 },
         "rate_percent": { "type": "integer", "maximum": 100, "minimum": -50 },
         "style": { "type": "string", "maxLength": 64 },
-        "voice_id": { "type": "string" }
+        "voice_id": { "type": "string" },
+        "volume_percent": { "type": "integer", "maximum": 100, "minimum": 0 }
       },
       "additionalProperties": false
     },

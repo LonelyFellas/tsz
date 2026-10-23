@@ -321,6 +321,12 @@ describe("RichText compatibility and canonical hash", () => {
     expect(
       canonicalVoiceHash(equivalent, { ...SETTINGS, pitchSemitones: 2 })
     ).not.toBe(hash);
+    expect(
+      canonicalVoiceHash(equivalent, { ...SETTINGS, volumePercent: 65 })
+    ).not.toBe(hash);
+    expect(
+      canonicalVoiceHash(equivalent, { ...SETTINGS, volumePercent: 100 })
+    ).toBe(hash);
     expect(canonicalVoiceHash(equivalent)).toHaveLength(8);
   });
 });

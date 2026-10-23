@@ -1954,6 +1954,92 @@ describe("VoiceEditor 发音区", () => {
     );
   });
 
+  it.each([65, 0])(
+    "未配置音色首次试听与选用均继承个人音量 %s，旧文本仍用自己的默认值",
+    async (volume) => {
+      const synthesize = vi.fn().mockResolvedValue(previewResult());
+      const onVoiceProfileChange = vi.fn();
+      const personalAdapter = {
+        ...adapter(synthesize),
+        listVoices: vi.fn().mockResolvedValue(
+          VOICES.map((voice) => ({
+            ...voice,
+            defaultSettings: {
+              rate_percent: -5,
+              pitch_semitones: 2,
+              volume_percent: volume
+            }
+          }))
+        )
+      };
+      const view = render(
+        <VoiceEditor
+          {...props({ previewAdapter: personalAdapter, onVoiceProfileChange })}
+        />
+      );
+      openVoices();
+      await screen.findByLabelText("启用 Sonia · 英式女声");
+      expect(
+        screen.getByRole("spinbutton", {
+          name: "Sonia · 英式女声 音量",
+          hidden: true
+        })
+      ).toHaveValue(String(volume));
+      fireEvent.click(button("试听 Sonia · 英式女声"));
+      await waitFor(() =>
+        expect(synthesize).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            voiceId: "sonia",
+            ratePercent: -5,
+            pitchSemitones: 2,
+            volumePercent: volume
+          }),
+          expect.anything()
+        )
+      );
+      expect(onVoiceProfileChange).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByLabelText("启用 Sonia · 英式女声"));
+      expect(onVoiceProfileChange).toHaveBeenLastCalledWith({
+        voices: [
+          {
+            voice_id: "sonia",
+            enabled: true,
+            rate_percent: -5,
+            pitch_semitones: 2,
+            volume_percent: volume
+          }
+        ]
+      });
+      view.unmount();
+      render(
+        <VoiceEditor
+          {...props({
+            previewAdapter: personalAdapter,
+            voiceProfile: {
+              voices: [{ voice_id: "sonia", enabled: false, rate_percent: 5 }]
+            }
+          })}
+        />
+      );
+      openVoices();
+      await screen.findByLabelText("启用 Sonia · 英式女声");
+      expect(
+        screen.getByRole("spinbutton", {
+          name: "Sonia · 英式女声 音量",
+          hidden: true
+        })
+      ).toHaveValue("100");
+      fireEvent.click(button("试听 Sonia · 英式女声"));
+      await waitFor(() =>
+        expect(synthesize).toHaveBeenLastCalledWith(
+          expect.objectContaining({ voiceId: "sonia", ratePercent: 5 }),
+          expect.anything()
+        )
+      );
+      expect(synthesize.mock.lastCall?.[0]).not.toHaveProperty("volumePercent");
+    }
+  );
+
   it("首次勾选读取个人参数，已有文本参数优先于个人默认值", async () => {
     const onVoiceProfileChange = vi.fn();
     const personalAdapter = {

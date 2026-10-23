@@ -45,6 +45,7 @@ export interface SaveAdminDubbingGroupsInput {
 export interface AdminVoiceParameters {
   rate_percent: number;
   pitch_semitones: number;
+  volume_percent?: number;
   style: string | null;
 }
 
@@ -82,6 +83,7 @@ export interface CreateAdminSpeechPreviewInput {
   style?: string | null;
   rate_percent?: number;
   pitch_semitones?: number;
+  volume_percent?: number;
 }
 
 export interface AdminSpeechPreviewResponse {

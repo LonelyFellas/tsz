@@ -18,7 +18,9 @@ function settingsForVoice(
   settings: readonly VoiceSetting[],
   voice: VoiceOption
 ): VoiceSettings {
-  const setting = settings.find((item) => item.voice_id === voice.id);
+  const setting =
+    settings.find((item) => item.voice_id === voice.id) ??
+    voice.defaultSettings;
   const rate = setting?.rate_percent ?? 0;
   const ratePercent = voice.rateRange
     ? Math.min(Math.max(rate, voice.rateRange.min), voice.rateRange.max)
@@ -28,6 +30,9 @@ function settingsForVoice(
     ratePercent,
     ...(setting?.pitch_semitones !== undefined
       ? { pitchSemitones: setting.pitch_semitones }
+      : {}),
+    ...(setting?.volume_percent !== undefined
+      ? { volumePercent: setting.volume_percent }
       : {}),
     ...(setting?.style ? { style: setting.style } : {})
   };

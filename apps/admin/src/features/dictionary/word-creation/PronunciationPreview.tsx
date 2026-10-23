@@ -368,6 +368,7 @@ export function PronunciationPreviewControls({
     voice?.id,
     selectedSetting?.rate_percent ?? 0,
     selectedSetting?.pitch_semitones ?? 0,
+    selectedSetting?.volume_percent ?? 100,
     selectedSetting?.style ?? ""
   ]);
   const text = previewContent.text.trim();
@@ -486,6 +487,9 @@ export function PronunciationPreviewControls({
           ratePercent: selectedSetting?.rate_percent ?? 0,
           ...(selectedSetting?.pitch_semitones !== undefined
             ? { pitchSemitones: selectedSetting.pitch_semitones }
+            : {}),
+          ...(selectedSetting?.volume_percent !== undefined
+            ? { volumePercent: selectedSetting.volume_percent }
             : {}),
           ...(selectedSetting?.style ? { style: selectedSetting.style } : {})
         },
