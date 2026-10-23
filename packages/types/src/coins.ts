@@ -66,7 +66,9 @@ export interface ManualCoinOperation {
   id: string;
   owner_type: CoinOwnerType;
   owner_id: string;
+  owner_display_name?: string | null;
   actor_id: string;
+  actor_display_name?: string | null;
   source_type: string;
   event_id: string;
   delta: string;
@@ -82,9 +84,12 @@ export interface ManualCoinOperationPage {
   pagination: CoinEntryPage["pagination"];
 }
 export interface CoinOperationsQuery {
+  include_names?: boolean;
   owner_type?: CoinOwnerType;
   owner_id?: string;
   actor_id?: string;
+  owner_search?: string;
+  actor_search?: string;
   source_type?: "manual_purchase" | "manual_reward" | "manual_reversal";
   created_from?: string;
   created_to?: string;
