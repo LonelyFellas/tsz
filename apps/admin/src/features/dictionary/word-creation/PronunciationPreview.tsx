@@ -1,5 +1,5 @@
-import { SoundOutlined, SyncOutlined } from "@ant-design/icons";
-import { App, Button, Space, Tag, Tooltip } from "antd";
+import { DownOutlined, SoundOutlined, SyncOutlined } from "@ant-design/icons";
+import { App, Button, Popover, Space, Tag, Tooltip } from "antd";
 import type { Dialect, RichTextV2, VoiceProfileV3 } from "@tsz/types";
 import type { AdminDialectPreference } from "@tsz/shared";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
@@ -222,22 +222,26 @@ export function PronunciationPreviewVoiceSummary({
   const enabled = voiceProfile?.voices.filter((row) => row.enabled) ?? [];
   if (column === "rate")
     return <span>{voice ? `${(1 + rate / 100).toFixed(2)}×` : "—"}</span>;
+  const summary = (
+    <span
+      className="word-pronunciation-voice-label"
+      title={voice ? `${isDefault ? "默认 · " : ""}${voice.label}` : undefined}
+    >
+      {context.voicesLoading
+        ? "正在读取音色"
+        : voice
+          ? voice.label.replace(` · ${voice.locale}`, "")
+          : context.voicesError || "当前口音没有可用音色"}
+    </span>
+  );
+  if (enabled.length <= 1) return summary;
   return (
-    <Space orientation="vertical" size={0}>
-      <span
-        title={
-          voice ? `${isDefault ? "默认 · " : ""}${voice.label}` : undefined
-        }
-      >
-        {context.voicesLoading
-          ? "正在读取音色"
-          : voice
-            ? voice.label.replace(` · ${voice.locale}`, "")
-            : context.voicesError || "当前口音没有可用音色"}
-      </span>
-      {enabled.length > 1 && (
-        <details>
-          <summary>全部 {enabled.length} 个音色</summary>
+    <Popover
+      trigger="click"
+      title={`全部 ${enabled.length} 个音色`}
+      destroyOnHidden
+      content={
+        <Space orientation="vertical">
           {enabled.map((setting) => (
             <div key={setting.voice_id}>
               {context.voices.find((row) => row.id === setting.voice_id)
@@ -260,9 +264,19 @@ export function PronunciationPreviewVoiceSummary({
               )}
             </div>
           ))}
-        </details>
-      )}
-    </Space>
+        </Space>
+      }
+    >
+      <Button
+        type="text"
+        size="small"
+        className="word-pronunciation-voice-summary"
+        aria-label={`查看${dialect === "uk" ? "英式" : dialect === "us" ? "美式" : "通用"}全部 ${enabled.length} 个音色`}
+      >
+        {summary}
+        <DownOutlined />
+      </Button>
+    </Popover>
   );
 }
 
