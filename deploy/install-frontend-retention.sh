@@ -35,7 +35,6 @@ NODE
 mkdir -p /opt/tsz-deploy-tools
 stage=$(mktemp -d /opt/tsz-deploy-tools/.frontend-retention.XXXXXX)
 changed=false
-had_tools=false
 was_enabled=false
 was_active=false
 systemctl is-enabled --quiet "$timer" && was_enabled=true
@@ -45,8 +44,14 @@ cleanup() {
   trap - EXIT INT TERM
   if [[ "$status" != 0 && "$changed" = true ]]; then
     systemctl stop "$timer" || failed=1
-    rm -rf -- "$root" || failed=1
-    if [[ "$had_tools" = true ]]; then mv "$stage/previous-tools" "$root" || failed=1; fi
+    # 以目录实际状态恢复；mv 完成后、下一条赋值前也可能收到信号。
+    if [[ -d "$stage/previous-tools" ]]; then
+      rm -rf -- "$root" || failed=1
+      mv "$stage/previous-tools" "$root" || failed=1
+    elif [[ ! -d "$stage/tools" ]]; then
+      # 无旧目录且新目录已移入：首次安装失败，恢复为未安装。
+      rm -rf -- "$root" || failed=1
+    fi
     for unit in "${units[@]}"; do
       if [[ -e "$stage/$unit" || -L "$stage/$unit" ]]; then
         cp -a "$stage/$unit" "$unit_dir/$unit" || failed=1
@@ -73,11 +78,10 @@ done
 for unit in "${units[@]}"; do
   if [[ -e "$unit_dir/$unit" || -L "$unit_dir/$unit" ]]; then cp -a "$unit_dir/$unit" "$stage/$unit"; fi
 done
+changed=true
 if [[ -d "$root" ]]; then
   mv "$root" "$stage/previous-tools"
-  had_tools=true
 fi
-changed=true
 mv "$stage/tools" "$root"
 for unit in "${units[@]}"; do
   install -m 644 "systemd/$unit" "$unit_dir/$unit"

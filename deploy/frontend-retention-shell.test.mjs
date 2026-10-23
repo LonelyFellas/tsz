@@ -203,6 +203,44 @@ for (const existing of [false, true]) {
   });
 }
 
+for (const phase of ["before-backup", "after-backup", "after-install"]) {
+  test(`interruption ${phase} preserves the previous installation`, async (t) => {
+    const f = await fixture(t);
+    mkdirSync(f.toolRoot, { recursive: true });
+    writeFileSync(join(f.toolRoot, "old-tool"), "old");
+    for (const unit of ["service", "timer"])
+      writeFileSync(
+        join(f.units, `tsz-frontend-retention.${unit}`),
+        `old-${unit}`
+      );
+    writeFileSync(join(f.temp, "enabled"), "");
+    writeFileSync(join(f.temp, "active"), "");
+    writeFileSync(
+      join(f.bin, "mv"),
+      `#!/bin/bash
+set -euo pipefail
+if [[ "$2" = */previous-tools && '${phase}' = before-backup ]]; then exit 1; fi
+/bin/mv "$@"
+if [[ ( "$2" = */previous-tools && '${phase}' = after-backup ) ||
+      ( "$1" = */tools && '${phase}' = after-install ) ]]; then
+  kill -TERM "$PPID"
+fi
+`,
+      { mode: 0o755 }
+    );
+    const result = f.run("install-frontend-retention.sh");
+    assert.notEqual(result.status, 0);
+    assert.equal(readFileSync(join(f.toolRoot, "old-tool"), "utf8"), "old");
+    for (const unit of ["service", "timer"])
+      assert.equal(
+        readFileSync(join(f.units, `tsz-frontend-retention.${unit}`), "utf8"),
+        `old-${unit}`
+      );
+    assert.ok(existsSync(join(f.temp, "enabled")));
+    assert.ok(existsSync(join(f.temp, "active")));
+  });
+}
+
 for (const reason of [
   "transaction",
   "bad-history",
