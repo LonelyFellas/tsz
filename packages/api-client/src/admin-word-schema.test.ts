@@ -509,6 +509,31 @@ describe("admin word V3/Any runtime decoder", () => {
     expect(Object.isFrozen(SUPPORTED_ADMIN_WORD_V3_SCHEMA_VERSIONS)).toBe(true);
   });
 
+  it("列表接受最后更新人并兼容旧接口缺少字段，拒绝错误类型", () => {
+    const oldResponse = {
+      words: [validAdminWordListItemV3()],
+      page: { page: 1, page_size: 20, total: 1 }
+    };
+    expect(decodeAdminWordAnyListResponse(oldResponse)).toBe(oldResponse);
+
+    const response = {
+      ...oldResponse,
+      words: [{ ...validAdminWordListItemV3(), updated_by_name: "李老师" }]
+    };
+    expect(decodeAdminWordAnyListResponse(response).words[0]).toMatchObject({
+      created_by_name: "Admin",
+      updated_by_name: "李老师"
+    });
+    for (const updated_by_name of [null, 123]) {
+      expect(() =>
+        decodeAdminWordAnyListResponse({
+          ...oldResponse,
+          words: [{ ...validAdminWordListItemV3(), updated_by_name }]
+        })
+      ).toThrow(InvalidAdminWordResponseError);
+    }
+  });
+
   it("V3 词条接受可选检测基准方言并拒绝 common 或未知值", () => {
     const word = {
       ...validAdminWordV3(),

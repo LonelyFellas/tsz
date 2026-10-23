@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/coins-management-clarity/docs/openapi.json",
-  "_generatedAt": "2026-10-23T14:47:42.269Z",
+  "_generatedAt": "2026-10-23T15:40:24.471Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -5294,7 +5294,11 @@
         "revision": { "type": "integer", "format": "int64" },
         "schema_version": { "type": "integer", "enum": [3] },
         "status": { "$ref": "#/components/schemas/AdminWordStatus" },
-        "updated_at": { "type": "string", "format": "date-time" }
+        "updated_at": { "type": "string", "format": "date-time" },
+        "updated_by_name": {
+          "type": "string",
+          "description": "与 updated_at 对应的最后更新人；契约允许旧后端响应缺少此字段。"
+        }
       },
       "additionalProperties": false
     },

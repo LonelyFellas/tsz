@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/coins-management-clarity/docs/openapi.json",
-  "_source_sha256": "f7398ade292dff056a26b5053ea6a331a98c51956f0d9796b40fa420175275a8",
+  "_source_sha256": "ef95269aba974feac1666c14c90620428f653f8d48dd0376e1058d4760e56e70",
   "roots": [
     "DictionaryPage",
     "DictionaryEntry",
@@ -223,7 +223,8 @@
         "revision": { "type": "integer" },
         "schema_version": { "type": "integer", "enum": [3] },
         "status": { "$ref": "#/$defs/AdminWordStatus" },
-        "updated_at": { "type": "string", "format": "date-time" }
+        "updated_at": { "type": "string", "format": "date-time" },
+        "updated_by_name": { "type": "string" }
       },
       "additionalProperties": false
     },
