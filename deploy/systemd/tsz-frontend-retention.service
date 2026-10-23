@@ -1,0 +1,13 @@
+[Unit]
+Description=Prune expired tsz frontend releases
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /opt/tsz-deploy-tools/frontend-retention/prune-frontend.sh
+TimeoutStartSec=15min
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/tsz-releases /opt/tsz-frontend-deploy.lock

@@ -85,14 +85,18 @@ function PronunciationCell({
                       ariaLabelPrefix={`读法 ${index + 1}${dialect === "uk" ? "英式" : "美式"}`}
                       playbackOnly
                     />
-                    <span
-                      className="v3-overview-phonetic tsz-phonetics"
-                      title={actualPron.text}
-                    >
-                      {addSlashes ? "/" : null}
-                      <RichTextReadOnly value={actualPron} emptyText="未填写" />
-                      {addSlashes ? "/" : null}
-                    </span>
+                    {actualPron.text.trim() ? (
+                      <span
+                        className="v3-overview-phonetic tsz-phonetics"
+                        title={actualPron.text}
+                      >
+                        {addSlashes ? "/" : null}
+                        <RichTextReadOnly value={actualPron} />
+                        {addSlashes ? "/" : null}
+                      </span>
+                    ) : (
+                      <Typography.Text type="secondary">未填写</Typography.Text>
+                    )}
                   </div>
                 </Tooltip>
               )}
@@ -129,13 +133,14 @@ export function V3FormContentOverview({
         size="small"
         pagination={false}
         rowKey="membershipId"
-        scroll={{ x: 1140 }}
+        tableLayout="fixed"
+        scroll={{ x: 820 }}
         dataSource={[...rows]}
         columns={[
           {
             title: "词形名称",
             key: "label",
-            width: 150,
+            width: "10%",
             fixed: "left",
             render: (_, row) => {
               const peers = rows.filter(
@@ -175,6 +180,7 @@ export function V3FormContentOverview({
                       <Button
                         type="link"
                         size="small"
+                        className="v3-overview-type-fix"
                         disabled={row.formTypeDisabled}
                         aria-label={`调整${label(row.form.form_type)}词形类型`}
                       >
@@ -190,7 +196,7 @@ export function V3FormContentOverview({
           {
             title: "词形变化",
             key: "spelling",
-            width: 150,
+            width: "14%",
             render: (_, { form }) => {
               const regions = form.regional_variants;
               const variants =
@@ -198,7 +204,11 @@ export function V3FormContentOverview({
                   ? [regions.common]
                   : [regions.uk, regions.us];
               return (
-                <Space orientation="vertical">
+                <Space
+                  orientation="vertical"
+                  size={4}
+                  className="v3-overview-spellings"
+                >
                   {variants.map((variant) => (
                     <div key={variant.id}>
                       {regions.mode !== "common" && (
@@ -225,7 +235,7 @@ export function V3FormContentOverview({
           {
             title: "英式发音",
             key: "uk",
-            width: 180,
+            width: "15%",
             render: (_, row) => (
               <PronunciationCell form={row.form} dialect="uk" />
             )
@@ -233,7 +243,7 @@ export function V3FormContentOverview({
           {
             title: "音色",
             key: "ukVoice",
-            width: 110,
+            width: "12%",
             render: (_, row) => (
               <PronunciationCell
                 form={row.form}
@@ -245,7 +255,7 @@ export function V3FormContentOverview({
           {
             title: "语速",
             key: "ukRate",
-            width: 80,
+            width: "6%",
             render: (_, row) => (
               <PronunciationCell form={row.form} dialect="uk" settings="rate" />
             )
@@ -253,7 +263,7 @@ export function V3FormContentOverview({
           {
             title: "美式发音",
             key: "us",
-            width: 180,
+            width: "15%",
             render: (_, row) => (
               <PronunciationCell form={row.form} dialect="us" />
             )
@@ -261,7 +271,7 @@ export function V3FormContentOverview({
           {
             title: "音色",
             key: "usVoice",
-            width: 110,
+            width: "12%",
             render: (_, row) => (
               <PronunciationCell
                 form={row.form}
@@ -273,7 +283,7 @@ export function V3FormContentOverview({
           {
             title: "语速",
             key: "usRate",
-            width: 80,
+            width: "6%",
             render: (_, row) => (
               <PronunciationCell form={row.form} dialect="us" settings="rate" />
             )
@@ -281,14 +291,19 @@ export function V3FormContentOverview({
           {
             title: "",
             key: "edit",
-            width: 100,
+            width: "10%",
             fixed: "right",
             render: (_, row) => (
-              <Space orientation="vertical">
+              <Space
+                orientation="vertical"
+                size={4}
+                className="v3-overview-action-list"
+              >
                 <div className="v3-overview-actions">
                   <Tooltip title="编辑词形内容">
                     <Button
                       type="text"
+                      size="small"
                       className="v3-overview-edit"
                       aria-label={`编辑${label(row.form.form_type)}内容`}
                       icon={<EditOutlined />}

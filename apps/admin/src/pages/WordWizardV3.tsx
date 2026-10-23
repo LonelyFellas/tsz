@@ -14,7 +14,6 @@ import {
   Button,
   ConfigProvider,
   Flex,
-  Modal,
   Result,
   Spin,
   Typography
@@ -1002,8 +1001,6 @@ export function WordWizardV3Page({
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const [activationGeneration, setActivationGeneration] = useState(0);
-  const [historyEntryId, setHistoryEntryId] = useState<string>();
-  const [historyBusy, setHistoryBusy] = useState(false);
   const queryClient = useQueryClient();
   const requests = useMemo(
     () => suppliedRequests ?? createV3WordRequests(),
@@ -1049,7 +1046,6 @@ export function WordWizardV3Page({
   );
   const replaceRestoredCanonical = useCallback(
     (draft: AdminWordDraftV3Envelope) => {
-      setHistoryEntryId(undefined);
       queryClient.setQueryData(queryKey, draft);
       void queryClient.invalidateQueries({ queryKey: wordKeys.lists() });
       void queryClient.invalidateQueries({ queryKey: wordKeys.stats() });
@@ -1199,13 +1195,6 @@ export function WordWizardV3Page({
             onWordChange={replaceCanonical}
             renderStep={(context) => (
               <Flex vertical gap="middle">
-                {context.activeStep !== "preview" && !context.readOnly && (
-                  <Flex justify="flex-end">
-                    <Button onClick={() => setHistoryEntryId(word.id)}>
-                      发布历史
-                    </Button>
-                  </Flex>
-                )}
                 <V3WizardSlots
                   context={context}
                   onActivated={replaceActivatedCanonical}
@@ -1213,43 +1202,6 @@ export function WordWizardV3Page({
                   requests={requests}
                   wordId={word.id}
                 />
-                <Modal
-                  open={
-                    historyEntryId === word.id &&
-                    context.activeStep !== "preview" &&
-                    !context.readOnly
-                  }
-                  title="发布历史"
-                  width={880}
-                  footer={null}
-                  destroyOnHidden
-                  closable={!historyBusy}
-                  keyboard={!historyBusy}
-                  mask={{ closable: !historyBusy }}
-                  onCancel={() => {
-                    if (!historyBusy) setHistoryEntryId(undefined);
-                  }}
-                >
-                  {historyEntryId === word.id &&
-                    context.activeStep !== "preview" &&
-                    !context.readOnly && (
-                      <V3PublicationHistory
-                        onBusyChange={setHistoryBusy}
-                        restoreBlockedByUnsavedChanges={
-                          context.hasUnsavedChanges || !sharedFormsReady
-                        }
-                        restoreBlockedReason={
-                          !sharedFormsReady
-                            ? "当前服务尚未支持共享词形，暂不能恢复历史内容"
-                            : undefined
-                        }
-                        currentWord={context.word}
-                        onRestored={replaceRestoredCanonical}
-                        onCanonicalRefreshed={replaceRestoredCanonical}
-                        requests={requests}
-                      />
-                    )}
-                </Modal>
                 {(context.activeStep === "preview" || context.readOnly) && (
                   <V3PublicationHistory
                     restoreBlockedByUnsavedChanges={

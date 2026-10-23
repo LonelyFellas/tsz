@@ -47,6 +47,8 @@ export function securityErrorMessage(error: unknown): string {
     invalid_credentials: "当前密码错误，请重试",
     invalid_token: "登录已失效，请重新登录后操作",
     user_already_exists: "该联系方式已被其他账号使用",
+    login_rate_limited: "登录尝试过于频繁，请稍后再试",
+    login_unavailable: "登录服务暂不可用，请稍后再试",
     otp_rate_limited: "验证码发送过于频繁，请稍后再试",
     otp_unavailable: "验证码服务暂不可用，请稍后再试",
     invalid_password: "密码须为 15–128 个字符，区分大小写，支持符号和空格",

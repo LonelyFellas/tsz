@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-custom-audio/docs/openapi.json",
-  "_generatedAt": "2026-10-23T06:07:08.736Z",
+  "_generatedAt": "2026-10-23T09:54:03.668Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -3756,6 +3756,8 @@
         "phone_unbind_forbidden",
         "otp_rate_limited",
         "otp_unavailable",
+        "login_rate_limited",
+        "login_unavailable",
         "coin_invalid_amount",
         "coin_account_unavailable",
         "coin_wallet_unavailable",
