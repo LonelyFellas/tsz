@@ -2523,6 +2523,18 @@ it("拼写试听比较兼容缺省空配置、音色顺序与字段顺序，保�
   expect(
     spellingSpeechEqual(left, {
       ...empty,
+      voice_profile: { voices: [{ ...sonia, volume_percent: 65 }, guy] }
+    })
+  ).toBe(false);
+  expect(
+    spellingSpeechEqual(left, {
+      ...empty,
+      voice_profile: { voices: [{ ...sonia, volume_percent: 100 }, guy] }
+    })
+  ).toBe(true);
+  expect(
+    spellingSpeechEqual(left, {
+      ...empty,
       voice_profile: { voices: [{ ...sonia, style: "cheerful" }, guy] }
     })
   ).toBe(false);

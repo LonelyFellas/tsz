@@ -52,12 +52,14 @@ import { TableEmptyState } from "@/components/TableEmptyState";
 import { DubbingGroups } from "./DubbingGroups";
 import { AddRecommendation } from "./AddRecommendation";
 import { SpeechRateInput } from "./SpeechRateInput";
+import { SpeechVolumeInput } from "./SpeechVolumeInput";
 import { styleNames } from "./voice-labels";
 import "./voice-library.css";
 
 interface Parameters {
   rate_percent: number;
   pitch_semitones: number;
+  volume_percent: number;
   style: string;
 }
 
@@ -88,6 +90,7 @@ function initialParameters(voice: AdminSpeechVoice): Parameters {
       c.min_pitch_semitones,
       Math.min(0, c.max_pitch_semitones)
     ),
+    volume_percent: 100,
     style: ""
   };
 }
@@ -179,6 +182,7 @@ export function VoiceLibrary() {
   const controller = useRef<AbortController | null>(null);
   const player = useRef<HTMLAudioElement | null>(null);
   const [form] = Form.useForm<VoiceForm>();
+  const formValues = Form.useWatch<VoiceForm>([], form);
   const canEditDescription = usePermission("speech.global_dubbing");
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState<"personal" | "description" | null>(null);
@@ -213,7 +217,11 @@ export function VoiceLibrary() {
   function voiceParameters(voice: AdminSpeechVoice): Parameters {
     const saved = metadata.get(voice.alias)?.parameters;
     return saved
-      ? { ...saved, style: saved.style ?? "" }
+      ? {
+          ...saved,
+          volume_percent: saved.volume_percent ?? 100,
+          style: saved.style ?? ""
+        }
       : initialParameters(voice);
   }
 
@@ -304,6 +312,9 @@ export function VoiceLibrary() {
           voice_alias: voice.alias,
           rate_percent: parameters.rate_percent,
           pitch_semitones: parameters.pitch_semitones,
+          ...(parameters.volume_percent === 100
+            ? {}
+            : { volume_percent: parameters.volume_percent }),
           ...(parameters.style ? { style: parameters.style } : {})
         },
         request.signal
@@ -349,6 +360,7 @@ export function VoiceLibrary() {
       const parameters = await form.validateFields([
         "rate_percent",
         "pitch_semitones",
+        "volume_percent",
         "style"
       ]);
       if (session !== editSession.current) return;
@@ -361,7 +373,12 @@ export function VoiceLibrary() {
   async function openRecommendation() {
     const session = editSession.current;
     try {
-      await form.validateFields(["rate_percent", "pitch_semitones", "style"]);
+      await form.validateFields([
+        "rate_percent",
+        "pitch_semitones",
+        "volume_percent",
+        "style"
+      ]);
       if (session === editSession.current) setAddingRecommendation(true);
     } catch {
       // Keep parameter validation visible in the drawer before opening the dialog.
@@ -381,7 +398,13 @@ export function VoiceLibrary() {
     try {
       values = await form.validateFields(
         kind === "personal"
-          ? ["rate_percent", "pitch_semitones", "style", "notes"]
+          ? [
+              "rate_percent",
+              "pitch_semitones",
+              "volume_percent",
+              "style",
+              "notes"
+            ]
           : ["description_zh"]
       );
     } catch {
@@ -398,6 +421,9 @@ export function VoiceLibrary() {
               parameters: {
                 rate_percent: values.rate_percent,
                 pitch_semitones: values.pitch_semitones,
+                ...(values.volume_percent === 100
+                  ? {}
+                  : { volume_percent: values.volume_percent }),
                 style: values.style || null
               },
               notes: values.notes,
@@ -440,6 +466,7 @@ export function VoiceLibrary() {
           ...settingsBaseline.current!,
           rate_percent: values.rate_percent,
           pitch_semitones: values.pitch_semitones,
+          volume_percent: values.volume_percent,
           style: values.style,
           notes: values.notes
         };
@@ -488,7 +515,11 @@ export function VoiceLibrary() {
       setBaseDescriptionRevision(item?.description_revision ?? 0);
       const values = {
         ...(item?.parameters
-          ? { ...item.parameters, style: item.parameters.style ?? "" }
+          ? {
+              ...item.parameters,
+              volume_percent: item.parameters.volume_percent ?? 100,
+              style: item.parameters.style ?? ""
+            }
           : initialParameters(selected)),
         notes: item?.notes ?? "",
         description_zh: item?.description_zh ?? ""
@@ -559,7 +590,7 @@ export function VoiceLibrary() {
                   {localeNames[preview.voice.locale] ?? preview.voice.locale}
                 </Tag>
                 <Typography.Text type="secondary">
-                  本次试听：
+                  本次试听：音量 {preview.parameters.volume_percent}%，
                   {((100 + preview.parameters.rate_percent) / 100).toFixed(2)}×
                   {preview.parameters.style
                     ? `，${styleNames[preview.parameters.style] ?? preview.parameters.style}`
@@ -610,6 +641,13 @@ export function VoiceLibrary() {
     );
 
   const capabilities = selected?.capabilities;
+  const defaults = selected ? initialParameters(selected) : null;
+  const parametersAreDefault =
+    !!defaults &&
+    !!formValues &&
+    (Object.keys(defaults) as (keyof Parameters)[]).every(
+      (key) => formValues[key] === defaults[key]
+    );
   return (
     <div className="voice-library" style={style}>
       {router && tab === "library" && (
@@ -711,6 +749,7 @@ export function VoiceLibrary() {
             onAudition={(voice, item) =>
               void audition(voice, {
                 ...item.parameters,
+                volume_percent: item.parameters.volume_percent ?? 100,
                 style: item.parameters.style ?? ""
               })
             }
@@ -1050,6 +1089,7 @@ export function VoiceLibrary() {
                 if (
                   "rate_percent" in changed ||
                   "pitch_semitones" in changed ||
+                  "volume_percent" in changed ||
                   "style" in changed
                 )
                   cancelPreview();
@@ -1062,117 +1102,152 @@ export function VoiceLibrary() {
                 aria-label="个人设置"
               >
                 <Typography.Title level={5}>调节声音</Typography.Title>
-                <Typography.Paragraph type="secondary">
-                  试听满意后保存为个人设置，下次选用时自动载入。
+                <Typography.Paragraph
+                  className="voice-library-settings-intro"
+                  type="secondary"
+                >
+                  试听满意后保存，下次选用时自动载入。
                 </Typography.Paragraph>
-                <div className="voice-library-parameter-grid">
+                <div className="voice-library-parameters">
                   <Form.Item
-                    name="rate_percent"
-                    label="语速"
+                    name="volume_percent"
+                    label={
+                      <span className="voice-library-volume-label">
+                        音量
+                        <span
+                          className="voice-library-muted-status"
+                          role="status"
+                        >
+                          {formValues?.volume_percent === 0 ? "已静音" : ""}
+                        </span>
+                      </span>
+                    }
+                    tooltip="100% 为原音量，0% 为静音。"
                     rules={[
                       {
                         required: true,
                         type: "integer",
-                        min: capabilities.min_rate_percent,
-                        max: capabilities.max_rate_percent,
-                        message: `请输入 ${((100 + capabilities.min_rate_percent) / 100).toFixed(2)} 至 ${((100 + capabilities.max_rate_percent) / 100).toFixed(2)} 倍速`
+                        min: 0,
+                        max: 100,
+                        message: "请输入 0 至 100 的整数"
                       }
                     ]}
-                    extra={
-                      capabilities.min_rate_percent ===
-                      capabilities.max_rate_percent
-                        ? "该音色使用固定语速。"
-                        : "1.00× 为标准语速。"
-                    }
                   >
-                    <SpeechRateInput
-                      aria-label="合成语速"
-                      min={capabilities.min_rate_percent}
-                      max={capabilities.max_rate_percent}
-                      disabled={
-                        settingsBusy ||
-                        capabilities.min_rate_percent ===
-                          capabilities.max_rate_percent
-                      }
-                      style={{ width: "100%" }}
-                    />
+                    <SpeechVolumeInput disabled={settingsBusy} />
                   </Form.Item>
-                  <Form.Item
-                    name="pitch_semitones"
-                    label="音调（半音）"
-                    rules={[
-                      {
-                        required: true,
-                        type: "integer",
-                        min: capabilities.min_pitch_semitones,
-                        max: capabilities.max_pitch_semitones,
-                        message: `请输入 ${capabilities.min_pitch_semitones} 至 ${capabilities.max_pitch_semitones} 的整数`
+                  <div className="voice-library-parameter-grid">
+                    <Form.Item
+                      name="rate_percent"
+                      label="语速"
+                      rules={[
+                        {
+                          required: true,
+                          type: "integer",
+                          min: capabilities.min_rate_percent,
+                          max: capabilities.max_rate_percent,
+                          message: `请输入 ${((100 + capabilities.min_rate_percent) / 100).toFixed(2)} 至 ${((100 + capabilities.max_rate_percent) / 100).toFixed(2)} 倍速`
+                        }
+                      ]}
+                      tooltip={
+                        capabilities.min_rate_percent ===
+                        capabilities.max_rate_percent
+                          ? "该音色使用固定语速。"
+                          : "1.00× 为标准语速。"
                       }
-                    ]}
-                    extra={
-                      capabilities.min_pitch_semitones ===
-                      capabilities.max_pitch_semitones
-                        ? "该音色使用固定音调。"
-                        : "0 保持原音调，正数升高，负数降低。"
-                    }
-                  >
-                    <InputNumber
-                      aria-label="音调"
-                      min={capabilities.min_pitch_semitones}
-                      max={capabilities.max_pitch_semitones}
-                      disabled={
-                        settingsBusy ||
+                    >
+                      <SpeechRateInput
+                        aria-label="合成语速"
+                        min={capabilities.min_rate_percent}
+                        max={capabilities.max_rate_percent}
+                        disabled={
+                          settingsBusy ||
+                          capabilities.min_rate_percent ===
+                            capabilities.max_rate_percent
+                        }
+                        style={{ width: "100%" }}
+                      />
+                    </Form.Item>
+                    <Form.Item
+                      name="pitch_semitones"
+                      label="音调"
+                      rules={[
+                        {
+                          required: true,
+                          type: "integer",
+                          min: capabilities.min_pitch_semitones,
+                          max: capabilities.max_pitch_semitones,
+                          message: `请输入 ${capabilities.min_pitch_semitones} 至 ${capabilities.max_pitch_semitones} 的整数`
+                        }
+                      ]}
+                      tooltip={
                         capabilities.min_pitch_semitones ===
-                          capabilities.max_pitch_semitones
+                        capabilities.max_pitch_semitones
+                          ? "该音色使用固定音调。"
+                          : "0 保持原音调，正数升高，负数降低。"
                       }
-                      style={{ width: "100%" }}
+                    >
+                      <InputNumber
+                        aria-label="音调"
+                        suffix="半音"
+                        min={capabilities.min_pitch_semitones}
+                        max={capabilities.max_pitch_semitones}
+                        disabled={
+                          settingsBusy ||
+                          capabilities.min_pitch_semitones ===
+                            capabilities.max_pitch_semitones
+                        }
+                        style={{ width: "100%" }}
+                      />
+                    </Form.Item>
+                  </div>
+                  <Form.Item name="style" label="说话风格">
+                    <Select
+                      aria-label="说话风格"
+                      disabled={settingsBusy}
+                      options={[
+                        { value: "", label: "自然" },
+                        ...capabilities.styles.map((style) => ({
+                          value: style,
+                          label: styleNames[style] ?? style
+                        }))
+                      ]}
                     />
                   </Form.Item>
                 </div>
-                <Form.Item name="style" label="说话风格">
-                  <Select
-                    aria-label="说话风格"
-                    disabled={settingsBusy}
-                    options={[
-                      { value: "", label: "自然" },
-                      ...capabilities.styles.map((style) => ({
-                        value: style,
-                        label: styleNames[style] ?? style
-                      }))
-                    ]}
-                  />
-                </Form.Item>
-                <Space wrap>
-                  <Button
-                    type="primary"
-                    aria-label="试听当前参数"
-                    icon={<PlayCircleOutlined />}
-                    disabled={settingsBusy || !canGenerate || !validText}
-                    loading={pendingVoice === selected.alias}
-                    onClick={() => void auditionDraft()}
-                  >
-                    试听当前参数
-                  </Button>
-                  <Button
-                    type="text"
-                    onClick={() => {
-                      cancelPreview();
-                      const defaults = initialParameters(selected);
-                      form.setFieldsValue(defaults);
-                      updateDirty(form.getFieldsValue());
-                      setSaveMessage(null);
-                    }}
-                  >
-                    恢复默认参数
-                  </Button>
-                </Space>
                 <div className="voice-library-settings-preview">
-                  <Typography.Paragraph
-                    className="voice-library-sample"
-                    type="secondary"
-                  >
+                  <Typography.Paragraph className="voice-library-sample">
                     {text}
                   </Typography.Paragraph>
+                  <Flex
+                    className="voice-library-preview-actions"
+                    align="center"
+                    gap={8}
+                    wrap
+                  >
+                    <Button
+                      type="primary"
+                      aria-label="试听当前参数"
+                      icon={<PlayCircleOutlined />}
+                      disabled={settingsBusy || !canGenerate || !validText}
+                      loading={pendingVoice === selected.alias}
+                      onClick={() => void auditionDraft()}
+                    >
+                      试听当前参数
+                    </Button>
+                    <Button
+                      type="text"
+                      disabled={settingsBusy || parametersAreDefault}
+                      onClick={() => {
+                        cancelPreview();
+                        const defaults = initialParameters(selected);
+                        form.setFieldsValue(defaults);
+                        updateDirty(form.getFieldsValue());
+                        setSaveMessage(null);
+                      }}
+                    >
+                      恢复默认参数
+                    </Button>
+                  </Flex>
                   {previewView()}
                 </div>
                 {canEditDescription && (
@@ -1268,7 +1343,7 @@ export function VoiceLibrary() {
                 destroyOnHidden
               >
                 <Typography.Paragraph type="secondary">
-                  使用当前语速、音调和风格创建推荐。
+                  使用当前音量、语速、音调和风格创建推荐。
                 </Typography.Paragraph>
                 <AddRecommendation
                   onBusyChange={setRecommendationPending}
@@ -1278,11 +1353,15 @@ export function VoiceLibrary() {
                     const values = await form.validateFields([
                       "rate_percent",
                       "pitch_semitones",
+                      "volume_percent",
                       "style"
                     ]);
                     return {
                       rate_percent: values.rate_percent,
                       pitch_semitones: values.pitch_semitones,
+                      ...(values.volume_percent === 100
+                        ? {}
+                        : { volume_percent: values.volume_percent }),
                       style: values.style || null
                     };
                   }}
