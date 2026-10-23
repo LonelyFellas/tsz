@@ -443,7 +443,7 @@ function Management({ profile }: { profile: AdminProfile }) {
         <Alert type="error" title="发放记录加载失败，请重试查询" />
       )}
       <OperationHistory
-        data={operations.data}
+        data={operations.isError ? undefined : operations.data}
         loading={operations.isFetching}
         filters={filters}
         onFilter={setFilters}

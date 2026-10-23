@@ -210,6 +210,28 @@ it("names lead to private details and reversal retries preserve the exact intent
     { reason: "发错数量", idempotency_key: expect.any(String) }
   ]);
 });
+it("hides cached records and closes details when refreshing fails", async () => {
+  vi.mocked(api.coinManagement.operations).mockResolvedValueOnce({
+    items: [operation],
+    pagination
+  });
+  open();
+  fireEvent.click(
+    screen.getByText("发放记录", { selector: ".ant-tabs-tab-btn" })
+  );
+  fireEvent.click(await screen.findByText("查看详情"));
+  expect(screen.getByText("内部凭据")).toBeInTheDocument();
+  vi.mocked(api.coinManagement.operations).mockRejectedValue(
+    new HttpError(503, "unavailable")
+  );
+  fireEvent.click(screen.getByText("刷新记录"));
+  await screen.findByText("发放记录加载失败，请重试查询");
+  expect(screen.queryByText("查看详情")).not.toBeInTheDocument();
+  expect(screen.queryByText("内部凭据")).not.toBeInTheDocument();
+  expect(
+    screen.queryByText("撤销发放", { selector: "button span" })
+  ).not.toBeInTheDocument();
+});
 it("name filters and reset clear both visible and collapsed conditions", async () => {
   open();
   fireEvent.click(
