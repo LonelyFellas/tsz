@@ -48,11 +48,11 @@ async function stage(component, id, withImageRuntime = true) {
     );
     if (withImageRuntime) {
       // HTTP fixture 复用挂载仓库中的真实 Next/Sharp，不复制整份依赖。
-      const runtime = `${artifact}/apps/web/node_modules/next/dist/server`;
+      const runtime = `${artifact}/apps/web/node_modules/next/dist/server/image-optimizer`;
       await mkdir(runtime, { recursive: true });
       await writeFile(
-        `${runtime}/image-optimizer.js`,
-        `module.exports = require('/repo/apps/web/node_modules/next/dist/server/image-optimizer.js');`
+        `${runtime}/transform.js`,
+        `module.exports = require('/repo/apps/web/node_modules/next/dist/server/image-optimizer/transform.js');`
       );
     }
   }
@@ -184,7 +184,7 @@ await stage("web", "missing-images", false);
 const missingImages = publish("/opt/stage-missing-images", "web", false);
 assert.match(
   missingImages.stderr,
-  /Cannot find module 'next\/dist\/server\/image-optimizer'/
+  /Cannot find module 'next\/dist\/server\/image-optimizer\/transform'/
 );
 assert.match(await readlink("/opt/tsz-releases/web/current"), /\/W1$/);
 assert.equal(await file("/opt/tsz-deploy-manifests/web.json"), webAccepted);
