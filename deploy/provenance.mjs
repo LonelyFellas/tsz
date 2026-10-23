@@ -14,13 +14,16 @@ import {
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+const WEB_ROUTE_CACHE = "apps/web/.next/server/route-cache";
+const LEGACY_WEB_EXCLUDED_PATHS = ["apps/web/.next/cache"];
+
 const COMPONENTS = {
   web: {
     kind: "directory",
     path: "/opt/tsz-releases/web/current",
     legacyPath: "/opt/tsz-web",
     repository: "LonelyFellas/tsz",
-    excludedPaths: ["apps/web/.next/cache"]
+    excludedPaths: [...LEGACY_WEB_EXCLUDED_PATHS, WEB_ROUTE_CACHE]
   },
   admin: {
     kind: "directory",
@@ -142,12 +145,18 @@ export function validateManifest(manifest, { allowCandidate = false } = {}) {
   ) {
     fail("artifact.path does not match component");
   }
+  const allowedExclusions = [
+    componentConfig.excludedPaths,
+    ...(manifest.component === "web" ? [LEGACY_WEB_EXCLUDED_PATHS] : [])
+  ];
   if (
     !Array.isArray(manifest.artifact.excluded_paths) ||
-    manifest.artifact.excluded_paths.length !==
-      componentConfig.excludedPaths.length ||
-    manifest.artifact.excluded_paths.some(
-      (entry, index) => entry !== componentConfig.excludedPaths[index]
+    !allowedExclusions.some(
+      (paths) =>
+        paths.length === manifest.artifact.excluded_paths.length &&
+        paths.every(
+          (entry, index) => entry === manifest.artifact.excluded_paths[index]
+        )
     )
   ) {
     fail("artifact.excluded_paths does not match component");
@@ -195,7 +204,8 @@ function isExcluded(relativePath, excludedPaths) {
 async function collectDirectoryRecords(
   root,
   relative = "",
-  excludedPaths = []
+  excludedPaths = [],
+  legacyRouteCacheAfter
 ) {
   const directory = path.join(root, ...relative.split("/").filter(Boolean));
   const entries = await readdir(directory);
@@ -207,9 +217,20 @@ async function collectDirectoryRecords(
     const stat = await lstat(absolutePath);
     if (stat.isDirectory()) {
       records.push(
-        ...(await collectDirectoryRecords(root, relativePath, excludedPaths))
+        ...(await collectDirectoryRecords(
+          root,
+          relativePath,
+          excludedPaths,
+          legacyRouteCacheAfter
+        ))
       );
     } else if (stat.isFile()) {
+      if (
+        legacyRouteCacheAfter !== undefined &&
+        relativePath.startsWith(`${WEB_ROUTE_CACHE}/`) &&
+        stat.mtimeMs > legacyRouteCacheAfter
+      )
+        continue;
       records.push([
         "file",
         relativePath,
@@ -225,12 +246,20 @@ async function collectDirectoryRecords(
   return records;
 }
 
-export async function digestDirectory(root, { excludedPaths = [] } = {}) {
+export async function digestDirectory(
+  root,
+  { excludedPaths = [], legacyRouteCacheAfter } = {}
+) {
   const rootStat = await stat(root).catch(() =>
     fail(`artifact root does not exist: ${root}`)
   );
   if (!rootStat.isDirectory()) fail("artifact root must be a directory");
-  const records = await collectDirectoryRecords(root, "", excludedPaths);
+  const records = await collectDirectoryRecords(
+    root,
+    "",
+    excludedPaths,
+    legacyRouteCacheAfter
+  );
   records.sort((left, right) =>
     Buffer.compare(Buffer.from(left[1]), Buffer.from(right[1]))
   );
@@ -274,8 +303,16 @@ async function verifyArtifact(manifest, artifactRoot) {
   if (manifest.artifact.kind !== "directory") {
     fail("frontend verifier only supports directory artifacts");
   }
+  const legacyRouteCacheAfter =
+    manifest.component === "web" &&
+    manifest.accepted_at !== null &&
+    manifest.artifact.excluded_paths.length === LEGACY_WEB_EXCLUDED_PATHS.length
+      ? Date.parse(manifest.accepted_at)
+      : undefined;
+  // 旧摘要包含构建期路由种子；仅忽略验收后新增的缓存，仍须精确匹配原摘要。
   const digest = await digestDirectory(artifactRoot, {
-    excludedPaths: manifest.artifact.excluded_paths
+    excludedPaths: manifest.artifact.excluded_paths,
+    legacyRouteCacheAfter
   });
   if (
     digest.sha256 !== manifest.artifact.sha256 ||
