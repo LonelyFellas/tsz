@@ -618,9 +618,12 @@ function Editor({
           "speech_storage_unavailable",
           "speech_voice_not_found"
         ].includes(e.code ?? "");
-      // A later rejection cannot establish whether an earlier attempt committed.
+      // Keep keyed commands frozen until replay confirms the earlier attempt.
+      // Legacy updates cannot replay a committed revision; reopen to reconcile them.
+      const canReplay =
+        request.kind === "create" || !!request.body.idempotency_key;
       const unknown =
-        uncertain ||
+        (uncertain && canReplay) ||
         (!audioUnavailable &&
           (!(e instanceof HttpError) || e.status >= 500 || e.status === 408));
       if (!unknown) {
@@ -646,17 +649,19 @@ function Editor({
       setError(
         unknown
           ? "保存结果未确认，请重试保存。确认前无法修改本次内容，刷新后仍可继续确认。"
-          : audioUnavailable
-            ? "语音服务暂不可用，本次未保存、未扣款。输入已保留，可稍后重试，或主动取消生成语音后保存文本。"
-            : e instanceof HttpError && messages[e.code ?? ""]
-              ? messages[e.code!]!
-              : e instanceof HttpError && e.status === 413
-                ? "词表内容过大，请减少词条或缩短注释后重试。当前编辑内容仍保留。"
-                : request.body.audio_generation &&
-                    e instanceof HttpError &&
-                    [400, 404, 422, 501].includes(e.status)
-                  ? "语音服务暂不可用或请求被拒绝，当前输入已保留。可稍后重试，或主动取消生成语音后保存文本。"
-                  : "保存失败：内容、版本或词条状态已变化。请检查输入；版本冲突时重新打开词表。"
+          : uncertain && !canReplay
+            ? "上次保存结果仍未确认，当前版本无法继续重试。请重新打开词表核对保存结果，当前输入已保留。"
+            : audioUnavailable
+              ? "语音服务暂不可用，本次未保存、未扣款。输入已保留，可稍后重试，或主动取消生成语音后保存文本。"
+              : e instanceof HttpError && messages[e.code ?? ""]
+                ? messages[e.code!]!
+                : e instanceof HttpError && e.status === 413
+                  ? "词表内容过大，请减少词条或缩短注释后重试。当前编辑内容仍保留。"
+                  : request.body.audio_generation &&
+                      e instanceof HttpError &&
+                      [400, 404, 422, 501].includes(e.status)
+                    ? "语音服务暂不可用或请求被拒绝，当前输入已保留。可稍后重试，或主动取消生成语音后保存文本。"
+                    : "保存失败：内容、版本或词条状态已变化。请检查输入；版本冲突时重新打开词表。"
       );
     } finally {
       savingRef.current = false;

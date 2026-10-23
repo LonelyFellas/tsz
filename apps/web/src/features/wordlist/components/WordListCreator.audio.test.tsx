@@ -417,6 +417,104 @@ it.each([
   }
 });
 
+it("纯平台无键更新响应丢失后遇409解除冻结，可重新打开核对已保存结果", async () => {
+  const platform = { item_id: "entry", entry_id: "entry", author_note: "" };
+  vi.mocked(api.wordList.edit).mockResolvedValue({
+    wordlist: meta,
+    entry_ids: ["entry"],
+    items: [platform]
+  });
+  const loaded = {
+    revision: 2,
+    pagination: { page: 1, page_size: 100, total: 1, total_pages: 1 },
+    items: [
+      {
+        ...platform,
+        entry: null,
+        position: 0,
+        private_note: "",
+        note_revision: 1
+      }
+    ]
+  };
+  vi.mocked(api.wordList.myItems).mockResolvedValue(loaded);
+  vi.mocked(api.wordList.update)
+    .mockRejectedValueOnce(new Error("response lost"))
+    .mockRejectedValueOnce(new HttpError(409, "revision changed"));
+  const first = renderWithProviders(<WordListCreator id="list" />);
+  fireEvent.change(await screen.findByLabelText("词表名称"), {
+    target: { value: "已保存的新名称" }
+  });
+  const save = screen.getByRole("button", { name: "保存" });
+  await waitFor(() => expect(save).toBeEnabled());
+  fireEvent.click(save);
+  const retry = await screen.findByRole("button", { name: "重试保存" });
+  const body = vi.mocked(api.wordList.update).mock.calls[0]![1];
+  expect(body.idempotency_key).toBeUndefined();
+  expect(body.audio_generation).toBeUndefined();
+  const key = pendingSaveKey("one", "list");
+  expect(sessionStorage.getItem(key)).not.toBeNull();
+  expect(screen.getByLabelText("词表名称")).toBeDisabled();
+  fireEvent.click(retry);
+  await waitFor(() => expect(screen.getByLabelText("词表名称")).toBeEnabled());
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "重新打开词表核对保存结果"
+  );
+  expect(screen.getByRole("alert")).not.toHaveTextContent("本次未保存");
+  expect(sessionStorage.getItem(key)).toBeNull();
+  expect(vi.mocked(api.wordList.update).mock.calls[1]![1]).toEqual(body);
+  first.unmount();
+  vi.mocked(api.wordList.edit).mockResolvedValue({
+    wordlist: { ...meta, name: "已保存的新名称", revision: 3 },
+    entry_ids: ["entry"],
+    items: [platform]
+  });
+  vi.mocked(api.wordList.myItems).mockResolvedValue({ ...loaded, revision: 3 });
+  renderWithProviders(<WordListCreator id="list" />);
+  expect(await screen.findByLabelText("词表名称")).toHaveValue(
+    "已保存的新名称"
+  );
+  expect(
+    screen.queryByRole("button", { name: "重试保存" })
+  ).not.toBeInTheDocument();
+});
+
+it("付费更新响应丢失后遇409仍保留原键，刷新后同键确认", async () => {
+  vi.mocked(api.wordList.update)
+    .mockRejectedValueOnce(new Error("response lost"))
+    .mockRejectedValueOnce(
+      new HttpError(409, "conflict", [], "coin_idempotency_conflict")
+    );
+  const first = renderWithProviders(<WordListCreator id="list" />);
+  const choice = await screen.findByRole("checkbox", { name: "生成语音 1" });
+  await waitFor(() => expect(choice).toBeEnabled());
+  fireEvent.click(choice);
+  const save = screen.getByRole("button", { name: "支付 2 天生币并保存" });
+  await waitFor(() => expect(save).toBeEnabled());
+  fireEvent.click(save);
+  fireEvent.click(await screen.findByRole("button", { name: "重试保存" }));
+  await waitFor(() => expect(api.wordList.update).toHaveBeenCalledTimes(2));
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "重试保存" })).toBeEnabled()
+  );
+  const body = vi.mocked(api.wordList.update).mock.calls[0]![1];
+  expect(body.idempotency_key).toEqual(expect.any(String));
+  expect(body.audio_generation).toEqual({
+    item_ids: ["custom"],
+    expected_cost: "2"
+  });
+  const key = pendingSaveKey("one", "list");
+  expect(sessionStorage.getItem(key)).toContain(body.idempotency_key!);
+  expect(screen.getByLabelText("词表名称")).toBeDisabled();
+  first.unmount();
+  renderWithProviders(<WordListCreator id="list" />);
+  fireEvent.click(await screen.findByRole("button", { name: "重试保存" }));
+  await waitFor(() => expect(sessionStorage.getItem(key)).toBeNull());
+  expect(
+    vi.mocked(api.wordList.update).mock.calls.map(([, request]) => request)
+  ).toEqual([body, body, body]);
+});
+
 it("旧端点不可用保留文本编辑且普通编辑省略幂等字段", async () => {
   vi.mocked(api.wordList.myCustomAudio).mockRejectedValue(
     new HttpError(404, "missing")
