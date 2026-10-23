@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-custom-audio/docs/openapi.json",
-  "_generatedAt": "2026-10-23T09:54:03.668Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/coins-management-clarity/docs/openapi.json",
+  "_generatedAt": "2026-10-23T14:11:26.082Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -1198,6 +1198,12 @@
         "schema": { "type": "string", "format": "uuid" }
       },
       {
+        "name": "actor_search",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
         "name": "created_from",
         "in": "query",
         "required": false,
@@ -1210,10 +1216,22 @@
         "schema": { "type": "string", "format": "date-time" }
       },
       {
+        "name": "include_names",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "boolean" }
+      },
+      {
         "name": "owner_id",
         "in": "query",
         "required": false,
         "schema": { "type": "string", "format": "uuid" }
+      },
+      {
+        "name": "owner_search",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
       },
       {
         "name": "owner_type",
@@ -3362,6 +3380,10 @@
         "created_at"
       ],
       "properties": {
+        "actor_display_name": {
+          "type": ["string", "null"],
+          "description": "Current operator name, included only when requested and available."
+        },
         "actor_id": { "type": "string", "format": "uuid" },
         "balance_after": {
           "type": "string",
@@ -3372,6 +3394,10 @@
         "event_id": { "type": "string" },
         "evidence_ref": { "type": ["string", "null"] },
         "id": { "type": "string", "format": "uuid" },
+        "owner_display_name": {
+          "type": ["string", "null"],
+          "description": "Current account name, included only when requested and available."
+        },
         "owner_id": { "type": "string", "format": "uuid" },
         "owner_type": { "$ref": "#/components/schemas/OwnerType" },
         "reason": { "type": "string" },
@@ -5720,7 +5746,14 @@
         "pitch_semitones": { "type": "integer", "format": "int32" },
         "rate_percent": { "type": "integer", "format": "int32" },
         "style": { "type": ["string", "null"] },
-        "voice_alias": { "type": "string" }
+        "voice_alias": { "type": "string" },
+        "volume_percent": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Absolute synthesis volume; omitted values retain the original volume (100).",
+          "maximum": 100,
+          "minimum": 0
+        }
       },
       "additionalProperties": false
     },
@@ -7495,7 +7528,13 @@
       "properties": {
         "pitch_semitones": { "type": "integer", "format": "int32" },
         "rate_percent": { "type": "integer", "format": "int32" },
-        "style": { "type": ["string", "null"] }
+        "style": { "type": ["string", "null"] },
+        "volume_percent": {
+          "type": "integer",
+          "format": "int32",
+          "maximum": 100,
+          "minimum": 0
+        }
       },
       "additionalProperties": false
     },
@@ -7531,7 +7570,13 @@
           "minimum": -50
         },
         "style": { "type": "string", "maxLength": 64 },
-        "voice_id": { "type": "string" }
+        "voice_id": { "type": "string" },
+        "volume_percent": {
+          "type": "integer",
+          "format": "int32",
+          "maximum": 100,
+          "minimum": 0
+        }
       },
       "additionalProperties": false
     },

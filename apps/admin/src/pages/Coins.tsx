@@ -1,4 +1,5 @@
-import { TableEmptyState } from "@/components/TableEmptyState";
+import { AccountLabel } from "@/features/coins/AccountLabel";
+import { OperationHistory } from "@/features/coins/OperationHistory";
 import { ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -7,7 +8,6 @@ import {
   Breadcrumb,
   Button,
   Card,
-  DatePicker,
   Descriptions,
   Flex,
   Form,
@@ -32,23 +32,24 @@ import type {
 } from "@tsz/types";
 import { useRef, useState } from "react";
 import { api, useAuthStore } from "@/lib/auth";
-import { EntriesTable, coinSourceLabels } from "@/features/coins/EntriesTable";
+import { EntriesTable } from "@/features/coins/EntriesTable";
 
 function errorText(error: unknown) {
   const messages: Record<string, string> = {
-    forbidden: "权限不足，或目标为本人钱包；请刷新权限后重试",
-    coin_wallet_unavailable: "钱包暂停或关闭，不能入账或冲正",
-    coin_account_unavailable: "目标账户不可用",
-    coin_source_conflict:
-      "该核验单号 / 事件已记账，或原单已冲正；请查询操作记录",
-    coin_idempotency_conflict: "此请求键已用于其他内容，请重新核对",
-    coin_insufficient_balance: "余额不足，不能全额冲正",
-    coin_invalid_amount: "请输入 BIGINT 范围内的正整数",
-    coin_reversal_invalid: "只能冲正原人工入账"
+    forbidden: "你没有操作权限，或正在操作自己的账号，请核对后重试",
+    coin_wallet_unavailable:
+      "该账号的天生币账户已暂停或关闭，暂时无法发放或撤销",
+    coin_account_unavailable: "该账号暂时不可用",
+    coin_source_conflict: "这笔业务已发放，或这笔发放已撤销，请查看发放记录",
+    coin_idempotency_conflict:
+      "本次提交与之前的内容不一致，请关闭窗口后重新核对",
+    coin_insufficient_balance: "该账号余额不足，无法扣回这笔天生币",
+    coin_invalid_amount: "请输入 1 至 9,223,372,036,854,775,807 之间的整数",
+    coin_reversal_invalid: "只能撤销手动发放的天生币"
   };
   return error instanceof HttpError && error.status < 500
     ? (messages[error.code ?? ""] ?? "操作被拒绝，请核对输入或重试")
-    : "请求结果未知，请查询记录，或保持内容不变并使用原请求重试";
+    : "暂时无法确认操作结果，请先查看发放记录；也可保持内容不变后重试，不会重复处理";
 }
 function canTarget(
   profile: AdminProfile,
@@ -82,7 +83,6 @@ type CreditFields = Pick<
 function Management({ profile }: { profile: AdminProfile }) {
   const { message } = App.useApp();
   const qc = useQueryClient();
-  const [operationForm] = Form.useForm();
   const [searchForm] = Form.useForm<CoinAccountsQuery>();
   const [creditForm] = Form.useForm<CreditFields>();
   const [search, setSearch] = useState<CoinAccountsQuery>();
@@ -129,7 +129,10 @@ function Management({ profile }: { profile: AdminProfile }) {
   const operations = useQuery({
     queryKey: ["admin-coins", "admin", profile.id, "operations", filters],
     queryFn: ({ signal }) =>
-      api.coinManagement.operations({ ...filters, page_size: 20 }, { signal })
+      api.coinManagement.operations(
+        { ...filters, page_size: 20, include_names: true },
+        { signal }
+      )
   });
   function choose(row: CoinAccount) {
     setSelected(row);
@@ -171,7 +174,7 @@ function Management({ profile }: { profile: AdminProfile }) {
       setConfirmation(undefined);
       creditForm.resetFields();
       await refresh();
-      void message.success("人工入账已完成");
+      void message.success("天生币已发放");
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -193,7 +196,7 @@ function Management({ profile }: { profile: AdminProfile }) {
       setReversing(undefined);
       setReason("");
       await refresh();
-      void message.success("原单已全额冲正");
+      void message.success("已撤销发放，天生币已扣回");
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -224,11 +227,11 @@ function Management({ profile }: { profile: AdminProfile }) {
             setSearch({ ...v, search: v.search.trim(), page: 1 });
           }}
         >
-          <Form.Item name="owner_type" label="身份域">
+          <Form.Item name="owner_type" label="账号类型">
             <Select
               style={{ width: 140 }}
               options={[
-                { value: "user", label: "C 端用户" },
+                { value: "user", label: "用户" },
                 { value: "admin", label: "管理员" }
               ]}
             />
@@ -240,12 +243,12 @@ function Management({ profile }: { profile: AdminProfile }) {
               {
                 required: true,
                 whitespace: true,
-                message: "请输入姓名、UUID、完整手机或邮箱"
+                message: "请输入姓名、账号编号、完整手机号或邮箱"
               }
             ]}
           >
             <Input
-              placeholder="姓名 / UUID / 完整手机或邮箱"
+              placeholder="姓名 / 账号编号 / 完整手机号或邮箱"
               style={{ width: 300 }}
               maxLength={200}
             />
@@ -276,17 +279,35 @@ function Management({ profile }: { profile: AdminProfile }) {
                   onChange: (page) => setSearch({ ...search, page })
                 }}
                 columns={[
-                  { title: "姓名", dataIndex: "display_name" },
-                  { title: "账户 UUID", dataIndex: "owner_id" },
+                  {
+                    title: "账号",
+                    render: (_, r: CoinAccount) => (
+                      <AccountLabel
+                        name={r.display_name}
+                        id={r.owner_id}
+                        type={r.owner_type}
+                      />
+                    )
+                  },
                   {
                     title: "余额",
                     dataIndex: "balance",
-                    render: (v: string) => formatCoins(v)
+                    render: (v: string) => (
+                      <Typography.Text strong className="coins-amount">
+                        {formatCoins(v)}
+                      </Typography.Text>
+                    )
                   },
                   {
                     title: "状态",
                     render: (_, r: CoinAccount) =>
-                      `${r.account_status} / ${r.status}`
+                      r.status === "closed"
+                        ? "天生币账户已关闭"
+                        : r.status === "deletion_pending"
+                          ? "天生币账户已暂停"
+                          : r.account_status === "active"
+                            ? "正常"
+                            : "账号不可用"
                   },
                   {
                     title: "操作",
@@ -315,15 +336,17 @@ function Management({ profile }: { profile: AdminProfile }) {
                 { key: "name", label: "姓名", children: selected.display_name },
                 {
                   key: "realm",
-                  label: "身份域",
-                  children:
-                    selected.owner_type === "user" ? "C 端用户" : "管理员"
+                  label: "账号类型",
+                  children: selected.owner_type === "user" ? "用户" : "管理员"
                 },
-                { key: "id", label: "账户 UUID", children: selected.owner_id }
+                { key: "id", label: "账号编号", children: selected.owner_id }
               ]}
             />
             {!creditAllowed ? (
-              <Alert type="info" title="当前账户或权限不允许人工入账" />
+              <Alert
+                type="info"
+                title="当前账号状态或你的权限不允许发放天生币"
+              />
             ) : (
               <Form
                 form={creditForm}
@@ -334,13 +357,13 @@ function Management({ profile }: { profile: AdminProfile }) {
               >
                 <Form.Item
                   name="category"
-                  label="入账类别"
+                  label="发放类型"
                   rules={[{ required: true }]}
                 >
                   <Select
                     options={[
                       { value: "purchase", label: "购买入账" },
-                      { value: "reward", label: "人工奖励" }
+                      { value: "reward", label: "手动奖励" }
                     ]}
                   />
                 </Form.Item>
@@ -356,7 +379,9 @@ function Management({ profile }: { profile: AdminProfile }) {
                         BigInt(v) <= 9223372036854775807n
                           ? Promise.resolve()
                           : Promise.reject(
-                              new Error("请输入 BIGINT 范围内的正整数")
+                              new Error(
+                                "请输入 1 至 9,223,372,036,854,775,807 之间的整数"
+                              )
                             )
                     }
                   ]}
@@ -365,7 +390,8 @@ function Management({ profile }: { profile: AdminProfile }) {
                 </Form.Item>
                 <Form.Item
                   name="event_id"
-                  label="稳定核验单号 / 奖励事件号"
+                  label="业务单号"
+                  extra="每笔发放使用独立单号，例如付款单号或奖励发放单号；重试同一笔时沿用原单号。"
                   rules={[{ required: true, whitespace: true }]}
                   normalize={(v: string) => v.trim()}
                 >
@@ -373,27 +399,29 @@ function Management({ profile }: { profile: AdminProfile }) {
                 </Form.Item>
                 <Form.Item
                   name="reason"
-                  label="入账原因（仅管理端可见）"
+                  label="发放原因"
+                  extra="仅管理员可见，请说明为什么发放。"
                   rules={[{ required: true, whitespace: true }]}
                   normalize={(v: string) => v.trim()}
                 >
-                  <Input.TextArea maxLength={1000} />
+                  <Input.TextArea rows={3} maxLength={1000} />
                 </Form.Item>
                 <Form.Item
                   name="evidence_ref"
-                  label="凭据文本引用（仅管理端可见）"
+                  label="凭据备注（选填）"
+                  extra="可填写凭证编号或说明，仅管理员可见。"
                 >
                   <Input maxLength={500} />
                 </Form.Item>
                 <Button type="primary" htmlType="submit">
-                  核对并入账
+                  核对并发放
                 </Button>
               </Form>
             )}
           </Card>
-          <Card title="账户流水">
+          <Card title="收支明细">
             {entries.isError ? (
-              <Alert type="error" title="流水查询失败" />
+              <Alert type="error" title="收支明细查询失败" />
             ) : (
               <EntriesTable
                 data={entries.data}
@@ -411,162 +439,32 @@ function Management({ profile }: { profile: AdminProfile }) {
   );
   const operationsPanel = (
     <Flex vertical gap={16}>
-      <Card size="small" styles={{ body: { paddingBottom: 8 } }}>
-        <Form
-          form={operationForm}
-          layout="inline"
-          style={{
-            rowGap: 12,
-            columnGap: 8,
-            display: "flex",
-            flexWrap: "wrap"
-          }}
-          onFinish={(v) =>
-            setFilters({
-              ...v,
-              page: 1,
-              created_from: v.time?.[0]?.toISOString(),
-              created_to: v.time?.[1]?.toISOString(),
-              time: undefined
-            } as CoinOperationsQuery)
-          }
-        >
-          <Form.Item name="owner_type" label="目标身份">
-            <Select
-              allowClear
-              style={{ width: 120 }}
-              options={[
-                { value: "user", label: "用户" },
-                { value: "admin", label: "管理员" }
-              ]}
-            />
-          </Form.Item>
-          <Form.Item name="owner_id" label="目标 UUID">
-            <Input />
-          </Form.Item>
-          <Form.Item name="actor_id" label="操作员 UUID">
-            <Input />
-          </Form.Item>
-          <Form.Item name="source_type" label="类型">
-            <Select
-              allowClear
-              style={{ width: 140 }}
-              options={[
-                "manual_purchase",
-                "manual_reward",
-                "manual_reversal"
-              ].map((value) => ({ value, label: coinSourceLabels[value] }))}
-            />
-          </Form.Item>
-          <Form.Item name="time" label="时间">
-            <DatePicker.RangePicker showTime />
-          </Form.Item>
-          <Form.Item>
-            <Button htmlType="submit" type="primary" icon={<SearchOutlined />}>
-              筛选
-            </Button>
-          </Form.Item>
-        </Form>
-      </Card>
-      <Card size="small">
-        {operations.isError ? (
-          <Alert type="error" title="操作记录加载失败，请刷新重试" />
-        ) : (
-          <Table
-            locale={{
-              emptyText: (
-                <TableEmptyState
-                  message="暂无操作记录"
-                  filtered={
-                    !!(
-                      filters.owner_type ||
-                      filters.owner_id ||
-                      filters.actor_id ||
-                      filters.source_type ||
-                      filters.created_from ||
-                      filters.created_to
-                    )
-                  }
-                  onResetFilters={() => {
-                    operationForm.resetFields();
-                    setFilters({});
-                  }}
-                />
-              )
-            }}
-            rowKey="id"
-            loading={operations.isFetching}
-            dataSource={operations.data?.items}
-            scroll={{ x: 1200 }}
-            pagination={{
-              current: filters.page ?? 1,
-              pageSize: 20,
-              total: operations.data?.pagination.total ?? 0,
-              showSizeChanger: false,
-              onChange: (page) => setFilters({ ...filters, page })
-            }}
-            columns={[
-              {
-                title: "时间",
-                dataIndex: "created_at",
-                render: (v: string) => new Date(v).toLocaleString("zh-CN")
-              },
-              {
-                title: "目标",
-                render: (_, r: ManualCoinOperation) => (
-                  <>
-                    {r.owner_type}
-                    <br />
-                    {r.owner_id}
-                  </>
-                )
-              },
-              {
-                title: "类别",
-                dataIndex: "source_type",
-                render: (v: string) => coinSourceLabels[v] ?? v
-              },
-              {
-                title: "数量",
-                dataIndex: "delta",
-                render: (v: string) => formatCoins(v)
-              },
-              { title: "核验 / 事件号", dataIndex: "event_id" },
-              { title: "操作员", dataIndex: "actor_id" },
-              { title: "原因", dataIndex: "reason" },
-              { title: "凭据", dataIndex: "evidence_ref" },
-              {
-                title: "纠错",
-                render: (_, r: ManualCoinOperation) =>
-                  r.reversed_by_operation_id ? (
-                    "已全额冲正"
-                  ) : r.reverses_operation_id ? (
-                    `冲正原单 ${r.reverses_operation_id}`
-                  ) : hasAdminPermission(profile, "coins.reverse") &&
-                    canTarget(profile, r) ? (
-                    <Button
-                      danger
-                      onClick={() => {
-                        setReversing(r);
-                        setReason("");
-                        setError(undefined);
-                      }}
-                    >
-                      全额冲正
-                    </Button>
-                  ) : (
-                    "—"
-                  )
-              }
-            ]}
-          />
-        )}
-      </Card>
+      {operations.isError && (
+        <Alert type="error" title="发放记录加载失败，请重试查询" />
+      )}
+      <OperationHistory
+        data={operations.data}
+        loading={operations.isFetching}
+        filters={filters}
+        onFilter={setFilters}
+        canReverse={(row) =>
+          hasAdminPermission(profile, "coins.reverse") &&
+          canTarget(profile, row)
+        }
+        onReverse={(row) => {
+          setReversing(row);
+          setReason("");
+          setError(undefined);
+        }}
+      />
     </Flex>
   );
   return (
     <Flex vertical gap={16}>
       <Breadcrumb items={[{ title: "天生币管理" }]} />
+      <Typography.Text type="secondary">
+        查找账号、发放天生币，或查看和撤销手动发放记录。
+      </Typography.Text>
       <Tabs
         tabBarExtraContent={
           <Button icon={<ReloadOutlined />} onClick={() => void refresh()}>
@@ -574,31 +472,31 @@ function Management({ profile }: { profile: AdminProfile }) {
           </Button>
         }
         items={[
-          { key: "accounts", label: "账户与人工入账", children: searchPanel },
+          { key: "accounts", label: "账户与发放", children: searchPanel },
           {
             key: "operations",
-            label: "操作记录与冲正",
+            label: "发放记录",
             children: operationsPanel
           }
         ]}
       />
       <Modal
-        title="确认人工入账"
+        title="确认发放天生币"
         open={!!confirmation}
         confirmLoading={busy}
-        okText="确认入账"
+        okText="确认发放"
         cancelText="返回修改"
         onOk={() => void sendCredit()}
         onCancel={() => {
           if (!busy) setConfirmation(undefined);
         }}
-        maskClosable={false}
+        mask={{ closable: false }}
         closable={!busy}
         cancelButtonProps={{ disabled: busy }}
       >
         <Alert
           type="info"
-          title="人工记账不代表线上付款。冲正仅用于原人工入账的全额纠错，不支持退款或债务。"
+          title="确认后将增加该账号的天生币余额。购买入账前请先核实付款，本操作不会收款或退款。"
           style={{ marginBottom: 16 }}
         />
         {confirmation && (
@@ -608,23 +506,22 @@ function Management({ profile }: { profile: AdminProfile }) {
               { key: "name", label: "姓名", children: selected?.display_name },
               {
                 key: "realm",
-                label: "身份域",
-                children:
-                  confirmation.owner_type === "user" ? "C 端用户" : "管理员"
+                label: "账号类型",
+                children: confirmation.owner_type === "user" ? "用户" : "管理员"
               },
               {
                 key: "id",
-                label: "账户 UUID",
+                label: "账号编号",
                 children: confirmation.owner_id
               },
               {
                 key: "amount",
-                label: "入账数量",
+                label: "发放数量",
                 children: formatCoins(confirmation.amount)
               },
               {
                 key: "event",
-                label: "核验 / 事件号",
+                label: "业务单号",
                 children: confirmation.event_id
               },
               { key: "reason", label: "原因", children: confirmation.reason }
@@ -634,17 +531,17 @@ function Management({ profile }: { profile: AdminProfile }) {
         {error && <Alert type="error" title={error} />}
       </Modal>
       <Modal
-        title="确认原单全额冲正"
+        title="确认撤销发放"
         open={!!reversing}
         confirmLoading={busy}
-        okText="确认全额冲正"
+        okText="确认扣回"
         okButtonProps={{ danger: true, disabled: !reason.trim() }}
         cancelText="取消"
         onOk={() => void sendReversal()}
         onCancel={() => {
           if (!busy) setReversing(undefined);
         }}
-        maskClosable={false}
+        mask={{ closable: false }}
         closable={!busy}
         cancelButtonProps={{ disabled: busy }}
       >
@@ -652,26 +549,32 @@ function Management({ profile }: { profile: AdminProfile }) {
           <Descriptions
             column={1}
             items={[
-              { key: "original", label: "原操作", children: reversing.id },
+              { key: "original", label: "原发放记录", children: reversing.id },
               {
                 key: "owner",
-                label: "目标",
-                children: `${reversing.owner_type} / ${reversing.owner_id}`
+                label: "账号",
+                children: (
+                  <AccountLabel
+                    name={reversing.owner_display_name}
+                    id={reversing.owner_id}
+                    type={reversing.owner_type}
+                  />
+                )
               },
               {
                 key: "amount",
-                label: "扣回原入账",
+                label: "将扣回",
                 children: formatCoins(reversing.delta)
               }
             ]}
           />
         )}
         <Typography.Paragraph>
-          原单最多冲正一次，余额不足或钱包暂停时会被拒绝。旧流水会保留。
+          撤销会扣回这笔发放的全部天生币，原记录仍会保留，不涉及退款。每笔只能撤销一次；余额不足或账户暂停时无法撤销。
         </Typography.Paragraph>
         <Input.TextArea
-          aria-label="冲正原因"
-          placeholder="必填：纠错原因"
+          aria-label="撤销原因"
+          placeholder="请说明撤销原因，例如发错账号或数量（必填）"
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           maxLength={1000}

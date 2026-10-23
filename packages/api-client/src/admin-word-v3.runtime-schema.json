@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-custom-audio/docs/openapi.json",
-  "_source_sha256": "f8ef1da00239e86b93c9018cc879b2007f68432051499ff621cb8d09a1a72410",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/coins-management-clarity/docs/openapi.json",
+  "_source_sha256": "f7398ade292dff056a26b5053ea6a331a98c51956f0d9796b40fa420175275a8",
   "roots": [
     "DictionaryPage",
     "DictionaryEntry",
@@ -2256,6 +2256,7 @@
         "created_at"
       ],
       "properties": {
+        "actor_display_name": { "type": ["string", "null"] },
         "actor_id": { "type": "string", "format": "uuid" },
         "balance_after": {
           "type": "string",
@@ -2266,6 +2267,7 @@
         "event_id": { "type": "string" },
         "evidence_ref": { "type": ["string", "null"] },
         "id": { "type": "string", "format": "uuid" },
+        "owner_display_name": { "type": ["string", "null"] },
         "owner_id": { "type": "string", "format": "uuid" },
         "owner_type": { "$ref": "#/$defs/OwnerType" },
         "reason": { "type": "string" },
@@ -3962,7 +3964,8 @@
         "pitch_semitones": { "type": "integer", "maximum": 12, "minimum": -12 },
         "rate_percent": { "type": "integer", "maximum": 100, "minimum": -50 },
         "style": { "type": "string", "maxLength": 64 },
-        "voice_id": { "type": "string" }
+        "voice_id": { "type": "string" },
+        "volume_percent": { "type": "integer", "maximum": 100, "minimum": 0 }
       },
       "additionalProperties": false
     },

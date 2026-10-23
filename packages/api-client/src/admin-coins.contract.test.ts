@@ -9,6 +9,8 @@ const operation = {
   owner_type: "user",
   owner_id: id,
   actor_id: id,
+  owner_display_name: "收款人",
+  actor_display_name: "操作人",
   source_type: "manual_purchase",
   event_id: "verified-1",
   delta: "9007199254740993",
@@ -81,6 +83,41 @@ describe("manual coin contracts", () => {
       api.coinManagement.accounts({ owner_type: "admin", search: id })
     ).rejects.toMatchObject({ status: 404 });
   });
+  it("accepts optional names and requests the enriched list explicitly", async () => {
+    const {
+      owner_display_name: _owner,
+      actor_display_name: _actor,
+      ...legacy
+    } = operation;
+    const pagination = { page: 1, page_size: 20, total: 1, total_pages: 1 };
+    const fetch = vi
+      .fn()
+      .mockResolvedValue(Response.json({ items: [operation], pagination }));
+    vi.stubGlobal("fetch", fetch);
+    expect(
+      (
+        await api.coinManagement.operations({
+          include_names: true,
+          owner_search: "张小明",
+          actor_search: "王老师"
+        })
+      ).items[0]?.owner_display_name
+    ).toBe("收款人");
+    const url = new URL(fetch.mock.calls[0]![0]);
+    expect(url.searchParams.get("include_names")).toBe("true");
+    expect(url.searchParams.get("owner_search")).toBe("张小明");
+    fetch.mockResolvedValue(Response.json({ items: [legacy], pagination }));
+    expect(
+      (await api.coinManagement.operations()).items[0]?.owner_display_name
+    ).toBeUndefined();
+    fetch.mockResolvedValue(
+      Response.json({
+        items: [{ ...operation, actor_display_name: 123 }],
+        pagination
+      })
+    );
+    await expect(api.coinManagement.operations()).rejects.toThrow();
+  });
   it("publishes strict request payload and management query contracts", () => {
     expect(snapshot.schemas.ManualCreditRequest.additionalProperties).toBe(
       false
@@ -107,6 +144,9 @@ describe("manual coin contracts", () => {
         "owner_type",
         "owner_id",
         "actor_id",
+        "owner_search",
+        "actor_search",
+        "include_names",
         "source_type",
         "created_from",
         "created_to"
