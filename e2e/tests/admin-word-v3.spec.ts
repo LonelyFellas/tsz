@@ -3109,7 +3109,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
 
     const group = page.locator(".v3-form-group-card").first();
     const rows = group.locator(
-      ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
+      ".v3-form-overview .ant-table-tbody > tr.v3-overview-form-start"
     );
     const labels = rows.locator(".v3-overview-form-type");
     await expect(labels).toHaveText([
@@ -3217,14 +3217,14 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     // 词形名称直接展示；唯一原形不可删除，新增第二个原形后可删除，删回去又锁上。
     await expect(
       firstGroup.locator(
-        ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
+        ".v3-form-overview .ant-table-tbody > tr.v3-overview-form-start"
       )
     ).toHaveCount(2);
     await expect(firstGroup.getByLabel("删除变化组 1 的词形 1")).toBeDisabled();
     await addFormType(page, 1, "原形");
     await expect(
       firstGroup.locator(
-        ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
+        ".v3-form-overview .ant-table-tbody > tr.v3-overview-form-start"
       )
     ).toHaveCount(3);
     await expect(firstGroup.getByLabel("删除变化组 1 的词形 1")).toBeEnabled();
@@ -3234,7 +3234,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await page.getByLabel("删除词形及相关发音").click();
     await expect(
       firstGroup.locator(
-        ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
+        ".v3-form-overview .ant-table-tbody > tr.v3-overview-form-start"
       )
     ).toHaveCount(2);
     await expect(firstGroup.getByLabel("删除变化组 1 的词形 1")).toBeDisabled();
@@ -3271,13 +3271,13 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     const secondGroup = nounGroups.nth(1);
     await expect(
       firstGroup.locator(
-        ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
+        ".v3-form-overview .ant-table-tbody > tr.v3-overview-form-start"
       )
     ).toHaveCount(2);
     // 手动加的组是空组：不再自动带原形，也不按词性自动补复数占位行。
     await expect(
       secondGroup.locator(
-        ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
+        ".v3-form-overview .ant-table-tbody > tr.v3-overview-form-start"
       )
     ).toHaveCount(0);
     await expect(secondGroup.getByText("草稿可暂时保留空变化组")).toBeVisible();
@@ -3286,7 +3286,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await addFormType(page, 2, "原形");
     await expect(
       secondGroup.locator(
-        ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
+        ".v3-form-overview .ant-table-tbody > tr.v3-overview-form-start"
       )
     ).toHaveCount(1);
     const secondContent = await openFormContent(page, secondGroup);
@@ -3441,12 +3441,12 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(nounGroups).toHaveCount(2);
     await expect(
       firstGroup.locator(
-        ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
+        ".v3-form-overview .ant-table-tbody > tr.v3-overview-form-start"
       )
     ).toHaveCount(2);
     await expect(
       secondGroup.locator(
-        ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
+        ".v3-form-overview .ant-table-tbody > tr.v3-overview-form-start"
       )
     ).toHaveCount(1);
 
@@ -3460,7 +3460,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await page.getByLabel("删除词形及相关发音").click();
     await expect(
       firstGroup.locator(
-        ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
+        ".v3-form-overview .ant-table-tbody > tr.v3-overview-form-start"
       )
     ).toHaveCount(1);
     await page.getByRole("button", { name: "保存草稿" }).click();
@@ -3486,12 +3486,12 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(nounGroups).toHaveCount(2);
     await expect(
       firstGroup.locator(
-        ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
+        ".v3-form-overview .ant-table-tbody > tr.v3-overview-form-start"
       )
     ).toHaveCount(1);
     await expect(
       secondGroup.locator(
-        ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
+        ".v3-form-overview .ant-table-tbody > tr.v3-overview-form-start"
       )
     ).toHaveCount(1);
     expect(
@@ -3600,7 +3600,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await applyFormContent(page);
     await expect(
       secondGroup.locator(
-        ".v3-form-overview .ant-table-tbody > tr[data-row-key]"
+        ".v3-form-overview .ant-table-tbody > tr.v3-overview-form-start"
       )
     ).toHaveCount(1);
 
