@@ -20,7 +20,7 @@ import { api, useAuthStore } from "@/lib/auth";
 import {
   SenseSectionBody,
   SenseSectionTitle
-} from "../dictionary/word-creation-v3/V3MeaningsAndExamplesStep";
+} from "../dictionary/word-creation-v3/components/V3SenseSection";
 import { V3EnglishTextPreview } from "../dictionary/word-creation-v3/components/V3EnglishTextPreview";
 import { SentenceEditor } from "./SentenceEditor";
 import { V3RowIndex } from "../dictionary/word-creation-v3/components/V3RowIndex";
