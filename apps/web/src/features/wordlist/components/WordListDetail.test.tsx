@@ -26,7 +26,11 @@ vi.mock("@/lib/request", () => ({
       myItems: vi.fn(),
       reviews: vi.fn(),
       publish: vi.fn(),
-      withdraw: vi.fn()
+      withdraw: vi.fn(),
+      customAudio: vi.fn().mockResolvedValue({ items: [] }),
+      myCustomAudio: vi.fn().mockResolvedValue({ items: [] }),
+      customAudioUrl: vi.fn(),
+      myCustomAudioUrl: vi.fn()
     },
     auth: { me: vi.fn() }
   }
@@ -149,6 +153,8 @@ const myPageResult = (page: number) => {
 };
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(api.wordList.customAudio).mockResolvedValue({ items: [] });
+  vi.mocked(api.wordList.myCustomAudio).mockResolvedValue({ items: [] });
   observers.length = 0;
   vi.stubGlobal("IntersectionObserver", TestObserver);
   identity.identity = "student";
@@ -1067,6 +1073,104 @@ it("blocks publication when availability belongs to a different wordlist revisio
   await screen.findByRole("button", { name: "重新加载词表" });
   expect(screen.getByRole("button", { name: "申请公开" })).toBeDisabled();
 });
+
+it.each([false, true])(
+  "自定义语音按阅读权限签名且英美都可播放 mine=%s",
+  async (mine) => {
+    const custom = {
+      item_id: "custom",
+      entry_id: null,
+      custom_word: { word: " custom phrase ", definition: "释义" },
+      entry: null,
+      position: 0,
+      private_note: "",
+      note_revision: 1
+    };
+    const result = {
+      revision: 1,
+      pagination: { page: 1, page_size: 50, total: 1, total_pages: 1 },
+      items: [custom]
+    };
+    vi.mocked(api.wordList.items).mockResolvedValue(result);
+    vi.mocked(api.wordList.myItems).mockResolvedValue(result);
+    const status = {
+      items: [
+        {
+          item_id: "custom",
+          job_id: "job",
+          word: "custom phrase",
+          status: "ready" as const,
+          locales: ["en-GB", "en-US"] as ("en-GB" | "en-US")[]
+        }
+      ]
+    };
+    vi.mocked(api.wordList.customAudio).mockResolvedValue(status);
+    vi.mocked(api.wordList.myCustomAudio).mockResolvedValue(status);
+    vi.mocked(api.auth.me).mockResolvedValue(
+      profile({ cefr_level: "A1", english_variant: "AmE" })
+    );
+    const sign = mine
+      ? api.wordList.myCustomAudioUrl
+      : api.wordList.customAudioUrl;
+    vi.mocked(sign).mockResolvedValue({
+      url: "https://example.com/audio",
+      expires_at: "2026-10-23T10:00:00Z",
+      url_expires_in_seconds: 300
+    });
+    const play = vi.fn().mockResolvedValue(undefined);
+    const pause = vi.fn();
+    vi.stubGlobal(
+      "Audio",
+      class {
+        play = play;
+        pause = pause;
+        onerror = null;
+      }
+    );
+    const mounted = open(mine);
+    await screen.findByRole("button", { name: "播放 custom phrase 美式语音" });
+    expect(
+      screen
+        .getAllByRole("button", { name: /播放 custom phrase/ })
+        .map((button) => button.getAttribute("aria-label"))
+    ).toEqual([
+      "播放  custom phrase  美式语音",
+      "播放  custom phrase  英式语音"
+    ]);
+    expect(
+      mine ? api.wordList.myCustomAudio : api.wordList.customAudio
+    ).toHaveBeenCalledWith(
+      "list",
+      ["custom"],
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "播放 custom phrase 美式语音" })
+    );
+    await waitFor(() =>
+      expect(sign).toHaveBeenCalledWith(
+        "list",
+        "custom",
+        "en-US",
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      )
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "播放 custom phrase 英式语音" })
+    );
+    await waitFor(() =>
+      expect(sign).toHaveBeenCalledWith(
+        "list",
+        "custom",
+        "en-GB",
+        expect.anything()
+      )
+    );
+    await waitFor(() => expect(play).toHaveBeenCalledTimes(2));
+    mounted.unmount();
+    expect(pause).toHaveBeenCalledTimes(2);
+  }
+);
 
 it("自定义词在阅读页展示原释义，不误判为不可用并提示不参与出题", async () => {
   vi.mocked(api.wordList.availability).mockResolvedValue({

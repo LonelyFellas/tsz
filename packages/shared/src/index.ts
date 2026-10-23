@@ -1,6 +1,7 @@
 export * from "./constants";
 export * from "./dialect-preference";
 export * from "./format";
+export { wordlistAudioWord } from "./wordlist-audio";
 export * from "./query";
 export * from "./validate";
 export { readTestResourceRun } from "./test-resources";

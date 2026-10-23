@@ -20,6 +20,8 @@ import type { Wordlist, WordlistEntry, AdminWordlistReview } from "@tsz/types";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import "@tsz/voice-editor/reader.css";
 import { api, usePermission } from "@/lib/auth";
+import { CustomAudio } from "./CustomAudio";
+import { wordlistAudioWord } from "@tsz/shared";
 
 export function WordlistEntryView({ entry }: { entry: WordlistEntry }) {
   return (
@@ -104,6 +106,32 @@ export function WordlistDetails({
             { signal }
           )
   });
+  const customIds =
+    items.data?.items.flatMap((item) =>
+      item.custom_word && item.item_id ? [item.item_id] : []
+    ) ?? [];
+  const audio = useQuery({
+    queryKey: [...key, "custom-audio", tab, current?.id, customIds],
+    enabled:
+      customIds.length > 0 && (tab === "current" || (reviewMode && !!current)),
+    retry: false,
+    queryFn: ({ signal }) =>
+      tab === "current"
+        ? api.wordlists.customAudio(list.id, customIds, { signal })
+        : api.wordlists.reviewCustomAudio(list.id, current!.id, customIds, {
+            signal
+          }),
+    refetchInterval: (query) =>
+      !query.state.error &&
+      query.state.data?.items.some((item) =>
+        ["queued", "processing", "refunding"].includes(item.status)
+      )
+        ? 3000
+        : false
+  });
+  const audioByItem = new Map(
+    audio.data?.items.map((item) => [item.item_id, item])
+  );
   async function decide() {
     if (
       !reviewMode ||
@@ -304,6 +332,15 @@ export function WordlistDetails({
             <p>读取词条…</p>
           ) : (
             <>
+              {audio.isError && (
+                <Alert
+                  type="warning"
+                  title="语音暂不可用，仍可查看词表内容"
+                  action={
+                    <Button onClick={() => void audio.refetch()}>重试</Button>
+                  }
+                />
+              )}
               {items.data.items.length === 0 && <p>暂无词项</p>}
               {items.data.items.map((item, index) => (
                 <article
@@ -327,6 +364,17 @@ export function WordlistDetails({
                         >
                           {item.custom_word.definition}
                         </Typography.Paragraph>
+                        {audioByItem.get(item.item_id!)?.word ===
+                          wordlistAudioWord(item.custom_word.word) && (
+                          <CustomAudio
+                            key={`${tab}:${current?.id}:${audioByItem.get(item.item_id!)!.job_id}`}
+                            listId={list.id}
+                            requestId={
+                              tab === "reviews" ? current?.id : undefined
+                            }
+                            audio={audioByItem.get(item.item_id!)!}
+                          />
+                        )}
                       </>
                     ) : item.entry ? (
                       <WordlistEntryView entry={item.entry} />

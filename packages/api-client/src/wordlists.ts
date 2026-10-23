@@ -1,4 +1,6 @@
 import { createWordlistLibraryEndpoints } from "./wordlist-library";
+import { customAudio, customAudioUrl } from "./wordlist-custom-audio";
+import type { WordlistAudioLocale } from "@tsz/types";
 import { SENTENCE_FORMATTING_HEADERS } from "./sentence-formatting";
 import type {
   WordlistInteractionStatsBatch,
@@ -68,6 +70,22 @@ type Options = { signal?: AbortSignal };
 export function createWordlistEndpoints(http: HttpClient) {
   return {
     library: createWordlistLibraryEndpoints(http),
+    customAudio: (id: string, itemIds: string[] = [], o?: Options) =>
+      customAudio(http, `/wordlists/${id}`, itemIds, o),
+    myCustomAudio: (id: string, itemIds: string[] = [], o?: Options) =>
+      customAudio(http, `/me/wordlists/${id}`, itemIds, o),
+    customAudioUrl: (
+      id: string,
+      itemId: string,
+      locale: WordlistAudioLocale,
+      o?: Options
+    ) => customAudioUrl(http, `/wordlists/${id}`, itemId, locale, o),
+    myCustomAudioUrl: (
+      id: string,
+      itemId: string,
+      locale: WordlistAudioLocale,
+      o?: Options
+    ) => customAudioUrl(http, `/me/wordlists/${id}`, itemId, locale, o),
     interactionStats: (ids: string[], o?: Options) =>
       http
         .get<unknown>(
@@ -262,6 +280,40 @@ export function createWordlistEndpoints(http: HttpClient) {
 }
 export function createAdminWordlistEndpoints(http: HttpClient) {
   return {
+    customAudio: (id: string, itemIds: string[] = [], o?: Options) =>
+      customAudio(http, `/wordlists/${id}`, itemIds, o),
+    customAudioUrl: (
+      id: string,
+      itemId: string,
+      locale: WordlistAudioLocale,
+      o?: Options
+    ) => customAudioUrl(http, `/wordlists/${id}`, itemId, locale, o),
+    reviewCustomAudio: (
+      id: string,
+      request: string,
+      itemIds: string[] = [],
+      o?: Options
+    ) =>
+      customAudio(
+        http,
+        `/wordlists/${id}/review-requests/${request}`,
+        itemIds,
+        o
+      ),
+    reviewCustomAudioUrl: (
+      id: string,
+      request: string,
+      itemId: string,
+      locale: WordlistAudioLocale,
+      o?: Options
+    ) =>
+      customAudioUrl(
+        http,
+        `/wordlists/${id}/review-requests/${request}`,
+        itemId,
+        locale,
+        o
+      ),
     management: (q: WordlistManagementQuery = {}, o?: Options) =>
       http
         .get<unknown>(`/wordlists/management${query(q)}`, o)

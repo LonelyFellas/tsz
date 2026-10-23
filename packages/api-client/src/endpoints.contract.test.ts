@@ -146,8 +146,10 @@ function collectCalls(
         name === "interactionStats" || name === "interactionStates"
           ? [SENTINEL]
           : SENTINEL,
-        SENTINEL,
-        SENTINEL,
+        name === "customAudio" || name === "myCustomAudio"
+          ? [SENTINEL]
+          : SENTINEL,
+        name === "reviewCustomAudio" ? [SENTINEL] : SENTINEL,
         SENTINEL
       );
     } else if (node && typeof node === "object") {
@@ -826,7 +828,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "6445d7902529ed47c99f0d25243acd188507e911224f42168d059c0c6c6ae0b2"
+      "f8ef1da00239e86b93c9018cc879b2007f68432051499ff621cb8d09a1a72410"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");

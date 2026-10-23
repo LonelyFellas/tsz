@@ -30,7 +30,11 @@ vi.mock("@/lib/auth", () => ({
       visibility: vi.fn(),
       recommend: vi.fn(),
       deleteImpact: vi.fn(),
-      delete: vi.fn()
+      delete: vi.fn(),
+      customAudio: vi.fn().mockResolvedValue({ items: [] }),
+      reviewCustomAudio: vi.fn().mockResolvedValue({ items: [] }),
+      customAudioUrl: vi.fn(),
+      reviewCustomAudioUrl: vi.fn()
     }
   }
 }));
@@ -671,6 +675,74 @@ it("keeps snapshot pagination scoped to the selected application and hides decis
   expect(within(drawer).queryByText("通过审核")).not.toBeInTheDocument();
   expect(within(drawer).queryByText("驳回")).not.toBeInTheDocument();
 });
+
+it.each([false, true])(
+  "plays custom audio using the current or review signature route review=%s",
+  async (review) => {
+    const items = {
+      revision: 4,
+      pagination,
+      items: [
+        {
+          item_id: "custom",
+          entry_id: null,
+          entry: null,
+          position: 0,
+          custom_word: { word: " phrase ", definition: "释义" }
+        }
+      ]
+    };
+    vi.mocked(api.wordlists.currentItems).mockResolvedValue(items);
+    vi.mocked(api.wordlists.items).mockResolvedValue(items);
+    const status = {
+      items: [
+        {
+          item_id: "custom",
+          job_id: "job",
+          word: "phrase",
+          status: "ready" as const,
+          locales: ["en-GB", "en-US"] as ("en-GB" | "en-US")[]
+        }
+      ]
+    };
+    vi.mocked(api.wordlists.customAudio).mockResolvedValue(status);
+    vi.mocked(api.wordlists.reviewCustomAudio).mockResolvedValue(status);
+    const sign = review
+      ? api.wordlists.reviewCustomAudioUrl
+      : api.wordlists.customAudioUrl;
+    vi.mocked(sign).mockResolvedValue({
+      url: "https://example.com/audio",
+      expires_at: "2026-10-23T10:00:00Z",
+      url_expires_in_seconds: 300
+    });
+    const play = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal(
+      "Audio",
+      class {
+        play = play;
+        pause = vi.fn();
+        onerror = null;
+      }
+    );
+    try {
+      mount(review ? <ReviewsPage /> : <WordListsPage />);
+      fireEvent.click(await screen.findByText(/^查\s*看$/));
+      await screen.findByRole("heading", { name: "phrase" });
+      fireEvent.click(
+        await screen.findByRole("button", { name: /播放英式语音/ })
+      );
+      await waitFor(() => expect(play).toHaveBeenCalledOnce());
+      const args = vi.mocked(sign).mock.calls[0]!;
+      expect(args[0]).toBe("list");
+      expect(args[review ? 2 : 1]).toBe("custom");
+      expect(args[review ? 3 : 2]).toBe("en-GB");
+      if (review)
+        expect(args[1]).toBe(vi.mocked(api.wordlists.items).mock.calls[0]![1]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  }
+);
 
 it("reads custom and platform words with their own definitions and author notes", async () => {
   vi.mocked(api.wordlists.currentItems).mockResolvedValue({

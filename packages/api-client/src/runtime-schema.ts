@@ -4,6 +4,7 @@ export const RUNTIME_SCHEMA_ROOTS = [
   "DictionaryPage",
   "DictionaryEntry",
   "AudioAssetUrlResponse",
+  "AudioStatuses",
   "LearningRewardDay",
   "LoginRewardDay",
   "LearningPreview",

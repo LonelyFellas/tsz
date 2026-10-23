@@ -38,7 +38,28 @@ export interface WordlistContentItem {
   custom_word?: CustomWord;
   author_note: string;
 }
+export interface WordlistAudioGeneration {
+  item_ids: string[];
+  expected_cost: string;
+}
+export type WordlistAudioLocale = "en-GB" | "en-US";
+export interface WordlistCustomAudio {
+  item_id: string;
+  job_id: string;
+  word: string;
+  status: "queued" | "processing" | "ready" | "refunding" | "refunded";
+  locales: WordlistAudioLocale[];
+}
+export interface WordlistCustomAudioItems {
+  items: WordlistCustomAudio[];
+}
+export interface WordlistCustomAudioUrl {
+  url: string;
+  expires_at: string;
+  url_expires_in_seconds: number;
+}
 export interface CreateWordlist {
+  audio_generation?: WordlistAudioGeneration;
   folder_id?: string;
   idempotency_key: string;
   name: string;
@@ -57,6 +78,8 @@ export interface WordlistNoteUpdate {
   private_note: string;
 }
 export interface UpdateWordlist {
+  idempotency_key?: string;
+  audio_generation?: WordlistAudioGeneration;
   expected_revision: number;
   content: {
     name: string;

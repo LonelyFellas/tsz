@@ -1,11 +1,12 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/issue-279-login-throttle/docs/openapi.json",
-  "_source_sha256": "6445d7902529ed47c99f0d25243acd188507e911224f42168d059c0c6c6ae0b2",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-custom-audio/docs/openapi.json",
+  "_source_sha256": "f8ef1da00239e86b93c9018cc879b2007f68432051499ff621cb8d09a1a72410",
   "roots": [
     "DictionaryPage",
     "DictionaryEntry",
     "AudioAssetUrlResponse",
+    "AudioStatuses",
     "LearningRewardDay",
     "LoginRewardDay",
     "LearningPreview",
@@ -460,6 +461,30 @@
         "url": { "type": "string" },
         "url_expires_in_seconds": { "type": "integer", "minimum": 0 }
       }
+    },
+    "AudioState": {
+      "type": "string",
+      "enum": ["queued", "processing", "ready", "refunding", "refunded"]
+    },
+    "AudioStatus": {
+      "type": "object",
+      "required": ["item_id", "job_id", "word", "status", "locales"],
+      "properties": {
+        "item_id": { "type": "string", "format": "uuid" },
+        "job_id": { "type": "string", "format": "uuid" },
+        "locales": { "type": "array", "items": { "type": "string" } },
+        "status": { "$ref": "#/$defs/AudioState" },
+        "word": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "AudioStatuses": {
+      "type": "object",
+      "required": ["items"],
+      "properties": {
+        "items": { "type": "array", "items": { "$ref": "#/$defs/AudioStatus" } }
+      },
+      "additionalProperties": false
     },
     "BatchPublicationResponseV3": {
       "type": "object",
@@ -997,6 +1022,8 @@
         "learning_insufficient_questions",
         "learning_already_answered",
         "word_list_conflict",
+        "word_list_audio_cost_changed",
+        "account_deletion_unsettled_audio",
         "word_list_entry_unavailable",
         "invalid_credentials",
         "invalid_token",

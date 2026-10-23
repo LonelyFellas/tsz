@@ -23,8 +23,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { HttpError } from "@tsz/api-client";
 import type {
-  CreateWordlist,
-  CustomWord,
+  UpdateWordlist,
+  WordlistCustomAudio,
   MyWordlistItem,
   WordlistCandidate,
   WordlistEditSnapshot,
@@ -33,6 +33,16 @@ import type {
 import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
 import { wordListKeys } from "../hooks/useWordLists";
+import { audioStatusLabels, useCustomAudio } from "../hooks/useCustomAudio";
+import {
+  pendingSaveKey,
+  readPendingSave,
+  writePendingSave,
+  removePendingSave,
+  type WordlistSave,
+  type WordlistSaveRow as Row
+} from "../pending-save";
+import { formatCoins, wordlistAudioWord } from "@tsz/shared";
 import { Button, Input, FormField } from "@tsz/ui/components";
 import { cn } from "@tsz/ui/lib/cn";
 import { ArrowLeft, Plus, Pencil } from "lucide-react";
@@ -41,19 +51,6 @@ import { ExcelImport } from "./ExcelImport";
 import { SortableWordRow } from "./SortableWordRow";
 import { createWordRowPreview, WordRowDragPreview } from "./WordRowDragPreview";
 const verticalOnly: Modifier = ({ transform }) => ({ ...transform, x: 0 });
-type Row = {
-  id: string;
-  entryId: string | null;
-  itemId?: string;
-  customWord?: CustomWord;
-  text?: string;
-  candidate?: WordlistCandidate;
-  note?: string;
-  authorNote?: string;
-  noteRevision?: number;
-  noteVersions?: Record<string, number | undefined>;
-  noteDirty?: boolean;
-};
 type RowField = "word" | "definition" | "author-note" | "private-note";
 const rowKey = (row: Row) => row.entryId ?? row.itemId!;
 const itemKey = (item: MyWordlistItem) => item.item_id ?? item.entry_id!;
@@ -98,7 +95,15 @@ export function WordListCreator({
     refetchOnMount: "always"
   });
   if (!userId) return null;
-  if (id && snapshot.isError)
+  let hasPending = false;
+  try {
+    hasPending =
+      typeof window !== "undefined" &&
+      !!sessionStorage.getItem(pendingSaveKey(userId, id, folderId));
+  } catch {
+    /* The editor reports storage failures before dispatch. */
+  }
+  if (id && snapshot.isError && !hasPending)
     return (
       <PageShell size="lg" embedded={embedded}>
         <PageNotice tone="error">
@@ -115,7 +120,7 @@ export function WordListCreator({
         </PageNotice>
       </PageShell>
     );
-  if (id && !snapshot.data)
+  if (id && !snapshot.data && !hasPending)
     return (
       <PageShell size="lg" embedded={embedded}>
         <PageNotice>正在读取词表…</PageNotice>
@@ -151,38 +156,61 @@ function Editor({
   id?: string;
   initial?: WordlistEditSnapshot;
 }) {
-  const [initial] = useState(snapshot);
+  const storageKey = pendingSaveKey(userId, id, folderId);
+  const [recovery] = useState(() => {
+    try {
+      return { saved: readPendingSave(storageKey), error: "" };
+    } catch {
+      return {
+        saved: null,
+        error: "待确认的保存记录无法读取，请保留此页面并联系支持。"
+      };
+    }
+  });
+  const [initial] = useState(recovery.saved?.form.initial ?? snapshot);
   const [originalIds] = useState(
     () =>
       new Set(initial?.items?.map((item) => item.item_id) ?? initial?.entry_ids)
   );
   const router = useRouter();
   const client = useQueryClient();
-  const [name, setName] = useState(initial?.wordlist.name ?? "");
-  const [rows, setRows] = useState<Row[]>(() =>
-    initial
-      ? (
-          initial.items ??
-          initial.entry_ids.map((entry_id) => ({ item_id: entry_id, entry_id }))
-        ).map((item) => ({
-          id: crypto.randomUUID(),
-          entryId: item.entry_id ?? null,
-          itemId: item.item_id,
-          customWord: "custom_word" in item ? item.custom_word : undefined
-        }))
-      : [emptyRow()]
+  const [name, setName] = useState(
+    recovery.saved?.form.name ?? initial?.wordlist.name ?? ""
+  );
+  const [rows, setRows] = useState<Row[]>(
+    () =>
+      recovery.saved?.form.rows ??
+      (initial
+        ? (
+            initial.items ??
+            initial.entry_ids.map((entry_id) => ({
+              item_id: entry_id,
+              entry_id
+            }))
+          ).map((item) => ({
+            id: crypto.randomUUID(),
+            entryId: item.entry_id ?? null,
+            itemId: item.item_id,
+            customWord: "custom_word" in item ? item.custom_word : undefined
+          }))
+        : [emptyRow()])
   );
   const [page, setPage] = useState(1);
   const [dirty, setDirty] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(
+    recovery.error ||
+      (recovery.saved ? "上次保存结果未确认，请重试保存以确认结果。" : "")
+  );
   const [nameInvalid, setNameInvalid] = useState(false);
-  const [uncertain, setUncertain] = useState(false);
+  const [uncertain, setUncertain] = useState(
+    !!recovery.saved || !!recovery.error
+  );
   const nameInput = useRef<HTMLInputElement>(null);
   const saveButton = useRef<HTMLButtonElement>(null);
   const savingRef = useRef(false);
-  const pending = useRef<CreateWordlist | null>(null);
+  const pending = useRef<WordlistSave | null>(recovery.saved?.request ?? null);
   const [dragPreview, setDragPreview] = useState<HTMLElement | null>(null);
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
@@ -237,7 +265,38 @@ function Editor({
     refetchOnWindowFocus: false,
     refetchOnReconnect: false
   });
-  const loadingItems = !!id && !loaded.data;
+  const loadingItems = !!id && !loaded.data && !uncertain;
+  const customIds = rows.flatMap((row) =>
+    row.customWord && originalIds.has(rowKey(row)) ? [rowKey(row)] : []
+  );
+  const audio = useCustomAudio(
+    id,
+    customIds,
+    true,
+    userId,
+    customIds.length > 0
+  );
+  const audioByItem = new Map(
+    audio.data?.items.map((item) => [item.item_id, item])
+  );
+  const selectedAudio = rows.filter((row) => {
+    if (!row.customWord || !row.generateAudio) return false;
+    const job = audioByItem.get(rowKey(row));
+    return !(
+      job &&
+      (job.status === "refunding" ||
+        (job.word === wordlistAudioWord(row.customWord.word) &&
+          job.status !== "refunded"))
+    );
+  });
+  const audioCost = BigInt(selectedAudio.length) * 2n;
+  const wallet = useQuery({
+    queryKey: ["coins", "user", userId, "wallet"],
+    enabled: rows.some((row) => row.customWord),
+    queryFn: ({ signal }) => api.coins.wallet({ signal }),
+    refetchOnMount: "always"
+  });
+  const insufficient = !!wallet.data && BigInt(wallet.data.balance) < audioCost;
   // Only this editing session's complete, revision-checked response supplies notes.
   const cache = new Map(loaded.data?.map((item) => [itemKey(item), item]));
   function authorNoteFor(row: Row) {
@@ -247,7 +306,7 @@ function Editor({
     return originalIds.has(entryId) ? cache.get(entryId)?.note_revision : 1;
   }
   useEffect(() => {
-    if (!dirty && !importOpen && !saving) return;
+    if (!dirty && !importOpen && !saving && !uncertain) return;
     const prevent = (e: BeforeUnloadEvent) => {
       if (!allowLeave.current) {
         e.preventDefault();
@@ -304,7 +363,7 @@ function Editor({
       document.removeEventListener("click", click, true);
       window.navigation?.removeEventListener("navigate", navigate);
     };
-  }, [dirty, importOpen, saving]);
+  }, [dirty, importOpen, saving, uncertain]);
   function change(rowId: string, patch: Partial<Row>) {
     setRows((current) =>
       current.map((row) => (row.id === rowId ? { ...row, ...patch } : row))
@@ -336,7 +395,25 @@ function Editor({
     });
   }
   async function save() {
-    if (savingRef.current || loadingItems) return;
+    if (savingRef.current || loadingItems || recovery.error) return;
+    if (pending.current) return dispatchSave(pending.current);
+    if (
+      selectedAudio.length &&
+      (insufficient || wallet.data?.status !== "open" || wallet.isError)
+    ) {
+      setError(
+        insufficient
+          ? "余额不足，当前输入已保留。请补充天生币后重试。"
+          : "暂时无法使用钱包，请刷新余额后重试。当前输入已保留。"
+      );
+      return;
+    }
+    if (selectedAudio.length && id && customIds.length && !audio.isSuccess) {
+      setError(
+        "语音服务暂不可用，当前输入已保留。可稍后重试，或主动取消生成语音后保存文本。"
+      );
+      return;
+    }
     if (!name.trim() || [...name].length > 100) {
       setError("名称须为 1–100 字");
       setNameInvalid(true);
@@ -402,70 +479,80 @@ function Editor({
       setError("词义和备注尚未读取完成，请稍后重试");
       return;
     }
-    savingRef.current = true;
-    setSaving(true);
-    setError("");
-    try {
-      let result;
-      if (id && initial) {
-        const same =
-          name === initial.wordlist.name &&
-          JSON.stringify(rows.map(rowKey)) ===
-            JSON.stringify(
-              initial.items?.map((item) => item.item_id) ?? initial.entry_ids
-            ) &&
-          rows.every(
-            (row) =>
-              authorNoteFor(row) ===
-                (cache.get(rowKey(row))?.author_note ?? "") &&
-              JSON.stringify(row.customWord) ===
-                JSON.stringify(cache.get(rowKey(row))?.custom_word)
-          );
-        result = await api.wordList.update(id, {
-          expected_revision: initial.wordlist.revision,
-          content: same
-            ? null
-            : {
-                name,
-                ...(rows.some((row) => row.customWord) ||
-                initial.items?.some((item) => item.custom_word)
-                  ? {
-                      items: rows.map((row) => ({
-                        item_id: rowKey(row),
-                        ...(row.entryId
-                          ? { entry_id: row.entryId }
-                          : { custom_word: row.customWord! }),
-                        author_note: authorNoteFor(row)
-                      }))
-                    }
-                  : {
-                      entry_ids: rows.map((r) => r.entryId!),
-                      ...(rows.some((row) => authorNoteFor(row)) ||
-                      loaded.data?.some((item) => item.author_note)
-                        ? {
-                            author_notes: rows.map((row) => ({
-                              entry_id: row.entryId!,
-                              author_note: authorNoteFor(row)
-                            }))
-                          }
-                        : {})
-                    })
-              },
-          note_updates: rows
-            .filter(
-              (r) =>
-                r.note !== undefined &&
-                (r.noteDirty || !originalIds.has(rowKey(r)))
-            )
-            .map((r) => ({
-              ...(r.entryId ? { entry_id: r.entryId } : { item_id: rowKey(r) }),
-              private_note: r.note!,
-              expected_note_revision:
-                r.noteRevision ?? noteRevisionFor(rowKey(r))!
-            }))
-        });
-      } else {
-        pending.current ??= {
+    const audioGeneration = selectedAudio.length
+      ? {
+          item_ids: selectedAudio.map(rowKey),
+          expected_cost: audioCost.toString()
+        }
+      : undefined;
+    let request: WordlistSave;
+    if (id && initial) {
+      const same =
+        name === initial.wordlist.name &&
+        JSON.stringify(rows.map(rowKey)) ===
+          JSON.stringify(
+            initial.items?.map((item) => item.item_id) ?? initial.entry_ids
+          ) &&
+        rows.every(
+          (row) =>
+            authorNoteFor(row) ===
+              (cache.get(rowKey(row))?.author_note ?? "") &&
+            JSON.stringify(row.customWord) ===
+              JSON.stringify(cache.get(rowKey(row))?.custom_word)
+        );
+      const body: UpdateWordlist = {
+        ...(audioGeneration || audio.isSuccess
+          ? { idempotency_key: crypto.randomUUID() }
+          : {}),
+        ...(audioGeneration ? { audio_generation: audioGeneration } : {}),
+        expected_revision: initial.wordlist.revision,
+        content: same
+          ? null
+          : {
+              name,
+              ...(rows.some((row) => row.customWord) ||
+              initial.items?.some((item) => item.custom_word)
+                ? {
+                    items: rows.map((row) => ({
+                      item_id: rowKey(row),
+                      ...(row.entryId
+                        ? { entry_id: row.entryId }
+                        : { custom_word: row.customWord! }),
+                      author_note: authorNoteFor(row)
+                    }))
+                  }
+                : {
+                    entry_ids: rows.map((r) => r.entryId!),
+                    ...(rows.some((row) => authorNoteFor(row)) ||
+                    loaded.data?.some((item) => item.author_note)
+                      ? {
+                          author_notes: rows.map((row) => ({
+                            entry_id: row.entryId!,
+                            author_note: authorNoteFor(row)
+                          }))
+                        }
+                      : {})
+                  })
+            },
+        note_updates: rows
+          .filter(
+            (r) =>
+              r.note !== undefined &&
+              (r.noteDirty || !originalIds.has(rowKey(r)))
+          )
+          .map((r) => ({
+            ...(r.entryId ? { entry_id: r.entryId } : { item_id: rowKey(r) }),
+            private_note: r.note!,
+            expected_note_revision:
+              r.noteRevision ?? noteRevisionFor(rowKey(r))!
+          }))
+      };
+      request = { kind: "update", id, body };
+    } else {
+      request = {
+        kind: "create",
+        body: {
+          ...(audioGeneration ? { audio_generation: audioGeneration } : {}),
           idempotency_key: crypto.randomUUID(),
           ...(folderId ? { folder_id: folderId } : {}),
           name,
@@ -476,25 +563,105 @@ function Editor({
             private_note: r.note ?? "",
             ...(authorNoteFor(r) ? { author_note: authorNoteFor(r) } : {})
           }))
-        };
-        result = await api.wordList.create(pending.current);
-      }
+        }
+      };
+    }
+    try {
+      writePendingSave(storageKey, request, {
+        name,
+        initial,
+        rows: rows.map((row) => ({
+          ...row,
+          authorNote: authorNoteFor(row),
+          note: row.note ?? cache.get(rowKey(row))?.private_note ?? "",
+          text:
+            row.customWord?.word ??
+            row.text ??
+            cache.get(rowKey(row))?.entry?.label
+        }))
+      });
+    } catch {
+      setError(
+        "无法保留保存记录，尚未提交。请允许浏览器存储后重试，当前输入已保留。"
+      );
+      return;
+    }
+    pending.current = request;
+    await dispatchSave(request);
+  }
+  async function dispatchSave(request: WordlistSave) {
+    savingRef.current = true;
+    setSaving(true);
+    setError("");
+    try {
+      const result =
+        request.kind === "create"
+          ? await api.wordList.create(request.body)
+          : await api.wordList.update(request.id, request.body);
+      removePendingSave(storageKey, request);
+      pending.current = null;
+      setUncertain(false);
       allowLeave.current = true;
       setDirty(false);
-      await client.invalidateQueries({ queryKey: wordListKeys.all });
+      await Promise.all([
+        client.invalidateQueries({ queryKey: wordListKeys.all }),
+        client.invalidateQueries({ queryKey: ["coins", "user", userId] })
+      ]);
       if (onSaved) onSaved(result.id);
       else router.push(`/account/wordlists/${result.id}`);
     } catch (e) {
+      const audioUnavailable =
+        e instanceof HttpError &&
+        !!request.body.audio_generation &&
+        [
+          "speech_provider_unavailable",
+          "speech_storage_unavailable",
+          "speech_voice_not_found"
+        ].includes(e.code ?? "");
+      // Keep keyed commands frozen until replay confirms the earlier attempt.
+      // Legacy updates cannot replay a committed revision; reopen to reconcile them.
+      const canReplay =
+        request.kind === "create" || !!request.body.idempotency_key;
       const unknown =
-        !(e instanceof HttpError) || e.status >= 500 || e.status === 408;
-      if (!id && !unknown) pending.current = null;
-      setUncertain(!id && unknown);
+        (uncertain && canReplay) ||
+        (!audioUnavailable &&
+          (!(e instanceof HttpError) || e.status >= 500 || e.status === 408));
+      if (!unknown) {
+        removePendingSave(storageKey, request);
+        pending.current = null;
+      }
+      setUncertain(unknown);
+      const messages: Record<string, string> = {
+        coin_insufficient_balance:
+          "余额不足，保存未完成。当前输入已保留，请补充天生币后重试。",
+        coin_wallet_unavailable:
+          "账户当前暂停收支，保存未完成。当前输入已保留。",
+        coin_idempotency_conflict: "保存记录不一致，请先核对词表和天生币流水。",
+        coin_source_conflict: "本次扣款已处理，请先核对词表和天生币流水。",
+        word_list_audio_cost_changed:
+          "语音费用已变化，本次未保存。请核对刷新后的语音状态与费用，再点击保存。"
+      };
+      if (e instanceof HttpError && e.code?.startsWith("coin_"))
+        void client.invalidateQueries({ queryKey: ["coins", "user", userId] });
+      if (e instanceof HttpError && e.code === "word_list_audio_cost_changed") {
+        if (id) void audio.refetch();
+      }
       setError(
-        e instanceof HttpError && e.status === 413
-          ? "词表内容过大，请减少词条或缩短注释后重试。当前编辑内容仍保留。"
-          : unknown
-            ? "保存结果未确认，请重试。"
-            : "保存失败：内容、版本或词条状态已变化。请检查输入；版本冲突时重新打开词表。"
+        unknown
+          ? "保存结果未确认，请重试保存。确认前无法修改本次内容，刷新后仍可继续确认。"
+          : uncertain && !canReplay
+            ? "上次保存结果仍未确认，当前版本无法继续重试。请重新打开词表核对保存结果，当前输入已保留。"
+            : audioUnavailable
+              ? "语音服务暂不可用，本次未保存、未扣款。输入已保留，可稍后重试，或主动取消生成语音后保存文本。"
+              : e instanceof HttpError && messages[e.code ?? ""]
+                ? messages[e.code!]!
+                : e instanceof HttpError && e.status === 413
+                  ? "词表内容过大，请减少词条或缩短注释后重试。当前编辑内容仍保留。"
+                  : request.body.audio_generation &&
+                      e instanceof HttpError &&
+                      [400, 404, 422, 501].includes(e.status)
+                    ? "语音服务暂不可用或请求被拒绝，当前输入已保留。可稍后重试，或主动取消生成语音后保存文本。"
+                    : "保存失败：内容、版本或词条状态已变化。请检查输入；版本冲突时重新打开词表。"
       );
     } finally {
       savingRef.current = false;
@@ -722,7 +889,18 @@ function Editor({
             <Button
               type="button"
               ref={saveButton}
-              disabled={saving || loadingItems}
+              disabled={
+                saving ||
+                loadingItems ||
+                !!recovery.error ||
+                (!uncertain &&
+                  selectedAudio.length > 0 &&
+                  (wallet.isFetching ||
+                    !wallet.data ||
+                    insufficient ||
+                    wallet.data.status !== "open" ||
+                    (customIds.length > 0 && !audio.isSuccess)))
+              }
               onClick={() => void save()}
             >
               {saving
@@ -731,10 +909,55 @@ function Editor({
                   ? "重试保存"
                   : locked
                     ? "保存备注"
-                    : "保存"}
+                    : selectedAudio.length
+                      ? `支付 ${audioCost.toString()} 天生币并保存`
+                      : "保存"}
             </Button>
           </div>
         </div>
+        {rows.some((row) => row.customWord) && (
+          <div className="mt-3 text-sm leading-6 text-foreground-muted">
+            <p>
+              语音费用：{audioCost.toString()} 天生币。每词英式、美式各一条，共
+              2 天生币，点击保存时扣款。
+            </p>
+            <p>
+              {wallet.isError
+                ? "余额读取失败，当前余额未知。"
+                : wallet.data
+                  ? `余额：${formatCoins(wallet.data.balance)}`
+                  : "正在读取余额…"}
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={wallet.isFetching}
+                onClick={() => void wallet.refetch()}
+              >
+                刷新余额
+              </Button>
+            </p>
+            {insufficient && (
+              <p role="status">余额不足，输入已保留。补充天生币后可保存。</p>
+            )}
+            {wallet.data && wallet.data.status !== "open" && (
+              <p role="status">账户当前暂停收支，暂不能生成语音。</p>
+            )}
+            {audio.isError && (
+              <p role="status">
+                语音暂不可用，仍可编辑文本。
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => void audio.refetch()}
+                >
+                  重试读取语音
+                </Button>
+              </p>
+            )}
+          </div>
+        )}
         {error && (
           <p
             id="wordlist-save-error"
@@ -849,6 +1072,10 @@ function Editor({
               >
                 <WordRow
                   row={row}
+                  audio={audioByItem.get(rowKey(row))}
+                  audioUnavailable={
+                    originalIds.has(rowKey(row)) && !audio.isSuccess
+                  }
                   stored={cache.get(rowKey(row))}
                   noteRevisionFor={noteRevisionFor}
                   invalidField={errorRow === row.id ? errorField : undefined}
@@ -886,6 +1113,8 @@ function Editor({
 }
 function WordRow({
   row,
+  audio,
+  audioUnavailable,
   stored,
   noteRevisionFor,
   invalidField,
@@ -894,6 +1123,8 @@ function WordRow({
   change
 }: {
   row: Row;
+  audio?: WordlistCustomAudio;
+  audioUnavailable: boolean;
   stored?: MyWordlistItem;
   noteRevisionFor: (entryId: string) => number | undefined;
   invalidField?: RowField;
@@ -1003,7 +1234,8 @@ function WordRow({
           setDismissed(false);
           if (row.customWord) {
             change({
-              customWord: { ...row.customWord, word: e.target.value }
+              customWord: { ...row.customWord, word: e.target.value },
+              generateAudio: false
             });
             return;
           }
@@ -1146,6 +1378,36 @@ function WordRow({
           <p className="mt-2 text-xs text-foreground-muted">
             自定义词汇可阅读，暂不参与学习出题。
           </p>
+          {audio &&
+            (audio.word === wordlistAudioWord(row.customWord.word) ||
+              audio.status === "refunding") && (
+              <p className="mt-2 text-sm text-foreground-muted">
+                {audioStatusLabels[audio.status]}
+              </p>
+            )}
+          {!locked &&
+            !(
+              audio &&
+              (audio.status === "refunding" ||
+                (audio.word === wordlistAudioWord(row.customWord.word) &&
+                  audio.status !== "refunded"))
+            ) && (
+              <label className="mt-3 flex min-h-11 items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="size-4 accent-primary"
+                  aria-label={`生成语音 ${index}`}
+                  checked={!!row.generateAudio}
+                  disabled={audioUnavailable && !row.generateAudio}
+                  onChange={(event) =>
+                    change({ generateAudio: event.target.checked })
+                  }
+                />
+                {audio?.status === "refunded"
+                  ? "重新生成英式和美式语音（2 天生币）"
+                  : "生成英式和美式语音（2 天生币）"}
+              </label>
+            )}
         </div>
       )}
       {(row.candidate || (row.entryId && stored?.entry)) && (

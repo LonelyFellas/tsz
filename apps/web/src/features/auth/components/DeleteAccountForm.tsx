@@ -25,6 +25,8 @@ const CHANNEL_LABEL: Record<AccountDeletionChannel, string> = {
 };
 
 const ERROR_BY_CODE: Record<string, string> = {
+  account_deletion_unsettled_audio:
+    "词表语音仍在生成或退款中，请等待处理完成后再申请注销",
   account_deletion_balance_changed: "余额已变化，请核对最新金额并重新签署",
   account_deletion_consent_outdated: "注销声明已更新，请重新阅读并签署",
   account_deletion_pending: "已有待生效的注销申请，请查看当前状态",
