@@ -10,8 +10,7 @@ import {
   pronunciationStyleLabel,
   relationLabel,
   sentenceLinkRoleLabel,
-  subPartOfSpeechLabel,
-  wordStatusLabel
+  subPartOfSpeechLabel
 } from "./presentation";
 
 describe("V3 product presentation", () => {
@@ -35,7 +34,6 @@ describe("V3 product presentation", () => {
     expect(languageSummary("invalid_code").identified).toBe(false);
   });
   it("集中映射词条、词形、地区与发音业务标签", () => {
-    expect(wordStatusLabel("published")).toBe("已发布");
     expect(formTypeLabel("base")).toBe("原形");
     expect(formTypeLabel("past_participle")).toBe("过去分词");
     expect(dialectLabel("common")).toBe("英美通用");

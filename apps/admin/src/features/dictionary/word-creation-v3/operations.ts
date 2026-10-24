@@ -412,24 +412,6 @@ function validDialectRules(rules: DialectRulesV3) {
   );
 }
 
-export function updateGroupDialectRules(
-  content: DraftFormsStepContentV3,
-  posId: string,
-  groupId: string,
-  rules: DialectRulesV3
-): OperationResult<DraftFormsStepContentV3> {
-  if (!validDialectRules(rules)) {
-    return { ok: false, reason: "invalid_dialect_rules" };
-  }
-  const next = clone(content);
-  const pos = next.pos.find((item) => item.pos_id === posId);
-  if (!pos) return { ok: false, reason: "pos_not_found" };
-  const group = pos.form_groups.find((item) => item.id === groupId);
-  if (!group) return { ok: false, reason: "group_not_found" };
-  group.dialect_rules = { ...rules };
-  return { ok: true, value: next };
-}
-
 /** 只改标记；专用组改回通用时已绑定的词义不在本地清除，交给保存时的影响预览确认。 */
 export function updateFormGroupScope(
   content: DraftFormsStepContentV3,
@@ -1281,18 +1263,6 @@ export function reorderPos(
     throw new Error("pos order contains an unknown ID");
   }
   next.pos = ordered as typeof next.pos;
-  return next;
-}
-
-export function reorderForms(
-  content: DraftFormsStepContentV3,
-  posId: string,
-  orderedIds: readonly string[]
-): DraftFormsStepContentV3 {
-  const next = clone(content);
-  const pos = next.pos.find((item) => item.pos_id === posId);
-  if (!pos) throw new Error(`pos not found: ${posId}`);
-  pos.forms = reorderByIds(pos.forms, orderedIds, "form");
   return next;
 }
 

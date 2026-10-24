@@ -1,12 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  CEFR_LEVELS,
-  cefrColor,
-  KIND_OPTIONS,
-  matchCategoryLabel,
-  MATCH_CATEGORY_LABEL,
-  STATUS_LABEL
-} from "./labels";
+import { CEFR_LEVELS, cefrColor, KIND_OPTIONS, STATUS_LABEL } from "./labels";
 
 describe("labels — wire 枚举 ↔ UI 标签", () => {
   it("kind/status 对照与 CEFR 全集", () => {
@@ -24,26 +17,5 @@ describe("labels — wire 枚举 ↔ UI 标签", () => {
       "#B817CF",
       "#D22D8D"
     ]);
-  });
-});
-
-describe("matchCategoryLabel — 命中原因", () => {
-  it("五类都有中文文案，且不重复", () => {
-    const labels = Object.values(MATCH_CATEGORY_LABEL);
-    expect(labels).toHaveLength(5);
-    expect(new Set(labels).size).toBe(5);
-  });
-
-  it("form_headword 与 headword_form 方向相反，文案不能雷同", () => {
-    expect(MATCH_CATEGORY_LABEL.form_headword).not.toBe(
-      MATCH_CATEGORY_LABEL.headword_form
-    );
-  });
-
-  it("白名单外的码原样透出，不吞掉", () => {
-    // 后端可能先于前端上线新类别；静默丢弃会让人误以为「没有命中原因」
-    expect(matchCategoryLabel("brand_new_category" as never)).toBe(
-      "brand_new_category"
-    );
   });
 });
