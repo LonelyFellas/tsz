@@ -1,6 +1,28 @@
 import { expect, test } from "@playwright/test";
 import { mockApi } from "./support/mockApi";
 
+test("账户菜单退出期间重新打开后，普通关闭不执行旧设置请求", async ({
+  page
+}) => {
+  await mockApi(page, { authenticated: true });
+  await page.goto("/");
+  await page.addStyleTag({
+    content:
+      '.account-menu-motion[data-state="closed"] { animation-duration: 2s !important; }'
+  });
+  const trigger = page.getByRole("button", { name: "账户菜单" });
+  await trigger.click();
+  await page.getByRole("menuitem", { name: "偏好设置", exact: true }).click();
+  await expect(
+    page.locator('[role="menu"][data-state="closed"]')
+  ).toBeAttached();
+  await trigger.evaluate((element: HTMLButtonElement) => element.click());
+  await expect(trigger).toHaveAttribute("aria-expanded", "true");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "偏好设置" })).toHaveCount(0);
+});
+
 for (const width of [375, 1280]) {
   test(`登录态落地页通过头像设置主题并在刷新后保留（${width}px）`, async ({
     page

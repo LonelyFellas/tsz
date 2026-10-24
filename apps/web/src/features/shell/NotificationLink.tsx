@@ -29,7 +29,7 @@ export function NotificationLink({ onNavigate }: { onNavigate: () => void }) {
       {count > 0 && (
         <span
           aria-hidden
-          className="absolute top-0.5 right-0 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] leading-4 font-medium text-primary-foreground ring-2 ring-background"
+          className="absolute top-0.5 right-0 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] leading-4 font-medium text-danger-foreground ring-2 ring-background"
         >
           {count > 99 ? "99+" : count}
         </span>

@@ -192,6 +192,7 @@ export function AccountMenuPopover({
   function beginDirectInteraction() {
     clearHoverTimers();
     openedByHover.current = false;
+    openingPreferences.current = false;
   }
   function blockBusyNavigation(event: MouseEvent<HTMLAnchorElement>) {
     if (busy) event.preventDefault();
