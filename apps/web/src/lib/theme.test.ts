@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   THEME_STORAGE_KEY,
   applyResolvedTheme,
-  getResolvedFromDom,
   getStoredTheme,
   resolveTheme,
   setTheme,
@@ -90,27 +89,13 @@ describe("getStoredTheme", () => {
   });
 });
 
-describe("applyResolvedTheme / getResolvedFromDom", () => {
+describe("applyResolvedTheme", () => {
   it("dark 给 <html> 加 class,light 去掉", () => {
     applyResolvedTheme("dark");
     expect(document.documentElement.classList.contains("dark")).toBe(true);
-    expect(getResolvedFromDom()).toBe("dark");
 
     applyResolvedTheme("light");
     expect(document.documentElement.classList.contains("dark")).toBe(false);
-    expect(getResolvedFromDom()).toBe("light");
-  });
-});
-
-describe("getResolvedFromDom:服务端", () => {
-  it("没有 document 时回退 light,由水合后的客户端校正", () => {
-    // 该函数会在 RSC/SSR 渲染路径上被调用,此处模拟服务端没有 document 的环境。
-    vi.stubGlobal("document", undefined);
-    try {
-      expect(getResolvedFromDom()).toBe("light");
-    } finally {
-      vi.unstubAllGlobals();
-    }
   });
 });
 
@@ -118,7 +103,7 @@ describe("setTheme", () => {
   it("写入显式选择并更新 <html>", () => {
     setTheme("dark");
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe("dark");
-    expect(getResolvedFromDom()).toBe("dark");
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
   });
 
   it("system 清除持久化,生效值取决于系统偏好", () => {
@@ -126,7 +111,7 @@ describe("setTheme", () => {
     stubMatchMedia(false);
     setTheme("system");
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();
-    expect(getResolvedFromDom()).toBe("light");
+    expect(document.documentElement.classList.contains("dark")).toBe(false);
   });
 
   it("持久化失败(如隐私模式)不抛错,仍更新 <html>", () => {
@@ -134,7 +119,7 @@ describe("setTheme", () => {
       throw new Error("QuotaExceeded");
     });
     expect(() => setTheme("dark")).not.toThrow();
-    expect(getResolvedFromDom()).toBe("dark");
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
     spy.mockRestore();
   });
 });
@@ -158,7 +143,7 @@ describe("subscribeTheme", () => {
     window.dispatchEvent(
       new StorageEvent("storage", { key: THEME_STORAGE_KEY })
     );
-    expect(getResolvedFromDom()).toBe("dark");
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
     expect(cb).toHaveBeenCalledTimes(1);
 
     window.dispatchEvent(new StorageEvent("storage", { key: "unrelated" }));
@@ -173,14 +158,14 @@ describe("subscribeTheme", () => {
 
     // 未保存(system):系统转深色应生效。
     fire();
-    expect(getResolvedFromDom()).toBe("dark");
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
     expect(cb).toHaveBeenCalled();
 
     // 已显式选 light:系统变化应被忽略。
     setTheme("light");
     cb.mockClear();
     fire();
-    expect(getResolvedFromDom()).toBe("light");
+    expect(document.documentElement.classList.contains("dark")).toBe(false);
     expect(cb).not.toHaveBeenCalled();
     unsub();
   });
