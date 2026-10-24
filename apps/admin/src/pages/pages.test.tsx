@@ -22,6 +22,23 @@ const smokeProfile = vi.hoisted(() => ({
   preferences: { dialect: "uk" as const }
 }));
 
+const dashboardOverview = vi.hoisted(() => ({
+  generated_at: "2026-10-24T00:00:00Z",
+  users: { total: 12335, today: 234, last_3_days: 25, last_7_days: 10 },
+  tasks: { total: 231, completed: 78, today: 3, week: 25 },
+  lexicon: { total: 233, today: 23, week: 55, month: 100 },
+  coins: {
+    circulation: "2313",
+    today_net: "23",
+    week_net: "-55",
+    month_net: "100"
+  },
+  user_growth: [{ date: "2026-10-23", value: 10 }],
+  coin_flow: [{ date: "2026-10-23", grant: "10", deduct: "2" }],
+  learning_progress: { completed: 34, in_progress: 41, not_started: 25 },
+  lexicon_creation: [{ week_start: "2026-10-19", value: 12 }]
+}));
+
 vi.mock("@/lib/env", () => ({
   env: {
     API_BASE_URL: "/api/v1",
@@ -37,6 +54,9 @@ vi.mock("@/features/dictionary/word-creation/UnifiedCreateEntryStep", () => ({
 // 把请求端点 mock 成稳定响应,避免触网。
 vi.mock("@/lib/auth", () => ({
   api: {
+    dashboard: {
+      overview: vi.fn().mockResolvedValue(dashboardOverview)
+    },
     words: {
       list: vi.fn().mockResolvedValue({
         words: [],
@@ -73,6 +93,20 @@ vi.mock("@/lib/auth", () => ({
 
 // 平台后台各模块页。烟雾测试保证：页面能正常渲染、关键内容正确，
 // 守住「导入错误 / 渲染时抛错」这类回归；待其余模块功能落地后在此补充业务测试。
+function renderHome() {
+  return render(
+    <QueryClientProvider
+      client={
+        new QueryClient({ defaultOptions: { queries: { retry: false } } })
+      }
+    >
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>
+    </QueryClientProvider>
+  );
+}
+
 describe("admin 页面烟雾测试", () => {
   it("审核空队列按已提交条件展示空状态，重置后恢复待审核条件并清空输入", async () => {
     render(
@@ -107,14 +141,14 @@ describe("admin 页面烟雾测试", () => {
     );
     expect(screen.queryByText("共 0 条")).not.toBeInTheDocument();
   });
-  it("首页渲染 KPI 指标行与四张图表卡", () => {
-    render(<HomePage />);
+  it("首页渲染 KPI 指标行与四张图表卡", async () => {
+    renderHome();
     expect(
       screen.getByRole("heading", { name: "首页数据" })
     ).toBeInTheDocument();
-    // 顶部 KPI 四格。
+    // 顶部 KPI 四格（等真实聚合数据返回后渲染）。
     for (const label of ["累计用户", "任务总量", "词库累计", "天生币流通"]) {
-      expect(screen.getByText(label)).toBeInTheDocument();
+      expect(await screen.findByText(label)).toBeInTheDocument();
     }
     // 下方四张图表卡的标题。
     for (const title of [
@@ -123,11 +157,38 @@ describe("admin 页面烟雾测试", () => {
       "学习进度分布",
       "词库创建趋势"
     ]) {
-      expect(screen.getByRole("heading", { name: title })).toBeInTheDocument();
+      expect(
+        await screen.findByRole("heading", { name: title })
+      ).toBeInTheDocument();
     }
-    // 天生币收支卡的操作位。
-    expect(screen.getByRole("button", { name: "发放" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "扣除" })).toBeInTheDocument();
+    // 天生币收支卡不再保留无行为的「发放 / 扣除」，改为跳转流水。
+    expect(screen.getByRole("link", { name: "查看流水" })).toHaveAttribute(
+      "href",
+      "/coins"
+    );
+    expect(api.dashboard.overview).toHaveBeenCalledTimes(1);
+  });
+
+  it("首页加载中展示骨架屏，不提前渲染 KPI", () => {
+    vi.mocked(api.dashboard.overview).mockReturnValueOnce(
+      new Promise<never>(() => {})
+    );
+    const { container } = renderHome();
+    expect(
+      screen.getByRole("heading", { name: "首页数据" })
+    ).toBeInTheDocument();
+    expect(container.querySelector(".ant-skeleton")).not.toBeNull();
+    expect(screen.queryByText("累计用户")).not.toBeInTheDocument();
+  });
+
+  it("首页加载失败时展示可重试错误，不回落 mock 数据", async () => {
+    vi.mocked(api.dashboard.overview).mockRejectedValueOnce(
+      new Error("network")
+    );
+    renderHome();
+    expect(await screen.findByText("首页数据加载失败")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /重\s*试/ })).toBeInTheDocument();
+    expect(screen.queryByText("累计用户")).not.toBeInTheDocument();
   });
 
   it.each([[ReviewsPage, "词表审核"]] as const)(

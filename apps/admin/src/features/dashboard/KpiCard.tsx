@@ -1,6 +1,6 @@
 import { ArrowDownOutlined, ArrowUpOutlined } from "@ant-design/icons";
 import { Card, Statistic, Typography } from "antd";
-import type { KpiItem } from "./mockData";
+import type { KpiItem } from "./display";
 
 interface KpiCardProps {
   item: KpiItem;
@@ -8,8 +8,7 @@ interface KpiCardProps {
 
 /**
  * 顶部 KPI 指标卡：一眼看「现在怎么样」。
- * 主数值（antd Statistic，自带千分位）+ 环比趋势行（涨绿/跌红）+ 次要口径 hint。
- * 数值目前为 mock，后续接 /admin 统计接口后由父级传入。
+ * 主数值（已格式化，硬币保留字符串精度）+ 环比趋势行（涨绿/跌红）+ 次要口径 hint。
  */
 export function KpiCard({ item }: KpiCardProps) {
   const { label, value, suffix, delta, hint } = item;
@@ -24,17 +23,16 @@ export function KpiCard({ item }: KpiCardProps) {
         suffix={suffix}
         styles={{ content: { fontSize: 26, fontWeight: 600, lineHeight: 1.3 } }}
       />
-      {/* 零增量视为持平：不渲染趋势行（与 KpiItem 契约一致）。仅正/负才出涨跌行。 */}
-      {delta && delta.value !== 0 && (
+      {/* 零增量视为持平：不渲染趋势行。仅正/负才出涨跌行。 */}
+      {delta && delta.direction !== 0 && (
         <Typography.Text
           style={{
             fontSize: 12,
-            color: delta.value > 0 ? "#52c41a" : "#ff4d4f"
+            color: delta.direction > 0 ? "#52c41a" : "#ff4d4f"
           }}
         >
-          {delta.value > 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />}{" "}
-          {delta.label} {delta.value > 0 ? "+" : ""}
-          {delta.value.toLocaleString()}
+          {delta.direction > 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />}{" "}
+          {delta.label} {delta.display}
         </Typography.Text>
       )}
       {hint && (

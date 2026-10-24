@@ -91,7 +91,8 @@ import type {
   UpdatePartOfSpeechInput,
   UpdateSubPartOfSpeechInput,
   ValidateAdminWordV3Input,
-  UpdateRoleRequest
+  UpdateRoleRequest,
+  AdminDashboardOverview
 } from "@tsz/types";
 import type { RefreshResponse } from "./endpoints";
 import {
@@ -247,6 +248,11 @@ function requireLifecycleBatchIdentity<
  */
 export function createAdminEndpoints(http: HttpClient) {
   return {
+    dashboard: {
+      /** GET /admin/dashboard/overview — 管理端首页聚合统计。 */
+      overview: (opts?: { signal?: AbortSignal }) =>
+        http.get<AdminDashboardOverview>("/dashboard/overview", opts)
+    },
     coins: createCoinEndpoints(http),
     wordlists: createAdminWordlistEndpoints(http),
     coinManagement: createAdminCoinEndpoints(http),

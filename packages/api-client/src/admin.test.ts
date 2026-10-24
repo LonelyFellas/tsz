@@ -397,6 +397,15 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     expect(http.get).toHaveBeenCalledWith("/lexicon/entries/stats");
   });
 
+  it("dashboard overview → GET /dashboard/overview 并透传取消信号", () => {
+    const api = createAdminEndpoints(http);
+    const controller = new AbortController();
+    api.dashboard.overview({ signal: controller.signal });
+    expect(http.get).toHaveBeenCalledWith("/dashboard/overview", {
+      signal: controller.signal
+    });
+  });
+
   it("surfaceMatchSnapshotPage → GET 精确 snapshot/cursor 并透传取消信号", () => {
     const api = createAdminEndpoints(http);
     const controller = new AbortController();

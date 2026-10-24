@@ -15,13 +15,8 @@ import {
   XAxis,
   YAxis
 } from "recharts";
-import {
-  CHART_COLORS,
-  COIN_FLOW,
-  DICTIONARY_TREND,
-  LEARNING_PROGRESS,
-  USER_GROWTH
-} from "./mockData";
+import type { CoinFlowPoint, ProgressSlice, TimePoint } from "./display";
+import { CHART_COLORS } from "./display";
 
 // recharts 由本组件引入，Home 是路由级 lazy chunk（见 router.tsx），
 // 故图表库只在进入首页时才加载，不驮到登录/其它页首屏包上。
@@ -33,10 +28,11 @@ const TOOLTIP_STYLE = {
   fontSize: 12
 } as const;
 const CHART_HEIGHT = 220;
+const numberTick = (value: number) => value.toLocaleString("zh-CN");
 
 interface ChartCardProps {
   title: string;
-  /** 标题右侧操作位（如天生币的「发放 / 扣除」）。 */
+  /** 标题右侧操作位（如天生币的「查看流水」）。 */
   extra?: ReactNode;
   children: ReactNode;
 }
@@ -59,12 +55,12 @@ function ChartCard({ title, extra, children }: ChartCardProps) {
 }
 
 /** 用户增长趋势：近 14 天每日新增（面积图）。 */
-export function UserGrowthChart() {
+export function UserGrowthChart({ data }: { data: TimePoint[] }) {
   return (
     <ChartCard title="用户增长趋势">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart
-          data={USER_GROWTH}
+          data={data}
           margin={{ top: 8, right: 8, left: -16, bottom: 0 }}
         >
           <defs>
@@ -93,9 +89,13 @@ export function UserGrowthChart() {
             tick={AXIS_TICK}
             tickLine={false}
             axisLine={false}
-            width={40}
+            width={48}
+            tickFormatter={numberTick}
           />
-          <Tooltip contentStyle={TOOLTIP_STYLE} />
+          <Tooltip
+            contentStyle={TOOLTIP_STYLE}
+            formatter={(value) => [numberTick(Number(value)), "新增用户"]}
+          />
           <Area
             type="monotone"
             dataKey="value"
@@ -110,13 +110,19 @@ export function UserGrowthChart() {
   );
 }
 
-/** 天生币收支：近 7 天发放 vs 扣除（分组柱状）。extra 承接「发放 / 扣除」操作。 */
-export function CoinFlowChart({ extra }: { extra?: ReactNode }) {
+/** 天生币收支：近 7 天发放 vs 扣除（分组柱状）。extra 承接流水入口。 */
+export function CoinFlowChart({
+  data,
+  extra
+}: {
+  data: CoinFlowPoint[];
+  extra?: ReactNode;
+}) {
   return (
     <ChartCard title="天生币收支" extra={extra}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
-          data={COIN_FLOW}
+          data={data}
           margin={{ top: 8, right: 8, left: -16, bottom: 0 }}
         >
           <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
@@ -130,9 +136,14 @@ export function CoinFlowChart({ extra }: { extra?: ReactNode }) {
             tick={AXIS_TICK}
             tickLine={false}
             axisLine={false}
-            width={40}
+            width={48}
+            tickFormatter={numberTick}
           />
-          <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "#f5f5f5" }} />
+          <Tooltip
+            contentStyle={TOOLTIP_STYLE}
+            cursor={{ fill: "#f5f5f5" }}
+            formatter={(value, name) => [numberTick(Number(value)), name]}
+          />
           <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
           <Bar
             dataKey="grant"
@@ -154,45 +165,63 @@ export function CoinFlowChart({ extra }: { extra?: ReactNode }) {
   );
 }
 
-/** 学习进度分布（环形图）。 */
-export function LearningProgressChart() {
+/** 学习进度分布（环形图）。基数或当日数据为零时显示空状态。 */
+export function LearningProgressChart({ data }: { data: ProgressSlice[] }) {
+  const total = data.reduce((sum, slice) => sum + slice.value, 0);
   return (
     <ChartCard title="学习进度分布">
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={LEARNING_PROGRESS}
-            dataKey="value"
-            nameKey="name"
-            innerRadius={56}
-            outerRadius={84}
-            paddingAngle={2}
-          >
-            {LEARNING_PROGRESS.map((slice, i) => (
-              <Cell
-                key={slice.name}
-                fill={CHART_COLORS.progress[i % CHART_COLORS.progress.length]}
-              />
-            ))}
-          </Pie>
-          <Tooltip
-            contentStyle={TOOLTIP_STYLE}
-            formatter={(v) => `${v as number}%`}
-          />
-          <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-        </PieChart>
-      </ResponsiveContainer>
+      {total === 0 ? (
+        <div
+          style={{
+            height: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center"
+          }}
+        >
+          <Typography.Text type="secondary">暂无学习数据</Typography.Text>
+        </div>
+      ) : (
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              dataKey="value"
+              nameKey="name"
+              innerRadius={56}
+              outerRadius={84}
+              paddingAngle={2}
+            >
+              {data.map((slice, i) => (
+                <Cell
+                  key={slice.name}
+                  fill={CHART_COLORS.progress[i % CHART_COLORS.progress.length]}
+                />
+              ))}
+            </Pie>
+            <Tooltip
+              contentStyle={TOOLTIP_STYLE}
+              formatter={(value) => {
+                const count = Number(value);
+                const percentage = Math.round((count / total) * 100);
+                return `${numberTick(count)}（${percentage}%）`;
+              }}
+            />
+            <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+          </PieChart>
+        </ResponsiveContainer>
+      )}
     </ChartCard>
   );
 }
 
 /** 词库创建趋势：近 6 周（柱状）。 */
-export function DictionaryTrendChart() {
+export function DictionaryTrendChart({ data }: { data: TimePoint[] }) {
   return (
     <ChartCard title="词库创建趋势">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
-          data={DICTIONARY_TREND}
+          data={data}
           margin={{ top: 8, right: 8, left: -16, bottom: 0 }}
         >
           <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
@@ -206,12 +235,17 @@ export function DictionaryTrendChart() {
             tick={AXIS_TICK}
             tickLine={false}
             axisLine={false}
-            width={40}
+            width={48}
+            tickFormatter={numberTick}
           />
-          <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "#f5f5f5" }} />
+          <Tooltip
+            contentStyle={TOOLTIP_STYLE}
+            cursor={{ fill: "#f5f5f5" }}
+            formatter={(value) => [numberTick(Number(value)), "新建词条"]}
+          />
           <Bar
             dataKey="value"
-            name="新建词库"
+            name="新建词条"
             fill={CHART_COLORS.brand}
             radius={[4, 4, 0, 0]}
             maxBarSize={28}
