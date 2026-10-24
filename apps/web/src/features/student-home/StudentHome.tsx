@@ -184,6 +184,9 @@ function HomeWorkspace({ userId }: { userId: string }) {
                 <Link href="/student/practice">查看全部任务</Link>
               </Button>
               <Button asChild variant="link" size="sm">
+                <Link href="/student/review">今日复习</Link>
+              </Button>
+              <Button asChild variant="link" size="sm">
                 <Link href="/wordlists">浏览词库广场</Link>
               </Button>
             </div>

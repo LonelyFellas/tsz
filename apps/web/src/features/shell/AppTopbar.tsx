@@ -39,6 +39,7 @@ const STUDENT_NAV: NavItem[][] = [
   [
     { href: "/account/wordlists", label: "我的词表", icon: BookOpen },
     { href: "/student/practice", label: "我的任务", icon: ClipboardList },
+    { href: "/student/review", label: "今日复习", icon: BookOpen },
     { href: "/dictionary", label: "词典", icon: BookSearch },
     { href: "/wordlists", label: "词库广场", icon: Globe }
   ],

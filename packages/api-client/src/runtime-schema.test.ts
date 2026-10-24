@@ -35,6 +35,11 @@ const runtimeSchemaBundle =
   runtimeSchemaBundleJson as unknown as RuntimeSchemaBundle;
 
 const ROOTS = [
+  "MemoryOverview",
+  "MemoryPage",
+  "MemoryItem",
+  "ReviewSession",
+  "ReviewReceipt",
   "DictionaryPage",
   "DictionaryEntry",
   "AudioAssetUrlResponse",

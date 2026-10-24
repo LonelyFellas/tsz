@@ -1,8 +1,13 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/coins-management-clarity/docs/openapi.json",
-  "_source_sha256": "ef95269aba974feac1666c14c90620428f653f8d48dd0376e1058d4760e56e70",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/smart-lexicon-architecture-audit/docs/openapi.json",
+  "_source_sha256": "e51f27e72e3f11db17f5cd62da1777b9bdad7129a6e95f07952b0a4444f98ecb",
   "roots": [
+    "MemoryOverview",
+    "MemoryPage",
+    "MemoryItem",
+    "ReviewSession",
+    "ReviewReceipt",
     "DictionaryPage",
     "DictionaryEntry",
     "AudioAssetUrlResponse",
@@ -2331,6 +2336,68 @@
       },
       "additionalProperties": false
     },
+    "MemoryItem": {
+      "type": "object",
+      "required": [
+        "id",
+        "label",
+        "stage",
+        "due_at",
+        "paused",
+        "content_available",
+        "revision"
+      ],
+      "properties": {
+        "content_available": { "type": "boolean" },
+        "due_at": { "type": "string", "format": "date-time" },
+        "id": { "type": "string", "format": "uuid" },
+        "label": { "type": ["string", "null"] },
+        "paused": { "type": "boolean" },
+        "revision": { "type": "integer" },
+        "stage": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "MemoryOverview": {
+      "type": "object",
+      "required": [
+        "available",
+        "enabled",
+        "answer_profile",
+        "due_count",
+        "relearning_count",
+        "later_count",
+        "paused_count",
+        "unavailable_count",
+        "server_time",
+        "next_day_at",
+        "current_session_id"
+      ],
+      "properties": {
+        "answer_profile": { "type": "string" },
+        "available": { "type": "boolean" },
+        "current_session_id": { "type": ["string", "null"], "format": "uuid" },
+        "due_count": { "type": "integer" },
+        "enabled": { "type": "boolean" },
+        "later_count": { "type": "integer" },
+        "next_day_at": { "type": "string", "format": "date-time" },
+        "paused_count": { "type": "integer" },
+        "relearning_count": { "type": "integer" },
+        "server_time": { "type": "string", "format": "date-time" },
+        "unavailable_count": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "MemoryPage": {
+      "type": "object",
+      "required": ["items", "next_cursor", "server_time"],
+      "properties": {
+        "items": { "type": "array", "items": { "$ref": "#/$defs/MemoryItem" } },
+        "next_cursor": { "type": ["string", "null"], "format": "uuid" },
+        "server_time": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
     "MyWordlistItem": {
       "type": "object",
       "required": [
@@ -2818,6 +2885,107 @@
         "node_role": { "$ref": "#/$defs/V3RetiredNodeRole" },
         "parent_node_id": { "type": "string", "format": "uuid" },
         "retired_at": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "ReviewFeedback": {
+      "type": "object",
+      "required": [
+        "answer_id",
+        "is_correct",
+        "submitted_answer",
+        "accepted_answers",
+        "memory_effect",
+        "accepted_at"
+      ],
+      "properties": {
+        "accepted_answers": { "type": "array", "items": { "type": "string" } },
+        "accepted_at": { "type": "string", "format": "date-time" },
+        "answer_id": { "type": "string", "format": "uuid" },
+        "is_correct": { "type": "boolean" },
+        "memory_effect": { "type": "string" },
+        "submitted_answer": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "ReviewItem": {
+      "type": "object",
+      "required": [
+        "id",
+        "memory_id",
+        "kind",
+        "answered",
+        "content_available",
+        "revealed",
+        "prompt",
+        "revealed_answers",
+        "feedback",
+        "expires_at"
+      ],
+      "properties": {
+        "answered": { "type": "boolean" },
+        "content_available": { "type": "boolean" },
+        "expires_at": { "type": "string", "format": "date-time" },
+        "feedback": {
+          "oneOf": [{ "$ref": "#/$defs/ReviewFeedback" }, { "type": "null" }]
+        },
+        "id": { "type": "string", "format": "uuid" },
+        "kind": { "type": "string" },
+        "memory_id": { "type": "string", "format": "uuid" },
+        "prompt": {
+          "oneOf": [{ "$ref": "#/$defs/LearningPrompt" }, { "type": "null" }]
+        },
+        "revealed": { "type": "boolean" },
+        "revealed_answers": {
+          "type": ["array", "null"],
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ReviewReceipt": {
+      "type": "object",
+      "required": [
+        "answer_id",
+        "item_id",
+        "is_correct",
+        "memory_effect",
+        "next_due_at",
+        "accepted_at",
+        "session"
+      ],
+      "properties": {
+        "accepted_at": { "type": "string", "format": "date-time" },
+        "answer_id": { "type": "string", "format": "uuid" },
+        "is_correct": { "type": "boolean" },
+        "item_id": { "type": "string", "format": "uuid" },
+        "memory_effect": { "type": "string" },
+        "next_due_at": { "type": "string", "format": "date-time" },
+        "session": { "$ref": "#/$defs/ReviewSession" }
+      },
+      "additionalProperties": false
+    },
+    "ReviewSession": {
+      "type": "object",
+      "required": [
+        "id",
+        "state",
+        "settings",
+        "items",
+        "target_count",
+        "answered_count",
+        "server_time",
+        "expires_at"
+      ],
+      "properties": {
+        "answered_count": { "type": "integer" },
+        "expires_at": { "type": "string", "format": "date-time" },
+        "id": { "type": "string", "format": "uuid" },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/ReviewItem" } },
+        "server_time": { "type": "string", "format": "date-time" },
+        "settings": { "$ref": "#/$defs/LearningContext" },
+        "state": { "type": "string" },
+        "target_count": { "type": "integer" }
       },
       "additionalProperties": false
     },
