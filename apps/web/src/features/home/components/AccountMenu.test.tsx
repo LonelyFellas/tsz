@@ -470,7 +470,7 @@ describe("AccountMenu", () => {
       "天生币：5",
       "学习工作台",
       "个人中心",
-      "站内通知",
+      "偏好设置",
       "申请教师认证",
       "退出登录"
     ]);
@@ -478,6 +478,19 @@ describe("AccountMenu", () => {
       screen.getByRole("menuitem", { name: "学习工作台" })
     ).toHaveAttribute("href", "/student/home");
     expect(screen.queryByText("注销账号")).not.toBeInTheDocument();
+  });
+
+  it("偏好设置关闭账户菜单并交给顶栏打开面板", async () => {
+    useUserStore.setState({ user: USER });
+    const onPreferences = vi.fn();
+    const user = userEvent.setup();
+    render(<AccountMenu onPreferences={onPreferences} />);
+    await user.click(screen.getByRole("button", { name: "账户菜单" }));
+    await user.click(screen.getByRole("menuitem", { name: "偏好设置" }));
+    expect(onPreferences).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument()
+    );
   });
 
   it.each(["student", "teacher"] as const)(
@@ -638,7 +651,11 @@ describe("AccountMenu", () => {
       "aria-disabled",
       "true"
     );
-    for (const name of ["天生币：5", "学习工作台", "个人中心", "站内通知"]) {
+    expect(screen.getByRole("menuitem", { name: "偏好设置" })).toHaveAttribute(
+      "aria-disabled",
+      "true"
+    );
+    for (const name of ["天生币：5", "学习工作台", "个人中心"]) {
       const link = screen.getByRole("menuitem", { name });
       expect(link).toHaveAttribute("aria-disabled", "true");
       expect(fireEvent.click(link)).toBe(false);

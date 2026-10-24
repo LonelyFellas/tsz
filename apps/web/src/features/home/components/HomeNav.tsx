@@ -1,19 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useState } from "react";
-import { Settings, X } from "lucide-react";
+import { useState } from "react";
 import {
-  Popover,
-  PopoverClose,
-  PopoverContent,
-  PopoverTrigger
-} from "@tsz/ui/components";
-import { ThemeModeControl } from "@/features/theme/ThemeModeControl";
+  AccountControls,
+  type TopbarPanel
+} from "@/features/shell/AccountControls";
+import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIdentityProvider";
 import { BrandMark } from "./BrandMark";
 import { useUserStore } from "@/stores/user";
 import { ThemeToggle } from "@/features/theme/ThemeToggle";
-import { AccountMenu } from "./AccountMenu";
 
 // 吸顶导航：左侧粗体字标，右侧毛玻璃胶囊收纳入口。
 // 已登录时工作台和账户入口收进右上角头像菜单,不再平铺在顶栏。
@@ -25,12 +21,10 @@ export function HomeNav() {
 function HomeNavContent() {
   const user = useUserStore((s) => s.user);
   const hydrated = useUserStore((s) => s.hydrated);
-  const [panel, setPanel] = useState<"settings" | "account" | null>(null);
-  const setAccountOpen = useCallback((open: boolean) => {
-    setPanel((current) =>
-      open ? "account" : current === "account" ? null : current
-    );
-  }, []);
+  const identity = useTeacherIdentity();
+  const [panel, setPanel] = useState<TopbarPanel>(null);
+  const studying =
+    !!user && user.roles.includes("student") && identity.identity !== "teacher";
 
   return (
     <header className="sticky top-0 z-50 bg-background/75 backdrop-blur-xl">
@@ -79,51 +73,11 @@ function HomeNavContent() {
             )}
           </nav>
           {hydrated && user && (
-            <>
-              <Popover
-                open={panel === "settings"}
-                onOpenChange={(open) =>
-                  setPanel((current) =>
-                    open ? "settings" : current === "settings" ? null : current
-                  )
-                }
-              >
-                <PopoverTrigger
-                  aria-label="偏好设置"
-                  className="inline-flex size-11 items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-surface/80 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary data-[state=open]:bg-surface data-[state=open]:text-primary data-[state=open]:shadow-glass"
-                >
-                  <Settings className="size-5" strokeWidth={1.5} aria-hidden />
-                </PopoverTrigger>
-                <PopoverContent
-                  align="end"
-                  sideOffset={8}
-                  aria-label="偏好设置"
-                  className="tsz-drawer rounded-3xl border-border/60 bg-surface/90 shadow-float backdrop-blur-xl"
-                >
-                  <div className="mb-5 flex items-center justify-between gap-3">
-                    <h2 className="text-lg font-bold tracking-tight">
-                      偏好设置
-                    </h2>
-                    <PopoverClose
-                      aria-label="关闭偏好设置"
-                      className="inline-flex size-9 items-center justify-center rounded-full bg-muted text-foreground-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                    >
-                      <X
-                        className="size-[18px]"
-                        strokeWidth={1.5}
-                        aria-hidden
-                      />
-                    </PopoverClose>
-                  </div>
-                  <ThemeModeControl />
-                </PopoverContent>
-              </Popover>
-              <AccountMenu
-                open={panel === "account"}
-                onOpenChange={setAccountOpen}
-                disableHover={panel === "settings"}
-              />
-            </>
+            <AccountControls
+              panel={panel}
+              setPanel={setPanel}
+              studying={studying}
+            />
           )}
         </div>
       </div>

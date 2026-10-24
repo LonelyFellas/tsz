@@ -20,10 +20,11 @@ function loadMenu() {
 export function AccountMenu({
   open: controlledOpen,
   onOpenChange,
-  disableHover = false
+  disableHover = false,
+  onPreferences
 }: Pick<
   AccountMenuPopoverProps,
-  "open" | "onOpenChange" | "disableHover"
+  "open" | "onOpenChange" | "disableHover" | "onPreferences"
 > = {}) {
   const user = useUserStore((s) => s.user);
   const request = useRef(0);
@@ -123,6 +124,7 @@ export function AccountMenu({
         open={controlledOpen}
         onOpenChange={onOpenChange}
         disableHover={disableHover}
+        onPreferences={onPreferences}
       />
     );
   return (

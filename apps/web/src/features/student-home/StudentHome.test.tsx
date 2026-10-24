@@ -23,11 +23,33 @@ vi.mock("@/lib/request", () => ({
   api: {
     learning: { list: mocks.list },
     learningPlans: { list: mocks.plansList },
-    auth: { me: mocks.me, updateLearningSettings: mocks.save }
+    auth: { me: mocks.me, updateLearningSettings: mocks.save },
+    teacherCertification: {
+      notifications: vi
+        .fn()
+        .mockResolvedValue({ items: [], total: 0, unread_count: 0 })
+    }
   }
 }));
 vi.mock("@/features/home/components/AccountMenu", () => ({
-  AccountMenu: () => <button>账户</button>
+  AccountMenu: ({
+    onPreferences,
+    onOpenChange
+  }: {
+    onPreferences: () => void;
+    onOpenChange: (open: boolean) => void;
+  }) => (
+    <button
+      aria-label="账户菜单"
+      onClick={() => {
+        onOpenChange(true);
+        onOpenChange(false);
+        onPreferences();
+      }}
+    >
+      偏好设置
+    </button>
+  )
 }));
 
 const user: User = {
@@ -166,7 +188,7 @@ it("左右面板互斥，Esc 关闭后返回触发器，外部点击关闭", asy
     "href",
     "/account/wordlists"
   );
-  await actions.click(screen.getByRole("button", { name: "偏好设置" }));
+  await actions.click(screen.getByRole("button", { name: "账户菜单" }));
   expect(
     screen.queryByRole("dialog", { name: "学习菜单" })
   ).not.toBeInTheDocument();
@@ -175,7 +197,7 @@ it("左右面板互斥，Esc 关闭后返回触发器，外部点击关闭", asy
   await waitFor(() =>
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
   );
-  expect(screen.getByRole("button", { name: "偏好设置" })).toHaveFocus();
+  expect(screen.getByRole("button", { name: "账户菜单" })).toHaveFocus();
   await actions.click(screen.getByRole("button", { name: "学习菜单" }));
   await actions.click(
     screen.getByRole("heading", { name: "从这里，继续积累。" })
@@ -186,7 +208,7 @@ it("左右面板互斥，Esc 关闭后返回触发器，外部点击关闭", asy
 it("外观立即生效不提交学习偏好，英美选择仍需明确保存", async () => {
   const actions = userEvent.setup();
   renderWithProviders(<StudentHome />);
-  await actions.click(screen.getByRole("button", { name: "偏好设置" }));
+  await actions.click(screen.getByRole("button", { name: "账户菜单" }));
   await screen.findByRole("radio", { name: "英式英语" });
   expect(screen.getByRole("button", { name: "保存学习偏好" })).toBeDisabled();
   await actions.click(screen.getByRole("button", { name: "深色" }));
@@ -204,7 +226,7 @@ it("保存偏好保留固定难度，失败保留选择并支持重试，重新�
   const actions = userEvent.setup();
   mocks.save.mockRejectedValueOnce(new Error("offline"));
   renderWithProviders(<StudentHome />);
-  await actions.click(screen.getByRole("button", { name: "偏好设置" }));
+  await actions.click(screen.getByRole("button", { name: "账户菜单" }));
   await actions.click(await screen.findByRole("radio", { name: "美式英语" }));
   await actions.click(screen.getByRole("button", { name: "保存学习偏好" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("保存失败");
@@ -221,7 +243,7 @@ it("保存偏好保留固定难度，失败保留选择并支持重试，重新�
     learning_settings: { cefr_level: "A2", english_variant: "AmE" }
   });
   await actions.click(screen.getByRole("button", { name: "关闭偏好设置" }));
-  await actions.click(screen.getByRole("button", { name: "偏好设置" }));
+  await actions.click(screen.getByRole("button", { name: "账户菜单" }));
   await waitFor(() => expect(mocks.me).toHaveBeenCalledTimes(2));
   expect(await screen.findByRole("radio", { name: "美式英语" })).toBeChecked();
 });
@@ -236,7 +258,7 @@ it("切换账号后关闭旧浮层并读取新账号任务，迟到的保存不�
   );
   const actions = userEvent.setup();
   renderWithProviders(<StudentHome />);
-  await actions.click(screen.getByRole("button", { name: "偏好设置" }));
+  await actions.click(screen.getByRole("button", { name: "账户菜单" }));
   await actions.click(await screen.findByRole("radio", { name: "美式英语" }));
   await actions.click(screen.getByRole("button", { name: "保存学习偏好" }));
   expect(screen.getByRole("button", { name: "保存中…" })).toBeDisabled();
@@ -256,7 +278,7 @@ it("切换账号后关闭旧浮层并读取新账号任务，迟到的保存不�
       learning_settings: { cefr_level: "A2", english_variant: "AmE" }
     })
   );
-  await actions.click(screen.getByRole("button", { name: "偏好设置" }));
+  await actions.click(screen.getByRole("button", { name: "账户菜单" }));
   expect(await screen.findByRole("radio", { name: "英式英语" })).toBeChecked();
   expect(screen.getByText("B1").closest("p")).toHaveTextContent("当前难度：B1");
   expect(screen.queryByText("日常英语")).not.toBeInTheDocument();

@@ -6,6 +6,7 @@ import { formatCoins } from "@tsz/shared";
 import { useState } from "react";
 import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
+import { notificationQuery } from "./notification-query";
 import { cn } from "@tsz/ui/lib/cn";
 import {
   PageNotice,
@@ -28,11 +29,7 @@ export function Notifications() {
   const userId = useUserStore((state) => state.user?.id);
   const [page, setPage] = useState(1);
   const client = useQueryClient();
-  const query = useQuery({
-    queryKey: ["notifications", userId, page],
-    queryFn: () => api.teacherCertification.notifications(page),
-    enabled: !!userId
-  });
+  const query = useQuery(notificationQuery(userId, page));
   const read = useMutation({
     mutationFn: (id: string) => api.teacherCertification.readNotification(id),
     onSuccess: () =>

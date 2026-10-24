@@ -1,10 +1,11 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { renderWithProviders } from "@/test/render";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { renderWithProviders as render } from "@/test/render";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import type { User } from "@tsz/types";
 import { HomeNav } from "./HomeNav";
 import { useUserStore } from "@/stores/user";
+import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIdentityProvider";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() })
@@ -13,9 +14,25 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/request", () => ({
   setAccessToken: vi.fn(),
   api: {
-    auth: { logout: vi.fn() },
-    coins: { wallet: vi.fn().mockResolvedValue({ balance: "5" }) }
+    coins: { wallet: vi.fn().mockResolvedValue({ balance: "5" }) },
+    teacherCertification: {
+      notifications: vi
+        .fn()
+        .mockResolvedValue({ items: [], total: 0, unread_count: 0 })
+    },
+    auth: {
+      logout: vi.fn(),
+      me: vi.fn().mockResolvedValue({
+        learning_settings: { cefr_level: "A1", english_variant: "BrE" }
+      })
+    }
   }
+}));
+
+vi.mock("@/features/teacher-certification/TeacherIdentityProvider", () => ({
+  useTeacherIdentity: vi
+    .fn()
+    .mockReturnValue({ identity: "student", verified: false, ready: true })
 }));
 
 const USER: User = {
@@ -29,6 +46,13 @@ const USER: User = {
 
 beforeEach(() => {
   useUserStore.setState({ user: null, onboarded: null, hydrated: false });
+  vi.mocked(useTeacherIdentity).mockReturnValue({
+    identity: "student",
+    verified: false,
+    ready: true,
+    error: false,
+    select: vi.fn()
+  });
 });
 
 describe("HomeNav", () => {
@@ -49,17 +73,24 @@ describe("HomeNav", () => {
     );
   });
 
-  it("已登录可通过齿轮打开外观设置，切换账号关闭旧面板", async () => {
+  it("已登录从头像打开外观和学习偏好，切换账号关闭旧面板", async () => {
     useUserStore.setState({ hydrated: true, user: USER });
     const actions = userEvent.setup();
     const view = render(<HomeNav />);
-    await actions.click(screen.getByRole("button", { name: "偏好设置" }));
+    if (!screen.queryByRole("menu"))
+      await actions.click(screen.getByRole("button", { name: "账户菜单" }));
+    await actions.click(
+      await screen.findByRole("menuitem", { name: "偏好设置" })
+    );
     expect(
       screen.getByRole("dialog", { name: "偏好设置" })
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "跟随系统" })
     ).toBeInTheDocument();
+    expect(
+      await screen.findByRole("radio", { name: "英式英语" })
+    ).toBeChecked();
     useUserStore.setState({ user: { ...USER, id: "u2" } });
     view.rerender(<HomeNav />);
     expect(
@@ -67,11 +98,39 @@ describe("HomeNav", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("首页教学视角只显示外观，不显示学生学习偏好", async () => {
+    useUserStore.setState({
+      hydrated: true,
+      user: { ...USER, roles: ["student", "teacher"] }
+    });
+    vi.mocked(useTeacherIdentity).mockReturnValue({
+      identity: "teacher",
+      verified: true,
+      ready: true,
+      error: false,
+      select: vi.fn()
+    });
+    const actions = userEvent.setup();
+    render(<HomeNav />);
+    await actions.click(screen.getByRole("button", { name: "账户菜单" }));
+    await actions.click(
+      await screen.findByRole("menuitem", { name: "偏好设置" })
+    );
+    expect(
+      screen.getByRole("button", { name: "跟随系统" })
+    ).toBeInTheDocument();
+    expect(screen.queryByText("英美偏好")).not.toBeInTheDocument();
+  });
+
   it("首页设置与账户互斥，设置打开时不响应头像悬停", async () => {
     useUserStore.setState({ hydrated: true, user: USER });
     const actions = userEvent.setup();
-    renderWithProviders(<HomeNav />);
-    await actions.click(screen.getByRole("button", { name: "偏好设置" }));
+    render(<HomeNav />);
+    if (!screen.queryByRole("menu"))
+      await actions.click(screen.getByRole("button", { name: "账户菜单" }));
+    await actions.click(
+      await screen.findByRole("menuitem", { name: "偏好设置" })
+    );
     const event = new MouseEvent("pointerover", { bubbles: true });
     Object.defineProperty(event, "pointerType", { value: "mouse" });
     fireEvent(screen.getByRole("button", { name: "账户菜单" }), event);
@@ -82,7 +141,11 @@ describe("HomeNav", () => {
     expect(
       screen.queryByRole("dialog", { name: "偏好设置" })
     ).not.toBeInTheDocument();
-    await actions.click(screen.getByRole("button", { name: "偏好设置" }));
+    if (!screen.queryByRole("menu"))
+      await actions.click(screen.getByRole("button", { name: "账户菜单" }));
+    await actions.click(
+      await screen.findByRole("menuitem", { name: "偏好设置" })
+    );
     expect(
       screen.getByRole("dialog", { name: "偏好设置" })
     ).toBeInTheDocument();
@@ -98,9 +161,13 @@ describe("HomeNav", () => {
       screen.getByRole("button", { name: "账户菜单" })
     ).toBeInTheDocument();
     expect(screen.queryByText("登录")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "站内通知" })).toHaveAttribute(
+      "href",
+      "/account/notifications"
+    );
     expect(
-      screen.getByRole("button", { name: "偏好设置" })
-    ).toBeInTheDocument();
+      screen.queryByRole("button", { name: "偏好设置" })
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /切换到.*色模式/ })
     ).not.toBeInTheDocument();

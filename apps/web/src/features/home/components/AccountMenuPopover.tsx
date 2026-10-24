@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Settings } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { formatCoins } from "@tsz/shared/format";
 import {
@@ -79,6 +80,7 @@ export interface AccountMenuPopoverProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   disableHover?: boolean;
+  onPreferences?: () => void;
 }
 
 export function AccountMenuPopover({
@@ -88,7 +90,8 @@ export function AccountMenuPopover({
   restoreTriggerFocus = false,
   open: controlledOpen,
   onOpenChange,
-  disableHover = false
+  disableHover = false,
+  onPreferences
 }: AccountMenuPopoverProps = {}) {
   const user = useUserStore((s) => s.user);
   const logout = useLogout();
@@ -107,6 +110,7 @@ export function AccountMenuPopover({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const tabExiting = useRef(false);
+  const openingPreferences = useRef(false);
   const openedByHover = useRef(initialHover);
   const initialKeyboardFocus = useRef(initialKeyboard);
   const openTimer = useRef<number | null>(null);
@@ -161,7 +165,12 @@ export function AccountMenuPopover({
     closeTimer.current = null;
   }
   function openOnHover(event: PointerEvent<HTMLElement>) {
-    if (event.pointerType !== "mouse" || disableHover) return;
+    if (
+      event.pointerType !== "mouse" ||
+      disableHover ||
+      openingPreferences.current
+    )
+      return;
     clearHoverTimers();
     if (open || busy) return;
     openTimer.current = window.setTimeout(() => {
@@ -183,6 +192,7 @@ export function AccountMenuPopover({
   function beginDirectInteraction() {
     clearHoverTimers();
     openedByHover.current = false;
+    openingPreferences.current = false;
   }
   function blockBusyNavigation(event: MouseEvent<HTMLAnchorElement>) {
     if (busy) event.preventDefault();
@@ -274,11 +284,20 @@ export function AccountMenuPopover({
           setOpen(false);
         }}
         onCloseAutoFocus={(event) => {
-          if (disableHover || tabExiting.current || openedByHover.current) {
+          if (
+            disableHover ||
+            tabExiting.current ||
+            openedByHover.current ||
+            openingPreferences.current
+          ) {
             event.preventDefault();
             tabExiting.current = false;
           }
           openedByHover.current = false;
+          if (openingPreferences.current) {
+            openingPreferences.current = false;
+            onPreferences?.();
+          }
         }}
       >
         <DropdownMenuLabel className="pt-8 pb-0 text-center">
@@ -353,18 +372,22 @@ export function AccountMenuPopover({
             个人中心
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild disabled={busy} className={MENU_ITEM_CLASS}>
-          <Link
-            href="/account/notifications"
-            onClick={blockBusyNavigation}
-            onAuxClick={blockBusyNavigation}
-          >
-            <MenuIcon>
-              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
-              <path d="M10 21h4" />
-            </MenuIcon>
-            站内通知
-          </Link>
+        <DropdownMenuItem
+          disabled={busy}
+          className={MENU_ITEM_CLASS}
+          onSelect={(event) => {
+            event.preventDefault();
+            beginDirectInteraction();
+            openingPreferences.current = true;
+            setOpen(false);
+          }}
+        >
+          <Settings
+            className="size-[18px] shrink-0"
+            strokeWidth={1.5}
+            aria-hidden
+          />
+          偏好设置
         </DropdownMenuItem>
         {teacher.verified && (
           <DropdownMenuItem
