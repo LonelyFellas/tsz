@@ -14,7 +14,6 @@ import { AccountMenuPopover as AccountMenu } from "./AccountMenuPopover";
 import { WordListCreator } from "@/features/wordlist/components/WordListCreator";
 import { useUserStore } from "@/stores/user";
 import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIdentityProvider";
-import { setTheme } from "@/lib/theme";
 import { env } from "@/lib/env";
 
 vi.mock("@/features/teacher-certification/TeacherIdentityProvider", () => ({
@@ -48,7 +47,6 @@ const USER: User = {
 };
 
 beforeEach(() => {
-  setTheme("light");
   vi.clearAllMocks();
   mockPush.mockReset();
   vi.mocked(api.coins.wallet).mockReset();
@@ -80,7 +78,6 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
-  setTheme("light");
   vi.unstubAllGlobals();
 });
 
@@ -475,7 +472,6 @@ describe("AccountMenu", () => {
       "个人中心",
       "站内通知",
       "申请教师认证",
-      "深色模式",
       "退出登录"
     ]);
     expect(
@@ -531,31 +527,6 @@ describe("AccountMenu", () => {
       );
     }
   );
-
-  it("头像菜单切换深色和浅色模式，并更新下次操作文案", async () => {
-    useUserStore.setState({ user: USER });
-    const user = userEvent.setup();
-    render(<AccountMenu />);
-
-    await user.click(screen.getByRole("button", { name: "账户菜单" }));
-    const darkItem = screen.getByRole("menuitem", { name: "深色模式" });
-    expect(darkItem.querySelector("svg")).toHaveAttribute(
-      "aria-hidden",
-      "true"
-    );
-    expect(darkItem.querySelector("circle")).toBeNull();
-    await user.click(darkItem);
-    expect(document.documentElement).toHaveClass("dark");
-    await user.click(screen.getByRole("button", { name: "账户菜单" }));
-    const lightItem = screen.getByRole("menuitem", { name: "浅色模式" });
-    expect(lightItem.querySelector("svg")).toHaveAttribute(
-      "aria-hidden",
-      "true"
-    );
-    expect(lightItem.querySelector("circle")).toBeInTheDocument();
-    await user.click(lightItem);
-    expect(document.documentElement).not.toHaveClass("dark");
-  });
 
   it("点击退出登录 → 调后端登出、清 token、跳登录页", async () => {
     useUserStore.setState({ user: USER });

@@ -77,8 +77,8 @@ it("游客看到词典、词库广场、外观设置与登录入口", async () =
       .getAllByRole("link")
       .map((link) => link.getAttribute("href"))
   ).toEqual(["/dictionary", "/wordlists", "/"]);
-  await actions.click(screen.getByRole("button", { name: "设置" }));
-  const settings = screen.getByRole("dialog", { name: "设置" });
+  await actions.click(screen.getByRole("button", { name: "偏好设置" }));
+  const settings = screen.getByRole("dialog", { name: "偏好设置" });
   expect(
     within(settings).getByRole("button", { name: "跟随系统" })
   ).toBeInTheDocument();
@@ -100,23 +100,23 @@ it("已认证教师看到教学菜单并高亮当前页", async () => {
   expect(
     within(menu).queryByRole("link", { name: "学习首页" })
   ).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "设置" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "偏好设置" })).toBeInTheDocument();
 });
 
-it("学生打开学习设置，看到外观与学习偏好", async () => {
+it("学生打开偏好设置，看到外观与学习偏好", async () => {
   route.pathname = "/student/home";
   useUserStore.setState({ user: student, hydrated: true });
   const actions = userEvent.setup();
   renderWithProviders(<AppTopbar />);
-  await actions.click(screen.getByRole("button", { name: "学习设置" }));
-  const settings = screen.getByRole("dialog", { name: "学习设置" });
+  await actions.click(screen.getByRole("button", { name: "偏好设置" }));
+  const settings = screen.getByRole("dialog", { name: "偏好设置" });
   expect(within(settings).getByText("英美偏好")).toBeInTheDocument();
   expect(
-    screen.queryByRole("button", { name: "设置" })
+    screen.queryByRole("button", { name: "学习设置" })
   ).not.toBeInTheDocument();
 });
 
-it("已认证教师选择学生工作台时显示学习菜单与学习设置", async () => {
+it("已认证教师选择学生工作台时显示学习菜单与偏好设置", async () => {
   route.pathname = "/student/home";
   identity.verified = true;
   identity.identity = "student";
@@ -126,7 +126,7 @@ it("已认证教师选择学生工作台时显示学习菜单与学习设置", a
   await actions.click(screen.getByRole("button", { name: "学习菜单" }));
   expect(menuLinks("学习菜单")).toContain("/student/practice");
   expect(menuLinks("学习菜单")).not.toContain("/teacher/classes");
-  expect(screen.getByRole("button", { name: "学习设置" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "偏好设置" })).toBeInTheDocument();
 });
 
 it("没有学生角色且不在教学工作台的账号只看到精简菜单", async () => {
@@ -150,7 +150,7 @@ it("没有学生角色且不在教学工作台的账号只看到精简菜单", a
     "/account/profile",
     "/"
   ]);
-  expect(screen.getByRole("button", { name: "设置" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "偏好设置" })).toBeInTheDocument();
 });
 
 it("首次进入教师页、资格核验返回前不闪出学习菜单", async () => {
@@ -163,7 +163,7 @@ it("首次进入教师页、资格核验返回前不闪出学习菜单", async (
   ).not.toBeInTheDocument();
   await actions.click(screen.getByRole("button", { name: "教学菜单" }));
   expect(menuLinks("教学菜单")).not.toContain("/student/home");
-  expect(screen.getByRole("button", { name: "设置" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "偏好设置" })).toBeInTheDocument();
 });
 
 it("已认证教师直接打开教师页时，工作台偏好尚未改写也显示教学菜单", () => {
@@ -184,15 +184,15 @@ it("左右浮层互斥：打开设置会关闭菜单", async () => {
   renderWithProviders(<AppTopbar />);
   await actions.click(screen.getByRole("button", { name: "学习菜单" }));
   expect(screen.getByRole("dialog", { name: "学习菜单" })).toBeInTheDocument();
-  await actions.click(screen.getByRole("button", { name: "学习设置" }));
-  expect(screen.getByRole("dialog", { name: "学习设置" })).toBeInTheDocument();
+  await actions.click(screen.getByRole("button", { name: "偏好设置" }));
+  expect(screen.getByRole("dialog", { name: "偏好设置" })).toBeInTheDocument();
   expect(
     screen.queryByRole("dialog", { name: "学习菜单" })
   ).not.toBeInTheDocument();
   await actions.click(screen.getByRole("button", { name: "学习菜单" }));
   expect(screen.getByRole("dialog", { name: "学习菜单" })).toBeInTheDocument();
   expect(
-    screen.queryByRole("dialog", { name: "学习设置" })
+    screen.queryByRole("dialog", { name: "偏好设置" })
   ).not.toBeInTheDocument();
 });
 

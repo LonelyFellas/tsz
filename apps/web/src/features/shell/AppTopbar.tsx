@@ -137,7 +137,7 @@ function TopbarPanels({ hydrated }: { hydrated: boolean }) {
         ? STUDENT_NAV
         : ACCOUNT_NAV;
   const menuTitle = teaching ? "教学菜单" : studying ? "学习菜单" : "网站菜单";
-  const settingsTitle = studying ? "学习设置" : "设置";
+  const settingsTitle = "偏好设置";
 
   function toggle(name: "navigation" | "settings", open: boolean) {
     setPanel((current) => (open ? name : current === name ? null : current));
