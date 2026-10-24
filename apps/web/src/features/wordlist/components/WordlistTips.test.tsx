@@ -1,5 +1,6 @@
 import { renderWithProviders } from "@/test/render";
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { QueryClient } from "@tanstack/react-query";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { useUserStore } from "@/stores/user";
 import { HttpError } from "@tsz/api-client";
@@ -44,6 +45,7 @@ function receipt(input: CreateWordlistTip) {
     created_at: ""
   };
 }
+afterEach(() => vi.restoreAllMocks());
 beforeEach(() => {
   vi.resetAllMocks();
   HTMLDialogElement.prototype.showModal = function () {
@@ -198,6 +200,58 @@ it("keeps uncertain receipt failures and identity conflicts locked to the origin
   expect(
     JSON.parse(sessionStorage.getItem("wordlist-tip:payer:list")!)
   ).toEqual(intent);
+});
+it.each([
+  [409, "coin_wallet_unavailable"],
+  [404, "not_found"]
+])(
+  "preserves an unresolved intent after a retry returns %s %s",
+  async (status, code) => {
+    const intent = {
+      event_id: "event",
+      idempotency_key: "key",
+      amount: "1",
+      like: true
+    };
+    sessionStorage.setItem("wordlist-tip:payer:list", JSON.stringify(intent));
+    vi.mocked(api.wordList.tipReceipt).mockRejectedValueOnce(
+      new HttpError(404, "not found")
+    );
+    vi.mocked(api.wordList.tip).mockRejectedValueOnce(
+      new HttpError(status as number, "unavailable", [], code as string)
+    );
+    renderWithProviders(panel());
+    fireEvent.click(screen.getByRole("button", { name: "重试这次投币" }));
+    await screen.findByText(/结果尚未确认/);
+    expect(
+      JSON.parse(sessionStorage.getItem("wordlist-tip:payer:list")!)
+    ).toEqual(intent);
+    expect(screen.getByRole("radio", { name: "1 枚天生币" })).toBeDisabled();
+    vi.mocked(api.wordList.tipReceipt).mockResolvedValueOnce(receipt(intent));
+    fireEvent.click(screen.getByRole("button", { name: "重试这次投币" }));
+    await screen.findByText(/作者已收到/);
+    expect(api.wordList.tip).toHaveBeenCalledOnce();
+  }
+);
+it("unlocks a confirmed payment while display refreshes are still pending", async () => {
+  let finish!: () => void;
+  const invalidation = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const refresh = vi
+    .spyOn(QueryClient.prototype, "invalidateQueries")
+    .mockReturnValue(invalidation);
+  renderWithProviders(panel());
+  fireEvent.click(screen.getByRole("button", { name: "确认投出" }));
+  await screen.findByText(/作者已收到/);
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "完成" })).toBeEnabled()
+  );
+  expect(screen.getByRole("button", { name: "关闭" })).toBeEnabled();
+  expect(refresh).toHaveBeenCalledWith({ queryKey: ["coins"] });
+  fireEvent.click(screen.getByRole("button", { name: "完成" }));
+  expect(onClose).toHaveBeenCalledOnce();
+  await act(async () => finish());
 });
 it("refreshes state after a rejected limit without reporting success", async () => {
   vi.mocked(api.wordList.tip).mockRejectedValueOnce(

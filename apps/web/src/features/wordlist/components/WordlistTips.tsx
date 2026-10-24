@@ -183,8 +183,10 @@ function TipForm({
       setPending(null);
       setSuccess(receipt.amount);
       setMessage(`已投出 ${formatCoins(receipt.amount)}，作者已收到。`);
-      await client.invalidateQueries({ queryKey: wordListKeys.all });
-      await client.invalidateQueries({ queryKey: ["coins"] });
+      void client
+        .invalidateQueries({ queryKey: wordListKeys.all })
+        .catch(() => {});
+      void client.invalidateQueries({ queryKey: ["coins"] }).catch(() => {});
     } catch (error) {
       if (!current()) return;
       if (
@@ -192,6 +194,7 @@ function TipForm({
         error instanceof HttpError &&
         error.status < 500 &&
         error.status !== 408 &&
+        (!pending || error.code === "coin_invalid_amount") &&
         error.code !== "coin_idempotency_conflict" &&
         error.code !== "coin_source_conflict"
       ) {
