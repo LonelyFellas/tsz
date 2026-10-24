@@ -26,7 +26,6 @@ import { displayNameOf } from "@/lib/user";
 import { api } from "@/lib/request";
 import { useLogout } from "@/features/auth/hooks/useLogout";
 import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIdentityProvider";
-import { useTheme } from "@/features/theme/useTheme";
 import { AccountAvatar } from "./AccountAvatar";
 
 const MENU_ITEM_CLASS =
@@ -88,7 +87,6 @@ export function AccountMenuPopover({
   const user = useUserStore((s) => s.user);
   const logout = useLogout();
   const teacher = useTeacherIdentity();
-  const { resolved, toggle } = useTheme();
   const [switching, setSwitching] = useState(false);
   const [switchError, setSwitchError] = useState("");
   const [open, setOpen] = useState(initialOpen);
@@ -414,19 +412,6 @@ export function AccountMenuPopover({
             </Link>
           </DropdownMenuItem>
         )}
-        <DropdownMenuItem onSelect={toggle} className={MENU_ITEM_CLASS}>
-          <MenuIcon>
-            {resolved === "dark" ? (
-              <>
-                <circle cx="12" cy="12" r="4" />
-                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
-              </>
-            ) : (
-              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" />
-            )}
-          </MenuIcon>
-          {resolved === "dark" ? "浅色模式" : "深色模式"}
-        </DropdownMenuItem>
         <DropdownMenuSeparator className="my-2" />
         <DropdownMenuItem
           data-leaves-page=""

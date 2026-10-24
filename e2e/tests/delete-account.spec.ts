@@ -16,7 +16,6 @@ for (const width of [375, 1280]) {
       "个人中心",
       "站内通知",
       "申请教师认证",
-      "深色模式",
       "退出登录"
     ];
     await expect(menu.getByRole("menuitem")).toHaveText(expectedItems);

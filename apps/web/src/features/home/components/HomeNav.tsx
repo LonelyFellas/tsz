@@ -1,6 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { Settings, X } from "lucide-react";
+import {
+  Popover,
+  PopoverClose,
+  PopoverContent,
+  PopoverTrigger
+} from "@tsz/ui/components";
+import { ThemeModeControl } from "@/features/theme/ThemeModeControl";
 import { BrandMark } from "./BrandMark";
 import { useUserStore } from "@/stores/user";
 import { ThemeToggle } from "@/features/theme/ThemeToggle";
@@ -58,7 +66,42 @@ export function HomeNav() {
               )
             )}
           </nav>
-          {hydrated && user && <AccountMenu />}
+          {hydrated && user && (
+            <>
+              <Popover key={user.id}>
+                <PopoverTrigger
+                  aria-label="偏好设置"
+                  className="inline-flex size-11 items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-surface/80 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary data-[state=open]:bg-surface data-[state=open]:text-primary data-[state=open]:shadow-glass"
+                >
+                  <Settings className="size-5" strokeWidth={1.5} aria-hidden />
+                </PopoverTrigger>
+                <PopoverContent
+                  align="end"
+                  sideOffset={8}
+                  aria-label="偏好设置"
+                  className="tsz-drawer rounded-3xl border-border/60 bg-surface/90 shadow-float backdrop-blur-xl"
+                >
+                  <div className="mb-5 flex items-center justify-between gap-3">
+                    <h2 className="text-lg font-bold tracking-tight">
+                      偏好设置
+                    </h2>
+                    <PopoverClose
+                      aria-label="关闭偏好设置"
+                      className="inline-flex size-9 items-center justify-center rounded-full bg-muted text-foreground-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    >
+                      <X
+                        className="size-[18px]"
+                        strokeWidth={1.5}
+                        aria-hidden
+                      />
+                    </PopoverClose>
+                  </div>
+                  <ThemeModeControl />
+                </PopoverContent>
+              </Popover>
+              <AccountMenu />
+            </>
+          )}
         </div>
       </div>
     </header>
