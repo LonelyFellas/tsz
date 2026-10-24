@@ -59,9 +59,3 @@ export function recordResult(
   storage?.setItem(STORAGE_KEY, JSON.stringify(next));
   return next;
 }
-
-export function resetQuota(
-  storage: StorageLike | null = defaultStorage()
-): void {
-  storage?.removeItem(STORAGE_KEY);
-}

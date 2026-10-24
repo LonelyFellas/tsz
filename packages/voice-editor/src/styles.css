@@ -295,54 +295,6 @@
   outline-offset: 1px;
 }
 
-/* 「起点 / 终点」回显：词名 + 该词里被选中的字母。 */
-.tsz-ve-anchor-slot {
-  display: inline-flex;
-  gap: 6px;
-  align-items: baseline;
-  padding: 1px 8px;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  font-size: 13px;
-}
-
-.tsz-ve-anchor-slot.is-start {
-  border-color: #1677ff;
-  color: #1677ff;
-}
-
-.tsz-ve-anchor-slot.is-end {
-  border-color: #fa8c16;
-  color: #fa8c16;
-}
-
-.tsz-ve-anchor-letters {
-  font-weight: 700;
-}
-
-/*
- * 「添加」用连读自己的粉色，不用 antd 主色蓝：这一行里蓝色已经是「起点锚点」
- * 的意思，主按钮再用蓝会让同一个颜色在同一行表示两件事。
- */
-.tsz-ve-liaison-commit.tsz-ve-liaison-commit {
-  border-color: #db2777;
-  background: #db2777;
-  color: #fff;
-}
-
-.tsz-ve-liaison-commit.tsz-ve-liaison-commit:not(:disabled):hover,
-.tsz-ve-liaison-commit.tsz-ve-liaison-commit:not(:disabled):focus-visible {
-  border-color: #c21f68;
-  background: #c21f68;
-  color: #fff;
-}
-
-.tsz-ve-liaison-commit.tsz-ve-liaison-commit:disabled {
-  border-color: var(--ant-color-border, #d9d9d9);
-  background: var(--ant-color-bg-container-disabled, #f5f5f5);
-  color: var(--ant-color-text-disabled, rgba(0, 0, 0, 0.25));
-}
-
 /*
  * 连读画笔下词渲染成 inline-flex 容器、其余画笔下是 button，盒模型必须一致，
  * 否则每次切画笔整行都会上下跳几像素。
@@ -1108,62 +1060,9 @@
   font-size: 12px;
 }
 
-.tsz-ve-pop-liaison {
-  min-width: 236px;
-}
-
 /* 浮层里的自定义输入框不收窄的话，会把几个很短的档位撑出一片空白。 */
 .tsz-ve-pop .tsz-ve-custom-input {
   width: 112px;
-}
-
-/* 连读工作台：锚点一行、动作一行，整体压到两行高。 */
-.tsz-ve-liaison-anchors {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  padding: 2px 6px;
-  font-size: 13px;
-}
-
-/* 「起点 / 终点」是开关：按下的那端接收接下来点的字母。 */
-.tsz-ve-anchor-field {
-  display: inline-flex;
-  gap: 5px;
-  align-items: center;
-  padding: 1px 6px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-.tsz-ve-anchor-field[aria-pressed="true"] {
-  border-color: var(--ant-color-border, #d9d9d9);
-  background: var(--ant-color-fill-tertiary, rgba(0, 0, 0, 0.04));
-}
-
-.tsz-ve-anchor-field:disabled {
-  cursor: default;
-}
-
-.tsz-ve-liaison-arrow {
-  color: var(--ant-color-text-quaternary, #bfbfbf);
-}
-
-.tsz-ve-liaison-actions {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  justify-content: flex-end;
-  padding: 0 6px;
-}
-
-.tsz-ve-liaison-actions .tsz-ve-pop-hint {
-  flex: 1;
-  padding: 0;
 }
 
 /* 工具栏色块与其他前置图标一样，由按钮统一控制图文间距。 */

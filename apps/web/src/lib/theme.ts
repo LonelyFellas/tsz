@@ -63,13 +63,6 @@ export function getStoredTheme(): Theme {
   }
 }
 
-/** 当前生效明暗 —— 直接读 <html> 的 class（前置脚本已保证正确）。
-    服务端无 document,回退 light（hydration 后由客户端校正）。 */
-export function getResolvedFromDom(): ResolvedTheme {
-  if (typeof document === "undefined") return "light";
-  return document.documentElement.classList.contains("dark") ? "dark" : "light";
-}
-
 /** 写入选择:落 localStorage + 更新 <html> + 通知订阅者。 */
 export function setTheme(next: Theme) {
   try {

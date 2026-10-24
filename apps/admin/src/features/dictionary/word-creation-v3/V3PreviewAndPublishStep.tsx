@@ -951,5 +951,3 @@ export function V3PreviewAndPublishStep(props: Props) {
     />
   );
 }
-
-export type { PublishRequests as V3PreviewPublishRequests };

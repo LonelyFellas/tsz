@@ -61,15 +61,6 @@ export function normalizeGrammarLevel(raw: unknown): string | undefined {
   return level === LEGACY_GRAMMAR_LEVEL ? "core" : level;
 }
 
-/** 连读两端的显示名与面板顺序；端别由面板上的开关手选。 */
-export const LIAISON_ANCHORS: ReadonlyArray<{
-  anchor: LiaisonEnd;
-  label: string;
-}> = [
-  { anchor: "start", label: "起点" },
-  { anchor: "end", label: "终点" }
-];
-
 /** 语速按倍数呈现，底层仍是 SSML 的相对百分比：1.25× ↔ rate="+25%"。 */
 export const RATE_PRESETS: ReadonlyArray<{
   multiplier: number;
