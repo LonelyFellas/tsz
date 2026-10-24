@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/smart-lexicon-architecture-audit/docs/openapi.json",
-  "_generatedAt": "2026-10-24T00:57:09.933Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/admin-dashboard-overview/docs/openapi.json",
+  "_generatedAt": "2026-10-24T02:21:07.279Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -21,6 +21,7 @@
     "/admin/coins/manual-credits": ["post"],
     "/admin/coins/manual-credits/{operation_id}/reversal": ["post"],
     "/admin/coins/operations": ["get"],
+    "/admin/dashboard/overview": ["get"],
     "/admin/lexicon/audio-assets": ["post"],
     "/admin/lexicon/audio-assets/upload-url": ["post"],
     "/admin/lexicon/audio-assets/{id}/url": ["get"],
