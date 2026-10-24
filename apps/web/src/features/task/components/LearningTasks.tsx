@@ -705,6 +705,11 @@ function Practice({ userId, id }: { userId: string; id: string }) {
         }
       />
       <div className="space-y-6">
+        {r.state === "completed" && (
+          <Link className={buttonClass} href="/student/review">
+            查看待巩固内容与复习安排
+          </Link>
+        )}
         {r.task_type === "daily" && plan.data?.current_cycle && (
           <div className="rounded-2xl bg-muted/70 p-4 text-sm">
             <p>

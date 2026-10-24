@@ -69,3 +69,4 @@ export * from "./wordlist-library";
 
 export type { LoginRewardDay } from "./login-reward";
 export * from "./learning-plans";
+export * from "./learning-memory";

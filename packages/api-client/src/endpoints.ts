@@ -1,3 +1,4 @@
+import { createLearningMemoryEndpoints } from "./learning-memory";
 import { createLoginRewardEndpoints } from "./login-reward";
 import { createDictionaryEndpoints } from "./dictionary";
 import { createLearningRewardEndpoints } from "./learning-rewards";
@@ -74,6 +75,7 @@ export type OtpPurpose =
 
 export function createEndpoints(http: HttpClient) {
   return {
+    memory: createLearningMemoryEndpoints(http),
     dictionary: createDictionaryEndpoints(http),
     coins: createCoinEndpoints(http),
     learningRewards: createLearningRewardEndpoints(http),

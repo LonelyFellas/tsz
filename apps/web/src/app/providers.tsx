@@ -11,6 +11,7 @@ import { useUserStore } from "@/stores/user";
 import { PhoneBindingGuard } from "@/features/auth/components/PhoneBindingGuard";
 import { NotificationTabBadge } from "@/features/teacher-certification/NotificationTabBadge";
 import { TeacherIdentityProvider } from "@/features/teacher-certification/TeacherIdentityProvider";
+import { clearUserPending } from "@/features/review/pending";
 
 // 服务端无 layout effect;客户端用 layoutEffect 在 paint 前补主题 class。
 const useIsoLayoutEffect =
@@ -93,6 +94,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
           queryClient.removeQueries({ queryKey: ["coins"] });
           void queryClient.cancelQueries({ queryKey: ["login-reward"] });
           queryClient.removeQueries({ queryKey: ["login-reward"] });
+          void queryClient.cancelQueries({ queryKey: ["memory"] });
+          queryClient.removeQueries({ queryKey: ["memory"] });
+          void queryClient.cancelQueries({ queryKey: ["review"] });
+          queryClient.removeQueries({ queryKey: ["review"] });
+          if (previous.user) clearUserPending(previous.user.id);
         }
       }),
     [queryClient]
