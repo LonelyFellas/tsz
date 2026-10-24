@@ -17,6 +17,8 @@ export interface TokenManager {
   getToken: () => string | undefined;
   getSessionGeneration: () => number;
   setAccessToken: (token: string | null) => void;
+  clearSession: () => void;
+  canRestoreSession: () => boolean;
   scheduleRefresh: (expiresIn: number) => void;
   refreshTokens: () => Promise<string>;
   redirectToLogin: () => void;
@@ -26,12 +28,30 @@ export interface TokenManagerOptions {
   baseUrl: string;
   loginPath?: string;
   onRefreshError?: (error: unknown | null) => void;
+  onSessionChanged?: () => void;
+}
+
+// 这里只比较身份以阻止跨账号重放；令牌签名与访问权限仍由服务端验证。
+function tokenIdentity(token: string | null): string | null {
+  try {
+    const payload = token?.split(".")[1];
+    if (!payload) return null;
+    const { sub, aud } = JSON.parse(
+      atob(payload.replace(/-/g, "+").replace(/_/g, "/"))
+    ) as { sub?: unknown; aud?: unknown };
+    return typeof sub === "string" && typeof aud === "string"
+      ? JSON.stringify([aud, sub.replace(/-/g, "").toLowerCase()])
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 export function createTokenManager({
   baseUrl,
   loginPath = "/login",
-  onRefreshError
+  onRefreshError,
+  onSessionChanged
 }: TokenManagerOptions): TokenManager {
   let accessToken: string | null = null;
   let refreshTimer: ReturnType<typeof setTimeout> | null = null;
@@ -47,6 +67,31 @@ export function createTokenManager({
   const unconfirmedKey = `tsz:refresh-unconfirmed:${baseUrl}`;
   let unconfirmed: RefreshUnconfirmedError | null = null;
   let legacyUnconfirmed = false;
+  const logoutKey = `tsz.auth.logged-out:${baseUrl}`;
+  const sessionKey = `tsz:auth-session:${baseUrl}`;
+  const tabSessionKey = `tsz:auth-tab:${baseUrl}`;
+  let locallyLoggedOut = false;
+  let sessionStamp: string | null = null;
+  try {
+    locallyLoggedOut =
+      typeof sessionStorage !== "undefined" &&
+      sessionStorage.getItem(logoutKey) === "1";
+    sessionStamp =
+      typeof localStorage !== "undefined"
+        ? localStorage.getItem(sessionKey)
+        : null;
+    const tabStamp =
+      typeof sessionStorage !== "undefined"
+        ? sessionStorage.getItem(tabSessionKey)
+        : null;
+    locallyLoggedOut ||=
+      (sessionStamp?.startsWith("logout:") ?? false) ||
+      (tabStamp !== null && tabStamp !== (sessionStamp ?? ""));
+    markLoggedOut(locallyLoggedOut);
+    rememberSessionStamp();
+  } catch {
+    /* 存储不可用时仍保留内存状态与刷新主体检查。 */
+  }
   try {
     const marker =
       typeof sessionStorage !== "undefined"
@@ -98,8 +143,80 @@ export function createTokenManager({
     refreshTimer = setTimeout(refreshInBackground, delay);
   }
 
+  function markLoggedOut(value: boolean) {
+    locallyLoggedOut = value;
+    try {
+      if (typeof sessionStorage === "undefined") return;
+      if (value) sessionStorage.setItem(logoutKey, "1");
+      else sessionStorage.removeItem(logoutKey);
+    } catch {
+      /* 存储不可用不阻断本地退出。 */
+    }
+  }
+
+  function rememberSessionStamp() {
+    try {
+      if (typeof sessionStorage !== "undefined")
+        sessionStorage.setItem(tabSessionKey, sessionStamp ?? "");
+    } catch {
+      /* 页面重建标记不可用时保留内存与主体检查。 */
+    }
+  }
+
+  function publishSession(kind: "login" | "logout") {
+    // 这是失效通知标记，不是凭据；非安全上下文也须完成本地登录和退出。
+    const stamp = `${kind}:${Date.now()}:${Math.random()}`;
+    try {
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem(sessionKey, stamp);
+        sessionStamp = stamp;
+        rememberSessionStamp();
+      }
+    } catch {
+      /* 不保存凭据；跨页通知不可用时由刷新主体检查兜底。 */
+    }
+  }
+
+  function invalidateSession() {
+    markLoggedOut(true);
+    setAccessToken(null);
+    onSessionChanged?.();
+    if (typeof window !== "undefined") window.location.href = loginPath;
+  }
+
+  function checkSharedSession() {
+    let stamp: string | null;
+    try {
+      if (typeof localStorage === "undefined") return;
+      stamp = localStorage.getItem(sessionKey);
+    } catch {
+      return;
+    }
+    if (stamp === sessionStamp) return;
+    sessionStamp = stamp;
+    rememberSessionStamp();
+    invalidateSession();
+    throw new SessionChangedError();
+  }
+
+  function clearSession() {
+    try {
+      checkSharedSession();
+    } catch {
+      return;
+    }
+    const wasLoggedOut = locallyLoggedOut;
+    markLoggedOut(true);
+    setAccessToken(null);
+    if (!wasLoggedOut) publishSession("logout");
+  }
+
   function setAccessToken(token: string | null) {
     sessionGeneration += 1;
+    if (token !== null) {
+      markLoggedOut(false);
+      publishSession("login");
+    }
     // Local logout cannot prove that the rotating Cookie was revoked.
     if (token !== null) {
       unconfirmed = null;
@@ -138,6 +255,12 @@ export function createTokenManager({
   }
 
   function refreshTokens(): Promise<string> {
+    try {
+      checkSharedSession();
+      if (locallyLoggedOut) throw new SessionChangedError();
+    } catch (error) {
+      return Promise.reject(error);
+    }
     if (unconfirmed && !legacyUnconfirmed) {
       onRefreshError?.(unconfirmed);
       return Promise.reject(unconfirmed);
@@ -151,6 +274,7 @@ export function createTokenManager({
     }
     const generation = sessionGeneration;
     const assertCurrent = () => {
+      checkSharedSession();
       if (generation !== sessionGeneration) throw new SessionChangedError();
     };
     refreshController = new AbortController();
@@ -223,6 +347,14 @@ export function createTokenManager({
           data.expires_in <= 0
         ) {
           throw new Error("会话刷新响应异常，请重试");
+        }
+        const identity = tokenIdentity(accessToken);
+        if (
+          identity !== null &&
+          identity !== tokenIdentity(data.access_token)
+        ) {
+          invalidateSession();
+          throw new SessionChangedError();
         }
         accessToken = data.access_token;
         const recovered = refreshNeeded || legacyUnconfirmed;
@@ -316,6 +448,14 @@ export function createTokenManager({
       )
         refreshInBackground();
     };
+    window.addEventListener("storage", (event) => {
+      if (event.key !== sessionKey) return;
+      try {
+        checkSharedSession();
+      } catch {
+        // 已清除当前页面身份并导航，不能让事件处理器产生未捕获异常。
+      }
+    });
     window.addEventListener("online", resume);
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible") resume();
@@ -323,9 +463,22 @@ export function createTokenManager({
   }
 
   return {
-    getToken: () => accessToken ?? undefined,
+    getToken: () => {
+      try {
+        checkSharedSession();
+      } catch {
+        // 请求层会检查已递增的代次；可见性事件的只读检查不应抛错。
+        return undefined;
+      }
+      return accessToken ?? undefined;
+    },
     getSessionGeneration: () => sessionGeneration,
     setAccessToken,
+    clearSession,
+    canRestoreSession: () => {
+      checkSharedSession();
+      return !locallyLoggedOut;
+    },
     scheduleRefresh,
     refreshTokens,
     redirectToLogin

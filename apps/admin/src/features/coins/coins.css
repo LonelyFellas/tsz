@@ -1,0 +1,49 @@
+.coins-filters {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 160px minmax(320px, 1.5fr) auto;
+  gap: 12px 16px;
+  align-items: start;
+}
+.coins-filters .ant-form-item,
+.coins-more-filters .ant-form-item {
+  margin-bottom: 0;
+}
+.coins-filter-actions {
+  padding-top: 30px;
+}
+.coins-more-filters:not([hidden]) {
+  display: grid;
+  grid-template-columns: minmax(180px, 320px) 160px;
+  gap: 16px;
+  margin-top: 16px;
+}
+.coins-amount {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.coins-reason {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.coins-detail-text {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+@media (max-width: 1400px) {
+  .coins-filters {
+    grid-template-columns: minmax(180px, 1fr) 160px minmax(280px, 1.5fr);
+  }
+  .coins-filter-actions {
+    grid-column: 1 / -1;
+    padding-top: 0;
+  }
+}
+@media (max-width: 720px) {
+  .coins-filters,
+  .coins-more-filters:not([hidden]) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

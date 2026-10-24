@@ -372,20 +372,32 @@ jobs:
       # 系统依赖走 apt,不随缓存走,每次都要重新拉 Ubuntu 源。该源偶发不可达时
       # install-deps 会一直卡住,直到吃满 job 的 timeout-minutes 被 cancel——
       # 表现为「跑了 20 分钟然后取消」,一个用例都没执行,极易被误判成用例挂了。
-      # 因此:单次 4 分钟封顶 + 最多三次重试;三次都失败也不阻断,继续执行 e2e——
+      # 因此:单次 3 分钟封顶 + 最多尝试两次;失败后继续执行 e2e——
       # runner 镜像通常已含所需库,真缺库时让 e2e 以真实报错失败,比留下一个
       # 「超时取消」更好排查。
       # timeout 与 apt 同为 root，超时后才能终止整组安装进程，避免遗留 apt 占锁。
+      - name: Configure APT downloads
+        run: |
+          # runner 的 Azure 镜像可能持续低速；优先官方 HTTPS 源，保留镜像回退。
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            printf 'https://archive.ubuntu.com/ubuntu/\tpriority:1\nhttp://azure.archive.ubuntu.com/ubuntu/\tpriority:2\nhttps://security.ubuntu.com/ubuntu/\tpriority:3\n' | sudo tee /etc/apt/apt-mirrors.txt > /dev/null
+          fi
+          sudo tee /etc/apt/apt.conf.d/99-ci-downloads > /dev/null <<'EOF'
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          Acquire::Retries "2";
+          EOF
+
       - name: Install Playwright system deps
         run: |
-          for i in 1 2 3; do
-            if sudo timeout --kill-after=15s 240 env "PATH=$PATH" pnpm --filter @tsz/e2e exec playwright install-deps chromium; then
+          for i in 1 2; do
+            if sudo timeout --kill-after=15s 180 env "PATH=$PATH" pnpm --filter @tsz/e2e exec playwright install-deps chromium; then
               exit 0
             fi
-            echo "::warning::playwright install-deps 第 $i 次失败或超时,15 秒后重试"
-            sleep 15
+            echo "::warning::playwright install-deps 第 $i 次失败或超时"
+            if [ "$i" -lt 2 ]; then sleep 10; fi
           done
-          echo "::warning::playwright install-deps 三次均失败,继续执行 e2e(runner 镜像通常已含所需库)"
+          echo "::warning::playwright install-deps 两次均失败,继续执行 e2e(runner 镜像通常已含所需库)"
 
       - name: Web E2E
         run: >-
@@ -473,22 +485,42 @@ jobs:
           node scripts/ci-metrics.mjs run playwright-browser --
           pnpm --filter @tsz/e2e exec playwright install chromium
 
+      - name: Configure APT downloads
+        run: |
+          # runner 的 Azure 镜像可能持续低速；优先官方 HTTPS 源，保留镜像回退。
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            printf 'https://archive.ubuntu.com/ubuntu/\tpriority:1\nhttp://azure.archive.ubuntu.com/ubuntu/\tpriority:2\nhttps://security.ubuntu.com/ubuntu/\tpriority:3\n' | sudo tee /etc/apt/apt-mirrors.txt > /dev/null
+          fi
+          sudo tee /etc/apt/apt.conf.d/99-ci-downloads > /dev/null <<'EOF'
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          Acquire::Retries "2";
+          EOF
+
       - name: Install Playwright system deps
         run: |
-          for i in 1 2 3; do
-            if sudo timeout --kill-after=15s 240 env "PATH=$PATH" pnpm --filter @tsz/e2e exec playwright install-deps chromium; then
+          for i in 1 2; do
+            if sudo timeout --kill-after=15s 180 env "PATH=$PATH" pnpm --filter @tsz/e2e exec playwright install-deps chromium; then
               exit 0
             fi
-            echo "::warning::playwright install-deps 第 $i 次失败或超时,15 秒后重试"
-            sleep 15
+            echo "::warning::playwright install-deps 第 $i 次失败或超时"
+            if [ "$i" -lt 2 ]; then sleep 10; fi
           done
-          echo "::warning::playwright install-deps 三次均失败,继续执行 e2e(runner 镜像通常已含所需库)"
+          echo "::warning::playwright install-deps 两次均失败,继续执行 e2e(runner 镜像通常已含所需库)"
 
       - name: Install Chinese fonts for layout checks
         run: |
-          sudo apt-get update -o Acquire::Retries=3
-          sudo apt-get install -o DPkg::Lock::Timeout=120 -y --no-install-recommends fonts-noto-cjk
-          fc-match -f '%{family}\n' ':lang=zh-cn' | grep -q 'Noto Sans CJK'
+          # 下载与安装一起限时；字体缺失仍阻断排版验收。
+          for i in 1 2; do
+            if sudo timeout --kill-after=15s 120 sh -c 'apt-get update && apt-get install -o DPkg::Lock::Timeout=120 -y --no-install-recommends fonts-noto-cjk'; then
+              fc-match -f '%{family}\n' ':lang=zh-cn' | grep -q 'Noto Sans CJK'
+              exit 0
+            fi
+            echo "::warning::中文字体安装第 $i 次失败或超时"
+            if [ "$i" -lt 2 ]; then sleep 10; fi
+          done
+          echo "::error::中文字体安装失败，无法进行排版验收"
+          exit 1
 
       - name: Admin E2E
         env:

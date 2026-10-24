@@ -7,8 +7,8 @@ export const coinSourceLabels: Record<string, string> = {
   learning_reward: "每日学习奖励",
   daily_login_reward: "每日登录奖励",
   manual_purchase: "购买入账",
-  manual_reward: "人工奖励",
-  manual_reversal: "人工入账冲正",
+  manual_reward: "手动奖励",
+  manual_reversal: "撤销发放",
   account_closure: "注销余额作废"
 };
 export function EntriesTable({

@@ -37,9 +37,18 @@ export function createAuthRuntime({
   loginPath
 }: AuthRuntimeOptions): AuthRuntime {
   const store = createAuthStore();
+  const clearUser = () =>
+    store.setState({
+      user: null,
+      activeRole: null,
+      onboarded: null,
+      hydrated: true,
+      connectionError: false
+    });
   const tokens = createTokenManager({
     baseUrl,
     loginPath,
+    onSessionChanged: clearUser,
     onRefreshError: (error) => {
       store.setState({
         refreshUnconfirmed: error instanceof RefreshUnconfirmedError
@@ -61,33 +70,6 @@ export function createAuthRuntime({
     onSessionExpired: tokens.redirectToLogin
   });
   const api = createEndpoints(http);
-  const logoutKey = `tsz.auth.logged-out:${baseUrl}`;
-  let locallyLoggedOut = false;
-  try {
-    locallyLoggedOut =
-      typeof sessionStorage !== "undefined" &&
-      sessionStorage.getItem(logoutKey) === "1";
-  } catch {
-    // Web Storage 可能被浏览器禁用，不能阻断内存会话操作。
-  }
-  function markLoggedOut(value: boolean) {
-    locallyLoggedOut = value;
-    try {
-      if (typeof sessionStorage === "undefined") return;
-      if (value) sessionStorage.setItem(logoutKey, "1");
-      else sessionStorage.removeItem(logoutKey);
-    } catch {
-      // 内存中的登出状态仍须生效。
-    }
-  }
-  const clearUser = () =>
-    store.setState({
-      user: null,
-      activeRole: null,
-      onboarded: null,
-      hydrated: true,
-      connectionError: false
-    });
   const restoreSession = createSessionRestore(
     tokens,
     () => api.auth.me(),
@@ -100,22 +82,14 @@ export function createAuthRuntime({
     api,
     store,
     tokens,
-    restoreSession: () => {
-      if (locallyLoggedOut) {
-        clearUser();
-        return Promise.resolve();
-      }
-      return restoreSession();
-    },
+    restoreSession,
     persistSession: (auth) => {
-      markLoggedOut(false);
       tokens.setAccessToken(auth.access_token);
       store.setState({ connectionError: false });
       tokens.scheduleRefresh(auth.expires_in);
     },
     clearSession: () => {
-      markLoggedOut(true);
-      tokens.setAccessToken(null);
+      tokens.clearSession();
       clearUser();
     }
   };

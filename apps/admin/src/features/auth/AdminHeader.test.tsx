@@ -18,15 +18,21 @@ vi.mock("react-router-dom", () => ({
 
 vi.mock("@/lib/auth", async () => {
   const { createAdminAuthStore } = await import("@tsz/shared/auth");
+  const useAuthStore = createAdminAuthStore();
+  const tokens = { setAccessToken: vi.fn() };
   return {
-    useAuthStore: createAdminAuthStore(),
+    useAuthStore,
+    clearSession: vi.fn(() => {
+      tokens.setAccessToken(null);
+      useAuthStore.getState().setProfile(null);
+    }),
     api: {
       auth: {
         logout: vi.fn().mockResolvedValue(undefined),
         logoutAll: vi.fn().mockResolvedValue(undefined)
       }
     },
-    tokens: { setAccessToken: vi.fn() }
+    tokens
   };
 });
 

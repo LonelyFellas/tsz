@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/smart-lexicon-architecture-audit/docs/openapi.json",
-  "_source_sha256": "51c6041fb7355168d711c3001718348422b8af90a5d2e3a21d7f58792e7de2ad",
+  "_source_sha256": "e51f27e72e3f11db17f5cd62da1777b9bdad7129a6e95f07952b0a4444f98ecb",
   "roots": [
     "MemoryOverview",
     "MemoryPage",
@@ -2262,6 +2262,7 @@
         "created_at"
       ],
       "properties": {
+        "actor_display_name": { "type": ["string", "null"] },
         "actor_id": { "type": "string", "format": "uuid" },
         "balance_after": {
           "type": "string",
@@ -2272,6 +2273,7 @@
         "event_id": { "type": "string" },
         "evidence_ref": { "type": ["string", "null"] },
         "id": { "type": "string", "format": "uuid" },
+        "owner_display_name": { "type": ["string", "null"] },
         "owner_id": { "type": "string", "format": "uuid" },
         "owner_type": { "$ref": "#/$defs/OwnerType" },
         "reason": { "type": "string" },

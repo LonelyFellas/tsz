@@ -13,6 +13,49 @@ const profile = {
   preferences: { dialect: "uk" }
 } satisfies AdminProfile;
 
+test("退出请求失败后刷新登录页仍保持退出，显式登录可恢复", async ({ page }) => {
+  let refreshes = 0;
+  await page.route("**/api/v1/admin/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/auth/logout"))
+      return route.abort("internetdisconnected");
+    if (path.endsWith("/auth/refresh")) {
+      refreshes++;
+      return route.fulfill({
+        json: { access_token: "still-valid", expires_in: 900 }
+      });
+    }
+    if (path.endsWith("/auth/login"))
+      return route.fulfill({
+        json: {
+          access_token: "explicit-login",
+          expires_in: 900,
+          must_change_password: false
+        }
+      });
+    if (path.endsWith("/profile")) return route.fulfill({ json: profile });
+    return route.fulfill({ json: {} });
+  });
+  await page.goto("/settings/profile");
+  await expect(page.getByRole("heading", { name: "个人设置" })).toBeVisible();
+  const baseline = refreshes;
+  await page.getByRole("button", { name: "账户菜单" }).click();
+  await page.getByRole("button", { name: /退出登录/ }).click();
+  await expect(page).toHaveURL(/\/login(?:\?|$)/);
+  await expect(page.getByLabel("登录密码", { exact: true })).toBeVisible();
+  await page.reload();
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  await expect(page.getByLabel("登录密码", { exact: true })).toBeVisible();
+  expect(refreshes).toBe(baseline);
+  await page.getByLabel("手机号", { exact: true }).fill(profile.phone);
+  await page
+    .getByLabel("登录密码", { exact: true })
+    .fill("Correct!Password731");
+  await page.getByLabel("验证码", { exact: true }).fill("000000");
+  await page.getByRole("button", { name: "登 录", exact: true }).click();
+  await expect(page.getByRole("button", { name: "账户菜单" })).toBeVisible();
+});
+
 test("旧 profile 缺少权限版本时失败关闭，不请求业务数据", async ({ page }) => {
   const legacyProfile: Partial<AdminProfile> = { ...profile };
   delete legacyProfile.permission_version;
