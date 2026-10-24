@@ -1,5 +1,4 @@
 import type {
-  AdminWordStatus,
   Dialect,
   FormsImpactNodeTypeV3,
   PronunciationStyle,
@@ -114,14 +113,6 @@ export function languageSummary(language: string): {
     // 未知/不合法的代码只作展示兜底，不能被显示成默认英语。
   }
   return { label: `${code}（未识别语言）`, identified: false };
-}
-
-export function wordStatusLabel(status: AdminWordStatus): string {
-  return {
-    draft: "草稿",
-    published: "已发布",
-    archived: "垃圾桶"
-  }[status];
 }
 
 export function formTypeLabel(value: WordFormTypeV3): string {
