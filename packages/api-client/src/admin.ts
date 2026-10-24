@@ -116,6 +116,7 @@ import {
   decodeEntryDeleteBatchResponse
 } from "./admin-word-schema";
 import type { HttpClient } from "./http";
+import { decodeAdminDashboardOverview } from "./admin-dashboard";
 
 const SPELLING_MARKUP_HEADERS = {
   ...SENTENCE_FORMATTING_HEADERS,
@@ -247,6 +248,13 @@ function requireLifecycleBatchIdentity<
  */
 export function createAdminEndpoints(http: HttpClient) {
   return {
+    dashboard: {
+      /** GET /admin/dashboard/overview — 管理端首页聚合统计。 */
+      overview: (opts?: { signal?: AbortSignal }) =>
+        http
+          .get<unknown>("/dashboard/overview", opts)
+          .then(decodeAdminDashboardOverview)
+    },
     coins: createCoinEndpoints(http),
     wordlists: createAdminWordlistEndpoints(http),
     coinManagement: createAdminCoinEndpoints(http),

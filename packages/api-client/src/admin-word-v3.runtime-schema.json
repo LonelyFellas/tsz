@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/smart-lexicon-architecture-audit/docs/openapi.json",
-  "_source_sha256": "e51f27e72e3f11db17f5cd62da1777b9bdad7129a6e95f07952b0a4444f98ecb",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/admin-dashboard-overview/docs/openapi.json",
+  "_source_sha256": "6def50ceaf54796741f9377105b8e567bb161b7daceb8675a82363d207396225",
   "roots": [
     "MemoryOverview",
     "MemoryPage",
@@ -65,6 +65,7 @@
     "CoinWallet",
     "CoinEntryPage",
     "UserCoinEntryPage",
+    "AdminDashboardOverview",
     "SharedSentence",
     "SentencePublication",
     "SentenceWithdrawalImpact",
@@ -150,6 +151,40 @@
         "server_time": { "type": "string", "format": "date-time" }
       },
       "additionalProperties": false
+    },
+    "AdminDashboardOverview": {
+      "type": "object",
+      "required": [
+        "generated_at",
+        "users",
+        "tasks",
+        "lexicon",
+        "coins",
+        "user_growth",
+        "coin_flow",
+        "learning_progress",
+        "lexicon_creation"
+      ],
+      "properties": {
+        "coin_flow": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/DashboardCoinFlowPoint" }
+        },
+        "coins": { "$ref": "#/$defs/DashboardCoins" },
+        "generated_at": { "type": "string", "format": "date-time" },
+        "learning_progress": { "$ref": "#/$defs/DashboardLearningProgress" },
+        "lexicon": { "$ref": "#/$defs/DashboardLexicon" },
+        "lexicon_creation": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/DashboardWeeklyPoint" }
+        },
+        "tasks": { "$ref": "#/$defs/DashboardTasks" },
+        "user_growth": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/DashboardDailyPoint" }
+        },
+        "users": { "$ref": "#/$defs/DashboardUsers" }
+      }
     },
     "AdminWordDraftV3Envelope": {
       "type": "object",
@@ -640,6 +675,80 @@
         "word": { "type": "string", "maxLength": 50, "minLength": 1 }
       },
       "additionalProperties": false
+    },
+    "DashboardCoinFlowPoint": {
+      "type": "object",
+      "required": ["date", "grant", "deduct"],
+      "properties": {
+        "date": { "type": "string" },
+        "deduct": { "type": "string" },
+        "grant": { "type": "string" }
+      }
+    },
+    "DashboardCoins": {
+      "type": "object",
+      "required": ["circulation", "today_net", "week_net", "month_net"],
+      "properties": {
+        "circulation": { "type": "string" },
+        "month_net": { "type": "string" },
+        "today_net": { "type": "string" },
+        "week_net": { "type": "string" }
+      }
+    },
+    "DashboardDailyPoint": {
+      "type": "object",
+      "required": ["date", "value"],
+      "properties": {
+        "date": { "type": "string" },
+        "value": { "type": "integer" }
+      }
+    },
+    "DashboardLearningProgress": {
+      "type": "object",
+      "required": ["completed", "in_progress", "not_started"],
+      "properties": {
+        "completed": { "type": "integer" },
+        "in_progress": { "type": "integer" },
+        "not_started": { "type": "integer" }
+      }
+    },
+    "DashboardLexicon": {
+      "type": "object",
+      "required": ["total", "today", "week", "month"],
+      "properties": {
+        "month": { "type": "integer" },
+        "today": { "type": "integer" },
+        "total": { "type": "integer" },
+        "week": { "type": "integer" }
+      }
+    },
+    "DashboardTasks": {
+      "type": "object",
+      "required": ["total", "completed", "today", "week"],
+      "properties": {
+        "completed": { "type": "integer" },
+        "today": { "type": "integer" },
+        "total": { "type": "integer" },
+        "week": { "type": "integer" }
+      }
+    },
+    "DashboardUsers": {
+      "type": "object",
+      "required": ["total", "today", "last_3_days", "last_7_days"],
+      "properties": {
+        "last_3_days": { "type": "integer" },
+        "last_7_days": { "type": "integer" },
+        "today": { "type": "integer" },
+        "total": { "type": "integer" }
+      }
+    },
+    "DashboardWeeklyPoint": {
+      "type": "object",
+      "required": ["week_start", "value"],
+      "properties": {
+        "value": { "type": "integer" },
+        "week_start": { "type": "string" }
+      }
     },
     "DeletionStatus": {
       "type": "string",
