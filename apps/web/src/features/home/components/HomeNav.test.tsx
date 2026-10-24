@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
 import type { User } from "@tsz/types";
 import { HomeNav } from "./HomeNav";
 import { useUserStore } from "@/stores/user";
@@ -44,6 +45,24 @@ describe("HomeNav", () => {
     );
   });
 
+  it("已登录可通过齿轮打开外观设置，切换账号关闭旧面板", async () => {
+    useUserStore.setState({ hydrated: true, user: USER });
+    const actions = userEvent.setup();
+    const view = render(<HomeNav />);
+    await actions.click(screen.getByRole("button", { name: "偏好设置" }));
+    expect(
+      screen.getByRole("dialog", { name: "偏好设置" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "跟随系统" })
+    ).toBeInTheDocument();
+    useUserStore.setState({ user: { ...USER, id: "u2" } });
+    view.rerender(<HomeNav />);
+    expect(
+      screen.queryByRole("dialog", { name: "偏好设置" })
+    ).not.toBeInTheDocument();
+  });
+
   it("已登录 → 显示账户菜单头像,不再平铺登录", () => {
     useUserStore.setState({ hydrated: true, user: USER });
     render(<HomeNav />);
@@ -51,6 +70,9 @@ describe("HomeNav", () => {
       screen.getByRole("button", { name: "账户菜单" })
     ).toBeInTheDocument();
     expect(screen.queryByText("登录")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "偏好设置" })
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /切换到.*色模式/ })
     ).not.toBeInTheDocument();
