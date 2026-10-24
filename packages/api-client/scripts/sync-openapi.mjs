@@ -122,6 +122,7 @@ const RUNTIME_SCHEMA_ROOTS = [
   "CoinWallet",
   "CoinEntryPage",
   "UserCoinEntryPage",
+  "AdminDashboardOverview",
   "SharedSentence",
   "SentencePublication",
   "SentenceWithdrawalImpact",

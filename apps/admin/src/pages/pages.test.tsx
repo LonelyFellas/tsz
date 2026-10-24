@@ -9,7 +9,7 @@ import { ReviewsPage } from "./Reviews";
 import { UsersPage } from "./Users";
 import { WordCreatePage } from "./WordCreate";
 import { WordsPage } from "./Words";
-import { api } from "@/lib/auth";
+import { api, usePermission } from "@/lib/auth";
 
 const smokeProfile = vi.hoisted(() => ({
   id: "smoke-admin",
@@ -87,7 +87,7 @@ vi.mock("@/lib/auth", () => ({
     }
   ),
   // 用户管理页据 useIsSuperAdmin 决定写操作是否置灰；烟雾测试给个超管即可。
-  usePermission: () => true,
+  usePermission: vi.fn(() => true),
   useIsSuperAdmin: () => true
 }));
 
@@ -166,7 +166,31 @@ describe("admin 页面烟雾测试", () => {
       "href",
       "/coins"
     );
+    expect(
+      screen.queryByRole("button", { name: "发放" })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "扣除" })
+    ).not.toBeInTheDocument();
     expect(api.dashboard.overview).toHaveBeenCalledTimes(1);
+  });
+
+  it("没有天生币查询权限时不渲染查看流水入口", async () => {
+    vi.mocked(usePermission).mockReturnValueOnce(false);
+    renderHome();
+    expect(await screen.findByText("累计用户")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "查看流水" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("学习进度全为零时展示空状态", async () => {
+    vi.mocked(api.dashboard.overview).mockResolvedValueOnce({
+      ...dashboardOverview,
+      learning_progress: { completed: 0, in_progress: 0, not_started: 0 }
+    });
+    renderHome();
+    expect(await screen.findByText("暂无学习数据")).toBeInTheDocument();
   });
 
   it("首页加载中展示骨架屏，不提前渲染 KPI", () => {
@@ -181,14 +205,17 @@ describe("admin 页面烟雾测试", () => {
     expect(screen.queryByText("累计用户")).not.toBeInTheDocument();
   });
 
-  it("首页加载失败时展示可重试错误，不回落 mock 数据", async () => {
-    vi.mocked(api.dashboard.overview).mockRejectedValueOnce(
-      new Error("network")
-    );
+  it("首页加载失败时展示可重试错误，点击重试后恢复", async () => {
+    vi.mocked(api.dashboard.overview)
+      .mockRejectedValueOnce(new Error("network"))
+      .mockResolvedValueOnce(dashboardOverview);
     renderHome();
     expect(await screen.findByText("首页数据加载失败")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /重\s*试/ })).toBeInTheDocument();
     expect(screen.queryByText("累计用户")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /重\s*试/ }));
+    expect(await screen.findByText("累计用户")).toBeInTheDocument();
+    expect(screen.queryByText("首页数据加载失败")).not.toBeInTheDocument();
   });
 
   it.each([[ReviewsPage, "词表审核"]] as const)(

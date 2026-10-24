@@ -2,7 +2,7 @@ import { Alert, Button, Card, Col, Row, Skeleton } from "antd";
 import { useQuery } from "@tanstack/react-query";
 import type { AdminDashboardOverview } from "@tsz/types";
 import { Link } from "react-router-dom";
-import { api, useAuthStore } from "@/lib/auth";
+import { api, useAuthStore, usePermission } from "@/lib/auth";
 import {
   CoinFlowChart,
   DictionaryTrendChart,
@@ -39,7 +39,7 @@ export function HomePage() {
         <Alert
           type="error"
           showIcon
-          message="首页数据加载失败"
+          title="首页数据加载失败"
           description="请检查网络或稍后重试。"
           action={
             <Button
@@ -60,6 +60,7 @@ export function HomePage() {
 }
 
 function DashboardContent({ data }: { data: AdminDashboardOverview }) {
+  const canViewCoins = usePermission("coins.access");
   return (
     <>
       {/* 顶部 KPI 指标行：一眼看关键量级与环比。 */}
@@ -83,7 +84,7 @@ function DashboardContent({ data }: { data: AdminDashboardOverview }) {
         <Col xs={24} xl={12}>
           <CoinFlowChart
             data={toCoinFlow(data)}
-            extra={<Link to="/coins">查看流水</Link>}
+            extra={canViewCoins ? <Link to="/coins">查看流水</Link> : undefined}
           />
         </Col>
         <Col xs={24} xl={12}>
@@ -96,7 +97,8 @@ function DashboardContent({ data }: { data: AdminDashboardOverview }) {
 
 function DashboardSkeleton() {
   return (
-    <>
+    <div aria-busy="true">
+      <span className="sr-only">加载中</span>
       <Row gutter={[16, 16]}>
         {[0, 1, 2, 3].map((index) => (
           <Col key={index} xs={12} lg={6}>
@@ -113,6 +115,6 @@ function DashboardSkeleton() {
           </Col>
         ))}
       </Row>
-    </>
+    </div>
   );
 }

@@ -397,15 +397,6 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     expect(http.get).toHaveBeenCalledWith("/lexicon/entries/stats");
   });
 
-  it("dashboard overview → GET /dashboard/overview 并透传取消信号", () => {
-    const api = createAdminEndpoints(http);
-    const controller = new AbortController();
-    api.dashboard.overview({ signal: controller.signal });
-    expect(http.get).toHaveBeenCalledWith("/dashboard/overview", {
-      signal: controller.signal
-    });
-  });
-
   it("surfaceMatchSnapshotPage → GET 精确 snapshot/cursor 并透传取消信号", () => {
     const api = createAdminEndpoints(http);
     const controller = new AbortController();
@@ -1704,4 +1695,47 @@ it("恢复历史只使用独立草稿接口，失败不降级为线上回滚", a
       headers: expect.objectContaining({ "Idempotency-Key": "restore-key" })
     })
   );
+});
+
+describe("createAdminEndpoints — dashboard", () => {
+  const overview = {
+    generated_at: "2026-10-24T00:00:00Z",
+    users: { total: 12335, today: 234, last_3_days: 25, last_7_days: 10 },
+    tasks: { total: 231, completed: 78, today: 3, week: 25 },
+    lexicon: { total: 233, today: 23, week: 55, month: 100 },
+    coins: {
+      circulation: "2313",
+      today_net: "23",
+      week_net: "-55",
+      month_net: "100"
+    },
+    user_growth: [{ date: "2026-10-23", value: 10 }],
+    coin_flow: [{ date: "2026-10-23", grant: "10", deduct: "2" }],
+    learning_progress: { completed: 34, in_progress: 41, not_started: 25 },
+    lexicon_creation: [{ week_start: "2026-10-19", value: 12 }]
+  };
+
+  it("overview → GET /dashboard/overview 并透传取消信号", async () => {
+    http.get.mockResolvedValueOnce(overview);
+    const api = createAdminEndpoints(http);
+    const controller = new AbortController();
+    await api.dashboard.overview({ signal: controller.signal });
+    expect(http.get).toHaveBeenCalledWith("/dashboard/overview", {
+      signal: controller.signal
+    });
+  });
+
+  it("overview 拒绝空或结构不完整的响应", async () => {
+    http.get.mockResolvedValueOnce({});
+    await expect(
+      createAdminEndpoints(http).dashboard.overview()
+    ).rejects.toThrow(/看板响应不符合接口契约/);
+  });
+
+  it("overview 接受完整响应", async () => {
+    http.get.mockResolvedValueOnce(overview);
+    await expect(
+      createAdminEndpoints(http).dashboard.overview()
+    ).resolves.toEqual(overview);
+  });
 });

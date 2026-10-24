@@ -25,11 +25,13 @@ export interface TimePoint {
   value: number;
 }
 
-/** 天生币收支的一天：发放与扣除两条。图表使用 number，KPI 仍用字符串。 */
+/** 天生币收支的一天：发放与扣除两条。图表用 number，tooltip 用原始字符串保精度。 */
 export interface CoinFlowPoint {
   label: string;
   grant: number;
   deduct: number;
+  grantText: string;
+  deductText: string;
 }
 
 /** 学习进度分布的一片。 */
@@ -62,7 +64,7 @@ export function formatAmount(value: string): string {
 }
 
 function signedAmount(value: string): string {
-  if (value === "0") return "0";
+  if (value === "0" || value === "-0") return "0";
   return value.startsWith("-")
     ? formatAmount(value)
     : `+${formatAmount(value)}`;
@@ -143,11 +145,13 @@ export function toUserGrowth(data: AdminDashboardOverview): TimePoint[] {
 }
 
 export function toCoinFlow(data: AdminDashboardOverview): CoinFlowPoint[] {
-  // 图表只做视觉比例，使用 number；KPI 与列表仍保留字符串精度。
   return data.coin_flow.map((point) => ({
     label: shortDate(point.date),
+    // 图表只做视觉比例，使用 number；tooltip 读 grantText/deductText 保留字符串精度。
     grant: Number(point.grant),
-    deduct: Number(point.deduct)
+    deduct: Number(point.deduct),
+    grantText: point.grant,
+    deductText: point.deduct
   }));
 }
 

@@ -142,7 +142,12 @@ export function CoinFlowChart({
           <Tooltip
             contentStyle={TOOLTIP_STYLE}
             cursor={{ fill: "#f5f5f5" }}
-            formatter={(value, name) => [numberTick(Number(value)), name]}
+            formatter={(value, name, item) => {
+              const point = item?.payload as CoinFlowPoint | undefined;
+              const text =
+                name === "发放" ? point?.grantText : point?.deductText;
+              return [text ?? numberTick(Number(value)), name];
+            }}
           />
           <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
           <Bar

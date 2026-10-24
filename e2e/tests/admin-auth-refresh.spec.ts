@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import type { AdminProfile } from "@tsz/types";
+import type { AdminDashboardOverview, AdminProfile } from "@tsz/types";
 
 const profile = {
   id: "a1",
@@ -12,6 +12,24 @@ const profile = {
   permissions: [],
   preferences: { dialect: "uk" }
 } satisfies AdminProfile;
+
+// 登录后默认落到首页；看板响应必须是完整结构，否则解码器会按契约错误处理。
+const dashboardOverview = {
+  generated_at: "2026-10-24T00:00:00Z",
+  users: { total: 12335, today: 234, last_3_days: 25, last_7_days: 10 },
+  tasks: { total: 231, completed: 78, today: 3, week: 25 },
+  lexicon: { total: 233, today: 23, week: 55, month: 100 },
+  coins: {
+    circulation: "2313",
+    today_net: "23",
+    week_net: "-55",
+    month_net: "100"
+  },
+  user_growth: [{ date: "2026-10-23", value: 10 }],
+  coin_flow: [{ date: "2026-10-23", grant: "10", deduct: "2" }],
+  learning_progress: { completed: 34, in_progress: 41, not_started: 25 },
+  lexicon_creation: [{ week_start: "2026-10-19", value: 12 }]
+} satisfies AdminDashboardOverview;
 
 test("退出请求失败后刷新登录页仍保持退出，显式登录可恢复", async ({ page }) => {
   let refreshes = 0;
@@ -34,6 +52,8 @@ test("退出请求失败后刷新登录页仍保持退出，显式登录可恢�
         }
       });
     if (path.endsWith("/profile")) return route.fulfill({ json: profile });
+    if (path.endsWith("/dashboard/overview"))
+      return route.fulfill({ json: dashboardOverview });
     return route.fulfill({ json: {} });
   });
   await page.goto("/settings/profile");
@@ -95,6 +115,8 @@ test("初始恢复 503 后手动登录可进入后台，不永久停在加载态
         }
       });
     if (path.endsWith("/profile")) return route.fulfill({ json: profile });
+    if (path.endsWith("/dashboard/overview"))
+      return route.fulfill({ json: dashboardOverview });
     return route.fulfill({ json: {} });
   });
   await page.goto("/login?redirect=/settings/profile");
@@ -220,6 +242,8 @@ test("主动刷新 503 自动恢复会话并保留未提交表单", async ({ pag
       });
     }
     if (path.endsWith("/profile")) return route.fulfill({ json: profile });
+    if (path.endsWith("/dashboard/overview"))
+      return route.fulfill({ json: dashboardOverview });
     return route.fulfill({ json: {} });
   });
   await page.goto("/change-password");
@@ -316,6 +340,8 @@ test("旧标签页未知标记刷新后直接恢复，无需重新登录", async
       });
     }
     if (path.endsWith("/profile")) return route.fulfill({ json: profile });
+    if (path.endsWith("/dashboard/overview"))
+      return route.fulfill({ json: dashboardOverview });
     return route.fulfill({ json: {} });
   });
   await page.goto("/settings/profile");
