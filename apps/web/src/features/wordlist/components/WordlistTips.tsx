@@ -6,7 +6,11 @@ import { Coins, Check } from "lucide-react";
 import { Button } from "@tsz/ui/components";
 import { HttpError } from "@tsz/api-client";
 import { formatCoins } from "@tsz/shared";
-import type { CreateWordlistTip, Wordlist } from "@tsz/types";
+import type {
+  CreateWordlistTip,
+  Wordlist,
+  WordlistTipStates
+} from "@tsz/types";
 import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
 import { wordListKeys } from "../hooks/useWordLists";
@@ -179,6 +183,35 @@ function TipForm({
         receipt.amount !== input.amount
       )
         throw new Error("receipt mismatch");
+      const tipQueries = {
+        queryKey: [...wordListKeys.mine(userId), "tip-states"]
+      };
+      void client.cancelQueries(tipQueries);
+      const confirmedTotal = pending
+        ? null
+        : BigInt(tipped!) + BigInt(receipt.amount);
+      client.setQueriesData<WordlistTipStates>(tipQueries, (data) =>
+        data
+          ? {
+              ...data,
+              // A recovered receipt may already be included in the cached total.
+              items: pending
+                ? data.items.filter((item) => item.wordlist_id !== list.id)
+                : data.items.map((item) =>
+                    item.wordlist_id === list.id
+                      ? {
+                          ...item,
+                          tip_amount: String(
+                            BigInt(item.tip_amount) > confirmedTotal!
+                              ? BigInt(item.tip_amount)
+                              : confirmedTotal
+                          )
+                        }
+                      : item
+                  )
+            }
+          : data
+      );
       sessionStorage.removeItem(storageKey);
       setPending(null);
       setSuccess(receipt.amount);
