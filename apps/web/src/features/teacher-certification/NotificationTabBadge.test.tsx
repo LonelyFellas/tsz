@@ -11,6 +11,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api } from "@/lib/request";
 import { NotificationTabBadge } from "./NotificationTabBadge";
 import { Notifications } from "./Notifications";
+import { NotificationLink } from "@/features/shell/NotificationLink";
 
 const session = vi.hoisted(() => ({
   user: { id: "user-1" } as { id: string } | null,
@@ -35,6 +36,7 @@ const data = (count: number) => ({
 const tree = (list = false) => (
   <QueryClientProvider client={client}>
     <NotificationTabBadge />
+    <NotificationLink onNavigate={() => {}} />
     {list && <Notifications />}
   </QueryClientProvider>
 );
@@ -85,6 +87,9 @@ it("keeps page titles on navigation and restores the original icon and title at 
   await waitFor(() => expect(document.title).toBe("(3) 通知 | 天生会背"));
   act(() => client.setQueryData(["notifications", "user-1", 1], data(123)));
   await waitFor(() => expect(document.title).toBe("(123) 通知 | 天生会背"));
+  expect(
+    screen.getByRole("link", { name: "站内通知，123 条未读" })
+  ).toHaveTextContent("99+");
   act(() => images.at(-1)?.onload?.());
   expect(fillText).toHaveBeenLastCalledWith("99+", 40, 16);
   act(() => client.setQueryData(["notifications", "user-1", 1], data(0)));
@@ -123,11 +128,16 @@ it.each(["wordlist_liked", "wordlist_tipped"] as const)(
     render(tree(true));
     await waitFor(() => expect(document.title).toBe("(1) 首页 | 天生会背"));
     expect(api.teacherCertification.notifications).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByRole("link", { name: "站内通知，1 条未读" })
+    ).toHaveAttribute("href", "/account/notifications");
     vi.mocked(api.teacherCertification.notifications).mockResolvedValue(
       data(0)
     );
     fireEvent.click(screen.getByRole("button", { name: "标为已读" }));
     await waitFor(() => expect(document.title).toBe("首页 | 天生会背"));
+    expect(screen.getByRole("link", { name: "站内通知" })).toBeInTheDocument();
+    expect(api.teacherCertification.notifications).toHaveBeenCalledTimes(2);
   }
 );
 
@@ -143,4 +153,7 @@ it("clears the previous account badge and ignores late image loads after logout"
   view.rerender(tree());
   act(() => oldImage?.onload?.());
   expect(document.querySelectorAll('link[rel="icon"]')).toHaveLength(1);
+  expect(
+    screen.queryByRole("link", { name: /站内通知/ })
+  ).not.toBeInTheDocument();
 });

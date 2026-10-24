@@ -16,6 +16,7 @@ export { Tabs, TabsList, TabsTrigger, TabsContent } from "./tabs";
 export {
   Popover,
   PopoverTrigger,
+  PopoverAnchor,
   PopoverContent,
   PopoverClose
 } from "./popover";

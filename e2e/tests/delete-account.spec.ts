@@ -14,7 +14,7 @@ for (const width of [375, 1280]) {
       "天生币：0",
       "学习工作台",
       "个人中心",
-      "站内通知",
+      "偏好设置",
       "申请教师认证",
       "退出登录"
     ];
@@ -41,7 +41,8 @@ for (const width of [375, 1280]) {
     expect(measurement.fitsViewport).toBe(true);
     expect(measurement.hits).toHaveLength(expectedItems.length);
     expect(measurement.hits.every(Boolean)).toBe(true);
-    await page.getByRole("menuitem", { name: "站内通知" }).click();
+    await page.keyboard.press("Escape");
+    await page.getByRole("link", { name: "站内通知" }).click();
     await expect(page).toHaveURL(/\/account\/notifications$/);
     await expect(page.getByRole("menu")).toHaveCount(0);
     await expect(

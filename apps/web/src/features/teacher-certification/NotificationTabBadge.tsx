@@ -2,15 +2,14 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
+import { notificationQuery } from "./notification-query";
 
 export function NotificationTabBadge() {
   const userId = useUserStore((state) => state.user?.id);
   const hydrated = useUserStore((state) => state.hydrated);
   const query = useQuery({
-    queryKey: ["notifications", userId, 1],
-    queryFn: () => api.teacherCertification.notifications(1),
+    ...notificationQuery(userId),
     enabled: hydrated && !!userId,
     refetchInterval: 60_000,
     refetchIntervalInBackground: true,

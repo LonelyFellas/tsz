@@ -23,7 +23,14 @@ vi.mock("@/features/teacher-certification/TeacherIdentityProvider", () => ({
   useTeacherIdentity: () => identity
 }));
 vi.mock("@/lib/request", () => ({
-  api: { coins: { wallet: vi.fn().mockResolvedValue({ balance: "5" }) } }
+  api: {
+    coins: { wallet: vi.fn().mockResolvedValue({ balance: "5" }) },
+    teacherCertification: {
+      notifications: vi
+        .fn()
+        .mockResolvedValue({ items: [], total: 0, unread_count: 0 })
+    }
+  }
 }));
 
 const teacher: User = {
@@ -43,6 +50,18 @@ const student: User = {
   avatar_url: "",
   active_role: "student"
 };
+
+async function openPreferences(actions: ReturnType<typeof userEvent.setup>) {
+  if (useUserStore.getState().user) {
+    if (!screen.queryByRole("menu"))
+      await actions.click(screen.getByRole("button", { name: "账户菜单" }));
+    await actions.click(
+      await screen.findByRole("menuitem", { name: "偏好设置" })
+    );
+  } else {
+    await actions.click(screen.getByRole("button", { name: "偏好设置" }));
+  }
+}
 
 function menuLinks(name: string) {
   return within(screen.getByRole("dialog", { name }))
@@ -77,7 +96,7 @@ it("游客看到词典、词库广场、外观设置与登录入口", async () =
       .getAllByRole("link")
       .map((link) => link.getAttribute("href"))
   ).toEqual(["/dictionary", "/wordlists", "/"]);
-  await actions.click(screen.getByRole("button", { name: "偏好设置" }));
+  await openPreferences(actions);
   const settings = screen.getByRole("dialog", { name: "偏好设置" });
   expect(
     within(settings).getByRole("button", { name: "跟随系统" })
@@ -100,7 +119,13 @@ it("已认证教师看到教学菜单并高亮当前页", async () => {
   expect(
     within(menu).queryByRole("link", { name: "学习首页" })
   ).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "偏好设置" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "站内通知" })).toHaveAttribute(
+    "href",
+    "/account/notifications"
+  );
+  expect(
+    screen.queryByRole("button", { name: "偏好设置" })
+  ).not.toBeInTheDocument();
 });
 
 it("学生打开偏好设置，看到外观与学习偏好", async () => {
@@ -108,7 +133,7 @@ it("学生打开偏好设置，看到外观与学习偏好", async () => {
   useUserStore.setState({ user: student, hydrated: true });
   const actions = userEvent.setup();
   renderWithProviders(<AppTopbar />);
-  await actions.click(screen.getByRole("button", { name: "偏好设置" }));
+  await openPreferences(actions);
   const settings = screen.getByRole("dialog", { name: "偏好设置" });
   expect(within(settings).getByText("英美偏好")).toBeInTheDocument();
   expect(
@@ -126,7 +151,13 @@ it("已认证教师选择学生工作台时显示学习菜单与偏好设置", a
   await actions.click(screen.getByRole("button", { name: "学习菜单" }));
   expect(menuLinks("学习菜单")).toContain("/student/practice");
   expect(menuLinks("学习菜单")).not.toContain("/teacher/classes");
-  expect(screen.getByRole("button", { name: "偏好设置" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "站内通知" })).toHaveAttribute(
+    "href",
+    "/account/notifications"
+  );
+  expect(
+    screen.queryByRole("button", { name: "偏好设置" })
+  ).not.toBeInTheDocument();
 });
 
 it("没有学生角色且不在教学工作台的账号只看到精简菜单", async () => {
@@ -146,11 +177,16 @@ it("没有学生角色且不在教学工作台的账号只看到精简菜单", a
     "/dictionary",
     "/wordlists",
     "/account/coins",
-    "/account/notifications",
     "/account/profile",
     "/"
   ]);
-  expect(screen.getByRole("button", { name: "偏好设置" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "站内通知" })).toHaveAttribute(
+    "href",
+    "/account/notifications"
+  );
+  expect(
+    screen.queryByRole("button", { name: "偏好设置" })
+  ).not.toBeInTheDocument();
 });
 
 it("首次进入教师页、资格核验返回前不闪出学习菜单", async () => {
@@ -163,7 +199,13 @@ it("首次进入教师页、资格核验返回前不闪出学习菜单", async (
   ).not.toBeInTheDocument();
   await actions.click(screen.getByRole("button", { name: "教学菜单" }));
   expect(menuLinks("教学菜单")).not.toContain("/student/home");
-  expect(screen.getByRole("button", { name: "偏好设置" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "站内通知" })).toHaveAttribute(
+    "href",
+    "/account/notifications"
+  );
+  expect(
+    screen.queryByRole("button", { name: "偏好设置" })
+  ).not.toBeInTheDocument();
 });
 
 it("已认证教师直接打开教师页时，工作台偏好尚未改写也显示教学菜单", () => {
@@ -184,7 +226,7 @@ it("左右浮层互斥：打开设置会关闭菜单", async () => {
   renderWithProviders(<AppTopbar />);
   await actions.click(screen.getByRole("button", { name: "学习菜单" }));
   expect(screen.getByRole("dialog", { name: "学习菜单" })).toBeInTheDocument();
-  await actions.click(screen.getByRole("button", { name: "偏好设置" }));
+  await openPreferences(actions);
   expect(screen.getByRole("dialog", { name: "偏好设置" })).toBeInTheDocument();
   expect(
     screen.queryByRole("dialog", { name: "学习菜单" })
@@ -207,7 +249,7 @@ it("设置打开时悬停头像不展开账户，主动点击可切换且再次�
   useUserStore.setState({ user: student, hydrated: true });
   const actions = userEvent.setup();
   renderWithProviders(<AppTopbar />);
-  await actions.click(screen.getByRole("button", { name: "偏好设置" }));
+  await openPreferences(actions);
   hoverAccount();
   await new Promise((resolve) => setTimeout(resolve, 180));
   expect(screen.queryByRole("menu")).not.toBeInTheDocument();
@@ -217,7 +259,7 @@ it("设置打开时悬停头像不展开账户，主动点击可切换且再次�
   expect(
     screen.queryByRole("dialog", { name: "偏好设置" })
   ).not.toBeInTheDocument();
-  await actions.click(screen.getByRole("button", { name: "偏好设置" }));
+  await openPreferences(actions);
   expect(screen.getByRole("dialog", { name: "偏好设置" })).toBeInTheDocument();
   await waitFor(() =>
     expect(screen.queryByRole("menu")).not.toBeInTheDocument()
@@ -226,7 +268,7 @@ it("设置打开时悬停头像不展开账户，主动点击可切换且再次�
   await new Promise((resolve) => setTimeout(resolve, 180));
   expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   await actions.keyboard("{Escape}");
-  expect(screen.getByRole("button", { name: "偏好设置" })).toHaveFocus();
+  expect(screen.getByRole("button", { name: "账户菜单" })).toHaveFocus();
 });
 
 it("悬停延迟未结束时打开导航，账户不会迟到展开", async () => {
