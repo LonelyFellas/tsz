@@ -208,6 +208,14 @@ export interface CreateWordlistTip {
   event_id: string;
   idempotency_key: string;
   amount: string;
+  like?: boolean;
+}
+export interface WordlistTipState {
+  wordlist_id: string;
+  tip_amount: string;
+}
+export interface WordlistTipStates {
+  items: WordlistTipState[];
 }
 export interface WordlistTip {
   event_id: string;

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/admin-dashboard-overview/docs/openapi.json",
-  "_source_sha256": "6def50ceaf54796741f9377105b8e567bb161b7daceb8675a82363d207396225",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-tipping/docs/openapi.json",
+  "_source_sha256": "a4bcaa23f69ca579f87117c234c7c1f74e294aacb13bc8163b001718f62b794c",
   "roots": [
     "MemoryOverview",
     "MemoryPage",
@@ -38,6 +38,7 @@
     "LibraryImpact",
     "WordlistTip",
     "WordlistTipPage",
+    "WordlistTipStates",
     "AdminWordlist",
     "AdminWordlistPage",
     "WordlistDeleteImpact",
@@ -1137,6 +1138,7 @@
         "learning_insufficient_questions",
         "learning_already_answered",
         "word_list_conflict",
+        "word_list_tip_limit",
         "word_list_audio_cost_changed",
         "account_deletion_unsettled_audio",
         "word_list_entry_unavailable",
@@ -4869,6 +4871,26 @@
         "wordlist_accessible": { "type": "boolean" },
         "wordlist_id": { "type": "string", "format": "uuid" },
         "wordlist_name": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "WordlistTipState": {
+      "type": "object",
+      "required": ["wordlist_id", "tip_amount"],
+      "properties": {
+        "tip_amount": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+        "wordlist_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "WordlistTipStates": {
+      "type": "object",
+      "required": ["items"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordlistTipState" }
+        }
       },
       "additionalProperties": false
     },

@@ -72,6 +72,7 @@ const ROOTS = [
   "LibraryImpact",
   "WordlistTip",
   "WordlistTipPage",
+  "WordlistTipStates",
   "AdminWordlist",
   "AdminWordlistPage",
   "WordlistDeleteImpact",

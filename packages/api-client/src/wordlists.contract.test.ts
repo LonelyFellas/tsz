@@ -632,6 +632,56 @@ it("keeps batched public stats separate from private state and decodes unavailab
   ).toThrow();
 });
 
+it("decodes personal tip totals independently and preserves the simultaneous-like intent", async () => {
+  const tipStates = { items: [{ wordlist_id: id, tip_amount: "7" }] };
+  const receipt = {
+    event_id: id,
+    wordlist_id: id,
+    payer_user_id: id,
+    author_user_id: id,
+    amount: "2",
+    operation_id: id,
+    created_at: "2026-10-24T00:00:00Z"
+  };
+  const http = {
+    get: vi.fn().mockResolvedValue(tipStates),
+    post: vi.fn().mockResolvedValue(receipt)
+  } as unknown as HttpClient;
+  const api = createWordlistEndpoints(http);
+  expect(await api.tipStates([id])).toEqual(tipStates);
+  expect(http.get).toHaveBeenCalledWith(
+    `/me/wordlist-tip-states?ids=${id}`,
+    undefined
+  );
+  const input = { event_id: id, idempotency_key: id, amount: "2", like: true };
+  expect(await api.tip(id, input)).toEqual(receipt);
+  expect(http.post).toHaveBeenCalledWith(
+    `/wordlists/${id}/tips`,
+    input,
+    undefined
+  );
+  for (const amount of ["-1", "1.5", "01"]) {
+    expect(() =>
+      decodeWordlistResponse("WordlistTipStates", {
+        items: [{ wordlist_id: id, tip_amount: amount }]
+      })
+    ).toThrow();
+  }
+  expect(() =>
+    decodeWordlistResponse("WordlistTipStates", {
+      items: [{ wordlist_id: id }]
+    })
+  ).toThrow();
+  expect(() =>
+    decodeWordlistResponse("WordlistInteractionState", {
+      wordlist_id: id,
+      liked: true,
+      favorited: false,
+      tip_amount: "2"
+    })
+  ).toThrow();
+});
+
 it("自定义项保持独立标识及释义，公共契约拒绝私密备注和超长自定义字段", async () => {
   const item = {
     item_id: id,

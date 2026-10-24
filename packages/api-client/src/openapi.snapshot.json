@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/admin-dashboard-overview/docs/openapi.json",
-  "_generatedAt": "2026-10-24T02:21:07.279Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-tipping/docs/openapi.json",
+  "_generatedAt": "2026-10-24T06:12:47.946Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -200,6 +200,7 @@
     "/me/wordlist-library/{space}/operations": ["post"],
     "/me/wordlist-library/{space}/preview": ["post"],
     "/me/wordlist-library/{space}/selection": ["post"],
+    "/me/wordlist-tip-states": ["get"],
     "/me/wordlist-tips": ["get"],
     "/me/wordlist-tips/{event_id}": ["get"],
     "/me/wordlists": ["get", "post"],
@@ -3775,6 +3776,7 @@
         "learning_insufficient_questions",
         "learning_already_answered",
         "word_list_conflict",
+        "word_list_tip_limit",
         "word_list_audio_cost_changed",
         "account_deletion_unsettled_audio",
         "word_list_entry_unavailable",

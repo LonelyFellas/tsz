@@ -169,14 +169,20 @@ export function WordListBrowser({ mine = false }: { mine?: boolean }) {
                         state={interactions.states.data?.items.find(
                           (s) => s.wordlist_id === list.id
                         )}
+                        tipState={interactions.tips.data?.items.find(
+                          (s) => s.wordlist_id === list.id
+                        )}
+                        tipFailed={interactions.tips.isError}
                         failed={
                           interactions.stats.isError ||
                           (!!interactions.userId && interactions.states.isError)
                         }
                         onRetry={() => {
                           void interactions.stats.refetch();
-                          if (interactions.userId)
+                          if (interactions.userId) {
                             void interactions.states.refetch();
+                            void interactions.tips.refetch();
+                          }
                         }}
                       />
                     )}

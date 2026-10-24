@@ -84,12 +84,17 @@ function Favorites({
                     state={interactions.states.data?.items.find(
                       (s) => s.wordlist_id === wordlist_id
                     )}
+                    tipState={interactions.tips.data?.items.find(
+                      (s) => s.wordlist_id === wordlist_id
+                    )}
+                    tipFailed={interactions.tips.isError}
                     failed={
                       interactions.stats.isError || interactions.states.isError
                     }
                     onRetry={() => {
                       void interactions.stats.refetch();
                       void interactions.states.refetch();
+                      void interactions.tips.refetch();
                     }}
                   />
                 </>

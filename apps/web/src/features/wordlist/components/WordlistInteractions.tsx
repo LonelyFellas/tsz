@@ -8,7 +8,8 @@ import { Heart, Bookmark, Coins } from "lucide-react";
 import type {
   Wordlist,
   WordlistInteractionState,
-  WordlistInteractionStats
+  WordlistInteractionStats,
+  WordlistTipState
 } from "@tsz/types";
 import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
@@ -21,6 +22,8 @@ export function WordlistInteractions(props: {
   list: Wordlist;
   stats?: WordlistInteractionStats;
   state?: WordlistInteractionState;
+  tipState?: WordlistTipState;
+  tipFailed?: boolean;
   failed: boolean;
   onRetry: () => void;
 }) {
@@ -37,6 +40,8 @@ function InteractionControls({
   list,
   stats,
   state,
+  tipState,
+  tipFailed = false,
   failed,
   onRetry,
   userId
@@ -44,6 +49,8 @@ function InteractionControls({
   list: Wordlist;
   stats?: WordlistInteractionStats;
   state?: WordlistInteractionState;
+  tipState?: WordlistTipState;
+  tipFailed?: boolean;
   failed: boolean;
   onRetry: () => void;
   userId?: string;
@@ -155,16 +162,33 @@ function InteractionControls({
             </Link>
           )
         )}
-        <button
-          type="button"
-          className={buttonClass}
-          disabled={list.owner_user_id === null || own || !stats}
-          aria-expanded={tipOpen}
-          onClick={() => setTipOpen(!tipOpen)}
-        >
-          <Coins className="size-4" aria-hidden />
-          投币 {stats?.tip_amount ?? "—"}
-        </button>
+        {userId || list.owner_user_id === null ? (
+          <button
+            type="button"
+            className={buttonClass}
+            disabled={list.owner_user_id === null || own || !stats || busy}
+            aria-haspopup="dialog"
+            aria-expanded={tipOpen}
+            aria-pressed={!!tipState && BigInt(tipState.tip_amount) > 0n}
+            aria-label={own ? "不能给自己的词表投币" : undefined}
+            onClick={() => setTipOpen(true)}
+          >
+            <Coins className="size-4" aria-hidden />
+            {tipState && BigInt(tipState.tip_amount) > 0n
+              ? "已投币"
+              : "投币"}{" "}
+            {stats?.tip_amount ?? "—"}
+          </button>
+        ) : (
+          <Link
+            className={buttonClass}
+            href={`/login?redirect=${encodeURIComponent(`/wordlists/${list.id}`)}`}
+            aria-label="登录后投币"
+          >
+            <Coins className="size-4" aria-hidden />
+            投币 {stats?.tip_amount ?? "—"}
+          </Link>
+        )}
       </div>
       {failed && (
         <p role="alert" className="mt-2 text-sm text-danger">
@@ -216,21 +240,34 @@ function InteractionControls({
           )}
         </LibraryDialog>
       )}
-      {tipOpen && <TipPanel list={list} />}
+      {tipOpen && (
+        <TipPanel
+          list={list}
+          tipped={tipState?.tip_amount}
+          failed={tipFailed}
+          onRetry={onRetry}
+          onClose={() => setTipOpen(false)}
+        />
+      )}
     </div>
   );
 }
 export function DetailInteractions({ list }: { list: Wordlist }) {
-  const { stats, states, userId } = useWordlistInteractions([list.id]);
+  const { stats, states, tips, userId } = useWordlistInteractions([list.id]);
   return (
     <WordlistInteractions
       list={list}
       stats={stats.data?.items[0]}
       state={states.data?.items[0]}
+      tipState={tips.data?.items[0]}
+      tipFailed={tips.isError}
       failed={stats.isError || (!!userId && states.isError)}
       onRetry={() => {
         void stats.refetch();
-        if (userId) void states.refetch();
+        if (userId) {
+          void states.refetch();
+          void tips.refetch();
+        }
       }}
     />
   );
