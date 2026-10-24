@@ -47,6 +47,7 @@ export const RUNTIME_SCHEMA_ROOTS = [
   "LibraryImpact",
   "WordlistTip",
   "WordlistTipPage",
+  "WordlistTipStates",
   "AdminWordlist",
   "AdminWordlistPage",
   "WordlistDeleteImpact",

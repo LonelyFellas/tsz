@@ -20,5 +20,11 @@ export function useWordlistInteractions(ids: string[]) {
     queryFn: ({ signal }) =>
       api.wordList.interactionStates(stableIds, { signal })
   });
-  return { stats, states, userId };
+  const tips = useQuery({
+    queryKey: [...wordListKeys.mine(userId), "tip-states", stableIds],
+    enabled: !!userId && stableIds.length > 0,
+    refetchOnMount: "always",
+    queryFn: ({ signal }) => api.wordList.tipStates(stableIds, { signal })
+  });
+  return { stats, states, tips, userId };
 }

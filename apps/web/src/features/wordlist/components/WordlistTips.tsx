@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Coins, Check } from "lucide-react";
+import { Button } from "@tsz/ui/components";
 import { HttpError } from "@tsz/api-client";
 import { formatCoins } from "@tsz/shared";
 import type { CreateWordlistTip, Wordlist } from "@tsz/types";
@@ -9,12 +11,8 @@ import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
 import { wordListKeys } from "../hooks/useWordLists";
 import { cn } from "@tsz/ui/lib/cn";
-import {
-  buttonClass,
-  inputClass,
-  primaryButtonClass,
-  textButtonClass
-} from "../reading";
+import { textButtonClass } from "../reading";
+import { LibraryDialog } from "./LibraryDialog";
 import {
   PageHeader,
   PageNotice,
@@ -34,7 +32,8 @@ function restore(key: string): CreateWordlistTip | null {
     !("amount" in value) ||
     typeof value.event_id !== "string" ||
     typeof value.idempotency_key !== "string" ||
-    typeof value.amount !== "string"
+    typeof value.amount !== "string" ||
+    ("like" in value && typeof value.like !== "boolean")
   )
     throw new Error("invalid saved tip");
   if (
@@ -45,29 +44,53 @@ function restore(key: string): CreateWordlistTip | null {
   return {
     event_id: value.event_id,
     idempotency_key: value.idempotency_key,
-    amount: value.amount
+    amount: value.amount,
+    ...("like" in value ? { like: value.like as boolean } : {})
   };
 }
-export function TipPanel({ list }: { list: Wordlist }) {
+export function TipPanel({
+  list,
+  tipped,
+  failed,
+  onRetry,
+  onClose
+}: {
+  list: Wordlist;
+  tipped?: string;
+  failed: boolean;
+  onRetry: () => void;
+  onClose: () => void;
+}) {
   const userId = useUserStore((s) => s.user?.id);
-  if (!userId)
-    return (
-      <Link
-        className={cn(buttonClass, "mt-6")}
-        href={`/login?redirect=${encodeURIComponent(`/wordlists/${list.id}`)}`}
-      >
-        登录后投币
-      </Link>
-    );
-  if (userId === list.owner_user_id)
-    return (
-      <button type="button" className={cn(buttonClass, "mt-6")} disabled>
-        不能给自己的词表投币
-      </button>
-    );
-  return <TipForm key={`${userId}:${list.id}`} userId={userId} list={list} />;
+  if (!userId || userId === list.owner_user_id || !list.owner_user_id)
+    return null;
+  return (
+    <TipForm
+      key={`${userId}:${list.id}`}
+      userId={userId}
+      list={list}
+      tipped={tipped}
+      failed={failed}
+      onRetry={onRetry}
+      onClose={onClose}
+    />
+  );
 }
-function TipForm({ userId, list }: { userId: string; list: Wordlist }) {
+function TipForm({
+  userId,
+  list,
+  tipped,
+  failed,
+  onRetry,
+  onClose
+}: {
+  userId: string;
+  list: Wordlist;
+  tipped?: string;
+  failed: boolean;
+  onRetry: () => void;
+  onClose: () => void;
+}) {
   const client = useQueryClient();
   const storageKey = `wordlist-tip:${userId}:${list.id}`;
   const [recovery] = useState(() => {
@@ -78,15 +101,19 @@ function TipForm({ userId, list }: { userId: string; list: Wordlist }) {
     }
   });
   const [pending, setPending] = useState(recovery.pending);
-  const [amount, setAmount] = useState(recovery.pending?.amount ?? "");
-  const [confirming, setConfirming] = useState(!!recovery.pending);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [like, setLike] = useState(recovery.pending?.like ?? !recovery.pending);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(
     recovery.error ? "无法读取本机的投币重试记录，请先到投币记录核对结果。" : ""
   );
-  const [success, setSuccess] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
   const mounted = useRef(false);
   const activeRequest = useRef<AbortController | null>(null);
+  const remaining =
+    tipped === undefined ? null : BigInt(tipped) >= 2n ? 0 : 2 - Number(tipped);
+  const amount =
+    pending?.amount ?? success ?? (remaining === 1 ? "1" : (selected ?? "2"));
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -94,21 +121,14 @@ function TipForm({ userId, list }: { userId: string; list: Wordlist }) {
       activeRequest.current?.abort();
     };
   }, []);
-  function confirm() {
-    if (
-      !/^[1-9][0-9]{0,18}$/.test(amount) ||
-      BigInt(amount) > 9223372036854775807n
-    ) {
-      setMessage("请输入有效的正整数数量");
-      return;
-    }
-    setMessage("");
-    setConfirming(true);
-  }
   async function send() {
     if (
       activeRequest.current ||
       !mounted.current ||
+      recovery.error ||
+      success ||
+      (!pending &&
+        (failed || remaining === null || Number(amount) > remaining)) ||
       useUserStore.getState().user?.id !== userId
     )
       return;
@@ -121,8 +141,10 @@ function TipForm({ userId, list }: { userId: string; list: Wordlist }) {
     const input = pending ?? {
       event_id: crypto.randomUUID(),
       idempotency_key: crypto.randomUUID(),
-      amount
+      amount,
+      like
     };
+    let posting = false;
     setBusy(true);
     setMessage("");
     try {
@@ -143,11 +165,15 @@ function TipForm({ userId, list }: { userId: string; list: Wordlist }) {
         }
       }
       if (!current()) return;
-      receipt ??= await api.wordList.tip(list.id, input, {
-        signal: controller.signal
-      });
+      if (!receipt) {
+        posting = true;
+        receipt = await api.wordList.tip(list.id, input, {
+          signal: controller.signal
+        });
+      }
       if (!current()) return;
       if (
+        receipt.event_id !== input.event_id ||
         receipt.wordlist_id !== list.id ||
         receipt.payer_user_id !== userId ||
         receipt.amount !== input.amount
@@ -155,35 +181,41 @@ function TipForm({ userId, list }: { userId: string; list: Wordlist }) {
         throw new Error("receipt mismatch");
       sessionStorage.removeItem(storageKey);
       setPending(null);
-      setConfirming(false);
-      setAmount("");
-      setSuccess(true);
+      setSuccess(receipt.amount);
       setMessage(`已投出 ${formatCoins(receipt.amount)}，作者已收到。`);
-      await client.invalidateQueries({ queryKey: wordListKeys.all });
-      await client.invalidateQueries({ queryKey: ["coins"] });
-      if (!current()) return;
-      await client.invalidateQueries({
-        queryKey: [...wordListKeys.mine(userId), "tips"]
-      });
+      void client
+        .invalidateQueries({ queryKey: wordListKeys.all })
+        .catch(() => {});
+      void client.invalidateQueries({ queryKey: ["coins"] }).catch(() => {});
     } catch (error) {
       if (!current()) return;
-      if (error instanceof HttpError && error.status < 500 && !pending) {
+      if (
+        posting &&
+        error instanceof HttpError &&
+        error.status < 500 &&
+        error.status !== 408 &&
+        (!pending || error.code === "coin_invalid_amount") &&
+        error.code !== "coin_idempotency_conflict" &&
+        error.code !== "coin_source_conflict"
+      ) {
         sessionStorage.removeItem(storageKey);
         setPending(null);
-        setConfirming(false);
         const messages: Record<string, string> = {
           coin_insufficient_balance: "余额不足，请查看钱包。",
           coin_wallet_unavailable: "你或作者的账户当前暂停收支。",
+          coin_account_unavailable: "你或作者的账户当前不可用。",
+          coin_invalid_amount: "每次可投 1 枚或 2 枚，请重新选择。",
+          word_list_tip_limit: "这份词表累计最多投 2 枚，请刷新投币状态。",
           word_list_conflict: "词条曾不可用，作者修复并重新审核后才能投币。",
+          word_list_entry_unavailable: "词表含不可用词条，暂不能投币。",
           validation_failed: "词表含不可用词条，暂不能投币。",
           not_found: "词表已下架或不可访问。",
-          forbidden: "不能给自己的词表投币。",
-          coin_idempotency_conflict: "请求信息不一致，请到投币记录核对。",
-          coin_source_conflict: "这次投币已处理，请到投币记录核对。"
+          forbidden: "不能给自己的词表投币。"
         };
         setMessage(
           messages[error.code ?? ""] ?? "投币被拒绝，请刷新词表并检查账户状态。"
         );
+        onRetry();
       } else
         setMessage(
           "结果尚未确认，请使用原请求重试，或先查看投币记录；不要重复发起新投币。"
@@ -194,87 +226,151 @@ function TipForm({ userId, list }: { userId: string; list: Wordlist }) {
     }
   }
   return (
-    <section
-      aria-label="词表投币"
-      className="mt-6 w-full rounded-2xl border border-border/60 bg-muted/70 p-5"
-    >
-      <h2 className="text-sm font-medium">给作者投币</h2>
-      <p className="mt-1 text-xs leading-5 text-foreground-muted">
-        投币将全额进入作者钱包。词条不可用或任一方暂停收支时无法投币。
+    <LibraryDialog title="给作者投币" busy={busy} onClose={onClose}>
+      <p className="break-words text-center text-sm leading-6 text-foreground-muted">
+        给 {list.owner_name} 投出{" "}
+        <strong className="text-2xl font-semibold tabular-nums text-primary">
+          {amount}
+        </strong>{" "}
+        枚天生币
       </p>
-      {confirming ? (
+      <p className="mt-2 text-center text-xs leading-5 text-foreground-muted">
+        每份词表累计最多投 2 枚，全额进入作者钱包。
+      </p>
+      {!success && (
         <>
-          <p className="mt-4 text-sm leading-6">
-            向作者 <strong>{list.owner_name}</strong> 投出{" "}
-            <strong>{formatCoins(amount)}</strong>
-          </p>
-          <p className="mt-1 break-all text-xs text-foreground-subtle">
-            作者 ID：{list.owner_user_id}
-          </p>
-          <div className="mt-4 flex flex-wrap gap-3">
-            <button
-              type="button"
-              className={cn(primaryButtonClass, "min-h-10 px-5")}
-              disabled={busy || recovery.error}
-              onClick={() => void send()}
-            >
-              {busy ? "正在确认…" : pending ? "重试这次投币" : "确认投出"}
-            </button>
-            {!pending && (
-              <button
-                type="button"
-                className={buttonClass}
-                disabled={busy}
-                onClick={() => setConfirming(false)}
-              >
-                取消
-              </button>
-            )}
-          </div>
-        </>
-      ) : (
-        <div className="mt-4 flex flex-wrap gap-3">
-          <input
-            aria-label="投币数量"
-            inputMode="numeric"
-            maxLength={19}
-            className={cn(inputClass, "min-h-10 flex-1 sm:max-w-56")}
-            placeholder="输入正整数数量"
-            value={amount}
-            disabled={recovery.error}
-            onChange={(e) => {
-              setAmount(e.target.value);
-              setSuccess(false);
-            }}
-          />
-          <button
-            type="button"
-            className={buttonClass}
-            disabled={recovery.error}
-            onClick={confirm}
+          <fieldset
+            className="mt-6 grid grid-cols-2 gap-4"
+            disabled={
+              busy ||
+              !!pending ||
+              recovery.error ||
+              failed ||
+              remaining === null
+            }
           >
-            投币
-          </button>
-        </div>
+            <legend className="sr-only">投币数量</legend>
+            {[1, 2].map((value) => (
+              <label
+                key={value}
+                className={cn(
+                  "relative flex min-h-40 flex-col items-center justify-center gap-4 rounded-2xl border border-border bg-muted/40 p-4 transition-colors has-checked:border-primary has-checked:bg-primary-muted has-checked:text-primary has-focus-visible:outline-2 has-focus-visible:outline-offset-4 has-focus-visible:outline-primary",
+                  remaining !== null && value > remaining
+                    ? "cursor-not-allowed opacity-40"
+                    : "cursor-pointer hover:border-primary/50"
+                )}
+              >
+                <input
+                  className="sr-only"
+                  type="radio"
+                  name="tip-amount"
+                  value={value}
+                  checked={amount === String(value)}
+                  disabled={remaining !== null && value > remaining}
+                  onChange={() => setSelected(String(value))}
+                  aria-label={`${value} 枚天生币`}
+                />
+                <span className="flex gap-1" aria-hidden>
+                  {Array.from({ length: value }, (_, i) => (
+                    <Coins key={i} className="size-9" strokeWidth={1.5} />
+                  ))}
+                </span>
+                <span className="text-sm font-medium">{value} 枚天生币</span>
+                {amount === String(value) && (
+                  <Check
+                    className="absolute right-3 top-3 size-4"
+                    aria-hidden
+                  />
+                )}
+              </label>
+            ))}
+          </fieldset>
+          <label className="mt-5 flex min-h-10 items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="size-4 accent-primary"
+              checked={like}
+              disabled={busy || !!pending || recovery.error}
+              onChange={(e) => setLike(e.target.checked)}
+            />
+            同时点赞内容
+          </label>
+          {pending && (
+            <p className="mt-2 text-sm leading-6 text-foreground-muted">
+              有一笔 {pending.amount} 枚天生币的投币待确认，将先核对这次结果。
+            </p>
+          )}
+          {!pending && !failed && remaining !== null && remaining < 2 && (
+            <p className="mt-2 text-sm text-foreground-muted">
+              {remaining === 0
+                ? "这份词表已投满 2 枚。"
+                : "已投 1 枚，还可投 1 枚。"}
+            </p>
+          )}
+          {!pending && (failed || remaining === null) && (
+            <p
+              role={failed ? "alert" : "status"}
+              className="mt-2 text-sm text-foreground-muted"
+            >
+              {failed ? "投币状态加载失败。" : "正在读取投币状态…"}
+              {failed && (
+                <button
+                  type="button"
+                  className={textButtonClass}
+                  onClick={onRetry}
+                >
+                  重试
+                </button>
+              )}
+            </p>
+          )}
+        </>
       )}
       {message && (
         <p
           role={success ? "status" : "alert"}
           className={cn(
-            "mt-3 text-sm leading-6",
+            "mt-4 text-sm leading-6",
             success ? "text-success" : "text-danger"
           )}
         >
           {message}
         </p>
       )}
-      <Link
-        className="mt-4 inline-block text-sm text-primary underline-offset-4 hover:underline"
-        href="/account/wordlist-tips"
-      >
-        查看我的投币记录 →
-      </Link>
-    </section>
+      <div className="mt-6 flex justify-center">
+        <Button
+          type="button"
+          className="min-w-36"
+          disabled={
+            busy ||
+            recovery.error ||
+            (!success &&
+              !pending &&
+              (failed || remaining === null || remaining === 0))
+          }
+          onClick={success ? onClose : () => void send()}
+        >
+          {busy
+            ? "正在确认…"
+            : success
+              ? "完成"
+              : pending
+                ? "重试这次投币"
+                : "确认投出"}
+        </Button>
+      </div>
+      <div className="mt-4 flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm">
+        <Link className="text-primary hover:underline" href="/account/coins">
+          查看钱包
+        </Link>
+        <Link
+          className="text-primary hover:underline"
+          href="/account/wordlist-tips"
+        >
+          查看我的投币记录 →
+        </Link>
+      </div>
+    </LibraryDialog>
   );
 }
 export function WordlistTips() {

@@ -12,6 +12,7 @@ vi.mock("@/lib/request", () => ({
       favorites: vi.fn(),
       interactionStats: vi.fn(),
       interactionStates: vi.fn(),
+      tipStates: vi.fn(),
       setInteraction: vi.fn(),
       tip: vi.fn(),
       tipReceipt: vi.fn()
@@ -42,6 +43,15 @@ function user(id: string) {
 }
 beforeEach(() => {
   vi.resetAllMocks();
+  HTMLDialogElement.prototype.showModal = function () {
+    this.setAttribute("open", "");
+  };
+  HTMLDialogElement.prototype.close = function () {
+    this.removeAttribute("open");
+  };
+  vi.mocked(api.wordList.tipStates).mockResolvedValue({
+    items: [{ wordlist_id: "list", tip_amount: "0" }]
+  });
   sessionStorage.clear();
   useUserStore.setState({ user: user("reader") });
   vi.mocked(api.wordList.list).mockResolvedValue({ items: [list], pagination });
@@ -77,12 +87,74 @@ it("batches card statistics, separates navigation, and confirms before charging"
     "/wordlists/list"
   );
   fireEvent.click(screen.getByRole("button", { name: "投币 17" }));
-  fireEvent.change(screen.getByLabelText("投币数量"), {
-    target: { value: "7" }
-  });
-  fireEvent.click(screen.getByRole("button", { name: "投币" }));
+  expect(
+    screen.getByRole("dialog", { name: "给作者投币" })
+  ).toBeInTheDocument();
+  expect(screen.getByRole("radio", { name: "2 枚天生币" })).toBeChecked();
   expect(api.wordList.tip).not.toHaveBeenCalled();
   expect(screen.getByRole("button", { name: "确认投出" })).toBeInTheDocument();
+});
+it("refreshes total, personal state and likes together after a confirmed tip", async () => {
+  vi.mocked(api.wordList.tip).mockImplementation(async (_id, input) => {
+    vi.mocked(api.wordList.tipStates).mockResolvedValue({
+      items: [{ wordlist_id: "list", tip_amount: "2" }]
+    });
+    vi.mocked(api.wordList.interactionStats).mockResolvedValue({
+      items: [
+        {
+          wordlist_id: "list",
+          like_count: 3,
+          favorite_count: 3,
+          tip_amount: "19"
+        }
+      ]
+    });
+    vi.mocked(api.wordList.interactionStates).mockResolvedValue({
+      items: [{ wordlist_id: "list", liked: true, favorited: false }]
+    });
+    return {
+      event_id: input.event_id,
+      wordlist_id: "list",
+      payer_user_id: "reader",
+      author_user_id: "author",
+      amount: "2",
+      operation_id: "op",
+      created_at: ""
+    };
+  });
+  renderWithProviders(<DetailInteractions list={list} />);
+  fireEvent.click(await screen.findByRole("button", { name: "投币 17" }));
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "确认投出" })).toBeEnabled()
+  );
+  fireEvent.click(screen.getByRole("button", { name: "确认投出" }));
+  await screen.findByText(/作者已收到/);
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "完成" })).toBeEnabled()
+  );
+  fireEvent.click(screen.getByRole("button", { name: "完成" }));
+  expect(screen.getByRole("button", { name: "已投币 19" })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  );
+  expect(screen.getByRole("button", { name: "取消点赞" })).toHaveTextContent(
+    "3"
+  );
+  fireEvent.click(screen.getByRole("button", { name: "已投币 19" }));
+  expect(screen.getByRole("button", { name: "确认投出" })).toBeDisabled();
+});
+it("keeps self-tipping disabled and closing a dialog never charges", async () => {
+  const view = renderWithProviders(<DetailInteractions list={list} />);
+  fireEvent.click(await screen.findByRole("button", { name: "投币 17" }));
+  fireEvent.click(screen.getByRole("button", { name: "关闭" }));
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(api.wordList.tip).not.toHaveBeenCalled();
+  view.unmount();
+  useUserStore.setState({ user: user("author") });
+  renderWithProviders(<DetailInteractions list={list} />);
+  expect(
+    screen.getByRole("button", { name: "不能给自己的词表投币" })
+  ).toBeDisabled();
 });
 it("failed writes never show success and account switches cannot reuse private state", async () => {
   vi.mocked(api.wordList.setInteraction).mockRejectedValue(
@@ -110,10 +182,11 @@ it("guests see statistics and login links without private requests or automatic 
   expect(
     await screen.findByRole("link", { name: "登录后点赞" })
   ).toHaveAttribute("href", "/login?redirect=%2Fwordlists%2Flist");
-  await screen.findByRole("button", { name: "投币 17" });
+  expect(
+    await screen.findByRole("link", { name: "登录后投币" })
+  ).toHaveAttribute("href", "/login?redirect=%2Fwordlists%2Flist");
   expect(api.wordList.interactionStates).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", { name: "投币 17" }));
-  expect(screen.getByRole("link", { name: "登录后投币" })).toBeInTheDocument();
+  expect(api.wordList.tipStates).not.toHaveBeenCalled();
   expect(api.wordList.tip).not.toHaveBeenCalled();
 });
 it("removes unavailable references and sends search and pagination to favorites", async () => {

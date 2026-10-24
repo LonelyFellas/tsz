@@ -7,6 +7,7 @@ vi.mock("@/lib/request", () => ({
     wordList: {
       interactionStats: vi.fn().mockResolvedValue({ items: [] }),
       interactionStates: vi.fn().mockResolvedValue({ items: [] }),
+      tipStates: vi.fn().mockResolvedValue({ items: [] }),
       recommended: vi.fn(),
       list: vi.fn().mockRejectedValue(new Error("offline"))
     }

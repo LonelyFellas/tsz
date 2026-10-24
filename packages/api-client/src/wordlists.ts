@@ -10,7 +10,8 @@ import type {
   SetWordlistInteraction,
   CreateWordlistTip,
   WordlistTip,
-  WordlistTipPage
+  WordlistTipPage,
+  WordlistTipStates
 } from "@tsz/types";
 import { checkInteger } from "./coins";
 import type {
@@ -137,6 +138,15 @@ export function createWordlistEndpoints(http: HttpClient) {
         .post<unknown>(`/me/wordlists/${id}/publish`, data)
         .then((v) =>
           decodeWordlistResponse<WordlistReview>("WordlistReview", v)
+        ),
+    tipStates: (ids: string[], o?: Options) =>
+      http
+        .get<unknown>(
+          `/me/wordlist-tip-states?ids=${encodeURIComponent(ids.join(","))}`,
+          o
+        )
+        .then((v) =>
+          decodeWordlistResponse<WordlistTipStates>("WordlistTipStates", v)
         ),
     tipReceipt: (eventId: string, o?: Options) =>
       http.get<unknown>(`/me/wordlist-tips/${eventId}`, o).then((v) => {
