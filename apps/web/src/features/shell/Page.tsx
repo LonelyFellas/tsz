@@ -131,7 +131,7 @@ export function Segmented<T extends string | boolean>({
     <div
       role="group"
       aria-label={label}
-      className="inline-flex gap-1 rounded-full border border-border/60 bg-muted p-1"
+      className="inline-grid auto-cols-fr grid-flow-col gap-1 rounded-full border border-border/60 bg-muted p-1"
     >
       {options.map((option) => (
         <button
@@ -140,7 +140,7 @@ export function Segmented<T extends string | boolean>({
           disabled={disabled}
           aria-pressed={option.value === value}
           onClick={() => onChange(option.value)}
-          className="inline-flex min-h-9 items-center rounded-full px-4 text-[13px] font-medium tracking-wide text-foreground-muted transition-[color,background-color,box-shadow] duration-200 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50 aria-pressed:bg-surface aria-pressed:text-foreground aria-pressed:shadow-[0_2px_8px_rgb(0_0_0/0.06)]"
+          className="inline-flex min-h-11 items-center justify-center rounded-full px-4 text-[13px] font-medium tracking-wide text-foreground-muted transition-[color,background-color,box-shadow] duration-200 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50 sm:min-h-9 aria-pressed:bg-surface aria-pressed:text-foreground aria-pressed:shadow-[0_2px_8px_rgb(0_0_0/0.06)]"
         >
           {option.label}
         </button>

@@ -43,10 +43,7 @@ export function LearningPreferences({ userId }: { userId: string }) {
   return (
     <div className="space-y-6">
       <ThemeModeControl />
-      <div className="border-t border-border/70 pt-5">
-        <p className="mb-3 text-xs font-medium tracking-[0.2em] text-foreground-muted">
-          学习偏好
-        </p>
+      <div>
         {profile.isPending ? (
           <p role="status">正在读取学习偏好…</p>
         ) : profile.isError ? (
@@ -83,11 +80,8 @@ export function LearningPreferences({ userId }: { userId: string }) {
                 });
             }}
           >
-            <fieldset disabled={save.isPending} className="space-y-3">
-              <legend className="text-sm font-medium">英美偏好</legend>
-              <p className="text-sm text-foreground-muted">
-                当前难度：{settings.cefr_level}（首次确认后固定）
-              </p>
+            <fieldset disabled={save.isPending} className="space-y-2">
+              <legend className="ml-4 text-sm font-medium">英美偏好</legend>
               <div className="grid grid-cols-2 gap-1 rounded-full border border-border/60 bg-muted p-1">
                 {(
                   [
@@ -97,7 +91,7 @@ export function LearningPreferences({ userId }: { userId: string }) {
                 ).map(([value, label]) => (
                   <label
                     key={value}
-                    className="relative flex min-h-10 cursor-pointer items-center justify-center rounded-full text-[13px] font-medium text-foreground-muted transition-[color,background-color,box-shadow] duration-200 hover:text-foreground has-checked:bg-surface has-checked:text-foreground has-checked:shadow-[0_2px_8px_rgb(0_0_0/0.06)] has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-primary"
+                    className="relative flex min-h-11 cursor-pointer items-center justify-center rounded-full text-[13px] font-medium text-foreground-muted transition-[color,background-color,box-shadow] duration-200 hover:text-foreground sm:min-h-9 has-checked:bg-surface has-checked:text-foreground has-checked:shadow-[0_2px_8px_rgb(0_0_0/0.06)] has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-primary"
                   >
                     <input
                       type="radio"
@@ -115,9 +109,14 @@ export function LearningPreferences({ userId }: { userId: string }) {
                 ))}
               </div>
             </fieldset>
-            <p className="text-xs leading-5 text-foreground-muted">
-              已开始的练习保留本轮设置，新偏好用于之后开始的轮次。
-            </p>
+            <div className="pl-4 text-xs text-foreground-muted">
+              <p>
+                当前难度：
+                <span className="font-medium text-foreground">
+                  {settings.cefr_level}
+                </span>
+              </p>
+            </div>
             {save.isError && (
               <p role="alert" className="text-sm text-danger">
                 {save.error instanceof HttpError &&
@@ -131,13 +130,21 @@ export function LearningPreferences({ userId }: { userId: string }) {
                 英美偏好已保存
               </p>
             )}
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={save.isPending || variant === settings.english_variant}
-            >
-              {save.isPending ? "保存中…" : "保存偏好"}
-            </Button>
+            <div className="flex justify-end">
+              <Button
+                type="submit"
+                variant={
+                  variant === settings.english_variant ? "outline" : "default"
+                }
+                size="sm"
+                className="min-h-11 sm:min-h-10"
+                disabled={
+                  save.isPending || variant === settings.english_variant
+                }
+              >
+                {save.isPending ? "保存中…" : "保存学习偏好"}
+              </Button>
+            </div>
           </form>
         )}
       </div>

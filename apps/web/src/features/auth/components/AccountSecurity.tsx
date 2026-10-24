@@ -536,7 +536,9 @@ function SecurityPasswordField({
   onChange,
   autoComplete,
   placeholder,
-  disabled
+  disabled,
+  invalid = false,
+  describedBy
 }: {
   id: string;
   label: string;
@@ -545,6 +547,8 @@ function SecurityPasswordField({
   autoComplete: "current-password" | "new-password";
   placeholder: string;
   disabled: boolean;
+  invalid?: boolean;
+  describedBy?: string;
 }) {
   const [visible, setVisible] = useState(false);
 
@@ -561,6 +565,8 @@ function SecurityPasswordField({
           autoComplete={autoComplete}
           placeholder={placeholder}
           value={value}
+          aria-invalid={invalid}
+          aria-describedby={describedBy}
           onChange={(event) => onChange(event.target.value)}
         />
         <button
@@ -584,6 +590,10 @@ function ChangePasswordForm({ onCancel }: { onCancel: () => void }) {
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
   const [error, setError] = useState("");
+  const newPasswordError = newPassword
+    ? passwordLengthError(newPassword)
+    : null;
+  const confirmationError = !!confirmation && confirmation !== newPassword;
   const valid =
     currentPassword.length > 0 &&
     isRegisterPassword(newPassword) &&
@@ -640,18 +650,17 @@ function ChangePasswordForm({ onCancel }: { onCancel: () => void }) {
             autoComplete="new-password"
             placeholder="请输入新密码"
             disabled={busy}
+            invalid={!!newPasswordError}
+            describedBy="security-new-password-message"
           />
           <p
+            id="security-new-password-message"
             className={cn(
               "mt-3 ml-4 text-xs",
-              newPassword && !isRegisterPassword(newPassword)
-                ? "text-danger"
-                : "text-foreground-muted"
+              newPasswordError ? "text-danger" : "text-foreground-muted"
             )}
           >
-            {newPassword
-              ? (passwordLengthError(newPassword) ?? PASSWORD_HINT)
-              : PASSWORD_HINT}
+            {newPasswordError ?? PASSWORD_HINT}
           </p>
         </div>
         <div>
@@ -663,9 +672,18 @@ function ChangePasswordForm({ onCancel }: { onCancel: () => void }) {
             autoComplete="new-password"
             placeholder="请再次输入新密码"
             disabled={busy}
+            invalid={confirmationError}
+            describedBy={
+              confirmationError
+                ? "security-confirm-password-message"
+                : undefined
+            }
           />
-          {confirmation && confirmation !== newPassword && (
-            <p className="mt-3 ml-4 text-xs text-danger">
+          {confirmationError && (
+            <p
+              id="security-confirm-password-message"
+              className="mt-3 ml-4 text-xs text-danger"
+            >
               两次输入的密码不一致
             </p>
           )}

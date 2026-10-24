@@ -66,7 +66,7 @@ function Wallet({ id }: { id: string }) {
         eyebrow="我的账户"
         title="我的天生币"
         actions={
-          <Button variant="outline" onClick={refresh}>
+          <Button variant="ghost" size="compact" onClick={refresh}>
             <RefreshCw className="size-4" strokeWidth={1.8} aria-hidden />
             刷新
           </Button>
@@ -77,36 +77,44 @@ function Wallet({ id }: { id: string }) {
           <p className="text-xs font-medium tracking-[0.2em] text-foreground-muted">
             当前余额 · 学生与教师身份共用
           </p>
-          {wallet.isError ? (
-            <p role="alert" className="mt-4 text-sm text-danger">
-              余额加载失败，请重试。当前余额未知。
-            </p>
-          ) : wallet.isPending || wallet.isFetching ? (
-            <p className="mt-4 text-sm text-foreground-muted">正在读取余额…</p>
-          ) : (
-            <p className="mt-4 break-all text-4xl font-bold tabular-nums tracking-tight text-foreground sm:text-5xl">
-              {formatCoins(wallet.data.balance)}
-            </p>
+          <div className="mt-4 min-h-10 sm:min-h-12">
+            {wallet.isError ? (
+              <p role="alert" className="text-sm text-danger">
+                余额加载失败，请重试。当前余额未知。
+              </p>
+            ) : wallet.isPending ? (
+              <p role="status" className="text-sm text-foreground-muted">
+                正在读取余额…
+              </p>
+            ) : (
+              <p className="break-all text-4xl font-bold tabular-nums tracking-tight text-foreground sm:text-5xl">
+                {formatCoins(wallet.data.balance)}
+              </p>
+            )}
+          </div>
+          <p
+            role="status"
+            className="h-5 text-xs leading-5 text-foreground-muted"
+          >
+            {wallet.isFetching && wallet.data && !wallet.isError
+              ? "正在更新余额…"
+              : null}
+          </p>
+          <div className="mt-1 h-1 w-10 rounded-full bg-primary" aria-hidden />
+          {!wallet.isError && wallet.data?.status === "deletion_pending" && (
+            <div
+              role="status"
+              className="mt-5 rounded-2xl bg-muted p-4 text-sm"
+            >
+              账号正在等待注销，钱包已暂停全部入账和支出。撤销后可恢复原余额。
+              <Link className="ml-2 text-primary" href="/account/delete">
+                查看注销申请
+              </Link>
+            </div>
           )}
-          <div className="mt-6 h-1 w-10 rounded-full bg-primary" aria-hidden />
-          {!wallet.isError &&
-            !wallet.isFetching &&
-            wallet.data?.status === "deletion_pending" && (
-              <div
-                role="status"
-                className="mt-5 rounded-2xl bg-muted p-4 text-sm"
-              >
-                账号正在等待注销，钱包已暂停全部入账和支出。撤销后可恢复原余额。
-                <Link className="ml-2 text-primary" href="/account/delete">
-                  查看注销申请
-                </Link>
-              </div>
-            )}
-          {!wallet.isError &&
-            !wallet.isFetching &&
-            wallet.data?.status === "closed" && (
-              <p className="mt-4 text-sm text-foreground-muted">钱包已关闭。</p>
-            )}
+          {!wallet.isError && wallet.data?.status === "closed" && (
+            <p className="mt-4 text-sm text-foreground-muted">钱包已关闭。</p>
+          )}
         </div>
       </section>
       <section className={`${panelClass} mt-6`}>

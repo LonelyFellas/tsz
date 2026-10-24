@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import { Plus, Search } from "lucide-react";
+import { Plus } from "lucide-react";
+import { SearchField } from "@/features/shell/SearchField";
 import { useWordlistInteractions } from "../hooks/useWordlistInteractions";
 import { WordlistInteractions } from "./WordlistInteractions";
 import { WordlistFavorites } from "./WordlistFavorites";
@@ -82,23 +83,16 @@ export function WordListBrowser({ mine = false }: { mine?: boolean }) {
             }}
           />
         )}
-        <label className="glass relative flex min-h-11 flex-1 items-center rounded-full pl-11 pr-5 transition-shadow focus-within:ring-4 focus-within:ring-primary/15">
-          <Search
-            className="absolute left-4 size-4 text-foreground-subtle"
-            strokeWidth={1.8}
-            aria-hidden
-          />
-          <input
-            className="w-full bg-transparent py-2.5 text-sm text-foreground outline-hidden placeholder:text-foreground-subtle"
-            aria-label="搜索词表"
-            placeholder="搜索词表名称"
-            value={q}
-            onChange={(e) => {
-              setQ(e.target.value);
-              setPage(1);
-            }}
-          />
-        </label>
+        <SearchField
+          className="flex-1"
+          aria-label="搜索词表"
+          placeholder="搜索词表名称"
+          value={q}
+          onValueChange={(value) => {
+            setQ(value);
+            setPage(1);
+          }}
+        />
       </div>
       {favorites ? (
         <WordlistFavorites page={page} q={q} onPageChange={setPage} />

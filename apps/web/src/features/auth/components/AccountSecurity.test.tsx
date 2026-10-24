@@ -458,6 +458,83 @@ describe("AccountSecurity", () => {
     expect(confirm).toHaveAttribute("type", "text");
   });
 
+  it("新密码长度错误与输入状态关联，修正后恢复普通提示", async () => {
+    await open("修改密码");
+    const password = screen.getByLabelText("新密码");
+    expect(password).not.toHaveAttribute("aria-invalid", "true");
+    expect(password).toHaveAccessibleDescription(
+      "15–128 个字符，区分大小写，支持符号和空格"
+    );
+    fill("新密码", "short");
+    expect(password).toHaveAttribute("aria-invalid", "true");
+    expect(password).toHaveAccessibleDescription("密码至少需要 15 个字符");
+    expect(screen.getByRole("button", { name: "确认修改密码" })).toBeDisabled();
+    fill("新密码", "New!密码🙂 river cloud");
+    expect(password).toHaveAttribute("aria-invalid", "false");
+    expect(password).toHaveAccessibleDescription(
+      "15–128 个字符，区分大小写，支持符号和空格"
+    );
+    expect(
+      screen.queryByText("密码至少需要 15 个字符")
+    ).not.toBeInTheDocument();
+    expect(auth.changePassword).not.toHaveBeenCalled();
+  });
+
+  it("确认密码不一致时关联错误，修改任一密码匹配后清除", async () => {
+    await open("修改密码");
+    fill("当前密码", "Current password 12345");
+    fill("新密码", "New!密码🙂 river cloud");
+    const confirmation = screen.getByLabelText("确认新密码");
+    expect(confirmation).not.toHaveAttribute("aria-invalid", "true");
+    expect(confirmation).not.toHaveAttribute("aria-describedby");
+    fill("确认新密码", "Other password 12345");
+    expect(confirmation).toHaveAttribute("aria-invalid", "true");
+    expect(confirmation).toHaveAccessibleDescription("两次输入的密码不一致");
+    fill("确认新密码", "New!密码🙂 river cloud");
+    expect(confirmation).toHaveAttribute("aria-invalid", "false");
+    expect(confirmation).not.toHaveAttribute("aria-describedby");
+    expect(screen.queryByText("两次输入的密码不一致")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "确认修改密码" })).toBeEnabled();
+    fill("新密码", "Other password 12345");
+    expect(confirmation).toHaveAttribute("aria-invalid", "true");
+    expect(confirmation).toHaveAccessibleDescription("两次输入的密码不一致");
+    fill("新密码", "New!密码🙂 river cloud");
+    expect(confirmation).toHaveAttribute("aria-invalid", "false");
+    expect(confirmation).not.toHaveAttribute("aria-describedby");
+    expect(screen.queryByText("两次输入的密码不一致")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "确认修改密码" })).toBeEnabled();
+  });
+
+  it("修改密码在途锁定字段和显隐按钮，防止重复提交并在完成后整页跳转", async () => {
+    let resolve!: () => void;
+    auth.changePassword.mockReturnValueOnce(
+      new Promise<void>((r) => {
+        resolve = r;
+      })
+    );
+    await open("修改密码");
+    fill("当前密码", "Current password 12345");
+    fill("新密码", "New!密码🙂 river cloud");
+    fill("确认新密码", "New!密码🙂 river cloud");
+    const submit = screen.getByRole("button", { name: "确认修改密码" });
+    fireEvent.click(submit);
+    fireEvent.submit(submit.closest("form")!);
+    expect(auth.changePassword).toHaveBeenCalledOnce();
+    for (const label of ["当前密码", "新密码", "确认新密码"]) {
+      expect(screen.getByLabelText(label)).toBeDisabled();
+      expect(
+        screen.getByRole("button", { name: `显示${label}` })
+      ).toBeDisabled();
+    }
+    expect(screen.getByRole("button", { name: "取消" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "← 返回账号安全" })
+    ).toBeDisabled();
+    await act(async () => resolve());
+    expect(clearSession).toHaveBeenCalledOnce();
+    expect(replace).toHaveBeenCalledWith("/login?security=success");
+  });
+
   it("新密码需确认一致，当前密码原串提交，成功退出", async () => {
     await open("修改密码");
     fill("当前密码", "RawCase!234");

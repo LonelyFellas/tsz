@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { renderWithProviders } from "@/test/render";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import type { User } from "@tsz/types";
@@ -11,7 +12,10 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/lib/request", () => ({
   setAccessToken: vi.fn(),
-  api: { auth: { logout: vi.fn() } }
+  api: {
+    auth: { logout: vi.fn() },
+    coins: { wallet: vi.fn().mockResolvedValue({ balance: "5" }) }
+  }
 }));
 
 const USER: User = {
@@ -61,6 +65,30 @@ describe("HomeNav", () => {
     expect(
       screen.queryByRole("dialog", { name: "偏好设置" })
     ).not.toBeInTheDocument();
+  });
+
+  it("首页设置与账户互斥，设置打开时不响应头像悬停", async () => {
+    useUserStore.setState({ hydrated: true, user: USER });
+    const actions = userEvent.setup();
+    renderWithProviders(<HomeNav />);
+    await actions.click(screen.getByRole("button", { name: "偏好设置" }));
+    const event = new MouseEvent("pointerover", { bubbles: true });
+    Object.defineProperty(event, "pointerType", { value: "mouse" });
+    fireEvent(screen.getByRole("button", { name: "账户菜单" }), event);
+    await new Promise((resolve) => setTimeout(resolve, 180));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    await actions.click(screen.getByRole("button", { name: "账户菜单" }));
+    await screen.findByRole("menu");
+    expect(
+      screen.queryByRole("dialog", { name: "偏好设置" })
+    ).not.toBeInTheDocument();
+    await actions.click(screen.getByRole("button", { name: "偏好设置" }));
+    expect(
+      screen.getByRole("dialog", { name: "偏好设置" })
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument()
+    );
   });
 
   it("已登录 → 显示账户菜单头像,不再平铺登录", () => {

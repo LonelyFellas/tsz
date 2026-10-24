@@ -18,6 +18,9 @@ import { useWordlistInteractions } from "../hooks/useWordlistInteractions";
 import { buttonClass } from "../reading";
 import { TipPanel } from "./WordlistTips";
 
+const interactionClass =
+  "relative inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-sm px-1 text-sm tabular-nums text-foreground-muted transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-9 aria-pressed:text-primary after:pointer-events-none after:absolute after:left-1/2 after:top-full after:z-30 after:mt-1 after:-translate-x-1/2 after:whitespace-nowrap after:rounded-md after:bg-foreground after:px-2 after:py-1 after:text-xs after:font-normal after:text-background after:opacity-0 after:content-[attr(data-tooltip)] hover:after:opacity-100 focus:after:opacity-100";
+
 export function WordlistInteractions(props: {
   list: Wordlist;
   stats?: WordlistInteractionStats;
@@ -126,13 +129,20 @@ function InteractionControls({
   ];
   return (
     <div className="mt-5">
-      <div className="flex flex-wrap gap-2" aria-label="词表互动">
+      <div
+        className="flex flex-wrap items-center gap-x-6 gap-y-1"
+        aria-label="词表互动"
+        aria-busy={busy}
+      >
         {controls.map(({ kind, label, activeLabel, active, count, Icon }) =>
           userId ? (
             <button
               key={kind}
               type="button"
-              className={buttonClass}
+              className={interactionClass}
+              data-tooltip={
+                own ? `不能给自己的词表${label}` : active ? activeLabel : label
+              }
               disabled={busy || own || !stats || !state || failed}
               aria-pressed={active ?? false}
               aria-label={
@@ -145,48 +155,60 @@ function InteractionControls({
               }
             >
               <Icon
-                className={`size-4 ${active ? "fill-primary text-primary" : ""}`}
+                className={`size-5 ${active ? "fill-primary" : ""}`}
                 aria-hidden
               />
-              {label} {count ?? "—"}
+              {count ?? "—"}
             </button>
           ) : (
             <Link
               key={kind}
-              className={buttonClass}
+              className={interactionClass}
+              data-tooltip={`登录后${label}`}
               href={`/login?redirect=${encodeURIComponent(`/wordlists/${list.id}`)}`}
               aria-label={`登录后${label}`}
             >
-              <Icon className="size-4" aria-hidden />
-              {label} {count ?? "—"}
+              <Icon className="size-5" aria-hidden />
+              {count ?? "—"}
             </Link>
           )
         )}
         {userId || list.owner_user_id === null ? (
           <button
             type="button"
-            className={buttonClass}
+            className={interactionClass}
+            data-tooltip={
+              list.owner_user_id === null
+                ? "平台词表不可投币"
+                : own
+                  ? "不能给自己的词表投币"
+                  : tipState && BigInt(tipState.tip_amount) > 0n
+                    ? "已投币"
+                    : "投币"
+            }
             disabled={list.owner_user_id === null || own || !stats || busy}
             aria-haspopup="dialog"
             aria-expanded={tipOpen}
             aria-pressed={!!tipState && BigInt(tipState.tip_amount) > 0n}
-            aria-label={own ? "不能给自己的词表投币" : undefined}
+            aria-label={
+              own
+                ? "不能给自己的词表投币"
+                : `${tipState && BigInt(tipState.tip_amount) > 0n ? "已投币" : "投币"} ${stats?.tip_amount ?? "—"}`
+            }
             onClick={() => setTipOpen(true)}
           >
-            <Coins className="size-4" aria-hidden />
-            {tipState && BigInt(tipState.tip_amount) > 0n
-              ? "已投币"
-              : "投币"}{" "}
+            <Coins className="size-5" aria-hidden />
             {stats?.tip_amount ?? "—"}
           </button>
         ) : (
           <Link
-            className={buttonClass}
+            className={interactionClass}
+            data-tooltip="登录后投币"
             href={`/login?redirect=${encodeURIComponent(`/wordlists/${list.id}`)}`}
             aria-label="登录后投币"
           >
-            <Coins className="size-4" aria-hidden />
-            投币 {stats?.tip_amount ?? "—"}
+            <Coins className="size-5" aria-hidden />
+            {stats?.tip_amount ?? "—"}
           </Link>
         )}
       </div>

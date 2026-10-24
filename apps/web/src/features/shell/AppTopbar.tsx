@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
@@ -119,7 +119,14 @@ function TopbarPanels({ hydrated }: { hydrated: boolean }) {
   const user = useUserStore((s) => s.user);
   const identity = useTeacherIdentity();
   const pathname = usePathname() ?? "";
-  const [panel, setPanel] = useState<"navigation" | "settings" | null>(null);
+  const [panel, setPanel] = useState<
+    "navigation" | "settings" | "account" | null
+  >(null);
+  const setAccountOpen = useCallback((open: boolean) => {
+    setPanel((current) =>
+      open ? "account" : current === "account" ? null : current
+    );
+  }, []);
 
   // /teacher/* 上不看工作台偏好：核验返回前内容已由 TeacherAccessGuard 拦住，核验通过后
   // 偏好要等 Provider 的 effect 才改写为 teacher，两段都按教学工作台展示，避免闪出学习菜单。
@@ -241,7 +248,11 @@ function TopbarPanels({ hydrated }: { hydrated: boolean }) {
           {!hydrated ? (
             <span className="size-8" aria-hidden />
           ) : user ? (
-            <AccountMenu />
+            <AccountMenu
+              open={panel === "account"}
+              onOpenChange={setAccountOpen}
+              disableHover={panel === "navigation" || panel === "settings"}
+            />
           ) : (
             <Link
               href="/login"

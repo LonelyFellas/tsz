@@ -123,6 +123,59 @@ it("late response from the previous account cannot overwrite current wallet", as
   expect(screen.queryByText("999 天生币")).not.toBeInTheDocument();
 });
 
+it("keeps the balance and account status visible while refreshing", async () => {
+  let finish!: (value: Awaited<ReturnType<typeof api.coins.wallet>>) => void;
+  vi.mocked(api.coins.wallet)
+    .mockResolvedValueOnce({
+      owner_type: "user",
+      owner_id: "u1",
+      balance: "100",
+      status: "deletion_pending"
+    })
+    .mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+    );
+  open();
+  await screen.findByText("100 天生币");
+  const { fireEvent } = await import("@testing-library/react");
+  fireEvent.click(screen.getByText("刷新"));
+  await waitFor(() => expect(api.coins.wallet).toHaveBeenCalledTimes(2));
+  expect(screen.getByText("100 天生币")).toBeInTheDocument();
+  expect(screen.getByText(/钱包已暂停全部/)).toBeInTheDocument();
+  expect(screen.getByText("正在更新余额…")).toBeInTheDocument();
+  await act(async () =>
+    finish({
+      owner_type: "user",
+      owner_id: "u1",
+      balance: "101",
+      status: "open"
+    })
+  );
+  expect(await screen.findByText("101 天生币")).toBeInTheDocument();
+  expect(screen.queryByText("正在更新余额…")).toBeNull();
+});
+
+it("does not present a cached balance as current after refresh fails", async () => {
+  vi.mocked(api.coins.wallet)
+    .mockResolvedValueOnce({
+      owner_type: "user",
+      owner_id: "u1",
+      balance: "100",
+      status: "open"
+    })
+    .mockRejectedValue(new Error("offline"));
+  open();
+  await screen.findByText("100 天生币");
+  const { fireEvent } = await import("@testing-library/react");
+  fireEvent.click(screen.getByText("刷新"));
+  expect(await screen.findByText(/当前余额未知/)).toBeInTheDocument();
+  expect(screen.queryByText("100 天生币")).not.toBeInTheDocument();
+  expect(screen.queryByText("0 天生币")).not.toBeInTheDocument();
+});
+
 it("refresh after pagination discards snapshot and reloads the cached first page", async () => {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: 60000 } }
