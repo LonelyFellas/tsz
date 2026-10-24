@@ -18,13 +18,11 @@ import {
   normalizeGroupDialectRules,
   updateFormRegularity,
   reorderFormGroups,
-  reorderForms,
   reorderPos,
   reorderPronunciations,
   unifyUkUsSpelling,
   updateConcreteFormType,
   updateFormGroupScope,
-  updateGroupDialectRules,
   updatePronunciation,
   updateVariantSpelling,
   updateSpellingVoiceProfile
@@ -260,52 +258,6 @@ describe("V3 forms operations", () => {
         () => uuidFromInt(715)
       )
     ).toEqual({ ok: false, reason: "component_merge_required" });
-  });
-
-  it("组级规则只接受 UU、UD、DD，只改目标组并保留全部节点", () => {
-    const original = formsFixture({
-      groups: [
-        {
-          id: UUIDS.group,
-          is_regular: true,
-          members: [{ id: UUIDS.membership, form_id: UUIDS.form }]
-        },
-        { id: UUIDS.group_2, is_regular: true, members: [] }
-      ]
-    });
-    const updated = updateGroupDialectRules(
-      original,
-      UUIDS.pos,
-      UUIDS.group_2,
-      { spelling_mode: "unified", phonetic_mode: "distinguish" }
-    );
-    expect(updated.ok).toBe(true);
-    if (!updated.ok) return;
-    const [first, second] = updated.value.pos[0]!.form_groups;
-    expect(second!.dialect_rules).toEqual({
-      spelling_mode: "unified",
-      phonetic_mode: "distinguish"
-    });
-    expect(first).toEqual(original.pos[0]!.form_groups[0]);
-    expect(updated.value.pos[0]!.forms).toEqual(original.pos[0]!.forms);
-    expect(
-      updateGroupDialectRules(original, UUIDS.pos, UUIDS.group, {
-        spelling_mode: "distinguish",
-        phonetic_mode: "unified"
-      })
-    ).toEqual({ ok: false, reason: "invalid_dialect_rules" });
-    expect(
-      updateGroupDialectRules(original, UUIDS.pos_2, UUIDS.group, {
-        spelling_mode: "unified",
-        phonetic_mode: "unified"
-      })
-    ).toEqual({ ok: false, reason: "pos_not_found" });
-    expect(
-      updateGroupDialectRules(original, UUIDS.pos, UUIDS.group_3, {
-        spelling_mode: "unified",
-        phonetic_mode: "unified"
-      })
-    ).toEqual({ ok: false, reason: "group_not_found" });
   });
 
   it("通用 / 专用只改目标组的 scope", () => {
@@ -750,7 +702,7 @@ describe("V3 forms operations", () => {
     );
   });
 
-  it("U08 重排只改变 wire 数组顺序", () => {
+  it("发音重排只改变目标发音数组顺序，保留词形与变化组", () => {
     const first = commonFormFixture();
     const second = commonFormFixture({
       id: UUIDS.form_2,
@@ -773,23 +725,26 @@ describe("V3 forms operations", () => {
         { id: UUIDS.group_2, is_regular: false, members: [] }
       ]
     });
-    const reorderedForms = reorderForms(content, UUIDS.pos, [
-      second.id,
-      first.id
-    ]);
     const reorderedPronunciations = reorderPronunciations(
-      reorderedForms,
+      content,
       second.regional_variants.common.id,
       [UUIDS.pronunciation_3, UUIDS.pronunciation_2]
     );
     expect(
       reorderedPronunciations.pos[0]!.forms.map((form) => form.id)
-    ).toEqual([second.id, first.id]);
+    ).toEqual([first.id, second.id]);
+    expect(reorderedPronunciations.pos[0]!.forms[0]).toEqual(first);
+    expect(reorderedPronunciations.pos[0]!.form_groups).toEqual(
+      content.pos[0]!.form_groups
+    );
     expect(
       commonVariant(
-        reorderedPronunciations.pos[0]!.forms[0]!
+        reorderedPronunciations.pos[0]!.forms[1]!
       ).pronunciations.map((item) => item.id)
     ).toEqual([UUIDS.pronunciation_3, UUIDS.pronunciation_2]);
+    expect(
+      second.regional_variants.common.pronunciations.map((item) => item.id)
+    ).toEqual([UUIDS.pronunciation_2, UUIDS.pronunciation_3]);
   });
 
   it("reorderPos 重排基本词性，缺项重项与未知 ID 一律拒绝", () => {
