@@ -329,3 +329,37 @@ it("无效会话404不显示为全局功能未开放，并展示冻结拼写档�
   expect(await screen.findByRole("alert")).toHaveTextContent("本次复习不存在");
   expect(screen.queryByText(/功能尚未开放/)).not.toBeInTheDocument();
 });
+it("切换拼写档案后从新档案第一页读取", async () => {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  mocks.overview.mockResolvedValue(summary);
+  mocks.items.mockResolvedValue({ items: [], next_cursor: "old-cursor" });
+  renderWithProviders(
+    <QueryClientProvider client={client}>
+      <ReviewWorkspace />
+    </QueryClientProvider>
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "下一页" }));
+  await waitFor(() =>
+    expect(mocks.items).toHaveBeenCalledWith(
+      "all",
+      "old-cursor",
+      expect.anything()
+    )
+  );
+  mocks.items.mockClear();
+  act(() => {
+    client.setQueryData(["memory", "u", "overview"], {
+      ...summary,
+      answer_profile: "AmE"
+    });
+  });
+  await waitFor(() =>
+    expect(mocks.items).toHaveBeenCalledWith(
+      "all",
+      undefined,
+      expect.anything()
+    )
+  );
+});

@@ -3,6 +3,7 @@ const PREFIX = "tsz:review-pending:";
 const MAX_AGE = 86400000;
 type Pending = { at: number; value: ReviewAnswerInput | StartReview };
 const memory = new Map<string, Pending>();
+const unpersisted = new Set<string>();
 export function pendingKey(user: string, scope: string) {
   return `${PREFIX}${user}:${scope}`;
 }
@@ -22,8 +23,10 @@ function parse(raw: string | null): Pending | null {
 function prune(user: string) {
   const prefix = `${PREFIX}${user}:`;
   for (const [key, saved] of memory) {
-    if (key.startsWith(prefix) && Date.now() - saved.at > MAX_AGE)
+    if (key.startsWith(prefix) && Date.now() - saved.at > MAX_AGE) {
       memory.delete(key);
+      unpersisted.delete(key);
+    }
   }
   try {
     for (let i = localStorage.length - 1; i >= 0; i--) {
@@ -43,10 +46,15 @@ export function readPending<T extends ReviewAnswerInput | StartReview>(
   const key = pendingKey(user, scope);
   try {
     const saved = parse(localStorage.getItem(key));
+    const local = memory.get(key);
+    if (local && unpersisted.has(key) && (!saved || local.at >= saved.at))
+      return local.value as T;
     if (saved) {
       memory.set(key, saved);
+      unpersisted.delete(key);
       return saved.value as T;
     }
+    memory.delete(key);
   } catch {
     /* Use the current page's pending request. */
   }
@@ -63,14 +71,18 @@ export function savePending(
   memory.set(key, saved);
   try {
     localStorage.setItem(key, JSON.stringify(saved));
+    unpersisted.delete(key);
   } catch {
+    unpersisted.add(key);
     /* Storage is an optional recovery aid. */
   }
 }
 export function clearPending(user: string, scope: string, expectedKey: string) {
   const key = pendingKey(user, scope);
-  if (memory.get(key)?.value.idempotency_key === expectedKey)
+  if (memory.get(key)?.value.idempotency_key === expectedKey) {
     memory.delete(key);
+    unpersisted.delete(key);
+  }
   try {
     const saved = parse(localStorage.getItem(key));
     if (saved?.value.idempotency_key === expectedKey)
@@ -82,7 +94,10 @@ export function clearPending(user: string, scope: string, expectedKey: string) {
 export function clearUserPending(user: string) {
   const prefix = `${PREFIX}${user}:`;
   for (const key of memory.keys())
-    if (key.startsWith(prefix)) memory.delete(key);
+    if (key.startsWith(prefix)) {
+      memory.delete(key);
+      unpersisted.delete(key);
+    }
   try {
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const key = localStorage.key(i);

@@ -57,6 +57,20 @@ it("localStorage写入失败时仍可提交并在本页恢复", () => {
   clearPending("one", "s", input.idempotency_key);
   expect(readPending("one", "s")).toBeNull();
 });
+it("最新内存请求不能被之前持久化的旧请求覆盖", () => {
+  const old = {
+    idempotency_key: "old-persisted",
+    item_id: "a",
+    answer: "apple"
+  };
+  const next = { idempotency_key: "new-memory", item_id: "b", answer: "bank" };
+  savePending("one", "session", old);
+  vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+    throw new DOMException("full", "QuotaExceededError");
+  });
+  savePending("one", "session", next);
+  expect(readPending("one", "session")).toEqual(next);
+});
 it("新操作会清理已放弃会话的过期答案", () => {
   vi.useFakeTimers();
   savePending("one", "abandoned", {

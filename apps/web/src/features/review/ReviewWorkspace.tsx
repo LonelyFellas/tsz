@@ -78,7 +78,10 @@ function Overview({ userId }: { userId: string }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [filter, setFilter] = useState("all");
-  const [after, setAfter] = useState<string>();
+  const [cursor, setCursor] = useState<{
+    profile: string | undefined;
+    value: string;
+  } | null>(null);
   const overview = useQuery({
     queryKey: ["memory", userId, "overview"],
     queryFn: ({ signal }) => api.memory.overview({ signal }),
@@ -87,6 +90,13 @@ function Overview({ userId }: { userId: string }) {
     refetchOnMount: "always",
     refetchOnWindowFocus: "always"
   });
+  const after =
+    cursor?.profile === overview.data?.answer_profile
+      ? cursor?.value
+      : undefined;
+  function setAfter(value: string | undefined) {
+    setCursor(value ? { profile: overview.data?.answer_profile, value } : null);
+  }
   const items = useQuery({
     queryKey: [
       "memory",
