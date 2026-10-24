@@ -143,6 +143,191 @@ it("refreshes total, personal state and likes together after a confirmed tip", a
   fireEvent.click(screen.getByRole("button", { name: "已投币 19" }));
   expect(screen.getByRole("button", { name: "确认投出" })).toBeDisabled();
 });
+it.each([
+  ["0", "1"],
+  ["0", "2"],
+  ["1", "1"]
+])(
+  "keeps the remaining allowance current after tipping %s + %s while refresh is pending",
+  async (initial, amount) => {
+    let total = BigInt(initial);
+    let finish!: () => void;
+    const refresh = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    vi.mocked(api.wordList.tipStates).mockResolvedValue({
+      items: [{ wordlist_id: "list", tip_amount: initial }]
+    });
+    vi.mocked(api.wordList.tip).mockImplementation(async (_id, input) => {
+      total += BigInt(input.amount);
+      vi.mocked(api.wordList.tipStates).mockImplementation(async () => {
+        await refresh;
+        return { items: [{ wordlist_id: "list", tip_amount: String(total) }] };
+      });
+      return {
+        event_id: input.event_id,
+        wordlist_id: "list",
+        payer_user_id: "reader",
+        author_user_id: "author",
+        amount: input.amount,
+        operation_id: "op",
+        created_at: ""
+      };
+    });
+    renderWithProviders(<DetailInteractions list={list} />);
+    fireEvent.click(await screen.findByRole("button", { name: /投币 17/ }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "确认投出" })).toBeEnabled()
+    );
+    fireEvent.click(screen.getByRole("radio", { name: `${amount} 枚天生币` }));
+    fireEvent.click(screen.getByRole("button", { name: "确认投出" }));
+    await screen.findByText(/作者已收到/);
+    await waitFor(() =>
+      expect(api.wordList.tipStates).toHaveBeenCalledTimes(2)
+    );
+    fireEvent.click(screen.getByRole("button", { name: "完成" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /投币 17/ }));
+    try {
+      expect(screen.getByRole("radio", { name: "2 枚天生币" })).toBeDisabled();
+      if (total === 1n) {
+        expect(screen.getByRole("radio", { name: "1 枚天生币" })).toBeChecked();
+        expect(screen.getByRole("button", { name: "确认投出" })).toBeEnabled();
+        fireEvent.click(screen.getByRole("button", { name: "确认投出" }));
+        await screen.findByText(/作者已收到/);
+        expect(api.wordList.tip).toHaveBeenLastCalledWith(
+          "list",
+          expect.objectContaining({ amount: "1" }),
+          expect.anything()
+        );
+        fireEvent.click(screen.getByRole("button", { name: "完成" }));
+        fireEvent.click(screen.getByRole("button", { name: /投币 17/ }));
+      }
+      const calls = vi.mocked(api.wordList.tip).mock.calls.length;
+      expect(screen.getByRole("radio", { name: "1 枚天生币" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "确认投出" })).toBeDisabled();
+      fireEvent.click(screen.getByRole("button", { name: "确认投出" }));
+      expect(api.wordList.tip).toHaveBeenCalledTimes(calls);
+    } finally {
+      await act(async () => finish());
+    }
+    expect(screen.getByRole("button", { name: "确认投出" })).toBeDisabled();
+  }
+);
+it.each(["1", "2"])(
+  "waits for authoritative totals after recovering a receipt when the total is %s",
+  async (total) => {
+    const intent = {
+      event_id: "event",
+      idempotency_key: "key",
+      amount: "1",
+      like: true
+    };
+    sessionStorage.setItem("wordlist-tip:reader:list", JSON.stringify(intent));
+    let finish!: () => void;
+    const refresh = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    vi.mocked(api.wordList.tipStates).mockResolvedValue({
+      items: [{ wordlist_id: "list", tip_amount: "1" }]
+    });
+    vi.mocked(api.wordList.tipReceipt).mockImplementation(async () => {
+      vi.mocked(api.wordList.tipStates).mockImplementation(async () => {
+        await refresh;
+        return { items: [{ wordlist_id: "list", tip_amount: total }] };
+      });
+      return {
+        event_id: intent.event_id,
+        wordlist_id: "list",
+        payer_user_id: "reader",
+        author_user_id: "author",
+        amount: intent.amount,
+        operation_id: "op",
+        created_at: ""
+      };
+    });
+    renderWithProviders(<DetailInteractions list={list} />);
+    fireEvent.click(await screen.findByRole("button", { name: /投币 17/ }));
+    await waitFor(() => expect(api.wordList.tipStates).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByRole("button", { name: "重试这次投币" }));
+    await screen.findByText(/作者已收到/);
+    fireEvent.click(screen.getByRole("button", { name: "完成" }));
+    fireEvent.click(screen.getByRole("button", { name: /投币 17/ }));
+    try {
+      expect(screen.getByRole("button", { name: "确认投出" })).toBeDisabled();
+      expect(api.wordList.tip).not.toHaveBeenCalled();
+    } finally {
+      await act(async () => finish());
+    }
+    await waitFor(() => {
+      const confirm = screen.getByRole("button", { name: "确认投出" });
+      if (total === "1") {
+        expect(confirm).toBeEnabled();
+        expect(screen.getByRole("radio", { name: "1 枚天生币" })).toBeChecked();
+      } else expect(confirm).toBeDisabled();
+    });
+    expect(screen.getByRole("radio", { name: "2 枚天生币" })).toBeDisabled();
+    expect(api.wordList.tip).not.toHaveBeenCalled();
+  }
+);
+it("does not count a receipt twice when its refreshed total arrives before the POST response", async () => {
+  let finish!: () => void;
+  const posted = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  vi.mocked(api.wordList.tip).mockImplementation(async (_id, input) => {
+    await posted;
+    return {
+      event_id: input.event_id,
+      wordlist_id: "list",
+      payer_user_id: "reader",
+      author_user_id: "author",
+      amount: input.amount,
+      operation_id: "op",
+      created_at: ""
+    };
+  });
+  const view = renderWithProviders(<DetailInteractions list={list} />);
+  fireEvent.click(await screen.findByRole("button", { name: "投币 17" }));
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "确认投出" })).toBeEnabled()
+  );
+  fireEvent.click(screen.getByRole("radio", { name: "1 枚天生币" }));
+  fireEvent.click(screen.getByRole("button", { name: "确认投出" }));
+  await waitFor(() => expect(api.wordList.tip).toHaveBeenCalledOnce());
+  vi.mocked(api.wordList.tipStates).mockResolvedValue({
+    items: [{ wordlist_id: "list", tip_amount: "1" }]
+  });
+  view.rerender(
+    <>
+      <DetailInteractions list={list} />
+      <WordListBrowser />
+    </>
+  );
+  await screen.findByRole("heading", { name: "公开词表" });
+  await waitFor(() =>
+    expect(screen.getAllByRole("button", { name: "已投币 17" })).toHaveLength(2)
+  );
+  let refreshed!: () => void;
+  const refresh = new Promise<void>((resolve) => {
+    refreshed = resolve;
+  });
+  vi.mocked(api.wordList.tipStates).mockImplementation(async () => {
+    await refresh;
+    return { items: [{ wordlist_id: "list", tip_amount: "1" }] };
+  });
+  await act(async () => finish());
+  await screen.findByText(/作者已收到/);
+  fireEvent.click(screen.getByRole("button", { name: "完成" }));
+  fireEvent.click(screen.getAllByRole("button", { name: "已投币 17" })[1]!);
+  try {
+    expect(screen.getByRole("radio", { name: "1 枚天生币" })).toBeChecked();
+    expect(screen.getByRole("button", { name: "确认投出" })).toBeEnabled();
+    expect(screen.getByRole("radio", { name: "2 枚天生币" })).toBeDisabled();
+  } finally {
+    await act(async () => refreshed());
+  }
+});
 it("keeps self-tipping disabled and closing a dialog never charges", async () => {
   const view = renderWithProviders(<DetailInteractions list={list} />);
   fireEvent.click(await screen.findByRole("button", { name: "投币 17" }));
