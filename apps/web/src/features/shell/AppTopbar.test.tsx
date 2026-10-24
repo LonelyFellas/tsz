@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 import type { User } from "@tsz/types";
@@ -22,8 +22,8 @@ vi.mock("@/features/student-home/LearningPreferences", () => ({
 vi.mock("@/features/teacher-certification/TeacherIdentityProvider", () => ({
   useTeacherIdentity: () => identity
 }));
-vi.mock("@/features/home/components/AccountMenu", () => ({
-  AccountMenu: () => <button>账户</button>
+vi.mock("@/lib/request", () => ({
+  api: { coins: { wallet: vi.fn().mockResolvedValue({ balance: "5" }) } }
 }));
 
 const teacher: User = {
@@ -194,6 +194,50 @@ it("左右浮层互斥：打开设置会关闭菜单", async () => {
   expect(
     screen.queryByRole("dialog", { name: "偏好设置" })
   ).not.toBeInTheDocument();
+});
+
+function hoverAccount() {
+  const event = new MouseEvent("pointerover", { bubbles: true });
+  Object.defineProperty(event, "pointerType", { value: "mouse" });
+  fireEvent(screen.getByRole("button", { name: "账户菜单" }), event);
+}
+
+it("设置打开时悬停头像不展开账户，主动点击可切换且再次打开设置关闭账户", async () => {
+  route.pathname = "/student/home";
+  useUserStore.setState({ user: student, hydrated: true });
+  const actions = userEvent.setup();
+  renderWithProviders(<AppTopbar />);
+  await actions.click(screen.getByRole("button", { name: "偏好设置" }));
+  hoverAccount();
+  await new Promise((resolve) => setTimeout(resolve, 180));
+  expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  expect(screen.getByRole("dialog", { name: "偏好设置" })).toBeInTheDocument();
+  await actions.click(screen.getByRole("button", { name: "账户菜单" }));
+  await screen.findByRole("menu");
+  expect(
+    screen.queryByRole("dialog", { name: "偏好设置" })
+  ).not.toBeInTheDocument();
+  await actions.click(screen.getByRole("button", { name: "偏好设置" }));
+  expect(screen.getByRole("dialog", { name: "偏好设置" })).toBeInTheDocument();
+  await waitFor(() =>
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument()
+  );
+  hoverAccount();
+  await new Promise((resolve) => setTimeout(resolve, 180));
+  expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  await actions.keyboard("{Escape}");
+  expect(screen.getByRole("button", { name: "偏好设置" })).toHaveFocus();
+});
+
+it("悬停延迟未结束时打开导航，账户不会迟到展开", async () => {
+  route.pathname = "/student/home";
+  useUserStore.setState({ user: student, hydrated: true });
+  renderWithProviders(<AppTopbar />);
+  hoverAccount();
+  fireEvent.click(screen.getByRole("button", { name: "学习菜单" }));
+  await new Promise((resolve) => setTimeout(resolve, 180));
+  expect(screen.getByRole("dialog", { name: "学习菜单" })).toBeInTheDocument();
+  expect(screen.queryByRole("menu")).not.toBeInTheDocument();
 });
 
 it("点击菜单链接后浮层关闭", async () => {

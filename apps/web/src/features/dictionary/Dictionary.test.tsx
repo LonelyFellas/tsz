@@ -45,6 +45,19 @@ beforeEach(() => {
   search.mockResolvedValue(response("apple"));
 });
 describe("词典页面", () => {
+  it("清空输入和 Escape 不触发查询，清空后焦点仍在搜索框", async () => {
+    const user = userEvent.setup();
+    render(<Dictionary />, { wrapper });
+    const input = screen.getByRole("searchbox", { name: "查找英文词汇" });
+    await user.type(input, "apple");
+    await user.click(screen.getByRole("button", { name: "清除搜索" }));
+    expect(input).toHaveValue("");
+    expect(input).toHaveFocus();
+    await user.type(input, "pear{Escape}");
+    expect(input).toHaveValue("");
+    expect(push).not.toHaveBeenCalled();
+    expect(search).not.toHaveBeenCalled();
+  });
   it("显示本地历史，重查及删除互不混淆，空输入不发请求", async () => {
     writeHistory("dictionary-user", ["apple", "pear"]);
     const user = userEvent.setup();

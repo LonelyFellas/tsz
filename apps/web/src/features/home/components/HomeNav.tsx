@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useCallback, useState } from "react";
 import { Settings, X } from "lucide-react";
 import {
   Popover,
@@ -18,7 +19,18 @@ import { AccountMenu } from "./AccountMenu";
 // 已登录时工作台和账户入口收进右上角头像菜单,不再平铺在顶栏。
 export function HomeNav() {
   const user = useUserStore((s) => s.user);
+  return <HomeNavContent key={user?.id ?? "guest"} />;
+}
+
+function HomeNavContent() {
+  const user = useUserStore((s) => s.user);
   const hydrated = useUserStore((s) => s.hydrated);
+  const [panel, setPanel] = useState<"settings" | "account" | null>(null);
+  const setAccountOpen = useCallback((open: boolean) => {
+    setPanel((current) =>
+      open ? "account" : current === "account" ? null : current
+    );
+  }, []);
 
   return (
     <header className="sticky top-0 z-50 bg-background/75 backdrop-blur-xl">
@@ -68,7 +80,14 @@ export function HomeNav() {
           </nav>
           {hydrated && user && (
             <>
-              <Popover key={user.id}>
+              <Popover
+                open={panel === "settings"}
+                onOpenChange={(open) =>
+                  setPanel((current) =>
+                    open ? "settings" : current === "settings" ? null : current
+                  )
+                }
+              >
                 <PopoverTrigger
                   aria-label="偏好设置"
                   className="inline-flex size-11 items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-surface/80 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary data-[state=open]:bg-surface data-[state=open]:text-primary data-[state=open]:shadow-glass"
@@ -99,7 +118,11 @@ export function HomeNav() {
                   <ThemeModeControl />
                 </PopoverContent>
               </Popover>
-              <AccountMenu />
+              <AccountMenu
+                open={panel === "account"}
+                onOpenChange={setAccountOpen}
+                disableHover={panel === "settings"}
+              />
             </>
           )}
         </div>

@@ -17,7 +17,14 @@ function loadMenu() {
 }
 
 // 首屏只有可交互的头像；菜单和浮层依赖在用户表达意图后下载。
-export function AccountMenu() {
+export function AccountMenu({
+  open: controlledOpen,
+  onOpenChange,
+  disableHover = false
+}: Pick<
+  AccountMenuPopoverProps,
+  "open" | "onOpenChange" | "disableHover"
+> = {}) {
   const user = useUserStore((s) => s.user);
   const request = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -41,9 +48,16 @@ export function AccountMenu() {
     request.current++;
     clearTimeout(timer.current);
     setLoadingUser(null);
-  }, []);
+    onOpenChange?.(false);
+  }, [onOpenChange]);
   useEffect(() => {
-    if (!user || loadingUser !== user.id) return;
+    if (controlledOpen === false || disableHover) {
+      request.current++;
+      clearTimeout(timer.current);
+    }
+  }, [controlledOpen, disableHover]);
+  useEffect(() => {
+    if (!user || loadingUser !== user.id || controlledOpen === false) return;
     const outside = (event: PointerEvent) => {
       if (!trigger.current?.contains(event.target as Node)) cancel();
     };
@@ -56,15 +70,16 @@ export function AccountMenu() {
       document.removeEventListener("pointerdown", outside, true);
       document.removeEventListener("keydown", escape, true);
     };
-  }, [loadingUser, user, cancel]);
+  }, [loadingUser, user, cancel, controlledOpen]);
   function preload() {
     void loadMenu().catch(() => {
       // 真正展开失败时交由全局资源恢复提示处理，预载不打断当前操作。
     });
   }
   async function open(hover: boolean, keyboard = false) {
-    if (!user) return;
+    if (!user || (hover && disableHover)) return;
     clearTimeout(timer.current);
+    onOpenChange?.(true);
     mode.current = hover ? "hover" : "direct";
     const ticket = ++request.current;
     const userId = user.id;
@@ -101,7 +116,15 @@ export function AccountMenu() {
   }
 
   if (!user) return null;
-  if (view?.userId === user.id) return <view.Menu {...view.props} />;
+  if (view?.userId === user.id)
+    return (
+      <view.Menu
+        {...view.props}
+        open={controlledOpen}
+        onOpenChange={onOpenChange}
+        disableHover={disableHover}
+      />
+    );
   return (
     <button
       ref={trigger}
@@ -109,11 +132,11 @@ export function AccountMenu() {
       aria-label="账户菜单"
       aria-haspopup="menu"
       aria-expanded={false}
-      aria-busy={loadingUser === user.id}
+      aria-busy={loadingUser === user.id && controlledOpen !== false}
       onFocus={preload}
       onBlur={cancel}
       onPointerEnter={(event) => {
-        if (event.pointerType !== "mouse") return;
+        if (event.pointerType !== "mouse" || disableHover) return;
         cancel();
         mode.current = "hover";
         preload();
@@ -139,7 +162,7 @@ export function AccountMenu() {
       className="group relative z-50 flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-opacity focus:outline-hidden aria-busy:cursor-progress aria-busy:opacity-70"
     >
       <AccountAvatar user={user} />
-      {loadingUser === user.id && (
+      {loadingUser === user.id && controlledOpen !== false && (
         <span className="sr-only" role="status">
           正在加载账户菜单…
         </span>

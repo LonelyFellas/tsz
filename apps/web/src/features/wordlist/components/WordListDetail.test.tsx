@@ -196,6 +196,30 @@ function open(mine = false, staleTime = 0) {
   const result = render(element());
   return { client, ...result, refresh: () => result.rerender(element()) };
 }
+it("清空详情搜索后恢复全部词条且保留输入焦点", async () => {
+  open();
+  await screen.findByRole("heading", { name: "apple" });
+  const input = screen.getByRole("searchbox", { name: "搜索词条" });
+  fireEvent.change(input, { target: { value: "apple" } });
+  await waitFor(() =>
+    expect(api.wordList.items).toHaveBeenLastCalledWith(
+      "list",
+      { page: 1, q: "apple" },
+      expect.anything()
+    )
+  );
+  fireEvent.click(screen.getByRole("button", { name: "清除搜索" }));
+  expect(input).toHaveValue("");
+  expect(input).toHaveFocus();
+  await waitFor(() =>
+    expect(api.wordList.items).toHaveBeenLastCalledWith(
+      "list",
+      { page: 1, q: "" },
+      expect.anything()
+    )
+  );
+});
+
 it("详情搜索等待组合输入结束，读取期间保留旧词条且不续载旧搜索", async () => {
   open();
   await screen.findByRole("heading", { name: "apple" });
@@ -1040,7 +1064,7 @@ it("uses whole-list counts when unavailable entries are on another page or hidde
     screen.getByRole("button", { name: "加载更多词条以查看原因" })
   );
   expect(await screen.findByText("原因：已移入垃圾桶")).toBeVisible();
-  fireEvent.change(screen.getByRole("textbox", { name: "搜索词条" }), {
+  fireEvent.change(screen.getByRole("searchbox", { name: "搜索词条" }), {
     target: { value: "apple" }
   });
   await waitFor(() =>
@@ -1054,7 +1078,7 @@ it("uses whole-list counts when unavailable entries are on another page or hidde
   fireEvent.click(
     await screen.findByRole("button", { name: "清空搜索查看原因" })
   );
-  expect(screen.getByRole("textbox", { name: "搜索词条" })).toHaveValue("");
+  expect(screen.getByRole("searchbox", { name: "搜索词条" })).toHaveValue("");
   expect(await screen.findByText("原因：已移入垃圾桶")).toBeVisible();
   expect(api.wordList.publish).not.toHaveBeenCalled();
 });

@@ -32,6 +32,7 @@ import {
   DropdownMenuSeparator
 } from "@tsz/ui/components";
 import { cn } from "@tsz/ui/lib/cn";
+import { SearchField } from "@/features/shell/SearchField";
 import { STATE_LABEL } from "../reading";
 import type {
   LibraryAction,
@@ -46,7 +47,6 @@ import {
   PageHeader,
   PageNotice,
   Pager,
-  buttonClass,
   Segmented
 } from "@/features/shell/Page";
 import { wordListKeys } from "../hooks/useWordLists";
@@ -327,9 +327,9 @@ function Library({ userId }: { userId: string }) {
           eyebrow="我的学习"
           title="我的词表"
           actions={
-            <Link href="/wordlists" className={buttonClass}>
-              浏览公开词表
-            </Link>
+            <Button asChild variant="ghost" size="compact">
+              <Link href="/wordlists">浏览公开词表</Link>
+            </Button>
           }
         />
       )}
@@ -669,7 +669,8 @@ function Library({ userId }: { userId: string }) {
                       <Button
                         disabled={busy || !result.data}
                         variant="outline"
-                        className="px-3 sm:px-5"
+                        size="sm"
+                        className="min-h-11 px-3 sm:min-h-10 sm:px-4"
                         onClick={() => {
                           setName("");
                           setError("");
@@ -683,7 +684,11 @@ function Library({ userId }: { userId: string }) {
                         新建文件夹
                       </Button>
                       {space === "owned" && (
-                        <Button asChild className="px-3 sm:px-5">
+                        <Button
+                          asChild
+                          size="sm"
+                          className="min-h-11 px-3 sm:min-h-10 sm:px-4"
+                        >
                           <Link
                             href={workspaceHref(undefined, "new")}
                             aria-disabled={busy}
@@ -701,6 +706,8 @@ function Library({ userId }: { userId: string }) {
                   {trash && (
                     <Button
                       variant="outline"
+                      size="sm"
+                      className="min-h-11 sm:min-h-10"
                       disabled={
                         busy ||
                         !result.data ||
@@ -713,64 +720,35 @@ function Library({ userId }: { userId: string }) {
                   )}
                 </div>
               </div>
-              <div className="relative mb-4 w-full sm:max-w-sm">
-                <Search
-                  className="pointer-events-none absolute left-4 top-4 size-4 text-foreground-subtle"
-                  aria-hidden
-                />
-                <Input
-                  ref={searchInput}
-                  type="search"
-                  maxLength={100}
-                  aria-label="搜索词表和文件夹"
-                  placeholder={trash ? "搜索回收站" : "搜索词表和文件夹"}
-                  value={query}
-                  disabled={busy}
-                  onChange={(event) => {
-                    setQuery(event.target.value);
-                    setPage(1);
-                    setSelected([]);
-                  }}
-                  onCompositionStart={() => setComposing(true)}
-                  onCompositionEnd={(event) => {
-                    setQuery(event.currentTarget.value);
-                    setComposing(false);
-                  }}
-                  onKeyDown={(event) => {
-                    if (
-                      event.key === "Escape" &&
-                      !event.nativeEvent.isComposing &&
-                      query
-                    ) {
-                      event.preventDefault();
-                      clearSearch();
-                    }
-                  }}
-                  className="w-full pl-11 pr-12 [&::-webkit-search-cancel-button]:appearance-none"
-                />
-                {query && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    disabled={busy}
-                    aria-label="清除搜索"
-                    onClick={clearSearch}
-                    className="absolute right-0.5 top-0.5"
-                  >
-                    <X className="size-4" aria-hidden />
-                  </Button>
-                )}
-              </div>
+              <SearchField
+                ref={searchInput}
+                className="mb-4 w-full sm:max-w-sm"
+                maxLength={100}
+                aria-label="搜索词表和文件夹"
+                placeholder={trash ? "搜索回收站" : "搜索词表和文件夹"}
+                value={query}
+                disabled={busy}
+                onValueChange={(value) => {
+                  setQuery(value);
+                  setPage(1);
+                  setSelected([]);
+                }}
+                onClear={clearSearch}
+                onCompositionStart={() => setComposing(true)}
+                onCompositionEnd={(event) => {
+                  setQuery(event.currentTarget.value);
+                  setComposing(false);
+                }}
+              />
               {items.length > 0 && (
                 <div
                   className={cn(
-                    "mb-2 flex min-h-14 flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-transparent px-2 py-1",
+                    "mb-2 flex min-h-11 flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-transparent px-2 py-1",
                     selected.length > 0 &&
                       "sticky top-20 z-20 border-primary/20 bg-surface/95 shadow-glass backdrop-blur-xl"
                   )}
                 >
-                  <label className="flex min-h-11 cursor-pointer items-center gap-2 px-2 text-sm">
+                  <label className="flex min-h-11 cursor-pointer items-center gap-2 px-2 text-sm sm:min-h-9">
                     <input
                       type="checkbox"
                       aria-label="选择当前页全部项目"
@@ -794,7 +772,7 @@ function Library({ userId }: { userId: string }) {
                         已选 {selected.length} 项
                       </span>
                       <Button
-                        size="sm"
+                        size="compact"
                         variant="ghost"
                         disabled={busy}
                         onClick={() => setSelected([])}
@@ -806,6 +784,7 @@ function Library({ userId }: { userId: string }) {
                           <Button
                             disabled={busy}
                             variant="outline"
+                            size="compact"
                             onClick={() =>
                               setModal({
                                 expectedVersion: result.data!.version,
@@ -818,7 +797,8 @@ function Library({ userId }: { userId: string }) {
                           </Button>
                           <Button
                             disabled={busy}
-                            variant="outline"
+                            variant="ghost"
+                            size="compact"
                             onClick={() => void confirm("purge", selected)}
                           >
                             彻底删除
@@ -829,6 +809,7 @@ function Library({ userId }: { userId: string }) {
                           <Button
                             disabled={busy}
                             variant="outline"
+                            size="compact"
                             onClick={() =>
                               setModal({
                                 expectedVersion: result.data!.version,
@@ -841,7 +822,8 @@ function Library({ userId }: { userId: string }) {
                           </Button>
                           <Button
                             disabled={busy}
-                            variant="outline"
+                            variant="ghost"
+                            size="compact"
                             onClick={() => void confirm("trash", selected)}
                           >
                             删除

@@ -41,7 +41,12 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function mount() {
+async function mount(
+  props: Pick<
+    AccountMenuPopoverProps,
+    "open" | "onOpenChange" | "disableHover"
+  > = {}
+) {
   const { useUserStore } = await import("@/stores/user");
   useUserStore.setState({
     user: {
@@ -54,8 +59,8 @@ async function mount() {
     hydrated: true
   });
   const { AccountMenu } = await import("./AccountMenu");
-  render(<AccountMenu />);
-  return useUserStore;
+  const view = render(<AccountMenu {...props} />);
+  return { store: useUserStore, view, AccountMenu };
 }
 function LoadedMenu(props: AccountMenuPopoverProps) {
   return (
@@ -119,8 +124,18 @@ it("悬停等待后的模块以不抢焦点的模式展开", async () => {
   expect(await screen.findByRole("menu")).toHaveAttribute("data-hover", "true");
 });
 
+it("父级切换到其他面板时取消下载中的展开意图", async () => {
+  const { view, AccountMenu } = await mount({ open: true });
+  const trigger = screen.getByRole("button", { name: "账户菜单" });
+  fireEvent.click(trigger, { detail: 0 });
+  await waitFor(() => expect(loader.called).toHaveBeenCalledOnce());
+  view.rerender(<AccountMenu open={false} disableHover />);
+  await act(async () => loader.resolve?.({ AccountMenuPopover: LoadedMenu }));
+  expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+});
+
 it("下载中切换账号，迟到结果不能展开旧账号菜单", async () => {
-  const store = await mount();
+  const { store } = await mount();
   fireEvent.click(screen.getByRole("button", { name: "账户菜单" }), {
     detail: 0
   });

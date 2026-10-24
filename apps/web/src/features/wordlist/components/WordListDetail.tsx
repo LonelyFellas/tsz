@@ -32,7 +32,7 @@ import { useUserStore } from "@/stores/user";
 import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIdentityProvider";
 import { wordListKeys } from "../hooks/useWordLists";
 import { STATE_LABEL, buttonClass, textButtonClass } from "../reading";
-import { Search } from "lucide-react";
+import { SearchField } from "@/features/shell/SearchField";
 import {
   PageHeader,
   PageNotice,
@@ -533,27 +533,18 @@ function Detail({
         </div>
       </section>
       <div className="mb-5 mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-        <label className="relative flex min-h-11 min-w-40 flex-1 items-center border border-border bg-surface sm:max-w-sm rounded-full pl-11 pr-5 transition-shadow focus-within:ring-4 focus-within:ring-primary/15">
-          <Search
-            className="absolute left-4 size-4 text-foreground-subtle"
-            strokeWidth={1.8}
-            aria-hidden
-          />
-          <input
-            aria-label="搜索词条"
-            placeholder="搜索词面"
-            className="w-full bg-transparent py-2.5 text-sm text-foreground outline-hidden placeholder:text-foreground-subtle"
-            value={query}
-            onCompositionStart={() => setComposing(true)}
-            onCompositionEnd={(event) => {
-              setComposing(false);
-              setQuery(event.currentTarget.value);
-            }}
-            onChange={(e) => {
-              setQuery(e.target.value);
-            }}
-          />
-        </label>
+        <SearchField
+          className="min-w-40 flex-1 sm:max-w-sm"
+          aria-label="搜索词条"
+          placeholder="搜索词面"
+          value={query}
+          onCompositionStart={() => setComposing(true)}
+          onCompositionEnd={(event) => {
+            setComposing(false);
+            setQuery(event.currentTarget.value);
+          }}
+          onValueChange={setQuery}
+        />
         <div className="flex flex-wrap items-center gap-3">
           <Segmented
             label="阅读模式"

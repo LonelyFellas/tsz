@@ -31,7 +31,7 @@ export function LearningPlanCreator({ userId }: { userId: string }) {
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [error, setError] = useState("");
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [unknown, setUnknown] = useState(false);
   const intent = useRef<CreateLearningPlan | null>(null);
@@ -50,6 +50,17 @@ export function LearningPlanCreator({ userId }: { userId: string }) {
     (Number.isInteger(n) && n >= 1 && n <= 200 && count.trim() !== "");
   const validSchedule =
     kind === "longterm" || !scheduled || !!(start && end && end >= start);
+  const errors: Record<string, string | undefined> = {
+    name:
+      submitted && (!name.trim() || [...name.trim()].length > 50)
+        ? "请输入 1–50 字的任务名称。"
+        : undefined,
+    sources: submitted && !selected.length ? "请选择 1–5 份词表。" : undefined,
+    count: !validCount ? "每日题量须为 1–200 的整数。" : undefined,
+    start: !validSchedule
+      ? "请填写完整日期，结束日期不得早于开始日期。"
+      : undefined
+  };
   const input: PreviewLearningPlan = {
     task_type: kind,
     wordlist_ids: selected.map((s) => s.wordlist.id),
@@ -86,15 +97,14 @@ export function LearningPlanCreator({ userId }: { userId: string }) {
   async function submit() {
     setError("");
     if (!intent.current) {
-      const next: Record<string, string> = {};
-      if (!name.trim() || [...name.trim()].length > 50)
-        next.name = "请输入 1–50 字的任务名称。";
-      if (!selected.length) next.sources = "请选择 1–5 份词表。";
-      if (!validCount) next.count = "每日题量须为 1–200 的整数。";
-      if (!validSchedule)
-        next.start = "请填写完整日期，结束日期不得早于开始日期。";
-      setErrors(next);
-      if (Object.keys(next).length) {
+      setSubmitted(true);
+      if (
+        !name.trim() ||
+        [...name.trim()].length > 50 ||
+        !selected.length ||
+        !validCount ||
+        !validSchedule
+      ) {
         requestAnimationFrame(() =>
           form.current
             ?.querySelector<HTMLElement>('[aria-invalid="true"]')
@@ -143,7 +153,10 @@ export function LearningPlanCreator({ userId }: { userId: string }) {
   const field = (id: string) => ({
     id: `plan-${id}`,
     "aria-invalid": !!errors[id],
-    "aria-describedby": `plan-${id}-message`
+    "aria-describedby":
+      errors[id] || id === "name" || id === "count"
+        ? `plan-${id}-message`
+        : undefined
   });
   return (
     <PageShell>
@@ -266,10 +279,7 @@ export function LearningPlanCreator({ userId }: { userId: string }) {
                   htmlFor="plan-count"
                   label="每日题量"
                   hint="每天 1–200 题；本轮不足一天时只做剩余题量。"
-                  error={
-                    errors.count ||
-                    (!validCount ? "每日题量须为 1–200 的整数。" : undefined)
-                  }
+                  error={errors.count}
                 >
                   <Input
                     {...field("count")}
@@ -297,12 +307,7 @@ export function LearningPlanCreator({ userId }: { userId: string }) {
                     <FormField
                       htmlFor="plan-start"
                       label="开始学习日"
-                      error={
-                        errors.start ||
-                        (!validSchedule
-                          ? "请填写完整日期，结束日期不得早于开始日期。"
-                          : undefined)
-                      }
+                      error={errors.start}
                     >
                       <Input
                         {...field("start")}
@@ -320,7 +325,12 @@ export function LearningPlanCreator({ userId }: { userId: string }) {
                       <Input
                         id="plan-end"
                         type="date"
-                        aria-describedby="plan-end-message"
+                        aria-invalid={!!errors.start}
+                        aria-describedby={
+                          errors.start
+                            ? "plan-start-message plan-end-message"
+                            : "plan-end-message"
+                        }
                         min={start}
                         disabled={locked}
                         value={end}

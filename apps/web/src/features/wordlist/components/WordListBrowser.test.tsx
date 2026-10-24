@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { renderWithProviders } from "@/test/render";
 import { WordListBrowser } from "./WordListBrowser";
@@ -17,6 +17,34 @@ it("read failure is visible and never falls back to prototype data", async () =>
   renderWithProviders(<WordListBrowser />);
   expect(await screen.findByRole("alert")).toHaveTextContent("词表加载失败");
   expect(screen.queryByText("小学一年级核心词")).not.toBeInTheDocument();
+});
+
+it("search can be cleared by its control and Escape without changing the category", async () => {
+  const { api } = await import("@/lib/request");
+  vi.mocked(api.wordList.recommended).mockResolvedValue({
+    items: [],
+    pagination: { page: 1, page_size: 50, total: 0, total_pages: 0 }
+  });
+  renderWithProviders(<WordListBrowser />);
+  fireEvent.click(screen.getByText("系统推荐"));
+  const search = screen.getByRole("searchbox", { name: "搜索词表" });
+  fireEvent.change(search, { target: { value: "apple" } });
+  await waitFor(() =>
+    expect(api.wordList.recommended).toHaveBeenCalledWith(
+      { page: 1, q: "apple" },
+      expect.anything()
+    )
+  );
+  fireEvent.click(screen.getByRole("button", { name: "清除搜索" }));
+  expect(search).toHaveValue("");
+  expect(search).toHaveFocus();
+  expect(screen.getByRole("button", { name: "系统推荐" })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  );
+  fireEvent.change(search, { target: { value: "pear" } });
+  fireEvent.keyDown(search, { key: "Escape" });
+  expect(search).toHaveValue("");
 });
 
 it("system recommendations use their own server query", async () => {

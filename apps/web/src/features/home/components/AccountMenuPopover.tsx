@@ -76,20 +76,32 @@ export interface AccountMenuPopoverProps {
   initialOpen?: boolean;
   initialKeyboard?: boolean;
   restoreTriggerFocus?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  disableHover?: boolean;
 }
 
 export function AccountMenuPopover({
   initialHover = false,
   initialOpen = false,
   initialKeyboard = false,
-  restoreTriggerFocus = false
+  restoreTriggerFocus = false,
+  open: controlledOpen,
+  onOpenChange,
+  disableHover = false
 }: AccountMenuPopoverProps = {}) {
   const user = useUserStore((s) => s.user);
   const logout = useLogout();
   const teacher = useTeacherIdentity();
   const [switching, setSwitching] = useState(false);
   const [switchError, setSwitchError] = useState("");
-  const [open, setOpen] = useState(initialOpen);
+  const [internalOpen, setInternalOpen] = useState(initialOpen);
+  const open = controlledOpen ?? internalOpen;
+  function setOpen(next: boolean | ((previous: boolean) => boolean)) {
+    const value = typeof next === "function" ? next(open) : next;
+    if (controlledOpen === undefined) setInternalOpen(value);
+    onOpenChange?.(value);
+  }
   const [loading, setLoading] = useState(false);
   const [avatarOffsetX, setAvatarOffsetX] = useState(0);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -130,6 +142,15 @@ export function AccountMenuPopover({
     [user?.id]
   );
 
+  useEffect(() => {
+    if (!open || disableHover) {
+      if (openTimer.current !== null) window.clearTimeout(openTimer.current);
+      if (closeTimer.current !== null) window.clearTimeout(closeTimer.current);
+      openTimer.current = null;
+      closeTimer.current = null;
+    }
+  }, [open, disableHover]);
+
   if (!user) return null;
 
   const busy = switching || loading;
@@ -140,7 +161,7 @@ export function AccountMenuPopover({
     closeTimer.current = null;
   }
   function openOnHover(event: PointerEvent<HTMLElement>) {
-    if (event.pointerType !== "mouse") return;
+    if (event.pointerType !== "mouse" || disableHover) return;
     clearHoverTimers();
     if (open || busy) return;
     openTimer.current = window.setTimeout(() => {
@@ -253,7 +274,7 @@ export function AccountMenuPopover({
           setOpen(false);
         }}
         onCloseAutoFocus={(event) => {
-          if (tabExiting.current || openedByHover.current) {
+          if (disableHover || tabExiting.current || openedByHover.current) {
             event.preventDefault();
             tabExiting.current = false;
           }

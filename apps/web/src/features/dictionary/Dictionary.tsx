@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Search, X } from "lucide-react";
-import { Button, Input } from "@tsz/ui/components";
+import { Button } from "@tsz/ui/components";
+import { SearchField } from "@/features/shell/SearchField";
 import type { CEFRLevel, DictionaryEntry, EnglishVariant } from "@tsz/types";
 import { useUserStore } from "@/stores/user";
 import { api } from "@/lib/request";
@@ -104,12 +105,12 @@ function DictionaryBody({
             查找英文词汇
           </label>
           <div className="flex gap-2">
-            <Input
+            <SearchField
               id="dictionary-search"
               value={input}
               maxLength={100}
-              onChange={(e) => {
-                setInput(e.target.value);
+              onValueChange={(value) => {
+                setInput(value);
                 setInvalid(false);
               }}
               placeholder="输入词汇关键词，快速查词"

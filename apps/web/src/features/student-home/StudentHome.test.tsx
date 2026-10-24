@@ -183,16 +183,33 @@ it("左右面板互斥，Esc 关闭后返回触发器，外部点击关闭", asy
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });
 
+it("外观立即生效不提交学习偏好，英美选择仍需明确保存", async () => {
+  const actions = userEvent.setup();
+  renderWithProviders(<StudentHome />);
+  await actions.click(screen.getByRole("button", { name: "偏好设置" }));
+  await screen.findByRole("radio", { name: "英式英语" });
+  expect(screen.getByRole("button", { name: "保存学习偏好" })).toBeDisabled();
+  await actions.click(screen.getByRole("button", { name: "深色" }));
+  expect(mocks.save).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "保存学习偏好" })).toBeDisabled();
+  await actions.click(screen.getByRole("radio", { name: "美式英语" }));
+  expect(mocks.save).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "保存学习偏好" })).toBeEnabled();
+  await actions.click(screen.getByRole("radio", { name: "英式英语" }));
+  expect(screen.getByRole("button", { name: "保存学习偏好" })).toBeDisabled();
+  await actions.click(screen.getByRole("button", { name: "跟随系统" }));
+});
+
 it("保存偏好保留固定难度，失败保留选择并支持重试，重新打开读取服务端结果", async () => {
   const actions = userEvent.setup();
   mocks.save.mockRejectedValueOnce(new Error("offline"));
   renderWithProviders(<StudentHome />);
   await actions.click(screen.getByRole("button", { name: "偏好设置" }));
   await actions.click(await screen.findByRole("radio", { name: "美式英语" }));
-  await actions.click(screen.getByRole("button", { name: "保存偏好" }));
+  await actions.click(screen.getByRole("button", { name: "保存学习偏好" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("保存失败");
   expect(screen.getByRole("radio", { name: "美式英语" })).toBeChecked();
-  await actions.click(screen.getByRole("button", { name: "保存偏好" }));
+  await actions.click(screen.getByRole("button", { name: "保存学习偏好" }));
   await screen.findByText("英美偏好已保存");
   expect(mocks.save).toHaveBeenLastCalledWith({
     cefr_level: "A2",
@@ -221,7 +238,7 @@ it("切换账号后关闭旧浮层并读取新账号任务，迟到的保存不�
   renderWithProviders(<StudentHome />);
   await actions.click(screen.getByRole("button", { name: "偏好设置" }));
   await actions.click(await screen.findByRole("radio", { name: "美式英语" }));
-  await actions.click(screen.getByRole("button", { name: "保存偏好" }));
+  await actions.click(screen.getByRole("button", { name: "保存学习偏好" }));
   expect(screen.getByRole("button", { name: "保存中…" })).toBeDisabled();
   mocks.list.mockResolvedValue({ items: [] });
   const nextUser = { ...user, id: "student-b" };
@@ -241,7 +258,7 @@ it("切换账号后关闭旧浮层并读取新账号任务，迟到的保存不�
   );
   await actions.click(screen.getByRole("button", { name: "偏好设置" }));
   expect(await screen.findByRole("radio", { name: "英式英语" })).toBeChecked();
-  expect(screen.getByText(/当前难度：B1/)).toBeInTheDocument();
+  expect(screen.getByText("B1").closest("p")).toHaveTextContent("当前难度：B1");
   expect(screen.queryByText("日常英语")).not.toBeInTheDocument();
 });
 
