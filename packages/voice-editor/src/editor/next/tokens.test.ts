@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RichTextAnnotation, RichTextV2 } from "@tsz/types";
 import {
-  EMPTY_MARKS,
   anchorLetters,
   graphemes,
   annotationsToMarks,
@@ -534,7 +533,9 @@ describe("remapMarks 的透传注解", () => {
     }) as const;
 
   const withPassthrough = (annotations: RichTextAnnotation[]): MarkState => ({
-    ...EMPTY_MARKS,
+    roles: [],
+    liaisons: [],
+    pauses: {},
     passthrough: annotations
   });
 

@@ -14,7 +14,7 @@ import {
 } from "antd";
 import { SelectionPanel } from "./SelectionPanel";
 import type { ReactNode } from "react";
-import { Fragment, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type {
   AudioAsset,
   AudioAssetGender,
@@ -30,7 +30,6 @@ import {
 } from "./audioAssets";
 import {
   GRAMMAR_ROLES,
-  LIAISON_ANCHORS,
   RATE_PRESETS,
   RATE_MULTIPLIER_MIN,
   RATE_MULTIPLIER_MAX,
@@ -38,9 +37,7 @@ import {
   VOICE_LOCALES,
   voiceShortName
 } from "./roles";
-import type { Brush, LiaisonEnd } from "./roles";
-import { anchorLetters } from "./tokens";
-import type { LiaisonAnchor, LiaisonDraft } from "./tokens";
+import type { Brush } from "./roles";
 
 /** 工具栏中的发音、标注和音频面板。 */
 
@@ -866,129 +863,6 @@ export function RolePanel({
         ) : (
           <>先输入句型或短语，再选中文字标注</>
         )}
-      </div>
-    </div>
-  );
-}
-
-/**
- * 「起点 / 终点」：既回显锚点所在的词与选中的字母，也是一枚开关——按下哪一端，
- * 接下来点的字母就归哪一端。端别由人选而不按点击先后推断，先定终点再回头选起点、
- * 选完终点再回去扩起点都行。
- */
-function AnchorSlot({
-  label,
-  slot,
-  text,
-  anchor,
-  active,
-  disabled,
-  onSelect
-}: {
-  label: string;
-  slot: LiaisonEnd;
-  text: string;
-  anchor?: LiaisonAnchor;
-  active: boolean;
-  disabled?: boolean;
-  onSelect: () => void;
-}) {
-  const letters = anchor ? anchorLetters(text, anchor) : "";
-  return (
-    <button
-      type="button"
-      className="tsz-ve-anchor-field"
-      aria-pressed={active}
-      aria-label={`选择${label}`}
-      disabled={disabled}
-      onClick={onSelect}
-    >
-      <Typography.Text type="secondary">{label}</Typography.Text>
-      {letters ? (
-        <span className={`tsz-ve-anchor-slot is-${slot}`}>
-          <span className="tsz-ve-anchor-letters">{letters}</span>
-        </span>
-      ) : (
-        <Typography.Text type="secondary">—</Typography.Text>
-      )}
-    </button>
-  );
-}
-
-export interface LiaisonPanelProps {
-  readOnly?: boolean;
-  text: string;
-  draft: LiaisonDraft;
-  /** 接下来点的字母归哪一端。 */
-  activeEnd: LiaisonEnd;
-  onActiveEndChange: (end: LiaisonEnd) => void;
-  onCommit: () => void;
-  onResetDraft: () => void;
-}
-
-/**
- * 连读：这层浮层是「连读工作台」，起点/终点边点边回显。
- *
- * 它必须开在工具栏**上方**——选锚点要在下面的文字上点字母，浮层开在下方会把
- * 标注带整个盖住，等于自断操作路径。开在上方盖住的是文本框，不影响落笔。
- */
-export function LiaisonPanel({
-  readOnly,
-  text,
-  draft,
-  activeEnd,
-  onActiveEndChange,
-  onCommit,
-  onResetDraft
-}: LiaisonPanelProps) {
-  const bothPicked = Boolean(draft.start && draft.end);
-  const canCommit = bothPicked;
-  const hint = !draft.start && !draft.end ? "点下面文字里的字母" : undefined;
-  return (
-    <div className="tsz-ve-pop tsz-ve-pop-liaison" aria-label="连读">
-      {/* 压成两行：这层浮层开在工具栏上方，再高就顶到抽屉标题栏了。 */}
-      <div className="tsz-ve-liaison-anchors">
-        {LIAISON_ANCHORS.map(({ anchor, label }, index) => (
-          <Fragment key={anchor}>
-            {index > 0 && (
-              <span className="tsz-ve-liaison-arrow" aria-hidden>
-                →
-              </span>
-            )}
-            <AnchorSlot
-              label={label}
-              slot={anchor}
-              text={text}
-              anchor={draft[anchor]}
-              active={activeEnd === anchor}
-              disabled={readOnly}
-              onSelect={() => onActiveEndChange(anchor)}
-            />
-          </Fragment>
-        ))}
-      </div>
-      <div className="tsz-ve-liaison-actions">
-        {/* 未选择端点时提示操作方式。 */}
-        {hint && <span className="tsz-ve-pop-hint">{hint}</span>}
-        <Button
-          size="small"
-          type="primary"
-          className="tsz-ve-liaison-commit"
-          aria-label="添加连读"
-          disabled={readOnly || !canCommit}
-          onClick={onCommit}
-        >
-          添加
-        </Button>
-        <Button
-          size="small"
-          type="text"
-          aria-label="重选"
-          disabled={readOnly || (!draft.start && !draft.end)}
-          onClick={onResetDraft}
-        >
-          重选
-        </Button>
       </div>
     </div>
   );

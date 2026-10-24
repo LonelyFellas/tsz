@@ -82,13 +82,6 @@ export interface EditorSnapshot<TLink = TextLinkV3> {
   recoverableTextLinks?: { text: string; link: TLink }[];
 }
 
-export const EMPTY_MARKS: MarkState = {
-  roles: [],
-  liaisons: [],
-  pauses: {},
-  passthrough: []
-};
-
 /** 覆盖码点 position 的单元；不属于任何单元则为空。 */
 export function unitAt(
   units: RoleUnit[],

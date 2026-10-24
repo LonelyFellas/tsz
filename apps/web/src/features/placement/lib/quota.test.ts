@@ -1,11 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  MAX_TESTS,
-  readQuota,
-  recordResult,
-  resetQuota,
-  type StorageLike
-} from "./quota";
+import { MAX_TESTS, readQuota, recordResult, type StorageLike } from "./quota";
 import { isBand, QuotaExhaustedError } from "./types";
 
 function memStorage(): StorageLike & { dump(): Map<string, string> } {
@@ -47,7 +41,7 @@ describe("readQuota", () => {
   });
 });
 
-describe("recordResult / resetQuota", () => {
+describe("recordResult", () => {
   let s: ReturnType<typeof memStorage>;
   beforeEach(() => {
     s = memStorage();
@@ -71,18 +65,11 @@ describe("recordResult / resetQuota", () => {
     expect(readQuota(s).used).toBe(MAX_TESTS);
   });
 
-  it("reset 清空", () => {
-    recordResult("B1", "t", s);
-    resetQuota(s);
-    expect(readQuota(s)).toEqual({ used: 0, last: null });
-  });
-
   it("默认存储走 localStorage(jsdom)", () => {
     window.localStorage.removeItem(KEY);
     recordResult("C1", "t");
     expect(readQuota().last?.band).toBe("C1");
-    resetQuota();
-    expect(readQuota()).toEqual({ used: 0, last: null });
+    window.localStorage.removeItem(KEY);
   });
 });
 
@@ -93,7 +80,6 @@ describe("默认存储在 SSR 下的降级", () => {
     try {
       expect(readQuota()).toEqual({ used: 0, last: null });
       expect(() => recordResult("B2", "t")).not.toThrow();
-      expect(() => resetQuota()).not.toThrow();
     } finally {
       vi.unstubAllGlobals();
     }
