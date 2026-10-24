@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -16,9 +16,14 @@ import {
 } from "@/features/shell/Page";
 import { clearPending, readPending, savePending } from "./pending";
 
-function errorText(error: unknown) {
+function errorText(
+  error: unknown,
+  context: "overview" | "session" = "overview"
+) {
   if (error instanceof HttpError && error.status === 404)
-    return "复习功能尚未开放，原有学习任务仍可继续。";
+    return context === "session"
+      ? "本次复习不存在或已不可访问，请返回今日复习。"
+      : "复习功能尚未开放，原有学习任务仍可继续。";
   return error instanceof Error ? error.message : "操作未完成，请重试。";
 }
 function time(value: string) {
@@ -51,7 +56,23 @@ export function ReviewWorkspace({ sessionId }: { sessionId?: string }) {
     <Overview key={user.id} userId={user.id} />
   );
 }
+function useReviewOperation(userId: string) {
+  const controller = useRef<AbortController | null>(null);
+  useEffect(() => {
+    const active = new AbortController();
+    controller.current = active;
+    return () => active.abort();
+  }, []);
+  return {
+    options: () => ({ signal: controller.current?.signal }),
+    current: () =>
+      !!controller.current &&
+      !controller.current.signal.aborted &&
+      useUserStore.getState().user?.id === userId
+  };
+}
 function Overview({ userId }: { userId: string }) {
+  const operation = useReviewOperation(userId);
   const router = useRouter();
   const client = useQueryClient();
   const [error, setError] = useState("");
@@ -61,21 +82,30 @@ function Overview({ userId }: { userId: string }) {
   const overview = useQuery({
     queryKey: ["memory", userId, "overview"],
     queryFn: ({ signal }) => api.memory.overview({ signal }),
+    refetchInterval: (query) =>
+      query.state.data?.available && query.state.data.enabled ? 30_000 : false,
     refetchOnMount: "always",
     refetchOnWindowFocus: "always"
   });
   const items = useQuery({
-    queryKey: ["memory", userId, "items", filter, after],
+    queryKey: [
+      "memory",
+      userId,
+      "items",
+      overview.data?.answer_profile,
+      filter,
+      after
+    ],
     enabled: !!overview.data?.available && !!overview.data?.enabled,
     queryFn: ({ signal }) => api.memory.items(filter, after, { signal }),
     refetchOnMount: "always"
   });
-  const current = () => useUserStore.getState().user?.id === userId;
+  const current = operation.current;
   async function toggle(enabled: boolean) {
     setBusy(true);
     setError("");
     try {
-      await api.memory.enrollment(enabled);
+      await api.memory.enrollment(enabled, operation.options());
       if (current())
         await client.invalidateQueries({ queryKey: ["memory", userId] });
     } catch (e) {
@@ -87,21 +117,32 @@ function Overview({ userId }: { userId: string }) {
   async function start(mode: "due" | "retest") {
     setBusy(true);
     setError("");
+    let requestedKey: string | undefined;
     try {
-      const input = readPending<StartReview>(userId, "start") ?? {
-        idempotency_key: crypto.randomUUID(),
-        mode,
-        limit: 20
-      };
-      savePending(userId, "start", input);
-      const session = await api.memory.start(input);
+      const saved = readPending<StartReview>(userId, "start");
+      requestedKey = saved?.idempotency_key;
+      let session = saved
+        ? await api.memory.start(saved, operation.options())
+        : null;
       if (!current()) return;
-      clearPending(userId, "start");
+      if (saved) clearPending(userId, "start", saved.idempotency_key);
+      if (!session || session.state !== "active") {
+        const input: StartReview = {
+          idempotency_key: crypto.randomUUID(),
+          mode,
+          limit: 20
+        };
+        savePending(userId, "start", input);
+        requestedKey = input.idempotency_key;
+        session = await api.memory.start(input, operation.options());
+        if (!current()) return;
+        clearPending(userId, "start", input.idempotency_key);
+      }
       router.push(`/student/review/${session.id}`);
     } catch (e) {
       if (current()) {
         if (e instanceof HttpError && e.status === 409) {
-          clearPending(userId, "start");
+          if (requestedKey) clearPending(userId, "start", requestedKey);
           await client.invalidateQueries({ queryKey: ["memory", userId] });
         }
         setError(errorText(e));
@@ -114,11 +155,15 @@ function Overview({ userId }: { userId: string }) {
     setBusy(true);
     setError("");
     try {
-      await api.memory.pause(id, paused, revision);
+      await api.memory.pause(id, paused, revision, operation.options());
       if (current())
         await client.invalidateQueries({ queryKey: ["memory", userId] });
     } catch (e) {
-      if (current()) setError(errorText(e));
+      if (current()) {
+        setError(errorText(e));
+        if (e instanceof HttpError && e.status === 409)
+          await client.invalidateQueries({ queryKey: ["memory", userId] });
+      }
     } finally {
       if (current()) setBusy(false);
     }
@@ -342,8 +387,11 @@ function Overview({ userId }: { userId: string }) {
   );
 }
 function Practice({ userId, id }: { userId: string; id: string }) {
+  const operation = useReviewOperation(userId);
   const client = useQueryClient();
-  const [answer, setAnswer] = useState("");
+  const [draft, setDraft] = useState<{ itemId: string; value: string } | null>(
+    null
+  );
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<ReviewReceipt | null>(null);
@@ -356,7 +404,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
     refetchOnMount: "always",
     refetchOnWindowFocus: "always"
   });
-  const current = () => useUserStore.getState().user?.id === userId;
+  const current = operation.current;
   const pendingAccepted =
     !!storedPending &&
     !!session.data?.items.some(
@@ -364,11 +412,14 @@ function Practice({ userId, id }: { userId: string; id: string }) {
     );
   const pending = pendingAccepted ? null : storedPending;
   useEffect(() => {
-    if (pendingAccepted) clearPending(userId, id);
-  }, [pendingAccepted, userId, id]);
+    if (pendingAccepted && storedPending)
+      clearPending(userId, id, storedPending.idempotency_key);
+  }, [pendingAccepted, storedPending, userId, id]);
   const next = session.data?.items.find(
     (i) => !i.answered && i.content_available
   );
+  const answer = draft?.itemId === next?.id ? (draft?.value ?? "") : "";
+  const sessionKey = ["review", userId, id];
   async function submit() {
     const input =
       pending ??
@@ -379,24 +430,28 @@ function Practice({ userId, id }: { userId: string; id: string }) {
     setBusy(true);
     setError("");
     try {
+      await client.cancelQueries({ queryKey: sessionKey });
+      if (!current()) return;
       savePending(userId, id, input);
       setPending(input);
-      const receipt = await api.memory.answer(id, input);
+      const receipt = await api.memory.answer(id, input, operation.options());
       if (!current()) return;
-      clearPending(userId, id);
+      await client.cancelQueries({ queryKey: sessionKey });
+      if (!current()) return;
+      clearPending(userId, id, input.idempotency_key);
       setPending(null);
-      setAnswer("");
+      setDraft(null);
       setFeedback(receipt);
-      client.setQueryData(["review", userId, id], receipt.session);
+      client.setQueryData(sessionKey, receipt.session);
       await client.invalidateQueries({ queryKey: ["memory", userId] });
     } catch (e) {
       if (current()) {
-        setError(errorText(e));
+        setError(errorText(e, "session"));
         if (
           e instanceof HttpError &&
           [400, 403, 404, 409, 422].includes(e.status)
         ) {
-          clearPending(userId, id);
+          clearPending(userId, id, input.idempotency_key);
           setPending(null);
         }
         await session.refetch();
@@ -410,10 +465,17 @@ function Practice({ userId, id }: { userId: string; id: string }) {
     setBusy(true);
     setError("");
     try {
-      const result = await api.memory.reveal(id, next.id);
-      if (current()) client.setQueryData(["review", userId, id], result);
+      await client.cancelQueries({ queryKey: sessionKey });
+      if (!current()) return;
+      const result = await api.memory.reveal(id, next.id, operation.options());
+      if (!current()) return;
+      await client.cancelQueries({ queryKey: sessionKey });
+      if (current()) client.setQueryData(sessionKey, result);
     } catch (e) {
-      if (current()) setError(errorText(e));
+      if (current()) {
+        setError(errorText(e, "session"));
+        await session.refetch();
+      }
     } finally {
       if (current()) setBusy(false);
     }
@@ -432,7 +494,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
         <PageNotice>正在恢复复习进度…</PageNotice>
       ) : session.isError ? (
         <PageNotice tone="error">
-          {errorText(session.error)}{" "}
+          {errorText(session.error, "session")}{" "}
           <Button variant="link" onClick={() => void session.refetch()}>
             重新读取
           </Button>
@@ -441,7 +503,11 @@ function Practice({ userId, id }: { userId: string; id: string }) {
         data && (
           <div className="space-y-6">
             <p className="text-sm text-foreground-muted">
-              本批已答 {data.answered_count}/{data.target_count} 项
+              本批已答 {data.answered_count}/{data.target_count} 项 ·{" "}
+              {data.settings.english_variant === "BrE"
+                ? "英式拼写"
+                : "美式拼写"}
+              （本批次固定）
             </p>
             {error && (
               <p role="alert" className="text-sm text-danger">
@@ -504,7 +570,9 @@ function Practice({ userId, id }: { userId: string; id: string }) {
                       spellCheck={false}
                       value={pending?.answer ?? answer}
                       disabled={busy || !!pending}
-                      onChange={(e) => setAnswer(e.target.value)}
+                      onChange={(e) =>
+                        setDraft({ itemId: next.id, value: e.target.value })
+                      }
                       maxLength={400}
                     />
                   </div>
