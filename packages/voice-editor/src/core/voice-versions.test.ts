@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { selectVoiceVersion, voiceSettingFor } from "./voice-versions";
+import {
+  selectVoiceVersion,
+  voiceSettingFor,
+  withNativeVoiceVersion
+} from "./voice-versions";
 import type { VoiceOption, VoiceSetting } from "../types";
 
 const voices = [
@@ -24,6 +28,33 @@ const normal: VoiceSetting = {
 const us: VoiceSetting = { voice_id: "guy", enabled: true, rate_percent: 10 };
 
 describe("文本配音版本", () => {
+  it("新身份创建保持参数且重复进入不重建版本，普通旧英美记录原样", () => {
+    const old = { voice_id: "sonia", enabled: false, rate_percent: -10 };
+    expect(
+      withNativeVoiceVersion(old, {
+        id: "sonia",
+        locale: "en-GB"
+      } as VoiceOption)
+    ).toBe(old);
+    const flash = {
+      id: "flash",
+      label: "Flash",
+      locale: "en-US",
+      supportsVolume: false
+    } as VoiceOption;
+    const created = withNativeVoiceVersion(
+      { ...old, voice_id: "flash" },
+      flash,
+      "首位推荐"
+    );
+    expect(created).toMatchObject({
+      locale: "en-US",
+      version_id: expect.any(String),
+      version_name: "首位推荐",
+      rate_percent: -10
+    });
+    expect(withNativeVoiceVersion(created, flash)).toBe(created);
+  });
   it("澳大利亚替换英式选用，其他地区各自保留补充版本", () => {
     const au: VoiceSetting = {
       ...slow,

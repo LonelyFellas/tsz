@@ -1838,6 +1838,81 @@ describe("VoiceEditor 发音区", () => {
     expect(play.querySelector('[aria-label="sound"]')).toBeNull();
   });
 
+  it("Flash自动首位推荐创建完整身份，未勾选先调参也保留地区", async () => {
+    const flash = {
+      ...VOICES[0]!,
+      id: "azure-hd-flash-tiana",
+      locale: "en-US",
+      label: "Tiana Flash",
+      supportsVolume: false,
+      supportsRate: false,
+      supportsPitch: false,
+      rateRange: { min: 0, max: 0 }
+    };
+    const onVoiceProfileChange = vi.fn();
+    const previewAdapter = {
+      ...adapter(),
+      listVoices: vi.fn().mockResolvedValue([flash])
+    };
+    const loadRecommendations = vi.fn().mockResolvedValue([
+      {
+        id: "flash-rec",
+        name: "Flash首推",
+        locale: "en-US",
+        groupName: "释义",
+        setting: { voice_id: flash.id, enabled: true, rate_percent: 0 }
+      }
+    ]);
+    const view = render(
+      <VoiceEditor
+        {...props({
+          previewAdapter,
+          loadRecommendations,
+          recommendationArea: "meaning",
+          autoRecommend: true,
+          onVoiceProfileChange
+        })}
+      />
+    );
+    await waitFor(() =>
+      expect(onVoiceProfileChange).toHaveBeenCalledWith({
+        voices: [
+          expect.objectContaining({
+            version_id: expect.any(String),
+            version_name: "Flash首推",
+            locale: "en-US",
+            voice_id: flash.id
+          })
+        ]
+      })
+    );
+    view.unmount();
+    onVoiceProfileChange.mockClear();
+    render(
+      <VoiceEditor {...props({ previewAdapter, onVoiceProfileChange })} />
+    );
+    openVoices();
+    const style = await screen.findByRole("combobox", {
+      name: "Tiana Flash 风格"
+    });
+    fireEvent.mouseDown(style);
+    fireEvent.click(
+      await screen.findByText("自然", {
+        selector: ".ant-select-item-option-content"
+      })
+    );
+    expect(onVoiceProfileChange).toHaveBeenLastCalledWith({
+      voices: [
+        expect.objectContaining({
+          version_id: expect.any(String),
+          locale: "en-US",
+          voice_id: flash.id,
+          enabled: false
+        })
+      ]
+    });
+  });
+
   it("仅空白新文本首次输入时采用首位推荐，已有文本与显式空配置不自动改写", async () => {
     const recommendation = {
       id: "r",

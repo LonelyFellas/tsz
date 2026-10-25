@@ -43,6 +43,26 @@ export function newVoiceVersionId(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
+export function withNativeVoiceVersion(
+  setting: VoiceSetting,
+  voice: VoiceOption | undefined,
+  name?: string
+): VoiceSetting {
+  if (
+    !voice ||
+    setting.version_id ||
+    (["en-GB", "en-US"].includes(voice.locale) &&
+      voice.supportsVolume !== false)
+  )
+    return setting;
+  return {
+    ...setting,
+    version_id: newVoiceVersionId(),
+    version_name: name ?? voice.label,
+    locale: voice.locale as AudioAssetLocale
+  };
+}
+
 export function voiceLocale(
   setting: VoiceSetting,
   voices: readonly VoiceOption[]
