@@ -10,6 +10,11 @@ import type { ComponentType } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { AccountMenuPopoverProps } from "./AccountMenuPopover";
 
+const push = vi.hoisted(() => vi.fn());
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push })
+}));
+
 const loader = vi.hoisted(() => ({
   called: vi.fn(),
   pending: undefined as
@@ -25,6 +30,7 @@ const loader = vi.hoisted(() => ({
 
 beforeEach(() => {
   vi.resetModules();
+  push.mockReset();
   vi.doMock("./AccountMenuPopover", () => {
     loader.called();
     return loader.pending!;
@@ -88,6 +94,20 @@ it("首屏不加载菜单模块，首次点击等待加载后打开；重复意�
   await finishLoad();
   expect(screen.getByRole("menu")).toHaveAttribute("data-open", "true");
   expect(screen.getByRole("menu")).toHaveAttribute("data-hover", "false");
+});
+
+it("鼠标点击未加载的头像直接进入个人中心，并取消迟到菜单", async () => {
+  await mount();
+  const trigger = screen.getByRole("button", { name: "账户菜单" });
+  const over = new MouseEvent("pointerover", { bubbles: true });
+  Object.defineProperty(over, "pointerType", { value: "mouse" });
+  fireEvent(trigger, over);
+  fireEvent.pointerDown(trigger);
+  fireEvent.click(trigger, { detail: 1 });
+  expect(push).toHaveBeenCalledWith("/account");
+  await finishLoad();
+  expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  expect(trigger).toHaveAttribute("aria-busy", "false");
 });
 
 it("键盘聚焦只预加载，ArrowDown 再打开", async () => {
@@ -201,14 +221,13 @@ for (const action of ["outside", "escape"] as const) {
     render(<input aria-label="其他输入" />);
     const input = screen.getByRole("textbox", { name: "其他输入" });
     const trigger = screen.getByRole("button", { name: "账户菜单" });
-    fireEvent(
-      trigger,
-      new MouseEvent("pointerdown", {
-        bubbles: true,
-        cancelable: true,
-        button: 0
-      })
-    );
+    const down = new MouseEvent("pointerdown", {
+      bubbles: true,
+      cancelable: true,
+      button: 0
+    });
+    Object.defineProperty(down, "pointerType", { value: "touch" });
+    fireEvent(trigger, down);
     expect(trigger).not.toHaveFocus();
     expect(trigger).toHaveAttribute("aria-busy", "true");
     if (action === "outside") fireEvent.pointerDown(input);

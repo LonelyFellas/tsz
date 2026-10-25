@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Settings } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ChevronRight, Settings, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { formatCoins } from "@tsz/shared/format";
 import {
@@ -20,7 +21,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger
 } from "@tsz/ui/components/dropdown-menu";
 import { useUserStore } from "@/stores/user";
 import { displayNameOf } from "@/lib/user";
@@ -80,7 +84,7 @@ export interface AccountMenuPopoverProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   disableHover?: boolean;
-  onPreferences?: () => void;
+  preferences?: ReactNode;
 }
 
 export function AccountMenuPopover({
@@ -91,18 +95,23 @@ export function AccountMenuPopover({
   open: controlledOpen,
   onOpenChange,
   disableHover = false,
-  onPreferences
+  preferences
 }: AccountMenuPopoverProps = {}) {
   const user = useUserStore((s) => s.user);
+  const router = useRouter();
+  const pointerType = useRef("mouse");
   const logout = useLogout();
   const teacher = useTeacherIdentity();
   const [switching, setSwitching] = useState(false);
   const [switchError, setSwitchError] = useState("");
   const [internalOpen, setInternalOpen] = useState(initialOpen);
   const open = controlledOpen ?? internalOpen;
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const [preferencesSideOffset, setPreferencesSideOffset] = useState(8);
   function setOpen(next: boolean | ((previous: boolean) => boolean)) {
     const value = typeof next === "function" ? next(open) : next;
     if (controlledOpen === undefined) setInternalOpen(value);
+    if (!value) setPreferencesOpen(false);
     onOpenChange?.(value);
   }
   const [loading, setLoading] = useState(false);
@@ -110,7 +119,8 @@ export function AccountMenuPopover({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const tabExiting = useRef(false);
-  const openingPreferences = useRef(false);
+  const preferencesTriggerRef = useRef<HTMLDivElement>(null);
+  const preferencesContentRef = useRef<HTMLDivElement>(null);
   const openedByHover = useRef(initialHover);
   const initialKeyboardFocus = useRef(initialKeyboard);
   const openTimer = useRef<number | null>(null);
@@ -137,6 +147,31 @@ export function AccountMenuPopover({
     window.addEventListener("resize", positionAvatar);
     return () => window.removeEventListener("resize", positionAvatar);
   }, [positionAvatar]);
+
+  useLayoutEffect(() => {
+    if (!preferencesOpen) return;
+    function positionPreferences() {
+      const rect = preferencesTriggerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const width = Math.min(330, window.innerWidth - 24);
+      if (
+        rect.left >= width + 20 ||
+        window.innerWidth - rect.right >= width + 20
+      ) {
+        setPreferencesSideOffset(8);
+      } else {
+        // 两侧均放不下时叠在账户菜单上，保留视口两侧的 12px 边距。
+        const left = Math.max(
+          12,
+          Math.min(window.innerWidth - width - 12, rect.left)
+        );
+        setPreferencesSideOffset(left - rect.right);
+      }
+    }
+    positionPreferences();
+    window.addEventListener("resize", positionPreferences);
+    return () => window.removeEventListener("resize", positionPreferences);
+  }, [preferencesOpen]);
 
   useEffect(
     () => () => {
@@ -165,12 +200,7 @@ export function AccountMenuPopover({
     closeTimer.current = null;
   }
   function openOnHover(event: PointerEvent<HTMLElement>) {
-    if (
-      event.pointerType !== "mouse" ||
-      disableHover ||
-      openingPreferences.current
-    )
-      return;
+    if (event.pointerType !== "mouse" || disableHover) return;
     clearHoverTimers();
     if (open || busy) return;
     openTimer.current = window.setTimeout(() => {
@@ -183,6 +213,14 @@ export function AccountMenuPopover({
   function closeAfterHover(event: PointerEvent<HTMLElement>) {
     if (event.pointerType !== "mouse") return;
     clearHoverTimers();
+    const target = event.relatedTarget;
+    if (
+      target instanceof Node &&
+      (triggerRef.current?.contains(target) ||
+        contentRef.current?.contains(target) ||
+        preferencesContentRef.current?.contains(target))
+    )
+      return;
     if (!openedByHover.current || busy) return;
     closeTimer.current = window.setTimeout(() => {
       closeTimer.current = null;
@@ -192,7 +230,6 @@ export function AccountMenuPopover({
   function beginDirectInteraction() {
     clearHoverTimers();
     openedByHover.current = false;
-    openingPreferences.current = false;
   }
   function blockBusyNavigation(event: MouseEvent<HTMLAnchorElement>) {
     if (busy) event.preventDefault();
@@ -222,7 +259,11 @@ export function AccountMenuPopover({
           aria-label="账户菜单"
           onPointerEnter={openOnHover}
           onPointerLeave={closeAfterHover}
-          onPointerDown={beginDirectInteraction}
+          onPointerDown={(event) => {
+            beginDirectInteraction();
+            pointerType.current = event.pointerType || "mouse";
+            if (pointerType.current === "mouse") event.preventDefault();
+          }}
           onKeyDown={(event) => {
             beginDirectInteraction();
             if (open && event.key === "ArrowDown") {
@@ -239,6 +280,10 @@ export function AccountMenuPopover({
               beginDirectInteraction();
               positionAvatar();
               setOpen((value) => !value);
+            } else if (pointerType.current === "mouse" && !busy) {
+              beginDirectInteraction();
+              setOpen(false);
+              router.push("/account");
             }
           }}
           className="group relative z-50 flex h-8 w-8 shrink-0 items-center justify-center rounded-full focus:outline-hidden"
@@ -262,6 +307,10 @@ export function AccountMenuPopover({
         }}
         onPointerLeave={closeAfterHover}
         onPointerDown={beginDirectInteraction}
+        onInteractOutside={(event) => {
+          if (preferencesContentRef.current?.contains(event.target as Node))
+            event.preventDefault();
+        }}
         onOpenAutoFocus={(event) => {
           if (openedByHover.current) event.preventDefault();
           else if (initialKeyboardFocus.current) {
@@ -277,27 +326,22 @@ export function AccountMenuPopover({
         }}
         onKeyDownCapture={(event) => {
           beginDirectInteraction();
-          if (event.key !== "Tab") return;
+          if (
+            event.key !== "Tab" ||
+            !event.currentTarget.contains(event.target as Node)
+          )
+            return;
           event.stopPropagation();
           tabExiting.current = true;
           triggerRef.current?.focus();
           setOpen(false);
         }}
         onCloseAutoFocus={(event) => {
-          if (
-            disableHover ||
-            tabExiting.current ||
-            openedByHover.current ||
-            openingPreferences.current
-          ) {
+          if (disableHover || tabExiting.current || openedByHover.current) {
             event.preventDefault();
             tabExiting.current = false;
           }
           openedByHover.current = false;
-          if (openingPreferences.current) {
-            openingPreferences.current = false;
-            onPreferences?.();
-          }
         }}
       >
         <DropdownMenuLabel className="pt-8 pb-0 text-center">
@@ -357,6 +401,11 @@ export function AccountMenuPopover({
               <rect x="14" y="14" width="7" height="7" rx="1.5" />
             </MenuIcon>
             {teacher.identity === "teacher" ? "教学工作台" : "学习工作台"}
+            <ChevronRight
+              className="ml-auto size-4 text-foreground-muted"
+              strokeWidth={1.5}
+              aria-hidden
+            />
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild disabled={busy} className={MENU_ITEM_CLASS}>
@@ -370,25 +419,82 @@ export function AccountMenuPopover({
               <path d="M5 21v-2a7 7 0 0 1 14 0v2" />
             </MenuIcon>
             个人中心
+            <ChevronRight
+              className="ml-auto size-4 text-foreground-muted"
+              strokeWidth={1.5}
+              aria-hidden
+            />
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem
-          disabled={busy}
-          className={MENU_ITEM_CLASS}
-          onSelect={(event) => {
-            event.preventDefault();
-            beginDirectInteraction();
-            openingPreferences.current = true;
-            setOpen(false);
-          }}
+        <DropdownMenuSub
+          open={preferencesOpen}
+          onOpenChange={setPreferencesOpen}
         >
-          <Settings
-            className="size-[18px] shrink-0"
-            strokeWidth={1.5}
-            aria-hidden
-          />
-          偏好设置
-        </DropdownMenuItem>
+          <DropdownMenuSubTrigger
+            ref={preferencesTriggerRef}
+            disabled={busy}
+            className={`${MENU_ITEM_CLASS} data-[state=open]:bg-primary-muted`}
+            onPointerLeave={(event) => {
+              // 保留入口焦点，避免向左移入面板时被父菜单抢回并关闭子层。
+              if (preferencesOpen) event.preventDefault();
+            }}
+          >
+            <Settings
+              className="size-[18px] shrink-0"
+              strokeWidth={1.5}
+              aria-hidden
+            />
+            偏好设置
+            <ChevronRight
+              className="ml-auto size-4 text-foreground-muted"
+              strokeWidth={1.5}
+              aria-hidden
+            />
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent
+            ref={preferencesContentRef}
+            sideOffset={preferencesSideOffset}
+            onPointerMove={(event) => event.stopPropagation()}
+            avoidCollisions={preferencesSideOffset >= 0}
+            role="dialog"
+            aria-label="偏好设置"
+            className="w-[330px] rounded-3xl border-border/60 bg-surface/95 p-5 backdrop-blur-xl"
+            onPointerEnter={(event) => {
+              if (event.pointerType === "mouse") clearHoverTimers();
+            }}
+            onPointerLeave={closeAfterHover}
+            onKeyDown={(event) => {
+              if (event.key === "Tab" && event.target === event.currentTarget) {
+                event.preventDefault();
+                event.currentTarget
+                  .querySelector<HTMLButtonElement>("button")
+                  ?.focus();
+              }
+            }}
+          >
+            <div
+              onKeyDown={(event) => {
+                if (event.key !== "Escape") event.stopPropagation();
+              }}
+            >
+              <div className="mb-5 flex items-center justify-between gap-3">
+                <h2 className="text-lg font-bold tracking-tight">偏好设置</h2>
+                <button
+                  type="button"
+                  aria-label="关闭偏好设置"
+                  onClick={() => {
+                    setPreferencesOpen(false);
+                    preferencesTriggerRef.current?.focus();
+                  }}
+                  className="inline-flex size-9 items-center justify-center rounded-full bg-muted text-foreground-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                >
+                  <X className="size-[18px]" strokeWidth={1.5} aria-hidden />
+                </button>
+              </div>
+              {preferences}
+            </div>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
         {teacher.verified && (
           <DropdownMenuItem
             data-leaves-page=""
@@ -453,6 +559,11 @@ export function AccountMenuPopover({
                 <path d="M22 9v6" />
               </MenuIcon>
               申请教师认证
+              <ChevronRight
+                className="ml-auto size-4 text-foreground-muted"
+                strokeWidth={1.5}
+                aria-hidden
+              />
             </Link>
           </DropdownMenuItem>
         )}

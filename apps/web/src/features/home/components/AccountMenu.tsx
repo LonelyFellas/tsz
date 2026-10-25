@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useUserStore } from "@/stores/user";
 import { AccountAvatar } from "./AccountAvatar";
 import type { AccountMenuPopoverProps } from "./AccountMenuPopover";
@@ -21,12 +22,14 @@ export function AccountMenu({
   open: controlledOpen,
   onOpenChange,
   disableHover = false,
-  onPreferences
+  preferences
 }: Pick<
   AccountMenuPopoverProps,
-  "open" | "onOpenChange" | "disableHover" | "onPreferences"
+  "open" | "onOpenChange" | "disableHover" | "preferences"
 > = {}) {
   const user = useUserStore((s) => s.user);
+  const router = useRouter();
+  const pointerType = useRef("mouse");
   const request = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const mode = useRef<"hover" | "direct">("hover");
@@ -124,7 +127,7 @@ export function AccountMenu({
         open={controlledOpen}
         onOpenChange={onOpenChange}
         disableHover={disableHover}
-        onPreferences={onPreferences}
+        preferences={preferences}
       />
     );
   return (
@@ -148,7 +151,12 @@ export function AccountMenu({
         if (mode.current === "hover") cancel();
       }}
       onPointerDown={(event) => {
+        pointerType.current = event.pointerType || "mouse";
         if (event.button !== 0 || event.ctrlKey) return;
+        if (pointerType.current === "mouse") {
+          cancel();
+          return;
+        }
         event.preventDefault();
         void open(false);
       }}
@@ -160,6 +168,10 @@ export function AccountMenu({
       }}
       onClick={(event) => {
         if (event.detail === 0) void open(false, true);
+        else if (pointerType.current === "mouse") {
+          cancel();
+          router.push("/account");
+        }
       }}
       className="group relative z-50 flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-opacity focus:outline-hidden aria-busy:cursor-progress aria-busy:opacity-70"
     >

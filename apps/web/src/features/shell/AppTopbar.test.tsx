@@ -54,7 +54,9 @@ const student: User = {
 async function openPreferences(actions: ReturnType<typeof userEvent.setup>) {
   if (useUserStore.getState().user) {
     if (!screen.queryByRole("menu"))
-      await actions.click(screen.getByRole("button", { name: "账户菜单" }));
+      fireEvent.click(screen.getByRole("button", { name: "账户菜单" }), {
+        detail: 0
+      });
     await actions.click(
       await screen.findByRole("menuitem", { name: "偏好设置" })
     );
@@ -244,30 +246,21 @@ function hoverAccount() {
   fireEvent(screen.getByRole("button", { name: "账户菜单" }), event);
 }
 
-it("设置打开时悬停头像不展开账户，主动点击可切换且再次打开设置关闭账户", async () => {
+it("偏好作为账户二级面板展开，Esc 关闭整体并返回头像", async () => {
   route.pathname = "/student/home";
   useUserStore.setState({ user: student, hydrated: true });
   const actions = userEvent.setup();
   renderWithProviders(<AppTopbar />);
   await openPreferences(actions);
-  hoverAccount();
-  await new Promise((resolve) => setTimeout(resolve, 180));
-  expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  expect(screen.getByRole("menu")).toBeInTheDocument();
   expect(screen.getByRole("dialog", { name: "偏好设置" })).toBeInTheDocument();
-  await actions.click(screen.getByRole("button", { name: "账户菜单" }));
-  await screen.findByRole("menu");
-  expect(
-    screen.queryByRole("dialog", { name: "偏好设置" })
-  ).not.toBeInTheDocument();
-  await openPreferences(actions);
-  expect(screen.getByRole("dialog", { name: "偏好设置" })).toBeInTheDocument();
-  await waitFor(() =>
-    expect(screen.queryByRole("menu")).not.toBeInTheDocument()
-  );
-  hoverAccount();
-  await new Promise((resolve) => setTimeout(resolve, 180));
-  expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   await actions.keyboard("{Escape}");
+  await waitFor(() => {
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("dialog", { name: "偏好设置" })
+    ).not.toBeInTheDocument();
+  });
   expect(screen.getByRole("button", { name: "账户菜单" })).toHaveFocus();
 });
 

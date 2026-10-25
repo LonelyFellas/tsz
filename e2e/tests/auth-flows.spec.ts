@@ -355,7 +355,7 @@ test.describe("鉴权与引导端到端流程", () => {
     await page.getByRole("button", { name: "立即登录" }).click();
 
     // 老用户（已引导）直接进主页：打开顶栏头像菜单后退出登录。
-    await page.getByRole("button", { name: "账户菜单" }).click();
+    await page.getByRole("button", { name: "账户菜单" }).hover();
     await page.getByText("退出登录").click();
     await expect(page).toHaveURL(/\/login/);
     await expect(page.getByRole("button", { name: "立即登录" })).toBeVisible();
