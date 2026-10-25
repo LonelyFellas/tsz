@@ -1,5 +1,10 @@
 import { expandFormContents } from "@tsz/shared";
-import { applyFormsStructure } from "./sharedFormsModel";
+import {
+  applyFormsStructure,
+  contentEditorForms,
+  contentFromEditor,
+  replaceSharedContent
+} from "./sharedFormsModel";
 import { V3FormContentOverview } from "./components/V3FormContentOverview";
 import { ConfigProvider } from "antd";
 import { V3FormContentModal } from "./components/V3FormContentModal";
@@ -6411,6 +6416,167 @@ describe("V3WordCreationWizard", () => {
     expect(saveForms).toHaveBeenCalledTimes(1);
   });
 });
+
+it.each([commonFormFixture(), ukUsFormFixture()])(
+  "$regional_variants.mode 共享词形编辑经保存请求与重开保留标注、音色、音频及引用身份",
+  async (form) => {
+    const expanded = formsFixture({ forms: [form] });
+    const shared = applyFormsStructure(
+      { forms_format: "shared_v1", contents: [], pos: [] },
+      expanded
+    );
+    if (!("forms_format" in shared)) throw new Error("fixture");
+    const initialWord: AdminWordV3 = { ...word(), forms: shared };
+    let latest: V3WizardSlotContext;
+    let savedWord: AdminWordV3 | undefined;
+    let editedContent: (typeof shared.contents)[number] | undefined;
+    const source = requests({
+      saveForms: vi.fn(async (_id, input) => {
+        savedWord = {
+          ...initialWord,
+          revision: 2,
+          forms: structuredClone(input.content)
+        };
+        return { word: savedWord };
+      })
+    });
+    const view = renderWizard(source, {
+      initialWord,
+      initialStep: "forms",
+      renderStep: (context) => {
+        latest = context;
+        return (
+          <>
+            <button
+              onClick={() => {
+                const forms = context.formContents;
+                if (!("forms_format" in forms)) throw new Error("fixture");
+                const editor = contentEditorForms(forms.contents[0]!);
+                const regions = editor.pos[0]!.forms[0]!.regional_variants;
+                for (const [index, variant] of (regions.mode === "common"
+                  ? [regions.common]
+                  : [regions.uk, regions.us]
+                ).entries()) {
+                  variant.spelling_rich = {
+                    version: 2,
+                    text: variant.spelling,
+                    annotations: [{ type: "italic", start: 0, end: 2 }]
+                  };
+                  const speech = {
+                    content: {
+                      version: 2 as const,
+                      text: variant.spelling,
+                      annotations: [
+                        { type: "pause" as const, at: 2, duration_ms: 500 }
+                      ]
+                    },
+                    voice_profile: {
+                      voices: [
+                        {
+                          voice_id: `voice-${index}`,
+                          enabled: true,
+                          rate_percent: -10
+                        }
+                      ]
+                    }
+                  };
+                  variant.spelling_speech = speech;
+                  const row = variant.pronunciations[0]!;
+                  row.dict_phonetic_rich = {
+                    version: 2,
+                    text: row.dict_phonetic,
+                    annotations: []
+                  };
+                  row.actual_pron_rich = {
+                    version: 2,
+                    text: row.actual_pron,
+                    annotations: [{ type: "italic", start: 0, end: 2 }]
+                  };
+                  row.style = "citation";
+                  row.voice_profile = speech.voice_profile;
+                  row.audio_assets = [
+                    {
+                      id: `019d2c55-1f9e-7f88-a189-a2b8a07154${index}0`,
+                      locale: index === 0 ? "en-GB" : "en-US",
+                      gender: "female",
+                      content_type: "audio/wav",
+                      size_bytes: 1024,
+                      duration_ms: 500,
+                      original_name: "recording.wav",
+                      created_at: "2026-10-25T00:00:00Z"
+                    }
+                  ];
+                  row.synthesis = {
+                    alphabet: "ipa",
+                    ipa: "",
+                    ups: "",
+                    use_spelling: false,
+                    uk: {
+                      ipa: "sɛn.tə",
+                      ups: "S EH N T AH",
+                      ipa_speech: speech,
+                      ups_speech: speech
+                    },
+                    us: {
+                      ipa: "sɛn.tɚ",
+                      ups: "S EH N T ER",
+                      ipa_speech: speech,
+                      ups_speech: speech
+                    }
+                  };
+                }
+                editedContent = contentFromEditor(editor);
+                context.setFormContents(
+                  replaceSharedContent(
+                    forms,
+                    editedContent,
+                    context.stableVariantIds,
+                    context.pronunciationReferenceIds
+                  )
+                );
+              }}
+            >
+              编辑共享词形配置
+            </button>
+            <button onClick={() => void context.actions.saveForms("save")}>
+              保存共享词形配置
+            </button>
+          </>
+        );
+      }
+    });
+    fireEvent.click(screen.getByText("编辑共享词形配置"));
+    expect(latest!.hasUnsavedChanges).toBe(true);
+    const expected = {
+      ...shared,
+      contents: [structuredClone(editedContent!)]
+    };
+    expect(latest!.formContents).toEqual(expected);
+    fireEvent.click(screen.getByText("保存共享词形配置"));
+    await waitFor(() => expect(latest!.word.revision).toBe(2));
+    expect(source.saveForms).toHaveBeenCalledExactlyOnceWith(initialWord.id, {
+      schema_version: 3,
+      base_revision: 1,
+      intent: "save",
+      content: expected
+    });
+    expect(latest!.formContents).toEqual(expected);
+    expect(latest!.draftForms).toEqual(expandFormContents(expected));
+    expect(latest!.hasUnsavedChanges).toBe(false);
+    view.unmount();
+    renderWizard(requests(), {
+      initialWord: savedWord!,
+      initialStep: "forms",
+      renderStep: (context) => {
+        latest = context;
+        return null;
+      }
+    });
+    expect(latest!.formContents).toEqual(expected);
+    expect(latest!.draftForms).toEqual(expandFormContents(expected));
+    expect(latest!.hasUnsavedChanges).toBe(false);
+  }
+);
 
 it("未保存页面时跨两次内容弹窗地区往返保留完整引用身份", async () => {
   const initialWord: AdminWordV3 = word();
