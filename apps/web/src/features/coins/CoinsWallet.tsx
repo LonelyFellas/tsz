@@ -202,7 +202,7 @@ function Wallet({ id }: { id: string }) {
             id="wallet-rewards"
             className="text-sm font-semibold text-foreground"
           >
-            今日奖励
+            每日奖励
           </h2>
           <div
             className={
@@ -331,7 +331,8 @@ function Wallet({ id }: { id: string }) {
                 <Button
                   type="button"
                   variant="ghost"
-                  size="compact"
+                  size="sm"
+                  className="min-h-11 sm:min-h-10"
                   disabled={page === 1 || entries.isFetching}
                   onClick={() => setPage(page - 1)}
                 >
@@ -343,7 +344,8 @@ function Wallet({ id }: { id: string }) {
                 <Button
                   type="button"
                   variant="ghost"
-                  size="compact"
+                  size="sm"
+                  className="min-h-11 sm:min-h-10"
                   disabled={
                     page >= entries.data.pagination.total_pages ||
                     entries.isFetching
