@@ -14,6 +14,7 @@ import type { AdminWordlist } from "@tsz/types";
 import { browserQueryDefaults } from "@tsz/shared";
 import { WordListsPage } from "./WordLists";
 import { ReviewsPage } from "./Reviews";
+import { WordlistEntryView } from "../features/wordlists/WordlistDetails";
 const permissions = vi.hoisted(() => ({ allowed: true, access: true }));
 vi.mock("@/lib/auth", () => ({
   usePermission: (key: string) =>
@@ -112,6 +113,61 @@ beforeEach(() => {
     ]
   });
 });
+it("词表详情与审核中的释义保留 ExtraBold 用途", () => {
+  mount(
+    <WordlistEntryView
+      entry={{
+        entry_id: "entry",
+        publication_id: "publication",
+        label: "read",
+        kind: "word",
+        pos: [
+          {
+            pos_id: "verb",
+            pos: "verb",
+            grammar_structures: [],
+            senses: [
+              {
+                id: "sense",
+                sub_pos: "verb",
+                level: "A1",
+                definitions: [
+                  {
+                    id: "definition",
+                    definition_mode: "en_definition",
+                    level: "A1",
+                    grammar_structure_id: null,
+                    texts: [
+                      {
+                        dialect: "common",
+                        content: {
+                          version: 2,
+                          text: "read a book",
+                          annotations: [
+                            { type: "bold", start: 0, end: 4 },
+                            { type: "italic", start: 0, end: 4 }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }}
+    />
+  );
+  expect(screen.getByTestId("voice-rich-text-readonly")).toHaveAttribute(
+    "data-text-role",
+    "definition"
+  );
+  expect(
+    document.querySelector(".tsz-ve-bold .tsz-ve-italic")
+  ).toHaveTextContent("read");
+});
+
 it.each([
   [true, "是"],
   [false, "否"],

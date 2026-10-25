@@ -37,7 +37,11 @@ export function WordlistEntryView({ entry }: { entry: WordlistEntry }) {
               {sense.definitions.map((def) => (
                 <div key={def.id}>
                   {def.texts.map((text, i) => (
-                    <RichTextReadOnly key={i} value={text.content} />
+                    <RichTextReadOnly
+                      key={i}
+                      value={text.content}
+                      textRole="definition"
+                    />
                   ))}
                 </div>
               ))}
