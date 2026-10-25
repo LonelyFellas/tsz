@@ -375,7 +375,7 @@ test("多个原形自动编号，指派只替换选中行且保存刷新后不�
   ]);
 });
 
-test("词形总览按英美发音逐行对应音色与语速，窄屏只滚动表格", async ({
+test("词形总览按英美发音逐行对应读法、音色与语速，窄屏只滚动表格", async ({
   page
 }) => {
   const api = await mockAdminV3Api(page, { formsFailureOnce: false });
@@ -390,6 +390,7 @@ test("词形总览按英美发音逐行对应音色与语速，窄屏只滚动�
   if (splitRegions.mode !== "common" || splitBindings.mode !== "common")
     throw new Error("Expected common variant and binding");
   const ukVariant = splitRegions.common;
+  ukVariant.pronunciations[0]!.style = "citation";
   ukVariant.pronunciations.push({
     ...structuredClone(ukVariant.pronunciations[0]!),
     id: "01990000-0000-7000-8000-000000009001",
@@ -404,7 +405,8 @@ test("词形总览按英美发音逐行对应音色与语速，窄屏只滚动�
       {
         ...structuredClone(ukVariant.pronunciations[0]!),
         id: "01990000-0000-7000-8000-000000009003",
-        actual_pron: "ˈɔrbɪtl ˈsentər"
+        actual_pron: "ˈɔrbɪtl ˈsentər",
+        style: "normal" as const
       }
     ]
   };
@@ -584,6 +586,11 @@ test("词形总览按英美发音逐行对应音色与语速，窄屏只滚动�
   }
   const splitRows = page.locator(`tr[data-overview-form-id="${splitForm.id}"]`);
   await expect(splitRows).toHaveCount(3);
+  for (const [index, style] of ["逐字正音", "弱读", "语流连读"].entries()) {
+    await expect(
+      splitRows.nth(index).getByRole("cell", { name: style, exact: true })
+    ).toBeVisible();
+  }
   expect(
     await splitRows.evaluateAll((rows) =>
       rows.map((row) => row.getAttribute("data-overview-dialect"))
@@ -638,7 +645,7 @@ test("词形总览按英美发音逐行对应音色与语速，窄屏只滚动�
         )
       );
     for (const cells of readings) {
-      expect(cells).toHaveLength(3);
+      expect(cells).toHaveLength(4);
       for (const cell of cells) {
         expect(Math.abs(cell.top - cells[0]!.top)).toBeLessThan(1);
         expect(cell.fits).toBe(true);
@@ -649,7 +656,9 @@ test("词形总览按英美发音逐行对应音色与语速，窄屏只滚动�
     const reader = overview
       .locator(".v3-overview-phonetic .has-liaison")
       .first();
-    await expect(reader.locator(".tsz-ve-arc-layer path")).toBeVisible();
+    await expect(
+      reader.locator(".tsz-ve-arc-layer path").first()
+    ).toBeVisible();
     await expect
       .poll(() =>
         reader.evaluate((node) => {
@@ -670,12 +679,48 @@ test("词形总览按英美发音逐行对应音色与语速，窄屏只滚动�
       )
       .toBe(true);
   };
-  for (const width of [1920, 1440, 1280, 1024]) {
+  for (const width of [2560, 1920, 1440, 1280, 1024]) {
     await page.setViewportSize({ width, height: 1100 });
+    await expect
+      .poll(() =>
+        overview.evaluate((node) => {
+          const table = node.getBoundingClientRect();
+          const body = node.closest(".ant-card-body")!.getBoundingClientRect();
+          return Math.abs(table.width - body.width);
+        })
+      )
+      .toBeLessThanOrEqual(1);
+    await expect
+      .poll(() =>
+        overview.evaluate((node) => {
+          const tab = node.closest(".v3-pos-tab")!;
+          const card = node
+            .closest(".v3-form-group-card")!
+            .getBoundingClientRect();
+          const addGroup = tab
+            .querySelector(".word-form-add-group")!
+            .getBoundingClientRect();
+          return (
+            card.width <= 1201 &&
+            Math.abs(card.left - addGroup.left) <= 1 &&
+            Math.abs(card.right - addGroup.right) <= 1
+          );
+        })
+      )
+      .toBe(true);
     await overview.screenshot({
       path: test.info().outputPath(`overview-${width}.png`),
       animations: "disabled"
     });
+    if (width >= 1920) {
+      await page
+        .locator(".v3-form-group-card")
+        .nth(1)
+        .screenshot({
+          path: test.info().outputPath(`overview-group-${width}.png`),
+          animations: "disabled"
+        });
+    }
     await expect
       .poll(() =>
         overview.locator(".ant-table-content").evaluate((node) => ({
@@ -751,6 +796,7 @@ test("词形总览按英美发音逐行对应音色与语速，窄屏只滚动�
     "",
     "词形名称",
     "词形拼写",
+    "读法",
     "实际发音",
     "音色",
     "语速"
@@ -940,6 +986,11 @@ test("词形总览按英美发音逐行对应音色与语速，窄屏只滚动�
   await picker.getByRole("button", { name: "确认替换", exact: true }).click();
   await expect(picker).toBeHidden();
   await expect(dialog.locator(".v3-content-label")).toHaveCount(3);
+  await dialog.getByRole("combobox", { name: "第 1 条发音的读法" }).click();
+  await page
+    .locator(".ant-select-dropdown:visible")
+    .getByText("逐字正音", { exact: true })
+    .click();
   await dialog
     .getByRole("radiogroup", { name: "是否规则变化", exact: true })
     .getByRole("radio", { name: "否", exact: true })
@@ -948,6 +999,9 @@ test("词形总览按英美发音逐行对应音色与语速，窄屏只滚动�
     .getByRole("button", { name: "确认，应用到草稿", exact: true })
     .click();
   await expect(dialog).toBeHidden();
+  await expect(
+    overview.getByRole("cell", { name: "逐字正音", exact: true })
+  ).toHaveCount(2);
   await page.getByRole("button", { name: "保存草稿", exact: true }).click();
   await expect.poll(() => api.getWord().revision).toBe(2);
   expect(
@@ -960,6 +1014,9 @@ test("词形总览按英美发音逐行对应音色与语速，窄屏只滚动�
     `**/api/v1/admin/lexicon/entries/${ADMIN_V3_MIXED_WORD_ID}`
   );
   await page.reload();
+  await expect(
+    overview.getByRole("cell", { name: "逐字正音", exact: true })
+  ).toHaveCount(2);
   await overview.locator("[data-v3-open-content]").first().click();
   await expect(dialog.locator(".v3-content-label")).toHaveCount(3);
   await expect(

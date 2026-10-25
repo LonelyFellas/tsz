@@ -2,10 +2,14 @@
   width: 100%;
 }
 
+.v3-pos-tab {
+  width: 100%;
+  max-width: 1200px;
+}
+
 .v3-form-overview {
   width: 100%;
   min-width: 0;
-  max-width: 920px;
   padding-bottom: 12px;
   isolation: isolate;
 }
@@ -31,6 +35,21 @@
   > tr.v3-overview-form-start
   > td {
   padding-top: 16px;
+}
+.v3-form-overview
+  .ant-table.ant-table-small
+  .ant-table-tbody
+  > tr.v3-overview-form-start
+  ~ tr.v3-overview-form-start
+  > td {
+  border-top: 1px solid var(--word-line);
+}
+.v3-form-overview
+  .ant-table.ant-table-small
+  .ant-table-tbody
+  > tr:has(+ .v3-overview-form-start)
+  > td {
+  padding-bottom: 14px;
 }
 .v3-form-overview .ant-table.ant-table-small tr > .v3-overview-action-cell {
   padding-inline: 16px 8px;
