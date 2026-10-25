@@ -37,7 +37,7 @@ test("另一标签页切换账号后旧页面退出，刷新也不恢复另一�
   await expect(page.getByRole("button", { name: "账户菜单" })).toBeVisible();
   const second = await context.newPage();
   await second.goto("/student/practice");
-  await second.getByRole("button", { name: "账户菜单" }).click();
+  await second.getByRole("button", { name: "账户菜单" }).hover();
   await second.getByRole("menuitem", { name: "退出登录" }).click();
   await expect(second).toHaveURL(/\/login(?:\?|$)/);
   await second.getByLabel("手机号或邮箱").fill("bob@example.com");
@@ -49,7 +49,7 @@ test("另一标签页切换账号后旧页面退出，刷新也不恢复另一�
   await page.reload();
   await expect(page.getByRole("button", { name: "立即登录" })).toBeVisible();
   await expect(page.getByRole("button", { name: "账户菜单" })).toHaveCount(0);
-  await second.getByRole("button", { name: "账户菜单" }).click();
+  await second.getByRole("button", { name: "账户菜单" }).hover();
   await expect(second.getByText("Bob", { exact: true })).toBeVisible();
   await second.close();
 });
@@ -61,7 +61,7 @@ test("旧页面错过账号切换通知，重建后仍保持退出", async ({ pa
   await page.goto("about:blank"); // 卸载旧文档，保留这个 tab 的 sessionStorage。
   const second = await context.newPage();
   await second.goto("/student/practice");
-  await second.getByRole("button", { name: "账户菜单" }).click();
+  await second.getByRole("button", { name: "账户菜单" }).hover();
   await second.getByRole("menuitem", { name: "退出登录" }).click();
   await second.getByLabel("手机号或邮箱").fill("bob@example.com");
   await second.getByLabel("密码", { exact: true }).fill("RawCase!234");
@@ -133,7 +133,7 @@ test("离线登出后 online 不会用残留 cookie 重新登录", async ({ page
   await expect(
     page.getByRole("heading", { name: "我的学习任务" })
   ).toBeVisible();
-  await page.getByRole("button", { name: "账户菜单" }).click();
+  await page.getByRole("button", { name: "账户菜单" }).hover();
   await page.getByRole("menuitem", { name: "退出登录" }).click();
   await expect(page).toHaveURL(/\/login(?:\?|$)/);
   await expect(page.getByRole("button", { name: "立即登录" })).toBeVisible();

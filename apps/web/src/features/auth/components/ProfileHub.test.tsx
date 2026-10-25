@@ -292,7 +292,7 @@ describe("ProfileHub — 交互", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(
       "暂时无法确认工作台身份"
     );
-    expect(screen.getByRole("button", { name: /← 返回/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "返回工作台" })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "重新核验身份" }));
     expect(mockInvalidate).toHaveBeenCalledWith({
       queryKey: ["teacher-certification", "u-123"]
@@ -307,7 +307,7 @@ describe("ProfileHub — 交互", () => {
     });
     rerender(<ProfileHub />);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    const back = screen.getByRole("button", { name: /← 返回/ });
+    const back = screen.getByRole("button", { name: "返回工作台" });
     expect(back).toBeEnabled();
     await user.click(back);
     expect(mockReplace).toHaveBeenCalledWith("/teacher/classes");
@@ -324,7 +324,7 @@ describe("ProfileHub — 交互", () => {
     const { rerender } = render(<ProfileHub />);
     await screen.findByText("Along");
     const user = userEvent.setup();
-    const back = screen.getByRole("button", { name: /← 返回/ });
+    const back = screen.getByRole("button", { name: "返回工作台" });
 
     expect(back).toBeDisabled();
     await user.click(back);
@@ -361,7 +361,7 @@ describe("ProfileHub — 交互", () => {
       await screen.findByText("Along");
       const user = userEvent.setup();
 
-      await user.click(screen.getByRole("button", { name: /← 返回/ }));
+      await user.click(screen.getByRole("button", { name: "返回工作台" }));
       expect(mockReplace).toHaveBeenCalledWith(destination);
       expect(mockBack).not.toHaveBeenCalled();
     }

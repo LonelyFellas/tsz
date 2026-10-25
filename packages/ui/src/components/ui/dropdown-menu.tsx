@@ -7,6 +7,43 @@ import { cn } from "../../lib/cn";
 
 const DropdownMenu = DropdownMenuPrimitive.Root;
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
+const DropdownMenuSub = DropdownMenuPrimitive.Sub;
+
+const DropdownMenuSubTrigger = forwardRef<
+  ComponentRef<typeof DropdownMenuPrimitive.SubTrigger>,
+  ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubTrigger>
+>(({ className, ...props }, ref) => (
+  <DropdownMenuPrimitive.SubTrigger
+    ref={ref}
+    className={cn(
+      "flex min-h-11 cursor-pointer select-none items-center rounded-lg px-3 py-2 text-sm text-foreground-muted outline-hidden focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary data-[highlighted]:bg-muted data-[highlighted]:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      className
+    )}
+    {...props}
+  />
+));
+DropdownMenuSubTrigger.displayName =
+  DropdownMenuPrimitive.SubTrigger.displayName;
+
+const DropdownMenuSubContent = forwardRef<
+  ComponentRef<typeof DropdownMenuPrimitive.SubContent>,
+  ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubContent>
+>(({ className, sideOffset = 8, collisionPadding = 12, ...props }, ref) => (
+  <DropdownMenuPrimitive.Portal>
+    <DropdownMenuPrimitive.SubContent
+      ref={ref}
+      sideOffset={sideOffset}
+      collisionPadding={collisionPadding}
+      className={cn(
+        "z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-32 max-w-[calc(100vw-24px)] overflow-y-auto overscroll-contain rounded-2xl border border-border/70 bg-surface p-1 text-foreground shadow-float outline-hidden",
+        className
+      )}
+      {...props}
+    />
+  </DropdownMenuPrimitive.Portal>
+));
+DropdownMenuSubContent.displayName =
+  DropdownMenuPrimitive.SubContent.displayName;
 
 type DropdownMenuContentProps = ComponentPropsWithoutRef<
   typeof DropdownMenuPrimitive.Content
@@ -91,5 +128,8 @@ export {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent
 };

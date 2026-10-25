@@ -7,7 +7,7 @@ for (const width of [375, 1280]) {
     await mockApi(page, { authenticated: true });
     await page.goto("/account");
     await expect(page.getByRole("heading", { name: "个人中心" })).toBeVisible();
-    await page.getByRole("button", { name: "账户菜单" }).click();
+    await page.getByRole("button", { name: "账户菜单" }).hover();
     const menu = page.getByRole("menu");
     await expect(menu).toBeVisible();
     const expectedItems = [

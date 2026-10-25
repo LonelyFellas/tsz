@@ -31,7 +31,8 @@ vi.mock("@/lib/request", () => ({
   clearSession: vi.fn(),
   api: {
     auth: { logout: vi.fn().mockResolvedValue(undefined) },
-    coins: { wallet: vi.fn() }
+    coins: { wallet: vi.fn() },
+    wordList: { edit: vi.fn(), update: vi.fn(), myItems: vi.fn() }
   }
 }));
 
@@ -103,13 +104,13 @@ describe("AccountMenu", () => {
     render(<AccountMenu />);
     expect(api.coins.wallet).not.toHaveBeenCalled();
     const trigger = screen.getByRole("button", { name: "账户菜单" });
-    await user.click(trigger);
+    fireEvent.click(trigger, { detail: 0 });
     expect(
       await screen.findByRole("menuitem", { name: "天生币：5" })
     ).toHaveAttribute("href", "/account/coins");
     await user.keyboard("{Escape}");
     vi.mocked(api.coins.wallet).mockRejectedValueOnce(new Error("offline"));
-    await user.click(trigger);
+    fireEvent.click(trigger, { detail: 0 });
     expect(
       await screen.findByRole("menuitem", { name: "余额暂不可用" })
     ).toHaveAttribute("href", "/account/coins");
@@ -122,7 +123,7 @@ describe("AccountMenu", () => {
       balance: "9007199254740993",
       status: "open"
     });
-    await user.click(trigger);
+    fireEvent.click(trigger, { detail: 0 });
     expect(
       await screen.findByRole("menuitem", {
         name: "天生币：9,007,199,254,740,993"
@@ -147,9 +148,10 @@ describe("AccountMenu", () => {
         status: "open"
       });
     useUserStore.setState({ user: USER });
-    const user = userEvent.setup();
     render(<AccountMenu />);
-    await user.click(screen.getByRole("button", { name: "账户菜单" }));
+    fireEvent.click(screen.getByRole("button", { name: "账户菜单" }), {
+      detail: 0
+    });
     expect(screen.getByText("读取余额…")).toBeInTheDocument();
     act(() =>
       useUserStore.setState({
@@ -398,7 +400,24 @@ describe("AccountMenu", () => {
     );
   });
 
-  it("仅click激活打开菜单，普通指针点击不重复切换", async () => {
+  it("鼠标点击头像进入个人中心，已展开菜单也会关闭", async () => {
+    useUserStore.setState({ user: USER });
+    const user = userEvent.setup({ skipHover: true });
+    render(<AccountMenu />);
+    const trigger = screen.getByRole("button", { name: "账户菜单" });
+    await user.click(trigger);
+    expect(mockPush).toHaveBeenCalledWith("/account");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    fireEvent.click(trigger, { detail: 0 });
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    await user.click(trigger);
+    expect(mockPush).toHaveBeenCalledTimes(2);
+    await waitFor(() =>
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument()
+    );
+  });
+
+  it("仅click激活打开菜单，触摸点击不跳转或重复切换", async () => {
     useUserStore.setState({ user: USER });
     const user = userEvent.setup();
     render(<AccountMenu />);
@@ -407,15 +426,17 @@ describe("AccountMenu", () => {
     expect(screen.getByRole("menu")).toBeVisible();
     await user.keyboard("{Escape}");
     await waitFor(() => expect(trigger).toHaveFocus());
-    await user.click(trigger);
+    await user.pointer({ target: trigger, keys: "[TouchA]" });
     expect(screen.getByRole("menu")).toBeVisible();
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it("修饰键Enter保留链接的原生激活，不生成无修饰键点击", async () => {
     useUserStore.setState({ user: USER });
-    const user = userEvent.setup();
     render(<AccountMenu />);
-    await user.click(screen.getByRole("button", { name: "账户菜单" }));
+    fireEvent.click(screen.getByRole("button", { name: "账户菜单" }), {
+      detail: 0
+    });
     const link = screen.getByRole("menuitem", { name: "个人中心" });
     const click = vi.fn();
     link.addEventListener("click", click);
@@ -431,14 +452,15 @@ describe("AccountMenu", () => {
     "Tab退出保留原生默认行为且不抢回随后焦点，shift=%s",
     async (shiftKey) => {
       useUserStore.setState({ user: USER });
-      const user = userEvent.setup();
       render(
         <>
           <AccountMenu />
           <button type="button">后续按钮</button>
         </>
       );
-      await user.click(screen.getByRole("button", { name: "账户菜单" }));
+      fireEvent.click(screen.getByRole("button", { name: "账户菜单" }), {
+        detail: 0
+      });
       const link = screen.getByRole("menuitem", { name: "个人中心" });
       link.focus();
       expect(fireEvent.keyDown(link, { key: "Tab", shiftKey })).toBe(true);
@@ -451,13 +473,14 @@ describe("AccountMenu", () => {
     }
   );
 
-  it("点击头像 → 展开常用入口，注销移至账号安全", async () => {
+  it("键盘激活头像 → 展开常用入口，注销移至账号安全", async () => {
     useUserStore.setState({ user: USER });
-    const user = userEvent.setup();
     render(<AccountMenu />);
 
     expect(screen.queryByText("退出登录")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "账户菜单" }));
+    fireEvent.click(screen.getByRole("button", { name: "账户菜单" }), {
+      detail: 0
+    });
     expect(screen.getByText("退出登录")).toBeInTheDocument();
     await screen.findByRole("menuitem", { name: "天生币：5" });
     expect(screen.getByText("学")).toBeVisible();
@@ -480,14 +503,55 @@ describe("AccountMenu", () => {
     expect(screen.queryByText("注销账号")).not.toBeInTheDocument();
   });
 
-  it("偏好设置关闭账户菜单并交给顶栏打开面板", async () => {
+  it("点击偏好设置保留账户菜单，操作面板后可关闭并回到入口", async () => {
     useUserStore.setState({ user: USER });
-    const onPreferences = vi.fn();
-    const user = userEvent.setup();
-    render(<AccountMenu onPreferences={onPreferences} />);
-    await user.click(screen.getByRole("button", { name: "账户菜单" }));
-    await user.click(screen.getByRole("menuitem", { name: "偏好设置" }));
-    expect(onPreferences).toHaveBeenCalledTimes(1);
+    const change = vi.fn();
+    // jsdom 没有浮层坐标；跨菜单的鼠标移动由浏览器验收覆盖。
+    const user = userEvent.setup({ skipHover: true });
+    render(
+      <AccountMenu preferences={<button onClick={change}>切换外观</button>} />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "账户菜单" }), {
+      detail: 0
+    });
+    const trigger = screen.getByRole("menuitem", { name: "偏好设置" });
+    await user.click(trigger);
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    await user.click(screen.getByRole("button", { name: "切换外观" }));
+    expect(change).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByRole("dialog", { name: "偏好设置" })
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "关闭偏好设置" }));
+    expect(
+      screen.queryByRole("dialog", { name: "偏好设置" })
+    ).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+  });
+
+  it("悬停偏好行可展开，键盘可进入并在控件之间切换", async () => {
+    useUserStore.setState({ user: USER });
+    const user = userEvent.setup({ skipHover: true });
+    render(<AccountMenu preferences={<button>切换外观</button>} />);
+    fireEvent.click(screen.getByRole("button", { name: "账户菜单" }), {
+      detail: 0
+    });
+    const trigger = screen.getByRole("menuitem", { name: "偏好设置" });
+    pointer(trigger, "pointermove");
+    await screen.findByRole("dialog", { name: "偏好设置" });
+    await user.keyboard("{ArrowRight}{Tab}");
+    expect(screen.getByRole("button", { name: "关闭偏好设置" })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "切换外观" })).toHaveFocus();
+    await user.keyboard("{ArrowLeft}");
+    expect(
+      screen.queryByRole("dialog", { name: "偏好设置" })
+    ).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
     await waitFor(() =>
       expect(screen.queryByRole("menu")).not.toBeInTheDocument()
     );
@@ -507,7 +571,9 @@ describe("AccountMenu", () => {
       useUserStore.setState({ user: USER });
       const user = userEvent.setup();
       render(<AccountMenu />);
-      await user.click(screen.getByRole("button", { name: "账户菜单" }));
+      fireEvent.click(screen.getByRole("button", { name: "账户菜单" }), {
+        detail: 0
+      });
       expect(
         screen.getByRole("menuitem", {
           name: identity === "teacher" ? "教学工作台" : "学习工作台"
@@ -546,7 +612,9 @@ describe("AccountMenu", () => {
     const user = userEvent.setup();
     render(<AccountMenu />);
 
-    await user.click(screen.getByRole("button", { name: "账户菜单" }));
+    fireEvent.click(screen.getByRole("button", { name: "账户菜单" }), {
+      detail: 0
+    });
     await user.click(screen.getByText("退出登录"));
 
     await waitFor(() => {
@@ -565,7 +633,9 @@ describe("AccountMenu", () => {
         <button type="button">页面按钮</button>
       </div>
     );
-    await user.click(screen.getByRole("button", { name: "账户菜单" }));
+    fireEvent.click(screen.getByRole("button", { name: "账户菜单" }), {
+      detail: 0
+    });
     const menu = screen.getByRole("menu");
     expect(container).not.toContainElement(menu);
     expect(document.body).toContainElement(menu);
@@ -612,7 +682,9 @@ describe("AccountMenu", () => {
     useUserStore.setState({ user: USER });
     const user = userEvent.setup();
     render(<AccountMenu />);
-    await user.click(screen.getByRole("button", { name: "账户菜单" }));
+    fireEvent.click(screen.getByRole("button", { name: "账户菜单" }), {
+      detail: 0
+    });
     await user.click(screen.getByRole("menuitem", { name: "切换为教师" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "切换失败，请重试"
@@ -641,7 +713,9 @@ describe("AccountMenu", () => {
     useUserStore.setState({ user: USER });
     const user = userEvent.setup();
     render(<AccountMenu />);
-    await user.click(screen.getByRole("button", { name: "账户菜单" }));
+    fireEvent.click(screen.getByRole("button", { name: "账户菜单" }), {
+      detail: 0
+    });
     await user.click(screen.getByRole("menuitem", { name: "切换为教师" }));
     expect(screen.getByRole("menuitem", { name: "正在切换…" })).toHaveAttribute(
       "aria-disabled",
@@ -699,7 +773,9 @@ describe("AccountMenu", () => {
     useUserStore.setState({ user: USER });
     const user = userEvent.setup();
     render(<AccountMenu />);
-    await user.click(screen.getByRole("button", { name: "账户菜单" }));
+    fireEvent.click(screen.getByRole("button", { name: "账户菜单" }), {
+      detail: 0
+    });
     await user.click(screen.getByRole("menuitem", { name: "退出登录" }));
     expect(screen.getByRole("menuitem", { name: "退出中…" })).toHaveAttribute(
       "aria-disabled",
@@ -722,13 +798,98 @@ describe("AccountMenu", () => {
     const user = userEvent.setup();
     render(<AccountMenu />);
 
-    await user.click(screen.getByRole("button", { name: "账户菜单" }));
+    fireEvent.click(screen.getByRole("button", { name: "账户菜单" }), {
+      detail: 0
+    });
     expect(screen.getByText("退出登录")).toBeInTheDocument();
     await user.keyboard("{Escape}");
     await waitFor(() => {
       expect(screen.queryByText("退出登录")).not.toBeInTheDocument();
     });
   });
+});
+
+it("头像导航遵守未保存保护，键盘和触摸开菜单不触发离页确认", async () => {
+  useUserStore.setState({ user: USER, onboarded: true });
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+  const user = userEvent.setup({ skipHover: true });
+  render(
+    <>
+      <WordListCreator />
+      <AccountMenu />
+    </>
+  );
+  fireEvent.change(screen.getByLabelText("词表名称"), {
+    target: { value: "保留草稿" }
+  });
+  const trigger = screen.getByRole("button", { name: "账户菜单" });
+  await user.click(trigger);
+  expect(confirm).toHaveBeenCalledWith("尚未保存，确定离开？");
+  expect(mockPush).not.toHaveBeenCalled();
+  expect(screen.getByLabelText("词表名称")).toHaveValue("保留草稿");
+  confirm.mockClear();
+  for (const modifier of ["ctrlKey", "metaKey", "shiftKey", "altKey"]) {
+    fireEvent.click(trigger, { detail: 1, [modifier]: true });
+  }
+  expect(mockPush).not.toHaveBeenCalled();
+  expect(confirm).not.toHaveBeenCalled();
+  await user.pointer({ target: trigger, keys: "[TouchA]" });
+  expect(confirm).not.toHaveBeenCalled();
+  expect(screen.getByRole("menu")).toBeInTheDocument();
+  await user.keyboard("{Escape}");
+  await user.click(trigger);
+  expect(mockPush).not.toHaveBeenCalled();
+  confirm.mockClear();
+  await user.keyboard("{Enter}");
+  expect(confirm).not.toHaveBeenCalled();
+  expect(screen.getByRole("menu")).toBeInTheDocument();
+  confirm.mockReturnValue(true);
+  await user.click(trigger);
+  expect(mockPush).toHaveBeenCalledWith("/account");
+  confirm.mockRestore();
+});
+
+it("词表保存中点击头像不会导航，即使允许离开也保留保存现场", async () => {
+  useUserStore.setState({ user: USER, onboarded: true });
+  vi.mocked(api.wordList.edit).mockResolvedValue({
+    wordlist: { id: "saving-list", name: "原名", revision: 1 },
+    entry_ids: []
+  } as never);
+  vi.mocked(api.wordList.myItems).mockResolvedValue({
+    items: [],
+    revision: 1,
+    pagination: { total: 0 }
+  } as never);
+  let finish!: () => void;
+  vi.mocked(api.wordList.update).mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = () => resolve({ id: "saving-list" } as never);
+      })
+  );
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+  const user = userEvent.setup({ skipHover: true });
+  render(
+    <>
+      <WordListCreator id="saving-list" onSaved={() => {}} />
+      <AccountMenu />
+    </>
+  );
+  await screen.findByDisplayValue("原名");
+  fireEvent.change(screen.getByLabelText("词表名称"), {
+    target: { value: "保存内容" }
+  });
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "保存" })).toBeEnabled()
+  );
+  await user.click(screen.getByRole("button", { name: "保存" }));
+  await waitFor(() => expect(api.wordList.update).toHaveBeenCalled());
+  await user.click(screen.getByRole("button", { name: "账户菜单" }));
+  expect(mockPush).not.toHaveBeenCalled();
+  expect(confirm).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "保存中…" })).toBeDisabled();
+  await act(async () => finish());
+  confirm.mockRestore();
 });
 
 it("failed identity switch restores the unsaved editor's unload and back protection", async () => {
@@ -753,7 +914,9 @@ it("failed identity switch restores the unsaved editor's unload and back protect
   fireEvent.change(screen.getByLabelText("词表名称"), {
     target: { value: "保留草稿" }
   });
-  await user.click(screen.getByRole("button", { name: "账户菜单" }));
+  fireEvent.click(screen.getByRole("button", { name: "账户菜单" }), {
+    detail: 0
+  });
   await user.click(screen.getByRole("menuitem", { name: "切换为教师" }));
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "切换失败，请重试"

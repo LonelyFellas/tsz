@@ -3,7 +3,7 @@
 import type { MeResponse } from "@tsz/types";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { UserPlus } from "lucide-react";
+import { ArrowLeft, UserPlus } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/request";
@@ -118,9 +118,10 @@ export function ProfileHub() {
             identity === "teacher" ? "/teacher/classes" : "/student/practice"
           )
         }
-        className="-ml-3 mb-5 inline-flex min-h-10 items-center rounded-full px-3 text-sm text-foreground-muted transition-colors hover:bg-surface/80 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
+        className="-ml-3 mb-5 inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 text-sm text-foreground-muted transition-colors hover:bg-surface/80 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
       >
-        ← 返回工作台
+        <ArrowLeft className="size-4" strokeWidth={1.8} aria-hidden />
+        返回工作台
       </button>
       {error && (
         <div

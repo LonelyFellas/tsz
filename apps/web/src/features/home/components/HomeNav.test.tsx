@@ -78,7 +78,9 @@ describe("HomeNav", () => {
     const actions = userEvent.setup();
     const view = render(<HomeNav />);
     if (!screen.queryByRole("menu"))
-      await actions.click(screen.getByRole("button", { name: "账户菜单" }));
+      fireEvent.click(screen.getByRole("button", { name: "账户菜单" }), {
+        detail: 0
+      });
     await actions.click(
       await screen.findByRole("menuitem", { name: "偏好设置" })
     );
@@ -112,7 +114,9 @@ describe("HomeNav", () => {
     });
     const actions = userEvent.setup();
     render(<HomeNav />);
-    await actions.click(screen.getByRole("button", { name: "账户菜单" }));
+    fireEvent.click(screen.getByRole("button", { name: "账户菜单" }), {
+      detail: 0
+    });
     await actions.click(
       await screen.findByRole("menuitem", { name: "偏好设置" })
     );
@@ -122,36 +126,27 @@ describe("HomeNav", () => {
     expect(screen.queryByText("英美偏好")).not.toBeInTheDocument();
   });
 
-  it("首页设置与账户互斥，设置打开时不响应头像悬停", async () => {
+  it("首页偏好与账户菜单并存，点击外部关闭两层", async () => {
     useUserStore.setState({ hydrated: true, user: USER });
     const actions = userEvent.setup();
     render(<HomeNav />);
-    if (!screen.queryByRole("menu"))
-      await actions.click(screen.getByRole("button", { name: "账户菜单" }));
+    fireEvent.click(screen.getByRole("button", { name: "账户菜单" }), {
+      detail: 0
+    });
     await actions.click(
       await screen.findByRole("menuitem", { name: "偏好设置" })
     );
-    const event = new MouseEvent("pointerover", { bubbles: true });
-    Object.defineProperty(event, "pointerType", { value: "mouse" });
-    fireEvent(screen.getByRole("button", { name: "账户菜单" }), event);
-    await new Promise((resolve) => setTimeout(resolve, 180));
-    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
-    await actions.click(screen.getByRole("button", { name: "账户菜单" }));
-    await screen.findByRole("menu");
-    expect(
-      screen.queryByRole("dialog", { name: "偏好设置" })
-    ).not.toBeInTheDocument();
-    if (!screen.queryByRole("menu"))
-      await actions.click(screen.getByRole("button", { name: "账户菜单" }));
-    await actions.click(
-      await screen.findByRole("menuitem", { name: "偏好设置" })
-    );
+    expect(screen.getByRole("menu")).toBeInTheDocument();
     expect(
       screen.getByRole("dialog", { name: "偏好设置" })
     ).toBeInTheDocument();
-    await waitFor(() =>
-      expect(screen.queryByRole("menu")).not.toBeInTheDocument()
-    );
+    await actions.click(document.body);
+    await waitFor(() => {
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("dialog", { name: "偏好设置" })
+      ).not.toBeInTheDocument();
+    });
   });
 
   it("已登录 → 显示账户菜单头像,不再平铺登录", () => {

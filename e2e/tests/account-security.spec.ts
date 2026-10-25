@@ -83,7 +83,7 @@ test("macOS Cmd+Enter 在新标签打开菜单链接并保留原页", async ({
   );
   await mockApi(context, { authenticated: true });
   await page.goto("/account/profile");
-  await page.getByRole("button", { name: "账户菜单" }).click();
+  await page.getByRole("button", { name: "账户菜单" }).press("ArrowDown");
   await page.getByRole("menuitem", { name: "个人中心" }).focus();
   const [popup] = await Promise.all([
     context.waitForEvent("page"),
