@@ -2003,6 +2003,10 @@ describe("VoiceEditor 发音区", () => {
       )
     );
     expect(onVoiceProfileChange).not.toHaveBeenCalled();
+    fireEvent.click(within(row).getByRole("button", { name: "调整参数" }));
+    expect(
+      screen.getByRole("checkbox", { name: "启用 Sonia · 英式女声" })
+    ).not.toBeChecked();
     fireEvent.click(within(row).getByRole("button", { name: "正式选用" }));
     expect(onVoiceProfileChange).toHaveBeenLastCalledWith({
       voices: [{ ...slow, enabled: true }, { ...normal, enabled: false }, us]
@@ -2010,6 +2014,73 @@ describe("VoiceEditor 发音区", () => {
     expect(
       within(row).getByRole("button", { name: "删除版本" })
     ).toBeDisabled();
+  });
+
+  it("拼写正式生成只提交正文与停顿，装饰变化不清除生成音频", async () => {
+    const onVoiceProfileChange = vi.fn();
+    const generateAudio = vi.fn().mockResolvedValue(asset());
+    const base = props({
+      mode: "spelling",
+      previewAdapter: { ...adapter(), generateAudio },
+      onVoiceProfileChange,
+      voiceProfile: {
+        voices: [
+          {
+            version_id: "11111111-1111-4111-8111-111111111111",
+            version_name: "自然",
+            locale: "en-GB",
+            voice_id: "sonia",
+            enabled: true,
+            rate_percent: 0
+          }
+        ]
+      }
+    });
+    const value: RichTextV2 = {
+      version: 2,
+      text: "hello there",
+      annotations: [
+        { type: "italic", start: 0, end: 5 },
+        { type: "liaison", start: 4, end: 6 },
+        { type: "pause", at: 5, duration_ms: 500 }
+      ]
+    };
+    // 连读与停顿分开验证，避免已有冲突规则阻止生成。
+    const view = render(
+      <VoiceEditor
+        {...base}
+        value={{
+          ...value,
+          annotations: value.annotations.filter(
+            (mark) => mark.type !== "liaison"
+          )
+        }}
+      />
+    );
+    openVoices();
+    await screen.findByLabelText("启用 Sonia · 英式女声");
+    fireEvent.click(screen.getByRole("button", { name: "生成正式音频" }));
+    await waitFor(() => expect(generateAudio).toHaveBeenCalled());
+    expect(generateAudio.mock.calls[0]![0].content).toEqual({
+      version: 2,
+      text: "hello there",
+      annotations: [{ type: "pause", at: 5, duration_ms: 500 }]
+    });
+    await screen.findByRole("button", { name: "播放正式音频" });
+    onVoiceProfileChange.mockClear();
+    view.rerender(
+      <VoiceEditor
+        {...base}
+        value={{
+          ...value,
+          annotations: [{ type: "pause", at: 5, duration_ms: 500 }]
+        }}
+      />
+    );
+    expect(
+      screen.getByRole("button", { name: "播放正式音频" })
+    ).toBeInTheDocument();
+    expect(onVoiceProfileChange).not.toHaveBeenCalled();
   });
 
   it("正式生成绑定当前版本，播放使用资产，改参数立即失效且不影响另一版本", async () => {
@@ -2058,6 +2129,84 @@ describe("VoiceEditor 发音区", () => {
       voices: [{ ...setting, volume_percent: 65, audio_asset_id: undefined }]
     });
     expect(screen.queryByRole("button", { name: "播放正式音频" })).toBeNull();
+  });
+
+  it("历史正文仅生成音频时也保存与生成一致的 V2 正文", async () => {
+    const onChange = vi.fn();
+    const onVoiceProfileChange = vi.fn();
+    const generateAudio = vi.fn().mockResolvedValue(asset());
+    render(
+      <VoiceEditor
+        {...props({
+          value: { version: 1, text: "hello", spans: [], liaisons: [] },
+          onChange,
+          previewAdapter: { ...adapter(), generateAudio },
+          onVoiceProfileChange,
+          voiceProfile: {
+            voices: [
+              {
+                version_id: "11111111-1111-4111-8111-111111111111",
+                version_name: "自然",
+                locale: "en-GB",
+                voice_id: "sonia",
+                enabled: true,
+                rate_percent: 0
+              }
+            ]
+          }
+        })}
+      />
+    );
+    openVoices();
+    await screen.findByLabelText("启用 Sonia · 英式女声");
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "生成正式音频" }));
+    await waitFor(() => expect(onVoiceProfileChange).toHaveBeenCalled());
+    expect(onChange).toHaveBeenCalledWith(
+      generateAudio.mock.calls[0]![0].content,
+      []
+    );
+    expect(onChange.mock.calls[0]![0].version).toBe(2);
+  });
+
+  it("音色下线后已有正式音频仍能重新选用", async () => {
+    const stored = {
+      version_id: "11111111-1111-4111-8111-111111111111",
+      version_name: "历史",
+      locale: "en-GB",
+      voice_id: "retired",
+      enabled: false,
+      rate_percent: 0,
+      audio_asset_id: "existing-audio"
+    };
+    const onVoiceProfileChange = vi.fn();
+    render(
+      <VoiceEditor
+        {...props({
+          previewAdapter: adapter(),
+          onVoiceProfileChange,
+          voiceProfile: {
+            voices: [
+              stored,
+              { voice_id: "sonia", enabled: true, rate_percent: 0 }
+            ]
+          }
+        })}
+      />
+    );
+    openVoices();
+    await screen.findByLabelText("启用 Sonia · 英式女声");
+    fireEvent.click(
+      within(screen.getByLabelText("配音版本 历史")).getByRole("button", {
+        name: "正式选用"
+      })
+    );
+    expect(onVoiceProfileChange).toHaveBeenLastCalledWith({
+      voices: [
+        { ...stored, enabled: true },
+        { voice_id: "sonia", enabled: false, rate_percent: 0 }
+      ]
+    });
   });
 
   it("正式生成期间不能完成编辑，改字后迟到音频不能绑定到新正文", async () => {

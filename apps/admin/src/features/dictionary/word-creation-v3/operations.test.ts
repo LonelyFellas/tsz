@@ -2536,6 +2536,50 @@ it("拼写试听比较兼容缺省空配置、音色顺序与字段顺序，保�
   ).toBe(false);
 });
 
+it("改拼写清除拼写及各音素版本的旧音频，保留声音配置", () => {
+  const original = formsFixture();
+  const variant = commonVariant(original.pos[0]!.forms[0]!);
+  const profile = {
+    voices: [
+      {
+        voice_id: "sonia",
+        enabled: true,
+        rate_percent: -25,
+        audio_asset_id: "stored-audio"
+      }
+    ]
+  };
+  const speech = {
+    content: { version: 2 as const, text: variant.spelling, annotations: [] },
+    voice_profile: profile
+  };
+  variant.spelling_speech = structuredClone(speech);
+  variant.pronunciations[0]!.synthesis = {
+    alphabet: "ipa",
+    ipa: "",
+    ups: "",
+    uk: {
+      ipa: "fɑː",
+      ups: "F AA",
+      ipa_speech: structuredClone(speech),
+      ups_speech: structuredClone(speech)
+    }
+  };
+  const result = commonVariant(
+    updateVariantSpelling(original, UUIDS.common_variant, "changed").pos[0]!
+      .forms[0]!
+  );
+  for (const updated of [
+    result.spelling_speech,
+    result.pronunciations[0]!.synthesis!.uk!.ipa_speech,
+    result.pronunciations[0]!.synthesis!.uk!.ups_speech
+  ]) {
+    expect(updated!.voice_profile.voices).toEqual([
+      { voice_id: "sonia", enabled: true, rate_percent: -25 }
+    ]);
+  }
+});
+
 it("改拼写同步迁移四份音素设置的停顿，保留各自音色与音素", () => {
   const original = formsFixture();
   const variant = commonVariant(original.pos[0]!.forms[0]!);

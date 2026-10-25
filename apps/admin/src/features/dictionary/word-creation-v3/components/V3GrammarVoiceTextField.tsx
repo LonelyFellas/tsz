@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { expandFormContents } from "@tsz/shared";
 import type { DraftFormsStepContentV3, GrammarFormLinkV3 } from "@tsz/types";
 import { toRichTextV2 } from "@tsz/voice-editor/core";
@@ -23,14 +23,14 @@ export function V3GrammarVoiceTextField({
   forms?: DraftFormsStepContentV3;
 }) {
   const requests = useMemo(() => createV3WordRequests(), []);
-  const previewAdapter = useMemo(
-    () =>
+  const createPreviewAdapter = useCallback(
+    (links: GrammarFormLinkV3[]) =>
       createGrammarFormPreviewAdapter(
         adminVoicePreviewAdapter,
         async () => {
           const targets = new Map<string, Promise<DraftFormsStepContentV3>>();
           return Promise.all(
-            textLinks.map(async (link) => {
+            links.map(async (link) => {
               const key = `${link.target_word_id}:${link.target_publication_id ?? "draft"}`;
               if (!targets.has(key)) {
                 targets.set(
@@ -89,9 +89,13 @@ export function V3GrammarVoiceTextField({
             })
           );
         },
-        textLinks
+        links
       ),
-    [requests, textLinks, forms, wordId]
+    [requests, forms, wordId]
+  );
+  const previewAdapter = useMemo(
+    () => createPreviewAdapter(textLinks),
+    [createPreviewAdapter, textLinks]
   );
   return (
     <V3VoiceTextField<GrammarFormLinkV3>
@@ -99,6 +103,7 @@ export function V3GrammarVoiceTextField({
       mode="grammar"
       textLinks={textLinks}
       previewAdapter={previewAdapter}
+      createPreviewAdapter={createPreviewAdapter}
       renderAssociationPicker={(pickerProps) => (
         <V3GrammarFormPicker {...pickerProps} wordId={wordId} forms={forms} />
       )}

@@ -590,9 +590,20 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     onVoiceProfileChange(profile);
   }
 
+  const generationContent =
+    mode === "synthesis"
+      ? toRichTextV2(value)
+      : mode === "spelling"
+        ? {
+            ...workingValue,
+            annotations: workingValue.annotations.filter(
+              (mark) => mark.type === "pause"
+            )
+          }
+        : workingValue;
   const audioContentKey = JSON.stringify([
-    mode === "synthesis" ? value : workingValue,
-    textLinks,
+    generationContent,
+    links,
     previewAdapter?.audioSourceKey
   ]);
   const lastAudioContent = useRef(audioContentKey);
@@ -624,7 +635,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       !setting.version_id
     )
       return;
-    const content = mode === "synthesis" ? toRichTextV2(value) : workingValue;
+    const content = generationContent;
     const key = voiceSettingKey(setting);
     const signature = JSON.stringify([
       content,
@@ -674,6 +685,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       if (currentSignature !== signature) {
         setRecommendationError("生成期间参数已修改，请重新生成。");
         return;
+      }
+      if (mode !== "synthesis" && value.version === 1) {
+        emittedRef.current = serialized;
+        incomingRef.current = serialized;
+        onChange(workingValue, links);
       }
       changeVoiceSettings(
         voiceSettingsRef.current.map((item) =>

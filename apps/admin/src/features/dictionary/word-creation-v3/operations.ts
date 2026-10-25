@@ -18,7 +18,11 @@ import type {
   WordUkFormVariantV3,
   WordUsFormVariantV3
 } from "@tsz/types";
-import { editRichText, spellingAnnotationsEqual } from "@tsz/voice-editor/core";
+import {
+  clearVoiceAudio,
+  editRichText,
+  spellingAnnotationsEqual
+} from "@tsz/voice-editor/core";
 import { spellingEditorValue, spellingSpeechEqual } from "./spellingSpeech";
 import { variantRegularity } from "./model";
 import { newWordNodeId } from "../word-model/primitives";
@@ -656,7 +660,11 @@ function applyVariantSpelling(
     ]) {
       if (!candidate) continue;
       for (const speech of [candidate.ipa_speech, candidate.ups_speech]) {
-        if (speech) speech.content = editRichText(speech.content, rich.text);
+        if (speech) {
+          if (speech.content.text !== rich.text)
+            speech.voice_profile = clearVoiceAudio(speech.voice_profile);
+          speech.content = editRichText(speech.content, rich.text);
+        }
       }
     }
   }
@@ -669,11 +677,18 @@ function applyVariantSpelling(
   const pauses = rich.annotations.filter(
     (annotation) => annotation.type === "pause"
   );
-  if (variant.spelling_speech || pauses.length > 0)
+  if (variant.spelling_speech || pauses.length > 0) {
+    const previous = variant.spelling_speech;
+    const content = { ...rich, annotations: pauses };
     variant.spelling_speech = {
-      content: { ...rich, annotations: pauses },
-      voice_profile: variant.spelling_speech?.voice_profile ?? { voices: [] }
+      content,
+      voice_profile: previous
+        ? JSON.stringify(previous.content) === JSON.stringify(content)
+          ? previous.voice_profile
+          : clearVoiceAudio(previous.voice_profile)
+        : { voices: [] }
     };
+  }
 }
 
 /** 在草稿副本里定位变体并就地改写；找不到抛错，与其余写操作的约定一致。 */

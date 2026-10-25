@@ -210,7 +210,7 @@ export function VoiceVersions({
                 size="small"
                 disabled={
                   readOnly ||
-                  !available ||
+                  (!available && !setting.audio_asset_id) ||
                   (setting.enabled && !!setting.version_id)
                 }
                 onClick={() => onSelect(setting)}

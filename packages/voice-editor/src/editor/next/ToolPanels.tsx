@@ -197,7 +197,13 @@ export function VoicePanel({
                     return (
                       <PopRow
                         key={voice.id}
-                        selected={enabledVoiceIds.includes(voice.id)}
+                        selected={
+                          voiceSettingFor(
+                            voiceSettings ?? [],
+                            voice.id,
+                            editingVersionKey
+                          )?.enabled ?? enabledVoiceIds.includes(voice.id)
+                        }
                         label={voiceShortName(voice)}
                         ariaLabel={`启用 ${voice.label}`}
                         disabled={readOnly}

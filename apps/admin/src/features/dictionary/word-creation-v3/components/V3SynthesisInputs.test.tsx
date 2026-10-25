@@ -67,6 +67,7 @@ function Harness({
   profiled = false,
   legacyPhrase = false,
   settingsPhrase = false,
+  generated = false,
   issues = []
 }: {
   dialect: Dialect;
@@ -75,8 +76,22 @@ function Harness({
   profiled?: boolean;
   legacyPhrase?: boolean;
   settingsPhrase?: boolean;
+  generated?: boolean;
   issues?: readonly V3DraftValidationIssue[];
 }) {
+  const generatedSpeech = {
+    content: { version: 2 as const, text: "far", annotations: [] },
+    voice_profile: {
+      voices: [
+        {
+          voice_id: "en-gb-sonia",
+          enabled: true,
+          rate_percent: 0,
+          audio_asset_id: "stored-audio"
+        }
+      ]
+    }
+  };
   const [pronunciation, setPronunciation] = useState<WordPronunciationV3>({
     id: "p",
     dict_phonetic: "fɑː",
@@ -125,8 +140,20 @@ function Harness({
               use_spelling: !profiled,
               ipa: "",
               ups: "",
-              uk: { ipa: "fɑː", ups: "F AA" },
-              us: { ipa: "fɑɹ", ups: "F AA R" }
+              uk: {
+                ipa: "fɑː",
+                ups: "F AA",
+                ...(generated
+                  ? { ipa_speech: generatedSpeech, ups_speech: generatedSpeech }
+                  : {})
+              },
+              us: {
+                ipa: "fɑɹ",
+                ups: "F AA R",
+                ...(generated
+                  ? { ipa_speech: generatedSpeech, ups_speech: generatedSpeech }
+                  : {})
+              }
             },
     ...(profiled
       ? {
@@ -172,6 +199,37 @@ const renderWithUps = (ui: Parameters<typeof render>[0]) => {
 };
 
 describe("双口音真实试听控件", () => {
+  it("改音素只清除对应音频引用，保留参数、另一读法和另一口音", () => {
+    renderWithUps(<Harness dialect="common" generated />);
+    fireEvent.change(screen.getByLabelText("第 1 条发音的英式 Azure IPA"), {
+      target: { value: "fɑːɹ" }
+    });
+    const saved = JSON.parse(
+      screen.getByTestId("pronunciation-wire").textContent!
+    );
+    expect(saved.synthesis.uk.ipa_speech.voice_profile.voices[0]).toEqual({
+      voice_id: "en-gb-sonia",
+      enabled: true,
+      rate_percent: 0
+    });
+    expect(
+      saved.synthesis.uk.ups_speech.voice_profile.voices[0].audio_asset_id
+    ).toBe("stored-audio");
+    expect(
+      saved.synthesis.us.ipa_speech.voice_profile.voices[0].audio_asset_id
+    ).toBe("stored-audio");
+    fireEvent.keyDown(screen.getByLabelText("第 1 条发音的英式 Azure IPA"), {
+      key: "z",
+      ctrlKey: true
+    });
+    const undone = JSON.parse(
+      screen.getByTestId("pronunciation-wire").textContent!
+    );
+    expect(undone.synthesis.uk.ipa).toBe("fɑː");
+    expect(
+      undone.synthesis.uk.ipa_speech.voice_profile.voices[0]
+    ).not.toHaveProperty("audio_asset_id");
+  });
   it.each(
     (["common", "uk", "us"] as const).flatMap((dialect) =>
       (["ipa", "ups"] as const).map((alphabet) => ({ dialect, alphabet }))

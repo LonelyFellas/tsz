@@ -23,6 +23,7 @@ import {
 import { PronunciationPreviewControls } from "../../word-creation/PronunciationPreview";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { v3IssueMessage } from "../presentationErrors";
+import { clearVoiceAudio } from "@tsz/voice-editor/core";
 import "./V3SynthesisInputs.css";
 type Alphabet = "ipa" | "ups";
 type Side = "uk" | "us";
@@ -140,7 +141,24 @@ export function V3SynthesisInputs({
     side: Side,
     candidate: PronunciationSynthesisCandidateV3
   ) => {
-    const next = { ...synthesis, [side]: candidate };
+    const previous = candidateForSide(synthesis, side, dialect);
+    const updated = { ...candidate };
+    for (const alphabet of ["ipa", "ups"] as const) {
+      if (
+        previous[alphabet] !== candidate[alphabet] ||
+        (alphabet === "ups" &&
+          JSON.stringify(previous.ups_words) !==
+            JSON.stringify(candidate.ups_words))
+      ) {
+        const speech = candidate[`${alphabet}_speech`];
+        if (speech)
+          updated[`${alphabet}_speech`] = {
+            ...speech,
+            voice_profile: clearVoiceAudio(speech.voice_profile)
+          };
+      }
+    }
+    const next = { ...synthesis, [side]: updated };
     expected.current = next;
     onChange({ synthesis: next });
     setDiagnostic("");

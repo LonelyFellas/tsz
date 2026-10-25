@@ -1,4 +1,17 @@
-import type { AudioAssetLocale, VoiceOption, VoiceSetting } from "../types";
+import type {
+  AudioAssetLocale,
+  VoiceOption,
+  VoiceProfile,
+  VoiceSetting
+} from "../types";
+
+export function clearVoiceAudio(profile: VoiceProfile): VoiceProfile {
+  return {
+    voices: profile.voices.map(
+      ({ audio_asset_id: _audio, ...setting }) => setting
+    )
+  };
+}
 
 export function voiceSettingKey(setting: VoiceSetting): string {
   return setting.version_id ?? setting.voice_id;
