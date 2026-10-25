@@ -1042,6 +1042,104 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     }
   });
 
+  test("Inter Display cv01 在正斜体和三档字重中实际改变数字字形", async ({
+    page
+  }) => {
+    await mockAdminV3Api(page);
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+    await expect(page.getByLabel("添加基本词性").first()).toBeVisible();
+
+    for (const style of ["normal", "italic"]) {
+      for (const weight of [400, 700, 800]) {
+        await test.step(`${style} / ${weight}`, async () => {
+          const glyphs = await page.evaluate(
+            async ({ style, weight }) => {
+              await document.fonts.load(
+                `${style} ${weight} 96px "TSZ Text"`,
+                "1"
+              );
+              const faceRule = [...document.styleSheets]
+                .flatMap((sheet) => [...sheet.cssRules])
+                .filter(
+                  (rule): rule is CSSFontFaceRule =>
+                    rule instanceof CSSFontFaceRule
+                )
+                .find((rule) => {
+                  const [min, max = min] = rule.style.fontWeight
+                    .split(" ")
+                    .map(Number);
+                  return (
+                    rule.style.fontFamily.replaceAll('"', "") === "TSZ Text" &&
+                    rule.style.fontStyle === style &&
+                    weight >= min &&
+                    weight <= max &&
+                    rule.style.getPropertyValue("src").includes("InterDisplay-")
+                  );
+                });
+              if (!faceRule)
+                throw new Error(`缺少 Inter Display ${style} ${weight}`);
+
+              // 同一字体文件只切换 cv01，在当前浏览器内比较像素，不依赖平台截图基线。
+              const referenceFaces = [1, 0].map(
+                (enabled) =>
+                  new FontFace(
+                    enabled ? "TSZCv01Enabled" : "TSZCv01Disabled",
+                    faceRule.style.getPropertyValue("src"),
+                    {
+                      style,
+                      weight: String(weight),
+                      featureSettings: `"cv01" ${enabled}, "cv06", "ss01", "ss03"`
+                    }
+                  )
+              );
+              try {
+                await Promise.all(referenceFaces.map((face) => face.load()));
+                referenceFaces.forEach((face) => document.fonts.add(face));
+                const canvas = document.createElement("canvas");
+                canvas.width = 256;
+                canvas.height = 160;
+                const context = canvas.getContext("2d")!;
+                const render = (family: string) => {
+                  context.clearRect(0, 0, canvas.width, canvas.height);
+                  context.font = `${style} ${weight} 96px "${family}"`;
+                  context.fillText("111", 16, 112);
+                  return [
+                    ...context.getImageData(0, 0, canvas.width, canvas.height)
+                      .data
+                  ];
+                };
+                const actual = render("TSZ Text");
+                const enabled = render(referenceFaces[0].family);
+                const disabled = render(referenceFaces[1].family);
+                return {
+                  hasInk: actual.some((value) => value !== 0),
+                  matchesEnabled: actual.every(
+                    (value, index) => value === enabled[index]
+                  ),
+                  differsFromDisabled: actual.some(
+                    (value, index) => value !== disabled[index]
+                  ),
+                  featureChangesGlyph: enabled.some(
+                    (value, index) => value !== disabled[index]
+                  )
+                };
+              } finally {
+                referenceFaces.forEach((face) => document.fonts.delete(face));
+              }
+            },
+            { style, weight }
+          );
+          expect(glyphs).toEqual({
+            hasInk: true,
+            matchesEnabled: true,
+            differsFromDisabled: true,
+            featureChangesGlyph: true
+          });
+        });
+      }
+    }
+  });
+
   test("字段标签与表头统一字体颜色，并轻微内缩对齐", async ({ page }) => {
     await mockAdminV3Api(page);
     await page.setViewportSize({ width: 1440, height: 1000 });
