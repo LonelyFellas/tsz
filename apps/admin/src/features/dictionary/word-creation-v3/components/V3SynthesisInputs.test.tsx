@@ -12,9 +12,13 @@ import { V3SynthesisInputs } from "./V3SynthesisInputs";
 
 const speech = vi.hoisted(() => ({
   synthesize: vi.fn(),
+  generateAudio: vi.fn(),
   recommendations: vi.fn()
 }));
-vi.mock("@/lib/auth", () => ({ usePermission: () => true }));
+vi.mock("@/lib/auth", () => ({
+  usePermission: () => true,
+  api: { speech: { generateAudio: speech.generateAudio } }
+}));
 vi.mock("@/lib/env", () => ({ env: { VOICE_PREVIEW: true } }));
 vi.mock("@/features/settings/useDialectPreference", () => ({
   useDialectPreference: () => ({ preference: "us" })
@@ -52,6 +56,9 @@ vi.mock("../../voice-editor/dataSource", () => ({
 
 beforeEach(() => {
   speech.recommendations.mockReset().mockResolvedValue([]);
+  speech.generateAudio
+    .mockReset()
+    .mockResolvedValue({ asset: { id: "new-audio" } });
   speech.synthesize.mockReset().mockResolvedValue({
     audioUrl: "/test-audio.mp3",
     expiresAt: new Date(Date.now() + 60000).toISOString(),
@@ -67,6 +74,7 @@ function Harness({
   profiled = false,
   legacyPhrase = false,
   settingsPhrase = false,
+  generated = false,
   issues = []
 }: {
   dialect: Dialect;
@@ -75,8 +83,22 @@ function Harness({
   profiled?: boolean;
   legacyPhrase?: boolean;
   settingsPhrase?: boolean;
+  generated?: boolean;
   issues?: readonly V3DraftValidationIssue[];
 }) {
+  const generatedSpeech = {
+    content: { version: 2 as const, text: "far", annotations: [] },
+    voice_profile: {
+      voices: [
+        {
+          voice_id: "en-gb-sonia",
+          enabled: true,
+          rate_percent: 0,
+          audio_asset_id: "stored-audio"
+        }
+      ]
+    }
+  };
   const [pronunciation, setPronunciation] = useState<WordPronunciationV3>({
     id: "p",
     dict_phonetic: "fɑː",
@@ -125,8 +147,20 @@ function Harness({
               use_spelling: !profiled,
               ipa: "",
               ups: "",
-              uk: { ipa: "fɑː", ups: "F AA" },
-              us: { ipa: "fɑɹ", ups: "F AA R" }
+              uk: {
+                ipa: "fɑː",
+                ups: "F AA",
+                ...(generated
+                  ? { ipa_speech: generatedSpeech, ups_speech: generatedSpeech }
+                  : {})
+              },
+              us: {
+                ipa: "fɑɹ",
+                ups: "F AA R",
+                ...(generated
+                  ? { ipa_speech: generatedSpeech, ups_speech: generatedSpeech }
+                  : {})
+              }
             },
     ...(profiled
       ? {
@@ -172,6 +206,89 @@ const renderWithUps = (ui: Parameters<typeof render>[0]) => {
 };
 
 describe("双口音真实试听控件", () => {
+  it.each(["ipa", "ups"] as const)(
+    "%s 弹窗改音素后生成并完成，保留新音频绑定",
+    async (alphabet) => {
+      speech.recommendations.mockResolvedValue([
+        {
+          id: "first",
+          name: "自然",
+          groupName: "发音",
+          locale: "en-GB",
+          setting: {
+            version_id: "11111111-1111-4111-8111-111111111111",
+            version_name: "自然",
+            locale: "en-GB",
+            voice_id: "en-gb-sonia",
+            enabled: true,
+            rate_percent: 0
+          }
+        }
+      ]);
+      renderWithUps(<Harness dialect="uk" />);
+      const label = `第 1 条发音 英式 Azure ${alphabet.toUpperCase()}`;
+      fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
+      const input = await screen.findByLabelText(`${label}音标编辑`);
+      fireEvent.change(input, {
+        target: { value: alphabet === "ipa" ? "fɑːɹ" : "F AA R" }
+      });
+      const generate = await screen.findByText("生成正式音频");
+      await waitFor(() => expect(generate.closest("button")).toBeEnabled());
+      fireEvent.click(generate);
+      await screen.findByText("已生成音频");
+      fireEvent.click(screen.getByLabelText(`完成${label}设置`));
+      const saved = JSON.parse(
+        screen.getByTestId("pronunciation-wire").textContent!
+      );
+      expect(saved.synthesis.uk[alphabet]).toBe(
+        alphabet === "ipa" ? "fɑːɹ" : "F AA R"
+      );
+      expect(
+        saved.synthesis.uk[`${alphabet}_speech`].voice_profile.voices[0]
+          .audio_asset_id
+      ).toBe("new-audio");
+      expect(speech.generateAudio).toHaveBeenCalledWith(
+        expect.objectContaining({
+          source: expect.objectContaining({
+            alphabet,
+            phoneme: saved.synthesis.uk[alphabet]
+          })
+        }),
+        expect.any(AbortSignal)
+      );
+    }
+  );
+  it("改音素只清除对应音频引用，保留参数、另一读法和另一口音", () => {
+    renderWithUps(<Harness dialect="common" generated />);
+    fireEvent.change(screen.getByLabelText("第 1 条发音的英式 Azure IPA"), {
+      target: { value: "fɑːɹ" }
+    });
+    const saved = JSON.parse(
+      screen.getByTestId("pronunciation-wire").textContent!
+    );
+    expect(saved.synthesis.uk.ipa_speech.voice_profile.voices[0]).toEqual({
+      voice_id: "en-gb-sonia",
+      enabled: true,
+      rate_percent: 0
+    });
+    expect(
+      saved.synthesis.uk.ups_speech.voice_profile.voices[0].audio_asset_id
+    ).toBe("stored-audio");
+    expect(
+      saved.synthesis.us.ipa_speech.voice_profile.voices[0].audio_asset_id
+    ).toBe("stored-audio");
+    fireEvent.keyDown(screen.getByLabelText("第 1 条发音的英式 Azure IPA"), {
+      key: "z",
+      ctrlKey: true
+    });
+    const undone = JSON.parse(
+      screen.getByTestId("pronunciation-wire").textContent!
+    );
+    expect(undone.synthesis.uk.ipa).toBe("fɑː");
+    expect(
+      undone.synthesis.uk.ipa_speech.voice_profile.voices[0]
+    ).not.toHaveProperty("audio_asset_id");
+  });
   it.each(
     (["common", "uk", "us"] as const).flatMap((dialect) =>
       (["ipa", "ups"] as const).map((alphabet) => ({ dialect, alphabet }))

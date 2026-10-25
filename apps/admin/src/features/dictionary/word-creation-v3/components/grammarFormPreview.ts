@@ -1,12 +1,34 @@
 import { grammarSynthesisContent } from "@tsz/shared";
+import type { GrammarFormLinkV3 } from "@tsz/types";
+import { api } from "@/lib/auth";
 import type { VoicePreviewAdapter } from "@tsz/voice-editor/types";
 
 export function createGrammarFormPreviewAdapter(
   source: VoicePreviewAdapter,
-  resolve: () => Promise<Parameters<typeof grammarSynthesisContent>[1]>
+  resolve: () => Promise<Parameters<typeof grammarSynthesisContent>[1]>,
+  formLinks: GrammarFormLinkV3[] = []
 ): VoicePreviewAdapter {
   return {
+    audioSourceKey: JSON.stringify(formLinks),
     listVoices: (input) => source.listVoices(input),
+    resolveAudio: source.resolveAudio,
+    generateAudio: source.generateAudio
+      ? async (input, options) => {
+          const result = await api.speech.generateAudio(
+            {
+              request_id: input.requestId,
+              source: {
+                kind: "text",
+                content: input.content,
+                form_links: formLinks
+              },
+              setting: input.setting
+            },
+            options?.signal
+          );
+          return result.asset;
+        }
+      : undefined,
     async synthesize(input, options) {
       const voices = await source.listVoices({
         language: input.language,

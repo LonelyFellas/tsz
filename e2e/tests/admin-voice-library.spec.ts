@@ -151,10 +151,15 @@ test("从一级菜单查找音色、调参并播放，改字后清除旧音频",
   const requests = await mockApi(page);
   await page.goto("/voices");
   await expect(
-    page.getByRole("navigation").getByText("音色库", { exact: true })
+    page.getByRole("navigation").getByText("配音中心", { exact: true })
   ).toBeVisible();
-  await page.getByRole("menuitem", { name: /音色库/ }).click();
+  await page.getByRole("menuitem", { name: /配音中心/ }).click();
   await expect(page).toHaveURL(/\/voices$/);
+  await expect(page.getByRole("tab", { name: "分组配音" })).toHaveAttribute(
+    "aria-selected",
+    "true"
+  );
+  await page.getByRole("tab", { name: "音色库" }).click();
   await expect(
     page.getByRole("button", { name: "试听 Guy", exact: true })
   ).toBeVisible();
@@ -279,7 +284,7 @@ test("分组草稿受保护，保存后重新打开保持英美推荐", async ({
     .first()
     .fill("0.80");
   await expect(page.getByLabel("Sonia 试听播放器")).toHaveCount(0);
-  await page.getByRole("tab", { name: "全部音色" }).click();
+  await page.getByRole("tab", { name: "音色库" }).click();
   await expect(page.getByRole("dialog")).toContainText("分组还有未保存的修改");
   await page
     .getByRole("dialog")
@@ -301,11 +306,54 @@ test("分组草稿受保护，保存后重新打开保持英美推荐", async ({
   await page.reload();
   await page.getByRole("tab", { name: "分组配音" }).click();
   await expect(page.getByText("发音推荐", { exact: true })).toBeVisible();
+  const savedGroup = page
+    .locator(".dubbing-group")
+    .filter({ hasText: "发音推荐" });
+  await expect(
+    savedGroup.getByRole("region", { name: "发音推荐 英式推荐" })
+  ).toBeVisible();
+  await savedGroup
+    .getByRole("radiogroup")
+    .getByText("美式", { exact: true })
+    .click();
+  await expect(
+    savedGroup.getByRole("radio", { name: "美式", exact: true })
+  ).toBeChecked();
+  await expect(
+    savedGroup.getByRole("region", { name: "发音推荐 英式推荐" })
+  ).toBeHidden();
+  await expect(
+    savedGroup.getByRole("region", { name: "发音推荐 美式推荐" })
+  ).toBeVisible();
+  await page.screenshot({
+    path: test.info().outputPath("dubbing-center-cards.png"),
+    fullPage: true,
+    animations: "disabled"
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await savedGroup
+    .getByRole("radiogroup")
+    .getByText("英式", { exact: true })
+    .click();
+  await expect(
+    savedGroup.getByRole("region", { name: "发音推荐 英式推荐" })
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth
+    )
+  ).toBe(true);
+  await page.screenshot({
+    path: test.info().outputPath("dubbing-center-cards-mobile.png"),
+    fullPage: true,
+    animations: "disabled"
+  });
+  await page.setViewportSize({ width: 1280, height: 720 });
   await expect(page.getByRole("tab", { name: "分组配音" })).toHaveAttribute(
     "aria-selected",
     "true"
   );
-  await page.getByRole("tab", { name: "全部音色" }).click();
+  await page.getByRole("tab", { name: "音色库" }).click();
   await expect(
     page.getByRole("table").getByLabel("试听 Sonia", { exact: true })
   ).toBeVisible();
@@ -454,6 +502,23 @@ test("窄屏分组使用单栏，滚动后仍可保存或取消", async ({ page 
 
 test("词形编辑器选用推荐并保留完整参数", async ({ page }) => {
   await mockAdminV3Api(page, { formsFailureOnce: false });
+  const generatedId = "11111111-2222-4333-8444-555555555555";
+  await page.route("**/api/v1/admin/speech/audio", (route) =>
+    route.fulfill({
+      json: {
+        asset: {
+          id: generatedId,
+          locale: "en-GB",
+          gender: "female",
+          content_type: "audio/mpeg",
+          size_bytes: 100,
+          duration_ms: null,
+          original_name: "generated.mp3",
+          created_at: "2026-10-25T00:00:00Z"
+        }
+      }
+    })
+  );
   await page.route("**/api/v1/admin/speech/voices", (route) =>
     route.fulfill({ json: { items: voices } })
   );
@@ -539,6 +604,43 @@ test("词形编辑器选用推荐并保留完整参数", async ({ page }) => {
     voiceRow.getByRole("spinbutton", { name: /Sonia.*音调/ })
   ).toHaveValue("2");
   await expect(voiceRow.locator(".ant-select")).toContainText("cheerful");
+  await page
+    .getByRole("textbox", { name: "新版本名称" })
+    .fill("另一个慢读版本");
+  await page.getByRole("button", { name: "另存为新版本" }).click();
+  const version = page.getByLabel("配音版本 另一个慢读版本", { exact: true });
+  await version.getByRole("button", { name: "正式选用", exact: true }).click();
+  await expect(version.getByText("正式选用", { exact: true })).toHaveCount(2);
+  await version
+    .getByRole("button", { name: "生成正式音频", exact: true })
+    .click();
+  await expect(version.getByText("已生成音频", { exact: true })).toBeVisible();
+  await editor.getByRole("button", { name: /^完成.*编辑$/ }).click();
+  await content
+    .getByRole("button", { name: "确认，应用到草稿", exact: true })
+    .click();
+  const savedVersions = page.waitForResponse(
+    (response) =>
+      response.request().method() === "PUT" &&
+      response.url().endsWith("/steps/forms")
+  );
+  await page.getByRole("button", { name: /保存草稿$/ }).click();
+  expect((await savedVersions).ok()).toBe(true);
+  await page.reload();
+  await page.locator("[data-v3-open-content]").first().click();
+  await content
+    .locator(".word-shared-form-spelling")
+    .first()
+    .getByRole("button", { name: /^打开.*编辑器$/ })
+    .click();
+  await expect(
+    page.getByLabel("配音版本 清晰慢读", { exact: true })
+  ).toBeVisible();
+  await expect(version).toBeVisible();
+  await expect(version.getByText("已生成音频", { exact: true })).toBeVisible();
+  await expect(
+    version.getByRole("button", { name: "正式选用", exact: true })
+  ).toBeDisabled();
   await page.screenshot({
     path: test.info().outputPath("text-recommendation.png"),
     fullPage: true
@@ -653,8 +755,9 @@ test("窄屏可浏览，只有例句权限时禁止生成；固定参数不可�
   await page.setViewportSize({ width: 390, height: 844 });
   const requests = await mockApi(page, ["sentences.access"]);
   await page.goto("/voices");
+  await page.getByRole("tab", { name: "音色库" }).click();
   await expect(
-    page.getByRole("navigation").getByText("音色库", { exact: true })
+    page.getByRole("navigation").getByText("配音中心", { exact: true })
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "试听 Sonia", exact: true })

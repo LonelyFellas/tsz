@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RichTextV2 } from "@tsz/types";
-import { canonicalVoiceHash } from "../../core";
+import {
+  canonicalVoiceHash,
+  voiceSettingFor,
+  voiceSettingKey
+} from "../../core";
 import type {
   VoiceOption,
   VoicePreviewAdapter,
@@ -16,11 +20,11 @@ function errorMessage(error: unknown): string {
 /** 试听使用该音色自己的语速，并按供应商能力夹取。 */
 function settingsForVoice(
   settings: readonly VoiceSetting[],
-  voice: VoiceOption
+  voice: VoiceOption,
+  versionKey?: string
 ): VoiceSettings {
   const setting =
-    settings.find((item) => item.voice_id === voice.id) ??
-    voice.defaultSettings;
+    voiceSettingFor(settings, voice.id, versionKey) ?? voice.defaultSettings;
   const rate = setting?.rate_percent ?? 0;
   const ratePercent = voice.rateRange
     ? Math.min(Math.max(rate, voice.rateRange.min), voice.rateRange.max)
@@ -55,7 +59,7 @@ export interface VoiceAudition {
   pendingVoiceId?: string;
   /** 正在播放的音色。 */
   playingVoiceId?: string;
-  audition: (voice: VoiceOption) => void;
+  audition: (voice: VoiceOption, setting?: VoiceSetting) => void;
   stop: () => void;
 }
 
@@ -89,6 +93,8 @@ export function useVoiceAudition({
   const requestHashRef = useRef("");
 
   const activeVoiceRef = useRef<VoiceOption | undefined>(undefined);
+  const activeVersionRef = useRef<string | undefined>(undefined);
+  const activeAssetRef = useRef<string | undefined>(undefined);
 
   const stopMedia = useCallback(() => {
     audioRef.current?.pause();
@@ -122,8 +128,14 @@ export function useVoiceAudition({
     const voice = activeVoiceRef.current;
     if (
       voice &&
+      activeAssetRef.current ===
+        voiceSettingFor(settings, voice.id, activeVersionRef.current)
+          ?.audio_asset_id &&
       requestHashRef.current ===
-        canonicalVoiceHash(content, settingsForVoice(settings, voice))
+        canonicalVoiceHash(
+          content,
+          settingsForVoice(settings, voice, activeVersionRef.current)
+        )
     )
       return;
     stop();
@@ -154,24 +166,39 @@ export function useVoiceAudition({
   }, [language, open, previewAdapter]);
 
   const audition = useCallback(
-    (voice: VoiceOption) => {
+    (voice: VoiceOption, setting?: VoiceSetting) => {
       if (!previewAdapter || !content.text.trim()) return;
       stop();
 
       const controller = new AbortController();
       abortRef.current = controller;
       activeVoiceRef.current = voice;
-      const voiceSettings = settingsForVoice(settings, voice);
+      activeVersionRef.current = setting ? voiceSettingKey(setting) : undefined;
+      const voiceSettings = settingsForVoice(
+        setting ? [setting] : settings,
+        voice,
+        activeVersionRef.current
+      );
       const requestHash = canonicalVoiceHash(content, voiceSettings);
       requestHashRef.current = requestHash;
       setPendingVoiceId(voice.id);
-      setStatus(`正在合成 ${voice.label}…`);
-
-      void previewAdapter
-        .synthesize(
-          { language, content, ...voiceSettings },
-          { signal: controller.signal }
-        )
+      const stored = setting ?? voiceSettingFor(settings, voice.id);
+      activeAssetRef.current = stored?.audio_asset_id;
+      setStatus(
+        stored?.audio_asset_id
+          ? `正在读取 ${voice.label} 正式音频…`
+          : `正在合成 ${voice.label}…`
+      );
+      const result =
+        stored?.audio_asset_id && previewAdapter.resolveAudio
+          ? previewAdapter.resolveAudio(stored.audio_asset_id, {
+              signal: controller.signal
+            })
+          : previewAdapter.synthesize(
+              { language, content, ...voiceSettings },
+              { signal: controller.signal }
+            );
+      void result
         .then((result) => {
           if (
             controller.signal.aborted ||

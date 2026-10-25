@@ -830,7 +830,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "a4bcaa23f69ca579f87117c234c7c1f74e294aacb13bc8163b001718f62b794c"
+      "4a138639064ea27841498814b45c59a1e115080287826657d0a13a6edf562438"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1136,6 +1136,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
           "post /admin/lexicon/audio-assets/upload-url",
           "post /admin/lexicon/audio-assets",
           "get /admin/lexicon/audio-assets/{id}/url",
+          "post /admin/speech/audio",
           "post /me/avatar/upload-url",
           "post /me/avatar",
           "post /me/teacher-certification/files"
@@ -1237,6 +1238,18 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
               ? [
                   {
                     name: "X-TSZ-Wordlist-Annotations",
+                    in: "header",
+                    required: false,
+                    schema: { type: ["string", "null"] }
+                  }
+                ]
+              : []),
+            ...(SPELLING_MARKUP_OPERATIONS.includes(operation) ||
+            (SENTENCE_FORMATTING_OPERATIONS.includes(operation) &&
+              operation.includes("/admin/lexicon/sentences"))
+              ? [
+                  {
+                    name: "X-TSZ-Voice-Versions",
                     in: "header",
                     required: false,
                     schema: { type: ["string", "null"] }

@@ -27,13 +27,21 @@ export function spellingSpeechEqual(
       (speech?.voice_profile.voices ?? [])
         .map((voice) => ({
           voice_id: voice.voice_id,
+          version_id: voice.version_id,
+          audio_asset_id: voice.audio_asset_id,
+          version_name: voice.version_name,
+          locale: voice.locale,
           enabled: voice.enabled,
           rate_percent: voice.rate_percent,
           pitch_semitones: voice.pitch_semitones ?? 0,
           volume_percent: voice.volume_percent ?? 100,
           style: voice.style ?? ""
         }))
-        .sort((a, b) => a.voice_id.localeCompare(b.voice_id))
+        .sort(
+          (a, b) =>
+            a.voice_id.localeCompare(b.voice_id) ||
+            (a.version_id ?? "").localeCompare(b.version_id ?? "")
+        )
     );
   const empty: RichTextV2 = { version: 2, text: "", annotations: [] };
   return (

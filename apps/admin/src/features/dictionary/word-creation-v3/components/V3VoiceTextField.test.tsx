@@ -583,7 +583,9 @@ describe("V3VoiceTextField 语种筛选", () => {
       />
     );
     await openVoicePanel();
-    await waitFor(() => expect(screen.getByText("Sonia")).toBeInTheDocument());
+    expect(
+      await screen.findByRole("checkbox", { name: "启用 Sonia" })
+    ).toBeInTheDocument();
     unmount();
 
     render(
@@ -601,7 +603,7 @@ describe("V3VoiceTextField 语种筛选", () => {
     await waitFor(() =>
       expect(document.querySelector(".tsz-ve-speech-panel")).not.toBeNull()
     );
-    expect(screen.queryByText("Sonia")).toBeNull();
+    expect(screen.queryByRole("checkbox", { name: "启用 Sonia" })).toBeNull();
   });
 });
 
@@ -1783,6 +1785,86 @@ it.each([
     expect(screen.getByLabelText("格式读取")).toBe(input);
   }
 );
+
+it("弹窗新增关联后生成使用当前草稿关联，不读取打开前的关联", async () => {
+  state.flags.VOICE_PREVIEW = true;
+  const onChange = vi.fn();
+  const generatedLinks: TextLinkV3[][] = [];
+  const createPreviewAdapter = (links: TextLinkV3[]) => ({
+    listVoices: state.listVoices,
+    synthesize: state.synthesize,
+    async generateAudio() {
+      generatedLinks.push(links);
+      return {
+        id: "audio",
+        locale: "en-GB" as const,
+        gender: "female" as const,
+        content_type: "audio/mpeg",
+        size_bytes: 10,
+        original_name: "audio.mp3",
+        created_at: "2026-10-25T00:00:00Z"
+      };
+    }
+  });
+  render(
+    <V3VoiceTextField<TextLinkV3>
+      mode="association"
+      value={VALUE}
+      textLinks={[]}
+      ariaLabel="草稿关联"
+      nodeId="v"
+      field="value"
+      onChange={onChange}
+      onVoiceProfileChange={vi.fn()}
+      voiceProfile={{
+        voices: [
+          {
+            version_id: "11111111-1111-4111-8111-111111111111",
+            version_name: "自然",
+            locale: "en-GB",
+            voice_id: "sonia",
+            enabled: true,
+            rate_percent: 0
+          }
+        ]
+      }}
+      createPreviewAdapter={createPreviewAdapter}
+      renderAssociationPicker={({ segments, onSelect }) => (
+        <button
+          onClick={() =>
+            onSelect({
+              id: "l",
+              source_segments: segments,
+              target_word_id: "w",
+              target_pos_id: "p",
+              target_base_form_id: "b",
+              target_form_id: "f",
+              target_variant_id: "v",
+              target_sense_id: "s"
+            })
+          }
+        >
+          关联此词
+        </button>
+      )}
+    />
+  );
+  fireEvent.click(screen.getByRole("button", { name: "打开草稿关联编辑器" }));
+  fireEvent.click(await screen.findByRole("button", { name: "关联单词" }));
+  fireEvent.mouseDown(screen.getByLabelText("关联 hello（1）"), { button: 0 });
+  fireEvent.click(await screen.findByText("关联此词"));
+  expect(onChange).not.toHaveBeenCalled();
+  const voicesToggle = screen.getByRole("button", { name: "发音" });
+  if (voicesToggle.getAttribute("aria-expanded") !== "true")
+    fireEvent.click(voicesToggle);
+  const generate = screen.getByText("生成正式音频").closest("button")!;
+  await waitFor(() => expect(generate).toBeEnabled());
+  fireEvent.click(generate);
+  await waitFor(() => expect(generatedLinks).toHaveLength(1));
+  expect(generatedLinks[0]).toEqual([
+    expect.objectContaining({ target_word_id: "w" })
+  ]);
+});
 
 it("仅关联保存通过独立回调保留原正文 wire 格式", async () => {
   const onChange = vi.fn();

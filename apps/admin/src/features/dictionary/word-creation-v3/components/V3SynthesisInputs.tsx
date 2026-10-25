@@ -140,7 +140,35 @@ export function V3SynthesisInputs({
     side: Side,
     candidate: PronunciationSynthesisCandidateV3
   ) => {
-    const next = { ...synthesis, [side]: candidate };
+    const previous = candidateForSide(synthesis, side, dialect);
+    const updated = { ...candidate };
+    for (const alphabet of ["ipa", "ups"] as const) {
+      if (
+        previous[alphabet] !== candidate[alphabet] ||
+        (alphabet === "ups" &&
+          JSON.stringify(previous.ups_words) !==
+            JSON.stringify(candidate.ups_words))
+      ) {
+        const speech = candidate[`${alphabet}_speech`];
+        const previousAssets = new Set(
+          previous[`${alphabet}_speech`]?.voice_profile.voices.map(
+            (setting) => setting.audio_asset_id
+          )
+        );
+        if (speech)
+          updated[`${alphabet}_speech`] = {
+            ...speech,
+            voice_profile: {
+              voices: speech.voice_profile.voices.map((setting) => {
+                if (!previousAssets.has(setting.audio_asset_id)) return setting;
+                const { audio_asset_id: _audio, ...rest } = setting;
+                return rest;
+              })
+            }
+          };
+      }
+    }
+    const next = { ...synthesis, [side]: updated };
     expected.current = next;
     onChange({ synthesis: next });
     setDiagnostic("");

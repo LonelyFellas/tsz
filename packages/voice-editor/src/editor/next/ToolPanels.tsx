@@ -13,6 +13,7 @@ import {
   Typography
 } from "antd";
 import { SelectionPanel } from "./SelectionPanel";
+import { voiceSettingFor, voiceSettingKey } from "../../core";
 import type { ReactNode } from "react";
 import { useRef, useState } from "react";
 import type {
@@ -109,6 +110,7 @@ export interface VoicePanelProps {
   voicesLoading: boolean;
   enabledVoiceIds: string[];
   voiceSettings?: readonly VoiceSetting[];
+  editingVersionKey?: string;
   onRateChange?: (voiceId: string, ratePercent: number) => void;
   onParametersChange?: (
     voiceId: string,
@@ -131,6 +133,7 @@ export function VoicePanel({
   voicesLoading,
   enabledVoiceIds,
   voiceSettings,
+  editingVersionKey,
   onRateChange,
   onParametersChange,
   onToggleVoice,
@@ -186,13 +189,21 @@ export function VoicePanel({
                   .filter((voice) => voice.gender === gender)
                   .map((voice) => {
                     const setting =
-                      voiceSettings?.find(
-                        (item) => item.voice_id === voice.id
+                      voiceSettingFor(
+                        voiceSettings ?? [],
+                        voice.id,
+                        editingVersionKey
                       ) ?? voice.defaultSettings;
                     return (
                       <PopRow
                         key={voice.id}
-                        selected={enabledVoiceIds.includes(voice.id)}
+                        selected={
+                          voiceSettingFor(
+                            voiceSettings ?? [],
+                            voice.id,
+                            editingVersionKey
+                          )?.enabled ?? enabledVoiceIds.includes(voice.id)
+                        }
                         label={voiceShortName(voice)}
                         ariaLabel={`启用 ${voice.label}`}
                         disabled={readOnly}
@@ -332,7 +343,7 @@ export function VoicePanel({
                 !voices.some((voice) => voice.id === setting.voice_id)
             )
             .map((setting) => (
-              <div key={setting.voice_id} className="tsz-ve-pop-status">
+              <div key={voiceSettingKey(setting)} className="tsz-ve-pop-status">
                 {setting.voice_id}（音色已失效，口音未知）
                 <Button
                   size="small"

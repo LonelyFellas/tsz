@@ -191,12 +191,12 @@ function buildNav(profile: AdminProfile | null): MenuItem[] {
     }
     if (
       g.key === "grp-dict" &&
-      visible(pageLeaf(ADMIN_PAGE_ROUTES.voices, "音色库"))
+      visible(pageLeaf(ADMIN_PAGE_ROUTES.voices, "配音中心"))
     ) {
       items.push({
         key: `/${ADMIN_PAGE_ROUTES.voices.path}`,
         icon: <SoundOutlined />,
-        label: "音色库"
+        label: "配音中心"
       });
     }
   }

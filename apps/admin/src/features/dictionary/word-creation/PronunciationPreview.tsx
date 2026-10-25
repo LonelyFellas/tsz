@@ -2,6 +2,7 @@ import { DownOutlined, SoundOutlined, SyncOutlined } from "@ant-design/icons";
 import { App, Button, Popover, Space, Tag, Tooltip } from "antd";
 import type { Dialect, RichTextV2, VoiceProfileV3 } from "@tsz/types";
 import type { AdminDialectPreference } from "@tsz/shared";
+import { voiceSettingFor } from "@tsz/voice-editor/core";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import type {
   VoiceOption,
@@ -192,8 +193,9 @@ export function resolvePronunciationPreviewVoice(
   return {
     voice,
     rate:
-      profile?.voices.find((row) => row.voice_id === voice?.id)?.rate_percent ??
-      0,
+      (voice
+        ? voiceSettingFor(profile?.voices ?? [], voice.id)?.rate_percent
+        : undefined) ?? 0,
     isDefault: settings.length === 0
   };
 }
@@ -260,7 +262,7 @@ export function PronunciationPreviewVoiceSummary({
             return (
               <li
                 className="word-pronunciation-voice-row"
-                key={setting.voice_id}
+                key={setting.version_id ?? setting.voice_id}
               >
                 <div className="word-pronunciation-voice-info">
                   <span className="word-pronunciation-voice-name" title={name}>
@@ -359,9 +361,9 @@ export function PronunciationPreviewControls({
     () => content ?? { version: 2, text: spelling ?? "", annotations: [] },
     [content, spelling]
   );
-  const selectedSetting = voiceProfile?.voices.find(
-    (setting) => setting.voice_id === voice?.id
-  );
+  const selectedSetting = voice
+    ? voiceSettingFor(voiceProfile?.voices ?? [], voice.id)
+    : undefined;
   const contentKey = JSON.stringify([
     previewContent,
     targetLocale,
@@ -369,7 +371,8 @@ export function PronunciationPreviewControls({
     selectedSetting?.rate_percent ?? 0,
     selectedSetting?.pitch_semitones ?? 0,
     selectedSetting?.volume_percent ?? 100,
-    selectedSetting?.style ?? ""
+    selectedSetting?.style ?? "",
+    selectedSetting?.audio_asset_id
   ]);
   const text = previewContent.text.trim();
   const playLabel = ariaLabelPrefix
@@ -479,22 +482,30 @@ export function PronunciationPreviewControls({
     setBusy(true);
     setStatus("正在生成试听…");
     try {
-      const preview = await (previewAdapter ?? context.adapter).synthesize(
-        {
-          language: "en",
-          content: previewContent,
-          voiceId: voice.id,
-          ratePercent: selectedSetting?.rate_percent ?? 0,
-          ...(selectedSetting?.pitch_semitones !== undefined
-            ? { pitchSemitones: selectedSetting.pitch_semitones }
-            : {}),
-          ...(selectedSetting?.volume_percent !== undefined
-            ? { volumePercent: selectedSetting.volume_percent }
-            : {}),
-          ...(selectedSetting?.style ? { style: selectedSetting.style } : {})
-        },
-        { signal: controller.signal }
-      );
+      const adapter = previewAdapter ?? context.adapter;
+      const preview =
+        selectedSetting?.audio_asset_id && adapter.resolveAudio
+          ? await adapter.resolveAudio(selectedSetting.audio_asset_id, {
+              signal: controller.signal
+            })
+          : await adapter.synthesize(
+              {
+                language: "en",
+                content: previewContent,
+                voiceId: voice.id,
+                ratePercent: selectedSetting?.rate_percent ?? 0,
+                ...(selectedSetting?.pitch_semitones !== undefined
+                  ? { pitchSemitones: selectedSetting.pitch_semitones }
+                  : {}),
+                ...(selectedSetting?.volume_percent !== undefined
+                  ? { volumePercent: selectedSetting.volume_percent }
+                  : {}),
+                ...(selectedSetting?.style
+                  ? { style: selectedSetting.style }
+                  : {})
+              },
+              { signal: controller.signal }
+            );
       if (controller.signal.aborted) {
         preview.dispose?.();
         return;

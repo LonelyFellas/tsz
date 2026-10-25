@@ -92,6 +92,13 @@ export function DictionaryDetail({
                               : "通用"}{" "}
                           · {v.spelling}
                         </span>
+                        {preferredAudio(item.audio, v.id, variant) && (
+                          <AudioButton
+                            entryId={id}
+                            audio={preferredAudio(item.audio, v.id, variant)!}
+                            label={`播放 ${v.spelling} 拼写`}
+                          />
+                        )}
                         {v.pronunciations.map((p) => {
                           const audio = preferredAudio(
                             item.audio,
@@ -166,6 +173,21 @@ export function DictionaryDetail({
                               variant={variant}
                               textRole="definition"
                             />
+                            {preferredAudio(
+                              item.audio,
+                              definition.id,
+                              variant
+                            ) && (
+                              <AudioButton
+                                entryId={id}
+                                audio={preferredAudio(
+                                  item.audio,
+                                  definition.id,
+                                  variant
+                                )!}
+                                label="播放英文释义"
+                              />
+                            )}
                           </>
                         ) : (
                           <p className="text-foreground-muted">暂无释义</p>
@@ -193,6 +215,17 @@ export function DictionaryDetail({
                                   variant={variant}
                                   textRole="example"
                                 />
+                                {preferredAudio(item.audio, e.id, variant) && (
+                                  <AudioButton
+                                    entryId={id}
+                                    audio={preferredAudio(
+                                      item.audio,
+                                      e.id,
+                                      variant
+                                    )!}
+                                    label="播放例句"
+                                  />
+                                )}
                                 <div className="mt-1 text-foreground-muted">
                                   <RichTextReadOnly
                                     value={e.translation}

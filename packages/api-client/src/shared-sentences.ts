@@ -48,6 +48,11 @@ function decodeList(value: unknown): SharedSentenceList {
     );
   return value as SharedSentenceList;
 }
+const TEXT_VOICE_HEADERS = {
+  ...SENTENCE_FORMATTING_HEADERS,
+  "X-TSZ-Voice-Versions": "v2"
+} as const;
+
 export function createSharedSentenceEndpoints(http: HttpClient) {
   const root = "/lexicon/sentences";
   return {
@@ -57,24 +62,24 @@ export function createSharedSentenceEndpoints(http: HttpClient) {
         if (value !== undefined) params.set(key, String(value));
       return http
         .get<unknown>(`${root}?${params}`, {
-          headers: SENTENCE_FORMATTING_HEADERS
+          headers: TEXT_VOICE_HEADERS
         })
         .then(decodeList);
     },
     get: (id: string, view: "draft" | "published" = "published") =>
       http
         .get<unknown>(`${root}/${id}?view=${view}`, {
-          headers: SENTENCE_FORMATTING_HEADERS
+          headers: TEXT_VOICE_HEADERS
         })
         .then(decodeSentence),
     create: (input: CreateSharedSentence) =>
       http
-        .post<unknown>(root, input, { headers: SENTENCE_FORMATTING_HEADERS })
+        .post<unknown>(root, input, { headers: TEXT_VOICE_HEADERS })
         .then(decodeSentence),
     update: (id: string, input: UpdateSharedSentence) =>
       http
         .put<unknown>(`${root}/${id}`, input, {
-          headers: SENTENCE_FORMATTING_HEADERS
+          headers: TEXT_VOICE_HEADERS
         })
         .then(decodeSentence),
     delete: (id: string, input: SentenceRevision) =>
@@ -99,7 +104,7 @@ export function createSharedSentenceEndpoints(http: HttpClient) {
       http
         .get<unknown>(
           `${root}/${id}/publications${beforeNumber === undefined ? "" : `?before_number=${beforeNumber}`}`,
-          { headers: SENTENCE_FORMATTING_HEADERS }
+          { headers: TEXT_VOICE_HEADERS }
         )
         .then((value) => {
           if (!Array.isArray(value)) throw new Error("例句历史响应必须为数组");
@@ -110,7 +115,7 @@ export function createSharedSentenceEndpoints(http: HttpClient) {
     publication: (id: string, publicationId: string) =>
       http
         .get<unknown>(`${root}/${id}/publications/${publicationId}`, {
-          headers: SENTENCE_FORMATTING_HEADERS
+          headers: TEXT_VOICE_HEADERS
         })
         .then((value) =>
           decodeContract<SentencePublication>("SentencePublication", value)
@@ -118,7 +123,7 @@ export function createSharedSentenceEndpoints(http: HttpClient) {
     publish: (id: string, key: string, input: SentencePublicationInput) =>
       http
         .post<unknown>(`${root}/${id}/publications`, input, {
-          headers: { ...SENTENCE_FORMATTING_HEADERS, "Idempotency-Key": key }
+          headers: { ...TEXT_VOICE_HEADERS, "Idempotency-Key": key }
         })
         .then(decodeSentence),
     rollback: (
@@ -132,7 +137,7 @@ export function createSharedSentenceEndpoints(http: HttpClient) {
           `${root}/${id}/publications/${publicationId}/rollback`,
           input,
           {
-            headers: { ...SENTENCE_FORMATTING_HEADERS, "Idempotency-Key": key }
+            headers: { ...TEXT_VOICE_HEADERS, "Idempotency-Key": key }
           }
         )
         .then(decodeSentence),
@@ -148,13 +153,13 @@ export function createSharedSentenceEndpoints(http: HttpClient) {
     withdraw: (id: string, key: string, input: WithdrawSentenceInput) =>
       http
         .post<unknown>(`${root}/${id}/withdraw`, input, {
-          headers: { ...SENTENCE_FORMATTING_HEADERS, "Idempotency-Key": key }
+          headers: { ...TEXT_VOICE_HEADERS, "Idempotency-Key": key }
         })
         .then(decodeSentence),
     restore: (id: string, key: string, input: SentencePublicationInput) =>
       http
         .post<unknown>(`${root}/${id}/restore`, input, {
-          headers: { ...SENTENCE_FORMATTING_HEADERS, "Idempotency-Key": key }
+          headers: { ...TEXT_VOICE_HEADERS, "Idempotency-Key": key }
         })
         .then(decodeSentence),
     targets: (query: SentenceTargetQuery) => {

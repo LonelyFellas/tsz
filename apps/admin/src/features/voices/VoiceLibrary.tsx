@@ -130,7 +130,7 @@ function VoiceSettingsNavigationGuard({
         </Space>
       }
     >
-      离开后将丢弃当前参数、听感或介绍的修改。
+      离开后将丢弃尚未保存的听感或介绍。
     </Modal>
   ) : null;
 }
@@ -156,7 +156,7 @@ export function VoiceLibrary() {
   const accountId = useAuthStore((s) => s.profile?.id);
   const { modal } = App.useApp();
   const [groupsDirty, setGroupsDirty] = useState(false);
-  const [tab, setTab] = useState("library");
+  const [tab, setTab] = useState("groups");
   const [query, setQuery] = useState("");
   const [locale, setLocale] = useState<string>();
   const [gender, setGender] = useState<string>();
@@ -171,6 +171,11 @@ export function VoiceLibrary() {
   const [addingRecommendation, setAddingRecommendation] = useState(false);
   const [recommendationPending, setRecommendationPending] = useState(false);
   const [settingsDirty, setSettingsDirty] = useState(false);
+  const [trialParameters, setTrialParameters] = useState<
+    Record<string, Parameters>
+  >({});
+  const storedParameters =
+    useRef<AdminVoiceLibraryResponse["items"][number]["parameters"]>(null);
   const [reloading, setReloading] = useState(false);
   const settingsBaseline = useRef<VoiceForm | null>(null);
   const editSession = useRef(0);
@@ -196,9 +201,8 @@ export function VoiceLibrary() {
     const baseline = settingsBaseline.current;
     setSettingsDirty(
       !baseline ||
-        (Object.keys(baseline) as (keyof VoiceForm)[]).some(
-          (key) => values[key] !== baseline[key]
-        )
+        values.notes !== baseline.notes ||
+        values.description_zh !== baseline.description_zh
     );
   }
   const library = useQuery({
@@ -215,14 +219,7 @@ export function VoiceLibrary() {
     [library.data]
   );
   function voiceParameters(voice: AdminSpeechVoice): Parameters {
-    const saved = metadata.get(voice.alias)?.parameters;
-    return saved
-      ? {
-          ...saved,
-          volume_percent: saved.volume_percent ?? 100,
-          style: saved.style ?? ""
-        }
-      : initialParameters(voice);
+    return trialParameters[voice.alias] ?? initialParameters(voice);
   }
 
   const voices = useQuery({
@@ -342,6 +339,7 @@ export function VoiceLibrary() {
     setSaveMessage(null);
     const info = metadata.get(voice.alias);
     setBasePersonalRevision(info?.personal_revision ?? 0);
+    storedParameters.current = info?.parameters ?? null;
     setBaseDescriptionRevision(info?.description_revision ?? 0);
     const values = {
       ...voiceParameters(voice),
@@ -397,15 +395,7 @@ export function VoiceLibrary() {
     let values: VoiceForm;
     try {
       values = await form.validateFields(
-        kind === "personal"
-          ? [
-              "rate_percent",
-              "pitch_semitones",
-              "volume_percent",
-              "style",
-              "notes"
-            ]
-          : ["description_zh"]
+        kind === "personal" ? ["notes"] : ["description_zh"]
       );
     } catch {
       return;
@@ -418,14 +408,7 @@ export function VoiceLibrary() {
       const saved =
         kind === "personal"
           ? await api.speech.saveSettings(selected.alias, {
-              parameters: {
-                rate_percent: values.rate_percent,
-                pitch_semitones: values.pitch_semitones,
-                ...(values.volume_percent === 100
-                  ? {}
-                  : { volume_percent: values.volume_percent }),
-                style: values.style || null
-              },
+              parameters: storedParameters.current,
               notes: values.notes,
               base_revision: basePersonalRevision
             })
@@ -464,10 +447,6 @@ export function VoiceLibrary() {
         setBasePersonalRevision(saved.personal_revision);
         settingsBaseline.current = {
           ...settingsBaseline.current!,
-          rate_percent: values.rate_percent,
-          pitch_semitones: values.pitch_semitones,
-          volume_percent: values.volume_percent,
-          style: values.style,
           notes: values.notes
         };
       } else {
@@ -480,7 +459,7 @@ export function VoiceLibrary() {
       updateDirty(form.getFieldsValue());
       setSaveMessage(
         kind === "personal"
-          ? "个人参数与听感已保存，仅你可见。"
+          ? "听感已保存，仅你可见。"
           : "中文介绍已保存，所有有权查看音色的管理员可见。"
       );
     } catch (cause) {
@@ -512,15 +491,10 @@ export function VoiceLibrary() {
         (entry) => entry.voice_alias === selected.alias
       );
       setBasePersonalRevision(item?.personal_revision ?? 0);
+      storedParameters.current = item?.parameters ?? null;
       setBaseDescriptionRevision(item?.description_revision ?? 0);
       const values = {
-        ...(item?.parameters
-          ? {
-              ...item.parameters,
-              volume_percent: item.parameters.volume_percent ?? 100,
-              style: item.parameters.style ?? ""
-            }
-          : initialParameters(selected)),
+        ...voiceParameters(selected),
         notes: item?.notes ?? "",
         description_zh: item?.description_zh ?? ""
       };
@@ -549,7 +523,7 @@ export function VoiceLibrary() {
     }
     modal.confirm({
       title: "还有未保存的音色设置",
-      content: "关闭会丢弃当前参数、听感或介绍的修改。",
+      content: "关闭会丢弃尚未保存的听感或介绍。",
       okText: "放弃修改",
       cancelText: "继续编辑",
       onOk: close
@@ -656,7 +630,7 @@ export function VoiceLibrary() {
           busy={settingsBusy}
         />
       )}
-      <Breadcrumb items={[{ title: "音色库" }]} />
+      <Breadcrumb items={[{ title: "配音中心" }]} />
       {!canGenerate && (
         <Alert
           type="info"
@@ -675,6 +649,12 @@ export function VoiceLibrary() {
         />
       )}
       <Card size="small" className="voice-library-content">
+        <div className="voice-library-heading">
+          <Typography.Title level={2}>配音中心</Typography.Title>
+          <Typography.Paragraph type="secondary">
+            按板块整理推荐配音，也可以到音色库试听和选择声音。
+          </Typography.Paragraph>
+        </div>
         <Tabs
           activeKey={tab}
           tabBarExtraContent={
@@ -704,8 +684,8 @@ export function VoiceLibrary() {
             setTab(value);
           }}
           items={[
-            { key: "library", label: "全部音色" },
-            { key: "groups", label: "分组配音" }
+            { key: "groups", label: "分组配音" },
+            { key: "library", label: "音色库" }
           ]}
         />
         <section className="voice-library-audition" aria-label="音色试听">
@@ -756,6 +736,12 @@ export function VoiceLibrary() {
           />
         ) : (
           <>
+            <div className="voice-library-list-heading">
+              <Typography.Title level={4}>音色列表</Typography.Title>
+              <Typography.Text type="secondary">
+                试听比较声音，调整参数后可加入分组推荐。
+              </Typography.Text>
+            </div>
             <div className="voice-library-filters">
               <Input
                 type="search"
@@ -1035,7 +1021,7 @@ export function VoiceLibrary() {
                 disabled={!library.isSuccess || settingsBusy}
                 onClick={() => void save("personal")}
               >
-                保存个人参数与听感
+                保存听感
               </Button>
             </Space>
           </Flex>
@@ -1091,8 +1077,33 @@ export function VoiceLibrary() {
                   "pitch_semitones" in changed ||
                   "volume_percent" in changed ||
                   "style" in changed
-                )
+                ) {
                   cancelPreview();
+                  if (
+                    Number.isInteger(values.rate_percent) &&
+                    values.rate_percent >= capabilities.min_rate_percent &&
+                    values.rate_percent <= capabilities.max_rate_percent &&
+                    Number.isInteger(values.pitch_semitones) &&
+                    values.pitch_semitones >=
+                      capabilities.min_pitch_semitones &&
+                    values.pitch_semitones <=
+                      capabilities.max_pitch_semitones &&
+                    Number.isInteger(values.volume_percent) &&
+                    values.volume_percent >= 0 &&
+                    values.volume_percent <= 100 &&
+                    (!values.style ||
+                      capabilities.styles.includes(values.style))
+                  )
+                    setTrialParameters((current) => ({
+                      ...current,
+                      [selected.alias]: {
+                        rate_percent: values.rate_percent,
+                        pitch_semitones: values.pitch_semitones,
+                        volume_percent: values.volume_percent,
+                        style: values.style
+                      }
+                    }));
+                }
                 updateDirty(values);
                 setSaveMessage(null);
               }}
@@ -1106,7 +1117,7 @@ export function VoiceLibrary() {
                   className="voice-library-settings-intro"
                   type="secondary"
                 >
-                  试听满意后保存，下次选用时自动载入。
+                  参数仅用于本次试听，刷新后恢复默认；加入分组推荐时保存当前参数。
                 </Typography.Paragraph>
                 <div className="voice-library-parameters">
                   <Form.Item
@@ -1241,6 +1252,10 @@ export function VoiceLibrary() {
                         cancelPreview();
                         const defaults = initialParameters(selected);
                         form.setFieldsValue(defaults);
+                        setTrialParameters((current) => ({
+                          ...current,
+                          [selected.alias]: defaults
+                        }));
                         updateDirty(form.getFieldsValue());
                         setSaveMessage(null);
                       }}

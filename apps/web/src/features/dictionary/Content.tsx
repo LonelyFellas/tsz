@@ -52,5 +52,5 @@ export function preferredAudio(
 ) {
   const candidates = audio.filter((a) => a.target_id === targetId);
   const locale = variant === "AmE" ? "en-US" : "en-GB";
-  return candidates.find((a) => a.locale === locale) ?? candidates[0];
+  return candidates.find((a) => a.locale === locale);
 }

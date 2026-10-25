@@ -87,6 +87,9 @@ export interface V3VoiceTextFieldProps<
   restoreTextLinksOnCorrection?: boolean;
   renderAssociationPicker?: VoiceEditorProps<TLink>["renderAssociationPicker"];
   previewAdapter?: VoiceEditorProps<TLink>["previewAdapter"];
+  createPreviewAdapter?: (
+    links: TLink[]
+  ) => NonNullable<VoiceEditorProps<TLink>["previewAdapter"]>;
   value: RichTextV3;
   id?: string;
   ariaLabel: string;
@@ -131,6 +134,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   restoreTextLinksOnCorrection,
   renderAssociationPicker,
   previewAdapter,
+  createPreviewAdapter,
   value,
   id,
   ariaLabel,
@@ -283,6 +287,10 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   const editorState = showDone
     ? draftState
     : { nodeId, value, textLinks, voiceProfile, audioAssets };
+  const sessionPreviewAdapter = useMemo(
+    () => createPreviewAdapter?.(editorState.textLinks ?? []) ?? previewAdapter,
+    [createPreviewAdapter, editorState.textLinks, previewAdapter]
+  );
   const draftPending = JSON.stringify(draftState) !== incomingKey;
   useEffect(() => {
     if (!showDone) return;
@@ -673,7 +681,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             }}
             previewAdapter={
               env.VOICE_PREVIEW
-                ? (previewAdapter ?? adminVoicePreviewAdapter)
+                ? (sessionPreviewAdapter ?? adminVoicePreviewAdapter)
                 : undefined
             }
             previewIsMock={voicePreviewIsMock}

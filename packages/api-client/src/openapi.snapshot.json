@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-tipping/docs/openapi.json",
-  "_generatedAt": "2026-10-24T06:12:47.946Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dubbing-center/docs/openapi.json",
+  "_generatedAt": "2026-10-25T07:00:06.341Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -92,6 +92,7 @@
       "delete",
       "patch"
     ],
+    "/admin/speech/audio": ["post"],
     "/admin/speech/groups": ["get", "put"],
     "/admin/speech/library": ["get"],
     "/admin/speech/library/{alias}/description": ["put"],
@@ -309,6 +310,12 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Voice-Versions",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "post /admin/lexicon/entries/archive-batch": [
@@ -350,6 +357,12 @@
       },
       {
         "name": "X-TSZ-Spelling-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Voice-Versions",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -405,6 +418,12 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Voice-Versions",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "post /admin/lexicon/entries/restore-batch": [
@@ -449,6 +468,12 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Voice-Versions",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "get /admin/lexicon/entries/{id}": [
@@ -484,6 +509,12 @@
       },
       {
         "name": "X-TSZ-Spelling-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Voice-Versions",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -531,6 +562,12 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Voice-Versions",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "get /admin/lexicon/entries/{id}/publications": [
@@ -566,6 +603,12 @@
       },
       {
         "name": "X-TSZ-Spelling-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Voice-Versions",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -613,6 +656,12 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Voice-Versions",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "get /admin/lexicon/entries/{id}/publications/{publication_id}": [
@@ -648,6 +697,12 @@
       },
       {
         "name": "X-TSZ-Spelling-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Voice-Versions",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -695,6 +750,12 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Voice-Versions",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "post /admin/lexicon/entries/{id}/publications/{publication_id}/rollback": [
@@ -736,6 +797,12 @@
       },
       {
         "name": "X-TSZ-Spelling-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Voice-Versions",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -783,6 +850,12 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Voice-Versions",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "put /admin/lexicon/entries/{id}/steps/forms": [
@@ -818,6 +891,12 @@
       },
       {
         "name": "X-TSZ-Spelling-Speech",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Voice-Versions",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -873,11 +952,23 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Voice-Versions",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "get /admin/lexicon/sentences": [
       {
         "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Voice-Versions",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -889,11 +980,23 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Voice-Versions",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "get /admin/lexicon/sentences/{id}": [
       {
         "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Voice-Versions",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -905,11 +1008,23 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Voice-Versions",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "get /admin/lexicon/sentences/{id}/publications": [
       {
         "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Voice-Versions",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -927,11 +1042,23 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Voice-Versions",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "get /admin/lexicon/sentences/{id}/publications/{publication_id}": [
       {
         "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Voice-Versions",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -949,6 +1076,12 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Voice-Versions",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "post /admin/lexicon/sentences/{id}/restore": [
@@ -963,6 +1096,12 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Voice-Versions",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "post /admin/lexicon/sentences/{id}/withdraw": [
@@ -974,6 +1113,20 @@
       },
       {
         "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Voice-Versions",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "post /admin/speech/audio": [
+      {
+        "name": "X-TSZ-Test-Run",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -2581,6 +2734,19 @@
         "401": { "$ref": "#/components/schemas/ProblemDetails" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" },
         "500": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/speech/audio": {
+      "request": { "$ref": "#/components/schemas/GenerateVoiceAudioRequest" },
+      "responses": {
+        "201": { "$ref": "#/components/schemas/GenerateVoiceAudioResponse" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "501": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
     "get /admin/speech/groups": {
@@ -6412,6 +6578,48 @@
         { "$ref": "#/components/schemas/ExpandedFormsStepContentV3" }
       ]
     },
+    "GenerateVoiceAudioRequest": {
+      "type": "object",
+      "required": ["request_id", "source", "setting"],
+      "properties": {
+        "request_id": { "type": "string", "format": "uuid" },
+        "setting": { "$ref": "#/components/schemas/VoiceSettingV3" },
+        "source": { "$ref": "#/components/schemas/GeneratedSpeechSource" }
+      },
+      "additionalProperties": false
+    },
+    "GeneratedSpeechSource": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["content", "kind"],
+          "properties": {
+            "content": { "$ref": "#/components/schemas/RichTextV2" },
+            "form_links": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/GrammarFormLinkV3" }
+            },
+            "kind": { "type": "string", "enum": ["text"] }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["content", "alphabet", "phoneme", "kind"],
+          "properties": {
+            "alphabet": {
+              "$ref": "#/components/schemas/RichTextPhonemeAlphabet"
+            },
+            "content": { "$ref": "#/components/schemas/RichTextV2" },
+            "kind": { "type": "string", "enum": ["phoneme"] },
+            "phoneme": { "type": "string" },
+            "ups_words": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/UpsWordV3" }
+            }
+          }
+        }
+      ]
+    },
     "GrammarFormLinkV3": {
       "type": "object",
       "required": [
@@ -7571,7 +7779,9 @@
       "description": "单个音色的 C 端启用选择和独立语速；取消勾选后仍保留语速。",
       "required": ["voice_id", "enabled", "rate_percent"],
       "properties": {
+        "audio_asset_id": { "type": "string", "format": "uuid" },
         "enabled": { "type": "boolean" },
+        "locale": { "$ref": "#/components/schemas/VoiceVersionLocaleV3" },
         "pitch_semitones": {
           "type": "integer",
           "format": "int32",
@@ -7585,6 +7795,8 @@
           "minimum": -50
         },
         "style": { "type": "string", "maxLength": 64 },
+        "version_id": { "type": "string", "format": "uuid" },
+        "version_name": { "type": "string", "maxLength": 40, "minLength": 1 },
         "voice_id": { "type": "string" },
         "volume_percent": {
           "type": "integer",
@@ -7595,6 +7807,7 @@
       },
       "additionalProperties": false
     },
+    "VoiceVersionLocaleV3": { "type": "string", "enum": ["en-GB", "en-US"] },
     "WithdrawSentenceInput": {
       "type": "object",
       "required": [
