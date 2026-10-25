@@ -583,7 +583,9 @@ describe("V3VoiceTextField 语种筛选", () => {
       />
     );
     await openVoicePanel();
-    await waitFor(() => expect(screen.getByText("Sonia")).toBeInTheDocument());
+    expect(
+      await screen.findByRole("checkbox", { name: "启用 Sonia" })
+    ).toBeInTheDocument();
     unmount();
 
     render(
@@ -601,7 +603,7 @@ describe("V3VoiceTextField 语种筛选", () => {
     await waitFor(() =>
       expect(document.querySelector(".tsz-ve-speech-panel")).not.toBeNull()
     );
-    expect(screen.queryByText("Sonia")).toBeNull();
+    expect(screen.queryByRole("checkbox", { name: "启用 Sonia" })).toBeNull();
   });
 });
 
