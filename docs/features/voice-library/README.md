@@ -1,8 +1,8 @@
 # 音色库需求与分批实施方案
 
-日期：2026-10-21，更新：2026-10-25。状态：TASK#147 配音中心改版、临时试听、文本命名版本、主动更新推荐及正式音频长期保存已实现，真实生成、保存刷新与播放验收通过；正在审查并创建前后端 PR，未合并、未部署。波形、格式导出及高级参数仍待后续批次，见第 10 节。
+日期：2026-10-21，更新：2026-10-26。状态：TASK#147 的 A／B／当前资源可用的 C 已实现、独立验收，并完成前后端 PR 合并及 tshb-test 配套发布；API 为 `6e01a7d`，Web／Admin 为 `cd061d5`，三组件 accepted、正式浏览器验收与临时数据清理通过，详见第 11 节。Neural HD／HD Omni 仍缺当前资源；波形、格式导出及高级参数仍待后续批次。
 
-本文件是跨仓任务的唯一主记录，包含产品需求、实现边界、批次与验收；后端相关改动引用本文件。用户已授权整理需求、分批实施及创建前后端 PR（含必要提交和推送），尚未授权合并或部署。
+本文件是跨仓任务的唯一主记录，包含产品需求、实现边界、批次与验收；后端相关改动引用本文件。用户后续已授权必要提交、推送、PR、合并及 B／C 验收后的 tshb-test 统一发布；生产环境和禅道回写不在范围内。下文保留各阶段当时的实施及授权记录，当前终态以第 11 节最终发布验收为准。
 
 ## 1. 目标与范围
 
@@ -422,4 +422,16 @@
 - 精确最终审查：前端667012c（业务85ed57f）、后端2a661034，分别由原reviewer检查原问题及增量，无剩余P0–P2。工作区干净，所有提交正常hooks。最初后端pre-commit因过早清理验收DB导致clippy在线宏Connection refused，未完成提交；新建专用hooks库后完整SQLx/clippy重跑通过，不跳门。
 - 补验清理：2026-10-25T17:20:26Z仅精确本地资源清理，3073/3079/8407/55549/6429关闭，专用DB/Redis/profile及统筹三页/账号/凭据/完整副本/运行binary删除。cloud_objects_created=false，未运行OSS写操作。统筹独立复核通过，脱敏coordinator-final-acceptance与cleanup-receipt保留。hooks独占55547/6427在原生push通过后也关闭并删除，仅留回执。
 - PR与门禁：前端 https://github.com/LonelyFellas/tsz/pull/557，后端 https://github.com/LonelyFellas/tsz-rust/pull/319，互相引用；正常push前端typecheck+4356普通测试、后端clippy+430lib/7bin通过。候选CI最初分别40216337381/40216473069；后续精确head/CI以PR最新状态为准，不把旧绿或推送成功当已部署。
-- 发布准备仍分开验收：实际基线API557a1cd、Web/Adminb414ef9；原生deployed_baseline只读采集134迁移、PID稳定、运行/磁盘摘要一致。写前dump固定数据库snapshot经SSH流到本机受限Backups，133基表count/checksum与schema/账本已采集，备份及无网络隔离恢复验证尚在进行。基线原始CI artifact与smoke回执已验证；最终候选main CI制品的实际基线升级/原子拒绝恢复演练尚未执行。manual恢复策略草案未批准，失败须保锁/数据并走reviewed forward fix，真实dump恢复/PITR另行明确批准。服务器98%/约814MB空闲，采用不落服务器整dump的方案，最终制品/成组备份/暂存/安全余量仍需核算；不删共享数据/既有备份过门。
+- 当时的发布准备：实际基线API557a1cd、Web/Adminb414ef9；原生deployed_baseline只读采集134迁移、PID稳定、运行/磁盘摘要一致。当时恢复点、实际基线迁移演练、独立manual策略及容量核算仍待完成；后续结果见下节，不将准备状态当作发布通过。
+
+### tshb-test 配套发布与最终验收（2026-10-26）
+
+- 交付：前端 PR #557、后端 PR #319 均已 squash 合并。实际发布顺序 API → Web → Admin，未涉及生产环境或禅道回写。后端为 `6e01a7d74e457267eaf56317e588260292c087c5`，main CI `40218880864`、生产／验证 attempt 均为 1；Web／Admin 为 `cd061d559d9cfe492f72d7ccf22666acc991feb8`，main CI `40217535891` attempt 1。两仓最终候选 CI 均成功；后端曾因公共 Vary 测试断言遗漏新增能力头失败，修正后原路径及最终 CI 通过，没有豁免门禁。
+- API：精确 main 的原生 `ops/deploy_test.py` plan／apply 通过，事务 `1fc3ff76-2f78-434f-a954-ad378ffb7bf6` 于 `2026-10-25T18:33:11Z` accepted。artifact ID `12608910814`，二进制 60,553,376 字节，SHA-256 `1f73c468e0fbd2baf8fc337579658df59e54e687bac70d8ab7ff2ccbfe77f7ec`；ZIP 26,243,477 字节。制品获取及校验 20.064 秒、上传步骤 10.664 秒、控制器事务 44.144 秒，服务器编译为 0。停服步骤开始至正式验收完成约 10.532 秒，仅为步骤时间上界。136 条迁移均成功，最新 `20261025160000`；候选／正式 HTTPS 鉴权、Cookie 轮换、草稿创建→独立读取→修改→再次读取及精确清理全部通过。
+- Web：原生入口从精确 main 隔离构建并验证 standalone 启动、Sharp 缩图和来源；最终 release `cd061d559d9cfe492f72d7ccf22666acc991feb8-1e97d498-09f5-4749-8ebe-eba7fd61a430`，`2026-10-25T18:40:17.614Z` accepted，2,271 文件，制品 SHA-256 `64018405cff68ceb16cc000aa0ecf858d5e3394b1dd345e5344e7d625a02cf75`。首次尝试在切流后遇 HTTPS curl 56／unexpected EOF 并由原生事务回退；旧版本、来源及入口复查通过后完整重试成功。nginx 同时出现旧 worker 中止告警，只作为相关现象，根因未证实；首次失败日志、stage／release 和回退备份保留。
+- Admin：原生入口从同一 main 隔离构建，release `cd061d559d9cfe492f72d7ccf22666acc991feb8-14a33d3b-f8db-4722-8116-3384521a0e2b`，`2026-10-25T18:42:10.645Z` accepted，139 文件，制品 SHA-256 `7030fd3012efa531e25cec6204e60c194b0ab93626658d4c1b209c4f68ac4fb9`。两前端均在服务器实际复算原生 provenance，未把容量预检清单当 accepted manifest。
+- 恢复点：`/Users/darwish/Backups/tsz-rust-task147-20261025T164943Z/` 内受限 PostgreSQL 逻辑快照 419,354,675 字节，SHA-256 `cbf631c5d50fb50f0173eb3163eb335080211026af88db0d464e8f5059f6d4f5`。无网络、无端口的一次性恢复验证通过，133 基表 count／确定性 checksum 和 schema 全匹配，临时恢复容器／卷均清理。快照不覆盖后续正常写入、Redis／OSS 或 PITR。
+- 迁移策略：实际现网基线 `557a1cd` 至候选的原生隔离升级及持久化通过；目录存在时 down 原子拒绝，原始回执保持 blocked／manual-plan 语义。独立技术核查批准后，受保护 `kind=manual` 策略绑定两版制品、迁移区间和原始回执；本次 apply 正常完成，未执行真实共享数据库 down／dump 恢复／PITR。**真实后端回退尚未演练**；迁移后失败须保留锁、状态、数据和备份，另审 forward fix，不能直接换回旧二进制。
+- 容量：写前保守总账及 API 即时检查通过。首次 Web 尝试的 BASH_ENV 附加容量守卫未加载，该次缺少实际写前守卫回执，未计为通过；改为显式加载并通过本地不足容量拒绝测试后，成功重试及 Admin 在上传／事务前均取得真实检查回执。Web 两边界预计峰值余量 323,170,304／328,003,584 字节，Admin 为 327,950,336／327,815,168 字节，均大于 256 MiB；最终服务器空闲 378,298,368 字节。失败制品计入实际占用，没有删除共享业务数据或既有备份腾空间。
+- 最终验收：API 磁盘／进程／manifest 摘要一致，health／ready 正常，候选端口退出，API 与前端事务锁释放；Web 首页、Admin 登录页 HTTPS 200，未登录 API 401，nginx 配置有效。统筹独立浏览器核对实际 release、126 个音色、11 列表头、完整 Tiana ID 搜索、英红美蓝、Flash 音量100／语速1／音调0禁用及限制说明；实际 390px 视口文档宽390，表格内部横向滚动。发布后验收只读，不重复云生成或共享业务编辑；生成→保存→重开→发布→播放沿用本节 B／C 隔离真实云端验收。
+- 清理与证据：API 三份独占 fixture 的账号／词表及其引用、精确账号 Redis 键已独立只读确认无残留；最终浏览器专用管理员、全部会话、专属 OTP 键、两张页面、profile 和凭据已彻底清理，新只读连接逐 UUID 引用复查通过，正常词条样本、`.env` 和 nginx 指纹未变。发布证据根目录 `/var/folders/fj/xzx7t8r90x36tp23zvvyrsb00000gn/T/tsz-task147-deploy-pl5bf8na/` 保留原生 plan／state／bundle、最终 host／provenance、独立浏览器及清理回执、容量记录和失败／成功原始日志；数据库恢复点、运维备份、现网 current／previous 与事务审计保留。Neural HD／HD Omni 仍因当前 Azure 资源无可用项而未开放。
