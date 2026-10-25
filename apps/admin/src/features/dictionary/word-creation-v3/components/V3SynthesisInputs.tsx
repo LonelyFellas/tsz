@@ -23,7 +23,6 @@ import {
 import { PronunciationPreviewControls } from "../../word-creation/PronunciationPreview";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { v3IssueMessage } from "../presentationErrors";
-import { clearVoiceAudio } from "@tsz/voice-editor/core";
 import "./V3SynthesisInputs.css";
 type Alphabet = "ipa" | "ups";
 type Side = "uk" | "us";
@@ -151,10 +150,21 @@ export function V3SynthesisInputs({
             JSON.stringify(candidate.ups_words))
       ) {
         const speech = candidate[`${alphabet}_speech`];
+        const previousAssets = new Set(
+          previous[`${alphabet}_speech`]?.voice_profile.voices.map(
+            (setting) => setting.audio_asset_id
+          )
+        );
         if (speech)
           updated[`${alphabet}_speech`] = {
             ...speech,
-            voice_profile: clearVoiceAudio(speech.voice_profile)
+            voice_profile: {
+              voices: speech.voice_profile.voices.map((setting) => {
+                if (!previousAssets.has(setting.audio_asset_id)) return setting;
+                const { audio_asset_id: _audio, ...rest } = setting;
+                return rest;
+              })
+            }
           };
       }
     }
