@@ -210,7 +210,11 @@ export interface VoiceProfile {
   voices: VoiceSetting[];
 }
 
+export type TextRole = "body" | "definition" | "example";
+
 export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
+  /** 正文字重按用途呈现，不改变标注的存储格式。 */
+  textRole?: TextRole;
   mode?:
     | "grammar"
     | "association"

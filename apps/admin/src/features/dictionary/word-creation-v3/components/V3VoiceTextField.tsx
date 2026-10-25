@@ -186,6 +186,8 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             : mode === "actual-pron" || mode === "dict-phonetic"
               ? undefined
               : "meaning");
+  const textRole =
+    area === "meaning" ? "definition" : area === "example" ? "example" : "body";
   const locale = voiceLocale(dialect);
   const prepareDefault =
     env.VOICE_EDITOR &&
@@ -524,6 +526,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           aria-hidden
         >
           <RichTextReadOnly
+            textRole={textRole}
             value={
               value.version === 2
                 ? {
@@ -639,6 +642,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             contentReadOnly={contentReadOnly}
             associationsReadOnly={associationsReadOnly}
             mode={mode}
+            textRole={textRole}
             autoRecommend={initialVoiceState.current.unconfigured}
             loadRecommendations={loadAdminVoiceRecommendations}
             recommendationArea={area}

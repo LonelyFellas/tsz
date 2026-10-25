@@ -1,1 +1,13 @@
 @import "@tsz/shared/fonts.css";
+
+.tsz-ve-editor,
+.tsz-ve-readonly {
+  --tsz-text-bold-weight: 700;
+}
+
+.tsz-ve-editor[data-text-role="definition"],
+.tsz-ve-editor[data-text-role="example"],
+.tsz-ve-readonly[data-text-role="definition"],
+.tsz-ve-readonly[data-text-role="example"] {
+  --tsz-text-bold-weight: 800;
+}

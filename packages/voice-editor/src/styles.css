@@ -361,7 +361,7 @@
 /* 字形直接参与排版，不用隐藏粗体占位撑开常规文字。 */
 .tsz-ve-letter.is-bold > .tsz-ve-letter-text,
 .tsz-ve-bold {
-  font-weight: 700;
+  font-weight: var(--tsz-text-bold-weight, 700);
 }
 .tsz-ve-letter.is-underline > .tsz-ve-letter-text,
 .tsz-ve-underline {

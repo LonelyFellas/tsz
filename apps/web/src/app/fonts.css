@@ -18,7 +18,20 @@
   src: url("../../../../packages/shared/src/fonts/TSZCommonText-Bold.woff2")
     format("woff2");
   font-style: normal;
-  font-weight: 501 900;
+  font-weight: 501 700;
+  font-feature-settings: "ss04", "ss06", "ss07", "ss08";
+  unicode-range:
+    U+0000-0026, U+0028-002B, U+002F, U+003A-003B, U+003F-00FF, U+2000-2017,
+    U+201A-201B, U+201E-206F;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TSZ Text";
+  src: url("../../../../packages/shared/src/fonts/TSZCommonText-ExtraBold.woff2")
+    format("woff2");
+  font-style: normal;
+  font-weight: 701 900;
   font-feature-settings: "ss04", "ss06", "ss07", "ss08";
   unicode-range:
     U+0000-0026, U+0028-002B, U+002F, U+003A-003B, U+003F-00FF, U+2000-2017,

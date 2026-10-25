@@ -1,4 +1,5 @@
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
+import type { TextRole } from "@tsz/voice-editor/types";
 import type {
   CEFRLevel,
   EnglishVariant,
@@ -12,10 +13,12 @@ import { selectDefinition, selectTexts, phoneticDelimiters } from "../reading";
 
 function Texts({
   texts,
-  variant
+  variant,
+  textRole = "body"
 }: {
   texts: WordlistText[];
   variant: EnglishVariant | null;
+  textRole?: TextRole;
 }) {
   return (
     <>
@@ -26,7 +29,7 @@ function Texts({
               {text.dialect === "uk" ? "英" : "美"}
             </span>
           )}
-          <RichTextReadOnly value={text.content} />
+          <RichTextReadOnly value={text.content} textRole={textRole} />
         </div>
       ))}
     </>
@@ -117,7 +120,11 @@ export function ReadingEntry({
                       <span className="mb-2 inline-block rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium tabular-nums tracking-wide text-foreground-muted">
                         {definition.level}
                       </span>
-                      <Texts texts={definition.texts} variant={variant} />
+                      <Texts
+                        texts={definition.texts}
+                        variant={variant}
+                        textRole="definition"
+                      />
                       {definition.texts.length === 0 && (
                         <p className="text-foreground-muted">
                           此释义暂无可用文本

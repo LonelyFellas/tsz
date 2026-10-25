@@ -25,6 +25,37 @@ const V2: RichTextV2 = {
 };
 
 describe("RichText reader", () => {
+  it("keeps the text role on formatted content so body and learning text can use different bold weights", () => {
+    const value: RichTextV2 = {
+      version: 2,
+      text: "Text 123",
+      annotations: [
+        { type: "bold", start: 0, end: 8 },
+        { type: "italic", start: 0, end: 8 }
+      ]
+    };
+    const { container, rerender } = render(
+      <RichTextReadOnly value={value} textRole="definition" />
+    );
+    expect(screen.getByTestId("voice-rich-text-readonly")).toHaveAttribute(
+      "data-text-role",
+      "definition"
+    );
+    expect(
+      container.querySelector(".tsz-ve-bold .tsz-ve-italic")
+    ).toHaveTextContent(value.text);
+    rerender(<RichTextReadOnly value={value} textRole="example" />);
+    expect(screen.getByTestId("voice-rich-text-readonly")).toHaveAttribute(
+      "data-text-role",
+      "example"
+    );
+    rerender(<RichTextReadOnly value={value} />);
+    expect(screen.getByTestId("voice-rich-text-readonly")).toHaveAttribute(
+      "data-text-role",
+      "body"
+    );
+  });
+
   it("segments and renders V2 semantic classes, IPA, and pause without an editor", () => {
     expect(segmentRichText(V2)).toEqual(
       expect.arrayContaining([

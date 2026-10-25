@@ -142,6 +142,7 @@ function parseValue(value: RichText): { value: RichTextV2; error?: string } {
 export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   value,
   mode = "pronunciation",
+  textRole = "body",
   locale,
   textFormattingEnabled = true,
   textLinks,
@@ -2349,6 +2350,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     <section
       className="tsz-ve-editor"
       data-mode={mode}
+      data-text-role={textRole}
       data-readonly={readOnly || undefined}
       /*
        * Esc 收笔挂在编辑器根节点而不是画布上：拿着笔时鼠标点不了光标，得有个
