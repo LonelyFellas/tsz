@@ -152,6 +152,10 @@ export function AccountMenu({
       }}
       onPointerDown={(event) => {
         pointerType.current = event.pointerType || "mouse";
+        event.currentTarget.toggleAttribute(
+          "data-leaves-page",
+          pointerType.current === "mouse"
+        );
         if (event.button !== 0 || event.ctrlKey) return;
         if (pointerType.current === "mouse") {
           cancel();
@@ -161,6 +165,7 @@ export function AccountMenu({
         void open(false);
       }}
       onKeyDown={(event) => {
+        event.currentTarget.removeAttribute("data-leaves-page");
         if (event.key === "ArrowDown") {
           event.preventDefault();
           void open(false, true);

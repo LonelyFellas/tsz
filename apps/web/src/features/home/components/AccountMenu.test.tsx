@@ -31,7 +31,8 @@ vi.mock("@/lib/request", () => ({
   clearSession: vi.fn(),
   api: {
     auth: { logout: vi.fn().mockResolvedValue(undefined) },
-    coins: { wallet: vi.fn() }
+    coins: { wallet: vi.fn() },
+    wordList: { edit: vi.fn(), update: vi.fn(), myItems: vi.fn() }
   }
 }));
 
@@ -544,13 +545,16 @@ describe("AccountMenu", () => {
     expect(screen.getByRole("button", { name: "关闭偏好设置" })).toHaveFocus();
     await user.tab();
     expect(screen.getByRole("button", { name: "切换外观" })).toHaveFocus();
+    await user.keyboard("{ArrowLeft}");
+    expect(
+      screen.queryByRole("dialog", { name: "偏好设置" })
+    ).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+    expect(screen.getByRole("menu")).toBeInTheDocument();
     await user.keyboard("{Escape}");
-    await waitFor(() => {
-      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole("dialog", { name: "偏好设置" })
-      ).not.toBeInTheDocument();
-    });
+    await waitFor(() =>
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument()
+    );
   });
 
   it.each(["student", "teacher"] as const)(
@@ -803,6 +807,84 @@ describe("AccountMenu", () => {
       expect(screen.queryByText("退出登录")).not.toBeInTheDocument();
     });
   });
+});
+
+it("头像导航遵守未保存保护，键盘和触摸开菜单不触发离页确认", async () => {
+  useUserStore.setState({ user: USER, onboarded: true });
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+  const user = userEvent.setup({ skipHover: true });
+  render(
+    <>
+      <WordListCreator />
+      <AccountMenu />
+    </>
+  );
+  fireEvent.change(screen.getByLabelText("词表名称"), {
+    target: { value: "保留草稿" }
+  });
+  const trigger = screen.getByRole("button", { name: "账户菜单" });
+  await user.click(trigger);
+  expect(confirm).toHaveBeenCalledWith("尚未保存，确定离开？");
+  expect(mockPush).not.toHaveBeenCalled();
+  expect(screen.getByLabelText("词表名称")).toHaveValue("保留草稿");
+  confirm.mockClear();
+  await user.pointer({ target: trigger, keys: "[TouchA]" });
+  expect(confirm).not.toHaveBeenCalled();
+  expect(screen.getByRole("menu")).toBeInTheDocument();
+  await user.keyboard("{Escape}");
+  await user.click(trigger);
+  expect(mockPush).not.toHaveBeenCalled();
+  confirm.mockClear();
+  await user.keyboard("{Enter}");
+  expect(confirm).not.toHaveBeenCalled();
+  expect(screen.getByRole("menu")).toBeInTheDocument();
+  confirm.mockReturnValue(true);
+  await user.click(trigger);
+  expect(mockPush).toHaveBeenCalledWith("/account");
+  confirm.mockRestore();
+});
+
+it("词表保存中点击头像不会导航，即使允许离开也保留保存现场", async () => {
+  useUserStore.setState({ user: USER, onboarded: true });
+  vi.mocked(api.wordList.edit).mockResolvedValue({
+    wordlist: { id: "saving-list", name: "原名", revision: 1 },
+    entry_ids: []
+  } as never);
+  vi.mocked(api.wordList.myItems).mockResolvedValue({
+    items: [],
+    revision: 1,
+    pagination: { total: 0 }
+  } as never);
+  let finish!: () => void;
+  vi.mocked(api.wordList.update).mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = () => resolve({ id: "saving-list" } as never);
+      })
+  );
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+  const user = userEvent.setup({ skipHover: true });
+  render(
+    <>
+      <WordListCreator id="saving-list" onSaved={() => {}} />
+      <AccountMenu />
+    </>
+  );
+  await screen.findByDisplayValue("原名");
+  fireEvent.change(screen.getByLabelText("词表名称"), {
+    target: { value: "保存内容" }
+  });
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "保存" })).toBeEnabled()
+  );
+  await user.click(screen.getByRole("button", { name: "保存" }));
+  await waitFor(() => expect(api.wordList.update).toHaveBeenCalled());
+  await user.click(screen.getByRole("button", { name: "账户菜单" }));
+  expect(mockPush).not.toHaveBeenCalled();
+  expect(confirm).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "保存中…" })).toBeDisabled();
+  await act(async () => finish());
+  confirm.mockRestore();
 });
 
 it("failed identity switch restores the unsaved editor's unload and back protection", async () => {

@@ -110,6 +110,31 @@ it("鼠标点击未加载的头像直接进入个人中心，并取消迟到菜�
   expect(trigger).toHaveAttribute("aria-busy", "false");
 });
 
+it("未加载头像在鼠标导航前标记离页，触摸和键盘打开不带离页标记", async () => {
+  await mount();
+  const trigger = screen.getByRole("button", { name: "账户菜单" });
+  const block = (event: MouseEvent) => {
+    if ((event.target as Element).closest("[data-leaves-page]")) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  };
+  document.addEventListener("click", block, true);
+  try {
+    const down = new MouseEvent("pointerdown", { bubbles: true, button: 0 });
+    Object.defineProperty(down, "pointerType", { value: "mouse" });
+    fireEvent(trigger, down);
+    fireEvent.click(trigger, { detail: 1 });
+    expect(push).not.toHaveBeenCalled();
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    expect(trigger).not.toHaveAttribute("data-leaves-page");
+    await finishLoad();
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+  } finally {
+    document.removeEventListener("click", block, true);
+  }
+});
+
 it("键盘聚焦只预加载，ArrowDown 再打开", async () => {
   await mount();
   const trigger = screen.getByRole("button", { name: "账户菜单" });

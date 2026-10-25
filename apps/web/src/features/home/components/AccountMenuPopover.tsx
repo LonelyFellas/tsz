@@ -170,7 +170,18 @@ export function AccountMenuPopover({
     }
     positionPreferences();
     window.addEventListener("resize", positionPreferences);
-    return () => window.removeEventListener("resize", positionPreferences);
+    // Radix 在 resize 后异步更新父菜单位置，按实际 portal transform 再测一次。
+    const wrapper = contentRef.current?.parentElement;
+    const observer = new MutationObserver(positionPreferences);
+    if (wrapper)
+      observer.observe(wrapper, {
+        attributes: true,
+        attributeFilter: ["style"]
+      });
+    return () => {
+      window.removeEventListener("resize", positionPreferences);
+      observer.disconnect();
+    };
   }, [preferencesOpen]);
 
   useEffect(
@@ -262,9 +273,14 @@ export function AccountMenuPopover({
           onPointerDown={(event) => {
             beginDirectInteraction();
             pointerType.current = event.pointerType || "mouse";
+            event.currentTarget.toggleAttribute(
+              "data-leaves-page",
+              pointerType.current === "mouse" && !busy
+            );
             if (pointerType.current === "mouse") event.preventDefault();
           }}
           onKeyDown={(event) => {
+            event.currentTarget.removeAttribute("data-leaves-page");
             beginDirectInteraction();
             if (open && event.key === "ArrowDown") {
               event.preventDefault();
@@ -434,10 +450,6 @@ export function AccountMenuPopover({
             ref={preferencesTriggerRef}
             disabled={busy}
             className={`${MENU_ITEM_CLASS} data-[state=open]:bg-primary-muted`}
-            onPointerLeave={(event) => {
-              // 保留入口焦点，避免向左移入面板时被父菜单抢回并关闭子层。
-              if (preferencesOpen) event.preventDefault();
-            }}
           >
             <Settings
               className="size-[18px] shrink-0"
@@ -457,6 +469,10 @@ export function AccountMenuPopover({
             onPointerMove={(event) => event.stopPropagation()}
             avoidCollisions={preferencesSideOffset >= 0}
             role="dialog"
+            onFocusOutside={(event) => {
+              // 父菜单的鼠标离开逻辑会临时聚焦容器，仍保留子菜单的指针宽限区。
+              if (event.target === contentRef.current) event.preventDefault();
+            }}
             aria-label="偏好设置"
             className="w-[330px] rounded-3xl border-border/60 bg-surface/95 p-5 backdrop-blur-xl"
             onPointerEnter={(event) => {
@@ -474,7 +490,14 @@ export function AccountMenuPopover({
           >
             <div
               onKeyDown={(event) => {
-                if (event.key !== "Escape") event.stopPropagation();
+                if (
+                  event.key !== "Escape" &&
+                  !(
+                    event.key === "ArrowLeft" &&
+                    event.target instanceof HTMLButtonElement
+                  )
+                )
+                  event.stopPropagation();
               }}
             >
               <div className="mb-5 flex items-center justify-between gap-3">

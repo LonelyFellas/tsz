@@ -35,6 +35,71 @@ test("偏好子面板悬停展开，X仅关闭偏好，Escape与外部点击关�
   await expect(settings).toHaveCount(0);
 });
 
+test("未保存词表时头像导航先确认，冷加载和已展开菜单均受保护", async ({
+  page
+}) => {
+  await mockApi(page, { authenticated: true });
+  await page.goto("/account/wordlists?space=owned&mode=new");
+  await page
+    .getByRole("textbox", { name: "词表名称", exact: true })
+    .fill("保留草稿");
+  const originalUrl = page.url();
+  const trigger = page.getByRole("button", { name: "账户菜单" });
+  const dialogs: string[] = [];
+  page.on("dialog", async (dialog) => {
+    dialogs.push(dialog.message());
+    await dialog.dismiss();
+  });
+  await trigger.click();
+  await expect.poll(() => dialogs.length).toBe(1);
+  await expect(page).toHaveURL(originalUrl);
+  await expect(
+    page.getByRole("textbox", { name: "词表名称", exact: true })
+  ).toHaveValue("保留草稿");
+  await trigger.press("ArrowDown");
+  await expect(page.getByRole("menu")).toBeVisible();
+  expect(dialogs).toHaveLength(1);
+  await trigger.click();
+  await expect.poll(() => dialogs.length).toBe(2);
+  await expect(page).toHaveURL(originalUrl);
+});
+
+test("偏好打开后缩窄窗口仍留在视口内，斜向移入不关闭", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await mockApi(page, { authenticated: true });
+  await page.goto("/");
+  const trigger = page.getByRole("button", { name: "账户菜单" });
+  const preferences = page.getByRole("menuitem", {
+    name: "偏好设置",
+    exact: true
+  });
+  const settings = page.getByRole("dialog", { name: "偏好设置" });
+  await trigger.hover();
+  await preferences.hover();
+  await expect(settings).toBeVisible();
+  const target = settings.getByRole("button", { name: "深色", exact: true });
+  const box = await target.boundingBox();
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2, {
+    steps: 30
+  });
+  await expect(settings).toBeVisible();
+  await target.click();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await page.setViewportSize({ width: 375, height: 812 });
+  await expect
+    .poll(() =>
+      settings.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.left >= 0 && rect.right <= innerWidth;
+      })
+    )
+    .toBe(true);
+  await page.keyboard.press("ArrowLeft");
+  await expect(settings).toHaveCount(0);
+  await expect(preferences).toBeFocused();
+  await expect(page.getByRole("menu")).toBeVisible();
+});
+
 for (const path of ["/", "/account/profile"]) {
   test(`桌面头像首次点击与展开后点击均进入个人中心（${path}）`, async ({
     page
