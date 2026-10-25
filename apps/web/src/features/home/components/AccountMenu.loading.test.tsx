@@ -110,6 +110,16 @@ it("鼠标点击未加载的头像直接进入个人中心，并取消迟到菜�
   expect(trigger).toHaveAttribute("aria-busy", "false");
 });
 
+it("修饰键点击未加载头像不在当前页导航", async () => {
+  await mount();
+  const trigger = screen.getByRole("button", { name: "账户菜单" });
+  for (const modifier of ["ctrlKey", "metaKey", "shiftKey", "altKey"]) {
+    fireEvent.click(trigger, { detail: 1, [modifier]: true });
+  }
+  expect(push).not.toHaveBeenCalled();
+  expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+});
+
 it("未加载头像在鼠标导航前标记离页，触摸和键盘打开不带离页标记", async () => {
   await mount();
   const trigger = screen.getByRole("button", { name: "账户菜单" });

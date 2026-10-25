@@ -292,6 +292,13 @@ export function AccountMenuPopover({
             }
           }}
           onClick={(event) => {
+            if (
+              event.ctrlKey ||
+              event.metaKey ||
+              event.shiftKey ||
+              event.altKey
+            )
+              return;
             if (event.detail === 0) {
               beginDirectInteraction();
               positionAvatar();

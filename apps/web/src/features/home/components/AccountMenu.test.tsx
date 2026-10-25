@@ -828,6 +828,11 @@ it("头像导航遵守未保存保护，键盘和触摸开菜单不触发离页�
   expect(mockPush).not.toHaveBeenCalled();
   expect(screen.getByLabelText("词表名称")).toHaveValue("保留草稿");
   confirm.mockClear();
+  for (const modifier of ["ctrlKey", "metaKey", "shiftKey", "altKey"]) {
+    fireEvent.click(trigger, { detail: 1, [modifier]: true });
+  }
+  expect(mockPush).not.toHaveBeenCalled();
+  expect(confirm).not.toHaveBeenCalled();
   await user.pointer({ target: trigger, keys: "[TouchA]" });
   expect(confirm).not.toHaveBeenCalled();
   expect(screen.getByRole("menu")).toBeInTheDocument();

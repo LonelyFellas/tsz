@@ -172,6 +172,8 @@ export function AccountMenu({
         } else if (event.key === "Escape") cancel();
       }}
       onClick={(event) => {
+        if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)
+          return;
         if (event.detail === 0) void open(false, true);
         else if (pointerType.current === "mouse") {
           cancel();
