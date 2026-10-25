@@ -1685,6 +1685,44 @@ describe("VoiceEditor 发音区", () => {
     expect(onVoiceProfileChange).not.toHaveBeenCalled();
   });
 
+  it.each(["en-AU", "en-US"] as const)(
+    "首次勾选新地区或Flash音色保留完整版本身份与原生locale %s",
+    async (nativeLocale) => {
+      const voice = {
+        ...VOICES[0]!,
+        id: nativeLocale === "en-US" ? "azure-hd-flash-tiana" : "natasha",
+        supportsVolume: nativeLocale === "en-US" ? false : true,
+        label: "New voice",
+        locale: nativeLocale
+      };
+      const onVoiceProfileChange = vi.fn();
+      render(
+        <VoiceEditor
+          {...props({
+            previewAdapter: {
+              ...adapter(),
+              listVoices: vi.fn().mockResolvedValue([voice])
+            },
+            onVoiceProfileChange
+          })}
+        />
+      );
+      openVoices();
+      fireEvent.click(await screen.findByLabelText("启用 New voice"));
+      expect(onVoiceProfileChange).toHaveBeenLastCalledWith({
+        voices: [
+          expect.objectContaining({
+            voice_id: voice.id,
+            locale: nativeLocale,
+            version_id: expect.any(String),
+            version_name: "New voice",
+            enabled: true
+          })
+        ]
+      });
+    }
+  );
+
   it("音色按语种分组，再按男女声分列", async () => {
     render(<VoiceEditor {...props({ previewAdapter: adapter() })} />);
     openVoices();

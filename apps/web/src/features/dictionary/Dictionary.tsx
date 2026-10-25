@@ -1,4 +1,5 @@
 "use client";
+import { selectTexts } from "@/features/wordlist/reading";
 import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -344,6 +345,9 @@ function Result({
                     entryId={entry.entry_id}
                     audio={item.audio}
                     targetId={grammar.id}
+                    sourceDialects={selectTexts(grammar.variants, variant).map(
+                      (text) => text.dialect
+                    )}
                     variant={variant}
                     label="播放语法结构"
                   />

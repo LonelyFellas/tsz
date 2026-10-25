@@ -37,6 +37,70 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("字典内容音频", () => {
+  it("同target补充音频按实际正文来源方言筛选，不以声音locale猜正文", async () => {
+    const items: DictionaryAudio[] = [
+      {
+        target_id: "text",
+        asset_id: "uk-in",
+        locale: "en-IN",
+        accent_group: "other",
+        source_dialect: "uk"
+      },
+      {
+        target_id: "text",
+        asset_id: "us-in",
+        locale: "en-IN",
+        accent_group: "other",
+        source_dialect: "us"
+      }
+    ];
+    const view = render(
+      <TargetAudio
+        entryId="entry"
+        targetId="text"
+        audio={items}
+        variant="BrE"
+        sourceDialects={["uk"]}
+        label="播放例句"
+      />
+    );
+    expect(view.container.querySelectorAll("button")).toHaveLength(1);
+    fireEvent.click(screen.getByText("其他音色"));
+    fireEvent.click(screen.getByLabelText("播放例句（印度补充音色）"));
+    await waitFor(() =>
+      expect(sign).toHaveBeenLastCalledWith("entry", "uk-in", {
+        signal: expect.any(AbortSignal)
+      })
+    );
+    view.rerender(
+      <TargetAudio
+        entryId="entry"
+        targetId="text"
+        audio={items}
+        variant="AmE"
+        sourceDialects={["us"]}
+        label="播放例句"
+      />
+    );
+    expect(view.container.querySelectorAll("button")).toHaveLength(1);
+    fireEvent.click(screen.getByLabelText("播放例句（印度补充音色）"));
+    await waitFor(() =>
+      expect(sign).toHaveBeenLastCalledWith("entry", "us-in", {
+        signal: expect.any(AbortSignal)
+      })
+    );
+    view.rerender(
+      <TargetAudio
+        entryId="entry"
+        targetId="text"
+        audio={items.map(({ source_dialect: _, ...item }) => item)}
+        variant="BrE"
+        sourceDialects={["uk"]}
+        label="播放例句"
+      />
+    );
+    expect(view.container.querySelectorAll("button")).toHaveLength(0);
+  });
   it("按分类选择AU/CA，兼容旧响应，缺侧不回退到补充声音", () => {
     expect(preferredAudio(audio, "text", "BrE")?.asset_id).toBe("au");
     expect(preferredAudio(audio, "text", "AmE")?.asset_id).toBe("ca");

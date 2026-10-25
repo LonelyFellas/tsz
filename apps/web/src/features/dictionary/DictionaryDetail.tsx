@@ -96,6 +96,7 @@ export function DictionaryDetail({
                           entryId={id}
                           audio={item.audio}
                           targetId={v.id}
+                          sourceDialects={[v.dialect]}
                           variant={variant}
                           label={`播放 ${v.spelling} 拼写`}
                         />
@@ -125,6 +126,18 @@ export function DictionaryDetail({
                                 entryId={id}
                                 audio={item.audio}
                                 targetId={p.id}
+                                sourceDialects={
+                                  v.dialect === "common"
+                                    ? [
+                                        "common",
+                                        ...(variant === "BrE"
+                                          ? ["uk" as const]
+                                          : variant === "AmE"
+                                            ? ["us" as const]
+                                            : ["uk" as const, "us" as const])
+                                      ]
+                                    : [v.dialect]
+                                }
                                 variant={variant}
                                 label={`播放 ${v.spelling} 发音`}
                               />
@@ -169,6 +182,10 @@ export function DictionaryDetail({
                               entryId={id}
                               audio={item.audio}
                               targetId={definition.id}
+                              sourceDialects={selectTexts(
+                                definition.texts,
+                                variant
+                              ).map((text) => text.dialect)}
                               variant={variant}
                               label="播放英文释义"
                             />
@@ -184,6 +201,10 @@ export function DictionaryDetail({
                               entryId={id}
                               audio={item.audio}
                               targetId={grammar.id}
+                              sourceDialects={selectTexts(
+                                grammar.variants,
+                                variant
+                              ).map((text) => text.dialect)}
                               variant={variant}
                               label="播放语法结构"
                             />
@@ -203,6 +224,10 @@ export function DictionaryDetail({
                                   entryId={id}
                                   audio={item.audio}
                                   targetId={e.id}
+                                  sourceDialects={selectTexts(
+                                    e.texts,
+                                    variant
+                                  ).map((text) => text.dialect)}
                                   variant={variant}
                                   label="播放例句"
                                 />

@@ -63,21 +63,37 @@ export function TargetAudio({
   audio,
   targetId,
   variant,
-  label
+  label,
+  sourceDialects
 }: {
   entryId: string;
   audio: DictionaryAudio[];
   targetId: string;
   variant: EnglishVariant | null;
   label: string;
+  sourceDialects?: ("common" | "uk" | "us")[];
 }) {
-  const primary = preferredAudio(audio, targetId, variant);
-  const supplemental = audio.filter(
+  const matching = audio.filter((item) =>
+    !item.source_dialect
+      ? !sourceDialects || sourceDialects.includes("common")
+      : !sourceDialects || sourceDialects.includes(item.source_dialect)
+  );
+  const primary = preferredAudio(matching, targetId, variant);
+  const supplemental = matching.filter(
     (item) =>
       item.target_id === targetId &&
       (item.accent_group ?? speechAccentGroup(item.locale)) === "other"
   );
-  if (!primary && !supplemental.length) return null;
+  if (!primary && !supplemental.length)
+    return audio.some(
+      (item) => item.target_id === targetId && !item.source_dialect
+    ) &&
+      sourceDialects &&
+      !sourceDialects.includes("common") ? (
+      <span className="text-xs text-foreground-muted">
+        当前正文的音频来源未确认，暂不可播放
+      </span>
+    ) : null;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       {primary && (

@@ -1717,15 +1717,33 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       );
       return;
     }
-    const selected = setting ?? {
-      voice_id: voiceId,
-      enabled: false,
-      rate_percent: 0,
-      ...voice.defaultSettings
+    const needsVersion =
+      !["en-GB", "en-US"].includes(voice.locale) ||
+      voice.supportsVolume === false;
+    const selected: VoiceSetting = {
+      ...(setting ?? {
+        voice_id: voiceId,
+        enabled: false,
+        rate_percent: 0,
+        ...voice.defaultSettings
+      }),
+      ...(needsVersion && !setting?.version_id
+        ? {
+            version_id: newVoiceVersionId(),
+            version_name: voice.label,
+            locale: voice.locale as `en-${string}`
+          }
+        : {})
     };
+    const existing =
+      setting && needsVersion && !setting.version_id
+        ? voiceSettings.filter(
+            (item) => voiceSettingKey(item) !== voiceSettingKey(setting)
+          )
+        : voiceSettings;
     changeVoiceSettings(
       selectVoiceVersion(
-        voiceSettings,
+        existing,
         selected,
         voice.locale as `en-${string}`,
         voices

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dubbing-center/docs/openapi.json",
-  "_source_sha256": "c32c7de6e24c65d75998cb613ef2a4764045b5ebd3ad4d6df669d42363797b33",
+  "_source_sha256": "b48f180aec5009f524a7afed53736efd02f7550796f19b8f9a5c9a7c7a427e56",
   "roots": [
     "MemoryOverview",
     "MemoryPage",
@@ -840,6 +840,7 @@
         "accent_group": { "$ref": "#/$defs/AccentGroup" },
         "asset_id": { "type": "string", "format": "uuid" },
         "locale": { "type": "string" },
+        "source_dialect": { "$ref": "#/$defs/Dialect" },
         "target_id": { "type": "string", "format": "uuid" }
       },
       "additionalProperties": false

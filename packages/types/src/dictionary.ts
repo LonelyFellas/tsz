@@ -6,6 +6,7 @@ export interface DictionaryAudio {
   asset_id: string;
   locale: string;
   accent_group?: "uk" | "us" | "other";
+  source_dialect?: "common" | "uk" | "us";
 }
 export interface DictionaryExample {
   id: string;
