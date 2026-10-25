@@ -1888,25 +1888,31 @@ describe("VoiceEditor 发音区", () => {
     );
     view.unmount();
     onVoiceProfileChange.mockClear();
+    const australianAdapter = {
+      ...adapter(),
+      listVoices: vi
+        .fn()
+        .mockResolvedValue([
+          { ...VOICES[0]!, id: "natasha", label: "Natasha", locale: "en-AU" }
+        ])
+    };
     render(
-      <VoiceEditor {...props({ previewAdapter, onVoiceProfileChange })} />
+      <VoiceEditor
+        {...props({ previewAdapter: australianAdapter, onVoiceProfileChange })}
+      />
     );
     openVoices();
-    const style = await screen.findByRole("combobox", {
-      name: "Tiana Flash 风格"
-    });
-    fireEvent.mouseDown(style);
-    fireEvent.click(
-      await screen.findByText("自然", {
-        selector: ".ant-select-item-option-content"
-      })
-    );
+    const rateButton = await screen.findByLabelText("设置 Natasha 的语速");
+    fireEvent.click(rateButton);
+    const rate = await screen.findByRole("textbox", { name: "自定义语速倍数" });
+    fireEvent.change(rate, { target: { value: "1.00" } });
+    fireEvent.keyDown(rate, { key: "Enter" });
     expect(onVoiceProfileChange).toHaveBeenLastCalledWith({
       voices: [
         expect.objectContaining({
           version_id: expect.any(String),
-          locale: "en-US",
-          voice_id: flash.id,
+          locale: "en-AU",
+          voice_id: "natasha",
           enabled: false
         })
       ]
