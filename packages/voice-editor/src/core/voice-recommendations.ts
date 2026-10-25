@@ -1,3 +1,4 @@
+import { speechAccentGroup } from "@tsz/shared";
 import type {
   AudioAssetLocale,
   VoiceOption,
@@ -11,9 +12,16 @@ export function isVoiceRecommendationAvailable(
 ): boolean {
   const voice = voices.find(
     (value) =>
-      value.id === item.setting.voice_id && value.locale === item.locale
+      value.id === item.setting.voice_id &&
+      (item.setting.locale
+        ? value.locale === item.setting.locale
+        : speechAccentGroup(value.locale) === speechAccentGroup(item.locale))
   );
-  if (!voice || (locale && item.locale !== locale)) return false;
+  if (
+    !voice ||
+    (locale && speechAccentGroup(item.locale) !== speechAccentGroup(locale))
+  )
+    return false;
   const {
     rate_percent: rate,
     pitch_semitones: pitch = 0,
@@ -24,6 +32,7 @@ export function isVoiceRecommendationAvailable(
     Number.isInteger(volume) &&
     volume >= 0 &&
     volume <= 100 &&
+    (voice.supportsVolume !== false || volume === 100) &&
     (!style || voice.styles.includes(style)) &&
     (!voice.rateRange ||
       (rate >= voice.rateRange.min && rate <= voice.rateRange.max)) &&

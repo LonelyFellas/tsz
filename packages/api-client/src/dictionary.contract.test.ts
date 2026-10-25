@@ -19,7 +19,14 @@ describe("词典请求契约", () => {
     const url = new URL(get.mock.calls[0]![0], "https://example.test");
     expect(url.pathname).toBe("/dictionary");
     expect(url.searchParams.get("q")).toBe("day in, day out");
-    expect(get.mock.calls[0]![1]).toEqual({ signal: controller.signal });
+    expect(get.mock.calls[0]![1]).toEqual({
+      signal: controller.signal,
+      headers: {
+        "X-TSZ-Voice-Versions": "v2",
+        "X-TSZ-Voice-Locales": "v1",
+        "X-TSZ-Voice-Models": "v1"
+      }
+    });
     for (const path of [
       "/dictionary",
       "/dictionary/entries/{id}",
@@ -37,6 +44,9 @@ describe("词典请求契约", () => {
     expect(get.mock.calls[1]![0]).toBe(
       `/dictionary/entries/${uuid}/audio/${uuid}`
     );
+    expect(get.mock.calls[1]![1]).toMatchObject({
+      headers: { "X-TSZ-Voice-Models": "v1" }
+    });
   });
   it("拒绝缺字段、后台字段和破损发布响应", () => {
     const content = {
@@ -48,6 +58,25 @@ describe("词典请求契约", () => {
     };
     const entry = { content, audio: [], examples: [] };
     expect(validateRuntimeSchema("DictionaryEntry", entry).valid).toBe(true);
+    expect(
+      validateRuntimeSchema("DictionaryEntry", {
+        ...entry,
+        audio: [{ target_id: uuid, asset_id: uuid, locale: "en-GB" }]
+      }).valid
+    ).toBe(true);
+    expect(
+      validateRuntimeSchema("DictionaryEntry", {
+        ...entry,
+        audio: [
+          {
+            target_id: uuid,
+            asset_id: uuid,
+            locale: "en-IN",
+            accent_group: "other"
+          }
+        ]
+      }).valid
+    ).toBe(true);
     expect(
       validateRuntimeSchema("DictionaryEntry", {
         ...entry,

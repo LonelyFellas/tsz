@@ -1,3 +1,4 @@
+import { speechAccentGroup } from "@tsz/shared";
 import {
   ArrowDownOutlined,
   ArrowUpOutlined,
@@ -79,7 +80,7 @@ function recommendationError(
   const accent = locale === "uk" ? "英式" : "美式";
   const location = `${groupName || "未命名分组"} / ${accent} / ${item.name || "未命名推荐"}`;
   if (!voice) return `${location}：音色已不可用，请重新选择${accent}音色。`;
-  if (voice.locale !== (locale === "uk" ? "en-GB" : "en-US")) {
+  if (speechAccentGroup(voice.locale) !== locale) {
     return `${location}：音色口音与${accent}推荐不符，请重新选择${accent}音色。`;
   }
   if (!item.name.trim()) return `${location}：请填写推荐名称。`;
@@ -90,6 +91,8 @@ function recommendationError(
     volume_percent = 100,
     style
   } = item.parameters;
+  if (caps.supports_volume_percent === false && volume_percent !== 100)
+    return `${location}：该模型仅支持原音量，请明确恢复原音量。`;
   if (
     !Number.isInteger(volume_percent) ||
     volume_percent < 0 ||
@@ -161,9 +164,7 @@ export function DubbingGroups({
   const current = draft ?? groups.data;
   const editable = canEdit && !!draft && !saving;
   const available = (locale: "uk" | "us") =>
-    voices.filter(
-      (voice) => voice.locale === (locale === "uk" ? "en-GB" : "en-US")
-    );
+    voices.filter((voice) => speechAccentGroup(voice.locale) === locale);
 
   function change(
     id: string,
@@ -634,7 +635,8 @@ export function DubbingGroups({
                             <Space size={4}>
                               <Tooltip title="试听">
                                 <Button
-                                  type="text"
+                                  color={locale === "uk" ? "danger" : "primary"}
+                                  variant="text"
                                   aria-label="试听"
                                   icon={<PlayCircleOutlined />}
                                   disabled={!canAudition || !!issue}
@@ -782,6 +784,29 @@ export function DubbingGroups({
                           {editable ? (
                             caps && (
                               <div className="dubbing-recommendation-parameters">
+                                {caps.supports_volume_percent === false &&
+                                  (item.parameters.volume_percent ?? 100) !==
+                                    100 && (
+                                    <Button
+                                      size="small"
+                                      onClick={() =>
+                                        updateItem(
+                                          group.id,
+                                          locale,
+                                          item.id,
+                                          (entry) => ({
+                                            ...entry,
+                                            parameters: {
+                                              ...entry.parameters,
+                                              volume_percent: 100
+                                            }
+                                          })
+                                        )
+                                      }
+                                    >
+                                      恢复原音量
+                                    </Button>
+                                  )}
                                 <Form.Item
                                   label="音量"
                                   htmlFor={`${item.id}-volume`}
@@ -789,6 +814,9 @@ export function DubbingGroups({
                                   <InputNumber
                                     id={`${item.id}-volume`}
                                     aria-label="推荐音量"
+                                    disabled={
+                                      caps.supports_volume_percent === false
+                                    }
                                     min={0}
                                     max={100}
                                     precision={0}

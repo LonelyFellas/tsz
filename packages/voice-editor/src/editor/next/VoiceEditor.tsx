@@ -1,3 +1,4 @@
+import { speechAccentGroup } from "@tsz/shared";
 import "./interaction.css";
 import {
   AudioOutlined,
@@ -22,6 +23,7 @@ import {
   voiceLocale,
   voiceSettingFor,
   voiceSettingKey,
+  withNativeVoiceVersion,
   normalizeRichTextV2,
   normalizeSpellingRich,
   toRichTextV2,
@@ -531,33 +533,28 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     if (readOnly) return;
     initialRecommendationPending.current = false;
     const existing = voiceSettingFor(voiceSettings, voiceId, editingVersionKey);
-    const next = existing
-      ? voiceSettings.map((voice) =>
-          voiceSettingKey(voice) === voiceSettingKey(existing)
-            ? {
-                ...voice,
-                ...patch,
-                ...([
-                  "rate_percent",
-                  "pitch_semitones",
-                  "volume_percent",
-                  "style"
-                ].some((key) => key in patch)
-                  ? { audio_asset_id: undefined }
-                  : {})
-              }
-            : voice
+    const updated = withNativeVoiceVersion(
+      {
+        ...(existing ?? {
+          voice_id: voiceId,
+          enabled: false,
+          rate_percent: 0,
+          ...voices.find((voice) => voice.id === voiceId)?.defaultSettings
+        }),
+        ...patch,
+        ...(["rate_percent", "pitch_semitones", "volume_percent", "style"].some(
+          (key) => key in patch
         )
-      : [
-          ...voiceSettings,
-          {
-            voice_id: voiceId,
-            enabled: false,
-            rate_percent: 0,
-            ...voices.find((voice) => voice.id === voiceId)?.defaultSettings,
-            ...patch
-          }
-        ];
+          ? { audio_asset_id: undefined }
+          : {})
+      },
+      voices.find((voice) => voice.id === voiceId)
+    );
+    const next = existing
+      ? voiceSettings.map((item) =>
+          voiceSettingKey(item) === voiceSettingKey(existing) ? updated : item
+        )
+      : [...voiceSettings, updated];
     setVoiceSettings(next);
     const profile = { voices: next };
     emittedProfileRef.current = JSON.stringify(profile);
@@ -636,6 +633,27 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     )
       return;
     const content = generationContent;
+    const selectedVoice = voices.find((voice) => voice.id === setting.voice_id);
+    if (
+      selectedVoice &&
+      ((selectedVoice.supportsVolume === false &&
+        (setting.volume_percent ?? 100) !== 100) ||
+        (selectedVoice.supportsRate === false && setting.rate_percent !== 0) ||
+        (selectedVoice.supportsPitch === false &&
+          (setting.pitch_semitones ?? 0) !== 0) ||
+        ((mode === "synthesis" || mode === "phoneme-settings") &&
+          selectedVoice.supportsPhoneme === false) ||
+        content.annotations.some(
+          (mark) =>
+            (mark.type === "pause" && selectedVoice.supportsPause === false) ||
+            (mark.type === "phoneme" && selectedVoice.supportsPhoneme === false)
+        ))
+    ) {
+      setRecommendationError(
+        "该模型不支持当前参数、停顿或指定音素；请明确调整后再生成，原内容已保留"
+      );
+      return;
+    }
     const key = voiceSettingKey(setting);
     const signature = JSON.stringify([
       content,
@@ -713,7 +731,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
 
   function chooseVersion(setting: VoiceSetting) {
     const accent = voiceLocale(setting, voices);
-    if (accent !== "en-GB" && accent !== "en-US") return;
+    if (!accent || !speechAccentGroup(accent)) return;
     if (
       voiceSettings.some((item) => item.enabled && !voiceLocale(item, voices))
     ) {
@@ -730,14 +748,16 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           version_name:
             voices.find((voice) => voice.id === setting.voice_id)?.label ??
             setting.voice_id,
-          locale: accent
+          locale: accent as `en-${string}`
         };
     const existing = setting.version_id
       ? voiceSettings
       : voiceSettings.filter(
           (item) => voiceSettingKey(item) !== voiceSettingKey(setting)
         );
-    changeVoiceSettings(selectVoiceVersion(existing, selected, accent, voices));
+    changeVoiceSettings(
+      selectVoiceVersion(existing, selected, accent as `en-${string}`, voices)
+    );
     setEditingVersionKey(voiceSettingKey(selected));
   }
 
@@ -747,7 +767,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       enabled: true,
       version_id: newVoiceVersionId(),
       version_name: item.name,
-      locale: item.locale
+      locale: (voices.find((voice) => voice.id === item.setting.voice_id)
+        ?.locale ?? item.locale) as `en-${string}`
     };
     changeVoiceSettings(
       selectVoiceVersion(voiceSettings, version, item.locale, voices)
@@ -835,7 +856,13 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     initialRecommendationPending.current = false;
     if (!usable.length) return;
     const profile = {
-      voices: usable.map((item) => ({ ...item.setting, enabled: true }))
+      voices: usable.map((item) =>
+        withNativeVoiceVersion(
+          { ...item.setting, enabled: true },
+          voices.find((voice) => voice.id === item.setting.voice_id),
+          item.name
+        )
+      )
     };
     setVoiceSettings(profile.voices);
     emittedProfileRef.current = JSON.stringify(profile);
@@ -1683,7 +1710,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       return;
     }
     const voice = voices.find((item) => item.id === voiceId);
-    if (voice?.locale !== "en-GB" && voice?.locale !== "en-US") return;
+    if (!voice || !speechAccentGroup(voice.locale)) return;
     if (
       voiceSettings.some((item) => item.enabled && !voiceLocale(item, voices))
     ) {
@@ -1692,14 +1719,28 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       );
       return;
     }
-    const selected = setting ?? {
-      voice_id: voiceId,
-      enabled: false,
-      rate_percent: 0,
-      ...voice.defaultSettings
-    };
+    const selected = withNativeVoiceVersion(
+      setting ?? {
+        voice_id: voiceId,
+        enabled: false,
+        rate_percent: 0,
+        ...voice.defaultSettings
+      },
+      voice
+    );
+    const existing =
+      setting && voiceSettingKey(selected) !== voiceSettingKey(setting)
+        ? voiceSettings.filter(
+            (item) => voiceSettingKey(item) !== voiceSettingKey(setting)
+          )
+        : voiceSettings;
     changeVoiceSettings(
-      selectVoiceVersion(voiceSettings, selected, voice.locale, voices)
+      selectVoiceVersion(
+        existing,
+        selected,
+        voice.locale as `en-${string}`,
+        voices
+      )
     );
   };
 
@@ -1739,7 +1780,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   const handleAudition = (voice: VoiceOption, setting?: VoiceSetting) => {
     if (
       conflictCount > 0 ||
-      (mode === "synthesis" &&
+      ((mode === "synthesis" || mode === "phoneme-settings") &&
         locale &&
         voice.locale.toLowerCase() !== locale.toLowerCase())
     )
@@ -2214,7 +2255,18 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             <VoiceVersions
               settings={voiceSettings}
               voices={voices}
+              hasPause={generationContent.annotations.some(
+                (mark) => mark.type === "pause"
+              )}
+              hasPhoneme={generationContent.annotations.some(
+                (mark) => mark.type === "phoneme"
+              )}
               locale={locale}
+              phonemeLocale={
+                mode === "synthesis" || mode === "phoneme-settings"
+                  ? locale
+                  : undefined
+              }
               editingKey={editingVersionKey}
               canAudition={
                 !!previewAdapter && !!text.trim() && conflictCount === 0

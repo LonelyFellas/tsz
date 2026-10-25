@@ -391,7 +391,7 @@ export interface VoiceSettingV3 {
   audio_asset_id?: string;
   version_id?: string;
   version_name?: string;
-  locale?: "en-GB" | "en-US";
+  locale?: SpeechLocaleV3;
   voice_id: string;
   enabled: boolean;
   rate_percent: number;
@@ -405,8 +405,9 @@ export interface VoiceProfileV3 {
   voices: VoiceSettingV3[];
 }
 
-export type AudioAssetLocaleV3 = "en-GB" | "en-US";
-export type AudioAssetGenderV3 = "female" | "male";
+export type SpeechLocaleV3 = `en-${string}`;
+export type AudioAssetLocaleV3 = SpeechLocaleV3;
+export type AudioAssetGenderV3 = "female" | "male" | "neutral";
 
 /**
  * 一条已上传的音频资产（真人录音）。元数据由服务端在 confirm 时生成，前端原样回传；

@@ -1,5 +1,6 @@
 export * from "./constants";
 export * from "./dialect-preference";
+export * from "./speech-locale";
 export * from "./format";
 export { wordlistAudioWord } from "./wordlist-audio";
 export * from "./query";

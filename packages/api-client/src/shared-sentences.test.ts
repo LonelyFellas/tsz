@@ -119,7 +119,12 @@ describe("shared sentence wire contract", () => {
     ).resolves.toEqual(response);
     await expect(endpoints.get(id, "draft")).resolves.toEqual(response);
     expect(post).toHaveBeenCalledWith("/lexicon/sentences", input, {
-      headers: { ...SENTENCE_FORMATTING_HEADERS, "X-TSZ-Voice-Versions": "v2" }
+      headers: {
+        ...SENTENCE_FORMATTING_HEADERS,
+        "X-TSZ-Voice-Versions": "v2",
+        "X-TSZ-Voice-Locales": "v1",
+        "X-TSZ-Voice-Models": "v1"
+      }
     });
     expect(put.mock.calls[0]?.[1]).toEqual({ base_revision: 1, content });
     // The deployed strict reader rejects the new property: frontend must ship first.
@@ -211,7 +216,9 @@ describe("shared sentence wire contract", () => {
       {
         headers: {
           ...SENTENCE_FORMATTING_HEADERS,
-          "X-TSZ-Voice-Versions": "v2"
+          "X-TSZ-Voice-Versions": "v2",
+          "X-TSZ-Voice-Locales": "v1",
+          "X-TSZ-Voice-Models": "v1"
         }
       }
     );
@@ -272,7 +279,9 @@ describe("shared sentence wire contract", () => {
       {
         headers: {
           ...SENTENCE_FORMATTING_HEADERS,
-          "X-TSZ-Voice-Versions": "v2"
+          "X-TSZ-Voice-Versions": "v2",
+          "X-TSZ-Voice-Locales": "v1",
+          "X-TSZ-Voice-Models": "v1"
         }
       }
     );
@@ -296,6 +305,8 @@ it("发布、回退、下架、恢复分别走独立路径并携带双版本与�
     headers: {
       ...SENTENCE_FORMATTING_HEADERS,
       "X-TSZ-Voice-Versions": "v2",
+      "X-TSZ-Voice-Locales": "v1",
+      "X-TSZ-Voice-Models": "v1",
       "Idempotency-Key": "command-key"
     }
   };
@@ -340,13 +351,23 @@ it("编辑显式读取草稿，历史支持游标并拒绝畸形响应", async (
   const api = createSharedSentenceEndpoints({ get } as unknown as HttpClient);
   await api.get(id, "draft");
   expect(get).toHaveBeenLastCalledWith(`/lexicon/sentences/${id}?view=draft`, {
-    headers: { ...SENTENCE_FORMATTING_HEADERS, "X-TSZ-Voice-Versions": "v2" }
+    headers: {
+      ...SENTENCE_FORMATTING_HEADERS,
+      "X-TSZ-Voice-Versions": "v2",
+      "X-TSZ-Voice-Locales": "v1",
+      "X-TSZ-Voice-Models": "v1"
+    }
   });
   await expect(api.publications(id, 5)).resolves.toEqual([publication]);
   expect(get).toHaveBeenLastCalledWith(
     `/lexicon/sentences/${id}/publications?before_number=5`,
     {
-      headers: { ...SENTENCE_FORMATTING_HEADERS, "X-TSZ-Voice-Versions": "v2" }
+      headers: {
+        ...SENTENCE_FORMATTING_HEADERS,
+        "X-TSZ-Voice-Versions": "v2",
+        "X-TSZ-Voice-Locales": "v1",
+        "X-TSZ-Voice-Models": "v1"
+      }
     }
   );
   await expect(api.publication(id, id)).resolves.toEqual(publication);
@@ -399,13 +420,23 @@ it("creation and historical detail negotiate the same response capability", asyn
   };
   await api.create(input as never);
   expect(post).toHaveBeenCalledWith("/lexicon/sentences", input, {
-    headers: { ...SENTENCE_FORMATTING_HEADERS, "X-TSZ-Voice-Versions": "v2" }
+    headers: {
+      ...SENTENCE_FORMATTING_HEADERS,
+      "X-TSZ-Voice-Versions": "v2",
+      "X-TSZ-Voice-Locales": "v1",
+      "X-TSZ-Voice-Models": "v1"
+    }
   });
   await api.publication(id, id);
   expect(get).toHaveBeenCalledWith(
     `/lexicon/sentences/${id}/publications/${id}`,
     {
-      headers: { ...SENTENCE_FORMATTING_HEADERS, "X-TSZ-Voice-Versions": "v2" }
+      headers: {
+        ...SENTENCE_FORMATTING_HEADERS,
+        "X-TSZ-Voice-Versions": "v2",
+        "X-TSZ-Voice-Locales": "v1",
+        "X-TSZ-Voice-Models": "v1"
+      }
     }
   );
 });

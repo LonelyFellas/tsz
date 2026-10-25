@@ -1,4 +1,5 @@
 import { EditOutlined } from "@ant-design/icons";
+import { HttpError } from "@tsz/api-client";
 import { Alert, Button, Space, Typography } from "antd";
 import {
   lazy,
@@ -161,24 +162,38 @@ export function V3PhonemeSpeechSettings({
       listVoices: (input) => adminVoicePreviewAdapter.listVoices(input),
       resolveAudio: adminVoicePreviewAdapter.resolveAudio,
       async generateAudio(input, options) {
-        const { alphabet, inputIssue, resolveCandidate } = latest.current;
+        const { alphabet, locale, inputIssue, resolveCandidate } =
+          latest.current;
         if (inputIssue) throw new Error(inputIssue);
         const candidate = resolveCandidate(input.content);
-        const result = await api.speech.generateAudio(
-          {
-            request_id: input.requestId,
-            source: {
-              kind: "phoneme",
-              content: candidate[`${alphabet}_speech`]!.content,
-              alphabet,
-              phoneme: input.content.text,
-              ups_words: alphabet === "ups" ? (candidate.ups_words ?? []) : []
+        try {
+          const result = await api.speech.generateAudio(
+            {
+              request_id: input.requestId,
+              source: {
+                kind: "phoneme",
+                phoneme_locale: locale,
+                content: candidate[`${alphabet}_speech`]!.content,
+                alphabet,
+                phoneme: input.content.text,
+                ups_words: alphabet === "ups" ? (candidate.ups_words ?? []) : []
+              },
+              setting: input.setting
             },
-            setting: input.setting
-          },
-          options?.signal
-        );
-        return result.asset;
+            options?.signal
+          );
+          return result.asset;
+        } catch (error) {
+          if (
+            error instanceof HttpError &&
+            error.status === 422 &&
+            /phoneme_locale/.test(error.message)
+          )
+            throw new Error(
+              "当前后端尚未支持精确地区音素生成，请升级服务后重试；现有配置与音频已保留"
+            );
+          throw error;
+        }
       },
       async synthesize(input, options) {
         const { spelling, alphabet, locale, inputIssue, resolveCandidate } =
