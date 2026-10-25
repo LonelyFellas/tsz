@@ -35,34 +35,39 @@ beforeEach(() => {
   vi.resetAllMocks();
   seed("a");
 });
-it("never repeats an award notification for a replayed operation and keeps the historical day", async () => {
-  vi.mocked(api.learningRewards.day).mockResolvedValue(awarded);
-  const client = new QueryClient({
-    defaultOptions: { queries: { retry: false } }
-  });
-  const notified = vi.fn();
-  render(
-    <QueryClientProvider client={client}>
-      <LearningRewardSummary
-        userId="a"
-        businessDay="2026-10-07"
-        completionId="completed"
-        onAward={notified}
-      />
-    </QueryClientProvider>
-  );
-  expect(await screen.findByText(/该日奖励已到账/)).toHaveTextContent(
-    "13 天生币"
-  );
-  expect(api.learningRewards.day).toHaveBeenCalledWith(
-    "2026-10-07",
-    expect.objectContaining({ signal: expect.any(AbortSignal) })
-  );
-  await act(() =>
-    client.invalidateQueries({ queryKey: ["learning-rewards", "a"] })
-  );
-  expect(notified).toHaveBeenCalledTimes(1);
-});
+it.each([false, true])(
+  "never repeats an award notification and keeps the historical day (embedded=%s)",
+  async (embedded) => {
+    vi.mocked(api.learningRewards.day).mockResolvedValue(awarded);
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } }
+    });
+    const notified = vi.fn();
+    render(
+      <QueryClientProvider client={client}>
+        <LearningRewardSummary
+          userId="a"
+          businessDay="2026-10-07"
+          completionId="completed"
+          onAward={notified}
+          embedded={embedded}
+        />
+      </QueryClientProvider>
+    );
+    expect(await screen.findByText(/该日奖励已到账/)).toHaveTextContent(
+      "13 天生币"
+    );
+    expect(screen.getByText(awarded.business_day)).toBeVisible();
+    expect(api.learningRewards.day).toHaveBeenCalledWith(
+      "2026-10-07",
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
+    await act(() =>
+      client.invalidateQueries({ queryKey: ["learning-rewards", "a"] })
+    );
+    expect(notified).toHaveBeenCalledTimes(1);
+  }
+);
 it("404 and failed reads never invent an award or replace a learning result", async () => {
   vi.mocked(api.learningRewards.day).mockRejectedValue(
     new HttpError(404, "Not found")

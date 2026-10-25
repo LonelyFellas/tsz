@@ -70,7 +70,7 @@ it("shows exact real balance and pending state without fake claim buttons", asyn
   });
   open();
   expect(
-    await screen.findByText("9,007,199,254,740,993 天生币")
+    await screen.findByLabelText("9,007,199,254,740,993 天生币")
   ).toBeInTheDocument();
   expect(screen.getByText(/钱包已暂停全部/)).toBeInTheDocument();
   expect(screen.getByText(/客服联系方式暂未配置/)).toBeInTheDocument();
@@ -88,11 +88,11 @@ it("failed read does not render zero or stale balance after account switch", asy
     })
     .mockRejectedValue(new Error("offline"));
   open();
-  expect(await screen.findByText("100 天生币")).toBeInTheDocument();
+  expect(await screen.findByLabelText("100 天生币")).toBeInTheDocument();
   act(() => seed("u2"));
   expect(await screen.findByText(/余额加载失败/)).toBeInTheDocument();
-  expect(screen.queryByText("100 天生币")).not.toBeInTheDocument();
-  expect(screen.queryByText("0 天生币")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("100 天生币")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("0 天生币")).not.toBeInTheDocument();
 });
 it("late response from the previous account cannot overwrite current wallet", async () => {
   let resolve!: (v: Awaited<ReturnType<typeof api.coins.wallet>>) => void;
@@ -111,7 +111,7 @@ it("late response from the previous account cannot overwrite current wallet", as
   open();
   await waitFor(() => expect(api.coins.wallet).toHaveBeenCalledOnce());
   act(() => seed("u2"));
-  expect(await screen.findByText("7 天生币")).toBeInTheDocument();
+  expect(await screen.findByLabelText("7 天生币")).toBeInTheDocument();
   await act(async () =>
     resolve({
       owner_type: "user",
@@ -120,7 +120,7 @@ it("late response from the previous account cannot overwrite current wallet", as
       status: "open"
     })
   );
-  expect(screen.queryByText("999 天生币")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("999 天生币")).not.toBeInTheDocument();
 });
 
 it("keeps the balance and account status visible while refreshing", async () => {
@@ -139,11 +139,11 @@ it("keeps the balance and account status visible while refreshing", async () => 
         })
     );
   open();
-  await screen.findByText("100 天生币");
+  await screen.findByLabelText("100 天生币");
   const { fireEvent } = await import("@testing-library/react");
   fireEvent.click(screen.getByText("刷新"));
   await waitFor(() => expect(api.coins.wallet).toHaveBeenCalledTimes(2));
-  expect(screen.getByText("100 天生币")).toBeInTheDocument();
+  expect(screen.getByLabelText("100 天生币")).toBeInTheDocument();
   expect(screen.getByText(/钱包已暂停全部/)).toBeInTheDocument();
   expect(screen.getByText("正在更新余额…")).toBeInTheDocument();
   await act(async () =>
@@ -154,7 +154,7 @@ it("keeps the balance and account status visible while refreshing", async () => 
       status: "open"
     })
   );
-  expect(await screen.findByText("101 天生币")).toBeInTheDocument();
+  expect(await screen.findByLabelText("101 天生币")).toBeInTheDocument();
   expect(screen.queryByText("正在更新余额…")).toBeNull();
 });
 
@@ -168,12 +168,12 @@ it("does not present a cached balance as current after refresh fails", async () 
     })
     .mockRejectedValue(new Error("offline"));
   open();
-  await screen.findByText("100 天生币");
+  await screen.findByLabelText("100 天生币");
   const { fireEvent } = await import("@testing-library/react");
   fireEvent.click(screen.getByText("刷新"));
   expect(await screen.findByText(/当前余额未知/)).toBeInTheDocument();
-  expect(screen.queryByText("100 天生币")).not.toBeInTheDocument();
-  expect(screen.queryByText("0 天生币")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("100 天生币")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("0 天生币")).not.toBeInTheDocument();
 });
 
 it("refresh after pagination discards snapshot and reloads the cached first page", async () => {
@@ -296,7 +296,7 @@ it("manual refresh also reloads rewards earned on another device", async () => {
     screen.getByRole("button", { name: "刷新" }).click();
   });
   await screen.findByText(/该日奖励已到账 13/);
-  await screen.findByText("13 天生币");
+  await screen.findByLabelText("13 天生币");
   expect(
     vi.mocked(api.coins.entries).mock.lastCall?.[0]?.snapshot
   ).toBeUndefined();
