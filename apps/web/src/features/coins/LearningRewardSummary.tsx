@@ -3,8 +3,9 @@ import { useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { HttpError } from "@tsz/api-client";
 import { formatCoins } from "@tsz/shared";
+import { Button } from "@tsz/ui/components";
 import Link from "next/link";
-import { Coins } from "lucide-react";
+import { BookOpen, ChevronDown, Coins } from "lucide-react";
 import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
 
@@ -12,12 +13,14 @@ export function LearningRewardSummary({
   userId,
   businessDay,
   completionId,
-  onAward
+  onAward,
+  embedded = false
 }: {
   userId: string;
   businessDay?: string;
   completionId?: string | null;
   onAward?: () => void;
+  embedded?: boolean;
 }) {
   const client = useQueryClient();
   const seen = useRef<string | null>(null);
@@ -48,27 +51,54 @@ export function LearningRewardSummary({
     d && d.minimum_units
       ? Math.min(100, Math.round((d.qualifying_units / d.minimum_units) * 100))
       : 0;
+  const Heading = embedded ? "h3" : "h2";
+  const rules = d && d.status !== "reward_disabled" && (
+    <p className="text-xs leading-5 text-foreground-muted">
+      已完成的每日任务累计 {d.minimum_units} 道不同题目，每个业务日最多获得{" "}
+      {formatCoins(d.daily_amount!)}。北京时间 04:00 换日，合法错误作答也计入。
+    </p>
+  );
   return (
     <section
       aria-label="每日学习奖励"
-      className="glass space-y-4 rounded-3xl p-5 sm:p-6"
+      className={
+        embedded ? "space-y-3" : "glass space-y-4 rounded-3xl p-5 sm:p-6"
+      }
     >
-      <div className="flex items-center gap-3">
-        <span
-          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-muted text-primary"
-          aria-hidden
+      <div
+        className={
+          embedded ? "flex items-center gap-2" : "flex items-center gap-3"
+        }
+      >
+        {embedded ? (
+          <BookOpen
+            className="size-4 shrink-0 text-foreground-muted"
+            strokeWidth={1.8}
+            aria-hidden
+          />
+        ) : (
+          <span
+            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-muted text-primary"
+            aria-hidden
+          >
+            <Coins className="size-[18px]" strokeWidth={1.8} />
+          </span>
+        )}
+        <Heading
+          className={
+            embedded
+              ? "text-sm font-medium text-foreground"
+              : "text-base font-bold tracking-tight text-foreground"
+          }
         >
-          <Coins className="size-[18px]" strokeWidth={1.8} />
-        </span>
-        <h2 className="text-base font-bold tracking-tight text-foreground">
           每日学习奖励
-          {d && !q.isError && (
+          {!embedded && d && !q.isError && (
             <span className="ml-2 text-sm font-normal tabular-nums text-foreground-muted">
               <span className="sr-only"> · </span>
               {d.business_day}
             </span>
           )}
-        </h2>
+        </Heading>
       </div>
       {q.isError ? (
         <p role="alert" className="text-sm text-foreground-muted">
@@ -93,7 +123,11 @@ export function LearningRewardSummary({
           {d.status === "awarded" ? (
             <p
               role="status"
-              className="rounded-2xl bg-success/10 px-4 py-3 text-sm font-medium text-success"
+              className={
+                embedded
+                  ? "text-sm leading-6 text-success"
+                  : "rounded-2xl bg-success/10 px-4 py-3 text-sm font-medium text-success"
+              }
             >
               该日奖励已到账 {formatCoins(d.awarded_amount)}
               ，继续学习不会重复发放。
@@ -128,19 +162,34 @@ export function LearningRewardSummary({
               </p>
             </div>
           )}
-          <p className="text-xs leading-5 text-foreground-muted">
-            已完成的每日任务累计 {d.minimum_units}{" "}
-            道不同题目，每个业务日最多获得 {formatCoins(d.daily_amount!)}
-            。北京时间 04:00 换日，合法错误作答也计入。
-          </p>
+          {embedded ? (
+            <details className="group/learning-rules">
+              <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1 rounded-sm text-xs text-foreground-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary sm:min-h-8 [&::-webkit-details-marker]:hidden">
+                学习奖励规则
+                <ChevronDown
+                  className="size-3.5 group-open/learning-rules:rotate-180"
+                  aria-hidden
+                />
+              </summary>
+              <div className="mt-1">{rules}</div>
+            </details>
+          ) : (
+            rules
+          )}
         </>
       )}
-      <Link
-        href="/student/practice"
-        className="inline-flex text-sm font-medium text-primary underline-offset-4 hover:underline"
-      >
-        查看每日学习任务 →
-      </Link>
+      {embedded ? (
+        <Button asChild size="compact">
+          <Link href="/student/practice">去学习</Link>
+        </Button>
+      ) : (
+        <Link
+          href="/student/practice"
+          className="inline-flex text-sm font-medium text-primary underline-offset-4 hover:underline"
+        >
+          查看每日学习任务 →
+        </Link>
+      )}
     </section>
   );
 }

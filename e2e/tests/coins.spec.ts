@@ -30,8 +30,22 @@ for (const width of [375, 1280]) {
     });
     await page.goto("/student/coins");
     await expect(page).toHaveURL(/\/account\/coins$/);
-    await expect(page.getByText("9,007,199,254,740,993 天生币")).toBeVisible();
+    await expect(
+      page.getByLabel("9,007,199,254,740,993 天生币", { exact: true })
+    ).toBeVisible();
     await expect(page.getByText(/钱包已暂停全部/)).toBeVisible();
+    await expect(
+      page.getByRole("navigation", { name: "收支记录分页" })
+    ).toHaveCount(0);
+    const purchaseInfo = page.getByText("天生币用途与购买说明", {
+      exact: true
+    });
+    await expect(page.getByText(/不支持在线支付或提现/)).not.toBeVisible();
+    await purchaseInfo.click();
+    await expect(page.getByText(/不支持在线支付或提现/)).toBeVisible();
+    await purchaseInfo.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByText(/不支持在线支付或提现/)).not.toBeVisible();
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth

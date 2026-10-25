@@ -5,9 +5,18 @@ import { formatCoins } from "@tsz/shared";
 import { Button } from "@tsz/ui/components";
 import Link from "next/link";
 import { useState } from "react";
-import { RefreshCw } from "lucide-react";
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  BookOpen,
+  ChevronDown,
+  ChevronRight,
+  Coins,
+  RefreshCw,
+  Users
+} from "lucide-react";
 import { api } from "@/lib/request";
-import { PageHeader, PageShell, panelClass } from "@/features/shell/Page";
+import { PageHeader, PageNotice, PageShell } from "@/features/shell/Page";
 import { LoginRewardSummary } from "./LoginReward";
 import { LearningRewardSummary } from "./LearningRewardSummary";
 import { useUserStore } from "@/stores/user";
@@ -63,51 +72,120 @@ function Wallet({ id }: { id: string }) {
     <PageShell>
       <PageHeader
         back={{ href: "/account", label: "返回个人中心" }}
-        eyebrow="我的账户"
         title="我的天生币"
         actions={
-          <Button variant="ghost" size="compact" onClick={refresh}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="compact"
+            onClick={refresh}
+          >
             <RefreshCw className="size-4" strokeWidth={1.8} aria-hidden />
             刷新
           </Button>
         }
       />
-      <section aria-label="钱包余额" className="glass rounded-3xl p-2">
-        <div className="relative overflow-hidden rounded-[20px] bg-surface/70 px-6 py-8 sm:px-10 sm:py-10">
-          <p className="text-xs font-medium tracking-[0.2em] text-foreground-muted">
-            当前余额 · 学生与教师身份共用
-          </p>
-          <div className="mt-4 min-h-10 sm:min-h-12">
-            {wallet.isError ? (
-              <p role="alert" className="text-sm text-danger">
-                余额加载失败，请重试。当前余额未知。
+      <div className="glass rounded-3xl p-2">
+        <section
+          aria-label="钱包余额"
+          className="rounded-[20px] bg-surface/70 p-5 sm:p-8"
+        >
+          <div className="grid items-center gap-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-8">
+            <div className="min-w-0">
+              <div className="flex items-center gap-3">
+                <span
+                  className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary-muted text-primary"
+                  aria-hidden
+                >
+                  <Coins className="size-5" strokeWidth={1.8} />
+                </span>
+                <h2 className="text-sm font-medium text-foreground-muted">
+                  当前余额
+                </h2>
+              </div>
+              <div className="mt-3 flex min-h-16 items-center">
+                {wallet.isError ? (
+                  <p role="alert" className="text-sm leading-6 text-danger">
+                    余额加载失败，请重试。当前余额未知。
+                  </p>
+                ) : wallet.isPending ? (
+                  <p role="status" className="text-sm text-foreground-muted">
+                    正在读取余额…
+                  </p>
+                ) : (
+                  <p
+                    aria-label={formatCoins(wallet.data.balance)}
+                    className="min-w-0 break-all text-5xl font-semibold tracking-tight text-foreground sm:text-[56px] sm:leading-tight"
+                  >
+                    {formatCoins(wallet.data.balance).replace(" 天生币", "")}
+                    <span className="ml-2 inline-block text-sm font-normal tracking-normal text-foreground-muted">
+                      {" 天生币"}
+                    </span>
+                  </p>
+                )}
+              </div>
+              <p className="mt-3 text-xs leading-5 text-foreground-muted">
+                学生与教师身份共用
               </p>
-            ) : wallet.isPending ? (
-              <p role="status" className="text-sm text-foreground-muted">
-                正在读取余额…
+              <p
+                role="status"
+                className="text-xs leading-5 text-foreground-muted"
+              >
+                {wallet.isFetching && wallet.data && !wallet.isError
+                  ? "正在更新余额…"
+                  : null}
               </p>
-            ) : (
-              <p className="break-all text-4xl font-bold tabular-nums tracking-tight text-foreground sm:text-5xl">
-                {formatCoins(wallet.data.balance)}
-              </p>
-            )}
+            </div>
+            <nav
+              aria-label="天生币相关页面"
+              className="grid gap-1 border-t border-border/60 pt-3 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0"
+            >
+              {[
+                {
+                  href: "/account/invitations",
+                  label: "邀请好友",
+                  icon: Users
+                },
+                {
+                  href: "/account/wordlist-tips",
+                  label: "词表投币记录",
+                  icon: BookOpen
+                }
+              ].map(({ href, label, icon: Icon }) => (
+                <Button
+                  key={href}
+                  asChild
+                  variant="ghost"
+                  size="compact"
+                  className="justify-start"
+                >
+                  <Link href={href}>
+                    <Icon
+                      className="size-4 text-foreground-muted"
+                      strokeWidth={1.8}
+                      aria-hidden
+                    />
+                    {label}
+                    <ChevronRight
+                      className="ml-auto size-4 text-foreground-muted"
+                      strokeWidth={1.8}
+                      aria-hidden
+                    />
+                  </Link>
+                </Button>
+              ))}
+            </nav>
           </div>
-          <p
-            role="status"
-            className="h-5 text-xs leading-5 text-foreground-muted"
-          >
-            {wallet.isFetching && wallet.data && !wallet.isError
-              ? "正在更新余额…"
-              : null}
-          </p>
-          <div className="mt-1 h-1 w-10 rounded-full bg-primary" aria-hidden />
           {!wallet.isError && wallet.data?.status === "deletion_pending" && (
             <div
               role="status"
-              className="mt-5 rounded-2xl bg-muted p-4 text-sm"
+              className="mt-5 rounded-2xl bg-muted p-4 text-sm leading-6"
             >
               账号正在等待注销，钱包已暂停全部入账和支出。撤销后可恢复原余额。
-              <Link className="ml-2 text-primary" href="/account/delete">
+              <Link
+                className="ml-2 rounded-sm text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-primary"
+                href="/account/delete"
+              >
                 查看注销申请
               </Link>
             </div>
@@ -115,140 +193,199 @@ function Wallet({ id }: { id: string }) {
           {!wallet.isError && wallet.data?.status === "closed" && (
             <p className="mt-4 text-sm text-foreground-muted">钱包已关闭。</p>
           )}
+        </section>
+        <section
+          aria-labelledby="wallet-rewards"
+          className="px-5 py-5 sm:px-8 sm:py-6"
+        >
+          <h2
+            id="wallet-rewards"
+            className="text-sm font-semibold text-foreground"
+          >
+            今日奖励
+          </h2>
+          <div
+            className={
+              isStudent
+                ? "mt-5 grid gap-5 divide-y divide-border/60 sm:grid-cols-2 sm:gap-6 sm:divide-x sm:divide-y-0"
+                : "mt-5"
+            }
+          >
+            <LoginRewardSummary
+              onAward={() => {
+                setPage(1);
+                setSnapshot(undefined);
+              }}
+            />
+            {isStudent && (
+              <div className="min-w-0 pt-5 sm:pl-6 sm:pt-0">
+                <LearningRewardSummary
+                  key={id}
+                  userId={id}
+                  onAward={refresh}
+                  embedded
+                />
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
+      <section aria-labelledby="wallet-entries" className="mt-9">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2
+            id="wallet-entries"
+            className="text-xl font-semibold tracking-tight text-foreground"
+          >
+            收支记录
+          </h2>
+          <span className="text-xs text-foreground-muted">按时间从新到旧</span>
         </div>
-      </section>
-      <section className={`${panelClass} mt-6`}>
-        <h2 className="text-lg font-bold tracking-tight text-foreground">
-          收支记录
-        </h2>
         {entries.isError ? (
-          <p role="alert" className="mt-4 text-sm text-danger">
-            流水加载失败，请重试。
-          </p>
+          <PageNotice tone="error">
+            <p>收支记录加载失败，请重试。</p>
+            <Button
+              type="button"
+              variant="link"
+              size="compact"
+              onClick={() => void entries.refetch()}
+            >
+              重新加载
+            </Button>
+          </PageNotice>
         ) : entries.isPending ? (
-          <p className="mt-4 text-sm text-foreground-muted">正在读取流水…</p>
+          <PageNotice>正在读取收支记录…</PageNotice>
         ) : (
           <>
             {entries.data.items.length === 0 ? (
-              <p className="mt-4 text-sm text-foreground-muted">暂无收支记录</p>
+              <PageNotice>
+                <p className="font-medium text-foreground">暂无收支记录</p>
+                <p className="mt-1">
+                  奖励到账或使用天生币后，会在这里留下记录。
+                </p>
+              </PageNotice>
             ) : (
-              <ul className="mt-2 divide-y divide-border/60">
-                {entries.data.items.map((entry) => (
-                  <li
-                    key={entry.id}
-                    className="flex flex-wrap justify-between gap-3 py-4"
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-foreground">
-                        {SOURCES[entry.source_type] ??
-                          (entry.kind === "transfer"
-                            ? "天生币转入 / 转出"
-                            : "天生币收支")}
-                      </p>
-                      <p className="mt-1 text-xs text-foreground-muted">
-                        {new Date(entry.created_at).toLocaleString("zh-CN")}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p
-                        className={`break-all font-bold tabular-nums ${
-                          entry.delta.startsWith("-")
-                            ? "text-foreground"
-                            : "text-success"
-                        }`}
-                      >
-                        {entry.delta.startsWith("-") ? "" : "+"}
-                        {formatCoins(entry.delta)}
-                      </p>
-                      <p className="mt-1 text-xs text-foreground-muted">
-                        余额 {formatCoins(entry.balance_after)}
-                      </p>
-                    </div>
-                  </li>
-                ))}
+              <ul className="divide-y divide-border/60 rounded-3xl border border-border/60 bg-surface/70 px-5 sm:px-8">
+                {entries.data.items.map((entry) => {
+                  const outgoing = entry.delta.startsWith("-");
+                  const Icon = outgoing ? ArrowUpRight : ArrowDownLeft;
+                  return (
+                    <li
+                      key={entry.id}
+                      className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-3 py-5"
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span
+                          className="hidden size-9 shrink-0 items-center justify-center rounded-full bg-muted text-foreground-muted sm:flex"
+                          aria-hidden
+                        >
+                          <Icon className="size-4" strokeWidth={1.8} />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium leading-6 text-foreground">
+                            {SOURCES[entry.source_type] ??
+                              (entry.kind === "transfer"
+                                ? "天生币转入 / 转出"
+                                : "天生币收支")}
+                          </p>
+                          <time
+                            dateTime={entry.created_at}
+                            className="mt-1 block text-xs leading-5 text-foreground-muted"
+                          >
+                            {new Date(entry.created_at).toLocaleString(
+                              "zh-CN",
+                              {
+                                year: "numeric",
+                                month: "2-digit",
+                                day: "2-digit",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                hour12: false
+                              }
+                            )}
+                          </time>
+                        </div>
+                      </div>
+                      <div className="min-w-0 text-right">
+                        <p
+                          className={`break-all text-sm font-semibold leading-6 tabular-nums ${
+                            outgoing ? "text-foreground" : "text-success"
+                          }`}
+                        >
+                          {outgoing ? "" : "+"}
+                          {formatCoins(entry.delta)}
+                        </p>
+                        <p className="mt-1 break-all text-xs leading-5 tabular-nums text-foreground-muted">
+                          余额 {formatCoins(entry.balance_after)}
+                        </p>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
-            <div className="mt-6 flex items-center justify-center gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page === 1}
-                onClick={() => setPage(page - 1)}
+            {(entries.data.pagination.total_pages > 1 || page > 1) && (
+              <nav
+                aria-label="收支记录分页"
+                className="mt-5 flex items-center justify-center gap-3"
               >
-                上一页
-              </Button>
-              <span className="min-w-16 text-center text-sm tabular-nums text-foreground-muted">
-                第 {page} 页
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= entries.data.pagination.total_pages}
-                onClick={() => {
-                  setSnapshot(entries.data.snapshot);
-                  setPage(page + 1);
-                }}
-              >
-                下一页
-              </Button>
-            </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="compact"
+                  disabled={page === 1 || entries.isFetching}
+                  onClick={() => setPage(page - 1)}
+                >
+                  上一页
+                </Button>
+                <span className="min-w-16 text-center text-sm tabular-nums text-foreground-muted">
+                  第 {page} 页
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="compact"
+                  disabled={
+                    page >= entries.data.pagination.total_pages ||
+                    entries.isFetching
+                  }
+                  onClick={() => {
+                    setSnapshot(entries.data.snapshot);
+                    setPage(page + 1);
+                  }}
+                >
+                  下一页
+                </Button>
+              </nav>
+            )}
           </>
         )}
       </section>
-      <div className="mt-6">
-        <LoginRewardSummary
-          onAward={() => {
-            setPage(1);
-            setSnapshot(undefined);
-          }}
-        />
-      </div>
-      {isStudent && (
-        <div className="mt-6">
-          <LearningRewardSummary key={id} userId={id} onAward={refresh} />
-        </div>
-      )}
-      <section className={`${panelClass} mt-6`}>
-        <h2 className="text-lg font-bold tracking-tight text-foreground">
-          获取与使用
-        </h2>
-        <p className="mt-3 text-sm leading-6 text-foreground-muted">
-          可向他人已公开且全部词条可用的词表投币，数量由你确认，全额进入作者钱包。
-        </p>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          {[
-            { href: "/account/wordlist-tips", label: "投出与收到的词表投币" },
-            { href: "/account/invitations", label: "邀请好友，查看奖励规则" }
-          ].map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="group flex min-h-14 items-center justify-between gap-3 rounded-2xl bg-muted/70 px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary"
-            >
-              {link.label}
-              <span
-                className="text-foreground-subtle transition-transform group-hover:translate-x-0.5"
-                aria-hidden
-              >
-                →
-              </span>
-            </Link>
-          ))}
-        </div>
-        <div className="mt-6 border-t border-border/60 pt-5">
-          <h3 className="text-sm font-medium text-foreground">联系客服</h3>
-          {contact ? (
-            <p className="mt-2 break-words text-sm">{contact}</p>
-          ) : (
-            <p className="mt-2 text-sm text-foreground-muted">
-              客服联系方式暂未配置，请等待平台公告。
-            </p>
-          )}
-          <p className="mt-2 text-xs leading-5 text-foreground-muted">
-            购买由客服人工核验，不支持在线支付或提现。建议在首个消费场景开放后再购买。
+      <details className="group mt-7 border-t border-border/60 pt-2">
+        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-xl text-sm text-foreground-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary [&::-webkit-details-marker]:hidden">
+          天生币用途与购买说明
+          <ChevronDown
+            className="size-4 shrink-0 transition-transform group-open:rotate-180 motion-reduce:transition-none"
+            strokeWidth={1.8}
+            aria-hidden
+          />
+        </summary>
+        <div className="space-y-4 pb-3 pt-1 text-sm leading-6 text-foreground-muted">
+          <p>
+            可向他人已公开且全部词条可用的词表投币，数量由你确认，全额进入作者钱包。
           </p>
+          <div>
+            <h3 className="font-medium text-foreground">联系客服购买</h3>
+            {contact ? (
+              <p className="mt-1 break-words">{contact}</p>
+            ) : (
+              <p className="mt-1">客服联系方式暂未配置，请等待平台公告。</p>
+            )}
+            <p className="mt-2">
+              购买由客服人工核验，不支持在线支付或提现。建议在首个消费场景开放后再购买。
+            </p>
+          </div>
         </div>
-      </section>
+      </details>
     </PageShell>
   );
 }
