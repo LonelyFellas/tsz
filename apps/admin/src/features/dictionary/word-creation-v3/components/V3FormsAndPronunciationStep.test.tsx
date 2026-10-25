@@ -1001,9 +1001,14 @@ describe("V3FormsAndPronunciationStep", () => {
         pronunciations: [
           pronunciationFixture({
             id: uuidFromInt(2191),
-            actual_pron: "uk-one"
+            actual_pron: "uk-one",
+            style: "citation"
           }),
-          pronunciationFixture({ id: uuidFromInt(2192), actual_pron: "uk-two" })
+          pronunciationFixture({
+            id: uuidFromInt(2192),
+            actual_pron: "uk-two",
+            style: "weak"
+          })
         ]
       },
       us: {
@@ -1014,7 +1019,11 @@ describe("V3FormsAndPronunciationStep", () => {
           annotations: [{ type: "italic", start: 0, end: 6 }]
         },
         pronunciations: [
-          pronunciationFixture({ id: uuidFromInt(2193), actual_pron: "us-one" })
+          pronunciationFixture({
+            id: uuidFromInt(2193),
+            actual_pron: "us-one",
+            style: "strong"
+          })
         ]
       }
     });
@@ -1048,12 +1057,22 @@ describe("V3FormsAndPronunciationStep", () => {
     );
     const { container, rerender } = render(view());
     expect(screen.getAllByText("travel", { exact: true })).toHaveLength(1);
+    expect(
+      screen.getByRole("columnheader", { name: "读法" })
+    ).toBeInTheDocument();
     const readingRows = container.querySelectorAll("tr[data-overview-dialect]");
     expect([...readingRows].map((row) => row.textContent)).toEqual([
-      expect.stringContaining("uk-one"),
-      expect.stringContaining("uk-two"),
-      expect.stringContaining("us-one")
+      expect.stringMatching(/逐字正音.*uk-one/),
+      expect.stringMatching(/弱读.*uk-two/),
+      expect.stringMatching(/强读.*us-one/)
     ]);
+    for (const [index, row] of [...readingRows].entries()) {
+      expect(
+        within(row as HTMLElement)
+          .getByText(["逐字正音", "弱读", "强读"][index]!, { exact: true })
+          .closest("td")
+      ).not.toHaveAttribute("rowspan");
+    }
     expect(
       screen.getByRole("img", { name: "英美通用拼写" }).closest("td")
     ).toHaveAttribute("rowspan", "3");
@@ -1064,15 +1083,19 @@ describe("V3FormsAndPronunciationStep", () => {
     form.regional_variants.us.spelling = "traveled";
     delete form.regional_variants.us.spelling_rich;
     form.regional_variants.us.pronunciations = [];
+    form.regional_variants.uk.pronunciations[0]!.style = "normal";
+    delete form.regional_variants.uk.pronunciations[1]!.style;
     rerender(view());
     expect(
       screen.getByRole("img", { name: "英式拼写" }).closest("td")
     ).toHaveAttribute("rowspan", "2");
     expect(screen.getByRole("img", { name: "美式拼写" })).toBeInTheDocument();
     expect(screen.getByText("美式未填写")).toBeInTheDocument();
-    expect(
-      container.querySelectorAll("tr[data-overview-dialect]")
-    ).toHaveLength(3);
+    const updatedRows = container.querySelectorAll("tr[data-overview-dialect]");
+    expect(updatedRows).toHaveLength(3);
+    expect(updatedRows[0]).toHaveTextContent(/语流连读.*uk-one/);
+    expect(updatedRows[1]).toHaveTextContent(/未填写.*uk-two/);
+    expect(updatedRows[2]).toHaveTextContent(/—.*美式未填写/);
   });
 
   it("总览词形名称保持文字，校验出错时可以调整类型并保留内容", async () => {

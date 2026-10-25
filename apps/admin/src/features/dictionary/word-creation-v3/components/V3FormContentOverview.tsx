@@ -179,7 +179,7 @@ export function V3FormContentOverview({
         pagination={false}
         rowKey="key"
         tableLayout="fixed"
-        scroll={{ x: 720 }}
+        scroll={{ x: 816 }}
         rowHoverable={false}
         dataSource={readings}
         onRow={(row) => ({
@@ -298,7 +298,7 @@ export function V3FormContentOverview({
           {
             title: "词形拼写",
             key: "spelling",
-            width: "26%",
+            width: "22%",
             onCell: (row) => ({ rowSpan: row.spellingRowSpan }),
             render: (_, { form, dialect, spellingDialect }) => {
               const regions = form.regional_variants;
@@ -339,6 +339,22 @@ export function V3FormContentOverview({
             }
           },
           {
+            title: "读法",
+            key: "style",
+            width: 96,
+            render: (_, { pronunciation }) => (
+              <div className="v3-overview-reading">
+                {pronunciation?.style ? (
+                  pronunciationStyleLabel(pronunciation.style)
+                ) : (
+                  <Typography.Text type="secondary">
+                    {pronunciation ? "未填写" : "—"}
+                  </Typography.Text>
+                )}
+              </div>
+            )
+          },
+          {
             title: "实际发音",
             key: "pronunciation",
             render: (_, row) => <PronunciationCell reading={row} />
@@ -346,7 +362,7 @@ export function V3FormContentOverview({
           {
             title: "音色",
             key: "voice",
-            width: 112,
+            width: 144,
             render: (_, row) => (
               <PronunciationCell reading={row} settings="voice" />
             )
