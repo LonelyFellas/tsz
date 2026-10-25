@@ -1,7 +1,10 @@
 import { env } from "../../../lib/env";
 import { spellingSpeechEqual } from "./spellingSpeech";
-import { toFormsWire } from "./model";
-import type { RichTextV2V3, WordConcreteFormV3 } from "@tsz/types";
+import type {
+  DraftFormsStepContentV3,
+  RichTextV2V3,
+  WordConcreteFormV3
+} from "@tsz/types";
 import { describe, expect, it, vi } from "vitest";
 import {
   addConcreteForm,
@@ -2056,8 +2059,11 @@ it("兼容发布不向旧 API 生成规则标记：新增、编辑和英美转�
     const noun = partOfSpeechCatalogFixture.items.find(
       (item) => item.code === "noun"
     )!;
-    const assertLegacyWire = (content: Parameters<typeof toFormsWire>[0]) => {
-      for (const pos of toFormsWire(content).pos) {
+    const assertLegacyContent = (content: DraftFormsStepContentV3) => {
+      const serialized: DraftFormsStepContentV3 = JSON.parse(
+        JSON.stringify(content)
+      );
+      for (const pos of serialized.pos) {
         for (const form of pos.forms) {
           const regional = form.regional_variants;
           for (const variant of regional.mode === "common"
@@ -2071,7 +2077,7 @@ it("兼容发布不向旧 API 生成规则标记：新增、编辑和英美转�
     const added = addPartOfSpeech({ pos: [] }, noun, ids);
     expect(added.ok).toBe(true);
     if (!added.ok) return;
-    assertLegacyWire(added.value);
+    assertLegacyContent(added.value);
     let content = formsFixture();
     content.pos[0]!.form_groups[0]!.is_regular = false;
     content = updateVariantSpelling(content, UUIDS.common_variant, "edited");
@@ -2085,7 +2091,7 @@ it("兼容发布不向旧 API 生成规则标记：新增、编辑和英美转�
     expect(withPlural.ok).toBe(true);
     if (!withPlural.ok) return;
     content = withPlural.value;
-    assertLegacyWire(content);
+    assertLegacyContent(content);
     for (const rules of [
       { spelling_mode: "distinguish", phonetic_mode: "distinguish" },
       { spelling_mode: "unified", phonetic_mode: "distinguish" },
@@ -2102,7 +2108,7 @@ it("兼容发布不向旧 API 生成规则标记：新增、编辑和英美转�
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       content = result.value;
-      assertLegacyWire(content);
+      assertLegacyContent(content);
     }
   } finally {
     env.FORM_SPELLING_REGULARITY = enabled;
@@ -2128,9 +2134,10 @@ it("兼容发布保留新 API 已有规则值，拆分和合并也不丢失 fals
     );
     expect(split.ok).toBe(true);
     if (!split.ok) return;
-    expect(
-      toFormsWire(split.value).pos[0]!.forms[0]!.regional_variants
-    ).toMatchObject({ uk: { is_regular: false }, us: { is_regular: false } });
+    expect(split.value.pos[0]!.forms[0]!.regional_variants).toMatchObject({
+      uk: { is_regular: false },
+      us: { is_regular: false }
+    });
     const merged = normalizeGroupDialectRules(
       split.value,
       UUIDS.pos,
@@ -2154,9 +2161,10 @@ it("兼容发布保留新 API 已有规则值，拆分和合并也不丢失 fals
       true,
       "distinguish"
     );
-    expect(
-      toFormsWire(distinct).pos[0]!.forms[0]!.regional_variants
-    ).toMatchObject({ uk: { is_regular: false }, us: { is_regular: true } });
+    expect(distinct.pos[0]!.forms[0]!.regional_variants).toMatchObject({
+      uk: { is_regular: false },
+      us: { is_regular: true }
+    });
     expect(
       normalizeGroupDialectRules(distinct, UUIDS.pos, UUIDS.group, {
         spelling_mode: "unified",
@@ -2168,7 +2176,7 @@ it("兼容发布保留新 API 已有规则值，拆分和合并也不丢失 fals
   }
 });
 
-it("拼写完整标注保存、改字重定位和清空均保留节点，wire 不丢字段", () => {
+it("拼写完整标注更新、改字重定位和清空均保留节点与字段", () => {
   const original = formsFixture();
   const rich: RichTextV2V3 = {
     version: 2,
@@ -2179,9 +2187,7 @@ it("拼写完整标注保存、改字重定位和清空均保留节点，wire �
     ]
   };
   const edited = updateVariantSpelling(original, UUIDS.common_variant, rich);
-  expect(
-    commonVariant(toFormsWire(edited).pos[0]!.forms[0]!).spelling_rich
-  ).toEqual(rich);
+  expect(commonVariant(edited.pos[0]!.forms[0]!).spelling_rich).toEqual(rich);
   expect(commonVariant(edited.pos[0]!.forms[0]!).id).toBe(UUIDS.common_variant);
   const shifted = updateVariantSpelling(
     edited,
@@ -2198,9 +2204,10 @@ it("拼写完整标注保存、改字重定位和清空均保留节点，wire �
     ...rich,
     annotations: []
   });
-  expect(
-    commonVariant(toFormsWire(cleared).pos[0]!.forms[0]!).spelling_rich
-  ).toEqual({ ...rich, annotations: [] });
+  expect(commonVariant(cleared.pos[0]!.forms[0]!).spelling_rich).toEqual({
+    ...rich,
+    annotations: []
+  });
   expect(
     commonVariant(original.pos[0]!.forms[0]!).spelling_rich
   ).toBeUndefined();
@@ -2354,7 +2361,7 @@ it("拼写停顿和音色独立保存、改字迁移、清除并保留各读法�
     [UUIDS.common_variant],
     { voices: [{ voice_id: "sonia", enabled: true, rate_percent: 10 }] }
   );
-  const variant = commonVariant(toFormsWire(edited).pos[0]!.forms[0]!);
+  const variant = commonVariant(edited.pos[0]!.forms[0]!);
   expect(variant.spelling_rich?.annotations).toEqual([
     { type: "italic", start: 0, end: 5 }
   ]);
@@ -2548,8 +2555,8 @@ it("改拼写同步迁移四份音素设置的停顿，保留各自音色与音�
     UUIDS.common_variant,
     "oh hello there"
   );
-  const saved = commonVariant(toFormsWire(updated).pos[0]!.forms[0]!)
-    .pronunciations[0]!.synthesis!;
+  const saved = commonVariant(updated.pos[0]!.forms[0]!).pronunciations[0]!
+    .synthesis!;
   for (const [side, alphabet, duration_ms] of [
     ["uk", "ipa", 500],
     ["uk", "ups", 1000],

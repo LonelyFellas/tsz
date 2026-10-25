@@ -592,10 +592,86 @@ describe("共享词形内容", () => {
     }
   );
 
-  it("内容编辑器只提取正文，不保存临时词性、绑定规则性和用途", () => {
-    const forms = sharedFormsFixture();
-    expect(contentFromEditor(contentEditorForms(forms.contents[0]!))).toEqual(
-      forms.contents[0]
-    );
-  });
+  it.each([commonFormFixture(), ukUsFormFixture()])(
+    "$regional_variants.mode 内容编辑器只提取正文，不保存临时词性、绑定规则性和用途",
+    (form) => {
+      const forms = applyFormsStructure(
+        { forms_format: "shared_v1", contents: [], pos: [] },
+        formsFixture({ forms: [form] })
+      ) as SharedFormsStepContentV3;
+      const original = forms.contents[0]!;
+      const source = original.regional_variants;
+      for (const variant of source.mode === "common"
+        ? [source.common]
+        : [source.uk, source.us]) {
+        variant.spelling_rich = {
+          version: 2,
+          text: variant.spelling,
+          annotations: [{ type: "italic", start: 0, end: 2 }]
+        };
+        variant.spelling_speech = {
+          content: {
+            version: 2,
+            text: variant.spelling,
+            annotations: [{ type: "pause", at: 2, duration_ms: 500 }]
+          },
+          voice_profile: {
+            voices: [{ voice_id: "sonia", enabled: true, rate_percent: -10 }]
+          }
+        };
+        const row = variant.pronunciations[0]!;
+        row.style = "citation";
+        row.dict_phonetic_rich = {
+          version: 2,
+          text: row.dict_phonetic,
+          annotations: []
+        };
+        row.actual_pron_rich = {
+          version: 2,
+          text: row.actual_pron,
+          annotations: []
+        };
+        row.voice_profile = variant.spelling_speech.voice_profile;
+        row.synthesis = {
+          alphabet: "ipa",
+          ipa: "",
+          ups: "",
+          uk: { ipa: "sɛn.tə", ups: "S EH N T AH" },
+          us: { ipa: "sɛn.tɚ", ups: "S EH N T ER" }
+        };
+        row.audio_assets = [
+          {
+            id: uuidFromInt(841),
+            locale: "en-GB",
+            gender: "female",
+            content_type: "audio/wav",
+            size_bytes: 1024,
+            original_name: "recording.wav",
+            created_at: "2026-10-25T00:00:00Z"
+          }
+        ];
+      }
+      const editor = contentEditorForms(original);
+      Object.assign(editor, { presentation: "readonly" });
+      Object.assign(editor.pos[0]!, { sort_order: 1 });
+      Object.assign(editor.pos[0]!.forms[0]!, { sort_order: 2 });
+      const regions = editor.pos[0]!.forms[0]!.regional_variants;
+      for (const variant of regions.mode === "common"
+        ? [regions.common]
+        : [regions.uk, regions.us]) {
+        variant.is_regular = false;
+        variant.component_usages = [
+          { id: uuidFromInt(840), state: "unresolved", literal: "centre" }
+        ];
+        Object.assign(variant, {
+          audio_url: "https://temporary.invalid/audio"
+        });
+      }
+      const writable = contentFromEditor(editor);
+      expect(writable).toEqual(original);
+      expect(JSON.stringify(writable)).not.toMatch(
+        /presentation|sort_order|audio_url|is_regular|component_usages|pos_id|form_type|dialect"/
+      );
+    }
+  );
 });

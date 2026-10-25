@@ -31,7 +31,6 @@ import {
   uuidSequence
 } from "../fixtures";
 import { buildV3ProductProgress } from "../readiness";
-import { validateFormsContent } from "../model";
 import { partOfSpeechCatalogFixture } from "../../word-creation/partOfSpeech.test.helper";
 import { pronunciationSynthesisContent } from "@tsz/shared";
 import {
@@ -1910,7 +1909,17 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(screen.getByText("草稿可暂时不添加词性")).toBeInTheDocument();
     expect(screen.queryByText(/已完成/)).toBeNull();
 
-    const emptyIssues = validateFormsContent({ pos: [] }, "complete");
+    const emptyIssues: V3DraftValidationIssue[] = [
+      {
+        schema_version: 3,
+        step: "forms",
+        node_id: "00000000-0000-0000-0000-000000000000",
+        field: "pos",
+        code: "pos_required",
+        message: "完整词条至少需要一个词性",
+        node_location: { node_role: "forms", ancestor_node_ids: [] }
+      }
+    ];
     rerender(
       <AntApp>
         <V3FormsAndPronunciationStep
@@ -1929,7 +1938,39 @@ describe("V3FormsAndPronunciationStep", () => {
     const incomplete = formsFixture({
       forms: [commonFormFixture({ spelling: "", pronunciations: [] })]
     });
-    const issues = validateFormsContent(incomplete, "complete");
+    const pos = incomplete.pos[0]!;
+    const form = pos.forms[0]!;
+    if (form.regional_variants.mode !== "common") throw new Error("fixture");
+    const variant = form.regional_variants.common;
+    const nodeLocation = {
+      node_role: "forms.form_variant",
+      ancestor_node_ids: [pos.pos_id, form.id],
+      pos_id: pos.pos_id,
+      form_id: form.id,
+      form_type: form.form_type,
+      variant_id: variant.id,
+      dialect: variant.dialect
+    };
+    const issues: V3DraftValidationIssue[] = [
+      {
+        schema_version: 3,
+        step: "forms",
+        node_id: variant.id,
+        field: "spelling",
+        code: "variant_spelling_required",
+        message: "完整词形需要拼写",
+        node_location: nodeLocation
+      },
+      {
+        schema_version: 3,
+        step: "forms",
+        node_id: variant.id,
+        field: "pronunciations",
+        code: "pronunciation_required",
+        message: "完整词形至少需要一条发音",
+        node_location: nodeLocation
+      }
+    ];
     rerender(
       <AntApp>
         <V3FormsAndPronunciationStep
@@ -3781,9 +3822,5 @@ it("目录自定义词形可展示，改名后保留词形编码", async () => {
   );
   expect((await screen.findAllByText("改名词形")).length).toBeGreaterThan(0);
   expect(screen.queryByText("自定义")).toBeNull();
-  expect(
-    validateFormsContent(initial, "save", {
-      allowedFormTypes: () => ["custom_variant"]
-    })
-  ).toEqual([]);
+  expect(formById(canonicalValue(), custom.id)).toEqual(custom);
 });
