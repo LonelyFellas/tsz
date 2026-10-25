@@ -14,7 +14,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PronunciationSynthesisV3, RichTextV2 } from "@tsz/types";
 import type { VoiceEditorProps } from "@tsz/voice-editor/types";
 import { formsFixture, commonFormFixture, ukUsFormFixture } from "../fixtures";
-import { toFormsWire } from "../model";
 import { V3PronunciationList } from "./V3PronunciationList";
 vi.mock("@/lib/env", () => ({
   env: { VOICE_EDITOR: true, AZURE_PRONUNCIATION_INPUTS: true }
@@ -137,7 +136,7 @@ function Harness({
         idFactory={() => crypto.randomUUID()}
         onChange={setContent}
       />
-      <output data-testid="wire">{JSON.stringify(toFormsWire(content))}</output>
+      <output data-testid="form-state">{JSON.stringify(content)}</output>
     </>
   );
 }
@@ -161,9 +160,7 @@ function RegionalHarness() {
           />
         </section>
       ))}
-      <output data-testid="regional-wire">
-        {JSON.stringify(toFormsWire(content))}
-      </output>
+      <output data-testid="regional-state">{JSON.stringify(content)}</output>
     </>
   );
 }
@@ -176,7 +173,7 @@ const convert = (name: string) =>
 const change = (name: string, value: string) =>
   changeVoiceText(field(name), { target: { value } });
 const rows = () =>
-  JSON.parse(screen.getByTestId("wire").textContent!).pos[0].forms[0]
+  JSON.parse(screen.getByTestId("form-state").textContent!).pos[0].forms[0]
     .regional_variants.common.pronunciations;
 describe("独立发音输入", () => {
   it("区分词形时英式和美式各只编辑自身的 IPA、UPS", () => {
@@ -204,7 +201,7 @@ describe("独立发音输入", () => {
       target: { value: "S EH N T ER" }
     });
     const variants = JSON.parse(
-      screen.getByTestId("regional-wire").textContent!
+      screen.getByTestId("regional-state").textContent!
     ).pos[0].forms[0].regional_variants;
     expect(variants.uk.pronunciations[0].synthesis.uk.ipa).toBe("sɛn.tə");
     expect(variants.uk.pronunciations[0].synthesis.us).toBeUndefined();
@@ -578,7 +575,7 @@ it("读法按指定顺序展示，逐字正音使用独立 wire 值", () => {
     ).map((item) => item.textContent)
   ).toEqual(["语流连读", "逐字正音", "强读", "弱读"]);
   fireEvent.click(screen.getByText("逐字正音"));
-  const wire = JSON.parse(screen.getByTestId("wire").textContent!);
+  const wire = JSON.parse(screen.getByTestId("form-state").textContent!);
   expect(
     wire.pos[0].forms[0].regional_variants.common.pronunciations[0].style
   ).toBe("citation");

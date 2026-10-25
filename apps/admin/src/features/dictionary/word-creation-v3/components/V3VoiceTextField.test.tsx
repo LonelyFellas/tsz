@@ -58,7 +58,6 @@ import {
   updateVariantSpelling,
   updateSpellingVoiceProfile
 } from "../operations";
-import { toFormsWire } from "../model";
 import { V3VoiceTextField } from "./V3VoiceTextField";
 import { V3LinkedEnglishTextField } from "./V3LinkedEnglishTextField";
 
@@ -210,7 +209,7 @@ it("折叠拼写输入直接保存后，正文和默认推荐一起读回", asyn
             )
           }
         />
-        <button onClick={() => saved(structuredClone(toFormsWire(content)))}>
+        <button onClick={() => saved(structuredClone(content))}>
           保存词形
         </button>
       </>
@@ -1836,15 +1835,13 @@ it("拼写停顿与音色同时编辑：取消恢复，完成同时写回且不�
             )
           }
         />
-        <output data-testid="spelling-wire">
-          {JSON.stringify(toFormsWire(content))}
-        </output>
+        <output data-testid="spelling-state">{JSON.stringify(content)}</output>
       </>
     );
   }
   render(<Host />);
   const saved = () =>
-    variantOf(JSON.parse(screen.getByTestId("spelling-wire").textContent!));
+    variantOf(JSON.parse(screen.getByTestId("spelling-state").textContent!));
   const edit = async () => {
     fireEvent.click(screen.getByLabelText("打开测试拼写编辑器"));
     fireEvent.click(await screen.findByLabelText("编辑第 1 处停顿 0.5 秒"));
