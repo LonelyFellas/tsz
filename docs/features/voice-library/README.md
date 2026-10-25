@@ -398,7 +398,7 @@
 - 独立验收：统筹另建三个Orca页面核对123项/14地区、AU红色及原生地区、六条ready、契约哈希；IN补充实际播放200/readyState4/2.088秒；390px文档宽390、按钮44px。编辑器将NZ切为AU→完成→保存草稿→整页刷新→重开，确认AU选中、CA/IN不变且六资产保留，之后恢复NZ保存；shared地区/voice-versions/Web Content合计8项测试通过。B统筹验收通过，随后明确要求清理并继续C。
 - 清理完成：2026-10-25T15:32:25Z 停本批写入后，6个OSS对象版本永久删除并独立列举 remaining=0/errors=0；五个端口无监听、专用DB/Redis/账号/凭据/完整业务副本和运行副本删除、profile及统筹三个页面一并删除。回执 `/tmp/tsz-task147-b.ottSVJ/cleanup-receipt.json` 与 `oss-cleanup.json`；统筹再次独立核实清理通过。原启动/清理脚本与脱敏证据保留，C于B验收后开始。
 
-### C 可用模型实施与自验、待统筹验收（2026-10-26）
+### C 可用模型实施、自验与统筹验收通过（2026-10-26）
 
 - 实际资源：2026-10-25T15:33:53Z 查询英语目录169项，当前可开放126项=89 Neural+34 Multilingual+3 GA HD Flash。三款完整ID为 `en-US-Jimmie:DragonHDFlashLatestNeural`、`en-US-Tiana:DragonHDFlashLatestNeural`、`en-US-Tyler:DragonHDFlashLatestNeural`。其余43项：38 MAI Preview；MiaNeural Deprecated；Andrew/Ava DragonLatestNeural、AshTurboMultilingualNeural、BlueNeural Preview。Neural HD／HD Omni当前资源均0，明确缺能力，不用静态候选冒充已接入。
 - 能力边界：官方Flash独立SSML矩阵不完整且资料表述存在差异，本批只开放原速0、原调0、原量100的自然朗读，3个可选能力 supports_volume_percent/supports_pause/supports_phoneme=false。固定rate/pitch沿用min=max=0，StyleList空，roles无输入字段；非默认参数、风格、停顿、音素及词形指定发音在供应商调用前拒绝，保留用户输入，不静默去标注或夹取参数。教学视觉标注及既有提示符朗读规则保持原语义，不新增温度/手写SSML/波形/WAV。
@@ -409,5 +409,5 @@
 - 真实云端：独占批次 `20261025-task147-c-zluh6q` 权限预检通过后，仅对三款Flash各生成短句“A clear voice.”，均201，真实MP3为14112/18432/16416字节；三个命名版本保存→独立GET读回→发布201。非默认rate/pitch/volume、pause、phoneme五类400，DB只有3条ready，不产生替代音频；草稿/发布各3条引用。Jimmie当前正式选用，另两版保留。
 - 浏览器：Orca新目录126条、Tiana抽屉固定音量100/语速1.00/音调0且禁用，限制说明可见；重开编辑器三版本及正式资产保留。Web字典Jimmie签名200、readyState4、duration1.176秒、无解码错误。独立真实后端Playwright390px宽度390、无pageerror，原API未mock；教学端仅现有字典消费入口，不新增题卡播放。
 - 待统筹验收环境：admin `http://127.0.0.1:3069/voices`、API `8405/api/v1`、Web `http://127.0.0.1:3071/dictionary/01a173d2-728b-7307-8e8f-a89f53a19cbc`，独占PG55545/task147_c、Redis6425。Orca profile `7a73632d-b1d7-44e4-bbc9-86256a590b04`，原admin page `48ffeb34-1faf-4ab7-bb05-e856a453ff1b`、Web page `bbb46ab1-094f-45ff-b351-8a8c0d063564`。`/tmp/tsz-task147-c.zlUH6q/` 内manifest、backend/frontend-build-manifest、fixture-state、resource-evidence、acceptance-results、generation/rejection-results、窄屏JSON/截图；凭据仅credentials.json600。后端HEAD38e6fbc+diff90af745...，二进制9147be49743575fff3842566e88401841f5e53c7d8263eb4f8d92acc47415e0e。
-- 资源保持：统筹已开始独立验收，明确要求不改源码/重启/清理，三个云对象与本地环境保持。结束后执行本任务cleanup.py停写→限定前缀永久删除所有版本并复查→清专用profile所有页面→删独占DB/Redis/账号/凭据/完整副本→复查端口；当前不宣称已清理。NeuralHD/Omni缺资源作为具体剩余阻塞，三Flash自然路径已真实验证。
+- 独立验收与清理：统筹确认新126/旧123、三条ready与完整ID/alias、5类preview和无Models请求400、非法volume个人保存400且无额外缓存/记录；Jimmie发布播放200/ready4/1.176秒、Tiana已存播放1.536秒；390px文档390、按钮44×44。Tyler选用→完成→保存→刷新重开确认三资产保留，随后恢复Jimmie保存；原始独立证据coordinator-acceptance.json保留。2026-10-25T16:20:06Z按精确run永久清理3个OSS版本、remaining/errors=0，五端口关闭，DB/Redis/profile含统筹三页/账号/凭据/完整副本/运行产物删除。统筹再次独立核实清理通过，回执cleanup-receipt.json/oss-cleanup.json。NeuralHD/Omni缺资源仍为具体剩余阻塞，当前可用3Flash自然路径功能验收完成。
 - 发布准备（只读）：最新主线统一后端ops/deploy_test.py控制器；当前测试服accepted API来源557a1cd、无部署锁。磁盘98%且不足1GB空闲，恢复点/制品/安全余量需在发布前核实，不擅自删除共享备份或数据；当前没有服务器发布写入。
