@@ -147,7 +147,6 @@ describe("AccountMenu", () => {
         status: "open"
       });
     useUserStore.setState({ user: USER });
-    const user = userEvent.setup();
     render(<AccountMenu />);
     fireEvent.click(screen.getByRole("button", { name: "账户菜单" }), {
       detail: 0
@@ -433,7 +432,6 @@ describe("AccountMenu", () => {
 
   it("修饰键Enter保留链接的原生激活，不生成无修饰键点击", async () => {
     useUserStore.setState({ user: USER });
-    const user = userEvent.setup();
     render(<AccountMenu />);
     fireEvent.click(screen.getByRole("button", { name: "账户菜单" }), {
       detail: 0
@@ -453,7 +451,6 @@ describe("AccountMenu", () => {
     "Tab退出保留原生默认行为且不抢回随后焦点，shift=%s",
     async (shiftKey) => {
       useUserStore.setState({ user: USER });
-      const user = userEvent.setup();
       render(
         <>
           <AccountMenu />
@@ -475,9 +472,8 @@ describe("AccountMenu", () => {
     }
   );
 
-  it("点击头像 → 展开常用入口，注销移至账号安全", async () => {
+  it("键盘激活头像 → 展开常用入口，注销移至账号安全", async () => {
     useUserStore.setState({ user: USER });
-    const user = userEvent.setup();
     render(<AccountMenu />);
 
     expect(screen.queryByText("退出登录")).not.toBeInTheDocument();
