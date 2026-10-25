@@ -1,4 +1,29 @@
 import type { RichTextV2 } from "./rich-text";
+import type {
+  GrammarFormLinkV3,
+  UpsWordV3,
+  VoiceSettingV3,
+  AudioAssetV3
+} from "./admin-word-v3";
+
+export type GeneratedSpeechSource =
+  | { kind: "text"; content: RichTextV2; form_links?: GrammarFormLinkV3[] }
+  | {
+      kind: "phoneme";
+      content: RichTextV2;
+      alphabet: "ipa" | "ups";
+      phoneme: string;
+      ups_words?: UpsWordV3[];
+    };
+
+export interface GenerateVoiceAudioRequest {
+  request_id: string;
+  source: GeneratedSpeechSource;
+  setting: VoiceSettingV3;
+}
+export interface GenerateVoiceAudioResponse {
+  asset: AudioAssetV3;
+}
 
 export interface AdminSpeechVoiceCapabilities {
   styles: string[];

@@ -388,6 +388,10 @@ export interface SenseGroupV3 {
 
 /** 单个音色的启用选择与独立语速；未启用时仍保留语速。 */
 export interface VoiceSettingV3 {
+  audio_asset_id?: string;
+  version_id?: string;
+  version_name?: string;
+  locale?: "en-GB" | "en-US";
   voice_id: string;
   enabled: boolean;
   rate_percent: number;

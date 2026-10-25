@@ -9,7 +9,32 @@
 }
 
 .voice-library-content > .ant-card-body {
-  padding: 0 16px 16px;
+  padding: 24px;
+}
+
+.voice-library-heading > .ant-typography:first-child {
+  margin: 0 0 8px;
+  font-size: 24px;
+}
+
+.voice-library-heading > .ant-typography:last-child {
+  margin-bottom: 20px;
+}
+
+.voice-library-list-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 16px;
+  margin-bottom: 16px;
+}
+
+.voice-library-list-heading > .ant-typography:first-child {
+  margin: 0;
+}
+
+.voice-library-list-heading > .ant-typography:last-child {
+  font-size: 12px;
 }
 
 .voice-library-audition {
@@ -199,6 +224,10 @@
 }
 
 @media (max-width: 600px) {
+  .voice-library-content > .ant-card-body {
+    padding: 16px;
+  }
+
   .voice-library-filters {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

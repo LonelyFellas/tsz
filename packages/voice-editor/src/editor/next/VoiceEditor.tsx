@@ -17,6 +17,11 @@ import {
   MAX_PAUSE_MS,
   MIN_PAUSE_MS,
   isVoiceRecommendationAvailable,
+  newVoiceVersionId,
+  selectVoiceVersion,
+  voiceLocale,
+  voiceSettingFor,
+  voiceSettingKey,
   normalizeRichTextV2,
   normalizeSpellingRich,
   toRichTextV2,
@@ -46,6 +51,7 @@ import {
   type PendingUpload
 } from "./audioAssets";
 import { MarkupPanel, type DropdownTool } from "./MarkupPanel";
+import { VoiceVersions } from "./VoiceVersions";
 import {
   LiaisonIcon,
   PausePanel,
@@ -170,10 +176,25 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   );
   const [recommendationId, setRecommendationId] = useState<string>();
   const [recommendationError, setRecommendationError] = useState("");
+  const [editingVersionKey, setEditingVersionKey] = useState<string>();
+  const [generatingVersion, setGeneratingVersion] = useState<string>();
+  const generationRequest = useRef<AbortController | null>(null);
+  const generationKeys = useRef(
+    new Map<string, { input: string; id: string }>()
+  );
+  useEffect(() => () => generationRequest.current?.abort(), []);
+  const [refreshingRecommendations, setRefreshingRecommendations] =
+    useState(false);
+  const recommendationRequest = useRef<AbortController | null>(null);
+  const voiceSettingsRef = useRef<VoiceSetting[]>([]);
+  const latestReadOnly = useRef(false);
+  useEffect(() => () => recommendationRequest.current?.abort(), []);
   const initialRecommendationPending = useRef(
     (autoRecommend ?? !value.text.trim()) && voiceProfile == null
   );
   useEffect(() => {
+    recommendationRequest.current?.abort();
+    setRefreshingRecommendations(false);
     setRecommendations([]);
     setRecommendationId(undefined);
     setRecommendationError("");
@@ -281,6 +302,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   const [voiceSettings, setVoiceSettings] = useState<VoiceSetting[]>(
     voiceProfile?.voices ?? []
   );
+  voiceSettingsRef.current = voiceSettings;
+  latestReadOnly.current = !!readOnly;
   const enabledVoiceIds = useMemo(
     () =>
       voiceSettings
@@ -506,10 +529,23 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   ) => {
     if (readOnly) return;
     initialRecommendationPending.current = false;
-    const existing = voiceSettings.find((voice) => voice.voice_id === voiceId);
+    const existing = voiceSettingFor(voiceSettings, voiceId, editingVersionKey);
     const next = existing
       ? voiceSettings.map((voice) =>
-          voice.voice_id === voiceId ? { ...voice, ...patch } : voice
+          voiceSettingKey(voice) === voiceSettingKey(existing)
+            ? {
+                ...voice,
+                ...patch,
+                ...([
+                  "rate_percent",
+                  "pitch_semitones",
+                  "volume_percent",
+                  "style"
+                ].some((key) => key in patch)
+                  ? { audio_asset_id: undefined }
+                  : {})
+              }
+            : voice
         )
       : [
           ...voiceSettings,
@@ -542,6 +578,211 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     settings: voiceSettings,
     previewAdapter
   });
+
+  function changeVoiceSettings(next: VoiceSetting[]) {
+    if (readOnly || !onVoiceProfileChange) return;
+    initialRecommendationPending.current = false;
+    stopAudition();
+    setVoiceSettings(next);
+    const profile = { voices: next };
+    emittedProfileRef.current = JSON.stringify(profile);
+    onVoiceProfileChange(profile);
+  }
+
+  const audioContentKey = JSON.stringify([
+    mode === "synthesis" ? value : workingValue,
+    textLinks,
+    previewAdapter?.audioSourceKey
+  ]);
+  const lastAudioContent = useRef(audioContentKey);
+  const audioContentRef = useRef(audioContentKey);
+  audioContentRef.current = audioContentKey;
+  useEffect(() => {
+    if (lastAudioContent.current === audioContentKey) return;
+    lastAudioContent.current = audioContentKey;
+    generationRequest.current?.abort();
+    setGeneratingVersion(undefined);
+    if (voiceSettingsRef.current.some((setting) => setting.audio_asset_id)) {
+      const profile = {
+        voices: voiceSettingsRef.current.map(
+          ({ audio_asset_id: _audio, ...setting }) => setting
+        )
+      };
+      setVoiceSettings(profile.voices);
+      emittedProfileRef.current = JSON.stringify(profile);
+      onVoiceProfileChange?.(profile);
+      setRecommendationError("正文或读法已变化，请重新生成正式音频。");
+    }
+  }, [audioContentKey, onVoiceProfileChange]);
+
+  async function generateVersionAudio(setting: VoiceSetting) {
+    if (
+      !previewAdapter?.generateAudio ||
+      readOnly ||
+      generatingVersion ||
+      !setting.version_id
+    )
+      return;
+    const content = mode === "synthesis" ? toRichTextV2(value) : workingValue;
+    const key = voiceSettingKey(setting);
+    const signature = JSON.stringify([
+      content,
+      previewAdapter.audioSourceKey,
+      {
+        ...setting,
+        enabled: undefined,
+        version_name: undefined,
+        audio_asset_id: undefined
+      }
+    ]);
+    const previous = generationKeys.current.get(key);
+    const requestId =
+      previous?.input === signature ? previous.id : newVoiceVersionId();
+    generationKeys.current.set(key, { input: signature, id: requestId });
+    generationRequest.current?.abort();
+    const request = new AbortController();
+    generationRequest.current = request;
+    const baseline = audioContentRef.current;
+    setGeneratingVersion(key);
+    setRecommendationError("");
+    try {
+      const asset = await previewAdapter.generateAudio(
+        { requestId, content, setting },
+        { signal: request.signal }
+      );
+      const current = voiceSettingsRef.current.find(
+        (item) => voiceSettingKey(item) === key
+      );
+      if (
+        request.signal.aborted ||
+        baseline !== audioContentRef.current ||
+        !current ||
+        latestReadOnly.current
+      )
+        return;
+      const currentSignature = JSON.stringify([
+        content,
+        previewAdapter.audioSourceKey,
+        {
+          ...current,
+          enabled: undefined,
+          version_name: undefined,
+          audio_asset_id: undefined
+        }
+      ]);
+      if (currentSignature !== signature) {
+        setRecommendationError("生成期间参数已修改，请重新生成。");
+        return;
+      }
+      changeVoiceSettings(
+        voiceSettingsRef.current.map((item) =>
+          voiceSettingKey(item) === key
+            ? { ...item, audio_asset_id: asset.id }
+            : item
+        )
+      );
+      generationKeys.current.delete(key);
+      setRecommendationError("正式音频已生成，请完成编辑并保存正文。");
+    } catch (error) {
+      if (!request.signal.aborted)
+        setRecommendationError(
+          error instanceof Error ? error.message : "生成失败，请重试。"
+        );
+    } finally {
+      if (generationRequest.current === request)
+        setGeneratingVersion(undefined);
+    }
+  }
+
+  function chooseVersion(setting: VoiceSetting) {
+    const accent = voiceLocale(setting, voices);
+    if (accent !== "en-GB" && accent !== "en-US") return;
+    if (
+      voiceSettings.some((item) => item.enabled && !voiceLocale(item, voices))
+    ) {
+      setRecommendationError(
+        "已启用的失效音色口音未知，请先取消启用，再选用版本。"
+      );
+      return;
+    }
+    const selected: VoiceSetting = setting.version_id
+      ? setting
+      : {
+          ...setting,
+          version_id: newVoiceVersionId(),
+          version_name:
+            voices.find((voice) => voice.id === setting.voice_id)?.label ??
+            setting.voice_id,
+          locale: accent
+        };
+    const existing = setting.version_id
+      ? voiceSettings
+      : voiceSettings.filter(
+          (item) => voiceSettingKey(item) !== voiceSettingKey(setting)
+        );
+    changeVoiceSettings(selectVoiceVersion(existing, selected, accent, voices));
+    setEditingVersionKey(voiceSettingKey(selected));
+  }
+
+  function applyRecommendation(item: VoiceRecommendation) {
+    const version: VoiceSetting = {
+      ...item.setting,
+      enabled: true,
+      version_id: newVoiceVersionId(),
+      version_name: item.name,
+      locale: item.locale
+    };
+    changeVoiceSettings(
+      selectVoiceVersion(voiceSettings, version, item.locale, voices)
+    );
+    setEditingVersionKey(version.version_id);
+  }
+
+  async function useLatestRecommendation(accent: "en-GB" | "en-US") {
+    if (!loadRecommendations || !recommendationArea || readOnly) return;
+    recommendationRequest.current?.abort();
+    const request = new AbortController();
+    recommendationRequest.current = request;
+    const baseline = voiceSettingsRef.current;
+    setRefreshingRecommendations(true);
+    try {
+      const items = await loadRecommendations({
+        area: recommendationArea,
+        locale,
+        refresh: true,
+        signal: request.signal
+      });
+      if (request.signal.aborted || latestReadOnly.current) return;
+      if (voiceSettingsRef.current !== baseline) {
+        setRecommendationError("加载期间配音配置已修改，请重新选用最新推荐。");
+        return;
+      }
+      setRecommendations(items);
+      const first = items.find((item) => item.locale === accent);
+      if (!first || !isVoiceRecommendationAvailable(first, voices, accent)) {
+        setRecommendationError("当前口音没有可用的首位推荐，请检查分组设置。");
+        return;
+      }
+      if (
+        voiceSettings.some((item) => item.enabled && !voiceLocale(item, voices))
+      ) {
+        setRecommendationError(
+          "已启用的失效音色口音未知，请先取消启用，再应用推荐。"
+        );
+        return;
+      }
+      setRecommendationError("");
+      applyRecommendation(first);
+    } catch {
+      if (!request.signal.aborted)
+        setRecommendationError(
+          "最新推荐加载失败，当前文本配置未修改，请重试。"
+        );
+    } finally {
+      if (recommendationRequest.current === request)
+        setRefreshingRecommendations(false);
+    }
+  }
 
   const recommendationAvailable = useCallback(
     (item: VoiceRecommendation): boolean =>
@@ -1419,10 +1660,30 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   };
 
   const toggleVoice = (voiceId: string) => {
-    updateVoice(voiceId, {
-      enabled: !voiceSettings.find((voice) => voice.voice_id === voiceId)
-        ?.enabled
-    });
+    const setting = voiceSettingFor(voiceSettings, voiceId, editingVersionKey);
+    if (setting?.enabled) {
+      updateVoice(voiceId, { enabled: false });
+      return;
+    }
+    const voice = voices.find((item) => item.id === voiceId);
+    if (voice?.locale !== "en-GB" && voice?.locale !== "en-US") return;
+    if (
+      voiceSettings.some((item) => item.enabled && !voiceLocale(item, voices))
+    ) {
+      setRecommendationError(
+        "已启用的失效音色口音未知，请先取消启用，再选择音色。"
+      );
+      return;
+    }
+    const selected = setting ?? {
+      voice_id: voiceId,
+      enabled: false,
+      rate_percent: 0,
+      ...voice.defaultSettings
+    };
+    changeVoiceSettings(
+      selectVoiceVersion(voiceSettings, selected, voice.locale, voices)
+    );
   };
 
   /** 自定义停顿按毫秒输入，与底层模型同单位，避免多一层换算。 */
@@ -1458,7 +1719,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   ).length;
 
   // TTS 试听与资产试听同一时间只响一路；历史冲突保留数据，先由编辑者处理。
-  const handleAudition = (voice: VoiceOption) => {
+  const handleAudition = (voice: VoiceOption, setting?: VoiceSetting) => {
     if (
       conflictCount > 0 ||
       (mode === "synthesis" &&
@@ -1467,7 +1728,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     )
       return;
     stopAssetPlayback();
-    audition(voice);
+    audition(
+      voice,
+      setting ?? voiceSettingFor(voiceSettings, voice.id, editingVersionKey)
+    );
   };
 
   /**
@@ -1907,32 +2171,49 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                       (value) => value.id === recommendationId
                     );
                     if (!item || !recommendationAvailable(item)) return;
-                    initialRecommendationPending.current = false;
-                    stopAudition();
-                    const next = voiceSettings
-                      .filter(
-                        (setting) => setting.voice_id !== item.setting.voice_id
-                      )
-                      .map((setting) =>
-                        voices.some(
-                          (voice) =>
-                            voice.id === setting.voice_id &&
-                            voice.locale === item.locale
-                        )
-                          ? { ...setting, enabled: false }
-                          : setting
-                      );
-                    next.push({ ...item.setting, enabled: true });
-                    const profile = { voices: next };
-                    setVoiceSettings(next);
-                    emittedProfileRef.current = JSON.stringify(profile);
-                    onVoiceProfileChange?.(profile);
+                    applyRecommendation(item);
                   }}
                 >
                   应用到当前文本
                 </Button>
               </Space>
             )}
+            {loadRecommendations && recommendationArea && (
+              <Space wrap style={{ marginBottom: 12 }}>
+                {(["en-GB", "en-US"] as const)
+                  .filter((accent) => !locale || accent === locale)
+                  .map((accent) => (
+                    <Button
+                      key={accent}
+                      loading={refreshingRecommendations}
+                      disabled={readOnly || !onVoiceProfileChange}
+                      onClick={() => void useLatestRecommendation(accent)}
+                    >
+                      使用最新{accent === "en-GB" ? "英式" : "美式"}首位推荐
+                    </Button>
+                  ))}
+              </Space>
+            )}
+            <VoiceVersions
+              settings={voiceSettings}
+              voices={voices}
+              locale={locale}
+              editingKey={editingVersionKey}
+              canAudition={
+                !!previewAdapter && !!text.trim() && conflictCount === 0
+              }
+              readOnly={readOnly || !onVoiceProfileChange}
+              onEdit={setEditingVersionKey}
+              onChange={changeVoiceSettings}
+              onSelect={chooseVersion}
+              onAudition={handleAudition}
+              onGenerate={
+                previewAdapter?.generateAudio && !previewIsMock
+                  ? generateVersionAudio
+                  : undefined
+              }
+              generatingVersion={generatingVersion}
+            />
             <VoicePanel
               readOnly={readOnly}
               locale={locale}
@@ -1945,6 +2226,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               voicesLoading={voicesLoading}
               enabledVoiceIds={enabledVoiceIds}
               voiceSettings={voiceSettings}
+              editingVersionKey={editingVersionKey}
               onRateChange={(voiceId, rate_percent) =>
                 updateVoice(voiceId, { rate_percent })
               }
@@ -2053,7 +2335,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         {renderActions && (
           <div className="tsz-ve-editor-actions">
             {renderActions(
-              !pendingUploads.some((item) => !item.error),
+              !generatingVersion && !pendingUploads.some((item) => !item.error),
               prepareComplete
             )}
           </div>
@@ -2243,6 +2525,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             linkWords.length === 0 &&
             !draft.start &&
             !draft.end &&
+            !generatingVersion &&
             !pendingUploads.some((item) => !item.error),
           prepareComplete
         )}

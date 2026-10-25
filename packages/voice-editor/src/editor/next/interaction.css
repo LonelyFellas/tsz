@@ -261,6 +261,25 @@
 .tsz-ve-bottom-tools .tsz-ve-speech-panel-title {
   display: none;
 }
+.tsz-ve-versions {
+  margin-bottom: 16px;
+}
+.tsz-ve-version {
+  padding: 12px 0;
+  border-top: 1px solid #dfe3eb;
+}
+.tsz-ve-version > .ant-typography {
+  margin: 6px 0;
+  font-size: 12px;
+}
+.tsz-ve-version-create {
+  margin-top: 12px;
+  max-width: 100%;
+}
+.tsz-ve-version-create > .ant-space-item {
+  min-width: 0;
+  max-width: 100%;
+}
 .tsz-ve-bottom-tools .tsz-ve-pop-voices {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

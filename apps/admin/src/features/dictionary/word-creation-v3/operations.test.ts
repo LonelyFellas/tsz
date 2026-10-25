@@ -2482,6 +2482,25 @@ it("拼写试听比较兼容缺省空配置、音色顺序与字段顺序，保�
     }
   };
   expect(spellingSpeechEqual(left, right)).toBe(true);
+  const named = {
+    ...sonia,
+    version_id: UUIDS.pos,
+    version_name: "自然",
+    locale: "en-GB" as const
+  };
+  const namedSpeech = { ...empty, voice_profile: { voices: [named, guy] } };
+  expect(
+    spellingSpeechEqual(namedSpeech, {
+      ...empty,
+      voice_profile: { voices: [guy, named] }
+    })
+  ).toBe(true);
+  expect(
+    spellingSpeechEqual(namedSpeech, {
+      ...empty,
+      voice_profile: { voices: [{ ...named, version_name: "慢读" }, guy] }
+    })
+  ).toBe(false);
   expect(
     spellingSpeechEqual(left, {
       ...empty,

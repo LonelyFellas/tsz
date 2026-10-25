@@ -90,9 +90,19 @@ export type LoadVoiceRecommendations = (input: {
   area: VoiceRecommendationArea;
   locale?: AudioAssetLocale;
   signal?: AbortSignal;
+  refresh?: boolean;
 }) => Promise<VoiceRecommendation[]>;
 
 export interface VoicePreviewAdapter {
+  audioSourceKey?: string;
+  generateAudio?(
+    input: { requestId: string; content: RichTextV2; setting: VoiceSetting },
+    options?: { signal?: AbortSignal }
+  ): Promise<AudioAsset>;
+  resolveAudio?(
+    assetId: string,
+    options?: { signal?: AbortSignal }
+  ): Promise<VoicePreviewResult>;
   listVoices(input: {
     language: string;
     signal?: AbortSignal;
@@ -176,6 +186,10 @@ export interface VoiceRichTextFieldProps {
  * 但本包不依赖 admin 的词条类型，故在此另行定义。
  */
 export interface VoiceSetting {
+  audio_asset_id?: string;
+  version_id?: string;
+  version_name?: string;
+  locale?: AudioAssetLocale;
   voice_id: string;
   enabled: boolean;
   rate_percent: number;

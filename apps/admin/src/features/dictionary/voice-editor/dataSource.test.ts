@@ -81,7 +81,7 @@ afterEach(() => {
 
 describe("admin voice preview data source", () => {
   it.each([new Error("offline"), { status: 500 }])(
-    "个人参数失败不清空成功的目录，已有文本仍能试听：%s",
+    "文本音色目录不依赖个人参数：%s",
     async (failure) => {
       state.library.mockRejectedValue(failure);
       const { adminVoicePreviewAdapter } = await import("./dataSource");
@@ -89,10 +89,8 @@ describe("admin voice preview data source", () => {
         language: "en"
       });
       expect(voices).toHaveLength(1);
-      expect(voices[0]).toMatchObject({
-        id: "real-voice",
-        personalSettingsError: expect.stringContaining("个人参数加载失败")
-      });
+      expect(voices[0]).toMatchObject({ id: "real-voice" });
+      expect(state.library).not.toHaveBeenCalled();
       expect(voices[0]?.defaultSettings).toBeUndefined();
       await adminVoicePreviewAdapter.synthesize({
         language: "en",
@@ -104,7 +102,7 @@ describe("admin voice preview data source", () => {
       expect(state.preview).toHaveBeenCalled();
     }
   );
-  it("分组和个人参数按账号共享缓存，换账号重新查询", async () => {
+  it("分组按账号共享缓存，选择音色不带入历史个人参数", async () => {
     state.library.mockResolvedValue({
       items: [
         {
@@ -118,20 +116,17 @@ describe("admin voice preview data source", () => {
     await loadAdminVoiceRecommendations({ area: "word" });
     await loadAdminVoiceRecommendations({ area: "meaning" });
     expect(state.groups).toHaveBeenCalledTimes(1);
-    expect(
-      await adminVoicePreviewAdapter.listVoices({ language: "en" })
-    ).toEqual([
-      expect.objectContaining({
-        defaultSettings: { rate_percent: 0, pitch_semitones: 0 }
-      })
-    ]);
+    const voices = await adminVoicePreviewAdapter.listVoices({
+      language: "en"
+    });
+    expect(voices[0]?.defaultSettings).toBeUndefined();
     await adminVoicePreviewAdapter.listVoices({ language: "en" });
-    expect(state.library).toHaveBeenCalledTimes(1);
+    expect(state.library).not.toHaveBeenCalled();
     state.profile = { ...state.profile, id: "another" };
     await loadAdminVoiceRecommendations({ area: "word" });
     await adminVoicePreviewAdapter.listVoices({ language: "en" });
     expect(state.groups).toHaveBeenCalledTimes(2);
-    expect(state.library).toHaveBeenCalledTimes(2);
+    expect(state.library).not.toHaveBeenCalled();
   });
 
   it("推荐按板块和口音加载，并复制完整声音参数", async () => {

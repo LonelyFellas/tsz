@@ -8,7 +8,6 @@ import { hasAdminPermission, hasAnyAdminPermission } from "@tsz/shared/auth";
 import { api, useAuthStore } from "@/lib/auth";
 import { env } from "@/lib/env";
 import { queryClient } from "@/lib/queryClient";
-import { HttpError } from "@tsz/api-client";
 import { createAdminVoicePreviewAdapter } from "./adapter";
 import { createAdminAudioUploadAdapter } from "./audioUploadAdapter";
 
@@ -39,7 +38,8 @@ async function resolveAdapter(): Promise<VoicePreviewAdapter> {
 export const loadAdminVoiceRecommendations: LoadVoiceRecommendations = async ({
   area,
   locale,
-  signal
+  signal,
+  refresh
 }) => {
   if (voicePreviewIsMock) return [];
   signal?.throwIfAborted();
@@ -47,7 +47,7 @@ export const loadAdminVoiceRecommendations: LoadVoiceRecommendations = async ({
   const response = await queryClient.fetchQuery({
     queryKey: ["admin-dubbing-groups", actor],
     queryFn: ({ signal }) => api.speech.groups(signal),
-    staleTime: 60_000
+    staleTime: refresh ? 0 : 60_000
   });
   signal?.throwIfAborted();
   if (useAuthStore.getState().profile?.id !== actor) return [];
@@ -78,48 +78,24 @@ export const loadAdminVoiceRecommendations: LoadVoiceRecommendations = async ({
 };
 
 export const adminVoicePreviewAdapter: VoicePreviewAdapter = {
+  async generateAudio(input, options) {
+    if (voicePreviewIsMock) throw new Error("模拟试听不支持生成正式音频");
+    const response = await api.speech.generateAudio(
+      {
+        request_id: input.requestId,
+        source: { kind: "text", content: input.content },
+        setting: input.setting
+      },
+      options?.signal
+    );
+    return response.asset;
+  },
+  async resolveAudio(assetId, options) {
+    const result = await api.audioAssets.url(assetId, options?.signal);
+    return { audioUrl: result.url, expiresAt: result.expires_at, cached: true };
+  },
   async listVoices(input) {
-    const voices = await (await resolveAdapter()).listVoices(input);
-    if (voicePreviewIsMock) return voices;
-    const actor = useAuthStore.getState().profile?.id;
-    let personalSettingsError: string | undefined;
-    const personal = await queryClient
-      .fetchQuery({
-        queryKey: ["admin-speech-library", actor],
-        queryFn: ({ signal }) => api.speech.library(signal),
-        staleTime: 60_000,
-        retry: false
-      })
-      .catch((error) => {
-        if (error instanceof HttpError && [401, 403].includes(error.status))
-          throw error;
-        input.signal?.throwIfAborted();
-        personalSettingsError =
-          "个人参数加载失败；已有文本仍使用已保存参数，新选音色暂用默认值。";
-        return null;
-      });
-    input.signal?.throwIfAborted();
-    if (useAuthStore.getState().profile?.id !== actor) return [];
-    return voices.map((voice) => {
-      const saved = personal?.items.find(
-        (item) => item.voice_alias === voice.id
-      )?.parameters;
-      return saved
-        ? {
-            ...voice,
-            defaultSettings: {
-              rate_percent: saved.rate_percent,
-              pitch_semitones: saved.pitch_semitones,
-              ...(saved.volume_percent !== undefined
-                ? { volume_percent: saved.volume_percent }
-                : {}),
-              ...(saved.style ? { style: saved.style } : {})
-            }
-          }
-        : personalSettingsError
-          ? { ...voice, personalSettingsError }
-          : voice;
-    });
+    return (await resolveAdapter()).listVoices(input);
   },
   async synthesize(input, options) {
     if (!hasAdminPermission(useAuthStore.getState().profile, "speech.generate"))

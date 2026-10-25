@@ -25,6 +25,79 @@
   font-size: 12px;
 }
 
+.dubbing-group-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  align-items: start;
+  gap: 16px;
+}
+
+.dubbing-group-list.is-editing {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.dubbing-group-list:not(.is-editing) .dubbing-group-header {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.dubbing-group-list:not(.is-editing) .dubbing-group-header .ant-form-item-label,
+.dubbing-group-list:not(.is-editing)
+  .dubbing-recommendation-fields
+  .ant-form-item-label,
+.dubbing-group-list:not(.is-editing) .dubbing-group-locale > .ant-typography {
+  display: none;
+}
+
+.dubbing-group-list:not(.is-editing)
+  .dubbing-group-header
+  > .ant-form-item:first-child {
+  font-size: 16px;
+}
+
+.dubbing-group-accent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.dubbing-group-accent > .ant-typography {
+  font-size: 12px;
+}
+
+.dubbing-group-list:not(.is-editing) .dubbing-group-locales {
+  grid-template-columns: minmax(0, 1fr);
+  margin-top: 12px;
+}
+
+.dubbing-group-locale[hidden] {
+  display: none;
+}
+
+.dubbing-group-list:not(.is-editing) .dubbing-recommendation-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.dubbing-group-list:not(.is-editing)
+  .dubbing-recommendation-fields
+  > :last-child,
+.dubbing-group-list:not(.is-editing) .dubbing-recommendation > .ant-typography {
+  font-size: 12px;
+  color: var(--voice-muted);
+}
+
+.dubbing-group-footnote.ant-typography {
+  margin: 16px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--voice-border);
+  font-size: 12px;
+}
+
 .dubbing-group-header {
   display: grid;
   grid-template-columns: minmax(160px, 240px) minmax(0, 1fr) auto;

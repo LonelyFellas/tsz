@@ -142,6 +142,26 @@ afterEach(() => {
 });
 
 describe("分组草稿与并发保存", () => {
+  it("切换卡片口音只改变展示，试听使用对应推荐且不写入草稿", () => {
+    const { onAudition, onDirtyChange } = mount();
+    expect(
+      screen.getByRole("region", { name: "发音推荐 英式推荐" })
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("region", { name: "发音推荐 美式推荐" })
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("radio", { name: "美式" }));
+    const region = screen.getByRole("region", { name: "发音推荐 美式推荐" });
+    expect(region).toBeVisible();
+    expect(
+      screen.queryByRole("region", { name: "发音推荐 英式推荐" })
+    ).toBeNull();
+    fireEvent.click(within(region).getByRole("button", { name: "试听" }));
+    expect(onAudition).toHaveBeenCalledWith(us, groupData().groups[0]!.us[0]);
+    expect(onDirtyChange).toHaveBeenLastCalledWith(false);
+    expect(api.speech.saveGroups).not.toHaveBeenCalled();
+  });
+
   it("清空草稿后创建初始分组仍使用开始编辑时的 revision", async () => {
     const { client } = mount();
     fireEvent.click(screen.getByRole("button", { name: /编辑分组/ }));

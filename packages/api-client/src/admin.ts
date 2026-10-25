@@ -123,6 +123,7 @@ const SPELLING_MARKUP_HEADERS = {
   "X-TSZ-Spelling-Markup": "v1",
   "X-TSZ-Spelling-Speech": "v1",
   "X-TSZ-Phoneme-Speech": "v1",
+  "X-TSZ-Voice-Versions": "v2",
   "X-TSZ-Form-Contents": "v1",
   "X-TSZ-Form-Content-Reassignment": "v1"
 };
@@ -307,6 +308,15 @@ export function createAdminEndpoints(http: HttpClient) {
       http.patch<UpdateAdminPreferencesResponse>("/profile/preferences", input),
     /** 语音富文本试听；wire 映射由 admin 业务层承担。 */
     speech: {
+      generateAudio: (
+        input: import("@tsz/types").GenerateVoiceAudioRequest,
+        signal?: AbortSignal
+      ) =>
+        http.post<import("@tsz/types").GenerateVoiceAudioResponse>(
+          "/speech/audio",
+          input,
+          { signal }
+        ),
       voices: (signal?: AbortSignal) =>
         http.get<AdminSpeechVoiceListResponse>("/speech/voices", { signal }),
       preview: (input: CreateAdminSpeechPreviewInput, signal?: AbortSignal) =>

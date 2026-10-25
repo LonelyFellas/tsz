@@ -23,6 +23,7 @@ import {
   synthesisPhonemeWordRanges
 } from "@tsz/shared";
 import { env } from "@/lib/env";
+import { api } from "@/lib/auth";
 import {
   adminVoicePreviewAdapter,
   loadAdminVoiceRecommendations,
@@ -158,6 +159,27 @@ export function V3PhonemeSpeechSettings({
   const adapter = useMemo<VoicePreviewAdapter>(
     () => ({
       listVoices: (input) => adminVoicePreviewAdapter.listVoices(input),
+      resolveAudio: adminVoicePreviewAdapter.resolveAudio,
+      async generateAudio(input, options) {
+        const { alphabet, inputIssue, resolveCandidate } = latest.current;
+        if (inputIssue) throw new Error(inputIssue);
+        const candidate = resolveCandidate(input.content);
+        const result = await api.speech.generateAudio(
+          {
+            request_id: input.requestId,
+            source: {
+              kind: "phoneme",
+              content: candidate[`${alphabet}_speech`]!.content,
+              alphabet,
+              phoneme: input.content.text,
+              ups_words: alphabet === "ups" ? (candidate.ups_words ?? []) : []
+            },
+            setting: input.setting
+          },
+          options?.signal
+        );
+        return result.asset;
+      },
       async synthesize(input, options) {
         const { spelling, alphabet, locale, inputIssue, resolveCandidate } =
           latest.current;

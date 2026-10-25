@@ -14,6 +14,7 @@ import type {
   AdminProfile
 } from "@tsz/types";
 import { App, ConfigProvider } from "antd";
+import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { HttpError } from "@tsz/api-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, useAuthStore } from "@/lib/auth";
@@ -43,6 +44,7 @@ const guy: AdminSpeechVoice = {
   capabilities: { ...sonia.capabilities, styles: [] }
 };
 const clients: QueryClient[] = [];
+const routers: ReturnType<typeof createMemoryRouter>[] = [];
 function setPermissions(permissions: AdminProfile["permissions"]) {
   useAuthStore.getState().setProfile({
     id: "voice-editor-admin",
@@ -55,20 +57,26 @@ function setPermissions(permissions: AdminProfile["permissions"]) {
     permissions
   });
 }
-function mount() {
+function mount(openLibrary = true) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } }
   });
   clients.push(client);
-  return render(
+  const router = createMemoryRouter([{ path: "/", element: <VoiceLibrary /> }]);
+  routers.push(router);
+  const view = render(
     <QueryClientProvider client={client}>
       <ConfigProvider theme={{ token: { motion: false } }}>
         <App>
-          <VoiceLibrary />
+          <RouterProvider router={router} />
         </App>
       </ConfigProvider>
     </QueryClientProvider>
   );
+  if (openLibrary && screen.queryByRole("tab", { name: "音色库" })) {
+    fireEvent.click(screen.getByRole("tab", { name: "音色库" }));
+  }
+  return view;
 }
 function result(name: string): AdminSpeechPreviewResponse {
   return {
@@ -100,24 +108,38 @@ beforeEach(() => {
       personal_revision: 0
     }))
   });
+  vi.spyOn(api.speech, "groups").mockResolvedValue({ groups: [], revision: 0 });
   vi.spyOn(api.speech, "saveSettings");
   vi.spyOn(api.speech, "saveDescription");
   vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
 });
 afterEach(() => {
+  routers.splice(0).forEach((router) => router.dispose());
   clients.splice(0).forEach((client) => client.clear());
   useAuthStore.getState().setProfile(null);
   vi.restoreAllMocks();
 });
 
-describe("音色库", () => {
+describe("配音中心", () => {
+  it("默认展示分组配音，再切换音色库查找声音", async () => {
+    mount(false);
+    expect(screen.getByRole("tab", { name: "分组配音" })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+    await screen.findByText("尚未设置分组推荐");
+    expect(screen.queryByRole("searchbox", { name: "搜索音色" })).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "音色库" }));
+    expect(await screen.findByLabelText("试听 Sonia")).toBeVisible();
+  });
+
   it("清空音量后输入框与控件组关联表单错误", async () => {
     mount();
     fireEvent.click(await screen.findByLabelText("调整 Sonia 参数"));
     const input = screen.getByRole("spinbutton", { name: "合成音量" });
     expect(input).toHaveAttribute("aria-required", "true");
     fireEvent.change(input, { target: { value: "" } });
-    fireEvent.click(screen.getByRole("button", { name: "保存个人参数与听感" }));
+    fireEvent.click(screen.getByRole("button", { name: "试听当前参数" }));
     await screen.findByText("请输入 0 至 100 的整数");
     expect(input).toHaveAttribute("aria-invalid", "true");
     expect(input).toHaveAccessibleDescription("请输入 0 至 100 的整数");
@@ -126,7 +148,7 @@ describe("音色库", () => {
     ).toHaveAccessibleDescription("请输入 0 至 100 的整数");
     expect(api.speech.saveSettings).not.toHaveBeenCalled();
   });
-  it("音量同步滑块、保存重开并参与试听，恢复默认清除旧音频", async () => {
+  it("音量仅在本次页面保留，保存听感不保存试听参数，恢复默认清除旧音频", async () => {
     vi.mocked(api.speech.saveSettings).mockImplementation(
       async (alias, input) => ({
         voice_alias: alias,
@@ -161,12 +183,12 @@ describe("音色库", () => {
       )
     );
     await screen.findByLabelText("Sonia 试听播放器");
-    fireEvent.click(screen.getByRole("button", { name: "保存个人参数与听感" }));
-    await screen.findByText("个人参数与听感已保存，仅你可见。");
+    fireEvent.click(screen.getByRole("button", { name: "保存听感" }));
+    await screen.findByText("听感已保存，仅你可见。");
     expect(api.speech.saveSettings).toHaveBeenLastCalledWith(
       sonia.alias,
       expect.objectContaining({
-        parameters: expect.objectContaining({ volume_percent: 65 })
+        parameters: null
       })
     );
     fireEvent.click(
@@ -196,6 +218,32 @@ describe("音色库", () => {
     fireEvent.click(screen.getByRole("button", { name: "恢复默认参数" }));
     expect(screen.queryByLabelText("Sonia 试听播放器")).toBeNull();
   }, 15000);
+
+  it("重新进入页面恢复默认试听参数，历史个人参数不被写回或清除", async () => {
+    const saved = {
+      voice_alias: sonia.alias,
+      parameters: { rate_percent: -25, pitch_semitones: 2, style: "cheerful" },
+      notes: "历史听感",
+      personal_revision: 3,
+      description_zh: null,
+      description_revision: 0
+    };
+    vi.mocked(api.speech.library).mockResolvedValue({ items: [saved] });
+    const first = mount();
+    fireEvent.click(await screen.findByLabelText("调整 Sonia 参数"));
+    expect(screen.getByLabelText("合成语速")).toHaveValue("1.00");
+    fireEvent.change(screen.getByLabelText("合成语速"), {
+      target: { value: "0.80" }
+    });
+    fireEvent.click(within(screen.getByRole("dialog")).getByLabelText("Close"));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    first.unmount();
+    mount();
+    fireEvent.click(await screen.findByLabelText("调整 Sonia 参数"));
+    expect(screen.getByLabelText("合成语速")).toHaveValue("1.00");
+    expect(screen.getByLabelText("我的听感")).toHaveValue("历史听感");
+    expect(api.speech.saveSettings).not.toHaveBeenCalled();
+  });
 
   it.each(["personal", "description"] as const)(
     "%s 保存完成后，保存期间发起的旧查询不能覆盖新设置",
@@ -239,9 +287,7 @@ describe("音色库", () => {
         });
       }
       fireEvent.click(
-        screen.getByText(
-          kind === "personal" ? "保存个人参数与听感" : "保存共享介绍"
-        )
+        screen.getByText(kind === "personal" ? "保存听感" : "保存共享介绍")
       );
       await waitFor(() => expect(method).toHaveBeenCalledTimes(1));
       vi.mocked(api.speech.library).mockImplementationOnce(() => get.promise);
@@ -252,7 +298,7 @@ describe("音色库", () => {
       await act(async () => put.resolve(saved));
       await screen.findByText(
         kind === "personal"
-          ? "个人参数与听感已保存，仅你可见。"
+          ? "听感已保存，仅你可见。"
           : "中文介绍已保存，所有有权查看音色的管理员可见。"
       );
       await act(async () => get.resolve(old));
@@ -310,12 +356,11 @@ describe("音色库", () => {
           target: { value: saved.description_zh }
         });
       }
-      const saveLabel =
-        kind === "personal" ? "保存个人参数与听感" : "保存共享介绍";
+      const saveLabel = kind === "personal" ? "保存听感" : "保存共享介绍";
       fireEvent.click(screen.getByText(saveLabel));
       await screen.findByText(
         kind === "personal"
-          ? "个人参数与听感已保存，仅你可见。"
+          ? "听感已保存，仅你可见。"
           : "中文介绍已保存，所有有权查看音色的管理员可见。"
       );
       fireEvent.click(
@@ -342,7 +387,7 @@ describe("音色库", () => {
     }
   );
 
-  it("目录先到达时等待个人资料，首次试听使用已保存参数", async () => {
+  it("历史个人参数仍可读取，但首次试听使用默认参数", async () => {
     const pending = deferred<AdminVoiceLibraryResponse>();
     vi.mocked(api.speech.library).mockImplementationOnce(() => pending.promise);
     mount();
@@ -373,9 +418,8 @@ describe("音色库", () => {
     await waitFor(() =>
       expect(api.speech.preview).toHaveBeenCalledWith(
         expect.objectContaining({
-          rate_percent: -25,
-          pitch_semitones: 2,
-          style: "cheerful"
+          rate_percent: 0,
+          pitch_semitones: 0
         }),
         expect.any(AbortSignal)
       )
@@ -419,7 +463,7 @@ describe("音色库", () => {
     expect(HTMLMediaElement.prototype.pause).toHaveBeenCalled();
   });
 
-  it("刷新后重新打开采用服务端新参数，保存中参数不可编辑", async () => {
+  it("刷新目录不覆盖本次试听参数，保存听感期间参数不可编辑", async () => {
     const info = {
       voice_alias: sonia.alias,
       parameters: { rate_percent: -25, pitch_semitones: 0, style: null },
@@ -437,7 +481,7 @@ describe("音色库", () => {
     fireEvent.change(screen.getByLabelText("合成语速"), {
       target: { value: "0.75" }
     });
-    fireEvent.click(screen.getByText("保存个人参数与听感"));
+    fireEvent.click(screen.getByText("保存听感"));
     await waitFor(() => expect(api.speech.saveSettings).toHaveBeenCalled());
     expect(screen.getByLabelText("合成语速")).toBeDisabled();
     expect(screen.getByLabelText("音调")).toBeDisabled();
@@ -453,7 +497,7 @@ describe("音色库", () => {
     fireEvent.click(screen.getByText("刷新音色"));
     await waitFor(() => expect(api.speech.library).toHaveBeenCalledTimes(2));
     fireEvent.click(screen.getByLabelText("调整 Sonia 参数"));
-    expect(screen.getByLabelText("合成语速")).toHaveValue("1.20");
+    expect(screen.getByLabelText("合成语速")).toHaveValue("0.75");
   }, 15000);
 
   it("关闭未保存听感时提示，重新载入期间不能切换音色", async () => {
@@ -467,16 +511,14 @@ describe("音色库", () => {
     });
     fireEvent.click(within(screen.getByRole("dialog")).getByLabelText("Close"));
     expect(
-      await screen.findByText("关闭会丢弃当前参数、听感或介绍的修改。")
+      await screen.findByText("关闭会丢弃尚未保存的听感或介绍。")
     ).toBeInTheDocument();
     fireEvent.click(screen.getByText("继续编辑"));
     await waitFor(() =>
-      expect(
-        screen.queryByText("关闭会丢弃当前参数、听感或介绍的修改。")
-      ).toBeNull()
+      expect(screen.queryByText("关闭会丢弃尚未保存的听感或介绍。")).toBeNull()
     );
     expect(screen.getByLabelText("我的听感")).toHaveValue("不能丢失的笔记");
-    fireEvent.click(screen.getByText("保存个人参数与听感"));
+    fireEvent.click(screen.getByText("保存听感"));
     const reload = await screen.findByText("重新载入设置");
     const pending = deferred<{ items: [] }>();
     vi.mocked(api.speech.library).mockImplementationOnce(() => pending.promise);
@@ -487,7 +529,7 @@ describe("音色库", () => {
     await act(async () => pending.resolve({ items: [] }));
   }, 15000);
 
-  it("个人设置保存并重新打开读回，冲突保留输入且不覆盖版本", async () => {
+  it("听感保存保留历史参数，重新打开读回，冲突保留输入且不覆盖版本", async () => {
     const saved = {
       voice_alias: sonia.alias,
       parameters: { rate_percent: -25, pitch_semitones: 0, style: null },
@@ -496,6 +538,9 @@ describe("音色库", () => {
       description_zh: null,
       description_revision: 0
     };
+    vi.mocked(api.speech.library).mockResolvedValue({
+      items: [{ ...saved, notes: "", personal_revision: 0 }]
+    });
     vi.mocked(api.speech.saveSettings)
       .mockResolvedValueOnce(saved)
       .mockRejectedValueOnce(
@@ -514,10 +559,8 @@ describe("音色库", () => {
       within(dialog).getByRole("textbox", { name: "我的听感" }),
       { target: { value: "清晰慢读" } }
     );
-    fireEvent.click(
-      within(dialog).getByRole("button", { name: "保存个人参数与听感" })
-    );
-    await screen.findByText("个人参数与听感已保存，仅你可见。");
+    fireEvent.click(within(dialog).getByRole("button", { name: "保存听感" }));
+    await screen.findByText("听感已保存，仅你可见。");
     expect(api.speech.saveSettings).toHaveBeenCalledWith(sonia.alias, {
       parameters: saved.parameters,
       notes: "清晰慢读",
@@ -534,9 +577,7 @@ describe("音色库", () => {
       within(reopened).getByRole("textbox", { name: "我的听感" }),
       { target: { value: "我的新笔记" } }
     );
-    fireEvent.click(
-      within(reopened).getByRole("button", { name: "保存个人参数与听感" })
-    );
+    fireEvent.click(within(reopened).getByRole("button", { name: "保存听感" }));
     await screen.findByText(
       "设置已在其他页面修改。当前输入已保留，请重新载入最新设置后再编辑。"
     );
@@ -641,20 +682,16 @@ describe("音色库", () => {
     fireEvent.change(screen.getByLabelText("合成语速"), {
       target: { value: "1.25" }
     });
-    fireEvent.click(screen.getByText("保存个人参数与听感"));
-    await screen.findByText("个人参数与听感已保存，仅你可见。");
+    fireEvent.click(screen.getByText("保存听感"));
+    await screen.findByText("听感已保存，仅你可见。");
     expect(api.speech.saveSettings).toHaveBeenCalledWith(
       sonia.alias,
-      expect.objectContaining({
-        parameters: { rate_percent: 25, pitch_semitones: 0, style: null }
-      })
+      expect.objectContaining({ parameters: null })
     );
     expect(api.speech.saveDescription).not.toHaveBeenCalled();
     fireEvent.click(within(drawer).getByLabelText("Close"));
     await waitFor(() =>
-      expect(
-        screen.getByText("关闭会丢弃当前参数、听感或介绍的修改。")
-      ).toBeVisible()
+      expect(screen.getByText("关闭会丢弃尚未保存的听感或介绍。")).toBeVisible()
     );
     fireEvent.click(screen.getByText("继续编辑"));
     fireEvent.click(description);

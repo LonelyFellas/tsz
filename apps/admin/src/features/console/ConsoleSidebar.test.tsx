@@ -105,7 +105,7 @@ describe("ConsoleSidebar", () => {
     expect(screen.queryByText("管理员管理")).toBeNull();
   });
 
-  it("按后端权限过滤菜单：只有 words.access 时词库与音色库可见", () => {
+  it("按后端权限过滤菜单：只有 words.access 时词库与配音中心可见", () => {
     setLevel("admin", ["words.access"]);
     renderAt("/");
     expect(screen.getByText("词库管理")).toBeInTheDocument();
@@ -120,11 +120,11 @@ describe("ConsoleSidebar", () => {
     ["sentences.access"],
     ["speech.global_dubbing"]
   ] as [string][])(
-    "音色库是可直接点击的一级菜单，目录权限为 %s",
+    "配音中心是可直接点击的一级菜单，目录权限为 %s",
     async (permission) => {
       setLevel("admin", [permission]);
       renderAt("/voices");
-      const entry = screen.getByRole("menuitem", { name: /音色库/ });
+      const entry = screen.getByRole("menuitem", { name: /配音中心/ });
       expect(entry).toHaveClass("ant-menu-item-selected");
       fireEvent.click(entry);
       expect(mockNavigate).toHaveBeenCalledWith("/voices");
@@ -135,10 +135,10 @@ describe("ConsoleSidebar", () => {
     }
   );
 
-  it("没有目录权限时不展示音色库，直链也不放行", async () => {
+  it("没有目录权限时不展示配音中心，直链也不放行", async () => {
     setLevel("admin", ["speech.generate"]);
     renderAt("/");
-    expect(screen.queryByText("音色库")).toBeNull();
+    expect(screen.queryByText("配音中心")).toBeNull();
     const { canVisitAdminRoute } = await import("@/lib/adminPageRoutes");
     expect(canVisitAdminRoute(useAuthStore.getState().profile, "/voices")).toBe(
       false

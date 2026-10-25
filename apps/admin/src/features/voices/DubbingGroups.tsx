@@ -26,6 +26,7 @@ import {
   Input,
   InputNumber,
   Modal,
+  Segmented,
   Select,
   Space,
   Tag,
@@ -133,6 +134,12 @@ export function DubbingGroups({
   onDirtyChange: (dirty: boolean) => void;
 }) {
   const accountId = useAuthStore((state) => state.profile?.id);
+  const preferredLocale = useAuthStore((state) =>
+    state.profile?.preferences.dialect === "us" ? "us" : "uk"
+  );
+  const [groupLocales, setGroupLocales] = useState<Record<string, "uk" | "us">>(
+    {}
+  );
   const canEdit = usePermission("speech.global_dubbing");
   const client = useQueryClient();
   const { modal } = App.useApp();
@@ -374,7 +381,7 @@ export function DubbingGroups({
         <Typography.Paragraph type="secondary" style={{ margin: 0 }}>
           {draft
             ? "正在编辑分组，保存后生效。"
-            : "按内容板块分别排列英式与美式推荐，不改写历史音频。"}
+            : "按内容板块排列英式与美式推荐，选择口音后试听。"}
         </Typography.Paragraph>
         {(canEdit || draft) && (
           <Space wrap>
@@ -486,7 +493,13 @@ export function DubbingGroups({
           未分组：{unassigned.map((area) => area.label).join("、")}
         </Typography.Text>
       )}
-      <Form component={false} layout="vertical">
+      <Form
+        component="div"
+        layout="vertical"
+        className={
+          draft ? "dubbing-group-list is-editing" : "dubbing-group-list"
+        }
+      >
         {current.groups.map((group) => (
           <Card key={group.id} size="small" className="dubbing-group">
             <div className="dubbing-group-header">
@@ -555,11 +568,46 @@ export function DubbingGroups({
                 </Tooltip>
               )}
             </div>
+            {!draft && (
+              <div className="dubbing-group-accent">
+                <Segmented
+                  aria-label={`${group.name} 推荐口音`}
+                  value={groupLocales[group.id] ?? preferredLocale}
+                  options={[
+                    { label: "英式", value: "uk" },
+                    { label: "美式", value: "us" }
+                  ]}
+                  onChange={(locale: "uk" | "us") => {
+                    onInvalidatePreview();
+                    setGroupLocales((value) => ({
+                      ...value,
+                      [group.id]: locale
+                    }));
+                  }}
+                />
+                <Typography.Text type="secondary">
+                  {group[groupLocales[group.id] ?? preferredLocale].length}{" "}
+                  个推荐
+                </Typography.Text>
+              </div>
+            )}
             <div className="dubbing-group-locales">
               {(["uk", "us"] as const).map((locale) => (
                 <section
                   key={locale}
                   className="dubbing-group-locale"
+                  hidden={
+                    !draft &&
+                    locale !== (groupLocales[group.id] ?? preferredLocale)
+                  }
+                  aria-hidden={
+                    !draft &&
+                    locale !== (groupLocales[group.id] ?? preferredLocale)
+                  }
+                  inert={
+                    !draft &&
+                    locale !== (groupLocales[group.id] ?? preferredLocale)
+                  }
                   aria-label={`${group.name} ${locale === "uk" ? "英式" : "美式"}推荐`}
                 >
                   <Typography.Title level={5}>
@@ -921,6 +969,14 @@ export function DubbingGroups({
                 </section>
               ))}
             </div>
+            {!draft && (
+              <Typography.Paragraph
+                type="secondary"
+                className="dubbing-group-footnote"
+              >
+                按推荐顺序选用，具体文本仍可单独调整。
+              </Typography.Paragraph>
+            )}
           </Card>
         ))}
       </Form>

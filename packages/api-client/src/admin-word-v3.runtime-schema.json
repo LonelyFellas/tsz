@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-tipping/docs/openapi.json",
-  "_source_sha256": "a4bcaa23f69ca579f87117c234c7c1f74e294aacb13bc8163b001718f62b794c",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dubbing-center/docs/openapi.json",
+  "_source_sha256": "4a138639064ea27841498814b45c59a1e115080287826657d0a13a6edf562438",
   "roots": [
     "MemoryOverview",
     "MemoryPage",
@@ -4240,15 +4240,20 @@
       "type": "object",
       "required": ["voice_id", "enabled", "rate_percent"],
       "properties": {
+        "audio_asset_id": { "type": "string", "format": "uuid" },
         "enabled": { "type": "boolean" },
+        "locale": { "$ref": "#/$defs/VoiceVersionLocaleV3" },
         "pitch_semitones": { "type": "integer", "maximum": 12, "minimum": -12 },
         "rate_percent": { "type": "integer", "maximum": 100, "minimum": -50 },
         "style": { "type": "string", "maxLength": 64 },
+        "version_id": { "type": "string", "format": "uuid" },
+        "version_name": { "type": "string", "maxLength": 40, "minLength": 1 },
         "voice_id": { "type": "string" },
         "volume_percent": { "type": "integer", "maximum": 100, "minimum": 0 }
       },
       "additionalProperties": false
     },
+    "VoiceVersionLocaleV3": { "type": "string", "enum": ["en-GB", "en-US"] },
     "WalletStatus": {
       "type": "string",
       "enum": ["open", "deletion_pending", "closed"]

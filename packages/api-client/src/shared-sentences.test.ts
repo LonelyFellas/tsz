@@ -119,7 +119,7 @@ describe("shared sentence wire contract", () => {
     ).resolves.toEqual(response);
     await expect(endpoints.get(id, "draft")).resolves.toEqual(response);
     expect(post).toHaveBeenCalledWith("/lexicon/sentences", input, {
-      headers: SENTENCE_FORMATTING_HEADERS
+      headers: { ...SENTENCE_FORMATTING_HEADERS, "X-TSZ-Voice-Versions": "v2" }
     });
     expect(put.mock.calls[0]?.[1]).toEqual({ base_revision: 1, content });
     // The deployed strict reader rejects the new property: frontend must ship first.
@@ -208,7 +208,12 @@ describe("shared sentence wire contract", () => {
     });
     expect(get).toHaveBeenCalledWith(
       `/lexicon/sentences?q=give+up&entry_id=${id}&sense_id=${id}`,
-      { headers: SENTENCE_FORMATTING_HEADERS }
+      {
+        headers: {
+          ...SENTENCE_FORMATTING_HEADERS,
+          "X-TSZ-Voice-Versions": "v2"
+        }
+      }
     );
     await expect(api.get(id)).rejects.toThrow("revision");
     await expect(api.get(id)).rejects.toThrow("unexpected_property");
@@ -264,7 +269,12 @@ describe("shared sentence wire contract", () => {
     expect(put).toHaveBeenCalledWith(
       `/lexicon/sentences/${id}`,
       expect.objectContaining({ context_entry_id: id, base_revision: 1 }),
-      { headers: SENTENCE_FORMATTING_HEADERS }
+      {
+        headers: {
+          ...SENTENCE_FORMATTING_HEADERS,
+          "X-TSZ-Voice-Versions": "v2"
+        }
+      }
     );
     await expect(
       api.targets({ q: "flower", context_entry_id: id, page: 2 })
@@ -285,6 +295,7 @@ it("发布、回退、下架、恢复分别走独立路径并携带双版本与�
   const headers = {
     headers: {
       ...SENTENCE_FORMATTING_HEADERS,
+      "X-TSZ-Voice-Versions": "v2",
       "Idempotency-Key": "command-key"
     }
   };
@@ -329,12 +340,14 @@ it("编辑显式读取草稿，历史支持游标并拒绝畸形响应", async (
   const api = createSharedSentenceEndpoints({ get } as unknown as HttpClient);
   await api.get(id, "draft");
   expect(get).toHaveBeenLastCalledWith(`/lexicon/sentences/${id}?view=draft`, {
-    headers: SENTENCE_FORMATTING_HEADERS
+    headers: { ...SENTENCE_FORMATTING_HEADERS, "X-TSZ-Voice-Versions": "v2" }
   });
   await expect(api.publications(id, 5)).resolves.toEqual([publication]);
   expect(get).toHaveBeenLastCalledWith(
     `/lexicon/sentences/${id}/publications?before_number=5`,
-    { headers: SENTENCE_FORMATTING_HEADERS }
+    {
+      headers: { ...SENTENCE_FORMATTING_HEADERS, "X-TSZ-Voice-Versions": "v2" }
+    }
   );
   await expect(api.publication(id, id)).resolves.toEqual(publication);
   await expect(api.publications(id)).rejects.toThrow("数组");
@@ -386,11 +399,13 @@ it("creation and historical detail negotiate the same response capability", asyn
   };
   await api.create(input as never);
   expect(post).toHaveBeenCalledWith("/lexicon/sentences", input, {
-    headers: SENTENCE_FORMATTING_HEADERS
+    headers: { ...SENTENCE_FORMATTING_HEADERS, "X-TSZ-Voice-Versions": "v2" }
   });
   await api.publication(id, id);
   expect(get).toHaveBeenCalledWith(
     `/lexicon/sentences/${id}/publications/${id}`,
-    { headers: SENTENCE_FORMATTING_HEADERS }
+    {
+      headers: { ...SENTENCE_FORMATTING_HEADERS, "X-TSZ-Voice-Versions": "v2" }
+    }
   );
 });
