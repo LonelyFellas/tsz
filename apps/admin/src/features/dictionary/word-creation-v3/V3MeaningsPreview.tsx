@@ -41,12 +41,15 @@ function DefinitionText({ definition }: { definition: WordDefinitionV3 }) {
     definition.definition_mode === "zh_definition" ||
     definition.definition_mode === "zh_sentence"
   ) {
-    return <RichTextReadOnly value={definition.content} />;
+    return (
+      <RichTextReadOnly value={definition.content} textRole="definition" />
+    );
   }
   return (
     <V3EnglishTextPreview
       value={definition.content as EnglishTextV3}
       hideCommonDialect
+      textRole="definition"
     />
   );
 }

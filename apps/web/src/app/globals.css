@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import "@tsz/shared/fonts.css";
+@import "@tsz/voice-editor/reader.css";
 @import "./fonts.css";
 
 @source '../../../../packages/ui/src/**/*.{ts,tsx}';

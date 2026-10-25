@@ -347,7 +347,10 @@ function PublicationSnapshotBody({
                 <Tag>{partOfSpeechLabel(meaning.pos)}</Tag>
                 <Tag>{definitionModeLabel(meaning.mode)}</Tag>
                 {meaning.english ? (
-                  <V3EnglishTextPreview value={meaning.english} />
+                  <V3EnglishTextPreview
+                    value={meaning.english}
+                    textRole="definition"
+                  />
                 ) : (
                   <Typography.Text>{meaning.text}</Typography.Text>
                 )}

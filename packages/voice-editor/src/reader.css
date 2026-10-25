@@ -86,7 +86,7 @@
 
 /* 字形直接参与排版，不用隐藏粗体占位撑开常规文字。 */
 .tsz-ve-bold {
-  font-weight: 700;
+  font-weight: var(--tsz-text-bold-weight, 700);
 }
 .tsz-ve-underline {
   text-decoration: underline solid;

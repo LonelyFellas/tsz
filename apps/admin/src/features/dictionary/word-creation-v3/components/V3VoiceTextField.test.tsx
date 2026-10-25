@@ -1410,6 +1410,38 @@ it("字典音标收起态不叠弧线层", () => {
 });
 
 it.each([
+  ["meaning", "definition"],
+  ["example", "example"]
+] as const)("%s 的收起预览和编辑态保留字重用途", async (area, textRole) => {
+  const { container } = render(
+    <V3VoiceTextField
+      mode="association"
+      recommendationArea={area}
+      ariaLabel="格式正文"
+      field="content"
+      nodeId="formatted"
+      value={{
+        version: 2,
+        text: "hello there",
+        annotations: [{ type: "bold", start: 0, end: 5 }]
+      }}
+      onChange={vi.fn()}
+    />
+  );
+  expect(container.querySelector(".tsz-ve-readonly")).toHaveAttribute(
+    "data-text-role",
+    textRole
+  );
+  fireEvent.click(screen.getByLabelText("打开格式正文编辑器"));
+  await waitFor(() =>
+    expect(document.querySelector(".tsz-ve-editor")).toHaveAttribute(
+      "data-text-role",
+      textRole
+    )
+  );
+});
+
+it.each([
   ["association", "tsz-entry-en"],
   ["pronunciation", "tsz-entry-en"],
   ["grammar", "tsz-words"],

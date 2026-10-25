@@ -950,7 +950,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await page.evaluate(async () => {
       await Promise.all(
         ["normal", "italic"].flatMap((style) =>
-          [400, 800].map((weight) =>
+          [400, 700, 800].map((weight) =>
             document.fonts.load(
               `${style} ${weight} 16px "TSZ Text"`,
               "Abc ,.-'‘’“”=<>0123456789"
@@ -967,7 +967,8 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
           family: font.family,
           style: font.style,
           features: font.featureSettings,
-          variation: font.variationSettings
+          variation: font.variationSettings,
+          weight: font.weight
         }))
     );
     expect(faces).toEqual(
@@ -981,7 +982,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
           features: expect.stringContaining('"liga" 0')
         }),
         ...["normal", "italic"].flatMap((style) =>
-          ['"wght" 400', '"wght" 800'].map((variation) =>
+          ['"wght" 400', '"wght" 700', '"wght" 800'].map((variation) =>
             expect.objectContaining({
               family: "TSZ Text",
               style,
@@ -990,6 +991,16 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
                 style === "normal"
                   ? '"ss04", "ss06", "ss07", "ss08"'
                   : '"ss02", "ss04", "ss06", "ss07", "ss08"'
+            })
+          )
+        ),
+        ...["normal", "italic"].flatMap((style) =>
+          ["100 500", "501 700", "701 900"].map((weight) =>
+            expect.objectContaining({
+              family: "TSZ Text",
+              style,
+              weight,
+              features: '"cv01", "cv06", "ss01", "ss03"'
             })
           )
         )
@@ -2752,6 +2763,9 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       await expect(
         dialog.locator(".is-bold.is-italic.is-underline")
       ).toHaveCount(4);
+      await expect(
+        dialog.locator(".is-bold.is-italic > .tsz-ve-letter-text").first()
+      ).toHaveCSS("font-weight", "800");
       await input.press(`${modifier}+l`);
       await expect(
         dialog.locator(".tsz-ve-arc-layer path").first()
@@ -2800,6 +2814,9 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(dialog).toBeHidden();
     await opener.click();
     await expect(dialog.locator(".is-bold")).toHaveCount(4);
+    await expect(
+      dialog.locator(".is-bold > .tsz-ve-letter-text").first()
+    ).toHaveCSS("font-weight", "800");
     await expect(
       dialog.locator(".tsz-ve-arc-layer path").first()
     ).toBeVisible();

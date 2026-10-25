@@ -1,6 +1,6 @@
 "use client";
-import "@tsz/voice-editor/reader.css";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
+import type { TextRole } from "@tsz/voice-editor/types";
 import { AudioButton as SignedAudioButton } from "@/features/audio/AudioButton";
 import type { DictionaryAudio, EnglishVariant, WordlistText } from "@tsz/types";
 import { api } from "@/lib/request";
@@ -8,15 +8,21 @@ import { selectTexts } from "@/features/wordlist/reading";
 
 export function Texts({
   texts,
-  variant
+  variant,
+  textRole = "body"
 }: {
   texts: WordlistText[];
   variant: EnglishVariant | null;
+  textRole?: TextRole;
 }) {
   return (
     <div className="space-y-1 break-words">
       {selectTexts(texts, variant).map((t, i) => (
-        <RichTextReadOnly key={`${t.dialect}:${i}`} value={t.content} />
+        <RichTextReadOnly
+          key={`${t.dialect}:${i}`}
+          value={t.content}
+          textRole={textRole}
+        />
       ))}
     </div>
   );
