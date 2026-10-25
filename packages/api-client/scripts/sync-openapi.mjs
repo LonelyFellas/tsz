@@ -312,6 +312,7 @@ const contractSchemaNames = [
   "PublishedSentenceTargetCandidateV3",
   "VoiceCapabilities",
   "VoiceResponse",
+  "VoiceMetadata",
   "VoiceListResponse",
   "CreatePreviewRequest",
   "PreviewCacheStatus",

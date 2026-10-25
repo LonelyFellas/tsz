@@ -101,16 +101,16 @@
   min-width: 22px;
   height: 22px;
   padding: 0;
-  color: var(--ant-color-text-secondary, #8c8c8c);
+  color: var(--tsz-ve-pop-accent, var(--ant-color-text-secondary, #8c8c8c));
 }
 
 .tsz-ve-audition-button:not(:disabled):hover {
-  color: var(--tsz-ve-role-core);
+  color: var(--tsz-ve-pop-accent, var(--tsz-ve-role-core));
 }
 
 /* 正在播放的那一条持续高亮，便于在整片音色里认出声音来源。 */
 .tsz-ve-audition-button[data-playing="true"] {
-  color: var(--tsz-ve-role-core);
+  color: var(--tsz-ve-pop-accent, var(--tsz-ve-role-core));
 }
 
 .tsz-ve-text-input {
@@ -838,11 +838,11 @@
 }
 
 .tsz-ve-pop-section[data-locale="en-GB"] {
-  --tsz-ve-pop-accent: #1c4bff;
+  --tsz-ve-pop-accent: var(--ant-color-error, #ff4d4f);
 }
 
 .tsz-ve-pop-section[data-locale="en-US"] {
-  --tsz-ve-pop-accent: #e5308f;
+  --tsz-ve-pop-accent: var(--ant-color-primary, #2053ff);
 }
 
 .tsz-ve-pop-row {

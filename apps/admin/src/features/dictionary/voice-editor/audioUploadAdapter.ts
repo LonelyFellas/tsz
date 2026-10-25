@@ -145,6 +145,18 @@ export function createAdminAudioUploadAdapter(
     isStorageUnavailable: () => storageUnavailable,
 
     async upload({ file, locale, gender, signal, onProgress }) {
+      if (gender !== "female" && gender !== "male") {
+        throw new AudioUploadError(
+          "confirm_failed",
+          "上传录音请选择男声或女声"
+        );
+      }
+      if (locale !== "en-GB" && locale !== "en-US") {
+        throw new AudioUploadError(
+          "confirm_failed",
+          "上传录音仅支持英式或美式归属"
+        );
+      }
       if (storageUnavailable) {
         throw new AudioUploadError(
           "storage_unavailable",

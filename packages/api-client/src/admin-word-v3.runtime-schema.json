@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dubbing-center/docs/openapi.json",
-  "_source_sha256": "4a138639064ea27841498814b45c59a1e115080287826657d0a13a6edf562438",
+  "_source_sha256": "c32c7de6e24c65d75998cb613ef2a4764045b5ebd3ad4d6df669d42363797b33",
   "roots": [
     "MemoryOverview",
     "MemoryPage",
@@ -96,6 +96,7 @@
     "ProblemDetails"
   ],
   "$defs": {
+    "AccentGroup": { "type": "string", "enum": ["uk", "us", "other"] },
     "AccountDeletionRequest": {
       "type": "object",
       "required": [
@@ -487,14 +488,16 @@
         "duration_ms": { "type": ["integer", "null"] },
         "gender": { "$ref": "#/$defs/AudioAssetGender" },
         "id": { "type": "string", "format": "uuid" },
-        "locale": { "$ref": "#/$defs/AudioAssetLocale" },
+        "locale": { "$ref": "#/$defs/EnglishLocale" },
         "original_name": { "type": "string" },
         "size_bytes": { "type": "integer" }
       },
       "additionalProperties": false
     },
-    "AudioAssetGender": { "type": "string", "enum": ["female", "male"] },
-    "AudioAssetLocale": { "type": "string", "enum": ["en-GB", "en-US"] },
+    "AudioAssetGender": {
+      "type": "string",
+      "enum": ["female", "male", "neutral"]
+    },
     "AudioAssetUrlResponse": {
       "type": "object",
       "required": ["url", "expires_at", "url_expires_in_seconds"],
@@ -834,6 +837,7 @@
       "type": "object",
       "required": ["target_id", "asset_id", "locale"],
       "properties": {
+        "accent_group": { "$ref": "#/$defs/AccentGroup" },
         "asset_id": { "type": "string", "format": "uuid" },
         "locale": { "type": "string" },
         "target_id": { "type": "string", "format": "uuid" }
@@ -966,6 +970,7 @@
       "additionalProperties": false
     },
     "EnglishLanguageV3": { "type": "string", "enum": ["en"] },
+    "EnglishLocale": { "type": "string", "pattern": "^en-[A-Z]{2}$" },
     "EnglishTextV3": {
       "oneOf": [
         {
@@ -4242,7 +4247,7 @@
       "properties": {
         "audio_asset_id": { "type": "string", "format": "uuid" },
         "enabled": { "type": "boolean" },
-        "locale": { "$ref": "#/$defs/VoiceVersionLocaleV3" },
+        "locale": { "$ref": "#/$defs/EnglishLocale" },
         "pitch_semitones": { "type": "integer", "maximum": 12, "minimum": -12 },
         "rate_percent": { "type": "integer", "maximum": 100, "minimum": -50 },
         "style": { "type": "string", "maxLength": 64 },
@@ -4253,7 +4258,6 @@
       },
       "additionalProperties": false
     },
-    "VoiceVersionLocaleV3": { "type": "string", "enum": ["en-GB", "en-US"] },
     "WalletStatus": {
       "type": "string",
       "enum": ["open", "deletion_pending", "closed"]

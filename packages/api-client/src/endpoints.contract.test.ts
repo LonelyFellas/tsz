@@ -830,7 +830,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "4a138639064ea27841498814b45c59a1e115080287826657d0a13a6edf562438"
+      "c32c7de6e24c65d75998cb613ef2a4764045b5ebd3ad4d6df669d42363797b33"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1132,6 +1132,42 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       "post /admin/auth/refresh": [currentOnlyHeader, refreshHeader],
       ...Object.fromEntries(
         [
+          "get /admin/speech/groups",
+          "put /admin/speech/groups",
+          "get /admin/speech/library",
+          "put /admin/speech/library/{alias}/personal",
+          "put /admin/speech/library/{alias}/description",
+          "get /admin/speech/voices",
+          "get /dictionary/entries/{id}/audio/{asset_id}"
+        ].map((operation) => [
+          operation,
+          [
+            {
+              name: "X-TSZ-Voice-Models",
+              in: "header",
+              required: false,
+              schema: { type: ["string", "null"] }
+            }
+          ]
+        ])
+      ),
+      ...Object.fromEntries(
+        ["get /dictionary", "get /dictionary/entries/{id}"].map((operation) => [
+          operation,
+          [
+            "X-TSZ-Voice-Locales",
+            "X-TSZ-Voice-Models",
+            "X-TSZ-Voice-Versions"
+          ].map((name) => ({
+            name,
+            in: "header",
+            required: false,
+            schema: { type: ["string", "null"] }
+          }))
+        ])
+      ),
+      ...Object.fromEntries(
+        [
           "post /admin/speech/previews",
           "post /admin/lexicon/audio-assets/upload-url",
           "post /admin/lexicon/audio-assets",
@@ -1148,7 +1184,29 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
               in: "header",
               required: false,
               schema: { type: ["string", "null"] }
-            }
+            },
+            ...(operation === "post /admin/speech/previews"
+              ? [
+                  {
+                    name: "X-TSZ-Voice-Models",
+                    in: "header",
+                    required: false,
+                    schema: { type: ["string", "null"] }
+                  }
+                ]
+              : []),
+            ...(operation === "post /admin/speech/audio"
+              ? [
+                  "X-TSZ-Voice-Locales",
+                  "X-TSZ-Voice-Models",
+                  "X-TSZ-Voice-Versions"
+                ].map((name) => ({
+                  name,
+                  in: "header",
+                  required: false,
+                  schema: { type: ["string", "null"] }
+                }))
+              : [])
           ]
         ])
       ),
@@ -1248,6 +1306,12 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
             (SENTENCE_FORMATTING_OPERATIONS.includes(operation) &&
               operation.includes("/admin/lexicon/sentences"))
               ? [
+                  {
+                    name: "X-TSZ-Voice-Models",
+                    in: "header",
+                    required: false,
+                    schema: { type: ["string", "null"] }
+                  },
                   {
                     name: "X-TSZ-Voice-Versions",
                     in: "header",

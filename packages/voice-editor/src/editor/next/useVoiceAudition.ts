@@ -26,9 +26,12 @@ function settingsForVoice(
   const setting =
     voiceSettingFor(settings, voice.id, versionKey) ?? voice.defaultSettings;
   const rate = setting?.rate_percent ?? 0;
-  const ratePercent = voice.rateRange
-    ? Math.min(Math.max(rate, voice.rateRange.min), voice.rateRange.max)
-    : rate;
+  const ratePercent =
+    voice.supportsRate === false
+      ? rate
+      : voice.rateRange
+        ? Math.min(Math.max(rate, voice.rateRange.min), voice.rateRange.max)
+        : rate;
   return {
     voiceId: voice.id,
     ratePercent,
@@ -170,6 +173,26 @@ export function useVoiceAudition({
       if (!previewAdapter || !content.text.trim()) return;
       stop();
 
+      const existing = setting ?? voiceSettingFor(settings, voice.id);
+      if (
+        !existing?.audio_asset_id &&
+        ((voice.supportsRate === false &&
+          (existing?.rate_percent ?? 0) !== 0) ||
+          (voice.supportsPitch === false &&
+            (existing?.pitch_semitones ?? 0) !== 0) ||
+          (voice.supportsVolume === false &&
+            (existing?.volume_percent ?? 100) !== 100) ||
+          content.annotations.some(
+            (mark) =>
+              (mark.type === "pause" && voice.supportsPause === false) ||
+              (mark.type === "phoneme" && voice.supportsPhoneme === false)
+          ))
+      ) {
+        setStatus(
+          "该模型不支持当前参数、停顿或指定音素；请明确调整后再试听，原内容已保留"
+        );
+        return;
+      }
       const controller = new AbortController();
       abortRef.current = controller;
       activeVoiceRef.current = voice;

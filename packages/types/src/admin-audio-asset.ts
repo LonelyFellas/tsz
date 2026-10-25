@@ -1,8 +1,4 @@
-import type {
-  AudioAssetGenderV3,
-  AudioAssetLocaleV3,
-  AudioAssetV3
-} from "./admin-word-v3";
+import type { AudioAssetV3 } from "./admin-word-v3";
 
 /**
  * 音频资产上传（OSS 预签名直传三步）的 wire。
@@ -108,8 +104,8 @@ export interface CreateAudioUploadResponse {
 
 export interface ConfirmAudioAssetInput {
   key: string;
-  locale: AudioAssetLocaleV3;
-  gender: AudioAssetGenderV3;
+  locale: "en-GB" | "en-US";
+  gender: "female" | "male";
   original_name: string;
 }
 

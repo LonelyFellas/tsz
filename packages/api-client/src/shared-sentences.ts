@@ -50,7 +50,9 @@ function decodeList(value: unknown): SharedSentenceList {
 }
 const TEXT_VOICE_HEADERS = {
   ...SENTENCE_FORMATTING_HEADERS,
-  "X-TSZ-Voice-Versions": "v2"
+  "X-TSZ-Voice-Versions": "v2",
+  "X-TSZ-Voice-Locales": "v1",
+  "X-TSZ-Voice-Models": "v1"
 } as const;
 
 export function createSharedSentenceEndpoints(http: HttpClient) {

@@ -1,3 +1,4 @@
+import { speechSelectionGroup } from "@tsz/shared";
 import type {
   AudioAssetLocale,
   VoiceOption,
@@ -63,7 +64,8 @@ export function selectVoiceVersion(
   const next = settings.map((item) =>
     voiceSettingKey(item) === key
       ? { ...selected, enabled: true }
-      : voiceLocale(item, voices) === locale
+      : speechSelectionGroup(voiceLocale(item, voices)) ===
+          speechSelectionGroup(locale)
         ? { ...item, enabled: false }
         : item
   );

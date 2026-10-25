@@ -7,7 +7,7 @@ import { useUserStore } from "@/stores/user";
 import { api } from "@/lib/request";
 import { phoneticDelimiters, selectTexts } from "@/features/wordlist/reading";
 import { dictionaryDefinition, dictionarySpellings, POS_ABBR } from "./reading";
-import { AudioButton, preferredAudio, Texts } from "./Content";
+import { TargetAudio, Texts } from "./Content";
 
 export function DictionaryDetail({
   id,
@@ -92,24 +92,19 @@ export function DictionaryDetail({
                               : "通用"}{" "}
                           · {v.spelling}
                         </span>
-                        {preferredAudio(item.audio, v.id, variant) && (
-                          <AudioButton
-                            entryId={id}
-                            audio={preferredAudio(item.audio, v.id, variant)!}
-                            label={`播放 ${v.spelling} 拼写`}
-                          />
-                        )}
+                        <TargetAudio
+                          entryId={id}
+                          audio={item.audio}
+                          targetId={v.id}
+                          variant={variant}
+                          label={`播放 ${v.spelling} 拼写`}
+                        />
                         {v.pronunciations.map((p) => {
-                          const audio = preferredAudio(
-                            item.audio,
-                            p.id,
-                            variant
-                          );
                           const [left, right] = phoneticDelimiters(
                             p.dict_phonetic
                           );
                           return (
-                            <span
+                            <div
                               key={p.id}
                               className="mr-3 inline-flex items-center gap-1"
                             >
@@ -126,14 +121,14 @@ export function DictionaryDetail({
                                   {right}
                                 </span>
                               )}
-                              {audio && (
-                                <AudioButton
-                                  entryId={id}
-                                  audio={audio}
-                                  label={`播放 ${v.spelling} ${audio.locale === "en-US" ? "美式" : "英式"}发音`}
-                                />
-                              )}
-                            </span>
+                              <TargetAudio
+                                entryId={id}
+                                audio={item.audio}
+                                targetId={p.id}
+                                variant={variant}
+                                label={`播放 ${v.spelling} 发音`}
+                              />
+                            </div>
                           );
                         })}
                       </div>
@@ -148,9 +143,6 @@ export function DictionaryDetail({
                     const grammar = pos.grammar_structures.find(
                       (g) => g.id === definition?.grammar_structure_id
                     );
-                    const audio =
-                      grammar &&
-                      preferredAudio(item.audio, grammar.id, variant);
                     const examples = item.examples.filter(
                       (e) => e.sense_id === sense.id
                     );
@@ -173,21 +165,13 @@ export function DictionaryDetail({
                               variant={variant}
                               textRole="definition"
                             />
-                            {preferredAudio(
-                              item.audio,
-                              definition.id,
-                              variant
-                            ) && (
-                              <AudioButton
-                                entryId={id}
-                                audio={preferredAudio(
-                                  item.audio,
-                                  definition.id,
-                                  variant
-                                )!}
-                                label="播放英文释义"
-                              />
-                            )}
+                            <TargetAudio
+                              entryId={id}
+                              audio={item.audio}
+                              targetId={definition.id}
+                              variant={variant}
+                              label="播放英文释义"
+                            />
                           </>
                         ) : (
                           <p className="text-foreground-muted">暂无释义</p>
@@ -196,13 +180,13 @@ export function DictionaryDetail({
                           <div className="mt-4 rounded-2xl bg-muted p-4">
                             <h4 className="mb-1 font-medium">语法结构</h4>
                             <Texts texts={grammar.variants} variant={variant} />
-                            {audio && (
-                              <AudioButton
-                                entryId={id}
-                                audio={audio}
-                                label="播放语法结构"
-                              />
-                            )}
+                            <TargetAudio
+                              entryId={id}
+                              audio={item.audio}
+                              targetId={grammar.id}
+                              variant={variant}
+                              label="播放语法结构"
+                            />
                           </div>
                         )}
                         {examples.length > 0 && (
@@ -215,17 +199,13 @@ export function DictionaryDetail({
                                   variant={variant}
                                   textRole="example"
                                 />
-                                {preferredAudio(item.audio, e.id, variant) && (
-                                  <AudioButton
-                                    entryId={id}
-                                    audio={preferredAudio(
-                                      item.audio,
-                                      e.id,
-                                      variant
-                                    )!}
-                                    label="播放例句"
-                                  />
-                                )}
+                                <TargetAudio
+                                  entryId={id}
+                                  audio={item.audio}
+                                  targetId={e.id}
+                                  variant={variant}
+                                  label="播放例句"
+                                />
                                 <div className="mt-1 text-foreground-muted">
                                   <RichTextReadOnly
                                     value={e.translation}

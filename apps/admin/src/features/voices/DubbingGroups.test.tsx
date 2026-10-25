@@ -142,6 +142,33 @@ afterEach(() => {
 });
 
 describe("分组草稿与并发保存", () => {
+  it("澳大利亚和加拿大推荐沿用英美分区并保留原生音色试听", async () => {
+    const au = { ...uk, locale: "en-AU" };
+    const ca = { ...us, locale: "en-CA" };
+    const { onAudition } = mount(groupData(), [au, ca]);
+    fireEvent.click(
+      within(
+        screen.getByRole("region", { name: "发音推荐 英式推荐" })
+      ).getByRole("button", { name: "试听" })
+    );
+    expect(onAudition).toHaveBeenLastCalledWith(
+      au,
+      groupData().groups[0]!.uk[0]
+    );
+    fireEvent.click(screen.getByRole("radio", { name: "美式" }));
+    fireEvent.click(
+      within(
+        screen.getByRole("region", { name: "发音推荐 美式推荐" })
+      ).getByRole("button", { name: "试听" })
+    );
+    expect(onAudition).toHaveBeenLastCalledWith(
+      ca,
+      groupData().groups[0]!.us[0]
+    );
+    fireEvent.click(screen.getByRole("button", { name: /编辑分组/ }));
+    fireEvent.click(screen.getByRole("button", { name: /保存分组配音/ }));
+    await waitFor(() => expect(api.speech.saveGroups).toHaveBeenCalled());
+  });
   it("切换卡片口音只改变展示，试听使用对应推荐且不写入草稿", () => {
     const { onAudition, onDirtyChange } = mount();
     expect(

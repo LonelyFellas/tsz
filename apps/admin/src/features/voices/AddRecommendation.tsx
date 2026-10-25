@@ -1,3 +1,4 @@
+import { speechAccentGroup } from "@tsz/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { HttpError } from "@tsz/api-client";
 import type {
@@ -37,7 +38,9 @@ export function AddRecommendation({
     return () => onBusyChange(false);
   }, [pending, onBusyChange]);
   const locale =
-    voice.locale === "en-GB" ? "uk" : voice.locale === "en-US" ? "us" : null;
+    speechAccentGroup(voice.locale) === "other"
+      ? null
+      : (speechAccentGroup(voice.locale) as "uk" | "us" | undefined);
 
   async function add() {
     if (pending || done || !groups.data || !locale) return;

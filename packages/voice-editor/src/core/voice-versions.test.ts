@@ -24,6 +24,50 @@ const normal: VoiceSetting = {
 const us: VoiceSetting = { voice_id: "guy", enabled: true, rate_percent: 10 };
 
 describe("文本配音版本", () => {
+  it("澳大利亚替换英式选用，其他地区各自保留补充版本", () => {
+    const au: VoiceSetting = {
+      ...slow,
+      version_id: "au",
+      voice_id: "natasha",
+      locale: "en-AU"
+    };
+    const india: VoiceSetting = {
+      ...normal,
+      version_id: "india",
+      voice_id: "neerja",
+      locale: "en-IN"
+    };
+    const ireland: VoiceSetting = {
+      ...normal,
+      version_id: "ireland",
+      voice_id: "emily",
+      locale: "en-IE"
+    };
+    const first = selectVoiceVersion(
+      [normal, us, india, ireland],
+      au,
+      "en-AU",
+      voices
+    );
+    expect(
+      first.find((item) => item.version_id === normal.version_id)?.enabled
+    ).toBe(false);
+    expect(first.find((item) => item.version_id === "au")).toMatchObject({
+      enabled: true,
+      locale: "en-AU"
+    });
+    expect(first.find((item) => item.version_id === "india")).toBe(india);
+    expect(first.find((item) => item.version_id === "ireland")).toBe(ireland);
+    const replacement = { ...india, version_id: "india-2", enabled: false };
+    const next = selectVoiceVersion(first, replacement, "en-IN", voices);
+    expect(next.find((item) => item.version_id === "india")?.enabled).toBe(
+      false
+    );
+    expect(next.find((item) => item.version_id === "ireland")?.enabled).toBe(
+      true
+    );
+    expect(next.find((item) => item.version_id === "au")?.enabled).toBe(true);
+  });
   it("同音色多个版本默认读取正式版本，调参时定位指定版本", () => {
     expect(voiceSettingFor([slow, normal], "sonia")).toBe(normal);
     expect(voiceSettingFor([slow, normal], "sonia", "slow")).toBe(slow);

@@ -1585,6 +1585,106 @@ describe("VoiceEditor 发音区", () => {
     expect(onVoiceProfileChange).not.toHaveBeenCalled();
   });
 
+  it("新英语地区按分类展示，其他音色是独立分区且正式生成保留原生地区", async () => {
+    const catalog = [
+      ...VOICES,
+      { ...VOICES[0]!, id: "natasha", label: "Natasha", locale: "en-AU" },
+      { ...VOICES[0]!, id: "neerja", label: "Neerja", locale: "en-IN" },
+      { ...VOICES[0]!, id: "clara", label: "Clara", locale: "en-CA" }
+    ];
+    const generateAudio = vi.fn().mockResolvedValue(asset({ locale: "en-IN" }));
+    const onVoiceProfileChange = vi.fn();
+    render(
+      <VoiceEditor
+        {...props({
+          locale: "en-GB",
+          previewAdapter: {
+            ...adapter(),
+            listVoices: vi.fn().mockResolvedValue(catalog),
+            generateAudio
+          },
+          voiceProfile: {
+            voices: [
+              {
+                version_id: "india",
+                version_name: "印度补充",
+                voice_id: "neerja",
+                locale: "en-IN",
+                enabled: true,
+                rate_percent: 0
+              }
+            ]
+          },
+          onVoiceProfileChange
+        })}
+      />
+    );
+    openVoices();
+    const indian = await screen.findByLabelText("配音版本 印度补充");
+    expect(screen.getByText("Other · 其他音色")).toBeInTheDocument();
+    expect(screen.getByText("Natasha")).toBeInTheDocument();
+    expect(screen.queryByLabelText("启用 Clara")).toBeNull();
+    expect(screen.getByText("· 澳大利亚")).toBeInTheDocument();
+    fireEvent.click(
+      within(indian).getByRole("button", { name: "生成正式音频" })
+    );
+    await waitFor(() =>
+      expect(generateAudio).toHaveBeenCalledWith(
+        expect.objectContaining({
+          setting: expect.objectContaining({
+            locale: "en-IN",
+            voice_id: "neerja"
+          })
+        }),
+        expect.anything()
+      )
+    );
+  });
+
+  it("Flash不静默夹取已保存的非默认参数，原版本保留并提示调整", async () => {
+    const flash = {
+      ...VOICES[0]!,
+      id: "flash",
+      label: "Flash",
+      locale: "en-US",
+      supportsRate: false,
+      supportsPitch: false,
+      supportsVolume: false,
+      supportsPause: false,
+      supportsPhoneme: false,
+      rateRange: { min: 0, max: 0 },
+      pitchRange: { min: 0, max: 0 }
+    };
+    const synthesize = vi.fn().mockResolvedValue(previewResult());
+    const onVoiceProfileChange = vi.fn();
+    render(
+      <VoiceEditor
+        {...props({
+          previewAdapter: {
+            listVoices: vi.fn().mockResolvedValue([flash]),
+            synthesize
+          },
+          voiceProfile: {
+            voices: [
+              {
+                voice_id: "flash",
+                enabled: true,
+                rate_percent: 10,
+                volume_percent: 65
+              }
+            ]
+          },
+          onVoiceProfileChange
+        })}
+      />
+    );
+    openVoices();
+    fireEvent.click(await screen.findByLabelText("试听 Flash"));
+    expect(synthesize).not.toHaveBeenCalled();
+    expect(screen.getByText(/该模型不支持当前参数/)).toBeVisible();
+    expect(onVoiceProfileChange).not.toHaveBeenCalled();
+  });
+
   it("音色按语种分组，再按男女声分列", async () => {
     render(<VoiceEditor {...props({ previewAdapter: adapter() })} />);
     openVoices();
