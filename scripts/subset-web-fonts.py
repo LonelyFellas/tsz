@@ -21,13 +21,14 @@ for source, family, target_name, style, characters, weight in (
     ("Andika-Regular", "TSZ Common Words", "TSZCommonWords-Regular", "Regular", LATIN + ENGLISH_IPA + LATIN_MARKS, None),
     ("Andika-Bold", "TSZ Common Words", "TSZCommonWords-Bold", "Bold", LATIN, None),
     ("Geist-Regular", "TSZ Common Text", "TSZCommonText-Regular", "Regular", LATIN + list(range(0x2000, 0x2070)), 400),
-    ("Geist-Regular", "TSZ Common Text", "TSZCommonText-Bold", "Bold", LATIN + list(range(0x2000, 0x2070)), 800),
+    ("Geist-Regular", "TSZ Common Text", "TSZCommonText-Bold", "Bold", LATIN + list(range(0x2000, 0x2070)), 700),
+    ("Geist-Regular", "TSZ Common Text", "TSZCommonText-ExtraBold", "ExtraBold", LATIN + list(range(0x2000, 0x2070)), 800),
 ):
     font = TTFont(FONT_DIR / f"{source}.woff2", recalcTimestamp=False)
     if weight is not None:
-        # fonts.css already fixes these two weights. No unused variable axis
-        # needs to be downloaded for either of the existing text styles.
-        font = instantiateVariableFont(font, {"wght": weight})
+        # fonts.css maps text styles to 400, 700 and 800. Static subsets
+        # avoid downloading an unused variable axis for each weight.
+        font = instantiateVariableFont(font, {"wght": weight}, updateFontNames=True)
     options = subset.Options()
     # Preserve standard shaping plus every feature enabled by web fonts.css.
     # Unused stylistic alternatives otherwise keep thousands of extra glyphs.

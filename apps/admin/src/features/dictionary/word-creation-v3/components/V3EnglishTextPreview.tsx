@@ -10,11 +10,13 @@ import { PronunciationPreviewControls } from "../../word-creation/PronunciationP
 export function V3EnglishTextPreview({
   value,
   hideCommonDialect = false,
-  showPlayback = false
+  showPlayback = false,
+  textRole = "example"
 }: {
   value: EnglishTextV3;
   hideCommonDialect?: boolean;
   showPlayback?: boolean;
+  textRole?: "definition" | "example";
 }) {
   const rows =
     value.mode === "unified"
@@ -52,6 +54,7 @@ export function V3EnglishTextPreview({
               )}
               <RichTextReadOnly
                 className="tsz-entry-en"
+                textRole={textRole}
                 value={variant.value}
               />
             </div>

@@ -161,7 +161,11 @@ export function DictionaryDetail({
                             <span className="mb-2 inline-block rounded-full bg-primary-muted px-2 text-xs text-primary">
                               {definition.level}
                             </span>
-                            <Texts texts={definition.texts} variant={variant} />
+                            <Texts
+                              texts={definition.texts}
+                              variant={variant}
+                              textRole="definition"
+                            />
                           </>
                         ) : (
                           <p className="text-foreground-muted">暂无释义</p>
@@ -184,9 +188,16 @@ export function DictionaryDetail({
                             <h4 className="font-medium">例句</h4>
                             {examples.map((e) => (
                               <div key={e.id}>
-                                <Texts texts={e.texts} variant={variant} />
+                                <Texts
+                                  texts={e.texts}
+                                  variant={variant}
+                                  textRole="example"
+                                />
                                 <div className="mt-1 text-foreground-muted">
-                                  <RichTextReadOnly value={e.translation} />
+                                  <RichTextReadOnly
+                                    value={e.translation}
+                                    textRole="example"
+                                  />
                                 </div>
                               </div>
                             ))}

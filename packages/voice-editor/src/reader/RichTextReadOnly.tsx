@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef } from "react";
 import type { ReactNode } from "react";
 import type { RichText, RichTextAnnotation } from "@tsz/types";
+import type { TextRole } from "../types";
 import { RichTextValidationError, liaisonAnchorSpans } from "../core";
 import {
   LiaisonArcLayer,
@@ -14,6 +15,7 @@ import { pauseMarkerLabel, pauseMarkerWidth } from "../marks/pausePresentation";
 
 export interface RichTextReadOnlyProps {
   value: RichText;
+  textRole?: TextRole;
   className?: string;
   emptyText?: string;
 }
@@ -127,6 +129,7 @@ function collectLiaisons(
 
 export function RichTextReadOnly({
   value,
+  textRole = "body",
   className,
   emptyText = "未填写"
 }: RichTextReadOnlyProps) {
@@ -180,6 +183,7 @@ export function RichTextReadOnly({
       ref={containerRef}
       className={`tsz-ve-readonly${liaisons.length > 0 ? " has-liaison" : ""}${className ? ` ${className}` : ""}`}
       data-testid="voice-rich-text-readonly"
+      data-text-role={textRole}
     >
       <LiaisonArcLayer arcs={arcs} strokeWidth={strokeWidth} />
       {parsed.segments.map((segment, index) =>

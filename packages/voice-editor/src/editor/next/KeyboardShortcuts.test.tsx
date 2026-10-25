@@ -42,6 +42,7 @@ it.each(["ctrlKey", "metaKey"])(
     render(
       <VoiceEditor
         mode="association"
+        textRole="example"
         value={value}
         textLinks={[link]}
         onChange={changed}
@@ -62,6 +63,10 @@ it.each(["ctrlKey", "metaKey"])(
     expect(
       document.querySelectorAll(".is-bold.is-italic.is-underline")
     ).toHaveLength(3);
+    expect(document.querySelector(".tsz-ve-editor")).toHaveAttribute(
+      "data-text-role",
+      "example"
+    );
     select(6, 7);
     shortcut(input, "u", { [modifier]: true });
     expect(changed.mock.lastCall?.[0].annotations).toContainEqual({

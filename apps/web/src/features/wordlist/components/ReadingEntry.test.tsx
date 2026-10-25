@@ -85,6 +85,12 @@ it("full mode preserves multiple pronunciations and dedicated sense mapping with
   );
   expect(screen.getByText("释义-a1")).toBeVisible();
   expect(screen.getByText("语法-a1")).toBeVisible();
+  expect(
+    screen.getByText("释义-a1").closest("[data-text-role]")
+  ).toHaveAttribute("data-text-role", "definition");
+  expect(
+    screen.getByText("语法-a1").closest("[data-text-role]")
+  ).toHaveAttribute("data-text-role", "body");
   expect(screen.queryByText("语法-c2")).not.toBeInTheDocument();
   expect(screen.getByText("暂无适合当前等级的释义")).toBeVisible();
   const firstSense = screen.getByText("及物").parentElement!;
