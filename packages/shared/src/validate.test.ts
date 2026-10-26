@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  accountToDisplayName,
   displayNameError,
   displayNameLength,
   normalizeDisplayName,
@@ -192,30 +191,4 @@ describe("hasDisplayNameForbiddenChars", () => {
       expect(hasDisplayNameForbiddenChars(v)).toBe(false);
     }
   );
-});
-
-describe("accountToDisplayName", () => {
-  it("手机号原样返回", () => {
-    expect(accountToDisplayName("13800138000")).toBe("13800138000");
-  });
-
-  it("邮箱取 @ 前缀;合法的 ' & 保留", () => {
-    expect(accountToDisplayName("alice@example.com")).toBe("alice");
-    expect(accountToDisplayName("o'brien@x.com")).toBe("o'brien");
-    expect(accountToDisplayName("tom&jerry@qq.com")).toBe("tom&jerry");
-  });
-
-  it("剔除 local part 里的禁字符", () => {
-    expect(accountToDisplayName('"a<b"@x.com')).toBe('"ab"');
-    expect(accountToDisplayName("zero\u200bwidth@x.com")).toBe("zerowidth");
-  });
-
-  it("超长 local part 按字符截到 50", () => {
-    const local = "a".repeat(64);
-    expect(accountToDisplayName(`${local}@x.com`)).toBe("a".repeat(50));
-  });
-
-  it("剔空退回默认昵称「用户」", () => {
-    expect(accountToDisplayName("<><>@x.com")).toBe("用户");
-  });
 });

@@ -109,7 +109,3 @@ export function expandFormContents(
 export type ExpandedAdminWordV3 = Omit<AdminWordV3, "forms"> & {
   forms: DraftFormsStepContentV3;
 };
-
-export function expandWordFormContents(word: AdminWordV3): ExpandedAdminWordV3 {
-  return { ...word, forms: expandFormContents(word.forms) };
-}

@@ -1022,30 +1022,6 @@ export function editableEnglishText(
   });
 }
 
-export function replaceEnglishText(
-  value: EnglishTextV3,
-  dialect: Dialect,
-  text: string
-): EnglishTextV3 {
-  const next = cloneEnglishText(value);
-  if (next.mode === "unified") {
-    if (dialect !== "common") {
-      throw new Error(`Dialect ${dialect} is not editable in unified mode`);
-    }
-    next.common.value = replaceRichText(next.common.value, text);
-    return next;
-  }
-  if (dialect === "common") {
-    throw new Error("Common dialect is not editable in distinguish mode");
-  }
-  const slot = next[dialect];
-  if (slot.state !== "ready") {
-    throw new Error(`Dialect ${dialect} is not ready`);
-  }
-  slot.variant.value = replaceRichText(slot.variant.value, text);
-  return next;
-}
-
 /**
  * 旧后端（capabilities.sense_component_usages 缺失）对 sense 上的未知字段会 400：
  * 发送前把释义级成分用词整段剥掉，其余内容原样。
