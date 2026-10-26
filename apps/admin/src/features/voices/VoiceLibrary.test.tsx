@@ -78,6 +78,11 @@ function mount(openLibrary = true) {
   }
   return view;
 }
+function editDescription() {
+  fireEvent.click(screen.getByRole("tab", { name: "音色资料" }));
+  const edit = screen.queryByText("编辑");
+  if (edit) fireEvent.click(edit);
+}
 function result(name: string): AdminSpeechPreviewResponse {
   return {
     cache_status: "generated",
@@ -140,7 +145,7 @@ describe("配音中心", () => {
       ]
     });
     mount();
-    fireEvent.click(await screen.findByLabelText("调整 Sonia 参数"));
+    fireEvent.click(await screen.findByLabelText("查看 Sonia 详情"));
     expect(screen.getByLabelText("合成音量")).toBeDisabled();
     expect(screen.getByLabelText("合成语速")).toBeDisabled();
     expect(screen.getByLabelText("音调")).toBeDisabled();
@@ -160,7 +165,7 @@ describe("配音中心", () => {
 
   it("清空音量后输入框与控件组关联表单错误", async () => {
     mount();
-    fireEvent.click(await screen.findByLabelText("调整 Sonia 参数"));
+    fireEvent.click(await screen.findByLabelText("查看 Sonia 详情"));
     const input = screen.getByRole("spinbutton", { name: "合成音量" });
     expect(input).toHaveAttribute("aria-required", "true");
     fireEvent.change(input, { target: { value: "" } });
@@ -184,7 +189,7 @@ describe("配音中心", () => {
       })
     );
     mount();
-    const open = await screen.findByLabelText("调整 Sonia 参数");
+    const open = await screen.findByLabelText("查看 Sonia 详情");
     fireEvent.click(open);
     const volume = screen.getByRole("spinbutton", { name: "合成音量" });
     expect(volume).toHaveValue("100");
@@ -255,7 +260,7 @@ describe("配音中心", () => {
     };
     vi.mocked(api.speech.library).mockResolvedValue({ items: [saved] });
     const first = mount();
-    fireEvent.click(await screen.findByLabelText("调整 Sonia 参数"));
+    fireEvent.click(await screen.findByLabelText("查看 Sonia 详情"));
     expect(screen.getByLabelText("合成语速")).toHaveValue("1.00");
     fireEvent.change(screen.getByLabelText("合成语速"), {
       target: { value: "0.80" }
@@ -264,7 +269,7 @@ describe("配音中心", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     first.unmount();
     mount();
-    fireEvent.click(await screen.findByLabelText("调整 Sonia 参数"));
+    fireEvent.click(await screen.findByLabelText("查看 Sonia 详情"));
     expect(screen.getByLabelText("合成语速")).toHaveValue("1.00");
     expect(screen.getByLabelText("我的听感")).toHaveValue("历史听感");
     expect(api.speech.saveSettings).not.toHaveBeenCalled();
@@ -294,7 +299,7 @@ describe("配音中心", () => {
           : api.speech.saveDescription;
       vi.mocked(method).mockImplementationOnce(() => put.promise);
       mount();
-      fireEvent.click(await screen.findByLabelText("调整 Sonia 参数"));
+      fireEvent.click(await screen.findByLabelText("查看 Sonia 详情"));
       const client = clients.at(-1)!;
       const queryKey = ["admin-speech-library", "voice-editor-admin"];
       const old = client.getQueryData<AdminVoiceLibraryResponse>(queryKey)!;
@@ -306,13 +311,13 @@ describe("配音中心", () => {
           target: { value: saved.notes }
         });
       } else {
-        fireEvent.click(screen.getByRole("button", { name: /共享介绍/ }));
+        editDescription();
         fireEvent.change(screen.getByLabelText("中文介绍"), {
           target: { value: saved.description_zh }
         });
       }
       fireEvent.click(
-        screen.getByText(kind === "personal" ? "保存听感" : "保存共享介绍")
+        screen.getByText(kind === "personal" ? "保存听感" : "保存介绍")
       );
       await waitFor(() => expect(method).toHaveBeenCalledTimes(1));
       vi.mocked(api.speech.library).mockImplementationOnce(() => get.promise);
@@ -331,12 +336,12 @@ describe("配音中心", () => {
         within(screen.getByRole("dialog")).getByLabelText("Close")
       );
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-      fireEvent.click(screen.getByLabelText("调整 Sonia 参数"));
+      fireEvent.click(screen.getByLabelText("查看 Sonia 详情"));
       if (kind === "personal") {
         expect(screen.getByLabelText("合成语速")).toHaveValue("0.75");
         expect(screen.getByLabelText("我的听感")).toHaveValue(saved.notes);
       } else {
-        fireEvent.click(screen.getByRole("button", { name: /共享介绍/ }));
+        editDescription();
         expect(screen.getByLabelText("中文介绍")).toHaveValue(
           saved.description_zh
         );
@@ -367,7 +372,7 @@ describe("配音中心", () => {
           : api.speech.saveDescription;
       vi.mocked(method).mockResolvedValue(saved);
       mount();
-      fireEvent.click(await screen.findByLabelText("调整 Sonia 参数"));
+      fireEvent.click(await screen.findByLabelText("查看 Sonia 详情"));
       if (kind === "personal") {
         fireEvent.change(screen.getByLabelText("合成语速"), {
           target: { value: "0.75" }
@@ -376,12 +381,12 @@ describe("配音中心", () => {
           target: { value: saved.notes }
         });
       } else {
-        fireEvent.click(screen.getByRole("button", { name: /共享介绍/ }));
+        editDescription();
         fireEvent.change(screen.getByLabelText("中文介绍"), {
           target: { value: saved.description_zh }
         });
       }
-      const saveLabel = kind === "personal" ? "保存听感" : "保存共享介绍";
+      const saveLabel = kind === "personal" ? "保存听感" : "保存介绍";
       fireEvent.click(screen.getByText(saveLabel));
       await screen.findByText(
         kind === "personal"
@@ -392,12 +397,12 @@ describe("配音中心", () => {
         within(screen.getByRole("dialog")).getByLabelText("Close")
       );
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-      fireEvent.click(screen.getByLabelText("调整 Sonia 参数"));
+      fireEvent.click(screen.getByLabelText("查看 Sonia 详情"));
       if (kind === "personal") {
         expect(screen.getByLabelText("合成语速")).toHaveValue("0.75");
         expect(screen.getByLabelText("我的听感")).toHaveValue(saved.notes);
       } else {
-        fireEvent.click(screen.getByRole("button", { name: /共享介绍/ }));
+        editDescription();
         expect(screen.getByLabelText("中文介绍")).toHaveValue(
           saved.description_zh
         );
@@ -460,7 +465,7 @@ describe("配音中心", () => {
     const pending = deferred<AdminSpeechPreviewResponse>();
     vi.mocked(api.speech.preview).mockImplementationOnce(() => pending.promise);
     mount();
-    fireEvent.click(await screen.findByLabelText("调整 Sonia 参数"));
+    fireEvent.click(await screen.findByLabelText("查看 Sonia 详情"));
     fireEvent.click(screen.getByLabelText("试听当前参数"));
     await waitFor(() => expect(api.speech.preview).toHaveBeenCalledTimes(1));
     const signal = vi.mocked(api.speech.preview).mock.calls[0]![1]!;
@@ -475,12 +480,13 @@ describe("配音中心", () => {
     fireEvent.change(screen.getByLabelText("我的听感"), {
       target: { value: "声音清晰" }
     });
-    fireEvent.click(screen.getByRole("button", { name: /共享介绍/ }));
+    editDescription();
     fireEvent.change(screen.getByLabelText("中文介绍"), {
       target: { value: "自然清晰" }
     });
     expect(screen.getByLabelText("Sonia 试听播放器")).toBe(audio);
     expect(HTMLMediaElement.prototype.pause).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("tab", { name: "调节声音" }));
     fireEvent.change(screen.getByLabelText("合成语速"), {
       target: { value: "0.75" }
     });
@@ -502,7 +508,7 @@ describe("配音中心", () => {
       () => pending.promise
     );
     mount();
-    fireEvent.click(await screen.findByLabelText("调整 Sonia 参数"));
+    fireEvent.click(await screen.findByLabelText("查看 Sonia 详情"));
     fireEvent.change(screen.getByLabelText("合成语速"), {
       target: { value: "0.75" }
     });
@@ -521,7 +527,7 @@ describe("配音中心", () => {
     vi.mocked(api.speech.library).mockResolvedValue({ items: [latest] });
     fireEvent.click(screen.getByText("刷新音色"));
     await waitFor(() => expect(api.speech.library).toHaveBeenCalledTimes(2));
-    fireEvent.click(screen.getByLabelText("调整 Sonia 参数"));
+    fireEvent.click(screen.getByLabelText("查看 Sonia 详情"));
     expect(screen.getByLabelText("合成语速")).toHaveValue("0.75");
   }, 15000);
 
@@ -530,7 +536,7 @@ describe("配音中心", () => {
       new HttpError(409, "conflict")
     );
     mount();
-    fireEvent.click(await screen.findByLabelText("调整 Sonia 参数"));
+    fireEvent.click(await screen.findByLabelText("查看 Sonia 详情"));
     fireEvent.change(screen.getByLabelText("我的听感"), {
       target: { value: "不能丢失的笔记" }
     });
@@ -572,7 +578,7 @@ describe("配音中心", () => {
         new HttpError(409, "conflict", [], "revision_conflict")
       );
     mount();
-    const open = await screen.findByLabelText("调整 Sonia 参数");
+    const open = await screen.findByLabelText("查看 Sonia 详情");
     await waitFor(() => expect(open).toBeEnabled());
     fireEvent.click(open);
     const dialog = await screen.findByRole("dialog");
@@ -614,7 +620,7 @@ describe("配音中心", () => {
       expect.objectContaining({ base_revision: 1 })
     );
     expect(
-      within(reopened).queryByRole("button", { name: "保存共享介绍" })
+      within(reopened).queryByRole("button", { name: "保存介绍" })
     ).toBeNull();
   }, 15_000);
 
@@ -658,36 +664,62 @@ describe("配音中心", () => {
     expect(screen.queryByLabelText("试听 Voice 12")).toBeNull();
   });
 
-  it("查看并关闭音色资料保留同一播放器，不重复生成试听", async () => {
+  it("单一详情入口默认调参，切换资料保留同一播放器与参数", async () => {
     mount();
-    fireEvent.click(await screen.findByLabelText("试听 Sonia"));
+    const open = await screen.findByLabelText("查看 Sonia 详情");
+    await waitFor(() => expect(open).toBeEnabled());
+    fireEvent.click(open);
+    const drawer = await screen.findByRole("dialog");
+    expect(within(drawer).getByText("Sonia 音色详情")).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "查看 Sonia 资料" })
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "调整 Sonia 参数" })
+    ).toBeNull();
+    expect(
+      within(drawer).getByRole("tab", { name: "调节声音" })
+    ).toHaveAttribute("aria-selected", "true");
+    expect(
+      within(drawer).getByRole("spinbutton", { name: "合成语速" })
+    ).toBeVisible();
+    fireEvent.change(screen.getByLabelText("合成语速"), {
+      target: { value: "0.75" }
+    });
+    fireEvent.click(screen.getByLabelText("试听当前参数"));
     const audio = await screen.findByLabelText("Sonia 试听播放器");
     vi.mocked(HTMLMediaElement.prototype.pause).mockClear();
-    fireEvent.click(screen.getByRole("button", { name: "查看 Sonia 资料" }));
-    const drawer = await screen.findByRole("dialog");
-    expect(within(drawer).getByText("Sonia 音色资料")).toBeVisible();
+    fireEvent.click(within(drawer).getByRole("tab", { name: "音色资料" }));
     expect(
       within(drawer).getByRole("region", { name: "音色资料" })
     ).toBeVisible();
+    expect(screen.getByLabelText("合成语速")).not.toBeVisible();
+    expect(
+      within(drawer).queryByRole("button", { name: "保存听感" })
+    ).toBeNull();
+    expect(within(drawer).queryByRole("button", { name: "编辑" })).toBeNull();
     expect(screen.getByLabelText("Sonia 试听播放器")).toBe(audio);
-    fireEvent.click(within(drawer).getByLabelText("Close"));
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(screen.getByLabelText("Sonia 试听播放器")).toBe(audio);
+    fireEvent.click(within(drawer).getByRole("tab", { name: "调节声音" }));
+    expect(screen.getByLabelText("合成语速")).toHaveValue("0.75");
+    expect(screen.getByLabelText("Sonia 试听播放器")).toBeVisible();
     expect(HTMLMediaElement.prototype.pause).not.toHaveBeenCalled();
     expect(api.speech.preview).toHaveBeenCalledTimes(1);
   });
 
-  it("查看资料不中止正在生成的试听", async () => {
+  it("详情内切换资料不中止正在生成的试听，关闭时取消", async () => {
     const pending = deferred<AdminSpeechPreviewResponse>();
     vi.mocked(api.speech.preview).mockImplementationOnce(() => pending.promise);
     mount();
-    fireEvent.click(await screen.findByLabelText("试听 Sonia"));
+    fireEvent.click(await screen.findByLabelText("查看 Sonia 详情"));
+    fireEvent.click(screen.getByLabelText("试听当前参数"));
+    await waitFor(() => expect(api.speech.preview).toHaveBeenCalledTimes(1));
     const signal = vi.mocked(api.speech.preview).mock.calls[0]![1]!;
-    fireEvent.click(screen.getByRole("button", { name: "查看 Sonia 资料" }));
+    fireEvent.click(screen.getByRole("tab", { name: "音色资料" }));
     expect(signal.aborted).toBe(false);
+    fireEvent.click(within(screen.getByRole("dialog")).getByLabelText("Close"));
+    expect(signal.aborted).toBe(true);
     await act(async () => pending.resolve(result("sonia")));
-    expect(await screen.findByLabelText("Sonia 试听播放器")).toBeVisible();
-    expect(api.speech.preview).toHaveBeenCalledTimes(1);
+    expect(screen.queryByLabelText("Sonia 试听播放器")).toBeNull();
   });
 
   it("取消生成后，迟到的音频不会重新出现", async () => {
@@ -706,12 +738,77 @@ describe("配音中心", () => {
     setPermissions(["speech.global_dubbing"]);
     mount();
     expect(await screen.findByLabelText("试听 Sonia")).toBeDisabled();
-    fireEvent.click(screen.getByLabelText("调整 Sonia 参数"));
-    fireEvent.click(screen.getByRole("button", { name: /共享介绍/ }));
-    expect(await screen.findByText("保存共享介绍")).toBeVisible();
+    fireEvent.click(screen.getByLabelText("查看 Sonia 详情"));
+    editDescription();
+    expect(screen.getByLabelText("中文介绍")).not.toHaveAttribute("readonly");
+    expect(screen.getByText("保存介绍")).toBeEnabled();
   });
 
-  it("介绍折叠后保留草稿，保存个人设置不会清除介绍修改", async () => {
+  it("首次编辑采用最新介绍版本，后续刷新不覆盖草稿及其版本", async () => {
+    setPermissions([
+      "words.access",
+      "speech.generate",
+      "speech.global_dubbing"
+    ]);
+    const original = {
+      voice_alias: sonia.alias,
+      description_zh: "旧介绍",
+      description_revision: 1,
+      parameters: null,
+      notes: "",
+      personal_revision: 0
+    };
+    vi.mocked(api.speech.library).mockResolvedValue({ items: [original] });
+    vi.mocked(api.speech.saveDescription).mockRejectedValue(
+      new HttpError(409, "conflict")
+    );
+    mount();
+    fireEvent.click(await screen.findByLabelText("查看 Sonia 详情"));
+    fireEvent.change(screen.getByLabelText("我的听感"), {
+      target: { value: "我的听感草稿" }
+    });
+    fireEvent.click(screen.getByRole("tab", { name: "音色资料" }));
+    const client = clients.at(-1)!;
+    const queryKey = ["admin-speech-library", "voice-editor-admin"];
+    const refresh = async (description: string, revision: number) => {
+      vi.mocked(api.speech.library).mockResolvedValue({
+        items: [
+          {
+            ...original,
+            description_zh: description,
+            description_revision: revision
+          }
+        ]
+      });
+      await act(async () => {
+        await client.refetchQueries({ queryKey, exact: true });
+      });
+    };
+    await refresh("最新介绍", 2);
+    expect(
+      within(screen.getByRole("dialog")).getByText("最新介绍")
+    ).toBeVisible();
+    editDescription();
+    const description = screen.getByLabelText("中文介绍");
+    expect(description).toHaveValue("最新介绍");
+    fireEvent.change(description, { target: { value: "我的介绍草稿" } });
+    await refresh("其他管理员再次更新", 3);
+    fireEvent.click(screen.getByRole("tab", { name: "调节声音" }));
+    expect(screen.getByLabelText("我的听感")).toHaveValue("我的听感草稿");
+    editDescription();
+    expect(description).toHaveValue("我的介绍草稿");
+    fireEvent.click(screen.getByText("保存介绍"));
+    await waitFor(() =>
+      expect(api.speech.saveDescription).toHaveBeenCalledWith(sonia.alias, {
+        description_zh: "我的介绍草稿",
+        base_revision: 2
+      })
+    );
+    await screen.findByText(/设置已在其他页面修改/);
+    expect(description).toHaveValue("我的介绍草稿");
+  });
+
+  it("资料页切换后保留草稿，保存听感不会清除介绍修改", async () => {
     setPermissions([
       "words.access",
       "speech.generate",
@@ -726,16 +823,13 @@ describe("配音中心", () => {
       description_revision: 0
     });
     mount();
-    fireEvent.click(await screen.findByLabelText("调整 Sonia 参数"));
+    fireEvent.click(await screen.findByLabelText("查看 Sonia 详情"));
     const drawer = screen.getByRole("dialog");
-    const description = within(drawer).getByRole("button", {
-      name: /共享介绍/
-    });
-    fireEvent.click(description);
+    editDescription();
     fireEvent.change(screen.getByLabelText("中文介绍"), {
       target: { value: "清晰自然" }
     });
-    fireEvent.click(description);
+    fireEvent.click(within(drawer).getByRole("tab", { name: "调节声音" }));
     fireEvent.change(screen.getByLabelText("合成语速"), {
       target: { value: "1.25" }
     });
@@ -751,7 +845,7 @@ describe("配音中心", () => {
       expect(screen.getByText("关闭会丢弃尚未保存的听感或介绍。")).toBeVisible()
     );
     fireEvent.click(screen.getByText("继续编辑"));
-    fireEvent.click(description);
+    editDescription();
     expect(screen.getByLabelText("中文介绍")).toHaveValue("清晰自然");
   });
 
@@ -762,7 +856,7 @@ describe("配音中心", () => {
       "speech.global_dubbing"
     ]);
     mount();
-    fireEvent.click(await screen.findByLabelText("调整 Sonia 参数"));
+    fireEvent.click(await screen.findByLabelText("查看 Sonia 详情"));
     fireEvent.change(screen.getByLabelText("合成语速"), {
       target: { value: "" }
     });
@@ -840,7 +934,7 @@ describe("配音中心", () => {
 
   it("调参按服务能力校验，原样提交百分比和半音，关闭后不留旧播放器", async () => {
     mount();
-    fireEvent.click(await screen.findByLabelText("调整 Sonia 参数"));
+    fireEvent.click(await screen.findByLabelText("查看 Sonia 详情"));
     const drawer = await screen.findByRole("dialog");
     fireEvent.change(within(drawer).getByLabelText("合成语速"), {
       target: { value: "0.75" }

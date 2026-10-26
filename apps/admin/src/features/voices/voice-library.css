@@ -14,15 +14,6 @@
   padding: 24px;
 }
 
-.voice-library-heading > .ant-typography:first-child {
-  margin: 0 0 8px;
-  font-size: 24px;
-}
-
-.voice-library-heading > .ant-typography:last-child {
-  margin-bottom: 20px;
-}
-
 .voice-catalog {
   container-type: inline-size;
 }
@@ -130,6 +121,18 @@
   font-size: 15px;
 }
 
+.voice-catalog-gender-male {
+  color: var(--ant-color-primary, #2053ff);
+}
+
+.voice-catalog-gender-female {
+  color: var(--ant-magenta-6, #c41d7f);
+}
+
+.voice-catalog-gender-neutral {
+  color: var(--ant-color-text-secondary, #8c8c8c);
+}
+
 .voice-catalog-attributes {
   display: flex;
   flex-wrap: wrap;
@@ -170,13 +173,20 @@
 }
 
 .voice-library-details {
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--voice-border);
   overflow-wrap: anywhere;
 }
 
-.voice-library-details > .ant-typography:first-child {
-  margin-top: 0;
+.voice-library-description-text.ant-typography {
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+}
+
+.voice-library-description-editor {
+  margin-top: 8px;
+}
+
+.voice-library-description-editor .ant-form-item {
+  margin-bottom: 12px;
 }
 
 .voice-library-official-description.ant-typography {
@@ -245,17 +255,44 @@
 
 .voice-library-audition {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
-  gap: 24px;
+  gap: 12px;
   margin-bottom: 20px;
-  padding: 16px;
+  padding: 10px 12px;
   border-radius: var(--voice-radius);
   background: var(--voice-fill);
 }
 
 .voice-library-audition-text .ant-form-item {
-  margin-bottom: 20px;
+  flex: 1;
+  margin: 0;
+}
+
+.voice-library-audition-text .ant-form-item-row {
+  flex-wrap: nowrap;
+}
+
+.voice-library-audition-text .ant-form-item .ant-form-item-label {
+  flex: 0 0 auto;
+  padding: 0 12px 0 0;
+}
+
+.voice-library-audition-text .ant-form-item .ant-form-item-control {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.voice-library-audition-input {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.voice-library-audition-count {
+  flex-shrink: 0;
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .voice-library-preview {
@@ -281,16 +318,21 @@
   bottom: 0;
   z-index: 5;
   margin: 20px -24px -24px;
-  padding: 16px 24px;
+  padding: 10px 24px;
   border-top: 1px solid var(--voice-border);
   border-radius: 0 0 var(--voice-radius) var(--voice-radius);
   background: var(--voice-surface);
 }
 
-.voice-library-audition-dock .voice-library-preview-empty {
-  justify-content: flex-start;
-  min-height: 32px;
-  font-size: 12px;
+.voice-library-audition .voice-library-player > .ant-flex {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.voice-library-audition .voice-library-player audio {
+  flex: 1 1 240px;
+  width: auto;
 }
 
 .voice-library-id {
@@ -395,10 +437,6 @@
   margin-top: 12px;
 }
 
-.voice-library-shared-description {
-  margin-top: 8px;
-}
-
 @media (max-width: 900px) {
   .voice-library-audition {
     grid-template-columns: minmax(0, 1fr);
@@ -417,13 +455,17 @@
   }
 
   .voice-library-audition {
-    padding: 12px;
+    padding: 8px;
+  }
+
+  .voice-library-audition-input {
+    gap: 8px;
   }
 
   .voice-library-audition-dock {
     position: static;
     margin: 20px -16px -16px;
-    padding: 16px;
+    padding: 8px 16px;
   }
 
   .voice-library-parameter-grid {

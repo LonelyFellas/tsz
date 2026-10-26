@@ -2,14 +2,16 @@ import { speechAccentGroup } from "@tsz/shared";
 import {
   CaretRightOutlined,
   FilterOutlined,
-  SearchOutlined
+  ManOutlined,
+  SearchOutlined,
+  WomanOutlined
 } from "@ant-design/icons";
 import type { AdminSpeechVoice, AdminVoiceLibraryItem } from "@tsz/types";
 import {
   Button,
   Checkbox,
+  Collapse,
   Descriptions,
-  Drawer,
   Form,
   Input,
   Pagination,
@@ -20,7 +22,7 @@ import {
   Tooltip,
   Typography
 } from "antd";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { GatedButton } from "@/components/GatedButton";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import { personalityNames, scenarioNames, styleNames } from "./voice-labels";
@@ -37,6 +39,15 @@ const genderNames: Record<string, string> = {
   male: "男声",
   neutral: "中性"
 };
+const genderIcons: Record<string, ReactNode> = {
+  male: <ManOutlined aria-hidden className="voice-catalog-gender-male" />,
+  female: <WomanOutlined aria-hidden className="voice-catalog-gender-female" />,
+  neutral: (
+    <span aria-hidden className="voice-catalog-gender-neutral">
+      ⚲
+    </span>
+  )
+};
 const ageNames: Record<string, string> = {
   Child: "儿童",
   Teen: "青少年",
@@ -49,7 +60,7 @@ const missing = "__missing__";
 const none = "__none__";
 const languages = new Intl.DisplayNames(["zh-CN"], { type: "language" });
 const regions = new Intl.DisplayNames(["zh-CN"], { type: "region" });
-function language(voice: AdminSpeechVoice) {
+export function language(voice: AdminSpeechVoice) {
   return languages.of(voice.locale.split("-")[0]!) ?? voice.locale;
 }
 function region(voice: AdminSpeechVoice) {
@@ -69,20 +80,32 @@ function list(
       : "未提供";
 }
 
-export function VoiceCatalogDetails({ voice }: { voice: AdminSpeechVoice }) {
+export function VoiceCatalogDetails({
+  voice,
+  description
+}: {
+  voice: AdminSpeechVoice;
+  description?: ReactNode;
+}) {
   const info = voice.metadata;
   return (
     <section className="voice-library-details" aria-label="音色资料">
-      <Typography.Title level={5}>音色资料</Typography.Title>
       <Descriptions
+        bordered
         size="small"
-        column={1}
+        column={{ xs: 1, sm: 2 }}
+        styles={{ label: { width: 84, whiteSpace: "nowrap" } }}
         items={[
-          {
-            key: "language",
-            label: "语言／地区",
-            children: `${language(voice)}／${region(voice)}（${voice.locale}）`
-          },
+          ...(description
+            ? [
+                {
+                  key: "description",
+                  label: "中文介绍",
+                  span: "filled" as const,
+                  children: description
+                }
+              ]
+            : []),
           {
             key: "age",
             label: "年龄",
@@ -97,16 +120,19 @@ export function VoiceCatalogDetails({ voice }: { voice: AdminSpeechVoice }) {
           {
             key: "personalities",
             label: "声音特征",
+            span: "filled",
             children: list(info?.personalities, personalityNames)
           },
           {
             key: "scenarios",
             label: "推荐场景",
+            span: "filled",
             children: list(info?.scenarios, scenarioNames)
           },
           {
             key: "styles",
             label: "可选风格",
+            span: "filled",
             children: [
               "自然",
               ...voice.capabilities.styles.map(
@@ -114,23 +140,46 @@ export function VoiceCatalogDetails({ voice }: { voice: AdminSpeechVoice }) {
               )
             ].join("、")
           },
-          { key: "roles", label: "可选角色", children: list(info?.roles) }
+          {
+            key: "roles",
+            label: "可选角色",
+            span: "filled",
+            children: list(info?.roles)
+          }
         ]}
       />
-      <Typography.Paragraph className="voice-library-official-description">
-        <Typography.Text type="secondary">官方原文</Typography.Text>
-        <br />
-        {info?.description || "未提供"}
-      </Typography.Paragraph>
-      {info?.source_url && (
-        <Typography.Link
-          href={info.source_url}
-          target="_blank"
-          rel="noreferrer"
-        >
-          官方资料（{info.checked_at.slice(0, 10)}）
-        </Typography.Link>
-      )}
+      <Collapse
+        ghost
+        items={[
+          {
+            key: "source",
+            label: "官方原文与来源",
+            children: (
+              <>
+                <Typography.Paragraph className="voice-library-official-description">
+                  {info?.description || "未提供"}
+                </Typography.Paragraph>
+                {info?.source_url && (
+                  <Typography.Link
+                    href={info.source_url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    官方资料（{info.checked_at.slice(0, 10)}）
+                  </Typography.Link>
+                )}
+                <Typography.Paragraph
+                  type="secondary"
+                  className="voice-library-id"
+                  copyable
+                >
+                  {voice.alias}
+                </Typography.Paragraph>
+              </>
+            )
+          }
+        ]}
+      />
     </section>
   );
 }
@@ -145,7 +194,7 @@ interface Props {
   activeVoice?: string;
   pendingVoice: string | null;
   onAudition: (voice: AdminSpeechVoice) => void;
-  onSettings: (voice: AdminSpeechVoice) => void;
+  onDetails: (voice: AdminSpeechVoice) => void;
 }
 
 type FilterKey =
@@ -205,16 +254,13 @@ export function VoiceCatalogTable({
   activeVoice,
   pendingVoice,
   onAudition,
-  onSettings
+  onDetails
 }: Props) {
   const [query, setQuery] = useState("");
   const [commonOnly, setCommonOnly] = useState(false);
   const [sort, setSort] = useState("recommended");
   const [filters, setFilters] = useState<Filters>({});
   const [moreFilters, setMoreFilters] = useState(false);
-  const [detailsVoice, setDetailsVoice] = useState<AdminSpeechVoice | null>(
-    null
-  );
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const rows = (() => {
@@ -288,15 +334,27 @@ export function VoiceCatalogTable({
   function options(key: FilterKey, labels: Record<string, string> = {}) {
     return [...new Set(voices.flatMap((voice) => filterValues(voice, key)))]
       .sort()
-      .map((value) => ({
-        value,
-        label:
+      .map((value) => {
+        const label =
           value === missing
             ? "未提供"
             : value === none
               ? "无"
-              : (labels[value] ?? value)
-      }));
+              : (labels[value] ?? value);
+        return {
+          value,
+          searchText: label,
+          label:
+            key === "gender" ? (
+              <Space size={6}>
+                {genderIcons[value]}
+                {label}
+              </Space>
+            ) : (
+              label
+            )
+        };
+      });
   }
   function filter(
     key: FilterKey,
@@ -313,6 +371,7 @@ export function VoiceCatalogTable({
           maxTagCount="responsive"
           value={filters[key] ?? []}
           options={options(key, labels)}
+          optionFilterProp="searchText"
           onChange={(value) => {
             setFilters((old) => ({ ...old, [key]: value }));
             setPage(1);
@@ -415,6 +474,7 @@ export function VoiceCatalogTable({
               .map((voice) => {
                 const info = metadata.get(voice.alias);
                 const active = voice.alias === activeVoice;
+                const gender = voice.gender.toLowerCase();
                 return (
                   <li
                     key={voice.alias}
@@ -446,6 +506,13 @@ export function VoiceCatalogTable({
                     />
                     <div className="voice-catalog-identity">
                       <Space size={8} wrap>
+                        {genderIcons[gender] && (
+                          <Tooltip title={genderNames[gender]}>
+                            <span role="img" aria-label={genderNames[gender]}>
+                              {genderIcons[gender]}
+                            </span>
+                          </Tooltip>
+                        )}
                         <Tooltip
                           title={
                             voice.metadata?.provider_voice_id ?? voice.alias
@@ -467,10 +534,9 @@ export function VoiceCatalogTable({
                       <div className="voice-catalog-attributes">
                         <span>{language(voice)}</span>
                         <span>{region(voice)}</span>
-                        <span>
-                          {genderNames[voice.gender.toLowerCase()] ??
-                            "性别未提供"}
-                        </span>
+                        {!genderIcons[gender] && (
+                          <span>{genderNames[gender] ?? "性别未提供"}</span>
+                        )}
                         <span>
                           {ageNames[voice.metadata?.age_group ?? ""] ??
                             voice.metadata?.age_group ??
@@ -503,18 +569,11 @@ export function VoiceCatalogTable({
                     <div className="voice-catalog-settings">
                       <Button
                         type="text"
-                        aria-label={`查看 ${voice.display_name} 资料`}
-                        onClick={() => setDetailsVoice(voice)}
-                      >
-                        查看资料
-                      </Button>
-                      <Button
-                        type="text"
-                        aria-label={`调整 ${voice.display_name} 参数`}
+                        aria-label={`查看 ${voice.display_name} 详情`}
                         disabled={settingsPending}
-                        onClick={() => onSettings(voice)}
+                        onClick={() => onDetails(voice)}
                       >
-                        设置
+                        详情
                       </Button>
                     </div>
                   </li>
@@ -529,41 +588,6 @@ export function VoiceCatalogTable({
           />
         )}
       </Spin>
-      <Drawer
-        title={
-          detailsVoice ? `${detailsVoice.display_name} 音色资料` : "音色资料"
-        }
-        open={!!detailsVoice}
-        onClose={() => setDetailsVoice(null)}
-        size={520}
-        destroyOnHidden
-      >
-        {detailsVoice && (
-          <>
-            <VoiceCatalogDetails voice={detailsVoice} />
-            {metadata.get(detailsVoice.alias)?.description_zh && (
-              <section aria-label="共享介绍">
-                <Typography.Title level={5}>共享介绍</Typography.Title>
-                <Typography.Paragraph
-                  style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}
-                >
-                  {metadata.get(detailsVoice.alias)?.description_zh}
-                </Typography.Paragraph>
-              </section>
-            )}
-            {metadata.get(detailsVoice.alias)?.notes && (
-              <section aria-label="我的听感">
-                <Typography.Title level={5}>我的听感</Typography.Title>
-                <Typography.Paragraph
-                  style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}
-                >
-                  {metadata.get(detailsVoice.alias)?.notes}
-                </Typography.Paragraph>
-              </section>
-            )}
-          </>
-        )}
-      </Drawer>
       {!!rows.length && (
         <Pagination
           className="voice-catalog-pagination"
