@@ -23,8 +23,8 @@ import { useUserStore } from "@/stores/user";
 
 const SOURCES: Record<string, string> = {
   wordlist_tip: "词表投币",
-  wordlist_custom_audio: "自定义词汇语音",
-  wordlist_custom_audio_refund: "自定义词汇语音退款",
+  wordlist_custom_audio: "自定义词条语音",
+  wordlist_custom_audio_refund: "自定义词条语音退款",
   invitation_reward: "邀请奖励",
   learning_reward: "每日学习奖励",
   daily_login_reward: "每日登录奖励",

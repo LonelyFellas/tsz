@@ -103,7 +103,7 @@ function DictionaryBody({
             htmlFor="dictionary-search"
             className="mb-2 block px-4 text-sm font-medium"
           >
-            查找英文词汇
+            查找英文词条
           </label>
           <div className="flex gap-2">
             <SearchField
@@ -114,7 +114,7 @@ function DictionaryBody({
                 setInput(value);
                 setInvalid(false);
               }}
-              placeholder="输入词汇关键词，快速查词"
+              placeholder="输入词条关键词，快速查词"
               autoComplete="off"
               aria-invalid={invalid}
               aria-describedby={
@@ -133,7 +133,7 @@ function DictionaryBody({
               role="alert"
               className="mt-2 px-4 text-sm text-danger"
             >
-              请输入 1–100 个字符的词汇关键词
+              请输入 1–100 个字符的词条关键词
             </p>
           )}
         </form>
@@ -202,7 +202,7 @@ function DictionaryBody({
             <>
               <p role="status" className="mb-4 text-sm text-foreground-muted">
                 {results.data.pagination.total
-                  ? `找到 ${results.data.pagination.total} 条词汇`
+                  ? `找到 ${results.data.pagination.total} 条词条`
                   : `没有找到“${query}”，试试其他拼写或更短的关键词。`}
               </p>
               {results.data.items.length > 0 && (
@@ -211,7 +211,7 @@ function DictionaryBody({
                     aria-hidden
                     className="hidden grid-cols-[1fr_1fr_3fr] gap-5 border-b border-border bg-muted px-6 py-4 text-sm font-medium md:grid"
                   >
-                    <span>英文词汇</span>
+                    <span>名称</span>
                     <span>其他拼写形式</span>
                     <div className="grid grid-cols-[3rem_1fr_1fr] gap-4">
                       <span>词性</span>
@@ -302,7 +302,7 @@ function Result({
         className="tsz-words break-words font-semibold text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary"
       >
         {spelling.primary}
-        <span className="sr-only">，查看词汇详情</span>
+        <span className="sr-only">，查看词条详情</span>
       </Link>
       <p className="tsz-words break-words text-sm text-foreground-muted">
         {spelling.alternate || "—"}

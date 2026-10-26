@@ -356,7 +356,7 @@ export function WordlistDetails({
                       <Typography.Text type="secondary">
                         {(page - 1) * 20 + index + 1}
                       </Typography.Text>
-                      <Tag>{item.custom_word ? "自定义词汇" : "平台词汇"}</Tag>
+                      <Tag>{item.custom_word ? "自定义词条" : "平台词条"}</Tag>
                     </Space>
                     {item.custom_word ? (
                       <>

@@ -145,7 +145,7 @@ function errorMessage(error: unknown): string {
     if (error.status === 403)
       return isAnnotationOwnershipError(error.code)
         ? annotationForbiddenMessage(error.code)
-        : "当前账号没有创建词汇的权限。";
+        : "当前账号没有创建词条的权限。";
     if (error.status === 503) return "词条服务暂时不可用，请稍后重试。";
     if (error.status === 410) return "检查结果已过期，请重新提交。";
   }
@@ -1187,10 +1187,10 @@ export function UnifiedCreateEntryStep({
       <div className="word-step-heading">
         <span className="word-step-number">STEP 01</span>
         <Typography.Title level={2} style={{ margin: 0 }}>
-          创建词汇
+          创建词条
         </Typography.Title>
         <Typography.Paragraph className="word-step-description">
-          利用内置词典检测单词或短语，确认主词后创建词汇。
+          利用内置词典检测单词或短语，确认主词后创建词条。
         </Typography.Paragraph>
       </div>
 

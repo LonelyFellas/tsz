@@ -21,14 +21,14 @@ export function ReadingTable({
   children: ReactNode;
 }) {
   const headings = full
-    ? ["英文词汇", "基本词性", "词形变化", "细分词性", "多维释义", "语法结构"]
-    : ["英文词汇", "词性", "多维释义", "语法结构"];
+    ? ["英文词条", "基本词性", "词形变化", "细分词性", "多维释义", "语法结构"]
+    : ["英文词条", "词性", "多维释义", "语法结构"];
   const widths = full ? [14, 9, 29, 12, 18, 18] : [20, 10, 35, 35];
   return (
     <div
       className="overflow-x-auto"
       role="region"
-      aria-label="词汇列表"
+      aria-label="词条列表"
       tabIndex={0}
     >
       <table
@@ -38,7 +38,7 @@ export function ReadingTable({
         )}
       >
         <caption className="sr-only">
-          {full ? "完整模式词汇列表" : "标准模式词汇列表"}
+          {full ? "完整模式词条列表" : "标准模式词条列表"}
         </caption>
         <colgroup>
           {widths.map((width, index) => (

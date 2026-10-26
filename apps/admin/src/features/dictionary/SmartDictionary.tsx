@@ -822,7 +822,7 @@ export function SmartDictionary({
 
   const columns: TableColumnsType<AdminWordListItemAny> = [
     {
-      title: "词汇",
+      title: "名称",
       key: "label",
       width: 150,
       fixed: "left",
@@ -1381,7 +1381,7 @@ export function SmartDictionary({
                 icon={<PlusOutlined />}
                 onClick={() => navigate("/words/new")}
               >
-                创建词汇
+                创建词条
               </Button>
             )}
             {adminWordsDataSourceCapabilities.batchArchive && (
@@ -1427,7 +1427,7 @@ export function SmartDictionary({
           </Space>
           <Space size="large" wrap>
             <Typography.Text type="secondary">
-              累计智能词汇:
+              累计智能词条:
               <Typography.Text strong>
                 {stats.data?.total ?? "-"}
               </Typography.Text>

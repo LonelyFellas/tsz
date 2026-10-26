@@ -868,13 +868,13 @@ it("reads custom and platform words with their own definitions and author notes"
   const custom = (
     await screen.findByRole("heading", { name: "a moment of clarity" })
   ).closest("article")!;
-  expect(within(custom).getByText("自定义词汇")).toBeVisible();
+  expect(within(custom).getByText("自定义词条")).toBeVisible();
   expect(within(custom).getByText("恍然大悟 思路突然清晰")).toBeVisible();
   expect(within(custom).getByText("自定义词的作者注")).toBeVisible();
   const platform = screen
     .getByRole("heading", { name: /^clarity$/ })
     .closest("article")!;
-  expect(within(platform).getByText("平台词汇")).toBeVisible();
+  expect(within(platform).getByText("平台词条")).toBeVisible();
   expect(within(platform).getByText("名词")).toBeVisible();
   expect(within(platform).getByText("清晰；清楚")).toBeVisible();
   expect(within(platform).getByText("平台词的作者注")).toBeVisible();
