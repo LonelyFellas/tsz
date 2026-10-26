@@ -18,12 +18,14 @@ export function isVoiceRecommendationAvailable(
         : speechAccentGroup(value.locale, value.accent) ===
           speechAccentGroup(item.locale))
   );
+  const group = item.setting.locale
+    ? speechAccentGroup(voice?.locale, voice?.accent)
+    : speechAccentGroup(item.locale);
   if (
     !voice ||
-    (locale && speechAccentGroup(item.locale) !== speechAccentGroup(locale)) ||
-    (speechAccentGroup(item.locale) !== "other" &&
-      speechAccentGroup(voice.locale, voice.accent) !==
-        speechAccentGroup(item.locale)) ||
+    (locale && group !== "other" && group !== speechAccentGroup(locale)) ||
+    (group !== "other" &&
+      speechAccentGroup(voice.locale, voice.accent) !== group) ||
     (item.setting.style_degree != null && voice.supportsStyleDegree !== true) ||
     (item.setting.role != null && !voice.roles?.includes(item.setting.role))
   )

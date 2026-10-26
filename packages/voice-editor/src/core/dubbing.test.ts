@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { isVoiceRecommendationAvailable } from "./voice-recommendations";
 import type { VoiceOption, VoiceProfile, VoiceRecommendation } from "../types";
 import {
   localVoiceProfile,
@@ -50,6 +51,28 @@ const recommendations: VoiceRecommendation[] = [
   }
 ];
 describe("文本配音模式", () => {
+  it("已保存版本按人工口音参与候选，原生地区保留且不决定英美侧", () => {
+    const reassigned = [{ ...voices[1]!, accent: "gb" as const }];
+    const setting = {
+      voice_id: "guy",
+      enabled: true,
+      rate_percent: 0,
+      locale: "en-US" as const
+    };
+    const item = {
+      id: "reassigned",
+      name: "reassigned",
+      locale: "en-US" as const,
+      groupName: "",
+      setting
+    };
+    expect(isVoiceRecommendationAvailable(item, reassigned, "en-GB")).toBe(
+      true
+    );
+    expect(isVoiceRecommendationAvailable(item, reassigned, "en-US")).toBe(
+      false
+    );
+  });
   it("普通英美推荐也保存稳定的完整版本身份", () => {
     expect(recommendationVoiceSetting(recommendations[0]!, voices)).toEqual({
       voice_id: "sonia",

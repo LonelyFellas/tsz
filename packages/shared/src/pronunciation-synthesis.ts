@@ -539,7 +539,7 @@ export function grammarSynthesisContent(
             ups_words: [{ ...synthesis.ups_words[0]!, text: segment.surface }]
           }
         : synthesis;
-    const resolved = pronunciationSynthesisContent(
+    const resolved = basePronunciationSynthesisContent(
       segment.surface,
       anchoredSynthesis,
       locale,
@@ -547,7 +547,7 @@ export function grammarSynthesisContent(
     );
     if (
       !resolved ||
-      (!first?.synthesis?.use_spelling &&
+      (!synthesis?.use_spelling &&
         !first?.synthesis?.[locale === "en-GB" ? "uk" : "us"] &&
         binding.dialect !== "common" &&
         pronunciationLocale(binding.dialect, "uk") !== locale)

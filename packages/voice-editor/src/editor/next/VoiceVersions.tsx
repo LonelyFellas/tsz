@@ -71,7 +71,11 @@ export function VoiceVersions({
   const visible = settings.filter(
     (setting) =>
       !locale ||
-      speechLocaleMatchesScope(voiceLocale(setting, voices) ?? "", locale) ||
+      speechLocaleMatchesScope(
+        voiceLocale(setting, voices) ?? "",
+        locale,
+        voices.find((voice) => voice.id === setting.voice_id)?.accent
+      ) ||
       !voiceLocale(setting, voices)
   );
   const sourceSetting = source

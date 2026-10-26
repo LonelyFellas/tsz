@@ -117,6 +117,11 @@ function Harness({
   const generatedSpeech = {
     content: { version: 2 as const, text: "far", annotations: [] },
     voice_profile: {
+      dubbing: {
+        mode: "inherit" as const,
+        area: "azure" as const,
+        recommendation_order: ["recommended"]
+      },
       voices: [
         {
           voice_id: "en-gb-sonia",
@@ -295,6 +300,11 @@ describe("双口音真实试听控件", () => {
     const saved = JSON.parse(
       screen.getByTestId("pronunciation-wire").textContent!
     );
+    expect(saved.synthesis.uk.ipa_speech.voice_profile.dubbing).toEqual({
+      mode: "inherit",
+      area: "azure",
+      recommendation_order: ["recommended"]
+    });
     expect(saved.synthesis.uk.ipa_speech.voice_profile.voices[0]).toEqual({
       voice_id: "en-gb-sonia",
       enabled: true,

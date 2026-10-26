@@ -2610,6 +2610,111 @@ describe("VoiceEditor 发音区", () => {
     ).toBeInTheDocument();
   });
 
+  it("英美独立解析，推荐参数更新后可生成且旧资产仍可审听", async () => {
+    const stored: VoiceSetting = {
+      version_id: "11111111-1111-4111-8111-111111111111",
+      version_name: "推荐",
+      locale: "en-GB",
+      voice_id: "sonia",
+      enabled: true,
+      rate_percent: 0,
+      audio_asset_id: "old-audio"
+    };
+    const resolveVoices = vi
+      .fn()
+      .mockImplementation(async ({ accent }: { accent: string }) => {
+        if (accent === "us") throw new Error("美式未确认读法");
+        return [{ ...stored, rate_percent: -5, audio_asset_id: undefined }];
+      });
+    const generateAudio = vi.fn().mockResolvedValue(asset());
+    const resolveAudio = vi.fn().mockResolvedValue({
+      audioUrl: "blob:old-audio",
+      expiresAt: "2099-01-01",
+      cached: true
+    });
+    render(
+      <VoiceEditor
+        {...props({
+          recommendationArea: "word",
+          voiceProfile: {
+            voices: [stored],
+            dubbing: { mode: "inherit", area: "word" }
+          },
+          onVoiceProfileChange: vi.fn(),
+          previewAdapter: {
+            ...adapter(),
+            resolveVoices,
+            generateAudio,
+            resolveAudio
+          }
+        })}
+      />
+    );
+    openVoices();
+    const row = await screen.findByLabelText("配音版本 推荐");
+    await waitFor(() =>
+      expect(
+        within(row).getByRole("button", { name: "生成正式音频" })
+      ).toBeEnabled()
+    );
+    fireEvent.click(screen.getByRole("button", { name: "播放旧音频 · 推荐" }));
+    await waitFor(() =>
+      expect(resolveAudio).toHaveBeenCalledWith("old-audio", expect.anything())
+    );
+    fireEvent.click(within(row).getByRole("button", { name: "生成正式音频" }));
+    await waitFor(() =>
+      expect(generateAudio).toHaveBeenCalledWith(
+        expect.objectContaining({
+          setting: expect.objectContaining({ rate_percent: -5 })
+        }),
+        expect.anything()
+      )
+    );
+  });
+
+  it("人工归为英式的美国音色在英式版本列表可见并可生成", async () => {
+    const setting: VoiceSetting = {
+      voice_id: "guy",
+      locale: "en-US",
+      version_id: "22222222-2222-4222-8222-222222222222",
+      version_name: "人工英式",
+      enabled: true,
+      rate_percent: 0
+    };
+    render(
+      <VoiceEditor
+        {...props({
+          locale: "en-GB",
+          voiceProfile: {
+            voices: [setting],
+            dubbing: { mode: "local", area: "word" }
+          },
+          recommendationArea: "word",
+          onVoiceProfileChange: vi.fn(),
+          previewAdapter: {
+            ...adapter(),
+            listVoices: vi
+              .fn()
+              .mockResolvedValue(
+                VOICES.map((voice) =>
+                  voice.id === "guy" ? { ...voice, accent: "gb" } : voice
+                )
+              ),
+            resolveVoices: vi.fn().mockResolvedValue([setting]),
+            generateAudio: vi.fn()
+          }
+        })}
+      />
+    );
+    openVoices();
+    const row = await screen.findByLabelText("配音版本 人工英式");
+    await waitFor(() =>
+      expect(
+        within(row).getByRole("button", { name: "生成正式音频" })
+      ).toBeEnabled()
+    );
+  });
+
   it("继承快照失效后保留已选和旧音频，但阻止重新生成并可取消选用", async () => {
     const stored: VoiceSetting = {
       version_id: "11111111-1111-4111-8111-111111111111",

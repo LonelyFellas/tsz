@@ -684,7 +684,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   useEffect(() => {
     if (!voiceProfile?.dubbing || !previewAdapter?.resolveVoices) return;
     const controller = new AbortController();
-    Promise.all(
+    Promise.allSettled(
       (["gb", "us"] as const)
         .filter(
           (accent) =>
@@ -698,8 +698,21 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         )
     )
       .then((values) => {
-        if (!controller.signal.aborted)
-          setResolvedVoices({ key: resolutionKey, voices: values.flat() });
+        if (controller.signal.aborted) return;
+        setResolvedVoices({
+          key: resolutionKey,
+          voices: values.flatMap((value) =>
+            value.status === "fulfilled" ? value.value : []
+          )
+        });
+        const failed = values.find((value) => value.status === "rejected");
+        setRecommendationError(
+          failed?.status === "rejected"
+            ? failed.reason instanceof Error
+              ? failed.reason.message
+              : "部分口音配音解析失败，请修复配置"
+            : ""
+        );
       })
       .catch((error) => {
         if (!controller.signal.aborted) {
@@ -745,8 +758,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                 setting.enabled &&
                 !effectiveSettings.some(
                   (resolved) =>
-                    voiceSettingKey(resolved) === voiceSettingKey(setting) &&
-                    voiceEffectKey(resolved) === voiceEffectKey(setting)
+                    voiceSettingKey(resolved) === voiceSettingKey(setting)
                 )
             )
             .map(voiceSettingKey)
@@ -764,6 +776,17 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         )
       ]
     : voiceSettings;
+  const previousAudio = voiceProfile?.dubbing
+    ? voiceSettings.filter(
+        (setting) =>
+          setting.audio_asset_id &&
+          effectiveSettings.some(
+            (resolved) =>
+              voiceSettingKey(resolved) === voiceSettingKey(setting) &&
+              voiceEffectKey(resolved) !== voiceEffectKey(setting)
+          )
+      )
+    : [];
   const enabledVoiceIds = displayedSettings
     .filter((voice) => voice.enabled)
     .map((voice) => voice.voice_id);
@@ -2722,6 +2745,24 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               }
               generatingVersion={generatingVersion}
             />
+            {previousAudio.map((setting) => {
+              const voice = voices.find((item) => item.id === setting.voice_id);
+              return voice ? (
+                <Button
+                  key={voiceSettingKey(setting)}
+                  size="small"
+                  disabled={!previewAdapter?.resolveAudio}
+                  onClick={() => {
+                    stopAssetPlayback();
+                    stopSsmlRef.current?.();
+                    stopReferenceRef.current?.();
+                    audition(voice, setting);
+                  }}
+                >
+                  播放旧音频 · {setting.version_name ?? setting.voice_id}
+                </Button>
+              ) : null;
+            })}
             <VoicePanel
               readOnly={readOnly}
               locale={locale}

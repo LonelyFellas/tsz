@@ -161,6 +161,7 @@ export function V3SynthesisInputs({
           updated[`${alphabet}_speech`] = {
             ...speech,
             voice_profile: {
+              ...speech.voice_profile,
               voices: speech.voice_profile.voices.map((setting) => {
                 if (!previousAssets.has(setting.audio_asset_id)) return setting;
                 const { audio_asset_id: _audio, ...rest } = setting;

@@ -194,6 +194,64 @@ describe("语法结构整段合成", () => {
       )
     ).toThrow(/版本变化/);
   });
+  it("明确自然朗读覆盖源词形口音，源设置的特殊读法不抹掉关联指定音素", () => {
+    const natural = {
+      ...first,
+      synthesis: { ...first.synthesis, use_spelling: true }
+    };
+    const reference = {
+      uk: {
+        pronunciation_id: first.id,
+        alphabet: "ipa" as const,
+        locale: "en-GB" as const,
+        use_spelling: true,
+        revision: readingRevision(natural.synthesis, "en-GB", "us", "ipa")
+      }
+    };
+    expect(
+      grammarSynthesisContent(
+        content,
+        [
+          {
+            ...binding,
+            dialect: "us",
+            pronunciations: [first],
+            reading_reference: reference
+          }
+        ],
+        "en-GB"
+      ).annotations
+    ).toEqual([]);
+    const annotated = {
+      ...first,
+      synthesis: {
+        ...first.synthesis,
+        uk: {
+          ipa: "dʒɒb",
+          ups: "JH Q B",
+          ipa_speech: {
+            content: {
+              version: 2 as const,
+              text: "job",
+              annotations: [
+                { type: "sub" as const, start: 0, end: 3, alias: "work" }
+              ]
+            },
+            voice_profile: { voices: [] }
+          }
+        }
+      }
+    };
+    expect(
+      grammarSynthesisContent(
+        content,
+        [{ ...binding, pronunciations: [annotated] }],
+        "en-GB"
+      ).annotations
+    ).toEqual([
+      { type: "phoneme", start: 4, end: 7, alphabet: "ipa", phoneme: "dʒɒb" }
+    ]);
+  });
   it("保持整段正文，只将关联词形的第一条发音标注到对应码点", () => {
     expect(grammarSynthesisContent(content, [binding], "en-GB")).toEqual({
       ...content,
