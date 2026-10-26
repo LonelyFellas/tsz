@@ -214,6 +214,19 @@ body {
   background: rgb(var(--ch-background));
 }
 
+.tsz-ve-readonly {
+  --tsz-ve-role-function: rgb(var(--ch-foreground));
+  --tsz-ve-role-core: rgb(var(--ch-primary));
+  --tsz-ve-role-grammar-text: rgb(var(--ch-foreground-muted));
+}
+
+.dark .tsz-ve-highlight {
+  --tsz-ve-role-function: rgb(var(--ch-background));
+  --tsz-ve-role-core: rgb(var(--ch-background));
+  --tsz-ve-role-grammar-text: rgb(var(--ch-background));
+  color: rgb(var(--ch-background));
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .account-menu-motion[data-state="open"] {
     animation: account-menu-in 180ms cubic-bezier(0.22, 1, 0.36, 1) both;

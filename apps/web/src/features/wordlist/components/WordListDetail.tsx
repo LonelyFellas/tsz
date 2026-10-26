@@ -10,7 +10,7 @@ import {
   useQuery,
   useQueryClient
 } from "@tanstack/react-query";
-import { ReadingEntry } from "./ReadingEntry";
+import { ReadingEntry, ReadingTable } from "./ReadingEntry";
 import { AudioButton } from "@/features/audio/AudioButton";
 import { audioStatusLabels, useCustomAudio } from "../hooks/useCustomAudio";
 import {
@@ -393,7 +393,7 @@ function Detail({
     );
   const list = meta.data;
   return (
-    <PageShell size="lg" embedded={embedded}>
+    <PageShell size="xl" embedded={embedded}>
       <PageHeader
         back={embedded ? undefined : back}
         eyebrow={embedded ? undefined : mine ? "我的词表" : "词库广场"}
@@ -732,92 +732,112 @@ function Detail({
             </p>
           )}
           <div aria-busy={updatingSearch}>
-            {loadedItems.map((item) =>
-              item.entry || item.custom_word ? (
-                <section
-                  key={item.item_id ?? item.entry_id}
-                  className="min-w-0 break-words border-b border-border/60 py-6 last:border-b-0"
-                >
-                  <div className="mb-3 text-xs font-medium tabular-nums tracking-wide text-foreground-subtle">
-                    {String(item.position + 1).padStart(2, "0")}
-                  </div>
-                  {item.custom_word ? (
-                    <div>
-                      <h2 className="tsz-words break-words text-xl font-semibold">
-                        {item.custom_word.word}
-                      </h2>
-                      {audioByItem.get(item.item_id!)?.word ===
-                        wordlistAudioWord(item.custom_word.word) &&
-                        (audioByItem.get(item.item_id!)?.status === "ready" ? (
-                          <div className="flex flex-wrap items-center gap-3">
-                            {locales.map((locale) => (
-                              <span
-                                key={locale}
-                                className="inline-flex items-center text-xs text-foreground-muted"
-                              >
-                                {locale === "en-GB" ? "英式" : "美式"}
-                                <AudioButton
-                                  label={`播放 ${item.custom_word!.word} ${locale === "en-GB" ? "英式" : "美式"}语音`}
-                                  sign={(signal) =>
-                                    mine
-                                      ? api.wordList.myCustomAudioUrl(
-                                          id,
-                                          item.item_id!,
-                                          locale,
-                                          { signal }
-                                        )
-                                      : api.wordList.customAudioUrl(
-                                          id,
-                                          item.item_id!,
-                                          locale,
-                                          { signal }
-                                        )
-                                  }
-                                />
-                              </span>
+            <ReadingTable full={view === "full"}>
+              {loadedItems.map((item) =>
+                item.entry || item.custom_word ? (
+                  <tbody
+                    key={item.item_id ?? item.entry_id}
+                    className="break-words border-b border-border/60 last:border-b-0"
+                  >
+                    {item.custom_word ? (
+                      <tr>
+                        <td>
+                          <h2 className="tsz-words break-words text-xl font-bold tracking-tight">
+                            {item.custom_word.word}
+                          </h2>
+                          {audioByItem.get(item.item_id!)?.word ===
+                            wordlistAudioWord(item.custom_word.word) &&
+                            (audioByItem.get(item.item_id!)?.status ===
+                            "ready" ? (
+                              <div className="flex flex-wrap items-center gap-3">
+                                {locales.map((locale) => (
+                                  <span
+                                    key={locale}
+                                    className="inline-flex items-center text-xs text-foreground-muted"
+                                  >
+                                    {locale === "en-GB" ? "英式" : "美式"}
+                                    <AudioButton
+                                      label={`播放 ${item.custom_word!.word} ${locale === "en-GB" ? "英式" : "美式"}语音`}
+                                      sign={(signal) =>
+                                        mine
+                                          ? api.wordList.myCustomAudioUrl(
+                                              id,
+                                              item.item_id!,
+                                              locale,
+                                              { signal }
+                                            )
+                                          : api.wordList.customAudioUrl(
+                                              id,
+                                              item.item_id!,
+                                              locale,
+                                              { signal }
+                                            )
+                                      }
+                                    />
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="mt-2 text-xs text-foreground-muted">
+                                {
+                                  audioStatusLabels[
+                                    audioByItem.get(item.item_id!)!.status
+                                  ]
+                                }
+                              </p>
                             ))}
-                          </div>
-                        ) : (
                           <p className="mt-2 text-xs text-foreground-muted">
-                            {
-                              audioStatusLabels[
-                                audioByItem.get(item.item_id!)!.status
-                              ]
-                            }
+                            自定义词汇
                           </p>
-                        ))}
-                      <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6">
-                        {item.custom_word.definition}
-                      </p>
-                      <p className="mt-2 text-xs text-foreground-muted">
-                        自定义词汇
-                      </p>
-                    </div>
-                  ) : (
-                    item.entry && (
-                      <ReadingEntry
-                        full={view === "full"}
-                        entry={item.entry}
-                        level={level}
-                        variant={variant}
-                      />
-                    )
-                  )}
-                  {item.author_note && (
-                    <p className="mt-5 whitespace-pre-wrap rounded-2xl bg-muted/70 px-4 py-3 text-sm leading-6">
-                      注：{item.author_note}
-                    </p>
-                  )}
-                  {mine &&
-                    "private_note" in item &&
-                    (item as MyWordlistItem).private_note && (
-                      <p className="mt-3 whitespace-pre-wrap rounded-2xl border border-dashed border-border px-4 py-3 text-sm leading-6 text-foreground-muted">
-                        私密备注：{(item as MyWordlistItem).private_note}
-                      </p>
+                        </td>
+                        <td />
+                        {view === "full" && (
+                          <>
+                            <td />
+                            <td />
+                          </>
+                        )}
+                        <td className="whitespace-pre-wrap">
+                          {item.custom_word.definition}
+                        </td>
+                        <td />
+                      </tr>
+                    ) : (
+                      item.entry && (
+                        <ReadingEntry
+                          full={view === "full"}
+                          entry={item.entry}
+                          level={level}
+                          variant={variant}
+                        />
+                      )
                     )}
-                </section>
-              ) : null
-            )}
+                    {!!(
+                      item.author_note ||
+                      (mine && "private_note" in item && item.private_note)
+                    ) && (
+                      <tr>
+                        <td colSpan={view === "full" ? 6 : 4}>
+                          {item.author_note && (
+                            <p className="whitespace-pre-wrap rounded-2xl bg-muted/70 px-4 py-3">
+                              注：{item.author_note}
+                            </p>
+                          )}
+                          {mine &&
+                            "private_note" in item &&
+                            (item as MyWordlistItem).private_note && (
+                              <p className="mt-3 whitespace-pre-wrap rounded-2xl border border-dashed border-border px-4 py-3 text-foreground-muted">
+                                私密备注：
+                                {(item as MyWordlistItem).private_note}
+                              </p>
+                            )}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                ) : null
+              )}
+            </ReadingTable>
           </div>
           {loadedItems.length > 0 &&
             loadedItems.every((item) => !item.entry && !item.custom_word) && (
