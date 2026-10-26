@@ -9,6 +9,7 @@ import {
   Button,
   Checkbox,
   Descriptions,
+  Drawer,
   Form,
   Input,
   Pagination,
@@ -211,6 +212,9 @@ export function VoiceCatalogTable({
   const [sort, setSort] = useState("recommended");
   const [filters, setFilters] = useState<Filters>({});
   const [moreFilters, setMoreFilters] = useState(false);
+  const [detailsVoice, setDetailsVoice] = useState<AdminSpeechVoice | null>(
+    null
+  );
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const rows = (() => {
@@ -496,15 +500,23 @@ export function VoiceCatalogTable({
                         )}
                       </div>
                     </div>
-                    <Button
-                      type="text"
-                      className="voice-catalog-settings"
-                      aria-label={`调整 ${voice.display_name} 参数`}
-                      disabled={settingsPending}
-                      onClick={() => onSettings(voice)}
-                    >
-                      资料与设置
-                    </Button>
+                    <div className="voice-catalog-settings">
+                      <Button
+                        type="text"
+                        aria-label={`查看 ${voice.display_name} 资料`}
+                        onClick={() => setDetailsVoice(voice)}
+                      >
+                        查看资料
+                      </Button>
+                      <Button
+                        type="text"
+                        aria-label={`调整 ${voice.display_name} 参数`}
+                        disabled={settingsPending}
+                        onClick={() => onSettings(voice)}
+                      >
+                        设置
+                      </Button>
+                    </div>
                   </li>
                 );
               })}
@@ -517,6 +529,41 @@ export function VoiceCatalogTable({
           />
         )}
       </Spin>
+      <Drawer
+        title={
+          detailsVoice ? `${detailsVoice.display_name} 音色资料` : "音色资料"
+        }
+        open={!!detailsVoice}
+        onClose={() => setDetailsVoice(null)}
+        size={520}
+        destroyOnHidden
+      >
+        {detailsVoice && (
+          <>
+            <VoiceCatalogDetails voice={detailsVoice} />
+            {metadata.get(detailsVoice.alias)?.description_zh && (
+              <section aria-label="共享介绍">
+                <Typography.Title level={5}>共享介绍</Typography.Title>
+                <Typography.Paragraph
+                  style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}
+                >
+                  {metadata.get(detailsVoice.alias)?.description_zh}
+                </Typography.Paragraph>
+              </section>
+            )}
+            {metadata.get(detailsVoice.alias)?.notes && (
+              <section aria-label="我的听感">
+                <Typography.Title level={5}>我的听感</Typography.Title>
+                <Typography.Paragraph
+                  style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}
+                >
+                  {metadata.get(detailsVoice.alias)?.notes}
+                </Typography.Paragraph>
+              </section>
+            )}
+          </>
+        )}
+      </Drawer>
       {!!rows.length && (
         <Pagination
           className="voice-catalog-pagination"

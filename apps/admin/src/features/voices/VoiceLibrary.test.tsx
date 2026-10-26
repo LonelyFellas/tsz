@@ -658,6 +658,38 @@ describe("配音中心", () => {
     expect(screen.queryByLabelText("试听 Voice 12")).toBeNull();
   });
 
+  it("查看并关闭音色资料保留同一播放器，不重复生成试听", async () => {
+    mount();
+    fireEvent.click(await screen.findByLabelText("试听 Sonia"));
+    const audio = await screen.findByLabelText("Sonia 试听播放器");
+    vi.mocked(HTMLMediaElement.prototype.pause).mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "查看 Sonia 资料" }));
+    const drawer = await screen.findByRole("dialog");
+    expect(within(drawer).getByText("Sonia 音色资料")).toBeVisible();
+    expect(
+      within(drawer).getByRole("region", { name: "音色资料" })
+    ).toBeVisible();
+    expect(screen.getByLabelText("Sonia 试听播放器")).toBe(audio);
+    fireEvent.click(within(drawer).getByLabelText("Close"));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByLabelText("Sonia 试听播放器")).toBe(audio);
+    expect(HTMLMediaElement.prototype.pause).not.toHaveBeenCalled();
+    expect(api.speech.preview).toHaveBeenCalledTimes(1);
+  });
+
+  it("查看资料不中止正在生成的试听", async () => {
+    const pending = deferred<AdminSpeechPreviewResponse>();
+    vi.mocked(api.speech.preview).mockImplementationOnce(() => pending.promise);
+    mount();
+    fireEvent.click(await screen.findByLabelText("试听 Sonia"));
+    const signal = vi.mocked(api.speech.preview).mock.calls[0]![1]!;
+    fireEvent.click(screen.getByRole("button", { name: "查看 Sonia 资料" }));
+    expect(signal.aborted).toBe(false);
+    await act(async () => pending.resolve(result("sonia")));
+    expect(await screen.findByLabelText("Sonia 试听播放器")).toBeVisible();
+    expect(api.speech.preview).toHaveBeenCalledTimes(1);
+  });
+
   it("取消生成后，迟到的音频不会重新出现", async () => {
     const pending = deferred<AdminSpeechPreviewResponse>();
     vi.mocked(api.speech.preview).mockImplementationOnce(() => pending.promise);

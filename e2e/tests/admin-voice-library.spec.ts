@@ -177,6 +177,40 @@ test("从一级菜单查找音色、调参并播放，改字后清除旧音频",
     fullPage: true,
     animations: "disabled"
   });
+  await page.getByRole("button", { name: "试听 Sonia", exact: true }).click();
+  const originalAudio = page.getByLabel("Sonia 试听播放器");
+  await expect(originalAudio).toBeVisible();
+  await expect
+    .poll(() =>
+      originalAudio.evaluate((node: HTMLAudioElement) => node.readyState)
+    )
+    .toBeGreaterThanOrEqual(2);
+  await originalAudio.evaluate(async (node: HTMLAudioElement) => {
+    node.loop = true;
+    node.dataset.previewIdentity = "original";
+    await node.play();
+  });
+  await page.getByRole("button", { name: "查看 Sonia 资料" }).click();
+  const details = page.getByRole("dialog", { name: "Sonia 音色资料" });
+  await expect(details.getByRole("region", { name: "音色资料" })).toBeVisible();
+  await expect(originalAudio).toHaveAttribute(
+    "data-preview-identity",
+    "original"
+  );
+  expect(
+    await originalAudio.evaluate((node: HTMLAudioElement) => node.paused)
+  ).toBe(false);
+  await details.getByRole("button", { name: /关闭|Close/ }).click();
+  await expect(details).toHaveCount(0);
+  await expect(originalAudio).toHaveAttribute(
+    "data-preview-identity",
+    "original"
+  );
+  expect(
+    await originalAudio.evaluate((node: HTMLAudioElement) => node.paused)
+  ).toBe(false);
+  expect(requests).toHaveLength(1);
+  requests.length = 0;
   await page.getByRole("button", { name: "调整 Sonia 参数" }).click();
   const drawer = page.getByRole("dialog");
   await drawer
