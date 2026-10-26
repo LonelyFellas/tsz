@@ -164,6 +164,43 @@ const meaningsCanonicalFixture: DraftMeaningsStepContentV3 = {
   ]
 };
 
+it("英文释义和例句的精确读法在草稿转换中深拷贝保留", () => {
+  const canonical = structuredClone(meaningsCanonicalFixture);
+  const variant = canonical.pos[0]!.senses[0]!.sentences[0]!.en_text;
+  if (variant.mode !== "unified") throw new Error("expected common");
+  variant.common.reading_links = [
+    {
+      id: "reading",
+      source_segments: [{ start: 4, end: 8, surface: "city" }],
+      target_word_id: "word",
+      target_pos_id: "pos",
+      target_form_id: "form",
+      target_variant_id: "variant",
+      target_dialect: "common"
+    }
+  ];
+  canonical.pos[0]!.senses[0]!.definitions.push({
+    id: "english",
+    level: "A1",
+    definition_mode: "en_definition",
+    content: variant
+  });
+  const writable = toWritableMeanings(canonical);
+  const sentence = writable.pos[0]!.senses[0]!.sentences[0]!.en_text;
+  const definition = writable.pos[0]!.senses[0]!.definitions.at(-1)!;
+  if (
+    sentence.mode !== "unified" ||
+    definition.definition_mode !== "en_definition" ||
+    definition.content.mode !== "unified"
+  )
+    throw new Error("expected common");
+  expect(sentence.common.reading_links).toEqual(variant.common.reading_links);
+  expect(definition.content.common.reading_links).toEqual(
+    variant.common.reading_links
+  );
+  expect(sentence.common.reading_links).not.toBe(variant.common.reading_links);
+});
+
 it("语义区间英文富文本和发音配置在编辑转换中保留且不共享引用", () => {
   const canonical = structuredClone(meaningsCanonicalFixture);
   canonical.sense_groups[0]!.name_en_rich = {

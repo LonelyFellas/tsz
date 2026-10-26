@@ -29,6 +29,7 @@ export interface VoiceOption {
   isCommon?: boolean;
   label: string;
   locale: string;
+  accent?: "gb" | "us" | "none";
   gender: "female" | "male" | "neutral";
   styles: string[];
   supportsRate: boolean;
@@ -36,19 +37,29 @@ export interface VoiceOption {
   supportsVolume?: boolean;
   supportsPause?: boolean;
   supportsPhoneme?: boolean;
+  supportsStyleDegree?: boolean;
+  roles?: string[];
   isDefault: boolean;
   personalSettingsError?: string;
   defaultSettings?: Pick<
     VoiceSetting,
-    "rate_percent" | "pitch_semitones" | "volume_percent" | "style"
+    | "rate_percent"
+    | "pitch_semitones"
+    | "volume_percent"
+    | "style"
+    | "style_degree"
+    | "role"
   >;
   rateRange?: { min: number; max: number };
   pitchRange?: { min: number; max: number };
 }
 
 export interface VoiceSettings {
+  outputFormat?: "mp3" | "wav";
   voiceId: string;
   style?: string;
+  styleDegree?: number;
+  role?: string;
   ratePercent?: number;
   pitchSemitones?: number;
   volumePercent?: number;
@@ -60,6 +71,8 @@ export interface VoicePreviewRequest extends VoiceSettings {
 }
 
 export interface VoicePreviewResult {
+  loadAudio?: (options?: { signal?: AbortSignal }) => Promise<Blob>;
+  originalName?: string;
   audioUrl: string;
   expiresAt: string;
   cached: boolean;
@@ -97,9 +110,26 @@ export type LoadVoiceRecommendations = (input: {
 }) => Promise<VoiceRecommendation[]>;
 
 export interface VoicePreviewAdapter {
+  renderSsml?(
+    input: { content: RichTextV2; setting: VoiceSetting },
+    options?: { signal?: AbortSignal }
+  ): Promise<string>;
+  synthesizeSsml?(
+    input: { ssml: string; voiceId: string; outputFormat?: "mp3" | "wav" },
+    options?: { signal?: AbortSignal }
+  ): Promise<VoicePreviewResult>;
   audioSourceKey?: string;
+  resolveVoices?(
+    input: { profile: VoiceProfile; content: RichTextV2; accent: "gb" | "us" },
+    options?: { signal?: AbortSignal }
+  ): Promise<VoiceSetting[]>;
   generateAudio?(
-    input: { requestId: string; content: RichTextV2; setting: VoiceSetting },
+    input: {
+      requestId: string;
+      content: RichTextV2;
+      setting: VoiceSetting;
+      profile?: VoiceProfile;
+    },
     options?: { signal?: AbortSignal }
   ): Promise<AudioAsset>;
   resolveAudio?(
@@ -150,6 +180,10 @@ export class AudioUploadError extends Error {
  * 「申请许可 → 直传 → confirm」三步都在适配器里完成，编辑器只看到一条资产或一个错误。
  */
 export interface AudioUploadAdapter {
+  loadAudio?(
+    assetId: string,
+    options?: { signal?: AbortSignal }
+  ): Promise<Blob>;
   upload(input: {
     file: File;
     locale: AudioAssetLocale;
@@ -189,6 +223,7 @@ export interface VoiceRichTextFieldProps {
  * 但本包不依赖 admin 的词条类型，故在此另行定义。
  */
 export interface VoiceSetting {
+  output_format?: "mp3" | "wav";
   audio_asset_id?: string;
   version_id?: string;
   version_name?: string;
@@ -199,6 +234,8 @@ export interface VoiceSetting {
   pitch_semitones?: number;
   volume_percent?: number;
   style?: string;
+  style_degree?: number;
+  role?: string;
 }
 
 export interface VoiceRecommendation {
@@ -211,6 +248,11 @@ export interface VoiceRecommendation {
 
 export interface VoiceProfile {
   voices: VoiceSetting[];
+  dubbing?: {
+    mode: "inherit" | "local";
+    area: VoiceRecommendationArea;
+    recommendation_order?: string[];
+  };
 }
 
 export type TextRole = "body" | "definition" | "example";
@@ -238,6 +280,10 @@ export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
   /** 改字失效的关联在改回原文时恢复；显式清除不自动恢复。 */
   restoreTextLinksOnCorrection?: boolean;
   renderAssociationPicker?: (props: AssociationPickerProps<TLink>) => ReactNode;
+  readingLinks?: import("@tsz/types").GrammarFormLinkV3[];
+  renderReadingPicker?: (
+    props: AssociationPickerProps<import("@tsz/types").GrammarFormLinkV3>
+  ) => ReactNode;
   onAssociationPendingChange?: (pending: boolean) => void;
   /** prepareComplete normalizes spelling through the editor history; false asks the user to review. */
   renderActions?: (
@@ -290,5 +336,9 @@ export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
   onAudioAssetsChange?: (next: AudioAsset[]) => void;
   /** 每段文本最多几条音频；缺省用 wire 的上限。 */
   audioAssetLimit?: number;
-  onChange: (value: RichTextV2, textLinks?: TLink[]) => void;
+  onChange: (
+    value: RichTextV2,
+    textLinks?: TLink[],
+    readingLinks?: import("@tsz/types").GrammarFormLinkV3[]
+  ) => void;
 }

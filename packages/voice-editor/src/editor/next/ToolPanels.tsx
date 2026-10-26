@@ -165,8 +165,8 @@ export function VoicePanel({
     ).map(({ key, badge, label: groupLabel }) => {
       const group = items.filter(
         (voice) =>
-          speechAccentGroup(voice.locale) === key &&
-          (speechLocaleMatchesScope(voice.locale, locale) ||
+          speechAccentGroup(voice.locale, voice.accent) === key &&
+          (speechLocaleMatchesScope(voice.locale, locale, voice.accent) ||
             enabledVoiceIds.includes(voice.id))
       );
       const groupLocale =
@@ -323,14 +323,22 @@ export function VoicePanel({
                             )}
                             <Button
                               size="small"
-                              color={
-                                speechAccentGroup(voice.locale) === "uk"
-                                  ? "danger"
-                                  : speechAccentGroup(voice.locale) === "us"
-                                    ? "primary"
-                                    : "default"
-                              }
+                              color={"default"}
                               variant="text"
+                              style={{
+                                color:
+                                  speechAccentGroup(
+                                    voice.locale,
+                                    voice.accent
+                                  ) === "uk"
+                                    ? "#2053FF"
+                                    : speechAccentGroup(
+                                          voice.locale,
+                                          voice.accent
+                                        ) === "us"
+                                      ? "#FC007A"
+                                      : "#8c8c8c"
+                              }}
                               className="tsz-ve-audition-button"
                               aria-label={`试听 ${voice.label}`}
                               loading={pendingVoiceId === voice.id}
@@ -478,7 +486,7 @@ function VoiceRateControl({
                 multiplier > RATE_MULTIPLIER_MAX ||
                 !allowed(percent)
               ) {
-                setError("请输入该音色支持的语速，范围为 0.50×–2.00×");
+                setError("请输入该音色支持的语速，范围为 0.30×–1.70×");
                 return;
               }
               apply(percent);

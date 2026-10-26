@@ -66,15 +66,18 @@ export const RATE_PRESETS: ReadonlyArray<{
   multiplier: number;
   percent: number;
 }> = [
-  { multiplier: 1.25, percent: 25 },
-  { multiplier: 1, percent: 0 },
-  { multiplier: 0.75, percent: -25 },
-  { multiplier: 0.5, percent: -50 }
-];
+  0.3,
+  0.4,
+  ...Array.from({ length: 11 }, (_, index) => (50 + index * 5) / 100),
+  ...Array.from({ length: 7 }, (_, index) => (11 + index) / 10)
+].map((multiplier) => ({
+  multiplier,
+  percent: Math.round((multiplier - 1) * 100)
+}));
 
 /** 自定义语速允许的倍数区间；超出一律拒绝，避免送出离谱的 prosody rate。 */
-export const RATE_MULTIPLIER_MIN = 0.5;
-export const RATE_MULTIPLIER_MAX = 2;
+export const RATE_MULTIPLIER_MIN = 0.3;
+export const RATE_MULTIPLIER_MAX = 1.7;
 
 /** 停顿预设（毫秒）。上下限直接用 core 的 MIN/MAX_PAUSE_MS。 */
 export const PAUSE_PRESETS: readonly number[] = [500, 1000, 2000, 5000];

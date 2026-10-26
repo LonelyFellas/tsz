@@ -186,6 +186,46 @@ describe("admin voice preview data source", () => {
       []
     );
   });
+  it("未选候选不作为默认，板块无已选时按口音回退全局常用", async () => {
+    const recommendation = (id: string, selected: boolean) => ({
+      id,
+      name: id,
+      selected,
+      voice_alias: id,
+      parameters: { rate_percent: -27, pitch_semitones: 0, style: null }
+    });
+    state.groups.mockResolvedValue({
+      revision: 4,
+      groups: [
+        {
+          id: "global",
+          name: "全局常用",
+          is_global: true,
+          areas: [],
+          uk: [recommendation("global-uk", true)],
+          us: [recommendation("global-us", true)]
+        },
+        {
+          id: "local",
+          name: "板块",
+          areas: ["word"],
+          uk: [recommendation("unselected", false)],
+          us: [recommendation("local-us", true)]
+        }
+      ]
+    });
+    const { loadAdminVoiceRecommendations } = await import("./dataSource");
+    expect(
+      (await loadAdminVoiceRecommendations({ area: "word" })).map(
+        (item) => item.id
+      )
+    ).toEqual(["global-uk", "local-us"]);
+    expect(
+      (await loadAdminVoiceRecommendations({ area: "grammar" })).map(
+        (item) => item.id
+      )
+    ).toEqual(["global-uk", "global-us"]);
+  });
   it("delegates both methods to the real API when mock is disabled", async () => {
     vi.stubEnv("PROD", false);
     const { adminVoicePreviewAdapter, voicePreviewIsMock } =

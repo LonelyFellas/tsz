@@ -99,6 +99,25 @@ describe("文本配音版本", () => {
     );
     expect(next.find((item) => item.version_id === "au")?.enabled).toBe(true);
   });
+  it("人工归属改变选用组但不改原生地区，未归类既有版本保留", () => {
+    const sg = {
+      ...slow,
+      version_id: "sg",
+      voice_id: "luna",
+      locale: "en-SG" as const
+    };
+    const current = [
+      ...voices,
+      { id: "luna", locale: "en-SG", accent: "gb" } as VoiceOption
+    ];
+    const next = selectVoiceVersion([normal, us], sg, "en-SG", current);
+    expect(next.find((item) => item.voice_id === "sonia")?.enabled).toBe(false);
+    expect(next.find((item) => item.voice_id === "guy")?.enabled).toBe(true);
+    expect(next.find((item) => item.voice_id === "luna")).toMatchObject({
+      enabled: true,
+      locale: "en-SG"
+    });
+  });
   it("同音色多个版本默认读取正式版本，调参时定位指定版本", () => {
     expect(voiceSettingFor([slow, normal], "sonia")).toBe(normal);
     expect(voiceSettingFor([slow, normal], "sonia", "slow")).toBe(slow);

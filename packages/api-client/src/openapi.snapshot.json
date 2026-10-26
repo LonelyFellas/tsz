@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dubbing-center/docs/openapi.json",
-  "_generatedAt": "2026-10-25T16:00:57.749Z",
+  "_generatedAt": "2026-10-26T21:03:39.345Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -24,6 +24,7 @@
     "/admin/dashboard/overview": ["get"],
     "/admin/lexicon/audio-assets": ["post"],
     "/admin/lexicon/audio-assets/upload-url": ["post"],
+    "/admin/lexicon/audio-assets/{id}/content": ["get"],
     "/admin/lexicon/audio-assets/{id}/url": ["get"],
     "/admin/lexicon/detections": ["post"],
     "/admin/lexicon/entries": ["get", "post"],
@@ -93,11 +94,23 @@
       "patch"
     ],
     "/admin/speech/audio": ["post"],
-    "/admin/speech/groups": ["get", "put"],
+    "/admin/speech/audio-update-settings": ["get", "put"],
+    "/admin/speech/audio-updates": ["get"],
+    "/admin/speech/audio-updates/{id}/cancel": ["post"],
+    "/admin/speech/audio-updates/{id}/retry": ["post"],
+    "/admin/speech/groups": ["get", "post", "put"],
+    "/admin/speech/groups/{id}": ["delete", "put"],
+    "/admin/speech/groups/{id}/audio-updates": ["get"],
     "/admin/speech/library": ["get"],
+    "/admin/speech/library/{alias}/accent": ["put"],
     "/admin/speech/library/{alias}/description": ["put"],
+    "/admin/speech/library/{alias}/description/restore": ["post"],
     "/admin/speech/library/{alias}/personal": ["put"],
     "/admin/speech/previews": ["post"],
+    "/admin/speech/previews/ssml": ["post"],
+    "/admin/speech/previews/{hash}/content": ["get"],
+    "/admin/speech/resolve": ["post"],
+    "/admin/speech/ssml": ["post"],
     "/admin/speech/voices": ["get"],
     "/admin/teacher-applications": ["get"],
     "/admin/teacher-applications/{id}": ["get"],
@@ -1296,6 +1309,12 @@
     ],
     "get /admin/speech/groups": [
       {
+        "name": "X-TSZ-Dubbing-Groups",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Voice-Models",
         "in": "header",
         "required": false,
@@ -1349,6 +1368,12 @@
       }
     ],
     "get /admin/speech/voices": [
+      {
+        "name": "X-TSZ-Voice-Catalog",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
       {
         "name": "X-TSZ-Voice-Models",
         "in": "header",
@@ -2410,6 +2435,16 @@
         "503": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
+    "get /admin/lexicon/audio-assets/{id}/content": {
+      "request": null,
+      "responses": {
+        "200": null,
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "501": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "get /admin/lexicon/audio-assets/{id}/url": {
       "request": null,
       "responses": {
@@ -3013,12 +3048,63 @@
         "503": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
+    "get /admin/speech/audio-update-settings": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/DubbingUpdateSettings" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "put /admin/speech/audio-update-settings": {
+      "request": { "$ref": "#/components/schemas/SaveDubbingUpdateSettings" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/DubbingUpdateSettings" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/speech/audio-updates": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/DubbingAudioUpdates" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/speech/audio-updates/{id}/cancel": {
+      "request": null,
+      "responses": {
+        "204": null,
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/speech/audio-updates/{id}/retry": {
+      "request": null,
+      "responses": {
+        "204": null,
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "get /admin/speech/groups": {
       "request": null,
       "responses": {
         "200": { "$ref": "#/components/schemas/DubbingGroupsResponse" },
         "401": { "$ref": "#/components/schemas/ProblemDetails" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/speech/groups": {
+      "request": { "$ref": "#/components/schemas/SaveDubbingGroupRequest" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/DubbingGroupsResponse" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
     "put /admin/speech/groups": {
@@ -3033,6 +3119,35 @@
         "422": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
+    "delete /admin/speech/groups/{id}": {
+      "request": { "$ref": "#/components/schemas/DeleteDubbingGroupRequest" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/DubbingGroupsResponse" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "put /admin/speech/groups/{id}": {
+      "request": { "$ref": "#/components/schemas/SaveDubbingGroupRequest" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/DubbingGroupsResponse" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/speech/groups/{id}/audio-updates": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/DubbingAudioUpdates" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "get /admin/speech/library": {
       "request": null,
       "responses": {
@@ -3041,8 +3156,34 @@
         "403": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
+    "put /admin/speech/library/{alias}/accent": {
+      "request": { "$ref": "#/components/schemas/SaveVoiceAccentRequest" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/VoiceLibraryItem" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "put /admin/speech/library/{alias}/description": {
       "request": { "$ref": "#/components/schemas/SaveVoiceDescriptionRequest" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/VoiceLibraryItem" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/speech/library/{alias}/description/restore": {
+      "request": {
+        "$ref": "#/components/schemas/RestoreVoiceDescriptionRequest"
+      },
       "responses": {
         "200": { "$ref": "#/components/schemas/VoiceLibraryItem" },
         "400": { "$ref": "#/components/schemas/ProblemDetails" },
@@ -3078,6 +3219,43 @@
         "429": { "$ref": "#/components/schemas/ProblemDetails" },
         "500": { "$ref": "#/components/schemas/ProblemDetails" },
         "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/speech/previews/ssml": {
+      "request": { "$ref": "#/components/schemas/ManualPreviewRequest" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/PreviewResponse" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/speech/previews/{hash}/content": {
+      "request": null,
+      "responses": {
+        "200": null,
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/speech/resolve": {
+      "request": { "$ref": "#/components/schemas/ResolveDubbingRequest" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/ResolveDubbingResponse" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/speech/ssml": {
+      "request": { "$ref": "#/components/schemas/RenderSsmlRequest" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/RenderSsmlResponse" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
     "get /admin/speech/voices": {
@@ -3523,11 +3701,15 @@
       "type": "object",
       "required": [
         "voice_alias",
+        "accent",
+        "accent_revision",
         "description_revision",
         "notes",
         "personal_revision"
       ],
       "properties": {
+        "accent": { "$ref": "#/components/schemas/VoiceAccent" },
+        "accent_revision": { "type": "integer", "format": "int64" },
         "description_revision": { "type": "integer", "format": "int64" },
         "description_zh": { "type": ["string", "null"] },
         "notes": { "type": "string" },
@@ -3560,6 +3742,90 @@
           "items": { "$ref": "#/components/schemas/DubbingGroup" }
         },
         "revision": { "type": "integer", "format": "int64" }
+      }
+    },
+    "DubbingAudioUpdates": {
+      "type": "object",
+      "required": ["updates"],
+      "properties": {
+        "updates": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/DubbingAudioUpdate" }
+        }
+      }
+    },
+    "DubbingAudioUpdate": {
+      "type": "object",
+      "required": [
+        "id",
+        "group_id",
+        "group_name",
+        "group_revision",
+        "state",
+        "due_at",
+        "total",
+        "completed",
+        "failed",
+        "skipped",
+        "error_codes"
+      ],
+      "properties": {
+        "completed": { "type": "integer", "format": "int64" },
+        "due_at": { "type": "string", "format": "date-time" },
+        "error_codes": { "type": "array", "items": { "type": "string" } },
+        "failed": { "type": "integer", "format": "int64" },
+        "group_id": { "type": "string", "format": "uuid" },
+        "group_name": { "type": "string" },
+        "group_revision": { "type": "integer", "format": "int64" },
+        "id": { "type": "string", "format": "uuid" },
+        "skipped": { "type": "integer", "format": "int64" },
+        "state": { "type": "string" },
+        "total": { "type": "integer", "format": "int64" }
+      }
+    },
+    "DubbingUpdateSettings": {
+      "type": "object",
+      "required": ["wait_seconds", "enabled", "revision"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "revision": { "type": "integer", "format": "int64" },
+        "wait_seconds": { "type": "integer", "format": "int32" }
+      }
+    },
+    "SaveDubbingUpdateSettings": {
+      "type": "object",
+      "required": ["wait_seconds", "enabled", "base_revision"],
+      "properties": {
+        "base_revision": { "type": "integer", "format": "int64" },
+        "enabled": { "type": "boolean" },
+        "wait_seconds": { "type": "integer", "format": "int32" }
+      },
+      "additionalProperties": false
+    },
+    "RenderSsmlResponse": {
+      "type": "object",
+      "required": ["ssml"],
+      "properties": { "ssml": { "type": "string" } }
+    },
+    "PreviewResponse": {
+      "type": "object",
+      "required": [
+        "content_path",
+        "cache_status",
+        "audio_url",
+        "expires_at",
+        "url_expires_in_seconds"
+      ],
+      "properties": {
+        "audio_url": { "type": "string" },
+        "cache_status": { "$ref": "#/components/schemas/PreviewCacheStatus" },
+        "content_path": { "type": "string" },
+        "expires_at": { "type": "string", "format": "date-time" },
+        "url_expires_in_seconds": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 0
+        }
       }
     },
     "AdminWordCreator": {
@@ -6157,6 +6423,33 @@
         "supports_volume_percent": { "type": "boolean" }
       }
     },
+    "VoiceCapabilityEvidence": {
+      "type": "object",
+      "required": [
+        "provider_voice_id",
+        "locale",
+        "gender",
+        "model",
+        "styles",
+        "source_url",
+        "checked_at"
+      ],
+      "properties": {
+        "checked_at": { "type": "string", "format": "date-time" },
+        "gender": { "type": "string" },
+        "locale": { "type": "string" },
+        "model": { "type": "string" },
+        "provider_voice_id": { "type": "string" },
+        "roles": { "type": ["array", "null"], "items": { "type": "string" } },
+        "source_url": { "type": "string" },
+        "styles": { "type": "array", "items": { "type": "string" } },
+        "supported_locales": {
+          "type": ["array", "null"],
+          "items": { "type": "string" }
+        },
+        "supports_style_degree": { "type": ["boolean", "null"] }
+      }
+    },
     "VoiceResponse": {
       "type": "object",
       "required": [
@@ -6168,8 +6461,21 @@
         "capabilities"
       ],
       "properties": {
+        "accent": {
+          "oneOf": [
+            { "$ref": "#/components/schemas/VoiceAccent" },
+            { "type": "null" }
+          ]
+        },
+        "accent_revision": { "type": ["integer", "null"], "format": "int64" },
         "alias": { "type": "string" },
         "capabilities": { "$ref": "#/components/schemas/VoiceCapabilities" },
+        "capability_evidence": {
+          "oneOf": [
+            { "$ref": "#/components/schemas/VoiceCapabilityEvidence" },
+            { "type": "null" }
+          ]
+        },
         "display_name": { "type": "string" },
         "gender": { "type": "string" },
         "is_common": { "type": "boolean" },
@@ -6179,7 +6485,8 @@
             { "$ref": "#/components/schemas/VoiceMetadata" },
             { "type": "null" }
           ]
-        }
+        },
+        "synthesis_available": { "type": ["boolean", "null"] }
       }
     },
     "VoiceMetadata": {
@@ -6219,9 +6526,22 @@
       "required": ["content", "voice_alias"],
       "properties": {
         "content": { "$ref": "#/components/schemas/RichTextV2" },
+        "output_format": {
+          "oneOf": [
+            { "$ref": "#/components/schemas/AudioOutputFormat" },
+            { "type": "null" }
+          ]
+        },
         "pitch_semitones": { "type": "integer", "format": "int32" },
         "rate_percent": { "type": "integer", "format": "int32" },
+        "role": { "type": ["string", "null"] },
         "style": { "type": ["string", "null"] },
+        "style_degree": {
+          "type": ["number", "null"],
+          "format": "double",
+          "maximum": 2,
+          "minimum": 0.01
+        },
         "voice_alias": { "type": "string" },
         "volume_percent": {
           "type": "integer",
@@ -6234,25 +6554,6 @@
       "additionalProperties": false
     },
     "PreviewCacheStatus": { "type": "string", "enum": ["hit", "generated"] },
-    "PreviewResponse": {
-      "type": "object",
-      "required": [
-        "cache_status",
-        "audio_url",
-        "expires_at",
-        "url_expires_in_seconds"
-      ],
-      "properties": {
-        "audio_url": { "type": "string" },
-        "cache_status": { "$ref": "#/components/schemas/PreviewCacheStatus" },
-        "expires_at": { "type": "string", "format": "date-time" },
-        "url_expires_in_seconds": {
-          "type": "integer",
-          "format": "int64",
-          "minimum": 0
-        }
-      }
-    },
     "AccountDeletionChannel": { "type": "string", "enum": ["phone", "email"] },
     "ArchiveLearningTask": {
       "type": "object",
@@ -6294,6 +6595,7 @@
       "type": "string",
       "enum": ["female", "male", "neutral"]
     },
+    "AudioOutputFormat": { "type": "string", "enum": ["mp3", "wav"] },
     "AvatarConfirmRequest": {
       "type": "object",
       "required": ["key"],
@@ -6537,6 +6839,14 @@
       "additionalProperties": false
     },
     "CycleOperation": { "type": "string", "enum": ["next", "restart_blocked"] },
+    "DeleteDubbingGroupRequest": {
+      "type": "object",
+      "required": ["base_revision"],
+      "properties": {
+        "base_revision": { "type": "integer", "format": "int64" }
+      },
+      "additionalProperties": false
+    },
     "DetectLexiconSurfaceV3Input": {
       "type": "object",
       "required": ["schema_version", "language", "kind", "surface"],
@@ -6596,13 +6906,19 @@
       },
       "additionalProperties": false
     },
+    "DubbingAreaV3": {
+      "type": "string",
+      "enum": ["word", "azure", "grammar", "meaning", "example"]
+    },
     "DubbingGroup": {
       "type": "object",
       "required": ["id", "name", "areas", "uk", "us"],
       "properties": {
         "areas": { "type": "array", "items": { "type": "string" } },
         "id": { "type": "string", "format": "uuid" },
+        "is_global": { "type": "boolean" },
         "name": { "type": "string" },
+        "revision": { "type": "integer", "format": "int64" },
         "uk": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/DubbingRecommendation" }
@@ -6621,6 +6937,7 @@
         "id": { "type": "string", "format": "uuid" },
         "name": { "type": "string" },
         "parameters": { "$ref": "#/components/schemas/VoiceParameters" },
+        "selected": { "type": "boolean" },
         "voice_alias": { "type": "string" }
       },
       "additionalProperties": false
@@ -6884,6 +7201,12 @@
       "type": "object",
       "required": ["request_id", "source", "setting"],
       "properties": {
+        "profile": {
+          "oneOf": [
+            { "$ref": "#/components/schemas/VoiceProfileV3" },
+            { "type": "null" }
+          ]
+        },
         "request_id": { "type": "string", "format": "uuid" },
         "setting": { "$ref": "#/components/schemas/VoiceSettingV3" },
         "source": { "$ref": "#/components/schemas/GeneratedSpeechSource" }
@@ -6941,6 +7264,12 @@
       ],
       "properties": {
         "id": { "type": "string", "format": "uuid" },
+        "reading_reference": {
+          "oneOf": [
+            { "$ref": "#/components/schemas/ReadingReferenceV3" },
+            { "type": "null" }
+          ]
+        },
         "source_segments": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/SentenceSourceRangeV1" },
@@ -7059,6 +7388,16 @@
           "type": "array",
           "items": { "type": "string", "format": "uuid" }
         }
+      },
+      "additionalProperties": false
+    },
+    "ManualPreviewRequest": {
+      "type": "object",
+      "required": ["voice_alias", "ssml"],
+      "properties": {
+        "output_format": { "$ref": "#/components/schemas/AudioOutputFormat" },
+        "ssml": { "type": "string", "maxLength": 32000 },
+        "voice_alias": { "type": "string" }
       },
       "additionalProperties": false
     },
@@ -7266,6 +7605,37 @@
       },
       "additionalProperties": false
     },
+    "ReadingReferenceV3": {
+      "type": "object",
+      "properties": {
+        "sense_id": { "type": ["string", "null"], "format": "uuid" },
+        "uk": {
+          "oneOf": [
+            { "$ref": "#/components/schemas/ReadingSelectionV3" },
+            { "type": "null" }
+          ]
+        },
+        "us": {
+          "oneOf": [
+            { "$ref": "#/components/schemas/ReadingSelectionV3" },
+            { "type": "null" }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "ReadingSelectionV3": {
+      "type": "object",
+      "required": ["pronunciation_id", "alphabet", "locale", "revision"],
+      "properties": {
+        "alphabet": { "$ref": "#/components/schemas/RichTextPhonemeAlphabet" },
+        "locale": { "$ref": "#/components/schemas/PhonemeLocaleV3" },
+        "pronunciation_id": { "type": "string", "format": "uuid" },
+        "revision": { "type": "string" },
+        "use_spelling": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
     "RegisterRequest": {
       "type": "object",
       "description": "联系方式恰好提供一种；验证码用途为 register。",
@@ -7304,6 +7674,25 @@
       },
       "additionalProperties": false
     },
+    "RenderSsmlRequest": {
+      "type": "object",
+      "required": ["source", "setting"],
+      "properties": {
+        "setting": { "$ref": "#/components/schemas/VoiceSettingV3" },
+        "source": { "$ref": "#/components/schemas/GeneratedSpeechSource" }
+      },
+      "additionalProperties": false
+    },
+    "ResolveDubbingRequest": {
+      "type": "object",
+      "required": ["profile", "source", "accent"],
+      "properties": {
+        "accent": { "$ref": "#/components/schemas/VoiceAccent" },
+        "profile": { "$ref": "#/components/schemas/VoiceProfileV3" },
+        "source": { "$ref": "#/components/schemas/GeneratedSpeechSource" }
+      },
+      "additionalProperties": false
+    },
     "RestoreDraftFromPublicationV3Input": {
       "type": "object",
       "required": [
@@ -7320,6 +7709,14 @@
         "base_revision": { "type": "integer", "format": "int64", "minimum": 1 },
         "confirmed_surface_match_token": { "type": "string" },
         "schema_version": { "type": "integer", "enum": [3] }
+      },
+      "additionalProperties": false
+    },
+    "RestoreVoiceDescriptionRequest": {
+      "type": "object",
+      "required": ["base_revision"],
+      "properties": {
+        "base_revision": { "type": "integer", "format": "int64" }
       },
       "additionalProperties": false
     },
@@ -7346,6 +7743,26 @@
             "phoneme": { "type": "string" },
             "start": { "type": "integer", "minimum": 0 },
             "type": { "type": "string", "enum": ["phoneme"] }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "interpret_as", "type"],
+          "properties": {
+            "end": { "type": "integer", "minimum": 0 },
+            "interpret_as": { "type": "string" },
+            "start": { "type": "integer", "minimum": 0 },
+            "type": { "type": "string", "enum": ["say_as"] }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "alias", "type"],
+          "properties": {
+            "alias": { "type": "string" },
+            "end": { "type": "integer", "minimum": 0 },
+            "start": { "type": "integer", "minimum": 0 },
+            "type": { "type": "string", "enum": ["sub"] }
           }
         },
         {
@@ -7445,6 +7862,28 @@
             "phoneme": { "type": "string", "maxLength": 1600 },
             "start": { "type": "integer", "minimum": 0 },
             "type": { "type": "string", "enum": ["phoneme"] }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "interpret_as", "type"],
+          "properties": {
+            "end": { "type": "integer", "minimum": 0 },
+            "interpret_as": { "type": "string" },
+            "start": { "type": "integer", "minimum": 0 },
+            "type": { "type": "string", "enum": ["say_as"] }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "alias", "type"],
+          "properties": {
+            "alias": { "type": "string" },
+            "end": { "type": "integer", "minimum": 0 },
+            "start": { "type": "integer", "minimum": 0 },
+            "type": { "type": "string", "enum": ["sub"] }
           },
           "additionalProperties": false
         },
@@ -7613,6 +8052,11 @@
         },
         "id": { "type": "string", "format": "uuid" },
         "origin": { "$ref": "#/components/schemas/TextOrigin" },
+        "reading_links": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/GrammarFormLinkV3" },
+          "maxItems": 100
+        },
         "text_links": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/TextLinkV3" },
@@ -7627,6 +8071,15 @@
       },
       "additionalProperties": false
     },
+    "SaveDubbingGroupRequest": {
+      "type": "object",
+      "required": ["group", "base_revision"],
+      "properties": {
+        "base_revision": { "type": "integer", "format": "int64" },
+        "group": { "$ref": "#/components/schemas/DubbingGroup" }
+      },
+      "additionalProperties": false
+    },
     "SaveDubbingGroupsRequest": {
       "type": "object",
       "required": ["groups", "base_revision"],
@@ -7636,6 +8089,15 @@
           "type": "array",
           "items": { "$ref": "#/components/schemas/DubbingGroup" }
         }
+      },
+      "additionalProperties": false
+    },
+    "SaveVoiceAccentRequest": {
+      "type": "object",
+      "required": ["accent", "base_revision"],
+      "properties": {
+        "accent": { "$ref": "#/components/schemas/VoiceAccent" },
+        "base_revision": { "type": "integer", "format": "int64" }
       },
       "additionalProperties": false
     },
@@ -7882,6 +8344,11 @@
       "description": "独立的拼写试听配置；content 与 spelling 同文，仅允许停顿标注。",
       "required": ["content", "voice_profile"],
       "properties": {
+        "audio_assets": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/AudioAsset" },
+          "maxItems": 8
+        },
         "content": { "$ref": "#/components/schemas/RichTextV2V3" },
         "voice_profile": { "$ref": "#/components/schemas/VoiceProfileV3" }
       },
@@ -8053,13 +8520,21 @@
       },
       "additionalProperties": false
     },
+    "VoiceAccent": { "type": "string", "enum": ["gb", "us", "none"] },
     "VoiceParameters": {
       "type": "object",
       "required": ["rate_percent", "pitch_semitones"],
       "properties": {
         "pitch_semitones": { "type": "integer", "format": "int32" },
         "rate_percent": { "type": "integer", "format": "int32" },
+        "role": { "type": ["string", "null"] },
         "style": { "type": ["string", "null"] },
+        "style_degree": {
+          "type": ["number", "null"],
+          "format": "double",
+          "maximum": 2,
+          "minimum": 0.01
+        },
         "volume_percent": {
           "type": "integer",
           "format": "int32",
@@ -8069,11 +8544,31 @@
       },
       "additionalProperties": false
     },
+    "VoiceProfileDubbingV3": {
+      "type": "object",
+      "required": ["mode", "area"],
+      "properties": {
+        "area": { "$ref": "#/components/schemas/DubbingAreaV3" },
+        "mode": { "$ref": "#/components/schemas/VoiceProfileModeV3" },
+        "recommendation_order": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "VoiceProfileModeV3": { "type": "string", "enum": ["inherit", "local"] },
     "VoiceProfileV3": {
       "type": "object",
       "description": "此段文本的逐音色配置。未出现的音色默认不启用、原速。\nvoice_id 是目录 alias；历史下线音色仍可保存，不做外键式校验。",
       "required": ["voices"],
       "properties": {
+        "dubbing": {
+          "oneOf": [
+            { "$ref": "#/components/schemas/VoiceProfileDubbingV3" },
+            { "type": "null" }
+          ]
+        },
         "voices": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/VoiceSettingV3" },
@@ -8090,6 +8585,12 @@
         "audio_asset_id": { "type": "string", "format": "uuid" },
         "enabled": { "type": "boolean" },
         "locale": { "$ref": "#/components/schemas/EnglishLocale" },
+        "output_format": {
+          "oneOf": [
+            { "$ref": "#/components/schemas/AudioOutputFormat" },
+            { "type": "null" }
+          ]
+        },
         "pitch_semitones": {
           "type": "integer",
           "format": "int32",
@@ -8102,7 +8603,14 @@
           "maximum": 100,
           "minimum": -50
         },
+        "role": { "type": ["string", "null"] },
         "style": { "type": "string", "maxLength": 64 },
+        "style_degree": {
+          "type": ["number", "null"],
+          "format": "double",
+          "maximum": 2,
+          "minimum": 0.01
+        },
         "version_id": { "type": "string", "format": "uuid" },
         "version_name": { "type": "string", "maxLength": 40, "minLength": 1 },
         "voice_id": { "type": "string" },

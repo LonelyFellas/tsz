@@ -12,12 +12,16 @@ import {
 } from "@tsz/voice-editor/types";
 
 export interface AdminSpeechDataSource {
+  previewContent?(path: string, signal?: AbortSignal): Promise<Blob>;
   voices(signal?: AbortSignal): Promise<AdminSpeechVoiceListResponse>;
   preview(
     input: {
       content: Parameters<VoicePreviewAdapter["synthesize"]>[0]["content"];
       voice_alias: string;
       style?: string | null;
+      style_degree?: number;
+      role?: string;
+      output_format?: "mp3" | "wav";
       rate_percent?: number;
       pitch_semitones?: number;
     },
@@ -80,6 +84,10 @@ function mapVoice(
     isCommon: item.is_common ?? true,
     label: `${item.display_name ?? item.alias} · ${item.locale}`,
     locale: item.locale,
+    accent: item.accent,
+    supportsStyleDegree:
+      item.capability_evidence?.supports_style_degree === true,
+    roles: item.capability_evidence?.roles ?? undefined,
     gender: gender === "female" || gender === "male" ? gender : "neutral",
     styles: [...capabilities.styles],
     supportsVolume: capabilities.supports_volume_percent ?? true,
@@ -100,8 +108,17 @@ function mapVoice(
   };
 }
 
-function mapPreview(result: AdminSpeechPreviewResponse): VoicePreviewResult {
+function mapPreview(
+  result: AdminSpeechPreviewResponse,
+  source?: AdminSpeechDataSource
+): VoicePreviewResult {
   return {
+    ...(result.content_path && source?.previewContent
+      ? {
+          loadAudio: (options?: { signal?: AbortSignal }) =>
+            source.previewContent!(result.content_path!, options?.signal)
+        }
+      : {}),
     audioUrl: result.audio_url,
     expiresAt: result.expires_at,
     cached: result.cache_status === "hit"
@@ -156,7 +173,13 @@ export function createAdminVoicePreviewAdapter(
         for (const voice of response.items) {
           catalog.set(voice.alias, voice.capabilities);
         }
-        return response.items.map(mapVoice);
+        return response.items
+          .filter(
+            (voice) =>
+              voice.locale.startsWith("en-") &&
+              voice.synthesis_available !== false
+          )
+          .map(mapVoice);
       } catch (error) {
         if (error instanceof HttpError) {
           throw safePreviewError(error);
@@ -224,9 +247,14 @@ export function createAdminVoicePreviewAdapter(
           );
         }
         const request = {
+          ...(input.outputFormat ? { output_format: input.outputFormat } : {}),
           content: input.content,
           voice_alias: input.voiceId,
           ...(input.style ? { style: input.style } : {}),
+          ...(input.styleDegree !== undefined
+            ? { style_degree: input.styleDegree }
+            : {}),
+          ...(input.role !== undefined ? { role: input.role } : {}),
           rate_percent: ratePercent,
           pitch_semitones: pitchSemitones,
           ...(volumePercent === 100 ? {} : { volume_percent: volumePercent })
@@ -238,7 +266,8 @@ export function createAdminVoicePreviewAdapter(
         ) {
           try {
             return mapPreview(
-              await dataSource.preview(request, options?.signal)
+              await dataSource.preview(request, options?.signal),
+              dataSource
             );
           } catch (error) {
             if (

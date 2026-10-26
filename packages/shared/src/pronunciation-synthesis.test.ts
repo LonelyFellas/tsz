@@ -9,7 +9,9 @@ import {
   pronunciationSynthesisLabel,
   editSynthesisUpsWords,
   synthesisPhonemeWordRanges,
-  synthesisInputIssue
+  synthesisInputIssue,
+  readingRevision,
+  mapSynthesisSpeechContent
 } from "./pronunciation-synthesis";
 
 describe("手动选源", () => {
@@ -151,6 +153,46 @@ describe("语法结构整段合成", () => {
         }
       ]
     });
+  });
+  it("明确选择第二读法及源字段，版本或口音失配时不回退首条", () => {
+    const second = {
+      ...first,
+      id: "selected-second",
+      synthesis: { ...first.synthesis, ipa: "dʒɛb" }
+    };
+    const reference = {
+      uk: {
+        pronunciation_id: second.id,
+        alphabet: "ipa" as const,
+        locale: "en-GB" as const,
+        revision: readingRevision(second.synthesis, "en-GB", "uk", "ipa")
+      }
+    };
+    const precise = {
+      ...binding,
+      pronunciations: [first, second],
+      reading_reference: reference
+    };
+    expect(
+      grammarSynthesisContent(content, [precise], "en-GB").annotations
+    ).toEqual([
+      { type: "phoneme", start: 4, end: 7, alphabet: "ipa", phoneme: "dʒɛb" }
+    ]);
+    expect(() => grammarSynthesisContent(content, [precise], "en-US")).toThrow(
+      /当前口音未选择读法/
+    );
+    expect(() =>
+      grammarSynthesisContent(
+        content,
+        [
+          {
+            ...precise,
+            reading_reference: { uk: { ...reference.uk, revision: "stale" } }
+          }
+        ],
+        "en-GB"
+      )
+    ).toThrow(/版本变化/);
   });
   it("保持整段正文，只将关联词形的第一条发音标注到对应码点", () => {
     expect(grammarSynthesisContent(content, [binding], "en-GB")).toEqual({
@@ -423,6 +465,71 @@ describe("独立合成输入", () => {
 });
 
 describe("IPA/UPS 来源与独立停顿", () => {
+  it("特殊读法按完整 UPS 词界往返，覆盖当前词音素且保留其余词", () => {
+    const candidate = {
+      ipa: "fɑː əˈweɪ",
+      ups: "F AA lng AX W EY",
+      ups_words: [
+        { text: "far", phoneme: "F AA lng" },
+        { text: "away", phoneme: "AX W EY" }
+      ]
+    };
+    const phones = {
+      version: 2 as const,
+      text: candidate.ups,
+      annotations: [
+        { type: "sub" as const, start: 0, end: 8, alias: "distant" }
+      ]
+    };
+    const speech = mapSynthesisSpeechContent(
+      phones,
+      "far away",
+      candidate,
+      "ups",
+      true
+    )!;
+    expect(speech.annotations).toEqual([
+      { type: "sub", start: 0, end: 3, alias: "distant" }
+    ]);
+    expect(
+      mapSynthesisSpeechContent(speech, "far away", candidate, "ups", false)
+    ).toEqual(phones);
+    expect(
+      mapSynthesisSpeechContent(
+        { ...phones, annotations: [{ ...phones.annotations[0]!, end: 4 }] },
+        "far away",
+        candidate,
+        "ups",
+        true
+      )
+    ).toBeUndefined();
+    const content = pronunciationSynthesisContent("far away", {
+      ...candidate,
+      alphabet: "ups",
+      ups_speech: { content: speech, voice_profile: { voices: [] } }
+    })!;
+    expect(content.annotations).toEqual([
+      {
+        type: "phoneme",
+        start: 4,
+        end: 8,
+        alphabet: "ups",
+        phoneme: "AX W EY"
+      },
+      { type: "sub", start: 0, end: 3, alias: "distant" }
+    ]);
+  });
+  it("读法版本的 UPS 词界使用固定数组格式，不受 JSON 对象键顺序影响", () => {
+    const synthesis = {
+      alphabet: "ups" as const,
+      ipa: "kæt",
+      ups: "K AE T",
+      ups_words: [{ phoneme: "K AE T", text: "cat" }]
+    };
+    expect(readingRevision(synthesis, "en-GB", "uk", "ups")).toBe(
+      '["en-GB","ups","K AE T",[["cat","K AE T"]],false]'
+    );
+  });
   it("将音标词界映射到正文词界，UPS 音素间空格不视为正文词界", () => {
     const candidate = {
       ipa: "fɑː ə.ˈweɪ",

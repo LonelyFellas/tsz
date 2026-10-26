@@ -32,6 +32,7 @@ import {
   theme
 } from "antd";
 import {
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -44,14 +45,25 @@ import { useUnsavedChanges } from "@tsz/shared/recovery";
 import { api, useAnyPermission, useAuthStore, usePermission } from "@/lib/auth";
 import {
   language,
+  accentNames,
+  voiceAccent,
   VoiceCatalogDetails,
   VoiceCatalogTable
 } from "./VoiceCatalogTable";
 import { DubbingGroups } from "./DubbingGroups";
+import { DubbingDrafts } from "./DubbingDrafts";
 import { AddRecommendation } from "./AddRecommendation";
 import { SpeechRateInput } from "./SpeechRateInput";
 import { SpeechVolumeInput } from "./SpeechVolumeInput";
 import { styleNames } from "./voice-labels";
+import {
+  AudioReview,
+  SsmlReview,
+  ReferenceAudio,
+  type ReviewAudio
+} from "@tsz/voice-editor/editor";
+import { adminVoicePreviewAdapter } from "@/features/dictionary/voice-editor/dataSource";
+import "@tsz/voice-editor/styles.css";
 import "./voice-library.css";
 
 interface Parameters {
@@ -135,6 +147,15 @@ function VoiceSettingsNavigationGuard({
 }
 
 export function VoiceLibrary() {
+  const accountId = useAuthStore((state) => state.profile?.id);
+  return (
+    <DubbingDrafts key={accountId}>
+      <VoiceLibraryContent />
+    </DubbingDrafts>
+  );
+}
+
+function VoiceLibraryContent() {
   const { token } = theme.useToken();
   const style = {
     "--voice-fill": token.colorFillAlter,
@@ -154,7 +175,7 @@ export function VoiceLibrary() {
   const canGenerate = canViewWords && canGenerateSpeech;
   const accountId = useAuthStore((s) => s.profile?.id);
   const { modal } = App.useApp();
-  const [groupsDirty, setGroupsDirty] = useState(false);
+  const [, setGroupsDirty] = useState(false);
   const [tab, setTab] = useState("groups");
   const [text, setText] = useState(
     "Please record the interview before the meeting starts."
@@ -178,13 +199,31 @@ export function VoiceLibrary() {
   const [pendingVoice, setPendingVoice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [audioError, setAudioError] = useState(false);
+  const [reviewAudio, setReviewAudio] = useState<ReviewAudio>();
+  const [outputFormat, setOutputFormat] = useState<"mp3" | "wav">("mp3");
+  const stopSsml = useRef<(() => void) | undefined>(undefined);
+  const stopReference = useRef<(() => void) | undefined>(undefined);
+  const registerSsmlStop = useCallback((stop: () => void) => {
+    stopSsml.current = stop;
+    return () => {
+      if (stopSsml.current === stop) stopSsml.current = undefined;
+    };
+  }, []);
+  const registerReferenceStop = useCallback((stop: () => void) => {
+    stopReference.current = stop;
+    return () => {
+      if (stopReference.current === stop) stopReference.current = undefined;
+    };
+  }, []);
   const controller = useRef<AbortController | null>(null);
   const player = useRef<HTMLAudioElement | null>(null);
   const [form] = Form.useForm<VoiceForm>();
   const formValues = Form.useWatch<VoiceForm>([], form);
   const canEditDescription = usePermission("speech.global_dubbing");
   const queryClient = useQueryClient();
-  const [saving, setSaving] = useState<"personal" | "description" | null>(null);
+  const [saving, setSaving] = useState<
+    "personal" | "description" | "accent" | "restore" | null
+  >(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [basePersonalRevision, setBasePersonalRevision] = useState(0);
@@ -228,6 +267,9 @@ export function VoiceLibrary() {
     controller.current?.abort();
     controller.current = null;
     player.current?.pause();
+    stopSsml.current?.();
+    stopReference.current?.();
+    setReviewAudio(undefined);
     setPendingVoice(null);
     setPreview(null);
     setError(null);
@@ -254,7 +296,12 @@ export function VoiceLibrary() {
   }, [canGenerate]);
 
   async function audition(voice: AdminSpeechVoice, parameters?: Parameters) {
-    if (!canGenerate || !validText || (!parameters && library.isPending))
+    if (
+      !canGenerate ||
+      !validText ||
+      voice.synthesis_available === false ||
+      (!parameters && library.isPending)
+    )
       return;
     parameters ??= voiceParameters(voice);
     cancelPreview();
@@ -266,6 +313,7 @@ export function VoiceLibrary() {
         {
           content: { version: 2, text, annotations: [] },
           voice_alias: voice.alias,
+          ...(outputFormat === "wav" ? { output_format: outputFormat } : {}),
           rate_percent: parameters.rate_percent,
           pitch_semitones: parameters.pitch_semitones,
           ...(parameters.volume_percent === 100
@@ -355,6 +403,88 @@ export function VoiceLibrary() {
       if (session === editSession.current) setAddingRecommendation(true);
     } catch {
       // Keep parameter validation visible in the drawer before opening the dialog.
+    }
+  }
+
+  async function saveShared(
+    kind: "accent" | "restore",
+    accent?: import("@tsz/types").VoiceAccent
+  ) {
+    if (!selected || settingsBusy || !canEditDescription) return;
+    const session = editSession.current;
+    const item = metadata.get(selected.alias);
+    if (kind === "accent" && item?.accent_revision == null) return;
+    setSaving(kind);
+    setSaveError(null);
+    setSaveMessage(null);
+    try {
+      const saved =
+        kind === "accent"
+          ? await api.speech.saveAccent(selected.alias, {
+              accent: accent!,
+              base_revision: item!.accent_revision!
+            })
+          : await api.speech.restoreDescription(selected.alias, {
+              base_revision: baseDescriptionRevision
+            });
+      if (
+        session !== editSession.current ||
+        useAuthStore.getState().profile?.id !== accountId
+      )
+        return;
+      await queryClient.cancelQueries({
+        queryKey: ["admin-speech-library", accountId],
+        exact: true
+      });
+      if (
+        session !== editSession.current ||
+        useAuthStore.getState().profile?.id !== accountId
+      )
+        return;
+      queryClient.setQueryData<AdminVoiceLibraryResponse>(
+        ["admin-speech-library", accountId],
+        (current) => ({
+          items: (current?.items ?? []).map((value) =>
+            value.voice_alias === saved.voice_alias ? saved : value
+          )
+        })
+      );
+      if (kind === "accent") {
+        setSelected(
+          (voice) =>
+            voice && {
+              ...voice,
+              accent: saved.accent,
+              accent_revision: saved.accent_revision
+            }
+        );
+        await queryClient.invalidateQueries({
+          queryKey: ["admin-speech-voices", accountId]
+        });
+        setSaveMessage(
+          "口音归属已保存，官方地区和原始 locale 保持不变。已有配置不会自动换声。"
+        );
+      } else {
+        setBaseDescriptionRevision(saved.description_revision);
+        form.setFieldValue("description_zh", saved.description_zh ?? "");
+        settingsBaseline.current = {
+          ...settingsBaseline.current!,
+          description_zh: saved.description_zh ?? ""
+        };
+        setEditingDescription(false);
+        updateDirty(form.getFieldsValue());
+        setSaveMessage(
+          "已恢复官方介绍；未提供官方中文时显示缺失。个人听感已保留。"
+        );
+      }
+    } catch (cause) {
+      setSaveError(
+        cause instanceof HttpError && cause.status === 409
+          ? "资料已在其他页面修改，当前输入已保留，请重新载入后再试。"
+          : "保存失败，当前输入已保留，请重试。"
+      );
+    } finally {
+      setSaving(null);
     }
   }
 
@@ -469,6 +599,14 @@ export function VoiceLibrary() {
       setBasePersonalRevision(item?.personal_revision ?? 0);
       storedParameters.current = item?.parameters ?? null;
       setBaseDescriptionRevision(item?.description_revision ?? 0);
+      setSelected(
+        (voice) =>
+          voice && {
+            ...voice,
+            accent: item?.accent,
+            accent_revision: item?.accent_revision
+          }
+      );
       const values = {
         ...voiceParameters(selected),
         notes: item?.notes ?? "",
@@ -552,7 +690,30 @@ export function VoiceLibrary() {
                 autoPlay
                 aria-label={`${preview.voice.display_name} 试听播放器`}
                 src={preview.audio_url}
+                onLoadedMetadata={(event) => {
+                  const snapshot = preview;
+                  setReviewAudio({
+                    audio: event.currentTarget,
+                    name: snapshot.voice.display_name,
+                    result: {
+                      audioUrl: snapshot.audio_url,
+                      expiresAt: snapshot.expires_at,
+                      cached: snapshot.cache_status === "hit",
+                      ...(snapshot.content_path
+                        ? {
+                            loadAudio: (options?: { signal?: AbortSignal }) =>
+                              api.speech.previewContent(
+                                snapshot.content_path!,
+                                options?.signal
+                              )
+                          }
+                        : {})
+                    }
+                  });
+                }}
                 onPlay={() => {
+                  stopSsml.current?.();
+                  stopReference.current?.();
                   if (Date.parse(preview.expires_at) <= Date.now()) {
                     player.current?.pause();
                     setAudioError(true);
@@ -560,6 +721,16 @@ export function VoiceLibrary() {
                 }}
                 onError={() => setAudioError(true)}
               />
+              {reviewAudio && (
+                <AudioReview
+                  key={reviewAudio.result.audioUrl}
+                  media={reviewAudio}
+                  onPlay={() => {
+                    stopSsml.current?.();
+                    stopReference.current?.();
+                  }}
+                />
+              )}
               {audioError && (
                 <Alert
                   type="warning"
@@ -640,14 +811,6 @@ export function VoiceLibrary() {
             </Button>
           }
           onChange={(value) => {
-            if (groupsDirty) {
-              modal.info({
-                title: "分组还有未保存的修改",
-                content: "请先保存分组，或点击取消编辑后切换。",
-                okText: "继续编辑"
-              });
-              return;
-            }
             cancelPreview();
             setTab(value);
           }}
@@ -691,7 +854,7 @@ export function VoiceLibrary() {
           </Form>
           {!selected && (pendingVoice || error || preview) && previewView()}
         </section>
-        {tab === "groups" ? (
+        <div hidden={tab !== "groups"} inert={tab !== "groups"}>
           <DubbingGroups
             onDirtyChange={setGroupsDirty}
             onInvalidatePreview={cancelPreview}
@@ -705,7 +868,8 @@ export function VoiceLibrary() {
               })
             }
           />
-        ) : (
+        </div>
+        {tab === "library" && (
           <>
             {voices.isError ? (
               <Alert
@@ -736,7 +900,19 @@ export function VoiceLibrary() {
       <Drawer
         className="voice-library-settings"
         style={style}
-        title={selected ? `${selected.display_name} 音色详情` : "音色详情"}
+        title={
+          selected ? (
+            <Space>
+              <span
+                className={`voice-accent-dot voice-accent-${voiceAccent(selected)}`}
+              />
+              <span>{selected.display_name} 音色详情</span>
+              <span>· {accentNames[voiceAccent(selected)]}</span>
+            </Space>
+          ) : (
+            "音色详情"
+          )
+        }
         open={!!selected}
         onClose={closeSettings}
         size={520}
@@ -901,9 +1077,15 @@ export function VoiceLibrary() {
                                 {
                                   required: true,
                                   type: "integer",
-                                  min: capabilities.min_rate_percent,
-                                  max: capabilities.max_rate_percent,
-                                  message: `请输入 ${((100 + capabilities.min_rate_percent) / 100).toFixed(2)} 至 ${((100 + capabilities.max_rate_percent) / 100).toFixed(2)} 倍速`
+                                  min: Math.max(
+                                    -70,
+                                    capabilities.min_rate_percent
+                                  ),
+                                  max: Math.min(
+                                    70,
+                                    capabilities.max_rate_percent
+                                  ),
+                                  message: `请输入 ${((100 + Math.max(-70, capabilities.min_rate_percent)) / 100).toFixed(2)} 至 ${((100 + Math.min(70, capabilities.max_rate_percent)) / 100).toFixed(2)} 倍速`
                                 }
                               ]}
                               tooltip={
@@ -983,24 +1165,34 @@ export function VoiceLibrary() {
                             wrap
                           >
                             <Button
-                              color={
-                                speechAccentGroup(selected.locale) === "uk"
-                                  ? "danger"
-                                  : speechAccentGroup(selected.locale) === "us"
-                                    ? "primary"
-                                    : "default"
-                              }
+                              className={`voice-accent-${voiceAccent(selected)}`}
+                              color="default"
                               variant="solid"
                               aria-label="试听当前参数"
                               icon={<PlayCircleOutlined />}
                               disabled={
-                                settingsBusy || !canGenerate || !validText
+                                settingsBusy ||
+                                !canGenerate ||
+                                !validText ||
+                                selected.synthesis_available === false
                               }
                               loading={pendingVoice === selected.alias}
                               onClick={() => void auditionDraft()}
                             >
                               试听当前参数
                             </Button>
+                            <Select
+                              aria-label="试听输出格式"
+                              value={outputFormat}
+                              options={[
+                                { value: "mp3", label: "MP3" },
+                                { value: "wav", label: "WAV" }
+                              ]}
+                              onChange={(value) => {
+                                cancelPreview();
+                                setOutputFormat(value);
+                              }}
+                            />
                             <Button
                               type="text"
                               disabled={settingsBusy || parametersAreDefault}
@@ -1020,16 +1212,57 @@ export function VoiceLibrary() {
                             </Button>
                           </Flex>
                           {previewView()}
+                          {canGenerate && (
+                            <SsmlReview
+                              key={selected.alias}
+                              adapter={adminVoicePreviewAdapter}
+                              content={{ version: 2, text, annotations: [] }}
+                              settings={[
+                                {
+                                  voice_id: selected.alias,
+                                  version_id:
+                                    "00000000-0000-4000-8000-000000000002",
+                                  version_name: selected.display_name,
+                                  locale: selected.locale as `en-${string}`,
+                                  enabled: true,
+                                  ...voiceParameters(selected),
+                                  style:
+                                    voiceParameters(selected).style ||
+                                    undefined,
+                                  output_format: outputFormat
+                                }
+                              ]}
+                              onPlay={() => {
+                                player.current?.pause();
+                                stopReference.current?.();
+                              }}
+                              registerStop={registerSsmlStop}
+                            />
+                          )}
+                          <ReferenceAudio
+                            registerStop={registerReferenceStop}
+                            onPlay={() => {
+                              player.current?.pause();
+                              stopSsml.current?.();
+                            }}
+                          />
                         </div>
                         {canEditDescription && (
                           <Button
                             className="voice-library-recommend-action"
                             disabled={
                               settingsBusy ||
-                              speechAccentGroup(selected.locale) === "other"
+                              selected.synthesis_available === false ||
+                              speechAccentGroup(
+                                selected.locale,
+                                selected.accent
+                              ) === "other"
                             }
                             title={
-                              speechAccentGroup(selected.locale) === "other"
+                              speechAccentGroup(
+                                selected.locale,
+                                selected.accent
+                              ) === "other"
                                 ? "其他地区仅作文本补充音色，不加入英美默认推荐"
                                 : undefined
                             }
@@ -1079,6 +1312,39 @@ export function VoiceLibrary() {
                         hidden={detailTab !== "info"}
                         inert={detailTab !== "info"}
                       >
+                        <Form.Item
+                          label="当前口音归属"
+                          tooltip="独立于官方地区和原始 locale，保存后供候选、标题和播放按钮使用。"
+                        >
+                          <Select<import("@tsz/types").VoiceAccent>
+                            aria-label="当前口音归属"
+                            value={voiceAccent(selected)}
+                            disabled={
+                              !canEditDescription ||
+                              settingsBusy ||
+                              metadata.get(selected.alias)?.accent_revision ==
+                                null
+                            }
+                            options={Object.entries(accentNames).map(
+                              ([value, label]) => ({ value, label })
+                            )}
+                            onChange={(value) =>
+                              void saveShared("accent", value)
+                            }
+                          />
+                        </Form.Item>
+                        {metadata.get(selected.alias)?.accent_revision ==
+                          null && (
+                          <Typography.Paragraph type="secondary">
+                            当前服务未提供可编辑的口音归属，请先升级 API。
+                          </Typography.Paragraph>
+                        )}
+                        <Typography.Paragraph type="secondary">
+                          原始 locale：
+                          <Typography.Text code>
+                            {selected.locale}
+                          </Typography.Text>
+                        </Typography.Paragraph>
                         <VoiceCatalogDetails
                           voice={selected}
                           description={
@@ -1091,6 +1357,21 @@ export function VoiceLibrary() {
                                 <Typography.Text type="secondary">
                                   所有管理员可见
                                 </Typography.Text>
+                                {canEditDescription &&
+                                  metadata.get(selected.alias)
+                                    ?.description_zh != null && (
+                                    <Button
+                                      type="link"
+                                      size="small"
+                                      disabled={
+                                        !library.isSuccess || settingsBusy
+                                      }
+                                      loading={saving === "restore"}
+                                      onClick={() => void saveShared("restore")}
+                                    >
+                                      恢复官方介绍
+                                    </Button>
+                                  )}
                                 {canEditDescription && !editingDescription && (
                                   <Button
                                     type="link"
@@ -1144,7 +1425,7 @@ export function VoiceLibrary() {
                               {!editingDescription && (
                                 <Typography.Paragraph className="voice-library-description-text">
                                   {metadata.get(selected.alias)
-                                    ?.description_zh || "暂无介绍"}
+                                    ?.description_zh ?? "官方未提供中文介绍"}
                                 </Typography.Paragraph>
                               )}
                             </>

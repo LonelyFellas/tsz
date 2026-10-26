@@ -232,6 +232,54 @@ export function synthesisPhonemeWordRanges(
   });
 }
 
+/** Speech ranges map only through explicit word boundaries, including UPS words. */
+export function mapSynthesisSpeechContent(
+  content: RichTextV2,
+  spelling: string,
+  candidate: PronunciationSynthesisCandidateV3,
+  alphabet: "ipa" | "ups",
+  toSpelling: boolean
+): RichTextV2 | undefined {
+  const ranges = synthesisPhonemeWordRanges(spelling, candidate, alphabet);
+  const words = [...spelling.matchAll(/\S+/gu)];
+  const annotations: RichTextV2["annotations"] = [];
+  for (const mark of content.annotations) {
+    if (mark.type === "pause") {
+      const range = ranges
+        ?.slice(0, -1)
+        .find((range) => (toSpelling ? range.end : range.textEnd) === mark.at);
+      if (!range) return undefined;
+      annotations.push({ ...mark, at: toSpelling ? range.textEnd : range.end });
+    } else if (mark.type === "say_as" || mark.type === "sub") {
+      const first =
+        ranges?.findIndex(
+          (range, index) =>
+            (toSpelling
+              ? range.start
+              : Array.from(spelling.slice(0, words[index]!.index)).length) ===
+            mark.start
+        ) ?? -1;
+      const last =
+        ranges?.findIndex(
+          (range) => (toSpelling ? range.end : range.textEnd) === mark.end
+        ) ?? -1;
+      if (!ranges || first < 0 || last < first) return undefined;
+      annotations.push({
+        ...mark,
+        start: toSpelling
+          ? Array.from(spelling.slice(0, words[first]!.index)).length
+          : ranges[first]!.start,
+        end: toSpelling ? ranges[last]!.textEnd : ranges[last]!.end
+      });
+    } else return undefined;
+  }
+  return {
+    version: 2,
+    text: toSpelling ? spelling : candidate[alphabet],
+    annotations
+  };
+}
+
 /** Keep explicit UPS word ownership only when an edit stays inside one word's phones. */
 export function editSynthesisUpsWords(
   spelling: string,
@@ -303,10 +351,14 @@ export function pronunciationSynthesisContent(
   );
   const speech = pronunciationSynthesisSpeech(synthesis, targetLocale);
   if (!content || !speech) return content;
-  if (speech.content.annotations.some((mark) => mark.type !== "pause"))
+  if (
+    speech.content.annotations.some(
+      (mark) => !["pause", "say_as", "sub"].includes(mark.type)
+    )
+  )
     return undefined;
-  const pauses = speech.content.annotations;
-  if (!pauses.length) return content;
+  const marks = speech.content.annotations;
+  if (!marks.length) return content;
   if (speech.content.text !== spelling) return undefined;
   const selected =
     targetLocale && synthesis
@@ -328,7 +380,30 @@ export function pronunciationSynthesisContent(
       };
     });
   }
-  return { ...content, annotations: [...content.annotations, ...pauses] };
+  const special = marks.filter(
+    (mark) => mark.type === "say_as" || mark.type === "sub"
+  );
+  if (
+    content.annotations.some(
+      (mark) =>
+        mark.type === "phoneme" &&
+        special.some(
+          (reading) =>
+            reading.start < mark.end &&
+            mark.start < reading.end &&
+            (reading.start > mark.start || reading.end < mark.end)
+        )
+    )
+  )
+    return undefined;
+  const annotations = content.annotations.filter(
+    (mark) =>
+      mark.type !== "phoneme" ||
+      !special.some(
+        (reading) => reading.start < mark.end && mark.start < reading.end
+      )
+  );
+  return { ...content, annotations: [...annotations, ...marks] };
 }
 
 /** IPA is derived from dictionary notation; actual pronunciation is display-only. */
@@ -384,12 +459,31 @@ export function convertAzureIpaToUps(
   };
 }
 
+export function readingRevision(
+  synthesis: PronunciationSynthesisV3,
+  locale: PhonemeLocaleV3,
+  legacyDialect: Dialect,
+  alphabet: "ipa" | "ups"
+): string {
+  const selected = synthesisForLocale(synthesis, locale, legacyDialect);
+  return JSON.stringify([
+    locale,
+    alphabet,
+    selected[alphabet],
+    alphabet === "ups"
+      ? (selected.ups_words?.map((word) => [word.text, word.phoneme]) ?? null)
+      : null,
+    selected.use_spelling ?? false
+  ]);
+}
+
 export function grammarSynthesisContent(
   content: RichTextV2,
   bindings: readonly {
     source_segments: SentenceSourceRangeV3[];
     dialect: Dialect;
     pronunciations: WordPronunciationV3[];
+    reading_reference?: import("@tsz/types").ReadingReferenceV3;
   }[],
   locale: PhonemeLocaleV3
 ): RichTextV2 {
@@ -406,9 +500,37 @@ export function grammarSynthesisContent(
     ) {
       throw new Error("词形关联已失效，请重新关联");
     }
-    const first = binding.pronunciations[0];
+    const reference =
+      binding.reading_reference?.[locale === "en-GB" ? "uk" : "us"];
+    if (binding.reading_reference && !reference)
+      throw new Error("当前口音未选择读法，请明确选择");
+    const first = reference
+      ? binding.pronunciations.find(
+          (row) => row.id === reference.pronunciation_id
+        )
+      : binding.pronunciations[0];
+    if (
+      reference &&
+      (!first?.synthesis ||
+        reference.locale !== locale ||
+        readingRevision(
+          { ...first.synthesis, use_spelling: reference.use_spelling ?? false },
+          locale,
+          binding.dialect,
+          reference.alphabet
+        ) !== reference.revision)
+    )
+      throw new Error("指定读法已失效或版本变化，请重新确认读法");
     const synthesis = first?.synthesis
-      ? synthesisForLocale(first.synthesis, locale, binding.dialect)
+      ? {
+          ...synthesisForLocale(first.synthesis, locale, binding.dialect),
+          ...(reference
+            ? {
+                alphabet: reference.alphabet,
+                use_spelling: reference.use_spelling ?? false
+              }
+            : {})
+        }
       : undefined;
     const anchoredSynthesis =
       synthesis?.ups_words?.length === 1

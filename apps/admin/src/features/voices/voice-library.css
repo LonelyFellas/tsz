@@ -41,7 +41,7 @@
 .voice-catalog-filter-grid,
 .voice-catalog-advanced-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
   align-items: end;
   gap: 12px;
 }
@@ -119,6 +119,32 @@
 .voice-catalog-name {
   overflow-wrap: anywhere;
   font-size: 15px;
+}
+
+.voice-accent-gb {
+  --voice-accent: #2053ff;
+}
+.voice-accent-us {
+  --voice-accent: #fc007a;
+}
+.voice-accent-none {
+  --voice-accent: #8c8c8c;
+}
+
+.voice-accent-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--voice-accent);
+  border-radius: 50%;
+  background: var(--voice-accent);
+}
+.voice-accent-dot.voice-accent-none {
+  background: transparent;
+}
+.ant-btn[class*="voice-accent-"]:not(:disabled) {
+  color: var(--voice-accent);
+  border-color: var(--voice-accent);
 }
 
 .voice-catalog-gender-male {

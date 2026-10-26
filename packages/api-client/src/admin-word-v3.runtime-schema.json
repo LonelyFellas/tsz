@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dubbing-center/docs/openapi.json",
-  "_source_sha256": "b48f180aec5009f524a7afed53736efd02f7550796f19b8f9a5c9a7c7a427e56",
+  "_source_sha256": "e18b715b7026839d5d1cad1a73724fb87836024f5fb7aaa80870f8f312a504dc",
   "roots": [
     "MemoryOverview",
     "MemoryPage",
@@ -507,6 +507,7 @@
         "url_expires_in_seconds": { "type": "integer", "minimum": 0 }
       }
     },
+    "AudioOutputFormat": { "type": "string", "enum": ["mp3", "wav"] },
     "AudioState": {
       "type": "string",
       "enum": ["queued", "processing", "ready", "refunding", "refunded"]
@@ -969,6 +970,10 @@
         "validated_revision": { "type": "integer" }
       },
       "additionalProperties": false
+    },
+    "DubbingAreaV3": {
+      "type": "string",
+      "enum": ["word", "azure", "grammar", "meaning", "example"]
     },
     "EnglishLanguageV3": { "type": "string", "enum": ["en"] },
     "EnglishLocale": { "type": "string", "pattern": "^en-[A-Z]{2}$" },
@@ -1526,6 +1531,12 @@
       ],
       "properties": {
         "id": { "type": "string", "format": "uuid" },
+        "reading_reference": {
+          "oneOf": [
+            { "$ref": "#/$defs/ReadingReferenceV3" },
+            { "type": "null" }
+          ]
+        },
         "source_segments": {
           "type": "array",
           "items": { "$ref": "#/$defs/SentenceSourceRangeV1" },
@@ -2797,6 +2808,37 @@
       },
       "additionalProperties": false
     },
+    "ReadingReferenceV3": {
+      "type": "object",
+      "properties": {
+        "sense_id": { "type": ["string", "null"], "format": "uuid" },
+        "uk": {
+          "oneOf": [
+            { "$ref": "#/$defs/ReadingSelectionV3" },
+            { "type": "null" }
+          ]
+        },
+        "us": {
+          "oneOf": [
+            { "$ref": "#/$defs/ReadingSelectionV3" },
+            { "type": "null" }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "ReadingSelectionV3": {
+      "type": "object",
+      "required": ["pronunciation_id", "alphabet", "locale", "revision"],
+      "properties": {
+        "alphabet": { "$ref": "#/$defs/RichTextPhonemeAlphabet" },
+        "locale": { "$ref": "#/$defs/PhonemeLocaleV3" },
+        "pronunciation_id": { "type": "string", "format": "uuid" },
+        "revision": { "type": "string" },
+        "use_spelling": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
     "RelatedEntrySenses": {
       "type": "object",
       "required": ["entry_id", "publication_id", "senses"],
@@ -3133,6 +3175,28 @@
         },
         {
           "type": "object",
+          "required": ["start", "end", "interpret_as", "type"],
+          "properties": {
+            "end": { "type": "integer", "minimum": 0 },
+            "interpret_as": { "type": "string" },
+            "start": { "type": "integer", "minimum": 0 },
+            "type": { "type": "string", "enum": ["say_as"] }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "alias", "type"],
+          "properties": {
+            "alias": { "type": "string" },
+            "end": { "type": "integer", "minimum": 0 },
+            "start": { "type": "integer", "minimum": 0 },
+            "type": { "type": "string", "enum": ["sub"] }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
           "required": ["start", "end", "type"],
           "properties": {
             "end": { "type": "integer", "minimum": 0 },
@@ -3266,6 +3330,11 @@
         },
         "id": { "type": "string", "format": "uuid" },
         "origin": { "$ref": "#/$defs/TextOrigin" },
+        "reading_links": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/GrammarFormLinkV3" },
+          "maxItems": 100
+        },
         "text_links": {
           "type": "array",
           "items": { "$ref": "#/$defs/TextLinkV3" },
@@ -3700,6 +3769,11 @@
       "type": "object",
       "required": ["content", "voice_profile"],
       "properties": {
+        "audio_assets": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AudioAsset" },
+          "maxItems": 8
+        },
         "content": { "$ref": "#/$defs/RichTextV2V3" },
         "voice_profile": { "$ref": "#/$defs/VoiceProfileV3" }
       },
@@ -4230,10 +4304,30 @@
         "sense_form_group_required"
       ]
     },
+    "VoiceProfileDubbingV3": {
+      "type": "object",
+      "required": ["mode", "area"],
+      "properties": {
+        "area": { "$ref": "#/$defs/DubbingAreaV3" },
+        "mode": { "$ref": "#/$defs/VoiceProfileModeV3" },
+        "recommendation_order": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "VoiceProfileModeV3": { "type": "string", "enum": ["inherit", "local"] },
     "VoiceProfileV3": {
       "type": "object",
       "required": ["voices"],
       "properties": {
+        "dubbing": {
+          "oneOf": [
+            { "$ref": "#/$defs/VoiceProfileDubbingV3" },
+            { "type": "null" }
+          ]
+        },
         "voices": {
           "type": "array",
           "items": { "$ref": "#/$defs/VoiceSettingV3" },
@@ -4249,9 +4343,18 @@
         "audio_asset_id": { "type": "string", "format": "uuid" },
         "enabled": { "type": "boolean" },
         "locale": { "$ref": "#/$defs/EnglishLocale" },
+        "output_format": {
+          "oneOf": [{ "$ref": "#/$defs/AudioOutputFormat" }, { "type": "null" }]
+        },
         "pitch_semitones": { "type": "integer", "maximum": 12, "minimum": -12 },
         "rate_percent": { "type": "integer", "maximum": 100, "minimum": -50 },
+        "role": { "type": ["string", "null"] },
         "style": { "type": "string", "maxLength": 64 },
+        "style_degree": {
+          "type": ["number", "null"],
+          "maximum": 2,
+          "minimum": 0.01
+        },
         "version_id": { "type": "string", "format": "uuid" },
         "version_name": { "type": "string", "maxLength": 40, "minLength": 1 },
         "voice_id": { "type": "string" },

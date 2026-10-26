@@ -45,7 +45,13 @@ const MODULE_QUERY_ROOTS: Record<string, readonly string[]> = {
   users: ["admin-users"],
   teacherapply: ["teacher-applications", "teacher-application"],
   lexicon_settings: ["part-of-speech-config"],
-  speech: ["admin-words", "admin-speech-library", "admin-dubbing-groups"]
+  speech: [
+    "admin-words",
+    "admin-speech-library",
+    "admin-dubbing-groups",
+    "admin-dubbing-update-settings",
+    "admin-dubbing-audio-updates"
+  ]
 };
 
 /** 账号切换全清；失权仅清受影响模块，增权不清除当前编辑页及其查询。 */

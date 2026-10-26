@@ -12,12 +12,14 @@ import { App, ConfigProvider } from "antd";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, useAuthStore } from "@/lib/auth";
 import { AddRecommendation } from "./AddRecommendation";
+import { DubbingDrafts, useDubbingDrafts } from "./DubbingDrafts";
 
 const voice: AdminSpeechVoice = {
   alias: "sonia",
   display_name: "Sonia",
   locale: "en-GB",
-  gender: "Female",
+  accent: "gb",
+  gender: "female",
   is_common: true,
   capabilities: {
     styles: [],
@@ -27,74 +29,80 @@ const voice: AdminSpeechVoice = {
     max_pitch_semitones: 10
   }
 };
-const parameters = { rate_percent: -25, pitch_semitones: 0, style: null };
-const queryKey = ["admin-dubbing-groups", "groups-admin"];
-const clients: QueryClient[] = [];
+const parameters = {
+  rate_percent: -27,
+  pitch_semitones: 2,
+  volume_percent: 65,
+  style: null
+};
 const initial: AdminDubbingGroupsResponse = {
   revision: 1,
   groups: [
-    {
-      id: "group-one",
-      name: "发音推荐",
-      areas: ["word"],
-      uk: [
-        { id: "uk-one", name: "英式日常", voice_alias: voice.alias, parameters }
-      ],
-      us: [{ id: "us-one", name: "美式日常", voice_alias: "guy", parameters }]
-    }
+    { id: "a", name: "A", areas: ["word"], revision: 3, uk: [], us: [] },
+    { id: "b", name: "B", areas: ["example"], revision: 2, uk: [], us: [] }
   ]
 };
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((done) => {
-    resolve = done;
-  });
-  return { promise, resolve };
+const clients: QueryClient[] = [];
+function Harness() {
+  const [drafts, setDrafts] = useDubbingDrafts();
+  return (
+    <>
+      <AddRecommendation
+        voice={voice}
+        readParameters={async () => parameters}
+        onBusyChange={vi.fn()}
+        onClose={vi.fn()}
+      />
+      <output data-testid="drafts">{JSON.stringify(drafts)}</output>
+      <button
+        onClick={() =>
+          setDrafts((value) => ({
+            ...value,
+            b: { ...initial.groups[1]!, name: "B draft" }
+          }))
+        }
+      >
+        编辑B
+      </button>
+    </>
+  );
 }
 function mount() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } }
   });
   clients.push(client);
-  client.setQueryData(queryKey, structuredClone(initial));
+  client.setQueryData(
+    ["admin-dubbing-groups", "groups-admin"],
+    structuredClone(initial)
+  );
   render(
     <QueryClientProvider client={client}>
       <ConfigProvider theme={{ token: { motion: false } }}>
         <App>
-          <AddRecommendation
-            voice={voice}
-            readParameters={async () => parameters}
-            onBusyChange={vi.fn()}
-            onClose={vi.fn()}
-          />
+          <DubbingDrafts>
+            <Harness />
+          </DubbingDrafts>
         </App>
       </ConfigProvider>
     </QueryClientProvider>
   );
   return client;
 }
-async function add() {
-  fireEvent.mouseDown(screen.getByLabelText("推荐分组"));
-  fireEvent.click(await screen.findByText("发音推荐"));
-  fireEvent.click(screen.getByRole("button", { name: "确认加入推荐" }));
-  await waitFor(() => expect(api.speech.saveGroups).toHaveBeenCalledOnce());
-}
 beforeEach(() => {
   useAuthStore.getState().setProfile({
     id: "groups-admin",
-    phone: "13800000000",
+    phone: "13800138446",
     display_name: "分组管理员",
     role: "admin",
     preferences: { dialect: "uk" },
     permission_version: 1,
     catalog_version: "test",
-    permissions: ["words.access", "speech.generate", "speech.global_dubbing"]
+    permissions: ["words.access", "speech.global_dubbing"]
   });
-  vi.spyOn(api.speech, "groups").mockResolvedValue(structuredClone(initial));
-  vi.spyOn(api.speech, "saveGroups").mockImplementation(async (input) => ({
-    groups: input.groups,
-    revision: input.base_revision + 1
-  }));
+  vi.spyOn(api.speech, "groups").mockResolvedValue(initial);
+  vi.spyOn(api.speech, "saveGroups");
+  vi.spyOn(api.speech, "saveGroup");
 });
 afterEach(() => {
   cleanup();
@@ -102,58 +110,56 @@ afterEach(() => {
   useAuthStore.getState().setProfile(null);
   vi.restoreAllMocks();
 });
-
-describe("加入推荐的缓存一致性", () => {
-  it("保存期间启动的旧 GET 不会覆盖刚加入的推荐", async () => {
-    const pendingSave = deferred<AdminDubbingGroupsResponse>();
-    const staleRead = deferred<AdminDubbingGroupsResponse>();
-    vi.mocked(api.speech.saveGroups).mockReturnValueOnce(pendingSave.promise);
-    vi.mocked(api.speech.groups).mockReturnValueOnce(staleRead.promise);
+describe("推荐只应用到分组草稿", () => {
+  it("复制完整参数仅写目标草稿，服务器缓存和B草稿不变", async () => {
     const client = mount();
-    await add();
-    let refresh!: Promise<void>;
-    act(() => {
-      refresh = client.refetchQueries({ queryKey, exact: true });
-    });
-    expect(api.speech.groups).toHaveBeenCalledOnce();
-    const saved = {
-      groups: vi.mocked(api.speech.saveGroups).mock.calls[0]![0].groups,
-      revision: 2
-    };
-    await act(async () => {
-      pendingSave.resolve(saved);
-    });
-    await screen.findByText(
-      "已加入分组推荐。后续修改个人参数不会改变这份推荐。"
+    fireEvent.click(screen.getByText("编辑B"));
+    fireEvent.mouseDown(screen.getByLabelText("推荐分组"));
+    fireEvent.click(
+      await screen.findByText("A", {
+        selector: ".ant-select-item-option-content"
+      })
     );
-    await act(async () => {
-      staleRead.resolve(structuredClone(initial));
-      await refresh;
+    fireEvent.click(screen.getByRole("button", { name: "确认加入推荐" }));
+    await screen.findByText("已应用到分组草稿，请回到该组点击“完成”后保存。");
+    const drafts = JSON.parse(screen.getByTestId("drafts").textContent!);
+    expect(drafts.a.uk[0]).toMatchObject({
+      selected: true,
+      voice_alias: "sonia",
+      parameters
     });
-    expect(client.getQueryData(queryKey)).toEqual(saved);
-    expect(saved.groups[0]!.uk).toHaveLength(2);
-    expect(saved.groups[0]!.uk[1]!.parameters).toEqual(parameters);
-  });
-
-  it("取消 GET 后再次核验账户再更新缓存", async () => {
-    const client = mount();
-    const cancelling = deferred<void>();
-    const cancel = vi
-      .spyOn(client, "cancelQueries")
-      .mockReturnValueOnce(cancelling.promise);
-    await add();
-    await waitFor(() =>
-      expect(cancel).toHaveBeenCalledWith({ queryKey, exact: true })
-    );
-    act(() => {
-      useAuthStore.getState().setProfile(null);
-    });
-    await act(async () => {
-      cancelling.resolve();
-    });
-    expect(client.getQueryData(queryKey)).toEqual(initial);
+    expect(drafts.b.name).toBe("B draft");
     expect(
-      screen.queryByText("已加入分组推荐。后续修改个人参数不会改变这份推荐。")
-    ).not.toBeInTheDocument();
+      client.getQueryData(["admin-dubbing-groups", "groups-admin"])
+    ).toEqual(initial);
+    expect(api.speech.saveGroups).not.toHaveBeenCalled();
+    expect(api.speech.saveGroup).not.toHaveBeenCalled();
+  });
+  it("选中分组已有20项时保留输入并拒绝新增", async () => {
+    const full = structuredClone(initial);
+    full.groups[0]!.uk = Array.from({ length: 20 }, (_, index) => ({
+      id: String(index),
+      name: String(index),
+      voice_alias: "sonia",
+      parameters
+    }));
+    const client = mount();
+    await act(async () => {
+      client.setQueryData(["admin-dubbing-groups", "groups-admin"], full);
+    });
+    fireEvent.mouseDown(screen.getByLabelText("推荐分组"));
+    fireEvent.click(
+      await screen.findByText("A", {
+        selector: ".ant-select-item-option-content"
+      })
+    );
+    fireEvent.click(screen.getByRole("button", { name: "确认加入推荐" }));
+    await waitFor(() =>
+      expect(
+        screen.getByText("该口音已有 20 个推荐，请先在分组配音中整理。")
+      ).toBeVisible()
+    );
+    expect(screen.getByLabelText("推荐版本名称")).toHaveValue("Sonia");
+    expect(screen.getByTestId("drafts")).toHaveTextContent("{}");
   });
 });

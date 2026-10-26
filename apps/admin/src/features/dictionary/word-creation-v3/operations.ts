@@ -1,5 +1,6 @@
 import { env } from "../../../lib/env";
 import type {
+  AudioAssetV3,
   PronunciationStyle,
   SpellingSpeechV3,
   VoiceProfileV3,
@@ -670,17 +671,18 @@ function applyVariantSpelling(
   }
   variant.spelling = rich.text;
   const annotations = rich.annotations.filter(
-    (annotation) => annotation.type !== "pause"
+    (annotation) => !["pause", "say_as", "sub"].includes(annotation.type)
   );
   if (variant.spelling_rich || annotations.length > 0)
     variant.spelling_rich = { ...rich, annotations };
-  const pauses = rich.annotations.filter(
-    (annotation) => annotation.type === "pause"
+  const pauses = rich.annotations.filter((annotation) =>
+    ["pause", "say_as", "sub"].includes(annotation.type)
   );
   if (variant.spelling_speech || pauses.length > 0) {
     const previous = variant.spelling_speech;
     const content = { ...rich, annotations: pauses };
     variant.spelling_speech = {
+      ...previous,
       content,
       voice_profile: previous
         ? JSON.stringify(previous.content) === JSON.stringify(content)
@@ -763,12 +765,32 @@ export function updateSpellingVoiceProfile(
   for (const id of variantIds) {
     next = mutateVariant(next, id, (variant) => {
       variant.spelling_speech = {
+        ...variant.spelling_speech,
         content: variant.spelling_speech?.content ?? {
           version: 2,
           text: variant.spelling,
           annotations: []
         },
         voice_profile: structuredClone(profile)
+      };
+    });
+  }
+  return next;
+}
+
+export function updateSpellingAudioAssets(
+  content: DraftFormsStepContentV3,
+  variantIds: string[],
+  audioAssets: AudioAssetV3[]
+): DraftFormsStepContentV3 {
+  let next = content;
+  for (const id of variantIds) {
+    next = mutateVariant(next, id, (variant) => {
+      variant.spelling_speech = {
+        content: { version: 2, text: variant.spelling, annotations: [] },
+        voice_profile: { voices: [] },
+        ...variant.spelling_speech,
+        audio_assets: structuredClone(audioAssets)
       };
     });
   }

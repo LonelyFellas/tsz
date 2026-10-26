@@ -197,6 +197,9 @@ function cloneVariant(variant: RichTextVariantV3): RichTextVariantV3 {
       : {}),
     ...(variant.text_links !== undefined
       ? { text_links: structuredClone(variant.text_links) }
+      : {}),
+    ...(variant.reading_links !== undefined
+      ? { reading_links: structuredClone(variant.reading_links) }
       : {})
   };
 }

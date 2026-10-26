@@ -3,6 +3,7 @@ import { DownOutlined, SwapOutlined } from "@ant-design/icons";
 import { Alert, Button, Input, Modal, Radio, Space, Typography } from "antd";
 import { useEffect, useId, useRef, useState } from "react";
 import type {
+  AudioAssetV3,
   Dialect,
   PronunciationSynthesisCandidateV3,
   PronunciationSynthesisV3,
@@ -138,7 +139,8 @@ export function V3SynthesisInputs({
   const source = synthesis.use_spelling ? "spelling" : synthesis.alphabet;
   const writeCandidate = (
     side: Side,
-    candidate: PronunciationSynthesisCandidateV3
+    candidate: PronunciationSynthesisCandidateV3,
+    audioAssets?: AudioAssetV3[]
   ) => {
     const previous = candidateForSide(synthesis, side, dialect);
     const updated = { ...candidate };
@@ -170,7 +172,10 @@ export function V3SynthesisInputs({
     }
     const next = { ...synthesis, [side]: updated };
     expected.current = next;
-    onChange({ synthesis: next });
+    onChange({
+      synthesis: next,
+      ...(audioAssets ? { audio_assets: audioAssets } : {})
+    });
     setDiagnostic("");
   };
   const change = (
@@ -372,7 +377,10 @@ export function V3SynthesisInputs({
                     locale={sideLocale}
                     label={`${label} ${sideLabel} ${name}`}
                     fallbackVoiceProfile={pronunciation.voice_profile}
-                    onChange={(next) => writeCandidate(side, next)}
+                    audioAssets={pronunciation.audio_assets}
+                    onChange={(next, audioAssets) =>
+                      writeCandidate(side, next, audioAssets)
+                    }
                   />
                 </Space.Compact>
                 {invalid && (

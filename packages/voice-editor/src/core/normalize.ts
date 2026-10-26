@@ -61,7 +61,9 @@ function typeRank(annotation: RichTextAnnotation): number {
     "phoneme",
     "italic",
     "bold",
-    "underline"
+    "underline",
+    "say_as",
+    "sub"
   ].indexOf(annotation.type);
 }
 
@@ -166,6 +168,28 @@ export function validateRichTextV2(
       });
     }
     if (
+      (annotation.type === "sub" &&
+        (!annotation.alias.trim() ||
+          codePointLength(annotation.alias) > 200 ||
+          /\p{Cc}/u.test(annotation.alias))) ||
+      (annotation.type === "say_as" &&
+        ![
+          "characters",
+          "cardinal",
+          "ordinal",
+          "digits",
+          "date",
+          "time",
+          "telephone"
+        ].includes(annotation.interpret_as))
+    ) {
+      issues.push({
+        code: "invalid_phoneme",
+        path,
+        message: "特殊读法的内容类型或替换文字无效"
+      });
+    }
+    if (
       annotation.type === "phoneme" &&
       (!annotation.phoneme.trim() ||
         codePointLength(annotation.phoneme.trim()) >
@@ -183,8 +207,13 @@ export function validateRichTextV2(
     .filter(
       (
         annotation
-      ): annotation is Extract<RichTextAnnotation, { type: "phoneme" }> =>
-        annotation.type === "phoneme"
+      ): annotation is Extract<
+        RichTextAnnotation,
+        { type: "phoneme" | "say_as" | "sub" }
+      > =>
+        annotation.type === "phoneme" ||
+        annotation.type === "say_as" ||
+        annotation.type === "sub"
     )
     .sort((a, b) => a.start - b.start || a.end - b.end);
   for (let index = 1; index < phonemes.length; index += 1) {
@@ -268,7 +297,11 @@ export function normalizeRichTextV2(value: RichTextV2): RichTextV2 {
 
   const merged: RangeAnnotation[] = [];
   for (const annotation of ranges) {
-    if (annotation.type === "phoneme") {
+    if (
+      annotation.type === "phoneme" ||
+      annotation.type === "say_as" ||
+      annotation.type === "sub"
+    ) {
       merged.push(annotation);
       continue;
     }

@@ -60,6 +60,12 @@ const missing = "__missing__";
 const none = "__none__";
 const languages = new Intl.DisplayNames(["zh-CN"], { type: "language" });
 const regions = new Intl.DisplayNames(["zh-CN"], { type: "region" });
+const englishLanguages = new Intl.DisplayNames(["en"], { type: "language" });
+export const accentNames = { gb: "英式", us: "美式", none: "不归类" };
+export function voiceAccent(voice: AdminSpeechVoice) {
+  const group = speechAccentGroup(voice.locale, voice.accent);
+  return group === "uk" ? "gb" : group === "us" ? "us" : "none";
+}
 export function language(voice: AdminSpeechVoice) {
   return languages.of(voice.locale.split("-")[0]!) ?? voice.locale;
 }
@@ -115,7 +121,12 @@ export function VoiceCatalogDetails({
           {
             key: "model",
             label: "模型",
-            children: modelNames[info?.model ?? ""] ?? info?.model ?? "未提供"
+            children:
+              modelNames[
+                info?.model ?? voice.capability_evidence?.model ?? ""
+              ] ??
+              info?.model ??
+              "未提供"
           },
           {
             key: "personalities",
@@ -144,7 +155,42 @@ export function VoiceCatalogDetails({
             key: "roles",
             label: "可选角色",
             span: "filled",
-            children: list(info?.roles)
+            children: list(
+              voice.capability_evidence
+                ? voice.capability_evidence.roles
+                : info?.roles
+            )
+          },
+          {
+            key: "supported-locales",
+            label: "支持语言",
+            span: "filled",
+            children: voice.capability_evidence?.supported_locales
+              ? voice.capability_evidence.supported_locales
+                  .map(
+                    (locale) =>
+                      `${languages.of(locale.split("-")[0]!)} (${locale})`
+                  )
+                  .join("、")
+              : "待验证：当前资源未提供完整语言清单"
+          },
+          {
+            key: "degree",
+            label: "风格强度",
+            span: "filled",
+            children:
+              voice.capability_evidence?.supports_style_degree === true
+                ? "0.01–2.00"
+                : "待验证：未确认该音色支持"
+          },
+          {
+            key: "generation",
+            label: "合成状态",
+            span: "filled",
+            children:
+              voice.synthesis_available === false
+                ? "当前音色或语种尚未开放合成"
+                : "已开放；以实际参数校验为准"
           }
         ]}
       />
@@ -159,6 +205,18 @@ export function VoiceCatalogDetails({
                 <Typography.Paragraph className="voice-library-official-description">
                   {info?.description || "未提供"}
                 </Typography.Paragraph>
+                {voice.capability_evidence && (
+                  <Typography.Paragraph>
+                    <Typography.Link
+                      href={voice.capability_evidence.source_url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      资源能力来源（
+                      {voice.capability_evidence.checked_at.slice(0, 10)}）
+                    </Typography.Link>
+                  </Typography.Paragraph>
+                )}
                 {info?.source_url && (
                   <Typography.Link
                     href={info.source_url}
@@ -171,9 +229,12 @@ export function VoiceCatalogDetails({
                 <Typography.Paragraph
                   type="secondary"
                   className="voice-library-id"
-                  copyable
                 >
-                  {voice.alias}
+                  <Typography.Text code copyable>
+                    {info?.provider_voice_id ??
+                      voice.capability_evidence?.provider_voice_id ??
+                      voice.alias}
+                  </Typography.Text>
                 </Typography.Paragraph>
               </>
             )
@@ -200,6 +261,7 @@ interface Props {
 type FilterKey =
   | "language"
   | "region"
+  | "accent"
   | "gender"
   | "age"
   | "scenario"
@@ -215,6 +277,8 @@ const filterValues = (voice: AdminSpeechVoice, key: FilterKey): string[] => {
       return [language(voice)];
     case "region":
       return [region(voice)];
+    case "accent":
+      return [voiceAccent(voice)];
     case "gender":
       return [voice.gender.toLowerCase() || missing];
     case "age":
@@ -232,15 +296,15 @@ const filterValues = (voice: AdminSpeechVoice, key: FilterKey): string[] => {
             ]
           : [none];
     case "model":
-      return [info?.model ?? missing];
+      return [info?.model ?? voice.capability_evidence?.model ?? missing];
     case "style":
       return ["neutral", ...voice.capabilities.styles];
-    case "role":
-      return info?.roles == null
-        ? [missing]
-        : info.roles.length
-          ? info.roles
-          : [none];
+    case "role": {
+      const roles = voice.capability_evidence
+        ? voice.capability_evidence.roles
+        : info?.roles;
+      return roles == null ? [missing] : roles.length ? roles : [none];
+    }
   }
 };
 
@@ -272,6 +336,14 @@ export function VoiceCatalogTable({
           (!search ||
             [
               voice.display_name,
+              language(voice),
+              voice.locale,
+              englishLanguages.of(voice.locale.split("-")[0]!),
+              new Intl.DisplayNames([voice.locale], { type: "language" }).of(
+                voice.locale.split("-")[0]!
+              ),
+              region(voice),
+              accentNames[voiceAccent(voice)],
               voice.alias,
               voice.metadata?.provider_voice_id,
               info?.description_zh,
@@ -408,7 +480,8 @@ export function VoiceCatalogTable({
         </div>
         <div className="voice-catalog-filter-grid">
           {filter("language", "语言")}
-          {filter("region", "口音／地区")}
+          {filter("region", "官方地区")}
+          {filter("accent", "口音归属", accentNames)}
           {filter("gender", "性别", genderNames)}
           {filter("age", "年龄组", ageNames)}
           <Button
@@ -463,7 +536,7 @@ export function VoiceCatalogTable({
       </div>
       {voices.some((voice) => !voice.metadata) && (
         <Typography.Paragraph type="secondary" className="voice-catalog-notice">
-          部分音色暂无详细资料，仍可试听。
+          部分音色暂无详细资料；合成状态以各音色的已验证能力为准。
         </Typography.Paragraph>
       )}
       <Spin spinning={loading}>
@@ -483,23 +556,27 @@ export function VoiceCatalogTable({
                     <GatedButton
                       className="voice-catalog-play"
                       shape="circle"
-                      color={
-                        speechAccentGroup(voice.locale) === "uk"
-                          ? "danger"
-                          : speechAccentGroup(voice.locale) === "us"
-                            ? "primary"
-                            : "default"
-                      }
+                      classNames={{
+                        root: `voice-accent-${voiceAccent(voice)}`
+                      }}
+                      color="default"
                       variant={active ? "solid" : "outlined"}
                       icon={<CaretRightOutlined />}
                       aria-label={`试听 ${voice.display_name}`}
-                      disabled={!canGenerate || !validText || settingsPending}
+                      disabled={
+                        !canGenerate ||
+                        !validText ||
+                        settingsPending ||
+                        voice.synthesis_available === false
+                      }
                       reason={
-                        !canGenerate
-                          ? "需要词库查看和语音生成权限"
-                          : settingsPending
-                            ? "正在加载个人音色设置"
-                            : "请输入 1–500 个字符的试听文本"
+                        voice.synthesis_available === false
+                          ? "当前音色或语种尚未开放合成，能力需验证"
+                          : !canGenerate
+                            ? "需要词库查看和语音生成权限"
+                            : settingsPending
+                              ? "正在加载个人音色设置"
+                              : "请输入 1–500 个字符的试听文本"
                       }
                       loading={pendingVoice === voice.alias}
                       onClick={() => onAudition(voice)}
@@ -513,6 +590,10 @@ export function VoiceCatalogTable({
                             </span>
                           </Tooltip>
                         )}
+                        <span
+                          className={`voice-accent-dot voice-accent-${voiceAccent(voice)}`}
+                          aria-label={`${accentNames[voiceAccent(voice)]}口音`}
+                        />
                         <Tooltip
                           title={
                             voice.metadata?.provider_voice_id ?? voice.alias
@@ -534,6 +615,7 @@ export function VoiceCatalogTable({
                       <div className="voice-catalog-attributes">
                         <span>{language(voice)}</span>
                         <span>{region(voice)}</span>
+                        <span>{accentNames[voiceAccent(voice)]}</span>
                         {!genderIcons[gender] && (
                           <span>{genderNames[gender] ?? "性别未提供"}</span>
                         )}

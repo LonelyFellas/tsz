@@ -23,7 +23,12 @@ export function canonicalVoiceHash(
       style: settings.style ?? "",
       rate_percent: settings.ratePercent ?? 0,
       pitch_semitones: settings.pitchSemitones ?? 0,
-      volume_percent: settings.volumePercent ?? 100
+      volume_percent: settings.volumePercent ?? 100,
+      ...(settings.styleDegree !== undefined
+        ? { style_degree: settings.styleDegree }
+        : {}),
+      ...(settings.role !== undefined ? { role: settings.role } : {}),
+      ...(settings.outputFormat === "wav" ? { output_format: "wav" } : {})
     })
   );
 }

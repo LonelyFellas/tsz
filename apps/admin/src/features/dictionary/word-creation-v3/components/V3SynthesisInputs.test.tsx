@@ -13,11 +13,14 @@ import { V3SynthesisInputs } from "./V3SynthesisInputs";
 const speech = vi.hoisted(() => ({
   synthesize: vi.fn(),
   generateAudio: vi.fn(),
+  resolve: vi.fn(),
   recommendations: vi.fn()
 }));
 vi.mock("@/lib/auth", () => ({
   usePermission: () => true,
-  api: { speech: { generateAudio: speech.generateAudio } }
+  api: {
+    speech: { generateAudio: speech.generateAudio, resolve: speech.resolve }
+  }
 }));
 vi.mock("@/lib/env", () => ({ env: { VOICE_PREVIEW: true } }));
 vi.mock("@/features/settings/useDialectPreference", () => ({
@@ -48,7 +51,11 @@ vi.mock("../../voice-editor/dataSource", () => ({
         isDefault: false
       }
     ],
-    synthesize: speech.synthesize
+    synthesize: speech.synthesize,
+    resolveVoices: (input: unknown) =>
+      speech
+        .resolve(input)
+        .then((response: { voices: unknown[] }) => response.voices)
   },
   adminAudioUploadAdapter: {},
   voicePreviewIsMock: false
@@ -56,6 +63,27 @@ vi.mock("../../voice-editor/dataSource", () => ({
 
 beforeEach(() => {
   speech.recommendations.mockReset().mockResolvedValue([]);
+  speech.resolve
+    .mockReset()
+    .mockImplementation(
+      async (input: {
+        profile: { voices: unknown[] };
+        accent: "gb" | "us";
+      }) => ({
+        voices: input.profile.voices.length
+          ? input.profile.voices
+          : [
+              {
+                voice_id: input.accent === "gb" ? "en-gb-sonia" : "en-us-aria",
+                version_id: "11111111-1111-4111-8111-111111111111",
+                version_name: "自然",
+                locale: input.accent === "gb" ? "en-GB" : "en-US",
+                enabled: true,
+                rate_percent: 0
+              }
+            ]
+      })
+    );
   speech.generateAudio
     .mockReset()
     .mockResolvedValue({ asset: { id: "new-audio" } });
@@ -855,7 +883,7 @@ it("UPS 音素间空格不能被保存为英文词间停顿", async () => {
   fireEvent.click(screen.getByLabelText("停顿"));
   fireEvent.click(screen.getByLabelText("停顿 0.5 秒"));
   fireEvent.mouseDown(screen.getByRole("dialog").querySelector(".tsz-ve-gap")!);
-  expect(screen.getByText(/停顿只能设置在词间音标边界/)).toBeInTheDocument();
+  expect(screen.getByText(/停顿须在词间/)).toBeInTheDocument();
   expect(screen.getByLabelText(`完成${label}设置`)).toBeDisabled();
 });
 
@@ -896,14 +924,14 @@ it("四个 TTS 设置器提供音标编辑、停顿和音色，完成各自保�
     const control = (label: string) =>
       dialog.querySelector<HTMLElement>(`[aria-label="${label}"]`)!;
     await waitFor(() => expect(control(`启用 ${voice}`)).not.toBeNull());
-    expect(control(`启用 ${voice}`)).not.toBeChecked();
-    for (const name of ["连读", "斜体", "语法结构", "音频", "编辑文本"])
+    await waitFor(() => expect(control(`启用 ${voice}`)).toBeChecked());
+    expect(control("音频")).not.toBeNull();
+    for (const name of ["连读", "斜体", "语法结构", "编辑文本"])
       expect(control(name)).toBeNull();
     expect(control(`${label}音标编辑`)).not.toHaveAttribute("readonly");
     expect(control(`${label}音标编辑`)).toHaveValue(
       wire().synthesis[side][alphabet.toLowerCase()]
     );
-    fireEvent.click(control(`启用 ${voice}`));
     fireEvent.click(control("停顿"));
     fireEvent.click(control(`停顿 ${duration / 1000} 秒`));
     fireEvent.mouseDown(

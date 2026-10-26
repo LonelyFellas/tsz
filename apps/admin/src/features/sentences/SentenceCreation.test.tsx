@@ -47,7 +47,7 @@ vi.mock("@/lib/auth", () => ({
 }));
 vi.mock("../dictionary/voice-editor/dataSource", () => ({
   loadAdminVoiceRecommendations: async () => [],
-  adminVoicePreviewAdapter: undefined,
+  adminVoicePreviewAdapter: { listVoices: async () => [], synthesize: vi.fn() },
   adminAudioUploadAdapter: undefined,
   voicePreviewIsMock: false
 }));

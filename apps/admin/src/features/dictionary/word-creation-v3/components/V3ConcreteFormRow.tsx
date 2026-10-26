@@ -19,6 +19,7 @@ import {
   updateConcreteFormType,
   updateVariantSpelling,
   updateSpellingVoiceProfile,
+  updateSpellingAudioAssets,
   updateFormRegularity,
   type V3IdFactory
 } from "../operations";
@@ -367,7 +368,20 @@ function V3DialectFormCell({
           ariaLabel={`${formLabel}${dialectLabel(dialect)}拼写`}
           field="spelling"
           nodeId={variant.id}
-          audioUploadEnabled={false}
+          audioUploadEnabled
+          audioAssets={variant.spelling_speech?.audio_assets}
+          onAudioAssetsChange={(assets) =>
+            onChange(
+              updateSpellingAudioAssets(
+                content,
+                dialectRules.spelling_mode === "unified" &&
+                  form.regional_variants.mode === "uk_us"
+                  ? [form.regional_variants.uk.id, form.regional_variants.us.id]
+                  : [variant.id],
+                assets
+              )
+            )
+          }
           voiceProfile={variant.spelling_speech?.voice_profile}
           onVoiceProfileChange={(profile) =>
             onChange(
@@ -592,7 +606,17 @@ export function V3ConcreteFormRow({
                 ariaLabel={`${formLabel}英美通用拼写`}
                 field="spelling"
                 nodeId={commonVariant.id}
-                audioUploadEnabled={false}
+                audioUploadEnabled
+                audioAssets={commonVariant.spelling_speech?.audio_assets}
+                onAudioAssetsChange={(assets) =>
+                  onChange(
+                    updateSpellingAudioAssets(
+                      content,
+                      [commonVariant.id],
+                      assets
+                    )
+                  )
+                }
                 voiceProfile={commonVariant.spelling_speech?.voice_profile}
                 onVoiceProfileChange={(profile) =>
                   onChange(
@@ -663,7 +687,19 @@ export function V3ConcreteFormRow({
                 field="spelling"
                 nodeAliases={unifiedSpellingVariantIds.join(" ")}
                 nodeId={form.id}
-                audioUploadEnabled={false}
+                audioUploadEnabled
+                audioAssets={
+                  unifiedSpellingVariants.uk.spelling_speech?.audio_assets
+                }
+                onAudioAssetsChange={(assets) =>
+                  onChange(
+                    updateSpellingAudioAssets(
+                      content,
+                      unifiedSpellingVariantIds,
+                      assets
+                    )
+                  )
+                }
                 voiceProfile={
                   unifiedSpellingVariants.uk.spelling_speech?.voice_profile
                 }

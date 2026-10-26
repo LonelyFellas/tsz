@@ -143,11 +143,13 @@ function collectCalls(
   const walk = (node: unknown, name = "") => {
     if (typeof node === "function") {
       (node as (...a: unknown[]) => unknown)(
-        name === "interactionStats" ||
-          name === "interactionStates" ||
-          name === "tipStates"
-          ? [SENTINEL]
-          : SENTINEL,
+        name === "previewContent"
+          ? `/speech/previews/${"a".repeat(64)}/content`
+          : name === "interactionStats" ||
+              name === "interactionStates" ||
+              name === "tipStates"
+            ? [SENTINEL]
+            : SENTINEL,
         name === "customAudio" || name === "myCustomAudio"
           ? [SENTINEL]
           : SENTINEL,
@@ -830,7 +832,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "b48f180aec5009f524a7afed53736efd02f7550796f19b8f9a5c9a7c7a427e56"
+      "e18b715b7026839d5d1cad1a73724fb87836024f5fb7aaa80870f8f312a504dc"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1130,14 +1132,30 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     expect(snapshot.operationHeaders).toEqual({
       "post /auth/refresh": [currentOnlyHeader, refreshHeader],
       "post /admin/auth/refresh": [currentOnlyHeader, refreshHeader],
+      "get /admin/speech/groups": [
+        "X-TSZ-Dubbing-Groups",
+        "X-TSZ-Voice-Models"
+      ].map((name) => ({
+        name,
+        in: "header",
+        required: false,
+        schema: { type: ["string", "null"] }
+      })),
+      "get /admin/speech/voices": [
+        "X-TSZ-Voice-Catalog",
+        "X-TSZ-Voice-Models"
+      ].map((name) => ({
+        name,
+        in: "header",
+        required: false,
+        schema: { type: ["string", "null"] }
+      })),
       ...Object.fromEntries(
         [
-          "get /admin/speech/groups",
           "put /admin/speech/groups",
           "get /admin/speech/library",
           "put /admin/speech/library/{alias}/personal",
           "put /admin/speech/library/{alias}/description",
-          "get /admin/speech/voices",
           "get /dictionary/entries/{id}/audio/{asset_id}"
         ].map((operation) => [
           operation,
@@ -1610,6 +1628,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       "generated"
     ]);
     expect(snapshot.schemas.PreviewResponse.required).toEqual([
+      "content_path",
       "cache_status",
       "audio_url",
       "expires_at",

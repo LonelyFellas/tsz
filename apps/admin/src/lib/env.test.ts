@@ -21,8 +21,7 @@ describe("env", () => {
     vi.resetModules();
     const { env } = await import("./env");
     expect(env.API_BASE_URL).toBe("/api/v1");
-    // 后端契约落地前默认关，dev 也不例外
-    expect(env.VOICE_AUDIO_UPLOAD).toBe(false);
+    expect(env.VOICE_AUDIO_UPLOAD).toBe(!import.meta.env.PROD);
     expect(env.VOICE_EDITOR).toBe(true);
     expect(env.SENTENCE_FORMATTING).toBe(true);
     expect(env.AZURE_PRONUNCIATION_INPUTS).toBe(true);

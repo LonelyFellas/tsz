@@ -15,11 +15,17 @@ export function isVoiceRecommendationAvailable(
       value.id === item.setting.voice_id &&
       (item.setting.locale
         ? value.locale === item.setting.locale
-        : speechAccentGroup(value.locale) === speechAccentGroup(item.locale))
+        : speechAccentGroup(value.locale, value.accent) ===
+          speechAccentGroup(item.locale))
   );
   if (
     !voice ||
-    (locale && speechAccentGroup(item.locale) !== speechAccentGroup(locale))
+    (locale && speechAccentGroup(item.locale) !== speechAccentGroup(locale)) ||
+    (speechAccentGroup(item.locale) !== "other" &&
+      speechAccentGroup(voice.locale, voice.accent) !==
+        speechAccentGroup(item.locale)) ||
+    (item.setting.style_degree != null && voice.supportsStyleDegree !== true) ||
+    (item.setting.role != null && !voice.roles?.includes(item.setting.role))
   )
     return false;
   const {

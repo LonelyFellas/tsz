@@ -28,7 +28,8 @@ import {
   updateFormGroupScope,
   updatePronunciation,
   updateVariantSpelling,
-  updateSpellingVoiceProfile
+  updateSpellingVoiceProfile,
+  updateSpellingAudioAssets
 } from "./operations";
 import {
   UUIDS,
@@ -2533,6 +2534,80 @@ it("拼写试听比较兼容缺省空配置、音色顺序与字段顺序，保�
   ).toBe(true);
   expect(
     spellingSpeechEqual(left, { ...empty, voice_profile: { voices: [sonia] } })
+  ).toBe(false);
+});
+
+it("显式配音配置保留已选版本的默认播放顺序", () => {
+  const voices = [
+    {
+      voice_id: "sonia",
+      version_id: UUIDS.pos,
+      enabled: true,
+      rate_percent: 0
+    },
+    {
+      voice_id: "sonia",
+      version_id: UUIDS.group,
+      enabled: true,
+      rate_percent: -25
+    }
+  ];
+  const speech = {
+    content: { version: 2 as const, text: "cat", annotations: [] },
+    voice_profile: {
+      voices,
+      dubbing: { mode: "local" as const, area: "word" as const }
+    }
+  };
+  expect(
+    spellingSpeechEqual(speech, {
+      ...speech,
+      voice_profile: { ...speech.voice_profile, voices: [...voices].reverse() }
+    })
+  ).toBe(false);
+});
+
+it("拼写录音随配置编辑保留，更新资产不会改变读法录音", () => {
+  const original = formsFixture();
+  const asset = {
+    id: "recording",
+    locale: "en-GB" as const,
+    gender: "female" as const,
+    content_type: "audio/wav",
+    size_bytes: 48,
+    duration_ms: null,
+    original_name: "recording.wav",
+    created_at: "2026-10-27T00:00:00Z"
+  };
+  const uploaded = updateSpellingAudioAssets(
+    original,
+    [UUIDS.common_variant],
+    [asset]
+  );
+  const configured = updateSpellingVoiceProfile(
+    uploaded,
+    [UUIDS.common_variant],
+    { voices: [] }
+  );
+  const edited = updateVariantSpelling(
+    configured,
+    UUIDS.common_variant,
+    "changed"
+  );
+  expect(
+    commonVariant(edited.pos[0]!.forms[0]!).spelling_speech?.audio_assets
+  ).toEqual([asset]);
+  expect(
+    commonVariant(original.pos[0]!.forms[0]!).spelling_speech
+  ).toBeUndefined();
+  expect(
+    spellingSpeechEqual(
+      commonVariant(uploaded.pos[0]!.forms[0]!).spelling_speech,
+      {
+        ...commonVariant(uploaded.pos[0]!.forms[0]!).spelling_speech!,
+        audio_assets: []
+      }
+    )
   ).toBe(false);
 });
 

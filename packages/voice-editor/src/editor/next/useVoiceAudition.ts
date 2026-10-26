@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RichTextV2 } from "@tsz/types";
+import type { ReviewAudio } from "./AudioReview";
 import {
   canonicalVoiceHash,
   voiceSettingFor,
@@ -23,8 +24,8 @@ function settingsForVoice(
   voice: VoiceOption,
   versionKey?: string
 ): VoiceSettings {
-  const setting =
-    voiceSettingFor(settings, voice.id, versionKey) ?? voice.defaultSettings;
+  const stored = voiceSettingFor(settings, voice.id, versionKey);
+  const setting = stored ?? voice.defaultSettings;
   const rate = setting?.rate_percent ?? 0;
   const ratePercent =
     voice.supportsRate === false
@@ -34,6 +35,7 @@ function settingsForVoice(
         : rate;
   return {
     voiceId: voice.id,
+    ...(stored?.output_format ? { outputFormat: stored.output_format } : {}),
     ratePercent,
     ...(setting?.pitch_semitones !== undefined
       ? { pitchSemitones: setting.pitch_semitones }
@@ -41,7 +43,11 @@ function settingsForVoice(
     ...(setting?.volume_percent !== undefined
       ? { volumePercent: setting.volume_percent }
       : {}),
-    ...(setting?.style ? { style: setting.style } : {})
+    ...(setting?.style ? { style: setting.style } : {}),
+    ...(setting?.style_degree !== undefined
+      ? { styleDegree: setting.style_degree }
+      : {}),
+    ...(setting?.role !== undefined ? { role: setting.role } : {})
   };
 }
 
@@ -55,6 +61,7 @@ export interface VoiceAuditionInput {
 }
 
 export interface VoiceAudition {
+  media?: ReviewAudio;
   voices: VoiceOption[];
   voicesLoading: boolean;
   status: string;
@@ -89,6 +96,7 @@ export function useVoiceAudition({
   const [status, setStatus] = useState("");
   const [pendingVoiceId, setPendingVoiceId] = useState<string>();
   const [playingVoiceId, setPlayingVoiceId] = useState<string>();
+  const [media, setMedia] = useState<ReviewAudio>();
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const resultRef = useRef<VoicePreviewResult | null>(null);
@@ -102,6 +110,7 @@ export function useVoiceAudition({
   const stopMedia = useCallback(() => {
     audioRef.current?.pause();
     audioRef.current = null;
+    setMedia(undefined);
     resultRef.current?.dispose?.();
     resultRef.current = null;
     setPlayingVoiceId(undefined);
@@ -234,6 +243,11 @@ export function useVoiceAudition({
 
           const audio = new Audio(result.audioUrl);
           audioRef.current = audio;
+          setMedia({
+            audio,
+            result,
+            name: setting?.version_name ?? voice.label
+          });
           const isCurrent = () => audioRef.current === audio;
 
           audio.addEventListener(
@@ -285,6 +299,7 @@ export function useVoiceAudition({
   );
 
   return {
+    media,
     voices,
     voicesLoading,
     status,

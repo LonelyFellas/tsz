@@ -1474,12 +1474,20 @@ describe("V3MeaningsAndExamplesStep", () => {
       fireEvent.click(screen.getByLabelText("发音"));
       const rateButtons = await screen.findAllByLabelText(/^设置 .* 的语速$/);
       fireEvent.click(rateButtons[0]!);
-      fireEvent.click(await screen.findByLabelText("语速 1.25 倍"));
+      fireEvent.click(await screen.findByLabelText("语速 1.20 倍"));
       expect(variant().voice_profile).toBeUndefined();
       fireEvent.click(screen.getByLabelText("完成语法结构 1 英美通用内容编辑"));
       expect(variant().voice_profile).toEqual({
+        dubbing: { mode: "local", area: "grammar", recommendation_order: [] },
         voices: [
-          { voice_id: expect.any(String), enabled: false, rate_percent: 25 }
+          {
+            voice_id: expect.any(String),
+            enabled: false,
+            rate_percent: 20,
+            version_id: expect.any(String),
+            version_name: "Sonia",
+            locale: "en-GB"
+          }
         ]
       });
     } finally {

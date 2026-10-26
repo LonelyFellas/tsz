@@ -8,6 +8,7 @@ import type {
 
 export function clearVoiceAudio(profile: VoiceProfile): VoiceProfile {
   return {
+    ...profile,
     voices: profile.voices.map(
       ({ audio_asset_id: _audio, ...setting }) => setting
     )
@@ -77,15 +78,22 @@ export function selectVoiceVersion(
   settings: readonly VoiceSetting[],
   selected: VoiceSetting,
   locale: AudioAssetLocale,
-  voices: readonly VoiceOption[]
+  voices: readonly VoiceOption[],
+  multiple = false
 ): VoiceSetting[] {
   const key = voiceSettingKey(selected);
   const hasSelected = settings.some((item) => voiceSettingKey(item) === key);
+  const selectedAccent = voices.find(
+    (voice) => voice.id === selected.voice_id
+  )?.accent;
   const next = settings.map((item) =>
     voiceSettingKey(item) === key
       ? { ...selected, enabled: true }
-      : speechSelectionGroup(voiceLocale(item, voices)) ===
-          speechSelectionGroup(locale)
+      : !multiple &&
+          speechSelectionGroup(
+            voiceLocale(item, voices),
+            voices.find((voice) => voice.id === item.voice_id)?.accent
+          ) === speechSelectionGroup(locale, selectedAccent)
         ? { ...item, enabled: false }
         : item
   );

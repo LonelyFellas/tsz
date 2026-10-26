@@ -1,5 +1,6 @@
 import { useDraftRecovery } from "@/features/recovery/useDraftRecovery";
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { expandFormContents } from "@tsz/shared";
 import { UNSAFE_DataRouterContext, useBlocker } from "react-router-dom";
 import {
   currentSentenceCandidates,
@@ -32,6 +33,8 @@ import { canAdminResourceAction, hasAdminPermission } from "@tsz/shared/auth";
 import { api, useAuthStore } from "@/lib/auth";
 import { PronunciationPreviewProvider } from "../dictionary/word-creation/PronunciationPreview";
 import { V3VoiceTextField } from "../dictionary/word-creation-v3/components/V3VoiceTextField";
+import { V3GrammarFormPicker } from "../dictionary/word-creation-v3/components/V3GrammarFormPicker";
+import { useReadingPreviewAdapter } from "../dictionary/word-creation-v3/components/useReadingPreviewAdapter";
 import { V3SentenceTranslationsField } from "../dictionary/word-creation-v3/components/V3SentenceTranslationsField";
 import { editableEnglishText } from "../dictionary/word-creation-v3/meaningsModel";
 import { SharedSentenceAssociationPicker } from "./SharedSentenceAssociationPicker";
@@ -64,6 +67,14 @@ export function SentenceEditor({
   onClose: () => void;
   onSaved: (sentence: SharedSentence) => void;
 }) {
+  const readingForms = useMemo(
+    () => (sourceWord ? expandFormContents(sourceWord.forms) : undefined),
+    [sourceWord]
+  );
+  const createReadingPreviewAdapter = useReadingPreviewAdapter(
+    sourceWord?.id,
+    readingForms
+  );
   const profile = useAuthStore((state) => state.profile);
   const canEdit = sentence
     ? canAdminResourceAction(
@@ -593,6 +604,16 @@ export function SentenceEditor({
               textLinks={content.annotations.filter(
                 (item) => item.source_dialect === row.dialect
               )}
+              readingLinks={variant.reading_links}
+              createReadingPreviewAdapter={createReadingPreviewAdapter}
+              renderReadingPicker={(props) => (
+                <V3GrammarFormPicker
+                  {...props}
+                  wordId={sourceWord?.id}
+                  forms={readingForms}
+                  meanings={sourceWord?.meanings}
+                />
+              )}
               ariaLabel="例句正文"
               nodeId={row.variant_id}
               field="value"
@@ -606,8 +627,8 @@ export function SentenceEditor({
               onAssociationsChange={(annotations) =>
                 changeVariant({}, annotations)
               }
-              onChange={(value, annotations) =>
-                changeVariant({ value }, annotations)
+              onChange={(value, annotations, reading_links) =>
+                changeVariant({ value, reading_links }, annotations)
               }
               voiceProfile={variant.voice_profile}
               onVoiceProfileChange={(voice_profile) =>
