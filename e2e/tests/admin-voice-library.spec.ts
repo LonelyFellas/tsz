@@ -151,7 +151,7 @@ test("从一级菜单查找音色、调参并播放，改字后清除旧音频",
   const requests = await mockApi(page);
   await page.goto("/voices");
   await expect(
-    page.getByRole("navigation").getByText("配音中心", { exact: true })
+    page.getByRole("heading", { name: "配音中心", exact: true })
   ).toBeVisible();
   await page.getByRole("menuitem", { name: /配音中心/ }).click();
   await expect(page).toHaveURL(/\/voices$/);
@@ -177,6 +177,40 @@ test("从一级菜单查找音色、调参并播放，改字后清除旧音频",
     fullPage: true,
     animations: "disabled"
   });
+  await page.getByRole("button", { name: "试听 Sonia", exact: true }).click();
+  const originalAudio = page.getByLabel("Sonia 试听播放器");
+  await expect(originalAudio).toBeVisible();
+  await expect
+    .poll(() =>
+      originalAudio.evaluate((node: HTMLAudioElement) => node.readyState)
+    )
+    .toBeGreaterThanOrEqual(2);
+  await originalAudio.evaluate(async (node: HTMLAudioElement) => {
+    node.loop = true;
+    node.dataset.previewIdentity = "original";
+    await node.play();
+  });
+  await page.getByRole("button", { name: "查看 Sonia 资料" }).click();
+  const details = page.getByRole("dialog", { name: "Sonia 音色资料" });
+  await expect(details.getByRole("region", { name: "音色资料" })).toBeVisible();
+  await expect(originalAudio).toHaveAttribute(
+    "data-preview-identity",
+    "original"
+  );
+  expect(
+    await originalAudio.evaluate((node: HTMLAudioElement) => node.paused)
+  ).toBe(false);
+  await details.getByRole("button", { name: /关闭|Close/ }).click();
+  await expect(details).toHaveCount(0);
+  await expect(originalAudio).toHaveAttribute(
+    "data-preview-identity",
+    "original"
+  );
+  expect(
+    await originalAudio.evaluate((node: HTMLAudioElement) => node.paused)
+  ).toBe(false);
+  expect(requests).toHaveLength(1);
+  requests.length = 0;
   await page.getByRole("button", { name: "调整 Sonia 参数" }).click();
   const drawer = page.getByRole("dialog");
   await drawer
@@ -231,7 +265,9 @@ test("从一级菜单查找音色、调参并播放，改字后清除旧音频",
   expect(errors).toEqual([]);
 });
 
-test("窄屏表头场景多选与清除可操作，弹层不撑宽页面", async ({ page }) => {
+test("窄屏展开更多筛选后场景多选与清除可操作，弹层不撑宽页面", async ({
+  page
+}) => {
   await mockApi(page);
   await page.route("**/api/v1/admin/speech/voices", (route) =>
     route.fulfill({
@@ -257,6 +293,7 @@ test("窄屏表头场景多选与清除可操作，弹层不撑宽页面", async
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/voices");
   await page.getByRole("tab", { name: "音色库" }).click();
+  await page.getByRole("button", { name: "更多筛选" }).click();
   const select = page.getByRole("combobox", { name: "推荐场景", exact: true });
   await select.scrollIntoViewIfNeeded();
   await select.click();
@@ -449,10 +486,14 @@ test("分组草稿受保护，保存后重新打开保持英美推荐", async ({
   );
   await page.getByRole("tab", { name: "音色库" }).click();
   await expect(
-    page.getByRole("table").getByLabel("试听 Sonia", { exact: true })
+    page
+      .getByRole("list", { name: "音色列表" })
+      .getByLabel("试听 Sonia", { exact: true })
   ).toBeVisible();
   await expect(
-    page.getByRole("table").getByLabel("试听 Guy", { exact: true })
+    page
+      .getByRole("list", { name: "音色列表" })
+      .getByLabel("试听 Guy", { exact: true })
   ).toBeVisible();
   await page.getByRole("button", { name: "调整 Sonia 参数" }).click();
   const drawer = page.getByRole("dialog");
@@ -851,7 +892,7 @@ test("窄屏可浏览，只有例句权限时禁止生成；固定参数不可�
   await page.goto("/voices");
   await page.getByRole("tab", { name: "音色库" }).click();
   await expect(
-    page.getByRole("navigation").getByText("配音中心", { exact: true })
+    page.getByRole("heading", { name: "配音中心", exact: true })
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "试听 Sonia", exact: true })
