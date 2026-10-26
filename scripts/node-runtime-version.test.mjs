@@ -103,10 +103,16 @@ test("CI, Docker, and native deployment use the same pinned Node runtime", async
   assert.match(deployWeb, /required_node_version="v\$\(.*\.node-version.*\)"/);
   assert.doesNotMatch(deployWeb, /required_node_version="v24\./);
   assert.match(deployWeb, /ssh tshb-test '\/usr\/bin\/node --version'/);
-  assert.ok(
-    deployWeb.indexOf("server_node_version=") <
-      deployWeb.indexOf('echo "==> build @tsz/web')
+  const packagePreparation = deployWeb.indexOf("prepare_deploy_artifact web");
+  assert.ok(packagePreparation >= 0, "deployment must consume the CI package");
+  const serverVersionCheck = deployWeb.indexOf(
+    '[[ "$(ssh tshb-test \'/usr/bin/node --version\')" = "$required_node_version" ]]'
   );
+  assert.ok(
+    serverVersionCheck >= 0,
+    "server Node must match the pinned version"
+  );
+  assert.ok(serverVersionCheck < packagePreparation);
   assert.match(
     webService,
     /^ExecStart=\/usr\/bin\/node apps\/web\/server\.js/m

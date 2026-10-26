@@ -155,7 +155,7 @@ export FAKE_HEAD="$FAKE_REMOTE_SHA"
 
 # S03 origin/main 前进后必须拒绝：构建树是旧 commit 导出的，不能再往服务器写。
 prepare_deploy_source web >/dev/null
-prepare_deploy_build_tree web >/dev/null
+prepare_deploy_tools web >/dev/null
 export FAKE_REMOTE_SHA="$(printf 'c%.0s' {1..40})"
 expect_rejection "S03 remote main advanced" '*origin/main advanced after source gate*' \
   recheck_deploy_source web
@@ -201,7 +201,7 @@ export FAKE_MISSING_COMMIT=0
 prepare_deploy_source web >/dev/null
 
 # S06 部署场景仍然 fail-closed：构建树里出现 Next/Vite 会读的 ignored .env* 一律拒绝，
-# helper 与两个入口(prepare_deploy_build_tree/recheck)都要拒，光锁 helper 挡不住入口漏调。
+# helper 与两个入口(prepare_deploy_tools/recheck)都要拒，光锁 helper 挡不住入口漏调。
 polluted="$test_dir/polluted"
 mkdir -p "$polluted/apps/web" "$polluted/apps/admin"
 : >"$polluted/apps/web/.env.local"
@@ -214,7 +214,7 @@ expect_failure "S06 build root is required" reject_ignored_build_env web ""
 export FAKE_ARCHIVE_DIR="$polluted"
 expect_rejection "S06 build tree rejects Next environment" \
   "*ignored build environment file exists: ${DEPLOY_BUILD_ROOT_PREFIX}*/apps/web/.env.local*" \
-  prepare_deploy_build_tree web
+  prepare_deploy_tools web
 [[ -n "$DEPLOY_BUILD_ROOT" ]] || fail "S06 failed build tree must stay cleanable"
 [[ ! -s "$FAKE_PNPM_CALLS" ]] || fail "S06 must reject before installing dependencies"
 remove_deploy_build_tree || fail "S06 cleanup"
@@ -224,13 +224,13 @@ rm "$polluted/apps/web/.env.local"
 : >"$polluted/apps/admin/.env.test"
 expect_rejection "S06 build tree rejects Vite environment" \
   "*ignored build environment file exists: ${DEPLOY_BUILD_ROOT_PREFIX}*/apps/admin/.env.test*" \
-  prepare_deploy_build_tree admin
+  prepare_deploy_tools admin
 remove_deploy_build_tree || fail "S06 cleanup"
 DEPLOY_BUILD_ROOT=""
 export FAKE_ARCHIVE_DIR="$clean_archive"
 
 # 构建树事后被污染，写服务器前的 recheck 也必须拒绝。
-prepare_deploy_build_tree web >/dev/null
+prepare_deploy_tools web >/dev/null
 : >"$DEPLOY_BUILD_ROOT/apps/web/.env.local"
 expect_rejection "S06 recheck rejects a polluted build tree" \
   '*ignored build environment file exists: *apps/web/.env.local*' \
@@ -240,15 +240,9 @@ recheck_deploy_source web || fail "S06 clean build tree must pass recheck"
 remove_deploy_build_tree || fail "S06 cleanup"
 DEPLOY_BUILD_ROOT=""
 
-# S07 构建环境仍然是 allowlist：换了构建目录不等于放弃环境隔离。
-export SHOULD_NOT_LEAK="secret"
-sanitized="$({ run_sanitized_build ALLOWED_VALUE=kept bash -c \
-  'printf "%s:%s" "$ALLOWED_VALUE" "${SHOULD_NOT_LEAK-unset}"'; })"
-[[ "$sanitized" = "kept:unset" ]] || fail "S07 sanitized build environment"
-
 # S08 构建树生命周期：导出到带前缀的临时目录、在那里装依赖、用完能删干净。
 : >"$FAKE_PNPM_CALLS"
-prepare_deploy_build_tree web >/dev/null
+prepare_deploy_tools web >/dev/null
 build_root="$DEPLOY_BUILD_ROOT"
 case "$build_root" in
   "$DEPLOY_BUILD_ROOT_PREFIX"*) ;;
@@ -259,9 +253,7 @@ esac
 [[ "$build_root" = "$(cd "$build_root" && pwd -P)" ]] ||
   fail "S08 build root must be a symlink-free real path: $build_root"
 [[ -f "$build_root/pnpm-workspace.yaml" ]] || fail "S08 target commit must be exported"
-pnpm_call="$(cat "$FAKE_PNPM_CALLS")"
-[[ "$pnpm_call" = *"$(basename "$build_root") install --frozen-lockfile" ]] ||
-  fail "S08 dependencies must be installed inside the build tree: $pnpm_call"
+[[ ! -s "$FAKE_PNPM_CALLS" ]] || fail "S08 deployment must never install dependencies"
 remove_deploy_build_tree || fail "S08 remove"
 [[ ! -e "$build_root" ]] || fail "S08 build tree must be removed"
 
@@ -274,16 +266,9 @@ expect_failure "S08 refuse to clean an unexpected build root" remove_deploy_buil
 DEPLOY_BUILD_ROOT=""
 remove_deploy_build_tree || fail "S08 empty build root is a no-op"
 
-export FAKE_PNPM_FAIL=1
-expect_rejection "S08 install failure" '*dependency install failed in the build tree*' \
-  prepare_deploy_build_tree web
-remove_deploy_build_tree || fail "S08 cleanup"
-DEPLOY_BUILD_ROOT=""
-export FAKE_PNPM_FAIL=0
-
 export FAKE_ARCHIVE_FAIL=1
 expect_rejection "S08 export failure" '*cannot export the target commit*' \
-  prepare_deploy_build_tree web
+  prepare_deploy_tools web
 remove_deploy_build_tree || fail "S08 cleanup"
 DEPLOY_BUILD_ROOT=""
 export FAKE_ARCHIVE_FAIL=0
@@ -292,7 +277,7 @@ export FAKE_ARCHIVE_FAIL=0
 saved_sha="$DEPLOY_GIT_SHA"
 DEPLOY_GIT_SHA=""
 expect_rejection "S09 build tree needs the source gate" '*source gate has not been prepared*' \
-  prepare_deploy_build_tree web
+  prepare_deploy_tools web
 expect_rejection "S09 recheck needs the source gate" '*source gate has not been prepared*' \
   recheck_deploy_source web
 DEPLOY_GIT_SHA="$saved_sha"
@@ -309,7 +294,7 @@ export DEPLOY_EXPECTED_CI_RUN_ID=123456789 DEPLOY_EXPECTED_CI_RUN_ATTEMPT=2
 expect_rejection 'S10 stale approved attempt' '*expected CI run/attempt changed*' prepare_deploy_source web
 export DEPLOY_EXPECTED_CI_RUN_ATTEMPT=1
 prepare_deploy_source web
-prepare_deploy_build_tree web >/dev/null
+prepare_deploy_tools web >/dev/null
 
 # S11 每次复核均要求原 run/attempt 且 completed/success，不能把 manifest 重新标成新 CI。
 export FAKE_ATTEMPT=2
