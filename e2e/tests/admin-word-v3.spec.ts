@@ -2331,6 +2331,41 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     const regional = expandedForm.regional_variants;
     const variant = regional.mode === "common" ? regional.common : regional.uk;
     const targetEntryId = "01990000-0000-7000-8000-000000000999";
+    const targetWord = structuredClone(word);
+    targetWord.id = targetEntryId;
+    const targetForms = expandFormContents(targetWord.forms);
+    const targetRegional = targetForms.pos[0]!.forms[0]!.regional_variants;
+    const targetVariant =
+      targetRegional.mode === "common"
+        ? targetRegional.common
+        : targetRegional.uk;
+    targetVariant.pronunciations[0]!.synthesis = {
+      alphabet: "ipa",
+      ipa: "",
+      ups: "",
+      uk: { ipa: "dʒɒb", ups: "JH Q B" },
+      us: { ipa: "dʒɑb", ups: "JH AA B" }
+    };
+    targetWord.forms = targetForms;
+    await page.route(
+      `**/lexicon/entries/${targetEntryId}/publications/${variant.id}`,
+      (route) =>
+        route.fulfill({
+          json: {
+            publication: {
+              schema_version: 3,
+              publication_id: variant.id,
+              entry_id: targetEntryId,
+              publication_number: 1,
+              source_revision: targetWord.revision,
+              published_by_admin_id: targetWord.created_by,
+              published_at: targetWord.created_at,
+              is_current: true,
+              word: targetWord
+            }
+          }
+        })
+    );
     await page.route(
       "**/lexicon/entries/component-targets/search",
       async (route) => {
@@ -2411,6 +2446,16 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       animations: "disabled"
     });
     await page.getByText(/原形 job/).click();
+    await page.getByLabel("英式具体读法", { exact: true }).click();
+    await page
+      .locator(".ant-select-dropdown:visible .ant-select-item-option-content")
+      .filter({ hasText: "读法 1 · IPA · dʒɒb" })
+      .click();
+    await page.getByLabel("美式具体读法", { exact: true }).click();
+    await page
+      .locator(".ant-select-dropdown:visible .ant-select-item-option-content")
+      .filter({ hasText: "读法 1 · IPA · dʒɑb" })
+      .click();
     await expect(page.getByText("选择词义", { exact: true })).toHaveCount(0);
     await expect(
       dialog.getByRole("button", { name: /^完成.*编辑$/ })
@@ -2424,8 +2469,15 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await dialog.getByLabel("关联 job（2）").click();
     await expect(page.getByText(/已关联 ·/)).toBeVisible();
     await expect(
-      page.getByText("点击词形可替换", { exact: true })
-    ).toBeVisible();
+      page
+        .getByLabel("英式具体读法", { exact: true })
+        .locator("xpath=ancestor::div[contains(@class,'ant-select')][1]")
+    ).toContainText("读法 1 · IPA · dʒɒb");
+    await expect(
+      page
+        .getByLabel("美式具体读法", { exact: true })
+        .locator("xpath=ancestor::div[contains(@class,'ant-select')][1]")
+    ).toContainText("读法 1 · IPA · dʒɑb");
     await page.screenshot({
       path: "/tmp/grammar-form-linked.png",
       fullPage: false,
