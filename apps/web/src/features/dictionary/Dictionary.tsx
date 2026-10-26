@@ -330,7 +330,11 @@ function Result({
                     <span className="mb-1 inline-block rounded-full bg-primary-muted px-2 text-xs text-primary">
                       {definition.level}
                     </span>
-                    <Texts texts={definition.texts} variant={variant} />
+                    <Texts
+                      texts={definition.texts}
+                      variant={variant}
+                      textRole="definition"
+                    />
                   </>
                 ) : (
                   <p className="text-foreground-muted">暂无释义</p>
