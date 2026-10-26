@@ -358,7 +358,7 @@ describe("SmartDictionary", () => {
     }
   );
 
-  it("真实查询行以词名上标保留完整数字和前导0，并提供编辑入口", async () => {
+  it("词名保留完整上标和编辑入口，悬停不显示气泡", async () => {
     const annotated = {
       ...v3Word("entry", "center"),
       annotation_visible: true,
@@ -378,15 +378,16 @@ describe("SmartDictionary", () => {
     );
     const annotation = screen.getByText("00123456789012345678");
     expect(annotation.tagName).toBe("SUP");
-    fireEvent.mouseEnter(annotation.parentElement!);
-    expect(await screen.findByRole("tooltip")).toHaveTextContent(
-      "center · 00123456789012345678"
-    );
+    await act(async () => {
+      fireEvent.mouseEnter(annotation.parentElement!);
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    });
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
     expect(annotation.previousElementSibling).toHaveTextContent("center");
     expect(screen.getByLabelText("编辑标注「center」")).toBeVisible();
   });
 
-  it("服务端标志隐藏圆标和tooltip，刷新可恢复且不依据当前页数量", async () => {
+  it("服务端标志隐藏上标，刷新可恢复且不依据当前页数量", () => {
     const item = {
       ...v3Word("entry", "center"),
       annotation: "007",
@@ -411,9 +412,6 @@ describe("SmartDictionary", () => {
     expect(
       screen.queryByLabelText("编辑标注「center」")
     ).not.toBeInTheDocument();
-    fireEvent.mouseEnter(screen.getByText("center").parentElement!);
-    expect(await screen.findByRole("tooltip")).not.toHaveTextContent("007");
-    fireEvent.mouseLeave(screen.getByText("center").parentElement!);
     item.annotation_visible = true;
     rendered.rerender(view());
     expect(screen.getByText("007").tagName).toBe("SUP");
@@ -849,8 +847,8 @@ describe("SmartDictionary", () => {
     expect(
       container.querySelectorAll(".ant-table-tbody > tr.ant-table-row")
     ).toHaveLength(3);
-    expect(screen.getByText("累计智能词汇:").parentElement).toHaveTextContent(
-      "累计智能词汇:3"
+    expect(screen.getByText("累计智能词条:").parentElement).toHaveTextContent(
+      "累计智能词条:3"
     );
     expect(screen.getByText("今日创编:").parentElement).toHaveTextContent(
       "今日创编:2"
@@ -978,7 +976,7 @@ describe("SmartDictionary", () => {
     expect(screen.getByTestId("location")).toHaveTextContent(first.id);
   });
 
-  it("手机宽度只保留完整的词汇与操作列", () => {
+  it("手机宽度只保留完整的词条与操作列", () => {
     matchViewport(390);
     render(
       <MemoryRouter>
@@ -991,7 +989,7 @@ describe("SmartDictionary", () => {
     const headers = screen.getAllByRole("columnheader");
     expect(headers.map((header) => header.textContent?.trim())).toEqual([
       "",
-      "词汇",
+      "名称",
       "操作"
     ]);
     expect(screen.getByText("继续创建").closest("button")).toBeEnabled();
@@ -1705,7 +1703,7 @@ describe("SmartDictionary", () => {
 
     expect(screen.getByText("垃圾桶")).toBeInTheDocument();
     expect(screen.queryByLabelText("词条状态")).toBeNull();
-    expect(screen.queryByText("创建词汇")).toBeNull();
+    expect(screen.queryByText("创建词条")).toBeNull();
     // 垃圾桶里全是归档词条，批量动作恒为恢复，不该出现「移入垃圾桶」。
     expect(screen.queryByText("移入垃圾桶")).toBeNull();
     expect(
@@ -1762,7 +1760,7 @@ describe("SmartDictionary", () => {
 
     expect(screen.getByText("智能词库")).toBeInTheDocument();
     expect(screen.getByLabelText("词条状态")).toBeInTheDocument();
-    expect(screen.getByText("创建词汇")).toBeInTheDocument();
+    expect(screen.getByText("创建词条")).toBeInTheDocument();
   });
 
   it("垃圾桶行提供永久删除，确认后携带双 revision 调用", async () => {

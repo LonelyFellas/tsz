@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { RouteGuard } from "@/features/auth/components/RouteGuard";
 import { DictionaryDetail } from "@/features/dictionary/DictionaryDetail";
 export const metadata: Metadata = {
-  title: "词汇详情",
+  title: "词条详情",
   robots: { index: false, follow: false }
 };
 export default async function DictionaryEntryPage({

@@ -48,7 +48,7 @@ describe("词典页面", () => {
   it("清空输入和 Escape 不触发查询，清空后焦点仍在搜索框", async () => {
     const user = userEvent.setup();
     render(<Dictionary />, { wrapper });
-    const input = screen.getByRole("searchbox", { name: "查找英文词汇" });
+    const input = screen.getByRole("searchbox", { name: "查找英文词条" });
     await user.type(input, "apple");
     await user.click(screen.getByRole("button", { name: "清除搜索" }));
     expect(input).toHaveValue("");
@@ -83,7 +83,7 @@ describe("词典页面", () => {
     );
     view.unmount();
     render(<Dictionary query="apple" />, { wrapper });
-    await screen.findByRole("link", { name: /apple，查看词汇详情/ });
+    await screen.findByRole("link", { name: /apple，查看词条详情/ });
     expect(
       screen.queryByRole("button", { name: "删除历史 apple" })
     ).not.toBeInTheDocument();
@@ -106,14 +106,14 @@ describe("词典页面", () => {
     await waitFor(() => expect(search).toHaveBeenCalled());
     view.rerender(<Dictionary query="pear" />);
     expect(
-      await screen.findByRole("link", { name: /pear，查看词汇详情/ })
+      await screen.findByRole("link", { name: /pear，查看词条详情/ })
     ).toHaveAttribute("href", expect.stringContaining("/dictionary/pear?"));
     expect(oldSignal?.aborted).toBe(true);
     await act(async () => {
       oldResolve(response("apple"));
     });
     expect(
-      screen.queryByRole("link", { name: /apple，查看词汇详情/ })
+      screen.queryByRole("link", { name: /apple，查看词条详情/ })
     ).not.toBeInTheDocument();
   });
   it("请求失败有重试，重试后显示结果", async () => {
@@ -123,7 +123,7 @@ describe("词典页面", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("查询暂时失败");
     await user.click(screen.getByRole("button", { name: "重新查询" }));
     expect(
-      await screen.findByRole("link", { name: /apple，查看词汇详情/ })
+      await screen.findByRole("link", { name: /apple，查看词条详情/ })
     ).toBeInTheDocument();
   });
 });

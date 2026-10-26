@@ -548,7 +548,7 @@ describe("UnifiedCreateEntryStep", () => {
     renderStep(requests());
 
     expect(screen.getByText("STEP 01")).toBeVisible();
-    expect(screen.getByText("创建词汇")).toBeVisible();
+    expect(screen.getByText("创建词条")).toBeVisible();
     expect(screen.getByText("录入与检测")).toBeVisible();
     expect(screen.getByText("录入词条")).toBeVisible();
     expect(screen.getByRole("button", { name: /词典检测/ })).toBeVisible();

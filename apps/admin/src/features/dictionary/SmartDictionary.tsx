@@ -822,7 +822,7 @@ export function SmartDictionary({
 
   const columns: TableColumnsType<AdminWordListItemAny> = [
     {
-      title: "词汇",
+      title: "名称",
       key: "label",
       width: 150,
       fixed: "left",
@@ -830,47 +830,37 @@ export function SmartDictionary({
       render: (_: unknown, record) => {
         const label = wordListLabel(record);
         const annotation = visibleWordAnnotation(record);
-        const dialects = wordListDialects(record);
-        const context =
-          dialects.length > 0
-            ? dialects.map((dialect) => DIALECT_LABEL[dialect]).join(" / ")
-            : "";
         return (
-          <Tooltip
-            title={[label, annotation, context].filter(Boolean).join(" · ")}
+          <span
+            style={{
+              display: "block",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              lineHeight: 1.6
+            }}
           >
-            <span
-              tabIndex={0}
-              style={{
-                display: "block",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-                lineHeight: 1.6
-              }}
-            >
-              <span className="tsz-words" style={{ fontWeight: 600 }}>
-                {label}
-              </span>
-              {annotation ? (
-                <sup
-                  style={{
-                    display: "inline-block",
-                    position: "relative",
-                    top: "-0.4em",
-                    marginInlineStart: 2,
-                    color: "rgba(0, 0, 0, 0.65)",
-                    fontSize: 11,
-                    fontWeight: 600,
-                    lineHeight: 1,
-                    verticalAlign: "baseline"
-                  }}
-                >
-                  {annotation}
-                </sup>
-              ) : null}
+            <span className="tsz-words" style={{ fontWeight: 600 }}>
+              {label}
             </span>
-          </Tooltip>
+            {annotation ? (
+              <sup
+                style={{
+                  display: "inline-block",
+                  position: "relative",
+                  top: "-0.4em",
+                  marginInlineStart: 2,
+                  color: "rgba(0, 0, 0, 0.65)",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  lineHeight: 1,
+                  verticalAlign: "baseline"
+                }}
+              >
+                {annotation}
+              </sup>
+            ) : null}
+          </span>
         );
       }
     },
@@ -1391,7 +1381,7 @@ export function SmartDictionary({
                 icon={<PlusOutlined />}
                 onClick={() => navigate("/words/new")}
               >
-                创建词汇
+                创建词条
               </Button>
             )}
             {adminWordsDataSourceCapabilities.batchArchive && (
@@ -1437,7 +1427,7 @@ export function SmartDictionary({
           </Space>
           <Space size="large" wrap>
             <Typography.Text type="secondary">
-              累计智能词汇:
+              累计智能词条:
               <Typography.Text strong>
                 {stats.data?.total ?? "-"}
               </Typography.Text>
