@@ -1,68 +1,51 @@
 ---
 name: deploy
-description: 将已合入 GitHub main 且精确 CI 成功的 tsz 前端部署到 tshb-test，使用仓库导出构建与 rsync 脚本，验证页面、API 和制品来源。用于明确的前端部署请求；不部署后端。
+description: 将已合入 GitHub main 且精确 CI 成功的前端 Linux 发布包部署到 tshb-test；不在部署端重新构建，保留原生切换、来源与验收门禁。
 ---
 
 # 前端部署到 tshb-test
 
-通用授权与主任务记录遵循 [AGENTS.md](../../../AGENTS.md)。复用已确认的范围、配套发布依据和同状态验收，不重新评估需求；下列执行时门禁仍逐项运行，已有授权不等于已有 CI/版本证据。
+通用授权与工作区遵循 [AGENTS.md](../../../AGENTS.md)。明确部署请求才执行远端发布；实现、构建和阅读本技能不授予服务器写入权限。
 
 ## 必须保留的约束
 
-- 只部署 GitHub 当前 main；精确 SHA 的最新 `CI` 工作流必须 `completed/success`。零散 check 的 skipped/neutral、无 CI、查询失败或状态未知都不能放行。
-- 唯一入口是 [deploy-web.sh](../../../deploy/deploy-web.sh) 和 [deploy-admin.sh](../../../deploy/deploy-admin.sh)，具体构建门禁见 [deploy-source.sh](../../../deploy/deploy-source.sh)。
-- 脚本从目标 Git 对象导出临时构建树。无需切 main、stash 或移动用户 .env；本地脏文件不进入制品。若部署入口脚本本身有未经核实的改动，先从目标提交取得可信入口，不能执行来历不明的修改。
-- 不在服务器创建 Git checkout，不运行废弃根 deploy.sh/Docker Compose；不修改后端服务、数据库或运行数据。
-- 部署请求已授权这次前端发布及必要验证；未授权的合并、后端部署和真实业务变更不包含在内。
+- 唯一入口为 [deploy-web.sh](../../../deploy/deploy-web.sh) 与 [deploy-admin.sh](../../../deploy/deploy-admin.sh)。只发布当前 GitHub main 的精确 SHA，最新 `CI` run/attempt 必须 completed/success。失败、无记录、来源未知或变化均停止。
+- 发布消费 CI 的 Linux/amd64 制品，不运行本地 pnpm install/build。服务器不拉源码、不编译，不运行旧根 deploy.sh 或旧 Docker Compose。
+- 入口从精确 Git 对象导出受信工具；下载包只作为数据安全解包，不导入其中的脚本。工作区脏文件和本地环境文件不进入发布包。
+- 原生 candidate manifest、共享远端锁、事务记录、原子切换、静态资源保留、smoke 和来源验证继续生效。不修改后端或数据库。
 
-## 1. 确认目标与 CI
+## 1. 固定候选和发布包
 
-本次依赖配套后端变更时，读取本仓 [配套发布清单](../contract-sync/references/paired-release.md)，先核实实际版本组合及兼容顺序；单组件发布不强制走双仓清单，不擅自扩展部署范围。
+需要配套后端时先按 [配套发布清单](../contract-sync/references/paired-release.md)确认版本组合和顺序。单组件只发目标组件，成功且身份未变的组件不重复发布。
 
-检查本地状态和脚本，fetch 后记录 main SHA，确认用户要求的改动已合入。
-CI 的 owner/repo 从 GitHub remote 解析，按脚本查询该 SHA 的最新 `CI` workflow run：
-`repos/<owner>/<repo>/actions/runs?branch=main&head_sha=<sha>&per_page=100`。
+fetch 后记录当前 main SHA，确认改动已合入。入口查询该 SHA 最新 `CI` 工作流；正在运行按 [CI 等待与续跑](references/ci-wait.md)处理，同范围授权沿用。每个组件执行前重新核对，main 前进不自动换包或追新版本。
 
-- 成功：记录 SHA、最新 run ID、run_attempt 与链接后继续；run 的 head_sha/head_branch 必须精确匹配该 main。
-- 正在运行：使用 [CI 等待与续跑](references/ci-wait.md)，成功后沿用原部署授权。
-- 失败、取消、超时、无记录或无法确定：停止并报告具体状态，不手动豁免脚本门禁。
+CI `quality` 在 Ubuntu 22.04 构建并验证 Web standalone/Sharp 与 Admin test-mode 制品。包名为 `tsz-<web|admin>-<sha>-attempt-<producer-attempt>`，必须唯一、未过期、来自精确 run。仅重跑失败测试时可复用该 run 中最近的成功构建包，生产 attempt 不得晚于最终 CI attempt；两者分别记录，包参数仍须匹配。包包含 `release.tar.gz`、原生 `candidate.json`、`release.json`；回执绑定 SHA/tree、run/attempt、构建参数、Node/平台、摘要与验证结果。
 
-每个组件部署前重新核对 main 与 CI。main 前进时对新目标重新验证，不能沿用旧绿色结果。
-同时部署 web/admin 时记录各自实际 SHA；中途目标变化须重新协调版本，不能把不同 SHA 误报成一次一致发布。
+部署端核对来源、构建参数、包和候选摘要；解包后做一次完整制品复算，上传前复用该结果，远端传输后独立复算。gzip 只解压一遍，未压缩 TAR 上完成路径与链接检查；校验完成后发布目录设为 0755，临时父目录与下载 ZIP 保持私有。缺包或校验失败即停止，不回退到本地构建，不改 manifest 为旧包换身份。首次上线此流程需先让新 CI 在 main 成功产生包；旧提交没有包时不能强行发布。
 
-## 2. 顺序部署
+## 2. 参数与顺序
 
-从仓库根执行 `./deploy/deploy-web.sh`；其全部检查通过后再执行 `./deploy/deploy-admin.sh`。
-用户仅指定一个组件时只运行该组件。
+先执行 `./deploy/deploy-web.sh`，成功后执行 `./deploy/deploy-admin.sh`；用户只选一个组件则只运行该入口。共享 nginx 和远端发布锁继续串行。
 
-编排已批准版本组合时，必须把完整小写 SHA 和 CI 元组传给原生入口，例如：
+可传入 `DEPLOY_EXPECTED_SHA`、`DEPLOY_EXPECTED_CI_RUN_ID`、`DEPLOY_EXPECTED_CI_RUN_ATTEMPT` 绑定已批准的精确元组；SHA 必须是首次读取的当前 main，CI 两个参数须成对匹配最新成功 run/attempt。不传时自动选择并固定当前元组。
 
-```bash
-DEPLOY_EXPECTED_SHA="$approved_sha" \
-DEPLOY_EXPECTED_CI_RUN_ID="$approved_run_id" \
-DEPLOY_EXPECTED_CI_RUN_ATTEMPT="$approved_attempt" ./deploy/deploy-admin.sh
-```
+Web 默认 `NEXT_PUBLIC_SITE_URL=https://test.tianshengzhi.com`。Admin 默认 test mode、真实词库/词性/TTS API，四个兼容开关默认 true：`DEPLOY_VOICE_EDITOR`、`DEPLOY_AZURE_PRONUNCIATION_INPUTS`、`DEPLOY_FORM_SPELLING_REGULARITY`、`DEPLOY_SENTENCE_FORMATTING`，只接受 true/false。
 
-web 同理。`DEPLOY_EXPECTED_SHA` 必须等于入口首次读取的当前 main，不能用来发布历史 SHA；CI 两个参数必须成对提供且匹配最新成功 run/attempt。不传参数的普通调用保持自动选择当前 main，但一旦选定就绑定同一 SHA/run/attempt，不自动追新版本。
-构建后先复用原生 candidate manifest 验证制品摘要及 repository/SHA/tree/CI 来源，再在首次远端写入前和上传完成、调用发布事务前复核当前 main 与最新成功 run/attempt。变化/未知即非零停止，不把 manifest 重标成新 CI。schema v1 没有 attempt 字段，attempt 记录在入口门禁状态及日志，release 状态另存该证据，不另建 manifest。
-这是两个边界的 fail-closed 复核，不是 GitHub 与服务器之间的原子事务：查询后到远端命令执行/锁等待/切换仍有竞态窗口；上传后检查失败可能已写入独立暂存，但不会启动发布事务，需保留并核对现场，不声称零服务器写入。
+参数是**期望包设置**，不是部署时重编译。需要 false 兼容包时，在 main 手动触发 CI，设置相应同名语义的 boolean inputs；完成后部署端传入匹配的 `DEPLOY_*`。输入与包不匹配时在上传前停止。Web 公开站点 URL 改动应先正式调整 CI 构建设置。
 
-需要先发兼容前端时，可用 `DEPLOY_VOICE_EDITOR=false ./deploy/deploy-admin.sh` 暂关语音编辑入口；后端验收后再按默认 `true` 重发 admin。开关只接受 `true` / `false`，不影响精确 main、CI、隔离构建或 manifest 门禁。
+旧后端不接受变体 `is_regular` 时先发布 `DEPLOY_FORM_SPELLING_REGULARITY=false` 的包，确认录入人员已保存并刷新/关闭旧标签页后再切 API；后端通过后重新生成并发布 true 包。其他接口不兼容按配套清单处理，不用快速连发替代中间版本验证。
 
-释义与例句的新格式写入口通过 `DEPLOY_SENTENCE_FORMATTING` 传入隔离构建，默认 `true`；句子格式能力协商与旧保存保护后端、配套读取客户端已上线验收。兼容发布可用 `DEPLOY_SENTENCE_FORMATTING=false ./deploy/deploy-admin.sh` 显式关闭写入口，保留读取能力。旧客户端获得兼容视图，可能覆盖新格式的保存由后端拒绝，不要求人工确认所有标签页刷新。只接受 `true` / `false`，不改变精确 main、CI 或制品来源校验。
+制品发现最多 60 秒、下载最多 300 秒、远端事务调用最多 480 秒，长调用每 30 秒报告状态；rsync 有 180 秒无 IO 超时。断线或超时不代表远端未执行，按原事务核对现场，不盲目重发。
 
-规则变化标记配套发布：旧后端不接受变体 `is_regular`。先用
-`DEPLOY_FORM_SPELLING_REGULARITY=false ./deploy/deploy-admin.sh` 发布兼容前端；它隐藏新开关，不向旧后端生成新字段，但保留新后端已返回的值。
-兼容 admin 验收后、切换 API 前，必须确认录入人员已保存并刷新/关闭全部旧标签页；无法确认时保持兼容 admin + 旧 API，不执行后端切换。后端完成验收后，用 `DEPLOY_FORM_SPELLING_REGULARITY=true ./deploy/deploy-admin.sh` 开启录入。此开关默认 true，只接受 true/false，不替代 main/CI/manifest 门禁。
+上传前和上传后、事务开始前复核 exact-main 与最新 CI run/attempt。查询与远端锁不是跨系统原子事务；上传后失败可能留下独立暂存，不能报告零远端写入。不删未完成事务记录继续发。
 
-脚本负责 Node 版本核对、隔离构建、写服务器前 exact-main/最新 CI run-attempt 校验、独立 release 上传、远端发布锁、原子入口切换、服务/nginx、smoke 和 manifest 验证；
-历史静态资源保留 30 天，当前与回滚版本始终保留。web 使用双端口 systemd 实例，当前端口记录在 `/opt/tsz-releases/web/port`。
-存在 `/opt/tsz-frontend-transaction` 时先核对其中记录的暂存目录、旧版本与备份，不直接删除记录继续发布。
-web 还必须先启动裁剪后的 standalone 制品确认可运行。使用可继续读取的长命令会话，不因工具提前返回而误判完成。
-脚本非零退出立即停止；已完成组件明确列为部分部署，不手工拼产物、补写 manifest 或跳过验证。
+## 3. 验收
 
-## 3. 验收与汇报
+Web 在 CI 先验证裁剪包启动与 Sharp，远端继续备用实例验活、HTTPS/版本/API 检查；Admin 继续原子切换及 HTTPS 验收。Node 本地/服务器版本仍按精确提交核对。当前与回退 release 始终保留，旧静态资源保留 30 天。
 
-按 [验收清单](references/verification.md) 复核脚本已输出的验收证据；仅缺项、状态变化或结果不明时补查对应项，不重复同状态的 smoke 或制品复算。
-报告每个组件的 SHA、CI run、HTTP/服务结果、manifest verify 结果及未完成部分。
-故障先只读检查；nginx 配置无效不强制 reload，API 失败不擅自重启后端。
+包内 `version.json` 是包版本的唯一来源，远端在候选校验后读取；每次发布仍使用独立 UUID 事务目录，不生成重复的 `package-id` 文件。
+
+按 [验收清单](references/verification.md)复用已输出的同状态证据，仅补缺项。`release.json` 保存到组件 manifests 下的 `<release-id>.ci.json`，accepted manifest 仍由远端验收后生成。只在 smoke、manifest 复算和清理均通过后报告成功。
+
+汇报组件实际 SHA、CI run/attempt、制品 ID/摘要、构建参数、HTTP/服务及 manifest 结果、阶段耗时和 `local build=0`。失败说明已完成组件、暂存及回退状态。不得强制 nginx reload、重启后端、补造 manifest 或绕过门禁。

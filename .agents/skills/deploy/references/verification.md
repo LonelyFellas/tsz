@@ -12,6 +12,8 @@ ssh tshb-test '/usr/bin/node /opt/tsz-deploy-tools/frontend-provenance.mjs verif
 ssh tshb-test '/usr/bin/node /opt/tsz-deploy-tools/frontend-provenance.mjs verify --manifest /opt/tsz-deploy-manifests/admin.json --artifact-root /opt/tsz-releases/admin/current'
 ```
 
+CI 发布包还须核对 `<release-id>.ci.json` 的 SHA/tree、run/attempt、Node/平台、构建参数与压缩包摘要；该回执只证明候选，不替代远端 accepted manifest。部署前包身份或参数不匹配必须停止，不本地重建。Web standalone 与 Sharp 在匹配 Linux CI 验证，Mac 不执行下载包中的 Linux 原生依赖。
+
 本次部署组件对应的 verify 必须实际复算制品，输出与相应目标一致的 git_sha、CI run、artifact_sha256/file_count 与 accepted_at；只读 JSON 不足以验收。
 HTTPS 域名在服务器本机用 `--resolve` 指到 127.0.0.1 验证（保留 SNI 与证书校验）；本机经代理 fake-ip 直连的结果不作数。
 web 目录为 /opt/tsz-releases/web/current，admin 为 /opt/tsz-releases/admin/current；仅两个 HTTPS 域名的 /api/v1/ 代理 127.0.0.1:8383。域名 HTTP 返回固定域名的 HTTPS 跳转；默认 HTTP 和旧 8081 端口统一 404，不再提供页面或 API（保留 8081 拒绝响应不等于端口已经从安全组关闭）。

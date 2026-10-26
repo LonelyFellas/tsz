@@ -7,6 +7,19 @@ on:
   # 手动补跑入口:main 的 push 事件偶发没触发 CI 时(#270 合并后遇到过),在 main 上手动跑一次;
   # 部署门禁按精确 SHA 认 CI 运行、不区分触发事件。缓存写入仍只认 push。
   workflow_dispatch:
+    inputs:
+      voice_editor:
+        type: boolean
+        default: true
+      azure_pronunciation_inputs:
+        type: boolean
+        default: true
+      form_spelling_regularity:
+        type: boolean
+        default: true
+      sentence_formatting:
+        type: boolean
+        default: true
 
 # 默认只给只读权限,按需在单个 job 内提权(最小权限,降低 token 被滥用的风险)。
 permissions:
@@ -19,7 +32,8 @@ concurrency:
 
 jobs:
   quality:
-    runs-on: ubuntu-latest
+    # Match tshb-test's glibc; standalone contains native Node dependencies.
+    runs-on: ubuntu-22.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
@@ -73,7 +87,38 @@ jobs:
         run: node scripts/ci-metrics.mjs run format -- pnpm format:check
 
       - name: Build
+        if: github.ref != 'refs/heads/main' || github.repository != 'LonelyFellas/tsz'
         run: node scripts/ci-metrics.mjs run build -- pnpm build
+
+      - name: Build and verify deployable packages
+        if: github.ref == 'refs/heads/main' && github.repository == 'LonelyFellas/tsz'
+        env:
+          DEPLOY_VOICE_EDITOR: ${{ github.event_name == 'workflow_dispatch' && inputs.voice_editor || github.event_name != 'workflow_dispatch' }}
+          DEPLOY_AZURE_PRONUNCIATION_INPUTS: ${{ github.event_name == 'workflow_dispatch' && inputs.azure_pronunciation_inputs || github.event_name != 'workflow_dispatch' }}
+          DEPLOY_FORM_SPELLING_REGULARITY: ${{ github.event_name == 'workflow_dispatch' && inputs.form_spelling_regularity || github.event_name != 'workflow_dispatch' }}
+          DEPLOY_SENTENCE_FORMATTING: ${{ github.event_name == 'workflow_dispatch' && inputs.sentence_formatting || github.event_name != 'workflow_dispatch' }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/releases"
+          node scripts/ci-metrics.mjs run build-web -- node deploy/release-artifact.mjs build web "$PWD" "$RUNNER_TEMP/releases/web"
+          node scripts/ci-metrics.mjs run build-admin -- node deploy/release-artifact.mjs build admin "$PWD" "$RUNNER_TEMP/releases/admin"
+
+      - name: Upload Web release
+        if: github.ref == 'refs/heads/main' && github.repository == 'LonelyFellas/tsz'
+        uses: actions/upload-artifact@v7
+        with:
+          name: tsz-web-${{ github.sha }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/releases/web/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Admin release
+        if: github.ref == 'refs/heads/main' && github.repository == 'LonelyFellas/tsz'
+        uses: actions/upload-artifact@v7
+        with:
+          name: tsz-admin-${{ github.sha }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/releases/admin/
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Save pnpm cache from trusted main
         if: >-
