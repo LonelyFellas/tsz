@@ -5,7 +5,8 @@ import { ArrowLeft } from "lucide-react";
 const WIDTH = {
   sm: "max-w-2xl",
   md: "max-w-3xl",
-  lg: "max-w-5xl"
+  lg: "max-w-5xl",
+  xl: "max-w-7xl"
 } as const;
 
 // 功能页外框：统一宽度、页边距与入场动画。sm 用于资料、安全等设置页，md 用于列表页，lg 用于宽内容。
@@ -23,7 +24,7 @@ export function PageShell({
       className={
         embedded
           ? "w-full"
-          : `animate-in mx-auto w-full ${WIDTH[size]} px-6 pb-16 pt-8 sm:pt-12`
+          : `animate-in mx-auto ${size === "xl" ? "relative left-1/2 w-screen -translate-x-1/2" : "w-full"} ${WIDTH[size]} px-6 pb-16 pt-8 sm:pt-12`
       }
     >
       {children}
