@@ -14,7 +14,7 @@ import "./word-creation.css";
 const WORD_STEP_ORDER = ["basics", "forms", "meanings", "preview"] as const;
 
 const WORD_STEP_TITLE: Record<WordCreationStep, string> = {
-  basics: "创建词汇",
+  basics: "创建词条",
   forms: "词形与发音",
   meanings: "词义与例句",
   preview: "预览并生效"

@@ -173,7 +173,7 @@ function ReviewQueue({ adminId }: { adminId: string }) {
           columns={[
             { title: "词表名称", render: (_, row) => row.wordlist.name },
             { title: "创建人", render: (_, row) => row.wordlist.owner_name },
-            { title: "词汇数量", render: (_, row) => row.wordlist.item_count },
+            { title: "词条数量", render: (_, row) => row.wordlist.item_count },
             {
               title: "审核状态",
               render: (_, row) => reviewLabels[row.review_state]

@@ -16,7 +16,7 @@ import {
 } from "./issueNavigation";
 
 const STEP_LABEL: Record<PersistedWordStep, string> = {
-  basics: "创建词汇",
+  basics: "创建词条",
   forms: "词形与发音",
   meanings: "词义与例句"
 };

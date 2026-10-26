@@ -2,6 +2,7 @@
   "name": "tsz",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "天生会背 — 词汇学习平台 (师生合一 + 平台后台)",
   "packageManager": "pnpm@10.33.0",
   "scripts": {
@@ -39,12 +40,13 @@
     "pnpm": "10.33.0"
   },
   "devDependencies": {
-    "@commitlint/cli": "^21.2.2",
-    "@commitlint/config-conventional": "^21.2.2",
+    "@commitlint/cli": "^21.2.4",
+    "@commitlint/config-conventional": "^21.2.4",
     "@tsz/config": "workspace:*",
+    "@types/node": "^24.19.2",
     "@vitest/coverage-v8": "^4.1.12",
     "lefthook": "^2.1.10",
-    "prettier": "^3.9.6",
+    "prettier": "^3.9.10",
     "turbo": "^2.10.11",
     "typescript": "^6.0.3",
     "vitest": "^4.1.12"

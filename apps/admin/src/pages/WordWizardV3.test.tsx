@@ -563,7 +563,7 @@ describe("WordWizardV3Page", () => {
     fireEvent.click(
       within(
         document.querySelector<HTMLElement>(".word-creation-stepper")!
-      ).getByText("创建词汇")
+      ).getByText("创建词条")
     );
     await waitFor(() =>
       expect(router.state.location.pathname).toContain("/basics")
@@ -593,7 +593,7 @@ describe("WordWizardV3Page", () => {
 
     expect(await screen.findByText("STEP 01")).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { level: 2, name: "创建词汇" })
+      screen.getByRole("heading", { level: 2, name: "创建词条" })
     ).toBeInTheDocument();
     expect(screen.getByText("所属语言｜英美区分")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /返回智能词库/ })).toBeVisible();

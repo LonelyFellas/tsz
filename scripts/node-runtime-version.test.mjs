@@ -50,6 +50,21 @@ test("package manager and install guards stay aligned", async () => {
   assert.match(packageJson.scripts["test:cov"], /^pnpm check:node && /);
 });
 
+test("tooling and application Node types stay on the pinned runtime major", async () => {
+  const runtimeMajor = EXPECTED_NODE_VERSION.split(".")[0];
+  for (const manifest of [
+    "package.json",
+    "apps/admin/package.json",
+    "apps/web/package.json"
+  ]) {
+    const packageJson = JSON.parse(await readRepositoryFile(manifest));
+    assert.match(
+      packageJson.devDependencies["@types/node"],
+      new RegExp(`^\\^${runtimeMajor}\\.`)
+    );
+  }
+});
+
 test("CI, Docker, and native deployment use the same pinned Node runtime", async () => {
   const [
     ci,

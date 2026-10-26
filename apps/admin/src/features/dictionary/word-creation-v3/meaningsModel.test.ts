@@ -30,7 +30,6 @@ import {
   fillDefaultSenseGroups,
   DEFAULT_SENSE_GROUP_SLOTS,
   relationDisplaySnapshots,
-  replaceEnglishText,
   sentenceTranslationsV3,
   replaceRichText,
   stripBlankRelations,
@@ -755,7 +754,7 @@ describe("V3 meanings writable model", () => {
     );
   });
 
-  it("RichText/EnglishText 文本编辑保留版本、annotation 与 text variant UUID", () => {
+  it("RichText 文本编辑保留版本与 annotation，EnglishText 行读取保留 text variant UUID", () => {
     const rich = {
       version: 2 as const,
       text: "before",
@@ -782,15 +781,6 @@ describe("V3 meanings writable model", () => {
         text: "The city center is busy."
       })
     ]);
-    expect(
-      replaceEnglishText(english, "common", "Canonical sentence")
-    ).toMatchObject({
-      mode: "unified",
-      common: {
-        id: "sentence-en-1",
-        value: { text: "Canonical sentence" }
-      }
-    });
   });
 
   it("文本缩短时清除越界 V1 spans/liaisons，并按 Unicode 码点判断边界", () => {
@@ -889,7 +879,7 @@ describe("V3 meanings writable model", () => {
     });
   });
 
-  it("distinguish EnglishText 只暴露 ready 方言并拒绝缺失或错误 dialect", () => {
+  it("distinguish EnglishText 只暴露 ready 方言", () => {
     const ukReady: EnglishTextV3 = {
       mode: "distinguish",
       source_dialect: "uk",
@@ -911,28 +901,6 @@ describe("V3 meanings writable model", () => {
     expect(editableEnglishText(ukReady)).toEqual([
       { dialect: "uk", variant_id: "uk-variant", text: "centre" }
     ]);
-    const changedUk = replaceEnglishText(ukReady, "uk", "center");
-    expect(changedUk).toMatchObject({
-      mode: "distinguish",
-      uk: {
-        state: "ready",
-        variant: {
-          id: "uk-variant",
-          value: { version: 1, text: "center" }
-        }
-      },
-      us: { state: "missing" }
-    });
-    expect(ukReady.uk).toMatchObject({
-      state: "ready",
-      variant: { value: { text: "centre" } }
-    });
-    expect(() => replaceEnglishText(ukReady, "common", "invalid")).toThrow(
-      "Common dialect is not editable in distinguish mode"
-    );
-    expect(() => replaceEnglishText(ukReady, "us", "invalid")).toThrow(
-      "Dialect us is not ready"
-    );
 
     const usReady: EnglishTextV3 = {
       mode: "distinguish",
@@ -950,16 +918,6 @@ describe("V3 meanings writable model", () => {
     expect(editableEnglishText(usReady)).toEqual([
       { dialect: "us", variant_id: "us-variant", text: "center" }
     ]);
-    expect(replaceEnglishText(usReady, "us", "centered")).toMatchObject({
-      us: { state: "ready", variant: { value: { text: "centered" } } }
-    });
-    expect(() =>
-      replaceEnglishText(
-        meaningsCanonicalFixture.pos[0]!.senses[0]!.sentences[0]!.en_text,
-        "uk",
-        "invalid"
-      )
-    ).toThrow("Dialect uk is not editable in unified mode");
   });
 
   it("canonical 深投影覆盖 V1、definition modes 与可选字段存在/缺失", () => {

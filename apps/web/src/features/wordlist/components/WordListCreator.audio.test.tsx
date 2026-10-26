@@ -97,7 +97,7 @@ async function newCustom() {
     target: { value: "my phrase" }
   });
   fireEvent.click(
-    await screen.findByRole("button", { name: "创建自定义词汇" })
+    await screen.findByRole("button", { name: "创建自定义词条" })
   );
   fireEvent.change(screen.getByLabelText("自定义释义 1"), {
     target: { value: "我的释义" }

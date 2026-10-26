@@ -27,10 +27,8 @@ import {
   ensureV3MeaningsForForms,
   toWritableMeanings
 } from "./meaningsModel";
-import {
-  senseNeedsDeleteConfirmation,
-  V3MeaningsAndExamplesStep
-} from "./V3MeaningsAndExamplesStep";
+import { senseNeedsDeleteConfirmation } from "./definitionModel";
+import { V3MeaningsAndExamplesStep } from "./V3MeaningsAndExamplesStep";
 import {
   UUIDS,
   commonFormFixture,

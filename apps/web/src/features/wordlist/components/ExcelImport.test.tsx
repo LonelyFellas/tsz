@@ -53,7 +53,7 @@ it("唯一命中自动选中，近似候选须人工选择，确认追加保留�
     />
   );
   await upload();
-  fireEvent.click(screen.getByRole("button", { name: "匹配词汇" }));
+  fireEvent.click(screen.getByRole("button", { name: "匹配词条" }));
   await screen.findByText(/已选定：apple/);
   expect(screen.getByRole("button", { name: "确认追加到词表" })).toBeDisabled();
   const section = within(screen.getByRole("region", { name: "文件第 4 行" }));
@@ -84,7 +84,7 @@ it("重复按词条 ID 检查，指出文件位置和已有词条，不自动丢
     />
   );
   await upload();
-  fireEvent.click(screen.getByRole("button", { name: "匹配词汇" }));
+  fireEvent.click(screen.getByRole("button", { name: "匹配词条" }));
   await screen.findByText(/与文件第 2 行重复/);
   expect(screen.getAllByText(/与编辑器已有词条重复/)).toHaveLength(2);
   expect(screen.getByRole("button", { name: "确认追加到词表" })).toBeDisabled();
@@ -110,12 +110,12 @@ it("校验错误可在预览修正；改词后撤销旧匹配；多精确候选�
     />
   );
   await upload();
-  expect(screen.getByRole("button", { name: "匹配词汇" })).toBeDisabled();
-  fireEvent.change(screen.getByLabelText("第 2 行词汇"), {
+  expect(screen.getByRole("button", { name: "匹配词条" })).toBeDisabled();
+  fireEvent.change(screen.getByLabelText("第 2 行词条名称"), {
     target: { value: "apple" }
   });
-  fireEvent.click(screen.getByRole("button", { name: "匹配词汇" }));
-  await screen.findByText("请人工选择词条；也可修改词汇后重新匹配。");
+  fireEvent.click(screen.getByRole("button", { name: "匹配词条" }));
+  await screen.findByText("请人工选择词条；也可修改词条名称后重新匹配。");
   expect(screen.getByRole("button", { name: "确认追加到词表" })).toBeDisabled();
   fireEvent.click(
     within(screen.getByRole("region", { name: "文件第 4 行" })).getByRole(
@@ -124,7 +124,7 @@ it("校验错误可在预览修正；改词后撤销旧匹配；多精确候选�
     )
   );
   expect(screen.getByRole("button", { name: "确认追加到词表" })).toBeEnabled();
-  fireEvent.change(screen.getByLabelText("第 2 行词汇"), {
+  fireEvent.change(screen.getByLabelText("第 2 行词条名称"), {
     target: { value: "other" }
   });
   expect(screen.getByRole("button", { name: "确认追加到词表" })).toBeDisabled();
@@ -149,7 +149,7 @@ it("取消中止在途请求，晚到结果不能追加或覆盖原编辑器", a
     />
   );
   await upload();
-  fireEvent.click(screen.getByRole("button", { name: "匹配词汇" }));
+  fireEvent.click(screen.getByRole("button", { name: "匹配词条" }));
   await waitFor(() => expect(api.wordList.matchImport).toHaveBeenCalled());
   fireEvent.click(screen.getByRole("button", { name: "取消导入" }));
   expect(cancel).toHaveBeenCalledOnce();
@@ -193,14 +193,14 @@ it("按 100 行分批，失败重试只请求未完成批次且保留已匹配�
   fireEvent.change(screen.getByLabelText("选择 Excel 文件"), {
     target: { files: [new File(["data"], "大词表.xlsx")] }
   });
-  fireEvent.click(await screen.findByRole("button", { name: "匹配词汇" }));
+  fireEvent.click(await screen.findByRole("button", { name: "匹配词条" }));
   await screen.findByRole("alert");
   expect(
     vi
       .mocked(api.wordList.matchImport)
       .mock.calls.map(([input]) => input.words.length)
   ).toEqual([100, 1]);
-  fireEvent.click(screen.getByRole("button", { name: "匹配词汇" }));
+  fireEvent.click(screen.getByRole("button", { name: "匹配词条" }));
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "确认追加到词表" })).toBeEnabled()
   );
@@ -233,10 +233,10 @@ it("未匹配行可明确改为自定义，释义必填，追加保留词面和�
     />
   );
   await upload();
-  fireEvent.click(screen.getByRole("button", { name: "匹配词汇" }));
-  await screen.findAllByRole("button", { name: "创建自定义词汇" });
+  fireEvent.click(screen.getByRole("button", { name: "匹配词条" }));
+  await screen.findAllByRole("button", { name: "创建自定义词条" });
   for (const button of screen.getAllByRole("button", {
-    name: "创建自定义词汇"
+    name: "创建自定义词条"
   }))
     fireEvent.click(button);
   expect(screen.getByRole("button", { name: "确认追加到词表" })).toBeDisabled();

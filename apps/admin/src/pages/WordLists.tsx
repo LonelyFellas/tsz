@@ -328,7 +328,7 @@ function Management({ adminId }: { adminId: string }) {
               render: (_, r) => r.wordlist.name
             },
             {
-              title: "词汇数量",
+              title: "词条数量",
               width: 90,
               render: (_, r) => r.wordlist.item_count
             },

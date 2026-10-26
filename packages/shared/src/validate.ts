@@ -42,7 +42,6 @@ export function isRegisterPassword(value: string): boolean {
 
 // 昵称与 Rust DisplayName::parse 对齐，先 trim 再检查码点长度和 Cc/Cf。
 const DISPLAY_NAME_FORBIDDEN_RE = /[<>\p{Cc}\p{Cf}]/u;
-const DISPLAY_NAME_FORBIDDEN_RE_G = /[<>\p{Cc}\p{Cf}]/gu;
 
 // 后端 display_name 长度上限(1–50 字符,docs/api.md)。
 export const DISPLAY_NAME_MAX = 50;
@@ -75,17 +74,4 @@ export function displayNameError(value: string): string | null {
 
 export function hasDisplayNameForbiddenChars(v: string): boolean {
   return DISPLAY_NAME_FORBIDDEN_RE.test(v);
-}
-
-/**
- * 账号 → 注册占位昵称。原型注册页不单独采集昵称,用账号占位;邮箱要
- * 剥掉域名,且 local part 可长于 50(上限 64)、极端形式(引号写法)还能
- * 含禁字符,直接透传会被后端 400。剔禁字符、按字符截到上限,剔空则退回「用户」。
- */
-export function accountToDisplayName(account: string): string {
-  const name = account
-    .replace(/@.*$/, "")
-    .replace(DISPLAY_NAME_FORBIDDEN_RE_G, "")
-    .trim();
-  return [...name].slice(0, DISPLAY_NAME_MAX).join("") || "用户";
 }
