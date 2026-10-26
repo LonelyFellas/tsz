@@ -401,7 +401,7 @@ it("Excel 追加替换初始空行，保存真实词条引用和作者注释；�
   fireEvent.change(screen.getByLabelText("选择 Excel 文件"), {
     target: { files: [new File(["data"], "导入.xlsx")] }
   });
-  fireEvent.click(await screen.findByRole("button", { name: "匹配词汇" }));
+  fireEvent.click(await screen.findByRole("button", { name: "匹配词条" }));
   await screen.findByText(/已选定：apple/);
   fireEvent.click(screen.getByRole("button", { name: "确认追加到词表" }));
   expect(screen.getAllByPlaceholderText("输入单词或短语")).toHaveLength(1);
@@ -964,7 +964,7 @@ it("无匹配时创建自定义词，校验释义并保存稳定标识及注", a
   fireEvent.change(input, { target: { value: "my own phrase" } });
   fireEvent.blur(input);
   fireEvent.click(
-    await screen.findByRole("button", { name: "创建自定义词汇" })
+    await screen.findByRole("button", { name: "创建自定义词条" })
   );
   fireEvent.click(screen.getByRole("button", { name: "保存" }));
   expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -1010,7 +1010,7 @@ it("搜索失败不把输入当作自定义词，也不能保存未选定行", a
   fireEvent.blur(input);
   expect(await screen.findByRole("alert")).toHaveTextContent("搜索失败");
   expect(
-    screen.queryByRole("button", { name: "创建自定义词汇" })
+    screen.queryByRole("button", { name: "创建自定义词条" })
   ).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "保存" }));
   expect(api.wordList.create).not.toHaveBeenCalled();
@@ -1146,7 +1146,7 @@ it("将已有高版本私密备注的平台行改为自定义词时使用新项�
   fireEvent.change(input, { target: { value: "my replacement phrase" } });
   fireEvent.blur(input);
   fireEvent.click(
-    await screen.findByRole("button", { name: "创建自定义词汇" })
+    await screen.findByRole("button", { name: "创建自定义词条" })
   );
   fireEvent.change(screen.getByLabelText("自定义释义 1"), {
     target: { value: "新的自定义释义" }

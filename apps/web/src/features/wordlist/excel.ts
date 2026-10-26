@@ -66,16 +66,17 @@ export function parseExcel(buffer: ArrayBuffer, fileName: string): ExcelRow[] {
   if (range.e.r > MAX_IMPORT_ROWS)
     throw new Error("每次最多导入 10000 行（不含表头）");
   if (range.e.c > 2)
-    throw new Error("仅支持「词汇 / 释义 / 注释」三列，请使用模板");
-  for (const [column, label] of ["词汇", "释义", "注释"].entries()) {
+    throw new Error("仅支持「词条名称 / 释义 / 注释」三列，请使用模板");
+  for (const [column, label] of ["词条名称", "释义", "注释"].entries()) {
     const cell = sheet[utils.encode_cell({ r: 0, c: column })];
     if (
       cell?.f ||
       cell?.F ||
       cell?.t !== "s" ||
-      String(cell.v).trim() !== label
+      (String(cell.v).trim() !== label &&
+        !(column === 0 && String(cell.v).trim() === "词汇"))
     )
-      throw new Error(`第 1 行表头须依次为「词汇 / 释义 / 注释」`);
+      throw new Error(`第 1 行表头须依次为「词条名称 / 释义 / 注释」`);
   }
   const rows: ExcelRow[] = [];
   for (let r = 1; r <= range.e.r; r++) {
@@ -101,13 +102,13 @@ export function parseExcel(buffer: ArrayBuffer, fileName: string): ExcelRow[] {
     }
     rows.push(row);
   }
-  if (!rows.length) throw new Error("文件没有可导入的词汇");
+  if (!rows.length) throw new Error("文件没有可导入的词条");
   return rows;
 }
 
 export function createExcelTemplate(): ArrayBuffer {
   const workbook = utils.book_new();
-  const sheet = utils.aoa_to_sheet([["词汇", "释义", "注释"]]);
+  const sheet = utils.aoa_to_sheet([["词条名称", "释义", "注释"]]);
   sheet["!cols"] = [{ wch: 30 }, { wch: 40 }, { wch: 50 }];
   utils.book_append_sheet(workbook, sheet, "词表");
   return write(workbook, { type: "array", bookType: "xlsx" });

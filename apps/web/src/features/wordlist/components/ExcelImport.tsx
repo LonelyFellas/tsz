@@ -74,10 +74,11 @@ export function ExcelImport({
         `${importFieldLabels[field as ImportField]}：${message}`
     );
     if (row.custom) {
-      if ([...row.word].length > 50) messages.push("自定义词汇不能超过 50 字");
+      if ([...row.word].length > 50)
+        messages.push("自定义词条名称不能超过 50 字");
       if (!row.gloss.trim()) messages.push("自定义释义不能为空");
     } else if (!row.selected)
-      messages.push(row.match ? "尚未选定平台词条" : "尚未匹配词汇");
+      messages.push(row.match ? "尚未选定平台词条" : "尚未匹配词条");
     else {
       const id = row.selected.entry_id;
       if (existingIds.has(id)) messages.push("与编辑器已有词条重复");
@@ -160,9 +161,9 @@ export function ExcelImport({
         Excel 导入
       </h1>
       <p className="text-sm leading-6 text-foreground-muted">
-        使用一个工作表，表头为「词汇 / 释义 / 注释」。支持 .xls、.xlsx，最多 10
-        MB、10000 行。
-        匹配平台词条时释义仅供核对；未匹配的行可选择创建自定义词汇并填写释义。注释会随词表展示给读者。
+        使用一个工作表，表头为「词条名称 / 释义 / 注释」。支持 .xls、.xlsx，最多
+        10 MB、10000 行。
+        匹配平台词条时释义仅供核对；未匹配的行可选择创建自定义词条并填写释义。注释会随词表展示给读者。
       </p>
       <fieldset disabled={!!busy} className="flex flex-wrap items-center gap-3">
         <Button
@@ -230,9 +231,9 @@ export function ExcelImport({
               variant="outline"
               size="sm"
               disabled={!!busy || invalid || unmatched.length === 0}
-              onClick={() => void perform("正在匹配词汇…", matchRows)}
+              onClick={() => void perform("正在匹配词条…", matchRows)}
             >
-              匹配词汇
+              匹配词条
             </Button>
             <label className="flex items-center gap-2">
               <input
@@ -308,7 +309,7 @@ export function ExcelImport({
                 ))}
                 {row.custom ? (
                   <p className="text-sm text-foreground-muted">
-                    自定义词汇，暂不参与学习出题。
+                    自定义词条，暂不参与学习出题。
                   </p>
                 ) : row.selected ? (
                   <p className="text-sm text-success">
@@ -319,12 +320,12 @@ export function ExcelImport({
                   <>
                     {row.match?.status === "ambiguous" && (
                       <p className="text-sm text-foreground-muted">
-                        请人工选择词条；也可修改词汇后重新匹配。
+                        请人工选择词条；也可修改词条名称后重新匹配。
                       </p>
                     )}
                     {row.match?.status === "unmatched" && (
                       <p className="text-sm text-foreground-muted">
-                        没有精确匹配，可创建自定义词汇、查找候选或修改词汇。
+                        没有精确匹配，可创建自定义词条、查找候选或修改词条名称。
                       </p>
                     )}
                     {row.match?.status === "unmatched" && (
@@ -342,7 +343,7 @@ export function ExcelImport({
                           )
                         }
                       >
-                        创建自定义词汇
+                        创建自定义词条
                       </Button>
                     )}
                     {row.match?.candidates.map((candidate) => (

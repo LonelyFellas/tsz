@@ -422,7 +422,7 @@ function Editor({
     }
     const unmatched = rows.find((r) => !r.entryId && !r.customWord);
     if (unmatched) {
-      invalidRow("每行都需选定平台词条或填写自定义词汇", unmatched);
+      invalidRow("每行都需选定平台词条或填写自定义词条", unmatched);
       return;
     }
     const invalidCustom = rows.find(
@@ -435,7 +435,7 @@ function Editor({
     );
     if (invalidCustom) {
       invalidRow(
-        "自定义词汇须为 1–50 字，释义须为 1–200 字",
+        "自定义词条须为 1–50 字，释义须为 1–200 字",
         invalidCustom,
         !invalidCustom.customWord!.word.trim() ||
           [...invalidCustom.customWord!.word].length > 50
@@ -1343,7 +1343,7 @@ function WordRow({
                 );
               }}
             >
-              创建自定义词汇
+              创建自定义词条
             </Button>
           </div>
         )}
@@ -1364,7 +1364,7 @@ function WordRow({
               maxLength={200}
               disabled={locked}
               value={row.customWord.definition}
-              placeholder="填写词汇的释义"
+              placeholder="填写词条的释义"
               onChange={(event) =>
                 change({
                   customWord: {
@@ -1376,7 +1376,7 @@ function WordRow({
             />
           </label>
           <p className="mt-2 text-xs text-foreground-muted">
-            自定义词汇可阅读，暂不参与学习出题。
+            自定义词条可阅读，暂不参与学习出题。
           </p>
           {audio &&
             (audio.word === wordlistAudioWord(row.customWord.word) ||

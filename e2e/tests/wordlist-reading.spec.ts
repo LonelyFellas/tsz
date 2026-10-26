@@ -66,7 +66,7 @@ test("丰富词表在两种模式下保留义项对齐、富文本和窄屏阅�
   await expect(table.locator("[contenteditable]")).toHaveCount(0);
   for (const mode of ["完整模式", "标准模式"]) {
     await page.getByRole("button", { name: mode, exact: true }).click();
-    await expect(table).toHaveAccessibleName(`${mode}词汇列表`);
+    await expect(table).toHaveAccessibleName(`${mode}词条列表`);
     await expect(table.getByRole("columnheader")).toHaveCount(
       mode === "完整模式" ? 6 : 4
     );
@@ -101,10 +101,10 @@ test("丰富词表在两种模式下保留义项对齐、富文本和窄屏阅�
   expect(themeColors.highlightedCore).toBe(themeColors.background);
   expect(themeColors.highlightedGrammar).toBe(themeColors.background);
   await page.setViewportSize({ width: 375, height: 812 });
-  const region = page.getByRole("region", { name: "词汇列表" });
+  const region = page.getByRole("region", { name: "词条列表" });
   for (const mode of ["完整模式", "标准模式"]) {
     await page.getByRole("button", { name: mode, exact: true }).click();
-    await expect(table).toHaveAccessibleName(`${mode}词汇列表`);
+    await expect(table).toHaveAccessibleName(`${mode}词条列表`);
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth)
     ).toBe(375);

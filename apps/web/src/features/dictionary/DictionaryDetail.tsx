@@ -38,13 +38,13 @@ export function DictionaryDetail({
         <Link href={back}>返回查询结果</Link>
       </Button>
       {(result.isPending || profile.isPending) && (
-        <p role="status">加载词汇详情…</p>
+        <p role="status">加载词条详情…</p>
       )}
       {(result.isError || profile.isError) && (
         <div role="alert">
-          <h1 className="text-3xl font-semibold">词汇详情暂不可用</h1>
+          <h1 className="text-3xl font-semibold">词条详情暂不可用</h1>
           <p className="mt-3 text-sm text-foreground-muted">
-            词汇可能已撤回，或网络暂时不可用。
+            词条可能已撤回，或网络暂时不可用。
           </p>
           <Button
             type="button"

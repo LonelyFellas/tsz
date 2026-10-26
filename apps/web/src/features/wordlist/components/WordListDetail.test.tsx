@@ -1223,7 +1223,7 @@ it("自定义词在阅读页展示原释义，不误判为不可用并提示不�
     screen.getByRole("heading", { name: "custom phrase" })
   ).toBeInTheDocument();
   expect(
-    screen.getByText(/其中 1 个自定义词汇暂不参与学习出题/)
+    screen.getByText(/其中 1 个自定义词条暂不参与学习出题/)
   ).toBeInTheDocument();
   expect(screen.getByText("注：自定义词的注")).toBeInTheDocument();
   expect(
