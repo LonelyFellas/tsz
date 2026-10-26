@@ -107,8 +107,12 @@ it("full mode groups forms once per basic part of speech and shows only the firs
   expect(screen.queryByText("语法-c2")).not.toBeInTheDocument();
   expect(screen.getByText("暂无适合当前等级的释义")).toBeVisible();
   const forms = screen.getByText("general-UK").closest("td")!;
-  expect(forms).toHaveAttribute("rowspan", "2");
-  expect(within(forms).getByText("dedicated-UK")).toBeVisible();
+  expect(forms).not.toHaveAttribute("rowspan");
+  expect(
+    within(firstSense).queryByText("dedicated-UK")
+  ).not.toBeInTheDocument();
+  const secondSense = screen.getByText("不及物").closest("tr")!;
+  expect(within(secondSense).getByText("dedicated-UK")).toBeVisible();
   expect(screen.getAllByText("general-UK")).toHaveLength(1);
   expect(screen.queryByText("general-US")).not.toBeInTheDocument();
   expect(screen.getAllByText("/riːd/").length).toBeGreaterThan(0);
@@ -167,8 +171,18 @@ it("preserves rich definitions, grammar annotations and all sense rows in both m
     </ReadingTable>
   );
   const view = render(content(false));
-  const verify = () => {
+  const verify = (full: boolean) => {
     expect(view.container.querySelectorAll("tbody tr")).toHaveLength(16);
+    const phrase = screen
+      .getByRole("heading", { name: "work out" })
+      .closest("tbody")!;
+    expect(
+      within(phrase).getByRole("heading", { name: full ? "VERB" : "v." })
+    ).toBeVisible();
+    expect(
+      within(phrase).getByRole("heading", { name: full ? "NOUN" : "n." })
+    ).toBeVisible();
+    expect(phrase.textContent).not.toMatch(/phrase_|PHRASE_/);
     expect(
       screen.getByRole("heading", { name: "center" }).closest("td")
     ).toHaveAttribute("rowspan", "7");
@@ -210,9 +224,10 @@ it("preserves rich definitions, grammar annotations and all sense rows in both m
     expect(grammar.querySelector(".tsz-ve-underline")).toHaveTextContent(
       "education"
     );
-    expect(grammar.querySelector('[data-color="yellow"]')).toHaveTextContent(
-      "education"
-    );
+    expect(grammar.querySelectorAll('[data-color="yellow"]')).toHaveLength(2);
+    expect(
+      grammar.querySelectorAll('[data-color="yellow"]')[1]
+    ).toHaveTextContent("education");
     expect(grammar.querySelector('[data-phoneme="ˈsentəz"]')).not.toBeNull();
     expect(grammar.querySelectorAll(".tsz-ve-liaison-anchor")).toHaveLength(2);
     expect(screen.getByText("0.3 s")).toHaveAttribute(
@@ -226,9 +241,9 @@ it("preserves rich definitions, grammar annotations and all sense rows in both m
       screen.getByText("一套；一组配套使用的物品。").closest("tr")
     ).toHaveTextContent("a set of keys / tools / instructions");
   };
-  verify();
+  verify(false);
   view.rerender(content(true));
-  verify();
+  verify(true);
 });
 it("phrase forms stay hidden and missing full data remains explicit", () => {
   const view = render(

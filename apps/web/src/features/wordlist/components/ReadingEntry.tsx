@@ -135,80 +135,125 @@ export function ReadingEntry({
     );
   return (
     <>
-      {entry.pos.flatMap((pos, posIndex) =>
-        (pos.senses.length ? pos.senses : [null]).map((sense, senseIndex) => {
-          const definition = sense
-            ? selectDefinition(sense.definitions, level)
-            : undefined;
-          const grammar = pos.grammar_structures.find(
-            (g) => g.id === definition?.grammar_structure_id
-          );
-          return (
-            <tr key={sense?.id ?? pos.pos_id}>
-              {posIndex === 0 && senseIndex === 0 && wordCell}
-              {senseIndex === 0 && (
-                <>
+      {entry.pos.flatMap((pos, posIndex) => {
+        const forms = pos.forms ?? [];
+        const commonForms = forms.filter((form) =>
+          pos.senses.every((sense) => form.sense_ids.includes(sense.id))
+        );
+        const unassociatedForms = forms.filter(
+          (form) => form.sense_ids.length === 0
+        );
+        const scopedForms = forms.filter(
+          (form) => form.sense_ids.length > 0 && !commonForms.includes(form)
+        );
+        const basicPos = pos.pos.replace(/^phrase_/, "");
+        return (pos.senses.length ? pos.senses : [null]).map(
+          (sense, senseIndex) => {
+            const definition = sense
+              ? selectDefinition(sense.definitions, level)
+              : undefined;
+            const grammar = pos.grammar_structures.find(
+              (g) => g.id === definition?.grammar_structure_id
+            );
+            return (
+              <tr key={sense?.id ?? pos.pos_id}>
+                {posIndex === 0 && senseIndex === 0 && wordCell}
+                {senseIndex === 0 && (
                   <td rowSpan={Math.max(1, pos.senses.length)}>
                     <h3 className="font-semibold">
                       {full
-                        ? pos.pos.toUpperCase()
-                        : (POS_ABBR[pos.pos] ?? pos.label ?? pos.pos)}
+                        ? POS_ABBR[basicPos]
+                          ? basicPos.toUpperCase()
+                          : (pos.label ?? pos.pos)
+                        : (POS_ABBR[basicPos] ?? pos.label ?? pos.pos)}
                     </h3>
                   </td>
-                  {full && (
-                    <td rowSpan={Math.max(1, pos.senses.length)}>
-                      {entry.kind === "word" && (
-                        <Forms forms={pos.forms ?? []} variant={variant} />
-                      )}
-                    </td>
-                  )}
-                </>
-              )}
-              {full && (
+                )}
+                {full && (scopedForms.length > 0 || senseIndex === 0) && (
+                  <td
+                    rowSpan={
+                      scopedForms.length > 0
+                        ? undefined
+                        : Math.max(1, pos.senses.length)
+                    }
+                  >
+                    {entry.kind === "word" && (
+                      <>
+                        <Forms
+                          forms={
+                            scopedForms.length > 0
+                              ? [
+                                  ...(senseIndex === 0 ? commonForms : []),
+                                  ...scopedForms.filter(
+                                    (form) =>
+                                      sense && form.sense_ids.includes(sense.id)
+                                  )
+                                ]
+                              : commonForms
+                          }
+                          variant={variant}
+                        />
+                        {senseIndex === 0 && unassociatedForms.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-xs text-foreground-muted">
+                              未关联义项
+                            </p>
+                            <Forms
+                              forms={unassociatedForms}
+                              variant={variant}
+                            />
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </td>
+                )}
+                {full && (
+                  <td>
+                    {sense && (sense.sub_pos_label || sense.sub_pos) && (
+                      <span className="inline-block rounded bg-muted px-1.5 text-xs font-medium text-foreground-muted">
+                        {sense.sub_pos_label ?? sense.sub_pos}
+                      </span>
+                    )}
+                  </td>
+                )}
                 <td>
-                  {sense && (sense.sub_pos_label || sense.sub_pos) && (
-                    <span className="inline-block rounded bg-muted px-1.5 text-xs font-medium text-foreground-muted">
-                      {sense.sub_pos_label ?? sense.sub_pos}
-                    </span>
+                  {definition ? (
+                    <div className="flex items-start gap-2">
+                      <span className="mt-0.5 shrink-0 rounded bg-primary-muted px-1.5 text-[11px] font-semibold leading-5 text-primary">
+                        {definition.level}
+                      </span>
+                      <div className="min-w-0">
+                        <Texts
+                          texts={definition.texts}
+                          variant={variant}
+                          textRole="definition"
+                        />
+                        {definition.texts.length === 0 && (
+                          <p className="text-foreground-muted">
+                            此释义暂无可用文本
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    sense && (
+                      <p className="text-foreground-muted">
+                        暂无适合当前等级的释义
+                      </p>
+                    )
                   )}
                 </td>
-              )}
-              <td>
-                {definition ? (
-                  <div className="flex items-start gap-2">
-                    <span className="mt-0.5 shrink-0 rounded bg-primary-muted px-1.5 text-[11px] font-semibold leading-5 text-primary">
-                      {definition.level}
-                    </span>
-                    <div className="min-w-0">
-                      <Texts
-                        texts={definition.texts}
-                        variant={variant}
-                        textRole="definition"
-                      />
-                      {definition.texts.length === 0 && (
-                        <p className="text-foreground-muted">
-                          此释义暂无可用文本
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  sense && (
-                    <p className="text-foreground-muted">
-                      暂无适合当前等级的释义
-                    </p>
-                  )
-                )}
-              </td>
-              <td>
-                {grammar && (
-                  <Texts texts={grammar.variants} variant={variant} />
-                )}
-              </td>
-            </tr>
-          );
-        })
-      )}
+                <td>
+                  {grammar && (
+                    <Texts texts={grammar.variants} variant={variant} />
+                  )}
+                </td>
+              </tr>
+            );
+          }
+        );
+      })}
     </>
   );
 }

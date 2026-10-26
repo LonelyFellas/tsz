@@ -51,7 +51,7 @@ test("丰富词表在两种模式下保留义项对齐、富文本和窄屏阅�
     "text-decoration-line",
     "underline"
   );
-  await expect(grammar.locator('[data-color="yellow"]')).not.toHaveCSS(
+  await expect(grammar.locator('[data-color="yellow"]').last()).not.toHaveCSS(
     "background-color",
     "rgba(0, 0, 0, 0)"
   );
@@ -88,14 +88,18 @@ test("丰富词表在两种模式下保留义项对齐、富文本和窄屏阅�
       core: color('[data-level="core"]'),
       grammar: color('[data-level="grammar"]'),
       highlighted: color('[data-color="yellow"]'),
+      highlightedFunction: color('.tsz-ve-highlight [data-level="function"]'),
+      highlightedCore: color('.tsz-ve-highlight [data-level="core"]'),
+      highlightedGrammar: color('.tsz-ve-highlight [data-level="grammar"]'),
       foreground: body.color,
       background: body.backgroundColor
     };
   });
-  expect(themeColors.function).toBe(themeColors.foreground);
-  expect(themeColors.core).not.toBe(themeColors.function);
-  expect(themeColors.grammar).not.toBe(themeColors.function);
+  expect(themeColors.function).toBe(themeColors.background);
   expect(themeColors.highlighted).toBe(themeColors.background);
+  expect(themeColors.highlightedFunction).toBe(themeColors.background);
+  expect(themeColors.highlightedCore).toBe(themeColors.background);
+  expect(themeColors.highlightedGrammar).toBe(themeColors.background);
   await page.setViewportSize({ width: 375, height: 812 });
   const region = page.getByRole("region", { name: "词汇列表" });
   for (const mode of ["完整模式", "标准模式"]) {

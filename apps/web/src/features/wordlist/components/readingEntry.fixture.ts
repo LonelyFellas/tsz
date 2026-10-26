@@ -37,6 +37,13 @@ export const richGrammar: RichTextV3 = {
     },
     { type: "emphasis", level: "core", ...range(centerGrammar, "centers") },
     { type: "emphasis", level: "grammar", ...range(centerGrammar, "on") },
+    {
+      type: "highlight",
+      color: "yellow",
+      ...range(centerGrammar, "something")
+    },
+    { type: "highlight", color: "green", ...range(centerGrammar, "centers") },
+    { type: "highlight", color: "pink", ...range(centerGrammar, "on") },
     { type: "italic", ...range(centerGrammar, "discussion") },
     { type: "bold", ...range(centerGrammar, "education") },
     { type: "underline", ...range(centerGrammar, "education") },
@@ -154,7 +161,10 @@ function pos(
   return {
     pos_id: id(offset + 90),
     pos: basicPos,
-    forms: wordForms,
+    forms: wordForms.map((form) => ({
+      ...form,
+      sense_ids: senses.map((sense) => sense.id)
+    })),
     senses,
     grammar_structures: meanings.map((meaning, index) => ({
       id: id(offset + 40 + index),
@@ -250,7 +260,7 @@ export const richReadingEntries: WordlistEntry[] = [
     pos: [
       pos(
         300,
-        "verb",
+        "phrase_verb",
         [],
         [
           [
@@ -278,7 +288,7 @@ export const richReadingEntries: WordlistEntry[] = [
       ),
       pos(
         400,
-        "noun",
+        "phrase_noun",
         [],
         [
           [
