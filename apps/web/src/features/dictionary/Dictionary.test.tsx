@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { DictionaryEntry } from "@tsz/types";
 import { Dictionary } from "./Dictionary";
 import { writeHistory } from "./history";
 const { search, me, push } = vi.hoisted(() => ({
@@ -16,11 +17,6 @@ vi.mock("@/stores/user", () => ({
 }));
 vi.mock("@/lib/request", () => ({
   api: { dictionary: { search }, auth: { me } }
-}));
-vi.mock("@tsz/voice-editor/reader", () => ({
-  RichTextReadOnly: ({ value }: { value: { text: string } }) => (
-    <span>{value.text}</span>
-  )
 }));
 function response(label: string) {
   return {
@@ -45,6 +41,70 @@ beforeEach(() => {
   search.mockResolvedValue(response("apple"));
 });
 describe("词典页面", () => {
+  it("搜索结果中的粗体释义使用释义用途，语法结构保持正文用途", async () => {
+    const bold = (text: string) => ({
+      version: 2 as const,
+      text,
+      annotations: [{ type: "bold" as const, start: 0, end: text.length }]
+    });
+    const item: DictionaryEntry = {
+      content: {
+        entry_id: "harbour",
+        publication_id: "publication",
+        label: "harbour",
+        kind: "word",
+        pos: [
+          {
+            pos_id: "noun",
+            pos: "noun",
+            grammar_structures: [
+              {
+                id: "grammar",
+                variants: [{ dialect: "common", content: bold("a harbour") }]
+              }
+            ],
+            senses: [
+              {
+                id: "sense",
+                sub_pos: "N-COUNT",
+                level: "A1",
+                definitions: [
+                  {
+                    id: "definition",
+                    definition_mode: "en_definition",
+                    level: "A1",
+                    grammar_structure_id: "grammar",
+                    texts: [
+                      {
+                        dialect: "common",
+                        content: bold("A place for ships.")
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      audio: [],
+      examples: []
+    };
+    search.mockResolvedValue({ ...response("harbour"), items: [item] });
+    render(<Dictionary query="harbour" />, { wrapper });
+    const definition = await screen.findByText("A place for ships.");
+    expect(definition).toHaveClass("tsz-ve-bold");
+    expect(definition.closest("[data-text-role]")).toHaveAttribute(
+      "data-text-role",
+      "definition"
+    );
+    const grammar = screen.getByText("a harbour");
+    expect(grammar).toHaveClass("tsz-ve-bold");
+    expect(grammar.closest("[data-text-role]")).toHaveAttribute(
+      "data-text-role",
+      "body"
+    );
+  });
   it("清空输入和 Escape 不触发查询，清空后焦点仍在搜索框", async () => {
     const user = userEvent.setup();
     render(<Dictionary />, { wrapper });
