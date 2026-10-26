@@ -100,7 +100,7 @@ function mount(items = voices) {
         validText
         pendingVoice={null}
         onAudition={vi.fn()}
-        onSettings={vi.fn()}
+        onDetails={vi.fn()}
       />
     </ConfigProvider>
   );
@@ -204,8 +204,13 @@ describe("紧凑音色目录", () => {
     expect(screen.getByText("我的听感：适合慢读")).toBeVisible();
     render(<VoiceCatalogDetails voice={sonia} />);
     const details = screen.getByRole("region", { name: "音色资料" });
-    expect(within(details).getByText("官方原文")).toBeVisible();
-    expect(within(details).getByText(metadata.description!)).toBeVisible();
+    expect(within(details).queryByText(metadata.description!)).toBeNull();
+    fireEvent.click(
+      within(details).getByRole("button", { name: "官方原文与来源" })
+    );
+    await waitFor(() =>
+      expect(within(details).getByText(metadata.description!)).toBeVisible()
+    );
     expect(
       within(details).getByRole("link", { name: /官方资料/ })
     ).toHaveAttribute("href", metadata.source_url);

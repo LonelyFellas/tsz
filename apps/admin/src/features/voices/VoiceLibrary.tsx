@@ -14,9 +14,9 @@ import type {
 import {
   Alert,
   App,
+  Breadcrumb,
   Button,
   Card,
-  Collapse,
   Drawer,
   Flex,
   Form,
@@ -42,7 +42,11 @@ import {
 import { UNSAFE_DataRouterContext, useBlocker } from "react-router-dom";
 import { useUnsavedChanges } from "@tsz/shared/recovery";
 import { api, useAnyPermission, useAuthStore, usePermission } from "@/lib/auth";
-import { VoiceCatalogDetails, VoiceCatalogTable } from "./VoiceCatalogTable";
+import {
+  language,
+  VoiceCatalogDetails,
+  VoiceCatalogTable
+} from "./VoiceCatalogTable";
 import { DubbingGroups } from "./DubbingGroups";
 import { AddRecommendation } from "./AddRecommendation";
 import { SpeechRateInput } from "./SpeechRateInput";
@@ -156,6 +160,8 @@ export function VoiceLibrary() {
     "Please record the interview before the meeting starts."
   );
   const [selected, setSelected] = useState<AdminSpeechVoice | null>(null);
+  const [detailTab, setDetailTab] = useState("adjust");
+  const [editingDescription, setEditingDescription] = useState(false);
   const [addingRecommendation, setAddingRecommendation] = useState(false);
   const [recommendationPending, setRecommendationPending] = useState(false);
   const [settingsDirty, setSettingsDirty] = useState(false);
@@ -282,11 +288,13 @@ export function VoiceLibrary() {
     }
   }
 
-  function openParameters(voice: AdminSpeechVoice) {
+  function openDetails(voice: AdminSpeechVoice) {
     if (settingsBusy) return;
     editSession.current += 1;
     cancelPreview();
     setSelected(voice);
+    setDetailTab("adjust");
+    setEditingDescription(false);
     setAddingRecommendation(false);
     setSaveError(null);
     setSaveMessage(null);
@@ -302,6 +310,20 @@ export function VoiceLibrary() {
     form.setFieldsValue(values);
     settingsBaseline.current = values;
     setSettingsDirty(false);
+  }
+
+  function editDescription() {
+    if (!selected || settingsBusy) return;
+    const info = metadata.get(selected.alias);
+    const description = info?.description_zh ?? "";
+    form.setFieldValue("description_zh", description);
+    setBaseDescriptionRevision(info?.description_revision ?? 0);
+    settingsBaseline.current = {
+      ...settingsBaseline.current!,
+      description_zh: description
+    };
+    updateDirty(form.getFieldsValue());
+    setEditingDescription(true);
   }
 
   async function auditionDraft() {
@@ -408,6 +430,7 @@ export function VoiceLibrary() {
           ...settingsBaseline.current!,
           description_zh: values.description_zh
         };
+        setEditingDescription(false);
       }
       updateDirty(form.getFieldsValue());
       setSaveMessage(
@@ -496,13 +519,11 @@ export function VoiceLibrary() {
           </Space>
         )}
         {error && <Alert type="error" showIcon title={error} />}
-        {!pendingVoice && !error && !preview && (
+        {selected && !pendingVoice && !error && !preview && (
           <div className="voice-library-preview-empty">
             <SoundOutlined />
             <Typography.Text type="secondary">
-              {selected
-                ? "调整参数后，点击试听"
-                : "点击音色旁的试听，比较声音效果"}
+              调整参数后，点击试听
             </Typography.Text>
           </div>
         )}
@@ -577,6 +598,7 @@ export function VoiceLibrary() {
     );
   return (
     <div className="voice-library" style={style}>
+      <Breadcrumb items={[{ title: "配音中心" }]} />
       {router && tab === "library" && (
         <VoiceSettingsNavigationGuard
           dirty={settingsDirty}
@@ -601,12 +623,6 @@ export function VoiceLibrary() {
         />
       )}
       <Card size="small" className="voice-library-content">
-        <div className="voice-library-heading">
-          <Typography.Title level={2}>配音中心</Typography.Title>
-          <Typography.Paragraph type="secondary">
-            按板块整理推荐配音，也可以到音色库试听和选择声音。
-          </Typography.Paragraph>
-        </div>
         <Tabs
           activeKey={tab}
           tabBarExtraContent={
@@ -644,36 +660,36 @@ export function VoiceLibrary() {
           className={`voice-library-audition${tab === "library" ? " voice-library-audition-dock" : ""}`}
           aria-label="音色试听"
         >
-          <Form layout="vertical" className="voice-library-audition-text">
+          <Form
+            layout="inline"
+            className="voice-library-audition-text"
+            colon={false}
+          >
             <Form.Item
-              label={
-                <Space size={8}>
-                  <Typography.Text strong>试听文本</Typography.Text>
-                  <Typography.Text type="secondary">
-                    用同一段话比较音色
-                  </Typography.Text>
-                </Space>
-              }
+              label={<Typography.Text strong>试听文本</Typography.Text>}
               validateStatus={!validText ? "error" : undefined}
               help={!validText ? "请输入 1–500 个字符的试听文本。" : undefined}
             >
-              <Input.TextArea
-                aria-label="共用试听文本"
-                value={text}
-                autoSize={{ minRows: 1, maxRows: 3 }}
-                onChange={(event) => {
-                  cancelPreview();
-                  setText(event.target.value);
-                }}
-                count={{
-                  show: true,
-                  strategy: (value) => Array.from(value).length,
-                  max: 500
-                }}
-              />
+              <div className="voice-library-audition-input">
+                <Input.TextArea
+                  aria-label="共用试听文本"
+                  value={text}
+                  autoSize={{ minRows: 1, maxRows: 3 }}
+                  onChange={(event) => {
+                    cancelPreview();
+                    setText(event.target.value);
+                  }}
+                />
+                <Typography.Text
+                  type="secondary"
+                  className="voice-library-audition-count"
+                >
+                  {textLength} / 500
+                </Typography.Text>
+              </div>
             </Form.Item>
           </Form>
-          {!selected && previewView()}
+          {!selected && (pendingVoice || error || preview) && previewView()}
         </section>
         {tab === "groups" ? (
           <DubbingGroups
@@ -711,7 +727,7 @@ export function VoiceLibrary() {
                 activeVoice={pendingVoice ?? preview?.voice.alias}
                 pendingVoice={pendingVoice}
                 onAudition={(voice) => void audition(voice)}
-                onSettings={openParameters}
+                onDetails={openDetails}
               />
             )}
           </>
@@ -720,7 +736,7 @@ export function VoiceLibrary() {
       <Drawer
         className="voice-library-settings"
         style={style}
-        title={selected ? `${selected.display_name} 音色设置` : "音色设置"}
+        title={selected ? `${selected.display_name} 音色详情` : "音色详情"}
         open={!!selected}
         onClose={closeSettings}
         size={520}
@@ -728,46 +744,24 @@ export function VoiceLibrary() {
         footer={
           <Flex justify="space-between" align="center" wrap gap={12}>
             <Typography.Text type="secondary">
-              {settingsDirty ? "有未保存的修改" : "个人设置仅你可见"}
+              {settingsDirty ? "有未保存的修改" : ""}
             </Typography.Text>
-            <Space>
-              <Button disabled={settingsBusy} onClick={closeSettings}>
-                关闭
-              </Button>
-              <Button
-                type="primary"
-                loading={saving === "personal"}
-                disabled={!library.isSuccess || settingsBusy}
-                onClick={() => void save("personal")}
-              >
-                保存听感
-              </Button>
-            </Space>
+            <Button disabled={settingsBusy} onClick={closeSettings}>
+              关闭
+            </Button>
           </Flex>
         }
       >
         {selected && capabilities && (
           <Flex vertical gap={16}>
-            <Flex vertical gap={8}>
-              <Space>
-                <Tag>
-                  {localeNames[selected.locale] ??
-                    speechRegionLabel(selected.locale)}
-                </Tag>
-                <Tag>
-                  {genderNames[selected.gender.toLowerCase()] ?? "未标注"}
-                </Tag>
-                {selected.is_common && <Tag color="blue">常用</Tag>}
-              </Space>
-              <Typography.Text
-                type="secondary"
-                className="voice-library-id"
-                copyable
-              >
-                {selected.alias}
-              </Typography.Text>
-            </Flex>
-            <VoiceCatalogDetails voice={selected} />
+            <Space wrap>
+              <Tag>{language(selected)}</Tag>
+              <Tag>{speechRegionLabel(selected.locale)}</Tag>
+              <Tag>
+                {genderNames[selected.gender.toLowerCase()] ?? "未标注"}
+              </Tag>
+              {selected.is_common && <Tag color="blue">常用</Tag>}
+            </Space>
             {saveError && (
               <Alert
                 type="error"
@@ -831,270 +825,332 @@ export function VoiceLibrary() {
                 setSaveMessage(null);
               }}
             >
-              <section
-                className="voice-library-settings-section"
-                aria-label="个人设置"
-              >
-                <Typography.Title level={5}>调节声音</Typography.Title>
-                <Typography.Paragraph
-                  className="voice-library-settings-intro"
-                  type="secondary"
-                >
-                  参数仅用于本次试听，刷新后恢复默认；加入分组推荐时保存当前参数。
-                </Typography.Paragraph>
-                {capabilities.supports_volume_percent === false && (
-                  <Alert
-                    type="info"
-                    showIcon
-                    title="该模型仅支持原速、原调、原音量自然朗读；不支持停顿或指定音素。已有非默认参数需要明确恢复后再生成。"
-                  />
-                )}
-                <div className="voice-library-parameters">
-                  <Form.Item
-                    name="volume_percent"
-                    label={
-                      <span className="voice-library-volume-label">
-                        音量
-                        <span
-                          className="voice-library-muted-status"
-                          role="status"
-                        >
-                          {formValues?.volume_percent === 0 ? "已静音" : ""}
-                        </span>
-                      </span>
-                    }
-                    tooltip="100% 为原音量，0% 为静音。"
-                    rules={[
-                      {
-                        required: true,
-                        type: "integer",
-                        min:
-                          capabilities.supports_volume_percent === false
-                            ? 100
-                            : 0,
-                        max: 100,
-                        message:
-                          capabilities.supports_volume_percent === false
-                            ? "该模型仅支持原音量，请明确恢复默认参数"
-                            : "请输入 0 至 100 的整数"
-                      }
-                    ]}
-                  >
-                    <SpeechVolumeInput
-                      disabled={
-                        settingsBusy ||
-                        capabilities.supports_volume_percent === false
-                      }
-                    />
-                  </Form.Item>
-                  <div className="voice-library-parameter-grid">
-                    <Form.Item
-                      name="rate_percent"
-                      label="语速"
-                      rules={[
-                        {
-                          required: true,
-                          type: "integer",
-                          min: capabilities.min_rate_percent,
-                          max: capabilities.max_rate_percent,
-                          message: `请输入 ${((100 + capabilities.min_rate_percent) / 100).toFixed(2)} 至 ${((100 + capabilities.max_rate_percent) / 100).toFixed(2)} 倍速`
-                        }
-                      ]}
-                      tooltip={
-                        capabilities.min_rate_percent ===
-                        capabilities.max_rate_percent
-                          ? "该音色使用固定语速。"
-                          : "1.00× 为标准语速。"
-                      }
-                    >
-                      <SpeechRateInput
-                        aria-label="合成语速"
-                        min={capabilities.min_rate_percent}
-                        max={capabilities.max_rate_percent}
-                        disabled={
-                          settingsBusy ||
-                          capabilities.min_rate_percent ===
-                            capabilities.max_rate_percent
-                        }
-                        style={{ width: "100%" }}
-                      />
-                    </Form.Item>
-                    <Form.Item
-                      name="pitch_semitones"
-                      label="音调"
-                      rules={[
-                        {
-                          required: true,
-                          type: "integer",
-                          min: capabilities.min_pitch_semitones,
-                          max: capabilities.max_pitch_semitones,
-                          message: `请输入 ${capabilities.min_pitch_semitones} 至 ${capabilities.max_pitch_semitones} 的整数`
-                        }
-                      ]}
-                      tooltip={
-                        capabilities.min_pitch_semitones ===
-                        capabilities.max_pitch_semitones
-                          ? "该音色使用固定音调。"
-                          : "0 保持原音调，正数升高，负数降低。"
-                      }
-                    >
-                      <InputNumber
-                        aria-label="音调"
-                        suffix="半音"
-                        min={capabilities.min_pitch_semitones}
-                        max={capabilities.max_pitch_semitones}
-                        disabled={
-                          settingsBusy ||
-                          capabilities.min_pitch_semitones ===
-                            capabilities.max_pitch_semitones
-                        }
-                        style={{ width: "100%" }}
-                      />
-                    </Form.Item>
-                  </div>
-                  <Form.Item name="style" label="说话风格">
-                    <Select
-                      aria-label="说话风格"
-                      disabled={settingsBusy}
-                      options={[
-                        { value: "", label: "自然" },
-                        ...capabilities.styles.map((style) => ({
-                          value: style,
-                          label: styleNames[style] ?? style
-                        }))
-                      ]}
-                    />
-                  </Form.Item>
-                </div>
-                <div className="voice-library-settings-preview">
-                  <Typography.Paragraph className="voice-library-sample">
-                    {text}
-                  </Typography.Paragraph>
-                  <Flex
-                    className="voice-library-preview-actions"
-                    align="center"
-                    gap={8}
-                    wrap
-                  >
-                    <Button
-                      color={
-                        speechAccentGroup(selected.locale) === "uk"
-                          ? "danger"
-                          : speechAccentGroup(selected.locale) === "us"
-                            ? "primary"
-                            : "default"
-                      }
-                      variant="solid"
-                      aria-label="试听当前参数"
-                      icon={<PlayCircleOutlined />}
-                      disabled={settingsBusy || !canGenerate || !validText}
-                      loading={pendingVoice === selected.alias}
-                      onClick={() => void auditionDraft()}
-                    >
-                      试听当前参数
-                    </Button>
-                    <Button
-                      type="text"
-                      disabled={settingsBusy || parametersAreDefault}
-                      onClick={() => {
-                        cancelPreview();
-                        const defaults = initialParameters(selected);
-                        form.setFieldsValue(defaults);
-                        setTrialParameters((current) => ({
-                          ...current,
-                          [selected.alias]: defaults
-                        }));
-                        updateDirty(form.getFieldsValue());
-                        setSaveMessage(null);
-                      }}
-                    >
-                      恢复默认参数
-                    </Button>
-                  </Flex>
-                  {previewView()}
-                </div>
-                {canEditDescription && (
-                  <Button
-                    className="voice-library-recommend-action"
-                    disabled={
-                      settingsBusy ||
-                      speechAccentGroup(selected.locale) === "other"
-                    }
-                    title={
-                      speechAccentGroup(selected.locale) === "other"
-                        ? "其他地区仅作文本补充音色，不加入英美默认推荐"
-                        : undefined
-                    }
-                    onClick={() => void openRecommendation()}
-                  >
-                    加入分组推荐
-                  </Button>
-                )}
-                <Form.Item
-                  name="notes"
-                  label="我的听感"
-                  style={{ marginTop: 24 }}
-                  rules={[
-                    {
-                      validator: (_, value: string) =>
-                        Array.from(value ?? "").length <= 3000
-                          ? Promise.resolve()
-                          : Promise.reject(new Error("听感最多 3000 个字符"))
-                    }
-                  ]}
-                >
-                  <Input.TextArea
-                    aria-label="我的听感"
-                    rows={3}
-                    placeholder="记录适合的语速、发音特点和使用场景，仅你可见"
-                  />
-                </Form.Item>
-              </section>
-              <Collapse
-                className="voice-library-shared-description"
+              <Tabs
+                activeKey={detailTab}
+                onChange={setDetailTab}
                 items={[
                   {
-                    key: "description",
-                    label: "共享介绍",
-                    extra: (
-                      <Typography.Text type="secondary">
-                        所有管理员可见
-                      </Typography.Text>
-                    ),
+                    key: "adjust",
+                    label: "调节声音",
                     forceRender: true,
                     children: (
-                      <>
+                      <section
+                        className="voice-library-settings-section"
+                        aria-label="调节声音"
+                        hidden={detailTab !== "adjust"}
+                        inert={detailTab !== "adjust"}
+                      >
+                        <Typography.Paragraph
+                          className="voice-library-settings-intro"
+                          type="secondary"
+                        >
+                          参数仅用于本次试听，刷新后恢复默认；加入分组推荐时保存当前参数。
+                        </Typography.Paragraph>
+                        {capabilities.supports_volume_percent === false && (
+                          <Alert
+                            type="info"
+                            showIcon
+                            title="该模型仅支持原速、原调、原音量自然朗读；不支持停顿或指定音素。已有非默认参数需要明确恢复后再生成。"
+                          />
+                        )}
+                        <div className="voice-library-parameters">
+                          <Form.Item
+                            name="volume_percent"
+                            label={
+                              <span className="voice-library-volume-label">
+                                音量
+                                <span
+                                  className="voice-library-muted-status"
+                                  role="status"
+                                >
+                                  {formValues?.volume_percent === 0
+                                    ? "已静音"
+                                    : ""}
+                                </span>
+                              </span>
+                            }
+                            tooltip="100% 为原音量，0% 为静音。"
+                            rules={[
+                              {
+                                required: true,
+                                type: "integer",
+                                min:
+                                  capabilities.supports_volume_percent === false
+                                    ? 100
+                                    : 0,
+                                max: 100,
+                                message:
+                                  capabilities.supports_volume_percent === false
+                                    ? "该模型仅支持原音量，请明确恢复默认参数"
+                                    : "请输入 0 至 100 的整数"
+                              }
+                            ]}
+                          >
+                            <SpeechVolumeInput
+                              disabled={
+                                settingsBusy ||
+                                capabilities.supports_volume_percent === false
+                              }
+                            />
+                          </Form.Item>
+                          <div className="voice-library-parameter-grid">
+                            <Form.Item
+                              name="rate_percent"
+                              label="语速"
+                              rules={[
+                                {
+                                  required: true,
+                                  type: "integer",
+                                  min: capabilities.min_rate_percent,
+                                  max: capabilities.max_rate_percent,
+                                  message: `请输入 ${((100 + capabilities.min_rate_percent) / 100).toFixed(2)} 至 ${((100 + capabilities.max_rate_percent) / 100).toFixed(2)} 倍速`
+                                }
+                              ]}
+                              tooltip={
+                                capabilities.min_rate_percent ===
+                                capabilities.max_rate_percent
+                                  ? "该音色使用固定语速。"
+                                  : "1.00× 为标准语速。"
+                              }
+                            >
+                              <SpeechRateInput
+                                aria-label="合成语速"
+                                min={capabilities.min_rate_percent}
+                                max={capabilities.max_rate_percent}
+                                disabled={
+                                  settingsBusy ||
+                                  capabilities.min_rate_percent ===
+                                    capabilities.max_rate_percent
+                                }
+                                style={{ width: "100%" }}
+                              />
+                            </Form.Item>
+                            <Form.Item
+                              name="pitch_semitones"
+                              label="音调"
+                              rules={[
+                                {
+                                  required: true,
+                                  type: "integer",
+                                  min: capabilities.min_pitch_semitones,
+                                  max: capabilities.max_pitch_semitones,
+                                  message: `请输入 ${capabilities.min_pitch_semitones} 至 ${capabilities.max_pitch_semitones} 的整数`
+                                }
+                              ]}
+                              tooltip={
+                                capabilities.min_pitch_semitones ===
+                                capabilities.max_pitch_semitones
+                                  ? "该音色使用固定音调。"
+                                  : "0 保持原音调，正数升高，负数降低。"
+                              }
+                            >
+                              <InputNumber
+                                aria-label="音调"
+                                suffix="半音"
+                                min={capabilities.min_pitch_semitones}
+                                max={capabilities.max_pitch_semitones}
+                                disabled={
+                                  settingsBusy ||
+                                  capabilities.min_pitch_semitones ===
+                                    capabilities.max_pitch_semitones
+                                }
+                                style={{ width: "100%" }}
+                              />
+                            </Form.Item>
+                          </div>
+                          <Form.Item name="style" label="说话风格">
+                            <Select
+                              aria-label="说话风格"
+                              disabled={settingsBusy}
+                              options={[
+                                { value: "", label: "自然" },
+                                ...capabilities.styles.map((style) => ({
+                                  value: style,
+                                  label: styleNames[style] ?? style
+                                }))
+                              ]}
+                            />
+                          </Form.Item>
+                        </div>
+                        <div className="voice-library-settings-preview">
+                          <Typography.Paragraph className="voice-library-sample">
+                            {text}
+                          </Typography.Paragraph>
+                          <Flex
+                            className="voice-library-preview-actions"
+                            align="center"
+                            gap={8}
+                            wrap
+                          >
+                            <Button
+                              color={
+                                speechAccentGroup(selected.locale) === "uk"
+                                  ? "danger"
+                                  : speechAccentGroup(selected.locale) === "us"
+                                    ? "primary"
+                                    : "default"
+                              }
+                              variant="solid"
+                              aria-label="试听当前参数"
+                              icon={<PlayCircleOutlined />}
+                              disabled={
+                                settingsBusy || !canGenerate || !validText
+                              }
+                              loading={pendingVoice === selected.alias}
+                              onClick={() => void auditionDraft()}
+                            >
+                              试听当前参数
+                            </Button>
+                            <Button
+                              type="text"
+                              disabled={settingsBusy || parametersAreDefault}
+                              onClick={() => {
+                                cancelPreview();
+                                const defaults = initialParameters(selected);
+                                form.setFieldsValue(defaults);
+                                setTrialParameters((current) => ({
+                                  ...current,
+                                  [selected.alias]: defaults
+                                }));
+                                updateDirty(form.getFieldsValue());
+                                setSaveMessage(null);
+                              }}
+                            >
+                              恢复默认参数
+                            </Button>
+                          </Flex>
+                          {previewView()}
+                        </div>
+                        {canEditDescription && (
+                          <Button
+                            className="voice-library-recommend-action"
+                            disabled={
+                              settingsBusy ||
+                              speechAccentGroup(selected.locale) === "other"
+                            }
+                            title={
+                              speechAccentGroup(selected.locale) === "other"
+                                ? "其他地区仅作文本补充音色，不加入英美默认推荐"
+                                : undefined
+                            }
+                            onClick={() => void openRecommendation()}
+                          >
+                            加入分组推荐
+                          </Button>
+                        )}
                         <Form.Item
-                          name="description_zh"
-                          label="中文介绍"
-                          extra="单独保存，不影响个人参数与听感。"
+                          name="notes"
+                          label="我的听感"
+                          style={{ marginTop: 24 }}
                           rules={[
                             {
                               validator: (_, value: string) =>
                                 Array.from(value ?? "").length <= 3000
                                   ? Promise.resolve()
                                   : Promise.reject(
-                                      new Error("介绍最多 3000 个字符")
+                                      new Error("听感最多 3000 个字符")
                                     )
                             }
                           ]}
                         >
                           <Input.TextArea
-                            aria-label="中文介绍"
+                            aria-label="我的听感"
                             rows={3}
-                            readOnly={!canEditDescription}
+                            placeholder="记录适合的语速、发音特点和使用场景，仅你可见"
                           />
                         </Form.Item>
-                        {canEditDescription && (
-                          <Button
-                            loading={saving === "description"}
-                            disabled={!library.isSuccess || settingsBusy}
-                            onClick={() => void save("description")}
-                          >
-                            保存共享介绍
-                          </Button>
-                        )}
-                      </>
+                        <Button
+                          type="primary"
+                          loading={saving === "personal"}
+                          disabled={!library.isSuccess || settingsBusy}
+                          onClick={() => void save("personal")}
+                        >
+                          保存听感
+                        </Button>
+                      </section>
+                    )
+                  },
+                  {
+                    key: "info",
+                    label: "音色资料",
+                    forceRender: true,
+                    children: (
+                      <section
+                        hidden={detailTab !== "info"}
+                        inert={detailTab !== "info"}
+                      >
+                        <VoiceCatalogDetails
+                          voice={selected}
+                          description={
+                            <>
+                              <Flex
+                                align="center"
+                                justify="space-between"
+                                gap={12}
+                              >
+                                <Typography.Text type="secondary">
+                                  所有管理员可见
+                                </Typography.Text>
+                                {canEditDescription && !editingDescription && (
+                                  <Button
+                                    type="link"
+                                    size="small"
+                                    disabled={
+                                      !library.isSuccess || settingsBusy
+                                    }
+                                    onClick={editDescription}
+                                  >
+                                    编辑
+                                  </Button>
+                                )}
+                              </Flex>
+                              <div
+                                className="voice-library-description-editor"
+                                hidden={!editingDescription}
+                                inert={!editingDescription}
+                              >
+                                <Form.Item
+                                  name="description_zh"
+                                  rules={[
+                                    {
+                                      validator: (_, value: string) =>
+                                        Array.from(value ?? "").length <= 3000
+                                          ? Promise.resolve()
+                                          : Promise.reject(
+                                              new Error("介绍最多 3000 个字符")
+                                            )
+                                    }
+                                  ]}
+                                >
+                                  <Input.TextArea
+                                    aria-label="中文介绍"
+                                    rows={3}
+                                    readOnly={!canEditDescription}
+                                  />
+                                </Form.Item>
+                                {canEditDescription && (
+                                  <Button
+                                    type="primary"
+                                    loading={saving === "description"}
+                                    disabled={
+                                      !library.isSuccess || settingsBusy
+                                    }
+                                    onClick={() => void save("description")}
+                                  >
+                                    保存介绍
+                                  </Button>
+                                )}
+                              </div>
+                              {!editingDescription && (
+                                <Typography.Paragraph className="voice-library-description-text">
+                                  {metadata.get(selected.alias)
+                                    ?.description_zh || "暂无介绍"}
+                                </Typography.Paragraph>
+                              )}
+                            </>
+                          }
+                        />
+                      </section>
                     )
                   }
                 ]}

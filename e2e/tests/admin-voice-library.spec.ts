@@ -151,7 +151,7 @@ test("从一级菜单查找音色、调参并播放，改字后清除旧音频",
   const requests = await mockApi(page);
   await page.goto("/voices");
   await expect(
-    page.getByRole("heading", { name: "配音中心", exact: true })
+    page.getByRole("navigation").getByText("配音中心")
   ).toBeVisible();
   await page.getByRole("menuitem", { name: /配音中心/ }).click();
   await expect(page).toHaveURL(/\/voices$/);
@@ -190,29 +190,24 @@ test("从一级菜单查找音色、调参并播放，改字后清除旧音频",
     node.dataset.previewIdentity = "original";
     await node.play();
   });
-  await page.getByRole("button", { name: "查看 Sonia 资料" }).click();
-  const details = page.getByRole("dialog", { name: "Sonia 音色资料" });
-  await expect(details.getByRole("region", { name: "音色资料" })).toBeVisible();
-  await expect(originalAudio).toHaveAttribute(
-    "data-preview-identity",
-    "original"
+  await page.getByRole("button", { name: "查看 Sonia 详情" }).click();
+  const drawer = page.getByRole("dialog", { name: "Sonia 音色详情" });
+  await expect(drawer.getByRole("tab", { name: "调节声音" })).toHaveAttribute(
+    "aria-selected",
+    "true"
   );
-  expect(
-    await originalAudio.evaluate((node: HTMLAudioElement) => node.paused)
-  ).toBe(false);
-  await details.getByRole("button", { name: /关闭|Close/ }).click();
-  await expect(details).toHaveCount(0);
-  await expect(originalAudio).toHaveAttribute(
-    "data-preview-identity",
-    "original"
-  );
-  expect(
-    await originalAudio.evaluate((node: HTMLAudioElement) => node.paused)
-  ).toBe(false);
+  await expect(originalAudio).toHaveCount(0);
+  await drawer.getByRole("tab", { name: "音色资料" }).click();
+  await expect(drawer.getByRole("region", { name: "音色资料" })).toBeVisible();
+  await expect(drawer.getByRole("button", { name: "保存听感" })).toHaveCount(0);
+  await page.screenshot({
+    path: testInfo.outputPath("voice-library-details.png"),
+    fullPage: true,
+    animations: "disabled"
+  });
+  await drawer.getByRole("tab", { name: "调节声音" }).click();
   expect(requests).toHaveLength(1);
   requests.length = 0;
-  await page.getByRole("button", { name: "调整 Sonia 参数" }).click();
-  const drawer = page.getByRole("dialog");
   await drawer
     .getByRole("spinbutton", { name: "合成语速", exact: true })
     .fill("0.75");
@@ -239,6 +234,21 @@ test("从一级菜单查找音色、调参并播放，改字后清除旧音频",
   await drawer
     .getByRole("textbox", { name: "我的听感" })
     .fill("声音清晰，适合慢读");
+  await audio.evaluate((node: HTMLAudioElement) => {
+    node.dataset.previewIdentity = "detail-preview";
+  });
+  await drawer.getByRole("tab", { name: "音色资料" }).click();
+  await expect(audio).toHaveAttribute(
+    "data-preview-identity",
+    "detail-preview"
+  );
+  expect(await audio.evaluate((node: HTMLAudioElement) => node.paused)).toBe(
+    false
+  );
+  await drawer.getByRole("tab", { name: "调节声音" }).click();
+  await expect(drawer.getByRole("textbox", { name: "我的听感" })).toHaveValue(
+    "声音清晰，适合慢读"
+  );
   await expect(audio).toBeVisible();
   await expect
     .poll(() => audio.evaluate((node: HTMLAudioElement) => node.paused))
@@ -346,7 +356,7 @@ test("HD Flash按模型能力禁用参数并保留自然试听请求", async ({ 
   );
   await page.goto("/voices");
   await page.getByRole("tab", { name: "音色库" }).click();
-  await page.getByLabel("调整 Tiana 参数", { exact: true }).click();
+  await page.getByLabel("查看 Tiana 详情", { exact: true }).click();
   const drawer = page.getByRole("dialog");
   await expect(drawer.getByLabel("合成音量", { exact: true })).toBeDisabled();
   await expect(drawer.getByLabel("合成语速", { exact: true })).toBeDisabled();
@@ -495,7 +505,7 @@ test("分组草稿受保护，保存后重新打开保持英美推荐", async ({
       .getByRole("list", { name: "音色列表" })
       .getByLabel("试听 Guy", { exact: true })
   ).toBeVisible();
-  await page.getByRole("button", { name: "调整 Sonia 参数" }).click();
+  await page.getByRole("button", { name: "查看 Sonia 详情" }).click();
   const drawer = page.getByRole("dialog");
   await drawer
     .getByRole("spinbutton", { name: "合成语速", exact: true })
@@ -892,7 +902,7 @@ test("窄屏可浏览，只有例句权限时禁止生成；固定参数不可�
   await page.goto("/voices");
   await page.getByRole("tab", { name: "音色库" }).click();
   await expect(
-    page.getByRole("heading", { name: "配音中心", exact: true })
+    page.getByRole("navigation").getByText("配音中心")
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "试听 Sonia", exact: true })
@@ -909,7 +919,7 @@ test("窄屏可浏览，只有例句权限时禁止生成；固定参数不可�
     fullPage: true,
     animations: "disabled"
   });
-  await page.getByRole("button", { name: "调整 Guy 参数" }).click();
+  await page.getByRole("button", { name: "查看 Guy 详情" }).click();
   await expect(
     page.getByRole("spinbutton", { name: "合成语速", exact: true })
   ).toBeDisabled();
