@@ -2,6 +2,40 @@ import { describe, expect, it } from "vitest";
 import spec from "./openapi.snapshot.json";
 
 describe("音色库契约", () => {
+  it("模型能力可省略以读取旧目录，Flash禁用能力由真实目录返回", () => {
+    for (const name of [
+      "supports_volume_percent",
+      "supports_pause",
+      "supports_phoneme"
+    ] as const) {
+      expect(spec.schemas.VoiceCapabilities.required).not.toContain(name);
+      expect(spec.schemas.VoiceCapabilities.properties[name]).toMatchObject({
+        type: "boolean"
+      });
+    }
+  });
+  it("只读目录资料可省略，未知值与明确空角色分开，不改变试听能力", () => {
+    expect(spec.schemas.VoiceResponse.required).not.toContain("metadata");
+    expect(spec.schemas.VoiceMetadata.required).toEqual([
+      "provider_voice_id",
+      "model",
+      "source_url",
+      "checked_at"
+    ]);
+    expect(spec.schemas.VoiceMetadata.properties.age_group.type).toContain(
+      "null"
+    );
+    expect(spec.schemas.VoiceMetadata.properties.roles.type).toContain("null");
+    expect(spec.schemas.VoiceMetadata.properties.roles.items).toEqual({
+      type: "string"
+    });
+    expect(spec.schemas.VoiceCapabilities.properties).not.toHaveProperty(
+      "roles"
+    );
+    expect(spec.schemas.CreatePreviewRequest.properties).not.toHaveProperty(
+      "model"
+    );
+  });
   it("个人写入不接受账号归属，保存声明版本冲突", () => {
     const schema = spec.schemas.SaveVoiceSettingsRequest;
     expect(schema.additionalProperties).toBe(false);

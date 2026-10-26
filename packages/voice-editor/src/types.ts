@@ -33,6 +33,9 @@ export interface VoiceOption {
   styles: string[];
   supportsRate: boolean;
   supportsPitch: boolean;
+  supportsVolume?: boolean;
+  supportsPause?: boolean;
+  supportsPhoneme?: boolean;
   isDefault: boolean;
   personalSettingsError?: string;
   defaultSettings?: Pick<

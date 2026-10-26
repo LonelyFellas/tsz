@@ -251,6 +251,7 @@ describe("双口音真实试听控件", () => {
         expect.objectContaining({
           source: expect.objectContaining({
             alphabet,
+            phoneme_locale: "en-GB",
             phoneme: saved.synthesis.uk[alphabet]
           })
         }),

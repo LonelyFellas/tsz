@@ -19,7 +19,8 @@ import {
   isVoiceRecommendationAvailable,
   normalizeSpellingRich,
   remapTextLinks,
-  toRichTextV2
+  toRichTextV2,
+  withNativeVoiceVersion
 } from "@tsz/voice-editor/core";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import { EditOutlined } from "@ant-design/icons";
@@ -239,10 +240,13 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           key: defaultKey,
           profile: usable.length
             ? {
-                voices: usable.map((item) => ({
-                  ...item.setting,
-                  enabled: true
-                }))
+                voices: usable.map((item) =>
+                  withNativeVoiceVersion(
+                    { ...item.setting, enabled: true },
+                    voices.find((voice) => voice.id === item.setting.voice_id),
+                    item.name
+                  )
+                )
               }
             : undefined,
           error:

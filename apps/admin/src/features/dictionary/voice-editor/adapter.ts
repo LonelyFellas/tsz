@@ -82,6 +82,9 @@ function mapVoice(
     locale: item.locale,
     gender: gender === "female" || gender === "male" ? gender : "neutral",
     styles: [...capabilities.styles],
+    supportsVolume: capabilities.supports_volume_percent ?? true,
+    supportsPause: capabilities.supports_pause ?? true,
+    supportsPhoneme: capabilities.supports_phoneme ?? true,
     supportsRate: capabilities.min_rate_percent < capabilities.max_rate_percent,
     supportsPitch:
       capabilities.min_pitch_semitones < capabilities.max_pitch_semitones,
@@ -200,8 +203,16 @@ export function createAdminVoicePreviewAdapter(
         const unsupportedVolume =
           !Number.isInteger(volumePercent) ||
           volumePercent < 0 ||
-          volumePercent > 100;
+          volumePercent > 100 ||
+          (capabilities.supports_volume_percent === false &&
+            volumePercent !== 100);
+        const unsupportedContent = input.content.annotations.some(
+          (mark) =>
+            (mark.type === "pause" && capabilities.supports_pause === false) ||
+            (mark.type === "phoneme" && capabilities.supports_phoneme === false)
+        );
         if (
+          unsupportedContent ||
           unsupportedStyle ||
           unsupportedRate ||
           unsupportedPitch ||

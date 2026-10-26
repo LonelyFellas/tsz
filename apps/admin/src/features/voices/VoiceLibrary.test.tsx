@@ -121,6 +121,31 @@ afterEach(() => {
 });
 
 describe("配音中心", () => {
+  it("HD Flash资料提示真实限制，并禁用音量语速音调控件", async () => {
+    vi.mocked(api.speech.voices).mockResolvedValue({
+      items: [
+        {
+          ...sonia,
+          capabilities: {
+            ...sonia.capabilities,
+            min_rate_percent: 0,
+            max_rate_percent: 0,
+            min_pitch_semitones: 0,
+            max_pitch_semitones: 0,
+            supports_volume_percent: false,
+            supports_pause: false,
+            supports_phoneme: false
+          }
+        }
+      ]
+    });
+    mount();
+    fireEvent.click(await screen.findByLabelText("调整 Sonia 参数"));
+    expect(screen.getByLabelText("合成音量")).toBeDisabled();
+    expect(screen.getByLabelText("合成语速")).toBeDisabled();
+    expect(screen.getByLabelText("音调")).toBeDisabled();
+    expect(screen.getByText(/该模型仅支持原速/)).toBeVisible();
+  });
   it("默认展示分组配音，再切换音色库查找声音", async () => {
     mount(false);
     expect(screen.getByRole("tab", { name: "分组配音" })).toHaveAttribute(

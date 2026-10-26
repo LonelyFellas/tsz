@@ -219,23 +219,29 @@ describe("createAdminEndpoints — speech 试听", () => {
     api.speech.saveSettings("voice/alias", input);
     expect(http.put).toHaveBeenCalledWith(
       "/speech/library/voice%2Falias/personal",
-      input
+      input,
+      { headers: { "X-TSZ-Voice-Models": "v1" } }
     );
     api.speech.saveDescription("voice", {
       description_zh: "中文介绍",
       base_revision: 1
     });
-    expect(http.put).toHaveBeenCalledWith("/speech/library/voice/description", {
-      description_zh: "中文介绍",
-      base_revision: 1
-    });
+    expect(http.put).toHaveBeenCalledWith(
+      "/speech/library/voice/description",
+      {
+        description_zh: "中文介绍",
+        base_revision: 1
+      },
+      { headers: { "X-TSZ-Voice-Models": "v1" } }
+    );
   });
   it("voices → GET /speech/voices 带 AbortSignal", () => {
     const api = createAdminEndpoints(http);
     const controller = new AbortController();
     api.speech.voices(controller.signal);
     expect(http.get).toHaveBeenCalledWith("/speech/voices", {
-      signal: controller.signal
+      signal: controller.signal,
+      headers: { "X-TSZ-Voice-Models": "v1" }
     });
   });
 
@@ -262,7 +268,8 @@ describe("createAdminEndpoints — speech 试听", () => {
     };
     api.speech.preview(input, controller.signal);
     expect(http.post).toHaveBeenCalledWith("/speech/previews", input, {
-      signal: controller.signal
+      signal: controller.signal,
+      headers: { "X-TSZ-Voice-Models": "v1" }
     });
   });
 });
@@ -520,6 +527,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         "X-TSZ-Spelling-Speech": "v1",
         "X-TSZ-Phoneme-Speech": "v1",
         "X-TSZ-Voice-Versions": "v2",
+        "X-TSZ-Voice-Locales": "v1",
+        "X-TSZ-Voice-Models": "v1",
         "X-TSZ-Form-Contents": "v1",
         "X-TSZ-Form-Content-Reassignment": "v1",
         "X-TSZ-Sentence-Formatting": "v1"
@@ -576,6 +585,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Spelling-Speech": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v2",
+          "X-TSZ-Voice-Locales": "v1",
+          "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1",
           "X-TSZ-Sentence-Formatting": "v1",
@@ -603,6 +614,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Spelling-Speech": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v2",
+          "X-TSZ-Voice-Locales": "v1",
+          "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1",
           "X-TSZ-Sentence-Formatting": "v1",
@@ -903,6 +916,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Spelling-Speech": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v2",
+          "X-TSZ-Voice-Locales": "v1",
+          "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1",
           "X-TSZ-Sentence-Formatting": "v1",
@@ -916,6 +931,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         "X-TSZ-Spelling-Speech": "v1",
         "X-TSZ-Phoneme-Speech": "v1",
         "X-TSZ-Voice-Versions": "v2",
+        "X-TSZ-Voice-Locales": "v1",
+        "X-TSZ-Voice-Models": "v1",
         "X-TSZ-Form-Contents": "v1",
         "X-TSZ-Form-Content-Reassignment": "v1",
         "X-TSZ-Sentence-Formatting": "v1"
@@ -930,6 +947,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Spelling-Speech": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v2",
+          "X-TSZ-Voice-Locales": "v1",
+          "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Sentence-Formatting": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1"
@@ -950,6 +969,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Spelling-Speech": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v2",
+          "X-TSZ-Voice-Locales": "v1",
+          "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1",
           "X-TSZ-Sentence-Formatting": "v1"
@@ -970,6 +991,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Spelling-Speech": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v2",
+          "X-TSZ-Voice-Locales": "v1",
+          "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1",
           "X-TSZ-Sentence-Formatting": "v1"
@@ -986,6 +1009,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         "X-TSZ-Spelling-Speech": "v1",
         "X-TSZ-Phoneme-Speech": "v1",
         "X-TSZ-Voice-Versions": "v2",
+        "X-TSZ-Voice-Locales": "v1",
+        "X-TSZ-Voice-Models": "v1",
         "X-TSZ-Form-Contents": "v1",
         "X-TSZ-Form-Content-Reassignment": "v1",
         "X-TSZ-Sentence-Formatting": "v1"
@@ -999,6 +1024,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Spelling-Speech": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v2",
+          "X-TSZ-Voice-Locales": "v1",
+          "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1",
           "X-TSZ-Sentence-Formatting": "v1"
@@ -1019,6 +1046,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Spelling-Speech": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v2",
+          "X-TSZ-Voice-Locales": "v1",
+          "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1",
           "X-TSZ-Sentence-Formatting": "v1",
@@ -1035,6 +1064,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Spelling-Speech": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v2",
+          "X-TSZ-Voice-Locales": "v1",
+          "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1",
           "X-TSZ-Sentence-Formatting": "v1",
@@ -1051,6 +1082,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Spelling-Speech": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v2",
+          "X-TSZ-Voice-Locales": "v1",
+          "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1",
           "X-TSZ-Sentence-Formatting": "v1",
@@ -1067,6 +1100,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Spelling-Speech": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v2",
+          "X-TSZ-Voice-Locales": "v1",
+          "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1",
           "X-TSZ-Sentence-Formatting": "v1",
@@ -1083,6 +1118,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Spelling-Speech": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v2",
+          "X-TSZ-Voice-Locales": "v1",
+          "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1",
           "X-TSZ-Sentence-Formatting": "v1",
@@ -1099,6 +1136,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Spelling-Speech": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v2",
+          "X-TSZ-Voice-Locales": "v1",
+          "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1",
           "X-TSZ-Sentence-Formatting": "v1",
@@ -1115,6 +1154,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Spelling-Speech": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v2",
+          "X-TSZ-Voice-Locales": "v1",
+          "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1",
           "X-TSZ-Sentence-Formatting": "v1",
@@ -1136,6 +1177,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Spelling-Speech": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v2",
+          "X-TSZ-Voice-Locales": "v1",
+          "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1",
           "X-TSZ-Sentence-Formatting": "v1",

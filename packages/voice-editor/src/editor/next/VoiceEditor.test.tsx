@@ -1585,6 +1585,144 @@ describe("VoiceEditor 发音区", () => {
     expect(onVoiceProfileChange).not.toHaveBeenCalled();
   });
 
+  it("新英语地区按分类展示，其他音色是独立分区且正式生成保留原生地区", async () => {
+    const catalog = [
+      ...VOICES,
+      { ...VOICES[0]!, id: "natasha", label: "Natasha", locale: "en-AU" },
+      { ...VOICES[0]!, id: "neerja", label: "Neerja", locale: "en-IN" },
+      { ...VOICES[0]!, id: "clara", label: "Clara", locale: "en-CA" }
+    ];
+    const generateAudio = vi.fn().mockResolvedValue(asset({ locale: "en-IN" }));
+    const onVoiceProfileChange = vi.fn();
+    render(
+      <VoiceEditor
+        {...props({
+          locale: "en-GB",
+          previewAdapter: {
+            ...adapter(),
+            listVoices: vi.fn().mockResolvedValue(catalog),
+            generateAudio
+          },
+          voiceProfile: {
+            voices: [
+              {
+                version_id: "india",
+                version_name: "印度补充",
+                voice_id: "neerja",
+                locale: "en-IN",
+                enabled: true,
+                rate_percent: 0
+              }
+            ]
+          },
+          onVoiceProfileChange
+        })}
+      />
+    );
+    openVoices();
+    const indian = await screen.findByLabelText("配音版本 印度补充");
+    expect(screen.getByText("Other · 其他音色")).toBeInTheDocument();
+    expect(screen.getByText("Natasha")).toBeInTheDocument();
+    expect(screen.queryByLabelText("启用 Clara")).toBeNull();
+    expect(screen.getByText("· 澳大利亚")).toBeInTheDocument();
+    fireEvent.click(
+      within(indian).getByRole("button", { name: "生成正式音频" })
+    );
+    await waitFor(() =>
+      expect(generateAudio).toHaveBeenCalledWith(
+        expect.objectContaining({
+          setting: expect.objectContaining({
+            locale: "en-IN",
+            voice_id: "neerja"
+          })
+        }),
+        expect.anything()
+      )
+    );
+  });
+
+  it("Flash不静默夹取已保存的非默认参数，原版本保留并提示调整", async () => {
+    const flash = {
+      ...VOICES[0]!,
+      id: "flash",
+      label: "Flash",
+      locale: "en-US",
+      supportsRate: false,
+      supportsPitch: false,
+      supportsVolume: false,
+      supportsPause: false,
+      supportsPhoneme: false,
+      rateRange: { min: 0, max: 0 },
+      pitchRange: { min: 0, max: 0 }
+    };
+    const synthesize = vi.fn().mockResolvedValue(previewResult());
+    const onVoiceProfileChange = vi.fn();
+    render(
+      <VoiceEditor
+        {...props({
+          previewAdapter: {
+            listVoices: vi.fn().mockResolvedValue([flash]),
+            synthesize
+          },
+          voiceProfile: {
+            voices: [
+              {
+                voice_id: "flash",
+                enabled: true,
+                rate_percent: 10,
+                volume_percent: 65
+              }
+            ]
+          },
+          onVoiceProfileChange
+        })}
+      />
+    );
+    openVoices();
+    fireEvent.click(await screen.findByLabelText("试听 Flash"));
+    expect(synthesize).not.toHaveBeenCalled();
+    expect(screen.getByText(/该模型不支持当前参数/)).toBeVisible();
+    expect(onVoiceProfileChange).not.toHaveBeenCalled();
+  });
+
+  it.each(["en-AU", "en-US"] as const)(
+    "首次勾选新地区或Flash音色保留完整版本身份与原生locale %s",
+    async (nativeLocale) => {
+      const voice = {
+        ...VOICES[0]!,
+        id: nativeLocale === "en-US" ? "azure-hd-flash-tiana" : "natasha",
+        supportsVolume: nativeLocale === "en-US" ? false : true,
+        label: "New voice",
+        locale: nativeLocale
+      };
+      const onVoiceProfileChange = vi.fn();
+      render(
+        <VoiceEditor
+          {...props({
+            previewAdapter: {
+              ...adapter(),
+              listVoices: vi.fn().mockResolvedValue([voice])
+            },
+            onVoiceProfileChange
+          })}
+        />
+      );
+      openVoices();
+      fireEvent.click(await screen.findByLabelText("启用 New voice"));
+      expect(onVoiceProfileChange).toHaveBeenLastCalledWith({
+        voices: [
+          expect.objectContaining({
+            voice_id: voice.id,
+            locale: nativeLocale,
+            version_id: expect.any(String),
+            version_name: "New voice",
+            enabled: true
+          })
+        ]
+      });
+    }
+  );
+
   it("音色按语种分组，再按男女声分列", async () => {
     render(<VoiceEditor {...props({ previewAdapter: adapter() })} />);
     openVoices();
@@ -1698,6 +1836,87 @@ describe("VoiceEditor 发音区", () => {
     expect(play).toHaveAttribute("aria-busy", "true");
     expect(play.querySelectorAll('[aria-label="loading"]')).toHaveLength(1);
     expect(play.querySelector('[aria-label="sound"]')).toBeNull();
+  });
+
+  it("Flash自动首位推荐创建完整身份，未勾选先调参也保留地区", async () => {
+    const flash = {
+      ...VOICES[0]!,
+      id: "azure-hd-flash-tiana",
+      locale: "en-US",
+      label: "Tiana Flash",
+      supportsVolume: false,
+      supportsRate: false,
+      supportsPitch: false,
+      rateRange: { min: 0, max: 0 }
+    };
+    const onVoiceProfileChange = vi.fn();
+    const previewAdapter = {
+      ...adapter(),
+      listVoices: vi.fn().mockResolvedValue([flash])
+    };
+    const loadRecommendations = vi.fn().mockResolvedValue([
+      {
+        id: "flash-rec",
+        name: "Flash首推",
+        locale: "en-US",
+        groupName: "释义",
+        setting: { voice_id: flash.id, enabled: true, rate_percent: 0 }
+      }
+    ]);
+    const view = render(
+      <VoiceEditor
+        {...props({
+          previewAdapter,
+          loadRecommendations,
+          recommendationArea: "meaning",
+          autoRecommend: true,
+          onVoiceProfileChange
+        })}
+      />
+    );
+    await waitFor(() =>
+      expect(onVoiceProfileChange).toHaveBeenCalledWith({
+        voices: [
+          expect.objectContaining({
+            version_id: expect.any(String),
+            version_name: "Flash首推",
+            locale: "en-US",
+            voice_id: flash.id
+          })
+        ]
+      })
+    );
+    view.unmount();
+    onVoiceProfileChange.mockClear();
+    const australianAdapter = {
+      ...adapter(),
+      listVoices: vi
+        .fn()
+        .mockResolvedValue([
+          { ...VOICES[0]!, id: "natasha", label: "Natasha", locale: "en-AU" }
+        ])
+    };
+    render(
+      <VoiceEditor
+        {...props({ previewAdapter: australianAdapter, onVoiceProfileChange })}
+      />
+    );
+    openVoices();
+    const rateButton = await screen.findByLabelText("设置 Natasha 的语速");
+    fireEvent.click(rateButton);
+    const rate = await screen.findByRole("textbox", { name: "自定义语速倍数" });
+    fireEvent.change(rate, { target: { value: "1.00" } });
+    fireEvent.keyDown(rate, { key: "Enter" });
+    expect(onVoiceProfileChange).toHaveBeenLastCalledWith({
+      voices: [
+        expect.objectContaining({
+          version_id: expect.any(String),
+          locale: "en-AU",
+          voice_id: "natasha",
+          enabled: false
+        })
+      ]
+    });
   });
 
   it("仅空白新文本首次输入时采用首位推荐，已有文本与显式空配置不自动改写", async () => {

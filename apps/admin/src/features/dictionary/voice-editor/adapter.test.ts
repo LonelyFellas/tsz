@@ -38,6 +38,78 @@ function source(): AdminSpeechDataSource {
 }
 
 describe("admin voice preview adapter", () => {
+  it("Flash仅允许自然默认参数，停顿、音素和音量变更在请求前拒绝", async () => {
+    const dataSource = source();
+    vi.mocked(dataSource.voices).mockResolvedValue({
+      items: [
+        {
+          alias: "flash",
+          display_name: "Tiana HD Flash",
+          locale: "en-US",
+          gender: "female",
+          is_common: false,
+          capabilities: {
+            styles: [],
+            min_rate_percent: 0,
+            max_rate_percent: 0,
+            min_pitch_semitones: 0,
+            max_pitch_semitones: 0,
+            supports_volume_percent: false,
+            supports_pause: false,
+            supports_phoneme: false
+          }
+        }
+      ]
+    });
+    const adapter = createAdminVoicePreviewAdapter(dataSource);
+    const voices = await adapter.listVoices({ language: "en" });
+    expect(voices[0]).toMatchObject({
+      supportsVolume: false,
+      supportsPause: false,
+      supportsPhoneme: false
+    });
+    for (const changes of [
+      { volumePercent: 65 },
+      { ratePercent: 10 },
+      { pitchSemitones: 1 },
+      {
+        content: {
+          ...CONTENT,
+          annotations: [{ type: "pause" as const, at: 5, duration_ms: 500 }]
+        }
+      },
+      {
+        content: {
+          ...CONTENT,
+          annotations: [
+            {
+              type: "phoneme" as const,
+              start: 0,
+              end: 5,
+              alphabet: "ipa" as const,
+              phoneme: "həˈləʊ"
+            }
+          ]
+        }
+      }
+    ]) {
+      await expect(
+        adapter.synthesize({
+          language: "en",
+          content: CONTENT,
+          voiceId: "flash",
+          ...changes
+        })
+      ).rejects.toMatchObject({ code: "option_not_supported" });
+    }
+    expect(dataSource.preview).not.toHaveBeenCalled();
+    await adapter.synthesize({
+      language: "en",
+      content: CONTENT,
+      voiceId: "flash"
+    });
+    expect(dataSource.preview).toHaveBeenCalledTimes(1);
+  });
   it("maps voice and preview wire fields in both directions with AbortSignal", async () => {
     const dataSource = source();
     const adapter = createAdminVoicePreviewAdapter(dataSource);
@@ -55,6 +127,9 @@ describe("admin voice preview adapter", () => {
         styles: ["cheerful"],
         supportsRate: true,
         supportsPitch: false,
+        supportsVolume: true,
+        supportsPause: true,
+        supportsPhoneme: true,
         isDefault: true,
         rateRange: { min: -10, max: 10 },
         pitchRange: { min: 0, max: 0 }

@@ -2,6 +2,28 @@ import { expect, it, vi } from "vitest";
 import type { VoicePreviewAdapter } from "@tsz/voice-editor/types";
 import { createGrammarFormPreviewAdapter } from "./grammarFormPreview";
 
+it("新地区普通正文保持自然朗读，含词形引用时明确拒绝且不发起合成", async () => {
+  const synthesize = vi
+    .fn()
+    .mockResolvedValue({ audioUrl: "audio", expiresAt: "", cached: false });
+  const source: VoicePreviewAdapter = {
+    listVoices: vi.fn().mockResolvedValue([{ id: "au", locale: "en-AU" }]),
+    synthesize
+  };
+  const resolve = vi.fn().mockResolvedValue([]);
+  const adapter = createGrammarFormPreviewAdapter(source, resolve);
+  const input = {
+    language: "en",
+    voiceId: "au",
+    content: { version: 2 as const, text: "a job", annotations: [] }
+  };
+  await adapter.synthesize(input);
+  expect(synthesize).toHaveBeenCalledWith(input, undefined);
+  resolve.mockResolvedValue([{ dialect: "uk", pronunciations: [] }]);
+  await expect(adapter.synthesize(input)).rejects.toThrow(/指定音素/);
+  expect(synthesize).toHaveBeenCalledTimes(1);
+});
+
 it("关联词形解析后仍只发起一次整段合成，清除时去掉旧音素", async () => {
   const synthesize = vi
     .fn()

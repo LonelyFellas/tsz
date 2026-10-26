@@ -10,6 +10,7 @@ export type GeneratedSpeechSource =
   | { kind: "text"; content: RichTextV2; form_links?: GrammarFormLinkV3[] }
   | {
       kind: "phoneme";
+      phoneme_locale?: "en-GB" | "en-US";
       content: RichTextV2;
       alphabet: "ipa" | "ups";
       phoneme: string;
@@ -26,11 +27,26 @@ export interface GenerateVoiceAudioResponse {
 }
 
 export interface AdminSpeechVoiceCapabilities {
+  supports_volume_percent?: boolean;
+  supports_pause?: boolean;
+  supports_phoneme?: boolean;
   styles: string[];
   min_rate_percent: number;
   max_rate_percent: number;
   min_pitch_semitones: number;
   max_pitch_semitones: number;
+}
+
+export interface AdminSpeechVoiceMetadata {
+  provider_voice_id: string;
+  model: string;
+  age_group: string | null;
+  description: string | null;
+  personalities: string[] | null;
+  scenarios: string[] | null;
+  roles: string[] | null;
+  source_url: string;
+  checked_at: string;
 }
 
 export interface AdminSpeechVoice {
@@ -39,6 +55,7 @@ export interface AdminSpeechVoice {
   is_common: boolean;
   locale: string;
   gender: string;
+  metadata?: AdminSpeechVoiceMetadata | null;
   capabilities: AdminSpeechVoiceCapabilities;
 }
 

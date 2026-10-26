@@ -1,3 +1,8 @@
+import {
+  speechAccentGroup,
+  speechLocaleMatchesScope,
+  speechRegionLabel
+} from "@tsz/shared";
 import { CheckOutlined, SoundOutlined } from "@ant-design/icons";
 import {
   Button,
@@ -150,27 +155,28 @@ export function VoicePanel({
     enabledVoiceIds.includes(voice.id)
   ).length;
   // 已勾选却不属于本侧的音色仍要露出来，否则历史配置只能看见结果、没法取消。
-  const visibleLocales = (items: VoiceOption[]) =>
-    locale
-      ? VOICE_LOCALES.filter(
-          (entry) =>
-            entry.locale === locale ||
-            items.some(
-              (voice) =>
-                voice.locale === entry.locale &&
-                enabledVoiceIds.includes(voice.id)
-            )
-        )
-      : VOICE_LOCALES;
   const renderGroups = (items: VoiceOption[]) =>
-    visibleLocales(items).map(({ locale, badge }) => {
-      const group = items.filter((voice) => voice.locale === locale);
+    (
+      [
+        { key: "uk", badge: "BrE", label: "英式发音" },
+        { key: "us", badge: "AmE", label: "美式发音" },
+        { key: "other", badge: "Other", label: "其他音色" }
+      ] as const
+    ).map(({ key, badge, label: groupLabel }) => {
+      const group = items.filter(
+        (voice) =>
+          speechAccentGroup(voice.locale) === key &&
+          (speechLocaleMatchesScope(voice.locale, locale) ||
+            enabledVoiceIds.includes(voice.id))
+      );
+      const groupLocale =
+        key === "uk" ? "en-GB" : key === "us" ? "en-US" : "other";
       if (group.length === 0) return null;
       return (
         <PopSection
-          key={locale}
-          title={`${badge} · ${locale === "en-GB" ? "英式发音" : "美式发音"}`}
-          locale={locale}
+          key={key}
+          title={`${badge} · ${groupLabel}`}
+          locale={groupLocale}
         >
           <div className="tsz-ve-voice-columns">
             {[
@@ -204,8 +210,18 @@ export function VoicePanel({
                             editingVersionKey
                           )?.enabled ?? enabledVoiceIds.includes(voice.id)
                         }
-                        label={voiceShortName(voice)}
+                        label={
+                          <>
+                            <span>{voiceShortName(voice)}</span>
+                            <span> · {speechRegionLabel(voice.locale)}</span>
+                          </>
+                        }
                         ariaLabel={`启用 ${voice.label}`}
+                        meta={
+                          voice.supportsVolume === false
+                            ? "仅自然朗读"
+                            : undefined
+                        }
                         disabled={readOnly}
                         onToggle={() => onToggleVoice(voice.id)}
                         trailing={
@@ -224,6 +240,26 @@ export function VoicePanel({
                               <details>
                                 <summary>更多参数</summary>
                                 <Space direction="vertical">
+                                  {voice.supportsVolume === false &&
+                                    ((setting?.volume_percent ?? 100) !== 100 ||
+                                      (setting?.pitch_semitones ?? 0) !== 0 ||
+                                      (setting?.rate_percent ?? 0) !== 0 ||
+                                      !!setting?.style) && (
+                                      <Button
+                                        size="small"
+                                        disabled={readOnly}
+                                        onClick={() =>
+                                          onParametersChange(voice.id, {
+                                            volume_percent: 100,
+                                            pitch_semitones: 0,
+                                            rate_percent: 0,
+                                            style: undefined
+                                          })
+                                        }
+                                      >
+                                        恢复该模型默认参数
+                                      </Button>
+                                    )}
                                   <label>
                                     音量
                                     <InputNumber
@@ -233,7 +269,10 @@ export function VoicePanel({
                                       max={100}
                                       precision={0}
                                       suffix="%"
-                                      disabled={readOnly}
+                                      disabled={
+                                        readOnly ||
+                                        voice.supportsVolume === false
+                                      }
                                       onChange={(volume) => {
                                         if (volume !== null)
                                           onParametersChange(voice.id, {
@@ -284,7 +323,14 @@ export function VoicePanel({
                             )}
                             <Button
                               size="small"
-                              type="text"
+                              color={
+                                speechAccentGroup(voice.locale) === "uk"
+                                  ? "danger"
+                                  : speechAccentGroup(voice.locale) === "us"
+                                    ? "primary"
+                                    : "default"
+                              }
+                              variant="text"
                               className="tsz-ve-audition-button"
                               aria-label={`试听 ${voice.label}`}
                               loading={pendingVoiceId === voice.id}
@@ -292,6 +338,8 @@ export function VoicePanel({
                               aria-busy={pendingVoiceId === voice.id}
                               disabled={
                                 !canAudition ||
+                                (Boolean(auditionLocale) &&
+                                  voice.supportsPhoneme === false) ||
                                 Boolean(
                                   auditionLocale &&
                                   voice.locale.toLowerCase() !==

@@ -1,4 +1,5 @@
 "use client";
+import { selectTexts } from "@/features/wordlist/reading";
 import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -19,7 +20,7 @@ import {
   writeHistory
 } from "./history";
 import { dictionaryDefinition, dictionarySpellings, POS_ABBR } from "./reading";
-import { AudioButton, preferredAudio, Texts } from "./Content";
+import { TargetAudio, Texts } from "./Content";
 
 export function Dictionary({
   query = "",
@@ -315,8 +316,6 @@ function Result({
           const grammar = pos.grammar_structures.find(
             (g) => g.id === definition?.grammar_structure_id
           );
-          const audio =
-            grammar && preferredAudio(item.audio, grammar.id, variant);
           return (
             <div
               key={pos.pos_id}
@@ -341,10 +340,15 @@ function Result({
                 {grammar && (
                   <Texts texts={grammar.variants} variant={variant} />
                 )}
-                {audio && (
-                  <AudioButton
+                {grammar && (
+                  <TargetAudio
                     entryId={entry.entry_id}
-                    audio={audio}
+                    audio={item.audio}
+                    targetId={grammar.id}
+                    sourceDialects={selectTexts(grammar.variants, variant).map(
+                      (text) => text.dialect
+                    )}
+                    variant={variant}
                     label="播放语法结构"
                   />
                 )}

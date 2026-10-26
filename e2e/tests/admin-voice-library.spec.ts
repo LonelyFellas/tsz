@@ -231,6 +231,100 @@ test("从一级菜单查找音色、调参并播放，改字后清除旧音频",
   expect(errors).toEqual([]);
 });
 
+test("窄屏表头场景多选与清除可操作，弹层不撑宽页面", async ({ page }) => {
+  await mockApi(page);
+  await page.route("**/api/v1/admin/speech/voices", (route) =>
+    route.fulfill({
+      json: {
+        items: voices.map((voice) => ({
+          ...voice,
+          metadata: {
+            provider_voice_id: voice.alias,
+            model: "neural",
+            age_group: "Adult",
+            description: "Official description",
+            personalities: null,
+            scenarios:
+              voice.locale === "en-GB" ? ["News", "Narration"] : ["Chat"],
+            roles: [],
+            source_url: "https://speech.microsoft.com/portal/voicegallery",
+            checked_at: "2026-10-25T13:14:11Z"
+          }
+        }))
+      }
+    })
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/voices");
+  await page.getByRole("tab", { name: "音色库" }).click();
+  const select = page.getByRole("combobox", { name: "推荐场景", exact: true });
+  await select.scrollIntoViewIfNeeded();
+  await select.click();
+  const option = page.locator(
+    ".ant-select-dropdown:visible .ant-select-item-option-content"
+  );
+  await option.getByText("新闻", { exact: true }).click();
+  await option.getByText("旁白", { exact: true }).click();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth
+    )
+  ).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(page.getByLabel("试听 Sonia", { exact: true })).toHaveCount(1);
+  await expect(page.getByLabel("试听 Guy", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "清除筛选" }).click();
+  await expect(page.getByLabel("试听 Guy", { exact: true })).toHaveCount(1);
+  await expect
+    .poll(() =>
+      page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)
+    )
+    .toBe(true);
+});
+
+test("HD Flash按模型能力禁用参数并保留自然试听请求", async ({ page }) => {
+  const requests = await mockApi(page);
+  await page.route("**/api/v1/admin/speech/voices", (route) =>
+    route.fulfill({
+      json: {
+        items: [
+          {
+            ...voices[1],
+            display_name: "Tiana",
+            alias: "azure-hd-flash-tiana",
+            capabilities: {
+              styles: [],
+              min_rate_percent: 0,
+              max_rate_percent: 0,
+              min_pitch_semitones: 0,
+              max_pitch_semitones: 0,
+              supports_volume_percent: false,
+              supports_pause: false,
+              supports_phoneme: false
+            }
+          }
+        ]
+      }
+    })
+  );
+  await page.goto("/voices");
+  await page.getByRole("tab", { name: "音色库" }).click();
+  await page.getByLabel("调整 Tiana 参数", { exact: true }).click();
+  const drawer = page.getByRole("dialog");
+  await expect(drawer.getByLabel("合成音量", { exact: true })).toBeDisabled();
+  await expect(drawer.getByLabel("合成语速", { exact: true })).toBeDisabled();
+  await expect(drawer.getByLabel("音调", { exact: true })).toBeDisabled();
+  await expect(drawer.getByText(/该模型仅支持原速/)).toBeVisible();
+  await drawer.getByRole("button", { name: "试听当前参数" }).click();
+  await expect.poll(() => requests.length).toBe(1);
+  expect(requests[0]).toMatchObject({
+    voice_alias: "azure-hd-flash-tiana",
+    rate_percent: 0,
+    pitch_semitones: 0
+  });
+  expect(requests[0]).not.toHaveProperty("volume_percent");
+});
+
 test("分组草稿受保护，保存后重新打开保持英美推荐", async ({ page }) => {
   await mockApi(page, [
     "words.access",

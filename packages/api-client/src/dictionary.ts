@@ -19,18 +19,39 @@ export function createDictionaryEndpoints(http: HttpClient) {
       http
         .get<unknown>(
           `/dictionary?${new URLSearchParams({ q, page: String(page), page_size: "20" })}`,
-          options
+          {
+            ...options,
+            headers: {
+              "X-TSZ-Voice-Versions": "v2",
+              "X-TSZ-Voice-Locales": "v1",
+              "X-TSZ-Voice-Models": "v1"
+            }
+          }
         )
         .then((v) => decode<DictionaryPage>("DictionaryPage", v)),
     get: (id: string, options?: { signal?: AbortSignal }) =>
       http
-        .get<unknown>(`/dictionary/entries/${encodeURIComponent(id)}`, options)
+        .get<unknown>(`/dictionary/entries/${encodeURIComponent(id)}`, {
+          ...options,
+          headers: {
+            "X-TSZ-Voice-Versions": "v2",
+            "X-TSZ-Voice-Locales": "v1",
+            "X-TSZ-Voice-Models": "v1"
+          }
+        })
         .then((v) => decode<DictionaryEntry>("DictionaryEntry", v)),
     audio: (id: string, assetId: string, options?: { signal?: AbortSignal }) =>
       http
         .get<unknown>(
           `/dictionary/entries/${encodeURIComponent(id)}/audio/${encodeURIComponent(assetId)}`,
-          options
+          {
+            ...options,
+            headers: {
+              "X-TSZ-Voice-Versions": "v2",
+              "X-TSZ-Voice-Locales": "v1",
+              "X-TSZ-Voice-Models": "v1"
+            }
+          }
         )
         .then((v) => decode<DictionaryAudioUrl>("AudioAssetUrlResponse", v))
   };

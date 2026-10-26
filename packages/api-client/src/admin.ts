@@ -124,6 +124,8 @@ const SPELLING_MARKUP_HEADERS = {
   "X-TSZ-Spelling-Speech": "v1",
   "X-TSZ-Phoneme-Speech": "v1",
   "X-TSZ-Voice-Versions": "v2",
+  "X-TSZ-Voice-Locales": "v1",
+  "X-TSZ-Voice-Models": "v1",
   "X-TSZ-Form-Contents": "v1",
   "X-TSZ-Form-Content-Reassignment": "v1"
 };
@@ -315,29 +317,50 @@ export function createAdminEndpoints(http: HttpClient) {
         http.post<import("@tsz/types").GenerateVoiceAudioResponse>(
           "/speech/audio",
           input,
-          { signal }
+          {
+            signal,
+            headers: {
+              "X-TSZ-Voice-Versions": "v2",
+              "X-TSZ-Voice-Locales": "v1",
+              "X-TSZ-Voice-Models": "v1"
+            }
+          }
         ),
       voices: (signal?: AbortSignal) =>
-        http.get<AdminSpeechVoiceListResponse>("/speech/voices", { signal }),
+        http.get<AdminSpeechVoiceListResponse>("/speech/voices", {
+          signal,
+          headers: { "X-TSZ-Voice-Models": "v1" }
+        }),
       preview: (input: CreateAdminSpeechPreviewInput, signal?: AbortSignal) =>
         http.post<AdminSpeechPreviewResponse>("/speech/previews", input, {
-          signal
+          signal,
+          headers: { "X-TSZ-Voice-Models": "v1" }
         }),
       groups: (signal?: AbortSignal) =>
-        http.get<AdminDubbingGroupsResponse>("/speech/groups", { signal }),
+        http.get<AdminDubbingGroupsResponse>("/speech/groups", {
+          signal,
+          headers: { "X-TSZ-Voice-Models": "v1" }
+        }),
       saveGroups: (input: SaveAdminDubbingGroupsInput) =>
-        http.put<AdminDubbingGroupsResponse>("/speech/groups", input),
+        http.put<AdminDubbingGroupsResponse>("/speech/groups", input, {
+          headers: { "X-TSZ-Voice-Models": "v1" }
+        }),
       library: (signal?: AbortSignal) =>
-        http.get<AdminVoiceLibraryResponse>("/speech/library", { signal }),
+        http.get<AdminVoiceLibraryResponse>("/speech/library", {
+          signal,
+          headers: { "X-TSZ-Voice-Models": "v1" }
+        }),
       saveSettings: (alias: string, input: SaveAdminVoiceSettingsInput) =>
         http.put<AdminVoiceLibraryItem>(
           `/speech/library/${encodeURIComponent(alias)}/personal`,
-          input
+          input,
+          { headers: { "X-TSZ-Voice-Models": "v1" } }
         ),
       saveDescription: (alias: string, input: SaveAdminVoiceDescriptionInput) =>
         http.put<AdminVoiceLibraryItem>(
           `/speech/library/${encodeURIComponent(alias)}/description`,
-          input
+          input,
+          { headers: { "X-TSZ-Voice-Models": "v1" } }
         )
     },
     /**

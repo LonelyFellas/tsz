@@ -1,3 +1,4 @@
+import { speechAccentGroup } from "@tsz/shared";
 import { DownOutlined, SoundOutlined, SyncOutlined } from "@ant-design/icons";
 import { App, Button, Popover, Space, Tag, Tooltip } from "antd";
 import type { Dialect, RichTextV2, VoiceProfileV3 } from "@tsz/types";
@@ -134,18 +135,16 @@ function voiceForDialect(
   dialect: Dialect,
   preference: AdminDialectPreference
 ): VoiceOption | undefined {
-  const locale = localeForDialect(dialect, preference)?.toLowerCase();
+  const locale = localeForDialect(dialect, preference);
   // 扩大供应商目录后仍优先沿用已有默认发音人，缺席时再按目录顺序回退。
   const preferredIds =
-    locale === "en-gb"
+    locale === "en-GB"
       ? ["en-gb-sonia", "en-gb-sonianeural"]
       : ["en-us-aria", "en-us-arianeural"];
   const matched = locale
     ? (voices.find(
-        (voice) =>
-          voice.locale.toLowerCase() === locale &&
-          preferredIds.includes(voice.id)
-      ) ?? voices.find((voice) => voice.locale.toLowerCase() === locale))
+        (voice) => voice.locale === locale && preferredIds.includes(voice.id)
+      ) ?? voices.find((voice) => voice.locale === locale))
     : undefined;
   // Common content also resolves to an explicit locale; never cross accents to keep playback enabled.
   return matched;
@@ -183,12 +182,15 @@ export function resolvePronunciationPreviewVoice(
   preference: AdminDialectPreference,
   profile?: VoiceProfileV3
 ) {
-  const locale = localeForDialect(dialect, preference)?.toLowerCase();
+  const locale = localeForDialect(dialect, preference);
   const settings = profile?.voices.filter((setting) => setting.enabled) ?? [];
   const voice = settings.length
     ? settings
         .map((setting) => voices.find((row) => row.id === setting.voice_id))
-        .find((row) => row?.locale.toLowerCase() === locale)
+        .find(
+          (row) =>
+            row && speechAccentGroup(row.locale) === speechAccentGroup(locale)
+        )
     : voiceForDialect(voices, dialect, preference);
   return {
     voice,
@@ -471,6 +473,15 @@ export function PronunciationPreviewControls({
       generationRef.current ||
       abortRef.current
     ) {
+      return;
+    }
+    if (
+      previewContent.annotations.some((mark) => mark.type === "phoneme") &&
+      voice.locale !== targetLocale
+    ) {
+      setStatus(
+        "指定音素仅支持完全匹配的地区，请选择对应音色或显式改用自然朗读"
+      );
       return;
     }
     claimPlayback(stopPlayback);

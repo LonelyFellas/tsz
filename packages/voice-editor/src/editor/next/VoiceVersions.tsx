@@ -1,4 +1,9 @@
 import {
+  speechAccentGroup,
+  speechLocaleMatchesScope,
+  speechRegionLabel
+} from "@tsz/shared";
+import {
   Button,
   Input,
   Popconfirm,
@@ -21,6 +26,9 @@ export function VoiceVersions({
   settings,
   voices,
   locale,
+  phonemeLocale,
+  hasPause,
+  hasPhoneme,
   editingKey,
   readOnly,
   canAudition,
@@ -34,6 +42,9 @@ export function VoiceVersions({
   settings: VoiceSetting[];
   voices: VoiceOption[];
   locale?: AudioAssetLocale;
+  phonemeLocale?: AudioAssetLocale;
+  hasPause?: boolean;
+  hasPhoneme?: boolean;
   editingKey?: string;
   readOnly?: boolean;
   canAudition: boolean;
@@ -46,17 +57,15 @@ export function VoiceVersions({
 }) {
   const [name, setName] = useState("");
   const [sourceId, setSourceId] = useState<string>();
-  const candidates = voices.filter(
-    (voice) =>
-      (!locale || voice.locale === locale) &&
-      ["en-GB", "en-US"].includes(voice.locale)
+  const candidates = voices.filter((voice) =>
+    speechLocaleMatchesScope(voice.locale, locale)
   );
   const source =
     candidates.find((voice) => voice.id === sourceId) ?? candidates[0];
   const visible = settings.filter(
     (setting) =>
       !locale ||
-      voiceLocale(setting, voices) === locale ||
+      speechLocaleMatchesScope(voiceLocale(setting, voices) ?? "", locale) ||
       !voiceLocale(setting, voices)
   );
   const sourceSetting = source
@@ -66,7 +75,7 @@ export function VoiceVersions({
     <section className="tsz-ve-versions" aria-label="当前文本的配音版本">
       <Typography.Text strong>当前文本的配音版本</Typography.Text>
       <Typography.Paragraph type="secondary">
-        英式与美式各选一个正式版本。保存后保留当前参数，分组调整不会自动覆盖。
+        英式与美式各选一个正式版本，其他地区按地区选用补充版本。保存后保留当前参数。
       </Typography.Paragraph>
       {visible.map((setting) => {
         const key = voiceSettingKey(setting);
@@ -87,17 +96,20 @@ export function VoiceVersions({
               }
             : undefined);
         const available =
-          (accent === "en-GB" || accent === "en-US") &&
+          (!phonemeLocale ||
+            (accent === phonemeLocale && voice?.supportsPhoneme !== false)) &&
+          (!hasPause || voice?.supportsPause !== false) &&
+          (!hasPhoneme || voice?.supportsPhoneme !== false) &&
+          !!speechAccentGroup(accent) &&
           isVoiceRecommendationAvailable(
             {
               id: key,
               name: setting.version_name ?? "",
               groupName: "",
-              locale: accent,
+              locale: accent as AudioAssetLocale,
               setting
             },
-            voices,
-            locale
+            voices
           );
         return (
           <div
@@ -133,11 +145,9 @@ export function VoiceVersions({
                 {setting.version_name ?? voice?.label ?? setting.voice_id}
               </Typography.Text>
               <Tag>
-                {accent === "en-GB"
-                  ? "英式"
-                  : accent === "en-US"
-                    ? "美式"
-                    : "口音未知"}
+                {accent
+                  ? `${speechAccentGroup(accent) === "uk" ? "英式" : speechAccentGroup(accent) === "us" ? "美式" : "其他音色"} · ${speechRegionLabel(accent)}`
+                  : "口音未知"}
               </Tag>
               {setting.enabled && (
                 <Tag color="blue">
