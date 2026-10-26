@@ -14,7 +14,6 @@ import type {
 import {
   Alert,
   App,
-  Breadcrumb,
   Button,
   Card,
   Collapse,
@@ -43,7 +42,7 @@ import {
 import { UNSAFE_DataRouterContext, useBlocker } from "react-router-dom";
 import { useUnsavedChanges } from "@tsz/shared/recovery";
 import { api, useAnyPermission, useAuthStore, usePermission } from "@/lib/auth";
-import { VoiceCatalogTable } from "./VoiceCatalogTable";
+import { VoiceCatalogDetails, VoiceCatalogTable } from "./VoiceCatalogTable";
 import { DubbingGroups } from "./DubbingGroups";
 import { AddRecommendation } from "./AddRecommendation";
 import { SpeechRateInput } from "./SpeechRateInput";
@@ -138,7 +137,7 @@ export function VoiceLibrary() {
     "--voice-surface": token.colorBgContainer,
     "--voice-border": token.colorBorderSecondary,
     "--voice-primary-bg": token.colorPrimaryBg,
-    "--voice-muted": token.colorTextTertiary,
+    "--voice-muted": token.colorTextSecondary,
     "--voice-radius": `${token.borderRadius}px`
   } as CSSProperties;
   const canView = useAnyPermission([
@@ -584,7 +583,6 @@ export function VoiceLibrary() {
           busy={settingsBusy}
         />
       )}
-      <Breadcrumb items={[{ title: "配音中心" }]} />
       {!canGenerate && (
         <Alert
           type="info"
@@ -642,7 +640,10 @@ export function VoiceLibrary() {
             { key: "library", label: "音色库" }
           ]}
         />
-        <section className="voice-library-audition" aria-label="音色试听">
+        <section
+          className={`voice-library-audition${tab === "library" ? " voice-library-audition-dock" : ""}`}
+          aria-label="音色试听"
+        >
           <Form layout="vertical" className="voice-library-audition-text">
             <Form.Item
               label={
@@ -659,7 +660,7 @@ export function VoiceLibrary() {
               <Input.TextArea
                 aria-label="共用试听文本"
                 value={text}
-                autoSize={{ minRows: 2, maxRows: 4 }}
+                autoSize={{ minRows: 1, maxRows: 3 }}
                 onChange={(event) => {
                   cancelPreview();
                   setText(event.target.value);
@@ -766,6 +767,7 @@ export function VoiceLibrary() {
                 {selected.alias}
               </Typography.Text>
             </Flex>
+            <VoiceCatalogDetails voice={selected} />
             {saveError && (
               <Alert
                 type="error"

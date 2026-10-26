@@ -1,25 +1,25 @@
 import { speechAccentGroup } from "@tsz/shared";
-import { PlayCircleOutlined, SearchOutlined } from "@ant-design/icons";
+import {
+  CaretRightOutlined,
+  FilterOutlined,
+  SearchOutlined
+} from "@ant-design/icons";
 import type { AdminSpeechVoice, AdminVoiceLibraryItem } from "@tsz/types";
 import {
   Button,
   Checkbox,
-  Flex,
+  Descriptions,
+  Form,
   Input,
+  Pagination,
   Select,
   Space,
-  Table,
+  Spin,
   Tag,
   Tooltip,
   Typography
 } from "antd";
-import {
-  createContext,
-  useContext,
-  useState,
-  type ReactNode,
-  type ThHTMLAttributes
-} from "react";
+import { useState } from "react";
 import { GatedButton } from "@/components/GatedButton";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import { personalityNames, scenarioNames, styleNames } from "./voice-labels";
@@ -46,34 +46,6 @@ const ageNames: Record<string, string> = {
 const ageOrder = Object.keys(ageNames);
 const missing = "__missing__";
 const none = "__none__";
-const HeaderContext = createContext(false);
-function CatalogHeaderCell({
-  children,
-  ...props
-}: ThHTMLAttributes<HTMLTableCellElement>) {
-  return (
-    <th {...props}>
-      <HeaderContext.Provider value>{children}</HeaderContext.Provider>
-    </th>
-  );
-}
-function ColumnHeader({
-  label,
-  children
-}: {
-  label: string;
-  children: ReactNode;
-}) {
-  const inHeader = useContext(HeaderContext);
-  return inHeader ? (
-    <div className="voice-library-column-header">
-      <span>{label}</span>
-      {children}
-    </div>
-  ) : (
-    label
-  );
-}
 const languages = new Intl.DisplayNames(["zh-CN"], { type: "language" });
 const regions = new Intl.DisplayNames(["zh-CN"], { type: "region" });
 function language(voice: AdminSpeechVoice) {
@@ -94,6 +66,72 @@ function list(
     : values
       ? "无"
       : "未提供";
+}
+
+export function VoiceCatalogDetails({ voice }: { voice: AdminSpeechVoice }) {
+  const info = voice.metadata;
+  return (
+    <section className="voice-library-details" aria-label="音色资料">
+      <Typography.Title level={5}>音色资料</Typography.Title>
+      <Descriptions
+        size="small"
+        column={1}
+        items={[
+          {
+            key: "language",
+            label: "语言／地区",
+            children: `${language(voice)}／${region(voice)}（${voice.locale}）`
+          },
+          {
+            key: "age",
+            label: "年龄",
+            children:
+              ageNames[info?.age_group ?? ""] ?? info?.age_group ?? "未提供"
+          },
+          {
+            key: "model",
+            label: "模型",
+            children: modelNames[info?.model ?? ""] ?? info?.model ?? "未提供"
+          },
+          {
+            key: "personalities",
+            label: "声音特征",
+            children: list(info?.personalities, personalityNames)
+          },
+          {
+            key: "scenarios",
+            label: "推荐场景",
+            children: list(info?.scenarios, scenarioNames)
+          },
+          {
+            key: "styles",
+            label: "可选风格",
+            children: [
+              "自然",
+              ...voice.capabilities.styles.map(
+                (value) => styleNames[value] ?? value
+              )
+            ].join("、")
+          },
+          { key: "roles", label: "可选角色", children: list(info?.roles) }
+        ]}
+      />
+      <Typography.Paragraph className="voice-library-official-description">
+        <Typography.Text type="secondary">官方原文</Typography.Text>
+        <br />
+        {info?.description || "未提供"}
+      </Typography.Paragraph>
+      {info?.source_url && (
+        <Typography.Link
+          href={info.source_url}
+          target="_blank"
+          rel="noreferrer"
+        >
+          官方资料（{info.checked_at.slice(0, 10)}）
+        </Typography.Link>
+      )}
+    </section>
+  );
 }
 
 interface Props {
@@ -168,26 +206,24 @@ export function VoiceCatalogTable({
   onAudition,
   onSettings
 }: Props) {
-  const [nameQuery, setNameQuery] = useState("");
-  const [descriptionQuery, setDescriptionQuery] = useState("");
+  const [query, setQuery] = useState("");
   const [commonOnly, setCommonOnly] = useState(false);
   const [sort, setSort] = useState("recommended");
   const [filters, setFilters] = useState<Filters>({});
+  const [moreFilters, setMoreFilters] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const rows = (() => {
-    const name = nameQuery.trim().toLowerCase();
-    const description = descriptionQuery.trim().toLowerCase();
+    const search = query.trim().toLowerCase();
     return voices
       .filter((voice) => {
         const info = metadata.get(voice.alias);
         return (
-          (!name ||
-            `${voice.display_name} ${voice.alias} ${voice.metadata?.provider_voice_id ?? ""}`
-              .toLowerCase()
-              .includes(name)) &&
-          (!description ||
+          (!search ||
             [
+              voice.display_name,
+              voice.alias,
+              voice.metadata?.provider_voice_id,
               info?.description_zh,
               info?.notes,
               voice.metadata?.description,
@@ -196,7 +232,7 @@ export function VoiceCatalogTable({
             ]
               .join(" ")
               .toLowerCase()
-              .includes(description)) &&
+              .includes(search)) &&
           (!commonOnly || voice.is_common) &&
           (Object.entries(filters) as [FilterKey, string[]][]).every(
             ([key, selected]) =>
@@ -226,14 +262,20 @@ export function VoiceCatalogTable({
       });
   })();
   const hasFilters =
-    !!nameQuery ||
-    !!descriptionQuery ||
+    !!query ||
     commonOnly ||
     Object.values(filters).some((value) => value.length) ||
     sort !== "recommended";
+  const advancedCount = ["scenario", "model", "style", "role"].reduce(
+    (count, key) => count + (filters[key as FilterKey]?.length ?? 0),
+    0
+  );
+  const currentPage = Math.min(
+    page,
+    Math.max(1, Math.ceil(rows.length / pageSize))
+  );
   function reset() {
-    setNameQuery("");
-    setDescriptionQuery("");
+    setQuery("");
     setCommonOnly(false);
     setFilters({});
     setSort("recommended");
@@ -258,319 +300,238 @@ export function VoiceCatalogTable({
     labels?: Record<string, string>
   ) {
     return (
-      <Select
-        mode="multiple"
-        popupAlign={{
-          overflow: { adjustX: true, adjustY: true, shiftX: true }
-        }}
-        size="small"
-        aria-label={label}
-        placeholder="全部"
-        allowClear
-        maxTagCount="responsive"
-        value={filters[key] ?? []}
-        options={options(key, labels)}
-        onChange={(value) => {
-          setFilters((old) => ({ ...old, [key]: value }));
-          setPage(1);
-        }}
-      />
+      <Form.Item label={label}>
+        <Select
+          mode="multiple"
+          aria-label={label}
+          placeholder="全部"
+          allowClear
+          maxTagCount="responsive"
+          value={filters[key] ?? []}
+          options={options(key, labels)}
+          onChange={(value) => {
+            setFilters((old) => ({ ...old, [key]: value }));
+            setPage(1);
+          }}
+        />
+      </Form.Item>
     );
   }
-  function header(label: string, controls: ReactNode) {
-    return <ColumnHeader label={label}>{controls}</ColumnHeader>;
-  }
-  const text = (value: string | null | undefined) => (
-    <Typography.Text type={value ? undefined : "secondary"}>
-      {value || "未提供"}
-    </Typography.Text>
-  );
   return (
-    <>
-      <div className="voice-library-list-heading">
-        <Typography.Title level={4}>音色列表</Typography.Title>
-        <Typography.Text type="secondary">
-          在表头查找音色，可横向滚动查看全部资料。
-        </Typography.Text>
-        <Button type="link" disabled={!hasFilters} onClick={reset}>
-          清除筛选
-        </Button>
+    <section className="voice-catalog" aria-label="音色库">
+      <Form layout="vertical" className="voice-catalog-filters">
+        <div className="voice-catalog-search">
+          <Input
+            type="search"
+            prefix={<SearchOutlined />}
+            aria-label="搜索音色"
+            placeholder="搜索名称、介绍或听感"
+            value={query}
+            allowClear
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setPage(1);
+            }}
+          />
+          <Checkbox
+            checked={commonOnly}
+            onChange={(event) => {
+              setCommonOnly(event.target.checked);
+              setPage(1);
+            }}
+          >
+            只看常用
+          </Checkbox>
+        </div>
+        <div className="voice-catalog-filter-grid">
+          {filter("language", "语言")}
+          {filter("region", "口音／地区")}
+          {filter("gender", "性别", genderNames)}
+          {filter("age", "年龄组", ageNames)}
+          <Button
+            icon={<FilterOutlined aria-hidden />}
+            aria-expanded={moreFilters}
+            aria-controls="voice-catalog-more-filters"
+            onClick={() => setMoreFilters(!moreFilters)}
+          >
+            更多筛选{advancedCount ? `（${advancedCount}）` : ""}
+          </Button>
+        </div>
+        <div id="voice-catalog-more-filters" hidden={!moreFilters}>
+          <div className="voice-catalog-advanced-grid">
+            {filter("scenario", "推荐场景")}
+            {filter("model", "模型", modelNames)}
+            {filter("style", "可选风格", { ...styleNames, neutral: "自然" })}
+            {filter("role", "可选角色")}
+          </div>
+        </div>
+      </Form>
+      <div className="voice-catalog-toolbar">
+        <Space size={12} wrap>
+          <Typography.Text strong>音色列表</Typography.Text>
+          <Typography.Text type="secondary">
+            {hasFilters
+              ? `${rows.length} / ${voices.length} 个音色`
+              : `共 ${voices.length} 个音色`}
+          </Typography.Text>
+          {hasFilters && (
+            <Button type="link" size="small" onClick={reset}>
+              清除筛选
+            </Button>
+          )}
+        </Space>
+        <Select
+          aria-label="音色排序"
+          variant="borderless"
+          className="voice-catalog-sort"
+          value={sort}
+          options={[
+            { value: "recommended", label: "常用优先" },
+            { value: "name-asc", label: "名称升序" },
+            { value: "name-desc", label: "名称倒序" },
+            { value: "age-asc", label: "年龄升序" },
+            { value: "age-desc", label: "年龄倒序" }
+          ]}
+          onChange={(value) => {
+            setSort(value);
+            setPage(1);
+          }}
+        />
       </div>
       {voices.some((voice) => !voice.metadata) && (
-        <Typography.Paragraph type="secondary">
-          部分目录扩展资料未提供，仍可浏览和试听现有音色。
+        <Typography.Paragraph type="secondary" className="voice-catalog-notice">
+          部分音色暂无详细资料，仍可试听。
         </Typography.Paragraph>
       )}
-      <Table<AdminSpeechVoice>
-        aria-label="音色列表"
-        components={{ header: { cell: CatalogHeaderCell } }}
-        size="middle"
-        rowKey="alias"
-        dataSource={rows}
-        loading={loading}
-        scroll={{ x: 2310 }}
-        rowClassName={(voice) =>
-          voice.alias === activeVoice ? "voice-library-row-active" : ""
-        }
-        pagination={{
-          current: page,
-          pageSize,
-          onChange: (next, size) => {
+      <Spin spinning={loading}>
+        {rows.length ? (
+          <ul className="voice-catalog-list" aria-label="音色列表">
+            {rows
+              .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+              .map((voice) => {
+                const info = metadata.get(voice.alias);
+                const active = voice.alias === activeVoice;
+                return (
+                  <li
+                    key={voice.alias}
+                    className={`voice-catalog-item${active ? " voice-catalog-item-active" : ""}`}
+                  >
+                    <GatedButton
+                      className="voice-catalog-play"
+                      shape="circle"
+                      color={
+                        speechAccentGroup(voice.locale) === "uk"
+                          ? "danger"
+                          : speechAccentGroup(voice.locale) === "us"
+                            ? "primary"
+                            : "default"
+                      }
+                      variant={active ? "solid" : "outlined"}
+                      icon={<CaretRightOutlined />}
+                      aria-label={`试听 ${voice.display_name}`}
+                      disabled={!canGenerate || !validText || settingsPending}
+                      reason={
+                        !canGenerate
+                          ? "需要词库查看和语音生成权限"
+                          : settingsPending
+                            ? "正在加载个人音色设置"
+                            : "请输入 1–500 个字符的试听文本"
+                      }
+                      loading={pendingVoice === voice.alias}
+                      onClick={() => onAudition(voice)}
+                    />
+                    <div className="voice-catalog-identity">
+                      <Space size={8} wrap>
+                        <Tooltip
+                          title={
+                            voice.metadata?.provider_voice_id ?? voice.alias
+                          }
+                        >
+                          <Typography.Text
+                            strong
+                            className="voice-catalog-name"
+                          >
+                            {voice.display_name}
+                          </Typography.Text>
+                        </Tooltip>
+                        {voice.is_common && (
+                          <Tag color="blue" variant="filled">
+                            常用
+                          </Tag>
+                        )}
+                      </Space>
+                      <div className="voice-catalog-attributes">
+                        <span>{language(voice)}</span>
+                        <span>{region(voice)}</span>
+                        <span>
+                          {genderNames[voice.gender.toLowerCase()] ??
+                            "性别未提供"}
+                        </span>
+                        <span>
+                          {ageNames[voice.metadata?.age_group ?? ""] ??
+                            voice.metadata?.age_group ??
+                            "年龄未提供"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="voice-catalog-summary">
+                      <p>
+                        {info?.description_zh ||
+                          voice.metadata?.description ||
+                          "暂无介绍，可试听了解声音。"}
+                      </p>
+                      <div className="voice-catalog-characteristics">
+                        {!!voice.metadata?.personalities?.length && (
+                          <span>
+                            {list(
+                              voice.metadata.personalities,
+                              personalityNames
+                            )}
+                          </span>
+                        )}
+                        {!!info?.notes && (
+                          <span className="voice-catalog-notes">
+                            我的听感：{info.notes}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      type="text"
+                      className="voice-catalog-settings"
+                      aria-label={`调整 ${voice.display_name} 参数`}
+                      disabled={settingsPending}
+                      onClick={() => onSettings(voice)}
+                    >
+                      资料与设置
+                    </Button>
+                  </li>
+                );
+              })}
+          </ul>
+        ) : (
+          <TableEmptyState
+            filtered={hasFilters && !!voices.length}
+            onResetFilters={reset}
+            message="暂无可用音色，请联系管理员检查语音服务配置。"
+          />
+        )}
+      </Spin>
+      {!!rows.length && (
+        <Pagination
+          className="voice-catalog-pagination"
+          current={currentPage}
+          pageSize={pageSize}
+          total={rows.length}
+          onChange={(next, size) => {
             setPage(size === pageSize ? next : 1);
             setPageSize(size);
-          },
-          showSizeChanger: true,
-          pageSizeOptions: [10, 20, 50],
-          showTotal: (total) => `共 ${total} 个音色`
-        }}
-        locale={{
-          emptyText: (
-            <TableEmptyState
-              filtered={hasFilters && !!voices.length}
-              onResetFilters={reset}
-              message="暂无可用音色，请联系管理员检查语音服务配置。"
-            />
-          )
-        }}
-        columns={[
-          {
-            title: "操作",
-            key: "actions",
-            width: 120,
-            render: (_, voice) => (
-              <Space size={4}>
-                <GatedButton
-                  shape="circle"
-                  color={
-                    speechAccentGroup(voice.locale) === "uk"
-                      ? "danger"
-                      : speechAccentGroup(voice.locale) === "us"
-                        ? "primary"
-                        : "default"
-                  }
-                  variant="outlined"
-                  icon={<PlayCircleOutlined />}
-                  aria-label={`试听 ${voice.display_name}`}
-                  disabled={!canGenerate || !validText || settingsPending}
-                  reason={
-                    !canGenerate
-                      ? "需要词库查看和语音生成权限"
-                      : settingsPending
-                        ? "正在加载个人音色设置"
-                        : "请输入 1–500 个字符的试听文本"
-                  }
-                  loading={pendingVoice === voice.alias}
-                  onClick={() => onAudition(voice)}
-                />
-                <Button
-                  type="link"
-                  size="small"
-                  aria-label={`调整 ${voice.display_name} 参数`}
-                  disabled={settingsPending}
-                  onClick={() => onSettings(voice)}
-                >
-                  设置
-                </Button>
-              </Space>
-            )
-          },
-          {
-            title: header(
-              "音色",
-              <>
-                <Input
-                  type="search"
-                  size="small"
-                  prefix={<SearchOutlined />}
-                  aria-label="搜索音色"
-                  placeholder="名称或标识"
-                  value={nameQuery}
-                  allowClear
-                  onChange={(event) => {
-                    setNameQuery(event.target.value);
-                    setPage(1);
-                  }}
-                />
-                <Select
-                  size="small"
-                  aria-label="名称排序"
-                  value={sort.startsWith("age") ? "recommended" : sort}
-                  options={[
-                    { value: "recommended", label: "常用优先" },
-                    { value: "name-asc", label: "名称升序" },
-                    { value: "name-desc", label: "名称倒序" }
-                  ]}
-                  onChange={(value) => {
-                    setSort(value);
-                    setPage(1);
-                  }}
-                />
-                <Checkbox
-                  checked={commonOnly}
-                  onChange={(event) => {
-                    setCommonOnly(event.target.checked);
-                    setPage(1);
-                  }}
-                >
-                  只看常用
-                </Checkbox>
-              </>
-            ),
-            key: "voice",
-            width: 230,
-            render: (_, voice) => (
-              <Space size={4} wrap>
-                <Tooltip
-                  title={voice.metadata?.provider_voice_id ?? voice.alias}
-                >
-                  <Typography.Text strong>{voice.display_name}</Typography.Text>
-                </Tooltip>
-                {voice.is_common && <Tag color="blue">常用</Tag>}
-              </Space>
-            )
-          },
-          {
-            title: header("语言", filter("language", "语言")),
-            key: "language",
-            width: 130,
-            render: (_, voice) => language(voice)
-          },
-          {
-            title: header("口音／地区", filter("region", "口音／地区")),
-            key: "region",
-            width: 145,
-            render: (_, voice) => (
-              <Flex vertical>
-                <span>{region(voice)}</span>
-                <Typography.Text type="secondary">
-                  {voice.locale}
-                </Typography.Text>
-              </Flex>
-            )
-          },
-          {
-            title: header("性别", filter("gender", "性别", genderNames)),
-            key: "gender",
-            width: 125,
-            render: (_, voice) => text(genderNames[voice.gender.toLowerCase()])
-          },
-          {
-            title: header(
-              "年龄",
-              <>
-                {filter("age", "年龄组", ageNames)}
-                <Select
-                  size="small"
-                  aria-label="年龄排序"
-                  value={sort.startsWith("age") ? sort : "none"}
-                  options={[
-                    { value: "none", label: "年龄不排序" },
-                    { value: "age-asc", label: "年龄升序" },
-                    { value: "age-desc", label: "年龄倒序" }
-                  ]}
-                  onChange={(value) => {
-                    setSort(value === "none" ? "recommended" : value);
-                    setPage(1);
-                  }}
-                />
-              </>
-            ),
-            key: "age",
-            width: 140,
-            render: (_, voice) =>
-              text(
-                ageNames[voice.metadata?.age_group ?? ""] ??
-                  voice.metadata?.age_group
-              )
-          },
-          {
-            title: header(
-              "介绍、特征与听感",
-              <Input
-                type="search"
-                size="small"
-                prefix={<SearchOutlined />}
-                aria-label="搜索介绍与听感"
-                placeholder="介绍、特征或听感"
-                value={descriptionQuery}
-                allowClear
-                onChange={(event) => {
-                  setDescriptionQuery(event.target.value);
-                  setPage(1);
-                }}
-              />
-            ),
-            key: "description",
-            width: 340,
-            render: (_, voice) => {
-              const info = metadata.get(voice.alias);
-              const official = voice.metadata;
-              return (
-                <Flex vertical gap={4}>
-                  {info?.description_zh && text(info.description_zh)}
-                  <Typography.Text type="secondary">
-                    官方原文：{official?.description || "未提供"}
-                  </Typography.Text>
-                  <Typography.Text type="secondary">
-                    特征：{list(official?.personalities, personalityNames)}
-                  </Typography.Text>
-                  {!!info?.notes && (
-                    <Typography.Text type="secondary">
-                      我的听感：{info.notes}
-                    </Typography.Text>
-                  )}
-                  {official?.source_url && (
-                    <Typography.Link
-                      href={official.source_url}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      官方资料 · {official.checked_at.slice(0, 10)}
-                    </Typography.Link>
-                  )}
-                </Flex>
-              );
-            }
-          },
-          {
-            title: header("推荐场景", filter("scenario", "推荐场景")),
-            key: "scenarios",
-            width: 230,
-            render: (_, voice) =>
-              text(list(voice.metadata?.scenarios, scenarioNames))
-          },
-          {
-            title: header("模型", filter("model", "模型", modelNames)),
-            key: "model",
-            width: 210,
-            render: (_, voice) =>
-              text(
-                modelNames[voice.metadata?.model ?? ""] ?? voice.metadata?.model
-              )
-          },
-          {
-            title: header(
-              "可选风格",
-              filter("style", "可选风格", { ...styleNames, neutral: "自然" })
-            ),
-            key: "styles",
-            width: 280,
-            render: (_, voice) =>
-              [
-                "自然",
-                ...voice.capabilities.styles.map(
-                  (value) => styleNames[value] ?? value
-                )
-              ].join("、")
-          },
-          {
-            title: header("可选角色", filter("role", "可选角色")),
-            key: "roles",
-            width: 260,
-            render: (_, voice) => text(list(voice.metadata?.roles))
-          }
-        ]}
-      />
-    </>
+          }}
+          showSizeChanger
+          pageSizeOptions={[10, 20, 50]}
+          showTotal={(total) => `共 ${total} 个音色`}
+        />
+      )}
+    </section>
   );
 }

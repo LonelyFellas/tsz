@@ -621,9 +621,9 @@ describe("配音中心", () => {
   it("从服务目录筛选，清空条件恢复完整列表", async () => {
     mount();
     await screen.findByLabelText("试听 Sonia");
-    const table = screen.getByRole("table");
-    expect(within(table).getByLabelText("试听 Sonia")).toBeVisible();
-    expect(within(table).getByLabelText("试听 Guy")).toBeVisible();
+    const list = screen.getByRole("list", { name: "音色列表" });
+    expect(within(list).getByLabelText("试听 Sonia")).toBeVisible();
+    expect(within(list).getByLabelText("试听 Guy")).toBeVisible();
     fireEvent.change(screen.getByLabelText("搜索音色"), {
       target: { value: "guy" }
     });
