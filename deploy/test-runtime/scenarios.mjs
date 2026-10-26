@@ -308,6 +308,23 @@ for (const component of ["admin", "web"]) {
   await writeFile("/etc/nginx/conf.d/zentao-ip.conf", ipConfig);
   assert.equal(spawnSync("nginx", ["-s", "reload"]).status, 0);
 }
+// Identical immutable package bytes can be retried in distinct transaction directories.
+const repeat = await stage("admin", "repeat-package");
+const retry = "/opt/stage-repeat-package-retry";
+await cp(repeat, retry, { recursive: true });
+await writeFile(`${repeat}/release-id`, "repeat-transaction-1");
+publish(repeat, "admin", true);
+await writeFile(`${retry}/release-id`, "repeat-transaction-2");
+publish(retry, "admin", true);
+assert.match(
+  await readlink("/opt/tsz-releases/admin/current"),
+  /\/repeat-transaction-2$/
+);
+assert.equal(
+  JSON.parse(await file("/opt/tsz-releases/admin/current/version.json"))
+    .release_id,
+  "repeat-package"
+);
 console.log(
   "PASS: first migration, accepted manifest, tamper rejection, admin/web HTTP failure rollback, web slot switch, HTTPS-only rejection, independent IP bypass blocks publication, preserved Zentao"
 );

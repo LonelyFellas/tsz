@@ -1,118 +1,138 @@
 import assert from "node:assert/strict";
-import {
-  cpSync,
-  existsSync,
-  mkdtempSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync
-} from "node:fs";
+import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { test } from "node:test";
+import { buildConfig, packRelease } from "./release-artifact.mjs";
 
 const sha = "a".repeat(40);
-// 真实入口/来源门/原生 manifest；仅 mock 外部 git/gh/ssh/rsync、构建与独立 boot。
-// ssh/远端 rsync 全部只记录本地日志，绝不访问服务器。
-function run(component, scenario, approved = true) {
-  const root = mkdtempSync(join(tmpdir(), "tsz-release-gate."));
-  const bin = join(root, "bin");
-  mkdirSync(bin);
-  cpSync(new URL("./", import.meta.url), join(root, "deploy"), {
-    recursive: true
-  });
-  if (scenario === "manifest-source") {
-    const provenance = join(root, "deploy/provenance.mjs");
-    writeFileSync(
-      provenance,
-      readFileSync(provenance, "utf8").replace(
-        "git_sha: gitSha,",
-        `git_sha: '${"c".repeat(40)}',`
-      )
-    );
-  }
-  const source = join(root, "deploy/deploy-source.sh");
-  writeFileSync(
-    source,
-    readFileSync(source, "utf8") +
-      "\nverify_standalone_boot() { :; }\nstop_standalone_boot() { :; }\n"
-  );
-  const log = join(root, "calls");
-  const phase = join(root, "phase");
-  const script = (name, body) =>
-    writeFileSync(
-      join(bin, name),
-      `#!/bin/bash\nset -euo pipefail\n${body}\n`,
-      { mode: 0o755 }
-    );
-  script(
-    "git",
-    `case "$*" in
-    'status --porcelain') ;;
-    'rev-parse HEAD') echo ${sha} ;;
-    'remote get-url origin') echo git@github.com:LonelyFellas/tsz.git ;;
-    'ls-remote --exit-code origin refs/heads/main')
-      if [[ '${scenario}' = main-* && -f '${phase}' ]]; then echo '${"c".repeat(40)} refs/heads/main'; else echo '${sha} refs/heads/main'; fi ;;
-    'cat-file -e '*) ;;
-    'rev-parse '*'^'{tree}) echo ${"b".repeat(40)} ;;
-    'show '*) echo '${process.version.slice(1)}' ;;
-    'archive --format=tar '*) tar -cf - -C '${root}' deploy ;;
-    *) echo "unexpected git $*" >&2; exit 91 ;;
-  esac`
-  );
-  script(
-    "gh",
-    `attempt=1; id=123; conclusion=success
-    if [[ -f '${phase}' ]]; then
-      case '${scenario}' in attempt-*) attempt=2;; run-*) id=124;; failure-*) conclusion=failure;; skipped-*) conclusion=skipped;; unknown-*) exit 0;; esac
-    fi
-    printf '%s\\tcompleted\\t%s\\thttps://github.com/LonelyFellas/tsz/actions/runs/%s\\t%s\\t${sha}\\tmain\\n' "$id" "$conclusion" "$id" "$attempt"`
-  );
-  script(
-    "pnpm",
-    `if [[ "$*" = install* ]]; then exit 0; fi
-    mkdir -p apps/admin/dist apps/web/.next/standalone/apps/web apps/web/.next/static
-    echo artifact > apps/admin/dist/index.html
-    echo artifact > apps/web/.next/standalone/apps/web/server.js
-    echo static > apps/web/.next/static/test.js
-    if [[ '${scenario}' = public ]]; then
-      mkdir -p apps/web/public/font-licenses apps/web/public/images
-      printf 'font license from build tree\\n' > apps/web/public/font-licenses/Andika-OFL.txt
-      printf '<svg/>\\n' > apps/web/public/images/icon.svg
-    fi
-    [[ '${scenario}' != *-build ]] || touch '${phase}'`
-  );
-  script(
-    "ssh",
-    `printf 'ssh %s\\n' "$*" >> '${log}'
-    case "$*" in
-      *'/usr/bin/node --version') echo '${process.version}' ;;
-      *'mktemp -d '*) echo /opt/tsz-release-stage.ABC123 ;;
-      *publish-release.sh*|*'rm -rf '*) ;;
-      *) exit 92 ;;
-    esac`
-  );
-  script(
-    "rsync",
-    `printf 'rsync %s\\n' "$*" >> '${log}'
-    args=("$@"); count=\${#args[@]}
-    if [[ "$*" = *tshb-test:* ]]; then
-      if [[ '${scenario}' = public && "$*" = *tshb-test:/opt/tsz-release-stage.ABC123/artifact/ ]]; then
-        public="\${args[count-2]%/}/apps/web/public"
-        [[ ! -d "$public" ]] || cp -R "$public" '${root}/uploaded-public'
-      fi
-      [[ '${scenario}' != *-upload ]] || touch '${phase}'
-    else
-      cp -R "\${args[count-2]}." "\${args[count-1]}"
-    fi`
-  );
+const identity = {
+  repository: "LonelyFellas/tsz",
+  sha,
+  tree: "b".repeat(40),
+  runId: 123,
+  attempt: 1
+};
+
+// Exercise real entrypoints, archive verification and provenance. Only external IO is replaced.
+async function run(component, scenario, approved = true) {
+  const root = await mkdtemp(join(tmpdir(), "tsz-release-gate."));
   try {
+    const bin = join(root, "bin");
+    await mkdir(bin);
+    await cp(new URL("./", import.meta.url), join(root, "deploy"), {
+      recursive: true
+    });
+    await writeFile(join(root, ".node-version"), process.version.slice(1));
+    const artifact = join(root, "fixture");
+    await mkdir(artifact);
+    const releaseId = `${sha}-ci-123-1-${component}`;
+    await writeFile(
+      join(artifact, "version.json"),
+      JSON.stringify({ release_id: releaseId })
+    );
+    await writeFile(join(artifact, "index.html"), "artifact");
+    if (component === "web") {
+      await mkdir(join(artifact, "apps/web/public/font-licenses"), {
+        recursive: true
+      });
+      await writeFile(
+        join(artifact, "apps/web/public/font-licenses/Andika-OFL.txt"),
+        "font license"
+      );
+    }
+    const bundle = join(root, "bundle");
+    await packRelease({
+      component,
+      artifact,
+      output: bundle,
+      identity,
+      config: buildConfig(component, {}),
+      releaseId,
+      checks: { entry: "passed", boot: "passed", sharp: "passed" }
+    });
+    if (scenario === "corrupt")
+      await writeFile(join(bundle, "release.tar.gz"), "corrupt");
+    if (scenario === "manifest-source") {
+      const file = join(bundle, "release.json");
+      const data = JSON.parse(await readFile(file));
+      data.identity.sha = "c".repeat(40);
+      await writeFile(file, JSON.stringify(data));
+    }
+    const zip = join(root, "package.zip");
+    assert.equal(
+      spawnSync("python3", [
+        "-I",
+        "-c",
+        "import pathlib,sys,zipfile\nwith zipfile.ZipFile(sys.argv[2],'w') as z:\n for p in pathlib.Path(sys.argv[1]).iterdir(): z.write(p,p.name)",
+        bundle,
+        zip
+      ]).status,
+      0
+    );
+    const log = join(root, "calls");
+    const phase = join(root, "phase");
+    const script = async (name, body) =>
+      writeFile(join(bin, name), `#!/bin/bash\nset -euo pipefail\n${body}\n`, {
+        mode: 0o755
+      });
+    await script(
+      "git",
+      `case "$*" in
+      'status --porcelain') ;;
+      'rev-parse HEAD') echo ${sha} ;;
+      'remote get-url origin') echo https://github.com/LonelyFellas/tsz.git ;;
+      'ls-remote --exit-code origin refs/heads/main')
+        if [[ '${scenario}' = main-* && -f '${phase}' ]]; then echo '${"c".repeat(40)} refs/heads/main'; else echo '${sha} refs/heads/main'; fi ;;
+      'cat-file -e '*) ;;
+      'rev-parse '*'^'{tree}) echo ${identity.tree} ;;
+      'show '*) echo '${process.version.slice(1)}' ;;
+      'archive --format=tar '*) tar -cf - -C '${root}' deploy .node-version ;;
+      *) exit 91 ;;
+    esac`
+    );
+    const record = {
+      id: 9,
+      name: `tsz-${component}-${sha}-attempt-1`,
+      expired: scenario === "expired",
+      workflow_run: { id: 123, head_sha: sha, head_branch: "main" }
+    };
+    await script(
+      "gh",
+      `case "$*" in
+      *'/artifacts/9/zip') cat '${zip}'; [[ '${scenario}' != *-download ]] || touch '${phase}' ;;
+      *'/artifacts?per_page=100') printf '%s' '${JSON.stringify([{ artifacts: scenario === "missing" ? [] : [record] }])}' ;;
+      *) attempt=1; id=123; conclusion=success
+        if [[ -f '${phase}' ]]; then
+          case '${scenario}' in attempt-*) attempt=2;; run-*) id=124;; failure-*) conclusion=failure;; skipped-*) conclusion=skipped;; unknown-*) exit 0;; esac
+        fi
+        printf '%s\tcompleted\t%s\thttps://github.com/LonelyFellas/tsz/actions/runs/%s\t%s\t${sha}\tmain\n' "$id" "$conclusion" "$id" "$attempt" ;;
+    esac`
+    );
+    await script("pnpm", `echo forbidden-build >> '${log}'; exit 98`);
+    await script(
+      "ssh",
+      `printf 'ssh %s\n' "$*" >> '${log}'
+      case "$*" in
+        *'/usr/bin/node --version') echo '${process.version}' ;;
+        *'mktemp -d '*) echo /opt/tsz-release-stage.ABC123 ;;
+        *publish-release.sh*|*'rm -rf '*) ;;
+        *) exit 92 ;;
+      esac`
+    );
+    await script(
+      "rsync",
+      `printf 'rsync %s\n' "$*" >> '${log}'
+      [[ '${scenario}' != *-upload ]] || touch '${phase}'
+      if [[ '${component}' = web && "$*" = *'/artifact/ tshb-test:'* ]]; then
+        args=("$@"); count=\${#args[@]}
+        cp "\${args[count-2]}apps/web/public/font-licenses/Andika-OFL.txt" '${root}/uploaded-license'
+      fi`
+    );
     const env = { ...process.env, PATH: `${bin}:${process.env.PATH}` };
-    delete env.DEPLOY_EXPECTED_SHA;
-    delete env.DEPLOY_EXPECTED_CI_RUN_ID;
-    delete env.DEPLOY_EXPECTED_CI_RUN_ATTEMPT;
+    for (const key of Object.keys(env))
+      if (key.startsWith("DEPLOY_")) delete env[key];
     if (approved)
       Object.assign(env, {
         DEPLOY_EXPECTED_SHA: sha,
@@ -125,69 +145,49 @@ function run(component, scenario, approved = true) {
       [join(root, `deploy/deploy-${component}.sh`)],
       { env, encoding: "utf8", timeout: 20000 }
     );
-    let calls = "";
-    try {
-      calls = readFileSync(log, "utf8");
-    } catch {}
-    const uploaded = join(root, "uploaded-public");
     return {
       ...result,
-      calls,
-      publicFiles: existsSync(uploaded)
-        ? {
-            license: readFileSync(
-              join(uploaded, "font-licenses/Andika-OFL.txt"),
-              "utf8"
-            ),
-            icon: readFileSync(join(uploaded, "images/icon.svg"), "utf8")
-          }
-        : undefined
+      calls: await readFile(log, "utf8").catch(() => ""),
+      license: await readFile(join(root, "uploaded-license"), "utf8").catch(
+        () => undefined
+      )
     };
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true });
   }
 }
 
-test("web: public assets are included in the uploaded standalone artifact", () => {
-  const result = run("web", "public");
-  assert.equal(result.status, 0, result.stdout + result.stderr);
-  assert.deepEqual(result.publicFiles, {
-    license: "font license from build tree\n",
-    icon: "<svg/>\n"
-  });
-  assert.match(result.calls, /ssh .*publish-release.sh/);
-});
-
 for (const component of ["admin", "web"]) {
   for (const approved of [true, false])
-    test(`${component}: stable ${approved ? "approved tuple" : "legacy call"}`, () => {
-      const result = run(component, "stable", approved);
+    test(`${component}: publish verified CI bytes without a local build (${approved})`, async () => {
+      const result = await run(component, "stable", approved);
       assert.equal(result.status, 0, result.stdout + result.stderr);
       assert.match(result.calls, /ssh .*publish-release.sh/);
+      assert.doesNotMatch(result.calls, /forbidden-build/);
+      if (component === "web") assert.equal(result.license, "font license");
     });
   for (const scenario of [
     "stale",
     "manifest-source",
-    "main-build",
-    "attempt-build",
-    "run-build",
-    "failure-build",
-    "skipped-build",
-    "unknown-build",
+    "missing",
+    "expired",
+    "corrupt",
+    "main-download",
+    "attempt-download",
+    "run-download",
+    "failure-download",
+    "skipped-download",
+    "unknown-download",
     "main-upload",
     "attempt-upload"
   ]) {
-    test(`${component}: stop on ${scenario}`, () => {
-      const result = run(component, scenario);
+    test(`${component}: stop before publishing on ${scenario}`, async () => {
+      const result = await run(component, scenario);
       assert.notEqual(result.status, 0, result.stdout + result.stderr);
       assert.doesNotMatch(result.calls, /ssh .*publish-release.sh/);
       if (!scenario.endsWith("-upload"))
         assert.doesNotMatch(result.calls, /mktemp|tshb-test:/);
       else assert.match(result.calls, /mktemp/);
-      assert.match(
-        result.stdout + result.stderr,
-        /DEPLOY_EXPECTED_SHA|origin\/main advanced|latest CI run\/attempt changed|not completed\/success|no unique CI run|Expected values to be strictly deep-equal/
-      );
     });
   }
 }

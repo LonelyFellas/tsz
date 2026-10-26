@@ -19,6 +19,8 @@ mkdir -p /opt/tsz-deploy-manifests
 "$node_bin" releases.mjs bootstrap /opt/tsz-releases/admin /opt/tsz-admin/dist admin
 "$node_bin" releases.mjs bootstrap /opt/tsz-releases/web /opt/tsz-web web
 "$node_bin" provenance.mjs verify-candidate --manifest candidate.json --artifact-root artifact
+package_id="$("$node_bin" -e 'console.log(JSON.parse(require("fs").readFileSync("artifact/version.json")).release_id)')"
+[[ "$package_id" =~ ^[a-zA-Z0-9-]+$ ]]
 if [[ "$component" = web ]]; then
   # 页面可启动不代表 Sharp 可用；Next 缩图失败会静默回传原图。
   (
@@ -132,7 +134,7 @@ else host=test.tianshengzhi.com; api_path=auth/me; fi
 ready=false
 for attempt in {1..10}; do
   if curl --noproxy '*' -fsS -m 3 --resolve "$host:443:127.0.0.1" "https://$host/version.json" > served-version.json &&
-    "$node_bin" --input-type=module -e 'import fs from "node:fs"; if (JSON.parse(fs.readFileSync("served-version.json")).release_id !== process.argv[1]) process.exit(1)' "$id"; then
+    "$node_bin" --input-type=module -e 'import fs from "node:fs"; if (JSON.parse(fs.readFileSync("served-version.json")).release_id !== process.argv[1]) process.exit(1)' "$package_id"; then
     ready=true
     break
   fi
@@ -163,6 +165,9 @@ cp provenance.mjs /opt/tsz-deploy-tools/frontend-provenance.mjs.partial
 mv /opt/tsz-deploy-tools/frontend-provenance.mjs.partial /opt/tsz-deploy-tools/frontend-provenance.mjs
 mkdir -p "$root/manifests"
 cp "$manifest" "$root/manifests/$id.json"
+if [[ -f ci-release.json ]]; then
+  cp ci-release.json "$root/manifests/$id.ci.json"
+fi
 accepted=true
 rm /opt/tsz-frontend-transaction
 trap - EXIT INT TERM

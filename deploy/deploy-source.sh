@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 
-# 构建源不再取自工作区：部署时把 origin/main 的目标 commit 用 git archive 导出到
-# 这个前缀下的临时目录，在那里装依赖、构建、取产物。gitignored 的 .env* 天然不在
-# git 对象里，工作区脏不脏、在哪个分支上都影响不到产物。
+# 受信工具取自 origin/main 的目标 commit，CI 包独立下载校验。
+# 临时源码目录只提供验证和远端事务工具，不安装依赖或构建。
 #
 # 前缀取 /tmp 的真实路径：macOS 上 /tmp 是指向 /private/tmp 的符号链接，而
 # provenance.mjs 判断「自己是不是主模块」用的是 import.meta.url(已解析符号链接)与
@@ -82,10 +81,6 @@ reject_ignored_build_env() {
       return 1
     fi
   done
-}
-
-run_sanitized_build() {
-  env -i PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" "$@"
 }
 
 wait_for_http_status() {
@@ -386,8 +381,8 @@ prepare_deploy_source() {
     "$repository" "$target_sha" "$run_url"
 }
 
-# 导出目标 commit 到临时目录并在那里装依赖。成功后 DEPLOY_BUILD_ROOT 指向可构建的干净源码树。
-prepare_deploy_build_tree() {
+# 导出精确候选中的受信工具；该目录永远不用于重建发布产物。
+prepare_deploy_tools() {
   local component="$1"
   [[ "${DEPLOY_GIT_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || {
     deploy_source_error "source gate has not been prepared"
@@ -407,15 +402,6 @@ prepare_deploy_build_tree() {
   }
   reject_ignored_build_env "$component" "$root" || return 1
 
-  printf '==> pnpm install --frozen-lockfile\n'
-  local install_start install_seconds
-  install_start="$SECONDS"
-  (cd "$root" && pnpm install --frozen-lockfile) || {
-    deploy_source_error "dependency install failed in the build tree"
-    return 1
-  }
-  install_seconds="$((SECONDS - install_start))"
-  printf '==> dependency install took %ss\n' "$install_seconds"
 }
 
 remove_deploy_build_tree() {

@@ -115,5 +115,5 @@ PENDING 白名单为准。本仓库负责前端与部署编排。
 
 ## 部署
 
-- 部署流程见 `.agents/skills/deploy/SKILL.md`：从 GitHub main 的精确提交导出本地构建，rsync 到 tshb-test；服务器不拉 Git 仓库。
+- 部署流程见 `.agents/skills/deploy/SKILL.md`：消费 GitHub main 精确 CI run/attempt 的 Linux 发布包，校验后 rsync 到 tshb-test；部署端不重新构建，服务器不拉 Git 仓库。
 - 生产环境 `.env` 的 `COOKIE_SECURE` **禁止为 false**（false 仅限纯 HTTP 的测试环境）。

@@ -42,6 +42,7 @@ test("W01: workflow identity, triggers, permissions and concurrency stay stable"
   assert.match(source, /^  pull_request:$/m);
   // main 的 push 事件偶发不触发 CI 时靠它补跑，否则部署门禁找不到精确 SHA 的运行。
   assert.match(source, /^  workflow_dispatch:$/m);
+  assert.match(source, /voice_editor:\n\s+type: boolean/);
   assert.match(source, /^permissions:\n  contents: read$/m);
   assert.match(
     source,
@@ -50,6 +51,23 @@ test("W01: workflow identity, triggers, permissions and concurrency stay stable"
   assert.match(
     source,
     /cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' \}\}/
+  );
+});
+
+test("deploy packages are built once on matching Linux and published per attempt", async () => {
+  const { jobs } = await workflowFixture();
+  const quality = jobs.get("quality");
+  assert.match(quality, /runs-on: ubuntu-22\.04/);
+  assert.match(quality, /if: github\.ref != 'refs\/heads\/main'/);
+  assert.match(quality, /release-artifact\.mjs build web/);
+  assert.match(quality, /release-artifact\.mjs build admin/);
+  assert.match(
+    quality,
+    /name: tsz-web-\$\{\{ github.sha \}\}-attempt-\$\{\{ github.run_attempt \}\}/
+  );
+  assert.match(
+    quality,
+    /name: tsz-admin-\$\{\{ github.sha \}\}-attempt-\$\{\{ github.run_attempt \}\}/
   );
 });
 
