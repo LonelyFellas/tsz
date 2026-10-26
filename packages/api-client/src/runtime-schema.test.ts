@@ -362,6 +362,78 @@ describe("runtime schema fail-closed diagnostics", () => {
     }
   );
 
+  it("显式继承、多选读法引用和特殊读法保持严格闭合契约", () => {
+    const id = "00000000-0000-4000-8000-000000000001";
+    const profile = {
+      voices: [
+        {
+          version_id: id,
+          version_name: "自然",
+          locale: "en-GB",
+          voice_id: "sonia",
+          enabled: true,
+          rate_percent: 0,
+          style_degree: 1.2
+        }
+      ],
+      dubbing: { mode: "local", area: "meaning", recommendation_order: [id] }
+    };
+    const reading = {
+      id,
+      source_segments: [{ start: 0, end: 3, surface: "cat" }],
+      target_word_id: id,
+      target_pos_id: id,
+      target_form_id: id,
+      target_variant_id: id,
+      target_dialect: "common",
+      reading_reference: {
+        uk: {
+          pronunciation_id: id,
+          alphabet: "ipa",
+          use_spelling: false,
+          locale: "en-GB",
+          revision: "version"
+        }
+      }
+    };
+    const word = validFixture("AdminWordV3") as {
+      meanings: { pos: Array<Record<string, unknown>> };
+    };
+    const variant = {
+      id,
+      origin: "manual",
+      value: {
+        version: 2,
+        text: "cat",
+        annotations: [{ type: "sub", start: 0, end: 3, alias: "kitten" }]
+      },
+      voice_profile: profile,
+      reading_links: [reading]
+    };
+    const pos = buildValidValue(
+      runtimeSchemaBundle.$defs.WordPosMeaningsV3!
+    ) as Record<string, unknown>;
+    const sense = buildValidValue(
+      runtimeSchemaBundle.$defs.WordSenseV3!
+    ) as Record<string, unknown>;
+    sense.definitions = [
+      {
+        id,
+        definition_mode: "en_definition",
+        level: "A1",
+        content: { mode: "unified", common: variant }
+      }
+    ];
+    pos.senses = [sense];
+    word.meanings.pos = [pos];
+    expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(true);
+    profile.voices[0]!.style_degree = 2.1;
+    expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(false);
+    profile.voices[0]!.style_degree = 1.2;
+    Object.assign(reading.reading_reference.uk, { unknown: true });
+    expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(false);
+  });
+
   it("IPA/UPS 四份配置可选且不可为 null，保留严格字段校验", () => {
     const word = validFixture("AdminWordV3") as { forms: { pos: unknown[] } };
     const pronunciation = buildValidValue(

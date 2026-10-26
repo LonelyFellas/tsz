@@ -57,6 +57,20 @@ export type RichTextAnnotation =
       phoneme: string;
     }
   | {
+      type: "say_as";
+      start: number;
+      end: number;
+      interpret_as:
+        | "characters"
+        | "cardinal"
+        | "ordinal"
+        | "digits"
+        | "date"
+        | "time"
+        | "telephone";
+    }
+  | { type: "sub"; start: number; end: number; alias: string }
+  | {
       type: "liaison";
       start: number;
       end: number;

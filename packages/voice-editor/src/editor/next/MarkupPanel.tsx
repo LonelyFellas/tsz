@@ -116,7 +116,8 @@ export function MarkupPanel({
     grammarMode ||
     associationMode ||
     mode === "spelling" ||
-    mode === "actual-pron";
+    mode === "actual-pron" ||
+    mode === "phoneme-settings";
   const selectionToolsLabel = grammarMode
     ? "“语法结构”和“连读符号”"
     : associationMode
@@ -133,6 +134,8 @@ export function MarkupPanel({
           tool.key === "bold" ||
           tool.key === "italic" ||
           tool.key === "underline" ||
+          tool.key === "reading" ||
+          tool.key === "reading-link" ||
           tool.key.startsWith("association-")
       )
     : [];
@@ -141,6 +144,8 @@ export function MarkupPanel({
     "bold",
     "italic",
     "underline",
+    "reading",
+    "reading-link",
     "association-word",
     "association-phrase"
   ];
@@ -154,7 +159,7 @@ export function MarkupPanel({
   const bottomTools = tools.filter(
     (tool) => tool.key === "pause" || tool.key === "voices"
   );
-  const uploadTool = composedMode
+  const uploadTool = selectionMode
     ? tools.find((tool) => tool.key === "uploads")
     : undefined;
   const secondaryTools = tools.filter(

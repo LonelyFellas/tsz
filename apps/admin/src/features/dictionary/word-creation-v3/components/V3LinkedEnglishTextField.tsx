@@ -13,6 +13,8 @@ import { editableEnglishText } from "../meaningsModel";
 import { dialectLabel } from "../presentation";
 import { V3VoiceTextField } from "./V3VoiceTextField";
 import { V3TextAssociationPicker } from "./V3TextAssociationPicker";
+import { V3GrammarFormPicker } from "./V3GrammarFormPicker";
+import { useReadingPreviewAdapter } from "./useReadingPreviewAdapter";
 
 function variantAt(
   content: EnglishTextV3,
@@ -50,6 +52,7 @@ export function V3LinkedEnglishTextField({
   linksEnabled: boolean;
   onChange: (next: EnglishTextV3) => void;
 }) {
+  const createReadingPreviewAdapter = useReadingPreviewAdapter(wordId, forms);
   const update = (dialect: Dialect, patch: Partial<RichTextVariantV3>) => {
     if (readOnly) return;
     const next = structuredClone(value);
@@ -66,6 +69,7 @@ export function V3LinkedEnglishTextField({
             value={variant.value}
             placeholder={placeholder}
             mode="association"
+            audioUploadEnabled
             recommendationArea="meaning"
             dialect={row.dialect}
             leadingAction={
@@ -76,9 +80,22 @@ export function V3LinkedEnglishTextField({
                 ariaLabelPrefix={`${label} ${dialectLabel(row.dialect)}${suffix}`}
                 content={toRichTextV2(variant.value)}
                 voiceProfile={variant.voice_profile ?? undefined}
+                previewAdapter={createReadingPreviewAdapter(
+                  variant.reading_links ?? []
+                )}
               />
             }
             textLinks={variant.text_links}
+            readingLinks={variant.reading_links}
+            createReadingPreviewAdapter={createReadingPreviewAdapter}
+            renderReadingPicker={(props) => (
+              <V3GrammarFormPicker
+                {...props}
+                wordId={wordId}
+                forms={forms}
+                meanings={meanings}
+              />
+            )}
             ariaLabel={`${label} ${dialectLabel(row.dialect)}${suffix}`}
             editorTitle={renderEditorTitle?.(row.dialect)}
             nodeId={row.variant_id}
@@ -108,9 +125,10 @@ export function V3LinkedEnglishTextField({
             onAssociationsChange={(text_links) =>
               update(row.dialect, { text_links })
             }
-            onChange={(text, text_links) =>
+            onChange={(text, text_links, reading_links) =>
               update(row.dialect, {
                 value: text,
+                reading_links,
                 ...(linksEnabled || variant.text_links ? { text_links } : {})
               })
             }

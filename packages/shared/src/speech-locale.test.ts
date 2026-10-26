@@ -17,6 +17,13 @@ describe("英语音色地区分类", () => {
     expect(speechAccentGroup("fr-FR")).toBeUndefined();
     expect(speechAccentGroup("en-US:anything")).toBeUndefined();
   });
+  it("人工当前归属覆盖工厂映射，原生 locale 保留独立语义", () => {
+    expect(speechAccentGroup("en-SG", "gb")).toBe("uk");
+    expect(speechAccentGroup("en-GB", "none")).toBe("other");
+    expect(speechAccentGroup("en-IE")).toBe("other");
+    expect(speechLocaleMatchesScope("en-SG", "en-GB", "gb")).toBe(true);
+    expect(speechLocaleMatchesScope("en-SG", "en-US", "gb")).toBe(false);
+  });
   it("英美栏保留对应分类和补充音色，不把另一侧当默认", () => {
     expect(speechLocaleMatchesScope("en-AU", "en-GB")).toBe(true);
     expect(speechLocaleMatchesScope("en-CA", "en-US")).toBe(true);

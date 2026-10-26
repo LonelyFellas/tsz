@@ -161,7 +161,17 @@ it("先在折叠字段输入再打开编辑器，保留已应用的首次推荐"
   );
   fireEvent.click(screen.getByLabelText("完成新拼写编辑"));
   expect(onProfile).toHaveBeenCalledWith({
-    voices: [{ voice_id: "sonia", enabled: true, rate_percent: -25 }]
+    dubbing: { mode: "inherit", area: "word", recommendation_order: ["r"] },
+    voices: [
+      {
+        voice_id: "sonia",
+        enabled: true,
+        rate_percent: -25,
+        version_id: "r",
+        version_name: "慢读",
+        locale: "en-GB"
+      }
+    ]
   });
 }, 15000);
 
@@ -223,7 +233,17 @@ it("折叠拼写输入直接保存后，正文和默认推荐一起读回", asyn
   const wire = saved.mock.lastCall![0] as typeof initial;
   expect(variantOf(wire).spelling).toBe("hello");
   expect(variantOf(wire).spelling_speech?.voice_profile).toEqual({
-    voices: [{ voice_id: "sonia", enabled: true, rate_percent: -25 }]
+    dubbing: { mode: "inherit", area: "word", recommendation_order: ["first"] },
+    voices: [
+      {
+        voice_id: "sonia",
+        enabled: true,
+        rate_percent: -25,
+        version_id: "first",
+        version_name: "慢读",
+        locale: "en-GB"
+      }
+    ]
   });
   expect(screen.queryByRole("dialog")).toBeNull();
   view.unmount();
@@ -339,7 +359,17 @@ it("折叠释义只复制有效口音的首位推荐，不回填失效推荐", a
     expect.objectContaining({ area: "meaning" })
   );
   expect(changed).toHaveBeenCalledWith({
-    voices: [{ voice_id: "sonia", enabled: true, rate_percent: -25 }]
+    dubbing: { mode: "inherit", area: "meaning", recommendation_order: ["uk"] },
+    voices: [
+      {
+        voice_id: "sonia",
+        enabled: true,
+        rate_percent: -25,
+        version_id: "uk",
+        version_name: "英式",
+        locale: "en-GB"
+      }
+    ]
   });
 });
 
@@ -625,7 +655,17 @@ it("宿主统一保存时音色配置直接回传且不显示内部完成按钮"
   );
   fireEvent.click(await screen.findByLabelText("启用 Sonia"));
   expect(onVoiceProfileChange).toHaveBeenCalledWith({
-    voices: [{ voice_id: "sonia", enabled: true, rate_percent: 0 }]
+    dubbing: { mode: "local", area: "example", recommendation_order: [] },
+    voices: [
+      {
+        voice_id: "sonia",
+        enabled: true,
+        rate_percent: 0,
+        version_id: expect.any(String),
+        version_name: "Sonia",
+        locale: "en-GB"
+      }
+    ]
   });
   expect(screen.queryByLabelText("完成例句正文编辑")).toBeNull();
 });
@@ -1986,7 +2026,17 @@ it("拼写停顿与音色同时编辑：取消恢复，完成同时写回且不�
       annotations: [{ type: "pause", at: 5, duration_ms: 1000 }]
     },
     voice_profile: {
-      voices: [{ voice_id: "sonia", enabled: true, rate_percent: 0 }]
+      dubbing: { mode: "local", area: "word", recommendation_order: [] },
+      voices: [
+        {
+          voice_id: "sonia",
+          enabled: true,
+          rate_percent: 0,
+          version_id: expect.any(String),
+          version_name: "Sonia",
+          locale: "en-GB"
+        }
+      ]
     }
   });
   expect(saved().spelling_rich?.annotations).toEqual([

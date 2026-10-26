@@ -34,10 +34,13 @@ export function VoiceVersions({
   canAudition,
   onEdit,
   onChange,
+  onReorder,
   onSelect,
   onAudition,
   onGenerate,
-  generatingVersion
+  generatingVersion,
+  unavailableVersions,
+  multiple
 }: {
   settings: VoiceSetting[];
   voices: VoiceOption[];
@@ -50,22 +53,29 @@ export function VoiceVersions({
   canAudition: boolean;
   onEdit: (key: string) => void;
   onChange: (settings: VoiceSetting[]) => void;
+  onReorder?: (settings: VoiceSetting[]) => void;
   onSelect: (setting: VoiceSetting) => void;
   onAudition: (voice: VoiceOption, setting: VoiceSetting) => void;
   onGenerate?: (setting: VoiceSetting) => void;
   generatingVersion?: string;
+  unavailableVersions?: ReadonlySet<string>;
+  multiple?: boolean;
 }) {
   const [name, setName] = useState("");
   const [sourceId, setSourceId] = useState<string>();
   const candidates = voices.filter((voice) =>
-    speechLocaleMatchesScope(voice.locale, locale)
+    speechLocaleMatchesScope(voice.locale, locale, voice.accent)
   );
   const source =
     candidates.find((voice) => voice.id === sourceId) ?? candidates[0];
   const visible = settings.filter(
     (setting) =>
       !locale ||
-      speechLocaleMatchesScope(voiceLocale(setting, voices) ?? "", locale) ||
+      speechLocaleMatchesScope(
+        voiceLocale(setting, voices) ?? "",
+        locale,
+        voices.find((voice) => voice.id === setting.voice_id)?.accent
+      ) ||
       !voiceLocale(setting, voices)
   );
   const sourceSetting = source
@@ -75,7 +85,10 @@ export function VoiceVersions({
     <section className="tsz-ve-versions" aria-label="当前文本的配音版本">
       <Typography.Text strong>当前文本的配音版本</Typography.Text>
       <Typography.Paragraph type="secondary">
-        英式与美式各选一个正式版本，其他地区按地区选用补充版本。保存后保留当前参数。
+        {multiple
+          ? "同口音可选多个版本，按顺序审听，首个有效已选版本作为默认。"
+          : "英式与美式各选一个正式版本，其他地区按地区选用补充版本。"}
+        保存后保留当前参数。
       </Typography.Paragraph>
       {visible.map((setting) => {
         const key = voiceSettingKey(setting);
@@ -96,6 +109,7 @@ export function VoiceVersions({
               }
             : undefined);
         const available =
+          !unavailableVersions?.has(key) &&
           (!phonemeLocale ||
             (accent === phonemeLocale && voice?.supportsPhoneme !== false)) &&
           (!hasPause || voice?.supportsPause !== false) &&
@@ -146,7 +160,7 @@ export function VoiceVersions({
               </Typography.Text>
               <Tag>
                 {accent
-                  ? `${speechAccentGroup(accent) === "uk" ? "英式" : speechAccentGroup(accent) === "us" ? "美式" : "其他音色"} · ${speechRegionLabel(accent)}`
+                  ? `${speechAccentGroup(accent, voice?.accent) === "uk" ? "英式" : speechAccentGroup(accent, voice?.accent) === "us" ? "美式" : "不归类"} · ${speechRegionLabel(accent)}`
                   : "口音未知"}
               </Tag>
               {setting.enabled && (
@@ -166,6 +180,25 @@ export function VoiceVersions({
               {setting.volume_percent ?? 100}%
             </Typography.Paragraph>
             <Space wrap>
+              <Select
+                size="small"
+                aria-label={`输出格式 ${setting.version_name ?? setting.voice_id}`}
+                value={setting.output_format ?? "mp3"}
+                disabled={readOnly || !!generatingVersion}
+                options={[
+                  { value: "mp3", label: "MP3" },
+                  { value: "wav", label: "WAV" }
+                ]}
+                onChange={(output_format: "mp3" | "wav") =>
+                  onChange(
+                    settings.map((item) =>
+                      voiceSettingKey(item) === key
+                        ? { ...item, output_format, audio_asset_id: undefined }
+                        : item
+                    )
+                  )
+                }
+              />
               <Button
                 size="small"
                 disabled={readOnly || !voice}
@@ -220,13 +253,43 @@ export function VoiceVersions({
                 size="small"
                 disabled={
                   readOnly ||
-                  (!available && !setting.audio_asset_id) ||
-                  (setting.enabled && !!setting.version_id)
+                  (!available &&
+                    !setting.audio_asset_id &&
+                    !(multiple && setting.enabled)) ||
+                  (setting.enabled && !!setting.version_id && !multiple)
                 }
                 onClick={() => onSelect(setting)}
               >
-                正式选用
+                {multiple && setting.enabled ? "取消选用" : "正式选用"}
               </Button>
+              {multiple &&
+                [-1, 1].map((offset) => {
+                  const index = settings.findIndex(
+                    (item) => voiceSettingKey(item) === key
+                  );
+                  return (
+                    <Button
+                      key={offset}
+                      size="small"
+                      disabled={
+                        readOnly ||
+                        index + offset < 0 ||
+                        index + offset >= settings.length
+                      }
+                      aria-label={`${offset < 0 ? "上移" : "下移"}配音版本 ${setting.version_name ?? setting.voice_id}`}
+                      onClick={() => {
+                        const next = [...settings];
+                        [next[index], next[index + offset]] = [
+                          next[index + offset]!,
+                          next[index]!
+                        ];
+                        (onReorder ?? onChange)(next);
+                      }}
+                    >
+                      {offset < 0 ? "上移" : "下移"}
+                    </Button>
+                  );
+                })}
               <Popconfirm
                 title="删除这个配音版本？"
                 onConfirm={() =>

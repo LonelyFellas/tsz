@@ -5,17 +5,25 @@ import {
   Empty,
   Flex,
   Spin,
-  Tooltip,
+  Select,
   Typography
 } from "antd";
-import { useEffect, useMemo, useState } from "react";
-import { expandFormContents } from "@tsz/shared";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  expandFormContents,
+  readingRevision,
+  synthesisForLocale,
+  synthesisInputIssue
+} from "@tsz/shared";
 import type {
   Dialect,
   DraftFormsStepContentV3,
+  DraftMeaningsStepContentWritableV3,
+  DraftMeaningsStepContentV3,
   GrammarFormLinkV3,
   PublishedSentenceTargetCandidateV3,
-  SentenceTargetCandidateFormV3
+  SentenceTargetCandidateFormV3,
+  WordPronunciationV3
 } from "@tsz/types";
 import type { AssociationPickerProps } from "@tsz/voice-editor/types";
 import { createV3WordRequests } from "../api";
@@ -37,7 +45,9 @@ function sameTarget(left?: GrammarFormLinkV3, right?: GrammarFormLinkV3) {
     left?.target_publication_id === right?.target_publication_id &&
     left?.target_pos_id === right?.target_pos_id &&
     left?.target_form_id === right?.target_form_id &&
-    left?.target_variant_id === right?.target_variant_id
+    left?.target_variant_id === right?.target_variant_id &&
+    JSON.stringify(left?.reading_reference) ===
+      JSON.stringify(right?.reading_reference)
   );
 }
 
@@ -48,22 +58,128 @@ export function V3GrammarFormPicker({
   onCancel,
   onPendingChange,
   wordId,
-  forms
+  forms,
+  meanings
 }: AssociationPickerProps<GrammarFormLinkV3> & {
   wordId?: string;
   forms?: DraftFormsStepContentV3;
+  meanings?: DraftMeaningsStepContentWritableV3 | DraftMeaningsStepContentV3;
 }) {
   const [selected, setSelected] = useState(initialSelected);
   const segmentsKey = JSON.stringify(segments);
   useEffect(() => {
     setSelected(initialSelected);
   }, [initialSelected, segmentsKey]);
+  const [readings, setReadings] = useState<WordPronunciationV3[]>([]);
+  const [readingPending, setReadingPending] = useState(false);
+  const [readingError, setReadingError] = useState("");
+  const [senses, setSenses] = useState<Array<{ value: string; label: string }>>(
+    []
+  );
   const draftPending = !sameTarget(selected, initialSelected);
   useEffect(() => {
     onPendingChange?.(draftPending);
     return () => onPendingChange?.(false);
   }, [draftPending, onPendingChange]);
   const requests = useMemo(() => createV3WordRequests(), []);
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
+  const selectedTarget =
+    selected &&
+    JSON.stringify([
+      selected.target_word_id,
+      selected.target_publication_id,
+      selected.target_pos_id,
+      selected.target_form_id,
+      selected.target_variant_id
+    ]);
+  useEffect(() => {
+    let active = true;
+    setReadings([]);
+    setSenses([]);
+    setReadingError("");
+    const selected = selectedRef.current;
+    if (!selected) {
+      setReadingPending(false);
+      return;
+    }
+    setReadingPending(true);
+    const target = selected;
+    void (async () => {
+      const local =
+        !target.target_publication_id &&
+        target.target_word_id === wordId &&
+        forms;
+      const word = local
+        ? undefined
+        : target.target_publication_id
+          ? (
+              await requests.getPublication(
+                target.target_word_id,
+                target.target_publication_id
+              )
+            ).publication.word
+          : (await requests.get(target.target_word_id)).word;
+      const targetForms = local ? forms : expandFormContents(word!.forms);
+      const targetMeanings = local ? meanings : word!.meanings;
+      const form = targetForms.pos
+        .find((pos) => pos.pos_id === target.target_pos_id)
+        ?.forms.find((form) => form.id === target.target_form_id);
+      const regional = form?.regional_variants;
+      const variants = regional
+        ? regional.mode === "common"
+          ? [regional.common]
+          : [regional.uk, regional.us]
+        : [];
+      const variant = variants.find(
+        (variant) => variant.id === target.target_variant_id
+      );
+      if (!variant) throw new Error("关联词形已失效，请重新选择");
+      if (active) {
+        setReadings(variant.pronunciations);
+        const pos = targetForms.pos.find(
+          (pos) => pos.pos_id === target.target_pos_id
+        )!;
+        const group = pos.form_groups.find((group) =>
+          group.members.some(
+            (member) => member.form_id === target.target_form_id
+          )
+        );
+        setSenses(
+          (
+            targetMeanings?.pos.find(
+              (pos) => pos.pos_id === target.target_pos_id
+            )?.senses ?? []
+          )
+            .filter(
+              (sense) =>
+                group?.scope === "general" ||
+                (!!group &&
+                  (
+                    sense.form_group_ids ??
+                    (sense.form_group_id ? [sense.form_group_id] : [])
+                  ).includes(group.id))
+            )
+            .map((sense) => ({
+              value: sense.id,
+              label: `${sense.level} · ${sense.definitions.flatMap((definition) => ("text" in definition.content ? [definition.content.text] : []))[0] ?? "未填写释义"}`
+            }))
+        );
+      }
+    })()
+      .catch((error) => {
+        if (active)
+          setReadingError(
+            error instanceof Error ? error.message : "读法加载失败"
+          );
+      })
+      .finally(() => {
+        if (active) setReadingPending(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [selectedTarget, requests, wordId, forms, meanings]);
   const formLabel = useFormTypeLabel();
   const posLabel = usePartOfSpeechLabel();
   const { preference } = useDialectPreference();
@@ -363,11 +479,11 @@ export function V3GrammarFormPicker({
       {initialSelected && !selected && (
         <Typography.Text type="secondary">确认后清除原关联</Typography.Text>
       )}
-      <Tooltip title="使用词形的首条发音">
-        <Typography.Text type="secondary">
-          {selected ? "点击词形可替换" : "选择词形关联"}
-        </Typography.Text>
-      </Tooltip>
+      <Typography.Text type="secondary">
+        {selected
+          ? "分别选择具体口音、音标字段和读法；历史关联保留原读法"
+          : "选择词形关联"}
+      </Typography.Text>
       {options.length > 0 && (
         <Cascader.Panel
           options={options}
@@ -395,6 +511,113 @@ export function V3GrammarFormPicker({
             }
           }}
         />
+      )}
+      {selected && (
+        <Flex vertical gap={8}>
+          <Select
+            aria-label="读法对应义项"
+            allowClear
+            placeholder="选择对应义项（可选）"
+            options={senses}
+            value={selected.reading_reference?.sense_id}
+            onChange={(sense_id) =>
+              setSelected(
+                (current) =>
+                  current && {
+                    ...current,
+                    reading_reference: {
+                      ...current.reading_reference,
+                      sense_id
+                    }
+                  }
+              )
+            }
+          />
+          {(["en-GB", "en-US"] as const).map((locale) => {
+            const key = locale === "en-GB" ? "uk" : "us";
+            const selection = selected.reading_reference?.[key];
+            const choices = readings.flatMap((row, index) =>
+              row.synthesis
+                ? (["ipa", "ups"] as const).flatMap((alphabet) => {
+                    const value = synthesisForLocale(
+                      row.synthesis!,
+                      locale,
+                      selected.target_dialect
+                    );
+                    const natural =
+                      alphabet === "ipa"
+                        ? [
+                            {
+                              value: `${row.id}:spelling`,
+                              label: `读法 ${index + 1} · 按拼写自然朗读`,
+                              row,
+                              alphabet,
+                              use_spelling: true
+                            }
+                          ]
+                        : [];
+                    if (synthesisInputIssue(alphabet, value[alphabet]))
+                      return natural;
+                    return [
+                      ...natural,
+                      {
+                        value: `${row.id}:${alphabet}`,
+                        label: `读法 ${index + 1} · ${alphabet.toUpperCase()} · ${value[alphabet]}`,
+                        row,
+                        alphabet,
+                        use_spelling: false
+                      }
+                    ];
+                  })
+                : []
+            );
+            return (
+              <Select
+                key={locale}
+                aria-label={`${locale === "en-GB" ? "英式" : "美式"}具体读法`}
+                placeholder="明确选择读法"
+                loading={readingPending}
+                value={
+                  selection
+                    ? `${selection.pronunciation_id}:${selection.use_spelling ? "spelling" : selection.alphabet}`
+                    : undefined
+                }
+                options={choices}
+                onChange={(value) => {
+                  const choice = choices.find(
+                    (choice) => choice.value === value
+                  );
+                  if (!choice?.row.synthesis) return;
+                  setSelected(
+                    (current) =>
+                      current && {
+                        ...current,
+                        reading_reference: {
+                          ...current.reading_reference,
+                          [key]: {
+                            pronunciation_id: choice.row.id,
+                            alphabet: choice.alphabet,
+                            use_spelling: choice.use_spelling,
+                            locale,
+                            revision: readingRevision(
+                              {
+                                ...choice.row.synthesis!,
+                                use_spelling: choice.use_spelling
+                              },
+                              locale,
+                              current.target_dialect,
+                              choice.alphabet
+                            )
+                          }
+                        }
+                      }
+                  );
+                }}
+              />
+            );
+          })}
+          {readingError && <Alert type="warning" title={readingError} />}
+        </Flex>
       )}
       {pending && <Spin size="small" />}
       {!pending && !error && options.length === 0 && (
@@ -452,7 +675,14 @@ export function V3GrammarFormPicker({
           type="primary"
           size="small"
           aria-label="确认词形关联"
-          disabled={!selected && !initialSelected}
+          disabled={
+            readingPending ||
+            (!selected && !initialSelected) ||
+            (!!selected &&
+              !sameTarget(selected, initialSelected) &&
+              !selected.reading_reference?.uk &&
+              !selected.reading_reference?.us)
+          }
           onClick={() => {
             if (draftPending) onSelect(selected);
             onCancel?.();

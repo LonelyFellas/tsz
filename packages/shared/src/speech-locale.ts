@@ -1,8 +1,10 @@
 export type SpeechAccentGroup = "uk" | "us" | "other";
 
 export function speechAccentGroup(
-  locale: string | undefined
+  locale: string | undefined,
+  accent?: "gb" | "us" | "none"
 ): SpeechAccentGroup | undefined {
+  if (accent) return accent === "gb" ? "uk" : accent === "us" ? "us" : "other";
   if (!locale || !/^en-[A-Z]{2}$/.test(locale)) return undefined;
   if (["en-GB", "en-AU", "en-NZ"].includes(locale)) return "uk";
   if (["en-US", "en-CA"].includes(locale)) return "us";
@@ -10,9 +12,10 @@ export function speechAccentGroup(
 }
 
 export function speechSelectionGroup(
-  locale: string | undefined
+  locale: string | undefined,
+  accent?: "gb" | "us" | "none"
 ): string | undefined {
-  const group = speechAccentGroup(locale);
+  const group = speechAccentGroup(locale, accent);
   return group === "other" ? locale : group;
 }
 
@@ -25,9 +28,10 @@ export function speechRegionLabel(locale: string): string {
 
 export function speechLocaleMatchesScope(
   voiceLocale: string,
-  scope?: string
+  scope?: string,
+  accent?: "gb" | "us" | "none"
 ): boolean {
-  if (!scope) return !!speechAccentGroup(voiceLocale);
-  const group = speechAccentGroup(voiceLocale);
+  if (!scope) return !!speechAccentGroup(voiceLocale, accent);
+  const group = speechAccentGroup(voiceLocale, accent);
   return group === "other" || group === speechAccentGroup(scope);
 }

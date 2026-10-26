@@ -117,6 +117,7 @@ export type PhraseComponentUsageV3 =
 export interface SpellingSpeechV3 {
   content: RichTextV2V3;
   voice_profile: VoiceProfileV3;
+  audio_assets?: AudioAssetV3[];
 }
 
 interface WordFormVariantBaseV3<TDialect extends Dialect> {
@@ -292,6 +293,20 @@ export type RichTextAnnotationV3 =
       phoneme: string;
     }
   | {
+      type: "say_as";
+      start: number;
+      end: number;
+      interpret_as:
+        | "characters"
+        | "cardinal"
+        | "ordinal"
+        | "digits"
+        | "date"
+        | "time"
+        | "telephone";
+    }
+  | { type: "sub"; start: number; end: number; alias: string }
+  | {
       type: "liaison";
       start: number;
       end: number;
@@ -337,6 +352,7 @@ export interface RichTextVariantV3 {
   audio_assets?: AudioAssetV3[];
   /** 人工正文关联。省略保留存量，显式空数组清除。 */
   text_links?: TextLinkV3[];
+  reading_links?: GrammarFormLinkV3[];
 }
 
 export interface TextLinkViaPhraseV3 {
@@ -388,6 +404,7 @@ export interface SenseGroupV3 {
 
 /** 单个音色的启用选择与独立语速；未启用时仍保留语速。 */
 export interface VoiceSettingV3 {
+  output_format?: "mp3" | "wav";
   audio_asset_id?: string;
   version_id?: string;
   version_name?: string;
@@ -398,11 +415,18 @@ export interface VoiceSettingV3 {
   pitch_semitones?: number;
   volume_percent?: number;
   style?: string;
+  style_degree?: number;
+  role?: string;
 }
 
 /** 未出现的音色默认不勾选、原速；voice_id 使用目录 alias。 */
 export interface VoiceProfileV3 {
   voices: VoiceSettingV3[];
+  dubbing?: {
+    mode: "inherit" | "local";
+    area: "word" | "azure" | "grammar" | "meaning" | "example";
+    recommendation_order?: string[];
+  };
 }
 
 export type SpeechLocaleV3 = `en-${string}`;
@@ -436,6 +460,21 @@ export interface GrammarFormLinkV3 {
   target_form_id: string;
   target_variant_id: string;
   target_dialect: Dialect;
+  reading_reference?: ReadingReferenceV3;
+}
+
+export interface ReadingReferenceV3 {
+  uk?: ReadingSelectionV3;
+  us?: ReadingSelectionV3;
+  sense_id?: string;
+}
+
+export interface ReadingSelectionV3 {
+  pronunciation_id: string;
+  alphabet: "ipa" | "ups";
+  use_spelling?: boolean;
+  locale: "en-GB" | "en-US";
+  revision: string;
 }
 
 export interface GrammarVariantV3 {

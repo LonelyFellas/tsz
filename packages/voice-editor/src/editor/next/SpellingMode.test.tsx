@@ -212,5 +212,5 @@ it("拼写可添加、清除与撤销停顿，清除不删除斜体或正文", (
     at: 5,
     duration_ms: 500
   });
-  expect(screen.queryByRole("button", { name: "音频" })).toBeNull();
+  expect(screen.getByRole("button", { name: "音频" })).toBeInTheDocument();
 });

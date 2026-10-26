@@ -140,6 +140,34 @@ describe("紧凑音色目录", () => {
     expect(names(container)).toHaveLength(4);
   });
 
+  it("语言中英原文搜索和官方地区、人工口音相互独立", async () => {
+    const { container } = mount([
+      {
+        ...sonia,
+        alias: "luna",
+        display_name: "Luna",
+        locale: "en-SG",
+        accent: "gb"
+      },
+      {
+        ...sonia,
+        alias: "wayne",
+        display_name: "Wayne",
+        locale: "en-SG",
+        accent: "none"
+      }
+    ]);
+    for (const text of ["英语", "English", "en-SG"]) {
+      fireEvent.change(screen.getByLabelText("搜索音色"), {
+        target: { value: text }
+      });
+      expect(names(container)).toHaveLength(2);
+    }
+    await select("官方地区", "新加坡");
+    await select("口音归属", "英式");
+    expect(names(container)).toEqual(["Luna"]);
+  });
+
   it("更多筛选收起后仍应用选项并显示数量，清除时一并重置", async () => {
     const { container } = mount();
     const toggle = screen.getByRole("button", { name: "更多筛选" });
@@ -162,7 +190,7 @@ describe("紧凑音色目录", () => {
     await select("推荐场景", "新闻");
     await select("推荐场景", "有声书");
     expect(names(container)).toEqual(["Ava", "Sonia", "Ana"]);
-    await select("口音／地区", "美国");
+    await select("官方地区", "美国");
     expect(names(container)).toEqual(["Ava", "Ana"]);
     await select("模型", "Multilingual");
     await select("可选风格", "愉快");

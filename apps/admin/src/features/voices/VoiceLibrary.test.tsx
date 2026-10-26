@@ -114,6 +114,13 @@ beforeEach(() => {
     }))
   });
   vi.spyOn(api.speech, "groups").mockResolvedValue({ groups: [], revision: 0 });
+  vi.spyOn(api.speech, "audioUpdateSettings").mockResolvedValue({
+    wait_seconds: 60,
+    enabled: false,
+    revision: 0
+  });
+  vi.spyOn(api.speech, "audioUpdates").mockResolvedValue({ updates: [] });
+  vi.spyOn(api.speech, "allAudioUpdates").mockResolvedValue({ updates: [] });
   vi.spyOn(api.speech, "saveSettings");
   vi.spyOn(api.speech, "saveDescription");
   vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});

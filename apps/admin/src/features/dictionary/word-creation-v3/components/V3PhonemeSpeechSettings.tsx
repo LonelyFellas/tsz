@@ -10,6 +10,7 @@ import {
   useState
 } from "react";
 import type {
+  AudioAssetV3,
   PhonemeLocaleV3,
   PronunciationSynthesisCandidateV3,
   RichTextV2,
@@ -21,11 +22,12 @@ import {
   editSynthesisUpsWords,
   pronunciationSynthesisContent,
   synthesisInputIssue,
-  synthesisPhonemeWordRanges
+  mapSynthesisSpeechContent
 } from "@tsz/shared";
 import { env } from "@/lib/env";
-import { api } from "@/lib/auth";
+import { api, usePermission } from "@/lib/auth";
 import {
+  adminAudioUploadAdapter,
   adminVoicePreviewAdapter,
   loadAdminVoiceRecommendations,
   voicePreviewIsMock
@@ -47,6 +49,7 @@ export function V3PhonemeSpeechSettings({
   locale,
   label,
   fallbackVoiceProfile,
+  audioAssets = [],
   nodeId,
   field,
   onChange
@@ -57,11 +60,16 @@ export function V3PhonemeSpeechSettings({
   locale: PhonemeLocaleV3;
   label: string;
   fallbackVoiceProfile?: VoiceProfileV3;
+  audioAssets?: AudioAssetV3[];
   nodeId: string;
   field: string;
-  onChange: (candidate: PronunciationSynthesisCandidateV3) => void;
+  onChange: (
+    candidate: PronunciationSynthesisCandidateV3,
+    audioAssets: AudioAssetV3[]
+  ) => void;
 }) {
   const { edit: canEdit } = useContentEditPermissions();
+  const canUploadAudio = usePermission("speech.upload_audio");
   const [open, setOpen] = useState(false);
   const wordHistory = useRef(
     new Map<string, PronunciationSynthesisCandidateV3["ups_words"]>()
@@ -70,32 +78,30 @@ export function V3PhonemeSpeechSettings({
     wordHistory.current.clear();
     wordHistory.current.set(candidate.ups, candidate.ups_words);
     const speech = candidate[`${alphabet}_speech`];
-    const ranges = synthesisPhonemeWordRanges(spelling, candidate, alphabet);
     return structuredClone({
-      content: {
-        version: 2 as const,
-        text: candidate[alphabet],
-        annotations: (speech?.content.text === spelling
-          ? speech.content.annotations
-          : []
-        ).flatMap((mark) => {
-          const range = ranges
-            ?.slice(0, -1)
-            .find(
-              (range) => mark.type === "pause" && range.textEnd === mark.at
-            );
-          return range && mark.type === "pause"
-            ? [{ ...mark, at: range.end }]
-            : [];
-        })
-      },
+      content:
+        speech?.content.text === spelling
+          ? (mapSynthesisSpeechContent(
+              speech.content,
+              spelling,
+              candidate,
+              alphabet,
+              false
+            ) ?? {
+              version: 2 as const,
+              text: candidate[alphabet],
+              annotations: []
+            })
+          : { version: 2 as const, text: candidate[alphabet], annotations: [] },
       voice_profile: speech?.voice_profile ?? fallbackVoiceProfile,
+      audio_assets: audioAssets,
       ups_words: candidate.ups_words
     });
   };
   const [draft, setDraft] = useState<{
     content: RichTextV2;
     voice_profile: VoiceProfileV3 | undefined;
+    audio_assets: AudioAssetV3[];
     ups_words: PronunciationSynthesisCandidateV3["ups_words"];
   }>(capture);
   const [source, setSource] = useState("");
@@ -104,35 +110,27 @@ export function V3PhonemeSpeechSettings({
     [alphabet]: draft.content.text,
     ...(alphabet === "ups" ? { ups_words: draft.ups_words } : {})
   };
-  const ranges = synthesisPhonemeWordRanges(
+  const pauseIssue = mapSynthesisSpeechContent(
+    draft.content,
     spelling,
     editedCandidate,
-    alphabet
-  );
-  const pauseIssue = draft.content.annotations.some(
-    (mark) =>
-      mark.type !== "pause" ||
-      !ranges?.slice(0, -1).some((range) => range.end === mark.at)
+    alphabet,
+    true
   )
-    ? "停顿只能设置在词间音标边界；短语 UPS 请保留逐词边界或从 IPA 重新转换"
-    : undefined;
+    ? undefined
+    : "停顿须在词间，特殊读法须选完整词界；短语 UPS 请保留逐词边界或从 IPA 重新转换";
   const inputIssue =
     synthesisInputIssue(alphabet, draft.content.text) ?? pauseIssue;
   const resolveCandidate = (content: RichTextV2) => ({
     ...editedCandidate,
     [`${alphabet}_speech`]: {
-      content: {
-        ...content,
-        text: spelling,
-        annotations: content.annotations.flatMap((mark) => {
-          const range = ranges
-            ?.slice(0, -1)
-            .find((range) => mark.type === "pause" && range.end === mark.at);
-          return range && mark.type === "pause"
-            ? [{ ...mark, at: range.textEnd }]
-            : [];
-        })
-      },
+      content: mapSynthesisSpeechContent(
+        content,
+        spelling,
+        editedCandidate,
+        alphabet,
+        true
+      ) ?? { version: 2 as const, text: spelling, annotations: [] },
       voice_profile: draft.voice_profile ?? { voices: [] }
     }
   });
@@ -161,6 +159,52 @@ export function V3PhonemeSpeechSettings({
     () => ({
       listVoices: (input) => adminVoicePreviewAdapter.listVoices(input),
       resolveAudio: adminVoicePreviewAdapter.resolveAudio,
+      synthesizeSsml: adminVoicePreviewAdapter.synthesizeSsml,
+      async renderSsml(input, options) {
+        const { alphabet, locale, inputIssue, resolveCandidate } =
+          latest.current;
+        if (inputIssue) throw new Error(inputIssue);
+        const candidate = resolveCandidate(input.content);
+        return (
+          await api.speech.renderSsml(
+            {
+              source: {
+                kind: "phoneme",
+                phoneme_locale: locale,
+                content: candidate[`${alphabet}_speech`]!.content,
+                alphabet,
+                phoneme: input.content.text,
+                ups_words: alphabet === "ups" ? (candidate.ups_words ?? []) : []
+              },
+              setting: input.setting
+            },
+            options?.signal
+          )
+        ).ssml;
+      },
+      async resolveVoices(input, options) {
+        const { alphabet, locale, inputIssue, resolveCandidate } =
+          latest.current;
+        if (inputIssue) throw new Error(inputIssue);
+        const candidate = resolveCandidate(input.content);
+        return (
+          await api.speech.resolve(
+            {
+              profile: input.profile,
+              accent: input.accent,
+              source: {
+                kind: "phoneme",
+                phoneme_locale: locale,
+                content: candidate[`${alphabet}_speech`]!.content,
+                alphabet,
+                phoneme: input.content.text,
+                ups_words: alphabet === "ups" ? (candidate.ups_words ?? []) : []
+              }
+            },
+            options?.signal
+          )
+        ).voices;
+      },
       async generateAudio(input, options) {
         const { alphabet, locale, inputIssue, resolveCandidate } =
           latest.current;
@@ -178,7 +222,8 @@ export function V3PhonemeSpeechSettings({
                 phoneme: input.content.text,
                 ups_words: alphabet === "ups" ? (candidate.ups_words ?? []) : []
               },
-              setting: input.setting
+              setting: input.setting,
+              ...(input.profile ? { profile: input.profile } : {})
             },
             options?.signal
           );
@@ -280,6 +325,14 @@ export function V3PhonemeSpeechSettings({
                   };
                 })
               }
+              audioUploadAdapter={
+                env.VOICE_AUDIO_UPLOAD ? adminAudioUploadAdapter : undefined
+              }
+              audioUploadAllowed={canUploadAudio}
+              audioAssets={draft.audio_assets}
+              onAudioAssetsChange={(audio_assets) =>
+                setDraft((current) => ({ ...current, audio_assets }))
+              }
               voiceProfile={draft.voice_profile}
               onVoiceProfileChange={(voice_profile) =>
                 setDraft((current) => ({ ...current, voice_profile }))
@@ -306,7 +359,10 @@ export function V3PhonemeSpeechSettings({
                       source !== sourceKey
                     }
                     onClick={() => {
-                      onChange(resolveCandidate(draft.content));
+                      onChange(
+                        resolveCandidate(draft.content),
+                        draft.audio_assets
+                      );
                       setOpen(false);
                     }}
                   >

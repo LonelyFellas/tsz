@@ -357,6 +357,7 @@ const GRAMMAR_PLACEHOLDER: Record<Dialect, string> = {
 function GrammarStructuresCard({
   wordId,
   forms,
+  meanings,
   pos,
   posIndex,
   spellingMode,
@@ -365,6 +366,7 @@ function GrammarStructuresCard({
 }: {
   wordId?: string;
   forms?: DraftFormsStepContentV3;
+  meanings: DraftMeaningsStepContentWritableV3;
   pos: DraftMeaningsStepContentWritableV3["pos"][number];
   posIndex: number;
   spellingMode: DialectModeV3;
@@ -445,6 +447,7 @@ function GrammarStructuresCard({
                     <V3GrammarVoiceTextField
                       wordId={wordId}
                       forms={forms}
+                      meanings={meanings}
                       textLinks={variant.form_links}
                       dialect={variant.dialect}
                       ariaLabel={`语法结构 ${structureIndex + 1} ${dialectLabel(variant.dialect)}内容`}
@@ -1225,6 +1228,7 @@ function V3MeaningsAndExamplesStepContent({
                     <GrammarStructuresCard
                       wordId={wordId}
                       forms={forms}
+                      meanings={value}
                       change={change}
                       idFactory={idFactory}
                       pos={pos}

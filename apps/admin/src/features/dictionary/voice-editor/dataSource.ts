@@ -52,39 +52,95 @@ export const loadAdminVoiceRecommendations: LoadVoiceRecommendations = async ({
   signal?.throwIfAborted();
   if (useAuthStore.getState().profile?.id !== actor) return [];
   const group = response.groups.find((item) => item.areas.includes(area));
-  if (!group) return [];
+  const global = response.groups.find((item) => item.is_global);
   return (["en-GB", "en-US"] as const)
     .filter((value) => !locale || locale === value)
-    .flatMap((value) =>
-      group[value === "en-GB" ? "uk" : "us"].map(
-        (item): VoiceRecommendation => ({
-          id: item.id,
-          name: item.name,
-          locale: value,
-          groupName: group.name,
-          setting: {
-            voice_id: item.voice_alias,
-            enabled: true,
-            rate_percent: item.parameters.rate_percent,
-            pitch_semitones: item.parameters.pitch_semitones,
-            ...(item.parameters.volume_percent !== undefined
-              ? { volume_percent: item.parameters.volume_percent }
-              : {}),
-            ...(item.parameters.style ? { style: item.parameters.style } : {})
-          }
-        })
-      )
-    );
+    .flatMap((value) => {
+      const key = value === "en-GB" ? "uk" : "us";
+      const local =
+        group?.[key].filter((item) => item.selected !== false) ?? [];
+      const source = local.length ? group : global;
+      const items = local.length
+        ? local
+        : (global?.[key].filter((item) => item.selected !== false) ?? []);
+      return items.map((item): VoiceRecommendation => ({
+        id: item.id,
+        name: item.name,
+        locale: value,
+        groupName: source!.name,
+        setting: {
+          voice_id: item.voice_alias,
+          enabled: true,
+          rate_percent: item.parameters.rate_percent,
+          pitch_semitones: item.parameters.pitch_semitones,
+          ...(item.parameters.volume_percent !== undefined
+            ? { volume_percent: item.parameters.volume_percent }
+            : {}),
+          ...(item.parameters.style ? { style: item.parameters.style } : {}),
+          ...(item.parameters.style_degree != null
+            ? { style_degree: item.parameters.style_degree }
+            : {}),
+          ...(item.parameters.role != null
+            ? { role: item.parameters.role }
+            : {})
+        }
+      }));
+    });
 };
 
 export const adminVoicePreviewAdapter: VoicePreviewAdapter = {
+  async renderSsml(input, options) {
+    return (
+      await api.speech.renderSsml(
+        {
+          source: { kind: "text", content: input.content },
+          setting: input.setting
+        },
+        options?.signal
+      )
+    ).ssml;
+  },
+  async synthesizeSsml(input, options) {
+    const result = await api.speech.manualPreview(
+      {
+        ssml: input.ssml,
+        voice_alias: input.voiceId,
+        output_format: input.outputFormat
+      },
+      options?.signal
+    );
+    return {
+      audioUrl: result.audio_url,
+      expiresAt: result.expires_at,
+      cached: result.cache_status === "hit",
+      ...(result.content_path
+        ? {
+            loadAudio: (options?: { signal?: AbortSignal }) =>
+              api.speech.previewContent(result.content_path!, options?.signal)
+          }
+        : {})
+    };
+  },
+  async resolveVoices(input, options) {
+    if (voicePreviewIsMock) throw new Error("模拟试听不支持服务端推荐解析");
+    const result = await api.speech.resolve(
+      {
+        profile: input.profile,
+        source: { kind: "text", content: input.content },
+        accent: input.accent
+      },
+      options?.signal
+    );
+    return result.voices;
+  },
   async generateAudio(input, options) {
     if (voicePreviewIsMock) throw new Error("模拟试听不支持生成正式音频");
     const response = await api.speech.generateAudio(
       {
         request_id: input.requestId,
         source: { kind: "text", content: input.content },
-        setting: input.setting
+        setting: input.setting,
+        ...(input.profile ? { profile: input.profile } : {})
       },
       options?.signal
     );
@@ -92,7 +148,13 @@ export const adminVoicePreviewAdapter: VoicePreviewAdapter = {
   },
   async resolveAudio(assetId, options) {
     const result = await api.audioAssets.url(assetId, options?.signal);
-    return { audioUrl: result.url, expiresAt: result.expires_at, cached: true };
+    return {
+      audioUrl: result.url,
+      expiresAt: result.expires_at,
+      cached: true,
+      loadAudio: (options?: { signal?: AbortSignal }) =>
+        api.audioAssets.content(assetId, options?.signal)
+    };
   },
   async listVoices(input) {
     return (await resolveAdapter()).listVoices(input);
@@ -114,6 +176,8 @@ async function resolveAudioAdapter(): Promise<AudioUploadAdapter> {
 }
 
 export const adminAudioUploadAdapter: AudioUploadAdapter = {
+  loadAudio: (assetId, options) =>
+    api.audioAssets.content(assetId, options?.signal),
   async upload(input) {
     if (
       !hasAdminPermission(

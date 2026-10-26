@@ -8,7 +8,8 @@ import type {
   RichTextV2,
   RichTextV3,
   VoiceProfileV3,
-  TextLinkV3
+  TextLinkV3,
+  GrammarFormLinkV3
 } from "@tsz/types";
 import type {
   VoiceAssociation,
@@ -20,7 +21,7 @@ import {
   normalizeSpellingRich,
   remapTextLinks,
   toRichTextV2,
-  withNativeVoiceVersion
+  recommendationVoiceSetting
 } from "@tsz/voice-editor/core";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import { EditOutlined } from "@ant-design/icons";
@@ -87,6 +88,11 @@ export interface V3VoiceTextFieldProps<
   textLinks?: VoiceEditorProps<TLink>["textLinks"];
   restoreTextLinksOnCorrection?: boolean;
   renderAssociationPicker?: VoiceEditorProps<TLink>["renderAssociationPicker"];
+  readingLinks?: GrammarFormLinkV3[];
+  renderReadingPicker?: VoiceEditorProps<TLink>["renderReadingPicker"];
+  createReadingPreviewAdapter?: (
+    links: GrammarFormLinkV3[]
+  ) => NonNullable<VoiceEditorProps<TLink>["previewAdapter"]>;
   previewAdapter?: VoiceEditorProps<TLink>["previewAdapter"];
   createPreviewAdapter?: (
     links: TLink[]
@@ -134,6 +140,9 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   textLinks,
   restoreTextLinksOnCorrection,
   renderAssociationPicker,
+  readingLinks,
+  renderReadingPicker,
+  createReadingPreviewAdapter,
   previewAdapter,
   createPreviewAdapter,
   value,
@@ -238,17 +247,16 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         );
         setDefaultVoice({
           key: defaultKey,
-          profile: usable.length
-            ? {
-                voices: usable.map((item) =>
-                  withNativeVoiceVersion(
-                    { ...item.setting, enabled: true },
-                    voices.find((voice) => voice.id === item.setting.voice_id),
-                    item.name
-                  )
-                )
-              }
-            : undefined,
+          profile: {
+            dubbing: {
+              mode: "inherit",
+              area,
+              recommendation_order: usable.map((item) => item.id)
+            },
+            voices: usable.map((item) =>
+              recommendationVoiceSetting(item, voices)
+            )
+          },
           error:
             usable.length < first.length
               ? "部分首位推荐已失效，请打开编辑器选择其他音色。"
@@ -270,14 +278,22 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   const [editorSession, setEditorSession] = useState(0);
   const captureSession = useCallback(
     () =>
-      structuredClone({ nodeId, value, textLinks, voiceProfile, audioAssets }),
-    [nodeId, value, textLinks, voiceProfile, audioAssets]
+      structuredClone({
+        nodeId,
+        value,
+        textLinks,
+        readingLinks,
+        voiceProfile,
+        audioAssets
+      }),
+    [nodeId, value, textLinks, readingLinks, voiceProfile, audioAssets]
   );
   const [draftState, setDraftState] = useState(captureSession);
   const incomingKey = JSON.stringify({
     nodeId,
     value,
     textLinks,
+    readingLinks,
     voiceProfile,
     audioAssets
   });
@@ -290,10 +306,19 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   }, [incomingKey, captureSession]);
   const editorState = showDone
     ? draftState
-    : { nodeId, value, textLinks, voiceProfile, audioAssets };
+    : { nodeId, value, textLinks, readingLinks, voiceProfile, audioAssets };
   const sessionPreviewAdapter = useMemo(
-    () => createPreviewAdapter?.(editorState.textLinks ?? []) ?? previewAdapter,
-    [createPreviewAdapter, editorState.textLinks, previewAdapter]
+    () =>
+      createReadingPreviewAdapter?.(editorState.readingLinks ?? []) ??
+      createPreviewAdapter?.(editorState.textLinks ?? []) ??
+      previewAdapter,
+    [
+      createReadingPreviewAdapter,
+      editorState.readingLinks,
+      createPreviewAdapter,
+      editorState.textLinks,
+      previewAdapter
+    ]
   );
   const draftPending = JSON.stringify(draftState) !== incomingKey;
   useEffect(() => {
@@ -331,13 +356,22 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     const next = draftState;
     // 宿主回调可能捕获旧表单，逐项刷新闭包，避免正文、音色和录音互相覆盖。
     if (
-      JSON.stringify([value, textLinks]) !==
-      JSON.stringify([next.value, next.textLinks])
+      JSON.stringify([value, textLinks, readingLinks]) !==
+      JSON.stringify([next.value, next.textLinks, next.readingLinks])
     ) {
       flushSync(() =>
         contentReadOnly
           ? callbacks.current.onAssociationsChange?.(next.textLinks ?? [])
-          : callbacks.current.onChange(toRichTextV2(next.value), next.textLinks)
+          : readingLinks !== undefined || renderReadingPicker
+            ? callbacks.current.onChange(
+                toRichTextV2(next.value),
+                next.textLinks,
+                next.readingLinks
+              )
+            : callbacks.current.onChange(
+                toRichTextV2(next.value),
+                next.textLinks
+              )
       );
     }
     if (JSON.stringify(voiceProfile) !== JSON.stringify(next.voiceProfile)) {
@@ -367,7 +401,11 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     if (!expanded) onAssociationPendingChange?.(false);
   }, [expanded, onEditingChange, onAssociationPendingChange]);
   const [feedback, feedbackHolder] = message.useMessage();
-  type Snapshot = { value: RichTextV3; links: typeof textLinks };
+  type Snapshot = {
+    value: RichTextV3;
+    links: typeof textLinks;
+    readingLinks?: GrammarFormLinkV3[];
+  };
   const history = useRef<{
     past: Snapshot[];
     future: Snapshot[];
@@ -375,28 +413,49 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   }>({
     past: [],
     future: [],
-    expected: JSON.stringify([nodeId, value, textLinks ?? []])
+    expected: JSON.stringify([
+      nodeId,
+      value,
+      textLinks ?? [],
+      readingLinks ?? []
+    ])
   });
   useEffect(() => {
-    const key = JSON.stringify([nodeId, value, textLinks ?? []]);
+    const key = JSON.stringify([
+      nodeId,
+      value,
+      textLinks ?? [],
+      readingLinks ?? []
+    ]);
     if (key !== history.current.expected) {
       history.current = { past: [], future: [], expected: key };
     }
-  }, [nodeId, value, textLinks]);
-  const publish = (next: RichTextV3, links: typeof textLinks) => {
+  }, [nodeId, value, textLinks, readingLinks]);
+  const publish = (
+    next: RichTextV3,
+    links: typeof textLinks,
+    nextReadingLinks = readingLinks
+  ) => {
     const nextLinks = mode === "association" ? (links ?? []) : links;
     history.current.expected = JSON.stringify([
       nodeId,
       toRichTextV2(next),
-      nextLinks ?? []
+      nextLinks ?? [],
+      nextReadingLinks ?? []
     ]);
-    onChange(toRichTextV2(next), nextLinks);
+    if (readingLinks !== undefined || renderReadingPicker)
+      onChange(toRichTextV2(next), nextLinks, nextReadingLinks);
+    else onChange(toRichTextV2(next), nextLinks);
   };
-  const change: VoiceEditorProps<TLink>["onChange"] = (next, links) => {
+  const change: VoiceEditorProps<TLink>["onChange"] = (
+    next,
+    links,
+    nextReadingLinks = readingLinks
+  ) => {
     if (readOnly) return;
     history.current.past = [
       ...history.current.past.slice(-99),
-      { value, links: textLinks }
+      { value, links: textLinks, readingLinks }
     ];
     history.current.future = [];
     const profile =
@@ -406,9 +465,9 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     if (profile) {
       initialVoiceState.current.unconfigured = false;
       // 正文先回灌父草稿，再用刷新后的回调写音色，避免两次更新互相覆盖。
-      flushSync(() => publish(next, links));
+      flushSync(() => publish(next, links, nextReadingLinks));
       callbacks.current.onVoiceProfileChange?.(structuredClone(profile));
-    } else publish(next, links);
+    } else publish(next, links, nextReadingLinks);
   };
   const restore = (redo: boolean) => {
     if (readOnly) return;
@@ -416,8 +475,8 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     const snapshot = source.pop();
     if (!snapshot) return;
     const destination = redo ? history.current.past : history.current.future;
-    destination.push({ value, links: textLinks });
-    publish(snapshot.value, snapshot.links);
+    destination.push({ value, links: textLinks, readingLinks });
+    publish(snapshot.value, snapshot.links, snapshot.readingLinks);
   };
   const fontClass =
     mode === "grammar" || mode === "spelling"
@@ -510,7 +569,13 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         const removed =
           (textLinks?.length ?? 0) > (links?.length ?? 0) ||
           toRichTextV2(value).annotations.length > next.annotations.length;
-        change(next, links);
+        change(
+          next,
+          links,
+          readingLinks
+            ? remapTextLinks(value.text, event.target.value, readingLinks)
+            : undefined
+        );
         if (removed)
           void feedback.info("已移除受改字影响的关联或标注，可撤销恢复");
       }}
@@ -663,6 +728,8 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             textLinks={editorState.textLinks}
             restoreTextLinksOnCorrection={restoreTextLinksOnCorrection}
             renderAssociationPicker={renderAssociationPicker}
+            readingLinks={editorState.readingLinks}
+            renderReadingPicker={renderReadingPicker}
             contextLabel={ariaLabel}
             inputDataAttributes={{
               "data-v3-node-id": nodeId,
@@ -671,16 +738,21 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             }}
             language="en"
             placeholder={placeholder}
-            onChange={(next: RichTextV2, nextLinks) => {
+            onChange={(next: RichTextV2, nextLinks, nextReadingLinks) => {
               if (readOnly) return;
               if (!showDone) {
                 if (contentReadOnly) onAssociationsChange?.(nextLinks ?? []);
+                else if (readingLinks !== undefined || renderReadingPicker)
+                  onChange(next, nextLinks, nextReadingLinks);
                 else onChange(next, nextLinks);
               } else
                 setDraftState((current) => ({
                   ...current,
                   value: contentReadOnly ? current.value : next,
-                  textLinks: nextLinks
+                  textLinks: nextLinks,
+                  readingLinks: contentReadOnly
+                    ? current.readingLinks
+                    : nextReadingLinks
                 }));
             }}
             previewAdapter={

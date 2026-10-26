@@ -79,6 +79,7 @@ export interface EditorSnapshot<TLink = TextLinkV3> {
   text: string;
   marks: MarkState;
   textLinks?: TLink[];
+  readingLinks?: import("@tsz/types").GrammarFormLinkV3[];
   recoverableTextLinks?: { text: string; link: TLink }[];
 }
 
@@ -397,6 +398,8 @@ export function annotationsToMarks(value: RichTextV2): MarkState {
   for (const annotation of value.annotations) {
     if (
       annotation.type === "phoneme" ||
+      annotation.type === "say_as" ||
+      annotation.type === "sub" ||
       annotation.type === "highlight" ||
       annotation.type === "italic" ||
       annotation.type === "bold" ||

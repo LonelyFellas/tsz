@@ -3,12 +3,13 @@ import { DownOutlined, SoundOutlined, SyncOutlined } from "@ant-design/icons";
 import { App, Button, Popover, Space, Tag, Tooltip } from "antd";
 import type { Dialect, RichTextV2, VoiceProfileV3 } from "@tsz/types";
 import type { AdminDialectPreference } from "@tsz/shared";
-import { voiceSettingFor } from "@tsz/voice-editor/core";
+import { retainResolvedAudio, voiceSettingFor } from "@tsz/voice-editor/core";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import type {
   VoiceOption,
   VoicePreviewAdapter,
-  VoicePreviewResult
+  VoicePreviewResult,
+  VoiceSetting
 } from "@tsz/voice-editor/types";
 import {
   createContext,
@@ -189,9 +190,13 @@ export function resolvePronunciationPreviewVoice(
         .map((setting) => voices.find((row) => row.id === setting.voice_id))
         .find(
           (row) =>
-            row && speechAccentGroup(row.locale) === speechAccentGroup(locale)
+            row &&
+            speechAccentGroup(row.locale, row.accent) ===
+              speechAccentGroup(locale)
         )
-    : voiceForDialect(voices, dialect, preference);
+    : profile?.dubbing
+      ? undefined
+      : voiceForDialect(voices, dialect, preference);
   return {
     voice,
     rate:
@@ -199,6 +204,71 @@ export function resolvePronunciationPreviewVoice(
         ? voiceSettingFor(profile?.voices ?? [], voice.id)?.rate_percent
         : undefined) ?? 0,
     isDefault: settings.length === 0
+  };
+}
+
+function useResolvedPreviewProfile(
+  context: PreviewContextValue,
+  profile: VoiceProfileV3 | undefined,
+  content: RichTextV2,
+  dialect: Dialect,
+  adapter = context.adapter
+) {
+  const locale = localeForDialect(dialect, context.dialectPreference);
+  const key = JSON.stringify([
+    profile,
+    content,
+    locale,
+    adapter.audioSourceKey
+  ]);
+  const inputRef = useRef({ profile, content, locale, adapter });
+  inputRef.current = { profile, content, locale, adapter };
+  const [resolved, setResolved] = useState<{
+    key: string;
+    voices: VoiceSetting[];
+    error?: string;
+  }>();
+  useEffect(() => {
+    const { profile, content, locale, adapter } = inputRef.current;
+    if (
+      !context.enabled ||
+      !profile?.dubbing ||
+      !adapter.resolveVoices ||
+      !content.text.trim()
+    )
+      return;
+    const controller = new AbortController();
+    void adapter
+      .resolveVoices(
+        { profile, content, accent: locale === "en-GB" ? "gb" : "us" },
+        { signal: controller.signal }
+      )
+      .then((voices) => {
+        if (!controller.signal.aborted) setResolved({ key, voices });
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted)
+          setResolved({ key, voices: [], error: errorMessage(error) });
+      });
+    return () => controller.abort();
+  }, [key, context.enabled]);
+  if (!profile?.dubbing) return { profile, pending: false, error: undefined };
+  if (!adapter.resolveVoices)
+    return {
+      profile: { ...profile, voices: [] },
+      pending: false,
+      error: "当前环境尚未支持推荐配音解析"
+    };
+  return {
+    profile: {
+      ...profile,
+      voices: retainResolvedAudio(
+        resolved?.key === key ? resolved.voices : [],
+        profile.voices
+      )
+    },
+    pending: !!content.text.trim() && resolved?.key !== key,
+    error: resolved?.key === key ? resolved.error : undefined
   };
 }
 
@@ -217,13 +287,19 @@ export function PronunciationPreviewVoiceSummary({
 }) {
   const context = useContext(PreviewContext);
   if (!context) throw new Error("PronunciationPreviewProvider is required");
+  const resolved = useResolvedPreviewProfile(
+    context,
+    voiceProfile,
+    content ?? { version: 2, text: "", annotations: [] },
+    dialect
+  );
   const { voice, rate, isDefault } = resolvePronunciationPreviewVoice(
     context.voices,
     dialect,
     context.dialectPreference,
-    voiceProfile
+    resolved.profile
   );
-  const enabled = voiceProfile?.voices.filter((row) => row.enabled) ?? [];
+  const enabled = resolved.profile?.voices.filter((row) => row.enabled) ?? [];
   if (column === "rate")
     return <span>{voice ? `${(1 + rate / 100).toFixed(2)}×` : "—"}</span>;
   const summary = (
@@ -231,11 +307,11 @@ export function PronunciationPreviewVoiceSummary({
       className="word-pronunciation-voice-label"
       title={voice ? `${isDefault ? "默认 · " : ""}${voice.label}` : undefined}
     >
-      {context.voicesLoading
+      {context.voicesLoading || resolved.pending
         ? "正在读取音色"
         : voice
           ? voice.label.replace(` · ${voice.locale}`, "")
-          : context.voicesError || "当前口音没有可用音色"}
+          : resolved.error || context.voicesError || "当前口音没有可用音色"}
     </span>
   );
   if (enabled.length <= 1) return summary;
@@ -351,20 +427,27 @@ export function PronunciationPreviewControls({
   const resultRef = useRef<VoicePreviewResult | null>(null);
   const expiryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const targetLocale = localeForDialect(dialect, context.dialectPreference);
-  const enabledSettings =
-    voiceProfile?.voices.filter((setting) => setting.enabled) ?? [];
-  const { voice } = resolvePronunciationPreviewVoice(
-    context.voices,
-    dialect,
-    context.dialectPreference,
-    voiceProfile
-  );
   const previewContent = useMemo<RichTextV2>(
     () => content ?? { version: 2, text: spelling ?? "", annotations: [] },
     [content, spelling]
   );
+  const resolved = useResolvedPreviewProfile(
+    context,
+    voiceProfile,
+    previewContent,
+    dialect,
+    previewAdapter ?? context.adapter
+  );
+  const enabledSettings =
+    resolved.profile?.voices.filter((setting) => setting.enabled) ?? [];
+  const { voice } = resolvePronunciationPreviewVoice(
+    context.voices,
+    dialect,
+    context.dialectPreference,
+    resolved.profile
+  );
   const selectedSetting = voice
-    ? voiceSettingFor(voiceProfile?.voices ?? [], voice.id)
+    ? voiceSettingFor(resolved.profile?.voices ?? [], voice.id)
     : undefined;
   const contentKey = JSON.stringify([
     previewContent,
@@ -374,7 +457,12 @@ export function PronunciationPreviewControls({
     selectedSetting?.pitch_semitones ?? 0,
     selectedSetting?.volume_percent ?? 100,
     selectedSetting?.style ?? "",
-    selectedSetting?.audio_asset_id
+    selectedSetting?.style_degree,
+    selectedSetting?.role,
+    selectedSetting?.output_format,
+    selectedSetting?.audio_asset_id,
+    voiceProfile?.dubbing,
+    resolved.pending
   ]);
   const text = previewContent.text.trim();
   const playLabel = ariaLabelPrefix
@@ -467,6 +555,7 @@ export function PronunciationPreviewControls({
       disabled ||
       !context.enabled ||
       context.voicesLoading ||
+      resolved.pending ||
       !voice ||
       !text ||
       busy ||
@@ -505,6 +594,9 @@ export function PronunciationPreviewControls({
                 content: previewContent,
                 voiceId: voice.id,
                 ratePercent: selectedSetting?.rate_percent ?? 0,
+                ...(selectedSetting?.output_format
+                  ? { outputFormat: selectedSetting.output_format }
+                  : {}),
                 ...(selectedSetting?.pitch_semitones !== undefined
                   ? { pitchSemitones: selectedSetting.pitch_semitones }
                   : {}),
@@ -513,6 +605,12 @@ export function PronunciationPreviewControls({
                   : {}),
                 ...(selectedSetting?.style
                   ? { style: selectedSetting.style }
+                  : {}),
+                ...(selectedSetting?.style_degree !== undefined
+                  ? { styleDegree: selectedSetting.style_degree }
+                  : {}),
+                ...(selectedSetting?.role !== undefined
+                  ? { role: selectedSetting.role }
                   : {})
               },
               { signal: controller.signal }
@@ -579,19 +677,21 @@ export function PronunciationPreviewControls({
 
   const unavailableReason = !context.enabled
     ? "语音试听功能未启用"
-    : context.voicesLoading
+    : context.voicesLoading || resolved.pending
       ? "正在加载发音人…"
-      : context.voicesError
-        ? context.voicesError
-        : !text
-          ? content
-            ? "请先填写字典音标"
-            : "请先填写词形拼写"
-          : !voice
-            ? enabledSettings.length
-              ? `已选音色不匹配 ${targetLocale ?? "当前口音"}，请在发音设置中选择对应音色`
-              : `${targetLocale ?? "英语"} 暂无可用发音人`
-            : "获取语音";
+      : resolved.error
+        ? resolved.error
+        : context.voicesError
+          ? context.voicesError
+          : !text
+            ? content
+              ? "请先填写字典音标"
+              : "请先填写词形拼写"
+            : !voice
+              ? enabledSettings.length
+                ? `已选音色不匹配 ${targetLocale ?? "当前口音"}，请在发音设置中选择对应音色`
+                : `${targetLocale ?? "英语"} 暂无可用发音人`
+              : "获取语音";
 
   const controls = (
     <>

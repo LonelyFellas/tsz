@@ -19,7 +19,8 @@ const preview = vi.hoisted(() => ({
   enabled: true,
   mocked: false,
   listVoices: vi.fn(),
-  synthesize: vi.fn()
+  synthesize: vi.fn(),
+  resolveVoices: vi.fn()
 }));
 
 const message = vi.hoisted(() => ({
@@ -47,7 +48,8 @@ vi.mock("@/lib/env", () => ({
 vi.mock("../voice-editor/dataSource", () => ({
   adminVoicePreviewAdapter: {
     listVoices: preview.listVoices,
-    synthesize: preview.synthesize
+    synthesize: preview.synthesize,
+    resolveVoices: preview.resolveVoices
   },
   get voicePreviewIsMock() {
     return preview.mocked;
@@ -197,6 +199,50 @@ afterEach(() => {
 });
 
 describe("PronunciationPreview", () => {
+  it("继承快捷播放采用当前解析结果且不使用旧快照默认", async () => {
+    preview.resolveVoices.mockResolvedValue([
+      {
+        voice_id: "british-voice",
+        version_id: "current",
+        version_name: "current",
+        locale: "en-GB",
+        enabled: true,
+        rate_percent: -27
+      }
+    ]);
+    render(
+      <PreviewHarness
+        voiceProfile={{
+          voices: [
+            { voice_id: "british-voice", enabled: true, rate_percent: 0 }
+          ],
+          dubbing: { mode: "inherit", area: "word" }
+        }}
+      />
+    );
+    const getButton = screen.getByLabelText("获取语音");
+    await waitFor(() => expect(getButton).toBeEnabled());
+    fireEvent.click(getButton);
+    await waitFor(() => expect(preview.synthesize).toHaveBeenCalled());
+    expect(preview.synthesize.mock.calls[0]![0]).toMatchObject({
+      voiceId: "british-voice",
+      ratePercent: -27
+    });
+  });
+  it("继承解析失败时禁用快捷播放，不退回目录默认音色", async () => {
+    preview.resolveVoices.mockRejectedValue(new Error("读法已变化"));
+    render(
+      <PreviewHarness
+        voiceProfile={{
+          voices: [],
+          dubbing: { mode: "inherit", area: "word" }
+        }}
+      />
+    );
+    await waitFor(() => expect(preview.resolveVoices).toHaveBeenCalled());
+    expect(screen.getByLabelText("获取语音")).toBeDisabled();
+    expect(preview.synthesize).not.toHaveBeenCalled();
+  });
   it.each([
     ["uk", "en-GB", "en-gb-sonia"],
     ["us", "en-US", "en-us-aria"]

@@ -22,7 +22,7 @@ describe("词典请求契约", () => {
     expect(get.mock.calls[0]![1]).toEqual({
       signal: controller.signal,
       headers: {
-        "X-TSZ-Voice-Versions": "v2",
+        "X-TSZ-Voice-Versions": "v3",
         "X-TSZ-Voice-Locales": "v1",
         "X-TSZ-Voice-Models": "v1"
       }

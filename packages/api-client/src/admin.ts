@@ -123,7 +123,7 @@ const SPELLING_MARKUP_HEADERS = {
   "X-TSZ-Spelling-Markup": "v1",
   "X-TSZ-Spelling-Speech": "v1",
   "X-TSZ-Phoneme-Speech": "v1",
-  "X-TSZ-Voice-Versions": "v2",
+  "X-TSZ-Voice-Versions": "v3",
   "X-TSZ-Voice-Locales": "v1",
   "X-TSZ-Voice-Models": "v1",
   "X-TSZ-Form-Contents": "v1",
@@ -310,6 +310,19 @@ export function createAdminEndpoints(http: HttpClient) {
       http.patch<UpdateAdminPreferencesResponse>("/profile/preferences", input),
     /** 语音富文本试听；wire 映射由 admin 业务层承担。 */
     speech: {
+      resolve: (
+        input: {
+          profile: import("@tsz/types").VoiceProfileV3;
+          source: import("@tsz/types").GeneratedSpeechSource;
+          accent: "gb" | "us";
+        },
+        signal?: AbortSignal
+      ) =>
+        http.post<{ voices: import("@tsz/types").VoiceSettingV3[] }>(
+          "/speech/resolve",
+          input,
+          { signal, headers: { "X-TSZ-Voice-Versions": "v3" } }
+        ),
       generateAudio: (
         input: import("@tsz/types").GenerateVoiceAudioRequest,
         signal?: AbortSignal
@@ -320,7 +333,7 @@ export function createAdminEndpoints(http: HttpClient) {
           {
             signal,
             headers: {
-              "X-TSZ-Voice-Versions": "v2",
+              "X-TSZ-Voice-Versions": "v3",
               "X-TSZ-Voice-Locales": "v1",
               "X-TSZ-Voice-Models": "v1"
             }
@@ -329,18 +342,90 @@ export function createAdminEndpoints(http: HttpClient) {
       voices: (signal?: AbortSignal) =>
         http.get<AdminSpeechVoiceListResponse>("/speech/voices", {
           signal,
-          headers: { "X-TSZ-Voice-Models": "v1" }
+          headers: { "X-TSZ-Voice-Models": "v1", "X-TSZ-Voice-Catalog": "v1" }
         }),
       preview: (input: CreateAdminSpeechPreviewInput, signal?: AbortSignal) =>
         http.post<AdminSpeechPreviewResponse>("/speech/previews", input, {
           signal,
           headers: { "X-TSZ-Voice-Models": "v1" }
         }),
+      renderSsml: (
+        input: {
+          source: import("@tsz/types").GeneratedSpeechSource;
+          setting: import("@tsz/types").VoiceSettingV3;
+        },
+        signal?: AbortSignal
+      ) => http.post<{ ssml: string }>("/speech/ssml", input, { signal }),
+      manualPreview: (
+        input: {
+          voice_alias: string;
+          ssml: string;
+          output_format?: "mp3" | "wav";
+        },
+        signal?: AbortSignal
+      ) =>
+        http.post<AdminSpeechPreviewResponse>("/speech/previews/ssml", input, {
+          signal
+        }),
+      previewContent: (path: string, signal?: AbortSignal) => {
+        if (!/^\/speech\/previews\/[0-9a-f]{64}\/content$/.test(path))
+          throw new Error("Invalid preview content path");
+        return http.getBlob(path, { signal });
+      },
       groups: (signal?: AbortSignal) =>
         http.get<AdminDubbingGroupsResponse>("/speech/groups", {
           signal,
-          headers: { "X-TSZ-Voice-Models": "v1" }
+          headers: { "X-TSZ-Voice-Models": "v1", "X-TSZ-Dubbing-Groups": "v2" }
         }),
+      saveGroup: (
+        group: import("@tsz/types").AdminDubbingGroup,
+        base_revision: number,
+        create = false
+      ) =>
+        create
+          ? http.post<AdminDubbingGroupsResponse>("/speech/groups", {
+              group,
+              base_revision
+            })
+          : http.put<AdminDubbingGroupsResponse>(
+              `/speech/groups/${encodeURIComponent(group.id)}`,
+              { group, base_revision }
+            ),
+      deleteGroup: (id: string, base_revision: number) =>
+        http.del<AdminDubbingGroupsResponse>(
+          `/speech/groups/${encodeURIComponent(id)}`,
+          { base_revision }
+        ),
+      audioUpdateSettings: (signal?: AbortSignal) =>
+        http.get<import("@tsz/types").AdminDubbingUpdateSettings>(
+          "/speech/audio-update-settings",
+          { signal }
+        ),
+      saveAudioUpdateSettings: (
+        input: import("@tsz/types").SaveAdminDubbingUpdateSettings
+      ) =>
+        http.put<import("@tsz/types").AdminDubbingUpdateSettings>(
+          "/speech/audio-update-settings",
+          input
+        ),
+      audioUpdates: (id: string, signal?: AbortSignal) =>
+        http.get<import("@tsz/types").AdminDubbingAudioUpdates>(
+          `/speech/groups/${encodeURIComponent(id)}/audio-updates`,
+          { signal }
+        ),
+      allAudioUpdates: (signal?: AbortSignal) =>
+        http.get<import("@tsz/types").AdminDubbingAudioUpdates>(
+          "/speech/audio-updates",
+          { signal }
+        ),
+      cancelAudioUpdate: (id: string) =>
+        http.post<void>(
+          `/speech/audio-updates/${encodeURIComponent(id)}/cancel`
+        ),
+      retryAudioUpdate: (id: string) =>
+        http.post<void>(
+          `/speech/audio-updates/${encodeURIComponent(id)}/retry`
+        ),
       saveGroups: (input: SaveAdminDubbingGroupsInput) =>
         http.put<AdminDubbingGroupsResponse>("/speech/groups", input, {
           headers: { "X-TSZ-Voice-Models": "v1" }
@@ -354,13 +439,33 @@ export function createAdminEndpoints(http: HttpClient) {
         http.put<AdminVoiceLibraryItem>(
           `/speech/library/${encodeURIComponent(alias)}/personal`,
           input,
-          { headers: { "X-TSZ-Voice-Models": "v1" } }
+          {
+            headers: { "X-TSZ-Voice-Models": "v1" }
+          }
+        ),
+      saveAccent: (
+        alias: string,
+        input: {
+          accent: import("@tsz/types").VoiceAccent;
+          base_revision: number;
+        }
+      ) =>
+        http.put<AdminVoiceLibraryItem>(
+          `/speech/library/${encodeURIComponent(alias)}/accent`,
+          input
+        ),
+      restoreDescription: (alias: string, input: { base_revision: number }) =>
+        http.post<AdminVoiceLibraryItem>(
+          `/speech/library/${encodeURIComponent(alias)}/description/restore`,
+          input
         ),
       saveDescription: (alias: string, input: SaveAdminVoiceDescriptionInput) =>
         http.put<AdminVoiceLibraryItem>(
           `/speech/library/${encodeURIComponent(alias)}/description`,
           input,
-          { headers: { "X-TSZ-Voice-Models": "v1" } }
+          {
+            headers: { "X-TSZ-Voice-Models": "v1" }
+          }
         )
     },
     /**
@@ -368,6 +473,11 @@ export function createAdminEndpoints(http: HttpClient) {
      * 契约以 tsz-rust/docs/openapi.json 与 tsz-rust/docs/object-storage-design.md 为准。
      */
     audioAssets: {
+      content: (id: string, signal?: AbortSignal) =>
+        http.getBlob(
+          `/lexicon/audio-assets/${encodeURIComponent(id)}/content`,
+          { signal }
+        ),
       /** POST /admin/lexicon/audio-assets/upload-url — 三步之①；存储未开通返回 501。 */
       createUpload: (input: CreateAudioUploadInput, signal?: AbortSignal) =>
         http.post<CreateAudioUploadResponse>(

@@ -21,6 +21,7 @@ export interface GenerateVoiceAudioRequest {
   request_id: string;
   source: GeneratedSpeechSource;
   setting: VoiceSettingV3;
+  profile?: import("./admin-word-v3").VoiceProfileV3;
 }
 export interface GenerateVoiceAudioResponse {
   asset: AudioAssetV3;
@@ -49,7 +50,24 @@ export interface AdminSpeechVoiceMetadata {
   checked_at: string;
 }
 
+export type VoiceAccent = "gb" | "us" | "none";
+
 export interface AdminSpeechVoice {
+  accent?: VoiceAccent;
+  accent_revision?: number;
+  synthesis_available?: boolean;
+  capability_evidence?: {
+    provider_voice_id: string;
+    locale: string;
+    gender: string;
+    model: string;
+    styles: string[];
+    supported_locales: string[] | null;
+    roles: string[] | null;
+    supports_style_degree: boolean | null;
+    source_url: string;
+    checked_at: string;
+  };
   alias: string;
   display_name: string;
   is_common: boolean;
@@ -60,6 +78,7 @@ export interface AdminSpeechVoice {
 }
 
 export interface AdminDubbingRecommendation {
+  selected?: boolean;
   id: string;
   name: string;
   voice_alias: string;
@@ -67,6 +86,8 @@ export interface AdminDubbingRecommendation {
 }
 
 export interface AdminDubbingGroup {
+  revision?: number;
+  is_global?: boolean;
   id: string;
   name: string;
   areas: string[];
@@ -79,6 +100,36 @@ export interface AdminDubbingGroupsResponse {
   revision: number;
 }
 
+export interface AdminDubbingUpdateSettings {
+  wait_seconds: number;
+  enabled: boolean;
+  revision: number;
+}
+
+export interface SaveAdminDubbingUpdateSettings {
+  wait_seconds: number;
+  enabled: boolean;
+  base_revision: number;
+}
+
+export interface AdminDubbingAudioUpdate {
+  id: string;
+  group_id: string;
+  group_name: string;
+  group_revision: number;
+  state: string;
+  due_at: string;
+  total: number;
+  completed: number;
+  failed: number;
+  skipped: number;
+  error_codes: string[];
+}
+
+export interface AdminDubbingAudioUpdates {
+  updates: AdminDubbingAudioUpdate[];
+}
+
 export interface SaveAdminDubbingGroupsInput {
   groups: AdminDubbingGroup[];
   base_revision: number;
@@ -89,10 +140,14 @@ export interface AdminVoiceParameters {
   pitch_semitones: number;
   volume_percent?: number;
   style: string | null;
+  style_degree?: number;
+  role?: string;
 }
 
 export interface AdminVoiceLibraryItem {
   voice_alias: string;
+  accent?: VoiceAccent;
+  accent_revision?: number;
   description_zh: string | null;
   description_revision: number;
   parameters: AdminVoiceParameters | null;
@@ -120,15 +175,19 @@ export interface AdminSpeechVoiceListResponse {
 }
 
 export interface CreateAdminSpeechPreviewInput {
+  output_format?: "mp3" | "wav";
   content: RichTextV2;
   voice_alias: string;
   style?: string | null;
   rate_percent?: number;
   pitch_semitones?: number;
   volume_percent?: number;
+  style_degree?: number;
+  role?: string;
 }
 
 export interface AdminSpeechPreviewResponse {
+  content_path?: string;
   cache_status: "hit" | "generated";
   audio_url: string;
   expires_at: string;

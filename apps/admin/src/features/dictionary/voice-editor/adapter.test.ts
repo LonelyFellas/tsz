@@ -130,6 +130,7 @@ describe("admin voice preview adapter", () => {
         supportsVolume: true,
         supportsPause: true,
         supportsPhoneme: true,
+        supportsStyleDegree: false,
         isDefault: true,
         rateRange: { min: -10, max: 10 },
         pitchRange: { min: 0, max: 0 }

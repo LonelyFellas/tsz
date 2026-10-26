@@ -5,7 +5,12 @@ import type {
   PublishedSentenceTargetCandidateV3,
   DraftMeaningsStepContentWritableV3
 } from "@tsz/types";
-import { commonFormFixture, formsFixture, ukUsFormFixture } from "../fixtures";
+import {
+  commonFormFixture as baseCommonFormFixture,
+  formsFixture,
+  ukUsFormFixture as baseUkUsFormFixture
+} from "../fixtures";
+import { readingRevision } from "@tsz/shared";
 import {
   act,
   fireEvent,
@@ -14,14 +19,86 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { expect, it, vi } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 import { V3TextAssociationPicker } from "./V3TextAssociationPicker";
 import { V3GrammarFormPicker } from "./V3GrammarFormPicker";
 const search = vi.fn();
 const get = vi.fn();
+const getPublication = vi.fn();
+const testReading = {
+  id: "reading-give",
+  dict_phonetic: "",
+  actual_pron: "",
+  synthesis: {
+    alphabet: "ipa" as const,
+    ipa: "ɡɪv",
+    ups: "G IH V",
+    uk: { ipa: "ɡɪv", ups: "G IH V" },
+    us: { ipa: "ɡɪv", ups: "G IH V" }
+  }
+};
+function commonFormFixture(
+  input: Parameters<typeof baseCommonFormFixture>[0] = {}
+) {
+  return baseCommonFormFixture({ pronunciations: [testReading], ...input });
+}
+function ukUsFormFixture(
+  input: Parameters<typeof baseUkUsFormFixture>[0] = {}
+) {
+  const form = baseUkUsFormFixture(input);
+  form.regional_variants.uk.pronunciations = [testReading];
+  form.regional_variants.us.pronunciations = [testReading];
+  return form;
+}
+beforeEach(() => {
+  const word = {
+    id: "entry-give",
+    presentation: { label: "give" },
+    forms: formsFixture({
+      pos_id: "pos-give",
+      pos: "verb",
+      forms: [
+        commonFormFixture({
+          id: "form-give",
+          variant_id: "variant-give",
+          spelling: "give"
+        })
+      ]
+    }),
+    meanings: { pos: [], sense_groups: [] }
+  };
+  get.mockResolvedValue({ word });
+  getPublication.mockResolvedValue({ publication: { word } });
+});
+async function chooseReading() {
+  const input = await screen.findByLabelText("英式具体读法");
+  await waitFor(() => {
+    fireEvent.mouseDown(input);
+    expect(
+      document.querySelector(
+        '.ant-select-item-option[title="读法 1 · IPA · ɡɪv"]'
+      )
+    ).not.toBeNull();
+  });
+  fireEvent.click(
+    document.querySelector(
+      '.ant-select-item-option[title="读法 1 · IPA · ɡɪv"]'
+    )!
+  );
+}
+const readingReference = {
+  uk: {
+    pronunciation_id: testReading.id,
+    alphabet: "ipa",
+    locale: "en-GB",
+    use_spelling: false,
+    revision: readingRevision(testReading.synthesis, "en-GB", "common", "ipa")
+  }
+};
 vi.mock("../api", () => ({
   createV3WordRequests: () => ({
     get: (id: string) => get(id),
+    getPublication: (...args: unknown[]) => getPublication(...args),
     searchComponentTargets: (input: unknown) => search(input)
   })
 }));
@@ -110,6 +187,7 @@ it("语法结构选到词形先暂存，确认才绑定，无释义的词形也�
     screen.getByText(/原形 give/).closest(".ant-cascader-menu-item-content")!
   );
   expect(onSelect).not.toHaveBeenCalled();
+  await chooseReading();
   fireEvent.click(screen.getByRole("button", { name: "确认词形关联" }));
   expect(onSelect).toHaveBeenCalledWith({
     id: expect.any(String),
@@ -119,7 +197,8 @@ it("语法结构选到词形先暂存，确认才绑定，无释义的词形也�
     target_pos_id: "pos-give",
     target_form_id: "form-give",
     target_variant_id: "variant-give",
-    target_dialect: "common"
+    target_dialect: "common",
+    reading_reference: readingReference
   });
   expect(screen.queryByText("暂无可关联词义")).toBeNull();
 });
@@ -146,6 +225,7 @@ it("新词形关联取消不提交，并清除待确认状态", async () => {
   fireEvent.click(await screen.findByText("原形 give · 英美通用"));
   expect(onSelect).not.toHaveBeenCalled();
   expect(onPendingChange).toHaveBeenLastCalledWith(true);
+  await chooseReading();
   expect(screen.getByRole("button", { name: "确认词形关联" })).toBeEnabled();
   fireEvent.click(screen.getByRole("button", { name: "取消词形关联" }));
   expect(onCancel).toHaveBeenCalledTimes(1);
@@ -180,6 +260,7 @@ it("语法结构可关联当前未保存词形，服务端没有候选也可选�
     expect(screen.getByText("原形 job · 英美通用")).toBeVisible();
   });
   fireEvent.click(screen.getByText("原形 job · 英美通用"));
+  await chooseReading();
   fireEvent.click(screen.getByRole("button", { name: "确认词形关联" }));
   expect(onSelect).toHaveBeenCalledWith({
     id: expect.any(String),
@@ -188,7 +269,8 @@ it("语法结构可关联当前未保存词形，服务端没有候选也可选�
     target_pos_id: "pos-job",
     target_form_id: "form-job",
     target_variant_id: "variant-job",
-    target_dialect: "common"
+    target_dialect: "common",
+    reading_reference: readingReference
   });
   expect(screen.queryByText("没有匹配的词形")).toBeNull();
 });
@@ -215,6 +297,7 @@ it("语法结构搜索包含其他词条的已保存草稿", async () => {
     expect(screen.getByText("原形 give · 英美通用")).toBeVisible();
   });
   fireEvent.click(screen.getByText("原形 give · 英美通用"));
+  await chooseReading();
   fireEvent.click(screen.getByRole("button", { name: "确认词形关联" }));
   expect(onSelect).toHaveBeenCalledWith(
     expect.objectContaining({ target_word_id: "entry-give" })
@@ -262,6 +345,7 @@ it("当前词条只展示编辑中的词形，不重复展示已保存草稿或�
     expect(screen.getByText("原形 give · 英美通用")).toBeVisible();
   });
   fireEvent.click(screen.getByText("原形 give · 英美通用"));
+  await chooseReading();
   fireEvent.click(screen.getByRole("button", { name: "确认词形关联" }));
   expect(props.onSelect).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -316,6 +400,7 @@ it("同拼写、不同音标的 job/Job 各显示一条英美通用，关联沿�
   expect(screen.getAllByText("原形 Job · 英美通用")).toHaveLength(1);
   expect(screen.queryByText(/原形 [jJ]ob · (英式|美式)/)).toBeNull();
   fireEvent.click(screen.getByText("原形 job · 英美通用"));
+  await chooseReading();
   fireEvent.click(screen.getByRole("button", { name: "确认词形关联" }));
   expect(onSelect).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -529,6 +614,7 @@ it("已有发布版自关联仍回显，确认后可切换为当前编辑词形"
   });
   fireEvent.click(screen.getByText("原形 give · 英美通用"));
   expect(onSelect).not.toHaveBeenCalled();
+  await chooseReading();
   fireEvent.click(screen.getByRole("button", { name: "确认词形关联" }));
   expect(onSelect).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -565,6 +651,7 @@ it.each(["pub-give", undefined])(
             {
               pos_id: "pos-give",
               pos: "verb",
+              form_groups: [],
               forms: [
                 {
                   id: "form-give",
@@ -574,7 +661,8 @@ it.each(["pub-give", undefined])(
                     common: {
                       id: "variant-give",
                       dialect: "common",
-                      spelling: "give"
+                      spelling: "give",
+                      pronunciations: [testReading]
                     }
                   }
                 }
@@ -662,6 +750,26 @@ it("切换词形暂存到确认，取消保留原关联，重复确认当前词�
     target_variant_id: "variant-give",
     target_dialect: "common"
   };
+  getPublication.mockResolvedValue({
+    publication: {
+      word: {
+        id: "entry-give",
+        presentation: { label: "give" },
+        meanings: { pos: [], sense_groups: [] },
+        forms: formsFixture({
+          pos_id: "pos-give",
+          pos: "verb",
+          forms: [
+            ukUsFormFixture({
+              id: "form-give",
+              uk: { id: "variant-give", spelling: "give" },
+              us: { id: "variant-give-us", spelling: "give" }
+            })
+          ]
+        })
+      }
+    }
+  });
   const onSelect = vi.fn();
   function Host() {
     const [selected, setSelected] = useState<GrammarFormLinkV3 | undefined>(
@@ -695,6 +803,7 @@ it("切换词形暂存到确认，取消保留原关联，重复确认当前词�
     screen.getByText("原形 give · 英美通用").closest(".ant-cascader-menu-item")
   ).toHaveAttribute("aria-checked", "true");
   fireEvent.click(alternativeLabel);
+  await chooseReading();
   fireEvent.click(screen.getByRole("button", { name: "确认词形关联" }));
   await waitFor(() =>
     expect(onSelect).toHaveBeenCalledWith(

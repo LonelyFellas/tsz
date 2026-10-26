@@ -42,12 +42,11 @@ const RELATED_SEARCH_V2 = parseBooleanEnvFlag(
   "VITE_RELATED_SEARCH_V2",
   false
 );
-// 上传音频持久化（docs/features/voice-editor-audio-upload）。后端契约（audio-assets
-// 端点与 audio_assets 字段）落地前默认关闭：开着的话保存草稿会把后端还不认识的字段送过去。
+// 开发环境默认启用已落地的音频资产链路；生产由发布配置显式开启。
 const VOICE_AUDIO_UPLOAD = parseBooleanEnvFlag(
   import.meta.env.VITE_VOICE_AUDIO_UPLOAD,
   "VITE_VOICE_AUDIO_UPLOAD",
-  false
+  !import.meta.env.PROD
 );
 const WORD_CONTENT_COMPLETION = parseBooleanEnvFlag(
   import.meta.env.VITE_WORD_CONTENT_COMPLETION,

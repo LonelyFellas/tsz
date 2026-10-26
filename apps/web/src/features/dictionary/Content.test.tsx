@@ -66,7 +66,7 @@ describe("字典内容音频", () => {
     );
     expect(view.container.querySelectorAll("button")).toHaveLength(1);
     fireEvent.click(screen.getByText("其他音色"));
-    fireEvent.click(screen.getByLabelText("播放例句（印度补充音色）"));
+    fireEvent.click(screen.getByLabelText("播放例句（印度补充音色 1）"));
     await waitFor(() =>
       expect(sign).toHaveBeenLastCalledWith("entry", "uk-in", {
         signal: expect.any(AbortSignal)
@@ -83,7 +83,7 @@ describe("字典内容音频", () => {
       />
     );
     expect(view.container.querySelectorAll("button")).toHaveLength(1);
-    fireEvent.click(screen.getByLabelText("播放例句（印度补充音色）"));
+    fireEvent.click(screen.getByLabelText("播放例句（印度补充音色 1）"));
     await waitFor(() =>
       expect(sign).toHaveBeenLastCalledWith("entry", "us-in", {
         signal: expect.any(AbortSignal)
@@ -100,6 +100,31 @@ describe("字典内容音频", () => {
       />
     );
     expect(view.container.querySelectorAll("button")).toHaveLength(0);
+  });
+  it("同口音多个版本按持久顺序默认播放，其余版本可单独播放", async () => {
+    const versions = [audio[0]!, { ...audio[0]!, asset_id: "second" }];
+    render(
+      <TargetAudio
+        entryId="entry"
+        targetId="text"
+        audio={versions}
+        variant="BrE"
+        label="播放词形"
+      />
+    );
+    fireEvent.click(screen.getByLabelText("播放词形（澳大利亚）"));
+    await waitFor(() =>
+      expect(sign).toHaveBeenLastCalledWith("entry", "au", {
+        signal: expect.any(AbortSignal)
+      })
+    );
+    fireEvent.click(screen.getByText("其他音色"));
+    fireEvent.click(screen.getByLabelText("播放词形（澳大利亚补充音色 1）"));
+    await waitFor(() =>
+      expect(sign).toHaveBeenLastCalledWith("entry", "second", {
+        signal: expect.any(AbortSignal)
+      })
+    );
   });
   it("按分类选择AU/CA，兼容旧响应，缺侧不回退到补充声音", () => {
     expect(preferredAudio(audio, "text", "BrE")?.asset_id).toBe("au");
@@ -131,14 +156,14 @@ describe("字典内容音频", () => {
     fireEvent.click(summary);
     details.open = true;
     expect(screen.queryByLabelText(/爱尔兰/)).toBeNull();
-    fireEvent.click(screen.getByLabelText("播放例句（印度补充音色）"));
+    fireEvent.click(screen.getByLabelText("播放例句（印度补充音色 1）"));
     await waitFor(() =>
       expect(sign).toHaveBeenCalledWith("entry", "in", {
         signal: expect.any(AbortSignal)
       })
     );
     await waitFor(() => expect(play).toHaveBeenCalledTimes(1));
-    const button = screen.getByLabelText("播放例句（印度补充音色）");
+    const button = screen.getByLabelText("播放例句（印度补充音色 1）");
     details.open = false;
     fireEvent(details, new Event("toggle"));
     expect(container.contains(button)).toBe(true);

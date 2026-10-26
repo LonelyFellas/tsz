@@ -838,11 +838,11 @@
 }
 
 .tsz-ve-pop-section[data-locale="en-GB"] {
-  --tsz-ve-pop-accent: var(--ant-color-error, #ff4d4f);
+  --tsz-ve-pop-accent: #2053ff;
 }
 
 .tsz-ve-pop-section[data-locale="en-US"] {
-  --tsz-ve-pop-accent: var(--ant-color-primary, #2053ff);
+  --tsz-ve-pop-accent: #fc007a;
 }
 
 .tsz-ve-pop-row {
@@ -1141,6 +1141,54 @@
 .tsz-ve-speech-tool[aria-expanded="true"]::after {
   margin-top: 2px;
   transform: rotate(225deg);
+}
+
+.tsz-ve-audio-review,
+.tsz-ve-ssml-review,
+.tsz-ve-reference-audio {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ant-color-border-secondary, #f0f0f0);
+}
+
+.tsz-ve-waveform {
+  display: block;
+  width: 100%;
+  height: 100px;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.tsz-ve-wave-baseline {
+  stroke: var(--ant-color-border, #d9d9d9);
+  stroke-width: 1;
+}
+.tsz-ve-wave-samples {
+  stroke: #2053ff;
+  stroke-width: 2;
+  fill: none;
+}
+.tsz-ve-wave-selection {
+  fill: #2053ff;
+  opacity: 0.1;
+}
+.tsz-ve-wave-cursor {
+  stroke: var(--ant-color-text, #141414);
+  stroke-width: 1;
+}
+.tsz-ve-wave-scale {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--ant-color-text-secondary, #666);
+  font-size: 12px;
+}
+.tsz-ve-audio-review .ant-input-number {
+  width: 100px;
 }
 
 @media (max-width: 600px) {

@@ -82,7 +82,10 @@ export function TargetAudio({
   const supplemental = matching.filter(
     (item) =>
       item.target_id === targetId &&
-      (item.accent_group ?? speechAccentGroup(item.locale)) === "other"
+      ((item.accent_group ?? speechAccentGroup(item.locale)) === "other" ||
+        ((item.accent_group ?? speechAccentGroup(item.locale)) ===
+          (variant === "AmE" ? "us" : "uk") &&
+          item.asset_id !== primary?.asset_id))
   );
   if (!primary && !supplemental.length)
     return audio.some(
@@ -115,7 +118,7 @@ export function TargetAudio({
                 <AudioButton
                   entryId={entryId}
                   audio={item}
-                  label={`${label}（${speechRegionLabel(item.locale)}补充音色）`}
+                  label={`${label}（${speechRegionLabel(item.locale)}补充音色 ${supplemental.indexOf(item) + 1}）`}
                 />
               </div>
             ))}

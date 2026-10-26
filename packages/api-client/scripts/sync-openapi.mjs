@@ -178,7 +178,12 @@ const IGNORED_ANNOTATION_KEYWORDS = new Set([
   "example",
   "readOnly"
 ]);
-const IGNORED_ANNOTATION_FORMATS = new Set(["int32", "int64"]);
+const IGNORED_ANNOTATION_FORMATS = new Set([
+  "int32",
+  "int64",
+  "float",
+  "double"
+]);
 const SUPPORTED_VALIDATION_FORMATS = new Set(["date", "date-time", "uuid"]);
 
 const sourceText = readFileSync(source, "utf8");
@@ -190,6 +195,12 @@ const contractSchemaNames = [
   "VoiceLibraryItem",
   "VoiceLibraryResponse",
   "DubbingGroupsResponse",
+  "DubbingAudioUpdates",
+  "DubbingAudioUpdate",
+  "DubbingUpdateSettings",
+  "SaveDubbingUpdateSettings",
+  "RenderSsmlResponse",
+  "PreviewResponse",
   "AdminWordCreator",
   "LoginRewardRequest",
   "LoginRewardDay",
@@ -311,6 +322,7 @@ const contractSchemaNames = [
   "SentenceTargetSenseV3",
   "PublishedSentenceTargetCandidateV3",
   "VoiceCapabilities",
+  "VoiceCapabilityEvidence",
   "VoiceResponse",
   "VoiceMetadata",
   "VoiceListResponse",

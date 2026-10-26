@@ -10,14 +10,24 @@ import {
   PauseOutlined,
   SoundOutlined
 } from "@ant-design/icons";
-import { Alert, Button, Modal, Select, Space, Tag, Tooltip } from "antd";
+import { Alert, Button, Input, Modal, Select, Space, Tag, Tooltip } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { RichText, RichTextV2, TextLinkV3 } from "@tsz/types";
+import type {
+  GrammarFormLinkV3,
+  RichText,
+  RichTextV2,
+  TextLinkV3
+} from "@tsz/types";
 import { AUDIO_ASSETS_PER_VARIANT_MAX } from "@tsz/types";
 import {
   MAX_PAUSE_MS,
   MIN_PAUSE_MS,
   isVoiceRecommendationAvailable,
+  localVoiceProfile,
+  recommendationVoiceSetting,
+  retainResolvedAudio,
+  voiceEffectKey,
+  resolveRecommendedVoices,
   newVoiceVersionId,
   selectVoiceVersion,
   voiceLocale,
@@ -54,6 +64,9 @@ import {
 } from "./audioAssets";
 import { MarkupPanel, type DropdownTool } from "./MarkupPanel";
 import { VoiceVersions } from "./VoiceVersions";
+import { AudioReview, type ReviewAudio } from "./AudioReview";
+import { SsmlReview } from "./SsmlReview";
+import { ReferenceAudio } from "./ReferenceAudio";
 import {
   LiaisonIcon,
   PausePanel,
@@ -150,6 +163,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   textLinks,
   restoreTextLinksOnCorrection = false,
   renderAssociationPicker,
+  readingLinks,
+  renderReadingPicker,
   onAssociationPendingChange,
   renderActions,
   language = "en",
@@ -177,6 +192,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   const [recommendations, setRecommendations] = useState<VoiceRecommendation[]>(
     []
   );
+  const [recommendationsLoaded, setRecommendationsLoaded] = useState(false);
   const [recommendationId, setRecommendationId] = useState<string>();
   const [recommendationError, setRecommendationError] = useState("");
   const [editingVersionKey, setEditingVersionKey] = useState<string>();
@@ -199,6 +215,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     recommendationRequest.current?.abort();
     setRefreshingRecommendations(false);
     setRecommendations([]);
+    setRecommendationsLoaded(false);
     setRecommendationId(undefined);
     setRecommendationError("");
     if (!loadRecommendations || !recommendationArea) return;
@@ -209,7 +226,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       signal: controller.signal
     })
       .then((items) => {
-        if (!controller.signal.aborted) setRecommendations(items);
+        if (!controller.signal.aborted) {
+          setRecommendations(items);
+          setRecommendationsLoaded(true);
+        }
       })
       .catch(() => {
         if (!controller.signal.aborted)
@@ -226,6 +246,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   const [initial] = useState(() => parseValue(value));
   const [text, setText] = useState(initial.value.text);
   const [links, setLinks] = useState<TLink[]>(textLinks ?? []);
+  const [speechLinks, setSpeechLinks] = useState<GrammarFormLinkV3[]>(
+    readingLinks ?? []
+  );
   const [recoverableLinks, setRecoverableLinks] = useState<
     RecoverableTextLink<TLink>[]
   >([]);
@@ -249,6 +272,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     end: number;
   }>();
   const [spellingNotice, setSpellingNotice] = useState("");
+  const [readingKind, setReadingKind] = useState("characters");
+  const [readingAlias, setReadingAlias] = useState("");
   const [caretPosition, setCaretPosition] = useState<number>();
   const [pauseGap, setPauseGap] = useState<number>();
   const [pendingConflict, setPendingConflict] = useState<
@@ -307,13 +332,6 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   );
   voiceSettingsRef.current = voiceSettings;
   latestReadOnly.current = !!readOnly;
-  const enabledVoiceIds = useMemo(
-    () =>
-      voiceSettings
-        .filter((voice) => voice.enabled)
-        .map((voice) => voice.voice_id),
-    [voiceSettings]
-  );
   const [upload, setUpload] = useState<UploadDraft>({
     locale: locale ?? "en-GB",
     gender: "female"
@@ -324,10 +342,26 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   /** 还没落成资产的上传：进行中或失败待重试。 */
   const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
   const [playingAssetId, setPlayingAssetId] = useState<string>();
+  const [assetReview, setAssetReview] = useState<ReviewAudio>();
   /** 试听失败的说明；只在音频面板里显示，不走阻断性错误那条红色通道。 */
   const [playbackMessage, setPlaybackMessage] = useState<string>();
   const uploadSeqRef = useRef(0);
   const uploadAudioRef = useRef<HTMLAudioElement | null>(null);
+  const stopReferenceRef = useRef<(() => void) | undefined>(undefined);
+  const registerReferenceStop = useCallback((stop: () => void) => {
+    stopReferenceRef.current = stop;
+    return () => {
+      if (stopReferenceRef.current === stop)
+        stopReferenceRef.current = undefined;
+    };
+  }, []);
+  const stopSsmlRef = useRef<(() => void) | undefined>(undefined);
+  const registerSsmlStop = useCallback((stop: () => void) => {
+    stopSsmlRef.current = stop;
+    return () => {
+      if (stopSsmlRef.current === stop) stopSsmlRef.current = undefined;
+    };
+  }, []);
   /** 正在取签名 URL 的那次试听；停播 / 卸载时中止，免得 URL 回来后在没人管的地方开播。 */
   const playRequestRef = useRef<AbortController | null>(null);
   const playingAssetIdRef = useRef<string | undefined>(undefined);
@@ -363,7 +397,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
    * 数据当成用户改动抛出去：人还没动手，历史标注已经被改写、表单已经变脏。
    */
   const incomingRef = useRef(
-    JSON.stringify({ value: initial.value, links: textLinks ?? [] })
+    JSON.stringify({
+      value: initial.value,
+      links: textLinks ?? [],
+      readingLinks: readingLinks ?? []
+    })
   );
   const emittedRef = useRef<string | undefined>(undefined);
   /** 记住最近用过的语法结构分类：画笔切到连读/停顿再切回来时不必重挑。 */
@@ -377,6 +415,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     playRequestRef.current = null;
     uploadAudioRef.current?.pause();
     uploadAudioRef.current = null;
+    setAssetReview(undefined);
     playingAssetIdRef.current = undefined;
     setPlayingAssetId(undefined);
   }, []);
@@ -456,14 +495,19 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   }, [marks, text]);
 
   const workingValue = working.value;
-  const serialized = JSON.stringify({ value: workingValue, links });
+  const serialized = JSON.stringify({
+    value: workingValue,
+    links,
+    readingLinks: speechLinks
+  });
 
   // 外部值变了才重新灌入；自己刚抛出去、又被父组件回灌的那一份直接跳过。
   useEffect(() => {
     const parsed = parseValue(value);
     const incoming = JSON.stringify({
       value: parsed.value,
-      links: textLinks ?? []
+      links: textLinks ?? [],
+      readingLinks: readingLinks ?? []
     });
     if (incoming === incomingRef.current) return;
     incomingRef.current = incoming;
@@ -471,6 +515,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     emittedRef.current = undefined;
     setText(parsed.value.text);
     setLinks(textLinks ?? []);
+    setSpeechLinks(readingLinks ?? []);
     setRecoverableLinks([]);
     setMarks(annotationsToMarks(parsed.value));
     setLoadError(parsed.error ?? "");
@@ -482,7 +527,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     setValidationMessage("");
     setPast([]);
     setFuture([]);
-  }, [value, textLinks]);
+  }, [value, textLinks, readingLinks]);
 
   // 折算结果一变就往上抛；折算不出合法 wire 时不抛，免得把坏值写进表单。
   useEffect(() => {
@@ -499,7 +544,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     emittedRef.current = serialized;
     // 自己抛出去的这份，等父组件回灌时不能再被当成外部改动。
     incomingRef.current = serialized;
-    if (
+    if (readingLinks !== undefined || renderReadingPicker)
+      onChange(workingValue, links, speechLinks);
+    else if (
       mode === "association" ||
       (mode === "grammar" && textLinks !== undefined)
     )
@@ -512,8 +559,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     working.error,
     workingValue,
     links,
+    speechLinks,
     mode,
-    textLinks
+    textLinks,
+    readingLinks,
+    renderReadingPicker
   ]);
 
   /* 自己刚抛出去、又被父组件回灌的那份要跳过，否则每次改动都会重置一遍。 */
@@ -532,7 +582,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   ) => {
     if (readOnly) return;
     initialRecommendationPending.current = false;
-    const existing = voiceSettingFor(voiceSettings, voiceId, editingVersionKey);
+    const existing = voiceSettingFor(
+      displayedSettings,
+      voiceId,
+      editingVersionKey
+    );
     const updated = withNativeVoiceVersion(
       {
         ...(existing ?? {
@@ -542,21 +596,33 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           ...voices.find((voice) => voice.id === voiceId)?.defaultSettings
         }),
         ...patch,
-        ...(["rate_percent", "pitch_semitones", "volume_percent", "style"].some(
-          (key) => key in patch
-        )
+        ...([
+          "rate_percent",
+          "pitch_semitones",
+          "volume_percent",
+          "style",
+          "style_degree",
+          "role",
+          "output_format"
+        ].some((key) => key in patch)
           ? { audio_asset_id: undefined }
           : {})
       },
       voices.find((voice) => voice.id === voiceId)
     );
+    const baseline = displayedSettings;
     const next = existing
-      ? voiceSettings.map((item) =>
+      ? baseline.map((item) =>
           voiceSettingKey(item) === voiceSettingKey(existing) ? updated : item
         )
-      : [...voiceSettings, updated];
-    setVoiceSettings(next);
-    const profile = { voices: next };
+      : [...baseline, updated];
+    const profile = localVoiceProfile(
+      next,
+      voices,
+      recommendationArea,
+      voiceProfile
+    );
+    setVoiceSettings(profile.voices);
     emittedProfileRef.current = JSON.stringify(profile);
     onVoiceProfileChange?.(profile);
   };
@@ -565,6 +631,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     voices,
     voicesLoading,
     status: auditionStatus,
+    media: auditionMedia,
     pendingVoiceId,
     playingVoiceId,
     audition,
@@ -581,8 +648,13 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     if (readOnly || !onVoiceProfileChange) return;
     initialRecommendationPending.current = false;
     stopAudition();
-    setVoiceSettings(next);
-    const profile = { voices: next };
+    const profile = localVoiceProfile(
+      next,
+      voices,
+      recommendationArea,
+      voiceProfile
+    );
+    setVoiceSettings(profile.voices);
     emittedProfileRef.current = JSON.stringify(profile);
     onVoiceProfileChange(profile);
   }
@@ -593,14 +665,176 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       : mode === "spelling"
         ? {
             ...workingValue,
-            annotations: workingValue.annotations.filter(
-              (mark) => mark.type === "pause"
+            annotations: workingValue.annotations.filter((mark) =>
+              ["pause", "say_as", "sub"].includes(mark.type)
             )
           }
         : workingValue;
+  const inherited = voiceProfile?.dubbing?.mode === "inherit";
+  const resolutionKey = JSON.stringify([
+    voiceProfile,
+    generationContent,
+    previewAdapter?.audioSourceKey,
+    locale
+  ]);
+  const [resolvedVoices, setResolvedVoices] = useState<{
+    key: string;
+    voices: VoiceSetting[];
+  }>();
+  useEffect(() => {
+    if (!voiceProfile?.dubbing || !previewAdapter?.resolveVoices) return;
+    const controller = new AbortController();
+    Promise.allSettled(
+      (["gb", "us"] as const)
+        .filter(
+          (accent) =>
+            !locale || (locale === "en-GB" ? accent === "gb" : accent === "us")
+        )
+        .map((accent) =>
+          previewAdapter.resolveVoices!(
+            { profile: voiceProfile, content: generationContent, accent },
+            { signal: controller.signal }
+          )
+        )
+    )
+      .then((values) => {
+        if (controller.signal.aborted) return;
+        setResolvedVoices({
+          key: resolutionKey,
+          voices: values.flatMap((value) =>
+            value.status === "fulfilled" ? value.value : []
+          )
+        });
+        const failed = values.find((value) => value.status === "rejected");
+        setRecommendationError(
+          failed?.status === "rejected"
+            ? failed.reason instanceof Error
+              ? failed.reason.message
+              : "部分口音配音解析失败，请修复配置"
+            : ""
+        );
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          setResolvedVoices({ key: resolutionKey, voices: [] });
+          setRecommendationError(
+            error instanceof Error
+              ? error.message
+              : "有效配音解析失败，请修复配置"
+          );
+        }
+      });
+    return () => controller.abort();
+  }, [resolutionKey, previewAdapter]);
+  const effectiveSettings = useMemo(() => {
+    if (voiceProfile?.dubbing && previewAdapter?.resolveVoices)
+      return resolvedVoices?.key === resolutionKey
+        ? retainResolvedAudio(resolvedVoices.voices, voiceSettings)
+        : [];
+    return resolveRecommendedVoices(
+      voiceProfile?.dubbing
+        ? { ...voiceProfile, voices: voiceSettings }
+        : { voices: voiceSettings },
+      recommendations,
+      voices,
+      locale
+    );
+  }, [
+    voiceProfile,
+    voiceSettings,
+    recommendations,
+    voices,
+    locale,
+    previewAdapter,
+    resolvedVoices,
+    resolutionKey
+  ]);
+  const unavailableVersions =
+    voiceProfile?.dubbing && previewAdapter?.resolveVoices
+      ? new Set(
+          voiceSettings
+            .filter(
+              (setting) =>
+                setting.enabled &&
+                !effectiveSettings.some(
+                  (resolved) =>
+                    voiceSettingKey(resolved) === voiceSettingKey(setting)
+                )
+            )
+            .map(voiceSettingKey)
+        )
+      : undefined;
+  const displayedSettings = voiceProfile?.dubbing
+    ? [
+        ...effectiveSettings,
+        ...voiceSettings.filter(
+          (setting) =>
+            !effectiveSettings.some(
+              (resolved) =>
+                voiceSettingKey(resolved) === voiceSettingKey(setting)
+            )
+        )
+      ]
+    : voiceSettings;
+  const previousAudio = voiceProfile?.dubbing
+    ? voiceSettings.filter(
+        (setting) =>
+          setting.audio_asset_id &&
+          effectiveSettings.some(
+            (resolved) =>
+              voiceSettingKey(resolved) === voiceSettingKey(setting) &&
+              voiceEffectKey(resolved) !== voiceEffectKey(setting)
+          )
+      )
+    : [];
+  const enabledVoiceIds = displayedSettings
+    .filter((voice) => voice.enabled)
+    .map((voice) => voice.voice_id);
+  function reorderVoices(next: VoiceSetting[]) {
+    if (!voiceProfile?.dubbing || readOnly || !onVoiceProfileChange) return;
+    const ids = next.map(voiceSettingKey);
+    const profile = {
+      ...voiceProfile,
+      dubbing: { ...voiceProfile.dubbing, recommendation_order: ids },
+      voices: [...voiceSettings].sort(
+        (left, right) =>
+          ids.indexOf(voiceSettingKey(left)) -
+          ids.indexOf(voiceSettingKey(right))
+      )
+    };
+    setVoiceSettings(profile.voices);
+    emittedProfileRef.current = JSON.stringify(profile);
+    onVoiceProfileChange(profile);
+  }
+  const currentDubbing = useRef({
+    settings: effectiveSettings,
+    mode: voiceProfile?.dubbing,
+    profile: voiceProfile
+  });
+  currentDubbing.current = {
+    settings: voiceProfile?.dubbing ? displayedSettings : voiceSettings,
+    mode: voiceProfile?.dubbing,
+    profile: voiceProfile
+  };
+  async function restoreRecommendations() {
+    if (!recommendationArea || readOnly || !onVoiceProfileChange) return;
+    stopAudition();
+    const profile = {
+      voices: [],
+      dubbing: {
+        mode: "inherit" as const,
+        area: recommendationArea,
+        recommendation_order: voiceProfile?.dubbing?.recommendation_order ?? []
+      }
+    };
+    setVoiceSettings([]);
+    emittedProfileRef.current = JSON.stringify(profile);
+    onVoiceProfileChange(profile);
+  }
   const audioContentKey = JSON.stringify([
     generationContent,
-    links,
+    mode === "grammar" ? links : undefined,
+    speechLinks,
     previewAdapter?.audioSourceKey
   ]);
   const lastAudioContent = useRef(audioContentKey);
@@ -613,6 +847,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     setGeneratingVersion(undefined);
     if (voiceSettingsRef.current.some((setting) => setting.audio_asset_id)) {
       const profile = {
+        ...voiceProfile,
         voices: voiceSettingsRef.current.map(
           ({ audio_asset_id: _audio, ...setting }) => setting
         )
@@ -629,6 +864,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       !previewAdapter?.generateAudio ||
       readOnly ||
       generatingVersion ||
+      unavailableVersions?.has(voiceSettingKey(setting)) ||
       !setting.version_id
     )
       return;
@@ -658,12 +894,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     const signature = JSON.stringify([
       content,
       previewAdapter.audioSourceKey,
-      {
-        ...setting,
-        enabled: undefined,
-        version_name: undefined,
-        audio_asset_id: undefined
-      }
+      key,
+      voiceEffectKey(setting)
     ]);
     const previous = generationKeys.current.get(key);
     const requestId =
@@ -673,19 +905,26 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     const request = new AbortController();
     generationRequest.current = request;
     const baseline = audioContentRef.current;
+    const modeBaseline = JSON.stringify(voiceProfile?.dubbing);
     setGeneratingVersion(key);
     setRecommendationError("");
     try {
       const asset = await previewAdapter.generateAudio(
-        { requestId, content, setting },
+        {
+          requestId,
+          content,
+          setting,
+          ...(voiceProfile?.dubbing ? { profile: voiceProfile } : {})
+        },
         { signal: request.signal }
       );
-      const current = voiceSettingsRef.current.find(
+      const current = currentDubbing.current.settings.find(
         (item) => voiceSettingKey(item) === key
       );
       if (
         request.signal.aborted ||
         baseline !== audioContentRef.current ||
+        modeBaseline !== JSON.stringify(currentDubbing.current.mode) ||
         !current ||
         latestReadOnly.current
       )
@@ -693,12 +932,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       const currentSignature = JSON.stringify([
         content,
         previewAdapter.audioSourceKey,
-        {
-          ...current,
-          enabled: undefined,
-          version_name: undefined,
-          audio_asset_id: undefined
-        }
+        key,
+        voiceEffectKey(current)
       ]);
       if (currentSignature !== signature) {
         setRecommendationError("生成期间参数已修改，请重新生成。");
@@ -709,13 +944,15 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         incomingRef.current = serialized;
         onChange(workingValue, links);
       }
-      changeVoiceSettings(
-        voiceSettingsRef.current.map((item) =>
-          voiceSettingKey(item) === key
-            ? { ...item, audio_asset_id: asset.id }
-            : item
-        )
+      const next = currentDubbing.current.settings.map((item) =>
+        voiceSettingKey(item) === key
+          ? { ...item, audio_asset_id: asset.id }
+          : item
       );
+      const profile = { ...currentDubbing.current.profile, voices: next };
+      setVoiceSettings(next);
+      emittedProfileRef.current = JSON.stringify(profile);
+      onVoiceProfileChange?.(profile);
       generationKeys.current.delete(key);
       setRecommendationError("正式音频已生成，请完成编辑并保存正文。");
     } catch (error) {
@@ -730,6 +967,17 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   }
 
   function chooseVersion(setting: VoiceSetting) {
+    const settings = displayedSettings;
+    if (setting.enabled && recommendationArea) {
+      changeVoiceSettings(
+        settings.map((item) =>
+          voiceSettingKey(item) === voiceSettingKey(setting)
+            ? { ...item, enabled: false }
+            : item
+        )
+      );
+      return;
+    }
     const accent = voiceLocale(setting, voices);
     if (!accent || !speechAccentGroup(accent)) return;
     if (
@@ -751,12 +999,18 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           locale: accent as `en-${string}`
         };
     const existing = setting.version_id
-      ? voiceSettings
-      : voiceSettings.filter(
+      ? settings
+      : settings.filter(
           (item) => voiceSettingKey(item) !== voiceSettingKey(setting)
         );
     changeVoiceSettings(
-      selectVoiceVersion(existing, selected, accent as `en-${string}`, voices)
+      selectVoiceVersion(
+        existing,
+        selected,
+        accent as `en-${string}`,
+        voices,
+        !!recommendationArea
+      )
     );
     setEditingVersionKey(voiceSettingKey(selected));
   }
@@ -771,7 +1025,13 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         ?.locale ?? item.locale) as `en-${string}`
     };
     changeVoiceSettings(
-      selectVoiceVersion(voiceSettings, version, item.locale, voices)
+      selectVoiceVersion(
+        voiceSettings,
+        version,
+        item.locale,
+        voices,
+        !!recommendationArea
+      )
     );
     setEditingVersionKey(version.version_id);
   }
@@ -835,7 +1095,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       !text.trim() ||
       !onVoiceProfileChange ||
       voicesLoading ||
-      !recommendations.length
+      (recommendationArea ? !recommendationsLoaded : !recommendations.length)
     )
       return;
     if (voiceSettings.length || voiceProfile != null) {
@@ -846,7 +1106,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       .filter((accent) => !locale || accent === locale)
       .map((accent) => recommendations.find((item) => item.locale === accent))
       .filter((item): item is VoiceRecommendation => !!item);
-    if (!first.length || !voices.length) return;
+    if (!voices.length) return;
     const usable = first.filter(recommendationAvailable);
     const unavailable = first.filter((item) => !recommendationAvailable(item));
     if (unavailable.length)
@@ -854,14 +1114,25 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         `${unavailable.map((item) => (item.locale === "en-GB" ? "英式" : "美式")).join("、")}首位推荐已失效，请选择其他音色。`
       );
     initialRecommendationPending.current = false;
-    if (!usable.length) return;
+    if (!usable.length && !recommendationArea) return;
     const profile = {
+      ...(recommendationArea
+        ? {
+            dubbing: {
+              mode: "inherit" as const,
+              area: recommendationArea,
+              recommendation_order: usable.map((item) => item.id)
+            }
+          }
+        : {}),
       voices: usable.map((item) =>
-        withNativeVoiceVersion(
-          { ...item.setting, enabled: true },
-          voices.find((voice) => voice.id === item.setting.voice_id),
-          item.name
-        )
+        recommendationArea
+          ? recommendationVoiceSetting(item, voices)
+          : withNativeVoiceVersion(
+              { ...item.setting, enabled: true },
+              voices.find((voice) => voice.id === item.setting.voice_id),
+              item.name
+            )
       )
     };
     setVoiceSettings(profile.voices);
@@ -873,6 +1144,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     onVoiceProfileChange,
     voicesLoading,
     recommendations,
+    recommendationsLoaded,
+    recommendationArea,
     locale,
     voiceSettings,
     voiceProfile,
@@ -1016,6 +1289,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     )
       return false;
     if (
+      contentReadOnly &&
+      JSON.stringify(next.readingLinks ?? []) !== JSON.stringify(speechLinks)
+    )
+      return false;
+    if (
       associationsReadOnly &&
       JSON.stringify(next.textLinks ?? []) !== JSON.stringify(links)
     ) {
@@ -1032,6 +1310,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       text,
       marks,
       textLinks: links,
+      readingLinks: speechLinks,
       recoverableTextLinks: recoverableLinks
     };
     const after = next(before);
@@ -1053,6 +1332,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     setText(after.text);
     setMarks(after.marks);
     setLinks(after.textLinks ?? []);
+    setSpeechLinks(after.readingLinks ?? []);
     setRecoverableLinks(after.recoverableTextLinks ?? []);
     setValidationMessage("");
     setSpellingNotice("");
@@ -1087,6 +1367,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           text,
           marks,
           textLinks: links,
+          readingLinks: speechLinks,
           recoverableTextLinks: recoverableLinks
         },
         ...stack
@@ -1095,6 +1376,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     setText(previous.text);
     setMarks(previous.marks);
     setLinks(previous.textLinks ?? []);
+    setSpeechLinks(previous.readingLinks ?? []);
     setRecoverableLinks(previous.recoverableTextLinks ?? []);
     setLinkNotice(
       previous.recoverableTextLinks?.length
@@ -1116,6 +1398,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           text,
           marks,
           textLinks: links,
+          readingLinks: speechLinks,
           recoverableTextLinks: recoverableLinks
         }
       ].slice(-MAX_HISTORY)
@@ -1123,6 +1406,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     setText(next.text);
     setMarks(next.marks);
     setLinks(next.textLinks ?? []);
+    setSpeechLinks(next.readingLinks ?? []);
     setRecoverableLinks(next.recoverableTextLinks ?? []);
     setLinkNotice(
       next.recoverableTextLinks?.length
@@ -1165,6 +1449,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       () => ({
         text: nextText,
         textLinks: mapped.links,
+        readingLinks: remapTextLinks(text, nextText, speechLinks),
         recoverableTextLinks: mapped.recoverable,
         marks: nextMarks
       }),
@@ -1704,7 +1989,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   };
 
   const toggleVoice = (voiceId: string) => {
-    const setting = voiceSettingFor(voiceSettings, voiceId, editingVersionKey);
+    const setting = voiceSettingFor(
+      displayedSettings,
+      voiceId,
+      editingVersionKey
+    );
     if (setting?.enabled) {
       updateVoice(voiceId, { enabled: false });
       return;
@@ -1730,16 +2019,17 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     );
     const existing =
       setting && voiceSettingKey(selected) !== voiceSettingKey(setting)
-        ? voiceSettings.filter(
+        ? displayedSettings.filter(
             (item) => voiceSettingKey(item) !== voiceSettingKey(setting)
           )
-        : voiceSettings;
+        : displayedSettings;
     changeVoiceSettings(
       selectVoiceVersion(
         existing,
         selected,
         voice.locale as `en-${string}`,
-        voices
+        voices,
+        !!recommendationArea
       )
     );
   };
@@ -1786,9 +2076,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     )
       return;
     stopAssetPlayback();
+    stopSsmlRef.current?.();
+    stopReferenceRef.current?.();
     audition(
       voice,
-      setting ?? voiceSettingFor(voiceSettings, voice.id, editingVersionKey)
+      setting ?? voiceSettingFor(displayedSettings, voice.id, editingVersionKey)
     );
   };
 
@@ -1905,6 +2197,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     }
     stopAssetPlayback();
     stopAudition();
+    stopSsmlRef.current?.();
+    stopReferenceRef.current?.();
     if (!audioUploadAdapter) return;
     setPlaybackMessage(undefined);
     // 取 URL 期间就算「在播」：再点一次是停止，连点不会起第二路
@@ -1933,10 +2227,26 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     playRequestRef.current = null;
     const audio = new Audio(resolved.url);
     uploadAudioRef.current = audio;
+    setAssetReview({
+      audio,
+      name: asset.original_name,
+      result: {
+        audioUrl: resolved.url,
+        expiresAt: resolved.expiresAt,
+        cached: true,
+        originalName: asset.original_name,
+        ...(audioUploadAdapter.loadAudio
+          ? {
+              loadAudio: (options?: { signal?: AbortSignal }) =>
+                audioUploadAdapter.loadAudio!(asset.id, options)
+            }
+          : {})
+      }
+    });
     audio.addEventListener(
       "ended",
       () => {
-        if (uploadAudioRef.current === audio) stopAssetPlayback();
+        if (uploadAudioRef.current === audio) setPlayingAssetId(undefined);
       },
       { once: true }
     );
@@ -1958,7 +2268,143 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   const storageUnavailable =
     audioUploadAdapter?.isStorageUnavailable?.() ?? false;
 
+  const readingSegment =
+    textSelection && wordSegments(text, [textSelection])[0];
+  const selectedReading =
+    readingSegment &&
+    speechLinks.find((link) =>
+      rangesOverlap(link.source_segments, [readingSegment])
+    );
   const tools = [
+    ...(renderReadingPicker
+      ? [
+          {
+            key: "reading-link",
+            label: "关联单词读法",
+            icon: <LinkOutlined aria-hidden />,
+            disabled: readOnly || !readingSegment,
+            content:
+              readingSegment && openTool === "reading-link"
+                ? renderReadingPicker({
+                    kind: "word",
+                    segments: selectedReading?.source_segments ?? [
+                      readingSegment
+                    ],
+                    selected: selectedReading,
+                    onPendingChange: setAssociationDraftPending,
+                    onCancel: () => {
+                      setOpenTool(undefined);
+                      setAssociationDraftPending(false);
+                    },
+                    onSelect: (next) => {
+                      if (readOnly) return;
+                      commit((current) => ({
+                        ...current,
+                        readingLinks: [
+                          ...(current.readingLinks ?? []).filter(
+                            (link) => link.id !== selectedReading?.id
+                          ),
+                          ...(next ? [next] : [])
+                        ]
+                      }));
+                    }
+                  })
+                : undefined
+          }
+        ]
+      : []),
+    {
+      key: "reading",
+      label: "特殊读法",
+      icon: <SoundOutlined aria-hidden />,
+      disabled: readOnly || !textSelection,
+      content: (
+        <Space orientation="vertical" size={8}>
+          <Select
+            aria-label="特殊读法类型"
+            value={readingKind}
+            onChange={setReadingKind}
+            options={[
+              { value: "characters", label: "逐字母" },
+              { value: "cardinal", label: "基数" },
+              { value: "ordinal", label: "序数" },
+              { value: "digits", label: "逐位数字" },
+              { value: "date", label: "日期" },
+              { value: "time", label: "时间" },
+              { value: "telephone", label: "电话号码" },
+              { value: "sub", label: "替换文字读" }
+            ]}
+          />
+          {readingKind === "sub" && (
+            <Input
+              aria-label="替换读法文字"
+              value={readingAlias}
+              maxLength={200}
+              onChange={(event) => setReadingAlias(event.target.value)}
+            />
+          )}
+          <Button
+            disabled={
+              !textSelection ||
+              readOnly ||
+              (readingKind === "sub" && !readingAlias.trim())
+            }
+            onClick={() => {
+              if (!textSelection) return;
+              const range = { ...textSelection };
+              const annotation =
+                readingKind === "sub"
+                  ? { type: "sub" as const, ...range, alias: readingAlias }
+                  : {
+                      type: "say_as" as const,
+                      ...range,
+                      interpret_as: readingKind as "characters"
+                    };
+              commit((current) => ({
+                ...current,
+                marks: {
+                  ...current.marks,
+                  passthrough: [
+                    ...current.marks.passthrough.filter(
+                      (mark) =>
+                        !(mark.type === "say_as" || mark.type === "sub") ||
+                        mark.end <= range.start ||
+                        mark.start >= range.end
+                    ),
+                    annotation
+                  ]
+                }
+              }));
+              setOpenTool(undefined);
+            }}
+          >
+            应用特殊读法
+          </Button>
+          <Button
+            disabled={!textSelection || readOnly}
+            onClick={() => {
+              if (!textSelection) return;
+              const range = { ...textSelection };
+              commit((current) => ({
+                ...current,
+                marks: {
+                  ...current.marks,
+                  passthrough: current.marks.passthrough.filter(
+                    (mark) =>
+                      !(mark.type === "say_as" || mark.type === "sub") ||
+                      mark.end <= range.start ||
+                      mark.start >= range.end
+                  )
+                }
+              }));
+              setOpenTool(undefined);
+            }}
+          >
+            删除特殊读法
+          </Button>
+        </Space>
+      )
+    },
     ...(mode === "grammar" ||
     mode === "association" ||
     mode === "spelling" ||
@@ -2238,6 +2684,19 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             )}
             {loadRecommendations && recommendationArea && (
               <Space wrap style={{ marginBottom: 12 }}>
+                <Tag>
+                  {inherited
+                    ? "继承推荐"
+                    : voiceProfile?.dubbing
+                      ? "局部独立"
+                      : "历史独立配置"}
+                </Tag>
+                <Button
+                  disabled={readOnly || !onVoiceProfileChange}
+                  onClick={() => void restoreRecommendations()}
+                >
+                  恢复继承推荐
+                </Button>
                 {(["en-GB", "en-US"] as const)
                   .filter((accent) => !locale || accent === locale)
                   .map((accent) => (
@@ -2253,7 +2712,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               </Space>
             )}
             <VoiceVersions
-              settings={voiceSettings}
+              multiple={!!recommendationArea}
+              settings={displayedSettings}
+              unavailableVersions={unavailableVersions}
               voices={voices}
               hasPause={generationContent.annotations.some(
                 (mark) => mark.type === "pause"
@@ -2274,6 +2735,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               readOnly={readOnly || !onVoiceProfileChange}
               onEdit={setEditingVersionKey}
               onChange={changeVoiceSettings}
+              onReorder={voiceProfile?.dubbing ? reorderVoices : undefined}
               onSelect={chooseVersion}
               onAudition={handleAudition}
               onGenerate={
@@ -2283,6 +2745,24 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               }
               generatingVersion={generatingVersion}
             />
+            {previousAudio.map((setting) => {
+              const voice = voices.find((item) => item.id === setting.voice_id);
+              return voice ? (
+                <Button
+                  key={voiceSettingKey(setting)}
+                  size="small"
+                  disabled={!previewAdapter?.resolveAudio}
+                  onClick={() => {
+                    stopAssetPlayback();
+                    stopSsmlRef.current?.();
+                    stopReferenceRef.current?.();
+                    audition(voice, setting);
+                  }}
+                >
+                  播放旧音频 · {setting.version_name ?? setting.voice_id}
+                </Button>
+              ) : null;
+            })}
             <VoicePanel
               readOnly={readOnly}
               locale={locale}
@@ -2294,7 +2774,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               voices={voices}
               voicesLoading={voicesLoading}
               enabledVoiceIds={enabledVoiceIds}
-              voiceSettings={voiceSettings}
+              voiceSettings={displayedSettings}
               editingVersionKey={editingVersionKey}
               onRateChange={(voiceId, rate_percent) =>
                 updateVoice(voiceId, { rate_percent })
@@ -2317,6 +2797,38 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                     : "TTS 后端未启用，仍可编辑"
               }
             />
+            {auditionMedia && (
+              <AudioReview
+                key={auditionMedia.result.audioUrl}
+                media={auditionMedia}
+                onPlay={() => {
+                  stopAssetPlayback();
+                  stopSsmlRef.current?.();
+                  stopReferenceRef.current?.();
+                }}
+              />
+            )}
+            <ReferenceAudio
+              registerStop={registerReferenceStop}
+              onPlay={() => {
+                stopAudition();
+                stopAssetPlayback();
+                stopSsmlRef.current?.();
+              }}
+            />
+            {previewAdapter?.renderSsml && displayedSettings.length > 0 && (
+              <SsmlReview
+                adapter={previewAdapter}
+                content={generationContent}
+                settings={displayedSettings}
+                registerStop={registerSsmlStop}
+                onPlay={() => {
+                  stopAudition();
+                  stopAssetPlayback();
+                  stopReferenceRef.current?.();
+                }}
+              />
+            )}
           </div>
         </div>
       )
@@ -2328,31 +2840,44 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       summary: assets.length > 0 ? String(assets.length) : undefined,
       icon: <AudioOutlined />,
       content: (
-        <UploadPanel
-          uploadAllowed={audioUploadAllowed}
-          readOnly={readOnly}
-          locale={locale}
-          available={Boolean(audioUploadAdapter) && !storageUnavailable}
-          unavailableReason={
-            audioUploadAdapter
-              ? "音频存储尚未开通，暂时不能上传"
-              : "音频上传未启用"
-          }
-          upload={upload}
-          onUploadChange={(next: Partial<UploadDraft>) =>
-            setUpload((current) => ({ ...current, ...next }))
-          }
-          assets={assets}
-          pending={pendingUploads}
-          limit={audioAssetLimit}
-          onAddFiles={addAudioFiles}
-          onRetryUpload={retryUpload}
-          onDismissUpload={dismissUpload}
-          onRemoveAsset={removeAsset}
-          onPlayAsset={(asset) => void playAsset(asset)}
-          playingAssetId={playingAssetId}
-          playbackMessage={playbackMessage}
-        />
+        <>
+          <UploadPanel
+            uploadAllowed={audioUploadAllowed}
+            readOnly={readOnly}
+            locale={locale}
+            available={Boolean(audioUploadAdapter) && !storageUnavailable}
+            unavailableReason={
+              audioUploadAdapter
+                ? "音频存储尚未开通，暂时不能上传"
+                : "音频上传未启用"
+            }
+            upload={upload}
+            onUploadChange={(next: Partial<UploadDraft>) =>
+              setUpload((current) => ({ ...current, ...next }))
+            }
+            assets={assets}
+            pending={pendingUploads}
+            limit={audioAssetLimit}
+            onAddFiles={addAudioFiles}
+            onRetryUpload={retryUpload}
+            onDismissUpload={dismissUpload}
+            onRemoveAsset={removeAsset}
+            onPlayAsset={(asset) => void playAsset(asset)}
+            playingAssetId={playingAssetId}
+            playbackMessage={playbackMessage}
+          />
+          {assetReview && (
+            <AudioReview
+              key={assetReview.result.audioUrl}
+              media={assetReview}
+              onPlay={() => {
+                stopAudition();
+                stopSsmlRef.current?.();
+                stopReferenceRef.current?.();
+              }}
+            />
+          )}
+        </>
       )
     }
   ].filter((tool) => {
@@ -2362,11 +2887,23 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     // 判据必须是这个显式取值：默认的 pronunciation 还挂着别的调用方，
     // 摘在默认值上会连带把它们的连读也拿掉。
     if (mode === "phoneme-settings")
-      return tool.key === "pause" || tool.key === "voices";
-    if (mode === "spelling")
-      return ["text", "italic", "liaison", "erase", "pause", "voices"].includes(
-        tool.key
+      return (
+        tool.key === "pause" ||
+        tool.key === "voices" ||
+        tool.key === "reading" ||
+        tool.key === "uploads"
       );
+    if (mode === "spelling")
+      return [
+        "text",
+        "italic",
+        "liaison",
+        "erase",
+        "pause",
+        "voices",
+        "reading",
+        "uploads"
+      ].includes(tool.key);
     if (mode === "dict-phonetic")
       return tool.key !== "roles" && tool.key !== "liaison";
     // 实际发音只用于展示，其余工具都是冲着合成去的。

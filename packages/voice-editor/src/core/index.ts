@@ -8,3 +8,4 @@ export * from "./edit-text";
 export * from "./spelling";
 export * from "./voice-recommendations";
 export * from "./voice-versions";
+export * from "./dubbing";
