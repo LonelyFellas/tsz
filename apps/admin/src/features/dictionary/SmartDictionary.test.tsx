@@ -358,7 +358,7 @@ describe("SmartDictionary", () => {
     }
   );
 
-  it("真实查询行以词名上标保留完整数字和前导0，并提供编辑入口", async () => {
+  it("词名保留完整上标和编辑入口，悬停不显示气泡", async () => {
     const annotated = {
       ...v3Word("entry", "center"),
       annotation_visible: true,
@@ -378,15 +378,16 @@ describe("SmartDictionary", () => {
     );
     const annotation = screen.getByText("00123456789012345678");
     expect(annotation.tagName).toBe("SUP");
-    fireEvent.mouseEnter(annotation.parentElement!);
-    expect(await screen.findByRole("tooltip")).toHaveTextContent(
-      "center · 00123456789012345678"
-    );
+    await act(async () => {
+      fireEvent.mouseEnter(annotation.parentElement!);
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    });
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
     expect(annotation.previousElementSibling).toHaveTextContent("center");
     expect(screen.getByLabelText("编辑标注「center」")).toBeVisible();
   });
 
-  it("服务端标志隐藏圆标和tooltip，刷新可恢复且不依据当前页数量", async () => {
+  it("服务端标志隐藏上标，刷新可恢复且不依据当前页数量", () => {
     const item = {
       ...v3Word("entry", "center"),
       annotation: "007",
@@ -411,9 +412,6 @@ describe("SmartDictionary", () => {
     expect(
       screen.queryByLabelText("编辑标注「center」")
     ).not.toBeInTheDocument();
-    fireEvent.mouseEnter(screen.getByText("center").parentElement!);
-    expect(await screen.findByRole("tooltip")).not.toHaveTextContent("007");
-    fireEvent.mouseLeave(screen.getByText("center").parentElement!);
     item.annotation_visible = true;
     rendered.rerender(view());
     expect(screen.getByText("007").tagName).toBe("SUP");
