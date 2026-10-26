@@ -1,4 +1,16 @@
 import { boundFormGroupIds } from "./meaningsModel";
+import {
+  DEFINITION_MODE_BY_PARTS,
+  definitionLanguageOf,
+  definitionStyleOf,
+  definitionsStillDefault,
+  definitionModeRemovesEnglishSettings,
+  senseNeedsDeleteConfirmation,
+  withDefinitionMode,
+  type DefinitionLanguageV3,
+  type DefinitionModeV3,
+  type DefinitionStyleV3
+} from "./definitionModel";
 import { toRichTextV2 } from "@tsz/voice-editor/core";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import { PronunciationPreviewProvider } from "../word-creation/PronunciationPreview";
@@ -33,7 +45,6 @@ import {
   Typography
 } from "antd";
 import type {
-  CefrLevel,
   Dialect,
   DialectModeV3,
   DraftFormsStepContentV3,
@@ -41,7 +52,6 @@ import type {
   EnglishTextV3,
   GrammarStructureV3,
   PartOfSpeechCatalogResponse,
-  RichTextV3,
   StepSaveIntent,
   V3DraftValidationIssue,
   WordDefinitionV3,
@@ -55,7 +65,6 @@ import { CEFR_OPTIONS } from "../labels";
 import { newWordNodeId } from "../word-model/primitives";
 import { addPartOfSpeech, deletePartOfSpeech } from "./operations";
 import {
-  DEFAULT_DEFINITION_PLAN,
   DEFAULT_SENSE_LEVEL,
   defaultDefinitions,
   definitionSummary,
@@ -864,91 +873,6 @@ function grammarStructureOptions(
   );
 }
 
-/** 这条释义还没录入任何东西：正文空白（英文两侧都算）且没选语法结构。 */
-function definitionIsBlank(definition: WordDefinitionV3): boolean {
-  if (definition.grammar_structure_id) return false;
-  if (
-    definition.definition_mode === "zh_definition" ||
-    definition.definition_mode === "zh_sentence"
-  )
-    return (definition.content as RichTextV3).text.trim() === "";
-  // 与 definitionRichText 同一处理：交叉类型下 definition_mode 收窄不到 content，显式断言。
-  const english = definition.content as EnglishTextV3;
-  const variants =
-    english.mode === "unified"
-      ? [english.common]
-      : [english.uk, english.us].flatMap((slot) =>
-          slot.state === "ready" ? [slot.variant] : []
-        );
-  return variants.every((variant) => variant.value.text.trim() === "");
-}
-
-/**
- * 这组释义是否还停在某个等级的默认铺排：条数、语言、等级、释义方式全对得上，
- * 且每条都还空着。只有这样才敢跟着词义等级整组换掉——录入者哪怕只调过一行的
- * 语言或等级，也说明已经排过版，不能抹掉。条数对不上（包括一条都没有）同理不动。
- */
-function definitionsStillDefault(
-  definitions: readonly WordDefinitionV3[],
-  level: string
-): boolean {
-  const plan = DEFAULT_DEFINITION_PLAN[level as CefrLevel] ?? [];
-  // 等级不在表里（后端/存量数据带来的非法值）就一律不动，别拿空计划去比空释义。
-  if (plan.length === 0) return false;
-  if (definitions.length !== plan.length) return false;
-  return definitions.every((definition, index) => {
-    const slot = plan[index]!;
-    return (
-      definitionIsBlank(definition) &&
-      definition.level === slot.level &&
-      definitionLanguageOf(definition.definition_mode) === slot.language &&
-      definitionStyleOf(definition.definition_mode) ===
-        (slot.style ?? "definition")
-    );
-  });
-}
-
-/** 默认空白模板可直接移除；录入内容或调整过配置的词义需要确认。 */
-export function senseNeedsDeleteConfirmation(
-  sense: WordSenseWritableV3,
-  inheritedGroupId?: string
-): boolean {
-  return Boolean(
-    sense.sense_group_id !== inheritedGroupId ||
-    sense.sub_pos.trim() ||
-    sense.level !== DEFAULT_SENSE_LEVEL ||
-    (sense.frequency && sense.frequency !== "0") ||
-    sense.depends_on_context ||
-    boundFormGroupIds(sense).length ||
-    sense.sentences.length ||
-    sense.relations.length ||
-    sense.component_usages?.length ||
-    !definitionsStillDefault(sense.definitions, DEFAULT_SENSE_LEVEL) ||
-    sense.definitions.some((definition) => {
-      if (
-        definition.definition_mode === "zh_definition" ||
-        definition.definition_mode === "zh_sentence"
-      )
-        return false;
-      const english = definition.content as EnglishTextV3;
-      return (
-        english.mode !== "unified" ||
-        Boolean(
-          english.common.voice_profile ||
-          english.common.audio_assets?.length ||
-          english.common.text_links?.length
-        )
-      );
-    })
-  );
-}
-
-type DefinitionModeV3 =
-  "zh_definition" | "zh_sentence" | "en_definition" | "en_sentence";
-
-type DefinitionLanguageV3 = "zh" | "en";
-type DefinitionStyleV3 = "definition" | "sentence";
-
 const DEFINITION_LANGUAGE_OPTIONS: Array<{
   label: string;
   value: DefinitionLanguageV3;
@@ -977,93 +901,6 @@ const DEFINITION_TEXT_SELECT_PROPS = {
   }
 } satisfies SelectProps;
 
-/** 语言与释义方式分两列选，落 wire 前合回后端唯一认的 definition_mode。 */
-const DEFINITION_MODE_BY_PARTS: Record<
-  DefinitionLanguageV3,
-  Record<DefinitionStyleV3, DefinitionModeV3>
-> = {
-  zh: { definition: "zh_definition", sentence: "zh_sentence" },
-  en: { definition: "en_definition", sentence: "en_sentence" }
-};
-
-function definitionLanguageOf(mode: DefinitionModeV3): DefinitionLanguageV3 {
-  return mode === "zh_definition" || mode === "zh_sentence" ? "zh" : "en";
-}
-
-function definitionStyleOf(mode: DefinitionModeV3): DefinitionStyleV3 {
-  return mode === "zh_definition" || mode === "en_definition"
-    ? "definition"
-    : "sentence";
-}
-
-function definitionRichText(definition: WordDefinitionV3) {
-  if (
-    definition.definition_mode === "zh_definition" ||
-    definition.definition_mode === "zh_sentence"
-  ) {
-    return definition.content as RichTextV3;
-  }
-  const englishContent = definition.content as EnglishTextV3;
-  if (englishContent.mode === "unified") {
-    return englishContent.common.value;
-  }
-  const readySlot = [englishContent.uk, englishContent.us].find(
-    (slot) => slot.state === "ready"
-  );
-  return readySlot?.state === "ready"
-    ? readySlot.variant.value
-    : { version: 2 as const, text: "", annotations: [] };
-}
-
-function withDefinitionMode(
-  definition: WordDefinitionV3,
-  definitionMode: DefinitionModeV3,
-  idFactory: () => string
-): WordDefinitionV3 {
-  if (definition.definition_mode === definitionMode) return definition;
-  // 语言/方式属于节点绑定；切换后正文也必须使用新的父子节点 ID。
-  const base = {
-    id: idFactory(),
-    level: definition.level,
-    ...(definition.grammar_structure_id
-      ? { grammar_structure_id: definition.grammar_structure_id }
-      : {})
-  };
-  if (definitionMode === "zh_definition" || definitionMode === "zh_sentence") {
-    return {
-      ...base,
-      definition_mode: definitionMode,
-      content_id: idFactory(),
-      content: definitionRichText(definition)
-    };
-  }
-  if (
-    definition.definition_mode === "en_definition" ||
-    definition.definition_mode === "en_sentence"
-  ) {
-    const content = structuredClone(definition.content);
-    if (content.mode === "unified") content.common.id = idFactory();
-    else {
-      for (const slot of [content.uk, content.us]) {
-        if (slot.state === "ready") slot.variant.id = idFactory();
-      }
-    }
-    return { ...base, definition_mode: definitionMode, content };
-  }
-  return {
-    ...base,
-    definition_mode: definitionMode,
-    content: {
-      mode: "unified",
-      common: {
-        id: idFactory(),
-        origin: "manual",
-        value: definition.content as RichTextV3
-      }
-    }
-  };
-}
-
 type ModalApi = ReturnType<typeof App.useApp>["modal"];
 
 /** 切到中文会丢掉英文侧的关联与发音设置，先让用户确认；其余切换直接生效。 */
@@ -1076,27 +913,7 @@ function requestDefinitionMode(
 ): void {
   const apply = () =>
     commit(withDefinitionMode(definition, definitionMode, idFactory));
-  const english =
-    definition.definition_mode === "en_definition" ||
-    definition.definition_mode === "en_sentence"
-      ? definition.content
-      : undefined;
-  const variants = english
-    ? english.mode === "unified"
-      ? [english.common]
-      : [english.uk, english.us].flatMap((slot) =>
-          slot.state === "ready" ? [slot.variant] : []
-        )
-    : [];
-  const removesEnglishSettings =
-    (definitionMode === "zh_definition" || definitionMode === "zh_sentence") &&
-    variants.some(
-      (variant) =>
-        variant.text_links?.length ||
-        variant.voice_profile ||
-        variant.audio_assets?.length
-    );
-  if (removesEnglishSettings)
+  if (definitionModeRemovesEnglishSettings(definition, definitionMode))
     modal.confirm({
       title: "切换为中文释义",
       content: "切换后将移除这条释义的英文关联和发音设置。",

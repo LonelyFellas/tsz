@@ -1,6 +1,6 @@
-import { resourceRecoveryScript } from "../../packages/shared/src/recovery/bootstrap";
+import { resourceRecoveryScript } from "../../packages/shared/src/recovery/bootstrap.ts";
 import { randomUUID } from "node:crypto";
-import { localSpeechMock } from "./scripts/local-speech-mock.js";
+import { localSpeechMock } from "./scripts/local-speech-mock.ts";
 import { fileURLToPath, URL } from "node:url";
 import react from "@vitejs/plugin-react";
 import { loadEnv } from "vite";
@@ -10,8 +10,8 @@ import { defineConfig } from "vitest/config";
 import {
   assertAdminTtsMockAllowed,
   parseBooleanEnvFlag
-} from "./src/lib/env-flags.js";
-import { buildAdminDevProxy } from "./src/lib/dev-proxy.js";
+} from "./src/lib/env-flags.ts";
+import { buildAdminDevProxy } from "./src/lib/dev-proxy.ts";
 
 // dev 代理配置：把 /api/v1/* 转发到后端，保证 refresh 的 HttpOnly cookie 与请求同源。
 // 复用 web 相同的 BACKEND_API_URL（默认已含 /api/v1 前缀），行为与旧 next.config
@@ -124,9 +124,18 @@ export default defineConfig(({ mode, command }) => {
           codeSplitting: {
             // priority 高的先认领模块（连同其未被认领的依赖）。
             groups: [
-              { name: initialPackageChunk, tags: ["$initial"], priority: 30 },
-              { name: antdComponentChunk, priority: 20 },
-              { name: packageChunk, priority: 10 }
+              {
+                name: initialPackageChunk,
+                debugName: "initial-packages",
+                tags: ["$initial"],
+                priority: 30
+              },
+              {
+                name: antdComponentChunk,
+                debugName: "antd-components",
+                priority: 20
+              },
+              { name: packageChunk, debugName: "packages", priority: 10 }
             ]
           }
         }
