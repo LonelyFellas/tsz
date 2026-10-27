@@ -141,8 +141,8 @@ for attempt in {1..10}; do
   sleep 1
 done
 [[ "$ready" = true ]]
-curl --noproxy '*' -fsS -m 8 --resolve "$host:443:127.0.0.1" "https://$host/" -o /dev/null
-code="$(curl --noproxy '*' -sS -m 8 -o /dev/null -w '%{http_code}' --resolve "$host:443:127.0.0.1" "https://$host/api/v1/$api_path")"
+curl --noproxy '*' -fsS -m 8 --retry 3 --retry-all-errors --retry-delay 1 --retry-max-time 30 --resolve "$host:443:127.0.0.1" "https://$host/" -o /dev/null
+code="$(curl --noproxy '*' -sS -m 8 --retry 3 --retry-all-errors --retry-delay 1 --retry-max-time 30 -o /dev/null -w '%{http_code}' --resolve "$host:443:127.0.0.1" "https://$host/api/v1/$api_path")"
 [[ "$code" = 401 ]]
 for port in 80 8081; do
   for http_host in unknown.invalid 47.121.142.19; do
