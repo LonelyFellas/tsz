@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   PronunciationPreviewControls,
   PronunciationPreviewProvider,
+  PronunciationPreviewVoiceSummary,
   usePronunciationVoiceNotice
 } from "./PronunciationPreview";
 import { deferred } from "./wordCreation.test.helper";
@@ -199,6 +200,83 @@ afterEach(() => {
 });
 
 describe("PronunciationPreview", () => {
+  it.each([
+    [undefined, "100%"],
+    [65, "65%"],
+    [0, "0%"]
+  ])("音量摘要将 %s 显示为 %s", async (volume, expected) => {
+    render(
+      <PronunciationPreviewProvider>
+        <PronunciationPreviewVoiceSummary
+          dialect="uk"
+          column="volume"
+          voiceProfile={{
+            voices: [
+              {
+                voice_id: "american-voice",
+                enabled: true,
+                rate_percent: 0,
+                volume_percent: 25
+              },
+              {
+                voice_id: "british-voice",
+                enabled: true,
+                rate_percent: 0,
+                ...(volume !== undefined ? { volume_percent: volume } : {})
+              }
+            ]
+          }}
+        />
+      </PronunciationPreviewProvider>
+    );
+    expect(await screen.findByText(expected)).toBeInTheDocument();
+  });
+
+  it("音量摘要随继承解析更新，不显示旧快照或失败后的默认音量", async () => {
+    const resolved = deferred<VoiceProfileV3["voices"]>();
+    preview.resolveVoices.mockReturnValueOnce(resolved.promise);
+    const voiceProfile: VoiceProfileV3 = {
+      voices: [
+        {
+          voice_id: "british-voice",
+          enabled: true,
+          rate_percent: 0,
+          volume_percent: 90
+        }
+      ],
+      dubbing: { mode: "inherit", area: "word" }
+    };
+    const summary = (content: string) => (
+      <PronunciationPreviewProvider>
+        <PronunciationPreviewVoiceSummary
+          dialect="uk"
+          column="volume"
+          voiceProfile={voiceProfile}
+          content={{ version: 2, text: content, annotations: [] }}
+        />
+      </PronunciationPreviewProvider>
+    );
+    const { rerender } = render(summary("tomato"));
+    expect(screen.getByText("—")).toBeInTheDocument();
+    await act(async () => {
+      resolved.resolve([
+        {
+          voice_id: "british-voice",
+          enabled: true,
+          rate_percent: 0,
+          volume_percent: 40
+        }
+      ]);
+    });
+    expect(await screen.findByText("40%")).toBeInTheDocument();
+    preview.resolveVoices.mockRejectedValueOnce(new Error("读法已变化"));
+    rerender(summary("tomatoes"));
+    await waitFor(() => expect(preview.resolveVoices).toHaveBeenCalledTimes(2));
+    expect(screen.getByText("—")).toBeInTheDocument();
+    expect(screen.queryByText("40%")).not.toBeInTheDocument();
+    expect(screen.queryByText("100%")).not.toBeInTheDocument();
+  });
+
   it("继承快捷播放采用当前解析结果且不使用旧快照默认", async () => {
     preview.resolveVoices.mockResolvedValue([
       {

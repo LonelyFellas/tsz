@@ -283,7 +283,7 @@ export function PronunciationPreviewVoiceSummary({
   voiceProfile?: VoiceProfileV3;
   pronunciationId?: string;
   content?: RichTextV2;
-  column?: "voice" | "rate";
+  column?: "voice" | "rate" | "volume";
 }) {
   const context = useContext(PreviewContext);
   if (!context) throw new Error("PronunciationPreviewProvider is required");
@@ -302,6 +302,12 @@ export function PronunciationPreviewVoiceSummary({
   const enabled = resolved.profile?.voices.filter((row) => row.enabled) ?? [];
   if (column === "rate")
     return <span>{voice ? `${(1 + rate / 100).toFixed(2)}×` : "—"}</span>;
+  if (column === "volume") {
+    const setting = voice
+      ? voiceSettingFor(resolved.profile?.voices ?? [], voice.id)
+      : undefined;
+    return <span>{voice ? `${setting?.volume_percent ?? 100}%` : "—"}</span>;
+  }
   const summary = (
     <span
       className="word-pronunciation-voice-label"
