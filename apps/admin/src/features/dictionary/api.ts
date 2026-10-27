@@ -24,7 +24,8 @@ export const wordKeys = {
   detail: (id: string) => [...wordKeys.all, "detail", id] as const
 };
 
-export function useWordList(query: AdminWordListQuery) {
+export function useWordList(filters: AdminWordListQuery) {
+  const query = { ...filters, include_name_variants: true };
   return useQuery({
     queryKey: wordKeys.list(query),
     queryFn: () => adminWordsDataSource.list(query),

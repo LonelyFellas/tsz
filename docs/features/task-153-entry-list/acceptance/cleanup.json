@@ -1,0 +1,15 @@
+{
+  "cleaned": true,
+  "scope": "task-153 local isolated acceptance",
+  "postgres_cluster_removed": true,
+  "redis_instance_stopped": true,
+  "api_stopped": true,
+  "admin_stopped": true,
+  "ports_closed": [8453, 3153, 55453, 56453],
+  "temporary_credentials_removed": true,
+  "browser_storage_removed": true,
+  "raw_fixture_data_removed": true,
+  "temporary_runtime_directory_removed": true,
+  "shared_services_modified": false,
+  "evidence": "sanitized screenshots and acceptance results retained"
+}

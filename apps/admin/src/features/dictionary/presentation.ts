@@ -1,4 +1,4 @@
-import type { AdminWordListItemAny, Dialect } from "@tsz/types";
+import type { AdminWordListItemAny } from "@tsz/types";
 import { reportClientError } from "@/lib/telemetry";
 
 const KNOWN_PRESENTATION_STRATEGIES = new Set([
@@ -46,9 +46,11 @@ export function observeWordListPresentation(
   return true;
 }
 
-/** 列表展示名一律用服务端 presentation，禁止从具体词形反推。 */
+/** 列表及行操作共用服务端名称，旧响应回退 presentation。 */
 export function wordListLabel(record: AdminWordListItemAny): string {
-  return record.presentation.label;
+  return record.name_variants?.length
+    ? record.name_variants.map((name) => name.text).join(" / ")
+    : record.presentation.label;
 }
 
 /**
@@ -64,9 +66,4 @@ export function visibleWordAnnotation(
   if (!record.annotation_visible) return undefined;
   const annotation = record.annotation?.trim();
   return annotation ? annotation : undefined;
-}
-
-/** 两个 schema 的方言摘要都由服务端给出（V3 按词性当前设置聚合），不从 matched surfaces 猜测。 */
-export function wordListDialects(record: AdminWordListItemAny): Dialect[] {
-  return record.dialects;
 }

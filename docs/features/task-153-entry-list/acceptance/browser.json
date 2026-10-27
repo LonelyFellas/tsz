@@ -1,0 +1,86 @@
+{
+  "passed": true,
+  "browser": "chromium",
+  "admin": "127.0.0.1:3153",
+  "api": "127.0.0.1:8453",
+  "mock": false,
+  "headers": [
+    "",
+    "词条名称",
+    "类型",
+    "常见释义",
+    "基本词性",
+    "难度",
+    "创建时间",
+    "创建人",
+    "关联",
+    "状态",
+    "更新时间",
+    "最后更新人",
+    "操作"
+  ],
+  "before": [
+    {
+      "text": "cosy",
+      "y": 488.625,
+      "dots": [
+        {
+          "side": "uk",
+          "color": "rgb(36, 87, 255)"
+        }
+      ]
+    },
+    {
+      "text": "cozy",
+      "y": 518.5,
+      "dots": [
+        {
+          "side": "us",
+          "color": "rgb(214, 37, 139)"
+        }
+      ]
+    }
+  ],
+  "mobile": {
+    "viewport": 390,
+    "body": 391,
+    "scroll": 362,
+    "client": 332
+  },
+  "network": [
+    {
+      "url": "http://127.0.0.1:3153/api/v1/admin/lexicon/entries?page=1&page_size=20&include_name_variants=true",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:3153/api/v1/admin/lexicon/entries?page=1&page_size=20&include_name_variants=true",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:3153/api/v1/admin/lexicon/entries?page=1&page_size=20&include_name_variants=true",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:3153/api/v1/admin/lexicon/entries?page=1&page_size=20&status=archived&include_name_variants=true",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:3153/api/v1/admin/lexicon/entries?page=1&page_size=20&status=archived&include_name_variants=true",
+      "status": 200
+    }
+  ],
+  "errors": [],
+  "checks": [
+    "real-login",
+    "opt-in",
+    "common",
+    "phonetic-only",
+    "same-spelling-double-dot",
+    "uk-first",
+    "browser-edit-save",
+    "independent-get",
+    "reload",
+    "trash-reload",
+    "mobile"
+  ]
+}

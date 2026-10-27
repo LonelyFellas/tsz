@@ -506,7 +506,15 @@ export function createAdminEndpoints(http: HttpClient) {
       /** GET /admin/lexicon/entries — 列表页：搜索行筛选 + 分页。 */
       list: (query: AdminWordListQuery = {}) =>
         http
-          .get<unknown>(`/lexicon/entries${qs({ ...query })}`)
+          .get<unknown>(
+            `/lexicon/entries${qs({
+              ...query,
+              include_name_variants:
+                query.include_name_variants === undefined
+                  ? undefined
+                  : String(query.include_name_variants)
+            })}`
+          )
           .then(decodeAdminWordAnyListResponse),
       /** 创建人选项仅要求词库访问权限，不依赖管理员管理权限。 */
       creators: () => http.get<AdminWordCreator[]>("/lexicon/entries/creators"),
