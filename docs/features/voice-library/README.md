@@ -1,6 +1,6 @@
 # 音色库需求与分批实施方案
 
-日期：2026-10-21，更新：2026-10-26。当前阶段：最新需求实施计划及两项产品决定已确认，见第 12 节；用户已要求从 Orca 新会话开始实施，准备交接至批次 1，尚无业务改动或迁移。本次调查代码基准为前端 `e134bcfb`、后端 `2ecf12f`，不是本次重新核验的部署版本。
+日期：2026-10-21，更新：2026-10-27。当前阶段：第 12 节六批实施与隔离真实验收已完成；前端 #567／#568 已合并，正在交付两份测试的 CI 超时修复；后端 #324 的精确版本 `c0f11e26` CI 已通过，PR 仍开放，详见 12.15。本次未核验部署 manifest，不将代码版本当作现网版本。
 
 本文件是跨仓任务的唯一主记录。第 1–11 节保留既有范围、实施与验收依据；与最新版冲突的保存、推荐、口音和音频更新规则，以第 12 节为准。上一轮 TASK#147 A／B／当前资源可用的 C 已完成配套发布，回执见第 11 节；其中的提交、合并和部署授权不自动扩展至本轮新增范围。Neural HD／HD Omni 的资源可用性仍待当前环境核实。
 
@@ -442,9 +442,9 @@
 
 依据用户提供的 `配音中心开发指南(20261026最新版)/配音中心开发指南.html` 与 `配音中心与文本设置.html`。正式规则以开发指南为准；原型中的未勾选候选兜底、直接 phoneme 局部保存和页面内任务队列不能照搬到正式实现。
 
-代码调查基准：前端 `origin/main e134bcfbb85bc9a404daa17d1e6ccd81d4955f25`，后端 `origin/main 2ecf12f3df8237741323ee7191cd05ae49ae69b7`。已有列表精简、性别符号、英语地区、HD Flash、正式音频能力均作为基础，不重新实施。本轮没有核验当前部署 manifest、调用 Azure、运行测试或迁移。
+计划调查基准：前端 `origin/main e134bcfbb85bc9a404daa17d1e6ccd81d4955f25`，后端 `origin/main 2ecf12f3df8237741323ee7191cd05ae49ae69b7`。已有列表精简、性别符号、英语地区、HD Flash、正式音频能力均作为基础，不重新实施。计划调查阶段尚未核验部署 manifest、调用 Azure、运行测试或迁移；后续实施与实际验证见 12.9–12.15。
 
-用户已确认计划中的两项产品决定，并要求从 Orca 新会话开始实施；授权范围为按本计划实现与必要验证，不包含提交、推送、PR、合并或部署。复用 `.worktrees/frontend/dubbing-center`，当前分支 `codex/dubbing-center-20261026-plan`，保留本轮未提交计划；后端复用 `.worktrees/backend/dubbing-center`，实施前从当时最新主线建立本轮分支。两仓不新增同任务工作区，跨仓只维护本记录。
+计划确认时，用户已确认两项产品决定，并要求从 Orca 新会话开始实施；当时授权范围为按本计划实现与必要验证，不包含提交、推送、PR、合并或部署。复用 `.worktrees/frontend/dubbing-center`，当时分支 `codex/dubbing-center-20261026-plan`，保留未提交计划；后端复用 `.worktrees/backend/dubbing-center`，实施前从当时最新主线建立本轮分支。两仓不新增同任务工作区，跨仓只维护本记录。
 
 覆盖配音中心，以及词形拼写、Azure IPA／UPS、语法结构、英文释义、多维例句五处文本；实际发音继续作为教学显示，不增加第六套配音存储。保留 Ant Design 6、既有权限和正式资产／发布链路。声音克隆、第三固定口音播放入口、学习题卡新音频系统不在本轮范围。
 
@@ -585,7 +585,7 @@
 
 Neural HD／Omni 当前可用性、未提供的支持语言／角色资料属于待验证依赖：记录来源及缺失，不能从名称推定，不要求为了完整显示全部原型项目而伪造能力。目录扩展不等于授权开放所有语种合成。
 
-当前阶段：批次 1–6 已完成本地实现、代码门及隔离环境真实 Azure／OSS 与 Web 音频链验收；临时云对象、测试数据及独占服务已清理，详见 12.13–12.14。Neural HD／Omni 和缺证据的 degree／role 保持未开放。前端仍为 `codex/dubbing-center-20261026-plan`（基准 `e134bcfb` + 本轮未提交差异），后端复用 `codex/dubbing-center-20261026`（基准 `2ecf12f3` + 本轮未提交差异）。2026-10-27 用户新增授权“推动上线到测试服务器上”，当前进入两仓交付、合并与测试服部署阶段；尚未核验现网 manifest，发布结果在后续记录实际版本与证据。
+当前阶段：批次 1–6 已完成本地实现、代码门及隔离环境真实 Azure／OSS 与 Web 音频链验收；临时云对象、测试数据及独占服务已清理，详见 12.13–12.14。Neural HD／Omni 和缺证据的 degree／role 保持未开放。前端复用 `codex/dubbing-ci-query-scope-20261027` 修复测试超时；后端 `codex/dubbing-center-20261026` 为 `c0f11e26`，工作区干净，PR #324 CI 已通过且仍开放。用户最新要求“继续修复，直到 CI 通过”，本轮按此推进必要修复、提交、推送、PR 与 CI 验证，不执行合并或部署。当前交付与验证结果见 12.15；未核验现网 manifest。
 
 ### 12.9 批次 1 实施与验证（2026-10-26）
 
@@ -639,4 +639,13 @@ Neural HD／Omni 当前可用性、未提供的支持语言／角色资料属于
 - **真实生成／发布**：先通过 `temporary-tests/20261027-dubbing-six-40a75f54/` 清理权限预检；六个短样本覆盖拼写 WAV、IPA／UPS／语法／英文释义／例句 MP3。生成→保存→独立 GET→刷新重开六个编辑入口→词条和例句发布→冻结引用均通过。另一次手动 SSML 试听与一次后台草稿更新，共 8 次短文本 Azure 合成；不以静音 fixture 或计数供应商替代。六样本浏览器解码时长 1.82–1.872 秒、峰值 0.422–0.481；WAV／MP3 实际解码、循环、倍速及原文件下载一致通过。
 - **任务／录音**：关闭创建页面后 worker 完成一条继承例句更新，草稿资产变化、旧词条及例句发布快照逐项保持；所有 7 个生成资产及后台任务均有本批隔离归属。五类录音真实直传→保存→独立读回→六个编辑入口重开→播放／下载字节一致→重新发布通过。Web 生产页面专用读者登录／学习配置后读取发布词条，五类录音均进入响应，签名请求 200、播放器 readyState=4 且时间推进；桌面及 390px 无横向溢出、无脚本错误。旧写保护、迁移、并发、租约及迟到响应沿用受控数据库回归证据；未对云供应商注入失败。
 - **清理回执**：先停全部本批写入服务；OSS 全版本删除含上传暂存、历史版本和删除标记，共 23 项，独立分页复查为空。随后删除独占库（账号、词条、例句、发布、引用、任务、会话、审计一并移除），精确删除本批缓存，移除凭据、browser state、原始录音和完整数据副本；只保留脱敏证据／回执。三个任务专用容器及其三个独占卷已删除，共享服务和业务数据未改动。脱敏汇总与清理回执位于 `/tmp/tsz-dubbing-20261026-tools.UC51m2/batch6-acceptance-evidence.json`、`batch6-cleanup-receipt.json`。
-- **终点／限制**：完成本轮实施与必要验证；两仓改动均未提交。Neural HD／Omni、未确认的 degree／role 和其他模型参数仍待真实资源证据；未做生产听感人工评分、现网 manifest 核验或发布环境验收。没有提交、推送、PR、合并、部署或禅道回写。
+- **当时终点／限制**：批次 6 验收结束时，两仓实现尚未提交；本批未执行提交、推送、PR、合并、部署或禅道回写。Neural HD／Omni、未确认的 degree／role 和其他模型参数仍待真实资源证据；未做生产听感人工评分、现网 manifest 核验或发布环境验收。后续 Git／PR／CI 的实际变化见 12.15，不将本条历史状态视为当前交付状态。
+
+### 12.15 接续验证与当前交付状态（2026-10-27）
+
+- **范围／版本**：本次仅处理现有两份测试的定位与验证、更新同一主记录；没有业务代码、接口或环境配置变化。前端 `codex/dubbing-ci-query-scope-20261027` 的 HEAD 为 `8826ad71a566e6de9a1b9fec788ddf360da39622`；后端 `codex/dubbing-center-20261026` 为 `c0f11e26e33a6f255d37e47f87a1674c3dd215a5`，工作区干净。保留接续前已有的 `e2e/playwright-report-admin/`，不据不明报告推导额外验收结果。当前会话没有执行提交、推送、创建 PR、合并、部署或禅道回写。
+- **测试改动与断言**：`DubbingGroups.test.tsx` 将编辑／完成／取消按钮改为组内精确文本查找后定位实际 button；`V3VoiceTextField.test.tsx` 的同一格式往返用例使用现有 aria-label 查找工具栏及格式／清空按钮，覆盖首次打开与重开。保留原 fixture、5 秒用例超时及全部行为断言：单组提交、另一组草稿保留、取消恢复、409 保留输入、revision、过期 GET／撤权、格式提交与取消及另一方言不变。未通过延长超时、删用例或弱化断言处理失败。
+- **本地验证**：两文件普通 Vitest 72／72 通过（12.96 秒）；补齐重开查询后的 V8 覆盖率定向运行 72／72 通过（21.35 秒）。两文件 ESLint 零告警、Prettier 与 `git diff --check` 通过。命令为 `pnpm exec vitest run --project admin apps/admin/src/features/dictionary/word-creation-v3/components/V3VoiceTextField.test.tsx apps/admin/src/features/voices/DubbingGroups.test.tsx --maxWorkers=1`，覆盖率复验增加 `--coverage --coverage.reporter=json-summary` 并输出至独立临时目录。运行中存在 jsdom 的伪元素 `getComputedStyle` 未实现提示，退出码均为 0。未重复全量、E2E 或真实云端合成；批次 6 脱敏验收及清理回执可读取，本轮未重建环境或产生云对象。
+- **前端交付／CI**：[PR #567](https://github.com/LonelyFellas/tsz/pull/567) 已合并为 `cdd3f813`，[PR #568](https://github.com/LonelyFellas/tsz/pull/568) 已合并为 `8826ad71`。该 main 提交的 [CI 40416955496](https://github.com/LonelyFellas/tsz/actions/runs/40416955496) attempt 1 实际失败：`admin-1` 的上述两文件共 4 个用例报 `Test timed out in 5000ms`，连带 coverage-merge／verify 失败；quality、tooling、其余普通测试分片、Web／Admin E2E 成功。当前定位修复仍未提交，不能把本地通过报告为远端 CI 已修复。
+- **后端交付／CI**：[PR #324](https://github.com/LonelyFellas/tsz-rust/pull/324) 仍为 OPEN，精确 head 为 `c0f11e26`。[CI 40417542078](https://github.com/LonelyFellas/tsz-rust/actions/runs/40417542078) attempt 1 已完成且 conclusion=success：Quality、Unit and doc tests、Dependency audit 及所有集成检查通过；PR 中发布制品构建与校验按规则 skipped，不称为制品已构建。本轮不再修改后端。
+- **当前授权／下一步**：用户要求“继续修复，直到 CI 通过”，已包含本轮必要修复、提交、推送、PR 及远端检查。前端沿用已有普通／V8 定向结果，正常执行 hooks 和独立 pre-push 审查后交付修复，再按精确 SHA 等待远端 CI；未合并、未部署。现网 manifest、任务自动执行开关及发布环境端到端状态本次不验证。

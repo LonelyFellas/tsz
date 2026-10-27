@@ -147,12 +147,15 @@ function mount(initial = data(), voices = [uk, us]) {
 }
 function card(name: string) {
   return screen
-    .getByRole("button", { name: `编辑${name}` })
+    .getByText(`编辑${name}`, { exact: true })
     .closest(".dubbing-group") as HTMLElement;
+}
+function groupButton(panel: HTMLElement, name: string | RegExp) {
+  return within(panel).getByText(name, { exact: true }).closest("button")!;
 }
 function edit(name: string) {
   const panel = card(name);
-  fireEvent.click(within(panel).getByRole("button", { name: `编辑${name}` }));
+  fireEvent.click(groupButton(panel, `编辑${name}`));
   return panel;
 }
 beforeEach(() => {
@@ -207,7 +210,7 @@ describe("单组草稿与推荐", () => {
     fireEvent.change(within(b).getByLabelText("分组名称"), {
       target: { value: "B saved" }
     });
-    fireEvent.click(within(b).getByRole("button", { name: "完成" }));
+    fireEvent.click(groupButton(b, "完成"));
     await waitFor(() => expect(api.speech.saveGroup).toHaveBeenCalledOnce());
     expect(api.speech.saveGroup).toHaveBeenCalledWith(
       expect.objectContaining({ id: "b", name: "B saved" }),
@@ -221,7 +224,7 @@ describe("单组草稿与推荐", () => {
         .getQueryData<AdminDubbingGroupsResponse>(queryKey)!
         .groups.find((group) => group.id === "a")!.name
     ).toBe("A");
-    fireEvent.click(within(a).getByRole("button", { name: /取\s*消/ }));
+    fireEvent.click(groupButton(a, /取\s*消/));
     expect(screen.getByText("B saved", { exact: true })).toBeVisible();
     expect(screen.queryByDisplayValue("A draft")).toBeNull();
     expect(api.speech.saveGroups).not.toHaveBeenCalled();
@@ -255,7 +258,7 @@ describe("单组草稿与推荐", () => {
         .slice(0, 2)
         .map((input) => input.getAttribute("aria-label"))
     ).toEqual(["选用 A英式", "选用 第二版本"]);
-    fireEvent.click(within(panel).getByRole("button", { name: "完成" }));
+    fireEvent.click(groupButton(panel, "完成"));
     await screen.findByText("本组配音已保存。");
     expect(within(panel).queryByLabelText("选用 A英式")).toBeNull();
     fireEvent.click(within(panel).getByRole("button", { name: "更多音色" }));
@@ -285,7 +288,7 @@ describe("单组草稿与推荐", () => {
         .slice(0, 2)
         .map((node) => node.getAttribute("aria-label"))
     ).toEqual(["选用 第二版本", "选用 A英式"]);
-    fireEvent.click(within(panel).getByRole("button", { name: /取\s*消/ }));
+    fireEvent.click(groupButton(panel, /取\s*消/));
     const reopened = edit("A");
     expect(
       [...reopened.querySelectorAll('input[type="checkbox"]')]
@@ -303,10 +306,10 @@ describe("单组草稿与推荐", () => {
     fireEvent.change(within(panel).getByLabelText("分组名称"), {
       target: { value: "保留输入" }
     });
-    fireEvent.click(within(panel).getByRole("button", { name: "完成" }));
+    fireEvent.click(groupButton(panel, "完成"));
     await screen.findByText(/本组已被修改或板块已被占用/);
     expect(within(panel).getByLabelText("分组名称")).toHaveValue("保留输入");
-    fireEvent.click(within(b).getByRole("button", { name: /取\s*消/ }));
+    fireEvent.click(groupButton(b, /取\s*消/));
     expect(within(panel).getByLabelText("分组名称")).toHaveValue("保留输入");
   });
   it("全局常用不能改名或删除，允许两侧无推荐", async () => {
@@ -320,7 +323,7 @@ describe("单组草稿与推荐", () => {
       within(panel).queryByRole("button", { name: "删除分组" })
     ).toBeNull();
     expect(within(panel).getByLabelText("全局常用 使用板块")).toBeDisabled();
-    fireEvent.click(within(panel).getByRole("button", { name: "完成" }));
+    fireEvent.click(groupButton(panel, "完成"));
     await waitFor(() =>
       expect(api.speech.saveGroup).toHaveBeenCalledWith(
         expect.objectContaining({ is_global: true, uk: [], us: [] }),
@@ -334,10 +337,10 @@ describe("单组草稿与推荐", () => {
     const panel = edit("A");
     const rate = within(panel).getAllByLabelText("推荐语速")[0]!;
     fireEvent.change(rate, { target: { value: "" } });
-    fireEvent.click(within(panel).getByRole("button", { name: "完成" }));
+    fireEvent.click(groupButton(panel, "完成"));
     expect(api.speech.saveGroup).not.toHaveBeenCalled();
     fireEvent.change(rate, { target: { value: "0.73" } });
-    fireEvent.click(within(panel).getByRole("button", { name: "完成" }));
+    fireEvent.click(groupButton(panel, "完成"));
     await waitFor(() => expect(api.speech.saveGroup).toHaveBeenCalled());
     expect(
       vi.mocked(api.speech.saveGroup).mock.calls[0]![0].uk[0]!.parameters
@@ -353,9 +356,9 @@ describe("单组草稿与推荐", () => {
     await act(async () => {
       client.setQueryData(queryKey, latest);
     });
-    fireEvent.click(within(panel).getByRole("button", { name: /取\s*消/ }));
+    fireEvent.click(groupButton(panel, /取\s*消/));
     const next = edit("A");
-    fireEvent.click(within(next).getByRole("button", { name: "完成" }));
+    fireEvent.click(groupButton(next, "完成"));
     await waitFor(() => expect(api.speech.saveGroup).toHaveBeenCalled());
     expect(api.speech.saveGroup).toHaveBeenCalledWith(
       expect.objectContaining({ revision: 4 }),
@@ -371,7 +374,7 @@ describe("单组草稿与推荐", () => {
     vi.mocked(api.speech.groups).mockReturnValueOnce(old.promise);
     const { client } = mount();
     const panel = edit("A");
-    fireEvent.click(within(panel).getByRole("button", { name: "完成" }));
+    fireEvent.click(groupButton(panel, "完成"));
     let refresh!: Promise<void>;
     act(() => {
       refresh = client.refetchQueries({ queryKey });
@@ -389,8 +392,8 @@ describe("单组草稿与推荐", () => {
     expect(client.getQueryData(queryKey)).toEqual(saved);
     const b = edit("B");
     act(() => setPermissions(["words.access"]));
-    expect(within(b).getByRole("button", { name: "完成" })).toBeDisabled();
-    fireEvent.click(within(b).getByRole("button", { name: /取\s*消/ }));
+    expect(groupButton(b, "完成")).toBeDisabled();
+    fireEvent.click(groupButton(b, /取\s*消/));
     expect(within(b).queryByLabelText("分组名称")).toBeNull();
   });
 });
