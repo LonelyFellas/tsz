@@ -1736,18 +1736,14 @@ it("释义完成后显示三种格式，重开取消保持保存内容和另一�
   }
   const view = render(<Host />);
   fireEvent.click(screen.getByLabelText("打开释义 英式正文编辑器"));
-  await screen.findByRole(
-    "toolbar",
-    { name: "标注工具栏" },
-    { timeout: 10000 }
-  );
+  await screen.findByLabelText("标注工具栏", {}, { timeout: 10000 });
   const input = screen.getByLabelText("释义 英式正文") as HTMLTextAreaElement;
   input.focus();
   input.setSelectionRange(2, 5);
   fireEvent.mouseUp(input);
   fireEvent.select(input);
   for (const name of ["加粗", "斜体", "下划线"])
-    fireEvent.click(screen.getByRole("button", { name }));
+    fireEvent.click(screen.getByLabelText(name));
   expect(
     JSON.parse(screen.getByTestId("sentence-format").textContent!)
   ).toEqual(initial);
@@ -1768,12 +1764,8 @@ it("释义完成后显示三种格式，重开取消保持保存内容和另一�
     )
   ).toHaveTextContent("job");
   fireEvent.click(screen.getByLabelText("打开释义 英式正文编辑器"));
-  await screen.findByRole(
-    "toolbar",
-    { name: "标注工具栏" },
-    { timeout: 10000 }
-  );
-  fireEvent.click(screen.getByRole("button", { name: "清空标注" }));
+  await screen.findByLabelText("标注工具栏", {}, { timeout: 10000 });
+  fireEvent.click(screen.getByLabelText("清空标注"));
   fireEvent.click(screen.getByLabelText("取消释义 英式正文编辑"));
   expect(
     JSON.parse(screen.getByTestId("sentence-format").textContent!)
