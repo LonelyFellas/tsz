@@ -60,3 +60,11 @@
 测试资源已全部清理，见 [清理回执](acceptance/cleanup.json)。本任务 API、admin、专用 PostgreSQL cluster、专用 Redis 均已停止；临时账号、词条、会话、凭据及浏览器数据随专用数据目录彻底移除。独立复查 8453、3153、55453、56453 四个端口均无监听，未改动其他工作区或共享数据。
 
 最终补充验证：`pnpm --filter @tsz/api-client test` 完整 30 文件、617 用例通过。两仓 `git diff --check` 通过，手工变更文件的 Prettier 检查通过。
+
+## 交付审查修复
+
+前端精确提交独立审查发现并修复：行操作与删除/归档确认统一使用结构化名称；长标注采用行内换行，避免挤掉词名及圆点。浏览器以合法 20 位数字标注、长词名和双点在 1440px/390px 下测量，各元素均在名称单元格内且尺寸非零，归档确认名称与可见行一致。此项为受控 mock 布局回归，不替代上面的真实后端验收。
+
+- [布局测量结果](acceptance/review-layout.json)
+- [长标注桌面截图](acceptance/review-layout-desktop.png)
+- [长标注手机截图](acceptance/review-layout-mobile.png)

@@ -687,7 +687,7 @@ describe("SmartDictionary", () => {
 
   it.each([undefined, "trash"] as const)(
     "列表 %s 使用结构化名称并保留每侧标注、圆点及行操作",
-    (mode) => {
+    async (mode) => {
       matchViewport(1440);
       const row: AdminWordListItemV3 = {
         ...word("regional", "legacy label"),
@@ -732,6 +732,12 @@ describe("SmartDictionary", () => {
       ).toEqual(["义项", "义项", "义项"]);
       expect(cells[cells.length - 1]!.querySelector("button")).toBeEnabled();
       expect(screen.queryByText("legacy label")).toBeNull();
+      const action = mode === "trash" ? "永久删除" : "移入垃圾桶";
+      fireEvent.click(screen.getByLabelText(`${action}「cosy / cozy / same」`));
+      expect(
+        (await screen.findAllByText(`${action}「cosy / cozy / same」？`)).at(-1)
+      ).toBeInTheDocument();
+      expect(screen.queryByText(`${action}「legacy label」？`)).toBeNull();
     }
   );
 

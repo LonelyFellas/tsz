@@ -43,6 +43,24 @@ describe("mixed word list presentation", () => {
     expect(wordListLabel(row)).toBe("legacy: centre · center");
   });
 
+  it("结构化名称用于行操作，缺省或空数组回退旧名称", () => {
+    const row = v3Row({
+      label: "旧顺序",
+      matched_surfaces: [],
+      strategy_version: "surface_summary_v1"
+    });
+    expect(
+      wordListLabel({
+        ...row,
+        name_variants: [
+          { text: "cosy", dialects: ["uk"] },
+          { text: "cozy", dialects: ["us"] }
+        ]
+      })
+    ).toBe("cosy / cozy");
+    expect(wordListLabel({ ...row, name_variants: [] })).toBe("旧顺序");
+  });
+
   it("未知但非空的 presentation strategy 仍按响应展示并上报安全诊断", () => {
     const row = v3Row({
       label: "服务端未来展示策略",

@@ -1,0 +1,110 @@
+{
+  "passed": true,
+  "mock": true,
+  "purpose": "review regression only; full real acceptance recorded separately",
+  "readings": [
+    {
+      "width": 1440,
+      "cell": {
+        "left": 289,
+        "right": 439,
+        "top": 312,
+        "bottom": 411.65625
+      },
+      "nodes": [
+        {
+          "text": "unfortunately",
+          "side": null,
+          "left": 297,
+          "right": 423.9375,
+          "top": 323,
+          "bottom": 353,
+          "width": 126.9375,
+          "height": 30
+        },
+        {
+          "text": "88888888888888888888",
+          "side": null,
+          "left": 297,
+          "right": 427.390625,
+          "top": 348.828125,
+          "bottom": 385.21875,
+          "width": 130.390625,
+          "height": 36.390625
+        },
+        {
+          "text": "",
+          "side": "uk",
+          "left": 308.765625,
+          "right": 316.765625,
+          "top": 384.5625,
+          "bottom": 392.5625,
+          "width": 8,
+          "height": 8
+        },
+        {
+          "text": "",
+          "side": "us",
+          "left": 321.765625,
+          "right": 329.765625,
+          "top": 384.5625,
+          "bottom": 392.5625,
+          "width": 8,
+          "height": 8
+        }
+      ]
+    },
+    {
+      "width": 390,
+      "cell": {
+        "left": 61,
+        "right": 211,
+        "top": 426,
+        "bottom": 525.65625
+      },
+      "nodes": [
+        {
+          "text": "unfortunately",
+          "side": null,
+          "left": 69,
+          "right": 195.9375,
+          "top": 437,
+          "bottom": 467,
+          "width": 126.9375,
+          "height": 30
+        },
+        {
+          "text": "88888888888888888888",
+          "side": null,
+          "left": 69,
+          "right": 199.390625,
+          "top": 462.828125,
+          "bottom": 499.21875,
+          "width": 130.390625,
+          "height": 36.390625
+        },
+        {
+          "text": "",
+          "side": "uk",
+          "left": 80.765625,
+          "right": 88.765625,
+          "top": 498.5625,
+          "bottom": 506.5625,
+          "width": 8,
+          "height": 8
+        },
+        {
+          "text": "",
+          "side": "us",
+          "left": 93.765625,
+          "right": 101.765625,
+          "top": 498.5625,
+          "bottom": 506.5625,
+          "width": 8,
+          "height": 8
+        }
+      ]
+    }
+  ],
+  "confirmationUsesVisibleName": true
+}

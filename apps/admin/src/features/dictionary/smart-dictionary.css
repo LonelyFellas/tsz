@@ -5,23 +5,18 @@
 }
 
 .word-list-name {
-  display: flex;
-  align-items: center;
-  gap: 5px;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .word-list-name-text {
-  min-width: 0;
-  overflow-wrap: anywhere;
-  white-space: normal;
   font-weight: 600;
 }
 
 .word-list-name-annotation {
   position: relative;
   top: -0.4em;
-  flex: none;
-  margin-inline-start: -3px;
+  margin-inline-start: 2px;
   color: rgba(0, 0, 0, 0.65);
   font-size: 11px;
   font-weight: 600;
@@ -29,10 +24,12 @@
 }
 
 .word-list-dialect-dot {
-  flex: none;
+  display: inline-block;
   width: 8px;
   height: 8px;
+  margin-inline-start: 5px;
   border-radius: 50%;
+  vertical-align: middle;
 }
 
 .word-list-dialect-dot-uk {

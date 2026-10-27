@@ -46,9 +46,11 @@ export function observeWordListPresentation(
   return true;
 }
 
-/** 列表展示名一律用服务端 presentation，禁止从具体词形反推。 */
+/** 列表及行操作共用服务端名称，旧响应回退 presentation。 */
 export function wordListLabel(record: AdminWordListItemAny): string {
-  return record.presentation.label;
+  return record.name_variants?.length
+    ? record.name_variants.map((name) => name.text).join(" / ")
+    : record.presentation.label;
 }
 
 /**
