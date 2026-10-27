@@ -60,6 +60,7 @@ import "../posTabs.css";
 import { sortableRowClass, useSortableRows } from "../sortableRows";
 import { SortableDragHandle } from "./SortableDragHandle";
 import { V3FormContentModal } from "./V3FormContentModal";
+import { V3FormCopyProvider } from "./V3FormCopyProvider";
 import type { createPronunciationReferenceIds } from "../sharedFormsModel";
 
 /** 只接受本编辑器发出的词性拖动，避免把外部拖入的内容当成排序。 */
@@ -456,8 +457,8 @@ export function V3FormsAndPronunciationStep({
           };
         });
 
-  return (
-    <PronunciationPreviewProvider>
+  const editor = (
+    <>
       {editingFormId &&
         sharedForms &&
         onSharedFormsChange &&
@@ -516,6 +517,17 @@ export function V3FormsAndPronunciationStep({
           tabBarExtraContent={value.pos.length === 0 ? addPosSelect : undefined}
         />
       </Flex>
+    </>
+  );
+  return (
+    <PronunciationPreviewProvider>
+      {sharedForms && onSharedFormsChange ? (
+        <V3FormCopyProvider forms={sharedForms} onChange={onSharedFormsChange}>
+          {editor}
+        </V3FormCopyProvider>
+      ) : (
+        editor
+      )}
     </PronunciationPreviewProvider>
   );
 }
