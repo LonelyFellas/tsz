@@ -28,9 +28,16 @@ describe("音色库契约", () => {
     expect(spec.schemas.SaveDubbingUpdateSettings.additionalProperties).toBe(
       false
     );
-    expect(spec.schemas.SaveDubbingUpdateSettings.required).toContain(
+    expect(spec.schemas.SaveDubbingUpdateSettings.required).toEqual([
+      "wait_seconds",
       "base_revision"
+    ]);
+    expect(spec.schemas.DubbingUpdateSettings.properties).not.toHaveProperty(
+      "enabled"
     );
+    expect(
+      spec.schemas.SaveDubbingUpdateSettings.properties
+    ).not.toHaveProperty("enabled");
   });
   it("模型能力可省略以读取旧目录，Flash禁用能力由真实目录返回", () => {
     for (const name of [

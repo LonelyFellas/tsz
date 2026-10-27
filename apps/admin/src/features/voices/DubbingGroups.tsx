@@ -416,13 +416,20 @@ export function DubbingGroups({
           未分组：{unassigned.map((area) => area.label).join("、")}
         </Typography.Text>
       )}
-      {canEdit && (
-        <DubbingAudioUpdateSettings onDirtyChange={setSettingsDirty} />
-      )}
+      <Typography.Text type="secondary">
+        分组配置保存后，自动更新继承推荐的内容草稿音频；独立配音、上传录音及已发布音频保持不变。
+      </Typography.Text>
       {canEdit && (
         <Collapse
           size="small"
           items={[
+            {
+              key: "settings",
+              label: "更新设置",
+              children: (
+                <DubbingAudioUpdateSettings onDirtyChange={setSettingsDirty} />
+              )
+            },
             {
               key: "updates",
               label: "音频更新记录（含已删除分组）",

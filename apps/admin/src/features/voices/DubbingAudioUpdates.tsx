@@ -1,15 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AdminDubbingAudioUpdate } from "@tsz/types";
-import {
-  Alert,
-  Button,
-  Flex,
-  InputNumber,
-  Space,
-  Switch,
-  Tag,
-  Typography
-} from "antd";
+import { Alert, Button, Flex, InputNumber, Space, Tag, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { api, useAuthStore } from "@/lib/auth";
 import { useUnsavedChanges } from "@tsz/shared/recovery";
@@ -37,10 +28,7 @@ export function DubbingAudioUpdateSettings({
     queryFn: ({ signal }) => api.speech.audioUpdateSettings(signal),
     retry: false
   });
-  const [draft, setDraft] = useState<{
-    wait_seconds: number;
-    enabled: boolean;
-  }>();
+  const [draft, setDraft] = useState<{ wait_seconds: number }>();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(false);
   const value = draft ?? settings.data;
@@ -56,7 +44,6 @@ export function DubbingAudioUpdateSettings({
     try {
       const result = await api.speech.saveAudioUpdateSettings({
         wait_seconds: value.wait_seconds,
-        enabled: value.enabled,
         base_revision: settings.data.revision
       });
       if (useAuthStore.getState().profile?.id !== accountId) return;
@@ -80,14 +67,7 @@ export function DubbingAudioUpdateSettings({
   return (
     <Flex vertical gap={8}>
       <Space wrap>
-        <Typography.Text>自动更新继承草稿音频</Typography.Text>
-        <Switch
-          aria-label="自动更新继承草稿音频"
-          checked={value.enabled}
-          disabled={saving}
-          onChange={(enabled) => setDraft({ ...value, enabled })}
-        />
-        <Typography.Text>提交后等待</Typography.Text>
+        <Typography.Text>分组完成后等待</Typography.Text>
         <InputNumber
           aria-label="音频更新等待秒数"
           min={0}
@@ -114,11 +94,9 @@ export function DubbingAudioUpdateSettings({
           </Button>
         )}
       </Space>
-      {!value.enabled && (
-        <Typography.Text type="secondary">
-          自动执行已暂停；已提交任务会保留，重新启用后继续。
-        </Typography.Text>
-      )}
+      <Typography.Text type="secondary">
+        仅用于之后提交的更新；同组再次完成会重新计时，已提交任务可在分组内撤销。
+      </Typography.Text>
       {error && (
         <Alert
           type="error"
@@ -177,14 +155,20 @@ function Update({
                 : "default"
           }
         >
-          {labels[update.state] ?? update.state}
+          {update.state === "completed" &&
+          update.completed === 0 &&
+          !update.error_codes.length
+            ? "配置已保存，无需更新音频"
+            : (labels[update.state] ?? update.state)}
         </Tag>
         <Typography.Text type="secondary">
           {update.group_name} · 配置版本 {update.group_revision}
         </Typography.Text>
         {update.state === "pending" && (
           <Typography.Text>
-            {seconds > 0 ? `${seconds} 秒后可执行` : "已到执行时间"}
+            {seconds > 0
+              ? `配置已保存，${seconds} 秒后自动更新相关草稿音频`
+              : "已到执行时间，等待自动更新"}
           </Typography.Text>
         )}
         {update.total > 0 && (

@@ -130,7 +130,7 @@ async function mockApi(
     } else if (path === "/speech/voices") {
       body = { items: voices };
     } else if (path === "/speech/audio-update-settings") {
-      body = { wait_seconds: 60, enabled: false, revision: 0 };
+      body = { wait_seconds: 60, revision: 0 };
     } else if (
       path === "/speech/audio-updates" ||
       path.endsWith("/audio-updates")
