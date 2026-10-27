@@ -127,7 +127,8 @@ describe("dictionary React Query hooks", () => {
     });
     expect(dataSource.list).toHaveBeenCalledWith({
       page: 1,
-      page_size: 20
+      page_size: 20,
+      include_name_variants: true
     });
     expect(dataSource.get).toHaveBeenCalledWith("v3-1");
     expect(hook.result.current.list.data).toEqual(list);

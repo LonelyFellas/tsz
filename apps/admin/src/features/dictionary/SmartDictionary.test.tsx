@@ -668,7 +668,7 @@ describe("SmartDictionary", () => {
     );
 
     expect(screen.getByText("短语展示名")).toBeVisible();
-    expect(screen.getByText("BrE")).toBeVisible();
+    expect(screen.queryByText("BrE")).toBeNull();
     expect(screen.getByText("服务端 V3 展示名")).toBeVisible();
     expect(screen.queryByText("surface-not-used-as-label")).toBeNull();
     expect(reportUnknownPresentationStrategy).toHaveBeenCalledTimes(1);
@@ -677,7 +677,7 @@ describe("SmartDictionary", () => {
       strategy_version: "future_strategy_9"
     });
     const v3Row = screen.getByText("服务端 V3 展示名").closest("tr")!;
-    expect(v3Row.querySelectorAll("td")[3]).toHaveTextContent("BrE / AmE");
+    expect(v3Row.querySelectorAll("[data-spelling-dialect]")).toHaveLength(0);
     expect(v3Row).toHaveTextContent("X9");
     fireEvent.click(v3Row.querySelector("td:last-child button")!);
     expect(screen.getByTestId("location")).toHaveTextContent(
@@ -685,7 +685,57 @@ describe("SmartDictionary", () => {
     );
   });
 
-  it("方言通用显示「英美通用」，基本词性显示英文缩写且只斜体字母", () => {
+  it.each([undefined, "trash"] as const)(
+    "列表 %s 使用结构化名称并保留每侧标注、圆点及行操作",
+    (mode) => {
+      matchViewport(1440);
+      const row: AdminWordListItemV3 = {
+        ...word("regional", "legacy label"),
+        status: mode === "trash" ? "archived" : "draft",
+        annotation: "义项",
+        annotation_visible: true,
+        name_variants: [
+          { text: "cosy", dialects: ["uk"] },
+          { text: "cozy", dialects: ["us"] },
+          { text: "same", dialects: ["uk", "us"] }
+        ]
+      };
+      apiMocks.useWordList.mockReturnValue({
+        data: { words: [row], page: { page: 1, page_size: 20, total: 1 } },
+        isPending: false,
+        isError: false
+      });
+      render(
+        <MemoryRouter>
+          <AntApp>
+            <SmartDictionary mode={mode} />
+          </AntApp>
+        </MemoryRouter>
+      );
+      const cells = screen
+        .getByText("cosy")
+        .closest("tr")!
+        .querySelectorAll("td");
+      const names = [...cells[1]!.querySelectorAll(".word-list-name")];
+      expect(
+        names.map((name) => name.querySelector(".tsz-words")?.textContent)
+      ).toEqual(["cosy", "cozy", "same"]);
+      expect(
+        names.map((name) =>
+          [...name.querySelectorAll("[data-spelling-dialect]")].map((dot) =>
+            dot.getAttribute("data-spelling-dialect")
+          )
+        )
+      ).toEqual([["uk"], ["us"], ["uk", "us"]]);
+      expect(
+        names.map((name) => name.querySelector("sup")?.textContent)
+      ).toEqual(["义项", "义项", "义项"]);
+      expect(cells[cells.length - 1]!.querySelector("button")).toBeEnabled();
+      expect(screen.queryByText("legacy label")).toBeNull();
+    }
+  );
+
+  it("通用拼写不加点，基本词性显示英文缩写且只斜体字母", () => {
     matchViewport(1440);
     catalogMocks.items = [
       {
@@ -708,6 +758,7 @@ describe("SmartDictionary", () => {
         words: [
           {
             ...word("entry", "hot"),
+            name_variants: [{ text: "hot", dialects: ["common", "uk", "us"] }],
             pos_list: ["adjective", "noun", "unknown-pos"]
           }
         ],
@@ -725,12 +776,13 @@ describe("SmartDictionary", () => {
     );
 
     const cells = screen.getByText("hot").closest("tr")!.querySelectorAll("td");
-    expect(cells[3]).toHaveTextContent("英美通用");
-    expect(screen.queryByText("Common")).toBeNull();
+    expect(cells[1]!.querySelectorAll("[data-spelling-dialect]")).toHaveLength(
+      0
+    );
     // 点号不在斜体里；目录里没有的编码原样显示、不斜体。
-    expect(cells[5]).toHaveTextContent("adj.n.unknown-pos");
+    expect(cells[4]).toHaveTextContent("adj.n.unknown-pos");
     expect(
-      [...cells[5]!.querySelectorAll("i")].map((node) => node.textContent)
+      [...cells[4]!.querySelectorAll("i")].map((node) => node.textContent)
     ).toEqual(["adj", "n"]);
   });
 
@@ -936,7 +988,7 @@ describe("SmartDictionary", () => {
     expect(screen.queryByText("a0a093e7")).toBeNull();
     expect(screen.getByText("工作空间")).toBeVisible();
     expect(screen.getByText("协作空间")).toBeVisible();
-    expect(screen.getByText("BrE")).toBeVisible();
+    expect(screen.queryByText("BrE")).toBeNull();
 
     const secondRow = screen.getByText("协作空间").closest("tr")!;
     const secondActions = [
@@ -989,7 +1041,7 @@ describe("SmartDictionary", () => {
     const headers = screen.getAllByRole("columnheader");
     expect(headers.map((header) => header.textContent?.trim())).toEqual([
       "",
-      "名称",
+      "词条名称",
       "操作"
     ]);
     expect(screen.getByText("继续创建").closest("button")).toBeEnabled();

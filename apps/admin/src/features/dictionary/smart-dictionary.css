@@ -1,3 +1,48 @@
+.word-list-names {
+  --word-uk: #2457ff;
+  --word-us: #d6258b;
+  line-height: 1.6;
+}
+
+.word-list-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.word-list-name-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  font-weight: 600;
+}
+
+.word-list-name-annotation {
+  position: relative;
+  top: -0.4em;
+  flex: none;
+  margin-inline-start: -3px;
+  color: rgba(0, 0, 0, 0.65);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.word-list-dialect-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.word-list-dialect-dot-uk {
+  background: var(--word-uk);
+}
+
+.word-list-dialect-dot-us {
+  background: var(--word-us);
+}
+
 .word-search-form {
   container-type: inline-size;
 }

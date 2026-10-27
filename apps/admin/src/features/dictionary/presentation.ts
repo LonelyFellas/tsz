@@ -1,4 +1,4 @@
-import type { AdminWordListItemAny, Dialect } from "@tsz/types";
+import type { AdminWordListItemAny } from "@tsz/types";
 import { reportClientError } from "@/lib/telemetry";
 
 const KNOWN_PRESENTATION_STRATEGIES = new Set([
@@ -64,9 +64,4 @@ export function visibleWordAnnotation(
   if (!record.annotation_visible) return undefined;
   const annotation = record.annotation?.trim();
   return annotation ? annotation : undefined;
-}
-
-/** 两个 schema 的方言摘要都由服务端给出（V3 按词性当前设置聚合），不从 matched surfaces 猜测。 */
-export function wordListDialects(record: AdminWordListItemAny): Dialect[] {
-  return record.dialects;
 }
