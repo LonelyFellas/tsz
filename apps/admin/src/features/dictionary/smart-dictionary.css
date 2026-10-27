@@ -40,6 +40,52 @@
   background: var(--word-us);
 }
 
+.word-list-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.word-list-primary-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 88px;
+  flex: none;
+}
+
+.word-list-row-actions .word-list-row-action {
+  padding-inline: 0;
+}
+
+.word-list-row-actions .word-list-more-action {
+  padding-inline: 8px;
+  color: rgba(0, 0, 0, 0.65);
+  font-size: 13px;
+}
+
+.word-list-more-action::before {
+  position: absolute;
+  inset-inline-start: -4px;
+  width: 1px;
+  height: 12px;
+  background: rgba(0, 0, 0, 0.1);
+  content: "";
+}
+
+.word-list-more-action .anticon {
+  font-size: 10px;
+}
+
+.word-list-row-actions .word-list-more-action[aria-expanded="true"] {
+  color: #2053ff;
+}
+
+.word-list-action-menu {
+  max-width: min(280px, calc(100vw - 24px));
+}
+
 .word-search-form {
   container-type: inline-size;
 }

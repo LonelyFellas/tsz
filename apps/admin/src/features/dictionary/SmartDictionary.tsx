@@ -2,6 +2,7 @@ import { TableEmptyState } from "@/components/TableEmptyState";
 import {
   DeleteOutlined,
   DownOutlined,
+  LoadingOutlined,
   PlusOutlined,
   RollbackOutlined,
   SearchOutlined,
@@ -15,6 +16,7 @@ import {
   Card,
   ConfigProvider,
   DatePicker,
+  Dropdown,
   Flex,
   Form,
   Input,
@@ -27,7 +29,7 @@ import {
   Typography,
   theme
 } from "antd";
-import type { TableColumnsType } from "antd";
+import type { MenuProps, TableColumnsType } from "antd";
 import dayjs from "dayjs";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -205,6 +207,7 @@ export function SmartDictionary({
   const [searchParams, setSearchParams] = useSearchParams();
   const [annotationEntry, setAnnotationEntry] =
     useState<AdminWordListItemAny>();
+  const [openActionRow, setOpenActionRow] = useState<string>();
   const [form] = Form.useForm<WordFilterValues>();
   const serializedSearchParams = searchParams.toString();
 
@@ -1027,149 +1030,155 @@ export function SmartDictionary({
     {
       title: "操作",
       key: "action",
-      // 归档视图的右组是「恢 复 + 永久删除」两个文字按钮，实测比常规页宽一倍多；
-      // 两种视图各给够用的宽度，常规页就不必为归档动作长期留白。
-      width: effectiveFilters.status === "archived" ? 280 : 180,
+      width: 190,
       fixed: "right",
       render: (_: unknown, record: AdminWordListItemAny) => {
         const rowName = `「${wordListLabel(record)}」`;
         const rowWritable = canModifyEntry(writeActor, record);
+        const archived = record.status === "archived";
+        const route = getWordRowRoute(record);
+        const transitionAllowed = canTransitionEntry(
+          writeActor,
+          record,
+          archived ? "restore" : "archive"
+        );
+        const transitionDisabled =
+          !transitionAllowed || lifecycleInput(record) === undefined;
+        const transitionHint = !transitionAllowed
+          ? "需要相应的归档或恢复权限；普通管理员仅可操作本人词条"
+          : lifecycleInput(record) === undefined
+            ? "该行缺少并发版本信息，请刷新列表后重试"
+            : undefined;
+        const rowLifecyclePending =
+          lifecyclePending &&
+          (archiveWord.variables?.wordId === record.id ||
+            restoreWord.variables?.wordId === record.id);
+        const rowDeletePending =
+          deleteWord.isPending && deleteWord.variables?.wordId === record.id;
+        const items: MenuProps["items"] = [];
+        if (canEditRowAnnotation(annotationActor, record)) {
+          items.push({
+            key: "annotation",
+            label: <span aria-label={`编辑标注${rowName}`}>标注</span>,
+            onClick: () => setAnnotationEntry(record)
+          });
+        }
+        if (adminWordsDataSourceCapabilities.archive && !archived) {
+          items.push({
+            key: "archive",
+            danger: true,
+            disabled: transitionDisabled || rowLifecyclePending,
+            icon: rowLifecyclePending ? (
+              <LoadingOutlined />
+            ) : (
+              <DeleteOutlined />
+            ),
+            label: (
+              <Tooltip title={transitionHint}>
+                <span aria-label={`移入垃圾桶${rowName}`}>移入垃圾桶</span>
+              </Tooltip>
+            ),
+            onClick: () => transitionOne(record, "archive")
+          });
+        }
+        if (adminWordsDataSourceCapabilities.permanentDelete && archived) {
+          const eligibility = evaluateDeleteEligibility(deleteActor, record);
+          items.push({
+            key: "delete",
+            danger: true,
+            disabled: !eligibility.deletable || rowDeletePending,
+            icon: rowDeletePending ? <LoadingOutlined /> : <DeleteOutlined />,
+            label: (
+              <Tooltip
+                title={
+                  eligibility.deletable
+                    ? undefined
+                    : DELETE_BLOCK_REASON_TEXT[eligibility.reason!]
+                }
+              >
+                <span aria-label={`永久删除${rowName}`}>永久删除</span>
+              </Tooltip>
+            ),
+            onClick: () => deleteOne(record)
+          });
+        }
+        const routeButton = (
+          <Button
+            type={archived ? "text" : "link"}
+            size="small"
+            className="word-list-row-action"
+            autoInsertSpace={false}
+            disabled={route === undefined}
+            aria-label={`${getWordRowActionLabel(record, rowWritable)}${rowName}`}
+            onClick={() => route && navigate(route)}
+          >
+            {getWordRowActionLabel(record, rowWritable)}
+          </Button>
+        );
         return (
-          // 左组是进入词条的入口、右组是生命周期动作，各自贴住一边：
-          // 「标注」按行有无都不会让删除入口跟着左右跳。
-          <Flex align="center" justify="space-between" gap={8}>
-            <Space size={4}>
-              {(() => {
-                // 旧结构（V1/V2）的行没有向导可进：向导已整条下线，只剩 V3。
-                // 置灰并说明原因，比点进去撞上 404 或空白页好。
-                const route = getWordRowRoute(record);
-                const button = (
-                  <Button
-                    type="link"
-                    size="small"
-                    disabled={route === undefined}
-                    aria-label={`${getWordRowActionLabel(record, rowWritable)}${rowName}`}
-                    onClick={() => route && navigate(route)}
-                  >
-                    {getWordRowActionLabel(record, rowWritable)}
-                  </Button>
-                );
-                return route === undefined ? (
-                  <Tooltip title={LEGACY_SCHEMA_BLOCKED_HINT}>
-                    <span>{button}</span>
-                  </Tooltip>
-                ) : (
-                  button
-                );
-              })()}
-              {/* 重复原型按归属提供入口，尚未填写标注也能补充。 */}
-              {canEditRowAnnotation(annotationActor, record) ? (
-                <Button
-                  type="link"
-                  size="small"
-                  aria-label={`编辑标注${rowName}`}
-                  onClick={() => setAnnotationEntry(record)}
-                >
-                  标注
-                </Button>
-              ) : null}
-            </Space>
-            <Space size={4}>
-              {adminWordsDataSourceCapabilities.archive &&
-                (() => {
-                  const button = (
+          <div className="word-list-row-actions">
+            <div className="word-list-primary-actions">
+              {archived && adminWordsDataSourceCapabilities.archive && (
+                <Tooltip title={transitionHint}>
+                  <span>
                     <Button
                       type="link"
                       size="small"
-                      danger={record.status !== "archived"}
-                      aria-label={`${record.status === "archived" ? "恢复" : "移入垃圾桶"}${rowName}`}
-                      icon={
-                        record.status === "archived" ? (
-                          <RollbackOutlined />
-                        ) : (
-                          <DeleteOutlined />
-                        )
-                      }
-                      disabled={
-                        !canTransitionEntry(
-                          writeActor,
-                          record,
-                          record.status === "archived" ? "restore" : "archive"
-                        ) || lifecycleInput(record) === undefined
-                      }
-                      loading={
-                        lifecyclePending &&
-                        (archiveWord.variables?.wordId === record.id ||
-                          restoreWord.variables?.wordId === record.id)
-                      }
-                      onClick={() =>
-                        transitionOne(
-                          record,
-                          record.status === "archived" ? "restore" : "archive"
-                        )
-                      }
+                      className="word-list-row-action"
+                      autoInsertSpace={false}
+                      aria-label={`恢复${rowName}`}
+                      disabled={transitionDisabled}
+                      loading={rowLifecyclePending}
+                      onClick={() => transitionOne(record, "restore")}
                     >
-                      {record.status === "archived" ? "恢 复" : null}
+                      恢复
                     </Button>
-                  );
-                  // 移入垃圾桶只留图标：列表里它最不该抢眼，文案落到 Tooltip。
-                  // 置灰时把原因摆出来，否则管理员只看到一个不能点的按钮。
-                  // 缺 lifecycle 字段那种置灰不给 Tooltip：那是数据问题，刷新即可，
-                  // 与「这条不归你管」不是一回事。
-                  const hint = !canTransitionEntry(
-                    writeActor,
-                    record,
-                    record.status === "archived" ? "restore" : "archive"
+                  </span>
+                </Tooltip>
+              )}
+              {route === undefined ? (
+                <Tooltip title={LEGACY_SCHEMA_BLOCKED_HINT}>
+                  <span>{routeButton}</span>
+                </Tooltip>
+              ) : (
+                routeButton
+              )}
+            </div>
+            {items.length > 0 && (
+              <Dropdown
+                trigger={["hover"]}
+                placement="bottomRight"
+                open={openActionRow === record.id}
+                onOpenChange={(open) =>
+                  setOpenActionRow((current) =>
+                    open
+                      ? record.id
+                      : current === record.id
+                        ? undefined
+                        : current
                   )
-                    ? "需要相应的归档或恢复权限；普通管理员仅可操作本人词条"
-                    : record.status === "archived"
-                      ? ""
-                      : "移入垃圾桶";
-                  return hint ? (
-                    <Tooltip title={hint}>
-                      <span>{button}</span>
-                    </Tooltip>
-                  ) : (
-                    button
-                  );
-                })()}
-              {adminWordsDataSourceCapabilities.permanentDelete &&
-                record.status === "archived" &&
-                (() => {
-                  const eligibility = evaluateDeleteEligibility(
-                    deleteActor,
-                    record
-                  );
-                  const button = (
-                    <Button
-                      type="link"
-                      size="small"
-                      danger
-                      aria-label={`永久删除${rowName}`}
-                      icon={<DeleteOutlined />}
-                      disabled={!eligibility.deletable}
-                      loading={
-                        deleteWord.isPending &&
-                        deleteWord.variables?.wordId === record.id
-                      }
-                      onClick={() => deleteOne(record)}
-                    >
-                      永久删除
-                    </Button>
-                  );
-                  // 置灰时把原因摆出来，否则管理员只看到一个不能点的按钮。
-                  return eligibility.deletable ? (
-                    button
-                  ) : (
-                    <Tooltip
-                      title={DELETE_BLOCK_REASON_TEXT[eligibility.reason!]}
-                    >
-                      <span>{button}</span>
-                    </Tooltip>
-                  );
-                })()}
-            </Space>
-          </Flex>
+                }
+                classNames={{ root: "word-list-action-menu" }}
+                menu={{
+                  items,
+                  onClick: () => setOpenActionRow(undefined)
+                }}
+              >
+                <Button
+                  type="text"
+                  size="small"
+                  className="word-list-more-action"
+                  autoInsertSpace={false}
+                  aria-label={`更多操作${rowName}`}
+                  aria-haspopup="menu"
+                  aria-expanded={openActionRow === record.id}
+                  onFocus={() => setOpenActionRow(record.id)}
+                >
+                  更多 <DownOutlined />
+                </Button>
+              </Dropdown>
+            )}
+          </div>
         );
       }
     }
