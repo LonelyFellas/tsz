@@ -1483,11 +1483,9 @@ describe("SmartDictionary", () => {
     apiMocks.useArchiveWord.mockReturnValue({ ...idleMutation(), mutateAsync });
     render(
       <MemoryRouter>
-        <ConfigProvider theme={{ token: { motion: false } }}>
-          <AntApp>
-            <SmartDictionary />
-          </AntApp>
-        </ConfigProvider>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
       </MemoryRouter>
     );
     const actions = await openRowActions("first");

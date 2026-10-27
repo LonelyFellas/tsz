@@ -3954,13 +3954,16 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     expect(status).toBe(200);
     await page.reload();
     const row = page.locator("tbody tr", { hasText: "orbit-v3" });
-    const archive = row.getByRole("button", { name: "移入垃圾桶「orbit-v3」" });
+    await row.getByRole("button", { name: "更多操作「orbit-v3」" }).hover();
+    const archive = page.getByRole("menuitem", {
+      name: "移入垃圾桶「orbit-v3」"
+    });
+    await expect(archive).toBeVisible();
     await expect(archive).toBeEnabled();
     await expect(
       row.getByRole("button", { name: "编辑「orbit-v3」" })
     ).toHaveCount(0);
-    await archive.hover();
-    await expect(page.getByRole("tooltip")).toHaveText("移入垃圾桶");
+    await expect(archive).toHaveText("移入垃圾桶");
   });
 
   test("E04 Mock 身份：普通管理员看他人未发布草稿只读", async ({ page }) => {
@@ -3974,9 +3977,15 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(
       row.getByRole("button", { name: "继续创建「orbit-v3」" })
     ).toHaveCount(0);
-    await expect(
-      row.getByRole("button", { name: "移入垃圾桶「orbit-v3」" })
-    ).toBeDisabled();
+    await row.getByRole("button", { name: "更多操作「orbit-v3」" }).hover();
+    const archive = page.getByRole("menuitem", {
+      name: "移入垃圾桶「orbit-v3」"
+    });
+    await expect(archive).toBeDisabled();
+    await archive.getByLabel("移入垃圾桶「orbit-v3」").hover();
+    await expect(page.getByRole("tooltip")).toContainText(
+      "普通管理员仅可操作本人词条"
+    );
 
     // 只读词条只剩预览可达，直链进词形步也会被改写到预览。
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
@@ -3996,8 +4005,9 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(
       row.getByRole("button", { name: "继续创建「orbit-v3」" })
     ).toBeVisible();
+    await row.getByRole("button", { name: "更多操作「orbit-v3」" }).hover();
     await expect(
-      row.getByRole("button", { name: "移入垃圾桶「orbit-v3」" })
+      page.getByRole("menuitem", { name: "移入垃圾桶「orbit-v3」" })
     ).toBeEnabled();
 
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
