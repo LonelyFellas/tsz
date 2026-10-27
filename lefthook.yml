@@ -18,7 +18,7 @@ commit-msg:
 
 pre-push:
   # lefthook 默认用 `git diff HEAD @{push}` 取「待推送文件」作为下面命令的触发依据。
-  # 但新分支首次推送时 @{push} 尚不存在 → 文件集为空 → typecheck/test 被静默跳过
+  # 但新分支首次推送时 @{push} 尚不存在 → 文件集为空 → typecheck 被静默跳过
   # (开 PR 最常见的「首推」场景下,本地这道校验形同虚设,只能靠 CI 兜底)。
   # 自定义 files 命令补 fallback:@{push} → @{u} → 与 main 的三点 diff → 全部跟踪文件,
   # 保证首推也能算出文件并触发校验;无待推送提交时仍返回空、照常跳过,不会过度触发。
@@ -26,23 +26,5 @@ pre-push:
   commands:
     typecheck:
       run: pnpm typecheck
-    # 只跑测试,不在本地收覆盖率。
-    #
-    # 这里原本是 pnpm test:cov,理由是「避免覆盖率不达标的改动本地全绿、推到 CI 才红」。
-    # 但覆盖率百分比门槛已于 2026-08-31 取消(见 vitest.shared-config.ts 里
-    # fullCoverageConfig 的注释),没有阈值可卡,本地这一趟就只剩开销、不再拦得住任何东西。
-    #
-    # 而且它现在跑不完:fullCoverageConfig 是全量单次收集,187 个测试文件跑完之后,
-    # v8 的覆盖率收集(takeCoverage/DebugGetCoverageInfo)会卡在第 187 个上不收敛——
-    # maxWorkers 调成 2 或 8 都一样,worker 满 CPU 空转十几分钟也出不来。
-    # CI 不受影响:它走 unit-coverage 的 matrix 按模块分片(vitest.ci-shard.config.ts),
-    # 每片数据量小,覆盖率报告照常产出。
-    #
-    # 显式并行，避免 lefthook 环境退成单 worker。8 worker 在本地同时运行多个
-    # jsdom UI 文件时会争抢 CPU，使原本通过的用例触发 5 秒超时。4 worker
-    # 仍复现后台权限和例句用例超时，单 worker 定向复验通过；限制为 2，
-    # 检查范围、断言和单项超时不变，不跳过任何测试。
-    test:
-      run: pnpm exec vitest run --maxWorkers=2
-    # e2e 不在 pre-push 跑:Playwright 要起服务、全量跑数分钟,是每次推送的最大等待项,
-    # 且 CI 的 e2e job 跑同一套件兜底(合 main 仍有门禁)。推送前想自查可手动 pnpm test:e2e。
+    # 开发时按风险运行定向测试；全量普通测试与 E2E 由 PR/main CI 执行，
+    # 不在每次 push 时重复运行。需要自查时仍可手动 pnpm test / pnpm test:e2e。
