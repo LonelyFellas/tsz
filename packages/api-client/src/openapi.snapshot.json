@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/task-153-entry-list/docs/openapi.json",
-  "_generatedAt": "2026-10-27T04:52:46.080Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dubbing-auto-update/docs/openapi.json",
+  "_generatedAt": "2026-10-27T07:28:31.340Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -3791,19 +3791,17 @@
     },
     "DubbingUpdateSettings": {
       "type": "object",
-      "required": ["wait_seconds", "enabled", "revision"],
+      "required": ["wait_seconds", "revision"],
       "properties": {
-        "enabled": { "type": "boolean" },
         "revision": { "type": "integer", "format": "int64" },
         "wait_seconds": { "type": "integer", "format": "int32" }
       }
     },
     "SaveDubbingUpdateSettings": {
       "type": "object",
-      "required": ["wait_seconds", "enabled", "base_revision"],
+      "required": ["wait_seconds", "base_revision"],
       "properties": {
         "base_revision": { "type": "integer", "format": "int64" },
-        "enabled": { "type": "boolean" },
         "wait_seconds": { "type": "integer", "format": "int32" }
       },
       "additionalProperties": false

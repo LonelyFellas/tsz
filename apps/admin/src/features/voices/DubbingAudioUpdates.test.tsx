@@ -74,7 +74,7 @@ it("按服务端任务倒计时，撤销只调用任务接口并重新读取", a
   const save = vi.spyOn(api.speech, "saveGroup");
   mount(<DubbingAudioUpdates groupId="group" revision={3} />);
   await screen.findByText("等待更新");
-  expect(screen.getByText(/秒后可执行/)).toBeInTheDocument();
+  expect(screen.getByText(/秒后自动更新相关草稿音频/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "撤销待更新" }));
   await screen.findByText("已撤销");
   expect(cancel).toHaveBeenCalledWith("job");
@@ -108,10 +108,33 @@ it("重开读取持久失败状态，并仅重试失败项", async () => {
   await waitFor(() => expect(retry).toHaveBeenCalledWith("job"));
 });
 
+it("服务端确认没有生成时展示无需更新，不把过期跳过显示为成功", async () => {
+  vi.spyOn(api.speech, "audioUpdates").mockResolvedValue({
+    updates: [update("completed")]
+  });
+  const view = mount(<DubbingAudioUpdates groupId="group" revision={3} />);
+  await screen.findByText("配置已保存，无需更新音频");
+  view.unmount();
+  vi.mocked(api.speech.audioUpdates).mockResolvedValue({
+    updates: [
+      {
+        ...update("completed"),
+        total: 1,
+        skipped: 1,
+        error_codes: ["revision_conflict"]
+      }
+    ]
+  });
+  mount(<DubbingAudioUpdates groupId="group" revision={4} />);
+  await screen.findByText(/正文或推荐已变化/);
+  expect(
+    screen.queryByText("配置已保存，无需更新音频")
+  ).not.toBeInTheDocument();
+});
+
 it("保存等待时间携带设置版本，失败保留输入", async () => {
   vi.spyOn(api.speech, "audioUpdateSettings").mockResolvedValue({
     wait_seconds: 60,
-    enabled: false,
     revision: 4
   });
   const save = vi
@@ -119,13 +142,13 @@ it("保存等待时间携带设置版本，失败保留输入", async () => {
     .mockRejectedValue(new Error("conflict"));
   mount(<DubbingAudioUpdateSettings />);
   const input = await screen.findByLabelText("音频更新等待秒数");
+  expect(screen.queryByRole("switch")).not.toBeInTheDocument();
   fireEvent.change(input, { target: { value: "90" } });
   fireEvent.click(screen.getByRole("button", { name: "保存更新设置" }));
   await screen.findByText(/设置保存失败或版本已变化/);
   expect(input).toHaveValue("90");
   expect(save).toHaveBeenCalledWith({
     wait_seconds: 90,
-    enabled: false,
     base_revision: 4
   });
 });

@@ -165,7 +165,6 @@ beforeEach(() => {
   vi.spyOn(api.speech, "allAudioUpdates").mockResolvedValue({ updates: [] });
   vi.spyOn(api.speech, "audioUpdateSettings").mockResolvedValue({
     wait_seconds: 60,
-    enabled: false,
     revision: 0
   });
   vi.spyOn(api.speech, "saveGroups");
@@ -200,6 +199,42 @@ afterEach(() => {
 });
 
 describe("单组草稿与推荐", () => {
+  it("完成后直接展示自动更新任务，等待设置默认收起且没有启用步骤", async () => {
+    const { unmount } = mount();
+    expect(screen.queryByLabelText("音频更新等待秒数")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("更新设置", { exact: true }));
+    expect(await screen.findByLabelText("音频更新等待秒数")).toHaveValue("60");
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+    const panel = edit("A");
+    const save = vi.mocked(api.speech.saveGroup).getMockImplementation()!;
+    vi.mocked(api.speech.saveGroup).mockImplementation(async (...args) => {
+      const result = await save(...args);
+      vi.mocked(api.speech.audioUpdates).mockResolvedValue({
+        updates: [
+          {
+            id: "automatic-job",
+            group_id: "a",
+            group_name: "A",
+            group_revision: 2,
+            state: "pending",
+            due_at: new Date(Date.now() + 60000).toISOString(),
+            total: 0,
+            completed: 0,
+            failed: 0,
+            skipped: 0,
+            error_codes: []
+          }
+        ]
+      });
+      return result;
+    });
+    fireEvent.click(groupButton(panel, "完成"));
+    await within(panel).findByText(/秒后自动更新相关草稿音频/);
+    expect(
+      within(panel).getByRole("button", { name: "撤销待更新" })
+    ).toBeEnabled();
+    unmount();
+  });
   it("A 有草稿时完成 B 只提交 B，取消 A 不影响已保存 B", async () => {
     const { client } = mount();
     const a = edit("A"),

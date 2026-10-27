@@ -116,7 +116,6 @@ beforeEach(() => {
   vi.spyOn(api.speech, "groups").mockResolvedValue({ groups: [], revision: 0 });
   vi.spyOn(api.speech, "audioUpdateSettings").mockResolvedValue({
     wait_seconds: 60,
-    enabled: false,
     revision: 0
   });
   vi.spyOn(api.speech, "audioUpdates").mockResolvedValue({ updates: [] });

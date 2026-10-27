@@ -102,13 +102,11 @@ export interface AdminDubbingGroupsResponse {
 
 export interface AdminDubbingUpdateSettings {
   wait_seconds: number;
-  enabled: boolean;
   revision: number;
 }
 
 export interface SaveAdminDubbingUpdateSettings {
   wait_seconds: number;
-  enabled: boolean;
   base_revision: number;
 }
 

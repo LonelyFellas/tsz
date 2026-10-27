@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/task-153-entry-list/docs/openapi.json",
-  "_source_sha256": "3fbefc8a73a890a7ff7ffd54c45cd9293fb1c14714c0d180149e48bed0b9bf38",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dubbing-auto-update/docs/openapi.json",
+  "_source_sha256": "bec18bcbfb2b463785f0b2b13e8beb0874f464cac9943513f254a5e3cc904bd1",
   "roots": [
     "MemoryOverview",
     "MemoryPage",
