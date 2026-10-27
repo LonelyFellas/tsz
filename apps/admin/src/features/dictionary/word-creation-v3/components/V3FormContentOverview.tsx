@@ -35,7 +35,7 @@ function PronunciationCell({
   settings
 }: {
   reading: OverviewReading;
-  settings?: "voice" | "rate";
+  settings?: "voice" | "rate" | "volume";
 }) {
   const { form, dialect, pronunciation: row, pronunciationIndex } = reading;
   if (!row) {
@@ -179,7 +179,7 @@ export function V3FormContentOverview({
         pagination={false}
         rowKey="key"
         tableLayout="fixed"
-        scroll={{ x: 816 }}
+        scroll={{ x: 840 }}
         rowHoverable={false}
         dataSource={readings}
         onRow={(row) => ({
@@ -298,7 +298,7 @@ export function V3FormContentOverview({
           {
             title: "词形拼写",
             key: "spelling",
-            width: "22%",
+            width: "18%",
             onCell: (row) => ({ rowSpan: row.spellingRowSpan }),
             render: (_, { form, dialect, spellingDialect }) => {
               const regions = form.regional_variants;
@@ -373,6 +373,14 @@ export function V3FormContentOverview({
             width: 76,
             render: (_, row) => (
               <PronunciationCell reading={row} settings="rate" />
+            )
+          },
+          {
+            title: "音量",
+            key: "volume",
+            width: 76,
+            render: (_, row) => (
+              <PronunciationCell reading={row} settings="volume" />
             )
           }
         ]}

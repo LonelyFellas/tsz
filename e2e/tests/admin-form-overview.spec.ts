@@ -375,7 +375,7 @@ test("多个原形自动编号，指派只替换选中行且保存刷新后不�
   ]);
 });
 
-test("词形总览按英美发音逐行对应读法、音色与语速，窄屏只滚动表格", async ({
+test("词形总览按英美发音逐行对应读法、音色、语速与音量，窄屏只滚动表格", async ({
   page
 }) => {
   const api = await mockAdminV3Api(page, { formsFailureOnce: false });
@@ -460,7 +460,12 @@ test("词形总览按英美发音逐行对应读法、音色与语速，窄屏�
               content: { version: 2, text: variant.spelling, annotations: [] },
               voice_profile: {
                 voices: [
-                  { voice_id: "libby", enabled: true, rate_percent: -30 }
+                  {
+                    voice_id: "libby",
+                    enabled: true,
+                    rate_percent: -30,
+                    volume_percent: 65
+                  }
                 ]
               }
             }
@@ -492,6 +497,7 @@ test("词形总览按英美发音逐行对应读法、音色与语速，窄屏�
     }
   );
   const longPronunciation = firstRegions.common.pronunciations[1]!;
+  longPronunciation.synthesis!.uk!.ipa_speech!.voice_profile!.voices[0]!.volume_percent = 0;
   const prefix = "ˌsuːpəkælɪfrædʒɪlɪstɪkˌekspiːælɪˈdəʊʃəs ";
   longPronunciation.actual_pron = `${prefix}pick it up`;
   longPronunciation.actual_pron_rich = {
@@ -645,7 +651,7 @@ test("词形总览按英美发音逐行对应读法、音色与语速，窄屏�
         )
       );
     for (const cells of readings) {
-      expect(cells).toHaveLength(4);
+      expect(cells).toHaveLength(5);
       for (const cell of cells) {
         expect(Math.abs(cell.top - cells[0]!.top)).toBeLessThan(1);
         expect(cell.fits).toBe(true);
@@ -785,6 +791,12 @@ test("词形总览按英美发音逐行对应读法、音色与语速，窄屏�
   await expect(overview.getByText("Andrew", { exact: true })).toHaveCount(2);
   await expect(overview.getByText("0.70×", { exact: true })).toHaveCount(2);
   await expect(overview.getByText("0.55×", { exact: true })).toHaveCount(2);
+  await expect(formRows.locator("td:last-child")).toHaveText([
+    "65%",
+    "0%",
+    "100%",
+    "100%"
+  ]);
   await expect(
     overview.getByRole("button", { name: "读法 1英式 播放语音", exact: true })
   ).toBeEnabled();
@@ -799,7 +811,8 @@ test("词形总览按英美发音逐行对应读法、音色与语速，窄屏�
     "读法",
     "实际发音",
     "音色",
-    "语速"
+    "语速",
+    "音量"
   ]);
   const actionButtons = formRows
     .first()
@@ -1017,6 +1030,12 @@ test("词形总览按英美发音逐行对应读法、音色与语速，窄屏�
   await expect(
     overview.getByRole("cell", { name: "逐字正音", exact: true })
   ).toHaveCount(2);
+  await expect(formRows.locator("td:last-child")).toHaveText([
+    "65%",
+    "0%",
+    "100%",
+    "100%"
+  ]);
   await overview.locator("[data-v3-open-content]").first().click();
   await expect(dialog.locator(".v3-content-label")).toHaveCount(3);
   await expect(
