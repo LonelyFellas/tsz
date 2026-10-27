@@ -117,6 +117,7 @@ export function V3FormCopyProvider({
   children: ReactNode;
 }) {
   const { message } = App.useApp();
+  const { componentDisabled } = ConfigProvider.useConfig();
   const formTypeLabel = useFormTypeLabel();
   const latest = useRef({ forms, onChange });
   latest.current = { forms, onChange };
@@ -464,7 +465,7 @@ export function V3FormCopyProvider({
             />
           )}
         </Flex>
-        <ConfigProvider componentDisabled={busy || undefined}>
+        <ConfigProvider componentDisabled={busy || Boolean(componentDisabled)}>
           <div inert={busy} aria-busy={busy}>
             {children}
           </div>
