@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import { createServer } from "node:http";
 import { test } from "node:test";
 import { buildConfig, packRelease } from "./release-artifact.mjs";
 
@@ -154,6 +155,80 @@ async function run(component, scenario, approved = true) {
     };
   } finally {
     await rm(root, { recursive: true, force: true });
+  }
+}
+
+async function runSmokeProbe(kind, scenario) {
+  let requests = 0;
+  const server = createServer((request, response) => {
+    requests++;
+    if (
+      scenario === "drop-always" ||
+      (scenario === "drop-first" && requests === 1)
+    ) {
+      request.socket.destroy();
+      return;
+    }
+    response.statusCode =
+      scenario === "bad-status" ? 503 : kind === "page" ? 200 : 401;
+    response.end();
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const script = await readFile(
+      new URL("./publish-release.sh", import.meta.url),
+      "utf8"
+    );
+    const line = script
+      .split("\n")
+      .find((value) =>
+        kind === "page"
+          ? value.startsWith("curl --noproxy '*'")
+          : value.startsWith('code="$(curl --noproxy')
+      );
+    assert.ok(line);
+    const port = server.address().port;
+    const command = line
+      .replace('--resolve "$host:443:127.0.0.1" ', "")
+      .replace(/https:\/\/\$host/g, `http://127.0.0.1:${port}`);
+    const result = await new Promise((resolve) => {
+      const child = spawn(
+        "bash",
+        [
+          "-c",
+          `set -euo pipefail\napi_path=auth/me\n${command}\n${kind === "api" ? '[[ "$code" = 401 ]]' : ""}`
+        ],
+        {
+          stdio: ["ignore", "pipe", "pipe"]
+        }
+      );
+      let stderr = "";
+      child.stderr.on("data", (data) => {
+        stderr += data;
+      });
+      child.on("exit", (status) => resolve({ status, stderr }));
+      child.on("error", (error) =>
+        resolve({ status: -1, stderr: error.message })
+      );
+    });
+    return { ...result, requests };
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+}
+
+for (const kind of ["page", "api"]) {
+  test(`${kind}: reload smoke retries a dropped connection and still checks the status`, async () => {
+    const result = await runSmokeProbe(kind, "drop-first");
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.requests, 2);
+  });
+  for (const scenario of ["drop-always", "bad-status"]) {
+    test(`${kind}: reload smoke rejects ${scenario} within the retry limit`, async () => {
+      const result = await runSmokeProbe(kind, scenario);
+      assert.notEqual(result.status, 0, result.stderr);
+      assert.equal(result.requests, 4);
+    });
   }
 }
 
