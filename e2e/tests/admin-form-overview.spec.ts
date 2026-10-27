@@ -5,6 +5,120 @@ import {
   mockAdminV3Api
 } from "./support/mockAdminV3Api";
 
+test("整组音标拖动复制后保存重开保持独立，音色复制不改音标", async ({
+  page
+}) => {
+  const api = await mockAdminV3Api(page, { formsFailureOnce: false });
+  const word = api.getWord();
+  const source = word.forms.contents[0]!;
+  const target = word.forms.contents[2]!;
+  if (
+    source.regional_variants.mode !== "common" ||
+    target.regional_variants.mode !== "common"
+  )
+    throw new Error("fixture");
+  source.regional_variants.common.pronunciations =
+    source.regional_variants.common.pronunciations.slice(0, 1);
+  for (const pos of word.forms.pos)
+    for (const form of pos.forms) {
+      if (
+        form.content_id === source.id &&
+        form.regional_bindings.mode === "common"
+      ) {
+        form.regional_bindings.common.pronunciations =
+          form.regional_bindings.common.pronunciations.slice(0, 1);
+      }
+    }
+  const profile = (voice: string, rate: number) => ({
+    voices: [
+      { voice_id: voice, enabled: true, rate_percent: rate, volume_percent: 80 }
+    ]
+  });
+  source.regional_variants.common.pronunciations[0]!.voice_profile = profile(
+    "source-voice",
+    -20
+  );
+  target.regional_variants.common.pronunciations[0]!.voice_profile = profile(
+    "target-voice",
+    10
+  );
+  let saved = false;
+  await page.route(`**/api/v1/admin/lexicon/entries/${word.id}`, (route) =>
+    saved
+      ? route.fallback()
+      : route.fulfill({ json: { word, retired_stable_nodes: [] } })
+  );
+  await page.setViewportSize({ width: 1440, height: 1600 });
+  await page.goto(`/words/${word.id}/v3/wizard/forms`);
+  const sourceId = word.forms.pos[0]!.forms[0]!.id;
+  const targetId = word.forms.pos[0]!.forms[2]!.id;
+  const sourceRow = page
+    .locator(`tr.v3-overview-form-start[data-overview-form-id="${sourceId}"]`)
+    .first();
+  const targetCell = page
+    .locator(
+      `[data-form-copy-target="${targetId}"][data-form-copy-kind="phonetics"]`
+    )
+    .first();
+  await sourceRow
+    .getByRole("button", { name: "复制英美音标", exact: true })
+    .dragTo(targetCell);
+  await expect(
+    page.getByRole("button", { name: "撤销", exact: true })
+  ).toBeVisible();
+  await expect(targetCell).toContainText("ˈɔːbɪt");
+  const save = page.getByRole("button", { name: /保存草稿$/ });
+  await expect(save).toBeEnabled();
+  saved = true;
+  await save.click();
+  await expect(save).not.toHaveClass(/ant-btn-loading/);
+  await expect(save).toBeDisabled();
+  const afterPhonetics = api
+    .getWord()
+    .forms.contents.find((row) => row.id === target.id)!;
+  if (afterPhonetics.regional_variants.mode !== "common")
+    throw new Error("fixture");
+  expect(afterPhonetics.regional_variants.common.spelling).toBe("orbits");
+  expect(
+    afterPhonetics.regional_variants.common.pronunciations[0]!.voice_profile
+  ).toEqual(profile("target-voice", 10));
+  await page.reload();
+  await expect(targetCell).toContainText("ˈɔːbɪt");
+  await sourceRow
+    .getByRole("button", { name: "复制英美音色参数", exact: true })
+    .click();
+  await page
+    .locator(
+      `[data-form-copy-target="${targetId}"][data-form-copy-kind="voices"]`
+    )
+    .first()
+    .click({ position: { x: 5, y: 5 } });
+  await expect(
+    page.getByRole("button", { name: "撤销", exact: true })
+  ).toBeVisible();
+  await save.click();
+  await expect(save).toBeDisabled();
+  const final = api.getWord().forms;
+  const copied = final.contents.find((row) => row.id === target.id)!;
+  if (copied.regional_variants.mode !== "common") throw new Error("fixture");
+  expect(copied.regional_variants.common.pronunciations[0]!.actual_pron).toBe(
+    "ˈɔːbɪt"
+  );
+  expect(
+    copied.regional_variants.common.pronunciations[0]!.voice_profile?.voices[0]
+  ).toMatchObject({
+    voice_id: "source-voice",
+    rate_percent: -20,
+    volume_percent: 80
+  });
+  expect(final.contents.find((row) => row.id === source.id)).toEqual(source);
+  expect(final.pos).toEqual(word.forms.pos);
+  await page.screenshot({
+    path: test.info().outputPath("form-copy-after-save.png"),
+    animations: "disabled"
+  });
+});
+
 test("发布历史仅在预览并生效页显示，录入步骤没有历史入口", async ({ page }) => {
   await mockAdminV3Api(page, { formsFailureOnce: false });
   for (const step of ["basics", "forms", "meanings"]) {

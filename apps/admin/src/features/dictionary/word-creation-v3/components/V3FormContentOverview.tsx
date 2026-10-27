@@ -1,4 +1,9 @@
 import { EditOutlined } from "@ant-design/icons";
+import {
+  V3FormCopyHandle,
+  V3FormCopyHelp,
+  useV3FormCopy
+} from "./V3FormCopyProvider";
 import { Button, Dropdown, Space, Table, Tooltip, Typography } from "antd";
 import type {
   WordConcreteFormV3,
@@ -136,6 +141,7 @@ export function V3FormContentOverview({
   issues: readonly V3DraftValidationIssue[];
 }) {
   const label = useFormTypeLabel();
+  const copy = useV3FormCopy();
   const readings = rows.flatMap((row): OverviewReading[] => {
     const regions = row.form.regional_variants;
     const uk = regions.mode === "common" ? regions.common : regions.uk;
@@ -355,22 +361,37 @@ export function V3FormContentOverview({
             )
           },
           {
-            title: "实际发音",
+            title: <Space>实际发音{copy && <V3FormCopyHelp />}</Space>,
             key: "pronunciation",
-            render: (_, row) => <PronunciationCell reading={row} />
+            onCell: (row) => copy?.cell(row.form.id, "phonetics") ?? {},
+            render: (_, row) => (
+              <div className="v3-form-copy-content">
+                <PronunciationCell reading={row} />
+                {row.formRowSpan > 0 && (
+                  <V3FormCopyHandle formId={row.form.id} kind="phonetics" />
+                )}
+              </div>
+            )
           },
           {
             title: "音色",
             key: "voice",
             width: 144,
+            onCell: (row) => copy?.cell(row.form.id, "voices") ?? {},
             render: (_, row) => (
-              <PronunciationCell reading={row} settings="voice" />
+              <div className="v3-form-copy-content">
+                <PronunciationCell reading={row} settings="voice" />
+                {row.formRowSpan > 0 && (
+                  <V3FormCopyHandle formId={row.form.id} kind="voices" />
+                )}
+              </div>
             )
           },
           {
             title: "语速",
             key: "rate",
             width: 76,
+            onCell: (row) => copy?.cell(row.form.id, "voices") ?? {},
             render: (_, row) => (
               <PronunciationCell reading={row} settings="rate" />
             )
@@ -379,6 +400,7 @@ export function V3FormContentOverview({
             title: "音量",
             key: "volume",
             width: 76,
+            onCell: (row) => copy?.cell(row.form.id, "voices") ?? {},
             render: (_, row) => (
               <PronunciationCell reading={row} settings="volume" />
             )

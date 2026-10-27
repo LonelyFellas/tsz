@@ -54,6 +54,49 @@
 .v3-form-overview .ant-table.ant-table-small tr > .v3-overview-action-cell {
   padding-inline: 16px 8px;
 }
+.v3-form-copy-feedback:empty {
+  display: none;
+}
+.v3-form-copy-feedback:not(:empty) {
+  margin-bottom: 12px;
+}
+.v3-form-copy-feedback.is-selecting {
+  position: fixed;
+  z-index: 1050;
+  top: 80px;
+  right: 16px;
+  width: min(560px, calc(100vw - 32px));
+  pointer-events: none;
+}
+.v3-form-copy-feedback.is-selecting button {
+  pointer-events: auto;
+}
+.v3-form-copy-content {
+  position: relative;
+  min-height: 28px;
+  padding-right: 24px;
+}
+.v3-form-copy-content .v3-form-copy-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 22px;
+  height: 24px;
+  color: #8d929b;
+  cursor: grab;
+  touch-action: none;
+}
+.v3-form-copy-content .v3-form-copy-handle[aria-pressed="true"] {
+  color: #2053ff;
+  background: #eef2ff;
+}
+.v3-form-copy-cell.is-copy-available {
+  cursor: copy;
+}
+.v3-form-copy-cell.is-copy-target {
+  background: #eef2ff;
+  box-shadow: inset 0 0 0 1px #2053ff;
+}
 .v3-overview-spellings {
   display: flex;
   align-items: baseline;
