@@ -6,12 +6,15 @@ import {
   pronunciationFixture,
   uuidFromInt
 } from "./fixtures";
-import { planFormCopy } from "./formCopyModel";
+import { applyFormCopy, planFormCopy } from "./formCopyModel";
 import { resolveFormCopyProfiles } from "./formCopyProfiles";
 import { applyFormsStructure } from "./sharedFormsModel";
 
-const resolve = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/auth", () => ({ api: { speech: { resolve } } }));
+const { resolve, voices } = vi.hoisted(() => ({
+  resolve: vi.fn(),
+  voices: vi.fn()
+}));
+vi.mock("@/lib/auth", () => ({ api: { speech: { resolve, voices } } }));
 function fixture(profile: VoiceProfileV3): SharedFormsStepContentV3 {
   return applyFormsStructure(
     { forms_format: "shared_v1", contents: [], pos: [] },
@@ -60,7 +63,13 @@ const profile: VoiceProfileV3 = {
   ],
   dubbing: { mode: "inherit", area: "azure" }
 };
-beforeEach(() =>
+beforeEach(() => {
+  voices.mockReset().mockResolvedValue({
+    items: [
+      { alias: "stored", locale: "en-GB", accent: "gb" },
+      { alias: "resolved", locale: "en-GB", accent: "gb" }
+    ]
+  });
   resolve.mockReset().mockResolvedValue({
     voices: [
       {
@@ -74,8 +83,8 @@ beforeEach(() =>
         role: "YoungAdultFemale"
       }
     ]
-  })
-);
+  });
+});
 
 describe("复制前解析完整音色配置", () => {
   it("解析继承配音，保留未启用配置，并按口音和正文类型请求", async () => {
@@ -143,6 +152,76 @@ describe("复制前解析完整音色配置", () => {
     );
     expect(resolve).toHaveBeenCalled();
   });
+  it("原生地区不覆盖目录人工口音归属，跨侧禁用副本不会覆盖启用音色", async () => {
+    voices.mockResolvedValue({
+      items: [
+        { alias: "reassigned", locale: "en-US", accent: "gb" },
+        { alias: "canadian", locale: "en-CA", accent: "us" }
+      ]
+    });
+    const sourceProfile: VoiceProfileV3 = {
+      voices: [
+        {
+          voice_id: "reassigned",
+          locale: "en-US",
+          version_id: uuidFromInt(60),
+          version_name: "British",
+          enabled: true,
+          rate_percent: -10
+        },
+        {
+          voice_id: "canadian",
+          locale: "en-CA",
+          version_id: uuidFromInt(61),
+          version_name: "American",
+          enabled: true,
+          rate_percent: 20
+        }
+      ],
+      dubbing: { mode: "local", area: "azure" }
+    };
+    resolve.mockImplementation(async (input) => ({
+      voices: sourceProfile.voices.filter(
+        (setting) =>
+          setting.voice_id ===
+          (input.accent === "gb" ? "reassigned" : "canadian")
+      )
+    }));
+    const forms = fixture(sourceProfile);
+    const plan = planFormCopy(
+      forms,
+      forms.pos[0]!.forms[0]!.id,
+      forms.pos[0]!.forms[1]!.id,
+      "voices"
+    );
+    const profiles = await resolveFormCopyProfiles(
+      plan,
+      new AbortController().signal
+    );
+    expect(
+      profiles
+        .find((item) => item.side === "uk" && item.channel === "fallback")!
+        .profile.voices.map((setting) => [setting.voice_id, setting.enabled])
+    ).toEqual([["reassigned", true]]);
+    expect(
+      profiles
+        .find((item) => item.side === "us" && item.channel === "fallback")!
+        .profile.voices.map((setting) => [setting.voice_id, setting.enabled])
+    ).toEqual([["canadian", true]]);
+    const target = applyFormCopy(forms, plan, profiles).contents[1]!
+      .regional_variants;
+    if (target.mode !== "common") throw new Error("fixture");
+    expect(
+      target.common.pronunciations[0]!.voice_profile!.voices.map((setting) => [
+        setting.voice_id,
+        setting.enabled
+      ])
+    ).toEqual([
+      ["reassigned", true],
+      ["canadian", true]
+    ]);
+  });
+
   it("任何通道解析失败都返回失败，调用者不能应用部分结果", async () => {
     resolve.mockRejectedValueOnce(new Error("配置已失效"));
     const forms = fixture(profile);

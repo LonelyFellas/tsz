@@ -30,9 +30,13 @@ test("整组音标拖动复制后保存重开保持独立，音色复制不改�
       }
     }
   const profile = (voice: string, rate: number) => ({
-    voices: [
-      { voice_id: voice, enabled: true, rate_percent: rate, volume_percent: 80 }
-    ]
+    voices: (["en-GB", "en-US"] as const).map((locale) => ({
+      voice_id: `${voice}-${locale}`,
+      locale,
+      enabled: true,
+      rate_percent: rate,
+      volume_percent: 80
+    }))
   });
   source.regional_variants.common.pronunciations[0]!.voice_profile = profile(
     "source-voice",
@@ -47,6 +51,28 @@ test("整组音标拖动复制后保存重开保持独立，音色复制不改�
     saved
       ? route.fallback()
       : route.fulfill({ json: { word, retired_stable_nodes: [] } })
+  );
+  await page.route("**/api/v1/admin/speech/voices", (route) =>
+    route.fulfill({
+      json: {
+        items: ["source-voice", "target-voice"].flatMap((voice) =>
+          ["en-GB", "en-US"].map((locale) => ({
+            alias: `${voice}-${locale}`,
+            display_name: voice,
+            locale,
+            gender: "female",
+            is_common: true,
+            capabilities: {
+              styles: [],
+              min_rate_percent: -50,
+              max_rate_percent: 100,
+              min_pitch_semitones: -12,
+              max_pitch_semitones: 12
+            }
+          }))
+        )
+      }
+    })
   );
   await page.setViewportSize({ width: 1440, height: 1600 });
   await page.goto(`/words/${word.id}/v3/wizard/forms`);
@@ -107,7 +133,7 @@ test("整组音标拖动复制后保存重开保持独立，音色复制不改�
   expect(
     copied.regional_variants.common.pronunciations[0]!.voice_profile?.voices[0]
   ).toMatchObject({
-    voice_id: "source-voice",
+    voice_id: "source-voice-en-GB",
     rate_percent: -20,
     volume_percent: 80
   });

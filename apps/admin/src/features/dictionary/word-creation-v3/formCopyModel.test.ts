@@ -218,7 +218,7 @@ describe("词形内容定向复制", () => {
     ).toBe("target-ipa");
     expect(
       copied.synthesis!.us!.ups_speech!.voice_profile.voices[0]!.voice_id
-    ).toBe("target-ups");
+    ).toBe("target");
     expect(JSON.stringify(copied)).not.toContain("audio_asset_id");
     expect(forms).toEqual(before);
   });
@@ -345,6 +345,132 @@ describe("词形内容定向复制", () => {
     expect(copied.synthesis!.alphabet).toBe("ipa");
     expect(variant(next.contents[1]!).spelling).toBe("longer spelling");
     expect(copied.voice_profile!.voices[0]!.voice_id).toBe("target");
+  });
+
+  it.each(["spelling", "ups"] as const)(
+    "音标切换 IPA→%s 保留目标原来有效的音色",
+    (selection) => {
+      const { forms, sourceId, targetId } = setup();
+      const source = variant(forms.contents[0]!).pronunciations[0]!;
+      const targetVariant = variant(forms.contents[1]!);
+      const target = targetVariant.pronunciations[0]!;
+      target.synthesis = {
+        alphabet: "ipa",
+        ipa: "old",
+        ups: "OLD",
+        uk: {
+          ipa: "old",
+          ups: "OLD",
+          ipa_speech: speech(targetVariant.spelling, profile("target-active")),
+          ups_speech: speech(targetVariant.spelling, profile("target-inactive"))
+        },
+        us: {
+          ipa: "old",
+          ups: "OLD",
+          ipa_speech: speech(targetVariant.spelling, profile("target-active")),
+          ups_speech: speech(targetVariant.spelling, profile("target-inactive"))
+        }
+      };
+      source.synthesis = {
+        alphabet: selection === "ups" ? "ups" : "ipa",
+        use_spelling: selection === "spelling",
+        ipa: "new",
+        ups: "N EW",
+        uk: {
+          ipa: "new",
+          ups: "N EW",
+          ups_words: [
+            { text: "old", phoneme: "N" },
+            { text: "word", phoneme: "EW" }
+          ]
+        },
+        us: {
+          ipa: "new",
+          ups: "N EW",
+          ups_words: [
+            { text: "old", phoneme: "N" },
+            { text: "word", phoneme: "EW" }
+          ]
+        }
+      };
+      const copied = variant(
+        applyFormCopy(
+          forms,
+          planFormCopy(forms, sourceId, targetId, "phonetics")
+        ).contents[1]!
+      ).pronunciations[0]!;
+      const effective =
+        selection === "spelling"
+          ? copied.voice_profile
+          : copied.synthesis!.uk!.ups_speech!.voice_profile;
+      expect(effective!.voices[0]!.voice_id).toBe("target-active");
+      expect(JSON.stringify(effective)).not.toContain("audio_asset_id");
+    }
+  );
+
+  it("common 目标跳过一侧时拒绝覆盖推荐配音的区域和顺序", () => {
+    const { forms, sourceId, targetId } = setup();
+    const source = variant(forms.contents[0]!).pronunciations[0]!;
+    const target = variant(forms.contents[1]!).pronunciations[0]!;
+    source.voice_profile = profile("source");
+    source.voice_profile.voices.forEach((voice) => {
+      voice.locale = "en-GB";
+    });
+    target.voice_profile = {
+      voices: [],
+      dubbing: {
+        mode: "local",
+        area: "word",
+        recommendation_order: ["us-b", "us-a"]
+      }
+    };
+    const before = structuredClone(forms);
+    const plan = planFormCopy(forms, sourceId, targetId, "voices", {
+      us: { [target.id]: null }
+    });
+    expect(() => applyFormCopy(forms, plan)).toThrow("口音不明确");
+    expect(forms).toEqual(before);
+  });
+
+  it("已按目录解析的口音归属优先于原生 locale，保留启用状态", () => {
+    const { forms, sourceId, targetId } = setup();
+    const source = variant(forms.contents[0]!).pronunciations[0]!;
+    source.voice_profile = profile("stored", true);
+    const resolved = (["uk", "us"] as const).map((side) => ({
+      side,
+      sourcePronunciationId: source.id,
+      channel: "fallback" as const,
+      sideScoped: true,
+      profile: {
+        voices: [
+          {
+            voice_id: side === "uk" ? "us-native-gb" : "canadian",
+            version_id: uuidFromInt(side === "uk" ? 801 : 802),
+            version_name: side,
+            locale: side === "uk" ? ("en-US" as const) : ("en-CA" as const),
+            enabled: true,
+            rate_percent: 0
+          }
+        ],
+        dubbing: { mode: "inherit" as const, area: "azure" as const }
+      }
+    }));
+    const copied = variant(
+      applyFormCopy(
+        forms,
+        planFormCopy(forms, sourceId, targetId, "voices"),
+        resolved
+      ).contents[1]!
+    ).pronunciations[0]!;
+    expect(
+      copied.voice_profile!.voices.map((voice) => [
+        voice.voice_id,
+        voice.enabled
+      ])
+    ).toEqual([
+      ["us-native-gb", true],
+      ["canadian", true]
+    ]);
   });
 
   it("版本不同要求逐侧映射，null跳过且不增删重排版本", () => {

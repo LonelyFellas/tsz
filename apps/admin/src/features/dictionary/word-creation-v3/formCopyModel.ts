@@ -8,7 +8,11 @@ import type {
   VoiceProfileV3,
   WordPronunciationV3
 } from "@tsz/types";
-import { pronunciationLocale, synthesisForLocale } from "@tsz/shared";
+import {
+  pronunciationLocale,
+  speechAccentGroup,
+  synthesisForLocale
+} from "@tsz/shared";
 import {
   clearVoiceAudio,
   localVoiceProfile,
@@ -62,6 +66,8 @@ export interface ResolvedFormCopyProfile {
   sourcePronunciationId: string;
   channel: "ipa" | "ups" | "fallback";
   profile: VoiceProfileV3;
+  /** Profile entries have already been scoped using the current voice catalogue. */
+  sideScoped?: boolean;
 }
 
 const SIDES = ["uk", "us"] as const;
@@ -415,6 +421,48 @@ function copyPhonetics(
   if (target.synthesis && selected && candidates.some(Boolean)) {
     target.synthesis.alphabet = selected.alphabet;
     target.synthesis.use_spelling = selected.use_spelling;
+    const sourceChanged =
+      Boolean(before.synthesis?.use_spelling) !==
+        Boolean(selected.use_spelling) ||
+      (!selected.use_spelling &&
+        before.synthesis?.alphabet !== selected.alphabet);
+    if (sourceChanged) {
+      const profiles = matches.map((match) => {
+        const previous = previousCandidates[match.side];
+        const profile =
+          !before.synthesis?.use_spelling && before.synthesis
+            ? (previous?.[`${before.synthesis.alphabet}_speech`]
+                ?.voice_profile ?? before.voice_profile)
+            : before.voice_profile;
+        return profile ? clearVoiceAudio(profile) : undefined;
+      });
+      if (selected.use_spelling) {
+        if (
+          profiles.some(
+            (profile) => JSON.stringify(profile) !== JSON.stringify(profiles[0])
+          )
+        )
+          throw new Error(
+            "目标英美音色不同，切换拼写发音无法保留原音色，请先将目标切换为英美区分"
+          );
+        if (profiles[0]) target.voice_profile = structuredClone(profiles[0]);
+        else delete target.voice_profile;
+      } else {
+        for (const [index, match] of matches.entries()) {
+          const candidate = target.synthesis[match.side];
+          if (!candidate) continue;
+          const key = `${selected.alphabet}_speech` as const;
+          candidate[key] = {
+            content: candidate[key]?.content ?? {
+              version: 2,
+              text: match.target.spelling,
+              annotations: []
+            },
+            voice_profile: structuredClone(profiles[index] ?? { voices: [] })
+          };
+        }
+      }
+    }
   }
 }
 
@@ -457,13 +505,18 @@ function copiedProfile(
 }
 
 function profileSide(locale: string | undefined): FormCopySide | undefined {
-  return locale === "en-GB" ? "uk" : locale === "en-US" ? "us" : undefined;
+  const group = speechAccentGroup(locale);
+  return group === "uk" || group === "us" ? group : undefined;
 }
 
 function mergeFallbacks(
   target: VoiceProfileV3 | undefined,
   matches: FormCopyPlan["matches"],
-  values: { match: FormCopyPlan["matches"][number]; profile: VoiceProfileV3 }[]
+  values: {
+    match: FormCopyPlan["matches"][number];
+    profile: VoiceProfileV3;
+    sideScoped?: boolean;
+  }[]
 ): VoiceProfileV3 {
   if (matches.length === 1) return values[0]!.profile;
   const complete = values.length === matches.length;
@@ -478,17 +531,24 @@ function mergeFallbacks(
   const replacedSides = new Set(values.map((item) => item.match.side));
   const unchanged = complete ? [] : (target?.voices ?? []);
   if (
-    values.some((item) =>
-      item.profile.voices.some((voice) => !profileSide(voice.locale))
+    values.some(
+      (item) =>
+        !item.sideScoped &&
+        (item.profile.dubbing?.mode === "inherit" ||
+          item.profile.voices.some((voice) => !profileSide(voice.locale)))
     ) ||
     unchanged.some((voice) => !profileSide(voice.locale)) ||
-    (!complete && target?.dubbing?.mode === "inherit")
+    (!complete && Boolean(target?.dubbing))
   )
     throw new Error(
       "音色口音不明确，无法合并英美音色或保留跳过侧，请先明确音色口音或将目标切换为英美区分"
     );
-  const voices = values.flatMap(({ match, profile }) =>
-    profile.voices.filter((voice) => profileSide(voice.locale) === match.side)
+  const voices = values.flatMap(({ match, profile, sideScoped }) =>
+    sideScoped
+      ? profile.voices
+      : profile.voices.filter(
+          (voice) => profileSide(voice.locale) === match.side
+        )
   );
   voices.push(
     ...unchanged.filter(
@@ -519,6 +579,7 @@ function copyVoices(
   const fallbacks: {
     match: FormCopyPlan["matches"][number];
     profile: VoiceProfileV3;
+    sideScoped?: boolean;
   }[] = [];
   for (const match of matches) {
     if (!match.source) continue;
@@ -546,8 +607,25 @@ function copyVoices(
             versions
           ) ?? fallback)
         : fallback;
-    if (effectiveFallback)
-      fallbacks.push({ match, profile: effectiveFallback });
+    if (effectiveFallback) {
+      const channel =
+        before.synthesis?.use_spelling &&
+        !from.synthesis?.use_spelling &&
+        fromCandidate?.[`${selectedAlphabet}_speech`]?.voice_profile
+          ? selectedAlphabet
+          : "fallback";
+      fallbacks.push({
+        match,
+        profile: effectiveFallback,
+        sideScoped: resolved.some(
+          (item) =>
+            item.side === match.side &&
+            item.sourcePronunciationId === match.source!.pronunciationId &&
+            item.channel === channel &&
+            item.sideScoped
+        )
+      });
+    }
     const previous = candidateForSide(before, match.target.region, match.side);
     for (const alphabet of ALPHABETS) {
       const key = `${alphabet}_speech` as const;

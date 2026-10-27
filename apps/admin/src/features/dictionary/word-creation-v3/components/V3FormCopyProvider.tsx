@@ -7,6 +7,7 @@ import {
   Alert,
   App,
   Button,
+  ConfigProvider,
   Flex,
   Modal,
   Select,
@@ -463,7 +464,11 @@ export function V3FormCopyProvider({
             />
           )}
         </Flex>
-        {children}
+        <ConfigProvider componentDisabled={busy}>
+          <div inert={busy} aria-busy={busy}>
+            {children}
+          </div>
+        </ConfigProvider>
         <Modal
           title={`复制${pending ? copyName(pending.kind) : "配置"}`}
           open={Boolean(pending)}

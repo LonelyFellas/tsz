@@ -6,7 +6,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App, ConfigProvider } from "antd";
+import { App, Button, ConfigProvider } from "antd";
 import type { SharedFormsStepContentV3 } from "@tsz/types";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -58,6 +58,15 @@ function fixture(targetCount = 1): SharedFormsStepContentV3 {
     })
   ) as SharedFormsStepContentV3;
 }
+function EditProbe() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button onClick={() => setOpen(true)}>编辑词形内容</Button>
+      {open && <div role="dialog">旧草稿抽屉</div>}
+    </>
+  );
+}
 function Cells({ forms }: { forms: SharedFormsStepContentV3 }) {
   const copy = useV3FormCopy()!;
   return (
@@ -94,6 +103,7 @@ function Harness({
       <App>
         <V3FormCopyProvider forms={forms} onChange={setForms}>
           <Cells forms={forms} />
+          <EditProbe />
           <button
             onClick={() => {
               const next = structuredClone(forms);
@@ -235,6 +245,35 @@ describe("词形复制交互", () => {
     expect(
       screen.getByText("目标在复制后又被修改，不能撤销覆盖这些修改")
     ).toBeInTheDocument();
+  });
+
+  it("解析配音期间禁止打开旧草稿抽屉，完成后恢复编辑", async () => {
+    let finish!: (value: []) => void;
+    resolveProfiles.mockImplementationOnce(
+      () =>
+        new Promise<[]>((resolve) => {
+          finish = resolve;
+        })
+    );
+    render(<Harness />);
+    fireEvent.click(
+      within(screen.getByTestId("form-0")).getByRole("button", {
+        name: "复制英美音标"
+      })
+    );
+    fireEvent.click(screen.getByTestId("phonetics-1"));
+    const edit = screen.getByRole("button", { name: "编辑词形内容" });
+    expect(edit).toBeDisabled();
+    expect(edit.closest("[inert]")).not.toBeNull();
+    fireEvent.click(edit);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await act(async () => {
+      finish([]);
+    });
+    expect(targetPronunciation().actual_pron).toBe("source");
+    expect(edit).toBeEnabled();
+    fireEvent.click(edit);
+    expect(screen.getByRole("dialog")).toHaveTextContent("旧草稿抽屉");
   });
 
   it("音色解析失败或解析期间目标改变时，不产生部分修改", async () => {
