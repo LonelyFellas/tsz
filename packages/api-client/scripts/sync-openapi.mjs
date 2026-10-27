@@ -300,6 +300,7 @@ const contractSchemaNames = [
   "DraftNodeLocation",
   "AdminWordDraftV3Envelope",
   "AdminWordListItemV3",
+  "EntryNameVariantV3",
   "EntryLifecycleInput",
   "EntryArchiveImpactInput",
   "EntryArchiveImpact",

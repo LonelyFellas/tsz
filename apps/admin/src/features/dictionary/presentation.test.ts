@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   observeWordListPresentation,
   visibleWordAnnotation,
-  wordListDialects,
   wordListLabel
 } from "./presentation";
 
@@ -34,7 +33,7 @@ const v3Row = (
 });
 
 describe("mixed word list presentation", () => {
-  it("V3 忠实消费服务端 presentation 与 dialects，不从具体词形猜展示名或方言", () => {
+  it("V3 忠实消费服务端 presentation，不从具体词形猜展示名", () => {
     const row = v3Row({
       label: "legacy: centre · center",
       matched_surfaces: ["centre", "center"],
@@ -42,20 +41,24 @@ describe("mixed word list presentation", () => {
     });
 
     expect(wordListLabel(row)).toBe("legacy: centre · center");
-    expect(wordListDialects(row)).toEqual(["uk", "us"]);
   });
 
-  it("V3 空白草稿的 dialects 为空数组时保持未知，不落回默认", () => {
-    const row = {
-      ...v3Row({
-        label: "未命名词条",
-        matched_surfaces: [],
-        strategy_version: "short_uuid_v1"
-      }),
-      dialects: []
-    };
-
-    expect(wordListDialects(row)).toEqual([]);
+  it("结构化名称用于行操作，缺省或空数组回退旧名称", () => {
+    const row = v3Row({
+      label: "旧顺序",
+      matched_surfaces: [],
+      strategy_version: "surface_summary_v1"
+    });
+    expect(
+      wordListLabel({
+        ...row,
+        name_variants: [
+          { text: "cosy", dialects: ["uk"] },
+          { text: "cozy", dialects: ["us"] }
+        ]
+      })
+    ).toBe("cosy / cozy");
+    expect(wordListLabel({ ...row, name_variants: [] })).toBe("旧顺序");
   });
 
   it("未知但非空的 presentation strategy 仍按响应展示并上报安全诊断", () => {

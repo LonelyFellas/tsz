@@ -509,6 +509,40 @@ describe("admin word V3/Any runtime decoder", () => {
     expect(Object.isFrozen(SUPPORTED_ADMIN_WORD_V3_SCHEMA_VERSIONS)).toBe(true);
   });
 
+  it("列表结构化名称兼容缺省，保留同形双侧且拒绝非法字段", () => {
+    const response = (name_variants: unknown) => ({
+      words: [{ ...validAdminWordListItemV3(), name_variants }],
+      page: { page: 1, page_size: 20, total: 1 }
+    });
+    for (const name_variants of [
+      [],
+      [
+        { text: "colour", dialects: ["uk"] },
+        { text: "color", dialects: ["us"] }
+      ],
+      [{ text: "same", dialects: ["uk", "us"] }]
+    ]) {
+      const value = response(name_variants);
+      expect(decodeAdminWordAnyListResponse(value)).toBe(value);
+    }
+    for (const invalid of [
+      null,
+      "colour",
+      [{ text: "colour" }],
+      [{ text: "colour", dialects: ["future"] }],
+      [{ text: "colour", dialects: ["uk"], extra: true }]
+    ]) {
+      expect(() => decodeAdminWordAnyListResponse(response(invalid))).toThrow(
+        InvalidAdminWordResponseError
+      );
+    }
+    const legacy = {
+      words: [validAdminWordListItemV3()],
+      page: { page: 1, page_size: 20, total: 1 }
+    };
+    expect(decodeAdminWordAnyListResponse(legacy)).toBe(legacy);
+  });
+
   it("列表接受最后更新人并兼容旧接口缺少字段，拒绝错误类型", () => {
     const oldResponse = {
       words: [validAdminWordListItemV3()],

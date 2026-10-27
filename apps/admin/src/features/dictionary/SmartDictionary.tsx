@@ -38,7 +38,6 @@ import type {
   AdminWordV3Envelope,
   AdminWordListItemAny,
   CefrLevel,
-  Dialect,
   EntryLifecycleBatchResponse,
   EntryLifecycleTarget,
   EntryReferenceKind,
@@ -89,7 +88,6 @@ import {
   observeWordListPresentation,
   type PresentationStrategyReporter,
   visibleWordAnnotation,
-  wordListDialects,
   wordListLabel
 } from "./presentation";
 import { useLifecycleSurfaceCommand } from "./useLifecycleSurfaceCommand";
@@ -121,12 +119,6 @@ const ENTRY_REFERENCE_KIND_LABEL: Record<EntryReferenceKind, string> = {
   publication_sense_ref: "已发布内容关联",
   sentence_association: "例句关联待认领",
   phrase_component: "短语成分"
-};
-
-const DIALECT_LABEL: Record<Dialect, string> = {
-  uk: "BrE",
-  us: "AmE",
-  common: "英美通用"
 };
 
 /** 基本词性按英文缩写展示，只斜体字母、点号保持正体（如 *adj*.）；目录里没有的编码原样显示。 */
@@ -822,45 +814,39 @@ export function SmartDictionary({
 
   const columns: TableColumnsType<AdminWordListItemAny> = [
     {
-      title: "名称",
+      title: "词条名称",
       key: "label",
       width: 150,
       fixed: "left",
       ellipsis: { showTitle: false },
       render: (_: unknown, record) => {
-        const label = wordListLabel(record);
         const annotation = visibleWordAnnotation(record);
+        const names = record.name_variants?.length
+          ? record.name_variants
+          : [{ text: wordListLabel(record), dialects: [] }];
         return (
-          <span
-            style={{
-              display: "block",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              lineHeight: 1.6
-            }}
-          >
-            <span className="tsz-words" style={{ fontWeight: 600 }}>
-              {label}
-            </span>
-            {annotation ? (
-              <sup
-                style={{
-                  display: "inline-block",
-                  position: "relative",
-                  top: "-0.4em",
-                  marginInlineStart: 2,
-                  color: "rgba(0, 0, 0, 0.65)",
-                  fontSize: 11,
-                  fontWeight: 600,
-                  lineHeight: 1,
-                  verticalAlign: "baseline"
-                }}
-              >
-                {annotation}
-              </sup>
-            ) : null}
-          </span>
+          <div className="word-list-names">
+            {names.map((name) => (
+              <div className="word-list-name" key={name.text}>
+                <span className="tsz-words word-list-name-text">
+                  {name.text}
+                </span>
+                {annotation ? (
+                  <sup className="word-list-name-annotation">{annotation}</sup>
+                ) : null}
+                {!name.dialects.includes("common") &&
+                  name.dialects.map((dialect) => (
+                    <span
+                      key={dialect}
+                      className={`word-list-dialect-dot word-list-dialect-dot-${dialect}`}
+                      role="img"
+                      aria-label={dialect === "uk" ? "英式拼写" : "美式拼写"}
+                      data-spelling-dialect={dialect}
+                    />
+                  ))}
+              </div>
+            ))}
+          </div>
         );
       }
     },
@@ -876,19 +862,7 @@ export function SmartDictionary({
       )
     },
     {
-      title: "方言",
-      key: "dialects",
-      width: 110,
-      responsive: ["sm"],
-      render: (_: unknown, record) => {
-        const dialects = wordListDialects(record);
-        return dialects.length > 0
-          ? dialects.map((dialect) => DIALECT_LABEL[dialect]).join(" / ")
-          : "-";
-      }
-    },
-    {
-      title: "释义",
+      title: "常见释义",
       dataIndex: "gloss",
       width: 180,
       ellipsis: true,

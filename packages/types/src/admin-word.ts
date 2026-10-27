@@ -48,6 +48,8 @@ export interface AdminWordListQuery {
   /** RFC3339,半开区间 [from, to) */
   created_from?: string;
   created_to?: string;
+  /** 显式请求结构化名称；缺省时保留旧响应形状。 */
+  include_name_variants?: boolean;
 }
 
 /** 列表行(读取时派生:gloss 取第一个词性第一个词义的第一条释义)。 */

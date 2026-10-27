@@ -375,6 +375,17 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     expect(sp.has("gloss")).toBe(false);
   });
 
+  it.each([true, false])(
+    "list 显式序列化名称请求参数 %s",
+    async (include_name_variants) => {
+      const api = createAdminEndpoints(http);
+      await api.words.list({ include_name_variants });
+      expect(http.get).toHaveBeenCalledWith(
+        `/lexicon/entries?include_name_variants=${include_name_variants}`
+      );
+    }
+  );
+
   it("list 在成功响应边界拒绝任一未知 schema 版本", async () => {
     http.get.mockResolvedValueOnce({
       words: [

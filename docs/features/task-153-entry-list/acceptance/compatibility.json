@@ -1,0 +1,8 @@
+{
+  "passed": true,
+  "actualResponses": true,
+  "oldReaderDefault": true,
+  "newReaderDefaultFallback": true,
+  "newReaderOptIn": true,
+  "oldReaderRejectsOptInAsExpected": true
+}

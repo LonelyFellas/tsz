@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dubbing-auto-update/docs/openapi.json",
-  "_source_sha256": "66006d3906717bdec837f033f8f9dacc268481be6676c8fdbc84939cfcc2b2a2",
+  "_source_sha256": "bec18bcbfb2b463785f0b2b13e8beb0874f464cac9943513f254a5e3cc904bd1",
   "roots": [
     "MemoryOverview",
     "MemoryPage",
@@ -258,6 +258,10 @@
         "levels": { "type": "array", "items": { "type": "string" } },
         "lifecycle_revision": { "type": "integer" },
         "max_reachable_step": { "$ref": "#/$defs/WordCreationStep" },
+        "name_variants": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/EntryNameVariantV3" }
+        },
         "pos_list": { "type": "array", "items": { "type": "string" } },
         "presentation": { "$ref": "#/$defs/EntryPresentationV3" },
         "published_revision": { "type": "integer" },
@@ -1060,6 +1064,15 @@
       "properties": {
         "affected": { "type": "integer", "minimum": 0 },
         "words": { "type": "array", "items": { "$ref": "#/$defs/AdminWordV3" } }
+      },
+      "additionalProperties": false
+    },
+    "EntryNameVariantV3": {
+      "type": "object",
+      "required": ["text", "dialects"],
+      "properties": {
+        "dialects": { "type": "array", "items": { "$ref": "#/$defs/Dialect" } },
+        "text": { "type": "string" }
       },
       "additionalProperties": false
     },

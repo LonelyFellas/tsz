@@ -1274,12 +1274,20 @@ export interface DetectLexiconSurfaceResponseV3 {
   surface_match_page?: SurfaceMatchPageV3;
 }
 
+export interface EntryNameVariantV3 {
+  text: string;
+  /** common 表示通用拼写；相同的英美专用拼写合并为 [uk, us]。 */
+  dialects: Dialect[];
+}
+
 export interface AdminWordListItemV3 {
   annotation_visible: boolean;
   schema_version: 3;
   id: string;
   kind: WordEntryKindV3;
   presentation: EntryPresentationV3;
+  /** 仅显式请求时返回；旧后端缺省时继续使用 presentation.label。 */
+  name_variants?: EntryNameVariantV3[];
   /**
    * 方言摘要，后端按词性**当前**设置聚合：任一词性区分英美拼写 → `["uk", "us"]`，
    * 否则 `["common"]`；还没有词性的空白草稿为空数组。建条 step 1 的选择只是初始快照。

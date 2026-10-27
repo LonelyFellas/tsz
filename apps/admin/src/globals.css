@@ -39,6 +39,13 @@ body {
   .ant-table-selection-column {
     position: static !important;
   }
+
+  .ant-table-cell-fix-start::after,
+  .ant-table-cell-fix-end::after,
+  .ant-table-cell-fix-left::after,
+  .ant-table-cell-fix-right::after {
+    display: none;
+  }
 }
 .ant-table-pagination {
   max-width: 100%;
