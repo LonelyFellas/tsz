@@ -1,9 +1,10 @@
 import {
   act,
   fireEvent,
-  render,
+  render as testingLibraryRender,
   screen,
-  waitFor
+  waitFor,
+  within
 } from "@testing-library/react";
 import { App as AntApp, ConfigProvider } from "antd";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
@@ -81,6 +82,16 @@ vi.mock("./part-of-speech/api", () => ({
 }));
 
 import { SmartDictionary } from "./SmartDictionary";
+
+function render(ui: Parameters<typeof testingLibraryRender>[0]) {
+  return testingLibraryRender(ui, {
+    wrapper: ({ children }) => (
+      <ConfigProvider theme={{ token: { motion: false } }}>
+        {children}
+      </ConfigProvider>
+    )
+  });
+}
 
 /** 列表默认行：产品只剩 V3，默认 fixture 就按 V3 出。 */
 function word(id: string, headword: string): AdminWordListItemV3 {
@@ -172,6 +183,22 @@ function idleMutation() {
     mutate: vi.fn(),
     mutateAsync: vi.fn()
   };
+}
+
+async function openRowActions(
+  name: string,
+  scope: HTMLElement = document.body
+) {
+  const trigger = within(scope).getByLabelText(`更多操作「${name}」`);
+  fireEvent.mouseEnter(trigger);
+  return waitFor(() => {
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    const menu = document.querySelector<HTMLElement>(
+      '.word-list-action-menu:not(.ant-dropdown-hidden) [role="menu"]'
+    );
+    expect(menu).toBeVisible();
+    return within(menu!);
+  });
 }
 
 function LocationProbe() {
@@ -384,10 +411,13 @@ describe("SmartDictionary", () => {
     });
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
     expect(annotation.previousElementSibling).toHaveTextContent("center");
-    expect(screen.getByLabelText("编辑标注「center」")).toBeVisible();
+    const actions = await openRowActions("center");
+    expect(
+      actions.getByRole("menuitem", { name: "编辑标注「center」" })
+    ).toBeVisible();
   });
 
-  it("服务端标志隐藏上标，刷新可恢复且不依据当前页数量", () => {
+  it("服务端标志隐藏上标，刷新可恢复且不依据当前页数量", async () => {
     const item = {
       ...v3Word("entry", "center"),
       annotation: "007",
@@ -409,17 +439,20 @@ describe("SmartDictionary", () => {
     const rendered = render(view());
     expect(screen.queryByText("007")).not.toBeInTheDocument();
     // 入口跟着角标走：没角标就没得改，否则会出现「能改一个看不见的标注」。
+    const actions = await openRowActions("center");
     expect(
-      screen.queryByLabelText("编辑标注「center」")
+      actions.queryByRole("menuitem", { name: "编辑标注「center」" })
     ).not.toBeInTheDocument();
     item.annotation_visible = true;
     rendered.rerender(view());
     expect(screen.getByText("007").tagName).toBe("SUP");
-    expect(screen.getByLabelText("编辑标注「center」")).toBeVisible();
+    expect(
+      actions.getByRole("menuitem", { name: "编辑标注「center」" })
+    ).toBeVisible();
     expect(item.annotation).toBe("007");
   });
 
-  it("重复原型的未标注词条提供列表编辑入口", () => {
+  it("重复原型的未标注词条提供列表编辑入口", async () => {
     apiMocks.useWordList.mockReturnValue({
       data: {
         words: [{ ...v3Word("entry", "center"), annotation_visible: true }],
@@ -435,7 +468,10 @@ describe("SmartDictionary", () => {
         </MemoryRouter>
       </AntApp>
     );
-    expect(screen.getByLabelText("编辑标注「center」")).toBeVisible();
+    const actions = await openRowActions("center");
+    expect(
+      actions.getByRole("menuitem", { name: "编辑标注「center」" })
+    ).toBeVisible();
   });
 
   it("普通管理员可见他人词条角标，但不给标注编辑入口", async () => {
@@ -466,12 +502,13 @@ describe("SmartDictionary", () => {
     // 角标是「这张列表里还有没有同词面的另一行」，与归属无关，一律显示；
     // 能不能改才看归属。
     expect(screen.getByText("007").tagName).toBe("SUP");
+    const actions = await openRowActions("center");
     expect(
-      screen.queryByLabelText("编辑标注「center」")
+      actions.queryByRole("menuitem", { name: "编辑标注「center」" })
     ).not.toBeInTheDocument();
   });
 
-  it("普通管理员的草稿行入口为查看，移入垃圾桶置灰", () => {
+  it("普通管理员的草稿行入口为查看，归档菜单说明禁用原因且不发请求", async () => {
     authMocks.profile = { id: "admin-1", role: "admin" };
     apiMocks.useWordList.mockReturnValue({
       data: {
@@ -490,10 +527,25 @@ describe("SmartDictionary", () => {
     );
     expect(screen.getByLabelText("查看「center」")).toBeVisible();
     expect(screen.queryByLabelText("继续创建「center」")).toBeNull();
-    expect(screen.getByLabelText("移入垃圾桶「center」")).toBeDisabled();
+    const actions = await openRowActions("center");
+    const archive = actions
+      .getByLabelText("移入垃圾桶「center」")
+      .closest('[role="menuitem"]')!;
+    expect(archive).toHaveAttribute("aria-disabled", "true");
+    expect(archive).toHaveTextContent(/^移入垃圾桶$/);
+    fireEvent.mouseEnter(actions.getByLabelText("移入垃圾桶「center」"));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(
+      "需要相应的归档或恢复权限；普通管理员仅可操作本人词条"
+    );
+    fireEvent.click(archive);
+    expect(dataSourceMocks.archiveImpact).not.toHaveBeenCalled();
+    expect(apiMocks.useArchiveWord().mutateAsync).not.toHaveBeenCalled();
+    expect(
+      screen.queryByText("移入垃圾桶「center」？")
+    ).not.toBeInTheDocument();
   });
 
-  it("超管的未发布草稿照常可以继续创建与移入垃圾桶", () => {
+  it("更多操作无需点击即可悬停展开，继续创建保留直接入口", async () => {
     apiMocks.useWordList.mockReturnValue({
       data: {
         words: [v3Word("entry", "center")],
@@ -510,10 +562,27 @@ describe("SmartDictionary", () => {
       </AntApp>
     );
     expect(screen.getByLabelText("继续创建「center」")).toBeVisible();
-    expect(screen.getByLabelText("移入垃圾桶「center」")).toBeEnabled();
+    const trigger = screen.getByLabelText("更多操作「center」");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByLabelText("移入垃圾桶「center」")).toBeNull();
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    const actions = await openRowActions("center");
+    const archive = actions
+      .getByLabelText("移入垃圾桶「center」")
+      .closest('[role="menuitem"]')!;
+    expect(archive).not.toHaveAttribute("aria-disabled", "true");
+    expect(archive).toHaveTextContent(/^移入垃圾桶$/);
+    fireEvent.click(archive);
+    expect(
+      (await screen.findAllByText("移入垃圾桶「center」？")).at(-1)
+    ).toBeInTheDocument();
+    expect(dataSourceMocks.archiveImpact).toHaveBeenCalledWith({
+      entries: [{ id: "entry", base_revision: 3, base_lifecycle_revision: 2 }]
+    });
   });
 
-  it("普通管理员不能编辑已发布词条，无发布权不能归档", () => {
+  it("普通管理员不能编辑已发布词条，无发布权不能归档", async () => {
     authMocks.profile = { id: "admin-1", role: "admin" };
     apiMocks.useWordList.mockReturnValue({
       data: {
@@ -537,7 +606,12 @@ describe("SmartDictionary", () => {
         </MemoryRouter>
       </AntApp>
     );
-    expect(screen.getByLabelText("移入垃圾桶「center」")).toBeDisabled();
+    const actions = await openRowActions("center");
+    expect(
+      actions
+        .getByLabelText("移入垃圾桶「center」")
+        .closest('[role="menuitem"]')!
+    ).toHaveAttribute("aria-disabled", "true");
   });
 
   it("普通管理员归档按钮按独立归档权限显示，不借编辑或发布权限", async () => {
@@ -567,15 +641,17 @@ describe("SmartDictionary", () => {
         </MemoryRouter>
       </AntApp>
     );
-    const button = screen.getByLabelText("移入垃圾桶「center」");
-    expect(button).toBeEnabled();
+    const actions = await openRowActions("center");
+    const archive = actions
+      .getByLabelText("移入垃圾桶「center」")
+      .closest('[role="menuitem"]')!;
+    expect(archive).not.toHaveAttribute("aria-disabled", "true");
     expect(screen.queryByLabelText("编辑「center」")).toBeNull();
-    fireEvent.mouseEnter(button.parentElement!);
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("移入垃圾桶");
-    expect(screen.getByRole("tooltip")).not.toHaveTextContent("仅有读取权限");
+    expect(archive).toHaveTextContent(/^移入垃圾桶$/);
+    expect(archive).not.toHaveTextContent("仅有读取权限");
   });
 
-  it("超管对他人创建的词条也有标注编辑入口", () => {
+  it("超管对他人创建的词条也有标注编辑入口", async () => {
     authMocks.profile = { id: "admin-9", role: "super_admin" };
     apiMocks.useWordList.mockReturnValue({
       data: {
@@ -599,10 +675,13 @@ describe("SmartDictionary", () => {
         </MemoryRouter>
       </AntApp>
     );
-    expect(screen.getByLabelText("编辑标注「center」")).toBeVisible();
+    const actions = await openRowActions("center");
+    expect(
+      actions.getByRole("menuitem", { name: "编辑标注「center」" })
+    ).toBeVisible();
   });
 
-  it("拿不到当前管理员身份时不给标注编辑入口", () => {
+  it("拿不到当前管理员身份时不给标注编辑入口", async () => {
     authMocks.profile = null;
     apiMocks.useWordList.mockReturnValue({
       data: {
@@ -626,8 +705,9 @@ describe("SmartDictionary", () => {
       </AntApp>
     );
     expect(screen.getByText("007").tagName).toBe("SUP");
+    const actions = await openRowActions("center");
     expect(
-      screen.queryByLabelText("编辑标注「center」")
+      actions.queryByRole("menuitem", { name: "编辑标注「center」" })
     ).not.toBeInTheDocument();
   });
 
@@ -733,7 +813,12 @@ describe("SmartDictionary", () => {
       expect(cells[cells.length - 1]!.querySelector("button")).toBeEnabled();
       expect(screen.queryByText("legacy label")).toBeNull();
       const action = mode === "trash" ? "永久删除" : "移入垃圾桶";
-      fireEvent.click(screen.getByLabelText(`${action}「cosy / cozy / same」`));
+      const actions = await openRowActions("cosy / cozy / same");
+      fireEvent.click(
+        actions
+          .getByLabelText(`${action}「cosy / cozy / same」`)
+          .closest('[role="menuitem"]')!
+      );
       expect(
         (await screen.findAllByText(`${action}「cosy / cozy / same」？`)).at(-1)
       ).toBeInTheDocument();
@@ -997,25 +1082,17 @@ describe("SmartDictionary", () => {
     expect(screen.queryByText("BrE")).toBeNull();
 
     const secondRow = screen.getByText("协作空间").closest("tr")!;
-    const secondActions = [
-      ...secondRow.querySelectorAll<HTMLButtonElement>("td:last-child button")
-    ];
-    const actionNamed = (name: string) => {
-      const button = secondActions.find(
-        (item) => item.getAttribute("aria-label") === name
-      );
-      if (!button) throw new Error(`找不到操作按钮：${name}`);
-      return button;
-    };
-    // 按可及名定位而非下标：操作数量会随「这行有没有标注角标」变化。
-    actionNamed("继续创建「workspace」");
+    expect(
+      within(secondRow).getByLabelText("继续创建「workspace」")
+    ).toBeEnabled();
+    const actions = await openRowActions("workspace", secondRow);
     // 未标注的行不提供标注入口（入口与角标同源）。
     expect(
-      secondActions.some((item) =>
-        item.getAttribute("aria-label")?.startsWith("编辑标注")
-      )
-    ).toBe(false);
-    const trashAction = actionNamed("移入垃圾桶「workspace」");
+      actions.queryByRole("menuitem", { name: "编辑标注「workspace」" })
+    ).toBeNull();
+    const trashAction = actions
+      .getByLabelText("移入垃圾桶「workspace」")
+      .closest('[role="menuitem"]')!;
     expect(trashAction.querySelector(".anticon-delete")).not.toBeNull();
     fireEvent.click(trashAction);
     fireEvent.click(
@@ -1034,7 +1111,7 @@ describe("SmartDictionary", () => {
     expect(screen.getByTestId("location")).toHaveTextContent(first.id);
   });
 
-  it("手机宽度只保留完整的词条与操作列", () => {
+  it("手机宽度只保留完整的词条与操作列", async () => {
     matchViewport(390);
     render(
       <MemoryRouter>
@@ -1051,8 +1128,12 @@ describe("SmartDictionary", () => {
       "操作"
     ]);
     expect(screen.getByText("继续创建").closest("button")).toBeEnabled();
-    // 行内归档只剩图标，按可及名定位。
-    expect(screen.getAllByLabelText(/^移入垃圾桶「/)[0]).toBeEnabled();
+    const actions = await openRowActions("first");
+    expect(
+      actions
+        .getByLabelText("移入垃圾桶「first」")
+        .closest('[role="menuitem"]')!
+    ).not.toHaveAttribute("aria-disabled", "true");
   });
 
   it("创建人长名称单行省略并可通过键盘触发 Tooltip，空值显示占位", () => {
@@ -1355,7 +1436,12 @@ describe("SmartDictionary", () => {
         </AntApp>
       </MemoryRouter>
     );
-    fireEvent.click(screen.getByLabelText("移入垃圾桶「first」"));
+    const actions = await openRowActions("first");
+    fireEvent.click(
+      actions
+        .getByLabelText("移入垃圾桶「first」")
+        .closest('[role="menuitem"]')!
+    );
     await screen.findByText(/无法读取影响/);
     const confirm = screen
       .getAllByText("移入垃圾桶", { exact: true })
@@ -1404,7 +1490,12 @@ describe("SmartDictionary", () => {
         </ConfigProvider>
       </MemoryRouter>
     );
-    fireEvent.click(screen.getByLabelText("移入垃圾桶「first」"));
+    const actions = await openRowActions("first");
+    fireEvent.click(
+      actions
+        .getByLabelText("移入垃圾桶「first」")
+        .closest('[role="menuitem"]')!
+    );
     await screen.findByText(/词条已发生变化/);
     expect(screen.queryByText(/^重\s*试$/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByText("刷新列表并重新确认"));
@@ -1412,7 +1503,12 @@ describe("SmartDictionary", () => {
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
     );
-    fireEvent.click(screen.getByLabelText("移入垃圾桶「first」"));
+    const refreshedActions = await openRowActions("first");
+    fireEvent.click(
+      refreshedActions
+        .getByLabelText("移入垃圾桶「first」")
+        .closest('[role="menuitem"]')!
+    );
     await screen.findByText(/将使 0 张词表/);
     expect(dataSourceMocks.archiveImpact).toHaveBeenLastCalledWith({
       entries: [{ id: "word-1", base_revision: 2, base_lifecycle_revision: 1 }]
@@ -1434,7 +1530,12 @@ describe("SmartDictionary", () => {
         </AntApp>
       </MemoryRouter>
     );
-    fireEvent.click(screen.getByLabelText("移入垃圾桶「first」"));
+    const actions = await openRowActions("first");
+    fireEvent.click(
+      actions
+        .getByLabelText("移入垃圾桶「first」")
+        .closest('[role="menuitem"]')!
+    );
     await screen.findByText("没有归档权限");
     expect(screen.queryByText(/^重\s*试$/)).not.toBeInTheDocument();
     expect(mutateAsync).not.toHaveBeenCalled();
@@ -1457,7 +1558,12 @@ describe("SmartDictionary", () => {
         </AntApp>
       </MemoryRouter>
     );
-    fireEvent.click(screen.getByLabelText("移入垃圾桶「first」"));
+    const actions = await openRowActions("first");
+    fireEvent.click(
+      actions
+        .getByLabelText("移入垃圾桶「first」")
+        .closest('[role="menuitem"]')!
+    );
     await screen.findByText("正在检查词表和练习的影响…");
     fireEvent.click(screen.getByText(/取\s*消/, { exact: true }));
     await act(async () => resolve({ wordlist_count: 3, active_run_count: 2 }));
@@ -1495,7 +1601,10 @@ describe("SmartDictionary", () => {
       </MemoryRouter>
     );
 
-    const rowArchive = screen.getByLabelText("移入垃圾桶「first」");
+    const actions = await openRowActions("first");
+    const rowArchive = actions
+      .getByLabelText("移入垃圾桶「first」")
+      .closest('[role="menuitem"]')!;
     fireEvent.click(rowArchive);
     await screen.findAllByText("移入垃圾桶「first」？");
     const confirm = screen
@@ -1513,6 +1622,54 @@ describe("SmartDictionary", () => {
     });
     await act(async () => resolveArchive({ word: word("word-1", "first") }));
   });
+
+  it.each(["archive", "delete"] as const)(
+    "%s 请求 pending 时菜单项禁用并显示进度，重复点击不再执行",
+    async (action) => {
+      const mutateAsync = vi.fn();
+      const mutation = {
+        ...idleMutation(),
+        isPending: true,
+        variables: { wordId: "word-1" },
+        mutateAsync
+      };
+      const deleting = action === "delete";
+      (deleting
+        ? apiMocks.useDeleteWordDraft
+        : apiMocks.useArchiveWord
+      ).mockReturnValue(mutation);
+      apiMocks.useWordList.mockReturnValue({
+        data: {
+          words: [
+            deleting ? archivedWord("word-1", "first") : word("word-1", "first")
+          ],
+          page: { page: 1, page_size: 20, total: 1 }
+        },
+        isPending: false,
+        isError: false
+      });
+      render(
+        <MemoryRouter>
+          <AntApp>
+            <SmartDictionary />
+          </AntApp>
+        </MemoryRouter>
+      );
+
+      const actions = await openRowActions("first");
+      const label = deleting ? "永久删除" : "移入垃圾桶";
+      const item = actions
+        .getByLabelText(`${label}「first」`)
+        .closest<HTMLElement>('[role="menuitem"]')!;
+      expect(item).toHaveAttribute("aria-disabled", "true");
+      expect(within(item).getByRole("img", { name: "loading" })).toBeVisible();
+      fireEvent.click(item);
+      fireEvent.click(item);
+      expect(mutateAsync).not.toHaveBeenCalled();
+      expect(dataSourceMocks.archiveImpact).not.toHaveBeenCalled();
+      expect(screen.queryByText(`${label}「first」？`)).not.toBeInTheDocument();
+    }
+  );
 
   it("批量归档失败保留选择，再次确认成功后清空选择", async () => {
     let resolveImpact!: (impact: {
@@ -1581,7 +1738,7 @@ describe("SmartDictionary", () => {
     await waitFor(() => expect(screen.queryByText("移入垃圾桶(1)")).toBeNull());
   });
 
-  it("archived 筛选结果仅提供恢复操作，单条恢复携带双 revision", async () => {
+  it("归档行恢复优先且保留查看路由，单条恢复携带双 revision", async () => {
     const mutateAsync = vi.fn().mockResolvedValue({
       word: archivedWord("word-1", "first")
     });
@@ -1604,26 +1761,20 @@ describe("SmartDictionary", () => {
         <AntApp>
           <SmartDictionary />
         </AntApp>
+        <LocationProbe />
       </MemoryRouter>
     );
 
+    const rowRestore = screen.getByLabelText("恢复「first」");
+    const rowActions = rowRestore.closest("td")!;
     expect(
-      screen
-        .queryAllByText("移入垃圾桶", { exact: true })
-        .map((item) => item.closest("button"))
-        .some((item) => item?.classList.contains("ant-btn-link"))
-    ).toBe(false);
-    const rowRestore = screen
-      .getAllByText("恢 复", { exact: true })
-      .map((item) => item.closest("button"))
-      .find((item) => item?.classList.contains("ant-btn-link"))!;
-    expect(rowRestore.getAttribute("aria-label")).toBe("恢复「first」");
-    expect(
-      rowRestore
-        .closest("td")!
-        .querySelector("button")!
-        .getAttribute("aria-label")
-    ).toBe("查看「first」");
+      [...rowActions.querySelectorAll("button")].map((button) =>
+        button.getAttribute("aria-label")
+      )
+    ).toEqual(["恢复「first」", "查看「first」", "更多操作「first」"]);
+    expect(rowRestore).toHaveTextContent(/^恢复$/);
+    const actions = await openRowActions("first");
+    expect(actions.queryByLabelText("移入垃圾桶「first」")).toBeNull();
     fireEvent.click(rowRestore);
     await screen.findAllByText("恢复「first」？");
     fireEvent.click(
@@ -1639,6 +1790,10 @@ describe("SmartDictionary", () => {
         wordId: "word-1",
         input: { base_revision: 1, base_lifecycle_revision: 1 }
       })
+    );
+    fireEvent.click(within(rowActions).getByLabelText("查看「first」"));
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "/words/word-1/v3/wizard/basics"
     );
   });
 
@@ -1696,7 +1851,7 @@ describe("SmartDictionary", () => {
     expect(screen.getByText(/共 7 条，仅显示前 2 条/)).toBeInTheDocument();
   });
 
-  it("被引用的词条不可永久删除，且说明原因", () => {
+  it("被引用的词条不可永久删除，且说明原因", async () => {
     matchViewport(1440);
     apiMocks.useWordList.mockReturnValue({
       data: {
@@ -1732,12 +1887,21 @@ describe("SmartDictionary", () => {
       </MemoryRouter>
     );
 
+    const actions = await openRowActions("referenced");
+    const deletion = actions
+      .getByLabelText("永久删除「referenced」")
+      .closest('[role="menuitem"]')!;
+    expect(deletion).toHaveAttribute("aria-disabled", "true");
+    expect(deletion).toHaveTextContent(/^永久删除$/);
+    fireEvent.mouseEnter(actions.getByLabelText("永久删除「referenced」"));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(
+      "该词条与其他内容存在关联，解除所有关联后才能删除"
+    );
+    fireEvent.click(deletion);
+    expect(apiMocks.useDeleteWordDraft().mutateAsync).not.toHaveBeenCalled();
     expect(
-      screen
-        .getAllByText("永久删除", { exact: true })
-        .map((item) => item.closest("button"))
-        .find((item) => item?.classList.contains("ant-btn-link"))
-    ).toBeDisabled();
+      screen.queryByText("永久删除「referenced」？")
+    ).not.toBeInTheDocument();
   });
 
   it("垃圾桶模式固定归档、去掉状态筛选与创建入口", () => {
@@ -1845,12 +2009,11 @@ describe("SmartDictionary", () => {
       </MemoryRouter>
     );
 
-    const rowDelete = screen
-      .getAllByText("永久删除", { exact: true })
-      .map((item) => item.closest("button"))
-      .find((item) => item?.classList.contains("ant-btn-link"))!;
-    expect(rowDelete.getAttribute("aria-label")).toBe("永久删除「first」");
-    expect(rowDelete).toBeEnabled();
+    const actions = await openRowActions("first");
+    const rowDelete = actions
+      .getByLabelText("永久删除「first」")
+      .closest('[role="menuitem"]')!;
+    expect(rowDelete).not.toHaveAttribute("aria-disabled", "true");
     fireEvent.click(rowDelete);
 
     await screen.findAllByText("永久删除「first」？");
@@ -1869,7 +2032,7 @@ describe("SmartDictionary", () => {
     });
   });
 
-  it("非垃圾桶行不出现永久删除入口", () => {
+  it("非垃圾桶行不出现永久删除入口", async () => {
     apiMocks.useWordList.mockReturnValue({
       data: {
         words: [word("word-1", "first")],
@@ -1888,7 +2051,8 @@ describe("SmartDictionary", () => {
       </MemoryRouter>
     );
 
-    expect(screen.queryByText("永久删除", { exact: true })).toBeNull();
+    const actions = await openRowActions("first");
+    expect(actions.queryByLabelText("永久删除「first」")).toBeNull();
   });
 
   it("普通管理员对垃圾桶词条置灰永久删除且点击不发请求", async () => {
@@ -1916,16 +2080,21 @@ describe("SmartDictionary", () => {
       </MemoryRouter>
     );
 
-    const rowDelete = screen
-      .getAllByText("永久删除", { exact: true })
-      .map((item) => item.closest("button"))
-      .find((item) => item?.classList.contains("ant-btn-link"))!;
-    expect(rowDelete).toBeDisabled();
+    const actions = await openRowActions("first");
+    const rowDelete = actions
+      .getByLabelText("永久删除「first」")
+      .closest('[role="menuitem"]')!;
+    expect(rowDelete).toHaveAttribute("aria-disabled", "true");
+    fireEvent.mouseEnter(actions.getByLabelText("永久删除「first」"));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(
+      "当前账号仅有读取权限"
+    );
     fireEvent.click(rowDelete);
-    await waitFor(() => expect(mutateAsync).not.toHaveBeenCalled());
+    expect(mutateAsync).not.toHaveBeenCalled();
+    expect(screen.queryByText("永久删除「first」？")).not.toBeInTheDocument();
   });
 
-  it("超管可以永久删除他人创建的垃圾桶词条", () => {
+  it("超管可以永久删除他人创建的垃圾桶词条", async () => {
     authMocks.profile = { id: "admin-9", role: "super_admin" };
     apiMocks.useWordList.mockReturnValue({
       data: {
@@ -1945,12 +2114,10 @@ describe("SmartDictionary", () => {
       </MemoryRouter>
     );
 
+    const actions = await openRowActions("first");
     expect(
-      screen
-        .getAllByText("永久删除", { exact: true })
-        .map((item) => item.closest("button"))
-        .find((item) => item?.classList.contains("ant-btn-link"))
-    ).toBeEnabled();
+      actions.getByLabelText("永久删除「first」").closest('[role="menuitem"]')!
+    ).not.toHaveAttribute("aria-disabled", "true");
   });
 
   it("批量永久删除提交每条双 revision，成功后清空选择", async () => {
@@ -2069,11 +2236,9 @@ describe("SmartDictionary", () => {
       </MemoryRouter>
     );
 
+    const actions = await openRowActions("first");
     fireEvent.click(
-      screen
-        .getAllByText("永久删除", { exact: true })
-        .map((item) => item.closest("button"))
-        .find((item) => item?.classList.contains("ant-btn-link"))!
+      actions.getByLabelText("永久删除「first」").closest('[role="menuitem"]')!
     );
     await screen.findAllByText("永久删除「first」？");
     fireEvent.click(
@@ -2113,10 +2278,7 @@ describe("SmartDictionary", () => {
       </MemoryRouter>
     );
 
-    const rowRestore = screen
-      .getAllByText("恢 复", { exact: true })
-      .map((item) => item.closest("button"))
-      .find((item) => item?.classList.contains("ant-btn-link"))!;
+    const rowRestore = screen.getByLabelText("恢复「first」");
     fireEvent.click(rowRestore);
     await screen.findAllByText("恢复「first」？");
     fireEvent.click(
@@ -2167,10 +2329,7 @@ describe("SmartDictionary", () => {
     );
 
     const restoreOnce = async () => {
-      const rowRestore = screen
-        .getAllByText("恢 复", { exact: true })
-        .map((item) => item.closest("button"))
-        .find((item) => item?.classList.contains("ant-btn-link"))!;
+      const rowRestore = screen.getByLabelText("恢复「first」");
       fireEvent.click(rowRestore);
       fireEvent.click(
         (await screen.findAllByText("恢 复", { exact: true }))
