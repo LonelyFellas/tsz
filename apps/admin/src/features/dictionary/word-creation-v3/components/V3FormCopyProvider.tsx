@@ -93,7 +93,7 @@ export function V3FormCopyHandle({
         icon={<CopyOutlined />}
         aria-label={`复制${copyName(kind)}`}
         aria-pressed={selected}
-        disabled={copy.busy}
+        disabled={copy.busy || undefined}
         onClick={(event) => {
           event.stopPropagation();
           copy.begin(formId, kind, true);
@@ -464,7 +464,7 @@ export function V3FormCopyProvider({
             />
           )}
         </Flex>
-        <ConfigProvider componentDisabled={busy}>
+        <ConfigProvider componentDisabled={busy || undefined}>
           <div inert={busy} aria-busy={busy}>
             {children}
           </div>

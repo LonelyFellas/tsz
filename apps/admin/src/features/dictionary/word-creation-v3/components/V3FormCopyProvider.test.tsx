@@ -144,6 +144,25 @@ beforeEach(() => {
 });
 
 describe("词形复制交互", () => {
+  it("空闲时继承页面保存期间的禁用状态", () => {
+    const forms = fixture();
+    render(
+      <ConfigProvider componentDisabled>
+        <App>
+          <V3FormCopyProvider forms={forms} onChange={vi.fn()}>
+            <Cells forms={forms} />
+            <EditProbe />
+          </V3FormCopyProvider>
+        </App>
+      </ConfigProvider>
+    );
+    expect(screen.getByRole("button", { name: "编辑词形内容" })).toBeDisabled();
+    for (const button of screen.getAllByRole("button", {
+      name: "复制英美音标"
+    }))
+      expect(button).toBeDisabled();
+  });
+
   it("点击和键盘复制到草稿，来源不变，允许撤销", async () => {
     const initial = fixture();
     render(<Harness initial={initial} />);
