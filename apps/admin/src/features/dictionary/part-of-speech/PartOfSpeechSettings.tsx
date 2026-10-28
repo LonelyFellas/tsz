@@ -1,3 +1,4 @@
+import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import { useIsSuperAdmin, usePermission } from "@/lib/auth";
 import { FormTypeSettings } from "./FormTypeSettings";
@@ -19,7 +20,6 @@ import {
   Segmented,
   Select,
   Space,
-  Table,
   Tag,
   Tabs,
   Tooltip,
@@ -301,58 +301,46 @@ export function PartOfSpeechSettings() {
         <FormTypeSettings />
       ) : activeTab === "basic" ? (
         <>
-          <Card size="small">
-            <Flex justify="space-between" align="center" wrap gap={12}>
-              <Form
-                form={form}
-                layout="inline"
-                onFinish={({ q: nextQ }) => {
-                  setQ(nextQ?.trim() ?? "");
-                  setPage(1);
-                }}
-                style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
-              >
-                <Form.Item name="q" label="关键词">
-                  <Input
-                    allowClear
-                    placeholder="中文 / 英文 / 编码 / 缩写"
-                    style={{ width: 260 }}
-                  />
-                </Form.Item>
-                <Form.Item>
-                  <Space>
-                    <Button
-                      type="primary"
-                      htmlType="submit"
-                      icon={<SearchOutlined />}
-                    >
-                      搜 索
-                    </Button>
-                    <Button
-                      icon={<ReloadOutlined />}
-                      onClick={() => {
-                        form.resetFields();
-                        setQ("");
-                        setPage(1);
-                      }}
-                    >
-                      重 置
-                    </Button>
-                  </Space>
-                </Form.Item>
-              </Form>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                disabled={!canEdit || !catalogReady}
-                onClick={() => {
-                  setEditing(undefined);
-                  setFormOpen(true);
-                }}
-              >
-                新增基本词性
-              </Button>
-            </Flex>
+          <Card className="admin-filter-card" size="small">
+            <Form
+              className="admin-filter-form"
+              colon={false}
+              form={form}
+              layout="inline"
+              onFinish={({ q: nextQ }) => {
+                setQ(nextQ?.trim() ?? "");
+                setPage(1);
+              }}
+            >
+              <Form.Item name="q" label="关键词">
+                <Input
+                  allowClear
+                  placeholder="中文 / 英文 / 编码 / 缩写"
+                  style={{ width: 260 }}
+                />
+              </Form.Item>
+              <Form.Item className="admin-filter-actions">
+                <Space>
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                    icon={<SearchOutlined />}
+                  >
+                    搜 索
+                  </Button>
+                  <Button
+                    icon={<ReloadOutlined />}
+                    onClick={() => {
+                      form.resetFields();
+                      setQ("");
+                      setPage(1);
+                    }}
+                  >
+                    重 置
+                  </Button>
+                </Space>
+              </Form.Item>
+            </Form>
           </Card>
 
           <Card size="small">
@@ -371,6 +359,21 @@ export function PartOfSpeechSettings() {
               />
             )}
             <Table<PartOfSpeechConfig>
+              toolbar={
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  disabled={!canEdit || !catalogReady}
+                  onClick={() => {
+                    setEditing(undefined);
+                    setFormOpen(true);
+                  }}
+                >
+                  新增基本词性
+                </Button>
+              }
+
+              tableId="parts-of-speech"
               locale={{
                 emptyText: (
                   <TableEmptyState
@@ -420,10 +423,36 @@ export function PartOfSpeechSettings() {
               }
             />
           )}
-          <Card size="small">
-            <Flex justify="space-between" align="center" wrap gap={12}>
-              <Flex align="center" gap={12} wrap>
-                <Typography.Text strong>所属基本词性</Typography.Text>
+
+          <SubPartOfSpeechPanel
+            toolbar={
+              <Tooltip
+                title={
+                  !catalog.isError && parts.length === 0
+                    ? "暂无基本词性"
+                    : undefined
+                }
+              >
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  disabled={
+                    !canEditSub || catalog.isError || parts.length === 0
+                  }
+                  onClick={() => subPanelRef.current?.openCreate()}
+                >
+                  新增细分词性
+                </Button>
+              </Tooltip>
+            }
+            toolbarExtra={
+              <Flex
+                className="admin-table-toolbar-filter"
+                align="center"
+                gap={12}
+                wrap
+              >
+                <Typography.Text type="secondary">所属基本词性</Typography.Text>
                 <Select
                   aria-label="所属基本词性"
                   value={selectedPart?.id ?? ""}
@@ -443,27 +472,7 @@ export function PartOfSpeechSettings() {
                   placeholder="请选择基本词性"
                 />
               </Flex>
-              <Tooltip
-                title={
-                  !catalog.isError && parts.length === 0
-                    ? "暂无基本词性"
-                    : undefined
-                }
-              >
-                <Button
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  disabled={
-                    !canEditSub || catalog.isError || parts.length === 0
-                  }
-                  onClick={() => subPanelRef.current?.openCreate()}
-                >
-                  新增细分词性
-                </Button>
-              </Tooltip>
-            </Flex>
-          </Card>
-          <SubPartOfSpeechPanel
+            }
             ref={subPanelRef}
             parents={selectedPart ? [selectedPart] : parts}
             createParent={selectedPart}

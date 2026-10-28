@@ -1,3 +1,4 @@
+import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import { ReloadOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -24,7 +25,6 @@ import {
   Select,
   Space,
   Spin,
-  Table,
   Tag,
   Typography
 } from "antd";
@@ -174,43 +174,7 @@ function ApplicationQueue() {
   return (
     <Flex vertical gap={16}>
       <Breadcrumb items={[{ title: "审核管理" }, { title: "教师申请审核" }]} />
-      <Card size="small" styles={{ body: { paddingBottom: 8 } }}>
-        <Form
-          layout="inline"
-          style={{
-            rowGap: 12,
-            columnGap: 8,
-            display: "flex",
-            flexWrap: "wrap"
-          }}
-        >
-          <Form.Item label="审核状态">
-            <Select
-              aria-label="认证状态"
-              allowClear
-              placeholder="全部状态"
-              value={status}
-              style={{ width: 140 }}
-              options={Object.entries(statuses).map(([value, label]) => ({
-                value,
-                label: label.label
-              }))}
-              onChange={(value) => {
-                setStatus(value);
-                setPage(1);
-              }}
-            />
-          </Form.Item>
-          <Form.Item>
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={() => void list.refetch()}
-            >
-              刷新
-            </Button>
-          </Form.Item>
-        </Form>
-      </Card>
+
       <Card size="small">
         {list.isError && (
           <Alert
@@ -221,6 +185,37 @@ function ApplicationQueue() {
           />
         )}
         <Table<TeacherApplication>
+          toolbar={
+            <Form className="admin-filter-form" colon={false} layout="inline">
+              <Form.Item label="审核状态">
+                <Select
+                  aria-label="认证状态"
+                  allowClear
+                  placeholder="全部状态"
+                  value={status}
+                  style={{ width: 140 }}
+                  options={Object.entries(statuses).map(([value, label]) => ({
+                    value,
+                    label: label.label
+                  }))}
+                  onChange={(value) => {
+                    setStatus(value);
+                    setPage(1);
+                  }}
+                />
+              </Form.Item>
+              <Form.Item className="admin-filter-actions">
+                <Button
+                  icon={<ReloadOutlined />}
+                  onClick={() => void list.refetch()}
+                >
+                  刷新
+                </Button>
+              </Form.Item>
+            </Form>
+          }
+
+          tableId="teacher-applications"
           locale={{
             emptyText: (
               <TableEmptyState

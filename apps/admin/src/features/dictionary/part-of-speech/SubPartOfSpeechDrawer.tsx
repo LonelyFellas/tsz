@@ -1,3 +1,7 @@
+import {
+  AdminTable as Table,
+  AdminTableToolbar
+} from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import { usePermission } from "@/lib/auth";
 import {
@@ -12,7 +16,6 @@ import {
   Row,
   Select,
   Space,
-  Table,
   Tooltip
 } from "antd";
 import { FullNameEnCell } from "./FullNameEnCell";
@@ -24,7 +27,7 @@ import type {
   SubPartOfSpeechConfig
 } from "@tsz/types";
 import { useEffect, useImperativeHandle, useRef, useState } from "react";
-import type { Ref } from "react";
+import type { ReactNode, Ref } from "react";
 import {
   useCreateSubPartOfSpeech,
   useRemoveSubPartOfSpeech,
@@ -44,6 +47,8 @@ export interface SubPartOfSpeechPanelHandle {
 type PanelParent = Pick<PartOfSpeechConfig, "id" | "name_zh" | "code">;
 
 interface Props {
+  toolbar?: ReactNode;
+  toolbarExtra?: ReactNode;
   /** 要展示的父级：选中具体词性时一个；「全部」时传全部基本词性。 */
   parents: PanelParent[];
   /** 新建细分词性时固定的父级；「全部」视图下为空，由弹窗内下拉选择。 */
@@ -214,6 +219,8 @@ export function SubPartOfSpeechPanel({
   onResetFilters,
   onSaved,
   onError,
+  toolbar,
+  toolbarExtra,
   ref
 }: Props) {
   const canEdit = usePermission("lexicon_settings.edit_sub");
@@ -357,6 +364,9 @@ export function SubPartOfSpeechPanel({
   return (
     <>
       <Card size="small">
+        {((!loading && parents.length === 0) || list.error) && (
+          <AdminTableToolbar extra={toolbarExtra}>{toolbar}</AdminTableToolbar>
+        )}
         {!loading && parents.length === 0 ? (
           <Empty description="暂无基本词性" />
         ) : list.error ? (
@@ -374,6 +384,9 @@ export function SubPartOfSpeechPanel({
           />
         ) : (
           <Table<SubPartOfSpeechConfig>
+            tableId="sub-parts-of-speech"
+            toolbar={toolbar}
+            toolbarExtra={toolbarExtra}
             locale={{
               emptyText: (
                 <TableEmptyState

@@ -1,3 +1,7 @@
+import {
+  AdminTable as Table,
+  AdminTableToolbar
+} from "@/components/AdminTable";
 import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
@@ -12,7 +16,6 @@ import {
   Input,
   Select,
   Space,
-  Table,
   Tabs,
   Tag,
   Typography
@@ -221,15 +224,60 @@ function Workbench({ profile }: { profile: AdminProfile }) {
       )}
     </Space>
   );
+  const candidateToolbar = entryId && (
+    <Space>
+      <Tag>当前词条的已发布词义</Tag>
+      <Button
+        size="small"
+        disabled={locked}
+        onClick={() =>
+          changeContext(() => {
+            const next = new URLSearchParams(params);
+            next.delete("entry_id");
+            setParams(next);
+          })
+        }
+      >
+        查看整个词库
+      </Button>
+    </Space>
+  );
+  const questionsToolbar = (
+    <Space>
+      <Select
+        aria-label="题目状态"
+        allowClear
+        placeholder="全部状态"
+        value={state}
+        style={{ width: 140 }}
+        options={Object.entries(questionLabels).map(([value, label]) => ({
+          value,
+          label
+        }))}
+        onChange={(value) => {
+          setState(value);
+          setPage(1);
+        }}
+      />
+      <Button onClick={() => void questions.refetch()}>刷新</Button>
+    </Space>
+  );
+  const generationsToolbar = (
+    <Button onClick={() => void generations.refetch()}>刷新</Button>
+  );
+
   return (
-    <Space orientation="vertical" size="large" style={{ width: "100%" }}>
+    <Flex vertical gap={16} style={{ width: "100%" }}>
       <div>
-        <Typography.Title level={2}>单选题工作台</Typography.Title>
-        <Typography.Paragraph type="secondary">
+        <Typography.Title level={3} style={{ margin: 0 }}>
+          单选题工作台
+        </Typography.Title>
+        <Typography.Paragraph type="secondary" style={{ margin: "8px 0 0" }}>
           从已发布的具体中文释义命题，四个选项均来自智能词库。生成仅产生草稿，人工审核通过后才用于学习。
         </Typography.Paragraph>
       </div>
       <Tabs
+        tabBarStyle={{ marginBottom: 0 }}
         activeKey={tab}
         onChange={setTab}
         items={[
@@ -284,35 +332,25 @@ function Workbench({ profile }: { profile: AdminProfile }) {
               </Form.Item>
             </Flex>
           </Form>
-          {entryId && (
-            <Space style={{ marginBottom: 16 }}>
-              <Tag>当前词条的已发布词义</Tag>
-              <Button
-                size="small"
-                disabled={locked}
-                onClick={() =>
-                  changeContext(() => {
-                    const next = new URLSearchParams(params);
-                    next.delete("entry_id");
-                    setParams(next);
-                  })
-                }
-              >
-                查看整个词库
-              </Button>
-            </Space>
-          )}
+
           {candidates.isError ? (
-            <Alert
-              type="error"
-              showIcon
-              title={candidates.error.message}
-              action={
-                <Button onClick={() => void candidates.refetch()}>重试</Button>
-              }
-            />
+            <>
+              <AdminTableToolbar>{candidateToolbar}</AdminTableToolbar>
+              <Alert
+                type="error"
+                showIcon
+                title={candidates.error.message}
+                action={
+                  <Button onClick={() => void candidates.refetch()}>
+                    重试
+                  </Button>
+                }
+              />
+            </>
           ) : (
             <Table<QuestionCandidate>
+              toolbar={candidateToolbar}
+              tableId="question-candidates"
               rowKey="candidate_ref"
               dataSource={candidates.data?.items ?? []}
               loading={candidates.isFetching}
@@ -408,32 +446,26 @@ function Workbench({ profile }: { profile: AdminProfile }) {
         aria-hidden={tab !== "questions"}
         inert={tab !== "questions"}
       >
-        <Card
-          title="题目审核"
-          extra={
-            <Space>
-              <Select
-                aria-label="题目状态"
-                allowClear
-                placeholder="全部状态"
-                value={state}
-                style={{ width: 140 }}
-                options={Object.entries(questionLabels).map(
-                  ([value, label]) => ({ value, label })
-                )}
-                onChange={(value) => {
-                  setState(value);
-                  setPage(1);
-                }}
-              />
-              <Button onClick={() => void questions.refetch()}>刷新</Button>
-            </Space>
-          }
-        >
+        <Card size="small">
           {questions.isError ? (
-            <Alert type="error" title={questions.error.message} />
+            <>
+              <AdminTableToolbar extra={questionsToolbar}>
+                <Typography.Text strong style={{ fontSize: 16 }}>
+                  题目审核
+                </Typography.Text>
+              </AdminTableToolbar>
+
+              <Alert type="error" title={questions.error.message} />
+            </>
           ) : (
             <Table<BankQuestion>
+              toolbar={
+                <Typography.Text strong style={{ fontSize: 16 }}>
+                  题目审核
+                </Typography.Text>
+              }
+              toolbarExtra={questionsToolbar}
+              tableId="bank-questions"
               rowKey="id"
               dataSource={questions.data?.items ?? []}
               loading={questions.isFetching}
@@ -478,16 +510,26 @@ function Workbench({ profile }: { profile: AdminProfile }) {
         aria-hidden={tab !== "generations"}
         inert={tab !== "generations"}
       >
-        <Card
-          title="生成记录"
-          extra={
-            <Button onClick={() => void generations.refetch()}>刷新</Button>
-          }
-        >
+        <Card size="small">
           {generations.isError ? (
-            <Alert type="error" title={generations.error.message} />
+            <>
+              <AdminTableToolbar extra={generationsToolbar}>
+                <Typography.Text strong style={{ fontSize: 16 }}>
+                  生成记录
+                </Typography.Text>
+              </AdminTableToolbar>
+
+              <Alert type="error" title={generations.error.message} />
+            </>
           ) : (
             <Table<QuestionGeneration>
+              toolbar={
+                <Typography.Text strong style={{ fontSize: 16 }}>
+                  生成记录
+                </Typography.Text>
+              }
+              toolbarExtra={generationsToolbar}
+              tableId="question-generations"
               rowKey="id"
               dataSource={generations.data?.items ?? []}
               loading={generations.isFetching}
@@ -535,6 +577,6 @@ function Workbench({ profile }: { profile: AdminProfile }) {
           onDirtyChange={setEditorDirty}
         />
       )}
-    </Space>
+    </Flex>
   );
 }

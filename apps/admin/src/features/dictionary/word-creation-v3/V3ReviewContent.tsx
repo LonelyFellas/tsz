@@ -1,3 +1,5 @@
+import { ColumnSettings } from "@/components/ColumnSettings";
+import { useColumnSettings } from "@/components/useColumnSettings";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import {
   expandFormContents,
@@ -17,7 +19,14 @@ import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
 import { ReadOutlined, SoundOutlined } from "@ant-design/icons";
 import { Button, Card, Collapse, Empty, Flex, Tag, Typography } from "antd";
 import type { AdminWordV3, Dialect, WordPronunciationV3 } from "@tsz/types";
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode
+} from "react";
 import { dialectLabel, pronunciationStyleLabel } from "./presentation";
 import { buildV3ReviewModel } from "./reviewModel";
 import { V3MeaningsPreview, reviewSenseTitle } from "./V3MeaningsPreview";
@@ -97,10 +106,50 @@ function FormsReview({
 }) {
   const formTypeLabel = useFormTypeLabel();
   const partOfSpeechLabel = usePartOfSpeechLabel();
+  const settings = useColumnSettings("word-forms-review", [
+    { key: "form", label: "词形", visible: true, fixed: false },
+    { key: "spelling", label: "拼写 / 方言", visible: true, fixed: false },
+    { key: "phonetic", label: "字典音标", visible: true, fixed: false },
+    { key: "actual", label: "实际发音", visible: true, fixed: false }
+  ]);
+  const visibleColumns = settings.columns.filter((column) => column.visible);
+  const reviewRef = useRef<HTMLDivElement>(null);
+  const [reviewWidth, setReviewWidth] = useState(0);
+  useLayoutEffect(() => {
+    const root = reviewRef.current;
+    if (!root) return;
+    const measure = () => setReviewWidth(root.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [word.forms.pos.length]);
+  const fixedOverflow =
+    reviewWidth > 0 &&
+    visibleColumns.filter((column) => column.fixed).length * 240 > reviewWidth;
+  const columnStyle = (key: string): CSSProperties | undefined => {
+    const column = visibleColumns.find((item) => item.key === key)!;
+    if (!settings.customized) return undefined;
+    const pinned = visibleColumns.filter((item) => item.fixed === column.fixed);
+    const index = pinned.findIndex((item) => item.key === key);
+    return {
+      width: 240,
+      boxSizing: "border-box",
+      overflowWrap: "anywhere",
+      ...(column.fixed &&
+        !fixedOverflow && {
+          position: "sticky",
+          [column.fixed]:
+            (column.fixed === "left" ? index : pinned.length - index - 1) * 240,
+          background: "var(--ant-color-bg-container, #fff)",
+          zIndex: 1
+        })
+    };
+  };
   if (word.forms.pos.length === 0)
     return <Empty description="暂无词形与发音" />;
   return (
-    <Flex vertical gap="middle">
+    <Flex ref={reviewRef} vertical gap="middle">
       {expandFormContents(word.forms).pos.map((pos) => (
         <section className="v3-review-pos" key={pos.pos_id}>
           <Flex align="center" justify="space-between">
@@ -153,14 +202,28 @@ function FormsReview({
               </div>
             ))}
           </div>
+          <ColumnSettings
+            columns={settings.columns}
+            onChange={settings.update}
+            onReset={settings.reset}
+            fixedOverflow={fixedOverflow}
+          />
           <div className="v3-review-table-scroll">
-            <table className="v3-review-form-table">
+            <table
+              className="v3-review-form-table"
+              style={
+                settings.customized
+                  ? { tableLayout: "fixed", width: visibleColumns.length * 240 }
+                  : undefined
+              }
+            >
               <thead>
                 <tr>
-                  <th>词形</th>
-                  <th>拼写 / 方言</th>
-                  <th>字典音标</th>
-                  <th>实际发音</th>
+                  {visibleColumns.map((column) => (
+                    <th key={column.key} style={columnStyle(column.key)}>
+                      {column.label}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               {pos.forms.map((form) => {
@@ -174,102 +237,120 @@ function FormsReview({
                       (variant.pronunciations.length
                         ? variant.pronunciations
                         : [null]
-                      ).map((pronunciation, index) => (
-                        <tr
-                          key={`${variant.id}:${pronunciation?.id ?? "empty"}`}
-                          data-testid={
-                            pronunciation
-                              ? `preview-pronunciation-${pronunciation.id}`
-                              : undefined
-                          }
-                        >
-                          <td>
-                            {index === 0 && formTypeLabel(form.form_type)}
-                          </td>
-                          <td>
-                            {index === 0 && (
-                              <>
-                                <strong className="tsz-words">
-                                  <RichTextReadOnly
-                                    value={
-                                      variant.spelling_rich ?? {
-                                        version: 2,
-                                        text: variant.spelling,
-                                        annotations: []
+                      ).map((pronunciation, index) => {
+                        const cells: Record<string, ReactNode> = {
+                          form: (
+                            <>{index === 0 && formTypeLabel(form.form_type)}</>
+                          ),
+                          spelling: (
+                            <>
+                              {index === 0 && (
+                                <>
+                                  <strong className="tsz-words">
+                                    <RichTextReadOnly
+                                      value={
+                                        variant.spelling_rich ?? {
+                                          version: 2,
+                                          text: variant.spelling,
+                                          annotations: []
+                                        }
                                       }
-                                    }
-                                    emptyText="待填写拼写"
-                                  />
-                                </strong>
-                                <small>{dialectLabel(variant.dialect)}</small>
-                              </>
-                            )}
-                          </td>
-                          <td>
-                            {pronunciation ? (
-                              <>
-                                <div className="v3-review-pronunciation-cell">
-                                  {playback &&
-                                    (pronunciation.synthesis?.uk ||
-                                    pronunciation.synthesis?.us
-                                      ? (["uk", "us"] as const)
-                                      : [variant.dialect]
-                                    ).map((dialect) => (
-                                      <ReviewPronunciationPlayback
-                                        key={dialect}
-                                        pronunciation={pronunciation}
-                                        spelling={variant.spelling}
-                                        dialect={dialect}
-                                        legacyDialect={variant.dialect}
-                                      />
-                                    ))}
-                                  <RichTextReadOnly
-                                    className="tsz-phonetics"
-                                    value={
-                                      pronunciation.dict_phonetic_rich ?? {
-                                        version: 2,
-                                        text: pronunciation.dict_phonetic,
-                                        annotations: []
+                                      emptyText="待填写拼写"
+                                    />
+                                  </strong>
+                                  <small>{dialectLabel(variant.dialect)}</small>
+                                </>
+                              )}
+                            </>
+                          ),
+                          phonetic: (
+                            <>
+                              {pronunciation ? (
+                                <>
+                                  <div className="v3-review-pronunciation-cell">
+                                    {playback &&
+                                      (pronunciation.synthesis?.uk ||
+                                      pronunciation.synthesis?.us
+                                        ? (["uk", "us"] as const)
+                                        : [variant.dialect]
+                                      ).map((dialect) => (
+                                        <ReviewPronunciationPlayback
+                                          key={dialect}
+                                          pronunciation={pronunciation}
+                                          spelling={variant.spelling}
+                                          dialect={dialect}
+                                          legacyDialect={variant.dialect}
+                                        />
+                                      ))}
+                                    <RichTextReadOnly
+                                      className="tsz-phonetics"
+                                      value={
+                                        pronunciation.dict_phonetic_rich ?? {
+                                          version: 2,
+                                          text: pronunciation.dict_phonetic,
+                                          annotations: []
+                                        }
                                       }
-                                    }
-                                  />
-                                </div>
-                                <small>
-                                  {pronunciation.style
-                                    ? pronunciationStyleLabel(
-                                        pronunciation.style
-                                      )
-                                    : "未选择读法"}
-                                </small>
-                                {pronunciation.synthesis && (
+                                    />
+                                  </div>
                                   <small>
-                                    {pronunciationSynthesisLabel(
-                                      pronunciation.synthesis,
-                                      variant.dialect
-                                    )}
+                                    {pronunciation.style
+                                      ? pronunciationStyleLabel(
+                                          pronunciation.style
+                                        )
+                                      : "未选择读法"}
                                   </small>
-                                )}
-                              </>
-                            ) : (
-                              "暂无发音"
-                            )}
-                          </td>
-                          <td>
-                            {pronunciation && (
-                              <RichTextReadOnly
-                                className="tsz-phonetics tsz-actual-pronunciation"
-                                value={
-                                  pronunciation.actual_pron_rich ?? {
-                                    version: 2,
-                                    text: pronunciation.actual_pron,
-                                    annotations: []
+                                  {pronunciation.synthesis && (
+                                    <small>
+                                      {pronunciationSynthesisLabel(
+                                        pronunciation.synthesis,
+                                        variant.dialect
+                                      )}
+                                    </small>
+                                  )}
+                                </>
+                              ) : (
+                                "暂无发音"
+                              )}
+                            </>
+                          ),
+                          actual: (
+                            <>
+                              {pronunciation && (
+                                <RichTextReadOnly
+                                  className="tsz-phonetics tsz-actual-pronunciation"
+                                  value={
+                                    pronunciation.actual_pron_rich ?? {
+                                      version: 2,
+                                      text: pronunciation.actual_pron,
+                                      annotations: []
+                                    }
                                   }
-                                }
-                              />
-                            )}
-                          </td>
-                        </tr>
-                      ))
+                                />
+                              )}
+                            </>
+                          )
+                        };
+                        return (
+                          <tr
+                            key={`${variant.id}:${pronunciation?.id ?? "empty"}`}
+                            data-testid={
+                              pronunciation
+                                ? `preview-pronunciation-${pronunciation.id}`
+                                : undefined
+                            }
+                          >
+                            {visibleColumns.map((column) => (
+                              <td
+                                key={column.key}
+                                style={columnStyle(column.key)}
+                              >
+                                {cells[column.key]}
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 );

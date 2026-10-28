@@ -1,3 +1,4 @@
+import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import { usePermission } from "@/lib/auth";
 import { PlusOutlined } from "@ant-design/icons";
@@ -11,7 +12,6 @@ import {
   Modal,
   Select,
   Space,
-  Table,
   Tooltip,
   Typography
 } from "antd";
@@ -224,49 +224,7 @@ export function FormTypeSettings() {
           action={<Button onClick={() => void catalog.refetch()}>重 试</Button>}
         />
       )}
-      <Card size="small">
-        <Flex justify="space-between" align="center" wrap gap={12}>
-          {/* 词形变化总量很小，一页就看完，不提供关键词搜索。 */}
-          <Flex align="center" gap={12} wrap>
-            <Typography.Text strong>所属基本词性</Typography.Text>
-            <Select
-              aria-label="所属基本词性"
-              value={query.part_of_speech_id ?? ""}
-              showSearch
-              optionFilterProp="label"
-              loading={catalog.isPending}
-              disabled={catalog.isError || parts.length === 0}
-              options={[
-                { value: "", label: "全部" },
-                ...parts.map((item) => ({
-                  value: item.id,
-                  label: item.name_zh
-                }))
-              ]}
-              onChange={(value) =>
-                setQuery({
-                  ...query,
-                  part_of_speech_id: value || undefined,
-                  page: 1
-                })
-              }
-              style={{ width: 200 }}
-              placeholder="请选择基本词性"
-            />
-          </Flex>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            disabled={!canEdit || !ready}
-            onClick={() => {
-              setEditing(undefined);
-              setOpen(true);
-            }}
-          >
-            新增词形变化
-          </Button>
-        </Flex>
-      </Card>
+
       <Card size="small">
         {list.isError && (
           <Alert
@@ -278,6 +236,55 @@ export function FormTypeSettings() {
           />
         )}
         <Table<FormTypeConfig>
+          toolbar={
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              disabled={!canEdit || !ready}
+              onClick={() => {
+                setEditing(undefined);
+                setOpen(true);
+              }}
+            >
+              新增词形变化
+            </Button>
+          }
+          toolbarExtra={
+            <Flex
+              className="admin-table-toolbar-filter"
+              align="center"
+              gap={12}
+              wrap
+            >
+              <Typography.Text type="secondary">所属基本词性</Typography.Text>
+              <Select
+                aria-label="所属基本词性"
+                value={query.part_of_speech_id ?? ""}
+                showSearch
+                optionFilterProp="label"
+                loading={catalog.isPending}
+                disabled={catalog.isError || parts.length === 0}
+                options={[
+                  { value: "", label: "全部" },
+                  ...parts.map((item) => ({
+                    value: item.id,
+                    label: item.name_zh
+                  }))
+                ]}
+                onChange={(value) =>
+                  setQuery({
+                    ...query,
+                    part_of_speech_id: value || undefined,
+                    page: 1
+                  })
+                }
+                style={{ width: 200 }}
+                placeholder="请选择基本词性"
+              />
+            </Flex>
+          }
+
+          tableId="form-types"
           locale={{
             emptyText: (
               <TableEmptyState
