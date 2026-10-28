@@ -323,7 +323,14 @@ describe("WordWizardV3Page", () => {
         await act(() => router.navigate(focusedEntry));
       }
       if (target === "content") {
-        expect(await screen.findByLabelText("词形英美通用拼写")).toBeVisible();
+        // 深链打开懒加载编辑器，覆盖率插桩时首次渲染可能超过默认一秒等待。
+        expect(
+          await screen.findByLabelText(
+            "词形英美通用拼写",
+            {},
+            { timeout: 5_000 }
+          )
+        ).toBeVisible();
       } else {
         await waitFor(() => {
           const field = document.querySelector(
@@ -338,7 +345,8 @@ describe("WordWizardV3Page", () => {
         { key: "label", visible: target === "form_type", fixed: "left" },
         { key: "volume", visible: false, fixed: false }
       ]);
-    }
+    },
+    10_000
   );
 
   it.each([true, undefined])(
