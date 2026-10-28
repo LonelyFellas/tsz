@@ -301,10 +301,13 @@ describe("WordWizardV3Page", () => {
           : form.regional_variants.uk;
       const entry = `/words/${WORD_ID}/v3/wizard/forms`;
       const focusedEntry = `${entry}?focus_node=${target === "content" ? variant.id : form.id}`;
-      const router = renderPage(
-        collapsed ? entry : focusedEntry,
-        createV3WordRequests(
-          source({ word: current, retired_stable_nodes: [] })
+      // 先完成异步词条加载及深链 effect，再开始等待目标控件。
+      const router = await act(async () =>
+        renderPage(
+          collapsed ? entry : focusedEntry,
+          createV3WordRequests(
+            source({ word: current, retired_stable_nodes: [] })
+          )
         )
       );
       if (collapsed) {
@@ -317,9 +320,7 @@ describe("WordWizardV3Page", () => {
         });
         fireEvent.click(collapse);
         expect(document.querySelector(".v3-form-overview")).toBeNull();
-        act(() => {
-          void router.navigate(focusedEntry);
-        });
+        await act(() => router.navigate(focusedEntry));
       }
       if (target === "content") {
         expect(await screen.findByLabelText("词形英美通用拼写")).toBeVisible();
