@@ -253,21 +253,21 @@ it("generation timeout preserves the chosen source and retries the same idempote
   mocks.generate.mockRejectedValue(new Error("网络中断"));
   render(<QuestionBank />, { wrapper });
   const row = await screen.findByRole("row", { name: /apple.*apple 的释义/ });
-  fireEvent.click(within(row).getByRole("radio"));
-  await waitFor(() =>
-    expect(screen.getByRole("button", { name: "生成四选一草稿" })).toBeEnabled()
-  );
-  fireEvent.click(screen.getByRole("button", { name: "生成四选一草稿" }));
+  const radio = within(row).getByRole("radio");
+  const generate = screen.getByRole("button", { name: "生成四选一草稿" });
+  fireEvent.click(radio);
+  await waitFor(() => expect(generate).toBeEnabled());
+  fireEvent.click(generate);
   await waitFor(() => expect(mocks.generate).toHaveBeenCalledOnce());
   await screen.findByText("网络中断");
-  await screen.findByRole("button", { name: "重试原生成请求" });
+  const retry = await screen.findByRole("button", { name: "重试原生成请求" });
   const first = mocks.generate.mock.calls[0]![0];
   expect(first.target).toMatchObject({
     candidate_ref: "apple",
     source: target.source
   });
-  expect(within(row).getByRole("radio")).toBeDisabled();
-  fireEvent.click(screen.getByRole("button", { name: "重试原生成请求" }));
+  expect(radio).toBeDisabled();
+  fireEvent.click(retry);
   await waitFor(() => expect(mocks.generate).toHaveBeenCalledTimes(2));
   expect(mocks.generate.mock.calls[1]![0]).toEqual(first);
 });
@@ -435,7 +435,11 @@ it.each(["all", "succeeded"])(
       items: [batch],
       pagination: { total: 1 }
     });
-    mocks.batch.mockResolvedValue(batch);
+    const finished = { ...batch, state: "completed", running: 0, succeeded: 1 };
+    // 定时轮询也应读取完成态，不能在慢机器上用旧 mock 覆盖完成通知。
+    mocks.batch.mockImplementation(() =>
+      Promise.resolve(completed ? finished : batch)
+    );
     mocks.batchItems.mockImplementation((_id, query) =>
       Promise.resolve({
         items: completed
@@ -474,10 +478,10 @@ it.each(["all", "succeeded"])(
       screen.queryByRole("button", { name: "预览审核" })
     ).not.toBeInTheDocument();
     completed = true;
-    act(() =>
+    await act(async () =>
       client.setQueryData(
         ["question-bank", profile.id, "batches", "detail", "batch-race"],
-        { ...batch, state: "completed", running: 0, succeeded: 1 }
+        finished
       )
     );
     fireEvent.click(await screen.findByRole("button", { name: "预览审核" }));
