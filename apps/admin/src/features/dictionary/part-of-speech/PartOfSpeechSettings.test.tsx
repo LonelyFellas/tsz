@@ -154,6 +154,8 @@ vi.mock("./SubPartOfSpeechDrawer", async () => {
     onResetFilters,
     onSaved,
     onError,
+    toolbar,
+    toolbarExtra,
     ref
   }: {
     parents: Pick<PartOfSpeechConfig, "id" | "name_zh">[];
@@ -162,11 +164,15 @@ vi.mock("./SubPartOfSpeechDrawer", async () => {
     onResetFilters?: () => void;
     onSaved: (text: string) => void;
     onError: (error: unknown) => void;
+    toolbar?: ReactNode;
+    toolbarExtra?: ReactNode;
     ref?: Ref<{ openCreate: () => void }>;
   }) => {
     useImperativeHandle(ref, () => ({ openCreate: subPanelHandle.openCreate }));
     return (
       <div data-testid="sub-panel">
+        {toolbar}
+        {toolbarExtra}
         细分-{parents.map((item) => item.id).join(",")}
         /新建父级-{createParent?.id ?? "无"}
         {filtered && <button onClick={onResetFilters}>重置细分词性筛选</button>}

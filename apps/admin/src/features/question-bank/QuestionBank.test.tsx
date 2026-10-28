@@ -258,3 +258,34 @@ it("generation timeout preserves the chosen source and retries the same idempote
   await waitFor(() => expect(mocks.generate).toHaveBeenCalledTimes(2));
   expect(mocks.generate.mock.calls[1]![0]).toEqual(first);
 });
+
+it("列表失败后仍可筛选、刷新题目与生成记录", async () => {
+  mocks.questions.mockRejectedValueOnce(new Error("审核读取失败"));
+  mocks.generations.mockRejectedValueOnce(new Error("记录读取失败"));
+  render(<QuestionBank />, { wrapper });
+  fireEvent.click(screen.getByRole("tab", { name: "题目审核" }));
+  await screen.findByText("审核读取失败");
+  expect(screen.getByRole("combobox", { name: "题目状态" })).toBeEnabled();
+  fireEvent.click(screen.getByRole("button", { name: /刷\s*新/ }));
+  await waitFor(() => expect(mocks.questions).toHaveBeenCalledTimes(2));
+  await waitFor(() =>
+    expect(screen.queryByText("审核读取失败")).not.toBeInTheDocument()
+  );
+  fireEvent.click(screen.getByRole("tab", { name: "生成记录" }));
+  await screen.findByText("记录读取失败");
+  fireEvent.click(screen.getByRole("button", { name: /刷\s*新/ }));
+  await waitFor(() => expect(mocks.generations).toHaveBeenCalledTimes(2));
+  await waitFor(() =>
+    expect(screen.queryByText("记录读取失败")).not.toBeInTheDocument()
+  );
+});
+
+it("命题词义读取失败后仍可切回整个词库", async () => {
+  mocks.candidates.mockRejectedValueOnce(new Error("词义读取失败"));
+  render(<QuestionBank />, { wrapper });
+  await screen.findByText("词义读取失败");
+  fireEvent.click(screen.getByRole("button", { name: "查看整个词库" }));
+  await screen.findByRole("row", { name: /apple.*apple 的释义/ });
+  expect(screen.queryByText("当前词条的已发布词义")).not.toBeInTheDocument();
+  expect(mocks.candidates).toHaveBeenCalledTimes(2);
+});

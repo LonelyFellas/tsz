@@ -275,6 +275,71 @@ async function editContentSpelling(value: string) {
 }
 
 describe("WordWizardV3Page", () => {
+  it.each([
+    ["content", false],
+    ["form_type", false],
+    ["content", true],
+    ["form_type", true]
+  ] as const)(
+    "隐藏列偏好不阻断 %s 的深链定位，收起分组=%s",
+    async (target, collapsed) => {
+      const storageKey = "tsz:admin:table-columns:v1:form-content-overview";
+      onTestFinished(() => localStorage.removeItem(storageKey));
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify([
+          { key: "edit", visible: false, fixed: "right" },
+          { key: "label", visible: false, fixed: "left" },
+          { key: "volume", visible: false, fixed: false }
+        ])
+      );
+      const current = word();
+      const form = expandFormContents(current.forms).pos[0]!.forms[0]!;
+      const variant =
+        form.regional_variants.mode === "common"
+          ? form.regional_variants.common
+          : form.regional_variants.uk;
+      const entry = `/words/${WORD_ID}/v3/wizard/forms`;
+      const focusedEntry = `${entry}?focus_node=${target === "content" ? variant.id : form.id}`;
+      const router = renderPage(
+        collapsed ? entry : focusedEntry,
+        createV3WordRequests(
+          source({ word: current, retired_stable_nodes: [] })
+        )
+      );
+      if (collapsed) {
+        const collapse = await waitFor(() => {
+          const button = document.querySelector<HTMLButtonElement>(
+            'button[aria-label="收起第 1 组词形变化"]'
+          );
+          expect(button).not.toBeNull();
+          return button!;
+        });
+        fireEvent.click(collapse);
+        expect(document.querySelector(".v3-form-overview")).toBeNull();
+        act(() => {
+          void router.navigate(focusedEntry);
+        });
+      }
+      if (target === "content") {
+        expect(await screen.findByLabelText("词形英美通用拼写")).toBeVisible();
+      } else {
+        await waitFor(() => {
+          const field = document.querySelector(
+            `[data-v3-node-id="${form.id}"][data-v3-field="form_type"]`
+          );
+          expect(field).not.toBeNull();
+          expect(field).toHaveFocus();
+        });
+      }
+      expect(JSON.parse(localStorage.getItem(storageKey)!)).toEqual([
+        { key: "edit", visible: target === "content", fixed: "right" },
+        { key: "label", visible: target === "form_type", fixed: "left" },
+        { key: "volume", visible: false, fixed: false }
+      ]);
+    }
+  );
+
   it.each([true, undefined])(
     "展开响应不能因能力位为 %s 而进入编辑",
     async (capability) => {
