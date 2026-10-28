@@ -44,6 +44,9 @@ it("plan creation preserves fingerprint, optional schedule and cancellation with
   expect(http.post).toHaveBeenCalledExactlyOnceWith(
     "/me/learning-plans",
     data,
-    { signal: controller.signal }
+    {
+      signal: controller.signal,
+      headers: { "X-TSZ-Learning-Capabilities": "choice-v1" }
+    }
   );
 });

@@ -1,5 +1,6 @@
 import type {
   LearningTaskType,
+  LearningQuestionType,
   LearningTask,
   LearningRun,
   LearningPreview,
@@ -12,6 +13,7 @@ export interface LearningSchedule {
   end_date: string;
 }
 export interface PreviewLearningPlan {
+  question_type?: LearningQuestionType;
   task_type: LearningTaskType;
   wordlist_ids: string[];
   daily_question_count: number | null;

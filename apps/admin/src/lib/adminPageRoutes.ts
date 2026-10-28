@@ -8,6 +8,10 @@ export const ADMIN_PAGE_ROUTES = {
   reviews: { path: "reviews", handle: { permission: "wordlists.access" } },
   coins: { path: "coins", handle: { permission: "coins.access" } },
   myCoins: { path: "account/coins", handle: {} },
+  questionBank: {
+    path: "question-bank",
+    handle: { permission: "words.access" }
+  },
   words: { path: "words", handle: { permission: "words.access" } },
   wordsTrash: { path: "words/trash", handle: { permission: "words.access" } },
   wordsNewV3: { path: "words/new/v3", handle: { permission: "words.create" } },

@@ -6,7 +6,8 @@ import { HttpError } from "@tsz/api-client";
 import type {
   CreateLearningPlan,
   PreviewLearningPlan,
-  LearningTaskType
+  LearningTaskType,
+  LearningQuestionType
 } from "@tsz/types";
 import { Button, Input, FormField } from "@tsz/ui/components";
 import { api } from "@/lib/request";
@@ -24,6 +25,15 @@ export function LearningPlanCreator({ userId }: { userId: string }) {
   const form = useRef<HTMLFormElement>(null);
   const [name, setName] = useState("");
   const [kind, setKind] = useState<LearningTaskType>("daily");
+  const [questionType, setQuestionType] =
+    useState<LearningQuestionType>("spelling_zh_to_en");
+  const capabilities = useQuery({
+    queryKey: ["learning", userId, "capabilities"],
+    queryFn: ({ signal }) => api.learning.capabilities({ signal }),
+    retry: false
+  });
+  const choiceSupported =
+    capabilities.data?.question_types.includes("choice_zh_to_en") === true;
   const [selected, setSelected] = useState<SelectedSource[]>([]);
   const [picker, setPicker] = useState(false);
   const [count, setCount] = useState("10");
@@ -62,6 +72,9 @@ export function LearningPlanCreator({ userId }: { userId: string }) {
       : undefined
   };
   const input: PreviewLearningPlan = {
+    ...(questionType === "choice_zh_to_en"
+      ? { question_type: questionType }
+      : {}),
     task_type: kind,
     wordlist_ids: selected.map((s) => s.wordlist.id),
     daily_question_count: kind === "daily" ? n : null,
@@ -103,7 +116,8 @@ export function LearningPlanCreator({ userId }: { userId: string }) {
         [...name.trim()].length > 50 ||
         !selected.length ||
         !validCount ||
-        !validSchedule
+        !validSchedule ||
+        (questionType === "choice_zh_to_en" && !choiceSupported)
       ) {
         requestAnimationFrame(() =>
           form.current
@@ -163,8 +177,8 @@ export function LearningPlanCreator({ userId }: { userId: string }) {
       <PageHeader
         back={{ href: "/student/practice", label: "我的任务" }}
         eyebrow="自主学习"
-        title="创建拼写任务"
-        description="看中文释义，拼写英文。每轮覆盖所选内容，答错也计入覆盖。"
+        title="创建学习任务"
+        description="选择拼写或单选练习。每轮覆盖所选内容，答错也计入覆盖。"
       />
       <form
         ref={form}
@@ -267,12 +281,44 @@ export function LearningPlanCreator({ userId }: { userId: string }) {
                 ))}
               </ul>
             </section>
-            <div className="rounded-2xl bg-muted/70 p-4">
-              <p className="text-sm font-medium">拼写题 · 看中文，写英文</p>
+            <fieldset disabled={locked} className="space-y-3">
+              <legend className="mb-2 text-sm font-medium">练习题型</legend>
+              {(
+                [
+                  ["spelling_zh_to_en", "拼写题 · 看中文，写英文"],
+                  ["choice_zh_to_en", "单选题 · 看中文，选英文"]
+                ] as const
+              ).map(([value, label]) => (
+                <label
+                  key={value}
+                  className="flex min-h-12 items-center gap-3 rounded-2xl border border-border p-4 has-checked:border-primary has-checked:bg-primary-muted has-disabled:opacity-60"
+                >
+                  <input
+                    type="radio"
+                    name="question-type"
+                    value={value}
+                    className="size-4 accent-primary"
+                    checked={questionType === value}
+                    disabled={value === "choice_zh_to_en" && !choiceSupported}
+                    onChange={() => setQuestionType(value)}
+                  />
+                  <span className="text-sm font-medium">{label}</span>
+                </label>
+              ))}
+              {!choiceSupported && (
+                <p className="text-xs text-foreground-muted">
+                  {capabilities.isPending
+                    ? "正在确认单选题是否可用…"
+                    : "当前单选题功能尚未就绪，可先创建拼写任务。"}
+                </p>
+              )}
               <p className="mt-1 text-xs text-foreground-muted">
-                采用当前学习设置，自定义词暂不参与出题。
+                {questionType === "choice_zh_to_en"
+                  ? "采用人工审核通过的题目，单选成绩不影响拼写掌握度。"
+                  : "采用当前学习设置。"}
+                自定义词暂不参与出题。
               </p>
-            </div>
+            </fieldset>
             {kind === "daily" && (
               <>
                 <FormField

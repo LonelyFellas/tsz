@@ -103,6 +103,62 @@ it("unknown answer result retains input and retries the original intent", async 
   await waitFor(() => expect(mocks.answer).toHaveBeenCalledTimes(2));
   expect(mocks.answer.mock.calls[1]![1]).toEqual(first[1]);
 });
+
+it.each([
+  { state: "expired", kind: "spelling_zh_to_en" },
+  { state: "invalidated", kind: "choice_zh_to_en" }
+])(
+  "replays an unconfirmed $kind answer after the run becomes $state",
+  async ({ state, kind }) => {
+    const current = { ...run, question_type: kind };
+    mocks.run.mockResolvedValue(current);
+    mocks.questions.mockResolvedValue({
+      items: [
+        {
+          ...question,
+          ...(kind === "choice_zh_to_en"
+            ? {
+                options: [
+                  { option_id: "a", spelling: "apple" },
+                  { option_id: "b", spelling: "banana" },
+                  { option_id: "c", spelling: "orange" },
+                  { option_id: "d", spelling: "tomato" }
+                ]
+              }
+            : {})
+        }
+      ],
+      pagination: { total_pages: 2 }
+    });
+    mocks.answer
+      .mockImplementationOnce(async () => {
+        mocks.run.mockResolvedValue({ ...current, state });
+        throw new Error("response lost");
+      })
+      .mockRejectedValueOnce(new HttpError(409, "本批次已不可作答"));
+    renderWithProviders(<LearningPractice id="run" />);
+    if (kind === "choice_zh_to_en")
+      fireEvent.click(await screen.findByRole("radio", { name: "apple" }));
+    else
+      fireEvent.change(await screen.findByLabelText("英文拼写"), {
+        target: { value: "apple" }
+      });
+    fireEvent.click(screen.getByRole("button", { name: "提交答案" }));
+    const retry = await screen.findByRole("button", { name: "重试原答案" });
+    expect(screen.getByRole("button", { name: "下一页" })).toBeDisabled();
+    fireEvent.click(retry);
+    await waitFor(() => expect(mocks.answer).toHaveBeenCalledTimes(2));
+    expect(mocks.answer.mock.calls[1]![1]).toEqual(
+      mocks.answer.mock.calls[0]![1]
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "重试原答案" })
+      ).not.toBeInTheDocument()
+    );
+    expect(screen.getByRole("button", { name: "下一页" })).toBeEnabled();
+  }
+);
 it("completion is server-owned and zero correct still displays completed", async () => {
   mocks.run.mockResolvedValue({
     ...run,
@@ -213,10 +269,11 @@ it("delayed server recovery of the last answer unlocks the next page", async () 
   );
   expect(screen.queryByText(/结果未确认/)).not.toBeInTheDocument();
 });
-it("a background question advance cannot submit the previous question's draft", async () => {
+it("a background confirmation cannot submit the next question with an empty draft", async () => {
   const { QueryClient, QueryClientProvider } =
     await import("@tanstack/react-query");
   const { render, act } = await import("@testing-library/react");
+  mocks.answer.mockRejectedValue(new Error("response lost"));
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } }
   });
@@ -228,6 +285,8 @@ it("a background question advance cannot submit the previous question's draft", 
   fireEvent.change(await screen.findByLabelText("英文拼写"), {
     target: { value: "apple" }
   });
+  fireEvent.click(screen.getByRole("button", { name: "提交答案" }));
+  await screen.findByRole("button", { name: "重试原答案" });
   await act(async () => {
     client.setQueryData(["learning", "learner-a", "questions", "run", 1], {
       items: [
@@ -245,7 +304,8 @@ it("a background question advance cannot submit the previous question's draft", 
   await screen.findByRole("heading", { name: /第 2 题/ });
   expect(screen.getByLabelText("英文拼写")).toHaveValue("");
   expect(screen.getByRole("button", { name: "提交答案" })).toBeDisabled();
-  expect(mocks.answer).not.toHaveBeenCalled();
+  fireEvent.submit(screen.getByLabelText("英文拼写").closest("form")!);
+  expect(mocks.answer).toHaveBeenCalledOnce();
 });
 
 it("来源失权后仍可重试未确认的原请求，再继续同页其他合法题", async () => {
@@ -361,4 +421,77 @@ it("历史批次的全局摘要明确标注任务当前轮次", async () => {
   });
   renderWithProviders(<LearningPractice id="run" />);
   expect(await screen.findByText(/任务当前第 2 轮已覆盖/)).toBeInTheDocument();
+});
+
+it("choice selection waits for explicit submission and renders only server-owned feedback", async () => {
+  const options = [
+    { option_id: "o-banana", spelling: "banana" },
+    { option_id: "o-apple", spelling: "apple" },
+    { option_id: "o-orange", spelling: "orange" },
+    { option_id: "o-pear", spelling: "pear" }
+  ];
+  mocks.run.mockResolvedValue({
+    ...run,
+    question_type: "choice_zh_to_en",
+    target_count: 1
+  });
+  mocks.questions.mockResolvedValue({
+    items: [{ ...question, options }],
+    pagination: { total_pages: 1 }
+  });
+  let complete!: () => void;
+  mocks.answer.mockImplementation(
+    () =>
+      new Promise<void>((resolve) => {
+        complete = () => {
+          mocks.run.mockResolvedValue({
+            ...run,
+            question_type: "choice_zh_to_en",
+            state: "completed",
+            answered_count: 1,
+            target_count: 1
+          });
+          mocks.questions.mockResolvedValue({
+            items: [
+              {
+                ...question,
+                options,
+                answered: true,
+                feedback: {
+                  submitted_answer: "o-banana",
+                  is_correct: false,
+                  accepted_answers: ["apple"],
+                  correct_option_id: "o-apple",
+                  explanation: "apple 表示苹果，banana 表示香蕉。"
+                }
+              }
+            ],
+            pagination: { total_pages: 1 }
+          });
+          resolve();
+        };
+      })
+  );
+  renderWithProviders(<LearningPractice id="run" />);
+  const banana = await screen.findByRole("radio", { name: "banana" });
+  expect(screen.queryByLabelText("英文拼写")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "提交答案" })).toBeDisabled();
+  fireEvent.click(banana);
+  expect(mocks.answer).not.toHaveBeenCalled();
+  expect(screen.queryByText(/正确答案：/)).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "提交答案" }));
+  fireEvent.submit(banana.closest("form")!);
+  expect(mocks.answer).toHaveBeenCalledOnce();
+  expect(mocks.answer.mock.calls[0]![1]).toMatchObject({
+    answer: "o-banana",
+    question_id: "q1"
+  });
+  expect(banana).toBeDisabled();
+  complete();
+  await screen.findByText("apple 表示苹果，banana 表示香蕉。");
+  expect(screen.getByText(/你的答案：/)).toHaveTextContent("banana");
+  expect(screen.getByText(/正确答案：/)).toHaveTextContent("apple");
+  expect(
+    screen.queryByRole("link", { name: "查看待巩固内容与复习安排" })
+  ).not.toBeInTheDocument();
 });

@@ -35,6 +35,13 @@ const runtimeSchemaBundle =
   runtimeSchemaBundleJson as unknown as RuntimeSchemaBundle;
 
 const ROOTS = [
+  "LearningCapabilities",
+  "QuestionCandidatePage",
+  "QuestionGeneration",
+  "QuestionGenerationPage",
+  "BankQuestion",
+  "BankQuestionPage",
+
   "MemoryOverview",
   "MemoryPage",
   "MemoryItem",

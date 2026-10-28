@@ -13,6 +13,7 @@ import { api } from "@/lib/request";
 import { cn } from "@tsz/ui/lib/cn";
 import { LearningProgressBar as ProgressBar } from "./LearningProgressBar";
 import { LearningPlanCreator } from "./LearningPlanCreator";
+import { ChoiceAnswerField } from "./ChoiceAnswerField";
 import { PlanCoverage, planStatusLabels } from "./PlanCoverage";
 import { listPlans, detailPlan, historyPlans } from "./plan-api";
 import { LearningRewardSummary } from "@/features/coins/LearningRewardSummary";
@@ -35,6 +36,9 @@ const alertText = "text-sm text-danger";
 const hintText = "text-sm leading-6 text-foreground-muted";
 const retryLink =
   "ml-1 font-medium text-primary underline-offset-4 hover:underline";
+function questionTypeLabel(type?: string) {
+  return type === "choice_zh_to_en" ? "中文释义单选" : "中文释义拼写";
+}
 
 function Stat({ label, value }: { label: string; value: ReactNode }) {
   return (
@@ -109,7 +113,7 @@ function TaskList({ userId }: { userId: string }) {
       <PageHeader
         eyebrow="我的学习"
         title="我的学习任务"
-        description="看中文释义，拼写英文。每题有效作答后计入进度，正确率单独统计。每日北京时间 04:00 换日。"
+        description="看中文释义，练习拼写或选择英文。每题有效作答后计入进度，正确率单独统计。每日北京时间 04:00 换日。"
         actions={
           <Link
             className={cn(primaryButtonClass, "min-h-10 px-5")}
@@ -162,6 +166,8 @@ function TaskList({ userId }: { userId: string }) {
                             {task.task_type === "daily"
                               ? "每日任务"
                               : "长期任务"}
+                            {" · "}
+                            {questionTypeLabel(task.question_type)}
                             {" · "}
                             {task.wordlist_ids.length} 个词表
                           </p>
@@ -344,7 +350,7 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
     <PageShell>
       <PageHeader
         back={{ href: "/student/practice", label: "我的任务" }}
-        eyebrow={task.task_type === "daily" ? "每日任务" : "长期任务"}
+        eyebrow={`${task.task_type === "daily" ? "每日任务" : "长期任务"} · ${questionTypeLabel(task.question_type)}`}
         title={task.name}
         description={
           <>
@@ -550,6 +556,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
   const [error, setError] = useState("");
   const [locating, setLocating] = useState(false);
   const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
   const [pending, setPending] = useState<SubmitLearningAnswer | null>(null);
   const run = useQuery({
     queryKey: ["learning", userId, "run", id],
@@ -612,6 +619,17 @@ function Practice({ userId, id }: { userId: string; id: string }) {
   const uncertain = !!pending && !pendingAccepted && !busy;
   const answer = draft?.questionId === next?.id ? (draft?.value ?? "") : "";
   async function submit() {
+    const replaying = !!pending && !pendingAccepted;
+    if (submitting.current || (!replaying && run.data?.state !== "active"))
+      return;
+    const isChoice = run.data?.question_type === "choice_zh_to_en";
+    if (
+      (!pending || pendingAccepted) &&
+      (!answer.trim() ||
+        (isChoice &&
+          !next?.options?.some((option) => option.option_id === answer)))
+    )
+      return;
     const submission =
       pending && !pendingAccepted
         ? pending
@@ -623,6 +641,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
             }
           : null;
     if (!submission) return;
+    submitting.current = true;
     setPending(submission);
     setBusy(true);
     setError("");
@@ -653,6 +672,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
         }
       }
     } finally {
+      submitting.current = false;
       if (op.current()) setBusy(false);
     }
   }
@@ -677,6 +697,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
       </PageShell>
     );
   const r = run.data;
+  const choice = r.question_type === "choice_zh_to_en";
   const records = qs.data.items.filter(
     (q) => q.answered || !q.content_available
   );
@@ -688,10 +709,15 @@ function Practice({ userId, id }: { userId: string; id: string }) {
           label: r.state === "invalidated" ? "返回任务重新开始" : "任务与历史"
         }}
         eyebrow={`${runLabels[r.state]} · ${r.settings.cefr_level} / ${r.settings.english_variant}`}
-        title={r.state === "completed" ? "本批次已完成" : "中文释义拼写"}
+        title={
+          r.state === "completed"
+            ? "本批次已完成"
+            : questionTypeLabel(r.question_type)
+        }
         description={
           <>
             完成以有效作答数量为准。
+            {choice && "选择一个英文选项后提交，单选成绩不影响拼写掌握度。"}
             {r.expires_at && (
               <>
                 截止：
@@ -705,7 +731,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
         }
       />
       <div className="space-y-6">
-        {r.state === "completed" && (
+        {r.state === "completed" && !choice && (
           <Link className={buttonClass} href="/student/review">
             查看待巩固内容与复习安排
           </Link>
@@ -767,20 +793,31 @@ function Practice({ userId, id }: { userId: string; id: string }) {
                     aria-hidden
                   />
                 </div>
-                <input
-                  className="mx-auto block min-h-14 w-full max-w-md rounded-full border border-border bg-surface px-6 text-center text-xl font-medium tracking-wide text-foreground transition-shadow placeholder:text-base placeholder:font-normal placeholder:tracking-normal placeholder:text-foreground-subtle focus-visible:border-primary/50 focus-visible:outline-hidden focus-visible:ring-4 focus-visible:ring-primary/15 disabled:opacity-50"
-                  aria-label="英文拼写"
-                  placeholder="输入英文拼写"
-                  autoComplete="off"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  maxLength={200}
-                  value={answer}
-                  disabled={busy || uncertain}
-                  onChange={(e) =>
-                    setDraft({ questionId: next.id, value: e.target.value })
-                  }
-                />
+                {choice ? (
+                  <ChoiceAnswerField
+                    question={next}
+                    value={answer}
+                    disabled={busy || uncertain}
+                    onChange={(value) =>
+                      setDraft({ questionId: next.id, value })
+                    }
+                  />
+                ) : (
+                  <input
+                    className="mx-auto block min-h-14 w-full max-w-md rounded-full border border-border bg-surface px-6 text-center text-xl font-medium tracking-wide text-foreground transition-shadow placeholder:text-base placeholder:font-normal placeholder:tracking-normal placeholder:text-foreground-subtle focus-visible:border-primary/50 focus-visible:outline-hidden focus-visible:ring-4 focus-visible:ring-primary/15 disabled:opacity-50"
+                    aria-label="英文拼写"
+                    placeholder="输入英文拼写"
+                    autoComplete="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    maxLength={200}
+                    value={answer}
+                    disabled={busy || uncertain}
+                    onChange={(e) =>
+                      setDraft({ questionId: next.id, value: e.target.value })
+                    }
+                  />
+                )}
                 {!uncertain && (
                   <button
                     className={`${primaryButtonClass} min-w-40`}
@@ -840,9 +877,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
                 onClick={() => {
                   if (
                     !draft?.value ||
-                    window.confirm(
-                      "刷新会丢弃未提交拼写，请先复制保存。确认刷新？"
-                    )
+                    window.confirm("刷新会丢弃未提交答案。确认刷新？")
                   )
                     window.location.reload();
                 }}
@@ -879,7 +914,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
           {records.length === 0 && (
             <p className={hintText}>本页还没有作答记录。</p>
           )}
-          <ul className="space-y-3">
+          <ul className="space-y-3" aria-live="polite">
             {records.map((q) => (
               <li
                 className={`rounded-2xl border px-4 py-3.5 ${
@@ -912,10 +947,21 @@ function Practice({ userId, id }: { userId: string; id: string }) {
                   <p className="mt-2 text-xs leading-5 text-foreground-muted">
                     你的答案：
                     <span className="font-medium text-foreground">
-                      {q.feedback.submitted_answer}
+                      {choice
+                        ? (q.options?.find(
+                            (option) =>
+                              option.option_id === q.feedback?.submitted_answer
+                          )?.spelling ?? q.feedback.submitted_answer)
+                        : q.feedback.submitted_answer}
                     </span>
                     <span className="mx-2">·</span>
-                    可接受拼写：{q.feedback.accepted_answers.join(" / ")}
+                    {choice ? "正确答案：" : "可接受拼写："}
+                    {q.feedback.accepted_answers.join(" / ")}
+                  </p>
+                )}
+                {q.feedback?.explanation && (
+                  <p className="mt-2 whitespace-pre-line text-sm leading-6 text-foreground-muted">
+                    {q.feedback.explanation}
                   </p>
                 )}
               </li>

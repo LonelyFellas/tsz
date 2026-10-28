@@ -55,7 +55,10 @@ describe("learning wire contract", () => {
     expect(http.post).toHaveBeenCalledWith(
       `/me/learning-runs/${id}/answers`,
       data,
-      { signal: controller.signal }
+      {
+        signal: controller.signal,
+        headers: { "X-TSZ-Learning-Capabilities": "choice-v1" }
+      }
     );
   });
   it("never accepts answers on unanswered question DTO", () => {

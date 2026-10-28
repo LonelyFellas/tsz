@@ -3,6 +3,7 @@ import { beforeEach, it, expect, vi } from "vitest";
 import { renderWithProviders } from "@/test/render";
 const mocks = vi.hoisted(() => ({
   preview: vi.fn(),
+  capabilities: vi.fn(),
   create: vi.fn(),
   list: vi.fn(),
   push: vi.fn(),
@@ -10,6 +11,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/request", () => ({
   api: {
+    learning: { capabilities: mocks.capabilities },
     learningPlans: { preview: mocks.preview, create: mocks.create },
     wordList: { library: { list: mocks.list } }
   }
@@ -48,6 +50,9 @@ const preview = {
 };
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.capabilities.mockResolvedValue({
+    question_types: ["spelling_zh_to_en", "choice_zh_to_en"]
+  });
   HTMLDialogElement.prototype.showModal = function () {
     this.open = true;
   };
@@ -261,5 +266,57 @@ it("late preview cannot replace the latest quota calculation and missing name fo
   fireEvent.click(screen.getByRole("button", { name: "完成创建" }));
   await screen.findByText("请输入 1–50 字的任务名称。");
   await waitFor(() => expect(screen.getByLabelText("任务名称")).toHaveFocus());
+  expect(mocks.create).not.toHaveBeenCalled();
+});
+
+it("choice creation previews the selected type and preserves it through the create request", async () => {
+  renderWithProviders(<LearningPlanCreator userId="learner" />);
+  const choice = await screen.findByRole("radio", {
+    name: "单选题 · 看中文，选英文"
+  });
+  await waitFor(() => expect(choice).toBeEnabled());
+  fireEvent.click(choice);
+  fireEvent.change(screen.getByLabelText("任务名称"), {
+    target: { value: "中文单选" }
+  });
+  await choose();
+  expect(mocks.preview.mock.calls.at(-1)![0]).toMatchObject({
+    question_type: "choice_zh_to_en"
+  });
+  fireEvent.click(screen.getByRole("button", { name: "完成创建" }));
+  await waitFor(() => expect(mocks.create).toHaveBeenCalledOnce());
+  expect(mocks.create.mock.calls[0]![0]).toMatchObject({
+    question_type: "choice_zh_to_en"
+  });
+});
+
+it("an old server disables choice without adding a new field to spelling requests", async () => {
+  const { HttpError } = await import("@tsz/api-client");
+  mocks.capabilities.mockRejectedValue(new HttpError(404, "not found"));
+  renderWithProviders(<LearningPlanCreator userId="learner" />);
+  await screen.findByText("当前单选题功能尚未就绪，可先创建拼写任务。");
+  expect(
+    screen.getByRole("radio", { name: "单选题 · 看中文，选英文" })
+  ).toBeDisabled();
+  await choose();
+  expect(mocks.preview.mock.calls.at(-1)![0]).not.toHaveProperty(
+    "question_type"
+  );
+});
+
+it("a choice preview without approved questions explains the exclusion and cannot create", async () => {
+  renderWithProviders(<LearningPlanCreator userId="learner" />);
+  await choose();
+  mocks.preview.mockResolvedValue({
+    ...preview,
+    eligible_count: 0,
+    can_create: false,
+    reasons: ["所选词表暂无匹配等级和档位的已审核单选题。"]
+  });
+  fireEvent.click(
+    screen.getByRole("radio", { name: "单选题 · 看中文，选英文" })
+  );
+  await screen.findByText("所选词表暂无匹配等级和档位的已审核单选题。");
+  expect(screen.getByRole("button", { name: "完成创建" })).toBeDisabled();
   expect(mocks.create).not.toHaveBeenCalled();
 });
