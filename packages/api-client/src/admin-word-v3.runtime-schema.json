@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/opencode-connect/docs/openapi.json",
-  "_source_sha256": "b77eade8deef9f789c493f21868a4291283c152f34bc8b0e3f0c5609a07100b3",
+  "_source": "/Users/darwish/.codex/worktrees/opencode-model-switch-4218/tsz-rust/docs/openapi.json",
+  "_source_sha256": "a6d71b33def2b67b043fced4328ce74e29f1e9e320b1fdbd41c4d4de373b363f",
   "roots": [
     "LearningCapabilities",
     "QuestionCandidatePage",
@@ -14,6 +14,9 @@
     "AiLedgerPage",
     "AiCostLedgerPage",
     "AiCostOverview",
+    "OpenCodeModelList",
+    "OpenCodeProviderList",
+    "OpenCodeModelSelection",
     "OpenCodeConnection",
     "OpenCodeLogin",
     "OpenCodeLoginStatus",
@@ -2930,6 +2933,60 @@
       "properties": {
         "expires_at": { "type": "string", "format": "date-time" },
         "status": { "$ref": "#/$defs/OpenCodeLoginState" }
+      },
+      "additionalProperties": false
+    },
+    "OpenCodeModel": {
+      "type": "object",
+      "required": ["provider_id", "model_id", "name", "enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "model_id": { "type": "string" },
+        "name": { "type": "string" },
+        "provider_id": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "OpenCodeModelList": {
+      "type": "object",
+      "required": ["models"],
+      "properties": {
+        "models": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/OpenCodeModel" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "OpenCodeModelSelection": {
+      "type": "object",
+      "required": ["source", "provider_id", "model_id"],
+      "properties": {
+        "model_id": { "type": "string" },
+        "provider_id": { "type": "string" },
+        "source": { "$ref": "#/$defs/OpenCodeModelSource" }
+      },
+      "additionalProperties": false
+    },
+    "OpenCodeModelSource": { "type": "string", "enum": ["direct", "opencode"] },
+    "OpenCodeProvider": {
+      "type": "object",
+      "required": ["id", "name", "connected"],
+      "properties": {
+        "connected": { "type": "boolean" },
+        "id": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "OpenCodeProviderList": {
+      "type": "object",
+      "required": ["providers"],
+      "properties": {
+        "providers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/OpenCodeProvider" }
+        }
       },
       "additionalProperties": false
     },

@@ -4,6 +4,7 @@ import { LinkOutlined, ReloadOutlined } from "@ant-design/icons";
 import { Alert, Button, Card, Flex, Space, Tag, Typography } from "antd";
 import type { OpenCodeLogin } from "@tsz/types";
 import { api } from "@/lib/auth";
+import { OpenCodeModels } from "./OpenCodeModels";
 
 export function OpenCodeConnection({ adminId }: { adminId: string }) {
   const client = useQueryClient();
@@ -41,9 +42,11 @@ export function OpenCodeConnection({ adminId }: { adminId: string }) {
   });
   useEffect(() => {
     if (status.data?.status === "complete")
-      void client.invalidateQueries({
-        queryKey: ["opencode-connection", adminId]
-      });
+      void Promise.all(
+        ["opencode-connection", "opencode-models", "opencode-providers"].map(
+          (key) => client.invalidateQueries({ queryKey: [key, adminId] })
+        )
+      );
   }, [status.data?.status, client, adminId]);
 
   const pending =
@@ -71,8 +74,7 @@ export function OpenCodeConnection({ adminId }: { adminId: string }) {
       <Flex vertical gap={12}>
         <Flex justify="space-between" align="center" wrap gap={12}>
           <Typography.Text type="secondary">
-            登录 OpenCode
-            Console，将账号连接到服务器。连接后仍使用当前出题模型。
+            登录 OpenCode Console，将账号连接到服务器，选择要使用的出题模型。
           </Typography.Text>
           <Space wrap>
             <Button
@@ -193,6 +195,11 @@ export function OpenCodeConnection({ adminId }: { adminId: string }) {
           <Alert type="success" showIcon title="OpenCode 授权已完成。" />
         )}
       </Flex>
+      <OpenCodeModels
+        key={adminId}
+        adminId={adminId}
+        configured={!!data?.configured}
+      />
     </Card>
   );
 }

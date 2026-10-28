@@ -138,3 +138,5 @@ it("链接过期后允许重新发起登录", async () => {
   ).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: /连接 OpenCode/ })).toBeEnabled();
 });
+
+vi.mock("./OpenCodeModels", () => ({ OpenCodeModels: () => null }));
