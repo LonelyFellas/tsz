@@ -9,14 +9,49 @@ import {
 const changedEvent = "admin-table-columns-changed";
 const revealEvent = "admin-table-columns-reveal";
 
+function revealedPreferences(
+  preferences: ColumnPreference[],
+  columnKeys: readonly string[]
+) {
+  if (
+    !preferences.some(
+      (column) => !column.visible && columnKeys.includes(column.key)
+    )
+  )
+    return;
+  return preferences.map((column) =>
+    columnKeys.includes(column.key) ? { ...column, visible: true } : column
+  );
+}
+
 /** 显式定位字段时恢复必需列，保留其余显示偏好、顺序与固定位置。 */
 export function revealTableColumns(
   tableId: string,
   columnKeys: readonly string[]
 ) {
-  window.dispatchEvent(
-    new CustomEvent(revealEvent, { detail: { tableId, columnKeys } })
+  // 已挂载的实例持有最新状态（包括本地存储不可用时的内存偏好）。
+  const unhandled = window.dispatchEvent(
+    new CustomEvent(revealEvent, {
+      cancelable: true,
+      detail: { tableId, columnKeys }
+    })
   );
+  if (!unhandled) return;
+  // 组被收起或步骤未挂载时，先恢复缓存，让稍后出现的表格读取正确状态。
+  const key = `tsz:admin:table-columns:v1:${tableId}`;
+  try {
+    const next = revealedPreferences(
+      readColumnPreferences(localStorage.getItem(key)),
+      columnKeys
+    );
+    if (!next) return;
+    localStorage.setItem(key, JSON.stringify(next));
+    window.dispatchEvent(
+      new CustomEvent(changedEvent, { detail: { key, preferences: next } })
+    );
+  } catch {
+    // 浏览器拒绝存储时保留既有偏好；已挂载实例由上面的事件处理。
+  }
 }
 
 export function useColumnSettings(
@@ -77,19 +112,15 @@ export function useColumnSettings(
   );
   useEffect(() => {
     const reveal = (event: Event) => {
-      if (!(event instanceof CustomEvent) || event.detail.tableId !== tableId)
-        return;
-      const next = preferences.map((column) =>
-        event.detail.columnKeys.includes(column.key)
-          ? { ...column, visible: true }
-          : column
-      );
       if (
-        next.some(
-          (column, index) => column.visible !== preferences[index]!.visible
-        )
+        event.defaultPrevented ||
+        !(event instanceof CustomEvent) ||
+        event.detail.tableId !== tableId
       )
-        save(next);
+        return;
+      event.preventDefault();
+      const next = revealedPreferences(preferences, event.detail.columnKeys);
+      if (next) save(next);
     };
     window.addEventListener(revealEvent, reveal);
     return () => window.removeEventListener(revealEvent, reveal);

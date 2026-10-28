@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ConfigProvider } from "antd";
 import { AdminTable, type AdminTableProps } from "./AdminTable";
+import { revealTableColumns } from "./useColumnSettings";
 
 type Row = { id: string; name: string; status: string };
 const columns: AdminTableProps<Row>["columns"] = [
@@ -189,6 +190,8 @@ describe("AdminTable", () => {
         within(settings()).getByRole("checkbox", { name: "状态" })
       );
       expect(headers()).toEqual(["名称", "操作"]);
+      act(() => revealTableColumns("test-table", ["status"]));
+      expect(headers()).toEqual(["名称", "状态", "操作"]);
     } finally {
       get.mockRestore();
       set.mockRestore();

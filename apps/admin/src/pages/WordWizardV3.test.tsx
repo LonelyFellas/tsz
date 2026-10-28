@@ -275,9 +275,14 @@ async function editContentSpelling(value: string) {
 }
 
 describe("WordWizardV3Page", () => {
-  it.each(["content", "form_type"] as const)(
-    "隐藏列偏好不阻断 %s 的深链定位",
-    async (target) => {
+  it.each([
+    ["content", false],
+    ["form_type", false],
+    ["content", true],
+    ["form_type", true]
+  ] as const)(
+    "隐藏列偏好不阻断 %s 的深链定位，收起分组=%s",
+    async (target, collapsed) => {
       const storageKey = "tsz:admin:table-columns:v1:form-content-overview";
       onTestFinished(() => localStorage.removeItem(storageKey));
       localStorage.setItem(
@@ -294,12 +299,28 @@ describe("WordWizardV3Page", () => {
         form.regional_variants.mode === "common"
           ? form.regional_variants.common
           : form.regional_variants.uk;
-      renderPage(
-        `/words/${WORD_ID}/v3/wizard/forms?focus_node=${target === "content" ? variant.id : form.id}`,
+      const entry = `/words/${WORD_ID}/v3/wizard/forms`;
+      const focusedEntry = `${entry}?focus_node=${target === "content" ? variant.id : form.id}`;
+      const router = renderPage(
+        collapsed ? entry : focusedEntry,
         createV3WordRequests(
           source({ word: current, retired_stable_nodes: [] })
         )
       );
+      if (collapsed) {
+        const collapse = await waitFor(() => {
+          const button = document.querySelector<HTMLButtonElement>(
+            'button[aria-label="收起第 1 组词形变化"]'
+          );
+          expect(button).not.toBeNull();
+          return button!;
+        });
+        fireEvent.click(collapse);
+        expect(document.querySelector(".v3-form-overview")).toBeNull();
+        act(() => {
+          void router.navigate(focusedEntry);
+        });
+      }
       if (target === "content") {
         expect(await screen.findByLabelText("词形英美通用拼写")).toBeVisible();
       } else {
