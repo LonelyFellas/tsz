@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   readColumnPreferences,
   resolveColumns,
@@ -7,6 +7,17 @@ import {
 } from "./column-settings";
 
 const changedEvent = "admin-table-columns-changed";
+const revealEvent = "admin-table-columns-reveal";
+
+/** 显式定位字段时恢复必需列，保留其余显示偏好、顺序与固定位置。 */
+export function revealTableColumns(
+  tableId: string,
+  columnKeys: readonly string[]
+) {
+  window.dispatchEvent(
+    new CustomEvent(revealEvent, { detail: { tableId, columnKeys } })
+  );
+}
 
 export function useColumnSettings(
   tableId: string,
@@ -47,20 +58,42 @@ export function useColumnSettings(
     };
   }, [storageKey]);
 
-  const save = (next: ColumnPreference[]) => {
-    setPreferences(next);
-    try {
-      if (next.length) localStorage.setItem(storageKey, JSON.stringify(next));
-      else localStorage.removeItem(storageKey);
-    } catch {
-      // 隐私模式、存储配额耗尽等情况不阻断表格操作。
-    }
-    window.dispatchEvent(
-      new CustomEvent(changedEvent, {
-        detail: { key: storageKey, preferences: next }
-      })
-    );
-  };
+  const save = useCallback(
+    (next: ColumnPreference[]) => {
+      setPreferences(next);
+      try {
+        if (next.length) localStorage.setItem(storageKey, JSON.stringify(next));
+        else localStorage.removeItem(storageKey);
+      } catch {
+        // 隐私模式、存储配额耗尽等情况不阻断表格操作。
+      }
+      window.dispatchEvent(
+        new CustomEvent(changedEvent, {
+          detail: { key: storageKey, preferences: next }
+        })
+      );
+    },
+    [storageKey]
+  );
+  useEffect(() => {
+    const reveal = (event: Event) => {
+      if (!(event instanceof CustomEvent) || event.detail.tableId !== tableId)
+        return;
+      const next = preferences.map((column) =>
+        event.detail.columnKeys.includes(column.key)
+          ? { ...column, visible: true }
+          : column
+      );
+      if (
+        next.some(
+          (column, index) => column.visible !== preferences[index]!.visible
+        )
+      )
+        save(next);
+    };
+    window.addEventListener(revealEvent, reveal);
+    return () => window.removeEventListener(revealEvent, reveal);
+  }, [preferences, save, tableId]);
   const columns = resolveColumns(defaults, preferences);
   return {
     columns,
