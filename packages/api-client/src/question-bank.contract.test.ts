@@ -143,3 +143,101 @@ it("unanswered choice options contain only opaque IDs and spelling; source and a
     }).valid
   ).toBe(false);
 });
+
+it("batch endpoints preserve selections, preview identity, paginated tasks and legacy response shapes", async () => {
+  const selection = {
+    question_levels: ["A1", "B1"],
+    answer_profiles: ["BrE", "AmE"]
+  };
+  const preview = {
+    selection,
+    coverage: [
+      {
+        question_level: "A1",
+        answer_profile: "BrE",
+        eligible: 90,
+        covered: 5,
+        generating: 2,
+        missing: 83
+      }
+    ],
+    missing: 83,
+    preview_token: "current-source-set"
+  };
+  const batch = {
+    id,
+    created_by: id,
+    preview,
+    state: "running",
+    total: 83,
+    queued: 83,
+    running: 0,
+    succeeded: 0,
+    failed: 0,
+    insufficient_candidates: 0,
+    cancelled: 0,
+    created_at: "2026-10-28T00:00:00Z"
+  };
+  const pagination = { page: 5, page_size: 20, total: 90, total_pages: 5 };
+  const http = {
+    get: vi.fn().mockResolvedValue({ items: [candidate], pagination }),
+    post: vi.fn().mockResolvedValue(preview)
+  } as unknown as HttpClient;
+  const api = createQuestionBankEndpoints(http);
+  expect(
+    (
+      await api.candidatePage({
+        question_level: "B1",
+        answer_profile: "BrE",
+        page: 5,
+        page_size: 20
+      })
+    ).pagination.total
+  ).toBe(90);
+  expect(http.get).toHaveBeenLastCalledWith(
+    "/question-bank/candidate-page?question_level=B1&answer_profile=BrE&page=5&page_size=20",
+    undefined
+  );
+  expect(await api.batchPreview(selection)).toEqual(preview);
+  expect(http.post).toHaveBeenLastCalledWith(
+    "/question-bank/batches/preview",
+    selection,
+    undefined
+  );
+  vi.mocked(http.post).mockResolvedValue(batch);
+  const input = {
+    idempotency_key: id,
+    selection,
+    preview_token: preview.preview_token
+  };
+  expect(await api.createBatch(input)).toEqual(batch);
+  expect(http.post).toHaveBeenLastCalledWith(
+    "/question-bank/batches",
+    input,
+    undefined
+  );
+  expect(await api.cancelBatch(id)).toEqual(batch);
+  expect(http.post).toHaveBeenLastCalledWith(
+    `/question-bank/batches/${id}/cancel`,
+    undefined,
+    undefined
+  );
+  expect(
+    validateRuntimeSchema("QuestionBatch", { ...batch, total: "83" }).valid
+  ).toBe(false);
+  expect(
+    validateRuntimeSchema("QuestionBatch", { ...batch, untracked: true }).valid
+  ).toBe(false);
+  expect(
+    validateRuntimeSchema("QuestionCandidatePage", {
+      contract_version: 1,
+      items: [candidate]
+    }).valid
+  ).toBe(true);
+  vi.mocked(http.get).mockResolvedValue({ items: [], pagination });
+  await api.batchItems(id, { page: 5, state: "failed" });
+  expect(http.get).toHaveBeenLastCalledWith(
+    `/question-bank/batches/${id}/items?page=5&state=failed`,
+    undefined
+  );
+});

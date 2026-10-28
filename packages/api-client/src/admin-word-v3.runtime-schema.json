@@ -1,10 +1,14 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/admin-ai-ledger/docs/openapi.json",
-  "_source_sha256": "2f227ef366741eb1ebdc24b20eb53f4c6dcdca1b6d112d63bb1aca1f0fd8c7cd",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/question-bank-batch/docs/openapi.json",
+  "_source_sha256": "a196abff79fa63eb07ec982585f129cef5fa86b4747431642e86df19935437c9",
   "roots": [
     "LearningCapabilities",
     "QuestionCandidatePage",
+    "QuestionCandidateSearchPage",
+    "QuestionBatchPreview",
+    "QuestionBatch",
+    "QuestionBatchPage",
     "QuestionGeneration",
     "QuestionGenerationPage",
     "AiLedgerPage",
@@ -3024,6 +3028,93 @@
       },
       "additionalProperties": false
     },
+    "QuestionBatch": {
+      "type": "object",
+      "required": [
+        "id",
+        "created_by",
+        "preview",
+        "state",
+        "total",
+        "queued",
+        "running",
+        "succeeded",
+        "failed",
+        "insufficient_candidates",
+        "cancelled",
+        "created_at"
+      ],
+      "properties": {
+        "cancelled": { "type": "integer" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "created_by": { "type": "string", "format": "uuid" },
+        "failed": { "type": "integer" },
+        "id": { "type": "string", "format": "uuid" },
+        "insufficient_candidates": { "type": "integer" },
+        "preview": { "$ref": "#/$defs/QuestionBatchPreview" },
+        "queued": { "type": "integer" },
+        "running": { "type": "integer" },
+        "state": { "type": "string" },
+        "succeeded": { "type": "integer" },
+        "total": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "QuestionBatchCoverage": {
+      "type": "object",
+      "required": [
+        "question_level",
+        "answer_profile",
+        "eligible",
+        "covered",
+        "generating",
+        "missing"
+      ],
+      "properties": {
+        "answer_profile": { "type": "string" },
+        "covered": { "type": "integer" },
+        "eligible": { "type": "integer" },
+        "generating": { "type": "integer" },
+        "missing": { "type": "integer" },
+        "question_level": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "QuestionBatchPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/QuestionBatch" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "QuestionBatchPreview": {
+      "type": "object",
+      "required": ["selection", "coverage", "missing", "preview_token"],
+      "properties": {
+        "coverage": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/QuestionBatchCoverage" }
+        },
+        "missing": { "type": "integer" },
+        "preview_token": { "type": "string" },
+        "selection": { "$ref": "#/$defs/QuestionBatchSelection" }
+      },
+      "additionalProperties": false
+    },
+    "QuestionBatchSelection": {
+      "type": "object",
+      "required": ["question_levels", "answer_profiles"],
+      "properties": {
+        "answer_profiles": { "type": "array", "items": { "type": "string" } },
+        "question_levels": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
     "QuestionCandidate": {
       "type": "object",
       "required": [
@@ -3068,6 +3159,18 @@
           "type": "array",
           "items": { "$ref": "#/$defs/QuestionCandidate" }
         }
+      },
+      "additionalProperties": false
+    },
+    "QuestionCandidateSearchPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/QuestionCandidate" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
       },
       "additionalProperties": false
     },
