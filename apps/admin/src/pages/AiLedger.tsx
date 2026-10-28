@@ -1,12 +1,9 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  InfoCircleOutlined,
-  LockOutlined,
-  ReloadOutlined
-} from "@ant-design/icons";
+import { InfoCircleOutlined, ReloadOutlined } from "@ant-design/icons";
 import {
   Alert,
+  Breadcrumb,
   Button,
   Card,
   Descriptions,
@@ -176,18 +173,11 @@ function Ledger({ adminId }: { adminId: string }) {
   const summary = data?.summary;
   return (
     <Flex vertical gap={16} className="ai-ledger">
+      <Breadcrumb items={[{ title: "系统设置" }, { title: "AI 账本" }]} />
       <Flex justify="space-between" align="center" wrap gap={12}>
-        <div>
-          <Space align="center">
-            <Typography.Title level={3} style={{ margin: 0 }}>
-              AI 账本
-            </Typography.Title>
-            <Tag icon={<LockOutlined />}>仅超管</Tag>
-          </Space>
-          <Typography.Paragraph type="secondary" className="ai-ledger-subtitle">
-            模型用量、缓存与响应耗时
-          </Typography.Paragraph>
-        </div>
+        <Typography.Text type="secondary">
+          模型用量、缓存与响应耗时
+        </Typography.Text>
         <Space>
           <Popover
             trigger="click"
