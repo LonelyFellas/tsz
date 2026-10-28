@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/question-bank-batch/docs/openapi.json",
-  "_source_sha256": "a196abff79fa63eb07ec982585f129cef5fa86b4747431642e86df19935437c9",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/admin-ai-ledger/docs/openapi.json",
+  "_source_sha256": "9a15e6b48a3ed57ab3a8808db585cd5cefcf2924ca27f87c9fa7c7e59568586a",
   "roots": [
     "LearningCapabilities",
     "QuestionCandidatePage",
@@ -12,6 +12,8 @@
     "QuestionGeneration",
     "QuestionGenerationPage",
     "AiLedgerPage",
+    "AiCostLedgerPage",
+    "AiCostOverview",
     "BankQuestion",
     "BankQuestionPage",
     "MemoryOverview",
@@ -486,6 +488,18 @@
       "properties": { "word": { "$ref": "#/$defs/AdminWordV3" } },
       "additionalProperties": false
     },
+    "AiCallCost": {
+      "type": "object",
+      "required": ["call_id", "estimated_cost_cny", "pricing"],
+      "properties": {
+        "call_id": { "type": "string", "format": "uuid" },
+        "estimated_cost_cny": { "type": ["string", "null"] },
+        "pricing": {
+          "oneOf": [{ "$ref": "#/$defs/AiModelPricing" }, { "type": "null" }]
+        }
+      },
+      "additionalProperties": false
+    },
     "AiCallMetrics": {
       "type": "object",
       "required": [
@@ -509,6 +523,80 @@
       "enum": ["response", "error", "cancelled"]
     },
     "AiCallPhase": { "type": "string", "enum": ["generate", "review"] },
+    "AiCostCurrency": { "type": "string", "enum": ["CNY"] },
+    "AiCostLedgerPage": {
+      "type": "object",
+      "required": ["ledger", "costs", "cost_summary"],
+      "properties": {
+        "cost_summary": { "$ref": "#/$defs/AiCostTotals" },
+        "costs": { "type": "array", "items": { "$ref": "#/$defs/AiCallCost" } },
+        "ledger": { "$ref": "#/$defs/AiLedgerPage" }
+      },
+      "additionalProperties": false
+    },
+    "AiCostOverview": {
+      "type": "object",
+      "required": [
+        "generated_at",
+        "timezone",
+        "currency",
+        "pricing_version",
+        "pricing_valid_until",
+        "total",
+        "today",
+        "week",
+        "month"
+      ],
+      "properties": {
+        "currency": { "$ref": "#/$defs/AiCostCurrency" },
+        "generated_at": { "type": "string", "format": "date-time" },
+        "month": { "$ref": "#/$defs/AiCostPeriod" },
+        "pricing_valid_until": { "type": "string", "format": "date" },
+        "pricing_version": { "type": "string" },
+        "timezone": { "$ref": "#/$defs/AiCostTimezone" },
+        "today": { "$ref": "#/$defs/AiCostPeriod" },
+        "total": { "$ref": "#/$defs/AiCostPeriod" },
+        "week": { "$ref": "#/$defs/AiCostPeriod" }
+      },
+      "additionalProperties": false
+    },
+    "AiCostPeriod": {
+      "type": "object",
+      "required": [
+        "estimated_cost_cny",
+        "total_calls",
+        "priced_calls",
+        "unknown_calls",
+        "start",
+        "end"
+      ],
+      "properties": {
+        "end": { "type": "string", "format": "date-time" },
+        "estimated_cost_cny": { "type": ["string", "null"] },
+        "priced_calls": { "type": "integer", "minimum": 0 },
+        "start": { "type": ["string", "null"], "format": "date-time" },
+        "total_calls": { "type": "integer", "minimum": 0 },
+        "unknown_calls": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "AiCostTimezone": { "type": "string", "enum": ["Asia/Shanghai"] },
+    "AiCostTotals": {
+      "type": "object",
+      "required": [
+        "estimated_cost_cny",
+        "total_calls",
+        "priced_calls",
+        "unknown_calls"
+      ],
+      "properties": {
+        "estimated_cost_cny": { "type": ["string", "null"] },
+        "priced_calls": { "type": "integer", "minimum": 0 },
+        "total_calls": { "type": "integer", "minimum": 0 },
+        "unknown_calls": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
     "AiLedgerItem": {
       "type": "object",
       "required": [
@@ -580,6 +668,31 @@
       },
       "additionalProperties": false
     },
+    "AiModelPricing": {
+      "type": "object",
+      "required": [
+        "version",
+        "model",
+        "currency",
+        "tariff",
+        "quoted_at",
+        "input_hit_per_million",
+        "input_miss_per_million",
+        "output_per_million"
+      ],
+      "properties": {
+        "currency": { "$ref": "#/$defs/AiCostCurrency" },
+        "input_hit_per_million": { "type": "string" },
+        "input_miss_per_million": { "type": "string" },
+        "model": { "type": "string" },
+        "output_per_million": { "type": "string" },
+        "quoted_at": { "type": "string", "format": "date-time" },
+        "tariff": { "$ref": "#/$defs/AiPricingTariff" },
+        "version": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "AiPricingTariff": { "type": "string", "enum": ["peak", "off_peak"] },
     "AudioAsset": {
       "type": "object",
       "required": [

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/question-bank-batch/docs/openapi.json",
-  "_generatedAt": "2026-10-28T04:28:30.196Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/admin-ai-ledger/docs/openapi.json",
+  "_generatedAt": "2026-10-28T05:16:34.710Z",
   "paths": {
     "/api/internal/agent/v1/requests/{id}/candidates/search": ["post"],
     "/api/internal/agent/v1/requests/{id}/context": ["get"],
@@ -14,6 +14,8 @@
     "/admin/admins/{admin_id}/reset-password": ["post"],
     "/admin/admins/{admin_id}/status": ["patch"],
     "/admin/ai-ledger": ["get"],
+    "/admin/ai-ledger/cost-overview": ["get"],
+    "/admin/ai-ledger/costs": ["get"],
     "/admin/auth/change-password": ["post"],
     "/admin/auth/login": ["post"],
     "/admin/auth/login-code": ["post"],
