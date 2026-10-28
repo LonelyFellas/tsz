@@ -128,3 +128,43 @@ it("模型配置与 Key 使用独立接口并校验响应白名单", async () =>
   await expect(api.models()).rejects.toThrow("OpenCode 响应不符合接口契约");
   expect(snapshot.paths["/admin/opencode/model"]).toEqual(["get", "put"]);
 });
+
+it("全量探针通过独立异步端点执行，读取结果不重复发起模型调用", async () => {
+  const report = {
+    batch_id: "00000000-0000-0000-0000-000000000001",
+    state: "running",
+    started_at: "2026-10-28T16:00:00Z",
+    finished_at: null,
+    models: [
+      {
+        source: "opencode",
+        provider_id: "test",
+        model_id: "paid",
+        name: "Paid",
+        enabled: true,
+        status: "unavailable",
+        checked_at: "2026-10-28T16:00:01Z",
+        duration_ms: 1,
+        http_status: 503,
+        error: "request_failed",
+        cost: null
+      }
+    ]
+  };
+  const get = vi.fn().mockResolvedValue(report);
+  const post = vi.fn().mockResolvedValue(report);
+  const api = createOpenCodeEndpoints({ get, post } as unknown as HttpClient);
+  const signal = new AbortController().signal;
+  expect(await api.probeReport({ signal })).toEqual(report);
+  expect(await api.probeAll()).toEqual(report);
+  expect(get).toHaveBeenCalledExactlyOnceWith("/opencode/probes", { signal });
+  expect(post).toHaveBeenCalledExactlyOnceWith("/opencode/probes");
+  get.mockResolvedValueOnce({
+    ...report,
+    context: "private-credential-fingerprint"
+  });
+  await expect(api.probeReport()).rejects.toThrow(
+    "OpenCode 响应不符合接口契约"
+  );
+  expect(snapshot.paths["/admin/opencode/probes"]).toEqual(["get", "post"]);
+});

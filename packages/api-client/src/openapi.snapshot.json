@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/.codex/worktrees/opencode-model-switch-4218/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-28T14:07:31.989Z",
+  "_generatedAt": "2026-10-28T15:58:47.527Z",
   "paths": {
     "/api/internal/agent/v1/requests/{id}/candidates/search": ["post"],
     "/api/internal/agent/v1/requests/{id}/context": ["get"],
@@ -85,6 +85,7 @@
     "/admin/opencode/login/{attempt_id}": ["delete", "get"],
     "/admin/opencode/model": ["get", "put"],
     "/admin/opencode/models": ["get"],
+    "/admin/opencode/probes": ["get", "post"],
     "/admin/opencode/providers": ["get"],
     "/admin/permission-audits": ["get"],
     "/admin/permission-changes": ["post"],

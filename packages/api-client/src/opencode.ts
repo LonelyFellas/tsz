@@ -2,6 +2,7 @@ import type {
   OpenCodeConnection,
   OpenCodeLogin,
   OpenCodeModelList,
+  OpenCodeModelProbeReport,
   OpenCodeProviderList,
   OpenCodeModelSelection,
   OpenCodeLoginStatus
@@ -20,6 +21,18 @@ function decode<T>(root: RuntimeSchemaRoot, value: unknown): T {
 
 export function createOpenCodeEndpoints(http: HttpClient) {
   return {
+    probeReport: async (options?: {
+      signal?: AbortSignal;
+    }): Promise<OpenCodeModelProbeReport> =>
+      decode(
+        "OpenCodeModelProbeReport",
+        await http.get<unknown>("/opencode/probes", options)
+      ),
+    probeAll: async (): Promise<OpenCodeModelProbeReport> =>
+      decode(
+        "OpenCodeModelProbeReport",
+        await http.post<unknown>("/opencode/probes")
+      ),
     models: async (options?: {
       signal?: AbortSignal;
     }): Promise<OpenCodeModelList> =>

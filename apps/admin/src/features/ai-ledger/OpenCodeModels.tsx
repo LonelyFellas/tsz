@@ -4,6 +4,7 @@ import {
   Alert,
   Button,
   Divider,
+  Tag,
   Flex,
   Form,
   Input,
@@ -11,15 +12,23 @@ import {
   Space,
   Typography
 } from "antd";
-import { ReloadOutlined } from "@ant-design/icons";
-import type { OpenCodeModelSelection } from "@tsz/types";
+import { RadarChartOutlined, ReloadOutlined } from "@ant-design/icons";
+import type { OpenCodeModelSelection, OpenCodeModelProbe } from "@tsz/types";
 import { api } from "@/lib/auth";
 
-const direct: OpenCodeModelSelection = {
-  source: "direct",
-  provider_id: "deepseek",
-  model_id: "deepseek-flash"
-};
+function probeLabel(model: OpenCodeModelProbe): string {
+  if (model.status === "available") return "探针通过";
+  if (model.status === "checking") return "正在探测";
+  if (model.status === "unverified") return "待探测";
+  if (model.error === "timeout") return "探测超时";
+  if (model.error === "disabled" || model.error === "not_configured")
+    return "未启用或未配置";
+  if (model.error === "interrupted") return "探测中断";
+  if (model.error === "invalid_response") return "响应无效";
+  if (model.error === "runtime_failed") return "调用失败，请重新探测";
+  return model.http_status ? `不可用（HTTP ${model.http_status}）` : "不可用";
+}
+
 const encode = (m: OpenCodeModelSelection) =>
   JSON.stringify([m.source, m.provider_id, m.model_id]);
 
@@ -33,15 +42,16 @@ export function OpenCodeModels({
   const client = useQueryClient();
   const [draft, setDraft] = useState<string>();
   const [keyForm] = Form.useForm<{ provider_id: string; api_key: string }>();
-  const catalogKey = ["opencode-models", adminId];
+  const catalogKey = ["opencode-model-probes", adminId];
   const currentKey = ["opencode-current-model", adminId];
   const providerKey = ["opencode-providers", adminId];
   const catalog = useQuery({
     queryKey: catalogKey,
-    queryFn: ({ signal }) => api.opencode.models({ signal }),
-    enabled: configured,
+    queryFn: ({ signal }) => api.opencode.probeReport({ signal }),
     retry: false,
-    gcTime: 0
+    gcTime: 0,
+    refetchInterval: (query) =>
+      query.state.data?.state === "running" ? 2000 : false
   });
   const current = useQuery({
     queryKey: currentKey,
@@ -55,6 +65,14 @@ export function OpenCodeModels({
     enabled: configured,
     retry: false,
     gcTime: 0
+  });
+  const probe = useMutation({
+    mutationFn: () => api.opencode.probeAll(),
+    onSuccess: async (report) => {
+      await client.cancelQueries({ queryKey: catalogKey });
+      client.setQueryData(catalogKey, report);
+      save.reset();
+    }
   });
   const save = useMutation({
     mutationFn: (model: OpenCodeModelSelection) =>
@@ -79,18 +97,18 @@ export function OpenCodeModels({
     },
     onSettled: () => keyForm.setFieldValue("api_key", "")
   });
-  const options = [
-    { value: encode(direct), label: "DeepSeek / deepseek-flash（直连）" },
-    ...(catalog.isError ? [] : (catalog.data?.models ?? [])).map((m) => ({
-      value: encode({
-        source: "opencode",
-        provider_id: m.provider_id,
-        model_id: m.model_id
-      }),
-      label: `${m.provider_id} / ${m.name} (${m.model_id})`,
-      disabled: !m.enabled
-    }))
-  ];
+  const models = catalog.isError ? [] : (catalog.data?.models ?? []);
+  const options = models.map((m) => ({
+    value: encode(m),
+    label: `${probeLabel(m)} · ${m.source === "direct" ? "DeepSeek / deepseek-flash（直连）" : `${m.provider_id} / ${m.name} (${m.model_id})`}`,
+    disabled: !m.enabled || m.status !== "available"
+  }));
+  const passed = models.filter((m) => m.status === "available").length;
+  const failed = models.filter((m) => m.status === "unavailable").length;
+  const running = catalog.data?.state === "running";
+  const currentProbe = models.find(
+    (m) => current.data && encode(m) === encode(current.data)
+  );
   const selected = draft ?? (current.data ? encode(current.data) : undefined);
   if (selected && !options.some((option) => option.value === selected)) {
     const [, providerId, modelId] = JSON.parse(selected) as string[];
@@ -123,7 +141,13 @@ export function OpenCodeModels({
             options={options}
             value={selected}
             loading={catalog.isFetching || current.isFetching}
-            disabled={save.isPending || current.isError || !current.data}
+            disabled={
+              save.isPending ||
+              current.isError ||
+              !current.data ||
+              catalog.isError ||
+              catalog.isFetching
+            }
             onChange={(value) => {
               setDraft(value);
               save.reset();
@@ -136,6 +160,8 @@ export function OpenCodeModels({
               !draft ||
               draft === (current.data && encode(current.data)) ||
               current.isError ||
+              catalog.isFetching ||
+              catalog.isError ||
               !options.some(
                 (o) => o.value === draft && !("disabled" in o && o.disabled)
               )
@@ -152,17 +178,66 @@ export function OpenCodeModels({
             保存模型
           </Button>
           <Button
+            icon={<RadarChartOutlined />}
+            loading={probe.isPending || running}
+            disabled={catalog.isError || !models.length || save.isPending}
+            onClick={() => probe.mutate()}
+          >
+            {running
+              ? `探测中 ${passed + failed}/${models.length}`
+              : "探测全部"}
+          </Button>
+          <Button
             icon={<ReloadOutlined />}
             aria-label="刷新模型"
             loading={catalog.isFetching || current.isFetching}
             onClick={() => {
               void current.refetch();
-              if (configured) void catalog.refetch();
+              void catalog.refetch();
             }}
           >
             刷新模型
           </Button>
         </Flex>
+        <Flex gap={8} wrap align="center">
+          <Typography.Text>全部 {models.length} 个模型</Typography.Text>
+          <Tag color="success">通过 {passed}</Tag>
+          <Tag color="error">不可用 {failed}</Tag>
+          <Tag>待完成 {models.length - passed - failed}</Tag>
+          {catalog.data?.finished_at && (
+            <Typography.Text type="secondary">
+              上次完成：
+              {new Date(catalog.data.finished_at).toLocaleString("zh-CN")}
+            </Typography.Text>
+          )}
+        </Flex>
+        <Typography.Text type="secondary">
+          探针会对每个模型发起最小请求，可能按服务商计费。探针通过后可切换模型；下方账本统计出题调用。
+        </Typography.Text>
+        {probe.isError && (
+          <Alert
+            type="error"
+            showIcon
+            title="未能启动探针，请刷新模型后重试。"
+          />
+        )}
+        {catalog.data?.state === "idle" && catalog.data.batch_id && (
+          <Alert type="info" showIcon title="目录或凭据已变化，请重新探测。" />
+        )}
+        {catalog.data?.state === "interrupted" && (
+          <Alert
+            type="warning"
+            showIcon
+            title="上次探针中断，未完成项不可选，请重新探测。"
+          />
+        )}
+        {currentProbe?.status === "unavailable" && (
+          <Alert
+            type="warning"
+            showIcon
+            title={`当前出题模型探针未通过：${probeLabel(currentProbe)}。请选择其他探针通过的模型。`}
+          />
+        )}
         {current.isError && (
           <Alert
             type="error"
@@ -174,7 +249,7 @@ export function OpenCodeModels({
           <Alert
             type="error"
             showIcon
-            title="无法获取模型列表，请刷新模型重试。"
+            title="无法获取模型及探针结果，请刷新模型重试。"
           />
         )}
         {configured &&
@@ -191,6 +266,7 @@ export function OpenCodeModels({
           !catalog.data.models.some(
             (m) =>
               m.enabled &&
+              m.source === current.data?.source &&
               m.provider_id === current.data?.provider_id &&
               m.model_id === current.data?.model_id
           ) && (
@@ -204,7 +280,7 @@ export function OpenCodeModels({
           <Alert
             type="error"
             showIcon
-            title="模型保存失败，请确认模型仍可用后重试。"
+            title="模型保存失败，请刷新并确认所选模型已通过探针。"
           />
         )}
         {save.isSuccess && !current.isError && (
