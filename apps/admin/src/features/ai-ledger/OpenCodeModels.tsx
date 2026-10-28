@@ -68,7 +68,8 @@ export function OpenCodeModels({
   });
   const probe = useMutation({
     mutationFn: () => api.opencode.probeAll(),
-    onSuccess: (report) => {
+    onSuccess: async (report) => {
+      await client.cancelQueries({ queryKey: catalogKey });
       client.setQueryData(catalogKey, report);
       save.reset();
     }

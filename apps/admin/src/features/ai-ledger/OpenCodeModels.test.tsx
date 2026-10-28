@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor
+} from "@testing-library/react";
 import { App, ConfigProvider } from "antd";
 import { beforeEach, expect, it, vi } from "vitest";
 import type {
@@ -209,4 +215,40 @@ it("目录 enabled 为 true 但探针失败的模型保持禁选", async () => {
   );
   expect(screen.getByRole("button", { name: "保存模型" })).toBeDisabled();
   expect(api.opencode.selectModel).not.toHaveBeenCalled();
+});
+
+it("较早的目录请求返回后仍保留新探针批次并继续轮询", async () => {
+  let resolveOld!: (value: OpenCodeModelProbeReport) => void;
+  const oldRequest = new Promise<OpenCodeModelProbeReport>((resolve) => {
+    resolveOld = resolve;
+  });
+  const next = report();
+  next.batch_id = "00000000-0000-0000-0000-000000000002";
+  next.state = "running";
+  next.models = next.models.map((m) => ({ ...m, status: "unverified" }));
+  vi.mocked(api.opencode.probeReport)
+    .mockResolvedValueOnce(report())
+    .mockReturnValueOnce(oldRequest)
+    .mockResolvedValue(next);
+  vi.mocked(api.opencode.probeAll).mockResolvedValue(next);
+  const client = mount();
+  await screen.findByText("通过 2");
+  fireEvent.click(screen.getByRole("button", { name: "刷新模型" }));
+  await waitFor(() =>
+    expect(api.opencode.probeReport).toHaveBeenCalledTimes(2)
+  );
+  fireEvent.click(screen.getByRole("button", { name: /探测全部/ }));
+  await screen.findByRole("button", { name: /探测中/ });
+  await act(async () => {
+    resolveOld(report());
+    await oldRequest;
+  });
+  await waitFor(() => expect(client.isFetching()).toBe(0));
+  expect(
+    client.getQueryData<OpenCodeModelProbeReport>([
+      "opencode-model-probes",
+      "super-test"
+    ])?.batch_id
+  ).toBe(next.batch_id);
+  expect(screen.getByRole("button", { name: /探测中/ })).toBeVisible();
 });
