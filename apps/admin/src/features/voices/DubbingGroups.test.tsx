@@ -239,10 +239,12 @@ describe("单组草稿与推荐", () => {
     const { client } = mount();
     const a = edit("A"),
       b = edit("B");
-    fireEvent.change(within(a).getByLabelText("分组名称"), {
+    const aName = within(a).getByDisplayValue("A");
+    const bName = within(b).getByDisplayValue("B");
+    fireEvent.change(aName, {
       target: { value: "A draft" }
     });
-    fireEvent.change(within(b).getByLabelText("分组名称"), {
+    fireEvent.change(bName, {
       target: { value: "B saved" }
     });
     fireEvent.click(groupButton(b, "完成"));
@@ -253,7 +255,8 @@ describe("单组草稿与推荐", () => {
       false
     );
     await screen.findByText("本组配音已保存。");
-    expect(within(a).getByLabelText("分组名称")).toHaveValue("A draft");
+    expect(aName).toBeInTheDocument();
+    expect(aName).toHaveValue("A draft");
     expect(
       client
         .getQueryData<AdminDubbingGroupsResponse>(queryKey)!
@@ -338,14 +341,21 @@ describe("单组草稿与推荐", () => {
     mount();
     const panel = edit("A"),
       b = edit("B");
-    fireEvent.change(within(panel).getByLabelText("分组名称"), {
+    const name = within(panel).getByDisplayValue("A");
+    fireEvent.change(name, {
       target: { value: "保留输入" }
     });
     fireEvent.click(groupButton(panel, "完成"));
     await screen.findByText(/本组已被修改或板块已被占用/);
-    expect(within(panel).getByLabelText("分组名称")).toHaveValue("保留输入");
+    expect(within(panel).getByDisplayValue("保留输入")).toHaveAttribute(
+      "aria-label",
+      "分组名称"
+    );
     fireEvent.click(groupButton(b, /取\s*消/));
-    expect(within(panel).getByLabelText("分组名称")).toHaveValue("保留输入");
+    expect(within(panel).getByDisplayValue("保留输入")).toHaveAttribute(
+      "aria-label",
+      "分组名称"
+    );
   });
   it("全局常用不能改名或删除，允许两侧无推荐", async () => {
     const initial = data();
@@ -386,6 +396,7 @@ describe("单组草稿与推荐", () => {
     const { client } = mount();
     const panel = edit("A"),
       b = edit("B");
+    const bName = within(b).getByDisplayValue("B");
     const latest = data();
     latest.groups[1]!.revision = 4;
     await act(async () => {
@@ -400,7 +411,8 @@ describe("单组草稿与推荐", () => {
       4,
       false
     );
-    expect(within(b).getByLabelText("分组名称")).toHaveValue("B");
+    expect(bName).toBeInTheDocument();
+    expect(bName).toHaveValue("B");
   });
   it("保存期间旧 GET 不覆盖结果，撤销权限后仍可取消", async () => {
     const pending = deferred<AdminDubbingGroupsResponse>();

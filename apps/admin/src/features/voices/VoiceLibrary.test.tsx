@@ -200,7 +200,8 @@ describe("配音中心", () => {
     const drawer = document.querySelector<HTMLElement>('[role="dialog"]')!;
     const button = (text: string) =>
       within(drawer).getByText(text, { exact: true }).closest("button")!;
-    const volume = within(drawer).getByLabelText("合成音量");
+    const volume = within(drawer).getByDisplayValue("100");
+    expect(volume).toHaveAttribute("aria-label", "合成音量");
     expect(volume).toHaveValue("100");
     await waitFor(() => expect(button("恢复默认参数")).toBeDisabled());
     fireEvent.change(volume, { target: { value: "65" } });
@@ -234,7 +235,8 @@ describe("配音中心", () => {
     const reset = within(reopened)
       .getByText("恢复默认参数", { exact: true })
       .closest("button")!;
-    const reopenedVolume = within(reopened).getByLabelText("合成音量");
+    const reopenedVolume = within(reopened).getByDisplayValue("65");
+    expect(reopenedVolume).toHaveAttribute("aria-label", "合成音量");
     expect(reopenedVolume).toHaveValue("65");
     fireEvent.click(reset);
     expect(reopenedVolume).toHaveValue("100");
@@ -684,8 +686,10 @@ describe("配音中心", () => {
       .getByText("音色资料", { exact: true })
       .closest('[role="tab"]')!;
     expect(soundTab).toHaveAttribute("aria-selected", "true");
-    expect(details.getByLabelText("合成语速")).toBeVisible();
-    fireEvent.change(screen.getByLabelText("合成语速"), {
+    const rate = details.getByDisplayValue("1.00");
+    expect(rate).toHaveAttribute("aria-label", "合成语速");
+    expect(rate).toBeVisible();
+    fireEvent.change(rate, {
       target: { value: "0.75" }
     });
     fireEvent.click(screen.getByLabelText("试听当前参数"));
@@ -694,14 +698,15 @@ describe("配音中心", () => {
     fireEvent.click(profileTab);
     const infoPanelId = profileTab.getAttribute("aria-controls")!;
     expect(document.getElementById(infoPanelId)).toBeVisible();
-    expect(screen.getByLabelText("合成语速")).not.toBeVisible();
+    expect(rate).not.toBeVisible();
     expect(
       details.getByText("保存听感", { exact: true }).closest("button")
     ).not.toBeVisible();
     expect(details.queryByText("编辑", { exact: true })).toBeNull();
     expect(screen.getByLabelText("Sonia 试听播放器")).toBe(audio);
     fireEvent.click(soundTab);
-    expect(screen.getByLabelText("合成语速")).toHaveValue("0.75");
+    expect(rate).toBeVisible();
+    expect(rate).toHaveValue("0.75");
     expect(screen.getByLabelText("Sonia 试听播放器")).toBeVisible();
     expect(HTMLMediaElement.prototype.pause).not.toHaveBeenCalled();
     expect(api.speech.preview).toHaveBeenCalledTimes(1);

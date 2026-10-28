@@ -120,9 +120,7 @@ describe("WordCreatePage", () => {
       annotation: "1",
       annotation_visible: false
     });
-    client.setQueryData(wordKeys.detail("existing"), {
-      annotation_revision: 1
-    });
+    client.setQueryData(wordKeys.stats(), { total: 1 });
     expect(client.getQueryState(listKey)?.isInvalidated).toBe(false);
     render(
       <QueryClientProvider client={client}>
@@ -142,8 +140,6 @@ describe("WordCreatePage", () => {
     fireEvent.click(screen.getByText(action));
     expect(screen.getByTestId("location")).toHaveTextContent(expected);
     expect(client.getQueryState(listKey)?.isInvalidated).toBe(true);
-    expect(
-      client.getQueryState(wordKeys.detail("existing"))?.isInvalidated
-    ).toBe(true);
+    expect(client.getQueryState(wordKeys.stats())?.isInvalidated).toBe(true);
   });
 });

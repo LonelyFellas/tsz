@@ -20,8 +20,7 @@ export const wordKeys = {
   lists: () => [...wordKeys.all, "list"] as const,
   list: (query: AdminWordListQuery) => [...wordKeys.lists(), query] as const,
   stats: () => [...wordKeys.all, "stats"] as const,
-  creators: () => [...wordKeys.all, "creators"] as const,
-  detail: (id: string) => [...wordKeys.all, "detail", id] as const
+  creators: () => [...wordKeys.all, "creators"] as const
 };
 
 export function useWordList(filters: AdminWordListQuery) {
@@ -49,25 +48,25 @@ export function useWordStats() {
   });
 }
 
-export function useWordDetail(wordId: string, enabled = true) {
-  return useQuery({
-    queryKey: wordKeys.detail(wordId),
-    queryFn: () => adminWordsDataSource.get(wordId),
-    enabled,
-    // 整棵树是编辑基准(updated_at 为乐观锁 token),进入编辑页必须拿最新,不吃缓存。
-    staleTime: 0,
-    gcTime: 0
-  });
-}
-
 /** 写操作共用:词条数据变更后,列表、统计、详情缓存全部失效。 */
 function useInvalidateWords() {
   const qc = useQueryClient();
   return () => qc.invalidateQueries({ queryKey: wordKeys.all });
 }
 
-export function useDeleteWordDraft() {
+/** 删除只刷新集合派生数据，避免重取正在使用的 V3 详情。 */
+function useInvalidateWordCollections() {
   const qc = useQueryClient();
+  return () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: wordKeys.lists() }),
+      qc.invalidateQueries({ queryKey: wordKeys.stats() }),
+      qc.invalidateQueries({ queryKey: wordKeys.creators() })
+    ]);
+}
+
+export function useDeleteWordDraft() {
+  const invalidate = useInvalidateWordCollections();
   return useMutation({
     mutationFn: ({
       wordId,
@@ -82,21 +81,12 @@ export function useDeleteWordDraft() {
         base_revision: baseRevision,
         base_lifecycle_revision: baseLifecycleRevision
       }),
-    onSuccess: (_data, { wordId }) => {
-      // 当前 basics 页仍订阅 detail；全量 invalidate 会主动重取已删除资源并按默认策略
-      // 重试 404，阻塞 mutateAsync 后的跳转。删除该详情缓存，仅刷新集合派生数据。
-      qc.removeQueries({ queryKey: wordKeys.detail(wordId), exact: true });
-      return Promise.all([
-        qc.invalidateQueries({ queryKey: wordKeys.lists() }),
-        qc.invalidateQueries({ queryKey: wordKeys.stats() }),
-        qc.invalidateQueries({ queryKey: wordKeys.creators() })
-      ]);
-    }
+    onSuccess: invalidate
   });
 }
 
 export function useDeleteWordBatch() {
-  const qc = useQueryClient();
+  const invalidate = useInvalidateWordCollections();
   return useMutation({
     mutationFn: ({
       idempotencyKey,
@@ -105,18 +95,7 @@ export function useDeleteWordBatch() {
       idempotencyKey: string;
       input: EntryDeleteBatchInput;
     }) => adminWordsDataSource.deleteBatch(idempotencyKey, input),
-    onSuccess: (_data, { input }) => {
-      // 与单条删除同因：详情缓存必须先移除，否则全量 invalidate 会重取已删资源
-      // 并按默认策略重试 404。
-      for (const entry of input.entries) {
-        qc.removeQueries({ queryKey: wordKeys.detail(entry.id), exact: true });
-      }
-      return Promise.all([
-        qc.invalidateQueries({ queryKey: wordKeys.lists() }),
-        qc.invalidateQueries({ queryKey: wordKeys.stats() }),
-        qc.invalidateQueries({ queryKey: wordKeys.creators() })
-      ]);
-    }
+    onSuccess: invalidate
   });
 }
 
