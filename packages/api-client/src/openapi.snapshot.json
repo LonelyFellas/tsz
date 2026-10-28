@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/vocabulary-mcq/docs/openapi.json",
-  "_generatedAt": "2026-10-27T16:11:43.180Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/admin-ai-ledger/docs/openapi.json",
+  "_generatedAt": "2026-10-28T03:11:31.793Z",
   "paths": {
     "/api/internal/agent/v1/requests/{id}/candidates/search": ["post"],
     "/api/internal/agent/v1/requests/{id}/context": ["get"],
@@ -13,6 +13,7 @@
     "/admin/admins/{admin_id}/permissions": ["get"],
     "/admin/admins/{admin_id}/reset-password": ["post"],
     "/admin/admins/{admin_id}/status": ["patch"],
+    "/admin/ai-ledger": ["get"],
     "/admin/auth/change-password": ["post"],
     "/admin/auth/login": ["post"],
     "/admin/auth/login-code": ["post"],

@@ -1,0 +1,144 @@
+.ai-ledger {
+  min-width: 0;
+}
+
+.ai-ledger .ai-ledger-subtitle {
+  margin: 6px 0 0;
+}
+
+.ai-ledger-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.ai-ledger-metric {
+  min-width: 0;
+  padding: 20px;
+}
+
+.ai-ledger-metric + .ai-ledger-metric {
+  border-left: 1px solid var(--ant-color-border-secondary, #f0f0f0);
+}
+
+.ai-ledger-metric .ant-statistic-content {
+  margin: 8px 0 6px;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+}
+
+.ai-ledger-metric-cache .ant-statistic-content {
+  color: var(--ant-color-primary, #2053ff);
+}
+
+.ai-ledger-note,
+.ai-ledger-muted {
+  color: var(--ant-color-text-secondary, rgba(0, 0, 0, 0.65));
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ai-ledger-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 20px;
+}
+
+.ai-ledger-table-title,
+.ai-ledger-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ai-ledger-table-title .ant-typography + .ant-typography {
+  font-size: 12px;
+}
+
+.ai-ledger .ai-ledger-filter {
+  display: flex;
+  flex: 1 1 480px;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ai-ledger-filter .ant-form-item {
+  margin-inline-end: 0;
+  width: min(100%, 400px);
+}
+
+.ai-ledger-number {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ai-ledger-cache {
+  display: inline-flex;
+  flex-direction: column;
+  width: 64px;
+  line-height: 1.4;
+}
+
+.ai-ledger-cache .ant-progress {
+  margin: 0;
+  line-height: 1;
+}
+
+.ai-ledger-records .ant-table-pagination {
+  padding: 0 20px;
+}
+
+.ai-ledger-records .ant-alert {
+  margin: 0 20px 20px;
+}
+
+.ai-ledger-details .ant-typography {
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.ai-ledger-explanation {
+  max-width: 300px;
+}
+
+.ai-ledger-explanation p {
+  margin: 0 0 8px;
+}
+
+.ai-ledger-explanation p:last-child {
+  margin: 0;
+}
+
+@media (max-width: 767px) {
+  .ai-ledger-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ai-ledger-metric {
+    padding: 16px;
+  }
+
+  .ai-ledger-metric:nth-child(3) {
+    border-left: 0;
+  }
+
+  .ai-ledger-metric:nth-child(n + 3) {
+    border-top: 1px solid var(--ant-color-border-secondary, #f0f0f0);
+  }
+
+  .ai-ledger-toolbar {
+    padding: 16px;
+  }
+
+  .ai-ledger .ai-ledger-filter {
+    justify-content: flex-start;
+  }
+}
