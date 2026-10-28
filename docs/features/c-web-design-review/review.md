@@ -91,6 +91,7 @@
 - 生产构建（webpack）通过，代理仍为 tshb-test。没有新增运行时依赖。手机固定列最后调整后，ReadingEntry / WordListDetail 两文件 36 项定向复跑通过。
 - 浏览器实际确认手机横向阅读时固定词面与完整正文列同时可见；最终证据为 `after-reading-full-scrolled-mobile.png`（375×812 CSS 视口、DPR2）。
 - 当前用户页面恢复词库广场与原浅色外观，临时视口/媒体/触控仿真已清除；本次新增的 help 搜索历史已删除。未创建临时业务记录或 OSS 对象。
+- 提交前重基到主线 `7c571c75`，兼容新合入的简洁阅读模式，保留三种模式的表头、列数和窄屏宽度。ReadingEntry / WordListDetail 两文件 38 项测试通过；两处首页 E2E 定位随新标题改为语义化主标题定位，完整 E2E 由 PR CI 执行。
 
 ## 下一步
 
