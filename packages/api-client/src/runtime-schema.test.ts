@@ -46,6 +46,9 @@ const ROOTS = [
   "AiLedgerPage",
   "AiCostLedgerPage",
   "AiCostOverview",
+  "OpenCodeConnection",
+  "OpenCodeLogin",
+  "OpenCodeLoginStatus",
   "BankQuestion",
   "BankQuestionPage",
 

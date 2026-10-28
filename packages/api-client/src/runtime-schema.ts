@@ -12,6 +12,9 @@ export const RUNTIME_SCHEMA_ROOTS = [
   "AiLedgerPage",
   "AiCostLedgerPage",
   "AiCostOverview",
+  "OpenCodeConnection",
+  "OpenCodeLogin",
+  "OpenCodeLoginStatus",
   "BankQuestion",
   "BankQuestionPage",
 
