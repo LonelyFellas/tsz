@@ -54,6 +54,28 @@ vi.mock("@/features/dictionary/word-creation/UnifiedCreateEntryStep", () => ({
 // 把请求端点 mock 成稳定响应,避免触网。
 vi.mock("@/lib/auth", () => ({
   api: {
+    aiLedger: {
+      costOverview: vi.fn().mockResolvedValue({
+        generated_at: "2026-10-28T04:00:00Z",
+        timezone: "Asia/Shanghai",
+        currency: "CNY",
+        pricing_version: "fixture",
+        pricing_valid_until: "2027-01-01",
+        ...Object.fromEntries(
+          ["total", "today", "week", "month"].map((key) => [
+            key,
+            {
+              start: null,
+              end: "2026-10-28T04:00:00Z",
+              estimated_cost_cny: "0",
+              total_calls: 0,
+              priced_calls: 0,
+              unknown_calls: 0
+            }
+          ])
+        )
+      })
+    },
     dashboard: {
       overview: vi.fn().mockResolvedValue(dashboardOverview)
     },

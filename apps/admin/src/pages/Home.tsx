@@ -10,6 +10,7 @@ import {
   UserGrowthChart
 } from "@/features/dashboard/DashboardCharts";
 import { KpiCard } from "@/features/dashboard/KpiCard";
+import { AiCostOverview } from "@/features/dashboard/AiCostOverview";
 import {
   buildKpiItems,
   toCoinFlow,
@@ -71,6 +72,8 @@ function DashboardContent({ data }: { data: AdminDashboardOverview }) {
           </Col>
         ))}
       </Row>
+
+      <AiCostOverview />
 
       {/* 下方图表：杂志式布局——用户增长作 hero 提为宽图，学习进度环形并列其右；
           天生币收支与词库创建下方等分。 */}
