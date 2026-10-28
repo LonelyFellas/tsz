@@ -141,23 +141,24 @@ it("failed edits survive closing and reopening; review uses the saved revision a
   };
   const view = render(<QuestionEditor {...props} />, { wrapper });
   const prompt = await screen.findByLabelText("中文题干");
+  const approve = screen.getByRole("button", { name: "审核通过并启用" });
+  const save = screen.getByRole("button", { name: "保存修改" });
   fireEvent.change(prompt, { target: { value: "一种常见水果：苹果" } });
-  expect(screen.getByRole("button", { name: "审核通过并启用" })).toBeDisabled();
-  fireEvent.click(screen.getByRole("button", { name: "保存修改" }));
+  expect(approve).toBeDisabled();
+  fireEvent.click(save);
   await screen.findByText("题目已被修改");
   expect(prompt).toHaveValue("一种常见水果：苹果");
   view.rerender(<QuestionEditor {...props} open={false} />);
   view.rerender(<QuestionEditor {...props} />);
   expect(screen.getByLabelText("中文题干")).toHaveValue("一种常见水果：苹果");
+  expect(save).toBeVisible();
   mocks.edit.mockResolvedValue({
     ...question,
     revision: 4,
     content: { ...content, prompt: "一种常见水果：苹果" }
   });
-  fireEvent.click(screen.getByRole("button", { name: "保存修改" }));
-  await waitFor(() =>
-    expect(screen.getByRole("button", { name: "审核通过并启用" })).toBeEnabled()
-  );
+  fireEvent.click(save);
+  await waitFor(() => expect(approve).toBeEnabled());
   expect(mocks.edit.mock.calls[1]![1]).toMatchObject({
     expected_revision: 3,
     prompt: "一种常见水果：苹果",
@@ -172,7 +173,7 @@ it("failed edits survive closing and reopening; review uses the saved revision a
     state: "approved",
     revision: 5
   });
-  fireEvent.click(screen.getByRole("button", { name: "审核通过并启用" }));
+  fireEvent.click(approve);
   await waitFor(() => expect(mocks.review).toHaveBeenCalledOnce());
   expect(mocks.review.mock.calls[0]![1]).toMatchObject({
     expected_revision: 4,
