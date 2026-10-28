@@ -83,7 +83,7 @@ export const readingEntry: WordlistEntry = {
 };
 function Entry(props: ComponentProps<typeof ReadingEntry>) {
   return (
-    <ReadingTable full={props.full ?? false}>
+    <ReadingTable full={props.full ?? false} simple={props.simple}>
       <tbody>
         <ReadingEntry {...props} />
       </tbody>
@@ -159,6 +159,49 @@ it("standard mode has four columns with abbreviated basic parts of speech and al
   expect(screen.queryByText("词形变化")).not.toBeInTheDocument();
   expect(screen.queryByText("general-UK")).not.toBeInTheDocument();
   expect(screen.queryByText("/riːd/")).not.toBeInTheDocument();
+});
+it("简洁模式保留全部义项、等级和词性合并，并按偏好选择富文本释义", () => {
+  const view = render(
+    <Entry entry={readingEntry} level="A1" variant="BrE" simple />
+  );
+  expect(screen.getByRole("table", { name: "简洁模式词条列表" })).toBeVisible();
+  expect(
+    screen.getAllByRole("columnheader").map((cell) => cell.textContent)
+  ).toEqual(["英文词条", "词性", "多维释义"]);
+  expect(
+    screen.getByRole("heading", { name: "read" }).closest("td")
+  ).toHaveAttribute("rowspan", "2");
+  expect(
+    screen.getByRole("heading", { name: "v." }).closest("td")
+  ).toHaveAttribute("rowspan", "2");
+  expect(screen.getByText("释义-a1")).toBeVisible();
+  expect(screen.getByText("A1")).toBeVisible();
+  expect(screen.getByText("暂无适合当前等级的释义")).toBeVisible();
+  expect(screen.queryByText("语法-a1")).not.toBeInTheDocument();
+  expect(screen.queryByText("词形变化")).not.toBeInTheDocument();
+  expect(screen.queryByText("及物")).not.toBeInTheDocument();
+
+  view.rerender(
+    <ReadingTable full={false} simple>
+      {richReadingEntries.map((entry) => (
+        <tbody key={entry.entry_id}>
+          <ReadingEntry entry={entry} level="C2" variant="BrE" simple />
+        </tbody>
+      ))}
+    </ReadingTable>
+  );
+  expect(view.container.querySelectorAll("tbody tr")).toHaveLength(16);
+  const phrase = screen
+    .getByRole("heading", { name: "work out" })
+    .closest("tbody")!;
+  expect(within(phrase).getByRole("heading", { name: "v." })).toBeVisible();
+  expect(within(phrase).getByRole("heading", { name: "n." })).toBeVisible();
+  const definition = screen
+    .getByRole("heading", { name: "center" })
+    .closest("tr")!
+    .querySelector('[data-text-role="definition"]')!;
+  expect(definition.querySelector(".tsz-ve-bold")).toHaveTextContent("为中心");
+  expect(definition.querySelector(".tsz-ve-italic")).toHaveTextContent("重点");
 });
 it("preserves rich definitions, grammar annotations and all sense rows in both modes", () => {
   const content = (full: boolean) => (
