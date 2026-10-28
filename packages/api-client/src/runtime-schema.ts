@@ -9,6 +9,7 @@ export const RUNTIME_SCHEMA_ROOTS = [
   "QuestionBatchPage",
   "QuestionGeneration",
   "QuestionGenerationPage",
+  "AiLedgerPage",
   "BankQuestion",
   "BankQuestionPage",
 
