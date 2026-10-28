@@ -181,6 +181,17 @@ describe("ConsoleSidebar", () => {
     expect(screen.getByText("审核管理")).toBeInTheDocument();
     fireEvent.click(screen.getByText("用户管理"));
     expect(screen.getByText("管理员管理")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("系统设置"));
+    fireEvent.click(screen.getByText("AI 账本"));
+    expect(mockNavigate).toHaveBeenCalledWith("/ai-ledger");
+  });
+
+  it("普通管理员能打开系统设置也看不到 AI 账本", () => {
+    setLevel("admin", ["lexicon_settings.access"]);
+    renderAt("/");
+    fireEvent.click(screen.getByText("系统设置"));
+    expect(screen.getByText("词性配置")).toBeInTheDocument();
+    expect(screen.queryByText("AI 账本")).not.toBeInTheDocument();
   });
 
   it("super_admin：用户管理分组下显示「管理员管理」并跳转 /admins", () => {

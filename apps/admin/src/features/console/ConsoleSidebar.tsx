@@ -157,7 +157,10 @@ const GROUPS: Group[] = [
     key: "grp-settings",
     icon: <SettingOutlined />,
     label: "系统设置",
-    leaves: [pageLeaf(ADMIN_PAGE_ROUTES.partsOfSpeech, "词性配置")]
+    leaves: [
+      pageLeaf(ADMIN_PAGE_ROUTES.partsOfSpeech, "词性配置"),
+      pageLeaf(ADMIN_PAGE_ROUTES.aiLedger, "AI 账本")
+    ]
   },
   {
     key: "grp-coin",

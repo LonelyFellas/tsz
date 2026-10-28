@@ -39,6 +39,7 @@ const ROOTS = [
   "QuestionCandidatePage",
   "QuestionGeneration",
   "QuestionGenerationPage",
+  "AiLedgerPage",
   "BankQuestion",
   "BankQuestionPage",
 

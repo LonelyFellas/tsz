@@ -23,6 +23,7 @@ const profile: AdminProfile = {
 beforeEach(() => useAuthStore.getState().setProfile(profile));
 describe("菜单之外的直链门禁", () => {
   it.each([
+    "/ai-ledger/",
     "/permissions/",
     "/Permissions",
     "/Users",
@@ -63,6 +64,7 @@ describe("菜单之外的直链门禁", () => {
     }
   );
   it.each([
+    "/ai-ledger",
     "/words",
     "/words/trash",
     "/words/w/v3/wizard/forms",
