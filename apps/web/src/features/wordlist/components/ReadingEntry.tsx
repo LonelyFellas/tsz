@@ -15,15 +15,23 @@ import { selectDefinition, selectTexts, phoneticDelimiters } from "../reading";
 
 export function ReadingTable({
   full,
+  simple = false,
   children
 }: {
   full: boolean;
+  simple?: boolean;
   children: ReactNode;
 }) {
   const headings = full
     ? ["英文词条", "基本词性", "词形变化", "细分词性", "多维释义", "语法结构"]
-    : ["英文词条", "词性", "多维释义", "语法结构"];
-  const widths = full ? [14, 9, 29, 12, 18, 18] : [20, 10, 35, 35];
+    : simple
+      ? ["英文词条", "词性", "多维释义"]
+      : ["英文词条", "词性", "多维释义", "语法结构"];
+  const widths = full
+    ? [14, 9, 29, 12, 18, 18]
+    : simple
+      ? [20, 10, 70]
+      : [20, 10, 35, 35];
   return (
     <div
       className="overflow-x-auto"
@@ -34,11 +42,15 @@ export function ReadingTable({
       <table
         className={cn(
           "w-full table-fixed border-collapse text-left text-sm leading-6 [&_td]:px-3 [&_td]:py-2 [&_td]:align-top [&_tr:first-child>td]:pt-6 [&_tr:last-child>td]:pb-6 [&_td[rowspan]]:pb-6",
-          full ? "min-w-[1120px]" : "min-w-[640px]"
+          full ? "min-w-[1120px]" : simple ? "min-w-[480px]" : "min-w-[640px]"
         )}
       >
         <caption className="sr-only">
-          {full ? "完整模式词条列表" : "标准模式词条列表"}
+          {full
+            ? "完整模式词条列表"
+            : simple
+              ? "简洁模式词条列表"
+              : "标准模式词条列表"}
         </caption>
         <colgroup>
           {widths.map((width, index) => (
@@ -48,7 +60,14 @@ export function ReadingTable({
         <thead className="border-b border-border/70">
           <tr>
             {headings.map((heading) => (
-              <th key={heading} scope="col" className="px-3 py-4 font-semibold">
+              <th
+                key={heading}
+                scope="col"
+                className={cn(
+                  "px-3 py-4 font-semibold",
+                  simple && "whitespace-nowrap"
+                )}
+              >
                 {heading}
               </th>
             ))}
@@ -87,11 +106,13 @@ function Texts({
 export function ReadingEntry({
   entry,
   full = false,
+  simple = false,
   level,
   variant
 }: {
   entry: WordlistEntry;
   full?: boolean;
+  simple?: boolean;
   level: CEFRLevel;
   variant: EnglishVariant | null;
 }) {
@@ -130,7 +151,7 @@ export function ReadingEntry({
     return (
       <tr>
         {wordCell}
-        <td colSpan={full ? 5 : 3} />
+        <td colSpan={full ? 5 : simple ? 2 : 3} />
       </tr>
     );
   return (
@@ -156,7 +177,15 @@ export function ReadingEntry({
               (g) => g.id === definition?.grammar_structure_id
             );
             return (
-              <tr key={sense?.id ?? pos.pos_id}>
+              <tr
+                key={sense?.id ?? pos.pos_id}
+                className={cn(
+                  simple &&
+                    posIndex > 0 &&
+                    senseIndex === 0 &&
+                    "border-t border-border/60"
+                )}
+              >
                 {posIndex === 0 && senseIndex === 0 && wordCell}
                 {senseIndex === 0 && (
                   <td rowSpan={Math.max(1, pos.senses.length)}>
@@ -244,11 +273,13 @@ export function ReadingEntry({
                     )
                   )}
                 </td>
-                <td>
-                  {grammar && (
-                    <Texts texts={grammar.variants} variant={variant} />
-                  )}
-                </td>
+                {!simple && (
+                  <td>
+                    {grammar && (
+                      <Texts texts={grammar.variants} variant={variant} />
+                    )}
+                  </td>
+                )}
               </tr>
             );
           }

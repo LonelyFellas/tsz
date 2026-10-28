@@ -1,5 +1,6 @@
 import { sentenceWord, sentenceTarget, sentenceCandidate } from "./fixtures";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -594,16 +595,19 @@ describe("当前词条关联与离开保护", () => {
   });
   it("关联层级为词条、匹配词形、词义，不能只选择词条就提交", async () => {
     const select = vi.fn();
-    show(
-      <SharedSentenceAssociationPicker
-        kind="word"
-        dialect="common"
-        segments={[{ start: 3, end: 7, surface: "make" }]}
-        labels={{}}
-        onSelect={select}
-        onTargetLabel={vi.fn()}
-      />
-    );
+    // 等异步候选和 Cascader 的初始化 effect 完成，再点击展开路径。
+    await act(async () => {
+      show(
+        <SharedSentenceAssociationPicker
+          kind="word"
+          dialect="common"
+          segments={[{ start: 3, end: 7, surface: "make" }]}
+          labels={{}}
+          onSelect={select}
+          onTargetLabel={vi.fn()}
+        />
+      );
+    });
     fireEvent.click(
       await screen.findByText("make", {
         selector: ".v3-component-usage-entry strong"
@@ -634,22 +638,25 @@ describe("当前词条关联与离开保护", () => {
       truncated: false
     });
     const select = vi.fn();
-    show(
-      <SharedSentenceAssociationPicker
-        kind="word"
-        dialect="common"
-        segments={[{ start: 0, end: 3, surface: "for" }]}
-        selected={{
-          id: "existing",
-          source_dialect: "common",
-          source_segments: [{ start: 0, end: 3, surface: "for" }],
-          target: sentenceTarget("source")
-        }}
-        labels={{ "source:sense": "for · 对于" }}
-        onSelect={select}
-        onTargetLabel={vi.fn()}
-      />
-    );
+    // 等异步候选和 Cascader 的初始化 effect 完成，再点击展开路径。
+    await act(async () => {
+      show(
+        <SharedSentenceAssociationPicker
+          kind="word"
+          dialect="common"
+          segments={[{ start: 0, end: 3, surface: "for" }]}
+          selected={{
+            id: "existing",
+            source_dialect: "common",
+            source_segments: [{ start: 0, end: 3, surface: "for" }],
+            target: sentenceTarget("source")
+          }}
+          labels={{ "source:sense": "for · 对于" }}
+          onSelect={select}
+          onTargetLabel={vi.fn()}
+        />
+      );
+    });
     fireEvent.click(
       await screen.findByText("for", {
         selector: ".v3-component-usage-entry strong"
@@ -678,16 +685,19 @@ describe("当前词条关联与离开保护", () => {
     candidate.matched_dialect = "us";
     searchTargets.mockResolvedValue({ matches: [candidate], truncated: false });
     const select = vi.fn();
-    show(
-      <SharedSentenceAssociationPicker
-        kind="word"
-        dialect="us"
-        segments={[{ start: 0, end: 5, surface: "color" }]}
-        labels={{}}
-        onSelect={select}
-        onTargetLabel={vi.fn()}
-      />
-    );
+    // 等异步候选和 Cascader 的初始化 effect 完成，再点击展开路径。
+    await act(async () => {
+      show(
+        <SharedSentenceAssociationPicker
+          kind="word"
+          dialect="us"
+          segments={[{ start: 0, end: 5, surface: "color" }]}
+          labels={{}}
+          onSelect={select}
+          onTargetLabel={vi.fn()}
+        />
+      );
+    });
     fireEvent.click(
       await screen.findByText("color", {
         selector: ".v3-component-usage-entry strong"
