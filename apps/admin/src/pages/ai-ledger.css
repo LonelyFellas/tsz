@@ -2,10 +2,6 @@
   min-width: 0;
 }
 
-.ai-ledger .ai-ledger-subtitle {
-  margin: 6px 0 0;
-}
-
 .ai-ledger-metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
