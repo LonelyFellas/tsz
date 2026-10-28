@@ -30,14 +30,14 @@ describe("HeroCTA", () => {
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
 
-  it("未登录 → 登录 + 浏览词表,各自 href", () => {
+  it("未登录 → 开始学习进入登录，浏览词表进入广场", () => {
     useUserStore.setState({ hydrated: true, user: null });
     render(<HeroCTA />);
-    expect(screen.getByText("登录").closest("a")).toHaveAttribute(
+    expect(screen.getByText("开始学习").closest("a")).toHaveAttribute(
       "href",
       "/login"
     );
-    expect(screen.getByText("浏览词表 ›").closest("a")).toHaveAttribute(
+    expect(screen.getByText("浏览词表").closest("a")).toHaveAttribute(
       "href",
       "/wordlists"
     );

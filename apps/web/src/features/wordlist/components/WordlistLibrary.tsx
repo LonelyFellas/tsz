@@ -335,7 +335,7 @@ function Library({ userId }: { userId: string }) {
       )}
       <div
         style={{ "--explorer-width": `${sidebarWidth}px` } as CSSProperties}
-        className="grid min-h-[70dvh] overflow-clip rounded-3xl border border-border/70 bg-surface/80 shadow-glass lg:grid-cols-[var(--explorer-width)_minmax(0,1fr)]"
+        className="grid min-h-[70dvh] grid-rows-[auto_1fr] overflow-clip rounded-3xl border border-border/70 bg-surface/80 shadow-glass lg:grid-cols-[var(--explorer-width)_minmax(0,1fr)] lg:grid-rows-1"
       >
         <ResponsiveExplorer overlayActive={!!modal}>
           {({ closeDrawer }) => (

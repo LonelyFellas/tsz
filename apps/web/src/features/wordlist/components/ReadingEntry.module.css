@@ -1,0 +1,45 @@
+.table {
+  min-width: 640px;
+}
+
+.table[data-full="true"] {
+  min-width: 1120px;
+}
+
+.table[data-simple="true"] {
+  min-width: 480px;
+}
+
+/* 窄屏中，固定词面和一列正文应能同时完整显示。 */
+@container (max-width: 639px) {
+  .table {
+    --reading-word-width: 104px;
+    --reading-content-width: calc(100cqw - var(--reading-word-width));
+    --reading-col-0: var(--reading-word-width);
+    --reading-col-1: 64px;
+    --reading-col-2: var(--reading-content-width);
+    --reading-col-3: var(--reading-content-width);
+    width: calc(
+      var(--reading-word-width) + 64px + var(--reading-content-width) * 2
+    );
+    min-width: 0;
+  }
+
+  .table[data-simple="true"] {
+    width: calc(
+      var(--reading-word-width) + 64px + var(--reading-content-width)
+    );
+    min-width: 0;
+  }
+
+  .table[data-full="true"] {
+    --reading-col-1: 88px;
+    --reading-col-3: 100px;
+    --reading-col-4: var(--reading-content-width);
+    --reading-col-5: var(--reading-content-width);
+    width: calc(
+      var(--reading-word-width) + 188px + var(--reading-content-width) * 3
+    );
+    min-width: 0;
+  }
+}

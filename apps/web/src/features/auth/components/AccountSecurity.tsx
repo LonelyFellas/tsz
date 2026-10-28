@@ -128,9 +128,9 @@ export function AccountSecurity() {
                 {(["phone", "email"] as const).map((channel) => (
                   <section
                     key={channel}
-                    className="flex flex-col gap-4 py-6 first:pt-0 sm:flex-row sm:items-center sm:justify-between"
+                    className="flex flex-wrap items-center justify-between gap-4 py-6 first:pt-0"
                   >
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1 basis-32">
                       <h2 className="text-sm font-medium text-foreground">
                         {LABELS[channel]}
                       </h2>
@@ -168,8 +168,8 @@ export function AccountSecurity() {
                     </div>
                   </section>
                 ))}
-                <section className="flex items-center justify-between gap-4 pb-0 pt-6">
-                  <div>
+                <section className="flex flex-wrap items-center justify-between gap-4 pb-0 pt-6">
+                  <div className="min-w-0 flex-1 basis-32">
                     <h2 className="text-sm font-medium text-foreground">
                       登录密码
                     </h2>

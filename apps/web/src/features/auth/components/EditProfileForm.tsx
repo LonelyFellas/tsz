@@ -395,9 +395,79 @@ export function EditProfileForm() {
             )}
           </div>
 
+          <form
+            aria-label="修改昵称"
+            className="space-y-5"
+            onSubmit={handleSubmit}
+          >
+            {/* 昵称 */}
+            <div>
+              <label
+                htmlFor="profile-display-name"
+                className="mb-2 block px-4 text-sm font-medium text-foreground"
+              >
+                昵称
+              </label>
+              <div className="relative">
+                <input
+                  id="profile-display-name"
+                  type="text"
+                  placeholder="请输入昵称"
+                  value={displayName}
+                  disabled={saving}
+                  aria-invalid={Boolean(nameMessage)}
+                  aria-describedby={
+                    nameMessage ? "profile-display-name-error" : undefined
+                  }
+                  onChange={(e) => {
+                    setNameError("");
+                    setSuccess(false);
+                    setDisplayName(e.target.value);
+                  }}
+                  className={cn(INPUT_CLASS, "pr-16")}
+                />
+                <span className="pointer-events-none absolute right-5 top-1/2 -translate-y-1/2 text-xs text-foreground-subtle">
+                  {displayNameLength(displayName)}/{NICKNAME_MAX}
+                </span>
+              </div>
+              {nameMessage && (
+                <p
+                  id="profile-display-name-error"
+                  className="mt-2 px-4 text-sm text-danger"
+                >
+                  {nameMessage}
+                </p>
+              )}
+            </div>
+
+            {success && (
+              <p className="flex items-center justify-center gap-1.5 rounded-2xl bg-success/10 px-4 py-3 text-center text-sm font-medium text-success">
+                <CheckIcon />
+                已保存
+              </p>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className={cn(buttonClass, "min-h-12 flex-1")}
+              >
+                取消
+              </button>
+              <button
+                type="submit"
+                disabled={!canSubmit}
+                className={cn(primaryButtonClass, "flex-1")}
+              >
+                {saving ? "保存中..." : "保存"}
+              </button>
+            </div>
+          </form>
+
           {user.roles.includes("student") && (
             <section
-              className="mb-7 border-y border-border/60 py-7"
+              className="mt-7 border-t border-border/60 pt-7"
               aria-labelledby="learning-settings-title"
             >
               <h2
@@ -511,76 +581,6 @@ export function EditProfileForm() {
               )}
             </section>
           )}
-
-          <form
-            aria-label="修改昵称"
-            className="space-y-5"
-            onSubmit={handleSubmit}
-          >
-            {/* 昵称 */}
-            <div>
-              <label
-                htmlFor="profile-display-name"
-                className="mb-2 block px-4 text-sm font-medium text-foreground"
-              >
-                昵称
-              </label>
-              <div className="relative">
-                <input
-                  id="profile-display-name"
-                  type="text"
-                  placeholder="请输入昵称"
-                  value={displayName}
-                  disabled={saving}
-                  aria-invalid={Boolean(nameMessage)}
-                  aria-describedby={
-                    nameMessage ? "profile-display-name-error" : undefined
-                  }
-                  onChange={(e) => {
-                    setNameError("");
-                    setSuccess(false);
-                    setDisplayName(e.target.value);
-                  }}
-                  className={cn(INPUT_CLASS, "pr-16")}
-                />
-                <span className="pointer-events-none absolute right-5 top-1/2 -translate-y-1/2 text-xs text-foreground-subtle">
-                  {displayNameLength(displayName)}/{NICKNAME_MAX}
-                </span>
-              </div>
-              {nameMessage && (
-                <p
-                  id="profile-display-name-error"
-                  className="mt-2 px-4 text-sm text-danger"
-                >
-                  {nameMessage}
-                </p>
-              )}
-            </div>
-
-            {success && (
-              <p className="flex items-center justify-center gap-1.5 rounded-2xl bg-success/10 px-4 py-3 text-center text-sm font-medium text-success">
-                <CheckIcon />
-                已保存
-              </p>
-            )}
-
-            <div className="flex gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => router.back()}
-                className={cn(buttonClass, "min-h-12 flex-1")}
-              >
-                取消
-              </button>
-              <button
-                type="submit"
-                disabled={!canSubmit}
-                className={cn(primaryButtonClass, "flex-1")}
-              >
-                {saving ? "保存中..." : "保存"}
-              </button>
-            </div>
-          </form>
         </div>
       </div>
       {avatarFile && (

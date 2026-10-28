@@ -96,7 +96,7 @@ export function WelcomeScreen({
         </>
       ) : (
         <>
-          <h1 className="text-3xl font-bold tracking-tight">
+          <h1 className="text-balance text-3xl font-bold tracking-tight">
             1 分钟，测出你的词汇量
           </h1>
           <p className="mt-2 text-sm leading-6 text-foreground-muted">

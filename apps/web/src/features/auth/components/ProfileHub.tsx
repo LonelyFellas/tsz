@@ -180,13 +180,13 @@ export function ProfileHub() {
           </div>
           <div className="mt-6 flex flex-col gap-3 border-t border-border/60 pt-5 sm:flex-row sm:items-center sm:justify-between sm:gap-5">
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
-              <span className="inline-flex max-w-full items-start gap-1.5 text-xs leading-5 text-foreground-muted">
+              <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 text-xs leading-5 text-foreground-muted">
                 <span className="min-w-0 break-all">ID:{user.id}</span>
                 <button
                   type="button"
                   onClick={() => copyId(user.id)}
                   aria-label="复制 ID"
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-foreground-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                  className="flex size-11 shrink-0 items-center justify-center rounded-full text-foreground-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                 >
                   {copyState === "copied" ? <CheckIcon /> : <CopyIcon />}
                 </button>

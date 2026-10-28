@@ -103,6 +103,22 @@ async function newCustom() {
     target: { value: "我的释义" }
   });
 }
+it("已公开词表仅保存备注时，不显示不适用的语音费用和余额操作", async () => {
+  vi.mocked(api.wordList.edit).mockResolvedValue({
+    wordlist: { ...meta, state: "published" },
+    entry_ids: [],
+    items: [custom]
+  });
+  renderWithProviders(<WordListCreator id="list" />);
+  expect(
+    await screen.findByRole("button", { name: "保存备注" })
+  ).toBeInTheDocument();
+  expect(await screen.findByLabelText("词条 1")).toBeDisabled();
+  expect(screen.queryByText(/语音费用：/)).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "刷新余额" })
+  ).not.toBeInTheDocument();
+});
 it("默认关闭，勾选不会扣款，确认保存发送双语音总价并刷新当前用户钱包", async () => {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } }

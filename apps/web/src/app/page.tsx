@@ -8,17 +8,27 @@ import {
   HomeJsonLd
 } from "@/features/home";
 
-// 首页:落地展示框架,各区块为占位结构,具体功能后续逐步接入。
-// 逻辑全在 feature 里,page 只组合区块;各区块自管内部宽度,便于 Hero 全宽出血。
 export default function HomePage() {
   return (
-    <div className="flex flex-col">
+    <div className="relative flex flex-col bg-surface">
       <HomeJsonLd />
+      <a
+        href="#home-content"
+        className="sr-only fixed left-4 top-4 z-[60] rounded-full bg-surface px-5 py-3 text-primary shadow-float focus:not-sr-only focus:fixed focus-visible:outline-2 focus-visible:outline-primary"
+      >
+        跳到主要内容
+      </a>
       <HomeNav />
-      <HomeHero />
-      <FeatureShowcase />
-      <LearningFlow />
-      <RoleEntry />
+      <main
+        id="home-content"
+        tabIndex={-1}
+        className="scroll-mt-20 focus:outline-none"
+      >
+        <HomeHero />
+        <FeatureShowcase />
+        <LearningFlow />
+        <RoleEntry />
+      </main>
       <HomeFooter />
     </div>
   );
