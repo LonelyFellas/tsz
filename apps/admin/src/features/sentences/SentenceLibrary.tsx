@@ -1,3 +1,4 @@
+import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import {
   ReloadOutlined,
@@ -23,7 +24,6 @@ import {
   Row,
   Select,
   Space,
-  Table,
   Tag,
   Typography
 } from "antd";
@@ -231,16 +231,8 @@ export function SentenceLibrary({
         </Typography.Text>
       )}
       {!entryId && (
-        <Card size="small" styles={{ body: { paddingBottom: 8 } }}>
-          <Form
-            layout="inline"
-            style={{
-              rowGap: 12,
-              columnGap: 8,
-              display: "flex",
-              flexWrap: "wrap"
-            }}
-          >
+        <Card className="admin-filter-card" size="small">
+          <Form className="admin-filter-form" colon={false} layout="inline">
             <Form.Item label="关键词">
               <Input
                 aria-label="例句关键词"
@@ -277,7 +269,7 @@ export function SentenceLibrary({
             <Form.Item label="创建时间">
               <DatePicker.RangePicker value={dates} onChange={setDates} />
             </Form.Item>
-            <Form.Item>
+            <Form.Item className="admin-filter-actions">
               <Space>
                 <Button
                   type="primary"
@@ -312,50 +304,6 @@ export function SentenceLibrary({
         </Card>
       )}
       <ContentContainer {...(!entryId ? { size: "small" as const } : {})}>
-        {!entryId && (
-          <Space wrap style={{ marginBottom: 12 }}>
-            <Typography.Text aria-live="polite">
-              已选 {selected.length} 条
-            </Typography.Text>
-            {canPublish && (
-              <Button
-                disabled={
-                  !selected.length ||
-                  rows.some(
-                    (row) =>
-                      selected.includes(row.id) && !canAction(row, "publish")
-                  )
-                }
-                onClick={() =>
-                  setBatch(rows.filter((row) => selected.includes(row.id)))
-                }
-              >
-                发布所选
-              </Button>
-            )}
-            <Button
-              danger
-              disabled={
-                !canDelete ||
-                !selected.length ||
-                rows.some(
-                  (row) =>
-                    selected.includes(row.id) &&
-                    row.current_publication_id != null
-                )
-              }
-              onClick={() =>
-                remove(rows.filter((row) => selected.includes(row.id)))
-              }
-            >
-              删除所选
-            </Button>
-            {selected.length > 0 && (
-              <Button onClick={() => setSelected([])}>取消选择</Button>
-            )}
-          </Space>
-        )}
-
         {query.isError && (
           <Alert
             type="error"
@@ -366,6 +314,56 @@ export function SentenceLibrary({
         <Row gutter={[16, 16]}>
           <Col xs={24} xl={24}>
             <Table<SharedSentence>
+              toolbar={
+                !entryId && (
+                  <Space wrap>
+                    <Typography.Text aria-live="polite">
+                      已选 {selected.length} 条
+                    </Typography.Text>
+                    {canPublish && (
+                      <Button
+                        disabled={
+                          !selected.length ||
+                          rows.some(
+                            (row) =>
+                              selected.includes(row.id) &&
+                              !canAction(row, "publish")
+                          )
+                        }
+                        onClick={() =>
+                          setBatch(
+                            rows.filter((row) => selected.includes(row.id))
+                          )
+                        }
+                      >
+                        发布所选
+                      </Button>
+                    )}
+                    <Button
+                      danger
+                      disabled={
+                        !canDelete ||
+                        !selected.length ||
+                        rows.some(
+                          (row) =>
+                            selected.includes(row.id) &&
+                            row.current_publication_id != null
+                        )
+                      }
+                      onClick={() =>
+                        remove(rows.filter((row) => selected.includes(row.id)))
+                      }
+                    >
+                      删除所选
+                    </Button>
+                    {selected.length > 0 && (
+                      <Button onClick={() => setSelected([])}>取消选择</Button>
+                    )}
+                  </Space>
+                )
+              }
+
+              tableId="sentences"
               locale={{
                 emptyText: (
                   <TableEmptyState

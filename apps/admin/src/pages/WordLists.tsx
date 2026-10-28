@@ -1,3 +1,4 @@
+import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import { useRef, useState } from "react";
 import {
@@ -20,7 +21,6 @@ import {
   Select,
   Space,
   Switch,
-  Table,
   Tag,
   Tooltip,
   Typography
@@ -152,16 +152,13 @@ function Management({ adminId }: { adminId: string }) {
   return (
     <Flex vertical gap={16}>
       <Breadcrumb items={[{ title: "词表管理" }, { title: "智能词表" }]} />
-      <Card size="small" styles={{ body: { paddingBottom: 8 } }}>
+      <Card className="admin-filter-card" size="small">
         <Form
+          className="admin-filter-form"
+          colon={false}
           form={form}
           layout="inline"
-          style={{
-            rowGap: 12,
-            columnGap: 8,
-            display: "flex",
-            flexWrap: "wrap"
-          }}
+
           onFinish={(values) =>
             setQuery({
               page: 1,
@@ -226,7 +223,7 @@ function Management({ adminId }: { adminId: string }) {
           <Form.Item name="dates" label="创建时间">
             <DatePicker.RangePicker />
           </Form.Item>
-          <Form.Item>
+          <Form.Item className="admin-filter-actions">
             <Space>
               <Button
                 type="primary"
@@ -265,6 +262,7 @@ function Management({ adminId }: { adminId: string }) {
           />
         )}
         <Table<AdminWordlist>
+          tableId="wordlists"
           locale={{
             emptyText: (
               <TableEmptyState

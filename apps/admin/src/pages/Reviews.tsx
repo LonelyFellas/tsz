@@ -1,3 +1,4 @@
+import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import { useEffect, useState } from "react";
 import { ReloadOutlined, SearchOutlined } from "@ant-design/icons";
@@ -12,8 +13,7 @@ import {
   Input,
   Result,
   Select,
-  Space,
-  Table
+  Space
 } from "antd";
 import type { AdminWordlist, WordlistManagementQuery } from "@tsz/types";
 import { api, useAuthStore, usePermission } from "@/lib/auth";
@@ -63,16 +63,13 @@ function ReviewQueue({ adminId }: { adminId: string }) {
   return (
     <Flex vertical gap={16}>
       <Breadcrumb items={[{ title: "审核管理" }, { title: "词表审核" }]} />
-      <Card size="small" styles={{ body: { paddingBottom: 8 } }}>
+      <Card className="admin-filter-card" size="small">
         <Form
+          className="admin-filter-form"
+          colon={false}
           form={form}
           layout="inline"
-          style={{
-            rowGap: 12,
-            columnGap: 8,
-            display: "flex",
-            flexWrap: "wrap"
-          }}
+
           initialValues={{ review_state: "pending" }}
           onFinish={(values) =>
             setQuery({
@@ -102,7 +99,7 @@ function ReviewQueue({ adminId }: { adminId: string }) {
               }))}
             />
           </Form.Item>
-          <Form.Item>
+          <Form.Item className="admin-filter-actions">
             <Space>
               <Button
                 type="primary"
@@ -133,6 +130,7 @@ function ReviewQueue({ adminId }: { adminId: string }) {
           />
         )}
         <Table<AdminWordlist>
+          tableId="wordlist-reviews"
           locale={{
             emptyText: (
               <TableEmptyState

@@ -1,10 +1,11 @@
+import { AdminTable as Table } from "@/components/AdminTable";
 import { EditOutlined } from "@ant-design/icons";
 import {
   V3FormCopyHandle,
   V3FormCopyHelp,
   useV3FormCopy
 } from "./V3FormCopyProvider";
-import { Button, Dropdown, Space, Table, Tooltip, Typography } from "antd";
+import { Button, Dropdown, Space, Tooltip, Typography } from "antd";
 import type {
   WordConcreteFormV3,
   WordFormGroupV3,
@@ -181,6 +182,7 @@ export function V3FormContentOverview({
   return (
     <div className="v3-form-overview">
       <Table<OverviewReading>
+        tableId="form-content-overview"
         size="small"
         pagination={false}
         rowKey="key"
@@ -195,7 +197,7 @@ export function V3FormContentOverview({
         })}
         columns={[
           {
-            title: "",
+            title: "操作",
             key: "edit",
             className: "v3-overview-action-cell",
             width: 80,

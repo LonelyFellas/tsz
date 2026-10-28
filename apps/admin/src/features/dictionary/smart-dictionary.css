@@ -4,6 +4,16 @@
   line-height: 1.6;
 }
 
+.word-list-stats .ant-typography {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.word-list-stats .ant-typography strong {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
 .word-list-name {
   overflow-wrap: anywhere;
   white-space: normal;

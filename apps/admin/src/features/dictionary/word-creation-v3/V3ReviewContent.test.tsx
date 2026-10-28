@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { Button } from "antd";
 import { describe, expect, it, vi } from "vitest";
 import { formsFixture } from "./fixtures";
@@ -54,6 +54,55 @@ function word(): import("@tsz/shared").ExpandedAdminWordV3 {
 }
 
 describe("V3ReviewContent", () => {
+  it("预览表格的列与内容同步显隐、移动，并在重新打开后保留", () => {
+    const storageKey = "tsz:admin:table-columns:v1:word-forms-review";
+    localStorage.removeItem(storageKey);
+    try {
+      const view = render(<V3ReviewContent word={word()} />);
+      fireEvent.click(screen.getByRole("button", { name: /列设置/ }));
+      const panel = screen.getByRole("region", { name: "表格列设置" });
+      fireEvent.click(
+        within(panel).getByRole("checkbox", { name: "拼写 / 方言" })
+      );
+      const source = within(panel).getByRole("button", {
+        name: "拖动实际发音排序"
+      });
+      const target = within(panel).getByRole("button", {
+        name: "拖动字典音标排序"
+      });
+      const dataTransfer = { setData: vi.fn(), setDragImage: vi.fn() };
+      fireEvent.dragStart(source, { dataTransfer });
+      fireEvent.dragOver(target, { dataTransfer });
+      fireEvent.drop(target, { dataTransfer });
+      fireEvent.dragEnd(source);
+      const table = screen.getByRole("table");
+      expect(
+        within(table)
+          .getAllByRole("columnheader")
+          .map((cell) => cell.textContent)
+      ).toEqual(["词形", "实际发音", "字典音标"]);
+      const cells = within(within(table).getAllByRole("row")[1]!).getAllByRole(
+        "cell"
+      );
+      expect(cells[1]).toHaveTextContent("centre");
+      expect(cells[2]).toHaveTextContent("sen-tre");
+      view.unmount();
+      render(<V3ReviewContent word={word()} />);
+      expect(
+        within(screen.getByRole("table"))
+          .getAllByRole("columnheader")
+          .map((cell) => cell.textContent)
+      ).toEqual(["词形", "实际发音", "字典音标"]);
+      fireEvent.click(screen.getByRole("button", { name: /列设置/ }));
+      fireEvent.click(screen.getByRole("button", { name: "恢复默认" }));
+      expect(
+        within(screen.getByRole("table")).getAllByRole("columnheader")
+      ).toHaveLength(4);
+    } finally {
+      localStorage.removeItem(storageKey);
+    }
+  });
+
   it("预览按选中的 UPS 合成，缺失或非法数据禁止试听", () => {
     const current = word();
     const form = current.forms.pos[0]!.forms[0]!;

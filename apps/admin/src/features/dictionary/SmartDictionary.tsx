@@ -1,3 +1,4 @@
+import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import {
   DeleteOutlined,
@@ -23,7 +24,6 @@ import {
   Popover,
   Select,
   Space,
-  Table,
   Tag,
   Tooltip,
   Typography,
@@ -1362,85 +1362,6 @@ export function SmartDictionary({
             />
           </div>
         )}
-        <Flex
-          justify="space-between"
-          align="center"
-          wrap
-          gap={12}
-          style={{ marginBottom: 12 }}
-        >
-          <Space wrap>
-            {!trashMode && canCreateEntry(writeActor) && (
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => navigate("/words/new")}
-              >
-                创建词条
-              </Button>
-            )}
-            {adminWordsDataSourceCapabilities.batchArchive && (
-              <Button
-                danger={!showRestoreAction}
-                icon={
-                  showRestoreAction ? <RollbackOutlined /> : <DeleteOutlined />
-                }
-                disabled={
-                  selectedKeys.length === 0 ||
-                  selectedRows.some(
-                    (row) =>
-                      !canTransitionEntry(
-                        writeActor,
-                        row,
-                        row.status === "archived" ? "restore" : "archive"
-                      )
-                  )
-                }
-                loading={archiveBatch.isPending || restoreBatch.isPending}
-                onClick={transitionSelected}
-              >
-                {showRestoreAction ? "恢 复" : "移入垃圾桶"}
-                {selectedKeys.length > 0 ? `(${selectedKeys.length})` : ""}
-              </Button>
-            )}
-            {adminWordsDataSourceCapabilities.batchPermanentDelete &&
-              restoringSelection && (
-                <Button
-                  danger
-                  icon={<DeleteOutlined />}
-                  disabled={
-                    selectedKeys.length === 0 ||
-                    writeActor?.role !== "super_admin"
-                  }
-                  loading={deleteBatch.isPending}
-                  onClick={deleteSelected}
-                >
-                  永久删除
-                  {selectedKeys.length > 0 ? `(${selectedKeys.length})` : ""}
-                </Button>
-              )}
-          </Space>
-          <Space size="large" wrap>
-            <Typography.Text type="secondary">
-              累计智能词条:
-              <Typography.Text strong>
-                {stats.data?.total ?? "-"}
-              </Typography.Text>
-            </Typography.Text>
-            <Typography.Text type="secondary">
-              今日创编:
-              <Typography.Text strong>
-                {stats.data?.today ?? "-"}
-              </Typography.Text>
-            </Typography.Text>
-            <Typography.Text type="secondary">
-              本月创编:
-              <Typography.Text strong>
-                {stats.data?.month ?? "-"}
-              </Typography.Text>
-            </Typography.Text>
-          </Space>
-        </Flex>
 
         {listQuery.isError && (
           <Alert
@@ -1483,6 +1404,86 @@ export function SmartDictionary({
         ) : null}
 
         <Table<AdminWordListItemAny>
+          tableId={trashMode ? "dictionary-trash" : "dictionary"}
+          toolbar={
+            <Space wrap>
+              {!trashMode && canCreateEntry(writeActor) && (
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={() => navigate("/words/new")}
+                >
+                  创建词条
+                </Button>
+              )}
+              {adminWordsDataSourceCapabilities.batchArchive && (
+                <Button
+                  danger={!showRestoreAction}
+                  icon={
+                    showRestoreAction ? (
+                      <RollbackOutlined />
+                    ) : (
+                      <DeleteOutlined />
+                    )
+                  }
+                  disabled={
+                    selectedKeys.length === 0 ||
+                    selectedRows.some(
+                      (row) =>
+                        !canTransitionEntry(
+                          writeActor,
+                          row,
+                          row.status === "archived" ? "restore" : "archive"
+                        )
+                    )
+                  }
+                  loading={archiveBatch.isPending || restoreBatch.isPending}
+                  onClick={transitionSelected}
+                >
+                  {showRestoreAction ? "恢 复" : "移入垃圾桶"}
+                  {selectedKeys.length > 0 ? `(${selectedKeys.length})` : ""}
+                </Button>
+              )}
+              {adminWordsDataSourceCapabilities.batchPermanentDelete &&
+                restoringSelection && (
+                  <Button
+                    danger
+                    icon={<DeleteOutlined />}
+                    disabled={
+                      selectedKeys.length === 0 ||
+                      writeActor?.role !== "super_admin"
+                    }
+                    loading={deleteBatch.isPending}
+                    onClick={deleteSelected}
+                  >
+                    永久删除
+                    {selectedKeys.length > 0 ? `(${selectedKeys.length})` : ""}
+                  </Button>
+                )}
+            </Space>
+          }
+          toolbarExtra={
+            <Space size={16} wrap className="word-list-stats">
+              <Typography.Text type="secondary">
+                累计智能词条:
+                <Typography.Text strong>
+                  {stats.data?.total ?? "-"}
+                </Typography.Text>
+              </Typography.Text>
+              <Typography.Text type="secondary">
+                今日创编:
+                <Typography.Text strong>
+                  {stats.data?.today ?? "-"}
+                </Typography.Text>
+              </Typography.Text>
+              <Typography.Text type="secondary">
+                本月创编:
+                <Typography.Text strong>
+                  {stats.data?.month ?? "-"}
+                </Typography.Text>
+              </Typography.Text>
+            </Space>
+          }
           locale={{
             emptyText: (
               <TableEmptyState
