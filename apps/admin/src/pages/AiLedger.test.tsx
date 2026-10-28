@@ -19,7 +19,10 @@ vi.mock("@/lib/auth", async () => {
   return {
     useAuthStore: store,
     useIsSuperAdmin: () => store((s) => s.profile?.role === "super_admin"),
-    api: { aiLedger: { costs: vi.fn() } }
+    api: {
+      aiLedger: { costs: vi.fn() },
+      opencode: { connection: vi.fn() }
+    }
   };
 });
 const profile: AdminProfile = {
@@ -83,6 +86,11 @@ const payload: Page = {
 beforeEach(() => {
   vi.resetAllMocks();
   useAuthStore.getState().setProfile(profile);
+  vi.mocked(api.opencode.connection).mockResolvedValue({
+    configured: false,
+    connected: false,
+    login_available: false
+  });
   vi.mocked(api.aiLedger.costs).mockResolvedValue({
     ledger: payload,
     costs: [],
@@ -157,12 +165,12 @@ it("刷新失败不展示旧账本或伪造空账本，可重试恢复", async (
   mount();
   await screen.findByText("已响应");
   vi.mocked(api.aiLedger.costs).mockRejectedValueOnce(new Error("unavailable"));
-  fireEvent.click(screen.getByRole("button", { name: /刷新/ }));
+  fireEvent.click(screen.getByRole("button", { name: "刷新 AI 账本" }));
   await screen.findByText("AI 账本暂时不可用");
   expect(screen.queryByText("已响应")).not.toBeInTheDocument();
   expect(
     screen.queryByText("暂无符合条件的模型调用记录")
   ).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: /刷新/ }));
+  fireEvent.click(screen.getByRole("button", { name: "刷新 AI 账本" }));
   await screen.findByText("已响应");
 });

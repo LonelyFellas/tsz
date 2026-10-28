@@ -14,6 +14,7 @@ export * from "./admin-permissions";
 export * from "./admin-role";
 export * from "./admin-dashboard";
 export * from "./ai-ledger";
+export * from "./opencode";
 export * from "./part-of-speech";
 export * from "./rich-text";
 export * from "./admin-tts";

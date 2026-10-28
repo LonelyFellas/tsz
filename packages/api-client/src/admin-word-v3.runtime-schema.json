@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/admin-ai-ledger/docs/openapi.json",
-  "_source_sha256": "9a15e6b48a3ed57ab3a8808db585cd5cefcf2924ca27f87c9fa7c7e59568586a",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/opencode-connect/docs/openapi.json",
+  "_source_sha256": "b77eade8deef9f789c493f21868a4291283c152f34bc8b0e3f0c5609a07100b3",
   "roots": [
     "LearningCapabilities",
     "QuestionCandidatePage",
@@ -14,6 +14,9 @@
     "AiLedgerPage",
     "AiCostLedgerPage",
     "AiCostOverview",
+    "OpenCodeConnection",
+    "OpenCodeLogin",
+    "OpenCodeLoginStatus",
     "BankQuestion",
     "BankQuestionPage",
     "MemoryOverview",
@@ -2894,6 +2897,39 @@
         },
         "pagination": { "$ref": "#/$defs/PaginationMeta" },
         "revision": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "OpenCodeConnection": {
+      "type": "object",
+      "required": ["configured", "connected", "login_available"],
+      "properties": {
+        "configured": { "type": "boolean" },
+        "connected": { "type": "boolean" },
+        "login_available": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "OpenCodeLogin": {
+      "type": "object",
+      "required": ["attempt_id", "authorization_url", "expires_at"],
+      "properties": {
+        "attempt_id": { "type": "string" },
+        "authorization_url": { "type": "string" },
+        "expires_at": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "OpenCodeLoginState": {
+      "type": "string",
+      "enum": ["pending", "complete", "failed", "expired"]
+    },
+    "OpenCodeLoginStatus": {
+      "type": "object",
+      "required": ["status", "expires_at"],
+      "properties": {
+        "expires_at": { "type": "string", "format": "date-time" },
+        "status": { "$ref": "#/$defs/OpenCodeLoginState" }
       },
       "additionalProperties": false
     },

@@ -24,6 +24,7 @@ import type { TableColumnsType } from "antd";
 import dayjs from "dayjs";
 import type { AiCallCost, AiLedgerItem } from "@tsz/types";
 import { formatEstimatedCost } from "@/features/ai-ledger/cost";
+import { OpenCodeConnection } from "@/features/ai-ledger/OpenCodeConnection";
 import { api, useAuthStore, useIsSuperAdmin } from "@/lib/auth";
 import "./ai-ledger.css";
 
@@ -193,6 +194,7 @@ function Ledger({ adminId }: { adminId: string }) {
   return (
     <Flex vertical gap={16} className="ai-ledger">
       <Breadcrumb items={[{ title: "系统设置" }, { title: "AI 账本" }]} />
+      <OpenCodeConnection adminId={adminId} />
       <Flex justify="space-between" align="center" wrap gap={12}>
         <Typography.Text type="secondary">
           模型用量、缓存与响应耗时
@@ -224,6 +226,7 @@ function Ledger({ adminId }: { adminId: string }) {
           </Popover>
           <Button
             icon={<ReloadOutlined />}
+            aria-label="刷新 AI 账本"
             loading={ledger.isFetching}
             onClick={() => void ledger.refetch()}
           >
