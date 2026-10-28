@@ -1,3 +1,4 @@
+import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 // 管理员管理（super_admin 专属）：列表、筛选、验证码建号，以及行操作（启禁用 / 重置密码）。
 // 全对接真实接口；超管账号不可被互操作（后端 403），整行操作按钮前端先置灰。
@@ -19,7 +20,6 @@ import {
   Modal,
   Select,
   Space,
-  Table,
   Tag
 } from "antd";
 import type { TableColumnsType } from "antd";
@@ -285,17 +285,13 @@ export function AdminManagement() {
 
       <Breadcrumb items={[{ title: "用户管理" }, { title: "管理员管理" }]} />
 
-      <Card size="small" styles={{ body: { paddingBottom: 8 } }}>
+      <Card className="admin-filter-card" size="small">
         <Form
+          className="admin-filter-form"
+          colon={false}
           form={form}
           layout="inline"
           onFinish={applyFilters}
-          style={{
-            rowGap: 12,
-            columnGap: 8,
-            display: "flex",
-            flexWrap: "wrap"
-          }}
         >
           <Form.Item name="phone" label="手机号">
             <Input placeholder="手机号包含" allowClear style={{ width: 160 }} />
@@ -311,7 +307,7 @@ export function AdminManagement() {
               options={ADMIN_LEVEL_OPTIONS}
             />
           </Form.Item>
-          <Form.Item>
+          <Form.Item className="admin-filter-actions">
             <Space>
               <Button
                 type="primary"
@@ -335,22 +331,6 @@ export function AdminManagement() {
       </Card>
 
       <Card size="small">
-        <Flex
-          justify="space-between"
-          align="center"
-          style={{ marginBottom: 12 }}
-        >
-          <GatedButton
-            type="primary"
-            icon={<PlusOutlined />}
-            reason="请先处理上一条临时密码"
-            disabled={secretBusy}
-            onClick={() => setCreateOpen(true)}
-          >
-            新建管理员
-          </GatedButton>
-        </Flex>
-
         {listQuery.isError && (
           <Alert
             type="error"
@@ -367,6 +347,19 @@ export function AdminManagement() {
         )}
 
         <Table<Admin>
+          toolbar={
+            <GatedButton
+              type="primary"
+              icon={<PlusOutlined />}
+              reason="请先处理上一条临时密码"
+              disabled={secretBusy}
+              onClick={() => setCreateOpen(true)}
+            >
+              新建管理员
+            </GatedButton>
+          }
+
+          tableId="admins"
           locale={{
             emptyText: (
               <TableEmptyState

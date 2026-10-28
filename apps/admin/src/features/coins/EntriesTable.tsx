@@ -1,5 +1,6 @@
+import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
-import { Table } from "antd";
+
 import { formatCoins } from "@tsz/shared";
 import type { CoinEntryPage } from "@tsz/types";
 export const coinSourceLabels: Record<string, string> = {
@@ -22,6 +23,7 @@ export function EntriesTable({
 }) {
   return (
     <Table
+      tableId="coin-entries"
       locale={{ emptyText: <TableEmptyState message="暂无账户流水" /> }}
       rowKey="id"
       loading={loading}

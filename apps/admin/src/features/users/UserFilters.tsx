@@ -12,12 +12,13 @@ export function UserFilters({ onSearch, onReset }: Props) {
   const [form] = Form.useForm<UserFilterValues>();
 
   return (
-    <Card size="small" styles={{ body: { paddingBottom: 8 } }}>
+    <Card className="admin-filter-card" size="small">
       <Form
+        className="admin-filter-form"
+        colon={false}
         form={form}
         layout="inline"
         onFinish={onSearch}
-        style={{ rowGap: 12, columnGap: 8, display: "flex", flexWrap: "wrap" }}
       >
         <Form.Item name="q" label="关键词">
           <Input
@@ -29,7 +30,7 @@ export function UserFilters({ onSearch, onReset }: Props) {
         <Form.Item name="registeredDate" label="注册时间">
           <DatePicker placeholder="请选择日期" style={{ width: 160 }} />
         </Form.Item>
-        <Form.Item>
+        <Form.Item className="admin-filter-actions">
           <Space>
             <Button type="primary" icon={<SearchOutlined />} htmlType="submit">
               搜索

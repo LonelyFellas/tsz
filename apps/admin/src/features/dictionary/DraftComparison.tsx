@@ -1,4 +1,5 @@
-import { Table, Typography } from "antd";
+import { AdminTable as Table } from "@/components/AdminTable";
+import { Typography } from "antd";
 
 type Difference = { path: string; local: unknown; remote: unknown };
 
@@ -44,6 +45,7 @@ export function DraftComparison({
       </Typography.Paragraph>
       {rows.length ? (
         <Table<Difference>
+          tableId="draft-comparison"
           size="small"
           rowKey="path"
           dataSource={rows}

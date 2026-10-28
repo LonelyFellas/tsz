@@ -1,3 +1,4 @@
+import { AdminTable as Table } from "@/components/AdminTable";
 import { AccountLabel } from "@/features/coins/AccountLabel";
 import { OperationHistory } from "@/features/coins/OperationHistory";
 import { ReloadOutlined, SearchOutlined } from "@ant-design/icons";
@@ -14,7 +15,6 @@ import {
   Input,
   Modal,
   Select,
-  Table,
   Tabs,
   Typography
 } from "antd";
@@ -211,16 +211,13 @@ function Management({ profile }: { profile: AdminProfile }) {
     selected.account_status === "active";
   const searchPanel = (
     <Flex vertical gap={16}>
-      <Card size="small" styles={{ body: { paddingBottom: 8 } }}>
+      <Card className="admin-filter-card" size="small">
         <Form
+          className="admin-filter-form"
+          colon={false}
           form={searchForm}
           layout="inline"
-          style={{
-            rowGap: 12,
-            columnGap: 8,
-            display: "flex",
-            flexWrap: "wrap"
-          }}
+
           initialValues={{ owner_type: "user" }}
           onFinish={(v) => {
             setSelected(undefined);
@@ -253,7 +250,7 @@ function Management({ profile }: { profile: AdminProfile }) {
               maxLength={200}
             />
           </Form.Item>
-          <Form.Item>
+          <Form.Item className="admin-filter-actions">
             <Button htmlType="submit" type="primary" icon={<SearchOutlined />}>
               查找
             </Button>
@@ -267,6 +264,7 @@ function Management({ profile }: { profile: AdminProfile }) {
           ) : (
             search && (
               <Table
+                tableId="coin-accounts"
                 rowKey="owner_id"
                 loading={accounts.isFetching}
                 dataSource={accounts.data?.items}

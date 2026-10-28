@@ -1,3 +1,4 @@
+import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 // 角色权限管理（super_admin 专属）：角色列表 + 建 / 改 / 删角色 + 派角色。全对接真实接口。
 // 系统角色（is_system「全功能管理员」）在 UI 上置灰不可编辑 / 删除，后端 403 只是兜底。
@@ -15,7 +16,6 @@ import {
   Flex,
   Modal,
   Space,
-  Table,
   Tag,
   Tooltip,
   Typography
@@ -221,30 +221,6 @@ export function RoleManagement() {
       <Breadcrumb items={[{ title: "用户管理" }, { title: "角色权限管理" }]} />
 
       <Card size="small">
-        <Flex
-          justify="space-between"
-          align="center"
-          style={{ marginBottom: 12 }}
-        >
-          <Space>
-            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-              新建角色
-            </Button>
-            <Button
-              icon={<UsergroupAddOutlined />}
-              onClick={() => setAssignOpen(true)}
-            >
-              指派角色
-            </Button>
-          </Space>
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={() => void listQuery.refetch()}
-          >
-            刷新
-          </Button>
-        </Flex>
-
         {listQuery.isError && (
           <Alert
             type="error"
@@ -261,6 +237,33 @@ export function RoleManagement() {
         )}
 
         <Table<AdminRole>
+          toolbar={
+            <Space wrap>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={openCreate}
+              >
+                新建角色
+              </Button>
+              <Button
+                icon={<UsergroupAddOutlined />}
+                onClick={() => setAssignOpen(true)}
+              >
+                指派角色
+              </Button>
+            </Space>
+          }
+          toolbarExtra={
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={() => void listQuery.refetch()}
+            >
+              刷新
+            </Button>
+          }
+
+          tableId="roles"
           locale={{ emptyText: <TableEmptyState message="暂无角色" /> }}
           rowKey="id"
           size="middle"

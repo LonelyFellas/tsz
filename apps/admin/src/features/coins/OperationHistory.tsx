@@ -1,3 +1,4 @@
+import { AdminTable as Table } from "@/components/AdminTable";
 import { useState } from "react";
 import {
   Button,
@@ -10,7 +11,6 @@ import {
   Input,
   Select,
   Space,
-  Table,
   Tag,
   Typography
 } from "antd";
@@ -192,10 +192,13 @@ export function OperationHistory({
           </Typography.Text>
         }
       >
-        <Typography.Paragraph type="secondary">
-          查看手动发放和撤销记录，完整单号与凭据可在详情中查看。
-        </Typography.Paragraph>
         <Table<ManualCoinOperation>
+          tableId="coin-operations"
+          toolbar={
+            <Typography.Text type="secondary">
+              查看手动发放和撤销记录，完整单号与凭据可在详情中查看。
+            </Typography.Text>
+          }
           rowKey="id"
           loading={loading}
           dataSource={data?.items}

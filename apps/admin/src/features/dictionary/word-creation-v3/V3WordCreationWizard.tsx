@@ -1,4 +1,5 @@
 import { onlyTextAssociationsChanged } from "../contentEditPermissions";
+import { revealTableColumns } from "@/components/useColumnSettings";
 import { UNSAFE_DataRouterContext } from "react-router-dom";
 import { WordNavigationGuard } from "@/features/recovery/WordNavigationGuard";
 import { useDraftRecovery } from "@/features/recovery/useDraftRecovery";
@@ -444,6 +445,14 @@ function V3WordCreationSession({
     )
       return;
     const controller = new AbortController();
+    if (
+      pendingFocusTarget.step === "forms" &&
+      !["pos", "scope"].includes(pendingFocusTarget.field)
+    ) {
+      revealTableColumns("form-content-overview", [
+        pendingFocusTarget.field === "form_type" ? "label" : "edit"
+      ]);
+    }
     const forms = draftFormsRef.current;
     const binding =
       "forms_format" in forms

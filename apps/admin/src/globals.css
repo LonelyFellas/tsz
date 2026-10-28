@@ -1,4 +1,5 @@
 @import "@tsz/shared/fonts.css";
+@import "./admin-layout.css";
 
 /* 版本恢复浮层（@tsz/shared/recovery 注入，见 vite.config.ts 的 release-identity）渲染在
    ConfigProvider 之外，取不到 antd token，只能读 CSS 变量，读不到时回退 web 的 Apple 蓝。
@@ -32,18 +33,23 @@ body {
   container-type: inline-size;
 }
 @container (max-width: 900px) {
-  .ant-table-cell-fix-start,
-  .ant-table-cell-fix-end,
-  .ant-table-cell-fix-left,
-  .ant-table-cell-fix-right,
-  .ant-table-selection-column {
+  .ant-table-wrapper:not(.admin-table-custom-columns) .ant-table-cell-fix-start,
+  .ant-table-wrapper:not(.admin-table-custom-columns) .ant-table-cell-fix-end,
+  .ant-table-wrapper:not(.admin-table-custom-columns) .ant-table-cell-fix-left,
+  .ant-table-wrapper:not(.admin-table-custom-columns) .ant-table-cell-fix-right,
+  .ant-table-wrapper:not(.admin-table-custom-columns)
+    .ant-table-selection-column {
     position: static !important;
   }
 
-  .ant-table-cell-fix-start::after,
-  .ant-table-cell-fix-end::after,
-  .ant-table-cell-fix-left::after,
-  .ant-table-cell-fix-right::after {
+  .ant-table-wrapper:not(.admin-table-custom-columns)
+    .ant-table-cell-fix-start::after,
+  .ant-table-wrapper:not(.admin-table-custom-columns)
+    .ant-table-cell-fix-end::after,
+  .ant-table-wrapper:not(.admin-table-custom-columns)
+    .ant-table-cell-fix-left::after,
+  .ant-table-wrapper:not(.admin-table-custom-columns)
+    .ant-table-cell-fix-right::after {
     display: none;
   }
 }
