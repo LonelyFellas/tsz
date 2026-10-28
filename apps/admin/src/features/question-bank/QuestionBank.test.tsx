@@ -13,17 +13,25 @@ import { beforeEach, expect, it, vi } from "vitest";
 import type { AdminProfile, BankQuestion, QuestionCandidate } from "@tsz/types";
 import { HttpError } from "@tsz/api-client";
 import { QuestionEditor } from "./QuestionEditor";
+import { BatchPanel } from "./BatchPanel";
 import { QuestionBank } from "./QuestionBank";
 const mocks = vi.hoisted(() => ({
   question: vi.fn(),
   candidates: vi.fn(),
+  candidatePage: vi.fn(),
   edit: vi.fn(),
   review: vi.fn(),
   generate: vi.fn(),
   generation: vi.fn(),
   generations: vi.fn(),
   questions: vi.fn(),
-  cancel: vi.fn()
+  cancel: vi.fn(),
+  batchPreview: vi.fn(),
+  createBatch: vi.fn(),
+  batches: vi.fn(),
+  batch: vi.fn(),
+  batchItems: vi.fn(),
+  cancelBatch: vi.fn()
 }));
 const profile = {
   id: "author",
@@ -114,6 +122,10 @@ beforeEach(() => {
   mocks.candidates.mockResolvedValue({
     contract_version: 1,
     items: [target, candidate("lemon")]
+  });
+  mocks.candidatePage.mockResolvedValue({
+    items: [target, candidate("lemon")],
+    pagination: { page: 1, page_size: 20, total: 81, total_pages: 5 }
   });
   mocks.questions.mockResolvedValue({ items: [], pagination: { total: 0 } });
   mocks.generations.mockResolvedValue({ items: [], pagination: { total: 0 } });
@@ -260,6 +272,221 @@ it("generation timeout preserves the chosen source and retries the same idempote
   expect(mocks.generate.mock.calls[1]![0]).toEqual(first);
 });
 
+it("candidate pagination reaches beyond the first eighty and resets selection", async () => {
+  render(<QuestionBank />, { wrapper });
+  await screen.findByText("apple 的释义");
+  fireEvent.click(screen.getByTitle("5"));
+  await waitFor(() =>
+    expect(mocks.candidatePage).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 5, page_size: 20 }),
+      expect.anything()
+    )
+  );
+});
+
+it("batch previews show actual missing counts; uncertain creation retries the same intent and opens persistent results", async () => {
+  const selection = { question_levels: ["B1"], answer_profiles: ["BrE"] };
+  const preview = {
+    selection,
+    coverage: [
+      {
+        question_level: "B1",
+        answer_profile: "BrE",
+        eligible: 93,
+        covered: 10,
+        generating: 2,
+        missing: 81
+      }
+    ],
+    missing: 81,
+    preview_token: "preview-1"
+  };
+  const batch = {
+    id: "batch-1",
+    created_by: "author",
+    preview,
+    state: "running",
+    total: 81,
+    queued: 79,
+    running: 1,
+    succeeded: 1,
+    failed: 0,
+    insufficient_candidates: 0,
+    cancelled: 0,
+    created_at: "2026-10-28T00:00:00Z"
+  };
+  mocks.batches.mockResolvedValue({ items: [batch], pagination: { total: 1 } });
+  mocks.batchPreview.mockResolvedValue(preview);
+  mocks.createBatch
+    .mockRejectedValueOnce(new HttpError(503, "暂时不可用"))
+    .mockResolvedValue(batch);
+  mocks.batch.mockResolvedValue(batch);
+  mocks.batchItems.mockResolvedValue({
+    items: [
+      {
+        id: "g1",
+        target,
+        question_level: "B1",
+        answer_profile: "BrE",
+        state: "succeeded",
+        question_id: "q1",
+        error_code: null,
+        reasons: []
+      }
+    ],
+    pagination: { total: 1 }
+  });
+  const showQuestion = vi.fn();
+  render(<BatchPanel profile={profile} showQuestion={showQuestion} active />, {
+    wrapper
+  });
+  expect(screen.getByRole("button", { name: "开始补齐缺题" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "预览全库缺题" }));
+  await screen.findByText("本次实际需生成 81 道待审核草稿。");
+  fireEvent.click(await screen.findByRole("button", { name: "开始补齐缺题" }));
+  fireEvent.click(await screen.findByRole("button", { name: "开始批量命题" }));
+  await screen.findByText("暂时不可用");
+  expect(screen.getByLabelText("批量学习等级")).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "重试原批次请求" }));
+  await screen.findByText("批次 batch-1 · 进行中");
+  expect(mocks.createBatch.mock.calls[0]![0]).toEqual(
+    mocks.createBatch.mock.calls[1]![0]
+  );
+  expect(mocks.createBatch.mock.calls[0]![0]).toMatchObject({
+    selection,
+    preview_token: "preview-1"
+  });
+  fireEvent.click(await screen.findByRole("button", { name: "预览审核" }));
+  expect(showQuestion).toHaveBeenCalledWith("q1");
+  mocks.cancelBatch.mockResolvedValue({ ...batch, state: "cancelled" });
+  fireEvent.click(screen.getByRole("button", { name: "取消批次" }));
+  const confirmations = await screen.findAllByRole("button", {
+    name: "取消批次"
+  });
+  fireEvent.click(confirmations[confirmations.length - 1]!);
+  await waitFor(() =>
+    expect(mocks.cancelBatch).toHaveBeenCalledExactlyOnceWith("batch-1")
+  );
+}, 10_000);
+
+it("switching workbench tabs preserves an uncertain batch request and its idempotency key", async () => {
+  mocks.batches.mockResolvedValue({ items: [], pagination: { total: 0 } });
+  mocks.batchPreview.mockResolvedValue({
+    selection: { question_levels: ["B1"], answer_profiles: ["BrE"] },
+    coverage: [],
+    missing: 1,
+    preview_token: "batch-preview"
+  });
+  mocks.createBatch.mockRejectedValue(new HttpError(503, "请求结果未知"));
+  render(<QuestionBank />, { wrapper });
+  fireEvent.click(screen.getByRole("tab", { name: "全库批量命题" }));
+  fireEvent.click(screen.getByRole("button", { name: "预览全库缺题" }));
+  await screen.findByText("本次实际需生成 1 道待审核草稿。");
+  fireEvent.click(screen.getByRole("button", { name: "开始补齐缺题" }));
+  fireEvent.click(await screen.findByRole("button", { name: "开始批量命题" }));
+  await screen.findByText("请求结果未知");
+  const original = mocks.createBatch.mock.calls[0]![0];
+  fireEvent.click(screen.getByRole("tab", { name: "题目审核" }));
+  expect(
+    screen.queryByRole("button", { name: "重试原批次请求" })
+  ).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("tab", { name: "全库批量命题" }));
+  fireEvent.click(
+    await screen.findByRole("button", { name: "重试原批次请求" })
+  );
+  await waitFor(() => expect(mocks.createBatch).toHaveBeenCalledTimes(2));
+  expect(mocks.createBatch.mock.calls[1]![0]).toEqual(original);
+}, 10_000);
+
+it.each(["all", "succeeded"])(
+  "fetches final batch results when detail completes before the %s task list",
+  async (filter) => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } }
+    });
+    const batch = {
+      id: "batch-race",
+      created_by: "author",
+      state: "running",
+      total: 1,
+      queued: 0,
+      running: 1,
+      succeeded: 0,
+      failed: 0,
+      insufficient_candidates: 0,
+      cancelled: 0,
+      preview: {
+        selection: { question_levels: ["B1"], answer_profiles: ["BrE"] }
+      },
+      created_at: "2026-10-28T00:00:00Z"
+    };
+    const task = {
+      id: "g-race",
+      target,
+      question_level: "B1",
+      answer_profile: "BrE",
+      state: "running",
+      question_id: null,
+      error_code: null,
+      reasons: []
+    };
+    let completed = false;
+    mocks.batches.mockResolvedValue({
+      items: [batch],
+      pagination: { total: 1 }
+    });
+    mocks.batch.mockResolvedValue(batch);
+    mocks.batchItems.mockImplementation((_id, query) =>
+      Promise.resolve({
+        items: completed
+          ? [{ ...task, state: "succeeded", question_id: "q-final" }]
+          : query.state === "succeeded"
+            ? []
+            : [task],
+        pagination: { total: completed || query.state !== "succeeded" ? 1 : 0 }
+      })
+    );
+    const showQuestion = vi.fn();
+    render(
+      <QueryClientProvider client={client}>
+        <ConfigProvider>
+          <App>
+            <MemoryRouter
+              initialEntries={["/question-bank?batch_id=batch-race"]}
+            >
+              <BatchPanel
+                profile={profile}
+                showQuestion={showQuestion}
+                active
+              />
+            </MemoryRouter>
+          </App>
+        </ConfigProvider>
+      </QueryClientProvider>
+    );
+    await screen.findByText("批次 batch-race · 进行中");
+    if (filter === "succeeded") {
+      fireEvent.mouseDown(screen.getByLabelText("批次任务状态"));
+      fireEvent.click(await screen.findByText("已生成草稿", { exact: true }));
+    }
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    expect(
+      screen.queryByRole("button", { name: "预览审核" })
+    ).not.toBeInTheDocument();
+    completed = true;
+    act(() =>
+      client.setQueryData(
+        ["question-bank", profile.id, "batches", "detail", "batch-race"],
+        { ...batch, state: "completed", running: 0, succeeded: 1 }
+      )
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "预览审核" }));
+    expect(showQuestion).toHaveBeenCalledWith("q-final");
+    client.clear();
+  },
+  10_000
+);
+
 it("列表失败后仍可筛选、刷新题目与生成记录", async () => {
   mocks.questions.mockRejectedValueOnce(new Error("审核读取失败"));
   mocks.generations.mockRejectedValueOnce(new Error("记录读取失败"));
@@ -282,11 +509,11 @@ it("列表失败后仍可筛选、刷新题目与生成记录", async () => {
 });
 
 it("命题词义读取失败后仍可切回整个词库", async () => {
-  mocks.candidates.mockRejectedValueOnce(new Error("词义读取失败"));
+  mocks.candidatePage.mockRejectedValueOnce(new Error("词义读取失败"));
   render(<QuestionBank />, { wrapper });
   await screen.findByText("词义读取失败");
   fireEvent.click(screen.getByRole("button", { name: "查看整个词库" }));
   await screen.findByRole("row", { name: /apple.*apple 的释义/ });
   expect(screen.queryByText("当前词条的已发布词义")).not.toBeInTheDocument();
-  expect(mocks.candidates).toHaveBeenCalledTimes(2);
+  expect(mocks.candidatePage).toHaveBeenCalledTimes(2);
 });

@@ -37,6 +37,10 @@ const runtimeSchemaBundle =
 const ROOTS = [
   "LearningCapabilities",
   "QuestionCandidatePage",
+  "QuestionCandidateSearchPage",
+  "QuestionBatchPreview",
+  "QuestionBatch",
+  "QuestionBatchPage",
   "QuestionGeneration",
   "QuestionGenerationPage",
   "AiLedgerPage",
