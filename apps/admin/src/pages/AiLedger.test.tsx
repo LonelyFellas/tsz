@@ -174,3 +174,7 @@ it("刷新失败不展示旧账本或伪造空账本，可重试恢复", async (
   fireEvent.click(screen.getByRole("button", { name: "刷新 AI 账本" }));
   await screen.findByText("已响应");
 });
+
+vi.mock("@/features/ai-ledger/OpenCodeModels", () => ({
+  OpenCodeModels: () => null
+}));

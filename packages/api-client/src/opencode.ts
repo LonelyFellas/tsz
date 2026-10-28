@@ -1,6 +1,9 @@
 import type {
   OpenCodeConnection,
   OpenCodeLogin,
+  OpenCodeModelList,
+  OpenCodeProviderList,
+  OpenCodeModelSelection,
   OpenCodeLoginStatus
 } from "@tsz/types";
 import type { HttpClient } from "./http";
@@ -17,6 +20,38 @@ function decode<T>(root: RuntimeSchemaRoot, value: unknown): T {
 
 export function createOpenCodeEndpoints(http: HttpClient) {
   return {
+    models: async (options?: {
+      signal?: AbortSignal;
+    }): Promise<OpenCodeModelList> =>
+      decode(
+        "OpenCodeModelList",
+        await http.get<unknown>("/opencode/models", options)
+      ),
+    providers: async (options?: {
+      signal?: AbortSignal;
+    }): Promise<OpenCodeProviderList> =>
+      decode(
+        "OpenCodeProviderList",
+        await http.get<unknown>("/opencode/providers", options)
+      ),
+    currentModel: async (options?: {
+      signal?: AbortSignal;
+    }): Promise<OpenCodeModelSelection> =>
+      decode(
+        "OpenCodeModelSelection",
+        await http.get<unknown>("/opencode/model", options)
+      ),
+    selectModel: async (
+      body: OpenCodeModelSelection
+    ): Promise<OpenCodeModelSelection> =>
+      decode(
+        "OpenCodeModelSelection",
+        await http.put<unknown>("/opencode/model", body)
+      ),
+    connectKey: (body: {
+      provider_id: string;
+      api_key: string;
+    }): Promise<void> => http.post<void>("/opencode/keys", body),
     connection: async (options?: {
       signal?: AbortSignal;
     }): Promise<OpenCodeConnection> =>
