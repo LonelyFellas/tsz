@@ -22,11 +22,11 @@ import { useAuthStore } from "@/lib/auth";
 import { ADMIN_PAGE_ROUTES } from "@/lib/adminPageRoutes";
 
 /**
- * 后台侧栏导航（antd Menu）。**由后端驱动**：每个叶子挂一个菜单权限 key（RBAC，
+ * 后台侧栏导航（antd Menu）。业务叶子挂菜单权限 key（RBAC，
  * docs/admin-rbac-design.md），仅当当前管理员持有该 key（super_admin 隐式持有全部）时才渲染
  * ——菜单可见性=后端下发的 profile.permissions。这与「路由是否已落地」正交：已落地叶子挂真实
  * path（key 即路由），点击跳转；未落地的以 `todo:` 前缀标记并渲染为禁用态，避免死链。「首页」
- * 无权限恒显示；「管理员管理」不走 key，仍按 level==super_admin 判定（D9）。当前高亮由
+ * 与「我的天生币」无需业务权限；「管理员管理」不走 key，仍按 level==super_admin 判定（D9）。当前高亮由
  * useLocation().pathname 推导。
  */
 type MenuItem = Required<MenuProps>["items"][number];
@@ -162,14 +162,17 @@ const GROUPS: Group[] = [
   {
     key: "grp-coin",
     icon: <DollarOutlined />,
-    label: "天生币管理",
-    leaves: [pageLeaf(ADMIN_PAGE_ROUTES.coins, "天生币管理")]
+    label: "天生币",
+    leaves: [
+      pageLeaf(ADMIN_PAGE_ROUTES.myCoins, "我的天生币"),
+      pageLeaf(ADMIN_PAGE_ROUTES.coins, "天生币管理")
+    ]
   }
 ];
 
 /**
  * 构造导航树。「首页」恒显示。每个叶子按权限过滤：superOnly 叶子看 isSuperAdmin；其余叶子
- * 当 super_admin 或 permissions 含其 key 时可见（super 隐式全权，即便 permissions 为空也放行）。
+ * 无权限要求时登录即可见，否则当 super_admin 或 permissions 含其 key 时可见。
  * 分组过滤掉不可见叶子后若为空则整组不渲染。
  */
 function buildNav(profile: AdminProfile | null): MenuItem[] {
@@ -178,7 +181,9 @@ function buildNav(profile: AdminProfile | null): MenuItem[] {
       ? profile?.role === "super_admin"
       : l.anyPermission
         ? hasAnyAdminPermission(profile, l.anyPermission)
-        : l.perm !== undefined && hasAdminPermission(profile, l.perm);
+        : l.perm !== undefined
+          ? hasAdminPermission(profile, l.perm)
+          : profile !== null;
 
   const items: MenuItem[] = [
     { key: "/", icon: <HomeOutlined />, label: "首页" }
