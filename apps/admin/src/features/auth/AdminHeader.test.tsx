@@ -134,6 +134,7 @@ describe("AdminHeader", () => {
     useAuthStore.setState({ profile: PROFILE, role: PROFILE.role });
     renderHeader();
     await openAccountMenu();
+    expect(screen.queryByRole("button", { name: "我的天生币" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /个人设置/ }));
     expect(mockNavigate).toHaveBeenCalledWith("/settings/profile");
   });
