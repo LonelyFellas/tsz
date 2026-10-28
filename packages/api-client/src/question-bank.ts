@@ -1,4 +1,11 @@
 import type {
+  QuestionCandidatePageQuery,
+  QuestionCandidateSearchPage,
+  QuestionBatchSelection,
+  QuestionBatchPreview,
+  CreateQuestionBatch,
+  QuestionBatch,
+  QuestionBatchPage,
   BankQuestion,
   BankQuestionPage,
   CreateQuestionGeneration,
@@ -24,7 +31,9 @@ function decode<T>(root: RuntimeSchemaRoot, value: unknown): T {
     );
   return value as T;
 }
-function query(data: QuestionBankQuery | QuestionCandidateQuery) {
+function query(
+  data: QuestionBankQuery | QuestionCandidateQuery | QuestionCandidatePageQuery
+) {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(data))
     if (value !== undefined && value !== "") params.set(key, String(value));
@@ -33,6 +42,38 @@ function query(data: QuestionBankQuery | QuestionCandidateQuery) {
 export function createQuestionBankEndpoints(http: HttpClient) {
   const base = "/question-bank";
   return {
+    candidatePage: (q: QuestionCandidatePageQuery, o?: Options) =>
+      http
+        .get<unknown>(`${base}/candidate-page${query(q)}`, o)
+        .then((v) =>
+          decode<QuestionCandidateSearchPage>("QuestionCandidateSearchPage", v)
+        ),
+    batchPreview: (data: QuestionBatchSelection, o?: Options) =>
+      http
+        .post<unknown>(`${base}/batches/preview`, data, o)
+        .then((v) => decode<QuestionBatchPreview>("QuestionBatchPreview", v)),
+    createBatch: (data: CreateQuestionBatch, o?: Options) =>
+      http
+        .post<unknown>(`${base}/batches`, data, o)
+        .then((v) => decode<QuestionBatch>("QuestionBatch", v)),
+    batches: (q: QuestionBankQuery = {}, o?: Options) =>
+      http
+        .get<unknown>(`${base}/batches${query(q)}`, o)
+        .then((v) => decode<QuestionBatchPage>("QuestionBatchPage", v)),
+    batch: (id: string, o?: Options) =>
+      http
+        .get<unknown>(`${base}/batches/${id}`, o)
+        .then((v) => decode<QuestionBatch>("QuestionBatch", v)),
+    batchItems: (id: string, q: QuestionBankQuery = {}, o?: Options) =>
+      http
+        .get<unknown>(`${base}/batches/${id}/items${query(q)}`, o)
+        .then((v) =>
+          decode<QuestionGenerationPage>("QuestionGenerationPage", v)
+        ),
+    cancelBatch: (id: string, o?: Options) =>
+      http
+        .post<unknown>(`${base}/batches/${id}/cancel`, undefined, o)
+        .then((v) => decode<QuestionBatch>("QuestionBatch", v)),
     candidates: (q: QuestionCandidateQuery, o?: Options) =>
       http
         .get<unknown>(`${base}/candidates${query(q)}`, o)

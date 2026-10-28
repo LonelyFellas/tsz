@@ -63,6 +63,10 @@ const QUERY_CONTRACT_OPERATIONS = new Set([
 const RUNTIME_SCHEMA_ROOTS = [
   "LearningCapabilities",
   "QuestionCandidatePage",
+  "QuestionCandidateSearchPage",
+  "QuestionBatchPreview",
+  "QuestionBatch",
+  "QuestionBatchPage",
   "QuestionGeneration",
   "QuestionGenerationPage",
   "BankQuestion",

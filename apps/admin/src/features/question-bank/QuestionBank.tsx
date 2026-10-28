@@ -34,6 +34,7 @@ import {
   generationReason,
   questionLabels
 } from "./model";
+import { BatchPanel } from "./BatchPanel";
 import { QuestionEditor } from "./QuestionEditor";
 
 export function QuestionBank() {
@@ -45,11 +46,14 @@ function Workbench({ profile }: { profile: AdminProfile }) {
   const [params, setParams] = useSearchParams();
   const client = useQueryClient();
   const entryId = params.get("entry_id") ?? undefined;
-  const [tab, setTab] = useState(entryId ? "generate" : "questions");
+  const [tab, setTab] = useState(
+    params.has("batch_id") ? "batches" : entryId ? "generate" : "questions"
+  );
   const [level, setLevel] = useState("B1");
   const [answerProfile, setAnswerProfile] = useState("BrE");
   const [search, setSearch] = useState("");
   const [target, setTarget] = useState<QuestionCandidate | null>(null);
+  const [candidatePage, setCandidatePage] = useState(1);
   const [page, setPage] = useState(1);
   const [state, setState] = useState<string>();
   const [generationPage, setGenerationPage] = useState(1);
@@ -72,12 +76,15 @@ function Workbench({ profile }: { profile: AdminProfile }) {
       entryId,
       search,
       level,
-      answerProfile
+      answerProfile,
+      candidatePage
     ],
     enabled: tab === "generate",
     queryFn: ({ signal }) =>
-      api.questionBank.candidates(
+      api.questionBank.candidatePage(
         {
+          page: candidatePage,
+          page_size: 20,
           entry_id: entryId,
           query: search,
           question_level: level,
@@ -139,6 +146,7 @@ function Workbench({ profile }: { profile: AdminProfile }) {
   }
   function changeContext(update: () => void) {
     setTarget(null);
+    setCandidatePage(1);
     update();
   }
   async function generate() {
@@ -234,6 +242,7 @@ function Workbench({ profile }: { profile: AdminProfile }) {
         onChange={setTab}
         items={[
           { key: "generate", label: "生成题目" },
+          { key: "batches", label: "全库批量命题" },
           { key: "questions", label: "题目审核" },
           { key: "generations", label: "生成记录" }
         ]}
@@ -316,7 +325,17 @@ function Workbench({ profile }: { profile: AdminProfile }) {
               rowKey="candidate_ref"
               dataSource={candidates.data?.items ?? []}
               loading={candidates.isFetching}
-              pagination={false}
+              pagination={{
+                current: candidatePage,
+                disabled: locked,
+                pageSize: 20,
+                total: candidates.data?.pagination.total ?? 0,
+                showSizeChanger: false,
+                onChange: (page) => {
+                  setTarget(null);
+                  setCandidatePage(page);
+                }
+              }}
               scroll={{ x: 650 }}
               locale={{
                 emptyText: (
@@ -362,6 +381,9 @@ function Workbench({ profile }: { profile: AdminProfile }) {
           </Space>
         </Card>
       </section>
+      {tab === "batches" && (
+        <BatchPanel profile={profile} showQuestion={showQuestion} />
+      )}
       {activeGeneration && (
         <Card size="small" title="当前生成状态">
           {generation.isError ? (

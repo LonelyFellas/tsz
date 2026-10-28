@@ -33,6 +33,7 @@ export const generationLabels: Record<QuestionGenerationState, string> = {
   insufficient_candidates: "库内候选不足"
 };
 export function generationReason(generation: QuestionGeneration) {
+  if (generation.state === "cancelled") return "";
   if (generation.reasons.length) return generation.reasons.join("；");
   switch (generation.error_code) {
     case "agent_retry_pending":
