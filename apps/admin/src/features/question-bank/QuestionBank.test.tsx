@@ -484,7 +484,14 @@ it.each(["all", "succeeded"])(
         finished
       )
     );
-    fireEvent.click(await screen.findByRole("button", { name: "预览审核" }));
+    // 覆盖率插桩下等待 Query 通知与 AntD 表格完成异步渲染。
+    fireEvent.click(
+      await screen.findByRole(
+        "button",
+        { name: "预览审核" },
+        { timeout: 5_000 }
+      )
+    );
     expect(showQuestion).toHaveBeenCalledWith("q-final");
     client.clear();
   },
