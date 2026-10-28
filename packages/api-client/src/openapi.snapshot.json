@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/admin-ai-ledger/docs/openapi.json",
-  "_generatedAt": "2026-10-28T03:11:31.793Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/question-bank-batch/docs/openapi.json",
+  "_generatedAt": "2026-10-28T04:28:30.196Z",
   "paths": {
     "/api/internal/agent/v1/requests/{id}/candidates/search": ["post"],
     "/api/internal/agent/v1/requests/{id}/context": ["get"],
@@ -87,6 +87,12 @@
     "/admin/permissions/{permission_key}/admins": ["get"],
     "/admin/profile": ["get"],
     "/admin/profile/preferences": ["patch"],
+    "/admin/question-bank/batches": ["get", "post"],
+    "/admin/question-bank/batches/preview": ["post"],
+    "/admin/question-bank/batches/{id}": ["get"],
+    "/admin/question-bank/batches/{id}/cancel": ["post"],
+    "/admin/question-bank/batches/{id}/items": ["get"],
+    "/admin/question-bank/candidate-page": ["get"],
     "/admin/question-bank/candidates": ["get"],
     "/admin/question-bank/generations": ["get", "post"],
     "/admin/question-bank/generations/{id}": ["get"],
@@ -3068,6 +3074,97 @@
         "401": { "$ref": "#/components/schemas/ProblemDetails" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" },
         "500": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/question-bank/batches": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/QuestionBatchPage" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/question-bank/batches": {
+      "request": { "$ref": "#/components/schemas/CreateQuestionBatch" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/QuestionBatch" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/question-bank/batches/preview": {
+      "request": { "$ref": "#/components/schemas/QuestionBatchSelection" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/QuestionBatchPreview" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/question-bank/batches/{id}": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/QuestionBatch" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/question-bank/batches/{id}/cancel": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/QuestionBatch" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/question-bank/batches/{id}/items": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/QuestionGenerationPage" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/question-bank/candidate-page": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/QuestionCandidateSearchPage" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
     "get /admin/question-bank/candidates": {
@@ -7057,6 +7154,16 @@
       },
       "additionalProperties": false
     },
+    "CreateQuestionBatch": {
+      "type": "object",
+      "required": ["idempotency_key", "selection", "preview_token"],
+      "properties": {
+        "idempotency_key": { "type": "string", "format": "uuid" },
+        "preview_token": { "type": "string" },
+        "selection": { "$ref": "#/components/schemas/QuestionBatchSelection" }
+      },
+      "additionalProperties": false
+    },
     "CreateQuestionGeneration": {
       "type": "object",
       "required": [
@@ -7876,6 +7983,15 @@
         "base_revision": { "type": "integer", "format": "int64", "minimum": 1 },
         "confirmed_surface_match_token": { "type": "string" },
         "schema_version": { "type": "integer", "enum": [3] }
+      },
+      "additionalProperties": false
+    },
+    "QuestionBatchSelection": {
+      "type": "object",
+      "required": ["question_levels", "answer_profiles"],
+      "properties": {
+        "answer_profiles": { "type": "array", "items": { "type": "string" } },
+        "question_levels": { "type": "array", "items": { "type": "string" } }
       },
       "additionalProperties": false
     },

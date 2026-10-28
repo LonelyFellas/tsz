@@ -128,3 +128,53 @@ export interface QuestionGenerationPage {
   items: QuestionGeneration[];
   pagination: CoinEntryPage["pagination"];
 }
+
+export interface QuestionCandidateSearchPage {
+  items: QuestionCandidate[];
+  pagination: CoinEntryPage["pagination"];
+}
+export interface QuestionCandidatePageQuery extends QuestionCandidateQuery {
+  page?: number;
+  page_size?: number;
+}
+export interface QuestionBatchSelection {
+  question_levels: string[];
+  answer_profiles: string[];
+}
+export interface QuestionBatchCoverage {
+  question_level: string;
+  answer_profile: string;
+  eligible: number;
+  covered: number;
+  generating: number;
+  missing: number;
+}
+export interface QuestionBatchPreview {
+  selection: QuestionBatchSelection;
+  coverage: QuestionBatchCoverage[];
+  missing: number;
+  preview_token: string;
+}
+export interface CreateQuestionBatch {
+  idempotency_key: string;
+  selection: QuestionBatchSelection;
+  preview_token: string;
+}
+export interface QuestionBatch {
+  id: string;
+  created_by: string;
+  preview: QuestionBatchPreview;
+  state: "running" | "completed" | "cancelled";
+  total: number;
+  queued: number;
+  running: number;
+  succeeded: number;
+  failed: number;
+  insufficient_candidates: number;
+  cancelled: number;
+  created_at: string;
+}
+export interface QuestionBatchPage {
+  items: QuestionBatch[];
+  pagination: CoinEntryPage["pagination"];
+}
