@@ -1,4 +1,5 @@
 import { createQuestionBankEndpoints } from "./question-bank";
+import { createAiLedgerEndpoints } from "./ai-ledger";
 import { createRelatedSuggestionEndpoints } from "./related-suggestions";
 import { SENTENCE_FORMATTING_HEADERS } from "./sentence-formatting";
 import { createAdminWordlistEndpoints } from "./wordlists";
@@ -252,6 +253,7 @@ function requireLifecycleBatchIdentity<
  */
 export function createAdminEndpoints(http: HttpClient) {
   return {
+    aiLedger: createAiLedgerEndpoints(http),
     questionBank: createQuestionBankEndpoints(http),
     dashboard: {
       /** GET /admin/dashboard/overview — 管理端首页聚合统计。 */

@@ -109,11 +109,39 @@ describe("ConsoleSidebar", () => {
     setLevel("admin", ["words.access"]);
     renderAt("/");
     expect(screen.getByText("词库管理")).toBeInTheDocument();
-    // 无 users.access / reviews.access / coins.access → 这些分组整组不渲染。
+    // 无 users.access / reviews.access → 这些分组整组不渲染。
     expect(screen.queryByText("用户管理")).toBeNull();
     expect(screen.queryByText("审核管理")).toBeNull();
     expect(screen.queryByText("天生币管理")).toBeNull();
   });
+
+  it.each([
+    { role: "admin" as const, permissions: [], canManage: false },
+    {
+      role: "admin" as const,
+      permissions: ["coins.access"],
+      canManage: true
+    },
+    { role: "super_admin" as const, permissions: [], canManage: true }
+  ])(
+    "$role permissions=$permissions：我的天生币独立于管理权限可见且可访问",
+    async ({ role, permissions, canManage }) => {
+      setLevel(role, permissions);
+      renderAt("/account/coins");
+      fireEvent.click(screen.getByText("天生币"));
+      const entry = screen.getByRole("menuitem", { name: "我的天生币" });
+      expect(entry).toHaveClass("ant-menu-item-selected");
+      fireEvent.click(entry);
+      expect(mockNavigate).toHaveBeenCalledWith("/account/coins");
+      expect(
+        screen.queryByRole("menuitem", { name: "天生币管理" }) !== null
+      ).toBe(canManage);
+      const { canVisitAdminRoute } = await import("@/lib/adminPageRoutes");
+      const profile = useAuthStore.getState().profile;
+      expect(canVisitAdminRoute(profile, "/account/coins")).toBe(true);
+      expect(canVisitAdminRoute(profile, "/coins")).toBe(canManage);
+    }
+  );
 
   it.each([
     ["words.access"],
@@ -153,6 +181,17 @@ describe("ConsoleSidebar", () => {
     expect(screen.getByText("审核管理")).toBeInTheDocument();
     fireEvent.click(screen.getByText("用户管理"));
     expect(screen.getByText("管理员管理")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("系统设置"));
+    fireEvent.click(screen.getByText("AI 账本"));
+    expect(mockNavigate).toHaveBeenCalledWith("/ai-ledger");
+  });
+
+  it("普通管理员能打开系统设置也看不到 AI 账本", () => {
+    setLevel("admin", ["lexicon_settings.access"]);
+    renderAt("/");
+    fireEvent.click(screen.getByText("系统设置"));
+    expect(screen.getByText("词性配置")).toBeInTheDocument();
+    expect(screen.queryByText("AI 账本")).not.toBeInTheDocument();
   });
 
   it("super_admin：用户管理分组下显示「管理员管理」并跳转 /admins", () => {
