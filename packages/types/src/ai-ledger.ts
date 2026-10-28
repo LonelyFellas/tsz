@@ -41,3 +41,45 @@ export interface AiLedgerQuery {
   page_size?: number;
   run_id?: string;
 }
+
+export interface AiModelPricing {
+  version: string;
+  model: string;
+  currency: "CNY";
+  tariff: "peak" | "off_peak";
+  quoted_at: string;
+  input_hit_per_million: string;
+  input_miss_per_million: string;
+  output_per_million: string;
+}
+export interface AiCallCost {
+  call_id: string;
+  estimated_cost_cny: string | null;
+  pricing: AiModelPricing | null;
+}
+export interface AiCostTotals {
+  estimated_cost_cny: string | null;
+  total_calls: number;
+  priced_calls: number;
+  unknown_calls: number;
+}
+export interface AiCostPeriod extends AiCostTotals {
+  start: string | null;
+  end: string;
+}
+export interface AiCostOverview {
+  generated_at: string;
+  timezone: "Asia/Shanghai";
+  currency: "CNY";
+  pricing_version: string;
+  pricing_valid_until: string;
+  total: AiCostPeriod;
+  today: AiCostPeriod;
+  week: AiCostPeriod;
+  month: AiCostPeriod;
+}
+export interface AiCostLedgerPage {
+  ledger: AiLedgerPage;
+  costs: AiCallCost[];
+  cost_summary: AiCostTotals;
+}

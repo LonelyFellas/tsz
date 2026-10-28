@@ -19,7 +19,7 @@ vi.mock("@/lib/auth", async () => {
   return {
     useAuthStore: store,
     useIsSuperAdmin: () => store((s) => s.profile?.role === "super_admin"),
-    api: { aiLedger: { list: vi.fn() } }
+    api: { aiLedger: { costs: vi.fn() } }
   };
 });
 const profile: AdminProfile = {
@@ -83,7 +83,16 @@ const payload: Page = {
 beforeEach(() => {
   vi.resetAllMocks();
   useAuthStore.getState().setProfile(profile);
-  vi.mocked(api.aiLedger.list).mockResolvedValue(payload);
+  vi.mocked(api.aiLedger.costs).mockResolvedValue({
+    ledger: payload,
+    costs: [],
+    cost_summary: {
+      estimated_cost_cny: null,
+      total_calls: 21,
+      priced_calls: 0,
+      unknown_calls: 21
+    }
+  });
 });
 function mount() {
   const client = new QueryClient({
@@ -108,7 +117,7 @@ it("普通管理员即使有词库权限也不挂载查询，超管降权后立�
   });
   mount();
   expect(screen.getByText("仅超级管理员可查看 AI 账本")).toBeInTheDocument();
-  expect(api.aiLedger.list).not.toHaveBeenCalled();
+  expect(api.aiLedger.costs).not.toHaveBeenCalled();
   act(() => useAuthStore.getState().setProfile(profile));
   await screen.findByText("已响应");
   act(() => useAuthStore.getState().setProfile({ ...profile, role: "admin" }));
@@ -124,7 +133,7 @@ it("区分零命中和未知记录，分页及任务筛选使用服务端查询"
   expect(screen.getAllByText("1.25 秒").length).toBeGreaterThan(0);
   fireEvent.click(screen.getByTitle("下一页"));
   await waitFor(() =>
-    expect(api.aiLedger.list).toHaveBeenLastCalledWith(
+    expect(api.aiLedger.costs).toHaveBeenLastCalledWith(
       { page: 2, page_size: 20, run_id: undefined },
       { signal: expect.any(AbortSignal) }
     )
@@ -134,11 +143,11 @@ it("区分零命中和未知记录，分页及任务筛选使用服务端查询"
   });
   fireEvent.click(screen.getByRole("button", { name: "查 询" }));
   await screen.findByText("请输入完整的任务 UUID");
-  expect(api.aiLedger.list).toHaveBeenCalledTimes(2);
+  expect(api.aiLedger.costs).toHaveBeenCalledTimes(2);
   fireEvent.change(screen.getByLabelText("任务 ID"), { target: { value: id } });
   fireEvent.click(screen.getByRole("button", { name: "查 询" }));
   await waitFor(() =>
-    expect(api.aiLedger.list).toHaveBeenLastCalledWith(
+    expect(api.aiLedger.costs).toHaveBeenLastCalledWith(
       { page: 1, page_size: 20, run_id: id },
       { signal: expect.any(AbortSignal) }
     )
@@ -147,7 +156,7 @@ it("区分零命中和未知记录，分页及任务筛选使用服务端查询"
 it("刷新失败不展示旧账本或伪造空账本，可重试恢复", async () => {
   mount();
   await screen.findByText("已响应");
-  vi.mocked(api.aiLedger.list).mockRejectedValueOnce(new Error("unavailable"));
+  vi.mocked(api.aiLedger.costs).mockRejectedValueOnce(new Error("unavailable"));
   fireEvent.click(screen.getByRole("button", { name: /刷新/ }));
   await screen.findByText("AI 账本暂时不可用");
   expect(screen.queryByText("已响应")).not.toBeInTheDocument();

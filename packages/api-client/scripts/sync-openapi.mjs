@@ -70,6 +70,8 @@ const RUNTIME_SCHEMA_ROOTS = [
   "QuestionGeneration",
   "QuestionGenerationPage",
   "AiLedgerPage",
+  "AiCostLedgerPage",
+  "AiCostOverview",
   "BankQuestion",
   "BankQuestionPage",
 

@@ -1,12 +1,9 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  InfoCircleOutlined,
-  LockOutlined,
-  ReloadOutlined
-} from "@ant-design/icons";
+import { InfoCircleOutlined, ReloadOutlined } from "@ant-design/icons";
 import {
   Alert,
+  Breadcrumb,
   Button,
   Card,
   Descriptions,
@@ -25,7 +22,8 @@ import {
 } from "antd";
 import type { TableColumnsType } from "antd";
 import dayjs from "dayjs";
-import type { AiLedgerItem } from "@tsz/types";
+import type { AiCallCost, AiLedgerItem } from "@tsz/types";
+import { formatEstimatedCost } from "@/features/ai-ledger/cost";
 import { api, useAuthStore, useIsSuperAdmin } from "@/lib/auth";
 import "./ai-ledger.css";
 
@@ -40,7 +38,9 @@ const outcomes = {
   error: ["失败", "red"],
   cancelled: ["已取消", "default"]
 } as const;
-const columns: TableColumnsType<AiLedgerItem> = [
+const columns = (
+  costs: ReadonlyMap<string, AiCallCost>
+): TableColumnsType<AiLedgerItem> => [
   {
     title: "调用时间",
     dataIndex: "created_at",
@@ -140,12 +140,26 @@ const columns: TableColumnsType<AiLedgerItem> = [
     )
   },
   {
-    title: "费用",
-    dataIndex: "cost",
-    width: 76,
+    title: "预估费用",
+    width: 120,
     align: "right",
-    render: (value: string | null) =>
-      value ?? <span className="ai-ledger-muted">未知</span>
+    render: (_, row) => (
+      <Tooltip
+        title={
+          costs.get(row.call_id)?.estimated_cost_cny ?? "缺少完整用量或计价依据"
+        }
+      >
+        <span
+          className={
+            costs.get(row.call_id)?.estimated_cost_cny == null
+              ? "ai-ledger-muted"
+              : "ai-ledger-number"
+          }
+        >
+          {formatEstimatedCost(costs.get(row.call_id)?.estimated_cost_cny)}
+        </span>
+      </Tooltip>
+    )
   }
 ];
 
@@ -163,31 +177,26 @@ function Ledger({ adminId }: { adminId: string }) {
   const [pageSize, setPageSize] = useState(20);
   const [runId, setRunId] = useState<string>();
   const ledger = useQuery({
-    queryKey: ["ai-ledger", adminId, page, pageSize, runId],
+    queryKey: ["ai-ledger-costs", adminId, page, pageSize, runId],
     queryFn: ({ signal }) =>
-      api.aiLedger.list(
+      api.aiLedger.costs(
         { page, page_size: pageSize, run_id: runId },
         { signal }
       ),
     retry: false,
     gcTime: 0
   });
-  const data = ledger.isError ? undefined : ledger.data;
+  const costs = ledger.isError ? undefined : ledger.data;
+  const data = costs?.ledger;
+  const costByCall = new Map(costs?.costs.map((cost) => [cost.call_id, cost]));
   const summary = data?.summary;
   return (
     <Flex vertical gap={16} className="ai-ledger">
+      <Breadcrumb items={[{ title: "系统设置" }, { title: "AI 账本" }]} />
       <Flex justify="space-between" align="center" wrap gap={12}>
-        <div>
-          <Space align="center">
-            <Typography.Title level={3} style={{ margin: 0 }}>
-              AI 账本
-            </Typography.Title>
-            <Tag icon={<LockOutlined />}>仅超管</Tag>
-          </Space>
-          <Typography.Paragraph type="secondary" className="ai-ledger-subtitle">
-            模型用量、缓存与响应耗时
-          </Typography.Paragraph>
-        </div>
+        <Typography.Text type="secondary">
+          模型用量、缓存与响应耗时
+        </Typography.Text>
         <Space>
           <Popover
             trigger="click"
@@ -201,6 +210,10 @@ function Ledger({ adminId }: { adminId: string }) {
                 </p>
                 <p>
                   未知表示尚未取得有效回执。已响应仅表示模型返回，不代表题目审核通过。
+                </p>
+                <p>
+                  费用按实际 token
+                  和发起调用时冻结的官方单价估算，区分缓存与高峰/空闲时段，不是供应商实际账单。历史记录缺少计价依据时保持未知。
                 </p>
               </div>
             }
@@ -260,6 +273,28 @@ function Ledger({ adminId }: { adminId: string }) {
         </Card>
       )}
       <Card className="ai-ledger-records" styles={{ body: { padding: 0 } }}>
+        {costs && (
+          <div style={{ padding: "16px 20px 0" }}>
+            <Typography.Text strong>
+              当前筛选预估费用：
+              {formatEstimatedCost(costs.cost_summary.estimated_cost_cny)}
+            </Typography.Text>
+            <Typography.Text type="secondary">
+              {" "}
+              · 已计价 {costs.cost_summary.priced_calls}/
+              {costs.cost_summary.total_calls} 次
+            </Typography.Text>
+            {costs.cost_summary.unknown_calls > 0 && (
+              <Typography.Text type="warning">
+                {" "}
+                · {costs.cost_summary.unknown_calls} 次费用未知
+                {costs.cost_summary.estimated_cost_cny !== null
+                  ? "，金额仅含已知部分"
+                  : ""}
+              </Typography.Text>
+            )}
+          </div>
+        )}
         <div className="ai-ledger-toolbar">
           <div className="ai-ledger-table-title">
             <Typography.Text strong>调用明细</Typography.Text>
@@ -319,11 +354,11 @@ function Ledger({ adminId }: { adminId: string }) {
         ) : (
           <Table<AiLedgerItem>
             rowKey="call_id"
-            columns={columns}
+            columns={columns(costByCall)}
             dataSource={data?.items ?? []}
             loading={ledger.isPending}
             size="middle"
-            scroll={{ x: 800 }}
+            scroll={{ x: 850 }}
             locale={{ emptyText: "暂无符合条件的模型调用记录" }}
             expandable={{
               columnWidth: 32,
@@ -358,6 +393,13 @@ function Ledger({ adminId }: { adminId: string }) {
                           {row.external_request_id}
                         </Typography.Text>
                       )
+                    },
+                    {
+                      key: "pricing",
+                      label: "计价依据",
+                      children: costByCall.get(row.call_id)?.pricing
+                        ? `${costByCall.get(row.call_id)!.pricing!.version} · ${costByCall.get(row.call_id)!.pricing!.tariff === "peak" ? "高峰" : "空闲"}时段（人民币预估）`
+                        : "未知"
                     },
                     {
                       key: "cache",
