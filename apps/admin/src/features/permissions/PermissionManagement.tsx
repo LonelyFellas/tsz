@@ -1,3 +1,4 @@
+import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import { CloseOutlined, PlusOutlined, ReloadOutlined } from "@ant-design/icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -19,7 +20,6 @@ import {
   Radio,
   Select,
   Space,
-  Table,
   Tag,
   Typography
 } from "antd";
@@ -74,6 +74,7 @@ function GrantedAdmins({
     <Drawer open size={640} title="管理员名单" onClose={onClose}>
       {query.isError && <Alert type="error" title={query.error.message} />}
       <Table
+        tableId="permission-admins"
         locale={{ emptyText: <TableEmptyState message="暂无已授权管理员" /> }}
         rowKey="admin_id"
         loading={query.isFetching}
@@ -199,6 +200,7 @@ function BatchTargets({
         {query.isError && <Alert type="error" title={query.error.message} />}
         <div ref={listRef} style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
           <Table
+            tableId="permission-admin-picker"
             locale={{
               emptyText: (
                 <TableEmptyState
@@ -300,33 +302,37 @@ function PermissionAudits({ onClose }: { onClose: () => void }) {
   });
   return (
     <Drawer open size={960} title="权限与标签变更记录" onClose={onClose}>
-      <Space wrap key={filterResetKey}>
-        <Input.Search
-          key={filterResetKey}
-          placeholder="管理员 ID"
-          onSearch={(value) => {
-            setAdminId(value);
-            setPage(1);
-          }}
-        />
-        <Input.Search
-          key={filterResetKey}
-          placeholder="权限标识"
-          onSearch={(value) => {
-            setKey(value);
-            setPage(1);
-          }}
-        />
-        <DatePicker.RangePicker
-          value={dates}
-          onChange={(value) => {
-            setDates(value);
-            setPage(1);
-          }}
-        />
-      </Space>
       {query.isError && <Alert type="error" title={query.error.message} />}
       <Table
+        toolbar={
+          <Space wrap key={filterResetKey}>
+            <Input.Search
+              key={filterResetKey}
+              placeholder="管理员 ID"
+              onSearch={(value) => {
+                setAdminId(value);
+                setPage(1);
+              }}
+            />
+            <Input.Search
+              key={filterResetKey}
+              placeholder="权限标识"
+              onSearch={(value) => {
+                setKey(value);
+                setPage(1);
+              }}
+            />
+            <DatePicker.RangePicker
+              value={dates}
+              onChange={(value) => {
+                setDates(value);
+                setPage(1);
+              }}
+            />
+          </Space>
+        }
+
+        tableId="permission-audits"
         locale={{
           emptyText: (
             <TableEmptyState
@@ -512,16 +518,8 @@ export function PermissionManagement() {
   return (
     <Flex vertical gap={16}>
       <Breadcrumb items={[{ title: "用户管理" }, { title: "权限管理" }]} />
-      <Card size="small" styles={{ body: { paddingBottom: 8 } }}>
-        <Form
-          layout="inline"
-          style={{
-            rowGap: 12,
-            columnGap: 8,
-            display: "flex",
-            flexWrap: "wrap"
-          }}
-        >
+      <Card className="admin-filter-card" size="small">
+        <Form className="admin-filter-form" colon={false} layout="inline">
           <Form.Item label="关键词">
             <Input
               placeholder="权限名称 / 说明"
@@ -561,7 +559,7 @@ export function PermissionManagement() {
               options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
             />
           </Form.Item>
-          <Form.Item>
+          <Form.Item className="admin-filter-actions">
             <Button
               icon={<ReloadOutlined />}
               onClick={() => {
@@ -576,37 +574,6 @@ export function PermissionManagement() {
         </Form>
       </Card>
       <Card size="small">
-        <Flex
-          justify="space-between"
-          align="center"
-          gap={12}
-          wrap
-          style={{ marginBottom: 12 }}
-        >
-          <Space wrap>
-            <Typography.Text type="secondary">
-              已选 {selected.length} 项
-            </Typography.Text>
-            <Button
-              type="primary"
-              disabled={!selected.length}
-              onClick={() => setBatchAction("grant")}
-            >
-              批量授权
-            </Button>
-            <Button
-              danger
-              disabled={!selected.length}
-              onClick={() => setBatchAction("revoke")}
-            >
-              撤销授权
-            </Button>
-            <Button onClick={() => openTagManager()}>标签管理</Button>
-          </Space>
-          <Space>
-            <Button onClick={() => setAudits(true)}>变更记录</Button>
-          </Space>
-        </Flex>
         {catalog.isError && (
           <Alert
             type="error"
@@ -622,6 +589,35 @@ export function PermissionManagement() {
           />
         )}
         <Table
+          toolbar={
+            <Space wrap>
+              <Typography.Text type="secondary">
+                已选 {selected.length} 项
+              </Typography.Text>
+              <Button
+                type="primary"
+                disabled={!selected.length}
+                onClick={() => setBatchAction("grant")}
+              >
+                批量授权
+              </Button>
+              <Button
+                danger
+                disabled={!selected.length}
+                onClick={() => setBatchAction("revoke")}
+              >
+                撤销授权
+              </Button>
+              <Button onClick={() => openTagManager()}>标签管理</Button>
+            </Space>
+          }
+          toolbarExtra={
+            <Space>
+              <Button onClick={() => setAudits(true)}>变更记录</Button>
+            </Space>
+          }
+
+          tableId="permission-catalog"
           locale={{
             emptyText: (
               <TableEmptyState
@@ -829,21 +825,7 @@ export function PermissionManagement() {
               <Typography.Text type="secondary">勾选后确认</Typography.Text>
             </Flex>
           )}
-          <Flex justify="space-between" align="center">
-            <Typography.Text strong>标签列表</Typography.Text>
-            <Button
-              type="primary"
-              disabled={busy}
-              onClick={() => {
-                setEditingTag("new");
-                setTagName("");
-                setTagColor("default");
-                setCustomColor("#2053FF");
-              }}
-            >
-              新建标签
-            </Button>
-          </Flex>
+
           <Input
             aria-label="搜索标签"
             placeholder="搜索标签"
@@ -852,6 +834,25 @@ export function PermissionManagement() {
             onChange={(event) => setTagSearch(event.target.value)}
           />
           <Table<PermissionTag>
+            toolbar={
+              <>
+                <Typography.Text strong>标签列表</Typography.Text>
+                <Button
+                  type="primary"
+                  disabled={busy}
+                  onClick={() => {
+                    setEditingTag("new");
+                    setTagName("");
+                    setTagColor("default");
+                    setCustomColor("#2053FF");
+                  }}
+                >
+                  新建标签
+                </Button>
+              </>
+            }
+
+            tableId="permission-tags"
             locale={{
               emptyText: (
                 <TableEmptyState

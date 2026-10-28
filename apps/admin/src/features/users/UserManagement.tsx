@@ -1,3 +1,4 @@
+import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 // 用户目录按独立权限展示资料；敏感资源在详情中按需读取。
 import {
@@ -12,7 +13,6 @@ import {
   Modal,
   Segmented,
   Space,
-  Table,
   Tag
 } from "antd";
 import type { TableColumnsType } from "antd";
@@ -307,15 +307,6 @@ export function UserManagement() {
       />
 
       <Card size="small">
-        {canReadBasic && (
-          <Segmented<UserRoleTab>
-            options={ROLE_TABS}
-            value={role}
-            onChange={changeRole}
-            style={{ marginBottom: 12 }}
-          />
-        )}
-
         {listQuery.isError && !connectionError && (
           <Alert
             type="error"
@@ -332,6 +323,17 @@ export function UserManagement() {
         )}
 
         <Table<AdminUser>
+          toolbar={
+            canReadBasic && (
+              <Segmented<UserRoleTab>
+                options={ROLE_TABS}
+                value={role}
+                onChange={changeRole}
+              />
+            )
+          }
+
+          tableId="users"
           locale={{
             emptyText: (
               <TableEmptyState

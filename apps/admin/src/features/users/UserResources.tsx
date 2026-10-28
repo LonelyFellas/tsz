@@ -1,8 +1,9 @@
+import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import { useQuery } from "@tanstack/react-query";
-import { Alert, Button, Card, Empty, Image, Space, Spin, Table } from "antd";
+import { Alert, Button, Card, Empty, Image, Space, Spin } from "antd";
 import type { CertificationFile } from "@tsz/types";
 import { HttpError } from "@tsz/api-client";
 import { api, usePermission } from "@/lib/auth";
@@ -114,6 +115,7 @@ function Entries({ userId }: { userId: string }) {
     );
   return (
     <Table
+      tableId="user-coin-bills"
       locale={{ emptyText: <TableEmptyState message="暂无账单记录" /> }}
       rowKey="id"
       size="small"

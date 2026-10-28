@@ -1,14 +1,6 @@
+import { AdminTable as Table } from "@/components/AdminTable";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  App,
-  Alert,
-  Button,
-  Flex,
-  Modal,
-  Space,
-  Table,
-  Typography
-} from "antd";
+import { App, Alert, Button, Flex, Modal, Space, Typography } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { HttpError } from "@tsz/api-client";
 import type { PermissionPreviewResponse } from "@tsz/types";
@@ -241,6 +233,7 @@ export function PermissionChangeDialog({
       {conflict ? (
         current && (
           <Table
+            tableId="permission-conflict"
             loading={recovery === "reading"}
             rowKey="admin_id"
             pagination={false}
@@ -260,6 +253,7 @@ export function PermissionChangeDialog({
         )
       ) : (
         <Table
+          tableId="permission-change-preview"
           loading={preview.isFetching}
           rowKey="admin_id"
           pagination={false}

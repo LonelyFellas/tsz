@@ -945,7 +945,7 @@ test("词形总览按英美发音逐行对应读法、音色、语速与音量�
   ).toBeEnabled();
   await overview.screenshot({ path: test.info().outputPath("overview.png") });
   await expect(overview.getByRole("columnheader")).toHaveText([
-    "",
+    "操作",
     "词形名称",
     "词形拼写",
     "读法",

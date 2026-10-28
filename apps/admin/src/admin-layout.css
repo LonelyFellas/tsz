@@ -1,0 +1,73 @@
+.admin-filter-card {
+  container-type: inline-size;
+  min-width: 0;
+}
+
+.admin-filter-card > .ant-card-body {
+  padding: 16px;
+}
+
+.admin-filter-form {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  max-width: 100%;
+}
+
+.admin-filter-form.ant-form-inline > .ant-form-item {
+  margin: 0;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.admin-filter-form .ant-form-item-control {
+  min-width: 0;
+}
+
+.admin-filter-form .ant-input-affix-wrapper,
+.admin-filter-form .ant-select,
+.admin-filter-form .ant-picker {
+  max-width: 100%;
+}
+
+.admin-filter-form .ant-form-item-label > label {
+  color: var(--ant-color-text-secondary, #626b79);
+}
+
+@container (max-width: 640px) {
+  .admin-filter-form > .ant-form-item:not(.admin-filter-actions) {
+    flex: 1 1 220px;
+  }
+
+  .admin-filter-form .ant-form-item-row {
+    flex-wrap: nowrap;
+  }
+
+  .admin-filter-form .ant-form-item-control {
+    flex: 1;
+  }
+
+  .admin-filter-form .ant-form-item-control-input-content > .ant-input,
+  .admin-filter-form
+    .ant-form-item-control-input-content
+    > .ant-input-affix-wrapper,
+  .admin-filter-form
+    .ant-form-item-control-input-content
+    > .ant-input-group-wrapper,
+  .admin-filter-form .ant-form-item-control-input-content > .ant-select,
+  .admin-filter-form .ant-form-item-control-input-content > .ant-picker {
+    width: 100% !important;
+  }
+}
+
+@container (max-width: 440px) {
+  .admin-filter-form > .ant-form-item:not(.admin-filter-actions) {
+    flex-basis: 100%;
+  }
+
+  .admin-filter-form .ant-form-item-label {
+    flex: 0 0 72px;
+    text-align: left;
+  }
+}

@@ -1,3 +1,4 @@
+import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -11,7 +12,6 @@ import {
   Pagination,
   Radio,
   Space,
-  Table,
   Tabs,
   Tag,
   Typography
@@ -241,6 +241,7 @@ export function WordlistDetails({
               <p>尚未提交公开审核</p>
             ) : !reviewMode ? (
               <Table<AdminWordlistReview>
+                tableId="wordlist-review-history"
                 locale={{
                   emptyText: <TableEmptyState message="暂无审核记录" />
                 }}

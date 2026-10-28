@@ -1,0 +1,71 @@
+.admin-table-toolbar {
+  container-type: inline-size;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  margin-bottom: 12px;
+  min-width: 0;
+}
+
+.admin-table-toolbar-primary,
+.admin-table-toolbar-extra,
+.admin-table-toolbar-trailing {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.admin-table-toolbar-trailing {
+  justify-content: flex-end;
+  margin-inline-start: auto;
+}
+
+.admin-table-toolbar-extra + .admin-table-toolbar-settings {
+  margin-inline-start: 4px;
+  padding-inline-start: 8px;
+  border-inline-start: 1px solid var(--ant-color-border-secondary, #e9ecf1);
+}
+
+.admin-table-toolbar .admin-column-settings-toolbar {
+  margin-bottom: 0;
+}
+
+.admin-table-toolbar .ant-picker,
+.admin-table-toolbar .ant-select {
+  max-width: 100%;
+}
+
+@container (max-width: 560px) {
+  .admin-table-toolbar-primary,
+  .admin-table-toolbar-primary > .ant-space {
+    display: contents;
+  }
+
+  .admin-table-toolbar-trailing:has(.admin-table-toolbar-filter) {
+    display: contents;
+  }
+
+  .admin-table-toolbar-extra:has(.admin-table-toolbar-filter) {
+    order: 1;
+    flex-basis: 100%;
+    width: 100%;
+  }
+
+  .admin-table-toolbar:has(.admin-table-toolbar-filter)
+    .admin-table-toolbar-settings {
+    margin-inline-start: auto;
+  }
+
+  .admin-table-toolbar-filter {
+    width: 100%;
+  }
+
+  .admin-table-toolbar-filter .ant-select {
+    flex: 1;
+    min-width: 0;
+  }
+}
