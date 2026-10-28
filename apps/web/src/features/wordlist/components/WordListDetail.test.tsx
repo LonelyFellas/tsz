@@ -411,6 +411,48 @@ it("old backend availability 404 never invents zero counts or blocks reading, an
   expect(api.wordList.myAvailability).not.toHaveBeenCalled();
 });
 
+it("简洁与标准模式共用已加载分页，切换后保留备注与搜索", async () => {
+  open(true);
+  await screen.findByRole("heading", { name: "apple" });
+  reachBottom();
+  await screen.findByRole("heading", { name: "banana" });
+  const calls = vi.mocked(api.wordList.myItems).mock.calls.length;
+  fireEvent.click(screen.getByRole("button", { name: "简洁模式" }));
+  expect(screen.getByRole("table", { name: "简洁模式词条列表" })).toBeVisible();
+  expect(screen.getAllByRole("columnheader")).toHaveLength(3);
+  expect(screen.getByRole("heading", { name: "banana" })).toBeVisible();
+  expect(screen.getAllByText("私密备注：作者秘密")[0]).toBeVisible();
+  expect(
+    screen.getAllByText("注：作者给读者的补充说明")[0]!.closest("td")
+  ).toHaveAttribute("colspan", "3");
+  expect(api.wordList.myItems).toHaveBeenCalledTimes(calls);
+  fireEvent.change(screen.getByLabelText("搜索词条"), {
+    target: { value: "apple" }
+  });
+  await waitFor(() =>
+    expect(api.wordList.myItems).toHaveBeenLastCalledWith(
+      "list",
+      { page: 1, q: "apple" },
+      expect.anything()
+    )
+  );
+  fireEvent.click(screen.getByRole("button", { name: "标准模式" }));
+  expect(screen.getAllByRole("columnheader")).toHaveLength(4);
+  expect(screen.getByLabelText("搜索词条")).toHaveValue("apple");
+  fireEvent.click(screen.getByRole("button", { name: "完整模式" }));
+  await waitFor(() =>
+    expect(api.wordList.myItems).toHaveBeenLastCalledWith(
+      "list",
+      { page: 1, q: "apple", view: "full" },
+      expect.anything()
+    )
+  );
+  await screen.findByRole("columnheader", { name: "词形变化" });
+  fireEvent.click(screen.getByRole("button", { name: "简洁模式" }));
+  await screen.findByRole("table", { name: "简洁模式词条列表" });
+  expect(screen.getAllByRole("columnheader")).toHaveLength(3);
+});
+
 it("switches real modes and reading context without writing preferences or leaking private responses", async () => {
   const view = open(true);
   await screen.findByText("A1-UK");
@@ -1229,4 +1271,14 @@ it("自定义词在阅读页展示原释义，不误判为不可用并提示不�
   expect(
     screen.queryByText("当前已加载的词条均不可用。")
   ).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "简洁模式" }));
+  expect(
+    screen.getByRole("heading", { name: "custom phrase" }).closest("tr")!
+      .children
+  ).toHaveLength(3);
+  expect(screen.getByText("独立的自定义释义")).toBeVisible();
+  expect(screen.getByText("注：自定义词的注").closest("td")).toHaveAttribute(
+    "colspan",
+    "3"
+  );
 });
