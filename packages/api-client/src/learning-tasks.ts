@@ -11,9 +11,11 @@ import type {
   LearningRunPage,
   LearningQuestionPage,
   LearningAnswerReceipt,
-  LearningPageQuery
+  LearningPageQuery,
+  LearningCapabilities
 } from "@tsz/types";
 import type { HttpClient } from "./http";
+import { learningOptions } from "./learning-capabilities";
 import {
   validateRuntimeSchema,
   type RuntimeSchemaRoot
@@ -35,21 +37,25 @@ function query(q: LearningPageQuery) {
 }
 export function createLearningTaskEndpoints(http: HttpClient) {
   return {
+    capabilities: (o?: Options) =>
+      http
+        .get<unknown>("/me/learning-capabilities", learningOptions(o))
+        .then((v) => decode<LearningCapabilities>("LearningCapabilities", v)),
     preview: (data: PreviewLearningTask, o?: Options) =>
       http
-        .post<unknown>("/me/learning-tasks/preview", data, o)
+        .post<unknown>("/me/learning-tasks/preview", data, learningOptions(o))
         .then((v) => decode<LearningPreview>("LearningPreview", v)),
     create: (data: CreateLearningTask, o?: Options) =>
       http
-        .post<unknown>("/me/learning-tasks", data, o)
+        .post<unknown>("/me/learning-tasks", data, learningOptions(o))
         .then((v) => decode<LearningTask>("LearningTask", v)),
     list: (q: LearningPageQuery = {}, o?: Options) =>
       http
-        .get<unknown>(`/me/learning-tasks${query(q)}`, o)
+        .get<unknown>(`/me/learning-tasks${query(q)}`, learningOptions(o))
         .then((v) => decode<LearningTaskPage>("LearningTaskPage", v)),
     detail: (id: string, o?: Options) =>
       http
-        .get<unknown>(`/me/learning-tasks/${id}`, o)
+        .get<unknown>(`/me/learning-tasks/${id}`, learningOptions(o))
         .then((v) => decode<LearningTaskDetail>("LearningTaskDetail", v)),
     rename: (
       id: string,
@@ -57,31 +63,49 @@ export function createLearningTaskEndpoints(http: HttpClient) {
       o?: Options
     ) =>
       http
-        .patch<unknown>(`/me/learning-tasks/${id}`, data, o)
+        .patch<unknown>(`/me/learning-tasks/${id}`, data, learningOptions(o))
         .then((v) => decode<LearningTask>("LearningTask", v)),
     archive: (id: string, data: { expected_revision: number }, o?: Options) =>
       http
-        .post<unknown>(`/me/learning-tasks/${id}/archive`, data, o)
+        .post<unknown>(
+          `/me/learning-tasks/${id}/archive`,
+          data,
+          learningOptions(o)
+        )
         .then((v) => decode<LearningTask>("LearningTask", v)),
     start: (id: string, data: StartLearningRun, o?: Options) =>
       http
-        .post<unknown>(`/me/learning-tasks/${id}/runs`, data, o)
+        .post<unknown>(
+          `/me/learning-tasks/${id}/runs`,
+          data,
+          learningOptions(o)
+        )
         .then((v) => decode<LearningRun>("LearningRun", v)),
     history: (id: string, q: LearningPageQuery = {}, o?: Options) =>
       http
-        .get<unknown>(`/me/learning-tasks/${id}/runs${query(q)}`, o)
+        .get<unknown>(
+          `/me/learning-tasks/${id}/runs${query(q)}`,
+          learningOptions(o)
+        )
         .then((v) => decode<LearningRunPage>("LearningRunPage", v)),
     run: (id: string, o?: Options) =>
       http
-        .get<unknown>(`/me/learning-runs/${id}`, o)
+        .get<unknown>(`/me/learning-runs/${id}`, learningOptions(o))
         .then((v) => decode<LearningRun>("LearningRun", v)),
     questions: (id: string, q: LearningPageQuery = {}, o?: Options) =>
       http
-        .get<unknown>(`/me/learning-runs/${id}/questions${query(q)}`, o)
+        .get<unknown>(
+          `/me/learning-runs/${id}/questions${query(q)}`,
+          learningOptions(o)
+        )
         .then((v) => decode<LearningQuestionPage>("LearningQuestionPage", v)),
     answer: (id: string, data: SubmitLearningAnswer, o?: Options) =>
       http
-        .post<unknown>(`/me/learning-runs/${id}/answers`, data, o)
+        .post<unknown>(
+          `/me/learning-runs/${id}/answers`,
+          data,
+          learningOptions(o)
+        )
         .then((v) => decode<LearningAnswerReceipt>("LearningAnswerReceipt", v))
   };
 }

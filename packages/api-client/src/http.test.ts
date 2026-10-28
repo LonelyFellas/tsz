@@ -561,10 +561,17 @@ describe("createHttpClient", () => {
   it("patch:method=PATCH 且 body 为 JSON 字符串", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(null));
     const http = createHttpClient({ baseUrl: "" });
-    await http.patch("/me", { display_name: "b" });
+    await http.patch(
+      "/me",
+      { display_name: "b" },
+      { headers: { "X-TSZ-Learning-Capabilities": "choice-v1" } }
+    );
     const init = fetchMock.mock.calls[0]![1];
     expect(init.method).toBe("PATCH");
     expect(init.body).toBe(JSON.stringify({ display_name: "b" }));
+    expect(new Headers(init.headers).get("X-TSZ-Learning-Capabilities")).toBe(
+      "choice-v1"
+    );
   });
 
   it("del:method=DELETE", async () => {

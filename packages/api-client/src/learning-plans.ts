@@ -15,6 +15,7 @@ import type {
   LearningPlanRunPage
 } from "@tsz/types";
 import type { HttpClient } from "./http";
+import { learningOptions } from "./learning-capabilities";
 import {
   validateRuntimeSchema,
   type RuntimeSchemaRoot
@@ -39,19 +40,19 @@ export function createLearningPlanEndpoints(http: HttpClient) {
   return {
     preview: (data: PreviewLearningPlan, o?: Options) =>
       http
-        .post<unknown>(`${base}/preview`, data, o)
+        .post<unknown>(`${base}/preview`, data, learningOptions(o))
         .then((v) => decode<LearningPlanPreview>("LearningPlanPreview", v)),
     create: (data: CreateLearningPlan, o?: Options) =>
       http
-        .post<unknown>(base, data, o)
+        .post<unknown>(base, data, learningOptions(o))
         .then((v) => decode<LearningPlan>("LearningPlan", v)),
     list: (q: LearningPageQuery = {}, o?: Options) =>
       http
-        .get<unknown>(`${base}${query(q)}`, o)
+        .get<unknown>(`${base}${query(q)}`, learningOptions(o))
         .then((v) => decode<LearningPlanPage>("LearningPlanPage", v)),
     detail: (id: string, o?: Options) =>
       http
-        .get<unknown>(`${base}/${id}`, o)
+        .get<unknown>(`${base}/${id}`, learningOptions(o))
         .then((v) => decode<LearningPlan>("LearningPlan", v)),
     rename: (
       id: string,
@@ -59,31 +60,31 @@ export function createLearningPlanEndpoints(http: HttpClient) {
       o?: Options
     ) =>
       http
-        .patch<unknown>(`${base}/${id}`, data, o)
+        .patch<unknown>(`${base}/${id}`, data, learningOptions(o))
         .then((v) => decode<LearningPlan>("LearningPlan", v)),
     archive: (id: string, data: { expected_revision: number }, o?: Options) =>
       http
-        .post<unknown>(`${base}/${id}/archive`, data, o)
+        .post<unknown>(`${base}/${id}/archive`, data, learningOptions(o))
         .then((v) => decode<LearningPlan>("LearningPlan", v)),
     start: (id: string, data: StartLearningRun, o?: Options) =>
       http
-        .post<unknown>(`${base}/${id}/runs`, data, o)
+        .post<unknown>(`${base}/${id}/runs`, data, learningOptions(o))
         .then((v) => decode<LearningRun>("LearningRun", v)),
     history: (id: string, q: LearningPageQuery = {}, o?: Options) =>
       http
-        .get<unknown>(`${base}/${id}/runs${query(q)}`, o)
+        .get<unknown>(`${base}/${id}/runs${query(q)}`, learningOptions(o))
         .then((v) => decode<LearningPlanRunPage>("LearningPlanRunPage", v)),
     cyclePreview: (id: string, data: PreviewLearningCycle, o?: Options) =>
       http
-        .post<unknown>(`${base}/${id}/cycles/preview`, data, o)
+        .post<unknown>(`${base}/${id}/cycles/preview`, data, learningOptions(o))
         .then((v) => decode<LearningCyclePreview>("LearningCyclePreview", v)),
     cycleCreate: (id: string, data: CreateLearningCycle, o?: Options) =>
       http
-        .post<unknown>(`${base}/${id}/cycles`, data, o)
+        .post<unknown>(`${base}/${id}/cycles`, data, learningOptions(o))
         .then((v) => decode<LearningCycle>("LearningCycle", v)),
     cycles: (id: string, q: LearningPageQuery = {}, o?: Options) =>
       http
-        .get<unknown>(`${base}/${id}/cycles${query(q)}`, o)
+        .get<unknown>(`${base}/${id}/cycles${query(q)}`, learningOptions(o))
         .then((v) => decode<LearningCyclePage>("LearningCyclePage", v))
   };
 }

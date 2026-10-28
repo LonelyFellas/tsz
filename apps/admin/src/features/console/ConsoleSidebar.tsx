@@ -100,6 +100,7 @@ const GROUPS: Group[] = [
     label: "词库管理",
     leaves: [
       pageLeaf(ADMIN_PAGE_ROUTES.words, "智能词库"),
+      pageLeaf(ADMIN_PAGE_ROUTES.questionBank, "单选题工作台"),
       pageLeaf(ADMIN_PAGE_ROUTES.wordsTrash, "垃圾桶"),
       {
         key: "todo:custom-dict",

@@ -1,6 +1,10 @@
 import type { CoinEntryPage } from "./coins";
 type PaginationMeta = CoinEntryPage["pagination"];
 export type LearningTaskType = "daily" | "longterm";
+export type LearningQuestionType = "spelling_zh_to_en" | "choice_zh_to_en";
+export interface LearningCapabilities {
+  question_types: LearningQuestionType[];
+}
 export type LearningTaskState = "active" | "archived";
 export type LearningRunState =
   "active" | "completed" | "expired" | "invalidated" | "cancelled";
@@ -29,6 +33,7 @@ export interface SubmitLearningAnswer {
   answer: string;
 }
 export interface LearningTask extends PreviewLearningTask {
+  question_type?: "choice_zh_to_en";
   id: string;
   name: string;
   state: LearningTaskState;
@@ -88,12 +93,15 @@ export interface LearningQuestion {
   answered: boolean;
   content_available: boolean;
   prompt: { definition: string; part_of_speech: string } | null;
+  options?: { option_id: string; spelling: string }[];
   feedback: {
     answer_id: string;
     submitted_answer: string;
     is_correct: boolean;
     accepted_at: string;
     accepted_answers: string[];
+    correct_option_id?: string;
+    explanation?: string;
   } | null;
 }
 export interface LearningQuestionPage {

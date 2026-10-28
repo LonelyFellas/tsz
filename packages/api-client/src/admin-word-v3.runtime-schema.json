@@ -1,8 +1,14 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dubbing-auto-update/docs/openapi.json",
-  "_source_sha256": "bec18bcbfb2b463785f0b2b13e8beb0874f464cac9943513f254a5e3cc904bd1",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/vocabulary-mcq/docs/openapi.json",
+  "_source_sha256": "fd9b62050f11e2cddd767cce4e23ca4306d08ce47b8d74f907c8ef09035d2a44",
   "roots": [
+    "LearningCapabilities",
+    "QuestionCandidatePage",
+    "QuestionGeneration",
+    "QuestionGenerationPage",
+    "BankQuestion",
+    "BankQuestionPage",
     "MemoryOverview",
     "MemoryPage",
     "MemoryItem",
@@ -533,6 +539,84 @@
       "required": ["items"],
       "properties": {
         "items": { "type": "array", "items": { "$ref": "#/$defs/AudioStatus" } }
+      },
+      "additionalProperties": false
+    },
+    "BankQuestion": {
+      "type": "object",
+      "required": [
+        "id",
+        "generation_id",
+        "revision",
+        "state",
+        "content",
+        "original_content",
+        "created_by",
+        "review_comment",
+        "created_at",
+        "updated_at"
+      ],
+      "properties": {
+        "content": { "$ref": "#/$defs/BankQuestionContent" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "created_by": { "type": "string", "format": "uuid" },
+        "generation_id": { "type": "string", "format": "uuid" },
+        "id": { "type": "string", "format": "uuid" },
+        "original_content": { "$ref": "#/$defs/BankQuestionContent" },
+        "review_comment": { "type": "string" },
+        "reviewed_by": { "type": ["string", "null"], "format": "uuid" },
+        "revision": { "type": "integer" },
+        "state": { "type": "string" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "BankQuestionContent": {
+      "type": "object",
+      "required": [
+        "target",
+        "prompt",
+        "question_level",
+        "answer_profile",
+        "options",
+        "correct_option_id",
+        "explanation",
+        "concerns"
+      ],
+      "properties": {
+        "answer_profile": { "type": "string" },
+        "concerns": { "type": "array", "items": { "type": "string" } },
+        "correct_option_id": { "type": "string" },
+        "explanation": { "type": "string" },
+        "options": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/BankQuestionOption" }
+        },
+        "prompt": { "type": "string" },
+        "question_level": { "type": "string" },
+        "target": { "$ref": "#/$defs/QuestionCandidate" }
+      },
+      "additionalProperties": false
+    },
+    "BankQuestionOption": {
+      "type": "object",
+      "required": ["option_id", "candidate", "explanation"],
+      "properties": {
+        "candidate": { "$ref": "#/$defs/QuestionCandidate" },
+        "explanation": { "type": "string" },
+        "option_id": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "BankQuestionPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/BankQuestion" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
       },
       "additionalProperties": false
     },
@@ -1771,6 +1855,8 @@
         "accepted_answers": { "type": "array", "items": { "type": "string" } },
         "accepted_at": { "type": "string", "format": "date-time" },
         "answer_id": { "type": "string", "format": "uuid" },
+        "correct_option_id": { "type": "string" },
+        "explanation": { "type": "string" },
         "is_correct": { "type": "boolean" },
         "submitted_answer": { "type": "string" }
       },
@@ -1793,6 +1879,14 @@
         "question": { "$ref": "#/$defs/LearningQuestion" },
         "question_id": { "type": "string", "format": "uuid" },
         "run": { "$ref": "#/$defs/LearningRun" }
+      },
+      "additionalProperties": false
+    },
+    "LearningCapabilities": {
+      "type": "object",
+      "required": ["question_types"],
+      "properties": {
+        "question_types": { "type": "array", "items": { "type": "string" } }
       },
       "additionalProperties": false
     },
@@ -1884,6 +1978,15 @@
         "no_base_form": { "type": "integer" },
         "no_chinese_definition": { "type": "integer" },
         "unavailable_entries": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "LearningOption": {
+      "type": "object",
+      "required": ["option_id", "spelling"],
+      "properties": {
+        "option_id": { "type": "string" },
+        "spelling": { "type": "string" }
       },
       "additionalProperties": false
     },
@@ -2094,6 +2197,10 @@
           ]
         },
         "id": { "type": "string", "format": "uuid" },
+        "options": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LearningOption" }
+        },
         "position": { "type": "integer" },
         "prompt": {
           "oneOf": [{ "$ref": "#/$defs/LearningPrompt" }, { "type": "null" }]
@@ -2243,6 +2350,7 @@
         "ends_at": { "type": ["string", "null"], "format": "date-time" },
         "id": { "type": "string", "format": "uuid" },
         "name": { "type": "string" },
+        "question_type": { "type": "string" },
         "revision": { "type": "integer" },
         "state": { "$ref": "#/$defs/LearningTaskState" },
         "task_type": { "$ref": "#/$defs/LearningTaskType" },
@@ -2818,6 +2926,116 @@
           "type": "array",
           "items": { "$ref": "#/$defs/SentenceTargetSenseV3" }
         }
+      },
+      "additionalProperties": false
+    },
+    "QuestionCandidate": {
+      "type": "object",
+      "required": [
+        "candidate_ref",
+        "source",
+        "content_fingerprint",
+        "spelling",
+        "part_of_speech",
+        "level",
+        "definition",
+        "other_definitions",
+        "accepted_spellings",
+        "answer_profile",
+        "form_type",
+        "teaching_eligible"
+      ],
+      "properties": {
+        "accepted_spellings": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "answer_profile": { "type": "string" },
+        "candidate_ref": { "type": "string" },
+        "content_fingerprint": { "type": "string" },
+        "definition": { "type": "string" },
+        "form_type": { "type": "string" },
+        "level": { "type": "string" },
+        "other_definitions": { "type": "array", "items": { "type": "string" } },
+        "part_of_speech": { "type": "string" },
+        "source": { "$ref": "#/$defs/QuestionSource" },
+        "spelling": { "type": "string" },
+        "teaching_eligible": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "QuestionCandidatePage": {
+      "type": "object",
+      "required": ["contract_version", "items"],
+      "properties": {
+        "contract_version": { "type": "integer" },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/QuestionCandidate" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "QuestionGeneration": {
+      "type": "object",
+      "required": [
+        "id",
+        "state",
+        "revision",
+        "created_by",
+        "question_level",
+        "answer_profile",
+        "target",
+        "reasons",
+        "created_at",
+        "updated_at"
+      ],
+      "properties": {
+        "agent_run_id": { "type": ["string", "null"], "format": "uuid" },
+        "answer_profile": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "created_by": { "type": "string", "format": "uuid" },
+        "error_code": { "type": ["string", "null"] },
+        "id": { "type": "string", "format": "uuid" },
+        "question_id": { "type": ["string", "null"], "format": "uuid" },
+        "question_level": { "type": "string" },
+        "reasons": { "type": "array", "items": { "type": "string" } },
+        "revision": { "type": "integer" },
+        "state": { "type": "string" },
+        "target": { "$ref": "#/$defs/QuestionCandidate" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "QuestionGenerationPage": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/QuestionGeneration" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "QuestionSource": {
+      "type": "object",
+      "required": [
+        "entry_id",
+        "publication_id",
+        "pos_id",
+        "sense_id",
+        "definition_id",
+        "form_id"
+      ],
+      "properties": {
+        "definition_id": { "type": "string", "format": "uuid" },
+        "entry_id": { "type": "string", "format": "uuid" },
+        "form_id": { "type": "string", "format": "uuid" },
+        "pos_id": { "type": "string", "format": "uuid" },
+        "publication_id": { "type": "string", "format": "uuid" },
+        "sense_id": { "type": "string", "format": "uuid" }
       },
       "additionalProperties": false
     },
