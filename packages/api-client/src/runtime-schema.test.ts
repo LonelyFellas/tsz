@@ -46,6 +46,7 @@ const ROOTS = [
   "AiLedgerPage",
   "AiCostLedgerPage",
   "AiCostOverview",
+  "OpenCodeModelProbeReport",
   "OpenCodeModelList",
   "OpenCodeProviderList",
   "OpenCodeModelSelection",

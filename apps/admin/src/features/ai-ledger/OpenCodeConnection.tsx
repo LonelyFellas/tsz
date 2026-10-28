@@ -43,9 +43,12 @@ export function OpenCodeConnection({ adminId }: { adminId: string }) {
   useEffect(() => {
     if (status.data?.status === "complete")
       void Promise.all(
-        ["opencode-connection", "opencode-models", "opencode-providers"].map(
-          (key) => client.invalidateQueries({ queryKey: [key, adminId] })
-        )
+        [
+          "opencode-connection",
+          "opencode-models",
+          "opencode-model-probes",
+          "opencode-providers"
+        ].map((key) => client.invalidateQueries({ queryKey: [key, adminId] }))
       );
   }, [status.data?.status, client, adminId]);
 
