@@ -95,7 +95,8 @@ function Detail({
     const timer = setTimeout(() => setQ(query.trim()), 250);
     return () => clearTimeout(timer);
   }, [query, composing]);
-  const [view, setView] = useState<WordlistView>("standard");
+  const [view, setView] = useState<WordlistView | "simple">("standard");
+  const requestView = view === "full" ? "full" : "standard";
   const [sort, setSort] = useState<WordlistSort>("author");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -127,7 +128,7 @@ function Detail({
       id,
       meta.data?.revision,
       q,
-      view,
+      requestView,
       sort
     ],
     enabled: meta.isSuccess,
@@ -140,7 +141,7 @@ function Detail({
             {
               page: pageParam.page,
               q,
-              ...(view === "full" ? { view } : {}),
+              ...(requestView === "full" ? { view: requestView } : {}),
               ...(sort !== "author" ? { sort } : {})
             },
             { signal }
@@ -150,7 +151,7 @@ function Detail({
             {
               page: pageParam.page,
               q,
-              ...(view === "full" ? { view } : {}),
+              ...(requestView === "full" ? { view: requestView } : {}),
               ...(sort !== "author" ? { sort } : {})
             },
             { signal }
@@ -164,7 +165,7 @@ function Detail({
         ? { page: lastPage.pagination.page + 1, revision: lastPage.revision }
         : undefined,
     placeholderData: (previous, previousQuery) =>
-      previousQuery?.queryKey.at(-2) === view &&
+      previousQuery?.queryKey.at(-2) === requestView &&
       previousQuery.queryKey.at(-4) === meta.data?.revision &&
       previousQuery.queryKey.at(-1) === sort
         ? previous
@@ -549,6 +550,7 @@ function Detail({
             label="阅读模式"
             value={view}
             options={[
+              { value: "simple", label: "简洁模式" },
               { value: "standard", label: "标准模式" },
               { value: "full", label: "完整模式" }
             ]}
@@ -732,7 +734,7 @@ function Detail({
             </p>
           )}
           <div aria-busy={updatingSearch}>
-            <ReadingTable full={view === "full"}>
+            <ReadingTable full={view === "full"} simple={view === "simple"}>
               {loadedItems.map((item) =>
                 item.entry || item.custom_word ? (
                   <tbody
@@ -800,12 +802,13 @@ function Detail({
                         <td className="whitespace-pre-wrap">
                           {item.custom_word.definition}
                         </td>
-                        <td />
+                        {view !== "simple" && <td />}
                       </tr>
                     ) : (
                       item.entry && (
                         <ReadingEntry
                           full={view === "full"}
+                          simple={view === "simple"}
                           entry={item.entry}
                           level={level}
                           variant={variant}
@@ -817,7 +820,11 @@ function Detail({
                       (mine && "private_note" in item && item.private_note)
                     ) && (
                       <tr>
-                        <td colSpan={view === "full" ? 6 : 4}>
+                        <td
+                          colSpan={
+                            view === "full" ? 6 : view === "simple" ? 3 : 4
+                          }
+                        >
                           {item.author_note && (
                             <p className="whitespace-pre-wrap rounded-2xl bg-muted/70 px-4 py-3">
                               注：{item.author_note}
