@@ -30,7 +30,7 @@ test("偏好子面板悬停展开，X仅关闭偏好，Escape与外部点击关�
   await trigger.press("ArrowDown");
   await preferences.click();
   await expect(settings).toBeVisible();
-  await page.getByRole("heading", { name: "天生会背", exact: true }).click();
+  await page.getByRole("heading", { level: 1 }).click();
   await expect(menu).toHaveCount(0);
   await expect(settings).toHaveCount(0);
 });

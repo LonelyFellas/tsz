@@ -124,7 +124,7 @@ function TaskList({ userId }: { userId: string }) {
         }
       />
       <div className="space-y-6">
-        <LearningRewardSummary key={userId} userId={userId} />
+        <LearningRewardSummary key={userId} userId={userId} taskList />
         <Segmented
           label="任务状态"
           value={archived}

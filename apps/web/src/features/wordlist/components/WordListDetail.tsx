@@ -743,7 +743,7 @@ function Detail({
                   >
                     {item.custom_word ? (
                       <tr>
-                        <td>
+                        <td className="sticky left-0 z-10 border-r border-border/60 bg-surface">
                           <h2 className="tsz-words break-words text-xl font-bold tracking-tight">
                             {item.custom_word.word}
                           </h2>

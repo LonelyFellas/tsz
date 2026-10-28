@@ -5,7 +5,7 @@ import { PageHeader, PageShell } from "@/features/shell/Page";
 
 export const metadata: Metadata = {
   title: "申请成为老师",
-  description: "在天生会背申请成为老师,创建班级、布置单词任务并跟踪学情。",
+  description: "在天生会背提交教师认证资料，通过站内通知查看审核结果。",
   alternates: { canonical: "/apply-teacher" },
   robots: { index: false, follow: false }
 };
@@ -21,7 +21,7 @@ export default function ApplyTeacherPage() {
             back={{ href: "/account", label: "返回个人中心" }}
             eyebrow="教师认证"
             title="申请成为老师"
-            description="通过认证后，可以创建班级、布置任务。你仍可用学生身份学习，原有记录会保留。"
+            description="提交资料申请教师认证，审核结果通过站内通知送达。班级与教学任务暂未开放；你仍可使用学生身份学习。"
           />
           <ApplyTeacherForm />
         </PageShell>

@@ -13,7 +13,7 @@ test.beforeEach(async ({ page }) => {
 
 test("首页可达并能进入词表", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "天生会背" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await page.getByRole("link", { name: "浏览词表" }).click();
   await expect(page).toHaveURL(/\/wordlists/);
   await expect(page.getByRole("heading", { name: "词表" })).toBeVisible();

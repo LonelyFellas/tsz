@@ -1,0 +1,268 @@
+.hero {
+  padding: 48px 24px 72px;
+  background: rgb(var(--ch-surface));
+}
+
+.heroCopy {
+  max-width: 880px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.headline {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 4.5rem);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+
+.heroDescription {
+  margin-top: 20px;
+  color: rgb(var(--ch-foreground-muted));
+  font-size: 20px;
+  line-height: 1.6;
+  text-wrap: balance;
+}
+
+.preview {
+  --home-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  max-width: 1152px;
+  margin: 40px auto 0;
+  overflow: hidden;
+  border-radius: 24px;
+  background: rgb(var(--ch-surface));
+  box-shadow: var(--tsz-shadow-float);
+}
+
+.picture {
+  position: relative;
+  min-height: 440px;
+  overflow: hidden;
+  background: rgb(var(--ch-muted));
+}
+
+.wordImage {
+  pointer-events: none;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 240ms var(--home-ease-out);
+}
+
+.wordImage[data-active="true"] {
+  opacity: 1;
+}
+
+.wordPanel {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding: 32px;
+}
+
+.wordContent {
+  flex: 1;
+  margin-top: 28px;
+}
+
+/* 官网主视觉的词面展示，沿用词汇字体；不改变学习页阅读尺寸。 */
+.specimenWord {
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+
+.phonetic {
+  margin-top: 10px;
+  color: rgb(var(--ch-foreground-muted));
+  font-size: 20px;
+  line-height: 1.5;
+}
+
+.definitionSpace {
+  display: grid;
+  min-height: 164px;
+}
+
+.definitionSpace > * {
+  grid-area: 1 / 1;
+}
+
+.definition {
+  margin-top: 16px;
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+.example {
+  margin-top: 22px;
+  border-top: 1px solid rgb(var(--ch-border) / 0.7);
+  padding-top: 20px;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.recallHint {
+  align-self: center;
+  color: rgb(var(--ch-foreground-muted));
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.previewControls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.memoryLine {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .wordContent {
+    animation: word-arrive 250ms var(--home-ease-out);
+  }
+
+  .picture {
+    animation: picture-arrive 800ms var(--home-ease-out);
+  }
+
+  @supports (animation-timeline: view()) {
+    .memoryLine {
+      animation: memory-trace linear both;
+      animation-timeline: view();
+      animation-range: entry 10% cover 35%;
+    }
+  }
+}
+
+@keyframes word-arrive {
+  from {
+    opacity: 0.55;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes picture-arrive {
+  from {
+    opacity: 0.65;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes memory-trace {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wordImage {
+    transition: none;
+  }
+}
+
+@media (min-width: 768px) and (max-height: 850px) {
+  .hero {
+    padding: 20px 24px 48px;
+  }
+
+  .headline {
+    font-size: clamp(2rem, 4.25vw, 3.5rem);
+  }
+
+  .heroDescription {
+    margin-top: 12px;
+    font-size: 18px;
+    line-height: 1.5;
+  }
+
+  .heroCopy > div {
+    margin-top: 20px;
+  }
+
+  .preview {
+    margin-top: 28px;
+  }
+
+  .picture {
+    min-height: 360px;
+  }
+
+  .wordPanel {
+    padding: 24px;
+  }
+
+  .wordContent {
+    margin-top: 16px;
+  }
+
+  .specimenWord {
+    font-size: 56px;
+  }
+
+  .definitionSpace {
+    min-height: 136px;
+  }
+
+  .example {
+    margin-top: 16px;
+    padding-top: 14px;
+  }
+
+  .previewControls {
+    margin-top: 16px;
+  }
+}
+
+@media (max-width: 767px) {
+  .hero {
+    padding: 32px 20px 48px;
+  }
+  .heroDescription {
+    margin-top: 16px;
+    font-size: 16px;
+  }
+  .preview {
+    grid-template-columns: minmax(0, 1fr);
+    margin-top: 32px;
+  }
+  .picture {
+    min-height: 0;
+    aspect-ratio: 1.7;
+  }
+  .wordPanel {
+    padding: 24px 20px;
+  }
+  .wordContent {
+    margin-top: 20px;
+  }
+  .specimenWord {
+    font-size: 44px;
+  }
+  .definitionSpace {
+    min-height: 154px;
+  }
+  .previewControls {
+    gap: 4px;
+    margin-top: 18px;
+  }
+}

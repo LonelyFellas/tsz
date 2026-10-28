@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Search, X } from "lucide-react";
 import { Button } from "@tsz/ui/components";
+import { cn } from "@tsz/ui/lib/cn";
 import { SearchField } from "@/features/shell/SearchField";
 import type { CEFRLevel, DictionaryEntry, EnglishVariant } from "@tsz/types";
 import { useUserStore } from "@/stores/user";
@@ -304,7 +305,12 @@ function Result({
         {spelling.primary}
         <span className="sr-only">，查看词条详情</span>
       </Link>
-      <p className="tsz-words break-words text-sm text-foreground-muted">
+      <p
+        className={cn(
+          "tsz-words break-words text-sm text-foreground-muted",
+          !spelling.alternate && "hidden md:block"
+        )}
+      >
         {spelling.alternate || "—"}
       </p>
       <div className="space-y-4">
@@ -319,12 +325,12 @@ function Result({
           return (
             <div
               key={pos.pos_id}
-              className="grid gap-3 text-sm leading-6 md:grid-cols-[3rem_1fr_1fr] md:gap-4"
+              className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm leading-6 md:grid-cols-[3rem_1fr_1fr] md:gap-4"
             >
               <p className="font-medium">
                 {POS_ABBR[pos.pos] ?? pos.label ?? pos.pos}
               </p>
-              <div>
+              <div className="flex flex-wrap items-start gap-x-2 gap-y-1 md:block">
                 {definition ? (
                   <>
                     <span className="mb-1 inline-block rounded-full bg-primary-muted px-2 text-xs text-primary">
@@ -340,7 +346,12 @@ function Result({
                   <p className="text-foreground-muted">暂无释义</p>
                 )}
               </div>
-              <div>
+              <div className="col-span-2 md:col-span-1">
+                {grammar && (
+                  <p className="mb-1 text-xs text-foreground-muted md:hidden">
+                    语法结构
+                  </p>
+                )}
                 {grammar && (
                   <Texts texts={grammar.variants} variant={variant} />
                 )}

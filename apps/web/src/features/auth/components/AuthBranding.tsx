@@ -7,8 +7,8 @@ const HIGHLIGHTS: { title: string; desc: string; icon: ReactNode }[] = [
     icon: <path d="M3 17c3-8 6-11 9-11s4 4 9 4M3 21h18" strokeLinecap="round" />
   },
   {
-    title: "老师布置，学生跟练",
-    desc: "班级任务按天推进，进度与正确率随时可见。",
+    title: "自己定目标，按计划练",
+    desc: "选择词表，创建每日或长期任务，跟踪自己的练习进度。",
     icon: (
       <>
         <rect x="4" y="4" width="16" height="16" rx="3" />

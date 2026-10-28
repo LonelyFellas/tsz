@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor
+} from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { HttpError } from "@tsz/api-client";
 import { useUserStore } from "@/stores/user";
@@ -34,6 +40,32 @@ function seed(id: string) {
 beforeEach(() => {
   vi.resetAllMocks();
   seed("a");
+});
+it("任务列表保留奖励进度和可展开规则，不显示指回当前页的链接", async () => {
+  vi.mocked(api.learningRewards.day).mockResolvedValue({
+    ...awarded,
+    status: "in_progress",
+    qualifying_units: 0,
+    awarded_amount: "0",
+    operation_id: null,
+    settled_at: null
+  });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  render(
+    <QueryClientProvider client={client}>
+      <LearningRewardSummary userId="a" taskList />
+    </QueryClientProvider>
+  );
+  expect(await screen.findByText(/奖励进度 0\/2/)).toBeVisible();
+  expect(
+    screen.queryByRole("link", { name: /查看每日学习任务|去学习/ })
+  ).not.toBeInTheDocument();
+  const rules = screen.getByText(/已完成的每日任务累计/);
+  expect(rules).not.toBeVisible();
+  fireEvent.click(screen.getByText("学习奖励规则"));
+  expect(rules).toBeVisible();
 });
 it.each([false, true])(
   "never repeats an award notification and keeps the historical day (embedded=%s)",

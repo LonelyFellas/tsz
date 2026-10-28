@@ -14,13 +14,15 @@ export function LearningRewardSummary({
   businessDay,
   completionId,
   onAward,
-  embedded = false
+  embedded = false,
+  taskList = false
 }: {
   userId: string;
   businessDay?: string;
   completionId?: string | null;
   onAward?: () => void;
   embedded?: boolean;
+  taskList?: boolean;
 }) {
   const client = useQueryClient();
   const seen = useRef<string | null>(null);
@@ -162,7 +164,7 @@ export function LearningRewardSummary({
               </p>
             </div>
           )}
-          {embedded ? (
+          {embedded || taskList ? (
             <details className="group/learning-rules">
               <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1 rounded-sm text-xs text-foreground-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary sm:min-h-8 [&::-webkit-details-marker]:hidden">
                 学习奖励规则
@@ -178,18 +180,19 @@ export function LearningRewardSummary({
           )}
         </>
       )}
-      {embedded ? (
-        <Button asChild size="compact">
-          <Link href="/student/practice">去学习</Link>
-        </Button>
-      ) : (
-        <Link
-          href="/student/practice"
-          className="inline-flex text-sm font-medium text-primary underline-offset-4 hover:underline"
-        >
-          查看每日学习任务 →
-        </Link>
-      )}
+      {!taskList &&
+        (embedded ? (
+          <Button asChild size="compact">
+            <Link href="/student/practice">去学习</Link>
+          </Button>
+        ) : (
+          <Link
+            href="/student/practice"
+            className="inline-flex text-sm font-medium text-primary underline-offset-4 hover:underline"
+          >
+            查看每日学习任务 →
+          </Link>
+        ))}
     </section>
   );
 }

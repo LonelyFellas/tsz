@@ -915,7 +915,7 @@ function Editor({
             </Button>
           </div>
         </div>
-        {rows.some((row) => row.customWord) && (
+        {!locked && rows.some((row) => row.customWord) && (
           <div className="mt-3 text-sm leading-6 text-foreground-muted">
             <p>
               语音费用：{audioCost.toString()} 天生币。每词英式、美式各一条，共

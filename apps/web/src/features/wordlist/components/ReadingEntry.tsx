@@ -12,6 +12,7 @@ import type {
 import { cn } from "@tsz/ui/lib/cn";
 import { POS_ABBR } from "@/features/dictionary/reading";
 import { selectDefinition, selectTexts, phoneticDelimiters } from "../reading";
+import styles from "./ReadingEntry.module.css";
 
 export function ReadingTable({
   full,
@@ -33,48 +34,69 @@ export function ReadingTable({
       ? [20, 10, 70]
       : [20, 10, 35, 35];
   return (
-    <div
-      className="overflow-x-auto"
-      role="region"
-      aria-label="词条列表"
-      tabIndex={0}
-    >
-      <table
+    <div className="@container">
+      <p
         className={cn(
-          "w-full table-fixed border-collapse text-left text-sm leading-6 [&_td]:px-3 [&_td]:py-2 [&_td]:align-top [&_tr:first-child>td]:pt-6 [&_tr:last-child>td]:pb-6 [&_td[rowspan]]:pb-6",
-          full ? "min-w-[1120px]" : simple ? "min-w-[480px]" : "min-w-[640px]"
+          "mb-3 text-xs leading-5 text-foreground-muted",
+          full
+            ? "@min-[1120px]:hidden"
+            : simple
+              ? "@min-[480px]:hidden"
+              : "@min-[640px]:hidden"
         )}
       >
-        <caption className="sr-only">
-          {full
-            ? "完整模式词条列表"
-            : simple
-              ? "简洁模式词条列表"
-              : "标准模式词条列表"}
-        </caption>
-        <colgroup>
-          {widths.map((width, index) => (
-            <col key={index} style={{ width: `${width}%` }} />
-          ))}
-        </colgroup>
-        <thead className="border-b border-border/70">
-          <tr>
-            {headings.map((heading) => (
-              <th
-                key={heading}
-                scope="col"
-                className={cn(
-                  "px-3 py-4 font-semibold",
-                  simple && "whitespace-nowrap"
-                )}
-              >
-                {heading}
-              </th>
+        左右滑动查看完整内容，词条固定在左侧。
+      </p>
+      <div
+        className="overflow-x-auto rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        role="region"
+        aria-label="词条列表"
+        tabIndex={0}
+      >
+        <table
+          data-full={full}
+          data-simple={!full && simple}
+          className={cn(
+            "w-full table-fixed border-collapse text-left text-sm leading-6 [&_td]:px-3 [&_td]:py-2 [&_td]:align-top [&_tr:first-child>td]:pt-6 [&_tr:last-child>td]:pb-6 [&_td[rowspan]]:pb-6",
+            styles.table
+          )}
+        >
+          <caption className="sr-only">
+            {full
+              ? "完整模式词条列表"
+              : simple
+                ? "简洁模式词条列表"
+                : "标准模式词条列表"}
+          </caption>
+          <colgroup>
+            {widths.map((width, index) => (
+              <col
+                key={index}
+                style={{ width: `var(--reading-col-${index}, ${width}%)` }}
+              />
             ))}
-          </tr>
-        </thead>
-        {children}
-      </table>
+          </colgroup>
+          <thead className="border-b border-border/70">
+            <tr>
+              {headings.map((heading) => (
+                <th
+                  key={heading}
+                  scope="col"
+                  className={cn(
+                    "px-3 py-4 font-semibold",
+                    simple && "whitespace-nowrap",
+                    heading === "英文词条" &&
+                      "sticky left-0 z-20 border-r border-border/60 bg-surface"
+                  )}
+                >
+                  {heading}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          {children}
+        </table>
+      </div>
     </div>
   );
 }
@@ -125,7 +147,10 @@ export function ReadingEntry({
     entry.pos.reduce((count, pos) => count + Math.max(1, pos.senses.length), 0)
   );
   const wordCell = (
-    <td rowSpan={missingFullData ? 1 : rowCount}>
+    <td
+      rowSpan={missingFullData ? 1 : rowCount}
+      className="sticky left-0 z-10 border-r border-border/60 bg-surface"
+    >
       <h2 className="tsz-words break-words text-xl font-bold tracking-tight">
         {entry.label}
       </h2>
