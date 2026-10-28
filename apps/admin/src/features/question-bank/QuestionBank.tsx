@@ -381,9 +381,17 @@ function Workbench({ profile }: { profile: AdminProfile }) {
           </Space>
         </Card>
       </section>
-      {tab === "batches" && (
-        <BatchPanel profile={profile} showQuestion={showQuestion} />
-      )}
+      <section
+        hidden={tab !== "batches"}
+        aria-hidden={tab !== "batches"}
+        inert={tab !== "batches"}
+      >
+        <BatchPanel
+          profile={profile}
+          showQuestion={showQuestion}
+          active={tab === "batches"}
+        />
+      </section>
       {activeGeneration && (
         <Card size="small" title="当前生成状态">
           {generation.isError ? (

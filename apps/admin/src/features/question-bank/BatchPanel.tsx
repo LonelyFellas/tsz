@@ -32,9 +32,11 @@ const batchLabels = {
 };
 export function BatchPanel({
   profile,
-  showQuestion
+  showQuestion,
+  active
 }: {
   profile: AdminProfile;
+  active: boolean;
   showQuestion: (id: string) => void;
 }) {
   const { modal } = App.useApp();
@@ -56,6 +58,7 @@ export function BatchPanel({
   const key = ["question-bank", profile.id, "batches"];
   const batches = useQuery({
     queryKey: [...key, page],
+    enabled: active,
     queryFn: ({ signal }) =>
       api.questionBank.batches({ page, page_size: 20 }, { signal }),
     retry: false,
@@ -65,19 +68,26 @@ export function BatchPanel({
   const detail = useQuery({
     queryKey: [...key, "detail", selected],
     queryFn: ({ signal }) => api.questionBank.batch(selected!, { signal }),
-    enabled: !!selected,
+    enabled: active && !!selected,
     retry: false,
     refetchInterval: (q) => (q.state.data?.state === "running" ? 3000 : false)
   });
   const items = useQuery({
-    queryKey: [...key, "items", selected, itemPage, itemState],
+    queryKey: [
+      ...key,
+      "items",
+      selected,
+      itemPage,
+      itemState,
+      detail.data?.state
+    ],
     queryFn: ({ signal }) =>
       api.questionBank.batchItems(
         selected!,
         { page: itemPage, page_size: 20, state: itemState },
         { signal }
       ),
-    enabled: !!selected,
+    enabled: active && !!selected,
     retry: false,
     refetchInterval: detail.data?.state === "running" ? 3000 : false
   });
