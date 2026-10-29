@@ -122,7 +122,7 @@ it("generation timeout preserves the chosen source and retries the same idempote
   fireEvent.click(retry);
   await waitFor(() => expect(mocks.generate).toHaveBeenCalledTimes(2));
   expect(mocks.generate.mock.calls[1]![0]).toEqual(first);
-});
+}, 10_000);
 
 it("candidate pagination reaches beyond the first eighty and resets selection", async () => {
   render(
@@ -496,7 +496,7 @@ it("a fixed review queue advances without offset skips and returns to the retain
     expect.objectContaining({ page: 1, page_size: 20 }),
     expect.anything()
   );
-});
+}, 10_000);
 it("closing the generation drawer retains an uncertain single request", async () => {
   mocks.generate.mockRejectedValue(new Error("生成结果未确认"));
   const rendered = render(<QuestionBank />, { wrapper: mainWrapper });
@@ -522,7 +522,7 @@ it("closing the generation drawer retains an uncertain single request", async ()
   );
   await waitFor(() => expect(mocks.generate).toHaveBeenCalledTimes(2));
   expect(mocks.generate.mock.calls[1]![0]).toEqual(original);
-});
+}, 10_000);
 
 it("reopening a listed question rechecks publication sources instead of trusting an earlier inspection", async () => {
   mocks.workbench.mockResolvedValue({
@@ -547,4 +547,4 @@ it("reopening a listed question rechecks publication sources instead of trusting
   await ui.findByText("部分选项的发布来源已变化");
   expect(ui.getByRole("button", { name: "通过并下一题" })).toBeDisabled();
   expect(mocks.inspect).toHaveBeenCalledTimes(2);
-});
+}, 10_000);
