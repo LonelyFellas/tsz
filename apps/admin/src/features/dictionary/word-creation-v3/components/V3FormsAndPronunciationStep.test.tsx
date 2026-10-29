@@ -1056,9 +1056,12 @@ describe("V3FormsAndPronunciationStep", () => {
       </AntApp>
     );
     const { container, rerender } = render(view());
+    const overview = within(container);
     expect(screen.getAllByText("travel", { exact: true })).toHaveLength(1);
     expect(
-      screen.getByRole("columnheader", { name: "读法" })
+      within(container.querySelector("thead")!).getByRole("columnheader", {
+        name: "读法"
+      })
     ).toBeInTheDocument();
     const readingRows = container.querySelectorAll("tr[data-overview-dialect]");
     expect([...readingRows].map((row) => row.textContent)).toEqual([
@@ -1073,10 +1076,18 @@ describe("V3FormsAndPronunciationStep", () => {
           .closest("td")
       ).not.toHaveAttribute("rowspan");
     }
-    expect(
-      screen.getByRole("img", { name: "英美通用拼写" }).closest("td")
-    ).toHaveAttribute("rowspan", "3");
-    fireEvent.click(screen.getByRole("button", { name: "编辑原形内容" }));
+    const commonSpelling = overview.getByLabelText("英美通用拼写", {
+      selector: '[role="img"]'
+    });
+    expect(commonSpelling).toBeVisible();
+    expect(commonSpelling).toHaveAccessibleName("英美通用拼写");
+    expect(commonSpelling.closest("td")).toHaveAttribute("rowspan", "3");
+    const edit = overview.getByLabelText("编辑原形内容", {
+      selector: "button"
+    });
+    expect(edit).toBeVisible();
+    expect(edit).toHaveAccessibleName("编辑原形内容");
+    fireEvent.click(edit);
     expect(onEdit).toHaveBeenCalledWith(form.id);
     expect(form).toEqual(original);
 
@@ -1086,10 +1097,17 @@ describe("V3FormsAndPronunciationStep", () => {
     form.regional_variants.uk.pronunciations[0]!.style = "normal";
     delete form.regional_variants.uk.pronunciations[1]!.style;
     rerender(view());
-    expect(
-      screen.getByRole("img", { name: "英式拼写" }).closest("td")
-    ).toHaveAttribute("rowspan", "2");
-    expect(screen.getByRole("img", { name: "美式拼写" })).toBeInTheDocument();
+    const britishSpelling = overview.getByLabelText("英式拼写", {
+      selector: '[role="img"]'
+    });
+    expect(britishSpelling).toBeVisible();
+    expect(britishSpelling).toHaveAccessibleName("英式拼写");
+    expect(britishSpelling.closest("td")).toHaveAttribute("rowspan", "2");
+    const americanSpelling = overview.getByLabelText("美式拼写", {
+      selector: '[role="img"]'
+    });
+    expect(americanSpelling).toBeVisible();
+    expect(americanSpelling).toHaveAccessibleName("美式拼写");
     expect(screen.getByText("美式未填写")).toBeInTheDocument();
     const updatedRows = container.querySelectorAll("tr[data-overview-dialect]");
     expect(updatedRows).toHaveLength(3);
