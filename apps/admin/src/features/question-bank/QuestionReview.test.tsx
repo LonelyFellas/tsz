@@ -404,3 +404,47 @@ it("legacy questions without review evidence are explicitly unverified", async (
   expect(screen.queryByText("存在尚未解决的歧义")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "通过并下一题" })).toBeEnabled();
 });
+it("an editor with edit_others and publish can review another owner's question", async () => {
+  const otherQuestion = { ...question, created_by: "other" };
+  const crossOwnerReviewer = {
+    ...profile,
+    permissions: [...profile.permissions, "words.edit_others"]
+  };
+  mocks.inspect.mockResolvedValue(inspect(otherQuestion));
+  const props = { id: "question", ...callbacks() };
+  const view = render(
+    <QuestionReview {...props} profile={crossOwnerReviewer} />,
+    { wrapper: Wrapper }
+  );
+  const approve = await screen.findByRole("button", { name: "通过并下一题" });
+  expect(approve).toBeEnabled();
+  expect(screen.getByRole("button", { name: "退回修改" })).toBeEnabled();
+  view.rerender(
+    <QuestionReview
+      {...props}
+      profile={{
+        ...crossOwnerReviewer,
+        permissions: crossOwnerReviewer.permissions.filter(
+          (key) => key !== "words.publish"
+        )
+      }}
+    />
+  );
+  expect(approve).toBeDisabled();
+  expect(screen.getByRole("button", { name: "退回修改" })).toBeDisabled();
+  view.rerender(<QuestionReview {...props} profile={crossOwnerReviewer} />);
+  mocks.review.mockResolvedValue({
+    ...otherQuestion,
+    revision: 4,
+    state: "approved"
+  });
+  fireEvent.click(approve);
+  await waitFor(() =>
+    expect(mocks.review).toHaveBeenCalledWith(
+      "question",
+      expect.objectContaining({ expected_revision: 3, decision: "approve" })
+    )
+  );
+  const disable = await screen.findByRole("button", { name: "停用题目" });
+  await waitFor(() => expect(disable).toBeEnabled());
+});

@@ -7,7 +7,7 @@ import type {
   BankQuestionState,
   QuestionReviewReason
 } from "@tsz/types";
-import { canAdminResourceAction } from "@tsz/shared/auth";
+import { canAdminResourceAction, hasAdminPermission } from "@tsz/shared/auth";
 
 export function canEditQuestion(
   profile: AdminProfile | null,
@@ -21,7 +21,7 @@ export function canReviewQuestion(
 ) {
   return (
     canEditQuestion(profile, createdBy) &&
-    canAdminResourceAction(profile, "words", "publish", createdBy)
+    hasAdminPermission(profile, "words.publish")
   );
 }
 export function candidateReference(
