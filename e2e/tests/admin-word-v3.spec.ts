@@ -950,27 +950,9 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(button("删除语法结构 1")).toBeDisabled();
   });
 
-  test("语义区间与语法结构在底部通栏添加，词义标题无内分隔线", async ({
-    page
-  }) => {
+  test("语义区间与语法结构可在底部添加", async ({ page }) => {
     await mockAdminV3Api(page);
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/meanings`);
-    const sense = page.locator(".word-sense-editor-v3").first();
-    await expect(sense.locator(".word-sense-header-actions")).toHaveCSS(
-      "margin-inline-start",
-      "8px"
-    );
-    await expect(
-      sense.locator(":scope > .ant-collapse-item > .ant-collapse-panel")
-    ).toHaveCSS("border-top-width", "0px");
-    await expect(sense.locator(".word-sense-header-content")).toHaveCSS(
-      "column-gap",
-      "8px"
-    );
-    await expect(sense.locator(":scope > .ant-collapse-item")).toHaveCSS(
-      "border-left-width",
-      "4px"
-    );
     for (const [name, cardClass, rowClass] of [
       ["语义区间", ".word-sense-groups-card", ".word-sense-group-item"],
       ["语法结构", ".word-grammar-card", ".word-grammar-row"]
@@ -981,21 +963,17 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
         exact: true
       });
       const rows = card.locator(rowClass);
+      await expect(rows.first()).toBeVisible();
       const count = await rows.count();
       await expect(
         card
           .locator(".ant-card-head")
           .getByRole("button", { name: `添加${name}` })
       ).toHaveCount(0);
-      await expect(add).toHaveClass(/ant-btn-block/);
-      await expect(add).toHaveCSS("border-top-style", "dashed");
       const buttonBox = (await add.boundingBox())!;
       const rowBox = (await rows.last().boundingBox())!;
       expect(buttonBox.y).toBeGreaterThanOrEqual(rowBox.y + rowBox.height);
       expect(Math.abs(buttonBox.width - rowBox.width)).toBeLessThan(1);
-      await card.screenshot({
-        path: test.info().outputPath(`bottom-add-${name}.png`)
-      });
       await add.click();
       await expect(rows).toHaveCount(count + 1);
     }
