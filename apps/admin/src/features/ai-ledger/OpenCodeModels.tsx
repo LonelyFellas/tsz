@@ -212,7 +212,8 @@ export function OpenCodeModels({
           )}
         </Flex>
         <Typography.Text type="secondary">
-          探针会对每个模型发起最小请求，可能按服务商计费。探针通过后可切换模型；下方账本统计出题调用。
+          探针会对每个模型发起最小请求，可能按服务商计费。探针通过后可切换模型；AI
+          账本统计出题调用。
         </Typography.Text>
         {probe.isError && (
           <Alert
