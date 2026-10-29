@@ -34,6 +34,7 @@ import dayjs from "dayjs";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "@/lib/auth";
+import { hasAdminPermission } from "@tsz/shared/auth";
 import { HttpError, InvalidAdminWordResponseError } from "@tsz/api-client";
 import type {
   AdminWordKind,
@@ -101,6 +102,7 @@ import {
 import {
   canCreateEntry,
   canModifyEntry,
+  canPublishEntry,
   canWriteEntry,
   canTransitionEntry,
   entryWriteForbiddenMessage,
@@ -112,6 +114,7 @@ import "./smart-dictionary.css";
 
 import { EditEntryAnnotation } from "./EditEntryAnnotation";
 import { canEditRowAnnotation } from "./annotationPermission";
+import { BatchPublicationModal } from "./BatchPublicationModal";
 
 const { RangePicker } = DatePicker;
 
@@ -245,6 +248,9 @@ export function SmartDictionary({
   const [selectedRecords, setSelectedRecords] = useState<
     Record<string, AdminWordListItemAny>
   >({});
+  const [publicationRows, setPublicationRows] =
+    useState<AdminWordListItemAny[]>();
+  const canBatchPublish = hasAdminPermission(profile, "words.publish");
   const [pendingRestore, setPendingRestore] = useState<PendingRestore>();
   const lifecycleCommandPending = useRef(false);
   const restoreAttemptGeneration = useRef(0);
@@ -1402,6 +1408,17 @@ export function SmartDictionary({
             onClose={() => setAnnotationEntry(undefined)}
           />
         ) : null}
+        {publicationRows && (
+          <BatchPublicationModal
+            rows={publicationRows}
+            onClose={() => setPublicationRows(undefined)}
+            onPublished={() => {
+              setPublicationRows(undefined);
+              setSelectedKeys([]);
+              setSelectedRecords({});
+            }}
+          />
+        )}
 
         <Table<AdminWordListItemAny>
           tableId={trashMode ? "dictionary-trash" : "dictionary"}
@@ -1415,6 +1432,27 @@ export function SmartDictionary({
                 >
                   创建词条
                 </Button>
+              )}
+              {!trashMode && canBatchPublish && (
+                <Tooltip title="选择 1–50 个有发布权限的词条，集中审听并确认后发布">
+                  <Button
+                    disabled={
+                      selectedKeys.length === 0 ||
+                      selectedKeys.length > 50 ||
+                      selectedRows.length !== selectedKeys.length ||
+                      selectedRows.some(
+                        (row) =>
+                          row.schema_version !== 3 ||
+                          row.status === "archived" ||
+                          !canPublishEntry(writeActor, row)
+                      )
+                    }
+                    onClick={() => setPublicationRows([...selectedRows])}
+                  >
+                    批量审听与发布
+                    {selectedKeys.length > 0 ? `(${selectedKeys.length})` : ""}
+                  </Button>
+                </Tooltip>
               )}
               {adminWordsDataSourceCapabilities.batchArchive && (
                 <Button
@@ -1503,7 +1541,7 @@ export function SmartDictionary({
           loading={listQuery.isPending}
           scroll={{ x: "max-content" }}
           rowSelection={
-            adminWordsDataSourceCapabilities.batchArchive
+            adminWordsDataSourceCapabilities.batchArchive || canBatchPublish
               ? {
                   selectedRowKeys: selectedKeys,
                   preserveSelectedRowKeys: true,
