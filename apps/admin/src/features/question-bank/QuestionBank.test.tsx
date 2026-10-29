@@ -54,7 +54,7 @@ function providers(route: string) {
     );
     return (
       <QueryClientProvider client={client}>
-        <ConfigProvider theme={{ token: { motion: false } }}>
+        <ConfigProvider>
           <App>
             <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
           </App>
@@ -432,19 +432,9 @@ it("workbench search and pagination send complete filters to the backend", async
     pagination: { page: 1, page_size: 20, total: 81, total_pages: 5 }
   });
   const rendered = render(<QuestionBank />, { wrapper: mainWrapper });
-  await waitFor(() =>
-    expect(
-      rendered.container.querySelector(`tr[data-row-key="${question.id}"]`)
-    ).not.toBeNull()
-  );
-  expect(
-    within(
-      rendered.container.querySelector(
-        `tr[data-row-key="${question.id}"]`
-      ) as HTMLElement
-    ).getByRole("button", { name: "apple" })
-  ).toBeVisible();
-  const search = screen.getByLabelText("搜索单词或题干");
+  const ui = within(rendered.container);
+  await ui.findByRole("button", { name: "apple" });
+  const search = ui.getByRole("searchbox", { name: "搜索单词或题干" });
   fireEvent.change(search, { target: { value: "苹果" } });
   fireEvent.keyDown(search, { key: "Enter", code: "Enter", keyCode: 13 });
   await waitFor(() =>
@@ -453,7 +443,7 @@ it("workbench search and pagination send complete filters to the backend", async
       expect.anything()
     )
   );
-  fireEvent.click(await screen.findByTitle("5"));
+  fireEvent.click(await ui.findByTitle("5"));
   await waitFor(() =>
     expect(mocks.workbench).toHaveBeenLastCalledWith(
       expect.objectContaining({ query: "苹果", page: 5 }),
@@ -488,21 +478,20 @@ it("a fixed review queue advances without offset skips and returns to the retain
     counts: { draft: 2, approved: 0, rejected: 0, disabled: 0 },
     pagination: { page: 1, page_size: 20, total: 2, total_pages: 1 }
   });
-  render(<QuestionBank />, { wrapper: mainWrapper });
-  fireEvent.click(
-    (await screen.findByText("审核本页 2 道")).closest("button")!
-  );
-  await screen.findByRole("heading", { name: "苹果" });
+  const rendered = render(<QuestionBank />, { wrapper: mainWrapper });
+  const ui = within(rendered.container);
+  fireEvent.click(await ui.findByRole("button", { name: "审核本页 2 道" }));
+  await ui.findByRole("heading", { name: "苹果" });
   mocks.review.mockResolvedValueOnce({
     ...question,
     state: "approved",
     revision: 4
   });
-  fireEvent.click(screen.getByText("通过并下一题").closest("button")!);
-  expect(await screen.findByRole("heading", { name: "梨" })).toBeVisible();
-  expect(screen.getByText("本次 2 道 · 已处理 1 道")).toBeVisible();
-  fireEvent.click(screen.getByText("返回题库").closest("button")!);
-  await screen.findByRole("button", { name: "apple" });
+  fireEvent.click(ui.getByRole("button", { name: "通过并下一题" }));
+  expect(await ui.findByRole("heading", { name: "梨" })).toBeVisible();
+  expect(ui.getByText("本次 2 道 · 已处理 1 道")).toBeVisible();
+  fireEvent.click(ui.getByRole("button", { name: "返回题库" }));
+  await ui.findByRole("button", { name: "apple" });
   expect(mocks.workbench).toHaveBeenLastCalledWith(
     expect.objectContaining({ page: 1, page_size: 20 }),
     expect.anything()
@@ -510,26 +499,27 @@ it("a fixed review queue advances without offset skips and returns to the retain
 });
 it("closing the generation drawer retains an uncertain single request", async () => {
   mocks.generate.mockRejectedValue(new Error("生成结果未确认"));
-  render(<QuestionBank />, { wrapper: mainWrapper });
-  const open = screen.getByText("生成题目").closest("button")!;
-  fireEvent.click(open);
-  const row = (await screen.findByText("apple 的释义")).closest("tr")!;
-  fireEvent.click(within(row).getByRole("radio"));
-  fireEvent.click(screen.getByText("生成四选一草稿").closest("button")!);
-  fireEvent.click(await screen.findByRole("button", { name: "确认生成" }));
-  await screen.findByText("生成结果未确认");
-  const original = mocks.generate.mock.calls[0]![0];
-  expect(screen.getByText("命题与生成任务")).toBeVisible();
-  const header = screen
-    .getByText("命题与生成任务")
-    .closest(".ant-drawer-header")!;
-  fireEvent.click(
-    within(header as HTMLElement).getByRole("button", { name: "Close" })
+  const rendered = render(<QuestionBank />, { wrapper: mainWrapper });
+  const ui = within(rendered.container);
+  fireEvent.click(ui.getByRole("button", { name: "生成题目" }));
+  const drawer = within(
+    (await screen.findByText("命题与生成任务")).closest<HTMLElement>(
+      "[role=dialog]"
+    )!
   );
-  fireEvent.click(open);
-  const retry = (await screen.findByText("重试原生成请求")).closest("button")!;
-  await waitFor(() => expect(retry).toBeVisible());
-  fireEvent.click(retry);
+  const row = await drawer.findByRole("row", { name: /apple.*apple 的释义/ });
+  fireEvent.click(within(row).getByRole("radio"));
+  fireEvent.click(drawer.getByRole("button", { name: "生成四选一草稿" }));
+  // The confirmation is mounted in a separate modal portal.
+  fireEvent.click(await screen.findByRole("button", { name: "确认生成" }));
+  await drawer.findByText("生成结果未确认");
+  const original = mocks.generate.mock.calls[0]![0];
+  expect(drawer.getByText("命题与生成任务")).toBeVisible();
+  fireEvent.click(drawer.getByRole("button", { name: "Close" }));
+  fireEvent.click(ui.getByRole("button", { name: "生成题目" }));
+  fireEvent.click(
+    await drawer.findByRole("button", { name: "重试原生成请求" })
+  );
   await waitFor(() => expect(mocks.generate).toHaveBeenCalledTimes(2));
   expect(mocks.generate.mock.calls[1]![0]).toEqual(original);
 });
