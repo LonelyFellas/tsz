@@ -2,11 +2,11 @@
   "bucket": "tshb-test-assets",
   "run_id": "speech-delivery-20261029-1bcfbc371c5f",
   "prefix": "temporary-tests/speech-delivery-20261029-1bcfbc371c5f/",
-  "started_at": "2026-10-29T03:42:02.914766+00:00",
+  "started_at": "2026-10-29T04:14:33.297278+00:00",
   "status": "clean",
   "planned": [],
   "deleted": [],
   "errors": [],
   "remaining": [],
-  "finished_at": "2026-10-29T03:42:03.114762+00:00"
+  "finished_at": "2026-10-29T04:14:33.483704+00:00"
 }

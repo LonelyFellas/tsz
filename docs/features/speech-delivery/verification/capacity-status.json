@@ -55,5 +55,80 @@
     "runtime_pool_before": 10,
     "runtime_pool_after": 20
   },
-  "final_optimized_30min": "running; will be validated before merge/deployment"
+  "final_optimized_30min": {
+    "started": "2026-10-29T03:43:52.621Z",
+    "updated": "2026-10-29T04:14:32.838Z",
+    "state": "passed",
+    "environment": "isolated single-instance native release optimized signing path pool20; signing API only, not media delivery",
+    "max_outstanding": 8192,
+    "refreshes": 3,
+    "refresh_latency_ms": [
+      13.88245800009463, 16.429917000001296, 15.99645800003782
+    ],
+    "phases": [
+      {
+        "name": "warmup",
+        "target_rps": 100,
+        "duration_seconds": 30,
+        "scheduled": 2999,
+        "sent": 2999,
+        "backpressure": 0,
+        "statuses": {
+          "200": 2999
+        },
+        "errors": 0,
+        "elapsed_seconds": 30.000575708,
+        "latency_ms": {
+          "p50": 6.63550000000032,
+          "p95": 9.297582999999577,
+          "p99": 11.222250000000713,
+          "max": 23.634082999999997
+        },
+        "actual_rps": 99.9647483164892,
+        "passed": true
+      },
+      {
+        "name": "sustained",
+        "target_rps": 400,
+        "duration_seconds": 1800,
+        "scheduled": 719998,
+        "sent": 719998,
+        "backpressure": 0,
+        "statuses": {
+          "200": 719998
+        },
+        "errors": 0,
+        "elapsed_seconds": 1800.0084,
+        "latency_ms": {
+          "p50": 7.103375000006054,
+          "p95": 9.771417000098154,
+          "p99": 12.333208000054583,
+          "max": 172.91579200001433
+        },
+        "actual_rps": 399.9970222361185,
+        "passed": true
+      },
+      {
+        "name": "burst",
+        "target_rps": 1000,
+        "duration_seconds": 10,
+        "scheduled": 9994,
+        "sent": 9994,
+        "backpressure": 0,
+        "statuses": {
+          "200": 9994
+        },
+        "errors": 0,
+        "elapsed_seconds": 10.00483837500005,
+        "latency_ms": {
+          "p50": 8.685042000142857,
+          "p95": 24.546290999976918,
+          "p99": 44.73454199987464,
+          "max": 55.74920900003053
+        },
+        "actual_rps": 998.9166866476191,
+        "passed": true
+      }
+    ]
+  }
 }
