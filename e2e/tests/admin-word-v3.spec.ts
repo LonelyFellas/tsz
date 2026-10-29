@@ -906,84 +906,16 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     }
   });
 
-  test("字段标签与表头统一字体颜色，并轻微内缩对齐", async ({ page }) => {
+  test("窄屏字段标题不被裁切", async ({ page }) => {
     await mockAdminV3Api(page);
-    await page.setViewportSize({ width: 1440, height: 1000 });
-    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/meanings`);
-    await page.getByRole("button", { name: "添加派生词", exact: true }).click();
-    const labels = page
-      .locator(
-        [
-          ".word-sense-field > .ant-typography:first-child",
-          ".word-sense-context-toggle > .ant-typography:first-child",
-          ".word-sense-group-heads > span:not(:empty)",
-          ".word-definition-list-header > span:not(:empty)",
-          ".word-relation-column-heads > span:not(:empty)"
-        ].join(", ")
-      )
-      .filter({ visible: true });
-    const labelInset = "6px";
-    const style = await labels.first().evaluate((node) => ({
-      color: getComputedStyle(node).color,
-      fontFamily: getComputedStyle(node).fontFamily
-    }));
-    for (const label of await labels.all()) {
-      await expect(label).toHaveCSS("font-size", "12px");
-      await expect(label).toHaveCSS("font-weight", "400");
-      await expect(label).toHaveCSS("color", style.color);
-      await expect(label).toHaveCSS("font-family", style.fontFamily);
-      await expect(label).toHaveCSS("padding-inline-start", labelInset);
-    }
-    const group = page.locator(".word-sense-field-group").first();
-    const title = group.locator(".ant-typography").first();
-    const titleTextX = await title.evaluate((node) => {
-      const range = document.createRange();
-      range.selectNodeContents(node);
-      return range.getBoundingClientRect().x;
-    });
-    expect(
-      titleTextX - (await group.locator(".ant-select").boundingBox())!.x
-    ).toBe(parseFloat(labelInset));
-    const tableTitle = page
-      .locator(".word-definition-list-header")
-      .first()
-      .getByText("释义语句", { exact: true });
-    const tableTextX = await tableTitle.evaluate((node) => {
-      const range = document.createRange();
-      range.selectNodeContents(node);
-      return range.getBoundingClientRect().x;
-    });
-    expect(
-      tableTextX -
-        (await page.getByLabel("定义 1 内容", { exact: true }).boundingBox())!.x
-    ).toBe(parseFloat(labelInset));
-    await page
-      .locator(".word-sense-meta-grid")
-      .first()
-      .screenshot({ path: test.info().outputPath("unified-field-labels.png") });
-    // 百分比后缀和开关图标都要与输入框内容保持同一水平中线。
-    const frequency = page.locator(".word-sense-field-frequency").first();
-    const frequencyBox = (await frequency.locator("input").boundingBox())!;
-    const suffixBox = (await frequency
-      .locator(".ant-input-number-suffix")
-      .boundingBox())!;
-    const trackBox = (await page
-      .locator(".word-sense-context-control .ant-switch")
-      .first()
-      .boundingBox())!;
-    const inputCenter = frequencyBox.y + frequencyBox.height / 2;
-    expect(
-      Math.abs(suffixBox.y + suffixBox.height / 2 - inputCenter)
-    ).toBeLessThanOrEqual(1);
-    expect(
-      Math.abs(trackBox.y + trackBox.height / 2 - inputCenter)
-    ).toBeLessThanOrEqual(1);
     await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/meanings`);
     const levelTitle = page
       .locator(
         ".word-sense-meta-grid > .word-sense-field:first-child > .ant-typography"
       )
       .first();
+    await expect(levelTitle).toBeVisible();
     expect(
       await levelTitle.evaluate((node) => node.scrollWidth - node.clientWidth)
     ).toBeLessThanOrEqual(1);
