@@ -1,0 +1,17 @@
+{
+  "source": "real baseline Agent v4 output; no seeded or mocked semantic verdict",
+  "status": 409,
+  "code": "learning_task_conflict",
+  "detail": "当前题面仍存在未解决的歧义，请更换干扰项或重新命题",
+  "semantic_review": {
+    "verdict": "needs_revision",
+    "issues": [
+      "题干仅为“结束；完成”两个并列释义，没有语境约束。选项A close 的定义亦为“关闭；结束”，其中“结束”直接对应题干；选项C end 定义为“结束；终止”，对应“结束”；选项D complete 定义为“完成；使完整”，对应“完成”。因此B finish 并非唯一可对应“结束；完成”的动词。",
+      "题干要求动词，但“结束；完成”是释义式中文，未提供任何句法或语义线索（如宾语类型、搭配、语域）以排除 close、end、complete。尤其 close 与 complete 分别覆盖题干的“结束”或“完成”之一，干扰强度高。",
+      "若以“结束；完成”视为一个整体含义，complete 可表达“完成”，end/close 可表达“结束”，finish 只是同时覆盖两个义项的常见选项之一；无法仅凭题干证明 finish 为唯一答案。",
+      "选项全部为B1、verb、BrE，难度与词性一致，但缺少能区分近义动词的语境；建议增加使用场景或改为带空格的句子以锁定唯一答案。"
+    ]
+  },
+  "baseline_commit": "76b5f6cd7709773aac747dd2c628524a8fe1e7ab",
+  "final_state": "rejected"
+}

@@ -15,6 +15,15 @@ export function canEditQuestion(
 ) {
   return canAdminResourceAction(profile, "words", "edit", createdBy);
 }
+export function canReviewQuestion(
+  profile: AdminProfile | null,
+  createdBy: string
+) {
+  return (
+    canEditQuestion(profile, createdBy) &&
+    canAdminResourceAction(profile, "words", "publish", createdBy)
+  );
+}
 export function candidateReference(
   candidate: QuestionCandidate
 ): QuestionEntryRead {

@@ -1,0 +1,630 @@
+[
+  {
+    "phase": "initial_budget4",
+    "target": "apple",
+    "state": "succeeded",
+    "question_created": true,
+    "model_usage": {
+      "model": "deepseek-flash",
+      "requests": 3,
+      "input_tokens": 5831,
+      "output_tokens": 509,
+      "cost": null
+    },
+    "reselection_count": 0,
+    "feedback": null,
+    "final_proposal": {
+      "outcome": "draft",
+      "concerns": [
+        "目标词“苹果”义项单一，三个干扰项均为其他水果名称，语义距离合适，未发现同时对应“苹果”的其他候选。",
+        "需人工确认水果类干扰是否过于集中，但本题语境下不影响唯一正确答案。"
+      ],
+      "distractors": [
+        {
+          "why_wrong": "“梨”是另一种水果，不能表示“苹果”。",
+          "candidate_ref": "5f2aad588ea91f37280556492d69d3ad21c36cb504cdb75ab1ee2f4b0dedf0f2",
+          "why_plausible": "与“苹果”同属常见水果名词，容易在同一语义场中被联想。",
+          "interference_type": "semantic"
+        },
+        {
+          "why_wrong": "“橙子”是柑橘类水果，与“苹果”所指不同。",
+          "candidate_ref": "075a3f91e1be65c0b12c318f400ffec260c40ede4e9ecfab3251b78cdc46d4b6",
+          "why_plausible": "同为日常常见水果，语义类别与“苹果”接近。",
+          "interference_type": "semantic"
+        },
+        {
+          "why_wrong": "“桃子”是另一种水果，并非“苹果”。",
+          "candidate_ref": "92fb451ab7d76bad621df4b3b9385e63789e266072c1b7b3ef0a78dbfa0a449b",
+          "why_plausible": "也是常见水果名称，与“苹果”构成同类干扰。",
+          "interference_type": "semantic"
+        }
+      ],
+      "suggested_prompt": null,
+      "needs_prompt_revision": false
+    },
+    "final_semantic_review": {
+      "issues": [],
+      "verdict": "no_obvious_issue"
+    },
+    "reasons": [],
+    "prompt_version": "mcq_zh_en_v5",
+    "question": {
+      "prompt": "苹果",
+      "correct_option_id": "D",
+      "options": [
+        {
+          "option_id": "A",
+          "spelling": "pear",
+          "definition": "梨"
+        },
+        {
+          "option_id": "B",
+          "spelling": "orange",
+          "definition": "橙子"
+        },
+        {
+          "option_id": "C",
+          "spelling": "peach",
+          "definition": "桃子"
+        },
+        {
+          "option_id": "D",
+          "spelling": "apple",
+          "definition": "苹果"
+        }
+      ]
+    },
+    "persisted_review_state": "approved",
+    "semantic_review_evidence": {
+      "verdict": "no_obvious_issue",
+      "issues": []
+    },
+    "source_checks": {
+      "target_current": true,
+      "sources": [
+        {
+          "option_id": "A",
+          "current": true
+        },
+        {
+          "option_id": "B",
+          "current": true
+        },
+        {
+          "option_id": "C",
+          "current": true
+        },
+        {
+          "option_id": "D",
+          "current": true
+        }
+      ]
+    }
+  },
+  {
+    "phase": "initial_budget4",
+    "target": "nurse",
+    "state": "succeeded",
+    "question_created": true,
+    "model_usage": {
+      "model": "deepseek-flash",
+      "requests": 2,
+      "input_tokens": 2969,
+      "output_tokens": 292,
+      "cost": null
+    },
+    "reselection_count": 0,
+    "feedback": null,
+    "final_proposal": {
+      "outcome": "draft",
+      "concerns": [
+        "题干只有“护士”一个义项，候选人中其他医疗职业词均属不同职务，区分较明确，但仍需人工确认不会因行业相近而被误判为可接受答案。"
+      ],
+      "distractors": [
+        {
+          "why_wrong": "surgeon 指外科医生，负责手术诊治，不是护理病人的护士，与护士的职责和身份不同。",
+          "candidate_ref": "24459e0a6113804f3be4e077b4a00553a5b3959a914d5ceced5abd4843b60797",
+          "why_plausible": "surgeon 与 nurse 同属医疗工作人员名词，语义场相近，容易让学习者混淆。",
+          "interference_type": "semantic"
+        },
+        {
+          "why_wrong": "midwife 专指助产士，负责接生和产妇护理，并不等同于一般护士。",
+          "candidate_ref": "bb7efd5ab733b3a82a78e09402c92e0b1d3e70a78f833ede52ccec91fa81cc25",
+          "why_plausible": "midwife 也是医疗护理领域的从业名词，与护士一样涉及照护病人。",
+          "interference_type": "semantic"
+        },
+        {
+          "why_wrong": "dentist 指牙医，是从事牙科诊疗的医生，不是护士。",
+          "candidate_ref": "a36e8cb8234ca60421dddce7c8a9126187b0b53a39077c7609bcd7c14ccd42c0",
+          "why_plausible": "dentist 同为医疗行业职业名词，和护士一样出现在医院诊所场景中。",
+          "interference_type": "semantic"
+        }
+      ],
+      "suggested_prompt": null,
+      "needs_prompt_revision": false
+    },
+    "final_semantic_review": {
+      "issues": [],
+      "verdict": "no_obvious_issue"
+    },
+    "reasons": [],
+    "prompt_version": "mcq_zh_en_v5",
+    "question": {
+      "prompt": "护士",
+      "correct_option_id": "B",
+      "options": [
+        {
+          "option_id": "A",
+          "spelling": "surgeon",
+          "definition": "外科医生"
+        },
+        {
+          "option_id": "B",
+          "spelling": "nurse",
+          "definition": "护士"
+        },
+        {
+          "option_id": "C",
+          "spelling": "midwife",
+          "definition": "助产士"
+        },
+        {
+          "option_id": "D",
+          "spelling": "dentist",
+          "definition": "牙医"
+        }
+      ]
+    },
+    "persisted_review_state": "draft",
+    "semantic_review_evidence": {
+      "verdict": "no_obvious_issue",
+      "issues": []
+    },
+    "source_checks": {
+      "target_current": true,
+      "sources": [
+        {
+          "option_id": "A",
+          "current": true
+        },
+        {
+          "option_id": "B",
+          "current": true
+        },
+        {
+          "option_id": "C",
+          "current": true
+        },
+        {
+          "option_id": "D",
+          "current": true
+        }
+      ]
+    }
+  },
+  {
+    "phase": "initial_budget4",
+    "target": "bitter",
+    "state": "succeeded",
+    "question_created": true,
+    "model_usage": {
+      "model": "deepseek-flash",
+      "requests": 3,
+      "input_tokens": 4992,
+      "output_tokens": 653,
+      "cost": null
+    },
+    "reselection_count": 0,
+    "feedback": null,
+    "final_proposal": {
+      "outcome": "draft",
+      "concerns": [
+        "“痛苦的”与“悲伤的、令人难过的”情感义接近，需人工确认是否会把“sad”误判为可接受的近义答案。"
+      ],
+      "distractors": [
+        {
+          "why_wrong": "该词释义是“酸的；酸败的”，不能表达“苦的；痛苦的”，与题干两种含义都不匹配。",
+          "candidate_ref": "826e8c157e242e2fcb73a01c535a173467d403828389573a80a91ebd9c45bee6",
+          "why_plausible": "“酸的”与“苦的”同属基本味觉形容词，学习者容易在味觉词义场中混淆。",
+          "interference_type": "semantic"
+        },
+        {
+          "why_wrong": "其含义是辛辣、刺激，并不表示苦味，也不表示“痛苦的”，两个义项均不成立。",
+          "candidate_ref": "f11f5edc4a794a58ddf2b4df9bc4c4d9d185cd21ce71edcb177daaafc8daf71b",
+          "why_plausible": "“辛辣的；刺激的”也是描述味道或感官刺激的形容词，与“苦的”在味觉语境下相近，易被误选。",
+          "interference_type": "semantic"
+        },
+        {
+          "why_wrong": "该词只表示悲伤、难过，没有“苦的”味觉义，也不能直接对应“痛苦的”这一义项，属于情感近义而非词义匹配。",
+          "candidate_ref": "c661d18a4600176e93971a369705c8e4a1f63007bdfd83a028bd2fbefd3afcfa",
+          "why_plausible": "“悲伤的；令人难过的”与题干第二义“痛苦的”在情感痛苦层面接近，可能被视为近义。",
+          "interference_type": "semantic"
+        }
+      ],
+      "suggested_prompt": null,
+      "needs_prompt_revision": false
+    },
+    "final_semantic_review": {
+      "issues": [],
+      "verdict": "no_obvious_issue"
+    },
+    "reasons": [],
+    "prompt_version": "mcq_zh_en_v5",
+    "question": {
+      "prompt": "苦的；痛苦的",
+      "correct_option_id": "C",
+      "options": [
+        {
+          "option_id": "A",
+          "spelling": "sour",
+          "definition": "酸的；酸败的"
+        },
+        {
+          "option_id": "B",
+          "spelling": "spicy",
+          "definition": "辛辣的；刺激的"
+        },
+        {
+          "option_id": "C",
+          "spelling": "bitter",
+          "definition": "苦的；痛苦的"
+        },
+        {
+          "option_id": "D",
+          "spelling": "sad",
+          "definition": "悲伤的；令人难过的"
+        }
+      ]
+    },
+    "persisted_review_state": "draft",
+    "semantic_review_evidence": {
+      "verdict": "no_obvious_issue",
+      "issues": []
+    },
+    "source_checks": {
+      "target_current": true,
+      "sources": [
+        {
+          "option_id": "A",
+          "current": true
+        },
+        {
+          "option_id": "B",
+          "current": true
+        },
+        {
+          "option_id": "C",
+          "current": true
+        },
+        {
+          "option_id": "D",
+          "current": true
+        }
+      ]
+    }
+  },
+  {
+    "phase": "initial_budget4",
+    "target": "finish",
+    "state": "insufficient_candidates",
+    "question_created": false,
+    "model_usage": {
+      "model": "deepseek-flash",
+      "requests": 3,
+      "input_tokens": 5273,
+      "output_tokens": 1050,
+      "cost": null
+    },
+    "reselection_count": 0,
+    "feedback": null,
+    "final_proposal": {
+      "outcome": "draft",
+      "concerns": [
+        "close 也有“结束”义，且可指结束活动，与题干第一义项存在一定重合，但未覆盖“完成”义，故未选作干扰项，建议人工确认是否接受。",
+        "complete 含“完成”义，与题干第二义项高度接近，是较强的近义候选，若作为干扰项可能被判定为也正确，故未纳入。",
+        "accomplish 表示“完成、实现”，与“完成”相近，但偏重达成目标，未选作干扰项以避免歧义，建议人工复核。"
+      ],
+      "distractors": [
+        {
+          "why_wrong": "conclude 侧重正式地结束或得出结论，并不表示“完成”某件具体事务，日常语境中不能像 finish 那样泛指做完任务。",
+          "candidate_ref": "ca2970e33db811c6cfd516a8381cef697c273212c1fcf438f69257c7c5490e82",
+          "why_plausible": "conclude 有“结束”之义，与题干“结束”相近，易被误认为可替代 finish。",
+          "interference_type": "semantic"
+        },
+        {
+          "why_wrong": "end 强调使某事终止或到达终点，不含“完成、做完”的义项，不能覆盖题干“完成”这一层意思。",
+          "candidate_ref": "ca1049176bc606c4c9c8b061a443221a00a04bd596a273970db65de7b046d872",
+          "why_plausible": "end 也表示“结束”，与题干第一个义项直接重合。",
+          "interference_type": "semantic"
+        },
+        {
+          "why_wrong": "stop 侧重中断或不再进行，并不表示把事情做完、完成，与 finish 的“完成”核心含义不符。",
+          "candidate_ref": "9faaea31fb9400287814ee595927b773d93825332f08d3e964540c2462b40004",
+          "why_plausible": "stop 有“停止”之义，与“结束”在部分语境中接近，容易混淆。",
+          "interference_type": "semantic"
+        }
+      ],
+      "suggested_prompt": null,
+      "needs_prompt_revision": false
+    },
+    "final_semantic_review": {
+      "issues": [
+        "题干为“结束；完成”，未限定及物性、搭配或语境，因此可对应多个选项：end 可表示“结束”（如 The meeting ended），conclude 可表示“结束/完成”（如 conclude a speech / work），stop 也可表示“结束/停止”。这些都可合理对应题干中的某一并列义项，无法证明 intended_answer=finish 唯一。",
+        "“完成”这一义项并非 finish 独有：conclude 也可表示完成/结束（conclude the deal），且题干未说明“完成工作/任务”之类的语境，干扰项 A 的“结束；推断”可合理覆盖“结束”义项。",
+        "选项 C stop 的释义“停止；阻止”对应“结束/停止”义，题干“结束；完成”未排除 stop 在“结束某事”上的近义用法，干扰强度不足以证明唯一答案。",
+        "题干为中文并列释义，不是联合条件；按规则任一选项对应其中一项即可成为潜在正确答案，而 A、B、C 均能合理对应“结束”，因此题目存在多解，需补充限定条件（如及物/不及物、典型搭配、例句语境）或调整题干/选项。",
+        "建议题干为 null，无额外可区分线索；需人工修订题干或选项以明确唯一性。"
+      ],
+      "verdict": "needs_revision"
+    },
+    "reasons": [
+      "剩余调用预算不足以重选并复审，尚未排除歧义",
+      "题干为“结束；完成”，未限定及物性、搭配或语境，因此可对应多个选项：end 可表示“结束”（如 The meeting ended），conclude 可表示“结束/完成”（如 conclude a speech / work），stop 也可表示“结束/停止”。这些都可合理对应题干中的某一并列义项，无法证明 intended_answer=finish 唯一。",
+      "“完成”这一义项并非 finish 独有：conclude 也可表示完成/结束（conclude the deal），且题干未说明“完成工作/任务”之类的语境，干扰项 A 的“结束；推断”可合理覆盖“结束”义项。",
+      "选项 C stop 的释义“停止；阻止”对应“结束/停止”义，题干“结束；完成”未排除 stop 在“结束某事”上的近义用法，干扰强度不足以证明唯一答案。",
+      "题干为中文并列释义，不是联合条件；按规则任一选项对应其中一项即可成为潜在正确答案，而 A、B、C 均能合理对应“结束”，因此题目存在多解，需补充限定条件（如及物/不及物、典型搭配、例句语境）或调整题干/选项。",
+      "建议题干为 null，无额外可区分线索；需人工修订题干或选项以明确唯一性。"
+    ],
+    "prompt_version": "mcq_zh_en_v5",
+    "question_rows_in_database": 0
+  },
+  {
+    "phase": "initial_budget4",
+    "target": "wage",
+    "state": "insufficient_candidates",
+    "question_created": false,
+    "model_usage": {
+      "model": "deepseek-flash",
+      "requests": 3,
+      "input_tokens": 6124,
+      "output_tokens": 1043,
+      "cost": null
+    },
+    "reselection_count": 0,
+    "feedback": null,
+    "final_proposal": {
+      "outcome": "draft",
+      "concerns": [
+        "目标词 wage 与 pay 在“工资”义上高度重叠，虽然 pay 可作合理干扰项，但若题目要求单一最佳答案，需人工确认 wage 与 pay 的区分是否足够清晰。",
+        "salary 与 wage 的计酬方式差异属于语用细节，题干仅给出“工资；工钱”，未限定计酬方式；若宽松理解，salary 也可能被视为可接受答案，建议人工复核题干是否需补充限定。"
+      ],
+      "distractors": [
+        {
+          "why_wrong": "pay 泛指工资或报酬，但常见用法更偏“薪水、薪酬”这一整体概念，且词形与 wage 容易混淆，作干扰项合理；在本题中不作为正确答案。",
+          "candidate_ref": "e3004096b89e0e24a46d39e0b6d4f2ce0bc875e190007f190ef93afc8960ac5a",
+          "why_plausible": "pay 作名词可指工资、薪酬，与目标释义“工资；工钱”高度接近。",
+          "interference_type": "semantic"
+        },
+        {
+          "why_wrong": "salary 通常指按月发放的固定薪金，尤其针对白领职位，而 wage 多指按小时、日或周计算的工钱；两者语域和计酬方式不同。",
+          "candidate_ref": "21a32299d51cdd905cc568530e388c257eeaefcf3b397e0c249b74c595c3fda2",
+          "why_plausible": "salary 意为薪水、薪金，与“工资”同属劳动报酬类名词，语义邻近。",
+          "interference_type": "semantic"
+        },
+        {
+          "why_wrong": "income 泛指各种收入来源，范围远大于“工资、工钱”，不特指雇佣劳动所得，因此不能替代 wage。",
+          "candidate_ref": "eb0aee78e520884b1dc21d85c768f866d675380d4eb65cf36b1c759fd17b31af",
+          "why_plausible": "income 意为收入、收益，属于薪酬报酬的上位概念，容易与工资类词混淆。",
+          "interference_type": "semantic"
+        }
+      ],
+      "suggested_prompt": null,
+      "needs_prompt_revision": false
+    },
+    "final_semantic_review": {
+      "issues": [
+        "题干为“工资；工钱”，是多义并列而非联合条件，任一义项对应即可。选项A pay 名词释义“工资；薪酬”与题干“工资”直接对应，且 pay 可指工钱/工资，可能成为正确答案，无法证明 wage 唯一。",
+        "选项C salary 释义“薪水；薪金”与“工资”语义接近，日常中文常以“工资”泛指薪水，存在可替代性歧义（尽管 salary 更偏固定月薪，题干未限定支付方式）。",
+        "选项B wage 的释义“工资；工钱”与题干完全重合，符合预期；但题干未提供区分 wage/pay/salary 的限定条件（如按小时/按周/体力劳动等），干扰项无法被明确排除。",
+        "选项D income 释义“收入；收益”偏总收入，与“工资；工钱”差距较大，干扰强度尚可；但整体区分度仍依赖未给出的语用条件。",
+        "建议明确题干限定（如“按小时或按周支付的劳动报酬；工钱”）或改用能唯一指向 wage 的释义，并复核 pay 是否应作为可接受答案。"
+      ],
+      "verdict": "needs_revision"
+    },
+    "reasons": [
+      "剩余调用预算不足以重选并复审，尚未排除歧义",
+      "题干为“工资；工钱”，是多义并列而非联合条件，任一义项对应即可。选项A pay 名词释义“工资；薪酬”与题干“工资”直接对应，且 pay 可指工钱/工资，可能成为正确答案，无法证明 wage 唯一。",
+      "选项C salary 释义“薪水；薪金”与“工资”语义接近，日常中文常以“工资”泛指薪水，存在可替代性歧义（尽管 salary 更偏固定月薪，题干未限定支付方式）。",
+      "选项B wage 的释义“工资；工钱”与题干完全重合，符合预期；但题干未提供区分 wage/pay/salary 的限定条件（如按小时/按周/体力劳动等），干扰项无法被明确排除。",
+      "选项D income 释义“收入；收益”偏总收入，与“工资；工钱”差距较大，干扰强度尚可；但整体区分度仍依赖未给出的语用条件。",
+      "建议明确题干限定（如“按小时或按周支付的劳动报酬；工钱”）或改用能唯一指向 wage 的释义，并复核 pay 是否应作为可接受答案。"
+    ],
+    "prompt_version": "mcq_zh_en_v5",
+    "question_rows_in_database": 0
+  },
+  {
+    "phase": "final_budget6",
+    "target": "finish",
+    "state": "insufficient_candidates",
+    "question_created": false,
+    "model_usage": {
+      "model": "deepseek-flash",
+      "requests": 4,
+      "input_tokens": 5602,
+      "output_tokens": 1420,
+      "cost": null
+    },
+    "reselection_count": 1,
+    "feedback": {
+      "issues": [
+        "题干仅给出“结束；完成”这一释义且未提供任何语境或句法限制，四个选项均为 verb 且均可表达“结束/完成”的一部分：end 可表“结束”，close 可表“结束”，complete 可表“完成”，因此无法证明只有 finish 是唯一正确答案。",
+        "选项 B end 的词典释义“结束；终止”与题干“结束”义项直接对应，属于可替代的正确答案，构成语义重叠。",
+        "选项 C close 的释义“关闭；结束”包含题干“结束”义项，虽以“关闭”为主，但“结束”义项在无语境下仍可成立，干扰强度不足。",
+        "选项 D complete 的释义“完成；使完整”直接对应题干“完成”义项，与 finish 在及物动词用法下高度近义，无法仅凭题干排除。",
+        "题干为并列释义“结束；完成”，按可替代义项理解，任何覆盖其中一项的选项都可能正确；四个选项均不同程度覆盖，故题目缺少唯一性约束。",
+        "缺少题干搭配信息（如宾语类型、是否强调达到终点、是否强调使某物完整），导致无法区分 finish/end/complete/close 的细微语义差异。",
+        "四个选项级别均为 B1，难度与题干匹配，但选项间近义度过高且无额外形式线索，易使学习者凭语感多选。"
+      ],
+      "previous_distractors": [
+        {
+          "spelling": "end",
+          "definition": "结束；终止"
+        },
+        {
+          "spelling": "close",
+          "definition": "关闭；结束"
+        },
+        {
+          "spelling": "complete",
+          "definition": "完成；使完整"
+        }
+      ]
+    },
+    "final_proposal": {
+      "outcome": "draft",
+      "concerns": [
+        "题干“结束；完成”过于宽泛，候选池中 conclude、close、end、complete、accomplish 都与其中至少一个义项合理对应，难以保证唯一正确答案。",
+        "原反馈指出 end、close、complete 均可部分替代题干释义，因此本轮不再选用这些近义词作为干扰项。",
+        "即使换成 lend、repair、borrow 等明显无关动词，题干本身仍缺少搭配或句法限制，人工审核时应考虑补充语境或收窄释义以避免多解。",
+        "建议题干改为强调“完成、做完”这一核心义项，并保留 finish 为唯一正确答案；该改动需人工确认。"
+      ],
+      "distractors": [
+        {
+          "why_wrong": "lend 表示“借出；贷给”，与“结束；完成”没有任何义项重合，不能替代 finish。",
+          "candidate_ref": "3d6781eb5582fc6cce854c42578846e89cd2a0cf50d82523f686d4657c8a7fa7",
+          "why_plausible": "lend 是 B1 级常见动词，与题干一样是单音节、行为动作类，学习者在无语境时可能仅凭“背过的动词”误选。",
+          "interference_type": "semantic"
+        },
+        {
+          "why_wrong": "repair 表示“修理；修复”，强调恢复功能，不表达“结束”或“完成”的义项，本题错误。",
+          "candidate_ref": "626c60b204061f4c5b997434cea68d5ae3b782bea7240db468bc84057afc280c",
+          "why_plausible": "repair 同为 B1 级及物动词，和 finish 一样常见于“把某事做好”的日常语境，容易在词形或语感上被误选。",
+          "interference_type": "semantic"
+        },
+        {
+          "why_wrong": "borrow 表示“借入；借用”，与题干“结束；完成”无任何义项对应，不能作为 finish 的同义替换。",
+          "candidate_ref": "cf9ce30318fdf91ebb612f337a7ebbfeaadf75defd760c50f6a0d25b6e21f752",
+          "why_plausible": "borrow 是 B1 级高频动词，与 finish 同属学习者早期接触的常用动词，在混杂选项中易被凭熟悉度误选。",
+          "interference_type": "semantic"
+        }
+      ],
+      "suggested_prompt": "finish（动词，B1，BrE）\n释义：完成（使某事达到终点并做完）\n选出最符合该释义的英文单词。",
+      "needs_prompt_revision": true
+    },
+    "final_semantic_review": {
+      "issues": [
+        "题干仅为中文并列释义“结束；完成”，未给出词性或语境；A的finish是“结束/完成”的直接对应，语义上唯一合理，但干扰项需核实是否也含其一义：lend、repair、borrow均无“结束/完成”义，故唯一性可成立。",
+        "真正的问题在于题干未说明题型，选项为英文单词而题干为中文释义，属“根据释义选词”；若按英文单词释义反向理解，finish对应“结束；完成”成立。",
+        "选项B、C、D难度同为B1且与题干语义无关，干扰强度偏低，易被排除；这不影响唯一性，但影响题目质量。",
+        "建议题干给出词性与语境，并避免仅以中文并列义项作为唯一线索。"
+      ],
+      "verdict": "needs_revision"
+    },
+    "reasons": [
+      "语义复审后仍未找到三个可排除歧义的干扰项",
+      "题干仅为中文并列释义“结束；完成”，未给出词性或语境；A的finish是“结束/完成”的直接对应，语义上唯一合理，但干扰项需核实是否也含其一义：lend、repair、borrow均无“结束/完成”义，故唯一性可成立。",
+      "真正的问题在于题干未说明题型，选项为英文单词而题干为中文释义，属“根据释义选词”；若按英文单词释义反向理解，finish对应“结束；完成”成立。",
+      "选项B、C、D难度同为B1且与题干语义无关，干扰强度偏低，易被排除；这不影响唯一性，但影响题目质量。",
+      "建议题干给出词性与语境，并避免仅以中文并列义项作为唯一线索。",
+      "原题干需要补充限定条件，不能通过只修改解析来排除歧义"
+    ],
+    "prompt_version": "mcq_zh_en_v5",
+    "question_rows_in_database": 0
+  },
+  {
+    "phase": "final_budget6",
+    "target": "wage",
+    "state": "insufficient_candidates",
+    "question_created": false,
+    "model_usage": {
+      "model": "deepseek-flash",
+      "requests": 4,
+      "input_tokens": 9000,
+      "output_tokens": 1234,
+      "cost": null
+    },
+    "reselection_count": 1,
+    "feedback": {
+      "issues": [
+        "题干中文『工资；工钱』与选项D定义完全一致，但A『pay』的可数名词义也可表示『工资；工钱』（如 take-home pay、payday、pay rate 等），与题干义项高度重合，可能成为另一正确答案。",
+        "B『salary』为固定薪金，与『工资；工钱』在中文口语中常可对应（『工资』泛指薪水），存在语义重叠，干扰项强度不足，可能被合理判为正确。",
+        "C『income』表示收入，虽更偏总收入，但在部分语境下与『工资』同义，干扰边界不够清晰。",
+        "题干只给出并列中文释义『工资；工钱』，未提供词性之外的可判定线索（如可数性、按小时/周计、体力劳动等），不足以证明只有 wage 唯一匹配；pay 与 wage 在该义项上几乎不可区分。",
+        "选项A、B、C、D 均为 B1 且都来自同一语义场，缺乏区分度足够强的干扰项，题目唯一性依赖词库预期答案而非语义证据。"
+      ],
+      "previous_distractors": [
+        {
+          "spelling": "pay",
+          "definition": "工资；薪酬"
+        },
+        {
+          "spelling": "salary",
+          "definition": "薪水；薪金"
+        },
+        {
+          "spelling": "income",
+          "definition": "收入；收益"
+        }
+      ]
+    },
+    "final_proposal": {
+      "outcome": "insufficient_candidates",
+      "reasons": [
+        "题干释义“工资；工钱”在候选池中有多个近义项：pay（工资；薪酬）与 salary（薪水；薪金）都可在中文语境中对应“工资”，income（收入；收益）在泛指劳动所得时也可能被合理匹配，无法凭现有题干唯一确定 wage。",
+        "反馈已指出上一轮 pay、salary、income 三个干扰项与“工资；工钱”存在语义重叠，而当前合法候选池中与 wage 同义或近义的选项并未减少，仍找不到三个既能有效干扰又不会变成另一正确答案的选项。",
+        "候选池其余词项分别为水果、职业、护理者或费用类词汇，若强行选取只是凑数，语义相关度低，无法构成有意义的近义干扰，反而降低题目质量。",
+        "建议在修订题干时补充可判定线索（如按小时或按周计酬、体力劳动者的工资等），或调整候选池以排除与 wage 高度同义的 pay、salary、income。"
+      ]
+    },
+    "final_semantic_review": null,
+    "reasons": [
+      "题干释义“工资；工钱”在候选池中有多个近义项：pay（工资；薪酬）与 salary（薪水；薪金）都可在中文语境中对应“工资”，income（收入；收益）在泛指劳动所得时也可能被合理匹配，无法凭现有题干唯一确定 wage。",
+      "反馈已指出上一轮 pay、salary、income 三个干扰项与“工资；工钱”存在语义重叠，而当前合法候选池中与 wage 同义或近义的选项并未减少，仍找不到三个既能有效干扰又不会变成另一正确答案的选项。",
+      "候选池其余词项分别为水果、职业、护理者或费用类词汇，若强行选取只是凑数，语义相关度低，无法构成有意义的近义干扰，反而降低题目质量。",
+      "建议在修订题干时补充可判定线索（如按小时或按周计酬、体力劳动者的工资等），或调整候选池以排除与 wage 高度同义的 pay、salary、income。"
+    ],
+    "prompt_version": "mcq_zh_en_v5",
+    "question_rows_in_database": 0
+  },
+  {
+    "phase": "browser_regeneration",
+    "target": "finish",
+    "state": "insufficient_candidates",
+    "question_created": false,
+    "model_usage": {
+      "model": "deepseek-flash",
+      "requests": 3,
+      "input_tokens": 4787,
+      "output_tokens": 843,
+      "cost": null
+    },
+    "reselection_count": 1,
+    "feedback": {
+      "issues": [
+        "题干仅给出中文释义“结束；完成”，问哪个动词对应。选项B finish（结束；完成）确实最贴合，但C end 也表示“结束；终止”，D complete 也表示“完成；使完整”，二者均能覆盖题干“结束”或“完成”之一项；按可替代义项判定，无法证明 finish 是唯一正确答案。",
+        "A close 的英文释义含“结束”，若仅考查“结束”义，也存在一定歧义；虽中文通常偏向“关闭”而非“完成”，其干扰强度与题干并列释义仍可能造成多解。",
+        "题干未提供任何造句或语境（如及物/不及物、对象），无法区分 end/finish/complete 的语用差异，导致唯一性无法成立。建议增加明确语境或限定搭配，使仅一个选项成立。"
+      ],
+      "previous_distractors": [
+        {
+          "spelling": "close",
+          "definition": "关闭；结束"
+        },
+        {
+          "spelling": "end",
+          "definition": "结束；终止"
+        },
+        {
+          "spelling": "complete",
+          "definition": "完成；使完整"
+        }
+      ]
+    },
+    "final_proposal": {
+      "outcome": "insufficient_candidates",
+      "reasons": [
+        "题干中文释义为“结束；完成”，按可替代义项判断：候选池中 end（结束；终止）可匹配“结束”，complete（完成；使完整）可匹配“完成”，close（关闭；结束）也可匹配“结束”，三者都可能是正确答案，无法凑出三个既不正确又有干扰价值的错误选项。",
+        "目标词 finish 本身含“结束”和“完成”两个义项，而候选池中恰有多个词分别覆盖其中一项；在没有任何搭配或语境限定的情况下，唯一性不成立，任何三个干扰项都会包含至少一个合理答案。",
+        "若要保留中文选英文的题型，建议补充使用场景或搭配限定（如具体宾语或句式），使只有 finish 成立；否则应改为其他考法。"
+      ]
+    },
+    "final_semantic_review": null,
+    "reasons": [
+      "题干中文释义为“结束；完成”，按可替代义项判断：候选池中 end（结束；终止）可匹配“结束”，complete（完成；使完整）可匹配“完成”，close（关闭；结束）也可匹配“结束”，三者都可能是正确答案，无法凑出三个既不正确又有干扰价值的错误选项。",
+      "目标词 finish 本身含“结束”和“完成”两个义项，而候选池中恰有多个词分别覆盖其中一项；在没有任何搭配或语境限定的情况下，唯一性不成立，任何三个干扰项都会包含至少一个合理答案。",
+      "若要保留中文选英文的题型，建议补充使用场景或搭配限定（如具体宾语或句式），使只有 finish 成立；否则应改为其他考法。"
+    ],
+    "prompt_version": "mcq_zh_en_v5",
+    "question_rows_in_database": 0
+  }
+]

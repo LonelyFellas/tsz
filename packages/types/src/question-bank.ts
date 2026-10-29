@@ -178,3 +178,63 @@ export interface QuestionBatchPage {
   items: QuestionBatch[];
   pagination: CoinEntryPage["pagination"];
 }
+
+/** Lightweight, server-filtered administrative workbench reads. */
+export interface QuestionWorkbenchQuery extends QuestionBankQuery {
+  query?: string;
+  question_level?: string;
+  answer_profile?: string;
+}
+export interface QuestionWorkbenchItem {
+  id: string;
+  revision: number;
+  state: BankQuestionState;
+  created_by: string;
+  spelling: string;
+  part_of_speech: string;
+  definition: string;
+  prompt: string;
+  question_level: string;
+  answer_profile: string;
+  options: { option_id: string; spelling: string }[];
+  correct_option_id: string;
+  source_current: boolean;
+  has_concerns: boolean;
+  updated_at: string;
+}
+export interface QuestionStateCounts {
+  draft: number;
+  approved: number;
+  rejected: number;
+  disabled: number;
+}
+export interface QuestionWorkbenchPage {
+  items: QuestionWorkbenchItem[];
+  pagination: CoinEntryPage["pagination"];
+  counts: QuestionStateCounts;
+}
+export interface QuestionSemanticReview {
+  verdict: "no_obvious_issue" | "needs_revision";
+  issues: string[];
+}
+export interface QuestionInspection {
+  question: BankQuestion;
+  sources: { option_id: string; current: boolean }[];
+  target_current: boolean;
+  semantic_review: QuestionSemanticReview | null;
+  semantic_review_current: boolean;
+}
+export interface SearchQuestionCandidates {
+  entry_id?: string;
+  query?: string;
+  question_level: string;
+  answer_profile: string;
+  page?: number;
+  page_size?: number;
+  part_of_speech?: string;
+  exclude_entry_ids?: string[];
+  exclude_spellings?: string[];
+  excluded_definition?: string;
+  target_spelling?: string;
+  editable_only?: boolean;
+}

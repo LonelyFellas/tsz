@@ -1,0 +1,10 @@
+{
+  "issue": "entry_id FK support lacked a leading index; repeated scans in large fixture cleanup",
+  "initial_cleanup": "hit its existing 5-minute statement limit and rolled the transaction back",
+  "rollback_verified_counts": {
+    "questions": 50027,
+    "entries": 50006
+  },
+  "verified_cancel_attempt": "no still-active matching statement remained",
+  "fix": "add leading entry_id index; retain all FK constraints"
+}

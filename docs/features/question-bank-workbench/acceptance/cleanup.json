@@ -1,0 +1,22 @@
+{
+  "run_id": "qbw-20261029-5a39b215",
+  "isolated_environment": true,
+  "logout_completed": true,
+  "browser_storage": {
+    "local_storage": 0,
+    "session_storage": 0,
+    "cache_storage": 0,
+    "indexed_databases": 0,
+    "service_workers": 0
+  },
+  "performance_fixtures_removed": true,
+  "owned_container_count_removed": 2,
+  "owned_volume_removed": true,
+  "owned_server_processes_stopped": true,
+  "owned_ports_no_listeners": [55479, 56479, 18479, 18480, 30479],
+  "unrelated_running_containers_preserved": true,
+  "fixture_helper_removed": true,
+  "temporary_public_cleanup_page_removed": true,
+  "private_runtime_removed": true,
+  "oss_objects_created": 0
+}

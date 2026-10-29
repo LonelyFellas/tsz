@@ -1,0 +1,32 @@
+{
+  "dataset": {
+    "entries": 50006,
+    "questions": 50027,
+    "fixture_entries": 50000,
+    "fixture_questions": 50000
+  },
+  "measurements": [
+    {
+      "case": "question page 1",
+      "ms": 47.5,
+      "status": 200,
+      "returned": 20,
+      "total": 50027
+    },
+    {
+      "case": "question page 1000",
+      "ms": 56.2,
+      "status": 200,
+      "returned": 20,
+      "total": 50027
+    },
+    {
+      "case": "filtered question search",
+      "ms": 966.4,
+      "status": 200,
+      "returned": 20,
+      "total": 33339
+    }
+  ],
+  "notes": "Task-exclusive fixture database. Real native HTTP handlers; one sample per case, not a throughput/SLA claim."
+}

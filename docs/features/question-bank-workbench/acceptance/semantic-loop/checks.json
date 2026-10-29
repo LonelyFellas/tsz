@@ -1,0 +1,42 @@
+{
+  "agent": {
+    "pytest_passed": 140,
+    "pytest_skipped": 1,
+    "skip_reason": "Optional real OpenCode runtime integration not configured; this acceptance explicitly uses DeepSeek.",
+    "ruff_check": "passed",
+    "ruff_format": "passed",
+    "mypy": "passed",
+    "contract_export_check": "passed",
+    "wheel_and_sdist_build": "passed",
+    "prompt_version": "mcq_zh_en_v5"
+  },
+  "backend": {
+    "question_bank_handler_passed": 20,
+    "includes": [
+      "structured evidence persistence",
+      "block unchanged ambiguity",
+      "explanation-only and option-order changes cannot bypass block",
+      "changed question keeps original evidence and marks applicability false",
+      "native migration down/up retains question snapshots"
+    ],
+    "clippy_all_targets_all_features_deny_warnings": "passed",
+    "fmt": "passed",
+    "native_server_build": "passed"
+  },
+  "frontend": {
+    "related_test_files": 3,
+    "related_tests_passed": 50,
+    "test_execution": "maxWorkers=1; original 5000 ms timeouts retained",
+    "typecheck_tasks": 7,
+    "affected_eslint": "passed",
+    "admin_production_build": "passed",
+    "api_client_test_files": 33,
+    "api_client_tests_passed": 650
+  },
+  "verification_notes": [
+    "New regression tests were run against the old workflow and failed, then passed with the semantic-reselection implementation.",
+    "An initial frontend parallel check hit five 5000 ms timeouts under concurrent builds; serial execution passed with unchanged timeouts.",
+    "An old migration regression manually reapplied only two historical migrations and lost the new evidence column; it now uses the complete native migrator chain.",
+    "No commit, push, PR, merge or deployment performed."
+  ]
+}

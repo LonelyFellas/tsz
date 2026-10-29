@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/speech-delivery/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-29T00:55:26.865Z",
+  "_source": "/Users/darwish/.codex/worktrees/question-bank-workbench-backend/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-10-29T05:25:15.406Z",
   "paths": {
     "/api/internal/agent/v1/requests/{id}/candidates/search": ["post"],
     "/api/internal/agent/v1/requests/{id}/context": ["get"],
@@ -107,12 +107,15 @@
     "/admin/question-bank/batches/{id}/cancel": ["post"],
     "/admin/question-bank/batches/{id}/items": ["get"],
     "/admin/question-bank/candidate-page": ["get"],
+    "/admin/question-bank/candidate-search": ["post"],
     "/admin/question-bank/candidates": ["get"],
     "/admin/question-bank/generations": ["get", "post"],
     "/admin/question-bank/generations/{id}": ["get"],
     "/admin/question-bank/generations/{id}/cancel": ["post"],
     "/admin/question-bank/questions": ["get"],
+    "/admin/question-bank/questions/workbench": ["get"],
     "/admin/question-bank/questions/{id}": ["get", "patch"],
+    "/admin/question-bank/questions/{id}/inspection": ["get"],
     "/admin/question-bank/questions/{id}/review": ["post"],
     "/admin/settings/form-types": ["get", "post"],
     "/admin/settings/form-types/{id}": ["delete", "patch"],
@@ -2007,6 +2010,44 @@
         "schema": { "type": "string" }
       }
     ],
+    "get /admin/question-bank/questions/workbench": [
+      {
+        "name": "answer_profile",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "format": "int32", "minimum": 0 }
+      },
+      {
+        "name": "page_size",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "format": "int32", "minimum": 0 }
+      },
+      {
+        "name": "query",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "question_level",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "state",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      }
+    ],
     "get /admin/settings/form-types": [
       {
         "name": "page",
@@ -3229,6 +3270,17 @@
         "503": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
+    "post /admin/question-bank/candidate-search": {
+      "request": { "$ref": "#/components/schemas/SearchQuestionCandidates" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/QuestionCandidateSearchPage" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "get /admin/question-bank/candidates": {
       "request": null,
       "responses": {
@@ -3307,6 +3359,15 @@
         "503": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
+    "get /admin/question-bank/questions/workbench": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/QuestionWorkbenchPage" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "get /admin/question-bank/questions/{id}": {
       "request": null,
       "responses": {
@@ -3331,6 +3392,15 @@
         "409": { "$ref": "#/components/schemas/ProblemDetails" },
         "422": { "$ref": "#/components/schemas/ProblemDetails" },
         "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/question-bank/questions/{id}/inspection": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/QuestionInspection" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
     "post /admin/question-bank/questions/{id}/review": {
@@ -8637,6 +8707,36 @@
             { "type": "null" }
           ]
         }
+      },
+      "additionalProperties": false
+    },
+    "SearchQuestionCandidates": {
+      "type": "object",
+      "required": ["question_level", "answer_profile"],
+      "properties": {
+        "answer_profile": { "type": "string" },
+        "editable_only": { "type": "boolean" },
+        "entry_id": { "type": ["string", "null"], "format": "uuid" },
+        "exclude_entry_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" }
+        },
+        "exclude_spellings": { "type": "array", "items": { "type": "string" } },
+        "excluded_definition": { "type": ["string", "null"] },
+        "page": {
+          "type": ["integer", "null"],
+          "format": "int32",
+          "minimum": 0
+        },
+        "page_size": {
+          "type": ["integer", "null"],
+          "format": "int32",
+          "minimum": 0
+        },
+        "part_of_speech": { "type": ["string", "null"] },
+        "query": { "type": ["string", "null"] },
+        "question_level": { "type": "string" },
+        "target_spelling": { "type": ["string", "null"] }
       },
       "additionalProperties": false
     },
