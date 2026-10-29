@@ -233,6 +233,10 @@ it("rechecks legacy service rows after the API rollout instead of retaining a by
   );
   fireEvent.click(screen.getByRole("button", { name: "检查所选音频" }));
   await waitFor(() => expect(ready).toHaveBeenLastCalledWith(true));
+  expect(
+    await screen.findByText("当前服务未提供音频确认，正式发布仍由服务端检查")
+  ).toBeInTheDocument();
+  expect(screen.getByText("可提交 1 / 1 项")).toBeInTheDocument();
   expect(confirm).not.toHaveBeenCalled();
   check.mockResolvedValue(review(t));
   fireEvent.click(screen.getByRole("button", { name: "检查所选音频" }));

@@ -193,6 +193,7 @@ function BatchReview({
             failure.status === 404
           ) {
             next[index] = { target: row.target, legacyService: true };
+            setRows([...next]);
             continue;
           }
           next[index] = {
@@ -224,7 +225,7 @@ function BatchReview({
           按冻结的版本检查音频。已确认项目直接复用；其余项目集中审听后，一次确认。确认部分成功时会保留结果，正式发布仍须全部通过。
         </Typography.Text>
         <Typography.Text>
-          已就绪 {rows.filter(complete).length} / {rows.length} 项
+          可提交 {rows.filter(complete).length} / {rows.length} 项
         </Typography.Text>
         {playError && <Alert type="error" showIcon title={playError} />}
         <List
