@@ -118,7 +118,7 @@ async function run(component, scenario, approved = true) {
       case "$*" in
         *'/usr/bin/node --version') echo '${process.version}' ;;
         *'mktemp -d '*) echo /opt/tsz-release-stage.ABC123 ;;
-        *publish-release.sh*|*'rm -rf '*) ;;
+        *publish-compatible.sh*|*'rm -rf '*) ;;
         *) exit 92 ;;
       esac`
     );
@@ -138,7 +138,8 @@ async function run(component, scenario, approved = true) {
       Object.assign(env, {
         DEPLOY_EXPECTED_SHA: sha,
         DEPLOY_EXPECTED_CI_RUN_ID: "123",
-        DEPLOY_EXPECTED_CI_RUN_ATTEMPT: "1"
+        DEPLOY_EXPECTED_CI_RUN_ATTEMPT: "1",
+        DEPLOY_EXPECTED_API_SHA: "d".repeat(40)
       });
     if (scenario === "stale") env.DEPLOY_EXPECTED_SHA = "c".repeat(40);
     const result = spawnSync(
@@ -237,7 +238,8 @@ for (const component of ["admin", "web"]) {
     test(`${component}: publish verified CI bytes without a local build (${approved})`, async () => {
       const result = await run(component, "stable", approved);
       assert.equal(result.status, 0, result.stdout + result.stderr);
-      assert.match(result.calls, /ssh .*publish-release.sh/);
+      assert.match(result.calls, /ssh .*publish-compatible.sh/);
+      if (approved) assert.match(result.calls, new RegExp("d{40}"));
       assert.doesNotMatch(result.calls, /forbidden-build/);
       if (component === "web") assert.equal(result.license, "font license");
     });
