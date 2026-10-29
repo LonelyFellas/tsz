@@ -81,6 +81,26 @@ vi.mock("./part-of-speech/api", () => ({
   })
 }));
 
+vi.mock("./BatchPublicationModal", () => ({
+  BatchPublicationModal: ({
+    rows,
+    onClose,
+    onPublished
+  }: {
+    rows: AdminWordListItemAny[];
+    onClose: () => void;
+    onPublished: () => void;
+  }) => (
+    <div data-testid="batch-audio-review">
+      {rows.map((row) => (
+        <span key={row.id}>{`${row.id}:${row.revision}`}</span>
+      ))}
+      <button onClick={onClose}>关闭批次审听</button>
+      <button onClick={onPublished}>完成批次发布</button>
+    </div>
+  )
+}));
+
 import { SmartDictionary } from "./SmartDictionary";
 
 function render(ui: Parameters<typeof testingLibraryRender>[0]) {
@@ -1384,7 +1404,7 @@ describe("SmartDictionary", () => {
     });
   });
 
-  it("翻页时保留完整批量选择，但不提供批量发布入口", async () => {
+  it("翻页保留选择和版本，集中审听关闭后保留选择、发布后清空", async () => {
     const { container } = render(
       <MemoryRouter>
         <AntApp>
@@ -1412,6 +1432,80 @@ describe("SmartDictionary", () => {
     });
     expect(batchButton).not.toBeDisabled();
     expect(screen.queryByText("发布所选")).not.toBeInTheDocument();
+    fireEvent.click(container.querySelector("tbody input[type='checkbox']")!);
+    fireEvent.click(screen.getByRole("button", { name: "批量审听与发布(2)" }));
+    expect(screen.getByTestId("batch-audio-review")).toHaveTextContent(
+      "word-1:1word-2:1"
+    );
+    fireEvent.click(screen.getByRole("button", { name: "关闭批次审听" }));
+    expect(screen.queryByTestId("batch-audio-review")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "批量审听与发布(2)" })
+    ).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "批量审听与发布(2)" }));
+    fireEvent.click(screen.getByRole("button", { name: "完成批次发布" }));
+    expect(screen.queryByTestId("batch-audio-review")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "批量审听与发布" })
+    ).toBeDisabled();
+  });
+
+  it("混选无发布权限的归属词条时禁止打开批次审听", () => {
+    authMocks.profile = {
+      id: "admin-1",
+      role: "admin",
+      permissions: ["words.access", "words.publish"]
+    };
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [
+          word("own", "own"),
+          { ...word("other", "other"), created_by: "admin-2" }
+        ],
+        page: { page: 1, page_size: 20, total: 2 }
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn()
+    });
+    const { container } = render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+      </MemoryRouter>
+    );
+    fireEvent.click(container.querySelector("thead input[type='checkbox']")!);
+    expect(
+      screen.getByRole("button", { name: "批量审听与发布(2)" })
+    ).toBeDisabled();
+    expect(screen.queryByTestId("batch-audio-review")).toBeNull();
+  });
+
+  it("超过后端50词条批次上限时禁止打开批次审听", () => {
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: Array.from({ length: 51 }, (_, index) =>
+          word(`word-${index}`, `word${index}`)
+        ),
+        page: { page: 1, page_size: 100, total: 51 }
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn()
+    });
+    const { container } = render(
+      <MemoryRouter initialEntries={["/words?page_size=100"]}>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+      </MemoryRouter>
+    );
+    fireEvent.click(container.querySelector("thead input[type='checkbox']")!);
+    expect(
+      screen.getByRole("button", { name: "批量审听与发布(51)" })
+    ).toBeDisabled();
+    expect(screen.queryByTestId("batch-audio-review")).toBeNull();
   });
 
   it("旧后端影响查询 404 时禁止归档，重试后显示影响并允许确认", async () => {
