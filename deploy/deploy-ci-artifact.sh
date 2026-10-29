@@ -46,11 +46,9 @@ NODE
   rsync -az --no-o --no-g --timeout=180 "$DEPLOY_BUILD_ROOT/deploy/nginx/" "tshb-test:$remote_stage/nginx/"
   rsync -az --no-o --no-g --timeout=180 "$DEPLOY_BUILD_ROOT/deploy/systemd/" "tshb-test:$remote_stage/systemd/"
   recheck_deploy_source "$component"
-  local publish_command="bash '$remote_stage/publish-release.sh' '$remote_stage' '$component'"
-  if [[ -n "${DEPLOY_EXPECTED_API_SHA:-}" ]]; then
-    [[ "$DEPLOY_EXPECTED_API_SHA" =~ ^[0-9a-f]{40}$ ]] || return 1
-    publish_command="bash '$remote_stage/publish-compatible.sh' '$remote_stage' '$component' '$DEPLOY_EXPECTED_API_SHA'"
-  fi
+  local expected_api_sha="${DEPLOY_EXPECTED_API_SHA:-}"
+  [[ -z "$expected_api_sha" || "$expected_api_sha" =~ ^[0-9a-f]{40}$ ]] || return 1
+  local publish_command="bash '$remote_stage/publish-compatible.sh' '$remote_stage' '$component' '$expected_api_sha'"
   python3 -I "$DEPLOY_BUILD_ROOT/deploy/run-with-progress.py" 480 remote-publish \
     ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes tshb-test \
     "$publish_command"
