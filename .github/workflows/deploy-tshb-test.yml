@@ -1,0 +1,67 @@
+name: Deploy tshb-test
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  actions: read
+  contents: read
+
+# A single deployment runs at a time; a newer pending run replaces an older one.
+concurrency:
+  group: deploy-tshb-test
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      github.repository == 'LonelyFellas/tsz' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Setup Node and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Install contract generator dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_HOST: ${{ secrets.TSHB_TEST_SSH_HOST }}
+          DEPLOY_SSH_USER: ${{ secrets.TSHB_TEST_SSH_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.TSHB_TEST_SSH_KEY }}
+          DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.TSHB_TEST_SSH_KNOWN_HOSTS }}
+        run: |
+          set -eu
+          [[ "$DEPLOY_SSH_HOST" =~ ^[a-zA-Z0-9.:-]+$ && "$DEPLOY_SSH_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          [[ -n "$DEPLOY_SSH_KEY" && -n "$DEPLOY_SSH_KNOWN_HOSTS" ]]
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/tshb-test-key"
+          printf '%s\n' "$DEPLOY_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/tshb-test-key" "$HOME/.ssh/known_hosts"
+          printf 'Host tshb-test\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/tshb-test-key\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n' "$DEPLOY_SSH_HOST" "$DEPLOY_SSH_USER" > "$HOME/.ssh/config"
+          chmod 600 "$HOME/.ssh/config"
+
+      - name: Deploy verified CI packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOY_EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
+          DEPLOY_EXPECTED_CI_RUN_ID: ${{ github.event.workflow_run.id }}
+          DEPLOY_EXPECTED_CI_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+        run: |
+          DEPLOY_EXPECTED_API_SHA="$(node deploy/check-api-contract.mjs)"
+          export DEPLOY_EXPECTED_API_SHA
+          ./deploy/deploy-web.sh
+          DEPLOY_EXPECTED_API_SHA="$(node deploy/check-api-contract.mjs)"
+          ./deploy/deploy-admin.sh

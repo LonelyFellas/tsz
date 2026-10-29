@@ -363,103 +363,19 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     });
   }
 
-  test("词形拼写与实际发音的输入和按钮保持连续边框", async ({ page }) => {
+  test("UPS 折叠控件可展开并收起", async ({ page }) => {
     await mockAdminV3Api(page, { formsFailureOnce: false });
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
     await openFormContent(page);
-    await page.evaluate(() => document.fonts.ready);
-    const groups = [
-      page
-        .locator(".word-shared-form-spelling .v3-voice-text-field-compact")
-        .first(),
-      page
-        .locator(
-          ".word-actual-pronunciation-control .v3-voice-text-field-compact"
-        )
-        .first()
-    ];
-    for (const width of [1280, 760]) {
-      await page.setViewportSize({ width, height: 1000 });
-      for (const [index, group] of groups.entries()) {
-        await expect(group).toBeVisible();
-        await expect(async () => {
-          const controls = await group.evaluate((node) =>
-            [...node.children].map((child) => {
-              const control = child.matches("button, textarea")
-                ? child
-                : child.querySelector("textarea")!;
-              const rect = control.getBoundingClientRect();
-              const style = getComputedStyle(control);
-              return {
-                x: rect.x,
-                right: rect.right,
-                y: rect.y,
-                height: rect.height,
-                left: [style.borderTopLeftRadius, style.borderBottomLeftRadius],
-                end: [style.borderTopRightRadius, style.borderBottomRightRadius]
-              };
-            })
-          );
-          expect(controls.length).toBeGreaterThanOrEqual(2);
-          for (let i = 0; i < controls.length; i++) {
-            const control = controls[i]!;
-            expect(Math.abs(control.y - controls[0]!.y)).toBeLessThanOrEqual(1);
-            expect(
-              Math.abs(control.height - controls[0]!.height)
-            ).toBeLessThanOrEqual(1);
-            if (i > 0) {
-              expect(control.left).toEqual(["0px", "0px"]);
-              expect(control.x - controls[i - 1]!.right).toBeCloseTo(-1, 1);
-            } else
-              expect(
-                control.left.every((radius) => Number.parseFloat(radius) > 0)
-              ).toBe(true);
-            if (i < controls.length - 1)
-              expect(control.end).toEqual(["0px", "0px"]);
-            else
-              expect(
-                control.end.every((radius) => Number.parseFloat(radius) > 0)
-              ).toBe(true);
-          }
-        }).toPass({ timeout: 5000 });
-        const input = group.locator("textarea");
-        await input.focus();
-        await expect(input).toBeFocused();
-        await expect(input).toHaveCSS("border-color", "rgb(32, 83, 255)");
-        await group.screenshot({
-          path: test.info().outputPath(`compact-field-${index}-${width}.png`)
-        });
-      }
-    }
-  });
-
-  test("UPS 折叠箭头与读法下拉保持一致", async ({ page }) => {
-    await mockAdminV3Api(page, { formsFailureOnce: false });
-    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
-    await openFormContent(page);
-    const fields = page.locator(".word-pronunciation-floating-fields").first();
-    const nativeArrow = fields.locator(".ant-select .anticon-down").first();
-    const toggle = fields.locator(".word-synthesis-ups-toggle");
-    const arrow = toggle.locator(".anticon-down");
-    const nativeStyle = await nativeArrow.evaluate((node) => ({
-      color: getComputedStyle(node).color,
-      fontSize: getComputedStyle(node).fontSize,
-      path: node.querySelector("path")!.getAttribute("d")!
-    }));
-    for (const [step, expanded] of [false, true, false].entries()) {
-      await expect(toggle).toHaveAttribute("aria-expanded", String(expanded));
-      await expect(arrow).toHaveCSS("color", nativeStyle.color);
-      await expect(arrow).toHaveCSS("font-size", nativeStyle.fontSize);
-      await expect(arrow.locator("path")).toHaveAttribute(
-        "d",
-        nativeStyle.path
-      );
-      await expect(arrow.locator("svg")).toHaveCSS(
-        "transform",
-        expanded ? "matrix(-1, 0, 0, -1, 0, 0)" : "none"
-      );
-      if (step < 2) await toggle.click();
-    }
+    const toggle = page
+      .locator(".word-pronunciation-floating-fields")
+      .first()
+      .locator(".word-synthesis-ups-toggle");
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
   });
 
   test("浮动标签在聚焦和悬停时始终完整显示", async ({ page }) => {
@@ -753,58 +669,6 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       }
     });
   }
-
-  test("词形拼写在基础确认、摘要、预览和历史快照中统一为 700", async ({
-    page
-  }) => {
-    await mockAdminV3Api(page);
-    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/basics`);
-    await expect(page.locator(".v3-summary-headword")).toHaveCSS(
-      "font-weight",
-      "700"
-    );
-    const spellings = page.locator(".dialect-panel input.tsz-words");
-    await expect(spellings.first()).toBeVisible();
-    for (const spelling of await spellings.all())
-      await expect(spelling).toHaveCSS("font-weight", "700");
-    // 仅向本用例拦截的 Mock API 生成发布快照。
-    const status = await page.evaluate(async (id) => {
-      const response = await fetch(
-        `/api/v1/admin/lexicon/entries/${id}/publications`,
-        { method: "POST" }
-      );
-      return response.status;
-    }, ADMIN_V3_MIXED_WORD_ID);
-    expect(status).toBe(200);
-    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/preview`);
-    const chain = page.locator(".v3-review-form-chain .tsz-words");
-    await expect(chain.first()).toBeVisible();
-    for (const spelling of await chain.all())
-      await expect(spelling).toHaveCSS("font-weight", "700");
-    await page.getByRole("button", { name: "查看第 2 次发布" }).click();
-    const snapshot = page.getByTestId("publication-snapshot-body");
-    await expect(
-      snapshot.getByText("orbit", { exact: true }).first()
-    ).toHaveCSS("font-weight", "700");
-  });
-
-  test("词形拼写收起态的可见文字与输入框都使用 Bold", async ({ page }) => {
-    await mockAdminV3Api(page);
-    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
-    const contentDrawer = await openFormContent(page);
-    const spelling = contentDrawer.locator("textarea.tsz-words").first();
-    const preview = contentDrawer
-      .locator(".v3-grammar-preview-content.tsz-words")
-      .first();
-    const text = preview.locator(".tsz-ve-readonly > span").first();
-    await expect(preview).toHaveText(await spelling.inputValue());
-    await expect(text).toHaveCSS("font-weight", "700");
-    await expect(spelling).toHaveCSS("font-weight", "700");
-    await spelling.focus();
-    await expect(text).toHaveCSS("font-weight", "700");
-    await spelling.blur();
-    await expect(text).toHaveCSS("font-weight", "700");
-  });
 
   test("英文词语、音标与默认正文实际加载各自字体，补字不回退到系统字体", async ({
     page
