@@ -89,22 +89,48 @@ if verify_standalone_boot "$test_dir/missing" apps/web/server.js 2>/dev/null; th
   fail "B04 missing entry should fail the boot gate"
 fi
 
+# 随机种子生成的端口可能已被其他进程占用；仅以本进程监听成功的回执作为就绪依据。
+occupy_seeded_ports() {
+  local count="$1" seed tick
+  for ((seed = 7; seed < 107; seed++)); do
+    RANDOM="$seed"
+    occupied_ports=()
+    for ((tick = 0; tick < count; tick++)); do
+      occupied_ports+=("$((40000 + RANDOM % 20000))")
+    done
+    rm -f "$test_dir/occupied-ready"
+    node -e 'const fs = require("node:fs"), http = require("node:http");
+const [ready, ...ports] = process.argv.slice(1);
+let pending = ports.length;
+for (const port of ports) {
+  const server = http.createServer((_q, s) => s.end("x"));
+  server.on("error", () => process.exit(2));
+  server.listen(Number(port), "127.0.0.1", () => {
+    if (--pending === 0) fs.writeFileSync(ready, "ready");
+  });
+}' "$test_dir/occupied-ready" "${occupied_ports[@]}" &
+    occupier_pid=$!
+    for ((tick = 0; tick < 50; tick++)); do
+      [[ -f "$test_dir/occupied-ready" ]] && break
+      kill -0 "$occupier_pid" 2>/dev/null || break
+      sleep 0.1
+    done
+    if [[ -f "$test_dir/occupied-ready" ]]; then
+      occupied_seed="$seed"
+      return 0
+    fi
+    { kill "$occupier_pid" 2>/dev/null; wait "$occupier_pid"; } 2>/dev/null || true
+    occupier_pid=""
+  done
+  fail "could not reserve a seeded set of test ports"
+}
+
 # B05 端口撞车要换端口重试，不能把好产物误判成起不来。
-# 给 RANDOM 播同一个种子，就能预知闸挑的第一个端口，先把它占住。
-RANDOM=7
-occupied_port=$((40000 + RANDOM % 20000))
-node -e "require('http').createServer((_q, s) => s.end('x')).listen($occupied_port, '127.0.0.1')" &
-occupier_pid=$!
-listening=""
-for ((tick = 0; tick < 50; tick++)); do
-  if curl -sS -m 1 -o /dev/null "http://127.0.0.1:${occupied_port}/" 2>/dev/null; then
-    listening=1
-    break
-  fi
-  sleep 0.1
-done
-[[ -n "$listening" ]] || fail "B05 could not occupy the port the gate will pick first"
-RANDOM=7
+occupied_ports=()
+occupied_seed=""
+occupy_seeded_ports 1
+occupied_port="${occupied_ports[0]}"
+RANDOM="$occupied_seed"
 verify_standalone_boot "$healthy" apps/web/server.js 2>"$test_dir/b05.err" ||
   fail "B05 an occupied port should be retried on another one, not reported as a dead artifact"
 grep -q "$occupied_port" "$test_dir/b05.err" ||
@@ -113,28 +139,8 @@ grep -q "$occupied_port" "$test_dir/b05.err" ||
 occupier_pid=""
 
 # B06 连着抢不到空闲端口时，结论要说「没抢到端口」，而不是诬赖产物起不来。
-RANDOM=7
-occupied_ports=()
-for ((tick = 0; tick < 3; tick++)); do
-  occupied_ports+=("$((40000 + RANDOM % 20000))")
-done
-node -e 'const http = require("http");
-for (const port of process.argv.slice(1)) {
-  http.createServer((_q, s) => s.end("x")).listen(Number(port), "127.0.0.1");
-}' "${occupied_ports[@]}" &
-occupier_pid=$!
-for port in "${occupied_ports[@]}"; do
-  listening=""
-  for ((tick = 0; tick < 50; tick++)); do
-    if curl -sS -m 1 -o /dev/null "http://127.0.0.1:${port}/" 2>/dev/null; then
-      listening=1
-      break
-    fi
-    sleep 0.1
-  done
-  [[ -n "$listening" ]] || fail "B06 could not occupy port $port"
-done
-RANDOM=7
+occupy_seeded_ports 3
+RANDOM="$occupied_seed"
 if verify_standalone_boot "$healthy" apps/web/server.js 2>"$test_dir/b06.err"; then
   fail "B06 should not pass when every candidate port is taken"
 fi
