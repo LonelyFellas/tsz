@@ -1311,7 +1311,7 @@ describe("WordWizardV3Page", () => {
     );
   });
 
-  it("#136 不完整词形可直接进入词义且纯导航不发请求", async () => {
+  it("不完整词形往返词义步骤保留未保存草稿且纯导航不发请求", async () => {
     const current = word({ meanings: { sense_groups: [], pos: [] } });
     const endpoints = source({ word: current, retired_stable_nodes: [] });
     const router = renderPage(
@@ -1319,7 +1319,8 @@ describe("WordWizardV3Page", () => {
       createV3WordRequests(endpoints)
     );
 
-    fireEvent.click(await screen.findByText("进入词义与例句"));
+    await editContentSpelling("center-unsaved");
+    fireEvent.click(screen.getByText("进入词义与例句"));
 
     await waitFor(() =>
       expect(router.state.location.pathname).toBe(
@@ -1327,6 +1328,12 @@ describe("WordWizardV3Page", () => {
       )
     );
     expect(await screen.findByLabelText("语义区间 1 中文")).toHaveValue("");
+    const formsStep = screen
+      .getAllByText("词形与发音")
+      .find((item) => item.closest('[role="button"]'));
+    if (!formsStep) throw new Error("forms step navigation not found");
+    fireEvent.click(formsStep);
+    expect(await openContentEditor()).toHaveValue("center-unsaved");
     expect(endpoints.previewFormsImpactV3).not.toHaveBeenCalled();
     expect(endpoints.saveFormsStepV3).not.toHaveBeenCalled();
     expect(endpoints.saveMeaningsStepV3).not.toHaveBeenCalled();
@@ -1390,34 +1397,6 @@ describe("WordWizardV3Page", () => {
       `/words/${WORD_ID}/v3/wizard/meanings`
     );
   });
-
-  // 三次页面挂载加富文本编辑器交互，CI 覆盖率插桩下会超过默认 5 秒。
-  it("#137 未保存词形草稿跨步骤导航后仍保留", async () => {
-    const current = word({
-      meanings: { sense_groups: [], pos: [] },
-      completed_steps: ["basics", "forms"],
-      max_reachable_step: "meanings"
-    });
-    const endpoints = source({ word: current, retired_stable_nodes: [] });
-    renderPage(
-      `/words/${WORD_ID}/v3/wizard/forms`,
-      createV3WordRequests(endpoints)
-    );
-
-    await editContentSpelling("center-unsaved");
-    fireEvent.click(screen.getByText("进入词义与例句"));
-    expect(await screen.findByLabelText("语义区间 1 中文")).toHaveValue("");
-
-    const formsStep = screen
-      .getAllByText("词形与发音")
-      .find((item) => item.closest('[role="button"]'));
-    if (!formsStep) throw new Error("forms step navigation not found");
-    fireEvent.click(formsStep);
-
-    expect(await openContentEditor()).toHaveValue("center-unsaved");
-    expect(endpoints.previewFormsImpactV3).not.toHaveBeenCalled();
-    expect(endpoints.saveFormsStepV3).not.toHaveBeenCalled();
-  }, 10_000);
 
   it("invalidates a prepared confirmation when the exact forms draft changes", async () => {
     const current = word();

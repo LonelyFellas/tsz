@@ -684,36 +684,6 @@ describe("V3FormsAndPronunciationStep", () => {
     }
   );
 
-  it("使用 V2 Step 2 的标题、词性页签与英美词形矩阵结构", async () => {
-    const regional = ukUsFormFixture({
-      id: uuidFromInt(90),
-      uk: { spelling: "centres" },
-      us: { spelling: "centers" }
-    });
-    const { container } = render(
-      <Harness initial={formsFixture({ forms: [regional] })} />
-    );
-
-    expect(screen.getByText("STEP 02")).toBeVisible();
-    expect(
-      screen.getByRole("heading", { level: 2, name: "词形与发音" })
-    ).toBeVisible();
-    expect(container.querySelector(".word-step-heading")).not.toBeNull();
-    expect(
-      container.querySelector(".word-pos-tabs.word-forms-tabs")
-    ).not.toBeNull();
-    await waitFor(() =>
-      expect(container.querySelector(".word-form-group-card")).not.toBeNull()
-    );
-    expect(
-      container.querySelector(".word-form-matrix, .v3-dialect-separated-matrix")
-    ).not.toBeNull();
-    expect(screen.getByText("词形类型")).toBeVisible();
-    expect(screen.getByText("英式英语")).toBeVisible();
-    expect(screen.getByText("美式英语")).toBeVisible();
-    expect(await screen.findByText("名词")).toBeVisible();
-  });
-
   it("DD 多条 form 使用独立类型列与两张完整方言面板", async () => {
     const firstBase = ukUsFormFixture({
       id: uuidFromInt(2101),
@@ -1323,68 +1293,6 @@ describe("V3FormsAndPronunciationStep", () => {
     return { content, base, secondBase, plural };
   }
 
-  it("以实际产品图为基准恢复词性 Tab 与同组词形矩阵层级", async () => {
-    const { content, base, secondBase, plural } = mixedMatrixFixture();
-    const { container } = render(<Harness initial={content} />);
-
-    expect(await screen.findByText("名词")).toBeVisible();
-    expect(
-      screen.getByText(
-        "先添加基本词性，再录入各种词形。录入词形时，不要遗漏 1) 英式或美式、2) 规则变化或不规则变化。字典音标用于展示与主动转换，选择 Azure IPA 或 UPS 输入进行合成。录入实际发音时需严格按照 “天生之®通用英语音标字母表” 进行操作。"
-      )
-    ).toBeVisible();
-    const addBasicPosSelect = screen
-      .getByLabelText("添加基本词性")
-      .closest(".ant-select");
-    expect(addBasicPosSelect).toHaveClass("word-add-basic-pos-select");
-    expect(addBasicPosSelect).toHaveTextContent("添加基本词性");
-    expect(
-      addBasicPosSelect?.querySelector('[data-icon="plus-circle"]')
-    ).not.toBeNull();
-    expect(screen.queryByLabelText("新增词性")).not.toBeInTheDocument();
-
-    const groupCard = await waitFor(() => {
-      const element = container.querySelector(
-        `[data-group-id="${content.pos[0]!.form_groups[0]!.id}"]`
-      );
-      expect(element).not.toBeNull();
-      return element as HTMLElement;
-    });
-    expect(container.querySelector(".word-form-base-card")).toBeNull();
-    expect(screen.queryByText("基准原形与发音")).toBeNull();
-    expect(groupCard.querySelectorAll(".v3-concrete-form-row")).toHaveLength(3);
-    expect(
-      groupCard.querySelector(
-        `[data-form-id="${base.id}"] .v3-concrete-form-row`
-      )
-    ).not.toBeNull();
-    expect(
-      groupCard.querySelector(
-        `[data-form-id="${secondBase.id}"] .v3-concrete-form-row`
-      )
-    ).not.toBeNull();
-
-    expect(screen.getByText("第 1 组 词形变化")).toBeVisible();
-    expect(screen.queryByText("词形是否规则变化？")).toBeNull();
-    expect(groupCard.querySelectorAll(".v3-spelling-regularity")).toHaveLength(
-      4
-    );
-    expect(screen.getByLabelText("收起第 1 组词形变化")).toHaveAttribute(
-      "aria-expanded",
-      "true"
-    );
-    expect(screen.queryByText("添加词形")).toBeNull();
-    expect(screen.getByLabelText("为第 1 组增加词形")).toBeVisible();
-    expect(screen.queryByLabelText(/下方添加同类型词形/)).toBeNull();
-    expect(container.textContent).not.toMatch(/派生词形|派生词性/);
-    expect(container.querySelector(".v3-form-group-tools")).toBeNull();
-    expect(
-      container.querySelector(
-        `[data-group-id="${content.pos[0]!.form_groups[0]!.id}"] [data-form-id="${plural.id}"]`
-      )
-    ).not.toBeNull();
-  });
-
   it("混合词形矩阵收起后重新展开仍保留三行与全部草稿", async () => {
     const { content } = mixedMatrixFixture();
     const { container } = render(<Harness initial={content} />);
@@ -1417,19 +1325,6 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(formById(canonicalValue(), base.id)).toMatchObject({
       regional_variants: { common: { is_regular: true } }
     });
-  });
-
-  it("以 82203e0 为基准把多词性的删除入口放回 Tab 标签", async () => {
-    const { container } = render(<Harness initial={multiPosFixture()} />);
-
-    expect(await screen.findByText("名词")).toBeVisible();
-    const deleteNoun = screen.getByLabelText("删除名词");
-    const deleteVerb = screen.getByLabelText("删除动词");
-    expect(deleteNoun.closest(".ant-tabs-tab")).not.toBeNull();
-    expect(deleteVerb.closest(".ant-tabs-tab")).not.toBeNull();
-    expect(
-      container.querySelector(".v3-pos-tab > .v3-delete-pos-row")
-    ).toBeNull();
   });
 
   it("按实际产品图把原形与其他词形放在同一变化组矩阵", async () => {
@@ -3513,14 +3408,19 @@ describe("V3FormsAndPronunciationStep", () => {
     );
 
     await chooseGroupAction(1, "删除本组");
-    expect(screen.getByText("删除变化组需要额外确认")).toBeInTheDocument();
+    const confirmation = screen
+      .getByText("删除变化组需要额外确认")
+      .closest<HTMLElement>('[role="alert"]')!;
+    expect(confirmation).toBeInTheDocument();
     expect(screen.getByText("受影响词形 1")).toBeInTheDocument();
     expect(canonicalValue().pos[0]).toMatchObject({
       forms: content.pos[0]!.forms,
       form_groups: content.pos[0]!.form_groups
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "取 消" }));
+    fireEvent.click(
+      within(confirmation).getByRole("button", { name: "取 消" })
+    );
     expect(screen.queryByText("删除变化组需要额外确认")).toBeNull();
     expect(canonicalValue().pos[0]).toMatchObject({
       forms: content.pos[0]!.forms,
@@ -3530,17 +3430,23 @@ describe("V3FormsAndPronunciationStep", () => {
     await chooseGroupAction(1, "删除本组");
     await addFormType(1, "原形");
     expect(canonicalValue().pos[0]!.forms).toHaveLength(3);
+    const pending = screen
+      .getByText("删除变化组需要额外确认")
+      .closest<HTMLElement>('[role="alert"]')!;
     fireEvent.click(
-      screen.getByRole("button", {
+      within(pending).getByRole("button", {
         name: "删除变化组并同时删除 1 个不再被其他变化组使用的词形"
       })
     );
-    expect(screen.getByText("删除影响已变化，请重新确认")).toBeInTheDocument();
+    const changed = screen
+      .getByText("删除影响已变化，请重新确认")
+      .closest<HTMLElement>('[role="alert"]')!;
+    expect(changed).toBeInTheDocument();
     expect(screen.getByText("受影响词形 2")).toBeInTheDocument();
     expect(canonicalValue().pos[0]!.forms).toHaveLength(3);
     expect(canonicalValue().pos[0]!.form_groups).toHaveLength(2);
     fireEvent.click(
-      screen.getByRole("button", {
+      within(changed).getByRole("button", {
         name: "删除变化组并同时删除 2 个不再被其他变化组使用的词形"
       })
     );

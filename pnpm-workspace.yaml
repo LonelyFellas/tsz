@@ -1,7 +1,6 @@
 packages:
   - "apps/*"
   - "packages/*"
-  - "e2e"
 # 本地构建的 standalone 同时需要 tshb-test 的 Linux x64 原生依赖。
 supportedArchitectures:
   os:

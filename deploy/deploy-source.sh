@@ -185,8 +185,7 @@ s.once("error", () => process.exit(1));
 s.listen(Number(process.argv[1]), "127.0.0.1", () => s.close(() => process.exit(0)));' "$1" 2>/dev/null
 }
 
-# 把 staged 产物在本地真起一次，再决定要不要 rsync。CI 只跑 pnpm build，e2e 的 webServer
-# 用 next start（走完整 workspace node_modules），两条流水线都不碰裁剪后的 standalone 产物：
+# 部署前在本地启动并验证从 CI 下载的 standalone 制品，再决定是否上传：
 # 2026-08-21 @swc/helpers 0.5.23 的 exports 新增 module-sync 条件，require() 命中未被 file
 # tracing 追到的 esm/，产物启动即 MODULE_NOT_FOUND，就是这样一路全绿到服务器上才炸的。
 # 而 rsync --delete 一旦跑完，服务器上原本能用的那份已被覆盖，脚本又只认 origin/main、

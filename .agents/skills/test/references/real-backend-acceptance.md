@@ -1,7 +1,7 @@
 # 真实后端验收
 
 当用户要求前后端联调、真实 API 验收，或本次风险无法由 mock/契约测试证明时读取。
-现有 `e2e/playwright.admin.config.ts` 下的 admin 测试通过 `page.route` 模拟 API，不能作为真实服务验收证据；保留这套快速回归，不直接移除它的拦截。
+使用 Codex 内置浏览器操作真实页面；mock 或契约测试不能作为真实服务验收证据。
 
 ## 验收前固定环境
 
@@ -13,7 +13,7 @@
 
 ## 建立一条真实请求链
 
-关闭目标路径的 mock：检查构建时开关、请求 client 装配、Playwright route、service worker 与 fixture。
+关闭目标路径的 mock：检查构建时开关、请求 client 装配、浏览器请求拦截、service worker 与 fixture。
 admin 相关的 `VITE_ADMIN_WORDS_MOCK`、`VITE_ADMIN_PART_OF_SPEECH_MOCK`、`VITE_ADMIN_TTS_MOCK` 应为 false；用实际 Network 响应确认。
 web placement 等直接创建 mock client 的路径即使开关关闭也仍是假数据，应报告接线缺口；不能在验收任务里顺便实现整套后端。
 
@@ -31,8 +31,7 @@ web placement 等直接创建 mock client 的路径即使开关关闭也仍是�
 
 ## 工具选择与结束
 
-一次性验收可用可用浏览器工具并记录步骤；反复发生的真实路径再考虑独立 Playwright 项目/fixture。
-确需自动化时先检查现有 e2e 配置，不把原有 mock 测试全局改成连真实库；新模式显式选择环境，并验证复用 server 的来源。
+使用 Codex 内置浏览器操作并记录真实页面验收步骤；验证复用服务的来源，不建立 E2E 测试套件。
 浏览器工具不可用时报告只完成 HTTP/契约验证，不能写成浏览器已验收。
 
 恢复本次修改的测试状态、清理确属本任务的数据/进程，保留用户要求继续使用的环境。不能批量删除共享数据或杀掉原有服务。

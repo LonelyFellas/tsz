@@ -26,5 +26,4 @@ pre-push:
   commands:
     typecheck:
       run: pnpm typecheck
-    # 开发时按风险运行定向测试；全量普通测试与 E2E 由 PR/main CI 执行，
-    # 不在每次 push 时重复运行。需要自查时仍可手动 pnpm test / pnpm test:e2e。
+    # 开发时按风险运行定向测试；全量普通测试由 PR/main CI 执行。

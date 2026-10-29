@@ -18,7 +18,6 @@ Linux 用 `ss -ltnp`、`/proc/<pid>/cwd`、`/proc/<pid>/exe`；权限不足标�
 | `apps/web/next.config.mjs`                                     | `/api/v1` rewrites；`BACKEND_API_URL` 默认 `http://localhost:8383/api/v1`；同时核实构建时和启动时输入     |
 | `apps/admin/vite.config.ts`、`apps/admin/src/lib/dev-proxy.ts` | 当前 mode 加载的 env、serve 代理、路径 rewrite、cookie domain；preview 的实际路由单独验证                 |
 | `apps/admin/src/lib/env.ts`、`apps/admin/src/lib/env-flags.ts` | `VITE_API_BASE_URL` 默认 `/api/v1`；布尔值使用受支持的 `true`/`false`，不用 `0`/`TRUE` 猜含义             |
-| `e2e/playwright.admin.config.ts`、测试 `page.route`            | 现有 admin e2e 用 API 拦截，不提供真实后端证据；复用 server 时核实 PID 与来源                             |
 | 页面实际 client 装配                                           | 例如 `apps/web/src/features/placement/lib/client.ts` 当前直接创建 mock client；无真实接线的路径列为未接通 |
 
 真实 admin 验收检查 `VITE_ADMIN_WORDS_MOCK`、`VITE_ADMIN_PART_OF_SPEECH_MOCK`、`VITE_ADMIN_TTS_MOCK` 的有效值为 false。

@@ -88,7 +88,7 @@ test("CI, Docker, and native deployment use the same pinned Node runtime", async
   const setupActionSteps = (
     ci.match(/uses: \.\/\.github\/actions\/setup-node-pnpm/g) ?? []
   ).length;
-  assert.equal(setupActionSteps, 7);
+  assert.equal(setupActionSteps, 5);
   assert.equal((ci.match(/uses: actions\/setup-node@v7/g) ?? []).length, 0);
   assert.equal(
     (setupNodePnpmAction.match(/uses: actions\/setup-node@v7/g) ?? []).length,

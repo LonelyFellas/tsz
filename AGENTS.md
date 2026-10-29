@@ -50,12 +50,11 @@ PENDING 白名单为准。本仓库负责前端与部署编排。
 - `apps/admin` — 平台后台，Vite + React Router + TanStack Query + **Ant Design 6**（品牌蓝 #2053FF）。
 - `packages/types` — 后端 wire 类型镜像；`packages/shared` — 共享逻辑（含鉴权内核）；
   `packages/api-client` — 请求层；`packages/ui` — web 专用组件库；`packages/config` — 共享配置。
-- `e2e` — Playwright（`@tsz/e2e`）。
 
 ## 常用命令
 
 - `pnpm dev`（web）/ `pnpm dev:admin` / `pnpm dev:all`
-- `pnpm test` / `pnpm test:cov`（生成覆盖率报告，规则与 CI 一致）/ `pnpm test:e2e`
+- `pnpm test` / `pnpm test:cov`（生成覆盖率报告，规则与 CI 一致）
 - `pnpm typecheck` / `pnpm lint` / `pnpm format`
 - **本地验收 web 用 `pnpm build` + `next start`，不要用 `next dev`**（Turbopack 内存暴涨会拖死机器）。
 
@@ -96,14 +95,14 @@ PENDING 白名单为准。本仓库负责前端与部署编排。
 ## 质量门
 
 - git hooks（lefthook）：pre-commit = prettier + eslint（按包），commit-msg = commitlint
-  （conventional commits），pre-push 的实际检查以 `lefthook.yml` 为准（当前仅 typecheck）。开发时按风险运行定向测试，全量普通测试与 e2e 由 PR/main CI 执行。
+  （conventional commits），pre-push 的实际检查以 `lefthook.yml` 为准（当前仅 typecheck）。开发时按风险运行定向测试，全量普通测试由 PR/main CI 执行。
 - **绝不绕过钩子**（`LEFTHOOK=0`、`--no-verify` 一律禁止）。push 报
   `failed to push some refs` 时读取完整输出，区分 hooks、远端拒绝、网络和认证问题，修复根因后重推。
 - 覆盖率规则以根 `vitest.shared-config.ts` 及各项目 Vitest 配置为准：当前生成报告，不设百分比门槛。
   PR、main 与手动 CI 按相同分片运行覆盖率模式并校验每个文件恰好执行一次；main 与手动 CI 合并覆盖率报告。
   不为提高数字补弱断言，也不通过 exclude 有分支逻辑来掩盖缺失测试。
 - 测试以可观察风险、回归价值和关键契约为中心；覆盖率用于发现盲区，不为提高数字堆叠低价值测试。
-  固定文案、配色和装饰尺寸不重复抄进断言；组件层已覆盖的输入边界不在 E2E 逐项重测，E2E 保留关键完整流程。
+  固定文案、配色和装饰尺寸不重复抄进断言；不维护 E2E，真实页面验收使用 Codex 内置浏览器。
 
 ## API 文档
 
