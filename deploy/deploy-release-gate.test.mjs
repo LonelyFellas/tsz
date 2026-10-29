@@ -49,7 +49,10 @@ async function run(component, scenario, approved = true) {
       artifact,
       output: bundle,
       identity,
-      config: buildConfig(component, {}),
+      config: buildConfig(
+        component,
+        scenario === "auto-config" ? { DEPLOY_VOICE_EDITOR: "false" } : {}
+      ),
       releaseId,
       checks: { entry: "passed", boot: "passed", sharp: "passed" }
     });
@@ -142,6 +145,7 @@ async function run(component, scenario, approved = true) {
         DEPLOY_EXPECTED_API_SHA: "d".repeat(40)
       });
     if (scenario === "stale") env.DEPLOY_EXPECTED_SHA = "c".repeat(40);
+    if (scenario === "auto-config") env.DEPLOY_AUTO_CONFIG = "1";
     const result = spawnSync(
       "bash",
       [join(root, `deploy/deploy-${component}.sh`)],
@@ -268,3 +272,9 @@ for (const component of ["admin", "web"]) {
     });
   }
 }
+
+test("admin: automatic deployment uses the verified package flags", async () => {
+  const result = await run("admin", "auto-config");
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.calls, /ssh .*publish-compatible.sh/);
+});

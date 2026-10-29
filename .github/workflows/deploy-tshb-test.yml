@@ -19,7 +19,7 @@ jobs:
   deploy:
     if: >-
       github.repository == 'LonelyFellas/tsz' &&
-      github.event.workflow_run.event == 'push' &&
+      (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch') &&
       github.event.workflow_run.head_branch == 'main' &&
       github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-22.04
@@ -64,6 +64,7 @@ jobs:
           DEPLOY_EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
           DEPLOY_EXPECTED_CI_RUN_ID: ${{ github.event.workflow_run.id }}
           DEPLOY_EXPECTED_CI_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          DEPLOY_AUTO_CONFIG: "1"
         run: |
           DEPLOY_EXPECTED_API_SHA="$(node deploy/check-api-contract.mjs)"
           export DEPLOY_EXPECTED_API_SHA

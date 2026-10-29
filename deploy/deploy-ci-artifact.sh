@@ -10,6 +10,20 @@ prepare_deploy_artifact() {
   [[ "$id" =~ ^[1-9][0-9]*$ ]] || return 1
   python3 -I "$DEPLOY_BUILD_ROOT/deploy/run-with-progress.py" 300 artifact-download gh api "repos/$DEPLOY_REPOSITORY/actions/artifacts/$id/zip" > "$destination/download.zip" || return 1
   python3 -I "$DEPLOY_BUILD_ROOT/deploy/unpack-release.py" zip "$destination/download.zip" "$destination/bundle" || return 1
+  if [[ "$component" = admin && "${DEPLOY_AUTO_CONFIG:-}" = 1 ]]; then
+    local flag value
+    for flag in VOICE_EDITOR AZURE_PRONUNCIATION_INPUTS FORM_SPELLING_REGULARITY SENTENCE_FORMATTING; do
+      value="$(node - "$destination/bundle/release.json" "$flag" <<'NODE'
+const fs = require('node:fs');
+const receipt = JSON.parse(fs.readFileSync(process.argv[2]));
+const value = receipt.config?.env?.[`VITE_${process.argv[3]}`];
+if (value !== 'true' && value !== 'false') process.exit(1);
+process.stdout.write(value);
+NODE
+)" || return 1
+      export "DEPLOY_$flag=$value"
+    done
+  fi
   DEPLOY_RELEASE_ID="$(node "$DEPLOY_BUILD_ROOT/deploy/release-artifact.mjs" verify "$component" \
     "$destination/bundle" "$destination/artifact")" || return 1
   local required_node
