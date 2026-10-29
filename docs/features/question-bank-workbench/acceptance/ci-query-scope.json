@@ -1,0 +1,43 @@
+{
+  "same_coverage_mode": true,
+  "timeout_ms_unchanged": 5000,
+  "business_logic_changed": false,
+  "measurements": [
+    {
+      "phase": "before",
+      "test": "workbench search and pagination send complete filters to the backend",
+      "status": "passed",
+      "duration_ms": 1022.1
+    },
+    {
+      "phase": "before",
+      "test": "a fixed review queue advances without offset skips and returns to the retained list",
+      "status": "passed",
+      "duration_ms": 2094.6
+    },
+    {
+      "phase": "before",
+      "test": "closing the generation drawer retains an uncertain single request",
+      "status": "passed",
+      "duration_ms": 2373.7
+    },
+    {
+      "phase": "after",
+      "test": "workbench search and pagination send complete filters to the backend",
+      "status": "passed",
+      "duration_ms": 770.5
+    },
+    {
+      "phase": "after",
+      "test": "a fixed review queue advances without offset skips and returns to the retained list",
+      "status": "passed",
+      "duration_ms": 1396.9
+    },
+    {
+      "phase": "after",
+      "test": "closing the generation drawer retains an uncertain single request",
+      "status": "passed",
+      "duration_ms": 1736.5
+    }
+  ]
+}
