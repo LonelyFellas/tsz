@@ -18,6 +18,7 @@ export * from "./opencode";
 export * from "./part-of-speech";
 export * from "./rich-text";
 export * from "./admin-tts";
+export * from "./publication-audio";
 export * from "./admin-audio-asset";
 export * from "./admin-word-v2";
 export * from "./admin-word-v3";

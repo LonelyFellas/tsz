@@ -4,8 +4,7 @@ import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import {
   expandFormContents,
   EMPTY_SYNTHESIS,
-  pronunciationSynthesisContent,
-  pronunciationSynthesisSpeech,
+  pronunciationPlaybackSource,
   synthesisInputIssue,
   synthesisLocaleIssue,
   pronunciationLocale,
@@ -18,7 +17,12 @@ import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
 import { ReadOutlined, SoundOutlined } from "@ant-design/icons";
 import { Button, Card, Collapse, Empty, Flex, Tag, Typography } from "antd";
-import type { AdminWordV3, Dialect, WordPronunciationV3 } from "@tsz/types";
+import type {
+  AdminWordV3,
+  Dialect,
+  WordPronunciationV3,
+  SpellingSpeechV3
+} from "@tsz/types";
 import {
   useEffect,
   useLayoutEffect,
@@ -45,11 +49,13 @@ interface Props {
 function ReviewPronunciationPlayback({
   pronunciation,
   spelling,
+  spellingSpeech,
   dialect,
   legacyDialect
 }: {
   pronunciation: WordPronunciationV3;
   spelling: string;
+  spellingSpeech?: SpellingSpeechV3;
   dialect: Dialect;
   legacyDialect: Dialect;
 }) {
@@ -60,39 +66,42 @@ function ReviewPronunciationPlayback({
     locale,
     legacyDialect
   );
-  const content = pronunciationSynthesisContent(
+  const { content, profile, assetId } = pronunciationPlaybackSource(
     spelling,
-    pronunciation.synthesis ? synthesis : undefined,
+    pronunciation,
+    spellingSpeech,
     locale,
+    legacyDialect,
     dialect === "common"
   );
   return (
     <PronunciationPreviewControls
       playbackOnly
+      assetOnly
       pronunciationId={pronunciation.id}
       dialect={dialect}
       ariaLabelPrefix={`${spelling} ${pronunciation.synthesis?.uk || pronunciation.synthesis?.us ? `${dialect === "uk" ? "英式" : "美式"} ` : ""}最终读音`}
-      disabled={!content}
+      audioAssetId={assetId}
+      disabled={!assetId}
       disabledReason={
-        content
-          ? undefined
-          : (synthesisInputIssue(
-              synthesis.alphabet,
-              synthesis[synthesis.alphabet]
-            ) ??
-            synthesisLocaleIssue(
-              synthesis,
-              synthesis.alphabet,
-              locale,
-              dialect === "common"
-            ) ??
-            (!spelling.trim() ? "请先填写词形拼写" : undefined))
+        !assetId && (content || !pronunciation.synthesis)
+          ? "尚未保存正式音频，请返回编辑补齐"
+          : content
+            ? undefined
+            : (synthesisInputIssue(
+                synthesis.alphabet,
+                synthesis[synthesis.alphabet]
+              ) ??
+              synthesisLocaleIssue(
+                synthesis,
+                synthesis.alphabet,
+                locale,
+                dialect === "common"
+              ) ??
+              (!spelling.trim() ? "请先填写词形拼写" : undefined))
       }
       content={content ?? { version: 2, text: "", annotations: [] }}
-      voiceProfile={
-        pronunciationSynthesisSpeech(synthesis)?.voice_profile ??
-        pronunciation.voice_profile
-      }
+      voiceProfile={profile}
     />
   );
 }
@@ -278,6 +287,9 @@ function FormsReview({
                                           key={dialect}
                                           pronunciation={pronunciation}
                                           spelling={variant.spelling}
+                                          spellingSpeech={
+                                            variant.spelling_speech
+                                          }
                                           dialect={dialect}
                                           legacyDialect={variant.dialect}
                                         />

@@ -162,6 +162,7 @@ const RUNTIME_SCHEMA_ROOTS = [
   "AdminWordListResponse",
   "EntryLifecycleBatchResponse",
   "DraftValidationResponseV3",
+  "PublicationAudioReview",
   "FormsImpactResponseV3",
   "InboundReferencesV3",
   "SurfaceMatchPageV3",

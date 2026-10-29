@@ -40,6 +40,7 @@ export function AudioButton({
   return (
     <SignedAudioButton
       label={label}
+      resourceKey={`dictionary:${entryId}:${audio.asset_id}`}
       sign={(signal) =>
         api.dictionary.audio(entryId, audio.asset_id, { signal })
       }

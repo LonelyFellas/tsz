@@ -1,0 +1,53 @@
+{
+  "started": "2026-10-29T02:54:52.465Z",
+  "updated": "2026-10-29T02:55:15.659Z",
+  "state": "failed",
+  "environment": "isolated localhost optimized native candidate; signing API only, not media delivery",
+  "max_outstanding": 8192,
+  "refreshes": 0,
+  "refresh_latency_ms": [],
+  "phases": [
+    {
+      "name": "warmup",
+      "target_rps": 100,
+      "duration_seconds": 10,
+      "scheduled": 999,
+      "sent": 999,
+      "backpressure": 0,
+      "statuses": {
+        "200": 999
+      },
+      "errors": 0,
+      "elapsed_seconds": 10.00507575,
+      "latency_ms": {
+        "p50": 8.375207999999475,
+        "p95": 12.807000000000016,
+        "p99": 18.06812499999998,
+        "max": 48.424625000000006
+      },
+      "actual_rps": 99.84931898191776,
+      "passed": true
+    },
+    {
+      "name": "burst",
+      "target_rps": 1000,
+      "duration_seconds": 10,
+      "scheduled": 9993,
+      "sent": 9993,
+      "backpressure": 0,
+      "statuses": {
+        "200": 9993
+      },
+      "errors": 0,
+      "elapsed_seconds": 13.185948667,
+      "latency_ms": {
+        "p50": 1567.7702499999978,
+        "p95": 3177.2911249999997,
+        "p99": 3188.717042,
+        "max": 3196.667708000001
+      },
+      "actual_rps": 757.8521843490201,
+      "passed": false
+    }
+  ]
+}

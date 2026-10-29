@@ -1,3 +1,4 @@
+import { confirmedPublicationAudioFixture } from "../PublicationAudioReviewPanel.test-helper";
 import { expandFormContents } from "@tsz/shared";
 import {
   applyFormsStructure,
@@ -3722,6 +3723,7 @@ describe("V3WordCreationWizard", () => {
   });
 
   it("maps its live context directly to T5B and returns paged terminal tokens to the one save flow", async () => {
+    confirmedPublicationAudioFixture();
     const initialWord = word();
     initialWord.capabilities.publication = { mode: "native" };
     initialWord.completed_steps = ["basics", "forms", "meanings"];
@@ -3833,6 +3835,7 @@ describe("V3WordCreationWizard", () => {
   });
 
   it("confirms a token-only impact through the controlled T5B mapping", async () => {
+    confirmedPublicationAudioFixture();
     const initialWord = word();
     initialWord.capabilities.publication = { mode: "native" };
     initialWord.completed_steps = ["basics", "forms", "meanings"];
@@ -3884,6 +3887,7 @@ describe("V3WordCreationWizard", () => {
   });
 
   it("invalidates prepared publication state when publish returns fresh validation issues", async () => {
+    confirmedPublicationAudioFixture();
     const initialWord = word();
     initialWord.capabilities.publication = { mode: "native" };
     initialWord.completed_steps = ["basics", "forms", "meanings"];
@@ -4000,6 +4004,7 @@ describe("V3WordCreationWizard", () => {
   it.each([409, 410])(
     "recovers a %s publish confirmation with a new key and the shared paged surface loader",
     async (status) => {
+      confirmedPublicationAudioFixture();
       const firstPage = {
         ...impactSurfacePage("publish-cursor"),
         snapshot_id: "publish-snapshot"
@@ -4094,6 +4099,7 @@ describe("V3WordCreationWizard", () => {
   );
 
   it("refreshes canonical before rotating a publish idempotency key and requires a fresh controlled prepare", async () => {
+    confirmedPublicationAudioFixture();
     const initialWord = word();
     initialWord.capabilities.publication = { mode: "native" };
     initialWord.completed_steps = ["basics", "forms", "meanings"];
@@ -4246,6 +4252,7 @@ describe("V3WordCreationWizard", () => {
   });
 
   it("reconciles a publish revision conflict before allowing a new revision and key", async () => {
+    confirmedPublicationAudioFixture();
     const initialWord = word();
     initialWord.capabilities.publication = { mode: "native" };
     initialWord.completed_steps = ["basics", "forms", "meanings"];

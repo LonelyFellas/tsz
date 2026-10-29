@@ -30,6 +30,17 @@ import { impactReasonLabel, impactTypeLabel } from "./presentation";
 import { buildV3PublicationIssueSummary } from "./publicationIssueSummary";
 import { createV3SaveFlow, type V3SaveFlow } from "./saveFlow";
 import { V3ReviewContent } from "./V3ReviewContent";
+import { PublicationAudioReviewPanel } from "../PublicationAudioReviewPanel";
+
+function useAudioReviewReadiness(word: AdminWordV3) {
+  const scope = `${word.id}:${word.revision}`;
+  const [reviewed, setReviewed] = useState<string>();
+  const onAudioReady = useCallback(
+    (ready: boolean) => setReviewed(ready ? scope : undefined),
+    [scope]
+  );
+  return { audioReady: reviewed === scope, onAudioReady };
+}
 
 type PublishRequests = Pick<
   V3WordRequests,
@@ -285,6 +296,7 @@ function ControlledV3PreviewAndPublishStep({
   word: AdminWordV3;
   controller: V3PreviewPublishController;
 }) {
+  const { audioReady, onAudioReady } = useAudioReviewReadiness(word);
   const publishLock = useRef(false);
   const impactPage = controller.impact?.surface_match_page;
   const publishPage =
@@ -317,6 +329,7 @@ function ControlledV3PreviewAndPublishStep({
   );
   const readyToPublish = Boolean(
     allowedToPublish &&
+    audioReady &&
     !unavailableMessage &&
     controller.issues.length === 0 &&
     controller.validation?.valid &&
@@ -330,7 +343,7 @@ function ControlledV3PreviewAndPublishStep({
     if (validation?.valid) await controller.actions.previewFormsImpact();
   };
   const publish = async (token?: string) => {
-    if (publishLock.current || !allowedToPublish) return;
+    if (publishLock.current || !allowedToPublish || !audioReady) return;
     publishLock.current = true;
     try {
       await controller.actions.publish(token);
@@ -361,8 +374,10 @@ function ControlledV3PreviewAndPublishStep({
           ) : controller.issues.length > 0 ? (
             <Typography.Text type="danger">有待完成内容</Typography.Text>
           ) : controller.validation?.valid ? (
-            <Typography.Text type="success">
-              当前内容已通过发布检查
+            <Typography.Text type={audioReady ? "success" : "secondary"}>
+              {audioReady
+                ? "当前内容已通过发布检查"
+                : "内容检查已通过，请完成音频确认"}
             </Typography.Text>
           ) : (
             <Typography.Text type="secondary">尚未检查发布条件</Typography.Text>
@@ -370,6 +385,16 @@ function ControlledV3PreviewAndPublishStep({
         }
         word={word}
       />
+      {canPrepare && !unavailableMessage && (
+        <PublicationAudioReviewPanel
+          owner="entry"
+          content={word}
+          id={word.id}
+          revision={word.revision}
+          canConfirm={allowedToPublish}
+          onReady={onAudioReady}
+        />
+      )}
       {unavailableMessage ? (
         <Alert
           showIcon
@@ -486,6 +511,7 @@ function StandaloneV3PreviewAndPublishStep({
   const mountedRef = useRef(true);
   const propWordRef = useRef(word);
   const [currentWord, setCurrentWord] = useState(word);
+  const { audioReady, onAudioReady } = useAudioReviewReadiness(currentWord);
   const [preparing, setPreparing] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [refreshingCanonical, setRefreshingCanonical] = useState(false);
@@ -526,6 +552,7 @@ function StandaloneV3PreviewAndPublishStep({
   );
   const readyToPublish = Boolean(
     allowedToPublish &&
+    audioReady &&
     !unavailableMessage &&
     impact &&
     validationIssues.length === 0 &&
@@ -718,6 +745,7 @@ function StandaloneV3PreviewAndPublishStep({
     if (
       publishLock.current ||
       !allowedToPublish ||
+      !audioReady ||
       reconciliationRequiredRef.current ||
       reconciliationLockRef.current
     ) {
@@ -809,8 +837,10 @@ function StandaloneV3PreviewAndPublishStep({
           ) : validationIssues.length > 0 ? (
             <Typography.Text type="danger">有待完成内容</Typography.Text>
           ) : impact ? (
-            <Typography.Text type="success">
-              当前内容已通过发布检查
+            <Typography.Text type={audioReady ? "success" : "secondary"}>
+              {audioReady
+                ? "当前内容已通过发布检查"
+                : "内容检查已通过，请完成音频确认"}
             </Typography.Text>
           ) : (
             <Typography.Text type="secondary">尚未检查发布条件</Typography.Text>
@@ -818,6 +848,16 @@ function StandaloneV3PreviewAndPublishStep({
         }
         word={currentWord}
       />
+      {canPrepare && !unavailableMessage && (
+        <PublicationAudioReviewPanel
+          owner="entry"
+          content={currentWord}
+          id={currentWord.id}
+          revision={currentWord.revision}
+          canConfirm={allowedToPublish}
+          onReady={onAudioReady}
+        />
+      )}
       {unavailableMessage ? (
         <Alert
           showIcon

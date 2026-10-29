@@ -1,6 +1,7 @@
 import { createQuestionBankEndpoints } from "./question-bank";
 import { createAiLedgerEndpoints } from "./ai-ledger";
 import { createOpenCodeEndpoints } from "./opencode";
+import { createPublicationAudioEndpoints } from "./publication-audio";
 import { createRelatedSuggestionEndpoints } from "./related-suggestions";
 import { SENTENCE_FORMATTING_HEADERS } from "./sentence-formatting";
 import { createAdminWordlistEndpoints } from "./wordlists";
@@ -508,6 +509,7 @@ export function createAdminEndpoints(http: HttpClient) {
      * 树内节点 id 由前端生成（UUID v4）且跨保存稳定，updated_at 兼作乐观锁 token。
      */
     words: {
+      publicationAudio: createPublicationAudioEndpoints(http),
       ...createRelatedSuggestionEndpoints(http),
       /** GET /admin/lexicon/entries — 列表页：搜索行筛选 + 分页。 */
       list: (query: AdminWordListQuery = {}) =>
