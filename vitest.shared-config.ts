@@ -30,7 +30,7 @@ export const coverageCollectionConfig = {
     "**/index.ts",
     "**/*.d.ts",
     "**/*.test.*",
-    // 纯静态展示 / 装配代码，无逻辑分支，由集成与 e2e 覆盖。
+    // 纯静态展示 / 装配代码，无逻辑分支。
     "apps/web/src/features/auth/components/AuthBranding.tsx",
     "apps/web/src/lib/query-client.ts",
     // SEO 常量单一来源，纯文案对象无逻辑分支。
@@ -40,8 +40,7 @@ export const coverageCollectionConfig = {
     // 定级测试(placement):流程编排(PlacementFlow)与各屏组件已有 jsdom
     // 集成测试(PlacementFlow.test.tsx,经注入的假 client 驱动全部分支);
     // 仅 SwipeCard 依赖 PointerEvent 手势/pointer capture/WAAPI 动画,
-    // jsdom 无法有效驱动(按钮/键盘路径已随流程测试覆盖),由 e2e 保底。
-    // TODO(定级): Playwright 补真实滑卡手势用例后评估是否移除本行。
+    // jsdom 无法有效驱动(按钮/键盘路径已随流程测试覆盖)；真实滑卡手势需浏览器验收。
     "apps/web/src/features/placement/components/SwipeCard.tsx",
     // mock↔http 装配点,单行无逻辑分支(同 query-client.ts)。
     "apps/web/src/features/placement/lib/client.ts",

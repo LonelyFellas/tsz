@@ -17,7 +17,7 @@ try {
 }
 
 // 生产构建告警:若忘了注入真实域名,canonical/sitemap/OG 会全部指向 localhost,
-// 且不易察觉(SEO 静默失效)。这里只告警不抛错——CI 的 e2e/verify 等也跑 production 构建
+// 且不易察觉(SEO 静默失效)。这里只告警不抛错——CI 的 verify 等也跑 production 构建
 // 但用 localhost 冒烟,硬抛错会误伤它们。真实部署时运维可在构建日志看到此警告。
 if (
   typeof window === "undefined" &&

@@ -46,7 +46,7 @@ description: 审查 tsz 前端 Next Web、React/antd Admin 与共享包改动，
 
 ## 最小验证与交付
 
-- 读取当前 package scripts、Vitest/Playwright、CI 清单及邻近测试，参考 [test](../test/SKILL.md) 选择已有单文件/包测试；只读任务不自动补测、更新快照、格式化或同步契约。
+- 读取当前 package scripts、Vitest、CI 清单及邻近测试，参考 [test](../test/SKILL.md) 选择已有单文件/包测试；只读任务不自动补测、更新快照、格式化或同步契约。
 - admin 测试核对 matchMedia/ResizeObserver 垫片及 antd 两字按钮空格；大表格避免昂贵查询导致伪超时。测试必须断言用户结果或请求契约，不能只验证 mock 自洽。
 - Web 本地真实验收按项目规范用 build + next start，不启动 next dev；仅在风险需要且依赖/数据安全已核实时运行。其余未运行项如实报告。
 - 不固定覆盖率门槛，不重复已有效的全量测试，不自动进入 ship。只读审查是行为约束而非沙箱；当前会话审查不冒充独立 reviewer，也不满足 ship 的独立 pre-push 门禁。

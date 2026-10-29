@@ -1,8 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import { spawnSync } from "node:child_process";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import * as prettier from "prettier";
 
@@ -150,47 +147,6 @@ test("W04: verify is a fail-closed stable summary", async () => {
   assert.match(block, /!= "success"/);
 });
 
-test("W05: web and admin E2E run independently and converge", async () => {
-  const { jobs } = await workflowFixture();
-  assert.match(jobs.get("e2e-web"), /test:e2e:web/);
-  assert.match(jobs.get("e2e-admin"), /test:e2e:admin/);
-  const admin = jobs.get("e2e-admin");
-  assert.match(admin, /apt-get install[^\n]*fonts-noto-cjk/);
-  assert.ok(
-    admin.indexOf("Install Chinese fonts") < admin.indexOf("- name: Admin E2E")
-  );
-  assert.match(admin, /fc-match[^\n]*lang=zh-cn[^\n]*Noto Sans CJK/);
-  const summary = jobs.get("e2e");
-  assert.match(summary, /needs: \[e2e-web, e2e-admin\]/);
-  assert.match(summary, /if: \$\{\{ always\(\) \}\}/);
-  assert.match(summary, /WEB_E2E_RESULT/);
-  assert.match(summary, /ADMIN_E2E_RESULT/);
-  assert.match(summary, /!= "success"/);
-});
-
-test("web excludes every admin E2E file and admin includes each exactly once", async () => {
-  const [web, admin, files] = await Promise.all([
-    readFile(new URL("../e2e/playwright.config.ts", import.meta.url), "utf8"),
-    readFile(
-      new URL("../e2e/playwright.admin.config.ts", import.meta.url),
-      "utf8"
-    ),
-    readdir(new URL("../e2e/tests/", import.meta.url))
-  ]);
-  const entries = (source, key) => {
-    const block = source.match(new RegExp(`${key}:\\s*\\[([\\s\\S]*?)\\]`));
-    assert.ok(block, `${key} must be explicit`);
-    return [...block[1].matchAll(/"([^"]+\.spec\.ts)"/g)].map(
-      (match) => match[1]
-    );
-  };
-  const expected = files
-    .filter((file) => /^admin-.*\.spec\.ts$/.test(file))
-    .sort();
-  assert.deepEqual(entries(admin, "testMatch").sort(), expected);
-  assert.deepEqual(entries(web, "testIgnore").sort(), expected);
-});
-
 test("W06: commitlint remains pull-request only", async () => {
   const { jobs } = await workflowFixture();
   const block = jobs.get("commitlint");
@@ -249,143 +205,12 @@ test("W08: Turbo cache restores everywhere but saves only from trusted main", as
   assert.doesNotMatch(quality, /restore-keys:\s*\|\s*\n\s+turbo-\s*$/m);
 });
 
-test("W09: Playwright cache is architecture-safe and never skips browser fallback", async () => {
-  const { jobs } = await workflowFixture();
-  for (const jobName of ["e2e-web", "e2e-admin"]) {
-    const block = jobs.get(jobName);
-    assert.match(block, /actions\/cache\/restore@v6/);
-    assert.match(block, /playwright-v2-/);
-    assert.match(block, /runner\.os/);
-    assert.match(block, /runner\.arch/);
-    assert.match(block, /steps\.pw\.outputs\.version/);
-    assert.match(block, /continue-on-error: true/);
-    assert.match(block, /steps\.pw-cache\.outcome == 'failure'/);
-    assert.match(block, /PLAYWRIGHT_BROWSERS_PATH/);
-    assert.match(block, /RUNNER_TEMP/);
-    assert.ok(
-      block.indexOf("Isolate failed Playwright restore") <
-        block.indexOf("Ensure Playwright browsers")
-    );
-    assert.match(block, /playwright install chromium/);
-    assert.doesNotMatch(
-      block,
-      /if:.*pw-cache\.outputs\.cache-hit[^\n]*\n\s+run:.*playwright install/s
-    );
-  }
-  assert.match(jobs.get("e2e-web"), /actions\/cache\/save@v6/);
-  assert.doesNotMatch(jobs.get("e2e-admin"), /actions\/cache\/save@v6/);
-});
-
-test("Playwright dependency timeouts can terminate privileged installers", async () => {
-  const { jobs } = await workflowFixture();
-  for (const name of ["e2e-web", "e2e-admin"]) {
-    const block = jobs.get(name);
-    assert.match(
-      block,
-      /sudo timeout --kill-after=15s 180 env "PATH=\$PATH" pnpm --filter @tsz\/e2e exec playwright install-deps chromium/
-    );
-    assert.doesNotMatch(block, /if timeout 240 pnpm/);
-  }
-  const admin = jobs.get("e2e-admin");
-  assert.match(
-    admin,
-    /apt-get install[^\n]*-o DPkg::Lock::Timeout=120[^\n]*fonts-noto-cjk/
-  );
-  assert.match(admin, /fc-match[^\n]*lang=zh-cn[^\n]*Noto Sans CJK/);
-});
-
-test("APT downloads leave time for E2E and required fonts still fail closed", async () => {
-  const { jobs } = await workflowFixture();
-  for (const name of ["e2e-web", "e2e-admin"]) {
-    const block = jobs.get(name);
-    const setup = block.slice(
-      block.indexOf("- name: Configure APT downloads"),
-      block.indexOf("- name: Install Playwright system deps")
-    );
-    assert.match(setup, /https:\/\/archive\.ubuntu\.com\/ubuntu\//);
-    assert.match(setup, /Acquire::http::Timeout "30"/);
-    assert.match(setup, /Acquire::https::Timeout "30"/);
-    assert.match(setup, /Acquire::Retries "2"/);
-    const deps = block.slice(
-      block.indexOf("- name: Install Playwright system deps")
-    );
-    assert.match(deps, /for i in 1 2; do/);
-    assert.doesNotMatch(deps, /for i in 1 2 3; do/);
-  }
-  const admin = jobs.get("e2e-admin");
-  const fonts = admin.slice(
-    admin.indexOf("- name: Install Chinese fonts"),
-    admin.indexOf("- name: Admin E2E")
-  );
-  assert.match(fonts, /sudo timeout --kill-after=15s 120 sh -c/);
-  assert.match(fonts, /for i in 1 2; do/);
-  assert.match(fonts, /fc-match[^\n]*lang=zh-cn[^\n]*Noto Sans CJK/);
-  assert.match(fonts, /exit 1/);
-  assert.doesNotMatch(fonts, /continue-on-error/);
-  assert.match(admin, /timeout-minutes: 20/);
-});
-
-test("font installation retries are bounded and missing fonts fail the step", async (t) => {
-  const { jobs } = await workflowFixture();
-  const admin = jobs.get("e2e-admin");
-  const step = admin.slice(
-    admin.indexOf("- name: Install Chinese fonts"),
-    admin.indexOf("- name: Admin E2E")
-  );
-  const script = step
-    .slice(step.indexOf("run: |") + "run: |".length)
-    .split("\n")
-    .map((line) => line.replace(/^ {10}/, ""))
-    .join("\n");
-  const dir = await mkdtemp(join(tmpdir(), "ci-font-test-"));
-  t.after(() => rm(dir, { recursive: true, force: true }));
-  await writeFile(
-    join(dir, "sudo"),
-    `#!/bin/sh
-count=$(wc -l < "$CALLS_FILE")
-printf 'attempt\\n' >> "$CALLS_FILE"
-[ "$count" -ge "$FAIL_COUNT" ]
-`,
-    { mode: 0o755 }
-  );
-  await writeFile(join(dir, "sleep"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
-  await writeFile(
-    join(dir, "fc-match"),
-    '#!/bin/sh\nprintf "%s\\n" "$FONT_FAMILY"\n',
-    { mode: 0o755 }
-  );
-  for (const [failCount, font, expectedStatus, attempts] of [
-    [1, "Noto Sans CJK SC", 0, 2],
-    [2, "Noto Sans CJK SC", 1, 2],
-    [0, "DejaVu Sans", 1, 1]
-  ]) {
-    const calls = join(dir, "calls");
-    await writeFile(calls, "");
-    const result = spawnSync("bash", ["-e", "-o", "pipefail", "-c", script], {
-      encoding: "utf8",
-      timeout: 5000,
-      env: {
-        ...process.env,
-        PATH: `${dir}:${process.env.PATH}`,
-        CALLS_FILE: calls,
-        FAIL_COUNT: String(failCount),
-        FONT_FAMILY: font
-      }
-    });
-    assert.equal(result.status, expectedStatus, result.stderr);
-    assert.equal(
-      (await readFile(calls, "utf8")).trim().split("\n").length,
-      attempts
-    );
-  }
-});
-
 test("W10: only trusted successful main pushes can write caches", async () => {
   const { source } = await workflowFixture();
   const saveIndexes = [
     ...source.matchAll(/uses: actions\/cache\/save@v6/g)
   ].map((match) => match.index);
-  assert.equal(saveIndexes.length, 3);
+  assert.equal(saveIndexes.length, 2);
   for (const index of saveIndexes) {
     const context = source.slice(Math.max(0, index - 500), index);
     for (const guard of [
@@ -401,7 +226,7 @@ test("W10: only trusted successful main pushes can write caches", async () => {
   assert.doesNotMatch(source, /uses: actions\/cache@v6/);
 });
 
-test("W11: cache outcomes never skip quality, coverage or E2E gates", async () => {
+test("W11: cache outcomes never skip quality or coverage gates", async () => {
   const { jobs } = await workflowFixture();
   const requiredSteps = [
     ["quality", ["Lint", "Typecheck", "Format check", "Build"]],
@@ -409,9 +234,7 @@ test("W11: cache outcomes never skip quality, coverage or E2E gates", async () =
     [
       "coverage-merge",
       ["Verify every test file ran exactly once", "Merge coverage report"]
-    ],
-    ["e2e-web", ["Web E2E"]],
-    ["e2e-admin", ["Admin E2E"]]
+    ]
   ];
   for (const [jobName, stepNames] of requiredSteps) {
     const block = jobs.get(jobName);

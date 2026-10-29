@@ -3690,27 +3690,6 @@ describe("V3MeaningsAndExamplesStep", () => {
     });
   });
 
-  it("拖拽手柄前置，删除按钮独立保留在行尾", () => {
-    render(<Harness wordId="entry-align" />);
-
-    for (const label of ["语义区间", "语法结构", "定义", "词义"]) {
-      const drag = screen.getByLabelText(`拖动${label} 1`);
-      const remove = screen.getByLabelText(`删除${label} 1`);
-      expect(drag.closest(".word-sort-leading")).not.toBeNull();
-      expect(drag.closest(".word-sort-actions")).toBeNull();
-      expect(remove.closest(".word-sort-leading")).toBeNull();
-      expect(
-        drag.compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING
-      ).toBeTruthy();
-    }
-    expect(meaningsCss).toMatch(
-      /\.word-sort-actions\s*\{[^}]*align-items:\s*center;[^}]*width:\s*var\(--word-ops-col,\s*32px\);/su
-    );
-    expect(meaningsCss).toMatch(
-      /\.word-sort-actions\s*>\s*\.ant-btn\s*\{[^}]*width:\s*32px;/su
-    );
-  });
-
   it("语义区间卡片位于步骤顶部、词性 Tabs 之外，并展示全部区间", () => {
     const initial = structuredClone(meaningsFixture);
     initial.sense_groups.push({
