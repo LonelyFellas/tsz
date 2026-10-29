@@ -25,11 +25,6 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 35
     steps:
-      - name: Block until cross-component deployment protocol is safe
-        run: |
-          echo '::error::Cross-component locking is not safe; automatic deployment is disabled.'
-          exit 1
-
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
