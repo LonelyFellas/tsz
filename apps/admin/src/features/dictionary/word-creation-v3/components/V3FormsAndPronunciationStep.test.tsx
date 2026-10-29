@@ -1058,7 +1058,10 @@ describe("V3FormsAndPronunciationStep", () => {
     const { container, rerender } = render(view());
     expect(screen.getAllByText("travel", { exact: true })).toHaveLength(1);
     expect(
-      screen.getByRole("columnheader", { name: "读法" })
+      within(container.querySelector<HTMLElement>("thead")!).getByRole(
+        "columnheader",
+        { name: "读法" }
+      )
     ).toBeInTheDocument();
     const readingRows = container.querySelectorAll("tr[data-overview-dialect]");
     expect([...readingRows].map((row) => row.textContent)).toEqual([
@@ -1074,9 +1077,17 @@ describe("V3FormsAndPronunciationStep", () => {
       ).not.toHaveAttribute("rowspan");
     }
     expect(
-      screen.getByRole("img", { name: "英美通用拼写" }).closest("td")
+      within(
+        readingRows[0]!.querySelector<HTMLElement>(".v3-overview-spellings")!
+      )
+        .getByRole("img", { name: "英美通用拼写" })
+        .closest("td")
     ).toHaveAttribute("rowspan", "3");
-    fireEvent.click(screen.getByRole("button", { name: "编辑原形内容" }));
+    fireEvent.click(
+      within(
+        readingRows[0]!.querySelector<HTMLElement>(".v3-overview-action-cell")!
+      ).getByRole("button", { name: "编辑原形内容" })
+    );
     expect(onEdit).toHaveBeenCalledWith(form.id);
     expect(form).toEqual(original);
 
@@ -1086,12 +1097,20 @@ describe("V3FormsAndPronunciationStep", () => {
     form.regional_variants.uk.pronunciations[0]!.style = "normal";
     delete form.regional_variants.uk.pronunciations[1]!.style;
     rerender(view());
-    expect(
-      screen.getByRole("img", { name: "英式拼写" }).closest("td")
-    ).toHaveAttribute("rowspan", "2");
-    expect(screen.getByRole("img", { name: "美式拼写" })).toBeInTheDocument();
-    expect(screen.getByText("美式未填写")).toBeInTheDocument();
     const updatedRows = container.querySelectorAll("tr[data-overview-dialect]");
+    expect(
+      within(
+        updatedRows[0]!.querySelector<HTMLElement>(".v3-overview-spellings")!
+      )
+        .getByRole("img", { name: "英式拼写" })
+        .closest("td")
+    ).toHaveAttribute("rowspan", "2");
+    expect(
+      within(
+        updatedRows[2]!.querySelector<HTMLElement>(".v3-overview-spellings")!
+      ).getByRole("img", { name: "美式拼写" })
+    ).toBeInTheDocument();
+    expect(screen.getByText("美式未填写")).toBeInTheDocument();
     expect(updatedRows).toHaveLength(3);
     expect(updatedRows[0]).toHaveTextContent(/语流连读.*uk-one/);
     expect(updatedRows[1]).toHaveTextContent(/未填写.*uk-two/);
