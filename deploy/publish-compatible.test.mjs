@@ -10,6 +10,7 @@ test("API lock protects publication and rejects busy or changed API", async () =
   try {
     const stage = join(root, "stage");
     const lock = join(root, "deploy.lock");
+    const crossLock = join(root, "cross.lock");
     const manifest = join(root, "api.json");
     const bin = join(root, "bin");
     await mkdir(stage);
@@ -17,9 +18,10 @@ test("API lock protects publication and rejects busy or changed API", async () =
     await writeFile(join(bin, "systemctl"), "#!/bin/sh\nexit 0\n", {
       mode: 0o755
     });
+    await writeFile(join(bin, "flock"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
     await writeFile(
       join(stage, "publish-release.sh"),
-      `#!/bin/bash\n[[ -f '${lock}/owner' ]] || exit 3\nprintf ok > '${root}/published'\n`
+      `#!/bin/bash\n[[ -f '${crossLock}' ]] || exit 3\nprintf ok > '${root}/published'\n`
     );
     const sha = "a".repeat(40);
     const data = {
@@ -37,7 +39,8 @@ test("API lock protects publication and rejects busy or changed API", async () =
     );
     script = script
       .replace(/^\[\[ "\$stage" =~.*$/m, ":")
-      .replace("lock=/opt/tsz-rust/deploy.lock", `lock='${lock}'`)
+      .replace("/opt/tsz-cross-deploy.lock", crossLock)
+      .replace("/opt/tsz-rust/deploy.lock", lock)
       .replaceAll("/usr/bin/node", process.execPath)
       .replace("/opt/tsz-deploy-manifests/api.json", manifest);
     const wrapper = join(root, "wrapper.sh");
