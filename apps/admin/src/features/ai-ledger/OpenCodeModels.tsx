@@ -100,7 +100,7 @@ export function OpenCodeModels({
   const models = catalog.isError ? [] : (catalog.data?.models ?? []);
   const options = models.map((m) => ({
     value: encode(m),
-    label: `${probeLabel(m)} · ${m.source === "direct" ? "DeepSeek / deepseek-flash（直连）" : `${m.provider_id} / ${m.name} (${m.model_id})`}`,
+    label: `${probeLabel(m)} · ${m.source === "direct" ? "DeepSeek / deepseek-flash（直连）" : `${m.source === "chatgpt" ? "ChatGPT" : m.provider_id} / ${m.name} (${m.model_id})`}`,
     disabled: !m.enabled || m.status !== "available"
   }));
   const passed = models.filter((m) => m.status === "available").length;
@@ -121,7 +121,7 @@ export function OpenCodeModels({
   const currentName = current.isError
     ? "暂时无法确认"
     : current.data
-      ? `${current.data.provider_id} / ${current.data.model_id}${current.data.source === "direct" ? "（直连）" : "（OpenCode）"}`
+      ? `${current.data.source === "chatgpt" ? "ChatGPT" : current.data.provider_id} / ${current.data.model_id}${current.data.source === "direct" ? "（直连）" : current.data.source === "chatgpt" ? "（ChatGPT 套餐）" : "（OpenCode）"}`
       : "正在读取…";
   return (
     <>
@@ -131,6 +131,22 @@ export function OpenCodeModels({
         <Typography.Text type="secondary">
           保存后用于新建出题任务，已创建的任务继续使用原模型。
         </Typography.Text>
+        {current.data?.source === "chatgpt" && (
+          <Alert
+            type="info"
+            showIcon
+            title="正在使用 ChatGPT 套餐"
+            description={
+              <Typography.Link
+                href="https://chatgpt.com/settings/usage"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                管理 ChatGPT 用量
+              </Typography.Link>
+            }
+          />
+        )}
         <Flex gap={8} wrap align="center">
           <Select
             aria-label="出题模型"
@@ -262,7 +278,8 @@ export function OpenCodeModels({
               title="暂未发现可用模型，可连接 OpenCode 或添加模型服务商的 API Key 后刷新。"
             />
           )}
-        {current.data?.source === "opencode" &&
+        {(current.data?.source === "opencode" ||
+          current.data?.source === "chatgpt") &&
           catalog.isSuccess &&
           !catalog.data.models.some(
             (m) =>
@@ -274,7 +291,11 @@ export function OpenCodeModels({
             <Alert
               type="warning"
               showIcon
-              title="当前模型已不在可用列表中，请重新连接服务商或选择其他模型。"
+              title={
+                current.data.source === "chatgpt"
+                  ? "当前 ChatGPT 模型或账号已不在可用列表中，请重新登录、探测或选择其他模型。"
+                  : "当前模型已不在可用列表中，请重新连接服务商或选择其他模型。"
+              }
             />
           )}
         {save.isError && (

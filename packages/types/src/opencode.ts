@@ -33,7 +33,7 @@ export interface OpenCodeProviderList {
   providers: OpenCodeProvider[];
 }
 export interface OpenCodeModelSelection {
-  source: "direct" | "opencode";
+  source: "direct" | "opencode" | "chatgpt";
   provider_id: string;
   model_id: string;
 }

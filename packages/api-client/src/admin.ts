@@ -1,6 +1,7 @@
 import { createQuestionBankEndpoints } from "./question-bank";
 import { createAiLedgerEndpoints } from "./ai-ledger";
 import { createOpenCodeEndpoints } from "./opencode";
+import { createChatGPTEndpoints } from "./chatgpt";
 import { createPublicationAudioEndpoints } from "./publication-audio";
 import { createRelatedSuggestionEndpoints } from "./related-suggestions";
 import { SENTENCE_FORMATTING_HEADERS } from "./sentence-formatting";
@@ -257,6 +258,7 @@ export function createAdminEndpoints(http: HttpClient) {
   return {
     aiLedger: createAiLedgerEndpoints(http),
     opencode: createOpenCodeEndpoints(http),
+    chatgpt: createChatGPTEndpoints(http),
     questionBank: createQuestionBankEndpoints(http),
     dashboard: {
       /** GET /admin/dashboard/overview — 管理端首页聚合统计。 */

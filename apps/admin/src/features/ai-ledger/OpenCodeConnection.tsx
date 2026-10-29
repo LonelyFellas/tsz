@@ -1,10 +1,20 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LinkOutlined, ReloadOutlined } from "@ant-design/icons";
-import { Alert, Button, Card, Flex, Space, Tag, Typography } from "antd";
+import {
+  Alert,
+  Button,
+  Card,
+  Divider,
+  Flex,
+  Space,
+  Tag,
+  Typography
+} from "antd";
 import type { OpenCodeLogin } from "@tsz/types";
 import { api } from "@/lib/auth";
 import { OpenCodeModels } from "./OpenCodeModels";
+import { ChatGPTConnection } from "./ChatGPTConnection";
 
 export function OpenCodeConnection({ adminId }: { adminId: string }) {
   const client = useQueryClient();
@@ -67,14 +77,12 @@ export function OpenCodeConnection({ adminId }: { adminId: string }) {
   const expired = status.data?.status === "expired";
 
   return (
-    <Card
-      title={
-        <Space>
-          OpenCode<Tag color={connected ? "success" : "default"}>{state}</Tag>
-        </Space>
-      }
-    >
+    <Card title="模型与账号">
       <Flex vertical gap={12}>
+        <Space>
+          <Typography.Text strong>OpenCode</Typography.Text>
+          <Tag color={connected ? "success" : "default"}>{state}</Tag>
+        </Space>
         <Flex justify="space-between" align="center" wrap gap={12}>
           <Typography.Text type="secondary">
             登录 OpenCode Console，将账号连接到服务器，选择要使用的出题模型。
@@ -198,6 +206,8 @@ export function OpenCodeConnection({ adminId }: { adminId: string }) {
           <Alert type="success" showIcon title="OpenCode 授权已完成。" />
         )}
       </Flex>
+      <Divider />
+      <ChatGPTConnection key={adminId} adminId={adminId} />
       <OpenCodeModels
         key={adminId}
         adminId={adminId}

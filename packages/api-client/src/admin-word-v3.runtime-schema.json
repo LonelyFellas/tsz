@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/question-bank-workbench-backend/tsz-rust/docs/openapi.json",
-  "_source_sha256": "820913694bf62528c8db7f8a527410928539bef09121ededf7a900cecd100767",
+  "_source": "/Users/darwish/.codex/worktrees/chatgpt-admin-backend/tsz-rust/docs/openapi.json",
+  "_source_sha256": "71f44f927ade2b1c85381c0cffd9b2e35fc59cbaec716f1edff7982d6d28954e",
   "roots": [
     "LearningCapabilities",
     "QuestionCandidatePage",
@@ -19,6 +19,10 @@
     "OpenCodeProviderList",
     "OpenCodeModelSelection",
     "OpenCodeConnection",
+    "ChatGPTAccounts",
+    "ChatGPTLogin",
+    "ChatGPTLoginStatus",
+    "ChatGPTLogout",
     "OpenCodeLogin",
     "OpenCodeLoginStatus",
     "BankQuestion",
@@ -966,6 +970,69 @@
           "additionalProperties": false
         }
       ]
+    },
+    "ChatGPTAccount": {
+      "type": "object",
+      "required": ["client_id", "email", "signed_in", "plan_enabled"],
+      "properties": {
+        "client_id": { "type": "string" },
+        "email": { "type": "string" },
+        "plan_enabled": { "type": "boolean" },
+        "signed_in": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "ChatGPTAccounts": {
+      "type": "object",
+      "required": ["configured", "accounts"],
+      "properties": {
+        "accounts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ChatGPTAccount" }
+        },
+        "active": { "type": ["string", "null"] },
+        "configured": { "type": "boolean" },
+        "pending_login": {
+          "oneOf": [{ "$ref": "#/$defs/ChatGPTLogin" }, { "type": "null" }]
+        }
+      },
+      "additionalProperties": false
+    },
+    "ChatGPTLogin": {
+      "type": "object",
+      "required": ["attempt_id", "authorization_url", "expires_at"],
+      "properties": {
+        "attempt_id": { "type": "string", "format": "uuid" },
+        "authorization_url": { "type": "string" },
+        "expires_at": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "ChatGPTLoginError": {
+      "type": "string",
+      "enum": ["denied", "identity_invalid", "unavailable"]
+    },
+    "ChatGPTLoginState": {
+      "type": "string",
+      "enum": ["pending", "complete", "failed", "expired", "cancelled"]
+    },
+    "ChatGPTLoginStatus": {
+      "type": "object",
+      "required": ["status", "expires_at"],
+      "properties": {
+        "error": {
+          "oneOf": [{ "$ref": "#/$defs/ChatGPTLoginError" }, { "type": "null" }]
+        },
+        "expires_at": { "type": "string", "format": "date-time" },
+        "status": { "$ref": "#/$defs/ChatGPTLoginState" }
+      },
+      "additionalProperties": false
+    },
+    "ChatGPTLogout": {
+      "type": "object",
+      "required": ["remote_revoked"],
+      "properties": { "remote_revoked": { "type": "boolean" } },
+      "additionalProperties": false
     },
     "CoinAccount": {
       "type": "object",
@@ -3117,7 +3184,10 @@
       },
       "additionalProperties": false
     },
-    "OpenCodeModelSource": { "type": "string", "enum": ["direct", "opencode"] },
+    "OpenCodeModelSource": {
+      "type": "string",
+      "enum": ["direct", "opencode", "chatgpt"]
+    },
     "OpenCodeProbeError": {
       "type": "string",
       "enum": [
