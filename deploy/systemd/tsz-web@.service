@@ -8,6 +8,7 @@ Environment=NODE_ENV=production
 Environment=HOSTNAME=127.0.0.1
 Environment=PORT=%i
 ExecStart=/usr/bin/node apps/web/server.js
+SuccessExitStatus=143
 Restart=on-failure
 RestartSec=2
 TimeoutStopSec=30
