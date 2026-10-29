@@ -206,7 +206,7 @@ Range、206、MIME、CORS、HTTPS、404/403 缓存规则都要实测；缺失文
 
 用户已授权连续完成实现、回归、PR、合并与部署，终点为上线验收；不在小阶段暂停。已确认：词形/读法目标口音默认音频必须齐全，其他内容检查显式启用配音；发布人集中审听并确认新批次。
 
-两仓继续复用本任务分支。后端 `codex/speech-delivery` 已同步 `origin/main=0d597e3`；前端 `codex/speech-lifecycle-assessment` 已同步 `origin/main=8f773676`。主线同步的生成物冲突已通过原生导出/完整同步解决。当前 OpenAPI SHA-256 为 `a196a30f17099395731e469f1179b619ed1938e2e2afeb75c165a5f249df1d5f`，257 paths / 378 schema closure。
+两仓继续复用本任务分支。后端 `codex/speech-delivery` 已同步 `origin/main=0b3a5c9`；前端 `codex/speech-lifecycle-assessment` 已同步 `origin/main=8f773676`。主线同步的生成物冲突已通过原生导出/完整同步解决。当前 OpenAPI SHA-256 为 `a196a30f17099395731e469f1179b619ed1938e2e2afeb75c165a5f249df1d5f`，257 paths / 378 schema closure。
 
 ### 已实现的闭环
 
@@ -219,8 +219,8 @@ Range、206、MIME、CORS、HTTPS、404/403 缓存规则都要实测；缺失文
 
 ### 当前验证证据
 
-- 后端：`lexicon_handler` 176、`lexicon_audio_asset_references` 27、`shared_sentences` 38、`speech_generated` 32 均已通过。共享例句 down/up 测试已按新增 FK 依赖先撤/后建 review schema。后续 active-source 修复的 collector 6 项及 `wordlists_handler` 全 target 51 项通过。原始失败基线回执保留在 `verification/lexicon-handler-initial-gate.json`；未将早期止于门禁的并发测试当作通过。
-- 前端：API client 651 项通过；最终读音/共享解析/阅读组件合计 83 项、集中审听/批量与兼容过渡 19 项通过；此前向导/例句等专门回归保留。admin 类型检查与受影响 ESLint 通过，最终原生 hooks/CI 状态另记。jsdom 提示不代替真实页面验收。
+- 后端：`lexicon_handler` 176、`lexicon_audio_asset_references` 27、`shared_sentences` 39、`speech_generated` 33 均已通过。共享例句 down/up 测试已按新增 FK 依赖先撤/后建 review schema。后续 active-source 修复的 collector 7 项及 `wordlists_handler` 全 target 51 项通过。原始失败基线回执保留在 `verification/lexicon-handler-initial-gate.json`；未将早期止于门禁的并发测试当作通过。
+- 前端：API client 651 项通过；最终读音/共享解析/阅读组件合计 85 项、集中审听/批量与兼容过渡 19 项通过；此前向导/例句等专门回归保留。admin 类型检查与受影响 ESLint 通过，最终原生 hooks/CI 状态另记。jsdom 提示不代替真实页面验收。
 - 真实链路：隔离数据库及 Redis，API `8417`、Admin `3037`，Web `3047` 为生产构建加 next start。临时管理员/学生通过真实登录；页面创建词条，API 保存后重新打开确认持久化。缺音频清单可辨认且无法确认；真实 Azure/OSS 正式音频完成后集中播放，确认、发布与独立数据库读取走通。修改后旧确认失效，重新审听后第二次发布；两次 publication 均绑定 receipt，current 指向第二次。
 - 阅读链路：修复后 Admin 最终读音显示“正式音频”，网络证据没有 `/speech/previews` 或 `/speech/audio`；Web 生产构建首次播放签名一次、后续两次重播签名请求为 0，真实媒体返回 206。脱敏网络证据、截图和进程/构建身份位于 `verification/`。这些是本地真实应用+Azure/OSS验收，不能代替最终 CI 制品或服务器部署验收。
 - 负载：独立 localhost 签名 API 正在执行 400 RPS / 30 分钟及 1000 RPS burst；100 RPS / 30 秒预热 2999 请求均 200，P95 13.8 ms。完整结果待结束，不宣称容量门已通过。本机 debug 服务、签名 API 与真实媒体分发/中国大陆网络必须分别报告。
@@ -233,6 +233,17 @@ OSS 先通过专用测试凭据权限探测，唯一批次 `speech-delivery-2026
 
 ### 尚未完成与下一步
 
-当前正进行原生提交门禁与持续负载验证；尚无 PR、合并或部署。接下来固定精确提交做独立审查、通过正常 hooks/CI 后按授权开 PR/合并与配套部署，再验收实际版本并清理。
+当前代码、审查修复与短时容量验证已通过；最终优化配置长稳态仍在跑。将创建草稿 PR 并行运行 CI，全部门禁通过后才合并/部署。接下来固定精确提交做独立审查、通过正常 hooks/CI 后按授权开 PR/合并与配套部署，再验收实际版本并清理。
 
 设计中更大的 owner-specific 持久准备任务、试听晋升、跨管理员公共 recipe/审听溯源、历史缺项批量修复及 CDN/地域体验目标尚未实施。现有 `dubbing_audio_updates` 仅服务继承组变化，不能冒充完整发布准备队列；没有已保存音色的历史词条不能静默猜测。完整设计仍有上述工作，当前闭环通过不等于整套长期方案全部完成。
+
+### 交付前追加证据
+
+- 后端独立审查累计 3 轮：确认 1 个 P2（grammar owner dialect）并修复，当前阻断 0。自检另修复空音频例句在未配置可选音频空间时被错误拒绝；实际旧 handler 在合法 fixture 返回 503，修复后空需求通过，有资产缺存储仍拒绝。shared_sentences 最新全 39 项通过。
+- 前端独立审查累计 3 轮：P2 1 个（缓存播放依赖目录，含迟到竞态）、P3 1 个（批量兼容提示未刷新）均修复，当前阻断 0。正式播放按保存的 profile/locale 直接选资产，不依赖 live catalog 或 TTS 开关。最终相关 85 项、shared/admin 类型及原生 hooks 通过。
+- 历史恢复/生命周期全 12 项通过；签名快路径及共享例句签名、hide/withdraw 后 404 已纳入 wordlists_handler 全 51 项通过。
+- 容量实测没有隐藏失败：发生器的前两次中断/丢弃回执保留；修正为非阻塞 token refresh，客户端并发预算覆盖峰值请求超时。原单实例 debug 路径 400 RPS / 30 分钟共 719,997 请求全 200，P95 82.5 ms；旧路径 native release 1000 RPS 突发 P95 3.18 s，未通过。
+- 已据实测消除签名时重建整份阅读投影的开销：与阅读端共享同一 owned-audio 遍历，保留当前发布/归档锁和 HD 能力过滤；共享例句不做按词条 revision 的粗缓存，仍检查其独立隐藏/撤回。原 10 连接预算下单实例峰值仍触顶，双实例 2×10 连接的 1000 RPS 验证通过，P95 12.8 ms。
+- 只读核实目标数据库上限 70、当时在用 18；应用运行连接池调整为 20，启动/迁移维护池保留 10，不改服务器环境文件。单实例优化版 1000 RPS 突发 9,995 次全 200、无丢弃/错误、P95 12.8 ms、实际 996.7 RPS，通过。最终优化配置 400 RPS / 30 分钟正在并行复验，尚未标为通过；签名发生器源码与各阶段原始回执位于 verification/。
+- 本地这些指标只证明明确 fixture 下的签名服务，不是媒体带宽/所有词条复杂度/中国大陆网络的承诺。OSS 的本批临时媒体全部版本已永久清空；后续签名负载只使用临时登记，最终仍会再次复查与删除专属 DB/Redis/账号/浏览器状态。
+- 部署只读准备已捕获实际基线 0d597e3、144 条成功迁移账本、校验旧 CI 制品与内嵌迁移；临时 deploy-info 容器已独立确认清理。目标已审核恢复镜像缓存存在、磁盘余量满足准备条件；独立 scheduled backup 当前告警，新增迁移仍需适用写前保护和实际基线隔离演练，不按普通无迁移发布跳过。

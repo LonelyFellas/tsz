@@ -1,0 +1,52 @@
+{
+  "started": "2026-10-29T01:50:45.716Z",
+  "updated": "2026-10-29T02:05:06.077Z",
+  "state": "interrupted",
+  "environment": "isolated localhost debug candidate; signing API only, not media delivery",
+  "max_outstanding": 256,
+  "refreshes": 1,
+  "phases": [
+    {
+      "name": "warmup",
+      "target_rps": 100,
+      "duration_seconds": 30,
+      "scheduled": 2999,
+      "sent": 2999,
+      "backpressure": 0,
+      "statuses": {
+        "200": 2999
+      },
+      "errors": 0,
+      "elapsed_seconds": 30.004130667,
+      "latency_ms": {
+        "p50": 9.154125000000931,
+        "p95": 14.443834000001516,
+        "p99": 17.42054199999984,
+        "max": 42.231625
+      },
+      "actual_rps": 99.95290426122713,
+      "passed": true
+    },
+    {
+      "name": "sustained",
+      "target_rps": 400,
+      "duration_seconds": 1800,
+      "scheduled": 332072,
+      "sent": 330577,
+      "backpressure": 1495,
+      "statuses": {
+        "200": 330577
+      },
+      "errors": 0,
+      "elapsed_seconds": 830.196644416,
+      "latency_ms": {
+        "p50": 15.118957999977283,
+        "p95": 45.09149999998044,
+        "p99": 642.4024579999968,
+        "max": 1883.826374999946
+      },
+      "actual_rps": 398.19120231754687,
+      "passed": false
+    }
+  ]
+}

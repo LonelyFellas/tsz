@@ -1,0 +1,59 @@
+{
+  "scope": "local signing API, single word fixture; excludes media delivery and Mainland network latency",
+  "criteria": {
+    "http_status": 200,
+    "errors": 0,
+    "backpressure": 0,
+    "p95_ms_max": 150,
+    "actual_rps_min_fraction": 0.98
+  },
+  "debug_steady_400_30min": {
+    "name": "sustained",
+    "target_rps": 400,
+    "duration_seconds": 1800,
+    "scheduled": 719997,
+    "sent": 719997,
+    "backpressure": 0,
+    "statuses": {
+      "200": 719997
+    },
+    "errors": 0,
+    "elapsed_seconds": 1800.0116327499998,
+    "latency_ms": {
+      "p50": 14.830291999969631,
+      "p95": 82.5482909999555,
+      "p99": 857.9326670001028,
+      "max": 1735.5881669999799
+    },
+    "actual_rps": 399.995748305255,
+    "passed": true
+  },
+  "optimized_pool20_burst": {
+    "name": "burst",
+    "target_rps": 1000,
+    "duration_seconds": 10,
+    "scheduled": 9995,
+    "sent": 9995,
+    "backpressure": 0,
+    "statuses": {
+      "200": 9995
+    },
+    "errors": 0,
+    "elapsed_seconds": 10.027956334,
+    "latency_ms": {
+      "p50": 9.004958000001352,
+      "p95": 12.7950409999994,
+      "p99": 37.37933299999713,
+      "max": 54.44075000000157
+    },
+    "actual_rps": 996.7135542973734,
+    "passed": true
+  },
+  "database_budget": {
+    "server_max_connections": 70,
+    "observed_client_connections_before_change": 18,
+    "runtime_pool_before": 10,
+    "runtime_pool_after": 20
+  },
+  "final_optimized_30min": "running; will be validated before merge/deployment"
+}

@@ -1,0 +1,74 @@
+{
+  "started": "2026-10-29T03:28:17.655Z",
+  "updated": "2026-10-29T03:29:58.181Z",
+  "state": "failed",
+  "environment": "isolated localhost optimized signing fast path; signing API only, not media delivery",
+  "max_outstanding": 8192,
+  "refreshes": 0,
+  "refresh_latency_ms": [],
+  "phases": [
+    {
+      "name": "warmup",
+      "target_rps": 100,
+      "duration_seconds": 30,
+      "scheduled": 2999,
+      "sent": 2999,
+      "backpressure": 0,
+      "statuses": {
+        "200": 2999
+      },
+      "errors": 0,
+      "elapsed_seconds": 30.009544332999997,
+      "latency_ms": {
+        "p50": 6.561875000003056,
+        "p95": 10.76641699999891,
+        "p99": 15.686041999999361,
+        "max": 73.93333300000086
+      },
+      "actual_rps": 99.93487294314394,
+      "passed": true
+    },
+    {
+      "name": "sustained",
+      "target_rps": 400,
+      "duration_seconds": 60,
+      "scheduled": 23999,
+      "sent": 23999,
+      "backpressure": 0,
+      "statuses": {
+        "200": 23999
+      },
+      "errors": 0,
+      "elapsed_seconds": 60.008906708,
+      "latency_ms": {
+        "p50": 8.042832999999519,
+        "p95": 11.594041000003926,
+        "p99": 16.264166999993904,
+        "max": 38.712166999990586
+      },
+      "actual_rps": 399.9239665667931,
+      "passed": true
+    },
+    {
+      "name": "burst",
+      "target_rps": 1000,
+      "duration_seconds": 10,
+      "scheduled": 9996,
+      "sent": 9996,
+      "backpressure": 0,
+      "statuses": {
+        "200": 9996
+      },
+      "errors": 0,
+      "elapsed_seconds": 10.496110792000007,
+      "latency_ms": {
+        "p50": 509.1535830000066,
+        "p95": 742.737083,
+        "p99": 756.9539580000128,
+        "max": 767.3423329999932
+      },
+      "actual_rps": 952.3527521850108,
+      "passed": false
+    }
+  ]
+}
