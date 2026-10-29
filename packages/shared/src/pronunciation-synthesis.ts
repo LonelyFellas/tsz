@@ -12,6 +12,7 @@ import type {
 } from "@tsz/types";
 
 import { ipaWordToUps } from "./ipa-ups";
+import { speechAccentGroup } from "./speech-locale";
 import {
   stripPhoneticDelimiters,
   convertDictionaryToUnified,
@@ -783,6 +784,19 @@ export function convertDictionaryPhonetic(
   return issue ? fail(start, issue) : { ok: true, value };
 }
 
+export function savedVoiceAudioAsset(
+  profile: VoiceProfileV3 | undefined,
+  locale: PhonemeLocaleV3 | undefined
+): string | undefined {
+  if (!locale) return undefined;
+  return profile?.voices.find(
+    (voice) =>
+      voice.enabled &&
+      voice.audio_asset_id &&
+      speechAccentGroup(voice.locale) === speechAccentGroup(locale)
+  )?.audio_asset_id;
+}
+
 /** Final playback follows the saved active source, without resolving new voices. */
 export function pronunciationPlaybackSource(
   spelling: string,
@@ -805,11 +819,7 @@ export function pronunciationPlaybackSource(
     ? spellingSpeech?.audio_assets
     : pronunciation.audio_assets;
   const matchesLocale = (value: string | undefined) =>
-    value !== undefined &&
-    (locale === "en-GB"
-      ? ["en-GB", "en-AU", "en-NZ"]
-      : ["en-US", "en-CA"]
-    ).includes(value);
+    speechAccentGroup(value) === speechAccentGroup(locale);
   const content = synthesis?.use_spelling
     ? spellingSpeech?.content
     : pronunciationSynthesisContent(
@@ -819,9 +829,7 @@ export function pronunciationPlaybackSource(
         requireLocaleConfirmation
       );
   const assetId =
-    (!synthesis || content ? profile : undefined)?.voices.find(
-      (v) => v.enabled && matchesLocale(v.locale) && v.audio_asset_id
-    )?.audio_asset_id ??
+    savedVoiceAudioAsset(!synthesis || content ? profile : undefined, locale) ??
     uploads?.find((asset) => matchesLocale(asset.locale))?.id ??
     pronunciation.audio_assets?.find((asset) => matchesLocale(asset.locale))
       ?.id;

@@ -883,3 +883,60 @@ it("切换试听会取消旧请求，旧响应不会抢播，且原按钮可以�
   expect(AudioMock.instances).toHaveLength(1);
   expect(screen.getByLabelText("IPA 播放语音")).toBeEnabled();
 });
+
+it("saved profile audio remains playable without a live voice catalog or synthesis service", async () => {
+  preview.enabled = false;
+  preview.listVoices.mockResolvedValue([]);
+  const asset = "00000000-0000-4000-8000-000000000123";
+  render(
+    <PreviewHarness
+      playbackOnly
+      voiceProfile={{
+        voices: [
+          {
+            voice_id: "retired-voice",
+            enabled: true,
+            rate_percent: 0,
+            locale: "en-GB",
+            audio_asset_id: asset
+          }
+        ]
+      }}
+    />
+  );
+  const button = screen.getByLabelText("播放语音");
+  expect(button).toBeEnabled();
+  fireEvent.click(button);
+  await waitFor(() =>
+    expect(preview.resolveAudio).toHaveBeenCalledWith(asset, expect.anything())
+  );
+  expect(preview.synthesize).not.toHaveBeenCalled();
+});
+
+it("late catalog arrival does not interrupt an immutable saved-asset playback", async () => {
+  const pending = deferred<typeof voices>();
+  preview.listVoices.mockImplementationOnce(() => pending.promise);
+  render(
+    <PreviewHarness
+      playbackOnly
+      voiceProfile={{
+        voices: [
+          {
+            voice_id: "british-voice",
+            enabled: true,
+            rate_percent: -25,
+            locale: "en-GB",
+            audio_asset_id: "00000000-0000-4000-8000-000000000124"
+          }
+        ]
+      }}
+    />
+  );
+  fireEvent.click(screen.getByLabelText("播放语音"));
+  await waitFor(() => expect(AudioMock.instances[0]?.play).toHaveBeenCalled());
+  const audio = AudioMock.instances[0]!;
+  await act(async () => pending.resolve(voices));
+  expect(audio.pause).not.toHaveBeenCalled();
+  expect(preview.resolveAudio).toHaveBeenCalledOnce();
+  expect(preview.synthesize).not.toHaveBeenCalled();
+});

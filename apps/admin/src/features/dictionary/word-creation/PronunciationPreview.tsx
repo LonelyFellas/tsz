@@ -1,7 +1,12 @@
-import { speechAccentGroup } from "@tsz/shared";
+import { speechAccentGroup, savedVoiceAudioAsset } from "@tsz/shared";
 import { DownOutlined, SoundOutlined, SyncOutlined } from "@ant-design/icons";
 import { App, Button, Popover, Space, Tag, Tooltip } from "antd";
-import type { Dialect, RichTextV2, VoiceProfileV3 } from "@tsz/types";
+import type {
+  Dialect,
+  RichTextV2,
+  VoiceProfileV3,
+  PhonemeLocaleV3
+} from "@tsz/types";
 import type { AdminDialectPreference } from "@tsz/shared";
 import { retainResolvedAudio, voiceSettingFor } from "@tsz/voice-editor/core";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
@@ -123,7 +128,7 @@ export function PronunciationPreviewProvider({
 function localeForDialect(
   dialect: Dialect,
   preference: AdminDialectPreference
-): string | undefined {
+): PhonemeLocaleV3 | undefined {
   // 统一内容没有自己的方言，按管理员偏好挑发音人（需求：试听也按偏好选发音人）。
   if (dialect === "common") return preference === "uk" ? "en-GB" : "en-US";
   if (dialect === "uk") return "en-GB";
@@ -464,24 +469,32 @@ export function PronunciationPreviewControls({
   const selectedSetting = voice
     ? voiceSettingFor(resolved.profile?.voices ?? [], voice.id)
     : undefined;
-  const savedAssetId = audioAssetId ?? selectedSetting?.audio_asset_id;
-  const contentKey = JSON.stringify([
-    previewContent,
-    targetLocale,
-    voice?.id,
-    selectedSetting?.rate_percent ?? 0,
-    selectedSetting?.pitch_semitones ?? 0,
-    selectedSetting?.volume_percent ?? 100,
-    selectedSetting?.style ?? "",
-    selectedSetting?.style_degree,
-    selectedSetting?.role,
-    selectedSetting?.output_format,
-    selectedSetting?.audio_asset_id,
-    audioAssetId,
-    playbackOnly,
-    voiceProfile?.dubbing,
-    resolved.pending
-  ]);
+  const savedAssetId =
+    audioAssetId ??
+    (playbackOnly
+      ? savedVoiceAudioAsset(playbackProfile, targetLocale)
+      : selectedSetting?.audio_asset_id);
+  const contentKey = JSON.stringify(
+    playbackOnly
+      ? [savedAssetId, targetLocale]
+      : [
+          previewContent,
+          targetLocale,
+          voice?.id,
+          selectedSetting?.rate_percent ?? 0,
+          selectedSetting?.pitch_semitones ?? 0,
+          selectedSetting?.volume_percent ?? 100,
+          selectedSetting?.style ?? "",
+          selectedSetting?.style_degree,
+          selectedSetting?.role,
+          selectedSetting?.output_format,
+          selectedSetting?.audio_asset_id,
+          audioAssetId,
+          playbackOnly,
+          voiceProfile?.dubbing,
+          resolved.pending
+        ]
+  );
   const text = previewContent.text.trim();
   const playLabel = ariaLabelPrefix
     ? `${ariaLabelPrefix} 播放语音`
@@ -523,14 +536,7 @@ export function PronunciationPreviewControls({
     cleanup();
     setBusy(false);
     setStatus("");
-  }, [
-    cleanup,
-    contentKey,
-    pronunciationId,
-    voice?.id,
-    disabled,
-    previewAdapter
-  ]);
+  }, [cleanup, contentKey, pronunciationId, disabled, previewAdapter]);
 
   useEffect(
     () => () => {
@@ -739,7 +745,9 @@ export function PronunciationPreviewControls({
             (result
               ? "播放语音"
               : playbackOnly
-                ? unavailableReason
+                ? savedAssetId
+                  ? "播放正式音频"
+                  : "尚未保存正式音频，请返回编辑补齐"
                 : "请先获取语音")
           }
         >
