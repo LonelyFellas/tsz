@@ -9,6 +9,7 @@ import {
   writeFile
 } from "node:fs/promises";
 import { resolve } from "node:path";
+import { compareApiContract } from "./compare-api-contract.mjs";
 
 // The existing generator defines exactly which backend contracts the frontend
 // consumes. Generate in a disposable directory so the checkout is never changed.
@@ -82,38 +83,7 @@ try {
     const expected = JSON.parse(
       await readFile(resolve(packageRoot, "src", name), "utf8")
     );
-    for (const value of [actual, expected]) {
-      delete value._source;
-      delete value._generatedAt;
-      delete value._source_sha256;
-    }
-    if (name === "openapi.snapshot.json") {
-      for (const [path, methods] of Object.entries(expected.paths)) {
-        assert.ok(
-          Array.isArray(actual.paths[path]) &&
-            methods.every((method) => actual.paths[path].includes(method)),
-          `API method missing at ${path}`
-        );
-      }
-      for (const section of [
-        "operationHeaders",
-        "operationQueryParameters",
-        "operationSchemas",
-        "schemas"
-      ]) {
-        for (const [key, value] of Object.entries(expected[section])) {
-          assert.ok(
-            JSON.stringify(actual[section][key]) === JSON.stringify(value),
-            `API contract differs: ${section} ${key}`
-          );
-        }
-      }
-    } else {
-      assert.ok(
-        JSON.stringify(actual) === JSON.stringify(expected),
-        `${name} differs from deployed API`
-      );
-    }
+    compareApiContract(actual, expected, name);
   }
   console.log(manifest.source.git_sha);
 } finally {
