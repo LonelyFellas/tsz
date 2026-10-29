@@ -1,0 +1,91 @@
+{
+  "run_id": "qbw-loop-20261029-178b2886",
+  "real_model": "deepseek-flash",
+  "total_generations": 9,
+  "current_agent_generations": 8,
+  "old_agent_control_generations": 1,
+  "final_current_request_limit": 6,
+  "semantic_reselection_limit": 1,
+  "output_token_budget_unchanged": 6000,
+  "current_prompt_version": "mcq_zh_en_v5",
+  "real_reselection_cases": [
+    "finish with budget 6",
+    "wage with budget 6",
+    "browser finish regeneration"
+  ],
+  "source_fixture": "same 51 synthetic representative published entries as prior evaluation; not production sampling",
+  "model_calls": {
+    "observed_calls": 27,
+    "usage_observed_calls": 27,
+    "cache_observed_calls": 27,
+    "input_tokens": 46915,
+    "output_tokens": 7739,
+    "cache_hit_tokens": 30336,
+    "cache_miss_tokens": 16579,
+    "cache_hit_rate": 0.6466162208248961,
+    "total_duration_ms": 59939.40116849262,
+    "average_duration_ms": 2219.977821055282
+  },
+  "cost_estimate": {
+    "estimated_cost_cny": "0.048141720000",
+    "total_calls": 27,
+    "priced_calls": 27,
+    "unknown_calls": 0
+  },
+  "native_fixture_counts": {
+    "users": 0,
+    "learning_tasks": 0,
+    "learning_runs": 0,
+    "learning_answers": 0,
+    "question_generations": 9,
+    "question_bank": 4,
+    "question_review_deliveries": 2,
+    "lexicon.entries": 51,
+    "lexicon.entry_publications": 51
+  },
+  "question_states": {
+    "approved": 1,
+    "rejected": 1,
+    "draft": 2
+  },
+  "review_feedback": {
+    "created": 2,
+    "delivered_to_real_agent": 2
+  },
+  "browser": {
+    "normal_2fa": true,
+    "real_regeneration_from_red_warning": true,
+    "insufficient_result_visible": true,
+    "no_question_created_for_insufficient": true,
+    "unresolved_approval_disabled": true,
+    "old_agent_approval_http_status": 409,
+    "risk_details_expandable": true,
+    "ordinary_hints_separate": true,
+    "legacy_rejected_in_ui": true,
+    "apple_trial_and_approval_in_ui": true,
+    "trial_learning_writes": 0,
+    "api_mocks": false,
+    "temporary_viewport_recovery": "1280x800 used after desktop browser surface became zero-width; restore before cleanup",
+    "console_errors": 0,
+    "independent_reload_final_states_verified": true
+  },
+  "version": {
+    "agent": {
+      "root": "/Users/darwish/.codex/worktrees/question-bank-semantic-loop-agent/tsz-agent",
+      "head": "76b5f6cd7709773aac747dd2c628524a8fe1e7ab",
+      "dirty_diff_sha256": "c473bff51db61059742c4e3b9688c23e7d978cba5a24aba20bd82e5ada64410c",
+      "workflow_sha256": "7b5049062496e06422aa3987c532b788f35dbc5926bb9cc7974bf9eca6cb7955",
+      "prompt_version": "mcq_zh_en_v5",
+      "model_request_limit": 6
+    },
+    "backend_binary_sha256": "1eaa328c48efa3ff28e5c87d6e315d2ff268f1eb155c85e050359446420709af",
+    "backend_root": "/Users/darwish/.codex/worktrees/question-bank-workbench-backend/tsz-rust",
+    "frontend_root": "/Users/darwish/.codex/worktrees/029c/tsz",
+    "workspace_changes": "uncommitted implementation, no push or deployment"
+  },
+  "limits": [
+    "Same model generates and reviews; no universal semantic correctness guarantee.",
+    "nurse and bitter are model-clean drafts left pending human review; only apple was approved.",
+    "Initial budget-4 finish/wage runs were safely insufficient before reselection; final budget-6 runs exercised reselection."
+  ]
+}

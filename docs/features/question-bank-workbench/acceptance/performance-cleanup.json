@@ -1,0 +1,15 @@
+{
+  "run_id": "qbw-20261029-5a39b215",
+  "removed_registered_sources": 50000,
+  "removed_registered_questions": 50000,
+  "seconds": 17.38,
+  "independent_checks": {
+    "performance_questions": 0,
+    "performance_generations": 0,
+    "performance_entries": 0,
+    "performance_publications": 0,
+    "performance_index_rows": 0,
+    "retained_entries": 6,
+    "retained_questions": 27
+  }
+}

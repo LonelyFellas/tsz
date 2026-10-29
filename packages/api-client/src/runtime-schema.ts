@@ -21,6 +21,8 @@ export const RUNTIME_SCHEMA_ROOTS = [
   "OpenCodeLoginStatus",
   "BankQuestion",
   "BankQuestionPage",
+  "QuestionWorkbenchPage",
+  "QuestionInspection",
 
   "MemoryOverview",
   "MemoryPage",

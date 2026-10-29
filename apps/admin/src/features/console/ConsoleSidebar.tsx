@@ -4,6 +4,7 @@ import {
   DollarOutlined,
   HomeOutlined,
   ProfileOutlined,
+  QuestionCircleOutlined,
   ReadOutlined,
   ScheduleOutlined,
   SettingOutlined,
@@ -100,7 +101,6 @@ const GROUPS: Group[] = [
     label: "词库管理",
     leaves: [
       pageLeaf(ADMIN_PAGE_ROUTES.words, "智能词库"),
-      pageLeaf(ADMIN_PAGE_ROUTES.questionBank, "单选题工作台"),
       pageLeaf(ADMIN_PAGE_ROUTES.wordsTrash, "垃圾桶"),
       {
         key: "todo:custom-dict",
@@ -110,6 +110,12 @@ const GROUPS: Group[] = [
       },
       pageLeaf(ADMIN_PAGE_ROUTES.sentences, "多维例句")
     ]
+  },
+  {
+    key: "grp-questions",
+    icon: <QuestionCircleOutlined />,
+    label: "题型管理",
+    leaves: [pageLeaf(ADMIN_PAGE_ROUTES.questionBank, "单选题工作台")]
   },
   {
     key: "grp-wordlist",

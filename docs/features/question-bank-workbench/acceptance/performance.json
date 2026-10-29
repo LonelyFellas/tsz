@@ -1,0 +1,53 @@
+{
+  "dataset": {
+    "entries": 50006,
+    "questions": 50027,
+    "fixture_entries": 50000,
+    "fixture_questions": 50000
+  },
+  "measurements": [
+    {
+      "case": "question page 1",
+      "ms": 63.5,
+      "status": 200,
+      "returned": 20,
+      "total": 50027
+    },
+    {
+      "case": "question page 1000",
+      "ms": 62.0,
+      "status": 200,
+      "returned": 20,
+      "total": 50027
+    },
+    {
+      "case": "filtered question search",
+      "ms": 1223.0,
+      "status": 200,
+      "returned": 20,
+      "total": 33339
+    },
+    {
+      "case": "published candidate page 1",
+      "ms": 148.7,
+      "status": 200,
+      "returned": 20,
+      "total": 200024
+    },
+    {
+      "case": "published candidate page 1000",
+      "ms": 211.7,
+      "status": 200,
+      "returned": 20,
+      "total": 200024
+    },
+    {
+      "case": "published candidate term search",
+      "ms": 41.1,
+      "status": 200,
+      "returned": 2,
+      "total": 2
+    }
+  ],
+  "notes": "Task-exclusive fixture database. Real native HTTP handlers; one sample per case, not a throughput/SLA claim."
+}

@@ -1,4 +1,8 @@
 import type {
+  QuestionWorkbenchQuery,
+  QuestionWorkbenchPage,
+  QuestionInspection,
+  SearchQuestionCandidates,
   QuestionCandidatePageQuery,
   QuestionCandidateSearchPage,
   QuestionBatchSelection,
@@ -32,7 +36,11 @@ function decode<T>(root: RuntimeSchemaRoot, value: unknown): T {
   return value as T;
 }
 function query(
-  data: QuestionBankQuery | QuestionCandidateQuery | QuestionCandidatePageQuery
+  data:
+    | QuestionBankQuery
+    | QuestionWorkbenchQuery
+    | QuestionCandidateQuery
+    | QuestionCandidatePageQuery
 ) {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(data))
@@ -42,6 +50,20 @@ function query(
 export function createQuestionBankEndpoints(http: HttpClient) {
   const base = "/question-bank";
   return {
+    workbench: (q: QuestionWorkbenchQuery = {}, o?: Options) =>
+      http
+        .get<unknown>(`${base}/questions/workbench${query(q)}`, o)
+        .then((v) => decode<QuestionWorkbenchPage>("QuestionWorkbenchPage", v)),
+    inspect: (id: string, o?: Options) =>
+      http
+        .get<unknown>(`${base}/questions/${id}/inspection`, o)
+        .then((v) => decode<QuestionInspection>("QuestionInspection", v)),
+    searchCandidates: (data: SearchQuestionCandidates, o?: Options) =>
+      http
+        .post<unknown>(`${base}/candidate-search`, data, o)
+        .then((v) =>
+          decode<QuestionCandidateSearchPage>("QuestionCandidateSearchPage", v)
+        ),
     candidatePage: (q: QuestionCandidatePageQuery, o?: Options) =>
       http
         .get<unknown>(`${base}/candidate-page${query(q)}`, o)

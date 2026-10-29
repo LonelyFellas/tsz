@@ -10,15 +10,18 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { App, ConfigProvider } from "antd";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
-import type { AdminProfile, BankQuestion, QuestionCandidate } from "@tsz/types";
+import { profile, target, question, candidate } from "./test-fixtures";
 import { HttpError } from "@tsz/api-client";
-import { QuestionEditor } from "./QuestionEditor";
+import { GenerationTools } from "./GenerationTools";
 import { BatchPanel } from "./BatchPanel";
 import { QuestionBank } from "./QuestionBank";
+import { useState } from "react";
 const mocks = vi.hoisted(() => ({
   question: vi.fn(),
   candidates: vi.fn(),
-  candidatePage: vi.fn(),
+  searchCandidates: vi.fn(),
+  workbench: vi.fn(),
+  inspect: vi.fn(),
   edit: vi.fn(),
   review: vi.fn(),
   generate: vi.fn(),
@@ -33,11 +36,6 @@ const mocks = vi.hoisted(() => ({
   batchItems: vi.fn(),
   cancelBatch: vi.fn()
 }));
-const profile = {
-  id: "author",
-  role: "admin",
-  permissions: ["words.access", "words.edit", "words.publish"]
-} as AdminProfile;
 vi.mock("@/lib/auth", () => ({
   api: { questionBank: mocks },
   useAuthStore: (select: (state: unknown) => unknown) =>
@@ -49,215 +47,69 @@ vi.mock("@/lib/auth", () => ({
       }
     })
 }));
-function candidate(spelling: string): QuestionCandidate {
-  return {
-    candidate_ref: spelling,
-    source: {
-      entry_id: spelling,
-      publication_id: `${spelling}-published`,
-      sense_id: `${spelling}-sense`,
-      definition_id: `${spelling}-definition`,
-      pos_id: "noun",
-      form_id: `${spelling}-form`
-    },
-    content_fingerprint: spelling,
-    spelling,
-    part_of_speech: "n.",
-    level: "A1",
-    definition: `${spelling} 的释义`,
-    other_definitions: [],
-    accepted_spellings: [spelling],
-    answer_profile: "BrE",
-    form_type: "base",
-    teaching_eligible: true
+function providers(route: string) {
+  return function Wrapper({ children }: { children: React.ReactNode }) {
+    const [client] = useState(
+      () => new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    );
+    return (
+      <QueryClientProvider client={client}>
+        <ConfigProvider>
+          <App>
+            <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
+          </App>
+        </ConfigProvider>
+      </QueryClientProvider>
+    );
   };
 }
-const target = candidate("apple");
-const content = {
-  target,
-  prompt: "苹果",
-  question_level: "B1",
-  answer_profile: "BrE",
-  options: ["apple", "banana", "pear", "orange"].map((word, index) => ({
-    option_id: String.fromCharCode(65 + index),
-    candidate: candidate(word),
-    explanation: `${word} 理由`
-  })),
-  correct_option_id: "A",
-  explanation: "苹果对应 apple。",
-  concerns: ["请核查干扰项语义。"]
-};
-const question: BankQuestion = {
-  id: "question",
-  generation_id: "generation",
-  revision: 3,
-  state: "draft",
-  content,
-  original_content: content,
-  created_by: "author",
-  reviewed_by: null,
-  review_comment: "",
-  created_at: "2026-10-28T00:00:00Z",
-  updated_at: "2026-10-28T00:00:00Z"
-};
-function wrapper({ children }: { children: React.ReactNode }) {
-  const client = new QueryClient({
-    defaultOptions: { queries: { retry: false } }
-  });
-  return (
-    <QueryClientProvider client={client}>
-      <ConfigProvider>
-        <App>
-          <MemoryRouter initialEntries={["/question-bank?entry_id=apple"]}>
-            {children}
-          </MemoryRouter>
-        </App>
-      </ConfigProvider>
-    </QueryClientProvider>
-  );
-}
+const wrapper = providers("/question-bank?entry_id=apple");
+const mainWrapper = providers("/question-bank");
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.question.mockResolvedValue(question);
   mocks.candidates.mockResolvedValue({
     contract_version: 1,
-    items: [target, candidate("lemon")]
+    items: [target]
   });
-  mocks.candidatePage.mockResolvedValue({
-    items: [target, candidate("lemon")],
+  mocks.searchCandidates.mockResolvedValue({
+    items: [target],
     pagination: { page: 1, page_size: 20, total: 81, total_pages: 5 }
   });
   mocks.questions.mockResolvedValue({ items: [], pagination: { total: 0 } });
-  mocks.generations.mockResolvedValue({ items: [], pagination: { total: 0 } });
-});
-it("failed edits survive closing and reopening; review uses the saved revision and never bypasses unsaved changes", async () => {
-  mocks.edit.mockRejectedValueOnce(new HttpError(409, "题目已被修改"));
-  const props = {
-    id: "question",
-    open: true,
-    profile,
-    onClose: vi.fn(),
-    onDirtyChange: vi.fn()
-  };
-  const view = render(<QuestionEditor {...props} />, { wrapper });
-  const prompt = await screen.findByLabelText("中文题干");
-  const approve = screen.getByRole("button", { name: "审核通过并启用" });
-  const save = screen.getByRole("button", { name: "保存修改" });
-  fireEvent.change(prompt, { target: { value: "一种常见水果：苹果" } });
-  expect(approve).toBeDisabled();
-  fireEvent.click(save);
-  await screen.findByText("题目已被修改");
-  expect(prompt).toHaveValue("一种常见水果：苹果");
-  view.rerender(<QuestionEditor {...props} open={false} />);
-  view.rerender(<QuestionEditor {...props} />);
-  expect(screen.getByLabelText("中文题干")).toHaveValue("一种常见水果：苹果");
-  expect(save).toBeVisible();
-  mocks.edit.mockResolvedValue({
-    ...question,
-    revision: 4,
-    content: { ...content, prompt: "一种常见水果：苹果" }
-  });
-  fireEvent.click(save);
-  await waitFor(() => expect(approve).toBeEnabled());
-  expect(mocks.edit.mock.calls[1]![1]).toMatchObject({
-    expected_revision: 3,
-    prompt: "一种常见水果：苹果",
-    options: content.options.map((o) => ({
-      candidate_ref: o.candidate.candidate_ref,
-      source: o.candidate.source,
-      answer_profile: "BrE"
+  mocks.inspect.mockResolvedValue({
+    question,
+    target_current: true,
+    sources: question.content.options.map((o) => ({
+      option_id: o.option_id,
+      current: true
     }))
   });
-  mocks.review.mockResolvedValue({
-    ...question,
-    state: "approved",
-    revision: 5
+  mocks.workbench.mockResolvedValue({
+    items: [],
+    counts: { draft: 0, approved: 0, rejected: 0, disabled: 0 },
+    pagination: { page: 1, page_size: 20, total: 0, total_pages: 0 }
   });
-  fireEvent.click(approve);
-  await waitFor(() => expect(mocks.review).toHaveBeenCalledOnce());
-  expect(mocks.review.mock.calls[0]![1]).toMatchObject({
-    expected_revision: 4,
-    decision: "approve"
-  });
-  await screen.findByRole("button", { name: "停用题目" });
-  expect(screen.getByLabelText("中文题干")).toBeDisabled();
-});
-it("another owner's question is readable but cannot be edited or reviewed with own-only permissions", async () => {
-  mocks.question.mockResolvedValue({ ...question, created_by: "other" });
-  render(
-    <QuestionEditor
-      id="question"
-      open
-      profile={profile}
-      onClose={vi.fn()}
-      onDirtyChange={vi.fn()}
-    />,
-    { wrapper }
-  );
-  expect(await screen.findByLabelText("中文题干")).toBeDisabled();
-  expect(screen.getByRole("button", { name: "审核通过并启用" })).toBeDisabled();
-  expect(
-    screen.queryByRole("button", { name: "保存修改" })
-  ).not.toBeInTheDocument();
-  expect(mocks.review).not.toHaveBeenCalled();
-});
-
-it("a late save from an unmounted question cannot clear another question's dirty state", async () => {
-  let resolveEdit!: (value: BankQuestion) => void;
-  mocks.edit.mockImplementation(
-    () =>
-      new Promise<BankQuestion>((resolve) => {
-        resolveEdit = resolve;
-      })
-  );
-  const second = {
-    ...question,
-    id: "second",
-    content: { ...content, prompt: "第二题原稿" }
-  };
-  mocks.question.mockImplementation(async (id: string) =>
-    id === "second" ? second : question
-  );
-  const dirty = vi.fn();
-  const props = {
-    id: "question",
-    open: true,
-    profile,
-    onClose: vi.fn(),
-    onDirtyChange: dirty
-  };
-  const rendered = render(<QuestionEditor {...props} />, { wrapper });
-  fireEvent.change(await screen.findByLabelText("中文题干"), {
-    target: { value: "第一题修改" }
-  });
-  fireEvent.click(screen.getByRole("button", { name: "保存修改" }));
-  await waitFor(() => expect(mocks.edit).toHaveBeenCalledOnce());
-  rendered.rerender(<QuestionEditor {...props} id="second" />);
-  const current = await screen.findByDisplayValue("第二题原稿");
-  fireEvent.change(current, { target: { value: "第二题尚未保存的修改" } });
-  dirty.mockClear();
-  await act(async () =>
-    resolveEdit({
-      ...question,
-      revision: 4,
-      content: { ...content, prompt: "第一题修改" }
-    })
-  );
-  expect(current).toHaveValue("第二题尚未保存的修改");
-  expect(dirty).not.toHaveBeenCalled();
-  expect(screen.getByRole("button", { name: "审核通过并启用" })).toBeDisabled();
-  rendered.rerender(<QuestionEditor {...props} />);
-  expect(await screen.findByDisplayValue("第一题修改")).toBeInTheDocument();
+  mocks.generations.mockResolvedValue({ items: [], pagination: { total: 0 } });
 });
 it("generation timeout preserves the chosen source and retries the same idempotent request", async () => {
   mocks.generate.mockRejectedValue(new Error("网络中断"));
-  render(<QuestionBank />, { wrapper });
+  render(
+    <GenerationTools
+      profile={profile}
+      active
+      initialTab="generate"
+      showQuestion={vi.fn()}
+    />,
+    { wrapper }
+  );
   const row = await screen.findByRole("row", { name: /apple.*apple 的释义/ });
   const radio = within(row).getByRole("radio");
   const generate = screen.getByRole("button", { name: "生成四选一草稿" });
   fireEvent.click(radio);
   await waitFor(() => expect(generate).toBeEnabled());
   fireEvent.click(generate);
+  fireEvent.click(await screen.findByRole("button", { name: "确认生成" }));
   await waitFor(() => expect(mocks.generate).toHaveBeenCalledOnce());
   await screen.findByText("网络中断");
   const retry = await screen.findByRole("button", { name: "重试原生成请求" });
@@ -273,11 +125,19 @@ it("generation timeout preserves the chosen source and retries the same idempote
 });
 
 it("candidate pagination reaches beyond the first eighty and resets selection", async () => {
-  render(<QuestionBank />, { wrapper });
+  render(
+    <GenerationTools
+      profile={profile}
+      active
+      initialTab="generate"
+      showQuestion={vi.fn()}
+    />,
+    { wrapper }
+  );
   await screen.findByText("apple 的释义");
-  fireEvent.click(screen.getByTitle("5"));
+  fireEvent.click(await screen.findByTitle("5"));
   await waitFor(() =>
-    expect(mocks.candidatePage).toHaveBeenLastCalledWith(
+    expect(mocks.searchCandidates).toHaveBeenLastCalledWith(
       expect.objectContaining({ page: 5, page_size: 20 }),
       expect.anything()
     )
@@ -378,7 +238,15 @@ it("switching workbench tabs preserves an uncertain batch request and its idempo
     preview_token: "batch-preview"
   });
   mocks.createBatch.mockRejectedValue(new HttpError(503, "请求结果未知"));
-  render(<QuestionBank />, { wrapper });
+  render(
+    <GenerationTools
+      profile={profile}
+      active
+      initialTab="generate"
+      showQuestion={vi.fn()}
+    />,
+    { wrapper }
+  );
   fireEvent.click(screen.getByRole("tab", { name: "全库批量命题" }));
   fireEvent.click(screen.getByRole("button", { name: "预览全库缺题" }));
   await screen.findByText("本次实际需生成 1 道待审核草稿。");
@@ -386,7 +254,7 @@ it("switching workbench tabs preserves an uncertain batch request and its idempo
   fireEvent.click(await screen.findByRole("button", { name: "开始批量命题" }));
   await screen.findByText("请求结果未知");
   const original = mocks.createBatch.mock.calls[0]![0];
-  fireEvent.click(screen.getByRole("tab", { name: "题目审核" }));
+  fireEvent.click(screen.getByRole("tab", { name: "单词义命题" }));
   expect(
     screen.queryByRole("button", { name: "重试原批次请求" })
   ).not.toBeInTheDocument();
@@ -471,7 +339,7 @@ it.each(["all", "succeeded"])(
     await screen.findByText("批次 batch-race · 进行中");
     if (filter === "succeeded") {
       fireEvent.mouseDown(screen.getByLabelText("批次任务状态"));
-      fireEvent.click(await screen.findByText("已生成草稿", { exact: true }));
+      fireEvent.click(await screen.findByText("已生成草稿", {}));
     }
     await waitFor(() => expect(client.isFetching()).toBe(0));
     expect(
@@ -498,19 +366,17 @@ it.each(["all", "succeeded"])(
   10_000
 );
 
-it("列表失败后仍可筛选、刷新题目与生成记录", async () => {
-  mocks.questions.mockRejectedValueOnce(new Error("审核读取失败"));
+it("生成记录读取失败后仍可刷新恢复", async () => {
   mocks.generations.mockRejectedValueOnce(new Error("记录读取失败"));
-  render(<QuestionBank />, { wrapper });
-  fireEvent.click(screen.getByRole("tab", { name: "题目审核" }));
-  await screen.findByText("审核读取失败");
-  expect(screen.getByRole("combobox", { name: "题目状态" })).toBeEnabled();
-  fireEvent.click(screen.getByRole("button", { name: /刷\s*新/ }));
-  await waitFor(() => expect(mocks.questions).toHaveBeenCalledTimes(2));
-  await waitFor(() =>
-    expect(screen.queryByText("审核读取失败")).not.toBeInTheDocument()
+  render(
+    <GenerationTools
+      profile={profile}
+      active
+      initialTab="generations"
+      showQuestion={vi.fn()}
+    />,
+    { wrapper }
   );
-  fireEvent.click(screen.getByRole("tab", { name: "生成记录" }));
   await screen.findByText("记录读取失败");
   fireEvent.click(screen.getByRole("button", { name: /刷\s*新/ }));
   await waitFor(() => expect(mocks.generations).toHaveBeenCalledTimes(2));
@@ -520,11 +386,156 @@ it("列表失败后仍可筛选、刷新题目与生成记录", async () => {
 });
 
 it("命题词义读取失败后仍可切回整个词库", async () => {
-  mocks.candidatePage.mockRejectedValueOnce(new Error("词义读取失败"));
-  render(<QuestionBank />, { wrapper });
+  mocks.searchCandidates.mockRejectedValueOnce(new Error("词义读取失败"));
+  render(
+    <GenerationTools
+      profile={profile}
+      active
+      initialTab="generate"
+      showQuestion={vi.fn()}
+    />,
+    { wrapper }
+  );
   await screen.findByText("词义读取失败");
   fireEvent.click(screen.getByRole("button", { name: "查看整个词库" }));
   await screen.findByRole("row", { name: /apple.*apple 的释义/ });
   expect(screen.queryByText("当前词条的已发布词义")).not.toBeInTheDocument();
-  expect(mocks.candidatePage).toHaveBeenCalledTimes(2);
+  expect(mocks.searchCandidates).toHaveBeenCalledTimes(2);
+});
+
+function workbenchItem(q = question) {
+  return {
+    id: q.id,
+    revision: q.revision,
+    state: q.state,
+    created_by: q.created_by,
+    spelling: q.content.target.spelling,
+    definition: q.content.target.definition,
+    part_of_speech: q.content.target.part_of_speech,
+    prompt: q.content.prompt,
+    question_level: q.content.question_level,
+    answer_profile: q.content.answer_profile,
+    options: q.content.options.map((o) => ({
+      option_id: o.option_id,
+      spelling: o.candidate.spelling
+    })),
+    correct_option_id: q.content.correct_option_id,
+    source_current: true,
+    has_concerns: false,
+    updated_at: q.updated_at
+  };
+}
+it("workbench search and pagination send complete filters to the backend", async () => {
+  mocks.workbench.mockResolvedValue({
+    items: [workbenchItem()],
+    counts: { draft: 81, approved: 0, rejected: 0, disabled: 0 },
+    pagination: { page: 1, page_size: 20, total: 81, total_pages: 5 }
+  });
+  render(<QuestionBank />, { wrapper: mainWrapper });
+  await screen.findByRole("button", { name: "apple" });
+  const search = screen.getByRole("searchbox", { name: "搜索单词或题干" });
+  fireEvent.change(search, { target: { value: "苹果" } });
+  fireEvent.keyDown(search, { key: "Enter", code: "Enter", keyCode: 13 });
+  await waitFor(() =>
+    expect(mocks.workbench).toHaveBeenLastCalledWith(
+      expect.objectContaining({ query: "苹果", page: 1 }),
+      expect.anything()
+    )
+  );
+  fireEvent.click(await screen.findByTitle("5"));
+  await waitFor(() =>
+    expect(mocks.workbench).toHaveBeenLastCalledWith(
+      expect.objectContaining({ query: "苹果", page: 5 }),
+      expect.anything()
+    )
+  );
+});
+it("a fixed review queue advances without offset skips and returns to the retained list", async () => {
+  const second = {
+    ...question,
+    id: "second",
+    content: {
+      ...question.content,
+      target: candidate("pear"),
+      prompt: "梨",
+      correct_option_id: "C"
+    }
+  };
+  mocks.inspect.mockImplementation(async (id: string) => {
+    const q = id === "second" ? second : question;
+    return {
+      question: q,
+      target_current: true,
+      sources: q.content.options.map((o) => ({
+        option_id: o.option_id,
+        current: true
+      }))
+    };
+  });
+  mocks.workbench.mockResolvedValue({
+    items: [workbenchItem(), workbenchItem(second)],
+    counts: { draft: 2, approved: 0, rejected: 0, disabled: 0 },
+    pagination: { page: 1, page_size: 20, total: 2, total_pages: 1 }
+  });
+  render(<QuestionBank />, { wrapper: mainWrapper });
+  fireEvent.click(await screen.findByRole("button", { name: "审核本页 2 道" }));
+  await screen.findByRole("heading", { name: "苹果" });
+  mocks.review.mockResolvedValueOnce({
+    ...question,
+    state: "approved",
+    revision: 4
+  });
+  fireEvent.click(screen.getByRole("button", { name: "通过并下一题" }));
+  expect(await screen.findByRole("heading", { name: "梨" })).toBeVisible();
+  expect(screen.getByText("本次 2 道 · 已处理 1 道")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "返回题库" }));
+  await screen.findByRole("button", { name: "apple" });
+  expect(mocks.workbench).toHaveBeenLastCalledWith(
+    expect.objectContaining({ page: 1, page_size: 20 }),
+    expect.anything()
+  );
+});
+it("closing the generation drawer retains an uncertain single request", async () => {
+  mocks.generate.mockRejectedValue(new Error("生成结果未确认"));
+  render(<QuestionBank />, { wrapper: mainWrapper });
+  fireEvent.click(screen.getByRole("button", { name: "生成题目" }));
+  const row = await screen.findByRole("row", { name: /apple.*apple 的释义/ });
+  fireEvent.click(within(row).getByRole("radio"));
+  fireEvent.click(screen.getByRole("button", { name: "生成四选一草稿" }));
+  fireEvent.click(await screen.findByRole("button", { name: "确认生成" }));
+  await screen.findByText("生成结果未确认");
+  const original = mocks.generate.mock.calls[0]![0];
+  expect(screen.getByText("命题与生成任务")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Close" }));
+  fireEvent.click(screen.getByRole("button", { name: "生成题目" }));
+  fireEvent.click(
+    await screen.findByRole("button", { name: "重试原生成请求" })
+  );
+  await waitFor(() => expect(mocks.generate).toHaveBeenCalledTimes(2));
+  expect(mocks.generate.mock.calls[1]![0]).toEqual(original);
+});
+
+it("reopening a listed question rechecks publication sources instead of trusting an earlier inspection", async () => {
+  mocks.workbench.mockResolvedValue({
+    items: [workbenchItem()],
+    counts: { draft: 1, approved: 0, rejected: 0, disabled: 0 },
+    pagination: { page: 1, page_size: 20, total: 1, total_pages: 1 }
+  });
+  const rendered = render(<QuestionBank />, { wrapper: mainWrapper });
+  const ui = within(rendered.container);
+  fireEvent.click(await ui.findByRole("button", { name: "apple" }));
+  expect(await ui.findByRole("button", { name: "通过并下一题" })).toBeEnabled();
+  fireEvent.click(ui.getByRole("button", { name: "返回题库" }));
+  mocks.inspect.mockResolvedValue({
+    question,
+    target_current: true,
+    sources: question.content.options.map((o, i) => ({
+      option_id: o.option_id,
+      current: i !== 1
+    }))
+  });
+  fireEvent.click(await ui.findByRole("button", { name: "apple" }));
+  await ui.findByText("部分选项的发布来源已变化");
+  expect(ui.getByRole("button", { name: "通过并下一题" })).toBeDisabled();
+  expect(mocks.inspect).toHaveBeenCalledTimes(2);
 });

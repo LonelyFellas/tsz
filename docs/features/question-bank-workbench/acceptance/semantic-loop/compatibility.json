@@ -1,0 +1,27 @@
+{
+  "legacy_schemas_unchanged": [
+    "QuestionCandidate",
+    "QuestionSource",
+    "QuestionEntryRead",
+    "QuestionCandidatePage",
+    "AgentGenerationContext",
+    "AgentCandidateSearch",
+    "AgentEntriesRequest",
+    "CreateQuestionGeneration",
+    "QuestionGeneration",
+    "QuestionGenerationPage",
+    "BankQuestionOption",
+    "BankQuestionContent",
+    "BankQuestion",
+    "BankQuestionPage",
+    "ReviewBankQuestion",
+    "EditBankQuestion"
+  ],
+  "inspection_only_added_fields": [
+    "semantic_review",
+    "semantic_review_current"
+  ],
+  "openapi_sha256": "f6df097b9592ccd2bc81cc51a0f5e2b9525495d5fecf2f1cf69886fcc88a5f55",
+  "agent_external_contract": "unchanged",
+  "agent_checkpoint_version": "mcq_zh_en_v5; drain or cancel v4 active jobs before switching worker"
+}

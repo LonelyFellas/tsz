@@ -1,0 +1,26 @@
+{
+  "legacy_schemas_compared": [
+    "BankQuestion",
+    "BankQuestionPage",
+    "BankQuestionContent",
+    "QuestionCandidate",
+    "QuestionCandidatePage",
+    "QuestionCandidateSearchPage",
+    "QuestionGeneration",
+    "QuestionGenerationPage",
+    "QuestionBatch",
+    "QuestionBatchPage",
+    "QuestionBatchPreview",
+    "CreateQuestionGeneration",
+    "CreateQuestionBatch",
+    "EditBankQuestion",
+    "ReviewBankQuestion"
+  ],
+  "legacy_schemas_changed": [],
+  "legacy_query_parameters_changed": [],
+  "openapi_sha256": "5bb70d54aeb4c71ca29b7cd0f7cf213ca84fb4586de7b1f5239c891da0e61155",
+  "runtime_sha_matches": true,
+  "new_frontend_old_backend": "new read endpoints unavailable; explicit upgrade notice, no mock fallback",
+  "new_migration_down": "only derived candidate search data; protected question facts retained by test",
+  "old_backend_new_schema_startup": "not verified; migration-aware rollback required"
+}

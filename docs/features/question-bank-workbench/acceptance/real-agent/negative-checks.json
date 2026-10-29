@@ -1,0 +1,27 @@
+[
+  {
+    "case": "duplicate_entry_or_accepted_spelling",
+    "status": 400,
+    "code": "invalid_request_body"
+  },
+  {
+    "case": "non_current_or_fabricated_publication",
+    "status": 409,
+    "code": "learning_run_unavailable"
+  },
+  {
+    "case": "target_answer_removed",
+    "status": 400,
+    "code": "invalid_request_body"
+  },
+  {
+    "case": "semantic_ambiguity_with_valid_sources_approval",
+    "status": 200,
+    "state": "approved"
+  },
+  {
+    "case": "immediate_disable_after_negative_test",
+    "status": 200,
+    "state": "disabled"
+  }
+]

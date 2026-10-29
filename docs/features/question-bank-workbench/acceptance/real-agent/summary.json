@@ -1,0 +1,206 @@
+{
+  "native_agent_commit": "fad44e9ab166845522e1299c8bfae2bca224f5bc",
+  "model": "deepseek-flash",
+  "sample_generations": 6,
+  "total_model_requests": 12,
+  "feedback_deliveries": {
+    "created": 7,
+    "delivered": 7
+  },
+  "regeneration_feedback_examples": 1,
+  "final_states": {
+    "apple": "approved",
+    "nurse": "rejected",
+    "bitter": "rejected",
+    "finish": "disabled",
+    "wage": "rejected",
+    "nurse_after_feedback": "approved"
+  },
+  "data_origin": "51 synthetic representative entries in task-exclusive published intelligent vocabulary; not production corpus",
+  "semantic_review": "separate call using same model; not an independent provider",
+  "no_automatic_semantic_guarantee": true,
+  "model_calls": {
+    "observed_calls": 12,
+    "usage_observed_calls": 12,
+    "cache_observed_calls": 12,
+    "input_tokens": 15928,
+    "output_tokens": 2977,
+    "cache_hit_tokens": 6656,
+    "cache_miss_tokens": 9272,
+    "cache_hit_rate": 0.4178804620793571,
+    "total_duration_ms": 26185.307707055472,
+    "average_duration_ms": 2182.108975587956
+  },
+  "cost_summary": {
+    "estimated_cost_cny": "0.042626240000",
+    "total_calls": 12,
+    "priced_calls": 12,
+    "unknown_calls": 0
+  },
+  "cost_note": "System estimate at recorded pricing, not supplier bill. Run usage.cost remains null; no fabricated provider billed cost.",
+  "source_inspections": {
+    "apple": {
+      "target_current": true,
+      "sources": [
+        {
+          "option_id": "A",
+          "current": true
+        },
+        {
+          "option_id": "B",
+          "current": true
+        },
+        {
+          "option_id": "C",
+          "current": true
+        },
+        {
+          "option_id": "D",
+          "current": true
+        }
+      ]
+    },
+    "nurse": {
+      "target_current": true,
+      "sources": [
+        {
+          "option_id": "A",
+          "current": true
+        },
+        {
+          "option_id": "B",
+          "current": true
+        },
+        {
+          "option_id": "C",
+          "current": true
+        },
+        {
+          "option_id": "D",
+          "current": true
+        }
+      ]
+    },
+    "bitter": {
+      "target_current": true,
+      "sources": [
+        {
+          "option_id": "A",
+          "current": true
+        },
+        {
+          "option_id": "B",
+          "current": true
+        },
+        {
+          "option_id": "C",
+          "current": true
+        },
+        {
+          "option_id": "D",
+          "current": true
+        }
+      ]
+    },
+    "finish": {
+      "target_current": true,
+      "sources": [
+        {
+          "option_id": "A",
+          "current": true
+        },
+        {
+          "option_id": "B",
+          "current": true
+        },
+        {
+          "option_id": "C",
+          "current": true
+        },
+        {
+          "option_id": "D",
+          "current": true
+        }
+      ]
+    },
+    "wage": {
+      "target_current": true,
+      "sources": [
+        {
+          "option_id": "A",
+          "current": true
+        },
+        {
+          "option_id": "B",
+          "current": true
+        },
+        {
+          "option_id": "C",
+          "current": true
+        },
+        {
+          "option_id": "D",
+          "current": true
+        }
+      ]
+    },
+    "nurse_after_feedback": {
+      "target_current": true,
+      "sources": [
+        {
+          "option_id": "A",
+          "current": true
+        },
+        {
+          "option_id": "B",
+          "current": true
+        },
+        {
+          "option_id": "C",
+          "current": true
+        },
+        {
+          "option_id": "D",
+          "current": true
+        }
+      ]
+    }
+  },
+  "browser": {
+    "origin": "http://qbw-real-20261029.localhost:30481",
+    "proxy": "http://127.0.0.1:18481/api/v1",
+    "mocks": false,
+    "normal_2fa_login": true,
+    "otp": "local Mock sender, no SMS sent",
+    "generation_and_feedback_regeneration": true,
+    "reject_and_approve_through_UI": true,
+    "trial_answered_correctly": true,
+    "reloaded_final_states_verified": true,
+    "console_errors": 0
+  },
+  "version": {
+    "agent_commit": "fad44e9ab166845522e1299c8bfae2bca224f5bc",
+    "backend_head": "0d597e3ec2b63e6c450c12d64410f36b5c7880d3",
+    "backend_binary_sha256": "227d12de73bc01a41fa4c29e68dc286bea119ec21f88c1bfea2a1f84004a4999",
+    "backend_dirty_implementation": "existing question-bank-workbench changes from prior turn, unchanged during real Agent validation",
+    "frontend_head": "8f7736760223a29a769a0a650c2310d40240582f",
+    "frontend_dirty_implementation": "existing question-bank-workbench changes from prior turn, unchanged during validation"
+  },
+  "trial_no_learning_writes": {
+    "users": 0,
+    "learning_tasks": 0,
+    "learning_runs": 0,
+    "learning_answers": 0
+  },
+  "native_fixture_counts_before_cleanup": {
+    "users": 0,
+    "learning_tasks": 0,
+    "learning_runs": 0,
+    "learning_answers": 0,
+    "question_generations": 6,
+    "question_bank": 6,
+    "question_review_deliveries": 7,
+    "lexicon.entries": 51,
+    "lexicon.entry_publications": 51
+  }
+}

@@ -7,13 +7,22 @@ import type {
   BankQuestionState,
   QuestionReviewReason
 } from "@tsz/types";
-import { canAdminResourceAction } from "@tsz/shared/auth";
+import { canAdminResourceAction, hasAdminPermission } from "@tsz/shared/auth";
 
 export function canEditQuestion(
   profile: AdminProfile | null,
   createdBy: string
 ) {
   return canAdminResourceAction(profile, "words", "edit", createdBy);
+}
+export function canReviewQuestion(
+  profile: AdminProfile | null,
+  createdBy: string
+) {
+  return (
+    canEditQuestion(profile, createdBy) &&
+    hasAdminPermission(profile, "words.publish")
+  );
 }
 export function candidateReference(
   candidate: QuestionCandidate

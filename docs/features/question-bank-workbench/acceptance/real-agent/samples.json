@@ -1,0 +1,453 @@
+[
+  {
+    "case": "apple",
+    "generation_state": "succeeded",
+    "prompt": "苹果",
+    "target": "apple",
+    "options": [
+      {
+        "option_id": "A",
+        "spelling": "apple",
+        "published_definition": "苹果"
+      },
+      {
+        "option_id": "B",
+        "spelling": "banana",
+        "published_definition": "香蕉"
+      },
+      {
+        "option_id": "C",
+        "spelling": "orange",
+        "published_definition": "橙子"
+      },
+      {
+        "option_id": "D",
+        "spelling": "pear",
+        "published_definition": "梨"
+      }
+    ],
+    "correct_option_id": "A",
+    "proposal": {
+      "outcome": "draft",
+      "distractors": [
+        {
+          "candidate_ref": "764fbee0202b1e4af6a6e67e9dd2282b72829a18623ad3f1107c8aa62764ee84",
+          "interference_type": "semantic",
+          "why_plausible": "banana 与 apple 同属常见水果，都是 B1 级名词，语义场接近，容易在“水果”类别中混淆。",
+          "why_wrong": "banana 的释义是“香蕉”，不是题干的“苹果”，词义不同，因此不能作为正确答案。"
+        },
+        {
+          "candidate_ref": "205fc7c47d11cba53623969557a13501c78b4db24b16dac6165429fb2640d96c",
+          "interference_type": "semantic",
+          "why_plausible": "orange 也是日常水果名词，与 apple 同类，学习者常在水果词汇中互相干扰。",
+          "why_wrong": "orange 的释义是“橙子”，与“苹果”所指不同，不满足题干释义。"
+        },
+        {
+          "candidate_ref": "c6b3602c269d1bd96ad955732b85726a61d027524f5fb1d74d5c9109e2f9f9f6",
+          "interference_type": "semantic",
+          "why_plausible": "pear 同样为常见水果类 B1 名词，和 apple 属于同一语义类别，容易混淆。",
+          "why_wrong": "pear 的释义是“梨”，并非“苹果”，词义不匹配，所以是错误选项。"
+        }
+      ],
+      "needs_prompt_revision": false,
+      "suggested_prompt": null,
+      "concerns": [
+        "三个干扰项均为水果类名词，语义干扰价值较高；但都来自同一语义场，需人工确认是否可接受。",
+        "题干只有单一释义“苹果”，未发现其他并列含义需要排查。",
+        "候选池中还有其他水果词（c01 pineapple、c08 peach、c09 plum），其干扰性质与所选三项相近，人工可酌情替换。"
+      ]
+    },
+    "semantic_review": {
+      "verdict": "no_obvious_issue",
+      "issues": []
+    },
+    "usage": {
+      "model": "deepseek-flash",
+      "requests": 2,
+      "input_tokens": 2744,
+      "output_tokens": 351,
+      "cost": null
+    },
+    "final_review_state": "approved",
+    "final_revision": 2,
+    "review_comment": ""
+  },
+  {
+    "case": "nurse",
+    "generation_state": "succeeded",
+    "prompt": "护士",
+    "target": "nurse",
+    "options": [
+      {
+        "option_id": "A",
+        "spelling": "caregiver",
+        "published_definition": "护理者；照料者"
+      },
+      {
+        "option_id": "B",
+        "spelling": "nurse",
+        "published_definition": "护士"
+      },
+      {
+        "option_id": "C",
+        "spelling": "doctor",
+        "published_definition": "医生"
+      },
+      {
+        "option_id": "D",
+        "spelling": "surgeon",
+        "published_definition": "外科医生"
+      }
+    ],
+    "correct_option_id": "B",
+    "proposal": {
+      "outcome": "draft",
+      "distractors": [
+        {
+          "candidate_ref": "70e08ffb83b2d9d4b67266e57fdb0a30cd998e36d2ef4a66b3b87cbbee5b27d5",
+          "interference_type": "semantic",
+          "why_plausible": "caregiver 与 nurse 同属医疗照护语义场，都是提供护理的人，考生容易把“护理者”与“护士”混淆。",
+          "why_wrong": "caregiver 指照料者、护理者（常指家庭照护人员），不是“护士”；nurse 的界定是医院等场所从事护理的专业人员，二者职业定位不同。"
+        },
+        {
+          "candidate_ref": "37bf6e84075a35ca5bd6829e1ef3b19889ed9d5e65f826acf5800e841ae5992a",
+          "interference_type": "semantic",
+          "why_plausible": "doctor 与 nurse 常在同一医疗语境中共现，都是医院里的职业名词，语义关联强。",
+          "why_wrong": "doctor 意为“医生”，与“护士”是不同职业，不能作为 nurse 的答案。"
+        },
+        {
+          "candidate_ref": "dae426d0da23a8b9edcd65d0c40fa3b5266a570de8e4ff03a1147a61c9febf22",
+          "interference_type": "semantic",
+          "why_plausible": "surgeon 同属医疗职业名词，与护士同处医院工作场景，易被当作近义职业词干扰。",
+          "why_wrong": "surgeon 意为“外科医生”，是医生的一种，不是“护士”。"
+        }
+      ],
+      "needs_prompt_revision": false,
+      "suggested_prompt": null,
+      "concerns": [
+        "c20 midwife（助产士）与 c18 dentist（牙医）也属医疗职业，但助产士与护士职责有交叉、dentist 专业性过强，故未选入以降低出现其他合理答案的风险。",
+        "题干仅给“护士”一个义项，nurse 的其他常见义项（保姆、看护）未在词库记载，但本题按原释义判分，不影响干扰项选择。"
+      ]
+    },
+    "semantic_review": {
+      "verdict": "needs_revision",
+      "issues": [
+        "题干仅为中文词“护士”，没有任何限定语境或排除条件；虽然 nurse 是最直接的对应词，但 caregiver（护理者/照料者）在中文里也可泛指提供照护的人，与“护士”的日常语义存在部分重叠，尤其在缺少“医院/专业医疗人员”等限定的时候。",
+        "caregiver 的英文定义“护理者；照料者”与“护士”并非完全互斥；若按“提供护理的人”宽泛理解，一些语境中 caregiver 可被误认为可接受的近义表达，从而削弱唯一答案。",
+        "题目未提供词义辨析线索或例句，无法从题干本身排除 caregiver；干扰项 C、D 明确是不同职业，但 A 属于语义相邻项，干扰强度偏高且无法靠题干消除。",
+        "建议将题干改为明确语境的表达以避免歧义，例如“在医院里照顾病人、执行医嘱的专业人员”，或要求选择“最直接对应‘护士’这一职业的英文名词”，并在审核时确认 caregiver 不被接受为正确答案。"
+      ]
+    },
+    "usage": {
+      "model": "deepseek-flash",
+      "requests": 2,
+      "input_tokens": 2753,
+      "output_tokens": 602,
+      "cost": null
+    },
+    "final_review_state": "rejected",
+    "final_revision": 2,
+    "review_comment": "caregiver 与护士的照护角色边界不够清楚。本轮保守退回：保持题干“护士”，更换 caregiver，优先从医生、外科医生、牙医等不同职业选择，避免需要在解析中补充题干没有的限定。"
+  },
+  {
+    "case": "bitter",
+    "generation_state": "succeeded",
+    "prompt": "苦的；痛苦的",
+    "target": "bitter",
+    "options": [
+      {
+        "option_id": "A",
+        "spelling": "bitter",
+        "published_definition": "苦的；痛苦的"
+      },
+      {
+        "option_id": "B",
+        "spelling": "sour",
+        "published_definition": "酸的；酸败的"
+      },
+      {
+        "option_id": "C",
+        "spelling": "sad",
+        "published_definition": "悲伤的；令人难过的"
+      },
+      {
+        "option_id": "D",
+        "spelling": "severe",
+        "published_definition": "严厉的；严重的"
+      }
+    ],
+    "correct_option_id": "A",
+    "proposal": {
+      "outcome": "draft",
+      "distractors": [
+        {
+          "candidate_ref": "3219988d9913279f4759080d6e4832b7242661b8624a7c355d73b426d909967c",
+          "interference_type": "semantic",
+          "why_plausible": "sour 与 bitter 同属基本味觉词，容易在“味道”语境里被误当作同义或近义选项。",
+          "why_wrong": "sour 的释义是“酸的；酸败的”，核心是酸味，不能表示“苦的”；其引申义也与“痛苦的”不吻合，因此不是正确答案。"
+        },
+        {
+          "candidate_ref": "68685c596cf9f232ca147bd361d96d401e0deea8963953025483cd0ead739d59",
+          "interference_type": "semantic",
+          "why_plausible": "sad 可表示“悲伤的；令人难过的”，与 bitter 的第二义“痛苦的”在情绪语义上接近，容易干扰。",
+          "why_wrong": "sad 只覆盖情绪上的难过，不包含“苦的”这一味觉义，不能对应题干两个并列含义，故错误。"
+        },
+        {
+          "candidate_ref": "db7f3d971a0a6a7a5ad3fb711bb5027bc94d8e9451cb65012827c6ca4f1ce49c",
+          "interference_type": "semantic",
+          "why_plausible": "severe 有“严厉的；严重的”之义，与 bitter 的“痛苦的”在“严重、难熬”的引申方向上可能被联想。",
+          "why_wrong": "severe 表示严厉或严重，并不表示味觉上的“苦的”，也不能直接等同于“痛苦的”，缺少题干核心的味觉义，故错误。"
+        }
+      ],
+      "needs_prompt_revision": false,
+      "suggested_prompt": null,
+      "concerns": [
+        "bitter 的“痛苦的”与多个情绪/程度形容词有语义邻近，但所选项均不能同时覆盖“苦的；痛苦的”两个并列义项。",
+        "c03 sharp 也有“剧烈的”义，与“痛苦的”有一定邻近，但缺少“苦的”味觉义，未选作干扰项。"
+      ]
+    },
+    "semantic_review": {
+      "verdict": "no_obvious_issue",
+      "issues": []
+    },
+    "usage": {
+      "model": "deepseek-flash",
+      "requests": 2,
+      "input_tokens": 2263,
+      "output_tokens": 398,
+      "cost": null
+    },
+    "final_review_state": "rejected",
+    "final_revision": 2,
+    "review_comment": "需要保守复核宽泛并列释义。severe 与“苦的”关联弱；sad 与“痛苦的”有情绪边界风险，不能仅用“没有同时覆盖两项中文”认定一定错误。请重新选项或先明确题意。"
+  },
+  {
+    "case": "finish",
+    "generation_state": "succeeded",
+    "prompt": "结束；完成",
+    "target": "finish",
+    "options": [
+      {
+        "option_id": "A",
+        "spelling": "end",
+        "published_definition": "结束；终止"
+      },
+      {
+        "option_id": "B",
+        "spelling": "finish",
+        "published_definition": "结束；完成"
+      },
+      {
+        "option_id": "C",
+        "spelling": "complete",
+        "published_definition": "完成；使完整"
+      },
+      {
+        "option_id": "D",
+        "spelling": "close",
+        "published_definition": "关闭；结束"
+      }
+    ],
+    "correct_option_id": "B",
+    "proposal": {
+      "outcome": "draft",
+      "distractors": [
+        {
+          "candidate_ref": "80252a5424f77d8058c8d66ec27ec5bba0a7eb52cce8136d5de3a031a1236e3f",
+          "interference_type": "semantic",
+          "why_plausible": "end 作为动词可表示“结束”，与题干“结束”这一义项高度接近，容易让学习者误以为它就是目标词。",
+          "why_wrong": "end 侧重“终止、到头”，不含题干中的“完成”义；finish 强调把事情做完或结束，两个义项都要兼顾，因此 end 不能作为本题的正确答案。"
+        },
+        {
+          "candidate_ref": "537b58ad114eabb7f53a5a00edf2964681c821d2476cecffd376ea4d36ed7f7b",
+          "interference_type": "semantic",
+          "why_plausible": "complete 表示“完成；使完整”，与题干“完成”这一义项对应，语义上较接近。",
+          "why_wrong": "complete 侧重“使完整、使齐全”，并不直接等同于“结束”；题干同时要求“结束”和“完成”两个义项，complete 不能完整覆盖，因此不是正确答案。"
+        },
+        {
+          "candidate_ref": "08a811aeedb074a7d762a3a2a29b4116e006d06cb31b35305dbffebcd6249691",
+          "interference_type": "semantic",
+          "why_plausible": "close 的释义中包含“结束”，与题干的“结束”义项重叠，容易让人误选。",
+          "why_wrong": "close 表示“结束”时多指活动、会议等收尾，也可表示“关闭”，但它不含“完成”义，无法对应题干的两个并列含义，所以不能作为正确答案。"
+        }
+      ],
+      "needs_prompt_revision": false,
+      "suggested_prompt": null,
+      "concerns": [
+        "c04 close、c02 end 与题干“结束”义项重叠，属于语义近似干扰，人工审核时需确认题库是否允许这样接近的干扰项。",
+        "c03 accomplish、c05 complete 均含“完成”义但与 finish 的“结束”义不完全重合，审核时请确认干扰强度是否合适。"
+      ]
+    },
+    "semantic_review": {
+      "verdict": "needs_revision",
+      "issues": [
+        "题干中文“结束；完成”同时兼容选项A(end, 结束/终止)、C(complete, 完成)和D(close, 结束)，无法证明唯一答案为finish。",
+        "选项A“end”的定义“结束；终止”与题干“结束”几乎完全对应，构成强干扰甚至可视为正确。",
+        "选项C“complete”的定义明确包含“完成”，与题干“完成”直接对应。",
+        "选项D“close”的定义包含“结束”，与题干“结束”直接对应。",
+        "题干缺少能区分finish与其他近义动词的语境或搭配信息，唯一性依赖词库标注而非语义。"
+      ]
+    },
+    "usage": {
+      "model": "deepseek-flash",
+      "requests": 2,
+      "input_tokens": 2337,
+      "output_tokens": 538,
+      "cost": null
+    },
+    "final_review_state": "disabled",
+    "final_revision": 3,
+    "review_comment": "负向验收结束：finish/end/complete/close 均可匹配原题干，禁止用于学习。"
+  },
+  {
+    "case": "wage",
+    "generation_state": "succeeded",
+    "prompt": "工资；工钱",
+    "target": "wage",
+    "options": [
+      {
+        "option_id": "A",
+        "spelling": "pay",
+        "published_definition": "工资；薪酬"
+      },
+      {
+        "option_id": "B",
+        "spelling": "salary",
+        "published_definition": "薪水；薪金"
+      },
+      {
+        "option_id": "C",
+        "spelling": "wage",
+        "published_definition": "工资；工钱"
+      },
+      {
+        "option_id": "D",
+        "spelling": "income",
+        "published_definition": "收入；收益"
+      }
+    ],
+    "correct_option_id": "C",
+    "proposal": {
+      "outcome": "draft",
+      "distractors": [
+        {
+          "candidate_ref": "7f4c9ddcfb5bed4a92b351285c98a03dd500b3f71c9702448eaafb6c1483acce",
+          "interference_type": "semantic",
+          "why_plausible": "pay 作名词表示“工资；薪酬”，与 wage“工资；工钱”语义非常接近，容易让考生误以为同义。",
+          "why_wrong": "pay 强调“报酬/薪酬”这一泛称，尤其指劳动所得的钱款总额，而题干 wage 特指按小时、日或周计算的“工资；工钱”，两者虽是近义但题意要求 wage 的精确对应，pay 会在释义上形成另一个可接受答案，故不宜作干扰项。"
+        },
+        {
+          "candidate_ref": "88f7dbaf81bacf0804c98a428cdb1790a4a4179877a263391cabd497d0ed74d0",
+          "interference_type": "semantic",
+          "why_plausible": "salary 也译“薪水；薪金”，与 wage 同属收入类名词，考生看到“工资”很容易联想到 salary。",
+          "why_wrong": "salary 通常指按月发放的固定薪金，多用于白领或固定职位，而 wage 指按小时、日或周结算的工资、工钱，两者在支付周期和适用对象上有明确区别；若选 salary 会偏离题干对“工钱”的限定。"
+        },
+        {
+          "candidate_ref": "1f3e4b08cb9a9219c605291e030ee833a1379c25920aebd68311dde9af4e21ed",
+          "interference_type": "semantic",
+          "why_plausible": "income 表示“收入；收益”，与 wage 同属报酬/收入语义场，作为同义联想项有一定迷惑性。",
+          "why_wrong": "income 是广义的“收入”，可包括工资以外的投资收益等，并不专指劳动所得的工资或工钱，与 wage 的“工资；工钱”不完全对应，容易造成语义泛化。"
+        }
+      ],
+      "needs_prompt_revision": false,
+      "suggested_prompt": null,
+      "concerns": [
+        "c01 pay（工资；薪酬）与 c20 salary（薪水；薪金）也与题干 wage 语义高度接近，严格说都可能被考生视为另一正确答案；建议人工复核是否保留这两个近义干扰项。",
+        "题干 target 含并列中文“工资；工钱”，需确保选项只对应 wage，而 pay/salary/income 在部分语境下也可译作“工资/收入”，干扰强度较高。"
+      ]
+    },
+    "semantic_review": {
+      "verdict": "needs_revision",
+      "issues": [
+        "题干仅给出“工资；工钱”这一释义，未给出任何限定条件（如按小时/周支付、体力劳动、可数性等），因此无法证明只有 wage 唯一正确。",
+        "pay 作为名词本身就可表示“工资；薪酬”，与题干“工资”高度同义，B1 学习者很可能选 A，唯一性不成立。",
+        "salary 的释义“薪水；薪金”在中文里与“工资”常可互换，题干未排除固定月薪语境，因此 B 也具有可辩护性。",
+        "wage 在词典中常标注为“工资（通常指按小时或周计算的报酬）”，但题干未提供这一区分性语境，干扰项与答案的语义边界无法仅凭题干判定。",
+        "income 表示“收入；收益”，与“工资”有区别，但作为较宽泛的上位词在部分语境中也可涵盖工资，题干未给出排除条件。",
+        "选项均为 B1 级名词且同属薪酬语义场，干扰强度高但缺乏区分性语境，属于典型的多义近义项重叠题。"
+      ]
+    },
+    "usage": {
+      "model": "deepseek-flash",
+      "requests": 2,
+      "input_tokens": 2755,
+      "output_tokens": 713,
+      "cost": null
+    },
+    "final_review_state": "rejected",
+    "final_revision": 2,
+    "review_comment": "原题干“工资；工钱”没有支付周期限制，pay 与 salary 都是可辩护答案。解析不能偷偷补入按小时、日或周结算等条件来把近义词判错。请替换近义正确项，无法找到三个合适选项时报告候选不足。"
+  },
+  {
+    "case": "nurse_after_feedback",
+    "generation_state": "succeeded",
+    "prompt": "护士",
+    "target": "nurse",
+    "options": [
+      {
+        "option_id": "A",
+        "spelling": "doctor",
+        "published_definition": "医生"
+      },
+      {
+        "option_id": "B",
+        "spelling": "surgeon",
+        "published_definition": "外科医生"
+      },
+      {
+        "option_id": "C",
+        "spelling": "nurse",
+        "published_definition": "护士"
+      },
+      {
+        "option_id": "D",
+        "spelling": "dentist",
+        "published_definition": "牙医"
+      }
+    ],
+    "correct_option_id": "C",
+    "proposal": {
+      "outcome": "draft",
+      "distractors": [
+        {
+          "candidate_ref": "37bf6e84075a35ca5bd6829e1ef3b19889ed9d5e65f826acf5800e841ae5992a",
+          "interference_type": "semantic",
+          "why_plausible": "医生和护士同属医疗照护职业，通常在同一场景中出现，学习者容易把“护士”与“医生”的职业词汇混淆。",
+          "why_wrong": "doctor 的释义是“医生”，指看病诊断的医生，不是“护士”；与题干“护士”所指职业不同，不能作为正确答案。"
+        },
+        {
+          "candidate_ref": "dae426d0da23a8b9edcd65d0c40fa3b5266a570de8e4ff03a1147a61c9febf22",
+          "interference_type": "semantic",
+          "why_plausible": "外科医生也是医院中的医疗职业，与护士同属医疗场景，容易因话题联想而被误选。",
+          "why_wrong": "surgeon 的释义是“外科医生”，强调做手术的医生，不是“护士”；职业身份不同，因此错误。"
+        },
+        {
+          "candidate_ref": "2c0b09944ab21f3c735f79fe54944b267e8b2fa47fde5b2124b3754af439579f",
+          "interference_type": "semantic",
+          "why_plausible": "牙医同属医疗健康行业的职业名称，与护士在“医护人员”这一宽泛类别下容易被混淆。",
+          "why_wrong": "dentist 的释义是“牙医”，专指牙科医生，不是“护士”；与题干职业不同，故错误。"
+        }
+      ],
+      "needs_prompt_revision": false,
+      "suggested_prompt": null,
+      "concerns": [
+        "已按 reviewed_examples 的退回意见避开 caregiver，改用医生、外科医生、牙医等不同医疗职业作为干扰项，避免与“护士”的照护角色边界不清。",
+        "三个干扰项均为同一语义场的医疗职业名词，与题干词性、等级、口音设置一致，且词库释义均无“护士”义项，不构成第二正确答案。"
+      ]
+    },
+    "semantic_review": {
+      "verdict": "no_obvious_issue",
+      "issues": []
+    },
+    "usage": {
+      "model": "deepseek-flash",
+      "requests": 2,
+      "input_tokens": 3076,
+      "output_tokens": 375,
+      "cost": null
+    },
+    "final_review_state": "approved",
+    "final_revision": 2,
+    "review_comment": ""
+  }
+]

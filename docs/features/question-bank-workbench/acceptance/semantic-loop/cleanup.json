@@ -1,0 +1,23 @@
+{
+  "run_id": "qbw-loop-20261029-178b2886",
+  "normal_logout_completed": true,
+  "browser_storage_zero": {
+    "local_storage": 0,
+    "session_storage": 0,
+    "cache_storage": 0,
+    "indexed_databases": 0,
+    "service_workers": 0
+  },
+  "browser_tab_closed_and_viewport_reset": true,
+  "owned_containers_removed": 2,
+  "owned_volume_removed": true,
+  "all_fixture_admins_sessions_publications_questions_feedback_model_ledgers_and_sqlx_test_databases_removed_with_exclusive_volume": true,
+  "owned_servers_and_worker_stopped": true,
+  "owned_ports_no_listeners": [55483, 56483, 18483, 18484, 30483],
+  "unrelated_running_containers_preserved": true,
+  "existing_provider_configuration_preserved": true,
+  "temporary_public_page_removed": true,
+  "private_runtime_removed": true,
+  "oss_objects_created": 0,
+  "independent_recheck": "passed: owned containers, volume, ports, baseline process, private runtime and temporary public page absent"
+}

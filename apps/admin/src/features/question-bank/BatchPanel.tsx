@@ -33,11 +33,13 @@ const batchLabels = {
 export function BatchPanel({
   profile,
   showQuestion,
+  showQuestions,
   active
 }: {
   profile: AdminProfile;
   active: boolean;
   showQuestion: (id: string) => void;
+  showQuestions?: (items: QuestionGeneration[]) => void;
 }) {
   const { modal } = App.useApp();
   const client = useQueryClient();
@@ -326,7 +328,26 @@ export function BatchPanel({
         )}
       </Card>
       {selected && (
-        <Card title="批次详情">
+        <Card
+          title="批次详情"
+          extra={
+            showQuestions && (
+              <Button
+                disabled={
+                  items.isFetching ||
+                  !items.data?.items.some((item) => item.question_id)
+                }
+                onClick={() =>
+                  showQuestions(
+                    items.data?.items.filter((item) => item.question_id) ?? []
+                  )
+                }
+              >
+                审核本页生成结果
+              </Button>
+            )
+          }
+        >
           {detail.isError ? (
             <Alert type="error" title={detail.error.message} />
           ) : (

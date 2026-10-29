@@ -241,3 +241,148 @@ it("batch endpoints preserve selections, preview identity, paginated tasks and l
     undefined
   );
 });
+
+it("workbench reads use separate strict schemas and candidate search preserves published-source filters", async () => {
+  const content = {
+    target: candidate,
+    prompt: "苹果",
+    question_level: "B1",
+    answer_profile: "BrE",
+    options: ["A", "B", "C", "D"].map((option_id) => ({
+      option_id,
+      candidate,
+      explanation: "核查理由"
+    })),
+    correct_option_id: "A",
+    explanation: "答后解析",
+    concerns: []
+  };
+  const question = {
+    id,
+    generation_id: id,
+    revision: 2,
+    state: "draft",
+    content,
+    original_content: content,
+    created_by: id,
+    reviewed_by: null,
+    review_comment: "",
+    created_at: "2026-10-29T00:00:00Z",
+    updated_at: "2026-10-29T00:00:00Z"
+  };
+  const page = {
+    items: [
+      {
+        id,
+        revision: 2,
+        state: "draft",
+        created_by: id,
+        spelling: "apple",
+        part_of_speech: "n.",
+        definition: "苹果",
+        prompt: "苹果",
+        question_level: "B1",
+        answer_profile: "BrE",
+        options: [{ option_id: "A", spelling: "apple" }],
+        correct_option_id: "A",
+        source_current: false,
+        has_concerns: false,
+        updated_at: "2026-10-29T00:00:00Z"
+      }
+    ],
+    pagination: { page: 5, page_size: 20, total: 90, total_pages: 5 },
+    counts: { draft: 88, approved: 2, rejected: 0, disabled: 0 }
+  };
+  const inspection = {
+    question,
+    target_current: true,
+    semantic_review: {
+      verdict: "needs_revision",
+      issues: ["其他选项也能匹配题干"]
+    },
+    semantic_review_current: true,
+    sources: [{ option_id: "A", current: true }]
+  };
+  const http = {
+    get: vi.fn().mockResolvedValueOnce(page).mockResolvedValueOnce(inspection),
+    post: vi.fn().mockResolvedValue({
+      items: [candidate],
+      pagination: { page: 1, page_size: 10, total: 1, total_pages: 1 }
+    })
+  } as unknown as HttpClient;
+  const api = createQuestionBankEndpoints(http);
+  const signal = new AbortController().signal;
+  expect(
+    await api.workbench(
+      {
+        query: "银行 bank",
+        state: "draft",
+        question_level: "B1",
+        answer_profile: "BrE",
+        page: 5,
+        page_size: 20
+      },
+      { signal }
+    )
+  ).toEqual(page);
+  expect(http.get).toHaveBeenNthCalledWith(
+    1,
+    "/question-bank/questions/workbench?query=%E9%93%B6%E8%A1%8C+bank&state=draft&question_level=B1&answer_profile=BrE&page=5&page_size=20",
+    { signal }
+  );
+  expect(await api.inspect(id, { signal })).toEqual(inspection);
+  expect(http.get).toHaveBeenNthCalledWith(
+    2,
+    `/question-bank/questions/${id}/inspection`,
+    { signal }
+  );
+  expect(
+    validateRuntimeSchema("QuestionWorkbenchPage", {
+      ...page,
+      original_content: content
+    }).valid
+  ).toBe(false);
+  expect(
+    validateRuntimeSchema("QuestionInspection", {
+      ...inspection,
+      target_current: null
+    }).valid
+  ).toBe(false);
+  expect(validateRuntimeSchema("QuestionInspection", inspection).valid).toBe(
+    true
+  );
+  expect(
+    validateRuntimeSchema("QuestionInspection", {
+      ...inspection,
+      semantic_review: null,
+      semantic_review_current: false
+    }).valid
+  ).toBe(true);
+  expect(
+    validateRuntimeSchema("QuestionInspection", {
+      ...inspection,
+      semantic_review: { verdict: "guaranteed_unique", issues: [] }
+    }).valid
+  ).toBe(false);
+  const search = {
+    question_level: "B1",
+    answer_profile: "BrE",
+    page: 1,
+    page_size: 10,
+    part_of_speech: "n.",
+    exclude_entry_ids: [id],
+    exclude_spellings: ["colour", "color"],
+    excluded_definition: "颜色",
+    target_spelling: "colour",
+    editable_only: false
+  };
+  await api.searchCandidates(search, { signal });
+  expect(http.post).toHaveBeenCalledExactlyOnceWith(
+    "/question-bank/candidate-search",
+    search,
+    { signal }
+  );
+  expect(snapshot.paths["/admin/question-bank/questions/workbench"]).toEqual([
+    "get"
+  ]);
+});

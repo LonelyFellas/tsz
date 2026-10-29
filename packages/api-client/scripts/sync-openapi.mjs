@@ -34,6 +34,7 @@ const QUERY_CONTRACT_OPERATIONS = new Set([
   "get /admin/question-bank/candidates",
   "get /admin/question-bank/generations",
   "get /admin/question-bank/questions",
+  "get /admin/question-bank/questions/workbench",
   "get /me/wordlist-tips",
   "get /wordlists",
   "get /wordlists/catalog",
@@ -81,6 +82,8 @@ const RUNTIME_SCHEMA_ROOTS = [
   "OpenCodeLoginStatus",
   "BankQuestion",
   "BankQuestionPage",
+  "QuestionWorkbenchPage",
+  "QuestionInspection",
 
   "MemoryOverview",
   "MemoryPage",

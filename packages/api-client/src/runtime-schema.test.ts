@@ -55,6 +55,8 @@ const ROOTS = [
   "OpenCodeLoginStatus",
   "BankQuestion",
   "BankQuestionPage",
+  "QuestionWorkbenchPage",
+  "QuestionInspection",
 
   "MemoryOverview",
   "MemoryPage",

@@ -1,0 +1,73 @@
+{
+  "frontend": {
+    "admin_related_tests": {
+      "files": 3,
+      "passed": 47
+    },
+    "api_client_tests": {
+      "files": 33,
+      "passed": 650
+    },
+    "typecheck": {
+      "successful_tasks": 7,
+      "total_tasks": 7
+    },
+    "affected_eslint": "passed",
+    "admin_production_build": "passed",
+    "format": "passed"
+  },
+  "backend": {
+    "expanded_integration_tests": {
+      "passed": 219,
+      "suites": {
+        "lexicon_handler": 176,
+        "lexicon_v3_lifecycle": 12,
+        "lexicon_v3_storage_schema": 13,
+        "question_bank_handler": 18
+      }
+    },
+    "after_final_fk_index": {
+      "passed": 31,
+      "suites": {
+        "question_bank_handler": 18,
+        "lexicon_v3_lifecycle": 12,
+        "hard_deleted": 1
+      }
+    },
+    "clippy_all_targets_all_features_deny_warnings": "passed",
+    "cargo_fmt": "passed"
+  },
+  "real_acceptance": {
+    "native_admin_api_postgresql_redis": true,
+    "agent": "explicit local substitute; real model quality unverified",
+    "mock_admin_api": false,
+    "desktop_viewports": [
+      [1600, 1000],
+      [1280, 800]
+    ],
+    "mobile_viewport": [390, 844],
+    "browser_console_errors": 0,
+    "flows": [
+      "2FA login",
+      "server-paginated selection and fixed review queue",
+      "replace distractor and require new rationale",
+      "save and independently reload",
+      "student trial without learning submission",
+      "approve and advance",
+      "real generation worker import with explicit agent substitute",
+      "published source invalidation blocks approval",
+      "rebind current published distractor and save",
+      "shared_v1 published-source inspection"
+    ]
+  },
+  "not_performed": [
+    "commit",
+    "push",
+    "pull request",
+    "merge",
+    "deployment",
+    "real model quality validation",
+    "C-client end-to-end rerun"
+  ],
+  "full_admin_test_run": "Earlier accidental full run: 156 files passed and old question-bank tests failed; those tests were migrated and related final tests passed. No claim that the full run passed."
+}
