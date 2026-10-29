@@ -54,7 +54,7 @@ function providers(route: string) {
     );
     return (
       <QueryClientProvider client={client}>
-        <ConfigProvider>
+        <ConfigProvider theme={{ token: { motion: false } }}>
           <App>
             <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
           </App>
@@ -431,9 +431,20 @@ it("workbench search and pagination send complete filters to the backend", async
     counts: { draft: 81, approved: 0, rejected: 0, disabled: 0 },
     pagination: { page: 1, page_size: 20, total: 81, total_pages: 5 }
   });
-  render(<QuestionBank />, { wrapper: mainWrapper });
-  await screen.findByRole("button", { name: "apple" });
-  const search = screen.getByRole("searchbox", { name: "搜索单词或题干" });
+  const rendered = render(<QuestionBank />, { wrapper: mainWrapper });
+  await waitFor(() =>
+    expect(
+      rendered.container.querySelector(`tr[data-row-key="${question.id}"]`)
+    ).not.toBeNull()
+  );
+  expect(
+    within(
+      rendered.container.querySelector(
+        `tr[data-row-key="${question.id}"]`
+      ) as HTMLElement
+    ).getByRole("button", { name: "apple" })
+  ).toBeVisible();
+  const search = screen.getByLabelText("搜索单词或题干");
   fireEvent.change(search, { target: { value: "苹果" } });
   fireEvent.keyDown(search, { key: "Enter", code: "Enter", keyCode: 13 });
   await waitFor(() =>
@@ -478,17 +489,19 @@ it("a fixed review queue advances without offset skips and returns to the retain
     pagination: { page: 1, page_size: 20, total: 2, total_pages: 1 }
   });
   render(<QuestionBank />, { wrapper: mainWrapper });
-  fireEvent.click(await screen.findByRole("button", { name: "审核本页 2 道" }));
+  fireEvent.click(
+    (await screen.findByText("审核本页 2 道")).closest("button")!
+  );
   await screen.findByRole("heading", { name: "苹果" });
   mocks.review.mockResolvedValueOnce({
     ...question,
     state: "approved",
     revision: 4
   });
-  fireEvent.click(screen.getByRole("button", { name: "通过并下一题" }));
+  fireEvent.click(screen.getByText("通过并下一题").closest("button")!);
   expect(await screen.findByRole("heading", { name: "梨" })).toBeVisible();
   expect(screen.getByText("本次 2 道 · 已处理 1 道")).toBeVisible();
-  fireEvent.click(screen.getByRole("button", { name: "返回题库" }));
+  fireEvent.click(screen.getByText("返回题库").closest("button")!);
   await screen.findByRole("button", { name: "apple" });
   expect(mocks.workbench).toHaveBeenLastCalledWith(
     expect.objectContaining({ page: 1, page_size: 20 }),
@@ -498,18 +511,24 @@ it("a fixed review queue advances without offset skips and returns to the retain
 it("closing the generation drawer retains an uncertain single request", async () => {
   mocks.generate.mockRejectedValue(new Error("生成结果未确认"));
   render(<QuestionBank />, { wrapper: mainWrapper });
-  fireEvent.click(screen.getByRole("button", { name: "生成题目" }));
-  const row = await screen.findByRole("row", { name: /apple.*apple 的释义/ });
+  const open = screen.getByText("生成题目").closest("button")!;
+  fireEvent.click(open);
+  const row = (await screen.findByText("apple 的释义")).closest("tr")!;
   fireEvent.click(within(row).getByRole("radio"));
-  fireEvent.click(screen.getByRole("button", { name: "生成四选一草稿" }));
+  fireEvent.click(screen.getByText("生成四选一草稿").closest("button")!);
   fireEvent.click(await screen.findByRole("button", { name: "确认生成" }));
   await screen.findByText("生成结果未确认");
   const original = mocks.generate.mock.calls[0]![0];
   expect(screen.getByText("命题与生成任务")).toBeVisible();
-  fireEvent.click(screen.getByRole("button", { name: "Close" }));
-  fireEvent.click(screen.getByRole("button", { name: "生成题目" }));
+  const header = screen
+    .getByText("命题与生成任务")
+    .closest(".ant-drawer-header")!;
   fireEvent.click(
-    await screen.findByRole("button", { name: "重试原生成请求" })
+    within(header as HTMLElement).getByRole("button", { name: "Close" })
+  );
+  fireEvent.click(open);
+  fireEvent.click(
+    (await screen.findByText("重试原生成请求")).closest("button")!
   );
   await waitFor(() => expect(mocks.generate).toHaveBeenCalledTimes(2));
   expect(mocks.generate.mock.calls[1]![0]).toEqual(original);

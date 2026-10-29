@@ -1433,21 +1433,25 @@ describe("SmartDictionary", () => {
     expect(batchButton).not.toBeDisabled();
     expect(screen.queryByText("发布所选")).not.toBeInTheDocument();
     fireEvent.click(container.querySelector("tbody input[type='checkbox']")!);
-    fireEvent.click(screen.getByRole("button", { name: "批量审听与发布(2)" }));
-    expect(screen.getByTestId("batch-audio-review")).toHaveTextContent(
-      "word-1:1word-2:1"
+    const batchReview = screen
+      .getByText("批量审听与发布(2)")
+      .closest("button")!;
+    fireEvent.click(batchReview);
+    const reviewDialog = screen.getByTestId("batch-audio-review");
+    expect(reviewDialog).toHaveTextContent("word-1:1word-2:1");
+    fireEvent.click(
+      within(reviewDialog).getByRole("button", { name: "关闭批次审听" })
     );
-    fireEvent.click(screen.getByRole("button", { name: "关闭批次审听" }));
     expect(screen.queryByTestId("batch-audio-review")).toBeNull();
-    expect(
-      screen.getByRole("button", { name: "批量审听与发布(2)" })
-    ).toBeEnabled();
-    fireEvent.click(screen.getByRole("button", { name: "批量审听与发布(2)" }));
-    fireEvent.click(screen.getByRole("button", { name: "完成批次发布" }));
+    expect(batchReview).toBeEnabled();
+    fireEvent.click(batchReview);
+    fireEvent.click(
+      within(screen.getByTestId("batch-audio-review")).getByRole("button", {
+        name: "完成批次发布"
+      })
+    );
     expect(screen.queryByTestId("batch-audio-review")).toBeNull();
-    expect(
-      screen.getByRole("button", { name: "批量审听与发布" })
-    ).toBeDisabled();
+    expect(batchReview).toBeDisabled();
   });
 
   it("混选无发布权限的归属词条时禁止打开批次审听", () => {
