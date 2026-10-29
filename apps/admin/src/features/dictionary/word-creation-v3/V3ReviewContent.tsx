@@ -77,6 +77,7 @@ function ReviewPronunciationPlayback({
   return (
     <PronunciationPreviewControls
       playbackOnly
+      assetOnly
       pronunciationId={pronunciation.id}
       dialect={dialect}
       ariaLabelPrefix={`${spelling} ${pronunciation.synthesis?.uk || pronunciation.synthesis?.us ? `${dialect === "uk" ? "英式" : "美式"} ` : ""}最终读音`}

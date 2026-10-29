@@ -75,6 +75,7 @@ export function V3LinkedEnglishTextField({
             leadingAction={
               <PronunciationPreviewControls
                 playbackOnly
+                assetOnly={readOnly}
                 pronunciationId={row.variant_id}
                 dialect={row.dialect}
                 ariaLabelPrefix={`${label} ${dialectLabel(row.dialect)}${suffix}`}

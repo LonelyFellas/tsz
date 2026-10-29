@@ -48,6 +48,7 @@ export function V3GrammarVoiceTextField({
       leadingAction={
         <PronunciationPreviewControls
           playbackOnly
+          assetOnly={props.readOnly}
           pronunciationId={props.nodeId}
           dialect={props.dialect ?? "common"}
           ariaLabelPrefix={props.ariaLabel}

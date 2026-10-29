@@ -8,6 +8,7 @@ import {
   focusManager
 } from "@tanstack/react-query";
 import { HttpError } from "@tsz/api-client";
+import { confirmedPublicationAudioFixture } from "@/features/dictionary/PublicationAudioReviewPanel.test-helper";
 import {
   fireEvent,
   render,
@@ -1841,6 +1842,7 @@ describe("WordWizardV3Page", () => {
   });
 
   it("publishes an eligible draft and immediately transitions the live page to read-only", async () => {
+    confirmedPublicationAudioFixture();
     const current = word({
       completed_steps: ["basics", "forms", "meanings"],
       max_reachable_step: "preview",
@@ -2299,6 +2301,7 @@ describe("WordWizardV3Page", () => {
   });
 
   it("refreshes after an activation conflict, clears preview confirmation state, and uses the latest base revisions", async () => {
+    confirmedPublicationAudioFixture();
     const current = word({
       status: "draft",
       completed_steps: ["basics", "forms", "meanings"],

@@ -54,13 +54,18 @@ function PronunciationCell({
       ? form.regional_variants.common
       : form.regional_variants[dialect];
   const locale = dialect === "uk" ? "en-GB" : "en-US";
-  const { content, profile, assetId } = pronunciationPlaybackSource(
+  const {
+    content,
+    profile: activeProfile,
+    assetId
+  } = pronunciationPlaybackSource(
     variant.spelling,
     row,
     variant.spelling_speech,
     locale,
     variant.dialect
   );
+  const profile = activeProfile ?? row.voice_profile;
   const actualPron = row.actual_pron_rich ?? {
     version: 2 as const,
     text: row.actual_pron,
@@ -92,7 +97,7 @@ function PronunciationCell({
               voiceProfile={profile}
               spelling={variant.spelling}
               audioAssetId={assetId}
-              disabled={!assetId}
+              disabled={!content && !assetId}
               disabledReason={
                 content || !row.synthesis
                   ? "尚未保存正式音频，请返回编辑补齐"

@@ -140,6 +140,7 @@ function PreviewHarness({
   content,
   voiceProfile,
   playbackOnly,
+  assetOnly,
   audioAssetId,
   dialect = "common",
   readOnly = false
@@ -148,6 +149,7 @@ function PreviewHarness({
   content?: RichTextV2;
   voiceProfile?: VoiceProfileV3;
   playbackOnly?: boolean;
+  assetOnly?: boolean;
   audioAssetId?: string;
   dialect?: Dialect;
   readOnly?: boolean;
@@ -160,6 +162,7 @@ function PreviewHarness({
         content={content}
         voiceProfile={voiceProfile}
         playbackOnly={playbackOnly}
+        assetOnly={assetOnly}
         audioAssetId={audioAssetId}
         dialect={dialect}
         disabled={readOnly}
@@ -733,7 +736,7 @@ it("最终读音只读取正式资产，读取失败也不回退合成", async (
   expect(preview.synthesize).not.toHaveBeenCalled();
 });
 it("最终读音缺正式资产时保持禁用而不新合成", async () => {
-  render(<PreviewHarness playbackOnly />);
+  render(<PreviewHarness playbackOnly assetOnly />);
   await waitFor(() => expect(preview.listVoices).toHaveBeenCalled());
   expect(screen.getByLabelText("播放语音")).toBeDisabled();
   expect(preview.synthesize).not.toHaveBeenCalled();
@@ -792,14 +795,18 @@ it("切换通用栏口音时停止旧音频并丢弃缓存，下一次只请求�
       }
     ]
   };
-  const view = render(<PreviewHarness playbackOnly voiceProfile={profile} />);
+  const view = render(
+    <PreviewHarness playbackOnly assetOnly voiceProfile={profile} />
+  );
   const play = screen.getByLabelText("播放语音");
   await waitFor(() => expect(play).toBeEnabled());
   fireEvent.click(play);
   await waitFor(() => expect(AudioMock.instances[0]?.play).toHaveBeenCalled());
   const oldAudio = AudioMock.instances[0]!;
   dialectPreference.value = "us";
-  view.rerender(<PreviewHarness playbackOnly voiceProfile={profile} />);
+  view.rerender(
+    <PreviewHarness playbackOnly assetOnly voiceProfile={profile} />
+  );
   await waitFor(() => expect(oldAudio.pause).toHaveBeenCalled());
   expect(dispose).toHaveBeenCalled();
   fireEvent.click(play);
@@ -891,6 +898,7 @@ it("saved profile audio remains playable without a live voice catalog or synthes
   render(
     <PreviewHarness
       playbackOnly
+      assetOnly
       voiceProfile={{
         voices: [
           {
@@ -919,6 +927,7 @@ it("late catalog arrival does not interrupt an immutable saved-asset playback", 
   render(
     <PreviewHarness
       playbackOnly
+      assetOnly
       voiceProfile={{
         voices: [
           {
@@ -939,4 +948,12 @@ it("late catalog arrival does not interrupt an immutable saved-asset playback", 
   expect(audio.pause).not.toHaveBeenCalled();
   expect(preview.resolveAudio).toHaveBeenCalledOnce();
   expect(preview.synthesize).not.toHaveBeenCalled();
+});
+
+it("compact editable preview may synthesize while asset-only reading never does", async () => {
+  render(<PreviewHarness playbackOnly />);
+  const button = screen.getByLabelText("播放语音");
+  await waitFor(() => expect(button).toBeEnabled());
+  fireEvent.click(button);
+  await waitFor(() => expect(preview.synthesize).toHaveBeenCalledOnce());
 });

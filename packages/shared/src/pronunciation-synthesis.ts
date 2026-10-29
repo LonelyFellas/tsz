@@ -835,7 +835,7 @@ export function pronunciationPlaybackSource(
       ?.id;
   return {
     content,
-    profile: profile ? { voices: profile.voices } : undefined,
+    profile,
     assetId
   };
 }

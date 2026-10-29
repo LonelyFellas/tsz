@@ -38,6 +38,7 @@ interface PreviewContextValue {
   claimPlayback: (stop: () => void) => void;
   releasePlayback: (stop: () => void) => void;
   enabled: boolean;
+  readOnly: boolean;
   voices: VoiceOption[];
   voicesLoading: boolean;
   voicesError: string;
@@ -104,6 +105,7 @@ export function PronunciationPreviewProvider({
       claimPlayback,
       releasePlayback,
       enabled,
+      readOnly,
       voices,
       voicesLoading,
       voicesError,
@@ -115,6 +117,7 @@ export function PronunciationPreviewProvider({
       releasePlayback,
       dialectPreference,
       enabled,
+      readOnly,
       voices,
       voicesError,
       voicesLoading
@@ -404,6 +407,7 @@ export function PronunciationPreviewControls({
   content,
   voiceProfile,
   playbackOnly = false,
+  assetOnly: assetOnlyProp = false,
   audioAssetId,
   dialect,
   ariaLabelPrefix,
@@ -419,6 +423,7 @@ export function PronunciationPreviewControls({
   content?: RichTextV2;
   voiceProfile?: VoiceProfileV3;
   playbackOnly?: boolean;
+  assetOnly?: boolean;
   audioAssetId?: string;
   dialect: Dialect;
   ariaLabelPrefix?: string;
@@ -430,6 +435,7 @@ export function PronunciationPreviewControls({
 }) {
   const context = useContext(PreviewContext);
   if (!context) throw new Error("PronunciationPreviewProvider is required");
+  const assetOnly = assetOnlyProp || context.readOnly || !!audioAssetId;
   const { message } = App.useApp();
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<VoicePreviewResult>();
@@ -446,10 +452,10 @@ export function PronunciationPreviewControls({
   );
   const playbackProfile = useMemo(
     () =>
-      playbackOnly && voiceProfile
+      assetOnly && voiceProfile
         ? { voices: voiceProfile.voices }
         : voiceProfile,
-    [playbackOnly, voiceProfile]
+    [assetOnly, voiceProfile]
   );
   const resolved = useResolvedPreviewProfile(
     context,
@@ -471,11 +477,11 @@ export function PronunciationPreviewControls({
     : undefined;
   const savedAssetId =
     audioAssetId ??
-    (playbackOnly
+    (assetOnly
       ? savedVoiceAudioAsset(playbackProfile, targetLocale)
       : selectedSetting?.audio_asset_id);
   const contentKey = JSON.stringify(
-    playbackOnly
+    assetOnly
       ? [savedAssetId, targetLocale]
       : [
           previewContent,
@@ -586,7 +592,7 @@ export function PronunciationPreviewControls({
       busy ||
       generationRef.current ||
       abortRef.current ||
-      (playbackOnly
+      (assetOnly
         ? !assetId || !adapter.resolveAudio
         : !context.enabled ||
           context.voicesLoading ||
@@ -596,7 +602,7 @@ export function PronunciationPreviewControls({
     )
       return;
     if (
-      !playbackOnly &&
+      !assetOnly &&
       voice &&
       previewContent.annotations.some((mark) => mark.type === "phoneme") &&
       voice.locale !== targetLocale
@@ -621,7 +627,7 @@ export function PronunciationPreviewControls({
           signal: controller.signal
         });
       } else {
-        if (playbackOnly || !voice) return;
+        if (assetOnly || !voice) return;
         preview = await adapter.synthesize(
           {
             language: "en",
@@ -702,7 +708,7 @@ export function PronunciationPreviewControls({
   };
 
   const replay = async () => {
-    if (disabled || (!playbackOnly && !context.enabled) || !result) return;
+    if (disabled || (!assetOnly && !context.enabled) || !result) return;
     claimPlayback(stopPlayback);
     const audio = attachAudio(result);
     try {
@@ -744,11 +750,13 @@ export function PronunciationPreviewControls({
             status ||
             (result
               ? "播放语音"
-              : playbackOnly
+              : assetOnly
                 ? savedAssetId
                   ? "播放正式音频"
                   : "尚未保存正式音频，请返回编辑补齐"
-                : "请先获取语音")
+                : playbackOnly
+                  ? unavailableReason
+                  : "请先获取语音")
           }
         >
           <Button
@@ -759,11 +767,15 @@ export function PronunciationPreviewControls({
               disabled ||
               busy ||
               (!result &&
-                (playbackOnly
+                (assetOnly
                   ? !savedAssetId ||
                     !(previewAdapter ?? context.adapter).resolveAudio
-                  : true)) ||
-              (!playbackOnly && !context.enabled)
+                  : !playbackOnly ||
+                    context.voicesLoading ||
+                    resolved.pending ||
+                    !voice ||
+                    !text)) ||
+              (!assetOnly && !context.enabled)
             }
             aria-label={playLabel}
             loading={playbackOnly && busy}
