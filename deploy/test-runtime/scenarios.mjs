@@ -157,6 +157,54 @@ assert.match(await readlink("/opt/tsz-releases/admin/current"), /\/A$/);
 assert.equal(await file("/opt/tsz-deploy-manifests/admin.json"), accepted);
 await assert.rejects(access("/opt/tsz-frontend-transaction"));
 await rm("/tmp/fail-api");
+
+// Verify the deployed Nginx protocol and retained assets without a browser.
+await stage("admin", "B2");
+publish("/opt/stage-B2", "admin", true);
+function adminHttps(path, protocol = "--http2") {
+  const response = spawnSync(
+    "curl",
+    [
+      "--noproxy",
+      "*",
+      "-sS",
+      "-m",
+      "5",
+      protocol,
+      "--resolve",
+      "admin-test.tianshengzhi.com:443:127.0.0.1",
+      "-D",
+      "-",
+      "-w",
+      "\nSTATUS=%{http_code} VERSION=%{http_version}\n",
+      `https://admin-test.tianshengzhi.com${path}`
+    ],
+    { encoding: "utf8" }
+  );
+  assert.equal(response.status, 0, response.stderr);
+  return response.stdout;
+}
+for (const [protocol, version] of [
+  ["--http2", "2"],
+  ["--http1.1", "1.1"]
+]) {
+  const response = adminHttps("/version.json", protocol);
+  assert.match(
+    response,
+    new RegExp(`STATUS=200 VERSION=${version.replace(".", "\\.")}\\s*$`)
+  );
+  assert.match(response, /cache-control:\s*no-store/i);
+  assert.match(response, /"release_id"\s*:\s*"B2"/);
+}
+for (const name of ["A.js", "B2.js"]) {
+  const response = adminHttps(`/assets/${name}`);
+  assert.match(response, /STATUS=200 VERSION=2\s*$/);
+  assert.match(response, /cache-control:[^\r\n]*immutable/i);
+}
+const missingAsset = adminHttps("/assets/missing.js");
+assert.match(missingAsset, /STATUS=404 VERSION=2\s*$/);
+assert.doesNotMatch(missingAsset, /cache-control:[^\r\n]*immutable/i);
+
 await stage("web", "W1");
 publish("/opt/stage-W1", "web", true);
 assert.equal((await file("/opt/tsz-releases/web/port")).trim(), "3100");
