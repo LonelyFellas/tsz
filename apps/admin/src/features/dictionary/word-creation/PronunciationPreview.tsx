@@ -1,7 +1,12 @@
-import { speechAccentGroup } from "@tsz/shared";
+import { speechAccentGroup, savedVoiceAudioAsset } from "@tsz/shared";
 import { DownOutlined, SoundOutlined, SyncOutlined } from "@ant-design/icons";
 import { App, Button, Popover, Space, Tag, Tooltip } from "antd";
-import type { Dialect, RichTextV2, VoiceProfileV3 } from "@tsz/types";
+import type {
+  Dialect,
+  RichTextV2,
+  VoiceProfileV3,
+  PhonemeLocaleV3
+} from "@tsz/types";
 import type { AdminDialectPreference } from "@tsz/shared";
 import { retainResolvedAudio, voiceSettingFor } from "@tsz/voice-editor/core";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
@@ -33,6 +38,7 @@ interface PreviewContextValue {
   claimPlayback: (stop: () => void) => void;
   releasePlayback: (stop: () => void) => void;
   enabled: boolean;
+  readOnly: boolean;
   voices: VoiceOption[];
   voicesLoading: boolean;
   voicesError: string;
@@ -99,6 +105,7 @@ export function PronunciationPreviewProvider({
       claimPlayback,
       releasePlayback,
       enabled,
+      readOnly,
       voices,
       voicesLoading,
       voicesError,
@@ -110,6 +117,7 @@ export function PronunciationPreviewProvider({
       releasePlayback,
       dialectPreference,
       enabled,
+      readOnly,
       voices,
       voicesError,
       voicesLoading
@@ -123,7 +131,7 @@ export function PronunciationPreviewProvider({
 function localeForDialect(
   dialect: Dialect,
   preference: AdminDialectPreference
-): string | undefined {
+): PhonemeLocaleV3 | undefined {
   // 统一内容没有自己的方言，按管理员偏好挑发音人（需求：试听也按偏好选发音人）。
   if (dialect === "common") return preference === "uk" ? "en-GB" : "en-US";
   if (dialect === "uk") return "en-GB";
@@ -399,6 +407,8 @@ export function PronunciationPreviewControls({
   content,
   voiceProfile,
   playbackOnly = false,
+  assetOnly: assetOnlyProp = false,
+  audioAssetId,
   dialect,
   ariaLabelPrefix,
   disabled = false,
@@ -413,6 +423,8 @@ export function PronunciationPreviewControls({
   content?: RichTextV2;
   voiceProfile?: VoiceProfileV3;
   playbackOnly?: boolean;
+  assetOnly?: boolean;
+  audioAssetId?: string;
   dialect: Dialect;
   ariaLabelPrefix?: string;
   disabled?: boolean;
@@ -423,6 +435,7 @@ export function PronunciationPreviewControls({
 }) {
   const context = useContext(PreviewContext);
   if (!context) throw new Error("PronunciationPreviewProvider is required");
+  const assetOnly = assetOnlyProp || context.readOnly || !!audioAssetId;
   const { message } = App.useApp();
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<VoicePreviewResult>();
@@ -437,9 +450,16 @@ export function PronunciationPreviewControls({
     () => content ?? { version: 2, text: spelling ?? "", annotations: [] },
     [content, spelling]
   );
+  const playbackProfile = useMemo(
+    () =>
+      assetOnly && voiceProfile
+        ? { voices: voiceProfile.voices }
+        : voiceProfile,
+    [assetOnly, voiceProfile]
+  );
   const resolved = useResolvedPreviewProfile(
     context,
-    voiceProfile,
+    playbackProfile,
     previewContent,
     dialect,
     previewAdapter ?? context.adapter
@@ -455,21 +475,32 @@ export function PronunciationPreviewControls({
   const selectedSetting = voice
     ? voiceSettingFor(resolved.profile?.voices ?? [], voice.id)
     : undefined;
-  const contentKey = JSON.stringify([
-    previewContent,
-    targetLocale,
-    voice?.id,
-    selectedSetting?.rate_percent ?? 0,
-    selectedSetting?.pitch_semitones ?? 0,
-    selectedSetting?.volume_percent ?? 100,
-    selectedSetting?.style ?? "",
-    selectedSetting?.style_degree,
-    selectedSetting?.role,
-    selectedSetting?.output_format,
-    selectedSetting?.audio_asset_id,
-    voiceProfile?.dubbing,
-    resolved.pending
-  ]);
+  const savedAssetId =
+    audioAssetId ??
+    (assetOnly
+      ? savedVoiceAudioAsset(playbackProfile, targetLocale)
+      : selectedSetting?.audio_asset_id);
+  const contentKey = JSON.stringify(
+    assetOnly
+      ? [savedAssetId, targetLocale]
+      : [
+          previewContent,
+          targetLocale,
+          voice?.id,
+          selectedSetting?.rate_percent ?? 0,
+          selectedSetting?.pitch_semitones ?? 0,
+          selectedSetting?.volume_percent ?? 100,
+          selectedSetting?.style ?? "",
+          selectedSetting?.style_degree,
+          selectedSetting?.role,
+          selectedSetting?.output_format,
+          selectedSetting?.audio_asset_id,
+          audioAssetId,
+          playbackOnly,
+          voiceProfile?.dubbing,
+          resolved.pending
+        ]
+  );
   const text = previewContent.text.trim();
   const playLabel = ariaLabelPrefix
     ? `${ariaLabelPrefix} 播放语音`
@@ -511,14 +542,7 @@ export function PronunciationPreviewControls({
     cleanup();
     setBusy(false);
     setStatus("");
-  }, [
-    cleanup,
-    contentKey,
-    pronunciationId,
-    voice?.id,
-    disabled,
-    previewAdapter
-  ]);
+  }, [cleanup, contentKey, pronunciationId, disabled, previewAdapter]);
 
   useEffect(
     () => () => {
@@ -539,38 +563,47 @@ export function PronunciationPreviewControls({
         () => {
           if (audioRef.current !== audio) return;
           discardResult();
-          setStatus("试听音频加载失败，请重新生成");
-          void message.error("试听音频加载失败，请重新生成");
+          const error = savedAssetId
+            ? "正式音频读取失败，请重试"
+            : "试听音频加载失败，请重新生成";
+          setStatus(error);
+          void message.error(error);
         },
         { once: true }
       );
       audio.addEventListener(
         "ended",
         () => {
-          if (audioRef.current === audio) setStatus("已生成试听");
+          if (audioRef.current === audio)
+            setStatus(savedAssetId ? "正式音频已就绪" : "已生成试听");
         },
         { once: true }
       );
       return audio;
     },
-    [audioFactory, discardResult, message]
+    [audioFactory, discardResult, message, savedAssetId]
   );
 
   const generate = async () => {
+    const adapter = previewAdapter ?? context.adapter;
+    const assetId = savedAssetId;
     if (
       disabled ||
-      !context.enabled ||
-      context.voicesLoading ||
-      resolved.pending ||
-      !voice ||
-      !text ||
       busy ||
       generationRef.current ||
-      abortRef.current
-    ) {
+      abortRef.current ||
+      (assetOnly
+        ? !assetId || !adapter.resolveAudio
+        : !context.enabled ||
+          context.voicesLoading ||
+          resolved.pending ||
+          !voice ||
+          !text)
+    )
       return;
-    }
     if (
+      !assetOnly &&
+      voice &&
       previewContent.annotations.some((mark) => mark.type === "phoneme") &&
       voice.locale !== targetLocale
     ) {
@@ -586,41 +619,41 @@ export function PronunciationPreviewControls({
     const controller = new AbortController();
     abortRef.current = controller;
     setBusy(true);
-    setStatus("正在生成试听…");
+    setStatus(assetId ? "正在读取正式音频…" : "正在生成试听…");
     try {
-      const adapter = previewAdapter ?? context.adapter;
-      const preview =
-        selectedSetting?.audio_asset_id && adapter.resolveAudio
-          ? await adapter.resolveAudio(selectedSetting.audio_asset_id, {
-              signal: controller.signal
-            })
-          : await adapter.synthesize(
-              {
-                language: "en",
-                content: previewContent,
-                voiceId: voice.id,
-                ratePercent: selectedSetting?.rate_percent ?? 0,
-                ...(selectedSetting?.output_format
-                  ? { outputFormat: selectedSetting.output_format }
-                  : {}),
-                ...(selectedSetting?.pitch_semitones !== undefined
-                  ? { pitchSemitones: selectedSetting.pitch_semitones }
-                  : {}),
-                ...(selectedSetting?.volume_percent !== undefined
-                  ? { volumePercent: selectedSetting.volume_percent }
-                  : {}),
-                ...(selectedSetting?.style
-                  ? { style: selectedSetting.style }
-                  : {}),
-                ...(selectedSetting?.style_degree !== undefined
-                  ? { styleDegree: selectedSetting.style_degree }
-                  : {}),
-                ...(selectedSetting?.role !== undefined
-                  ? { role: selectedSetting.role }
-                  : {})
-              },
-              { signal: controller.signal }
-            );
+      let preview: VoicePreviewResult;
+      if (assetId && adapter.resolveAudio) {
+        preview = await adapter.resolveAudio(assetId, {
+          signal: controller.signal
+        });
+      } else {
+        if (assetOnly || !voice) return;
+        preview = await adapter.synthesize(
+          {
+            language: "en",
+            content: previewContent,
+            voiceId: voice.id,
+            ratePercent: selectedSetting?.rate_percent ?? 0,
+            ...(selectedSetting?.output_format
+              ? { outputFormat: selectedSetting.output_format }
+              : {}),
+            ...(selectedSetting?.pitch_semitones !== undefined
+              ? { pitchSemitones: selectedSetting.pitch_semitones }
+              : {}),
+            ...(selectedSetting?.volume_percent !== undefined
+              ? { volumePercent: selectedSetting.volume_percent }
+              : {}),
+            ...(selectedSetting?.style ? { style: selectedSetting.style } : {}),
+            ...(selectedSetting?.style_degree !== undefined
+              ? { styleDegree: selectedSetting.style_degree }
+              : {}),
+            ...(selectedSetting?.role !== undefined
+              ? { role: selectedSetting.role }
+              : {})
+          },
+          { signal: controller.signal }
+        );
+      }
       if (controller.signal.aborted) {
         preview.dispose?.();
         return;
@@ -630,7 +663,9 @@ export function PronunciationPreviewControls({
       const expiresIn = Date.parse(preview.expiresAt) - Date.now();
       const expire = () => {
         discardResult();
-        setStatus("试听已过期，请重新生成");
+        setStatus(
+          assetId ? "音频地址已过期，请重新播放" : "试听已过期，请重新生成"
+        );
       };
       if (!Number.isFinite(expiresIn) || expiresIn <= 0) {
         expire();
@@ -642,7 +677,13 @@ export function PronunciationPreviewControls({
       try {
         await audio.play();
         if (audioRef.current === audio) {
-          setStatus(preview.cached ? "播放中（缓存命中）" : "播放中（新合成）");
+          setStatus(
+            assetId
+              ? "播放中（正式音频）"
+              : preview.cached
+                ? "播放中（缓存命中）"
+                : "播放中（新合成）"
+          );
         }
       } catch {
         if (audioRef.current === audio) {
@@ -667,12 +708,13 @@ export function PronunciationPreviewControls({
   };
 
   const replay = async () => {
-    if (disabled || !context.enabled || !result) return;
+    if (disabled || (!assetOnly && !context.enabled) || !result) return;
     claimPlayback(stopPlayback);
     const audio = attachAudio(result);
     try {
       await audio.play();
-      if (audioRef.current === audio) setStatus("播放中");
+      if (audioRef.current === audio)
+        setStatus(savedAssetId ? "播放中（正式音频）" : "播放中");
     } catch {
       if (audioRef.current === audio) {
         setStatus("播放失败，请检查浏览器音频权限后重试");
@@ -708,9 +750,13 @@ export function PronunciationPreviewControls({
             status ||
             (result
               ? "播放语音"
-              : playbackOnly
-                ? unavailableReason
-                : "请先获取语音")
+              : assetOnly
+                ? savedAssetId
+                  ? "播放正式音频"
+                  : "尚未保存正式音频，请返回编辑补齐"
+                : playbackOnly
+                  ? unavailableReason
+                  : "请先获取语音")
           }
         >
           <Button
@@ -719,10 +765,17 @@ export function PronunciationPreviewControls({
             icon={<SoundOutlined />}
             disabled={
               disabled ||
-              !context.enabled ||
               busy ||
               (!result &&
-                (!playbackOnly || context.voicesLoading || !voice || !text))
+                (assetOnly
+                  ? !savedAssetId ||
+                    !(previewAdapter ?? context.adapter).resolveAudio
+                  : !playbackOnly ||
+                    context.voicesLoading ||
+                    resolved.pending ||
+                    !voice ||
+                    !text)) ||
+              (!assetOnly && !context.enabled)
             }
             aria-label={playLabel}
             loading={playbackOnly && busy}

@@ -1,0 +1,53 @@
+{
+  "started": "2026-10-29T03:41:42.508Z",
+  "updated": "2026-10-29T03:42:02.544Z",
+  "state": "passed",
+  "environment": "isolated single-instance optimized signing path, runtime pool20; signing API only, not media delivery",
+  "max_outstanding": 8192,
+  "refreshes": 0,
+  "refresh_latency_ms": [],
+  "phases": [
+    {
+      "name": "warmup",
+      "target_rps": 100,
+      "duration_seconds": 10,
+      "scheduled": 999,
+      "sent": 999,
+      "backpressure": 0,
+      "statuses": {
+        "200": 999
+      },
+      "errors": 0,
+      "elapsed_seconds": 10.002587375,
+      "latency_ms": {
+        "p50": 6.140666000001147,
+        "p95": 8.569375000000036,
+        "p99": 10.934124999999767,
+        "max": 33.545375
+      },
+      "actual_rps": 99.87415880983495,
+      "passed": true
+    },
+    {
+      "name": "burst",
+      "target_rps": 1000,
+      "duration_seconds": 10,
+      "scheduled": 9995,
+      "sent": 9995,
+      "backpressure": 0,
+      "statuses": {
+        "200": 9995
+      },
+      "errors": 0,
+      "elapsed_seconds": 10.027956334,
+      "latency_ms": {
+        "p50": 9.004958000001352,
+        "p95": 12.7950409999994,
+        "p99": 37.37933299999713,
+        "max": 54.44075000000157
+      },
+      "actual_rps": 996.7135542973734,
+      "passed": true
+    }
+  ]
+}

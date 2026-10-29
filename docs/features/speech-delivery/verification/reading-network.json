@@ -1,0 +1,79 @@
+{
+  "truncated": false,
+  "hasMore": false,
+  "events": [
+    {
+      "method": "Network.requestWillBeSent",
+      "path": "/api/v1/admin/lexicon/audio-assets/01a18538-f501-758f-ada1-25af1c3124a4/url"
+    },
+    {
+      "method": "Network.responseReceived",
+      "path": "/api/v1/admin/lexicon/audio-assets/01a18538-f501-758f-ada1-25af1c3124a4/url",
+      "status": 200
+    },
+    {
+      "method": "Network.requestWillBeSent",
+      "path": "/temporary-tests/speech-delivery-20261029-1bcfbc371c5f/audio/assets/generated/01a18538-f501-758f-ada1-25af1c3124a4.mp3"
+    },
+    {
+      "method": "Network.responseReceived",
+      "path": "/temporary-tests/speech-delivery-20261029-1bcfbc371c5f/audio/assets/generated/01a18538-f501-758f-ada1-25af1c3124a4.mp3",
+      "status": 206
+    },
+    {
+      "method": "Network.requestWillBeSent",
+      "path": "/api/v1/admin/speech/voices"
+    },
+    {
+      "method": "Network.responseReceived",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "Network.requestWillBeSent",
+      "path": "/api/v1/admin/speech/voices"
+    },
+    {
+      "method": "Network.responseReceived",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "Network.requestWillBeSent",
+      "path": "/api/v1/admin/lexicon/audio-assets/01a18538-f501-758f-ada1-25af1c3124a4/url"
+    },
+    {
+      "method": "Network.responseReceived",
+      "path": "/api/v1/admin/lexicon/audio-assets/01a18538-f501-758f-ada1-25af1c3124a4/url",
+      "status": 200
+    },
+    {
+      "method": "Network.requestWillBeSent",
+      "path": "/temporary-tests/speech-delivery-20261029-1bcfbc371c5f/audio/assets/generated/01a18538-f501-758f-ada1-25af1c3124a4.mp3"
+    },
+    {
+      "method": "Network.responseReceived",
+      "path": "/temporary-tests/speech-delivery-20261029-1bcfbc371c5f/audio/assets/generated/01a18538-f501-758f-ada1-25af1c3124a4.mp3",
+      "status": 206
+    },
+    {
+      "method": "Network.requestWillBeSent",
+      "path": "/api/v1/admin/lexicon/audio-assets/01a18538-f81c-7015-be26-252024e8702c/url"
+    },
+    {
+      "method": "Network.responseReceived",
+      "path": "/api/v1/admin/lexicon/audio-assets/01a18538-f81c-7015-be26-252024e8702c/url",
+      "status": 200
+    },
+    {
+      "method": "Network.requestWillBeSent",
+      "path": "/temporary-tests/speech-delivery-20261029-1bcfbc371c5f/audio/assets/generated/01a18538-f81c-7015-be26-252024e8702c.mp3"
+    },
+    {
+      "method": "Network.responseReceived",
+      "path": "/temporary-tests/speech-delivery-20261029-1bcfbc371c5f/audio/assets/generated/01a18538-f81c-7015-be26-252024e8702c.mp3",
+      "status": 206
+    }
+  ],
+  "requestsSynthesis": false
+}

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/opencode-model-switch-4218/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-28T15:58:47.527Z",
+  "_source": "/Users/darwish/.codex/worktrees/speech-delivery/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-10-29T00:55:26.865Z",
   "paths": {
     "/api/internal/agent/v1/requests/{id}/candidates/search": ["post"],
     "/api/internal/agent/v1/requests/{id}/context": ["get"],
@@ -51,6 +51,8 @@
     "/admin/lexicon/entries/{id}/annotation": ["patch"],
     "/admin/lexicon/entries/{id}/archive": ["post"],
     "/admin/lexicon/entries/{id}/inbound-references": ["get"],
+    "/admin/lexicon/entries/{id}/publication-audio/check": ["post"],
+    "/admin/lexicon/entries/{id}/publication-audio/confirm": ["post"],
     "/admin/lexicon/entries/{id}/publications": ["get", "post"],
     "/admin/lexicon/entries/{id}/publications/{publication_id}": ["get"],
     "/admin/lexicon/entries/{id}/publications/{publication_id}/restore-draft": [
@@ -68,6 +70,8 @@
     "/admin/lexicon/sentences": ["get", "post"],
     "/admin/lexicon/sentences/targets": ["get"],
     "/admin/lexicon/sentences/{id}": ["delete", "get", "put"],
+    "/admin/lexicon/sentences/{id}/publication-audio/check": ["post"],
+    "/admin/lexicon/sentences/{id}/publication-audio/confirm": ["post"],
     "/admin/lexicon/sentences/{id}/publications": ["get", "post"],
     "/admin/lexicon/sentences/{id}/publications/{publication_id}": ["get"],
     "/admin/lexicon/sentences/{id}/publications/{publication_id}/rollback": [
@@ -2782,6 +2786,30 @@
         "503": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
+    "post /admin/lexicon/entries/{id}/publication-audio/check": {
+      "request": { "$ref": "#/components/schemas/CheckPublicationAudio" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/PublicationAudioReview" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/lexicon/entries/{id}/publication-audio/confirm": {
+      "request": { "$ref": "#/components/schemas/ConfirmPublicationAudio" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/PublicationAudioReview" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "get /admin/lexicon/entries/{id}/publications": {
       "request": null,
       "responses": {
@@ -2997,6 +3025,30 @@
         "404": { "$ref": "#/components/schemas/ProblemDetails" },
         "409": { "$ref": "#/components/schemas/ProblemDetails" },
         "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/lexicon/sentences/{id}/publication-audio/check": {
+      "request": { "$ref": "#/components/schemas/CheckPublicationAudio" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/PublicationAudioReview" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/lexicon/sentences/{id}/publication-audio/confirm": {
+      "request": { "$ref": "#/components/schemas/ConfirmPublicationAudio" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/PublicationAudioReview" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
     "get /admin/lexicon/sentences/{id}/publications": {
@@ -6985,6 +7037,14 @@
         }
       }
     },
+    "CheckPublicationAudio": {
+      "type": "object",
+      "required": ["base_revision"],
+      "properties": {
+        "base_revision": { "type": "integer", "format": "int64", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
     "CommonDialectV3": { "type": "string", "enum": ["common"] },
     "ComponentTargetMatchV3": {
       "type": "string",
@@ -7014,6 +7074,20 @@
           "description": "仅作展示元数据，绝不参与对象键。首尾空白会被去掉，不接受控制字符。",
           "maxLength": 120,
           "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "ConfirmPublicationAudio": {
+      "type": "object",
+      "required": ["base_revision", "manifest_hash"],
+      "properties": {
+        "base_revision": { "type": "integer", "format": "int64", "minimum": 1 },
+        "manifest_hash": {
+          "type": "string",
+          "maxLength": 64,
+          "minLength": 64,
+          "pattern": "^[0-9a-f]{64}$"
         }
       },
       "additionalProperties": false

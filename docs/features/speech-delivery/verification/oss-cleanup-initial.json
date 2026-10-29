@@ -1,0 +1,54 @@
+{
+  "bucket": "tshb-test-assets",
+  "run_id": "speech-delivery-20261029-1bcfbc371c5f",
+  "prefix": "temporary-tests/speech-delivery-20261029-1bcfbc371c5f/",
+  "started_at": "2026-10-29T01:06:15.095480+00:00",
+  "status": "clean",
+  "planned": [
+    {
+      "key": "temporary-tests/speech-delivery-20261029-1bcfbc371c5f/audio/assets/generated/01a1852f-47e6-77b1-be5f-70c776ddc785.mp3",
+      "version_id": "CAEQERiBgICLzt6UjBoiIGIyYTMwZWM3OTAyMDQ3NWI5MGVhN2Y3OTU1OTMyZDI3",
+      "kind": "version"
+    },
+    {
+      "key": "temporary-tests/speech-delivery-20261029-1bcfbc371c5f/audio/assets/generated/01a1852f-4e6d-7188-ba7f-7d4028d54637.mp3",
+      "version_id": "CAEQERiBgIDmz96UjBoiIGU1YWI0ZjJkNjBiNTQ4OTY4MjI4NzdjYjczNGU5NmE3",
+      "kind": "version"
+    },
+    {
+      "key": "temporary-tests/speech-delivery-20261029-1bcfbc371c5f/audio/assets/generated/01a18531-7460-766a-a4c4-72c196e4621d.mp3",
+      "version_id": "CAEQERiBgID0.OKUjBoiIDk3YjQ1NjBhZmU4YzQ5YzdhMzNjZDNjZDJkMWJiNGVm",
+      "kind": "version"
+    },
+    {
+      "key": "temporary-tests/speech-delivery-20261029-1bcfbc371c5f/audio/assets/generated/01a18531-7923-7389-b4b1-c3b1e9a9eed4.mp3",
+      "version_id": "CAEQERiBgIDm.uKUjBoiIDJmOTcxYTgzMTIwYTRkNmU5MDE3NDg0YjI2MmMyMjQ0",
+      "kind": "version"
+    }
+  ],
+  "deleted": [
+    {
+      "key": "temporary-tests/speech-delivery-20261029-1bcfbc371c5f/audio/assets/generated/01a1852f-47e6-77b1-be5f-70c776ddc785.mp3",
+      "version_id": "CAEQERiBgICLzt6UjBoiIGIyYTMwZWM3OTAyMDQ3NWI5MGVhN2Y3OTU1OTMyZDI3",
+      "kind": "version"
+    },
+    {
+      "key": "temporary-tests/speech-delivery-20261029-1bcfbc371c5f/audio/assets/generated/01a1852f-4e6d-7188-ba7f-7d4028d54637.mp3",
+      "version_id": "CAEQERiBgIDmz96UjBoiIGU1YWI0ZjJkNjBiNTQ4OTY4MjI4NzdjYjczNGU5NmE3",
+      "kind": "version"
+    },
+    {
+      "key": "temporary-tests/speech-delivery-20261029-1bcfbc371c5f/audio/assets/generated/01a18531-7923-7389-b4b1-c3b1e9a9eed4.mp3",
+      "version_id": "CAEQERiBgIDm.uKUjBoiIDJmOTcxYTgzMTIwYTRkNmU5MDE3NDg0YjI2MmMyMjQ0",
+      "kind": "version"
+    },
+    {
+      "key": "temporary-tests/speech-delivery-20261029-1bcfbc371c5f/audio/assets/generated/01a18531-7460-766a-a4c4-72c196e4621d.mp3",
+      "version_id": "CAEQERiBgID0.OKUjBoiIDk3YjQ1NjBhZmU4YzQ5YzdhMzNjZDNjZDJkMWJiNGVm",
+      "kind": "version"
+    }
+  ],
+  "errors": [],
+  "remaining": [],
+  "finished_at": "2026-10-29T01:06:15.404454+00:00"
+}

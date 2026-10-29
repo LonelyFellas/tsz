@@ -42,6 +42,7 @@ export function V3EnglishTextPreview({
                     dialect={dialect}
                     ariaLabelPrefix="整句"
                     playbackOnly
+                    assetOnly
                   />
                 </ConfigProvider>
               </div>

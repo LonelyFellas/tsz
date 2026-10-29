@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  pronunciationPlaybackSource,
   convertDictionaryPhonetic,
   convertDictionaryToAzureIpa,
   convertAzureIpaToUps,
@@ -759,4 +760,84 @@ describe("IPA/UPS 来源与独立停顿", () => {
       pronunciationSynthesisContent("far away", legacy, "en-GB")
     ).toBeUndefined();
   });
+});
+
+it("final playback follows spelling/phoneme selection and retains legacy recordings", () => {
+  const setting = (
+    asset: string,
+    locale: import("@tsz/types").SpeechLocaleV3
+  ) => ({
+    voice_id: "voice",
+    locale,
+    enabled: true,
+    rate_percent: 0,
+    audio_asset_id: asset
+  });
+  const pronunciation: import("@tsz/types").WordPronunciationV3 = {
+    id: "pron",
+    dict_phonetic: "test",
+    actual_pron: "test",
+    style: "normal",
+    voice_profile: { voices: [setting("legacy", "en-GB")] }
+  };
+  expect(
+    pronunciationPlaybackSource("word", pronunciation, undefined, "en-GB", "uk")
+      .assetId
+  ).toBe("legacy");
+  pronunciation.synthesis = {
+    alphabet: "ipa",
+    ipa: "test",
+    ups: "",
+    use_spelling: false,
+    uk: {
+      ipa: "test",
+      ups: "",
+      ipa_speech: {
+        content: { version: 2, text: "word", annotations: [] },
+        voice_profile: { voices: [setting("active", "en-GB")] }
+      }
+    }
+  };
+  expect(
+    pronunciationPlaybackSource("word", pronunciation, undefined, "en-GB", "uk")
+      .assetId
+  ).toBe("active");
+  pronunciation.synthesis.use_spelling = true;
+  const spelling: import("@tsz/types").SpellingSpeechV3 = {
+    content: {
+      version: 2,
+      text: "word",
+      annotations: [{ type: "pause", at: 1, duration_ms: 100 }]
+    },
+    voice_profile: { voices: [setting("spelling", "en-AU")] }
+  };
+  const selected = pronunciationPlaybackSource(
+    "word",
+    pronunciation,
+    spelling,
+    "en-GB",
+    "uk"
+  );
+  expect(selected.assetId).toBe("spelling");
+  expect(selected.content).toEqual(spelling.content);
+  expect(
+    pronunciationPlaybackSource("word", pronunciation, undefined, "en-GB", "uk")
+      .assetId
+  ).toBeUndefined();
+  pronunciation.audio_assets = [
+    {
+      id: "recording",
+      locale: "en-GB",
+      gender: "female",
+      content_type: "audio/mpeg",
+      size_bytes: 3,
+      duration_ms: null,
+      original_name: "fixture.mp3",
+      created_at: "2026-10-29T00:00:00Z"
+    }
+  ];
+  expect(
+    pronunciationPlaybackSource("word", pronunciation, undefined, "en-GB", "uk")
+      .assetId
+  ).toBe("recording");
 });

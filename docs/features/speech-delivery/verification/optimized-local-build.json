@@ -1,0 +1,8 @@
+{
+  "base_sha": "c12e4a75bbb3fb5b2395b59fe8fcd5e8c0364225",
+  "source_diff_sha256": "e71ec20e75963d3257262a94bdf41f2ca8932a87ba233576e88c13f0506f84a0",
+  "binary_sha256": "757475762048ee3e1288cd5a8a54d24aca616bc753624c2fa3baebcc1042f09a",
+  "runtime_pool_max": 20,
+  "profile": "native release",
+  "purpose": "local performance only"
+}

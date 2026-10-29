@@ -6,8 +6,9 @@ import { newSentence } from "../sentences/model";
 import type { SharedSentence, AdminWordListItemAny } from "@tsz/types";
 import { BatchPublicationModal } from "./BatchPublicationModal";
 
-const { publish, auth } = vi.hoisted(() => ({
+const { publish, auth, checkAudio } = vi.hoisted(() => ({
   publish: vi.fn(),
+  checkAudio: vi.fn(),
   auth: { role: "super_admin", permissions: [] as string[] }
 }));
 vi.mock("@/lib/auth", () => ({
@@ -20,8 +21,28 @@ vi.mock("@/lib/auth", () => ({
       }
     }),
   api: {
-    sentences: { list: vi.fn(async () => ({ items: [], total: 0 })) },
-    words: { publishBatchV3: publish }
+    sentences: {
+      list: vi.fn(async () => ({ items: [], total: 0 })),
+      publicationAudio: {
+        check: (
+          id: string,
+          input: { base_revision: number },
+          signal?: AbortSignal
+        ) => checkAudio("sentence", id, input, signal),
+        confirm: vi.fn()
+      }
+    },
+    words: {
+      publishBatchV3: publish,
+      publicationAudio: {
+        check: (
+          id: string,
+          input: { base_revision: number },
+          signal?: AbortSignal
+        ) => checkAudio("entry", id, input, signal),
+        confirm: vi.fn()
+      }
+    }
   }
 }));
 function row(id: string, revision: number): AdminWordListItemAny {
@@ -57,9 +78,28 @@ function mount(sentences: SharedSentence[] = []) {
 }
 beforeEach(() => {
   publish.mockReset();
+  checkAudio.mockReset().mockImplementation(async (owner, id, input) => ({
+    manifest: {
+      owner: { [owner]: id },
+      revision: input.base_revision,
+      policy_version: 1,
+      items: [],
+      ready: true,
+      manifest_hash: "a".repeat(64)
+    },
+    confirmed: true,
+    receipt_id: `review-${id}`
+  }));
   auth.role = "super_admin";
   auth.permissions = [];
 });
+
+async function prepareAudio() {
+  fireEvent.click(screen.getByRole("button", { name: "检查所选音频" }));
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "发布所选" })).toBeEnabled()
+  );
+}
 
 describe("原子批次发布确认", () => {
   it.each([true, false])(
@@ -89,6 +129,7 @@ describe("原子批次发布确认", () => {
         updated_at: "2026-09-23T00:00:00Z"
       };
       mount([sentence]);
+      if (own) await prepareAudio();
       const button = await screen.findByRole("button", { name: "发布所选" });
       if (own) expect(button).toBeEnabled();
       else expect(button).toBeDisabled();
@@ -98,6 +139,7 @@ describe("原子批次发布确认", () => {
   it("只提交显式选中范围及确认时版本，成功后统一刷新", async () => {
     publish.mockResolvedValue({ words: [] });
     const done = mount();
+    await prepareAudio();
     fireEvent.click(await screen.findByRole("button", { name: "发布所选" }));
     await waitFor(() => expect(done).toHaveBeenCalledOnce());
     expect(publish).toHaveBeenCalledWith(expect.any(String), {
@@ -122,8 +164,10 @@ describe("原子批次发布确认", () => {
       .mockRejectedValueOnce(new Error("connection lost"))
       .mockResolvedValue({ words: [] });
     const done = mount();
+    await prepareAudio();
     fireEvent.click(await screen.findByRole("button", { name: "发布所选" }));
     await screen.findByText(/发布结果暂时未知/);
+    expect(screen.getByRole("button", { name: "检查所选音频" })).toBeDisabled();
     fireEvent.click(await screen.findByRole("button", { name: "发布所选" }));
     await waitFor(() => expect(done).toHaveBeenCalledOnce());
     expect(publish.mock.calls[1]).toEqual(publish.mock.calls[0]);
@@ -133,6 +177,7 @@ describe("原子批次发布确认", () => {
       new HttpError(409, "revision changed", undefined, "revision_conflict")
     );
     const done = mount();
+    await prepareAudio();
     fireEvent.click(await screen.findByRole("button", { name: "发布所选" }));
     await screen.findByText(/刷新列表并重新选择/);
     expect(
@@ -140,8 +185,8 @@ describe("原子批次发布确认", () => {
     ).toBeDisabled();
     expect(publish).toHaveBeenCalledOnce();
     expect(done).not.toHaveBeenCalled();
-    expect(screen.getByText("first-page")).toBeInTheDocument();
-    expect(screen.getByText("second-page")).toBeInTheDocument();
+    expect(screen.getAllByText("first-page")[0]).toBeInTheDocument();
+    expect(screen.getAllByText("second-page")[0]).toBeInTheDocument();
   });
 });
 
@@ -160,6 +205,7 @@ it("混合范围同一次提交，例句使用自己的双 revision", async () =
     updated_at: "2026-09-23T00:00:00Z"
   };
   const done = mount([sentence]);
+  await prepareAudio();
   fireEvent.click(await screen.findByRole("button", { name: "发布所选" }));
   await waitFor(() => expect(done).toHaveBeenCalledOnce());
   expect(publish).toHaveBeenCalledOnce();
@@ -185,6 +231,7 @@ it("混合失败定位具体例句并禁止自动换版本重发", async () => {
     })
   );
   const done = mount();
+  await prepareAudio();
   fireEvent.click(await screen.findByRole("button", { name: "发布所选" }));
   await screen.findByText("例句 failed-sentence：例句版本冲突");
   expect(screen.getByRole("button", { name: "发布所选" })).toBeDisabled();

@@ -1,0 +1,16 @@
+{
+  "base_sha": "0d597e3ec2b63e6c450c12d64410f36b5c7880d3",
+  "source_hash": "8aa644fef1bf5db2c763cb443a50f42ca90328901bd495ba1b0db07d83d2f35b",
+  "binary_sha256": "c7afdc38ff96a9a9c6a0a480094e404ace8e3269ee7f0ade96fa48754a70b490",
+  "api_port": 8417,
+  "admin_port": 3037,
+  "previous_pid": 18311,
+  "pid": 58148,
+  "web_mode": "production next build + next start",
+  "web_port": 3047,
+  "frontend_base": "8f773676",
+  "mock_words": false,
+  "mock_parts_of_speech": false,
+  "mock_tts": false,
+  "scope": "dedicated local PostgreSQL/Redis and task-owned cloud test prefix"
+}

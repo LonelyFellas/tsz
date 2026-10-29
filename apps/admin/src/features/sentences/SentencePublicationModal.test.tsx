@@ -12,6 +12,7 @@ import { api } from "@/lib/auth";
 vi.mock("@/lib/auth", () => ({
   api: {
     sentences: {
+      publicationAudio: { check: vi.fn(), confirm: vi.fn() },
       publish: vi.fn(),
       rollback: vi.fn(),
       withdraw: vi.fn(),
@@ -57,13 +58,34 @@ function show(action: SentencePublicationAction, canPublish = true) {
   );
   return onChanged;
 }
-beforeEach(() => vi.resetAllMocks());
+beforeEach(() => {
+  vi.resetAllMocks();
+  vi.mocked(api.sentences.publicationAudio.check).mockImplementation(
+    async (id, input) => ({
+      manifest: {
+        owner: { sentence: id },
+        revision: input.base_revision,
+        policy_version: 1,
+        items: [],
+        ready: true,
+        manifest_hash: "a".repeat(64)
+      },
+      confirmed: false,
+      receipt_id: null
+    })
+  );
+});
 describe("共享例句独立发布操作", () => {
   it("未知结果重试使用相同双版本和幂等键，发布不触发恢复", async () => {
     vi.mocked(api.sentences.publish)
       .mockRejectedValueOnce(new Error("connection lost"))
       .mockResolvedValue(sentence);
     const done = show("publish");
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /^确\s*认$/ })
+      ).not.toBeDisabled()
+    );
     fireEvent.click(screen.getByRole("button", { name: /确\s*认/ }));
     await screen.findByText(/操作结果暂时未知/);
     fireEvent.click(screen.getByRole("button", { name: /确\s*认/ }));

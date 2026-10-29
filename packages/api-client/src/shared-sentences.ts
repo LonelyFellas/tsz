@@ -1,4 +1,5 @@
 import { SENTENCE_FORMATTING_HEADERS } from "./sentence-formatting";
+import { createPublicationAudioEndpoints } from "./publication-audio";
 import { validateRuntimeSchema } from "./runtime-schema";
 import type {
   CreateSharedSentence,
@@ -58,6 +59,7 @@ const TEXT_VOICE_HEADERS = {
 export function createSharedSentenceEndpoints(http: HttpClient) {
   const root = "/lexicon/sentences";
   return {
+    publicationAudio: createPublicationAudioEndpoints(http, "sentences"),
     list: (query: SentenceListQuery = {}) => {
       const params = new URLSearchParams();
       for (const [key, value] of Object.entries(query))

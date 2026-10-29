@@ -2,6 +2,8 @@ import type {
   PronunciationSynthesisV3,
   PronunciationSynthesisCandidateV3,
   SynthesisSpeechV3,
+  SpellingSpeechV3,
+  VoiceProfileV3,
   RichTextV2,
   PhonemeLocaleV3,
   SentenceSourceRangeV3,
@@ -10,6 +12,7 @@ import type {
 } from "@tsz/types";
 
 import { ipaWordToUps } from "./ipa-ups";
+import { speechAccentGroup } from "./speech-locale";
 import {
   stripPhoneticDelimiters,
   convertDictionaryToUnified,
@@ -779,4 +782,60 @@ export function convertDictionaryPhonetic(
   const value = result.join(alphabet === "ups" ? " " : "");
   const issue = synthesisInputIssue(alphabet, value);
   return issue ? fail(start, issue) : { ok: true, value };
+}
+
+export function savedVoiceAudioAsset(
+  profile: VoiceProfileV3 | undefined,
+  locale: PhonemeLocaleV3 | undefined
+): string | undefined {
+  if (!locale) return undefined;
+  return profile?.voices.find(
+    (voice) =>
+      voice.enabled &&
+      voice.audio_asset_id &&
+      speechAccentGroup(voice.locale) === speechAccentGroup(locale)
+  )?.audio_asset_id;
+}
+
+/** Final playback follows the saved active source, without resolving new voices. */
+export function pronunciationPlaybackSource(
+  spelling: string,
+  pronunciation: WordPronunciationV3,
+  spellingSpeech: SpellingSpeechV3 | undefined,
+  locale: PhonemeLocaleV3,
+  legacyDialect: Dialect,
+  requireLocaleConfirmation = false
+): { content?: RichTextV2; profile?: VoiceProfileV3; assetId?: string } {
+  const synthesis = pronunciation.synthesis
+    ? synthesisForLocale(pronunciation.synthesis, locale, legacyDialect)
+    : undefined;
+  const speech = synthesis?.use_spelling
+    ? spellingSpeech
+    : pronunciationSynthesisSpeech(synthesis, locale);
+  const profile = synthesis
+    ? speech?.voice_profile
+    : pronunciation.voice_profile;
+  const uploads = synthesis?.use_spelling
+    ? spellingSpeech?.audio_assets
+    : pronunciation.audio_assets;
+  const matchesLocale = (value: string | undefined) =>
+    speechAccentGroup(value) === speechAccentGroup(locale);
+  const content = synthesis?.use_spelling
+    ? spellingSpeech?.content
+    : pronunciationSynthesisContent(
+        spelling,
+        synthesis,
+        locale,
+        requireLocaleConfirmation
+      );
+  const assetId =
+    savedVoiceAudioAsset(!synthesis || content ? profile : undefined, locale) ??
+    uploads?.find((asset) => matchesLocale(asset.locale))?.id ??
+    pronunciation.audio_assets?.find((asset) => matchesLocale(asset.locale))
+      ?.id;
+  return {
+    content,
+    profile,
+    assetId
+  };
 }

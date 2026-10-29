@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   Alert,
   List,
@@ -26,6 +26,11 @@ import { editableEnglishText } from "./word-creation-v3/meaningsModel";
 import { wordListLabel } from "./presentation";
 import { LifecycleSurfaceConfirmation } from "./LifecycleSurfaceConfirmation";
 import { useSurfaceSnapshot } from "./useSurfaceSnapshot";
+import {
+  BatchPublicationAudioReviewPanel,
+  publicationAudioScope,
+  type PublicationAudioTarget
+} from "./BatchPublicationAudioReviewPanel";
 import {
   canAcknowledgeSurfaceSnapshot,
   isSurfaceMatchPageAny
@@ -88,6 +93,36 @@ export function BatchPublicationModal({
   const busy = useRef(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
+  const [audioReadyScope, setAudioReadyScope] = useState<string>();
+  const [attemptLocked, setAttemptLocked] = useState(false);
+  const audioTargets: PublicationAudioTarget[] = [
+    ...input.items.map((item) => ({
+      owner: "entry" as const,
+      id: item.entry_id,
+      revision: item.base_revision,
+      lifecycleRevision: item.base_lifecycle_revision,
+      label: wordListLabel(rows.find((row) => row.id === item.entry_id)!)
+    })),
+    ...(input.sentences ?? []).map((item) => ({
+      owner: "sentence" as const,
+      id: item.sentence_id,
+      revision: item.base_revision,
+      lifecycleRevision: item.base_lifecycle_revision,
+      label: editableEnglishText(
+        sentenceRows.find((row) => row.id === item.sentence_id)!.content
+          .sentence.en_text
+      )
+        .map((v) => v.text)
+        .join(" / ")
+        .slice(0, 100)
+    }))
+  ];
+  const audioScope = publicationAudioScope(audioTargets);
+  const audioReady = audioReadyScope === audioScope;
+  const onAudioReady = useCallback(
+    (ready: boolean) => setAudioReadyScope(ready ? audioScope : undefined),
+    [audioScope]
+  );
   const [conflict, setConflict] = useState(false);
   const [surface, setSurface] = useState<{
     entryId: string;
@@ -102,11 +137,13 @@ export function BatchPublicationModal({
     if (
       busy.current ||
       !allowed ||
+      !audioReady ||
       conflict ||
       request.items.length + (request.sentences?.length ?? 0) === 0
     )
       return;
     setStarted(true);
+    setAttemptLocked(true);
     busy.current = true;
     setPending(true);
     setError(undefined);
@@ -164,6 +201,7 @@ export function BatchPublicationModal({
         "aria-label": "发布所选",
         disabled:
           !allowed ||
+          !audioReady ||
           conflict ||
           Boolean(surface) ||
           rows.length + sentenceRows.length === 0 ||
@@ -181,6 +219,13 @@ export function BatchPublicationModal({
           size="small"
           dataSource={rows}
           renderItem={(row) => <List.Item>{wordListLabel(row)}</List.Item>}
+        />
+        <BatchPublicationAudioReviewPanel
+          targets={audioTargets}
+          allowed={allowed}
+          locked={attemptLocked || pending || conflict}
+          onStart={() => setStarted(true)}
+          onReady={onAudioReady}
         />
         <Typography.Text>
           一起发布的例句草稿（明确选择，不自动收录）

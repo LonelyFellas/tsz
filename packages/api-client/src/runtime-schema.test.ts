@@ -136,6 +136,7 @@ const ROOTS = [
   "AdminWordListResponse",
   "EntryLifecycleBatchResponse",
   "DraftValidationResponseV3",
+  "PublicationAudioReview",
   "FormsImpactResponseV3",
   "InboundReferencesV3",
   "SurfaceMatchPageV3",
@@ -220,6 +221,7 @@ function buildValidValue(
       );
     case "string":
       if (schema.pattern === "^[A-F0-9]{16}$") return "0123456789ABCDEF";
+      if (schema.pattern === "^[0-9a-f]{64}$") return "a".repeat(64);
       if (schema.pattern && new RegExp(schema.pattern).test("1")) return "1";
       if (schema.format === "uuid") return UUID_V4;
       if (schema.format === "date-time") return RFC3339;

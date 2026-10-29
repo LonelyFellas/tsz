@@ -21,7 +21,8 @@ const preview = vi.hoisted(() => ({
   mocked: false,
   listVoices: vi.fn(),
   synthesize: vi.fn(),
-  resolveVoices: vi.fn()
+  resolveVoices: vi.fn(),
+  resolveAudio: vi.fn()
 }));
 
 const message = vi.hoisted(() => ({
@@ -50,7 +51,8 @@ vi.mock("../voice-editor/dataSource", () => ({
   adminVoicePreviewAdapter: {
     listVoices: preview.listVoices,
     synthesize: preview.synthesize,
-    resolveVoices: preview.resolveVoices
+    resolveVoices: preview.resolveVoices,
+    resolveAudio: preview.resolveAudio
   },
   get voicePreviewIsMock() {
     return preview.mocked;
@@ -138,6 +140,8 @@ function PreviewHarness({
   content,
   voiceProfile,
   playbackOnly,
+  assetOnly,
+  audioAssetId,
   dialect = "common",
   readOnly = false
 }: {
@@ -145,6 +149,8 @@ function PreviewHarness({
   content?: RichTextV2;
   voiceProfile?: VoiceProfileV3;
   playbackOnly?: boolean;
+  assetOnly?: boolean;
+  audioAssetId?: string;
   dialect?: Dialect;
   readOnly?: boolean;
 }) {
@@ -156,6 +162,8 @@ function PreviewHarness({
         content={content}
         voiceProfile={voiceProfile}
         playbackOnly={playbackOnly}
+        assetOnly={assetOnly}
+        audioAssetId={audioAssetId}
         dialect={dialect}
         disabled={readOnly}
         audioFactory={(src) =>
@@ -190,6 +198,7 @@ beforeEach(() => {
   dialectPreference.value = "uk";
   preview.listVoices.mockResolvedValue(voices);
   preview.synthesize.mockResolvedValue(result());
+  preview.resolveAudio.mockReset().mockResolvedValue(result());
   message.error.mockReset();
   AudioMock.instances = [];
   AudioMock.playErrors = [];
@@ -706,52 +715,31 @@ describe("PronunciationPreview", () => {
   });
 });
 
-it("最终读音使用编辑后的标注、选定音色和语速，并直接播放", async () => {
-  preview.listVoices.mockResolvedValue(voices);
-  preview.synthesize.mockResolvedValue(result());
-  const content: RichTextV2 = {
-    version: 2,
-    text: "a b",
-    annotations: [{ type: "pause", at: 1, duration_ms: 500 }]
-  };
-  render(
-    <PreviewHarness
-      content={content}
-      dialect="us"
-      playbackOnly
-      voiceProfile={{
-        voices: [
-          {
-            voice_id: "american-voice",
-            enabled: true,
-            rate_percent: -25,
-            pitch_semitones: 2,
-            volume_percent: 65,
-            style: "cheerful"
-          }
-        ]
-      }}
-    />
-  );
-  expect(screen.queryByRole("button", { name: "获取语音" })).toBeNull();
-  const button = screen.getByRole("button", { name: "播放语音" });
-  await waitFor(() => expect(button).toBeEnabled());
-  fireEvent.click(button);
+it("最终读音只读取正式资产，读取失败也不回退合成", async () => {
+  preview.listVoices.mockResolvedValue([]);
+  const view = render(<PreviewHarness playbackOnly audioAssetId="formal-us" />);
+  const play = screen.getByRole("button", { name: "播放语音" });
+  expect(play).toBeEnabled();
+  fireEvent.click(play);
   await waitFor(() =>
-    expect(preview.synthesize).toHaveBeenCalledWith(
-      {
-        language: "en",
-        content,
-        voiceId: "american-voice",
-        ratePercent: -25,
-        pitchSemitones: 2,
-        volumePercent: 65,
-        style: "cheerful"
-      },
+    expect(preview.resolveAudio).toHaveBeenCalledWith(
+      "formal-us",
       expect.anything()
     )
   );
   await waitFor(() => expect(AudioMock.instances[0]?.play).toHaveBeenCalled());
+  expect(preview.synthesize).not.toHaveBeenCalled();
+  preview.resolveAudio.mockRejectedValue(new Error("asset unavailable"));
+  view.rerender(<PreviewHarness playbackOnly audioAssetId="another-formal" />);
+  fireEvent.click(play);
+  await waitFor(() => expect(message.error).toHaveBeenCalled());
+  expect(preview.synthesize).not.toHaveBeenCalled();
+});
+it("最终读音缺正式资产时保持禁用而不新合成", async () => {
+  render(<PreviewHarness playbackOnly assetOnly />);
+  await waitFor(() => expect(preview.listVoices).toHaveBeenCalled());
+  expect(screen.getByLabelText("播放语音")).toBeDisabled();
+  expect(preview.synthesize).not.toHaveBeenCalled();
 });
 
 it("音色配置按实际口音过滤，而不是取第一个启用项", async () => {
@@ -788,21 +776,44 @@ it("仅启用了另一口音时禁用，切换到匹配口音后才能试听", a
 });
 it("切换通用栏口音时停止旧音频并丢弃缓存，下一次只请求新口音", async () => {
   const dispose = vi.fn();
-  preview.synthesize.mockResolvedValue(result({ dispose }));
-  const view = render(<PreviewHarness playbackOnly />);
+  preview.resolveAudio.mockResolvedValue(result({ dispose }));
+  const profile: VoiceProfileV3 = {
+    voices: [
+      {
+        voice_id: "british-voice",
+        enabled: true,
+        rate_percent: 0,
+        locale: "en-GB",
+        audio_asset_id: "formal-uk"
+      },
+      {
+        voice_id: "american-voice",
+        enabled: true,
+        rate_percent: 0,
+        locale: "en-US",
+        audio_asset_id: "formal-us"
+      }
+    ]
+  };
+  const view = render(
+    <PreviewHarness playbackOnly assetOnly voiceProfile={profile} />
+  );
   const play = screen.getByLabelText("播放语音");
   await waitFor(() => expect(play).toBeEnabled());
   fireEvent.click(play);
   await waitFor(() => expect(AudioMock.instances[0]?.play).toHaveBeenCalled());
   const oldAudio = AudioMock.instances[0]!;
   dialectPreference.value = "us";
-  view.rerender(<PreviewHarness playbackOnly />);
+  view.rerender(
+    <PreviewHarness playbackOnly assetOnly voiceProfile={profile} />
+  );
   await waitFor(() => expect(oldAudio.pause).toHaveBeenCalled());
   expect(dispose).toHaveBeenCalled();
   fireEvent.click(play);
-  await waitFor(() => expect(preview.synthesize).toHaveBeenCalledTimes(2));
-  expect(preview.synthesize.mock.calls[0]![0].voiceId).toBe("british-voice");
-  expect(preview.synthesize.mock.calls[1]![0].voiceId).toBe("american-voice");
+  await waitFor(() => expect(preview.resolveAudio).toHaveBeenCalledTimes(2));
+  expect(preview.resolveAudio.mock.calls[0]![0]).toBe("formal-uk");
+  expect(preview.resolveAudio.mock.calls[1]![0]).toBe("formal-us");
+  expect(preview.synthesize).not.toHaveBeenCalled();
 });
 it("仅调速但不勾选仍可试听，并使用默认音色自己的语速", async () => {
   render(
@@ -836,6 +847,7 @@ function PairedPreview() {
           spelling="cat"
           dialect="uk"
           playbackOnly
+          audioAssetId={`formal-${name}`}
           ariaLabelPrefix={name}
           audioFactory={(src) =>
             new AudioMock(src) as unknown as HTMLAudioElement
@@ -862,13 +874,13 @@ it("开始另一行试听会停止正在播放的音频", async () => {
 
 it("切换试听会取消旧请求，旧响应不会抢播，且原按钮可以重试", async () => {
   const pending = deferred<VoicePreviewResult>();
-  preview.synthesize.mockImplementationOnce(() => pending.promise);
+  preview.resolveAudio.mockImplementationOnce(() => pending.promise);
   render(<PairedPreview />);
   await waitFor(() =>
     expect(screen.getByLabelText("IPA 播放语音")).toBeEnabled()
   );
   fireEvent.click(screen.getByLabelText("IPA 播放语音"));
-  const signal = preview.synthesize.mock.calls[0]![1].signal as AbortSignal;
+  const signal = preview.resolveAudio.mock.calls[0]![1].signal as AbortSignal;
   fireEvent.click(screen.getByLabelText("UPS 播放语音"));
   await waitFor(() => expect(AudioMock.instances).toHaveLength(1));
   expect(signal.aborted).toBe(true);
@@ -877,4 +889,71 @@ it("切换试听会取消旧请求，旧响应不会抢播，且原按钮可以�
   expect(dispose).toHaveBeenCalledOnce();
   expect(AudioMock.instances).toHaveLength(1);
   expect(screen.getByLabelText("IPA 播放语音")).toBeEnabled();
+});
+
+it("saved profile audio remains playable without a live voice catalog or synthesis service", async () => {
+  preview.enabled = false;
+  preview.listVoices.mockResolvedValue([]);
+  const asset = "00000000-0000-4000-8000-000000000123";
+  render(
+    <PreviewHarness
+      playbackOnly
+      assetOnly
+      voiceProfile={{
+        voices: [
+          {
+            voice_id: "retired-voice",
+            enabled: true,
+            rate_percent: 0,
+            locale: "en-GB",
+            audio_asset_id: asset
+          }
+        ]
+      }}
+    />
+  );
+  const button = screen.getByLabelText("播放语音");
+  expect(button).toBeEnabled();
+  fireEvent.click(button);
+  await waitFor(() =>
+    expect(preview.resolveAudio).toHaveBeenCalledWith(asset, expect.anything())
+  );
+  expect(preview.synthesize).not.toHaveBeenCalled();
+});
+
+it("late catalog arrival does not interrupt an immutable saved-asset playback", async () => {
+  const pending = deferred<typeof voices>();
+  preview.listVoices.mockImplementationOnce(() => pending.promise);
+  render(
+    <PreviewHarness
+      playbackOnly
+      assetOnly
+      voiceProfile={{
+        voices: [
+          {
+            voice_id: "british-voice",
+            enabled: true,
+            rate_percent: -25,
+            locale: "en-GB",
+            audio_asset_id: "00000000-0000-4000-8000-000000000124"
+          }
+        ]
+      }}
+    />
+  );
+  fireEvent.click(screen.getByLabelText("播放语音"));
+  await waitFor(() => expect(AudioMock.instances[0]?.play).toHaveBeenCalled());
+  const audio = AudioMock.instances[0]!;
+  await act(async () => pending.resolve(voices));
+  expect(audio.pause).not.toHaveBeenCalled();
+  expect(preview.resolveAudio).toHaveBeenCalledOnce();
+  expect(preview.synthesize).not.toHaveBeenCalled();
+});
+
+it("compact editable preview may synthesize while asset-only reading never does", async () => {
+  render(<PreviewHarness playbackOnly />);
+  const button = screen.getByLabelText("播放语音");
+  await waitFor(() => expect(button).toBeEnabled());
+  fireEvent.click(button);
+  await waitFor(() => expect(preview.synthesize).toHaveBeenCalledOnce());
 });

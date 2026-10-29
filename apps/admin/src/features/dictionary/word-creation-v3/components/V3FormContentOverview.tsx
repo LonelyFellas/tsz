@@ -13,11 +13,7 @@ import type {
   V3DraftValidationIssue
 } from "@tsz/types";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
-import {
-  pronunciationSynthesisContent,
-  pronunciationSynthesisSpeech,
-  synthesisForLocale
-} from "@tsz/shared";
+import { pronunciationPlaybackSource } from "@tsz/shared";
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
 import {
   PronunciationPreviewControls,
@@ -58,17 +54,18 @@ function PronunciationCell({
       ? form.regional_variants.common
       : form.regional_variants[dialect];
   const locale = dialect === "uk" ? "en-GB" : "en-US";
-  const synthesis = row.synthesis
-    ? synthesisForLocale(row.synthesis, locale, variant.dialect)
-    : undefined;
-  const content = pronunciationSynthesisContent(
+  const {
+    content,
+    profile: activeProfile,
+    assetId
+  } = pronunciationPlaybackSource(
     variant.spelling,
-    synthesis,
-    locale
+    row,
+    variant.spelling_speech,
+    locale,
+    variant.dialect
   );
-  const profile =
-    pronunciationSynthesisSpeech(synthesis, locale)?.voice_profile ??
-    row.voice_profile;
+  const profile = activeProfile ?? row.voice_profile;
   const actualPron = row.actual_pron_rich ?? {
     version: 2 as const,
     text: row.actual_pron,
@@ -99,8 +96,13 @@ function PronunciationCell({
               content={content}
               voiceProfile={profile}
               spelling={variant.spelling}
-              disabled={!content}
-              disabledReason="请先填写当前口音的 Azure IPA/UPS 或选择拼写来源"
+              audioAssetId={assetId}
+              disabled={!content && !assetId}
+              disabledReason={
+                content || !row.synthesis
+                  ? "尚未保存正式音频，请返回编辑补齐"
+                  : "请先填写当前口音的 Azure IPA/UPS 或选择拼写来源"
+              }
               ariaLabelPrefix={`读法 ${pronunciationIndex + 1}${dialect === "uk" ? "英式" : "美式"}`}
               playbackOnly
             />
