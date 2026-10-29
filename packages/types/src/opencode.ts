@@ -63,3 +63,19 @@ export interface OpenCodeModelProbeReport {
   finished_at?: string | null;
   models: OpenCodeModelProbe[];
 }
+
+export interface OpenCodeConnectedProvider {
+  id: string;
+  name: string;
+  connections: OpenCodeProviderConnection[];
+}
+export interface OpenCodeConnectedProviderList {
+  providers: OpenCodeConnectedProvider[];
+}
+
+export interface OpenCodeProviderConnection {
+  id: string | null;
+  method: "oauth" | "key" | "external" | "env";
+  label: string;
+  active: boolean;
+}

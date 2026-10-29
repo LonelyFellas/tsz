@@ -168,3 +168,60 @@ it("全量探针通过独立异步端点执行，读取结果不重复发起模�
   );
   expect(snapshot.paths["/admin/opencode/probes"]).toEqual(["get", "post"]);
 });
+
+it("按凭据切换和登出，列表拒绝秘密字段", async () => {
+  const data = {
+    providers: [
+      {
+        id: "opencode",
+        name: "OpenCode",
+        connections: [
+          { id: "cred_oauth", method: "oauth", label: "TSZ", active: true },
+          { id: "cred_key", method: "key", label: "TSZ", active: false },
+          { id: null, method: "env", label: "TEST_KEY", active: false }
+        ]
+      }
+    ]
+  };
+  const get = vi.fn().mockResolvedValue(data);
+  const del = vi.fn().mockResolvedValue(undefined);
+  const post = vi.fn().mockResolvedValue(undefined);
+  const api = createOpenCodeEndpoints({
+    get,
+    del,
+    post
+  } as unknown as HttpClient);
+  const signal = new AbortController().signal;
+  expect(await api.connectedProviders({ signal })).toEqual(data);
+  expect(get).toHaveBeenCalledWith("/opencode/connections", { signal });
+  await api.disconnectConnection("provider/one", "credential/one");
+  expect(del).toHaveBeenCalledExactlyOnceWith(
+    "/opencode/providers/provider%2Fone/connections/credential%2Fone"
+  );
+  await api.activateConnection("opencode", "cred_key");
+  expect(post).toHaveBeenCalledExactlyOnceWith(
+    "/opencode/providers/opencode/connections/cred_key/activate"
+  );
+  expect(snapshot.paths["/admin/opencode/connections"]).toEqual(["get"]);
+  expect(
+    snapshot.paths[
+      "/admin/opencode/providers/{provider_id}/connections/{connection_id}"
+    ]
+  ).toEqual(["delete"]);
+  expect(
+    snapshot.paths[
+      "/admin/opencode/providers/{provider_id}/connections/{connection_id}/activate"
+    ]
+  ).toEqual(["post"]);
+  get.mockResolvedValue({
+    providers: [
+      {
+        ...data.providers[0],
+        connections: [
+          { ...data.providers[0]!.connections[0], api_key: "must-not-leak" }
+        ]
+      }
+    ]
+  });
+  await expect(api.connectedProviders()).rejects.toThrow();
+});

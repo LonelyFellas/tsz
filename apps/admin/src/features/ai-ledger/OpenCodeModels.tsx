@@ -92,6 +92,9 @@ export function OpenCodeModels({
       await Promise.all([
         client.invalidateQueries({ queryKey: catalogKey }),
         client.invalidateQueries({ queryKey: providerKey }),
+        client.invalidateQueries({
+          queryKey: ["opencode-connections", adminId]
+        }),
         client.invalidateQueries({ queryKey: ["opencode-connection", adminId] })
       ]);
     },
@@ -316,7 +319,7 @@ export function OpenCodeModels({
             <Typography.Text type="secondary">
               填写模型服务商的 API
               Key，保存后自动刷新模型列表。使用费用由对应服务商计费；保存 Key
-              不会自动切换模型。
+              不会自动切换模型。新凭据会成为该供应商的当前凭据，可在上方切换。
             </Typography.Text>
             <Form
               form={keyForm}

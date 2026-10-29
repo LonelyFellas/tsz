@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/chatgpt-admin-backend/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-29T09:02:04.456Z",
+  "_source": "/Users/darwish/.codex/worktrees/opencode-provider-logout/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-10-29T13:44:27.954Z",
   "paths": {
     "/api/internal/agent/v1/requests/{id}/candidates/search": ["post"],
     "/api/internal/agent/v1/requests/{id}/context": ["get"],
@@ -89,6 +89,7 @@
     "/admin/me/coins/entries": ["get"],
     "/admin/me/coins/wallet": ["get"],
     "/admin/opencode": ["get"],
+    "/admin/opencode/connections": ["get"],
     "/admin/opencode/keys": ["post"],
     "/admin/opencode/login": ["post"],
     "/admin/opencode/login/{attempt_id}": ["delete", "get"],
@@ -96,6 +97,12 @@
     "/admin/opencode/models": ["get"],
     "/admin/opencode/probes": ["get", "post"],
     "/admin/opencode/providers": ["get"],
+    "/admin/opencode/providers/{provider_id}/connections/{connection_id}": [
+      "delete"
+    ],
+    "/admin/opencode/providers/{provider_id}/connections/{connection_id}/activate": [
+      "post"
+    ],
     "/admin/permission-audits": ["get"],
     "/admin/permission-changes": ["post"],
     "/admin/permission-changes/preview": ["post"],

@@ -76,6 +76,7 @@ const RUNTIME_SCHEMA_ROOTS = [
   "OpenCodeModelProbeReport",
   "OpenCodeModelList",
   "OpenCodeProviderList",
+  "OpenCodeConnectedProviderList",
   "OpenCodeModelSelection",
   "OpenCodeConnection",
   "ChatGPTAccounts",

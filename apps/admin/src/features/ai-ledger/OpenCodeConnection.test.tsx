@@ -141,3 +141,5 @@ it("链接过期后允许重新发起登录", async () => {
 
 vi.mock("./OpenCodeModels", () => ({ OpenCodeModels: () => null }));
 vi.mock("./ChatGPTConnection", () => ({ ChatGPTConnection: () => null }));
+
+vi.mock("./OpenCodeProviders", () => ({ OpenCodeProviders: () => null }));

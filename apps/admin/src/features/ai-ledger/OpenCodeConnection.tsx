@@ -13,6 +13,7 @@ import {
 } from "antd";
 import type { OpenCodeLogin } from "@tsz/types";
 import { api } from "@/lib/auth";
+import { OpenCodeProviders } from "./OpenCodeProviders";
 import { OpenCodeModels } from "./OpenCodeModels";
 import { ChatGPTConnection } from "./ChatGPTConnection";
 
@@ -57,7 +58,8 @@ export function OpenCodeConnection({ adminId }: { adminId: string }) {
           "opencode-connection",
           "opencode-models",
           "opencode-model-probes",
-          "opencode-providers"
+          "opencode-providers",
+          "opencode-connections"
         ].map((key) => client.invalidateQueries({ queryKey: [key, adminId] }))
       );
   }, [status.data?.status, client, adminId]);
@@ -92,7 +94,12 @@ export function OpenCodeConnection({ adminId }: { adminId: string }) {
               icon={<ReloadOutlined />}
               aria-label="刷新 OpenCode 连接状态"
               loading={connection.isFetching}
-              onClick={() => void connection.refetch()}
+              onClick={() => {
+                void connection.refetch();
+                void client.invalidateQueries({
+                  queryKey: ["opencode-connections", adminId]
+                });
+              }}
             >
               刷新状态
             </Button>
@@ -206,6 +213,16 @@ export function OpenCodeConnection({ adminId }: { adminId: string }) {
           <Alert type="success" showIcon title="OpenCode 授权已完成。" />
         )}
       </Flex>
+      {data?.configured && (
+        <OpenCodeProviders
+          adminId={adminId}
+          disabled={pending || login.isPending}
+          onDisconnected={() => {
+            setAttempt(undefined);
+            login.reset();
+          }}
+        />
+      )}
       <Divider />
       <ChatGPTConnection key={adminId} adminId={adminId} />
       <OpenCodeModels
