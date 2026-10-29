@@ -49,6 +49,7 @@ const ROOTS = [
   "OpenCodeModelProbeReport",
   "OpenCodeModelList",
   "OpenCodeProviderList",
+  "OpenCodeConnectedProviderList",
   "OpenCodeModelSelection",
   "OpenCodeConnection",
   "ChatGPTAccounts",

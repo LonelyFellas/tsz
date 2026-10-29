@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/chatgpt-admin-backend/tsz-rust/docs/openapi.json",
-  "_source_sha256": "71f44f927ade2b1c85381c0cffd9b2e35fc59cbaec716f1edff7982d6d28954e",
+  "_source": "/Users/darwish/.codex/worktrees/opencode-provider-logout/tsz-rust/docs/openapi.json",
+  "_source_sha256": "b927ab1445f2583318684c6de01e8ab4b0efbb75820e6c97506a3a7039ad967f",
   "roots": [
     "LearningCapabilities",
     "QuestionCandidatePage",
@@ -17,6 +17,7 @@
     "OpenCodeModelProbeReport",
     "OpenCodeModelList",
     "OpenCodeProviderList",
+    "OpenCodeConnectedProviderList",
     "OpenCodeModelSelection",
     "OpenCodeConnection",
     "ChatGPTAccounts",
@@ -3074,6 +3075,30 @@
       },
       "additionalProperties": false
     },
+    "OpenCodeConnectedProvider": {
+      "type": "object",
+      "required": ["id", "name", "connections"],
+      "properties": {
+        "connections": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/OpenCodeProviderConnection" }
+        },
+        "id": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "OpenCodeConnectedProviderList": {
+      "type": "object",
+      "required": ["providers"],
+      "properties": {
+        "providers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/OpenCodeConnectedProvider" }
+        }
+      },
+      "additionalProperties": false
+    },
     "OpenCodeConnection": {
       "type": "object",
       "required": ["configured", "connected", "login_available"],
@@ -3083,6 +3108,10 @@
         "login_available": { "type": "boolean" }
       },
       "additionalProperties": false
+    },
+    "OpenCodeConnectionMethod": {
+      "type": "string",
+      "enum": ["oauth", "key", "external", "env"]
     },
     "OpenCodeLogin": {
       "type": "object",
@@ -3215,6 +3244,17 @@
         "connected": { "type": "boolean" },
         "id": { "type": "string" },
         "name": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "OpenCodeProviderConnection": {
+      "type": "object",
+      "required": ["method", "label", "active"],
+      "properties": {
+        "active": { "type": "boolean" },
+        "id": { "type": ["string", "null"] },
+        "label": { "type": "string" },
+        "method": { "$ref": "#/$defs/OpenCodeConnectionMethod" }
       },
       "additionalProperties": false
     },

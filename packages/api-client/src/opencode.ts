@@ -1,5 +1,6 @@
 import type {
   OpenCodeConnection,
+  OpenCodeConnectedProviderList,
   OpenCodeLogin,
   OpenCodeModelList,
   OpenCodeModelProbeReport,
@@ -60,6 +61,27 @@ export function createOpenCodeEndpoints(http: HttpClient) {
       decode(
         "OpenCodeModelSelection",
         await http.put<unknown>("/opencode/model", body)
+      ),
+    connectedProviders: async (options?: {
+      signal?: AbortSignal;
+    }): Promise<OpenCodeConnectedProviderList> =>
+      decode(
+        "OpenCodeConnectedProviderList",
+        await http.get<unknown>("/opencode/connections", options)
+      ),
+    disconnectConnection: (
+      providerId: string,
+      connectionId: string
+    ): Promise<void> =>
+      http.del(
+        `/opencode/providers/${encodeURIComponent(providerId)}/connections/${encodeURIComponent(connectionId)}`
+      ),
+    activateConnection: (
+      providerId: string,
+      connectionId: string
+    ): Promise<void> =>
+      http.post(
+        `/opencode/providers/${encodeURIComponent(providerId)}/connections/${encodeURIComponent(connectionId)}/activate`
       ),
     connectKey: (body: {
       provider_id: string;
