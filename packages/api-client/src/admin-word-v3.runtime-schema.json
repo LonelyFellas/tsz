@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/opencode-model-switch-4218/tsz-rust/docs/openapi.json",
-  "_source_sha256": "5aced8938ca50c70ce2f582400458a72b5940dc2fa060397336a052cb5279a66",
+  "_source": "/Users/darwish/.codex/worktrees/speech-delivery/tsz-rust/docs/openapi.json",
+  "_source_sha256": "a196a30f17099395731e469f1179b619ed1938e2e2afeb75c165a5f249df1d5f",
   "roots": [
     "LearningCapabilities",
     "QuestionCandidatePage",
@@ -101,6 +101,7 @@
     "AdminWordListResponse",
     "EntryLifecycleBatchResponse",
     "DraftValidationResponseV3",
+    "PublicationAudioReview",
     "FormsImpactResponseV3",
     "InboundReferencesV3",
     "SurfaceMatchPageV3",
@@ -736,7 +737,71 @@
         "url_expires_in_seconds": { "type": "integer", "minimum": 0 }
       }
     },
+    "AudioManifest": {
+      "type": "object",
+      "required": [
+        "owner",
+        "revision",
+        "policy_version",
+        "items",
+        "ready",
+        "manifest_hash"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AudioRequirement" }
+        },
+        "manifest_hash": {
+          "type": "string",
+          "maxLength": 64,
+          "minLength": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "owner": { "$ref": "#/$defs/PublicationAudioOwner" },
+        "policy_version": { "type": "integer", "minimum": 1 },
+        "ready": { "type": "boolean" },
+        "revision": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
     "AudioOutputFormat": { "type": "string", "enum": ["mp3", "wav"] },
+    "AudioRequirement": {
+      "type": "object",
+      "required": [
+        "target_id",
+        "content_id",
+        "source_path",
+        "default_for",
+        "setting",
+        "asset_id",
+        "source",
+        "issue"
+      ],
+      "properties": {
+        "asset_id": { "type": ["string", "null"], "format": "uuid" },
+        "content_id": { "type": ["string", "null"], "format": "uuid" },
+        "default_for": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AccentGroup" }
+        },
+        "issue": {
+          "oneOf": [{ "$ref": "#/$defs/RequirementIssue" }, { "type": "null" }]
+        },
+        "setting": {
+          "oneOf": [{ "$ref": "#/$defs/VoiceSettingV3" }, { "type": "null" }]
+        },
+        "source": {
+          "oneOf": [
+            { "$ref": "#/$defs/GeneratedSpeechSource" },
+            { "type": "null" }
+          ]
+        },
+        "source_path": { "type": "string" },
+        "target_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
     "AudioState": {
       "type": "string",
       "enum": ["queued", "processing", "ready", "refunding", "refunded"]
@@ -1833,6 +1898,42 @@
         }
       },
       "additionalProperties": false
+    },
+    "GeneratedSpeechSource": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["content", "kind"],
+          "properties": {
+            "content": { "$ref": "#/$defs/RichTextV2" },
+            "form_links": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/GrammarFormLinkV3" }
+            },
+            "kind": { "type": "string", "enum": ["text"] }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["content", "alphabet", "phoneme", "kind"],
+          "properties": {
+            "alphabet": { "$ref": "#/$defs/RichTextPhonemeAlphabet" },
+            "content": { "$ref": "#/$defs/RichTextV2" },
+            "kind": { "type": "string", "enum": ["phoneme"] },
+            "phoneme": { "type": "string" },
+            "phoneme_locale": {
+              "oneOf": [
+                { "$ref": "#/$defs/PhonemeLocaleV3" },
+                { "type": "null" }
+              ]
+            },
+            "ups_words": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/UpsWordV3" }
+            }
+          }
+        }
+      ]
     },
     "GrammarFormLinkV3": {
       "type": "object",
@@ -3245,6 +3346,30 @@
       },
       "additionalProperties": false
     },
+    "PublicationAudioOwner": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["entry"],
+          "properties": { "entry": { "type": "string", "format": "uuid" } }
+        },
+        {
+          "type": "object",
+          "required": ["sentence"],
+          "properties": { "sentence": { "type": "string", "format": "uuid" } }
+        }
+      ]
+    },
+    "PublicationAudioReview": {
+      "type": "object",
+      "required": ["manifest", "confirmed", "receipt_id"],
+      "properties": {
+        "confirmed": { "type": "boolean" },
+        "manifest": { "$ref": "#/$defs/AudioManifest" },
+        "receipt_id": { "type": ["string", "null"], "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
     "PublishedSentenceTargetCandidateV3": {
       "type": "object",
       "required": [
@@ -3720,6 +3845,17 @@
       "type": "string",
       "enum": ["synonym", "antonym", "derivative"]
     },
+    "RequirementIssue": {
+      "type": "string",
+      "enum": [
+        "missing_configuration",
+        "missing_asset",
+        "invalid_source",
+        "asset_unavailable",
+        "effect_mismatch",
+        "object_unavailable"
+      ]
+    },
     "RetiredContentSlotV3": {
       "type": "object",
       "required": ["id", "content_id", "role", "retired_at"],
@@ -3848,6 +3984,108 @@
         "target_count": { "type": "integer" }
       },
       "additionalProperties": false
+    },
+    "RichTextAnnotation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["start", "end", "level", "type"],
+          "properties": {
+            "end": { "type": "integer", "minimum": 0 },
+            "level": { "$ref": "#/$defs/RichTextEmphasisLevel" },
+            "start": { "type": "integer", "minimum": 0 },
+            "type": { "type": "string", "enum": ["emphasis"] }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "alphabet", "phoneme", "type"],
+          "properties": {
+            "alphabet": { "$ref": "#/$defs/RichTextPhonemeAlphabet" },
+            "end": { "type": "integer", "minimum": 0 },
+            "phoneme": { "type": "string" },
+            "start": { "type": "integer", "minimum": 0 },
+            "type": { "type": "string", "enum": ["phoneme"] }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "interpret_as", "type"],
+          "properties": {
+            "end": { "type": "integer", "minimum": 0 },
+            "interpret_as": { "type": "string" },
+            "start": { "type": "integer", "minimum": 0 },
+            "type": { "type": "string", "enum": ["say_as"] }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "alias", "type"],
+          "properties": {
+            "alias": { "type": "string" },
+            "end": { "type": "integer", "minimum": 0 },
+            "start": { "type": "integer", "minimum": 0 },
+            "type": { "type": "string", "enum": ["sub"] }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "type"],
+          "properties": {
+            "end": { "type": "integer", "minimum": 0 },
+            "end_len": { "type": "integer", "minimum": 1 },
+            "start": { "type": "integer", "minimum": 0 },
+            "start_len": { "type": "integer", "minimum": 1 },
+            "type": { "type": "string", "enum": ["liaison"] }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "color", "type"],
+          "properties": {
+            "color": { "$ref": "#/$defs/RichTextHighlightColor" },
+            "end": { "type": "integer", "minimum": 0 },
+            "start": { "type": "integer", "minimum": 0 },
+            "type": { "type": "string", "enum": ["highlight"] }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["at", "duration_ms", "type"],
+          "properties": {
+            "at": { "type": "integer", "minimum": 0 },
+            "duration_ms": { "type": "integer", "minimum": 0 },
+            "type": { "type": "string", "enum": ["pause"] }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "type"],
+          "properties": {
+            "end": { "type": "integer", "minimum": 0 },
+            "start": { "type": "integer", "minimum": 0 },
+            "type": { "type": "string", "enum": ["italic"] }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "type"],
+          "properties": {
+            "end": { "type": "integer", "minimum": 0 },
+            "start": { "type": "integer", "minimum": 0 },
+            "type": { "type": "string", "enum": ["bold"] }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["start", "end", "type"],
+          "properties": {
+            "end": { "type": "integer", "minimum": 0 },
+            "start": { "type": "integer", "minimum": 0 },
+            "type": { "type": "string", "enum": ["underline"] }
+          }
+        }
+      ]
     },
     "RichTextAnnotationV3": {
       "oneOf": [
@@ -3997,6 +4235,19 @@
         },
         "text": { "type": "string", "maxLength": 5000 },
         "version": { "type": "integer", "enum": [1] }
+      },
+      "additionalProperties": false
+    },
+    "RichTextV2": {
+      "type": "object",
+      "required": ["version", "text", "annotations"],
+      "properties": {
+        "annotations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/RichTextAnnotation" }
+        },
+        "text": { "type": "string" },
+        "version": { "type": "integer", "minimum": 0 }
       },
       "additionalProperties": false
     },

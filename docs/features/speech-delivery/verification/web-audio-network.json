@@ -1,0 +1,88 @@
+{
+  "truncated": false,
+  "hasMore": false,
+  "events": [
+    {
+      "method": "Network.requestWillBeSent",
+      "path": "/api/v1/dictionary/entries/01a1852b-20f1-727e-b05a-37fa42166d9c/audio/01a18538-f501-758f-ada1-25af1c3124a4"
+    },
+    {
+      "method": "Network.responseReceived",
+      "path": "/api/v1/dictionary/entries/01a1852b-20f1-727e-b05a-37fa42166d9c/audio/01a18538-f501-758f-ada1-25af1c3124a4",
+      "status": 200
+    },
+    {
+      "method": "Network.requestWillBeSent",
+      "path": "/temporary-tests/speech-delivery-20261029-1bcfbc371c5f/audio/assets/generated/01a18538-f501-758f-ada1-25af1c3124a4.mp3"
+    },
+    {
+      "method": "Network.responseReceived",
+      "path": "/temporary-tests/speech-delivery-20261029-1bcfbc371c5f/audio/assets/generated/01a18538-f501-758f-ada1-25af1c3124a4.mp3",
+      "status": 206
+    },
+    {
+      "method": "Network.requestWillBeSent",
+      "path": "/api/v1/me/notifications"
+    },
+    {
+      "method": "Network.responseReceived",
+      "path": "/api/v1/me/notifications",
+      "status": 200
+    },
+    {
+      "method": "Network.requestWillBeSent",
+      "path": "/api/v1/me/notifications"
+    },
+    {
+      "method": "Network.responseReceived",
+      "path": "/api/v1/me/notifications",
+      "status": 200
+    },
+    {
+      "method": "Network.requestWillBeSent",
+      "path": "/api/v1/me/notifications"
+    },
+    {
+      "method": "Network.responseReceived",
+      "path": "/api/v1/me/notifications",
+      "status": 200
+    },
+    {
+      "method": "Network.requestWillBeSent",
+      "path": "/api/v1/me/notifications"
+    },
+    {
+      "method": "Network.responseReceived",
+      "path": "/api/v1/me/notifications",
+      "status": 200
+    },
+    {
+      "method": "Network.requestWillBeSent",
+      "path": "/api/v1/me/coins/login-reward"
+    },
+    {
+      "method": "Network.requestWillBeSent",
+      "path": "/temporary-tests/speech-delivery-20261029-1bcfbc371c5f/audio/assets/generated/01a18538-f501-758f-ada1-25af1c3124a4.mp3"
+    },
+    {
+      "method": "Network.responseReceived",
+      "path": "/api/v1/me/coins/login-reward",
+      "status": 200
+    },
+    {
+      "method": "Network.responseReceived",
+      "path": "/temporary-tests/speech-delivery-20261029-1bcfbc371c5f/audio/assets/generated/01a18538-f501-758f-ada1-25af1c3124a4.mp3",
+      "status": 206
+    },
+    {
+      "method": "Network.requestWillBeSent",
+      "path": "/api/v1/me/notifications"
+    },
+    {
+      "method": "Network.responseReceived",
+      "path": "/api/v1/me/notifications",
+      "status": 200
+    }
+  ],
+  "signingRequests": 1
+}

@@ -1,10 +1,11 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Alert, Button, Input, List, Modal, Space, Typography } from "antd";
 import { HttpError } from "@tsz/api-client";
 import type { SharedSentence, SentencePublication } from "@tsz/types";
 import { api } from "@/lib/auth";
 import { V3EnglishTextPreview } from "../dictionary/word-creation-v3/components/V3EnglishTextPreview";
+import { PublicationAudioReviewPanel } from "../dictionary/PublicationAudioReviewPanel";
 
 export type SentencePublicationAction =
   "publish" | "history" | "withdraw" | "restore";
@@ -29,6 +30,13 @@ export function SentencePublicationModal({
   onClose: () => void;
   onChanged: () => void;
 }) {
+  const audioScope = `${sentence.id}:${sentence.revision}`;
+  const [reviewedAudio, setReviewedAudio] = useState<string>();
+  const audioReady = reviewedAudio === audioScope;
+  const onAudioReady = useCallback(
+    (ready: boolean) => setReviewedAudio(ready ? audioScope : undefined),
+    [audioScope]
+  );
   const canAct =
     canPublish &&
     (action !== "history" ||
@@ -72,6 +80,7 @@ export function SentencePublicationModal({
   };
   const submit = async () => {
     if (busy.current || blocked || !canAct) return;
+    if (action === "publish" && !audioReady) return;
     if (action === "history" && !selected) return;
     if (action === "withdraw" && (!impact.data || !reason.trim())) return;
     busy.current = true;
@@ -128,6 +137,7 @@ export function SentencePublicationModal({
         disabled:
           !canAct ||
           blocked ||
+          (action === "publish" && !audioReady) ||
           (action === "history" && !selected) ||
           (action === "withdraw" &&
             (!impact.data || impact.isError || !reason.trim()))
@@ -149,10 +159,19 @@ export function SentencePublicationModal({
           description="需要对应的发布、撤回或历史恢复权限；普通管理员仅能操作本人例句。"
         />
         {action === "publish" && (
-          <V3EnglishTextPreview
-            value={sentence.content.sentence.en_text}
-            hideCommonDialect
-          />
+          <>
+            <V3EnglishTextPreview
+              value={sentence.content.sentence.en_text}
+              hideCommonDialect
+            />
+            <PublicationAudioReviewPanel
+              owner="sentence"
+              id={sentence.id}
+              revision={sentence.revision}
+              canConfirm={canAct}
+              onReady={onAudioReady}
+            />
+          </>
         )}
         {action === "withdraw" && (
           <>

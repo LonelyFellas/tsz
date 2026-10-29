@@ -2,6 +2,8 @@ import type {
   PronunciationSynthesisV3,
   PronunciationSynthesisCandidateV3,
   SynthesisSpeechV3,
+  SpellingSpeechV3,
+  VoiceProfileV3,
   RichTextV2,
   PhonemeLocaleV3,
   SentenceSourceRangeV3,
@@ -779,4 +781,53 @@ export function convertDictionaryPhonetic(
   const value = result.join(alphabet === "ups" ? " " : "");
   const issue = synthesisInputIssue(alphabet, value);
   return issue ? fail(start, issue) : { ok: true, value };
+}
+
+/** Final playback follows the saved active source, without resolving new voices. */
+export function pronunciationPlaybackSource(
+  spelling: string,
+  pronunciation: WordPronunciationV3,
+  spellingSpeech: SpellingSpeechV3 | undefined,
+  locale: PhonemeLocaleV3,
+  legacyDialect: Dialect,
+  requireLocaleConfirmation = false
+): { content?: RichTextV2; profile?: VoiceProfileV3; assetId?: string } {
+  const synthesis = pronunciation.synthesis
+    ? synthesisForLocale(pronunciation.synthesis, locale, legacyDialect)
+    : undefined;
+  const speech = synthesis?.use_spelling
+    ? spellingSpeech
+    : pronunciationSynthesisSpeech(synthesis, locale);
+  const profile = synthesis
+    ? speech?.voice_profile
+    : pronunciation.voice_profile;
+  const uploads = synthesis?.use_spelling
+    ? spellingSpeech?.audio_assets
+    : pronunciation.audio_assets;
+  const matchesLocale = (value: string | undefined) =>
+    value !== undefined &&
+    (locale === "en-GB"
+      ? ["en-GB", "en-AU", "en-NZ"]
+      : ["en-US", "en-CA"]
+    ).includes(value);
+  const content = synthesis?.use_spelling
+    ? spellingSpeech?.content
+    : pronunciationSynthesisContent(
+        spelling,
+        synthesis,
+        locale,
+        requireLocaleConfirmation
+      );
+  const assetId =
+    (!synthesis || content ? profile : undefined)?.voices.find(
+      (v) => v.enabled && matchesLocale(v.locale) && v.audio_asset_id
+    )?.audio_asset_id ??
+    uploads?.find((asset) => matchesLocale(asset.locale))?.id ??
+    pronunciation.audio_assets?.find((asset) => matchesLocale(asset.locale))
+      ?.id;
+  return {
+    content,
+    profile: profile ? { voices: profile.voices } : undefined,
+    assetId
+  };
 }

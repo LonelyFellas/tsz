@@ -103,7 +103,7 @@ describe("V3ReviewContent", () => {
     }
   });
 
-  it("预览按选中的 UPS 合成，缺失或非法数据禁止试听", () => {
+  it("最终读音选择已保存的 UPS/拼写音频，缺项不合成", () => {
     const current = word();
     const form = current.forms.pos[0]!.forms[0]!;
     if (form.regional_variants.mode !== "common")
@@ -115,6 +115,24 @@ describe("V3ReviewContent", () => {
       ipa: "ignored",
       ups: "S EH N T AX R",
       ups_locale: "en-GB"
+    };
+    pronunciation.synthesis.uk = {
+      ipa: "ignored",
+      ups: "S EH N T AX R",
+      ups_speech: {
+        content: { version: 2, text: variant.spelling, annotations: [] },
+        voice_profile: {
+          voices: [
+            {
+              voice_id: "sonia",
+              locale: "en-GB",
+              enabled: true,
+              rate_percent: 0,
+              audio_asset_id: "ups-formal"
+            }
+          ]
+        }
+      }
     };
     playbackSpy.mockClear();
     const view = render(<V3ReviewContent word={current} playback />);
@@ -136,6 +154,7 @@ describe("V3ReviewContent", () => {
         }
       })
     );
+    delete pronunciation.synthesis.uk;
     pronunciation.synthesis.ups_locale = "en-US";
     playbackSpy.mockClear();
     view.rerender(<V3ReviewContent word={current} playback />);
@@ -151,9 +170,23 @@ describe("V3ReviewContent", () => {
     expect(playbackSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         disabled: true,
-        disabledReason: "请填写 Azure IPA"
+        disabledReason: "尚未保存正式音频，请返回编辑补齐"
       })
     );
+    variant.spelling_speech = {
+      content: { version: 2, text: variant.spelling, annotations: [] },
+      voice_profile: {
+        voices: [
+          {
+            voice_id: "sonia",
+            locale: "en-GB",
+            enabled: true,
+            rate_percent: 0,
+            audio_asset_id: "spelling-formal"
+          }
+        ]
+      }
+    };
     pronunciation.synthesis = {
       alphabet: "ipa",
       ipa: "",

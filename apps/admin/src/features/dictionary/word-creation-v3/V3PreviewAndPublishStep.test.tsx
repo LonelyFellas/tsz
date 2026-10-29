@@ -1,4 +1,4 @@
-import { useAuthStore } from "@/lib/auth";
+import { api, useAuthStore } from "@/lib/auth";
 import { HttpError, RequestTimeoutError } from "@tsz/api-client";
 import type {
   AdminWordV3,
@@ -1582,6 +1582,31 @@ describe("V3PreviewAndPublishStep", () => {
 });
 
 beforeEach(() => {
+  // These cases exercise surface confirmation and command reconciliation with
+  // an explicitly satisfied audio prerequisite; audio review has its own tests.
+  vi.spyOn(api.words.publicationAudio, "check").mockImplementation(
+    async (entryId, input) => ({
+      manifest: {
+        owner: { entry: entryId },
+        revision: input.base_revision,
+        policy_version: 1,
+        items: ["uk", "us"].map((accent, index) => ({
+          target_id: uuidFromInt(90000),
+          content_id: null,
+          source_path: "/forms/contents/0",
+          default_for: [accent as "uk" | "us"],
+          setting: null,
+          asset_id: uuidFromInt(90001 + index),
+          source: null,
+          issue: null
+        })),
+        ready: true,
+        manifest_hash: "a".repeat(64)
+      },
+      confirmed: true,
+      receipt_id: uuidFromInt(90003)
+    })
+  );
   useAuthStore.setState({
     profile: {
       id: "admin-1",

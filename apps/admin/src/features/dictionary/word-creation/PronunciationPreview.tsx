@@ -399,6 +399,7 @@ export function PronunciationPreviewControls({
   content,
   voiceProfile,
   playbackOnly = false,
+  audioAssetId,
   dialect,
   ariaLabelPrefix,
   disabled = false,
@@ -413,6 +414,7 @@ export function PronunciationPreviewControls({
   content?: RichTextV2;
   voiceProfile?: VoiceProfileV3;
   playbackOnly?: boolean;
+  audioAssetId?: string;
   dialect: Dialect;
   ariaLabelPrefix?: string;
   disabled?: boolean;
@@ -437,9 +439,16 @@ export function PronunciationPreviewControls({
     () => content ?? { version: 2, text: spelling ?? "", annotations: [] },
     [content, spelling]
   );
+  const playbackProfile = useMemo(
+    () =>
+      playbackOnly && voiceProfile
+        ? { voices: voiceProfile.voices }
+        : voiceProfile,
+    [playbackOnly, voiceProfile]
+  );
   const resolved = useResolvedPreviewProfile(
     context,
-    voiceProfile,
+    playbackProfile,
     previewContent,
     dialect,
     previewAdapter ?? context.adapter
@@ -455,6 +464,7 @@ export function PronunciationPreviewControls({
   const selectedSetting = voice
     ? voiceSettingFor(resolved.profile?.voices ?? [], voice.id)
     : undefined;
+  const savedAssetId = audioAssetId ?? selectedSetting?.audio_asset_id;
   const contentKey = JSON.stringify([
     previewContent,
     targetLocale,
@@ -467,6 +477,8 @@ export function PronunciationPreviewControls({
     selectedSetting?.role,
     selectedSetting?.output_format,
     selectedSetting?.audio_asset_id,
+    audioAssetId,
+    playbackOnly,
     voiceProfile?.dubbing,
     resolved.pending
   ]);
@@ -539,38 +551,47 @@ export function PronunciationPreviewControls({
         () => {
           if (audioRef.current !== audio) return;
           discardResult();
-          setStatus("试听音频加载失败，请重新生成");
-          void message.error("试听音频加载失败，请重新生成");
+          const error = savedAssetId
+            ? "正式音频读取失败，请重试"
+            : "试听音频加载失败，请重新生成";
+          setStatus(error);
+          void message.error(error);
         },
         { once: true }
       );
       audio.addEventListener(
         "ended",
         () => {
-          if (audioRef.current === audio) setStatus("已生成试听");
+          if (audioRef.current === audio)
+            setStatus(savedAssetId ? "正式音频已就绪" : "已生成试听");
         },
         { once: true }
       );
       return audio;
     },
-    [audioFactory, discardResult, message]
+    [audioFactory, discardResult, message, savedAssetId]
   );
 
   const generate = async () => {
+    const adapter = previewAdapter ?? context.adapter;
+    const assetId = savedAssetId;
     if (
       disabled ||
-      !context.enabled ||
-      context.voicesLoading ||
-      resolved.pending ||
-      !voice ||
-      !text ||
       busy ||
       generationRef.current ||
-      abortRef.current
-    ) {
+      abortRef.current ||
+      (playbackOnly
+        ? !assetId || !adapter.resolveAudio
+        : !context.enabled ||
+          context.voicesLoading ||
+          resolved.pending ||
+          !voice ||
+          !text)
+    )
       return;
-    }
     if (
+      !playbackOnly &&
+      voice &&
       previewContent.annotations.some((mark) => mark.type === "phoneme") &&
       voice.locale !== targetLocale
     ) {
@@ -586,41 +607,41 @@ export function PronunciationPreviewControls({
     const controller = new AbortController();
     abortRef.current = controller;
     setBusy(true);
-    setStatus("正在生成试听…");
+    setStatus(assetId ? "正在读取正式音频…" : "正在生成试听…");
     try {
-      const adapter = previewAdapter ?? context.adapter;
-      const preview =
-        selectedSetting?.audio_asset_id && adapter.resolveAudio
-          ? await adapter.resolveAudio(selectedSetting.audio_asset_id, {
-              signal: controller.signal
-            })
-          : await adapter.synthesize(
-              {
-                language: "en",
-                content: previewContent,
-                voiceId: voice.id,
-                ratePercent: selectedSetting?.rate_percent ?? 0,
-                ...(selectedSetting?.output_format
-                  ? { outputFormat: selectedSetting.output_format }
-                  : {}),
-                ...(selectedSetting?.pitch_semitones !== undefined
-                  ? { pitchSemitones: selectedSetting.pitch_semitones }
-                  : {}),
-                ...(selectedSetting?.volume_percent !== undefined
-                  ? { volumePercent: selectedSetting.volume_percent }
-                  : {}),
-                ...(selectedSetting?.style
-                  ? { style: selectedSetting.style }
-                  : {}),
-                ...(selectedSetting?.style_degree !== undefined
-                  ? { styleDegree: selectedSetting.style_degree }
-                  : {}),
-                ...(selectedSetting?.role !== undefined
-                  ? { role: selectedSetting.role }
-                  : {})
-              },
-              { signal: controller.signal }
-            );
+      let preview: VoicePreviewResult;
+      if (assetId && adapter.resolveAudio) {
+        preview = await adapter.resolveAudio(assetId, {
+          signal: controller.signal
+        });
+      } else {
+        if (playbackOnly || !voice) return;
+        preview = await adapter.synthesize(
+          {
+            language: "en",
+            content: previewContent,
+            voiceId: voice.id,
+            ratePercent: selectedSetting?.rate_percent ?? 0,
+            ...(selectedSetting?.output_format
+              ? { outputFormat: selectedSetting.output_format }
+              : {}),
+            ...(selectedSetting?.pitch_semitones !== undefined
+              ? { pitchSemitones: selectedSetting.pitch_semitones }
+              : {}),
+            ...(selectedSetting?.volume_percent !== undefined
+              ? { volumePercent: selectedSetting.volume_percent }
+              : {}),
+            ...(selectedSetting?.style ? { style: selectedSetting.style } : {}),
+            ...(selectedSetting?.style_degree !== undefined
+              ? { styleDegree: selectedSetting.style_degree }
+              : {}),
+            ...(selectedSetting?.role !== undefined
+              ? { role: selectedSetting.role }
+              : {})
+          },
+          { signal: controller.signal }
+        );
+      }
       if (controller.signal.aborted) {
         preview.dispose?.();
         return;
@@ -630,7 +651,9 @@ export function PronunciationPreviewControls({
       const expiresIn = Date.parse(preview.expiresAt) - Date.now();
       const expire = () => {
         discardResult();
-        setStatus("试听已过期，请重新生成");
+        setStatus(
+          assetId ? "音频地址已过期，请重新播放" : "试听已过期，请重新生成"
+        );
       };
       if (!Number.isFinite(expiresIn) || expiresIn <= 0) {
         expire();
@@ -642,7 +665,13 @@ export function PronunciationPreviewControls({
       try {
         await audio.play();
         if (audioRef.current === audio) {
-          setStatus(preview.cached ? "播放中（缓存命中）" : "播放中（新合成）");
+          setStatus(
+            assetId
+              ? "播放中（正式音频）"
+              : preview.cached
+                ? "播放中（缓存命中）"
+                : "播放中（新合成）"
+          );
         }
       } catch {
         if (audioRef.current === audio) {
@@ -667,12 +696,13 @@ export function PronunciationPreviewControls({
   };
 
   const replay = async () => {
-    if (disabled || !context.enabled || !result) return;
+    if (disabled || (!playbackOnly && !context.enabled) || !result) return;
     claimPlayback(stopPlayback);
     const audio = attachAudio(result);
     try {
       await audio.play();
-      if (audioRef.current === audio) setStatus("播放中");
+      if (audioRef.current === audio)
+        setStatus(savedAssetId ? "播放中（正式音频）" : "播放中");
     } catch {
       if (audioRef.current === audio) {
         setStatus("播放失败，请检查浏览器音频权限后重试");
@@ -719,10 +749,13 @@ export function PronunciationPreviewControls({
             icon={<SoundOutlined />}
             disabled={
               disabled ||
-              !context.enabled ||
               busy ||
               (!result &&
-                (!playbackOnly || context.voicesLoading || !voice || !text))
+                (playbackOnly
+                  ? !savedAssetId ||
+                    !(previewAdapter ?? context.adapter).resolveAudio
+                  : true)) ||
+              (!playbackOnly && !context.enabled)
             }
             aria-label={playLabel}
             loading={playbackOnly && busy}
