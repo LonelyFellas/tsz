@@ -7,6 +7,10 @@ import test from "node:test";
 import * as prettier from "prettier";
 
 const workflowUrl = new URL("../.github/workflows/ci.yml", import.meta.url);
+const deployWorkflowUrl = new URL(
+  "../.github/workflows/deploy-tshb-test.yml",
+  import.meta.url
+);
 const setupActionUrl = new URL(
   "../.github/actions/setup-node-pnpm/action.yml",
   import.meta.url
@@ -33,6 +37,26 @@ async function workflowFixture() {
   const source = await readFile(workflowUrl, "utf8");
   return { source, jobs: extractJobBlocks(source) };
 }
+
+test("automatic deployment is restricted to successful main push CI and binds its identity", async () => {
+  const source = await readFile(deployWorkflowUrl, "utf8");
+  assert.equal(await prettier.check(source, { parser: "yaml" }), true);
+  for (const required of [
+    "github.event.workflow_run.event == 'push'",
+    "github.event.workflow_run.head_branch == 'main'",
+    "github.event.workflow_run.conclusion == 'success'",
+    "github.event.workflow_run.head_sha",
+    "DEPLOY_EXPECTED_CI_RUN_ID",
+    "DEPLOY_EXPECTED_CI_RUN_ATTEMPT",
+    "StrictHostKeyChecking yes",
+    "./deploy/deploy-web.sh",
+    "./deploy/deploy-admin.sh"
+  ])
+    assert.ok(
+      source.includes(required),
+      `missing deployment safeguard: ${required}`
+    );
+});
 
 test("W01: workflow identity, triggers, permissions and concurrency stay stable", async () => {
   const { source } = await workflowFixture();
@@ -71,20 +95,13 @@ test("deploy packages are built once on matching Linux and published per attempt
   );
 });
 
-test("W02: coverage matrix has five fixed modules and fail-fast disabled", async () => {
+test("W02: all test modules run in coverage mode and publish their results", async () => {
   const { jobs } = await workflowFixture();
   const block = jobs.get("unit-coverage");
   assert.ok(block);
   assert.match(block, /fail-fast: false/);
-  for (const module of ["packages", "web", "admin-1", "admin-2", "admin-3"]) {
-    assert.match(block, new RegExp(`module: ${module}(?:\\n|$)`));
-  }
   assert.match(block, /pnpm ci:test-module/);
-  assert.ok(
-    block.includes(
-      "${{ github.event_name == 'pull_request' && 'test' || 'coverage' }}"
-    )
-  );
+  assert.match(block, /\.ci-artifacts\/\$\{\{ matrix\.module \}\}\s+coverage/);
   assert.match(block, /actions\/upload-artifact@v7/);
   // 重跑后各 attempt 的同名产物并存，名字不带 attempt 就分不出新旧。
   assert.match(

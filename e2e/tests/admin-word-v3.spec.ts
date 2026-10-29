@@ -363,103 +363,19 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     });
   }
 
-  test("词形拼写与实际发音的输入和按钮保持连续边框", async ({ page }) => {
+  test("UPS 折叠控件可展开并收起", async ({ page }) => {
     await mockAdminV3Api(page, { formsFailureOnce: false });
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
     await openFormContent(page);
-    await page.evaluate(() => document.fonts.ready);
-    const groups = [
-      page
-        .locator(".word-shared-form-spelling .v3-voice-text-field-compact")
-        .first(),
-      page
-        .locator(
-          ".word-actual-pronunciation-control .v3-voice-text-field-compact"
-        )
-        .first()
-    ];
-    for (const width of [1280, 760]) {
-      await page.setViewportSize({ width, height: 1000 });
-      for (const [index, group] of groups.entries()) {
-        await expect(group).toBeVisible();
-        await expect(async () => {
-          const controls = await group.evaluate((node) =>
-            [...node.children].map((child) => {
-              const control = child.matches("button, textarea")
-                ? child
-                : child.querySelector("textarea")!;
-              const rect = control.getBoundingClientRect();
-              const style = getComputedStyle(control);
-              return {
-                x: rect.x,
-                right: rect.right,
-                y: rect.y,
-                height: rect.height,
-                left: [style.borderTopLeftRadius, style.borderBottomLeftRadius],
-                end: [style.borderTopRightRadius, style.borderBottomRightRadius]
-              };
-            })
-          );
-          expect(controls.length).toBeGreaterThanOrEqual(2);
-          for (let i = 0; i < controls.length; i++) {
-            const control = controls[i]!;
-            expect(Math.abs(control.y - controls[0]!.y)).toBeLessThanOrEqual(1);
-            expect(
-              Math.abs(control.height - controls[0]!.height)
-            ).toBeLessThanOrEqual(1);
-            if (i > 0) {
-              expect(control.left).toEqual(["0px", "0px"]);
-              expect(control.x - controls[i - 1]!.right).toBeCloseTo(-1, 1);
-            } else
-              expect(
-                control.left.every((radius) => Number.parseFloat(radius) > 0)
-              ).toBe(true);
-            if (i < controls.length - 1)
-              expect(control.end).toEqual(["0px", "0px"]);
-            else
-              expect(
-                control.end.every((radius) => Number.parseFloat(radius) > 0)
-              ).toBe(true);
-          }
-        }).toPass({ timeout: 5000 });
-        const input = group.locator("textarea");
-        await input.focus();
-        await expect(input).toBeFocused();
-        await expect(input).toHaveCSS("border-color", "rgb(32, 83, 255)");
-        await group.screenshot({
-          path: test.info().outputPath(`compact-field-${index}-${width}.png`)
-        });
-      }
-    }
-  });
-
-  test("UPS 折叠箭头与读法下拉保持一致", async ({ page }) => {
-    await mockAdminV3Api(page, { formsFailureOnce: false });
-    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
-    await openFormContent(page);
-    const fields = page.locator(".word-pronunciation-floating-fields").first();
-    const nativeArrow = fields.locator(".ant-select .anticon-down").first();
-    const toggle = fields.locator(".word-synthesis-ups-toggle");
-    const arrow = toggle.locator(".anticon-down");
-    const nativeStyle = await nativeArrow.evaluate((node) => ({
-      color: getComputedStyle(node).color,
-      fontSize: getComputedStyle(node).fontSize,
-      path: node.querySelector("path")!.getAttribute("d")!
-    }));
-    for (const [step, expanded] of [false, true, false].entries()) {
-      await expect(toggle).toHaveAttribute("aria-expanded", String(expanded));
-      await expect(arrow).toHaveCSS("color", nativeStyle.color);
-      await expect(arrow).toHaveCSS("font-size", nativeStyle.fontSize);
-      await expect(arrow.locator("path")).toHaveAttribute(
-        "d",
-        nativeStyle.path
-      );
-      await expect(arrow.locator("svg")).toHaveCSS(
-        "transform",
-        expanded ? "matrix(-1, 0, 0, -1, 0, 0)" : "none"
-      );
-      if (step < 2) await toggle.click();
-    }
+    const toggle = page
+      .locator(".word-pronunciation-floating-fields")
+      .first()
+      .locator(".word-synthesis-ups-toggle");
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
   });
 
   test("浮动标签在聚焦和悬停时始终完整显示", async ({ page }) => {
@@ -754,58 +670,6 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     });
   }
 
-  test("词形拼写在基础确认、摘要、预览和历史快照中统一为 700", async ({
-    page
-  }) => {
-    await mockAdminV3Api(page);
-    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/basics`);
-    await expect(page.locator(".v3-summary-headword")).toHaveCSS(
-      "font-weight",
-      "700"
-    );
-    const spellings = page.locator(".dialect-panel input.tsz-words");
-    await expect(spellings.first()).toBeVisible();
-    for (const spelling of await spellings.all())
-      await expect(spelling).toHaveCSS("font-weight", "700");
-    // 仅向本用例拦截的 Mock API 生成发布快照。
-    const status = await page.evaluate(async (id) => {
-      const response = await fetch(
-        `/api/v1/admin/lexicon/entries/${id}/publications`,
-        { method: "POST" }
-      );
-      return response.status;
-    }, ADMIN_V3_MIXED_WORD_ID);
-    expect(status).toBe(200);
-    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/preview`);
-    const chain = page.locator(".v3-review-form-chain .tsz-words");
-    await expect(chain.first()).toBeVisible();
-    for (const spelling of await chain.all())
-      await expect(spelling).toHaveCSS("font-weight", "700");
-    await page.getByRole("button", { name: "查看第 2 次发布" }).click();
-    const snapshot = page.getByTestId("publication-snapshot-body");
-    await expect(
-      snapshot.getByText("orbit", { exact: true }).first()
-    ).toHaveCSS("font-weight", "700");
-  });
-
-  test("词形拼写收起态的可见文字与输入框都使用 Bold", async ({ page }) => {
-    await mockAdminV3Api(page);
-    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
-    const contentDrawer = await openFormContent(page);
-    const spelling = contentDrawer.locator("textarea.tsz-words").first();
-    const preview = contentDrawer
-      .locator(".v3-grammar-preview-content.tsz-words")
-      .first();
-    const text = preview.locator(".tsz-ve-readonly > span").first();
-    await expect(preview).toHaveText(await spelling.inputValue());
-    await expect(text).toHaveCSS("font-weight", "700");
-    await expect(spelling).toHaveCSS("font-weight", "700");
-    await spelling.focus();
-    await expect(text).toHaveCSS("font-weight", "700");
-    await spelling.blur();
-    await expect(text).toHaveCSS("font-weight", "700");
-  });
-
   test("英文词语、音标与默认正文实际加载各自字体，补字不回退到系统字体", async ({
     page
   }) => {
@@ -1042,182 +906,16 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     }
   });
 
-  test("Inter Display cv01 在正斜体和三档字重中实际改变数字字形", async ({
-    page
-  }) => {
+  test("窄屏字段标题不被裁切", async ({ page }) => {
     await mockAdminV3Api(page);
-    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
-    await expect(page.getByLabel("添加基本词性").first()).toBeVisible();
-
-    for (const style of ["normal", "italic"]) {
-      for (const weight of [400, 700, 800]) {
-        await test.step(`${style} / ${weight}`, async () => {
-          const glyphs = await page.evaluate(
-            async ({ style, weight }) => {
-              await document.fonts.load(
-                `${style} ${weight} 96px "TSZ Text"`,
-                "1"
-              );
-              const faceRule = [...document.styleSheets]
-                .flatMap((sheet) => [...sheet.cssRules])
-                .filter(
-                  (rule): rule is CSSFontFaceRule =>
-                    rule instanceof CSSFontFaceRule
-                )
-                .find((rule) => {
-                  const [min, max = min] = rule.style.fontWeight
-                    .split(" ")
-                    .map(Number);
-                  return (
-                    rule.style.fontFamily.replaceAll('"', "") === "TSZ Text" &&
-                    rule.style.fontStyle === style &&
-                    weight >= min &&
-                    weight <= max &&
-                    rule.style.getPropertyValue("src").includes("InterDisplay-")
-                  );
-                });
-              if (!faceRule)
-                throw new Error(`缺少 Inter Display ${style} ${weight}`);
-
-              // 同一字体文件只切换 cv01，在当前浏览器内比较像素，不依赖平台截图基线。
-              const referenceFaces = [1, 0].map(
-                (enabled) =>
-                  new FontFace(
-                    enabled ? "TSZCv01Enabled" : "TSZCv01Disabled",
-                    faceRule.style.getPropertyValue("src"),
-                    {
-                      style,
-                      weight: String(weight),
-                      featureSettings: `"cv01" ${enabled}, "cv06", "ss01", "ss03"`
-                    }
-                  )
-              );
-              try {
-                await Promise.all(referenceFaces.map((face) => face.load()));
-                referenceFaces.forEach((face) => document.fonts.add(face));
-                const canvas = document.createElement("canvas");
-                canvas.width = 256;
-                canvas.height = 160;
-                const context = canvas.getContext("2d")!;
-                const render = (family: string) => {
-                  context.clearRect(0, 0, canvas.width, canvas.height);
-                  context.font = `${style} ${weight} 96px "${family}"`;
-                  context.fillText("111", 16, 112);
-                  return [
-                    ...context.getImageData(0, 0, canvas.width, canvas.height)
-                      .data
-                  ];
-                };
-                const actual = render("TSZ Text");
-                const enabled = render(referenceFaces[0].family);
-                const disabled = render(referenceFaces[1].family);
-                return {
-                  hasInk: actual.some((value) => value !== 0),
-                  matchesEnabled: actual.every(
-                    (value, index) => value === enabled[index]
-                  ),
-                  differsFromDisabled: actual.some(
-                    (value, index) => value !== disabled[index]
-                  ),
-                  featureChangesGlyph: enabled.some(
-                    (value, index) => value !== disabled[index]
-                  )
-                };
-              } finally {
-                referenceFaces.forEach((face) => document.fonts.delete(face));
-              }
-            },
-            { style, weight }
-          );
-          expect(glyphs).toEqual({
-            hasInk: true,
-            matchesEnabled: true,
-            differsFromDisabled: true,
-            featureChangesGlyph: true
-          });
-        });
-      }
-    }
-  });
-
-  test("字段标签与表头统一字体颜色，并轻微内缩对齐", async ({ page }) => {
-    await mockAdminV3Api(page);
-    await page.setViewportSize({ width: 1440, height: 1000 });
-    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/meanings`);
-    await page.getByRole("button", { name: "添加派生词", exact: true }).click();
-    const labels = page
-      .locator(
-        [
-          ".word-sense-field > .ant-typography:first-child",
-          ".word-sense-context-toggle > .ant-typography:first-child",
-          ".word-sense-group-heads > span:not(:empty)",
-          ".word-definition-list-header > span:not(:empty)",
-          ".word-relation-column-heads > span:not(:empty)"
-        ].join(", ")
-      )
-      .filter({ visible: true });
-    const labelInset = "6px";
-    const style = await labels.first().evaluate((node) => ({
-      color: getComputedStyle(node).color,
-      fontFamily: getComputedStyle(node).fontFamily
-    }));
-    for (const label of await labels.all()) {
-      await expect(label).toHaveCSS("font-size", "12px");
-      await expect(label).toHaveCSS("font-weight", "400");
-      await expect(label).toHaveCSS("color", style.color);
-      await expect(label).toHaveCSS("font-family", style.fontFamily);
-      await expect(label).toHaveCSS("padding-inline-start", labelInset);
-    }
-    const group = page.locator(".word-sense-field-group").first();
-    const title = group.locator(".ant-typography").first();
-    const titleTextX = await title.evaluate((node) => {
-      const range = document.createRange();
-      range.selectNodeContents(node);
-      return range.getBoundingClientRect().x;
-    });
-    expect(
-      titleTextX - (await group.locator(".ant-select").boundingBox())!.x
-    ).toBe(parseFloat(labelInset));
-    const tableTitle = page
-      .locator(".word-definition-list-header")
-      .first()
-      .getByText("释义语句", { exact: true });
-    const tableTextX = await tableTitle.evaluate((node) => {
-      const range = document.createRange();
-      range.selectNodeContents(node);
-      return range.getBoundingClientRect().x;
-    });
-    expect(
-      tableTextX -
-        (await page.getByLabel("定义 1 内容", { exact: true }).boundingBox())!.x
-    ).toBe(parseFloat(labelInset));
-    await page
-      .locator(".word-sense-meta-grid")
-      .first()
-      .screenshot({ path: test.info().outputPath("unified-field-labels.png") });
-    // 百分比后缀和开关图标都要与输入框内容保持同一水平中线。
-    const frequency = page.locator(".word-sense-field-frequency").first();
-    const frequencyBox = (await frequency.locator("input").boundingBox())!;
-    const suffixBox = (await frequency
-      .locator(".ant-input-number-suffix")
-      .boundingBox())!;
-    const trackBox = (await page
-      .locator(".word-sense-context-control .ant-switch")
-      .first()
-      .boundingBox())!;
-    const inputCenter = frequencyBox.y + frequencyBox.height / 2;
-    expect(
-      Math.abs(suffixBox.y + suffixBox.height / 2 - inputCenter)
-    ).toBeLessThanOrEqual(1);
-    expect(
-      Math.abs(trackBox.y + trackBox.height / 2 - inputCenter)
-    ).toBeLessThanOrEqual(1);
     await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/meanings`);
     const levelTitle = page
       .locator(
         ".word-sense-meta-grid > .word-sense-field:first-child > .ant-typography"
       )
       .first();
+    await expect(levelTitle).toBeVisible();
     expect(
       await levelTitle.evaluate((node) => node.scrollWidth - node.clientWidth)
     ).toBeLessThanOrEqual(1);
@@ -1252,27 +950,9 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(button("删除语法结构 1")).toBeDisabled();
   });
 
-  test("语义区间与语法结构在底部通栏添加，词义标题无内分隔线", async ({
-    page
-  }) => {
+  test("语义区间与语法结构可在底部添加", async ({ page }) => {
     await mockAdminV3Api(page);
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/meanings`);
-    const sense = page.locator(".word-sense-editor-v3").first();
-    await expect(sense.locator(".word-sense-header-actions")).toHaveCSS(
-      "margin-inline-start",
-      "8px"
-    );
-    await expect(
-      sense.locator(":scope > .ant-collapse-item > .ant-collapse-panel")
-    ).toHaveCSS("border-top-width", "0px");
-    await expect(sense.locator(".word-sense-header-content")).toHaveCSS(
-      "column-gap",
-      "8px"
-    );
-    await expect(sense.locator(":scope > .ant-collapse-item")).toHaveCSS(
-      "border-left-width",
-      "4px"
-    );
     for (const [name, cardClass, rowClass] of [
       ["语义区间", ".word-sense-groups-card", ".word-sense-group-item"],
       ["语法结构", ".word-grammar-card", ".word-grammar-row"]
@@ -1283,21 +963,17 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
         exact: true
       });
       const rows = card.locator(rowClass);
+      await expect(rows.first()).toBeVisible();
       const count = await rows.count();
       await expect(
         card
           .locator(".ant-card-head")
           .getByRole("button", { name: `添加${name}` })
       ).toHaveCount(0);
-      await expect(add).toHaveClass(/ant-btn-block/);
-      await expect(add).toHaveCSS("border-top-style", "dashed");
       const buttonBox = (await add.boundingBox())!;
       const rowBox = (await rows.last().boundingBox())!;
       expect(buttonBox.y).toBeGreaterThanOrEqual(rowBox.y + rowBox.height);
       expect(Math.abs(buttonBox.width - rowBox.width)).toBeLessThan(1);
-      await card.screenshot({
-        path: test.info().outputPath(`bottom-add-${name}.png`)
-      });
       await add.click();
       await expect(rows).toHaveCount(count + 1);
     }

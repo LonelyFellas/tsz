@@ -25,7 +25,7 @@ on:
 permissions:
   contents: read
 
-# PR 上新推送时取消进行中的旧任务;但 main 不取消(避免取消接续部署的半成品构建)。
+# PR 上新推送时取消进行中的旧任务；main 不取消正在运行的任务。
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -221,13 +221,13 @@ jobs:
           node scripts/ci-metrics.mjs run install --
           pnpm install --frozen-lockfile
 
-      # PR 跑完整普通测试；main 与手动运行采集覆盖率。两种模式共用分片和执行清单校验。
+      # PR 与 main 使用相同的覆盖率模式，避免合并后才暴露测试超时。
       - name: Run test module
         run: >-
           node scripts/ci-metrics.mjs run tests-${{ matrix.module }} --
           pnpm ci:test-module ${{ matrix.module }}
           .ci-artifacts/${{ matrix.module }}
-          ${{ github.event_name == 'pull_request' && 'test' || 'coverage' }}
+          coverage
 
       - name: Measure coverage module artifact
         if: ${{ !cancelled() }}

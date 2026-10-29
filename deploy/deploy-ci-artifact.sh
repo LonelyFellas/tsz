@@ -10,6 +10,20 @@ prepare_deploy_artifact() {
   [[ "$id" =~ ^[1-9][0-9]*$ ]] || return 1
   python3 -I "$DEPLOY_BUILD_ROOT/deploy/run-with-progress.py" 300 artifact-download gh api "repos/$DEPLOY_REPOSITORY/actions/artifacts/$id/zip" > "$destination/download.zip" || return 1
   python3 -I "$DEPLOY_BUILD_ROOT/deploy/unpack-release.py" zip "$destination/download.zip" "$destination/bundle" || return 1
+  if [[ "$component" = admin && "${DEPLOY_AUTO_CONFIG:-}" = 1 ]]; then
+    local flag value
+    for flag in VOICE_EDITOR AZURE_PRONUNCIATION_INPUTS FORM_SPELLING_REGULARITY SENTENCE_FORMATTING; do
+      value="$(node - "$destination/bundle/release.json" "$flag" <<'NODE'
+const fs = require('node:fs');
+const receipt = JSON.parse(fs.readFileSync(process.argv[2]));
+const value = receipt.config?.env?.[`VITE_${process.argv[3]}`];
+if (value !== 'true' && value !== 'false') process.exit(1);
+process.stdout.write(value);
+NODE
+)" || return 1
+      export "DEPLOY_$flag=$value"
+    done
+  fi
   DEPLOY_RELEASE_ID="$(node "$DEPLOY_BUILD_ROOT/deploy/release-artifact.mjs" verify "$component" \
     "$destination/bundle" "$destination/artifact")" || return 1
   local required_node
@@ -40,14 +54,17 @@ NODE
   printf '%s\n' "$DEPLOY_RELEASE_ID-$(node -e 'console.log(require("crypto").randomUUID())')" > "$destination/release-id"
   rsync -az --no-o --no-g --timeout=180 "$destination/release-id" "tshb-test:$remote_stage/release-id"
   local file
-  for file in releases.mjs provenance.mjs publish-release.sh install-nginx-local.sh; do
+  for file in releases.mjs provenance.mjs publish-release.sh publish-compatible.sh install-nginx-local.sh; do
     rsync -az --no-o --no-g --timeout=180 "$DEPLOY_BUILD_ROOT/deploy/$file" "tshb-test:$remote_stage/$file"
   done
   rsync -az --no-o --no-g --timeout=180 "$DEPLOY_BUILD_ROOT/deploy/nginx/" "tshb-test:$remote_stage/nginx/"
   rsync -az --no-o --no-g --timeout=180 "$DEPLOY_BUILD_ROOT/deploy/systemd/" "tshb-test:$remote_stage/systemd/"
   recheck_deploy_source "$component"
+  local expected_api_sha="${DEPLOY_EXPECTED_API_SHA:-}"
+  [[ -z "$expected_api_sha" || "$expected_api_sha" =~ ^[0-9a-f]{40}$ ]] || return 1
+  local publish_command="bash '$remote_stage/publish-compatible.sh' '$remote_stage' '$component' '$expected_api_sha'"
   python3 -I "$DEPLOY_BUILD_ROOT/deploy/run-with-progress.py" 480 remote-publish \
     ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes tshb-test \
-    "bash '$remote_stage/publish-release.sh' '$remote_stage' '$component'"
+    "$publish_command"
   ssh tshb-test "rm -rf -- '$remote_stage'"
 }
