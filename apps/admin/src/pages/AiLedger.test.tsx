@@ -13,6 +13,10 @@ import type { AdminProfile, AiLedgerPage as Page } from "@tsz/types";
 import { api, useAuthStore } from "@/lib/auth";
 import { AiLedgerPage } from "./AiLedger";
 
+vi.mock("@/features/ai-ledger/ChatGPTConnection", () => ({
+  ChatGPTConnection: () => null
+}));
+
 vi.mock("@/lib/auth", async () => {
   const { createAdminAuthStore } = await import("@tsz/shared/auth");
   const store = createAdminAuthStore();

@@ -116,6 +116,41 @@ it("展示当前模型，切换后独立重读服务端持久化结果", async (
   expect(api.opencode.selectModel).toHaveBeenCalledExactlyOnceWith(target);
   expect(api.opencode.currentModel).toHaveBeenCalledTimes(2);
 });
+it("ChatGPT 模型使用相同探针门禁，保存后重读并标明套餐来源", async () => {
+  const chatgpt: OpenCodeModelSelection = {
+    source: "chatgpt",
+    provider_id: "oaiapp_fixture",
+    model_id: "fixture-model"
+  };
+  vi.mocked(api.opencode.probeReport).mockResolvedValue({
+    state: "completed",
+    models: [
+      {
+        ...chatgpt,
+        name: "ChatGPT fixture",
+        enabled: true,
+        status: "available",
+        cost: null
+      }
+    ]
+  });
+  vi.mocked(api.opencode.selectModel).mockResolvedValue(chatgpt);
+  mount();
+  await screen.findByText("当前出题模型：deepseek / deepseek-flash（直连）");
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: "出题模型" }));
+  fireEvent.click(await screen.findByText(/ChatGPT \/ ChatGPT fixture/));
+  vi.mocked(api.opencode.currentModel).mockResolvedValue(chatgpt);
+  fireEvent.click(screen.getByRole("button", { name: "保存模型" }));
+  await screen.findByText(
+    "当前出题模型：ChatGPT / fixture-model（ChatGPT 套餐）"
+  );
+  expect(api.opencode.selectModel).toHaveBeenCalledExactlyOnceWith(chatgpt);
+  expect(api.opencode.currentModel).toHaveBeenCalledTimes(2);
+  expect(
+    screen.getByRole("link", { name: "管理 ChatGPT 用量" })
+  ).toHaveAttribute("href", "https://chatgpt.com/settings/usage");
+});
+
 it("切换失败保留原模型和选择，列表失败允许刷新", async () => {
   vi.mocked(api.opencode.selectModel).mockRejectedValue(
     new Error("unavailable")
