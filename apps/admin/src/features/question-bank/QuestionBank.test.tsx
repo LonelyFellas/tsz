@@ -527,9 +527,9 @@ it("closing the generation drawer retains an uncertain single request", async ()
     within(header as HTMLElement).getByRole("button", { name: "Close" })
   );
   fireEvent.click(open);
-  fireEvent.click(
-    (await screen.findByText("重试原生成请求")).closest("button")!
-  );
+  const retry = (await screen.findByText("重试原生成请求")).closest("button")!;
+  await waitFor(() => expect(retry).toBeVisible());
+  fireEvent.click(retry);
   await waitFor(() => expect(mocks.generate).toHaveBeenCalledTimes(2));
   expect(mocks.generate.mock.calls[1]![0]).toEqual(original);
 });
