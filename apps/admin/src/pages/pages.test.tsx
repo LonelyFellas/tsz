@@ -50,6 +50,10 @@ vi.mock("@/features/dictionary/word-creation/UnifiedCreateEntryStep", () => ({
   UnifiedCreateEntryStep: () => <div>unified-create-entry</div>
 }));
 
+vi.mock("@/features/ai-ledger/OpenCodeConnection", () => ({
+  OpenCodeConnection: () => <div>OpenCode connection</div>
+}));
+
 // 智能词库页走真实数据层(React Query + api.words),烟雾测试只验渲染,
 // 把请求端点 mock 成稳定响应,避免触网。
 vi.mock("@/lib/auth", () => ({

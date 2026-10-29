@@ -3,14 +3,20 @@
 // 菜单权限 key 驱动，个人设置不需要也不应该占一个权限位。
 import { Space, Typography } from "antd";
 import { DialectPreference } from "@/features/settings/DialectPreference";
+import { OpenCodeConnection } from "@/features/ai-ledger/OpenCodeConnection";
+import { useAuthStore } from "@/lib/auth";
 
 export function ProfileSettingsPage() {
+  const profile = useAuthStore((state) => state.profile);
   return (
     <Space orientation="vertical" size={16} style={{ width: "100%" }}>
       <Typography.Title level={4} style={{ margin: 0 }}>
         个人设置
       </Typography.Title>
       <DialectPreference />
+      {profile?.role === "super_admin" && (
+        <OpenCodeConnection key={profile.id} adminId={profile.id} />
+      )}
     </Space>
   );
 }
