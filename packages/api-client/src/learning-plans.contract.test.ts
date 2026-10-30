@@ -46,7 +46,10 @@ it("plan creation preserves fingerprint, optional schedule and cancellation with
     data,
     {
       signal: controller.signal,
-      headers: { "X-TSZ-Learning-Capabilities": "choice-v1,mastery-v1" }
+      headers: {
+        "X-TSZ-Learning-Capabilities":
+          "choice-v1,mastery-v1,wordlist-spelling-v1"
+      }
     }
   );
 });
@@ -98,7 +101,12 @@ it("source refresh uses the cycle protocol with typed recovery counts", async ()
   expect(http.post).toHaveBeenCalledWith(
     `/me/learning-plans/${id}/cycles/preview`,
     request,
-    { headers: { "X-TSZ-Learning-Capabilities": "choice-v1,mastery-v1" } }
+    {
+      headers: {
+        "X-TSZ-Learning-Capabilities":
+          "choice-v1,mastery-v1,wordlist-spelling-v1"
+      }
+    }
   );
   expect(
     validateRuntimeSchema("LearningCyclePreview", {

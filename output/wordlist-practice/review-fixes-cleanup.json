@@ -1,0 +1,20 @@
+{
+  "scope": "review regression fixes; exclusive local Postgres/Redis",
+  "postgres_cluster_removed": true,
+  "redis_stopped_and_files_removed": true,
+  "temporary_directory_removed": true,
+  "ports_closed": {
+    "55572": true,
+    "56572": true
+  },
+  "test_data": "all fixture databases and dedicated cache removed with exclusive resources",
+  "oss_objects_created": 0,
+  "browser_or_shared_service_changes": false,
+  "checks": {
+    "regression_and_affected_tests_passed": 47,
+    "existing_manual_performance_test_ignored": 1,
+    "clippy_all_targets_all_features": "passed",
+    "cargo_fmt": "passed",
+    "git_diff_check": "passed"
+  }
+}

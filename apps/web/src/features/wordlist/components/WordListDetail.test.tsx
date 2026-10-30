@@ -1238,7 +1238,7 @@ it.each([false, true])(
   }
 );
 
-it("自定义词在阅读页展示原释义，不误判为不可用并提示不参与出题", async () => {
+it("自定义词在阅读页展示原释义，不误判为不可用并说明可用于拼写练习", async () => {
   vi.mocked(api.wordList.availability).mockResolvedValue({
     revision: 1,
     available_count: 1,
@@ -1265,7 +1265,7 @@ it("自定义词在阅读页展示原释义，不误判为不可用并提示不�
     screen.getByRole("heading", { name: "custom phrase" })
   ).toBeInTheDocument();
   expect(
-    screen.getByText(/其中 1 个自定义词条暂不参与学习出题/)
+    screen.getByText(/其中 1 个自定义词条，可用于拼写练习/)
   ).toBeInTheDocument();
   expect(screen.getByText("注：自定义词的注")).toBeInTheDocument();
   expect(

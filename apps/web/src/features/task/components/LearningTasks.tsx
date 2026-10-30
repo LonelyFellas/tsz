@@ -639,7 +639,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
     const replaying = !!pending && !pendingAccepted;
     if (submitting.current || (!replaying && run.data?.state !== "active"))
       return;
-    const isChoice = run.data?.question_type === "choice_zh_to_en";
+    const isChoice = !!next?.options;
     if (
       (!pending || pendingAccepted) &&
       (!submittedValue.trim() ||
@@ -715,7 +715,8 @@ function Practice({ userId, id }: { userId: string; id: string }) {
       </PageShell>
     );
   const r = run.data;
-  const choice = r.question_type === "choice_zh_to_en";
+  const choice = !!next?.options;
+  const choiceTask = r.question_type === "choice_zh_to_en";
   const records = qs.data.items.filter(
     (q) => q.answered || !q.content_available
   );
@@ -730,7 +731,9 @@ function Practice({ userId, id }: { userId: string; id: string }) {
         title={
           r.state === "completed"
             ? "本批次已完成"
-            : questionTypeLabel(r.question_type)
+            : choiceTask && next && !choice
+              ? "中文释义拼写"
+              : questionTypeLabel(r.question_type)
         }
         description={
           <>
@@ -738,6 +741,10 @@ function Practice({ userId, id }: { userId: string; id: string }) {
               ? "每次含重练最多 30 题，错题隔至少 3 道其他题再出现。跨天复习才能确认掌握。"
               : "完成以有效作答数量为准。"}
             {choice && "选择一个英文选项后提交，单选成绩不影响拼写掌握度。"}
+            {choiceTask &&
+              next &&
+              !choice &&
+              "本题没有合适的单选选项，已自动改为拼写练习。"}
             {r.expires_at && (
               <>
                 截止：
@@ -751,7 +758,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
         }
       />
       <div className="space-y-6">
-        {r.state === "completed" && !choice && (
+        {r.state === "completed" && !choiceTask && (
           <Link className={buttonClass} href="/student/review">
             查看待巩固内容与复习安排
           </Link>
@@ -995,7 +1002,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
                   <p className="mt-2 text-xs leading-5 text-foreground-muted">
                     你的答案：
                     <span className="font-medium text-foreground">
-                      {choice
+                      {q.options
                         ? (q.options?.find(
                             (option) =>
                               option.option_id === q.feedback?.submitted_answer
@@ -1003,7 +1010,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
                         : q.feedback.submitted_answer}
                     </span>
                     <span className="mx-2">·</span>
-                    {choice ? "正确答案：" : "可接受拼写："}
+                    {q.options ? "正确答案：" : "可接受拼写："}
                     {q.feedback.accepted_answers.join(" / ")}
                   </p>
                 )}

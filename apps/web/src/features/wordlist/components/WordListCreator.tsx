@@ -1376,7 +1376,7 @@ function WordRow({
             />
           </label>
           <p className="mt-2 text-xs text-foreground-muted">
-            自定义词条可阅读，暂不参与学习出题。
+            自定义词条可阅读，也可用于拼写练习。
           </p>
           {audio &&
             (audio.word === wordlistAudioWord(row.customWord.word) ||

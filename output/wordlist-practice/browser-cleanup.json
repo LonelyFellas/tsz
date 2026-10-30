@@ -1,0 +1,5 @@
+{
+  "origin": "http://127.0.0.1:13571",
+  "signed_out": true,
+  "storage": "{\"result\":\"已清理测试站点存储\",\"local_storage\":0,\"session_storage\":0,\"cache_storage\":0,\"service_workers\":0,\"indexed_db\":0}"
+}

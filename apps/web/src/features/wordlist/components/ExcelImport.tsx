@@ -309,7 +309,7 @@ export function ExcelImport({
                 ))}
                 {row.custom ? (
                   <p className="text-sm text-foreground-muted">
-                    自定义词条，暂不参与学习出题。
+                    自定义词条，可用于拼写练习。
                   </p>
                 ) : row.selected ? (
                   <p className="text-sm text-success">
