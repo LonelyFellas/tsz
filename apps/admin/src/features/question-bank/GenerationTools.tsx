@@ -398,7 +398,7 @@ export function GenerationTools({
                 modal.confirm({
                   title: "生成四选一草稿？",
                   content:
-                    "本次为所选已发布词义生成一道草稿，可能产生模型费用。生成结果仍需人工审核。",
+                    "本次按词库规则生成一道草稿。请人工核查选项语义和答案唯一性。",
                   okText: "确认生成",
                   cancelText: "返回选择",
                   onOk: generate
