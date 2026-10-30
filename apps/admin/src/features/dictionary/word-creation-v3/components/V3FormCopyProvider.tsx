@@ -136,6 +136,10 @@ export function V3FormCopyProvider({
   >(undefined);
   const suppressClick = useRef(false);
   const [source, setSource] = useState<Selection>();
+  const [hovered, setHovered] = useState<{
+    formId: string;
+    kind: FormCopyKind;
+  }>();
   const [target, setTarget] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<FormCopyPlan>();
@@ -330,12 +334,22 @@ export function V3FormCopyProvider({
       const active = Boolean(
         source && source.kind === kind && source.formId !== formId
       );
+      const highlighted =
+        !busy &&
+        !componentDisabled &&
+        hovered?.formId === formId &&
+        hovered.kind === kind;
       return {
-        className: `v3-form-copy-cell${active ? " is-copy-available" : ""}${active && target === formId ? " is-copy-target" : ""}`,
+        className: `v3-form-copy-cell${highlighted ? " is-copy-hovered" : ""}${active ? " is-copy-available" : ""}${active && target === formId ? " is-copy-target" : ""}`,
         "data-form-copy-target": formId,
         "data-form-copy-kind": kind,
-        onMouseEnter() {
+        // 表格关闭整行 hover 时会移除 mouse 进入/离开事件，保留 pointer 事件。
+        onPointerEnter() {
+          if (!busy && !componentDisabled) setHovered({ formId, kind });
           if (active && source?.clicked) setTarget(formId);
+        },
+        onPointerLeave() {
+          setHovered(undefined);
         },
         onClick(event) {
           if (

@@ -6,7 +6,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App, Button, ConfigProvider } from "antd";
+import { App, Button, ConfigProvider, Table } from "antd";
 import type { SharedFormsStepContentV3 } from "@tsz/types";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -87,6 +87,18 @@ function Cells({ forms }: { forms: SharedFormsStepContentV3 }) {
           >
             音色落点 {index}
           </div>
+          <div
+            {...copy.cell(form.id, "phonetics")}
+            data-testid={`phonetics-paired-${index}`}
+          >
+            另一口音的音标 {index}
+          </div>
+          <div
+            {...copy.cell(form.id, "voices")}
+            data-testid={`voices-paired-${index}`}
+          >
+            音色参数 {index}
+          </div>
         </div>
       ))}
     </>
@@ -144,6 +156,66 @@ beforeEach(() => {
 });
 
 describe("词形复制交互", () => {
+  it("实际表格关闭整行 hover 时仍能高亮复制区域", () => {
+    const forms = fixture();
+    function TableCells() {
+      const copy = useV3FormCopy()!;
+      return (
+        <Table
+          rowHoverable={false}
+          pagination={false}
+          rowKey="id"
+          dataSource={forms.pos[0]!.forms}
+          columns={[
+            {
+              onCell: (form) => copy.cell(form.id, "phonetics"),
+              render: (_, form) => form.id
+            }
+          ]}
+        />
+      );
+    }
+    render(
+      <App>
+        <V3FormCopyProvider forms={forms} onChange={vi.fn()}>
+          <TableCells />
+        </V3FormCopyProvider>
+      </App>
+    );
+    const cell = screen.getByText(forms.pos[0]!.forms[0]!.id).closest("td")!;
+    fireEvent.pointerEnter(cell);
+    expect(cell).toHaveClass("is-copy-hovered");
+    fireEvent.pointerLeave(cell);
+    expect(cell).not.toHaveClass("is-copy-hovered");
+  });
+
+  it("悬停按词形和复制类型高亮整组，切换区域或离开后恢复", () => {
+    render(<Harness />);
+    const phonetics = screen.getByTestId("phonetics-0");
+    const paired = screen.getByTestId("phonetics-paired-0");
+    const voices = screen.getByTestId("voices-0");
+    fireEvent.pointerEnter(phonetics);
+    expect(phonetics).toHaveClass("is-copy-hovered");
+    expect(paired).toHaveClass("is-copy-hovered");
+    expect(voices).not.toHaveClass("is-copy-hovered");
+    expect(screen.getByTestId("phonetics-1")).not.toHaveClass(
+      "is-copy-hovered"
+    );
+    fireEvent.pointerLeave(phonetics);
+    fireEvent.pointerEnter(voices);
+    expect(phonetics).not.toHaveClass("is-copy-hovered");
+    expect(paired).not.toHaveClass("is-copy-hovered");
+    expect(voices).toHaveClass("is-copy-hovered");
+    expect(screen.getByTestId("voices-paired-0")).toHaveClass(
+      "is-copy-hovered"
+    );
+    fireEvent.pointerLeave(voices);
+    expect(voices).not.toHaveClass("is-copy-hovered");
+    expect(screen.getByTestId("voices-paired-0")).not.toHaveClass(
+      "is-copy-hovered"
+    );
+  });
+
   it("空闲时继承页面保存期间的禁用状态", () => {
     const forms = fixture();
     render(
@@ -161,6 +233,10 @@ describe("词形复制交互", () => {
       name: "复制英美音标"
     }))
       expect(button).toBeDisabled();
+    fireEvent.pointerEnter(screen.getByTestId("phonetics-0"));
+    expect(screen.getByTestId("phonetics-0")).not.toHaveClass(
+      "is-copy-hovered"
+    );
   });
 
   it("点击和键盘复制到草稿，来源不变，允许撤销", async () => {
@@ -280,7 +356,11 @@ describe("词形复制交互", () => {
         name: "复制英美音标"
       })
     );
-    fireEvent.click(screen.getByTestId("phonetics-1"));
+    const target = screen.getByTestId("phonetics-1");
+    fireEvent.pointerEnter(target);
+    expect(target).toHaveClass("is-copy-hovered");
+    fireEvent.click(target);
+    expect(target).not.toHaveClass("is-copy-hovered");
     const edit = screen.getByRole("button", { name: "编辑词形内容" });
     expect(edit).toBeDisabled();
     expect(edit.closest("[inert]")).not.toBeNull();

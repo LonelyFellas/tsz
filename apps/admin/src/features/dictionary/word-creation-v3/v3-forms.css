@@ -93,6 +93,9 @@
 .v3-form-copy-cell.is-copy-available {
   cursor: copy;
 }
+.v3-form-copy-cell.is-copy-hovered {
+  background: #eef2ff;
+}
 .v3-form-copy-cell.is-copy-target {
   background: #eef2ff;
   box-shadow: inset 0 0 0 1px #2053ff;
