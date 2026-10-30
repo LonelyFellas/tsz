@@ -1,5 +1,5 @@
 import { HttpError } from "@tsz/api-client";
-import { screen, fireEvent, waitFor } from "@testing-library/react";
+import { screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { renderWithProviders } from "@/test/render";
 const mocks = vi.hoisted(() => ({
@@ -704,8 +704,11 @@ it("revoked sources remain unconfirmable rather than silently renewing access", 
     />
   );
   fireEvent.click(screen.getByRole("button", { name: "重新确认来源" }));
-  await screen.findByText("来源尚未恢复");
-  expect(screen.getByRole("button", { name: "确认更新来源" })).toBeDisabled();
+  const dialog = await screen.findByRole("dialog", { name: "重新确认来源" });
+  expect(within(dialog).getByText("来源尚未恢复")).toBeInTheDocument();
+  expect(
+    await within(dialog).findByRole("button", { name: "确认更新来源" })
+  ).toBeDisabled();
   expect(mocks.cycleCreate).not.toHaveBeenCalled();
 });
 it("existing coverage cycle confirmation keeps its original operation", async () => {
