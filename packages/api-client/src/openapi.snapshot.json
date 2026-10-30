@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/opencode-provider-logout/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-29T13:44:27.954Z",
+  "_source": "/Users/darwish/.codex/worktrees/task-155-backend-trash/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-10-30T01:46:08.208Z",
   "paths": {
     "/api/internal/agent/v1/requests/{id}/candidates/search": ["post"],
     "/api/internal/agent/v1/requests/{id}/context": ["get"],
@@ -83,6 +83,8 @@
       "post"
     ],
     "/admin/lexicon/sentences/{id}/restore": ["post"],
+    "/admin/lexicon/sentences/{id}/trash": ["post"],
+    "/admin/lexicon/sentences/{id}/untrash": ["post"],
     "/admin/lexicon/sentences/{id}/withdraw": ["post"],
     "/admin/lexicon/sentences/{id}/withdrawal-impact": ["get"],
     "/admin/lexicon/surface-match-snapshots/{snapshot_id}": ["get"],
@@ -3141,6 +3143,25 @@
       "responses": {
         "200": { "$ref": "#/components/schemas/SharedSentence" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/lexicon/sentences/{id}/trash": {
+      "request": { "$ref": "#/components/schemas/SentenceRevision" },
+      "responses": {
+        "204": null,
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/lexicon/sentences/{id}/untrash": {
+      "request": { "$ref": "#/components/schemas/SentenceRevision" },
+      "responses": {
+        "204": null,
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
         "409": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },

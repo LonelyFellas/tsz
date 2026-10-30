@@ -137,6 +137,12 @@ export const router = createBrowserRouter([
             })
           },
           {
+            ...ADMIN_PAGE_ROUTES.sentencesTrash,
+            lazy: async () => ({
+              Component: (await import("@/pages/Sentences")).SentencesTrashPage
+            })
+          },
+          {
             ...ADMIN_PAGE_ROUTES.sentences,
             lazy: async () => ({
               Component: (await import("@/pages/Sentences")).SentencesPage

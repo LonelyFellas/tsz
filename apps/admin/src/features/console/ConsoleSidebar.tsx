@@ -107,8 +107,16 @@ const GROUPS: Group[] = [
         label: "自定义词库",
         perm: "customdict.access",
         disabled: true
-      },
-      pageLeaf(ADMIN_PAGE_ROUTES.sentences, "多维例句")
+      }
+    ]
+  },
+  {
+    key: "grp-sentences",
+    icon: <ReadOutlined />,
+    label: "例句管理",
+    leaves: [
+      pageLeaf(ADMIN_PAGE_ROUTES.sentences, "多维例句"),
+      pageLeaf(ADMIN_PAGE_ROUTES.sentencesTrash, "垃圾桶")
     ]
   },
   {

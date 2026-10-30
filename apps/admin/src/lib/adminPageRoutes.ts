@@ -21,6 +21,10 @@ export const ADMIN_PAGE_ROUTES = {
     path: "words/:wordId/v3/wizard/:step",
     handle: { permission: "words.access" }
   },
+  sentencesTrash: {
+    path: "sentences/trash",
+    handle: { permission: "sentences.access" }
+  },
   sentences: {
     path: "sentences",
     handle: { anyPermission: ["sentences.access", "sentences.read_published"] }

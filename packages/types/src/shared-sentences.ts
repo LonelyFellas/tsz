@@ -84,6 +84,7 @@ export interface SharedSentence {
   updated_at: string;
 }
 export interface SentenceListQuery {
+  trash?: boolean;
   view?: "draft" | "published";
   sense_id?: string;
   q?: string;

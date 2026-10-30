@@ -86,6 +86,10 @@ export function createSharedSentenceEndpoints(http: HttpClient) {
           headers: TEXT_VOICE_HEADERS
         })
         .then(decodeSentence),
+    trash: (id: string, input: SentenceRevision) =>
+      http.post<void>(`${root}/${id}/trash`, input),
+    untrash: (id: string, input: SentenceRevision) =>
+      http.post<void>(`${root}/${id}/untrash`, input),
     delete: (id: string, input: SentenceRevision) =>
       http.del<void>(`${root}/${id}`, input),
     setVisibility: (

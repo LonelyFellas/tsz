@@ -31,6 +31,8 @@ vi.mock("@/lib/auth", () => ({
       list: vi.fn(),
       get: vi.fn(),
       delete: vi.fn(),
+      trash: vi.fn(),
+      untrash: vi.fn(),
       setVisibility: vi.fn(),
       publications: vi.fn(),
       rollback: vi.fn()
@@ -70,7 +72,7 @@ function fixture(): SharedSentence {
     updated_at: "2026-09-12T10:00:00Z"
   };
 }
-function show(entryId?: string) {
+function show(entryId?: string, trash = false) {
   render(
     <QueryClientProvider
       client={
@@ -80,7 +82,7 @@ function show(entryId?: string) {
       <MemoryRouter>
         <ConfigProvider locale={zhCN} theme={{ token: { motion: false } }}>
           <App>
-            <SentenceLibrary entryId={entryId} />
+            <SentenceLibrary entryId={entryId} trash={trash} />
           </App>
         </ConfigProvider>
       </MemoryRouter>
@@ -259,7 +261,7 @@ describe("独立多维例句库", () => {
     expect(screen.getByText(/查\s*看/).closest("button")).toBeVisible();
     expect(screen.queryByText(/^编\s*辑$/)).toBeNull();
     expect(screen.queryByText(/^删\s*除$/)).toBeNull();
-    expect(screen.getByText("删除所选").closest("button")).toBeDisabled();
+    expect(screen.getByText("移入垃圾桶所选").closest("button")).toBeDisabled();
     expect(api.sentences.delete).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText("例句关键词"), {
       target: { value: "flower" }
@@ -356,7 +358,50 @@ it("批量选择显示数量并可取消，草稿删除仍先确认", async () =
   expect(screen.getByText("已选 0 条")).toBeVisible();
   expect(screen.getByText("发布所选").closest("button")).toBeDisabled();
   fireEvent.click(screen.getByLabelText("更多操作"));
-  fireEvent.click(screen.getByText(/^删\s*除$/));
+  fireEvent.click(screen.getByText("移入垃圾桶"));
   await waitFor(() => expect(screen.getByRole("dialog")).toBeVisible());
   expect(api.sentences.delete).not.toHaveBeenCalled();
+  fireEvent.click(
+    screen.getByRole("dialog").querySelector(".ant-btn-primary")!
+  );
+  await waitFor(() =>
+    expect(api.sentences.trash).toHaveBeenCalledWith(expect.any(String), {
+      base_revision: 3
+    })
+  );
+  expect(api.sentences.delete).not.toHaveBeenCalled();
+});
+
+it("垃圾桶固定查询并隐藏编辑发布，恢复携带当前版本", async () => {
+  auth.role = "super_admin";
+  const item = fixture();
+  vi.mocked(api.sentences.list).mockResolvedValue({ items: [item], total: 1 });
+  vi.mocked(api.sentences.untrash).mockResolvedValue(undefined);
+  show(undefined, true);
+  await screen.findByText("A wonderful flower.");
+  expect(api.sentences.list).toHaveBeenCalledWith(
+    expect.objectContaining({ trash: true, view: "draft" })
+  );
+  expect(screen.queryByText("发布所选")).toBeNull();
+  expect(screen.queryByText(/^编\s*辑$/)).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "恢 复" }));
+  const dialog = await screen.findByRole("dialog");
+  fireEvent.click(dialog.querySelector(".ant-btn-primary")!);
+  await waitFor(() =>
+    expect(api.sentences.untrash).toHaveBeenCalledWith(item.id, {
+      base_revision: item.revision
+    })
+  );
+  expect(api.sentences.delete).not.toHaveBeenCalled();
+});
+
+it("普通管理员查看垃圾桶时不提供恢复或永久删除行操作", async () => {
+  vi.mocked(api.sentences.list).mockResolvedValue({
+    items: [fixture()],
+    total: 1
+  });
+  show(undefined, true);
+  await screen.findByText("A wonderful flower.");
+  expect(screen.queryByRole("button", { name: "恢 复" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "永久删除" })).toBeNull();
 });

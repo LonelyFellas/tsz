@@ -62,9 +62,11 @@ function entryLink(entry: SharedSentence["entries"][number]) {
 
 export function SentenceLibrary({
   entryId,
+  trash = false,
   readOnly: requestedReadOnly = false
 }: {
   entryId?: string;
+  trash?: boolean;
   readOnly?: boolean;
 }) {
   const { modal, message } = App.useApp();
@@ -112,11 +114,12 @@ export function SentenceLibrary({
   const [batch, setBatch] = useState<SharedSentence[]>();
   const [selected, setSelected] = useState<React.Key[]>([]);
   const query = useQuery({
-    queryKey: ["shared-sentences", entryId, filters, readOnly],
+    queryKey: ["shared-sentences", entryId, filters, readOnly, trash],
     enabled: canRead,
     queryFn: () =>
       api.sentences.list({
         ...filters,
+        ...(trash ? { trash: true } : {}),
         view: readOnly ? "published" : "draft",
         entry_id: entryId
       })
@@ -152,9 +155,9 @@ export function SentenceLibrary({
       void failure(error);
     }
   };
-  const remove = (items: SharedSentence[]) =>
+  const remove = (items: SharedSentence[], restoring = false) =>
     modal.confirm({
-      title: `删除 ${items.length} 条未发布草稿？`,
+      title: `${restoring ? "恢复" : trash ? "永久删除" : "移入垃圾桶"} ${items.length} 条未发布草稿？`,
       content: (
         <Flex vertical gap="small">
           {items.map((item) => (
@@ -164,16 +167,26 @@ export function SentenceLibrary({
             </Typography.Text>
           ))}
           <Typography.Text type="danger">
-            仅从未发布的草稿可删除；已发布例句必须使用全局下架。
+            {restoring
+              ? "恢复时会重新校验关联词条和词义；目标失效时保留在垃圾桶。"
+              : trash
+                ? "永久删除后无法恢复，关联及音频引用将被清理。"
+                : "仅从未发布的草稿可移入垃圾桶；保留关联与音频，可在垃圾桶恢复。"}
           </Typography.Text>
         </Flex>
       ),
-      okButtonProps: { danger: true },
+      okButtonProps: { danger: !restoring },
       onOk: async () => {
         const errors: string[] = [];
         for (const item of items) {
           try {
-            await api.sentences.delete(item.id, {
+            await (
+              restoring
+                ? api.sentences.untrash
+                : trash
+                  ? api.sentences.delete
+                  : api.sentences.trash
+            )(item.id, {
               base_revision: item.revision
             });
           } catch (e) {
@@ -184,7 +197,10 @@ export function SentenceLibrary({
         }
         refresh();
         if (errors.length)
-          modal.error({ title: "部分例句未删除", content: errors.join("；") });
+          modal.error({
+            title: "部分例句操作失败",
+            content: errors.join("；")
+          });
       }
     });
   // 词条向导里的引用列表用 /sentences?sentence=<id> 深链到这条例句的详情。
@@ -223,7 +239,12 @@ export function SentenceLibrary({
           多维例句
         </Typography.Title>
       ) : (
-        <Breadcrumb items={[{ title: "词库管理" }, { title: "多维例句" }]} />
+        <Breadcrumb
+          items={[
+            { title: "例句管理" },
+            { title: trash ? "垃圾桶" : "多维例句" }
+          ]}
+        />
       )}
       {entryId && (
         <Typography.Text type="secondary">
@@ -320,7 +341,7 @@ export function SentenceLibrary({
                     <Typography.Text aria-live="polite">
                       已选 {selected.length} 条
                     </Typography.Text>
-                    {canPublish && (
+                    {canPublish && !trash && (
                       <Button
                         disabled={
                           !selected.length ||
@@ -339,6 +360,19 @@ export function SentenceLibrary({
                         发布所选
                       </Button>
                     )}
+                    {trash && canDelete && (
+                      <Button
+                        disabled={!selected.length}
+                        onClick={() =>
+                          remove(
+                            rows.filter((row) => selected.includes(row.id)),
+                            true
+                          )
+                        }
+                      >
+                        恢复所选
+                      </Button>
+                    )}
                     <Button
                       danger
                       disabled={
@@ -354,7 +388,7 @@ export function SentenceLibrary({
                         remove(rows.filter((row) => selected.includes(row.id)))
                       }
                     >
-                      删除所选
+                      {trash ? "永久删除所选" : "移入垃圾桶所选"}
                     </Button>
                     {selected.length > 0 && (
                       <Button onClick={() => setSelected([])}>取消选择</Button>
@@ -367,7 +401,13 @@ export function SentenceLibrary({
               locale={{
                 emptyText: (
                   <TableEmptyState
-                    message={entryId ? "暂无关联例句" : "暂无例句"}
+                    message={
+                      entryId
+                        ? "暂无关联例句"
+                        : trash
+                          ? "垃圾桶暂无例句"
+                          : "暂无例句"
+                    }
                     filtered={
                       !!(
                         filters.q ||
@@ -390,7 +430,7 @@ export function SentenceLibrary({
               loading={query.isFetching}
               scroll={{ x: entryId ? 700 : 1350 }}
               rowSelection={
-                !entryId && (canEdit || canPublish)
+                !entryId && (canEdit || canPublish || canDelete)
                   ? {
                       selectedRowKeys: selected,
                       onChange: setSelected,
@@ -432,11 +472,13 @@ export function SentenceLibrary({
                   width: 100,
                   render: (_, row) => (
                     <Tag>
-                      {row.withdrawn_at
-                        ? "草稿（已撤回）"
-                        : row.current_publication_id
-                          ? "已发布"
-                          : "草稿"}
+                      {trash
+                        ? "垃圾桶"
+                        : row.withdrawn_at
+                          ? "草稿（已撤回）"
+                          : row.current_publication_id
+                            ? "已发布"
+                            : "草稿"}
                     </Tag>
                   )
                 },
@@ -503,11 +545,13 @@ export function SentenceLibrary({
                     <Space>
                       <Button
                         size="small"
-                        onClick={() => void open(row.id, false)}
+                        onClick={() =>
+                          trash ? setDetail(row) : void open(row.id, false)
+                        }
                       >
                         查看
                       </Button>
-                      {!readOnly && (
+                      {!readOnly && !trash && (
                         <>
                           {(canAction(row, "edit") ||
                             canAction(row, "associate")) && (
@@ -530,7 +574,24 @@ export function SentenceLibrary({
                           )}
                         </>
                       )}
-                      {canReadAll && (
+                      {trash && canDelete && (
+                        <>
+                          <Button
+                            size="small"
+                            onClick={() => remove([row], true)}
+                          >
+                            恢复
+                          </Button>
+                          <Button
+                            size="small"
+                            danger
+                            onClick={() => remove([row])}
+                          >
+                            永久删除
+                          </Button>
+                        </>
+                      )}
+                      {canReadAll && !trash && (
                         <Dropdown
                           trigger={["click"]}
                           menu={{
@@ -570,7 +631,7 @@ export function SentenceLibrary({
                                     {
                                       key: "delete",
                                       danger: true,
-                                      label: "删除",
+                                      label: "移入垃圾桶",
                                       onClick: () => remove([row])
                                     }
                                   ]

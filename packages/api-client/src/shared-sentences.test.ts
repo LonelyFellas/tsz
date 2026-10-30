@@ -440,3 +440,15 @@ it("creation and historical detail negotiate the same response capability", asyn
     }
   );
 });
+
+it("垃圾桶操作保留版本校验并与发布恢复路径区分", async () => {
+  const post = vi.fn().mockResolvedValue(undefined);
+  const api = createSharedSentenceEndpoints({ post } as unknown as HttpClient);
+  const revision = { base_revision: 3 };
+  await api.trash(id, revision);
+  await api.untrash(id, revision);
+  expect(post.mock.calls).toEqual([
+    [`/lexicon/sentences/${id}/trash`, revision],
+    [`/lexicon/sentences/${id}/untrash`, revision]
+  ]);
+});
