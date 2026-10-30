@@ -46,7 +46,18 @@ vi.mock("@/lib/auth", () => ({
   }
 }));
 vi.mock("./SentenceEditor", () => ({
-  SentenceEditor: () => <div>独立例句编辑器</div>
+  SentenceEditor: ({
+    sentence,
+    onSaved
+  }: {
+    sentence?: SharedSentence;
+    onSaved: (item: SharedSentence) => void;
+  }) => (
+    <div>
+      {sentence ? "独立例句编辑器" : "新建例句编辑器"}
+      <button onClick={() => onSaved(fixture())}>保存测试例句</button>
+    </div>
+  )
 }));
 function fixture(): SharedSentence {
   const content = newSentence();
@@ -78,7 +89,7 @@ function fixture(): SharedSentence {
     updated_at: "2026-09-12T10:00:00Z"
   };
 }
-function show(entryId?: string, trash = false) {
+function show(entryId?: string, trash = false, readOnly = false) {
   render(
     <QueryClientProvider
       client={
@@ -88,7 +99,11 @@ function show(entryId?: string, trash = false) {
       <MemoryRouter>
         <ConfigProvider locale={zhCN} theme={{ token: { motion: false } }}>
           <App>
-            <SentenceLibrary entryId={entryId} trash={trash} />
+            <SentenceLibrary
+              entryId={entryId}
+              trash={trash}
+              readOnly={readOnly}
+            />
           </App>
         </ConfigProvider>
       </MemoryRouter>
@@ -103,6 +118,63 @@ beforeEach(() => {
 });
 
 describe("独立多维例句库", () => {
+  it("独立创建保存后刷新列表，未关联例句有提示", async () => {
+    auth.permissions = ["sentences.access", "sentences.create"];
+    const item = fixture();
+    item.content.annotations = [];
+    vi.mocked(api.sentences.list).mockResolvedValue({
+      items: [item],
+      total: 1
+    });
+    show();
+    await screen.findByText("A wonderful flower.");
+    expect(screen.getByText("未关联")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: /新建例句/ }));
+    expect(screen.getByText("新建例句编辑器")).toBeVisible();
+    const calls = vi.mocked(api.sentences.list).mock.calls.length;
+    fireEvent.click(screen.getByText("保存测试例句"));
+    await waitFor(() =>
+      expect(vi.mocked(api.sentences.list).mock.calls.length).toBeGreaterThan(
+        calls
+      )
+    );
+    expect(screen.queryByText("新建例句编辑器")).toBeNull();
+  });
+  it.each([
+    {
+      permissions: ["sentences.access"],
+      entryId: undefined,
+      trash: false,
+      readOnly: false
+    },
+    {
+      permissions: ["sentences.access", "sentences.create"],
+      entryId: "entry",
+      trash: false,
+      readOnly: false
+    },
+    {
+      permissions: ["sentences.access", "sentences.create"],
+      entryId: undefined,
+      trash: true,
+      readOnly: false
+    },
+    {
+      permissions: ["sentences.access", "sentences.create"],
+      entryId: undefined,
+      trash: false,
+      readOnly: true
+    }
+  ])(
+    "无创建权、词条内、垃圾桶或只读时不显示独立新建入口：%j",
+    async ({ permissions, entryId, trash, readOnly }) => {
+      auth.permissions = permissions;
+      vi.mocked(api.sentences.list).mockResolvedValue({ items: [], total: 0 });
+      show(entryId, trash, readOnly);
+      await waitFor(() => expect(api.sentences.list).toHaveBeenCalled());
+      expect(screen.queryByRole("button", { name: /新建例句/ })).toBeNull();
+    }
+  );
   it.each([false, true])(
     "昵称与UUID不同的本人例句仍有编辑、发布和生命周期操作（下架=%s）",
     async (withdrawn) => {

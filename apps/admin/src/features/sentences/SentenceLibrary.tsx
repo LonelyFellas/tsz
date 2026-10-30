@@ -1,6 +1,7 @@
 import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import {
+  PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
   MoreOutlined
@@ -75,6 +76,8 @@ export function SentenceLibrary({
   const readOnly = requestedReadOnly || !canReadAll;
   const canRead =
     canReadAll || hasAdminPermission(profile, "sentences.read_published");
+  const canCreate =
+    !readOnly && hasAdminPermission(profile, "sentences.create");
   const canEdit =
     !readOnly &&
     (hasAdminPermission(profile, "sentences.edit") ||
@@ -109,7 +112,7 @@ export function SentenceLibrary({
   const [keyword, setKeyword] = useState("");
   const [level, setLevel] = useState<string>();
   const [dates, setDates] = useState<[Dayjs | null, Dayjs | null] | null>(null);
-  const [editor, setEditor] = useState<SharedSentence>();
+  const [editor, setEditor] = useState<SharedSentence | "new">();
   const [detail, setDetail] = useState<SharedSentence>();
   const [batch, setBatch] = useState<SharedSentence[]>();
   const [selected, setSelected] = useState<React.Key[]>([]);
@@ -225,10 +228,16 @@ export function SentenceLibrary({
     <Flex vertical gap="middle">
       {editor && (
         <SentenceEditor
-          key={`${editor.id}:${editor.revision}`}
-          sentence={editor}
+          key={editor === "new" ? "new" : `${editor.id}:${editor.revision}`}
+          sentence={editor === "new" ? undefined : editor}
           onClose={() => setEditor(undefined)}
           onSaved={() => {
+            if (editor === "new") {
+              setKeyword("");
+              setLevel(undefined);
+              setDates(null);
+              setFilters({ page: 1, page_size: filters.page_size });
+            }
             setEditor(undefined);
             refresh();
           }}
@@ -397,6 +406,19 @@ export function SentenceLibrary({
                 )
               }
 
+              toolbarExtra={
+                !entryId &&
+                !trash &&
+                canCreate && (
+                  <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    onClick={() => setEditor("new")}
+                  >
+                    新建例句
+                  </Button>
+                )
+              }
               tableId="sentences"
               locale={{
                 emptyText: (
@@ -502,6 +524,7 @@ export function SentenceLibrary({
                   width: 190,
                   render: (_, row) => (
                     <Flex vertical>
+                      {!row.entries.length && <Tag>未关联</Tag>}
                       {row.entries.slice(0, 2).map((e) => (
                         <span className="tsz-words" key={e.id}>
                           {entryLink(e)}{" "}
