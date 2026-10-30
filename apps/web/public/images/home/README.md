@@ -4,6 +4,27 @@
 
 ocean 原始图为 1672 × 941 PNG，交付为 1400 × 788 WebP（quality 88）；wave / shore 原始图为 1536 × 1024 PNG，交付为 1400 × 933 WebP（quality 86）。所有词面、音标、释义、例句和操作由真实 HTML 渲染。
 
+## 页面加载版本
+
+上述 WebP 保留为压缩源文件。首页实际使用 `src/features/home/assets/` 中预先生成的 640 / 960 / 1280 / 1400px AVIF（quality 60）和 WebP（quality 75，与原 Next 默认输出一致），按容器宽度与设备像素比选择；保留源图最大尺寸和裁剪方式。AVIF 优先，WebP 兼容回退，不在请求时转码。
+
+资源通过 `hero-images.ts` 静态导入，构建时由 Next 添加内容哈希，复用 `/_next/static/` 的长期不可变缓存和部署资源保留机制。首图立即高优先级加载，其余图在首图解码完成（或失败）后加载；提前切词时立即请求所选图片。切换仍使用 240ms 淡入淡出，并尊重减少动态效果设置。加载时显示内嵌模糊预览，不额外请求占位图片。
+
+在仓库根目录重新生成：
+
+```sh
+node scripts/optimize-home-images.mjs
+pnpm exec prettier --write apps/web/src/features/home/components/hero-images.ts
+```
+
+脚本复用当前 Next 依赖中的 Sharp；生成资源已入库，普通构建无需重新压缩。
+
+| 图片  | 源 WebP | AVIF 640px | AVIF 960px | AVIF 1280px | AVIF 1400px |
+| ----- | ------- | ---------- | ---------- | ----------- | ----------- |
+| ocean | 383 KiB | 45 KiB     | 92 KiB     | 143 KiB     | 196 KiB     |
+| wave  | 296 KiB | 40 KiB     | 81 KiB     | 121 KiB     | 162 KiB     |
+| shore | 245 KiB | 26 KiB     | 57 KiB     | 96 KiB      | 139 KiB     |
+
 用户指定的视觉参考：[Apple 中国官网](https://www.apple.com.cn/)。采用其居中短标题、大幅产品主视觉和清晰分区的排版方法，不使用 Apple 的标志、产品图片或其他品牌素材。
 
 ## ocean 生成提示词
