@@ -24,10 +24,10 @@ export function ReadingTable({
   children: ReactNode;
 }) {
   const headings = full
-    ? ["英文词条", "基本词性", "词形变化", "细分词性", "多维释义", "语法结构"]
+    ? ["英文词条", "基本词性", "词形变化", "细分词性", "多维词义", "语法结构"]
     : simple
-      ? ["英文词条", "词性", "多维释义"]
-      : ["英文词条", "词性", "多维释义", "语法结构"];
+      ? ["英文词条", "词性", "多维词义"]
+      : ["英文词条", "词性", "多维词义", "语法结构"];
   const widths = full
     ? [14, 9, 29, 12, 18, 18]
     : simple
@@ -85,6 +85,7 @@ export function ReadingTable({
                   className={cn(
                     "px-3 py-4 font-semibold",
                     simple && "whitespace-nowrap",
+                    heading.endsWith("词性") && "text-right",
                     heading === "英文词条" &&
                       "sticky left-0 z-20 border-r border-border/60 bg-surface"
                   )}
@@ -138,9 +139,19 @@ export function ReadingEntry({
   level: CEFRLevel;
   variant: EnglishVariant | null;
 }) {
-  const firstBase = entry.pos[0]?.forms?.find(
-    (form) => form.form_type === "base"
-  );
+  const firstBase = entry.pos
+    .flatMap((pos) => pos.forms ?? [])
+    .find((form) => form.form_type === "base");
+  const preferredDialect = variant === "AmE" ? "us" : "uk";
+  const spellings = firstBase?.variants
+    .filter((regional) => regional.dialect !== "common")
+    .sort(
+      (a, b) =>
+        Number(b.dialect === preferredDialect) -
+        Number(a.dialect === preferredDialect)
+    )
+    .map((regional) => regional.spelling)
+    .filter((spelling, index, all) => all.indexOf(spelling) === index);
   const missingFullData = full && entry.pos.some((pos) => !pos.forms);
   const rowCount = Math.max(
     1,
@@ -152,13 +163,14 @@ export function ReadingEntry({
       className="sticky left-0 z-10 border-r border-border/60 bg-surface"
     >
       <h2 className="tsz-words break-words text-xl font-bold tracking-tight">
-        {entry.label}
+        {spellings?.length
+          ? spellings.map((spelling) => (
+              <span key={spelling} className="block">
+                {spelling}
+              </span>
+            ))
+          : entry.label}
       </h2>
-      {full && !missingFullData && firstBase && (
-        <div className="mt-2">
-          <Pronunciations variants={firstBase.variants} variant={variant} />
-        </div>
-      )}
     </td>
   );
   if (missingFullData)
@@ -213,7 +225,10 @@ export function ReadingEntry({
               >
                 {posIndex === 0 && senseIndex === 0 && wordCell}
                 {senseIndex === 0 && (
-                  <td rowSpan={Math.max(1, pos.senses.length)}>
+                  <td
+                    rowSpan={Math.max(1, pos.senses.length)}
+                    className="text-right"
+                  >
                     <h3 className="font-semibold">
                       {full
                         ? POS_ABBR[basicPos]
@@ -263,7 +278,7 @@ export function ReadingEntry({
                   </td>
                 )}
                 {full && (
-                  <td>
+                  <td className="text-right">
                     {sense && (sense.sub_pos_label || sense.sub_pos) && (
                       <span className="inline-block rounded bg-muted px-1.5 text-xs font-medium text-foreground-muted">
                         {sense.sub_pos_label ?? sense.sub_pos}
@@ -316,12 +331,10 @@ export function ReadingEntry({
 
 function Pronunciations({
   variants,
-  variant,
-  spelling = false
+  variant
 }: {
   variants: WordlistFormVariant[];
   variant: EnglishVariant | null;
-  spelling?: boolean;
 }) {
   const regionalVariants = selectTexts(variants, variant);
   return (
@@ -330,7 +343,6 @@ function Pronunciations({
         const pronunciation = regional.pronunciations[0];
         const phonetic = pronunciation?.dict_phonetic.trim();
         const [left, right] = phoneticDelimiters(phonetic ?? "");
-        if (!spelling && !phonetic) return null;
         return (
           <div
             key={regional.id}
@@ -341,11 +353,7 @@ function Pronunciations({
                 {regional.dialect === "uk" ? "英" : "美"}
               </span>
             )}
-            {spelling && (
-              <span className="tsz-words font-semibold">
-                {regional.spelling}
-              </span>
-            )}
+            <span className="tsz-words font-semibold">{regional.spelling}</span>
             {pronunciation && phonetic && (
               <span className="tsz-phonetics">
                 {left}
@@ -377,7 +385,7 @@ function Forms({
           <span className="mt-0.5 shrink-0 rounded bg-muted px-1.5 text-xs font-medium leading-5 text-foreground-muted">
             {form.label}
           </span>
-          <Pronunciations variants={form.variants} variant={variant} spelling />
+          <Pronunciations variants={form.variants} variant={variant} />
         </div>
       ))}
     </div>
