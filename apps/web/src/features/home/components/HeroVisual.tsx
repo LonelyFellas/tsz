@@ -48,13 +48,24 @@ const WORDS = [
 ] as const;
 
 export function HeroVisual() {
-  const [index, setIndex] = useState(0);
+  const [{ index, requestedIndices }, setPreview] = useState({
+    index: 0,
+    requestedIndices: [0]
+  });
   const [showDefinition, setShowDefinition] = useState(true);
   const [firstImageSettled, setFirstImageSettled] = useState(false);
   const current = WORDS[index]!;
 
   function changeWord(direction: number) {
-    setIndex((value) => (value + direction + WORDS.length) % WORDS.length);
+    setPreview((value) => {
+      const nextIndex = (value.index + direction + WORDS.length) % WORDS.length;
+      return {
+        index: nextIndex,
+        requestedIndices: value.requestedIndices.includes(nextIndex)
+          ? value.requestedIndices
+          : [...value.requestedIndices, nextIndex]
+      };
+    });
     setShowDefinition(true);
   }
 
@@ -67,7 +78,7 @@ export function HeroVisual() {
             className={styles.wordPicture}
             data-active={wordIndex === index}
           >
-            {(wordIndex === 0 || firstImageSettled || wordIndex === index) && (
+            {(firstImageSettled || requestedIndices.includes(wordIndex)) && (
               <>
                 <source
                   type="image/avif"

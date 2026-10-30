@@ -51,6 +51,18 @@ it("首图未完成时切词立即加载所选图片，首图失败也不阻塞�
   expect(screen.getByRole("img")).toHaveAttribute("src", "/images/wave.webp");
 });
 
+it("首图仍在加载时保留已请求的图片节点，连续切词不打断淡出或重新挂载", () => {
+  render(<HeroVisual />);
+  fireEvent.click(screen.getByRole("button", { name: "下一个单词" }));
+  const wave = screen.getByRole("img");
+  fireEvent.click(screen.getByRole("button", { name: "下一个单词" }));
+  expect(screen.getByRole("heading", { name: "shore" })).toBeInTheDocument();
+  expect(wave).toBeInTheDocument();
+  expect(wave).toHaveAttribute("aria-hidden", "true");
+  fireEvent.click(screen.getByRole("button", { name: "上一个单词" }));
+  expect(screen.getByRole("img")).toBe(wave);
+});
+
 it("三个单词各有对应图片，循环与返回时图片保持一致", () => {
   render(<HeroVisual />);
   const sources: string[] = [];
