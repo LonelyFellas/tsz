@@ -314,7 +314,7 @@ export function LearningPlanCreator({ userId }: { userId: string }) {
               )}
               <p className="mt-1 text-xs text-foreground-muted">
                 {questionType === "choice_zh_to_en"
-                  ? "采用人工审核通过的题目，单选成绩不影响拼写掌握度。"
+                  ? "按所选词表和学习设置自动出题，单选成绩不影响拼写掌握度。"
                   : "采用当前学习设置。"}
                 自定义词暂不参与出题。
               </p>

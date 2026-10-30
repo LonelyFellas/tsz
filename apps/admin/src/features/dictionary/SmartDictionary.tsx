@@ -103,7 +103,6 @@ import {
   canCreateEntry,
   canModifyEntry,
   canPublishEntry,
-  canWriteEntry,
   canTransitionEntry,
   entryWriteForbiddenMessage,
   isEntryOwnershipError
@@ -1063,17 +1062,6 @@ export function SmartDictionary({
         const rowDeletePending =
           deleteWord.isPending && deleteWord.variables?.wordId === record.id;
         const items: MenuProps["items"] = [];
-        if (
-          !trashMode &&
-          canWriteEntry(writeActor, record) &&
-          record.status === "published"
-        ) {
-          items.push({
-            key: "generate-question",
-            label: "生成单选题",
-            onClick: () => navigate(`/question-bank?entry_id=${record.id}`)
-          });
-        }
         if (canEditRowAnnotation(annotationActor, record)) {
           items.push({
             key: "annotation",
