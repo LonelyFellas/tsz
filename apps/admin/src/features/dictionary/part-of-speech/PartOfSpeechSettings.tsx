@@ -265,7 +265,7 @@ export function PartOfSpeechSettings() {
 
   return (
     <Flex vertical gap={16}>
-      <Breadcrumb items={[{ title: "系统设置" }, { title: "词性配置" }]} />
+      <Breadcrumb items={[{ title: "词库管理" }, { title: "词性配置" }]} />
       {/* Tab 自带的上内边距与下外边距会让它和上下块的间距比页面统一的 16px 大，这里归零。 */}
       <ConfigProvider
         theme={{

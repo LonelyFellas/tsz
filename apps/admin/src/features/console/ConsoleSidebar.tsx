@@ -101,6 +101,7 @@ const GROUPS: Group[] = [
     leaves: [
       pageLeaf(ADMIN_PAGE_ROUTES.words, "智能词库"),
       pageLeaf(ADMIN_PAGE_ROUTES.wordsTrash, "垃圾桶"),
+      pageLeaf(ADMIN_PAGE_ROUTES.partsOfSpeech, "词性配置"),
       {
         key: "todo:custom-dict",
         label: "自定义词库",
@@ -124,6 +125,7 @@ const GROUPS: Group[] = [
     label: "词表管理",
     leaves: [
       pageLeaf(ADMIN_PAGE_ROUTES.wordlists, "智能词表"),
+      pageLeaf(ADMIN_PAGE_ROUTES.reviews, "词表审核"),
       {
         key: "todo:custom-wordlist",
         label: "自定义词表",
@@ -150,7 +152,6 @@ const GROUPS: Group[] = [
     icon: <AuditOutlined />,
     label: "审核管理",
     leaves: [
-      pageLeaf(ADMIN_PAGE_ROUTES.reviews, "词表审核"),
       pageLeaf(ADMIN_PAGE_ROUTES.teacherApplications, "教师申请审核"),
       {
         key: "todo:comments",
@@ -164,10 +165,7 @@ const GROUPS: Group[] = [
     key: "grp-settings",
     icon: <SettingOutlined />,
     label: "系统设置",
-    leaves: [
-      pageLeaf(ADMIN_PAGE_ROUTES.partsOfSpeech, "词性配置"),
-      pageLeaf(ADMIN_PAGE_ROUTES.aiLedger, "AI 账本")
-    ]
+    leaves: [pageLeaf(ADMIN_PAGE_ROUTES.aiLedger, "AI 账本")]
   },
   {
     key: "grp-coin",
