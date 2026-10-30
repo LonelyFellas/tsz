@@ -269,6 +269,66 @@ it("moves a selection from the content pane into the tree and rejects another sy
   );
 });
 
+it.each(["owned", "favorites"] as const)(
+  "moves a nested item to %s root through the blank tree area",
+  async (space) => {
+    navigation.params = `space=${space}&folder=folder`;
+    vi.mocked(api.wordList.library.list).mockImplementation(async (_, query) =>
+      page(query?.parent_id ? [{ ...file, parent_id: "folder" }] : [folder])
+    );
+    renderWithProviders(<WordlistLibrary />);
+    const tree = screen.getByRole("navigation", { name: "工程目录" });
+    fireEvent.keyDown(
+      await within(tree).findByRole("button", { name: "英语" }),
+      {
+        key: "ArrowRight"
+      }
+    );
+    const source = await within(tree).findByRole("button", {
+      name: "我的备注"
+    });
+    const payload = new Map<string, string>();
+    const dataTransfer = {
+      types: ["application/x-tsz-library"],
+      setData: (key: string, value: string) => payload.set(key, value),
+      getData: (key: string) => payload.get(key) ?? ""
+    };
+    fireEvent.dragStart(source.parentElement!, { dataTransfer });
+    const blank = within(tree).getByRole("region", {
+      name: "根目录放置区域"
+    });
+    fireEvent.drop(blank, {
+      dataTransfer: {
+        getData: () =>
+          JSON.stringify({
+            space: space === "owned" ? "favorites" : "owned",
+            ids: ["file"]
+          })
+      }
+    });
+    expect(api.wordList.library.operate).not.toHaveBeenCalled();
+    expect(fireEvent.dragOver(blank, { dataTransfer })).toBe(false);
+    expect(within(blank).getByText("松开以移到根目录")).toBeInTheDocument();
+    fireEvent.dragLeave(blank, { relatedTarget: null });
+    expect(within(blank).queryByText("松开以移到根目录")).toBeNull();
+    fireEvent.dragOver(blank, { dataTransfer });
+    fireEvent.drop(blank, { dataTransfer });
+    await waitFor(() =>
+      expect(api.wordList.library.operate).toHaveBeenCalledExactlyOnceWith(
+        space,
+        {
+          expected_version: "v1",
+          action: "move",
+          ids: ["file"],
+          target_id: null
+        }
+      )
+    );
+    expect(await screen.findByRole("status")).toHaveTextContent("已移动");
+    expect(within(blank).queryByText("松开以移到根目录")).toBeNull();
+  }
+);
+
 it("creates a child in the context-menu folder rather than the currently open directory", async () => {
   renderWithProviders(<WordlistLibrary />);
   const tree = screen.getByRole("navigation", { name: "工程目录" });

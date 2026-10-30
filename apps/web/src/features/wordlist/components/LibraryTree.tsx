@@ -1,6 +1,6 @@
 "use client";
 import { LIBRARY_DRAG_TYPE, libraryDragIds } from "../library-drag";
-import { useState, type KeyboardEvent } from "react";
+import { useState, type DragEvent, type KeyboardEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   ChevronDown,
@@ -51,6 +51,29 @@ const iconButton =
   "inline-flex size-10 shrink-0 items-center justify-center rounded-xl lg:size-7 lg:rounded-lg text-foreground-muted hover:bg-foreground/10 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-40";
 export function LibraryTree(props: Props) {
   const [expansion, setExpansion] = useState(() => new Map<string, boolean>());
+  const [rootDragOver, setRootDragOver] = useState(false);
+  function dragOverRoot(event: DragEvent<HTMLElement>) {
+    if (
+      props.trash ||
+      props.disabled ||
+      !Array.from(event.dataTransfer.types).includes(LIBRARY_DRAG_TYPE)
+    )
+      return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    setRootDragOver(true);
+  }
+  function leaveRoot(event: DragEvent<HTMLElement>) {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+      setRootDragOver(false);
+  }
+  function dropAtRoot(event: DragEvent<HTMLElement>) {
+    event.preventDefault();
+    setRootDragOver(false);
+    if (props.trash || props.disabled) return;
+    const ids = libraryDragIds(event.dataTransfer, props.space);
+    if (ids.length) props.onMove(ids, null);
+  }
   const expanded = new Set([
     ...props.ancestorIds.filter((id) => expansion.get(id) !== false),
     ...[...expansion].filter(([, open]) => open).map(([id]) => id)
@@ -88,21 +111,21 @@ export function LibraryTree(props: Props) {
     rows[next]?.focus();
   }
   return (
-    <nav aria-label="工程目录" className="min-w-0" onKeyDown={navigate}>
-      <div className="flex min-h-11 items-center border-y border-border/60 bg-muted/60 pl-2 pr-1">
+    <nav
+      aria-label="工程目录"
+      className="flex min-h-full min-w-0 flex-col"
+      onKeyDown={navigate}
+      onDragEnd={() => setRootDragOver(false)}
+    >
+      <div className="flex min-h-11 shrink-0 items-center border-y border-border/60 bg-muted/60 pl-2 pr-1">
         <button
           data-leaves-page
           data-explorer-item
           disabled={props.disabled}
           onClick={() => props.onFolder()}
-          onDragOver={(event) => {
-            if (!props.trash) event.preventDefault();
-          }}
-          onDrop={(event) => {
-            event.preventDefault();
-            const ids = libraryDragIds(event.dataTransfer, props.space);
-            if (!props.trash && ids.length) props.onMove(ids, null);
-          }}
+          onDragOver={dragOverRoot}
+          onDragLeave={leaveRoot}
+          onDrop={dropAtRoot}
           className="flex min-w-0 flex-1 items-center gap-1.5 py-1 text-left text-xs font-semibold focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
         >
           <ChevronDown className="size-3.5 shrink-0" aria-hidden />
@@ -141,8 +164,18 @@ export function LibraryTree(props: Props) {
           <ListCollapse className="size-3.5" aria-hidden />
         </button>
       </div>
-      <div className="min-h-64 overflow-x-auto py-1">
+      <div className="shrink-0 overflow-x-auto py-1">
         <TreeLevel {...props} expanded={expanded} toggle={toggle} depth={0} />
+      </div>
+      <div
+        role="region"
+        aria-label="根目录放置区域"
+        onDragOver={dragOverRoot}
+        onDragLeave={leaveRoot}
+        onDrop={dropAtRoot}
+        className={`min-h-32 flex-1 px-3 py-4 text-center text-xs ${rootDragOver ? "bg-primary-muted text-primary outline-2 -outline-offset-2 outline-primary" : ""}`}
+      >
+        {rootDragOver && "松开以移到根目录"}
       </div>
     </nav>
   );
