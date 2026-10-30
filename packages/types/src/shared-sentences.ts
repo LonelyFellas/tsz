@@ -30,8 +30,8 @@ export interface SharedSentenceContent {
   annotations: SharedSentenceAnnotation[];
 }
 export interface CreateSharedSentence {
-  source_entry_id: string;
-  source_sense_id: string;
+  source_entry_id?: string;
+  source_sense_id?: string;
   content: SharedSentenceContent;
 }
 export interface UpdateSharedSentence {

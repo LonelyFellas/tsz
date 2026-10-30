@@ -17,6 +17,7 @@ export function SharedSentenceAssociationPicker({
   segments,
   selected,
   onSelect,
+  onCancel,
   dialect,
   labels,
   sourceEntryId,
@@ -77,9 +78,14 @@ export function SharedSentenceAssociationPicker({
           onReplace={() => {}}
           readOnly
         />
-        <Button size="small" onClick={() => onSelect(undefined)}>
-          清除关联
-        </Button>
+        <Flex justify="end" gap="small">
+          <Button size="small" onClick={() => onSelect(undefined)}>
+            清除关联
+          </Button>
+          <Button size="small" aria-label="关闭关联详情" onClick={onCancel}>
+            关闭
+          </Button>
+        </Flex>
       </Flex>
     );
   }

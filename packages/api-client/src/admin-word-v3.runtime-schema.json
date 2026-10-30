@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/on-demand-choice/docs/openapi.json",
-  "_source_sha256": "b210ee88e023af2b520dc5aacfecb310f301828c4360cb98bcac05eaa56494f1",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/task-154-independent-sentences/docs/openapi.json",
+  "_source_sha256": "31af0b23570f8a96bfa81d0dc18917f70648f6c05df79c8ca1d4ef612ef5d4e7",
   "roots": [
     "LearningCapabilities",
     "AiLedgerPage",
