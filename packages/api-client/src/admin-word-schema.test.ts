@@ -11,19 +11,15 @@ import {
   decodeAdminWordAnyListResponse,
   decodeAdminWordDraftAnyEnvelope,
   decodeAdminWordV3Envelope,
-  decodeDetectLexiconResponseAny,
   decodeDetectLexiconResponseV3,
   decodeDraftValidationIssueAny,
-  decodeDraftValidationResponseAny,
   decodeDraftValidationResponseV3,
   decodeEntryLifecycleBatchAnyResponse,
   decodeEntryDeleteBatchResponse,
-  decodeFormsImpactResponseAny,
   decodeFormsImpactResponseV3,
   decodeInboundReferencesV3,
   decodeRelatedSearchResponseAny,
   decodeSearchComponentTargetsV3Response,
-  decodeSurfaceMatchPageAny,
   decodeSurfaceMatchPageV3
 } from "./admin-word-schema";
 
@@ -1000,24 +996,12 @@ describe("admin word V3/Any runtime decoder", () => {
 
   it.each([
     [
-      "validation any",
-      "DraftValidationResponseV3",
-      decodeDraftValidationResponseAny
-    ],
-    [
       "validation v3",
       "DraftValidationResponseV3",
       decodeDraftValidationResponseV3
     ],
-    ["impact any", "FormsImpactResponseV3", decodeFormsImpactResponseAny],
     ["impact v3", "FormsImpactResponseV3", decodeFormsImpactResponseV3],
-    ["surface any", "SurfaceMatchPageV3", decodeSurfaceMatchPageAny],
     ["surface v3", "SurfaceMatchPageV3", decodeSurfaceMatchPageV3],
-    [
-      "detection any",
-      "DetectLexiconSurfaceResponseV3",
-      decodeDetectLexiconResponseAny
-    ],
     [
       "detection v3",
       "DetectLexiconSurfaceResponseV3",
@@ -1131,7 +1115,7 @@ describe("admin word V3/Any runtime decoder", () => {
 
   it("非 aggregate union 的未知版本同样 fail closed", () => {
     const error = captureUnsupported(() =>
-      decodeFormsImpactResponseAny({ schema_version: 4 })
+      decodeFormsImpactResponseV3({ schema_version: 4 })
     );
 
     expect(error).toMatchObject({
