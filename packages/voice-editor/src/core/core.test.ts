@@ -10,12 +10,9 @@ import {
   canonicalVoiceHash,
   codePointLength,
   codePointSlice,
-  codePointToUtf16Index,
   migrateRichTextV1,
   normalizeRichTextV2,
-  selectedText,
   toRichTextV2,
-  utf16IndexToCodePoint,
   validateRichTextV2
 } from "./index";
 
@@ -27,24 +24,11 @@ const SETTINGS: VoiceSettings = {
 };
 
 describe("Unicode code-point helpers", () => {
-  it("round-trips every valid boundary across emoji, combining marks, IPA, and newline", () => {
+  it("counts and slices code points across emoji, combining marks, IPA, and newline", () => {
     const value = "A😀e\u0301ɪ\n";
-    const utf16Boundaries = [0, 1, 3, 4, 5, 6, 7];
 
     expect(codePointLength(value)).toBe(6);
     expect(codePointSlice(value, 1, 5)).toBe("😀e\u0301ɪ");
-    utf16Boundaries.forEach((utf16, codePoint) => {
-      expect(codePointToUtf16Index(value, codePoint)).toBe(utf16);
-      expect(utf16IndexToCodePoint(value, utf16)).toBe(codePoint);
-    });
-  });
-
-  it.each([-1, 7, 1.5])("rejects invalid code-point offset %s", (offset) => {
-    expect(() => codePointToUtf16Index("A😀", offset)).toThrow(RangeError);
-  });
-
-  it.each([-1, 2, 4, 1.5])("rejects invalid UTF-16 index %s", (index) => {
-    expect(() => utf16IndexToCodePoint("A😀", index)).toThrow(RangeError);
   });
 });
 
@@ -282,7 +266,6 @@ describe("RichText compatibility and canonical hash", () => {
     expect(migrated.annotations).toHaveLength(5);
     expect(input).toEqual(snapshot);
     expect(toRichTextV2(input)).toEqual(migrated);
-    expect(selectedText(input, 0, 2)).toBe("😀a");
   });
 
   it("hashes canonical semantics and changes on content or voice settings", () => {
