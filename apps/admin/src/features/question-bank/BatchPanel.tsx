@@ -251,7 +251,7 @@ export function BatchPanel({
             modal.confirm({
               title: `创建批次并生成 ${preview!.missing} 道草稿？`,
               content:
-                "生成会调用命题服务并可能产生模型费用。仅补齐当前缺题，所有结果仍须人工审核。词库或覆盖情况变化时将要求重新预览。",
+                "按词库规则补齐当前缺题。请人工核查选项语义和答案唯一性。词库或覆盖情况变化时将要求重新预览。",
               okText: "开始批量命题",
               cancelText: "返回预览",
               onOk: () => create()
