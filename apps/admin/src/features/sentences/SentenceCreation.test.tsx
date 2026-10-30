@@ -425,6 +425,79 @@ describe("按词条关联反查共享多维例句", () => {
     }
   );
 
+  it("查看已有词义关联后可关闭浮层，保留关联并正常保存", async () => {
+    const content = newSentence();
+    if (content.sentence.en_text.mode === "unified")
+      content.sentence.en_text.common.value.text = "We make stories.";
+    content.sentence.zh_translations[0]!.content.text = "我们编故事。";
+    content.annotations = [
+      {
+        id: "existing-link",
+        source_dialect: "common",
+        source_segments: [{ start: 3, end: 7, surface: "make" }],
+        target: sentenceTarget()
+      }
+    ];
+    vi.mocked(api.sentences.update).mockImplementation(async (_id, input) =>
+      shared(input.content)
+    );
+    show(
+      <SentenceEditor
+        sentence={shared(content)}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />
+    );
+    await screen.findByLabelText("标注工具栏");
+    fireEvent.click(screen.getByLabelText("关联单词"));
+    fireEvent.mouseDown(screen.getByLabelText("关联 make（2）"), { button: 0 });
+    await screen.findByText("已关联：具体词义");
+    expect(screen.getByLabelText("完成例句编辑")).toBeDisabled();
+    fireEvent.click(
+      within(screen.getByText("已关联：具体词义").parentElement!).getByRole(
+        "button",
+        { name: "关闭关联详情" }
+      )
+    );
+    expect(screen.queryByText("已关联：具体词义")).toBeNull();
+    expect(screen.getByLabelText("完成例句编辑")).toBeEnabled();
+    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    await waitFor(() => expect(api.sentences.update).toHaveBeenCalledOnce());
+    expect(
+      vi.mocked(api.sentences.update).mock.calls[0]![1].content.annotations
+    ).toEqual(content.annotations);
+  });
+  it("独立创建无需来源词义或关联，保存失败保留输入并以相同 ID 重试", async () => {
+    const onSaved = vi.fn();
+    vi.mocked(api.sentences.create)
+      .mockRejectedValueOnce(new Error("网络暂时不可用"))
+      .mockImplementationOnce(async (input) => shared(input.content));
+    show(<SentenceEditor onClose={vi.fn()} onSaved={onSaved} />);
+    await screen.findByLabelText("标注工具栏");
+    const save = screen.getByLabelText("完成例句编辑");
+    expect(save).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("例句正文"), {
+      target: { value: "We make up stories." }
+    });
+    expect(save).toBeDisabled();
+    fireEvent.change(
+      screen.getAllByPlaceholderText("请输入对应的中文译文")[0]!,
+      { target: { value: "我们编故事。" } }
+    );
+    expect(save).toBeEnabled();
+    fireEvent.click(save);
+    await screen.findByText("网络暂时不可用");
+    expect(screen.getByLabelText("例句正文")).toHaveValue(
+      "We make up stories."
+    );
+    fireEvent.click(save);
+    await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
+    const [first, retry] = vi.mocked(api.sentences.create).mock.calls;
+    expect(first![0]).toEqual(retry![0]);
+    expect(first![0]).not.toHaveProperty("source_entry_id");
+    expect(first![0]).not.toHaveProperty("source_sense_id");
+    expect(first![0].content.annotations).toEqual([]);
+  });
   it("必须确认当前词义关联，独立保存失败保留输入，重试不重复创建", async () => {
     vi.mocked(api.sentences.create)
       .mockRejectedValueOnce(new Error("网络暂时不可用"))

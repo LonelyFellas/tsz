@@ -45,6 +45,22 @@ const body = {
 };
 
 describe("shared sentence wire contract", () => {
+  it("独立创建只传例句内容，响应仍按严格契约解码", async () => {
+    const post = vi.fn().mockResolvedValue(body);
+    const endpoints = createSharedSentenceEndpoints({
+      post
+    } as unknown as HttpClient);
+    await expect(
+      endpoints.create({ content: body.content } as Parameters<
+        typeof endpoints.create
+      >[0])
+    ).resolves.toEqual(body);
+    expect(post).toHaveBeenCalledWith(
+      "/lexicon/sentences",
+      { content: body.content },
+      expect.any(Object)
+    );
+  });
   it("例句录音在创建、更新、重读和发布快照中保留；兼容缺省字段且不放宽未知字段", async () => {
     const asset = {
       id,

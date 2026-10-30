@@ -181,7 +181,11 @@ export function SentenceEditor({
       return;
     }
     if (!canSave) {
-      setError("请填写译文，并确认句中已有效关联当前词义");
+      setError(
+        sourceEntryId
+          ? "请填写正文和译文，并确认句中已有效关联当前词义"
+          : "请填写例句正文和至少一条译文"
+      );
       return false;
     }
     setSaving(true);
@@ -216,13 +220,13 @@ export function SentenceEditor({
             : {}),
           content: next
         });
-      else if (sourceEntryId && sourceSenseId)
+      else
         saved = await api.sentences.create({
-          source_entry_id: sourceEntryId,
-          source_sense_id: sourceSenseId,
+          ...(sourceEntryId && sourceSenseId
+            ? { source_entry_id: sourceEntryId, source_sense_id: sourceSenseId }
+            : {}),
           content: next
         });
-      else throw new Error("请先保存词义，再从具体词义内创建例句");
       recovery.discard();
       afterSave?.();
       onSaved(saved);
@@ -528,6 +532,15 @@ export function SentenceEditor({
               description="请点击原来的关联片段，补选具体词义或清除关联后再完成。"
             />
           )}
+          {!sourceEntryId &&
+            !content.annotations.some(
+              (annotation) => annotation.target.state === "linked"
+            ) && (
+              <Alert
+                type="info"
+                title="未关联具体词义，暂不会用于对应单词的练习。可先保存，之后再补充关联。"
+              />
+            )}
           {sourceEntryId && (
             <Alert
               type={currentLinked ? "success" : "info"}
