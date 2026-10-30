@@ -1,4 +1,3 @@
-import { createQuestionBankEndpoints } from "./question-bank";
 import { createAiLedgerEndpoints } from "./ai-ledger";
 import { createOpenCodeEndpoints } from "./opencode";
 import { createChatGPTEndpoints } from "./chatgpt";
@@ -259,7 +258,6 @@ export function createAdminEndpoints(http: HttpClient) {
     aiLedger: createAiLedgerEndpoints(http),
     opencode: createOpenCodeEndpoints(http),
     chatgpt: createChatGPTEndpoints(http),
-    questionBank: createQuestionBankEndpoints(http),
     dashboard: {
       /** GET /admin/dashboard/overview — 管理端首页聚合统计。 */
       overview: (opts?: { signal?: AbortSignal }) =>

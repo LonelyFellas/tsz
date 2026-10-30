@@ -311,12 +311,12 @@ it("a choice preview without approved questions explains the exclusion and canno
     ...preview,
     eligible_count: 0,
     can_create: false,
-    reasons: ["所选词表暂无匹配等级和档位的已审核单选题。"]
+    reasons: ["所选词表暂无足够的无释义重叠选项，暂不可出单选题。"]
   });
   fireEvent.click(
     screen.getByRole("radio", { name: "单选题 · 看中文，选英文" })
   );
-  await screen.findByText("所选词表暂无匹配等级和档位的已审核单选题。");
+  await screen.findByText("所选词表暂无足够的无释义重叠选项，暂不可出单选题。");
   expect(screen.getByRole("button", { name: "完成创建" })).toBeDisabled();
   expect(mocks.create).not.toHaveBeenCalled();
 });
