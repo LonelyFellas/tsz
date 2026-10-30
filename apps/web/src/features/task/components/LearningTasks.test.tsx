@@ -1,5 +1,5 @@
 import { HttpError } from "@tsz/api-client";
-import { screen, fireEvent, waitFor } from "@testing-library/react";
+import { screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { renderWithProviders } from "@/test/render";
 const mocks = vi.hoisted(() => ({
@@ -10,12 +10,21 @@ const mocks = vi.hoisted(() => ({
   list: vi.fn(),
   plansList: vi.fn(),
   plansDetail: vi.fn(),
+  cyclePreview: vi.fn(),
+  cycleCreate: vi.fn(),
+  cycles: vi.fn(),
   user: { id: "learner-a", roles: ["student"] }
 }));
 vi.mock("@/lib/request", () => ({
   api: {
     learning: mocks,
-    learningPlans: { list: mocks.plansList, detail: mocks.plansDetail },
+    learningPlans: {
+      list: mocks.plansList,
+      detail: mocks.plansDetail,
+      cyclePreview: mocks.cyclePreview,
+      cycleCreate: mocks.cycleCreate,
+      cycles: mocks.cycles
+    },
     learningRewards: { day: mocks.day }
   }
 }));
@@ -26,6 +35,8 @@ vi.mock("@/stores/user", () => ({
   )
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+import { PlanCoverage } from "./PlanCoverage";
+import type { LearningPlan } from "@tsz/types";
 import { LearningPractice, LearningTaskList } from "./LearningTasks";
 const run = {
   id: "run",
@@ -47,6 +58,9 @@ const question = {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.answer.mockReset();
+  mocks.cyclePreview.mockReset();
+  mocks.cycleCreate.mockReset();
+  mocks.cycles.mockReset();
   mocks.plansList.mockRejectedValue(new HttpError(404, "API missing"));
   mocks.plansDetail.mockRejectedValue(new HttpError(404, "API missing"));
   mocks.user = { id: "learner-a", roles: ["student"] };
@@ -508,4 +522,230 @@ it("choice selection waits for explicit submission and renders only server-owned
   expect(
     screen.queryByRole("link", { name: "查看待巩固内容与复习安排" })
   ).not.toBeInTheDocument();
+});
+
+it("mastery practice records uncertainty and restores the server retry queue", async () => {
+  const current = {
+    ...run,
+    question_type: "choice_zh_to_en",
+    practice_mode: "mastery_v1"
+  };
+  const options = [
+    { option_id: "a", spelling: "apple" },
+    { option_id: "b", spelling: "banana" },
+    { option_id: "c", spelling: "orange" },
+    { option_id: "d", spelling: "tomato" }
+  ];
+  mocks.run.mockResolvedValue(current);
+  mocks.questions.mockResolvedValue({
+    items: [{ ...question, options }],
+    pagination: { total_pages: 1 }
+  });
+  mocks.answer.mockImplementation(async () => {
+    mocks.run.mockResolvedValue({
+      ...current,
+      target_count: 3,
+      answered_count: 1
+    });
+    mocks.questions.mockResolvedValue({
+      items: [
+        {
+          ...question,
+          options,
+          answered: true,
+          feedback: {
+            submitted_answer: "不确定",
+            is_correct: false,
+            accepted_answers: ["apple"]
+          }
+        },
+        {
+          ...question,
+          id: "retry",
+          position: 2,
+          practice_kind: "retry",
+          options
+        }
+      ],
+      pagination: { total_pages: 1 }
+    });
+  });
+  renderWithProviders(<LearningPractice id="run" />);
+  fireEvent.click(await screen.findByRole("button", { name: "不确定" }));
+  await waitFor(() => expect(mocks.answer).toHaveBeenCalledOnce());
+  expect(mocks.answer.mock.calls[0]![1]).toMatchObject({
+    question_id: "q1",
+    answer: "不确定"
+  });
+  await screen.findByText(/错题重练/);
+  expect(screen.getByText(/已答 1\/3 题/)).toBeInTheDocument();
+  expect(screen.getByText(/你的答案：/)).toHaveTextContent("不确定");
+});
+
+function sourceRepairPlan(): LearningPlan {
+  return {
+    mode: "mastery_v1",
+    task: {
+      id: "task",
+      name: "来源恢复",
+      task_type: "longterm",
+      wordlist_ids: ["list"],
+      daily_question_count: null,
+      ends_at: null,
+      state: "active",
+      revision: 3,
+      created_at: "2026-10-30T00:00:00Z"
+    },
+    schedule: null,
+    sources: [],
+    current_cycle: {
+      id: "cycle",
+      cycle_number: 1,
+      state: "active",
+      total_count: 4,
+      covered_count: 1,
+      remaining_count: 3,
+      available_remaining_count: 0,
+      blocked_count: 3,
+      earliest_day: "2026-10-30",
+      created_at: "2026-10-30T00:00:00Z",
+      completed_at: null
+    },
+    current_run: null,
+    mastery: {
+      new_count: 3,
+      learning_count: 0,
+      mastered_count: 1,
+      due_count: 0,
+      next_review_day: null
+    },
+    today_available_count: 0,
+    estimated_learning_days: null,
+    estimate_from_day: null,
+    schedule_at_risk: false,
+    status: "source_blocked",
+    can_start: false,
+    can_start_next_cycle: false,
+    can_restart_blocked_cycle: false,
+    reasons: [],
+    server_time: "2026-10-30T00:00:00Z",
+    business_day: "2026-10-30",
+    next_day_at: "2026-10-30T20:00:00Z",
+    timezone: "Asia/Shanghai"
+  };
+}
+function sourceRepairPreview(available = true) {
+  return {
+    source_refresh: {
+      refreshed_count: available ? 3 : 0,
+      changed_content_count: 1,
+      unavailable_count: available ? 1 : 4
+    },
+    preview: {
+      eligible_count: available ? 3 : 0,
+      can_create: available,
+      reasons: available ? [] : ["来源尚未恢复"],
+      preview_fingerprint: "source-fingerprint"
+    },
+    earliest_day: "2026-10-30",
+    previous_covered_count: 1,
+    previous_total_count: 4,
+    previous_blocked_count: 3
+  };
+}
+function enableSourceDialog() {
+  HTMLDialogElement.prototype.showModal = function () {
+    this.open = true;
+  };
+  HTMLDialogElement.prototype.close = function () {
+    this.open = false;
+  };
+}
+it("source refresh requires confirmation and retries unknown results with the same intent", async () => {
+  enableSourceDialog();
+  mocks.cyclePreview.mockResolvedValue(sourceRepairPreview());
+  mocks.cycleCreate
+    .mockRejectedValueOnce(new Error("response lost"))
+    .mockResolvedValueOnce({ id: "cycle" });
+  const refresh = vi.fn().mockResolvedValue(undefined);
+  renderWithProviders(
+    <PlanCoverage
+      plan={sourceRepairPlan()}
+      userId="learner-a"
+      refresh={refresh}
+    />
+  );
+  fireEvent.click(screen.getByRole("button", { name: "刷新学习安排" }));
+  expect(mocks.cyclePreview).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "重新确认来源" }));
+  await screen.findByRole("dialog", { name: "重新确认来源" });
+  expect(mocks.cyclePreview).toHaveBeenCalledWith(
+    "task",
+    {
+      operation: "refresh_sources",
+      after_cycle_id: "cycle",
+      expected_revision: 3
+    },
+    expect.objectContaining({ signal: expect.any(AbortSignal) })
+  );
+  expect(mocks.cycleCreate).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "确认更新来源" }));
+  const retry = await screen.findByRole("button", { name: "重试原请求" });
+  expect(screen.getByRole("button", { name: "关闭" })).toBeDisabled();
+  const intent = mocks.cycleCreate.mock.calls[0]![1];
+  expect(intent).toMatchObject({
+    operation: "refresh_sources",
+    after_cycle_id: "cycle",
+    expected_revision: 3,
+    preview_fingerprint: "source-fingerprint"
+  });
+  fireEvent.click(retry);
+  await waitFor(() => expect(mocks.cycleCreate).toHaveBeenCalledTimes(2));
+  expect(mocks.cycleCreate.mock.calls[1]![1]).toEqual(intent);
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+  );
+  expect(refresh).toHaveBeenCalledTimes(2);
+});
+it("revoked sources remain unconfirmable rather than silently renewing access", async () => {
+  enableSourceDialog();
+  mocks.cyclePreview.mockResolvedValue(sourceRepairPreview(false));
+  renderWithProviders(
+    <PlanCoverage
+      plan={sourceRepairPlan()}
+      userId="learner-a"
+      refresh={vi.fn()}
+    />
+  );
+  fireEvent.click(screen.getByRole("button", { name: "重新确认来源" }));
+  const dialog = await screen.findByRole("dialog", { name: "重新确认来源" });
+  expect(within(dialog).getByText("来源尚未恢复")).toBeInTheDocument();
+  expect(
+    await within(dialog).findByRole("button", { name: "确认更新来源" })
+  ).toBeDisabled();
+  expect(mocks.cycleCreate).not.toHaveBeenCalled();
+});
+it("existing coverage cycle confirmation keeps its original operation", async () => {
+  enableSourceDialog();
+  const plan = sourceRepairPlan();
+  plan.mode = "coverage_v1";
+  delete plan.mastery;
+  plan.can_start_next_cycle = true;
+  mocks.cycles.mockResolvedValue({ items: [], pagination: { total_pages: 1 } });
+  mocks.cyclePreview.mockResolvedValue({
+    ...sourceRepairPreview(),
+    source_refresh: undefined
+  });
+  mocks.cycleCreate.mockResolvedValue({ id: "new-cycle" });
+  renderWithProviders(
+    <PlanCoverage plan={plan} userId="learner-a" refresh={vi.fn()} />
+  );
+  fireEvent.click(screen.getByRole("button", { name: "开启下一轮" }));
+  await screen.findByRole("dialog", { name: "开启下一轮" });
+  fireEvent.click(screen.getByRole("button", { name: "确认开启新轮" }));
+  await waitFor(() => expect(mocks.cycleCreate).toHaveBeenCalledOnce());
+  expect(mocks.cycleCreate.mock.calls[0]![1]).toMatchObject({
+    operation: "next",
+    after_cycle_id: "cycle"
+  });
 });

@@ -39,10 +39,14 @@ function HomeWorkspace({ userId }: { userId: string }) {
   const run = featured?.current_run;
   const continuing = featured?.can_start && run?.state === "active";
   const completed =
-    featured?.mode === "coverage_v1"
-      ? featured.current_cycle?.state === "completed"
+    featured?.mode !== "legacy_v1"
+      ? featured?.current_cycle?.state === "completed"
       : run?.state === "completed";
-  const showRun = !!run && (continuing || run.state === "completed");
+  const showRun =
+    !!run &&
+    (continuing ||
+      (run.state === "completed" &&
+        !(featured?.mastery && featured.can_start)));
 
   return (
     <div className="min-h-dvh">
@@ -88,7 +92,7 @@ function HomeWorkspace({ userId }: { userId: string }) {
                   <p className="text-xs font-medium tracking-[0.2em] text-foreground-muted">
                     {continuing
                       ? "继续这一轮"
-                      : featured.mode === "coverage_v1"
+                      : featured.mode !== "legacy_v1"
                         ? planStatusLabels[featured.status]
                         : completed
                           ? "本轮已完成"
@@ -103,7 +107,8 @@ function HomeWorkspace({ userId }: { userId: string }) {
                   />
                   {featured.current_cycle ? (
                     <div className="mt-8 text-sm text-foreground-muted">
-                      本轮已覆盖 {featured.current_cycle.covered_count}/
+                      {featured.mastery ? "已跨天确认" : "本轮已覆盖"}{" "}
+                      {featured.current_cycle.covered_count}/
                       {featured.current_cycle.total_count} 题
                       {featured.task.task_type === "daily" && run && (
                         <p className="mt-2">

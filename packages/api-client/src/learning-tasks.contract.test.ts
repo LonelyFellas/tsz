@@ -58,7 +58,8 @@ describe("learning wire contract", () => {
       {
         signal: controller.signal,
         headers: {
-          "X-TSZ-Learning-Capabilities": "choice-v1,wordlist-spelling-v1"
+          "X-TSZ-Learning-Capabilities":
+            "choice-v1,mastery-v1,wordlist-spelling-v1"
         }
       }
     );

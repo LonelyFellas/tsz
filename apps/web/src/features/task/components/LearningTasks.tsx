@@ -176,7 +176,7 @@ function TaskList({ userId }: { userId: string }) {
                           </h2>
                         </div>
                         <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs text-foreground-muted">
-                          {plan.mode === "coverage_v1"
+                          {plan.mode !== "legacy_v1"
                             ? planStatusLabels[plan.status]
                             : r
                               ? runLabels[r.state]
@@ -193,7 +193,9 @@ function TaskList({ userId }: { userId: string }) {
                             label={`${task.name} 本轮覆盖进度`}
                           />
                           <p className="text-sm text-foreground-muted">
-                            本轮已覆盖 {c.covered_count}/{c.total_count} 题
+                            {plan.mastery ? "已跨天确认" : "本轮已覆盖"}{" "}
+                            {c.covered_count}/{c.total_count}{" "}
+                            {plan.mastery ? "个词义" : "题"}
                             {c.blocked_count > 0 &&
                               ` · 不可用 ${c.blocked_count} 题`}
                           </p>
@@ -282,7 +284,7 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
         after_run_id: after
       };
       const r = await (
-        q.data.mode === "coverage_v1" ? api.learningPlans : api.learning
+        q.data.mode !== "legacy_v1" ? api.learningPlans : api.learning
       ).start(id, intent.current, op.options());
       if (op.current()) router.push(`/student/practice/${r.id}`);
     } catch (e) {
@@ -303,7 +305,7 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
     try {
       if (archive)
         await (
-          q.data.mode === "coverage_v1" ? api.learningPlans : api.learning
+          q.data.mode !== "legacy_v1" ? api.learningPlans : api.learning
         ).archive(
           id,
           { expected_revision: q.data.task.revision },
@@ -311,7 +313,7 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
         );
       else
         await (
-          q.data.mode === "coverage_v1" ? api.learningPlans : api.learning
+          q.data.mode !== "legacy_v1" ? api.learningPlans : api.learning
         ).rename(
           id,
           { expected_revision: q.data.task.revision, name },
@@ -354,9 +356,11 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
         title={task.name}
         description={
           <>
-            {task.task_type === "daily"
-              ? `每日 ${task.daily_question_count} 题 · 北京时间 04:00 换日`
-              : "长期任务 · 每轮覆盖全部可出题内容"}
+            {q.data.mastery
+              ? "按单词掌握情况安排新学与到期复习，每次含重练最多 30 题。"
+              : task.task_type === "daily"
+                ? `每日 ${task.daily_question_count} 题 · 北京时间 04:00 换日`
+                : "长期任务 · 每轮覆盖全部可出题内容"}
             {task.ends_at && (
               <>
                 <br />
@@ -392,7 +396,11 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
                     <Stat label="目标" value={r.target_count} />
                     <Stat label="答对" value={r.correct_count} />
                   </dl>
-                  <ProgressBar value={r.answered_count} max={r.target_count} />
+                  <ProgressBar
+                    value={r.answered_count}
+                    max={r.target_count}
+                    label={r.practice_mode ? "本次进度" : "本轮进度"}
+                  />
                 </>
               ) : (
                 <p className={hintText}>开始后，进度和正确率会显示在这里。</p>
@@ -420,8 +428,9 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
               </Link>
             )}
             {task.state === "active" &&
-              (q.data.mode === "coverage_v1"
-                ? q.data.can_start && !r
+              (q.data.mode !== "legacy_v1"
+                ? q.data.can_start &&
+                  (!r || (q.data.mode === "mastery_v1" && r.state !== "active"))
                 : !r ||
                   ([
                     "completed",
@@ -437,7 +446,11 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
                   disabled={busy}
                   onClick={() => void start(r?.id ?? null)}
                 >
-                  {r ? "重新开始一轮" : "开始练习"}
+                  {r
+                    ? q.data.mode === "mastery_v1"
+                      ? "开始下次练习"
+                      : "重新开始一轮"
+                    : "开始练习"}
                 </button>
               )}
           </div>
@@ -461,7 +474,7 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                   <input
                     className={cn(field, "mt-0 flex-1")}
-                    maxLength={q.data.mode === "coverage_v1" ? undefined : 100}
+                    maxLength={q.data.mode !== "legacy_v1" ? undefined : 100}
                     aria-label="新任务名称"
                     placeholder="新任务名称"
                     value={name}
@@ -514,7 +527,10 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
                       </span>
                       <span className="text-xs text-foreground-muted">
                         {runLabels[h.state]}
-                        {cycle_id && " · 覆盖计划批次"}
+                        {cycle_id &&
+                          (h.practice_mode
+                            ? " · 按掌握情况练习"
+                            : " · 覆盖计划批次")}
                       </span>
                     </span>
                     <span className="shrink-0 text-sm tabular-nums text-foreground-muted">
@@ -569,7 +585,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
     refetchOnMount: "always",
     refetchOnWindowFocus: "always",
     queryFn: ({ signal }) =>
-      api.learning.questions(id, { page, page_size: 20 }, { signal })
+      api.learning.questions(id, { page, page_size: 50 }, { signal })
   });
   const plan = useQuery({
     queryKey: [
@@ -595,7 +611,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
             ? qs.data
             : await api.learning.questions(
                 id,
-                { page: p, page_size: 20 },
+                { page: p, page_size: 50 },
                 op.options()
               );
         if (!op.current()) return;
@@ -618,15 +634,17 @@ function Practice({ userId, id }: { userId: string; id: string }) {
     !!qs.data?.items.some((q) => q.id === pending.question_id && q.answered);
   const uncertain = !!pending && !pendingAccepted && !busy;
   const answer = draft?.questionId === next?.id ? (draft?.value ?? "") : "";
-  async function submit() {
+  async function submit(unsure = false) {
+    const submittedValue = unsure ? "不确定" : answer;
     const replaying = !!pending && !pendingAccepted;
     if (submitting.current || (!replaying && run.data?.state !== "active"))
       return;
     const isChoice = !!next?.options;
     if (
       (!pending || pendingAccepted) &&
-      (!answer.trim() ||
+      (!submittedValue.trim() ||
         (isChoice &&
+          !unsure &&
           !next?.options?.some((option) => option.option_id === answer)))
     )
       return;
@@ -637,7 +655,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
           ? {
               idempotency_key: crypto.randomUUID(),
               question_id: next.id,
-              answer
+              answer: submittedValue
             }
           : null;
     if (!submission) return;
@@ -719,7 +737,9 @@ function Practice({ userId, id }: { userId: string; id: string }) {
         }
         description={
           <>
-            完成以有效作答数量为准。
+            {r.practice_mode
+              ? "每次含重练最多 30 题，错题隔至少 3 道其他题再出现。跨天复习才能确认掌握。"
+              : "完成以有效作答数量为准。"}
             {choice && "选择一个英文选项后提交，单选成绩不影响拼写掌握度。"}
             {choiceTask &&
               next &&
@@ -743,29 +763,38 @@ function Practice({ userId, id }: { userId: string; id: string }) {
             查看待巩固内容与复习安排
           </Link>
         )}
-        {r.task_type === "daily" && plan.data?.current_cycle && (
-          <div className="rounded-2xl bg-muted/70 p-4 text-sm">
-            <p>
-              任务当前第 {plan.data.current_cycle.cycle_number} 轮已覆盖{" "}
-              {plan.data.current_cycle.covered_count}/
-              {plan.data.current_cycle.total_count} 题 · 不可用{" "}
-              {plan.data.current_cycle.blocked_count} 题
-            </p>
-            {r.task_type === "daily" && (
+        {r.task_type === "daily" &&
+          plan.data?.current_cycle &&
+          !r.practice_mode && (
+            <div className="rounded-2xl bg-muted/70 p-4 text-sm">
               <p>
-                今日批次与本轮覆盖分开统计；部分有效作答会保留覆盖，奖励仅统计完成批次。
+                任务当前第 {plan.data.current_cycle.cycle_number} 轮已覆盖{" "}
+                {plan.data.current_cycle.covered_count}/
+                {plan.data.current_cycle.total_count} 题 · 不可用{" "}
+                {plan.data.current_cycle.blocked_count} 题
               </p>
-            )}
-          </div>
-        )}
+              {r.task_type === "daily" && (
+                <p>
+                  今日批次与本轮覆盖分开统计；部分有效作答会保留覆盖，奖励仅统计完成批次。
+                </p>
+              )}
+            </div>
+          )}
         <div className="glass rounded-3xl p-2">
           <div className="space-y-8 rounded-[20px] bg-surface/70 px-6 py-8 sm:px-10 sm:py-10">
             <div className="space-y-3">
-              <ProgressBar value={r.answered_count} max={r.target_count} />
+              <ProgressBar
+                value={r.answered_count}
+                max={r.target_count}
+                label={r.practice_mode ? "本次进度" : "本轮进度"}
+              />
               <div className="flex flex-wrap justify-between gap-2 text-sm tabular-nums text-foreground-muted">
                 <p>
                   已答 {r.answered_count}/{r.target_count} 题 · 答对{" "}
                   {r.correct_count} 题
+                  {r.practice_mode &&
+                    r.state === "active" &&
+                    " · 本次最多 30 题"}
                 </p>
                 <p className="font-medium text-foreground">
                   正确率{" "}
@@ -788,6 +817,11 @@ function Practice({ userId, id }: { userId: string; id: string }) {
                   <h2 className="mx-auto max-w-xl text-balance">
                     <span className="block text-xs font-medium tracking-[0.2em] text-foreground-muted">
                       第 {next.position + 1} 题
+                      {next.practice_kind === "retry"
+                        ? " · 错题重练"
+                        : next.practice_kind === "review"
+                          ? " · 到期复习"
+                          : ""}
                       {next.prompt?.part_of_speech &&
                         ` · ${next.prompt.part_of_speech}`}
                     </span>
@@ -825,6 +859,16 @@ function Practice({ userId, id }: { userId: string; id: string }) {
                     }
                   />
                 )}
+                {r.practice_mode && !uncertain && (
+                  <button
+                    type="button"
+                    className={buttonClass}
+                    disabled={busy}
+                    onClick={() => void submit(true)}
+                  >
+                    不确定
+                  </button>
+                )}
                 {!uncertain && (
                   <button
                     className={`${primaryButtonClass} min-w-40`}
@@ -843,7 +887,9 @@ function Practice({ userId, id }: { userId: string; id: string }) {
                     ? "本轮词条或词表来源发生变化，无法继续。已提交的作答记录仍保留；返回任务页可检查来源后重新开始。恢复词条不会自动恢复旧轮次。"
                     : r.state !== "completed"
                       ? "本轮无法继续。已答记录仍可查看；返回任务页可检查来源后重新开始。"
-                      : "已保存本轮完成记录。"}
+                      : r.practice_mode
+                        ? "本次练习已完成。正确词留待跨天确认，未完成的错题将在后续复习优先安排。"
+                        : "已保存本轮完成记录。"}
               </p>
             )}
             {r.state === "active" && !next && (
@@ -917,7 +963,9 @@ function Practice({ userId, id }: { userId: string; id: string }) {
           />
         )}
         <div className={box}>
-          <h2 className={sectionTitle}>本轮记录</h2>
+          <h2 className={sectionTitle}>
+            {r.practice_mode ? "本次记录" : "本轮记录"}
+          </h2>
           {records.length === 0 && (
             <p className={hintText}>本页还没有作答记录。</p>
           )}

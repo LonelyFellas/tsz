@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/task-154-independent-sentences/docs/openapi.json",
-  "_generatedAt": "2026-10-30T06:14:07.620Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/choice-distractor-quality/docs/openapi.json",
+  "_generatedAt": "2026-10-30T08:42:38.828Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -6957,6 +6957,7 @@
         },
         "idempotency_key": { "type": "string", "format": "uuid" },
         "name": { "type": "string" },
+        "practice_mode": { "type": "string" },
         "preview_fingerprint": { "type": "string" },
         "question_type": { "type": "string" },
         "schedule": {
@@ -6987,7 +6988,10 @@
       },
       "additionalProperties": false
     },
-    "CycleOperation": { "type": "string", "enum": ["next", "restart_blocked"] },
+    "CycleOperation": {
+      "type": "string",
+      "enum": ["next", "restart_blocked", "refresh_sources"]
+    },
     "DeleteDubbingGroupRequest": {
       "type": "object",
       "required": ["base_revision"],
@@ -7668,6 +7672,7 @@
           "type": ["integer", "null"],
           "format": "int32"
         },
+        "practice_mode": { "type": "string" },
         "question_type": { "type": "string" },
         "schedule": {
           "oneOf": [

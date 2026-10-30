@@ -30,7 +30,7 @@
 
 ## 兼容与验证
 
-HTTP 路径和 JSON DTO 形状保持不变（`options` 原本就是可省略字段）。新前端声明 `choice-v1,wordlist-spelling-v1`；后端对不支持拼写回退的旧客户端明确返回更新提示，保护其无法渲染的混合任务。新前端连接旧后端时，既有 `choice-v1` 能力协商继续有效。发布应先前端、后后端；本次没有执行发布。词表权限、原有任务和历史快照继续沿用原规则。
+HTTP 路径和 JSON DTO 形状保持不变（`options` 原本就是可省略字段）。新前端声明 `choice-v1,mastery-v1,wordlist-spelling-v1`；后端对不支持拼写回退的旧客户端明确返回更新提示，保护其无法渲染的混合任务。新前端连接旧后端时，既有 `choice-v1` 能力协商继续有效。发布应先前端、后后端；本次没有执行发布。词表权限、原有任务和历史快照继续沿用原规则。
 
 平台题使用原算法时保留既有拼写记忆签名；自定义或扩展条件的拼写题只计任务事实，不伪造平台义项记忆。新增轮次采用 `wordlist_all_v1`；混合判分采用 `wordlist_mixed_v1`，每条答案记录实际判分版本。
 
@@ -58,3 +58,15 @@ OpenAPI 无新增字段或端点；后端现有 spec 与前端 runtime source SH
 - 本轮回归新增 3 项：新版本纯平台词学习事实回退保护、旧版本纯平台词迁移往返与继续答题、合法保存的空白词面/不可拼写项与其余来源共同学习。修复前前两个缺陷分别以允许 down 和 preview 返回 400 的确定性失败复现；修复后受影响集成 46 项及原拼写判分单元测试 1 项均通过。既有 50k 性能用例仍为手动 ignored，未修改相关 recall 算法。
 
 - 本轮 `cargo clippy --locked --all-targets --all-features -- -D warnings`、`cargo fmt --all -- --check` 及 `git diff --check` 通过。独占 Postgres/Redis 及完整临时目录均已停止、删除，55572/56572 独立复查无监听；清理回执为 `output/wordlist-practice/review-fixes-cleanup.json`。本地实施阶段未进行外部交付；后续交付状态以配套 PR 为准，不合并、不部署。
+
+## 当前主线整合与再次验收
+
+配套交付整合后端 `bfea662`（语义干扰项、mastery 与来源恢复）及前端 `2f75d4d1`。复用主线能力，保留三项能力头；新增迁移顺延为 `20261030070000_wordlist_practice`，避免与主线 40000–60000 重号。自定义来源接入 mastery 去重、重练复制及来源重新确认；已更新的来源只改当前单元，不改历史问题和答案。旧轮次使用新投影后同时更新生成/判分版本，防止不支持拼写回退的旧客户端误读。
+
+整合后的 Rust lib 462 项、学习/记忆/迁移/题型相关集成 95 项通过（既有 50k 手动性能项仍 ignored）；API client 全套 647 项、受影响前端组件/契约 44 项及 Web production build 通过。语义证据不足等测试继续断言不生成不可靠选项，并验证改用有效拼写。OpenAPI 与 runtime source SHA256 现均为 `1a0a3a013614c747c64f6718cb1a33547843f3c7f3fdc49e793a9811e83e86c2`；上文旧 hash 属于首次实施基线。
+
+再次使用 Web production build + next start（13574）连接本工作区 API（18574）、独占 Postgres 55574 的 wordlist_ship 和 Redis 56574/0，无业务 mock、无 OSS。验收 API binary SHA256 为 `7a22f7d4b7e7933edbf54863ff01ea8bf43def3dbc70a0144733655ad7bf0378`。
+
+内置浏览器：纯自定义私密词表 6 项 → 创建单选优先的 mastery 计划 → 6 个独立目标全部回退拼写 → 首题“不确定”安排重练 → 刷新保持 1/7 及队列 → 完成 7/7（含一次重练）→ 整页刷新保留历史。重新确认来源识别全部 6 个目标、0 个内容改变，并保留待巩固进度。独立 SQL 核实 6 个自定义身份、7 条题目/答案、1 条完成记录、6 条首次覆盖和 1 条来源更新回执；历史题目的平台 entry_id 均为空。截图在同一验收目录的 mastery-* 文件。
+
+浏览器已退出并经同源清理页核实 localStorage/sessionStorage/Cache Storage/Service Worker/IndexedDB 均为 0，随后关闭专用标签页。原生 hooks 使用的独占数据库与缓存会在提交及审查结束后清理，最终回执和 PR/CI 状态记录于配套 PR。
