@@ -62,7 +62,7 @@ function ReviewQueue({ adminId }: { adminId: string }) {
   }, [result.data, result.isFetching, result.isSuccess]);
   return (
     <Flex vertical gap={16}>
-      <Breadcrumb items={[{ title: "审核管理" }, { title: "词表审核" }]} />
+      <Breadcrumb items={[{ title: "词表管理" }, { title: "词表审核" }]} />
       <Card className="admin-filter-card" size="small">
         <Form
           className="admin-filter-form"
