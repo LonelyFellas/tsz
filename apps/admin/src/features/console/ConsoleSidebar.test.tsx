@@ -281,13 +281,14 @@ describe("ConsoleSidebar", () => {
 it("公开例句只读管理员可见例句菜单及直链，不能进入词库", async () => {
   setLevel("admin", ["sentences.read_published"]);
   renderAt("/sentences");
-  fireEvent.click(screen.getByText("词库管理"));
+  fireEvent.click(screen.getByText("例句管理"));
   await waitFor(() => expect(screen.getByText("多维例句")).toBeVisible());
   expect(screen.queryByText("智能词库")).toBeNull();
   const { canVisitAdminRoute } = await import("@/lib/adminPageRoutes");
   const profile = useAuthStore.getState().profile;
   expect(canVisitAdminRoute(profile, "/sentences")).toBe(true);
   expect(canVisitAdminRoute(profile, "/words")).toBe(false);
+  expect(canVisitAdminRoute(profile, "/sentences/trash")).toBe(false);
   expect(
     canVisitAdminRoute({ ...profile!, permissions: [] }, "/sentences")
   ).toBe(false);
@@ -342,4 +343,21 @@ it("收起侧栏的浮层菜单中，垃圾桶也不会同时选中智能词库"
   expect(screen.getByRole("menuitem", { name: "智能词库" })).not.toHaveClass(
     "ant-menu-item-selected"
   );
+});
+
+it("例句垃圾桶与多维例句分别选中，使用例句管理权限", async () => {
+  setLevel("admin", ["sentences.access"]);
+  renderAt("/sentences/trash");
+  fireEvent.click(screen.getByText("例句管理"));
+  expect(screen.getByRole("menuitem", { name: "垃圾桶" })).toHaveClass(
+    "ant-menu-item-selected"
+  );
+  expect(screen.getByRole("menuitem", { name: "多维例句" })).not.toHaveClass(
+    "ant-menu-item-selected"
+  );
+  const { canVisitAdminRoute } = await import("@/lib/adminPageRoutes");
+  expect(
+    canVisitAdminRoute(useAuthStore.getState().profile, "/sentences/trash")
+  ).toBe(true);
+  expect(screen.queryByText("词库管理")).toBeNull();
 });

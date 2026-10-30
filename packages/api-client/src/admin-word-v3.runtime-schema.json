@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/opencode-provider-logout/tsz-rust/docs/openapi.json",
-  "_source_sha256": "b927ab1445f2583318684c6de01e8ab4b0efbb75820e6c97506a3a7039ad967f",
+  "_source": "/Users/darwish/.codex/worktrees/task-155-backend-trash/tsz-rust/docs/openapi.json",
+  "_source_sha256": "708cea88eb7ccbfbce00bd913ee61a7b9b8ccc7463ce7114be5cbb47c568b9f7",
   "roots": [
     "LearningCapabilities",
     "QuestionCandidatePage",
