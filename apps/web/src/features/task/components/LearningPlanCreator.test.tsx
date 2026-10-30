@@ -320,3 +320,26 @@ it("a choice preview without approved questions explains the exclusion and canno
   expect(screen.getByRole("button", { name: "完成创建" })).toBeDisabled();
   expect(mocks.create).not.toHaveBeenCalled();
 });
+
+it("opts into mastery only when supported and caps the initial queue at twenty", async () => {
+  mocks.capabilities.mockResolvedValue({
+    question_types: ["spelling_zh_to_en", "choice_zh_to_en"],
+    practice_modes: ["mastery_v1"]
+  });
+  renderWithProviders(<LearningPlanCreator userId="learner" />);
+  await screen.findByText("按单词掌握情况安排新学、错题重练和到期复习。");
+  const count = screen.getByLabelText("每日题量");
+  fireEvent.change(count, { target: { value: "21" } });
+  expect(count).toHaveAttribute("aria-invalid", "true");
+  fireEvent.change(count, { target: { value: "20" } });
+  await choose();
+  await waitFor(() =>
+    expect(mocks.preview).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        practice_mode: "mastery_v1",
+        daily_question_count: 20
+      }),
+      expect.anything()
+    )
+  );
+});

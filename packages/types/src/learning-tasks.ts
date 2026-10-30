@@ -4,6 +4,7 @@ export type LearningTaskType = "daily" | "longterm";
 export type LearningQuestionType = "spelling_zh_to_en" | "choice_zh_to_en";
 export interface LearningCapabilities {
   question_types: LearningQuestionType[];
+  practice_modes?: string[];
 }
 export type LearningTaskState = "active" | "archived";
 export type LearningRunState =
@@ -41,6 +42,7 @@ export interface LearningTask extends PreviewLearningTask {
   created_at: string;
 }
 export interface LearningRun {
+  practice_mode?: "mastery_v1";
   id: string;
   task_id: string;
   task_type: LearningTaskType;
@@ -88,6 +90,7 @@ export interface LearningPreview {
   can_start: boolean;
 }
 export interface LearningQuestion {
+  practice_kind?: "review" | "retry";
   id: string;
   position: number;
   answered: boolean;

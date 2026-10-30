@@ -21,7 +21,8 @@ export const planStatusLabels: Record<LearningPlan["status"], string> = {
   not_started: "尚未开始",
   today_completed: "今日已完成",
   source_blocked: "来源阻塞",
-  ready: "可以学习"
+  ready: "可以学习",
+  review_waiting: "等待下次复习"
 };
 export function PlanCoverage({
   plan,
@@ -65,12 +66,6 @@ export function PlanCoverage({
     queryFn: ({ signal }) =>
       api.learningPlans.cycles(plan.task.id, { page: historyPage }, { signal })
   });
-  if (!c)
-    return (
-      <p className="text-sm text-foreground-muted">
-        原有抽题模式 · 保留原任务与历史行为。
-      </p>
-    );
   async function inspect(operation: CycleOperation) {
     if (!c) return;
     setBusy(true);
@@ -130,6 +125,144 @@ export function PlanCoverage({
       if (current()) setBusy(false);
     }
   }
+  const confirmation = preview && c && (
+    <LibraryDialog
+      title={
+        operation === "refresh_sources"
+          ? "重新确认来源"
+          : operation === "next"
+            ? "开启下一轮"
+            : "放弃受阻轮次"
+      }
+      busy={busy || unknown}
+      onClose={() => setPreview(null)}
+    >
+      <div className="space-y-4 text-sm">
+        <p>
+          {operation === "refresh_sources" ? "当前已跨天确认：" : "原轮进度："}
+          {preview.previous_covered_count}/{preview.previous_total_count}
+          ，不可用 {preview.previous_blocked_count} 题。
+        </p>
+        {operation === "restart_blocked" && (
+          <p>确认后将取消本轮及未完成批次，历史记录保留；新轮进度从零开始。</p>
+        )}
+        {operation === "refresh_sources" ? (
+          <>
+            <p>
+              将结束当前未完成批次，保留所有作答历史。内容未变的掌握状态和复习日期保持，内容有变的词义需要重新练习。
+            </p>
+            {preview.source_refresh && (
+              <p>
+                可重新确认 {preview.source_refresh.refreshed_count} 个词义，其中{" "}
+                {preview.source_refresh.changed_content_count}{" "}
+                个内容有变；仍不可用 {preview.source_refresh.unavailable_count}{" "}
+                个，继续保留原进度。
+              </p>
+            )}
+          </>
+        ) : (
+          <p>
+            新轮共 {preview.preview.eligible_count} 题，最早从{" "}
+            {preview.earliest_day} 开始。
+          </p>
+        )}
+        {preview.preview.reasons.map((r) => (
+          <p key={r} className="text-danger">
+            {r}
+          </p>
+        ))}
+        {error && (
+          <p role="alert" className="text-danger">
+            {error}
+          </p>
+        )}
+        {unknown && <p>结果未确认；请重试原请求。</p>}
+        <div className="flex justify-end gap-3">
+          <Button
+            variant="outline"
+            disabled={busy || unknown}
+            onClick={() => setPreview(null)}
+          >
+            取消
+          </Button>
+          <Button
+            disabled={busy || !preview.preview.can_create}
+            onClick={() => void create()}
+          >
+            {busy
+              ? "正在创建…"
+              : unknown
+                ? "重试原请求"
+                : operation === "refresh_sources"
+                  ? "确认更新来源"
+                  : "确认开启新轮"}
+          </Button>
+        </div>
+      </div>
+    </LibraryDialog>
+  );
+  if (plan.mastery)
+    return (
+      <section aria-label="单词掌握情况" className="space-y-4">
+        <h2 className="text-lg font-semibold">
+          {planStatusLabels[plan.status]}
+        </h2>
+        <LearningProgressBar
+          label="跨天确认进度"
+          max={c?.total_count ?? 1}
+          value={plan.mastery.mastered_count}
+        />
+        <p className="text-sm text-foreground-muted">
+          未学词义 {plan.mastery.new_count} · 待巩固{" "}
+          {plan.mastery.learning_count} · 已跨天确认{" "}
+          {plan.mastery.mastered_count}
+        </p>
+        <p className="text-sm text-foreground-muted">
+          到期复习 {plan.mastery.due_count} 题
+          {plan.mastery.next_review_day &&
+            ` · 下次复习：${plan.mastery.next_review_day}`}
+        </p>
+        <p className="text-sm text-foreground-muted">
+          每次最多 20 个新词，含错题重练最多 30
+          题。当天答对先记熟悉，跨天再次答对后延长复习间隔。
+        </p>
+        {!!c?.blocked_count && (
+          <p className="text-sm text-danger">
+            有 {c.blocked_count} 题来源不可用，掌握进度已保留。
+          </p>
+        )}
+        <Button
+          type="button"
+          variant="outline"
+          disabled={busy || unknown}
+          onClick={() => void refresh()}
+        >
+          刷新学习安排
+        </Button>
+        {plan.task.state === "active" && plan.status !== "schedule_ended" && (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy || unknown || !c}
+            onClick={() => void inspect("refresh_sources")}
+          >
+            重新确认来源
+          </Button>
+        )}
+        {error && !preview && (
+          <p role="alert" className="text-sm text-danger">
+            {error}
+          </p>
+        )}
+        {confirmation}
+      </section>
+    );
+  if (!c)
+    return (
+      <p className="text-sm text-foreground-muted">
+        原有抽题模式 · 保留原任务与历史行为。
+      </p>
+    );
   return (
     <section className="space-y-4" aria-label="覆盖轮次">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -218,56 +351,7 @@ export function PlanCoverage({
           {error}
         </p>
       )}
-      {preview && (
-        <LibraryDialog
-          title={operation === "next" ? "开启下一轮" : "放弃受阻轮次"}
-          busy={busy || unknown}
-          onClose={() => setPreview(null)}
-        >
-          <div className="space-y-4 text-sm">
-            <p>
-              原轮进度：{preview.previous_covered_count}/
-              {preview.previous_total_count}，不可用{" "}
-              {preview.previous_blocked_count} 题。
-            </p>
-            {operation === "restart_blocked" && (
-              <p>
-                确认后将取消本轮及未完成批次，历史记录保留；新轮进度从零开始。
-              </p>
-            )}
-            <p>
-              新轮共 {preview.preview.eligible_count} 题，最早从{" "}
-              {preview.earliest_day} 开始。
-            </p>
-            {preview.preview.reasons.map((r) => (
-              <p key={r} className="text-danger">
-                {r}
-              </p>
-            ))}
-            {error && (
-              <p role="alert" className="text-danger">
-                {error}
-              </p>
-            )}
-            {unknown && <p>结果未确认；请重试原请求，避免重复开启轮次。</p>}
-            <div className="flex justify-end gap-3">
-              <Button
-                variant="outline"
-                disabled={busy || unknown}
-                onClick={() => setPreview(null)}
-              >
-                取消
-              </Button>
-              <Button
-                disabled={busy || !preview.preview.can_create}
-                onClick={() => void create()}
-              >
-                {busy ? "正在创建…" : unknown ? "重试原请求" : "确认开启新轮"}
-              </Button>
-            </div>
-          </div>
-        </LibraryDialog>
-      )}
+      {confirmation}
       <details className="border-t border-border/60 pt-4">
         <summary className="cursor-pointer text-sm font-medium">
           覆盖轮次历史

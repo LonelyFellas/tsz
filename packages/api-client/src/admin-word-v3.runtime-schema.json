@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/task-154-independent-sentences/docs/openapi.json",
-  "_source_sha256": "31af0b23570f8a96bfa81d0dc18917f70648f6c05df79c8ca1d4ef612ef5d4e7",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/choice-distractor-quality/docs/openapi.json",
+  "_source_sha256": "1a0a3a013614c747c64f6718cb1a33547843f3c7f3fdc49e793a9811e83e86c2",
   "roots": [
     "LearningCapabilities",
     "AiLedgerPage",
@@ -2187,6 +2187,7 @@
       "type": "object",
       "required": ["question_types"],
       "properties": {
+        "practice_modes": { "type": "array", "items": { "type": "string" } },
         "question_types": { "type": "array", "items": { "type": "string" } }
       },
       "additionalProperties": false
@@ -2256,7 +2257,8 @@
         "preview": { "$ref": "#/$defs/LearningPlanPreview" },
         "previous_blocked_count": { "type": "integer" },
         "previous_covered_count": { "type": "integer" },
-        "previous_total_count": { "type": "integer" }
+        "previous_total_count": { "type": "integer" },
+        "source_refresh": { "$ref": "#/$defs/SourceRefreshPreview" }
       },
       "additionalProperties": false
     },
@@ -2327,6 +2329,7 @@
         },
         "estimate_from_day": { "type": ["string", "null"], "format": "date" },
         "estimated_learning_days": { "type": ["integer", "null"] },
+        "mastery": { "$ref": "#/$defs/MasterySummary" },
         "mode": { "$ref": "#/$defs/LearningPlanMode" },
         "next_day_at": { "type": "string", "format": "date-time" },
         "reasons": { "type": "array", "items": { "type": "string" } },
@@ -2348,7 +2351,7 @@
     },
     "LearningPlanMode": {
       "type": "string",
-      "enum": ["legacy_v1", "coverage_v1"]
+      "enum": ["legacy_v1", "coverage_v1", "mastery_v1"]
     },
     "LearningPlanPage": {
       "type": "object",
@@ -2448,7 +2451,8 @@
         "not_started",
         "today_completed",
         "source_blocked",
-        "ready"
+        "ready",
+        "review_waiting"
       ]
     },
     "LearningPreview": {
@@ -2503,6 +2507,7 @@
           "items": { "$ref": "#/$defs/LearningOption" }
         },
         "position": { "type": "integer" },
+        "practice_kind": { "type": "string" },
         "prompt": {
           "oneOf": [{ "$ref": "#/$defs/LearningPrompt" }, { "type": "null" }]
         }
@@ -2595,6 +2600,7 @@
         "generation_version": { "type": "string" },
         "grading_version": { "type": "string" },
         "id": { "type": "string", "format": "uuid" },
+        "practice_mode": { "type": "string" },
         "question_type": { "type": "string" },
         "server_time": { "type": "string", "format": "date-time" },
         "settings": { "$ref": "#/$defs/LearningContext" },
@@ -2848,6 +2854,24 @@
           "items": { "$ref": "#/$defs/ManualCoinOperation" }
         },
         "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "MasterySummary": {
+      "type": "object",
+      "required": [
+        "new_count",
+        "learning_count",
+        "mastered_count",
+        "due_count",
+        "next_review_day"
+      ],
+      "properties": {
+        "due_count": { "type": "integer" },
+        "learning_count": { "type": "integer" },
+        "mastered_count": { "type": "integer" },
+        "new_count": { "type": "integer" },
+        "next_review_day": { "type": ["string", "null"], "format": "date" }
       },
       "additionalProperties": false
     },
@@ -4531,6 +4555,20 @@
       "additionalProperties": false
     },
     "SourceDialect": { "type": "string", "enum": ["uk", "us"] },
+    "SourceRefreshPreview": {
+      "type": "object",
+      "required": [
+        "refreshed_count",
+        "changed_content_count",
+        "unavailable_count"
+      ],
+      "properties": {
+        "changed_content_count": { "type": "integer" },
+        "refreshed_count": { "type": "integer" },
+        "unavailable_count": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
     "SpellingSpeechV3": {
       "type": "object",
       "required": ["content", "voice_profile"],
