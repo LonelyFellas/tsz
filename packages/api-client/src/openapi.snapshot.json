@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/on-demand-choice/docs/openapi.json",
-  "_generatedAt": "2026-10-30T03:19:43.324Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/task-154-independent-sentences/docs/openapi.json",
+  "_generatedAt": "2026-10-30T06:14:07.620Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -6975,7 +6975,7 @@
     },
     "CreateSharedSentence": {
       "type": "object",
-      "required": ["source_entry_id", "source_sense_id", "content"],
+      "required": ["content"],
       "properties": {
         "content": { "$ref": "#/components/schemas/SharedSentenceContent" },
         "source_entry_id": {
