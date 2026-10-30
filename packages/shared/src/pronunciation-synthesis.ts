@@ -820,14 +820,14 @@ export function pronunciationPlaybackSource(
     : pronunciation.audio_assets;
   const matchesLocale = (value: string | undefined) =>
     speechAccentGroup(value) === speechAccentGroup(locale);
-  const content = synthesis?.use_spelling
-    ? spellingSpeech?.content
-    : pronunciationSynthesisContent(
-        spelling,
-        synthesis,
-        locale,
-        requireLocaleConfirmation
-      );
+  const content =
+    (synthesis?.use_spelling ? spellingSpeech?.content : undefined) ??
+    pronunciationSynthesisContent(
+      spelling,
+      synthesis,
+      locale,
+      requireLocaleConfirmation
+    );
   const assetId =
     savedVoiceAudioAsset(!synthesis || content ? profile : undefined, locale) ??
     uploads?.find((asset) => matchesLocale(asset.locale))?.id ??

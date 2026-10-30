@@ -3,8 +3,14 @@ import { App } from "antd";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { DialectRulesV3, WordConcreteFormV3 } from "@tsz/types";
 import { PronunciationPreviewProvider } from "../../word-creation/PronunciationPreview";
-import { commonFormFixture, formsFixture, ukUsFormFixture } from "../fixtures";
+import {
+  commonFormFixture,
+  formsFixture,
+  pronunciationFixture,
+  ukUsFormFixture
+} from "../fixtures";
 import { V3ConcreteFormRow } from "./V3ConcreteFormRow";
+import { V3FormContentOverview } from "./V3FormContentOverview";
 
 const preview = vi.hoisted(() => ({
   preference: "uk" as "uk" | "us",
@@ -22,8 +28,8 @@ vi.mock("../../voice-editor/dataSource", () => ({
   loadAdminVoiceRecommendations: vi.fn().mockResolvedValue([]),
   adminVoicePreviewAdapter: {
     listVoices: async () => [
-      { id: "british-voice", locale: "en-GB" },
-      { id: "american-voice", locale: "en-US" }
+      { id: "british-voice", label: "British", locale: "en-GB" },
+      { id: "american-voice", label: "American", locale: "en-US" }
     ],
     synthesize: preview.synthesize
   },
@@ -79,6 +85,56 @@ beforeEach(() => {
 });
 
 afterEach(() => vi.unstubAllGlobals());
+
+it("总览选择词形拼写后，无独立语音配置或正式音频也可播放", async () => {
+  const form = ukUsFormFixture({
+    uk: {
+      spelling: "belonging",
+      pronunciations: [
+        pronunciationFixture({
+          synthesis: { alphabet: "ipa", ipa: "", ups: "", use_spelling: true }
+        })
+      ]
+    }
+  });
+  const pos = formsFixture({ forms: [form] }).pos[0]!;
+  render(
+    <App>
+      <PronunciationPreviewProvider>
+        <V3FormContentOverview
+          rows={[
+            {
+              membershipId: pos.form_groups[0]!.members[0]!.id,
+              form,
+              formLabel: "原形",
+              formTypeAriaLabel: "词形类型",
+              formTypeDisabled: false,
+              formTypeOptions: ["base"],
+              membershipCount: 1
+            }
+          ]}
+          group={pos.form_groups[0]!}
+          sharedCounts={new Map()}
+          onEdit={() => undefined}
+          onFormTypeChange={() => undefined}
+          issues={[]}
+        />
+      </PronunciationPreviewProvider>
+    </App>
+  );
+  const play = screen.getByLabelText("读法 1英式 播放语音");
+  await waitFor(() => expect(play).toBeEnabled());
+  fireEvent.click(play);
+  await waitFor(() =>
+    expect(preview.synthesize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: { version: 2, text: "belonging", annotations: [] },
+        voiceId: "british-voice"
+      }),
+      expect.anything()
+    )
+  );
+});
 
 it.each(["common", "uk_us"] as const)(
   "%s 共用拼写随全局口音切换播放和图标颜色，并丢弃旧音频",

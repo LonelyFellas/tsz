@@ -762,6 +762,42 @@ describe("IPA/UPS 来源与独立停顿", () => {
   });
 });
 
+it.each(["en-GB", "en-US"] as const)(
+  "拼写来源未配置独立语音时，%s 仍可用已有拼写试听",
+  (locale) => {
+    const pronunciation: import("@tsz/types").WordPronunciationV3 = {
+      id: "pron",
+      dict_phonetic: "",
+      actual_pron: "",
+      style: "normal",
+      synthesis: { alphabet: "ipa", ipa: "", ups: "", use_spelling: true }
+    };
+    const selected = pronunciationPlaybackSource(
+      "belonging",
+      pronunciation,
+      undefined,
+      locale,
+      "common"
+    );
+    expect(selected.content).toEqual({
+      version: 2,
+      text: "belonging",
+      annotations: []
+    });
+    expect(selected.profile).toBeUndefined();
+    expect(selected.assetId).toBeUndefined();
+    expect(
+      pronunciationPlaybackSource(
+        " ",
+        pronunciation,
+        undefined,
+        locale,
+        "common"
+      ).content
+    ).toBeUndefined();
+  }
+);
+
 it("final playback follows spelling/phoneme selection and retains legacy recordings", () => {
   const setting = (
     asset: string,
