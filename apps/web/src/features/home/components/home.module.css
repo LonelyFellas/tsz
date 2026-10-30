@@ -45,15 +45,20 @@
   background: rgb(var(--ch-muted));
 }
 
-.wordImage {
+.wordPicture {
+  position: absolute;
+  inset: 0;
   pointer-events: none;
-  object-fit: cover;
   opacity: 0;
   transition: opacity 240ms var(--home-ease-out);
 }
 
-.wordImage[data-active="true"] {
+.wordPicture[data-active="true"] {
   opacity: 1;
+}
+
+.wordImage {
+  object-fit: cover;
 }
 
 .wordPanel {
@@ -175,7 +180,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .wordImage {
+  .wordPicture {
     transition: none;
   }
 }
