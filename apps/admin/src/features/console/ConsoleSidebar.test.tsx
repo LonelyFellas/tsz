@@ -186,12 +186,12 @@ describe("ConsoleSidebar", () => {
     expect(mockNavigate).toHaveBeenCalledWith("/ai-ledger");
   });
 
-  it("普通管理员能打开系统设置也看不到 AI 账本", () => {
+  it("词性配置权限可在词库管理中访问，不能访问 AI 账本", () => {
     setLevel("admin", ["lexicon_settings.access"]);
     renderAt("/");
-    fireEvent.click(screen.getByText("系统设置"));
+    fireEvent.click(screen.getByText("词库管理"));
     expect(screen.getByText("词性配置")).toBeInTheDocument();
-    expect(screen.queryByText("AI 账本")).not.toBeInTheDocument();
+    expect(screen.queryByText("系统设置")).not.toBeInTheDocument();
   });
 
   it("super_admin：用户管理分组下显示「管理员管理」并跳转 /admins", () => {
@@ -221,7 +221,7 @@ describe("ConsoleSidebar", () => {
     expect(screen.queryByText("管理员管理")).toBeNull();
   });
 
-  it("词性配置仅超级管理员可见并导航到系统设置路由", () => {
+  it("词性配置按权限显示并导航到原路由", () => {
     setLevel("admin", ["words.access"]);
     const ordinary = renderAt("/");
     expect(screen.queryByText("系统设置")).toBeNull();
@@ -229,7 +229,7 @@ describe("ConsoleSidebar", () => {
 
     setLevel("super_admin", []);
     renderAt("/");
-    fireEvent.click(screen.getByText("系统设置"));
+    fireEvent.click(screen.getByText("词库管理"));
     const entry = screen.getByText("词性配置");
     fireEvent.click(entry);
     expect(mockNavigate).toHaveBeenCalledWith("/settings/parts-of-speech");
@@ -298,7 +298,7 @@ it("词表查看权限可进入审核菜单及直链，审核操作权限不替�
   const { canVisitAdminRoute } = await import("@/lib/adminPageRoutes");
   setLevel("admin", ["wordlists.access"]);
   const view = renderAt("/");
-  fireEvent.click(screen.getByText("审核管理"));
+  fireEvent.click(screen.getByText("词表管理"));
   fireEvent.click(screen.getByText("词表审核"));
   expect(mockNavigate).toHaveBeenCalledWith("/reviews");
   expect(canVisitAdminRoute(useAuthStore.getState().profile, "/reviews")).toBe(
@@ -307,7 +307,7 @@ it("词表查看权限可进入审核菜单及直链，审核操作权限不替�
   view.unmount();
   setLevel("admin", ["wordlists.review"]);
   renderAt("/");
-  expect(screen.queryByText("审核管理")).toBeNull();
+  expect(screen.queryByText("词表管理")).toBeNull();
   expect(canVisitAdminRoute(useAuthStore.getState().profile, "/reviews")).toBe(
     false
   );
