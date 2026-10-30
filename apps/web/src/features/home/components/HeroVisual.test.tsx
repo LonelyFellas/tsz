@@ -1,7 +1,67 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { HeroVisual } from "./HeroVisual";
+
+// Vitest 不执行 Next 的静态图片 metadata loader；这里只替代资源导入边界。
+vi.mock("./hero-images", () => ({
+  HOME_IMAGES: Object.fromEntries(
+    ["ocean", "wave", "shore"].map((word) => [
+      word,
+      {
+        avif: `/images/${word}.avif 1400w`,
+        webp: `/images/${word}.webp 1400w`,
+        fallback: {
+          src: `/images/${word}.webp`,
+          width: 1400,
+          height: 933,
+          blurDataURL: "data:image/webp;base64,UklGRg=="
+        }
+      }
+    ])
+  )
+}));
+
+it("首图完成前不请求隐藏图片，完成后低优先级加载其余图片", async () => {
+  render(<HeroVisual />);
+  expect(screen.getAllByRole("img", { hidden: true })).toHaveLength(1);
+  const first = screen.getByRole("img");
+  expect(first).toHaveAttribute("fetchpriority", "high");
+  fireEvent.load(first);
+  await waitFor(() =>
+    expect(screen.getAllByRole("img", { hidden: true })).toHaveLength(3)
+  );
+  const images = screen.getAllByRole("img", { hidden: true });
+  expect(images).toHaveLength(3);
+  for (const image of images.slice(1)) {
+    expect(image).toHaveAttribute("fetchpriority", "low");
+    expect(image).toHaveAttribute("aria-hidden", "true");
+  }
+});
+
+it("首图未完成时切词立即加载所选图片，首图失败也不阻塞后续图片", () => {
+  render(<HeroVisual />);
+  const first = screen.getByRole("img");
+  fireEvent.click(screen.getByRole("button", { name: "下一个单词" }));
+  expect(screen.getByRole("heading", { name: "wave" })).toBeInTheDocument();
+  expect(screen.getByRole("img")).toHaveAttribute("src", "/images/wave.webp");
+  expect(screen.getByRole("img")).toHaveAttribute("fetchpriority", "high");
+  fireEvent.error(first);
+  expect(screen.getAllByRole("img", { hidden: true })).toHaveLength(3);
+  expect(screen.getByRole("img")).toHaveAttribute("src", "/images/wave.webp");
+});
+
+it("首图仍在加载时保留已请求的图片节点，连续切词不打断淡出或重新挂载", () => {
+  render(<HeroVisual />);
+  fireEvent.click(screen.getByRole("button", { name: "下一个单词" }));
+  const wave = screen.getByRole("img");
+  fireEvent.click(screen.getByRole("button", { name: "下一个单词" }));
+  expect(screen.getByRole("heading", { name: "shore" })).toBeInTheDocument();
+  expect(wave).toBeInTheDocument();
+  expect(wave).toHaveAttribute("aria-hidden", "true");
+  fireEvent.click(screen.getByRole("button", { name: "上一个单词" }));
+  expect(screen.getByRole("img")).toBe(wave);
+});
 
 it("三个单词各有对应图片，循环与返回时图片保持一致", () => {
   render(<HeroVisual />);

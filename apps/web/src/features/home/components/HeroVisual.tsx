@@ -5,12 +5,16 @@ import { useState } from "react";
 import { ArrowLeft, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { Button } from "@tsz/ui/components";
 import { cn } from "@tsz/ui/lib/cn";
+import { HOME_IMAGES } from "./hero-images";
 import styles from "./home.module.css";
+
+const IMAGE_SIZES =
+  "(min-width: 1200px) 629px, (min-width: 768px) calc((100vw - 48px) * 6 / 11), calc(100vw - 40px)";
 
 const WORDS = [
   {
     word: "ocean",
-    image: "/images/home/ocean.webp",
+    image: HOME_IMAGES.ocean,
     imageAlt: "俯瞰蓝色海洋，白色海浪涌向浅色沙岸",
     phonetic: "/ˈəʊʃən/",
     definition: "海洋",
@@ -21,7 +25,7 @@ const WORDS = [
   },
   {
     word: "wave",
-    image: "/images/home/wave.webp",
+    image: HOME_IMAGES.wave,
     imageAlt: "近距离看一道卷起的蓝色海浪，浪尖溅起白色水花",
     phonetic: "/weɪv/",
     definition: "海浪；波浪",
@@ -32,7 +36,7 @@ const WORDS = [
   },
   {
     word: "shore",
-    image: "/images/home/shore.webp",
+    image: HOME_IMAGES.shore,
     imageAlt: "平静海水与浅色沙滩交接，海岸线向远处延伸",
     phonetic: "/ʃɔː/",
     definition: "岸；滨",
@@ -44,12 +48,24 @@ const WORDS = [
 ] as const;
 
 export function HeroVisual() {
-  const [index, setIndex] = useState(0);
+  const [{ index, requestedIndices }, setPreview] = useState({
+    index: 0,
+    requestedIndices: [0]
+  });
   const [showDefinition, setShowDefinition] = useState(true);
+  const [firstImageSettled, setFirstImageSettled] = useState(false);
   const current = WORDS[index]!;
 
   function changeWord(direction: number) {
-    setIndex((value) => (value + direction + WORDS.length) % WORDS.length);
+    setPreview((value) => {
+      const nextIndex = (value.index + direction + WORDS.length) % WORDS.length;
+      return {
+        index: nextIndex,
+        requestedIndices: value.requestedIndices.includes(nextIndex)
+          ? value.requestedIndices
+          : [...value.requestedIndices, nextIndex]
+      };
+    });
     setShowDefinition(true);
   }
 
@@ -57,19 +73,49 @@ export function HeroVisual() {
     <section className={styles.preview} aria-label="词汇预览">
       <div className={styles.picture}>
         {WORDS.map((word, wordIndex) => (
-          <Image
+          <picture
             key={word.word}
-            src={word.image}
-            alt={word.imageAlt}
-            aria-hidden={wordIndex !== index}
+            className={styles.wordPicture}
             data-active={wordIndex === index}
-            fill
-            sizes="(min-width: 1200px) 640px, (min-width: 768px) 55vw, 100vw"
-            preload={wordIndex === 0}
-            loading={wordIndex === 0 ? undefined : "eager"}
-            fetchPriority={wordIndex === 0 ? undefined : "low"}
-            className={styles.wordImage}
-          />
+          >
+            {(firstImageSettled || requestedIndices.includes(wordIndex)) && (
+              <>
+                <source
+                  type="image/avif"
+                  srcSet={word.image.avif}
+                  sizes={IMAGE_SIZES}
+                />
+                <source
+                  type="image/webp"
+                  srcSet={word.image.webp}
+                  sizes={IMAGE_SIZES}
+                />
+                <Image
+                  src={word.image.fallback}
+                  alt={word.imageAlt}
+                  aria-hidden={wordIndex !== index}
+                  fill
+                  unoptimized
+                  placeholder="blur"
+                  loading="eager"
+                  fetchPriority={
+                    wordIndex === 0 || wordIndex === index ? "high" : "low"
+                  }
+                  onLoad={
+                    wordIndex === 0
+                      ? () => setFirstImageSettled(true)
+                      : undefined
+                  }
+                  onError={
+                    wordIndex === 0
+                      ? () => setFirstImageSettled(true)
+                      : undefined
+                  }
+                  className={styles.wordImage}
+                />
+              </>
+            )}
+          </picture>
         ))}
       </div>
       <div className={styles.wordPanel}>
