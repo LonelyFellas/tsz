@@ -13,6 +13,7 @@ export interface LearningSchedule {
   end_date: string;
 }
 export interface PreviewLearningPlan {
+  practice_mode?: "mastery_v1";
   question_type?: LearningQuestionType;
   task_type: LearningTaskType;
   wordlist_ids: string[];
@@ -38,7 +39,7 @@ export interface LearningPlanPreview extends Omit<
   business_day: string;
   timezone: string;
 }
-export type CycleOperation = "next" | "restart_blocked";
+export type CycleOperation = "next" | "restart_blocked" | "refresh_sources";
 export interface PreviewLearningCycle {
   operation: CycleOperation;
   after_cycle_id: string;
@@ -49,6 +50,11 @@ export interface CreateLearningCycle extends PreviewLearningCycle {
   idempotency_key: string;
 }
 export interface LearningCyclePreview {
+  source_refresh?: {
+    refreshed_count: number;
+    changed_content_count: number;
+    unavailable_count: number;
+  };
   preview: LearningPlanPreview;
   earliest_day: string;
   previous_covered_count: number;
@@ -79,7 +85,14 @@ export interface LearningPlanSource {
 }
 export interface LearningPlan extends Omit<LearningTaskDetail, "task"> {
   task: LearningTask;
-  mode: "legacy_v1" | "coverage_v1";
+  mode: "legacy_v1" | "coverage_v1" | "mastery_v1";
+  mastery?: {
+    new_count: number;
+    learning_count: number;
+    mastered_count: number;
+    due_count: number;
+    next_review_day: string | null;
+  };
   schedule: LearningSchedule | null;
   sources: LearningPlanSource[];
   current_cycle: LearningCycle | null;
@@ -94,7 +107,8 @@ export interface LearningPlan extends Omit<LearningTaskDetail, "task"> {
     | "not_started"
     | "today_completed"
     | "source_blocked"
-    | "ready";
+    | "ready"
+    | "review_waiting";
   can_start: boolean;
   can_start_next_cycle: boolean;
   can_restart_blocked_cycle: boolean;

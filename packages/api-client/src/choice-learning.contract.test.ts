@@ -35,7 +35,7 @@ it("choice capability is explicit and legacy spelling tasks remain valid", async
     (await createLearningTaskEndpoints(http).capabilities()).question_types
   ).toContain("choice_zh_to_en");
   expect(http.get).toHaveBeenCalledWith("/me/learning-capabilities", {
-    headers: { "X-TSZ-Learning-Capabilities": "choice-v1" }
+    headers: { "X-TSZ-Learning-Capabilities": "choice-v1,mastery-v1" }
   });
   const task = {
     id,

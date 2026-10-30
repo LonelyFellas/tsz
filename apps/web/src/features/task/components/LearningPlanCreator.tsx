@@ -32,6 +32,8 @@ export function LearningPlanCreator({ userId }: { userId: string }) {
     queryFn: ({ signal }) => api.learning.capabilities({ signal }),
     retry: false
   });
+  const masterySupported =
+    capabilities.data?.practice_modes?.includes("mastery_v1") === true;
   const choiceSupported =
     capabilities.data?.question_types.includes("choice_zh_to_en") === true;
   const [selected, setSelected] = useState<SelectedSource[]>([]);
@@ -57,7 +59,10 @@ export function LearningPlanCreator({ userId }: { userId: string }) {
   const n = Number(count);
   const validCount =
     kind === "longterm" ||
-    (Number.isInteger(n) && n >= 1 && n <= 200 && count.trim() !== "");
+    (Number.isInteger(n) &&
+      n >= 1 &&
+      n <= (masterySupported ? 20 : 200) &&
+      count.trim() !== "");
   const validSchedule =
     kind === "longterm" || !scheduled || !!(start && end && end >= start);
   const errors: Record<string, string | undefined> = {
@@ -66,12 +71,15 @@ export function LearningPlanCreator({ userId }: { userId: string }) {
         ? "请输入 1–50 字的任务名称。"
         : undefined,
     sources: submitted && !selected.length ? "请选择 1–5 份词表。" : undefined,
-    count: !validCount ? "每日题量须为 1–200 的整数。" : undefined,
+    count: !validCount
+      ? `每日题量须为 1–${masterySupported ? 20 : 200} 的整数。`
+      : undefined,
     start: !validSchedule
       ? "请填写完整日期，结束日期不得早于开始日期。"
       : undefined
   };
   const input: PreviewLearningPlan = {
+    ...(masterySupported ? { practice_mode: "mastery_v1" as const } : {}),
     ...(questionType === "choice_zh_to_en"
       ? { question_type: questionType }
       : {}),
@@ -178,7 +186,11 @@ export function LearningPlanCreator({ userId }: { userId: string }) {
         back={{ href: "/student/practice", label: "我的任务" }}
         eyebrow="自主学习"
         title="创建学习任务"
-        description="选择拼写或单选练习。每轮覆盖所选内容，答错也计入覆盖。"
+        description={
+          masterySupported
+            ? "按单词掌握情况安排新学、错题重练和到期复习。"
+            : "选择拼写或单选练习。每轮覆盖所选内容，答错也计入覆盖。"
+        }
       />
       <form
         ref={form}
@@ -219,9 +231,11 @@ export function LearningPlanCreator({ userId }: { userId: string }) {
                 onChange={setKind}
               />
               <p className="mx-4 mt-2 text-xs leading-5 text-foreground-muted">
-                {kind === "daily"
-                  ? "按每日题量覆盖一轮，最后一个学习日只做剩余题量。"
-                  : "完整覆盖一轮，可跨天继续，不设每日额度。"}
+                {masterySupported
+                  ? "每次先安排最多 20 题，错题隔至少 3 题重练，含重练最多 30 题。跨天复习确认掌握。"
+                  : kind === "daily"
+                    ? "按每日题量覆盖一轮，最后一个学习日只做剩余题量。"
+                    : "完整覆盖一轮，可跨天继续，不设每日额度。"}
               </p>
             </fieldset>
             <section aria-labelledby="sources-title" className="space-y-3">
@@ -324,7 +338,11 @@ export function LearningPlanCreator({ userId }: { userId: string }) {
                 <FormField
                   htmlFor="plan-count"
                   label="每日题量"
-                  hint="每天 1–200 题；本轮不足一天时只做剩余题量。"
+                  hint={
+                    masterySupported
+                      ? "每次新学和到期复习 1–20 题，错题重练另计，总计最多 30 题。"
+                      : "每天 1–200 题；本轮不足一天时只做剩余题量。"
+                  }
                   error={errors.count}
                 >
                   <Input
@@ -332,7 +350,7 @@ export function LearningPlanCreator({ userId }: { userId: string }) {
                     type="number"
                     inputMode="numeric"
                     min={1}
-                    max={200}
+                    max={masterySupported ? 20 : 200}
                     step={1}
                     disabled={locked}
                     value={count}
