@@ -141,7 +141,8 @@ function Detail({
             {
               page: pageParam.page,
               q,
-              ...(requestView === "full" ? { view: requestView } : {}),
+              // 三种展示模式的词面都需要完整数据中的英美拼写。
+              view: "full",
               ...(sort !== "author" ? { sort } : {})
             },
             { signal }
@@ -151,7 +152,7 @@ function Detail({
             {
               page: pageParam.page,
               q,
-              ...(requestView === "full" ? { view: requestView } : {}),
+              view: "full",
               ...(sort !== "author" ? { sort } : {})
             },
             { signal }
