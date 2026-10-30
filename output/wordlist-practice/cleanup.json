@@ -1,0 +1,19 @@
+{
+  "scope": "exclusive local test resources",
+  "api_stopped": true,
+  "web_and_cleanup_server_stopped": true,
+  "postgres_cluster_removed": true,
+  "redis_stopped_and_files_removed": true,
+  "test_account_sessions_wordlist_tasks_answers_completions_removed_with_exclusive_cluster": true,
+  "temporary_directory_removed": true,
+  "ports_closed": {
+    "13571": true,
+    "18571": true,
+    "55571": true,
+    "56571": true
+  },
+  "browser": "signed out; origin localStorage/sessionStorage/Cache Storage/service workers/IndexedDB confirmed zero; tab closed",
+  "oss_objects_created": 0,
+  "protected_existing_services": "not modified",
+  "retained": "sanitized screenshots and receipts only"
+}

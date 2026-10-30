@@ -314,9 +314,9 @@ export function LearningPlanCreator({ userId }: { userId: string }) {
               )}
               <p className="mt-1 text-xs text-foreground-muted">
                 {questionType === "choice_zh_to_en"
-                  ? "按所选词表和学习设置自动出题，单选成绩不影响拼写掌握度。"
+                  ? "优先生成单选题，没有合适选项时自动改为拼写题。单选成绩不影响拼写掌握度。"
                   : "采用当前学习设置。"}
-                自定义词暂不参与出题。
+                自定义词可用于拼写练习。
               </p>
             </fieldset>
             {kind === "daily" && (
@@ -433,7 +433,7 @@ export function LearningPlanCreator({ userId }: { userId: string }) {
                   <p className="mt-2 text-xs text-foreground-muted">
                     {preview.data.settings.cefr_level} /{" "}
                     {preview.data.settings.english_variant} · 自定义词{" "}
-                    {preview.data.custom_word_count} 个，不参与出题
+                    {preview.data.custom_word_count} 个，可用于拼写练习
                   </p>
                   {Object.entries(preview.data.exclusions).some(
                     ([, v]) => v > 0

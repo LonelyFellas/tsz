@@ -46,7 +46,9 @@ it("plan creation preserves fingerprint, optional schedule and cancellation with
     data,
     {
       signal: controller.signal,
-      headers: { "X-TSZ-Learning-Capabilities": "choice-v1" }
+      headers: {
+        "X-TSZ-Learning-Capabilities": "choice-v1,wordlist-spelling-v1"
+      }
     }
   );
 });

@@ -423,6 +423,20 @@ it("历史批次的全局摘要明确标注任务当前轮次", async () => {
   expect(await screen.findByText(/任务当前第 2 轮已覆盖/)).toBeInTheDocument();
 });
 
+it("a choice task falls back to spelling for a question without options", async () => {
+  mocks.run.mockResolvedValue({ ...run, question_type: "choice_zh_to_en" });
+  renderWithProviders(<LearningPractice id="run" />);
+  const input = await screen.findByLabelText("英文拼写");
+  expect(screen.getByText(/已自动改为拼写练习/)).toBeInTheDocument();
+  expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+  fireEvent.change(input, { target: { value: "apple" } });
+  fireEvent.click(screen.getByRole("button", { name: "提交答案" }));
+  await waitFor(() => expect(mocks.answer).toHaveBeenCalledOnce());
+  expect(mocks.answer.mock.calls[0]![1]).toMatchObject({
+    question_id: "q1",
+    answer: "apple"
+  });
+});
 it("choice selection waits for explicit submission and renders only server-owned feedback", async () => {
   const options = [
     { option_id: "o-banana", spelling: "banana" },

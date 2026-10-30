@@ -504,7 +504,7 @@ function Detail({
             <p className="mt-4 text-sm text-foreground-muted">
               整张词表：{availabilityData.available_count} 个可用词条
               {!!availabilityData.custom_count &&
-                `，其中 ${availabilityData.custom_count} 个自定义词条暂不参与学习出题`}
+                `，其中 ${availabilityData.custom_count} 个自定义词条，可用于拼写练习`}
               {availabilityData.unavailable_count > 0 &&
                 `，${availabilityData.unavailable_count} 个暂不可用，不参与出题`}
             </p>
