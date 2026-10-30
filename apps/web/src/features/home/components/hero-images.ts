@@ -1,3 +1,4 @@
+/// <reference types="next/image-types/global" />
 // 由 scripts/optimize-home-images.mjs 生成；静态导入由 Next 添加内容哈希。
 const ocean640avif = new URL("../assets/ocean-640.avif", import.meta.url)
   .pathname;

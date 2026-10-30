@@ -58,7 +58,8 @@ for (const word of ["ocean", "wave", "shore"]) {
 
 await writeFile(
   manifest,
-  `// 由 scripts/optimize-home-images.mjs 生成；静态导入由 Next 添加内容哈希。
+  `/// <reference types="next/image-types/global" />
+// 由 scripts/optimize-home-images.mjs 生成；静态导入由 Next 添加内容哈希。
 ${imports.join("\n")}
 
 export const HOME_IMAGES = {
