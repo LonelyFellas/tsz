@@ -265,22 +265,10 @@ function decodeVersionedRoot<T>(
   return value as T;
 }
 
-export function decodeDraftValidationResponseAny(
-  value: unknown
-): DraftValidationResponseV3 {
-  return decodeVersionedRoot("DraftValidationResponseV3", value);
-}
-
 export function decodeDraftValidationResponseV3(
   value: unknown
 ): DraftValidationResponseV3 {
   return decodeVersionedRoot("DraftValidationResponseV3", value);
-}
-
-export function decodeFormsImpactResponseAny(
-  value: unknown
-): FormsImpactResponseV3 {
-  return decodeVersionedRoot("FormsImpactResponseV3", value);
 }
 
 export function decodeFormsImpactResponseV3(
@@ -300,18 +288,8 @@ export function decodeEntryArchiveImpact(value: unknown): EntryArchiveImpact {
   return value as EntryArchiveImpact;
 }
 
-export function decodeSurfaceMatchPageAny(value: unknown): SurfaceMatchPageV3 {
-  return decodeVersionedRoot("SurfaceMatchPageV3", value);
-}
-
 export function decodeSurfaceMatchPageV3(value: unknown): SurfaceMatchPageV3 {
   return decodeVersionedRoot("SurfaceMatchPageV3", value);
-}
-
-export function decodeDetectLexiconResponseAny(
-  value: unknown
-): DetectLexiconSurfaceResponseV3 {
-  return decodeVersionedRoot("DetectLexiconSurfaceResponseV3", value);
 }
 
 export function decodeDetectLexiconResponseV3(

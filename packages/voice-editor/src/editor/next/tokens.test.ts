@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RichTextAnnotation, RichTextV2 } from "@tsz/types";
 import {
-  anchorLetters,
   graphemes,
   annotationsToMarks,
   applyRoleRange,
@@ -55,14 +54,6 @@ describe("tokenize", () => {
 
 describe("连读锚点换算", () => {
   const tokens = tokenize(TEXT);
-
-  it("回显锚点选中的文字，跨词时空格一并带上", () => {
-    // "centre" 的 "re"
-    expect(anchorLetters(TEXT, { start: 6, end: 8 })).toBe("re");
-    // 横跨 centre 与 of 之间那个空格
-    expect(anchorLetters(TEXT, { start: 7, end: 10 })).toBe("e o");
-    expect(anchorLetters(TEXT, { start: 99, end: 100 })).toBe("");
-  });
 
   it("锚点必须是非空区间", () => {
     expect(isValidAnchor({ start: 2, end: 5 })).toBe(true);
@@ -383,7 +374,6 @@ describe("annotationsToMarks", () => {
     };
     const [link] = annotationsToMarks(value).liaisons;
     expect(link!.start).toEqual({ start: 6, end: 11 });
-    expect(anchorLetters(TEXT, link!.start)).toBe("re of");
   });
 
   it("端点落在空白上的历史连读直接丢弃，不硬凑锚点", () => {

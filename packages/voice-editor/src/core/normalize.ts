@@ -5,12 +5,8 @@ import type {
   RichTextV2
 } from "@tsz/types";
 import { isRichTextV2 } from "@tsz/types";
-import {
-  codePointLength,
-  codePointRangeContainsNewline,
-  codePointSlice
-} from "./codepoints";
-// 上限常量的唯一来源在 ./limits（同时供保存路径的预检复用）。
+import { codePointLength, codePointRangeContainsNewline } from "./codepoints";
+// 上限常量的唯一来源在 ./limits。
 import {
   MAX_PAUSE_MS,
   phonemeCodePointLimit,
@@ -387,12 +383,4 @@ export function toRichTextV2(value: RichText): RichTextV2 {
         annotations: value.annotations.map((annotation) => ({ ...annotation }))
       })
     : migrateRichTextV1(value);
-}
-
-export function selectedText(
-  value: RichText,
-  start: number,
-  end: number
-): string {
-  return codePointSlice(value.text, start, end);
 }

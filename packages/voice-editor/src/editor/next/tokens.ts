@@ -198,11 +198,6 @@ export function tokenIndexAt(
   )?.index;
 }
 
-/** 锚点选中的文字，用于「起点 / 终点」那行回显。 */
-export function anchorLetters(text: string, anchor: LiaisonAnchor): string {
-  return Array.from(text).slice(anchor.start, anchor.end).join("");
-}
-
 /** 锚点自身是否成立：非空区间。 */
 export function isValidAnchor(anchor: LiaisonAnchor): boolean {
   return anchor.start >= 0 && anchor.end > anchor.start;
