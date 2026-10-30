@@ -106,15 +106,15 @@ it("full mode groups forms once per basic part of speech and shows only the firs
   ).toHaveAttribute("data-text-role", "body");
   expect(screen.queryByText("语法-c2")).not.toBeInTheDocument();
   expect(screen.getByText("暂无适合当前等级的释义")).toBeVisible();
-  const forms = screen.getByText("general-UK").closest("td")!;
+  const forms = screen.getByText("词形-general").closest("td")!;
   expect(forms).not.toHaveAttribute("rowspan");
   expect(
     within(firstSense).queryByText("dedicated-UK")
   ).not.toBeInTheDocument();
   const secondSense = screen.getByText("不及物").closest("tr")!;
   expect(within(secondSense).getByText("dedicated-UK")).toBeVisible();
-  expect(screen.getAllByText("general-UK")).toHaveLength(1);
-  expect(screen.queryByText("general-US")).not.toBeInTheDocument();
+  expect(within(forms).getAllByText("general-UK")).toHaveLength(1);
+  expect(within(forms).queryByText("general-US")).not.toBeInTheDocument();
   expect(screen.getAllByText("/riːd/").length).toBeGreaterThan(0);
   expect(screen.queryByText("/red/")).not.toBeInTheDocument();
   expect(screen.queryByText(/读音 \d/)).not.toBeInTheDocument();
@@ -123,7 +123,11 @@ it("full mode groups forms once per basic part of speech and shows only the firs
   expect(screen.getByText("释义-c2")).toBeVisible();
   expect(screen.getByText("语法-c2")).toBeVisible();
   expect(screen.getByText("dedicated-US")).toBeVisible();
-  expect(screen.queryByText("general-UK")).not.toBeInTheDocument();
+  expect(
+    within(screen.getByText("词形-general").closest("td")!).queryByText(
+      "general-UK"
+    )
+  ).not.toBeInTheDocument();
 });
 it("standard mode has four columns with abbreviated basic parts of speech and aligned senses", () => {
   const entry = {
@@ -151,13 +155,15 @@ it("standard mode has four columns with abbreviated basic parts of speech and al
   expect(screen.getByRole("heading", { name: "v." })).toBeVisible();
   expect(screen.getByRole("heading", { name: "n." })).toBeVisible();
   expect(
-    screen.getByRole("heading", { name: "read" }).closest("td")
+    screen
+      .getByRole("heading", { name: /general-UK\s*general-US/ })
+      .closest("td")
   ).toHaveAttribute("rowspan", "3");
   const secondSense = screen.getByText("释义-b2").closest("tr")!;
   expect(within(secondSense).getByText("语法-b2")).toBeVisible();
   expect(screen.queryByText("及物")).not.toBeInTheDocument();
   expect(screen.queryByText("词形变化")).not.toBeInTheDocument();
-  expect(screen.queryByText("general-UK")).not.toBeInTheDocument();
+  expect(screen.queryByText("词形-general")).not.toBeInTheDocument();
   expect(screen.queryByText("/riːd/")).not.toBeInTheDocument();
 });
 it("简洁模式保留全部义项、等级和词性合并，并按偏好选择富文本释义", () => {
@@ -167,9 +173,11 @@ it("简洁模式保留全部义项、等级和词性合并，并按偏好选择�
   expect(screen.getByRole("table", { name: "简洁模式词条列表" })).toBeVisible();
   expect(
     screen.getAllByRole("columnheader").map((cell) => cell.textContent)
-  ).toEqual(["英文词条", "词性", "多维释义"]);
+  ).toEqual(["英文词条", "词性", "多维词义"]);
   expect(
-    screen.getByRole("heading", { name: "read" }).closest("td")
+    screen
+      .getByRole("heading", { name: /general-UK\s*general-US/ })
+      .closest("td")
   ).toHaveAttribute("rowspan", "2");
   expect(
     screen.getByRole("heading", { name: "v." }).closest("td")
@@ -297,7 +305,7 @@ it("phrase forms stay hidden and missing full data remains explicit", () => {
       full
     />
   );
-  expect(screen.queryByText("general-UK")).not.toBeInTheDocument();
+  expect(screen.queryByText("词形-general")).not.toBeInTheDocument();
   expect(screen.getByText("及物")).toBeVisible();
   view.rerender(
     <Entry
@@ -311,4 +319,48 @@ it("phrase forms stay hidden and missing full data remains explicit", () => {
     />
   );
   expect(screen.getByRole("alert")).toHaveTextContent("完整内容暂不可用");
+});
+
+it.each([
+  { full: false, simple: false },
+  { full: false, simple: true },
+  { full: true, simple: false }
+])("词面双拼写随英美偏好排序，且不再显示音标：%j", (mode) => {
+  const view = render(
+    <Entry entry={readingEntry} level="C2" variant="BrE" {...mode} />
+  );
+  const wordCell = () => view.container.querySelector<HTMLElement>("tbody td")!;
+  expect(within(wordCell()).getByRole("heading").children).toHaveLength(2);
+  expect(wordCell()).toHaveTextContent(/^general-UKgeneral-US$/);
+  view.rerender(
+    <Entry entry={readingEntry} level="C2" variant="AmE" {...mode} />
+  );
+  expect(wordCell()).toHaveTextContent(/^general-USgeneral-UK$/);
+  if (mode.full)
+    expect(screen.getAllByText("/ɹiːd/").length).toBeGreaterThan(0);
+});
+
+it("英美拼写相同时只显示一行", () => {
+  render(
+    <Entry
+      entry={{
+        ...readingEntry,
+        pos: readingEntry.pos.map((pos) => ({
+          ...pos,
+          forms: pos.forms?.map((form) => ({
+            ...form,
+            variants: form.variants.map((regional) => ({
+              ...regional,
+              spelling: "read"
+            }))
+          }))
+        }))
+      }}
+      level="C2"
+      variant="AmE"
+    />
+  );
+  expect(screen.getByRole("heading", { name: "read" }).children).toHaveLength(
+    1
+  );
 });

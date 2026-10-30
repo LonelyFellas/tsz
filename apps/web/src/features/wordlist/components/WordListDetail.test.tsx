@@ -204,7 +204,7 @@ it("清空详情搜索后恢复全部词条且保留输入焦点", async () => {
   await waitFor(() =>
     expect(api.wordList.items).toHaveBeenLastCalledWith(
       "list",
-      { page: 1, q: "apple" },
+      { page: 1, q: "apple", view: "full" },
       expect.anything()
     )
   );
@@ -214,7 +214,7 @@ it("清空详情搜索后恢复全部词条且保留输入焦点", async () => {
   await waitFor(() =>
     expect(api.wordList.items).toHaveBeenLastCalledWith(
       "list",
-      { page: 1, q: "" },
+      { page: 1, q: "", view: "full" },
       expect.anything()
     )
   );
@@ -242,7 +242,7 @@ it("详情搜索等待组合输入结束，读取期间保留旧词条且不续�
   await waitFor(() => expect(api.wordList.items).toHaveBeenCalledTimes(2));
   expect(api.wordList.items).toHaveBeenLastCalledWith(
     "list",
-    { page: 1, q: "苹果" },
+    { page: 1, q: "苹果", view: "full" },
     expect.anything()
   );
   expect(screen.getByRole("heading", { name: "apple" })).toBeVisible();
@@ -432,7 +432,7 @@ it("简洁与标准模式共用已加载分页，切换后保留备注与搜索"
   await waitFor(() =>
     expect(api.wordList.myItems).toHaveBeenLastCalledWith(
       "list",
-      { page: 1, q: "apple" },
+      { page: 1, q: "apple", view: "full" },
       expect.anything()
     )
   );
@@ -501,14 +501,14 @@ it("switches real modes and reading context without writing preferences or leaki
   expect(screen.getByText("注：作者给读者的补充说明")).toBeVisible();
   expect(api.wordList.items).toHaveBeenCalled();
 });
-it("search resets pagination and unsupported full mode can return to the standard response", async () => {
+it("search resets pagination and a failed full-mode fetch can return to cached standard content", async () => {
   open();
   await screen.findByText("A1-UK");
   reachBottom();
   await waitFor(() =>
     expect(api.wordList.items).toHaveBeenLastCalledWith(
       "list",
-      { page: 2, q: "" },
+      { page: 2, q: "", view: "full" },
       expect.anything()
     )
   );
@@ -520,7 +520,7 @@ it("search resets pagination and unsupported full mode can return to the standar
   await waitFor(() =>
     expect(api.wordList.items).toHaveBeenLastCalledWith(
       "list",
-      { page: 1, q: "app" },
+      { page: 1, q: "app", view: "full" },
       expect.anything()
     )
   );
