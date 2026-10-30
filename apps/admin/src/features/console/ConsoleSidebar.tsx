@@ -4,7 +4,6 @@ import {
   DollarOutlined,
   HomeOutlined,
   ProfileOutlined,
-  QuestionCircleOutlined,
   ReadOutlined,
   ScheduleOutlined,
   SettingOutlined,
@@ -118,12 +117,6 @@ const GROUPS: Group[] = [
       pageLeaf(ADMIN_PAGE_ROUTES.sentences, "多维例句"),
       pageLeaf(ADMIN_PAGE_ROUTES.sentencesTrash, "垃圾桶")
     ]
-  },
-  {
-    key: "grp-questions",
-    icon: <QuestionCircleOutlined />,
-    label: "题型管理",
-    leaves: [pageLeaf(ADMIN_PAGE_ROUTES.questionBank, "单选题工作台")]
   },
   {
     key: "grp-wordlist",

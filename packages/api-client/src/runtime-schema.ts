@@ -2,13 +2,6 @@ import runtimeSchemaBundleJson from "./admin-word-v3.runtime-schema.json";
 
 export const RUNTIME_SCHEMA_ROOTS = [
   "LearningCapabilities",
-  "QuestionCandidatePage",
-  "QuestionCandidateSearchPage",
-  "QuestionBatchPreview",
-  "QuestionBatch",
-  "QuestionBatchPage",
-  "QuestionGeneration",
-  "QuestionGenerationPage",
   "AiLedgerPage",
   "AiCostLedgerPage",
   "AiCostOverview",
@@ -24,10 +17,6 @@ export const RUNTIME_SCHEMA_ROOTS = [
   "ChatGPTLogout",
   "OpenCodeLogin",
   "OpenCodeLoginStatus",
-  "BankQuestion",
-  "BankQuestionPage",
-  "QuestionWorkbenchPage",
-  "QuestionInspection",
 
   "MemoryOverview",
   "MemoryPage",

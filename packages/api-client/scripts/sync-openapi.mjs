@@ -31,10 +31,6 @@ const API_PREFIX = "/api/v1";
 const ADMIN_LEXICON_PREFIX = `${API_PREFIX}/admin/lexicon`;
 const HTTP_METHODS = ["get", "head", "post", "put", "patch", "delete"];
 const QUERY_CONTRACT_OPERATIONS = new Set([
-  "get /admin/question-bank/candidates",
-  "get /admin/question-bank/generations",
-  "get /admin/question-bank/questions",
-  "get /admin/question-bank/questions/workbench",
   "get /me/wordlist-tips",
   "get /wordlists",
   "get /wordlists/catalog",
@@ -63,13 +59,6 @@ const QUERY_CONTRACT_OPERATIONS = new Set([
 
 const RUNTIME_SCHEMA_ROOTS = [
   "LearningCapabilities",
-  "QuestionCandidatePage",
-  "QuestionCandidateSearchPage",
-  "QuestionBatchPreview",
-  "QuestionBatch",
-  "QuestionBatchPage",
-  "QuestionGeneration",
-  "QuestionGenerationPage",
   "AiLedgerPage",
   "AiCostLedgerPage",
   "AiCostOverview",
@@ -85,10 +74,6 @@ const RUNTIME_SCHEMA_ROOTS = [
   "ChatGPTLogout",
   "OpenCodeLogin",
   "OpenCodeLoginStatus",
-  "BankQuestion",
-  "BankQuestionPage",
-  "QuestionWorkbenchPage",
-  "QuestionInspection",
 
   "MemoryOverview",
   "MemoryPage",
@@ -660,7 +645,6 @@ for (const [rawPath, item] of Object.entries(spec.paths)) {
       rawPath.startsWith(ADMIN_LEXICON_PREFIX) ||
       rawPath.startsWith(`${API_PREFIX}/admin/speech/`) ||
       rawPath.startsWith(`${API_PREFIX}/me/learning-plans`) ||
-      rawPath.startsWith(`${API_PREFIX}/admin/question-bank`) ||
       rawPath === `${API_PREFIX}/me/learning-capabilities` ||
       rawPath.startsWith(`${API_PREFIX}/me/account-deletion`) ||
       rawPath === `${API_PREFIX}/auth/account` ||
