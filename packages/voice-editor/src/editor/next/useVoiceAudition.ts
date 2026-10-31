@@ -4,7 +4,8 @@ import type { ReviewAudio } from "./AudioReview";
 import {
   canonicalVoiceHash,
   voiceSettingFor,
-  voiceSettingKey
+  voiceSettingKey,
+  effectiveVoiceSetting
 } from "../../core";
 import type {
   VoiceOption,
@@ -25,7 +26,13 @@ function settingsForVoice(
   versionKey?: string
 ): VoiceSettings {
   const stored = voiceSettingFor(settings, voice.id, versionKey);
-  const setting = stored ?? voice.defaultSettings;
+  const raw = stored ?? {
+    voice_id: voice.id,
+    enabled: false,
+    rate_percent: 0,
+    ...voice.defaultSettings
+  };
+  const setting = effectiveVoiceSetting(raw, voice);
   const rate = setting?.rate_percent ?? 0;
   const ratePercent =
     voice.supportsRate === false
@@ -58,6 +65,7 @@ export interface VoiceAuditionInput {
   /** 每个音色各自的设置；未配置的音色使用原速。 */
   settings: readonly VoiceSetting[];
   previewAdapter?: VoicePreviewAdapter;
+  catalog?: VoiceOption[];
 }
 
 export interface VoiceAudition {
@@ -89,7 +97,8 @@ export function useVoiceAudition({
   language,
   content,
   settings,
-  previewAdapter
+  previewAdapter,
+  catalog
 }: VoiceAuditionInput): VoiceAudition {
   const [voices, setVoices] = useState<VoiceOption[]>([]);
   const [voicesLoading, setVoicesLoading] = useState(false);
@@ -155,6 +164,10 @@ export function useVoiceAudition({
   }, [content, settings, stop]);
 
   useEffect(() => {
+    if (catalog) {
+      setVoices(catalog);
+      return;
+    }
     if (!open || !previewAdapter) {
       setVoices([]);
       return;
@@ -175,7 +188,7 @@ export function useVoiceAudition({
         if (!controller.signal.aborted) setVoicesLoading(false);
       });
     return () => controller.abort();
-  }, [language, open, previewAdapter]);
+  }, [language, open, previewAdapter, catalog]);
 
   const audition = useCallback(
     (voice: VoiceOption, setting?: VoiceSetting) => {
@@ -185,17 +198,13 @@ export function useVoiceAudition({
       const existing = setting ?? voiceSettingFor(settings, voice.id);
       if (
         !existing?.audio_asset_id &&
-        ((voice.supportsRate === false &&
-          (existing?.rate_percent ?? 0) !== 0) ||
-          (voice.supportsPitch === false &&
-            (existing?.pitch_semitones ?? 0) !== 0) ||
-          (voice.supportsVolume === false &&
-            (existing?.volume_percent ?? 100) !== 100) ||
-          content.annotations.some(
-            (mark) =>
-              (mark.type === "pause" && voice.supportsPause === false) ||
-              (mark.type === "phoneme" && voice.supportsPhoneme === false)
-          ))
+        content.annotations.some(
+          (mark) =>
+            (mark.type === "pause" && voice.supportsPause === false) ||
+            (mark.type === "phoneme" && voice.supportsPhoneme === false) ||
+            (mark.type === "sub" && voice.supportsSub === false) ||
+            (mark.type === "say_as" && voice.supportsSayAs === false)
+        )
       ) {
         setStatus(
           "该模型不支持当前参数、停顿或指定音素；请明确调整后再试听，原内容已保留"

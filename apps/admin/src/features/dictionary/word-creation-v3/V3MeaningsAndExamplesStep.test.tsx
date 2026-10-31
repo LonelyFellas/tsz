@@ -1400,43 +1400,75 @@ describe("V3MeaningsAndExamplesStep", () => {
   }, 15_000);
 
   it("语法结构变体上已有的 audio_assets 列在音频面板里，移除后从草稿去掉引用", async () => {
-    const initial = structuredClone(meaningsFixture);
-    // 此用例只验证语法音频回写，避免无关释义/例句扩大 DOM 和可及名查询成本。
-    initial.pos[0]!.senses = [];
-    initial.pos[0]!.grammar_structures[0]!.variants[0]!.audio_assets = [
-      {
-        id: "asset-1",
-        locale: "en-GB",
-        gender: "female",
-        content_type: "audio/mpeg",
-        size_bytes: 3,
-        original_name: "old.mp3",
-        created_at: "2026-09-06T00:00:00Z"
-      }
-    ];
-    render(<Harness initial={initial} />);
-    fireEvent.click(screen.getByLabelText("打开语法结构 1 英美通用内容编辑器"));
-    await screen.findByLabelText("标注工具栏", {}, { timeout: 10_000 });
-    fireEvent.click(screen.getByLabelText("音频"));
-    expect(screen.getByLabelText("试听 old.mp3")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByLabelText("移除 old.mp3"));
-    // Popconfirm 的确认键：这一页 DOM 很大，findByRole 逐个算可及名在 CI 上会拖到超时，按类名定位
-    const confirm = await waitFor(() => {
-      const found = document.querySelector<HTMLButtonElement>(
-        ".ant-popconfirm-buttons .ant-btn-primary"
+    const listing = vi
+      .spyOn(adminVoicePreviewAdapter, "listVoices")
+      .mockResolvedValue([
+        {
+          id: "sonia",
+          label: "Sonia",
+          locale: "en-GB",
+          gender: "female",
+          styles: [],
+          supportsRate: true,
+          supportsPitch: false,
+          isDefault: true
+        }
+      ]);
+    try {
+      const initial = structuredClone(meaningsFixture);
+      // 此用例只验证语法音频回写，避免无关释义/例句扩大 DOM 和可及名查询成本。
+      initial.pos[0]!.senses = [];
+      initial.pos[0]!.grammar_structures[0]!.variants[0]!.audio_assets = [
+        {
+          id: "asset-1",
+          locale: "en-GB",
+          gender: "female",
+          content_type: "audio/mpeg",
+          size_bytes: 3,
+          original_name: "old.mp3",
+          created_at: "2026-09-06T00:00:00Z"
+        }
+      ];
+      render(<Harness initial={initial} />);
+      fireEvent.click(
+        screen.getByLabelText("打开语法结构 1 英美通用内容编辑器")
       );
-      expect(found).not.toBeNull();
-      return found!;
-    });
-    fireEvent.click(confirm);
-    expect(
-      value().pos[0]!.grammar_structures[0]!.variants[0]!.audio_assets
-    ).toEqual(initial.pos[0]!.grammar_structures[0]!.variants[0]!.audio_assets);
-    fireEvent.click(screen.getByLabelText("完成语法结构 1 英美通用内容编辑"));
-    expect(
-      value().pos[0]!.grammar_structures[0]!.variants[0]!.audio_assets
-    ).toEqual([]);
+      await screen.findByLabelText("标注工具栏", {}, { timeout: 10_000 });
+      const editor = screen
+        .getByLabelText("标注工具栏")
+        .closest('[role="dialog"]') as HTMLElement;
+      fireEvent.click(await within(editor).findByLabelText("选用 Sonia"));
+      fireEvent.click(await within(editor).findByLabelText("修改 Sonia"));
+      expect(screen.getByLabelText("试听 old.mp3")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByLabelText("移除 old.mp3"));
+      // Popconfirm 的确认键：这一页 DOM 很大，findByRole 逐个算可及名在 CI 上会拖到超时，按类名定位
+      const confirm = await waitFor(() => {
+        const found = document.querySelector<HTMLButtonElement>(
+          ".ant-popconfirm-buttons .ant-btn-primary"
+        );
+        expect(found).not.toBeNull();
+        return found!;
+      });
+      fireEvent.click(confirm);
+      expect(
+        value().pos[0]!.grammar_structures[0]!.variants[0]!.audio_assets
+      ).toEqual(
+        initial.pos[0]!.grammar_structures[0]!.variants[0]!.audio_assets
+      );
+      const detail = screen
+        .getByLabelText("当前音色语速")
+        .closest('[role="dialog"]') as HTMLElement;
+      fireEvent.click(
+        within(detail).getByRole("button", { name: "保存配音设置" })
+      );
+      fireEvent.click(screen.getByLabelText("完成语法结构 1 英美通用内容编辑"));
+      expect(
+        value().pos[0]!.grammar_structures[0]!.variants[0]!.audio_assets
+      ).toEqual([]);
+    } finally {
+      listing.mockRestore();
+    }
   }, 30_000);
 
   it("音色与语速落到语法结构变体的 voice_profile 上", async () => {
@@ -1471,14 +1503,29 @@ describe("V3MeaningsAndExamplesStep", () => {
       // 没动过之前不该凭空写出一份配置
       expect(variant().voice_profile).toBeUndefined();
 
-      fireEvent.click(screen.getByLabelText("发音"));
+      const editor = screen
+        .getByLabelText("标注工具栏")
+        .closest('[role="dialog"]') as HTMLElement;
+      fireEvent.click(await within(editor).findByLabelText("选用 Sonia"));
+      fireEvent.click(await within(editor).findByLabelText("修改 Sonia"));
       const rateButtons = await screen.findAllByLabelText(/^设置 .* 的语速$/);
       fireEvent.click(rateButtons[0]!);
       fireEvent.click(await screen.findByLabelText("语速 1.20 倍"));
       expect(variant().voice_profile).toBeUndefined();
+      const detail = screen
+        .getByLabelText("当前音色语速")
+        .closest('[role="dialog"]') as HTMLElement;
+      fireEvent.click(
+        within(detail).getByRole("button", { name: "保存配音设置" })
+      );
+      fireEvent.click(within(editor).getByLabelText("选用 Sonia"));
       fireEvent.click(screen.getByLabelText("完成语法结构 1 英美通用内容编辑"));
       expect(variant().voice_profile).toEqual({
-        dubbing: { mode: "local", area: "grammar", recommendation_order: [] },
+        dubbing: {
+          mode: "local",
+          area: "grammar",
+          pool_version: "provider_id_v1"
+        },
         voices: [
           {
             voice_id: expect.any(String),

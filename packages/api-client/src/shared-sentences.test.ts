@@ -137,7 +137,7 @@ describe("shared sentence wire contract", () => {
     expect(post).toHaveBeenCalledWith("/lexicon/sentences", input, {
       headers: {
         ...SENTENCE_FORMATTING_HEADERS,
-        "X-TSZ-Voice-Versions": "v3",
+        "X-TSZ-Voice-Versions": "v4",
         "X-TSZ-Voice-Locales": "v1",
         "X-TSZ-Voice-Models": "v1"
       }
@@ -232,7 +232,7 @@ describe("shared sentence wire contract", () => {
       {
         headers: {
           ...SENTENCE_FORMATTING_HEADERS,
-          "X-TSZ-Voice-Versions": "v3",
+          "X-TSZ-Voice-Versions": "v4",
           "X-TSZ-Voice-Locales": "v1",
           "X-TSZ-Voice-Models": "v1"
         }
@@ -295,7 +295,7 @@ describe("shared sentence wire contract", () => {
       {
         headers: {
           ...SENTENCE_FORMATTING_HEADERS,
-          "X-TSZ-Voice-Versions": "v3",
+          "X-TSZ-Voice-Versions": "v4",
           "X-TSZ-Voice-Locales": "v1",
           "X-TSZ-Voice-Models": "v1"
         }
@@ -320,7 +320,7 @@ it("发布、回退、下架、恢复分别走独立路径并携带双版本与�
   const headers = {
     headers: {
       ...SENTENCE_FORMATTING_HEADERS,
-      "X-TSZ-Voice-Versions": "v3",
+      "X-TSZ-Voice-Versions": "v4",
       "X-TSZ-Voice-Locales": "v1",
       "X-TSZ-Voice-Models": "v1",
       "Idempotency-Key": "command-key"
@@ -369,7 +369,7 @@ it("编辑显式读取草稿，历史支持游标并拒绝畸形响应", async (
   expect(get).toHaveBeenLastCalledWith(`/lexicon/sentences/${id}?view=draft`, {
     headers: {
       ...SENTENCE_FORMATTING_HEADERS,
-      "X-TSZ-Voice-Versions": "v3",
+      "X-TSZ-Voice-Versions": "v4",
       "X-TSZ-Voice-Locales": "v1",
       "X-TSZ-Voice-Models": "v1"
     }
@@ -380,7 +380,7 @@ it("编辑显式读取草稿，历史支持游标并拒绝畸形响应", async (
     {
       headers: {
         ...SENTENCE_FORMATTING_HEADERS,
-        "X-TSZ-Voice-Versions": "v3",
+        "X-TSZ-Voice-Versions": "v4",
         "X-TSZ-Voice-Locales": "v1",
         "X-TSZ-Voice-Models": "v1"
       }
@@ -438,7 +438,7 @@ it("creation and historical detail negotiate the same response capability", asyn
   expect(post).toHaveBeenCalledWith("/lexicon/sentences", input, {
     headers: {
       ...SENTENCE_FORMATTING_HEADERS,
-      "X-TSZ-Voice-Versions": "v3",
+      "X-TSZ-Voice-Versions": "v4",
       "X-TSZ-Voice-Locales": "v1",
       "X-TSZ-Voice-Models": "v1"
     }
@@ -449,7 +449,7 @@ it("creation and historical detail negotiate the same response capability", asyn
     {
       headers: {
         ...SENTENCE_FORMATTING_HEADERS,
-        "X-TSZ-Voice-Versions": "v3",
+        "X-TSZ-Voice-Versions": "v4",
         "X-TSZ-Voice-Locales": "v1",
         "X-TSZ-Voice-Models": "v1"
       }

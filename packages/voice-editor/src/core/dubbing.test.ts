@@ -136,6 +136,17 @@ describe("文本配音模式", () => {
       { ...recommendations[0]!, id: "global", groupName: "全局常用" }
     ];
     expect(
+      resolveRecommendedVoices(
+        profile,
+        [
+          { ...recommendations[0]!, id: "unselected", selected: false },
+          recommendations[1]!
+        ],
+        voices,
+        "en-GB"
+      ).map((item) => item.version_id)
+    ).toEqual(["second"]);
+    expect(
       resolveRecommendedVoices(profile, items, voices, "en-GB").map(
         (item) => item.version_id
       )

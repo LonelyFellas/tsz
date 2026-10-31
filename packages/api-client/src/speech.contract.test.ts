@@ -2,9 +2,57 @@ import { describe, expect, it, vi } from "vitest";
 import { decodeDubbingGroupsV3 } from "./dubbing-groups-v3";
 import { createAdminEndpoints } from "./admin";
 import type { HttpClient } from "./http";
+import type { VoiceProfileV3 } from "@tsz/types";
 import spec from "./openapi.snapshot.json";
 
 describe("音色库契约", () => {
+  it("局部池显式版本与推荐来源严格解析，resolve携带v4且原样传输无推荐池", async () => {
+    const id = "11111111-1111-4111-8111-111111111111";
+    const profile: VoiceProfileV3 = {
+      voices: [
+        {
+          voice_id: "sonia",
+          enabled: false,
+          rate_percent: -27,
+          version_id: id,
+          version_name: "保留参数",
+          locale: "en-GB"
+        }
+      ],
+      dubbing: {
+        mode: "local" as const,
+        area: "word" as const,
+        pool_version: "provider_id_v1" as const
+      }
+    };
+    expect(spec.schemas.VoicePoolVersionV3.enum).toEqual(["provider_id_v1"]);
+    expect(spec.schemas.LocalVoiceRecommendationV3.additionalProperties).toBe(
+      false
+    );
+    expect(spec.schemas.LocalVoiceRecommendationV3.required).toEqual([
+      "group_id",
+      "pair_id",
+      "voice_ids",
+      "contribution_ids"
+    ]);
+    const http = { post: vi.fn().mockResolvedValue({ voices: [] }) };
+    const input = {
+      profile,
+      accent: "gb" as const,
+      source: {
+        kind: "text" as const,
+        content: { version: 2 as const, text: "hello", annotations: [] }
+      }
+    };
+    await createAdminEndpoints(http as unknown as HttpClient).speech.resolve(
+      input
+    );
+    expect(http.post).toHaveBeenCalledWith("/speech/resolve", input, {
+      signal: undefined,
+      headers: { "X-TSZ-Voice-Versions": "v4" }
+    });
+    expect(http.post.mock.calls[0]![1].profile).toBe(profile);
+  });
   it("音频任务持久查询、撤销和重试声明权限与冲突边界", () => {
     for (const operation of [
       "get /admin/speech/audio-updates",

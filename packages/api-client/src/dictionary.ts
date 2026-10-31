@@ -22,7 +22,7 @@ export function createDictionaryEndpoints(http: HttpClient) {
           {
             ...options,
             headers: {
-              "X-TSZ-Voice-Versions": "v3",
+              "X-TSZ-Voice-Versions": "v4",
               "X-TSZ-Voice-Locales": "v1",
               "X-TSZ-Voice-Models": "v1"
             }
@@ -34,7 +34,7 @@ export function createDictionaryEndpoints(http: HttpClient) {
         .get<unknown>(`/dictionary/entries/${encodeURIComponent(id)}`, {
           ...options,
           headers: {
-            "X-TSZ-Voice-Versions": "v3",
+            "X-TSZ-Voice-Versions": "v4",
             "X-TSZ-Voice-Locales": "v1",
             "X-TSZ-Voice-Models": "v1"
           }
@@ -47,7 +47,7 @@ export function createDictionaryEndpoints(http: HttpClient) {
           {
             ...options,
             headers: {
-              "X-TSZ-Voice-Versions": "v3",
+              "X-TSZ-Voice-Versions": "v4",
               "X-TSZ-Voice-Locales": "v1",
               "X-TSZ-Voice-Models": "v1"
             }

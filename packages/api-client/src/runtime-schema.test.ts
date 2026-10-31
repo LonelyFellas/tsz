@@ -454,6 +454,68 @@ describe("runtime schema fail-closed diagnostics", () => {
     expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(false);
   });
 
+  it("新版局部池保留无推荐状态和来源身份，未知池版本与来源字段被严格拒绝", () => {
+    const id = "11111111-1111-4111-8111-111111111111";
+    const word = validFixture("AdminWordV3") as {
+      meanings: { pos: Array<Record<string, unknown>> };
+    };
+    const pos = buildValidValue(
+      runtimeSchemaBundle.$defs.WordPosMeaningsV3!
+    ) as Record<string, unknown>;
+    const sense = buildValidValue(
+      runtimeSchemaBundle.$defs.WordSenseV3!
+    ) as Record<string, unknown>;
+    const profile = {
+      voices: [
+        {
+          voice_id: "sonia",
+          enabled: false,
+          rate_percent: -27,
+          version_id: id,
+          version_name: "缓存",
+          locale: "en-GB"
+        }
+      ],
+      dubbing: {
+        mode: "local",
+        area: "meaning",
+        pool_version: "provider_id_v1"
+      }
+    };
+    sense.definitions = [
+      {
+        id,
+        definition_mode: "en_definition",
+        level: "A1",
+        content: {
+          mode: "unified",
+          common: {
+            id,
+            origin: "manual",
+            value: { version: 2, text: "cat", annotations: [] },
+            voice_profile: profile
+          }
+        }
+      }
+    ];
+    pos.senses = [sense];
+    word.meanings.pos = [pos];
+    expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(true);
+    profile.dubbing.pool_version = "unknown";
+    expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(false);
+    profile.dubbing.pool_version = "provider_id_v1";
+    const source = {
+      group_id: id,
+      pair_id: id,
+      voice_ids: ["sonia"],
+      contribution_ids: [id]
+    };
+    Object.assign(profile.dubbing, { recommendation: source });
+    expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(true);
+    Object.assign(source, { guessed: true });
+    expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(false);
+  });
+
   it("IPA/UPS 四份配置可选且不可为 null，保留严格字段校验", () => {
     const word = validFixture("AdminWordV3") as { forms: { pos: unknown[] } };
     const pronunciation = buildValidValue(

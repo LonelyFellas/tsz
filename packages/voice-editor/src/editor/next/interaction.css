@@ -432,3 +432,208 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.tsz-ve-local-pool {
+  width: 1140px;
+  min-width: 0;
+  max-width: 100%;
+  margin-top: 16px;
+}
+.tsz-ve-local-pool > .ant-typography,
+.tsz-ve-local-pool > section,
+.tsz-ve-local-pool > .ant-alert {
+  margin-top: 16px;
+}
+.tsz-ve-local-pool .ant-typography.ant-typography-secondary,
+.tsz-ve-voice-detail .ant-typography.ant-typography-secondary,
+.tsz-ve-voice-parameters .ant-typography.ant-typography-secondary,
+.tsz-ve-local-pool .ant-input::placeholder {
+  color: #687181;
+}
+.tsz-ve-pool-side-title::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-inline-end: 6px;
+  border-radius: 50%;
+  background: #2053ff;
+  vertical-align: 0.1em;
+}
+.tsz-ve-pool-side-title[data-accent="us"]::before {
+  background: #fc007a;
+}
+.tsz-ve-local-pool .ant-input-search {
+  width: 360px;
+  max-width: 100%;
+}
+.tsz-ve-pool-scroll {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  margin: 12px 0;
+}
+.tsz-ve-pool-sides {
+  display: flex;
+  align-items: start;
+  gap: 24px;
+  width: max-content;
+}
+.tsz-ve-pool-sides > section {
+  width: 548px;
+}
+.tsz-ve-pool-row {
+  display: grid;
+  grid-template-columns: 32px 54px 52px 32px 202px 66px 56px 30px;
+  align-items: center;
+  min-height: 40px;
+  gap: 4px;
+  border-bottom: 1px solid #e1e5eb;
+}
+.tsz-ve-pool-head {
+  color: #687181;
+  font-size: 12px;
+  border-bottom: 1px solid #e1e5eb;
+}
+.tsz-ve-pool-recommendations {
+  display: block;
+  font-size: var(--ant-font-size, 14px);
+  width: max-content;
+  min-width: 520px;
+}
+.tsz-ve-pool-pair {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  border-bottom: 1px solid #e1e5eb;
+  min-height: 44px;
+}
+.tsz-ve-pool-pair > :first-child {
+  width: 220px;
+  min-width: 220px;
+}
+.tsz-ve-pool-pair .ant-radio-wrapper > span:last-child {
+  min-width: 0;
+}
+.tsz-ve-pool-pair > .ant-radio-wrapper small,
+.tsz-ve-pool-pair > span > small {
+  display: block;
+  color: #687181;
+  font-size: 12px;
+}
+.tsz-ve-pool-pair-side {
+  display: grid;
+  grid-template-columns: 32px 202px 66px 56px;
+  gap: 4px;
+  align-items: center;
+}
+.tsz-ve-pool-catalog {
+  display: grid;
+  grid-template-columns: repeat(4, 250px);
+  gap: 16px;
+  width: max-content;
+}
+.tsz-ve-pool-catalog-list {
+  height: 280px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  border-top: 1px solid #e1e5eb;
+  border-bottom: 1px solid #e1e5eb;
+  margin-top: 8px;
+}
+.tsz-ve-pool-catalog-list > div {
+  padding: 8px 2px;
+  min-height: 64px;
+}
+.tsz-ve-pool-catalog-list > div[hidden] {
+  display: none;
+}
+.tsz-ve-pool-catalog-list .ant-checkbox-wrapper {
+  align-items: center;
+  width: 100%;
+}
+.tsz-ve-pool-catalog-list .ant-checkbox-label {
+  min-width: 0;
+}
+.tsz-ve-pool-provider-id {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.tsz-ve-pool-provider-id code {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px;
+  font-size: inherit;
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+.tsz-ve-pool-provider-id .ant-typography-copy {
+  flex: none;
+  margin-inline-start: 0;
+}
+.tsz-ve-shared-name {
+  display: inline-flex;
+  align-items: baseline;
+  min-width: 0;
+  max-width: 100%;
+  vertical-align: middle;
+}
+.tsz-ve-shared-name > strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tsz-ve-shared-name > .anticon {
+  margin-left: 0.2em;
+  flex-shrink: 0;
+  font-size: inherit;
+}
+.tsz-ve-shared-name > small {
+  margin-left: 0.8em;
+  min-width: 0;
+  font-size: 12px;
+  color: #687181;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tsz-ve-shared-number {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.tsz-ve-shared-times {
+  margin-left: 0.15em;
+}
+.tsz-ve-shared-number > small {
+  margin-left: 0.2em;
+  font-size: 12px;
+}
+.tsz-ve-voice-parameters section {
+  padding: 12px;
+  margin: 12px 0;
+  border: 1px solid #e1e5eb;
+}
+.tsz-ve-voice-parameters label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tsz-ve-voice-parameters .ant-typography {
+  margin-bottom: 8px;
+}
+.tsz-ve-voice-parameters .ant-typography code {
+  font-size: 12px;
+}

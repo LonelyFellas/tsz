@@ -9,6 +9,7 @@ import type {
 } from "../types";
 import { speechAccentGroup } from "@tsz/shared";
 import { isVoiceRecommendationAvailable } from "./voice-recommendations";
+import { effectiveVoiceSetting } from "./voice-pool";
 import { newVoiceVersionId, voiceSettingKey } from "./voice-versions";
 
 export function recommendationVoiceSetting(
@@ -80,7 +81,15 @@ export function localVoiceProfile(
           dubbing: {
             mode: "local" as const,
             area,
-            recommendation_order: previous?.dubbing?.recommendation_order ?? []
+            recommendation_order: previous?.dubbing?.recommendation_order ?? [],
+            ...(previous?.dubbing?.pool_version
+              ? {
+                  pool_version: previous.dubbing.pool_version,
+                  ...(previous.dubbing.recommendation
+                    ? { recommendation: previous.dubbing.recommendation }
+                    : {})
+                }
+              : {})
           }
         }
       : {})
@@ -121,7 +130,12 @@ export function resolveRecommendedVoices(
                     name: setting.version_name ?? "",
                     locale: accent,
                     groupName: "",
-                    setting
+                    setting: profile.dubbing?.pool_version
+                      ? effectiveVoiceSetting(
+                          setting,
+                          voices.find((voice) => voice.id === setting.voice_id)
+                        )
+                      : setting
                   },
                   voices,
                   accent,
@@ -129,9 +143,12 @@ export function resolveRecommendedVoices(
                 )
             )
           : [];
+      if (profile.dubbing?.pool_version && profile.dubbing.mode === "local")
+        return local;
       if (selected.length) return local.length === selected.length ? local : [];
       const recommended = recommendations.find(
         (item) =>
+          item.selected !== false &&
           item.locale === accent &&
           isVoiceRecommendationAvailable(item, voices, accent, content)
       );

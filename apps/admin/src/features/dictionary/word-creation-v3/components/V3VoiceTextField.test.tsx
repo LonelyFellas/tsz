@@ -5,7 +5,8 @@ import {
   fireEvent,
   render as rtlRender,
   screen,
-  waitFor
+  waitFor,
+  within
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -78,15 +79,22 @@ const fieldCss = readFileSync(
   "utf8"
 );
 
-async function openAudioPanel() {
+async function openVoiceAudioDetail(voice = "Sonia") {
+  const checkbox = await screen.findByRole("checkbox", {
+    name: `选用 ${voice}`
+  });
+  if (!(checkbox as HTMLInputElement).checked) fireEvent.click(checkbox);
+  fireEvent.click(await screen.findByRole("button", { name: `修改 ${voice}` }));
+  await screen.findByRole("region", { name: "当前文本口音录音" });
+}
+async function openAudioPanel(voice = "Sonia") {
   fireEvent.click(screen.getByRole("button", { name: /^打开.*编辑器$/ }));
-  // 编辑器是 lazy 代码块，整包并行跑时首次加载可能超过默认 1s
   await screen.findByRole(
     "toolbar",
     { name: "标注工具栏" },
     { timeout: 10_000 }
   );
-  fireEvent.click(screen.getByRole("button", { name: "音频" }));
+  await openVoiceAudioDetail(voice);
 }
 
 beforeEach(() => {
@@ -157,11 +165,16 @@ it("先在折叠字段输入再打开编辑器，保留已应用的首次推荐"
   });
   fireEvent.click(screen.getByLabelText("打开新拼写编辑器"));
   await waitFor(() =>
-    expect(screen.getByLabelText("启用 Sonia")).toBeChecked()
+    expect(screen.getByLabelText("选用 Sonia")).toBeChecked()
   );
   fireEvent.click(screen.getByLabelText("完成新拼写编辑"));
   expect(onProfile).toHaveBeenCalledWith({
-    dubbing: { mode: "inherit", area: "word", recommendation_order: ["r"] },
+    dubbing: {
+      mode: "inherit",
+      area: "word",
+      pool_version: "provider_id_v1",
+      recommendation_order: ["r"]
+    },
     voices: [
       {
         voice_id: "sonia",
@@ -233,7 +246,12 @@ it("折叠拼写输入直接保存后，正文和默认推荐一起读回", asyn
   const wire = saved.mock.lastCall![0] as typeof initial;
   expect(variantOf(wire).spelling).toBe("hello");
   expect(variantOf(wire).spelling_speech?.voice_profile).toEqual({
-    dubbing: { mode: "inherit", area: "word", recommendation_order: ["first"] },
+    dubbing: {
+      mode: "inherit",
+      area: "word",
+      pool_version: "provider_id_v1",
+      recommendation_order: ["first"]
+    },
     voices: [
       {
         voice_id: "sonia",
@@ -359,7 +377,12 @@ it("折叠释义只复制有效口音的首位推荐，不回填失效推荐", a
     expect.objectContaining({ area: "meaning" })
   );
   expect(changed).toHaveBeenCalledWith({
-    dubbing: { mode: "inherit", area: "meaning", recommendation_order: ["uk"] },
+    dubbing: {
+      mode: "inherit",
+      area: "meaning",
+      pool_version: "provider_id_v1",
+      recommendation_order: ["uk"]
+    },
     voices: [
       {
         voice_id: "sonia",
@@ -424,6 +447,7 @@ it.each(["后续适用组", "全局常用"])(
       dubbing: {
         mode: "inherit",
         area: "word",
+        pool_version: "provider_id_v1",
         recommendation_order: ["usable"]
       },
       voices: [
@@ -600,7 +624,7 @@ describe("V3VoiceTextField 取消和收起态", () => {
         fireEvent.click(screen.getByLabelText("编辑第 1 处停顿 0.5 秒"));
         fireEvent.click(screen.getByRole("button", { name: "移除停顿" }));
       } else {
-        fireEvent.click(await screen.findByLabelText("启用 Sonia"));
+        fireEvent.click(await screen.findByLabelText("选用 Sonia"));
       }
       const escape = () =>
         fireEvent.keyDown(screen.getByRole("dialog"), {
@@ -617,7 +641,7 @@ describe("V3VoiceTextField 取消和收起态", () => {
         );
       else if (kind === "停顿")
         expect(screen.queryByLabelText("编辑第 1 处停顿 0.5 秒")).toBeNull();
-      else expect(screen.getByLabelText("启用 Sonia")).toBeChecked();
+      else expect(screen.getByLabelText("选用 Sonia")).toBeChecked();
       fireEvent.click(screen.getByLabelText("完成测试语法编辑"));
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
       const saved = JSON.parse(screen.getByTestId("cancel-value").textContent!);
@@ -723,9 +747,9 @@ it("宿主统一保存时音色配置直接回传且不显示内部完成按钮"
       onVoiceProfileChange={onVoiceProfileChange}
     />
   );
-  fireEvent.click(await screen.findByLabelText("启用 Sonia"));
+  fireEvent.click(await screen.findByLabelText("选用 Sonia"));
   expect(onVoiceProfileChange).toHaveBeenCalledWith({
-    dubbing: { mode: "local", area: "example", recommendation_order: [] },
+    dubbing: { mode: "local", area: "example", pool_version: "provider_id_v1" },
     voices: [
       {
         voice_id: "sonia",
@@ -804,7 +828,7 @@ describe("V3VoiceTextField 上传音频", () => {
         />
       );
       if (showDone) await openAudioPanel();
-      else fireEvent.click(await screen.findByLabelText("音频"));
+      else await openVoiceAudioDetail();
       fireEvent.change(screen.getByLabelText("上传音频"), {
         target: {
           files: [
@@ -813,6 +837,7 @@ describe("V3VoiceTextField 上传音频", () => {
         }
       });
       await screen.findByLabelText("试听 a.mp3");
+      fireEvent.click(screen.getByRole("button", { name: "保存配音设置" }));
       if (showDone) {
         expect(onAudioAssetsChange).not.toHaveBeenCalled();
         fireEvent.click(screen.getByLabelText("完成语法结构 1 通用内容编辑"));
@@ -838,6 +863,18 @@ describe("V3VoiceTextField 上传音频", () => {
 
   it("已有的 audio_assets 原样列出来；开关关着时面板置灰但列表仍在", async () => {
     state.flags.VOICE_AUDIO_UPLOAD = false;
+    state.listVoices.mockResolvedValue([
+      {
+        id: "aria",
+        label: "Aria",
+        locale: "en-US",
+        gender: "female",
+        styles: [],
+        supportsRate: true,
+        supportsPitch: false,
+        isDefault: true
+      }
+    ]);
     render(
       <V3VoiceTextField
         ariaLabel="语法结构 1 通用内容"
@@ -858,7 +895,7 @@ describe("V3VoiceTextField 上传音频", () => {
         value={VALUE}
       />
     );
-    await openAudioPanel();
+    await openAudioPanel("Aria");
     expect(screen.getByLabelText("试听 old.mp3")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "选择音频文件" })).toBeDisabled();
     expect(screen.getByText("音频上传未启用")).toBeInTheDocument();
@@ -953,13 +990,18 @@ it("页面只读、弹窗编辑；多行正文、关联和设置往返不丢失"
   expect(observe).not.toHaveBeenCalled();
   expect(screen.getByLabelText("英文例句")).toHaveAttribute("readonly");
   fireEvent.click(screen.getByLabelText("打开英文例句编辑器"));
-  await screen.findByRole("toolbar", { name: "标注工具栏" });
-  expect(screen.getByRole("button", { name: "编辑文本" })).toBeInTheDocument();
-  expect(screen.getByLabelText("英文例句")).not.toHaveAttribute("readonly");
-  fireEvent.change(screen.getByLabelText("英文例句"), {
+  const editor = await screen.findByRole("dialog", { name: "编辑英文例句" });
+  await within(editor).findByRole("toolbar", { name: "标注工具栏" });
+  expect(
+    within(editor).getByRole("button", { name: "编辑文本" })
+  ).toBeInTheDocument();
+  expect(within(editor).getByLabelText("英文例句")).not.toHaveAttribute(
+    "readonly"
+  );
+  fireEvent.change(within(editor).getByLabelText("英文例句"), {
     target: { value: "oh hello\nthere" }
   });
-  fireEvent.click(screen.getByLabelText("完成英文例句编辑"));
+  fireEvent.click(within(editor).getByLabelText("完成英文例句编辑"));
   expect(screen.queryByRole("toolbar")).not.toBeInTheDocument();
   expect(screen.getByLabelText("英文例句")).toHaveValue("oh hello\nthere");
   expect(screen.getByLabelText("英文例句")).toHaveAttribute("readonly");
@@ -974,12 +1016,19 @@ it("页面只读、弹窗编辑；多行正文、关联和设置往返不丢失"
     { start: 9, end: 14, surface: "there" }
   ]);
   fireEvent.click(screen.getByLabelText("打开英文例句编辑器"));
-  await screen.findByRole("toolbar", { name: "标注工具栏" });
-  expect(screen.getByLabelText("英文例句")).toHaveValue("oh hello\nthere");
-  fireEvent.click(screen.getByLabelText("发音"));
-  expect(await screen.findByLabelText("设置 Sonia 的语速")).toHaveTextContent(
-    "1.25×"
+  const reopened = await screen.findByRole("dialog", { name: "编辑英文例句" });
+  await within(reopened).findByRole("toolbar", { name: "标注工具栏" });
+  expect(within(reopened).getByLabelText("英文例句")).toHaveValue(
+    "oh hello\nthere"
   );
+  fireEvent.click(await within(reopened).findByLabelText("选用 Sonia"));
+  fireEvent.click(await within(reopened).findByLabelText("修改 Sonia"));
+  const voiceDetail = (await screen.findByLabelText("当前音色语速")).closest(
+    '[role="dialog"]'
+  ) as HTMLElement;
+  expect(
+    await within(voiceDetail).findByLabelText("设置 Sonia 的语速")
+  ).toHaveTextContent("1.25×");
   expect(document.querySelectorAll(".tsz-ve-letter.is-linked")).toHaveLength(5);
 });
 
@@ -1952,14 +2001,25 @@ it("弹窗新增关联后生成使用当前草稿关联，不读取打开前的�
     />
   );
   fireEvent.click(screen.getByRole("button", { name: "打开草稿关联编辑器" }));
-  fireEvent.click(await screen.findByRole("button", { name: "关联单词" }));
-  fireEvent.mouseDown(screen.getByLabelText("关联 hello（1）"), { button: 0 });
+  const editor = await screen.findByRole("dialog", { name: "编辑草稿关联" });
+  fireEvent.click(
+    await within(editor).findByRole("button", { name: "关联单词" })
+  );
+  fireEvent.mouseDown(within(editor).getByLabelText("关联 hello（1）"), {
+    button: 0
+  });
   fireEvent.click(await screen.findByText("关联此词"));
   expect(onChange).not.toHaveBeenCalled();
-  const voicesToggle = screen.getByRole("button", { name: "发音" });
-  if (voicesToggle.getAttribute("aria-expanded") !== "true")
-    fireEvent.click(voicesToggle);
-  const generate = screen.getByText("生成正式音频").closest("button")!;
+  const chosen = within(editor).getByRole("region", { name: "英式已获取音色" });
+  const editVoice = await within(chosen).findByLabelText("修改 自然");
+  await waitFor(() => expect(editVoice).toBeEnabled());
+  fireEvent.click(editVoice);
+  const voiceDetail = (await screen.findByLabelText("当前音色语速")).closest(
+    '[role="dialog"]'
+  ) as HTMLElement;
+  const generate = within(voiceDetail).getByRole("button", {
+    name: "生成正式音频"
+  });
   await waitFor(() => expect(generate).toBeEnabled());
   fireEvent.click(generate);
   await waitFor(() => expect(generatedLinks).toHaveLength(1));
@@ -2062,7 +2122,7 @@ it("拼写停顿与音色同时编辑：取消恢复，完成同时写回且不�
     fireEvent.click(screen.getByLabelText("打开测试拼写编辑器"));
     fireEvent.click(await screen.findByLabelText("编辑第 1 处停顿 0.5 秒"));
     fireEvent.click(screen.getByLabelText("停顿 1 秒"));
-    fireEvent.click(await screen.findByLabelText("启用 Sonia"));
+    fireEvent.click(await screen.findByLabelText("选用 Sonia"));
   };
   await edit();
   fireEvent.click(screen.getByLabelText("试听 Sonia"));
@@ -2088,7 +2148,7 @@ it("拼写停顿与音色同时编辑：取消恢复，完成同时写回且不�
       annotations: [{ type: "pause", at: 5, duration_ms: 1000 }]
     },
     voice_profile: {
-      dubbing: { mode: "local", area: "word", recommendation_order: [] },
+      dubbing: { mode: "local", area: "word", pool_version: "provider_id_v1" },
       voices: [
         {
           voice_id: "sonia",
@@ -2109,5 +2169,5 @@ it("拼写停顿与音色同时编辑：取消恢复，完成同时写回且不�
   expect(
     await screen.findByLabelText("编辑第 1 处停顿 1 秒")
   ).toBeInTheDocument();
-  expect(await screen.findByLabelText("启用 Sonia")).toBeChecked();
+  expect(await screen.findByLabelText("选用 Sonia")).toBeChecked();
 });

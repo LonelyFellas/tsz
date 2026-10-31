@@ -26,6 +26,9 @@ export interface AssociationPickerProps<
 
 export interface VoiceOption {
   id: string;
+  provider?: string;
+  providerVoiceId?: string;
+  displayName?: string;
   isCommon?: boolean;
   label: string;
   locale: string;
@@ -245,17 +248,13 @@ export interface VoiceRecommendation {
   name: string;
   locale: AudioAssetLocale;
   groupName: string;
+  groupId?: string;
+  pairId?: string;
+  selected?: boolean;
   setting: VoiceSetting;
 }
 
-export interface VoiceProfile {
-  voices: VoiceSetting[];
-  dubbing?: {
-    mode: "inherit" | "local";
-    area: VoiceRecommendationArea;
-    recommendation_order?: string[];
-  };
-}
+export type VoiceProfile = import("@tsz/types").VoiceProfileV3;
 
 export type TextRole = "body" | "definition" | "example";
 
@@ -297,6 +296,8 @@ export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
   /** 无障碍名，同时用于区分同一页面上的多个编辑器。 */
   contextLabel?: string;
   previewAdapter?: VoicePreviewAdapter;
+  /** Catalogue reads remain available when synthesis is disabled by the host. */
+  previewEnabled?: boolean;
   loadRecommendations?: LoadVoiceRecommendations;
   recommendationArea?: VoiceRecommendationArea;
   /** 宿主在首次创建时判断，避免折叠输入后打开编辑器丢失未配置状态。 */

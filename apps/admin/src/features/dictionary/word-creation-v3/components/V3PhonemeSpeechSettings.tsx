@@ -279,6 +279,7 @@ export function V3PhonemeSpeechSettings({
       />
       {open && (
         <VoiceEditorModal
+          width={1200}
           title={`${label} · 音标、停顿与音色`}
           open
           footer={null}
@@ -299,6 +300,10 @@ export function V3PhonemeSpeechSettings({
               locale={locale}
               language="en"
               contextLabel={`${label}音标编辑`}
+              inputDataAttributes={{
+                "data-v3-node-id": nodeId,
+                "data-v3-field": field
+              }}
               value={draft.content}
               onChange={(content) =>
                 setDraft((current) => {
@@ -337,9 +342,8 @@ export function V3PhonemeSpeechSettings({
               onVoiceProfileChange={(voice_profile) =>
                 setDraft((current) => ({ ...current, voice_profile }))
               }
-              previewAdapter={
-                env.VOICE_PREVIEW && source === sourceKey ? adapter : undefined
-              }
+              previewAdapter={adapter}
+              previewEnabled={env.VOICE_PREVIEW && source === sourceKey}
               previewIsMock={voicePreviewIsMock}
               renderActions={(canComplete) => (
                 <Space>

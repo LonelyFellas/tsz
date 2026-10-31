@@ -18,6 +18,7 @@ import {
   Typography
 } from "antd";
 import { SelectionPanel } from "./SelectionPanel";
+import { PoolVoiceName } from "./VoiceDisplay";
 import { voiceSettingFor, voiceSettingKey } from "../../core";
 import type { ReactNode } from "react";
 import { useRef, useState } from "react";
@@ -1060,6 +1061,174 @@ export function PausePanel({
           </Button>
         </div>
       )}
+    </div>
+  );
+}
+
+/** A single voice draft: no catalogue, selection controls or hidden parameter panels. */
+export function VoiceParameters({
+  voice,
+  setting,
+  readOnly,
+  onChange
+}: {
+  voice: VoiceOption;
+  setting: VoiceSetting;
+  readOnly?: boolean;
+  onChange: (patch: Partial<VoiceSetting>) => void;
+}) {
+  return (
+    <div className="tsz-ve-voice-parameters">
+      <section aria-label="常用参数">
+        <Typography.Title level={5}>常用参数</Typography.Title>
+        <PoolVoiceName voice={voice} fallback={voice.id} />
+        <Typography.Paragraph>
+          <Typography.Text code copyable>
+            {voice.providerVoiceId ?? voice.id}
+          </Typography.Text>
+        </Typography.Paragraph>
+        <Space wrap align="start">
+          <div>
+            <Typography.Text>语速</Typography.Text>
+            <VoiceRateControl
+              voice={voice}
+              ratePercent={setting.rate_percent}
+              readOnly={readOnly}
+              onChange={(rate_percent) => onChange({ rate_percent })}
+            />
+            <div>
+              <InputNumber
+                aria-label="当前音色语速"
+                min={(100 + (voice.rateRange?.min ?? -50)) / 100}
+                max={(100 + (voice.rateRange?.max ?? 100)) / 100}
+                step={0.01}
+                precision={2}
+                value={(100 + setting.rate_percent) / 100}
+                disabled={readOnly || !voice.supportsRate}
+                onChange={(rate) => {
+                  if (rate != null)
+                    onChange({ rate_percent: Math.round((rate - 1) * 100) });
+                }}
+              />
+            </div>
+            <Typography.Text type="secondary">
+              支持 {((100 + (voice.rateRange?.min ?? -50)) / 100).toFixed(2)}–
+              {((100 + (voice.rateRange?.max ?? 100)) / 100).toFixed(2)} 倍
+            </Typography.Text>
+          </div>
+          <label>
+            音量
+            <InputNumber
+              aria-label="当前音色音量"
+              min={0}
+              max={100}
+              precision={0}
+              suffix="%"
+              value={setting.volume_percent ?? 100}
+              disabled={readOnly || voice.supportsVolume === false}
+              onChange={(volume_percent) => {
+                if (volume_percent != null) onChange({ volume_percent });
+              }}
+            />
+          </label>
+        </Space>
+        {(!voice.supportsRate || voice.supportsVolume === false) && (
+          <Typography.Paragraph type="secondary">
+            不支持的参数保留原值，仅在有效请求中忽略。
+          </Typography.Paragraph>
+        )}
+      </section>
+      <section aria-label="其他参数">
+        <Typography.Title level={5}>其他参数</Typography.Title>
+        <Space wrap align="start">
+          <label>
+            说话风格
+            <Select
+              aria-label="当前音色风格"
+              value={setting.style ?? ""}
+              disabled={readOnly || !voice.styles.length}
+              style={{ width: 160 }}
+              options={[
+                { value: "", label: "默认" },
+                ...voice.styles.map((style) => ({
+                  value: style,
+                  label: style === "neutral" ? "默认" : style
+                })),
+                ...(setting.style && !voice.styles.includes(setting.style)
+                  ? [
+                      {
+                        value: setting.style,
+                        label: `${setting.style}（不支持，保留）`,
+                        disabled: true
+                      }
+                    ]
+                  : [])
+              ]}
+              onChange={(style) => onChange({ style: style || undefined })}
+            />
+          </label>
+          <label>
+            风格强度
+            <InputNumber
+              aria-label="当前音色风格强度"
+              min={0.01}
+              max={2}
+              step={0.01}
+              precision={2}
+              value={setting.style_degree}
+              disabled={
+                readOnly || voice.supportsStyleDegree !== true || !setting.style
+              }
+              onChange={(value) =>
+                onChange({ style_degree: value ?? undefined })
+              }
+            />
+          </label>
+          <label>
+            角色
+            <Select
+              aria-label="当前音色角色"
+              allowClear
+              value={setting.role}
+              style={{ width: 160 }}
+              disabled={readOnly || !voice.roles?.length || !setting.style}
+              options={[
+                ...(voice.roles ?? []).map((role) => ({
+                  value: role,
+                  label: role
+                })),
+                ...(setting.role && !voice.roles?.includes(setting.role)
+                  ? [
+                      {
+                        value: setting.role,
+                        label: `${setting.role}（保留）`,
+                        disabled: true
+                      }
+                    ]
+                  : [])
+              ]}
+              onChange={(role) => onChange({ role })}
+            />
+          </label>
+          <label>
+            音调（半音）
+            <InputNumber
+              aria-label="当前音色音调"
+              min={voice.pitchRange?.min ?? -12}
+              max={voice.pitchRange?.max ?? 12}
+              precision={0}
+              value={setting.pitch_semitones ?? 0}
+              disabled={readOnly || !voice.supportsPitch}
+              onChange={(pitch_semitones) => {
+                if (pitch_semitones != null) onChange({ pitch_semitones });
+              }}
+            />
+          </label>
+        </Space>
+        <Typography.Paragraph type="secondary">
+          参数能力未确认时不能合成；指定读法和停顿始终严格校验，正文标注不会被删除。
+        </Typography.Paragraph>
+      </section>
     </div>
   );
 }

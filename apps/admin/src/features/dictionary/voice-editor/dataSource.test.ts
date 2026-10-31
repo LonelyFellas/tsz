@@ -5,7 +5,7 @@ const state = vi.hoisted(() => ({
   profile: { id: "a", role: "super_admin", permissions: [] as string[] },
   voices: vi.fn(),
   preview: vi.fn(),
-  groups: vi.fn(),
+  groupsV3: vi.fn(),
   library: vi.fn(),
   audioUrl: vi.fn(),
   audioCreateUpload: vi.fn(),
@@ -19,7 +19,7 @@ vi.mock("@/lib/auth", () => ({
     speech: {
       voices: state.voices,
       preview: state.preview,
-      groups: state.groups,
+      groupsV3: state.groupsV3,
       library: state.library
     },
     audioAssets: {
@@ -29,6 +29,19 @@ vi.mock("@/lib/auth", () => ({
     }
   }
 }));
+
+function legacyResponse(response: {
+  groups: Array<Record<string, unknown>>;
+  [key: string]: unknown;
+}) {
+  return {
+    ...response,
+    groups: response.groups.map(({ uk, us, ...group }) => ({
+      ...group,
+      recommendations: { format: "legacy", uk: uk ?? [], us: us ?? [] }
+    }))
+  };
+}
 
 const CONTENT = { version: 2 as const, text: "hello", annotations: [] };
 
@@ -62,7 +75,7 @@ beforeEach(() => {
   state.env.ADMIN_TTS_MOCK = false;
   state.voices.mockReset();
   state.preview.mockReset();
-  state.groups.mockReset().mockResolvedValue({ groups: [], revision: 0 });
+  state.groupsV3.mockReset().mockResolvedValue({ groups: [], revision: 0 });
   state.library.mockReset().mockResolvedValue({ items: [] });
   state.audioUrl.mockReset().mockResolvedValue({
     url: "https://example.test/asset.mp3",
@@ -102,6 +115,79 @@ describe("admin voice preview data source", () => {
       expect(state.preview).toHaveBeenCalled();
     }
   );
+  it("v3配对推荐保留整套双侧身份和组内未选项，单侧正文也能查看完整推荐", async () => {
+    const voice = (id: string) => ({
+      id: `side-${id}`,
+      voice_alias: id,
+      parameters: {
+        rate_percent: -27,
+        pitch_semitones: 0,
+        volume_percent: 65,
+        style: null
+      }
+    });
+    state.groupsV3.mockResolvedValue({
+      revision: 1,
+      order_revision: 0,
+      groups: [
+        {
+          id: "g",
+          name: "适用组",
+          areas: ["word"],
+          is_global: false,
+          revision: 1,
+          recommendations: {
+            format: "paired",
+            pairs: [
+              {
+                id: "pair",
+                name: "同名",
+                selected: false,
+                uk: voice("sonia"),
+                us: voice("aria")
+              }
+            ]
+          }
+        }
+      ]
+    });
+    const { loadAdminVoiceRecommendations } = await import("./dataSource");
+    const result = await loadAdminVoiceRecommendations({
+      area: "word",
+      locale: "en-GB"
+    });
+    expect(
+      result.map(({ id, groupId, pairId, selected, locale }) => ({
+        id,
+        groupId,
+        pairId,
+        selected,
+        locale
+      }))
+    ).toEqual([
+      {
+        id: "side-sonia",
+        groupId: "g",
+        pairId: "pair",
+        selected: false,
+        locale: "en-GB"
+      },
+      {
+        id: "side-aria",
+        groupId: "g",
+        pairId: "pair",
+        selected: false,
+        locale: "en-US"
+      }
+    ]);
+    expect(
+      result.every(
+        (item) =>
+          item.setting.rate_percent === -27 &&
+          item.setting.volume_percent === 65
+      )
+    ).toBe(true);
+  });
   it("分组按账号共享缓存，选择音色不带入历史个人参数", async () => {
     state.library.mockResolvedValue({
       items: [
@@ -115,7 +201,7 @@ describe("admin voice preview data source", () => {
       await import("./dataSource");
     await loadAdminVoiceRecommendations({ area: "word" });
     await loadAdminVoiceRecommendations({ area: "meaning" });
-    expect(state.groups).toHaveBeenCalledTimes(1);
+    expect(state.groupsV3).toHaveBeenCalledTimes(1);
     const voices = await adminVoicePreviewAdapter.listVoices({
       language: "en"
     });
@@ -125,42 +211,44 @@ describe("admin voice preview data source", () => {
     state.profile = { ...state.profile, id: "another" };
     await loadAdminVoiceRecommendations({ area: "word" });
     await adminVoicePreviewAdapter.listVoices({ language: "en" });
-    expect(state.groups).toHaveBeenCalledTimes(2);
+    expect(state.groupsV3).toHaveBeenCalledTimes(2);
     expect(state.library).not.toHaveBeenCalled();
   });
 
   it("推荐按板块和口音加载，并复制完整声音参数", async () => {
-    state.groups.mockResolvedValue({
-      revision: 1,
-      groups: [
-        {
-          id: "g",
-          name: "释义",
-          areas: ["meaning"],
-          uk: [
-            {
-              id: "uk-rec",
-              name: "慢读",
-              voice_alias: "sonia",
-              parameters: {
-                rate_percent: -25,
-                pitch_semitones: 2,
-                volume_percent: 65,
-                style: "cheerful"
+    state.groupsV3.mockResolvedValue(
+      legacyResponse({
+        revision: 1,
+        groups: [
+          {
+            id: "g",
+            name: "释义",
+            areas: ["meaning"],
+            uk: [
+              {
+                id: "uk-rec",
+                name: "慢读",
+                voice_alias: "sonia",
+                parameters: {
+                  rate_percent: -25,
+                  pitch_semitones: 2,
+                  volume_percent: 65,
+                  style: "cheerful"
+                }
               }
-            }
-          ],
-          us: [
-            {
-              id: "us-rec",
-              name: "美式",
-              voice_alias: "guy",
-              parameters: { rate_percent: 0, pitch_semitones: 0, style: null }
-            }
-          ]
-        }
-      ]
-    });
+            ],
+            us: [
+              {
+                id: "us-rec",
+                name: "美式",
+                voice_alias: "guy",
+                parameters: { rate_percent: 0, pitch_semitones: 0, style: null }
+              }
+            ]
+          }
+        ]
+      })
+    );
     const { loadAdminVoiceRecommendations } = await import("./dataSource");
     const result = await loadAdminVoiceRecommendations({
       area: "meaning",
@@ -172,6 +260,7 @@ describe("admin voice preview data source", () => {
         name: "慢读",
         locale: "en-GB",
         groupName: "释义",
+        groupId: "g",
         setting: {
           voice_id: "sonia",
           enabled: true,
@@ -186,7 +275,7 @@ describe("admin voice preview data source", () => {
       []
     );
   });
-  it("按提交组顺序返回所有适用已选项，保留末尾全局供资格过滤后回退", async () => {
+  it("按提交组顺序返回完整候选及选用状态，保留末尾全局供解析方过滤回退", async () => {
     const recommendation = (id: string, selected: boolean) => ({
       id,
       name: id,
@@ -194,32 +283,37 @@ describe("admin voice preview data source", () => {
       voice_alias: id,
       parameters: { rate_percent: -27, pitch_semitones: 0, style: null }
     });
-    state.groups.mockResolvedValue({
-      revision: 4,
-      groups: [
-        {
-          id: "global",
-          name: "全局常用",
-          is_global: true,
-          areas: [],
-          uk: [recommendation("global-uk", true)],
-          us: [recommendation("global-us", true)]
-        },
-        {
-          id: "local",
-          name: "板块",
-          areas: ["word"],
-          uk: [recommendation("unselected", false)],
-          us: [recommendation("local-us", true)]
-        }
-      ]
-    });
+    state.groupsV3.mockResolvedValue(
+      legacyResponse({
+        revision: 4,
+        groups: [
+          {
+            id: "global",
+            name: "全局常用",
+            is_global: true,
+            areas: [],
+            uk: [recommendation("global-uk", true)],
+            us: [recommendation("global-us", true)]
+          },
+          {
+            id: "local",
+            name: "板块",
+            areas: ["word"],
+            uk: [recommendation("unselected", false)],
+            us: [recommendation("local-us", true)]
+          }
+        ]
+      })
+    );
     const { loadAdminVoiceRecommendations } = await import("./dataSource");
     expect(
       (await loadAdminVoiceRecommendations({ area: "word" })).map(
         (item) => item.id
       )
-    ).toEqual(["global-uk", "local-us", "global-us"]);
+    ).toEqual(["unselected", "local-us", "global-uk", "global-us"]);
+    expect(
+      (await loadAdminVoiceRecommendations({ area: "word" }))[0]
+    ).toMatchObject({ id: "unselected", selected: false });
     expect(
       (await loadAdminVoiceRecommendations({ area: "grammar" })).map(
         (item) => item.id

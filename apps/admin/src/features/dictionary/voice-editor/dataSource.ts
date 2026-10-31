@@ -45,8 +45,8 @@ export const loadAdminVoiceRecommendations: LoadVoiceRecommendations = async ({
   signal?.throwIfAborted();
   const actor = useAuthStore.getState().profile?.id;
   const response = await queryClient.fetchQuery({
-    queryKey: ["admin-dubbing-groups", actor],
-    queryFn: ({ signal }) => api.speech.groups(signal),
+    queryKey: ["admin-dubbing-groups-v3", actor],
+    queryFn: ({ signal }) => api.speech.groupsV3(signal),
     staleTime: refresh ? 0 : 60_000
   });
   signal?.throwIfAborted();
@@ -57,17 +57,36 @@ export const loadAdminVoiceRecommendations: LoadVoiceRecommendations = async ({
     ),
     ...response.groups.filter((item) => item.is_global)
   ];
-  return (["en-GB", "en-US"] as const)
-    .filter((value) => !locale || locale === value)
-    .flatMap((value) =>
-      applicable.flatMap((source) => {
+  return applicable.flatMap((source) =>
+    (["en-GB", "en-US"] as const)
+      .filter(
+        (value) =>
+          source.recommendations.format === "paired" ||
+          !locale ||
+          locale === value
+      )
+      .flatMap((value) => {
         const key = value === "en-GB" ? "uk" : "us";
-        const items = source[key].filter((item) => item.selected !== false);
+        const items =
+          source.recommendations.format === "paired"
+            ? source.recommendations.pairs.map((pair) => ({
+                ...pair[key],
+                name: pair.name,
+                selected: pair.selected,
+                pairId: pair.id
+              }))
+            : source.recommendations[key].map((item) => ({
+                ...item,
+                pairId: undefined
+              }));
         return items.map((item): VoiceRecommendation => ({
           id: item.id,
           name: item.name,
           locale: value,
           groupName: source.name,
+          groupId: source.id,
+          ...(item.pairId ? { pairId: item.pairId } : {}),
+          ...(item.selected !== undefined ? { selected: item.selected } : {}),
           setting: {
             voice_id: item.voice_alias,
             enabled: true,
@@ -86,7 +105,7 @@ export const loadAdminVoiceRecommendations: LoadVoiceRecommendations = async ({
           }
         }));
       })
-    );
+  );
 };
 
 export const adminVoicePreviewAdapter: VoicePreviewAdapter = {

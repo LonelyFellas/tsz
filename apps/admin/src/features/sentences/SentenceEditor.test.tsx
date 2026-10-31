@@ -167,12 +167,12 @@ describe("当前词条关联与离开保护", () => {
     show(
       <SentenceEditor sentence={current} onClose={vi.fn()} onSaved={vi.fn()} />
     );
-    await screen.findByRole("combobox", { name: "分组推荐" });
+    await screen.findByRole("radiogroup", { name: "局部推荐" });
     fireEvent.change(screen.getByLabelText("例句正文"), {
       target: { value: "A new sentence." }
     });
     await waitFor(() =>
-      expect(screen.getByLabelText("启用 Sonia")).toBeChecked()
+      expect(screen.getByLabelText("选用 Sonia")).toBeChecked()
     );
     expect(screen.getByLabelText("例句正文")).toHaveValue("A new sentence.");
     fireEvent.click(screen.getByLabelText("完成例句编辑"));
