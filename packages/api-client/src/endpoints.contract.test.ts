@@ -832,7 +832,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "6680916841855f8fb84abad6311ec8e19ef78e9c68f424bc0c97507197d9f284"
+      "ca88e558880f33412ec3bcea0933c71e73d3371c08059fbf09791e983ac90127"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1823,4 +1823,21 @@ it("拼写展示字段可选且不接受 null，三种地区变体复用 V2 契�
   expect(snapshot.schemas.V3ValidationIssueCode.enum).toContain(
     "spelling_rich_text_invalid"
   );
+});
+
+it("group ordering only accepts persisted IDs and its own revision", () => {
+  const operation = snapshot.operationSchemas["put /admin/speech/groups/order"];
+  expect(operation.request).toEqual({
+    $ref: "#/components/schemas/SaveDubbingGroupOrderRequest"
+  });
+  expect(operation.responses["200"]).toEqual({
+    $ref: "#/components/schemas/DubbingGroupsV3Response"
+  });
+  const schema = snapshot.schemas.SaveDubbingGroupOrderRequest;
+  expect(schema.additionalProperties).toBe(false);
+  expect(schema.required).toEqual(["group_ids", "base_revision"]);
+  expect(Object.keys(schema.properties).sort()).toEqual([
+    "base_revision",
+    "group_ids"
+  ]);
 });

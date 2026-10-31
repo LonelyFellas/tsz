@@ -186,7 +186,7 @@ describe("admin voice preview data source", () => {
       []
     );
   });
-  it("未选候选不作为默认，板块无已选时按口音回退全局常用", async () => {
+  it("按提交组顺序返回所有适用已选项，保留末尾全局供资格过滤后回退", async () => {
     const recommendation = (id: string, selected: boolean) => ({
       id,
       name: id,
@@ -219,7 +219,7 @@ describe("admin voice preview data source", () => {
       (await loadAdminVoiceRecommendations({ area: "word" })).map(
         (item) => item.id
       )
-    ).toEqual(["global-uk", "local-us"]);
+    ).toEqual(["global-uk", "local-us", "global-us"]);
     expect(
       (await loadAdminVoiceRecommendations({ area: "grammar" })).map(
         (item) => item.id

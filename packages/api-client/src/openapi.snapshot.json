@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dubbing-center/docs/openapi.json",
-  "_generatedAt": "2026-10-31T03:04:13.343Z",
+  "_generatedAt": "2026-10-31T04:10:35.764Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -128,6 +128,7 @@
     "/admin/speech/audio-updates/{id}/cancel": ["post"],
     "/admin/speech/audio-updates/{id}/retry": ["post"],
     "/admin/speech/groups": ["get", "post", "put"],
+    "/admin/speech/groups/order": ["put"],
     "/admin/speech/groups/{id}": ["delete", "put"],
     "/admin/speech/groups/{id}/audio-updates": ["get"],
     "/admin/speech/library": ["get"],
@@ -3242,6 +3243,19 @@
         "401": { "$ref": "#/components/schemas/ProblemDetails" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" },
         "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "put /admin/speech/groups/order": {
+      "request": {
+        "$ref": "#/components/schemas/SaveDubbingGroupOrderRequest"
+      },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/DubbingGroupsV3Response" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
         "409": { "$ref": "#/components/schemas/ProblemDetails" },
         "422": { "$ref": "#/components/schemas/ProblemDetails" }
       }
@@ -8372,6 +8386,19 @@
         "voice_profile": {
           "$ref": "#/components/schemas/VoiceProfileV3",
           "description": "缺省即「没配过」。未配置时不上 wire，存量内容重新序列化后逐字节不变。"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SaveDubbingGroupOrderRequest": {
+      "type": "object",
+      "description": "Only persisted identities participate; group content drafts are never accepted here.",
+      "required": ["group_ids", "base_revision"],
+      "properties": {
+        "base_revision": { "type": "integer", "format": "int64", "minimum": 0 },
+        "group_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" }
         }
       },
       "additionalProperties": false

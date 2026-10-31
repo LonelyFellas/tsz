@@ -183,7 +183,9 @@ export function DubbingGroups({
       ...Object.values(drafts).filter(
         (draft) => !groups.data!.groups.some((group) => group.id === draft.id)
       )
-    ]
+    ].sort(
+      (left, right) => Number(!!left.is_global) - Number(!!right.is_global)
+    )
   };
   const available = (locale: "uk" | "us") =>
     voices.filter(
@@ -289,7 +291,7 @@ export function DubbingGroups({
     } catch (cause) {
       setError(
         cause instanceof HttpError && cause.status === 409
-          ? "本组已被修改或板块已被占用，草稿已保留，请取消本组并重新载入。"
+          ? "本组已被修改或名称已被使用，草稿已保留，请取消本组并重新载入。"
           : "保存失败，本组草稿已保留，请重试。"
       );
     } finally {
@@ -300,7 +302,7 @@ export function DubbingGroups({
     modal.confirm({
       title: `删除「${group.name}」？`,
       content:
-        "删除后板块回退全局常用或合格默认，并安排继承草稿音频更新；已发布音频保持原样。",
+        "删除后按其他适用组的优先级或全局常用解析，并安排继承草稿音频更新；已发布音频保持原样。",
       okText: "删除分组",
       cancelText: "取消",
       onOk: async () => {
@@ -536,18 +538,11 @@ export function DubbingGroups({
                       aria-label={`${group.name} 使用板块`}
                       value={group.areas}
                       disabled={group.is_global}
-                      options={areas.map((area) => ({
-                        ...area,
-                        disabled: current.groups.some(
-                          (other) =>
-                            other.id !== group.id &&
-                            other.areas.includes(area.value)
-                        )
-                      }))}
+                      options={areas}
                       onChange={(value: string[]) =>
                         change(group.id, (item) => ({ ...item, areas: value }))
                       }
-                      placeholder="选择板块（已归属的板块需先移出）"
+                      placeholder="选择板块（可与其他组共用）"
                     />
                   ) : (
                     <Space size={[4, 4]} wrap>

@@ -1,5 +1,6 @@
 import type {
   AdminDubbingGroupsV3Response,
+  SaveAdminDubbingGroupOrderInput,
   SaveAdminPairedDubbingGroupInput
 } from "@tsz/types";
 import type { HttpClient } from "./http";
@@ -36,6 +37,10 @@ export function createDubbingGroupsV3Endpoints(http: HttpClient) {
             { headers }
           )
       ).then(decodeDubbingGroupsV3),
+    saveGroupOrder: (input: SaveAdminDubbingGroupOrderInput) =>
+      http
+        .put<unknown>("/speech/groups/order", input, { headers })
+        .then(decodeDubbingGroupsV3),
     deleteGroupV3: (id: string, base_revision: number) =>
       http
         .del<unknown>(

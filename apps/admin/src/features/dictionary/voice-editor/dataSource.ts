@@ -51,41 +51,42 @@ export const loadAdminVoiceRecommendations: LoadVoiceRecommendations = async ({
   });
   signal?.throwIfAborted();
   if (useAuthStore.getState().profile?.id !== actor) return [];
-  const group = response.groups.find((item) => item.areas.includes(area));
-  const global = response.groups.find((item) => item.is_global);
+  const applicable = [
+    ...response.groups.filter(
+      (item) => !item.is_global && item.areas.includes(area)
+    ),
+    ...response.groups.filter((item) => item.is_global)
+  ];
   return (["en-GB", "en-US"] as const)
     .filter((value) => !locale || locale === value)
-    .flatMap((value) => {
-      const key = value === "en-GB" ? "uk" : "us";
-      const local =
-        group?.[key].filter((item) => item.selected !== false) ?? [];
-      const source = local.length ? group : global;
-      const items = local.length
-        ? local
-        : (global?.[key].filter((item) => item.selected !== false) ?? []);
-      return items.map((item): VoiceRecommendation => ({
-        id: item.id,
-        name: item.name,
-        locale: value,
-        groupName: source!.name,
-        setting: {
-          voice_id: item.voice_alias,
-          enabled: true,
-          rate_percent: item.parameters.rate_percent,
-          pitch_semitones: item.parameters.pitch_semitones,
-          ...(item.parameters.volume_percent !== undefined
-            ? { volume_percent: item.parameters.volume_percent }
-            : {}),
-          ...(item.parameters.style ? { style: item.parameters.style } : {}),
-          ...(item.parameters.style_degree != null
-            ? { style_degree: item.parameters.style_degree }
-            : {}),
-          ...(item.parameters.role != null
-            ? { role: item.parameters.role }
-            : {})
-        }
-      }));
-    });
+    .flatMap((value) =>
+      applicable.flatMap((source) => {
+        const key = value === "en-GB" ? "uk" : "us";
+        const items = source[key].filter((item) => item.selected !== false);
+        return items.map((item): VoiceRecommendation => ({
+          id: item.id,
+          name: item.name,
+          locale: value,
+          groupName: source.name,
+          setting: {
+            voice_id: item.voice_alias,
+            enabled: true,
+            rate_percent: item.parameters.rate_percent,
+            pitch_semitones: item.parameters.pitch_semitones,
+            ...(item.parameters.volume_percent !== undefined
+              ? { volume_percent: item.parameters.volume_percent }
+              : {}),
+            ...(item.parameters.style ? { style: item.parameters.style } : {}),
+            ...(item.parameters.style_degree != null
+              ? { style_degree: item.parameters.style_degree }
+              : {}),
+            ...(item.parameters.role != null
+              ? { role: item.parameters.role }
+              : {})
+          }
+        }));
+      })
+    );
 };
 
 export const adminVoicePreviewAdapter: VoicePreviewAdapter = {

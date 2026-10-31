@@ -239,3 +239,9 @@ export interface AdminSpeechPreviewResponse {
   expires_at: string;
   url_expires_in_seconds: number;
 }
+
+/** Persisted group identities only; base_revision is order_revision. */
+export interface SaveAdminDubbingGroupOrderInput {
+  group_ids: string[];
+  base_revision: number;
+}

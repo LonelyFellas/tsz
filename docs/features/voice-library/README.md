@@ -1,6 +1,6 @@
 # 音色库需求与分批实施方案
 
-日期：2026-10-21，更新：2026-10-31。当前阶段：已完成 TASK#147 的 2026-10-30 附件与当前主线差异评估，用户已授权从第一批开始实施，交接状态见 13.12；当前改动未提交、推送、开 PR 或部署。第 12 节交付状态是当时记录，不代表当前远端或现网状态；本轮未核验部署 manifest。
+日期：2026-10-21，更新：2026-10-31。当前阶段：2026-10-30 新版第一批已合并，第二批「来源解析与任务」已完成本地实现和必要验证，详见 13.14。第二批已获审查、提交、推送、开 PR、跟进 CI 并在通过后合并的授权；完成后创建第三批新聊天。当前交付进行中，不部署、不回写禅道。第 12 节交付状态是历史记录，不代表当前远端或现网状态；本轮未核验部署 manifest。
 
 本文件是跨仓任务的唯一主记录。第 1–12 节保留历史范围、实施与验收依据；2026-10-30 新版的差异、用户确认与待实施规则以第 13 节为准，不将计划写成已完成。上一轮 TASK#147 A／B／当前资源可用的 C 已完成配套发布，回执见第 11 节；其中的提交、合并和部署授权不自动扩展至本轮新增范围。Neural HD／HD Omni 的资源可用性仍待当前环境核实。
 
@@ -874,3 +874,42 @@ Neural HD／Omni 当前可用性、未提供的支持语言／角色资料属于
 **脱敏清理回执**：先核实精确容器名、创建归属、ID 与仅本地绑定，再删除 `tsz-task147-contract-20261031-pg`（`2af0d033a1fc`）和 `tsz-task147-contract-20261031-redis`（`2324e870f34a`）及其两个专属匿名卷。独立 `docker container inspect`／`docker volume inspect` 确认资源不存在，包含全部临时 fixture／会话／任务／Redis 键；受限临时连接文件已删除。HTTP 服务随测试 JoinSet／进程退出，未遗留监听。本次没有新建 OSS／Azure 资源，没有修改其他容器或正常业务数据。
 
 兼容与余项：旧 v2／无头客户端可读候选 API；已配对组旧写／删被保护。候选前端现有 UI 仍走 v2；独立 v3 方法访问旧 API 会因缺少明确格式与顺序 revision 拒绝。新客户端＋新 API 已有契约／存储证据，浏览器页面与已部署版本组合尚未验收。第一批实际盘点仍缺现网证据，不自动整理线上历史数据。第二批继续在本任务工作区实施共享板块、独立排序、优先级和任务合并；页面／局部池／正式播放按 13.9 后续批次推进。
+
+### 13.14 第一批交付及第二批实施（2026-10-31）
+
+第一批现已交付，13.12–13.13 保留当时的现场记录：
+
+- 前端 [PR #625](https://github.com/LonelyFellas/tsz/pull/625) 已合并，main squash `921e87d2ce857c023a3576513a21e2b2e5d20971`。精确 PR head `67c059872064f7be715e39ee2052024a9c611ed0` 的 [CI run 41163647165](https://github.com/LonelyFellas/tsz/actions/runs/41163647165) 完整成功，含覆盖率合并和 verify；独立审查一轮，无确认缺陷。
+- 后端 [PR #358](https://github.com/LonelyFellas/tsz-rust/pull/358) 已合并，main squash `e75ddbc82de33b8217171c165d2f1475a8078799`。精确 PR head `84b1389da314022f145211bfceb1ff96fd2d2d61` 的 [CI run 41164921091](https://github.com/LonelyFellas/tsz-rust/actions/runs/41164921091) 完整成功；独立审查两轮，已修复历史迁移 fixture 调用新 repository 的问题。两个历史 fixture 继续只写对应旧 schema，不撤回该修复。
+- 本聊天重新 fetch，使用 `merge-base --is-ancestor` 确认两仓最新 `origin/main` 含上述 squash；没有将新 main CI 或部署状态推断为通过。
+
+第二批复用前端 `/Users/darwish/.codex/worktrees/b34c/tsz` 和后端 `/Users/darwish/Dev/tsz-core/.worktrees/backend/dubbing-center`。启动时均干净；各从上述最新 `origin/main` 新建 `codex/task147-oct30-priority`。当前来源为各仓 **基线 SHA + 工作区差异**，两仓由当前聊天唯一写入，不更动其他 checkout。
+
+范围与关键路径：复用配对身份、独立 `order_revision`、持久队列、租约、权限复核与最终效果 hash；实施共享板块 → 独立完整 ID 顺序命令 → 首个合格默认解析 → 跨组重叠任务合并 → 契约同步及隔离验证。批次估算沿用 13.9 的 2–3 人日；组布局和排序控件留在第三批，局部新池留在第四批，五入口统一保存及学习播放均不计本批完成。旧 local 空池继续历史语义，inherit 耗尽适用组与全局后不任取目录音色。
+
+已实现：
+
+- 普通组允许共享板块；保留组内去重、名称与身份校验、组数量上限、逐组 revision 以及已配对组的旧写／删保护。v3 读取和页面展示全局常用固定末位；创建按此插入，历史 legacy 不自动配对或丢弃侧项。
+- 新增 `PUT /admin/speech/groups/order`，请求仅为完整 `group_ids` 与 `base_revision`（独立 `order_revision`）；拒绝夹带内容字段、缺失／重复／未知 ID 与非末位全局。和创建／删除竞争以 409 拒绝过期顺序；与普通内容保存可各自成功，不推进其他组内容 revision。无变化重排不推进 revision 或重置任务窗口。返回提交前构造的严格 v3 快照，保留 paired／legacy 表示。
+- 后端和前端按已提交组优先级跳过空组、未选项、失效声音／参数，取首个合格组的首个合格项，耗尽后查全局。旧 `recommendation_order` 不再覆盖动态继承的组／项优先级。前端推荐加载保留所有适用组和末尾全局，使资格过滤发生后仍可继续找下一组；恢复推荐和首次选择使用相同过滤。原生 locale、人工口音、实际音素／停顿和模型能力继续独立校验，不删除指定发音来满足声音能力。无有效继承推荐时拒绝，不任取目录声音。旧 local 空池仍保留历史回退，局部独立配置和发布快照不随此转换。
+- 沿用持久任务与 worker：在配置事务内合并同测试作用域中所有传递重叠的 pending／running 任务，包含此前移出的 area；旧任务 superseded，新任务按最后状态重新等待，默认仍 60 秒。窗口使用取得配置锁后的数据库实时时钟，避免锁等待吃掉等待时长。跨组更晚任务同样阻止旧失败任务重试。既有权限／security_version、租约、最终重新解析、效果 hash、完整目标原子切换和发布引用保护继续生效；不新增任务系统。来源身份变更但效果相同也复用当前目标音频，纯名称、未改变有效默认、改回当前效果均不调用 TTS。
+- 后端原生全特性 OpenAPI 导出和显式 `OPENAPI_SOURCE` 完整同步完成。spec SHA-256 `ca88e558880f33412ec3bcea0933c71e73d3371c08059fbf09791e983ac90127`，runtime `_source_sha256` 一致，未扩大 PENDING。新增 SQL 为运行时查询，无 SQLx 宏缓存变化；没有新增 migration 或持久测试 target，既有历史迁移／回退拒绝回归保留。
+
+验证结果：
+
+- 前端 `pnpm --filter @tsz/api-client test`：35 文件 653 项通过。`pnpm --filter @tsz/voice-editor test`：28 文件 425 项通过；最后删除一处重复资格检查后，`VoiceEditor.test.tsx` 142 项与该文件 ESLint／Prettier 再次通过。Admin 的 `DubbingGroups`、`AddRecommendation`、`dataSource`、`adapter` 定向 4 文件 47 项通过。
+- `pnpm typecheck` 7 个任务、`pnpm lint` 7 个任务、`pnpm build` 的 Admin 与 Web 生产构建均通过。lint 只有既有两条 Next 整页跳转 warning；Web 本地构建保留未设生产站点域名的 SEO 提示。最后删除重复资格检查后，Admin 生产构建增量复验通过；未修改 Web 消费者。
+- 后端 `SQLX_OFFLINE=true CARGO_TARGET_DIR=/Users/darwish/Dev/tsz-core/tsz-rust/target cargo test --locked --lib --test speech_library --test speech_preview_handler --test speech_generated --no-default-features -- --test-threads=2`：464 项 lib、20 项 repository、11 项 handler、35 项 generated 全部通过（共 530 项）；随后新增的锁等待窗口回归 1 项，以及含加强跨组相同效果断言的 audio_updates 13 项定向复验均通过；合计 531 项不同 Rust 用例有通过证据。没有降低超时／断言，单机沿用受控并发 2；CI 的标准参数未改。fmt 与全 target／全 feature clippy 均通过，最后增量改动后的 clippy 再次通过。
+- 首轮确实发现新增路由漏登权限策略，已补齐；继承只取首项后，将旧多推荐原子切换 fixture 改为统一文本两侧声音，保留“第二侧失败则两侧都不切换、重试复用已就绪首侧”的断言；发布检查改为验证首项变化失效、名字或末尾推荐不改变有效默认。全局末位后修正了旧 fixture 的位置假设，没有删除历史迁移隔离或放宽保护。
+
+真实链路与边界：
+
+- 受控 HTTP handler 测试将当前源码 router 绑定本地动态端口并使用隔离 PG16，通过真实 reqwest POST／GET／PUT／DELETE 验证 paired 和单侧 legacy 共用板块、严格顺序命令／静态路由、401／422／409、内容与格式原样回读、原生 `en-SG` 自然朗读候选及指定音素时跳过至合格 `en-GB`。不通过 mock 服务自证契约。
+- 浏览器验收的 Admin 为前端当前工作区 Vite dev，入口 `http://127.0.0.1:30471/voices`；代理显式指向当前后端源码编译的临时验收 router `http://127.0.0.1:60648/api/v1`，使用 sqlx 专属迁移数据库及本批 Redis。`VITE_ADMIN_TTS_MOCK`、`VITE_ADMIN_WORDS_MOCK`、`VITE_ADMIN_PART_OF_SPEECH_MOCK` 均为 false；只有登录 OTP 使用本地测试 sender，未接外部短信。
+- `iab` 返回 `Browser is not available: iab`，浏览器清单仅有 Chrome 扩展入口；已说明原因后用主代理新建专用 Chrome 标签回退。真实登录 → 创建 A → A 保留改名草稿 → 创建并完成同样使用 `word` 的 B → A 草稿仍在 → 取消 A → 刷新重读，通过。独立数据库 SELECT 确认 A 名称仍为原值、A/B 均持久化 `word`、全局末位；队列为 A superseded、B pending。该页面服务器未启动合成 worker，不把待执行状态称为自动合成完成；执行、失败、迟到响应和权限撤销由受控 worker 回归证明。
+- 未调用 Azure／OSS；worker 测试为内存 provider／storage fixture，不计真实云语音或真实对象链通过。本批无 Web 播放变化，未启动 Web 服务或演练发布／播放。未连接现网盘点、未核验线上 manifest 或新 main CI；没有本批 PR／CI／部署。
+- 旧无头／v2 请求对候选 API 的真实读取、单侧写入和配对组拒写／删已验证；旧整表写仍 409。新排序方法只接新端点，不回退到内容保存。候选客户端对旧 API 的完整二进制／浏览器混合组合尚未演练，旧解析会返回全部推荐，不能宣称语义兼容；新版共享优先级／首项语义写入后不支持直接回退不认识这些语义的旧二进制。后续配套发布继续按兼容门禁核实，不以本地两仓通过替代线上组合验收。
+
+脱敏清理回执：核实精确容器 ID、任务标签、仅本地绑定与卷归属后，已删除 `tsz-task147-priority-20261031-pg`（`4a99905f0b3a`）及 `tsz-task147-priority-20261031-redis`（`81718bb90398`），包含所有 sqlx 临时库／失败 fixture、账号、会话、任务与 Redis 键。独立 inspect 确认两容器及匿名卷 `275c6f782cec128cbb6b1cf8ab3fe742887f34981c2bc5b43a0ff39e22cf36e4`、`09ead3db6db056016e2abd0ab8e18185daa3adf48cf91542fc8786003e04f26b` 均不存在。首次清理脚本在卷不存在错误文本大小写检查处中断，独立复查确认实际删除已成功，并完成剩余受限凭据／临时 fixture 文件移除；没有数据或凭据文件残留。临时浏览器 router 正常结束，临时 Rust 验收 target 已移除；Vite PID `38467` 按实际 cwd 核实后停止，30471／60648 无监听。正常共享 55446／56349 的两个既有容器仍在运行；没有云对象创建或清理动作。浏览器账号已退出、专用标签已关闭，登录表单已确认清空；CDP 不支持清除站点存储命令，无法确认本地静态缓存是否清除，**浏览器站点数据彻底清空未验证**。
+
+本批终点：两仓本地实现、受影响定向回归、最终质量检查、真实 HTTP／隔离页面持久化与服务端测试数据清理已完成；两仓保留未提交差异，最终 `git diff --check` 和全部前端变更文件 Prettier 检查通过。第三批分组配对布局／排序控件，第四批新版局部池及后续保存／学习播放仍未实施，不计本批完成。上述为本地实施结束时的授权边界；用户随后已授权本批审查、提交、推送、PR、CI 修复与全绿后合并，并创建新聊天推进第三批，仍不包含部署或禅道回写。审查轮次、精确 head、CI 与合并回执记入两仓关联 PR，第三批接续时同步至此主记录。

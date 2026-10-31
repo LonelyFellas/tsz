@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dubbing-center/docs/openapi.json",
-  "_source_sha256": "6680916841855f8fb84abad6311ec8e19ef78e9c68f424bc0c97507197d9f284",
+  "_source_sha256": "ca88e558880f33412ec3bcea0933c71e73d3371c08059fbf09791e983ac90127",
   "roots": [
     "DubbingGroupsV3Response",
     "LearningCapabilities",

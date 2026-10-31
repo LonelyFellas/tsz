@@ -737,7 +737,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         : { voices: voiceSettings },
       recommendations,
       voices,
-      locale
+      locale,
+      generationContent
     );
   }, [
     voiceProfile,
@@ -1056,8 +1057,17 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         return;
       }
       setRecommendations(items);
-      const first = items.find((item) => item.locale === accent);
-      if (!first || !isVoiceRecommendationAvailable(first, voices, accent)) {
+      const first = items.find(
+        (item) =>
+          item.locale === accent &&
+          isVoiceRecommendationAvailable(
+            item,
+            voices,
+            accent,
+            generationContent
+          )
+      );
+      if (!first) {
         setRecommendationError("当前口音没有可用的首位推荐，请检查分组设置。");
         return;
       }
@@ -1084,8 +1094,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
 
   const recommendationAvailable = useCallback(
     (item: VoiceRecommendation): boolean =>
-      isVoiceRecommendationAvailable(item, voices, locale),
-    [voices, locale]
+      isVoiceRecommendationAvailable(item, voices, locale, generationContent),
+    [voices, locale, generationContent]
   );
 
   useEffect(() => {
@@ -1104,7 +1114,18 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     }
     const first = (["en-GB", "en-US"] as const)
       .filter((accent) => !locale || accent === locale)
-      .map((accent) => recommendations.find((item) => item.locale === accent))
+      .map((accent) =>
+        recommendations.find(
+          (item) =>
+            item.locale === accent &&
+            isVoiceRecommendationAvailable(
+              item,
+              voices,
+              accent,
+              generationContent
+            )
+        )
+      )
       .filter((item): item is VoiceRecommendation => !!item);
     if (!voices.length) return;
     const usable = first.filter(recommendationAvailable);
