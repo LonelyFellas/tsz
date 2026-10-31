@@ -514,7 +514,9 @@ describe("按词条关联反查共享多维例句", () => {
       fireEvent.change(screen.getByLabelText("例句正文"), {
         target: { value: "We make up stories." }
       });
-      expect(save).toBeDisabled();
+    });
+    expect(save).toBeDisabled();
+    await act(async () => {
       fireEvent.change(
         screen.getAllByPlaceholderText("请输入对应的中文译文")[0]!,
         { target: { value: "我们编故事。" } }
