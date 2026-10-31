@@ -504,6 +504,10 @@ describe("新版局部主页和唯一声音草稿", () => {
       />
     );
     await screen.findByText(/音色归属与当前正文口音不符/);
+    expect(screen.getByRole("button", { name: /^试听 Alpha/ })).toHaveAttribute(
+      "data-accent",
+      "us"
+    );
     expect(onProfile).not.toHaveBeenCalled();
     expect(
       within(

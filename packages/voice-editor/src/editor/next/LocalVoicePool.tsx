@@ -262,8 +262,9 @@ export function LocalVoicePool({
     });
   }
   function preview(item: VoiceSetting, accent?: AudioAssetLocale) {
+    const catalogVoice = voices.find((v) => v.id === item.voice_id);
     const voice =
-      voices.find((v) => v.id === item.voice_id) ??
+      catalogVoice ??
       (item.audio_asset_id && item.locale
         ? {
             id: item.voice_id,
@@ -277,6 +278,9 @@ export function LocalVoicePool({
           }
         : undefined);
     if (!voice) return;
+    const currentAccent = catalogVoice
+      ? speechAccentGroup(catalogVoice.locale, catalogVoice.accent)
+      : "other";
     const available = isVoiceRecommendationAvailable(
       {
         id: voiceSettingKey(item),
@@ -294,6 +298,15 @@ export function LocalVoicePool({
         size="small"
         type="text"
         icon={<SoundOutlined />}
+        data-accent={currentAccent ?? "other"}
+        style={{
+          color:
+            currentAccent === "uk"
+              ? "#2053FF"
+              : currentAccent === "us"
+                ? "#FC007A"
+                : "#8c8c8c"
+        }}
         aria-label={`试听 ${voice.displayName ?? voice.label}${!accent && item.version_name ? ` · ${item.version_name}` : ""}`}
         disabled={
           !canAudition ||
@@ -414,7 +427,13 @@ export function LocalVoicePool({
               });
               return (
                 <section key={side.key} aria-label={`${side.label}已获取音色`}>
-                  <Typography.Text strong>{side.label}</Typography.Text>
+                  <Typography.Text
+                    className="tsz-ve-pool-side-title"
+                    data-accent={side.key}
+                    strong
+                  >
+                    {side.label}
+                  </Typography.Text>
                   <div className="tsz-ve-pool-row tsz-ve-pool-head">
                     <span>序号</span>
                     <span>概率</span>
@@ -751,7 +770,11 @@ export function LocalVoicePool({
                   key={key}
                   aria-label={`${side.label}${gender === "female" ? "女声" : "男声"}目录`}
                 >
-                  <Typography.Text strong>
+                  <Typography.Text
+                    className="tsz-ve-pool-side-title"
+                    data-accent={side.key}
+                    strong
+                  >
                     {side.label} · {gender === "female" ? "女声" : "男声"}
                   </Typography.Text>
                   <div

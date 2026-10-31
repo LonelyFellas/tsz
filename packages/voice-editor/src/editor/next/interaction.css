@@ -444,6 +444,24 @@
 .tsz-ve-local-pool > .ant-alert {
   margin-top: 16px;
 }
+.tsz-ve-local-pool .ant-typography.ant-typography-secondary,
+.tsz-ve-voice-parameters .ant-typography.ant-typography-secondary,
+.tsz-ve-local-pool .ant-input::placeholder {
+  color: #687181;
+}
+.tsz-ve-pool-side-title::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-inline-end: 6px;
+  border-radius: 50%;
+  background: #2053ff;
+  vertical-align: 0.1em;
+}
+.tsz-ve-pool-side-title[data-accent="us"]::before {
+  background: #fc007a;
+}
 .tsz-ve-local-pool .ant-input-search {
   width: 360px;
   max-width: 100%;
@@ -538,9 +556,31 @@
   min-width: 0;
 }
 .tsz-ve-pool-provider-id {
-  display: block;
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
   overflow-wrap: anywhere;
-  font-size: 11px;
+  font-size: 12px;
+}
+.tsz-ve-pool-provider-id code {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px;
+  font-size: inherit;
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+.tsz-ve-pool-provider-id .ant-typography-copy {
+  flex: none;
+  margin-inline-start: 0;
 }
 .tsz-ve-shared-name {
   display: inline-flex;
@@ -578,7 +618,7 @@
 }
 .tsz-ve-shared-number > small {
   margin-left: 0.2em;
-  font-size: 0.85em;
+  font-size: 12px;
 }
 .tsz-ve-voice-parameters section {
   padding: 12px;

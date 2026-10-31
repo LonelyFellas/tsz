@@ -5,7 +5,8 @@ import {
   fireEvent,
   render as rtlRender,
   screen,
-  waitFor
+  waitFor,
+  within
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -989,13 +990,18 @@ it("页面只读、弹窗编辑；多行正文、关联和设置往返不丢失"
   expect(observe).not.toHaveBeenCalled();
   expect(screen.getByLabelText("英文例句")).toHaveAttribute("readonly");
   fireEvent.click(screen.getByLabelText("打开英文例句编辑器"));
-  await screen.findByRole("toolbar", { name: "标注工具栏" });
-  expect(screen.getByRole("button", { name: "编辑文本" })).toBeInTheDocument();
-  expect(screen.getByLabelText("英文例句")).not.toHaveAttribute("readonly");
-  fireEvent.change(screen.getByLabelText("英文例句"), {
+  const editor = await screen.findByRole("dialog", { name: "编辑英文例句" });
+  await within(editor).findByRole("toolbar", { name: "标注工具栏" });
+  expect(
+    within(editor).getByRole("button", { name: "编辑文本" })
+  ).toBeInTheDocument();
+  expect(within(editor).getByLabelText("英文例句")).not.toHaveAttribute(
+    "readonly"
+  );
+  fireEvent.change(within(editor).getByLabelText("英文例句"), {
     target: { value: "oh hello\nthere" }
   });
-  fireEvent.click(screen.getByLabelText("完成英文例句编辑"));
+  fireEvent.click(within(editor).getByLabelText("完成英文例句编辑"));
   expect(screen.queryByRole("toolbar")).not.toBeInTheDocument();
   expect(screen.getByLabelText("英文例句")).toHaveValue("oh hello\nthere");
   expect(screen.getByLabelText("英文例句")).toHaveAttribute("readonly");
@@ -1010,13 +1016,19 @@ it("页面只读、弹窗编辑；多行正文、关联和设置往返不丢失"
     { start: 9, end: 14, surface: "there" }
   ]);
   fireEvent.click(screen.getByLabelText("打开英文例句编辑器"));
-  await screen.findByRole("toolbar", { name: "标注工具栏" });
-  expect(screen.getByLabelText("英文例句")).toHaveValue("oh hello\nthere");
-  fireEvent.click(await screen.findByLabelText("选用 Sonia"));
-  fireEvent.click(await screen.findByRole("button", { name: "修改 Sonia" }));
-  expect(await screen.findByLabelText("设置 Sonia 的语速")).toHaveTextContent(
-    "1.25×"
+  const reopened = await screen.findByRole("dialog", { name: "编辑英文例句" });
+  await within(reopened).findByRole("toolbar", { name: "标注工具栏" });
+  expect(within(reopened).getByLabelText("英文例句")).toHaveValue(
+    "oh hello\nthere"
   );
+  fireEvent.click(await within(reopened).findByLabelText("选用 Sonia"));
+  fireEvent.click(await within(reopened).findByLabelText("修改 Sonia"));
+  const voiceDetail = (await screen.findByLabelText("当前音色语速")).closest(
+    '[role="dialog"]'
+  ) as HTMLElement;
+  expect(
+    await within(voiceDetail).findByLabelText("设置 Sonia 的语速")
+  ).toHaveTextContent("1.25×");
   expect(document.querySelectorAll(".tsz-ve-letter.is-linked")).toHaveLength(5);
 });
 
@@ -1989,12 +2001,25 @@ it("弹窗新增关联后生成使用当前草稿关联，不读取打开前的�
     />
   );
   fireEvent.click(screen.getByRole("button", { name: "打开草稿关联编辑器" }));
-  fireEvent.click(await screen.findByRole("button", { name: "关联单词" }));
-  fireEvent.mouseDown(screen.getByLabelText("关联 hello（1）"), { button: 0 });
+  const editor = await screen.findByRole("dialog", { name: "编辑草稿关联" });
+  fireEvent.click(
+    await within(editor).findByRole("button", { name: "关联单词" })
+  );
+  fireEvent.mouseDown(within(editor).getByLabelText("关联 hello（1）"), {
+    button: 0
+  });
   fireEvent.click(await screen.findByText("关联此词"));
   expect(onChange).not.toHaveBeenCalled();
-  fireEvent.click(await screen.findByRole("button", { name: /^修改 / }));
-  const generate = screen.getByText("生成正式音频").closest("button")!;
+  const chosen = within(editor).getByRole("region", { name: "英式已获取音色" });
+  const editVoice = await within(chosen).findByLabelText("修改 自然");
+  await waitFor(() => expect(editVoice).toBeEnabled());
+  fireEvent.click(editVoice);
+  const voiceDetail = (await screen.findByLabelText("当前音色语速")).closest(
+    '[role="dialog"]'
+  ) as HTMLElement;
+  const generate = within(voiceDetail).getByRole("button", {
+    name: "生成正式音频"
+  });
   await waitFor(() => expect(generate).toBeEnabled());
   fireEvent.click(generate);
   await waitFor(() => expect(generatedLinks).toHaveLength(1));
