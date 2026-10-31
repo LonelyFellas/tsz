@@ -43,6 +43,8 @@ export function isVoiceRecommendationAvailable(
     content?.annotations.some(
       (mark) =>
         (mark.type === "pause" && voice.supportsPause === false) ||
+        (mark.type === "say_as" && voice.supportsSayAs === false) ||
+        (mark.type === "sub" && voice.supportsSub === false) ||
         (mark.type === "phoneme" &&
           (voice.supportsPhoneme === false ||
             voice.locale !== (locale ?? item.locale)))

@@ -373,6 +373,76 @@ it("折叠释义只复制有效口音的首位推荐，不回填失效推荐", a
   });
 });
 
+it.each(["后续适用组", "全局常用"])(
+  "折叠输入跳过失效首组并采用%s的首个合格推荐",
+  async (groupName) => {
+    state.recommendations.mockResolvedValue([
+      {
+        id: "invalid-first",
+        name: "失效",
+        groupName: "首组",
+        locale: "en-GB",
+        setting: { voice_id: "missing", enabled: true, rate_percent: 0 }
+      },
+      {
+        id: "usable",
+        name: "有效推荐",
+        groupName,
+        locale: "en-GB",
+        setting: { voice_id: "sonia", enabled: true, rate_percent: -25 }
+      },
+      {
+        id: "later",
+        name: "更后推荐",
+        groupName,
+        locale: "en-GB",
+        setting: { voice_id: "sonia", enabled: true, rate_percent: 0 }
+      }
+    ]);
+    const changed = vi.fn();
+    render(
+      <V3VoiceTextField
+        mode="spelling"
+        dialect="uk"
+        ariaLabel="优先级拼写"
+        field="spelling"
+        nodeId="priority-word"
+        value={{ version: 2, text: "", annotations: [] }}
+        onChange={vi.fn()}
+        onVoiceProfileChange={changed}
+      />
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText("优先级拼写")).not.toHaveAttribute(
+        "readonly"
+      )
+    );
+    fireEvent.change(screen.getByLabelText("优先级拼写"), {
+      target: { value: "hello" }
+    });
+    expect(changed).toHaveBeenCalledWith({
+      dubbing: {
+        mode: "inherit",
+        area: "word",
+        recommendation_order: ["usable"]
+      },
+      voices: [
+        {
+          voice_id: "sonia",
+          enabled: true,
+          rate_percent: -25,
+          version_id: "usable",
+          version_name: "有效推荐",
+          locale: "en-GB"
+        }
+      ]
+    });
+    expect(
+      screen.queryByText("部分首位推荐已失效，请打开编辑器选择其他音色。")
+    ).not.toBeInTheDocument();
+  }
+);
+
 it("切换节点后忽略上一节点迟到的默认推荐", async () => {
   let resolve!: (items: unknown[]) => void;
   let signal!: AbortSignal;

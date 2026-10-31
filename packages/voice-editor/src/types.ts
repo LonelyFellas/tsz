@@ -37,6 +37,8 @@ export interface VoiceOption {
   supportsVolume?: boolean;
   supportsPause?: boolean;
   supportsPhoneme?: boolean;
+  supportsSayAs?: boolean;
+  supportsSub?: boolean;
   supportsStyleDegree?: boolean;
   roles?: string[];
   isDefault: boolean;

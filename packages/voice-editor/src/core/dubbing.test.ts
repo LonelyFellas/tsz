@@ -197,6 +197,58 @@ describe("文本配音模式", () => {
       resolveRecommendedVoices(profile, items, options, "en-GB")[0]!.voice_id
     ).toBe("native");
   });
+  it.each([
+    { type: "sub" as const, start: 0, end: 3, alias: "kitten" },
+    {
+      type: "say_as" as const,
+      start: 0,
+      end: 3,
+      interpret_as: "characters" as const
+    }
+  ])(
+    "Flash 不支持 $type 时跳过该组，保留原标记并采用后续 Neural",
+    (annotation) => {
+      const profile: VoiceProfile = {
+        voices: [],
+        dubbing: { mode: "inherit", area: "word" }
+      };
+      const content = {
+        version: 2 as const,
+        text: "cat",
+        annotations: [annotation]
+      };
+      const options = [
+        {
+          ...voices[1]!,
+          id: "flash",
+          supportsRate: false,
+          supportsPitch: false,
+          supportsVolume: false,
+          supportsPause: false,
+          supportsPhoneme: false,
+          supportsSayAs: false,
+          supportsSub: false
+        },
+        voices[1]!
+      ];
+      const items = ["flash", "guy"].map((voice_id) => ({
+        id: voice_id,
+        name: voice_id,
+        groupName: voice_id,
+        locale: "en-US" as const,
+        setting: { voice_id, rate_percent: 0, enabled: true }
+      }));
+      expect(
+        resolveRecommendedVoices(profile, items, options, "en-US", content).map(
+          (item) => item.voice_id
+        )
+      ).toEqual(["guy"]);
+      expect(content.annotations).toEqual([annotation]);
+      expect(
+        resolveRecommendedVoices(profile, items, options, "en-US")[0]!.voice_id
+      ).toBe("flash");
+    }
+  );
   it("局部多版本优先，完整参数复制并保留稳定版本ID", () => {
     const local = localVoiceProfile(
       [
