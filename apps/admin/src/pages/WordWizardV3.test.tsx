@@ -43,6 +43,44 @@ import {
 } from "@/features/dictionary/word-creation-v3/fixtures";
 import { WordWizardV3Page, type V3MeaningsStepRenderer } from "./WordWizardV3";
 
+// 原有编排用例覆盖正文编辑器关闭时的手动草稿保存；默认编辑器的直接持久化另有下方回归。
+const voiceEditorMode = vi.hoisted(() => ({ enabled: false }));
+vi.mock("@/lib/env", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/env")>();
+  return {
+    ...actual,
+    env: {
+      ...actual.env,
+      get VOICE_EDITOR() {
+        return voiceEditorMode.enabled;
+      }
+    }
+  };
+});
+vi.mock("@/features/dictionary/voice-editor/dataSource", () => ({
+  adminVoicePreviewAdapter: {
+    listVoices: async () => [
+      {
+        id: "sonia",
+        label: "Sonia",
+        locale: "en-GB",
+        gender: "female",
+        styles: []
+      },
+      {
+        id: "jenny",
+        label: "Jenny",
+        locale: "en-US",
+        gender: "female",
+        styles: []
+      }
+    ]
+  },
+  loadAdminVoiceRecommendations: async () => [],
+  adminAudioUploadAdapter: undefined,
+  voicePreviewIsMock: false
+}));
+
 // 编辑用例使用超管，默认只读用例显式切换为普通管理员。
 const authMocks = vi.hoisted(() => ({
   profile: {
@@ -2957,3 +2995,97 @@ describe("WordWizardV3Page", () => {
     expect(screen.getByText("完成并进入预览").closest("button")).toBeVisible();
   });
 });
+
+it.each([false, true])(
+  "正文保存直接走完整业务请求，首次失败=%s 时保留并重试",
+  async (failFirst) => {
+    voiceEditorMode.enabled = true;
+    onTestFinished(() => {
+      voiceEditorMode.enabled = false;
+    });
+    const current = word();
+    const variants = current.forms.contents[0]!.regional_variants;
+    if (variants.mode !== "common") throw new Error("expected common fixture");
+    variants.common.spelling_speech = {
+      content: { version: 2, text: variants.common.spelling, annotations: [] },
+      voice_profile: {
+        dubbing: {
+          mode: "local",
+          area: "word",
+          pool_version: "provider_id_v1"
+        },
+        voices: [
+          {
+            voice_id: "sonia",
+            locale: "en-GB",
+            enabled: true,
+            rate_percent: -27
+          },
+          {
+            voice_id: "jenny",
+            locale: "en-US",
+            enabled: true,
+            rate_percent: -20
+          }
+        ]
+      }
+    };
+    const endpoints = source({ word: current, retired_stable_nodes: [] });
+    const save = vi
+      .mocked(endpoints.saveFormsStepV3)
+      .mockImplementation(async (_id, input) => ({
+        word: { ...current, revision: 2, forms: input.content }
+      }));
+    if (failFirst) save.mockRejectedValueOnce(new Error("保存失败请重试"));
+    renderPage(
+      `/words/${WORD_ID}/v3/wizard/forms`,
+      createV3WordRequests(endpoints)
+    );
+    const field = await openContentEditor();
+    fireEvent.click(
+      within(
+        field.closest<HTMLElement>(".v3-voice-text-field-compact")!
+      ).getByLabelText("打开词形英美通用拼写编辑器")
+    );
+    const toolbar = await screen.findByRole("toolbar", { name: "标注工具栏" });
+    const dialog = toolbar.closest('[role="dialog"]')! as HTMLElement;
+    await waitFor(() =>
+      expect(within(dialog).getByLabelText("选用 Sonia")).toBeChecked()
+    );
+    fireEvent.change(within(dialog).getByLabelText("词形英美通用拼写"), {
+      target: { value: "centre-saved" }
+    });
+    const button = within(dialog).getByLabelText("保存词形英美通用拼写修改");
+    fireEvent.click(button);
+    if (failFirst) {
+      await screen.findByText(
+        "保存未完成，全部修改已保留；请处理业务校验或版本冲突后重试。"
+      );
+      expect(within(dialog).getByLabelText("词形英美通用拼写")).toHaveValue(
+        "centre-saved"
+      );
+      fireEvent.click(button);
+    }
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(failFirst ? 2 : 1));
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
+    const payload = save.mock.calls[0]![1];
+    expect(payload).toMatchObject({
+      schema_version: 3,
+      base_revision: 1,
+      intent: "save"
+    });
+    if (!isSharedForms(payload.content))
+      throw new Error("expected shared save");
+    const stored = payload.content.contents[0]!.regional_variants;
+    if (stored.mode !== "common") throw new Error("expected common save");
+    expect(stored.common).toMatchObject({
+      spelling: "centre-saved",
+      spelling_speech: {
+        content: { version: 2, text: "centre-saved" },
+        voice_profile: variants.common.spelling_speech.voice_profile
+      }
+    });
+    if (failFirst) expect(save.mock.calls[1]![1]).toEqual(payload);
+    expect(endpoints.previewFormsImpactV3).not.toHaveBeenCalled();
+  }
+);

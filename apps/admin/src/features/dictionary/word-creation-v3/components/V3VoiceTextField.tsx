@@ -31,6 +31,7 @@ import { flushSync } from "react-dom";
 import { Alert, Button, Input, Space, message } from "antd";
 import {
   type ReactNode,
+  type RefObject,
   Suspense,
   lazy,
   useCallback,
@@ -71,6 +72,7 @@ export interface V3VoiceTextFieldProps<
   onDone?: () => void;
   onCommit?: (result: VoiceEditResult<TLink>) => void;
   onSave?: () => Promise<boolean>;
+  saveActionRef?: RefObject<(() => Promise<boolean>) | null>;
   onCancel?: () => void;
   doneLoading?: boolean;
   doneDisabled?: boolean;
@@ -131,6 +133,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   onDone,
   onCommit,
   onSave,
+  saveActionRef,
   onCancel,
   doneLoading,
   doneDisabled,
@@ -389,7 +392,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   };
   const completeEditing = async (
     capture?: (forSave?: boolean) => VoiceEditResult<TLink>
-  ) => {
+  ): Promise<boolean> => {
     if (
       savingRef.current ||
       doneLoading ||
@@ -397,7 +400,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       readOnly ||
       draftState.nodeId !== nodeId
     )
-      return;
+      return false;
     const target = nodeId;
     savingRef.current = true;
     setSaving(true);
@@ -468,24 +471,26 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           ? () => saveRef.current.businessSave!.save(area)
           : undefined);
       if (persist && !(await persist())) {
-        if (activeTarget.current !== target) return;
+        if (activeTarget.current !== target) return false;
         setSaveError(
           "保存未完成，全部修改已保留；请处理业务校验或版本冲突后重试。"
         );
-        return;
+        return false;
       }
-      if (activeTarget.current !== target) return;
+      if (activeTarget.current !== target) return false;
       setDraftState(next);
       setSavedTarget(persist ? target : null);
       if (onDone) onDone();
       else if (showDone) setEditing(false);
+      return true;
     } catch (error) {
-      if (activeTarget.current !== target) return;
+      if (activeTarget.current !== target) return false;
       setSaveError(
         error instanceof Error
           ? error.message
           : "保存失败，全部修改已保留，请重试"
       );
+      return false;
     } finally {
       savingRef.current = false;
       setSaving(false);
@@ -780,6 +785,12 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           <EditorPendingState
             pending={!canComplete}
             onChange={onDraftPendingChange}
+            saveActionRef={saveActionRef}
+            save={async () =>
+              canComplete && prepareComplete()
+                ? completeEditing(captureResult)
+                : false
+            }
           />
         )}
         <Space className="v3-voice-text-editor-done" size={6}>
@@ -939,11 +950,22 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
 // renderActions 在子编辑器渲染时调用，提交限制通过 effect 通知宿主。
 function EditorPendingState({
   pending,
-  onChange
+  onChange,
+  saveActionRef,
+  save
 }: {
   pending: boolean;
   onChange?: (pending: boolean) => void;
+  saveActionRef?: RefObject<(() => Promise<boolean>) | null>;
+  save?: () => Promise<boolean>;
 }) {
+  useLayoutEffect(() => {
+    if (!saveActionRef) return;
+    saveActionRef.current = save ?? null;
+    return () => {
+      saveActionRef.current = null;
+    };
+  }, [save, saveActionRef]);
   useEffect(() => {
     onChange?.(pending);
     return () => onChange?.(false);

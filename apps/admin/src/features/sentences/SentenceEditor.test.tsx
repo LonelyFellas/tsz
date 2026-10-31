@@ -813,3 +813,124 @@ it("仅关联账号打开本人例句，正文、等级和译文不可改，关�
   expect(screen.queryByLabelText("编辑文本")).toBeNull();
   expect(screen.queryByLabelText("音频")).toBeNull();
 });
+
+it.each([
+  ["registered", true],
+  ["registered", false],
+  ["router", true],
+  ["router", false]
+] as const)(
+  "例句 %s 离开保存复用正文快照与有效池校验，配置有效=%s",
+  async (kind, configured) => {
+    const item = example();
+    if (item.content.sentence.en_text.mode !== "unified")
+      throw new Error("expected unified fixture");
+    item.content.sentence.en_text.common.voice_profile = {
+      dubbing: {
+        mode: configured ? "inherit" : "local",
+        area: "example",
+        pool_version: "provider_id_v1"
+      },
+      voices: []
+    };
+    if (configured)
+      speech.recommendations.mockResolvedValue([
+        {
+          id: "leave-uk",
+          name: "英式",
+          groupName: "例句",
+          locale: "en-GB",
+          setting: { voice_id: "sonia", enabled: true, rate_percent: -27 }
+        },
+        {
+          id: "leave-us",
+          name: "美式",
+          groupName: "例句",
+          locale: "en-US",
+          setting: { voice_id: "jenny", enabled: true, rate_percent: -20 }
+        }
+      ]);
+    vi.mocked(api.sentences.update).mockImplementation(async (_id, input) => ({
+      ...item,
+      revision: 4,
+      content: input.content
+    }));
+    let leave: (() => Promise<boolean>) | undefined;
+    const router = createMemoryRouter([
+      {
+        path: "/",
+        element: (
+          <>
+            <Link to="/next">离开例句</Link>
+            <SentenceEditor
+              sentence={item}
+              registerLeaveGuard={
+                kind === "registered"
+                  ? (guard) => {
+                      leave = guard;
+                    }
+                  : undefined
+              }
+              onClose={vi.fn()}
+              onSaved={vi.fn()}
+            />
+          </>
+        )
+      },
+      { path: "/next", element: <div>例句保存后页面</div> }
+    ]);
+    show(<RouterProvider router={router} />);
+    await screen.findByRole("toolbar", { name: "标注工具栏" });
+    if (configured)
+      await waitFor(() =>
+        expect(screen.getByLabelText("选用 Sonia")).toBeChecked()
+      );
+    fireEvent.change(
+      screen.getAllByPlaceholderText("请输入对应的中文译文")[0]!,
+      {
+        target: { value: "离开时保留全部修改" }
+      }
+    );
+    let outcome: Promise<boolean> | undefined;
+    if (kind === "registered")
+      act(() => {
+        outcome = leave!();
+      });
+    else fireEvent.click(screen.getByText("离开例句"));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "保存例句后离开" })
+    );
+    if (configured) {
+      await waitFor(() => expect(api.sentences.update).toHaveBeenCalledOnce());
+      expect(vi.mocked(api.sentences.update).mock.calls[0]![1]).toMatchObject({
+        base_revision: 3,
+        content: {
+          sentence: {
+            en_text: {
+              common: {
+                voice_profile: {
+                  dubbing: { mode: "local", pool_version: "provider_id_v1" },
+                  voices: [
+                    { voice_id: "sonia", rate_percent: -27 },
+                    { voice_id: "jenny", rate_percent: -20 }
+                  ]
+                }
+              }
+            },
+            zh_translations: [{ content: { text: "离开时保留全部修改" } }]
+          }
+        }
+      });
+      if (outcome) expect(await outcome).toBe(true);
+      else await screen.findByText("例句保存后页面");
+    } else {
+      await screen.findByText(/英式没有实际可用的已选音色/);
+      expect(api.sentences.update).not.toHaveBeenCalled();
+      expect(
+        screen.getByDisplayValue("离开时保留全部修改")
+      ).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe("/");
+      if (outcome) expect(await outcome).toBe(false);
+    }
+  }
+);

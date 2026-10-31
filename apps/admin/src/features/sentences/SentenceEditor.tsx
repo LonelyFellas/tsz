@@ -133,6 +133,21 @@ export function SentenceEditor({
     )
   );
   const [saving, setSaving] = useState(false);
+  const saveActionRef = useRef<(() => Promise<boolean>) | null>(null);
+  const afterLeaveSave = useRef<(() => void) | undefined>(undefined);
+  const saveBeforeLeave = async (afterSave?: () => void) => {
+    let accepted = false;
+    afterLeaveSave.current = () => {
+      accepted = true;
+      afterSave?.();
+    };
+    try {
+      // 成功回调可能立即卸载编辑器；离开结果以业务保存成功为准。
+      return ((await saveActionRef.current?.()) ?? false) || accepted;
+    } finally {
+      afterLeaveSave.current = undefined;
+    }
+  };
   const [dialect, setDialect] = useState<Dialect>("common");
   const [pendingAnnotation, setPendingAnnotation] = useState(false);
   const [error, setError] = useState("");
@@ -343,7 +358,7 @@ export function SentenceEditor({
                           footer: null,
                           content: "正在保存例句…"
                         });
-                        const saved = await finish();
+                        const saved = await saveBeforeLeave();
                         dialog.destroy();
                         resolve(saved === true);
                       }}
@@ -443,7 +458,7 @@ export function SentenceEditor({
               dirty={dirty}
               saving={saving}
               canSave={canSave}
-              save={finish}
+              save={saveBeforeLeave}
             />
           )}
           <Flex justify="space-between" align="center">
@@ -602,7 +617,10 @@ export function SentenceEditor({
               mode="association"
               presentation="editor"
               showDone={false}
-              onSave={() => finish().then((value) => value === true)}
+              saveActionRef={saveActionRef}
+              onSave={() =>
+                finish(afterLeaveSave.current).then((value) => value === true)
+              }
               doneLoading={saving}
               doneDisabled={conflict || !allowed || !canSave}
               onCommit={(result) =>
