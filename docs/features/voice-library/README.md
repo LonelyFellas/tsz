@@ -1,6 +1,6 @@
 # 音色库需求与分批实施方案
 
-日期：2026-10-21，更新：2026-10-31。当前阶段：2026-10-30 新版第一、二、三批已合并；第三批最终回执见 13.17。第四批「局部池与详情页」已完成本地实施，现按授权同步主线、重新生成契约并进入独立审查／提交／PR／精确 CI／合并，见 13.19。全绿合并后另开聊天推进第五批；不部署、不回写禅道。第 12 节及此前的阶段状态保留为历史记录，不代表现网版本。
+日期：2026-10-21，更新：2026-10-31。当前阶段：2026-10-30 新版第四批已合并；合并前 PR CI、合并后 main push CI 超时及后续修复分别记录于 13.19，不将 PR 全绿外推为 main 全绿。第五批本地改动保留在独立工作区，不包含在本次 CI 修复中；不部署、不回写禅道。第 12 节及此前阶段状态保留为历史，不代表现网版本。
 
 本文件是跨仓任务的唯一主记录。第 1–12 节保留历史范围、实施与验收依据；2026-10-30 新版的差异、用户确认与待实施规则以第 13 节为准，不将计划写成已完成。上一轮 TASK#147 A／B／当前资源可用的 C 已完成配套发布，回执见第 11 节；其中的提交、合并和部署授权不自动扩展至本轮新增范围。Neural HD／HD Omni 的资源可用性仍待当前环境核实。
 
@@ -1056,3 +1056,17 @@ CI 修复保持全部用例、输入、流程断言、覆盖率和 5000ms 原时
 admin-2 最终首轮结果与补验：该分片另有 IPA／UPS 两条本批改动的完整生成流程超过原 5000ms。按同样 coverage／单 worker 配置本地也复现 5512／5068ms；同样只收窄至当前设置器与唯一声音详情的查询，原输入、用户操作、请求与资产断言、5000ms 均保留，修正后为 1108／649ms 并通过。分片中的既有 Wizard publication-issue 定位用例也一次超时；文件在 origin/main 与本批 head 的 blob 均为 `11f85f1ff68c510a566f007ea3e6342c814d41e4`（与第三批相同），未改该文件。同 CI coverage／单 worker 配置下原用例 1119ms 通过；后续 CI 仍须核对该整片实际结果，不把本地通过视为远端全绿。
 
 真实详情弹层的最终视觉检查发现 Portal 中的顶部保存范围／录音说明仍沿用 AntD 默认浅灰；已将既有说明色作用域延伸到该详情弹层，保持内容与交互不变，避免主池可读而详情说明对比度不足。
+
+第四批合并后 main CI 失败与修复（2026-10-31，用户截图后核实）：
+
+- 精确 main SHA `8d1793678c973792fb9720dd05bfd26b3f3c74df` 的 [push run 41190707974](https://github.com/LonelyFellas/tsz/actions/runs/41190707974) attempt 1 failure。直接失败是 admin-2 中 `V3WordCreationWizard > routes a meanings publication issue to its POS and backend text-variant locator` 超过原 5000ms；该分片其余 727 项通过。coverage-merge 复现同一 blob 失败，verify 因依赖失败而失败，不是三个独立根因。quality 及其他分片成功，不将其发行包视为完整 CI 验收通过。
+- 既有第四批 PR #629 的精确 head `9a029038146f2be850b4f5e583a24b192c5f6ff4` run `41189921969` attempt 1 全绿及 squash 合并事实仍成立，但不能外推为上述 main 全绿。历史 PR 失败和取消记录保留，后续实际 PR／main 结果分别补记。
+- 复用主记录，不重新评估功能。fetch 后从同一 origin/main 建立独立 `/Users/darwish/.codex/worktrees/task147-main-ci/tsz`、`codex/task147-main-ci`。第五批两仓未提交差异保留在原工作区，没有混入本次修复。
+- 原代码同 CI coverage／单 worker 配置下 Wizard 全文件 118 项通过，一次原生分片诊断运行 54 文件／728 项通过，但该运行期间后续探针改动了辅助文件，故不将它归为纯 main 基线或最终验证；远端失败证据仍有效。最终文件冻结后重新运行完整分片。分段计时约 1.22 秒，首次编辑器步骤约 0.59 秒；CPU 采样显示全页 label 查询和重复轮询占明显开销。仅预加载真实模块或仅关闭动画没有稳定收益，探针已撤回，未改生产组件。
+- 修复保留真实编辑器、原输入／用户步骤／业务断言和原 5000ms：测试助手在异步 act 中等待实际懒加载资源，按当前字段／弹窗收窄查询，并以公开 role＋aria-label 等待唯一工具栏，避免轮询全页 label 关联。定位用例按实际 tabpanel／sense 查字段，最后断言同一个真实输入节点获得焦点、内容未丢；不放宽语义、不换 mock、不增加重试或超时、不改变 CI／覆盖率配置。
+- 保留受控调度实验：仅对本任务新测试进程以约 20% 活跃时间施加 SIGSTOP/SIGCONT 调度压力，两版都触及原 5000ms（原查询约 6.76 秒，单独 selector／异步资源／最终组合分别仍有约 5.19／5.18／5.17 秒超时）。这是本地压力诊断，不能冒充 GitHub 环境或记为通过；不将调低压力后的成功用于替代正常 CI 门禁。正常配置下最终目标用例约 976ms 通过；完整消费者回归及精确远端 CI 仍需继续核实。
+
+- 最终正常配置回归：目标用例约 976ms；五个直接消费者（Wizard、Meanings、PronunciationList、Forms、WordWizard 页面）在相同 coverage／单 worker 下 387 项通过。原始辅助函数和 Wizard 用例备份用于诊断前后比对，所有临时计时／CPU profiler 探针均已撤回。完整最终 admin-2、正常 hooks、精确提交独立审查和远端 PR／main CI 的结果分别记录，不将本地通过当作远端通过。
+
+- 冻结后的最终原生 admin-2 coverage 分片 54 文件／728 项全部通过；运行前后 apps/admin 差异 SHA-256 均为 `ad8ee1218a11f2ab59ecf60f74192f804eb7ad9349e034578aa0092388edd173`。消费者 387 项、定向 ESLint、全部改动 Prettier 和 diff 检查通过；生产源码／接口／依赖／timeout／CI 配置均未改，后续由原生 hooks 承接类型检查，远端 CI 单独验收。
+- 同时补核后端合并后 main：`a1399cc3288fa34a82e7399ef83939dcaafddc54` 的 [run 41189799840](https://github.com/LonelyFellas/tsz-rust/actions/runs/41189799840) attempt 1 cancelled，lexicon-pagination 触及 job 的 20 分钟窗口，最后停留在 251 词条／2008 候选分页回归；其余测试、构建和制品校验成功，两个汇总门因未通过分片而失败。未将 cancelled 记为成功。独立后端 `/Users/darwish/.codex/worktrees/task147-main-ci-backend/tsz-rust` 从同一 main 开始调查，不混入第五批后端差异。

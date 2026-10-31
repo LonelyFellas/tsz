@@ -28,6 +28,7 @@ import {
   fireEvent,
   render,
   screen,
+  within,
   waitFor
 } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -2840,17 +2841,25 @@ describe("V3WordCreationWizard", () => {
     );
     expect(secondTab).not.toBeNull();
     fireEvent.click(secondTab!);
-    const secondSenseHeader = screen
+    const secondPanel = container.querySelector<HTMLElement>(
+      `[id="${secondTab!.getAttribute("aria-controls")}"]`
+    );
+    expect(secondPanel).not.toBeNull();
+    const secondSenseHeader = within(secondPanel!)
       .getByText(/^2\./u)
       .closest<HTMLElement>('[role="button"]');
     expect(secondSenseHeader).not.toBeNull();
     fireEvent.click(secondSenseHeader!);
-    await changeVoiceText(screen.getByLabelText("定义 1 英美通用内容"), {
-      target: { value: "local unsaved" }
-    });
     const secondSense = secondSenseHeader!.closest<HTMLElement>(
       '[data-v3-node-id="meaning-sense-2"]'
     );
+    expect(secondSense).not.toBeNull();
+    const definitionInput = within(secondSense!).getByLabelText(
+      "定义 1 英美通用内容"
+    );
+    await changeVoiceText(definitionInput, {
+      target: { value: "local unsaved" }
+    });
     const collapseDefinitions = secondSense?.querySelector<HTMLElement>(
       'button[aria-label="收起多维释义"]'
     );
@@ -2865,9 +2874,7 @@ describe("V3WordCreationWizard", () => {
 
     fireEvent.click(screen.getByText("定位词义"));
 
-    await waitFor(() =>
-      expect(screen.getByLabelText("定义 1 英美通用内容")).toHaveFocus()
-    );
+    await waitFor(() => expect(definitionInput).toHaveFocus());
     expect(secondTab).toHaveAttribute("aria-selected", "true");
     expect(
       container.querySelector(
@@ -2875,9 +2882,7 @@ describe("V3WordCreationWizard", () => {
       )
     ).toHaveAttribute("aria-expanded", "false");
     expect(secondSenseHeader).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByLabelText("定义 1 英美通用内容")).toHaveValue(
-      "local unsaved"
-    );
+    expect(definitionInput).toHaveValue("local unsaved");
   });
 
   it("completes forms before meanings with the accepted canonical revision and exact live drafts", async () => {
