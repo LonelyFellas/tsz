@@ -102,6 +102,21 @@ export function V3LinkedEnglishTextField({
             nodeId={row.variant_id}
             field="value"
             readOnly={readOnly}
+            onCommit={(result) =>
+              update(row.dialect, {
+                ...(!readOnly
+                  ? {
+                      value: result.value,
+                      reading_links: result.readingLinks,
+                      voice_profile: result.voiceProfile,
+                      audio_assets: result.audioAssets
+                    }
+                  : {}),
+                ...(linksEnabled || variant.text_links
+                  ? { text_links: result.textLinks }
+                  : {})
+              })
+            }
             voiceProfile={variant.voice_profile}
             onVoiceProfileChange={(voice_profile) =>
               update(row.dialect, { voice_profile })

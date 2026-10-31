@@ -1,3 +1,4 @@
+import { useVoiceSave } from "./voiceSaveContext";
 import { confirmedPublicationAudioFixture } from "../PublicationAudioReviewPanel.test-helper";
 import { expandFormContents } from "@tsz/shared";
 import {
@@ -7238,4 +7239,31 @@ it("仅关联保存不自动拆分已有通用语法变体或重建节点", asyn
       JSON.parse(screen.getByTestId("association-draft").textContent!)
     ).toEqual(toWritableMeanings(saved.meanings))
   );
+});
+
+it("局部词义保存只发一次有 revision 的聚合请求，保留另一步词形草稿", async () => {
+  const source = requests();
+  function LocalSave() {
+    const save = useVoiceSave();
+    return (
+      <button onClick={() => void save!.save("grammar")}>保存局部语法</button>
+    );
+  }
+  renderWizard(source, {
+    renderStep: (context) => (
+      <>
+        <Slot context={context} />
+        <LocalSave />
+      </>
+    )
+  });
+  fireEvent.click(screen.getByText("编辑"));
+  fireEvent.click(screen.getByText("保存局部语法"));
+  await waitFor(() => expect(source.saveMeanings).toHaveBeenCalledOnce());
+  expect(source.saveForms).not.toHaveBeenCalled();
+  expect(vi.mocked(source.saveMeanings).mock.calls[0]![1]).toMatchObject({
+    base_revision: 1,
+    intent: "save"
+  });
+  expect(screen.getByTestId("spelling")).toHaveTextContent("local edit");
 });

@@ -258,6 +258,14 @@ export type VoiceProfile = import("@tsz/types").VoiceProfileV3;
 
 export type TextRole = "body" | "definition" | "example";
 
+export interface VoiceEditResult<TLink extends VoiceAssociation = TextLinkV3> {
+  value: RichText;
+  textLinks?: TLink[];
+  readingLinks?: import("@tsz/types").GrammarFormLinkV3[];
+  voiceProfile?: VoiceProfile | null;
+  audioAssets?: AudioAsset[];
+}
+
 export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
   /** 正文字重按用途呈现，不改变标注的存储格式。 */
   textRole?: TextRole;
@@ -289,7 +297,8 @@ export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
   /** prepareComplete normalizes spelling through the editor history; false asks the user to review. */
   renderActions?: (
     canComplete: boolean,
-    prepareComplete?: () => boolean
+    prepareComplete?: () => boolean,
+    captureResult?: (forSave?: boolean) => VoiceEditResult<TLink>
   ) => ReactNode;
   value: RichText;
   language?: string;

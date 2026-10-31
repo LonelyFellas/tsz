@@ -1,3 +1,4 @@
+import { useVoiceSave } from "../voiceSaveContext";
 import { usePermission } from "@/lib/auth";
 import { ConfigProvider } from "antd";
 import { useContentEditPermissions } from "../../contentEditPermissions";
@@ -13,7 +14,8 @@ import type {
 } from "@tsz/types";
 import type {
   VoiceAssociation,
-  VoiceEditorProps
+  VoiceEditorProps,
+  VoiceEditResult
 } from "@tsz/voice-editor/types";
 import {
   editRichText,
@@ -67,6 +69,8 @@ export interface V3VoiceTextFieldProps<
   TLink extends VoiceAssociation = TextLinkV3
 > {
   onDone?: () => void;
+  onCommit?: (result: VoiceEditResult<TLink>) => void;
+  onSave?: () => Promise<boolean>;
   onCancel?: () => void;
   doneLoading?: boolean;
   doneDisabled?: boolean;
@@ -125,6 +129,8 @@ export interface V3VoiceTextFieldProps<
 // 错误定位属性仅挂在当前编辑入口，避免弹窗与页面出现重复锚点。
 export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   onDone,
+  onCommit,
+  onSave,
   onCancel,
   doneLoading,
   doneDisabled,
@@ -167,6 +173,26 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   onChange,
   onAssociationsChange
 }: V3VoiceTextFieldProps<TLink>) {
+  const businessSave = useVoiceSave();
+  const saveRef = useRef({ onSave, businessSave });
+  useLayoutEffect(() => {
+    saveRef.current = { onSave, businessSave };
+  });
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const [failure, setFailure] = useState<{ target: string; message: string }>();
+  const saveError = failure?.target === nodeId ? failure.message : "";
+  const setSaveError = (message: string) =>
+    setFailure({ target: nodeId, message });
+  const [savedTarget, setSavedTarget] = useState<string | null>(null);
+  const saved = savedTarget === nodeId;
+  const activeTarget = useRef<string | null>(nodeId);
+  useLayoutEffect(() => {
+    activeTarget.current = nodeId;
+    return () => {
+      activeTarget.current = null;
+    };
+  }, [nodeId]);
   const canUploadAudio = usePermission("speech.upload_audio");
   const permissions = useContentEditPermissions();
   const contentReadOnly = requestedContentReadOnly ?? !permissions.edit;
@@ -336,6 +362,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     return () => onDraftPendingChange?.(false);
   }, [draftPending, onDraftPendingChange, showDone]);
   const callbacks = useRef({
+    onCommit,
     onChange,
     onAssociationsChange,
     onVoiceProfileChange,
@@ -343,6 +370,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   });
   useLayoutEffect(() => {
     callbacks.current = {
+      onCommit,
       onChange,
       onAssociationsChange,
       onVoiceProfileChange,
@@ -350,7 +378,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     };
   });
   const cancelEditing = () => {
-    if (doneLoading) return;
+    if (doneLoading || savingRef.current) return;
     setDraftState(captureSession());
     history.current.past = [];
     history.current.future = [];
@@ -359,45 +387,109 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     onAssociationPendingChange?.(false);
     onCancel?.();
   };
-  const completeEditing = () => {
-    if (doneLoading || doneDisabled || readOnly || draftState.nodeId !== nodeId)
-      return;
-    const next = draftState;
-    // 宿主回调可能捕获旧表单，逐项刷新闭包，避免正文、音色和录音互相覆盖。
+  const completeEditing = async (
+    capture?: (forSave?: boolean) => VoiceEditResult<TLink>
+  ) => {
     if (
-      JSON.stringify([value, textLinks, readingLinks]) !==
-      JSON.stringify([next.value, next.textLinks, next.readingLinks])
-    ) {
-      flushSync(() =>
-        contentReadOnly
-          ? callbacks.current.onAssociationsChange?.(next.textLinks ?? [])
-          : readingLinks !== undefined || renderReadingPicker
-            ? callbacks.current.onChange(
-                toRichTextV2(next.value),
-                next.textLinks,
-                next.readingLinks
-              )
-            : callbacks.current.onChange(
-                toRichTextV2(next.value),
-                next.textLinks
-              )
+      savingRef.current ||
+      doneLoading ||
+      doneDisabled ||
+      readOnly ||
+      draftState.nodeId !== nodeId
+    )
+      return;
+    const target = nodeId;
+    savingRef.current = true;
+    setSaving(true);
+    setSaveError("");
+    setSavedTarget(null);
+    try {
+      const captured = (onCommit || onSave || businessSave
+        ? capture?.(!!(onSave || businessSave))
+        : undefined) ?? {
+        ...draftState,
+        value:
+          draftState.value.version === 2
+            ? draftState.value
+            : toRichTextV2(draftState.value),
+        audioAssets: draftState.audioAssets ?? undefined
+      };
+      const result = contentReadOnly
+        ? {
+            ...captured,
+            value,
+            readingLinks,
+            voiceProfile,
+            audioAssets: audioAssets ?? undefined
+          }
+        : captured;
+      const next = { ...draftState, ...result, nodeId: target };
+      if (callbacks.current.onCommit) {
+        flushSync(() => callbacks.current.onCommit!(result));
+      } else {
+        // 宿主回调可能捕获旧表单，逐项刷新闭包，避免正文、音色和录音互相覆盖。
+        if (
+          JSON.stringify([value, textLinks, readingLinks]) !==
+          JSON.stringify([next.value, next.textLinks, next.readingLinks])
+        ) {
+          flushSync(() =>
+            contentReadOnly
+              ? callbacks.current.onAssociationsChange?.(next.textLinks ?? [])
+              : readingLinks !== undefined || renderReadingPicker
+                ? callbacks.current.onChange(
+                    toRichTextV2(next.value),
+                    next.textLinks,
+                    next.readingLinks
+                  )
+                : callbacks.current.onChange(
+                    toRichTextV2(next.value),
+                    next.textLinks
+                  )
+          );
+        }
+        if (
+          JSON.stringify(voiceProfile) !== JSON.stringify(next.voiceProfile)
+        ) {
+          flushSync(() =>
+            callbacks.current.onVoiceProfileChange?.(
+              next.voiceProfile ?? { voices: [] }
+            )
+          );
+        }
+        if (JSON.stringify(audioAssets) !== JSON.stringify(next.audioAssets)) {
+          flushSync(() =>
+            callbacks.current.onAudioAssetsChange?.(next.audioAssets ?? [])
+          );
+        }
+      }
+      const persist =
+        saveRef.current.onSave ??
+        (saveRef.current.businessSave
+          ? () => saveRef.current.businessSave!.save(area)
+          : undefined);
+      if (persist && !(await persist())) {
+        if (activeTarget.current !== target) return;
+        setSaveError(
+          "保存未完成，全部修改已保留；请处理业务校验或版本冲突后重试。"
+        );
+        return;
+      }
+      if (activeTarget.current !== target) return;
+      setDraftState(next);
+      setSavedTarget(persist ? target : null);
+      if (onDone) onDone();
+      else if (showDone) setEditing(false);
+    } catch (error) {
+      if (activeTarget.current !== target) return;
+      setSaveError(
+        error instanceof Error
+          ? error.message
+          : "保存失败，全部修改已保留，请重试"
       );
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
-    if (JSON.stringify(voiceProfile) !== JSON.stringify(next.voiceProfile)) {
-      flushSync(() =>
-        callbacks.current.onVoiceProfileChange?.(
-          next.voiceProfile ?? { voices: [] }
-        )
-      );
-    }
-    if (JSON.stringify(audioAssets) !== JSON.stringify(next.audioAssets)) {
-      flushSync(() =>
-        callbacks.current.onAudioAssetsChange?.(next.audioAssets ?? [])
-      );
-    }
-    setDraftState(next);
-    if (onDone) onDone();
-    else setEditing(false);
   };
   const expanded = env.VOICE_EDITOR && (presentation === "editor" || editing);
   // 缓存住：每次渲染都新建对象会让弧线层跟着重量一遍。
@@ -667,6 +759,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           icon={<EditOutlined />}
           onClick={() => {
             setDraftState(captureSession());
+            setSaveError("");
             setRecorded(true);
             setEditing(true);
           }}
@@ -678,31 +771,46 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
 
   const renderActions = (
     canComplete: boolean,
-    prepareComplete: () => boolean = () => true
+    prepareComplete: () => boolean = () => true,
+    captureResult?: (forSave?: boolean) => VoiceEditResult<TLink>
   ) =>
-    showDone ? (
-      <Space className="v3-voice-text-editor-done" size={6}>
-        <Button
-          size="small"
-          aria-label={`取消${ariaLabel}编辑`}
-          disabled={doneLoading}
-          onClick={cancelEditing}
-        >
-          取消
-        </Button>
-        <Button
-          type="primary"
-          size="small"
-          aria-label={`完成${ariaLabel}编辑`}
-          loading={doneLoading}
-          disabled={doneDisabled || readOnly || !canComplete}
-          onClick={() => {
-            if (prepareComplete()) completeEditing();
-          }}
-        >
-          完成
-        </Button>
-      </Space>
+    showDone || onSave ? (
+      <>
+        {!showDone && (
+          <EditorPendingState
+            pending={!canComplete}
+            onChange={onDraftPendingChange}
+          />
+        )}
+        <Space className="v3-voice-text-editor-done" size={6}>
+          {showDone && (
+            <Button
+              size="small"
+              aria-label={`取消${ariaLabel}编辑`}
+              disabled={doneLoading || saving}
+              onClick={cancelEditing}
+            >
+              取消
+            </Button>
+          )}
+          <Button
+            type="primary"
+            size="small"
+            aria-label={
+              businessSave || onSave
+                ? `保存${ariaLabel}修改`
+                : `完成${ariaLabel}编辑`
+            }
+            loading={doneLoading || saving}
+            disabled={doneDisabled || readOnly || !canComplete}
+            onClick={() => {
+              if (prepareComplete()) void completeEditing(captureResult);
+            }}
+          >
+            {businessSave || onSave ? "保存修改" : "完成"}
+          </Button>
+        </Space>
+      </>
     ) : (
       <EditorPendingState
         pending={!canComplete}
@@ -717,6 +825,9 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     >
       <div className="v3-voice-text-editor" style={{ minWidth: 0 }}>
         {feedbackHolder}
+        {saveError && <Alert type="error" showIcon title={saveError} />}
+        {saving && <span role="status">正在保存修改…</span>}
+        {saved && <span role="status">修改已保存为草稿</span>}
         <Suspense
           fallback={<div style={{ paddingBottom: 32 }}>{fallback}</div>}
         >
@@ -790,7 +901,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
               else
                 setDraftState((current) => ({ ...current, audioAssets: next }));
             }}
-            readOnly={readOnly}
+            readOnly={readOnly || saving}
             value={editorState.value}
             voiceProfile={editorState.voiceProfile}
           />
@@ -803,6 +914,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   return (
     <>
       {fieldView}
+      {saved && !editing && <span role="status">修改已保存为草稿</span>}
       {defaultLoading && <span role="status">正在加载默认配音…</span>}
       {!editing && defaultVoice?.key === defaultKey && defaultVoice.error && (
         <Alert type="warning" showIcon title={defaultVoice.error} />
@@ -814,8 +926,8 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           open={editing}
           footer={null}
           onCancel={cancelEditing}
-          closable={!doneLoading}
-          keyboard={!doneLoading && !draftPending}
+          closable={!doneLoading && !saving}
+          keyboard={!doneLoading && !saving && !draftPending}
         >
           {editor}
         </VoiceEditorModal>

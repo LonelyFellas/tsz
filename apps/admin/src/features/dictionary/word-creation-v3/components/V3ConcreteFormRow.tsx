@@ -1,3 +1,4 @@
+import { toRichTextV2 } from "@tsz/voice-editor/core";
 import { env } from "../../../../lib/env";
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
 import { WarningOutlined } from "@ant-design/icons";
@@ -364,6 +365,37 @@ function V3DialectFormCell({
               ariaLabelPrefix={`${formLabel}${dialectLabel(dialect)}拼写`}
             />
           }
+          onCommit={(result) => {
+            let next = content;
+            if (dialectRules.spelling_mode === "unified") {
+              const unified = unifyUkUsSpelling(
+                form,
+                toRichTextV2(result.value)
+              );
+              if (!unified.ok)
+                throw new Error("词形拼写无法统一，请修复后保存");
+              next = replaceForm(next, unified.value);
+            } else
+              next = updateVariantSpelling(
+                next,
+                variant.id,
+                toRichTextV2(result.value)
+              );
+            const ids =
+              dialectRules.spelling_mode === "unified" &&
+              form.regional_variants.mode === "uk_us"
+                ? [form.regional_variants.uk.id, form.regional_variants.us.id]
+                : [variant.id];
+            next = updateSpellingVoiceProfile(
+              next,
+              ids,
+              result.voiceProfile ?? { voices: [] }
+            );
+            onChange(
+              updateSpellingAudioAssets(next, ids, result.audioAssets ?? [])
+            );
+          }}
+
           invalid={spellingInvalid}
           ariaLabel={`${formLabel}${dialectLabel(dialect)}拼写`}
           field="spelling"
@@ -617,6 +649,24 @@ export function V3ConcreteFormRow({
                     )
                   )
                 }
+                onCommit={(result) => {
+                  const next = updateVariantSpelling(
+                    content,
+                    commonVariant.id,
+                    toRichTextV2(result.value)
+                  );
+                  onChange(
+                    updateSpellingAudioAssets(
+                      updateSpellingVoiceProfile(
+                        next,
+                        [commonVariant.id],
+                        result.voiceProfile ?? { voices: [] }
+                      ),
+                      [commonVariant.id],
+                      result.audioAssets ?? []
+                    )
+                  );
+                }}
                 voiceProfile={commonVariant.spelling_speech?.voice_profile}
                 onVoiceProfileChange={(profile) =>
                   onChange(
@@ -700,6 +750,26 @@ export function V3ConcreteFormRow({
                     )
                   )
                 }
+                onCommit={(result) => {
+                  const unified = unifyUkUsSpelling(
+                    form,
+                    toRichTextV2(result.value)
+                  );
+                  if (!unified.ok)
+                    throw new Error("词形拼写无法统一，请修复后保存");
+                  const next = updateSpellingVoiceProfile(
+                    replaceForm(content, unified.value),
+                    unifiedSpellingVariantIds,
+                    result.voiceProfile ?? { voices: [] }
+                  );
+                  onChange(
+                    updateSpellingAudioAssets(
+                      next,
+                      unifiedSpellingVariantIds,
+                      result.audioAssets ?? []
+                    )
+                  );
+                }}
                 voiceProfile={
                   unifiedSpellingVariants.uk.spelling_speech?.voice_profile
                 }

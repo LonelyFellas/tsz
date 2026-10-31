@@ -477,6 +477,18 @@ function GrammarStructuresCard({
                           target.form_links = links ?? [];
                         })
                       }
+                      onCommit={(result) =>
+                        change((draft) => {
+                          const target =
+                            draft.pos[posIndex]!.grammar_structures[
+                              structureIndex
+                            ]!.variants[variantIndex]!;
+                          target.content = result.value;
+                          target.form_links = result.textLinks ?? [];
+                          target.voice_profile = result.voiceProfile;
+                          target.audio_assets = result.audioAssets;
+                        })
+                      }
                       onVoiceProfileChange={(next) =>
                         change((draft) => {
                           const target =

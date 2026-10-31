@@ -378,9 +378,7 @@ export function MarkupPanel({
           onLetterClick={onLetterClick}
           onLiaisonClick={onLiaisonClick}
         />
-        {selectionMode && actions && (
-          <div className="tsz-ve-editor-actions">{actions}</div>
-        )}
+        {actions && <div className="tsz-ve-editor-actions">{actions}</div>}
       </div>
       {bottomTools.length > 0 && (
         <div className="tsz-ve-bottom-tools">
@@ -404,15 +402,12 @@ export function MarkupPanel({
           ))}
         </div>
       )}
-      {(secondaryTools.length > 0 || (!selectionMode && actions)) && (
+      {secondaryTools.length > 0 && (
         <div className="tsz-ve-footer">
           {secondaryTools.length > 0 && (
             <div className="tsz-ve-secondary-tools">
               {secondaryTools.map(renderTool)}
             </div>
-          )}
-          {!selectionMode && actions && (
-            <div className="tsz-ve-editor-actions">{actions}</div>
           )}
         </div>
       )}

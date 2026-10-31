@@ -32,8 +32,15 @@ export async function changeVoiceText(
     selector: "button span"
   });
   if (confirm) fireEvent.click(confirm);
-  fireEvent.click(within(dialog).getByLabelText(`完成${label}编辑`));
+  const done = () =>
+    within(dialog).queryByLabelText(`保存${label}修改`) ??
+    within(dialog).getByLabelText(`完成${label}编辑`);
+  fireEvent.click(done());
   if (within(dialog).queryByText(/已规范化拼写/)) {
-    fireEvent.click(within(dialog).getByLabelText(`完成${label}编辑`));
+    fireEvent.click(done());
   }
+  await waitFor(() => {
+    if (dialog.isConnected && within(dialog).queryByLabelText(label))
+      throw new Error("编辑器尚未完成保存");
+  });
 }

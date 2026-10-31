@@ -430,15 +430,6 @@ export function SentenceEditor({
             <Button aria-label="取消例句编辑" disabled={saving} onClick={close}>
               取消
             </Button>
-            <Button
-              aria-label="完成例句编辑"
-              type="primary"
-              loading={saving}
-              disabled={!canSave}
-              onClick={() => void finish()}
-            >
-              完成
-            </Button>
           </Flex>
         }
         onCancel={close}
@@ -611,6 +602,20 @@ export function SentenceEditor({
               mode="association"
               presentation="editor"
               showDone={false}
+              onSave={() => finish().then((value) => value === true)}
+              doneLoading={saving}
+              doneDisabled={conflict || !allowed || !canSave}
+              onCommit={(result) =>
+                changeVariant(
+                  {
+                    value: result.value,
+                    reading_links: result.readingLinks,
+                    voice_profile: result.voiceProfile,
+                    audio_assets: result.audioAssets
+                  },
+                  result.textLinks
+                )
+              }
               restoreTextLinksOnCorrection
               audioUploadEnabled
               value={variant.value}

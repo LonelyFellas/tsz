@@ -475,6 +475,7 @@ export function V3FormsAndPronunciationStep({
             retiredContentSlots={retiredContentSlots}
             retiredStableNodes={retiredStableNodes}
             registerLeaveGuard={registerLeaveGuard}
+            onApply={onSharedFormsChange}
             onCancel={() => setEditingFormId(undefined)}
             onConfirm={(next) => {
               onSharedFormsChange(next);
