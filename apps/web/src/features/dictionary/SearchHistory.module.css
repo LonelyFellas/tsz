@@ -1,0 +1,39 @@
+.scroller {
+  scrollbar-width: none;
+}
+
+.scroller::-webkit-scrollbar {
+  display: none;
+}
+
+.arrow {
+  display: none;
+  position: absolute;
+  top: 1px;
+  z-index: 1;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease-out;
+}
+
+.arrow[aria-disabled="true"]:focus-visible {
+  opacity: 0.45;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .arrow {
+    display: inline-flex;
+  }
+
+  .root:hover .arrow:not([aria-disabled="true"]),
+  .root:focus-within .arrow:not([aria-disabled="true"]) {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arrow {
+    transition: none;
+  }
+}

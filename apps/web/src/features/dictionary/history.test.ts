@@ -5,7 +5,7 @@ beforeEach(() => {
   vi.restoreAllMocks();
 });
 describe("本地查词历史", () => {
-  it("归一化、大小写去重、最近前置并限制20条", () => {
+  it("归一化、大小写去重、最近前置并限制10条", () => {
     expect(addHistory(["apple", "pear"], "  APPLE  ")).toEqual([
       "APPLE",
       "pear"
@@ -14,8 +14,14 @@ describe("本地查词历史", () => {
       addHistory,
       [] as string[]
     );
-    expect(terms).toHaveLength(20);
-    expect(terms[0]).toBe("word24");
+    expect(terms).toEqual(
+      Array.from({ length: 10 }, (_, i) => `word${24 - i}`)
+    );
+  });
+  it("读取旧历史时也只保留最近10条", () => {
+    const terms = Array.from({ length: 20 }, (_, i) => `word${i}`);
+    localStorage.setItem("tsz:dictionary:history:a", JSON.stringify(terms));
+    expect(readHistory("a")).toEqual(terms.slice(0, 10));
   });
   it("按账号隔离并支持删除后的持久化", () => {
     writeHistory("a", ["apple", "pear"]);

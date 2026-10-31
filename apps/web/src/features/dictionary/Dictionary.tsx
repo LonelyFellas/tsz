@@ -4,7 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Search, X } from "lucide-react";
+import { Search } from "lucide-react";
 import { Button } from "@tsz/ui/components";
 import { cn } from "@tsz/ui/lib/cn";
 import { SearchField } from "@/features/shell/SearchField";
@@ -22,6 +22,7 @@ import {
 } from "./history";
 import { dictionaryDefinition, dictionarySpellings, POS_ABBR } from "./reading";
 import { TargetAudio, Texts } from "./Content";
+import { SearchHistory } from "./SearchHistory";
 
 export function Dictionary({
   query = "",
@@ -139,34 +140,7 @@ function DictionaryBody({
           )}
         </form>
         {history.length > 0 && (
-          <div
-            aria-label="搜索历史"
-            className="mt-4 flex max-w-full gap-2 overflow-x-auto pb-2"
-          >
-            {history.map((term) => (
-              <div
-                key={term}
-                className="inline-flex shrink-0 items-center rounded-full border border-border bg-surface"
-              >
-                <button
-                  type="button"
-                  className="min-h-11 max-w-48 truncate rounded-l-full py-2 pl-4 pr-1 text-sm hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
-                  onClick={() => search(term)}
-                >
-                  {term}
-                </button>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  aria-label={`删除历史 ${term}`}
-                  onClick={() => remove(term)}
-                >
-                  <X className="size-4" aria-hidden />
-                </Button>
-              </div>
-            ))}
-          </div>
+          <SearchHistory terms={history} onSearch={search} onRemove={remove} />
         )}
       </div>
       {query && (
