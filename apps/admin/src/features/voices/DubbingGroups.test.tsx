@@ -347,6 +347,47 @@ describe("v3 逐组草稿、整套身份与顺序", () => {
       ]).size
     ).toBe(6);
   });
+  it.each(["长".repeat(40), "😀".repeat(40)])(
+    "40 字推荐名复制后可直接完成整组保存：%s",
+    async (name) => {
+      const initial = data();
+      pairs(initial)[0]!.name = name;
+      mount(initial);
+      const panel = edit("A");
+      fireEvent.click(
+        within(panel).getByRole("button", { name: `复制整套 ${name}` })
+      );
+      const copiedName = (screen.getByLabelText("推荐名称") as HTMLInputElement)
+        .value;
+      expect(Array.from(copiedName)).toHaveLength(40);
+      expect(copiedName.endsWith(" 副本")).toBe(true);
+      fireEvent.click(screen.getByRole("button", { name: "保存整套推荐" }));
+      fireEvent.click(groupButton(panel, "完成"));
+      await screen.findByText("本组配音已保存。");
+      const names = vi
+        .mocked(api.speech.savePairedGroup)
+        .mock.calls[0]![0].group.pairs.map((p) => p.name);
+      expect(names).toEqual([name, copiedName]);
+      expect(names.every((n) => Array.from(n).length <= 40)).toBe(true);
+    }
+  );
+  it("程序预填的超长推荐名在弹层保存前被拒绝并保留整套输入", async () => {
+    mount();
+    const panel = edit("A");
+    fireEvent.click(
+      within(panel).getByRole("button", { name: "新增整套推荐" })
+    );
+    fireEvent.change(screen.getByLabelText("推荐名称"), {
+      target: { value: "长".repeat(41) }
+    });
+    selectVoice("Sonia 女声");
+    selectVoice("Guy 男声");
+    fireEvent.click(screen.getByRole("button", { name: "保存整套推荐" }));
+    await screen.findByText("推荐名称最多 40 字。");
+    expect(screen.getByLabelText("推荐名称")).toHaveValue("长".repeat(41));
+    expect(api.speech.savePairedGroup).not.toHaveBeenCalled();
+    expect(screen.getByRole("radio", { name: "Guy 男声" })).toBeChecked();
+  });
   it("取消勾选不移动推荐，保存保留人工顺序及未选项", async () => {
     const initial = data();
     pairs(initial).push({
@@ -452,6 +493,43 @@ describe("v3 逐组草稿、整套身份与顺序", () => {
     expect(
       screen.queryByRole("button", { name: "编辑B" })
     ).not.toBeInTheDocument();
+  });
+  it("保存取消无 observer 的旧文本 GET，迟到回包不会被下一次文本加载复用", async () => {
+    const { client } = mount();
+    const key = ["admin-dubbing-groups", "groups-admin"];
+    const stale = {
+      groups: [{ id: "before-save", uk: [], us: [] }],
+      revision: 1
+    };
+    const fresh = {
+      groups: [{ id: "after-save", uk: [], us: [] }],
+      revision: 2
+    };
+    const late = deferred<typeof stale>();
+    const aborted = vi.fn();
+    const oldGet = client
+      .fetchQuery({
+        queryKey: key,
+        queryFn: ({ signal }) => {
+          signal.addEventListener("abort", aborted);
+          return late.promise;
+        }
+      })
+      .catch(() => undefined);
+    const panel = edit("A");
+    fireEvent.click(groupButton(panel, "完成"));
+    await screen.findByText("本组配音已保存。");
+    await act(async () => late.resolve(stale));
+    await oldGet;
+    const reloadText = vi.fn().mockResolvedValue(fresh);
+    const response = await client.fetchQuery({
+      queryKey: key,
+      queryFn: reloadText,
+      staleTime: 60_000
+    });
+    expect(aborted).toHaveBeenCalledOnce();
+    expect(reloadText).toHaveBeenCalledOnce();
+    expect(response).toEqual(fresh);
   });
   it("全局固定末位不可排序、改名、删除，空套允许保存", async () => {
     const initial = data();

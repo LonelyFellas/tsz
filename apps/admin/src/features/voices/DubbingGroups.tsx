@@ -135,10 +135,16 @@ export function DubbingGroups({
     });
   }
   async function accept(result: AdminDubbingGroupsV3Response) {
-    await client.cancelQueries({
-      queryKey: dubbingGroupsKey(accountId),
-      exact: true
-    });
+    await Promise.all([
+      client.cancelQueries({
+        queryKey: dubbingGroupsKey(accountId),
+        exact: true
+      }),
+      client.cancelQueries({
+        queryKey: ["admin-dubbing-groups", accountId],
+        exact: true
+      })
+    ]);
     if (useAuthStore.getState().profile?.id !== accountId) return false;
     client.setQueryData(dubbingGroupsKey(accountId), result);
     // 文本消费者仍读取 v2；只使其失效，不把 v3 recommendations 写入旧缓存。
@@ -163,6 +169,10 @@ export function DubbingGroups({
     for (const pair of draft.recommendations.pairs) {
       if (!pair.name.trim()) {
         setError("请填写推荐名称。");
+        return;
+      }
+      if (Array.from(pair.name).length > 40) {
+        setError("推荐名称最多 40 字。");
         return;
       }
       for (const side of sides) {
@@ -832,7 +842,7 @@ export function DubbingGroups({
                                       initial: {
                                         ...structuredClone(pair),
                                         id: newWordNodeId(),
-                                        name: `${pair.name} 副本`,
+                                        name: `${Array.from(pair.name).slice(0, 37).join("")} 副本`,
                                         uk: {
                                           ...structuredClone(pair.uk),
                                           id: newWordNodeId()

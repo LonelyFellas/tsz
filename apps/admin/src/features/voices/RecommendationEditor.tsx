@@ -104,6 +104,10 @@ export function RecommendationEditor({
       setError("请填写推荐名称。");
       return;
     }
+    if (Array.from(value.name.trim()).length > 40) {
+      setError("推荐名称最多 40 字。");
+      return;
+    }
     for (const key of sides) {
       const next = value[key];
       if (!next) {
