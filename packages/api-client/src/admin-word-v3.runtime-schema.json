@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dubbing-center/docs/openapi.json",
-  "_source_sha256": "ca88e558880f33412ec3bcea0933c71e73d3371c08059fbf09791e983ac90127",
+  "_source": "/Users/darwish/.codex/worktrees/choice-tiered-backend/tsz-rust/docs/openapi.json",
+  "_source_sha256": "70d8514941d9960dec46199321ff93922fd186d238b62f12ffc9a8555f053f2c",
   "roots": [
     "DubbingGroupsV3Response",
     "LearningCapabilities",
@@ -946,6 +946,57 @@
       "required": ["remote_revoked"],
       "properties": { "remote_revoked": { "type": "boolean" } },
       "additionalProperties": false
+    },
+    "ChoicePlanPreview": {
+      "type": "object",
+      "required": [
+        "total_count",
+        "unavailable_count",
+        "unavailable_items",
+        "unavailable_truncated"
+      ],
+      "properties": {
+        "total_count": { "type": "integer" },
+        "unavailable_count": { "type": "integer" },
+        "unavailable_items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ChoiceUnavailableItem" }
+        },
+        "unavailable_truncated": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "ChoiceUnavailableItem": {
+      "type": "object",
+      "required": [
+        "unit_key",
+        "source_wordlist_id",
+        "entry_id",
+        "item_id",
+        "spelling",
+        "definition",
+        "reason"
+      ],
+      "properties": {
+        "definition": { "type": "string" },
+        "entry_id": { "type": ["string", "null"], "format": "uuid" },
+        "item_id": { "type": ["string", "null"], "format": "uuid" },
+        "reason": { "$ref": "#/$defs/ChoiceUnavailableReason" },
+        "source_wordlist_id": { "type": "string", "format": "uuid" },
+        "spelling": { "type": "string" },
+        "unit_key": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "ChoiceUnavailableReason": {
+      "type": "string",
+      "enum": [
+        "target_ineligible",
+        "evidence_incomplete",
+        "target_unaligned",
+        "insufficient_distractors",
+        "custom_source_unsupported"
+      ]
     },
     "CoinAccount": {
       "type": "object",
@@ -2288,6 +2339,7 @@
       "type": "object",
       "required": ["question_types"],
       "properties": {
+        "choice_policies": { "type": "array", "items": { "type": "string" } },
         "practice_modes": { "type": "array", "items": { "type": "string" } },
         "question_types": { "type": "array", "items": { "type": "string" } }
       },
@@ -2487,6 +2539,7 @@
         "available_learning_days": { "type": ["integer", "null"] },
         "business_day": { "type": "string", "format": "date" },
         "can_create": { "type": "boolean" },
+        "choice": { "$ref": "#/$defs/ChoicePlanPreview" },
         "custom_word_count": { "type": "integer" },
         "eligible_count": { "type": "integer" },
         "entry_count": { "type": "integer" },

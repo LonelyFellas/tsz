@@ -70,7 +70,8 @@ beforeEach(() => {
   mocks.get.mockResolvedValue(wordlist);
   mocks.myDetail.mockResolvedValue({ ...wordlist, state: "draft" });
   mocks.capabilities.mockResolvedValue({
-    question_types: ["spelling_zh_to_en", "choice_zh_to_en"]
+    question_types: ["spelling_zh_to_en", "choice_zh_to_en"],
+    choice_policies: ["strict_tiered_v1"]
   });
   HTMLDialogElement.prototype.showModal = function () {
     this.open = true;
@@ -522,8 +523,96 @@ it("choice creation previews the selected type and preserves it through the crea
   fireEvent.click(screen.getByRole("button", { name: "完成创建" }));
   await waitFor(() => expect(mocks.create).toHaveBeenCalledOnce());
   expect(mocks.create.mock.calls[0]![0]).toMatchObject({
-    question_type: "choice_zh_to_en"
+    question_type: "choice_zh_to_en",
+    choice_policy: "strict_tiered_v1"
   });
+});
+
+const partialChoicePreview = {
+  ...preview,
+  eligible_count: 1,
+  choice: {
+    total_count: 2,
+    unavailable_count: 1,
+    unavailable_truncated: false,
+    unavailable_items: [
+      {
+        unit_key: "custom-item",
+        source_wordlist_id: "list",
+        entry_id: null,
+        item_id: "custom-item",
+        spelling: "myword",
+        definition: "自定义释义",
+        reason: "custom_source_unsupported"
+      }
+    ]
+  }
+};
+it("requires explicit confirmation of the unavailable scope before creating a strict choice task", async () => {
+  renderWithProviders(<LearningPlanCreator userId="learner" />);
+  await choose();
+  mocks.preview.mockResolvedValue(partialChoicePreview);
+  fireEvent.click(
+    screen.getByRole("radio", { name: "单选题 · 看中文，选英文" })
+  );
+  await screen.findByText("2 个目标词义 · 1 个可出单选 · 1 个暂不可用");
+  fireEvent.change(screen.getByLabelText("任务名称"), {
+    target: { value: "单选范围确认" }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "完成创建" }));
+  expect(mocks.create).not.toHaveBeenCalled();
+  await screen.findByText("请先核对暂不可用内容，并确认仅使用可用内容创建。");
+  fireEvent.click(
+    screen.getByRole("checkbox", { name: /仅使用可出单选的内容创建任务/ })
+  );
+  fireEvent.click(screen.getByRole("button", { name: "完成创建" }));
+  await waitFor(() => expect(mocks.create).toHaveBeenCalledOnce());
+  expect(mocks.create.mock.calls[0]![0]).toMatchObject({
+    choice_policy: "strict_tiered_v1",
+    accept_partial_choice: true,
+    preview_fingerprint: "fingerprint"
+  });
+});
+it("invalidates scope confirmation when the server preview changes", async () => {
+  renderWithProviders(<LearningPlanCreator userId="learner" />);
+  await choose();
+  mocks.preview.mockResolvedValue(partialChoicePreview);
+  fireEvent.click(
+    screen.getByRole("radio", { name: "单选题 · 看中文，选英文" })
+  );
+  const checkbox = await screen.findByRole("checkbox", {
+    name: /仅使用可出单选的内容创建任务/
+  });
+  fireEvent.click(checkbox);
+  expect(checkbox).toBeChecked();
+  mocks.preview.mockResolvedValue({
+    ...partialChoicePreview,
+    preview_fingerprint: "new-scope"
+  });
+  fireEvent.change(screen.getByLabelText("每日题量"), {
+    target: { value: "11" }
+  });
+  await waitFor(() =>
+    expect(mocks.preview).toHaveBeenLastCalledWith(
+      expect.objectContaining({ daily_question_count: 11 }),
+      expect.anything()
+    )
+  );
+  await waitFor(() =>
+    expect(
+      screen.getByRole("checkbox", { name: /仅使用可出单选的内容创建任务/ })
+    ).not.toBeChecked()
+  );
+});
+it("requires strict choice support even when an older server advertises mixed choice tasks", async () => {
+  mocks.capabilities.mockResolvedValue({
+    question_types: ["spelling_zh_to_en", "choice_zh_to_en"]
+  });
+  renderWithProviders(<LearningPlanCreator userId="learner" />);
+  await screen.findByText("当前单选题功能尚未就绪，可先创建拼写任务。");
+  expect(
+    screen.getByRole("radio", { name: "单选题 · 看中文，选英文" })
+  ).toBeDisabled();
 });
 
 it("an old server disables choice without adding a new field to spelling requests", async () => {
@@ -560,6 +649,7 @@ it("a choice preview without approved questions explains the exclusion and canno
 it("opts into mastery only when supported and caps the initial queue at twenty", async () => {
   mocks.capabilities.mockResolvedValue({
     question_types: ["spelling_zh_to_en", "choice_zh_to_en"],
+    choice_policies: ["strict_tiered_v1"],
     practice_modes: ["mastery_v1"]
   });
   renderWithProviders(<LearningPlanCreator userId="learner" />);

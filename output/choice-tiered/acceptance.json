@@ -1,0 +1,49 @@
+{
+  "natural_corpus": {
+    "targets": 56,
+    "eligible": 42,
+    "unavailable": 14,
+    "failure_counts": {
+      "target_unaligned": 11,
+      "evidence_incomplete": 3
+    },
+    "semantic_only_after_projection_fix": 0,
+    "raw_dictionary_rows": 222,
+    "source_entries": 56
+  },
+  "browser": {
+    "real_router": true,
+    "api_mock": false,
+    "password_login": true,
+    "scope_confirmed": true,
+    "options": ["help", "read", "play", "walk"],
+    "order_and_ids_preserved_after_reload": true,
+    "completion_preserved_after_reload": true
+  },
+  "frontend": {
+    "base_sha": "97db9d0f36a6517ebc17740279fff0de436a522e",
+    "build_id": "toB-2jeQyCjKaYCRNQtqZ",
+    "production_build": true
+  },
+  "backend": {
+    "base_sha": "dc3f65ae32b4e978110dcf6894c8850473338dc1",
+    "api_binary_sha256": "93dad0665d0f10b2ffd40ef020022a0105b488c3a26ac5cb289bccf356181118",
+    "schema_sha256": "70d8514941d9960dec46199321ff93922fd186d238b62f12ffc9a8555f053f2c"
+  },
+  "checks": {
+    "backend_regressions_passed": 560,
+    "web_component_tests_passed": 47,
+    "api_contract_tests_passed": 654,
+    "typecheck": "passed",
+    "lint": "passed with 2 pre-existing warnings",
+    "clippy": "passed",
+    "scale": {
+      "published_candidates": 50000,
+      "targets": 1000,
+      "semantic_preview_seconds": 7.008430292,
+      "supplemental_preview_seconds": 7.085282375,
+      "synthetic": true
+    }
+  },
+  "deployment": "not_requested"
+}

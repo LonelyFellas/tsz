@@ -48,7 +48,7 @@ it("plan creation preserves fingerprint, optional schedule and cancellation with
       signal: controller.signal,
       headers: {
         "X-TSZ-Learning-Capabilities":
-          "choice-v1,mastery-v1,wordlist-spelling-v1"
+          "choice-v1,mastery-v1,wordlist-spelling-v1,strict-choice-v1"
       }
     }
   );
@@ -104,7 +104,7 @@ it("source refresh uses the cycle protocol with typed recovery counts", async ()
     {
       headers: {
         "X-TSZ-Learning-Capabilities":
-          "choice-v1,mastery-v1,wordlist-spelling-v1"
+          "choice-v1,mastery-v1,wordlist-spelling-v1,strict-choice-v1"
       }
     }
   );

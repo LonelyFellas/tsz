@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dubbing-center/docs/openapi.json",
-  "_generatedAt": "2026-10-31T04:10:35.764Z",
+  "_source": "/Users/darwish/.codex/worktrees/choice-tiered-backend/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-10-31T07:10:11.673Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -7050,6 +7050,7 @@
         "idempotency_key"
       ],
       "properties": {
+        "accept_partial_choice": { "type": "boolean" },
         "after_cycle_id": { "type": "string", "format": "uuid" },
         "expected_revision": { "type": "integer", "format": "int64" },
         "idempotency_key": { "type": "string", "format": "uuid" },
@@ -7070,6 +7071,8 @@
         "preview_fingerprint"
       ],
       "properties": {
+        "accept_partial_choice": { "type": "boolean" },
+        "choice_policy": { "type": "string" },
         "daily_question_count": {
           "type": ["integer", "null"],
           "format": "int32"
@@ -7832,6 +7835,7 @@
         "schedule"
       ],
       "properties": {
+        "choice_policy": { "type": "string" },
         "daily_question_count": {
           "type": ["integer", "null"],
           "format": "int32"

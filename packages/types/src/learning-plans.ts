@@ -13,6 +13,7 @@ export interface LearningSchedule {
   end_date: string;
 }
 export interface PreviewLearningPlan {
+  choice_policy?: "strict_tiered_v1";
   practice_mode?: "mastery_v1";
   question_type?: LearningQuestionType;
   task_type: LearningTaskType;
@@ -21,14 +22,35 @@ export interface PreviewLearningPlan {
   schedule: LearningSchedule | null;
 }
 export interface CreateLearningPlan extends PreviewLearningPlan {
+  accept_partial_choice?: boolean;
   idempotency_key: string;
   name: string;
   preview_fingerprint: string;
+}
+export interface ChoicePlanPreview {
+  total_count: number;
+  unavailable_count: number;
+  unavailable_truncated: boolean;
+  unavailable_items: {
+    unit_key: string;
+    source_wordlist_id: string;
+    entry_id: string | null;
+    item_id: string | null;
+    spelling: string;
+    definition: string;
+    reason:
+      | "target_ineligible"
+      | "evidence_incomplete"
+      | "target_unaligned"
+      | "insufficient_distractors"
+      | "custom_source_unsupported";
+  }[];
 }
 export interface LearningPlanPreview extends Omit<
   LearningPreview,
   "can_start"
 > {
+  choice?: ChoicePlanPreview;
   custom_word_count: number;
   estimated_learning_days: number | null;
   available_learning_days: number | null;
@@ -46,6 +68,7 @@ export interface PreviewLearningCycle {
   expected_revision: number;
 }
 export interface CreateLearningCycle extends PreviewLearningCycle {
+  accept_partial_choice?: boolean;
   preview_fingerprint: string;
   idempotency_key: string;
 }

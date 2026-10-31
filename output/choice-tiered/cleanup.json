@@ -1,0 +1,24 @@
+{
+  "containers_removed": [
+    "tsz-choice-tiered-20261031-pg",
+    "tsz-choice-tiered-20261031-redis"
+  ],
+  "anonymous_volumes_removed": true,
+  "ports": {
+    "13581": "no listener",
+    "18581": "no listener",
+    "55581": "no listener",
+    "56581": "no listener"
+  },
+  "raw_samples_credentials_and_logs_removed": true,
+  "browser_data": {
+    "localStorage": 0,
+    "sessionStorage": 0,
+    "caches": 0,
+    "serviceWorkers": 0,
+    "indexedDB": 0
+  },
+  "refresh_cookie_expiry_sent": true,
+  "oss_objects_created": 0,
+  "pre_existing_containers_preserved": true
+}
