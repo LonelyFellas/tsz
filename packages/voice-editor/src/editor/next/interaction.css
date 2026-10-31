@@ -634,3 +634,6 @@
 .tsz-ve-voice-parameters .ant-typography {
   margin-bottom: 8px;
 }
+.tsz-ve-voice-parameters .ant-typography code {
+  font-size: 12px;
+}

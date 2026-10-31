@@ -18,6 +18,7 @@ import {
   Typography
 } from "antd";
 import { SelectionPanel } from "./SelectionPanel";
+import { PoolVoiceName } from "./VoiceDisplay";
 import { voiceSettingFor, voiceSettingKey } from "../../core";
 import type { ReactNode } from "react";
 import { useRef, useState } from "react";
@@ -1080,9 +1081,7 @@ export function VoiceParameters({
     <div className="tsz-ve-voice-parameters">
       <section aria-label="常用参数">
         <Typography.Title level={5}>常用参数</Typography.Title>
-        <Typography.Text strong>
-          {voice.displayName ?? voice.label}
-        </Typography.Text>
+        <PoolVoiceName voice={voice} fallback={voice.id} />
         <Typography.Paragraph>
           <Typography.Text code copyable>
             {voice.providerVoiceId ?? voice.id}
