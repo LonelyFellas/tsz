@@ -160,13 +160,16 @@ function card(name: string) {
     .closest(".dubbing-group") as HTMLElement;
 }
 function groupButton(panel: HTMLElement, name: string | RegExp) {
-  return within(panel).getByRole("button", {
-    name:
-      typeof name === "string"
-        ? new RegExp("^" + name.split("").join("\\s*") + "$")
-        : name
-  });
+  return within(panel)
+    .getByText(typeof name === "string" ? name.replace(/\s/g, "") : name, {
+      normalizer: (text) => text.replace(/\s/g, "")
+    })
+    .closest("button")!;
 }
+function dialogButton(name: string) {
+  return groupButton(screen.getByRole("dialog"), name);
+}
+
 function edit(name: string) {
   const panel = card(name);
   fireEvent.click(groupButton(panel, `编辑${name}`));
@@ -221,7 +224,9 @@ function pairs(response: AdminDubbingGroupsV3Response, index = 0) {
   return rec.pairs;
 }
 function selectVoice(name: string) {
-  fireEvent.click(screen.getByRole("radio", { name }));
+  fireEvent.click(
+    within(screen.getByRole("dialog")).getByRole("radio", { name })
+  );
 }
 
 describe("v3 逐组草稿、整套身份与顺序", () => {
@@ -281,7 +286,7 @@ describe("v3 逐组草稿、整套身份与顺序", () => {
     fireEvent.change(screen.getByLabelText("推荐语速"), {
       target: { value: "0.73" }
     });
-    fireEvent.click(screen.getByRole("button", { name: "保存配音设置" }));
+    fireEvent.click(dialogButton("保存配音设置"));
     expect(api.speech.savePairedGroup).not.toHaveBeenCalled();
     fireEvent.click(groupButton(panel, "完成"));
     await screen.findByText("本组配音已保存。");
@@ -295,21 +300,19 @@ describe("v3 逐组草稿、整套身份与顺序", () => {
   it("新建整套不猜另一声，明确四列选择后仅回草稿", async () => {
     mount();
     const panel = edit("A");
-    fireEvent.click(
-      within(panel).getByRole("button", { name: "新增整套推荐" })
-    );
+    fireEvent.click(groupButton(panel, "新增整套推荐"));
     fireEvent.change(screen.getByLabelText("推荐名称"), {
       target: { value: "新套" }
     });
     selectVoice("Sonia 女声");
-    fireEvent.click(screen.getByRole("button", { name: "保存整套推荐" }));
+    fireEvent.click(dialogButton("保存整套推荐"));
     await waitFor(() =>
       expect(
         screen.getByText("请明确选择美式音色，每套必须包含英美各一项。")
       ).toBeVisible()
     );
     selectVoice("Guy 男声");
-    fireEvent.click(screen.getByRole("button", { name: "保存整套推荐" }));
+    fireEvent.click(dialogButton("保存整套推荐"));
     expect(api.speech.savePairedGroup).not.toHaveBeenCalled();
     fireEvent.click(groupButton(panel, "完成"));
     await screen.findByText("本组配音已保存。");
@@ -329,7 +332,7 @@ describe("v3 逐组草稿、整套身份与顺序", () => {
     fireEvent.click(
       within(panel).getByRole("button", { name: "复制整套 A推荐" })
     );
-    fireEvent.click(screen.getByRole("button", { name: "保存整套推荐" }));
+    fireEvent.click(dialogButton("保存整套推荐"));
     fireEvent.click(groupButton(panel, "完成"));
     await screen.findByText("本组配音已保存。");
     const input = vi.mocked(api.speech.savePairedGroup).mock.calls[0]![0];
@@ -361,7 +364,7 @@ describe("v3 逐组草稿、整套身份与顺序", () => {
         .value;
       expect(Array.from(copiedName)).toHaveLength(40);
       expect(copiedName.endsWith(" 副本")).toBe(true);
-      fireEvent.click(screen.getByRole("button", { name: "保存整套推荐" }));
+      fireEvent.click(dialogButton("保存整套推荐"));
       fireEvent.click(groupButton(panel, "完成"));
       await screen.findByText("本组配音已保存。");
       const names = vi
@@ -374,15 +377,13 @@ describe("v3 逐组草稿、整套身份与顺序", () => {
   it("程序预填的超长推荐名在弹层保存前被拒绝并保留整套输入", async () => {
     mount();
     const panel = edit("A");
-    fireEvent.click(
-      within(panel).getByRole("button", { name: "新增整套推荐" })
-    );
+    fireEvent.click(groupButton(panel, "新增整套推荐"));
     fireEvent.change(screen.getByLabelText("推荐名称"), {
       target: { value: "长".repeat(41) }
     });
     selectVoice("Sonia 女声");
     selectVoice("Guy 男声");
-    fireEvent.click(screen.getByRole("button", { name: "保存整套推荐" }));
+    fireEvent.click(dialogButton("保存整套推荐"));
     await screen.findByText("推荐名称最多 40 字。");
     expect(screen.getByLabelText("推荐名称")).toHaveValue("长".repeat(41));
     expect(api.speech.savePairedGroup).not.toHaveBeenCalled();
@@ -422,11 +423,9 @@ describe("v3 逐组草稿、整套身份与顺序", () => {
     fireEvent.change(within(b).getByLabelText("分组名称"), {
       target: { value: "B草稿" }
     });
-    fireEvent.click(screen.getByRole("button", { name: "新增分组" }));
-    expect(
-      screen.getByRole("button", { name: "上移分组 新分组" })
-    ).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "上移分组 B草稿" }));
+    fireEvent.click(groupButton(document.body, "新增分组"));
+    expect(screen.getByLabelText("上移分组 新分组")).toBeDisabled();
+    fireEvent.click(screen.getByLabelText("上移分组 B草稿"));
     await screen.findByText("分组顺序已保存，未完成内容仍保留在各组草稿。");
     expect(api.speech.saveGroupOrder).toHaveBeenCalledWith({
       group_ids: ["b", "a", "global"],
@@ -460,7 +459,7 @@ describe("v3 逐组草稿、整套身份与顺序", () => {
       fireEvent.click(
         operation === "save"
           ? groupButton(b, "完成")
-          : screen.getByRole("button", { name: "上移分组 B草稿" })
+          : screen.getByLabelText("上移分组 B草稿")
       );
       await screen.findByText(/全部草稿已保留/);
       expect(within(a).getByLabelText("分组名称")).toHaveValue("A草稿");
@@ -564,9 +563,7 @@ describe("v3 逐组草稿、整套身份与顺序", () => {
     fireEvent.click(groupButton(panel, "完成"));
     await screen.findByText(/请先人工整理完整英美推荐套/);
     expect(api.speech.savePairedGroup).not.toHaveBeenCalled();
-    fireEvent.click(
-      within(panel).getByRole("button", { name: "人工配对／补齐" })
-    );
+    fireEvent.click(groupButton(panel, "人工配对／补齐"));
     fireEvent.change(screen.getByLabelText("推荐名称"), {
       target: { value: "人工第一套" }
     });
@@ -581,13 +578,9 @@ describe("v3 逐组草稿、整套身份与顺序", () => {
         })
       );
     }
-    fireEvent.click(screen.getByRole("button", { name: "保存整套推荐" }));
-    expect(
-      within(panel).getByRole("button", { name: "完成整理" })
-    ).toBeDisabled();
-    fireEvent.click(
-      within(panel).getByRole("button", { name: "人工配对／补齐" })
-    );
+    fireEvent.click(dialogButton("保存整套推荐"));
+    expect(groupButton(panel, "完成整理")).toBeDisabled();
+    fireEvent.click(groupButton(panel, "人工配对／补齐"));
     fireEvent.change(screen.getByLabelText("推荐名称"), {
       target: { value: "补齐套" }
     });
@@ -598,8 +591,8 @@ describe("v3 逐组草稿、整套身份与顺序", () => {
       })
     );
     selectVoice("Guy 男声");
-    fireEvent.click(screen.getByRole("button", { name: "保存整套推荐" }));
-    fireEvent.click(within(panel).getByRole("button", { name: "完成整理" }));
+    fireEvent.click(dialogButton("保存整套推荐"));
+    fireEvent.click(groupButton(panel, "完成整理"));
     fireEvent.click(groupButton(panel, "完成"));
     await screen.findByText("本组配音已保存。");
     const result = vi.mocked(api.speech.savePairedGroup).mock.calls[0]![0].group
@@ -616,9 +609,7 @@ describe("v3 逐组草稿、整套身份与顺序", () => {
     }));
     mount(data(), [...many, uk, us]);
     const panel = edit("A");
-    fireEvent.click(
-      within(panel).getByRole("button", { name: "新增整套推荐" })
-    );
+    fireEvent.click(groupButton(panel, "新增整套推荐"));
     const list = screen.getByLabelText("英式女声滚动列表");
     list.scrollTop = 170;
     expect(within(list).getAllByRole("radio")).toHaveLength(31);
@@ -702,9 +693,7 @@ describe("v3 逐组草稿、整套身份与顺序", () => {
     };
     mount(initial);
     const panel = edit("A");
-    fireEvent.click(
-      within(panel).getByRole("button", { name: "人工配对／补齐" })
-    );
+    fireEvent.click(groupButton(panel, "人工配对／补齐"));
     fireEvent.change(screen.getByLabelText("推荐名称"), {
       target: { value: "明确替换" }
     });
@@ -716,8 +705,8 @@ describe("v3 逐组草稿、整套身份与顺序", () => {
     );
     selectVoice("Sonia 女声");
     selectVoice("Guy 男声");
-    fireEvent.click(screen.getByRole("button", { name: "保存整套推荐" }));
-    fireEvent.click(within(panel).getByRole("button", { name: "完成整理" }));
+    fireEvent.click(dialogButton("保存整套推荐"));
+    fireEvent.click(groupButton(panel, "完成整理"));
     fireEvent.click(groupButton(panel, "完成"));
     await screen.findByText("本组配音已保存。");
     expect(

@@ -968,3 +968,7 @@ Neural HD／Omni 当前可用性、未提供的支持语言／角色资料属于
 用户已授权按项目流程审查第三批、修复问题后提交／推送／开 PR，跟进精确 CI 到全绿后合并，再创建新聊天推进第四批；不部署、不回写禅道。复用现有两仓工作区和第三批分支。交付前两仓重新 fetch，origin/main 仍为前端 `97db9d0f36a6517ebc17740279fff0de436a522e`、后端 `dc3f65ae32b4e978110dcf6894c8850473338dc1`；后端干净，本批无后端交付差异，不创建空 PR。前端正常 hooks 提交后，对精确提交进行一次独立只读审查，修复复用同一 reviewer 增量复查；本节或关联 PR 后续记录审查、CI 与合并回执，不能将交付计划记为完成。
 
 第三批初审固定 `7c174baf180e43df999c5c60091bd02757b7e720`，完整 18 文件及直接调用链确认 2 个 P2 根因：复制 40 字名称默认追加后缀超限；v3 拆分查询键后未取消无 observer 的旧 v2 fetchQuery，迟到响应可能使旧配置重新缓存 60 秒。名称边界 3 项和旧查询竞态 1 项新增回归均先在原提交上失败；修复按 Unicode 字符预算保留复制后缀、在弹层与组保存边界校验 40 字，并在所有配置 mutation 共用 accept 中取消两种精确账号键再更新／失效缓存。后续验证与同一 reviewer 增量复查完成前不推送。
+
+第三批 PR [#627](https://github.com/LonelyFellas/tsz/pull/627) 已创建，首推 head `a3a0ee1882bce1a068c34f70c6e38084730c3ade`。独立审查第 2 轮增量复查通过，两个 P2 均已修复，剩余阻断 0；原生 pre-commit／commit-msg／pre-push 正常通过。[CI 41178173810](https://github.com/LonelyFellas/tsz/actions/runs/41178173810) attempt 1 的其他分片、quality、tooling-tests、commitlint 及 coverage-merge 均成功，但 admin-1 的组排序／legacy 整理两条完整流程超出原 5000ms，verify 因此失败，不予合并。
+
+CI 修复保持全部用例、输入、流程断言、覆盖率和 5000ms 原时限，只将本文件昂贵的大范围按钮可访问名称查询改为组内／弹层内的明确文本或 aria-label 定位。使用相同 CI shard 配置、V8 coverage 与 maxWorkers=1 单文件比较，原 19 项在本地均通过、总用例耗时 15.72 秒，两个慢用例 1476／2154ms；优化后仍 19 项全通过，总耗时 7.08 秒，对应用例 201／655ms。原 CI 的实际超时记录保留为失败，不用本地通过冒充 CI；新提交须同一 reviewer 增量复查并等待新 head 的完整 CI。
