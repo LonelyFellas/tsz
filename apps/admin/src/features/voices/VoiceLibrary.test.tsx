@@ -113,7 +113,11 @@ beforeEach(() => {
       personal_revision: 0
     }))
   });
-  vi.spyOn(api.speech, "groups").mockResolvedValue({ groups: [], revision: 0 });
+  vi.spyOn(api.speech, "groupsV3").mockResolvedValue({
+    groups: [],
+    revision: 0,
+    order_revision: 0
+  });
   vi.spyOn(api.speech, "audioUpdateSettings").mockResolvedValue({
     wait_seconds: 60,
     revision: 0
@@ -676,7 +680,10 @@ describe("配音中心", () => {
     fireEvent.click(open);
     const drawer = document.querySelector<HTMLElement>('[role="dialog"]')!;
     const details = within(drawer);
-    expect(details.getByText("Sonia 音色详情")).toBeVisible();
+    expect(details.getByText("音色详情", { exact: false })).toBeVisible();
+    expect(
+      details.getByText("Sonia", { selector: ".voice-shared-name strong" })
+    ).toBeVisible();
     expect(screen.queryByLabelText("查看 Sonia 资料")).toBeNull();
     expect(screen.queryByLabelText("调整 Sonia 参数")).toBeNull();
     const soundTab = details

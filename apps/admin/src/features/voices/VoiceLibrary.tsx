@@ -52,6 +52,7 @@ import {
 } from "./VoiceCatalogTable";
 import { DubbingGroups } from "./DubbingGroups";
 import { DubbingDrafts } from "./DubbingDrafts";
+import { VoiceName, VoiceRate, VoiceVolume } from "./VoiceDisplay";
 import { AddRecommendation } from "./AddRecommendation";
 import { SpeechRateInput } from "./SpeechRateInput";
 import { SpeechVolumeInput } from "./SpeechVolumeInput";
@@ -669,18 +670,16 @@ function VoiceLibraryContent() {
           <div className="voice-library-player">
             <Flex vertical gap={8}>
               <Space wrap>
-                <Typography.Text strong>
-                  {preview.voice.display_name}
-                </Typography.Text>
+                <VoiceName voice={preview.voice} />
                 <Tag>
                   {localeNames[preview.voice.locale] ?? preview.voice.locale}
                 </Tag>
                 <Typography.Text type="secondary">
-                  本次试听：音量 {preview.parameters.volume_percent}%，
-                  {((100 + preview.parameters.rate_percent) / 100).toFixed(2)}×
+                  本次试听：音量 <VoiceVolume parameters={preview.parameters} />
+                  ，<VoiceRate parameters={preview.parameters} />
                   {preview.parameters.style
                     ? `，${styleNames[preview.parameters.style] ?? preview.parameters.style}`
-                    : "，自然"}
+                    : "，默认"}
                 </Typography.Text>
               </Space>
               <audio
@@ -906,7 +905,9 @@ function VoiceLibraryContent() {
               <span
                 className={`voice-accent-dot voice-accent-${voiceAccent(selected)}`}
               />
-              <span>{selected.display_name} 音色详情</span>
+              <span>
+                <VoiceName voice={selected} /> 音色详情
+              </span>
               <span>· {accentNames[voiceAccent(selected)]}</span>
             </Space>
           ) : (
@@ -1145,7 +1146,7 @@ function VoiceLibraryContent() {
                               aria-label="说话风格"
                               disabled={settingsBusy}
                               options={[
-                                { value: "", label: "自然" },
+                                { value: "", label: "默认" },
                                 ...capabilities.styles.map((style) => ({
                                   value: style,
                                   label: styleNames[style] ?? style
@@ -1456,6 +1457,7 @@ function VoiceLibraryContent() {
                 <AddRecommendation
                   onBusyChange={setRecommendationPending}
                   voice={selected}
+                  voices={voices.data?.items ?? []}
                   onClose={() => setAddingRecommendation(false)}
                   readParameters={async () => {
                     const values = await form.validateFields([

@@ -66,6 +66,27 @@ describe("身份和授权缓存边界", () => {
     detach();
     client.clear();
   });
+  it("配对查询与旧文本查询分别缓存，撤销配音权限同时清理两种表示", () => {
+    const store = createAdminAuthStore();
+    const client = new QueryClient();
+    store
+      .getState()
+      .setProfile({ ...profile, permissions: ["speech.global_dubbing"] });
+    const detach = bindAdminAuthorizationCache(store, client);
+    client.setQueryData(["admin-dubbing-groups", "a"], {
+      groups: [{ uk: [], us: [] }]
+    });
+    client.setQueryData(["admin-dubbing-groups-v3", "a"], {
+      groups: [{ recommendations: { format: "paired", pairs: [] } }]
+    });
+    store.getState().setProfile({ ...profile, permissions: [] });
+    expect(client.getQueryData(["admin-dubbing-groups", "a"])).toBeUndefined();
+    expect(
+      client.getQueryData(["admin-dubbing-groups-v3", "a"])
+    ).toBeUndefined();
+    detach();
+    client.clear();
+  });
   it("同身份同权限的归属拒绝刷新不清缓存；permissions顺序也不影响身份", () => {
     const store = createAdminAuthStore();
     const client = new QueryClient();

@@ -1,3 +1,4 @@
+import { VoiceName } from "./VoiceDisplay";
 import { speechAccentGroup } from "@tsz/shared";
 import {
   CaretRightOutlined,
@@ -497,7 +498,7 @@ export function VoiceCatalogTable({
           <div className="voice-catalog-advanced-grid">
             {filter("scenario", "推荐场景")}
             {filter("model", "模型", modelNames)}
-            {filter("style", "可选风格", { ...styleNames, neutral: "自然" })}
+            {filter("style", "可选风格", { ...styleNames, neutral: "默认" })}
             {filter("role", "可选角色")}
           </div>
         </div>
@@ -583,13 +584,6 @@ export function VoiceCatalogTable({
                     />
                     <div className="voice-catalog-identity">
                       <Space size={8} wrap>
-                        {genderIcons[gender] && (
-                          <Tooltip title={genderNames[gender]}>
-                            <span role="img" aria-label={genderNames[gender]}>
-                              {genderIcons[gender]}
-                            </span>
-                          </Tooltip>
-                        )}
                         <span
                           className={`voice-accent-dot voice-accent-${voiceAccent(voice)}`}
                           aria-label={`${accentNames[voiceAccent(voice)]}口音`}
@@ -599,12 +593,9 @@ export function VoiceCatalogTable({
                             voice.metadata?.provider_voice_id ?? voice.alias
                           }
                         >
-                          <Typography.Text
-                            strong
-                            className="voice-catalog-name"
-                          >
-                            {voice.display_name}
-                          </Typography.Text>
+                          <span className="voice-catalog-name">
+                            <VoiceName voice={voice} />
+                          </span>
                         </Tooltip>
                         {voice.is_common && (
                           <Tag color="blue" variant="filled">

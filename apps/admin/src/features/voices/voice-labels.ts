@@ -57,6 +57,7 @@ export const personalityNames: Record<string, string> = {
 };
 
 export const styleNames: Record<string, string> = {
+  neutral: "默认",
   cheerful: "愉快",
   sad: "悲伤",
   angry: "生气",

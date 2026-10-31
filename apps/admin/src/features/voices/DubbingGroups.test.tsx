@@ -9,8 +9,8 @@ import {
   within
 } from "@testing-library/react";
 import type {
-  AdminDubbingGroup,
-  AdminDubbingGroupsResponse,
+  AdminDubbingGroupV3,
+  AdminDubbingGroupsV3Response,
   AdminProfile,
   AdminSpeechVoice
 } from "@tsz/types";
@@ -42,49 +42,58 @@ const us: AdminSpeechVoice = {
   alias: "guy",
   display_name: "Guy",
   locale: "en-US",
-  accent: "us"
+  accent: "us",
+  gender: "male"
 };
-const queryKey = ["admin-dubbing-groups", "groups-admin"];
+const queryKey = ["admin-dubbing-groups-v3", "groups-admin"];
 const clients: QueryClient[] = [];
 const routers: ReturnType<typeof createMemoryRouter>[] = [];
 function group(
   id: string,
   name: string,
   areas: string[] = []
-): AdminDubbingGroup {
+): AdminDubbingGroupV3 {
   return {
     id,
     name,
     areas,
     revision: 1,
     is_global: false,
-    uk: [
-      {
-        id: `${id}-uk`,
-        name: `${name}英式`,
-        voice_alias: uk.alias,
-        selected: true,
-        parameters: { rate_percent: 0, pitch_semitones: 0, style: null }
-      }
-    ],
-    us: [
-      {
-        id: `${id}-us`,
-        name: `${name}美式`,
-        voice_alias: us.alias,
-        selected: true,
-        parameters: { rate_percent: 0, pitch_semitones: 0, style: null }
-      }
-    ]
+    recommendations: {
+      format: "paired",
+      pairs: [
+        {
+          id: `${id}-pair`,
+          name: `${name}推荐`,
+          selected: true,
+          uk: {
+            id: `${id}-uk`,
+            voice_alias: uk.alias,
+            parameters: { rate_percent: 0, pitch_semitones: 0, style: null }
+          },
+          us: {
+            id: `${id}-us`,
+            voice_alias: us.alias,
+            parameters: {
+              rate_percent: -20,
+              pitch_semitones: 2,
+              volume_percent: 80,
+              style: null
+            }
+          }
+        }
+      ]
+    }
   };
 }
-function data(): AdminDubbingGroupsResponse {
+function data(): AdminDubbingGroupsV3Response {
   return {
     revision: 3,
+    order_revision: 8,
     groups: [
-      { ...group("global", "全局常用"), is_global: true },
       group("a", "A", ["word"]),
-      group("b", "B", ["example"])
+      group("b", "B", ["example"]),
+      { ...group("global", "全局常用"), is_global: true }
     ]
   };
 }
@@ -151,7 +160,12 @@ function card(name: string) {
     .closest(".dubbing-group") as HTMLElement;
 }
 function groupButton(panel: HTMLElement, name: string | RegExp) {
-  return within(panel).getByText(name, { exact: true }).closest("button")!;
+  return within(panel).getByRole("button", {
+    name:
+      typeof name === "string"
+        ? new RegExp("^" + name.split("").join("\\s*") + "$")
+        : name
+  });
 }
 function edit(name: string) {
   const panel = card(name);
@@ -160,313 +174,479 @@ function edit(name: string) {
 }
 beforeEach(() => {
   setPermissions(["words.access", "speech.generate", "speech.global_dubbing"]);
-  vi.spyOn(api.speech, "groups").mockResolvedValue(data());
+  vi.spyOn(api.speech, "groupsV3").mockResolvedValue(data());
   vi.spyOn(api.speech, "audioUpdates").mockResolvedValue({ updates: [] });
   vi.spyOn(api.speech, "allAudioUpdates").mockResolvedValue({ updates: [] });
   vi.spyOn(api.speech, "audioUpdateSettings").mockResolvedValue({
     wait_seconds: 60,
     revision: 0
   });
-  vi.spyOn(api.speech, "saveGroups");
-  vi.spyOn(api.speech, "saveGroup").mockImplementation(
-    async (group, base_revision) => ({
+  vi.spyOn(api.speech, "savePairedGroup").mockImplementation(
+    async ({ group: input, base_revision }) => ({
+      ...data(),
       revision: 4,
-      groups: data().groups.map((item) =>
-        item.id === group.id
+      groups: data().groups.map((g) =>
+        g.id === input.id
           ? {
-              ...group,
+              ...input,
               revision: base_revision + 1,
-              uk: [...group.uk].sort(
-                (a, b) =>
-                  Number(b.selected !== false) - Number(a.selected !== false)
-              )
+              recommendations: { format: "paired", pairs: input.pairs }
             }
-          : item
+          : g
       )
     })
   );
-  vi.spyOn(api.speech, "deleteGroup").mockImplementation(async (id) => ({
-    revision: 4,
-    groups: data().groups.filter((group) => group.id !== id)
+  vi.spyOn(api.speech, "saveGroupOrder").mockImplementation(async (input) => ({
+    ...data(),
+    order_revision: 9,
+    groups: input.group_ids.map((id) => data().groups.find((g) => g.id === id)!)
   }));
+  vi.spyOn(api.speech, "deleteGroupV3").mockImplementation(async (id) => ({
+    ...data(),
+    order_revision: 9,
+    groups: data().groups.filter((g) => g.id !== id)
+  }));
+  vi.spyOn(api.speech, "saveGroup");
 });
 afterEach(() => {
   cleanup();
-  routers.splice(0).forEach((router) => router.dispose());
-  clients.splice(0).forEach((client) => client.clear());
+  routers.splice(0).forEach((r) => r.dispose());
+  clients.splice(0).forEach((c) => c.clear());
   useAuthStore.getState().setProfile(null);
   vi.restoreAllMocks();
 });
+function pairs(response: AdminDubbingGroupsV3Response, index = 0) {
+  const rec = response.groups[index]!.recommendations;
+  if (rec.format !== "paired") throw new Error("fixture must be paired");
+  return rec.pairs;
+}
+function selectVoice(name: string) {
+  fireEvent.click(screen.getByRole("radio", { name }));
+}
 
-describe("单组草稿与推荐", () => {
-  it("完成后直接展示自动更新任务，等待设置默认收起且没有启用步骤", async () => {
-    const { unmount } = mount();
-    expect(screen.queryByLabelText("音频更新等待秒数")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText("更新设置", { exact: true }));
-    expect(await screen.findByLabelText("音频更新等待秒数")).toHaveValue("60");
-    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
-    const panel = edit("A");
-    const save = vi.mocked(api.speech.saveGroup).getMockImplementation()!;
-    vi.mocked(api.speech.saveGroup).mockImplementation(async (...args) => {
-      const result = await save(...args);
-      vi.mocked(api.speech.audioUpdates).mockResolvedValue({
-        updates: [
-          {
-            id: "automatic-job",
-            group_id: "a",
-            group_name: "A",
-            group_revision: 2,
-            state: "pending",
-            due_at: new Date(Date.now() + 60000).toISOString(),
-            total: 0,
-            completed: 0,
-            failed: 0,
-            skipped: 0,
-            error_codes: []
-          }
-        ]
-      });
-      return result;
-    });
-    fireEvent.click(groupButton(panel, "完成"));
-    await within(panel).findByText(/秒后自动更新相关草稿音频/);
-    expect(
-      within(panel).getByRole("button", { name: "撤销待更新" })
-    ).toBeEnabled();
-    unmount();
-  });
-  it("A 有草稿时完成 B 只提交 B，取消 A 不影响已保存 B", async () => {
+describe("v3 逐组草稿、整套身份与顺序", () => {
+  it("A 草稿下完成 B 仅持久化 B，取消 A 不撤销 B 和既有任务", async () => {
     const { client } = mount();
+    const oldTextResponse = {
+      groups: [{ id: "legacy-text", uk: [], us: [] }],
+      revision: 1
+    };
+    client.setQueryData(
+      ["admin-dubbing-groups", "groups-admin"],
+      oldTextResponse
+    );
     const a = edit("A"),
       b = edit("B");
-    const aName = within(a).getByDisplayValue("A");
-    const bName = within(b).getByDisplayValue("B");
-    fireEvent.change(aName, {
-      target: { value: "A draft" }
+    fireEvent.change(within(a).getByLabelText("分组名称"), {
+      target: { value: "A草稿" }
     });
-    fireEvent.change(bName, {
-      target: { value: "B saved" }
+    fireEvent.change(within(b).getByLabelText("分组名称"), {
+      target: { value: "B已完成" }
     });
     fireEvent.click(groupButton(b, "完成"));
-    await waitFor(() => expect(api.speech.saveGroup).toHaveBeenCalledOnce());
-    expect(api.speech.saveGroup).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "b", name: "B saved" }),
-      1,
+    await screen.findByText("本组配音已保存。");
+    expect(api.speech.savePairedGroup).toHaveBeenCalledTimes(1);
+    expect(api.speech.savePairedGroup).toHaveBeenCalledWith(
+      expect.objectContaining({
+        group: expect.objectContaining({ id: "b", name: "B已完成" }),
+        base_revision: 1
+      }),
       false
     );
-    await screen.findByText("本组配音已保存。");
-    expect(aName).toBeInTheDocument();
-    expect(aName).toHaveValue("A draft");
+    expect(within(a).getByLabelText("分组名称")).toHaveValue("A草稿");
     expect(
-      client
-        .getQueryData<AdminDubbingGroupsResponse>(queryKey)!
-        .groups.find((group) => group.id === "a")!.name
+      (client.getQueryData(queryKey) as AdminDubbingGroupsV3Response).groups[0]!
+        .name
     ).toBe("A");
-    fireEvent.click(groupButton(a, /取\s*消/));
-    expect(screen.getByText("B saved", { exact: true })).toBeVisible();
-    expect(screen.queryByDisplayValue("A draft")).toBeNull();
-    expect(api.speech.saveGroups).not.toHaveBeenCalled();
-  });
-  it("取消勾选时行位置不变，完成后未选折叠且已选稳定前置", async () => {
-    const initial = data();
-    const a = initial.groups[1]!;
-    a.uk.push({ ...a.uk[0]!, id: "second", name: "第二版本" });
-    mount(initial);
-    vi.mocked(api.speech.saveGroup).mockImplementation(
-      async (group, revision) => ({
-        ...initial,
-        groups: initial.groups.map((item) =>
-          item.id === group.id
-            ? {
-                ...group,
-                revision: revision + 1,
-                uk: [...group.uk].sort(
-                  (a, b) =>
-                    Number(b.selected !== false) - Number(a.selected !== false)
-                )
-              }
-            : item
-        )
-      })
-    );
-    const panel = edit("A");
-    fireEvent.click(within(panel).getByLabelText("选用 A英式"));
+    fireEvent.click(groupButton(a, "取消"));
+    await screen.findByText("编辑A");
+    expect(screen.getByText("编辑B已完成")).toBeInTheDocument();
+    expect(api.speech.saveGroup).not.toHaveBeenCalled();
     expect(
-      [...panel.querySelectorAll('input[type="checkbox"]')]
-        .slice(0, 2)
-        .map((input) => input.getAttribute("aria-label"))
-    ).toEqual(["选用 A英式", "选用 第二版本"]);
+      client.getQueryData(["admin-dubbing-groups", "groups-admin"])
+    ).toEqual(oldTextResponse);
+  });
+  it("单侧铅笔仅显示本侧两列，保存保持另一侧 ID／参数及本侧身份", async () => {
+    mount();
+    const panel = edit("A");
+    fireEvent.click(
+      within(panel).getByRole("button", { name: "修改英式 A推荐" })
+    );
+    expect(
+      screen.getByRole("region", { name: "英式女声目录" })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "美式男声目录" })
+    ).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("推荐语速"), {
+      target: { value: "0.73" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存配音设置" }));
+    expect(api.speech.savePairedGroup).not.toHaveBeenCalled();
     fireEvent.click(groupButton(panel, "完成"));
     await screen.findByText("本组配音已保存。");
-    expect(within(panel).queryByLabelText("选用 A英式")).toBeNull();
-    fireEvent.click(within(panel).getByRole("button", { name: "更多音色" }));
-    expect(within(panel).getByLabelText("选用 A英式")).not.toBeChecked();
-    expect(within(panel).getByLabelText("选用 第二版本")).toBeChecked();
+    const input = vi.mocked(api.speech.savePairedGroup).mock.calls[0]![0];
+    expect(input.group.pairs[0]!.uk).toEqual({
+      ...pairs(data())[0]!.uk,
+      parameters: { rate_percent: -27, pitch_semitones: 0, style: null }
+    });
+    expect(input.group.pairs[0]!.us).toEqual(pairs(data())[0]!.us);
   });
-  it("拖动只重排当前组当前口音，取消丢弃顺序", () => {
+  it("新建整套不猜另一声，明确四列选择后仅回草稿", async () => {
+    mount();
+    const panel = edit("A");
+    fireEvent.click(
+      within(panel).getByRole("button", { name: "新增整套推荐" })
+    );
+    fireEvent.change(screen.getByLabelText("推荐名称"), {
+      target: { value: "新套" }
+    });
+    selectVoice("Sonia 女声");
+    fireEvent.click(screen.getByRole("button", { name: "保存整套推荐" }));
+    await waitFor(() =>
+      expect(
+        screen.getByText("请明确选择美式音色，每套必须包含英美各一项。")
+      ).toBeVisible()
+    );
+    selectVoice("Guy 男声");
+    fireEvent.click(screen.getByRole("button", { name: "保存整套推荐" }));
+    expect(api.speech.savePairedGroup).not.toHaveBeenCalled();
+    fireEvent.click(groupButton(panel, "完成"));
+    await screen.findByText("本组配音已保存。");
+    const input = vi.mocked(api.speech.savePairedGroup).mock.calls[0]![0];
+    expect(input.group.pairs).toHaveLength(2);
+    const pair = input.group.pairs[1]!;
+    expect(pair).toMatchObject({
+      name: "新套",
+      uk: { voice_alias: "sonia" },
+      us: { voice_alias: "guy" }
+    });
+    expect(new Set([pair.id, pair.uk.id, pair.us.id]).size).toBe(3);
+  });
+  it("复制整套保留双侧完整参数，生成三个新 ID", async () => {
+    mount();
+    const panel = edit("A");
+    fireEvent.click(
+      within(panel).getByRole("button", { name: "复制整套 A推荐" })
+    );
+    fireEvent.click(screen.getByRole("button", { name: "保存整套推荐" }));
+    fireEvent.click(groupButton(panel, "完成"));
+    await screen.findByText("本组配音已保存。");
+    const input = vi.mocked(api.speech.savePairedGroup).mock.calls[0]![0];
+    const [first, copy] = input.group.pairs;
+    expect(copy!.uk.parameters).toEqual(first!.uk.parameters);
+    expect(copy!.us.parameters).toEqual(first!.us.parameters);
+    expect(
+      new Set([
+        first!.id,
+        first!.uk.id,
+        first!.us.id,
+        copy!.id,
+        copy!.uk.id,
+        copy!.us.id
+      ]).size
+    ).toBe(6);
+  });
+  it("取消勾选不移动推荐，保存保留人工顺序及未选项", async () => {
     const initial = data();
-    initial.groups[1]!.uk.push({
-      ...initial.groups[1]!.uk[0]!,
+    pairs(initial).push({
+      ...structuredClone(pairs(initial)[0]!),
       id: "second",
-      name: "第二版本"
+      name: "第二套",
+      uk: { ...pairs(initial)[0]!.uk, id: "second-uk" },
+      us: { ...pairs(initial)[0]!.us, id: "second-us" }
     });
     mount(initial);
     const panel = edit("A");
-    const first = within(panel)
-      .getByLabelText("选用 A英式")
-      .closest(".dubbing-recommendation")!;
-    const second = within(panel)
-      .getByLabelText("选用 第二版本")
-      .closest(".dubbing-recommendation")!;
-    fireEvent.dragStart(second);
-    fireEvent.dragOver(first);
-    fireEvent.drop(first);
+    fireEvent.click(within(panel).getByLabelText("选用 A推荐"));
+    fireEvent.click(groupButton(panel, "完成"));
+    await screen.findByText("本组配音已保存。");
     expect(
-      [...panel.querySelectorAll('input[type="checkbox"]')]
-        .slice(0, 2)
-        .map((node) => node.getAttribute("aria-label"))
-    ).toEqual(["选用 第二版本", "选用 A英式"]);
-    fireEvent.click(groupButton(panel, /取\s*消/));
-    const reopened = edit("A");
-    expect(
-      [...reopened.querySelectorAll('input[type="checkbox"]')]
-        .slice(0, 2)
-        .map((node) => node.getAttribute("aria-label"))
-    ).toEqual(["选用 A英式", "选用 第二版本"]);
+      vi
+        .mocked(api.speech.savePairedGroup)
+        .mock.calls[0]![0].group.pairs.map((p) => [p.id, p.selected])
+    ).toEqual([
+      ["a-pair", false],
+      ["second", true]
+    ]);
+    expect(screen.queryByText("更多音色")).not.toBeInTheDocument();
   });
-  it("可选择其他组已使用的板块，完成仅提交当前组", async () => {
-    mount();
+  it("组重排只提交服务器完整集合和 order_revision，排除新组与 A/B 内容草稿", async () => {
+    const { client } = mount();
     const a = edit("A"),
       b = edit("B");
-    fireEvent.change(within(a).getByDisplayValue("A"), {
-      target: { value: "A 未完成" }
+    fireEvent.change(within(a).getByLabelText("分组名称"), {
+      target: { value: "A草稿" }
     });
-    fireEvent.mouseDown(within(b).getByLabelText("B 使用板块"));
-    const word = await screen.findByRole("option", { name: "词形拼写" });
-    expect(word).not.toHaveAttribute("aria-disabled", "true");
-    fireEvent.click(
-      screen
-        .getAllByText("词形拼写")
-        .find((node) =>
-          node.className.includes("ant-select-item-option-content")
-        )!
-    );
-    fireEvent.click(groupButton(b, "完成"));
-    await waitFor(() => expect(api.speech.saveGroup).toHaveBeenCalledTimes(1));
-    expect(api.speech.saveGroup).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "b", areas: ["example", "word"] }),
-      1,
-      false
-    );
-    expect(within(a).getByDisplayValue("A 未完成")).toBeInTheDocument();
-  });
-  it("409 保留本组输入，其他组仍能取消", async () => {
-    vi.mocked(api.speech.saveGroup).mockRejectedValue(
-      new HttpError(409, "conflict")
-    );
-    mount();
-    const panel = edit("A"),
-      b = edit("B");
-    const name = within(panel).getByDisplayValue("A");
-    fireEvent.change(name, {
-      target: { value: "保留输入" }
+    fireEvent.change(within(b).getByLabelText("分组名称"), {
+      target: { value: "B草稿" }
     });
-    fireEvent.click(groupButton(panel, "完成"));
-    await screen.findByText(/本组已被修改或名称已被使用/);
-    expect(within(panel).getByDisplayValue("保留输入")).toHaveAttribute(
-      "aria-label",
-      "分组名称"
-    );
-    fireEvent.click(groupButton(b, /取\s*消/));
-    expect(within(panel).getByDisplayValue("保留输入")).toHaveAttribute(
-      "aria-label",
-      "分组名称"
-    );
-  });
-  it("全局常用不能改名或删除，允许两侧无推荐", async () => {
-    const initial = data();
-    initial.groups[0]!.uk = [];
-    initial.groups[0]!.us = [];
-    mount(initial);
-    const panel = edit("全局常用");
-    expect(within(panel).queryByLabelText("分组名称")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "新增分组" }));
     expect(
-      within(panel).queryByRole("button", { name: "删除分组" })
-    ).toBeNull();
-    expect(within(panel).getByLabelText("全局常用 使用板块")).toBeDisabled();
-    fireEvent.click(groupButton(panel, "完成"));
-    await waitFor(() =>
-      expect(api.speech.saveGroup).toHaveBeenCalledWith(
-        expect.objectContaining({ is_global: true, uk: [], us: [] }),
-        1,
-        false
-      )
-    );
-  });
-  it("保存前验证声音参数，修复 0.73 后原样提交", async () => {
-    mount();
-    const panel = edit("A");
-    const rate = within(panel).getAllByLabelText("推荐语速")[0]!;
-    fireEvent.change(rate, { target: { value: "" } });
-    fireEvent.click(groupButton(panel, "完成"));
-    expect(api.speech.saveGroup).not.toHaveBeenCalled();
-    fireEvent.change(rate, { target: { value: "0.73" } });
-    fireEvent.click(groupButton(panel, "完成"));
-    await waitFor(() => expect(api.speech.saveGroup).toHaveBeenCalled());
+      screen.getByRole("button", { name: "上移分组 新分组" })
+    ).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "上移分组 B草稿" }));
+    await screen.findByText("分组顺序已保存，未完成内容仍保留在各组草稿。");
+    expect(api.speech.saveGroupOrder).toHaveBeenCalledWith({
+      group_ids: ["b", "a", "global"],
+      base_revision: 8
+    });
+    expect(api.speech.savePairedGroup).not.toHaveBeenCalled();
+    expect(within(a).getByLabelText("分组名称")).toHaveValue("A草稿");
+    expect(within(b).getByLabelText("分组名称")).toHaveValue("B草稿");
     expect(
-      vi.mocked(api.speech.saveGroup).mock.calls[0]![0].uk[0]!.parameters
-        .rate_percent
-    ).toBe(-27);
+      (
+        client.getQueryData(queryKey) as AdminDubbingGroupsV3Response
+      ).groups.map((g) => g.name)
+    ).toEqual(["B", "A", "全局常用"]);
   });
-  it("取消后重新编辑使用已加载最新 revision，其他草稿保留", async () => {
+  it.each(["save", "order"])(
+    "%s 409 保留全部草稿并允许重新载入",
+    async (operation) => {
+      const conflict = new HttpError(409, "conflict");
+      if (operation === "save")
+        vi.mocked(api.speech.savePairedGroup).mockRejectedValue(conflict);
+      else vi.mocked(api.speech.saveGroupOrder).mockRejectedValue(conflict);
+      mount();
+      const a = edit("A"),
+        b = edit("B");
+      fireEvent.change(within(a).getByLabelText("分组名称"), {
+        target: { value: "A草稿" }
+      });
+      fireEvent.change(within(b).getByLabelText("分组名称"), {
+        target: { value: "B草稿" }
+      });
+      fireEvent.click(
+        operation === "save"
+          ? groupButton(b, "完成")
+          : screen.getByRole("button", { name: "上移分组 B草稿" })
+      );
+      await screen.findByText(/全部草稿已保留/);
+      expect(within(a).getByLabelText("分组名称")).toHaveValue("A草稿");
+      expect(within(b).getByLabelText("分组名称")).toHaveValue("B草稿");
+      fireEvent.click(screen.getByRole("button", { name: "重新载入" }));
+      await waitFor(() => expect(api.speech.groupsV3).toHaveBeenCalled());
+      expect(within(b).getByLabelText("分组名称")).toHaveValue("B草稿");
+    }
+  );
+  it("保存期间旧 GET 不覆盖新结果，撤销权限仍可取消其他草稿", async () => {
+    const late = deferred<AdminDubbingGroupsV3Response>(),
+      save = deferred<AdminDubbingGroupsV3Response>();
+    vi.mocked(api.speech.groupsV3).mockReturnValue(late.promise);
+    vi.mocked(api.speech.savePairedGroup).mockReturnValue(save.promise);
     const { client } = mount();
-    const panel = edit("A"),
+    const a = edit("A"),
       b = edit("B");
-    const bName = within(b).getByDisplayValue("B");
-    const latest = data();
-    latest.groups[1]!.revision = 4;
-    await act(async () => {
-      client.setQueryData(queryKey, latest);
-    });
-    fireEvent.click(groupButton(panel, /取\s*消/));
-    const next = edit("A");
-    fireEvent.click(groupButton(next, "完成"));
-    await waitFor(() => expect(api.speech.saveGroup).toHaveBeenCalled());
-    expect(api.speech.saveGroup).toHaveBeenCalledWith(
-      expect.objectContaining({ revision: 4 }),
-      4,
-      false
-    );
-    expect(bName).toBeInTheDocument();
-    expect(bName).toHaveValue("B");
-  });
-  it("保存期间旧 GET 不覆盖结果，撤销权限后仍可取消", async () => {
-    const pending = deferred<AdminDubbingGroupsResponse>();
-    const old = deferred<AdminDubbingGroupsResponse>();
-    vi.mocked(api.speech.saveGroup).mockReturnValueOnce(pending.promise);
-    vi.mocked(api.speech.groups).mockReturnValueOnce(old.promise);
-    const { client } = mount();
-    const panel = edit("A");
-    fireEvent.click(groupButton(panel, "完成"));
-    let refresh!: Promise<void>;
-    act(() => {
-      refresh = client.refetchQueries({ queryKey });
-    });
-    const saved = data();
-    saved.groups[1]!.revision = 2;
-    await act(async () => {
-      pending.resolve(saved);
-    });
+    void client.refetchQueries({ queryKey });
+    fireEvent.click(groupButton(a, "完成"));
+    const fresh = data();
+    fresh.revision = 9;
+    fresh.groups[0]!.revision = 2;
+    await act(async () => save.resolve(fresh));
     await screen.findByText("本组配音已保存。");
-    await act(async () => {
-      old.resolve(data());
-      await refresh;
-    });
-    expect(client.getQueryData(queryKey)).toEqual(saved);
-    const b = edit("B");
+    await act(async () => late.resolve(data()));
+    expect(client.getQueryData(queryKey)).toEqual(fresh);
     act(() => setPermissions(["words.access"]));
     expect(groupButton(b, "完成")).toBeDisabled();
-    fireEvent.click(groupButton(b, /取\s*消/));
-    expect(within(b).queryByLabelText("分组名称")).toBeNull();
+    fireEvent.click(groupButton(b, "取消"));
+    expect(
+      screen.queryByRole("button", { name: "编辑B" })
+    ).not.toBeInTheDocument();
+  });
+  it("全局固定末位不可排序、改名、删除，空套允许保存", async () => {
+    const initial = data();
+    initial.groups[2]!.recommendations = { format: "paired", pairs: [] };
+    mount(initial);
+    const panel = edit("全局常用");
+    expect(within(panel).queryByLabelText("分组名称")).not.toBeInTheDocument();
+    expect(within(panel).queryByLabelText("删除分组")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /上移分组 全局/ })
+    ).not.toBeInTheDocument();
+    fireEvent.click(groupButton(panel, "完成"));
+    await screen.findByText("本组配音已保存。");
+    expect(
+      vi.mocked(api.speech.savePairedGroup).mock.calls[0]![0].group.pairs
+    ).toEqual([]);
+  });
+  it("所有历史侧项可见，拒绝未整理保存，人工补齐保留不等长及重复声音旧 ID", async () => {
+    const initial = data(),
+      old = pairs(initial)[0]!;
+    initial.groups[0]!.recommendations = {
+      format: "legacy",
+      uk: [
+        { ...old.uk, name: "旧一", selected: true },
+        { ...old.uk, id: "old-uk-2", name: "旧二", selected: false }
+      ],
+      us: [{ ...old.us, name: "旧美", selected: true }]
+    };
+    mount(initial);
+    const panel = edit("A");
+    expect(within(panel).getByText("old-uk-2")).toBeVisible();
+    fireEvent.click(groupButton(panel, "完成"));
+    await screen.findByText(/请先人工整理完整英美推荐套/);
+    expect(api.speech.savePairedGroup).not.toHaveBeenCalled();
+    fireEvent.click(
+      within(panel).getByRole("button", { name: "人工配对／补齐" })
+    );
+    fireEvent.change(screen.getByLabelText("推荐名称"), {
+      target: { value: "人工第一套" }
+    });
+    for (const [side, text] of [
+      ["英式", "旧二"],
+      ["美式", "旧美"]
+    ]) {
+      fireEvent.mouseDown(screen.getByLabelText(`${side}历史版本`));
+      fireEvent.click(
+        await screen.findByText(new RegExp(text!), {
+          selector: ".ant-select-item-option-content"
+        })
+      );
+    }
+    fireEvent.click(screen.getByRole("button", { name: "保存整套推荐" }));
+    expect(
+      within(panel).getByRole("button", { name: "完成整理" })
+    ).toBeDisabled();
+    fireEvent.click(
+      within(panel).getByRole("button", { name: "人工配对／补齐" })
+    );
+    fireEvent.change(screen.getByLabelText("推荐名称"), {
+      target: { value: "补齐套" }
+    });
+    fireEvent.mouseDown(screen.getByLabelText("英式历史版本"));
+    fireEvent.click(
+      await screen.findByText(/旧一/, {
+        selector: ".ant-select-item-option-content"
+      })
+    );
+    selectVoice("Guy 男声");
+    fireEvent.click(screen.getByRole("button", { name: "保存整套推荐" }));
+    fireEvent.click(within(panel).getByRole("button", { name: "完成整理" }));
+    fireEvent.click(groupButton(panel, "完成"));
+    await screen.findByText("本组配音已保存。");
+    const result = vi.mocked(api.speech.savePairedGroup).mock.calls[0]![0].group
+      .pairs;
+    expect(result.map((p) => p.uk.id)).toEqual(["old-uk-2", "a-uk"]);
+    expect(result[0]!.selected).toBe(false);
+    expect(result[0]!.us).toEqual(old.us);
+  });
+  it("搜索与选声复用同一滚动容器和完整目录，不重排或挂载列", () => {
+    const many = Array.from({ length: 30 }, (_, i) => ({
+      ...uk,
+      alias: `uk-${i}`,
+      display_name: `Female${i}`
+    }));
+    mount(data(), [...many, uk, us]);
+    const panel = edit("A");
+    fireEvent.click(
+      within(panel).getByRole("button", { name: "新增整套推荐" })
+    );
+    const list = screen.getByLabelText("英式女声滚动列表");
+    list.scrollTop = 170;
+    expect(within(list).getAllByRole("radio")).toHaveLength(31);
+    selectVoice("Female20 女声");
+    fireEvent.change(screen.getByLabelText("搜索推荐音色"), {
+      target: { value: "Female20" }
+    });
+    expect(screen.getByLabelText("英式女声滚动列表")).toBe(list);
+    expect(list.scrollTop).toBe(170);
+    fireEvent.change(screen.getByLabelText("搜索推荐音色"), {
+      target: { value: "" }
+    });
+    expect(within(list).getAllByRole("radio")).toHaveLength(31);
+    expect(list.scrollTop).toBe(170);
+  });
+  it("共享板块只提交当前组，API 失败保留参数、选用和另一组草稿", async () => {
+    vi.mocked(api.speech.savePairedGroup).mockRejectedValueOnce(
+      new Error("offline")
+    );
+    mount();
+    const a = edit("A"),
+      b = edit("B");
+    fireEvent.change(within(a).getByLabelText("分组名称"), {
+      target: { value: "A保留" }
+    });
+    fireEvent.mouseDown(within(b).getByLabelText("B 使用板块"));
+    fireEvent.click(
+      await screen.findByText("词形拼写", {
+        selector: ".ant-select-item-option-content"
+      })
+    );
+    fireEvent.click(within(b).getByLabelText("选用 B推荐"));
+    fireEvent.click(groupButton(b, "完成"));
+    await screen.findByText("保存失败，本组全部草稿已保留，请重试。");
+    expect(within(b).getByLabelText("选用 B推荐")).not.toBeChecked();
+    expect(within(a).getByLabelText("分组名称")).toHaveValue("A保留");
+    const input = vi.mocked(api.speech.savePairedGroup).mock.calls[0]![0];
+    expect(input.group.areas).toEqual(["example", "word"]);
+    expect(input.group.pairs[0]!.selected).toBe(false);
+    fireEvent.click(groupButton(b, "完成"));
+    await screen.findByText("本组配音已保存。");
+    expect(vi.mocked(api.speech.savePairedGroup).mock.calls[1]![0]).toEqual(
+      input
+    );
+  });
+  it("取消单侧参数修改不污染本组或另一组", async () => {
+    mount();
+    const panel = edit("A");
+    fireEvent.click(
+      within(panel).getByRole("button", { name: "修改英式 A推荐" })
+    );
+    fireEvent.change(screen.getByLabelText("推荐语速"), {
+      target: { value: "0.73" }
+    });
+    expect(api.speech.savePairedGroup).not.toHaveBeenCalled();
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: /^取?\s*消$/
+      })
+    );
+    fireEvent.click(groupButton(panel, "完成"));
+    await screen.findByText("本组配音已保存。");
+    expect(
+      vi.mocked(api.speech.savePairedGroup).mock.calls[0]![0].group.pairs
+    ).toEqual(pairs(data()));
+  });
+  it("人工整理失效旧音色时可替换声音并保留原侧 ID", async () => {
+    const initial = data();
+    initial.groups[0]!.recommendations = {
+      format: "legacy",
+      uk: [
+        {
+          id: "old-disabled-side",
+          name: "失效旧声",
+          selected: false,
+          voice_alias: "unavailable",
+          parameters: { rate_percent: 0, pitch_semitones: 0, style: null }
+        }
+      ],
+      us: []
+    };
+    mount(initial);
+    const panel = edit("A");
+    fireEvent.click(
+      within(panel).getByRole("button", { name: "人工配对／补齐" })
+    );
+    fireEvent.change(screen.getByLabelText("推荐名称"), {
+      target: { value: "明确替换" }
+    });
+    fireEvent.mouseDown(screen.getByLabelText("英式历史版本"));
+    fireEvent.click(
+      await screen.findByText(/失效旧声 ·/, {
+        selector: ".ant-select-item-option-content"
+      })
+    );
+    selectVoice("Sonia 女声");
+    selectVoice("Guy 男声");
+    fireEvent.click(screen.getByRole("button", { name: "保存整套推荐" }));
+    fireEvent.click(within(panel).getByRole("button", { name: "完成整理" }));
+    fireEvent.click(groupButton(panel, "完成"));
+    await screen.findByText("本组配音已保存。");
+    expect(
+      vi.mocked(api.speech.savePairedGroup).mock.calls[0]![0].group.pairs[0]
+    ).toMatchObject({
+      selected: false,
+      uk: { id: "old-disabled-side", voice_alias: "sonia" }
+    });
   });
 });
