@@ -1,0 +1,117 @@
+.lexicon-assistant-launcher {
+  inset-inline-end: 28px;
+  inset-block-end: 28px;
+}
+
+.lexicon-assistant-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px !important;
+  min-width: 0;
+}
+
+.lexicon-assistant-context {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.lexicon-assistant-transcript {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  scrollbar-color: #bfbfbf transparent;
+  scrollbar-width: thin;
+}
+
+.lexicon-assistant-welcome {
+  padding-block: 24px;
+}
+
+.lexicon-assistant-welcome .ant-empty-image {
+  height: auto;
+  color: #2053ff;
+  font-size: 32px;
+}
+
+.lexicon-assistant-starter {
+  height: auto;
+  min-height: 40px;
+  white-space: normal;
+  text-align: start;
+  justify-content: flex-start;
+}
+
+.lexicon-assistant-turn {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.lexicon-assistant-question {
+  justify-self: end;
+  max-width: 92%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: #f0f5ff;
+  color: #1d39c4;
+  white-space: pre-wrap;
+}
+
+.lexicon-assistant-answer-text {
+  margin-top: 8px;
+  margin-bottom: 12px !important;
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
+
+.lexicon-assistant-stale {
+  display: block;
+  margin-top: 4px;
+}
+
+.lexicon-assistant-sources summary {
+  padding-block: 6px;
+  cursor: pointer;
+  color: #595959;
+}
+
+.lexicon-assistant-sources ul {
+  padding-inline-start: 20px;
+  margin-block: 8px;
+}
+
+.lexicon-assistant-sources li + li {
+  margin-top: 8px;
+}
+
+.lexicon-assistant-composer {
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.lexicon-assistant-connecting {
+  min-height: 64px;
+}
+
+@media (max-width: 600px) {
+  .lexicon-assistant-launcher {
+    inset-inline-end: 16px;
+    inset-block-end: 16px;
+  }
+  .lexicon-assistant-body {
+    padding: 16px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lexicon-assistant-transcript {
+    scroll-behavior: auto;
+  }
+}

@@ -2032,6 +2032,22 @@ function V3WordCreationSession({
       sharedSentenceCount={sharedSentenceCount}
       word={word}
       partOfSpeechCatalog={partOfSpeechCatalog?.items}
+      assistantCatalog={partOfSpeechCatalog}
+      onAssistantFormsApply={
+        contentEditing && !sessionReadOnly
+          ? (next, expected) => {
+              if (
+                pending.size ||
+                conflict ||
+                remoteUpdate ||
+                JSON.stringify(draftFormsRef.current) !== expected
+              )
+                return false;
+              setFormContents(next);
+              return true;
+            }
+          : undefined
+      }
       activeStep={activeStep}
       reachableSteps={reachableSteps}
       readOnly={sessionReadOnly}

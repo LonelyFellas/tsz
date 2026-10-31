@@ -1,0 +1,21 @@
+{
+  "run_id": "lexicon-agent-20261031",
+  "canonical_unchanged": true,
+  "canonical_entry_count": 2,
+  "audio_assets_created": 0,
+  "oss_objects_created": 0,
+  "owned_postgres_and_redis_removed": true,
+  "owned_listeners_stopped": true,
+  "protected_containers_still_present": true,
+  "browser": {
+    "logged_out": true,
+    "local_storage": 0,
+    "session_storage": 0,
+    "indexed_databases": 0,
+    "caches": 0,
+    "service_workers": 0,
+    "tab_closed": true,
+    "viewport_restored": true
+  },
+  "private_runtime_removed": true
+}

@@ -134,6 +134,7 @@ function collectCalls(
     getBlob: record("get"),
     upload: record("post"),
     post: record("post"),
+    postStream: record("post"),
     put: record("put"),
     patch: record("patch"),
     del: record("delete") // http.del → HTTP DELETE
@@ -832,7 +833,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "e850eed519d629614539e01c64bc7a77a91f10f6dd45c7ca3ab1e56a767a661b"
+      "851b1c429cef0853635a89e95f5559e95fd0f10c2693ed993e6b4af53f9fcfab"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
