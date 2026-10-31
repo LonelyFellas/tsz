@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/choice-distractor-quality/docs/openapi.json",
-  "_generatedAt": "2026-10-30T08:42:38.828Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dubbing-center/docs/openapi.json",
+  "_generatedAt": "2026-10-31T03:04:13.343Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -1351,9 +1351,33 @@
         "schema": { "type": ["string", "null"] }
       }
     ],
+    "post /admin/speech/groups": [
+      {
+        "name": "X-TSZ-Dubbing-Groups",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
     "put /admin/speech/groups": [
       {
         "name": "X-TSZ-Voice-Models",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "delete /admin/speech/groups/{id}": [
+      {
+        "name": "X-TSZ-Dubbing-Groups",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "put /admin/speech/groups/{id}": [
+      {
+        "name": "X-TSZ-Dubbing-Groups",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -3195,15 +3219,15 @@
     "get /admin/speech/groups": {
       "request": null,
       "responses": {
-        "200": { "$ref": "#/components/schemas/DubbingGroupsResponse" },
+        "200": { "$ref": "#/components/schemas/DubbingGroupsReadResponse" },
         "401": { "$ref": "#/components/schemas/ProblemDetails" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
     "post /admin/speech/groups": {
-      "request": { "$ref": "#/components/schemas/SaveDubbingGroupRequest" },
+      "request": { "$ref": "#/components/schemas/DubbingGroupWriteRequest" },
       "responses": {
-        "200": { "$ref": "#/components/schemas/DubbingGroupsResponse" },
+        "200": { "$ref": "#/components/schemas/DubbingGroupsReadResponse" },
         "400": { "$ref": "#/components/schemas/ProblemDetails" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" },
         "409": { "$ref": "#/components/schemas/ProblemDetails" },
@@ -3225,7 +3249,7 @@
     "delete /admin/speech/groups/{id}": {
       "request": { "$ref": "#/components/schemas/DeleteDubbingGroupRequest" },
       "responses": {
-        "200": { "$ref": "#/components/schemas/DubbingGroupsResponse" },
+        "200": { "$ref": "#/components/schemas/DubbingGroupsReadResponse" },
         "400": { "$ref": "#/components/schemas/ProblemDetails" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" },
         "404": { "$ref": "#/components/schemas/ProblemDetails" },
@@ -3234,9 +3258,9 @@
       }
     },
     "put /admin/speech/groups/{id}": {
-      "request": { "$ref": "#/components/schemas/SaveDubbingGroupRequest" },
+      "request": { "$ref": "#/components/schemas/DubbingGroupWriteRequest" },
       "responses": {
-        "200": { "$ref": "#/components/schemas/DubbingGroupsResponse" },
+        "200": { "$ref": "#/components/schemas/DubbingGroupsReadResponse" },
         "400": { "$ref": "#/components/schemas/ProblemDetails" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" },
         "409": { "$ref": "#/components/schemas/ProblemDetails" },
@@ -3853,6 +3877,87 @@
         },
         "revision": { "type": "integer", "format": "int64" }
       }
+    },
+    "DubbingGroupsReadResponse": {
+      "oneOf": [
+        { "$ref": "#/components/schemas/DubbingGroupsResponse" },
+        { "$ref": "#/components/schemas/DubbingGroupsV3Response" }
+      ]
+    },
+    "DubbingGroupsV3Response": {
+      "type": "object",
+      "required": ["groups", "revision", "order_revision"],
+      "properties": {
+        "groups": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/DubbingGroupV3" }
+        },
+        "order_revision": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 0
+        },
+        "revision": { "type": "integer", "format": "int64", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "DubbingGroupV3": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "areas",
+        "revision",
+        "is_global",
+        "recommendations"
+      ],
+      "properties": {
+        "areas": { "type": "array", "items": { "type": "string" } },
+        "id": { "type": "string", "format": "uuid" },
+        "is_global": { "type": "boolean" },
+        "name": { "type": "string" },
+        "recommendations": {
+          "$ref": "#/components/schemas/DubbingRecommendationsV3"
+        },
+        "revision": { "type": "integer", "format": "int64", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "DubbingRecommendationsV3": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["uk", "us", "format"],
+          "properties": {
+            "format": { "type": "string", "enum": ["legacy"] },
+            "uk": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/DubbingRecommendation" }
+            },
+            "us": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/DubbingRecommendation" }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["pairs", "format"],
+          "properties": {
+            "format": { "type": "string", "enum": ["paired"] },
+            "pairs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/DubbingRecommendationPair"
+              },
+              "maxItems": 20
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "discriminator": { "propertyName": "format" }
     },
     "DubbingAudioUpdates": {
       "type": "object",
@@ -7083,6 +7188,23 @@
       },
       "additionalProperties": false
     },
+    "DubbingGroupWriteRequest": {
+      "oneOf": [
+        { "$ref": "#/components/schemas/SaveDubbingGroupRequest" },
+        { "$ref": "#/components/schemas/SavePairedDubbingGroupRequest" }
+      ]
+    },
+    "DubbingPairVoice": {
+      "type": "object",
+      "description": "A pair owns selection and order; each side retains its existing version identity.",
+      "required": ["id", "voice_alias", "parameters"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "parameters": { "$ref": "#/components/schemas/VoiceParameters" },
+        "voice_alias": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
     "DubbingRecommendation": {
       "type": "object",
       "required": ["id", "name", "voice_alias", "parameters"],
@@ -7092,6 +7214,18 @@
         "parameters": { "$ref": "#/components/schemas/VoiceParameters" },
         "selected": { "type": "boolean" },
         "voice_alias": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "DubbingRecommendationPair": {
+      "type": "object",
+      "required": ["id", "name", "selected", "uk", "us"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "name": { "type": "string" },
+        "selected": { "type": "boolean" },
+        "uk": { "$ref": "#/components/schemas/DubbingPairVoice" },
+        "us": { "$ref": "#/components/schemas/DubbingPairVoice" }
       },
       "additionalProperties": false
     },
@@ -7551,6 +7685,22 @@
         "output_format": { "$ref": "#/components/schemas/AudioOutputFormat" },
         "ssml": { "type": "string", "maxLength": 32000 },
         "voice_alias": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "PairedDubbingGroup": {
+      "type": "object",
+      "required": ["id", "name", "areas", "is_global", "pairs"],
+      "properties": {
+        "areas": { "type": "array", "items": { "type": "string" } },
+        "id": { "type": "string", "format": "uuid" },
+        "is_global": { "type": "boolean" },
+        "name": { "type": "string" },
+        "pairs": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/DubbingRecommendationPair" },
+          "maxItems": 20
+        }
       },
       "additionalProperties": false
     },
@@ -8244,6 +8394,15 @@
           "type": "array",
           "items": { "$ref": "#/components/schemas/DubbingGroup" }
         }
+      },
+      "additionalProperties": false
+    },
+    "SavePairedDubbingGroupRequest": {
+      "type": "object",
+      "required": ["group", "base_revision"],
+      "properties": {
+        "base_revision": { "type": "integer", "format": "int64", "minimum": 0 },
+        "group": { "$ref": "#/components/schemas/PairedDubbingGroup" }
       },
       "additionalProperties": false
     },

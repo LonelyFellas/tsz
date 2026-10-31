@@ -100,6 +100,54 @@ export interface AdminDubbingGroupsResponse {
   revision: number;
 }
 
+export interface AdminDubbingPairVoice {
+  id: string;
+  voice_alias: string;
+  parameters: AdminVoiceParameters;
+}
+
+export interface AdminDubbingRecommendationPair {
+  id: string;
+  name: string;
+  selected: boolean;
+  uk: AdminDubbingPairVoice;
+  us: AdminDubbingPairVoice;
+}
+
+export type AdminDubbingRecommendationsV3 =
+  | {
+      format: "legacy";
+      uk: AdminDubbingRecommendation[];
+      us: AdminDubbingRecommendation[];
+    }
+  | { format: "paired"; pairs: AdminDubbingRecommendationPair[] };
+
+export interface AdminDubbingGroupV3 {
+  id: string;
+  name: string;
+  areas: string[];
+  revision: number;
+  is_global: boolean;
+  recommendations: AdminDubbingRecommendationsV3;
+}
+
+export interface AdminDubbingGroupsV3Response {
+  groups: AdminDubbingGroupV3[];
+  revision: number;
+  order_revision: number;
+}
+
+export interface SaveAdminPairedDubbingGroupInput {
+  group: {
+    id: string;
+    name: string;
+    areas: string[];
+    is_global: boolean;
+    pairs: AdminDubbingRecommendationPair[];
+  };
+  base_revision: number;
+}
+
 export interface AdminDubbingUpdateSettings {
   wait_seconds: number;
   revision: number;

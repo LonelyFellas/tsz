@@ -35,6 +35,7 @@ const runtimeSchemaBundle =
   runtimeSchemaBundleJson as unknown as RuntimeSchemaBundle;
 
 const ROOTS = [
+  "DubbingGroupsV3Response",
   "LearningCapabilities",
   "AiLedgerPage",
   "AiCostLedgerPage",

@@ -58,6 +58,7 @@ const QUERY_CONTRACT_OPERATIONS = new Set([
 ]);
 
 const RUNTIME_SCHEMA_ROOTS = [
+  "DubbingGroupsV3Response",
   "LearningCapabilities",
   "AiLedgerPage",
   "AiCostLedgerPage",
@@ -213,6 +214,10 @@ const contractSchemaNames = [
   "VoiceLibraryItem",
   "VoiceLibraryResponse",
   "DubbingGroupsResponse",
+  "DubbingGroupsReadResponse",
+  "DubbingGroupsV3Response",
+  "DubbingGroupV3",
+  "DubbingRecommendationsV3",
   "DubbingAudioUpdates",
   "DubbingAudioUpdate",
   "DubbingUpdateSettings",

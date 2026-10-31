@@ -832,7 +832,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "1a0a3a013614c747c64f6718cb1a33547843f3c7f3fdc49e793a9811e83e86c2"
+      "6680916841855f8fb84abad6311ec8e19ef78e9c68f424bc0c97507197d9f284"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1141,6 +1141,23 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
         required: false,
         schema: { type: ["string", "null"] }
       })),
+      ...Object.fromEntries(
+        [
+          "post /admin/speech/groups",
+          "put /admin/speech/groups/{id}",
+          "delete /admin/speech/groups/{id}"
+        ].map((operation) => [
+          operation,
+          [
+            {
+              name: "X-TSZ-Dubbing-Groups",
+              in: "header",
+              required: false,
+              schema: { type: ["string", "null"] }
+            }
+          ]
+        ])
+      ),
       "get /admin/speech/voices": [
         "X-TSZ-Voice-Catalog",
         "X-TSZ-Voice-Models"

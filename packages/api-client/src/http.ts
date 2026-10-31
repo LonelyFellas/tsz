@@ -377,12 +377,13 @@ export function createHttpClient({
     del: <T>(
       path: string,
       data?: unknown,
-      opts?: { retryOnUnauthorized?: boolean }
+      opts?: { retryOnUnauthorized?: boolean; headers?: HeadersInit }
     ) =>
       request<T>(
         path,
         {
           method: "DELETE",
+          ...(opts?.headers ? { headers: opts.headers } : {}),
           // 部分删除接口需要请求体（如注销账号需带 channel + code）。
           ...(data !== undefined ? { body: JSON.stringify(data) } : {})
         },
