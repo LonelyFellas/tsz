@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dubbing-center/docs/openapi.json",
-  "_generatedAt": "2026-10-31T08:19:47.156Z",
+  "_source": "/Users/darwish/.codex/worktrees/task147-batch6-playback-backend/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-10-31T13:30:26.222Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -216,6 +216,7 @@
     "/me/learning-runs/{id}": ["get"],
     "/me/learning-runs/{id}/answers": ["post"],
     "/me/learning-runs/{id}/questions": ["get"],
+    "/me/learning-runs/{id}/questions/{question_id}/audio": ["get"],
     "/me/learning-settings": ["put"],
     "/me/learning-tasks": ["get", "post"],
     "/me/learning-tasks/preview": ["post"],

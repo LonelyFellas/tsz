@@ -16,6 +16,7 @@ import { LearningPlanCreator } from "./LearningPlanCreator";
 import { ChoiceAnswerField } from "./ChoiceAnswerField";
 import { PlanCoverage, planStatusLabels } from "./PlanCoverage";
 import { listPlans, detailPlan, historyPlans } from "./plan-api";
+import { LearningAnswerAudio } from "./LearningAnswerAudio";
 import { LearningRewardSummary } from "@/features/coins/LearningRewardSummary";
 import { useUserStore } from "@/stores/user";
 import { buttonClass, primaryButtonClass } from "@/features/wordlist/reading";
@@ -1028,6 +1029,15 @@ function Practice({ userId, id }: { userId: string; id: string }) {
                     {q.options ? "正确答案：" : "可接受拼写："}
                     {q.feedback.accepted_answers.join(" / ")}
                   </p>
+                )}
+                {q.answered && q.feedback && (
+                  <LearningAnswerAudio
+                    runId={id}
+                    questionId={q.id}
+                    userId={userId}
+                    available={q.content_available}
+                    accent={r.settings.english_variant === "AmE" ? "us" : "uk"}
+                  />
                 )}
                 {q.feedback?.explanation && (
                   <p className="mt-2 whitespace-pre-line text-sm leading-6 text-foreground-muted">

@@ -97,9 +97,18 @@ export function TargetAudio({
       <span className="text-xs text-foreground-muted">
         当前正文的音频来源未确认，暂不可播放
       </span>
-    ) : null;
+    ) : (
+      <span className="text-xs text-foreground-muted">
+        当前口音暂无正式音频
+      </span>
+    );
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      {!primary && (
+        <span className="text-xs text-foreground-muted">
+          当前口音暂无正式音频
+        </span>
+      )}
       {primary && (
         <AudioButton
           entryId={entryId}

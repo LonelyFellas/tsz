@@ -12,7 +12,8 @@ import type {
   LearningQuestionPage,
   LearningAnswerReceipt,
   LearningPageQuery,
-  LearningCapabilities
+  LearningCapabilities,
+  LearningQuestionAudio
 } from "@tsz/types";
 import type { HttpClient } from "./http";
 import { learningOptions } from "./learning-capabilities";
@@ -99,6 +100,13 @@ export function createLearningTaskEndpoints(http: HttpClient) {
           learningOptions(o)
         )
         .then((v) => decode<LearningQuestionPage>("LearningQuestionPage", v)),
+    audio: (id: string, questionId: string, accent: "uk" | "us", o?: Options) =>
+      http
+        .get<unknown>(
+          `/me/learning-runs/${id}/questions/${questionId}/audio?accent=${accent}`,
+          learningOptions(o)
+        )
+        .then((v) => decode<LearningQuestionAudio>("LearningQuestionAudio", v)),
     answer: (id: string, data: SubmitLearningAnswer, o?: Options) =>
       http
         .post<unknown>(

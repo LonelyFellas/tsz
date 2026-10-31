@@ -46,6 +46,7 @@ export const RUNTIME_SCHEMA_ROOTS = [
   "LearningRun",
   "LearningRunPage",
   "LearningQuestionPage",
+  "LearningQuestionAudio",
   "LearningAnswerReceipt",
 
   "AccountDeletionRequest",
