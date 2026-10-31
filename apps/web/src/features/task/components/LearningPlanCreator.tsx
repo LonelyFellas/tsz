@@ -2,12 +2,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { HttpError } from "@tsz/api-client";
 import type {
   CreateLearningPlan,
   PreviewLearningPlan,
   LearningTaskType,
-  LearningQuestionType
+  LearningQuestionType,
+  Wordlist
 } from "@tsz/types";
 import { Button, Input, FormField } from "@tsz/ui/components";
 import { api } from "@/lib/request";
@@ -20,10 +22,87 @@ import {
 } from "@/features/shell/Page";
 import { PlanSourcePicker, type SelectedSource } from "./PlanSourcePicker";
 import { missingPlans } from "./plan-api";
-export function LearningPlanCreator({ userId }: { userId: string }) {
+export function LearningPlanCreator({
+  userId,
+  wordlistId,
+  owned = false
+}: {
+  userId: string;
+  wordlistId?: string;
+  owned?: boolean;
+}) {
+  if (!wordlistId) return <PlanForm userId={userId} />;
+  return (
+    <PreselectedPlan userId={userId} wordlistId={wordlistId} owned={owned} />
+  );
+}
+function PreselectedPlan({
+  userId,
+  wordlistId,
+  owned
+}: {
+  userId: string;
+  wordlistId: string;
+  owned: boolean;
+}) {
+  const source = useQuery({
+    queryKey: ["learning-plan-source", userId, wordlistId, owned],
+    queryFn: ({ signal }) =>
+      owned
+        ? api.wordList.myDetail(wordlistId, { signal })
+        : api.wordList.get(wordlistId, { signal }),
+    retry: false,
+    refetchOnWindowFocus: false
+  });
+  if (!source.data)
+    return (
+      <PageShell>
+        <PageHeader
+          title="创建学习任务"
+          back={{ href: "/student/practice", label: "我的任务" }}
+        />
+        {source.isError ? (
+          <PageNotice tone="error">
+            词表不存在、不可访问或暂时无法加载。
+            <Button variant="link" onClick={() => void source.refetch()}>
+              重试
+            </Button>
+            <Button asChild variant="link">
+              <Link href="/student/tasks/new">重新选择词表</Link>
+            </Button>
+          </PageNotice>
+        ) : (
+          <PageNotice>正在读取当前词表…</PageNotice>
+        )}
+      </PageShell>
+    );
+  return (
+    <PlanForm
+      userId={userId}
+      initialWordlist={source.data}
+      sourceError={source.isError}
+      onRetrySource={() => void source.refetch()}
+    />
+  );
+}
+function PlanForm({
+  userId,
+  initialWordlist,
+  sourceError = false,
+  onRetrySource
+}: {
+  userId: string;
+  initialWordlist?: Wordlist;
+  sourceError?: boolean;
+  onRetrySource?: () => void;
+}) {
   const router = useRouter();
   const form = useRef<HTMLFormElement>(null);
-  const [name, setName] = useState("");
+  const [name, setName] = useState(
+    initialWordlist
+      ? `${[...initialWordlist.name].slice(0, 48).join("")}练习`
+      : ""
+  );
   const [kind, setKind] = useState<LearningTaskType>("daily");
   const [questionType, setQuestionType] =
     useState<LearningQuestionType>("spelling_zh_to_en");
@@ -36,7 +115,11 @@ export function LearningPlanCreator({ userId }: { userId: string }) {
     capabilities.data?.practice_modes?.includes("mastery_v1") === true;
   const choiceSupported =
     capabilities.data?.question_types.includes("choice_zh_to_en") === true;
-  const [selected, setSelected] = useState<SelectedSource[]>([]);
+  const [selected, setSelected] = useState<SelectedSource[]>(
+    initialWordlist ? [{ wordlist: initialWordlist }] : []
+  );
+  const sourceUnavailable =
+    sourceError && selected.some((s) => s.wordlist.id === initialWordlist?.id);
   const [picker, setPicker] = useState(false);
   const [count, setCount] = useState("10");
   const [scheduled, setScheduled] = useState(false);
@@ -100,6 +183,7 @@ export function LearningPlanCreator({ userId }: { userId: string }) {
   const preview = useQuery({
     queryKey: ["learning-plans", userId, "v1", "preview", debounced],
     enabled:
+      !sourceUnavailable &&
       !unknown &&
       !busy &&
       selected.length > 0 &&
@@ -116,6 +200,7 @@ export function LearningPlanCreator({ userId }: { userId: string }) {
   const pendingPreview = debounced !== serialized || preview.isFetching;
   const locked = busy || unknown;
   async function submit() {
+    if (sourceUnavailable && !intent.current) return;
     setError("");
     if (!intent.current) {
       setSubmitted(true);
@@ -192,6 +277,14 @@ export function LearningPlanCreator({ userId }: { userId: string }) {
             : "选择拼写或单选练习。每轮覆盖所选内容，答错也计入覆盖。"
         }
       />
+      {sourceUnavailable && (
+        <PageNotice tone="error">
+          暂时无法确认词表是否可用，草稿已保留。请重试或移除此词表后再创建。
+          <Button variant="link" onClick={onRetrySource}>
+            重试
+          </Button>
+        </PageNotice>
+      )}
       <form
         ref={form}
         onSubmit={(e) => {
@@ -493,7 +586,10 @@ export function LearningPlanCreator({ userId }: { userId: string }) {
             className="w-full"
             disabled={
               busy ||
-              (!unknown && (pendingPreview || !preview.data?.can_create))
+              (!unknown &&
+                (sourceUnavailable ||
+                  pendingPreview ||
+                  !preview.data?.can_create))
             }
           >
             {busy ? "正在创建…" : unknown ? "重试原创建请求" : "完成创建"}

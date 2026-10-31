@@ -404,15 +404,24 @@ function Detail({
           <span className="break-words">{`${list.owner_name} · ${STATE_LABEL[list.state]} · ${list.item_count} 个词条`}</span>
         }
         actions={
-          mine && (
+          <>
             <Button asChild>
-              <Link href={editHref ?? `/account/wordlists/${id}/edit`}>
-                {list.state === "pending" || list.state === "published"
-                  ? "查看与编辑"
-                  : "编辑词表"}
+              <Link
+                href={`/student/tasks/new?${new URLSearchParams({ wordlist: id, source: mine ? "owned" : "public" })}`}
+              >
+                开始练习
               </Link>
             </Button>
-          )
+            {mine && (
+              <Button asChild variant="outline">
+                <Link href={editHref ?? `/account/wordlists/${id}/edit`}>
+                  {list.state === "pending" || list.state === "published"
+                    ? "查看与编辑"
+                    : "编辑词表"}
+                </Link>
+              </Button>
+            )}
+          </>
         }
       />
       <section className="border-b border-border/70 pb-5">

@@ -1,11 +1,22 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within
+} from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, it, expect, vi } from "vitest";
+import { HttpError } from "@tsz/api-client";
 import { renderWithProviders } from "@/test/render";
 const mocks = vi.hoisted(() => ({
   preview: vi.fn(),
   capabilities: vi.fn(),
   create: vi.fn(),
   list: vi.fn(),
+  get: vi.fn(),
+  myDetail: vi.fn(),
   push: vi.fn(),
   user: { id: "learner", roles: ["student"] }
 }));
@@ -13,7 +24,11 @@ vi.mock("@/lib/request", () => ({
   api: {
     learning: { capabilities: mocks.capabilities },
     learningPlans: { preview: mocks.preview, create: mocks.create },
-    wordList: { library: { list: mocks.list } }
+    wordList: {
+      get: mocks.get,
+      myDetail: mocks.myDetail,
+      library: { list: mocks.list }
+    }
   }
 }));
 vi.mock("@/stores/user", () => ({
@@ -24,6 +39,7 @@ vi.mock("@/stores/user", () => ({
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push }) }));
 import { LearningPlanCreator } from "./LearningPlanCreator";
+import { LearningTaskCreator } from "./LearningTasks";
 const wordlist = {
   id: "list",
   name: "原词表",
@@ -50,6 +66,9 @@ const preview = {
 };
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.user = { id: "learner", roles: ["student"] };
+  mocks.get.mockResolvedValue(wordlist);
+  mocks.myDetail.mockResolvedValue({ ...wordlist, state: "draft" });
   mocks.capabilities.mockResolvedValue({
     question_types: ["spelling_zh_to_en", "choice_zh_to_en"]
   });
@@ -75,6 +94,223 @@ async function choose() {
   fireEvent.click(within(dialog).getByRole("button", { name: "确认选择" }));
   await screen.findByText("35 个平台词条 · 35 道可出题内容");
 }
+it.each([false, true])(
+  "preselects the current wordlist with owned=%s and creates without opening the picker",
+  async (owned) => {
+    renderWithProviders(
+      <LearningTaskCreator wordlistId="list" owned={owned} />
+    );
+    await screen.findByText("35 个平台词条 · 35 道可出题内容");
+    expect(owned ? mocks.myDetail : mocks.get).toHaveBeenCalledWith("list", {
+      signal: expect.any(AbortSignal)
+    });
+    expect(owned ? mocks.get : mocks.myDetail).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("任务名称")).toHaveValue("原词表练习");
+    expect(
+      screen.getByRole("button", { name: "选择词表（1/5）" })
+    ).toBeInTheDocument();
+    expect(mocks.list).not.toHaveBeenCalled();
+    expect(mocks.preview).toHaveBeenLastCalledWith(
+      expect.objectContaining({ wordlist_ids: ["list"] }),
+      { signal: expect.any(AbortSignal) }
+    );
+    fireEvent.click(screen.getByRole("button", { name: "完成创建" }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledOnce());
+    expect(mocks.create.mock.calls[0]![0]).toMatchObject({
+      wordlist_ids: ["list"],
+      name: "原词表练习"
+    });
+  }
+);
+it("does not restore a preselected source after the learner removes it", async () => {
+  renderWithProviders(<LearningTaskCreator wordlistId="list" owned />);
+  await screen.findByText("35 个平台词条 · 35 道可出题内容");
+  fireEvent.change(screen.getByLabelText("任务名称"), {
+    target: { value: "我的计划" }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "移除 原词表" }));
+  expect(
+    screen.getByRole("button", { name: "选择词表（0/5）" })
+  ).toBeInTheDocument();
+  expect(screen.getByLabelText("任务名称")).toHaveValue("我的计划");
+  expect(screen.getByRole("button", { name: "完成创建" })).toBeDisabled();
+  expect(mocks.create).not.toHaveBeenCalled();
+});
+it("preserves the draft through a failed source refresh and retry, blocking creation until recovery", async () => {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  render(
+    <QueryClientProvider client={client}>
+      <LearningTaskCreator wordlistId="list" owned />
+    </QueryClientProvider>
+  );
+  await screen.findByText("35 个平台词条 · 35 道可出题内容");
+  fireEvent.change(screen.getByLabelText("任务名称"), {
+    target: { value: "用户已编辑的任务名" }
+  });
+  fireEvent.change(screen.getByLabelText("每日题量"), {
+    target: { value: "15" }
+  });
+  fireEvent.click(
+    screen.getByRole("radio", { name: "单选题 · 看中文，选英文" })
+  );
+  fireEvent.click(screen.getByLabelText(/设置日期计划/));
+  fireEvent.change(screen.getByLabelText("开始学习日"), {
+    target: { value: "2026-11-01" }
+  });
+  fireEvent.change(screen.getByLabelText("结束学习日"), {
+    target: { value: "2026-11-10" }
+  });
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "完成创建" })).toBeEnabled()
+  );
+  mocks.myDetail.mockRejectedValueOnce(new Error("offline"));
+  await act(async () => {
+    await client.refetchQueries({ queryKey: ["learning-plan-source"] });
+  });
+  await screen.findByRole("alert");
+  expect(screen.getByLabelText("任务名称")).toHaveValue("用户已编辑的任务名");
+  expect(screen.getByLabelText("每日题量")).toHaveValue(15);
+  expect(
+    screen.getByRole("radio", { name: "单选题 · 看中文，选英文" })
+  ).toBeChecked();
+  expect(screen.getByLabelText("开始学习日")).toHaveValue("2026-11-01");
+  expect(screen.getByLabelText("结束学习日")).toHaveValue("2026-11-10");
+  expect(
+    screen.getByRole("button", { name: "选择词表（1/5）" })
+  ).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "完成创建" })).toBeDisabled();
+  fireEvent.submit(screen.getByLabelText("任务名称").closest("form")!);
+  expect(mocks.create).not.toHaveBeenCalled();
+
+  let finish!: (value: unknown) => void;
+  mocks.myDetail.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  fireEvent.click(screen.getByRole("button", { name: "重试" }));
+  await waitFor(() => expect(mocks.myDetail).toHaveBeenCalledTimes(3));
+  expect(screen.getByLabelText("任务名称")).toHaveValue("用户已编辑的任务名");
+  expect(screen.getByRole("button", { name: "完成创建" })).toBeDisabled();
+  await act(async () =>
+    finish({ ...wordlist, name: "刷新后的词表名", state: "draft" })
+  );
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "完成创建" })).toBeEnabled()
+  );
+  expect(screen.getByLabelText("任务名称")).toHaveValue("用户已编辑的任务名");
+  fireEvent.click(screen.getByRole("button", { name: "完成创建" }));
+  await waitFor(() => expect(mocks.create).toHaveBeenCalledOnce());
+  expect(mocks.create.mock.calls[0]![0]).toMatchObject({
+    name: "用户已编辑的任务名",
+    wordlist_ids: ["list"],
+    daily_question_count: 15,
+    question_type: "choice_zh_to_en",
+    schedule: { start_date: "2026-11-01", end_date: "2026-11-10" }
+  });
+});
+it("blocks an inaccessible preselected wordlist and allows retry without creating a task", async () => {
+  mocks.myDetail.mockRejectedValueOnce(new HttpError(404, "不存在"));
+  renderWithProviders(<LearningTaskCreator wordlistId="list" owned />);
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "词表不存在、不可访问或暂时无法加载。"
+  );
+  expect(screen.getByRole("link", { name: "重新选择词表" })).toHaveAttribute(
+    "href",
+    "/student/tasks/new"
+  );
+  expect(mocks.preview).not.toHaveBeenCalled();
+  expect(mocks.create).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "重试" }));
+  await screen.findByText("35 个平台词条 · 35 道可出题内容");
+  expect(screen.getByLabelText("任务名称")).toHaveValue("原词表练习");
+});
+it("allows replacing an unavailable source without discarding the draft", async () => {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  render(
+    <QueryClientProvider client={client}>
+      <LearningTaskCreator wordlistId="list" owned />
+    </QueryClientProvider>
+  );
+  await screen.findByText("35 个平台词条 · 35 道可出题内容");
+  fireEvent.change(screen.getByLabelText("任务名称"), {
+    target: { value: "更换来源的计划" }
+  });
+  mocks.myDetail.mockRejectedValueOnce(new HttpError(404, "不可访问"));
+  await act(async () => {
+    await client.refetchQueries({ queryKey: ["learning-plan-source"] });
+  });
+  await screen.findByRole("alert");
+  fireEvent.click(screen.getByRole("button", { name: "移除 原词表" }));
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("任务名称")).toHaveValue("更换来源的计划");
+  mocks.list.mockResolvedValue({
+    version: "v1",
+    ancestors: [],
+    items: [
+      {
+        id: "replacement-node",
+        wordlist_id: "replacement",
+        name: "替代词表",
+        wordlist: { ...wordlist, id: "replacement", name: "替代词表" }
+      }
+    ],
+    pagination: { total_pages: 1 }
+  });
+  await choose();
+  fireEvent.click(screen.getByRole("button", { name: "完成创建" }));
+  await waitFor(() => expect(mocks.create).toHaveBeenCalledOnce());
+  expect(mocks.create.mock.calls[0]![0]).toMatchObject({
+    name: "更换来源的计划",
+    wordlist_ids: ["replacement"]
+  });
+});
+it("retains an uncertain creation request through a source refresh failure", async () => {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  mocks.create.mockRejectedValueOnce(new Error("offline"));
+  render(
+    <QueryClientProvider client={client}>
+      <LearningTaskCreator wordlistId="list" owned />
+    </QueryClientProvider>
+  );
+  await screen.findByText("35 个平台词条 · 35 道可出题内容");
+  fireEvent.click(screen.getByRole("button", { name: "完成创建" }));
+  await screen.findByRole("button", { name: "重试原创建请求" });
+  const original = mocks.create.mock.calls[0]![0];
+  mocks.myDetail.mockRejectedValueOnce(new Error("offline"));
+  await act(async () => {
+    await client.refetchQueries({ queryKey: ["learning-plan-source"] });
+  });
+  await screen.findByText(/暂时无法确认词表是否可用/);
+  expect(screen.getByLabelText("任务名称")).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "重试原创建请求" }));
+  await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(2));
+  expect(mocks.create.mock.calls[1]![0]).toEqual(original);
+});
+it("rechecks the current account before reusing a private source", async () => {
+  const view = renderWithProviders(
+    <LearningTaskCreator wordlistId="list" owned />
+  );
+  await screen.findByText("35 个平台词条 · 35 道可出题内容");
+  mocks.myDetail.mockRejectedValue(new HttpError(404, "不可访问"));
+  mocks.user = { id: "another-learner", roles: ["student"] };
+  view.rerender(<LearningTaskCreator wordlistId="list" owned />);
+  await screen.findByRole("alert");
+  expect(mocks.myDetail).toHaveBeenCalledTimes(2);
+  expect(screen.queryByLabelText("任务名称")).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "移除 原词表" })
+  ).not.toBeInTheDocument();
+  expect(mocks.create).not.toHaveBeenCalled();
+  mocks.myDetail.mockResolvedValue({ ...wordlist, state: "draft" });
+});
 it.each(["201", "0", "1.5", ""])(
   "daily quota %s links its error to the input and clears it after correction",
   (value) => {

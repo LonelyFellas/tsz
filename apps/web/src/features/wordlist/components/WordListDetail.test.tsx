@@ -184,6 +184,24 @@ beforeEach(() => {
   vi.mocked(api.auth.me).mockResolvedValue(profile(settings));
 });
 afterEach(() => vi.unstubAllGlobals());
+it.each([false, true])(
+  "links practice to the current wordlist with mine=%s without publishing",
+  async (mine) => {
+    if (mine)
+      vi.mocked(api.wordList.myDetail).mockResolvedValue({
+        ...list,
+        state: "draft"
+      });
+    open(mine);
+    expect(
+      await screen.findByRole("link", { name: "开始练习" })
+    ).toHaveAttribute(
+      "href",
+      `/student/tasks/new?wordlist=list&source=${mine ? "owned" : "public"}`
+    );
+    expect(api.wordList.publish).not.toHaveBeenCalled();
+  }
+);
 function open(mine = false, staleTime = 0) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime } }
