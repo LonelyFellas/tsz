@@ -3021,7 +3021,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           setUpload((current) => ({ ...current, locale: dialect }));
         }}
         onCloseDetail={stopAssetPlayback}
-        audioTools={(dialect) => (
+        audioTools={(dialect, stopDetailPlayback) => (
           <section aria-label="当前文本口音录音">
             <p>
               真人录音属于当前文本／口音，沿用原资产保存边界，不属于当前音色版本。
@@ -3051,7 +3051,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               onRetryUpload={retryUpload}
               onDismissUpload={dismissUpload}
               onRemoveAsset={removeAsset}
-              onPlayAsset={(asset) => void playAsset(asset)}
+              onPlayAsset={(asset) => {
+                stopDetailPlayback();
+                void playAsset(asset);
+              }}
               playingAssetId={playingAssetId}
               playbackMessage={playbackMessage}
             />
@@ -3059,7 +3062,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               <AudioReview
                 key={assetReview.result.audioUrl}
                 media={assetReview}
-                onPlay={stopAudition}
+                onPlay={() => {
+                  stopDetailPlayback();
+                  stopAudition();
+                }}
               />
             )}
           </section>

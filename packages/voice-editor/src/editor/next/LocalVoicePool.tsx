@@ -95,7 +95,10 @@ export function LocalVoicePool({
   onRestore: () => void;
   onOpenDetail: (dialect: "en-GB" | "en-US") => void;
   onCloseDetail: () => void;
-  audioTools: (dialect: "en-GB" | "en-US") => ReactNode;
+  audioTools: (
+    dialect: "en-GB" | "en-US",
+    stopPlayback: () => void
+  ) => ReactNode;
   error?: string;
   unavailableVersions?: ReadonlySet<string>;
   previousAudio?: VoiceSetting[];
@@ -832,7 +835,9 @@ export function LocalVoicePool({
               (item) =>
                 voiceSettingKey(item) === voiceSettingKey(detail.setting)
             )}
-            audioTools={audioTools(detail.dialect)}
+            audioTools={(stopPlayback) =>
+              audioTools(detail.dialect, stopPlayback)
+            }
             pendingUpload={pendingUpload}
             stopExternalAudio={onCloseDetail}
             onCancel={() => {

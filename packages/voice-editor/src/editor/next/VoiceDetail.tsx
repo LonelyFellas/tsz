@@ -46,7 +46,7 @@ export function VoiceDetail({
   adapter?: VoicePreviewAdapter;
   readOnly: boolean;
   canAudition: boolean;
-  audioTools?: ReactNode;
+  audioTools?: (stopPlayback: () => void) => ReactNode;
   pendingUpload: boolean;
   unavailable?: boolean;
   previousAudio?: VoiceSetting[];
@@ -298,7 +298,10 @@ export function VoiceDetail({
           }}
         />
       )}
-      {audioTools}
+      {audioTools?.(() => {
+        preview.stop();
+        ssmlStop.current?.();
+      })}
     </Modal>
   );
 }

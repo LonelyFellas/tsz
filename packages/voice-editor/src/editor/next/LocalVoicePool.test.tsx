@@ -10,6 +10,8 @@ import {
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
+  AudioAsset,
+  AudioUploadAdapter,
   VoiceOption,
   VoicePreviewAdapter,
   VoicePreviewResult,
@@ -89,18 +91,28 @@ const recommendation = (id: string, pair: string): VoiceRecommendation => ({
   setting: { voice_id: id, enabled: true, rate_percent: -10 }
 });
 class AudioMock extends EventTarget {
+  static instances: AudioMock[] = [];
+  constructor(readonly src = "") {
+    super();
+    AudioMock.instances.push(this);
+  }
   currentTime = 0;
   duration = 2;
   paused = true;
   playbackRate = 1;
   play = vi.fn(async () => {
     this.paused = false;
+    this.dispatchEvent(new Event("play"));
   });
   pause = vi.fn(() => {
     this.paused = true;
+    this.dispatchEvent(new Event("pause"));
   });
 }
-beforeEach(() => vi.stubGlobal("Audio", AudioMock));
+beforeEach(() => {
+  AudioMock.instances = [];
+  vi.stubGlobal("Audio", AudioMock);
+});
 function adapter(
   synthesize = vi.fn().mockResolvedValue({
     audioUrl: "blob:audio",
@@ -117,7 +129,9 @@ function Harness({
   onProfile = vi.fn(),
   readOnly = false,
   target = "target-a",
-  content = { version: 2 as const, text: "hello", annotations: [] }
+  content = { version: 2 as const, text: "hello", annotations: [] },
+  audioAssets,
+  audioAdapter
 }: {
   initial?: VoiceProfile;
   preview?: VoicePreviewAdapter;
@@ -126,6 +140,8 @@ function Harness({
   readOnly?: boolean;
   target?: string;
   content?: { version: 2; text: string; annotations: [] };
+  audioAssets?: AudioAsset[];
+  audioAdapter?: AudioUploadAdapter;
 }) {
   const [profile, setProfile] = useState(initial);
   const loadRecommendations = useCallback(
@@ -144,6 +160,8 @@ function Harness({
             onProfile(next);
           }}
           previewAdapter={preview}
+          audioAssets={audioAssets}
+          audioUploadAdapter={audioAdapter}
           loadRecommendations={loadRecommendations}
           recommendationArea="meaning"
           readOnly={readOnly}
@@ -499,4 +517,113 @@ describe("新版局部主页和唯一声音草稿", () => {
       })
     );
   });
+  it.each(["tts", "ssml"] as const)(
+    "真人录音接管详情%s时停止已播声音并中止在途请求，迟到结果不叠播",
+    async (mode) => {
+      const recorded: AudioAsset = {
+        id: "recording",
+        locale: "en-GB",
+        gender: "female",
+        content_type: "audio/mpeg",
+        size_bytes: 3,
+        original_name: "recording.mp3",
+        created_at: "2026-10-31T00:00:00Z"
+      };
+      const sample = () =>
+        Promise.resolve(new Blob([new Uint8Array(3)], { type: "audio/mpeg" }));
+      const audioAdapter: AudioUploadAdapter = {
+        upload: vi.fn(),
+        resolveUrl: vi.fn().mockResolvedValue({
+          url: "blob:recording",
+          expiresAt: "2099-01-01"
+        }),
+        loadAudio: sample
+      };
+      const activeResult: VoicePreviewResult = {
+        audioUrl: "blob:detail-active",
+        expiresAt: "2099-01-01",
+        cached: false,
+        loadAudio: sample,
+        dispose: vi.fn()
+      };
+      let finish!: (result: VoicePreviewResult) => void;
+      const pending = new Promise<VoicePreviewResult>((resolve) => {
+        finish = resolve;
+      });
+      const synthesize = vi
+        .fn<VoicePreviewAdapter["synthesize"]>()
+        .mockResolvedValueOnce(activeResult)
+        .mockReturnValueOnce(pending);
+      const synthesizeSsml = vi
+        .fn<NonNullable<VoicePreviewAdapter["synthesizeSsml"]>>()
+        .mockResolvedValueOnce(activeResult)
+        .mockReturnValueOnce(pending);
+      const preview = {
+        ...adapter(synthesize),
+        renderSsml: vi
+          .fn()
+          .mockResolvedValue(
+            '<speak><voice name="Alpha">hello</voice></speak>'
+          ),
+        synthesizeSsml
+      };
+      render(
+        <Harness
+          preview={preview}
+          audioAdapter={audioAdapter}
+          audioAssets={[recorded]}
+        />
+      );
+      const dialog = await detail();
+      if (mode === "ssml")
+        fireEvent.click(
+          within(dialog).getByRole("button", { name: "查看 SSML" })
+        );
+      const play = await within(dialog).findByRole("button", {
+        name: mode === "tts" ? "试听当前音色" : "试听 SSML"
+      });
+      await waitFor(() => expect(play).toBeEnabled());
+      fireEvent.click(play);
+      await waitFor(() =>
+        expect(
+          AudioMock.instances.some(
+            (audio) => audio.src === activeResult.audioUrl && !audio.paused
+          )
+        ).toBe(true)
+      );
+      const activeAudio = AudioMock.instances.find(
+        (audio) => audio.src === activeResult.audioUrl
+      )!;
+      fireEvent.click(within(dialog).getByLabelText("试听 recording.mp3"));
+      await waitFor(() =>
+        expect(
+          AudioMock.instances.some(
+            (audio) => audio.src === "blob:recording" && !audio.paused
+          )
+        ).toBe(true)
+      );
+      expect(activeAudio.paused).toBe(true);
+      fireEvent.click(play);
+      const calls =
+        mode === "tts" ? synthesize.mock.calls : synthesizeSsml.mock.calls;
+      await waitFor(() => expect(calls).toHaveLength(2));
+      const signal = calls[1]![1]!.signal!;
+      fireEvent.click(within(dialog).getByLabelText("试听 recording.mp3"));
+      expect(signal.aborted).toBe(true);
+      const dispose = vi.fn();
+      await act(async () =>
+        finish({
+          audioUrl: "blob:detail-late",
+          expiresAt: "2099-01-01",
+          cached: false,
+          dispose,
+          loadAudio: sample
+        })
+      );
+      expect(dispose).toHaveBeenCalledTimes(1);
+      expect(
+        AudioMock.instances.some((audio) => audio.src === "blob:detail-late")
+      ).toBe(false);
+    }
+  );
 });
