@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   run: vi.fn(),
   questions: vi.fn(),
   answer: vi.fn(),
+  audio: vi.fn(),
   list: vi.fn(),
   plansList: vi.fn(),
   plansDetail: vi.fn(),
@@ -58,6 +59,11 @@ const question = {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.answer.mockReset();
+  mocks.audio.mockResolvedValue({
+    policy_version: "harmonic_v1",
+    occurrence: 1,
+    audio: null
+  });
   mocks.cyclePreview.mockReset();
   mocks.cycleCreate.mockReset();
   mocks.cycles.mockReset();

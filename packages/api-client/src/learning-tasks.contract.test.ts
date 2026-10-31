@@ -89,3 +89,49 @@ describe("learning wire contract", () => {
     ).toBe(false);
   });
 });
+
+it("reads only answer audio with strict source, policy and effective rank metadata", async () => {
+  const value = {
+    policy_version: "harmonic_v1",
+    occurrence: 2,
+    audio: {
+      publication_id: id,
+      target_id: id,
+      asset_id: id,
+      locale: "en-AU",
+      accent_group: "uk",
+      source_dialect: "common",
+      effective_rank: 2,
+      candidate_count: 3,
+      url: "https://audio.example.test/formal.mp3",
+      expires_at: "2026-10-31T00:00:00Z"
+    }
+  };
+  const http = {
+    get: vi.fn().mockResolvedValue(value)
+  } as unknown as HttpClient;
+  const signal = new AbortController().signal;
+  expect(
+    await createLearningTaskEndpoints(http).audio(id, id, "uk", { signal })
+  ).toEqual(value);
+  expect(http.get).toHaveBeenCalledWith(
+    `/me/learning-runs/${id}/questions/${id}/audio?accent=uk`,
+    expect.objectContaining({ signal })
+  );
+  expect(
+    validateRuntimeSchema("LearningQuestionAudio", { ...value, audio: null })
+      .valid
+  ).toBe(true);
+  expect(
+    validateRuntimeSchema("LearningQuestionAudio", {
+      ...value,
+      answer_snapshot: ["secret"]
+    }).valid
+  ).toBe(false);
+  expect(
+    validateRuntimeSchema("LearningQuestionAudio", {
+      ...value,
+      audio: { ...value.audio, accent_group: "other" }
+    }).valid
+  ).toBe(false);
+});

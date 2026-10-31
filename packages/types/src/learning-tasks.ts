@@ -125,3 +125,21 @@ export interface LearningPageQuery {
   page_size?: number;
   state?: LearningTaskState;
 }
+
+export interface LearningAudioSelection {
+  publication_id: string;
+  target_id: string;
+  asset_id: string;
+  locale: string;
+  accent_group: "uk" | "us";
+  source_dialect: "common" | "uk" | "us";
+  effective_rank: number;
+  candidate_count: number;
+  url: string;
+  expires_at: string;
+}
+export interface LearningQuestionAudio {
+  policy_version: string;
+  occurrence: number;
+  audio: LearningAudioSelection | null;
+}

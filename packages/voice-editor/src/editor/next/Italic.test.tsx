@@ -31,11 +31,13 @@ it("释义例句格式共用选区、独立部分取消，清空和撤销保留�
     />
   );
   const formats = ["加粗", "斜体", "下划线"];
-  for (const name of formats)
-    expect(screen.getByRole("button", { name })).toBeDisabled();
+  const buttons = new Map(
+    formats.map((name) => [name, screen.getByRole("button", { name })])
+  );
+  for (const button of buttons.values()) expect(button).toBeDisabled();
   select(2, 5);
   for (const name of formats) {
-    const button = screen.getByRole("button", { name });
+    const button = buttons.get(name)!;
     fireEvent.mouseDown(button);
     fireEvent.click(button);
     expect(button).toHaveAttribute("aria-pressed", "true");
@@ -51,7 +53,7 @@ it("释义例句格式共用选区、独立部分取消，清空和撤销保留�
     view.container.querySelectorAll(".is-bold.is-italic.is-underline")
   ).toHaveLength(3);
   select(3, 4);
-  fireEvent.click(screen.getByRole("button", { name: "下划线" }));
+  fireEvent.click(buttons.get("下划线")!);
   expect(
     onChange.mock.lastCall?.[0].annotations.filter(
       (item: { type: string }) => item.type === "underline"
@@ -60,11 +62,12 @@ it("释义例句格式共用选区、独立部分取消，清空和撤销保留�
     { type: "underline", start: 2, end: 3 },
     { type: "underline", start: 4, end: 5 }
   ]);
-  fireEvent.click(screen.getByRole("button", { name: "上一步" }));
+  const undo = screen.getByRole("button", { name: "上一步" });
+  fireEvent.click(undo);
   expect(onChange.mock.lastCall?.[0]).toEqual(saved);
   fireEvent.click(screen.getByRole("button", { name: "清空标注" }));
   expect(onChange.mock.lastCall).toEqual([value, [link]]);
-  fireEvent.click(screen.getByRole("button", { name: "上一步" }));
+  fireEvent.click(undo);
   expect(onChange.mock.lastCall?.[0]).toEqual(saved);
   view.unmount();
   const reopened = render(

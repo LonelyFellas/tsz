@@ -1,4 +1,4 @@
-import { speechAccentGroup } from "@tsz/shared";
+import { harmonicProbabilities, speechAccentGroup } from "@tsz/shared";
 import type {
   VoiceOption,
   VoiceProfile,
@@ -225,7 +225,7 @@ export function reorderPoolVoice(
   return next;
 }
 
-/** Admin preview only. Learning playback is a separate delivery batch. */
+/** Same harmonic_v1 rule as formal playback, after per-accent eligibility filtering. */
 export function voicePoolProbabilities(
   settings: readonly VoiceSetting[],
   voices: readonly VoiceOption[],
@@ -260,9 +260,9 @@ export function voicePoolProbabilities(
           content
         )
     );
-    const total = eligible.reduce((sum, _, rank) => sum + 1 / (rank + 1), 0);
+    const weights = harmonicProbabilities(eligible.length);
     eligible.forEach((item, rank) =>
-      probabilities.set(voiceSettingKey(item), 1 / (rank + 1) / total)
+      probabilities.set(voiceSettingKey(item), weights[rank]!)
     );
   }
   return probabilities;

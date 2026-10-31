@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dubbing-center/docs/openapi.json",
-  "_source_sha256": "e850eed519d629614539e01c64bc7a77a91f10f6dd45c7ca3ab1e56a767a661b",
+  "_source": "/Users/darwish/.codex/worktrees/task147-batch6-playback-backend/tsz-rust/docs/openapi.json",
+  "_source_sha256": "6b6be63f02d6ca6df28fff7e4e257106d4619317d65e3a7fbcd1088f61ea33b6",
   "roots": [
     "DubbingGroupsV3Response",
     "LearningCapabilities",
@@ -46,6 +46,7 @@
     "LearningRun",
     "LearningRunPage",
     "LearningQuestionPage",
+    "LearningQuestionAudio",
     "LearningAnswerReceipt",
     "WordlistInteractionStatsBatch",
     "WordlistInteractionState",
@@ -2335,6 +2336,35 @@
       },
       "additionalProperties": false
     },
+    "LearningAudioAccent": { "type": "string", "enum": ["uk", "us"] },
+    "LearningAudioSelection": {
+      "type": "object",
+      "required": [
+        "publication_id",
+        "target_id",
+        "asset_id",
+        "locale",
+        "accent_group",
+        "source_dialect",
+        "effective_rank",
+        "candidate_count",
+        "url",
+        "expires_at"
+      ],
+      "properties": {
+        "accent_group": { "$ref": "#/$defs/LearningAudioAccent" },
+        "asset_id": { "type": "string", "format": "uuid" },
+        "candidate_count": { "type": "integer", "minimum": 1 },
+        "effective_rank": { "type": "integer", "minimum": 1 },
+        "expires_at": { "type": "string", "format": "date-time" },
+        "locale": { "type": "string" },
+        "publication_id": { "type": "string", "format": "uuid" },
+        "source_dialect": { "$ref": "#/$defs/Dialect" },
+        "target_id": { "type": "string", "format": "uuid" },
+        "url": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
     "LearningCapabilities": {
       "type": "object",
       "required": ["question_types"],
@@ -2665,6 +2695,21 @@
         "prompt": {
           "oneOf": [{ "$ref": "#/$defs/LearningPrompt" }, { "type": "null" }]
         }
+      },
+      "additionalProperties": false
+    },
+    "LearningQuestionAudio": {
+      "type": "object",
+      "required": ["policy_version", "occurrence", "audio"],
+      "properties": {
+        "audio": {
+          "oneOf": [
+            { "$ref": "#/$defs/LearningAudioSelection" },
+            { "type": "null" }
+          ]
+        },
+        "occurrence": { "type": "integer", "minimum": 1 },
+        "policy_version": { "type": "string" }
       },
       "additionalProperties": false
     },
