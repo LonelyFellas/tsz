@@ -1,8 +1,12 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/task147-batch6-playback-backend/tsz-rust/docs/openapi.json",
-  "_source_sha256": "6b6be63f02d6ca6df28fff7e4e257106d4619317d65e3a7fbcd1088f61ea33b6",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-readonly-agent-backend/tsz-rust/docs/openapi.json",
+  "_source_sha256": "f9d21f038643428ed14a20ccd2ada3356a928369b13afa3331f089b2374825d1",
   "roots": [
+    "LexiconAssistantCapability",
+    "LexiconAssistantResponse",
+    "LexiconAssistantEvent",
+    "LexiconFormCandidatesResponse",
     "DubbingGroupsV3Response",
     "LearningCapabilities",
     "AiLedgerPage",
@@ -699,6 +703,44 @@
       "additionalProperties": false
     },
     "AiPricingTariff": { "type": "string", "enum": ["peak", "off_peak"] },
+    "AssistantCandidateForm": {
+      "type": "object",
+      "required": ["form_type", "is_regular", "uk", "us"],
+      "properties": {
+        "form_type": { "type": "string" },
+        "is_regular": { "type": "boolean" },
+        "uk": { "$ref": "#/$defs/AssistantCandidateVariant" },
+        "us": { "$ref": "#/$defs/AssistantCandidateVariant" }
+      },
+      "additionalProperties": false
+    },
+    "AssistantCandidatePos": {
+      "type": "object",
+      "required": ["pos", "forms"],
+      "properties": {
+        "forms": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AssistantCandidateForm" },
+          "maxItems": 10,
+          "minItems": 1
+        },
+        "pos": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "AssistantCandidateVariant": {
+      "type": "object",
+      "required": ["spelling", "dict_phonetic"],
+      "properties": {
+        "dict_phonetic": { "type": "string", "maxLength": 200 },
+        "spelling": { "type": "string", "maxLength": 100, "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "AssistantSourceKind": {
+      "type": "string",
+      "enum": ["smart_lexicon", "builtin_dictionary", "filling_rules"]
+    },
     "AudioAsset": {
       "type": "object",
       "required": [
@@ -1754,6 +1796,7 @@
         "speech_preview_in_progress",
         "speech_provider_unavailable",
         "speech_rate_limited",
+        "lexicon_assistant_rate_limited",
         "speech_storage_unavailable",
         "unsupported_audio_content_type",
         "audio_file_too_large",
@@ -2901,6 +2944,137 @@
     },
     "LearningTaskState": { "type": "string", "enum": ["active", "archived"] },
     "LearningTaskType": { "type": "string", "enum": ["daily", "longterm"] },
+    "LexiconAssistantCapability": {
+      "type": "object",
+      "required": ["available"],
+      "properties": { "available": { "type": "boolean" } },
+      "additionalProperties": false
+    },
+    "LexiconAssistantEvent": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["message", "event"],
+          "properties": {
+            "event": { "type": "string", "enum": ["status"] },
+            "message": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["text", "event"],
+          "properties": {
+            "event": { "type": "string", "enum": ["delta"] },
+            "text": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["event"],
+          "properties": { "event": { "type": "string", "enum": ["reset"] } }
+        },
+        {
+          "type": "object",
+          "required": ["response", "event"],
+          "properties": {
+            "event": { "type": "string", "enum": ["complete"] },
+            "response": { "$ref": "#/$defs/LexiconAssistantResponse" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["status", "event"],
+          "properties": {
+            "event": { "type": "string", "enum": ["failed"] },
+            "status": { "type": "integer", "minimum": 0 }
+          }
+        }
+      ]
+    },
+    "LexiconAssistantResponse": {
+      "type": "object",
+      "required": [
+        "entry_id",
+        "context_id",
+        "answer",
+        "sources",
+        "usage",
+        "requires_human_review"
+      ],
+      "properties": {
+        "answer": { "type": "string" },
+        "context_id": { "type": "string", "format": "uuid" },
+        "entry_id": { "type": "string", "format": "uuid" },
+        "requires_human_review": { "type": "boolean" },
+        "sources": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LexiconAssistantSource" }
+        },
+        "usage": { "$ref": "#/$defs/LexiconAssistantUsage" }
+      },
+      "additionalProperties": false
+    },
+    "LexiconAssistantSource": {
+      "type": "object",
+      "required": ["kind", "label", "entry_id", "version", "truncated"],
+      "properties": {
+        "entry_id": { "type": ["string", "null"], "format": "uuid" },
+        "kind": { "$ref": "#/$defs/AssistantSourceKind" },
+        "label": { "type": "string" },
+        "truncated": { "type": "boolean" },
+        "version": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "LexiconAssistantUsage": {
+      "type": "object",
+      "required": [
+        "model",
+        "model_calls",
+        "tool_calls",
+        "input_tokens",
+        "output_tokens"
+      ],
+      "properties": {
+        "input_tokens": { "type": ["integer", "null"], "minimum": 0 },
+        "model": { "type": "string" },
+        "model_calls": { "type": "integer", "minimum": 0 },
+        "output_tokens": { "type": ["integer", "null"], "minimum": 0 },
+        "tool_calls": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "LexiconFormCandidatesResponse": {
+      "type": "object",
+      "required": [
+        "entry_id",
+        "base_revision",
+        "context_id",
+        "catalog_version",
+        "headword",
+        "pos",
+        "notes",
+        "usage",
+        "requires_human_review"
+      ],
+      "properties": {
+        "base_revision": { "type": "integer" },
+        "catalog_version": { "type": "integer" },
+        "context_id": { "type": "string", "format": "uuid" },
+        "entry_id": { "type": "string", "format": "uuid" },
+        "headword": { "type": "string" },
+        "notes": { "type": "array", "items": { "type": "string" } },
+        "pos": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AssistantCandidatePos" },
+          "maxItems": 8,
+          "minItems": 1
+        },
+        "requires_human_review": { "type": "boolean" },
+        "usage": { "$ref": "#/$defs/LexiconAssistantUsage" }
+      },
+      "additionalProperties": false
+    },
     "LibraryCrumb": {
       "type": "object",
       "required": ["id", "name"],

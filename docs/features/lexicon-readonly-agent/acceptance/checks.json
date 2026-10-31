@@ -1,0 +1,70 @@
+{
+  "scope": "local implementation; no commit, PR or deployment",
+  "baselines": {
+    "frontend": "bb657959",
+    "backend": "a1399cc",
+    "agent": "a33dc78"
+  },
+  "branch": "codex/lexicon-readonly-agent",
+  "source_state": "baseline SHA plus working tree changes",
+  "backend_openapi_sha256": "8a2920238a3a8507581fd6001756e27daceda1b1f028550d57a24ab185d21f16",
+  "checks": {
+    "api_client": {
+      "files": 36,
+      "passed": 664
+    },
+    "admin_focused": {
+      "files": 3,
+      "passed": 100
+    },
+    "typescript": {
+      "tasks_passed": 7
+    },
+    "frontend_eslint": "passed",
+    "frontend_format": "passed",
+    "admin_production_build": "passed",
+    "rust_assistant_handler": {
+      "passed": 4
+    },
+    "rust_assistant_unit": {
+      "passed": 2
+    },
+    "rust_clippy_all_targets_all_features": "passed",
+    "rust_fmt": "passed",
+    "agent_full": {
+      "passed": 212,
+      "skipped": 4
+    },
+    "agent_after_final_prompt_change": {
+      "passed": 8
+    },
+    "agent_ruff_mypy_contract_export_build": "passed"
+  },
+  "real_acceptance": {
+    "environment": "dedicated local PostgreSQL/Redis; synthetic dictionary and lexicon fixtures; actual DeepSeek; built-in browser",
+    "api_mocks": false,
+    "smart_lexicon_and_dictionary_sources": true,
+    "real_increment_before_completion": true,
+    "unsaved_phonetic_read": "/bæŋk/",
+    "stop_keeps_partial_text": true,
+    "term_switch_clears_conversation": true,
+    "canonical_unchanged": true,
+    "desktop": {
+      "width": 1280,
+      "height": 900
+    },
+    "mobile": {
+      "viewport_width": 390,
+      "page_width": 390,
+      "drawer_width": 390,
+      "height": 844
+    }
+  },
+  "limitations": [
+    "Full admin runtime suite and remote CI were not run; focused regression and type/build gates passed.",
+    "Four optional live runtime tests remain skipped; this feature was verified with the existing DeepSeek provider.",
+    "Model language suggestions need human review; no automatic save or publication.",
+    "Early model wording exposed internal fields and incorrect form reuse advice; projection and domain instructions were corrected before final acceptance."
+  ],
+  "cleanup_receipt": "cleanup.json"
+}

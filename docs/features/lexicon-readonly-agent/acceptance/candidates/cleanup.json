@@ -1,0 +1,22 @@
+{
+  "run_id": "lexicon-candidates-test-20261031-21f7bd",
+  "owned_word_entries_removed": 4,
+  "owned_account_sessions_dictionary_and_sqlx_agent_test_databases_removed_with_cluster": true,
+  "postgres_and_redis_removed": true,
+  "audio_assets_created": 0,
+  "oss_objects_created": 0,
+  "browser": {
+    "logged_out": true,
+    "local_storage": 0,
+    "session_storage": 0,
+    "indexed_databases": 0,
+    "caches": 0,
+    "service_workers": 0,
+    "test_tab_closed": true,
+    "viewport_restored": true
+  },
+  "user_preview_containers_preserved": true,
+  "user_preview_tab_preserved": true,
+  "private_runtime_removed": true,
+  "previous_failed_bootstrap_batch_cleaned": true
+}

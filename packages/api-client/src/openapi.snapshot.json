@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/task147-batch6-playback-backend/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-31T13:30:26.222Z",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-readonly-agent-backend/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-10-31T16:12:09.803Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -30,6 +30,10 @@
     "/admin/coins/manual-credits/{operation_id}/reversal": ["post"],
     "/admin/coins/operations": ["get"],
     "/admin/dashboard/overview": ["get"],
+    "/admin/lexicon/assistant": ["post"],
+    "/admin/lexicon/assistant/capability": ["get"],
+    "/admin/lexicon/assistant/form-candidates": ["post"],
+    "/admin/lexicon/assistant/stream": ["post"],
     "/admin/lexicon/audio-assets": ["post"],
     "/admin/lexicon/audio-assets/upload-url": ["post"],
     "/admin/lexicon/audio-assets/{id}/content": ["get"],
@@ -2471,6 +2475,53 @@
         "403": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
+    "post /admin/lexicon/assistant": {
+      "request": { "$ref": "#/components/schemas/LexiconAssistantInput" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/LexiconAssistantResponse" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "429": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/lexicon/assistant/capability": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/LexiconAssistantCapability" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/lexicon/assistant/form-candidates": {
+      "request": { "$ref": "#/components/schemas/LexiconFormCandidatesInput" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/LexiconFormCandidatesResponse" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "429": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/lexicon/assistant/stream": {
+      "request": { "$ref": "#/components/schemas/LexiconAssistantInput" },
+      "responses": {
+        "200": null,
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "429": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "post /admin/lexicon/audio-assets": {
       "request": { "$ref": "#/components/schemas/ConfirmAudioAssetRequest" },
       "responses": {
@@ -4790,6 +4841,7 @@
         "speech_preview_in_progress",
         "speech_provider_unavailable",
         "speech_rate_limited",
+        "lexicon_assistant_rate_limited",
         "speech_storage_unavailable",
         "unsupported_audio_content_type",
         "audio_file_too_large",
@@ -6809,6 +6861,7 @@
       },
       "additionalProperties": false
     },
+    "AssistantHistoryRole": { "type": "string", "enum": ["user", "assistant"] },
     "AudioAsset": {
       "type": "object",
       "description": "一条已登记的音频资产。既是 confirm 的响应体，也内嵌在 `GrammarVariantV3.audio_assets` 里。\n除 `id` 外的字段都是服务端权威元数据：保存词义时按 id 重新灌入，客户端回传的值不作数。",
@@ -7638,6 +7691,63 @@
       "additionalProperties": false
     },
     "LearningTaskType": { "type": "string", "enum": ["daily", "longterm"] },
+    "LexiconAssistantHistory": {
+      "type": "object",
+      "required": ["role", "content"],
+      "properties": {
+        "content": { "type": "string", "maxLength": 4000, "minLength": 1 },
+        "role": { "$ref": "#/components/schemas/AssistantHistoryRole" }
+      },
+      "additionalProperties": false
+    },
+    "LexiconAssistantInput": {
+      "type": "object",
+      "required": [
+        "entry_id",
+        "base_revision",
+        "context_id",
+        "step",
+        "local_content",
+        "context_truncated",
+        "question",
+        "history"
+      ],
+      "properties": {
+        "base_revision": { "type": "integer", "format": "int64", "minimum": 1 },
+        "context_id": { "type": "string", "format": "uuid" },
+        "context_truncated": { "type": "boolean" },
+        "entry_id": { "type": "string", "format": "uuid" },
+        "history": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/LexiconAssistantHistory" },
+          "maxItems": 6
+        },
+        "local_content": { "type": "string", "maxLength": 24000 },
+        "question": { "type": "string", "maxLength": 2000, "minLength": 1 },
+        "step": { "$ref": "#/components/schemas/WordCreationStep" }
+      },
+      "additionalProperties": false
+    },
+    "LexiconFormCandidatesInput": {
+      "type": "object",
+      "required": [
+        "entry_id",
+        "base_revision",
+        "context_id",
+        "catalog_version",
+        "headword",
+        "local_content"
+      ],
+      "properties": {
+        "base_revision": { "type": "integer", "format": "int64" },
+        "catalog_version": { "type": "integer", "format": "int64" },
+        "context_id": { "type": "string", "format": "uuid" },
+        "entry_id": { "type": "string", "format": "uuid" },
+        "headword": { "type": "string", "maxLength": 100, "minLength": 1 },
+        "local_content": { "type": "string", "maxLength": 24000 }
+      },
+      "additionalProperties": false
+    },
     "LibraryAction": {
       "type": "string",
       "enum": ["move", "trash", "restore", "purge"]
@@ -9070,6 +9180,10 @@
         }
       },
       "additionalProperties": false
+    },
+    "WordCreationStep": {
+      "type": "string",
+      "enum": ["basics", "forms", "meanings", "preview"]
     },
     "WordDefinitionV3": {
       "oneOf": [

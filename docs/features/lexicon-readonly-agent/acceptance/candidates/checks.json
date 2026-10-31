@@ -1,0 +1,106 @@
+{
+  "feature": "AI form candidates preview and local adoption",
+  "code_checks": {
+    "api_client_tests_passed": 666,
+    "admin_candidate_model_and_dialog_tests_passed": 8,
+    "existing_assistant_layout_wizard_regression_passed": 100,
+    "rust_assistant_handlers_passed": 6,
+    "rust_clippy_all_targets_all_features": "passed",
+    "agent_full_tests_passed": 219,
+    "agent_optional_runtime_tests_skipped": 4,
+    "agent_final_prompt_focused_tests_passed": 7,
+    "agent_ruff_format_mypy_export_build": "passed",
+    "typescript_tasks_passed": 7,
+    "admin_eslint_format_production_build": "passed"
+  },
+  "real_acceptance": {
+    "environment": "dedicated local PostgreSQL/Redis, actual DeepSeek, production static preview, built-in browser; all API mocks disabled",
+    "manual_save": {
+      "saved_revision": 2,
+      "persisted_pos": [
+        {
+          "pos": "noun",
+          "forms": 2
+        },
+        {
+          "pos": "verb",
+          "forms": 5
+        }
+      ],
+      "manual_save_and_independent_get_verified": true,
+      "generation_did_not_save": true
+    },
+    "regional_save": {
+      "entry": "color",
+      "revision": 2,
+      "status": "draft",
+      "pos": [
+        {
+          "code": "noun",
+          "forms": 2
+        },
+        {
+          "code": "verb",
+          "forms": 5
+        }
+      ],
+      "audio_assets_created": 0,
+      "independent_api_and_database_verified": true,
+      "distinct_regional_spellings_observed_and_saved": true
+    },
+    "refined_model": {
+      "valid": true,
+      "model": "deepseek-flash",
+      "base_spellings": [
+        {
+          "uk": "centre",
+          "us": "center",
+          "uk_phonetic": "/ˈsɛntə/",
+          "us_phonetic": "/ˈsɛntər/"
+        },
+        {
+          "uk": "centre",
+          "us": "center",
+          "uk_phonetic": "/ˈsɛntə/",
+          "us_phonetic": "/ˈsɛntər/"
+        },
+        {
+          "uk": "centre",
+          "us": "center",
+          "uk_phonetic": "/ˈsɛntə/",
+          "us_phonetic": "/ˈsɛntər/"
+        }
+      ],
+      "notes": [
+        "英式拼写按 centre 系列给出，美式拼写按 center 系列给出。",
+        "名词与动词的英式音标均按 /ˈsɛntə/ 给出，美式均按 /ˈsɛntər/ 给出，未强行共用其他读音。",
+        "形容词比较级和最高级的拼写及读音不常见，音标留空，建议人工复核是否采纳。",
+        "副词与代词用法罕见，本预览未提供候选。"
+      ]
+    },
+    "invalid_generation_attempt": {
+      "http_status": 503,
+      "no_candidates_adopted": true,
+      "cause": "not established; retry remains explicit"
+    },
+    "desktop": {
+      "viewport_height": 900,
+      "import_button_bottom": 838
+    },
+    "mobile": {
+      "width": 390,
+      "page_width": 390,
+      "modal_width": 358,
+      "footer_bottom": 802,
+      "viewport_height": 844
+    }
+  },
+  "local_preview": {
+    "url": "http://127.0.0.1:62487",
+    "updated": true,
+    "existing_database_and_user_content_preserved": true,
+    "candidate_endpoint_verified": true,
+    "existing_entries_present": 3
+  },
+  "delivery": "local changes only; no commit, PR, remote CI or deployment"
+}

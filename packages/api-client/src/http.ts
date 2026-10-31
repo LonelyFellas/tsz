@@ -174,7 +174,8 @@ export function createHttpClient({
     retryOnUnauthorized:
       boolean | ((code: string | undefined) => boolean) = true,
     responseType: "json" | "blob" = "json",
-    deadline?: ReturnType<typeof createRequestDeadline>
+    deadline?: ReturnType<typeof createRequestDeadline>,
+    consumeStream?: (response: Response, checkSession: () => void) => Promise<T>
   ): Promise<T> {
     if (!retrying && !skipAuth && getTestResourceRun) {
       const run = getTestResourceRun();
@@ -235,7 +236,8 @@ export function createHttpClient({
         skipAuth,
         retryOnUnauthorized,
         responseType,
-        deadline
+        deadline,
+        consumeStream
       );
     }
 
@@ -253,6 +255,16 @@ export function createHttpClient({
         meta,
         problem
       );
+    }
+
+    if (consumeStream) {
+      const checkSession = () => {
+        init.signal?.throwIfAborted();
+        if (!skipAuth && !isCurrent()) throw new Error("session changed");
+      };
+      const result = await consumeStream(res, checkSession);
+      checkSession();
+      return result;
     }
 
     if (responseType === "blob") {
@@ -275,11 +287,15 @@ export function createHttpClient({
     skipAuth = false,
     retryOnUnauthorized:
       boolean | ((code: string | undefined) => boolean) = true,
-    responseType: "json" | "blob" = "json"
+    responseType: "json" | "blob" = "json",
+    consumeStream?: (response: Response, checkSession: () => void) => Promise<T>
   ): Promise<T> {
     const method = init.method ?? "GET";
     const longOperation =
       init.body instanceof Blob ||
+      path === "/lexicon/assistant" ||
+      path === "/lexicon/assistant/stream" ||
+      path === "/lexicon/assistant/form-candidates" ||
       /\/(speech|audio|avatar|teacher-certification|teacher-applications)/.test(
         path
       );
@@ -297,7 +313,8 @@ export function createHttpClient({
           skipAuth,
           retryOnUnauthorized,
           responseType,
-          deadline
+          deadline,
+          consumeStream
         )
       );
     } finally {
@@ -306,6 +323,21 @@ export function createHttpClient({
   }
 
   return {
+    postStream: <T>(
+      path: string,
+      data: unknown,
+      consume: (response: Response, checkSession: () => void) => Promise<T>,
+      signal?: AbortSignal
+    ) =>
+      request<T>(
+        path,
+        { method: "POST", body: JSON.stringify(data), signal },
+        false,
+        false,
+        true,
+        "json",
+        consume
+      ),
     getBlob: (path: string, opts?: { signal?: AbortSignal }) =>
       request<Blob>(
         path,
