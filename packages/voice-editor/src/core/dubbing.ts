@@ -2,6 +2,7 @@ import type {
   AudioAssetLocale,
   VoiceOption,
   VoiceProfile,
+  VoicePreviewRequest,
   VoiceRecommendation,
   VoiceRecommendationArea,
   VoiceSetting
@@ -90,15 +91,10 @@ export function resolveRecommendedVoices(
   profile: VoiceProfile | null | undefined,
   recommendations: readonly VoiceRecommendation[],
   voices: readonly VoiceOption[],
-  locale?: AudioAssetLocale
+  locale?: AudioAssetLocale,
+  content?: VoicePreviewRequest["content"]
 ): VoiceSetting[] {
   if (!profile?.dubbing) return profile?.voices ?? [];
-  const order = profile.dubbing.recommendation_order ?? [];
-  const sorted = [...recommendations].sort((a, b) => {
-    const left = order.indexOf(a.id),
-      right = order.indexOf(b.id);
-    return (left < 0 ? Infinity : left) - (right < 0 ? Infinity : right);
-  });
   return (["en-GB", "en-US"] as const)
     .filter((accent) => !locale || accent === locale)
     .flatMap((accent) => {
@@ -128,20 +124,20 @@ export function resolveRecommendedVoices(
                     setting
                   },
                   voices,
-                  accent
+                  accent,
+                  content
                 )
             )
           : [];
       if (selected.length) return local.length === selected.length ? local : [];
-      const recommended = sorted.filter(
+      const recommended = recommendations.find(
         (item) =>
           item.locale === accent &&
-          isVoiceRecommendationAvailable(item, voices, accent)
+          isVoiceRecommendationAvailable(item, voices, accent, content)
       );
-      if (recommended.length)
-        return recommended.map((item) =>
-          recommendationVoiceSetting(item, voices)
-        );
+      if (recommended) return [recommendationVoiceSetting(recommended, voices)];
+      // Existing local-empty profiles retain their old fallback until pool conversion.
+      if (profile.dubbing?.mode === "inherit") return [];
       const fallback = voices.find(
         (voice) =>
           speechAccentGroup(voice.locale, voice.accent) ===
@@ -155,7 +151,8 @@ export function resolveRecommendedVoices(
               setting: { voice_id: voice.id, enabled: true, rate_percent: 0 }
             },
             voices,
-            accent
+            accent,
+            content
           )
       );
       return fallback

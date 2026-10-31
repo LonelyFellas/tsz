@@ -231,20 +231,27 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           locale,
           signal: controller.signal
         });
-        const first = (["en-GB", "en-US"] as const)
-          .filter((accent) => !locale || accent === locale)
-          .map((accent) => items.find((item) => item.locale === accent))
-          .filter((item) => item !== undefined);
-        const voices = first.length
+        const accents = (["en-GB", "en-US"] as const).filter(
+          (accent) =>
+            (!locale || accent === locale) &&
+            items.some((item) => item.locale === accent)
+        );
+        const voices = accents.length
           ? await (previewAdapter ?? adminVoicePreviewAdapter).listVoices({
               language: "en",
               signal: controller.signal
             })
           : [];
         if (controller.signal.aborted) return;
-        const usable = first.filter((item) =>
-          isVoiceRecommendationAvailable(item, voices, locale)
-        );
+        const usable = accents
+          .map((accent) =>
+            items.find(
+              (item) =>
+                item.locale === accent &&
+                isVoiceRecommendationAvailable(item, voices, accent)
+            )
+          )
+          .filter((item) => item !== undefined);
         setDefaultVoice({
           key: defaultKey,
           profile: {
@@ -258,7 +265,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             )
           },
           error:
-            usable.length < first.length
+            usable.length < accents.length
               ? "部分首位推荐已失效，请打开编辑器选择其他音色。"
               : undefined
         });

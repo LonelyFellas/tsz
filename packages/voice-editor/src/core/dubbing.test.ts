@@ -99,7 +99,7 @@ describe("文本配音模式", () => {
       retainResolvedAudio([{ ...setting, volume_percent: 100 }], [stored])[0]
     ).toHaveProperty("audio_asset_id", "audio");
   });
-  it("历史快照不靠参数相等转继承，显式继承才读取推荐顺序", () => {
+  it("历史快照不靠参数相等转继承，继承取当前组优先级首项而非旧顺序", () => {
     const old = {
       voices: [{ voice_id: "sonia", enabled: true, rate_percent: 0 }]
     };
@@ -118,8 +118,137 @@ describe("文本配音模式", () => {
       resolveRecommendedVoices(inherited, recommendations, voices, "en-GB").map(
         (setting) => setting.version_id
       )
-    ).toEqual(["second", "first"]);
+    ).toEqual(["first"]);
   });
+  it("逐组跳过失效项，适用组耗尽才回退全局，继承不补目录声音", () => {
+    const profile: VoiceProfile = {
+      voices: [],
+      dubbing: { mode: "inherit", area: "word" }
+    };
+    const items = [
+      {
+        ...recommendations[0]!,
+        id: "invalid",
+        groupName: "A",
+        setting: { voice_id: "missing", enabled: true, rate_percent: 0 }
+      },
+      { ...recommendations[1]!, groupName: "B" },
+      { ...recommendations[0]!, id: "global", groupName: "全局常用" }
+    ];
+    expect(
+      resolveRecommendedVoices(profile, items, voices, "en-GB").map(
+        (item) => item.version_id
+      )
+    ).toEqual(["second"]);
+    expect(
+      resolveRecommendedVoices(
+        profile,
+        [items[0]!, items[2]!],
+        voices,
+        "en-GB"
+      ).map((item) => item.version_id)
+    ).toEqual(["global"]);
+    expect(
+      resolveRecommendedVoices(profile, [items[0]!], voices, "en-GB")
+    ).toEqual([]);
+    const oldLocal = {
+      ...profile,
+      dubbing: { ...profile.dubbing!, mode: "local" as const }
+    };
+    expect(
+      resolveRecommendedVoices(oldLocal, [], voices, "en-GB")
+    ).toHaveLength(1);
+  });
+  it("按实际标记跳过原生地区或模型能力不符项，保留指定发音", () => {
+    const profile: VoiceProfile = {
+      voices: [],
+      dubbing: { mode: "inherit", area: "word" }
+    };
+    const marked = {
+      version: 2 as const,
+      text: "cat",
+      annotations: [
+        {
+          type: "phoneme" as const,
+          start: 0,
+          end: 3,
+          alphabet: "ipa" as const,
+          phoneme: "kæt"
+        }
+      ]
+    };
+    const options = [
+      { ...voices[0]!, id: "native", locale: "en-SG" },
+      { ...voices[0]!, id: "unsupported", supportsPhoneme: false },
+      ...voices
+    ];
+    const items = ["native", "unsupported", "sonia"].map((voice_id, index) => ({
+      ...recommendations[0]!,
+      id: String(index),
+      setting: { voice_id, rate_percent: 0, enabled: true }
+    }));
+    expect(
+      resolveRecommendedVoices(profile, items, options, "en-GB", marked).map(
+        (item) => item.voice_id
+      )
+    ).toEqual(["sonia"]);
+    expect(marked.annotations[0]!.phoneme).toBe("kæt");
+    expect(
+      resolveRecommendedVoices(profile, items, options, "en-GB")[0]!.voice_id
+    ).toBe("native");
+  });
+  it.each([
+    { type: "sub" as const, start: 0, end: 3, alias: "kitten" },
+    {
+      type: "say_as" as const,
+      start: 0,
+      end: 3,
+      interpret_as: "characters" as const
+    }
+  ])(
+    "Flash 不支持 $type 时跳过该组，保留原标记并采用后续 Neural",
+    (annotation) => {
+      const profile: VoiceProfile = {
+        voices: [],
+        dubbing: { mode: "inherit", area: "word" }
+      };
+      const content = {
+        version: 2 as const,
+        text: "cat",
+        annotations: [annotation]
+      };
+      const options = [
+        {
+          ...voices[1]!,
+          id: "flash",
+          supportsRate: false,
+          supportsPitch: false,
+          supportsVolume: false,
+          supportsPause: false,
+          supportsPhoneme: false,
+          supportsSayAs: false,
+          supportsSub: false
+        },
+        voices[1]!
+      ];
+      const items = ["flash", "guy"].map((voice_id) => ({
+        id: voice_id,
+        name: voice_id,
+        groupName: voice_id,
+        locale: "en-US" as const,
+        setting: { voice_id, rate_percent: 0, enabled: true }
+      }));
+      expect(
+        resolveRecommendedVoices(profile, items, options, "en-US", content).map(
+          (item) => item.voice_id
+        )
+      ).toEqual(["guy"]);
+      expect(content.annotations).toEqual([annotation]);
+      expect(
+        resolveRecommendedVoices(profile, items, options, "en-US")[0]!.voice_id
+      ).toBe("flash");
+    }
+  );
   it("局部多版本优先，完整参数复制并保留稳定版本ID", () => {
     const local = localVoiceProfile(
       [

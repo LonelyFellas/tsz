@@ -45,6 +45,19 @@ describe("admin voice preview adapter", () => {
         {
           alias: "flash",
           display_name: "Tiana HD Flash",
+          capability_evidence: {
+            provider_voice_id: "en-US-Tiana:DragonHDFlashLatestNeural",
+            locale: "en-US",
+            gender: "female",
+            model: "hd_flash",
+            styles: [],
+            supported_locales: ["en-US"],
+            roles: null,
+            supports_style_degree: false,
+            source_url:
+              "https://learn.microsoft.com/azure/ai-services/speech-service/",
+            checked_at: "2026-10-31T00:00:00Z"
+          },
           locale: "en-US",
           gender: "female",
           is_common: false,
@@ -66,7 +79,9 @@ describe("admin voice preview adapter", () => {
     expect(voices[0]).toMatchObject({
       supportsVolume: false,
       supportsPause: false,
-      supportsPhoneme: false
+      supportsPhoneme: false,
+      supportsSayAs: false,
+      supportsSub: false
     });
     for (const changes of [
       { volumePercent: 65 },

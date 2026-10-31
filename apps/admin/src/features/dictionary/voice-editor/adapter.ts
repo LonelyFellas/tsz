@@ -93,6 +93,9 @@ function mapVoice(
     supportsVolume: capabilities.supports_volume_percent ?? true,
     supportsPause: capabilities.supports_pause ?? true,
     supportsPhoneme: capabilities.supports_phoneme ?? true,
+    ...(item.capability_evidence?.model === "hd_flash"
+      ? { supportsSayAs: false, supportsSub: false }
+      : {}),
     supportsRate: capabilities.min_rate_percent < capabilities.max_rate_percent,
     supportsPitch:
       capabilities.min_pitch_semitones < capabilities.max_pitch_semitones,

@@ -334,6 +334,32 @@ describe("单组草稿与推荐", () => {
         .map((node) => node.getAttribute("aria-label"))
     ).toEqual(["选用 A英式", "选用 第二版本"]);
   });
+  it("可选择其他组已使用的板块，完成仅提交当前组", async () => {
+    mount();
+    const a = edit("A"),
+      b = edit("B");
+    fireEvent.change(within(a).getByDisplayValue("A"), {
+      target: { value: "A 未完成" }
+    });
+    fireEvent.mouseDown(within(b).getByLabelText("B 使用板块"));
+    const word = await screen.findByRole("option", { name: "词形拼写" });
+    expect(word).not.toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(
+      screen
+        .getAllByText("词形拼写")
+        .find((node) =>
+          node.className.includes("ant-select-item-option-content")
+        )!
+    );
+    fireEvent.click(groupButton(b, "完成"));
+    await waitFor(() => expect(api.speech.saveGroup).toHaveBeenCalledTimes(1));
+    expect(api.speech.saveGroup).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "b", areas: ["example", "word"] }),
+      1,
+      false
+    );
+    expect(within(a).getByDisplayValue("A 未完成")).toBeInTheDocument();
+  });
   it("409 保留本组输入，其他组仍能取消", async () => {
     vi.mocked(api.speech.saveGroup).mockRejectedValue(
       new HttpError(409, "conflict")
@@ -346,7 +372,7 @@ describe("单组草稿与推荐", () => {
       target: { value: "保留输入" }
     });
     fireEvent.click(groupButton(panel, "完成"));
-    await screen.findByText(/本组已被修改或板块已被占用/);
+    await screen.findByText(/本组已被修改或名称已被使用/);
     expect(within(panel).getByDisplayValue("保留输入")).toHaveAttribute(
       "aria-label",
       "分组名称"

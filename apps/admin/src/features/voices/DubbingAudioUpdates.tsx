@@ -95,7 +95,7 @@ export function DubbingAudioUpdateSettings({
         )}
       </Space>
       <Typography.Text type="secondary">
-        仅用于之后提交的更新；同组再次完成会重新计时，已提交任务可在分组内撤销。
+        仅用于之后提交的更新；共享板块的分组再次完成或调整优先级会重新计时，已提交任务可在分组内撤销。
       </Typography.Text>
       {error && (
         <Alert

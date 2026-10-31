@@ -376,6 +376,11 @@ describe("配对推荐 v3 契约", () => {
       input,
       { headers }
     );
+    const order = { group_ids: [groupId], base_revision: value.order_revision };
+    await expect(endpoints.saveGroupOrder(order)).resolves.toBe(value);
+    expect(http.put).toHaveBeenLastCalledWith("/speech/groups/order", order, {
+      headers
+    });
     await endpoints.deleteGroupV3(groupId, 1);
     expect(http.del).toHaveBeenLastCalledWith(
       `/speech/groups/${groupId}`,
