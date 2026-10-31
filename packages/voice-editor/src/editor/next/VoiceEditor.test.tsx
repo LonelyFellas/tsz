@@ -3879,3 +3879,78 @@ it("synthesis 面板直接使用 phoneme 内容，隐藏正文工具，换格式
   expect(onChange).not.toHaveBeenCalled();
   expect(screen.queryByLabelText("编辑文本")).not.toBeInTheDocument();
 });
+
+it("普通保存固定有效继承副本并保留原始参数与稳定来源，浏览不冻结", async () => {
+  const saved = vi.fn();
+  const recommendation = {
+    id: "recommendation-side",
+    name: "原始慢读",
+    groupName: "组",
+    groupId: "group-id",
+    pairId: "pair-id",
+    locale: "en-GB" as const,
+    setting: { voice_id: "sonia", enabled: true, rate_percent: -25 }
+  };
+  const setting = {
+    ...recommendation.setting,
+    rate_percent: 0,
+    version_id: recommendation.id,
+    version_name: recommendation.name,
+    locale: "en-GB" as const
+  };
+  const previewAdapter = {
+    ...adapter(),
+    listVoices: vi
+      .fn()
+      .mockResolvedValue([
+        { ...VOICES[0]!, supportsRate: false, rateRange: undefined }
+      ]),
+    resolveVoices: vi.fn().mockResolvedValue([setting])
+  };
+  const onVoiceProfileChange = vi.fn();
+  render(
+    <VoiceEditor
+      {...props({
+        mode: "grammar",
+        locale: "en-GB",
+        recommendationArea: "grammar",
+        previewAdapter,
+        loadRecommendations: vi.fn().mockResolvedValue([recommendation]),
+        onVoiceProfileChange,
+        voiceProfile: {
+          dubbing: {
+            mode: "inherit",
+            area: "grammar",
+            pool_version: "provider_id_v1"
+          },
+          voices: [
+            { ...setting, rate_percent: -20 },
+            { voice_id: "gone", enabled: true, rate_percent: 10 }
+          ]
+        }
+      })}
+      renderActions={(_canComplete, _prepare, capture) => (
+        <button onClick={() => saved(capture!(true))}>固定保存</button>
+      )}
+    />
+  );
+  await screen.findByLabelText("英式池 原始慢读");
+  expect(onVoiceProfileChange).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByText("固定保存"));
+  expect(saved).toHaveBeenCalledOnce();
+  expect(saved.mock.calls[0]![0].voiceProfile).toMatchObject({
+    dubbing: {
+      mode: "local",
+      pool_version: "provider_id_v1",
+      recommendation: {
+        group_id: "group-id",
+        pair_id: "pair-id",
+        contribution_ids: ["recommendation-side"]
+      }
+    },
+    voices: [
+      { voice_id: "sonia", enabled: true, rate_percent: -25 },
+      { voice_id: "gone", enabled: false, rate_percent: 10 }
+    ]
+  });
+});

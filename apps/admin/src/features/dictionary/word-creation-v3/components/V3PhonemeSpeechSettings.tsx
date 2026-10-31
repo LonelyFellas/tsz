@@ -1,3 +1,5 @@
+import { useVoiceSave } from "../voiceSaveContext";
+import { flushSync } from "react-dom";
 import { EditOutlined } from "@ant-design/icons";
 import { HttpError } from "@tsz/api-client";
 import { Alert, Button, Space, Typography } from "antd";
@@ -68,6 +70,22 @@ export function V3PhonemeSpeechSettings({
     audioAssets: AudioAssetV3[]
   ) => void;
 }) {
+  const businessSave = useVoiceSave();
+  const businessSaveRef = useRef(businessSave);
+  useLayoutEffect(() => {
+    businessSaveRef.current = businessSave;
+  });
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const [saveError, setSaveError] = useState("");
+  const targetKey = JSON.stringify([nodeId, alphabet, locale]);
+  const activeTarget = useRef<string | null>(targetKey);
+  useLayoutEffect(() => {
+    activeTarget.current = targetKey;
+    return () => {
+      activeTarget.current = null;
+    };
+  }, [targetKey]);
   const { edit: canEdit } = useContentEditPermissions();
   const canUploadAudio = usePermission("speech.upload_audio");
   const [open, setOpen] = useState(false);
@@ -135,6 +153,9 @@ export function V3PhonemeSpeechSettings({
     }
   });
   const sourceKey = JSON.stringify([
+    nodeId,
+    alphabet,
+    locale,
     spelling,
     candidate[alphabet],
     alphabet === "ups" ? candidate.ups_words : undefined
@@ -273,6 +294,7 @@ export function V3PhonemeSpeechSettings({
         disabled={!canEdit}
         onClick={() => {
           setDraft(capture());
+          setSaveError("");
           setSource(sourceKey);
           setOpen(true);
         }}
@@ -283,13 +305,18 @@ export function V3PhonemeSpeechSettings({
           title={`${label} · 音标、停顿与音色`}
           open
           footer={null}
-          onCancel={() => setOpen(false)}
+          onCancel={() => {
+            if (!savingRef.current) setOpen(false);
+          }}
+          closable={!saving}
+          keyboard={!saving}
         >
+          {saveError && <Alert type="error" showIcon title={saveError} />}
           <Suspense
             fallback={<Typography.Text>正在加载 TTS 设置…</Typography.Text>}
           >
             <VoiceEditor
-              readOnly={!canEdit || source !== sourceKey}
+              readOnly={!canEdit || saving || source !== sourceKey}
               mode="phoneme-settings"
               autoRecommend={
                 candidate[`${alphabet}_speech`]?.voice_profile == null &&
@@ -345,32 +372,85 @@ export function V3PhonemeSpeechSettings({
               previewAdapter={adapter}
               previewEnabled={env.VOICE_PREVIEW && source === sourceKey}
               previewIsMock={voicePreviewIsMock}
-              renderActions={(canComplete) => (
+              renderActions={(canComplete, prepareComplete, captureResult) => (
                 <Space>
                   <Button
                     aria-label={`取消${label}设置`}
+                    disabled={saving}
                     onClick={() => setOpen(false)}
                   >
                     取消
                   </Button>
                   <Button
                     type="primary"
-                    aria-label={`完成${label}设置`}
+                    aria-label={
+                      businessSave ? `保存${label}修改` : `完成${label}设置`
+                    }
+                    loading={saving}
                     disabled={
                       !canEdit ||
                       !canComplete ||
                       Boolean(inputIssue) ||
                       source !== sourceKey
                     }
-                    onClick={() => {
-                      onChange(
-                        resolveCandidate(draft.content),
-                        draft.audio_assets
-                      );
-                      setOpen(false);
+                    onClick={async () => {
+                      if (
+                        savingRef.current ||
+                        (prepareComplete && !prepareComplete())
+                      )
+                        return;
+                      savingRef.current = true;
+                      setSaving(true);
+                      setSaveError("");
+                      try {
+                        const result = captureResult?.(!!businessSave);
+                        const next = resolveCandidate(
+                          toRichTextV2(result?.value ?? draft.content)
+                        );
+                        if (result?.voiceProfile)
+                          next[`${alphabet}_speech`]!.voice_profile =
+                            result.voiceProfile;
+                        flushSync(() => {
+                          setSource(
+                            JSON.stringify([
+                              nodeId,
+                              alphabet,
+                              locale,
+                              spelling,
+                              next[alphabet],
+                              alphabet === "ups" ? next.ups_words : undefined
+                            ])
+                          );
+                          onChange(
+                            next,
+                            result?.audioAssets ?? draft.audio_assets
+                          );
+                        });
+                        if (
+                          businessSaveRef.current &&
+                          !(await businessSaveRef.current.save("azure"))
+                        ) {
+                          if (activeTarget.current !== targetKey) return;
+                          setSaveError(
+                            "保存未完成，全部修改已保留；请处理业务校验或版本冲突后重试。"
+                          );
+                          return;
+                        }
+                        if (activeTarget.current === targetKey) setOpen(false);
+                      } catch (error) {
+                        if (activeTarget.current !== targetKey) return;
+                        setSaveError(
+                          error instanceof Error
+                            ? error.message
+                            : "保存失败，修改已保留"
+                        );
+                      } finally {
+                        savingRef.current = false;
+                        setSaving(false);
+                      }
                     }}
                   >
-                    完成
+                    {businessSave ? "保存修改" : "完成"}
                   </Button>
                 </Space>
               )}

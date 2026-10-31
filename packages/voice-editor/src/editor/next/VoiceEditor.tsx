@@ -21,6 +21,7 @@ import type {
 import { AUDIO_ASSETS_PER_VARIANT_MAX } from "@tsz/types";
 import {
   MAX_PAUSE_MS,
+  convertVoicePool,
   MIN_PAUSE_MS,
   isVoiceRecommendationAvailable,
   localVoiceProfile,
@@ -647,6 +648,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   });
 
   function changeVoiceSettings(next: VoiceSetting[]) {
+    restoreInheritance.current = false;
     if (readOnly || !onVoiceProfileChange) return;
     initialRecommendationPending.current = false;
     stopAudition();
@@ -822,7 +824,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     mode: voiceProfile?.dubbing,
     profile: voiceProfile
   };
+  const restoreInheritance = useRef(false);
   async function restoreRecommendations() {
+    restoreInheritance.current = true;
     if (!recommendationArea || readOnly || !onVoiceProfileChange) return;
     stopAudition();
     const profile = {
@@ -1376,6 +1380,101 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     setRecoverableLinks(after.recoverableTextLinks ?? []);
     setValidationMessage("");
     setSpellingNotice("");
+  };
+
+  const captureResult = (forSave = false) => {
+    let profile = voiceProfile;
+    if (
+      forSave &&
+      !contentReadOnly &&
+      mode !== "actual-pron" &&
+      recommendationArea &&
+      (autoRecommend ?? !value.text.trim()) &&
+      profile == null
+    )
+      throw new Error(
+        "默认配音尚未配置，请加载目录并选择当前口音的可用音色后保存"
+      );
+    if (
+      forSave &&
+      !contentReadOnly &&
+      mode !== "actual-pron" &&
+      profile?.dubbing?.pool_version
+    ) {
+      if (
+        voicesLoading ||
+        (previewAdapter?.resolveVoices && resolvedVoices?.key !== resolutionKey)
+      )
+        throw new Error("正在校验有效配音，请稍后保存");
+      const required = locale ? [speechAccentGroup(locale)] : ["uk", "us"];
+      for (const accent of required) {
+        if (
+          !effectiveSettings.some(
+            (setting) =>
+              setting.enabled &&
+              speechAccentGroup(
+                voiceLocale(setting, voices),
+                voices.find((voice) => voice.id === setting.voice_id)?.accent
+              ) === accent
+          )
+        )
+          throw new Error(
+            `${accent === "uk" ? "英式" : "美式"}没有实际可用的已选音色，请选择后保存`
+          );
+      }
+      if (inherited && !restoreInheritance.current) {
+        const activeKeys = new Set(effectiveSettings.map(voiceSettingKey));
+        const rawSettings = displayedSettings.map((setting) => {
+          const key = voiceSettingKey(setting);
+          const recommendation = recommendations.find(
+            (item) => item.id === key
+          );
+          const raw = recommendation
+            ? recommendationVoiceSetting(recommendation, voices)
+            : (voiceSettings.find((item) => voiceSettingKey(item) === key) ??
+              setting);
+          return {
+            ...raw,
+            enabled: activeKeys.has(key),
+            ...(setting.audio_asset_id
+              ? { audio_asset_id: setting.audio_asset_id }
+              : {})
+          };
+        });
+        profile = convertVoicePool(
+          profile,
+          rawSettings,
+          voices,
+          profile.dubbing.area
+        );
+        const active = effectiveSettings.filter((setting) => setting.enabled);
+        const sources = active.map((setting) =>
+          recommendations.find((item) => item.id === voiceSettingKey(setting))
+        );
+        const source = sources[0];
+        if (
+          source?.groupId &&
+          source.pairId &&
+          sources.every(
+            (item) =>
+              item?.groupId === source.groupId && item?.pairId === source.pairId
+          )
+        )
+          profile.dubbing!.recommendation = {
+            group_id: source.groupId,
+            pair_id: source.pairId,
+            voice_ids: active.map((setting) => setting.voice_id),
+            contribution_ids: active.map(voiceSettingKey)
+          };
+      }
+    }
+    return structuredClone({
+      value: workingValue,
+      textLinks: links,
+      readingLinks: speechLinks,
+      voiceProfile: profile,
+      audioAssets: assets
+    });
   };
 
   const prepareComplete = () => {
@@ -3102,7 +3201,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           <div className="tsz-ve-editor-actions">
             {renderActions(
               !generatingVersion && !pendingUploads.some((item) => !item.error),
-              prepareComplete
+              prepareComplete,
+              captureResult
             )}
           </div>
         )}
@@ -3294,7 +3394,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             !draft.end &&
             !generatingVersion &&
             !pendingUploads.some((item) => !item.error),
-          prepareComplete
+          prepareComplete,
+          captureResult
         )}
         onCaretChange={(position) => {
           setCaretPosition(position);

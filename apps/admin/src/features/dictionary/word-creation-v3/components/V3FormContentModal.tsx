@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { VoiceSaveContext, useVoiceSave } from "../voiceSaveContext";
+import { flushSync } from "react-dom";
+import { type ContextType, useEffect, useMemo, useRef, useState } from "react";
 import { CloseOutlined, PlusOutlined } from "@ant-design/icons";
 import {
   Alert,
@@ -54,7 +56,8 @@ export function V3FormContentModal({
   retiredStableNodes = [],
   registerLeaveGuard,
   onCancel,
-  onConfirm
+  onConfirm,
+  onApply
 }: {
   forms: SharedFormsStepContentV3;
   contentReassignmentAvailable?: boolean;
@@ -70,7 +73,13 @@ export function V3FormContentModal({
   registerLeaveGuard?: (guard?: () => Promise<boolean>) => void;
   onCancel: () => void;
   onConfirm: (forms: SharedFormsStepContentV3) => void;
+  onApply?: (forms: SharedFormsStepContentV3) => void;
 }) {
+  const outerSave = useVoiceSave();
+  const outerSaveRef = useRef(outerSave);
+  outerSaveRef.current = outerSave;
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const original = useRef(forms);
   const [pronunciationIds] = useState(
     () =>
@@ -214,18 +223,21 @@ export function V3FormContentModal({
     labels,
     assignment: choosing ? assignment : undefined
   };
+  const completeForms = () => {
+    const local = state.current.assignment ?? state.current.labels;
+    return local.contents.some((row) => row.id === content.id)
+      ? replaceSharedContent(
+          local,
+          contentFromEditor(state.current.editor),
+          stableVariantIds,
+          pronunciationIds
+        )
+      : local;
+  };
   const confirmed = () => {
+    if (savingRef.current) return false;
     try {
-      const local = state.current.assignment ?? state.current.labels;
-      const next = local.contents.some((row) => row.id === content.id)
-        ? replaceSharedContent(
-            local,
-            contentFromEditor(state.current.editor),
-            stableVariantIds,
-            pronunciationIds
-          )
-        : local;
-      onConfirm(next);
+      onConfirm(completeForms());
       return true;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "内容尚未完成");
@@ -245,6 +257,7 @@ export function V3FormContentModal({
   };
   const askLeaveRef = useRef<() => Promise<boolean>>(undefined);
   askLeaveRef.current = () => {
+    if (savingRef.current) return Promise.resolve(false);
     if (pendingLeave.current) return pendingLeave.current;
     if (!state.current.dirty) {
       onCancel();
@@ -471,7 +484,33 @@ export function V3FormContentModal({
         }
       };
     });
-  return (
+  const saveScope: ContextType<typeof VoiceSaveContext> =
+    outerSave && onApply
+      ? {
+          save: async (area) => {
+            if (savingRef.current) return false;
+            savingRef.current = true;
+            setSaving(true);
+            try {
+              const next = completeForms();
+              flushSync(() => onApply(next));
+              const accepted = await outerSaveRef.current!.save(area);
+              if (accepted) {
+                original.current = next;
+                initialEditor.current = JSON.stringify(
+                  contentFromEditor(state.current.editor)
+                );
+                setLabels(next);
+              }
+              return accepted;
+            } finally {
+              savingRef.current = false;
+              setSaving(false);
+            }
+          }
+        }
+      : outerSave;
+  const drawer = (
     <Drawer
       open
       placement="right"
@@ -484,8 +523,13 @@ export function V3FormContentModal({
       footer={
         <Flex justify="flex-end" align="center" gap="small" wrap>
           <Space>
-            <Button onClick={() => void askLeaveRef.current!()}>取消</Button>
-            <Button type="primary" onClick={confirmed}>
+            <Button
+              disabled={saving}
+              onClick={() => void askLeaveRef.current!()}
+            >
+              取消
+            </Button>
+            <Button type="primary" disabled={saving} onClick={confirmed}>
               确认，应用到草稿
             </Button>
           </Space>
@@ -522,7 +566,10 @@ export function V3FormContentModal({
                   aria-label="英美音标是否有区别"
                   value={rules.phonetic_mode}
                   onChange={(event) =>
-                    changeRules({ ...rules, phonetic_mode: event.target.value })
+                    changeRules({
+                      ...rules,
+                      phonetic_mode: event.target.value
+                    })
                   }
                 >
                   <Radio value="distinguish">是</Radio>
@@ -813,5 +860,10 @@ export function V3FormContentModal({
         </div>
       </Modal>
     </Drawer>
+  );
+  return (
+    <VoiceSaveContext.Provider value={saveScope}>
+      {drawer}
+    </VoiceSaveContext.Provider>
   );
 }

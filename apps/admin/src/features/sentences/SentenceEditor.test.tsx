@@ -32,6 +32,15 @@ vi.mock("../dictionary/voice-editor/dataSource", () => ({
   adminVoicePreviewAdapter: {
     listVoices: async () => [
       {
+        id: "jenny",
+        label: "Jenny",
+        locale: "en-US",
+        gender: "female",
+        styles: [],
+        supportsRate: true,
+        supportsPitch: true
+      },
+      {
         id: "sonia",
         label: "Sonia",
         locale: "en-GB",
@@ -154,6 +163,13 @@ describe("当前词条关联与离开保护", () => {
         groupName: "例句",
         locale: "en-GB",
         setting: { voice_id: "sonia", enabled: true, rate_percent: -25 }
+      },
+      {
+        id: "r-us",
+        name: "美式慢读",
+        groupName: "例句",
+        locale: "en-US",
+        setting: { voice_id: "jenny", enabled: true, rate_percent: -20 }
       }
     ]);
     const current = example();
@@ -175,7 +191,7 @@ describe("当前词条关联与离开保护", () => {
       expect(screen.getByLabelText("选用 Sonia")).toBeChecked()
     );
     expect(screen.getByLabelText("例句正文")).toHaveValue("A new sentence.");
-    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    fireEvent.click(screen.getByLabelText("保存例句正文修改"));
     await waitFor(() => expect(api.sentences.update).toHaveBeenCalled());
     expect(
       vi.mocked(api.sentences.update).mock.calls[0]![1].content.sentence.en_text
@@ -183,7 +199,11 @@ describe("当前词条关联与离开保护", () => {
       common: {
         value: { text: "A new sentence." },
         voice_profile: {
-          voices: [{ voice_id: "sonia", enabled: true, rate_percent: -25 }]
+          voices: [
+            { voice_id: "sonia", enabled: true, rate_percent: -25 },
+            { voice_id: "jenny", enabled: true, rate_percent: -20 }
+          ],
+          dubbing: { mode: "local", pool_version: "provider_id_v1" }
         }
       }
     });
@@ -217,13 +237,13 @@ describe("当前词条关联与离开保护", () => {
     fireEvent.change(await screen.findByLabelText("例句正文"), {
       target: { value: "We make new stories." }
     });
-    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    fireEvent.click(screen.getByLabelText("保存例句正文修改"));
     expect(await screen.findByText("invalid request body")).toBeInTheDocument();
     expect(screen.getByLabelText("例句正文")).toHaveValue(
       "We make new stories."
     );
     expect(onSaved).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    fireEvent.click(screen.getByLabelText("保存例句正文修改"));
     await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
     expect(api.sentences.update).toHaveBeenCalledTimes(2);
     for (const [, input] of vi.mocked(api.sentences.update).mock.calls)
@@ -234,7 +254,7 @@ describe("当前词条关联与离开保护", () => {
         }
       });
   });
-  it("只显示一组取消和完成，正文与译文修改一次保存", async () => {
+  it("只显示一个正文保存入口，正文与译文修改一次保存", async () => {
     const current = example();
     show(
       <SentenceEditor sentence={current} onClose={vi.fn()} onSaved={vi.fn()} />
@@ -247,14 +267,16 @@ describe("当前词条关联与离开保护", () => {
       screen.getAllByText(/^取\s*消$/, { selector: "button span" })
     ).toHaveLength(1);
     expect(
-      screen.getAllByText(/^完\s*成$/, { selector: "button span" })
+      screen.getAllByText("保存修改", { selector: "button span" })
     ).toHaveLength(1);
     const footer = screen
-      .getByLabelText("完成例句编辑")
+      .getByLabelText("保存例句正文修改")
       .closest(".ant-modal-footer");
-    expect(footer).not.toBeNull();
-    expect(footer).toContainElement(screen.getByLabelText("取消例句编辑"));
-    expect(screen.getByLabelText("完成例句编辑")).toBeEnabled();
+    expect(footer).toBeNull();
+    expect(
+      screen.getByLabelText("保存例句正文修改").closest(".tsz-ve-editing-area")
+    ).not.toBeNull();
+    expect(screen.getByLabelText("保存例句正文修改")).toBeEnabled();
     fireEvent.change(
       screen.getAllByPlaceholderText("请输入对应的中文译文")[0]!,
       {
@@ -265,7 +287,7 @@ describe("当前词条关联与离开保护", () => {
     vi.mocked(api.sentences.update).mockImplementation(
       async (_id, payload) => ({ ...current, content: payload.content })
     );
-    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    fireEvent.click(screen.getByLabelText("保存例句正文修改"));
     await waitFor(() => expect(api.sentences.update).toHaveBeenCalledOnce());
     expect(
       vi.mocked(api.sentences.update).mock.calls[0]![1].content.sentence.en_text
@@ -325,7 +347,7 @@ describe("当前词条关联与离开保护", () => {
     show(
       <SentenceEditor sentence={current} onClose={vi.fn()} onSaved={onSaved} />
     );
-    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    fireEvent.click(screen.getByLabelText("保存例句正文修改"));
     fireEvent.click(
       await screen.findByText("刷新并比较", { selector: "button span" })
     );
@@ -333,12 +355,12 @@ describe("当前词条关联与离开保护", () => {
     expect(comparison).toHaveTextContent("Remote sentence.");
     expect(comparison).toHaveTextContent("We make stories.");
     expect(api.sentences.get).toHaveBeenCalledWith(current.id, "draft");
-    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    fireEvent.click(screen.getByLabelText("保存例句正文修改"));
     expect(api.sentences.update).toHaveBeenCalledTimes(1);
     fireEvent.click(
       screen.getByText("保留本地修改", { selector: "button span" })
     );
-    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    fireEvent.click(screen.getByLabelText("保存例句正文修改"));
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
     expect(vi.mocked(api.sentences.update).mock.calls[1]![1]).toMatchObject({
       base_revision: 4,
@@ -357,7 +379,7 @@ describe("当前词条关联与离开保护", () => {
     show(
       <SentenceEditor sentence={current} onClose={vi.fn()} onSaved={vi.fn()} />
     );
-    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    fireEvent.click(screen.getByLabelText("保存例句正文修改"));
     fireEvent.click(
       await screen.findByText("刷新并比较", { selector: "button span" })
     );
@@ -365,7 +387,7 @@ describe("当前词条关联与离开保护", () => {
     expect(
       screen.queryByText("保留本地修改", { selector: "button span" })
     ).toBeNull();
-    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    fireEvent.click(screen.getByLabelText("保存例句正文修改"));
     expect(api.sentences.update).toHaveBeenCalledTimes(1);
     fireEvent.click(
       await screen.findByText("刷新并比较", { selector: "button span" })
@@ -373,11 +395,11 @@ describe("当前词条关联与离开保护", () => {
     fireEvent.click(
       await screen.findByText("保留本地修改", { selector: "button span" })
     );
-    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    fireEvent.click(screen.getByLabelText("保存例句正文修改"));
     await waitFor(() => expect(api.sentences.update).toHaveBeenCalledTimes(2));
     expect(await screen.findByText("例句版本冲突")).toBeInTheDocument();
     expect(screen.queryByLabelText("草稿差异")).toBeNull();
-    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    fireEvent.click(screen.getByLabelText("保存例句正文修改"));
     expect(api.sentences.update).toHaveBeenCalledTimes(2);
     expect(await screen.findByLabelText("例句正文")).toHaveValue(
       "We make stories."
@@ -397,7 +419,7 @@ describe("当前词条关联与离开保护", () => {
     show(
       <SentenceEditor sentence={current} onClose={vi.fn()} onSaved={vi.fn()} />
     );
-    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    fireEvent.click(screen.getByLabelText("保存例句正文修改"));
     fireEvent.click(
       await screen.findByText("刷新并比较", { selector: "button span" })
     );
@@ -456,7 +478,7 @@ describe("当前词条关联与离开保护", () => {
         onSaved={vi.fn()}
       />
     );
-    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    fireEvent.click(screen.getByLabelText("保存例句正文修改"));
     await waitFor(() => expect(api.sentences.update).toHaveBeenCalledTimes(1));
     expect(
       vi.mocked(api.sentences.update).mock.calls[0]![1].content.annotations
@@ -505,7 +527,7 @@ describe("当前词条关联与离开保护", () => {
         ?.closest("button");
       if (spelling === "make") expect(shortcut).toBeUndefined();
       else expect(shortcut).toBeEnabled();
-      expect(screen.getByLabelText("完成例句编辑")).toBeDisabled();
+      expect(screen.getByLabelText("保存例句正文修改")).toBeDisabled();
       expect(api.sentences.update).not.toHaveBeenCalled();
       expect(api.sentences.create).not.toHaveBeenCalled();
     }
@@ -542,7 +564,7 @@ describe("当前词条关联与离开保护", () => {
       await screen.findByText(/请关联当前词义：make/);
       expect(screen.getByLabelText("例句正文")).toBeEnabled();
       expect(
-        screen.getByRole("button", { name: "完成例句编辑" })
+        screen.getByRole("button", { name: "保存例句正文修改" })
       ).toBeDisabled();
       expect(api.sentences.update).not.toHaveBeenCalled();
     }
@@ -573,17 +595,18 @@ describe("当前词条关联与离开保护", () => {
     fireEvent.click(screen.getByLabelText("关联单词"));
     fireEvent.mouseDown(screen.getByLabelText("关联 make（2）"), { button: 0 });
     await screen.findByText("旧关联尚未选择具体词义，请补全或清除。");
+    const picker = await screen.findByRole("group", { name: "关联单词：make" });
     fireEvent.click(
-      await screen.findByText("make", {
+      await within(picker).findByText("make", {
         selector: ".v3-component-usage-entry strong"
       })
     );
     fireEvent.click(
-      await screen.findByText(/原形 make/, {}, { timeout: 5000 })
+      await within(picker).findByText(/原形 make/, {}, { timeout: 5000 })
     );
-    fireEvent.click(await screen.findByText("编造（故事、借口等）"));
-    fireEvent.click(screen.getByRole("button", { name: "确认关联" }));
-    const done = screen.getByRole("button", { name: "完成例句编辑" });
+    fireEvent.click(await within(picker).findByText("编造（故事、借口等）"));
+    fireEvent.click(within(picker).getByRole("button", { name: "确认关联" }));
+    const done = screen.getByLabelText("保存例句正文修改");
     await waitFor(() => expect(done).toBeEnabled());
     fireEvent.click(done);
     await waitFor(() => expect(api.sentences.update).toHaveBeenCalledOnce());
@@ -791,3 +814,136 @@ it("仅关联账号打开本人例句，正文、等级和译文不可改，关�
   expect(screen.queryByLabelText("编辑文本")).toBeNull();
   expect(screen.queryByLabelText("音频")).toBeNull();
 });
+
+it.each([
+  ["registered", true],
+  ["registered", false],
+  ["router", true],
+  ["router", false]
+] as const)(
+  "例句 %s 离开保存复用正文快照与有效池校验，配置有效=%s",
+  async (kind, configured) => {
+    const item = example();
+    if (item.content.sentence.en_text.mode !== "unified")
+      throw new Error("expected unified fixture");
+    item.content.sentence.en_text.common.voice_profile = {
+      dubbing: {
+        mode: configured ? "inherit" : "local",
+        area: "example",
+        pool_version: "provider_id_v1"
+      },
+      voices: []
+    };
+    if (configured)
+      speech.recommendations.mockResolvedValue([
+        {
+          id: "22222222-2222-4222-8222-222222222221",
+          name: "英式",
+          groupName: "例句",
+          locale: "en-GB",
+          setting: { voice_id: "sonia", enabled: true, rate_percent: -27 }
+        },
+        {
+          id: "22222222-2222-4222-8222-222222222222",
+          name: "美式",
+          groupName: "例句",
+          locale: "en-US",
+          setting: { voice_id: "jenny", enabled: true, rate_percent: -20 }
+        }
+      ]);
+    vi.mocked(api.sentences.update).mockImplementation(async (_id, input) => ({
+      ...item,
+      revision: 4,
+      content: input.content
+    }));
+    let leave: (() => Promise<boolean>) | undefined;
+    const router = createMemoryRouter([
+      {
+        path: "/",
+        element: (
+          <>
+            <Link to="/next">离开例句</Link>
+            <SentenceEditor
+              sentence={item}
+              registerLeaveGuard={
+                kind === "registered"
+                  ? (guard) => {
+                      leave = guard;
+                    }
+                  : undefined
+              }
+              onClose={vi.fn()}
+              onSaved={vi.fn()}
+            />
+          </>
+        )
+      },
+      { path: "/next", element: <div>例句保存后页面</div> }
+    ]);
+    show(<RouterProvider router={router} />);
+    await screen.findByRole("toolbar", { name: "标注工具栏" });
+    if (configured)
+      await waitFor(() =>
+        expect(screen.getByLabelText("选用 Sonia")).toBeChecked()
+      );
+    fireEvent.change(
+      screen.getAllByPlaceholderText("请输入对应的中文译文")[0]!,
+      {
+        target: { value: "离开时保留全部修改" }
+      }
+    );
+    let outcome: Promise<boolean> | undefined;
+    if (kind === "registered")
+      act(() => {
+        outcome = leave!();
+      });
+    else fireEvent.click(screen.getByText("离开例句"));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "保存例句后离开" })
+    );
+    if (configured) {
+      await waitFor(() => expect(api.sentences.update).toHaveBeenCalledOnce());
+      expect(vi.mocked(api.sentences.update).mock.calls[0]![1]).toMatchObject({
+        base_revision: 3,
+        content: {
+          sentence: {
+            en_text: {
+              common: {
+                voice_profile: {
+                  dubbing: { mode: "local", pool_version: "provider_id_v1" },
+                  voices: [
+                    {
+                      voice_id: "sonia",
+                      version_id: "22222222-2222-4222-8222-222222222221",
+                      version_name: "英式",
+                      locale: "en-GB",
+                      rate_percent: -27
+                    },
+                    {
+                      voice_id: "jenny",
+                      version_id: "22222222-2222-4222-8222-222222222222",
+                      version_name: "美式",
+                      locale: "en-US",
+                      rate_percent: -20
+                    }
+                  ]
+                }
+              }
+            },
+            zh_translations: [{ content: { text: "离开时保留全部修改" } }]
+          }
+        }
+      });
+      if (outcome) expect(await outcome).toBe(true);
+      else await screen.findByText("例句保存后页面");
+    } else {
+      await screen.findByText(/英式没有实际可用的已选音色/);
+      expect(api.sentences.update).not.toHaveBeenCalled();
+      expect(
+        screen.getByDisplayValue("离开时保留全部修改")
+      ).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe("/");
+      if (outcome) expect(await outcome).toBe(false);
+    }
+  }
+);

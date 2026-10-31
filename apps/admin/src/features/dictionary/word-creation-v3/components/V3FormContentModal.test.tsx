@@ -1,3 +1,4 @@
+import { VoiceSaveContext, useVoiceSave } from "../voiceSaveContext";
 import { useState } from "react";
 import {
   act,
@@ -36,19 +37,27 @@ vi.mock("./V3ConcreteFormRow", () => ({
     content: DraftFormsStepContentV3;
     onChange: (next: DraftFormsStepContentV3) => void;
   }) => {
+    const localSave = useVoiceSave();
     const regions = content.pos[0]!.forms[0]!.regional_variants;
     return (
-      <input
-        aria-label="内容拼写"
-        value={regions.mode === "common" ? regions.common.spelling : ""}
-        onChange={(event) => {
-          const next = structuredClone(content);
-          const target = next.pos[0]!.forms[0]!.regional_variants;
-          if (target.mode === "common")
-            target.common.spelling = event.target.value;
-          onChange(next);
-        }}
-      />
+      <>
+        {localSave && (
+          <button onClick={() => void localSave.save("word")}>
+            保存当前正文
+          </button>
+        )}
+        <input
+          aria-label="内容拼写"
+          value={regions.mode === "common" ? regions.common.spelling : ""}
+          onChange={(event) => {
+            const next = structuredClone(content);
+            const target = next.pos[0]!.forms[0]!.regional_variants;
+            if (target.mode === "common")
+              target.common.spelling = event.target.value;
+            onChange(next);
+          }}
+        />
+      </>
     );
   }
 }));
@@ -61,8 +70,10 @@ function setup({
   initialForms,
   editFormId,
   contentReassignmentAvailable = true,
-  savedContentIds
+  savedContentIds,
+  persist
 }: {
+  persist?: (value: SharedFormsStepContentV3) => Promise<boolean>;
   multipleGroups?: boolean;
   serverFieldOrder?: boolean;
   multiplePos?: boolean;
@@ -124,32 +135,38 @@ function setup({
   };
   function Host() {
     const [open, setOpen] = useState(true);
+    const [applied, setApplied] = useState(forms);
     return (
       <ConfigProvider virtual={false} theme={{ token: { motion: false } }}>
         <App>
-          {open && (
-            <V3FormContentModal
-              forms={forms}
-              contentReassignmentAvailable={contentReassignmentAvailable}
-              savedContentIds={savedContentIds}
-              formId={editFormId ?? forms.pos[0]!.forms[baseOnly ? 0 : 1]!.id}
-              issues={[]}
-              stableVariantIds={createStableVariantIdFactory(
-                expandFormContents(forms),
-                []
-              )}
-              retiredContentSlots={[]}
-              registerLeaveGuard={registerLeaveGuard}
-              onConfirm={(next) => {
-                onConfirm(next);
-                setOpen(false);
-              }}
-              onCancel={() => {
-                onCancel();
-                setOpen(false);
-              }}
-            />
-          )}
+          <VoiceSaveContext.Provider
+            value={persist ? { save: () => persist(applied) } : null}
+          >
+            {open && (
+              <V3FormContentModal
+                forms={applied}
+                onApply={setApplied}
+                contentReassignmentAvailable={contentReassignmentAvailable}
+                savedContentIds={savedContentIds}
+                formId={editFormId ?? forms.pos[0]!.forms[baseOnly ? 0 : 1]!.id}
+                issues={[]}
+                stableVariantIds={createStableVariantIdFactory(
+                  expandFormContents(forms),
+                  []
+                )}
+                retiredContentSlots={[]}
+                registerLeaveGuard={registerLeaveGuard}
+                onConfirm={(next) => {
+                  onConfirm(next);
+                  setOpen(false);
+                }}
+                onCancel={() => {
+                  onCancel();
+                  setOpen(false);
+                }}
+              />
+            )}
+          </VoiceSaveContext.Provider>
         </App>
       </ConfigProvider>
     );
@@ -667,4 +684,29 @@ describe("词形内容弹窗的草稿边界", () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
     expect(onConfirm).not.toHaveBeenCalled();
   });
+});
+
+it("局部保存先交接完整抽屉结果再请求业务保存，失败不关闭并保留其他词形", async () => {
+  const persist = vi
+    .fn()
+    .mockResolvedValueOnce(false)
+    .mockResolvedValueOnce(true);
+  const { forms, onConfirm } = setup({ persist });
+  const other = structuredClone(forms.contents[0]);
+  fireEvent.change(screen.getByLabelText("内容拼写"), {
+    target: { value: "atomic draft" }
+  });
+  fireEvent.click(screen.getByText("保存当前正文"));
+  await waitFor(() => expect(persist).toHaveBeenCalledOnce());
+  expect(screen.getByLabelText("内容拼写")).toHaveValue("atomic draft");
+  expect(onConfirm).not.toHaveBeenCalled();
+  expect(persist.mock.calls[0]![0].contents[0]).toEqual(other);
+  const edited = persist.mock.calls[0]![0].contents[1]!.regional_variants;
+  expect(edited.mode === "common" && edited.common.spelling).toBe(
+    "atomic draft"
+  );
+  fireEvent.click(screen.getByText("保存当前正文"));
+  await waitFor(() => expect(persist).toHaveBeenCalledTimes(2));
+  expect(persist.mock.calls[1]![0]).toEqual(persist.mock.calls[0]![0]);
+  expect(onConfirm).not.toHaveBeenCalled();
 });
