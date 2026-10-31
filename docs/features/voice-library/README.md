@@ -1186,3 +1186,10 @@ admin-2 最终首轮结果与补验：该分片另有 IPA／UPS 两条本批改�
 - 两仓复用第六批独立工作树与 `codex/task147-batch6-playback`。重新 fetch 后 origin/main 仍为前端 `e6017ac8625055cd26504ec4a2f47231a3bc2e09`、后端 `8c772b8e85516735d4644a06a484f4a47946797f`，没有新增主线差异或合并冲突；本批原差异完整保留，无需 stash／重放，不改默认 checkout。
 - 复用 13.21 的有效验证与真实播放／资源清理回执；原生 hooks 正常执行。后端 SQLx prepare／Clippy 使用新建独占 PG `56681`、Redis `56682` 和批次 `task147-batch6-ship-20261031-7d51`，不连接受保护共享服务，也不复用已清理的实施期资源。本轮未新增云资源。
 - 提交后固定精确 base／head，按两仓 ship 技能各进行一次完整只读独立审查；有阻断先修复、定向验证并由同一 reviewer 增量复查，不以实施自检代替独立审查。审查、PR 与 CI 的实际结果继续补在本节／关联 PR；后续发布仍另行授权。
+
+第六批精确交付审查与关联 PR：
+
+- 前端首个精确提交 `e5ef0bd065f4137d77734f36fe8a8025206eed36`，原生 pre-commit／commit-msg／pre-push 类型检查通过，已创建 [PR #633](https://github.com/LonelyFellas/tsz/pull/633)。独立 reviewer `/root/review_frontend` 审查完整 19 文件及直接调用链，并用 Git blob 核对既有验证输入；审查：初审 1 轮；确认缺陷 0；证据排除误报 0；剩余阻断 0；关联回归／回退未知。后续仅交付记录增量由同一 reviewer 复核，精确最终 head 与轮次以 PR 最终回执为准。
+- 后端精确提交 `a4256f8ae7a5c495c1bd533410f9a963c471c4e8`，原生 SQLx prepare、全 target／feature Clippy 和 pre-push fmt 通过，`.sqlx` 无差异，已创建 [PR #364](https://github.com/LonelyFellas/tsz-rust/pull/364)。独立 reviewer `/root/review_backend` 检查完整 16 文件、权限／锁／事务／引用／回收／迁移及调用方；审查：1 轮；确认缺陷 0；证据排除误报 0；剩余阻断 0；关联回归／回退未知。两仓精确契约对象与实施验证输入一致，本次未新增产品代码修复。
+- 新端点与旧学习 DTO 分开，建议配套发布先 API 后 Web；写入学习选声事实后，禁止直接回退或混跑不认识该引用的旧资产回收 worker，存在事实时 down 会拒绝。上述是代码／契约边界，完整历史二进制组合和真实发布仍未验证，本轮不部署。
+- 远端闭环以每个 PR 的精确最终 head 绑定 CI run／attempt，全绿后才合并，再单独核对 merge SHA 的 main CI，不能用 PR 成功代替 main 成功。本节中首个提交／初审是历史阶段事实；实际合并、精确 run／attempt、最终审查与清理结果由两份关联 PR 正文和主记录引用的脱敏回执 `/Users/darwish/.codex/visualizations/2026/10/31/01a1921f-04bc-7d80-99b7-69e1f2f4e4bd/task147-batch6-ship-receipt.json`、`task147-batch6-ship-cleanup.json` 给出，不把缺少当前结果的历史“进行中”当终态。
