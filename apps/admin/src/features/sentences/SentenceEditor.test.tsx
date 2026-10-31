@@ -836,14 +836,14 @@ it.each([
     if (configured)
       speech.recommendations.mockResolvedValue([
         {
-          id: "leave-uk",
+          id: "22222222-2222-4222-8222-222222222221",
           name: "英式",
           groupName: "例句",
           locale: "en-GB",
           setting: { voice_id: "sonia", enabled: true, rate_percent: -27 }
         },
         {
-          id: "leave-us",
+          id: "22222222-2222-4222-8222-222222222222",
           name: "美式",
           groupName: "例句",
           locale: "en-US",
@@ -911,8 +911,20 @@ it.each([
                 voice_profile: {
                   dubbing: { mode: "local", pool_version: "provider_id_v1" },
                   voices: [
-                    { voice_id: "sonia", rate_percent: -27 },
-                    { voice_id: "jenny", rate_percent: -20 }
+                    {
+                      voice_id: "sonia",
+                      version_id: "22222222-2222-4222-8222-222222222221",
+                      version_name: "英式",
+                      locale: "en-GB",
+                      rate_percent: -27
+                    },
+                    {
+                      voice_id: "jenny",
+                      version_id: "22222222-2222-4222-8222-222222222222",
+                      version_name: "美式",
+                      locale: "en-US",
+                      rate_percent: -20
+                    }
                   ]
                 }
               }

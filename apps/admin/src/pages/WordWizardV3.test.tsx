@@ -3017,12 +3017,16 @@ it.each([false, true])(
         voices: [
           {
             voice_id: "sonia",
+            version_id: uuidFromInt(701),
+            version_name: "英式慢读",
             locale: "en-GB",
             enabled: true,
             rate_percent: -27
           },
           {
             voice_id: "jenny",
+            version_id: uuidFromInt(702),
+            version_name: "美式慢读",
             locale: "en-US",
             enabled: true,
             rate_percent: -20
