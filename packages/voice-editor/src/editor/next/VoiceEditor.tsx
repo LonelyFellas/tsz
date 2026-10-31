@@ -64,6 +64,7 @@ import {
 } from "./audioAssets";
 import { MarkupPanel, type DropdownTool } from "./MarkupPanel";
 import { VoiceVersions } from "./VoiceVersions";
+import { LocalVoicePool } from "./LocalVoicePool";
 import { AudioReview, type ReviewAudio } from "./AudioReview";
 import { SsmlReview } from "./SsmlReview";
 import { ReferenceAudio } from "./ReferenceAudio";
@@ -170,6 +171,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   language = "en",
   contextLabel = "语音编辑器",
   previewAdapter,
+  previewEnabled = true,
   loadRecommendations,
   recommendationArea,
   autoRecommend,
@@ -765,18 +767,21 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             .map(voiceSettingKey)
         )
       : undefined;
-  const displayedSettings = voiceProfile?.dubbing
-    ? [
-        ...effectiveSettings,
-        ...voiceSettings.filter(
-          (setting) =>
-            !effectiveSettings.some(
-              (resolved) =>
-                voiceSettingKey(resolved) === voiceSettingKey(setting)
+  const displayedSettings =
+    voiceProfile?.dubbing?.pool_version && voiceProfile.dubbing.mode === "local"
+      ? voiceSettings
+      : voiceProfile?.dubbing
+        ? [
+            ...effectiveSettings,
+            ...voiceSettings.filter(
+              (setting) =>
+                !effectiveSettings.some(
+                  (resolved) =>
+                    voiceSettingKey(resolved) === voiceSettingKey(setting)
+                )
             )
-        )
-      ]
-    : voiceSettings;
+          ]
+        : voiceSettings;
   const previousAudio = voiceProfile?.dubbing
     ? voiceSettings.filter(
         (setting) =>
@@ -825,6 +830,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       dubbing: {
         mode: "inherit" as const,
         area: recommendationArea,
+        pool_version: "provider_id_v1" as const,
         recommendation_order: voiceProfile?.dubbing?.recommendation_order ?? []
       }
     };
@@ -833,6 +839,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     onVoiceProfileChange(profile);
   }
   const audioContentKey = JSON.stringify([
+    contextLabel,
+    inputDataAttributes,
+    locale,
+    recommendationArea,
     generationContent,
     mode === "grammar" ? links : undefined,
     speechLinks,
@@ -844,7 +854,14 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   useEffect(() => {
     if (lastAudioContent.current === audioContentKey) return;
     lastAudioContent.current = audioContentKey;
+    stopAudition();
+    stopSsmlRef.current?.();
+    stopReferenceRef.current?.();
     generationRequest.current?.abort();
+    uploadControllersRef.current.forEach((controller) => controller.abort());
+    uploadControllersRef.current.clear();
+    setPendingUploads([]);
+    stopAssetPlayback();
     setGeneratingVersion(undefined);
     if (voiceSettingsRef.current.some((setting) => setting.audio_asset_id)) {
       const profile = {
@@ -969,7 +986,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
 
   function chooseVersion(setting: VoiceSetting) {
     const settings = displayedSettings;
-    if (setting.enabled && recommendationArea) {
+    if (setting.enabled && (recommendationArea || voiceProfile?.dubbing)) {
       changeVoiceSettings(
         settings.map((item) =>
           voiceSettingKey(item) === voiceSettingKey(setting)
@@ -1117,6 +1134,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       .map((accent) =>
         recommendations.find(
           (item) =>
+            item.selected !== false &&
             item.locale === accent &&
             isVoiceRecommendationAvailable(
               item,
@@ -1142,6 +1160,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             dubbing: {
               mode: "inherit" as const,
               area: recommendationArea,
+              pool_version: "provider_id_v1" as const,
               recommendation_order: usable.map((item) => item.id)
             }
           }
@@ -2089,6 +2108,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
 
   // TTS 试听与资产试听同一时间只响一路；历史冲突保留数据，先由编辑者处理。
   const handleAudition = (voice: VoiceOption, setting?: VoiceSetting) => {
+    if (!previewEnabled) return;
     if (
       conflictCount > 0 ||
       ((mode === "synthesis" || mode === "phoneme-settings") &&
@@ -2733,7 +2753,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               </Space>
             )}
             <VoiceVersions
-              multiple={!!recommendationArea}
+              multiple={!!recommendationArea || !!voiceProfile?.dubbing}
               settings={displayedSettings}
               unavailableVersions={unavailableVersions}
               voices={voices}
@@ -2751,7 +2771,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               }
               editingKey={editingVersionKey}
               canAudition={
-                !!previewAdapter && !!text.trim() && conflictCount === 0
+                previewEnabled &&
+                !!previewAdapter &&
+                !!text.trim() &&
+                conflictCount === 0
               }
               readOnly={readOnly || !onVoiceProfileChange}
               onEdit={setEditingVersionKey}
@@ -2760,7 +2783,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               onSelect={chooseVersion}
               onAudition={handleAudition}
               onGenerate={
-                previewAdapter?.generateAudio && !previewIsMock
+                previewEnabled &&
+                previewAdapter?.generateAudio &&
+                !previewIsMock
                   ? generateVersionAudio
                   : undefined
               }
@@ -2805,6 +2830,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               pendingVoiceId={pendingVoiceId}
               playingVoiceId={playingVoiceId}
               canAudition={
+                previewEnabled &&
                 Boolean(previewAdapter) &&
                 text.trim().length > 0 &&
                 conflictCount === 0
@@ -2936,6 +2962,111 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     return true;
   });
 
+  const localPool =
+    recommendationArea && mode !== "actual-pron" && !contentReadOnly ? (
+      <LocalVoicePool
+        profile={voiceProfile}
+        unavailableVersions={unavailableVersions}
+        previousAudio={previousAudio}
+        settings={
+          inherited
+            ? displayedSettings.map((item) =>
+                effectiveSettings.some(
+                  (effective) =>
+                    voiceSettingKey(effective) === voiceSettingKey(item)
+                )
+                  ? item
+                  : { ...item, enabled: false }
+              )
+            : displayedSettings
+        }
+        voices={voices}
+        loading={voicesLoading}
+        recommendations={recommendations}
+        area={recommendationArea}
+        locale={locale}
+        content={generationContent}
+        sourceKey={audioContentKey}
+        adapter={
+          previewIsMock || !previewEnabled
+            ? {
+                ...previewAdapter!,
+                generateAudio: undefined,
+                synthesizeSsml: undefined
+              }
+            : previewAdapter
+        }
+        readOnly={readOnly || !onVoiceProfileChange}
+        canAudition={
+          previewEnabled &&
+          !!previewAdapter &&
+          !!text.trim() &&
+          conflictCount === 0
+        }
+        error={recommendationError}
+        pendingUpload={pendingUploads.some((item) => !item.error)}
+        onChange={(profile) => {
+          if (readOnly || !onVoiceProfileChange) return;
+          initialRecommendationPending.current = false;
+          stopAudition();
+          setVoiceSettings(profile.voices);
+          emittedProfileRef.current = JSON.stringify(profile);
+          onVoiceProfileChange(profile);
+        }}
+        onAudition={handleAudition}
+        onRestore={() => void restoreRecommendations()}
+        onOpenDetail={(dialect) => {
+          stopAudition();
+          stopAssetPlayback();
+          setUpload((current) => ({ ...current, locale: dialect }));
+        }}
+        onCloseDetail={stopAssetPlayback}
+        audioTools={(dialect) => (
+          <section aria-label="当前文本口音录音">
+            <p>
+              真人录音属于当前文本／口音，沿用原资产保存边界，不属于当前音色版本。
+            </p>
+            <UploadPanel
+              uploadAllowed={audioUploadAllowed}
+              readOnly={readOnly}
+              locale={dialect}
+              available={!!audioUploadAdapter && !storageUnavailable}
+              unavailableReason={
+                audioUploadAdapter
+                  ? "音频存储尚未开通，暂时不能上传"
+                  : "音频上传未启用"
+              }
+              upload={{ ...upload, locale: dialect }}
+              onUploadChange={(next) =>
+                setUpload((current) => ({
+                  ...current,
+                  ...next,
+                  locale: dialect
+                }))
+              }
+              assets={assets.filter((asset) => asset.locale === dialect)}
+              pending={pendingUploads.filter((item) => item.locale === dialect)}
+              limit={audioAssetLimit}
+              onAddFiles={addAudioFiles}
+              onRetryUpload={retryUpload}
+              onDismissUpload={dismissUpload}
+              onRemoveAsset={removeAsset}
+              onPlayAsset={(asset) => void playAsset(asset)}
+              playingAssetId={playingAssetId}
+              playbackMessage={playbackMessage}
+            />
+            {assetReview && (
+              <AudioReview
+                key={assetReview.result.audioUrl}
+                media={assetReview}
+                onPlay={stopAudition}
+              />
+            )}
+          </section>
+        )}
+      />
+    ) : undefined;
+
   if (mode === "synthesis") {
     return (
       <section
@@ -2944,21 +3075,23 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         aria-label={contextLabel}
       >
         {previewIsMock && <Tag color="warning">模拟试听</Tag>}
-        {tools
-          .filter((tool) => tool.key === "voices" || tool.key === "uploads")
-          .map((tool) => (
-            <div key={tool.key}>
-              {tool.key === "uploads" &&
-              !audioUploadAdapter &&
-              assets.length === 0 ? (
-                <div className="tsz-ve-synthesis-upload-unavailable">
-                  真人录音 · 暂未启用
-                </div>
-              ) : (
-                tool.content
-              )}
-            </div>
-          ))}
+        {localPool}
+        {!localPool &&
+          tools
+            .filter((tool) => tool.key === "voices" || tool.key === "uploads")
+            .map((tool) => (
+              <div key={tool.key}>
+                {tool.key === "uploads" &&
+                !audioUploadAdapter &&
+                assets.length === 0 ? (
+                  <div className="tsz-ve-synthesis-upload-unavailable">
+                    真人录音 · 暂未启用
+                  </div>
+                ) : (
+                  tool.content
+                )}
+              </div>
+            ))}
         {renderActions && (
           <div className="tsz-ve-editor-actions">
             {renderActions(
@@ -3183,60 +3316,74 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         tools={
           mode === "association" ||
           (mode === "grammar" && renderAssociationPicker)
-            ? tools.flatMap<DropdownTool>((tool) =>
-                tool.key === "roles"
-                  ? [
-                      ...(mode === "grammar" && !contentReadOnly ? [tool] : []),
-                      ...(mode === "grammar"
-                        ? (["word"] as const)
-                        : (["word", "phrase"] as const)
-                      ).map((targetKind): DropdownTool => ({
-                        key: `association-${targetKind}`,
-                        disabled: linksReadOnly,
-                        label: targetKind === "word" ? "关联单词" : "关联短语",
-                        icon: <LinkOutlined />,
-                        active:
-                          brush.kind === "association" &&
-                          brush.targetKind === targetKind,
-                        placement: "topLeft",
-                        stayOpen: true,
-                        content: (
-                          <div className="tsz-ve-pop">
-                            <div className="tsz-ve-pop-hint">
-                              {!renderAssociationPicker
-                                ? "当前后端尚不支持正文关联，已有关联保留。"
-                                : targetKind === "word"
-                                  ? "点击一个未关联的单词，再选择关联目标。"
-                                  : linkWords.length > 0
-                                    ? `已选 ${linkWords.length} 个单词：${linkSegments.map((segment) => segment.surface).join(" … ")}`
-                                    : "依次点击至少两个未关联的单词，可不连续；再次点击取消选择。"}
+            ? tools
+                .filter(
+                  (tool) =>
+                    !localPool ||
+                    (tool.key !== "voices" && tool.key !== "uploads")
+                )
+                .flatMap<DropdownTool>((tool) =>
+                  tool.key === "roles"
+                    ? [
+                        ...(mode === "grammar" && !contentReadOnly
+                          ? [tool]
+                          : []),
+                        ...(mode === "grammar"
+                          ? (["word"] as const)
+                          : (["word", "phrase"] as const)
+                        ).map((targetKind): DropdownTool => ({
+                          key: `association-${targetKind}`,
+                          disabled: linksReadOnly,
+                          label:
+                            targetKind === "word" ? "关联单词" : "关联短语",
+                          icon: <LinkOutlined />,
+                          active:
+                            brush.kind === "association" &&
+                            brush.targetKind === targetKind,
+                          placement: "topLeft",
+                          stayOpen: true,
+                          content: (
+                            <div className="tsz-ve-pop">
+                              <div className="tsz-ve-pop-hint">
+                                {!renderAssociationPicker
+                                  ? "当前后端尚不支持正文关联，已有关联保留。"
+                                  : targetKind === "word"
+                                    ? "点击一个未关联的单词，再选择关联目标。"
+                                    : linkWords.length > 0
+                                      ? `已选 ${linkWords.length} 个单词：${linkSegments.map((segment) => segment.surface).join(" … ")}`
+                                      : "依次点击至少两个未关联的单词，可不连续；再次点击取消选择。"}
+                              </div>
+                              {renderAssociationPicker &&
+                                targetKind === "phrase" && (
+                                  <Button
+                                    size="small"
+                                    disabled={
+                                      linksReadOnly || linkWords.length < 2
+                                    }
+                                    onClick={() => {
+                                      setOpenTool(undefined);
+                                      setAssociationPickerOpen(true);
+                                    }}
+                                  >
+                                    选择关联短语
+                                  </Button>
+                                )}
                             </div>
-                            {renderAssociationPicker &&
-                              targetKind === "phrase" && (
-                                <Button
-                                  size="small"
-                                  disabled={
-                                    linksReadOnly || linkWords.length < 2
-                                  }
-                                  onClick={() => {
-                                    setOpenTool(undefined);
-                                    setAssociationPickerOpen(true);
-                                  }}
-                                >
-                                  选择关联短语
-                                </Button>
-                              )}
-                          </div>
-                        )
-                      }))
-                    ]
-                  : [tool]
+                          )
+                        }))
+                      ]
+                    : [tool]
+                )
+            : tools.filter(
+                (tool) =>
+                  !localPool ||
+                  (tool.key !== "voices" && tool.key !== "uploads")
               )
-            : tools
         }
         openTool={openTool}
         onOpenToolChange={openToolAndArm}
       />
+      {localPool}
     </section>
   );
 }

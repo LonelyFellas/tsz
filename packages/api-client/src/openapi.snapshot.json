@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/choice-tiered-backend/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-31T07:10:11.673Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dubbing-center/docs/openapi.json",
+  "_generatedAt": "2026-10-31T08:19:47.156Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -7695,6 +7695,25 @@
       },
       "additionalProperties": false
     },
+    "LocalVoiceRecommendationV3": {
+      "type": "object",
+      "required": ["group_id", "pair_id", "voice_ids", "contribution_ids"],
+      "properties": {
+        "contribution_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" },
+          "maxItems": 2
+        },
+        "group_id": { "type": "string", "format": "uuid" },
+        "pair_id": { "type": "string", "format": "uuid" },
+        "voice_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "maxItems": 2
+        }
+      },
+      "additionalProperties": false
+    },
     "ManualPreviewRequest": {
       "type": "object",
       "required": ["voice_alias", "ssml"],
@@ -8889,12 +8908,29 @@
       },
       "additionalProperties": false
     },
+    "VoicePoolVersionV3": {
+      "type": "string",
+      "description": "Explicit opt-in: historical profiles keep their existing fallback and version semantics.",
+      "enum": ["provider_id_v1"]
+    },
     "VoiceProfileDubbingV3": {
       "type": "object",
       "required": ["mode", "area"],
       "properties": {
         "area": { "$ref": "#/components/schemas/DubbingAreaV3" },
         "mode": { "$ref": "#/components/schemas/VoiceProfileModeV3" },
+        "pool_version": {
+          "oneOf": [
+            { "$ref": "#/components/schemas/VoicePoolVersionV3" },
+            { "type": "null" }
+          ]
+        },
+        "recommendation": {
+          "oneOf": [
+            { "$ref": "#/components/schemas/LocalVoiceRecommendationV3" },
+            { "type": "null" }
+          ]
+        },
         "recommendation_order": {
           "type": "array",
           "items": { "type": "string", "format": "uuid" }

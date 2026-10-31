@@ -265,10 +265,12 @@ describe("双口音真实试听控件", () => {
       fireEvent.change(input, {
         target: { value: alphabet === "ipa" ? "fɑːɹ" : "F AA R" }
       });
+      fireEvent.click(await screen.findByRole("button", { name: /^修改 / }));
       const generate = await screen.findByText("生成正式音频");
       await waitFor(() => expect(generate.closest("button")).toBeEnabled());
       fireEvent.click(generate);
-      await screen.findByText("已生成音频");
+      await screen.findByRole("button", { name: "播放正式音频" });
+      fireEvent.click(screen.getByRole("button", { name: "保存配音设置" }));
       fireEvent.click(screen.getByLabelText(`完成${label}设置`));
       const saved = JSON.parse(
         screen.getByTestId("pronunciation-wire").textContent!
@@ -772,7 +774,10 @@ it.each([
     expect(input).not.toHaveAttribute("readonly");
     fireEvent.change(input, { target: { value: edited } });
     const voice = side === "uk" ? "Sonia" : "Aria";
-    fireEvent.click(await screen.findByLabelText(`启用 ${voice}`));
+    const selectedVoice = await screen.findByLabelText<HTMLInputElement>(
+      `选用 ${voice}`
+    );
+    if (!selectedVoice.checked) fireEvent.click(selectedVoice);
     fireEvent.click(screen.getByLabelText(`试听 ${voice}`));
     await waitFor(() =>
       expect(speech.synthesize).toHaveBeenLastCalledWith(
@@ -836,7 +841,7 @@ it("短语 UPS 在一个词内增改音素后保留词界，停顿按正文位�
   fireEvent.click(screen.getByLabelText("停顿 0.5 秒"));
   const dialog = screen.getByRole("dialog");
   fireEvent.mouseDown(dialog.querySelectorAll(".tsz-ve-gap")[3]!);
-  fireEvent.click(screen.getByLabelText("启用 Sonia"));
+  fireEvent.click(screen.getByLabelText("选用 Sonia"));
   fireEvent.click(screen.getByLabelText("试听 Sonia"));
   await waitFor(() =>
     expect(speech.synthesize).toHaveBeenLastCalledWith(
@@ -911,8 +916,9 @@ it("未配置的音素设置器采用首位推荐，完成时保存参数", asyn
   const label = "第 1 条发音 英式 Azure IPA";
   fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
   await waitFor(() =>
-    expect(screen.getByLabelText("启用 Sonia")).toBeChecked()
+    expect(screen.getByLabelText("选用 Sonia")).toBeChecked()
   );
+  fireEvent.click(await screen.findByRole("button", { name: "修改 慢读" }));
   expect(screen.getByLabelText("设置 Sonia 的语速")).toHaveTextContent("0.75");
 });
 
@@ -933,9 +939,12 @@ it("四个 TTS 设置器提供音标编辑、停顿和音色，完成各自保�
     });
     const control = (label: string) =>
       dialog.querySelector<HTMLElement>(`[aria-label="${label}"]`)!;
-    await waitFor(() => expect(control(`启用 ${voice}`)).not.toBeNull());
-    await waitFor(() => expect(control(`启用 ${voice}`)).toBeChecked());
-    expect(control("音频")).not.toBeNull();
+    await waitFor(() => expect(control(`选用 ${voice}`)).not.toBeNull());
+    await waitFor(() => expect(control(`选用 ${voice}`)).toBeChecked());
+    expect(control("音频")).toBeNull();
+    expect(
+      dialog.querySelector('[aria-label="局部配音音色池"]')
+    ).not.toBeNull();
     for (const name of ["连读", "斜体", "语法结构", "编辑文本"])
       expect(control(name)).toBeNull();
     expect(control(`${label}音标编辑`)).not.toHaveAttribute("readonly");
@@ -947,7 +956,10 @@ it("四个 TTS 设置器提供音标编辑、停顿和音色，完成各自保�
     fireEvent.mouseDown(
       dialog.querySelectorAll(".tsz-ve-gap")[alphabet === "UPS" ? 2 : 0]!
     );
-    fireEvent.click(control(`试听 ${voice}`));
+    const poolPreview = await screen.findByRole("button", {
+      name: `试听 ${voice}`
+    });
+    fireEvent.click(poolPreview);
     await waitFor(() =>
       expect(speech.synthesize).toHaveBeenLastCalledWith(
         expect.objectContaining({
@@ -979,7 +991,7 @@ it("四个 TTS 设置器提供音标编辑、停顿和音色，完成各自保�
     name: `${label} · 音标、停顿与音色`
   });
   const sonia = () =>
-    dialog.querySelector<HTMLElement>('[aria-label="启用 Sonia"]')!;
+    dialog.querySelector<HTMLElement>('[aria-label="选用 Sonia"]')!;
   await waitFor(() => expect(sonia()).not.toBeNull());
   expect(sonia()).toBeChecked();
   fireEvent.click(sonia());

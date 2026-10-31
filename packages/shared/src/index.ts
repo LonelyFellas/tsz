@@ -9,3 +9,4 @@ export * from "./pronunciation-synthesis";
 export * from "./form-contents";
 export { convertDictionaryToUnified } from "./unified-phonetic";
 export { ipaWordToUps, UPS_RULE_SOURCE } from "./ipa-ups";
+export * from "./voice-display";

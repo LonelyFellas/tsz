@@ -9,3 +9,4 @@ export * from "./spelling";
 export * from "./voice-recommendations";
 export * from "./voice-versions";
 export * from "./dubbing";
+export * from "./voice-pool";

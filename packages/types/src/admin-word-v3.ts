@@ -426,6 +426,13 @@ export interface VoiceProfileV3 {
     mode: "inherit" | "local";
     area: "word" | "azure" | "grammar" | "meaning" | "example";
     recommendation_order?: string[];
+    pool_version?: "provider_id_v1";
+    recommendation?: {
+      group_id: string;
+      pair_id: string;
+      voice_ids: string[];
+      contribution_ids: string[];
+    };
   };
 }
 

@@ -14,8 +14,10 @@ export function SsmlReview({
   content,
   settings,
   onPlay,
-  registerStop
+  registerStop,
+  singleVoice
 }: {
+  singleVoice?: boolean;
   adapter: VoicePreviewAdapter;
   content: RichTextV2;
   settings: VoiceSetting[];
@@ -128,20 +130,22 @@ export function SsmlReview({
   return (
     <section className="tsz-ve-ssml-review" aria-label="SSML 试听设置">
       <Space wrap>
-        <Select
-          aria-label="SSML 配音版本"
-          value={selected && voiceSettingKey(selected)}
-          options={settings.map((setting) => ({
-            value: voiceSettingKey(setting),
-            label: setting.version_name ?? setting.voice_id
-          }))}
-          onChange={(value) => {
-            stop();
-            setVersion(value);
-            setManual(false);
-            setRaw("");
-          }}
-        />
+        {!singleVoice && (
+          <Select
+            aria-label="SSML 配音版本"
+            value={selected && voiceSettingKey(selected)}
+            options={settings.map((setting) => ({
+              value: voiceSettingKey(setting),
+              label: setting.version_name ?? setting.voice_id
+            }))}
+            onChange={(value) => {
+              stop();
+              setVersion(value);
+              setManual(false);
+              setRaw("");
+            }}
+          />
+        )}
         <Switch
           checked={manual}
           disabled={!automatic || loading}

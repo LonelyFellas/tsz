@@ -135,6 +135,9 @@ describe("admin voice preview adapter", () => {
     ).resolves.toEqual([
       {
         id: "ava",
+        provider: "azure",
+        providerVoiceId: undefined,
+        displayName: "Ava 爱娃",
         label: "Ava 爱娃 · en-US",
         isCommon: true,
         locale: "en-US",
@@ -145,7 +148,6 @@ describe("admin voice preview adapter", () => {
         supportsVolume: true,
         supportsPause: true,
         supportsPhoneme: true,
-        supportsStyleDegree: false,
         isDefault: true,
         rateRange: { min: -10, max: 10 },
         pitchRange: { min: 0, max: 0 }

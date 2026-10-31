@@ -81,12 +81,16 @@ function mapVoice(
   const capabilities = item.capabilities;
   return {
     id: item.alias,
+    provider: "azure",
+    providerVoiceId: item.capability_evidence?.provider_voice_id,
+    displayName: item.display_name ?? item.alias,
     isCommon: item.is_common ?? true,
     label: `${item.display_name ?? item.alias} · ${item.locale}`,
     locale: item.locale,
     accent: item.accent,
-    supportsStyleDegree:
-      item.capability_evidence?.supports_style_degree === true,
+    ...(item.capability_evidence?.supports_style_degree != null
+      ? { supportsStyleDegree: item.capability_evidence.supports_style_degree }
+      : {}),
     roles: item.capability_evidence?.roles ?? undefined,
     gender: gender === "female" || gender === "male" ? gender : "neutral",
     styles: [...capabilities.styles],

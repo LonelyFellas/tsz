@@ -247,6 +247,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           .map((accent) =>
             items.find(
               (item) =>
+                item.selected !== false &&
                 item.locale === accent &&
                 isVoiceRecommendationAvailable(item, voices, accent)
             )
@@ -257,6 +258,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           profile: {
             dubbing: {
               mode: "inherit",
+              pool_version: "provider_id_v1",
               area,
               recommendation_order: usable.map((item) => item.id)
             },
@@ -762,11 +764,8 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
                     : nextReadingLinks
                 }));
             }}
-            previewAdapter={
-              env.VOICE_PREVIEW
-                ? (sessionPreviewAdapter ?? adminVoicePreviewAdapter)
-                : undefined
-            }
+            previewAdapter={sessionPreviewAdapter ?? adminVoicePreviewAdapter}
+            previewEnabled={env.VOICE_PREVIEW}
             previewIsMock={voicePreviewIsMock}
             onVoiceProfileChange={(next) => {
               if (readOnly || contentReadOnly) return;
@@ -810,6 +809,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       )}
       {editing && (
         <VoiceEditorModal
+          {...(area ? { width: 1200 } : {})}
           title={editorTitle ?? `编辑${ariaLabel}`}
           open={editing}
           footer={null}
