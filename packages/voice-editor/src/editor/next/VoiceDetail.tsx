@@ -169,6 +169,7 @@ export function VoiceDetail({
   }
   return (
     <Modal
+      className="tsz-ve-voice-detail"
       open
       title={`修改${dialect === "en-GB" ? "英式" : "美式"}配音设置 · ${voice.displayName ?? voice.label}`}
       width={880}

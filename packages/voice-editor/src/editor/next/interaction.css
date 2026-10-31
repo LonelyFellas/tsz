@@ -445,6 +445,7 @@
   margin-top: 16px;
 }
 .tsz-ve-local-pool .ant-typography.ant-typography-secondary,
+.tsz-ve-voice-detail .ant-typography.ant-typography-secondary,
 .tsz-ve-voice-parameters .ant-typography.ant-typography-secondary,
 .tsz-ve-local-pool .ant-input::placeholder {
   color: #687181;
