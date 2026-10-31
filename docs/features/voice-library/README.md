@@ -1193,3 +1193,9 @@ admin-2 最终首轮结果与补验：该分片另有 IPA／UPS 两条本批改�
 - 后端精确提交 `a4256f8ae7a5c495c1bd533410f9a963c471c4e8`，原生 SQLx prepare、全 target／feature Clippy 和 pre-push fmt 通过，`.sqlx` 无差异，已创建 [PR #364](https://github.com/LonelyFellas/tsz-rust/pull/364)。独立 reviewer `/root/review_backend` 检查完整 16 文件、权限／锁／事务／引用／回收／迁移及调用方；审查：1 轮；确认缺陷 0；证据排除误报 0；剩余阻断 0；关联回归／回退未知。两仓精确契约对象与实施验证输入一致，本次未新增产品代码修复。
 - 新端点与旧学习 DTO 分开，建议配套发布先 API 后 Web；写入学习选声事实后，禁止直接回退或混跑不认识该引用的旧资产回收 worker，存在事实时 down 会拒绝。上述是代码／契约边界，完整历史二进制组合和真实发布仍未验证，本轮不部署。
 - 远端闭环以每个 PR 的精确最终 head 绑定 CI run／attempt，全绿后才合并，再单独核对 merge SHA 的 main CI，不能用 PR 成功代替 main 成功。本节中首个提交／初审是历史阶段事实；实际合并、精确 run／attempt、最终审查与清理结果由两份关联 PR 正文和主记录引用的脱敏回执 `/Users/darwish/.codex/visualizations/2026/10/31/01a1921f-04bc-7d80-99b7-69e1f2f4e4bd/task147-batch6-ship-receipt.json`、`task147-batch6-ship-cleanup.json` 给出，不把缺少当前结果的历史“进行中”当终态。
+
+第六批首个远端 CI 失败与定向修正：
+
+- 前端精确 `c5c491e173561715fa80285ab5d58565fa94bd4c` 的 run `41208640873` attempt 1：仅 packages 分片的既有 Italic 组合用例超过原 5000ms，其余 1506 项通过；其余覆盖率分片／quality／tooling／commitlint 成功，verify 因该失败正确阻断。后端精确 `a4256f8ae7a5c495c1bd533410f9a963c471c4e8` 的 run `41208450239` attempt 1：lexicon-learning 的旧空库回退因新增选声外键阻止删除父表，lexicon-other 的旧前缀 fixture 调用当前回收 worker 时缺少新表；其余原生分片／单元／审计／quality 成功，聚合门正确阻断，两个 PR 发行任务按设计 skip。上述失败回执保留，不合并、不放宽时限或断言、不盲目 rerun。
+- 两个 Rust 失败均在独占库沿原输入复现。空库回退按依赖先移除学习音频子表，重建父表后再恢复；不确定对象删除用例迁移到当前完整 schema。当前 schema 的后续迁移有明确禁止自动降级的既有边界，因此将原“回收标记阻止历史原生降级”的完整断言迁入独立历史 schema 用例，仍检查特定拒绝原因、版本不变及标记保留；原当前 worker 的删除失败／保存拒绝／URL拒绝／重试清理断言均保留。schema 4 项、资产引用完整 28 项通过，未修改生产 SQL、迁移或 API。
+- 前端仅优化该既有组合测试对同一组稳定按钮的重复可访问查询，Role 查询从 10 次减为 5 次；保留真实选择、格式开关、回调数据、局部取消、清空、撤销与重开全部断言，不改 5 秒时限、CI worker 或覆盖率。相同 coverage／单 worker 的完整 Italic 文件 10 项通过，目标本地约 1000ms；不将本地耗时外推为远端成功。新精确提交继续经过原生 hooks、同一 reviewer 增量复查及真实 PR CI。
