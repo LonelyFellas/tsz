@@ -1,3 +1,4 @@
+import { createDubbingGroupsV3Endpoints } from "./dubbing-groups-v3";
 import { createAiLedgerEndpoints } from "./ai-ledger";
 import { createOpenCodeEndpoints } from "./opencode";
 import { createChatGPTEndpoints } from "./chatgpt";
@@ -379,6 +380,7 @@ export function createAdminEndpoints(http: HttpClient) {
           throw new Error("Invalid preview content path");
         return http.getBlob(path, { signal });
       },
+      ...createDubbingGroupsV3Endpoints(http),
       groups: (signal?: AbortSignal) =>
         http.get<AdminDubbingGroupsResponse>("/speech/groups", {
           signal,

@@ -583,12 +583,19 @@ describe("createHttpClient", () => {
     expect(fetchMock.mock.calls[0]![1].body).toBeUndefined();
   });
 
-  it("del:带 data 时序列化为请求体", async () => {
+  it("del:带 data 时序列化为请求体并传递协商头", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(null));
     const http = createHttpClient({ baseUrl: "" });
-    await http.del("/items/1", { channel: "phone", code: "123456" });
+    await http.del(
+      "/items/1",
+      { channel: "phone", code: "123456" },
+      {
+        headers: { "X-TSZ-Dubbing-Groups": "v3" }
+      }
+    );
     const init = fetchMock.mock.calls[0]![1];
     expect(init.method).toBe("DELETE");
+    expect(new Headers(init.headers).get("X-TSZ-Dubbing-Groups")).toBe("v3");
     expect(init.body).toBe(
       JSON.stringify({ channel: "phone", code: "123456" })
     );

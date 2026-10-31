@@ -1,8 +1,9 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/choice-distractor-quality/docs/openapi.json",
-  "_source_sha256": "1a0a3a013614c747c64f6718cb1a33547843f3c7f3fdc49e793a9811e83e86c2",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/dubbing-center/docs/openapi.json",
+  "_source_sha256": "6680916841855f8fb84abad6311ec8e19ef78e9c68f424bc0c97507197d9f284",
   "roots": [
+    "DubbingGroupsV3Response",
     "LearningCapabilities",
     "AiLedgerPage",
     "AiCostLedgerPage",
@@ -1327,6 +1328,106 @@
     "DubbingAreaV3": {
       "type": "string",
       "enum": ["word", "azure", "grammar", "meaning", "example"]
+    },
+    "DubbingGroupsV3Response": {
+      "type": "object",
+      "required": ["groups", "revision", "order_revision"],
+      "properties": {
+        "groups": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/DubbingGroupV3" }
+        },
+        "order_revision": { "type": "integer", "minimum": 0 },
+        "revision": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "DubbingGroupV3": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "areas",
+        "revision",
+        "is_global",
+        "recommendations"
+      ],
+      "properties": {
+        "areas": { "type": "array", "items": { "type": "string" } },
+        "id": { "type": "string", "format": "uuid" },
+        "is_global": { "type": "boolean" },
+        "name": { "type": "string" },
+        "recommendations": { "$ref": "#/$defs/DubbingRecommendationsV3" },
+        "revision": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "DubbingPairVoice": {
+      "type": "object",
+      "required": ["id", "voice_alias", "parameters"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "parameters": { "$ref": "#/$defs/VoiceParameters" },
+        "voice_alias": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "DubbingRecommendation": {
+      "type": "object",
+      "required": ["id", "name", "voice_alias", "parameters"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "name": { "type": "string" },
+        "parameters": { "$ref": "#/$defs/VoiceParameters" },
+        "selected": { "type": "boolean" },
+        "voice_alias": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "DubbingRecommendationPair": {
+      "type": "object",
+      "required": ["id", "name", "selected", "uk", "us"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "name": { "type": "string" },
+        "selected": { "type": "boolean" },
+        "uk": { "$ref": "#/$defs/DubbingPairVoice" },
+        "us": { "$ref": "#/$defs/DubbingPairVoice" }
+      },
+      "additionalProperties": false
+    },
+    "DubbingRecommendationsV3": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["uk", "us", "format"],
+          "properties": {
+            "format": { "type": "string", "enum": ["legacy"] },
+            "uk": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/DubbingRecommendation" }
+            },
+            "us": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/DubbingRecommendation" }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["pairs", "format"],
+          "properties": {
+            "format": { "type": "string", "enum": ["paired"] },
+            "pairs": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/DubbingRecommendationPair" },
+              "maxItems": 20
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
     },
     "EnglishLanguageV3": { "type": "string", "enum": ["en"] },
     "EnglishLocale": { "type": "string", "pattern": "^en-[A-Z]{2}$" },
@@ -5107,6 +5208,23 @@
         "dedicated_form_group_unused",
         "sense_form_group_required"
       ]
+    },
+    "VoiceParameters": {
+      "type": "object",
+      "required": ["rate_percent", "pitch_semitones"],
+      "properties": {
+        "pitch_semitones": { "type": "integer" },
+        "rate_percent": { "type": "integer" },
+        "role": { "type": ["string", "null"] },
+        "style": { "type": ["string", "null"] },
+        "style_degree": {
+          "type": ["number", "null"],
+          "maximum": 2,
+          "minimum": 0.01
+        },
+        "volume_percent": { "type": "integer", "maximum": 100, "minimum": 0 }
+      },
+      "additionalProperties": false
     },
     "VoiceProfileDubbingV3": {
       "type": "object",
