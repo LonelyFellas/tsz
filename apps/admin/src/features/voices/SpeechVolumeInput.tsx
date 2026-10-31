@@ -53,7 +53,7 @@ export function SpeechVolumeInput({
         value={value}
         onChange={onChange}
         disabled={disabled}
-        suffix="%"
+        suffix={<small className="voice-shared-unit">%</small>}
         style={{ width: 96 }}
       />
     </Flex>

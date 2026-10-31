@@ -39,7 +39,12 @@ export function SpeechRateInput({
           { value: "custom", label: "自定义" },
           ...presets.map((percent) => ({
             value: percent,
-            label: `${((percent + 100) / 100).toFixed(2)}×`,
+            label: (
+              <span>
+                {((percent + 100) / 100).toFixed(2)}
+                <span className="voice-shared-times">✗</span>
+              </span>
+            ),
             disabled: percent < min || percent > max
           }))
         ]}
@@ -57,7 +62,7 @@ export function SpeechRateInput({
         max={(Math.min(max, 70) + 100) / 100}
         step={0.05}
         precision={2}
-        suffix="×"
+        suffix={<span className="voice-shared-times">✗</span>}
         onChange={(rate) =>
           onChange?.(rate == null ? null : Math.round((rate - 1) * 100))
         }

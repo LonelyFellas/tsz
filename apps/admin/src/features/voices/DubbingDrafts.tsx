@@ -6,9 +6,9 @@ import {
   type ReactNode,
   type SetStateAction
 } from "react";
-import type { AdminDubbingGroup } from "@tsz/types";
+import type { DubbingDraft } from "./dubbing-model";
 
-type Drafts = Record<string, AdminDubbingGroup>;
+type Drafts = Record<string, DubbingDraft>;
 type DraftState = [Drafts, Dispatch<SetStateAction<Drafts>>];
 const Context = createContext<DraftState | null>(null);
 

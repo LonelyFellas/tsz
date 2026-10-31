@@ -32,7 +32,8 @@ const MODULE_QUERY_ROOTS: Record<string, readonly string[]> = {
     "inbound-references",
     "admin-speech-voices",
     "admin-speech-library",
-    "admin-dubbing-groups"
+    "admin-dubbing-groups",
+    "admin-dubbing-groups-v3"
   ],
   sentences: [
     "shared-sentences",
@@ -40,7 +41,8 @@ const MODULE_QUERY_ROOTS: Record<string, readonly string[]> = {
     "sentence-withdrawal-impact",
     "admin-speech-voices",
     "admin-speech-library",
-    "admin-dubbing-groups"
+    "admin-dubbing-groups",
+    "admin-dubbing-groups-v3"
   ],
   users: ["admin-users"],
   teacherapply: ["teacher-applications", "teacher-application"],
@@ -49,6 +51,7 @@ const MODULE_QUERY_ROOTS: Record<string, readonly string[]> = {
     "admin-words",
     "admin-speech-library",
     "admin-dubbing-groups",
+    "admin-dubbing-groups-v3",
     "admin-dubbing-update-settings",
     "admin-dubbing-audio-updates"
   ]

@@ -1,94 +1,99 @@
 import { speechAccentGroup } from "@tsz/shared";
 import { useQuery } from "@tanstack/react-query";
 import type { AdminSpeechVoice, AdminVoiceParameters } from "@tsz/types";
-import { Alert, Button, Form, Input, Select, Space } from "antd";
+import { Alert, Button, Form, Select, Space } from "antd";
 import { useEffect, useState } from "react";
-import { api, useAuthStore } from "@/lib/auth";
-import { newWordNodeId } from "@/features/dictionary/word-model/primitives";
+import { api, useAuthStore, usePermission } from "@/lib/auth";
 import { useDubbingDrafts } from "./DubbingDrafts";
+import {
+  dubbingGroupsKey,
+  newPairVoice,
+  type DubbingDraft
+} from "./dubbing-model";
+import {
+  RecommendationEditor,
+  type RecommendationSeed
+} from "./RecommendationEditor";
 
 export function AddRecommendation({
   voice,
+  voices,
   readParameters,
   onBusyChange,
   onClose
 }: {
   voice: AdminSpeechVoice;
+  voices: AdminSpeechVoice[];
   readParameters: () => Promise<AdminVoiceParameters>;
   onClose: () => void;
   onBusyChange: (busy: boolean) => void;
 }) {
   const accountId = useAuthStore((state) => state.profile?.id);
+  const canEdit = usePermission("speech.global_dubbing");
   const [drafts, setDrafts] = useDubbingDrafts();
   const groups = useQuery({
-    queryKey: ["admin-dubbing-groups", accountId],
-    queryFn: ({ signal }) => api.speech.groups(signal),
+    queryKey: dubbingGroupsKey(accountId),
+    queryFn: ({ signal }) => api.speech.groupsV3(signal),
     retry: false
   });
-  const [form] = Form.useForm<{ group: string; name: string }>();
+  const [groupId, setGroupId] = useState<string>();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [seed, setSeed] = useState<RecommendationSeed>();
   const [done, setDone] = useState(false);
   useEffect(() => {
-    onBusyChange(pending);
+    onBusyChange(pending || !!seed);
     return () => onBusyChange(false);
-  }, [pending, onBusyChange]);
-  const locale =
-    speechAccentGroup(voice.locale, voice.accent) === "other"
-      ? null
-      : (speechAccentGroup(voice.locale, voice.accent) as
-          "uk" | "us" | undefined);
-
+  }, [pending, seed, onBusyChange]);
+  const locale = speechAccentGroup(voice.locale, voice.accent);
+  const options: DubbingDraft[] = [
+    ...(groups.data?.groups.map((group) => drafts[group.id] ?? group) ?? []),
+    ...Object.values(drafts).filter(
+      (draft) => !groups.data?.groups.some((group) => group.id === draft.id)
+    )
+  ];
   async function add() {
-    if (pending || done || !groups.data || !locale) return;
-    let values: { group: string; name: string };
-    let parameters: AdminVoiceParameters;
-    try {
-      values = await form.validateFields();
-      parameters = await readParameters();
-    } catch {
+    if (
+      !canEdit ||
+      pending ||
+      done ||
+      !groups.data ||
+      (locale !== "uk" && locale !== "us")
+    )
+      return;
+    const group = options.find((g) => g.id === groupId);
+    if (!group) {
+      setError("请选择推荐分组。");
       return;
     }
-    const group =
-      drafts[values.group] ??
-      groups.data.groups.find((item) => item.id === values.group);
-    if (!group) return;
-    if (group[locale].length >= 20) {
-      setError("该口音已有 20 个推荐，请先在分组配音中整理。");
+    const rec = group.recommendations;
+    if (
+      (rec.format === "paired"
+        ? rec.pairs.length
+        : Math.max(
+            rec.uk.length,
+            rec.us.length,
+            group.legacyPairs?.length ?? 0
+          )) >= 20
+    ) {
+      setError("该组已有 20 个推荐，请先在分组配音中整理。");
       return;
     }
     setPending(true);
     setError("");
     try {
+      const parameters = await readParameters();
       if (useAuthStore.getState().profile?.id !== accountId) return;
-      setDrafts((current) => {
-        const target = current[group.id] ?? group;
-        if (target[locale].length >= 20) return current;
-        return {
-          ...current,
-          [group.id]: {
-            ...target,
-            [locale]: [
-              ...target[locale],
-              {
-                id: newWordNodeId(),
-                name: values.name.trim(),
-                voice_alias: voice.alias,
-                parameters,
-                selected: true
-              }
-            ]
-          }
-        };
+      setSeed({
+        name: voice.display_name,
+        [locale]: { ...newPairVoice(voice), parameters }
       });
-      setDone(true);
     } catch {
-      setError("应用失败，当前参数保留，请重试。");
+      setError("请先修正当前试听参数，输入已保留。");
     } finally {
       setPending(false);
     }
   }
-
   if (done)
     return (
       <Alert
@@ -107,81 +112,74 @@ export function AddRecommendation({
           action={<Button onClick={() => void groups.refetch()}>重试</Button>}
         />
       )}
-      {groups.isSuccess && !groups.data.groups.length && (
-        <Alert type="info" title="请先到分组配音创建分组，再添加当前音色。" />
-      )}
-      <Form
-        form={form}
-        layout="vertical"
-        initialValues={{ name: voice.display_name }}
-        disabled={pending}
-      >
-        <Form.Item
-          name="group"
-          label="推荐分组"
-          rules={[{ required: true, message: "请选择推荐分组" }]}
-        >
+      <Form component="div" layout="vertical">
+        <Form.Item label="推荐分组">
           <Select
             aria-label="推荐分组"
+            value={groupId}
             loading={groups.isPending}
-            options={[
-              ...(groups.data?.groups.map(
-                (group) => drafts[group.id] ?? group
-              ) ?? []),
-              ...Object.values(drafts).filter(
-                (draft) =>
-                  !groups.data?.groups.some((group) => group.id === draft.id)
-              )
-            ].map((group) => ({
+            options={options.map((group) => ({
               value: group.id,
               label: group.name
             }))}
+            disabled={pending || !!seed || !canEdit}
+            onChange={setGroupId}
           />
-        </Form.Item>
-        <Form.Item
-          name="name"
-          label="推荐版本名称"
-          rules={[
-            {
-              required: true,
-              whitespace: true,
-              max: 40,
-              message: "请输入不超过 40 字的推荐名称"
-            }
-          ]}
-        >
-          <Input aria-label="推荐版本名称" maxLength={40} />
         </Form.Item>
         <Space>
           <Button
             type="primary"
             disabled={
-              !groups.isSuccess || !groups.data.groups.length || !locale
+              !canEdit ||
+              !groups.isSuccess ||
+              !options.length ||
+              (locale !== "uk" && locale !== "us")
             }
             loading={pending}
             onClick={() => void add()}
           >
-            确认加入推荐
+            创建整套推荐
           </Button>
           <Button disabled={pending} onClick={onClose}>
             取消添加
           </Button>
         </Space>
       </Form>
-      {error && (
-        <Alert
-          type="error"
-          title={error}
-          action={
-            <Button
-              onClick={() => {
-                void groups.refetch();
-                setError("");
-              }}
-            >
-              刷新分组
-            </Button>
-          }
+      {error && <Alert type="error" title={error} />}
+      {seed && (
+        <RecommendationEditor
+          voices={voices}
+          initial={seed}
+          disabled={!canEdit || pending}
+          onCancel={() => setSeed(undefined)}
+          onSave={(pair) => {
+            if (!canEdit || useAuthStore.getState().profile?.id !== accountId)
+              return;
+            const original = options.find((g) => g.id === groupId);
+            if (!original) return;
+            setDrafts((current) => {
+              const target = current[original.id] ?? original;
+              const rec = target.recommendations;
+              return {
+                ...current,
+                [target.id]:
+                  rec.format === "paired"
+                    ? {
+                        ...target,
+                        recommendations: {
+                          format: "paired",
+                          pairs: [...rec.pairs, pair]
+                        }
+                      }
+                    : {
+                        ...target,
+                        legacyPairs: [...(target.legacyPairs ?? []), pair]
+                      }
+              };
+            });
+            setSeed(undefined);
+            setDone(true);
+          }}
         />
       )}
     </div>
