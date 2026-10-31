@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/.codex/worktrees/lexicon-readonly-agent-backend/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-31T12:08:10.210Z",
+  "_generatedAt": "2026-10-31T16:12:09.803Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -220,6 +220,7 @@
     "/me/learning-runs/{id}": ["get"],
     "/me/learning-runs/{id}/answers": ["post"],
     "/me/learning-runs/{id}/questions": ["get"],
+    "/me/learning-runs/{id}/questions/{question_id}/audio": ["get"],
     "/me/learning-settings": ["put"],
     "/me/learning-tasks": ["get", "post"],
     "/me/learning-tasks/preview": ["post"],

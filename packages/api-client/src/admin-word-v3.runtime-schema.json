@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/.codex/worktrees/lexicon-readonly-agent-backend/tsz-rust/docs/openapi.json",
-  "_source_sha256": "851b1c429cef0853635a89e95f5559e95fd0f10c2693ed993e6b4af53f9fcfab",
+  "_source_sha256": "f9d21f038643428ed14a20ccd2ada3356a928369b13afa3331f089b2374825d1",
   "roots": [
     "LexiconAssistantCapability",
     "LexiconAssistantResponse",
@@ -50,6 +50,7 @@
     "LearningRun",
     "LearningRunPage",
     "LearningQuestionPage",
+    "LearningQuestionAudio",
     "LearningAnswerReceipt",
     "WordlistInteractionStatsBatch",
     "WordlistInteractionState",
@@ -2378,6 +2379,35 @@
       },
       "additionalProperties": false
     },
+    "LearningAudioAccent": { "type": "string", "enum": ["uk", "us"] },
+    "LearningAudioSelection": {
+      "type": "object",
+      "required": [
+        "publication_id",
+        "target_id",
+        "asset_id",
+        "locale",
+        "accent_group",
+        "source_dialect",
+        "effective_rank",
+        "candidate_count",
+        "url",
+        "expires_at"
+      ],
+      "properties": {
+        "accent_group": { "$ref": "#/$defs/LearningAudioAccent" },
+        "asset_id": { "type": "string", "format": "uuid" },
+        "candidate_count": { "type": "integer", "minimum": 1 },
+        "effective_rank": { "type": "integer", "minimum": 1 },
+        "expires_at": { "type": "string", "format": "date-time" },
+        "locale": { "type": "string" },
+        "publication_id": { "type": "string", "format": "uuid" },
+        "source_dialect": { "$ref": "#/$defs/Dialect" },
+        "target_id": { "type": "string", "format": "uuid" },
+        "url": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
     "LearningCapabilities": {
       "type": "object",
       "required": ["question_types"],
@@ -2708,6 +2738,21 @@
         "prompt": {
           "oneOf": [{ "$ref": "#/$defs/LearningPrompt" }, { "type": "null" }]
         }
+      },
+      "additionalProperties": false
+    },
+    "LearningQuestionAudio": {
+      "type": "object",
+      "required": ["policy_version", "occurrence", "audio"],
+      "properties": {
+        "audio": {
+          "oneOf": [
+            { "$ref": "#/$defs/LearningAudioSelection" },
+            { "type": "null" }
+          ]
+        },
+        "occurrence": { "type": "integer", "minimum": 1 },
+        "policy_version": { "type": "string" }
       },
       "additionalProperties": false
     },

@@ -1,3 +1,4 @@
+import { VoiceSaveContext } from "./voiceSaveContext";
 import { onlyTextAssociationsChanged } from "../contentEditPermissions";
 import { revealTableColumns } from "@/components/useColumnSettings";
 import { UNSAFE_DataRouterContext } from "react-router-dom";
@@ -1372,7 +1373,8 @@ function V3WordCreationSession({
   const saveMeanings = useCallback(
     async (
       content: DraftMeaningsStepContentWritableV3,
-      intent: StepSaveIntent
+      intent: StepSaveIntent,
+      saveFormsFirst = true
     ) => {
       if (blockedByRemoteUpdate()) return;
       if (
@@ -1391,7 +1393,7 @@ function V3WordCreationSession({
         return;
       }
       if (
-        dirtyRef.current.forms ||
+        (saveFormsFirst && dirtyRef.current.forms) ||
         (intent === "complete" &&
           !flow.canonical().completed_steps.includes("forms"))
       ) {
@@ -1415,7 +1417,7 @@ function V3WordCreationSession({
       const scope = scopeRef.current;
       const done = markPending("save_meanings");
       const retry = async () => {
-        await saveMeanings(content, intent);
+        await saveMeanings(content, intent, saveFormsFirst);
       };
       savesInFlightRef.current += 1;
       try {
@@ -2020,7 +2022,22 @@ function V3WordCreationSession({
         />
       )}
       {recovery.notice}
-      {renderStep(context)}
+      <VoiceSaveContext.Provider
+        value={{
+          save: async (area) => {
+            if (pending.size || sessionReadOnly || !word.id) return false;
+            if (area === "meaning" || area === "grammar")
+              return Boolean(
+                await saveMeanings(draftMeaningsRef.current, "save", false)
+              );
+            return Boolean(
+              await saveFormsContent(draftFormsRef.current, "save")
+            );
+          }
+        }}
+      >
+        {renderStep(context)}
+      </VoiceSaveContext.Provider>
     </>
   );
   if (!sessionReadOnly && activeStep === "basics") {

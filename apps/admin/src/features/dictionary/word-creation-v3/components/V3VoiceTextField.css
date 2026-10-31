@@ -179,3 +179,12 @@ textarea.word-pronunciation-phonetic-input.ant-input {
   line-height: var(--ant-line-height, 1.5714285714);
   padding: 4px 11px;
 }
+
+/* 保存始终在正文可见边框内，随正文之后排版，避免遮挡文字或窄屏溢出。 */
+.v3-voice-text-editor .tsz-ve-editing-area {
+  border-bottom: 1px solid #e1e6ef;
+}
+.v3-voice-text-editor .tsz-ve-editing-area > .tsz-ve-editor-actions {
+  padding: 8px 12px 12px;
+  justify-content: flex-end;
+}

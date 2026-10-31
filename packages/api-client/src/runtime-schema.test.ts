@@ -84,6 +84,7 @@ const ROOTS = [
   "LearningRun",
   "LearningRunPage",
   "LearningQuestionPage",
+  "LearningQuestionAudio",
   "LearningAnswerReceipt",
 
   "WordlistInteractionStatsBatch",

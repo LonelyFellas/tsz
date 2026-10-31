@@ -1,3 +1,4 @@
+import { VoiceSaveContext } from "../voiceSaveContext";
 import { PronunciationPreviewProvider } from "../../word-creation/PronunciationPreview";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -2170,4 +2171,255 @@ it("拼写停顿与音色同时编辑：取消恢复，完成同时写回且不�
     await screen.findByLabelText("编辑第 1 处停顿 1 秒")
   ).toBeInTheDocument();
   expect(await screen.findByLabelText("选用 Sonia")).toBeChecked();
+});
+
+it("业务保存以一次完整快照合并正文和参数，失败保留且连续点击只发一次请求", async () => {
+  let reject!: (error: Error) => void;
+  const pending = new Promise<boolean>((_resolve, fail) => {
+    reject = fail;
+  });
+  const persist = vi.fn().mockReturnValueOnce(pending).mockResolvedValue(true);
+  const committed = vi.fn();
+  const oldChannel = vi.fn();
+  const stored: unknown[] = [];
+  function Host() {
+    const [draft, setDraft] = useState({
+      value: VALUE,
+      voiceProfile: {
+        dubbing: {
+          mode: "local" as const,
+          area: "meaning" as const,
+          pool_version: "provider_id_v1" as const
+        },
+        voices: [
+          {
+            voice_id: "sonia",
+            version_id: "11111111-1111-4111-8111-111111111111",
+            version_name: "自然",
+            locale: "en-GB" as const,
+            enabled: true,
+            rate_percent: -25
+          }
+        ]
+      },
+      unrelated: "另一个未保存字段"
+    });
+    return (
+      <VoiceSaveContext.Provider
+        value={{
+          save: async () => {
+            stored.push(structuredClone(draft));
+            return persist();
+          }
+        }}
+      >
+        <V3VoiceTextField
+          ariaLabel="原子正文"
+          nodeId="atomic"
+          field="value"
+          mode="association"
+          dialect="uk"
+          value={draft.value}
+          voiceProfile={draft.voiceProfile}
+          onChange={oldChannel}
+          onVoiceProfileChange={oldChannel}
+          onCommit={(result) => {
+            committed(result);
+            setDraft((current) => ({
+              ...current,
+              value: result.value,
+              voiceProfile: result.voiceProfile! as typeof current.voiceProfile
+            }));
+          }}
+        />
+      </VoiceSaveContext.Provider>
+    );
+  }
+  render(<Host />);
+  fireEvent.click(screen.getByLabelText("打开原子正文编辑器"));
+  await screen.findByRole("toolbar", { name: "标注工具栏" });
+  fireEvent.click(
+    within(
+      await screen.findByRole("region", { name: "英式已获取音色" })
+    ).getByRole("button", { name: /^修改 / })
+  );
+  fireEvent.change(screen.getByLabelText("当前音色语速"), {
+    target: { value: "0.73" }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "保存配音设置" }));
+  fireEvent.change(screen.getByLabelText("原子正文"), {
+    target: { value: "hello changed" }
+  });
+  const button = screen.getByLabelText("保存原子正文修改");
+  fireEvent.click(button);
+  fireEvent.click(button);
+  await waitFor(() => expect(persist).toHaveBeenCalledOnce());
+  expect(committed).toHaveBeenCalledOnce();
+  expect(oldChannel).not.toHaveBeenCalled();
+  expect(stored[0]).toMatchObject({
+    value: { text: "hello changed" },
+    voiceProfile: { voices: [{ rate_percent: -27 }] },
+    unrelated: "另一个未保存字段"
+  });
+  reject(new Error("revision_conflict：草稿版本已改变"));
+  expect(
+    await screen.findByText("revision_conflict：草稿版本已改变")
+  ).toBeInTheDocument();
+  expect(screen.getByLabelText("原子正文")).toHaveValue("hello changed");
+  fireEvent.click(screen.getByLabelText("保存原子正文修改"));
+  await waitFor(() => expect(persist).toHaveBeenCalledTimes(2));
+  expect(stored[1]).toEqual(stored[0]);
+});
+
+it("新版无推荐空池整次拒绝保存，保留输入并定位当前编辑器", async () => {
+  const persist = vi.fn().mockResolvedValue(true);
+  const commit = vi.fn();
+  render(
+    <VoiceSaveContext.Provider value={{ save: persist }}>
+      <V3VoiceTextField
+        ariaLabel="空池正文"
+        nodeId="empty-pool"
+        field="value"
+        mode="association"
+        dialect="uk"
+        value={VALUE}
+        voiceProfile={{
+          voices: [],
+          dubbing: {
+            mode: "local",
+            area: "meaning",
+            pool_version: "provider_id_v1"
+          }
+        }}
+        onChange={vi.fn()}
+        onCommit={commit}
+      />
+    </VoiceSaveContext.Provider>
+  );
+  fireEvent.click(screen.getByLabelText("打开空池正文编辑器"));
+  await screen.findByRole("toolbar", { name: "标注工具栏" });
+  fireEvent.click(screen.getByLabelText("保存空池正文修改"));
+  expect(
+    await screen.findByText("英式没有实际可用的已选音色，请选择后保存")
+  ).toBeInTheDocument();
+  expect(commit).not.toHaveBeenCalled();
+  expect(persist).not.toHaveBeenCalled();
+  expect(screen.getByLabelText("空池正文")).toHaveValue(VALUE.text);
+});
+
+it.each([true, false])(
+  "保存迟到回包 accepted=%s 不能关闭或覆盖切换后的业务目标",
+  async (accepted) => {
+    let resolve!: (value: boolean) => void;
+    const onSave = vi.fn(
+      () =>
+        new Promise<boolean>((done) => {
+          resolve = done;
+        })
+    );
+    const onDone = vi.fn();
+    const input = (nodeId: string, text: string) => (
+      <V3VoiceTextField
+        mode="association"
+        presentation="editor"
+        ariaLabel="切换正文"
+        field="value"
+        nodeId={nodeId}
+        value={{ version: 2, text, annotations: [] }}
+        onChange={vi.fn()}
+        onCommit={vi.fn()}
+        onSave={onSave}
+        onDone={onDone}
+      />
+    );
+    const view = render(input("a", "first"));
+    await screen.findByRole("toolbar", { name: "标注工具栏" });
+    fireEvent.click(screen.getByLabelText("保存切换正文修改"));
+    await waitFor(() => expect(onSave).toHaveBeenCalledOnce());
+    view.rerender(input("b", "second"));
+    resolve(accepted);
+    await waitFor(() =>
+      expect(screen.getByLabelText("保存切换正文修改")).toBeEnabled()
+    );
+    expect(screen.getByLabelText("切换正文")).toHaveValue("second");
+    expect(onDone).not.toHaveBeenCalled();
+    expect(screen.queryByText("修改已保存为草稿")).toBeNull();
+    expect(screen.queryByText(/保存未完成，全部修改已保留/)).toBeNull();
+  }
+);
+
+it("仅关联权限的完整快照保留原正文 wire、读法、声音与资产", async () => {
+  const original: RichTextV3 = {
+    version: 1,
+    text: "hello there",
+    spans: [],
+    liaisons: []
+  };
+  const profile: VoiceProfileV3 = {
+    voices: [{ voice_id: "sonia", enabled: true, rate_percent: -25 }]
+  };
+  const commit = vi.fn();
+  const persist = vi.fn().mockResolvedValue(true);
+  render(
+    <V3VoiceTextField
+      mode="association"
+      ariaLabel="仅关联快照"
+      nodeId="association-only"
+      field="value"
+      value={original}
+      voiceProfile={profile}
+      audioAssets={[]}
+      readingLinks={[]}
+      contentReadOnly
+      associationsReadOnly={false}
+      renderAssociationPicker={() => null}
+      onChange={vi.fn()}
+      onCommit={commit}
+      onSave={persist}
+    />
+  );
+  fireEvent.click(screen.getByLabelText("打开仅关联快照编辑器"));
+  await screen.findByRole("toolbar", { name: "标注工具栏" });
+  fireEvent.click(screen.getByLabelText("保存仅关联快照修改"));
+  await waitFor(() => expect(persist).toHaveBeenCalledOnce());
+  expect(commit).toHaveBeenCalledWith(
+    expect.objectContaining({
+      value: original,
+      voiceProfile: profile,
+      audioAssets: [],
+      readingLinks: []
+    })
+  );
+});
+
+it("首次正文的目录加载失败不能按历史缺省 profile 绕过整次保存校验", async () => {
+  state.listVoices.mockRejectedValue(new Error("目录不可用"));
+  const commit = vi.fn();
+  const persist = vi.fn().mockResolvedValue(true);
+  render(
+    <V3VoiceTextField
+      mode="association"
+      presentation="editor"
+      ariaLabel="首次快照"
+      nodeId="new-profile"
+      field="value"
+      value={{ version: 2, text: "", annotations: [] }}
+      onChange={vi.fn()}
+      onCommit={commit}
+      onSave={persist}
+    />
+  );
+  await screen.findByRole("toolbar", { name: "标注工具栏" });
+  fireEvent.change(screen.getByLabelText("首次快照"), {
+    target: { value: "A new sentence." }
+  });
+  fireEvent.click(screen.getByLabelText("保存首次快照修改"));
+  expect(
+    await screen.findByText(
+      "默认配音尚未配置，请加载目录并选择当前口音的可用音色后保存"
+    )
+  ).toBeInTheDocument();
+  expect(screen.getByLabelText("首次快照")).toHaveValue("A new sentence.");
+  expect(commit).not.toHaveBeenCalled();
+  expect(persist).not.toHaveBeenCalled();
 });

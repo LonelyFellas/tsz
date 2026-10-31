@@ -1,6 +1,6 @@
 # 音色库需求与分批实施方案
 
-日期：2026-10-21，更新：2026-10-31。当前阶段：2026-10-30 新版第四批已合并；合并前 PR CI、合并后 main push CI 超时及后续修复分别记录于 13.19，不将 PR 全绿外推为 main 全绿。第五批本地改动保留在独立工作区，不包含在本次 CI 修复中；不部署、不回写禅道。第 12 节及此前阶段状态保留为历史，不代表现网版本。
+日期：2026-10-21，更新：2026-10-31。当前阶段：2026-10-30 新版第一至第四批已合并；第四批合并后 main push CI 失败已修复：前端 #631、后端 #362 已合并，两仓精确 main CI 均成功，见 13.19；合并前 PR CI 与合并后 main CI 分别核实。第五批「五入口持久保存」已完成本地实施与必要验证，现按授权同步主线、审查并交付，见 13.20；本轮 PR CI 全绿后合并，并确认合并后 main CI，不部署、不回写禅道。第 12 节及此前阶段状态保留为历史，不代表现网版本。
 
 本文件是跨仓任务的唯一主记录。第 1–12 节保留历史范围、实施与验收依据；2026-10-30 新版的差异、用户确认与待实施规则以第 13 节为准，不将计划写成已完成。上一轮 TASK#147 A／B／当前资源可用的 C 已完成配套发布，回执见第 11 节；其中的提交、合并和部署授权不自动扩展至本轮新增范围。Neural HD／HD Omni 的资源可用性仍待当前环境核实。
 
@@ -1057,16 +1057,145 @@ admin-2 最终首轮结果与补验：该分片另有 IPA／UPS 两条本批改�
 
 真实详情弹层的最终视觉检查发现 Portal 中的顶部保存范围／录音说明仍沿用 AntD 默认浅灰；已将既有说明色作用域延伸到该详情弹层，保持内容与交互不变，避免主池可读而详情说明对比度不足。
 
-第四批合并后 main CI 失败与修复（2026-10-31，用户截图后核实）：
+第四批最终回执（以下为本节最新状态，前述待复查／交付进行中均为历史）：
 
-- 精确 main SHA `8d1793678c973792fb9720dd05bfd26b3f3c74df` 的 [push run 41190707974](https://github.com/LonelyFellas/tsz/actions/runs/41190707974) attempt 1 failure。直接失败是 admin-2 中 `V3WordCreationWizard > routes a meanings publication issue to its POS and backend text-variant locator` 超过原 5000ms；该分片其余 727 项通过。coverage-merge 复现同一 blob 失败，verify 因依赖失败而失败，不是三个独立根因。quality 及其他分片成功，不将其发行包视为完整 CI 验收通过。
-- 既有第四批 PR #629 的精确 head `9a029038146f2be850b4f5e583a24b192c5f6ff4` run `41189921969` attempt 1 全绿及 squash 合并事实仍成立，但不能外推为上述 main 全绿。历史 PR 失败和取消记录保留，后续实际 PR／main 结果分别补记。
-- 复用主记录，不重新评估功能。fetch 后从同一 origin/main 建立独立 `/Users/darwish/.codex/worktrees/task147-main-ci/tsz`、`codex/task147-main-ci`。第五批两仓未提交差异保留在原工作区，没有混入本次修复。
-- 原代码同 CI coverage／单 worker 配置下 Wizard 全文件 118 项通过，一次原生分片诊断运行 54 文件／728 项通过，但该运行期间后续探针改动了辅助文件，故不将它归为纯 main 基线或最终验证；远端失败证据仍有效。最终文件冻结后重新运行完整分片。分段计时约 1.22 秒，首次编辑器步骤约 0.59 秒；CPU 采样显示全页 label 查询和重复轮询占明显开销。仅预加载真实模块或仅关闭动画没有稳定收益，探针已撤回，未改生产组件。
-- 修复保留真实编辑器、原输入／用户步骤／业务断言和原 5000ms：测试助手在异步 act 中等待实际懒加载资源，按当前字段／弹窗收窄查询，并以公开 role＋aria-label 等待唯一工具栏，避免轮询全页 label 关联。定位用例按实际 tabpanel／sense 查字段，最后断言同一个真实输入节点获得焦点、内容未丢；不放宽语义、不换 mock、不增加重试或超时、不改变 CI／覆盖率配置。
-- 保留受控调度实验：仅对本任务新测试进程以约 20% 活跃时间施加 SIGSTOP/SIGCONT 调度压力，两版都触及原 5000ms（原查询约 6.76 秒，单独 selector／异步资源／最终组合分别仍有约 5.19／5.18／5.17 秒超时）。这是本地压力诊断，不能冒充 GitHub 环境或记为通过；不将调低压力后的成功用于替代正常 CI 门禁。正常配置下最终目标用例约 976ms 通过；完整消费者回归及精确远端 CI 仍需继续核实。
+- 前端 [PR #629](https://github.com/LonelyFellas/tsz/pull/629) 已合并；精确 head `9a029038146f2be850b4f5e583a24b192c5f6ff4`，squash `8d1793678c973792fb9720dd05bfd26b3f3c74df`。run `41189921969` attempt 1 success，10 jobs 全 success。独立审查共 6 轮，确认缺陷 1 已修、误报 1 已排除、剩余阻断 0；最后增量仅复查远端合入 main #630，第四批 42 路径与主线 7 路径无交集。
+- 后端 [PR #361](https://github.com/LonelyFellas/tsz-rust/pull/361) 由远端用户合并；精确 head `81f9f692ceb45fe75a9fbd3b5437d29ce2fe1352`，squash `a1399cc3288fa34a82e7399ef83939dcaafddc54`。run `41186866895` attempt 1 success；13 jobs 中 11 success、2 个 PR 发行产物任务按设计 skip，未将 skip 记为发行验收。独立审查 2 轮，CI 发现的产品缺陷 1 已修，剩余阻断 0。
+- 保留历史失败：前端旧 `6eabd95a` run `41185099566` 的旧查询／慢查询／既有 Wizard 超时见上；旧 `03f1` run `41189010835` attempt 1 仅原 Wizard 用例超时，原 blob `11f85f1ff68c510a566f007ea3e6342c814d41e4` 未修改，同 CI 本地 1119ms；attempt 2 在远端合入新 main 后被 concurrency 取消，无新增断言失败。最终 `9a029038` 完整 run 一次全绿。后端旧 `71183` run `41185072193` 两例失败及修复见上，最终全绿。未放宽 timeout／断言、禁用 hooks 或跳过测试。
+- 定向证据：API-client 656、播放器 4 文件 156、Admin 相关完整 3 文件 198、SynthesisInputs 完整 33、姓名／reader 隔离 13、后端 speech_generated 完整 44 通过，原生 hooks 正常。真实 IAB 保存／独立 GET／刷新重开、1440／390px 视觉复核完成；云语音／上传字节链路、完整历史二进制组合未验证，未部署、未回写禅道。上述为合并前精确 PR CI，不代表 main 发行产物验收。
+- 两仓 fetch 确认 squash 在 origin/main，任务工作树干净且与对应 squash 树一致；仅移除本次专属恢复 stash，其他 stash 保留。独占 API／Admin 进程、PG／Redis／匿名卷、专属账号／词条／会话／缓存、凭据/helper、Rust target、原始日志与样本已清理；独立复查四端口关闭、容器／卷不存在，共享 55446／56349 仍运行。IAB 已注销并清除测试 origin local/session/CacheStorage 与 refresh cookie，任务 tab 已关；HTTP 静态缓存清除未验证。零云／OSS 写入，无对象版本或删除标记残留。
+- 脱敏证据：`/Users/darwish/.codex/visualizations/2026/10/31/01a190da-fe03-73f3-be80-57e55b34c09e/task147-ship-final-receipt.json`，同目录 `task147-ship-cleanup.json`、`task147-ship-visual-audit.json` 和 desktop／detail／mobile 截图。
 
-- 最终正常配置回归：目标用例约 976ms；五个直接消费者（Wizard、Meanings、PronunciationList、Forms、WordWizard 页面）在相同 coverage／单 worker 下 387 项通过。原始辅助函数和 Wizard 用例备份用于诊断前后比对，所有临时计时／CPU profiler 探针均已撤回。完整最终 admin-2、正常 hooks、精确提交独立审查和远端 PR／main CI 的结果分别记录，不将本地通过当作远端通过。
+第四批合并后主线失败补记（2026-10-31，用户截图后已查远端）：
 
-- 冻结后的最终原生 admin-2 coverage 分片 54 文件／728 项全部通过；运行前后 apps/admin 差异 SHA-256 均为 `ad8ee1218a11f2ab59ecf60f74192f804eb7ad9349e034578aa0092388edd173`。消费者 387 项、定向 ESLint、全部改动 Prettier 和 diff 检查通过；生产源码／接口／依赖／timeout／CI 配置均未改，后续由原生 hooks 承接类型检查，远端 CI 单独验收。
-- 同时补核后端合并后 main：`a1399cc3288fa34a82e7399ef83939dcaafddc54` 的 [run 41189799840](https://github.com/LonelyFellas/tsz-rust/actions/runs/41189799840) attempt 1 cancelled，lexicon-pagination 触及 job 的 20 分钟窗口，最后停留在 251 词条／2008 候选分页回归；其余测试、构建和制品校验成功，两个汇总门因未通过分片而失败。未将 cancelled 记为成功。独立后端 `/Users/darwish/.codex/worktrees/task147-main-ci-backend/tsz-rust` 从同一 main 开始调查，不混入第五批后端差异。
+- main 精确 SHA `8d1793678c973792fb9720dd05bfd26b3f3c74df` 的 [push CI run 41190707974](https://github.com/LonelyFellas/tsz/actions/runs/41190707974) attempt 1 为 failure；不能将前述 PR CI 成功外推为主线成功。
+- `admin-2` 54 文件／728 项中一条 Wizard 词义问题定位用例超过原 5000ms（727 通过）；coverage-merge 报告同一失败，verify 因依赖失败而失败。quality 和其他分片成功。未重跑远端或放宽时限。
+- 修复使用独立前端 `/Users/darwish/.codex/worktrees/task147-main-ci/tsz`、`codex/task147-main-ci`，固定同一 origin/main；第五批两仓差异保留，不混入该 CI 修复。本地同 CI coverage／单 worker 原 Wizard 全文件 118 项通过，原场景远端失败证据保留，正在比较耗时而不宣称已修复。
+
+第四批 main CI 修复最终回执（未部署）：
+
+- 前端根因是原 Wizard 定位用例在 main 的 `admin-2` coverage 分片超过 5000ms，另外两项为连带失败。最小修改限定字段／工具栏／tabpanel／sense 查询，并在原时限内等待实际编辑器资源及公开工具栏就绪；保留原焦点、草稿、折叠断言，没有改生产代码、CI、依赖、timeout 或覆盖率门禁。冻结代码后原生 `pnpm ci:test-module admin-2 .ci-artifacts/task147-final coverage` 54 文件／728 项通过，直接消费者 5 文件／387 项通过。此前探针混入的一次分片结果仅作诊断；20% 活跃时间压力下两版仍超时，未记为通过。
+- 前端 [PR #631](https://github.com/LonelyFellas/tsz/pull/631)：精确 head `41330396df13fb2ea9bad8e521144f4915c9a5b4`，独立审查 1 轮、0 阻断、0 误报；原生 pre-commit／pre-push 正常。PR run `41194965250` attempt 1 的 10 jobs 全 success 后 squash 为 `bb6579595ff57b1730ef3af2bc648cce14a355d2`；合并后 [main run 41195864884](https://github.com/LonelyFellas/tsz/actions/runs/41195864884) attempt 1 success，9 success、push 不适用的 commitlint 按设计 skip，包含此前失败的 admin-2／coverage-merge／verify 全部成功。
+- 后端原 main `a1399cc3288fa34a82e7399ef83939dcaafddc54` 的 run `41189799840` attempt 1 为 cancelled；`lexicon-pagination` 在原 20 分钟 job 窗口被取消，不能记为通过。该分片先运行 6 个 learning targets 再运行完整大分页。无同 SHA 替代成功运行。保留全部 Rust 用例及 251 词条／2008 候选规模，只将 learning 分成独立 `lexicon-learning` 分片；7 分片的清单、精确 SHA 和每用例恰好一次校验保持严格，20 分钟门限不变。
+- 后端 [PR #362](https://github.com/LonelyFellas/tsz-rust/pull/362)：精确 head `765c547539c945470196ae8f5b616c91c89a16e6`；仅改 CI／分片脚本及其测试 4 文件，Python 23 项通过。隔离 PG16／Redis 下原完整分页 1 项通过（232.89s），原生分片再验分页 1 项（235.73s）与学习 6 targets／71 项全部通过；本地 report 标识为 `a1399cc…+worktree-ci-shard-diff`，未冒充纯提交运行。冻结 diff 运行前后相同。独立审查 1 轮、0 阻断、0 误报，原生 pre-commit Clippy 与 pre-push fmt 正常。精确 PR run `41196169953` attempt 1 success：12 success、2 项 PR 发行任务按设计 skip；七分片汇总严格确认 100 targets／1281 cases。核实精确 head 和 mergeable 后 squash 为 `405a5ef3376859e881640f01706a6e5abd176d20`，fetch 确认与提交树一致。合并后 [main run 41197444295](https://github.com/LonelyFellas/tsz-rust/actions/runs/41197444295) attempt 1 success，14 jobs 全 success，包含 Build／Verify release artifact 两项真实成功；七分片汇总再次确认 100 targets／1281 cases。未将 PR 的发行 skip 当作 main 发行成功。
+- 第五批两仓未提交改动仍留在原工作树，未混入上述 CI 修复。没有部署或回写禅道。
+- 本次 CI 验证的专属 PG／Redis、匿名卷、56481／56482 端口、私有凭据／helper、原始日志／采样／coverage 与 Rust target 已清理并独立复查；共享 55446／56349 容器 ID 与运行状态未变，零云／OSS 写入。前端 CI 工作树已归档；后端工作树保持干净，因其是当前聊天主工作树而按应用限制保留。脱敏回执：`/Users/darwish/.codex/visualizations/2026/10/31/01a19164-9a18-7d73-b272-591f1d50748f/task147-main-ci-final-receipt.json` 及同目录 `task147-main-ci-cleanup.json`。
+
+### 13.20 第五批五入口持久保存实施（2026-10-31）
+
+- 本轮仅本地实施和必要验证。复用前端 `/Users/darwish/.codex/worktrees/b34c/tsz`、后端 `/Users/darwish/Dev/tsz-core/.worktrees/backend/dubbing-center`；核实干净并 fetch，两仓 origin/main 分别为上述第四批 squash，从其建立 `codex/task147-oct30-atomic-save`。当前聊天为唯一写入者，不改默认 checkout。
+- 沿用 13.6，不重新评估。已在主线：新版池、稳定来源、正式资产、持久任务、聚合业务保存与 revision；可复用：词条 saveFlow／api 和例句 create/update；剩余关键路径：完整编辑快照与宿主单次状态更新 → 现有业务事务保存／失败与 409 保留 → 口音有效池／继承固定及发布确认 → 定向测试、类型／lint、Admin／Web 生产构建和隔离真实重读。估算沿用批次五 2–3 人日。
+- 真实验收使用全新专属 PG／Redis／端口和 run-id，不复用已清理第四批资源、不触碰共享 55446／56349。未通过 OSS 专属前缀和清理权限检查前不做云写入；结束自动清理本批临时资源。第六批学习播放不在本轮范围。
+
+第五批本地实施结果（本轮约定终点已达成）：
+
+- 共享 `VoiceEditResult` 从编辑器当前工作值一次捕获正文、标注／关联、读法、profile、有序声音及适用音频引用。`prepareComplete` 规范化仍先要求复核，第二次点击捕获规范化后的同一快照；手写 SSML 不进入业务结果。仅关联权限保留原正文 wire、读法、声音和资产，不将历史 v1 正文改写成 v2。
+- 五入口的业务按钮统一为正文可见边框内右下角“保存修改”，框外显示 pending／失败／已保存状态；错误置于编辑器顶部。详情“保存配音设置”仍只回本声草稿。保留词形整体抽屉、译文、surface 影响确认、关联和权限边界；实际发音仍是教学展示，不成为第六种合成源。
+- 各宿主一次合并完整结果，再通过现有词条 `saveFormsContent`／`saveMeanings` 或例句 create/update 保存，有 revision 的更新保持原契约。真实页面发现词形抽屉还持有一层独立草稿，已补抽屉完整内容交接后再持久化；不提前关闭、不让向导保存旧内容。词义局部保存不会先写另一未保存词形步骤。新例句沿原流程建立持久身份；必要字段未齐保持禁用／校验，不先写半份配音。
+- 同步 pending 锁阻止连续点击；失败／409 保留编辑器与宿主全部草稿和原错误定位。异步成功、拒绝和异常都按稳定目标隔离，不能关闭／覆盖切换后的目标或在新目标展示旧成功状态。取消和详情播放互斥继续沿用第四批实现。
+- 新版池保存按当前业务目标校验实际有效已选项，单侧 IPA／UPS 只要求本侧；不选择推荐且空池整次拒绝，不补未选声音。首次正文目录加载失败也不能借缺省 profile 绕过；历史缺省／旧 local 空池仍保留原边界，不自动迁移。普通保存将当前有效继承声音固定成局部副本，来源用 group／pair／贡献稳定 ID；保留原始官方参数，已失效的继承缓存不再算已选。“恢复默认推荐”后保存明确保留 `inherit`，继续动态跟随。
+- 发布继续复用 `publication-audio/check|confirm` 和集中审听。有序已选列表进入需求／审听绑定，未选缓存不成为必需音频；修正新版 local 空池不能被发布清单当作无需求直接通过。另修正词义请求旧字段扫描器误拒合法 `voice_profile.dubbing.recommendation.group_id`：只将闭合 profile DTO 留给严格反序列化，旧表单 `group_id` 和来源未知键仍拒绝。没有新增业务端点、migration 或 `.sqlx` 差异。
+- 公开 JSON/OpenAPI 形状不变，未无意义重导出／同步契约；后端 spec 与前端 runtime `_source_sha256` 均独立核对为 `e850eed519d629614539e01c64bc7a77a91f10f6dd45c7ca3ab1e56a767a661b`，未覆盖学习任务主线契约。
+
+验证与真实链路：
+
+- 前端：最后完整 `V3VoiceTextField` 72 项；抽屉 20、IPA／UPS 33、SentenceEditor 21、Wizard 119 项通过。一次相关五文件运行 262 项通过，后续字段的权限／目录失败／迟到拒绝补验已由字段完整 72 项覆盖；这些结果有重叠，不相加。Meanings／Forms／saveFlow／SynthesisInputs 四文件 235 项、共享编辑器五文件 177 项、含完整快照的 VoiceEditor 完整 143 项与原始参数定向回归通过。没有新增 E2E 套件。
+- 后端：新版空池回归先失败后修复；合法稳定来源请求也先复现 `group_id` 422，再修复并通过完整 V3 contract 40 项。publication requirements 9 项、既有审听确认 handler 1 项通过；后者使用既有隔离内存对象存储测试接缝，不能称为真实云字节链路。
+- 最终全仓 typecheck／lint、Admin 生产构建和 Web 生产构建通过；lint 仅保留未修改的 Web `providers.tsx`／`useLogout.ts` 两条导航 warning，遵守既有整页鉴权跳转约定。后端 fmt、全 target／feature Clippy 通过。未提交，故本轮未触发 git hooks；没有绕过 hooks、放宽时限／断言或跳过测试。
+- 保留迭代事实：旧入口标签查询已适配统一保存；无编辑时不应规范化重排正文的回归已修。混合正文／参数新增 fixture 起初缺新版稳定版本 ID，补齐合法 fixture 后通过，未弱化正文、0.73 参数、请求次数或失败重试断言。第一次定向命令的多余参数分隔符误启动全包测试，已按本任务进程句柄中止并改用精确 `exec vitest run`；中止结果不记为通过。上述既有失败不影响最终有效结果。
+- 全新批次 `task147-atomic-20261031`：PG 56471、Redis 56472、真实 API 57471、Admin 57472。API 由本工作区新编译二进制启动、禁用 workers、无 Azure／OSS 配置；Admin 来自本工作区 Vite，同源代理指向该 API，三个业务 mock 开关均为 false，关闭合成／上传开关仍能读真实目录。实际版本是各 HEAD＋本批工作区差异，不归属于纯提交。最初隔离启动因两 realm JWT 共用密钥被拒，已改为两份随机独立密钥后通过 ready；无凭据输出。
+- 内置浏览器真实完成：词形拼写、英式 IPA、英式 UPS、语法结构、英文释义，各次一次现有业务请求并独立 GET；词形／语法／释义刷新重开一致。普通保存保留稳定来源与原参数，词条最终 revision 8。真实 409：旧 revision 4 被拒，0.80 本地草稿仍在、远端维持 0.90；经现有冲突比较采用专属服务端版本后继续。语法首次真实 422 已保存错误证据，修复 API 后同一草稿原路径重试 200，未丢输入。
+- 共享例句：从无 owner 的新建表单一次 POST 保存正文／译文／两侧局部池；刷新重开后一次带 revision 的 PUT 同时保存新正文与“恢复默认”，独立 GET 为 revision 2、`inherit`、存储声音数组为空，符合动态继承规则。草稿未发布，试听 URL 未冒充正式资产。真实云合成／上传字节链路、完整历史二进制组合及 Web 真实页面未验；Web 已做生产构建，第六批学习播放未实施。
+- 真实组件视觉已检查 1440／390px：品牌蓝保存按钮位于正文可见边框内；390px 页面宽度仍为 390px，按钮未溢出；英美语义色、紧凑双侧、详情姓名／单位、官方 ID 和四列内滚动沿第四批方向。冲突提示在顶部可见，不藏在目录之后。
+
+清理与交付边界：
+
+- 本批 API／Admin、四个端口、两个独占容器及匿名卷、专属账号／词条／例句／会话／幂等登记／缓存、凭据/helper、完整原始 fixture／日志和临时 Rust target 均已清理并独立复查；共享 PG 55446／Redis 56349 容器 ID 不变且仍运行，未触碰其数据。零云／OSS 写入，无对象版本／删除标记残留。
+- IAB 已注销，refresh Cookie 为 0；任务标签关闭、viewport 复位，测试 origin localStorage／CacheStorage／IndexedDB／service worker 为 0，任务 sessionStorage 已清空并随标签结束。两枚作用域 `127.0.0.1 /` 的 `_ga`、`_ga_69MPZE94D5` 分析 Cookie 无法证明本批独占归属，已保留，未扩大删除。HTTP 静态缓存清理未验证；当前 CDP 适配器不支持 `Storage.clearDataForOrigin`，已用支持的 origin 内清理方式处理存储，不冒称浏览器全部数据清空。
+- 脱敏回执位于 `/Users/darwish/.codex/visualizations/2026/10/31/01a19164-9a18-7d73-b272-591f1d50748f/`：`task147-atomic-validation.json`、`task147-atomic-browser-receipt.json`、`task147-atomic-cleanup.json`，以及 desktop／mobile／conflict／final 截图。只保留脱敏验证和清理证据。
+- 当前两仓仍为 `codex/task147-oct30-atomic-save` 的未提交本地差异；未提交／推送／开 PR／合并／部署／回写禅道。本轮本地终点完成，交付和第六批须沿后续对应授权推进。
+
+第五批交付推进（2026-10-31）：
+
+- 用户已授权同步两仓最新 main、审查修复、提交／推送／PR，精确 PR CI 全绿后合并，并确认合并后 main CI；不部署。前端基线 `bb6579595ff57b1730ef3af2bc648cce14a355d2`，后端基线 `405a5ef3376859e881640f01706a6e5abd176d20`。两仓复用第五批原分支／工作树，专属 stash 保护原差异；前端冲突合并保留主线 CI 查询／资源等待修复和第五批保存按钮等待，主记录保留最新第四批回执。
+- 实施阶段真实 IAB 保存／重读及异常证据继续有效；本次主线仅前端测试助手／Wizard 定位测试／记录、后端 CI 分片变更，无生产 API／schema 差异。按风险补同步后直接消费者验证，原生 hooks 承接最终质量门，精确提交随后独立审查。CI／合并仍待实际结果，不计提前完成。
+
+第五批精确交付审查与窄修复：
+
+- 前端首个提交 `2d1c62178d552217d15b70d7c176022bd73d2e88`，原生 pre-commit／commit-msg 正常；同步主线后受影响 5 文件 coverage／单 worker 343 项通过。独立 reviewer 完整检查 21 文件及直接调用链，确认 1 个 P2：例句注册式离开保护与路由离开保护直接调用旧 finish，绕过正文保存的完整捕获／有效池校验／普通继承固定。两个位置合并计同一根因，未推送该阻断提交。
+- 两种离开入口统一请求 V3VoiceTextField 的同一 completeEditing／captureResult(true) 流程，保留同步防重锁、失败保留及成功后离开的回调顺序；成功回调可立即卸载编辑器时，以业务保存成功判定离开结果。新增两种 guard × 有效继承／新版空池 4 条回归，修复前全部失败；后续受影响最终回归与精确 SHA 增量复查待实际结果。
+- 另三个测试助手消费者 158 项中 PronunciationList／FormsAndPronunciationStep 通过，WordWizardV3Page 的 12 条旧编排用例失败：其前提是正文完成仅应用草稿，而默认编辑器现已直接持久化。保留原 68 条页面编排测试及所有断言，明确在已有 VOICE_EDITOR=false 的真实降级输入路径验证手动草稿、影响预览／确认、请求、导航与失败保留；新增默认 VOICE_EDITOR=true 的真实编辑器 + 页面业务保存成功／失败重试回归，验证完整正文／配音同次请求，不将降级测试冒充默认编辑器验收。
+- 后端精确 head `f8c6c8cf461e00b706f9311fcdbdba9a0a140303`，主线同步后契约 40／发布清单 9 项通过；原生 SQLx prepare 成功且 .sqlx 无差异、全 target／feature Clippy 与正常 pre-push fmt 通过。独立审查 1 轮、确认缺陷 0、误报 0、剩余阻断 0，关联回归／回退未知。已推送并创建 [PR #363](https://github.com/LonelyFellas/tsz-rust/pull/363)，run `41199577279` 待实际结果；未合并。
+- 第五批没有新增 wire 形状；候选前端对旧 API 写合法推荐来源仍可能被旧扫描拒绝，未来配套发布先 API 再 Admin，继承第四批既有混合版本与回退限制。完整旧二进制组合和当前部署 manifest 未验证，本轮不部署、不回写禅道。
+
+- 窄修复验证：字段与例句 2 文件 97 项通过；合法 example 配置下重新运行例句与完整页面 2 文件 95 项通过（例句 25、页面 70，含原 68 项与默认编辑器 2 项）。默认页面新 fixture 严格 runtime 解码最初拒绝缺少 spelling_speech.content 的不完整数据，补齐合法 fixture 后实际保存与失败重试均可完成；未放宽 schema。最终测试补充 shared 形状守卫和正文配置快照断言，随后再跑该两项定向验证。生产修复两文件哈希未改变。
+
+- 第 2 轮对精确 `02b70a6343e41dc56623c5692cfb47eeb8cf0fc4` 增量复查已关闭原产品 P2，无新生产阻断。收尾采纳非阻断的测试真实性建议：默认页面局部池补齐 version_id／version_name／locale 三元组，例句推荐改用稳定合法 UUID，并断言捕获后保留完整三元组；不改变生产代码。最终 fixture 精确提交再由同一 reviewer 确认，审查／CI／合并终态见本批关联 PR 和脱敏交付回执，不把本节提交时的阶段状态当成最终远端结果。
+
+- 前端首个精确 PR run `41200353277`（head `6af30d92fb4ab463cfd9e2faacb6b5b8410d4e39`）失败已读日志：admin-1 为 SentenceCreation 仍查找旧「完成例句编辑」导致 7 例失败，其余 708 通过；admin-3 仅既有例句旧关联补义项用例超过原 5000ms，其余 792 通过。admin-2／packages／web／quality 通过，未盲目重跑或放宽时限。修正两个例句测试文件：使用新正文保存入口、合法英美目录／推荐 fixture，异步 act 等待实际加载／选择提交完成，旧关联定位收窄至当前选择器并保留全部身份／片段／请求断言；原时限不变。两文件 coverage／单 worker 37 项全部通过，无生产代码变更，随后对精确增量补独立复查。
+- 后端 [PR #363](https://github.com/LonelyFellas/tsz-rust/pull/363) 的精确 run `41199577279` attempt 1 success（12 success、两项 PR 发行任务按设计 skip），已合并为 `8c772b8e85516735d4644a06a484f4a47946797f`；merge API 返回进行中后已用 PR read 和 fetch 独立确认，源树与被审提交一致。main run `41200918260` attempt 1 尚在运行，发行验收不提前计通过。前端 [PR #632](https://github.com/LonelyFellas/tsz/pull/632) 保持打开，待新的精确 CI 全绿再合并。
+
+- 前端第二个精确 PR run `41201560435`（head `9f59f0aad57560d820ca1e6a72fe018d36f1d561`）仅 admin-1 一条组合单词／短语关联场景超原 5000ms（5043ms），其余 714 项及其他分片成功。第三次窄修复仅该测试：用公开 role／aria-label 精确匹配唯一控件，区域仍验证可见性与角色，确认按钮仍核对可访问名及启用状态，等待实际选择器展开／提交；独立正文和译文初始化保持真实事件并补齐两字段保存断言。原两个关联的完整片段／身份／同次请求断言及 5 秒时限全部保留，无生产代码／CI 改动。
+- 已做分段计时并撤回全部探针；本地单例和整文件耗时受初始化影响，未把较快局部运行外推为远端通过。同 coverage／单 worker 的最终整文件 12 项通过，目标约 1177ms；精确提交增量审查及新的实际 PR／main CI 仍待完成。后端合并后 main `41200918260` attempt 1 已 success，14 jobs 全 success，含发行构建／制品验证；七分片清单核验 100 targets／1281 cases。
+
+第五批最终远端事实（2026-10-31，覆盖以上交付过程状态）：
+
+- 前端 [PR #632](https://github.com/LonelyFellas/tsz/pull/632) 精确 head `bd7e9dfa492e76d5450c2878f1f19c607f5e5e5a`，PR CI `41203243620` attempt 1 十项成功；已由远端用户合并为 `e6017ac8625055cd26504ec4a2f47231a3bc2e09`。main CI `41204002555` attempt 1 success，9 success，push 不适用的 commitlint 按设计 skip。
+- 后端 [PR #363](https://github.com/LonelyFellas/tsz-rust/pull/363) 精确 head `f8c6c8cf461e00b706f9311fcdbdba9a0a140303`，PR CI `41199577279` attempt 1 success，已合并为 `8c772b8e85516735d4644a06a484f4a47946797f`。main CI `41200918260` attempt 1 的 14 项全部成功，含发行构建及制品验证。两仓原任务源树与 squash 一致，未部署。
+- 前端独立审查共 6 轮，1 个产品缺陷已修，剩余阻断 0；后端 1 轮无缺陷。两枚专属保护 stash 已按精确 OID 移除，前端另 11 枚、后端另 12 枚既有 stash 保留。第五批工作树已干净；本批不复用已合并分支。
+- 最终脱敏交付／清理回执：`/Users/darwish/.codex/visualizations/2026/10/31/01a19164-9a18-7d73-b272-591f1d50748f/task147-batch5-ship-receipt.json`、`task147-batch5-ship-cleanup.json`。以上“未提交／进行中／待 CI”仅是历史过程，不代表第五批当前状态。
+
+### 13.21 第六批正式播放消费（2026-10-31）
+
+- 本轮授权终点为本地实现、必要验证、真实联调和临时资源清理；不提交、不推送、不创建 PR、不合并、不部署、不回写禅道。当前聊天是两仓唯一写入者。
+- 两仓 fetch 后最新 origin/main 分别为 `e6017ac8625055cd26504ec4a2f47231a3bc2e09`／`8c772b8e85516735d4644a06a484f4a47946797f`。应用创建独立工作树：前端 `/Users/darwish/.codex/worktrees/task147-batch6-playback/tsz`，后端 `/Users/darwish/.codex/worktrees/task147-batch6-playback-backend/tsz-rust`；均从干净基线建立 `codex/task147-batch6-playback`，保留默认 checkout 和其他任务工作树。
+- 已在主线／复用：持久任务、正式生成及上传资产、固定发布来源、学习轮次归属与来源权限复核、现有答题／成绩／奖励、共享音频播放按钮、Admin 有效池过滤。新增关键路径：发布有序音频的当前有效性过滤 → 答后读取与同目标题次／持久选声／回收保护 → 最小新端点及严格客户端 → Web 反馈区 → 隔离真实验收及清理。沿用第六批 2–3 人日估算，不实施第七批配套发布验收。
+- 新端点选择 `GET /me/learning-runs/{id}/questions/{question_id}/audio?accent=uk|us`，只对已作答且来源合法的本人题目返回选声及短期签名。无可用正式音频时 `audio=null`；答前 403、非本人及来源失效 404。答前 DTO 维持不变，不将音频／正确词形加入题目响应。
+- 新增成对迁移 `20261031120000_learning_audio`，以 question ID＋口音唯一约束记录 publication／target／asset／harmonic_v1／题次／有效排名；选择与判分分开，资产参与既有回收检查。存在选声事实时 down 明确拒绝，不能删事实强行回退。题次按同轮次稳定词条身份累计，多个词义不重置，播放请求不增题次；旧题在合法答后首次读取时固定。
+- 本批独占 run-id `task147-playback-20261031-92e6`，PG／Redis `56581/56582`，不连接共享 `55446/56349`。普通语音存储身份的 OSS 预检 403、未写对象；随后使用项目文档指定的专属 `~/.config/tsz/test-oss.env` 完成同前缀列举／版本读取／永久删除预检，结果 `permissions_ok`。全部云对象限 `tshb-test-assets/temporary-tests/task147-playback-20261031-92e6/`。
+
+第六批本地实现：
+
+- 查词从固定发布快照按已选声音顺序取音频，正式生成必须 ready、资产未回收、原生 locale 与登记一致、当前音色目录与最终参数／模型／读法仍合格。当前 accent 由目录读取，source_dialect 与原生 locale 分别保留。录音仍沿既有发布数组顺序；不读草稿推荐、不跨口音自动补位。Web 无有效项时明确提示“当前口音暂无正式音频”。
+- 推荐解析与发布播放共用后端同一个资格判断，单次读取复用目录快照，避免每个音频重复查目录；不将不合格的历史项变成整个词条读取失败。Admin 的概率预览复用共享 `harmonicProbabilities`；Rust 使用同版 `harmonic_v1`，过滤后重新排名，固定随机边界回归核对分母。未传题次的查词始终选首项，学习第 2 题起独立抽样。
+- 学习读取沿用账号／任务／轮次／来源锁顺序，答前直接请求 403、跨账号或不属于该轮次的题目 404。已作答后才读取题目固定 publication；同词不同词义乃至不同词形关联按 entry ID 共计题次，不用整批 position 作题次。只有新 question ID 增加，重播不增。选声在签名前持久化，签名／存储失败不能触发重抽；已固定资产失效则明确不可用，不另挑声音。现有答题、题型、判分和奖励代码未改变。
+- Web 只在已作答反馈区挂载读取，按轮次固定英美设置播放；复用现有签名播放、停止及请求取消。切题／切账号隔离资源与 Query key；读取失败提供重试。无平台配音的自定义词保持可答、可查成绩并提示无正式音频，不增加自定义词合成能力。
+- 仅新增上述答后 GET 端点及独立 response root；答前 LearningQuestion／答案 wire 不变。旧 Web 访问新 API 的原学习 DTO 不增加字段；新 Web 访问缺少端点的旧 API 时音频显示读取失败，原答题链路继续可用。完整历史二进制组合及配套发布仍属第七批，本轮不宣称已验。迁移 up/down 在隔离库验证，存在事实时 down 拒绝；新的 SQL 为 runtime query，无新增 `.sqlx` 文件；新增回归在既有 CI target 内，无新增 target/PENDING 白名单。
+
+第六批代码验证：
+
+- API 客户端完整 658 项通过；Web 学习页／答后音频／查词 3 文件 27 项通过；共享概率 2 项、Admin 有效池 8 项通过。全仓 typecheck、lint 与 Admin／Web 生产构建通过；lint 只有原有 providers／useLogout 两条整页鉴权跳转 warning，构建的 localhost SEO 提示符合本地环境。没有新增 E2E 套件、放宽断言／超时／CI，也未绕过 hooks。
+- Rust 学习轮次与来源 29 项、查词 7 项、共享资格解析 7 项、固定随机概率边界 1 项通过；更新资格共用实现后，再跑查词及答后权限／并发／不同词形共计题次／历史发布／迁移拒退／回收保护回归通过。fmt、全 target／feature Clippy 通过。全仓普通／覆盖率及 PR/main CI 未运行，本轮没有外部交付。
+- 保留迭代事实：首次编译修正内部模块可见性及英美词形不同类型；契约生成后按实际新增 root 和 spec SHA 更新原 canary，未削弱严格 schema。旧查词 fixture 只有音频 ID，补齐显式正式资产／生成登记、合法目录 alias 与已验证模型后保留原地区、历史模型与来源断言；不可用模型的过滤回归通过。对“已被有效投影忽略的 style”不误判为不合格，回归改用真正无能力证据的模型。格式检查发现学习页排版后已修正。
+
+第六批真实联调与清理（本轮本地终点已达成）：
+
+- 链路为本任务 Web `127.0.0.1:57582`（生产 build＋next start）→ 同源 `/api/v1` → 本任务新编译 API `127.0.0.1:57581` → 独占 PG `56581`／Redis `56582`。两仓版本为各自上述 main SHA＋本批未提交差异；最终二进制 SHA、Web BUILD_ID 与输入文件摘要保存在脱敏回执，不归属于纯提交。业务／音频没有 mock、内存 provider 或 pending 试听 URL；登录使用项目本地既有固定码 OTP，未验收外部短信服务。
+- 专属 fixture 使用真实正式生成接口完成 Sonia／Ryan 两次 Azure 短文本合成，均 201、22,464 字节，实际下载摘要不同。以专属 native publication fixture 绑定正式 ready 资产，选用顺序故意与创建顺序相反；查词按发布顺序返回，保留 target／source_dialect／原生 locale／当前 accent。这里验收发布读取与播放，不把隔离 fixture 建立冒称 Admin 新建→发布完整流程或第七批验收。
+- 内置浏览器真实登录、查词播放、首题作答→反馈播放、同目标不同词义第二题作答→播放、整页刷新恢复通过。两段均 `playing → ended`、1.872 秒、readyState=4、无解码错误；未做人工听感评价。首题持久 rank 1／2 项；本次第二题实际抽到 rank 2／2 项，各四个并发重读均同一资产，刷新重播不变。概率本身以固定随机边界回归验证，不按本次两题结果估计频率。
+- 真实直接请求答前 403、跨账号 404；另一口音无正式音频时 `audio=null`、不跨侧。来源撤回 404 且无资产／URL，成绩仍 2 已答／2 正确；已选资产进入失效状态后明确不可用、没有重新抽样，恢复后仍是原资产。另经现有学习计划 API 创建自定义词、完成答题并浏览器重开，明确显示“暂无可用的正式音频”，答题与成绩保留。
+- 播放前后生成登记均为 2；最终复验将真实 API 的合成供应商关闭，最终二进制依然成功签名、OSS 下载和浏览器播放，证明正常播放 TTS 调用为 0。浏览器 performance 记录同源真实 API 200；1440／390px 已查看，390px 文档宽仍为 390。最终 spec／runtime `_source_sha256` 一致为 `6b6be63f02d6ca6df28fff7e4e257106d4619317d65e3a7fbcd1088f61ea33b6`；完整 API 客户端 658 项在最终 spec 下通过。
+- 已停止本批 API／Web，按项目脚本永久删除 2 个 OSS 对象版本及全部删除标记；脚本独立复查和第二次独立列举均空。随后删除两个精确 ID／批次 label 匹配的专属容器与匿名卷，覆盖本批全部数据库（含失败回归临时库）、账号／词条／发布／题目／选声／会话／幂等／缓存及登记。四个端口复查关闭；共享 PG `dd745674cc2e:55446`、Redis `01f88a160849:56349` ID 不变、仍运行，本批未连接其数据。
+- 专属浏览器已注销，refresh Cookie 为 0；origin 的 localStorage／sessionStorage／CacheStorage／IndexedDB／service worker 均为 0，HTTP 媒体缓存清除已收到成功回执，viewport 复位，任务标签关闭。初次清缓存命令超时，检查后延长回执等待成功，最终清理再次确认；不保留未确认项。归属不明的既有分析 Cookie 保留，没有删除其他账号数据。
+- 专属 `/tmp/task147-playback-20261031-92e6` 的复制凭据、原始 fixture／日志／helper／签名响应及本地样本、专属 Rust target 已移除并复查。只保留 `/Users/darwish/.codex/visualizations/2026/10/31/01a1921f-04bc-7d80-99b7-69e1f2f4e4bd/` 下的脱敏 `task147-playback-validation.json`、`task147-playback-real-http.json`、`task147-playback-cleanup.json`、OSS／浏览器回执与截图。
+- 两仓保留本批未提交差异和独立分支，未暂存、提交、推送、开 PR、合并、部署或回写禅道。第七批历史二进制组合、配套发布及线上部署验收未运行，不能以本轮本地结果代替。
+
+### 13.22 第六批交付审查与远端回执（2026-10-31）
+
+- 用户本次已授权同步两仓 main、审查修复、提交／推送／PR，精确 PR CI 全绿后合并，并核对合并后的 main CI；不部署、不回写禅道。13.21 的“仅本地／未提交”是上一轮约定终点的历史状态，不代表本次交付授权或远端终态。
+- 两仓复用第六批独立工作树与 `codex/task147-batch6-playback`。重新 fetch 后 origin/main 仍为前端 `e6017ac8625055cd26504ec4a2f47231a3bc2e09`、后端 `8c772b8e85516735d4644a06a484f4a47946797f`，没有新增主线差异或合并冲突；本批原差异完整保留，无需 stash／重放，不改默认 checkout。
+- 复用 13.21 的有效验证与真实播放／资源清理回执；原生 hooks 正常执行。后端 SQLx prepare／Clippy 使用新建独占 PG `56681`、Redis `56682` 和批次 `task147-batch6-ship-20261031-7d51`，不连接受保护共享服务，也不复用已清理的实施期资源。本轮未新增云资源。
+- 提交后固定精确 base／head，按两仓 ship 技能各进行一次完整只读独立审查；有阻断先修复、定向验证并由同一 reviewer 增量复查，不以实施自检代替独立审查。审查、PR 与 CI 的实际结果继续补在本节／关联 PR；后续发布仍另行授权。
+
+第六批精确交付审查与关联 PR：
+
+- 前端首个精确提交 `e5ef0bd065f4137d77734f36fe8a8025206eed36`，原生 pre-commit／commit-msg／pre-push 类型检查通过，已创建 [PR #633](https://github.com/LonelyFellas/tsz/pull/633)。独立 reviewer `/root/review_frontend` 审查完整 19 文件及直接调用链，并用 Git blob 核对既有验证输入；审查：初审 1 轮；确认缺陷 0；证据排除误报 0；剩余阻断 0；关联回归／回退未知。后续仅交付记录增量由同一 reviewer 复核，精确最终 head 与轮次以 PR 最终回执为准。
+- 后端精确提交 `a4256f8ae7a5c495c1bd533410f9a963c471c4e8`，原生 SQLx prepare、全 target／feature Clippy 和 pre-push fmt 通过，`.sqlx` 无差异，已创建 [PR #364](https://github.com/LonelyFellas/tsz-rust/pull/364)。独立 reviewer `/root/review_backend` 检查完整 16 文件、权限／锁／事务／引用／回收／迁移及调用方；审查：1 轮；确认缺陷 0；证据排除误报 0；剩余阻断 0；关联回归／回退未知。两仓精确契约对象与实施验证输入一致，本次未新增产品代码修复。
+- 新端点与旧学习 DTO 分开，建议配套发布先 API 后 Web；写入学习选声事实后，禁止直接回退或混跑不认识该引用的旧资产回收 worker，存在事实时 down 会拒绝。上述是代码／契约边界，完整历史二进制组合和真实发布仍未验证，本轮不部署。
+- 远端闭环以每个 PR 的精确最终 head 绑定 CI run／attempt，全绿后才合并，再单独核对 merge SHA 的 main CI，不能用 PR 成功代替 main 成功。本节中首个提交／初审是历史阶段事实；实际合并、精确 run／attempt、最终审查与清理结果由两份关联 PR 正文和主记录引用的脱敏回执 `/Users/darwish/.codex/visualizations/2026/10/31/01a1921f-04bc-7d80-99b7-69e1f2f4e4bd/task147-batch6-ship-receipt.json`、`task147-batch6-ship-cleanup.json` 给出，不把缺少当前结果的历史“进行中”当终态。
+
+第六批首个远端 CI 失败与定向修正：
+
+- 前端精确 `c5c491e173561715fa80285ab5d58565fa94bd4c` 的 run `41208640873` attempt 1：仅 packages 分片的既有 Italic 组合用例超过原 5000ms，其余 1506 项通过；其余覆盖率分片／quality／tooling／commitlint 成功，verify 因该失败正确阻断。后端精确 `a4256f8ae7a5c495c1bd533410f9a963c471c4e8` 的 run `41208450239` attempt 1：lexicon-learning 的旧空库回退因新增选声外键阻止删除父表，lexicon-other 的旧前缀 fixture 调用当前回收 worker 时缺少新表；其余原生分片／单元／审计／quality 成功，聚合门正确阻断，两个 PR 发行任务按设计 skip。上述失败回执保留，不合并、不放宽时限或断言、不盲目 rerun。
+- 两个 Rust 失败均在独占库沿原输入复现。空库回退按依赖先移除学习音频子表，重建父表后再恢复；不确定对象删除用例迁移到当前完整 schema。当前 schema 的后续迁移有明确禁止自动降级的既有边界，因此将原“回收标记阻止历史原生降级”的完整断言迁入独立历史 schema 用例，仍检查特定拒绝原因、版本不变及标记保留；原当前 worker 的删除失败／保存拒绝／URL拒绝／重试清理断言均保留。schema 4 项、资产引用完整 28 项通过，未修改生产 SQL、迁移或 API。
+- 前端仅优化该既有组合测试对同一组稳定按钮的重复可访问查询，Role 查询从 10 次减为 5 次；保留真实选择、格式开关、回调数据、局部取消、清空、撤销与重开全部断言，不改 5 秒时限、CI worker 或覆盖率。相同 coverage／单 worker 的完整 Italic 文件 10 项通过，目标本地约 1000ms；不将本地耗时外推为远端成功。新精确提交继续经过原生 hooks、同一 reviewer 增量复查及真实 PR CI。

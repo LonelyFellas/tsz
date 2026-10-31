@@ -2,6 +2,7 @@ import { useState } from "react";
 import { PronunciationPreviewProvider } from "../dictionary/word-creation/PronunciationPreview";
 import { sentenceWord, sentenceTarget, sentenceCandidate } from "./fixtures";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -46,8 +47,41 @@ vi.mock("@/lib/auth", () => ({
   }
 }));
 vi.mock("../dictionary/voice-editor/dataSource", () => ({
-  loadAdminVoiceRecommendations: async () => [],
-  adminVoicePreviewAdapter: { listVoices: async () => [], synthesize: vi.fn() },
+  loadAdminVoiceRecommendations: async () => [
+    {
+      id: "33333333-3333-4333-8333-333333333331",
+      name: "英式",
+      groupName: "例句",
+      locale: "en-GB",
+      setting: { voice_id: "sonia", enabled: true, rate_percent: -25 }
+    },
+    {
+      id: "33333333-3333-4333-8333-333333333332",
+      name: "美式",
+      groupName: "例句",
+      locale: "en-US",
+      setting: { voice_id: "jenny", enabled: true, rate_percent: -20 }
+    }
+  ],
+  adminVoicePreviewAdapter: {
+    listVoices: async () => [
+      {
+        id: "sonia",
+        label: "Sonia",
+        locale: "en-GB",
+        gender: "female",
+        styles: []
+      },
+      {
+        id: "jenny",
+        label: "Jenny",
+        locale: "en-US",
+        gender: "female",
+        styles: []
+      }
+    ],
+    synthesize: vi.fn()
+  },
   adminAudioUploadAdapter: undefined,
   voicePreviewIsMock: false
 }));
@@ -329,7 +363,7 @@ describe("按词条关联反查共享多维例句", () => {
     expect(inputs).toHaveLength(3);
     fireEvent.change(inputs[1]!, { target: { value: " \n\t " } });
     fireEvent.change(inputs[2]!, { target: { value: "新增高阶译文。" } });
-    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    fireEvent.click(screen.getByLabelText("保存例句正文修改"));
     await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
     const saved = vi.mocked(api.sentences.update).mock.calls[0]![1].content
       .sentence;
@@ -407,7 +441,7 @@ describe("按词条关联反查共享多维例句", () => {
       await screen.findByLabelText("标注工具栏");
       await screen.findByText("已关联当前词义：make up · 编造（故事、借口等）");
       const input = screen.getByLabelText("例句正文");
-      const save = screen.getByLabelText("完成例句编辑");
+      const save = screen.getByLabelText("保存例句正文修改");
       fireEvent.change(input, { target: { value: typo } });
       expect(input).toHaveValue(text);
       fireEvent.click(
@@ -452,7 +486,7 @@ describe("按词条关联反查共享多维例句", () => {
     fireEvent.click(screen.getByLabelText("关联单词"));
     fireEvent.mouseDown(screen.getByLabelText("关联 make（2）"), { button: 0 });
     await screen.findByText("已关联：具体词义");
-    expect(screen.getByLabelText("完成例句编辑")).toBeDisabled();
+    expect(screen.getByLabelText("保存例句正文修改")).toBeDisabled();
     fireEvent.click(
       within(screen.getByText("已关联：具体词义").parentElement!).getByRole(
         "button",
@@ -460,8 +494,8 @@ describe("按词条关联反查共享多维例句", () => {
       )
     );
     expect(screen.queryByText("已关联：具体词义")).toBeNull();
-    expect(screen.getByLabelText("完成例句编辑")).toBeEnabled();
-    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    expect(screen.getByLabelText("保存例句正文修改")).toBeEnabled();
+    fireEvent.click(screen.getByLabelText("保存例句正文修改"));
     await waitFor(() => expect(api.sentences.update).toHaveBeenCalledOnce());
     expect(
       vi.mocked(api.sentences.update).mock.calls[0]![1].content.annotations
@@ -474,15 +508,22 @@ describe("按词条关联反查共享多维例句", () => {
       .mockImplementationOnce(async (input) => shared(input.content));
     show(<SentenceEditor onClose={vi.fn()} onSaved={onSaved} />);
     await screen.findByLabelText("标注工具栏");
-    const save = screen.getByLabelText("完成例句编辑");
+    const save = screen.getByLabelText("保存例句正文修改");
     expect(save).toBeDisabled();
-    fireEvent.change(screen.getByLabelText("例句正文"), {
-      target: { value: "We make up stories." }
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("例句正文"), {
+        target: { value: "We make up stories." }
+      });
     });
     expect(save).toBeDisabled();
-    fireEvent.change(
-      screen.getAllByPlaceholderText("请输入对应的中文译文")[0]!,
-      { target: { value: "我们编故事。" } }
+    await act(async () => {
+      fireEvent.change(
+        screen.getAllByPlaceholderText("请输入对应的中文译文")[0]!,
+        { target: { value: "我们编故事。" } }
+      );
+    });
+    await waitFor(() =>
+      expect(screen.getByLabelText("选用 Sonia")).toBeChecked()
     );
     expect(save).toBeEnabled();
     fireEvent.click(save);
@@ -528,13 +569,13 @@ describe("按词条关联反查共享多维例句", () => {
       screen.getAllByPlaceholderText("请输入对应的中文译文")[0]!,
       { target: { value: "我们编故事。" } }
     );
-    expect(screen.getByLabelText("完成例句编辑")).toBeDisabled();
+    expect(screen.getByLabelText("保存例句正文修改")).toBeDisabled();
     fireEvent.click(await screen.findByText(/确认关联 make up/));
     await screen.findByText("已关联当前词义：make up · 编造（故事、借口等）");
-    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    fireEvent.click(screen.getByLabelText("保存例句正文修改"));
     await screen.findByText("网络暂时不可用");
     expect(text).toHaveValue("We make up stories.");
-    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    fireEvent.click(screen.getByLabelText("保存例句正文修改"));
     await screen.findByText("We make up stories.");
     const [first, retry] = vi.mocked(api.sentences.create).mock.calls;
     expect(first![0]).toEqual(retry![0]);
@@ -550,47 +591,63 @@ describe("按词条关联反查共享多维例句", () => {
     expect(screen.queryByText(/保存当前词义后/)).toBeNull();
   });
   it("复用正文关联单词和短语工具，保存非连续片段及待关联信息", async () => {
+    // 大编辑器按公开 role/aria-label 精确定位；区域仍要求唯一、可见。
+    const labelled = (label: string, role?: string) => {
+      const matches = document.querySelectorAll<HTMLElement>(
+        `${role ? `[role="${role}"]` : ""}[aria-label=${JSON.stringify(label)}]`
+      );
+      expect(matches).toHaveLength(1);
+      if (role) expect(matches[0]).toBeVisible();
+      return matches[0]!;
+    };
+    const region = (role: string, label: string) =>
+      waitFor(() => labelled(label, role));
     vi.mocked(api.sentences.create).mockImplementation(async (input) =>
       shared(input.content)
     );
     show(<SenseSentences />);
     fireEvent.click(screen.getByRole("button", { name: "添加例句" }));
-    await screen.findByRole("toolbar", { name: "标注工具栏" });
-    fireEvent.change(screen.getByRole("textbox", { name: "例句正文" }), {
-      target: { value: "We make the story up." }
+    const toolbar = await region("toolbar", "标注工具栏");
+    const text = labelled("例句正文");
+    expect(text).toBeVisible();
+    await act(async () => {
+      fireEvent.change(text, {
+        target: { value: "We make the story up." }
+      });
+      fireEvent.change(
+        screen.getAllByPlaceholderText("请输入对应的中文译文")[0]!,
+        { target: { value: "我们编造这个故事。" } }
+      );
     });
-    fireEvent.change(
-      screen.getAllByPlaceholderText("请输入对应的中文译文")[0]!,
-      { target: { value: "我们编造这个故事。" } }
-    );
-    await screen.findByRole("toolbar", { name: "标注工具栏" });
+    await waitFor(() => expect(toolbar).toBeVisible());
     expect(screen.queryByText("句内关联")).toBeNull();
-    fireEvent.click(screen.getByLabelText("关联单词"));
-    fireEvent.mouseDown(screen.getByLabelText("关联 story（4）"), {
-      button: 0
+    fireEvent.click(labelled("关联单词"));
+    await act(async () => {
+      fireEvent.mouseDown(labelled("关联 story（4）"), {
+        button: 0
+      });
     });
-    const wordPicker = await screen.findByRole("group", {
-      name: "关联单词：story"
-    });
+    const wordPicker = await region("group", "关联单词：story");
     fireEvent.click(
-      within(wordPicker).getByRole("radio", { name: "词条未创建，记为待关联" })
+      within(wordPicker).getByLabelText("词条未创建，记为待关联")
     );
-    fireEvent.change(
-      within(wordPicker).getByRole("textbox", { name: "待关联释义" }),
-      {
-        target: { value: "故事" }
-      }
-    );
-    fireEvent.click(
-      within(wordPicker).getByRole("button", { name: "确认关联" })
-    );
-    fireEvent.click(screen.getByLabelText("关联短语"));
-    fireEvent.mouseDown(screen.getByLabelText("关联 make（2）"), { button: 0 });
-    fireEvent.mouseDown(screen.getByLabelText("关联 up.（5）"), { button: 0 });
-    fireEvent.click(await screen.findByText("选择关联短语"));
-    const phrasePicker = await screen.findByRole("group", {
-      name: "关联短语：make up"
+    fireEvent.change(within(wordPicker).getByLabelText("待关联释义"), {
+      target: { value: "故事" }
     });
+    const confirmWord = within(wordPicker)
+      .getByText("确认关联", { selector: "button span" })
+      .closest("button")!;
+    expect(confirmWord).toHaveAccessibleName("确认关联");
+    expect(confirmWord).toBeEnabled();
+    fireEvent.click(confirmWord);
+    fireEvent.click(labelled("关联短语"));
+    fireEvent.mouseDown(labelled("关联 make（2）"), { button: 0 });
+    fireEvent.mouseDown(labelled("关联 up.（5）"), { button: 0 });
+    const choosePhrase = await screen.findByText("选择关联短语");
+    await act(async () => {
+      fireEvent.click(choosePhrase);
+    });
+    const phrasePicker = await region("group", "关联短语：make up");
     fireEvent.click(
       await within(phrasePicker).findByText("make up", { selector: "strong" })
     );
@@ -598,18 +655,25 @@ describe("按词条关联反查共享多维例句", () => {
     fireEvent.click(
       await within(phrasePicker).findByText("编造（故事、借口等）")
     );
-    await waitFor(() =>
-      expect(
-        within(phrasePicker).getByRole("button", { name: "确认关联" })
-      ).toBeEnabled()
-    );
-    fireEvent.click(
-      within(phrasePicker).getByRole("button", { name: "确认关联" })
-    );
-    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    const confirmPhrase = within(phrasePicker)
+      .getByText("确认关联", { selector: "button span" })
+      .closest("button")!;
+    expect(confirmPhrase).toHaveAccessibleName("确认关联");
+    await waitFor(() => expect(confirmPhrase).toBeEnabled());
+    await act(async () => {
+      fireEvent.click(confirmPhrase);
+    });
+    fireEvent.click(labelled("保存例句正文修改"));
     await waitFor(() => expect(api.sentences.create).toHaveBeenCalledOnce());
-    const annotations = vi.mocked(api.sentences.create).mock.calls[0]![0]
-      .content.annotations;
+    const saved = vi.mocked(api.sentences.create).mock.calls[0]![0].content;
+    expect(saved.sentence.en_text).toMatchObject({
+      mode: "unified",
+      common: { value: { text: "We make the story up." } }
+    });
+    expect(saved.sentence.zh_translations[0]!.content.text).toBe(
+      "我们编造这个故事。"
+    );
+    const annotations = saved.annotations;
     expect(annotations).toEqual([
       expect.objectContaining({
         source_dialect: "common",

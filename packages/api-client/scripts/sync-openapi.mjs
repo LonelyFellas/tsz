@@ -107,6 +107,7 @@ const RUNTIME_SCHEMA_ROOTS = [
   "LearningRun",
   "LearningRunPage",
   "LearningQuestionPage",
+  "LearningQuestionAudio",
   "LearningAnswerReceipt",
 
   "WordlistInteractionStatsBatch",
