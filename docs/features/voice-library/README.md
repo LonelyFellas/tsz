@@ -1134,3 +1134,6 @@ admin-2 最终首轮结果与补验：该分片另有 IPA／UPS 两条本批改�
 
 - 前端首个精确 PR run `41200353277`（head `6af30d92fb4ab463cfd9e2faacb6b5b8410d4e39`）失败已读日志：admin-1 为 SentenceCreation 仍查找旧「完成例句编辑」导致 7 例失败，其余 708 通过；admin-3 仅既有例句旧关联补义项用例超过原 5000ms，其余 792 通过。admin-2／packages／web／quality 通过，未盲目重跑或放宽时限。修正两个例句测试文件：使用新正文保存入口、合法英美目录／推荐 fixture，异步 act 等待实际加载／选择提交完成，旧关联定位收窄至当前选择器并保留全部身份／片段／请求断言；原时限不变。两文件 coverage／单 worker 37 项全部通过，无生产代码变更，随后对精确增量补独立复查。
 - 后端 [PR #363](https://github.com/LonelyFellas/tsz-rust/pull/363) 的精确 run `41199577279` attempt 1 success（12 success、两项 PR 发行任务按设计 skip），已合并为 `8c772b8e85516735d4644a06a484f4a47946797f`；merge API 返回进行中后已用 PR read 和 fetch 独立确认，源树与被审提交一致。main run `41200918260` attempt 1 尚在运行，发行验收不提前计通过。前端 [PR #632](https://github.com/LonelyFellas/tsz/pull/632) 保持打开，待新的精确 CI 全绿再合并。
+
+- 前端第二个精确 PR run `41201560435`（head `9f59f0aad57560d820ca1e6a72fe018d36f1d561`）仅 admin-1 一条组合单词／短语关联场景超原 5000ms（5043ms），其余 714 项及其他分片成功。第三次窄修复仅该测试：用公开 role／aria-label 精确匹配唯一控件，区域仍验证可见性与角色，确认按钮仍核对可访问名及启用状态，等待实际选择器展开／提交；独立正文和译文初始化保持真实事件并补齐两字段保存断言。原两个关联的完整片段／身份／同次请求断言及 5 秒时限全部保留，无生产代码／CI 改动。
+- 已做分段计时并撤回全部探针；本地单例和整文件耗时受初始化影响，未把较快局部运行外推为远端通过。同 coverage／单 worker 的最终整文件 12 项通过，目标约 1177ms；精确提交增量审查及新的实际 PR／main CI 仍待完成。后端合并后 main `41200918260` attempt 1 已 success，14 jobs 全 success，含发行构建／制品验证；七分片清单核验 100 targets／1281 cases。
