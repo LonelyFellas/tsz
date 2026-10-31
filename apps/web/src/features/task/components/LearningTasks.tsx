@@ -239,9 +239,24 @@ function TaskList({ userId }: { userId: string }) {
     </PageShell>
   );
 }
-export function LearningTaskCreator() {
+export function LearningTaskCreator({
+  wordlistId,
+  owned = false
+}: {
+  wordlistId?: string;
+  owned?: boolean;
+} = {}) {
   return (
-    <Student>{(id) => <LearningPlanCreator key={id} userId={id} />}</Student>
+    <Student>
+      {(id) => (
+        <LearningPlanCreator
+          key={`${id}:${wordlistId ?? "manual"}:${owned}`}
+          userId={id}
+          wordlistId={wordlistId}
+          owned={owned}
+        />
+      )}
+    </Student>
   );
 }
 export function LearningTaskPage({ id }: { id: string }) {

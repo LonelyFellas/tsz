@@ -12,5 +12,9 @@ export default function StudentLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <RouteGuard requireOnboarding>{children}</RouteGuard>;
+  return (
+    <RouteGuard requireOnboarding preserveSearch>
+      {children}
+    </RouteGuard>
+  );
 }
