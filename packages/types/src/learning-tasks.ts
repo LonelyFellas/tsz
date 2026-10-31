@@ -3,6 +3,7 @@ type PaginationMeta = CoinEntryPage["pagination"];
 export type LearningTaskType = "daily" | "longterm";
 export type LearningQuestionType = "spelling_zh_to_en" | "choice_zh_to_en";
 export interface LearningCapabilities {
+  choice_policies?: "strict_tiered_v1"[];
   question_types: LearningQuestionType[];
   practice_modes?: string[];
 }

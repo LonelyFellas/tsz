@@ -21,6 +21,7 @@ import {
   Segmented
 } from "@/features/shell/Page";
 import { PlanSourcePicker, type SelectedSource } from "./PlanSourcePicker";
+import { ChoiceScopePreview } from "./ChoiceScopePreview";
 import { missingPlans } from "./plan-api";
 export function LearningPlanCreator({
   userId,
@@ -114,7 +115,8 @@ function PlanForm({
   const masterySupported =
     capabilities.data?.practice_modes?.includes("mastery_v1") === true;
   const choiceSupported =
-    capabilities.data?.question_types.includes("choice_zh_to_en") === true;
+    capabilities.data?.question_types.includes("choice_zh_to_en") === true &&
+    capabilities.data.choice_policies?.includes("strict_tiered_v1") === true;
   const [selected, setSelected] = useState<SelectedSource[]>(
     initialWordlist ? [{ wordlist: initialWordlist }] : []
   );
@@ -126,6 +128,7 @@ function PlanForm({
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [error, setError] = useState("");
+  const [acceptedPreview, setAcceptedPreview] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [unknown, setUnknown] = useState(false);
@@ -164,7 +167,10 @@ function PlanForm({
   const input: PreviewLearningPlan = {
     ...(masterySupported ? { practice_mode: "mastery_v1" as const } : {}),
     ...(questionType === "choice_zh_to_en"
-      ? { question_type: questionType }
+      ? {
+          question_type: questionType,
+          choice_policy: "strict_tiered_v1" as const
+        }
       : {}),
     task_type: kind,
     wordlist_ids: selected.map((s) => s.wordlist.id),
@@ -199,6 +205,8 @@ function PlanForm({
   });
   const pendingPreview = debounced !== serialized || preview.isFetching;
   const locked = busy || unknown;
+  const partialChoice = (preview.data?.choice?.unavailable_count ?? 0) > 0;
+  const acceptedChoice = acceptedPreview === preview.data?.preview_fingerprint;
   async function submit() {
     if (sourceUnavailable && !intent.current) return;
     setError("");
@@ -223,8 +231,13 @@ function PlanForm({
         setError("请等待有效题量预览后再创建。");
         return;
       }
+      if (partialChoice && !acceptedChoice) {
+        setError("请先核对暂不可用内容，并确认仅使用可用内容创建。");
+        return;
+      }
       intent.current = {
         ...input,
+        ...(partialChoice ? { accept_partial_choice: true } : {}),
         name: name.trim(),
         idempotency_key: crypto.randomUUID(),
         preview_fingerprint: preview.data.preview_fingerprint
@@ -421,7 +434,7 @@ function PlanForm({
               )}
               <p className="mt-1 text-xs text-foreground-muted">
                 {questionType === "choice_zh_to_en"
-                  ? "优先生成单选题，没有合适选项时自动改为拼写题。单选成绩不影响拼写掌握度。"
+                  ? "每题选择一个英文答案。暂不可用的词义会在预览中列出，不会改为拼写题。单选成绩不影响拼写掌握度。"
                   : "采用当前学习设置。"}
                 自定义词可用于拼写练习。
               </p>
@@ -531,16 +544,43 @@ function PlanForm({
             ) : (
               preview.data && (
                 <>
-                  <p className="text-lg font-semibold">
-                    {preview.data.entry_count} 个平台词条 ·{" "}
-                    {preview.data.eligible_count} 道可出题内容
-                  </p>
-                  {kind === "daily" && (
-                    <p className="mt-2 text-sm text-foreground-muted">
-                      按每天完成计划量，预计{" "}
-                      {preview.data.estimated_learning_days} 个学习日完成本轮。
+                  {preview.data.choice ? (
+                    <ChoiceScopePreview
+                      preview={preview.data.choice}
+                      eligibleCount={preview.data.eligible_count}
+                    />
+                  ) : (
+                    <p className="text-lg font-semibold">
+                      {preview.data.entry_count} 个平台词条 ·{" "}
+                      {preview.data.eligible_count} 道可出题内容
                     </p>
                   )}
+                  {partialChoice && preview.data.can_create && (
+                    <label className="mt-4 flex min-h-11 items-start gap-3 text-sm">
+                      <input
+                        type="checkbox"
+                        className="mt-1 size-4 accent-primary"
+                        disabled={locked || pendingPreview}
+                        checked={acceptedChoice}
+                        onChange={(e) =>
+                          setAcceptedPreview(
+                            e.target.checked
+                              ? preview.data!.preview_fingerprint
+                              : null
+                          )
+                        }
+                      />
+                      仅使用可出单选的内容创建任务，暂不可用内容不纳入本次学习范围
+                    </label>
+                  )}
+                  {kind === "daily" &&
+                    preview.data.estimated_learning_days != null && (
+                      <p className="mt-2 text-sm text-foreground-muted">
+                        按每天完成计划量，预计{" "}
+                        {preview.data.estimated_learning_days}{" "}
+                        个学习日完成本轮。
+                      </p>
+                    )}
                   <p className="mt-2 text-xs text-foreground-muted">
                     {preview.data.settings.cefr_level} /{" "}
                     {preview.data.settings.english_variant} · 自定义词{" "}

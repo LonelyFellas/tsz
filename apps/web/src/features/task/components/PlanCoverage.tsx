@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { ChoiceScopePreview } from "./ChoiceScopePreview";
 import { LearningProgressBar } from "./LearningProgressBar";
 import { Pager } from "@/features/shell/Page";
 import { HttpError } from "@tsz/api-client";
@@ -34,6 +35,7 @@ export function PlanCoverage({
   refresh: () => Promise<unknown>;
 }) {
   const [preview, setPreview] = useState<LearningCyclePreview | null>(null);
+  const [acceptedPreview, setAcceptedPreview] = useState<string | null>(null);
   const [operation, setOperation] = useState<CycleOperation>("next");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -71,6 +73,7 @@ export function PlanCoverage({
     setBusy(true);
     setError("");
     setOperation(operation);
+    setAcceptedPreview(null);
     try {
       const p = await api.learningPlans.cyclePreview(
         plan.task.id,
@@ -90,9 +93,20 @@ export function PlanCoverage({
   }
   async function create() {
     if (!c || !preview) return;
+    if (
+      preview.preview.choice?.unavailable_count &&
+      acceptedPreview !== preview.preview.preview_fingerprint &&
+      !intent.current
+    ) {
+      setError("请确认仅使用可用内容开启新轮。");
+      return;
+    }
     setBusy(true);
     setError("");
     intent.current ??= {
+      ...(preview.preview.choice?.unavailable_count
+        ? { accept_partial_choice: true }
+        : {}),
       operation,
       after_cycle_id: c.id,
       expected_revision: plan.task.revision,
@@ -166,6 +180,33 @@ export function PlanCoverage({
             {preview.earliest_day} 开始。
           </p>
         )}
+        {preview.preview.choice && (
+          <ChoiceScopePreview
+            preview={preview.preview.choice}
+            eligibleCount={preview.preview.eligible_count}
+          />
+        )}
+        {!!preview.preview.choice?.unavailable_count &&
+          preview.preview.can_create && (
+            <label className="flex min-h-11 items-start gap-3">
+              <input
+                type="checkbox"
+                className="mt-1 size-4 accent-primary"
+                disabled={busy || unknown}
+                checked={
+                  acceptedPreview === preview.preview.preview_fingerprint
+                }
+                onChange={(e) =>
+                  setAcceptedPreview(
+                    e.target.checked
+                      ? preview.preview.preview_fingerprint
+                      : null
+                  )
+                }
+              />
+              仅使用可出单选的内容开启新轮，暂不可用内容不纳入新轮学习范围
+            </label>
+          )}
         {preview.preview.reasons.map((r) => (
           <p key={r} className="text-danger">
             {r}

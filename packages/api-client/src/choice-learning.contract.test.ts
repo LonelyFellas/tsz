@@ -36,7 +36,8 @@ it("choice capability is explicit and legacy spelling tasks remain valid", async
   ).toContain("choice_zh_to_en");
   expect(http.get).toHaveBeenCalledWith("/me/learning-capabilities", {
     headers: {
-      "X-TSZ-Learning-Capabilities": "choice-v1,mastery-v1,wordlist-spelling-v1"
+      "X-TSZ-Learning-Capabilities":
+        "choice-v1,mastery-v1,wordlist-spelling-v1,strict-choice-v1"
     }
   });
   const task = {
@@ -57,6 +58,22 @@ it("choice capability is explicit and legacy spelling tasks remain valid", async
       question_type: "choice_zh_to_en"
     }).valid
   ).toBe(true);
+});
+
+it("negotiates strict choice separately from the legacy question type", () => {
+  expect(
+    validateRuntimeSchema("LearningCapabilities", {
+      question_types: ["spelling_zh_to_en", "choice_zh_to_en"],
+      choice_policies: ["strict_tiered_v1"]
+    }).valid
+  ).toBe(true);
+  expect(
+    validateRuntimeSchema("LearningCapabilities", {
+      question_types: ["spelling_zh_to_en"],
+      choice_policies: ["strict_tiered_v1"],
+      correct_option_id: "not-public"
+    }).valid
+  ).toBe(false);
 });
 
 it("unanswered choice options contain only opaque IDs and spelling; source and answer metadata are rejected", () => {
