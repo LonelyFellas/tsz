@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DictionaryEntry } from "@tsz/types";
 import { Dictionary } from "./Dictionary";
 import { writeHistory } from "./history";
@@ -33,6 +33,13 @@ function wrapper({ children }: { children: React.ReactNode }) {
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }
 beforeEach(() => {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      disconnect() {}
+    }
+  );
   vi.clearAllMocks();
   localStorage.clear();
   me.mockResolvedValue({
@@ -40,6 +47,7 @@ beforeEach(() => {
   });
   search.mockResolvedValue(response("apple"));
 });
+afterEach(() => vi.unstubAllGlobals());
 describe("词典页面", () => {
   it("搜索结果中的粗体释义使用释义用途，语法结构保持正文用途", async () => {
     const bold = (text: string) => ({

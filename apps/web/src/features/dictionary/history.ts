@@ -1,4 +1,4 @@
-const LIMIT = 20;
+const LIMIT = 10;
 const key = (userId: string) => `tsz:dictionary:history:${userId}`;
 export function normalizeTerm(term: string) {
   return term.normalize("NFKC").trim().replace(/\s+/g, " ");
