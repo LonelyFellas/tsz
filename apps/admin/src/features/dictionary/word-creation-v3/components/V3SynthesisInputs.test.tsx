@@ -1,5 +1,11 @@
 import { App, ConfigProvider } from "antd";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within
+} from "@testing-library/react";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -265,13 +271,23 @@ describe("双口音真实试听控件", () => {
       fireEvent.change(input, {
         target: { value: alphabet === "ipa" ? "fɑːɹ" : "F AA R" }
       });
-      fireEvent.click(await screen.findByRole("button", { name: /^修改 / }));
-      const generate = await screen.findByText("生成正式音频");
-      await waitFor(() => expect(generate.closest("button")).toBeEnabled());
+      const editor = input.closest('[role="dialog"]') as HTMLElement;
+      const editVoice = await within(editor).findByLabelText("修改 自然");
+      await waitFor(() => expect(editVoice).toBeEnabled());
+      fireEvent.click(editVoice);
+      const detail = (await screen.findByLabelText("当前音色语速")).closest(
+        '[role="dialog"]'
+      ) as HTMLElement;
+      const generate = within(detail).getByRole("button", {
+        name: "生成正式音频"
+      });
+      await waitFor(() => expect(generate).toBeEnabled());
       fireEvent.click(generate);
-      await screen.findByRole("button", { name: "播放正式音频" });
-      fireEvent.click(screen.getByRole("button", { name: "保存配音设置" }));
-      fireEvent.click(screen.getByLabelText(`完成${label}设置`));
+      await within(detail).findByRole("button", { name: "播放正式音频" });
+      fireEvent.click(
+        within(detail).getByRole("button", { name: "保存配音设置" })
+      );
+      fireEvent.click(within(editor).getByLabelText(`完成${label}设置`));
       const saved = JSON.parse(
         screen.getByTestId("pronunciation-wire").textContent!
       );
