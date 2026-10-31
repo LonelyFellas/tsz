@@ -595,17 +595,18 @@ describe("当前词条关联与离开保护", () => {
     fireEvent.click(screen.getByLabelText("关联单词"));
     fireEvent.mouseDown(screen.getByLabelText("关联 make（2）"), { button: 0 });
     await screen.findByText("旧关联尚未选择具体词义，请补全或清除。");
+    const picker = await screen.findByRole("group", { name: "关联单词：make" });
     fireEvent.click(
-      await screen.findByText("make", {
+      await within(picker).findByText("make", {
         selector: ".v3-component-usage-entry strong"
       })
     );
     fireEvent.click(
-      await screen.findByText(/原形 make/, {}, { timeout: 5000 })
+      await within(picker).findByText(/原形 make/, {}, { timeout: 5000 })
     );
-    fireEvent.click(await screen.findByText("编造（故事、借口等）"));
-    fireEvent.click(screen.getByRole("button", { name: "确认关联" }));
-    const done = screen.getByRole("button", { name: "保存例句正文修改" });
+    fireEvent.click(await within(picker).findByText("编造（故事、借口等）"));
+    fireEvent.click(within(picker).getByRole("button", { name: "确认关联" }));
+    const done = screen.getByLabelText("保存例句正文修改");
     await waitFor(() => expect(done).toBeEnabled());
     fireEvent.click(done);
     await waitFor(() => expect(api.sentences.update).toHaveBeenCalledOnce());

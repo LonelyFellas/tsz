@@ -2,6 +2,7 @@ import { useState } from "react";
 import { PronunciationPreviewProvider } from "../dictionary/word-creation/PronunciationPreview";
 import { sentenceWord, sentenceTarget, sentenceCandidate } from "./fixtures";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -46,8 +47,41 @@ vi.mock("@/lib/auth", () => ({
   }
 }));
 vi.mock("../dictionary/voice-editor/dataSource", () => ({
-  loadAdminVoiceRecommendations: async () => [],
-  adminVoicePreviewAdapter: { listVoices: async () => [], synthesize: vi.fn() },
+  loadAdminVoiceRecommendations: async () => [
+    {
+      id: "33333333-3333-4333-8333-333333333331",
+      name: "英式",
+      groupName: "例句",
+      locale: "en-GB",
+      setting: { voice_id: "sonia", enabled: true, rate_percent: -25 }
+    },
+    {
+      id: "33333333-3333-4333-8333-333333333332",
+      name: "美式",
+      groupName: "例句",
+      locale: "en-US",
+      setting: { voice_id: "jenny", enabled: true, rate_percent: -20 }
+    }
+  ],
+  adminVoicePreviewAdapter: {
+    listVoices: async () => [
+      {
+        id: "sonia",
+        label: "Sonia",
+        locale: "en-GB",
+        gender: "female",
+        styles: []
+      },
+      {
+        id: "jenny",
+        label: "Jenny",
+        locale: "en-US",
+        gender: "female",
+        styles: []
+      }
+    ],
+    synthesize: vi.fn()
+  },
   adminAudioUploadAdapter: undefined,
   voicePreviewIsMock: false
 }));
@@ -329,7 +363,7 @@ describe("按词条关联反查共享多维例句", () => {
     expect(inputs).toHaveLength(3);
     fireEvent.change(inputs[1]!, { target: { value: " \n\t " } });
     fireEvent.change(inputs[2]!, { target: { value: "新增高阶译文。" } });
-    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    fireEvent.click(screen.getByLabelText("保存例句正文修改"));
     await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
     const saved = vi.mocked(api.sentences.update).mock.calls[0]![1].content
       .sentence;
@@ -407,7 +441,7 @@ describe("按词条关联反查共享多维例句", () => {
       await screen.findByLabelText("标注工具栏");
       await screen.findByText("已关联当前词义：make up · 编造（故事、借口等）");
       const input = screen.getByLabelText("例句正文");
-      const save = screen.getByLabelText("完成例句编辑");
+      const save = screen.getByLabelText("保存例句正文修改");
       fireEvent.change(input, { target: { value: typo } });
       expect(input).toHaveValue(text);
       fireEvent.click(
@@ -452,7 +486,7 @@ describe("按词条关联反查共享多维例句", () => {
     fireEvent.click(screen.getByLabelText("关联单词"));
     fireEvent.mouseDown(screen.getByLabelText("关联 make（2）"), { button: 0 });
     await screen.findByText("已关联：具体词义");
-    expect(screen.getByLabelText("完成例句编辑")).toBeDisabled();
+    expect(screen.getByLabelText("保存例句正文修改")).toBeDisabled();
     fireEvent.click(
       within(screen.getByText("已关联：具体词义").parentElement!).getByRole(
         "button",
@@ -460,8 +494,8 @@ describe("按词条关联反查共享多维例句", () => {
       )
     );
     expect(screen.queryByText("已关联：具体词义")).toBeNull();
-    expect(screen.getByLabelText("完成例句编辑")).toBeEnabled();
-    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    expect(screen.getByLabelText("保存例句正文修改")).toBeEnabled();
+    fireEvent.click(screen.getByLabelText("保存例句正文修改"));
     await waitFor(() => expect(api.sentences.update).toHaveBeenCalledOnce());
     expect(
       vi.mocked(api.sentences.update).mock.calls[0]![1].content.annotations
@@ -474,15 +508,20 @@ describe("按词条关联反查共享多维例句", () => {
       .mockImplementationOnce(async (input) => shared(input.content));
     show(<SentenceEditor onClose={vi.fn()} onSaved={onSaved} />);
     await screen.findByLabelText("标注工具栏");
-    const save = screen.getByLabelText("完成例句编辑");
+    const save = screen.getByLabelText("保存例句正文修改");
     expect(save).toBeDisabled();
-    fireEvent.change(screen.getByLabelText("例句正文"), {
-      target: { value: "We make up stories." }
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("例句正文"), {
+        target: { value: "We make up stories." }
+      });
+      expect(save).toBeDisabled();
+      fireEvent.change(
+        screen.getAllByPlaceholderText("请输入对应的中文译文")[0]!,
+        { target: { value: "我们编故事。" } }
+      );
     });
-    expect(save).toBeDisabled();
-    fireEvent.change(
-      screen.getAllByPlaceholderText("请输入对应的中文译文")[0]!,
-      { target: { value: "我们编故事。" } }
+    await waitFor(() =>
+      expect(screen.getByLabelText("选用 Sonia")).toBeChecked()
     );
     expect(save).toBeEnabled();
     fireEvent.click(save);
@@ -528,13 +567,13 @@ describe("按词条关联反查共享多维例句", () => {
       screen.getAllByPlaceholderText("请输入对应的中文译文")[0]!,
       { target: { value: "我们编故事。" } }
     );
-    expect(screen.getByLabelText("完成例句编辑")).toBeDisabled();
+    expect(screen.getByLabelText("保存例句正文修改")).toBeDisabled();
     fireEvent.click(await screen.findByText(/确认关联 make up/));
     await screen.findByText("已关联当前词义：make up · 编造（故事、借口等）");
-    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    fireEvent.click(screen.getByLabelText("保存例句正文修改"));
     await screen.findByText("网络暂时不可用");
     expect(text).toHaveValue("We make up stories.");
-    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    fireEvent.click(screen.getByLabelText("保存例句正文修改"));
     await screen.findByText("We make up stories.");
     const [first, retry] = vi.mocked(api.sentences.create).mock.calls;
     expect(first![0]).toEqual(retry![0]);
@@ -603,10 +642,12 @@ describe("按词条关联反查共享多维例句", () => {
         within(phrasePicker).getByRole("button", { name: "确认关联" })
       ).toBeEnabled()
     );
-    fireEvent.click(
-      within(phrasePicker).getByRole("button", { name: "确认关联" })
-    );
-    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    await act(async () => {
+      fireEvent.click(
+        within(phrasePicker).getByRole("button", { name: "确认关联" })
+      );
+    });
+    fireEvent.click(screen.getByLabelText("保存例句正文修改"));
     await waitFor(() => expect(api.sentences.create).toHaveBeenCalledOnce());
     const annotations = vi.mocked(api.sentences.create).mock.calls[0]![0]
       .content.annotations;

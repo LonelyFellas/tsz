@@ -1131,3 +1131,6 @@ admin-2 最终首轮结果与补验：该分片另有 IPA／UPS 两条本批改�
 - 窄修复验证：字段与例句 2 文件 97 项通过；合法 example 配置下重新运行例句与完整页面 2 文件 95 项通过（例句 25、页面 70，含原 68 项与默认编辑器 2 项）。默认页面新 fixture 严格 runtime 解码最初拒绝缺少 spelling_speech.content 的不完整数据，补齐合法 fixture 后实际保存与失败重试均可完成；未放宽 schema。最终测试补充 shared 形状守卫和正文配置快照断言，随后再跑该两项定向验证。生产修复两文件哈希未改变。
 
 - 第 2 轮对精确 `02b70a6343e41dc56623c5692cfb47eeb8cf0fc4` 增量复查已关闭原产品 P2，无新生产阻断。收尾采纳非阻断的测试真实性建议：默认页面局部池补齐 version_id／version_name／locale 三元组，例句推荐改用稳定合法 UUID，并断言捕获后保留完整三元组；不改变生产代码。最终 fixture 精确提交再由同一 reviewer 确认，审查／CI／合并终态见本批关联 PR 和脱敏交付回执，不把本节提交时的阶段状态当成最终远端结果。
+
+- 前端首个精确 PR run `41200353277`（head `6af30d92fb4ab463cfd9e2faacb6b5b8410d4e39`）失败已读日志：admin-1 为 SentenceCreation 仍查找旧「完成例句编辑」导致 7 例失败，其余 708 通过；admin-3 仅既有例句旧关联补义项用例超过原 5000ms，其余 792 通过。admin-2／packages／web／quality 通过，未盲目重跑或放宽时限。修正两个例句测试文件：使用新正文保存入口、合法英美目录／推荐 fixture，异步 act 等待实际加载／选择提交完成，旧关联定位收窄至当前选择器并保留全部身份／片段／请求断言；原时限不变。两文件 coverage／单 worker 37 项全部通过，无生产代码变更，随后对精确增量补独立复查。
+- 后端 [PR #363](https://github.com/LonelyFellas/tsz-rust/pull/363) 的精确 run `41199577279` attempt 1 success（12 success、两项 PR 发行任务按设计 skip），已合并为 `8c772b8e85516735d4644a06a484f4a47946797f`；merge API 返回进行中后已用 PR read 和 fetch 独立确认，源树与被审提交一致。main run `41200918260` attempt 1 尚在运行，发行验收不提前计通过。前端 [PR #632](https://github.com/LonelyFellas/tsz/pull/632) 保持打开，待新的精确 CI 全绿再合并。
