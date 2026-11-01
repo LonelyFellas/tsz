@@ -70,7 +70,7 @@ export function assistantFieldTarget(
   return {
     step,
     node_id: nodeId,
-    field: match[3]!,
+    field: match[3] === "spelling_rich" ? "spelling" : match[3]!,
     pos_id: posId,
     form_id: formId,
     form_group_id: groupId,

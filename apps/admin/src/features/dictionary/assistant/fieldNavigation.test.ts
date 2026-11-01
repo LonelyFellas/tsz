@@ -13,6 +13,13 @@ it("从本地草稿解析字段路径并保留词性与词形身份", () => {
   expect(result?.pos_id).toBe(forms.pos[0]!.pos_id);
   expect(result?.form_id).toBe(forms.pos[0]!.forms[0]!.id);
   expect(result?.field).toBe("spelling");
+  expect(
+    assistantFieldTarget(
+      "forms.pos[0].forms[0].regional_variants.common.spelling_rich",
+      forms,
+      { sense_groups: [], pos: [] }
+    )?.field
+  ).toBe("spelling");
   expect(result?.variant_id).toBe(
     forms.pos[0]!.forms[0]!.regional_variants.mode === "common"
       ? forms.pos[0]!.forms[0]!.regional_variants.common.id

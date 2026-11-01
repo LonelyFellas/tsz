@@ -328,7 +328,12 @@ function Ledger({ adminId }: { adminId: string }) {
             <Form.Item name="purpose" label="用途">
               <Select
                 allowClear
-                placeholder="全部用途"
+                disabled={data?.purpose_filter_supported !== true}
+                placeholder={
+                  data?.purpose_filter_supported === true
+                    ? "全部用途"
+                    : "当前服务不支持用途筛选"
+                }
                 style={{ width: 140 }}
                 options={Object.entries(callPurposeLabels).map(
                   ([value, label]) => ({ value, label })

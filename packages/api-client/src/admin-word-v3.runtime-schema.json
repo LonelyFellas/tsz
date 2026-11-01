@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/lexicon-assistant-p1/docs/openapi.json",
-  "_source_sha256": "0e973ef8589c40bc14ce51f0df0a178ad7af6e5d6b67cadbf9605b962a33ce78",
+  "_source_sha256": "9c3f786d17e7985ac4eb8ad3bbbd94581acb739b06c055ba8fc397a2b3e5c539",
   "roots": [
     "LexiconAssistantCapability",
     "LexiconAssistantResponse",
@@ -664,6 +664,7 @@
         },
         "page": { "type": "integer", "minimum": 0 },
         "page_size": { "type": "integer", "minimum": 0 },
+        "purpose_filter_supported": { "type": ["boolean", "null"] },
         "summary": { "$ref": "#/$defs/AiLedgerSummary" },
         "total": { "type": "integer", "minimum": 0 }
       },

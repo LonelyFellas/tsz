@@ -38,6 +38,7 @@ export interface AiLedgerPage {
   page: number;
   page_size: number;
   summary: AiLedgerSummary;
+  purpose_filter_supported?: boolean;
 }
 export interface AiLedgerQuery {
   page?: number;
